@@ -18,7 +18,7 @@ import ChipsField from "../nodes-configuration/fields/chips-field"
 import KeyValueField from "../nodes-configuration/fields/key-value-field"
 import SortByField from "../nodes-configuration/fields/sort-by-field"
 import SwitchRulesField from "../nodes-configuration/fields/switch-rules-field"
-import { SEM_SUGESTAO, sugestaoParaNo } from "../utils/colunas-conhecidas"
+import { NO_SUGGESTION, sugestaoParaNo } from "../utils/colunas-conhecidas"
 import { saidasDoNo } from "../utils/node-ports"
 import { useKnownColumnsStore } from "@/app/stores/knownColumnsStore"
 import WFSHelper from "../nodes-configuration/wfs-helper"
@@ -143,17 +143,17 @@ const NodeConfigForm = ({
   // dialog open. And there is nothing to gain: the run button sits behind the
   // overlay, so no run is fired from here; what matters is the state at the
   // moment the dialog opened.
-  const colunasSugeridas = useMemo(() => {
-    if (!nodeFound?.id) return SEM_SUGESTAO
+  const suggestedColumns = useMemo(() => {
+    if (!nodeFound?.id) return NO_SUGGESTION
     return sugestaoParaNo(edges, useKnownColumnsStore.getState().porNo, nodeFound.id)
     // `edges` is included because rewiring the node changes where the columns come from.
   }, [edges, nodeFound?.id])
 
   /** Columns to offer in this field, according to the side it declares. */
-  function sugerirColunas(field: INodesPropertyAPI): string[] {
+  function suggestColumns(field: INodesPropertyAPI): string[] {
     const de = field.suggest_columns
     if (!de) return []
-    return de === "*" ? colunasSugeridas.todas : (colunasSugeridas.porPorta[de] ?? [])
+    return de === "*" ? suggestedColumns.todas : (suggestedColumns.porPorta[de] ?? [])
   }
 
   const hasUnsaved = JSON.stringify(nodeFound?.data.properties) !== JSON.stringify(values)
@@ -200,9 +200,9 @@ const NodeConfigForm = ({
           nodeId={nodeFound?.id}
           campos={nodeFound?.data?.fields}
           conexoesDeEntrada={conexoesDeEntrada}
-          sugestoesDeColunas={colunasSugeridas.todas}
-          sugestoesDesatualizadas={colunasSugeridas.desatualizadas}
-          sugestoesParciais={colunasSugeridas.parciais}
+          sugestoesDeColunas={suggestedColumns.todas}
+          sugestoesDesatualizadas={suggestedColumns.desatualizadas}
+          sugestoesParciais={suggestedColumns.parciais}
         />
       </div>
     )
@@ -250,7 +250,7 @@ const NodeConfigForm = ({
 
         // Fields by type
         switch (field.type) {
-          case "string":  return <StringField key={key} {...fieldProps} nodeFound={nodeFound} sugestoes={sugerirColunas(field)} sugestoesDesatualizadas={colunasSugeridas.desatualizadas} sugestoesParciais={colunasSugeridas.parciais} />
+          case "string":  return <StringField key={key} {...fieldProps} nodeFound={nodeFound} sugestoes={suggestColumns(field)} sugestoesDesatualizadas={suggestedColumns.desatualizadas} sugestoesParciais={suggestedColumns.parciais} />
           case "number":  return <NumericField key={key} {...fieldProps} variant="number" />
           case "integer": return <NumericField key={key} {...fieldProps} variant="integer" />
           case "boolean": return <BooleanField key={key} {...fieldProps} />
@@ -260,7 +260,7 @@ const NodeConfigForm = ({
           case "artifact": return <ArtifactField key={key} {...fieldProps} />
           case "select":  return <SelectField key={key} {...fieldProps} />
           case "ports":   return <PortsField key={key} {...fieldProps} conexoesDeEntrada={conexoesDeEntrada} />
-          case "chips":   return <ChipsField key={key} {...fieldProps} sugestoes={sugerirColunas(field)} sugestoesDesatualizadas={colunasSugeridas.desatualizadas} sugestoesParciais={colunasSugeridas.parciais} />
+          case "chips":   return <ChipsField key={key} {...fieldProps} sugestoes={suggestColumns(field)} sugestoesDesatualizadas={suggestedColumns.desatualizadas} sugestoesParciais={suggestedColumns.parciais} />
           case "keyvalue": return <KeyValueField key={key} {...fieldProps} />
           case "object":
             // Dedicated editors instead of raw JSON — same dispatch by
@@ -268,9 +268,9 @@ const NodeConfigForm = ({
             // write the SAME list that execute reads, so saved workflows open
             // here and the ones made here run on an old executor.
             if (nodeName === "Sort" && field.name === "sort_by")
-              return <SortByField key={key} {...fieldProps} sugestoes={sugerirColunas(field)} sugestoesDesatualizadas={colunasSugeridas.desatualizadas} sugestoesParciais={colunasSugeridas.parciais} />
+              return <SortByField key={key} {...fieldProps} sugestoes={suggestColumns(field)} sugestoesDesatualizadas={suggestedColumns.desatualizadas} sugestoesParciais={suggestedColumns.parciais} />
             if (nodeName === "Switch" && field.name === "rules")
-              return <SwitchRulesField key={key} {...fieldProps} sugestoes={sugerirColunas(field)} sugestoesDesatualizadas={colunasSugeridas.desatualizadas} sugestoesParciais={colunasSugeridas.parciais} />
+              return <SwitchRulesField key={key} {...fieldProps} sugestoes={suggestColumns(field)} sugestoesDesatualizadas={suggestedColumns.desatualizadas} sugestoesParciais={suggestedColumns.parciais} />
             return field.name === "payload_schema"
               ? <PayloadSchemaEditor key={key} {...fieldProps} />
               : <ObjectField key={key} {...fieldProps} />

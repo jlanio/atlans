@@ -16,7 +16,7 @@ beforeEach(() => {
 const fc = (features: unknown[] = []) => ({ type: "FeatureCollection", features })
 
 /** A response with a chunked body, like the real browser's. */
-function respostaEmPedacos(texto: string, pedaco = 64) {
+function chunkedResponse(texto: string, pedaco = 64) {
   const bytes = new TextEncoder().encode(texto)
   let i = 0
   return {
@@ -132,7 +132,7 @@ describe("useCamadas.adicionar", () => {
     })
     // 26 MB body, above the per-layer ceiling.
     const gigante = JSON.stringify({ type: "FeatureCollection", features: [], lixo: "x".repeat(26 * 1024 * 1024) })
-    ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(respostaEmPedacos(gigante, 1024 * 1024))
+    ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(chunkedResponse(gigante, 1024 * 1024))
 
     const { result } = renderHook(() => useCamadas([]))
     await act(async () => { await result.current.adicionar("b1") })
@@ -168,11 +168,11 @@ describe("useCamadas.adicionar", () => {
     const { result } = renderHook(() => useCamadas([]))
     await act(async () => { await result.current.adicionar("d1") })
     await act(async () => { await result.current.adicionar("d2") })
-    const cor1 = result.current.camadas[0].color
+    const color1 = result.current.camadas[0].color
     await act(async () => { await result.current.adicionar("d1") })
 
     expect(result.current.camadas.map((c) => c.id)).toEqual(["art:d1", "art:d2"])
-    expect(result.current.camadas[0].color).toBe(cor1)
+    expect(result.current.camadas[0].color).toBe(color1)
   })
 
   it("uma tentativa que falha não queima cor da paleta", async () => {
@@ -185,13 +185,13 @@ describe("useCamadas.adicionar", () => {
 
     const { result: sozinho } = renderHook(() => useCamadas([]))
     await act(async () => { await sozinho.current.adicionar("boa") })
-    const primeiraCor = sozinho.current.camadas[0].color
+    const firstColor = sozinho.current.camadas[0].color
 
     const { result } = renderHook(() => useCamadas([]))
     await act(async () => { await result.current.adicionar("ruim") })
     await act(async () => { await result.current.adicionar("boa") })
 
-    expect(result.current.camadas[0].color).toBe(primeiraCor)
+    expect(result.current.camadas[0].color).toBe(firstColor)
   })
 
   it("trocar de escopo (outra conversa) limpa camadas, e a camada volta ao reabrir o chat", async () => {
@@ -265,23 +265,23 @@ describe("useCamadas.adicionar", () => {
         portas.push(() => resolve({ ok: true, headers: { get: () => null }, json: async () => fc() }))
       }),
     )
-    const respirar = () => new Promise((r) => setTimeout(r, 0))
+    const nextTick = () => new Promise((r) => setTimeout(r, 0))
 
     const { result, rerender } = renderHook(
       ({ conversa }: { conversa: string }) => useCamadas([], conversa),
       { initialProps: { conversa: "A" } },
     )
     let antiga!: Promise<void>
-    await act(async () => { antiga = result.current.adicionar("x1"); await respirar() })
+    await act(async () => { antiga = result.current.adicionar("x1"); await nextTick() })
 
     rerender({ conversa: "B" })
     let nova!: Promise<void>
-    await act(async () => { nova = result.current.adicionar("x1"); await respirar() })
+    await act(async () => { nova = result.current.adicionar("x1"); await nextTick() })
     expect(fetch).toHaveBeenCalledTimes(2)
 
     // The old one only finishes now, already outside its scope: if it erases the new one's
     // mark, the same artifact is downloaded a third time.
-    await act(async () => { portas[0](); await antiga; await respirar() })
+    await act(async () => { portas[0](); await antiga; await nextTick() })
     await act(async () => { await result.current.adicionar("x1") })
     expect(fetch).toHaveBeenCalledTimes(2)
 
@@ -318,7 +318,7 @@ describe("useCamadas.adicionar", () => {
     // ~12 MB per body: fits within the per-layer ceiling (25 MB) for the first two, but
     // not within the ~10 MB left for the 3rd after the two reservations.
     const corpo = JSON.stringify({ type: "FeatureCollection", features: [], lixo: "x".repeat(12 * 1024 * 1024) })
-    ;(fetch as unknown as ReturnType<typeof vi.fn>).mockImplementation(async () => respostaEmPedacos(corpo, 1024 * 1024))
+    ;(fetch as unknown as ReturnType<typeof vi.fn>).mockImplementation(async () => chunkedResponse(corpo, 1024 * 1024))
 
     const { result } = renderHook(() => useCamadas([]))
     await act(async () => {

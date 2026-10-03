@@ -37,7 +37,7 @@ def artefatos(tmp_path, monkeypatch):
 
 # ── Escrita ──────────────────────────────────────────────────────────────────
 
-def test_save_artifact_local_grava_no_disco(artefatos):
+def test_save_artifact_local_writes_to_disk(artefatos):
     chave, meta = artifact_helpers.save_artifact_local(
         content=b'{"tipo":"teste"}', filename="saida.geojson",
         workspace_id="ws-1", task_id="run-9", label="Saida", fmt="geojson", features=3,
@@ -52,7 +52,7 @@ def test_save_artifact_local_grava_no_disco(artefatos):
     assert meta["features"] == 3
 
 
-def test_save_artifact_local_nao_faz_nenhuma_chamada_http(artefatos, monkeypatch):
+def test_save_artifact_local_makes_no_http_call(artefatos, monkeypatch):
     """The central test of the policy: not a single byte may leave the machine."""
     import httpx
 
@@ -68,23 +68,23 @@ def test_save_artifact_local_nao_faz_nenhuma_chamada_http(artefatos, monkeypatch
     )
 
 
-def test_save_artifact_local_nao_tem_fallback_para_upload(artefatos, monkeypatch):
+def test_save_artifact_local_has_no_upload_fallback(artefatos, monkeypatch):
     """If the local write fails, the exception PROPAGATES.
 
     Falling back to the upload would send to the cloud exactly the data that was
     marked not to leave — the opposite of what the failure should cause.
     """
-    def sem_escrita(*a, **k):
+    def no_write(*a, **k):
         raise OSError("disco cheio")
 
-    monkeypatch.setattr(artifact_helpers, "_write_local", sem_escrita)
+    monkeypatch.setattr(artifact_helpers, "_write_local", no_write)
     with pytest.raises(OSError):
         artifact_helpers.save_artifact_local(
             content=b"x", filename="a.json", workspace_id="ws-1", task_id="run-1",
         )
 
 
-def test_local_nao_e_confundido_com_fallback_de_falha(artefatos):
+def test_local_is_not_confused_with_failure_fallback(artefatos):
     """`local_fallback` means "the upload broke"; `content_location` means
     "it was decided that it stays here". Mixing the two would turn a network
     outage into silent compliance in the server's records."""
@@ -98,7 +98,7 @@ def test_local_nao_e_confundido_com_fallback_de_falha(artefatos):
 
 # ── Leitura ──────────────────────────────────────────────────────────────────
 
-def _resposta_local(local_path: str, dono: str = "exec-1") -> dict:
+def _local_response(local_path: str, dono: str = "exec-1") -> dict:
     return {
         "content_location": "executor",
         "executor_id": dono,
@@ -108,7 +108,7 @@ def _resposta_local(local_path: str, dono: str = "exec-1") -> dict:
     }
 
 
-def test_resolver_local_devolve_copia_e_NAO_apaga_o_original(artefatos):
+def test_resolve_local_returns_copy_and_does_NOT_delete_the_original(artefatos):
     """The `os.unlink` pitfall.
 
     The caller (`read_drive_file_as`) deletes the returned path. If we resolved
@@ -134,7 +134,7 @@ def test_resolver_local_devolve_copia_e_NAO_apaga_o_original(artefatos):
         Path(temp).unlink(missing_ok=True)
 
 
-def test_artefato_de_outro_executor_da_erro_nomeado(artefatos):
+def test_artifact_from_another_executor_gives_named_error(artefatos):
     """It must not be a raw FileNotFoundError: the operator needs to know that the
     file is on ANOTHER machine, and not go looking for a lost file."""
     with pytest.raises(FileNotFoundError) as exc:
@@ -151,20 +151,20 @@ def test_artefato_de_outro_executor_da_erro_nomeado(artefatos):
     "ws-1/../../../windows/system32/config/sam",
     "ws-1/run-9/../../../../segredo.txt",
 ])
-def test_path_traversal_no_local_path_e_barrado(artefatos, malicioso):
+def test_path_traversal_in_local_path_is_blocked(artefatos, malicioso):
     """`local_path` arrives over the network. The server derives it, but relying on
     that would be outsourcing our own security."""
     with pytest.raises(PermissionError):
         drive_resolver._copy_local_to_temp(malicioso, "exec-1", "", "x")
 
 
-def test_local_path_vazio_da_mensagem_util(artefatos):
+def test_empty_local_path_gives_useful_message(artefatos):
     with pytest.raises(FileNotFoundError) as exc:
         drive_resolver._copy_local_to_temp("", "exec-1", "", "saida.geojson")
     assert "caminho" in str(exc.value).lower()
 
 
-def test_raiz_dos_artefatos_e_a_mesma_na_escrita_e_na_leitura(artefatos):
+def test_artifacts_root_is_the_same_for_write_and_read(artefatos):
     """Writing and reading must agree on where the files live; if they diverge,
     every local artifact becomes 'not found'."""
     artifact_helpers.save_artifact_local(

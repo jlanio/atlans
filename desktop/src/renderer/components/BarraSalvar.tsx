@@ -35,8 +35,8 @@ export function BarraSalvar({
   aoSalvar: () => Promise<void> | void
   aoDescartar: () => void
 }) {
-  const [ocupado, setOcupado] = useState(false)
-  const [reiniciado, setReiniciado] = useState(false)
+  const [ocupado, setBusy] = useState(false)
+  const [reiniciado, setRestarted] = useState(false)
   // Runs in progress — the drain waits for them. Comes from the context, not
   // from a prop: that way the 1 Hz snapshot tick re-renders this bar, and not
   // the whole settings screens that contain it.
@@ -45,16 +45,16 @@ export function BarraSalvar({
   if (!mudou && !salvo) return null
 
   async function reiniciar() {
-    setOcupado(true)
+    setBusy(true)
     try {
       // A single channel: the main process does `stop()` and then `start()`, in
       // that order. Here it is no longer possible to sequence with two
       // invokes — `parar` returns right away, and the following `iniciar`
       // would arrive with the old process still draining.
       await window.atlas.reiniciar()
-      setReiniciado(true)
+      setRestarted(true)
     } finally {
-      setOcupado(false)
+      setBusy(false)
     }
   }
 
@@ -62,7 +62,7 @@ export function BarraSalvar({
     <div className="sticky bottom-0 -mx-6 -mb-16 flex flex-wrap items-center gap-3 border-t bg-background/95 px-6 py-3 backdrop-blur">
       {mudou ? (
         <>
-          <Button disabled={invalido || ocupado} onClick={() => { setReiniciado(false); void aoSalvar() }}>
+          <Button disabled={invalido || ocupado} onClick={() => { setRestarted(false); void aoSalvar() }}>
             Salvar alterações
           </Button>
           <Button variant="ghost" disabled={ocupado} onClick={aoDescartar}>Descartar</Button>

@@ -6,7 +6,7 @@ from mcp.server.mcpserver import Context
 from mcp_types import ToolAnnotations
 
 from app.mcp import guia, infra
-from app.mcp.catalogo import descrever, indice_compacto, tipos_do_catalogo
+from app.mcp.catalogo import descrever, compact_index, catalog_types
 from app.mcp.erros import erro
 from app.mcp.escopo import escopo_da_chamada, exigir_escopo
 from app.mcp.tools.base import ferramenta
@@ -15,10 +15,10 @@ from app.services.node_service import NodeService
 # The prefix of the equivalent resource. The tool and the resource deliver the
 # SAME text; returning the URI along with it saves the integrator from having to
 # build it on their own.
-URI_DO_GUIA = "atlans://guide/authoring/{topic}"
+GUIDE_URI = "atlans://guide/authoring/{topic}"
 
 
-async def _definicoes():
+async def _definitions():
     """The current node catalog — already without the nodes disabled by the platform."""
     async with infra.sessao() as db:
         return await NodeService().list_nodes(db)
@@ -38,24 +38,24 @@ async def search_nodes(
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
 
-    definicoes = await _definicoes()
-    itens = indice_compacto(definicoes, query=query, tipo=type)
+    definitions = await _definitions()
+    itens = compact_index(definitions, query=query, tipo=type)
     return {
         "items": itens,
         "total": len(itens),
-        "types": tipos_do_catalogo(definicoes),
+        "types": catalog_types(definitions),
     }
 
 
 # The ceiling of sheets per call. It protects the conversation's context (the
 # full sheet is large) without pushing the model back to the one-round-per-node
 # pattern.
-TETO_DE_FICHAS = 8
+SHEETS_CEILING = 8
 
 
-def _achar(definicoes, pedido: str):
+def _find(definitions, pedido: str):
     """The SAME resolution as the old path: name or alias, in catalog order."""
-    for d in definicoes:
+    for d in definitions:
         if d.name == pedido or (d.alias and d.alias == pedido):
             return d
     return None
@@ -84,44 +84,44 @@ async def describe_node(ctx: Context, name: str | list[str], brief: bool = True)
                 "A lista de `name` veio vazia.",
                 "informe ao menos um nome de nó",
             )
-        ignorados = pedidos[TETO_DE_FICHAS:]
-        pedidos = pedidos[:TETO_DE_FICHAS]
+        ignorados = pedidos[SHEETS_CEILING:]
+        pedidos = pedidos[:SHEETS_CEILING]
 
-        definicoes = await _definicoes()
+        definitions = await _definitions()
         fichas: list[dict] = []
         # An unknown name does NOT bring down the batch: the sheets found come
         # back and `not_found` names the ones that were missing — the model
         # fixes only what it got wrong, without paying another round for the
         # ones it got right. A disabled node answers the same as a nonexistent
         # one, as on the single-name path.
-        nao_achados: list[str] = []
+        not_found: list[str] = []
         # Dedupe also by RESOLUTION: a name and an alias of the same node in
         # the list would return the same sheet twice — the context spending
         # this ceiling exists to avoid.
-        descritos: set[str] = set()
+        described: set[str] = set()
         for pedido in pedidos:
-            d = _achar(definicoes, pedido)
+            d = _find(definitions, pedido)
             if d is None:
-                nao_achados.append(pedido)
-            elif d.name not in descritos:
-                descritos.add(d.name)
+                not_found.append(pedido)
+            elif d.name not in described:
+                described.add(d.name)
                 fichas.append(descrever(d, brief=brief))
         saida: dict = {"nodes": fichas, "total": len(fichas)}
         dicas: list[str] = []
-        if nao_achados:
-            saida["not_found"] = nao_achados
+        if not_found:
+            saida["not_found"] = not_found
             dicas.append("use search_nodes para conferir os nomes em not_found")
         if ignorados:
             saida["skipped"] = ignorados
             dicas.append(
-                f"o teto é {TETO_DE_FICHAS} nomes por chamada; peça os de skipped na próxima"
+                f"o teto é {SHEETS_CEILING} nomes por chamada; peça os de skipped na próxima"
             )
         if dicas:
             saida["hint"] = "; ".join(dicas)
         return saida
 
-    procurado = str(name).strip()
-    d = _achar(await _definicoes(), procurado)
+    wanted = str(name).strip()
+    d = _find(await _definitions(), wanted)
     if d is not None:
         return descrever(d, brief=brief)
 
@@ -130,7 +130,7 @@ async def describe_node(ctx: Context, name: str | list[str], brief: bool = True)
     # platform has to answer the same as a nonexistent node.
     raise erro(
         "not_found",
-        f"Nenhum nó chamado '{procurado}' está disponível.",
+        f"Nenhum nó chamado '{wanted}' está disponível.",
         "use search_nodes para ver os nós disponíveis",
     )
 
@@ -153,7 +153,7 @@ async def get_authoring_guide(ctx: Context, topic: str) -> dict:
             "not_found",
             str(exc),
             "escolha um dos tópicos disponíveis em topics",
-            topics=list(guia.TOPICOS),
+            topics=list(guia.TOPICS),
         ) from exc
     except OSError as exc:
         # The topic exists in the list but the file could not be read: that is a
@@ -168,12 +168,12 @@ async def get_authoring_guide(ctx: Context, topic: str) -> dict:
     return {
         "topic": pedido,
         "markdown": markdown,
-        "resource_uri": URI_DO_GUIA.replace("{topic}", pedido),
-        "topics": list(guia.TOPICOS),
+        "resource_uri": GUIDE_URI.replace("{topic}", pedido),
+        "topics": list(guia.TOPICS),
     }
 
 
-_SOMENTE_LEITURA = ToolAnnotations(
+_READ_ONLY = ToolAnnotations(
     read_only_hint=True,
     destructive_hint=False,
     idempotent_hint=True,
@@ -191,7 +191,7 @@ def registrar(server) -> None:
             "linha de descrição e se o nó exige credencial. Filtre por texto (`query`, "
             "sobre nome, apelido e descrição) e por `type`."
         ),
-        annotations=_SOMENTE_LEITURA,
+        annotations=_READ_ONLY,
     )(search_nodes)
 
     server.tool(
@@ -204,7 +204,7 @@ def registrar(server) -> None:
             "completa. Use os nomes exatamente como aparecem aqui — propriedade não "
             "declarada falha na validação."
         ),
-        annotations=_SOMENTE_LEITURA,
+        annotations=_READ_ONLY,
     )(describe_node)
 
     server.tool(
@@ -216,5 +216,5 @@ def registrar(server) -> None:
             "de montar uma definição nova; `sources` diz como achar uma fonte externa sem "
             "adivinhar url/typeName."
         ),
-        annotations=_SOMENTE_LEITURA,
+        annotations=_READ_ONLY,
     )(get_authoring_guide)

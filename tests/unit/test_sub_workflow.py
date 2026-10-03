@@ -164,7 +164,7 @@ class TestTimeout:
         assert elapsed < 3.0, f"Timeout demorou demais: {elapsed:.2f}s"
 
     @pytest.mark.asyncio
-    async def test_timeout_de_um_no_do_filho_nao_vira_timeout_do_sub_fluxo(self):
+    async def test_child_node_timeout_does_not_become_sub_workflow_timeout(self):
         """The child's PythonScript raises the built-in TimeoutError when the
         script exceeds ITS OWN deadline. From 3.11 on it is the same
         `asyncio.TimeoutError`, and the error became "excedeu o timeout de 300s,

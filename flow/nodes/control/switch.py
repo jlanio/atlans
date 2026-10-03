@@ -146,12 +146,12 @@ class Switch(BaseNode):
         # vanished from the dict and an edge from_key='output_N' to it didn't resolve —
         # under the old resolver it crossed in data from ANOTHER bucket (F5). With the
         # empty bucket present, the edge resolves to an empty container, which is correct.
-        todas_saidas = {fallback}
+        all_outputs = {fallback}
         for rule in rules:
             saida = rule.get("output")
             if saida:
-                todas_saidas.add(saida)
-        todas_saidas |= set(buckets.keys())
+                all_outputs.add(saida)
+        all_outputs |= set(buckets.keys())
 
         if is_gdf:
             import pandas as pd
@@ -166,9 +166,9 @@ class Switch(BaseNode):
                     pd.DataFrame.from_records(rows), geometry=geo_col_name, crs=data.crs
                 )
 
-            result = {key: _to_gdf(buckets.get(key, [])) for key in todas_saidas}
+            result = {key: _to_gdf(buckets.get(key, [])) for key in all_outputs}
         else:
-            result = {key: buckets.get(key, []) for key in todas_saidas}
+            result = {key: buckets.get(key, []) for key in all_outputs}
 
         logger.info(
             "Switch: %d registros distribuídos em %d saídas (%d com dados).",

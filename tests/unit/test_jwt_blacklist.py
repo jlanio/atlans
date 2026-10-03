@@ -9,7 +9,7 @@ from app.core.utils.jwt_utils import is_token_blacklisted
 
 
 @pytest.mark.asyncio
-async def test_token_nao_blacklisted_retorna_false():
+async def test_token_not_blacklisted_returns_false():
     """Caminho feliz: Redis OK e chave ausente → False."""
     mock_redis = MagicMock()
     mock_redis.exists = AsyncMock(return_value=0)
@@ -21,7 +21,7 @@ async def test_token_nao_blacklisted_retorna_false():
 
 
 @pytest.mark.asyncio
-async def test_token_blacklisted_retorna_true():
+async def test_token_blacklisted_returns_true():
     """Caminho feliz: Redis OK e chave presente → True."""
     mock_redis = MagicMock()
     mock_redis.exists = AsyncMock(return_value=1)
@@ -33,7 +33,7 @@ async def test_token_blacklisted_retorna_true():
 
 
 @pytest.mark.asyncio
-async def test_redis_indisponivel_levanta_503():
+async def test_redis_unavailable_raises_503():
     """Fail-closed: Redis down → HTTPException 503.
 
     Before the fix, the function silently returned False (fail-OPEN), which
@@ -52,7 +52,7 @@ async def test_redis_indisponivel_levanta_503():
 
 
 @pytest.mark.asyncio
-async def test_redis_timeout_tambem_levanta_503():
+async def test_redis_timeout_also_raises_503():
     """TimeoutError must also fail closed (it is not a special case)."""
     mock_redis = MagicMock()
     mock_redis.exists = AsyncMock(side_effect=TimeoutError("op timed out"))

@@ -6,20 +6,20 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/app/components/ui/dropdown-menu"
 import { Skeleton } from "@/app/components/ui/skeleton"
-import { formatarInteiro, plural } from "@/lib/formatos"
+import { formatInteger, plural } from "@/lib/formatos"
 
-export interface ContagensDoCabecalho {
+export interface HeaderCounts {
   workflows: number
   grupos: number
   ativos: number
   agendados: number
-  /** With a published and accessible portal (`temPortal`). */
+  /** With a published and accessible portal (`hasPortal`). */
   portal: number
 }
 
 interface Props {
   /** Of the whole list; null on the first load (the subtitle becomes a skeleton). */
-  contagens: ContagensDoCabecalho | null
+  contagens: HeaderCounts | null
   /** Reload in progress: the button spins and is locked. */
   atualizando: boolean
   canEdit: boolean
@@ -33,7 +33,7 @@ interface Props {
  * zero parts disappear — "0 agendados" helps nobody —, with no groups the
  * "em N grupos" goes away, and the singular applies to each number.
  */
-export function textoDoSubtitulo(c: ContagensDoCabecalho): string {
+export function textoDoSubtitulo(c: HeaderCounts): string {
   if (c.workflows === 0) {
     return c.grupos > 0 ? `Nenhum workflow · ${plural(c.grupos, "grupo")}` : "Nenhum workflow ainda"
   }
@@ -44,7 +44,7 @@ export function textoDoSubtitulo(c: ContagensDoCabecalho): string {
   ]
   if (c.ativos > 0) partes.push(plural(c.ativos, "ativo"))
   if (c.agendados > 0) partes.push(plural(c.agendados, "agendado"))
-  if (c.portal > 0) partes.push(`${formatarInteiro(c.portal)} com portal`)
+  if (c.portal > 0) partes.push(`${formatInteger(c.portal)} com portal`)
   return partes.join(" · ")
 }
 

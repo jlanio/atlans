@@ -17,7 +17,7 @@ from flow.utils.geo_helpers import safe_httpx_request
 # ── O boundary: safe_httpx_request ───────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_ip_interno_e_recusado():
+async def test_internal_ip_is_rejected():
     """A host that resolves to metadata/internal must not go out."""
     with patch("flow.utils.geo_helpers.socket.getaddrinfo",
                return_value=[(None, None, None, None, ("169.254.169.254", 0))]):
@@ -26,7 +26,7 @@ async def test_ip_interno_e_recusado():
 
 
 @pytest.mark.asyncio
-async def test_conecta_no_ip_fixado_nao_no_hostname():
+async def test_connects_to_the_pinned_ip_not_the_hostname():
     """The central defense: the request goes out to the IP resolved at validation,
     not to the hostname (which DNS could re-resolve to an internal target)."""
     captured = {}
@@ -51,7 +51,7 @@ async def test_conecta_no_ip_fixado_nao_no_hostname():
 
 
 @pytest.mark.asyncio
-async def test_params_dict_preservado():
+async def test_params_dict_preserved():
     """http_request uses a params dict — the new passthrough must not lose it."""
     captured = {}
 
@@ -72,7 +72,7 @@ async def test_params_dict_preservado():
 # ── Delegation: the nodes use the safe path, not raw httpx ───────────────────
 
 @pytest.mark.asyncio
-async def test_http_request_node_delega_para_safe_httpx():
+async def test_http_request_node_delegates_to_safe_httpx():
     from flow.nodes.action.http_request import HttpRequestNode
 
     node = HttpRequestNode("n1", {"url": "http://example.com", "method": "GET"})
@@ -91,7 +91,7 @@ async def test_http_request_node_delega_para_safe_httpx():
 
 
 @pytest.mark.asyncio
-async def test_send_webhook_node_delega_para_safe_httpx():
+async def test_send_webhook_node_delegates_to_safe_httpx():
     from flow.nodes.outputs.send_webhook import SendWebhookNode
 
     node = SendWebhookNode("n1", {"url": "http://hook.example.com", "method": "POST"})

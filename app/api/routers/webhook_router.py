@@ -43,7 +43,7 @@ _MAX_WEBHOOK_BODY = 10 * 1024 * 1024  # 10 MB
 # (flow/nodes/outputs/response_node.py) PLUS the types only body_ref produces.
 # It cannot be stricter than the node: downgrading a type the UI offers
 # would silently break existing workflows, with a warning only in the server log.
-_CONTENT_TYPES_PERMITIDOS = {
+_ALLOWED_CONTENT_TYPES = {
     "application/json",
     "application/xml",
     "application/geo+json",
@@ -69,7 +69,7 @@ _CONTENT_TYPES_PERMITIDOS = {
 # and runs inline `<script>` in an XML with the XHTML namespace (and SVG is XML). Since
 # these types are in the node's allowlist and the response goes out on the API ORIGIN
 # (default CSP with `unsafe-inline`), they ALSO need the `sandbox` CSP.
-_CONTENT_TYPES_RENDERIZAVEIS = {
+_RENDERABLE_CONTENT_TYPES = {
     "text/html", "application/xml", "text/xml", "application/xhtml+xml",
     "image/svg+xml",
 }
@@ -77,7 +77,7 @@ _CONTENT_TYPES_RENDERIZAVEIS = {
 # Headers the workflow can NOT set: the security ones (which the middleware
 # applies), those that pin identity in the browser, and those Starlette itself
 # computes. Content-Type is left out because it comes from `content_type`, already validated.
-_HEADERS_BLOQUEADOS = frozenset({
+_BLOCKED_HEADERS = frozenset({
     "content-security-policy", "content-security-policy-report-only",
     "x-frame-options", "x-content-type-options", "strict-transport-security",
     "referrer-policy", "permissions-policy", "x-xss-protection",
@@ -86,7 +86,7 @@ _HEADERS_BLOQUEADOS = frozenset({
 })
 
 
-def _sanear_resposta_do_node(resp: dict, request: Request) -> tuple[str, dict]:
+def _sanitize_node_response(resp: dict, request: Request) -> tuple[str, dict]:
     """Returns safe (content_type, headers) from what the ResponseNode asked for.
 
     A type outside the allowlist becomes `text/plain`: the content still reaches the
@@ -98,7 +98,7 @@ def _sanear_resposta_do_node(resp: dict, request: Request) -> tuple[str, dict]:
     """
     content_type = str(resp.get("content_type") or "application/json")
     base = content_type.split(";")[0].strip().lower()
-    if base not in _CONTENT_TYPES_PERMITIDOS:
+    if base not in _ALLOWED_CONTENT_TYPES:
         logger.warning(
             "[webhook] content_type '%s' fora da allowlist — rebaixado para text/plain.",
             content_type,
@@ -106,7 +106,7 @@ def _sanear_resposta_do_node(resp: dict, request: Request) -> tuple[str, dict]:
         content_type = "text/plain; charset=utf-8"
         base = "text/plain"
 
-    if base in _CONTENT_TYPES_RENDERIZAVEIS:
+    if base in _RENDERABLE_CONTENT_TYPES:
         request.state.corpo_nao_confiavel = True
 
     # `headers` comes from the executor's JSON and the node exposes it as a free field of type
@@ -120,7 +120,7 @@ def _sanear_resposta_do_node(resp: dict, request: Request) -> tuple[str, dict]:
 
     headers = {
         str(k): str(v) for k, v in brutos.items()
-        if str(k).lower() not in _HEADERS_BLOQUEADOS
+        if str(k).lower() not in _BLOCKED_HEADERS
     }
     headers["Content-Type"] = content_type
     return content_type, headers
@@ -296,7 +296,7 @@ async def webhook_trigger(
     # 6) Builds the HTTP response from the ResponseNode's data
     resp = payload.get("response") or {}
     http_status  = resp.get("status_code", 200)
-    _content_type, extra_headers = _sanear_resposta_do_node(resp, request)
+    _content_type, extra_headers = _sanitize_node_response(resp, request)
 
     # 6a) Body stored in MinIO (large body, avoids HoL on the executor→server WS):
     # streams directly from MinIO to the caller and schedules immediate removal.
@@ -319,12 +319,12 @@ async def webhook_trigger(
         # (response_node.py). Without it, a `body_ref` pointing to
         # `drive/{ws}/…` or `artifacts/{ws}/…` of the SAME workspace would make the
         # webhook serve and then DELETE that object.
-        prefixo_ok = isinstance(s3_key, str) and s3_key.startswith(
+        prefix_ok = isinstance(s3_key, str) and s3_key.startswith(
             f"webhook-responses/{wf.workspace_id}/"
         )
         try:
             _validate_agent_s3_key(s3_key, [wf.workspace_id])
-            if not prefixo_ok:
+            if not prefix_ok:
                 raise HTTPException(status_code=403, detail="body_ref fora de webhook-responses/")
         except HTTPException as exc:
             logger.error(

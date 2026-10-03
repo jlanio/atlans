@@ -36,7 +36,7 @@ def _expected_area(radius_m, quad_segs=8):
 # ── Geographic layer (EPSG:4326) ──────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_metros_em_camada_geografica_reprojeta_e_volta():
+async def test_meters_on_geographic_layer_reprojects_and_back():
     gdf = _pt(LON, LAT, "EPSG:4326")
     node = BufferNode("n", {"distance": 100, "distanceUnit": "meters"})
     out = (await node.execute({"input": gdf}))["output"]
@@ -46,7 +46,7 @@ async def test_metros_em_camada_geografica_reprojeta_e_volta():
 
 
 @pytest.mark.asyncio
-async def test_graus_em_camada_geografica_nao_reprojeta():
+async def test_degrees_on_geographic_layer_does_not_reproject():
     gdf = _pt(LON, LAT, "EPSG:4326")
     node = BufferNode("n", {"distance": 1, "distanceUnit": "degrees"})
     out = (await node.execute({"input": gdf}))["output"]
@@ -59,10 +59,10 @@ async def test_graus_em_camada_geografica_nao_reprojeta():
     assert maxy == pytest.approx(LAT + 1, abs=0.01)
 
 
-# ── Camada projetada em metros (EPSG:32723) ───────────────────────────────────
+# ── Camada projected em metros (EPSG:32723) ───────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_metros_em_camada_metrica_nao_reprojeta():
+async def test_meters_on_metric_layer_does_not_reproject():
     gdf = _pt(UTM_X, UTM_Y, "EPSG:32723")
     node = BufferNode("n", {"distance": 100, "distanceUnit": "meters"})
     out = (await node.execute({"input": gdf}))["output"]
@@ -73,7 +73,7 @@ async def test_metros_em_camada_metrica_nao_reprojeta():
 
 
 @pytest.mark.asyncio
-async def test_graus_em_camada_metrica_volta_ao_crs_de_entrada():
+async def test_degrees_on_metric_layer_returns_to_input_crs():
     gdf = _pt(UTM_X, UTM_Y, "EPSG:32723")
     node = BufferNode("n", {"distance": 0.001, "distanceUnit": "degrees"})
     out = (await node.execute({"input": gdf}))["output"]
@@ -86,7 +86,7 @@ async def test_graus_em_camada_metrica_volta_ao_crs_de_entrada():
 # ── Validation ────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_unidade_invalida_da_erro():
+async def test_invalid_unit_errors():
     gdf = _pt(LON, LAT, "EPSG:4326")
     node = BufferNode("n", {"distance": 100, "distanceUnit": "leguas"})
     with pytest.raises(ValueError, match="distanceUnit"):
@@ -94,7 +94,7 @@ async def test_unidade_invalida_da_erro():
 
 
 @pytest.mark.asyncio
-async def test_camada_sem_crs_continua_dando_erro():
+async def test_layer_without_crs_still_errors():
     gdf = gpd.GeoDataFrame({"id": [0]}, geometry=[Point(LON, LAT)])
     node = BufferNode("n", {"distance": 100, "distanceUnit": "meters"})
     with pytest.raises(ValueError, match="CRS"):

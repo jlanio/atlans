@@ -1,5 +1,5 @@
 import { NodesDrawerState, useWorkflowCatalogStore } from "@/app/stores/workflowCatalogStore"
-import { descricaoDoTipo, estiloDoTipo, nomeDoTipo } from "@/consts/NodeTypeStyles"
+import { typeDescription, typeStyle, typeName } from "@/consts/NodeTypeStyles"
 import { cn } from "@/lib/utils"
 import IconDrawer from "./components/icon-drawer"
 
@@ -20,7 +20,7 @@ const OptionsDrawer = () => {
   return (
     <div className="p-3 grid grid-cols-2 gap-2">
       {uniqueType.map((type) => {
-        const estilo = estiloDoTipo(type)
+        const estilo = typeStyle(type)
         const count = nodesAPI.filter(n => n.type === type).length
 
         return (
@@ -42,13 +42,13 @@ const OptionsDrawer = () => {
             </div>
             <div className="flex flex-col gap-0.5 w-full">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-semibold text-foreground truncate">{nomeDoTipo(type)}</span>
+                <span className="text-sm font-semibold text-foreground truncate">{typeName(type)}</span>
                 <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground shrink-0 tabular-nums">
                   {count}
                 </span>
               </div>
               <span className="text-[11px] text-muted-foreground leading-tight">
-                {descricaoDoTipo(type)}
+                {typeDescription(type)}
               </span>
             </div>
           </button>

@@ -12,15 +12,15 @@
 import { TbAlertTriangle, TbCheck, TbLoader2 } from "react-icons/tb"
 
 import { cn } from "@/lib/utils"
-import type { BlocoDoAssistente } from "@/app/components/home/assistente/quadros"
-import { detalheDaChamada, rotuloDaFerramenta } from "@/app/components/home/assistente/rotulos"
-import { useIdiomaDaTela } from "../i18n"
+import type { AssistantBlock } from "@/app/components/home/assistente/quadros"
+import { callDetail, toolLabel } from "@/app/components/home/assistente/rotulos"
+import { useScreenLanguage } from "../i18n"
 
-type BlocoDeFerramenta = Extract<BlocoDoAssistente, { tipo: "ferramenta" }>
+type ToolBlock = Extract<AssistantBlock, { tipo: "ferramenta" }>
 
-export default function Passo({ bloco }: { bloco: BlocoDeFerramenta }) {
-  const idioma = useIdiomaDaTela()
-  const detalhe = detalheDaChamada(bloco.argumentos)
+export default function Step({ bloco }: { bloco: ToolBlock }) {
+  const idioma = useScreenLanguage()
+  const detalhe = callDetail(bloco.argumentos)
   const { progresso } = bloco
 
   return (
@@ -41,7 +41,7 @@ export default function Passo({ bloco }: { bloco: BlocoDeFerramenta }) {
 
       <span className="min-w-0 flex-1">
         <span className={cn("font-medium", bloco.estado === "erro" ? "text-destructive" : "text-foreground")}>
-          {rotuloDaFerramenta(bloco.nome, idioma)}
+          {toolLabel(bloco.nome, idioma)}
         </span>
         {detalhe && <span className="text-muted-foreground"> · {detalhe}</span>}
 

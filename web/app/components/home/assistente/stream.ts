@@ -16,33 +16,33 @@
 // Decoding the frames and applying them to the turn belongs to `quadros.ts`, pure.
 import type { Dispatch, SetStateAction } from "react"
 
-import type { IAssistenteEstado } from "@/service/types"
+import type { IAssistantState } from "@/service/types"
 import {
   aplicarQuadro,
   cotaDoQuadro,
   criarDecodificador,
-  type QuadroSSE,
-  type TurnoDoAssistente,
+  type SSEFrame,
+  type AssistantTurn,
 } from "./quadros"
 
 /** The error of a turn the network cut: the `fetch` rejected or the stream broke. */
-export const SEM_CONEXAO = {
+export const NO_CONNECTION = {
   code: "sem_conexao",
   message: "A conversa foi interrompida.",
   hint: "confira a conexão e tente de novo",
 }
 
 let sequencia = 0
-/** Turn id — render key and target of `aplicarNoTurno`. Unique within the tab. */
-export const proximoIdDeTurno = () => `t${++sequencia}`
+/** Turn id — render key and target of `applyToTurn`. Unique within the tab. */
+export const nextTurnId = () => `t${++sequencia}`
 
 /** Applies a frame to turn `id`, without touching the others. */
-export function aplicarNoTurno(
-  setTurnos: Dispatch<SetStateAction<TurnoDoAssistente[]>>,
+export function applyToTurn(
+  setTurns: Dispatch<SetStateAction<AssistantTurn[]>>,
   id: string,
-  quadro: QuadroSSE,
+  quadro: SSEFrame,
 ): void {
-  setTurnos((anteriores) => anteriores.map((t) => (t.id === id ? aplicarQuadro(t, quadro) : t)))
+  setTurns((anteriores) => anteriores.map((t) => (t.id === id ? aplicarQuadro(t, quadro) : t)))
 }
 
 /**
@@ -52,13 +52,13 @@ export function aplicarNoTurno(
  * at the end of the turn is what updates it. Returns whether the frame was a
  * quota frame (and has already been handled).
  */
-export function aplicarCota(
-  setEstado: Dispatch<SetStateAction<IAssistenteEstado | null>>,
-  quadro: QuadroSSE,
+export function applyQuota(
+  setAppState: Dispatch<SetStateAction<IAssistantState | null>>,
+  quadro: SSEFrame,
 ): boolean {
   const cota = cotaDoQuadro(quadro)
   if (!cota) return false
-  setEstado((atual) => atual
+  setAppState((atual) => atual
     ? { ...atual, cota: { gasto: cota.gasto, teto: cota.teto, reabre_em_segundos: atual.cota?.reabre_em_segundos ?? null } }
     : atual)
   return true
@@ -73,7 +73,7 @@ export function aplicarCota(
  */
 export async function lerQuadrosSSE(
   corpo: ReadableStream<Uint8Array>,
-  tratar: (quadro: QuadroSSE) => void,
+  tratar: (quadro: SSEFrame) => void,
 ): Promise<void> {
   const leitor = corpo.getReader()
   const decodificar = criarDecodificador()
@@ -102,7 +102,7 @@ export async function lerQuadrosSSE(
 }
 
 /** The code and the sentence for each status the route rejects BEFORE becoming a stream. */
-export type ErrosDaRota = Record<number, { code: string; message: string }>
+export type RouteErrors = Record<number, { code: string; message: string }>
 
 /**
  * The API error body when the response did not even become a stream.
@@ -117,7 +117,7 @@ export type ErrosDaRota = Record<number, { code: string; message: string }>
  * quota; the editor's 409 is the conversation in progress on the workflow, the
  * Home's is the confirmation that expired.
  */
-export async function erroDaResposta(resposta: Response, padroes: ErrosDaRota): Promise<Record<string, unknown>> {
+export async function erroDaResposta(resposta: Response, padroes: RouteErrors): Promise<Record<string, unknown>> {
   const padrao = padroes[resposta.status] ?? { code: "erro_http", message: `A API respondeu ${resposta.status}.` }
   try {
     const corpo = await resposta.json()

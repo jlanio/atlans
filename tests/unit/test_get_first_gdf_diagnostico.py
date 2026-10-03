@@ -34,12 +34,12 @@ def _gdf(vazio: bool = False) -> gpd.GeoDataFrame:
     return gpd.GeoDataFrame({"geometry": [Point(0, 0)]}, geometry="geometry", crs="EPSG:4326")
 
 
-def test_retorna_o_primeiro_gdf_nao_vazio():
+def test_returns_the_first_non_empty_gdf():
     alvo = _gdf()
     assert _Node().get_first_gdf({"metadata": {"a": 1}, "output": alvo}) is alvo
 
 
-def test_erro_lista_chaves_e_tipos_recebidos():
+def test_error_lists_received_keys_and_types():
     """O caso do CSV: DataInput entrega DataFrame + metadata, PostGIS quer GDF."""
     with pytest.raises(ValueError) as exc:
         _Node().get_first_gdf({"output": pd.DataFrame({"a": [1]}), "metadata": {"x": 1}})
@@ -49,7 +49,7 @@ def test_erro_lista_chaves_e_tipos_recebidos():
     assert "metadata" in msg and "dict" in msg
 
 
-def test_erro_sinaliza_gdf_vazio_em_vez_de_so_dizer_ausente():
+def test_error_flags_empty_gdf_instead_of_just_saying_missing():
     """An empty GeoDataFrame is ignored by the loop — without this clue the user
     would look for a connection error, not a filter that returned nothing."""
     with pytest.raises(ValueError) as exc:
@@ -60,6 +60,6 @@ def test_erro_sinaliza_gdf_vazio_em_vez_de_so_dizer_ausente():
     assert "output" in msg
 
 
-def test_inputs_vazios_nao_quebram_a_mensagem():
+def test_empty_inputs_do_not_break_the_message():
     with pytest.raises(ValueError, match="Nenhum GeoDataFrame"):
         _Node().get_first_gdf({})

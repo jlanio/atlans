@@ -7,14 +7,14 @@ from flow.registry import register_node
 from flow.nodes.base import BaseNode
 from flow.utils.artifact_helpers import (
     EXECUTOR,
-    descrever_localidade,
+    describe_locality,
     persistir_artefato,
-    propriedade_localidade,
-    resolver_localidade,
+    locality_property,
+    resolve_locality,
 )
 from flow.utils.geo_helpers import ensure_gdf_crs, gdf_para_geojson, slugify_label
 from flow.utils.logger import get_logger
-from flow.utils.s3_cliente import cliente_s3
+from flow.utils.s3_cliente import s3_client
 
 logger = get_logger(__name__)
 
@@ -32,7 +32,7 @@ def _upload_to_s3(
     """
     Blocking helper: sends a JSON string to an object in an S3 bucket.
     """
-    s3 = cliente_s3(
+    s3 = s3_client(
         s3_auth,
         region=region,
         access_key_id=aws_access_key_id,
@@ -172,7 +172,7 @@ class SaveToS3Node(BaseNode):
                 # configured explicitly, with its own credential — locality here
                 # is about the platform's storage, not about where the user
                 # decided to send their data.
-                propriedade_localidade(
+                locality_property(
                     visible_when={'field': 'registerArtifact', 'in': [True, 'true']}
                 ),
             ],
@@ -242,7 +242,7 @@ class SaveToS3Node(BaseNode):
         features = len(data)
         logger.info(f"Serializando {features} feicoes para GeoJSON...")
         try:
-            json_str = await asyncio.to_thread(gdf_para_geojson, data, nat_como_nulo=True)
+            json_str = await asyncio.to_thread(gdf_para_geojson, data, nat_as_null=True)
         except Exception as e:
             raise RuntimeError(f"Erro ao serializar GeoDataFrame para GeoJSON: {e}") from e
 
@@ -279,7 +279,7 @@ class SaveToS3Node(BaseNode):
             filename = f"{safe_label}.geojson"
             content = json_str.encode('utf-8')
 
-            localidade, quem = resolver_localidade(self.get_param('localidade', None))
+            localidade, quem = resolve_locality(self.get_param('localidade', None))
             if localidade == EXECUTOR:
                 credential_id = None
             elif s3_auth and not credential_id:
@@ -303,7 +303,7 @@ class SaveToS3Node(BaseNode):
                 features=features,
                 credential_id=credential_id,
             )
-            self.log(descrever_localidade(localidade, quem))
+            self.log(describe_locality(localidade, quem))
             onde = 'neste executor' if localidade == EXECUTOR else 'no MinIO'
             self.log(f"Copia do artefato salva {onde}: {minio_key}")
             output_data['artifact_s3_key'] = minio_key

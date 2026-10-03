@@ -72,7 +72,7 @@ class FileInfo:
         self.size = st.st_size
         self.mtime = st.st_mtime
         # When this stat was taken. It is what makes the (size, mtime) pair a
-        # reliable WITNESS of "unchanged" — see `_testemunho_confiavel`.
+        # reliable WITNESS of "unchanged" — see `_trustworthy_witness`.
         self.stat_at = time.time()
         self._md5: str | None = None
 
@@ -82,7 +82,7 @@ class FileInfo:
             self._md5 = _compute_md5(self.path)
         return self._md5
 
-    def semear_md5(self, valor: str) -> None:
+    def seed_md5(self, valor: str) -> None:
         """Adopts the MD5 the manifest already held for this file.
 
         Only called when (size, mtime) match the manifest — that is, when the
@@ -221,13 +221,13 @@ class DatasetScanner:
             manifest_ds = manifest_datasets[name]
             manifest_files = manifest_ds.get("files", {})
 
-            if not force_hash and _metadados_inalterados(ds, manifest_files):
+            if not force_hash and _metadata_unchanged(ds, manifest_files):
                 continue  # atalho barato: nem abriu o arquivo
 
             # Here the hash is mandatory: (size, mtime) diverged and it is what
             # separates a real edit from a `touch` — without this confirmation,
             # opening the file in QGIS would be enough to re-send everything.
-            current_hashes = _hashes_atuais(ds)
+            current_hashes = _current_hashes(ds)
             if current_hashes is None:
                 continue
             manifest_hashes = {fname: info.get("md5") for fname, info in manifest_files.items()}
@@ -235,17 +235,17 @@ class DatasetScanner:
             if current_hashes != manifest_hashes:
                 modified_datasets.append(name)
             else:
-                _renovar_testemunho(ds, manifest_files)
+                _renew_witness(ds, manifest_files)
 
         return new_datasets, modified_datasets, removed_datasets
 
 
 # Worst mtime granularity seen in the field: FAT32/exFAT on USB sticks and
 # external HDDs record the modification time in 2-second steps.
-_GRANULARIDADE_MTIME_S = 2.0
+_MTIME_GRANULARITY_S = 2.0
 
 
-def _testemunho_confiavel(gravado: dict) -> bool:
+def _trustworthy_witness(gravado: dict) -> bool:
     """Can the recorded (size, mtime) pair WITNESS that the file didn't change?
 
     It can only if, at the moment it was collected, the file's mtime was
@@ -264,7 +264,7 @@ def _testemunho_confiavel(gravado: dict) -> bool:
         into a different bucket and the shortcut is safe again.
 
     An entry without `stat_at` (manifest written before this field) has no
-    way to prove anything: it rehashes once and `_renovar_testemunho`
+    way to prove anything: it rehashes once and `_renew_witness`
     re-anchors it.
     """
     mtime = gravado["mtime"]
@@ -273,10 +273,10 @@ def _testemunho_confiavel(gravado: dict) -> bool:
     stat_at = gravado.get("stat_at")
     if stat_at is None:
         return False
-    return (stat_at - mtime) >= _GRANULARIDADE_MTIME_S
+    return (stat_at - mtime) >= _MTIME_GRANULARITY_S
 
 
-def _metadados_inalterados(ds: Dataset, manifest_files: dict) -> bool:
+def _metadata_unchanged(ds: Dataset, manifest_files: dict) -> bool:
     """Do the (size, mtime) of ALL files match the manifest?
 
     All-or-nothing on purpose: seeding the MD5 of some files and hashing the
@@ -290,22 +290,22 @@ def _metadados_inalterados(ds: Dataset, manifest_files: dict) -> bool:
         gravado = manifest_files[fname]
         if not isinstance(gravado, dict):
             return False
-        md5_gravado = gravado.get("md5")
+        stored_md5 = gravado.get("md5")
         # An old manifest (or an entry written without stat) has nothing to
         # compare with — falls back to the hash.
-        if not md5_gravado or gravado.get("size") is None or gravado.get("mtime") is None:
+        if not stored_md5 or gravado.get("size") is None or gravado.get("mtime") is None:
             return False
         if finfo.size != gravado["size"] or finfo.mtime != gravado["mtime"]:
             return False
-        if not _testemunho_confiavel(gravado):
+        if not _trustworthy_witness(gravado):
             return False
 
     for fname, finfo in ds.files.items():
-        finfo.semear_md5(manifest_files[fname]["md5"])
+        finfo.seed_md5(manifest_files[fname]["md5"])
     return True
 
 
-def _renovar_testemunho(ds: Dataset, manifest_files: dict) -> None:
+def _renew_witness(ds: Dataset, manifest_files: dict) -> None:
     """Re-anchors (size, mtime, stat_at) after the HASH confirms the content
     is the same.
 
@@ -324,7 +324,7 @@ def _renovar_testemunho(ds: Dataset, manifest_files: dict) -> None:
             gravado["stat_at"] = finfo.stat_at
 
 
-def entrada_de_manifesto(path: Path, md5: str) -> dict:
+def manifest_entry(path: Path, md5: str) -> dict:
     """'files' entry for a file that WE just wrote (download).
 
     Goes through `FileInfo` so the witness format (size/mtime/stat_at) has a
@@ -332,11 +332,11 @@ def entrada_de_manifesto(path: Path, md5: str) -> dict:
     was enough to get the dataset rehashed every cycle.
     """
     info = FileInfo(path)
-    info.semear_md5(md5)
+    info.seed_md5(md5)
     return info.to_dict()
 
 
-def _hashes_atuais(ds: Dataset) -> dict[str, str] | None:
+def _current_hashes(ds: Dataset) -> dict[str, str] | None:
     """MD5 of all the dataset's files, or None if any could not be read.
 
     `scan()` already handles the temp file that vanishes between `iterdir` and

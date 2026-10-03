@@ -18,13 +18,13 @@ import type { IExecutor } from "@/service/types"
 // ticks keeps the same reference, so its signature is serialized only once
 // (and not twice — old + new — every 15s cycle as before). The comparison is
 // still over the whole JSON: no displayed field slips through.
-const assinaturaCache = new WeakMap<IExecutor, string>()
+const signatureCache = new WeakMap<IExecutor, string>()
 function assinatura(e: IExecutor): string {
-  let s = assinaturaCache.get(e)
+  let s = signatureCache.get(e)
   if (s === undefined) {
     // Safe: the objects come from JSON.parse of the same response, stable key order.
     s = JSON.stringify(e)
-    assinaturaCache.set(e, s)
+    signatureCache.set(e, s)
   }
   return s
 }
@@ -33,11 +33,11 @@ export function reconciliarExecutores(
   anteriores: IExecutor[],
   recebidos: IExecutor[],
 ): IExecutor[] {
-  const porId = new Map(anteriores.map(e => [e.id_hash, e]))
+  const byId = new Map(anteriores.map(e => [e.id_hash, e]))
   let mudou = recebidos.length !== anteriores.length
 
-  const reconciliados = recebidos.map((novo, i) => {
-    const velho = porId.get(novo.id_hash)
+  const reconciled = recebidos.map((novo, i) => {
+    const velho = byId.get(novo.id_hash)
     if (velho && assinatura(velho) === assinatura(novo)) {
       if (anteriores[i] !== velho) mudou = true  // mesmo conjunto, ordem diferente
       return velho
@@ -46,5 +46,5 @@ export function reconciliarExecutores(
     return novo
   })
 
-  return mudou ? reconciliados : anteriores
+  return mudou ? reconciled : anteriores
 }

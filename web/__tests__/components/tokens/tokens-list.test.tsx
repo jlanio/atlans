@@ -30,37 +30,37 @@ vi.mock("next-auth/react", () => ({
 }))
 
 import { createToast } from "@/utils/createToast"
-import TokensDeAcesso, { diasAteExpirar, textoDeExpiracao, textoDeWorkspaces } from "@/app/components/tokens"
+import AccessTokens, { diasAteExpirar, textoDeExpiracao, textoDeWorkspaces } from "@/app/components/tokens"
 
 const ok = <T,>(data: T) => ({ success: true, status: 200, data })
 const falhou = (message = "boom", status = 500) => ({ success: false, status, error: { name: "AxiosError", message } })
 
 // ── Massa ────────────────────────────────────────────────────────────────────
-const DIA = 86_400_000
-const emDias = (n: number) => new Date(Date.now() + n * DIA).toISOString()
+const DAY_MS = 86_400_000
+const inDays = (n: number) => new Date(Date.now() + n * DAY_MS).toISOString()
 
 // Synthetic secret, in a single place, so detect-secrets doesn't flag the fixture.
-const SEGREDO_FAKE = "atl_teste_0000000000000000000000000000" // pragma: allowlist secret
+const FAKE_SECRET = "atl_teste_0000000000000000000000000000" // pragma: allowlist secret
 
 function token(extra: Partial<ApiToken> & Pick<ApiToken, "id" | "name">): ApiToken {
   return {
     token_prefix: "atl_xxxxxx",
     scopes: ["workflows:read"],
     workspace_ids: null,
-    expires_at: emDias(60),
+    expires_at: inDays(60),
     last_used_at: null,
     revoked_at: null,
-    created_at: emDias(-3),
+    created_at: inDays(-3),
     status: "active",
     ...extra,
   }
 }
 
 const TOKENS: ApiToken[] = [
-  token({ id: "t1", name: "agente de relatórios", token_prefix: "atl_ab12cd", scopes: ["runs:execute", "workflows:read"], last_used_at: emDias(-0.1) }),
-  token({ id: "t2", name: "cursor do fulano", token_prefix: "atl_ef34gh", scopes: ["drive:read"], workspace_ids: ["ws-1", "ws-2"], expires_at: emDias(5), created_at: emDias(-10) }),
-  token({ id: "t3", name: "antigo", token_prefix: "atl_ij56kl", scopes: ["workflows:write"], workspace_ids: ["ws-1"], expires_at: emDias(-2), last_used_at: emDias(-30), created_at: emDias(-100), status: "expired" }),
-  token({ id: "t4", name: "vazado", token_prefix: "atl_mn78op", scopes: ["drive:write"], revoked_at: emDias(-1), created_at: emDias(-20), status: "revoked" }),
+  token({ id: "t1", name: "agente de relatórios", token_prefix: "atl_ab12cd", scopes: ["runs:execute", "workflows:read"], last_used_at: inDays(-0.1) }),
+  token({ id: "t2", name: "cursor do fulano", token_prefix: "atl_ef34gh", scopes: ["drive:read"], workspace_ids: ["ws-1", "ws-2"], expires_at: inDays(5), created_at: inDays(-10) }),
+  token({ id: "t3", name: "antigo", token_prefix: "atl_ij56kl", scopes: ["workflows:write"], workspace_ids: ["ws-1"], expires_at: inDays(-2), last_used_at: inDays(-30), created_at: inDays(-100), status: "expired" }),
+  token({ id: "t4", name: "vazado", token_prefix: "atl_mn78op", scopes: ["drive:write"], revoked_at: inDays(-1), created_at: inDays(-20), status: "revoked" }),
 ]
 
 const WORKSPACES: IWorkspace[] = [
@@ -84,7 +84,7 @@ function linha(nome: string) {
 // ── Testes ───────────────────────────────────────────────────────────────────
 describe("Tokens de acesso — lista", () => {
   it("mostra o skeleton na 1ª carga e depois os cartões com selos traduzidos", async () => {
-    render(<TokensDeAcesso />)
+    render(<AccessTokens />)
     expect(screen.getByRole("heading", { level: 1, name: "Tokens de acesso" })).toBeInTheDocument()
     expect(screen.getByRole("status", { name: /carregando os tokens de acesso/i })).toHaveAttribute("aria-busy", "true")
 
@@ -108,7 +108,7 @@ describe("Tokens de acesso — lista", () => {
   })
 
   it("cada cartão traz prefixo, escopos como chips, workspaces, último uso e criação", async () => {
-    render(<TokensDeAcesso />)
+    render(<AccessTokens />)
     const t1 = await waitFor(() => linha("agente de relatórios"))
     expect(t1).toHaveTextContent("atl_ab12cd…")
     // Chips in canonical order, not in the order the backend sent.
@@ -132,7 +132,7 @@ describe("Tokens de acesso — lista", () => {
 
   it("sem tokens: vazio de primeiro uso com o escopo da tela e o CTA que abre o diálogo", async () => {
     svc.listApiTokens.mockResolvedValue(ok([]))
-    render(<TokensDeAcesso />)
+    render(<AccessTokens />)
     const cta = await screen.findByRole("button", { name: /criar o primeiro token/i })
     expect(screen.getByText("Para agentes e integrações — valem só para o que a sua conta já pode fazer")).toBeInTheDocument()
     expect(screen.getByText(/herda as permissões da sua conta/i)).toBeInTheDocument()
@@ -144,7 +144,7 @@ describe("Tokens de acesso — lista", () => {
 
   it("erro na 1ª carga toma a tela (não o vazio) e «Tentar de novo» recarrega", async () => {
     svc.listApiTokens.mockResolvedValueOnce(falhou("rede caiu")).mockResolvedValueOnce(ok(TOKENS))
-    render(<TokensDeAcesso />)
+    render(<AccessTokens />)
 
     const alerta = await screen.findByRole("alert")
     expect(alerta).toHaveTextContent("Não foi possível carregar os tokens de acesso.")
@@ -158,7 +158,7 @@ describe("Tokens de acesso — lista", () => {
 
   it("recarga que falha sobre lista pronta mantém a lista e avisa por toast", async () => {
     svc.listApiTokens.mockResolvedValueOnce(ok(TOKENS)).mockResolvedValueOnce(falhou("timeout"))
-    render(<TokensDeAcesso />)
+    render(<AccessTokens />)
     await screen.findByText("agente de relatórios")
 
     fireEvent.click(screen.getByRole("button", { name: "Atualizar a lista de tokens" }))
@@ -169,7 +169,7 @@ describe("Tokens de acesso — lista", () => {
 
   it("sessão não autenticada desliga o skeleton sem buscar nada", async () => {
     sessao.status = "unauthenticated"
-    render(<TokensDeAcesso />)
+    render(<AccessTokens />)
     await waitFor(() => expect(screen.queryByRole("status", { name: /carregando/i })).toBeNull())
     expect(svc.listApiTokens).not.toHaveBeenCalled()
   })
@@ -177,8 +177,8 @@ describe("Tokens de acesso — lista", () => {
 
 describe("Tokens de acesso — revogar", () => {
   it("confirma, chama revokeApiToken e a linha vira «Revogado» no lugar", async () => {
-    svc.revokeApiToken.mockResolvedValue(ok({ ...TOKENS[0], status: "revoked", revoked_at: emDias(0) }))
-    render(<TokensDeAcesso />)
+    svc.revokeApiToken.mockResolvedValue(ok({ ...TOKENS[0], status: "revoked", revoked_at: inDays(0) }))
+    render(<AccessTokens />)
     await screen.findByText("agente de relatórios")
 
     fireEvent.click(screen.getByRole("button", { name: "Revogar o token agente de relatórios" }))
@@ -199,7 +199,7 @@ describe("Tokens de acesso — revogar", () => {
 
   it("falha na revogação avisa e não mexe na lista", async () => {
     svc.revokeApiToken.mockResolvedValue(falhou("sem permissão", 403))
-    render(<TokensDeAcesso />)
+    render(<AccessTokens />)
     await screen.findByText("agente de relatórios")
 
     fireEvent.click(screen.getByRole("button", { name: "Revogar o token agente de relatórios" }))
@@ -217,9 +217,9 @@ describe("Tokens de acesso — revogar", () => {
 
 describe("Tokens de acesso — criar pelo cabeçalho", () => {
   it("o token novo entra no topo da lista e o segredo aparece só no diálogo", async () => {
-    const criado: ApiTokenCreated = { ...token({ id: "t9", name: "agente novo", token_prefix: "atl_novo00", created_at: emDias(0) }), token: SEGREDO_FAKE }
+    const criado: ApiTokenCreated = { ...token({ id: "t9", name: "agente novo", token_prefix: "atl_novo00", created_at: inDays(0) }), token: FAKE_SECRET }
     svc.createApiToken.mockResolvedValue(ok(criado))
-    render(<TokensDeAcesso />)
+    render(<AccessTokens />)
     await screen.findByText("agente de relatórios")
 
     fireEvent.click(screen.getByRole("button", { name: "Novo token" }))
@@ -234,14 +234,14 @@ describe("Tokens de acesso — criar pelo cabeçalho", () => {
       workspace_ids: ["ws-1", "ws-2"],
       expires_in_days: 90,
     }))
-    expect(await within(dialogo).findByLabelText("Segredo do token")).toHaveTextContent(SEGREDO_FAKE)
+    expect(await within(dialogo).findByLabelText("Segredo do token")).toHaveTextContent(FAKE_SECRET)
 
     // Behind the dialog the list already has the new token — at the top, and without the secret.
     const linhas = document.querySelectorAll("li[data-token-status]")
     expect(linhas).toHaveLength(5)
     expect(linhas[0]).toHaveTextContent("agente novo")
     expect(linhas[0]).toHaveTextContent("atl_novo00…")
-    expect(linhas[0]).not.toHaveTextContent(SEGREDO_FAKE)
+    expect(linhas[0]).not.toHaveTextContent(FAKE_SECRET)
 
     fireEvent.click(within(dialogo).getByRole("button", { name: "Concluir" }))
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())

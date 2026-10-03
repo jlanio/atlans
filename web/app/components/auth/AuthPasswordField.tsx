@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
 import { TbAlertCircle, TbEye, TbEyeOff } from "react-icons/tb";
-import { useTextos } from "@/app/components/home/i18n";
+import { useTexts } from "@/app/components/home/i18n";
 
 /* Standardized password field (login, sign-up, reset): show/hide + Caps Lock
    warning. Before, only login had both; sign-up and reset used a raw
@@ -39,7 +39,7 @@ export function AuthPasswordField({
   labelRight,
   children,
 }: AuthPasswordFieldProps) {
-  const t = useTextos().entrada.auth;
+  const t = useTexts().entrada.auth;
   const [show, setShow] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
 
@@ -47,7 +47,7 @@ export function AuthPasswordField({
   // query the key, only `getModifierState` during a keyboard event. It lives in
   // the password field because that is where the involuntary uppercase does not
   // show on screen — the failure the user cannot diagnose alone.
-  function sincronizarCapsLock(e: React.KeyboardEvent<HTMLInputElement>) {
+  function syncCapsLock(e: React.KeyboardEvent<HTMLInputElement>) {
     setCapsLock(e.getModifierState?.("CapsLock") ?? false);
   }
 
@@ -71,8 +71,8 @@ export function AuthPasswordField({
           disabled={disabled}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onKeyUp={sincronizarCapsLock}
-          onKeyDown={sincronizarCapsLock}
+          onKeyUp={syncCapsLock}
+          onKeyDown={syncCapsLock}
           onBlur={() => setCapsLock(false)}
           className="auth-input h-11 pr-11 text-sm"
         />

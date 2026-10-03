@@ -1,7 +1,7 @@
-import TokensDeAcesso from "@/app/components/tokens"
+import AccessTokens from "@/app/components/tokens"
 
 const TokensPage = () => {
-  return <TokensDeAcesso />
+  return <AccessTokens />
 }
 
 export default TokensPage

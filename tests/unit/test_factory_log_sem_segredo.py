@@ -8,11 +8,11 @@ password sat in plain text in the log file and in any collector it was shipped t
 import logging
 
 
-from flow.factory import NodeFactory, _sem_segredos
+from flow.factory import NodeFactory, _without_secrets
 
 
-def test_valores_sensiveis_viram_marcador():
-    limpo = _sem_segredos({
+def test_sensitive_values_become_placeholder():
+    limpo = _without_secrets({
         "url": "https://api.exemplo.com/x",
         "http_auth": {"type": "http_bearer", "token": "SEGREDO"},
         # A fake value, shaped like the real one on purpose: that shape is what
@@ -27,11 +27,11 @@ def test_valores_sensiveis_viram_marcador():
     assert limpo["method"] == "GET"
 
 
-def test_comparacao_de_nome_ignora_caixa():
-    assert _sem_segredos({"Token": "abc", "PASSWORD": "x"}) == {"Token": "***", "PASSWORD": "***"}
+def test_name_comparison_ignores_case():
+    assert _without_secrets({"Token": "abc", "PASSWORD": "x"}) == {"Token": "***", "PASSWORD": "***"}
 
 
-def test_o_segredo_nao_aparece_no_log_da_fabrica(caplog):
+def test_the_secret_does_not_appear_in_the_factory_log(caplog):
     fabrica = NodeFactory()
     node_def = {
         "id": "n1",

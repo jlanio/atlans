@@ -126,34 +126,34 @@ def sample_agent():
 
 class TestSafePinnedOutputs:
 
-    def test_none_retorna_dict_vazio(self):
+    def test_none_returns_empty_dict(self):
         assert _safe_pinned_outputs(None) == {}
 
-    def test_vazio_retorna_dict_vazio(self):
+    def test_empty_returns_empty_dict(self):
         assert _safe_pinned_outputs({}) == {}
 
-    def test_com_pin_s3_key_preserva(self):
+    def test_with_pin_s3_key_preserves(self):
         """A node with __pin_s3_key__ and pin_metadata should be preserved intact."""
         raw = {"n1": {"__pin_s3_key__": "s3://bucket/key"}}
         meta = {"n1": {"pinned_at": "2026-01-01"}}
         result = _safe_pinned_outputs(raw, meta)
         assert result == {"n1": {"__pin_s3_key__": "s3://bucket/key"}}
 
-    def test_dict_vazio_com_metadata_preservado(self):
+    def test_empty_dict_with_metadata_preserved(self):
         """A node with an empty dict and pin_metadata should be preserved (awaiting auto-pin)."""
         raw = {"n1": {}}
         meta = {"n1": {"pinned_at": "2026-01-01"}}
         result = _safe_pinned_outputs(raw, meta)
         assert result == {"n1": {}}
 
-    def test_dados_brutos_com_metadata_retorna_dict_vazio(self):
+    def test_raw_data_with_metadata_returns_empty_dict(self):
         """Raw data with metadata should be replaced with {} for auto-pin."""
         raw = {"n1": {"column_a": [1, 2, 3], "column_b": ["x", "y"]}}
         meta = {"n1": {"pinned_at": "2026-01-01"}}
         result = _safe_pinned_outputs(raw, meta)
         assert result == {"n1": {}}
 
-    def test_sem_metadata_ignora_entrada(self):
+    def test_without_metadata_ignores_entry(self):
         """Nodes in pinned_outputs without matching pin_metadata should be ignored."""
         raw = {"n1": {"__pin_s3_key__": "s3://key"}, "n2": {}}
         meta = {"n1": {"pinned_at": "2026-01-01"}}
@@ -161,7 +161,7 @@ class TestSafePinnedOutputs:
         assert "n1" in result
         assert "n2" not in result
 
-    def test_metadata_vazia_descarta_toda_orfa(self):
+    def test_empty_metadata_discards_every_orphan(self):
         """Without metadata NO entry gets through — not even the one with `__pin_s3_key__`.
 
         This test used to say the opposite (the name promised discarding and the
@@ -174,18 +174,18 @@ class TestSafePinnedOutputs:
         raw = {"n1": {}, "n2": {"__pin_s3_key__": "s3://key"}}
         assert _safe_pinned_outputs(raw, {}) == {}
 
-    def test_metadata_none_descarta_toda_orfa(self):
+    def test_metadata_none_discards_every_orphan(self):
         """`None` is the same case as `{}` — and it is the value unpin writes."""
         raw = {"n1": {"__pin_s3_key__": "s3://key"}}
         assert _safe_pinned_outputs(raw, None) == {}
 
-    def test_desfixar_um_no_nao_ressuscita_o_pin_de_outro(self):
+    def test_unpinning_one_node_does_not_revive_another_pin(self):
         """The regression this fix exists to prevent.
 
         With `{A, B}` in `pinned_outputs` and only `A` in `pin_metadata`, B is an
         orphan and is left out — that already held. The problem showed up in the
         next step: unpinning A writes `pin_metadata = None`
-        (`pin_service.desfixar_saida`), the column empties, and the previous
+        (`pin_service.unpin_output`), the column empties, and the previous
         version went back to sending B to the executor. Unpinning one node
         resurrected another's pin, with a cache that never expires.
         """
@@ -221,44 +221,44 @@ class TestHasSubstantialChanges:
     def _edge(self, src: str, tgt: str, sh: str = "out", th: str = "in"):
         return {"source": src, "target": tgt, "sourceHandle": sh, "targetHandle": th}
 
-    def test_nos_identicos_retorna_false(self):
+    def test_identical_nodes_returns_false(self):
         d = self._def(nodes=[self._node("n1", {"key": "val"})])
         assert _has_substantial_changes(d, d) is False
 
-    def test_no_adicionado_retorna_true(self):
+    def test_added_node_returns_true(self):
         old = self._def(nodes=[self._node("n1")])
         new = self._def(nodes=[self._node("n1"), self._node("n2")])
         assert _has_substantial_changes(old, new) is True
 
-    def test_no_removido_retorna_true(self):
+    def test_removed_node_returns_true(self):
         old = self._def(nodes=[self._node("n1"), self._node("n2")])
         new = self._def(nodes=[self._node("n1")])
         assert _has_substantial_changes(old, new) is True
 
-    def test_edge_adicionada_retorna_true(self):
+    def test_added_edge_returns_true(self):
         nodes = [self._node("n1"), self._node("n2")]
         old = self._def(nodes=nodes, edges=[])
         new = self._def(nodes=nodes, edges=[self._edge("n1", "n2")])
         assert _has_substantial_changes(old, new) is True
 
-    def test_edge_removida_retorna_true(self):
+    def test_removed_edge_returns_true(self):
         nodes = [self._node("n1"), self._node("n2")]
         old = self._def(nodes=nodes, edges=[self._edge("n1", "n2")])
         new = self._def(nodes=nodes, edges=[])
         assert _has_substantial_changes(old, new) is True
 
-    def test_propriedade_alterada_retorna_true(self):
+    def test_changed_property_returns_true(self):
         old = self._def(nodes=[self._node("n1", props={"k": "old_value"})])
         new = self._def(nodes=[self._node("n1", props={"k": "new_value"})])
         assert _has_substantial_changes(old, new) is True
 
-    def test_apenas_posicao_alterada_retorna_false(self):
+    def test_only_position_changed_returns_false(self):
         """Moving a node on the canvas (position) is not a substantial change."""
         old = self._def(nodes=[self._node("n1", props={"k": "v"}, position={"x": 0, "y": 0})])
         new = self._def(nodes=[self._node("n1", props={"k": "v"}, position={"x": 500, "y": 300})])
         assert _has_substantial_changes(old, new) is False
 
-    def test_definicoes_vazias_retorna_false(self):
+    def test_empty_definitions_returns_false(self):
         assert _has_substantial_changes({}, {}) is False
 
 
@@ -267,7 +267,7 @@ class TestHasSubstantialChanges:
 class TestCreateWorkflow:
 
     @pytest.mark.asyncio
-    async def test_sucesso_sem_schedule(self, service, sample_workflow):
+    async def test_success_without_schedule(self, service, sample_workflow):
         """Should encrypt and create the workflow; without a ScheduleTrigger, no schedule is created."""
         definition = {"nodes": [], "edges": []}
         service.crud.create = AsyncMock(return_value=sample_workflow)
@@ -281,7 +281,7 @@ class TestCreateWorkflow:
         assert result is sample_workflow
 
     @pytest.mark.asyncio
-    async def test_carimba_autor_no_create(self, service, sample_workflow):
+    async def test_stamps_author_on_create(self, service, sample_workflow):
         """The user's created_by_id/updated_by_id reach the INSERT — without that the
         listing would never show 'criado há X por Y' (created X ago by Y) (the
         POST /workflows router stopped passing them on and the fields were born
@@ -302,7 +302,7 @@ class TestCreateWorkflow:
         assert kwargs.get("workspace_id") == "ws-1"
 
     @pytest.mark.asyncio
-    async def test_sucesso_com_schedule_trigger(self, service, sample_workflow):
+    async def test_success_with_schedule_trigger(self, service, sample_workflow):
         """Should call apply_schedule_if_needed when the definition contains a ScheduleTrigger."""
         definition = {"nodes": [{"type": "trigger", "name": "ScheduleTrigger"}], "edges": []}
         service.crud.create = AsyncMock(return_value=sample_workflow)
@@ -315,7 +315,7 @@ class TestCreateWorkflow:
         apply_sched.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_falha_agendamento_loga_warning_nao_falha(self, service, sample_workflow):
+    async def test_schedule_failure_logs_warning_does_not_fail(self, service, sample_workflow):
         """A scheduling failure should not prevent the workflow from being created."""
         definition = {"nodes": [{"type": "trigger"}], "edges": []}
         service.crud.create = AsyncMock(return_value=sample_workflow)
@@ -334,7 +334,7 @@ class TestCreateWorkflow:
 class TestGetWorkflowByHash:
 
     @pytest.mark.asyncio
-    async def test_encontrado_com_decriptografia(self, service, sample_workflow):
+    async def test_found_with_decryption(self, service, sample_workflow):
         """Should decrypt the definition when returning the workflow."""
         service.crud.get_by_hash = AsyncMock(return_value=sample_workflow)
         decrypted_def = {"nodes": [{"id": "n1"}], "edges": []}
@@ -346,7 +346,7 @@ class TestGetWorkflowByHash:
         assert result.definition == decrypted_def
 
     @pytest.mark.asyncio
-    async def test_nao_encontrado_lanca_not_found_error(self, service):
+    async def test_not_found_raises_not_found_error(self, service):
         """A nonexistent workflow should raise WorkflowNotFoundError."""
         service.crud.get_by_hash = AsyncMock(return_value=None)
 
@@ -354,7 +354,7 @@ class TestGetWorkflowByHash:
             await service.get_workflow_by_hash("nao-existe")
 
     @pytest.mark.asyncio
-    async def test_erro_decriptografia_lanca_decryption_error(self, service, sample_workflow):
+    async def test_decryption_failure_raises_decryption_error(self, service, sample_workflow):
         """A decryption failure should raise WorkflowDecryptionError."""
         service.crud.get_by_hash = AsyncMock(return_value=sample_workflow)
 
@@ -368,7 +368,7 @@ class TestGetWorkflowByHash:
 class TestStartAnalysis:
 
     @pytest.mark.asyncio
-    async def test_idempotency_hit_retorna_sem_executar(self, service, patched_redis):
+    async def test_idempotency_hit_returns_without_running(self, service, patched_redis):
         """With an existing idempotency_key in Redis, it should not execute again."""
         patched_redis.get = AsyncMock(return_value="existing-job-id")
         service._load_workflow = AsyncMock()  # must not be called
@@ -381,7 +381,7 @@ class TestStartAnalysis:
         service._load_workflow.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_sem_idempotency_key_nao_consulta_redis(self, service, patched_redis, sample_workflow, sample_agent):
+    async def test_without_idempotency_key_does_not_query_redis(self, service, patched_redis, sample_workflow, sample_agent):
         """Without an idempotency_key, Redis should not be queried for idempotency."""
         service._load_workflow = AsyncMock(return_value=(sample_workflow, {"nodes": [], "edges": []}))
         service._resolve_candidates = AsyncMock(return_value=[sample_agent])
@@ -392,7 +392,7 @@ class TestStartAnalysis:
         patched_redis.get.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_workflow_nao_encontrado(self, service, patched_redis):
+    async def test_workflow_not_found(self, service, patched_redis):
         """A nonexistent workflow should propagate WorkflowNotFoundError."""
         service._load_workflow = AsyncMock(side_effect=WorkflowNotFoundError("não existe"))
 
@@ -400,7 +400,7 @@ class TestStartAnalysis:
             await service.start_analysis("nao-existe")
 
     @pytest.mark.asyncio
-    async def test_workflow_inativo(self, service, patched_redis):
+    async def test_inactive_workflow(self, service, patched_redis):
         """An inactive workflow should propagate WorkflowInactiveError."""
         service._load_workflow = AsyncMock(side_effect=WorkflowInactiveError("inativo"))
 
@@ -416,7 +416,7 @@ class TestStartAnalysis:
             await service.start_analysis("wf-bad-key")
 
     @pytest.mark.asyncio
-    async def test_sucesso_retorna_dispatch_result_com_uuid(
+    async def test_success_returns_dispatch_result_with_uuid(
         self, service, patched_redis, sample_workflow, sample_agent
     ):
         """A successful execution should return a DispatchResult with a UUID job_id and call Redis.lpush."""
@@ -429,7 +429,7 @@ class TestStartAnalysis:
         assert result.id == "job-uuid-abc"
 
     @pytest.mark.asyncio
-    async def test_sucesso_com_idempotency_key_grava_no_redis(
+    async def test_success_with_idempotency_key_writes_to_redis(
         self, service, patched_redis, sample_workflow, sample_agent
     ):
         """With a new idempotency_key, it should write the job_id to Redis after dispatch."""
@@ -450,7 +450,7 @@ class TestStartAnalysis:
 class TestResolveCandidates:
 
     @pytest.mark.asyncio
-    async def test_pool_vazio_503(self, service, mock_db, sample_workflow):
+    async def test_empty_pool_503(self, service, mock_db, sample_workflow):
         """With no default executors available, it should return HTTP 503."""
         sample_workflow.workspace_id = None
 
@@ -459,7 +459,7 @@ class TestResolveCandidates:
                 await service._resolve_candidates(sample_workflow)
 
     @pytest.mark.asyncio
-    async def test_todos_offline_503(self, service, mock_db, sample_workflow):
+    async def test_all_offline_503(self, service, mock_db, sample_workflow):
         """All defaults offline should raise NoExecutorAvailableError."""
         sample_workflow.workspace_id = None
         ag1 = _make_agent(status="active")
@@ -474,7 +474,7 @@ class TestResolveCandidates:
                 await service._resolve_candidates(sample_workflow)
 
     @pytest.mark.asyncio
-    async def test_retorna_agents_ordenados_por_carga(self, service, mock_db, sample_workflow):
+    async def test_returns_agents_sorted_by_load(self, service, mock_db, sample_workflow):
         """Should return online executors ordered by lowest load."""
         sample_workflow.workspace_id = None
         ag_busy = _make_agent(status="active")
@@ -507,7 +507,7 @@ class TestResolveCandidates:
         assert candidates[0].id_hash == ag_idle.id_hash  # menor carga primeiro
 
     @pytest.mark.asyncio
-    async def test_workspace_dedicado_tem_prioridade(self, service, mock_db, sample_workflow):
+    async def test_dedicated_workspace_takes_priority(self, service, mock_db, sample_workflow):
         """The workspace's dedicated executor should come before the default pool."""
         sample_workflow.workspace_id = "ws-001"
         dedicated = _make_agent(status="active")
@@ -526,7 +526,7 @@ class TestResolveCandidates:
         assert candidates[0].id_hash == dedicated.id_hash
 
     @pytest.mark.asyncio
-    async def test_failover_dedicado_offline_usa_pool(self, service, mock_db, sample_workflow):
+    async def test_failover_dedicated_offline_uses_pool(self, service, mock_db, sample_workflow):
         """If the dedicated executor is offline, it should fall back to the default pool."""
         sample_workflow.workspace_id = "ws-001"
         dedicated = _make_agent(status="active")
@@ -553,7 +553,7 @@ class TestResolveCandidates:
 class TestDispatchJob:
 
     @pytest.mark.asyncio
-    async def test_todos_candidatos_falham_cifra_503(self, service, patched_redis, sample_workflow, sample_agent):
+    async def test_all_candidates_fail_encryption_503(self, service, patched_redis, sample_workflow, sample_agent):
         """A RuntimeError in build_job_message for all candidates should result in HTTP 503."""
         definition = {"nodes": [], "edges": []}
 
@@ -563,7 +563,7 @@ class TestDispatchJob:
                 await service._dispatch_job(sample_workflow, definition, [sample_agent], {}, False)
 
     @pytest.mark.asyncio
-    async def test_send_job_retorna_false_503(self, service, patched_redis, sample_workflow, sample_agent):
+    async def test_send_job_returns_false_503(self, service, patched_redis, sample_workflow, sample_agent):
         """All candidates refuse → HTTP 503."""
         definition = {"nodes": [], "edges": []}
         mock_msg = {"envelope": {}, "ephemeral_public": "", "ciphertext": "", "signature": ""}
@@ -577,7 +577,7 @@ class TestDispatchJob:
                 await service._dispatch_job(sample_workflow, definition, [sample_agent], {}, False)
 
     @pytest.mark.asyncio
-    async def test_nenhum_candidato_aceita_marca_run_failed(self, service, patched_redis, sample_workflow, sample_agent):
+    async def test_no_candidate_accepts_marks_run_failed(self, service, patched_redis, sample_workflow, sample_agent):
         """When no candidate accepts, the run created as pending should end with
         status='failed' (not a zombie in pending).
 
@@ -605,7 +605,7 @@ class TestDispatchJob:
         assert added_runs[0].end_time is not None
 
     @pytest.mark.asyncio
-    async def test_sucesso_retorna_dispatch_result(self, service, patched_redis, sample_workflow, sample_agent):
+    async def test_success_returns_dispatch_result(self, service, patched_redis, sample_workflow, sample_agent):
         """A successfully dispatched job should return a DispatchResult with job_id."""
         definition = {"nodes": [], "edges": []}
         mock_msg = {"envelope": {}, "ephemeral_public": "", "ciphertext": "", "signature": ""}
@@ -645,7 +645,7 @@ class TestDispatchJob:
         assert result.has_response_node is True
 
     @pytest.mark.asyncio
-    async def test_failover_primeiro_rejeita_segundo_aceita(self, service, patched_redis, sample_workflow):
+    async def test_failover_first_rejects_second_accepts(self, service, patched_redis, sample_workflow):
         """If the first candidate rejects (queue full), it should try the second."""
         definition = {"nodes": [], "edges": []}
         mock_msg = {"envelope": {}, "ephemeral_public": "", "ciphertext": "", "signature": ""}
@@ -674,7 +674,7 @@ class TestDispatchJob:
         assert len(added_runs) == 1
 
     @pytest.mark.asyncio
-    async def test_credenciais_injetadas_e_credential_id_removido(
+    async def test_credentials_injected_and_credential_id_removed(
         self, service, patched_redis, sample_workflow, sample_agent
     ):
         """credential_id should be removed from the node and connectionString injected."""
@@ -713,7 +713,7 @@ class TestDispatchJob:
 class TestDeleteWorkflow:
 
     @pytest.mark.asyncio
-    async def test_sucesso_desativa_schedules(self, service, mock_db, sample_workflow):
+    async def test_success_deactivates_schedules(self, service, mock_db, sample_workflow):
         """Should soft-delete the workflow and deactivate all linked schedules."""
         service.crud.soft_delete_by_hash = AsyncMock(return_value=sample_workflow)
 
@@ -731,7 +731,7 @@ class TestDeleteWorkflow:
         mock_db.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_nao_encontrado_lanca_not_found_error(self, service, mock_db):
+    async def test_not_found_raises_not_found_error(self, service, mock_db):
         """A nonexistent workflow should raise WorkflowNotFoundError."""
         service.crud.soft_delete_by_hash = AsyncMock(return_value=None)
 
@@ -739,7 +739,7 @@ class TestDeleteWorkflow:
             await service.delete_workflow("nao-existe")
 
     @pytest.mark.asyncio
-    async def test_sem_schedules_nao_falha(self, service, mock_db, sample_workflow):
+    async def test_without_schedules_does_not_fail(self, service, mock_db, sample_workflow):
         """A workflow without schedules should be deleted without error."""
         service.crud.soft_delete_by_hash = AsyncMock(return_value=sample_workflow)
         mock_db.execute.return_value = _make_scalars_result([])
@@ -754,7 +754,7 @@ class TestDeleteWorkflow:
 class TestUpdateWorkflow:
 
     @pytest.mark.asyncio
-    async def test_nao_encontrado_lanca_not_found_error(self, service):
+    async def test_not_found_raises_not_found_error(self, service):
         """A nonexistent workflow should raise WorkflowNotFoundError."""
         from app.schemas.workflow import WorkflowUpdate
 
@@ -764,7 +764,7 @@ class TestUpdateWorkflow:
             await service.update_workflow("nao-existe", WorkflowUpdate(name="new-name"), updated_by_id="usr-1")
 
     @pytest.mark.asyncio
-    async def test_sem_mudancas_substanciais_nao_cria_versao(self, service, sample_workflow):
+    async def test_without_substantial_changes_does_not_create_version(self, service, sample_workflow):
         """An update without substantial changes should not create a version snapshot."""
         from app.schemas.workflow import WorkflowUpdate
 
@@ -787,7 +787,7 @@ class TestUpdateWorkflow:
         service.crud.create_version.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_com_mudancas_substanciais_cria_versao(self, service, sample_workflow):
+    async def test_with_substantial_changes_creates_version(self, service, sample_workflow):
         """An update with substantial changes should create a snapshot of the previous version."""
         from app.schemas.workflow import WorkflowUpdate
 
@@ -810,7 +810,7 @@ class TestUpdateWorkflow:
         service.crud.create_version.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_update_sempre_chama_apply_schedule_mesmo_sem_schedule_trigger(self, service, sample_workflow):
+    async def test_update_always_calls_apply_schedule_even_without_schedule_trigger(self, service, sample_workflow):
         """An update with a definition should ALWAYS call apply_schedule_if_needed.
 
         Regression: previously the update had a guard `if extract_schedule_node(...)`
@@ -860,7 +860,7 @@ class TestApplyScheduleIfNeeded:
     """
 
     @pytest.mark.asyncio
-    async def test_sem_schedule_trigger_apenas_remove_agendamentos(self):
+    async def test_without_schedule_trigger_only_removes_schedules(self):
         """Definition without ScheduleTrigger → delete_all_schedules is called,
         create_schedule is NOT called."""
         from app.core.scheduling.hooks import apply_schedule_if_needed
@@ -881,7 +881,7 @@ class TestApplyScheduleIfNeeded:
         scheduler_mock.create_schedule.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_com_schedule_trigger_cria_quando_nao_havia_nenhum(self):
+    async def test_with_schedule_trigger_creates_when_there_was_none(self):
         """Definition with ScheduleTrigger and no existing schedule → creates one."""
         from app.core.scheduling.hooks import apply_schedule_if_needed
 

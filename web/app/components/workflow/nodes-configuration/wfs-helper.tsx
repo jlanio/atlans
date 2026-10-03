@@ -56,11 +56,11 @@ const WFSHelper = ({ values, setNodeField, workflowId }: WFSHelperProps) => {
   // The credential the list was fetched with. Once the node's credential changes,
   // the list no longer holds: a GeoServer shows different layers for each key
   // (and to anonymous users).
-  const [listadaCom, setListadaCom] = useState("")
+  const [listedWith, setListedWith] = useState("")
 
   const url = String(values?.url ?? "").trim()
   const credentialId = String(values?.credential_id ?? "")
-  const listaValida = discovered && layers.length > 0 && listadaCom === credentialId
+  const listIsValid = discovered && layers.length > 0 && listedWith === credentialId
 
   const discoverLayers = useCallback(async () => {
     if (!url) {
@@ -80,7 +80,7 @@ const WFSHelper = ({ values, setNodeField, workflowId }: WFSHelperProps) => {
     setLayers([])
     // The fetch uses the current credential: if it fails, the "credential
     // changed" warning has nothing left to ask for — only the error remains.
-    setListadaCom(credentialId)
+    setListedWith(credentialId)
 
     try {
       // With the node's credential, the list is the one the run will see — protected
@@ -100,11 +100,11 @@ const WFSHelper = ({ values, setNodeField, workflowId }: WFSHelperProps) => {
       setDiscovered(true)
     } catch (err) {
       // The API error body is `{message}`; `detail` is kept for older responses.
-      const doServidor = axios.isAxiosError(err)
+      const fromServer = axios.isAxiosError(err)
         ? (err.response?.data?.message ?? err.response?.data?.detail)
         : undefined
-      if (typeof doServidor === "string" && doServidor) {
-        setError(doServidor)
+      if (typeof fromServer === "string" && fromServer) {
+        setError(fromServer)
       } else {
         const msg = err instanceof Error ? err.message : String(err)
         setError(msg)
@@ -118,7 +118,7 @@ const WFSHelper = ({ values, setNodeField, workflowId }: WFSHelperProps) => {
   // The saved layer is outside the list (fetched with another key, or no key):
   // without an item with this value the Select would fall back to the
   // placeholder and look empty.
-  const gravadaForaDaLista = !!currentTypeName && !layers.some(l => l.name === currentTypeName)
+  const savedOutsideList = !!currentTypeName && !layers.some(l => l.name === currentTypeName)
 
   return (
     <div className="flex flex-col gap-2">
@@ -173,7 +173,7 @@ const WFSHelper = ({ values, setNodeField, workflowId }: WFSHelperProps) => {
       {/* Layer: dropdown if discovered, manual input otherwise */}
       <div className="flex flex-col gap-1">
         <Label>Camada (typeName)</Label>
-        {listaValida ? (
+        {listIsValid ? (
           <Select
             value={currentTypeName || "__none__"}
             onValueChange={v => setNodeField("typeName", v === "__none__" ? "" : v)}
@@ -183,7 +183,7 @@ const WFSHelper = ({ values, setNodeField, workflowId }: WFSHelperProps) => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__" disabled>Selecione uma camada</SelectItem>
-              {gravadaForaDaLista && (
+              {savedOutsideList && (
                 <SelectItem value={currentTypeName}>
                   <span className="font-mono text-xs">{currentTypeName}</span>
                   <span className="text-muted-foreground ml-1 text-xs">— não listada</span>
@@ -207,12 +207,12 @@ const WFSHelper = ({ values, setNodeField, workflowId }: WFSHelperProps) => {
             className="h-8 text-sm font-mono"
           />
         )}
-        {listaValida && (
+        {listIsValid && (
           <p className="text-[10px] text-muted-foreground">
-            {layers.length} camada(s) encontrada(s){listadaCom ? " com a credencial do nó" : ""}
+            {layers.length} camada(s) encontrada(s){listedWith ? " com a credencial do nó" : ""}
           </p>
         )}
-        {discovered && !listaValida && listadaCom !== credentialId && (
+        {discovered && !listIsValid && listedWith !== credentialId && (
           <p className="text-[10px] text-muted-foreground">
             A credencial do nó mudou — busque as camadas de novo para ver as que ela alcança.
           </p>

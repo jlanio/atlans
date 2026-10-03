@@ -1,11 +1,11 @@
 "use client"
 import { useState, type Ref } from "react"
-import MapLibreMap, { type MapLibreMapHandle, type MapLayer, type PosicaoDoUsuario } from "../share/MapLibreMap"
+import MapLibreMap, { type MapLibreMapHandle, type MapLayer, type UserPosition } from "../share/MapLibreMap"
 import { centroDaRegiao, fusoDoNavegador } from "./mapa/regiao"
 import { transformarRequisicao } from "./mapa/requisicao"
-import { useTextos } from "./i18n"
+import { useTexts } from "./i18n"
 
-export interface GloboProps {
+export interface GlobeProps {
   layers?: MapLayer[];
   /** From useCamadas, to frame/fly to the layers the conversation puts on the globe. */
   mapaRef?: Ref<MapLibreMapHandle>;
@@ -18,7 +18,7 @@ export interface GloboProps {
   /** The connection's country (`CF-IPCountry`), the fallback when the browser hides the time zone. */
   pais?: string | null;
   /** Lifts the resolved location (the control's `geolocate`) up for the Home to attach to the turn. */
-  aoLocalizar?: (pos: PosicaoDoUsuario) => void;
+  aoLocalizar?: (pos: UserPosition) => void;
   /** Lifts the location failure up (browser code; 1 = permission denied) — becomes a toast. */
   aoErroDeLocalizacao?: (codigo: number) => void;
 }
@@ -40,14 +40,14 @@ export interface GloboProps {
  * The layers (run outputs) come in through `layers`; `mapaRef` lets useCamadas
  * frame the new layer.
  */
-export default function Globo({ layers = [], mapaRef, girando = false, pais = null, aoLocalizar, aoErroDeLocalizacao }: GloboProps) {
+export default function Globo({ layers = [], mapaRef, girando = false, pais = null, aoLocalizar, aoErroDeLocalizacao }: GlobeProps) {
   // The region is read ONCE, on mount: MapLibreMap builds the map with this
   // center and keeps it as the destination of the hero's return — a new array
   // on every render changes nothing there, but the state makes that explicit.
   // On the server the time zone is the server's (and the value does not go into
   // the HTML); the client's is the one that counts.
   const [centro] = useState(() => centroDaRegiao({ fuso: fusoDoNavegador(), pais }))
-  const textos = useTextos().casca.mapa
+  const textos = useTexts().casca.mapa
   return (
     <MapLibreMap
       ref={mapaRef}

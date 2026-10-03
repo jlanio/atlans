@@ -21,7 +21,7 @@ from app.core.exceptions import (
     DangerousInnerExtensionError,
     EmptyFileError,
     FileExtensionNotAllowedError,
-    ConteudoNoExecutorError,
+    ContentOnExecutorError,
     InvalidFileOperationError,
     WorkflowNotFoundError,
     WorkspaceAccessDeniedError,
@@ -104,14 +104,14 @@ def _recusar_se_local(wf) -> None:
     """
     if getattr(wf, "content_location", "minio") != "executor":
         return
-    raise ConteudoNoExecutorError(
+    raise ContentOnExecutorError(
         "O conteudo deste arquivo permanece no executor e nunca foi enviado "
         "para a nuvem, entao nao ha o que baixar pela plataforma. Ele continua "
         "disponivel para workflows que rodem naquele mesmo executor."
     )
 
 
-def _recusar_se_catalogado(wf) -> None:
+def _refuse_if_cataloged(wf) -> None:
     """Blocks destructive operations on a file that only exists on the executor.
 
     A cataloged file (GeoSync in "Manter apenas no executor" (keep only on the
@@ -125,7 +125,7 @@ def _recusar_se_catalogado(wf) -> None:
     """
     if getattr(wf, "content_location", "minio") != "executor":
         return
-    raise ConteudoNoExecutorError(
+    raise ContentOnExecutorError(
         "Este registro reflete um arquivo que permanece no executor e nunca foi "
         "enviado para a nuvem — exclui-lo aqui nao apagaria o arquivo. Para "
         "remove-lo, apague o arquivo na pasta sincronizada do executor, ou tire "
@@ -139,7 +139,7 @@ class DriveService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    # ── Configuracoes e extensoes ─────────────────────────────────────────
+    # ── Settings e extensoes ─────────────────────────────────────────
 
     async def get_settings(self) -> PlatformFileSettings:
         result = await self.db.execute(select(PlatformFileSettings).where(PlatformFileSettings.id == 1))
@@ -218,9 +218,9 @@ class DriveService:
 
         if search:
             # The user's `%` and `_` are literals, not wildcards (see `contem`).
-            nome_contem = contem(WorkspaceFile.original_name, search)
-            query = query.where(nome_contem)
-            count_query = count_query.where(nome_contem)
+            name_contains = contem(WorkspaceFile.original_name, search)
+            query = query.where(name_contains)
+            count_query = count_query.where(name_contains)
         if ext:
             query = query.where(WorkspaceFile.extension == ext.lower())
             count_query = count_query.where(WorkspaceFile.extension == ext.lower())
@@ -230,10 +230,10 @@ class DriveService:
         # created_at — sorting by it would make freshly written content
         # show up at the end of the list, together with the oldest files.
         # coalesce covers rows that were never updated (updated_at NULL).
-        ultima_escrita = sa_func.coalesce(
+        last_write = sa_func.coalesce(
             WorkspaceFile.content_written_at, WorkspaceFile.created_at
         )
-        query = query.order_by(ultima_escrita.desc()).offset((page - 1) * page_size).limit(page_size)
+        query = query.order_by(last_write.desc()).offset((page - 1) * page_size).limit(page_size)
         items = (await self.db.execute(query)).scalars().all()
 
         return items, total
@@ -391,7 +391,7 @@ class DriveService:
             )
             wf = existente.scalar_one_or_none()
 
-        reaproveitou = wf is not None
+        reused = wf is not None
         if wf is not None:
             s3_key = wf.s3_key          # PUT sobrescreve o objeto existente
 
@@ -432,12 +432,12 @@ class DriveService:
             "upload_url": upload_url,
             "id_hash": wf.id_hash,
             "s3_key": s3_key,
-            "reused": reaproveitou,
+            "reused": reused,
         }
 
     # ── Upload confirmation ───────────────────────────────────────────────
 
-    def _e_upload_de_drive_pendente(self, wf: WorkspaceFile) -> bool:
+    def _is_pending_drive_upload(self, wf: WorkspaceFile) -> bool:
         """Is the confirm closing a Drive upload that has not been accepted yet?
 
         Only that case can be rejected destructively, and the scope is narrow on
@@ -469,7 +469,7 @@ class DriveService:
         partes = wf.s3_key.split("/")
         return len(partes) > 2 and partes[0] == "drive" and partes[1] == wf.workspace_id
 
-    def _e_artefato_de_execucao_pendente(self, wf: WorkspaceFile) -> bool:
+    def _is_pending_run_artifact(self, wf: WorkspaceFile) -> bool:
         """Is the confirm closing a run artifact (via s3_key_override)?
 
         Run artifacts come in through `create_agent_upload_url(s3_key_override=
@@ -486,7 +486,7 @@ class DriveService:
         partes = wf.s3_key.split("/")
         return len(partes) > 2 and partes[0] == "artifacts" and partes[1] == wf.workspace_id
 
-    async def _recusar_acima_do_teto(self, wf: WorkspaceFile, tamanho_real: int) -> None:
+    async def _refuse_above_ceiling(self, wf: WorkspaceFile, actual_size: int) -> None:
         """Applies `max_size_mb` to the REAL object, on confirm. Without it the ceiling is optional.
 
         In the upload via presigned URL, the client is the one stating the size:
@@ -503,14 +503,14 @@ class DriveService:
         deletes the expired ROW, never the object. The row goes too because,
         without the object, it describes nothing.
 
-        Whatever does NOT fit `_e_upload_de_drive_pendente` is also rejected,
+        Whatever does NOT fit `_is_pending_drive_upload` is also rejected,
         but without deleting anything: better an object above the ceiling that
         the reconcile flags as drift than a deletion path with no confirmation
         and no trash.
         """
         settings = await self.get_settings()
         max_bytes = settings.max_size_mb * 1024 * 1024
-        if tamanho_real <= max_bytes:
+        if actual_size <= max_bytes:
             return
 
         # A run artifact (s3_key_override) skipped validate_upload: it did not
@@ -518,20 +518,20 @@ class DriveService:
         # deleting — applying the ceiling here would bring down the run.
         # Already-confirmed ones and cross-workspace keys do NOT fit and are
         # still rejected below.
-        if self._e_artefato_de_execucao_pendente(wf):
+        if self._is_pending_run_artifact(wf):
             logger.info(
                 "Drive: artefato de execucao '%s' (ws=%s) tem %s bytes, acima do teto "
                 "de %sMB — aceito (upload de execucao nao declara tamanho ao teto).",
-                wf.original_name, wf.workspace_id, tamanho_real, settings.max_size_mb,
+                wf.original_name, wf.workspace_id, actual_size, settings.max_size_mb,
             )
             return
 
         # Locals BEFORE the delete: after the commit the instance has been removed
         # from the session and reading an attribute from it is an error.
         s3_key, nome, ws_id = wf.s3_key, wf.original_name, wf.workspace_id
-        excedeu = f"'{nome}' (ws={ws_id}) tem {tamanho_real} bytes, acima do teto de {settings.max_size_mb}MB"
+        excedeu = f"'{nome}' (ws={ws_id}) tem {actual_size} bytes, acima do teto de {settings.max_size_mb}MB"
 
-        if not self._e_upload_de_drive_pendente(wf):
+        if not self._is_pending_drive_upload(wf):
             logger.warning("Drive: %s — confirmacao recusada; objeto e registro mantidos.", excedeu)
             raise FileTooLargeError(f"Arquivo excede {settings.max_size_mb}MB.")
 
@@ -568,7 +568,7 @@ class DriveService:
         if not obj:
             raise FileNotFoundError("Arquivo nao encontrado no storage.")
 
-        await self._recusar_acima_do_teto(wf, obj["size"])
+        await self._refuse_above_ceiling(wf, obj["size"])
 
         # content_md5 is only filled in here, on confirm. Arriving already filled
         # means this row was reused by an upload with overwrite=True — for the
@@ -629,9 +629,9 @@ class DriveService:
         the report.
 
         A CATALOGED file (`content_location='executor'`) is rejected: see
-        `_recusar_se_catalogado`.
+        `_refuse_if_cataloged`.
         """
-        _recusar_se_catalogado(wf)
+        _refuse_if_cataloged(wf)
         del_info = {
             "id_hash": wf.id_hash, "original_name": wf.original_name,
             "extension": wf.extension, "size": wf.size,
@@ -664,7 +664,7 @@ class DriveService:
         Mirrors `delete_file`, with ONE deliberate difference: it accepts the
         CATALOGED file (`content_location='executor'`). The user's path rejects it
         — deleting it from the web would not remove the bytes, which live on the
-        executor — and `_recusar_se_catalogado` says, in its own message, "apague
+        executor — and `_refuse_if_cataloged` says, in its own message, "apague
         o arquivo na pasta sincronizada do executor" (delete the file in the
         executor's synced folder). That is exactly the request that arrives here:
         the owning executor itself reporting that the file left the folder.

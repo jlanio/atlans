@@ -100,7 +100,7 @@ def _count_certs(payload: bytes) -> int:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def test_bundle_combina_publicas_e_interna(root_cert, fake_certifi):
+def test_bundle_combines_public_and_internal(root_cert, fake_certifi):
     """The file published in the env has the public CAs AND the internal one."""
     from executor import _ca_bootstrap
 
@@ -119,7 +119,7 @@ def test_bundle_combina_publicas_e_interna(root_cert, fake_certifi):
     assert ctx.cert_store_stats()["x509_ca"] == 3
 
 
-def test_set_env_publica_as_tres_variaveis(root_cert, fake_certifi):
+def test_set_env_publishes_the_three_variables(root_cert, fake_certifi):
     """stdlib/httpx, requests/urllib3 e libcurl (GDAL/pyogrio) leem vars distintas."""
     from executor import _ca_bootstrap
 
@@ -136,7 +136,7 @@ def test_set_env_publica_as_tres_variaveis(root_cert, fake_certifi):
     assert _count_certs(open(publicado, "rb").read()) == 3
 
 
-def test_bundle_regravado_quando_root_cert_muda(root_cert, fake_certifi):
+def test_bundle_rewritten_when_root_cert_changes(root_cert, fake_certifi):
     """Renewal of the internal CA must be reflected in the derived bundle."""
     from executor import _ca_bootstrap
 
@@ -152,7 +152,7 @@ def test_bundle_regravado_quando_root_cert_muda(root_cert, fake_certifi):
     assert novo.strip() in depois
 
 
-def test_bundle_nao_reescreve_sem_mudanca(root_cert, fake_certifi):
+def test_bundle_not_rewritten_without_change(root_cert, fake_certifi):
     """Boot normal nao toca o disco (mtime estavel)."""
     from executor import _ca_bootstrap
 
@@ -164,7 +164,7 @@ def test_bundle_nao_reescreve_sem_mudanca(root_cert, fake_certifi):
     assert bundle.stat().st_mtime_ns == mtime
 
 
-def test_cert_dir_read_only_cai_para_tmpdir(root_cert, fake_certifi, monkeypatch, tmp_path):
+def test_read_only_cert_dir_falls_back_to_tmpdir(root_cert, fake_certifi, monkeypatch, tmp_path):
     """The compose file offers mounting ./executor-certs:/data/certs:ro — the bundle is
     derived, so writing it to the tmpdir is enough and better than degrading."""
     from executor import _ca_bootstrap
@@ -175,12 +175,12 @@ def test_cert_dir_read_only_cai_para_tmpdir(root_cert, fake_certifi, monkeypatch
 
     real_write = _ca_bootstrap.Path.write_bytes
 
-    def write_bytes_negando_certdir(self, data):
+    def write_bytes_denying_certdir(self, data):
         if self.parent == root_cert.parent:
             raise OSError(30, "Read-only file system")
         return real_write(self, data)
 
-    monkeypatch.setattr(_ca_bootstrap.Path, "write_bytes", write_bytes_negando_certdir)
+    monkeypatch.setattr(_ca_bootstrap.Path, "write_bytes", write_bytes_denying_certdir)
 
     bundle = _ca_bootstrap._ensure_combined_bundle(root_cert)
 
@@ -188,7 +188,7 @@ def test_cert_dir_read_only_cai_para_tmpdir(root_cert, fake_certifi, monkeypatch
     assert _count_certs(bundle.read_bytes()) == 3
 
 
-def test_sem_certifi_usa_cafile_do_sistema(root_cert, monkeypatch, tmp_path):
+def test_without_certifi_uses_system_cafile(root_cert, monkeypatch, tmp_path):
     """Without certifi installed, the OS trust store still has to get into the bundle."""
     import builtins
 
@@ -199,12 +199,12 @@ def test_sem_certifi_usa_cafile_do_sistema(root_cert, monkeypatch, tmp_path):
 
     real_import = builtins.__import__
 
-    def sem_certifi(name, *args, **kwargs):
+    def without_certifi(name, *args, **kwargs):
         if name == "certifi":
             raise ImportError("no certifi")
         return real_import(name, *args, **kwargs)
 
-    monkeypatch.setattr(builtins, "__import__", sem_certifi)
+    monkeypatch.setattr(builtins, "__import__", without_certifi)
     monkeypatch.setattr(
         _ca_bootstrap.ssl, "get_default_verify_paths",
         lambda: ssl.DefaultVerifyPaths(str(sistema), None, "", str(sistema), "", ""),
@@ -216,7 +216,7 @@ def test_sem_certifi_usa_cafile_do_sistema(root_cert, monkeypatch, tmp_path):
     assert sistema.read_bytes().strip() in bundle.read_bytes()
 
 
-def test_sem_ca_publica_nenhuma_degrada_para_root(root_cert, monkeypatch):
+def test_without_any_public_ca_degrades_to_root(root_cert, monkeypatch):
     """Without public material the executor still talks to agents.atlans.example.org;
     it is the WARNING that has to explain why public HTTPS is going to fail."""
     from executor import _ca_bootstrap
@@ -231,7 +231,7 @@ def test_sem_ca_publica_nenhuma_degrada_para_root(root_cert, monkeypatch):
     assert any(n == "WARNING" and "certifi" in m for n, m in avisos)
 
 
-def test_ssl_cert_file_externo_nao_e_sobrescrito(root_cert, fake_certifi, monkeypatch):
+def test_external_ssl_cert_file_is_not_overwritten(root_cert, fake_certifi, monkeypatch):
     """The operator's override still wins — a documented rule of the module."""
     from executor import _ca_bootstrap
 
@@ -241,7 +241,7 @@ def test_ssl_cert_file_externo_nao_e_sobrescrito(root_cert, fake_certifi, monkey
     assert os.environ["SSL_CERT_FILE"] == "/opt/corp/ca.pem"
 
 
-def test_bootstrap_reusa_cert_existente_e_publica_bundle(root_cert, fake_certifi, monkeypatch):
+def test_bootstrap_reuses_existing_cert_and_publishes_bundle(root_cert, fake_certifi, monkeypatch):
     """The container's real path: cert already in EXECUTOR_CERT_DIR, no download."""
     from executor import _ca_bootstrap
 
@@ -261,7 +261,7 @@ def test_bootstrap_reusa_cert_existente_e_publica_bundle(root_cert, fake_certifi
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def test_detecta_erro_de_cadeia_embrulhado():
+def test_detects_wrapped_chain_error():
     """requests embrulha o SSLCertVerificationError e perde o tipo original."""
     from flow.utils.geo_helpers import is_tls_verify_error
 
@@ -274,8 +274,8 @@ def test_detecta_erro_de_cadeia_embrulhado():
             raise raiz
         except ssl.SSLCertVerificationError as exc:
             raise ConnectionError("Max retries exceeded with url: /geoserver/ows") from exc
-    except ConnectionError as embrulhado:
-        assert is_tls_verify_error(embrulhado)
+    except ConnectionError as wrapped:
+        assert is_tls_verify_error(wrapped)
 
     # Untyped text (urllib3's case, which stringifies the cause).
     assert is_tls_verify_error(
@@ -284,7 +284,7 @@ def test_detecta_erro_de_cadeia_embrulhado():
     )
 
 
-def test_nao_confunde_falha_transiente():
+def test_does_not_confuse_transient_failure():
     from flow.utils.geo_helpers import is_tls_verify_error
 
     assert not is_tls_verify_error(TimeoutError("read timeout"))
@@ -292,7 +292,7 @@ def test_nao_confunde_falha_transiente():
     assert not is_tls_verify_error(None)
 
 
-def test_ciclo_de_causas_nao_trava():
+def test_cause_cycle_does_not_hang():
     """A circular __context__ must not turn into an infinite loop in the middle of a run."""
     from flow.utils.geo_helpers import is_tls_verify_error
 
@@ -303,13 +303,13 @@ def test_ciclo_de_causas_nao_trava():
     assert is_tls_verify_error(a) is False
 
 
-def test_wfs_nao_retenta_erro_de_certificado(monkeypatch):
+def test_wfs_does_not_retry_certificate_error(monkeypatch):
     """3 attempts with backoff only make the user wait for the same error."""
     import flow.nodes.datasource.wfs as wfs
 
     chamadas = []
 
-    def falha_tls(*_a, **_k):
+    def tls_failure(*_a, **_k):
         chamadas.append(1)
         raise ConnectionError(
             "HTTPSConnectionPool(host='geoportal.example.org', port=443): "
@@ -318,7 +318,7 @@ def test_wfs_nao_retenta_erro_de_certificado(monkeypatch):
             "unable to get local issuer certificate (_ssl.c:1010)')))"
         )
 
-    monkeypatch.setattr(wfs, "_fetch_wfs_features", falha_tls)
+    monkeypatch.setattr(wfs, "_fetch_wfs_features", tls_failure)
     monkeypatch.setattr(wfs.time if hasattr(wfs, "time") else __import__("time"),
                         "sleep", lambda _s: pytest.fail("nao deve dormir em backoff"))
 
@@ -335,7 +335,7 @@ def test_wfs_nao_retenta_erro_de_certificado(monkeypatch):
     assert "tentativa(s)" not in msg, "nao deve virar a mensagem generica de retry"
 
 
-async def test_safe_httpx_request_traduz_erro_de_certificado(monkeypatch):
+async def test_safe_httpx_request_translates_certificate_error(monkeypatch):
     """The HTTP nodes (GET/POST/Request) and the webhook all go through here: the
     translation lives in the helper so it isn't reimplemented in each node."""
     import httpx
@@ -344,13 +344,13 @@ async def test_safe_httpx_request_traduz_erro_de_certificado(monkeypatch):
 
     monkeypatch.setattr(gh, "validate_url_ssrf", lambda _u: ("203.0.113.10", "geoportal.example.org"))
 
-    async def send_falhando(self, request, **_k):
+    async def failing_send(self, request, **_k):
         raise httpx.ConnectError(
             "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: "
             "unable to get local issuer certificate (_ssl.c:1010)"
         )
 
-    monkeypatch.setattr(httpx.AsyncClient, "send", send_falhando)
+    monkeypatch.setattr(httpx.AsyncClient, "send", failing_send)
 
     with pytest.raises(RuntimeError) as ei:
         await gh.safe_httpx_request("GET", "https://geoportal.example.org/geoserver/ows")
@@ -361,7 +361,7 @@ async def test_safe_httpx_request_traduz_erro_de_certificado(monkeypatch):
     assert "cadeia incompleta" in msg
 
 
-async def test_safe_httpx_request_nao_mascara_outros_erros(monkeypatch):
+async def test_safe_httpx_request_does_not_mask_other_errors(monkeypatch):
     """Timeout continua sendo timeout — o caller distingue transiente de fatal."""
     import httpx
 
@@ -378,17 +378,17 @@ async def test_safe_httpx_request_nao_mascara_outros_erros(monkeypatch):
         await gh.safe_httpx_request("GET", "https://exemplo.gov.br/api")
 
 
-def test_wfs_ainda_retenta_falha_transiente(monkeypatch):
+def test_wfs_still_retries_transient_failure(monkeypatch):
     """The fix must not turn off the legitimate retry."""
     import flow.nodes.datasource.wfs as wfs
 
     chamadas = []
 
-    def falha_transiente(*_a, **_k):
+    def transient_failure(*_a, **_k):
         chamadas.append(1)
         raise TimeoutError("read timeout")
 
-    monkeypatch.setattr(wfs, "_fetch_wfs_features", falha_transiente)
+    monkeypatch.setattr(wfs, "_fetch_wfs_features", transient_failure)
     monkeypatch.setattr(__import__("time"), "sleep", lambda _s: None)
 
     with pytest.raises(RuntimeError, match="tentativa"):

@@ -12,13 +12,13 @@ import { GisFlowService } from "@/service/GisFlowService"
 import type { IWorkspacePolicyAdmin } from "@/service/types"
 import { createToast } from "@/utils/createToast"
 import { cn } from "@/lib/utils"
-import { classeDoModo, rotuloDoModo } from "@/app/components/workspace/politica"
+import { modeClass, modeLabel } from "@/app/components/workspace/politica"
 import {
-  CABECALHO_DE_COLUNAS, CELULA_COM_ROTULO, DESTAQUE_DA_FICHA, LINHA_EMPILHADA,
+  COLUMN_HEADER, LABELED_CELL, CARD_HIGHLIGHT, STACKED_ROW,
 } from "@/app/components/shared/tabela-empilhada"
 
 /** Under a floor and with no main executor: nothing runs until the owner adds one. */
-export function semOndeRodar(ws: IWorkspacePolicyAdmin): boolean {
+export function hasNowhereToRun(ws: IWorkspacePolicyAdmin): boolean {
   return ws.isolation_floor === "no_pool" && ws.primary_count === 0
 }
 
@@ -35,14 +35,14 @@ export function IsolationFloorSection({ items, onChanged }: {
   items: IWorkspacePolicyAdmin[]
   onChanged: () => void
 }) {
-  const [confirmar, setConfirmar] = useState<IWorkspacePolicyAdmin | null>(null)
-  const [salvando, setSalvando] = useState<string | null>(null)
+  const [confirmar, setPendingConfirm] = useState<IWorkspacePolicyAdmin | null>(null)
+  const [salvando, setSaving] = useState<string | null>(null)
 
   async function aplicar(ws: IWorkspacePolicyAdmin, floor: "none" | "no_pool") {
-    setConfirmar(null)
-    setSalvando(ws.id_hash)
+    setPendingConfirm(null)
+    setSaving(ws.id_hash)
     const res = await GisFlowService.setWorkspaceIsolationFloor(ws.id_hash, floor)
-    setSalvando(null)
+    setSaving(null)
     if (res.error) {
       createToast.error("Erro ao alterar o piso", res.error.message)
       return
@@ -61,7 +61,7 @@ export function IsolationFloorSection({ items, onChanged }: {
   }
 
   function alternar(ws: IWorkspacePolicyAdmin, exigir: boolean) {
-    if (exigir) { setConfirmar(ws); return }
+    if (exigir) { setPendingConfirm(ws); return }
     aplicar(ws, "none")
   }
 
@@ -73,7 +73,7 @@ export function IsolationFloorSection({ items, onChanged }: {
     <div className="flex flex-col gap-4">
       <div className="rounded-lg border border-border overflow-x-auto">
         <table className="w-full text-xs md:min-w-[560px]">
-          <thead className={CABECALHO_DE_COLUNAS}>
+          <thead className={COLUMN_HEADER}>
             <tr className="bg-muted/50 border-b border-border">
               <th className="text-left px-3 py-2 font-medium text-muted-foreground">Workspace</th>
               <th className="text-left px-3 py-2 font-medium text-muted-foreground">Política</th>
@@ -82,25 +82,25 @@ export function IsolationFloorSection({ items, onChanged }: {
           </thead>
           <tbody>
             {items.map(ws => {
-              const sobPiso = ws.isolation_floor === "no_pool"
-              const alerta = semOndeRodar(ws)
+              const underFloor = ws.isolation_floor === "no_pool"
+              const alerta = hasNowhereToRun(ws)
               return (
-                <tr key={ws.id_hash} className={`border-b border-border last:border-b-0 ${LINHA_EMPILHADA}`}>
-                  <td className={`px-3 py-2 ${DESTAQUE_DA_FICHA}`}>
+                <tr key={ws.id_hash} className={`border-b border-border last:border-b-0 ${STACKED_ROW}`}>
+                  <td className={`px-3 py-2 ${CARD_HIGHLIGHT}`}>
                     <div className="flex items-center gap-1.5 font-medium text-foreground">
                       {ws.name}
                       {ws.is_default && <Badge variant="secondary" className="px-1 py-0 text-[9px]">padrão</Badge>}
                     </div>
                     <div className="text-muted-foreground">{ws.owner_username ?? "(sem dono)"}</div>
                   </td>
-                  <td data-rotulo="política" className={`px-3 py-2 ${CELULA_COM_ROTULO}`}>
+                  <td data-rotulo="política" className={`px-3 py-2 ${LABELED_CELL}`}>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <Badge
                         variant="outline"
-                        className={cn("gap-1 px-1.5 py-0 text-[10px]", classeDoModo(ws.mode))}
+                        className={cn("gap-1 px-1.5 py-0 text-[10px]", modeClass(ws.mode))}
                       >
-                        {sobPiso && <TbLock size={10} aria-hidden="true" />}
-                        {rotuloDoModo(ws.mode)}
+                        {underFloor && <TbLock size={10} aria-hidden="true" />}
+                        {modeLabel(ws.mode)}
                       </Badge>
                       <span className="tabular-nums text-muted-foreground">
                         {ws.primary_count} {ws.primary_count === 1 ? "principal" : "principais"}
@@ -114,9 +114,9 @@ export function IsolationFloorSection({ items, onChanged }: {
                       )}
                     </div>
                   </td>
-                  <td data-rotulo="exigir isolamento" className={`px-3 py-2 text-right ${CELULA_COM_ROTULO}`}>
+                  <td data-rotulo="exigir isolamento" className={`px-3 py-2 text-right ${LABELED_CELL}`}>
                     <Switch
-                      checked={sobPiso}
+                      checked={underFloor}
                       disabled={salvando === ws.id_hash}
                       onCheckedChange={v => alternar(ws, v)}
                       aria-label={`Exigir isolamento de ${ws.name}`}
@@ -129,7 +129,7 @@ export function IsolationFloorSection({ items, onChanged }: {
         </table>
       </div>
 
-      <Dialog open={confirmar !== null} onOpenChange={o => { if (!o) setConfirmar(null) }}>
+      <Dialog open={confirmar !== null} onOpenChange={o => { if (!o) setPendingConfirm(null) }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Exigir isolamento de «{confirmar?.name}»?</DialogTitle>
@@ -147,7 +147,7 @@ export function IsolationFloorSection({ items, onChanged }: {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmar(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setPendingConfirm(null)}>Cancelar</Button>
             <Button onClick={() => confirmar && aplicar(confirmar, "no_pool")}>Exigir isolamento</Button>
           </DialogFooter>
         </DialogContent>

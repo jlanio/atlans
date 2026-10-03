@@ -23,7 +23,7 @@ vi.mock("@/context/WorkspaceContext", () => ({
 
 // Recharts doesn't paint in jsdom (ResponsiveContainer measures 0×0).
 vi.mock("next/dynamic", () => ({
-  default: () => function BarrasDubladas({ dias }: { dias: unknown[] }) {
+  default: () => function StubbedBars({ dias }: { dias: unknown[] }) {
     return <div data-testid="barras">{dias.length} dias</div>
   },
 }))
@@ -48,7 +48,7 @@ vi.mock("@/utils/createToast", () => ({
 
 import { GisFlowService } from "@/service/GisFlowService"
 import { createToast } from "@/utils/createToast"
-import HistoricoPage from "@/app/(dashboard)/observability/page"
+import HistoryPage from "@/app/(dashboard)/observability/page"
 
 const svc = GisFlowService as unknown as Record<string, ReturnType<typeof vi.fn>>
 const toast = createToast as unknown as { success: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> }
@@ -101,7 +101,7 @@ const executor: IExecutorMetrics = {
   capacity: { running: 2, queued: 0, max_concurrent: 4, max_queue: 20 }, p50_seconds: 38,
 }
 
-function respostasBoas() {
+function goodResponses() {
   svc.getObservabilityMetrics.mockResolvedValue(ok(metricas()))
   svc.getRunsByDay.mockResolvedValue(ok({ days: [
     { day: "2026-09-05", total: 40, success: 38, failed: 2, running: 0, cancelled: 0 },
@@ -119,19 +119,19 @@ function respostasBoas() {
 
 beforeEach(() => {
   vi.resetAllMocks()
-  respostasBoas()
+  goodResponses()
   url.sp = new URLSearchParams("")
   sessao.role = "user"
   workspaces.lista = [{ id_hash: "ws-1", name: "Cadastro" }]
 })
 afterEach(cleanup)
 
-const ultimaUrl = () => replace.mock.calls.at(-1)![0] as string
+const lastUrl = () => replace.mock.calls.at(-1)![0] as string
 
 // ── Testes ───────────────────────────────────────────────────────────────────
 describe("Histórico — página", () => {
   it("compõe cabeçalho, faixa Agora, indicadores, gráfico, atenção, abas e tabela", async () => {
-    render(<HistoricoPage />)
+    render(<HistoryPage />)
     expect(screen.getByRole("heading", { level: 1, name: "Histórico" })).toBeInTheDocument()
     expect(screen.getByText(/comparado com os 30 dias anteriores/)).toBeInTheDocument()
 
@@ -173,7 +173,7 @@ describe("Histórico — página", () => {
   })
 
   it("trocar o período escreve a URL sem scroll", async () => {
-    render(<HistoricoPage />)
+    render(<HistoryPage />)
     await screen.findByLabelText("Agora")
     fireEvent.click(screen.getByRole("button", { name: "Últimos 7 dias" }))
     expect(replace).toHaveBeenCalledWith("/observability?periodo=7", { scroll: false })
@@ -181,7 +181,7 @@ describe("Histórico — página", () => {
 
   it("?execucao= abre o painel da execução e fechá-lo limpa a URL", async () => {
     url.sp = new URLSearchParams("execucao=run-1")
-    render(<HistoricoPage />)
+    render(<HistoryPage />)
     await waitFor(() => expect(svc.getRunDetail).toHaveBeenCalledWith("run-1"))
     const sheet = await screen.findByRole("dialog")
     await waitFor(() => expect(sheet).toHaveTextContent("Integração SICAR"))
@@ -191,58 +191,58 @@ describe("Histórico — página", () => {
     expect(linha).toHaveAttribute("aria-current", "true")
 
     fireEvent.keyDown(sheet, { key: "Escape" })
-    await waitFor(() => expect(ultimaUrl()).toBe("/observability"))
+    await waitFor(() => expect(lastUrl()).toBe("/observability"))
   })
 
   it("clicar numa linha abre a execução pela URL", async () => {
-    render(<HistoricoPage />)
+    render(<HistoryPage />)
     fireEvent.click(await screen.findByRole("button", { name: "Abrir execução de Integração SICAR" }))
-    expect(ultimaUrl()).toBe("/observability?execucao=run-1")
+    expect(lastUrl()).toBe("/observability?execucao=run-1")
   })
 
   it("visão workflows: lista as linhas; clicar leva às execuções filtradas", async () => {
     url.sp = new URLSearchParams("visao=workflows")
-    render(<HistoricoPage />)
+    render(<HistoryPage />)
     expect(screen.getByRole("tab", { name: /Por workflow/ })).toHaveAttribute("aria-selected", "true")
     const painel = screen.getByRole("tabpanel")
     expect(painel).toHaveAttribute("aria-labelledby", "visao-aba-workflows")
     fireEvent.click(await within(painel).findByRole("button", { name: "Ver execuções de Integração SICAR" }))
-    expect(ultimaUrl()).toBe("/observability?workflow=wf-2")
+    expect(lastUrl()).toBe("/observability?workflow=wf-2")
     // No filters or table in this view.
     expect(within(painel).queryByRole("searchbox")).not.toBeInTheDocument()
   })
 
   it("trocar de visão pela aba fecha a execução aberta", async () => {
     url.sp = new URLSearchParams("execucao=run-1")
-    render(<HistoricoPage />)
+    render(<HistoryPage />)
     await screen.findByRole("dialog")
     fireEvent.click(screen.getByRole("tab", { name: /Por executor/, hidden: true }))
-    expect(ultimaUrl()).toBe("/observability?visao=executores")
+    expect(lastUrl()).toBe("/observability?visao=executores")
   })
 
   it("ações de atenção: presa abre a execução; falhas repetidas filtram por workflow com status=failed", async () => {
-    render(<HistoricoPage />)
+    render(<HistoryPage />)
     const atencao = screen.getByRole("region", { name: "Precisa de atenção" })
     // Each item has the main action AND a "dismiss" (which also names the
     // workflow); the regexes target the ACTION (verb/state in the name), not
     // the dismiss × ("Dispensar o alerta de …").
     const presa = await within(atencao).findByRole("button", { name: /Cadastro rural.*em andamento/ })
     fireEvent.click(presa)
-    expect(ultimaUrl()).toBe("/observability?execucao=run-presa")
+    expect(lastUrl()).toBe("/observability?execucao=run-presa")
 
     fireEvent.click(within(atencao).getByRole("button", { name: /Integração SICAR falhou/ }))
-    expect(ultimaUrl()).toBe("/observability?status=failed&workflow=wf-2&execucao=run-presa")
+    expect(lastUrl()).toBe("/observability?status=failed&workflow=wf-2&execucao=run-presa")
   })
 
   it("'Ver em andamento' aplica status=running e a visão execuções", async () => {
     url.sp = new URLSearchParams("visao=executores")
-    render(<HistoricoPage />)
+    render(<HistoryPage />)
     fireEvent.click(await screen.findByRole("button", { name: "Ver execuções em andamento" }))
-    expect(ultimaUrl()).toBe("/observability?status=running")
+    expect(lastUrl()).toBe("/observability?status=running")
   })
 
   it("Atualizar refaz os dados com force e a lista de execuções", async () => {
-    render(<HistoricoPage />)
+    render(<HistoryPage />)
     await screen.findByRole("button", { name: "Abrir execução de Integração SICAR" })
     await waitFor(() => expect(screen.getByRole("button", { name: "Atualizar os dados do Histórico" })).toBeEnabled())
     fireEvent.click(screen.getByRole("button", { name: "Atualizar os dados do Histórico" }))
@@ -252,7 +252,7 @@ describe("Histórico — página", () => {
 
   it("falha parcial vira aviso na seção, e o resto da página continua", async () => {
     svc.getRunsByDay.mockResolvedValue(falha())
-    render(<HistoricoPage />)
+    render(<HistoryPage />)
     expect(await screen.findByText(/Não foi possível carregar as execuções por dia/)).toBeInTheDocument()
     expect(screen.getByRole("group", { name: /^Execuções: 1\.284/ })).toBeInTheDocument()
   })
@@ -261,9 +261,9 @@ describe("Histórico — página", () => {
     sessao.role = "admin"
     svc.getPendingAcks.mockResolvedValue(ok({ items: [{ job_id: "j1", executor_id: "ex-1", elapsed_seconds: 40 }], threshold_overdue_seconds: 15 }))
     url.sp = new URLSearchParams("visao=workflows")
-    render(<HistoricoPage />)
-    const abaAcks = await screen.findByRole("tab", { name: /Confirmações/ })
-    await waitFor(() => expect(abaAcks).toHaveTextContent("1"))
+    render(<HistoryPage />)
+    const acksTab = await screen.findByRole("tab", { name: /Confirmações/ })
+    await waitFor(() => expect(acksTab).toHaveTextContent("1"))
 
     const painel = screen.getByRole("tabpanel")
     const interruptor = await within(painel).findByRole("switch", { name: "Desativar Integração SICAR" })
@@ -276,13 +276,13 @@ describe("Histórico — página", () => {
   })
 
   it("usuário com um só workspace não vê o seletor de workspace; com dois, vê", async () => {
-    const { unmount } = render(<HistoricoPage />)
+    const { unmount } = render(<HistoryPage />)
     await screen.findByRole("button", { name: "Abrir execução de Integração SICAR" })
     expect(screen.queryByRole("combobox", { name: "Workspace" })).not.toBeInTheDocument()
     unmount()
 
     workspaces.lista = [{ id_hash: "ws-1", name: "Cadastro" }, { id_hash: "ws-2", name: "Geo" }]
-    render(<HistoricoPage />)
+    render(<HistoryPage />)
     expect(await screen.findByRole("combobox", { name: "Workspace" })).toBeInTheDocument()
   })
 })

@@ -105,7 +105,7 @@ export default function CommandPalette() {
     // canvas next to it had just fetched. Only the workflow list is volatile
     // enough to be worth a GET per open.
     const catalogo = useWorkflowCatalogStore.getState()
-    const [wfRes, credenciais, nosDoCatalogo] = await Promise.all([
+    const [wfRes, credenciais, catalogNodes] = await Promise.all([
       // Including the assistant's: the palette is the shortcut to open a workflow
       // by name, and not finding what the assistant created is the same as not having it.
       GisFlowService.getWorkflows(undefined, { incluirDoAssistente: true }),
@@ -137,7 +137,7 @@ export default function CommandPalette() {
 
     // Workflow nodes — only appear on the canvas
     const nodeItems: CommandItem[] = isOnCanvas
-      ? nosDoCatalogo.map(node => ({
+      ? catalogNodes.map(node => ({
           id: `node-${node.name}`,
           label: node.alias ?? node.name,
           description: node.description,

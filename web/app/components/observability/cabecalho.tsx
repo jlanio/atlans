@@ -3,11 +3,11 @@
 import { TbRefresh } from "react-icons/tb"
 import { Button } from "@/app/components/ui/button"
 import { cn } from "@/lib/utils"
-import { PERIODOS, type Periodo } from "./historico-url"
+import { PERIODS, type Period } from "./historico-url"
 
 interface Props {
-  periodo: Periodo
-  onPeriodo: (p: Periodo) => void
+  periodo: Period
+  onPeriodo: (p: Period) => void
   carregando: boolean
   onAtualizar: () => void
   /** Size of the previous window the indicators are compared with. */
@@ -49,7 +49,7 @@ export function CabecalhoDoHistorico({
           aria-label="Período"
           className="inline-flex h-8 w-full overflow-hidden rounded-md border bg-card max-md:h-10 sm:w-auto"
         >
-          {PERIODOS.map(p => {
+          {PERIODS.map(p => {
             const ativo = p === periodo
             return (
               <button

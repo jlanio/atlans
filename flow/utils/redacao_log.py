@@ -11,7 +11,7 @@ here — a single list.
 Two ways to turn it on:
 
 - `SecretScrubFilter`: per-logger filter (the app's `get_logger` attaches it).
-- `instalar_no_processo()`: the LogRecord factory, through which EVERY record
+- `install_in_process()`: the LogRecord factory, through which EVERY record
   in the process passes — including third-party libraries' and those of handlers
   that don't exist yet (the executor installs several: console, files, panel).
   It is the same hook `segredos_vivos` uses for the secrets in use.
@@ -149,10 +149,10 @@ class SecretScrubFilter(logging.Filter):
 # Arguments the pattern pass has already seen in full: text (redacted one by
 # one) and numbers (carry no secret). With all of them like this, the interpolated
 # message has nothing more to show.
-_ARGS_SIMPLES = (str, int, float, bool, type(None))
+_SIMPLE_ARGS = (str, int, float, bool, type(None))
 
 
-def _redigir_registro(registro: logging.LogRecord) -> None:
+def _redact_record(registro: logging.LogRecord) -> None:
     """The `SecretScrubFilter` plus what only shows up INTERPOLATED: an argument
     that is not a string (the asyncpg exception carries the DSN in its `str()`), and
     the exception's traceback. The record keeps its shape (`msg`/`args` one by one)
@@ -164,9 +164,9 @@ def _redigir_registro(registro: logging.LogRecord) -> None:
     #    the two factories were installed — this one applies both, in this order.
     from flow.utils import segredos_vivos
 
-    formas = segredos_vivos._formas
+    formas = segredos_vivos._forms
     if formas:
-        segredos_vivos._limpar(registro, formas)
+        segredos_vivos._clean(registro, formas)
     # 2. The patterns on `msg` and on each text argument.
     _secret_filter_do_flow.filter(registro)
     # 3. The interpolated message, only when it has something more to show: a `msg`
@@ -174,7 +174,7 @@ def _redigir_registro(registro: logging.LogRecord) -> None:
     #    Rescanning the whole message every time doubled the cost of every record.
     args = registro.args
     valores = args.values() if isinstance(args, dict) else (args or ())
-    if not isinstance(registro.msg, str) or not all(isinstance(v, _ARGS_SIMPLES) for v in valores):
+    if not isinstance(registro.msg, str) or not all(isinstance(v, _SIMPLE_ARGS) for v in valores):
         try:
             mensagem = registro.getMessage()
         except Exception:
@@ -187,9 +187,9 @@ def _redigir_registro(registro: logging.LogRecord) -> None:
     #    ready-made instead of formatting `exc_info` again).
     if registro.exc_info and not registro.exc_text:
         texto = logging.Formatter().formatException(registro.exc_info)
-        redigido = _scrub(texto)
-        registro.exc_text = redigido
-        if redigido != texto:
+        redacted = _scrub(texto)
+        registro.exc_text = redacted
+        if redacted != texto:
             registro.exc_info = None
     if registro.stack_info:
         registro.stack_info = _scrub(registro.stack_info)
@@ -197,28 +197,28 @@ def _redigir_registro(registro: logging.LogRecord) -> None:
 
 _secret_filter_do_flow = SecretScrubFilter()
 _lock = threading.Lock()
-_instalada = False
+_installed = False
 
 
-def instalar_no_processo() -> None:
+def install_in_process() -> None:
     """Redacts every log record of this process. Idempotent.
 
     Fails open, like the filter: if the redaction raises, the record goes on as
     it came — losing the log would be worse.
     """
-    global _instalada
+    global _installed
     with _lock:
-        if _instalada:
+        if _installed:
             return
         anterior = logging.getLogRecordFactory()
 
         def fabrica(*args, **kwargs):
             registro = anterior(*args, **kwargs)
             try:
-                _redigir_registro(registro)
+                _redact_record(registro)
             except Exception:  # logging never brings down the caller
                 pass
             return registro
 
         logging.setLogRecordFactory(fabrica)
-        _instalada = True
+        _installed = True

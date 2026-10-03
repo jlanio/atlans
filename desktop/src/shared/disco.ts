@@ -18,12 +18,12 @@ export const DISCO_BAIXO_GB = 5
 /** Below this, it is a matter of time until it fails. */
 export const DISCO_CRITICO_GB = 1
 
-export type NivelDisco = 'ok' | 'baixo' | 'critico'
+export type DiskLevel = 'ok' | 'baixo' | 'critico'
 
-export function nivelDoDisco(livreGb: number | null | undefined): NivelDisco | null {
-  if (typeof livreGb !== 'number') return null
-  if (livreGb < DISCO_CRITICO_GB) return 'critico'
-  if (livreGb < DISCO_BAIXO_GB) return 'baixo'
+export function diskLevel(freeGb: number | null | undefined): DiskLevel | null {
+  if (typeof freeGb !== 'number') return null
+  if (freeGb < DISCO_CRITICO_GB) return 'critico'
+  if (freeGb < DISCO_BAIXO_GB) return 'baixo'
   return 'ok'
 }
 

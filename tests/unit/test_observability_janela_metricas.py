@@ -33,7 +33,7 @@ def _user(role="admin"):
     return u
 
 
-class _LinhaVazia:
+class _EmptyRow:
     """A "no data" aggregation row: any column reads as None. Serves the
     queries these tests do NOT inspect (previous period, percentiles,
     top failures, `now` block), which only need an empty result."""
@@ -50,11 +50,11 @@ def _db():
     wf = MagicMock()
     wf.one.return_value = SimpleNamespace(total=0, ativos=0)
     runs = MagicMock()
-    runs.one.return_value = _LinhaVazia()
+    runs.one.return_value = _EmptyRow()
 
-    def _vazio():
+    def _empty():
         r = MagicMock()
-        r.one.return_value = _LinhaVazia()
+        r.one.return_value = _EmptyRow()
         r.all.return_value = []
         r.scalars.return_value.all.return_value = []
         r.scalar_one_or_none.return_value = None
@@ -63,16 +63,16 @@ def _db():
     respostas = [wf, runs]
 
     async def _execute(stmt):
-        return respostas.pop(0) if respostas else _vazio()
+        return respostas.pop(0) if respostas else _empty()
 
     return MagicMock(execute=AsyncMock(side_effect=_execute))
 
 
-def _query_dos_runs(db):
+def _runs_query(db):
     return db.execute.await_args_list[1].args[0]
 
 
-def _limiar_do_where(stmt) -> datetime:
+def _where_threshold(stmt) -> datetime:
     """The datetime of `WHERE start_time >= :param` — without a workspace filter,
     the WHERE has that condition and no other."""
     return stmt.whereclause.right.value
@@ -80,7 +80,7 @@ def _limiar_do_where(stmt) -> datetime:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("days", [1, 7, 13])
-async def test_where_cobre_14_dias_quando_a_janela_pedida_e_menor(days):
+async def test_where_covers_14_days_when_the_requested_window_is_smaller(days):
     """Scenario: `GET /observability/metrics?days=7` with hundreds of runs in
     the previous week. If the WHERE spans 7 days, `prev_7d` cannot possibly see
     anything and the week-over-week comparison goes to zero."""
@@ -89,12 +89,12 @@ async def test_where_cobre_14_dias_quando_a_janela_pedida_e_menor(days):
 
     await ObservabilityService.get_metrics(db, _user(), [], days=days, force=True, como_admin=True)
 
-    limiar = _limiar_do_where(_query_dos_runs(db))
+    limiar = _where_threshold(_runs_query(db))
     assert antes - limiar >= timedelta(days=14) - timedelta(seconds=5)
 
 
 @pytest.mark.asyncio
-async def test_where_respeita_a_janela_pedida_quando_ela_e_maior_que_14_dias():
+async def test_where_respects_the_requested_window_when_larger_than_14_days():
     """The widening is a floor, not a ceiling: `days=90` still scans 90
     days, or `total_runs` would under-report."""
     db = _db()
@@ -102,12 +102,12 @@ async def test_where_respeita_a_janela_pedida_quando_ela_e_maior_que_14_dias():
 
     await ObservabilityService.get_metrics(db, _user(), [], days=90, force=True, como_admin=True)
 
-    limiar = _limiar_do_where(_query_dos_runs(db))
+    limiar = _where_threshold(_runs_query(db))
     assert timedelta(days=89) < antes - limiar < timedelta(days=91)
 
 
 @pytest.mark.asyncio
-async def test_agregados_da_janela_ganham_filter_para_nao_herdar_os_14_dias():
+async def test_window_aggregates_get_filter_to_not_inherit_the_14_days():
     """With the widened WHERE, `total`/`success`/`failed`/`running`/`avg` NEED
     their own FILTER: without it, `?days=7` would return the 14-day numbers
     under the 7-day label."""
@@ -115,7 +115,7 @@ async def test_agregados_da_janela_ganham_filter_para_nao_herdar_os_14_dias():
 
     await ObservabilityService.get_metrics(db, _user(), [], days=7, force=True, como_admin=True)
 
-    sql = str(_query_dos_runs(db))
+    sql = str(_runs_query(db))
     cabecalho = sql.split("FROM", 1)[0]
     for rotulo in ("AS total", "AS success", "AS failed", "AS running", "AS avg_duration"):
         coluna = cabecalho.split(rotulo)[0].rsplit(",", 1)[-1]
@@ -123,21 +123,21 @@ async def test_agregados_da_janela_ganham_filter_para_nao_herdar_os_14_dias():
 
 
 @pytest.mark.asyncio
-async def test_todas_as_janelas_sao_timezone_aware():
+async def test_all_windows_are_timezone_aware():
     """A naive bind on a timestamptz column is read in the process time zone: with
     TZ=America/Cuiaba the 24h window becomes 20h."""
     db = _db()
 
     await ObservabilityService.get_metrics(db, _user(), [], days=90, force=True, como_admin=True)
 
-    binds = _query_dos_runs(db).compile().params.values()
-    momentos = [v for v in binds if isinstance(v, datetime)]
-    assert momentos, "a query perdeu os limiares de tempo"
-    assert all(m.tzinfo is not None for m in momentos)
+    binds = _runs_query(db).compile().params.values()
+    instants = [v for v in binds if isinstance(v, datetime)]
+    assert instants, "a query perdeu os limiares de tempo"
+    assert all(m.tzinfo is not None for m in instants)
 
 
 @pytest.mark.asyncio
-async def test_janela_dos_executores_tambem_e_aware():
+async def test_executors_window_is_also_aware():
     """Mesmo bug, mesma tabela timestamptz, outro endpoint."""
     resultado = MagicMock()
     resultado.all.return_value = []
@@ -146,12 +146,12 @@ async def test_janela_dos_executores_tambem_e_aware():
     await ObservabilityService.get_executor_metrics(db, _user(), [], days=30, force=True, como_admin=True)
 
     stmt = db.execute.await_args_list[0].args[0]
-    momentos = [v for v in stmt.compile().params.values() if isinstance(v, datetime)]
-    assert momentos and all(m.tzinfo is not None for m in momentos)
+    instants = [v for v in stmt.compile().params.values() if isinstance(v, datetime)]
+    assert instants and all(m.tzinfo is not None for m in instants)
 
 
 @pytest.mark.asyncio
-async def test_resposta_informa_o_periodo_aplicado():
+async def test_response_reports_the_applied_period():
     """Contract with the screen: it sends `days` and labels the card with `period_days`."""
     db = _db()
 

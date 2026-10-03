@@ -15,14 +15,14 @@
 //        (standard cron/croniter can't express "last day").
 //   • Advanced                       → raw cron or rrule, for those who know.
 
-export type Frequencia = "intervalo" | "diario" | "semanal" | "mensal" | "avancado"
-export type UnidadeIntervalo = "seconds" | "minutes" | "hours" | "days"
-export type TipoAvancado = "cron" | "rrule"
+export type Frequency = "intervalo" | "diario" | "semanal" | "mensal" | "avancado"
+export type IntervalUnit = "seconds" | "minutes" | "hours" | "days"
+export type AdvancedType = "cron" | "rrule"
 
-export interface EstadoAgenda {
-  freq: Frequencia
+export interface ScheduleState {
+  freq: Frequency
   intervalo: number
-  unidade: UnidadeIntervalo
+  unidade: IntervalUnit
   hora: number        // 0-23
   minuto: number      // 0-59
   everyDays: number   // "daily": every N days (1 = every day)
@@ -31,7 +31,7 @@ export interface EstadoAgenda {
   monthLast: boolean
   timezone: string
   active: boolean
-  advTipo: TipoAvancado
+  advTipo: AdvancedType
   advCron: string
   advRrule: string
 }
@@ -43,10 +43,10 @@ export interface EstadoAgenda {
 // zone than it would run in. This is only the fallback for when the catalog
 // didn't come — the same default as a server without configuration.
 export const FUSO_DE_RESERVA = "UTC"
-const CRON_PADRAO = "0 9 * * *"
+const DEFAULT_CRON = "0 9 * * *"
 
-const DIAS_CURTOS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"]
-const DIAS_LONGOS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"]
+const SHORT_DAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"]
+const LONG_DAYS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"]
 // RRule BYDAY (RFC 5545): SU=Sunday … SA=Saturday, at the same index as cron.
 const BYDAY = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"]
 
@@ -63,31 +63,31 @@ function inteiro(v: Valores, chave: string, padrao: number): number {
   return Number.isFinite(n) ? n : padrao
 }
 
-function estadoInicial(fusoPadrao: string): EstadoAgenda {
+function initialState(defaultTimeZone: string): ScheduleState {
   return {
     freq: "diario", intervalo: 15, unidade: "minutes", hora: 9, minuto: 0,
     everyDays: 1, weekdays: [1, 2, 3, 4, 5], monthDay: 1, monthLast: false,
-    timezone: fusoPadrao, active: true, advTipo: "cron", advCron: CRON_PADRAO, advRrule: "",
+    timezone: defaultTimeZone, active: true, advTipo: "cron", advCron: DEFAULT_CRON, advRrule: "",
   }
 }
 
 /** The installation's default time zone: the `default` of the `timezone` field in the node catalog. */
-export function fusoPadraoDosCampos(campos?: { name: string; default?: unknown }[]): string {
+export function fieldsDefaultTimezone(campos?: { name: string; default?: unknown }[]): string {
   const padrao = campos?.find(c => c.name === "timezone")?.default
   return typeof padrao === "string" && padrao.trim() ? padrao.trim() : FUSO_DE_RESERVA
 }
 
 /** Translates the fields stored on the node into the builder state. */
-export function lerEstado(valores: Valores, fusoPadrao: string = FUSO_DE_RESERVA): EstadoAgenda {
-  const e = estadoInicial(fusoPadrao)
-  e.timezone = texto(valores, "timezone", fusoPadrao) || fusoPadrao
+export function lerEstado(valores: Valores, defaultTimeZone: string = FUSO_DE_RESERVA): ScheduleState {
+  const e = initialState(defaultTimeZone)
+  e.timezone = texto(valores, "timezone", defaultTimeZone) || defaultTimeZone
   // `Boolean("false")` is true — explicitly coerces strings/0 (legacy data).
   const a = valores?.active
   e.active = !(a === false || a === "false" || a === 0 || a === "0")
   e.intervalo = Math.max(1, inteiro(valores, "interval", 15))
   const unidade = texto(valores, "unit", "minutes")
-  e.unidade = (["seconds", "minutes", "hours", "days"].includes(unidade) ? unidade : "minutes") as UnidadeIntervalo
-  e.advCron = texto(valores, "cron_expression", CRON_PADRAO) || CRON_PADRAO
+  e.unidade = (["seconds", "minutes", "hours", "days"].includes(unidade) ? unidade : "minutes") as IntervalUnit
+  e.advCron = texto(valores, "cron_expression", DEFAULT_CRON) || DEFAULT_CRON
   e.advRrule = texto(valores, "rrule_expression", "")
 
   const strategy = texto(valores, "strategy", "cron") || "cron"
@@ -104,15 +104,15 @@ export function lerEstado(valores: Valores, fusoPadrao: string = FUSO_DE_RESERVA
     // saved — and a "Salvar" from there writes strategy=cron with CRON_PADRAO,
     // silently erasing the rrule.
     e.advTipo = "rrule"
-    return aplicarRrule(e, e.advRrule)
+    return applyRrule(e, e.advRrule)
   }
   // strategy === "cron" (or absent): tries to map to a builder mode.
-  return aplicarCron(e, e.advCron)
+  return applyCron(e, e.advCron)
 }
 
-function aplicarCron(e: EstadoAgenda, expr: string): EstadoAgenda {
+function applyCron(e: ScheduleState, expr: string): ScheduleState {
   const p = String(expr || "").trim().split(/\s+/)
-  const avancado = (): EstadoAgenda => ({ ...e, freq: "avancado", advTipo: "cron", advCron: expr })
+  const avancado = (): ScheduleState => ({ ...e, freq: "avancado", advTipo: "cron", advCron: expr })
   if (p.length !== 5) return avancado()
   const [min, hora, dom, mes, dow] = p
   const m = /^\d+$/.test(min) ? +min : null
@@ -124,7 +124,7 @@ function aplicarCron(e: EstadoAgenda, expr: string): EstadoAgenda {
   if (dom === "*" && dow === "*") return { ...e, freq: "diario", everyDays: 1, hora: h, minuto: m }
   // Weekly: "M H * * d,d" (day-of-week only)
   if (dom === "*" && dow !== "*") {
-    const dias = expandirDow(dow)
+    const dias = expandDow(dow)
     return dias ? { ...e, freq: "semanal", weekdays: dias, hora: h, minuto: m } : avancado()
   }
   // Monthly: "M H D * *" (day-of-month only)
@@ -136,7 +136,7 @@ function aplicarCron(e: EstadoAgenda, expr: string): EstadoAgenda {
 }
 
 /** Expande "1-5" / "2,4" / "1" em [1..5] / [2,4] / [1]; null se tiver algo fora disso. */
-function expandirDow(dow: string): number[] | null {
+function expandDow(dow: string): number[] | null {
   const out: number[] = []
   for (const parte of dow.split(",")) {
     const faixa = /^(\d)-(\d)$/.exec(parte)
@@ -156,13 +156,13 @@ function expandirDow(dow: string): number[] | null {
   return unicos.length ? unicos : null
 }
 
-function aplicarRrule(e: EstadoAgenda, expr: string): EstadoAgenda {
+function applyRrule(e: ScheduleState, expr: string): ScheduleState {
   const partes: Record<string, string> = {}
   String(expr || "").replace(/^RRULE:/i, "").split(";").forEach(kv => {
     const i = kv.indexOf("=")
     if (i > 0) partes[kv.slice(0, i).trim().toUpperCase()] = kv.slice(i + 1).trim()
   })
-  const avancado = (): EstadoAgenda => ({ ...e, freq: "avancado", advTipo: "rrule", advRrule: expr })
+  const avancado = (): ScheduleState => ({ ...e, freq: "avancado", advTipo: "rrule", advRrule: expr })
   const freq = (partes.FREQ || "").toUpperCase()
   const h = /^\d+$/.test(partes.BYHOUR || "") ? +partes.BYHOUR : null
   const m = /^\d+$/.test(partes.BYMINUTE || "") ? +partes.BYMINUTE : null
@@ -191,24 +191,24 @@ function aplicarRrule(e: EstadoAgenda, expr: string): EstadoAgenda {
 
 // ── Estado → campos gravados ──────────────────────────────────────────────────
 
-export interface CamposAgenda {
+export interface ScheduleFields {
   strategy: "cron" | "interval" | "rrule"
   cron_expression: string
   interval: number
-  unit: UnidadeIntervalo
+  unit: IntervalUnit
   rrule_expression: string
   timezone: string
   active: boolean
 }
 
-const hhmm = (e: EstadoAgenda) => ({ m: clamp(e.minuto, 0, 59), h: clamp(e.hora, 0, 23) })
+const hhmm = (e: ScheduleState) => ({ m: clamp(e.minuto, 0, 59), h: clamp(e.hora, 0, 23) })
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(Number.isFinite(n) ? n : min)))
 }
 
 /** Produces the COMPLETE, canonical set of fields to persist for the state. */
-export function gerarCampos(e: EstadoAgenda): CamposAgenda {
-  const base: CamposAgenda = {
+export function gerarCampos(e: ScheduleState): ScheduleFields {
+  const base: ScheduleFields = {
     strategy: "cron", cron_expression: "", interval: Math.max(1, e.intervalo),
     unit: e.unidade, rrule_expression: "", timezone: e.timezone || FUSO_DE_RESERVA, active: e.active,
   }
@@ -236,16 +236,16 @@ export function gerarCampos(e: EstadoAgenda): CamposAgenda {
 
 // ── Frase em pt-BR ────────────────────────────────────────────────────────────
 
-const UNIDADE_TXT: Record<UnidadeIntervalo, [string, string]> = {
+const UNIT_TEXT: Record<IntervalUnit, [string, string]> = {
   seconds: ["segundo", "segundos"], minutes: ["minuto", "minutos"],
   hours: ["hora", "horas"], days: ["dia", "dias"],
 }
-const hhmmStr = (e: EstadoAgenda) => `${String(clamp(e.hora, 0, 23)).padStart(2, "0")}:${String(clamp(e.minuto, 0, 59)).padStart(2, "0")}`
+const hhmmStr = (e: ScheduleState) => `${String(clamp(e.hora, 0, 23)).padStart(2, "0")}:${String(clamp(e.minuto, 0, 59)).padStart(2, "0")}`
 
-export function descrever(e: EstadoAgenda): string {
+export function descrever(e: ScheduleState): string {
   const hora = hhmmStr(e)
   if (e.freq === "intervalo") {
-    const n = Math.max(1, e.intervalo), par = UNIDADE_TXT[e.unidade]
+    const n = Math.max(1, e.intervalo), par = UNIT_TEXT[e.unidade]
     return `A cada ${n} ${n === 1 ? par[0] : par[1]}`
   }
   if (e.freq === "diario") return e.everyDays <= 1 ? `Todos os dias às ${hora}` : `A cada ${e.everyDays} dias às ${hora}`
@@ -255,16 +255,16 @@ export function descrever(e: EstadoAgenda): string {
     if (ds.length === 7) return `Todos os dias às ${hora}`
     if (ds.join() === "1,2,3,4,5") return `De segunda a sexta às ${hora}`
     if (ds.join() === "0,6") return `Sábado e domingo às ${hora}`
-    return `Toda ${ds.map(d => DIAS_CURTOS[d]).join(", ")} às ${hora}`
+    return `Toda ${ds.map(d => SHORT_DAYS[d]).join(", ")} às ${hora}`
   }
   if (e.freq === "mensal") return e.monthLast ? `No último dia do mês às ${hora}` : `Todo dia ${e.monthDay} às ${hora}`
   // advanced
   if (e.advTipo === "rrule") return e.advRrule ? "Regra RRule personalizada" : "Defina a expressão RRule"
-  return descreverCron(e.advCron)
+  return describeCron(e.advCron)
 }
 
 /** Best-effort description of a raw cron (advanced mode). */
-export function descreverCron(expr: string): string {
+export function describeCron(expr: string): string {
   const p = String(expr || "").trim().split(/\s+/)
   if (p.length !== 5) return "Expressão inválida (5 campos: min hora dia mês dia-semana)"
   const [min, hora, dom, mes, dow] = p
@@ -278,8 +278,8 @@ export function descreverCron(expr: string): string {
   const hhmmTxt = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
   if (dom === "*" && mes === "*" && dow === "*") return `Diariamente às ${hhmmTxt}`
   if (dom === "*" && mes === "*" && dow !== "*") {
-    const dias = expandirDow(dow)
-    if (dias) return `${dias.map(d => DIAS_CURTOS[d]).join(", ")} às ${hhmmTxt}`
+    const dias = expandDow(dow)
+    if (dias) return `${dias.map(d => SHORT_DAYS[d]).join(", ")} às ${hhmmTxt}`
   }
   if (/^\d+$/.test(dom) && mes === "*" && dow === "*") return `Todo dia ${dom} às ${hhmmTxt}`
   return `Personalizado: ${expr}`
@@ -290,7 +290,7 @@ export function descreverCron(expr: string): string {
  * what the scheduler would reject (cron ≠ 5 fields; empty rrule/without FREQ)
  * so the client doesn't write an expression that would silently erase the schedule.
  */
-export function validarAvancado(e: EstadoAgenda): string | null {
+export function validarAvancado(e: ScheduleState): string | null {
   if (e.freq !== "avancado") return null
   if (e.advTipo === "cron") {
     const p = String(e.advCron || "").trim().split(/\s+/).filter(Boolean)
@@ -304,7 +304,7 @@ export function validarAvancado(e: EstadoAgenda): string | null {
 }
 
 /** Summary of what will be saved (shown in "ver o que será salvo"). */
-export function resumoSalvo(e: EstadoAgenda): string {
+export function resumoSalvo(e: ScheduleState): string {
   const c = gerarCampos(e)
   if (c.strategy === "interval") return `intervalo: ${c.interval} (${c.unit})`
   if (c.strategy === "rrule") return `rrule: ${c.rrule_expression}`
@@ -313,9 +313,9 @@ export function resumoSalvo(e: EstadoAgenda): string {
 
 // ── Next runs (same semantics as async_scheduler) ─────────────────────────────
 
-interface ParteFuso { y: number; mo: number; d: number; h: number; mi: number; wd: number }
+interface TimeZoneParts { y: number; mo: number; d: number; h: number; mi: number; wd: number }
 
-function partesNoFuso(date: Date, tz: string): ParteFuso {
+function partsInTimeZone(date: Date, tz: string): TimeZoneParts {
   const f = new Intl.DateTimeFormat("en-CA", {
     timeZone: tz, hour12: false, year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", weekday: "short",
@@ -327,19 +327,19 @@ function partesNoFuso(date: Date, tz: string): ParteFuso {
 }
 
 /** UTC instant matching the "wall clock" time (y-mo-d h:mi) in the time zone. */
-function utcDaParede(y: number, mo: number, d: number, h: number, mi: number, tz: string): Date {
+function utcFromWallClock(y: number, mo: number, d: number, h: number, mi: number, tz: string): Date {
   let ts = Date.UTC(y, mo - 1, d, h, mi, 0)
   for (let i = 0; i < 3; i++) {
-    const p = partesNoFuso(new Date(ts), tz)
+    const p = partsInTimeZone(new Date(ts), tz)
     const visto = Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, 0)
-    const querido = Date.UTC(y, mo - 1, d, h, mi, 0)
-    if (visto === querido) break
-    ts += querido - visto
+    const desired = Date.UTC(y, mo - 1, d, h, mi, 0)
+    if (visto === desired) break
+    ts += desired - visto
   }
   return new Date(ts)
 }
 
-function ultimoDiaDoMes(y: number, mo1: number): number {
+function lastDayOfMonth(y: number, mo1: number): number {
   return new Date(Date.UTC(y, mo1, 0)).getUTCDate() // mo1 = month 1-12
 }
 
@@ -348,7 +348,7 @@ function ultimoDiaDoMes(y: number, mo1: number): number {
  * time zone. Returns null when the preview isn't possible (advanced without a
  * recognized shape). Mirrors what async_scheduler would compute.
  */
-export function proximasExecucoes(e: EstadoAgenda, count = 5, agora: Date = new Date()): Date[] | null {
+export function proximasExecucoes(e: ScheduleState, count = 5, agora: Date = new Date()): Date[] | null {
   const out: Date[] = []
   const tz = e.timezone || FUSO_DE_RESERVA
   const { m, h } = hhmm(e)
@@ -361,67 +361,67 @@ export function proximasExecucoes(e: EstadoAgenda, count = 5, agora: Date = new 
 
   if (e.freq === "avancado") {
     if (e.advTipo === "rrule") return null       // raw rrule: no local forecast
-    return proximasDeCron(e.advCron, tz, count, agora)
+    return nextFromCron(e.advCron, tz, count, agora)
   }
 
   if (e.freq === "mensal") {
-    const base = partesNoFuso(agora, tz)
+    const base = partsInTimeZone(agora, tz)
     for (let k = 0; out.length < count && k < 120; k++) {
-      let ano = base.y, mesIdx = base.mo - 1 + k
-      ano += Math.floor(mesIdx / 12); mesIdx = ((mesIdx % 12) + 12) % 12
-      const ult = ultimoDiaDoMes(ano, mesIdx + 1)
+      let ano = base.y, monthIdx = base.mo - 1 + k
+      ano += Math.floor(monthIdx / 12); monthIdx = ((monthIdx % 12) + 12) % 12
+      const ult = lastDayOfMonth(ano, monthIdx + 1)
       let dia: number
       if (e.monthLast) dia = ult
       else { if (e.monthDay > ult) continue; dia = e.monthDay }   // month without day D → SKIP
-      const q = utcDaParede(ano, mesIdx + 1, dia, h, m, tz)
+      const q = utcFromWallClock(ano, monthIdx + 1, dia, h, m, tz)
       if (q.getTime() > agora.getTime()) out.push(q)
     }
     return out
   }
 
   // daily / weekly: scans day by day in the time zone's calendar.
-  const t0 = partesNoFuso(agora, tz)
+  const t0 = partsInTimeZone(agora, tz)
   const ancora = Date.UTC(t0.y, t0.mo - 1, t0.d)
-  const nDias = e.freq === "diario" ? Math.max(1, e.everyDays) : 1
+  const nDays = e.freq === "diario" ? Math.max(1, e.everyDays) : 1
   const dias = e.freq === "semanal" ? Array.from(new Set(e.weekdays)) : null
   if (dias && !dias.length) return []
   // Ceiling adapted to the cadence: "every N days" with a large N needs to scan
   // further ahead to find `count` runs.
-  const teto = Math.max(1200, (count + 1) * nDias)
+  const teto = Math.max(1200, (count + 1) * nDays)
   for (let k = 0; out.length < count && k < teto; k++) {
     const cd = new Date(ancora + k * 86400000)
     const y = cd.getUTCFullYear(), mo = cd.getUTCMonth() + 1, d = cd.getUTCDate(), wd = cd.getUTCDay()
-    const ok = e.freq === "diario" ? (k % nDias === 0) : dias!.indexOf(wd) !== -1
+    const ok = e.freq === "diario" ? (k % nDays === 0) : dias!.indexOf(wd) !== -1
     if (!ok) continue
-    const q = utcDaParede(y, mo, d, h, m, tz)
+    const q = utcFromWallClock(y, mo, d, h, m, tz)
     if (q.getTime() > agora.getTime()) out.push(q)
   }
   return out
 }
 
 /** Preview for a raw cron — only the shapes with a fixed minute and hour. */
-function proximasDeCron(expr: string, tz: string, count: number, agora: Date): Date[] | null {
+function nextFromCron(expr: string, tz: string, count: number, agora: Date): Date[] | null {
   const p = String(expr || "").trim().split(/\s+/)
   if (p.length !== 5) return null
   const [min, hora, dom, mes, dow] = p
   const m = /^\d+$/.test(min) ? +min : null
   const h = /^\d+$/.test(hora) ? +hora : null
   if (m === null || h === null || mes !== "*") return null
-  const diasSemana = dow === "*" ? null : expandirDow(dow)
-  if (dow !== "*" && !diasSemana) return null
-  const diaMes = dom === "*" ? null : (/^\d+$/.test(dom) ? +dom : null)
-  if (dom !== "*" && diaMes === null) return null
-  if (diaMes !== null && diasSemana) return null   // a combination we don't generate
+  const weekDays = dow === "*" ? null : expandDow(dow)
+  if (dow !== "*" && !weekDays) return null
+  const dayOfMonth = dom === "*" ? null : (/^\d+$/.test(dom) ? +dom : null)
+  if (dom !== "*" && dayOfMonth === null) return null
+  if (dayOfMonth !== null && weekDays) return null   // a combination we don't generate
 
   const out: Date[] = []
-  const t0 = partesNoFuso(agora, tz)
+  const t0 = partsInTimeZone(agora, tz)
   const ancora = Date.UTC(t0.y, t0.mo - 1, t0.d)
   for (let k = 0; out.length < count && k < 1200; k++) {
     const cd = new Date(ancora + k * 86400000)
     const y = cd.getUTCFullYear(), mo = cd.getUTCMonth() + 1, d = cd.getUTCDate(), wd = cd.getUTCDay()
-    const ok = diaMes !== null ? d === diaMes : (diasSemana ? diasSemana.indexOf(wd) !== -1 : true)
+    const ok = dayOfMonth !== null ? d === dayOfMonth : (weekDays ? weekDays.indexOf(wd) !== -1 : true)
     if (!ok) continue
-    const q = utcDaParede(y, mo, d, h, m, tz)
+    const q = utcFromWallClock(y, mo, d, h, m, tz)
     if (q.getTime() > agora.getTime()) out.push(q)
   }
   return out
@@ -429,13 +429,13 @@ function proximasDeCron(expr: string, tz: string, count: number, agora: Date): D
 
 // ── Labels for the UI ─────────────────────────────────────────────────────────
 
-export const NOME_DIA_CURTO = DIAS_CURTOS
-export const NOME_DIA_LONGO = DIAS_LONGOS
+export const SHORT_DAY_NAME = SHORT_DAYS
+export const LONG_DAY_NAME = LONG_DAYS
 
 // ── Fusos IANA ────────────────────────────────────────────────────────────────
 
 /** "UTC−3", "UTC+5:30", "UTC" — the time zone's offset at `agora`. */
-export function deslocamentoDoFuso(zona: string, agora: Date = new Date()): string | null {
+export function timezoneOffset(zona: string, agora: Date = new Date()): string | null {
   try {
     const parte = new Intl.DateTimeFormat("en-US", { timeZone: zona, timeZoneName: "shortOffset" })
       .formatToParts(agora).find(p => p.type === "timeZoneName")?.value
@@ -453,14 +453,14 @@ export function deslocamentoDoFuso(zona: string, agora: Date = new Date()): stri
  * saved earlier and that, outside the list, would vanish from the picker.
  * Alphabetical order, UTC first.
  */
-export function opcoesDeFuso(atual?: string, agora: Date = new Date()): { value: string; label: string }[] {
-  let zonas: string[] = []
+export function timezoneOptions(atual?: string, agora: Date = new Date()): { value: string; label: string }[] {
+  let timeZones: string[] = []
   try {
-    zonas = Intl.supportedValuesOf("timeZone")
+    timeZones = Intl.supportedValuesOf("timeZone")
   } catch { /* old browser: keeps only UTC and the current one */ }
-  const todas = Array.from(new Set([...zonas, ...(atual ? [atual] : [])].filter(z => z !== "UTC"))).sort()
+  const todas = Array.from(new Set([...timeZones, ...(atual ? [atual] : [])].filter(z => z !== "UTC"))).sort()
   return ["UTC", ...todas].map(zona => {
-    const desloc = deslocamentoDoFuso(zona, agora)
+    const desloc = timezoneOffset(zona, agora)
     const nome = zona.replaceAll("_", " ")
     return { value: zona, label: desloc && desloc !== nome ? `${nome} (${desloc})` : nome }
   })

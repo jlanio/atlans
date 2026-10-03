@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.core.utils.estatistica import percentil_linear, taxa_de_sucesso
+from app.core.utils.estatistica import percentil_linear, success_rate
 from app.services.observability_service import ObservabilityService
 
 
@@ -50,7 +50,7 @@ def _run(status: str, n: int):
 
 
 @pytest.mark.asyncio
-async def test_detalhe_do_workflow_usa_a_taxa_das_outras_telas():
+async def test_workflow_detail_uses_the_rate_of_the_other_screens():
     runs = [_run(s, i) for i, s in enumerate(["success", "success", "failed", "running", "cancelled"])]
     db = _db(_resultado(escalar="Bacia"), _resultado(linhas=runs))
 
@@ -63,7 +63,7 @@ async def test_detalhe_do_workflow_usa_a_taxa_das_outras_telas():
 
 
 @pytest.mark.asyncio
-async def test_detalhe_so_com_execucoes_em_andamento_nao_mostra_100_por_cento():
+async def test_detail_with_only_in_progress_runs_does_not_show_100_percent():
     runs = [_run("running", 0), _run("pending", 1)]
     db = _db(_resultado(escalar="Bacia"), _resultado(linhas=runs))
 
@@ -74,13 +74,13 @@ async def test_detalhe_so_com_execucoes_em_andamento_nao_mostra_100_por_cento():
 
 # ── The single pieces ────────────────────────────────────────────────────────
 
-def test_taxa_de_sucesso_so_olha_concluidas_e_falhas():
-    assert taxa_de_sucesso(8, 2) == 0.8
-    assert taxa_de_sucesso(2, 1) == 0.6667          # 4 decimal places, as the screen receives it
-    assert taxa_de_sucesso(0, 0) == 0.0             # no denominator does not blow up
+def test_success_rate_only_looks_at_completed_and_failed():
+    assert success_rate(8, 2) == 0.8
+    assert success_rate(2, 1) == 0.6667          # 4 decimal places, as the screen receives it
+    assert success_rate(0, 0) == 0.0             # no denominator does not blow up
 
 
-def test_percentil_linear_sem_valores_e_ausencia_e_nao_zero():
+def test_linear_percentile_without_values_is_absence_not_zero():
     """History shows "—" with no completed run; whoever wants zero (the cost
     per plan) decides that on their own screen."""
     assert percentil_linear([], 0.5) is None

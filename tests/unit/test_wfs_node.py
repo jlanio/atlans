@@ -14,7 +14,7 @@ import flow.nodes.datasource.wfs as wfs
 
 # ── _parse_sortby ──────────────────────────────────────────────────────────────
 
-def test_parse_sortby_divide_por_virgula_para_lista():
+def test_parse_sortby_splits_by_comma_into_list():
     # owslib does `','.join(sortby)`, so the value needs to arrive as a list.
     assert wfs._parse_sortby("gid") == ["gid"]
     assert wfs._parse_sortby("gid, nome") == ["gid", "nome"]
@@ -22,7 +22,7 @@ def test_parse_sortby_divide_por_virgula_para_lista():
     assert wfs._parse_sortby(" a , , b ") == ["a", "b"]   # empty entries between commas are dropped
 
 
-def test_parse_sortby_vazio_vira_none():
+def test_parse_sortby_empty_becomes_none():
     assert wfs._parse_sortby("") is None
     assert wfs._parse_sortby("   ") is None
 
@@ -37,7 +37,7 @@ class _FakeResponse:
         return self._payload
 
 
-_UMA_FEICAO = (
+_ONE_FEATURE = (
     b'{"type":"FeatureCollection","features":['
     b'{"type":"Feature","geometry":{"type":"Point","coordinates":[0,0]},'
     b'"properties":{"id":1}}]}'
@@ -47,7 +47,7 @@ _UMA_FEICAO = (
 class _FakeWFS:
     """Records getfeature's kwargs and returns a configurable response."""
     ultimo_kwargs: dict = {}
-    resposta: bytes = _UMA_FEICAO
+    resposta: bytes = _ONE_FEATURE
 
     def __init__(self, *a, **k):
         pass
@@ -65,7 +65,7 @@ class _FakeWFS:
 
 
 @pytest.fixture(autouse=True)
-def _cache_limpo(monkeypatch):
+def _clean_cache(monkeypatch):
     """The capabilities cache is process-wide: each test starts without it."""
     monkeypatch.setattr(wfs, "_caps_cache", {})
 
@@ -74,26 +74,26 @@ def _cache_limpo(monkeypatch):
 def fake_wfs(monkeypatch):
     import owslib.wfs as ows
     _FakeWFS.ultimo_kwargs = {}
-    _FakeWFS.resposta = _UMA_FEICAO
+    _FakeWFS.resposta = _ONE_FEATURE
     monkeypatch.setattr(ows, "WebFeatureService", _FakeWFS)
     return _FakeWFS
 
 
 # ── SORTBY (item 2) ──────────────────────────────────────────────────────────────
 
-def test_sortby_vai_como_lista_ao_getfeature(fake_wfs):
+def test_sortby_goes_as_list_to_getfeature(fake_wfs):
     wfs._fetch_wfs_features("http://x/ows", "camada", 1000, sort_by=["gid"])
     assert fake_wfs.ultimo_kwargs.get("sortby") == ["gid"]
 
 
-def test_sem_sortby_nao_manda_a_chave(fake_wfs):
+def test_without_sortby_does_not_send_the_key(fake_wfs):
     wfs._fetch_wfs_features("http://x/ows", "camada", 1000, sort_by=None)
     assert "sortby" not in fake_wfs.ultimo_kwargs
 
 
 # ── Error translation (item 3) ───────────────────────────────────────────────────
 
-_ERRO_ORDEM_NATURAL = (
+_NATURAL_ORDER_ERROR = (
     b'<?xml version="1.0" encoding="UTF-8"?>'
     b'<ows:ExceptionReport xmlns:ows="http://www.opengis.net/ows/1.1" version="2.0.0">'
     b'<ows:Exception exceptionCode="NoApplicableCode"><ows:ExceptionText>'
@@ -103,8 +103,8 @@ _ERRO_ORDEM_NATURAL = (
 )
 
 
-def test_erro_de_ordem_natural_vira_mensagem_acionavel(fake_wfs):
-    fake_wfs.resposta = _ERRO_ORDEM_NATURAL
+def test_natural_order_error_becomes_actionable_message(fake_wfs):
+    fake_wfs.resposta = _NATURAL_ORDER_ERROR
     with pytest.raises(RuntimeError) as ei:
         wfs._fetch_wfs_features("http://x/ows", "camada_sem_pk", 1000)
     msg = str(ei.value)
@@ -115,7 +115,7 @@ def test_erro_de_ordem_natural_vira_mensagem_acionavel(fake_wfs):
     assert "natural order" in msg
 
 
-def test_outros_erros_wfs_passam_sem_reescrever(fake_wfs):
+def test_other_wfs_errors_pass_without_rewriting(fake_wfs):
     fake_wfs.resposta = (
         b'<ows:ExceptionReport xmlns:ows="http://www.opengis.net/ows/1.1">'
         b'<ows:Exception><ows:ExceptionText>Feature type nao encontrado</ows:ExceptionText>'
@@ -137,74 +137,74 @@ class _FakeWFSContado(_FakeWFS):
 
     def __init__(self, *a, **k):
         type(self).construcoes += 1
-        self._camadas = tuple(type(self).camadas)
+        self._layers = tuple(type(self).camadas)
 
     @property
     def contents(self):
-        return {c: object() for c in self._camadas}
+        return {c: object() for c in self._layers}
 
 
 @pytest.fixture
-def wfs_contado(monkeypatch):
+def counted_wfs(monkeypatch):
     import owslib.wfs as ows
     _FakeWFSContado.construcoes = 0
     _FakeWFSContado.camadas = ("camada",)
-    _FakeWFSContado.resposta = _UMA_FEICAO
+    _FakeWFSContado.resposta = _ONE_FEATURE
     monkeypatch.setattr(ows, "WebFeatureService", _FakeWFSContado)
     monkeypatch.setattr(wfs, "_CAPS_TTL_S", 3600)
     return _FakeWFSContado
 
 
-def test_capabilities_sao_reaproveitadas_entre_chamadas_e_retries(wfs_contado, monkeypatch):
+def test_capabilities_are_reused_across_calls_and_retries(counted_wfs, monkeypatch):
     wfs._fetch_wfs_features("http://x/ows", "camada", 10)
     wfs._fetch_wfs_features("http://x/ows", "camada", 10)
-    assert wfs_contado.construcoes == 1
+    assert counted_wfs.construcoes == 1
 
     # A getfeature that fails twice does not redo GetCapabilities on every attempt.
     tentativas = {"n": 0}
     original = _FakeWFSContado.getfeature
 
-    def _instavel(self, **kwargs):
+    def _flaky(self, **kwargs):
         tentativas["n"] += 1
         if tentativas["n"] < 3:
             raise ConnectionError("caiu")
         return original(self, **kwargs)
 
-    monkeypatch.setattr(_FakeWFSContado, "getfeature", _instavel)
+    monkeypatch.setattr(_FakeWFSContado, "getfeature", _flaky)
     monkeypatch.setattr("time.sleep", lambda s: None)
     wfs._fetch_with_retry("http://x/ows", "camada", 10, None, None, None, 5, 2, 0.0)
-    assert tentativas["n"] == 3 and wfs_contado.construcoes == 1
+    assert tentativas["n"] == 3 and counted_wfs.construcoes == 1
 
 
-def test_ttl_vencido_reconstroi(wfs_contado):
+def test_expired_ttl_rebuilds(counted_wfs):
     wfs._fetch_wfs_features("http://x/ows", "camada", 10)
     chave = ("http://x/ows", "2.0.0")
     obj, _ = wfs._caps_cache[chave]
     wfs._caps_cache[chave] = (obj, 0.0)  # expirou
     wfs._fetch_wfs_features("http://x/ows", "camada", 10)
-    assert wfs_contado.construcoes == 2
+    assert counted_wfs.construcoes == 2
 
 
-def test_camada_ausente_forca_um_refresh_antes_de_falhar(wfs_contado):
+def test_missing_layer_forces_a_refresh_before_failing(counted_wfs):
     wfs._fetch_wfs_features("http://x/ows", "camada", 10)
     # The new layer appeared on the server after the cache was built.
     _FakeWFSContado.camadas = ("camada", "nova")
     wfs._fetch_wfs_features("http://x/ows", "nova", 10)
-    assert wfs_contado.construcoes == 2
+    assert counted_wfs.construcoes == 2
     # And a layer that really does not exist costs ONE refresh, not one per attempt.
     with pytest.raises(ValueError, match="não encontrada"):
         wfs._fetch_wfs_features("http://x/ows", "fantasma", 10)
-    assert wfs_contado.construcoes == 3
+    assert counted_wfs.construcoes == 3
 
 
-def test_ttl_zero_desliga_o_cache(wfs_contado, monkeypatch):
+def test_zero_ttl_disables_the_cache(counted_wfs, monkeypatch):
     monkeypatch.setattr(wfs, "_CAPS_TTL_S", 0)
     wfs._fetch_wfs_features("http://x/ows", "camada", 10)
     wfs._fetch_wfs_features("http://x/ows", "camada", 10)
-    assert wfs_contado.construcoes == 2 and wfs._caps_cache == {}
+    assert counted_wfs.construcoes == 2 and wfs._caps_cache == {}
 
 
-def test_o_cache_tem_teto(wfs_contado, monkeypatch):
+def test_the_cache_has_a_ceiling(counted_wfs, monkeypatch):
     monkeypatch.setattr(wfs, "_CAPS_MAX", 2)
     for host in ("a", "b", "c"):
         wfs._fetch_wfs_features(f"http://{host}/ows", "camada", 10)
@@ -224,7 +224,7 @@ def _no_wfs(url, type_name="camada", **extra):
     return wfs.WFSNode("n", {"url": url, "typeName": type_name, **extra})
 
 
-async def test_execute_bloqueia_ssrf_para_endereco_interno(monkeypatch):
+async def test_execute_blocks_ssrf_to_internal_address(monkeypatch):
     """Mutation: remove the call to validate_url_ssrf in execute.
 
     A link-local address (cloud metadata) is refused BEFORE the fetch — owslib
@@ -240,7 +240,7 @@ async def test_execute_bloqueia_ssrf_para_endereco_interno(monkeypatch):
     fetch.assert_not_called()
 
 
-async def test_execute_valida_ssrf_antes_de_buscar(monkeypatch):
+async def test_execute_validates_ssrf_before_fetching(monkeypatch):
     """Mutation: call the fetch without validating the URL.
 
     The validation runs and only then is owslib called (happy path intact).

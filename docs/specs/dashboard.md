@@ -61,7 +61,7 @@ called it** — §4).
 ### 2.2 Reused, unchanged — all of them already accept `workspace_id`
 
 - `GET /observability/metrics?days=30[&workspace_id=&force=]` → `IObservabilityMetrics`.
-  The `run_f` of `_resolver_escopo` filters `WorkflowRun`, so in the `now` block only
+  The `run_f` of `_resolve_scope` filters `WorkflowRun`, so in the `now` block only
   `running`/`pending`/`stuck` respect the scope. `now.executors`, `queued_on_executors`
   and `overdue_acks` reflect the **user's accessible fleet** (default pool + the user's
   workspaces + assigned ones), global by design — dispatch draws from that same fleet, so
@@ -78,7 +78,7 @@ called it** — §4).
   `has_*_trigger` from the listing, already delivered in the Projects PR).
 
 **Window = 7 / 30 / 90 days (default 30)**, chosen in the header (`?periodo=`, reusing
-`Periodo`/`PERIODOS` from History), in `metrics`, `runs-by-day` and `metrics/executores`.
+`Period`/`PERIODS` from History), in `metrics`, `runs-by-day` and `metrics/executores`.
 The instant (`now`) is not a window: a separate 30 s poll, always on the current window.
 
 ## 3. Web
@@ -99,7 +99,7 @@ Dashboard              [↻ Atualizar]  [«Bacia do Rio Doce» ▾]  [7 · 30 ·
 │ stuck → repeated failures → ceiling │  │ scheduled, by time              │
 └─────────────────────────────────────┘  └─────────────────────────────────┘
 
-┌ RESUMO DO PERÍODO · ÚLTIMOS N DIAS ────────────────────────── Ver no Histórico →┐
+┌ RESUMO DO PERÍODO · ÚLTIMOS N DAYS ────────────────────────── Ver no Histórico →┐
 │ [Execuções] [Taxa de sucesso] [Duração típica] [Falhas]   (4 indicators)         │
 │ ▂▃▅▇… daily chart (4 status series)                                               │
 └────────────────────────────────────────────────────────────────────────────────┘
@@ -116,20 +116,20 @@ were not built — §4.)
 | File | Responsibility |
 |---|---|
 | `index.tsx` | Orchestrates: scope, data, composition, routing of the actions. |
-| `dashboard-url.ts` / `use-dashboard-url.ts` | Scope and period state in the URL (`?escopo=todos`, `?periodo=`; `Periodo`/`PERIODOS` reused from History). |
+| `dashboard-url.ts` / `use-dashboard-url.ts` | Scope and period state in the URL (`?escopo=todos`, `?periodo=`; `Period`/`PERIODS` reused from History). |
 | `use-dashboard-dados.ts` | 5 scoped calls in parallel (§3.3), partial failure per section, 30 s health poll, sequencing. |
 | `saude.ts` / `saude-hero.tsx` | Tone (pure) + colored strip with a verdict (§3.4). |
 | `proximas.ts` / `proximas-lista.tsx` | Derives and lists the upcoming scheduled runs (§3.6). |
 | `estados.tsx` | 1st-load skeleton, backbone error, first-use empty state and the amber per-section partial-failure notice (§3.10). |
 | `cabecalho.tsx` | Title, subtitle with scope, scope toggle, period selector, Atualizar (§3.9). |
-| reuse from History | `observability/indicadores.tsx`, `grafico-por-dia.tsx`, `atencao.ts`+`atencao-lista.tsx`; `ItensAgora` extracted from `agora-faixa.tsx` (named export, non-breaking) so Health can reuse the same line. |
+| reuse from History | `observability/indicadores.tsx`, `grafico-por-dia.tsx`, `atencao.ts`+`atencao-lista.tsx`; `NowItems` extracted from `agora-faixa.tsx` (named export, non-breaking) so Health can reuse the same line. |
 
 `page.tsx` is a thin wrapper that renders `<DashboardView/>`.
 
 ### 3.3 Data (`use-dashboard-dados.ts`)
 
 ```ts
-interface DadosDoDashboard {
+interface DashboardData {
   metrics: IObservabilityMetrics | null   // health + attention + indicators
   dias: IRunsByDay[]                       // chart
   runs: IRunSummary[]                      // only feeds the "first-use empty state" (§3.10)
@@ -144,10 +144,10 @@ interface DadosDoDashboard {
 }
 // null = "all" (no workspace_id); undefined = active scope still without an id (workspace
 // loading) → does NOT fetch, keeps the skeleton; dias = 7/30/90
-useDashboardDados(escopoWorkspaceId: string | null | undefined, dias: number)
+useDashboardDados(scopeWorkspaceId: string | null | undefined, dias: number)
 ```
 
-- `escopoWorkspaceId` (resolved in `index`): `escopo === "todos" ? null`; in the active
+- `scopeWorkspaceId` (resolved in `index`): `escopo === "todos" ? null`; in the active
   scope, `undefined` while the workspace list is loading (does not fetch), then
   `current?.id_hash`. The **five** calls go out together (`Promise.allSettled`) —
   `metrics`, `runs-by-day`, `runs`, `executores` and the `workflows` listing; only
@@ -171,13 +171,13 @@ useDashboardDados(escopoWorkspaceId: string | null | undefined, dias: number)
 ### 3.4 Health (pure `saude.ts` + `saude-hero.tsx`)
 
 ```ts
-type TomDeSaude = "calmo" | "atencao" | "critico"
-function tomDeSaude(now: INowBlock | null | undefined, temAtencao: boolean): TomDeSaude
+type HealthTone = "calmo" | "atencao" | "critico"
+function tomDeSaude(now: INowBlock | null | undefined, temAtencao: boolean): HealthTone
 // critical: now.stuck_count > 0  OR  (executors.total > 0 && executors.online === 0)
 // attention: executors.online < executors.total  OR  overdue_acks > 0  OR there are attention items*
 // calm: none of the above
 // (* "there are attention items" is decided in index via montarAtencao; health receives, besides
-//    `now`, the per-type count of the list (ResumoDaAtencao: falhas, saturado) so it can
+//    `now`, the per-type count of the list (AttentionSummary: falhas, saturado) so it can
 //    say "2 workflows falhando" without reimplementing top_failing. Stuck runs are NOT in
 //    the summary: they already have their own reason, and counting them again would duplicate the verdict.)
 // The fleet (executors) that weighs on the tone is the one accessible to the user, not cut down by
@@ -188,9 +188,9 @@ function veredito(now, tom, resumo, semExecucoes?): string
 ```
 
 - `saude-hero.tsx`: when **calm**, a thin green line (4px stripe + check icon + sentence
-  + `ItensAgora`), like History's neutral `agora-faixa` — NOT a big green card.
+  + `NowItems`), like History's neutral `agora-faixa` — NOT a big green card.
   When **attention/critical**, the `rounded-xl` envelope gets a thick stripe (the
-  `workspace-hero` pattern, no diffuse glow) + a two-part verdict. Reuses `ItensAgora` (extracted from
+  `workspace-hero` pattern, no diffuse glow) + a two-part verdict. Reuses `NowItems` (extracted from
   `agora-faixa.tsx`). "Ver em andamento →" (See running) → `/observability?status=running` (with
   `&workspace=` when scoped). A stuck run is clickable → `/observability/run/{runId}`.
 - Reason texts: "1 execução presa há 18 min" (1 run stuck for 18 min), "2 workflows falhando" (2 workflows failing), "1 executor
@@ -198,7 +198,7 @@ function veredito(now, tom, resumo, semExecucoes?): string
 
 ### 3.5 Precisa de atenção (Needs attention) — reuse of `observability/atencao.ts` + `atencao-lista.tsx`
 
-`montarAtencao({ metrics, executores })` already exists. `index` maps `AcaoDeAtencao`:
+`montarAtencao({ metrics, executores })` already exists. `index` maps `AttentionAction`:
 `abrir-execucao` → `/observability/run/{runId}`; `filtrar-workflow` →
 `/observability?workflow={id}&status=failed` (the default view — runs — applies both
 filters; the "workflows" view would ignore both and land on an unfiltered list);
@@ -228,7 +228,7 @@ Empty → green "Nada pendente. Última falha há X." (Nothing pending. Last fai
   ativos" (`N = metrics.active_workflows`). Skeleton while loading.
 - **Scope toggle** (segmented, only with > 1 workspace): "«{workspace ativo}»" ↔
   "Todos os workspaces". Changes `?escopo=`. `aria-label="Escopo do painel"`.
-- **Period selector** (segmented, 7/30/90 days, default 30): reuses `PERIODOS` from
+- **Period selector** (segmented, 7/30/90 days, default 30): reuses `PERIODS` from
   History and the same design. Changes `?periodo=`. `aria-label="Período"`, each button
   `aria-label="Últimos N dias"`. It governs the window of the indicators, the chart and the
   failures in "Precisa de atenção" (the "Saúde · agora" (Health · now) and the "Próximas" do not change).
@@ -283,7 +283,7 @@ Described in the original plan but **not built** — not present in the code tod
   (`formatBytes` + Drive/Artifacts). There is no `atalhos.tsx`. Copy that would go with it:
   "Atalhos", "Abrir «{nome}»", "Novo workflow", "Seus workspaces", "Armazenamento".
 - **Storage in the data hook**: the `storage: IStorageUsage | null` field and
-  `falhas.storage`, and the `getMyStorageUsage(escopoWorkspaceId)` call. The endpoint and the
+  `falhas.storage`, and the `getMyStorageUsage(scopeWorkspaceId)` call. The endpoint and the
   service method did exist at one point (§2.1), but were never wired and were removed: building
   this block includes recreating them.
 - **Freshness stamp in the header**: "atualizado há X". `atualizadoEm` is tracked in the

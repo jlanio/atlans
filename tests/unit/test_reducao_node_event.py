@@ -13,11 +13,11 @@ import json
 
 from app.api.routers.executor_ws import resultados as RES
 from executor.connection import _dumps_event
-from flow.utils.publisher.reducao import TETO_NODE_EVENT_BYTES as TETO
-from flow.utils.publisher.reducao import TETO_POR_CAMPO, reduzir_node_event
+from flow.utils.publisher.reducao import NODE_EVENT_BYTES_CEILING as TETO
+from flow.utils.publisher.reducao import PER_FIELD_CEILING, shrink_node_event
 
 
-def _completed_com_traceback_grande() -> tuple[dict, dict]:
+def _completed_with_large_traceback() -> tuple[dict, dict]:
     colunas = {"result": [f"col_{i}" for i in range(120)]}
     evento = {
         "type": "node_event", "run_id": "run-1", "node": "n1", "status": "completed",
@@ -35,8 +35,8 @@ def _completed_com_traceback_grande() -> tuple[dict, dict]:
 
 # ── The bug: the executor's reduction lost output_columns ────────────────────
 
-def test_completed_com_traceback_grande_mantem_output_columns_na_reducao_do_executor():
-    evento, colunas = _completed_com_traceback_grande()
+def test_completed_with_large_traceback_keeps_output_columns_in_executor_reduction():
+    evento, colunas = _completed_with_large_traceback()
 
     bruto = _dumps_event(evento)
 
@@ -53,7 +53,7 @@ def test_completed_com_traceback_grande_mantem_output_columns_na_reducao_do_exec
     assert reduzido["__original_size__"] == len(json.dumps(evento))
 
 
-def test_failed_com_erro_gigante_chega_com_o_erro_encurtado_e_a_categoria():
+def test_failed_with_huge_error_arrives_with_the_shortened_error_and_the_category():
     """The executor dropped `error` and `extra` together: the node showed as failed
     in the panel with no message at all and without saying whether a retry was worth it."""
     evento = {
@@ -74,8 +74,8 @@ def test_failed_com_erro_gigante_chega_com_o_erro_encurtado_e_a_categoria():
 
 # ── The server reapplies it as a defense, with the rules of both sides ───────
 
-def test_evento_reduzido_pelo_executor_passa_pelo_servidor_sem_perder_mais_nada():
-    evento, colunas = _completed_com_traceback_grande()
+def test_event_reduced_by_the_executor_passes_the_server_without_losing_anything_else():
+    evento, colunas = _completed_with_large_traceback()
     enviado = json.loads(_dumps_event(evento))
 
     publicado = json.loads(RES._serialize_node_event("ex-1", enviado))
@@ -84,7 +84,7 @@ def test_evento_reduzido_pelo_executor_passa_pelo_servidor_sem_perder_mais_nada(
     assert (publicado.get("extra") or {}).get("output_columns") == colunas
 
 
-def test_servidor_preserva_as_linhas_de_stdout_de_evento_que_chega_grande():
+def test_server_preserves_the_stdout_lines_of_an_event_that_arrives_large():
     """Buggy executor (or too old to reduce): the server threw away the whole
     `lines` as a heavy key and the node's output tab was left empty."""
     msg = {
@@ -101,7 +101,7 @@ def test_servidor_preserva_as_linhas_de_stdout_de_evento_que_chega_grande():
     assert "nao couberam" in linhas[-1], "o corte tem que ser marcado"
 
 
-def test_servidor_reduzindo_aos_campos_de_controle_preserva_duration_ms():
+def test_server_reducing_to_control_fields_preserves_duration_ms():
     msg = {
         "type": "node_event", "run_id": "r", "node": "n", "kind": "lifecycle",
         "status": "completed", "level": "info", "timestamp": 1.0, "duration_ms": 12.0,
@@ -116,7 +116,7 @@ def test_servidor_reduzindo_aos_campos_de_controle_preserva_duration_ms():
 
 # ── Steps of the single rule ──────────────────────────────────────────────────
 
-def test_degrau_1_serializa_o_extra_leve_com_o_default_do_executor():
+def test_step_1_serializes_the_light_extra_with_the_executor_default():
     """The remaining `extra` may hold Timestamp/numpy in the executor: without its
     `default` the dumps raised TypeError and the sender recycled the event in a loop."""
     from datetime import datetime
@@ -132,13 +132,13 @@ def test_degrau_1_serializa_o_extra_leve_com_o_default_do_executor():
     assert reduzido["extra"] == {"quando": "2026-09-30T12:00:00"}
 
 
-def test_evento_que_cabe_volta_intacto():
+def test_event_that_fits_comes_back_intact():
     evento = {"run_id": "r", "node": "n", "status": "completed", "extra": {"branch": "a"}}
     payload = json.dumps(evento)
-    assert reduzir_node_event(evento, payload) is payload
+    assert shrink_node_event(evento, payload) is payload
 
 
-def test_degrau_2_ainda_guarda_as_linhas_de_stdout():
+def test_step_2_still_keeps_the_stdout_lines():
     """Even without the weight the event does not fit (hostile control field): it
     falls back to the coerced control fields, and the lines that fit come back with it."""
     evento = {
@@ -151,11 +151,11 @@ def test_degrau_2_ainda_guarda_as_linhas_de_stdout():
 
     assert len(bruto) <= TETO
     reduzido = json.loads(bruto)
-    assert len(reduzido["node"]) <= TETO_POR_CAMPO
+    assert len(reduzido["node"]) <= PER_FIELD_CEILING
     assert reduzido["extra"]["lines"] == [f"linha {i}" for i in range(50)]
 
 
-def test_rede_de_seguranca_mantem_o_type_que_roteia_a_mensagem():
+def test_safety_net_keeps_the_type_that_routes_the_message():
     """Without `type` the server does not know what to do with the message and discards it."""
     evento = {
         "type": "node_event", "run_id": "r", "node": "n", "status": "failed",
@@ -163,7 +163,7 @@ def test_rede_de_seguranca_mantem_o_type_que_roteia_a_mensagem():
     }
     payload = json.dumps(evento)
 
-    bruto = reduzir_node_event(evento, payload, teto=800)
+    bruto = shrink_node_event(evento, payload, teto=800)
 
     assert len(bruto) <= 800
     reduzido = json.loads(bruto)

@@ -21,7 +21,7 @@ Two halves:
    in this file, not a side effect.
 2. **Workspace routes** (groups, members, artifacts, Drive, workflow
    creation). The workspace comes from the body or the resource, so the check
-   runs in the handler (`exigir_papel_no_workspace`). Every write route of these
+   runs in the handler (`require_workspace_role`). Every write route of these
    routers must be in `ROTAS_DE_WORKSPACE` — or in `SEM_PAPEL_DE_WORKSPACE`,
    with the reason.
 
@@ -43,36 +43,36 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from app.core.authorization.workflow_access import WORKSPACE_ROLE_ORDER
-from tests.unit._mcp_harness import TABELAS
-from tests.unit._rotas import rotas_efetivas
+from tests.unit._mcp_harness import TABLES
+from tests.unit._rotas import effective_routes
 
 WS = "ws-a"
 WF = "wf-a"
-WF_APAGADO = "wf-apagado"
-GRUPO = "grupo-a"
+WF_DELETED = "wf-apagado"
+GROUP = "grupo-a"
 ARTEFATO = "art-a"
-ARQUIVO = "arq-a"
+FILE_ID = "arq-a"
 
 # One user per role in workspace `ws-a`; `u-owner` is the owner (no row in
 # `workspace_members`, as in production). `u-fora` is nowhere and `u-alvo` is
 # the member the member routes act on.
-USUARIO_DO_PAPEL = {
+USER_BY_ROLE = {
     "owner": "u-owner",
     "admin": "u-admin",
     "operator": "u-operator",
     "editor": "u-editor",
     "viewer": "u-viewer",
 }
-FORA = "u-fora"
+OUTSIDER = "u-fora"
 ALVO = "u-alvo"
 
 _EDITOR = "Requer role 'editor' ou superior."
 _ADMIN_DO_WORKSPACE = "Requer role 'admin' ou superior neste workspace."
-_SO_O_DONO = "Apenas o dono pode gerenciar este workspace."
-_NAO_MEMBRO = "Acesso negado a este recurso."
+_OWNER_ONLY = "Apenas o dono pode gerenciar este workspace."
+_NON_MEMBER = "Acesso negado a este recurso."
 
 
-def _abaixo_de(minimo: str | None) -> list[str]:
+def _below(minimo: str | None) -> list[str]:
     """The roles that do NOT reach `minimo` — the ones the route must refuse."""
     if minimo is None:
         return []
@@ -153,27 +153,27 @@ ROTAS_DE_WORKSPACE: list[RotaDeWorkspace] = [
     ),
     RotaDeWorkspace(
         "PUT", "/workflow-groups/reorder", "/workflow-groups/reorder", "editor", _EDITOR,
-        json={"group_ids": [GRUPO]},
+        json={"group_ids": [GROUP]},
     ),
     RotaDeWorkspace(
-        "PUT", "/workflow-groups/{group_id}", f"/workflow-groups/{GRUPO}", "editor", _EDITOR,
+        "PUT", "/workflow-groups/{group_id}", f"/workflow-groups/{GROUP}", "editor", _EDITOR,
         json={"name": "Outro"},
     ),
-    RotaDeWorkspace("DELETE", "/workflow-groups/{group_id}", f"/workflow-groups/{GRUPO}", "editor", _EDITOR),
+    RotaDeWorkspace("DELETE", "/workflow-groups/{group_id}", f"/workflow-groups/{GROUP}", "editor", _EDITOR),
     RotaDeWorkspace(
         "POST", "/workflow-groups/{group_id}/workflows/{workflow_id}",
-        f"/workflow-groups/{GRUPO}/workflows/{WF}", "editor", _EDITOR,
+        f"/workflow-groups/{GROUP}/workflows/{WF}", "editor", _EDITOR,
     ),
     RotaDeWorkspace(
         "DELETE", "/workflow-groups/{group_id}/workflows/{workflow_id}",
-        f"/workflow-groups/{GRUPO}/workflows/{WF}", "editor", _EDITOR,
+        f"/workflow-groups/{GROUP}/workflows/{WF}", "editor", _EDITOR,
     ),
     # Workspace e membros
     RotaDeWorkspace(
-        "PUT", "/workspaces/{id_hash}", f"/workspaces/{WS}", "owner", _SO_O_DONO,
+        "PUT", "/workspaces/{id_hash}", f"/workspaces/{WS}", "owner", _OWNER_ONLY,
         json={"name": "Outro"},
     ),
-    RotaDeWorkspace("DELETE", "/workspaces/{id_hash}", f"/workspaces/{WS}", "owner", _SO_O_DONO),
+    RotaDeWorkspace("DELETE", "/workspaces/{id_hash}", f"/workspaces/{WS}", "owner", _OWNER_ONLY),
     RotaDeWorkspace(
         "POST", "/workspaces/{id_hash}/members", f"/workspaces/{WS}/members", "admin",
         _ADMIN_DO_WORKSPACE, json={"email": "novo@teste", "role": "viewer"},
@@ -211,7 +211,7 @@ ROTAS_DE_WORKSPACE: list[RotaDeWorkspace] = [
     # Artefatos
     RotaDeWorkspace(
         "DELETE", "/artifacts/{id_hash}", f"/artifacts/{ARTEFATO}", "editor",
-        "Requer role 'editor' ou superior para excluir artefatos.", mensagem_fora=_NAO_MEMBRO,
+        "Requer role 'editor' ou superior para excluir artefatos.", mensagem_fora=_NON_MEMBER,
     ),
     RotaDeWorkspace(
         "POST", "/artifacts/batch-delete", "/artifacts/batch-delete", "editor",
@@ -221,9 +221,9 @@ ROTAS_DE_WORKSPACE: list[RotaDeWorkspace] = [
     # Drive
     RotaDeWorkspace(
         "POST", "/drive/upload", f"/drive/upload?workspace_id={WS}", "editor", _EDITOR,
-        arquivo=True, mensagem_fora=_NAO_MEMBRO,
+        arquivo=True, mensagem_fora=_NON_MEMBER,
     ),
-    RotaDeWorkspace("DELETE", "/drive/{id_hash}", f"/drive/{ARQUIVO}", "editor", _EDITOR, mensagem_fora=_NAO_MEMBRO),
+    RotaDeWorkspace("DELETE", "/drive/{id_hash}", f"/drive/{FILE_ID}", "editor", _EDITOR, mensagem_fora=_NON_MEMBER),
 ]
 
 #: Write routes of these routers that do NOT require a workspace role — each one
@@ -247,7 +247,7 @@ _ROUTERS = {
     "workflows_router", "schedules_router", "workflow_groups_router",
     "workspace_router", "artifacts_router", "drive_router",
 }
-_ESCRITA = {"POST", "PUT", "PATCH", "DELETE"}
+_WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -257,7 +257,7 @@ _ESCRITA = {"POST", "PUT", "PATCH", "DELETE"}
 def _rotas() -> list[APIRoute]:
     """The app's HTTP routes, including those of the included routers.
 
-    Via `rotas_efetivas`: since FastAPI 0.141 `app.routes` keeps one node
+    Via `effective_routes`: since FastAPI 0.141 `app.routes` keeps one node
     per included router, without its routes, and the matrix would see none
     (see `tests/unit/_rotas.py`). `dependant` and `methods` separate the API
     routes from the OpenAPI ones (no `dependant`) and the WebSocket ones (no `methods`).
@@ -265,7 +265,7 @@ def _rotas() -> list[APIRoute]:
     from app.main import app
 
     return [
-        r for r in rotas_efetivas(app)
+        r for r in effective_routes(app)
         if getattr(r, "dependant", None) is not None and getattr(r, "methods", None)
     ]
 
@@ -274,7 +274,7 @@ def _e_rota_de_workflow(rota: APIRoute) -> bool:
     return rota.path.startswith("/workflows/{id_hash}")
 
 
-def _rotas_de_workflow() -> dict[tuple[str, str], APIRoute]:
+def _workflow_routes() -> dict[tuple[str, str], APIRoute]:
     return {
         (metodo, rota.path): rota
         for rota in _rotas() if _e_rota_de_workflow(rota)
@@ -282,11 +282,11 @@ def _rotas_de_workflow() -> dict[tuple[str, str], APIRoute]:
     }
 
 
-def _papel_declarado(rota: APIRoute):
+def _declared_role(rota: APIRoute):
     """The route's `workflow_com_papel` dependency, or None if it declares no role."""
-    for dependencia in rota.dependant.dependencies:
-        if hasattr(dependencia.call, "papel_minimo"):
-            return dependencia.call
+    for dependency in rota.dependant.dependencies:
+        if hasattr(dependency.call, "papel_minimo"):
+            return dependency.call
     return None
 
 
@@ -294,7 +294,7 @@ def _papel_declarado(rota: APIRoute):
 # Harness: app real, SQLite, papel vindo de `workspace_members`
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def _semear(db) -> None:
+async def _seed(db) -> None:
     from app.models.artifact import Artifact
     from app.models.user import User
     from app.models.workflow import Workflow
@@ -303,26 +303,26 @@ async def _semear(db) -> None:
     from app.models.workspace_file import WorkspaceFile
     from app.models.workspace_member import WorkspaceMember
 
-    usuarios = [*USUARIO_DO_PAPEL.values(), FORA, ALVO]
+    usuarios = [*USER_BY_ROLE.values(), OUTSIDER, ALVO]
     db.add_all([
         User(id_hash=u, username=u, email=f"{u}@teste", hashed_password="x") for u in usuarios
     ])
-    db.add(Workspace(id_hash=WS, name="A", owner_id=USUARIO_DO_PAPEL["owner"]))
+    db.add(Workspace(id_hash=WS, name="A", owner_id=USER_BY_ROLE["owner"]))
     db.add_all([
-        WorkspaceMember(workspace_id=WS, user_id=USUARIO_DO_PAPEL[papel], role=papel)
+        WorkspaceMember(workspace_id=WS, user_id=USER_BY_ROLE[papel], role=papel)
         for papel in ("admin", "operator", "editor", "viewer")
     ])
     db.add(WorkspaceMember(workspace_id=WS, user_id=ALVO, role="viewer"))
     vazio = {"nodes": [], "edges": []}
     db.add(Workflow(id_hash=WF, name="Fluxo", workspace_id=WS, definition=vazio, flag_ative=True))
     db.add(Workflow(
-        id_hash=WF_APAGADO, name="Apagado", workspace_id=WS, definition=vazio,
+        id_hash=WF_DELETED, name="Apagado", workspace_id=WS, definition=vazio,
         flag_ative=True, deleted_at=datetime(2026, 9, 1),
     ))
-    db.add(WorkflowGroup(id_hash=GRUPO, name="Grupo", workspace_id=WS))
+    db.add(WorkflowGroup(id_hash=GROUP, name="Grupo", workspace_id=WS))
     db.add(Artifact(id_hash=ARTEFATO, workspace_id=WS, output_key="saida", filename="a.geojson"))
     db.add(WorkspaceFile(
-        id_hash=ARQUIVO, workspace_id=WS, original_name="a.csv", extension="csv",
+        id_hash=FILE_ID, workspace_id=WS, original_name="a.csv", extension="csv",
         s3_key=f"drive/{WS}/a.csv",
     ))
     await db.commit()
@@ -346,23 +346,23 @@ async def cliente(client, monkeypatch):
 
     engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all, tables=[*TABELAS, WorkflowGroup.__table__])
+        await conn.run_sync(Base.metadata.create_all, tables=[*TABLES, WorkflowGroup.__table__])
     fabrica = async_sessionmaker(engine, expire_on_commit=False)
     async with fabrica() as db:
-        await _semear(db)
+        await _seed(db)
 
     async def _db():
         async with fabrica() as sessao:
             yield sessao
 
-    async def _quem(request: Request):
+    async def _who(request: Request):
         uid = request.headers["x-usuario"]
         return SimpleNamespace(
             id_hash=uid, username=uid, email=f"{uid}@teste", role="user", is_active=True,
         )
 
     app.dependency_overrides[get_db] = _db
-    app.dependency_overrides[get_current_user] = _quem
+    app.dependency_overrides[get_current_user] = _who
     # The conftest `client` pins the workspaces to a fake value; here they
     # come from the members table, as in production.
     app.dependency_overrides.pop(get_user_workspace_ids, None)
@@ -374,7 +374,7 @@ async def cliente(client, monkeypatch):
     await engine.dispose()
 
 
-def _como(usuario: str) -> dict[str, str]:
+def _as_user(usuario: str) -> dict[str, str]:
     return {"x-usuario": usuario}
 
 
@@ -389,7 +389,7 @@ def _url(caminho: str, id_hash: str) -> str:
     )
 
 
-def _status_e_mensagem(resposta) -> tuple[int, object]:
+def _status_and_message(resposta) -> tuple[int, object]:
     """`http_exception_handler` devolve o `detail` em `message`."""
     try:
         corpo = resposta.json()
@@ -402,79 +402,79 @@ def _status_e_mensagem(resposta) -> tuple[int, object]:
 # 1. Workflow routes: the role is declared in the dependency
 # ══════════════════════════════════════════════════════════════════════════════
 
-def test_toda_rota_de_workflow_declara_o_papel_na_dependencia():
+def test_every_workflow_route_declares_the_role_in_the_dependency():
     """A route that loads the workflow from the path without `workflow_com_papel` is
     the route that can forget the check — that is what happened with pins and scheduling."""
-    sem_papel = sorted(
+    without_role = sorted(
         f"{metodo} {caminho}"
-        for (metodo, caminho), rota in _rotas_de_workflow().items()
-        if _papel_declarado(rota) is None
+        for (metodo, caminho), rota in _workflow_routes().items()
+        if _declared_role(rota) is None
     )
-    assert not sem_papel, (
+    assert not without_role, (
         "rota de workflow sem papel declarado na dependência — use "
         "`Depends(workflow_com_papel(minimo))` (None = basta pertencer):\n  "
-        + "\n  ".join(sem_papel)
+        + "\n  ".join(without_role)
     )
 
 
-def test_o_papel_declarado_e_o_da_matriz():
-    rotas = _rotas_de_workflow()
-    fora_da_matriz = sorted(f"{m} {p}" for m, p in set(rotas) - set(PAPEL_DAS_ROTAS_DE_WORKFLOW))
-    sumidas = sorted(f"{m} {p}" for m, p in set(PAPEL_DAS_ROTAS_DE_WORKFLOW) - set(rotas))
-    assert not fora_da_matriz, (
+def test_the_declared_role_is_the_matrix_one():
+    rotas = _workflow_routes()
+    outside_matrix = sorted(f"{m} {p}" for m, p in set(rotas) - set(PAPEL_DAS_ROTAS_DE_WORKFLOW))
+    vanished = sorted(f"{m} {p}" for m, p in set(PAPEL_DAS_ROTAS_DE_WORKFLOW) - set(rotas))
+    assert not outside_matrix, (
         "rota de workflow nova: registre o papel mínimo dela em "
-        "PAPEL_DAS_ROTAS_DE_WORKFLOW:\n  " + "\n  ".join(fora_da_matriz)
+        "PAPEL_DAS_ROTAS_DE_WORKFLOW:\n  " + "\n  ".join(outside_matrix)
     )
-    assert not sumidas, "rota saiu da app — tire a linha da matriz:\n  " + "\n  ".join(sumidas)
+    assert not vanished, "rota saiu da app — tire a linha da matriz:\n  " + "\n  ".join(vanished)
 
-    divergentes = []
+    mismatched = []
     for chave, rota in sorted(rotas.items()):
-        dependencia = _papel_declarado(rota)
+        dependency = _declared_role(rota)
         esperado = PAPEL_DAS_ROTAS_DE_WORKFLOW[chave][0]
-        if dependencia is not None and dependencia.papel_minimo != esperado:
-            divergentes.append(f"{chave}: declara {dependencia.papel_minimo!r}, a matriz diz {esperado!r}")
-    assert not divergentes, "\n".join(divergentes)
+        if dependency is not None and dependency.papel_minimo != esperado:
+            mismatched.append(f"{chave}: declara {dependency.papel_minimo!r}, a matriz diz {esperado!r}")
+    assert not mismatched, "\n".join(mismatched)
 
 
 @pytest.mark.parametrize("chave", list(PAPEL_DAS_ROTAS_DE_WORKFLOW), ids=" ".join)
-async def test_a_dependencia_deixa_passar_do_minimo_para_cima(chave):
+async def test_the_dependency_lets_through_from_the_minimum_up(chave):
     """The other side of the matrix: the guard must not refuse those who have the role."""
     minimo = PAPEL_DAS_ROTAS_DE_WORKFLOW[chave][0]
-    dependencia = _papel_declarado(_rotas_de_workflow()[chave])
-    assert dependencia is not None, f"{chave} não declara papel"
+    dependency = _declared_role(_workflow_routes()[chave])
+    assert dependency is not None, f"{chave} não declara papel"
     wf = object()
     inicio = 0 if minimo is None else WORKSPACE_ROLE_ORDER.index(minimo)
     for papel in WORKSPACE_ROLE_ORDER[inicio:]:
-        assert await dependencia((wf, papel)) is wf, papel
+        assert await dependency((wf, papel)) is wf, papel
 
 
-_CASOS_DE_WORKFLOW = [
+_WORKFLOW_CASES = [
     pytest.param(metodo, caminho, papel, id=f"{metodo} {caminho} como {papel}")
     for (metodo, caminho), (minimo, _) in PAPEL_DAS_ROTAS_DE_WORKFLOW.items()
-    for papel in _abaixo_de(minimo)
+    for papel in _below(minimo)
 ]
 
 
-@pytest.mark.parametrize("metodo, caminho, papel", _CASOS_DE_WORKFLOW)
-async def test_rota_de_workflow_recusa_papel_abaixo_do_minimo(cliente, metodo, caminho, papel):
+@pytest.mark.parametrize("metodo, caminho, papel", _WORKFLOW_CASES)
+async def test_workflow_route_rejects_role_below_minimum(cliente, metodo, caminho, papel):
     """No body on purpose: the guard is in the dependency and answers before
     body validation, so the matrix does not need to know how to build each one."""
     mensagem = PAPEL_DAS_ROTAS_DE_WORKFLOW[(metodo, caminho)][1]
-    resposta = await cliente.request(metodo, _url(caminho, WF), headers=_como(USUARIO_DO_PAPEL[papel]))
-    assert _status_e_mensagem(resposta) == (403, mensagem)
+    resposta = await cliente.request(metodo, _url(caminho, WF), headers=_as_user(USER_BY_ROLE[papel]))
+    assert _status_and_message(resposta) == (403, mensagem)
 
 
 @pytest.mark.parametrize("metodo, caminho", list(PAPEL_DAS_ROTAS_DE_WORKFLOW), ids=" ".join)
-async def test_rota_de_workflow_404_antes_de_403(cliente, metodo, caminho):
+async def test_workflow_route_404_before_403(cliente, metodo, caminho):
     """From outside the workspace: membership 403. Nonexistent workflow or one in
     the trash: 404 — for outsiders AND for those without the role."""
-    resposta = await cliente.request(metodo, _url(caminho, WF), headers=_como(FORA))
-    assert _status_e_mensagem(resposta) == (403, _NAO_MEMBRO)
+    resposta = await cliente.request(metodo, _url(caminho, WF), headers=_as_user(OUTSIDER))
+    assert _status_and_message(resposta) == (403, _NON_MEMBER)
 
-    for sumido in ("wf-nao-existe", WF_APAGADO):
-        for usuario in (FORA, USUARIO_DO_PAPEL["viewer"]):
-            resposta = await cliente.request(metodo, _url(caminho, sumido), headers=_como(usuario))
-            assert _status_e_mensagem(resposta) == (404, f"Workflow '{sumido}' não encontrado"), (
+    for sumido in ("wf-nao-existe", WF_DELETED):
+        for usuario in (OUTSIDER, USER_BY_ROLE["viewer"]):
+            resposta = await cliente.request(metodo, _url(caminho, sumido), headers=_as_user(usuario))
+            assert _status_and_message(resposta) == (404, f"Workflow '{sumido}' não encontrado"), (
                 sumido, usuario,
             )
 
@@ -483,7 +483,7 @@ async def test_rota_de_workflow_404_antes_de_403(cliente, metodo, caminho):
 # 2. Workspace routes: the check runs in the handler
 # ══════════════════════════════════════════════════════════════════════════════
 
-def test_toda_rota_de_escrita_de_workspace_esta_na_matriz():
+def test_every_workspace_write_route_is_in_the_matrix():
     """A new write route in one of these routers must state the role it requires
     — or, in `SEM_PAPEL_DE_WORKSPACE`, why it requires none."""
     registradas = {(r.metodo, r.caminho) for r in ROTAS_DE_WORKSPACE} | set(SEM_PAPEL_DE_WORKSPACE)
@@ -491,32 +491,32 @@ def test_toda_rota_de_escrita_de_workspace_esta_na_matriz():
     for rota in _rotas():
         if rota.endpoint.__module__.rsplit(".", 1)[-1] not in _ROUTERS or _e_rota_de_workflow(rota):
             continue
-        existentes |= {(metodo, rota.path) for metodo in rota.methods & _ESCRITA}
+        existentes |= {(metodo, rota.path) for metodo in rota.methods & _WRITE_METHODS}
 
     faltando = sorted(f"{m} {p}" for m, p in existentes - registradas)
-    sumidas = sorted(f"{m} {p}" for m, p in registradas - existentes)
+    vanished = sorted(f"{m} {p}" for m, p in registradas - existentes)
     assert not faltando, (
         "rota de escrita sem papel registrado — acrescente-a em ROTAS_DE_WORKSPACE "
         "(ou em SEM_PAPEL_DE_WORKSPACE, com o motivo):\n  " + "\n  ".join(faltando)
     )
-    assert not sumidas, "rota saiu da app — tire a linha da matriz:\n  " + "\n  ".join(sumidas)
+    assert not vanished, "rota saiu da app — tire a linha da matriz:\n  " + "\n  ".join(vanished)
 
 
-_CASOS_DE_WORKSPACE = [
+_WORKSPACE_CASES = [
     pytest.param(rota, papel, id=f"{rota.metodo} {rota.caminho} como {papel or 'de fora'}")
     for rota in ROTAS_DE_WORKSPACE
-    for papel in [*_abaixo_de(rota.minimo), None]
+    for papel in [*_below(rota.minimo), None]
 ]
 
 
-@pytest.mark.parametrize("rota, papel", _CASOS_DE_WORKSPACE)
-async def test_rota_de_workspace_recusa_papel_abaixo_do_minimo(cliente, rota, papel):
-    usuario = USUARIO_DO_PAPEL[papel] if papel else FORA
+@pytest.mark.parametrize("rota, papel", _WORKSPACE_CASES)
+async def test_workspace_route_rejects_role_below_minimum(cliente, rota, papel):
+    usuario = USER_BY_ROLE[papel] if papel else OUTSIDER
     esperado = rota.mensagem if papel else (rota.mensagem_fora or rota.mensagem)
     extras: dict = {}
     if rota.json is not None:
         extras["json"] = rota.json
     if rota.arquivo:
         extras["files"] = {"file": ("dados.csv", b"a,b\n1,2\n", "text/csv")}
-    resposta = await cliente.request(rota.metodo, rota.url, headers=_como(usuario), **extras)
-    assert _status_e_mensagem(resposta) == (403, esperado)
+    resposta = await cliente.request(rota.metodo, rota.url, headers=_as_user(usuario), **extras)
+    assert _status_and_message(resposta) == (403, esperado)

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import type { ItemDeAtencao } from "./atencao"
+import type { AttentionItem } from "./atencao"
 
 /**
  * "Dismiss" items from the Needs attention list — a per-browser convenience
@@ -22,13 +22,13 @@ import type { ItemDeAtencao } from "./atencao"
  * dismissal).
  */
 
-const CHAVE_STORAGE = "atlans:atencao-dispensados"
+const STORAGE_KEY = "atlans:atencao-dispensados"
 
 type Mapa = Record<string, string>
 
 function ler(): Mapa {
   try {
-    const raw = localStorage.getItem(CHAVE_STORAGE)
+    const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return {}
     const obj = JSON.parse(raw)
     return obj && typeof obj === "object" ? (obj as Mapa) : {}
@@ -39,63 +39,63 @@ function ler(): Mapa {
 
 function gravar(mapa: Mapa): void {
   try {
-    localStorage.setItem(CHAVE_STORAGE, JSON.stringify(mapa))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(mapa))
   } catch {
     /* private mode / quota / storage blocked: the dismissal lasts only for this session */
   }
 }
 
 /** Prunes `mapa` to the keys present in `itens` (alerts still in effect). */
-function podar(mapa: Mapa, itens: ItemDeAtencao[]): Mapa {
-  const vigentes = new Set(itens.map(i => i.chave))
+function prune(mapa: Mapa, itens: AttentionItem[]): Mapa {
+  const currentKeys = new Set(itens.map(i => i.chave))
   const novo: Mapa = {}
   for (const chave of Object.keys(mapa)) {
-    if (vigentes.has(chave)) novo[chave] = mapa[chave]
+    if (currentKeys.has(chave)) novo[chave] = mapa[chave]
   }
   return novo
 }
 
-export interface Dispensados {
+export interface Dismissed {
   /** The list without the dismissed items (signature still equal to the stored one). */
-  ocultar: (itens: ItemDeAtencao[]) => ItemDeAtencao[]
+  ocultar: (itens: AttentionItem[]) => AttentionItem[]
   /** How many of the current `itens` are dismissed right now. */
-  contarOcultos: (itens: ItemDeAtencao[]) => number
+  contarOcultos: (itens: AttentionItem[]) => number
   /** Dispensa um item (guarda chave→assinatura, podando os resolvidos). */
-  dispensar: (item: ItemDeAtencao, itens: ItemDeAtencao[]) => void
+  dispensar: (item: AttentionItem, itens: AttentionItem[]) => void
   /** Dismisses all visible `itens` at once. */
-  dispensarTodos: (itens: ItemDeAtencao[]) => void
+  dispensarTodos: (itens: AttentionItem[]) => void
   /** Undoes all dismissals. */
   restaurar: () => void
 }
 
-export function useAtencaoDispensada(): Dispensados {
+export function useDismissedAttention(): Dismissed {
   // Starts empty (the server knows nothing of dismissals) and hydrates from
   // localStorage on the client — avoids a hydration mismatch and accessing
   // `localStorage` during SSR. A first frame shows everything; right after, the
   // dismissals are applied.
-  const [mapa, setMapa] = useState<Mapa>({})
-  useEffect(() => { setMapa(ler()) }, [])
+  const [mapa, setDismissedMap] = useState<Mapa>({})
+  useEffect(() => { setDismissedMap(ler()) }, [])
 
   const persistir = useCallback((novo: Mapa) => {
-    setMapa(novo)
+    setDismissedMap(novo)
     gravar(novo)
   }, [])
 
   const ocultar = useCallback(
-    (itens: ItemDeAtencao[]) => itens.filter(i => mapa[i.chave] !== i.assinatura),
+    (itens: AttentionItem[]) => itens.filter(i => mapa[i.chave] !== i.assinatura),
     [mapa],
   )
 
   const contarOcultos = useCallback(
-    (itens: ItemDeAtencao[]) => itens.reduce((n, i) => (mapa[i.chave] === i.assinatura ? n + 1 : n), 0),
+    (itens: AttentionItem[]) => itens.reduce((n, i) => (mapa[i.chave] === i.assinatura ? n + 1 : n), 0),
     [mapa],
   )
 
-  const dispensar = useCallback((item: ItemDeAtencao, itens: ItemDeAtencao[]) => {
-    persistir(podar({ ...mapa, [item.chave]: item.assinatura }, itens))
+  const dispensar = useCallback((item: AttentionItem, itens: AttentionItem[]) => {
+    persistir(prune({ ...mapa, [item.chave]: item.assinatura }, itens))
   }, [mapa, persistir])
 
-  const dispensarTodos = useCallback((itens: ItemDeAtencao[]) => {
+  const dispensarTodos = useCallback((itens: AttentionItem[]) => {
     const novo: Mapa = {}
     for (const i of itens) novo[i.chave] = i.assinatura
     persistir(novo)

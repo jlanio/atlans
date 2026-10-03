@@ -22,7 +22,7 @@ import * as Projetos from "@/app/components/projects/estados"
 import * as Artefatos from "@/app/components/artifacts/estados"
 import * as Executores from "@/app/components/executores/estados"
 import * as Dashboard from "@/app/components/dashboard/estados"
-import * as Configuracoes from "@/app/components/admin/settings/estados"
+import * as Settings from "@/app/components/admin/settings/estados"
 import { TabelaExecucoes } from "@/app/components/observability/tabela-execucoes"
 import { VisaoExecutores } from "@/app/components/observability/visao-executores"
 import { VisaoWorkflows } from "@/app/components/observability/visao-workflows"
@@ -30,35 +30,35 @@ import { TbDatabase } from "react-icons/tb"
 
 afterEach(cleanup)
 
-const MENSAGEM = "Serviço indisponível (503)"
+const MESSAGE = "Serviço indisponível (503)"
 
-const TABELA = {
+const TABLE = {
   runs: [], total: 0, hasMore: false, carregando: false, carregandoMais: false, filtrado: false,
   onCarregarMais: () => {}, onAbrir: () => {},
 }
 
-type Caso = [tela: string, montar: (onTentar: () => void) => ReactElement, titulo: string, mensagem: string]
+type TestCase = [tela: string, montar: (onTentar: () => void) => ReactElement, titulo: string, mensagem: string]
 
-const ERROS: Caso[] = [
-  ["Credenciais", t => <Credenciais.ErroDeCarga mensagem={MENSAGEM} onTentar={t} />, "Não foi possível carregar as credenciais.", MENSAGEM],
-  ["Tokens de acesso", t => <Tokens.ErroDeCarga mensagem={MENSAGEM} onTentar={t} />, "Não foi possível carregar os tokens de acesso.", MENSAGEM],
-  ["Drive", t => <Drive.ErroDeCarga mensagem={MENSAGEM} onTentar={t} />, "Não foi possível carregar os arquivos", MENSAGEM],
-  ["Admin › Usuários", t => <Usuarios.ErroDeCarga mensagem={MENSAGEM} onTentar={t} />, "Não foi possível carregar os usuários", MENSAGEM],
-  ["Projetos", t => <Projetos.ErroDeCarga mensagem={MENSAGEM} onTentar={t} />, "Não foi possível carregar os projetos", MENSAGEM],
-  ["Artefatos", t => <Artefatos.ErroDeCarga mensagem={MENSAGEM} onTentar={t} />, "Não foi possível carregar os artefatos", MENSAGEM],
-  ["Executores", t => <Executores.ErroDosExecutores mensagem={MENSAGEM} onTentar={t} />, "Não foi possível carregar os executores", MENSAGEM],
-  ["Dashboard", t => <Dashboard.ErroDoPainel mensagem={MENSAGEM} onTentar={t} />, "Não foi possível carregar o painel", MENSAGEM],
-  ["Admin › Configurações", t => <Configuracoes.CartaoDeErro mensagem={MENSAGEM} onTentar={t} />, "Não foi possível carregar as configurações", MENSAGEM],
+const ERRORS: TestCase[] = [
+  ["Credenciais", t => <Credenciais.ErroDeCarga mensagem={MESSAGE} onTentar={t} />, "Não foi possível carregar as credenciais.", MESSAGE],
+  ["Tokens de acesso", t => <Tokens.ErroDeCarga mensagem={MESSAGE} onTentar={t} />, "Não foi possível carregar os tokens de acesso.", MESSAGE],
+  ["Drive", t => <Drive.ErroDeCarga mensagem={MESSAGE} onTentar={t} />, "Não foi possível carregar os arquivos", MESSAGE],
+  ["Admin › Usuários", t => <Usuarios.ErroDeCarga mensagem={MESSAGE} onTentar={t} />, "Não foi possível carregar os usuários", MESSAGE],
+  ["Projetos", t => <Projetos.ErroDeCarga mensagem={MESSAGE} onTentar={t} />, "Não foi possível carregar os projetos", MESSAGE],
+  ["Artefatos", t => <Artefatos.ErroDeCarga mensagem={MESSAGE} onTentar={t} />, "Não foi possível carregar os artefatos", MESSAGE],
+  ["Executores", t => <Executores.ErroDosExecutores mensagem={MESSAGE} onTentar={t} />, "Não foi possível carregar os executores", MESSAGE],
+  ["Dashboard", t => <Dashboard.ErroDoPainel mensagem={MESSAGE} onTentar={t} />, "Não foi possível carregar o painel", MESSAGE],
+  ["Admin › Configurações", t => <Settings.CartaoDeErro mensagem={MESSAGE} onTentar={t} />, "Não foi possível carregar as configurações", MESSAGE],
   [
     "Histórico (tabela de execuções)",
-    t => <TabelaExecucoes {...TABELA} falhou onRecarregar={t} />,
+    t => <TabelaExecucoes {...TABLE} falhou onRecarregar={t} />,
     "Não foi possível carregar as execuções",
     "A lista não está vazia — só não pôde ser lida agora.",
   ],
 ]
 
 describe("erro de carga: cada tela anuncia a falha, com a mensagem, na moldura destrutiva", () => {
-  it.each(ERROS)("%s", (_tela, montar, titulo, mensagem) => {
+  it.each(ERRORS)("%s", (_screen, montar, titulo, mensagem) => {
     const onTentar = vi.fn()
     render(montar(onTentar))
 
@@ -76,7 +76,7 @@ describe("erro de carga: cada tela anuncia a falha, com a mensagem, na moldura d
   it.each([
     ["Credenciais", <Credenciais.ErroDeCarga key="c" onTentar={() => {}} />],
     ["Tokens de acesso", <Tokens.ErroDeCarga key="t" onTentar={() => {}} />],
-  ])("%s: sem a mensagem do servidor, a frase de sempre", (_tela, elemento) => {
+  ])("%s: sem a mensagem do servidor, a frase de sempre", (_screen, elemento) => {
     render(elemento)
     expect(screen.getByRole("alert")).toHaveTextContent("Verifique a conexão e tente novamente.")
   })
@@ -224,7 +224,7 @@ describe("vazio e sem resultado: cada tela mantém o seu texto (e nada disso é 
   })
 
   it("Admin › Configurações: o vazio da seção", () => {
-    render(<Configuracoes.VazioEmCirculo icone={TbDatabase} titulo="Nenhum arquivo armazenado" descricao="Nenhum workspace consumiu disco do MinIO ainda." />)
+    render(<Settings.VazioEmCirculo icone={TbDatabase} titulo="Nenhum arquivo armazenado" descricao="Nenhum workspace consumiu disco do MinIO ainda." />)
     expect(screen.getByText("Nenhum arquivo armazenado")).toBeInTheDocument()
     expect(screen.getByText("Nenhum workspace consumiu disco do MinIO ainda.")).toBeInTheDocument()
     expect(screen.queryByRole("alert")).toBeNull()
@@ -232,10 +232,10 @@ describe("vazio e sem resultado: cada tela mantém o seu texto (e nada disso é 
 
   it("Histórico: tabela vazia, tabela filtrada e as duas visões sem linhas", () => {
     const onLimpar = vi.fn()
-    const { rerender } = render(<TabelaExecucoes {...TABELA} falhou={false} />)
+    const { rerender } = render(<TabelaExecucoes {...TABLE} falhou={false} />)
     expect(screen.getByText("Nenhuma execução no período")).toBeInTheDocument()
     expect(screen.getByText("Quando um workflow rodar, ele aparece aqui com status, duração e executor.")).toBeInTheDocument()
-    rerender(<TabelaExecucoes {...TABELA} falhou={false} filtrado onLimparFiltros={onLimpar} />)
+    rerender(<TabelaExecucoes {...TABLE} falhou={false} filtrado onLimparFiltros={onLimpar} />)
     expect(screen.getByText("Nada com esses filtros")).toBeInTheDocument()
     expect(screen.getByText("Nenhuma execução no período combina com os filtros escolhidos.")).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }))
@@ -259,9 +259,9 @@ describe("aviso âmbar de falha parcial: uma linha de status, com o texto de cad
     ["Projetos", (t: () => void) => <Projetos.MetricasIndisponiveis onTentar={t} />, "Sem dados de execução agora — a lista continua completa."],
     ["Executores", (t: () => void) => <Executores.AvisoDeMetricas onTentar={t} />, "Sem dados de execução agora — a lista continua completa."],
     ["Dashboard", (t: () => void) => <Dashboard.AvisoDeSecao onTentar={t}>Não foi possível carregar as próximas execuções.</Dashboard.AvisoDeSecao>, "Não foi possível carregar as próximas execuções."],
-    ["Admin › Configurações", (t: () => void) => <Configuracoes.AvisoDeSecao onTentar={t}>Não foi possível carregar as extensões.</Configuracoes.AvisoDeSecao>, "Não foi possível carregar as extensões."],
+    ["Admin › Configurações", (t: () => void) => <Settings.AvisoDeSecao onTentar={t}>Não foi possível carregar as extensões.</Settings.AvisoDeSecao>, "Não foi possível carregar as extensões."],
     ["Artefatos", (t: () => void) => <Artefatos.AvisoDeRecarga mensagem="Não foi possível atualizar a lista." onTentar={t} />, "Não foi possível atualizar a lista."],
-  ])("%s", (_tela, montar, texto) => {
+  ])("%s", (_screen, montar, texto) => {
     const onTentar = vi.fn()
     render(montar(onTentar))
     const aviso = screen.getByRole("status")

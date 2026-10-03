@@ -31,7 +31,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture
-def pasta_de_extensoes(tmp_path, monkeypatch):
+def extensions_folder(tmp_path, monkeypatch):
     """`app.extensoes` looking at a temporary folder, with the registry cleared
     before and after — and without leaving fake modules in `sys.modules`."""
     monkeypatch.setattr(extensoes, "__path__", [str(tmp_path)])
@@ -44,7 +44,7 @@ def pasta_de_extensoes(tmp_path, monkeypatch):
             del sys.modules[nome]
 
 
-def _extensao(pasta: Path, nome: str, init: str, arquivos: dict[str, str] | None = None) -> None:
+def _extension(pasta: Path, nome: str, init: str, arquivos: dict[str, str] | None = None) -> None:
     pacote = pasta / nome
     pacote.mkdir()
     (pacote / "__init__.py").write_text(textwrap.dedent(init))
@@ -54,7 +54,7 @@ def _extensao(pasta: Path, nome: str, init: str, arquivos: dict[str, str] | None
         alvo.write_text(textwrap.dedent(codigo))
 
 
-REGISTRA_TUDO = """
+REGISTERS_EVERYTHING = """
     async def plano_e_teto(user_id, *, db=None, redis=None):
         return "ouro", 7
 
@@ -68,9 +68,9 @@ REGISTRA_TUDO = """
 
 # ── DESCOBERTA ───────────────────────────────────────────────────────────────
 
-def test_cada_subpacote_e_uma_extensao(pasta_de_extensoes):
-    _extensao(pasta_de_extensoes, "ouro", REGISTRA_TUDO)
-    _extensao(pasta_de_extensoes, "prata", "def registrar(registro):\n    registro.rotas.append('prata')\n")
+def test_each_subpackage_is_an_extension(extensions_folder):
+    _extension(extensions_folder, "ouro", REGISTERS_EVERYTHING)
+    _extension(extensions_folder, "prata", "def registrar(registro):\n    registro.rotas.append('prata')\n")
 
     r = extensoes.registro()
 
@@ -80,14 +80,14 @@ def test_cada_subpacote_e_uma_extensao(pasta_de_extensoes):
     assert extensoes.registro() is r, "montado uma vez só"
 
 
-def test_subpacote_com_sublinhado_e_arquivo_solto_nao_sao_extensao(pasta_de_extensoes):
-    _extensao(pasta_de_extensoes, "_rascunho", "raise RuntimeError('não devia importar')\n")
-    (pasta_de_extensoes / "solto.py").write_text("raise RuntimeError('não devia importar')\n")
+def test_underscored_subpackage_and_loose_file_are_not_extensions(extensions_folder):
+    _extension(extensions_folder, "_rascunho", "raise RuntimeError('não devia importar')\n")
+    (extensions_folder / "solto.py").write_text("raise RuntimeError('não devia importar')\n")
 
     assert extensoes.registro().nomes == []
 
 
-def test_sem_extensao_os_padroes_do_nucleo(pasta_de_extensoes):
+def test_without_extension_the_core_defaults(extensions_folder):
     r = extensoes.registro()
     assert (r.rotas, r.tarefas_de_fundo, r.templates, r.painel_do_modelo) == ([], [], [], [])
     assert r.plano_e_teto is None
@@ -100,56 +100,56 @@ def test_sem_extensao_os_padroes_do_nucleo(pasta_de_extensoes):
     ("1", True), ("true", True), ("sim", True), (" ON ", True),
     ("", False), ("0", False), ("false", False),
 ])
-def test_atlans_sem_extensoes(pasta_de_extensoes, monkeypatch, valor, desligadas):
-    _extensao(pasta_de_extensoes, "ouro", REGISTRA_TUDO)
+def test_atlans_without_extensions(extensions_folder, monkeypatch, valor, desligadas):
+    _extension(extensions_folder, "ouro", REGISTERS_EVERYTHING)
     monkeypatch.setenv("ATLANS_SEM_EXTENSOES", valor)
 
     assert extensoes.desligadas() is desligadas
     assert extensoes.registro().nomes == ([] if desligadas else ["ouro"])
 
 
-# ── ERROS ────────────────────────────────────────────────────────────────────
+# ── ERRORS ────────────────────────────────────────────────────────────────────
 
-def test_extensao_sem_registrar_derruba_o_arranque(pasta_de_extensoes):
-    _extensao(pasta_de_extensoes, "torta", "VALOR = 1\n")
+def test_extension_without_register_breaks_startup(extensions_folder):
+    _extension(extensions_folder, "torta", "VALOR = 1\n")
     with pytest.raises(RuntimeError, match="'torta' não tem registrar"):
         extensoes.registro()
 
 
-def test_extensao_que_nao_importa_derruba_o_arranque(pasta_de_extensoes):
+def test_extension_that_fails_to_import_breaks_startup(extensions_folder):
     """Silently disappearing along with billing would be worse than not starting."""
-    _extensao(pasta_de_extensoes, "quebrada", "import modulo_que_nao_existe\n")
+    _extension(extensions_folder, "quebrada", "import modulo_que_nao_existe\n")
     with pytest.raises(ModuleNotFoundError):
         extensoes.registro()
 
 
 # ── MODELOS ──────────────────────────────────────────────────────────────────
 
-def test_importar_modelos_importa_o_de_cada_extensao(pasta_de_extensoes):
-    _extensao(pasta_de_extensoes, "ouro", REGISTRA_TUDO, {"modelos/__init__.py": "CARREGADO = True\n"})
-    _extensao(pasta_de_extensoes, "sem_tabelas", "def registrar(registro):\n    pass\n")
+def test_import_models_imports_each_extensions_models(extensions_folder):
+    _extension(extensions_folder, "ouro", REGISTERS_EVERYTHING, {"modelos/__init__.py": "CARREGADO = True\n"})
+    _extension(extensions_folder, "sem_tabelas", "def registrar(registro):\n    pass\n")
 
     extensoes.importar_modelos()
 
     assert sys.modules[f"{extensoes.__name__}.ouro.modelos"].CARREGADO is True
 
 
-def test_modelos_que_nao_importam_nao_somem_em_silencio(pasta_de_extensoes):
+def test_models_that_fail_to_import_do_not_vanish_silently(extensions_folder):
     """Only the absence of its OWN `modelos` is normal; a broken import inside it
     is an error."""
-    _extensao(pasta_de_extensoes, "ouro", REGISTRA_TUDO, {"modelos/__init__.py": "import tabela_que_falta\n"})
+    _extension(extensions_folder, "ouro", REGISTERS_EVERYTHING, {"modelos/__init__.py": "import tabela_que_falta\n"})
     with pytest.raises(ModuleNotFoundError, match="tabela_que_falta"):
         extensoes.importar_modelos()
 
 
-def test_o_schema_de_cada_extensao_vai_para_a_base_zero(pasta_de_extensoes, monkeypatch):
+def test_each_extensions_schema_goes_to_the_base_zero(extensions_folder, monkeypatch):
     """An extension's tables live in its `schema.sql`, which the alembic zero
     baseline runs after the core script — without importing the extension."""
-    _extensao(pasta_de_extensoes, "ouro", "raise RuntimeError('não é para importar')\n",
+    _extension(extensions_folder, "ouro", "raise RuntimeError('não é para importar')\n",
               {"schema.sql": "CREATE TABLE ouro (id INT);\n"})
-    _extensao(pasta_de_extensoes, "prata", "def registrar(registro):\n    pass\n")
+    _extension(extensions_folder, "prata", "def registrar(registro):\n    pass\n")
 
-    assert extensoes.esquemas() == [pasta_de_extensoes / "ouro" / "schema.sql"]
+    assert extensoes.esquemas() == [extensions_folder / "ouro" / "schema.sql"]
 
     monkeypatch.setenv("ATLANS_SEM_EXTENSOES", "1")
     assert extensoes.esquemas() == []
@@ -157,7 +157,7 @@ def test_o_schema_de_cada_extensao_vai_para_a_base_zero(pasta_de_extensoes, monk
 
 # ── CORE ─────────────────────────────────────────────────────────────────────
 
-async def test_sem_extensao_o_teto_e_o_da_instalacao(registro_de_teste):
+async def test_without_extension_the_ceiling_is_the_installations(empty_registry):
     from app.mcp import cotas
     from app.services import teto_do_assistente
 
@@ -166,7 +166,7 @@ async def test_sem_extensao_o_teto_e_o_da_instalacao(registro_de_teste):
     assert teto_do_assistente.assinaturas_ativas() is False
 
 
-async def test_com_extensao_quem_responde_e_ela(registro_de_teste):
+async def test_with_extension_it_is_the_one_that_answers(empty_registry):
     from app.services import teto_do_assistente
 
     vistos = []
@@ -175,13 +175,13 @@ async def test_com_extensao_quem_responde_e_ela(registro_de_teste):
         vistos.append((user_id, db, redis))
         return "ouro", 7
 
-    registro_de_teste.plano_e_teto = plano_e_teto
+    empty_registry.plano_e_teto = plano_e_teto
     assert await teto_do_assistente.plano_e_teto("usr-1", db="sessao", redis="pool") == ("ouro", 7)
     assert await teto_do_assistente.teto_de("usr-2") == 7
     assert vistos == [("usr-1", "sessao", "pool"), ("usr-2", None, None)]
 
 
-def test_os_emails_do_nucleo_nao_veem_os_das_extensoes(registro_de_teste, monkeypatch, tmp_path):
+def test_core_emails_do_not_see_the_extensions_ones(empty_registry, monkeypatch, tmp_path):
     """The extensions' e-mail template folders go in AFTER the core's."""
     from jinja2 import TemplateNotFound
 
@@ -194,13 +194,13 @@ def test_os_emails_do_nucleo_nao_veem_os_das_extensoes(registro_de_teste, monkey
         email_service._ambiente().get_template("so_da_extensao.html")
 
     monkeypatch.setattr(email_service, "_template_env", None)
-    registro_de_teste.templates.append(tmp_path)
+    empty_registry.templates.append(tmp_path)
     assert email_service._ambiente().get_template("so_da_extensao.html").render(nome="Ana") == "<p>Ana</p>"
 
 
 # ── TETO ─────────────────────────────────────────────────────────────────────
 
-def _teto_com(valor: str | None) -> subprocess.CompletedProcess:
+def _ceiling_with(valor: str | None) -> subprocess.CompletedProcess:
     env = {k: v for k, v in os.environ.items() if k != "ASSISTENTE_TETO_DE_TOKENS_POR_DIA"}
     if valor is not None:
         env["ASSISTENTE_TETO_DE_TOKENS_POR_DIA"] = valor
@@ -211,15 +211,15 @@ def _teto_com(valor: str | None) -> subprocess.CompletedProcess:
 
 
 @pytest.mark.parametrize("valor, teto", [(None, "1500000"), ("", "1500000"), ("2000000", "2000000"), (" 250_000 ", "250000")])
-def test_o_teto_da_instalacao_vem_do_ambiente(valor, teto):
-    r = _teto_com(valor)
+def test_the_installation_ceiling_comes_from_the_environment(valor, teto):
+    r = _ceiling_with(valor)
     assert r.returncode == 0, r.stderr[-1500:]
     assert r.stdout.strip() == teto
 
 
 @pytest.mark.parametrize("valor", ["0", "-5", "muito"])
-def test_teto_que_nao_e_positivo_impede_a_api_de_subir(valor):
+def test_non_positive_ceiling_prevents_the_api_from_starting(valor):
     """Zero would lock every conversation after the first turn, without warning."""
-    r = _teto_com(valor)
+    r = _ceiling_with(valor)
     assert r.returncode != 0
     assert "ASSISTENTE_TETO_DE_TOKENS_POR_DIA" in r.stderr

@@ -31,7 +31,7 @@ import type { FieldProps } from "./types"
  * longer exists — they vanish from the canvas and keep executing, and with no
  * line drawn not even the delete button is reachable.
  */
-export function AvisoPortasTravadas({ conexoes }: { conexoes: number }) {
+export function LockedPortsNotice({ conexoes }: { conexoes: number }) {
   return (
     <p className="flex items-start gap-2 rounded-md border border-yellow-500/40 bg-yellow-500/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
       <TbPlugConnected size={14} className="mt-px shrink-0 text-yellow-500" />
@@ -64,7 +64,7 @@ const PortsField = ({ field, values, setNodeField, conexoesDeEntrada = 0 }: Port
     gravar([...portas, nome])
   }
 
-  const duplicadas = useMemo(() => {
+  const duplicates = useMemo(() => {
     const vistas = new Set<string>()
     const dup = new Set<string>()
     for (const p of portas) (vistas.has(p) ? dup : vistas).add(p)
@@ -83,7 +83,7 @@ const PortsField = ({ field, values, setNodeField, conexoesDeEntrada = 0 }: Port
         </Button>
       </div>
 
-      {travado && <AvisoPortasTravadas conexoes={conexoesDeEntrada} />}
+      {travado && <LockedPortsNotice conexoes={conexoesDeEntrada} />}
 
       {portas.length === 0 ? (
         <p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
@@ -98,7 +98,7 @@ const PortsField = ({ field, values, setNodeField, conexoesDeEntrada = 0 }: Port
         <div className="flex flex-col gap-1.5">
           {portas.map((porta, i) => {
             const invalida = porta !== "" && !NOME_DE_PORTA.test(porta)
-            const temEspaco = /\s/.test(porta)
+            const hasSpace = /\s/.test(porta)
             return (
               <div key={i} className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-1.5">
@@ -132,12 +132,12 @@ const PortsField = ({ field, values, setNodeField, conexoesDeEntrada = 0 }: Port
                   // message for being the common case and the only one with an
                   // obvious fix to suggest.
                   <span className="text-[10px] text-destructive">
-                    {temEspaco
+                    {hasSpace
                       ? "Espaços não são aceitos — use _ para separar palavras (ex: meus_pontos)."
                       : "Só letras, números e _ — o nome vira uma variável no script."}
                   </span>
                 )}
-                {duplicadas.has(porta) && (
+                {duplicates.has(porta) && (
                   <span className="text-[10px] text-destructive">
                     Nome repetido: uma das entradas sobrescreveria a outra.
                   </span>

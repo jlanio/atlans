@@ -17,7 +17,7 @@ from shapely.geometry import Point
 from typing import Any, Dict
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
-from flow.utils.identidade import user_agent as user_agent_da_instalacao
+from flow.utils.identidade import user_agent as installation_user_agent
 from flow.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -26,18 +26,18 @@ logger = get_logger(__name__)
 # the defaults into the node, and an executor older than this version would call
 # Nominatim with an empty User-Agent — geopy refuses it (ConfigurationError). This
 # node treats the old value as empty: both mean "the installation's".
-USER_AGENT_ANTIGO = "atlas-studio-geocode/1.0"
+LEGACY_USER_AGENT = "atlas-studio-geocode/1.0"
 
 
 def user_agent_do_no(valor) -> str:
     """The field's User-Agent, or the installation's when it is empty or the old one."""
     texto = (valor or "").strip()
-    if texto in ("", USER_AGENT_ANTIGO):
-        return user_agent_da_instalacao("geocode")
+    if texto in ("", LEGACY_USER_AGENT):
+        return installation_user_agent("geocode")
     return texto
 
 
-def _servidor_nominatim(ambiente=None) -> dict[str, str]:
+def _nominatim_server(ambiente=None) -> dict[str, str]:
     """geopy `domain`/`scheme` for NOMINATIM_URL; empty = the public server."""
     ambiente = os.environ if ambiente is None else ambiente
     url = (ambiente.get("NOMINATIM_URL") or "").strip().rstrip("/")
@@ -91,7 +91,7 @@ class GeocodeNode(BaseNode):
                     "name": "user_agent",
                     "label": "User-Agent",
                     "type": "string",
-                    "default": USER_AGENT_ANTIGO,
+                    "default": LEGACY_USER_AGENT,
                     "description": (
                         "User-Agent para as requisições Nominatim. Vazio ou o padrão = "
                         "Atlans/geocode com o site desta instalação, como a política de uso pede."
@@ -112,7 +112,7 @@ class GeocodeNode(BaseNode):
         crs            = self.parameters.get("crs", "EPSG:4326")
         delay          = float(self.parameters.get("delay_seconds", 1.1))
         user_agent     = user_agent_do_no(self.parameters.get("user_agent"))
-        servidor       = _servidor_nominatim()
+        servidor       = _nominatim_server()
 
         # Gets the input data: may be a GeoDataFrame or a regular DataFrame
         # If there is a GDF, uses it; otherwise, takes the first value of the inputs

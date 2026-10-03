@@ -28,16 +28,16 @@ import {
 import { TbPlus, TbTrash } from "react-icons/tb"
 
 import { FieldLabel } from "./field-label"
-import SugestoesDeColunas from "./sugestoes-de-colunas"
+import ColumnSuggestions from "./sugestoes-de-colunas"
 import type { FieldProps } from "./types"
 
-export interface CriterioDeOrdenacao {
+export interface SortCriterion {
   field: string
   direction: "asc" | "desc"
 }
 
 /** Reads the saved value, whether it comes as a list (ObjectField/definition) or a JSON string. */
-export function lerCriterios(bruto: unknown): CriterioDeOrdenacao[] {
+export function lerCriterios(bruto: unknown): SortCriterion[] {
   let lista: unknown = bruto
   if (typeof bruto === "string" && bruto.trim().startsWith("[")) {
     try { lista = JSON.parse(bruto) } catch { lista = [] }
@@ -58,22 +58,22 @@ type SortByFieldProps = FieldProps<{
 }>
 
 const SortByField = ({ field, values, setNodeField, sugestoes = [], sugestoesDesatualizadas = false, sugestoesParciais = false }: SortByFieldProps) => {
-  const criterios = lerCriterios(values?.[field.name])
+  const criteria = lerCriterios(values?.[field.name])
 
   // The REAL list, not a JSON string: it is what execute reads today — and the
   // cast is the same as in SetFieldsHelper, because `setNodeField` only types scalars.
-  const gravar = (next: CriterioDeOrdenacao[]) =>
+  const gravar = (next: SortCriterion[]) =>
     setNodeField(field.name, next as unknown as string)
 
-  const editar = (idx: number, mudanca: Partial<CriterioDeOrdenacao>) =>
-    gravar(criterios.map((c, i) => (i === idx ? { ...c, ...mudanca } : c)))
+  const editar = (idx: number, mudanca: Partial<SortCriterion>) =>
+    gravar(criteria.map((c, i) => (i === idx ? { ...c, ...mudanca } : c)))
 
   // Click on a suggestion: fills the first empty row or opens a new one —
   // never replaces what has already been typed.
   function escolher(nome: string) {
-    const vazia = criterios.findIndex(c => c.field.trim() === "")
+    const vazia = criteria.findIndex(c => c.field.trim() === "")
     if (vazia >= 0) editar(vazia, { field: nome })
-    else gravar([...criterios, { field: nome, direction: "asc" }])
+    else gravar([...criteria, { field: nome, direction: "asc" }])
   }
 
   return (
@@ -83,29 +83,29 @@ const SortByField = ({ field, values, setNodeField, sugestoes = [], sugestoesDes
         <Button
           size="icon" variant="ghost" className="h-6 w-6"
           aria-label="Adicionar critério"
-          onClick={() => gravar([...criterios, { field: "", direction: "asc" }])}
+          onClick={() => gravar([...criteria, { field: "", direction: "asc" }])}
         >
           <TbPlus className="h-3.5 w-3.5" />
         </Button>
       </div>
 
-      {criterios.length === 0 ? (
+      {criteria.length === 0 ? (
         <p className="text-[11px] text-muted-foreground italic px-1">
           Nenhum critério. Clique em + (ou numa coluna abaixo) para adicionar.
         </p>
       ) : (
         <div className="flex flex-col gap-1.5">
-          {criterios.map((criterio, idx) => (
+          {criteria.map((criterion, idx) => (
             <div key={idx} className="grid grid-cols-[1fr_7.5rem_auto] gap-1.5 items-center">
               <Input
-                value={criterio.field}
+                value={criterion.field}
                 placeholder="nome_da_coluna"
                 className="h-7 text-xs font-mono"
                 onChange={e => editar(idx, { field: e.target.value })}
               />
               <Select
-                value={criterio.direction}
-                onValueChange={v => editar(idx, { direction: v as CriterioDeOrdenacao["direction"] })}
+                value={criterion.direction}
+                onValueChange={v => editar(idx, { direction: v as SortCriterion["direction"] })}
               >
                 <SelectTrigger className="h-7 text-xs">
                   <SelectValue />
@@ -119,7 +119,7 @@ const SortByField = ({ field, values, setNodeField, sugestoes = [], sugestoesDes
                 size="icon" variant="ghost"
                 className="h-7 w-7 text-muted-foreground hover:text-destructive"
                 aria-label={`Remover critério ${idx + 1}`}
-                onClick={() => gravar(criterios.filter((_, i) => i !== idx))}
+                onClick={() => gravar(criteria.filter((_, i) => i !== idx))}
               >
                 <TbTrash className="h-3.5 w-3.5" />
               </Button>
@@ -128,8 +128,8 @@ const SortByField = ({ field, values, setNodeField, sugestoes = [], sugestoesDes
         </div>
       )}
 
-      <SugestoesDeColunas
-        nomes={sugestoes.filter(s => !criterios.some(c => c.field === s))}
+      <ColumnSuggestions
+        nomes={sugestoes.filter(s => !criteria.some(c => c.field === s))}
         onEscolher={escolher}
         totalConhecido={sugestoes.length}
         desatualizadas={sugestoesDesatualizadas}

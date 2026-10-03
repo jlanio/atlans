@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
-import { TabelaExecucoes, duracaoDaExecucao, sublinhaDoWorkflow } from "@/app/components/observability/tabela-execucoes"
+import { TabelaExecucoes, runDuration, workflowSubline } from "@/app/components/observability/tabela-execucoes"
 import type { IRunSummary } from "@/service/types"
 
 // The Portuguese StatusBadge is a side effect of another workstream (spec
@@ -143,12 +143,12 @@ describe("helpers da tabela", () => {
   it("em andamento mostra o decorrido desde o início", () => {
     const agora = Date.parse("2026-09-06T12:00:00Z")
     const r = run({ status: "running", duration_seconds: null, started_at: "2026-09-06T11:57:58Z" })
-    expect(duracaoDaExecucao(r, agora)).toBe("2 min 02 s")
-    expect(duracaoDaExecucao(run({ status: "success", duration_seconds: 3661 }), agora)).toBe("1 h 1 min")
+    expect(runDuration(r, agora)).toBe("2 min 02 s")
+    expect(runDuration(run({ status: "success", duration_seconds: 3661 }), agora)).toBe("1 h 1 min")
   })
 
   it("sublinha junta workspace, origem e quem disparou, pulando o que falta", () => {
-    expect(sublinhaDoWorkflow(run({ trigger_source: "manual", triggered_by_username: "fulana" }))).toBe("Cadastro · manual · fulana")
-    expect(sublinhaDoWorkflow(run({ workspace_name: null, trigger_source: null }))).toBe("")
+    expect(workflowSubline(run({ trigger_source: "manual", triggered_by_username: "fulana" }))).toBe("Cadastro · manual · fulana")
+    expect(workflowSubline(run({ workspace_name: null, trigger_source: null }))).toBe("")
   })
 })

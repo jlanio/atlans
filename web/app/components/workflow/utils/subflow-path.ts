@@ -15,11 +15,11 @@
 // reading the meta. Node ids are canvas UUIDs, so `::` never collides with the
 // content.
 
-export const SEPARADOR = "::"
+export const SEPARATOR = "::"
 
 /** Address segments: the SubWorkflow nodes traversed + the node itself. */
-export function segmentosDoRunNodeId(runNodeId: string): string[] {
-  return runNodeId.split(SEPARADOR).filter(Boolean)
+export function runNodeIdSegments(runNodeId: string): string[] {
+  return runNodeId.split(SEPARATOR).filter(Boolean)
 }
 
 /**
@@ -29,7 +29,7 @@ export function segmentosDoRunNodeId(runNodeId: string): string[] {
  * definition loaded from the backend.
  */
 export function idLocal(runNodeId: string): string {
-  const segmentos = segmentosDoRunNodeId(runNodeId)
+  const segmentos = runNodeIdSegments(runNodeId)
   return segmentos[segmentos.length - 1] ?? runNodeId
 }
 
@@ -37,8 +37,8 @@ export function idLocal(runNodeId: string): string {
  * SubWorkflow nodes traversed to reach it. Empty for a node of the open
  * workflow itself — it is the "did this come from inside a sub-workflow?" test.
  */
-export function caminhoDeChamada(runNodeId: string): string[] {
-  return segmentosDoRunNodeId(runNodeId).slice(0, -1)
+export function callPath(runNodeId: string): string[] {
+  return runNodeIdSegments(runNodeId).slice(0, -1)
 }
 
 /**
@@ -49,7 +49,7 @@ export function caminhoDeChamada(runNodeId: string): string[] {
  * of the open graph another node's state, with the same local id by coincidence.
  */
 export function pertenceAoNivel(runNodeId: string, caminho: string[]): boolean {
-  const chamada = caminhoDeChamada(runNodeId)
+  const chamada = callPath(runNodeId)
   return (
     chamada.length === caminho.length &&
     chamada.every((segmento, i) => segmento === caminho[i])

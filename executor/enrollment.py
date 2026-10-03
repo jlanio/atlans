@@ -10,7 +10,7 @@ Flow:
   5. Server consumes the OTP, validates the CSR, asks step-ca to sign, returns the cert
   6. Executor validates the bundle and swaps cert.pem, chain.pem, ca.pem, key.pem and
      x25519_key.pem in CERT_DIR (0o600) via .new + os.replace —
-     `_persistir_bundle`, the same path as renewal (executor/renewal.py)
+     `_persist_bundle`, the same path as renewal (executor/renewal.py)
   7. Wipes the OTP from memory
 """
 from __future__ import annotations
@@ -151,7 +151,7 @@ def _write_pem(path: Path, content: bytes, mode: int = 0o600) -> None:
         pass  # Windows
 
 
-def _pem_privado(chave: Ed25519PrivateKey | X25519PrivateKey) -> bytes:
+def _private_pem(chave: Ed25519PrivateKey | X25519PrivateKey) -> bytes:
     """Private key in unencrypted PKCS8 PEM — the format of key.pem and x25519_key.pem."""
     return chave.private_bytes(
         serialization.Encoding.PEM,
@@ -232,7 +232,7 @@ def _validate_bundle(bundle: dict, new_key: Ed25519PrivateKey) -> str | None:
     return None
 
 
-def _persistir_bundle(
+def _persist_bundle(
     cert_dir: Path,
     bundle: dict,
     chave_ed: Ed25519PrivateKey,
@@ -257,28 +257,28 @@ def _persistir_bundle(
     if problema:
         return problema
 
-    conteudos = [
+    contents = [
         (CERT_FILE, bundle["cert_pem"].encode()),
         # chain_pem is optional (see _validate_bundle): missing or null becomes empty.
         (CHAIN_FILE, (bundle.get("chain_pem") or "").encode()),
         (CA_FILE, bundle["ca_pem"].encode()),
-        (KEY_FILE, _pem_privado(chave_ed)),
+        (KEY_FILE, _private_pem(chave_ed)),
     ]
     if chave_x is not None:
-        conteudos.append((X25519_KEY_FILE, _pem_privado(chave_x)))
+        contents.append((X25519_KEY_FILE, _private_pem(chave_x)))
 
-    novos = [(cert_dir / (nome + ".new"), cert_dir / nome, dados) for nome, dados in conteudos]
+    novos = [(cert_dir / (nome + ".new"), cert_dir / nome, dados) for nome, dados in contents]
     try:
         for temporario, _final, dados in novos:
             _write_pem(temporario, dados)
     except OSError:
-        for temporario, _final, _dados in novos:
+        for temporario, _final, _data in novos:
             try:
                 temporario.unlink(missing_ok=True)
             except OSError:
                 pass
         raise
-    for temporario, final, _dados in novos:
+    for temporario, final, _data in novos:
         os.replace(temporario, final)
     return None
 
@@ -382,7 +382,7 @@ def _persist_agent_config_to_env(
 # ── API publica ────────────────────────────────────────────────────────────────
 
 
-def _motivo_da_recusa(resp) -> str:
+def _refusal_reason(resp) -> str:
     """The reason the server gave, in the format it responds with.
 
     The server's handlers return `message` (not `detail`, FastAPI's raw field),
@@ -488,7 +488,7 @@ def enroll(
 
     if resp.status_code != 200 and resp.status_code != 201:
         raise RuntimeError(
-            f"Servidor recusou enrollment (status {resp.status_code}): {_motivo_da_recusa(resp)}"
+            f"Servidor recusou enrollment (status {resp.status_code}): {_refusal_reason(resp)}"
         )
 
     bundle = resp.json()
@@ -497,7 +497,7 @@ def enroll(
     # renewal: validates first and swaps via .new + os.replace. Writing directly,
     # as before, accepted an empty ca_pem and — on a RE-enroll — overwrote the
     # good ca.pem, leaving the executor without a trust anchor.
-    problema = _persistir_bundle(cert_dir, bundle, ed_key, x_key)
+    problema = _persist_bundle(cert_dir, bundle, ed_key, x_key)
     if problema:
         raise RuntimeError(
             f"Servidor devolveu um bundle invalido no enrollment ({problema}). "
@@ -581,7 +581,7 @@ def _cli_main(argv: list[str]) -> int:
         stream=sys.stderr if args.json else sys.stdout,
     )
 
-    def _falhar(mensagem: str, *, codigo: str = "erro") -> int:
+    def _fail(mensagem: str, *, codigo: str = "erro") -> int:
         if args.json:
             json.dump({"ok": False, "codigo": codigo, "erro": mensagem}, sys.stdout)
             sys.stdout.write("\n")
@@ -594,7 +594,7 @@ def _cli_main(argv: list[str]) -> int:
     if args.otp_stdin:
         otp = sys.stdin.readline().strip()
         if not otp:
-            return _falhar("nenhum OTP recebido no stdin.", codigo="otp_ausente")
+            return _fail("nenhum OTP recebido no stdin.", codigo="otp_ausente")
 
     # Loads executor/.env (no-op if env_file was already applied by docker compose).
     try:
@@ -607,7 +607,7 @@ def _cli_main(argv: list[str]) -> int:
     # Resolve executor_id: flag CLI > env var > erro claro.
     executor_id = (args.executor_id or os.getenv("EXECUTOR_ID") or "").strip()
     if not executor_id:
-        return _falhar(
+        return _fail(
             "EXECUTOR_ID nao definido. Configure no .env ou passe --executor-id=<id>.",
             codigo="executor_id_ausente",
         )
@@ -617,7 +617,7 @@ def _cli_main(argv: list[str]) -> int:
     try:
         info = enroll(args.server, otp, executor_id, args.cert_dir, env_path=_env_path)
     except RuntimeError as exc:
-        return _falhar(str(exc), codigo="enroll_recusado")
+        return _fail(str(exc), codigo="enroll_recusado")
 
     # Cert issued, but the server's signing key does not match the pinned one:
     # the executor will not come up like this (see executor/server_key.py). Exiting

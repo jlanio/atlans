@@ -15,7 +15,7 @@ import KeyValueField from "@/app/components/workflow/nodes-configuration/fields/
 const campo = { name: "headers", label: "Cabeçalhos", type: "keyvalue" } as never
 
 /** Reproduces the modal's real controlled loop. */
-function Anfitriao({ inicial = {} }: { inicial?: Record<string, string> }) {
+function Host({ inicial = {} }: { inicial?: Record<string, string> }) {
   const [values, setValues] = useState<Record<string, unknown>>({ headers: inicial })
   return (
     <KeyValueField
@@ -28,7 +28,7 @@ function Anfitriao({ inicial = {} }: { inicial?: Record<string, string> }) {
 
 describe("KeyValueField", () => {
   it("o botão Adicionar cria uma linha em branco", () => {
-    render(<Anfitriao />)
+    render(<Host />)
     expect(screen.queryByLabelText("Nome do item 1")).toBeNull()
 
     fireEvent.click(screen.getByRole("button", { name: /adicionar/i }))
@@ -40,7 +40,7 @@ describe("KeyValueField", () => {
   })
 
   it("dá para digitar nome e valor na linha recém-criada", () => {
-    render(<Anfitriao />)
+    render(<Host />)
     fireEvent.click(screen.getByRole("button", { name: /adicionar/i }))
 
     fireEvent.change(screen.getByLabelText("Nome do item 1"), {
@@ -55,7 +55,7 @@ describe("KeyValueField", () => {
   })
 
   it("apagar o nome para renomear não faz a linha sumir", () => {
-    render(<Anfitriao inicial={{ "Content-Typo": "application/json" }} />)
+    render(<Host inicial={{ "Content-Typo": "application/json" }} />)
 
     // The natural step when renaming: clear the field before typing the right one.
     fireEvent.change(screen.getByLabelText("Nome do item 1"), { target: { value: "" } })
@@ -70,7 +70,7 @@ describe("KeyValueField", () => {
   })
 
   it("duas linhas novas não colapsam numa só", () => {
-    render(<Anfitriao />)
+    render(<Host />)
     const botao = screen.getByRole("button", { name: /adicionar/i })
     fireEvent.click(botao)
     fireEvent.click(botao)
@@ -80,7 +80,7 @@ describe("KeyValueField", () => {
   })
 
   it("remover apaga a linha certa", () => {
-    render(<Anfitriao inicial={{ a: "1", b: "2" }} />)
+    render(<Host inicial={{ a: "1", b: "2" }} />)
     fireEvent.click(screen.getByLabelText("Remover item 1"))
 
     expect(screen.getByLabelText("Nome do item 1")).toHaveValue("b")
@@ -89,7 +89,7 @@ describe("KeyValueField", () => {
 
   it("linha sem nome não é gravada no valor do nó", () => {
     let ultimo: unknown = null
-    function Espia() {
+    function Spy() {
       const [values, setValues] = useState<Record<string, unknown>>({ headers: {} })
       return (
         <KeyValueField
@@ -102,7 +102,7 @@ describe("KeyValueField", () => {
         />
       )
     }
-    render(<Espia />)
+    render(<Spy />)
     fireEvent.click(screen.getByRole("button", { name: /adicionar/i }))
     fireEvent.change(screen.getByLabelText("Valor do item 1"), { target: { value: "orfao" } })
 

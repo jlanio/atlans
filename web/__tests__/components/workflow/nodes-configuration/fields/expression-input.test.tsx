@@ -24,24 +24,24 @@ vi.mock("@xyflow/react", () => ({
 
 import ExpressionInput from "@/app/components/workflow/nodes-configuration/fields/expression-input"
 
-type DadosNo = Partial<INodeContext["data"]> & { name: string }
+type NodeData = Partial<INodeContext["data"]> & { name: string }
 
-function no(id: string, data: DadosNo): INodeContext {
+function no(id: string, data: NodeData): INodeContext {
   return { id, data } as unknown as INodeContext
 }
 
 // Catalog output fields (`saidas`) — it's from them that the autocomplete
 // builds `$Alias.campo`.
-const CAIXA = no("n1", {
+const BOUNDING_BOX = no("n1", {
   name: "ComputeBoundingBox",
   alias: "Caixa Delimitadora",
   saidas: [
     { name: "bbox", type: "array", description: "Extensão [minx, miny, maxx, maxy]" },
     { name: "crs", type: "string" },
   ],
-} as unknown as DadosNo)
+} as unknown as NodeData)
 
-const DESTINO = no("n2", { name: "DataOutput", alias: "Saída", inputs: [] } as DadosNo)
+const DESTINO = no("n2", { name: "DataOutput", alias: "Saída", inputs: [] } as NodeData)
 
 /** Renders with the controlled input, as the real form does. */
 function montar(inicial = "") {
@@ -60,7 +60,7 @@ function montar(inicial = "") {
 }
 
 beforeEach(() => {
-  nodesMock = [CAIXA, DESTINO]
+  nodesMock = [BOUNDING_BOX, DESTINO]
   edgesMock = [{ id: "e1", source: "n1", target: "n2" }]
 })
 
@@ -125,8 +125,8 @@ describe("sugestões de alias", () => {
   it("dois nós sem alias próprio aparecem uma vez só", () => {
     // Same `name` → same key in the executor's context.
     nodesMock = [
-      no("n1", { name: "ComputeBoundingBox" } as DadosNo),
-      no("n3", { name: "ComputeBoundingBox" } as DadosNo),
+      no("n1", { name: "ComputeBoundingBox" } as NodeData),
+      no("n3", { name: "ComputeBoundingBox" } as NodeData),
       DESTINO,
     ]
     edgesMock = [
@@ -148,7 +148,7 @@ describe("sugestões de alias", () => {
         name: "ComputeBoundingBox",
         alias: "Caixa",
         properties: { alias: "Caixa" },
-      } as unknown as DadosNo),
+      } as unknown as NodeData),
       DESTINO,
     ]
     const { onChange, digitar } = montar()
@@ -174,12 +174,12 @@ describe("sugestões de alias", () => {
 
   it("reserva vagas para aliases quando um nó tem muitos campos", () => {
     // A straight cut hid ALL the aliases behind the first node's fields.
-    const muitosCampos = no("n1", {
+    const manyFields = no("n1", {
       name: "NoGordo",
       saidas: Array.from({ length: 20 }, (_, i) => ({ name: `campo${i}` })),
-    } as unknown as DadosNo)
-    const outro = no("n3", { name: "SegundoNo" } as DadosNo)
-    nodesMock = [muitosCampos, outro, DESTINO]
+    } as unknown as NodeData)
+    const outro = no("n3", { name: "SegundoNo" } as NodeData)
+    nodesMock = [manyFields, outro, DESTINO]
     edgesMock = [{ id: "e1", source: "n1", target: "n2" }]
     const { digitar } = montar()
 
@@ -191,7 +191,7 @@ describe("sugestões de alias", () => {
   })
 
   it("aceita alias acentuado no gatilho", () => {
-    nodesMock = [no("n1", { name: "ComputeArea", alias: "Área" } as DadosNo), DESTINO]
+    nodesMock = [no("n1", { name: "ComputeArea", alias: "Área" } as NodeData), DESTINO]
     const { digitar } = montar()
 
     digitar("{{$Áre")
@@ -219,12 +219,12 @@ describe("sugestões de inputs", () => {
 
   it("campo declarado por dois pais aparece uma vez, marcado", () => {
     // `inputs` is a single dict — the `output` key is the same for both.
-    const comOutput = (id: string, nome: string) =>
+    const withOutput = (id: string, nome: string) =>
       no(id, {
         name: nome,
         saidas: [{ name: "output", type: "geodataframe" }],
-      } as unknown as DadosNo)
-    nodesMock = [comOutput("n1", "ReadGeoJSON"), comOutput("n3", "ReadWFS"), DESTINO]
+      } as unknown as NodeData)
+    nodesMock = [withOutput("n1", "ReadGeoJSON"), withOutput("n3", "ReadWFS"), DESTINO]
     edgesMock = [
       { id: "e1", source: "n1", target: "n2" },
       { id: "e2", source: "n3", target: "n2" },

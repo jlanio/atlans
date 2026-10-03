@@ -28,11 +28,11 @@ import os
 
 logger = logging.getLogger("executor.supervisor")
 
-INTERVALO_S = 5.0
+INTERVAL_S = 5.0
 VAR_PID = "EXECUTOR_SUPERVISOR_PID"
 
 
-def pid_configurado() -> int | None:
+def configured_pid() -> int | None:
     """The supervisor's PID, or None if the executor was not started by one.
 
     Running `python -m executor` by hand doesn't set the variable, so the
@@ -60,11 +60,11 @@ class MonitorSupervisor:
     died long ago — the orphan it exists to prevent.
     """
 
-    def __init__(self, pid: int, *, intervalo: float = INTERVALO_S) -> None:
+    def __init__(self, pid: int, *, intervalo: float = INTERVAL_S) -> None:
         self._pid = pid
-        self._intervalo = intervalo
+        self._interval = intervalo
         self._proc = None
-        self._criado_em: float | None = None
+        self._created_at: float | None = None
 
     def vincular(self) -> bool:
         """Pins the supervisor's identity. False if it no longer exists."""
@@ -75,7 +75,7 @@ class MonitorSupervisor:
             return False
         try:
             self._proc = psutil.Process(self._pid)
-            self._criado_em = self._proc.create_time()
+            self._created_at = self._proc.create_time()
             return True
         except Exception as exc:
             logger.warning(
@@ -96,38 +96,38 @@ class MonitorSupervisor:
             import psutil
             if proc.status() == psutil.STATUS_ZOMBIE:
                 return False
-            return proc.create_time() == self._criado_em
+            return proc.create_time() == self._created_at
         except Exception:
             # NoSuchProcess, AccessDenied on a process now owned by someone else —
             # all mean "the supervisor I knew is gone".
             return False
 
-    async def vigiar(self, ao_morrer) -> None:
-        """Loops until the supervisor disappears; then calls `ao_morrer` exactly once."""
+    async def watch(self, on_death) -> None:
+        """Loops until the supervisor disappears; then calls `on_death` exactly once."""
         while True:
-            await asyncio.sleep(self._intervalo)
+            await asyncio.sleep(self._interval)
             if not self.vivo():
                 logger.warning(
                     "Supervisor (PID %d) encerrou — iniciando shutdown ordenado "
                     "para nao ficar orfao.", self._pid,
                 )
                 try:
-                    ao_morrer()
+                    on_death()
                 except Exception as exc:
                     logger.error("Falha ao sinalizar o shutdown pelo watchdog: %s", exc)
                 return
 
 
-def criar_task(ao_morrer, *, intervalo: float = INTERVALO_S) -> asyncio.Task | None:
+def criar_task(on_death, *, intervalo: float = INTERVAL_S) -> asyncio.Task | None:
     """Sobe o watchdog se houver supervisor configurado. None caso contrario."""
-    pid = pid_configurado()
+    pid = configured_pid()
     if pid is None:
         return None
     monitor = MonitorSupervisor(pid, intervalo=intervalo)
     if not monitor.vincular():
         # The supervisor died between the spawn and this point. Shutting down now is
         # right: nobody will consume the NDJSON channel or stop this process later.
-        ao_morrer()
+        on_death()
         return None
     logger.info("Watchdog do supervisor ativo (PID %d, a cada %.0fs).", pid, intervalo)
-    return asyncio.create_task(monitor.vigiar(ao_morrer), name="supervisor-watchdog")
+    return asyncio.create_task(monitor.watch(on_death), name="supervisor-watchdog")

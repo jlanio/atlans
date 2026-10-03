@@ -13,29 +13,29 @@
 import { Menu, Tray, app, nativeImage, type NativeImage } from 'electron'
 import fs from 'node:fs'
 import { arquivoDoApp } from '../paths.js'
-import type { EstadoApp } from '../state/store.js'
+import type { AppState } from '../state/store.js'
 import { abrirJanela } from './windows.js'
 import { abrirJanelaWeb } from './janela-web.js'
 import { autostartAtivo, definirAutostart } from './autostart.js'
 
 let tray: Tray | null = null
 
-export type IconeEstado = 'online' | 'busy' | 'offline'
+export type IconState = 'online' | 'busy' | 'offline'
 
-const ARQUIVO_ICONE: Record<IconeEstado, string> = {
+const ICON_FILE: Record<IconState, string> = {
   online: 'icon.ico',
   busy: 'icon-busy.ico',
   offline: 'icon-offline.ico',
 }
 
 /** Icons loaded once. See the header note about I/O at 1 Hz. */
-const cacheIcones = new Map<IconeEstado, NativeImage>()
+const iconCache = new Map<IconState, NativeImage>()
 
-function carregarIcone(estado: IconeEstado): NativeImage {
-  const emCache = cacheIcones.get(estado)
+function loadIcon(estado: IconState): NativeImage {
+  const emCache = iconCache.get(estado)
   if (emCache) return emCache
 
-  const caminho = arquivoDoApp('build', ARQUIVO_ICONE[estado])
+  const caminho = arquivoDoApp('build', ICON_FILE[estado])
   // `createFromPath` on a missing file returns an EMPTY image instead of
   // throwing, and the result is an invisible tray — the app seems not to have
   // opened. A visible generic icon is better than none.
@@ -44,20 +44,20 @@ function carregarIcone(estado: IconeEstado): NativeImage {
     const carregada = nativeImage.createFromPath(caminho)
     if (!carregada.isEmpty()) img = carregada
   }
-  cacheIcones.set(estado, img)
+  iconCache.set(estado, img)
   return img
 }
 
 // ── Pure functions (testable without Electron) ───────────────────────────────
 
-export function estadoDoIcone(estado: EstadoApp | null): IconeEstado {
+export function estadoDoIcone(estado: AppState | null): IconState {
   if (!estado || estado.supervisor !== 'running') return 'offline'
   const snap = estado.snapshot
   if (!snap || snap.conn_state !== 'connected') return 'offline'
   return snap.running_count > 0 ? 'busy' : 'online'
 }
 
-export function resumo(estado: EstadoApp | null): string {
+export function resumo(estado: AppState | null): string {
   if (!estado) return 'Iniciando…'
   switch (estado.supervisor) {
     case 'stopped': return estado.detalheSupervisor ?? 'Parado'
@@ -83,14 +83,14 @@ export function resumo(estado: EstadoApp | null): string {
  * Slice of the state the tray actually displays.
  *
  * This string is what decides whether to rebuild the menu. Comparing the whole
- * `EstadoApp` would be useless: it changes on every snapshot (uptime, CPU,
+ * `AppState` would be useless: it changes on every snapshot (uptime, CPU,
  * memory), and none of that appears in the tray.
  *
  * `autostartAtivo()` answers from the module cache (see autostart.ts): it used
  * to read the Windows registry synchronously, right here, on every state
  * update — the only spot in the file that escaped the 1 Hz shielding.
  */
-export function assinaturaDoTray(estado: EstadoApp | null): string {
+export function assinaturaDoTray(estado: AppState | null): string {
   return [
     estadoDoIcone(estado),
     resumo(estado),
@@ -101,16 +101,16 @@ export function assinaturaDoTray(estado: EstadoApp | null): string {
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 
-export interface AcoesTray {
+export interface TrayActions {
   iniciar: () => void
   parar: () => void
   sair: () => void
 }
 
-let ultimaAssinatura = ''
+let lastSignature = ''
 
-export function criarTray(acoes: AcoesTray): Tray {
-  tray = new Tray(carregarIcone('offline'))
+export function createTray(acoes: TrayActions): Tray {
+  tray = new Tray(loadIcon('offline'))
 
   // A single click opens the app — the web window, which is the face of the
   // product. It is the gesture the user tries first, and not responding gives
@@ -119,20 +119,20 @@ export function criarTray(acoes: AcoesTray): Tray {
   // three times.
   tray.on('click', () => abrirJanelaWeb())
 
-  ultimaAssinatura = ''
-  atualizarTray(null, acoes)
+  lastSignature = ''
+  updateTray(null, acoes)
   return tray
 }
 
-export function atualizarTray(estado: EstadoApp | null, acoes: AcoesTray): void {
+export function updateTray(estado: AppState | null, acoes: TrayActions): void {
   if (!tray) return
 
   const assinatura = assinaturaDoTray(estado)
-  if (assinatura === ultimaAssinatura) return    // nada que o tray mostre mudou
-  ultimaAssinatura = assinatura
+  if (assinatura === lastSignature) return    // nada que o tray mostre mudou
+  lastSignature = assinatura
 
   const texto = resumo(estado)
-  tray.setImage(carregarIcone(estadoDoIcone(estado)))
+  tray.setImage(loadIcon(estadoDoIcone(estado)))
   // The Windows tooltip cuts off at 127 characters; a long error detail would
   // fill the limit and hide the beginning, which is the useful part.
   tray.setToolTip(`Atlans Executor — ${texto}`.slice(0, 127))
@@ -158,8 +158,8 @@ export function atualizarTray(estado: EstadoApp | null, acoes: AcoesTray): void 
         // The menu keeps the checkbox's own state; forcing the rebuild makes the
         // check mark reflect what the system ACTUALLY wrote, not what the click
         // asked for — `definirAutostart` can fail silently.
-        ultimaAssinatura = ''
-        atualizarTray(estado, acoes)
+        lastSignature = ''
+        updateTray(estado, acoes)
       },
     },
     { type: 'separator' },
@@ -168,9 +168,9 @@ export function atualizarTray(estado: EstadoApp | null, acoes: AcoesTray): void 
   ]))
 }
 
-export function destruirTray(): void {
+export function destroyTray(): void {
   tray?.destroy()
   tray = null
-  cacheIcones.clear()
-  ultimaAssinatura = ''
+  iconCache.clear()
+  lastSignature = ''
 }

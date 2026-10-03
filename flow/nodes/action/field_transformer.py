@@ -2,13 +2,13 @@ from jinja2 import Undefined
 from typing import Any, Dict
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
-from flow.utils.jinja_seguro import criar_ambiente_sandbox
+from flow.utils.jinja_seguro import create_sandbox_environment
 from flow.utils.safe_env import safe_env
 
-_JINJA_ENV = criar_ambiente_sandbox(undefined=Undefined)
+_JINJA_ENV = create_sandbox_environment(undefined=Undefined)
 
 
-def _tem_expressao(v: Any) -> bool:
+def _has_expression(v: Any) -> bool:
     """True if the value is a string with Jinja syntax ({{ }} or {% %})."""
     return isinstance(v, str) and ("{{" in v or "{%" in v)
 
@@ -105,7 +105,7 @@ class SetFields(BaseNode):
         set_fields: Dict[str, Any] = self.parameters.get('setFields', {})
         if set_fields:
             # Checks whether any value uses Jinja to decide whether it needs to iterate row by row
-            has_expressions = any(_tem_expressao(v) for v in set_fields.values())
+            has_expressions = any(_has_expression(v) for v in set_fields.values())
 
             if has_expressions:
                 # `to_dict(orient='records')` materializes the WHOLE GeoDataFrame
@@ -115,7 +115,7 @@ class SetFields(BaseNode):
                 # outside the loop.
                 registros = gdf.to_dict(orient="records")
                 for field, raw_value in set_fields.items():
-                    if not _tem_expressao(raw_value):
+                    if not _has_expression(raw_value):
                         # Fixed value amid fields with expressions. Scalar →
                         # pandas broadcast. Container (list/tuple/dict/set) →
                         # replicated per row, preserving the old behavior

@@ -25,16 +25,16 @@ FILE_ATTRIBUTE_HIDDEN = 0x02
 FILE_ATTRIBUTE_ARCHIVE = 0x20
 
 
-def _simular_windows(monkeypatch, get_retorno, registro):
+def _simulate_windows(monkeypatch, get_return, registro):
     """Makes `ocultar_no_windows` believe it is running on Windows, with a fake kernel32.
 
-    `get_retorno` is what the simulated GetFileAttributesW returns; each
+    `get_return` is what the simulated GetFileAttributesW returns; each
     SetFileAttributesW goes into `registro` as (path, attrs).
     """
     import ctypes
 
     def _get(_p):
-        return get_retorno
+        return get_return
 
     def _set(p, attrs):
         registro.append((p, attrs))
@@ -53,7 +53,7 @@ def _simular_windows(monkeypatch, get_retorno, registro):
 
 # ── No-op outside Windows ──────────────────────────────────────────────────────
 
-def test_noop_fora_do_windows_nao_toca_no_kernel32(monkeypatch, tmp_path):
+def test_noop_outside_windows_does_not_touch_kernel32(monkeypatch, tmp_path):
     """On Linux/macOS the dot already hides; the os.name guard must exit BEFORE
     any call to kernel32.
 
@@ -85,16 +85,16 @@ def test_noop_fora_do_windows_nao_toca_no_kernel32(monkeypatch, tmp_path):
     assert tocado == []   # the os.name short-circuit prevented any syscall
 
 
-def test_nao_levanta_em_caminho_inexistente(monkeypatch):
+def test_does_not_raise_on_nonexistent_path(monkeypatch):
     monkeypatch.setattr(utils.os, "name", "posix")
     assert utils.ocultar_no_windows("/nao/existe/.atlans-sync.json") is None
 
 
 # ── Logic on Windows (simulated kernel32) ───────────────────────────────────────
 
-def test_seta_oculto_preservando_outros_atributos(monkeypatch, tmp_path):
+def test_sets_hidden_preserving_other_attributes(monkeypatch, tmp_path):
     registro = []
-    _simular_windows(monkeypatch, FILE_ATTRIBUTE_ARCHIVE, registro)
+    _simulate_windows(monkeypatch, FILE_ATTRIBUTE_ARCHIVE, registro)
 
     f = tmp_path / ".atlans-sync.json"
     f.write_text("{}")
@@ -107,24 +107,24 @@ def test_seta_oculto_preservando_outros_atributos(monkeypatch, tmp_path):
     assert attrs & FILE_ATTRIBUTE_ARCHIVE     # without clearing what was already there
 
 
-def test_nao_reaplica_se_ja_oculto(monkeypatch, tmp_path):
+def test_does_not_reapply_if_already_hidden(monkeypatch, tmp_path):
     registro = []
-    _simular_windows(monkeypatch, FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_ARCHIVE, registro)
+    _simulate_windows(monkeypatch, FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_ARCHIVE, registro)
 
     utils.ocultar_no_windows(tmp_path / "x")
     assert registro == []                     # already hidden → no SetFileAttributes
 
 
 @pytest.mark.parametrize("invalido", [-1, 0xFFFFFFFF])
-def test_bail_quando_get_file_attributes_falha(monkeypatch, tmp_path, invalido):
+def test_bail_when_get_file_attributes_fails(monkeypatch, tmp_path, invalido):
     registro = []
-    _simular_windows(monkeypatch, invalido, registro)
+    _simulate_windows(monkeypatch, invalido, registro)
 
     utils.ocultar_no_windows(tmp_path / "sumido")
     assert registro == []                     # Get falhou → nao tenta setar nada
 
 
-def test_nunca_levanta_mesmo_com_set_quebrado(monkeypatch, tmp_path):
+def test_never_raises_even_with_broken_set(monkeypatch, tmp_path):
     import ctypes
 
     def _get(_p):
@@ -148,7 +148,7 @@ def test_nunca_levanta_mesmo_com_set_quebrado(monkeypatch, tmp_path):
 
 # ── Fiacao: o manifesto e o outbox realmente chamam o helper ────────────────────
 
-def test_manifesto_e_ocultado_apos_cada_gravacao(monkeypatch, tmp_path):
+def test_manifest_is_hidden_after_each_write(monkeypatch, tmp_path):
     """`.atlans-sync.json` — the example the user mentioned — is hidden on save.
 
     Reapplied on every write on purpose: on Windows os.replace makes the
@@ -171,7 +171,7 @@ def test_manifesto_e_ocultado_apos_cada_gravacao(monkeypatch, tmp_path):
     assert chamadas.count(alvo) == 2
 
 
-def test_outbox_sqlite_wal_e_journal_sao_ocultados(monkeypatch, tmp_path):
+def test_outbox_sqlite_wal_and_journal_are_hidden(monkeypatch, tmp_path):
     """The 'sqlite files' (.sqlite, -wal, -shm, -journal) mentioned by the user.
 
     -journal is included because, when WAL does not kick in (e.g. a network share),
@@ -197,7 +197,7 @@ def test_outbox_sqlite_wal_e_journal_sao_ocultados(monkeypatch, tmp_path):
         result_store.close()
 
 
-def test_outbox_real_segue_operavel_apos_ocultar(monkeypatch, tmp_path):
+def test_real_outbox_stays_operable_after_hiding(monkeypatch, tmp_path):
     """With the REAL helper (no-op on Linux), the db is created, hidden and remains
     writable: validates result_store's premise (hiding after CREATE/write does
     not break SQLite), plus the put/count/mark_sent/load_pending cycle."""
@@ -222,7 +222,7 @@ def test_outbox_real_segue_operavel_apos_ocultar(monkeypatch, tmp_path):
         result_store.close()
 
 
-def test_lixeira_e_ocultada_ao_criar(monkeypatch, tmp_path):
+def test_trash_is_hidden_on_creation(monkeypatch, tmp_path):
     from executor.sync import paths as paths_mod
 
     ocultos = []
@@ -235,7 +235,7 @@ def test_lixeira_e_ocultada_ao_criar(monkeypatch, tmp_path):
     assert str(tmp_path / paths_mod.TRASH_DIR_NAME) in ocultos
 
 
-def test_sync_config_oculta_dotfile_de_config(monkeypatch, tmp_path):
+def test_sync_config_hides_config_dotfile(monkeypatch, tmp_path):
     """Wiring of the 4th point: .atlans-sync-config.json is hidden when read."""
     from executor.sync import sync_config as sc
 
@@ -249,7 +249,7 @@ def test_sync_config_oculta_dotfile_de_config(monkeypatch, tmp_path):
     assert str(alvo) in chamadas
 
 
-def test_sync_config_nao_oculta_quando_ausente(monkeypatch, tmp_path):
+def test_sync_config_does_not_hide_when_absent(monkeypatch, tmp_path):
     """Without the file, the early return prevents the call (does not hide a nonexistent path)."""
     from executor.sync import sync_config as sc
 
@@ -259,7 +259,7 @@ def test_sync_config_nao_oculta_quando_ausente(monkeypatch, tmp_path):
     assert chamadas == []
 
 
-def test_ignore_oculta_dotfile_de_config(monkeypatch, tmp_path):
+def test_ignore_hides_config_dotfile(monkeypatch, tmp_path):
     """Consistencia: .atlans-ignore recebe o mesmo tratamento do sync-config."""
     from executor.sync import ignore as ig
 
@@ -273,7 +273,7 @@ def test_ignore_oculta_dotfile_de_config(monkeypatch, tmp_path):
     assert str(alvo) in chamadas
 
 
-def test_ignore_nao_oculta_quando_ausente(monkeypatch, tmp_path):
+def test_ignore_does_not_hide_when_absent(monkeypatch, tmp_path):
     from executor.sync import ignore as ig
 
     chamadas = []
@@ -282,12 +282,12 @@ def test_ignore_nao_oculta_quando_ausente(monkeypatch, tmp_path):
     assert chamadas == []
 
 
-def test_manifesto_sobrevive_a_os_replace_que_falha(monkeypatch, tmp_path):
+def test_manifest_survives_failing_os_replace(monkeypatch, tmp_path):
     """Contract for the os.replace error path (e.g. destination locked on Windows).
 
     The most serious risk raised in the review: if the atomic os.replace failed
     over the manifest, the executor could neither corrupt nor hang. Since on Linux
-    replace always works, we simulate the failure. Expected: _escrever returns False,
+    replace always works, we simulate the failure. Expected: _write_loop returns False,
     flush() does NOT mark it as persisted, the manifest stays 'dirty' for the next
     flush to try again, nothing is written and the `.tmp` is cleaned up.
     """
@@ -296,13 +296,13 @@ def test_manifesto_sobrevive_a_os_replace_que_falha(monkeypatch, tmp_path):
     m = manifest_mod.SyncManifest(str(tmp_path), "ws-1", "exec-1")
     m.set_dataset("parcelas", {"type": "geojson"})
 
-    def _replace_bloqueado(*_a, **_k):
+    def _blocked_replace(*_a, **_k):
         raise PermissionError("[WinError 5] Access is denied")
 
-    monkeypatch.setattr(manifest_mod.os, "replace", _replace_bloqueado)
+    monkeypatch.setattr(manifest_mod.os, "replace", _blocked_replace)
 
     asyncio.run(m.flush())  # must not raise
 
-    assert m._sujo is True                                    # pendente p/ retry
+    assert m._is_dirty is True                                    # pendente p/ retry
     assert not (tmp_path / ".atlans-sync.json").exists()      # nada persistido
     assert not (tmp_path / ".atlans-sync.json.tmp").exists()  # .tmp limpo

@@ -184,11 +184,11 @@ _MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024  # 50 MB
 _MAX_COMPRESSED_BYTES = _MAX_UNCOMPRESSED_BYTES
 
 
-class _CorpoGrandeDemais(Exception):
+class _BodyTooLarge(Exception):
     """Body (compressed or decompressed) exceeded the configured ceiling."""
 
 
-async def _ler_corpo_limitado(request: Request, teto: int) -> bytes:
+async def _read_limited_body(request: Request, teto: int) -> bytes:
     """Reads the body in chunks, cutting at the ceiling — never buffers an absurd body.
 
     `await request.body()` materializes the whole body in RAM before any
@@ -200,12 +200,12 @@ async def _ler_corpo_limitado(request: Request, teto: int) -> bytes:
     async for pedaco in request.stream():
         total += len(pedaco)
         if total > teto:
-            raise _CorpoGrandeDemais()
+            raise _BodyTooLarge()
         pedacos.append(pedaco)
     return b"".join(pedacos)
 
 
-def _descomprimir_gzip_com_teto(raw: bytes, teto: int) -> bytes:
+def _decompress_gzip_with_ceiling(raw: bytes, teto: int) -> bytes:
     """Decompresses gzip in chunks, cutting at the ceiling — never materializes the bomb.
 
     `gzip.decompress()` would decompress the ENTIRE payload before any size
@@ -220,13 +220,13 @@ def _descomprimir_gzip_com_teto(raw: bytes, teto: int) -> bytes:
         # +1 on the limit to detect the overflow exactly at the ceiling
         saida += d.decompress(dados, max(1, teto + 1 - len(saida)))
         if len(saida) > teto:
-            raise _CorpoGrandeDemais()
+            raise _BodyTooLarge()
         dados = d.unconsumed_tail
         if not dados:
             break
     saida += d.flush()
     if len(saida) > teto:
-        raise _CorpoGrandeDemais()
+        raise _BodyTooLarge()
     return bytes(saida)
 
 
@@ -253,14 +253,14 @@ async def publish_portal_layer(
     # — a bomb (a few KB -> GBs) is rejected without being materialized. Decompressing
     # and the json.loads (50 MB) go to a thread so as not to block the event loop.
     try:
-        raw_body = await _ler_corpo_limitado(request, _MAX_COMPRESSED_BYTES)
-    except _CorpoGrandeDemais:
+        raw_body = await _read_limited_body(request, _MAX_COMPRESSED_BYTES)
+    except _BodyTooLarge:
         raise HTTPException(status_code=413, detail=f"Payload excede {_MAX_UNCOMPRESSED_BYTES // (1024*1024)}MB.")
 
     if request.headers.get("Content-Encoding", "") == "gzip":
         try:
-            raw_body = await asyncio.to_thread(_descomprimir_gzip_com_teto, raw_body, _MAX_UNCOMPRESSED_BYTES)
-        except _CorpoGrandeDemais:
+            raw_body = await asyncio.to_thread(_decompress_gzip_with_ceiling, raw_body, _MAX_UNCOMPRESSED_BYTES)
+        except _BodyTooLarge:
             raise HTTPException(status_code=413, detail=f"Payload excede {_MAX_UNCOMPRESSED_BYTES // (1024*1024)}MB.")
         except Exception:
             raise HTTPException(status_code=400, detail="Falha na descompressao gzip.")

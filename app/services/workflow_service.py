@@ -49,10 +49,10 @@ from app.core.authorization.credential_loader import (
     resolve_credentials_from_ids,
 )
 from app.services.workflow_move_service import (
-    _com_sufixo,
+    _with_suffix,
     move_workflow as _move_workflow,
-    nome_livre as _nome_livre,
-    nomes_no_workspace as _nomes_no_workspace,
+    free_name as _free_name,
+    names_in_workspace as _names_in_workspace,
 )
 from app.services.workflow_version_service import (
     _has_substantial_changes,
@@ -202,18 +202,18 @@ async def restore_workspace_workflows(
     # trash does not show up in listings —, but the batch UPDATE would fail
     # ENTIRELY and bring down the workspace restore with it. Renaming whoever
     # comes back is better than returning nothing.
-    voltando = (await db.execute(
+    returning = (await db.execute(
         sa_select(Workflow.id_hash, Workflow.name).where(
             Workflow.workspace_id == workspace_id,
             Workflow.deleted_at == when,
         )
     )).all()
 
-    if voltando:
-        ocupados = await _nomes_no_workspace(db, workspace_id)
+    if returning:
+        ocupados = await _names_in_workspace(db, workspace_id)
         vistos = set()
-        for id_hash, nome in voltando:
-            livre = _nome_livre(nome, ocupados | vistos)
+        for id_hash, nome in returning:
+            livre = _free_name(nome, ocupados | vistos)
             vistos.add(livre)
             if livre != nome:
                 _logger.warning(
@@ -258,7 +258,7 @@ __all__ = [
 # merged into dicts. That is 3 queries per listing, all indexed; never one per
 # row.
 #
-# The helpers `_como_utc` and `_nomes_de_usuarios` are twins of the ones in
+# The helpers `_as_utc` and `_nomes_de_usuarios` are twins of the ones in
 # `app/services/observability/`. They stay local on purpose: importing that
 # package just for two five-line functions would couple the workflow listing to
 # the entire metrics service (and its import time) for no gain.
@@ -278,7 +278,7 @@ _SCHEDULE_COLUMNS = (
 )
 
 
-def _como_utc(valor: Optional[datetime]) -> Optional[datetime]:
+def _as_utc(valor: Optional[datetime]) -> Optional[datetime]:
     """`next_run_at`/`last_run_at` are stored as NAIVE UTC (see `_to_utc_naive`
     in the scheduler). Without the tzinfo, Pydantic serializes without an offset
     and the web app reads the time as local — "next 06:00" would become
@@ -288,7 +288,7 @@ def _como_utc(valor: Optional[datetime]) -> Optional[datetime]:
     return valor.replace(tzinfo=timezone.utc)
 
 
-def _ordem_de_preferencia(linha) -> tuple:
+def _preference_order(linha) -> tuple:
     """When a workflow has more than one schedule, the list shows only one: the
     active one with the smallest `next_run_at` (the one that will fire first);
     an active one with no computed next run after that; with none active, any
@@ -311,13 +311,13 @@ async def _resumos_de_agendamento(db: AsyncSession, hashes: Iterable[str]) -> di
     escolhido: dict[str, object] = {}
     for linha in result.all():
         atual = escolhido.get(linha.workflow_hash)
-        if atual is None or _ordem_de_preferencia(linha) < _ordem_de_preferencia(atual):
+        if atual is None or _preference_order(linha) < _preference_order(atual):
             escolhido[linha.workflow_hash] = linha
     return {
         hash_: {
             "active": bool(linha.active),
-            "next_run_at": _como_utc(linha.next_run_at),
-            "last_run_at": _como_utc(linha.last_run_at),
+            "next_run_at": _as_utc(linha.next_run_at),
+            "last_run_at": _as_utc(linha.last_run_at),
             "strategy": linha.strategy,
             "cron_expression": linha.cron_expression,
             "interval": linha.interval,
@@ -341,7 +341,7 @@ async def _nomes_de_usuarios(db: AsyncSession, user_ids: Iterable[Optional[str]]
     return {r.id_hash: r.username for r in result.all()}
 
 
-async def _mesclar_listagem(db: AsyncSession, linhas) -> list[dict]:
+async def _merge_listing(db: AsyncSession, linhas) -> list[dict]:
     """Converts the CRUD rows into dicts and adds `schedule`,
     `created_by_username` and `updated_by_username`."""
     itens = [dict(linha) for linha in linhas]
@@ -358,13 +358,13 @@ async def _mesclar_listagem(db: AsyncSession, linhas) -> list[dict]:
     return itens
 
 
-_MENSAGEM_CREDENCIAL_ALHEIA = (
+_FOREIGN_CREDENTIAL_MESSAGE = (
     "A definição referencia credencial que você não pode usar. "
     "Use uma credencial sua ou compartilhada com o workspace."
 )
 
 
-async def assert_credenciais_da_definicao(
+async def assert_definition_credentials(
     db: AsyncSession, definition: object, *, user_id: str, workspace_id: str | None,
 ) -> None:
     """Refuses to save a definition that references a credential the author
@@ -383,7 +383,7 @@ async def assert_credenciais_da_definicao(
     duplicate and on version restore. The four writes of `WorkflowService` call
     it against the author, who is MANDATORY in them (`created_by_id`,
     `updated_by_id`, `duplicated_by`, `restored_by`: keyword-only, no default,
-    and empty is refused by `_exigir_autor`) — the author is the one who needs
+    and empty is refused by `_require_author`) — the author is the one who needs
     to reach the credentials. When the author was optional, a caller that
     forgot it silently skipped the guard.
 
@@ -398,10 +398,10 @@ async def assert_credenciais_da_definicao(
     try:
         await assert_credentials_accessible(db, ids, user_id, shared_workspace_id=workspace_id)
     except CredentialAccessDeniedError as exc:
-        raise CredentialAccessDeniedError(_MENSAGEM_CREDENCIAL_ALHEIA) from exc
+        raise CredentialAccessDeniedError(_FOREIGN_CREDENTIAL_MESSAGE) from exc
 
 
-def _exigir_autor(autor: object, parametro: str) -> str:
+def _require_author(autor: object, parametro: str) -> str:
     """The author of a write: a user id, never empty.
 
     The four authorship parameters are already mandatory in the signature;
@@ -437,11 +437,11 @@ class WorkflowService:
         `created_by_id` is mandatory: it is against it that the credential
         guard (SEG-12) checks the definition.
         """
-        autor = _exigir_autor(created_by_id, "created_by_id")
+        autor = _require_author(created_by_id, "created_by_id")
 
         # 0. Credentials in the definition within reach of whoever writes (SEG-12).
         #    Duplication goes through here with `created_by_id` = who duplicated.
-        await assert_credenciais_da_definicao(
+        await assert_definition_credentials(
             self.crud.db, definition, user_id=autor, workspace_id=workspace_id,
         )
 
@@ -501,7 +501,7 @@ class WorkflowService:
         referenced sub-workflows need to live in it. Copying to another
         workspace would produce a workflow that looks intact and fails when run.
         """
-        autor = _exigir_autor(duplicated_by, "duplicated_by")
+        autor = _require_author(duplicated_by, "duplicated_by")
         original = await self.get_workflow_by_hash(id_hash)
 
         # Deep copy: `encrypt_workflow_connections` writes into the dict it receives,
@@ -511,7 +511,7 @@ class WorkflowService:
 
         disable_schedule_node(definition)
 
-        nome_pedido = novo_nome.strip() if novo_nome and novo_nome.strip() else None
+        requested_name = novo_nome.strip() if novo_nome and novo_nome.strip() else None
 
         # Everything that comes from `original` is read NOW, while the session is clean.
         #
@@ -522,14 +522,14 @@ class WorkflowService:
         # AsyncSession that is not an extra SELECT: it is `MissingGreenlet`. The
         # retry below would turn the 409 into a 500 — exactly on the path that
         # exists so as never to fail.
-        nome_original = original.name
+        original_name = original.name
         workspace_id = original.workspace_id
         # What defines HOW the workflow behaves comes along with the copy.
         # `params_schema` in particular: it is what makes the screen ask for the
         # parameters before running (see handleRunClick in the front end) —
         # without it the copy would fire straight away, silently, with an empty
         # schema.
-        herdado = dict(
+        inherited = dict(
             description=original.description,
             params_schema=original.params_schema,
             group_id=original.group_id,
@@ -550,31 +550,31 @@ class WorkflowService:
         # acervo.py`); this was the divergence recorded as debt in #96.
         # `duplicated_by` is mandatory: it is also against it that
         # `create_workflow` checks the copy's credentials (SEG-12).
-        herdado["created_by_id"] = autor
-        herdado["updated_by_id"] = autor
+        inherited["created_by_id"] = autor
+        inherited["updated_by_id"] = autor
 
-        async def _criar(nome: str) -> Workflow:
+        async def _create(nome: str) -> Workflow:
             return await self.create_workflow(
-                nome, definition, workspace_id=workspace_id, **herdado,
+                nome, definition, workspace_id=workspace_id, **inherited,
             )
 
         # A name hand-picked by the user: a collision is an answer, not an accident.
         # Renaming on our own would create "Meu Fluxo (2)" for whoever typed
         # "Meu Fluxo" — better to return the 409 and let the person decide.
-        if nome_pedido:
-            return await _criar(nome_pedido)
+        if requested_name:
+            return await _create(requested_name)
 
         # Derived name: the promise of duplication is "click, copied". A collision
         # here is our failure, not the user's choice, so we resolve it ourselves.
         #
-        # `_nome_de_copia` queries the taken names and the INSERT comes after:
+        # `_copy_name` queries the taken names and the INSERT comes after:
         # the window between the two is real (two simultaneous duplications read
         # the same set). The `move` already handled this — duplication did not,
         # and the 409 went all the way up to the screen. See
-        # workflow_move_service._aplicar.
-        nome = await self._nome_de_copia(nome_original, workspace_id)
+        # workflow_move_service._apply.
+        nome = await self._copy_name(original_name, workspace_id)
         try:
-            return await _criar(nome)
+            return await _create(nome)
         except WorkflowNameConflictError:
             # `create_workflow` has already rolled back. Recomputing is the first
             # bet: the new read sees the name that caused the collision and
@@ -583,19 +583,19 @@ class WorkflowService:
                 "Colisão de nome ao duplicar o workflow %s (nome '%s'); recalculando.",
                 id_hash, nome,
             )
-            nome = await self._nome_de_copia(nome_original, workspace_id)
+            nome = await self._copy_name(original_name, workspace_id)
             try:
-                return await _criar(nome)
+                return await _create(nome)
             except WorkflowNameConflictError as exc:
                 # Colliding twice in a row indicates a persistent race. The
                 # random suffix does not compete with anyone.
-                nome = _com_sufixo(f"Cópia de {nome_original}", uuid4().hex[:6])
+                nome = _with_suffix(f"Cópia de {original_name}", uuid4().hex[:6])
                 _logger.warning(
                     "Segunda colisão ao duplicar o workflow %s; usando sufixo único '%s'.",
                     id_hash, nome,
                 )
                 try:
-                    return await _criar(nome)
+                    return await _create(nome)
                 except WorkflowNameConflictError:
                     raise WorkflowNameConflictError(
                         "Não foi possível encontrar um nome livre para a cópia neste workspace."
@@ -620,7 +620,7 @@ class WorkflowService:
             new_name=new_name, moved_by_id=moved_by_id, dry_run=dry_run,
         )
 
-    async def _nome_de_copia(self, nome_base: str, workspace_id: str | None) -> str:
+    async def _copy_name(self, base_name: str, workspace_id: str | None) -> str:
         """"Cópia de X", "Cópia de X (2)", ... — the first free one in the workspace.
 
         There is a UniqueConstraint(name, workspace_id): without disambiguation,
@@ -631,8 +631,8 @@ class WorkflowService:
         # changes. Duplicating the criterion would make duplicate and move
         # diverge when the scope of "taken name" changes (soft-delete, inactive
         # workflows…).
-        existentes = await _nomes_no_workspace(self.crud.db, workspace_id)
-        return _nome_livre(f"Cópia de {nome_base}", existentes)
+        existentes = await _names_in_workspace(self.crud.db, workspace_id)
+        return _free_name(f"Cópia de {base_name}", existentes)
 
     async def get_workflow_by_hash(self, id_hash: str) -> Workflow:
         wf = await self.crud.get_by_hash(id_hash)
@@ -859,26 +859,26 @@ class WorkflowService:
         )
 
     async def list_workflows_metadata(
-        self, workspace_id: str | None = None, *, incluir_do_assistente: bool = False,
+        self, workspace_id: str | None = None, *, include_from_assistant: bool = False,
     ) -> list[dict]:
         """Light listing — metadata without definition, plus the schedule
-        summary and the authorship names (see `_mesclar_listagem`).
+        summary and the authorship names (see `_merge_listing`).
 
-        `incluir_do_assistente` passes along the screen's toggle: by default
+        `include_from_assistant` passes along the screen's toggle: by default
         the assistant's workflows are left out."""
         linhas = await self.crud.get_all_metadata(
-            workspace_id=workspace_id, incluir_do_assistente=incluir_do_assistente,
+            workspace_id=workspace_id, include_from_assistant=include_from_assistant,
         )
-        return await _mesclar_listagem(self.crud.db, linhas)
+        return await _merge_listing(self.crud.db, linhas)
 
     async def list_workflows_metadata_by_ids(
-        self, workspace_ids: list[str], *, incluir_do_assistente: bool = False,
+        self, workspace_ids: list[str], *, include_from_assistant: bool = False,
     ) -> list[dict]:
         """Light listing by workspace IDs — same merge as `list_workflows_metadata`."""
         linhas = await self.crud.get_all_metadata_by_workspace_ids(
-            workspace_ids, incluir_do_assistente=incluir_do_assistente,
+            workspace_ids, include_from_assistant=include_from_assistant,
         )
-        return await _mesclar_listagem(self.crud.db, linhas)
+        return await _merge_listing(self.crud.db, linhas)
 
     async def delete_workflow(self, id_hash: str) -> None:
         """Soft delete: desativa o workflow e seus schedules associados."""
@@ -911,7 +911,7 @@ class WorkflowService:
         *,
         updated_by_id: str,
     ) -> Workflow:
-        autor = _exigir_autor(updated_by_id, "updated_by_id")
+        autor = _require_author(updated_by_id, "updated_by_id")
 
         # 1. Ensures the workflow exists — uses get_by_hash (no decrypt) so as not to
         #    mark the definition as dirty in the SQLAlchemy session and keep the
@@ -922,7 +922,7 @@ class WorkflowService:
 
         # 2. Extracts only the payload fields
         updates: dict = workflow_in.model_dump(exclude_unset=True)
-        flag_ative_anterior = bool(wf.flag_ative)
+        previous_flag_ative = bool(wf.flag_ative)
 
         # 2a. Authorship comes from the authenticated identity, never from the body —
         #     `WorkflowUpdate` no longer exposes `updated_by_id` precisely so that
@@ -932,7 +932,7 @@ class WorkflowService:
         # 2b. Credentials of the new definition within reach of the editor (SEG-12),
         #     before any write — including the snapshot below.
         if "definition" in updates:
-            await assert_credenciais_da_definicao(
+            await assert_definition_credentials(
                 self.crud.db, updates["definition"],
                 user_id=autor, workspace_id=wf.workspace_id,
             )
@@ -958,7 +958,7 @@ class WorkflowService:
                 # `encrypt_workflow_connections` is idempotent (it skips what
                 # already starts with `gAAAA`), so it covers both possible
                 # states of the session. Same remedy, and for the same reason,
-                # as `workflow_move_service._aplicar`.
+                # as `workflow_move_service._apply`.
                 #
                 # This call sits OUTSIDE the `try/except IntegrityError` right
                 # below, and that is deliberate — but it fools a hasty reader.
@@ -987,14 +987,14 @@ class WorkflowService:
         # in an AsyncSession is not one more SELECT, it is `MissingGreenlet`,
         # that is, this message's 409 would become a 500 precisely on the error
         # path.
-        nome_tentado = updates.get("name") or wf.name
+        attempted_name = updates.get("name") or wf.name
         try:
             wf = await self.crud.update(wf, updates)
         except IntegrityError as exc:
             await self.crud.db.rollback()
             if "uq_workflow_name_workspace" in str(exc.orig):
                 raise WorkflowNameConflictError(
-                    f"Já existe um workflow chamado '{nome_tentado}' neste workspace."
+                    f"Já existe um workflow chamado '{attempted_name}' neste workspace."
                 ) from exc
             raise
 
@@ -1019,7 +1019,7 @@ class WorkflowService:
         # `apply_schedule_if_needed` returns early when the workflow is
         # deactivated (it preserves the old config), and it is this sync that
         # has the final say on `active`.
-        if bool(wf.flag_ative) != flag_ative_anterior:
+        if bool(wf.flag_ative) != previous_flag_ative:
             try:
                 await sync_schedules_with_workflow_state(wf, self.crud.db)
             except Exception as exc:
@@ -1045,7 +1045,7 @@ class WorkflowService:
         that the person restoring cannot access. A nonexistent version raises
         `WorkflowNotFoundError` right here — the error is not swallowed to
         "skip" the guard."""
-        autor = _exigir_autor(restored_by, "restored_by")
+        autor = _require_author(restored_by, "restored_by")
 
         # The RAW version, without decrypting: `credential_id` is not encrypted, and
         # opening the blob would make a version with a `connectionString` that
@@ -1057,7 +1057,7 @@ class WorkflowService:
                 f"Versão {version_number} do workflow {id_hash} não encontrada"
             )
         wf = await self.crud.get_by_hash(id_hash)
-        await assert_credenciais_da_definicao(
+        await assert_definition_credentials(
             self.crud.db, versao.definition,
             user_id=autor, workspace_id=wf.workspace_id if wf else None,
         )

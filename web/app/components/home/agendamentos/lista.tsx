@@ -16,16 +16,16 @@ import { createToast } from "@/utils/createToast"
 import { AvisoAmbar } from "@/app/components/shared/estados"
 import ExecuteParamsDialog from "@/app/components/workflow/execute-params-dialog"
 import { cn } from "@/lib/utils"
-import type { IAgendamentoMeu } from "@/service/types"
+import type { IMySchedule } from "@/service/types"
 import type { IParamSchema } from "@/service/types"
 import { useAgendamentos } from "@/app/hooks/home/useAgendamentos"
 import { LinhaDoMeu, GatilhoDeAcoes } from "../linha"
-import { useFormatos, useIdiomaDaTela, useTextosDaCasca } from "../i18n/da-casca"
+import { useFormats, useScreenLanguage, useShellTexts } from "../i18n/da-casca"
 import { resumirNoIdioma } from "./resumo"
 
 // Only the sublist hides on its own in the 3rem rail; the standalone blocks
 // (error, warning) need the class added by hand.
-const SO_EXPANDIDO = "group-data-[collapsible=icon]:hidden"
+const EXPANDED_ONLY = "group-data-[collapsible=icon]:hidden"
 
 /**
  * The BROWSER's time zone, to decide whether the schedule's one is worth naming.
@@ -44,7 +44,7 @@ function fusoDoNavegador(): string | null {
  * A clock time written in the description ("todo dia às 06:00", "seg–sex às
  * 06:00", "dia 5 às 06:00"). That is what the time zone qualifies.
  */
-const TEM_HORA = /\d{1,2}:\d{2}/
+const HAS_TIME = /\d{1,2}:\d{2}/
 
 /**
  * The schedule runs in the time zone the backend stores (UTC by default, or the
@@ -61,12 +61,12 @@ const TEM_HORA = /\d{1,2}:\d{2}/
  * cadence. The RAW expression (`descricaoCrua`) is left out for another reason:
  * nobody reads the time zone of a cron the screen couldn't translate.
  */
-function sufixoDeFuso(
+function timezoneSuffix(
   timezone: string | null | undefined,
   resumo: { descricao: string; descricaoCrua: boolean } | null,
 ): string {
   if (!timezone || !resumo) return ""
-  if (resumo.descricaoCrua || !TEM_HORA.test(resumo.descricao)) return ""
+  if (resumo.descricaoCrua || !HAS_TIME.test(resumo.descricao)) return ""
   const local = fusoDoNavegador()
   if (local && local === timezone) return ""
   return ` (${timezone})`
@@ -99,17 +99,17 @@ export function AgendamentosLista() {
   } = useAgendamentos()
   const { workspaces } = useWorkspace()
   const { refresh: refreshActiveRuns } = useActiveRuns()
-  const idioma = useIdiomaDaTela()
-  const textos = useTextosDaCasca()
+  const idioma = useScreenLanguage()
+  const textos = useShellTexts()
   const t = textos.listas
-  const fmt = useFormatos()
+  const fmt = useFormats()
 
   const [executeTarget, setExecuteTarget] = useState<
     { workflowId: string; workflowName: string; schema: Record<string, IParamSchema> } | null
   >(null)
-  const [preparandoId, setPreparandoId] = useState<string | null>(null)
+  const [preparingId, setPreparingId] = useState<string | null>(null)
 
-  const podeMexer = useCallback(
+  const canModify = useCallback(
     (workspaceId: string | null | undefined) =>
       hasMinRole(workspaces.find((w) => w.id_hash === workspaceId)?.my_role, "operator"),
     [workspaces],
@@ -132,11 +132,11 @@ export function AgendamentosLista() {
   // Run now needs the params_schema, which `/me/schedules` doesn't bring: fetches
   // the workflow on click and, if it has parameters, opens the dialog; otherwise
   // fires directly. Same flow as projects/index.tsx (handleRunClick).
-  const prepararRun = useCallback(
-    async (item: IAgendamentoMeu) => {
-      setPreparandoId(item.job_id)
+  const prepareRun = useCallback(
+    async (item: IMySchedule) => {
+      setPreparingId(item.job_id)
       const res = await GisFlowService.getWorkflowById(item.workflow_id)
-      setPreparandoId(null)
+      setPreparingId(null)
       if (res.error || !res.data) {
         createToast.error(
           t.agendamentos.prepararFalhou,
@@ -178,7 +178,7 @@ export function AgendamentosLista() {
     // §3: the error block only takes over the list when there was never an
     // accepted load. With schedules on screen, the failure becomes the footer's amber warning.
     corpo = (
-      <div role="alert" className={`flex flex-col items-start gap-1 px-2 py-1.5 ${SO_EXPANDIDO}`}>
+      <div role="alert" className={`flex flex-col items-start gap-1 px-2 py-1.5 ${EXPANDED_ONLY}`}>
         <p className="text-xs text-sidebar-foreground/70">{erro}</p>
         <button
           type="button"
@@ -202,10 +202,10 @@ export function AgendamentosLista() {
           // In Portuguese it is the trigger's `resumirAgendamento` as is; in the
           // other languages, the same rules with the dictionary's sentences.
           const resumo = resumirNoIdioma(item, item.flag_ative, idioma)
-          const permitido = podeMexer(item.workspace_id)
-          const preparando = preparandoId === item.job_id
-          const fuso = sufixoDeFuso(item.timezone, resumo)
-          const linhaResumo = !resumo
+          const permitido = canModify(item.workspace_id)
+          const preparando = preparingId === item.job_id
+          const fuso = timezoneSuffix(item.timezone, resumo)
+          const summaryLine = !resumo
             ? null
             : resumo.estado === "pausado"
               ? resumo.motivoPausa
@@ -258,9 +258,9 @@ export function AgendamentosLista() {
                 </span>
                 {/* Second line truncated with the full text in `title`: "pausado
                     — workflow inativo" cut to "pausado — wor…" says nothing. */}
-                {linhaResumo && (
-                  <span className="truncate pl-3 text-[11px] text-sidebar-foreground/55" title={linhaResumo}>
-                    {linhaResumo}
+                {summaryLine && (
+                  <span className="truncate pl-3 text-[11px] text-sidebar-foreground/55" title={summaryLine}>
+                    {summaryLine}
                   </span>
                 )}
               </div>
@@ -292,7 +292,7 @@ export function AgendamentosLista() {
                       )}
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onSelect={() => prepararRun(item)}
+                      onSelect={() => prepareRun(item)}
                       disabled={preparando}
                       className="gap-2 max-md:min-h-10"
                     >
@@ -316,7 +316,7 @@ export function AgendamentosLista() {
       {/* The footer lives OUTSIDE the branches: with an EMPTY list and a reload
           that failed, the amber warning had nowhere to appear. */}
       {((erro && jaCarregou) || faltam) && (
-        <div className={`flex flex-col gap-1 px-2 pb-1 ${SO_EXPANDIDO}`}>
+        <div className={`flex flex-col gap-1 px-2 pb-1 ${EXPANDED_ONLY}`}>
           {/* Reload that failed over the ready list: warn, don't erase the list. */}
           {erro && jaCarregou && (
             <AvisoAmbar

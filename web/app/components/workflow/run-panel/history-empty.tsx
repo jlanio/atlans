@@ -24,7 +24,7 @@ const HistoryEmpty = () => {
   const [runs, setRuns] = useState<IRunSummary[]>([])
   const [loading, setLoading] = useState(false)
   // The list did not arrive: the "no runs" slot says so, not the empty state.
-  const [falhou, setFalhou] = useState(false)
+  const [falhou, setFailed] = useState(false)
   const [loadingRunId, setLoadingRunId] = useState<string | null>(null)
   const loadHistoricalEvents = useWorkflowExecutionStore(s => s.loadHistoricalEvents)
 
@@ -34,7 +34,7 @@ const HistoryEmpty = () => {
     const res = await GisFlowService.getObservabilityRuns({ workflow_id: id, limit: 5 })
     const dados = dadoOuAviso(res, "Erro ao carregar execuções recentes")
     setRuns(dados?.runs ?? [])
-    setFalhou(dados === null)
+    setFailed(dados === null)
     setLoading(false)
   }, [id])
 

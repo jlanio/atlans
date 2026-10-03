@@ -11,7 +11,7 @@ import { POST } from "@/app/api/csp-report/route"
 
 afterEach(() => vi.restoreAllMocks())
 
-const POLITICA = "default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; " +
+const POLICY = "default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; " +
   "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; ".repeat(6)
 
 function relato(i: number) {
@@ -24,7 +24,7 @@ function relato(i: number) {
       documentURL: "https://atlans.example.org/workflow/x",
       effectiveDirective: "script-src-elem",
       blockedURL: `https://cdn.exemplo/${i}.js`,
-      originalPolicy: POLITICA,
+      originalPolicy: POLICY,
       disposition: "enforce",
       statusCode: 200,
     },

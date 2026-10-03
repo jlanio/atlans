@@ -27,10 +27,10 @@ from flow.nodes.contrato import NOMES_ANTIGOS
 # Outputs that were renamed along with the node. Only `DataInput` changed one:
 # `DriveTrigger`'s metadata `drive_file_id` became `file_id`. `DataOutput`
 # kept the four outputs of `ArtifactOutput`.
-_SAIDAS_RENOMEADAS = {"DriveTrigger": {"drive_file_id": "file_id"}}
+_RENAMED_OUTPUTS = {"DriveTrigger": {"drive_file_id": "file_id"}}
 
 
-def _propriedades_novas(antigo: str, props: dict) -> dict:
+def _new_properties(antigo: str, props: dict) -> dict:
     """What changes in the properties besides the name.
 
     `ArtifactOutput` was public when it had NO credential and protected when
@@ -52,13 +52,13 @@ def _propriedades_novas(antigo: str, props: dict) -> dict:
     return props
 
 
-def _padrao_de_saida(alias: str, antiga: str) -> re.Pattern:
+def _output_pattern(alias: str, antiga: str) -> re.Pattern:
     """`Alias.metadata.<antiga>` in an expression, in the forms Jinja accepts:
     `$Alias...`/`{{ Alias... }}`, with `.metadata` or `['metadata']`, and the key
     as an attribute, `['<antiga>']` or `.get('<antiga>')`. The lookbehind prevents
     matching the alias as a suffix of another name (`MeuDriveTrigger`) or as an
     attribute (`x.DriveTrigger`). What escapes this (via `named.`, `nodes[...]`,
-    mapped input, Python code) comes out in `sobras_para_revisar`."""
+    mapped input, Python code) comes out in `leftovers_to_review`."""
     a, k = re.escape(alias), re.escape(antiga)
     return re.compile(
         rf"(?<![\w.])(?P<base>\$?{a}(?:\.metadata|\[(?P<q1>['\"])metadata(?P=q1)\]))"
@@ -66,7 +66,7 @@ def _padrao_de_saida(alias: str, antiga: str) -> re.Pattern:
     )
 
 
-def _trocar_chave(m: re.Match, nova: str) -> str:
+def _swap_key(m: re.Match, nova: str) -> str:
     base = m.group("base")
     if m.group("q2"):
         return f"{base}[{m.group('q2')}{nova}{m.group('q2')}]"
@@ -75,13 +75,13 @@ def _trocar_chave(m: re.Match, nova: str) -> str:
     return f"{base}.{nova}"
 
 
-def _reescrever_saidas(valor, padroes: list[tuple[re.Pattern, str, str]]):
+def _rewrite_outputs(valor, padroes: list[tuple[re.Pattern, str, str]]):
     """Applies the output renames to every string in `valor` (dicts and lists
     included). Returns (new value, {(old, new) applied})."""
     if isinstance(valor, str):
         feitas = set()
         for padrao, antiga, nova in padroes:
-            valor, n = padrao.subn(lambda m, nova=nova: _trocar_chave(m, nova), valor)
+            valor, n = padrao.subn(lambda m, nova=nova: _swap_key(m, nova), valor)
             if n:
                 feitas.add((antiga, nova))
         return valor, feitas
@@ -90,13 +90,13 @@ def _reescrever_saidas(valor, padroes: list[tuple[re.Pattern, str, str]]):
         itens = valor.items() if isinstance(valor, dict) else enumerate(valor)
         novo = {} if isinstance(valor, dict) else [None] * len(valor)
         for chave, item in itens:
-            novo[chave], f = _reescrever_saidas(item, padroes)
+            novo[chave], f = _rewrite_outputs(item, padroes)
             feitas |= f
         return novo, feitas
     return valor, set()
 
 
-def migrar_definicao(definicao) -> tuple[object, list[tuple[str, str, str]]]:
+def migrate_definition(definicao) -> tuple[object, list[tuple[str, str, str]]]:
     """Returns (rewritten definition, changes [(node_id, old, new)]).
 
     With no change, returns the SAME object (the caller rewrites nothing). The name can
@@ -117,75 +117,75 @@ def migrar_definicao(definicao) -> tuple[object, list[tuple[str, str, str]]]:
     padroes: list[tuple[re.Pattern, str, str]] = []
     nova = copy.deepcopy(definicao)
 
-    def _niveis(no):
+    def _levels(no):
         dados = no.get("data")
         return [no] + ([dados] if isinstance(dados, dict) else [])
 
     for no in nova["nodes"]:
         if not isinstance(no, dict):
             continue
-        antigo = next((n["name"] for n in _niveis(no) if n.get("name") in NOMES_ANTIGOS), None)
+        antigo = next((n["name"] for n in _levels(no) if n.get("name") in NOMES_ANTIGOS), None)
         if antigo is None:
             continue
         novo = NOMES_ANTIGOS[antigo]
-        for nivel in _niveis(no):
+        for nivel in _levels(no):
             if nivel.get("name") == antigo:
                 alias = resolve_alias(nivel)
                 if alias == antigo:
                     nivel["alias"] = antigo
-                for antiga, nova_saida in _SAIDAS_RENOMEADAS.get(antigo, {}).items():
-                    padroes.append((_padrao_de_saida(alias, antiga), antiga, nova_saida))
+                for antiga, new_output in _RENAMED_OUTPUTS.get(antigo, {}).items():
+                    padroes.append((_output_pattern(alias, antiga), antiga, new_output))
                 nivel["name"] = novo
             if isinstance(nivel.get("properties"), dict):
-                nivel["properties"] = _propriedades_novas(antigo, nivel["properties"])
+                nivel["properties"] = _new_properties(antigo, nivel["properties"])
         trocas.append((str(no.get("id")), antigo, novo))
     if not trocas:
         return definicao, []
     for no in nova["nodes"] if padroes else ():
         if not isinstance(no, dict):
             continue
-        for nivel in _niveis(no):
+        for nivel in _levels(no):
             if not isinstance(nivel.get("properties"), dict):
                 continue
-            nivel["properties"], feitas = _reescrever_saidas(nivel["properties"], padroes)
-            for antiga, nova_saida in sorted(feitas):
-                trocas.append((str(no.get("id")), f"metadata.{antiga}", f"metadata.{nova_saida}"))
+            nivel["properties"], feitas = _rewrite_outputs(nivel["properties"], padroes)
+            for antiga, new_output in sorted(feitas):
+                trocas.append((str(no.get("id")), f"metadata.{antiga}", f"metadata.{new_output}"))
     return nova, trocas
 
 
-def _textos(valor):
+def _texts(valor):
     if isinstance(valor, str):
         yield valor
     elif isinstance(valor, dict):
         for item in valor.values():
-            yield from _textos(item)
+            yield from _texts(item)
     elif isinstance(valor, list):
         for item in valor:
-            yield from _textos(item)
+            yield from _texts(item)
 
 
-def sobras_para_revisar(definicao) -> list[str]:
+def leftovers_to_review(definicao) -> list[str]:
     """Ids of the nodes that still cite a renamed output after the migration —
     forms the rewrite cannot reach safely (`named.X`, `nodes['id']`,
     mapped input, Python code). Whoever runs the command reviews them by hand."""
     if not isinstance(definicao, dict) or not isinstance(definicao.get("nodes"), list):
         return []
-    antigas = {antiga for saidas in _SAIDAS_RENOMEADAS.values() for antiga in saidas}
+    antigas = {antiga for saidas in _RENAMED_OUTPUTS.values() for antiga in saidas}
     ids = []
     for no in definicao["nodes"]:
         if not isinstance(no, dict):
             continue
-        niveis = [no] + ([no["data"]] if isinstance(no.get("data"), dict) else [])
+        tiers = [no] + ([no["data"]] if isinstance(no.get("data"), dict) else [])
         if any(
             antiga in texto
-            for nivel in niveis for texto in _textos(nivel.get("properties"))
+            for nivel in tiers for texto in _texts(nivel.get("properties"))
             for antiga in antigas
         ):
             ids.append(str(no.get("id")))
     return ids
 
 
-async def migrar_nos(db, *, aplicar: bool) -> list[dict]:
+async def migrate_nodes(db, *, aplicar: bool) -> list[dict]:
     """Scans workflows and saved versions. Returns one line per definition that
     changes (or would change, without `aplicar`).
 
@@ -204,7 +204,7 @@ async def migrar_nos(db, *, aplicar: bool) -> list[dict]:
         filtro = or_(*[texto.like(f'%"{nome}"%') for nome in NOMES_ANTIGOS])
         linhas = (await db.execute(select(modelo).where(filtro))).scalars().all()
         for linha in linhas:
-            nova, trocas = migrar_definicao(linha.definition)
+            nova, trocas = migrate_definition(linha.definition)
             if not trocas:
                 continue
             relatorio.append({
@@ -213,7 +213,7 @@ async def migrar_nos(db, *, aplicar: bool) -> list[dict]:
                 "nome": getattr(linha, "name", None),
                 "versao": getattr(linha, "version_number", None),
                 "trocas": trocas,
-                "revisar": sobras_para_revisar(nova),
+                "revisar": leftovers_to_review(nova),
             })
             if aplicar:
                 linha.definition = nova
@@ -222,7 +222,7 @@ async def migrar_nos(db, *, aplicar: bool) -> list[dict]:
     return relatorio
 
 
-async def nomes_antigos_desabilitados(db) -> list[str]:
+async def disabled_old_names(db) -> list[str]:
     """Old names the admin left disabled.
 
     The `disabled_nodes` map is by name, and this command does NOT transfer the mark

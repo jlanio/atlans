@@ -25,7 +25,7 @@ export function SkeletonDeTokens() {
       aria-label="Carregando os tokens de acesso"
       className="flex flex-col gap-3"
     >
-      {[0, 1, 2].map(i => <LinhaFantasma key={i} />)}
+      {[0, 1, 2].map(i => <GhostRow key={i} />)}
     </div>
   )
 }
@@ -34,7 +34,7 @@ export function SkeletonDeTokens() {
  * Taller on the phone: there the EntityCard stacks the "Revogar" button on a
  * second line, and a short skeleton shrank the list when the data arrived.
  */
-function LinhaFantasma() {
+function GhostRow() {
   return (
     <div className="flex h-[132px] items-center gap-3 rounded-lg border bg-card px-3 shadow-xs sm:h-[92px]">
       <Skeleton className="size-8 shrink-0 rounded-md" />

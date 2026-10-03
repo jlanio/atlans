@@ -56,8 +56,8 @@ const NodeConfigModal = () => {
   // (and the whole form) run on every pointermove. These two subscriptions only
   // change when the `data` of the node being edited is replaced or when some
   // node enters/leaves.
-  const dadosDoNo = useStore(s => (configNodeIdParam ? s.nodeLookup.get(configNodeIdParam)?.data : undefined))
-  const totalDeNos = useStore(s => s.nodeLookup.size)
+  const nodeData = useStore(s => (configNodeIdParam ? s.nodeLookup.get(configNodeIdParam)?.data : undefined))
+  const totalNodes = useStore(s => s.nodeLookup.size)
   const [nodeFound, setNodeFound] = useState<INodeContext>()
   const [values, setValues] = useState<Record<string, string | number | boolean>>()
   const [showDiscardDialog, setShowDiscardDialog] = useState(false)
@@ -85,10 +85,10 @@ const NodeConfigModal = () => {
     const found = getNode(configNodeIdParam)
     if (found) {
       setNodeFound(found)
-    } else if (totalDeNos > 0) {
+    } else if (totalNodes > 0) {
       removeConfigNodeParam()
     }
-  }, [dadosDoNo, totalDeNos, configNodeIdParam, getNode, removeConfigNodeParam])
+  }, [nodeData, totalNodes, configNodeIdParam, getNode, removeConfigNodeParam])
 
   useEffect(() => {
     setValues(nodeFound?.data.properties)
@@ -146,7 +146,7 @@ const NodeConfigModal = () => {
     // The position comes from the canvas, not from the snapshot the modal opened
     // with: the node may have been dragged while the form was open (there is no
     // blocking overlay) and writing the old position would make it jump back.
-    const noAtualizado = {
+    const updatedNode = {
       ...nodeFound,
       position: getNode(nodeFound.id)?.position ?? nodeFound.position,
       data: {
@@ -157,8 +157,8 @@ const NodeConfigModal = () => {
     } as INodeContext
 
     // Functional form: applies on top of the store's latest list.
-    setNodes(nds => nds.map(node => (node.id === noAtualizado.id ? noAtualizado : node)))
-    setNodeFound(noAtualizado)
+    setNodes(nds => nds.map(node => (node.id === updatedNode.id ? updatedNode : node)))
+    setNodeFound(updatedNode)
     removeConfigNodeParam()
   }
 
@@ -332,14 +332,14 @@ const NodeConfigModal = () => {
             />
           )}
 
-          {/* Aba "Helper" — DataOutput */}
+          {/* Tab "Helper" — DataOutput */}
           {nodeName === "DataOutput" && configTab === "helper" && (
             <div className="flex-1 overflow-y-auto">
               <DataOutputHelper label={String(values?.label ?? "")} />
             </div>
           )}
 
-          {/* Aba "Helper" — WebhookTrigger */}
+          {/* Tab "Helper" — WebhookTrigger */}
           {isWebhookTrigger && configTab === "helper" && (
             <div className="flex flex-col gap-3 px-4 pb-4 overflow-y-auto">
               <div className="flex gap-1 mt-3">

@@ -18,56 +18,56 @@ import os
 import zipfile
 
 # 1) Disables the VRT drivers before GDAL registers them (if imported in time).
-_skip_atual = {s for s in os.environ.get("GDAL_SKIP", "").split(",") if s}
-os.environ["GDAL_SKIP"] = ",".join(sorted(_skip_atual | {"OGR_VRT", "VRT"}))
+_current_skip = {s for s in os.environ.get("GDAL_SKIP", "").split(",") if s}
+os.environ["GDAL_SKIP"] = ",".join(sorted(_current_skip | {"OGR_VRT", "VRT"}))
 
 import geopandas as gpd  # noqa: E402  (import apos configurar GDAL_SKIP)
 
 
-class FonteGeoInseguraError(ValueError):
+class UnsafeGeoSourceError(ValueError):
     """The geospatial source is a VRT or a virtual path — refused for security."""
 
 
 # Assinaturas de VRT (vetor e raster). Comparadas em minusculas.
-_ASSINATURAS_VRT = (b"<ogrvrtdatasource", b"<vrtdataset")
+_VRT_SIGNATURES = (b"<ogrvrtdatasource", b"<vrtdataset")
 # Path prefixes that GDAL treats as a virtual file system (network,
 # nested files) or as a connection to an external datasource.
-_PREFIXOS_VIRTUAIS = ("/vsi",)
-_PREFIXOS_CONEXAO = (
+_VIRTUAL_PREFIXES = ("/vsi",)
+_CONNECTION_PREFIXES = (
     "csv:", "pg:", "mysql:", "oci:", "wfs:", "gtiff:", "gpkg:", "sqlite:",
     "http:", "https:", "ftp:", "postgresql:", "mongodb:", "es:", "carto:",
 )
 
 
-def _tem_assinatura_vrt(cabecalho: bytes) -> bool:
+def _has_vrt_signature(cabecalho: bytes) -> bool:
     trecho = cabecalho[:8192].lower()
-    return any(a in trecho for a in _ASSINATURAS_VRT)
+    return any(a in trecho for a in _VRT_SIGNATURES)
 
 
-def _zip_tem_vrt(dados_ou_caminho) -> bool:
+def _zip_has_vrt(data_or_path) -> bool:
     try:
-        zf = (zipfile.ZipFile(io.BytesIO(dados_ou_caminho)) if isinstance(dados_ou_caminho, (bytes, bytearray))
-              else zipfile.ZipFile(dados_ou_caminho))
+        zf = (zipfile.ZipFile(io.BytesIO(data_or_path)) if isinstance(data_or_path, (bytes, bytearray))
+              else zipfile.ZipFile(data_or_path))
         with zf:
             return any(nome.lower().endswith(".vrt") for nome in zf.namelist())
     except (zipfile.BadZipFile, OSError):
         return False
 
 
-def _validar_bytes(dados: bytes) -> None:
-    if _tem_assinatura_vrt(dados):
-        raise FonteGeoInseguraError(
+def _validate_bytes(dados: bytes) -> None:
+    if _has_vrt_signature(dados):
+        raise UnsafeGeoSourceError(
             "Conteudo recusado: documento OGR VRT nao e permitido (pode ler "
             "arquivos locais do executor ou fazer requisicoes de rede)."
         )
-    if dados[:4] == b"PK\x03\x04" and _zip_tem_vrt(dados):
-        raise FonteGeoInseguraError("Arquivo .zip contem um .vrt — recusado por seguranca.")
+    if dados[:4] == b"PK\x03\x04" and _zip_has_vrt(dados):
+        raise UnsafeGeoSourceError("Arquivo .zip contem um .vrt — recusado por seguranca.")
 
 
-def _validar_caminho(caminho: str) -> None:
+def _validate_path(caminho: str) -> None:
     baixo = caminho.lower()
-    if baixo.startswith(_PREFIXOS_VIRTUAIS) or baixo.startswith(_PREFIXOS_CONEXAO):
-        raise FonteGeoInseguraError(
+    if baixo.startswith(_VIRTUAL_PREFIXES) or baixo.startswith(_CONNECTION_PREFIXES):
+        raise UnsafeGeoSourceError(
             f"Caminho '{caminho[:60]}' nao e um arquivo local simples e foi recusado."
         )
     try:
@@ -75,30 +75,30 @@ def _validar_caminho(caminho: str) -> None:
             cabecalho = fh.read(8192)
     except OSError:
         return  # deixa o gpd.read_file dar o erro de I/O apropriado
-    if _tem_assinatura_vrt(cabecalho):
-        raise FonteGeoInseguraError(
+    if _has_vrt_signature(cabecalho):
+        raise UnsafeGeoSourceError(
             "Conteudo recusado: documento OGR VRT nao e permitido."
         )
-    if cabecalho[:4] == b"PK\x03\x04" and _zip_tem_vrt(caminho):
-        raise FonteGeoInseguraError("Arquivo .zip contem um .vrt — recusado por seguranca.")
+    if cabecalho[:4] == b"PK\x03\x04" and _zip_has_vrt(caminho):
+        raise UnsafeGeoSourceError("Arquivo .zip contem um .vrt — recusado por seguranca.")
 
 
-def ler_geodataframe(fonte, **kwargs):
+def read_geodataframe(fonte, **kwargs):
     """Hardened `geopandas.read_file`: refuses VRT and virtual paths.
 
     `fonte` may be a path (str/PathLike), bytes or a binary buffer
     (io.BytesIO), as `gpd.read_file` accepts.
     """
     if isinstance(fonte, (bytes, bytearray)):
-        _validar_bytes(bytes(fonte))
+        _validate_bytes(bytes(fonte))
     elif isinstance(fonte, io.BytesIO):
         dados = fonte.getvalue()
-        _validar_bytes(dados)
+        _validate_bytes(dados)
     elif hasattr(fonte, "read"):
-        # Buffer generico: le, valida e reembrulha para o read_file.
+        # Buffer generic: le, valida e reembrulha para o read_file.
         dados = fonte.read()
-        _validar_bytes(dados)
+        _validate_bytes(dados)
         fonte = io.BytesIO(dados)
     else:
-        _validar_caminho(os.fspath(fonte))
+        _validate_path(os.fspath(fonte))
     return gpd.read_file(fonte, **kwargs)

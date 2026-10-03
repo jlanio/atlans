@@ -18,17 +18,17 @@
 import { TbArrowsMaximize } from "react-icons/tb"
 
 import Conversa from "@/app/components/home/assistente/conversa"
-import type { TurnoDoAssistente } from "@/app/components/home/assistente/quadros"
+import type { AssistantTurn } from "@/app/components/home/assistente/quadros"
 import { useHomeStore } from "@/app/stores/homeStore"
-import { useExtrasDoAssistente, type Confirmar, type Enviar } from "./extras"
+import { useAssistantExtras, type Confirmar, type Enviar } from "./extras"
 import MarcaAnimada from "./marca-animada"
-import { useTextos } from "../i18n"
+import { useTexts } from "../i18n"
 
 /** How many turns stay in the center: the last exchange (the question and the answer). */
-export const ITENS_AO_CENTRO = 2
+export const CENTER_ITEMS = 2
 
 interface Props {
-  turnos: TurnoDoAssistente[]
+  turnos: AssistantTurn[]
   correndo: boolean
   confirmar: Confirmar
   /** Quick replies are sent through here — the same `enviar` as the bar. */
@@ -48,13 +48,13 @@ export default function Pilha({
   turnos, correndo, confirmar, enviar, saindo = false, comAvisoDeCota = false, folgaExtras = 0,
 }: Props) {
   const abrir = useHomeStore((s) => s.abrirPainel)
-  const extras = useExtrasDoAssistente({ confirmar, correndo, enviar })
-  const t = useTextos().assistente
+  const extras = useAssistantExtras({ confirmar, correndo, enviar })
+  const t = useTexts().assistente
 
   if (turnos.length === 0) return null
 
-  const ultimos = turnos.slice(-ITENS_AO_CENTRO)
-  const ocultos = turnos.length - ultimos.length
+  const latest = turnos.slice(-CENTER_ITEMS)
+  const ocultos = turnos.length - latest.length
 
   return (
     <section
@@ -70,7 +70,7 @@ export default function Pilha({
           if the cards exceed it. */}
       <div className="home-pilha-itens flex min-h-0 flex-col">
         <Conversa
-          turnos={ultimos}
+          turnos={latest}
           correndo={correndo}
           extras={extras}
           nome={t.nome}

@@ -35,7 +35,7 @@ import random
 # Floor of the jitter range: the actual wait falls between 50% and 100% of the
 # computed interval. Same range as `executor/connection.py`, which got it right
 # first.
-FATOR_JITTER_MIN = 0.5
+MIN_JITTER_FACTOR = 0.5
 
 # Exponent ceiling. `base ** tentativa` is FLOATING-POINT arithmetic, and
 # overflows (`OverflowError`) around 2**1024 — the INTEGER `2 ** n` this
@@ -47,10 +47,10 @@ FATOR_JITTER_MIN = 0.5
 # Capping here changes no returned value: with `base > 1`, `inicial * 2**64`
 # already exceeds 1e18, many orders of magnitude above any real `teto`, and
 # the `min` saturates anyway.
-_EXPOENTE_MAX = 64
+_MAX_EXPONENT = 64
 
 
-def com_jitter(segundos: float) -> float:
+def with_jitter(segundos: float) -> float:
     """Spreads out an already computed wait.
 
     For when the interval does NOT grow exponentially — the fixed reconnection
@@ -59,7 +59,7 @@ def com_jitter(segundos: float) -> float:
     """
     if segundos <= 0:
         return 0.0
-    return segundos * (FATOR_JITTER_MIN + random.random() * (1.0 - FATOR_JITTER_MIN))
+    return segundos * (MIN_JITTER_FACTOR + random.random() * (1.0 - MIN_JITTER_FACTOR))
 
 
 def espera_exponencial(
@@ -77,6 +77,6 @@ def espera_exponencial(
         tentativa = 0
     # `base <= 1` does not grow, so it does not overflow — and capping the exponent
     # there WOULD CHANGE the result, instead of just avoiding the overflow.
-    if base > 1 and tentativa > _EXPOENTE_MAX:
-        tentativa = _EXPOENTE_MAX
-    return com_jitter(min(inicial * (base ** tentativa), teto))
+    if base > 1 and tentativa > _MAX_EXPONENT:
+        tentativa = _MAX_EXPONENT
+    return with_jitter(min(inicial * (base ** tentativa), teto))

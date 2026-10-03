@@ -9,12 +9,12 @@ from sqlalchemy.pool import StaticPool
 
 from app.models.base import Base
 from app.models.system_config import SystemConfig
-from app.models.uso_do_assistente import UsoDoAssistente
-from tests.unit._mcp_harness import TABELAS_DAS_EXTENSOES
+from app.models.uso_do_assistente import AssistantUsage
+from tests.unit._mcp_harness import EXTENSION_TABLES
 
 # The configuration (the model) and the measured usage; with the plans, their
 # tables, which the per-plan cost queries.
-TABELAS = [SystemConfig.__table__, UsoDoAssistente.__table__, *TABELAS_DAS_EXTENSOES]
+TABLES = [SystemConfig.__table__, AssistantUsage.__table__, *EXTENSION_TABLES]
 
 CATALOGO = [
     {"id": "a/barato", "nome": "Barato", "entrada_por_milhao": 1.0,
@@ -25,7 +25,7 @@ CATALOGO = [
 
 
 @asynccontextmanager
-async def api_com_banco(client, usuario):
+async def api_with_db(client, usuario):
     """The API client as admin, with the in-memory database in place of the real
     one. Each test file wraps it in its own `api` fixture."""
     from app.api.dependencies import get_db
@@ -36,7 +36,7 @@ async def api_com_banco(client, usuario):
 
     engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all, tables=TABELAS)
+        await conn.run_sync(Base.metadata.create_all, tables=TABLES)
     fabrica = async_sessionmaker(engine, expire_on_commit=False)
     async with fabrica() as sessao:
         async def _db():
@@ -50,25 +50,25 @@ async def api_com_banco(client, usuario):
     await engine.dispose()
 
 
-def com_catalogo(catalogo=CATALOGO, erro=None, sonda=None):
+def with_catalog(catalogo=CATALOGO, erro=None, sonda=None):
     """The stubbed catalog and the stubbed PROBE.
 
     The probe makes a real call to the provider before saving a model — it is
     what stops the screen from accepting an id that does not work. Here it is a
     no-op by default; `sonda=<exceção>` makes the refusal happen.
     """
-    async def _listar(**kw):
+    async def _list_schedules(**kw):
         if erro is not None:
             raise erro
         return [dict(m) for m in catalogo]
 
-    async def _sondar(modelo, **kw):
+    async def _probe(modelo, **kw):
         if sonda is not None:
             raise sonda
 
     pilha = ExitStack()
-    pilha.enter_context(patch("app.services.openrouter.listar_modelos", _listar))
-    pilha.enter_context(patch("app.services.openrouter.sondar_modelo", _sondar))
+    pilha.enter_context(patch("app.services.openrouter.listar_modelos", _list_schedules))
+    pilha.enter_context(patch("app.services.openrouter.sondar_modelo", _probe))
     pilha.enter_context(patch("app.api.routers.admin_assistente_router.OPENROUTER_API_KEY", "k"))
     pilha.enter_context(patch("app.mcp.infra.redis_ou_none", lambda: None))
     return pilha

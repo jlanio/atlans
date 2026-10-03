@@ -38,9 +38,9 @@ vi.mock("@/utils/createToast", () => ({
 // The sections load through `useFetchData`, which waits for the authenticated session.
 vi.mock("next-auth/react", () => ({ useSession: () => ({ status: "authenticated" }) }))
 
-const workspaceAtual = { id_hash: "ws-a", name: "A", my_role: "owner" }
+const currentWorkspace = { id_hash: "ws-a", name: "A", my_role: "owner" }
 vi.mock("@/context/WorkspaceContext", () => ({
-  useWorkspace: () => ({ current: workspaceAtual }),
+  useWorkspace: () => ({ current: currentWorkspace }),
   hasMinRole: () => true,
 }))
 
@@ -64,7 +64,7 @@ function abrir() {
   return render(
     <WorkspaceSettingsSheet
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      workspace={workspaceAtual as any}
+      workspace={currentWorkspace as any}
       currentUserId="u-1"
       onClose={() => {}}
     />,

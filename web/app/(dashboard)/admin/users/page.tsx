@@ -19,11 +19,11 @@ import {
 import { TooltipProvider } from "@/app/components/ui/tooltip"
 import { createToast } from "@/utils/createToast"
 import { cn } from "@/lib/utils"
-import { formatarInteiro, plural } from "@/lib/formatos"
+import { formatInteger, plural } from "@/lib/formatos"
 import { BulkActionDialog } from "@/app/components/admin/users/dialogs"
-import { TabelaDeUsuarios } from "@/app/components/admin/users/tabela"
+import { UsersTable } from "@/app/components/admin/users/tabela"
 import {
-  ErroDeCarga, SemAcesso, SemResultado, SkeletonDeUsuarios, VazioPrimeiroUso,
+  ErroDeCarga, SemAcesso, SemResultado, UsersSkeleton, VazioPrimeiroUso,
 } from "@/app/components/admin/users/estados"
 
 // ── Main page ────────────────────────────────────────────────────────────────
@@ -32,7 +32,7 @@ type StatusFilter = "all" | "active" | "suspended" | "deleted"
 
 const PAGE_SIZE = 25
 
-const OPCOES_STATUS: { value: StatusFilter; label: string }[] = [
+const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all",       label: "Todos" },
   { value: "active",    label: "Ativos" },
   { value: "suspended", label: "Suspensos" },
@@ -46,12 +46,12 @@ const OPCOES_STATUS: { value: StatusFilter; label: string }[] = [
  * While there is nothing to count (1st load), the header shows a Skeleton in
  * its place (contract §1).
  */
-function textoDeEscopo(total: number, status: StatusFilter, role: string, q: string): string {
+function scopeText(total: number, status: StatusFilter, role: string, q: string): string {
   const nucleo = (() => {
     switch (status) {
-      case "active":    return total === 1 ? "1 usuário ativo"    : `${formatarInteiro(total)} usuários ativos`
-      case "suspended": return total === 1 ? "1 usuário suspenso" : `${formatarInteiro(total)} usuários suspensos`
-      case "deleted":   return total === 1 ? "1 usuário excluído" : `${formatarInteiro(total)} usuários excluídos`
+      case "active":    return total === 1 ? "1 usuário ativo"    : `${formatInteger(total)} usuários ativos`
+      case "suspended": return total === 1 ? "1 usuário suspenso" : `${formatInteger(total)} usuários suspensos`
+      case "deleted":   return total === 1 ? "1 usuário excluído" : `${formatInteger(total)} usuários excluídos`
       default:          return plural(total, "usuário")
     }
   })()
@@ -233,7 +233,7 @@ export default function AdminUsersPage() {
             <h1 className="text-2xl font-semibold text-foreground">Usuários</h1>
             {data ? (
               <p className="text-sm font-medium text-muted-foreground">
-                {textoDeEscopo(total, statusFilter, roleFilter, debouncedSearch)}
+                {scopeText(total, statusFilter, roleFilter, debouncedSearch)}
               </p>
             ) : (
               <Skeleton className="mt-1 h-4 w-64" />
@@ -279,7 +279,7 @@ export default function AdminUsersPage() {
               aria-label="Filtrar por status"
               className="inline-flex h-8 overflow-hidden rounded-md border bg-card max-md:h-10"
             >
-              {OPCOES_STATUS.map(opt => {
+              {STATUS_OPTIONS.map(opt => {
                 const ativo = statusFilter === opt.value
                 return (
                   <button
@@ -339,7 +339,7 @@ export default function AdminUsersPage() {
 
         {/* Body — precedence: loading → error (only if there was never a load) →
             empty/no-result → table (contract §3). */}
-        {data === null && loading && <SkeletonDeUsuarios />}
+        {data === null && loading && <UsersSkeleton />}
 
         {data === null && erro && !loading && (
           <ErroDeCarga
@@ -355,7 +355,7 @@ export default function AdminUsersPage() {
         )}
 
         {data !== null && users.length > 0 && (
-          <TabelaDeUsuarios
+          <UsersTable
             users={users}
             loading={loading}
             currentUserId={currentUserId}

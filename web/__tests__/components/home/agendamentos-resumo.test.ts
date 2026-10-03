@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { resumirAgendamento } from "@/app/components/projects/gatilho"
-import { resumirNoIdioma, traduzirResumo } from "@/app/components/home/agendamentos/resumo"
+import { resumirNoIdioma, translateSummary } from "@/app/components/home/agendamentos/resumo"
 import type { IWorkflowSchedule } from "@/service/types"
 
 /**
@@ -72,8 +72,8 @@ describe("o molde em português do dicionário", () => {
     // a form that one translates and the other does not would come out different here.
     for (const s of TODOS) {
       for (const ativo of [true, false]) {
-        const doGatilho = resumirAgendamento(s, ativo, AGORA)!
-        expect(traduzirResumo(doGatilho, s, "pt-BR", AGORA)).toEqual(doGatilho)
+        const fromTrigger = resumirAgendamento(s, ativo, AGORA)!
+        expect(translateSummary(fromTrigger, s, "pt-BR", AGORA)).toEqual(fromTrigger)
       }
     }
   })

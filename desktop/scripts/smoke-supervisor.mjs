@@ -69,12 +69,12 @@ const sup = new PythonSupervisor({ pythonExe: PY_EXE, cwd: RESOURCES, env })
 
 const eventos = []
 const estados = []
-const stderrLinhas = []
-const stdoutBrutas = []
+const stderrLines = []
+const stdoutRaw = []
 
 sup.on('evento', (e) => eventos.push(e))
 sup.on('estado', (e, d) => { estados.push(e); log(`  estado: ${e}${d ? ` — ${d}` : ''}`) })
-sup.on('linha', (t, origem) => (origem === 'stderr' ? stderrLinhas : stdoutBrutas).push(t))
+sup.on('linha', (t, origem) => (origem === 'stderr' ? stderrLines : stdoutRaw).push(t))
 
 const esperar = (cond, ms, oque) => new Promise((res, rej) => {
   const t0 = Date.now()
@@ -99,7 +99,7 @@ const checar = (nome, ok_) => { checagens.push([nome, ok_]); log(`  ${ok_ ? 'OK 
  * `Snapshot \{` with the brace is intentional: without it the regex would also
  * match `SnapshotEvent`, and the fields of the two would get mixed up.
  */
-function camposDoEspelhoTS() {
+function tsMirrorFields() {
   const src = fs.readFileSync(path.join(DESKTOP, 'src', 'shared', 'events.ts'), 'utf8')
   const corpo = /export interface Snapshot \{([\s\S]*?)\n\}/.exec(src)
   if (!corpo) fail('Não achei a interface Snapshot em src/shared/events.ts')
@@ -124,7 +124,7 @@ try {
   // mirror in events.ts, not a count. The previous version asserted "55 fields"
   // and broke when it gained two — and the error (`55 != 57`) said neither
   // which ones nor on which side the divergence was.
-  const esperados = camposDoEspelhoTS()
+  const esperados = tsMirrorFields()
   const recebidos = new Set(Object.keys(snap))
   const faltando = [...esperados].filter((c) => !recebidos.has(c))
   const sobrando = [...recebidos].filter((c) => !esperados.has(c))
@@ -148,8 +148,8 @@ try {
   checar('state failed traz a causa', typeof falha?.data.detail === 'string' && falha.data.detail.length > 0)
   checar('supervisor nao tenta religar apos falha com causa', sup.estado === 'failed')
 
-  checar('stderr recebeu o log humano', stderrLinhas.length > 0)
-  checar('stdout nao teve linha fora do framing', stdoutBrutas.length === 0)
+  checar('stderr recebeu o log humano', stderrLines.length > 0)
+  checar('stdout nao teve linha fora do framing', stdoutRaw.length === 0)
 } finally {
   // WAITS for the process to die before exiting.
   //

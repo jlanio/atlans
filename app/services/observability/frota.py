@@ -57,7 +57,7 @@ async def _executores_do_escopo(db: AsyncSession, user, *, como_admin: bool = Fa
     ]
 
 
-def _normalizar_capacidade(cap) -> Optional[dict]:
+def _normalize_capacity(cap) -> Optional[dict]:
     """Only the contract's four fields; the executor may publish more."""
     if not isinstance(cap, dict):
         return None
@@ -92,7 +92,7 @@ async def _presenca(executor_ids: Iterable[str]) -> tuple[dict[str, bool], dict[
 
     async def _cap(eid: str) -> Optional[dict]:
         try:
-            return _normalizar_capacidade(await executor_registry.read_capacity(eid))
+            return _normalize_capacity(await executor_registry.read_capacity(eid))
         except Exception as exc:
             logger.debug("Capacidade do executor '%s' indisponivel: %s", eid, exc)
             return None
@@ -124,7 +124,7 @@ async def _confirmacoes_atrasadas() -> Optional[int]:
     return sum(1 for i in itens if (i.get("elapsed_seconds") or 0) >= limiar)
 
 
-async def _nomes_de_executores(db: AsyncSession, executor_ids: Iterable[str]) -> dict[str, str]:
+async def _executor_names(db: AsyncSession, executor_ids: Iterable[str]) -> dict[str, str]:
     ids = [i for i in set(executor_ids) if isinstance(i, str)]
     if not ids:
         return {}
@@ -134,12 +134,12 @@ async def _nomes_de_executores(db: AsyncSession, executor_ids: Iterable[str]) ->
 
 async def _resolve_agent_names(db: AsyncSession, runs) -> dict[str, str]:
     """Resolves executor names for hosts in the 'executor:{id_hash}' format."""
-    return await _nomes_de_executores(
+    return await _executor_names(
         db, [_executor_id_do_host(r.host) for r in runs if _executor_id_do_host(r.host)]
     )
 
 
-async def _nomes_de_workspaces(db: AsyncSession, workspace_ids: Iterable[str]) -> dict[str, str]:
+async def _workspace_names(db: AsyncSession, workspace_ids: Iterable[str]) -> dict[str, str]:
     """Name by the RUN's `workspace_id`, not by the workflow's current workspace:
     a run produced before the workflow was moved belongs to the original
     workspace, and that is the name the row has to show."""

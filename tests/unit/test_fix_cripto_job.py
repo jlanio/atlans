@@ -92,16 +92,16 @@ def _patch_urlopen(monkeypatch, behavior):
     return usados
 
 
-def test_sem_pin_nao_ha_fallback_sem_verificacao(monkeypatch, tmp_path):
+def test_without_pin_there_is_no_unverified_fallback(monkeypatch, tmp_path):
     """A failing TLS handshake must NOT turn into an insecure download (the old TOFU)."""
     from executor import _ca_bootstrap
 
     monkeypatch.delenv(_ca_bootstrap._PIN_ENV, raising=False)
 
-    def sempre_falha_tls(req, kwargs):
+    def always_fail_tls(req, kwargs):
         raise urllib.error.URLError(ssl.SSLError("CERTIFICATE_VERIFY_FAILED"))
 
-    usados = _patch_urlopen(monkeypatch, sempre_falha_tls)
+    usados = _patch_urlopen(monkeypatch, always_fail_tls)
     dest = tmp_path / "atlans-root.crt"
 
     with pytest.raises(urllib.error.URLError):
@@ -112,7 +112,7 @@ def test_sem_pin_nao_ha_fallback_sem_verificacao(monkeypatch, tmp_path):
     assert usados[0] is not None and usados[0].verify_mode == ssl.CERT_REQUIRED
 
 
-def test_http_puro_aborta_sem_tocar_a_rede(monkeypatch, tmp_path):
+def test_plain_http_aborts_without_touching_the_network(monkeypatch, tmp_path):
     """`--server=ws://...` became `http://` and the SSLContext was ignored by urllib:
     the CA arrived in cleartext and became the trust store of the whole host."""
     from executor import _ca_bootstrap
@@ -128,7 +128,7 @@ def test_http_puro_aborta_sem_tocar_a_rede(monkeypatch, tmp_path):
     assert not dest.exists()
 
 
-def test_http_puro_e_permitido_com_fingerprint_pinado(monkeypatch, tmp_path, ca_pem_bytes):
+def test_plain_http_is_allowed_with_pinned_fingerprint(monkeypatch, tmp_path, ca_pem_bytes):
     """With the pin, integrity does not depend on the channel — on-prem over http stays viable."""
     from executor import _ca_bootstrap
 
@@ -140,23 +140,23 @@ def test_http_puro_e_permitido_com_fingerprint_pinado(monkeypatch, tmp_path, ca_
     assert dest.read_bytes() == ca_pem_bytes
 
 
-def test_erro_nao_tls_nao_tenta_de_novo(monkeypatch, tmp_path):
+def test_non_tls_error_does_not_retry(monkeypatch, tmp_path):
     """A URLError from DNS/connection propagates directly — switching TLS context would not help."""
     from executor import _ca_bootstrap
 
     monkeypatch.setenv(_ca_bootstrap._PIN_ENV, "ab" * 32)
 
-    def dns_quebrado(req, kwargs):
+    def broken_dns(req, kwargs):
         raise urllib.error.URLError(OSError("Name or service not known"))
 
-    usados = _patch_urlopen(monkeypatch, dns_quebrado)
+    usados = _patch_urlopen(monkeypatch, broken_dns)
 
     with pytest.raises(urllib.error.URLError):
         _ca_bootstrap._download_atomic("https://atlans.example.org/x", tmp_path / "ca.crt")
     assert len(usados) == 1
 
 
-def test_pin_permite_cadeia_nao_validada_mas_confere_fingerprint(
+def test_pin_allows_unvalidated_chain_but_checks_fingerprint(
     monkeypatch, tmp_path, ca_pem_bytes
 ):
     """With a correct ATLANS_CA_SHA256, the download goes through even without a valid chain."""
@@ -166,13 +166,13 @@ def test_pin_permite_cadeia_nao_validada_mas_confere_fingerprint(
 
     estado = {"n": 0}
 
-    def falha_a_primeira(req, kwargs):
+    def fail_the_first(req, kwargs):
         estado["n"] += 1
         if estado["n"] == 1:
             raise urllib.error.URLError(ssl.SSLError("self signed certificate in chain"))
         return _FakeResp(ca_pem_bytes)
 
-    usados = _patch_urlopen(monkeypatch, falha_a_primeira)
+    usados = _patch_urlopen(monkeypatch, fail_the_first)
     dest = tmp_path / "atlans-root.crt"
 
     _ca_bootstrap._download_atomic("https://atlans.example.org/x", dest)
@@ -181,7 +181,7 @@ def test_pin_permite_cadeia_nao_validada_mas_confere_fingerprint(
     assert usados[1].verify_mode == ssl.CERT_NONE, "2a tentativa e a pinada"
 
 
-def test_pin_divergente_aborta_sem_gravar(monkeypatch, tmp_path, ca_pem_bytes):
+def test_mismatched_pin_aborts_without_writing(monkeypatch, tmp_path, ca_pem_bytes):
     """Fingerprint diferente = possivel interceptacao: nada toca o disco."""
     from executor import _ca_bootstrap
 
@@ -201,7 +201,7 @@ def test_pin_divergente_aborta_sem_gravar(monkeypatch, tmp_path, ca_pem_bytes):
 
 
 @pytest.fixture
-def bundle_valido():
+def valid_bundle():
     key = Ed25519PrivateKey.generate()
     ca = _self_signed(Ed25519PrivateKey.generate(), cn="Atlans Root")
     cert = _self_signed(key, cn="executor-abc")
@@ -214,26 +214,26 @@ def bundle_valido():
     }
 
 
-def test_bundle_valido_passa(bundle_valido):
+def test_valid_bundle_passes(valid_bundle):
     from executor.enrollment import _validate_bundle
 
-    key, bundle = bundle_valido
+    key, bundle = valid_bundle
     assert _validate_bundle(bundle, key) is None
 
 
 @pytest.mark.parametrize("campo", ["cert_pem", "ca_pem"])
-def test_bundle_com_campo_obrigatorio_vazio_e_recusado(bundle_valido, campo):
+def test_bundle_with_empty_required_field_is_refused(valid_bundle, campo):
     """ca_pem vazio sobrescrevia o ca.pem bom e deixava o executor offline eterno."""
     from executor.enrollment import _validate_bundle
 
-    key, bundle = bundle_valido
+    key, bundle = valid_bundle
     bundle[campo] = ""
     motivo = _validate_bundle(bundle, key)
     assert motivo and campo in motivo
 
 
 @pytest.mark.parametrize("valor", ["", None])
-def test_chain_pem_vazio_e_aceito(bundle_valido, valor):
+def test_empty_chain_pem_is_accepted(valid_bundle, valor):
     """An empty chain_pem is LEGITIMATELY issued by the server — it must not block renewal.
 
     `sign_csr_via_stepca` builds `chain_pem = body.get("ca") or ""`, and `enroll`
@@ -244,7 +244,7 @@ def test_chain_pem_vazio_e_aceito(bundle_valido, valor):
     """
     from executor.enrollment import _validate_bundle
 
-    key, bundle = bundle_valido
+    key, bundle = valid_bundle
     if valor is None:
         bundle.pop("chain_pem", None)
     else:
@@ -252,27 +252,27 @@ def test_chain_pem_vazio_e_aceito(bundle_valido, valor):
     assert _validate_bundle(bundle, key) is None
 
 
-def test_bundle_com_pem_invalido_e_recusado(bundle_valido):
+def test_bundle_with_invalid_pem_is_refused(valid_bundle):
     from executor.enrollment import _validate_bundle
 
-    key, bundle = bundle_valido
+    key, bundle = valid_bundle
     bundle["ca_pem"] = "-----BEGIN CERTIFICATE-----\nlixo\n-----END CERTIFICATE-----\n"
     assert _validate_bundle(bundle, key) is not None
 
 
-def test_cert_de_outra_chave_e_recusado(bundle_valido):
+def test_cert_for_another_key_is_refused(valid_bundle):
     from executor.enrollment import _validate_bundle
 
-    _key, bundle = bundle_valido
+    _key, bundle = valid_bundle
     assert "nao corresponde" in _validate_bundle(bundle, Ed25519PrivateKey.generate())
 
 
 @pytest.mark.asyncio
-async def test_maybe_renew_nao_escreve_com_ca_pem_vazio(monkeypatch, tmp_path, bundle_valido):
+async def test_maybe_renew_does_not_write_with_empty_ca_pem(monkeypatch, tmp_path, valid_bundle):
     """Ponta a ponta: servidor devolve ca_pem="" e os arquivos originais sobrevivem."""
     from executor import enrollment, renewal
 
-    key, bundle = bundle_valido
+    key, bundle = valid_bundle
     bundle["ca_pem"] = ""
 
     for nome, conteudo in (
@@ -303,7 +303,7 @@ async def test_maybe_renew_nao_escreve_com_ca_pem_vazio(monkeypatch, tmp_path, b
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def test_chave_ausente_falha_alto_em_vez_de_gerar(tmp_path):
+def test_missing_key_fails_loudly_instead_of_generating(tmp_path):
     from executor.crypto import PrivateKeyMissingError, load_private_key
 
     caminho = tmp_path / "x25519_key.pem"
@@ -312,7 +312,7 @@ def test_chave_ausente_falha_alto_em_vez_de_gerar(tmp_path):
     assert not caminho.exists(), "nao pode criar chave nova"
 
 
-def test_chave_existente_e_carregada(tmp_path):
+def test_existing_key_is_loaded(tmp_path):
     from executor.crypto import load_private_key
 
     priv = X25519PrivateKey.generate()
@@ -333,7 +333,7 @@ def test_chave_existente_e_carregada(tmp_path):
     )
 
 
-def test_arquivo_com_chave_errada_e_recusado(tmp_path):
+def test_file_with_wrong_key_is_refused(tmp_path):
     """Point EXECUTOR_PRIVATE_KEY_PATH at the mTLS key.pem (Ed25519)."""
     from executor.crypto import PrivateKeyMissingError, load_private_key
 
@@ -347,7 +347,7 @@ def test_arquivo_com_chave_errada_e_recusado(tmp_path):
         load_private_key(None, str(caminho))
 
 
-def test_crypto_nao_expoe_mais_geracao():
+def test_crypto_no_longer_exposes_generation():
     """Generation lives only in the enrollment flow."""
     from executor import crypto
 
@@ -360,7 +360,7 @@ def test_crypto_nao_expoe_mais_geracao():
 
 
 @pytest.fixture
-def validador_limpo(monkeypatch):
+def clean_validator(monkeypatch):
     from executor import job_validator
 
     job_validator._nonce_cache.clear()
@@ -375,7 +375,7 @@ def validador_limpo(monkeypatch):
     job_validator._nonce_cache.clear()
 
 
-def _mensagem(
+def _message(
     expires_delta_seconds: float,
     nonce: str = "nonce-1",
     *,
@@ -403,70 +403,70 @@ def _mensagem(
     }
 
 
-def test_envelope_dentro_do_horizonte_passa(validador_limpo):
-    validador_limpo.validate_job(_mensagem(120))
+def test_envelope_within_the_horizon_passes(clean_validator):
+    clean_validator.validate_job(_message(120))
 
 
-def test_envelope_com_validade_absurda_e_rejeitado(validador_limpo):
+def test_envelope_with_absurd_validity_is_rejected(clean_validator):
     """An expires_at 10 years out was valid forever — now it hits the ceiling."""
-    with pytest.raises(validador_limpo.JobValidationError, match="teto"):
-        validador_limpo.validate_job(_mensagem(10 * 365 * 86400, nonce="nonce-longo"))
+    with pytest.raises(clean_validator.JobValidationError, match="teto"):
+        clean_validator.validate_job(_message(10 * 365 * 86400, nonce="nonce-longo"))
 
 
-def test_envelope_sem_issued_at_e_rejeitado(validador_limpo):
+def test_envelope_without_issued_at_is_rejected(clean_validator):
     """Without issued_at there is no way to measure the declared duration — and the only
     alternative would be to anchor the ceiling on the local clock again, which is the skew bug."""
-    msg = _mensagem(120, nonce="sem-issued")
+    msg = _message(120, nonce="sem-issued")
     del msg["envelope"]["issued_at"]
-    with pytest.raises(validador_limpo.JobValidationError, match="issued_at"):
-        validador_limpo.validate_job(msg)
+    with pytest.raises(clean_validator.JobValidationError, match="issued_at"):
+        clean_validator.validate_job(msg)
 
 
-def test_relogio_atrasado_nao_rejeita_job_legitimo(validador_limpo, caplog):
+def test_lagging_clock_does_not_reject_legitimate_job(clean_validator, caplog):
     """REGRESSION: the 1st version of the ceiling compared expires_at with the LOCAL clock.
     An executor 10 min behind rejected 100% of jobs — total unavailability
     from broken NTP. By measuring the declared duration, skew stops mattering
     up to the HARD CEILING (900s), which is tested right below."""
     with caplog.at_level("WARNING"):
-        validador_limpo.validate_job(_mensagem(300, nonce="skew", skew_seconds=600))
+        clean_validator.validate_job(_message(300, nonce="skew", skew_seconds=600))
     assert "Relógio local diverge" in caplog.text, "o operador precisa saber que e o NTP"
 
 
 # ── Hard skew ceiling: fail LOUDLY instead of staying replayable ──────────────
 
-def test_primeiro_aviso_de_skew_sai_em_host_recem_iniciado(validador_limpo, caplog, monkeypatch):
+def test_first_skew_warning_is_emitted_on_freshly_started_host(clean_validator, caplog, monkeypatch):
     """REGRESSION: the throttle anchored at 0.0 and `time.monotonic()` is the machine's
     uptime on Linux. On a host only a few seconds old — a container starting
     on a new VM, which is exactly when NTP tends to be off — the first
     warning was swallowed, and the operator only saw the rejection talking about replay."""
-    monkeypatch.setattr(validador_limpo.time, "monotonic", lambda: 12.0)
+    monkeypatch.setattr(clean_validator.time, "monotonic", lambda: 12.0)
 
     with caplog.at_level("WARNING"):
-        validador_limpo.validate_job(_mensagem(300, nonce="uptime-baixo", skew_seconds=600))
+        clean_validator.validate_job(_message(300, nonce="uptime-baixo", skew_seconds=600))
 
     assert "Relógio local diverge" in caplog.text
 
 
-def test_avisos_de_skew_seguem_throttled(validador_limpo, caplog, monkeypatch):
+def test_skew_warnings_stay_throttled(clean_validator, caplog, monkeypatch):
     """The warning is per host, not per job: without a throttle, a full queue with NTP
     off becomes one WARNING per job."""
     momento = {"t": 12.0}
-    monkeypatch.setattr(validador_limpo.time, "monotonic", lambda: momento["t"])
+    monkeypatch.setattr(clean_validator.time, "monotonic", lambda: momento["t"])
 
     with caplog.at_level("WARNING"):
-        validador_limpo.validate_job(_mensagem(300, nonce="skew-1", skew_seconds=600))
+        clean_validator.validate_job(_message(300, nonce="skew-1", skew_seconds=600))
         momento["t"] += 30.0  # within the 300s interval
         caplog.clear()
-        validador_limpo.validate_job(_mensagem(300, nonce="skew-2", skew_seconds=600))
+        clean_validator.validate_job(_message(300, nonce="skew-2", skew_seconds=600))
     assert "Relógio local diverge" not in caplog.text
 
     with caplog.at_level("WARNING"):
         momento["t"] += 400.0  # passou o intervalo
-        validador_limpo.validate_job(_mensagem(300, nonce="skew-3", skew_seconds=600))
+        clean_validator.validate_job(_message(300, nonce="skew-3", skew_seconds=600))
     assert "Relógio local diverge" in caplog.text
 
 
-def test_relogio_muito_atrasado_e_rejeitado_apontando_o_ntp(validador_limpo):
+def test_clock_far_behind_is_rejected_pointing_to_ntp(clean_validator):
     """The case that silently opened up replay.
 
     With the local clock behind the server, `agora_local` never reaches
@@ -475,26 +475,26 @@ def test_relogio_muito_atrasado_e_rejeitado_apontando_o_ntp(validador_limpo):
     cache TTL. Once the TTL passes, the same signed envelope is accepted again.
     The hard ceiling trades that silent exposure for a refusal that says what to do.
     """
-    teto = validador_limpo._MAX_CLOCK_SKEW_SECONDS
-    msg = _mensagem(300, nonce="atrasado-demais", skew_seconds=teto + 120)
-    with pytest.raises(validador_limpo.JobValidationError) as exc:
-        validador_limpo.validate_job(msg)
+    teto = clean_validator._MAX_CLOCK_SKEW_SECONDS
+    msg = _message(300, nonce="atrasado-demais", skew_seconds=teto + 120)
+    with pytest.raises(clean_validator.JobValidationError) as exc:
+        clean_validator.validate_job(msg)
     texto = str(exc.value)
     assert "NTP" in texto
     assert "atrasado" in texto, "a direcao da deriva precisa estar correta na mensagem"
     assert "replay" not in texto.split("NÃO é replay")[0], "nao pode acusar replay"
 
 
-def test_relogio_muito_adiantado_e_rejeitado_apontando_o_ntp(validador_limpo):
+def test_clock_far_ahead_is_rejected_pointing_to_ntp(clean_validator):
     """The ceiling is symmetric — a clock running ahead also stops, with the right direction."""
-    teto = validador_limpo._MAX_CLOCK_SKEW_SECONDS
-    msg = _mensagem(300, nonce="adiantado-demais", skew_seconds=-(teto + 120))
-    with pytest.raises(validador_limpo.JobValidationError) as exc:
-        validador_limpo.validate_job(msg)
+    teto = clean_validator._MAX_CLOCK_SKEW_SECONDS
+    msg = _message(300, nonce="adiantado-demais", skew_seconds=-(teto + 120))
+    with pytest.raises(clean_validator.JobValidationError) as exc:
+        clean_validator.validate_job(msg)
     assert "adiantado" in str(exc.value)
 
 
-def test_ttl_do_nonce_cobre_a_janela_maxima_de_aceitacao(validador_limpo):
+def test_nonce_ttl_covers_the_maximum_acceptance_window(clean_validator):
     """Anti-replay INVARIANT, verified instead of trusted.
 
     A nonce may only be forgotten after the corresponding envelope is no longer
@@ -504,57 +504,57 @@ def test_ttl_do_nonce_cobre_a_janela_maxima_de_aceitacao(validador_limpo):
     this test breaks — which is exactly when the hole would reappear.
     """
     janela = (
-        validador_limpo._MAX_EXPIRY_HORIZON_SECONDS
-        + validador_limpo._CLOCK_SKEW_TOLERANCE_SECONDS
-        + validador_limpo._MAX_CLOCK_SKEW_SECONDS
+        clean_validator._MAX_EXPIRY_HORIZON_SECONDS
+        + clean_validator._CLOCK_SKEW_TOLERANCE_SECONDS
+        + clean_validator._MAX_CLOCK_SKEW_SECONDS
     )
-    assert validador_limpo._nonce_ttl_seconds() >= janela
+    assert clean_validator._nonce_ttl_seconds() >= janela
 
 
-def test_envelope_ja_expirado_alem_da_tolerancia_e_rejeitado(validador_limpo):
+def test_envelope_already_expired_beyond_tolerance_is_rejected(clean_validator):
     """Local clock AHEAD beyond the slack: rejects, but pointing at the clock."""
-    msg = _mensagem(300, nonce="velho", skew_seconds=-(300 + 300 + 60))
-    with pytest.raises(validador_limpo.JobValidationError, match="NTP"):
-        validador_limpo.validate_job(msg)
+    msg = _message(300, nonce="velho", skew_seconds=-(300 + 300 + 60))
+    with pytest.raises(clean_validator.JobValidationError, match="NTP"):
+        clean_validator.validate_job(msg)
 
 
-def test_replay_do_mesmo_nonce_e_rejeitado(validador_limpo):
-    validador_limpo.validate_job(_mensagem(120, nonce="repetido"))
-    with pytest.raises(validador_limpo.JobValidationError, match="replay"):
-        validador_limpo.validate_job(_mensagem(120, nonce="repetido"))
+def test_replay_of_same_nonce_is_rejected(clean_validator):
+    clean_validator.validate_job(_message(120, nonce="repetido"))
+    with pytest.raises(clean_validator.JobValidationError, match="replay"):
+        clean_validator.validate_job(_message(120, nonce="repetido"))
 
 
-def test_ttl_do_cache_cobre_o_horizonte_maximo(validador_limpo, monkeypatch):
+def test_cache_ttl_covers_the_maximum_horizon(clean_validator, monkeypatch):
     """A nonce must not be forgotten while the envelope is still valid."""
     from executor import config
 
     monkeypatch.setattr(config, "NONCE_CACHE_TTL", 5)
-    assert validador_limpo._nonce_ttl_seconds() >= validador_limpo._MAX_EXPIRY_HORIZON_SECONDS
+    assert clean_validator._nonce_ttl_seconds() >= clean_validator._MAX_EXPIRY_HORIZON_SECONDS
 
 
-def test_expurgo_remove_so_os_expirados(validador_limpo, monkeypatch):
+def test_purge_removes_only_the_expired(clean_validator, monkeypatch):
     import time
 
     agora = time.monotonic()
-    ttl = validador_limpo._nonce_ttl_seconds()
-    validador_limpo._nonce_cache["velho"] = agora - ttl - 10
-    validador_limpo._nonce_cache["novo"] = agora
+    ttl = clean_validator._nonce_ttl_seconds()
+    clean_validator._nonce_cache["velho"] = agora - ttl - 10
+    clean_validator._nonce_cache["novo"] = agora
 
-    assert validador_limpo._nonce_seen("outro") is False
-    assert "velho" not in validador_limpo._nonce_cache
-    assert "novo" in validador_limpo._nonce_cache
+    assert clean_validator._nonce_seen("outro") is False
+    assert "velho" not in clean_validator._nonce_cache
+    assert "novo" in clean_validator._nonce_cache
 
 
-def test_descarte_de_nonce_valido_e_logado_em_error(validador_limpo, monkeypatch, caplog):
+def test_valid_nonce_drop_is_logged_at_error(clean_validator, monkeypatch, caplog):
     """The old hole was the SILENT discarding of entries that were still valid."""
-    monkeypatch.setattr(validador_limpo, "_NONCE_CACHE_MAX", 2)
-    validador_limpo._nonce_seen("a")
-    validador_limpo._nonce_seen("b")
+    monkeypatch.setattr(clean_validator, "_NONCE_CACHE_MAX", 2)
+    clean_validator._nonce_seen("a")
+    clean_validator._nonce_seen("b")
 
     with caplog.at_level("ERROR"):
-        validador_limpo._nonce_seen("c")
+        clean_validator._nonce_seen("c")
 
-    assert "a" not in validador_limpo._nonce_cache
+    assert "a" not in clean_validator._nonce_cache
     assert any(r.levelname == "ERROR" and "anti-replay" in r.message for r in caplog.records)
 
 
@@ -577,7 +577,7 @@ def _fake_executor():
     )
 
 
-def test_collect_stats_inclui_as_metricas_do_coletor():
+def test_collect_stats_includes_the_collector_metrics():
     from executor.job_executor import _collect_stats
 
     ex = _fake_executor()
@@ -587,14 +587,14 @@ def test_collect_stats_inclui_as_metricas_do_coletor():
     assert stats["__metrics__"] == {"run": {"nodes_executed": 1}, "nodes": {}}
 
 
-def test_error_result_sempre_tem_stats():
+def test_error_result_always_has_stats():
     from executor.job_executor import _error_result
 
     assert _error_result("j", "r", "boom", "runtime")["stats"] == {}
 
 
 @pytest.mark.asyncio
-async def test_falha_do_workflow_devolve_stats_parciais(monkeypatch):
+async def test_workflow_failure_returns_partial_stats(monkeypatch):
     """node_stats of the nodes already executed must not become {} on the server."""
     from executor import job_executor
 
@@ -618,7 +618,7 @@ async def test_falha_do_workflow_devolve_stats_parciais(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_timeout_tambem_devolve_stats_parciais(monkeypatch):
+async def test_timeout_also_returns_partial_stats(monkeypatch):
     """The deadline cancels the coroutine — the stats come through the holder, not the return value."""
     from executor import config, job_executor
 
@@ -641,7 +641,7 @@ async def test_timeout_tambem_devolve_stats_parciais(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_timeout_de_um_no_nao_vira_timeout_do_job(monkeypatch):
+async def test_node_timeout_does_not_become_job_timeout(monkeypatch):
     """From 3.11 on, `asyncio.TimeoutError` IS the built-in TimeoutError. The
     PythonScript raises the built-in one when the script exceeds ITS OWN deadline; with
     the job's `except asyncio.TimeoutError`, the run came out as "Job expirou após
@@ -672,7 +672,7 @@ async def test_timeout_de_um_no_nao_vira_timeout_do_job(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_o_prazo_do_job_expirado_segue_sendo_o_do_job(monkeypatch):
+async def test_expired_job_deadline_is_still_the_job_deadline(monkeypatch):
     from executor import config, job_executor
 
     async def fake_dispatch(job_type, payload, envelope, event_queue=None, stats_holder=None):
@@ -691,7 +691,7 @@ async def test_o_prazo_do_job_expirado_segue_sendo_o_do_job(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_falha_de_validacao_nao_inventa_stats(monkeypatch):
+async def test_validation_failure_does_not_invent_stats(monkeypatch):
     from executor import job_executor
     from executor.job_validator import JobValidationError
 
@@ -710,7 +710,7 @@ async def test_falha_de_validacao_nao_inventa_stats(monkeypatch):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def test_contexto_mtls_carrega_certifi_alem_da_ca_interna(monkeypatch):
+def test_mtls_context_loads_certifi_besides_the_internal_ca(monkeypatch):
     """The bootstrap's SSL_CERT_FILE replaces the trust store — certifi has to come back."""
     import certifi
 

@@ -18,7 +18,7 @@ export interface Workspace {
   name?: string
 }
 
-export type ResultadoStatus =
+export type StatusResult =
   | { ok: true; executor_id: string; server_url: string; status: string | null; workspaces: Workspace[] }
   | { ok: false; codigo: 'config' | 'enrollment' | 'revoked' | 'rede' | 'http' | 'resposta' | 'falha'; erro: string }
 
@@ -38,9 +38,9 @@ const TIMEOUT_MS = 30_000
 // current session is good enough — and `forcar` covers anyone who wants to
 // query again.
 
-let cache: ResultadoStatus | null = null
+let cache: StatusResult | null = null
 /** In-flight query, so that two simultaneous requests do not cause two spawns. */
-let emVoo: Promise<ResultadoStatus> | null = null
+let inFlight: Promise<StatusResult> | null = null
 /**
  * Serial number of the valid query.
  *
@@ -62,29 +62,29 @@ let serie = 0
  * saying the server changed, and returning the cache — or an in-flight query
  * started BEFORE the change — would ignore the request.
  */
-export function consultarStatusCacheado(forcar = false): Promise<ResultadoStatus> {
+export function consultarStatusCacheado(forcar = false): Promise<StatusResult> {
   if (!forcar && cache) return Promise.resolve(cache)
-  if (emVoo && !forcar) return emVoo
+  if (inFlight && !forcar) return inFlight
 
-  const minhaSerie = ++serie
-  const p: Promise<ResultadoStatus> = consultarStatus()
-    // `consultarStatus` resolves even on errors, but `spawn` can throw
+  const mySerial = ++serie
+  const p: Promise<StatusResult> = queryStatus()
+    // `queryStatus` resolves even on errors, but `spawn` can throw
     // synchronously (invalid argument, nonexistent cwd). Without this catch the
     // rejection leaked to the renderer's `invoke` as an IPC error — and, worse,
     // left `emVoo` stuck forever, freezing the screen on "carregando" (loading).
-    .catch((e: unknown): ResultadoStatus => ({
+    .catch((e: unknown): StatusResult => ({
       ok: false, codigo: 'falha', erro: e instanceof Error ? e.message : String(e),
     }))
     .then((r) => {
-      if (r.ok && minhaSerie === serie) cache = r
+      if (r.ok && mySerial === serie) cache = r
       return r
     })
     .finally(() => {
       // Only clears it if it is still the current query: a stale query must not
       // take down the one that replaced it.
-      if (emVoo === p) emVoo = null
+      if (inFlight === p) inFlight = null
     })
-  emVoo = p
+  inFlight = p
   return p
 }
 
@@ -101,12 +101,12 @@ export function consultarStatusCacheado(forcar = false): Promise<ResultadoStatus
  */
 export function invalidarStatus(): void {
   cache = null
-  emVoo = null
+  inFlight = null
   serie++
 }
 
 /** The raw query. Private: outside callers go through the cache above. */
-function consultarStatus(): Promise<ResultadoStatus> {
+function queryStatus(): Promise<StatusResult> {
   return new Promise((resolve) => {
     const proc = spawn(PYTHON_EXE, ['-X', 'utf8', '-m', 'executor', 'status', '--json'], {
       cwd: RESOURCES,
@@ -118,7 +118,7 @@ function consultarStatus(): Promise<ResultadoStatus> {
     let saida = ''
     let erro = ''
     let terminou = false
-    const finalizar = (r: ResultadoStatus) => {
+    const finish = (r: StatusResult) => {
       if (terminou) return
       terminou = true
       clearTimeout(timer)
@@ -127,7 +127,7 @@ function consultarStatus(): Promise<ResultadoStatus> {
 
     const timer = setTimeout(() => {
       proc.kill()
-      finalizar({ ok: false, codigo: 'rede', erro: 'O servidor não respondeu a tempo.' })
+      finish({ ok: false, codigo: 'rede', erro: 'O servidor não respondeu a tempo.' })
     }, TIMEOUT_MS)
 
     proc.stdout.setEncoding('utf8')
@@ -135,20 +135,20 @@ function consultarStatus(): Promise<ResultadoStatus> {
     proc.stderr.setEncoding('utf8')
     proc.stderr.on('data', (c: string) => { erro += c })
 
-    proc.on('error', (e) => finalizar({ ok: false, codigo: 'falha', erro: e.message }))
+    proc.on('error', (e) => finish({ ok: false, codigo: 'falha', erro: e.message }))
 
     proc.on('close', () => {
       // `_ca_bootstrap` writes informational lines before the JSON; taking the
       // last non-empty one ignores them.
       const linha = saida.split('\n').map((l) => l.trim()).filter(Boolean).pop()
       if (!linha) {
-        finalizar({ ok: false, codigo: 'falha', erro: erro.trim() || 'Sem resposta.' })
+        finish({ ok: false, codigo: 'falha', erro: erro.trim() || 'Sem resposta.' })
         return
       }
       try {
-        finalizar(JSON.parse(linha) as ResultadoStatus)
+        finish(JSON.parse(linha) as StatusResult)
       } catch {
-        finalizar({ ok: false, codigo: 'resposta', erro: erro.trim() || linha.slice(0, 200) })
+        finish({ ok: false, codigo: 'resposta', erro: erro.trim() || linha.slice(0, 200) })
       }
     })
   })

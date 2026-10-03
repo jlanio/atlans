@@ -234,12 +234,12 @@ whenever the source declares outputs, **including** on branch edges (the `from_k
 pass-through data). The comments in `conditional.py`/`jinja_branch.py`/`change_detector.py`
 ("branch is born without from_key") are stale (NOT yet fixed in the code — see PR-C).
 State of the gaps:
-- **F9 — RESOLVED.** `escolherChave` (`custom-edges/index.tsx:101`) now syncs the
+- **F9 — RESOLVED.** `chooseKey` (`custom-edges/index.tsx:101`) now syncs the
   `sourceHandle` when switching `from_key` via `sourceHandleDaChave` (`:117,127`), keeping the
   invariant `sourceHandle == from_key` for a multi-output node.
-- **Picker disabled on the branch (PENDING)** (`custom-edges/index.tsx:99`): `podeTrocar`
-  still excludes `true/false` handles (`!HANDLE_DE_RAMO.has(handleKey)`), so a wrong `from_key`
-  at a fork still has no UI to correct it. Enable `podeTrocar` even with a
+- **Picker disabled on the branch (PENDING)** (`custom-edges/index.tsx:99`): `canSwitch`
+  still excludes `true/false` handles (`!BRANCH_HANDLE.has(handleKey)`), so a wrong `from_key`
+  at a fork still has no UI to correct it. Enable `canSwitch` even with a
   `true/false` handle (the color/route keeps coming from the handle; only the DATA becomes selectable).
 - **F10 — RESOLVED.** `useCanvasHistory` captures a baseline right after hydration
   (the history reset function), so the 1st edge edit became undoable.
@@ -284,7 +284,7 @@ State of the gaps:
 - **Lint BEFORE building the executor** (`flow/utils/definition_lint.py`, pure — no database
   and no executor). Fatal codes → **422**
   `{"error": "invalid_definition", "message": "Definição inválida: …", "report": {…}}`
-  (`DefinicaoInvalidaError`, `app/core/exceptions.py`; `report` has the same shape as the
+  (`InvalidDefinitionError`, `app/core/exceptions.py`; `report` has the same shape as the
   `__report__` below, with `ok: false`):
   `unknown_node` (the message starts with `Node '<name>' não encontrado para instância
   (id=<id>).`; it is only fatal for a node that would enter the execution order — an isolated one or one outside
@@ -384,7 +384,7 @@ skip (PR-B) and routing (PR-C) were already correct.
   `core.py:850-851`. **Front end — partial:** F9 (sync `sourceHandle` when switching
   `from_key`) DONE in `custom-edges/index.tsx:117,127`; F10 (history baseline on load)
   DONE in `useCanvasHistory.ts`. **Still pending:** enable the picker on branch edges
-  (`podeTrocar` still excludes `true/false` handles, `custom-edges/index.tsx:99`) and type
+  (`canSwitch` still excludes `true/false` handles, `custom-edges/index.tsx:99`) and type
   `AtlansEdgeData` (§6). Risk: low.
 - **Validation in `/validate`: lint + structured 422 + declared outputs — DONE (PR 3 of the
   MCP's Phase 0, `docs/specs/mcp-server.md` §6.3).** Pre-checks before building the

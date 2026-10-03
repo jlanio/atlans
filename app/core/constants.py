@@ -3,7 +3,7 @@
 Global constants of Atlas Studio.
 Centralizes magic strings and fixed values used across multiple modules.
 """
-from flow.utils.fuso import fuso_padrao_do_agendamento
+from flow.utils.fuso import default_schedule_timezone
 
 # ── node_stats ────────────────────────────────────────────────────────────────
 # Reserved key inside the node_stats JSON for run-wide metadata.
@@ -35,16 +35,16 @@ HSTS_MAX_AGE = 31_536_000   # 1 ano — Strict-Transport-Security max-age
 # with UTC when the installation does not set it.
 #
 # Changing the value on an installation that already has schedules is NOT a detail:
-# `timezone` is part of `_mesma_configuracao` (`app/core/scheduling/hooks.py`),
+# `timezone` is part of `_same_configuration` (`app/core/scheduling/hooks.py`),
 # so the next save of each scheduled workflow without an explicit timezone recreates the
 # schedule — which resets `next_run_at` and skips that day's occurrence. That is why the
 # value is set before creating schedules, and a deploy can check that
 # it is in the .env before starting up.
-FUSO_PADRAO_DO_AGENDAMENTO = fuso_padrao_do_agendamento()
+FUSO_PADRAO_DO_AGENDAMENTO = default_schedule_timezone()
 
 # Ceiling on events kept in a run's history (`workflow:{run}:history`).
 # The rpush was unbounded: a compromised (or buggy) executor could push
 # messages of up to 16 MB in a loop and blow up Redis's memory — which also
 # holds presence, the token blacklist and rate limit counters. The frontend only
 # rebuilds the canvas from the recent events, so truncating the start is safe.
-MAX_EVENTOS_NO_HISTORICO = 5000
+MAX_EVENTS_IN_HISTORY = 5000

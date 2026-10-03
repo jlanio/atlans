@@ -54,19 +54,19 @@ class FakePubSub:
     """
 
     def __init__(self, mensagens: list[str], *, segurar: bool = False):
-        self._mensagens = mensagens
-        self._segurar = segurar
-        self.canais: list[str] = []
+        self._messages = mensagens
+        self._hold = segurar
+        self.channels: list[str] = []
         self.listens = 0
 
     async def subscribe(self, canal: str) -> None:
-        self.canais.append(canal)
+        self.channels.append(canal)
 
     async def listen(self):
         self.listens += 1
-        for raw in self._mensagens:
+        for raw in self._messages:
             yield {"type": "message", "data": raw}
-        if self._segurar:
+        if self._hold:
             await asyncio.Event().wait()
 
 
@@ -113,7 +113,7 @@ def _redis(historico: list[str]) -> MagicMock:
     return rc
 
 
-async def _coletar(gen, *, maximo: int | None = None) -> list[svc.Lote]:
+async def _collect(gen, *, maximo: int | None = None) -> list[svc.Lote]:
     """Consumes the generator (up to `maximo` batches), closing it as a client would."""
     lotes: list[svc.Lote] = []
     try:
@@ -134,17 +134,17 @@ def _nodes(lotes: list[svc.Lote]) -> list[str]:
 
 
 @pytest.mark.asyncio
-async def test_replay_le_o_historico_em_uma_unica_chamada_e_entrega_em_lotes():
+async def test_replay_reads_the_history_in_a_single_call_and_delivers_in_batches():
     historico = [stdout(f"n{i}") for i in range(1200)]
     rc = _redis(historico)
     sub = FakeSubClient(FakePubSub([COMPLETE]))
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=rc):
-        lotes = await _coletar(svc.iter_run_events("run-1", timeout_s=5))
+        lotes = await _collect(svc.iter_run_events("run-1", timeout_s=5))
 
     rc.lrange.assert_awaited_once_with("workflow:run-1:history", 0, -1)
-    assert sub._pubsub.canais == ["workflow:run-1:events"]
+    assert sub._pubsub.channels == ["workflow:run-1:events"]
     # SENDING is still paginated (500/500/200) and then comes the live complete.
     assert [len(lote.eventos) for lote in lotes] == [500, 500, 200, 1]
     assert [lote.completo for lote in lotes] == [False, False, False, True]
@@ -153,7 +153,7 @@ async def test_replay_le_o_historico_em_uma_unica_chamada_e_entrega_em_lotes():
 
 
 @pytest.mark.asyncio
-async def test_replay_corta_no_complete_e_nao_vai_ao_vivo():
+async def test_replay_stops_at_complete_and_does_not_go_live():
     """Run already ended: last batch with `completo=True`, pub/sub never read."""
     rc = _redis([stdout("n1"), COMPLETE, stdout("n2")])
     # If the generator went live, it would get stuck here — the test would hang.
@@ -162,7 +162,7 @@ async def test_replay_corta_no_complete_e_nao_vai_ao_vivo():
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=rc):
         lotes = await asyncio.wait_for(
-            _coletar(svc.iter_run_events("run-1", timeout_s=5)), timeout=2,
+            _collect(svc.iter_run_events("run-1", timeout_s=5)), timeout=2,
         )
 
     assert len(lotes) == 1
@@ -173,27 +173,27 @@ async def test_replay_corta_no_complete_e_nao_vai_ao_vivo():
 
 
 @pytest.mark.asyncio
-async def test_replay_marca_completo_so_no_ultimo_lote():
+async def test_replay_marks_complete_only_on_the_last_batch():
     historico = [stdout(f"n{i}") for i in range(7)] + [COMPLETE]
     rc = _redis(historico)
     sub = FakeSubClient(FakePubSub([], segurar=True))
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=rc):
-        lotes = await _coletar(svc.iter_run_events("run-1", timeout_s=5, chunk=3))
+        lotes = await _collect(svc.iter_run_events("run-1", timeout_s=5, chunk=3))
 
     assert [len(lote.eventos) for lote in lotes] == [3, 3, 2]
     assert [lote.completo for lote in lotes] == [False, False, True]
 
 
 @pytest.mark.asyncio
-async def test_replay_vazio_vai_direto_ao_vivo():
+async def test_empty_replay_goes_straight_live():
     rc = _redis([])
     sub = FakeSubClient(FakePubSub([lifecycle("n1", "started"), COMPLETE]))
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=rc):
-        lotes = await _coletar(svc.iter_run_events("run-1", timeout_s=5))
+        lotes = await _collect(svc.iter_run_events("run-1", timeout_s=5))
 
     assert _nodes(lotes) == ["n1", WORKFLOW_COMPLETE_NODE]
     assert lotes[-1].completo is True
@@ -203,7 +203,7 @@ async def test_replay_vazio_vai_direto_ao_vivo():
 
 
 @pytest.mark.asyncio
-async def test_dedup_descarta_a_cauda_do_replay_repetida_ao_vivo():
+async def test_dedup_drops_the_replay_tail_repeated_live():
     duplicados = [stdout("n8", "linha"), stdout("n8", "linha"), stdout("n9")]
     novos = [stdout("n10"), stdout("n8", "linha")]
     rc = _redis(duplicados)
@@ -211,16 +211,16 @@ async def test_dedup_descarta_a_cauda_do_replay_repetida_ao_vivo():
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=rc):
-        lotes = await _coletar(svc.iter_run_events("run-1", timeout_s=5))
+        lotes = await _collect(svc.iter_run_events("run-1", timeout_s=5))
 
-    replay, ao_vivo = lotes[0], lotes[1:]
+    replay, live = lotes[0], lotes[1:]
     assert _nodes([replay]) == ["n8", "n8", "n9"]
     # The `n8` repeated AFTER the boundary is legitimate and has to get through.
-    assert _nodes(ao_vivo) == ["n10", "n8", WORKFLOW_COMPLETE_NODE]
+    assert _nodes(live) == ["n10", "n8", WORKFLOW_COMPLETE_NODE]
 
 
 @pytest.mark.asyncio
-async def test_dedup_desliga_na_primeira_mensagem_que_nao_casa():
+async def test_dedup_turns_off_at_the_first_non_matching_message():
     """A repeat in the MIDDLE of the run is not swallowed: the dedup is prefix-only."""
     cauda = [stdout("n1", "x")]
     rc = _redis(cauda)
@@ -228,7 +228,7 @@ async def test_dedup_desliga_na_primeira_mensagem_que_nao_casa():
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=rc):
-        lotes = await _coletar(svc.iter_run_events("run-1", timeout_s=5))
+        lotes = await _collect(svc.iter_run_events("run-1", timeout_s=5))
 
     assert _nodes(lotes[1:]) == ["n2", "n1", WORKFLOW_COMPLETE_NODE]
 
@@ -237,7 +237,7 @@ async def test_dedup_desliga_na_primeira_mensagem_que_nao_casa():
 
 
 @pytest.mark.asyncio
-async def test_buffer_cheio_descarta_stdout_antes_de_lifecycle_e_conta_dropped():
+async def test_full_buffer_drops_stdout_before_lifecycle_and_counts_dropped():
     mensagens = [
         stdout("s1"), stdout("s2"),
         lifecycle("n1", "completed"), lifecycle("n2", "completed"),
@@ -251,7 +251,7 @@ async def test_buffer_cheio_descarta_stdout_antes_de_lifecycle_e_conta_dropped()
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=rc), \
             patch.object(svc, "_QUEUE_MAXSIZE", 3):
-        lotes = await _coletar(svc.iter_run_events("run-1", timeout_s=5))
+        lotes = await _collect(svc.iter_run_events("run-1", timeout_s=5))
 
     assert len(lotes) == 1
     assert lotes[0].dropped == 2
@@ -260,7 +260,7 @@ async def test_buffer_cheio_descarta_stdout_antes_de_lifecycle_e_conta_dropped()
 
 
 @pytest.mark.asyncio
-async def test_complete_nunca_e_descartado_do_buffer():
+async def test_complete_is_never_dropped_from_the_buffer():
     buf = svc._EventBuffer(2)
     buf.push(lifecycle("a", "started"), droppable=False)
     buf.push(COMPLETE, droppable=False)
@@ -271,14 +271,14 @@ async def test_complete_nunca_e_descartado_do_buffer():
 
 
 @pytest.mark.asyncio
-async def test_canal_quieto_emite_heartbeat_vazio():
+async def test_quiet_channel_emits_empty_heartbeat():
     rc = _redis([])
     sub = FakeSubClient(FakePubSub([], segurar=True))
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=rc):
         lotes = await asyncio.wait_for(
-            _coletar(svc.iter_run_events("run-1", timeout_s=5, heartbeat_s=0.01), maximo=2),
+            _collect(svc.iter_run_events("run-1", timeout_s=5, heartbeat_s=0.01), maximo=2),
             timeout=2,
         )
 
@@ -288,14 +288,14 @@ async def test_canal_quieto_emite_heartbeat_vazio():
 
 
 @pytest.mark.asyncio
-async def test_prazo_estourado_encerra_sem_completo():
+async def test_deadline_exceeded_ends_without_complete():
     rc = _redis([stdout("n1")])
     sub = FakeSubClient(FakePubSub([], segurar=True))
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=rc):
         lotes = await asyncio.wait_for(
-            _coletar(svc.iter_run_events("run-1", timeout_s=0.05, heartbeat_s=0.01)),
+            _collect(svc.iter_run_events("run-1", timeout_s=0.05, heartbeat_s=0.01)),
             timeout=2,
         )
 
@@ -305,14 +305,14 @@ async def test_prazo_estourado_encerra_sem_completo():
 
 
 @pytest.mark.asyncio
-async def test_consumidor_que_para_no_meio_fecha_a_conexao_do_assinante():
+async def test_consumer_that_stops_midway_closes_the_subscriber_connection():
     rc = _redis([])
     sub = FakeSubClient(FakePubSub([stdout("n1")], segurar=True))
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=rc):
         lotes = await asyncio.wait_for(
-            _coletar(svc.iter_run_events("run-1", timeout_s=5), maximo=1), timeout=2,
+            _collect(svc.iter_run_events("run-1", timeout_s=5), maximo=1), timeout=2,
         )
 
     assert _nodes(lotes) == ["n1"]
@@ -320,7 +320,7 @@ async def test_consumidor_que_para_no_meio_fecha_a_conexao_do_assinante():
 
 
 @pytest.mark.asyncio
-async def test_redis_fora_vira_run_events_unavailable_e_fecha_o_assinante():
+async def test_redis_down_becomes_run_events_unavailable_and_closes_the_subscriber():
     sub = FakeSubClient(FakePubSub([]))
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
@@ -329,13 +329,13 @@ async def test_redis_fora_vira_run_events_unavailable_e_fecha_o_assinante():
                 MagicMock(side_effect=RuntimeError("Redis pool não inicializado.")),
             ):
         with pytest.raises(svc.RunEventsUnavailable):
-            await _coletar(svc.iter_run_events("run-1", timeout_s=5))
+            await _collect(svc.iter_run_events("run-1", timeout_s=5))
 
     assert sub.fechado is True
 
 
 @pytest.mark.asyncio
-async def test_falha_no_subscribe_tambem_e_run_events_unavailable():
+async def test_subscribe_failure_is_also_run_events_unavailable():
     from redis.exceptions import ConnectionError as RedisConnectionError
 
     pubsub = FakePubSub([])
@@ -345,7 +345,7 @@ async def test_falha_no_subscribe_tambem_e_run_events_unavailable():
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis([])):
         with pytest.raises(svc.RunEventsUnavailable):
-            await _coletar(svc.iter_run_events("run-1", timeout_s=5))
+            await _collect(svc.iter_run_events("run-1", timeout_s=5))
 
     assert sub.fechado is True
 
@@ -384,15 +384,15 @@ async def banco(tmp_path):
     await engine.dispose()
 
 
-async def _mudar_status(fabrica, status: str, *, apos_s: float) -> None:
-    await asyncio.sleep(apos_s)
+async def _change_status(fabrica, status: str, *, after_s: float) -> None:
+    await asyncio.sleep(after_s)
     async with fabrica() as s:
         await s.execute(update(WorkflowRun).where(WorkflowRun.task_id == "run-1").values(status=status))
         await s.commit()
 
 
 @pytest.mark.asyncio
-async def test_ler_status_do_run_por_task_id(banco):
+async def test_read_run_status_by_task_id(banco):
     async with banco() as db:
         status, run = await svc.ler_status_do_run(db, "run-1")
         assert status == "running" and run.task_id == "run-1"
@@ -400,7 +400,7 @@ async def test_ler_status_do_run_por_task_id(banco):
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_complete_ao_vivo_espera_a_linha_ficar_terminal(banco):
+async def test_wait_run_live_complete_waits_for_the_row_to_become_terminal(banco):
     """The consumer publishes the event and ONLY THEN writes the row."""
     mensagens = [
         stdout("n1", "print ignorado"),
@@ -416,15 +416,15 @@ async def test_esperar_run_complete_ao_vivo_espera_a_linha_ficar_terminal(banco)
     async def on_progress(n, total, msg):
         progresso.append((n, total, msg))
 
-    atualizador = asyncio.create_task(_mudar_status(banco, "failed", apos_s=0.05))
+    updater = asyncio.create_task(_change_status(banco, "failed", after_s=0.05))
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis([])), \
             patch.object(svc, "_POLL_POS_COMPLETE_S", 0.01):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=5, total_nos=2, on_progress=on_progress, poll_s=1.0),
+            svc.esperar_run("run-1", timeout_s=5, total_nodes=2, on_progress=on_progress, poll_s=1.0),
             timeout=3,
         )
-    await atualizador
+    await updater
 
     assert resultado.status == "failed"
     assert resultado.run is not None and resultado.run.task_id == "run-1"
@@ -436,17 +436,17 @@ async def test_esperar_run_complete_ao_vivo_espera_a_linha_ficar_terminal(banco)
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_cancel_de_run_pending_termina_pelo_poll(banco):
+async def test_wait_run_cancel_of_pending_run_ends_via_poll(banco):
     """No `__workflow_complete__` published: the database poll is what ends it."""
     sub = FakeSubClient(FakePubSub([], segurar=True))
-    atualizador = asyncio.create_task(_mudar_status(banco, "cancelled", apos_s=0.05))
+    updater = asyncio.create_task(_change_status(banco, "cancelled", after_s=0.05))
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis([])):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=5, total_nos=3, poll_s=0.01), timeout=3,
+            svc.esperar_run("run-1", timeout_s=5, total_nodes=3, poll_s=0.01), timeout=3,
         )
-    await atualizador
+    await updater
 
     assert resultado.status == "cancelled"
     assert resultado.concluidos == 0
@@ -456,9 +456,9 @@ async def test_esperar_run_cancel_de_run_pending_termina_pelo_poll(banco):
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_sem_redis_segue_so_pelo_poll(banco):
+async def test_wait_run_without_redis_continues_only_via_poll(banco):
     sub = FakeSubClient(FakePubSub([]))
-    atualizador = asyncio.create_task(_mudar_status(banco, "success", apos_s=0.05))
+    updater = asyncio.create_task(_change_status(banco, "success", after_s=0.05))
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(
@@ -466,9 +466,9 @@ async def test_esperar_run_sem_redis_segue_so_pelo_poll(banco):
                 MagicMock(side_effect=RuntimeError("Redis pool não inicializado.")),
             ):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=5, total_nos=1, poll_s=0.01), timeout=3,
+            svc.esperar_run("run-1", timeout_s=5, total_nodes=1, poll_s=0.01), timeout=3,
         )
-    await atualizador
+    await updater
 
     assert resultado.redis_indisponivel is True
     assert resultado.status == "success"
@@ -476,7 +476,7 @@ async def test_esperar_run_sem_redis_segue_so_pelo_poll(banco):
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_prazo_estourado_devolve_timed_out(banco):
+async def test_wait_run_deadline_exceeded_returns_timed_out(banco):
     sub = FakeSubClient(FakePubSub([lifecycle("n1", "completed")], segurar=True))
     progresso: list[tuple[int, int, str]] = []
 
@@ -486,7 +486,7 @@ async def test_esperar_run_prazo_estourado_devolve_timed_out(banco):
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis([])):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=0.1, total_nos=4, on_progress=on_progress, poll_s=0.02),
+            svc.esperar_run("run-1", timeout_s=0.1, total_nodes=4, on_progress=on_progress, poll_s=0.02),
             timeout=3,
         )
 
@@ -498,19 +498,19 @@ async def test_esperar_run_prazo_estourado_devolve_timed_out(banco):
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_soma_eventos_descartados(banco):
+async def test_wait_run_sums_dropped_events(banco):
     mensagens = [stdout("s1"), stdout("s2"), lifecycle("n1", "completed"), COMPLETE]
     sub = FakeSubClient(FakePubSub(mensagens))
-    atualizador = asyncio.create_task(_mudar_status(banco, "success", apos_s=0.02))
+    updater = asyncio.create_task(_change_status(banco, "success", after_s=0.02))
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis([])), \
             patch.object(svc, "_QUEUE_MAXSIZE", 2), \
             patch.object(svc, "_POLL_POS_COMPLETE_S", 0.01):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=5, total_nos=1, poll_s=1.0), timeout=3,
+            svc.esperar_run("run-1", timeout_s=5, total_nodes=1, poll_s=1.0), timeout=3,
         )
-    await atualizador
+    await updater
 
     assert resultado.eventos_descartados == 2
     assert resultado.concluidos == 1
@@ -518,7 +518,7 @@ async def test_esperar_run_soma_eventos_descartados(banco):
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_replay_ja_completo_nao_ouve_o_pubsub(banco):
+async def test_wait_run_already_complete_replay_does_not_listen_to_pubsub(banco):
     """History already holding the marker: `listen()` is never iterated.
 
     The double counts the entries into the body of `listen()` and would be stuck
@@ -528,29 +528,29 @@ async def test_esperar_run_replay_ja_completo_nao_ouve_o_pubsub(banco):
     """
     pubsub = FakePubSub([], segurar=True)
     sub = FakeSubClient(pubsub)
-    atualizador = asyncio.create_task(_mudar_status(banco, "success", apos_s=0.02))
+    updater = asyncio.create_task(_change_status(banco, "success", after_s=0.02))
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis([lifecycle("n1", "completed"), COMPLETE])), \
             patch.object(svc, "_POLL_POS_COMPLETE_S", 0.01):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=30, total_nos=1, poll_s=30.0), timeout=1,
+            svc.esperar_run("run-1", timeout_s=30, total_nodes=1, poll_s=30.0), timeout=1,
         )
-    await atualizador
+    await updater
 
     # Subscribed (the SUBSCRIBE-before-LRANGE order does not change), but never listened to.
-    assert pubsub.canais == ["workflow:run-1:events"]
+    assert pubsub.channels == ["workflow:run-1:events"]
     assert pubsub.listens == 0
     assert resultado.viu_complete is True
     assert resultado.status == "success"
     assert resultado.concluidos == 1
     assert resultado.timed_out is False
     assert sub.fechado is True
-    assert (await _linha(banco)).status == "success"
+    assert (await _row(banco)).status == "success"
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_complete_sem_linha_terminal_devolve_viu_complete(banco):
+async def test_wait_run_complete_without_terminal_row_returns_saw_complete(banco):
     """Consumer stopped: the graph finished, the row did not. The caller needs to know.
 
     Without `viu_complete` the result was indistinguishable from a run still
@@ -564,7 +564,7 @@ async def test_esperar_run_complete_sem_linha_terminal_devolve_viu_complete(banc
             patch.object(svc, "_POLL_POS_COMPLETE_S", 0.01), \
             patch.object(svc, "_POLL_POS_COMPLETE_MAX_S", 0.05):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=30, total_nos=1, poll_s=30.0), timeout=3,
+            svc.esperar_run("run-1", timeout_s=30, total_nodes=1, poll_s=30.0), timeout=3,
         )
 
     assert resultado.viu_complete is True
@@ -574,24 +574,24 @@ async def test_esperar_run_complete_sem_linha_terminal_devolve_viu_complete(banc
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_sem_complete_nao_marca_viu_complete(banco):
+async def test_wait_run_without_complete_does_not_mark_saw_complete(banco):
     """An end that publishes no event: `viu_complete` stays False even with an outcome."""
     sub = FakeSubClient(FakePubSub([], segurar=True))
-    atualizador = asyncio.create_task(_mudar_status(banco, "cancelled", apos_s=0.02))
+    updater = asyncio.create_task(_change_status(banco, "cancelled", after_s=0.02))
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis([])):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=5, total_nos=1, poll_s=0.01), timeout=3,
+            svc.esperar_run("run-1", timeout_s=5, total_nodes=1, poll_s=0.01), timeout=3,
         )
-    await atualizador
+    await updater
 
     assert resultado.status == "cancelled"
     assert resultado.viu_complete is False
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_reaproveita_a_leitura_em_curso_apos_o_complete(banco):
+async def test_wait_run_reuses_the_in_flight_read_after_complete(banco):
     """The read the poll already had in flight is not thrown away (doubled latency).
 
     The read is slow on purpose, so the replay's complete arrives while it is in
@@ -602,7 +602,7 @@ async def test_esperar_run_reaproveita_a_leitura_em_curso_apos_o_complete(banco)
     leituras: list[str] = []
     real = svc.ler_status_do_run
 
-    async def ler_devagar(db, run_id):
+    async def read_slowly(db, run_id):
         leituras.append(run_id)
         await asyncio.sleep(0.05)
         return await real(db, run_id)
@@ -614,9 +614,9 @@ async def test_esperar_run_reaproveita_a_leitura_em_curso_apos_o_complete(banco)
     sub = FakeSubClient(FakePubSub([], segurar=True))
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis([lifecycle("n1", "completed"), COMPLETE])), \
-            patch.object(svc, "ler_status_do_run", ler_devagar):
+            patch.object(svc, "ler_status_do_run", read_slowly):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=30, total_nos=1, poll_s=30.0), timeout=3,
+            svc.esperar_run("run-1", timeout_s=30, total_nodes=1, poll_s=30.0), timeout=3,
         )
 
     assert resultado.status == "success"
@@ -625,7 +625,7 @@ async def test_esperar_run_reaproveita_a_leitura_em_curso_apos_o_complete(banco)
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_callback_que_falha_nao_derruba_a_espera(banco, caplog):
+async def test_wait_run_failing_callback_does_not_break_the_wait(banco, caplog):
     """The caller's `on_progress` is broken: warns once and keeps counting."""
     mensagens = [
         lifecycle("n1", "completed"),
@@ -640,18 +640,18 @@ async def test_esperar_run_callback_que_falha_nao_derruba_a_espera(banco, caplog
         chamadas.append(n)
         raise RuntimeError("consumidor do progresso caiu")
 
-    atualizador = asyncio.create_task(_mudar_status(banco, "failed", apos_s=0.02))
+    updater = asyncio.create_task(_change_status(banco, "failed", after_s=0.02))
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis([])), \
             patch.object(svc, "_POLL_POS_COMPLETE_S", 0.01):
         with caplog.at_level("WARNING"):
             resultado = await asyncio.wait_for(
                 svc.esperar_run(
-                    "run-1", timeout_s=5, total_nos=3, on_progress=on_progress, poll_s=1.0,
+                    "run-1", timeout_s=5, total_nodes=3, on_progress=on_progress, poll_s=1.0,
                 ),
                 timeout=3,
             )
-    await atualizador
+    await updater
 
     # Notified once, gave up notifying — and counted all three anyway.
     assert chamadas == [1]
@@ -663,29 +663,29 @@ async def test_esperar_run_callback_que_falha_nao_derruba_a_espera(banco, caplog
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_tolera_falhas_transitorias_do_poll(banco, caplog):
+async def test_wait_run_tolerates_transient_poll_failures(banco, caplog):
     """Database blip with the events channel healthy: the wait goes on."""
     from sqlalchemy.exc import SQLAlchemyError
 
     real = svc.ler_status_do_run
     tentativas = {"n": 0}
 
-    async def ler_instavel(db, run_id):
+    async def read_flaky(db, run_id):
         tentativas["n"] += 1
-        if tentativas["n"] <= svc._POLL_FALHAS_CONSECUTIVAS_MAX - 1:
+        if tentativas["n"] <= svc._POLL_MAX_CONSECUTIVE_FAILURES - 1:
             raise SQLAlchemyError("checkout do pool estourou")
         return await real(db, run_id)
 
     sub = FakeSubClient(FakePubSub([], segurar=True))
-    atualizador = asyncio.create_task(_mudar_status(banco, "success", apos_s=0.02))
+    updater = asyncio.create_task(_change_status(banco, "success", after_s=0.02))
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis([])), \
-            patch.object(svc, "ler_status_do_run", ler_instavel):
+            patch.object(svc, "ler_status_do_run", read_flaky):
         with caplog.at_level("WARNING"):
             resultado = await asyncio.wait_for(
-                svc.esperar_run("run-1", timeout_s=5, total_nos=1, poll_s=0.01), timeout=3,
+                svc.esperar_run("run-1", timeout_s=5, total_nodes=1, poll_s=0.01), timeout=3,
             )
-    await atualizador
+    await updater
 
     assert resultado.status == "success"
     assert resultado.timed_out is False
@@ -693,35 +693,35 @@ async def test_esperar_run_tolera_falhas_transitorias_do_poll(banco, caplog):
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_propaga_quando_o_poll_falha_alem_do_teto(banco):
+async def test_wait_run_propagates_when_the_poll_fails_beyond_the_ceiling(banco):
     """Real unavailability (not a hiccup): the error propagates to the caller."""
     from sqlalchemy.exc import SQLAlchemyError
 
     chamadas = {"n": 0}
 
-    async def sempre_falha(db, run_id):
+    async def always_fails(db, run_id):
         chamadas["n"] += 1
         raise SQLAlchemyError("banco fora")
 
     sub = FakeSubClient(FakePubSub([], segurar=True))
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis([])), \
-            patch.object(svc, "ler_status_do_run", sempre_falha):
+            patch.object(svc, "ler_status_do_run", always_fails):
         with pytest.raises(SQLAlchemyError):
             await asyncio.wait_for(
-                svc.esperar_run("run-1", timeout_s=5, total_nos=1, poll_s=0.01), timeout=3,
+                svc.esperar_run("run-1", timeout_s=5, total_nodes=1, poll_s=0.01), timeout=3,
             )
 
-    assert chamadas["n"] == svc._POLL_FALHAS_CONSECUTIVAS_MAX
+    assert chamadas["n"] == svc._POLL_MAX_CONSECUTIVE_FAILURES
 
 
-async def _linha(fabrica) -> WorkflowRun:
+async def _row(fabrica) -> WorkflowRun:
     async with fabrica() as s:
         return (await s.execute(select(WorkflowRun).where(WorkflowRun.task_id == "run-1"))).scalar_one()
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_viu_complete_quando_as_duas_tarefas_terminam_juntas(banco):
+async def test_wait_run_saw_complete_when_both_tasks_finish_together(banco):
     """Events and poll finishing in the SAME loop step.
 
     It is a real race — the `__workflow_complete__` arrives while the poll's
@@ -733,7 +733,7 @@ async def test_esperar_run_viu_complete_quando_as_duas_tarefas_terminam_juntas(b
     """
     wait_real = asyncio.wait
 
-    async def wait_as_duas(tarefas, **kw):
+    async def wait_both(tarefas, **kw):
         done, pendentes = await wait_real(tarefas, **kw)
         if pendentes:
             await wait_real(pendentes)
@@ -747,9 +747,9 @@ async def test_esperar_run_viu_complete_quando_as_duas_tarefas_terminam_juntas(b
     sub = FakeSubClient(FakePubSub([], segurar=True))
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis([lifecycle("n1", "completed"), COMPLETE])), \
-            patch.object(asyncio, "wait", wait_as_duas):
+            patch.object(asyncio, "wait", wait_both):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=5, total_nos=1, poll_s=0.01), timeout=3,
+            svc.esperar_run("run-1", timeout_s=5, total_nodes=1, poll_s=0.01), timeout=3,
         )
 
     assert resultado.status == "success"
@@ -764,41 +764,41 @@ async def test_esperar_run_viu_complete_quando_as_duas_tarefas_terminam_juntas(b
 # ones) and which events do NOT count as progress.
 
 
-def _desfecho(resultado: svc.ResultadoEspera) -> tuple:
+def _outcome(resultado: svc.WaitResult) -> tuple:
     return (
         resultado.status, resultado.concluidos, resultado.eventos_descartados,
         resultado.timed_out, resultado.redis_indisponivel, resultado.viu_complete,
     )
 
 
-async def _marcar_terminal(fabrica, status: str) -> None:
+async def _mark_terminal(fabrica, status: str) -> None:
     async with fabrica() as s:
         await s.execute(update(WorkflowRun).where(WorkflowRun.task_id == "run-1").values(status=status))
         await s.commit()
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_repassa_aos_eventos_so_o_prazo_que_resta(banco):
-    prazos: list[float] = []
+async def test_wait_run_passes_only_the_remaining_deadline_to_events(banco):
+    timeouts: list[float] = []
 
-    async def eventos_falsos(run_id, *, timeout_s):
-        prazos.append(timeout_s)
+    async def fake_events(run_id, *, timeout_s):
+        timeouts.append(timeout_s)
         await asyncio.Event().wait()
         yield  # pragma: no cover - never gets here
 
-    atualizador = asyncio.create_task(_mudar_status(banco, "success", apos_s=0.02))
-    with patch.object(svc, "iter_run_events", eventos_falsos):
+    updater = asyncio.create_task(_change_status(banco, "success", after_s=0.02))
+    with patch.object(svc, "iter_run_events", fake_events):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=7, total_nos=1, poll_s=0.01), timeout=3,
+            svc.esperar_run("run-1", timeout_s=7, total_nodes=1, poll_s=0.01), timeout=3,
         )
-    await atualizador
+    await updater
 
-    assert len(prazos) == 1 and 6.5 < prazos[0] <= 7
-    assert _desfecho(resultado) == ("success", 0, 0, False, False, False)
+    assert len(timeouts) == 1 and 6.5 < timeouts[0] <= 7
+    assert _outcome(resultado) == ("success", 0, 0, False, False, False)
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_poll_longo_nao_passa_do_prazo(banco):
+async def test_wait_run_long_poll_does_not_exceed_the_deadline(banco):
     """`poll_s` longer than the deadline: the wait ends at the deadline, not at the next poll."""
     sub = FakeSubClient(FakePubSub([], segurar=True))
     inicio = asyncio.get_running_loop().time()
@@ -806,43 +806,43 @@ async def test_esperar_run_poll_longo_nao_passa_do_prazo(banco):
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis([])):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=0.1, total_nos=1, poll_s=30.0), timeout=3,
+            svc.esperar_run("run-1", timeout_s=0.1, total_nodes=1, poll_s=30.0), timeout=3,
         )
 
     assert asyncio.get_running_loop().time() - inicio < 1.5
-    assert _desfecho(resultado) == ("running", 0, 0, True, False, False)
+    assert _outcome(resultado) == ("running", 0, 0, True, False, False)
     assert sub.fechado is True
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_run_que_nao_existe_estoura_o_prazo_sem_linha(banco):
+async def test_wait_run_nonexistent_run_exceeds_the_deadline_without_row(banco):
     sub = FakeSubClient(FakePubSub([], segurar=True))
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis([])):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("nao-existe", timeout_s=0.1, total_nos=1, poll_s=0.02), timeout=3,
+            svc.esperar_run("nao-existe", timeout_s=0.1, total_nodes=1, poll_s=0.02), timeout=3,
         )
 
     assert resultado.run is None
-    assert _desfecho(resultado) == (None, 0, 0, True, False, False)
+    assert _outcome(resultado) == (None, 0, 0, True, False, False)
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_erro_generico_nos_eventos_segue_pelo_poll(banco, caplog):
-    async def eventos_quebrados(run_id, *, timeout_s):
+async def test_wait_run_generic_error_in_events_continues_via_poll(banco, caplog):
+    async def broken_events(run_id, *, timeout_s):
         raise ValueError("canal quebrou")
         yield  # pragma: no cover - generator
 
-    atualizador = asyncio.create_task(_mudar_status(banco, "failed", apos_s=0.02))
-    with patch.object(svc, "iter_run_events", eventos_quebrados), \
+    updater = asyncio.create_task(_change_status(banco, "failed", after_s=0.02))
+    with patch.object(svc, "iter_run_events", broken_events), \
             caplog.at_level("ERROR"):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=5, total_nos=1, poll_s=0.01), timeout=3,
+            svc.esperar_run("run-1", timeout_s=5, total_nodes=1, poll_s=0.01), timeout=3,
         )
-    await atualizador
+    await updater
 
-    assert _desfecho(resultado) == ("failed", 0, 0, False, False, False)
+    assert _outcome(resultado) == ("failed", 0, 0, False, False, False)
     assert any(
         r.getMessage() == "Erro ao acompanhar eventos do run run-1; seguindo só pelo poll: canal quebrou"
         for r in caplog.records
@@ -850,18 +850,18 @@ async def test_esperar_run_erro_generico_nos_eventos_segue_pelo_poll(banco, capl
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_redis_fora_avisa_e_marca_redis_indisponivel(banco, caplog):
-    atualizador = asyncio.create_task(_mudar_status(banco, "cancelled", apos_s=0.02))
+async def test_wait_run_redis_down_warns_and_marks_redis_unavailable(banco, caplog):
+    updater = asyncio.create_task(_change_status(banco, "cancelled", after_s=0.02))
     sub = FakeSubClient(FakePubSub([]))
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", MagicMock(side_effect=RuntimeError("sem pool"))), \
             caplog.at_level("WARNING"):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=5, total_nos=1, poll_s=0.01), timeout=3,
+            svc.esperar_run("run-1", timeout_s=5, total_nodes=1, poll_s=0.01), timeout=3,
         )
-    await atualizador
+    await updater
 
-    assert _desfecho(resultado) == ("cancelled", 0, 0, False, True, False)
+    assert _outcome(resultado) == ("cancelled", 0, 0, False, True, False)
     assert any(
         r.getMessage() == (
             "Eventos do run run-1 indisponíveis; seguindo só pelo poll: "
@@ -872,7 +872,7 @@ async def test_esperar_run_redis_fora_avisa_e_marca_redis_indisponivel(banco, ca
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_devolve_a_linha_desprendida_e_legivel(banco):
+async def test_wait_run_returns_the_detached_readable_row(banco):
     """`run` comes back without a session, with the attributes already loaded."""
     async with banco() as s:
         await s.execute(
@@ -885,14 +885,14 @@ async def test_esperar_run_devolve_a_linha_desprendida_e_legivel(banco):
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis([])):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=5, total_nos=1, poll_s=0.01), timeout=3,
+            svc.esperar_run("run-1", timeout_s=5, total_nodes=1, poll_s=0.01), timeout=3,
         )
 
     assert resultado.run.node_stats == {"n1": {"status": "completed"}}
     assert resultado.run.workflow_hash == "wf-1"
 
 
-def _leitura_pos_complete(falhas: int):
+def _post_complete_read(falhas: int):
     """1st read: 'running' (the consumer has not written yet); then `falhas`
     consecutive transient failures; then the real row."""
     from sqlalchemy.exc import SQLAlchemyError
@@ -913,9 +913,9 @@ def _leitura_pos_complete(falhas: int):
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_poll_pos_complete_tolera_falhas_transitorias(banco, caplog):
-    await _marcar_terminal(banco, "success")
-    ler, chamadas = _leitura_pos_complete(falhas=svc._POLL_FALHAS_CONSECUTIVAS_MAX - 1)
+async def test_wait_run_post_complete_poll_tolerates_transient_failures(banco, caplog):
+    await _mark_terminal(banco, "success")
+    ler, chamadas = _post_complete_read(falhas=svc._POLL_MAX_CONSECUTIVE_FAILURES - 1)
     sub = FakeSubClient(FakePubSub([], segurar=True))
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
@@ -924,23 +924,23 @@ async def test_esperar_run_poll_pos_complete_tolera_falhas_transitorias(banco, c
             patch.object(svc, "_POLL_POS_COMPLETE_S", 0.01), \
             caplog.at_level("WARNING"):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=30, total_nos=1, poll_s=30.0), timeout=3,
+            svc.esperar_run("run-1", timeout_s=30, total_nodes=1, poll_s=30.0), timeout=3,
         )
 
-    assert _desfecho(resultado) == ("success", 1, 0, False, False, True)
-    assert chamadas["n"] == 1 + svc._POLL_FALHAS_CONSECUTIVAS_MAX
+    assert _outcome(resultado) == ("success", 1, 0, False, False, True)
+    assert chamadas["n"] == 1 + svc._POLL_MAX_CONSECUTIVE_FAILURES
     avisos = [r.getMessage() for r in caplog.records if "Poll pós-complete" in r.getMessage()]
     assert avisos == [
-        f"Poll pós-complete do run run-1 falhou ({i}/{svc._POLL_FALHAS_CONSECUTIVAS_MAX}): conexão reciclada"
-        for i in range(1, svc._POLL_FALHAS_CONSECUTIVAS_MAX)
+        f"Poll pós-complete do run run-1 falhou ({i}/{svc._POLL_MAX_CONSECUTIVE_FAILURES}): conexão reciclada"
+        for i in range(1, svc._POLL_MAX_CONSECUTIVE_FAILURES)
     ]
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_poll_pos_complete_propaga_no_teto(banco):
+async def test_wait_run_post_complete_poll_propagates_at_the_ceiling(banco):
     from sqlalchemy.exc import SQLAlchemyError
 
-    ler, chamadas = _leitura_pos_complete(falhas=99)
+    ler, chamadas = _post_complete_read(falhas=99)
     sub = FakeSubClient(FakePubSub([], segurar=True))
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
@@ -949,14 +949,14 @@ async def test_esperar_run_poll_pos_complete_propaga_no_teto(banco):
             patch.object(svc, "_POLL_POS_COMPLETE_S", 0.01):
         with pytest.raises(SQLAlchemyError):
             await asyncio.wait_for(
-                svc.esperar_run("run-1", timeout_s=30, total_nos=1, poll_s=30.0), timeout=3,
+                svc.esperar_run("run-1", timeout_s=30, total_nodes=1, poll_s=30.0), timeout=3,
             )
 
-    assert chamadas["n"] == 1 + svc._POLL_FALHAS_CONSECUTIVAS_MAX
+    assert chamadas["n"] == 1 + svc._POLL_MAX_CONSECUTIVE_FAILURES
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_erro_que_nao_e_transitorio_propaga_na_primeira(banco):
+async def test_wait_run_non_transient_error_propagates_on_first(banco):
     chamadas = {"n": 0}
 
     async def ler(db, run_id):
@@ -969,7 +969,7 @@ async def test_esperar_run_erro_que_nao_e_transitorio_propaga_na_primeira(banco)
             patch.object(svc, "ler_status_do_run", ler):
         with pytest.raises(ValueError, match="bug na consulta"):
             await asyncio.wait_for(
-                svc.esperar_run("run-1", timeout_s=5, total_nos=1, poll_s=0.01), timeout=3,
+                svc.esperar_run("run-1", timeout_s=5, total_nodes=1, poll_s=0.01), timeout=3,
             )
 
     assert chamadas["n"] == 1
@@ -977,12 +977,12 @@ async def test_esperar_run_erro_que_nao_e_transitorio_propaga_na_primeira(banco)
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_falha_transitoria_depois_do_prazo_propaga_sem_esperar_o_teto(banco):
+async def test_wait_run_transient_failure_after_deadline_propagates_without_waiting_for_the_ceiling(banco):
     from sqlalchemy.exc import SQLAlchemyError
 
     chamadas = {"n": 0}
 
-    async def ler_lento(db, run_id):
+    async def read_slow(db, run_id):
         chamadas["n"] += 1
         await asyncio.sleep(0.1)
         raise SQLAlchemyError("pool esgotado")
@@ -990,17 +990,17 @@ async def test_esperar_run_falha_transitoria_depois_do_prazo_propaga_sem_esperar
     sub = FakeSubClient(FakePubSub([], segurar=True))
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis([])), \
-            patch.object(svc, "ler_status_do_run", ler_lento):
+            patch.object(svc, "ler_status_do_run", read_slow):
         with pytest.raises(SQLAlchemyError):
             await asyncio.wait_for(
-                svc.esperar_run("run-1", timeout_s=0.05, total_nos=1, poll_s=0.01), timeout=3,
+                svc.esperar_run("run-1", timeout_s=0.05, total_nodes=1, poll_s=0.01), timeout=3,
             )
 
     assert chamadas["n"] == 1
 
 
 @pytest.mark.asyncio
-async def test_esperar_run_so_conta_ciclo_de_vida_valido_e_descarta_o_que_vem_depois_do_complete(banco):
+async def test_wait_run_only_counts_valid_lifecycle_and_drops_what_comes_after_complete(banco):
     """What is NOT progress: stdout/debug, invalid JSON or JSON that is not an
     object, a kind that is not lifecycle, an event without a node, a non-final
     status — and what the history stored AFTER `__workflow_complete__` (another cycle)."""
@@ -1017,7 +1017,7 @@ async def test_esperar_run_so_conta_ciclo_de_vida_valido_e_descarta_o_que_vem_de
         COMPLETE,
         lifecycle("n5", "completed"),
     ]
-    await _marcar_terminal(banco, "failed")
+    await _mark_terminal(banco, "failed")
     progresso: list[tuple[int, int, str]] = []
 
     async def on_progress(n, total, msg):
@@ -1027,10 +1027,10 @@ async def test_esperar_run_so_conta_ciclo_de_vida_valido_e_descarta_o_que_vem_de
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=_redis(historico)):
         resultado = await asyncio.wait_for(
-            svc.esperar_run("run-1", timeout_s=5, total_nos=6, on_progress=on_progress, poll_s=30.0),
+            svc.esperar_run("run-1", timeout_s=5, total_nodes=6, on_progress=on_progress, poll_s=30.0),
             timeout=3,
         )
 
     assert progresso == [(1, 6, "n0: completed"), (2, 6, "n4: failed (2,5 s)")]
-    assert _desfecho(resultado) == ("failed", 2, 0, False, False, True)
+    assert _outcome(resultado) == ("failed", 2, 0, False, False, True)
     assert sub._pubsub.listens == 0

@@ -17,7 +17,7 @@ from app.core.exceptions import (  # noqa: F401 — ScheduleNotFoundError re-exp
 )
 
 
-def campos_de_ativacao(ativar: bool) -> dict:
+def activation_fields(ativar: bool) -> dict:
     """Fields to write to the Schedule when turning the schedule on/off.
 
     Turning it back on clears `next_run_at` on purpose. While the schedule was
@@ -34,10 +34,10 @@ def campos_de_ativacao(ativar: bool) -> dict:
     return {"active": True, "next_run_at": None} if ativar else {"active": False}
 
 
-_CAMPOS_DE_HORARIO = ("strategy", "cron_expression", "interval", "unit", "rrule_expression", "timezone")
+_TIMING_FIELDS = ("strategy", "cron_expression", "interval", "unit", "rrule_expression", "timezone")
 
 
-def _horario_mudou(updates: dict, sch: Schedule) -> bool:
+def _timing_changed(updates: dict, sch: Schedule) -> bool:
     """True if any timing field PRESENT in `updates` differs from the value
     stored in `sch`.
 
@@ -47,14 +47,14 @@ def _horario_mudou(updates: dict, sch: Schedule) -> bool:
     """
     return any(
         campo in updates and updates[campo] != getattr(sch, campo)
-        for campo in _CAMPOS_DE_HORARIO
+        for campo in _TIMING_FIELDS
     )
 
 
-def _como_utc(valor: Optional[datetime]) -> Optional[datetime]:
+def _as_utc(valor: Optional[datetime]) -> Optional[datetime]:
     """`next_run_at`/`last_run_at` are stored as UTC-NAIVE (see `_to_utc_naive` in the
     scheduler). Without tzinfo, Pydantic serializes with no offset and the web reads the time
-    as local. Same normalization as `workflow_service._como_utc` — duplicated on
+    as local. Same normalization as `workflow_service._as_utc` — duplicated on
     purpose: importing it from there would close a cycle (workflow_service already imports
     from this module)."""
     if valor is None or valor.tzinfo is not None:
@@ -62,7 +62,7 @@ def _como_utc(valor: Optional[datetime]) -> Optional[datetime]:
     return valor.replace(tzinfo=timezone.utc)
 
 
-async def listar_agendamentos_de(
+async def list_schedules_for(
     db: AsyncSession, workspace_ids: List[str], *, limit: int = 200, offset: int = 0
 ) -> List[dict]:
     """All schedules of the user's workspaces, one per row (not one per
@@ -125,8 +125,8 @@ async def listar_agendamentos_de(
             "unit": r["unit"],
             "rrule_expression": r["rrule_expression"],
             "timezone": r["timezone"],
-            "next_run_at": _como_utc(r["next_run_at"]),
-            "last_run_at": _como_utc(r["last_run_at"]),
+            "next_run_at": _as_utc(r["next_run_at"]),
+            "last_run_at": _as_utc(r["last_run_at"]),
             "retry_count": r["retry_count"],
             "workflow_id": r["workflow_hash"],
             "workflow_name": r["workflow_name"],
@@ -172,7 +172,7 @@ class ScheduleService:
         self.db = db
         self.schedule_crud = ScheduleCRUD(db)
 
-    async def _buscar_workflow(self, id_hash: str) -> Workflow:
+    async def _get_workflow(self, id_hash: str) -> Workflow:
         """The workflow, whether active or not. Does NOT authorize anything.
 
         The caller is the one who authorizes — the routes go through
@@ -186,7 +186,7 @@ class ScheduleService:
             raise WorkflowNotFoundError(f"Workflow '{id_hash}' não encontrado.")
         return workflow
 
-    async def _exigir_workflow_ativo(self, id_hash: str) -> Workflow:
+    async def _require_active_workflow(self, id_hash: str) -> Workflow:
         """Likewise, but refuses a deactivated workflow — for whoever is going to WRITE.
 
         `WorkflowInactiveError` (409), and not `ValueError`: a bare `ValueError`
@@ -194,7 +194,7 @@ class ScheduleService:
         `Exception`), so it became a **500** with an internal error message
         for a refusal that is a domain one.
         """
-        workflow = await self._buscar_workflow(id_hash)
+        workflow = await self._get_workflow(id_hash)
         if not workflow.flag_ative:
             raise WorkflowInactiveError(
                 f"Workflow '{id_hash}' está desativado. Ative-o para gerenciar agendamentos."
@@ -202,7 +202,7 @@ class ScheduleService:
         return workflow
 
     async def create_schedule(self, id_hash: str, schedule_in: ScheduleCreate) -> Schedule:
-        workflow = await self._exigir_workflow_ativo(id_hash)
+        workflow = await self._require_active_workflow(id_hash)
 
         # Single source of the validation (also used by apply_schedule_if_needed
         # BEFORE deleting the previous schedule).
@@ -262,7 +262,7 @@ class ScheduleService:
         # `update_schedule`, which both call this method. Only when there actually is a
         # transition to active — re-editing an already active schedule must not clear it.
         if updates.get("active") is True and not sch.active:
-            updates.update(campos_de_ativacao(True))
+            updates.update(activation_fields(True))
         # Changing the TIMING (strategy/cron/interval/unit/rrule/timezone) also clears
         # `next_run_at`, even on a schedule that stays active: the stored value was
         # computed from the OLD expression, so keeping it would make the next occurrence
@@ -271,7 +271,7 @@ class ScheduleService:
         # activation, `_process_schedule` recomputes the next FUTURE occurrence and only
         # then fires. Editing a non-timing field (or re-saving the same
         # time) does not touch `next_run_at`.
-        elif _horario_mudou(updates, sch):
+        elif _timing_changed(updates, sch):
             updates["next_run_at"] = None
         return await self.schedule_crud.update_by_id(job_id, updates)
 

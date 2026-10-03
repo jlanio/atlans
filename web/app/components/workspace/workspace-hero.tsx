@@ -23,13 +23,13 @@ import { POOL } from "./use-workspace-executors"
 import { WorkspaceAvatar } from "./workspace-avatar"
 import type { SectionId } from "./settings-sheet"
 import {
-  corDoPonto, descreverExecutor, emAlerta, resumirExecutor, rotularExecutor, type EntradaDoResumo,
+  dotColor, describeExecutor, inAlert, resumirExecutor, labelExecutor, type SummaryEntry,
 } from "./executor-resumo"
 import {
-  classeDoModo, contarOnline, rotuloDaAcaoDePolitica, rotuloDoModo, rotuloDoStatus, saudeDoPool, semSinal,
+  modeClass, countOnline, policyActionLabel, modeLabel, rotuloDoStatus, poolHealth, noSignal,
 } from "./politica"
 
-interface Props extends EntradaDoResumo {
+interface Props extends SummaryEntry {
   workspace: Workspace
   salvandoExecutor: boolean
   podeGerenciar: boolean
@@ -38,9 +38,9 @@ interface Props extends EntradaDoResumo {
   onConfigurar: (secao: SectionId) => void
 }
 
-const TITULO_PREVIA = "Prévia: passa a valer quando o roteamento por política for ligado. "
+const PREVIEW_TITLE = "Prévia: passa a valer quando o roteamento por política for ligado. "
   + "Hoje as execuções seguem o executor selecionado."
-const TITULO_PISO = "Isolamento obrigatório: definido pelo administrador da plataforma"
+const FLOOR_TITLE = "Isolamento obrigatório: definido pelo administrador da plataforma"
 
 /**
  * Panel of the active workspace.
@@ -64,10 +64,10 @@ export function WorkspaceHero({
   const politica = entrada.politica ?? null
   const emVigor = politica?.policy_routing_enabled === true
   const resumo = resumirExecutor(entrada)
-  const alerta = emAlerta(resumo, politica)
-  const ponto = corDoPonto(resumo, politica)
+  const alerta = inAlert(resumo, politica)
+  const ponto = dotColor(resumo, politica)
   const papel = workspace.my_role === "owner" ? "Proprietário" : roleLabel(workspace.my_role)
-  const [confirmarPool, setConfirmarPool] = useState(false)
+  const [confirmPool, setConfirmPool] = useState(false)
 
   // Only active dedicated executors: a pool executor is not a target — the
   // "Pool compartilhado" item already is the pool. The current one, if it is
@@ -78,21 +78,21 @@ export function WorkspaceHero({
 
   // Is there a dedicated executor in play? Then "pool" erases the policy and
   // changes where the data goes: confirmation first.
-  const dedicadoAtual = resumo.estado === "ok" || resumo.estado === "inativo"
+  const currentDedicated = resumo.estado === "ok" || resumo.estado === "inativo"
     ? (resumo.executor.executor_type === "dedicated" ? resumo.executor.name : null)
     : null
-  const temDedicado = dedicadoAtual !== null || (politica?.primary.length ?? 0) > 0
+  const hasDedicated = currentDedicated !== null || (politica?.primary.length ?? 0) > 0
 
   function escolher(valor: string) {
-    if (valor === POOL && temDedicado) { setConfirmarPool(true); return }
+    if (valor === POOL && hasDedicated) { setConfirmPool(true); return }
     onTrocarExecutor(valor)
   }
 
-  const contagemDaPolitica = politica && politica.mode !== "pool"
-    ? contarOnline(
+  const policyCount = politica && politica.mode !== "pool"
+    ? countOnline(
         politica.available_primary + politica.available_fallback,
         politica.primary.length + politica.fallback.length,
-        semSinal([...politica.primary, ...politica.fallback]),
+        noSignal([...politica.primary, ...politica.fallback]),
       )
     : null
 
@@ -165,7 +165,7 @@ export function WorkspaceHero({
             // Group or fallback IN EFFECT: it is not a single target, and the quick
             // picker does not represent it. Adjusting goes through the editor (link below).
             <div className="flex min-w-0 items-center gap-2 rounded-md border bg-background/60 px-3 py-2 text-sm">
-              <span className="min-w-0 flex-1 truncate font-medium">{rotularExecutor(resumo)}</span>
+              <span className="min-w-0 flex-1 truncate font-medium">{labelExecutor(resumo)}</span>
             </div>
           ) : podeGerenciar ? (
             <div className="flex items-center gap-2">
@@ -257,7 +257,7 @@ export function WorkspaceHero({
               alerta ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground",
             )}>
               {ponto && <span aria-hidden="true" className={cn("mt-1 inline-block size-2 shrink-0 rounded-full", ponto)} />}
-              <span>{descreverExecutor(resumo, politica)}</span>
+              <span>{describeExecutor(resumo, politica)}</span>
             </p>
           )}
 
@@ -269,17 +269,17 @@ export function WorkspaceHero({
               <span>Política:</span>
               <Badge
                 variant="outline"
-                className={cn("gap-1 px-1.5 py-0 text-[10px]", classeDoModo(politica.mode), !emVigor && "border-dashed")}
-                title={politica.isolation_floor === "no_pool" ? TITULO_PISO : !emVigor ? TITULO_PREVIA : undefined}
+                className={cn("gap-1 px-1.5 py-0 text-[10px]", modeClass(politica.mode), !emVigor && "border-dashed")}
+                title={politica.isolation_floor === "no_pool" ? FLOOR_TITLE : !emVigor ? PREVIEW_TITLE : undefined}
               >
                 {politica.isolation_floor === "no_pool" && <TbLock size={10} aria-hidden="true" />}
-                {rotuloDoModo(politica.mode)}{!emVigor && " · prévia"}
+                {modeLabel(politica.mode)}{!emVigor && " · prévia"}
               </Badge>
-              {politica.isolation_floor === "no_pool" && <span className="sr-only">{TITULO_PISO}</span>}
+              {politica.isolation_floor === "no_pool" && <span className="sr-only">{FLOOR_TITLE}</span>}
               {politica.mode === "pool"
-                ? (saudeDoPool(politica) && <span>{saudeDoPool(politica)}</span>)
-                : (politica.primary.length + politica.fallback.length > 1 && resumo.estado !== "grupo" && contagemDaPolitica && (
-                  <span>{contagemDaPolitica}</span>
+                ? (poolHealth(politica) && <span>{poolHealth(politica)}</span>)
+                : (politica.primary.length + politica.fallback.length > 1 && resumo.estado !== "grupo" && policyCount && (
+                  <span>{policyCount}</span>
                 ))}
               {podeGerenciar && (
                 <button
@@ -288,7 +288,7 @@ export function WorkspaceHero({
                   className="inline-flex items-center gap-1 underline-offset-2 hover:text-foreground hover:underline"
                 >
                   <TbAdjustments size={12} aria-hidden="true" />
-                  {rotuloDaAcaoDePolitica(politica.mode)}
+                  {policyActionLabel(politica.mode)}
                 </button>
               )}
             </div>
@@ -298,21 +298,21 @@ export function WorkspaceHero({
 
       {/* Going back to the pool with a dedicated executor in play: erases the
           policy and changes where the data goes. */}
-      <Dialog open={confirmarPool} onOpenChange={setConfirmarPool}>
+      <Dialog open={confirmPool} onOpenChange={setConfirmPool}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Voltar ao pool compartilhado?</DialogTitle>
             <DialogDescription>
               As execuções de «{workspace.name}» deixam de ir para{" "}
-              {dedicadoAtual ?? "os executores dedicados deste workspace"} e passam a rodar em
+              {currentDedicated ?? "os executores dedicados deste workspace"} e passam a rodar em
               qualquer executor compartilhado da plataforma, inclusive os dados que elas
               processam. A política de execução deste workspace (principais, reserva e último
               recurso) será apagada.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmarPool(false)}>Cancelar</Button>
-            <Button onClick={() => { setConfirmarPool(false); onTrocarExecutor(POOL) }}>Usar o pool</Button>
+            <Button variant="outline" onClick={() => setConfirmPool(false)}>Cancelar</Button>
+            <Button onClick={() => { setConfirmPool(false); onTrocarExecutor(POOL) }}>Usar o pool</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

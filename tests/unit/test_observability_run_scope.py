@@ -28,7 +28,7 @@ def _user(role="user"):
 
 # ── _run_filter ──────────────────────────────────────────────────────────────
 
-def test_filtro_usa_o_workspace_do_run_e_nao_do_workflow():
+def test_filter_uses_the_run_workspace_not_the_workflow_one():
     filtros = _run_filter(_user(), ["ws-1"])
 
     sql = str(filtros[0])
@@ -38,7 +38,7 @@ def test_filtro_usa_o_workspace_do_run_e_nao_do_workflow():
     assert "workflows" not in sql
 
 
-def test_filtro_nao_tem_escape_por_workspace_nulo():
+def test_filter_has_no_null_workspace_escape():
     """The `OR workspace_id IS NULL` must not come back.
 
     It existed to preserve legacy history, but the price was handing that
@@ -52,7 +52,7 @@ def test_filtro_nao_tem_escape_por_workspace_nulo():
     assert "IS NULL" not in sql.upper()
 
 
-def test_filtro_de_workflow_tambem_nao_tem_escape_por_nulo():
+def test_workflow_filter_also_has_no_null_escape():
     """Same regression, on the `workflows` table side (_wf_filter)."""
     from app.services.observability_service import _wf_filter
 
@@ -62,7 +62,7 @@ def test_filtro_de_workflow_tambem_nao_tem_escape_por_nulo():
     assert "workflows.workspace_id" in sql
 
 
-def test_admin_nao_recebe_filtro_quando_o_chamador_pede_a_visao_total():
+def test_admin_gets_no_filter_when_the_caller_asks_for_the_full_view():
     """The admin bypass is no longer inferred from `user.role` inside the service:
     the caller says `como_admin=True` (the REST router does that for a global
     admin); without the kwarg, an admin gets the same slice as a member."""
@@ -72,7 +72,7 @@ def test_admin_nao_recebe_filtro_quando_o_chamador_pede_a_visao_total():
 
 # ── get_run_detail ───────────────────────────────────────────────────────────
 
-def _db_com_run(run):
+def _db_with_run(run):
     resultado = MagicMock()
     resultado.scalar_one_or_none.return_value = run
     return MagicMock(execute=AsyncMock(return_value=resultado))
@@ -102,7 +102,7 @@ def _where(db, chamada=0):
 
 
 @pytest.mark.asyncio
-async def test_run_de_outro_workspace_nao_e_acessivel():
+async def test_run_from_another_workspace_is_not_accessible():
     """Move scenario: the workflow went to ws-destino, but this run happened
     in ws-origem and does not belong to someone who only reaches the destination.
 
@@ -113,7 +113,7 @@ async def test_run_de_outro_workspace_nao_e_acessivel():
     """
     from app.core.exceptions import RunNotFoundError
 
-    db = _db_com_run(None)   # the row does not come back because the WHERE excluded it
+    db = _db_with_run(None)   # the row does not come back because the WHERE excluded it
 
     with pytest.raises(RunNotFoundError):
         await ObservabilityService.get_run_detail(db, "run-1", _user(), ["ws-destino"])
@@ -124,8 +124,8 @@ async def test_run_de_outro_workspace_nao_e_acessivel():
 
 
 @pytest.mark.asyncio
-async def test_run_do_proprio_workspace_e_acessivel():
-    db = _db_com_run(_run("ws-origem"))
+async def test_run_from_own_workspace_is_accessible():
+    db = _db_with_run(_run("ws-origem"))
 
     detalhe = await ObservabilityService.get_run_detail(db, "run-1", _user(), ["ws-origem"])
 
@@ -135,8 +135,8 @@ async def test_run_do_proprio_workspace_e_acessivel():
 
 
 @pytest.mark.asyncio
-async def test_admin_acessa_run_de_qualquer_workspace():
-    db = _db_com_run(_run("ws-origem"))
+async def test_admin_accesses_run_from_any_workspace():
+    db = _db_with_run(_run("ws-origem"))
 
     detalhe = await ObservabilityService.get_run_detail(db, "run-1", _user("admin"), [], como_admin=True)
 

@@ -9,13 +9,13 @@ import type { Workspace } from "@/context/WorkspaceContext"
 import { roleLabel } from "./role-labels"
 import { WorkspaceAvatar } from "./workspace-avatar"
 import {
-  corDoPonto, emAlerta, resumirExecutor, rotularExecutor, type EntradaDoResumo,
+  dotColor, inAlert, resumirExecutor, labelExecutor, type SummaryEntry,
 } from "./executor-resumo"
-import { classeDoModo, rotuloCurtoDoModo } from "./politica"
+import { modeClass, shortModeLabel } from "./politica"
 
-const TITULO_PISO = "Isolamento obrigatório: definido pelo administrador da plataforma"
+const FLOOR_TITLE = "Isolamento obrigatório: definido pelo administrador da plataforma"
 
-interface Props extends EntradaDoResumo {
+interface Props extends SummaryEntry {
   workspace: Workspace
   onUsar: () => void
   onConfigurar: () => void
@@ -28,8 +28,8 @@ interface Props extends EntradaDoResumo {
  */
 export function WorkspaceRow({ workspace, onUsar, onConfigurar, ...entrada }: Props) {
   const resumo = resumirExecutor(entrada)
-  const alerta = emAlerta(resumo, entrada.politica)
-  const ponto = corDoPonto(resumo, entrada.politica)
+  const alerta = inAlert(resumo, entrada.politica)
+  const ponto = dotColor(resumo, entrada.politica)
   const papel = workspace.my_role === "owner" ? "Proprietário" : roleLabel(workspace.my_role)
   // Only when there is a dedicated executor: "Compartilhado" (Shared) is the
   // default and a badge on every row would be noise — the "Pool" label already
@@ -61,7 +61,7 @@ export function WorkspaceRow({ workspace, onUsar, onConfigurar, ...entrada }: Pr
               alerta && "font-medium text-amber-700 dark:text-amber-400",
             )}>
               {ponto && <span aria-hidden="true" className={cn("inline-block size-2 shrink-0 rounded-full", ponto)} />}
-              <span className="truncate">{rotularExecutor(resumo)}</span>
+              <span className="truncate">{labelExecutor(resumo)}</span>
             </span>
           )}
           {politica && resumo.estado !== "carregando" && (
@@ -69,13 +69,13 @@ export function WorkspaceRow({ workspace, onUsar, onConfigurar, ...entrada }: Pr
               variant="outline"
               className={cn(
                 "shrink-0 gap-0.5 px-1 py-0 text-[10px] leading-tight",
-                classeDoModo(politica.mode),
+                modeClass(politica.mode),
                 !emVigor && "border-dashed",
               )}
-              title={politica.isolation_floor === "no_pool" ? TITULO_PISO : !emVigor ? "Prévia: ainda não está em vigor" : undefined}
+              title={politica.isolation_floor === "no_pool" ? FLOOR_TITLE : !emVigor ? "Prévia: ainda não está em vigor" : undefined}
             >
               {politica.isolation_floor === "no_pool" && <TbLock size={9} aria-hidden="true" />}
-              {rotuloCurtoDoModo(politica.mode)}{!emVigor && " · prévia"}
+              {shortModeLabel(politica.mode)}{!emVigor && " · prévia"}
             </Badge>
           )}
         </div>

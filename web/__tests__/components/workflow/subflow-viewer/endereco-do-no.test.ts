@@ -10,23 +10,23 @@
 import { describe, it, expect } from "vitest"
 
 import {
-  caminhoDeChamada, idLocal, pertenceAoNivel, segmentosDoRunNodeId,
+  callPath, idLocal, pertenceAoNivel, runNodeIdSegments,
 } from "@/app/components/workflow/utils/subflow-path"
 
 describe("endereço de um nó do run", () => {
   it("nó do próprio fluxo não tem caminho de chamada", () => {
-    expect(caminhoDeChamada("abc")).toEqual([])
+    expect(callPath("abc")).toEqual([])
     expect(idLocal("abc")).toBe("abc")
-    expect(segmentosDoRunNodeId("abc")).toEqual(["abc"])
+    expect(runNodeIdSegments("abc")).toEqual(["abc"])
   })
 
   it("um nível: separa o nó SubWorkflow do nó que rodou", () => {
-    expect(caminhoDeChamada("sA::X")).toEqual(["sA"])
+    expect(callPath("sA::X")).toEqual(["sA"])
     expect(idLocal("sA::X")).toBe("X")
   })
 
   it("cadeia A→B→C: o id guarda os dois nós atravessados", () => {
-    expect(caminhoDeChamada("sA::sB::X")).toEqual(["sA", "sB"])
+    expect(callPath("sA::sB::X")).toEqual(["sA", "sB"])
     // It's this id — not the full address — that matches the sub-workflow
     // definition loaded from the backend.
     expect(idLocal("sA::sB::X")).toBe("X")

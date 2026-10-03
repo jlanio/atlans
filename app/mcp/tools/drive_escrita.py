@@ -51,7 +51,7 @@ from app.core.authorization.workflow_access import (
 # exception go up to `@ferramenta`, which maps it by `status_code` and returns
 # the service's message instead of the tool's hint. The alias makes the
 # difference visible instead of depending on whoever remembers.
-from app.core.exceptions import FileNotFoundError as ArquivoNaoEncontradoError
+from app.core.exceptions import FileNotFoundError as AppFileNotFoundError
 from app.core.rbac import ROLE_EDITOR
 from app.core.storage import _PRESIGN_EXPIRY
 from app.core.utils.datetime_utils import utc_now_naive
@@ -59,12 +59,12 @@ from app.core.utils.logger import get_logger
 from app.mcp import infra
 from app.mcp.erros import erro
 from app.mcp.escopo import escopo_da_chamada, exigir_escopo
-from app.mcp.resolucao import resolver_workspace
+from app.mcp.resolucao import resolve_workspace
 from app.mcp.saida import envelope, iso
 from app.mcp.tools.base import anotacoes, ferramenta
 from app.core.exceptions import FileValidationError
 from app.services.drive_service import (
-    ConteudoNoExecutorError, DriveService, FileTooLargeError,
+    ContentOnExecutorError, DriveService, FileTooLargeError,
 )
 
 logger = get_logger("app.mcp.tools.drive_escrita")
@@ -81,24 +81,24 @@ logger = get_logger("app.mcp.tools.drive_escrita")
 # It is the same care as with the download URLs, with one difference that
 # explains why it is longer here: there the clock runs until a click, here it
 # runs during the ENTIRE TRANSFER.
-VALIDADE_DO_ENVIO_S = _PRESIGN_EXPIRY
+UPLOAD_VALIDITY_S = _PRESIGN_EXPIRY
 
-_MENSAGEM_PAPEL = "Requer papel 'editor' ou superior neste workspace."
+_ROLE_MESSAGE = "Requer papel 'editor' ou superior neste workspace."
 
 
 async def _exigir_editor(db, escopo, workspace_id: str) -> None:
-    """The pair the REST route applies with `exigir_papel_no_workspace(..., ROLE_EDITOR)`.
+    """The pair the REST route applies with `require_workspace_role(..., ROLE_EDITOR)`.
 
     The Drive is per WORKSPACE, not per workflow, so there is no
     `carregar_workflow` to return the role along with it: it is fetched here.
-    `resolver_workspace` has already guaranteed the workspace is within the
+    `resolve_workspace` has already guaranteed the workspace is within the
     token's reach; what is missing is the caller's role INSIDE it.
     """
     papel = await get_workspace_member_role(db, workspace_id, escopo.user_id)
-    exigir_papel(papel, ROLE_EDITOR, _MENSAGEM_PAPEL)
+    exigir_papel(papel, ROLE_EDITOR, _ROLE_MESSAGE)
 
 
-def _erro_de_arquivo(exc: Exception):
+def _file_error(exc: Exception):
     """`FileValidationError` covers a forbidden extension, a double extension and a
     name without an extension — all with the cause already in the message."""
     return erro(
@@ -152,7 +152,7 @@ async def create_drive_upload_url(
         )
 
     async with infra.sessao() as db:
-        ws = await resolver_workspace(db, escopo, workspace_id)
+        ws = await resolve_workspace(db, escopo, workspace_id)
         await _exigir_editor(db, escopo, ws)
 
         try:
@@ -165,7 +165,7 @@ async def create_drive_upload_url(
                 "o teto é do workspace e o administrador o configura",
             )
         except FileValidationError as exc:
-            raise _erro_de_arquivo(exc)
+            raise _file_error(exc)
 
     return envelope(
         {
@@ -173,8 +173,8 @@ async def create_drive_upload_url(
             "workspace_id": ws,
             "upload_url": criado["upload_url"],
             "method": "PUT",
-            "expires_in_seconds": VALIDADE_DO_ENVIO_S,
-            "expires_at": iso(utc_now_naive() + timedelta(seconds=VALIDADE_DO_ENVIO_S)),
+            "expires_in_seconds": UPLOAD_VALIDITY_S,
+            "expires_at": iso(utc_now_naive() + timedelta(seconds=UPLOAD_VALIDITY_S)),
             "hint": (
                 "faça PUT do conteúdo nesta URL e depois chame "
                 "confirm_drive_upload(file_id) — sem o confirm o arquivo não "
@@ -211,7 +211,7 @@ async def confirm_drive_upload(ctx: Context, file_id: str) -> dict:
         servico = DriveService(db)
         try:
             arquivo = await servico.get_file(str(file_id))
-        except ArquivoNaoEncontradoError as exc:
+        except AppFileNotFoundError as exc:
             raise erro(
                 "not_found",
                 "Nenhum arquivo do Drive com este identificador.",
@@ -221,7 +221,7 @@ async def confirm_drive_upload(ctx: Context, file_id: str) -> dict:
         # Resolve BY the file's workspace, and not by a parameter: a
         # `workspace_id` coming from the caller here would only serve to let
         # it point at a workspace of its own and confirm someone else's file.
-        await resolver_workspace(db, escopo, arquivo.workspace_id)
+        await resolve_workspace(db, escopo, arquivo.workspace_id)
         await _exigir_editor(db, escopo, arquivo.workspace_id)
 
         try:
@@ -232,7 +232,7 @@ async def confirm_drive_upload(ctx: Context, file_id: str) -> dict:
                 f"{exc} O objeto enviado foi apagado.",
                 "confira o tamanho real do arquivo e peça uma URL nova",
             )
-        except ArquivoNaoEncontradoError as exc:
+        except AppFileNotFoundError as exc:
             raise erro(
                 "not_found",
                 "O conteúdo não chegou ao storage: o envio não aconteceu ou não terminou.",
@@ -285,14 +285,14 @@ async def delete_drive_file(ctx: Context, file_id: str, confirm: bool = False) -
         servico = DriveService(db)
         try:
             arquivo = await servico.get_file(str(file_id))
-        except ArquivoNaoEncontradoError as exc:
+        except AppFileNotFoundError as exc:
             raise erro(
                 "not_found",
                 "Nenhum arquivo do Drive com este identificador.",
                 "use list_drive_files para ver os arquivos do workspace",
             ) from exc
 
-        await resolver_workspace(db, escopo, arquivo.workspace_id)
+        await resolve_workspace(db, escopo, arquivo.workspace_id)
         await _exigir_editor(db, escopo, arquivo.workspace_id)
 
         descricao = {
@@ -320,7 +320,7 @@ async def delete_drive_file(ctx: Context, file_id: str, confirm: bool = False) -
 
         try:
             await servico.delete_file(arquivo)
-        except ConteudoNoExecutorError as exc:
+        except ContentOnExecutorError as exc:
             raise erro(
                 "unavailable_local", str(exc),
                 "quem quer que o arquivo suma apaga o arquivo na máquina do "

@@ -41,9 +41,9 @@ SEGREDO = re.compile(r"atl_pat_[A-Za-z0-9_-]{43}")
 # literal; the tool -> guard table is a dict of `"nome": Guarda(...)`.
 # The example domain of docs/mcp.md: the screen uses the installation's.
 URL_DO_DOC = "https://atlans.example.org/mcp"
-_SNIPPET_SIMPLES = re.compile(r"^\s*snippet:\s*'([^']*)',\s*$", re.MULTILINE)
-_ENTRADA_GUARDA = re.compile(r'^\s*"([a-z][a-z0-9_]*)"\s*:\s*Guarda\(', re.MULTILINE)
-_LINHA_DE_TOOL = re.compile(r"^\|\s*`([a-z][a-z0-9_]*)`\s*\|", re.MULTILINE)
+_SIMPLE_SNIPPET = re.compile(r"^\s*snippet:\s*'([^']*)',\s*$", re.MULTILINE)
+_GUARD_ENTRY = re.compile(r'^\s*"([a-z][a-z0-9_]*)"\s*:\s*Guarda\(', re.MULTILINE)
+_TOOL_ROW = re.compile(r"^\|\s*`([a-z][a-z0-9_]*)`\s*\|", re.MULTILINE)
 
 
 def _doc() -> str:
@@ -51,7 +51,7 @@ def _doc() -> str:
     return DOC.read_text(encoding="utf-8")
 
 
-def _snippets_da_tela() -> list[str]:
+def _screen_snippets() -> list[str]:
     """The `snippet:` entries of `CLIENTES`, with the TSX escapes already resolved.
 
     The screen's snippets carry the `URL_DO_MCP` marker (the screen replaces it
@@ -66,7 +66,7 @@ def _snippets_da_tela() -> list[str]:
     # The only possible escape in a single-quoted TSX literal.
     simples = [
         s.replace("\\'", "'").replace(marcador.group(1), URL_DO_DOC)
-        for s in _SNIPPET_SIMPLES.findall(fonte)
+        for s in _SIMPLE_SNIPPET.findall(fonte)
     ]
     assert len(simples) >= 2, "os snippets literais de CLIENTES mudaram de forma — ajuste a regex"
 
@@ -85,41 +85,41 @@ def _snippets_da_tela() -> list[str]:
     return [*simples, mcp_json]
 
 
-def test_cada_snippet_da_tela_aparece_no_documento():
+def test_every_screen_snippet_appears_in_the_document():
     doc = _doc()
-    faltando = [s for s in _snippets_da_tela() if s not in doc]
+    faltando = [s for s in _screen_snippets() if s not in doc]
     assert not faltando, "snippet da tela que nao esta em docs/mcp.md:\n" + "\n\n".join(faltando)
 
 
-def test_nenhum_snippet_carrega_um_segredo():
+def test_no_snippet_carries_a_secret():
     """A command copied from the document (or the screen) can never leak a token."""
     for origem, texto in (("docs/mcp.md", _doc()), ("create-token.tsx", TSX.read_text(encoding="utf-8"))):
         achados = SEGREDO.findall(texto)
         assert not achados, f"{origem} tem o que parece um segredo de PAT: {achados}"
 
 
-def test_toda_tool_registrada_esta_na_tabela_do_documento():
+def test_every_registered_tool_is_in_the_document_table():
     if not GUARDAS.exists():
         pytest.skip("app/mcp/guardas.py ainda nao existe — a tabela do doc sera conferida quando entrar")
 
-    registradas = set(_ENTRADA_GUARDA.findall(GUARDAS.read_text(encoding="utf-8")))
+    registradas = set(_GUARD_ENTRY.findall(GUARDAS.read_text(encoding="utf-8")))
     assert registradas, "GUARDAS deixou de ser um dict de `\"nome\": Guarda(...)` — ajuste a regex"
 
-    documentadas = set(_LINHA_DE_TOOL.findall(_doc()))
-    faltando = sorted(registradas - documentadas)
+    documented = set(_TOOL_ROW.findall(_doc()))
+    faltando = sorted(registradas - documented)
     assert not faltando, (
         "tool registrada em app/mcp/guardas.py sem linha na tabela de docs/mcp.md: " + ", ".join(faltando)
     )
 
 
-def test_o_exemplo_de_erro_do_documento_e_o_que_o_servidor_devolve():
+def test_the_document_error_example_is_what_the_server_returns():
     """The document's `forbidden_scope` JSON block, byte for byte the server's."""
     from mcp.server.mcpserver.exceptions import ToolError
 
     from app.mcp.escopo import exigir_escopo
-    from tests.unit._mcp_harness import escopo_falso
+    from tests.unit._mcp_harness import fake_scope
 
     with pytest.raises(ToolError) as exc:
-        exigir_escopo(escopo_falso(scopes={"workflows:read"}), "workflows:write")
+        exigir_escopo(fake_scope(scopes={"workflows:read"}), "workflows:write")
     bloco = json.dumps(json.loads(str(exc.value)), ensure_ascii=False, indent=2)
     assert bloco in _doc(), "o exemplo de erro em docs/mcp.md divergiu do servidor:\n" + bloco

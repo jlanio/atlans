@@ -184,7 +184,7 @@ async def websocket_workflow(ws: WebSocket, run_id: str):
     close_code = 1000
     close_reason = ""
     try:
-        await _encaminhar_eventos(ws, run_id)
+        await _forward_events(ws, run_id)
     except WebSocketDisconnect as exc:
         # Tab closed in the middle of a send: normal path, not a server failure.
         logger.debug("WS /ws/workflow/%s encerrado pelo cliente: %s", run_id, exc)
@@ -216,7 +216,7 @@ async def websocket_workflow(ws: WebSocket, run_id: str):
                 logger.debug("Falha ao fechar WebSocket do workflow %s: %s", run_id, close_exc)
 
 
-async def _encaminhar_eventos(ws: WebSocket, run_id: str) -> None:
+async def _forward_events(ws: WebSocket, run_id: str) -> None:
     """Batches → frames, plus a socket reader.
 
     Reading the socket is what makes the server notice the closed tab RIGHT AWAY:

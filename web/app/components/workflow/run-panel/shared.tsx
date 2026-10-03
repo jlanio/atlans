@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
 import { NodeRun, NodeRunStatus } from "./timeline"
 import { useRunPanelStore } from "@/app/stores/runPanelStore"
 import { SubflowLevel, useSubflowDrilldownStore } from "@/app/stores/subflowDrilldownStore"
-import { caminhoDeChamada, idLocal } from "../utils/subflow-path"
+import { callPath, idLocal } from "../utils/subflow-path"
 
 /** PT-BR labels for the categories of the backend's error taxonomy.
  *
@@ -106,22 +106,22 @@ export function Elapsed({ since }: { since: number }) {
  * whole row instead of a string takes the choice away from the caller — passing
  * the wrong id no longer compiles.
  */
-export interface AlvoNoCanvas {
+export interface CanvasTarget {
   canvasNodeId: string
 }
 
 /** Panel → canvas correlation actions. */
 export function useNodeFocus() {
   const reactFlow = useReactFlow()
-  const guardarHover = useRunPanelStore(s => s.setHovered)
+  const storeHover = useRunPanelStore(s => s.setHovered)
 
-  function setHovered(alvo: AlvoNoCanvas | null) {
-    guardarHover(alvo?.canvasNodeId ?? null)
+  function setHovered(alvo: CanvasTarget | null) {
+    storeHover(alvo?.canvasNodeId ?? null)
   }
 
   /** Selects and centers the node on the canvas — possible because the panel is
    *  no longer modal: before, the Sheet's overlay covered and disabled the canvas. */
-  function focusNode(alvo: AlvoNoCanvas) {
+  function focusNode(alvo: CanvasTarget) {
     const nodeId = alvo.canvasNodeId
     const exists = reactFlow.getNodes().some(n => n.id === nodeId)
     if (!exists) return
@@ -150,34 +150,34 @@ export function useNodeFocus() {
  * first step is on the editor canvas: the following ones live inside workflows
  * not yet loaded, and the viewer resolves them on the way down.
  */
-export function useAbrirSubfluxo() {
+export function useOpenSubworkflow() {
   const reactFlow = useReactFlow()
   const open = useSubflowDrilldownStore(s => s.open)
 
   /** Did the row come from inside a sub-workflow AND can the path be built? */
   function podeAbrir(node: NodeRun): boolean {
-    return caminhoDeChamada(node.nodeId).length > 0 && !!hashDoNoNoCanvas(node)
+    return callPath(node.nodeId).length > 0 && !!hashDoNoNoCanvas(node)
   }
 
   function hashDoNoNoCanvas(node: NodeRun): string {
-    const raiz = caminhoDeChamada(node.nodeId)[0]
+    const raiz = callPath(node.nodeId)[0]
     const alvo = reactFlow.getNodes().find(n => n.id === raiz)
     const props = (alvo?.data?.properties ?? {}) as Record<string, unknown>
     return String(props.workflowHash ?? "").trim()
   }
 
   function abrir(node: NodeRun) {
-    const caminho = caminhoDeChamada(node.nodeId)
+    const caminho = callPath(node.nodeId)
     if (caminho.length === 0) return
 
-    const nosDoCanvas = reactFlow.getNodes()
+    const canvasNodes = reactFlow.getNodes()
     // Only the root step can be resolved from here. Deeper ones go in with an
     // empty hash and the viewer fills them in on the way down — but descending
     // straight to a deep level would stop at the first step without a hash, so
     // we open up to there.
     const degraus: SubflowLevel[] = []
     for (const canvasNodeId of caminho) {
-      const noCanvas = nosDoCanvas.find(n => n.id === canvasNodeId)
+      const noCanvas = canvasNodes.find(n => n.id === canvasNodeId)
       const props = (noCanvas?.data?.properties ?? {}) as Record<string, unknown>
       const hash = String(props.workflowHash ?? "").trim()
       if (!hash) break

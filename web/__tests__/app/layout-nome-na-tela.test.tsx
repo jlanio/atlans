@@ -14,15 +14,15 @@ vi.mock("@/app/fonts/inter", () => ({ inter: { variable: "font-inter" } }))
 vi.mock("@/app/globals.css", () => ({}))
 
 import RootLayout, { generateMetadata } from "@/app/layout"
-import { NomeNaTelaProvider } from "@/app/components/share/nome-na-tela"
-import { lerNomeNaTelaDoAmbiente } from "@/lib/nome-na-tela"
+import { DisplayNameProvider } from "@/app/components/share/nome-na-tela"
+import { readDisplayNameFromEnv } from "@/lib/nome-na-tela"
 
-function acharProvider(no: ReactNode): ReactElement<{ nome: string }> | null {
+function findProvider(no: ReactNode): ReactElement<{ nome: string }> | null {
   if (!isValidElement(no)) return null
-  if (no.type === NomeNaTelaProvider) return no as ReactElement<{ nome: string }>
+  if (no.type === DisplayNameProvider) return no as ReactElement<{ nome: string }>
   const filhos = (no.props as { children?: ReactNode }).children
   for (const filho of Array.isArray(filhos) ? filhos : [filhos]) {
-    const achado = acharProvider(filho)
+    const achado = findProvider(filho)
     if (achado) return achado
   }
   return null
@@ -36,7 +36,7 @@ describe("o layout raiz e o nome na tela", () => {
   it("passa ao provider e ao título da aba o nome lido do ambiente no pedido", async () => {
     vi.stubEnv("NOME_NA_TELA", "  Geo   Exemplo ")
 
-    const provider = acharProvider(await RootLayout({ children: <main /> }))
+    const provider = findProvider(await RootLayout({ children: <main /> }))
 
     expect(provider).not.toBeNull()
     expect(provider!.props.nome).toBe("Geo Exemplo")
@@ -46,19 +46,19 @@ describe("o layout raiz e o nome na tela", () => {
   it("sem NOME_NA_TELA, «Atlans» nos dois", async () => {
     vi.stubEnv("NOME_NA_TELA", "")
 
-    const provider = acharProvider(await RootLayout({ children: <main /> }))
+    const provider = findProvider(await RootLayout({ children: <main /> }))
 
     expect(provider!.props.nome).toBe("Atlans")
     expect((await generateMetadata()).title).toBe("Atlans")
   })
 
   it("um valor estranho volta ao padrão em vez de ir para a tela", () => {
-    expect(lerNomeNaTelaDoAmbiente({ NOME_NA_TELA: "Minha Instalação" })).toBe("Minha Instalação")
-    expect(lerNomeNaTelaDoAmbiente({ NOME_NA_TELA: "a".repeat(41) })).toBe("Atlans")
-    expect(lerNomeNaTelaDoAmbiente({ NOME_NA_TELA: "<b>x</b>" })).toBe("Atlans")
+    expect(readDisplayNameFromEnv({ NOME_NA_TELA: "Minha Instalação" })).toBe("Minha Instalação")
+    expect(readDisplayNameFromEnv({ NOME_NA_TELA: "a".repeat(41) })).toBe("Atlans")
+    expect(readDisplayNameFromEnv({ NOME_NA_TELA: "<b>x</b>" })).toBe("Atlans")
     // Spaces and line breaks become one space; a control character does not get through.
-    expect(lerNomeNaTelaDoAmbiente({ NOME_NA_TELA: "linha\nquebrada" })).toBe("linha quebrada")
-    expect(lerNomeNaTelaDoAmbiente({ NOME_NA_TELA: "nome\u0007ruim" })).toBe("Atlans")
-    expect(lerNomeNaTelaDoAmbiente({})).toBe("Atlans")
+    expect(readDisplayNameFromEnv({ NOME_NA_TELA: "linha\nquebrada" })).toBe("linha quebrada")
+    expect(readDisplayNameFromEnv({ NOME_NA_TELA: "nome\u0007ruim" })).toBe("Atlans")
+    expect(readDisplayNameFromEnv({})).toBe("Atlans")
   })
 })

@@ -15,16 +15,16 @@ Three decisions that apply to every test here:
 - **Infra via two patches.** `app.mcp.infra.sessao` and `app.mcp.infra.redis_ou_none`
   are the MCP's only points of contact with Postgres and Redis; swapping them
   swaps the whole infrastructure without touching any other module.
-- **A client that goes through the stack.** `cliente_mcp` talks to the real
+- **A client that goes through the stack.** `mcp_client` talks to the real
   ASGI app (PAT middleware + streamable HTTP transport), not to the in-process
   server — it is the only way to prove that the token arrives, that `Host` is
   checked and that the scope filters the catalog.
 
-A limitation worth knowing before writing an execution test: `RedisFalso` does
+A limitation worth knowing before writing an execution test: `FakeRedis` does
 NOT have pub/sub. It covers the key commands (quotas, idempotency, replay via
 `LRANGE`) and nothing else — whoever tests `run_workflow(wait)` should swap
 `esperar_run` for a stub (`patch` in the module the tool imports) and describe
-the outcome with `resultado_de_espera(...)`. Testing the real wait is the job
+the outcome with `wait_result(...)`. Testing the real wait is the job
 of `test_run_events_service.py`, which has `FakePubSub` for that.
 """
 from __future__ import annotations
@@ -39,7 +39,7 @@ from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.mcp.escopo import EscopoEfetivo
+from app.mcp.escopo import EffectiveScope
 from app.models.api_token import ApiToken
 from app.models.artifact import Artifact
 from app.models.base import Base
@@ -57,9 +57,9 @@ from app.models.platform_file_settings import (
 from app.models.workspace_file import WorkspaceFile
 from app.models.workspace_member import WorkspaceMember
 from app.services import api_token_service
-from app.services.run_events_service import ResultadoEspera
+from app.services.run_events_service import WaitResult
 
-TABELAS_DAS_EXTENSOES = [
+EXTENSION_TABLES = [
     tabela for tabela in Base.metadata.sorted_tables
     if any(
         mapper.local_table is tabela and mapper.class_.__module__.startswith("app.extensoes.")
@@ -69,7 +69,7 @@ TABELAS_DAS_EXTENSOES = [
 
 # The tables the MCP touches that compile on SQLite. `Credential` and `Executor`
 # are left out: they use JSONB, which only exists in Postgres.
-TABELAS = [
+TABLES = [
     User.__table__,
     Workspace.__table__,
     WorkspaceMember.__table__,
@@ -98,16 +98,16 @@ TABELAS = [
     # assistant quota queries the subscription to resolve the ceiling, and
     # without them any test that exercises `conversar()` would break at
     # collection.
-    *TABELAS_DAS_EXTENSOES,
+    *EXTENSION_TABLES,
 ]
 
 
 @asynccontextmanager
-async def banco_em_memoria():
+async def in_memory_db():
     """A new SQLite engine with the tables created; returns the session factory."""
     engine = create_async_engine("sqlite+aiosqlite://")
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all, tables=TABELAS)
+        await conn.run_sync(Base.metadata.create_all, tables=TABLES)
     try:
         yield async_sessionmaker(engine, expire_on_commit=False)
     finally:
@@ -115,10 +115,10 @@ async def banco_em_memoria():
 
 
 @asynccontextmanager
-async def banco_de_executores():
+async def executors_db():
     """A new SQLite with the `executors` table; returns the session factory.
 
-    It stays out of `TABELAS` because it uses JSONB, which SQLite does not
+    It stays out of `TABLES` because it uses JSONB, which SQLite does not
     compile: here goes a copy of the table with JSON instead. The code's
     queries use the real `Executor` model — only the table and column names
     matter."""
@@ -140,7 +140,7 @@ async def banco_de_executores():
         await engine.dispose()
 
 
-def sessao_de(fabrica):
+def session_from(fabrica):
     """Replacement for `app.mcp.infra.sessao` bound to this factory.
 
     Mimics the original: rollback in the `finally`, so whoever writes has to
@@ -148,17 +148,17 @@ def sessao_de(fabrica):
     """
 
     @asynccontextmanager
-    async def _sessao():
+    async def _session():
         async with fabrica() as sessao:
             try:
                 yield sessao
             finally:
                 await sessao.rollback()
 
-    return _sessao
+    return _session
 
 
-async def criar_usuario(db, id_hash: str = "usr-1", username: str = "ana", status: str = "active") -> User:
+async def create_user(db, id_hash: str = "usr-1", username: str = "ana", status: str = "active") -> User:
     usuario = User(
         id_hash=id_hash,
         username=username,
@@ -171,14 +171,14 @@ async def criar_usuario(db, id_hash: str = "usr-1", username: str = "ana", statu
     return usuario
 
 
-async def criar_workspace(db, id_hash: str, owner_id: str, name: str = "Principal") -> Workspace:
+async def create_workspace(db, id_hash: str, owner_id: str, name: str = "Principal") -> Workspace:
     workspace = Workspace(id_hash=id_hash, name=name, owner_id=owner_id)
     db.add(workspace)
     await db.commit()
     return workspace
 
 
-async def criar_pat(db, user_id: str, scopes, workspace_ids=None) -> str:
+async def create_pat(db, user_id: str, scopes, workspace_ids=None) -> str:
     """Issues a real PAT and returns the secret in plain text.
 
     Goes through the real service (`criar`), not a hand-written INSERT: the
@@ -196,7 +196,7 @@ async def criar_pat(db, user_id: str, scopes, workspace_ids=None) -> str:
     return segredo
 
 
-async def criar_run(
+async def create_run(
     db,
     *,
     task_id: str,
@@ -238,7 +238,7 @@ async def criar_run(
     return run
 
 
-async def criar_artefato(db, *, run_id: str, workspace_id: str, **campos) -> Artifact:
+async def create_artifact(db, *, run_id: str, workspace_id: str, **campos) -> Artifact:
     """An artifact in storage, the way the output node writes it.
 
     The default is the common case (`content_location="minio"` with `s3_key`),
@@ -259,8 +259,8 @@ async def criar_artefato(db, *, run_id: str, workspace_id: str, **campos) -> Art
     return artefato
 
 
-def resultado_de_espera(**kw) -> ResultadoEspera:
-    """The `ResultadoEspera` that a stubbed `esperar_run` would return.
+def wait_result(**kw) -> WaitResult:
+    """The `WaitResult` that a stubbed `esperar_run` would return.
 
     The default describes the happy case — finished with `success`, no
     timeout, with `__workflow_complete__` seen. Each test overrides only the
@@ -277,11 +277,11 @@ def resultado_de_espera(**kw) -> ResultadoEspera:
         "viu_complete": True,
     }
     campos.update(kw)
-    return ResultadoEspera(**campos)
+    return WaitResult(**campos)
 
 
-def escopo_falso(**kw) -> EscopoEfetivo:
-    """A ready-made `EscopoEfetivo`; override only the field the test investigates."""
+def fake_scope(**kw) -> EffectiveScope:
+    """A ready-made `EffectiveScope`; override only the field the test investigates."""
     campos = {
         "user_id": "usr-1",
         "username": "ana",
@@ -294,10 +294,10 @@ def escopo_falso(**kw) -> EscopoEfetivo:
     campos.update(kw)
     campos["scopes"] = frozenset(campos["scopes"])
     campos["workspace_ids"] = frozenset(campos["workspace_ids"])
-    return EscopoEfetivo(**campos)
+    return EffectiveScope(**campos)
 
 
-def ctx_falso(escopo: EscopoEfetivo | None):
+def fake_ctx(escopo: EffectiveScope | None):
     """The `ctx` a tool receives — only what `escopo_da_chamada` and the progress read."""
     estado = SimpleNamespace(escopo=escopo) if escopo is not None else SimpleNamespace()
     return SimpleNamespace(
@@ -306,7 +306,7 @@ def ctx_falso(escopo: EscopoEfetivo | None):
     )
 
 
-def cliente_mcp(app_mcp, segredo: str, *, host: str = "localhost:8000", cabecalhos: dict | None = None) -> Client:
+def mcp_client(app_mcp, segredo: str, *, host: str = "localhost:8000", cabecalhos: dict | None = None) -> Client:
     """Modern MCP client talking to the whole ASGI app, inside the process.
 
     `host` has to match `MCP_ALLOWED_HOSTS` (the default covers
@@ -326,7 +326,7 @@ def cliente_mcp(app_mcp, segredo: str, *, host: str = "localhost:8000", cabecalh
     )
 
 
-class RedisFalso:
+class FakeRedis:
     """Fake Redis: only the commands the MCP uses, in a dictionary.
 
     TTL is counted as "this much was requested", not by the clock: the tests
@@ -334,7 +334,7 @@ class RedisFalso:
     the TTL, not the passage of time. "Time passed" is written by hand, in
     `ttls[chave]`.
 
-    It also serves the tests of the window counter (`contar_na_janela`), which
+    It also serves the tests of the window counter (`count_in_window`), which
     is a MULTI/EXEC with `EXPIRE ... NX`: hence `pipeline()` and `nx`.
     """
 
@@ -393,7 +393,7 @@ class RedisFalso:
         return True
 
     def pipeline(self, transaction: bool = True):
-        return _PipelineFalso(self, transaction)
+        return _FakePipeline(self, transaction)
 
     async def ttl(self, chave):
         self.chamadas.append(("ttl", chave))
@@ -420,31 +420,31 @@ class RedisFalso:
         return list(lista[inicio : fim + 1])
 
 
-class _PipelineFalso:
-    """`RedisFalso`'s `pipeline()`: each command enters the queue and `execute()`
+class _FakePipeline:
+    """`FakeRedis`'s `pipeline()`: each command enters the queue and `execute()`
     runs the whole queue in order, without yielding the loop midway — which
     is, here, the atomicity of MULTI/EXEC. Records `("exec", [comandos])` in
     `chamadas` so the test can see what went out together in the same
     transaction."""
 
-    def __init__(self, redis: RedisFalso, transacao: bool) -> None:
+    def __init__(self, redis: FakeRedis, transacao: bool) -> None:
         self._redis = redis
-        self._transacao = transacao
+        self._transaction = transacao
         self._fila: list[tuple] = []
 
     def __getattr__(self, nome):
         comando = getattr(self._redis, nome)
 
-        def _enfileirar(*args, **kwargs):
+        def _enqueue(*args, **kwargs):
             self._fila.append((nome, comando, args, kwargs))
             return self
 
-        return _enfileirar
+        return _enqueue
 
     async def execute(self):
         fila, self._fila = self._fila, []
         self._redis.chamadas.append(
-            ("exec" if self._transacao else "pipeline", [nome for nome, *_ in fila])
+            ("exec" if self._transaction else "pipeline", [nome for nome, *_ in fila])
         )
         return [await comando(*args, **kwargs) for _, comando, args, kwargs in fila]
 

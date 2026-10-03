@@ -12,13 +12,13 @@
  */
 export function moverGrupo(
   ordem: string[],
-  origemId: string,
-  alvoId: string,
+  sourceId: string,
+  targetId: string,
 ): string[] {
-  if (origemId === alvoId) return ordem
+  if (sourceId === targetId) return ordem
 
-  const de = ordem.indexOf(origemId)
-  const para = ordem.indexOf(alvoId)
+  const de = ordem.indexOf(sourceId)
+  const para = ordem.indexOf(targetId)
   // Id not in the list: the screen is working with a different set than the
   // one at hand. Moving blindly would save a made-up order.
   if (de < 0 || para < 0) return ordem

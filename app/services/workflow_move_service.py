@@ -35,7 +35,7 @@ from app.services.workflow_move_report import collect_warnings, warn
 _logger = get_logger(__name__)
 
 
-async def nomes_no_workspace(db, workspace_id: str) -> set[str]:
+async def names_in_workspace(db, workspace_id: str) -> set[str]:
     """Names already taken in the workspace. Shared with duplication."""
     return {
         n for (n,) in (
@@ -53,18 +53,18 @@ async def nomes_no_workspace(db, workspace_id: str) -> set[str]:
 # the limit would overflow the column, and DataError is not IntegrityError — it
 # would escape the retry as a 500, precisely in the operation that promises not
 # to fail.
-_MAX_NOME = 255
+_MAX_NAME = 255
 
 
-def _com_sufixo(base: str, sufixo: str) -> str:
+def _with_suffix(base: str, sufixo: str) -> str:
     """`base (suffix)`, shortening the base if the result exceeds 255 chars."""
-    excedente = len(base) + len(sufixo) + 3 - _MAX_NOME
-    if excedente > 0:
-        base = base[: max(1, len(base) - excedente)]
+    excess = len(base) + len(sufixo) + 3 - _MAX_NAME
+    if excess > 0:
+        base = base[: max(1, len(base) - excess)]
     return f"{base} ({sufixo})"
 
 
-def nome_livre(base: str, existentes: set[str]) -> str:
+def free_name(base: str, existentes: set[str]) -> str:
     """First free name starting from `base`: "X", "X (2)", "X (3)"…
 
     There is a UniqueConstraint(name, workspace_id): without disambiguation,
@@ -72,17 +72,17 @@ def nome_livre(base: str, existentes: set[str]) -> str:
     blow up with IntegrityError — and the contract of this feature is that the
     move does not fail because of that.
 
-    The ceiling and the random suffix repeat what `_nome_de_copia` already does
+    The ceiling and the random suffix repeat what `_copy_name` already does
     for duplication: an ugly name is preferable to a 409 in the user's face.
     """
-    base = base[:_MAX_NOME]
+    base = base[:_MAX_NAME]
     if base not in existentes:
         return base
     for i in range(2, 100):
-        tentativa = _com_sufixo(base, str(i))
+        tentativa = _with_suffix(base, str(i))
         if tentativa not in existentes:
             return tentativa
-    return _com_sufixo(base, uuid4().hex[:6])
+    return _with_suffix(base, uuid4().hex[:6])
 
 
 async def move_workflow(
@@ -123,21 +123,21 @@ async def move_workflow(
         raise WorkflowMoveTargetError("O workflow já está neste workspace.")
 
     # deepcopy BEFORE decrypting: the analysis must not touch the ORM object.
-    definition_clara = decrypt_workflow_connections(copy.deepcopy(wf.definition or {}))
+    plain_definition = decrypt_workflow_connections(copy.deepcopy(wf.definition or {}))
 
-    warnings = await collect_warnings(db, wf, definition_clara, origin_ws, target_workspace_id)
+    warnings = await collect_warnings(db, wf, plain_definition, origin_ws, target_workspace_id)
 
-    nome_desejado = (new_name or "").strip() or wf.name
-    existentes = await nomes_no_workspace(db, target_workspace_id)
-    nome_final = nome_livre(nome_desejado, existentes)
+    desired_name = (new_name or "").strip() or wf.name
+    existentes = await names_in_workspace(db, target_workspace_id)
+    nome_final = free_name(desired_name, existentes)
     renamed = nome_final != wf.name
-    if nome_final != nome_desejado:
+    if nome_final != desired_name:
         warnings.insert(0, warn(
             "name_conflict",
-            f"Já havia um workflow chamado '{nome_desejado}' no destino; "
+            f"Já havia um workflow chamado '{desired_name}' no destino; "
             f"este foi renomeado para '{nome_final}'.",
             severity="info",
-            requested_name=nome_desejado, final_name=nome_final,
+            requested_name=desired_name, final_name=nome_final,
         ))
 
     resultado = {
@@ -154,22 +154,22 @@ async def move_workflow(
         return resultado
 
     # Turn off the schedule in the definition. It goes in the same transaction as
-    # the UPDATE on `schedules`, below. `definition_clara` is already a private
+    # the UPDATE on `schedules`, below. `plain_definition` is already a private
     # copy (nothing else reads it after this point), so the in-place mutation is
     # safe.
-    disable_schedule_node(definition_clara)
+    disable_schedule_node(plain_definition)
 
     # `definition` encrypted only once: `encrypt_workflow_connections` mutates the
     # dict it receives, and reusing the result avoids depending on idempotence
     # between the two attempts.
-    definition_cifrada = encrypt_workflow_connections(definition_clara)
+    encrypted_definition = encrypt_workflow_connections(plain_definition)
     # Snapshot of the PREVIOUS state. Being explicit is not redundant: for the
     # reason in the docstring, `wf.definition` may be in plain text in the
     # session, and workflow_versions is a persisted table like any other.
     snapshot = encrypt_workflow_connections(copy.deepcopy(wf.definition or {}))
-    pins_para_apagar = _pin_keys(wf.pinned_outputs)
+    pins_to_delete = _pin_keys(wf.pinned_outputs)
 
-    async def _aplicar(nome: str) -> None:
+    async def _apply(nome: str) -> None:
         """Writes everything that makes up the move. Re-runnable after a rollback.
 
         `create_version` only does a `flush`, and the UPDATE on `schedules` is
@@ -218,13 +218,13 @@ async def move_workflow(
         alvo.portal_shared_with = None
         alvo.pinned_outputs = None          # apontam para pin-cache/{ws_origem}/…
         alvo.pin_metadata = None
-        alvo.definition = copy.deepcopy(definition_cifrada)
+        alvo.definition = copy.deepcopy(encrypted_definition)
         if moved_by_id:
             alvo.updated_by_id = moved_by_id
         await db.commit()
 
     try:
-        await _aplicar(nome_final)
+        await _apply(nome_final)
     except IntegrityError as exc:
         await db.rollback()
         if "uq_workflow_name_workspace" not in str(exc.orig):
@@ -237,9 +237,9 @@ async def move_workflow(
             "Colisão de nome ao mover o workflow %s para %s; tentando sufixo único.",
             id_hash, target_workspace_id,
         )
-        nome_final = _com_sufixo(nome_desejado[:_MAX_NOME], uuid4().hex[:6])
+        nome_final = _with_suffix(desired_name[:_MAX_NAME], uuid4().hex[:6])
         try:
-            await _aplicar(nome_final)
+            await _apply(nome_final)
         except IntegrityError as exc2:
             # Colliding again with a random suffix is unlikely enough to indicate
             # something else; still, a readable 409 is better than letting the
@@ -262,7 +262,7 @@ async def move_workflow(
         resultado["name"] = nome_final
         resultado["renamed"] = True
 
-    await _apagar_pins(pins_para_apagar)
+    await _apagar_pins(pins_to_delete)
     return resultado
 
 

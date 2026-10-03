@@ -23,7 +23,7 @@ from decimal import Decimal
 
 from app.core.utils.logger import get_logger
 from app.mcp import infra
-from app.models.uso_do_assistente import UsoDoAssistente
+from app.models.uso_do_assistente import AssistantUsage
 
 logger = get_logger(__name__)
 
@@ -49,7 +49,7 @@ async def registrar_volta(
         return
     try:
         async with infra.sessao() as db:
-            db.add(UsoDoAssistente(
+            db.add(AssistantUsage(
                 user_id=user_id,
                 modelo=modelo,
                 superficie=superficie,

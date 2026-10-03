@@ -16,17 +16,17 @@ import websockets
 from websockets.exceptions import ConnectionClosed, ConnectionClosedError
 from websockets.frames import Close
 
-from flow.utils.backoff import com_jitter
+from flow.utils.backoff import with_jitter
 from flow.utils.protocolo_ws import (
     PROTOCOL_VERSION,
-    TIPO_ERRO,
-    TIPOS_DO_SERVIDOR,
-    reduzir_stats,
+    ERROR_TYPE,
+    SERVER_TYPES,
+    shrink_stats,
 )
 from flow.utils.publisher.reducao import (
-    CAMPOS_DE_CONTROLE,
-    TETO_NODE_EVENT_BYTES,
-    reduzir_node_event,
+    CONTROL_FIELDS,
+    NODE_EVENT_BYTES_CEILING,
+    shrink_node_event,
 )
 from executor import config
 from executor.job_queue import ExecutorJobQueue
@@ -94,7 +94,7 @@ def _dumps_result(obj: dict) -> str:
         # __response__ is required for the synchronous webhook pattern — without
         # it, webhook_router's BRPOP hangs. The yardstick here is the whole
         # message against the WS frame.
-        _stats, result, preservou = reduzir_stats(
+        _stats, result, preservou = shrink_stats(
             obj.get("stats") or {}, len(result), _MAX_WS_PAYLOAD,
             lambda stats: json.dumps({**obj, "stats": stats}, default=_json_default),
         )
@@ -125,16 +125,16 @@ def _dumps_event(obj: dict) -> str:
     included.
     """
     result = json.dumps(obj, default=_json_default)
-    if len(result) <= TETO_NODE_EVENT_BYTES:
+    if len(result) <= NODE_EVENT_BYTES_CEILING:
         return result
     logger.warning(
         "node_event node=%s status=%s de %d bytes excede %d — reduzido.",
-        obj.get("node"), obj.get("status"), len(result), TETO_NODE_EVENT_BYTES,
+        obj.get("node"), obj.get("status"), len(result), NODE_EVENT_BYTES_CEILING,
     )
-    return reduzir_node_event(obj, result, default=_json_default)
+    return shrink_node_event(obj, result, default=_json_default)
 
 
-# The server → executor type allowlist is TIPOS_DO_SERVIDOR, from the protocol
+# The server → executor type allowlist is SERVER_TYPES, from the protocol
 # vocabulary in flow/utils/protocolo_ws.py (see `_receive_loop`).
 #
 # `purge_artifacts` deletes files from the user's disk. It is already covered by
@@ -150,30 +150,30 @@ _SIGNED_SERVER_MESSAGES = frozenset({"control", "cancel"})
 _HEARTBEAT_INTERVAL = 30  # segundos
 # Interval for sending the capacity report
 _CAPACITY_INTERVAL = 10  # segundos
-# Interval of the job inventory (see `_inventario_loop`). The first goes out right
+# Interval of the job inventory (see `_inventory_loop`). The first goes out right
 # after the handshake; from then on, one per minute is enough — the server only
 # closes lost runs more than 3 min old.
-_INVENTARIO_INTERVAL = 60  # segundos
+_INVENTORY_INTERVAL = 60  # segundos
 # Ceiling on ids per inventory. Above it, the inventory goes out marked `truncado` and the
 # server closes nothing for absence (there is no way to know what was left out).
 _INVENTARIO_MAX = 1000
 # For how long a SENT result still counts as "on its way" — see
-# `_lembrar_enviado`. Slack over what the server takes to process it
+# `_remember_sent`. Slack over what the server takes to process it
 # (draining the inbox of a connection that dropped: ~20 s); after that the server's own
 # result key (TTL 300 s) already protects it. Short on purpose:
 # on a busy executor the sent ones must not fill the whole inventory.
-_ENVIADOS_TTL_S = 90.0
-_ENVIADOS_MAX = 2000
+_SENT_TTL_S = 90.0
+_SENT_MAX = 2000
 # Reason of the 'cancelled' result of a job the executor did not have when the
-# cancellation arrived (see `_encerrar_cancelamento_desconhecido`).
-_MOTIVO_CANCELAMENTO_DESCONHECIDO = (
+# cancellation arrived (see `_close_unknown_cancellation`).
+_UNKNOWN_CANCELLATION_REASON = (
     "Cancelada. O executor não tinha esta execução quando o pedido chegou — "
     "ela já tinha se perdido antes de rodar ou de o resultado sair."
 )
 # Consecutive samples of a full pool before announcing zero capacity — see
-# `_pool_saturado`. With the capacity's 10s tick, that is ~10s of uninterrupted
+# `_pool_saturated`. With the capacity's 10s tick, that is ~10s of uninterrupted
 # thread queue: a dispatch spike does not pass, an orphan thread does.
-_POOL_SATURADO_TICKS = 2
+_POOL_SATURATED_TICKS = 2
 
 # Minimum duration of a WS session to consider it "stable" and reset the backoff.
 # Without this guard, any post-accept close (4408 heartbeat timeout, 4426
@@ -219,12 +219,12 @@ _SEND_RETRY_PAUSE_MIN = 0.05
 _SEND_FAIL_STREAK_LIMIT = 3
 
 
-def _pausa_por_rajada(falhas_consecutivas: int) -> float:
+def _burst_pause(consecutive_failures: int) -> float:
     """How long to sleep after N consecutive send failures. 0 up to the burst limit."""
-    if falhas_consecutivas < _SEND_FAIL_STREAK_LIMIT:
+    if consecutive_failures < _SEND_FAIL_STREAK_LIMIT:
         return 0.0
-    crescimento = _SEND_RETRY_PAUSE_MIN * (2 ** (falhas_consecutivas - _SEND_FAIL_STREAK_LIMIT))
-    return min(_SEND_RETRY_PAUSE, crescimento)
+    growth = _SEND_RETRY_PAUSE_MIN * (2 ** (consecutive_failures - _SEND_FAIL_STREAK_LIMIT))
+    return min(_SEND_RETRY_PAUSE, growth)
 
 # Close codes the server emits in the post-handshake accept() (executor_ws_router)
 # to deny authoritatively: 4401 not authenticated, 4403 revoked/forbidden,
@@ -348,7 +348,7 @@ class ExecutorConnection:
         # count jobs — the executor kept announcing free capacity with the
         # whole pipeline stalled, and the server kept dispatching to it.
         self._thread_pool = thread_pool
-        self._pool_saturado_seguidas = 0
+        self._pool_saturated_streak = 0
         self._results    = result_queue
         self._events     = event_queue
         self._drive_events = drive_event_queue
@@ -361,7 +361,7 @@ class ExecutorConnection:
         # an infinite loop against a server that has already said no.
         self.terminal_deny: str | None = None
         # Signals "don't wait for the backoff, try now" — see _esperar_retry.
-        self._retry_agora = asyncio.Event()
+        self._retry_now = asyncio.Event()
         # Null object instead of None: the call sites call self._stats.on_X()
         # directly, without an `if` scattered over every connection state point.
         if stats is None:
@@ -375,9 +375,9 @@ class ExecutorConnection:
         # Instant the WS handshake was ACCEPTED (not the start of the attempt),
         # or None when the attempt never got to open a session. It is the only honest
         # marker for the backoff: see `_apply_session_backoff_reset`.
-        self._sessao_iniciada_em: float | None = None
-        # job_id -> instant the result was sent; see `_lembrar_enviado`.
-        self._enviados: dict[str, float] = {}
+        self._session_started_at: float | None = None
+        # job_id -> instant the result was sent; see `_remember_sent`.
+        self._sent: dict[str, float] = {}
 
     async def push_capacity(self) -> None:
         """Sends a capacity report NOW, outside the `_capacity_loop` tick.
@@ -397,7 +397,7 @@ class ExecutorConnection:
             logger.debug("push_capacity: sem sessão WS ativa — nada a enviar.")
             return
         try:
-            cap = self._montar_capacity()
+            cap = self._build_capacity()
             await ws.send(json.dumps({"type": "capacity", **cap}))
             logger.info(
                 "Capacity enviado imediatamente (queued=%s running=%s).",
@@ -414,13 +414,13 @@ class ExecutorConnection:
         while True:
             # `t0` serves ONLY the log ("conexao encerrada apos X"): it measures the
             # whole attempt, TCP + TLS/mTLS + upgrade included. What decides
-            # the backoff is `self._sessao_iniciada_em`, set after the
+            # the backoff is `self._session_started_at`, set after the
             # handshake is accepted — see `_apply_session_backoff_reset`.
             t0 = time.monotonic()
             # Reset on every attempt: without this the good session from the previous round
             # would make the backoff of an attempt that never even opened a socket look like
             # a "healthy session" and step back.
-            self._sessao_iniciada_em = None
+            self._session_started_at = None
             self._stats.on_connecting()
             try:
                 await self._connect_and_run()
@@ -432,14 +432,14 @@ class ExecutorConnection:
                 # or the receive_loop ended. It is still a disconnection: it needs
                 # the same sleep as the exception path, otherwise it reconnects in a spin.
                 delay = self._apply_session_backoff_reset(delay)
-                actual = com_jitter(delay)
+                actual = with_jitter(delay)
                 logger.warning(
                     "Conexão encerrada pelo servidor após %.1fs. Reconectando em %.1fs.",
                     time.monotonic() - t0, actual,
                 )
-                self._stats.on_disconnected(proximo_retry_s=actual)
-                reagendado = await self._esperar_retry(actual)
-                delay = 1 if reagendado else min(delay * 2, config.RECONNECT_MAX_DELAY)
+                self._stats.on_disconnected(next_retry_s=actual)
+                rescheduled = await self._esperar_retry(actual)
+                delay = 1 if rescheduled else min(delay * 2, config.RECONNECT_MAX_DELAY)
             except asyncio.CancelledError:
                 logger.info("Conexão cancelada — encerrando.")
                 self._stats.on_disconnected(terminal=True)
@@ -468,43 +468,43 @@ class ExecutorConnection:
                 # reconnect in sync after a server outage. The formula
                 # was born here and now lives in `flow/utils/backoff.py`, from which
                 # the platform's other loops now read it.
-                actual = com_jitter(delay)
+                actual = with_jitter(delay)
                 logger.error("%s Reconectando em %.1fs.", msg, actual, exc_info=include_tb)
-                self._stats.on_disconnected(proximo_retry_s=actual)
-                reagendado = await self._esperar_retry(actual)
-                delay = 1 if reagendado else min(delay * 2, config.RECONNECT_MAX_DELAY)
+                self._stats.on_disconnected(next_retry_s=actual)
+                rescheduled = await self._esperar_retry(actual)
+                delay = 1 if rescheduled else min(delay * 2, config.RECONNECT_MAX_DELAY)
 
     async def _esperar_retry(self, segundos: float) -> bool:
         """Sleeps until the next attempt, but wakes up if someone asks for it now.
 
-        Returns True if the wait was cut short by `reconectar_agora()` — the
+        Returns True if the wait was cut short by `reconnect_now()` — the
         caller then resets the backoff, because whoever asked knows something the
         process did not (the network came back, the server came up). Without this, an
         operator who has just fixed the network would wait out the whole backoff,
         which reaches RECONNECT_MAX_DELAY (15s by default).
         """
-        self._retry_agora.clear()
+        self._retry_now.clear()
         try:
-            await asyncio.wait_for(self._retry_agora.wait(), timeout=segundos)
+            await asyncio.wait_for(self._retry_now.wait(), timeout=segundos)
             return True
         except asyncio.TimeoutError:
             return False
 
-    def reconectar_agora(self) -> bool:
+    def reconnect_now(self) -> bool:
         """Interrupts the backoff in progress. Returns False if there was no wait.
 
         Safe to call at any time: with the WS alive, the event just stays
         set and is cleared on the next wait.
         """
-        if self._retry_agora.is_set():
+        if self._retry_now.is_set():
             return False
-        self._retry_agora.set()
+        self._retry_now.set()
         return True
 
     def _apply_session_backoff_reset(self, delay: int | float) -> int | float:
         """Adjusts the backoff according to the WS SESSION that has just ended.
 
-        The clock starts at `self._sessao_iniciada_em`, set after the
+        The clock starts at `self._session_started_at`, set after the
         handshake was ACCEPTED — never at the start of the attempt. Measuring the whole
         attempt broke the anti-spin defense in the most expensive scenario: a server in
         deploy/overload accepts the TCP and never completes the upgrade, the
@@ -524,11 +524,11 @@ class ExecutorConnection:
             executor vanished from the panel for tens of seconds on every outage of
             a few seconds of real unavailability;
           - session that dies right after the handshake — or that never got to
-            exist (`_sessao_iniciada_em is None`: DNS, TCP refused, TLS
+            exist (`_session_started_at is None`: DNS, TCP refused, TLS
             rejected, hung upgrade): keeps the accumulated delay, which is what
             guarantees exponential growth against a repeated error.
         """
-        inicio = self._sessao_iniciada_em
+        inicio = self._session_started_at
         if inicio is None:
             return delay
         duracao = time.monotonic() - inicio
@@ -564,7 +564,7 @@ class ExecutorConnection:
             # Backoff marker: from HERE on there is a session. Everything that came
             # before (TCP, TLS/mTLS, upgrade) is attempt cost, not service
             # time — see `_apply_session_backoff_reset`.
-            self._sessao_iniciada_em = time.monotonic()
+            self._session_started_at = time.monotonic()
             self._stats.on_connected()
             # Handle of the live session, so `push_capacity()` can send outside the
             # _capacity_loop's 10s tick. Cleared in the `finally` below: during the
@@ -587,7 +587,7 @@ class ExecutorConnection:
             tasks: list[asyncio.Task] = [
                 asyncio.create_task(self._heartbeat_loop(ws),     name="heartbeat"),
                 asyncio.create_task(self._capacity_loop(ws),      name="capacity"),
-                asyncio.create_task(self._inventario_loop(ws),    name="inventario"),
+                asyncio.create_task(self._inventory_loop(ws),    name="inventario"),
                 asyncio.create_task(self._receive_loop(ws),       name="receive"),
                 asyncio.create_task(self._result_sender_loop(ws), name="results"),
             ]
@@ -613,7 +613,7 @@ class ExecutorConnection:
                     if not task.done():
                         task.cancel()
                 await asyncio.gather(*tasks, return_exceptions=True)
-                # Sessao acabou: sem socket ate a proxima conexao.
+                # SessionMaker acabou: sem socket ate a proxima conexao.
                 self._ws = None
 
             # The exception that brought the session down MUST rise to run(): the
@@ -694,7 +694,7 @@ class ExecutorConnection:
             # alongside the HMAC on the relay channels: if some day an unauthenticated
             # message reaches the WS, it finds no new/experimental
             # handler exposed by accident.
-            if msg_type not in TIPOS_DO_SERVIDOR:
+            if msg_type not in SERVER_TYPES:
                 logger.debug("Mensagem desconhecida do servidor: %s", msg_type)
                 continue
 
@@ -773,9 +773,9 @@ class ExecutorConnection:
                     continue
                 outcome = self._queue.cancel(job_id)
                 if outcome == "unknown":
-                    outcome = await self._encerrar_cancelamento_desconhecido(job_id)
+                    outcome = await self._close_unknown_cancellation(job_id)
                 logger.info("Cancelamento do job '%.8s': %s", job_id, outcome)
-            elif msg_type == TIPO_ERRO:
+            elif msg_type == ERROR_TYPE:
                 # The server refused (and discarded) a message from this executor:
                 # invalid JSON, missing required field, invalid capacity,
                 # message before the handshake, unsupported version. There is nothing
@@ -798,9 +798,9 @@ class ExecutorConnection:
         logger.info("Job recebido  id=%.8s  type=%s", job_id, job_type)
 
         # Cancelled while in transit: the server has already closed the run as cancelled
-        # (see `_encerrar_cancelamento_desconhecido`). Running it now would be
+        # (see `_close_unknown_cancellation`). Running it now would be
         # executing — with side effects — something the user told to stop.
-        if self._queue.cancelado_antes_de_chegar(job_id):
+        if self._queue.cancelled_before_arrival(job_id):
             logger.info("Job '%.8s' descartado: foi cancelado antes de chegar.", job_id)
             return
 
@@ -856,7 +856,7 @@ class ExecutorConnection:
         """Reads results from the output queue and sends them to the server as job_result."""
         from executor import result_store
 
-        falhas_seguidas = 0
+        failure_streak = 0
         while True:
             try:
                 result: dict = await asyncio.wait_for(self._results.get(), timeout=5.0)
@@ -880,10 +880,10 @@ class ExecutorConnection:
                 await ws.send(_dumps_result({"type": "job_result", **result}))
                 logger.info("Job %.8s → %s", result.get("job_id", "?"), (result.get("status") or "?").upper())
                 sent_ok = True
-                falhas_seguidas = 0
+                failure_streak = 0
                 # SEND watermark (not consumption): the `task_done()` below
                 # is unconditional and does not distinguish sent from re-queued.
-                self._marcar_enviado(self._results, result)
+                self._mark_sent(self._results, result)
             except ConnectionClosed:
                 # Puts the result back in the queue — it will be resent after reconnecting.
                 # The result_store still keeps a persistent copy, so a restart
@@ -916,12 +916,12 @@ class ExecutorConnection:
                 # GIS nodes' `to_thread`, and a batch of heavy nodes held up the
                 # delivery of ALL results for minutes.
                 result_store.increment_attempts(str(result.get("job_id") or ""))
-                falhas_seguidas += 1
+                failure_streak += 1
                 if attempts >= _MAX_RESULT_SEND_ATTEMPTS:
                     # Out of the queue for good — settles the watermark account,
-                    # otherwise the shutdown's `_aguardar_confirmacao` waits for a
+                    # otherwise the shutdown's `_await_confirmation` waits for a
                     # result that will only come back through the outbox on the next start.
-                    self._marcar_resolvido(self._results, result)
+                    self._mark_resolved(self._results, result)
                     logger.error(
                         "Resultado do job '%s' descartado da fila apos %d tentativas (%s) — "
                         "permanece no outbox e sera reenviado no proximo start.",
@@ -936,7 +936,7 @@ class ExecutorConnection:
                     # Pause per BURST: an isolated failure costs nothing; only an error
                     # that repeats turns into a sleep (this is the queue's only
                     # consumer, so a tight spin would lock it up).
-                    pausa = _pausa_por_rajada(falhas_seguidas)
+                    pausa = _burst_pause(failure_streak)
                     if pausa:
                         await asyncio.sleep(pausa)
             finally:
@@ -953,7 +953,7 @@ class ExecutorConnection:
             # Outside the try/except so it does not run on ConnectionClosed (retry)
             if sent_ok:
                 enviado = str(result.get("job_id") or "")
-                self._lembrar_enviado(enviado)
+                self._remember_sent(enviado)
                 result_store.mark_sent(enviado)
 
     def _requeue_result(self, result: dict, attempts: int = 0) -> None:
@@ -966,7 +966,7 @@ class ExecutorConnection:
         the result_store keeps the persistent copy for replay on restart.
         """
         # Settles the account of the PREVIOUS entry before the put, which opens a new one.
-        self._marcar_resolvido(self._results, result)
+        self._mark_resolved(self._results, result)
         if attempts:
             result[_ATTEMPTS_KEY] = attempts
         try:
@@ -983,9 +983,9 @@ class ExecutorConnection:
     async def _event_sender_loop(self, ws):
         """Drains the node event queue and sends them to the server as node_event."""
         # New session: puts back in the queue the lifecycle that was lost while
-        # there was no socket (see ColetorDeLifecycle).
+        # there was no socket (see LifecycleCollector).
         self._ressincronizar_lifecycle()
-        falhas_seguidas = 0
+        failure_streak = 0
         try:
             while True:
                 # The queue has room again: put back into it the lifecycle that PRESSURE made
@@ -994,7 +994,7 @@ class ExecutorConnection:
                 # more often than the session drops. The nodes kept their spinner until
                 # the end of the run and the events stayed stuck in memory; and the resend, if
                 # it came at all, came hours later, for a run the server had already closed.
-                self._ressincronizar_lifecycle(so_com_folga=True)
+                self._ressincronizar_lifecycle(only_with_slack=True)
                 try:
                     event: dict = await asyncio.wait_for(self._events.get(), timeout=5.0)
                 except asyncio.TimeoutError:
@@ -1015,10 +1015,10 @@ class ExecutorConnection:
                     # size ceiling — job_result's truncation via 'stats'
                     # did not work here (an event has no 'stats').
                     await ws.send(_dumps_event({"type": "node_event", **event}))
-                    falhas_seguidas = 0
+                    failure_streak = 0
                     # See the equivalent comment in _result_sender_loop: the
                     # end-of-job barrier can only count what LEFT through the WS.
-                    self._marcar_enviado(self._events, event)
+                    self._mark_sent(self._events, event)
                 except ConnectionClosed:
                     logger.warning(
                         "Node event descartado por ConnectionClosed — re-enfileirando node=%s status=%s",
@@ -1041,7 +1041,7 @@ class ExecutorConnection:
                     # because the failure is probably deterministic and an
                     # immortal event traps the queue's single consumer.
                     attempts += 1
-                    falhas_seguidas += 1
+                    failure_streak += 1
                     if attempts >= _MAX_EVENT_SEND_ATTEMPTS:
                         # Gave up on this event — but if it was lifecycle, the
                         # canvas would show the node as "running" forever. Keep
@@ -1050,10 +1050,10 @@ class ExecutorConnection:
                         # DETERMINISTIC (non-serializable payload), and resending the
                         # whole event would only repeat the 3 attempts on every
                         # reconnection.
-                        self._registrar_perda(event, minimo=True)
+                        self._record_loss(event, minimo=True)
                         # Does not go back to the queue: settles the account so the end-of-job
                         # barrier does not keep waiting for an event that will never come.
-                        self._marcar_resolvido(self._events, event)
+                        self._mark_resolved(self._events, event)
                         logger.error(
                             "Node event node=%s status=%s descartado apos %d tentativas: %s",
                             event.get("node"), event.get("status"), attempts, exc,
@@ -1064,9 +1064,9 @@ class ExecutorConnection:
                             event.get("node"), event.get("status"), attempts, exc,
                         )
                         self._requeue_event(event, attempts)
-                        # Pause per BURST (see _pausa_por_rajada): the 1s per item
+                        # Pause per BURST (see _burst_pause): the 1s per item
                         # turned the queue into a funnel of 1 event/s.
-                        pausa = _pausa_por_rajada(falhas_seguidas)
+                        pausa = _burst_pause(failure_streak)
                         if pausa:
                             await asyncio.sleep(pausa)
                 finally:
@@ -1093,13 +1093,13 @@ class ExecutorConnection:
         # Settles the account of the PREVIOUS entry before the put, which opens a new one.
         # Also applies when the put fails because the queue is full: there the event is lost
         # for good and the watermark has to be closed all the same.
-        self._marcar_resolvido(self._events, event)
+        self._mark_resolved(self._events, event)
         if attempts:
             event[_ATTEMPTS_KEY] = attempts
         try:
             self._events.put_nowait(event)
         except asyncio.QueueFull:
-            self._registrar_perda(event)
+            self._record_loss(event)
             logger.warning(
                 "Fila de node_events cheia — evento node=%s status=%s descartado.",
                 event.get("node"), event.get("status"),
@@ -1110,7 +1110,7 @@ class ExecutorConnection:
     # ── Lifecycle resync after a drop ─────────────────────────────────────────
 
     @staticmethod
-    def _marcar_enviado(fila, item: dict) -> None:
+    def _mark_sent(fila, item: dict) -> None:
         """Tells the counting queue that the item actually left through the WebSocket.
 
         Duck typing on purpose: in tests (and in any ad-hoc use) the queues
@@ -1121,7 +1121,7 @@ class ExecutorConnection:
             marcar(item)
 
     @staticmethod
-    def _marcar_resolvido(fila, item: dict) -> None:
+    def _mark_resolved(fila, item: dict) -> None:
         """Settles the account of an item that left the queue WITHOUT having been sent.
 
         Mandatory on EVERY re-queue and definitive-drop path: `_put`
@@ -1135,20 +1135,20 @@ class ExecutorConnection:
         if marcar is not None:
             marcar(item)
 
-    def _registrar_perda(self, event: dict, minimo: bool = False) -> None:
+    def _record_loss(self, event: dict, minimo: bool = False) -> None:
         """Keeps the last lifecycle of a lost event, to resend later."""
         coletor = getattr(self._events, "coletor", None)
         if coletor is None:
             return
         if minimo:
-            guardado = {k: event[k] for k in CAMPOS_DE_CONTROLE if k in event}
+            guardado = {k: event[k] for k in CONTROL_FIELDS if k in event}
         else:
             # Without the internal attempt key: it must not come back along with it and
             # make the resynced event start out already at the retry ceiling.
             guardado = {k: v for k, v in event.items() if k != _ATTEMPTS_KEY}
         coletor.registrar(guardado)
 
-    def _ressincronizar_lifecycle(self, so_com_folga: bool = False) -> None:
+    def _ressincronizar_lifecycle(self, only_with_slack: bool = False) -> None:
         """Re-queues the lifecycle that was lost (session drop OR pressure).
 
         Without this, a 30-60s network drop in the middle of a long workflow
@@ -1157,7 +1157,7 @@ class ExecutorConnection:
         node_events — the server already knows how to rebuild the canvas from them and
         orders by timestamp, so resending an already-seen `completed` is harmless.
 
-        With `so_com_folga=True` (the call on each turn of the sender, with the session
+        With `only_with_slack=True` (the call on each turn of the sender, with the session
         ALIVE) the resend only happens when the queue is below half. That is what
         keeps the remedy from becoming the disease: putting the events back into a still
         full queue would trigger the pressure drop again, in a loop between collector and
@@ -1166,7 +1166,7 @@ class ExecutorConnection:
         coletor = getattr(self._events, "coletor", None)
         if coletor is None:
             return
-        if so_com_folga:
+        if only_with_slack:
             if not len(coletor):
                 return
             maxsize = getattr(self._events, "maxsize", 0) or 0
@@ -1178,7 +1178,7 @@ class ExecutorConnection:
         logger.info(
             "Reenviando %d evento(s) de ciclo de vida que nao couberam antes "
             "(%s).", len(pendentes),
-            "fila folgou" if so_com_folga else "sessao restabelecida",
+            "fila folgou" if only_with_slack else "sessao restabelecida",
         )
         for i, evento in enumerate(pendentes):
             try:
@@ -1212,12 +1212,12 @@ class ExecutorConnection:
         while True:
             await asyncio.sleep(_CAPACITY_INTERVAL)
             try:
-                cap = self._montar_capacity()
+                cap = self._build_capacity()
                 await ws.send(json.dumps({"type": "capacity", **cap}))
             except ConnectionClosed:
                 break
 
-    async def _inventario_loop(self, ws):
+    async def _inventory_loop(self, ws):
         """Sends the server, right after the handshake and every minute, the jobs that
         this executor HAS: active (queue, semaphore, execution) and with a result
         not yet confirmed.
@@ -1234,7 +1234,7 @@ class ExecutorConnection:
             # _connect_and_run's `wait` would close the whole connection with the first task
             # that finished.
             try:
-                inventario = self._montar_inventario()
+                inventario = self._build_inventory()
             except Exception as exc:
                 logger.warning("Inventário de jobs não montado nesta volta: %s", exc)
                 inventario = None
@@ -1243,9 +1243,9 @@ class ExecutorConnection:
                     await ws.send(json.dumps(inventario))
                 except ConnectionClosed:
                     break
-            await asyncio.sleep(_INVENTARIO_INTERVAL)
+            await asyncio.sleep(_INVENTORY_INTERVAL)
 
-    def _lembrar_enviado(self, job_id: str) -> None:
+    def _remember_sent(self, job_id: str) -> None:
         """Keeps for a few minutes the id of a result that has just gone out.
 
         `mark_sent` deletes the result from the outbox as soon as `ws.send` returns,
@@ -1258,12 +1258,12 @@ class ExecutorConnection:
         """
         if not job_id:
             return
-        self._enviados.pop(job_id, None)
-        self._enviados[job_id] = time.monotonic()
-        while len(self._enviados) > _ENVIADOS_MAX:
-            self._enviados.pop(next(iter(self._enviados)))
+        self._sent.pop(job_id, None)
+        self._sent[job_id] = time.monotonic()
+        while len(self._sent) > _SENT_MAX:
+            self._sent.pop(next(iter(self._sent)))
 
-    def _resultados_pendentes(self) -> set[str] | None:
+    def _pending_results(self) -> set[str] | None:
         """Results that have not gone out yet: in the outbox or in the in-memory queue.
         None when the outbox could not be read."""
         from executor import result_store
@@ -1271,35 +1271,35 @@ class ExecutorConnection:
         pendentes = result_store.job_ids_pendentes()
         if pendentes is None:
             return None
-        a_caminho = set(pendentes)
+        in_transit = set(pendentes)
         # The in-memory queue also counts: with the outbox disabled (disk without
         # permission, corrupted SQLite) it is the only record of a result
         # that has not gone out yet.
         for item in list(getattr(self._results, "_queue", ()) or ()):
             if isinstance(item, dict) and item.get("job_id"):
-                a_caminho.add(str(item["job_id"]))
-        return a_caminho
+                in_transit.add(str(item["job_id"]))
+        return in_transit
 
-    def _enviados_recentes(self) -> list[str]:
-        """Results sent less than `_ENVIADOS_TTL_S` ago, from the most recent to the
+    def _recently_sent(self) -> list[str]:
+        """Results sent less than `_SENT_TTL_S` ago, from the most recent to the
         oldest."""
-        vence = time.monotonic() - _ENVIADOS_TTL_S
-        for job_id in [j for j, quando in self._enviados.items() if quando < vence]:
-            del self._enviados[job_id]
-        return list(reversed(self._enviados))
+        vence = time.monotonic() - _SENT_TTL_S
+        for job_id in [j for j, quando in self._sent.items() if quando < vence]:
+            del self._sent[job_id]
+        return list(reversed(self._sent))
 
-    def _resultados_a_caminho(self) -> set[str] | None:
+    def _results_in_flight(self) -> set[str] | None:
         """Jobs that FINISHED here and whose result the server may not have
         processed yet. None when the outbox could not be read — then there is no way to
         assert that a job did NOT finish here."""
-        pendentes = self._resultados_pendentes()
+        pendentes = self._pending_results()
         if pendentes is None:
             return None
-        return pendentes | set(self._enviados_recentes())
+        return pendentes | set(self._recently_sent())
 
-    def _montar_inventario(self) -> dict:
-        ativos = self._queue.job_ids_ativos() if self._queue is not None else []
-        pendentes = self._resultados_pendentes()
+    def _build_inventory(self) -> dict:
+        ativos = self._queue.active_job_ids() if self._queue is not None else []
+        pendentes = self._pending_results()
         # Unreadable outbox: the inventory goes out marked `truncado` — the server
         # promotes and stops zombies, but closes nothing for absence (an empty list
         # would assert "nothing pending"). Sending nothing would let the inventory
@@ -1315,7 +1315,7 @@ class ExecutorConnection:
         vaga = _INVENTARIO_MAX - len(ativos) - len(resultados)
         if vaga > 0:
             ja = set(ativos) | set(resultados)
-            resultados += [j for j in self._enviados_recentes() if j not in ja][:vaga]
+            resultados += [j for j in self._recently_sent() if j not in ja][:vaga]
         return {
             "type":       "inventario",
             "ativos":     ativos[:_INVENTARIO_MAX],
@@ -1323,7 +1323,7 @@ class ExecutorConnection:
             "truncado":   truncado,
         }
 
-    async def _encerrar_cancelamento_desconhecido(self, job_id: str) -> str:
+    async def _close_unknown_cancellation(self, job_id: str) -> str:
         """Cancellation of a job that is not on this instance.
 
         The executor used to answer "unknown" only in the log and stay silent: the run
@@ -1338,15 +1338,15 @@ class ExecutorConnection:
         had not written it yet, could even beat it. With an unreadable outbox
         there is no way to know: it answers nothing, and the inventory sorts it out later.
         """
-        a_caminho = self._resultados_a_caminho()
-        if a_caminho is None:
+        in_transit = self._results_in_flight()
+        if in_transit is None:
             return "outbox_ilegivel"
-        if job_id in a_caminho:
+        if job_id in in_transit:
             return "resultado_pendente"
-        await self._queue.encerrar_desconhecido(job_id, _MOTIVO_CANCELAMENTO_DESCONHECIDO)
+        await self._queue.close_unknown(job_id, _UNKNOWN_CANCELLATION_REASON)
         return "encerrado"
 
-    def _montar_capacity(self) -> dict:
+    def _build_capacity(self) -> dict:
         """Capacity payload, with the thread pool taken into account.
 
         `get_capacity()` counts JOBS. That stopped describing the executor once
@@ -1364,17 +1364,17 @@ class ExecutorConnection:
         failing the run.
         """
         cap = {**self._queue.get_capacity(), **_get_dynamic_metrics()}
-        if not self._pool_saturado():
+        if not self._pool_saturated():
             return cap
         return {
             **cap,
             "queued": cap.get("max_queue", 0) + cap.get("max_concurrent", 0),
         }
 
-    def _pool_saturado(self) -> bool:
+    def _pool_saturated(self) -> bool:
         """True when the nodes' pool is full AND has work waiting.
 
-        Requires `_POOL_SATURADO_TICKS` CONSECUTIVE samples: a normal spike (N
+        Requires `_POOL_SATURATED_TICKS` CONSECUTIVE samples: a normal spike (N
         nodes dispatched at the same instant) saturates the pool for milliseconds, and
         announcing the executor as full because of that would take the machine out of the
         ranking for nothing. Orphan threads do not resolve themselves — the condition persists.
@@ -1391,15 +1391,15 @@ class ExecutorConnection:
         except Exception:
             return False
         if not cheio:
-            self._pool_saturado_seguidas = 0
+            self._pool_saturated_streak = 0
             return False
-        self._pool_saturado_seguidas += 1
-        if self._pool_saturado_seguidas == _POOL_SATURADO_TICKS:
+        self._pool_saturated_streak += 1
+        if self._pool_saturated_streak == _POOL_SATURATED_TICKS:
             logger.error(
                 "Pool de threads dos nos saturado (%d workers ocupados, %d tarefa(s) na "
                 "espera) — anunciando capacidade zero. Suspeite de no travado "
                 "(PythonScript em laco infinito nao e cancelavel pelo timeout).",
                 pool._max_workers, pool._work_queue.qsize(),
             )
-        return self._pool_saturado_seguidas >= _POOL_SATURADO_TICKS
+        return self._pool_saturated_streak >= _POOL_SATURATED_TICKS
 

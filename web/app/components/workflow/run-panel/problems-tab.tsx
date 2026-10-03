@@ -6,12 +6,12 @@ import {
 } from "react-icons/tb"
 import { cn } from "@/lib/utils"
 import { NodeRun, RunTimeline } from "./timeline"
-import { ERROR_CATEGORY_LABEL, EmptyHint, formatOffset, useAbrirSubfluxo, useNodeFocus } from "./shared"
+import { ERROR_CATEGORY_LABEL, EmptyHint, formatOffset, useOpenSubworkflow, useNodeFocus } from "./shared"
 import { useConfigNodeParams } from "@/app/hooks/workflow/useConfigNodeParams"
 
 function ProblemCard({ node }: { node: NodeRun }) {
   const { focusNode, setHovered } = useNodeFocus()
-  const { abrir, podeAbrir } = useAbrirSubfluxo()
+  const { abrir, podeAbrir } = useOpenSubworkflow()
   const [showTrace, setShowTrace] = useState(false)
   const [copied, setCopied] = useState(false)
   const { setConfigNodeParam } = useConfigNodeParams()

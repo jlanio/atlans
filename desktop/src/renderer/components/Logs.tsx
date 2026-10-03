@@ -18,23 +18,23 @@ import {
 import {
   TbArrowDown, TbDownload, TbFileText, TbFolderOpen, TbSearch, TbSearchOff, TbX,
 } from 'react-icons/tb'
-import type { LinhaVisivel } from '../lib/useLog.js'
+import type { VisibleLine } from '../lib/useLog.js'
 import { Button } from './ui/button.js'
 import { Input } from './ui/input.js'
 import { cn } from '../lib/utils.js'
 
-const NIVEIS = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'RAW'] as const
-type Nivel = (typeof NIVEIS)[number]
+const LEVELS = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'RAW'] as const
+type Nivel = (typeof LEVELS)[number]
 
 /** Color of the message TEXT. Only where the color carries meaning. */
-const CORES: Record<string, string> = {
+const COLORS: Record<string, string> = {
   ERROR: 'text-destructive',
   WARN: 'text-yellow-600 dark:text-yellow-500',
   RAW: 'text-muted-foreground',
 }
 
 /** Level marker in the filter — a dot, so the chip does not become a block. */
-const PONTOS: Record<Nivel, string> = {
+const DOTS: Record<Nivel, string> = {
   ERROR: 'bg-destructive',
   WARN: 'bg-yellow-500',
   INFO: 'bg-sky-500',
@@ -43,7 +43,7 @@ const PONTOS: Record<Nivel, string> = {
 }
 
 /** Row background strip. Only ERROR and WARN — the rest would be pointless zebra. */
-const FUNDOS: Record<string, string> = {
+const BACKGROUNDS: Record<string, string> = {
   ERROR: 'bg-destructive/8',
   WARN: 'bg-yellow-500/8',
 }
@@ -58,7 +58,7 @@ function hora(ts: number): string {
  * Without this, searching a thousand-line log returns thirty similar lines and
  * the eye still needs to scan each one for where the match is.
  */
-function Realce({ texto, termo }: { texto: string; termo: string }) {
+function Highlighted({ texto, termo }: { texto: string; termo: string }) {
   if (!termo) return <>{texto}</>
 
   const partes: Array<{ t: string; hit: boolean }> = []
@@ -96,7 +96,7 @@ function Realce({ texto, termo }: { texto: string; termo: string }) {
  * The number is generous enough to scroll a good way before needing the
  * "mostrar anteriores" (show earlier) button.
  */
-const JANELA = 400
+const WINDOW_SIZE = 400
 
 /**
  * One log line.
@@ -110,22 +110,22 @@ const JANELA = 400
  * and with the index every line would change key on each discard —
  * invalidating the memoization exactly when it matters most, with the log full.
  */
-const LinhaDeLog = memo(function LinhaDeLog({
+const LogRow = memo(function LogRow({
   linha, termo,
 }: {
-  linha: LinhaVisivel
+  linha: VisibleLine
   termo: string
 }) {
   return (
-    <div className={cn('flex gap-3 px-3 py-0.5 hover:bg-muted/40', FUNDOS[linha.level])}>
+    <div className={cn('flex gap-3 px-3 py-0.5 hover:bg-muted/40', BACKGROUNDS[linha.level])}>
       <span className="shrink-0 text-muted-foreground/70 tabular-nums">{hora(linha.ts)}</span>
       {/* Fixed width so the messages stay in a single column: with automatic
           width, each different alias misaligned everything. */}
       <span className="w-12 shrink-0 truncate text-muted-foreground" title={linha.alias}>
         {linha.alias}
       </span>
-      <span className={cn('min-w-0 whitespace-pre-wrap break-words', CORES[linha.level])}>
-        <Realce texto={linha.msg} termo={termo} />
+      <span className={cn('min-w-0 whitespace-pre-wrap break-words', COLORS[linha.level])}>
+        <Highlighted texto={linha.msg} termo={termo} />
       </span>
     </div>
   )
@@ -141,20 +141,20 @@ const LinhaDeLog = memo(function LinhaDeLog({
  * which is the only form in which it exists.
  */
 export function Logs({ linhas, pastaDeLogs }: {
-  linhas: LinhaVisivel[]
+  linhas: VisibleLine[]
   /** Folder of the log files — enables the shortcut in the footer. */
   pastaDeLogs?: string
 }) {
-  const [busca, setBusca] = useState('')
-  const [ocultos, setOcultos] = useState<Set<Nivel>>(new Set())
-  const [exportado, setExportado] = useState<string | null>(null)
+  const [busca, setSearch] = useState('')
+  const [ocultos, setHidden] = useState<Set<Nivel>>(new Set())
+  const [exportado, setExported] = useState<string | null>(null)
   const areaRef = useRef<HTMLDivElement>(null)
   // Auto-scroll only while the user is at the end. Always scrolling would yank
   // the screen away from someone who scrolled up to read an old line — and a
   // new line arrives every second.
-  const [seguindo, setSeguindo] = useState(true)
-  const [limite, setLimite] = useState(JANELA)
-  // Position saved before growing the window — see `mostrarAnteriores`.
+  const [seguindo, setFollowing] = useState(true)
+  const [limite, setLimit] = useState(WINDOW_SIZE)
+  // Position saved before growing the window — see `showEarlier`.
   const ancora = useRef<{ altura: number; topo: number } | null>(null)
 
   const contagem = useMemo(() => {
@@ -198,10 +198,10 @@ export function Logs({ linhas, pastaDeLogs }: {
    * makes the screen jump and the line being read disappears — the opposite of
    * what the button promises.
    */
-  function mostrarAnteriores() {
+  function showEarlier() {
     const el = areaRef.current
     if (el) ancora.current = { altura: el.scrollHeight, topo: el.scrollTop }
-    setLimite((n) => n + JANELA)
+    setLimit((n) => n + WINDOW_SIZE)
   }
 
   // `useLayoutEffect` and not `useEffect`: scrolling after paint produces a
@@ -230,21 +230,21 @@ export function Logs({ linhas, pastaDeLogs }: {
   //
   // Depends on `termo`, not `busca`: it is the filtering that changes the
   // content, and it arrives one render after the keystroke.
-  useEffect(() => { setSeguindo(true); setLimite(JANELA) }, [termo, ocultos])
+  useEffect(() => { setFollowing(true); setLimit(WINDOW_SIZE) }, [termo, ocultos])
 
-  function aoRolar() {
+  function handleScroll() {
     const el = areaRef.current
     if (!el) return
     // 24px of tolerance: requiring the exact end makes wheel scrolling, which
     // moves in steps, turn off follow mode without the user having asked.
-    setSeguindo(el.scrollHeight - el.scrollTop - el.clientHeight < 24)
+    setFollowing(el.scrollHeight - el.scrollTop - el.clientHeight < 24)
   }
 
   function alternar(n: Nivel) {
     const novo = new Set(ocultos)
     if (novo.has(n)) novo.delete(n)
     else novo.add(n)
-    setOcultos(novo)
+    setHidden(novo)
   }
 
   async function exportar() {
@@ -254,7 +254,7 @@ export function Logs({ linhas, pastaDeLogs }: {
       .map((l) => `${hora(l.ts)} ${l.level.padEnd(5)} ${l.alias.padEnd(6)} ${l.msg}`)
       .join('\n')
     const caminho = await window.atlas.exportarLog(texto)
-    if (caminho) setExportado(caminho)
+    if (caminho) setExported(caminho)
   }
 
   const filtrando = Boolean(termo) || ocultos.size > 0
@@ -267,14 +267,14 @@ export function Logs({ linhas, pastaDeLogs }: {
           <TbSearch size={15} className="pointer-events-none absolute left-3 text-muted-foreground" />
           <Input
             value={busca}
-            onChange={(e) => setBusca(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar no log…"
             spellCheck={false}
             aria-label="Buscar no log"
             className="h-full pr-8 pl-9 select-text"
           />
           {busca && (
-            <button type="button" onClick={() => setBusca('')} aria-label="Limpar busca"
+            <button type="button" onClick={() => setSearch('')} aria-label="Limpar busca"
                     className="absolute right-2 rounded-sm p-1 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-ring/50 focus-visible:ring-2 animate-in fade-in-0 zoom-in-75 duration-150">
               <TbX size={14} />
             </button>
@@ -290,7 +290,7 @@ export function Logs({ linhas, pastaDeLogs }: {
       {/* Level chips on a row of their own: next to the search they wrapped
           to the line below in a narrow window and the alignment fell apart. */}
       <div className="flex flex-wrap items-center gap-1.5">
-        {NIVEIS.map((n) => {
+        {LEVELS.map((n) => {
           const escondido = ocultos.has(n)
           const total = contagem[n] ?? 0
           return (
@@ -310,7 +310,7 @@ export function Logs({ linhas, pastaDeLogs }: {
             >
               <span className={cn(
                 'size-1.5 shrink-0 rounded-full transition-opacity',
-                PONTOS[n], escondido && 'opacity-30',
+                DOTS[n], escondido && 'opacity-30',
               )} />
               <span className="font-mono">{n}</span>
               <span className={cn('tabular-nums', escondido ? 'opacity-60' : 'text-muted-foreground')}>
@@ -323,7 +323,7 @@ export function Logs({ linhas, pastaDeLogs }: {
         {filtrando && (
           <button
             type="button"
-            onClick={() => { setBusca(''); setOcultos(new Set()) }}
+            onClick={() => { setSearch(''); setHidden(new Set()) }}
             className="ml-1 text-[11px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
           >
             limpar filtros
@@ -353,22 +353,22 @@ export function Logs({ linhas, pastaDeLogs }: {
         ) : (
           <div
             ref={areaRef}
-            onScroll={aoRolar}
+            onScroll={handleScroll}
             // `log` brings the panel typography — see the rule in index.css.
             className="log flex min-h-0 flex-1 flex-col overflow-y-auto py-1.5 font-mono select-text"
           >
             {visiveis.length > limite && (
               <button
                 type="button"
-                onClick={mostrarAnteriores}
+                onClick={showEarlier}
                 className="mx-3 mb-1 rounded-md border border-dashed py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
               >
-                mostrar {Math.min(JANELA, visiveis.length - limite)} linha(s) anterior(es)
+                mostrar {Math.min(WINDOW_SIZE, visiveis.length - limite)} linha(s) anterior(es)
                 {' · '}{visiveis.length - limite} acima
               </button>
             )}
             {recorte.map((l) => (
-              <LinhaDeLog key={l.seq} linha={l} termo={termo} />
+              <LogRow key={l.seq} linha={l} termo={termo} />
             ))}
           </div>
         )}
@@ -378,7 +378,7 @@ export function Logs({ linhas, pastaDeLogs }: {
         {!seguindo && visiveis.length > 0 && (
           <button
             type="button"
-            onClick={() => setSeguindo(true)}
+            onClick={() => setFollowing(true)}
             className="absolute right-4 bottom-3 flex items-center gap-1.5 rounded-full border bg-popover px-3 py-1.5 text-xs font-medium shadow-md transition-colors hover:bg-accent"
           >
             <TbArrowDown size={13} /> Acompanhar o fim

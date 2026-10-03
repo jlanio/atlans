@@ -17,13 +17,13 @@
 import { useState } from 'react'
 import { cn } from '../lib/utils.js'
 
-type Semaforo = 'fechar' | 'minimizar' | 'maximizar'
+type TrafficLight = 'fechar' | 'minimizar' | 'maximizar'
 
 // macOS traffic-light colors. They are fixed values on purpose, not design
 // system tokens: the user recognizes this specific red/yellow/green as "window
 // controls", and swapping them for the product's terracotta palette would take
 // away precisely the familiarity that motivates using them.
-const CORES: Record<Semaforo, string> = {
+const COLORS: Record<TrafficLight, string> = {
   fechar: 'bg-[#ff5f57]',
   minimizar: 'bg-[#febc2e]',
   maximizar: 'bg-[#28c840]',
@@ -31,13 +31,13 @@ const CORES: Record<Semaforo, string> = {
 
 // Dark shade of the circle's own color, as on macOS: a black or white glyph
 // would clash with the colored background instead of settling into it.
-const TINTA: Record<Semaforo, string> = {
+const INK: Record<TrafficLight, string> = {
   fechar: '#7a0a04',
   minimizar: '#8a5a00',
   maximizar: '#0a5c17',
 }
 
-function Glifo({ tipo, maximizada }: { tipo: Semaforo; maximizada: boolean }) {
+function Glyph({ tipo, maximizada }: { tipo: TrafficLight; maximizada: boolean }) {
   const comum = {
     // `group-hover/semaforo` matches the `group/semaforo` of the button ITSELF —
     // each circle is its own group, so only the one under the cursor reveals
@@ -46,7 +46,7 @@ function Glifo({ tipo, maximizada }: { tipo: Semaforo; maximizada: boolean }) {
     // the circle.
     className:
       'pointer-events-none absolute inset-0 m-auto opacity-0 transition-opacity duration-150 group-hover/semaforo:opacity-100 group-focus-visible/semaforo:opacity-100',
-    stroke: TINTA[tipo],
+    stroke: INK[tipo],
     strokeWidth: 1.3,
     strokeLinecap: 'round' as const,
     fill: 'none',
@@ -73,7 +73,7 @@ function Glifo({ tipo, maximizada }: { tipo: Semaforo; maximizada: boolean }) {
 function Botao({
   tipo, rotulo, maximizada, aoClicar,
 }: {
-  tipo: Semaforo
+  tipo: TrafficLight
   rotulo: string
   maximizada: boolean
   aoClicar: () => void
@@ -100,10 +100,10 @@ function Botao({
         'transition-transform active:scale-90',
         'focus-visible:ring-ring/70 focus-visible:ring-2',
         'bg-clip-content',
-        CORES[tipo],
+        COLORS[tipo],
       )}
     >
-      <Glifo tipo={tipo} maximizada={maximizada} />
+      <Glyph tipo={tipo} maximizada={maximizada} />
     </button>
   )
 }
@@ -111,10 +111,10 @@ function Botao({
 export function TitleBar({ titulo }: { titulo?: string }) {
   // Only tracked to choose the label between "Maximizar" and "Restaurar" — the
   // button does not change appearance.
-  const [maximizada, setMaximizada] = useState(false)
+  const [maximizada, setMaximized] = useState(false)
 
-  const alternarMaximizar = () => {
-    void window.atlas.janela('alternar-maximizar').then(setMaximizada)
+  const toggleMaximize = () => {
+    void window.atlas.janela('alternar-maximizar').then(setMaximized)
   }
 
   return (
@@ -122,7 +122,7 @@ export function TitleBar({ titulo }: { titulo?: string }) {
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       // Double click on the bar toggles maximize — expected behavior on both
       // systems.
-      onDoubleClick={alternarMaximizar}
+      onDoubleClick={toggleMaximize}
       className="relative flex h-9 shrink-0 items-center justify-end border-b border-border/60 bg-sidebar px-3 select-none"
     >
       {/* Title centered in the WINDOW, not in the remaining space: `absolute`
@@ -137,7 +137,7 @@ export function TitleBar({ titulo }: { titulo?: string }) {
         <Botao tipo="minimizar" rotulo="Minimizar" maximizada={maximizada}
                aoClicar={() => void window.atlas.janela('minimizar')} />
         <Botao tipo="maximizar" rotulo={maximizada ? 'Restaurar' : 'Maximizar'} maximizada={maximizada}
-               aoClicar={alternarMaximizar} />
+               aoClicar={toggleMaximize} />
         <Botao tipo="fechar" rotulo="Fechar" maximizada={maximizada}
                aoClicar={() => void window.atlas.janela('fechar')} />
       </div>

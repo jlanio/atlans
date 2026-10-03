@@ -34,30 +34,30 @@ import { TbArrowUp, TbChevronUp, TbPlayerStopFilled, TbSparkles } from "react-ic
 import { Button } from "@/app/components/ui/button"
 import ExecActivity from "@/app/components/shared/exec-activity"
 import {
-  AvisoDeAnexosRecusados, ChipsDeAnexo, ConviteDeSoltura, comReferencia, sugestaoParaAnexos,
+  RejectedAttachmentsNotice, AttachmentChips, DropPrompt, comReferencia, suggestionForAttachments,
 } from "@/app/components/home/assistente/anexos"
 import { BotaoMais, ChipDeLocalizacao } from "@/app/components/home/assistente/mais"
-import { AvisoDeCotaCheia } from "@/app/components/home/assistente/aviso-de-cota"
-import { IndicadorDeEtapa, type Etapa } from "@/app/components/home/assistente/etapa"
-import UsoDaCota from "@/app/components/home/assistente/uso-da-cota"
+import { QuotaFullNotice } from "@/app/components/home/assistente/aviso-de-cota"
+import { IndicadorDeEtapa, type Stage } from "@/app/components/home/assistente/etapa"
+import QuotaUsage from "@/app/components/home/assistente/uso-da-cota"
 import MarcaAnimada from "@/app/components/home/assistente/marca-animada"
 import { usePrefereMenosMovimento } from "@/app/hooks/usePrefereMenosMovimento"
 import { useHomeStore } from "@/app/stores/homeStore"
 import { cn } from "@/lib/utils"
-import type { IAssistenteEstado } from "@/service/types"
-import { useIdiomaDaTela, useTextos } from "../i18n"
+import type { IAssistantState } from "@/service/types"
+import { useScreenLanguage, useTexts } from "../i18n"
 
-export type VarianteDaBarra = "hero" | "rodape"
+export type BarVariant = "hero" | "rodape"
 
 interface Props {
   enviar: (mensagem: string) => Promise<void> | void
   /** A stream is in progress — the hook's `enviar` returns silently. */
   correndo?: boolean
-  estado?: IAssistenteEstado | null
+  estado?: IAssistantState | null
   /** Returns focus to the field when the bar appeared via shortcut/button. */
   autoFoco?: boolean
   /** `hero` on the first visit; `rodape` after the first response. */
-  variante?: VarianteDaBarra
+  variante?: BarVariant
   /** Interrupts the stream: the stop button (and Esc, via HomeView). */
   parar?: () => void
   /** The panel opened and the bar is leaving: fade, no clicks, no stealing focus. */
@@ -73,7 +73,7 @@ interface Props {
   aoMedirExtras?: (altura: number) => void
   /** The current step of the response (reasoning or the tool in progress), shown
    *  in the footer while the assistant works. `null` when there is no step. */
-  etapa?: Etapa | null
+  etapa?: Stage | null
   /** Attaches files chosen via "+" (the same path as dragging). */
   aoAnexar?: (arquivos: File[]) => void
   /** Triggers the globe's location control (the "Usar minha localização" of "+"). */
@@ -84,8 +84,8 @@ export default function Barra({
   enviar, correndo = false, estado, autoFoco = false, variante = "rodape", parar, saindo = false,
   aoMedirExtras, etapa = null, aoAnexar, aoPedirLocalizacao,
 }: Props) {
-  const idioma = useIdiomaDaTela()
-  const t = useTextos().assistente
+  const idioma = useScreenLanguage()
+  const t = useTexts().assistente
   const sugestoes = t.barra.sugestoes
   const abrir = useHomeStore((s) => s.abrirPainel)
   // The draft lives in the store, shared with the panel: opening/collapsing (via
@@ -105,13 +105,13 @@ export default function Barra({
   // own). A DERIVED boolean on purpose: the position changes on every tick of
   // follow mode, but the extras' height only changes when the chip enters/leaves
   // — subscribing to the object re-rendered the bar (and re-measured) on every GPS tick.
-  const temLocalizacao = useHomeStore((s) => s.compartilharLocalizacao && s.localizacao !== null)
-  const campoRef = useRef<HTMLInputElement>(null)
+  const hasLocation = useHomeStore((s) => s.compartilharLocalizacao && s.localizacao !== null)
+  const inputRef = useRef<HTMLInputElement>(null)
   // The ruler of the extras above the box: its height becomes the strip's
   // clearance. Measured in layout (before paint) on every content change, and
   // observed for the line breaks only a resize causes.
   const extrasRef = useRef<HTMLDivElement>(null)
-  const [focado, setFocado] = useState(false)
+  const [focused, setFocused] = useState(false)
   // The send flash: turns on when sending, turns off at the end of the `::after`
   // animation (the element's own `animationend` — a child with an infinite
   // animation, like the cursor, never fires it). With reduced motion the animation
@@ -119,7 +119,7 @@ export default function Barra({
   const [flash, setFlash] = useState(false)
 
   useEffect(() => {
-    if (autoFoco) campoRef.current?.focus()
+    if (autoFoco) inputRef.current?.focus()
   }, [autoFoco])
 
   // The current step only in the footer: in the hero "Trabalhando…" already
@@ -129,7 +129,7 @@ export default function Barra({
   // `etapa` is a new object per render, and as a dep it would make the
   // measurement run on every frame of the stream; the HEIGHT only changes on
   // appear/disappear (the label truncates, it never wraps).
-  const mostrarEtapa = variante !== "hero" && etapa != null
+  const showStage = variante !== "hero" && etapa != null
 
   // Measures the extras on every content change (chips enter/leave, the
   // rejected warning opens/closes, the step appears/disappears). `useEffect`
@@ -138,7 +138,7 @@ export default function Barra({
   // this calculation prevents is the PERSISTENT overlap, not a one-frame one.
   useEffect(() => {
     if (extrasRef.current) aoMedirExtras?.(extrasRef.current.offsetHeight)
-  }, [aoMedirExtras, anexos, arrastando, mostrarEtapa, temLocalizacao])
+  }, [aoMedirExtras, anexos, arrastando, showStage, hasLocation])
 
   // Observes resize separately: with many chips the row wraps into more lines
   // when the window narrows, without `anexos` changing. Mounted once (stable
@@ -160,14 +160,14 @@ export default function Barra({
   // The question the attachments suggest, when there is one in the Drive. It takes
   // the place of the typed suggestions: offering "Mostre os focos de calor" to
   // someone who just dropped a shapefile is ignoring what the person did.
-  const sugestaoDeAnexo = sugestaoParaAnexos(anexos, idioma)
-  const temAnexoPronto = sugestaoDeAnexo !== null
+  const attachmentSuggestion = suggestionForAttachments(anexos, idioma)
+  const hasReadyAttachment = attachmentSuggestion !== null
   // There is something above the box (chips, rejected warning, the step, the location) or the invitation.
-  const temExtras = anexos.length > 0 || arrastando || mostrarEtapa || temLocalizacao
+  const hasExtras = anexos.length > 0 || arrastando || showStage || hasLocation
 
   // The typed suggestion only exists in the hero, with the field empty and nothing running.
-  const sugestaoVisivel = hero && rascunho === "" && !correndo && !estourou && !temAnexoPronto
-  const { texto: sugestao, indice } = useSugestaoDigitada(sugestaoVisivel, sugestoes)
+  const suggestionVisible = hero && rascunho === "" && !correndo && !estourou && !hasReadyAttachment
+  const { texto: sugestao, indice } = useTypedSuggestion(suggestionVisible, sugestoes)
 
   function submeter() {
     const digitado = rascunho.trim()
@@ -175,7 +175,7 @@ export default function Barra({
     // envia". With a ready attachment the suggestion is its own, and it applies in
     // BOTH variants: whoever dropped a file has already said what they want, even
     // outside the hero.
-    const texto = digitado || sugestaoDeAnexo || (sugestaoVisivel ? (sugestoes[indice] ?? "") : "")
+    const texto = digitado || attachmentSuggestion || (suggestionVisible ? (sugestoes[indice] ?? "") : "")
     if (!texto) return
     // With a stream in progress (or the quota exceeded) the hook's `enviar` returns
     // silently: the typed sentence vanished forever without any signal. Here the
@@ -198,26 +198,26 @@ export default function Barra({
       submeter()
       return
     }
-    if (e.key === "Tab" && !e.shiftKey && sugestaoVisivel) {
+    if (e.key === "Tab" && !e.shiftKey && suggestionVisible) {
       // Tab accepts the suggestion instead of leaving the field — that's what the hint promises.
       e.preventDefault()
       definirRascunho(sugestoes[indice] ?? "")
     }
   }
 
-  function escolherChip(chip: string) {
+  function pickChip(chip: string) {
     definirRascunho(chip)
-    campoRef.current?.focus()
+    inputRef.current?.focus()
   }
 
   const placeholder = correndo
     ? t.barra.respondendo
-    : sugestaoDeAnexo ?? t.barra.placeholder
+    : attachmentSuggestion ?? t.barra.placeholder
 
   return (
     <div className="home dark home-barra pb-safe" data-variante={variante} data-saindo={saindo} data-testid="barra">
       {estourou && cota && (
-        <AvisoDeCotaCheia
+        <QuotaFullNotice
           cota={cota}
           plano={estado?.plano}
           assinaturasAtivas={estado?.assinaturas_ativas}
@@ -234,16 +234,16 @@ export default function Barra({
           `mb` on the last child, the margin collapsed OUTSIDE the measured height,
           and the strip rose ~6 px too little — touching "Expandir" again. Empty,
           with no `pb`, it measures zero. */}
-      <div ref={extrasRef} className={cn("flex flex-col gap-1.5", temExtras && "pb-1.5")}>
-        <AvisoDeAnexosRecusados anexos={anexos} onFechar={descartarAnexosRecusados} />
+      <div ref={extrasRef} className={cn("flex flex-col gap-1.5", hasExtras && "pb-1.5")}>
+        <RejectedAttachmentsNotice anexos={anexos} onFechar={descartarAnexosRecusados} />
 
         {/* Above the box, not inside: it is a 44 px `rounded-full` (56 in the
             hero) and has no room for a row that wraps. */}
-        {arrastando && <ConviteDeSoltura className="justify-center" />}
-        <ChipsDeAnexo anexos={anexos} onRemover={removerAnexo} className="justify-center" />
+        {arrastando && <DropPrompt className="justify-center" />}
+        <AttachmentChips anexos={anexos} onRemover={removerAnexo} className="justify-center" />
         <ChipDeLocalizacao className="justify-center" />
         {/* The current step, while the assistant works. */}
-        {mostrarEtapa && etapa && <IndicadorDeEtapa etapa={etapa} className="justify-center px-1" />}
+        {showStage && etapa && <IndicadorDeEtapa etapa={etapa} className="justify-center px-1" />}
       </div>
 
       <div
@@ -263,21 +263,21 @@ export default function Barra({
         )}
         <div className="relative flex h-full min-w-0 flex-1 items-center">
           <input
-            ref={campoRef}
+            ref={inputRef}
             value={rascunho}
             onChange={(e) => definirRascunho(e.target.value)}
             onKeyDown={aoTeclar}
-            onFocus={() => setFocado(true)}
-            onBlur={() => setFocado(false)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             maxLength={8000}
             disabled={estourou}
             autoComplete="off"
-            placeholder={sugestaoVisivel ? "" : placeholder}
-            aria-describedby={sugestaoVisivel ? "home-barra-dica" : undefined}
+            placeholder={suggestionVisible ? "" : placeholder}
+            aria-describedby={suggestionVisible ? "home-barra-dica" : undefined}
             className="home-barra-campo w-full min-w-0 bg-transparent text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-60"
             aria-label={t.barra.rotuloDoCampo}
           />
-          {sugestaoVisivel && (
+          {suggestionVisible && (
             <span
               className="home-barra-sugestao pointer-events-none absolute inset-0 flex items-center overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground"
               aria-hidden="true"
@@ -314,7 +314,7 @@ export default function Barra({
           <Button
             size="icon"
             onClick={submeter}
-            disabled={(!rascunho.trim() && !sugestaoVisivel && !temAnexoPronto) || bloqueado}
+            disabled={(!rascunho.trim() && !suggestionVisible && !hasReadyAttachment) || bloqueado}
             // The press: sinks more than every button's `active:scale-[0.98]`.
             className="home-barra-btn shrink-0 rounded-full active:scale-90"
             aria-label={t.barra.enviar}
@@ -324,22 +324,22 @@ export default function Barra({
         )}
       </div>
 
-      {(cota != null || sugestaoVisivel) && (
+      {(cota != null || suggestionVisible) && (
         // The meta line under the box, on the right — the place of Claude Code's
         // context indicator, which was the owner's reference. The typing hint
         // (visible only with the cursor in the field; outside it, it stays in the
         // DOM for the screen reader, which is who doesn't see the typed sentence)
         // and the quota donut share the same line so they don't fight over the corner.
         <div className="home-barra-meta flex items-center justify-end gap-3 pr-2">
-          {sugestaoVisivel && (
+          {suggestionVisible && (
             <p
               id="home-barra-dica"
-              className={cn("text-[11px] text-muted-foreground/80", !focado && "sr-only")}
+              className={cn("text-[11px] text-muted-foreground/80", !focused && "sr-only")}
             >
               {t.barra.dica}
             </p>
           )}
-          {cota != null && <UsoDaCota cota={cota} />}
+          {cota != null && <QuotaUsage cota={cota} />}
         </div>
       )}
 
@@ -364,7 +364,7 @@ export default function Barra({
             <button
               key={chip}
               type="button"
-              onClick={() => escolherChip(chip)}
+              onClick={() => pickChip(chip)}
               className="rounded-full border border-white/10 bg-background/60 px-3 py-1.5 text-[12.5px] text-[#cfcfcf] backdrop-blur hover:border-primary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:min-h-10"
             >
               {chip}
@@ -382,40 +382,40 @@ export default function Barra({
  * resuming (the person typed and erased) continues from where it was. With
  * reduced motion, the whole sentence, static.
  */
-function useSugestaoDigitada(ativa: boolean, sugestoes: readonly string[]): { texto: string; indice: number } {
-  const [indice, setIndice] = useState(0)
-  const [pos, setPos] = useState(0)
-  const [apagando, setApagando] = useState(false)
-  const reduz = usePrefereMenosMovimento()
+function useTypedSuggestion(ativa: boolean, sugestoes: readonly string[]): { texto: string; indice: number } {
+  const [indice, setIndex] = useState(0)
+  const [pos, setPosition] = useState(0)
+  const [apagando, setErasing] = useState(false)
+  const reducedMotion = usePrefereMenosMovimento()
 
   useEffect(() => {
-    if (!ativa || reduz) return
+    if (!ativa || reducedMotion) return
     const alvo = sugestoes[indice] ?? ""
     let atraso: number
     let passo: () => void
     if (!apagando) {
       if (pos >= alvo.length) {
         atraso = 2300
-        passo = () => setApagando(true)
+        passo = () => setErasing(true)
       } else {
         atraso = 26 + Math.random() * 30
-        passo = () => setPos((p) => p + 1)
+        passo = () => setPosition((p) => p + 1)
       }
     } else if (pos === 0) {
       atraso = 420
       passo = () => {
-        setApagando(false)
-        setIndice((i) => (i + 1) % sugestoes.length)
+        setErasing(false)
+        setIndex((i) => (i + 1) % sugestoes.length)
       }
     } else {
       atraso = 14
-      passo = () => setPos((p) => Math.max(0, p - 1))
+      passo = () => setPosition((p) => Math.max(0, p - 1))
     }
     const timer = setTimeout(passo, atraso)
     return () => clearTimeout(timer)
-  }, [ativa, reduz, indice, pos, apagando, sugestoes])
+  }, [ativa, reducedMotion, indice, pos, apagando, sugestoes])
 
   const alvo = sugestoes[indice] ?? ""
-  const texto = reduz ? alvo : alvo.slice(0, pos)
+  const texto = reducedMotion ? alvo : alvo.slice(0, pos)
   return { texto, indice }
 }

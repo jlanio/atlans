@@ -24,14 +24,14 @@ def _prop(name="inputsMapping", default=None):
 
 # ── The case that used to break ──────────────────────────────────────────────
 
-def test_dict_serializado_pela_ui_e_aceito():
+def test_dict_serialized_by_the_ui_is_accepted():
     out = validate_node_parameters(
         {"inputsMapping": '{"geometry": "camada_wfs"}'}, _prop(),
     )
     assert out["inputsMapping"] == {"geometry": "camada_wfs"}
 
 
-def test_lista_serializada_e_aceita():
+def test_serialized_list_is_accepted():
     """`ports` declara type "object" mas o valor legitimo e lista."""
     out = validate_node_parameters(
         {"ports": '["geometry", "buffer_m"]'}, _prop("ports", default=[]),
@@ -39,7 +39,7 @@ def test_lista_serializada_e_aceita():
     assert out["ports"] == ["geometry", "buffer_m"]
 
 
-def test_string_vazia_vira_objeto_vazio():
+def test_empty_string_becomes_empty_object():
     """A field cleared in the UI must not bring down the run."""
     out = validate_node_parameters({"inputsMapping": ""}, _prop())
     assert out["inputsMapping"] == {}
@@ -47,29 +47,29 @@ def test_string_vazia_vira_objeto_vazio():
 
 # ── Comportamento preservado ─────────────────────────────────────────────────
 
-def test_dict_nativo_continua_passando():
+def test_native_dict_still_passes():
     out = validate_node_parameters({"inputsMapping": {"a": "b"}}, _prop())
     assert out["inputsMapping"] == {"a": "b"}
 
 
-def test_lista_nativa_continua_passando():
+def test_native_list_still_passes():
     out = validate_node_parameters({"ports": ["a"]}, _prop("ports", default=[]))
     assert out["ports"] == ["a"]
 
 
 # ── Invalid input is still rejected ──────────────────────────────────────────
 
-def test_json_malformado_falha_citando_o_valor():
+def test_malformed_json_fails_citing_the_value():
     with pytest.raises(ValueError, match="JSON válido"):
         validate_node_parameters({"inputsMapping": "{isto nao e json"}, _prop())
 
 
-def test_json_escalar_e_recusado():
+def test_scalar_json_is_rejected():
     """'123' decodes, but it is not a structure — it cannot become an object parameter."""
     with pytest.raises(ValueError, match="objeto"):
         validate_node_parameters({"inputsMapping": "123"}, _prop())
 
 
-def test_tipo_incompativel_e_recusado():
+def test_incompatible_type_is_rejected():
     with pytest.raises(ValueError, match="Tipo recebido: int"):
         validate_node_parameters({"inputsMapping": 42}, _prop())

@@ -6,7 +6,7 @@ import Cookies from "js-cookie";
 
 // On the server there is no layout to measure and React warns on every render.
 // The choice is constant per environment, so it does not break hook order.
-const useEfeitoDeLayout = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 type Theme = "light" | "dark";
 
@@ -36,7 +36,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   // nobody sees it. (Eliminating it altogether requires the layout to pass the
   // theme resolved on the server as a prop, which cannot be done from here
   // alone.)
-  useEfeitoDeLayout(() => {
+  useIsomorphicLayoutEffect(() => {
     const resolvido: Theme = document.documentElement.classList.contains("dark") ? "dark" : "light";
     setThemeState(resolvido);
   }, []);

@@ -44,12 +44,12 @@ async def db():
             tables=[User.__table__, Workspace.__table__, WorkspaceMember.__table__],
         )
     async with async_sessionmaker(engine, expire_on_commit=False)() as sessao:
-        await _semear(sessao)
+        await _seed(sessao)
         yield sessao
     await engine.dispose()
 
 
-async def _semear(sessao) -> None:
+async def _seed(sessao) -> None:
     """Two users, six workspaces.
 
     u-dono  owns "Zeta" (and is ALSO a "viewer" member of it), "Beta"
@@ -62,10 +62,10 @@ async def _semear(sessao) -> None:
     from app.models.workspace import Workspace
     from app.models.workspace_member import WorkspaceMember
 
-    def _usuario(id_hash: str) -> User:
+    def _user(id_hash: str) -> User:
         return User(id_hash=id_hash, username=id_hash, email=f"{id_hash}@teste", hashed_password="x")
 
-    sessao.add_all([_usuario("u-dono"), _usuario("u-outro")])
+    sessao.add_all([_user("u-dono"), _user("u-outro")])
     sessao.add_all([
         Workspace(id_hash="ws-zeta", name="Zeta", owner_id="u-dono", description="o principal"),
         Workspace(id_hash="ws-beta", name="Beta", owner_id="u-dono", is_default=True),
@@ -82,40 +82,40 @@ async def _semear(sessao) -> None:
     await sessao.commit()
 
 
-async def test_dono_vence_membro_na_dedup(db):
+async def test_owner_beats_member_in_dedup(db):
     lista = await listar_workspaces_do_usuario(db, "u-dono")
     zetas = [w for w in lista if w.id_hash == "ws-zeta"]
     assert len(zetas) == 1
     assert zetas[0].my_role == "owner"          # the "viewer" row in WorkspaceMember does not demote
 
 
-async def test_lixeira_fica_de_fora_para_dono_e_para_membro(db):
+async def test_trash_is_left_out_for_owner_and_member(db):
     ids = {w.id_hash for w in await listar_workspaces_do_usuario(db, "u-dono")}
     assert "ws-lixo" not in ids                 # theirs, in the trash
     assert "ws-lixo-comp" not in ids            # is operator, but the workspace was deleted
     assert "ws-omega" not in ids                # neither owner nor member
 
 
-async def test_ordem_proprios_por_nome_depois_compartilhados_por_nome(db):
+async def test_order_own_by_name_then_shared_by_name(db):
     """Not a global ordering: "Alfa" (shared) comes AFTER "Zeta" (own)."""
     nomes = [w.name for w in await listar_workspaces_do_usuario(db, "u-dono")]
     assert nomes == ["Beta", "Zeta", "Alfa"]
 
 
-async def test_my_role_is_default_e_campos_ecoados(db):
-    por_id = {w.id_hash: w for w in await listar_workspaces_do_usuario(db, "u-dono")}
-    assert por_id["ws-alfa"].my_role == "editor"
-    assert por_id["ws-alfa"].owner_id == "u-outro"
-    assert por_id["ws-beta"].is_default is True
-    assert por_id["ws-zeta"].is_default is False
-    assert por_id["ws-zeta"].description == "o principal"
+async def test_my_role_is_default_and_echoed_fields(db):
+    by_task_id = {w.id_hash: w for w in await listar_workspaces_do_usuario(db, "u-dono")}
+    assert by_task_id["ws-alfa"].my_role == "editor"
+    assert by_task_id["ws-alfa"].owner_id == "u-outro"
+    assert by_task_id["ws-beta"].is_default is True
+    assert by_task_id["ws-zeta"].is_default is False
+    assert by_task_id["ws-zeta"].description == "o principal"
 
 
-async def test_usuario_sem_workspaces_recebe_lista_vazia(db):
+async def test_user_without_workspaces_gets_empty_list(db):
     assert await listar_workspaces_do_usuario(db, "u-ninguem") == []
 
 
-async def test_rota_de_listagem_ecoa_o_que_o_service_devolve(client):
+async def test_listing_route_echoes_what_the_service_returns(client):
     """`GET /workspaces` is a shell: the body is the service's list, untouched.
 
     The route is really exercised (the real app, through the conftest's `client`) and the

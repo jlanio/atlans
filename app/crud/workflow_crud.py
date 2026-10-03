@@ -10,10 +10,10 @@ from app.core.utils.logger import get_logger
 # The name of the UNIQUE (workflow_hash, version_number). Stable in the three
 # places that define it: `app/models/workflow_version.py`, the initial migration
 # and `scripts/init_schema.sql`.
-_NOME_DA_UNIQUE_DE_VERSAO = "uq_workflow_version"
+_VERSION_UNIQUE_CONSTRAINT_NAME = "uq_workflow_version"
 
 
-def _e_colisao_de_versao(exc: IntegrityError) -> bool:
+def _is_version_collision(exc: IntegrityError) -> bool:
     """Is the violation the one from the UNIQUE (workflow_hash, version_number)?
 
     Two ways to recognize it, because the two databases say different things:
@@ -31,15 +31,15 @@ def _e_colisao_de_versao(exc: IntegrityError) -> bool:
     in each database.
     """
     texto = str(getattr(exc, "orig", exc)).lower()
-    if _NOME_DA_UNIQUE_DE_VERSAO in texto:
+    if _VERSION_UNIQUE_CONSTRAINT_NAME in texto:
         return True
     return "unique" in texto and "version_number" in texto
 
 # Three attempts cover real contention (simultaneous saves of the same workflow).
 # Exhausting all three is not "more bad luck": it signals something else, and becomes a 409.
-_TENTATIVAS_DE_VERSAO = 3
+_VERSION_ATTEMPTS = 3
 
-def _tem_node(nome: str, rotulo: str):
+def _has_node(nome: str, rotulo: str):
     """Listing flag: the definition mentions a node with this name.
 
     Searches the text of `definition['nodes']` — does not bring the JSON into
@@ -65,7 +65,7 @@ def _tem_node(nome: str, rotulo: str):
     ).label(rotulo)
 
 
-_has_publish_map_expr = _tem_node("PublishMap", "has_publish_map")
+_has_publish_map_expr = _has_node("PublishMap", "has_publish_map")
 
 # A workflow that exists to be CALLED by another: it declares the public
 # sub-workflow output. `SubWorkflowOutput` is the only mandatory node of the
@@ -74,21 +74,21 @@ _has_publish_map_expr = _tem_node("PublishMap", "has_publish_map")
 #
 # Worth flagging in the listing because a sub-workflow usually has NO trigger:
 # running it alone from the list's button does not do what one expects.
-_e_subfluxo_expr = _tem_node("SubWorkflowOutput", "is_subworkflow")
+_e_subfluxo_expr = _has_node("SubWorkflowOutput", "is_subworkflow")
 
 # Triggers, by the same mechanism. They are the workflow's nature ("how it
 # fires"), not execution — that is why they go in the listing and not in metrics.
 # The names are the ones registered in `flow/nodes/trigger/*` (`get_definition()['name']`).
 #
-# Accepted substring collisions, besides the general ones of `_tem_node`: a node
+# Accepted substring collisions, besides the general ones of `_has_node`: a node
 # whose name CONTAINS the one searched for also flags — "GeofenceTrigger" matches
 # the `GeofenceTriggerNode` class if the registered name ever changes to it, which
 # is the desired result; today there is no registered node that contains
 # "FileTrigger", "WebhookTrigger" or "ScheduleTrigger" without being the trigger itself.
-_has_webhook_trigger_expr = _tem_node("WebhookTrigger", "has_webhook_trigger")
-_has_schedule_trigger_expr = _tem_node("ScheduleTrigger", "has_schedule_trigger")
-_has_file_trigger_expr = _tem_node("FileTrigger", "has_file_trigger")
-_has_geofence_trigger_expr = _tem_node("GeofenceTrigger", "has_geofence_trigger")
+_has_webhook_trigger_expr = _has_node("WebhookTrigger", "has_webhook_trigger")
+_has_schedule_trigger_expr = _has_node("ScheduleTrigger", "has_schedule_trigger")
+_has_file_trigger_expr = _has_node("FileTrigger", "has_file_trigger")
+_has_geofence_trigger_expr = _has_node("GeofenceTrigger", "has_geofence_trigger")
 
 # Light columns for listing — excludes definition, pinned_outputs, pin_metadata,
 # params_schema. `deleted_at` is also left out: both queries that use this
@@ -142,14 +142,14 @@ class WorkflowCRUD:
     # just the tenant's.
 
     async def get_all_metadata(
-        self, workspace_id: str | None = None, *, incluir_do_assistente: bool = False,
+        self, workspace_id: str | None = None, *, include_from_assistant: bool = False,
     ):
         """Returns workflows WITHOUT the heavy JSON fields (definition, pinned_outputs, etc.).
         Ideal for listing — saves ~10KB per workflow.
 
         By default hides the assistant's workflows (`origem = "assistente"`):
         they are a delivery vehicle for Home, not items the owner manages. Who
-        passes `incluir_do_assistente=True` today: `ActiveRunsContext` (needs
+        passes `include_from_assistant=True` today: `ActiveRunsContext` (needs
         the names for the run badge), the `list_workflows` tool when the caller
         is the assistant itself, and the `GET /workflows?assistente=1` route.
 
@@ -158,9 +158,9 @@ class WorkflowCRUD:
         does not filter by `origem`. Until both sides agree, an assistant
         workflow shows up in History and in metrics without existing in
         Projects. Its schedules show up on purpose, with a badge — see
-        `schedule_service.listar_agendamentos_de`."""
+        `schedule_service.list_schedules_for`."""
         stmt = select(*_METADATA_COLUMNS).where(Workflow.deleted_at.is_(None))
-        if not incluir_do_assistente:
+        if not include_from_assistant:
             stmt = stmt.where(Workflow.origem != "assistente")
         if workspace_id:
             stmt = stmt.where(Workflow.workspace_id == workspace_id)
@@ -168,7 +168,7 @@ class WorkflowCRUD:
         return result.mappings().all()
 
     async def get_all_metadata_by_workspace_ids(
-        self, workspace_ids: list[str], *, incluir_do_assistente: bool = False,
+        self, workspace_ids: list[str], *, include_from_assistant: bool = False,
     ):
         """Returns workflows (metadata only) from the given workspaces.
 
@@ -177,7 +177,7 @@ class WorkflowCRUD:
             Workflow.deleted_at.is_(None),
             Workflow.workspace_id.in_(workspace_ids),
         )
-        if not incluir_do_assistente:
+        if not include_from_assistant:
             stmt = stmt.where(Workflow.origem != "assistente")
         result = await self.db.execute(stmt)
         return result.mappings().all()
@@ -222,7 +222,7 @@ class WorkflowCRUD:
         definition: dict,
         change_note: str | None = None,
         *,
-        tentativas: int = _TENTATIVAS_DE_VERSAO,
+        tentativas: int = _VERSION_ATTEMPTS,
     ) -> WorkflowVersion:
         """Automatic snapshot: saves the CURRENT version before an update.
 
@@ -233,7 +233,7 @@ class WorkflowCRUD:
 
         **The window is not that of one INSERT.** Since this function only does
         `flush()` (the commit belongs to the caller, on purpose — see
-        `workflow_move_service._aplicar`, which depends on it to undo everything
+        `workflow_move_service._apply`, which depends on it to undo everything
         together), it runs from the `SELECT max()` to the commit further on,
         covering everything the caller does in between.
 
@@ -243,7 +243,7 @@ class WorkflowCRUD:
         Without `begin_nested`, catching the error does not fix it — it only
         swaps the 500 for a `PendingRollbackError` on the next commit. Same
         reason, and same mold, as `_upsert_pin_artifact`
-        (`app/core/run_result_consumer.py`), `api_token_service.marcar_uso` and
+        (`app/core/run_result_consumer.py`), `api_token_service.mark_used` and
         `credential_loader`.
 
         Why NOT `SELECT ... FOR UPDATE` on the workflow row: `FOR UPDATE`
@@ -276,7 +276,7 @@ class WorkflowCRUD:
                     await self.db.flush()   # gets the ID without a separate commit
                 return version
             except IntegrityError as exc:
-                if not _e_colisao_de_versao(exc):
+                if not _is_version_collision(exc):
                     raise
                 # There is no `expunge(version)` here, and its absence is measured: the
                 # SAVEPOINT rollback already removes from the session the object

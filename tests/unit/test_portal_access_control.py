@@ -29,7 +29,7 @@ def _req(auth=None):
 # ── enforce_portal_access: o gate ────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_portal_inexistente_404():
+async def test_missing_portal_404():
     with pytest.raises(HTTPException) as e:
         await enforce_portal_access(None, _req())
     assert e.value.status_code == 404
@@ -43,19 +43,19 @@ async def test_disabled_404():
 
 
 @pytest.mark.asyncio
-async def test_public_passa_sem_token():
+async def test_public_passes_without_token():
     await enforce_portal_access(_wf(access="public"), _req())  # does not raise
 
 
 @pytest.mark.asyncio
-async def test_private_sem_token_401():
+async def test_private_without_token_401():
     with pytest.raises(HTTPException) as e:
         await enforce_portal_access(_wf(access="private"), _req())
     assert e.value.status_code == 401
 
 
 @pytest.mark.asyncio
-async def test_private_usuario_nao_autorizado_403():
+async def test_private_unauthorized_user_403():
     wf = _wf(access="private", shared=["alice"])
     with patch("app.core.utils.jwt_utils.decode_token",
                return_value={"type": "access", "sub": "bob", "username": "bob"}), \
@@ -67,7 +67,7 @@ async def test_private_usuario_nao_autorizado_403():
 
 
 @pytest.mark.asyncio
-async def test_private_usuario_autorizado_passa():
+async def test_private_authorized_user_passes():
     wf = _wf(access="private", shared=["alice"])
     with patch("app.core.utils.jwt_utils.decode_token",
                return_value={"type": "access", "sub": "u-1", "username": "Alice"}), \
@@ -77,7 +77,7 @@ async def test_private_usuario_autorizado_passa():
 
 
 @pytest.mark.asyncio
-async def test_private_refresh_token_recusado():
+async def test_private_refresh_token_rejected():
     """A token that is not an access token (e.g. refresh) is not valid on the portal."""
     wf = _wf(access="private", shared=["alice"])
     with patch("app.core.utils.jwt_utils.decode_token",
@@ -88,7 +88,7 @@ async def test_private_refresh_token_recusado():
 
 
 @pytest.mark.asyncio
-async def test_private_token_blacklistado_recusado():
+async def test_private_blacklisted_token_rejected():
     """A token revoked at logout cannot access a private portal (defense in depth)."""
     wf = _wf(access="private", shared=["u-1"])
     with patch("app.core.utils.jwt_utils.decode_token",
@@ -103,7 +103,7 @@ async def test_private_token_blacklistado_recusado():
 # ── Wiring: os endpoints chamam o gate ───────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_download_endpoint_bloqueia_portal_privado(client):
+async def test_download_endpoint_blocks_private_portal(client):
     """download_portal_layer resolve o workflow dono e aplica o gate."""
     from app.main import app
     from app.api.dependencies import get_db
@@ -134,7 +134,7 @@ async def test_download_endpoint_bloqueia_portal_privado(client):
 
 
 @pytest.mark.asyncio
-async def test_tile_endpoint_bloqueia_portal_privado(client):
+async def test_tile_endpoint_blocks_private_portal(client):
     """The tile resolves gate + layer in a single query, and the gate still holds.
 
     Each pan/zoom requests dozens of tiles; before, each one made two metadata

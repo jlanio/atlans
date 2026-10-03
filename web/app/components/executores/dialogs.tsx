@@ -131,7 +131,7 @@ function Stepper({ steps, current }: { steps: string[]; current: number }) {
  * workspaces. Without this the admin saw a generic toast and had no way to
  * purge an old executor; with this they know the cost and decide.
  */
-export function ConflitoDePolitica({ workspaces, acao }: { workspaces: string[]; acao: "revogar" | "remover" }) {
+export function PolicyConflict({ workspaces, acao }: { workspaces: string[]; acao: "revogar" | "remover" }) {
   return (
     <p
       role="alert"
@@ -245,7 +245,7 @@ export function CreateAgentDialog({ onCreated, executores, isAdmin, quota, owned
             (the Docker command of the Conectar step) forces the grid width above
             `max-w-lg` and overflows/clips the modal instead of fitting. */}
         <div key={step} className="min-w-0 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200">
-          {/* ── Passo 1: Configurar ─────────────────────────────────────────── */}
+          {/* ── Step 1: Configurar ─────────────────────────────────────────── */}
           {step === 1 && (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
@@ -330,7 +330,7 @@ export function CreateAgentDialog({ onCreated, executores, isAdmin, quota, owned
             </div>
           )}
 
-          {/* ── Passo 2: Conectar ───────────────────────────────────────────── */}
+          {/* ── Step 2: Conectar ───────────────────────────────────────────── */}
           {step === 2 && (
             generating && !otp ? (
               <div className="py-10 text-center text-sm text-muted-foreground">Preparando o vínculo…</div>
@@ -380,7 +380,7 @@ export function EditAgentDialog({ executor, onUpdated }: { executor: IExecutor; 
   })
 
   // The button and Enter follow the same rule: a name with at least 2 characters.
-  const podeSalvar = name.trim().length >= 2
+  const canSave = name.trim().length >= 2
 
   function handleClose(val: boolean) {
     if (!val) { setName(executor.name); setDescription(executor.description ?? "") }
@@ -408,7 +408,7 @@ export function EditAgentDialog({ executor, onUpdated }: { executor: IExecutor; 
               id="edit-ag-name"
               value={name}
               onChange={e => setName(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && podeSalvar && acao.executar()}
+              onKeyDown={e => e.key === "Enter" && canSave && acao.executar()}
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -424,7 +424,7 @@ export function EditAgentDialog({ executor, onUpdated }: { executor: IExecutor; 
 
         <DialogFooter>
           <Button variant="outline" disabled={acao.executando} onClick={() => handleClose(false)}>Cancelar</Button>
-          <Button onClick={acao.executar} disabled={!podeSalvar || acao.executando}>
+          <Button onClick={acao.executar} disabled={!canSave || acao.executando}>
             {acao.executando ? "Salvando…" : "Salvar"}
           </Button>
         </DialogFooter>
@@ -438,27 +438,27 @@ export function EditAgentDialog({ executor, onUpdated }: { executor: IExecutor; 
 /**
  * The action cycle of revoke and remove, with the execution policy 409 in
  * place of a toast: this executor is the ONLY primary of some workspace.
- * The screen says WHICH ones (`ConflitoDePolitica`) and the next confirmation
+ * The screen says WHICH ones (`PolicyConflict`) and the next confirmation
  * goes with `force` — the "… mesmo assim" (anyway). A single copy for both
  * dialogs, which repeated this handling line by line.
  *
  * The conflict is not cleared on close (as before): reopening shows the
  * warning from the previous attempt and already offers the "mesmo assim".
  */
-function useAcaoComConflito(
+function useActionWithConflict(
   acao: (force: boolean) => Promise<IResponse<unknown>>,
   textos: { sucesso: string; erro: string; aoConcluir: () => void },
 ) {
-  const [conflito, setConflito] = useState<string[] | null>(null)
+  const [conflito, setConflict] = useState<string[] | null>(null)
   const dialogo = useAcaoDeDialogo(() => acao(conflito !== null), {
     sucesso: textos.sucesso,
     erro: (mensagem, erro) => {
       if (erro.code !== "workspace_policy_conflict") return [textos.erro, mensagem]
-      setConflito((erro.workspaces ?? []).map(w => w.workspace_name))
+      setConflict((erro.workspaces ?? []).map(w => w.workspace_name))
       return null
     },
     aoConcluir: () => {
-      setConflito(null)
+      setConflict(null)
       textos.aoConcluir()
     },
   })
@@ -468,7 +468,7 @@ function useAcaoComConflito(
 // ── Revocation dialog ─────────────────────────────────────────────────────────
 
 export function RevokeAgentDialog({ executor, onRevoked }: { executor: IExecutor; onRevoked: () => void }) {
-  const acao = useAcaoComConflito(
+  const acao = useActionWithConflict(
     force => GisFlowService.revokeAgent(executor.id_hash, force),
     { sucesso: "Executor revogado.", erro: "Erro ao revogar executor", aoConcluir: onRevoked },
   )
@@ -501,7 +501,7 @@ export function RevokeAgentDialog({ executor, onRevoked }: { executor: IExecutor
         onConfirm={acao.executar}
       >
         {acao.conflito && (
-          <ConflitoDePolitica workspaces={acao.conflito} acao="revogar" />
+          <PolicyConflict workspaces={acao.conflito} acao="revogar" />
         )}
       </DeleteDialog>
     </Dialog>
@@ -511,7 +511,7 @@ export function RevokeAgentDialog({ executor, onRevoked }: { executor: IExecutor
 // ── Removal dialog (soft-delete) ─────────────────────────────────────────────
 
 export function DeleteAgentDialog({ executor, onDeleted }: { executor: IExecutor; onDeleted: () => void }) {
-  const acao = useAcaoComConflito(
+  const acao = useActionWithConflict(
     force => GisFlowService.deleteAgent(executor.id_hash, force),
     { sucesso: "Executor removido.", erro: "Erro ao remover executor", aoConcluir: onDeleted },
   )
@@ -542,7 +542,7 @@ export function DeleteAgentDialog({ executor, onDeleted }: { executor: IExecutor
         onConfirm={acao.executar}
       >
         {acao.conflito && (
-          <ConflitoDePolitica workspaces={acao.conflito} acao="remover" />
+          <PolicyConflict workspaces={acao.conflito} acao="remover" />
         )}
       </DeleteDialog>
     </Dialog>

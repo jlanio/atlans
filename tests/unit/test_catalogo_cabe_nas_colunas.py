@@ -27,7 +27,7 @@ from pathlib import Path
 
 import pytest
 
-from app.models.fonte_de_dados import FonteDeDados
+from app.models.fonte_de_dados import DataSource
 from app.services import fontes_service as fs
 from app.services import fontes_vault
 
@@ -43,22 +43,22 @@ DO_VAULT = ("instituicao", "grupo", "titulo", "type_name", "url")
 def _registros():
     if not CATALOGO.is_dir():
         pytest.skip(f"catálogo não está neste checkout ({CATALOGO})")
-    return [r for r in fontes_vault.ler_pasta(CATALOGO) if not isinstance(r, fontes_vault.Ignorada)]
+    return [r for r in fontes_vault.read_folder(CATALOGO) if not isinstance(r, fontes_vault.Skipped)]
 
 
-def test_o_catalogo_versionado_cabe_nas_colunas():
+def test_the_versioned_catalog_fits_the_columns():
     """No LIMITED field of the real catalog exceeds what Postgres accepts."""
     registros = _registros()
     assert len(registros) > 1000, "o catálogo veio vazio — o teste não estaria conferindo nada"
 
     # Only those the COLUMN limits. `titulo`, `descricao` and `dicas` are TEXT and
     # return `None` here — if one of them becomes VARCHAR again, it gets in on its own.
-    limitados = {c: fs._limite(c) for c in DO_VAULT if fs._limite(c) is not None}
-    assert limitados, "nenhum campo limitado — o teste não estaria conferindo nada"
+    limited = {c: fs._column_limit(c) for c in DO_VAULT if fs._column_limit(c) is not None}
+    assert limited, "nenhum campo limitado — o teste não estaria conferindo nada"
 
     estouros: list[str] = []
     for registro in registros:
-        for campo, limite in limitados.items():
+        for campo, limite in limited.items():
             valor = getattr(registro, campo, None)
             if limite is not None and valor is not None and len(str(valor)) > limite:
                 estouros.append(
@@ -74,7 +74,7 @@ def test_o_catalogo_versionado_cabe_nas_colunas():
     )
 
 
-def test_o_titulo_de_fato_precisa_de_TEXT():
+def test_the_title_really_needs_TEXT():
     """The premise of `titulo` as TEXT (scripts/init_schema.sql; the historical
     migration `a3c81d7e2f46` made the change), pinned against the real data.
 
@@ -85,4 +85,4 @@ def test_o_titulo_de_fato_precisa_de_TEXT():
     registros = _registros()
     longos = [r for r in registros if r.titulo and len(r.titulo) > 255]
     assert longos, "nenhum título passa de 255 — reveja se TEXT ainda se justifica"
-    assert FonteDeDados.__table__.c["titulo"].type.__class__.__name__ == "Text"
+    assert DataSource.__table__.c["titulo"].type.__class__.__name__ == "Text"

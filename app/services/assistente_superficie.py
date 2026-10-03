@@ -45,7 +45,7 @@ from app.services.assistente_service import (
     EstadoDoLaco,
     Evento,
     Superficie,
-    _resumo,
+    _summarize,
 )
 
 logger = get_logger("app.agente.superficie")
@@ -86,16 +86,16 @@ FERRAMENTA_DO_GLOBO: dict[str, Any] = {
 }
 
 
-async def _exibir_no_globo(argumentos: Any, estado: EstadoDoLaco) -> tuple[str, bool]:
+async def _show_on_globe(argumentos: Any, estado: EstadoDoLaco) -> tuple[str, bool]:
     """Validates the arguments and returns the text the model reads. Does not go to the server.
 
-    Does NOT emit the `camada` frame here: what builds it is `_quadros_da_home`,
+    Does NOT emit the `camada` frame here: what builds it is `_home_frames`,
     from the `argumentos`. An `emitir` from here would go out on the SSE and
     vanish in the replay (which only re-runs `quadros_extras`), and the layer
     would disappear from the globe when the chat is reopened. A single path
     serves both.
     """
-    aid = _artefato_pedido(argumentos)
+    aid = _requested_artifact(argumentos)
     if aid is None:
         return ("`artifact_id` precisa ser o id de um artefato de execução.", True)
     return (
@@ -105,14 +105,14 @@ async def _exibir_no_globo(argumentos: Any, estado: EstadoDoLaco) -> tuple[str, 
     )
 
 
-def _artefato_pedido(argumentos: Any) -> str | None:
+def _requested_artifact(argumentos: Any) -> str | None:
     aid = argumentos.get("artifact_id") if isinstance(argumentos, dict) else None
     if not isinstance(aid, str) or not aid.strip():
         return None
     return aid.strip()
 
 
-def _quadro_do_globo(argumentos: Any) -> list[Evento]:
+def _globe_frame(argumentos: Any) -> list[Evento]:
     """The `camada` frame of a successful `exibir_no_globo`.
 
     `available=True` on purpose: the frame is a POINTER and the truth is
@@ -120,7 +120,7 @@ def _quadro_do_globo(argumentos: Any) -> list[Evento]:
     normalize it as `False` and draw the warning card ("sem prévia no globo",
     no preview on the globe) while the layer was showing on the globe.
     """
-    aid = _artefato_pedido(argumentos)
+    aid = _requested_artifact(argumentos)
     if aid is None:
         return []
     dados: dict[str, Any] = {"artifact_id": aid, "available": True}
@@ -133,14 +133,14 @@ def _quadro_do_globo(argumentos: Any) -> list[Evento]:
 # ── Quick replies: `sugerir_respostas` ───────────────────────────────────────
 # The Home's second LOCAL tool, modeled on `exibir_no_globo`: it does not go to
 # the server, is not in `GUARDAS`, and the frame (`respostas_rapidas`) is born
-# from the ARGUMENTS in `_quadros_da_home` — never from an `emitir` here —, so
+# from the ARGUMENTS in `_home_frames` — never from an `emitir` here —, so
 # the replay rebuilds it along the same path. What it does is offer the person
 # up to three short continuations (chips under the answer) that become their
 # next message with one click. Whether they still apply is decided by the web
 # app: only on the last turn.
 NOME_DAS_RESPOSTAS = "sugerir_respostas"
-TETO_DE_RESPOSTAS = 3
-TAMANHO_DA_RESPOSTA = 80
+ANSWERS_CEILING = 3
+ANSWER_LENGTH = 80
 
 FERRAMENTA_DAS_RESPOSTAS: dict[str, Any] = {
     "name": NOME_DAS_RESPOSTAS,
@@ -160,7 +160,7 @@ FERRAMENTA_DAS_RESPOSTAS: dict[str, Any] = {
                 "type": "array",
                 "items": {"type": "string"},
                 "minItems": 1,
-                "maxItems": TETO_DE_RESPOSTAS,
+                "maxItems": ANSWERS_CEILING,
                 "description": "As frases, como a pessoa as diria. De uma a três.",
             },
         },
@@ -169,12 +169,12 @@ FERRAMENTA_DAS_RESPOSTAS: dict[str, Any] = {
 }
 
 
-def _opcoes_pedidas(argumentos: Any) -> list[str] | None:
+def _requested_options(argumentos: Any) -> list[str] | None:
     """The valid options, cleaned and capped — or `None` if none is left.
 
     Strings only; whitespace normalized; empty ones out; duplicates out (the
-    first one stays); each cut at `TAMANHO_DA_RESPOSTA`; only the first
-    `TETO_DE_RESPOSTAS`. Tolerates `argumentos` that is not a dict (input cut
+    first one stays); each cut at `ANSWER_LENGTH`; only the first
+    `ANSWERS_CEILING`. Tolerates `argumentos` that is not a dict (input cut
     off in the stream).
     """
     cru = argumentos.get("opcoes") if isinstance(argumentos, dict) else None
@@ -184,24 +184,24 @@ def _opcoes_pedidas(argumentos: Any) -> list[str] | None:
     for item in cru:
         if not isinstance(item, str):
             continue
-        frase = " ".join(item.split())[:TAMANHO_DA_RESPOSTA].strip()
+        frase = " ".join(item.split())[:ANSWER_LENGTH].strip()
         if frase and frase not in opcoes:
             opcoes.append(frase)
-        if len(opcoes) == TETO_DE_RESPOSTAS:
+        if len(opcoes) == ANSWERS_CEILING:
             break
     return opcoes or None
 
 
-async def _sugerir_respostas(argumentos: Any, estado: EstadoDoLaco) -> tuple[str, bool]:
+async def _suggest_answers(argumentos: Any, estado: EstadoDoLaco) -> tuple[str, bool]:
     """Validates the options and returns the text the model reads. Does not go to the server.
 
-    Does NOT emit the frame here — what builds it is `_quadros_da_home`, from
-    the arguments (the same reason as `_exibir_no_globo`: an `emitir` would
+    Does NOT emit the frame here — what builds it is `_home_frames`, from
+    the arguments (the same reason as `_show_on_globe`: an `emitir` would
     vanish in the replay). The returned text tells the model to END the turn:
     that is what keeps the model from repeating the options in prose after
     putting them on screen.
     """
-    opcoes = _opcoes_pedidas(argumentos)
+    opcoes = _requested_options(argumentos)
     if opcoes is None:
         return ("`opcoes` precisa ser uma lista de 1 a 3 frases curtas.", True)
     return (
@@ -211,9 +211,9 @@ async def _sugerir_respostas(argumentos: Any, estado: EstadoDoLaco) -> tuple[str
     )
 
 
-def _quadro_das_respostas(argumentos: Any) -> list[Evento]:
+def _answers_frame(argumentos: Any) -> list[Evento]:
     """O quadro `respostas_rapidas` de um `sugerir_respostas` bem-sucedido."""
-    opcoes = _opcoes_pedidas(argumentos)
+    opcoes = _requested_options(argumentos)
     if opcoes is None:
         return []
     return [Evento("respostas_rapidas", {"opcoes": opcoes})]
@@ -270,17 +270,17 @@ CONFIRMAVEIS_SEMPRE: frozenset[str] = frozenset(
 # on its own.
 TTL_DA_CONFIRMACAO_S = 15 * 60
 
-MENSAGEM_AGUARDANDO = (
+AWAITING_MESSAGE = (
     "Aguardando a confirmação da pessoa pelo botão. Diga em uma linha o que está "
     "pendente e ENCERRE o turno — não repita esta chamada nem peça confirmação por texto."
 )
 
-MENSAGEM_SEM_CONFIRMACAO = (
+NO_CONFIRMATION_MESSAGE = (
     "Não foi possível abrir a confirmação desta ação agora. Explique à pessoa que a "
     "ação não pôde ser preparada e siga sem executá-la."
 )
 
-MENSAGEM_FORA_DO_ALCANCE = (
+OUT_OF_REACH_MESSAGE = (
     "Esta ferramenta não está disponível no assistente da Home."
 )
 
@@ -289,7 +289,7 @@ def chave_de_confirmacao(user_id: str, conversa_id: str | None, tool_use_id: str
     return f"agente:confirmacao:{user_id}:{conversa_id or 'novo'}:{tool_use_id}"
 
 
-async def _fluxo_e_da_pessoa(estado: EstadoDoLaco, argumentos: Any) -> bool:
+async def _workflow_belongs_to_person(estado: EstadoDoLaco, argumentos: Any) -> bool:
     """True when the target is NOT one of the assistant's own workflows — so it asks for a click.
 
     Fails CLOSED: with no clear target, or when the workflow does not load
@@ -313,7 +313,7 @@ async def _fluxo_e_da_pessoa(estado: EstadoDoLaco, argumentos: Any) -> bool:
         return True
     try:
         async with infra.sessao() as db:
-            wf, _papel = await carregar_workflow(db, estado.escopo, str(ref))
+            wf, _role = await carregar_workflow(db, estado.escopo, str(ref))
             origem = getattr(wf, "origem", "usuario")
     except Exception:
         logger.exception("Nao foi possivel ler a origem do fluxo %s; exigindo clique.", ref)
@@ -325,11 +325,11 @@ async def _confirmavel(estado: EstadoDoLaco, nome: str, argumentos: Any) -> bool
     if nome in CONFIRMAVEIS_SEMPRE:
         return True
     if nome in CONFIRMAVEIS_SE_FLUXO_DA_PESSOA:
-        return await _fluxo_e_da_pessoa(estado, argumentos)
+        return await _workflow_belongs_to_person(estado, argumentos)
     return False
 
 
-def _alvo(argumentos: Any) -> str | None:
+def _target(argumentos: Any) -> str | None:
     """An identifier of the target, for the confirmation card to show what it touches."""
     if not isinstance(argumentos, dict):
         return None
@@ -340,7 +340,7 @@ def _alvo(argumentos: Any) -> str | None:
     return None
 
 
-async def _pedir_confirmacao(
+async def _ask_confirmation(
     estado: EstadoDoLaco, nome: str, argumentos: Any, tool_use_id: str | None
 ) -> tuple[str, bool]:
     """Stores `{token, tool, args}` in Redis, emits the `confirmacao` frame and returns
@@ -358,7 +358,7 @@ async def _pedir_confirmacao(
         # Without Redis there is no way to store the token to validate the click
         # later; without `tool_use_id` there is no way to match the click with the
         # call. A closed refusal, and not a confirmation that can never be honored.
-        return (MENSAGEM_SEM_CONFIRMACAO, True)
+        return (NO_CONFIRMATION_MESSAGE, True)
 
     token = secrets.token_urlsafe(24)
     payload = json.dumps(
@@ -377,7 +377,7 @@ async def _pedir_confirmacao(
         await estado.redis.set(chave, payload, ex=TTL_DA_CONFIRMACAO_S)
     except Exception as exc:  # pragma: no cover - depends on Redis
         logger.warning("Falha ao guardar a confirmação: %s", exc.__class__.__name__)
-        return (MENSAGEM_SEM_CONFIRMACAO, True)
+        return (NO_CONFIRMATION_MESSAGE, True)
 
     await estado.emitir(
         Evento(
@@ -385,14 +385,14 @@ async def _pedir_confirmacao(
             {
                 "tool_use_id": tool_use_id,
                 "token": token,
-                "acao": {"tool": nome, "argumentos": _resumo(argumentos), "alvo": _alvo(argumentos)},
+                "acao": {"tool": nome, "argumentos": _summarize(argumentos), "alvo": _target(argumentos)},
             },
         )
     )
-    return (MENSAGEM_AGUARDANDO, False)
+    return (AWAITING_MESSAGE, False)
 
 
-async def _portao_da_home(
+async def _home_gate(
     estado: EstadoDoLaco, nome: str, argumentos: Any, tool_use_id: str | None = None
 ) -> tuple[str, bool] | None:
     """The Home's gate: confirmation by click for whatever touches what already existed.
@@ -403,10 +403,10 @@ async def _portao_da_home(
     if nome not in GUARDAS:
         # `permitida` already filters the list the model sees; refusing here too keeps
         # the response uniform and is the same `list_tools`/`call_tool` separation as MCP.
-        return (MENSAGEM_FORA_DO_ALCANCE, True)
+        return (OUT_OF_REACH_MESSAGE, True)
     if not await _confirmavel(estado, nome, argumentos):
         return None
-    return await _pedir_confirmacao(estado, nome, argumentos, tool_use_id)
+    return await _ask_confirmation(estado, nome, argumentos, tool_use_id)
 
 
 # ── The frames the Home emits after a tool ───────────────────────────────────
@@ -419,7 +419,7 @@ def _json_ou_none(resultado: str) -> Any:
         return None
 
 
-def _quadro_fluxo(corpo: dict) -> list[Evento]:
+def _workflow_frame(corpo: dict) -> list[Evento]:
     """`create_workflow` bem-sucedido → um quadro `fluxo` (o badge junto do chat)."""
     wid = corpo.get("id")
     if not wid:
@@ -428,7 +428,7 @@ def _quadro_fluxo(corpo: dict) -> list[Evento]:
     return [Evento("fluxo", {"workflow_id": wid, "nome": nome})]
 
 
-def _quadros_camada(corpo: dict) -> list[Evento]:
+def _layer_frames(corpo: dict) -> list[Evento]:
     """The GeoJSON artifacts of a run → one `camada` frame each.
 
     It is what makes "the answer reach the globe" without the model asking for
@@ -464,23 +464,23 @@ def _quadros_camada(corpo: dict) -> list[Evento]:
     return quadros
 
 
-def _quadros_da_home(
-    estado: EstadoDoLaco, nome: str, argumentos: Any, resultado: str, deu_erro: bool
+def _home_frames(
+    estado: EstadoDoLaco, nome: str, argumentos: Any, resultado: str, had_error: bool
 ) -> list[Evento]:
     """`fluxo` from a `create_workflow`; `camada` from a run's artifacts (or from
     an `exibir_no_globo`); `respostas_rapidas` from a `sugerir_respostas`."""
-    if deu_erro:
+    if had_error:
         return []
     if nome == "create_workflow":
         corpo = _json_ou_none(resultado)
-        return _quadro_fluxo(corpo) if isinstance(corpo, dict) else []
+        return _workflow_frame(corpo) if isinstance(corpo, dict) else []
     if nome in ("run_workflow", "get_run_artifacts"):
         corpo = _json_ou_none(resultado)
-        return _quadros_camada(corpo) if isinstance(corpo, dict) else []
+        return _layer_frames(corpo) if isinstance(corpo, dict) else []
     if nome == NOME_DO_GLOBO:
-        return _quadro_do_globo(argumentos)
+        return _globe_frame(argumentos)
     if nome == NOME_DAS_RESPOSTAS:
-        return _quadro_das_respostas(argumentos)
+        return _answers_frame(argumentos)
     return []
 
 
@@ -494,10 +494,10 @@ MENSAGEM_CONFIRMADA = "[Ação confirmada pela pessoa pelo botão]"
 MENSAGEM_RECUSADA = "[Ação recusada pela pessoa]"
 
 # What the guard compares, already without accents and lowercased — see `parece_sintetica`.
-_PREFIXO_NORMALIZADO = "[acao"
+_NORMALIZED_PREFIX = "[acao"
 
 
-def _sem_acento(texto: str) -> str:
+def _unaccented(texto: str) -> str:
     return unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii")
 
 
@@ -508,12 +508,12 @@ def parece_sintetica(mensagem: str) -> bool:
     both the accented spelling the prompt itself teaches ("[Ação confirmada…")
     and the lowercase one ("[acao confirmada…").
     """
-    return _sem_acento((mensagem or "").lstrip()).casefold().startswith(_PREFIXO_NORMALIZADO)
+    return _unaccented((mensagem or "").lstrip()).casefold().startswith(_NORMALIZED_PREFIX)
 
 
 # ── The Home's instructions ──────────────────────────────────────────────────
 # Block [1] of the system prompt on the Home surface. It corrects where the MCP
-# policy (`INSTRUCOES`) does not apply here: there, confirmation IN TEXT is asked
+# policy (`INSTRUCTIONS`) does not apply here: there, confirmation IN TEXT is asked
 # before creating or executing; here the assistant creates and runs its OWN
 # workflows without asking, and confirmation is BY CLICK, only for whatever
 # touches what already existed.
@@ -572,12 +572,12 @@ HOME = Superficie(
     instrucoes=INSTRUCOES_DA_HOME,
     # The delivery (the globe) opens the model's list; the quick replies come right after.
     ferramentas_extras=(FERRAMENTA_DO_GLOBO, FERRAMENTA_DAS_RESPOSTAS),
-    executores_locais={NOME_DO_GLOBO: _exibir_no_globo, NOME_DAS_RESPOSTAS: _sugerir_respostas},
+    executores_locais={NOME_DO_GLOBO: _show_on_globe, NOME_DAS_RESPOSTAS: _suggest_answers},
     # Full reach: every MCP tool. What holds back the destructive ones is
     # confirmation by click, not the absence of scope.
     permitida=lambda nome: nome in GUARDAS,
-    portao=_portao_da_home,
-    quadros_extras=_quadros_da_home,
+    portao=_home_gate,
+    quadros_extras=_home_frames,
 )
 
 

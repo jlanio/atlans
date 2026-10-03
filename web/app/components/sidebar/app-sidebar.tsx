@@ -44,7 +44,7 @@ const automationBase = [
 // Resources: infrastructure that workflows consume.
 // "Executores" is inserted conditionally in AppSidebar (admin always; other
 // users only when they have at least one accessible executor).
-const executoresItem = { title: "Executores", url: "/executores", icon: TbServer }
+const executorsItem = { title: "Executores", url: "/executores", icon: TbServer }
 const resourcesBase = [
   { title: "Credenciais",    url: "/credentials",   icon: TbId },
   { title: "Drive",          url: "/drive",          icon: TbDatabaseImport },
@@ -153,8 +153,8 @@ const AppSidebar = () => {
 
   // Also shows the menu when the user has quota to create — without this, admin
   // can grant quota but the user doesn't see the path to create.
-  const showExecutores = isAdmin || hasAgents || quota > 0
-  const resourcesSection = showExecutores ? [executoresItem, ...resourcesBase] : resourcesBase
+  const showExecutors = isAdmin || hasAgents || quota > 0
+  const resourcesSection = showExecutors ? [executorsItem, ...resourcesBase] : resourcesBase
   const automationSection = isAdmin ? [dashboardItem, ...automationBase] : automationBase
 
   return (

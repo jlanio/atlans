@@ -7,7 +7,7 @@ import { useWorkflowSaveStore } from "@/app/stores/workflowSaveStore"
 import { WorkspaceBadge } from "@/app/components/workspace/workspace-badge"
 import { Skeleton } from "@/app/components/ui/skeleton"
 import { cn } from "@/lib/utils"
-import { CAMADA_SOBRE_O_CANVAS } from "./canvas-layers"
+import { LAYER_ABOVE_CANVAS } from "./canvas-layers"
 
 interface Props {
   /**
@@ -71,7 +71,7 @@ export default function WorkflowLocation({ workspaceId, carregando = false, chil
       // before the add-node button, in the right corner. `flex-wrap`: the
       // save chip drops to the line below when the two do not fit, instead of
       // squeezing the workflow name.
-      className={`${CAMADA_SOBRE_O_CANVAS} left-2 top-2 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-2 pl-safe sm:left-4 sm:top-3 sm:max-w-[min(44rem,calc(100%-6rem))]`}
+      className={`${LAYER_ABOVE_CANVAS} left-2 top-2 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-2 pl-safe sm:left-4 sm:top-3 sm:max-w-[min(44rem,calc(100%-6rem))]`}
     >
       {/* `min-h-8`: with the skeletons (shorter than the text) the box
           shrank and the row jumped when the name arrived. */}

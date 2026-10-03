@@ -17,16 +17,16 @@ from executor import connection as conn_mod
 from executor.connection import ExecutorConnection
 
 
-class _WSQueEntrega:
+class _DeliveringWS:
     """WebSocket that delivers a fixed list of messages and records what is sent."""
 
     def __init__(self, mensagens):
-        self._mensagens = [json.dumps(m) for m in mensagens]
+        self._messages = [json.dumps(m) for m in mensagens]
         self.enviadas = []
 
     def __aiter__(self):
         async def _gen():
-            for m in self._mensagens:
+            for m in self._messages:
                 yield m
         return _gen()
 
@@ -34,11 +34,11 @@ class _WSQueEntrega:
         self.enviadas.append(json.loads(raw))
 
 
-def _conexao():
+def _connection():
     return ExecutorConnection(job_queue=None, result_queue=asyncio.Queue())
 
 
-def _avisos(caplog) -> list[str]:
+def _warnings(caplog) -> list[str]:
     return [
         r.getMessage() for r in caplog.records
         if r.name == "executor.connection" and r.levelno == logging.WARNING
@@ -47,21 +47,21 @@ def _avisos(caplog) -> list[str]:
 
 # ── The bug: the server's error response reached no one ──────────────────────
 
-async def test_executor_registra_em_warning_o_erro_que_o_servidor_devolve(caplog):
-    conn = _conexao()
-    ws = _WSQueEntrega([{"type": "error", "reason": "invalid_capacity"}])
+async def test_executor_logs_as_warning_the_error_the_server_returns(caplog):
+    conn = _connection()
+    ws = _DeliveringWS([{"type": "error", "reason": "invalid_capacity"}])
 
     with caplog.at_level(logging.DEBUG, logger="executor.connection"):
         await conn._receive_loop(ws)
 
-    assert any("invalid_capacity" in aviso for aviso in _avisos(caplog)), (
+    assert any("invalid_capacity" in aviso for aviso in _warnings(caplog)), (
         "o executor recebeu a recusa do servidor e não disse nada ao operador"
     )
 
 
-async def test_erro_do_servidor_leva_o_detalhe_e_nao_muda_o_estado_da_conexao(caplog):
-    conn = _conexao()
-    ws = _WSQueEntrega([{
+async def test_server_error_carries_the_detail_and_does_not_change_the_connection_state(caplog):
+    conn = _connection()
+    ws = _DeliveringWS([{
         "type": "error", "reason": "invalid_schema",
         "missing_fields": ["max_queue"], "message_type": "capacity",
     }])
@@ -69,7 +69,7 @@ async def test_erro_do_servidor_leva_o_detalhe_e_nao_muda_o_estado_da_conexao(ca
     with caplog.at_level(logging.DEBUG, logger="executor.connection"):
         await conn._receive_loop(ws)
 
-    avisos = [a for a in _avisos(caplog) if "invalid_schema" in a]
+    avisos = [a for a in _warnings(caplog) if "invalid_schema" in a]
     assert avisos and "max_queue" in avisos[0], "o detalhe da recusa se perdeu"
     assert ws.enviadas == [], "erro é só registro: nada volta ao servidor"
     assert conn._should_reconnect is True
@@ -78,7 +78,7 @@ async def test_erro_do_servidor_leva_o_detalhe_e_nao_muda_o_estado_da_conexao(ca
 
 # ── Stats truncation: the server's rule and the executor's ───────────────────
 
-def test_truncagem_de_stats_do_executor_informa_o_tamanho_original(monkeypatch):
+def test_executor_stats_truncation_reports_the_original_size(monkeypatch):
     """Not even the control keys fit: `__original_size__` must be the size of the
     whole job_result. The executor stored there the size of the FIRST reduction —
     the server, in the same situation, stores the original."""

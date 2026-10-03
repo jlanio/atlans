@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 import { NodeRun, RunTimeline } from "./timeline"
 import {
   DriftBadge, Elapsed, Highlight, NodeStatusIcon,
-  formatMs, formatOffset, useAbrirSubfluxo, useNodeFocus,
+  formatMs, formatOffset, useOpenSubworkflow, useNodeFocus,
 } from "./shared"
 import { useRunPanelStore } from "@/app/stores/runPanelStore"
 
@@ -41,7 +41,7 @@ const NodeRow = memo(function NodeRow({
   onToggle: (nodeId: string) => void
 }) {
   const { focusNode, setHovered } = useNodeFocus()
-  const { abrir, podeAbrir } = useAbrirSubfluxo()
+  const { abrir, podeAbrir } = useOpenSubworkflow()
   const rowRef = useRef<HTMLDivElement>(null)
   const reveal = useRunPanelStore(s => s.reveal)
 

@@ -2,7 +2,7 @@
 """
 Name binding order in the executor boot.
 
-`main()` passed `ao_sincronizar=_sincronizar_agora` to `dashboard.start(...)`
+`main()` passed `on_sync=_sincronizar_agora` to `dashboard.start(...)`
 — a call that executes RIGHT AWAY — but only defined `_sincronizar_agora` AFTER,
 in the same scope. In Python that is not "defined later": the name becomes an
 unbound local and reading it raises `UnboundLocalError`.
@@ -29,12 +29,12 @@ import pytest
 FONTE = Path(__file__).resolve().parents[2] / "executor" / "main.py"
 
 
-def _arvore():
+def _tree():
     return ast.parse(FONTE.read_text(encoding="utf-8"))
 
 
-def _funcao(nome: str):
-    for no in ast.walk(_arvore()):
+def _function(nome: str):
+    for no in ast.walk(_tree()):
         if isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef)) and no.name == nome:
             return no
     pytest.fail(f"funcao '{nome}' nao encontrada em {FONTE}")
@@ -42,9 +42,9 @@ def _funcao(nome: str):
 
 # ── ESPECIFICO ───────────────────────────────────────────────────────────────
 
-def test_sincronizar_agora_e_definido_antes_de_ser_passado_ao_dashboard():
+def test_sync_now_is_defined_before_being_passed_to_the_dashboard():
     """The exact regression: def ahead of the use, in the scope of main()."""
-    main = _funcao("main")
+    main = _function("main")
 
     definicao = [
         no.lineno for no in ast.walk(main)
@@ -66,7 +66,7 @@ def test_sincronizar_agora_e_definido_antes_de_ser_passado_ao_dashboard():
     )
 
 
-def test_symtable_confirma_que_o_nome_e_local_de_main():
+def test_symtable_confirms_the_name_is_local_to_main():
     """Anchors the premise of the test above.
 
     The order only matters because the name is LOCAL to `main()`. If it ever
@@ -78,21 +78,21 @@ def test_symtable_confirma_que_o_nome_e_local_de_main():
     def achar(tabela, nome):
         if tabela.get_name() == nome:
             return tabela
-        for filha in tabela.get_children():
-            achada = achar(filha, nome)
-            if achada:
-                return achada
+        for child in tabela.get_children():
+            found = achar(child, nome)
+            if found:
+                return found
         return None
 
     main = achar(st, "main")
     assert main is not None
-    simbolo = next(s for s in main.get_symbols() if s.get_name() == "_sincronizar_agora")
-    assert simbolo.is_local(), "premissa mudou: o nome deixou de ser local de main()"
+    symbol = next(s for s in main.get_symbols() if s.get_name() == "_sincronizar_agora")
+    assert symbol.is_local(), "premissa mudou: o nome deixou de ser local de main()"
 
 
 # ── GERAL ────────────────────────────────────────────────────────────────────
 
-def test_nenhuma_closure_de_main_e_usada_antes_de_existir():
+def test_no_main_closure_is_used_before_it_exists():
     """Sweeps the whole class of the error, not just the instance already fixed.
 
     For each nested function defined directly in `main()`, requires that no read
@@ -100,33 +100,33 @@ def test_nenhuma_closure_de_main_e_usada_antes_de_existir():
     ANOTHER nested function does not count: it only runs when called, and by
     then the name is already bound.
     """
-    main = _funcao("main")
+    main = _function("main")
 
-    aninhadas = {
+    nested_calls = {
         no.name: no.lineno
         for no in main.body
         if isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
 
-    corpos_aninhados = [
+    nested_bodies = [
         no for no in main.body
         if isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef))
     ]
 
-    def dentro_de_aninhada(linha: int) -> bool:
+    def inside_nested(linha: int) -> bool:
         return any(
-            f.lineno <= linha <= (f.end_lineno or f.lineno) for f in corpos_aninhados
+            f.lineno <= linha <= (f.end_lineno or f.lineno) for f in nested_bodies
         )
 
     problemas = []
     for no in ast.walk(main):
         if not (isinstance(no, ast.Name) and isinstance(no.ctx, ast.Load)):
             continue
-        definida_em = aninhadas.get(no.id)
-        if definida_em is None:
+        defined_at = nested_calls.get(no.id)
+        if defined_at is None:
             continue
-        if no.lineno < definida_em and not dentro_de_aninhada(no.lineno):
-            problemas.append(f"{no.id} usada na linha {no.lineno}, definida na {definida_em}")
+        if no.lineno < defined_at and not inside_nested(no.lineno):
+            problemas.append(f"{no.id} usada na linha {no.lineno}, definida na {defined_at}")
 
     assert not problemas, (
         "closure(s) de main() usadas antes de existir — UnboundLocalError no boot:\n  "

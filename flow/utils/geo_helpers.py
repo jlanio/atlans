@@ -224,7 +224,7 @@ async def safe_httpx_request(
 _CGNAT = ipaddress.ip_network("100.64.0.0/10")
 
 
-def _endereco_perigoso(ip) -> bool:
+def _dangerous_address(ip) -> bool:
     """True for an IP that must not be the target of an outbound request (SSRF)."""
     if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
         ip = ip.ipv4_mapped  # ::ffff:169.254.169.254 → o IPv4 embutido
@@ -252,13 +252,13 @@ def validate_url_ssrf(url: str) -> tuple[str, str]:
     # Blocks hostnames that are already an internal IP. Audit (SEG-81): before, the
     # `raise` in this block fell into the `except ValueError` just below (the same
     # type used for "not a literal IP") and was SWALLOWED — the direct check became
-    # a dead letter. Now it uses `_endereco_perigoso`, with no try/except around
+    # a dead letter. Now it uses `_dangerous_address`, with no try/except around
     # the raise.
     try:
         direct_ip = ipaddress.ip_address(hostname)
     except ValueError:
         direct_ip = None  # hostname is not a literal IP — ok, let's resolve it
-    if direct_ip is not None and _endereco_perigoso(direct_ip):
+    if direct_ip is not None and _dangerous_address(direct_ip):
         raise ValueError(
             f"Requisições para endereços internos/privados não são permitidas ({hostname})."
         )
@@ -274,7 +274,7 @@ def validate_url_ssrf(url: str) -> tuple[str, str]:
     resolved_ip = infos[0][4][0]
     for info in infos:
         candidato = info[4][0]
-        if _endereco_perigoso(ipaddress.ip_address(candidato)):
+        if _dangerous_address(ipaddress.ip_address(candidato)):
             raise ValueError(
                 f"Requisições para endereços internos/privados não são permitidas ({candidato})."
             )
@@ -312,7 +312,7 @@ def ensure_gdf_crs(gdf, target_crs: str):
     return gdf
 
 
-def gdf_para_geojson(gdf, crs: str | None = None, *, nat_como_nulo: bool = False) -> str:
+def gdf_para_geojson(gdf, crs: str | None = None, *, nat_as_null: bool = False) -> str:
     """Serializes a GeoDataFrame as GeoJSON text — the single entry point for every
     node that writes or sends GeoJSON.
 
@@ -320,7 +320,7 @@ def gdf_para_geojson(gdf, crs: str | None = None, *, nat_como_nulo: bool = False
       target one is assigned). Empty/None serializes in the CRS the GDF is in.
     - Datetime columns become text (`astype(str)`), because `to_json` does not
       serialize them ("Object of type Timestamp is not JSON serializable").
-    - `nat_como_nulo`: a missing date (NaT) comes out as `null` instead of "NaT". The
+    - `nat_as_null`: a missing date (NaT) comes out as `null` instead of "NaT". The
       nodes that serialized with raw `to_json` (SaveToS3, SendWebhook, HttpRequest,
       the pin fallback) already delivered `null` in an all-empty date column —
       a `dt_cancelamento` with no value in any feature —, and that is what they keep
@@ -337,12 +337,12 @@ def gdf_para_geojson(gdf, crs: str | None = None, *, nat_como_nulo: bool = False
     Synchronous function — use asyncio.to_thread() in async contexts.
     """
     gdf = ensure_gdf_crs(gdf, crs)
-    colunas_data = gdf.select_dtypes(include=["datetime", "datetimetz"]).columns
-    if len(colunas_data):
+    date_columns = gdf.select_dtypes(include=["datetime", "datetimetz"]).columns
+    if len(date_columns):
         gdf = gdf.copy()
-        for col in colunas_data:
+        for col in date_columns:
             texto = gdf[col].astype(str)
-            if nat_como_nulo:
+            if nat_as_null:
                 texto = texto.where(gdf[col].notna(), None)
             gdf[col] = texto
     return gdf.to_json()
@@ -363,8 +363,8 @@ def slugify_label(label: str) -> str:
     """
     import unicodedata
 
-    decomposto = unicodedata.normalize("NFKD", label or "")
-    ascii_only = "".join(c for c in decomposto if not unicodedata.combining(c))
+    decomposed = unicodedata.normalize("NFKD", label or "")
+    ascii_only = "".join(c for c in decomposed if not unicodedata.combining(c))
     slug = "".join(
         c if (c.isascii() and c.isalnum()) or c in "-_" else "_"
         for c in ascii_only
@@ -454,7 +454,7 @@ def working_crs_for_unit(gdf, unit: str):
     raise ValueError(f"Unidade de distância não suportada: '{unit}'.")
 
 
-def para_crs_metrico(*gdfs):
+def to_metric_crs(*gdfs):
     """Brings the layers to ONE common projected CRS, where area makes sense.
 
     The common CRS comes from the first layer with a CRS: its own, when already
@@ -478,12 +478,12 @@ def para_crs_metrico(*gdfs):
     asyncio.to_thread() in async contexts (estimate_utm_crs walks
     total_bounds and to_crs is O(n)).
     """
-    com_crs = [gdf for gdf in gdfs if gdf.crs is not None]
-    if not com_crs:
+    with_crs = [gdf for gdf in gdfs if gdf.crs is not None]
+    if not with_crs:
         return gdfs
-    alvo = com_crs[0].crs
+    alvo = with_crs[0].crs
     if alvo.is_geographic:
-        alvo = com_crs[0].estimate_utm_crs()
+        alvo = with_crs[0].estimate_utm_crs()
     return tuple(
         gdf.to_crs(alvo) if gdf.crs is not None and gdf.crs != alvo else gdf
         for gdf in gdfs

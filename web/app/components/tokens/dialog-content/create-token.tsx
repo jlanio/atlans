@@ -32,7 +32,7 @@ import { Input } from "@/app/components/ui/input"
 import { Label } from "@/app/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select"
 import {
-  ESCOPOS, ESCOPOS_SOMENTE_LEITURA, ESCOPO_DESCRICOES, ESCOPO_ROTULOS, ordenarEscopos,
+  ESCOPOS, READ_ONLY_SCOPES, SCOPE_DESCRIPTIONS, SCOPE_LABELS, ordenarEscopos,
 } from "../escopo-rotulos"
 
 // ── Constantes ───────────────────────────────────────────────────────────────
@@ -49,7 +49,7 @@ export function urlDoMcp(): string {
   return `${getExternalApiUrl()}/mcp`
 }
 
-export function snippetCom(snippet: string, url: string): string {
+export function snippetWithUrl(snippet: string, url: string): string {
   return snippet.replaceAll(URL_DO_MCP, url)
 }
 
@@ -57,14 +57,14 @@ export function snippetCom(snippet: string, url: string): string {
 // Text, not a link: the document lives with the code, not in this installation.
 export const DOCS_MCP = "docs/mcp.md"
 
-const VALIDADES: readonly ApiTokenExpiresInDays[] = [30, 90, 180, 365]
-const VALIDADE_PADRAO: ApiTokenExpiresInDays = 90
+const VALIDITIES: readonly ApiTokenExpiresInDays[] = [30, 90, 180, 365]
+const DEFAULT_VALIDITY: ApiTokenExpiresInDays = 90
 
-function rotuloDeValidade(dias: ApiTokenExpiresInDays): string {
+function validityLabel(dias: ApiTokenExpiresInDays): string {
   return dias === 365 ? "1 ano" : `${dias} dias`
 }
 
-const ESCOPO_ICONES: Record<ApiTokenScope, IconType> = {
+const SCOPE_ICONS: Record<ApiTokenScope, IconType> = {
   "workflows:read":  TbEye,
   "workflows:write": TbPencil,
   "runs:execute":    TbPlayerPlay,
@@ -134,25 +134,25 @@ function alternar<T>(lista: readonly T[], item: T): T[] {
  * without permission) the failure becomes a message — the text stays
  * selectable for copying by hand.
  */
-function useCopiar() {
-  const [copiado, setCopiado] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
+function useCopy() {
+  const [copiado, setCopied] = useState(false)
+  const [erro, setError] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   useEffect(() => () => clearTimeout(timer.current), [])
 
   async function copiar(texto: string) {
-    setErro(null)
+    setError(null)
     try {
       if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
         throw new Error("Área de transferência indisponível")
       }
       await navigator.clipboard.writeText(texto)
-      setCopiado(true)
+      setCopied(true)
       clearTimeout(timer.current)
-      timer.current = setTimeout(() => setCopiado(false), 2000)
+      timer.current = setTimeout(() => setCopied(false), 2000)
     } catch {
-      setCopiado(false)
-      setErro("Não foi possível copiar automaticamente — selecione o texto e copie manualmente.")
+      setCopied(false)
+      setError("Não foi possível copiar automaticamente — selecione o texto e copie manualmente.")
     }
   }
 
@@ -170,12 +170,12 @@ interface CreateTokenProps {
 }
 
 const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
-  const [criado, setCriado] = useState<ApiTokenCreated | null>(null)
-  const [cliente, setCliente] = useState<Cliente>("claude")
-  const segredo = useCopiar()
-  const comando = useCopiar()
+  const [criado, setCreated] = useState<ApiTokenCreated | null>(null)
+  const [cliente, setClient] = useState<Cliente>("claude")
+  const segredo = useCopy()
+  const comando = useCopy()
 
-  const idsAtuais = useMemo(() => workspaces.map(w => w.id_hash), [workspaces])
+  const currentIds = useMemo(() => workspaces.map(w => w.id_hash), [workspaces])
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -183,8 +183,8 @@ const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
       name: "",
       scopes: [],
       all_workspaces: false,
-      workspace_ids: idsAtuais,
-      expires_in_days: VALIDADE_PADRAO,
+      workspace_ids: currentIds,
+      expires_in_days: DEFAULT_VALIDITY,
     },
   })
 
@@ -192,9 +192,9 @@ const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
   // user hasn't touched the checkboxes, "all checked" remains the default.
   useEffect(() => {
     if (!form.getFieldState("workspace_ids").isDirty) {
-      form.setValue("workspace_ids", idsAtuais)
+      form.setValue("workspace_ids", currentIds)
     }
-  }, [idsAtuais, form])
+  }, [currentIds, form])
 
   const todos = form.watch("all_workspaces")
   const validade = form.watch("expires_in_days")
@@ -214,13 +214,13 @@ const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
       createToast.error("Não foi possível criar o token", res.error?.message)
       return
     }
-    setCriado(res.data)
+    setCreated(res.data)
     onCreated(res.data)
     createToast.success("Token criado", res.data.name)
   }
 
-  const clienteAtual = CLIENTES.find(c => c.id === cliente) ?? CLIENTES[0]
-  const snippetAtual = snippetCom(clienteAtual.snippet, urlDoMcp())
+  const currentClient = CLIENTES.find(c => c.id === cliente) ?? CLIENTES[0]
+  const currentSnippet = snippetWithUrl(currentClient.snippet, urlDoMcp())
 
   return (
     <DialogContent
@@ -299,7 +299,7 @@ const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
                   key={c.id}
                   type="button"
                   aria-pressed={cliente === c.id}
-                  onClick={() => setCliente(c.id)}
+                  onClick={() => setClient(c.id)}
                   className={cn(
                     "flex-1 border-l px-3 text-xs font-medium outline-none transition-colors first:border-l-0 sm:flex-none",
                     "focus-visible:z-10 focus-visible:ring-[3px] focus-visible:ring-ring/50",
@@ -312,13 +312,13 @@ const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
             </div>
             <div className="flex items-start gap-2">
               <pre className="min-w-0 flex-1 whitespace-pre-wrap break-all rounded-lg border border-border bg-muted/60 px-3 py-2.5 font-mono text-[11px] leading-relaxed">
-                {snippetAtual}
+                {currentSnippet}
               </pre>
               <Button
                 type="button"
                 size="icon"
                 variant="outline"
-                onClick={() => comando.copiar(snippetAtual)}
+                onClick={() => comando.copiar(currentSnippet)}
                 title="Copiar comando"
                 aria-label="Copiar comando"
                 className="shrink-0 max-md:size-10"
@@ -331,7 +331,7 @@ const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
             {comando.erro && (
               <p role="alert" className="text-xs text-destructive">{comando.erro}</p>
             )}
-            <p className="text-xs text-muted-foreground">{clienteAtual.nota}</p>
+            <p className="text-xs text-muted-foreground">{currentClient.nota}</p>
             <p className="text-xs text-muted-foreground/80">
               Conecte pelo comando acima. Limites e detalhes em <code className="font-mono">{DOCS_MCP}</code>.
             </p>
@@ -377,7 +377,7 @@ const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
                       variant="ghost"
                       size="sm"
                       disabled={isSubmitting}
-                      onClick={() => field.onChange([...ESCOPOS_SOMENTE_LEITURA])}
+                      onClick={() => field.onChange([...READ_ONLY_SCOPES])}
                       className="h-7 px-2 text-xs max-md:h-10"
                     >
                       Somente leitura
@@ -389,7 +389,7 @@ const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
                     className="grid grid-cols-1 gap-2 sm:grid-cols-2"
                   >
                     {ESCOPOS.map(escopo => (
-                      <EscopoCard
+                      <ScopeCard
                         key={escopo}
                         escopo={escopo}
                         ativo={field.value.includes(escopo)}
@@ -474,8 +474,8 @@ const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {VALIDADES.map(d => (
-                        <SelectItem key={d} value={String(d)}>{rotuloDeValidade(d)}</SelectItem>
+                      {VALIDITIES.map(d => (
+                        <SelectItem key={d} value={String(d)}>{validityLabel(d)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -507,13 +507,13 @@ const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
  * and off by itself), in the same frame as the executors' `SelectCard`, plus the
  * check that says "this one is selected" when several are on.
  */
-function EscopoCard({ escopo, ativo, disabled, onToggle }: {
+function ScopeCard({ escopo, ativo, disabled, onToggle }: {
   escopo: ApiTokenScope
   ativo: boolean
   disabled?: boolean
   onToggle: () => void
 }) {
-  const Icone = ESCOPO_ICONES[escopo]
+  const Icone = SCOPE_ICONS[escopo]
   return (
     <button
       type="button"
@@ -534,10 +534,10 @@ function EscopoCard({ escopo, ativo, disabled, onToggle }: {
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center justify-between gap-1.5 text-sm font-semibold text-foreground">
-          {ESCOPO_ROTULOS[escopo]}
+          {SCOPE_LABELS[escopo]}
           {ativo && <TbCheck className="size-4 shrink-0 text-primary" aria-hidden="true" />}
         </span>
-        <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{ESCOPO_DESCRICOES[escopo]}</span>
+        <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{SCOPE_DESCRIPTIONS[escopo]}</span>
       </span>
     </button>
   )

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import (
     get_db, get_current_user, get_user_workspace_ids, require_admin,
-    exigir_papel_no_workspace, verify_workspace_access,
+    require_workspace_role, verify_workspace_access,
 )
 from app.models.artifact import Artifact
 from app.models.credential import Credential
@@ -22,7 +22,7 @@ from app.core.rbac import ROLE_EDITOR
 from app.core.utils.logger import get_logger
 from app.core.rate_limiter import limiter
 from app.services.artifact_service import listar_artefatos
-from app.services.remocao_de_artefatos import remover_artefatos
+from app.services.remocao_de_artefatos import remove_artifacts
 
 logger = get_logger(__name__)
 
@@ -144,7 +144,7 @@ async def _resolve_bearer_credential(
         return None, None
 
 
-def _recusar_se_token_expirado(expires_at_str: str | None) -> None:
+def _reject_if_token_expired(expires_at_str: str | None) -> None:
     """Denies access when the credential's `expires_at` has already passed.
 
     Same semantics as `_validate_webhook_token`
@@ -191,7 +191,7 @@ async def _autorizar_download(artifact: Artifact, request: Request, db: AsyncSes
     expected_token, expires_at = await _resolve_bearer_credential(artifact.credential_id, db)
     if not expected_token or not _hmac.compare_digest(provided_token, expected_token):
         raise HTTPException(status_code=401, detail="Token inválido.")
-    _recusar_se_token_expirado(expires_at)
+    _reject_if_token_expired(expires_at)
 
 
 async def _url_de_download(artifact: Artifact) -> dict:
@@ -272,7 +272,7 @@ async def list_artifacts(
 
 # ── DELETE /artifacts/{id_hash} ───────────────────────────────────────────────
 
-_EXCLUIR_ARTEFATOS = "Requer role 'editor' ou superior para excluir artefatos."
+_DELETE_ARTIFACTS = "Requer role 'editor' ou superior para excluir artefatos."
 
 
 @router.delete("/{id_hash}", status_code=status.HTTP_204_NO_CONTENT)
@@ -287,13 +287,13 @@ async def delete_artifact(
     artifact = _artifact_or_404(result.scalar_one_or_none())
 
     verify_workspace_access(artifact.workspace_id, workspace_ids)
-    await exigir_papel_no_workspace(
-        db, artifact.workspace_id, current_user.id_hash, ROLE_EDITOR, _EXCLUIR_ARTEFATOS,
+    await require_workspace_role(
+        db, artifact.workspace_id, current_user.id_hash, ROLE_EDITOR, _DELETE_ARTIFACTS,
     )
 
     # Content on an executor's disk, object in MinIO, portal layer: the
-    # rule is that of every removal (`remover_artefatos`); here only the response.
-    remocao = await remover_artefatos(db, [artifact], agendar_pendentes=True)
+    # rule is that of every removal (`remove_artifacts`); here only the response.
+    remocao = await remove_artifacts(db, [artifact], schedule_pending=True)
     if remocao.falhas_s3:
         # MinIO failed (other than "already gone") and the record stayed: the object
         # remains reachable by reconciliation, and repeating the request solves it.
@@ -357,14 +357,14 @@ async def batch_delete_artifacts(
     # message is the same whichever workspace blocks, so the order in which
     # they are checked does not show in the response.
     for ws_id in sorted({a.workspace_id for a in artifacts}):
-        await exigir_papel_no_workspace(
-            db, ws_id, current_user.id_hash, ROLE_EDITOR, _EXCLUIR_ARTEFATOS,
+        await require_workspace_role(
+            db, ws_id, current_user.id_hash, ROLE_EDITOR, _DELETE_ARTIFACTS,
         )
 
-    # The rule is that of every removal (`remover_artefatos`): local ones become ONE
+    # The rule is that of every removal (`remove_artifacts`): local ones become ONE
     # order per executor, MinIO goes first and its failure preserves the row
     # (reconciliation tries again), the portal layer goes along.
-    remocao = await remover_artefatos(db, artifacts, agendar_pendentes=True)
+    remocao = await remove_artifacts(db, artifacts, schedule_pending=True)
     if remocao.falhas_s3:
         logger.error(
             "Batch-delete: %d artefato(s) pulado(s) por falha no S3. Reconcile tentara depois.",

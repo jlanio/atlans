@@ -1,21 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
-import { LinhaWorkflow, ehNovo, formatarHa, textoDeAutoria, type LinhaWorkflowProps } from "@/app/components/projects/linha-workflow"
+import { LinhaWorkflow, ehNovo, formatarHa, textoDeAutoria, type WorkflowRowProps } from "@/app/components/projects/linha-workflow"
 import { derivarGatilho, resumirAgendamento } from "@/app/components/projects/gatilho"
-import type { ComoAnda } from "@/app/components/projects/como-anda"
+import type { HowItsGoing } from "@/app/components/projects/como-anda"
 import type { IWorkflow, IWorkflowGroup, IWorkflowSchedule } from "@/service/types"
 
 afterEach(cleanup)
 
 const agora = new Date()
 const haMin = (min: number) => new Date(agora.getTime() - min * 60_000).toISOString()
-const haDias = (dias: number) => new Date(agora.getTime() - dias * 86_400_000).toISOString()
+const daysAgo = (dias: number) => new Date(agora.getTime() - dias * 86_400_000).toISOString()
 
 function wf(extra: Partial<IWorkflow> = {}): IWorkflow {
   return {
     id_hash: "wf-1", flag_ative: true, name: "Consolidação de outorgas", description: "Une as outorgas da ANA e do IGAM",
     version: "1", priority: 0, definition: { nodes: [], edges: [] }, created_by_id: "u1", updated_by_id: "u2",
-    workspace_id: "ws-1", group_id: "g1", created_at: haDias(5), updated_at: haDias(2),
+    workspace_id: "ws-1", group_id: "g1", created_at: daysAgo(5), updated_at: daysAgo(2),
     created_by_username: "joao", updated_by_username: "maria", ...extra,
   }
 }
@@ -26,19 +26,19 @@ const grupos: IWorkflowGroup[] = [
 ]
 
 // Tomorrow at 06:00 on the local clock: it is what "próxima amanhã, 06:00" expects.
-const amanhaAsSeis = new Date(agora)
-amanhaAsSeis.setDate(amanhaAsSeis.getDate() + 1)
-amanhaAsSeis.setHours(6, 0, 0, 0)
+const tomorrowAtSix = new Date(agora)
+tomorrowAtSix.setDate(tomorrowAtSix.getDate() + 1)
+tomorrowAtSix.setHours(6, 0, 0, 0)
 
 const schedule: IWorkflowSchedule = {
-  active: true, next_run_at: amanhaAsSeis.toISOString(), last_run_at: null,
+  active: true, next_run_at: tomorrowAtSix.toISOString(), last_run_at: null,
   strategy: "cron", cron_expression: "0 6 * * *",
 }
 
-const concluida: ComoAnda = { tipo: "concluida", quando: "há 3 h", instante: 1, erro: null, total: 61, falhas: 3, mediana: 180 }
-const executando: ComoAnda = { tipo: "executando", desde: "há 4 min", instante: 1, origem: "agendado", executor: "geo-01", tipica: 420 }
+const concluida: HowItsGoing = { tipo: "concluida", quando: "há 3 h", instante: 1, erro: null, total: 61, falhas: 3, mediana: 180 }
+const executando: HowItsGoing = { tipo: "executando", desde: "há 4 min", instante: 1, origem: "agendado", executor: "geo-01", tipica: 420 }
 
-function props(extra: Partial<LinhaWorkflowProps> = {}): LinhaWorkflowProps {
+function props(extra: Partial<WorkflowRowProps> = {}): WorkflowRowProps {
   const workflow = extra.workflow ?? wf()
   return {
     workflow,

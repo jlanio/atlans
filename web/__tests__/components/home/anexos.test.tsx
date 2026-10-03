@@ -4,22 +4,22 @@
  * Two ideas under protection here:
  *
  *  1. **What travels with the message is EXACTLY what is in view.** Only the
- *     READY ones go into `comReferencia` and `sugestaoParaAnexos`; what is still
+ *     READY ones go into `comReferencia` and `suggestionForAttachments`; what is still
  *     uploading and what was refused are not mentioned — telling the assistant to look for
  *     a file that never reached the Drive is a false promise.
  *  2. **The refusal is the same as on the `/drive` screen.** `recusasDe` feeds the
- *     `ResultadoDoUpload` panel, with `classifyUploadError`'s classification — the
+ *     `UploadResult` panel, with `classifyUploadError`'s classification — the
  *     two labels never diverge because they are the same piece.
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { cleanup, render, screen, fireEvent } from "@testing-library/react"
 
 import {
-  AvisoDeAnexosRecusados, ChipsDeAnexo, ConviteDeSoltura,
-  anexosProntos, comReferencia, sugestaoParaAnexos, recusasDe,
+  RejectedAttachmentsNotice, AttachmentChips, DropPrompt,
+  anexosProntos, comReferencia, suggestionForAttachments, recusasDe,
 } from "@/app/components/home/assistente/anexos"
 import type { Anexo } from "@/app/stores/homeStore"
-import { IdiomaProvider } from "@/context/IdiomaContext"
+import { LanguageProvider } from "@/context/IdiomaContext"
 
 afterEach(() => cleanup())
 
@@ -50,16 +50,16 @@ describe("o texto que viaja com a mensagem", () => {
   })
 
   it("a sugestão nomeia o arquivo — e conta o resto quando há mais de um", () => {
-    expect(sugestaoParaAnexos([pronto("a.csv")])).toBe("Analise a.csv")
-    expect(sugestaoParaAnexos([pronto("a.csv"), pronto("b.geojson", "b")])).toMatch(/Analise a\.csv e mais 1 arquivo/)
-    expect(sugestaoParaAnexos([enviando("a.csv")])).toBeNull()
+    expect(suggestionForAttachments([pronto("a.csv")])).toBe("Analise a.csv")
+    expect(suggestionForAttachments([pronto("a.csv"), pronto("b.geojson", "b")])).toMatch(/Analise a\.csv e mais 1 arquivo/)
+    expect(suggestionForAttachments([enviando("a.csv")])).toBeNull()
   })
 })
 
 describe("os chips na caixa", () => {
   it("mostra subindo e pronto; o × só existe depois que chegou", () => {
     const onRemover = vi.fn()
-    render(<ChipsDeAnexo anexos={[pronto("chegou.geojson"), enviando("subindo.csv")]} onRemover={onRemover} />)
+    render(<AttachmentChips anexos={[pronto("chegou.geojson"), enviando("subindo.csv")]} onRemover={onRemover} />)
 
     expect(screen.getByText("chegou.geojson")).toBeTruthy()
     expect(screen.getByText("subindo.csv")).toBeTruthy()
@@ -71,7 +71,7 @@ describe("os chips na caixa", () => {
   })
 
   it("os recusados NÃO entram na fileira de chips — vão para o aviso", () => {
-    render(<ChipsDeAnexo anexos={[recusado("x.pdf", "extension", "não permitida")]} onRemover={vi.fn()} />)
+    render(<AttachmentChips anexos={[recusado("x.pdf", "extension", "não permitida")]} onRemover={vi.fn()} />)
     expect(screen.queryByText("x.pdf")).toBeNull()
     expect(screen.queryByTestId("chips-de-anexo")).toBeNull()
   })
@@ -85,7 +85,7 @@ describe("o aviso dos recusados", () => {
 
   it("mostra o painel com o motivo do servidor e fecha no ×", () => {
     const onFechar = vi.fn()
-    render(<AvisoDeAnexosRecusados anexos={[recusado("mosaico.tif", "size", "Arquivo excede 200MB.")]} onFechar={onFechar} />)
+    render(<RejectedAttachmentsNotice anexos={[recusado("mosaico.tif", "size", "Arquivo excede 200MB.")]} onFechar={onFechar} />)
     expect(screen.getByText("«mosaico.tif»")).toBeTruthy()
     expect(screen.getByText("Arquivo excede 200MB.")).toBeTruthy()
     fireEvent.click(screen.getByRole("button", { name: /Fechar o resultado do envio/i }))
@@ -94,12 +94,12 @@ describe("o aviso dos recusados", () => {
 
   it("em inglês: o rótulo do tipo, a contagem e o × no idioma; o motivo do servidor como veio", () => {
     render(
-      <IdiomaProvider inicial={{ idioma: "en", detectado: "en", escolhido: null }}>
-        <AvisoDeAnexosRecusados
+      <LanguageProvider inicial={{ idioma: "en", detectado: "en", escolhido: null }}>
+        <RejectedAttachmentsNotice
           anexos={[recusado("a.tif", "size", "Arquivo excede 200MB."), recusado("b.exe", "extension", "x")]}
           onFechar={vi.fn()}
         />
-      </IdiomaProvider>,
+      </LanguageProvider>,
     )
     expect(screen.getByText("File too large")).toBeTruthy()
     expect(screen.getByText("Extension not allowed")).toBeTruthy()
@@ -109,14 +109,14 @@ describe("o aviso dos recusados", () => {
   })
 
   it("sem recusados, não renderiza nada", () => {
-    const { container } = render(<AvisoDeAnexosRecusados anexos={[pronto("ok.csv")]} onFechar={vi.fn()} />)
+    const { container } = render(<RejectedAttachmentsNotice anexos={[pronto("ok.csv")]} onFechar={vi.fn()} />)
     expect(container.firstChild).toBeNull()
   })
 })
 
 describe("o convite de soltura", () => {
   it("é o único realce do arraste — texto de anexar", () => {
-    render(<ConviteDeSoltura />)
+    render(<DropPrompt />)
     expect(screen.getByText(/Solte para anexar à conversa/i)).toBeTruthy()
   })
 })

@@ -51,11 +51,11 @@ def root_cert(tmp_path):
 
 # ── Locating the root cert ───────────────────────────────────────────────────
 
-def test_encontra_root_no_cert_dir(root_cert):
+def test_finds_root_in_cert_dir(root_cert):
     assert _find_internal_root_cert(root_cert.parent) == root_cert
 
 
-def test_encontra_root_via_ssl_cert_file(tmp_path, root_cert, monkeypatch):
+def test_finds_root_via_ssl_cert_file(tmp_path, root_cert, monkeypatch):
     """Quickstart scenario: cert OUTSIDE cert_dir, pointed to by env."""
     vazio = tmp_path / "certs"
     vazio.mkdir()
@@ -64,7 +64,7 @@ def test_encontra_root_via_ssl_cert_file(tmp_path, root_cert, monkeypatch):
     assert _find_internal_root_cert(vazio) == root_cert
 
 
-def test_encontra_root_via_requests_ca_bundle(tmp_path, root_cert, monkeypatch):
+def test_finds_root_via_requests_ca_bundle(tmp_path, root_cert, monkeypatch):
     vazio = tmp_path / "certs"
     vazio.mkdir()
     monkeypatch.delenv("SSL_CERT_FILE", raising=False)
@@ -73,7 +73,7 @@ def test_encontra_root_via_requests_ca_bundle(tmp_path, root_cert, monkeypatch):
     assert _find_internal_root_cert(vazio) == root_cert
 
 
-def test_cert_dir_tem_precedencia_sobre_env(tmp_path, root_cert, monkeypatch):
+def test_cert_dir_takes_precedence_over_env(tmp_path, root_cert, monkeypatch):
     """The cert from the previous enrollment wins over the machine's global env."""
     outro = tmp_path / "outro.crt"
     outro.write_bytes(root_cert.read_bytes())
@@ -82,7 +82,7 @@ def test_cert_dir_tem_precedencia_sobre_env(tmp_path, root_cert, monkeypatch):
     assert _find_internal_root_cert(root_cert.parent) == root_cert
 
 
-def test_env_apontando_para_arquivo_inexistente_e_ignorado(tmp_path, monkeypatch):
+def test_env_pointing_to_missing_file_is_ignored(tmp_path, monkeypatch):
     vazio = tmp_path / "certs"
     vazio.mkdir()
     monkeypatch.setenv("SSL_CERT_FILE", "/caminho/que/nao/existe.crt")
@@ -95,7 +95,7 @@ def test_env_apontando_para_arquivo_inexistente_e_ignorado(tmp_path, monkeypatch
 
 # ── Verification context ─────────────────────────────────────────────────────
 
-def test_com_ca_interna_devolve_contexto_combinado(tmp_path, root_cert, monkeypatch):
+def test_with_internal_ca_returns_combined_context(tmp_path, root_cert, monkeypatch):
     """Swapping certifi for the internal CA is not enough: a server with a public
     cert (atlans.example.org behind Cloudflare) needs the default trust store too."""
     vazio = tmp_path / "certs"
@@ -107,12 +107,12 @@ def test_com_ca_interna_devolve_contexto_combinado(tmp_path, root_cert, monkeypa
     assert isinstance(verify, ssl.SSLContext)
     assert "CA interna" in desc
     # The context must contain the internal CA AND the public ones.
-    assuntos = {c["subject"][0][0][1] for c in verify.get_ca_certs()}
-    assert "Atlans Test CA" in assuntos
-    assert len(assuntos) > 1, "trust store padrao foi perdido"
+    subjects = {c["subject"][0][0][1] for c in verify.get_ca_certs()}
+    assert "Atlans Test CA" in subjects
+    assert len(subjects) > 1, "trust store padrao foi perdido"
 
 
-def test_sem_ca_interna_cai_para_certifi(tmp_path, monkeypatch):
+def test_without_internal_ca_falls_back_to_certifi(tmp_path, monkeypatch):
     vazio = tmp_path / "certs"
     vazio.mkdir()
     monkeypatch.delenv("SSL_CERT_FILE", raising=False)
@@ -124,7 +124,7 @@ def test_sem_ca_interna_cai_para_certifi(tmp_path, monkeypatch):
     assert "certifi" in desc
 
 
-def test_root_corrompido_nao_derruba_o_enroll(tmp_path, monkeypatch):
+def test_corrupted_root_does_not_break_the_enroll(tmp_path, monkeypatch):
     """An unreadable cert degrades to the public bundle instead of blowing up."""
     ruim = tmp_path / "atlans-root.crt"
     ruim.write_text("isto nao e um certificado")

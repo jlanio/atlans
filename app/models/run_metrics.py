@@ -42,7 +42,7 @@ class WorkflowRunMetrics(Base):
     mem_avg_mb      = Column(Float, nullable=True)
     mem_peak_mb     = Column(Float, nullable=True)
 
-    # Dados processados
+    # Dados processed
     input_bytes     = Column(BigInteger, default=0)
     output_bytes    = Column(BigInteger, default=0)
     transfer_bytes  = Column(BigInteger, default=0)

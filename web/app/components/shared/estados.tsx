@@ -147,10 +147,10 @@ export function VazioPrimeiroUso({
 }) {
   let final: ReactNode = null
   if (podeCriar) {
-    const IconeDoCta = cta?.icone
+    const CtaIcon = cta?.icone
     final = acao ?? (cta && (
       <Button onClick={cta.onClick} className="max-md:h-10">
-        {IconeDoCta && <IconeDoCta size={15} aria-hidden="true" />} {cta.rotulo}
+        {CtaIcon && <CtaIcon size={15} aria-hidden="true" />} {cta.rotulo}
       </Button>
     ))
   } else if (pedirA) {

@@ -19,7 +19,7 @@ beforeEach(() => {
 })
 afterEach(() => vi.restoreAllMocks())
 
-const ultimaUrl = () => replace.mock.calls.at(-1)![0] as string
+const lastUrl = () => replace.mock.calls.at(-1)![0] as string
 
 describe("useHistoricoUrl", () => {
   it("lê o estado da query string com defaults", () => {
@@ -41,35 +41,35 @@ describe("useHistoricoUrl", () => {
     url.sp = new URLSearchParams("periodo=7")
     const { result } = renderHook(() => useHistoricoUrl())
     act(() => result.current.atualizar({ periodo: 30 }))
-    expect(ultimaUrl()).toBe("/observability")
+    expect(lastUrl()).toBe("/observability")
   })
 
   it("mudar período ou filtro mantém a execução aberta", () => {
     url.sp = new URLSearchParams("execucao=run-1")
     const { result } = renderHook(() => useHistoricoUrl())
     act(() => result.current.atualizar({ periodo: 7 }))
-    expect(ultimaUrl()).toContain("execucao=run-1")
+    expect(lastUrl()).toContain("execucao=run-1")
     act(() => result.current.atualizar({ status: "failed" }))
-    expect(ultimaUrl()).toContain("execucao=run-1")
-    expect(ultimaUrl()).toContain("status=failed")
+    expect(lastUrl()).toContain("execucao=run-1")
+    expect(lastUrl()).toContain("status=failed")
   })
 
   it("mudar de visão fecha a execução", () => {
     url.sp = new URLSearchParams("execucao=run-1")
     const { result } = renderHook(() => useHistoricoUrl())
     act(() => result.current.atualizar({ visao: "workflows" }))
-    expect(ultimaUrl()).toBe("/observability?visao=workflows")
+    expect(lastUrl()).toBe("/observability?visao=workflows")
   })
 
   it("abrir e fechar execução", () => {
     url.sp = new URLSearchParams("periodo=7")
     const { result } = renderHook(() => useHistoricoUrl())
     act(() => result.current.abrirExecucao("run-9"))
-    expect(ultimaUrl()).toBe("/observability?periodo=7&execucao=run-9")
+    expect(lastUrl()).toBe("/observability?periodo=7&execucao=run-9")
 
     url.sp = new URLSearchParams("periodo=7&execucao=run-9")
     act(() => result.current.fecharExecucao())
-    expect(ultimaUrl()).toBe("/observability?periodo=7")
+    expect(lastUrl()).toBe("/observability?periodo=7")
   })
 
   it("fechar sem execução aberta não escreve nada", () => {
@@ -84,6 +84,6 @@ describe("useHistoricoUrl", () => {
     // The URL is still the old one (the router hasn't responded): the second
     // write starts from what was written, not from what's in the bar.
     act(() => result.current.atualizar({ workflow: "wf-1" }))
-    expect(ultimaUrl()).toBe("/observability?status=failed&workflow=wf-1")
+    expect(lastUrl()).toBe("/observability?status=failed&workflow=wf-1")
   })
 })

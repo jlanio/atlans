@@ -16,7 +16,7 @@ import * as Estado from "@/app/components/shared/estados"
  * the subtitle as a skeleton), and here goes the outline of the toolbar and
  * rows — with the same heights as the real list, so the swap doesn't jump.
  */
-export function SkeletonDeCredenciais() {
+export function CredentialsSkeleton() {
   return (
     <div
       role="status"
@@ -32,7 +32,7 @@ export function SkeletonDeCredenciais() {
         <Skeleton className="h-9 w-40 rounded-md max-md:h-10" />
       </div>
       <div className="flex flex-col gap-3">
-        {[0, 1, 2].map(i => <LinhaFantasma key={i} />)}
+        {[0, 1, 2].map(i => <GhostRow key={i} />)}
       </div>
     </div>
   )
@@ -42,7 +42,7 @@ export function SkeletonDeCredenciais() {
  * Taller on phones: there the EntityCard stacks the badges on a second line,
  * and a short skeleton made the list shrink the instant the data arrived.
  */
-function LinhaFantasma() {
+function GhostRow() {
   return (
     <div className="flex h-[86px] items-center gap-3 rounded-lg border bg-card px-3 shadow-xs sm:h-[58px]">
       <Skeleton className="size-8 shrink-0 rounded-md" />

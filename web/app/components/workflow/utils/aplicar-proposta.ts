@@ -29,12 +29,12 @@ import { buildEdges, buildNodes, CanvasDefinition } from "./build-canvas"
 import { measuredHeight, measuredWidth } from "./node-metrics"
 
 /** Minimum gap between a new card and a preserved card, when resolving overlaps. */
-const FOLGA = 24
+const MARGIN = 24
 
 /** Same grid as the auto-layout, so pushed cards stay aligned. */
 const snap = (v: number) => Math.round(v / 8) * 8
 
-export interface ResumoDaProposta {
+export interface ProposalSummary {
   /** Proposal nodes whose `id` does not exist on the canvas. */
   novos: number
   /** Nodes present on both sides that changed type, alias or property. */
@@ -43,10 +43,10 @@ export interface ResumoDaProposta {
   removidos: number
 }
 
-export interface ResultadoDaProposta {
+export interface ProposalResult {
   nodes: INodeContext[]
   edges: Edge[]
-  resumo: ResumoDaProposta
+  resumo: ProposalSummary
   /**
    * False when the catalog has not arrived yet. `buildNodes` without a catalog
    * returns an empty list — applying at that moment would EMPTY the canvas,
@@ -77,18 +77,18 @@ export function aplicarProposta(
   definicao: CanvasDefinition | undefined,
   nodesAPI: INodesAPI[] | undefined,
   atuais: INodeContext[],
-): ResultadoDaProposta {
-  const propostos = buildNodes(definicao, nodesAPI)
-  const edges = buildEdges(definicao, propostos)
+): ProposalResult {
+  const proposed = buildNodes(definicao, nodesAPI)
+  const edges = buildEdges(definicao, proposed)
 
   const pedidos = definicao?.nodes?.length ?? 0
-  const naTela = new Map(atuais.map(no => [no.id, no]))
+  const onScreen = new Map(atuais.map(no => [no.id, no]))
 
   const preservados: INodeContext[] = []
   const novos: INodeContext[] = []
 
-  for (const proposto of propostos) {
-    const atual = naTela.get(proposto.id)
+  for (const proposto of proposed) {
+    const atual = onScreen.get(proposto.id)
     if (atual) {
       // The position from there, not the layout's: it is the layout the person arranged.
       preservados.push({ ...proposto, position: { ...atual.position } })
@@ -97,17 +97,17 @@ export function aplicarProposta(
     }
   }
 
-  const colocados = posicionarOsNovos(novos, preservados, edges, naTela)
-  const finais = new Map([...preservados, ...colocados].map(no => [no.id, no]))
+  const placed = placeNewNodes(novos, preservados, edges, onScreen)
+  const finalNodes = new Map([...preservados, ...placed].map(no => [no.id, no]))
 
   const idsNovos = new Set(novos.map(no => no.id))
 
   return {
     // Definition order, so the canvas does not shuffle on every apply.
-    nodes: propostos.map(p => finais.get(p.id) ?? p),
+    nodes: proposed.map(p => finalNodes.get(p.id) ?? p),
     edges,
-    resumo: contar(propostos, preservados, atuais, naTela),
-    catalogoPronto: pedidos === 0 || propostos.length > 0,
+    resumo: contar(proposed, preservados, atuais, onScreen),
+    catalogoPronto: pedidos === 0 || proposed.length > 0,
     // What arrived NOW. Feeds the entry animation: without the list, the canvas
     // would have to animate everything on every draw — and a workflow that
     // flashes entirely on each added node is the opposite of watching the
@@ -129,11 +129,11 @@ export function aplicarProposta(
  * its own would have nowhere to get the workflow's direction from — it is the
  * edge linking it to what already exists that says which side it comes in on.
  */
-function posicionarOsNovos(
+function placeNewNodes(
   novos: INodeContext[],
   preservados: INodeContext[],
   edges: Edge[],
-  naTela: Map<string, INodeContext>,
+  onScreen: Map<string, INodeContext>,
 ): INodeContext[] {
   if (!novos.length) return []
 
@@ -142,27 +142,27 @@ function posicionarOsNovos(
   // Preserved cards measured by what is ON SCREEN (React Flow has already
   // measured them); the new card, by the per-port calculation — it does not
   // exist yet.
-  const ocupadas: Caixa[] = preservados.map(no => caixaDe(no, naTela.get(no.id)))
+  const occupied: Caixa[] = preservados.map(no => boxOf(no, onScreen.get(no.id)))
 
   return novos.map(novo => {
     const alvo = layout.get(novo.id) ?? novo.position
-    const caixa = caixaDe({ ...novo, position: alvo })
+    const caixa = boxOf({ ...novo, position: alvo })
 
     // Each push moves past the bottom of every box that was in the way, so the
     // loop always advances and ends after at most one round per box.
-    for (let volta = 0; volta <= ocupadas.length; volta++) {
-      const batendo = ocupadas.filter(o => colide(caixa, o))
-      if (!batendo.length) break
-      caixa.y = snap(Math.max(...batendo.map(o => o.y + o.h)) + FOLGA)
+    for (let volta = 0; volta <= occupied.length; volta++) {
+      const colliding = occupied.filter(o => colide(caixa, o))
+      if (!colliding.length) break
+      caixa.y = snap(Math.max(...colliding.map(o => o.y + o.h)) + MARGIN)
     }
 
-    ocupadas.push(caixa)
+    occupied.push(caixa)
     return { ...novo, position: { x: caixa.x, y: caixa.y } }
   })
 }
 
 /** Card box. `medida` is the node on screen, when there is one: it was actually measured. */
-function caixaDe(node: INodeContext, medida?: INodeContext): Caixa {
+function boxOf(node: INodeContext, medida?: INodeContext): Caixa {
   const referencia = medida ?? node
   return {
     x: node.position.x,
@@ -175,26 +175,26 @@ function caixaDe(node: INodeContext, medida?: INodeContext): Caixa {
 /** Overlap of two boxes, with the gap counted on both sides. */
 function colide(a: Caixa, b: Caixa): boolean {
   return (
-    a.x < b.x + b.w + FOLGA &&
-    a.x + a.w + FOLGA > b.x &&
-    a.y < b.y + b.h + FOLGA &&
-    a.y + a.h + FOLGA > b.y
+    a.x < b.x + b.w + MARGIN &&
+    a.x + a.w + MARGIN > b.x &&
+    a.y < b.y + b.h + MARGIN &&
+    a.y + a.h + MARGIN > b.y
   )
 }
 
 function contar(
-  propostos: INodeContext[],
+  proposed: INodeContext[],
   preservados: INodeContext[],
   atuais: INodeContext[],
-  naTela: Map<string, INodeContext>,
-): ResumoDaProposta {
-  const alterados = preservados.filter(no => mudou(no, naTela.get(no.id))).length
-  const idsPropostos = new Set(propostos.map(n => n.id))
+  onScreen: Map<string, INodeContext>,
+): ProposalSummary {
+  const alterados = preservados.filter(no => mudou(no, onScreen.get(no.id))).length
+  const proposedIds = new Set(proposed.map(n => n.id))
 
   return {
-    novos: propostos.length - preservados.length,
+    novos: proposed.length - preservados.length,
     alterados,
-    removidos: atuais.filter(no => !idsPropostos.has(no.id)).length,
+    removidos: atuais.filter(no => !proposedIds.has(no.id)).length,
   }
 }
 
@@ -210,7 +210,7 @@ function mudou(proposto: INodeContext, atual: INodeContext | undefined): boolean
   if (!atual) return false
   if (proposto.data?.name !== atual.data?.name) return true
   if ((proposto.data?.alias ?? "") !== (atual.data?.alias ?? "")) return true
-  return !mesmasPropriedades(proposto.data?.properties, atual.data?.properties)
+  return !sameProperties(proposto.data?.properties, atual.data?.properties)
 }
 
 /**
@@ -218,7 +218,7 @@ function mudou(proposto: INodeContext, atual: INodeContext | undefined): boolean
  * on who built the node (the editor builds it from the catalog, the drawer
  * copies the whole catalog object), and a different order is not a change.
  */
-function mesmasPropriedades(a: unknown, b: unknown): boolean {
+function sameProperties(a: unknown, b: unknown): boolean {
   const esquerda = (a ?? {}) as Record<string, unknown>
   const direita = (b ?? {}) as Record<string, unknown>
   const chaves = new Set([...Object.keys(esquerda), ...Object.keys(direita)])

@@ -25,11 +25,11 @@ import pytest
 RAIZ = Path(__file__).resolve().parents[2]
 
 
-def _fonte(rel: str) -> str:
+def _source(rel: str) -> str:
     return (RAIZ / rel).read_text(encoding="utf-8")
 
 
-def _alvos_de_to_thread(fonte: str) -> list[str]:
+def _to_thread_targets(fonte: str) -> list[str]:
     """Names/attributes that are the FIRST argument of `asyncio.to_thread(...)`
     (the function that actually runs in the thread). A lambda becomes '<lambda>'."""
     arvore = ast.parse(fonte)
@@ -62,7 +62,7 @@ def _lambdas_de_to_thread(fonte: str) -> list[str]:
 
 # ── Pure helpers (behavior test) ─────────────────────────────────────────────
 
-def test_montar_envelope_gzip_embute_geojson_sem_reparsar():
+def test_build_gzip_envelope_embeds_geojson_without_reparsing():
     """Mutation: break the splice `cabeca[:-1] + ',\"geojson\":' + geojson_str + '}'`
     (e.g.: go back to json.dumps with the already parsed geojson, or concatenate wrongly).
 
@@ -105,7 +105,7 @@ def test_concat_chunks_junta_e_reindexa():
 
 # ── ResourceTracker: lock (concorrencia) ─────────────────────────────────────
 
-def test_resource_tracker_amostra_concorrente_nao_perde_amostras():
+def test_resource_tracker_concurrent_sampling_loses_no_samples():
     """Mutation: remove the `with self._lock:` from `sample()`.
 
     50 threads sample the SAME tracker (run_tracker is shared, and end_node now
@@ -125,18 +125,18 @@ def test_resource_tracker_amostra_concorrente_nao_perde_amostras():
     assert tr.summary()["samples"] == 50
 
 
-def test_resource_tracker_usa_lock_na_fonte():
+def test_resource_tracker_uses_lock_in_source():
     """Mutation: remove the ResourceTracker lock (the deterministic catcher).
 
     The concurrent test above is probabilistic; this one pins the lock's presence."""
-    fonte = _fonte("flow/metrics/collector.py")
+    fonte = _source("flow/metrics/collector.py")
     assert "self._lock = threading.Lock()" in fonte
     assert "with self._lock:" in fonte
 
 
 # ── ExpressionService: LRU cache with lock ───────────────────────────────────
 
-def test_expression_service_compila_concorrente_sem_corromper():
+def test_expression_service_compiles_concurrently_without_corruption():
     """Mutation: remove the lock/double-check of `_compiled`.
 
     300 distinct sources compiled by 16 threads (repeated to exercise the
@@ -158,9 +158,9 @@ def test_expression_service_compila_concorrente_sem_corromper():
     assert len(svc._template_cache) == 300
 
 
-def test_expression_service_tem_lock_na_fonte():
+def test_expression_service_has_lock_in_source():
     """Mutation: remove the _compiled lock (deterministic catcher for the one above)."""
-    fonte = _fonte("flow/utils/expression_service.py")
+    fonte = _source("flow/utils/expression_service.py")
     assert "import threading" in fonte
     assert "self._template_cache_lock = threading.Lock()" in fonte
     assert "with self._template_cache_lock:" in fonte
@@ -168,15 +168,15 @@ def test_expression_service_tem_lock_na_fonte():
 
 # ── Source-checks: o pesado sai do event loop (asyncio.to_thread) ─────────────
 
-def test_leitura_de_spill_vai_para_thread():
+def test_spill_read_goes_to_thread():
     """Mutacao: `parent_outputs = _load_from_disk(...)` sincrono de volta."""
-    alvos = _alvos_de_to_thread(_fonte("flow/executor/core.py"))
+    alvos = _to_thread_targets(_source("flow/executor/core.py"))
     assert "_load_from_disk" in alvos, "a leitura do spill tem de ir para thread"
 
 
-def test_metricas_end_node_vao_para_thread():
+def test_end_node_metrics_go_to_thread():
     """Mutacao: `self.metrics_collector.end_node(...)` sincrono de volta."""
-    alvos = _alvos_de_to_thread(_fonte("flow/executor/core.py"))
+    alvos = _to_thread_targets(_source("flow/executor/core.py"))
     assert "end_node" in alvos, "end_node (O(n)) tem de ir para thread"
 
 
@@ -190,24 +190,24 @@ def test_metricas_end_node_vao_para_thread():
     ("flow/nodes/outputs/carta_imagem.py", "persistir_artefato"),
     ("flow/nodes/outputs/send_email.py", "upload_artifact_to_minio"),
 ])
-def test_upload_de_artefato_vai_para_thread(rel, func):
+def test_artifact_upload_goes_to_thread(rel, func):
     """Mutation: unwrap the `asyncio.to_thread` of an upload (direct call).
 
     The upload (blocking httpx/disk) must run in a thread — the function appears
     as the 1st ARG of `to_thread`, not as the `func` of a direct Call."""
-    alvos = _alvos_de_to_thread(_fonte(rel))
+    alvos = _to_thread_targets(_source(rel))
     assert func in alvos, f"{rel}: {func} tem de rodar em asyncio.to_thread"
 
 
-def test_purgar_vai_para_thread():
+def test_purge_goes_to_thread():
     """Mutation: synchronous `n = purgar(...)` back in _receive_loop."""
-    alvos = _alvos_de_to_thread(_fonte("executor/connection.py"))
+    alvos = _to_thread_targets(_source("executor/connection.py"))
     assert "purgar" in alvos, "purgar (I/O de disco) tem de ir para thread"
 
 
-def test_buffer_valida_geometrias_em_thread():
+def test_buffer_validates_geometries_in_thread():
     """Mutation: synchronous `is_valid` filter back in the loop."""
-    fonte = _fonte("flow/nodes/spatial/buffer.py")
+    fonte = _source("flow/nodes/spatial/buffer.py")
     assert any("is_valid" in s for s in _lambdas_de_to_thread(fonte)), (
         "o pre-filtro is_valid (GEOS, O(n)) tem de rodar em asyncio.to_thread"
     )
@@ -215,28 +215,28 @@ def test_buffer_valida_geometrias_em_thread():
 
 def test_dispatch_serializa_payload_em_thread():
     """Mutacao: `plaintext = json.dumps(agent_payload...)` inline de volta."""
-    fonte = _fonte("app/services/workflow_execution_service.py")
+    fonte = _source("app/services/workflow_execution_service.py")
     assert any("agent_payload" in s and "dumps" in s
                for s in _lambdas_de_to_thread(fonte)), (
         "o json.dumps do payload (multi-MB) tem de rodar em asyncio.to_thread"
     )
 
 
-def test_publish_map_envelope_gzip_em_thread_sem_reparsar():
+def test_publish_map_gzip_envelope_in_thread_without_reparsing():
     """Mutations: (a) inline envelope+gzip in the loop; (b) bring back the redundant
     `json.loads(geojson_str)` + counting features via the parsed dict."""
-    fonte = _fonte("flow/nodes/outputs/publish_map.py")
-    assert "_montar_envelope_gzip" in _alvos_de_to_thread(fonte), (
+    fonte = _source("flow/nodes/outputs/publish_map.py")
+    assert "_montar_envelope_gzip" in _to_thread_targets(fonte), (
         "envelope + gzip tem de rodar em asyncio.to_thread"
     )
     # AST (immune to comments): no call to json.loads in the module — the
     # redundant geojson parse (json.loads -> json.dumps) was eliminated.
-    chamadas_loads = [
+    loads_calls = [
         n for n in ast.walk(ast.parse(fonte))
         if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
         and n.func.attr == "loads"
     ]
-    assert not chamadas_loads, (
+    assert not loads_calls, (
         "o parse redundante do geojson (json.loads->json.dumps) nao pode voltar"
     )
     assert "features_count = len(value)" in fonte, (
@@ -246,7 +246,7 @@ def test_publish_map_envelope_gzip_em_thread_sem_reparsar():
 
 def test_database_query_streama_em_chunks():
     """Mutacao: voltar a `connection.fetch(prepared_query, *values)` de tudo."""
-    fonte = _fonte("flow/nodes/datasource/database_query.py")
+    fonte = _source("flow/nodes/datasource/database_query.py")
     assert "cursor.fetch(_CHUNK_SIZE)" in fonte, "tem de usar cursor em chunks"
     assert ".cursor(prepared_query" in fonte
     assert "connection.fetch(prepared_query" not in fonte, (

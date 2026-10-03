@@ -7,7 +7,7 @@ Whatever is a deterministic consequence of the tenant change (schedule turned
 off, portal deactivated, group and pins cleared) is applied without asking, by
 the same rationale already written in `duplicate_workflow`.
 
-The most important test here is `test_connection_string_e_gravada_cifrada`: the
+The most important test here is `test_connection_string_is_stored_encrypted`: the
 route's dependency decrypts the definition on the SAME session object, and move
 is the first path that rewrites that column.
 """
@@ -22,12 +22,12 @@ ORIGEM = "ws-origem"
 DESTINO = "ws-destino"
 
 
-def _definition(com_schedule=True, conn=None):
+def _definition(with_schedule=True, conn=None):
     nodes = [{
         "id": "n1", "name": "WFS", "type": "datasource",
         "properties": {"credential_id": "cred-1", **({"connectionString": conn} if conn else {})},
     }]
-    if com_schedule:
+    if with_schedule:
         nodes.insert(0, {
             "id": "t1", "name": "ScheduleTrigger", "type": "trigger",
             "properties": {"strategy": "cron", "cron_expression": "0 6 * * *",
@@ -50,14 +50,14 @@ def _workflow(definition=None, **kw):
     return m
 
 
-def _crud(wf, nomes_no_destino=()):
+def _crud(wf, names_in_target=()):
     """Stubbed CRUD; `db.execute` returns the names already present at the destination."""
     crud = MagicMock()
     crud.get_by_hash = AsyncMock(return_value=wf)
     crud.create_version = AsyncMock()
 
     resultado = MagicMock()
-    resultado.all.return_value = [(n,) for n in nomes_no_destino]
+    resultado.all.return_value = [(n,) for n in names_in_target]
     crud.db = MagicMock(
         execute=AsyncMock(return_value=resultado),
         commit=AsyncMock(), rollback=AsyncMock(), refresh=AsyncMock(),
@@ -66,20 +66,20 @@ def _crud(wf, nomes_no_destino=()):
 
 
 @pytest.fixture(autouse=True)
-def _sem_relatorio():
+def _without_report():
     """The report has its own database; here the target is the mutations."""
     with patch.object(move_svc, "collect_warnings", new=AsyncMock(return_value=[])) as m:
         yield m
 
 
 @pytest.fixture(autouse=True)
-def _sem_minio():
+def _without_minio():
     with patch.object(move_svc, "_apagar_pins", new=AsyncMock()) as m:
         yield m
 
 
-async def _mover(wf, nomes_no_destino=(), **kw):
-    crud = _crud(wf, nomes_no_destino)
+async def _mover(wf, names_in_target=(), **kw):
+    crud = _crud(wf, names_in_target)
     resultado = await move_svc.move_workflow(crud, "wf-1", DESTINO, **kw)
     return resultado, crud
 
@@ -87,7 +87,7 @@ async def _mover(wf, nomes_no_destino=(), **kw):
 # ── Destino ──────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_recusa_mover_para_o_proprio_workspace():
+async def test_refuses_to_move_to_its_own_workspace():
     """It would not be a no-op: it would create a version, turn off the schedule,
     delete the pins and deactivate the portal. The guard lives in the service so
     that any caller inherits it, not only the HTTP route."""
@@ -108,7 +108,7 @@ async def test_recusa_mover_para_o_proprio_workspace():
 # ── Mutacoes ─────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_workspace_muda_para_o_destino():
+async def test_workspace_changes_to_the_target():
     wf = _workflow()
     resultado, _ = await _mover(wf)
 
@@ -118,8 +118,8 @@ async def test_workspace_muda_para_o_destino():
 
 
 @pytest.mark.asyncio
-async def test_id_hash_nao_muda():
-    """Move preserva a identidade: URLs de webhook e links continuam validos."""
+async def test_id_hash_does_not_change():
+    """Move preserva a identidade: URLs de webhook e links continuam valid_items."""
     wf = _workflow()
     resultado, _ = await _mover(wf)
 
@@ -127,7 +127,7 @@ async def test_id_hash_nao_muda():
 
 
 @pytest.mark.asyncio
-async def test_grupo_e_limpo():
+async def test_group_is_cleared():
     """WorkflowGroup tem workspace_id proprio — o grupo ficaria invisivel."""
     wf = _workflow()
     await _mover(wf)
@@ -146,7 +146,7 @@ async def test_portal_volta_para_disabled():
 
 
 @pytest.mark.asyncio
-async def test_pins_sao_limpos():
+async def test_pins_are_cleared():
     """The s3_keys point to pin-cache/{ws_origem}/... — unreadable at the destination."""
     wf = _workflow(
         pinned_outputs={"n1": {"__pin_s3_key__": f"pin-cache/{ORIGEM}/run-1/n1_pin.json"}},
@@ -159,18 +159,18 @@ async def test_pins_sao_limpos():
 
 
 @pytest.mark.asyncio
-async def test_objetos_de_pin_sao_apagados_do_storage(_sem_minio):
+async def test_pin_objects_are_deleted_from_storage(_without_minio):
     wf = _workflow(
         pinned_outputs={"n1": {"__pin_s3_key__": f"pin-cache/{ORIGEM}/run-1/n1_pin.json"}},
     )
     await _mover(wf)
 
-    _sem_minio.assert_awaited_once()
-    assert _sem_minio.await_args.args[0] == [f"pin-cache/{ORIGEM}/run-1/n1_pin.json"]
+    _without_minio.assert_awaited_once()
+    assert _without_minio.await_args.args[0] == [f"pin-cache/{ORIGEM}/run-1/n1_pin.json"]
 
 
 @pytest.mark.asyncio
-async def test_autoria_e_carimbada():
+async def test_authorship_is_stamped():
     wf = _workflow()
     await _mover(wf, moved_by_id="usr-9")
 
@@ -180,7 +180,7 @@ async def test_autoria_e_carimbada():
 # ── Agendamento ──────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_agendamento_chega_desligado_na_definition():
+async def test_schedule_arrives_disabled_in_the_definition():
     """The canvas reads the node's `active`; turning it off only in the database would leave the screen lying."""
     from app.core.utils.encryption import decrypt_workflow_connections
 
@@ -196,7 +196,7 @@ async def test_agendamento_chega_desligado_na_definition():
 
 
 @pytest.mark.asyncio
-async def test_schedules_do_banco_sao_desativados():
+async def test_database_schedules_are_deactivated():
     """The AsyncScheduler ticks over Schedule.active — without this UPDATE the
     workflow would keep triggering on its own, now in the new workspace."""
     wf = _workflow()
@@ -213,8 +213,8 @@ async def test_schedules_do_banco_sao_desativados():
 
 
 @pytest.mark.asyncio
-async def test_workflow_sem_schedule_nao_quebra():
-    wf = _workflow(definition=_definition(com_schedule=False))
+async def test_workflow_without_schedule_does_not_break():
+    wf = _workflow(definition=_definition(with_schedule=False))
     resultado, _ = await _mover(wf)
 
     assert resultado["to_workspace_id"] == DESTINO
@@ -223,7 +223,7 @@ async def test_workflow_sem_schedule_nao_quebra():
 # ── Encryption regressions ───────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_connection_string_e_gravada_cifrada():
+async def test_connection_string_is_stored_encrypted():
     """REGRESSION: the definition arrives in plain text in the session.
 
     `get_accessible_workflow_with_role` calls `get_workflow_by_hash`, which does
@@ -241,7 +241,7 @@ async def test_connection_string_e_gravada_cifrada():
 
 
 @pytest.mark.asyncio
-async def test_snapshot_de_versao_tambem_vai_cifrado():
+async def test_version_snapshot_is_also_encrypted():
     """workflow_versions is a persisted table like any other."""
     wf = _workflow(definition=_definition(conn="postgresql://user:senha@host/db"))
     _, crud = await _mover(wf)
@@ -253,7 +253,7 @@ async def test_snapshot_de_versao_tambem_vai_cifrado():
 
 
 @pytest.mark.asyncio
-async def test_snapshot_registra_a_origem_e_o_destino():
+async def test_snapshot_records_the_source_and_the_target():
     wf = _workflow()
     _, crud = await _mover(wf)
 
@@ -264,7 +264,7 @@ async def test_snapshot_registra_a_origem_e_o_destino():
 # ── Nome ─────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_mantem_o_nome_quando_nao_ha_colisao():
+async def test_keeps_the_name_when_there_is_no_collision():
     wf = _workflow()
     resultado, _ = await _mover(wf)
 
@@ -273,10 +273,10 @@ async def test_mantem_o_nome_quando_nao_ha_colisao():
 
 
 @pytest.mark.asyncio
-async def test_desambigua_quando_o_nome_ja_existe_no_destino():
+async def test_disambiguates_when_the_name_already_exists_in_the_target():
     """There is a UniqueConstraint(name, workspace_id) and move must not fail."""
     wf = _workflow()
-    resultado, _ = await _mover(wf, nomes_no_destino=["Edificações"])
+    resultado, _ = await _mover(wf, names_in_target=["Edificações"])
 
     assert resultado["name"] == "Edificações (2)"
     assert resultado["renamed"] is True
@@ -284,17 +284,17 @@ async def test_desambigua_quando_o_nome_ja_existe_no_destino():
 
 
 @pytest.mark.asyncio
-async def test_desambigua_repetidamente():
+async def test_disambiguates_repeatedly():
     wf = _workflow()
     resultado, _ = await _mover(
-        wf, nomes_no_destino=["Edificações", "Edificações (2)", "Edificações (3)"],
+        wf, names_in_target=["Edificações", "Edificações (2)", "Edificações (3)"],
     )
 
     assert resultado["name"] == "Edificações (4)"
 
 
 @pytest.mark.asyncio
-async def test_nome_explicito_prevalece():
+async def test_explicit_name_prevails():
     wf = _workflow()
     resultado, _ = await _mover(wf, new_name="Cadastro 2026")
 
@@ -303,7 +303,7 @@ async def test_nome_explicito_prevalece():
 
 
 @pytest.mark.asyncio
-async def test_nome_em_branco_mantem_o_atual():
+async def test_blank_name_keeps_the_current_one():
     wf = _workflow()
     resultado, _ = await _mover(wf, new_name="   ")
 
@@ -313,7 +313,7 @@ async def test_nome_em_branco_mantem_o_atual():
 # ── Preview (dry_run) ────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_dry_run_nao_grava_nada():
+async def test_dry_run_writes_nothing():
     wf = _workflow()
     resultado, crud = await _mover(wf, dry_run=True)
 
@@ -326,9 +326,9 @@ async def test_dry_run_nao_grava_nada():
 
 
 @pytest.mark.asyncio
-async def test_dry_run_ainda_reporta_a_colisao_de_nome():
+async def test_dry_run_still_reports_the_name_collision():
     wf = _workflow()
-    resultado, _ = await _mover(wf, nomes_no_destino=["Edificações"], dry_run=True)
+    resultado, _ = await _mover(wf, names_in_target=["Edificações"], dry_run=True)
 
     assert resultado["name"] == "Edificações (2)"
 
@@ -336,7 +336,7 @@ async def test_dry_run_ainda_reporta_a_colisao_de_nome():
 # ── Race on the name ─────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_colisao_em_corrida_e_resolvida_com_sufixo_aleatorio():
+async def test_race_collision_is_resolved_with_a_random_suffix():
     """Between the free-name check and the commit, another session may create a
     workflow with the same name at the destination. The constraint catches it,
     and the operation — which promised not to fail — tries again instead of
@@ -358,7 +358,7 @@ async def test_colisao_em_corrida_e_resolvida_com_sufixo_aleatorio():
 
 
 @pytest.mark.asyncio
-async def test_retry_refaz_snapshot_e_desativacao_dos_schedules():
+async def test_retry_redoes_snapshot_and_schedule_deactivation():
     """REGRESSION: `create_version` only flushes and the UPDATE on schedules is
     DML in the same transaction — the rollback undoes both. If the retry only
     renamed, the workflow would end up moved without a snapshot and with the
@@ -381,7 +381,7 @@ async def test_retry_refaz_snapshot_e_desativacao_dos_schedules():
 
 
 @pytest.mark.asyncio
-async def test_integrity_error_de_outra_causa_propaga():
+async def test_integrity_error_from_another_cause_propagates():
     """Only the name collision is retried; any other violation is a real bug and
     must not be masked by a rename."""
     from sqlalchemy.exc import IntegrityError
@@ -395,7 +395,7 @@ async def test_integrity_error_de_outra_causa_propaga():
 
 
 @pytest.mark.asyncio
-async def test_segunda_colisao_vira_conflito_legivel():
+async def test_second_collision_becomes_a_readable_conflict():
     """Unlikely with a random suffix, but 409 is better than 500."""
     from sqlalchemy.exc import IntegrityError
     from app.core.exceptions import WorkflowNameConflictError
@@ -409,7 +409,7 @@ async def test_segunda_colisao_vira_conflito_legivel():
 
 
 @pytest.mark.asyncio
-async def test_segunda_violacao_de_OUTRA_causa_nao_vira_mensagem_de_nome():
+async def test_second_violation_from_ANOTHER_cause_does_not_become_a_name_message():
     """The second level's label lied: ANY IntegrityError became
     "nao ha nome livre no destino" (no free name at the destination).
 
@@ -426,9 +426,9 @@ async def test_segunda_violacao_de_OUTRA_causa_nao_vira_mensagem_de_nome():
     from app.core.exceptions import WorkflowNameConflictError
 
     crud = _crud(_workflow())
-    colisao_de_nome = IntegrityError("stmt", {}, Exception("uq_workflow_name_workspace"))
-    outra_causa = IntegrityError("stmt", {}, Exception("uq_workflow_version"))
-    crud.db.commit = AsyncMock(side_effect=[colisao_de_nome, outra_causa])
+    name_collision = IntegrityError("stmt", {}, Exception("uq_workflow_name_workspace"))
+    other_cause = IntegrityError("stmt", {}, Exception("uq_workflow_version"))
+    crud.db.commit = AsyncMock(side_effect=[name_collision, other_cause])
 
     # `WorkflowNameConflictError` is NOT a subclass of `IntegrityError`: requiring
     # `IntegrityError` here is, at the same time, requiring that the wrong
@@ -444,7 +444,7 @@ async def test_segunda_violacao_de_OUTRA_causa_nao_vira_mensagem_de_nome():
 # ── Workflow inexistente ─────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_workflow_inexistente():
+async def test_nonexistent_workflow():
     from app.core.exceptions import WorkflowNotFoundError
 
     crud = _crud(None)
@@ -454,36 +454,36 @@ async def test_workflow_inexistente():
 
 # ── Free-name helper ─────────────────────────────────────────────────────────
 
-def test_nome_livre_devolve_a_base_quando_esta_livre():
-    assert move_svc.nome_livre("X", set()) == "X"
+def test_free_name_returns_the_base_when_it_is_free():
+    assert move_svc.free_name("X", set()) == "X"
 
 
-def test_nome_livre_pula_os_ocupados():
-    assert move_svc.nome_livre("X", {"X", "X (2)"}) == "X (3)"
+def test_free_name_skips_the_taken_ones():
+    assert move_svc.free_name("X", {"X", "X (2)"}) == "X (3)"
 
 
-def test_nome_livre_cai_no_sufixo_aleatorio_no_teto():
+def test_free_name_falls_back_to_a_random_suffix_at_the_ceiling():
     """An ugly name is preferable to blowing up with 409 in an operation that promised not to fail."""
     ocupados = {"X"} | {f"X ({i})" for i in range(2, 100)}
-    livre = move_svc.nome_livre("X", ocupados)
+    livre = move_svc.free_name("X", ocupados)
 
     assert livre.startswith("X (") and livre not in ocupados
 
 
-def test_nome_livre_respeita_o_limite_da_coluna():
+def test_free_name_respects_the_column_limit():
     """`workflows.name` is String(255). A suffix on a name already at the limit
     would overflow the column, and DataError is not IntegrityError — it would
     escape the retry as a 500."""
     longo = "N" * 255
 
-    assert len(move_svc.nome_livre(longo, set())) <= 255
-    assert len(move_svc.nome_livre(longo, {longo})) <= 255
-    assert len(move_svc.nome_livre("N" * 300, set())) <= 255
+    assert len(move_svc.free_name(longo, set())) <= 255
+    assert len(move_svc.free_name(longo, {longo})) <= 255
+    assert len(move_svc.free_name("N" * 300, set())) <= 255
 
 
-def test_nome_livre_truncado_ainda_desambigua():
+def test_truncated_free_name_still_disambiguates():
     longo = "N" * 255
-    livre = move_svc.nome_livre(longo, {longo})
+    livre = move_svc.free_name(longo, {longo})
 
     assert livre != longo and livre.endswith("(2)")
 
@@ -491,7 +491,7 @@ def test_nome_livre_truncado_ainda_desambigua():
 # ── Pin artifacts ────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_linhas_de_artefato_do_pin_sao_removidas():
+async def test_pin_artifact_rows_are_removed():
     """They would remain as a dead download for the source, and
     `_upsert_pin_artifact` (which looks up by workflow_hash + node_id, without
     filtering by tenant) would reuse the row in a future pin at the destination,

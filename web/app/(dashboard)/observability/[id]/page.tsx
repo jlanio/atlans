@@ -13,7 +13,7 @@ import "dayjs/locale/pt-br"
 import { dayjs, fromNowLocal } from "@/lib/dayjs"
 import { formatDuration, successRateColor } from "@/utils/formatters"
 import { StatusBadge } from "@/app/components/shared/StatusBadge"
-import { CABECALHO_DE_COLUNAS, CELULA_COM_ROTULO, DESTAQUE_DA_FICHA, LINHA_EMPILHADA, LINHA_EXPANDIDA } from "@/app/components/shared/tabela-empilhada"
+import { COLUMN_HEADER, LABELED_CELL, CARD_HIGHLIGHT, STACKED_ROW, EXPANDED_ROW } from "@/app/components/shared/tabela-empilhada"
 
 dayjs.locale("pt-br")
 
@@ -29,10 +29,10 @@ const RunRow = memo(function RunRow({ run, dedicado, onAbrir }: { run: IRunSumma
   return (
     <>
       <tr
-        className={`border-b last:border-0 cursor-pointer hover:bg-muted/50 focus-within:bg-muted/50 ${LINHA_EMPILHADA}`}
+        className={`border-b last:border-0 cursor-pointer hover:bg-muted/50 focus-within:bg-muted/50 ${STACKED_ROW}`}
         onClick={() => onAbrir(run.run_id)}
       >
-        <td className={`py-2 pr-4 font-mono text-xs text-muted-foreground ${DESTAQUE_DA_FICHA}`}>
+        <td className={`py-2 pr-4 font-mono text-xs text-muted-foreground ${CARD_HIGHLIGHT}`}>
           {/* Keyboard/screen-reader target: a button on the id, not the whole row
               (a <tr role="button"> would erase the cells and cannot contain the
               button that expands the error). */}
@@ -78,7 +78,7 @@ const RunRow = memo(function RunRow({ run, dedicado, onAbrir }: { run: IRunSumma
         </td>
       </tr>
       {expanded && run.error_message && (
-        <tr className={`bg-red-50 dark:bg-red-950/20 ${LINHA_EXPANDIDA}`}>
+        <tr className={`bg-red-50 dark:bg-red-950/20 ${EXPANDED_ROW}`}>
           {/* `whitespace-pre-wrap` only breaks at spaces: a URL or a path with
               no space became the minimum width of the whole table, and it
               scrolled sideways. `wrap-anywhere` allows breaking at any point
@@ -163,7 +163,7 @@ function NodeStatsTable({ nodes }: { nodes: INodeStatSummary[] }) {
 
   return (
     <table className="w-full text-sm">
-      <thead className={CABECALHO_DE_COLUNAS}>
+      <thead className={COLUMN_HEADER}>
         <tr className="text-xs text-muted-foreground border-b">
           <th className="pb-2 text-left font-medium">Nó</th>
           <th className="pb-2 text-right font-medium">Duração média</th>
@@ -174,8 +174,8 @@ function NodeStatsTable({ nodes }: { nodes: INodeStatSummary[] }) {
       </thead>
       <tbody>
         {nodes.map(node => (
-          <tr key={node.node_id} className={`border-b last:border-0 ${LINHA_EMPILHADA}`}>
-            <td className={`py-2 pr-4 ${DESTAQUE_DA_FICHA}`}>
+          <tr key={node.node_id} className={`border-b last:border-0 ${STACKED_ROW}`}>
+            <td className={`py-2 pr-4 ${CARD_HIGHLIGHT}`}>
               <div className="flex flex-col gap-1">
                 <span className="font-medium">{node.node_name}</span>
                 {/* Relative duration bar */}
@@ -187,20 +187,20 @@ function NodeStatsTable({ nodes }: { nodes: INodeStatSummary[] }) {
                 </div>
               </div>
             </td>
-            <td data-rotulo="média" className={`py-2 pr-4 text-right font-mono text-xs ${CELULA_COM_ROTULO}`}>
+            <td data-rotulo="média" className={`py-2 pr-4 text-right font-mono text-xs ${LABELED_CELL}`}>
               {formatDuration(node.avg_duration_ms)}
             </td>
-            <td data-rotulo="falhas" className={`py-2 pr-4 text-right ${CELULA_COM_ROTULO}`}>
+            <td data-rotulo="falhas" className={`py-2 pr-4 text-right ${LABELED_CELL}`}>
               {node.failure_count > 0
                 ? <span className="text-red-600 font-medium">{node.failure_count}</span>
                 : <span className="text-muted-foreground">0</span>}
             </td>
-            <td data-rotulo="cache" className={`py-2 pr-4 text-right ${CELULA_COM_ROTULO}`}>
+            <td data-rotulo="cache" className={`py-2 pr-4 text-right ${LABELED_CELL}`}>
               {node.cache_hits > 0
                 ? <span className="text-purple-600 font-medium flex items-center justify-end gap-1"><TbBolt className="h-3 w-3" />{node.cache_hits}</span>
                 : <span className="text-muted-foreground">—</span>}
             </td>
-            <td data-rotulo="saída" className={`py-2 text-right ${CELULA_COM_ROTULO}`}>
+            <td data-rotulo="saída" className={`py-2 text-right ${LABELED_CELL}`}>
               {node.avg_output_features != null
                 ? <span className="flex items-center justify-end gap-1 text-muted-foreground"><TbDatabase className="h-3 w-3" />{node.avg_output_features.toLocaleString()}</span>
                 : <span className="text-muted-foreground">—</span>}
@@ -221,7 +221,7 @@ export default function WorkflowObservabilityPage() {
   // for admins; for everyone else it is the active one — the only one the
   // workflow can be in.
   const { current } = useWorkspace()
-  const [dedicado, setDedicado] = useState(false)
+  const [dedicado, setDedicated] = useState(false)
 
   const { data: metrics, loading, error, refetch: fetchMetrics } = useFetchData(
     () => GisFlowService.getWorkflowMetrics(id, 20),
@@ -233,12 +233,12 @@ export default function WorkflowObservabilityPage() {
   // active one before that cost a second request (and a badge for the wrong workspace).
   const workspaceId = metrics ? (metrics.workspace_id ?? current?.id_hash ?? null) : null
   useEffect(() => {
-    if (!workspaceId) { setDedicado(false); return }
+    if (!workspaceId) { setDedicated(false); return }
     let cancelado = false
     GisFlowService.getWorkspacePolicy(workspaceId).then(res => {
       if (cancelado) return
       // A failing read = no badge: nothing is asserted about the policy.
-      setDedicado(!res.error && (res.data?.primary.length ?? 0) > 0)
+      setDedicated(!res.error && (res.data?.primary.length ?? 0) > 0)
     })
     return () => { cancelado = true }
   }, [workspaceId])
@@ -246,7 +246,7 @@ export default function WorkflowObservabilityPage() {
   const successRate = metrics ? `${(metrics.success_rate * 100).toFixed(1)}%` : "—"
   // Stable so RunRow's React.memo holds: without this, every render gave a new
   // function to all rows and the poll re-rendered the whole table.
-  const abrirRun = useCallback((runId: string) => router.push(`/observability/run/${runId}`), [router])
+  const openRun = useCallback((runId: string) => router.push(`/observability/run/${runId}`), [router])
 
   return (
     <PageRoot>
@@ -348,7 +348,7 @@ export default function WorkflowObservabilityPage() {
             // scrolling at all (see tabela-empilhada.ts).
             <div className="overflow-x-auto">
             <table className="w-full md:min-w-[720px]">
-              <thead className={CABECALHO_DE_COLUNAS}>
+              <thead className={COLUMN_HEADER}>
                 <tr className="text-xs text-muted-foreground border-b">
                   <th className="pb-2 text-left font-medium">Run ID</th>
                   <th className="pb-2 text-left font-medium">Status</th>
@@ -361,7 +361,7 @@ export default function WorkflowObservabilityPage() {
               </thead>
               <tbody>
                 {metrics.last_runs.map(run => (
-                  <RunRow key={run.run_id} run={run} dedicado={dedicado} onAbrir={abrirRun} />
+                  <RunRow key={run.run_id} run={run} dedicado={dedicado} onAbrir={openRun} />
                 ))}
               </tbody>
             </table>

@@ -7,20 +7,20 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react"
  */
 import Barra from "@/app/components/home/assistente/barra"
 import { useHomeStore } from "@/app/stores/homeStore"
-import { IdiomaProvider } from "@/context/IdiomaContext"
+import { LanguageProvider } from "@/context/IdiomaContext"
 import { textosDe } from "@/app/components/home/i18n"
 import type { Idioma } from "@/lib/idioma"
-import type { IAssistenteEstado } from "@/service/types"
+import type { IAssistantState } from "@/service/types"
 
-const ATIVO: IAssistenteEstado = { ativo: true, cota: { gasto: 0, teto: 1_000_000, reabre_em_segundos: null } }
+const ATIVO: IAssistantState = { ativo: true, cota: { gasto: 0, teto: 1_000_000, reabre_em_segundos: null } }
 
 beforeEach(() => { cleanup(); useHomeStore.setState({ painel: "barra", rascunho: "", anexos: [] }) })
 
 const montar = (idioma: Idioma, props: Partial<React.ComponentProps<typeof Barra>> = {}) =>
   render(
-    <IdiomaProvider inicial={{ idioma, detectado: idioma, escolhido: idioma }}>
+    <LanguageProvider inicial={{ idioma, detectado: idioma, escolhido: idioma }}>
       <Barra enviar={() => {}} estado={ATIVO} {...props} />
-    </IdiomaProvider>,
+    </LanguageProvider>,
   )
 
 describe("Barra — espanhol", () => {

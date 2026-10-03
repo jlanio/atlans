@@ -12,7 +12,7 @@ from typing import Any, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class CamadaDoGlobo(BaseModel):
+class GlobeLayer(BaseModel):
     """What Home needs to put a run output on the globe.
 
     `tipo` decides how the web app loads it:
@@ -63,7 +63,7 @@ class CamadaDoGlobo(BaseModel):
 class Localizacao(BaseModel):
     """The current position of whoever is on Home, when the person decides to share it.
 
-    It arrives optionally with the turn (`MensagemDaHome.localizacao`): the
+    It arrives optionally with the turn (`HomeMessage.localizacao`): the
     browser only sends it after the person allows GPS. It serves as a reference
     point for relative requests ("near me", "within N km"); absent/null when
     they did not share it. `extra="forbid"` as in the rest of what the client
@@ -87,10 +87,10 @@ class Localizacao(BaseModel):
 # The language of the chatting person's SCREEN (the translated Home). The
 # assistant answers in it; "pt-BR" (or absent) keeps the installation's default
 # language.
-IdiomaDaTela = Literal["pt-BR", "en", "es"]
+ScreenLanguage = Literal["pt-BR", "en", "es"]
 
 
-class MensagemDaHome(BaseModel):
+class HomeMessage(BaseModel):
     """A message from whoever is using the Home assistant.
 
     `extra="forbid"` as in the assistant: the transcript does NOT come from the
@@ -117,19 +117,19 @@ class MensagemDaHome(BaseModel):
             "referencia para pedidos relativos; nula/ausente quando ela nao compartilhou."
         ),
     )
-    idioma: Optional[IdiomaDaTela] = Field(
+    idioma: Optional[ScreenLanguage] = Field(
         default=None,
         description="O idioma da tela de quem pergunta; o assistente responde nele (ausente/pt-BR: o padrao).",
     )
 
 
-class RenomearConversa(BaseModel):
+class RenameConversation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     titulo: str = Field(..., min_length=1, max_length=120)
 
 
-class DecisaoDeConfirmacao(BaseModel):
+class ConfirmationDecision(BaseModel):
     """The click on the confirmation card: the token the server issued and the decision.
 
     It carries NO arguments — what runs are the args STORED in Redis by Home's
@@ -138,7 +138,7 @@ class DecisaoDeConfirmacao(BaseModel):
     confirmation verified on the server.
 
     `localizacao` is NOT an argument of the action: it is the same optional
-    context as the turn (MensagemDaHome.localizacao), resent because the
+    context as the turn (HomeMessage.localizacao), resent because the
     confirmation RESUMES the model's loop and the server does not keep the
     coordinate (it lives only in the stream's prompt). Without resending it, a
     "near me" workflow that asks for confirmation resumed without knowing where
@@ -153,13 +153,13 @@ class DecisaoDeConfirmacao(BaseModel):
         default=None,
         description="A posicao atual de quem confirma, quando compartilhada — a retomada continua sabendo o 'perto de mim'.",
     )
-    idioma: Optional[IdiomaDaTela] = Field(
+    idioma: Optional[ScreenLanguage] = Field(
         default=None,
         description="O idioma da tela de quem confirma — a retomada continua respondendo nele.",
     )
 
 
-class ConversaResumo(BaseModel):
+class ConversationSummary(BaseModel):
     """One row of the person's conversation list."""
 
     id: str
@@ -170,12 +170,12 @@ class ConversaResumo(BaseModel):
     updated_at: Optional[datetime] = None
 
 
-class ConversaLista(BaseModel):
-    itens: List[ConversaResumo]
+class ConversationList(BaseModel):
+    itens: List[ConversationSummary]
     total: int
 
 
-class QuadroDoReplay(BaseModel):
+class ReplayFrame(BaseModel):
     """A replay frame — the SAME vocabulary as the SSE, so the panel reapplies it
     through the same path as a live frame. `tool_result` never goes out here."""
 
@@ -183,15 +183,15 @@ class QuadroDoReplay(BaseModel):
     dados: dict[str, Any] = Field(default_factory=dict)
 
 
-class ConversaDetalhe(BaseModel):
+class ConversationDetail(BaseModel):
     id: str
     titulo: Optional[str] = None
     workflow_id: Optional[str] = None
-    quadros: List[QuadroDoReplay]
+    quadros: List[ReplayFrame]
 
 
 # ── Editor surface (the canvas panel) ────────────────────────────────────────
-class MensagemDoEditor(BaseModel):
+class EditorMessage(BaseModel):
     """A message from whoever is using it.
 
     `extra="forbid"` on purpose: the transcript does NOT come from the client
@@ -217,7 +217,7 @@ class MensagemDoEditor(BaseModel):
     )
 
 
-class CotaDoAssistente(BaseModel):
+class AssistantQuota(BaseModel):
     gasto: int = Field(..., description="Tokens consumidos na janela atual")
     teto: int = Field(..., description="Tokens permitidos por janela")
     reabre_em_segundos: Optional[int] = Field(
@@ -225,14 +225,14 @@ class CotaDoAssistente(BaseModel):
     )
 
 
-class EstadoDoAssistente(BaseModel):
+class AssistantState(BaseModel):
     """What the panel needs to know before appearing on screen."""
 
     ativo: bool = Field(..., description="Falso quando a instalação não configurou a chave")
     motivo: Optional[str] = Field(
         default=None, description="Por que está desligado, quando está"
     )
-    cota: Optional[CotaDoAssistente] = None
+    cota: Optional[AssistantQuota] = None
     # The plan of whoever asks, when a plans extension is installed ("free" |
     # "pro" | "max", in the paid-plans one). Optional because the payload
     # existed before plans: an old client (or an installation without the

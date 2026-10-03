@@ -857,7 +857,7 @@ export interface ApiTokenCreated extends ApiToken {
 
 // ── Assistente ─────────────────────────────────────────────────────────────────
 
-export interface IAssistenteCota {
+export interface IAssistantQuota {
   /** Tokens consumed in the current window. */
   gasto: number
   teto: number
@@ -870,10 +870,10 @@ export interface IAssistenteCota {
  * state, not an error: the installation simply has not configured the key, and
  * `motivo` says what is missing.
  */
-export interface IAssistenteEstado {
+export interface IAssistantState {
   ativo: boolean
   motivo?: string | null
-  cota?: IAssistenteCota | null
+  cota?: IAssistantQuota | null
   /** The plan that sets this person's ceiling, on an installation with plans (an
    *  extension); `null` without them. */
   plano?: string | null
@@ -891,7 +891,7 @@ export interface IAssistenteEstado {
  * schedule's `active` or the workflow's `flag_ative` turned off —, which is why
  * the two fields come together.
  */
-export interface IAgendamentoMeu {
+export interface IMySchedule {
   job_id: string
   id_hash: string
   active: boolean
@@ -916,18 +916,18 @@ export interface IAgendamentoMeu {
 
 /**
  * The page + the TOTAL of `GET /me/schedules` — the SAME envelope as
- * `IConversaLista`. The route has a ceiling (200 per page); without the total it
+ * `IConversationList`. The route has a ceiling (200 per page); without the total it
  * truncated silently and whoever saw 200 rows concluded that was all of them.
  */
-export interface IAgendamentosMeus {
-  itens: IAgendamentoMeu[]
+export interface IMySchedules {
+  itens: IMySchedule[]
   total: number
 }
 
 // ── Home assistant (conversations) ───────────────────────────────────────────
 
 /** A row of the conversation list (GET /assistente/conversas). */
-export interface IConversaResumo {
+export interface IConversationSummary {
   id: string
   titulo?: string | null
   workflow_id?: string | null
@@ -936,8 +936,8 @@ export interface IConversaResumo {
   updated_at?: string | null
 }
 
-export interface IConversaLista {
-  itens: IConversaResumo[]
+export interface IConversationList {
+  itens: IConversationSummary[]
   total: number
 }
 
@@ -948,7 +948,7 @@ export interface IQuadroDoReplay {
 }
 
 /** The replay of a conversation (GET /assistente/conversas/{id}), for the panel to reapply. */
-export interface IConversaDetalhe {
+export interface IConversationDetail {
   id: string
   titulo?: string | null
   workflow_id?: string | null
@@ -962,7 +962,7 @@ export interface IConversaDetalhe {
  * in `mvt`), or `indisponivel` (no preview; `hint` says why). `bbox` only frames
  * safely when `crs` is EPSG:4326.
  */
-export interface ICamadaDoGlobo {
+export interface IGlobeLayer {
   artifact_id: string
   nome: string
   output_key?: string | null
@@ -991,7 +991,7 @@ export interface ICamadaDoGlobo {
 // The admin panel: the model in use and the provider's catalog. An extension
 // (`web/extensoes`) can add fields to it.
 
-export interface IModeloDoCatalogo {
+export interface ICatalogModel {
   id: string
   nome: string
   /** `null`, and NEVER 0: a model without a known price cannot appear as free
@@ -1001,7 +1001,7 @@ export interface IModeloDoCatalogo {
   contexto: number | null
 }
 
-export interface ISituacaoDoModelo {
+export interface IModelStatus {
   modelo: string
   /** `ambiente` = nobody has chosen yet, `ASSISTENTE_MODELO` applies. The two
    *  states call for different buttons: one offers to set it, the other offers
@@ -1012,9 +1012,9 @@ export interface ISituacaoDoModelo {
   padrao_do_ambiente: string
 }
 
-export interface IPainelDoModelo {
-  atual: ISituacaoDoModelo
-  catalogo: IModeloDoCatalogo[]
+export interface IModelPanel {
+  atual: IModelStatus
+  catalogo: ICatalogModel[]
   /** Why the catalog came back empty. A provider being down must not take down
    *  the screen — but the screen needs to say what happened. */
   catalogo_indisponivel: string | null
@@ -1040,7 +1040,7 @@ export interface IResponse<T> {
 
 export interface INodePortAPI {
   name: string
-  /** Data type the port accepts/emits (TIPOS_DE_CAMPO contract). */
+  /** Data type the port accepts/emits (FIELD_TYPES contract). */
   type?: string
   description?: string
 }

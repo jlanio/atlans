@@ -10,13 +10,13 @@ import { Connection, Edge } from "@xyflow/react"
 import { INodeOutputField, INodePortAPI } from "@/service/types"
 import { limitadoAUmaAresta } from "./resolve-edge-keys"
 
-export type MotivoDeRecusa =
+export type RejectionReason =
   | "auto-conexao"
   | "duplicada"
   | "destino-de-uma-aresta"
   | "tipo-incompativel"
 
-export const MENSAGEM_DE_RECUSA: Record<MotivoDeRecusa, string> = {
+export const REJECTION_MESSAGE: Record<RejectionReason, string> = {
   "auto-conexao": "Um nó não pode ligar nele mesmo.",
   "duplicada": "Essa conexão já existe.",
   "destino-de-uma-aresta":
@@ -26,7 +26,7 @@ export const MENSAGEM_DE_RECUSA: Record<MotivoDeRecusa, string> = {
 }
 
 /** Minimal node shape the validation needs to see. */
-interface NoParaValidar {
+interface NodeToValidate {
   id: string
   data?: {
     name?: string
@@ -36,7 +36,7 @@ interface NoParaValidar {
   }
 }
 
-const ESCALARES = new Set(["string", "number", "boolean", "list"])
+const SCALARS = new Set(["string", "number", "boolean", "list"])
 
 /**
  * Data type that LEAVES through the source handle.
@@ -48,7 +48,7 @@ const ESCALARES = new Set(["string", "number", "boolean", "list"])
  *   spreads them all — `any`.
  */
 export function tipoEmitido(
-  data: NoParaValidar["data"],
+  data: NodeToValidate["data"],
   sourceHandle?: string | null,
 ): string {
   const saidas = data?.saidas ?? []
@@ -64,7 +64,7 @@ export function tipoEmitido(
 
 /** Data type the target handle ACCEPTS (`any` when not declared). */
 export function tipoAceito(
-  data: NoParaValidar["data"],
+  data: NodeToValidate["data"],
   targetHandle?: string | null,
 ): string {
   const inputs = data?.inputs ?? []
@@ -88,29 +88,29 @@ export function tipoAceito(
  */
 export function validarConexao(
   conexao: Pick<Connection, "source" | "target" | "sourceHandle" | "targetHandle">,
-  nodes: NoParaValidar[],
+  nodes: NodeToValidate[],
   edges: Pick<Edge, "source" | "target" | "sourceHandle" | "targetHandle">[],
-): MotivoDeRecusa | null {
+): RejectionReason | null {
   if (conexao.source === conexao.target) return "auto-conexao"
 
   // React Flow uses `null` for an anonymous handle and the load returns
   // `undefined`; strict comparison would give a false negative (the lesson
   // recorded in the canvas).
-  const mesmoHandle = (a?: string | null, b?: string | null) => (a ?? null) === (b ?? null)
+  const sameHandle = (a?: string | null, b?: string | null) => (a ?? null) === (b ?? null)
   const repetida = edges.some(e =>
     e.source === conexao.source &&
     e.target === conexao.target &&
-    mesmoHandle(e.sourceHandle, conexao.sourceHandle) &&
-    mesmoHandle(e.targetHandle, conexao.targetHandle),
+    sameHandle(e.sourceHandle, conexao.sourceHandle) &&
+    sameHandle(e.targetHandle, conexao.targetHandle),
   )
   if (repetida) return "duplicada"
 
   const origem = nodes.find(n => n.id === conexao.source)
   const destino = nodes.find(n => n.id === conexao.target)
 
-  const portasDoDestino = (destino?.data?.inputs ?? []).length
+  const targetPortCount = (destino?.data?.inputs ?? []).length
   if (
-    limitadoAUmaAresta(destino?.data?.name, portasDoDestino) &&
+    limitadoAUmaAresta(destino?.data?.name, targetPortCount) &&
     edges.some(e => e.target === conexao.target)
   ) {
     return "destino-de-uma-aresta"
@@ -118,7 +118,7 @@ export function validarConexao(
 
   const emitido = tipoEmitido(origem?.data, conexao.sourceHandle)
   const aceito = tipoAceito(destino?.data, conexao.targetHandle)
-  if (aceito === "geodataframe" && ESCALARES.has(emitido)) {
+  if (aceito === "geodataframe" && SCALARS.has(emitido)) {
     return "tipo-incompativel"
   }
 

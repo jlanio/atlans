@@ -20,7 +20,7 @@
 //      between the snapshot being taken in the main process and the promise
 //      resolving here — right at boot, which is when the most lines arrive.
 import { useEffect, useRef, useState } from 'react'
-import type { LinhaLog, LoteLog } from '../../main/state/store.js'
+import type { LogLine, LogBatch } from '../../main/state/store.js'
 
 /** Same ceiling as the main process. Diverging would only make both ends disagree. */
 export const MAX_LOG = 1000
@@ -33,11 +33,11 @@ export const MAX_LOG = 1000
  * per letter, and the lag showed between the key and the letter on screen.
  * Here the cost is paid ONCE per line, when it comes in.
  *
- * It lives in the renderer, not in `LinhaLog` in the main process: the field
+ * It lives in the renderer, not in `LogLine` in the main process: the field
  * would double the size of each log batch over IPC, which is precisely what
  * this channel was designed to trim.
  */
-export interface LinhaVisivel extends LinhaLog {
+export interface VisibleLine extends LogLine {
   /**
    * `alias` and `msg` lowercased, separated by a line break.
    *
@@ -48,17 +48,17 @@ export interface LinhaVisivel extends LinhaLog {
   busca: string
 }
 
-function comBusca(l: LinhaLog): LinhaVisivel {
+function withSearch(l: LogLine): VisibleLine {
   return { ...l, busca: (l.alias + '\n' + l.msg).toLowerCase() }
 }
 
-export interface EstadoLog {
-  linhas: LinhaVisivel[]
+export interface LogState {
+  linhas: VisibleLine[]
   /** `seq` of the last line already incorporated. */
   ultimoSeq: number
 }
 
-export const LOG_VAZIO: EstadoLog = { linhas: [], ultimoSeq: 0 }
+export const EMPTY_LOG: LogState = { linhas: [], ultimoSeq: 0 }
 
 /**
  * Incorporates a batch into the local buffer.
@@ -73,26 +73,26 @@ export const LOG_VAZIO: EstadoLog = { linhas: [], ultimoSeq: 0 }
  * Returns the SAME state object when nothing changes — the caller uses that to
  * avoid pointless renders.
  */
-export function mesclarLog(
-  atual: EstadoLog,
-  lote: LoteLog,
+export function mergeLog(
+  atual: LogState,
+  lote: LogBatch,
   modo: 'completo' | 'incremental',
-): { estado: EstadoLog; recarregar: boolean } {
+): { estado: LogState; recarregar: boolean } {
   if (lote.linhas.length === 0) return { estado: atual, recarregar: false }
 
-  const ultimoDoLote = lote.linhas[lote.linhas.length - 1]!.seq
+  const lastInBatch = lote.linhas[lote.linhas.length - 1]!.seq
 
   if (modo === 'completo') {
     // The lines we already have that are NEWER than the snapshot survive: they
     // arrived via push after the main process built the response, and simply
     // replacing would lose them forever (`ultimoSeq` would already have passed
     // them).
-    const posteriores = atual.linhas.filter((l) => l.seq > ultimoDoLote)
-    const linhas = lote.linhas.map(comBusca).concat(posteriores)
+    const later = atual.linhas.filter((l) => l.seq > lastInBatch)
+    const linhas = lote.linhas.map(withSearch).concat(later)
     return {
       estado: {
         linhas: linhas.length > MAX_LOG ? linhas.slice(-MAX_LOG) : linhas,
-        ultimoSeq: Math.max(atual.ultimoSeq, ultimoDoLote),
+        ultimoSeq: Math.max(atual.ultimoSeq, lastInBatch),
       },
       recarregar: false,
     }
@@ -109,37 +109,37 @@ export function mesclarLog(
   const novas = lote.linhas.filter((l) => l.seq > atual.ultimoSeq)
   if (novas.length === 0) return { estado: atual, recarregar: false }
 
-  const linhas = atual.linhas.concat(novas.map(comBusca))
+  const linhas = atual.linhas.concat(novas.map(withSearch))
   return {
     estado: {
       linhas: linhas.length > MAX_LOG ? linhas.slice(-MAX_LOG) : linhas,
-      ultimoSeq: Math.max(atual.ultimoSeq, ultimoDoLote),
+      ultimoSeq: Math.max(atual.ultimoSeq, lastInBatch),
     },
     recarregar: false,
   }
 }
 
-export function useLog(): LinhaVisivel[] {
-  const [linhas, setLinhas] = useState<LinhaVisivel[]>(LOG_VAZIO.linhas)
+export function useLog(): VisibleLine[] {
+  const [linhas, setLines] = useState<VisibleLine[]>(EMPTY_LOG.linhas)
   // The source of truth is the ref, updated SYNCHRONOUSLY. The state is only the
   // mirror for rendering — mixing the two is what produced defect 1.
-  const estadoRef = useRef<EstadoLog>(LOG_VAZIO)
+  const stateRef = useRef<LogState>(EMPTY_LOG)
 
   useEffect(() => {
     let vivo = true
 
-    const aplicar = (lote: LoteLog, modo: 'completo' | 'incremental') => {
+    const aplicar = (lote: LogBatch, modo: 'completo' | 'incremental') => {
       if (!vivo) return
-      const { estado, recarregar } = mesclarLog(estadoRef.current, lote, modo)
+      const { estado, recarregar } = mergeLog(stateRef.current, lote, modo)
 
       if (recarregar) {
         void window.atlas.log().then((l) => aplicar(l, 'completo'))
         return
       }
-      if (estado === estadoRef.current) return   // nothing new: does not re-render
+      if (estado === stateRef.current) return   // nothing new: does not re-render
 
-      estadoRef.current = estado
-      setLinhas(estado.linhas)
+      stateRef.current = estado
+      setLines(estado.linhas)
     }
 
     // The subscription comes BEFORE the invoke: a batch arriving while the promise

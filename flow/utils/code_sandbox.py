@@ -73,7 +73,7 @@ BLOCKED_BUILTINS = {
 # allowlist, blocking the NAME of these attributes cuts the last hop to stdlib
 # outside the allowlist. The definitive defense is still the isolated
 # subprocess (follow-up); this closes the known vectors.
-_MODULOS_PERIGOSOS = {
+_DANGEROUS_MODULES = {
     "os", "sys", "subprocess", "importlib", "imp", "pkgutil", "runpy",
     "socket", "ssl", "ctypes", "cffi", "platform", "posix", "nt", "pty",
     "shutil", "tempfile", "pathlib", "glob", "pickle", "marshal", "shelve",
@@ -94,7 +94,7 @@ _MODULOS_PERIGOSOS = {
 }
 # Dangerous callables reachable even without naming the module (`x.system(...)`,
 # `x.import_module(...)`). Complements the blocking of the handles above.
-_CHAMAVEIS_PERIGOSOS = {
+_DANGEROUS_CALLABLES = {
     "system", "popen", "popen2", "popen3", "popen4", "startfile",
     "spawn", "spawnl", "spawnle", "spawnlp", "spawnlpe", "spawnv", "spawnve",
     "spawnvp", "spawnvpe", "posix_spawn", "posix_spawnp",
@@ -111,7 +111,7 @@ _BLOCKED_ATTR_NAMES = {
     "f_globals", "f_builtins", "f_locals", "f_back", "f_code", "f_trace",
     "tb_frame", "tb_next", "func_globals", "func_code",
     "modules", "builtins",  # sys.modules / *.builtins → recuperam a stdlib inteira
-} | _MODULOS_PERIGOSOS | _CHAMAVEIS_PERIGOSOS
+} | _DANGEROUS_MODULES | _DANGEROUS_CALLABLES
 
 # ── Methods blocked by name ──────────────────────────────────────────────────
 # `str.format`/`format_map` resolve fields like `{0.__class__}` through the

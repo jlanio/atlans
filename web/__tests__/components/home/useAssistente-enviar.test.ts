@@ -20,7 +20,7 @@ vi.mock("@/service/GisFlowService", () => ({
 import { useAssistente } from "@/app/hooks/home/useAssistente"
 import { useHomeStore } from "@/app/stores/homeStore"
 import * as React from "react"
-import { IdiomaProvider, useIdioma } from "@/context/IdiomaContext"
+import { LanguageProvider, useLanguage } from "@/context/IdiomaContext"
 
 const fetchMock = vi.fn()
 
@@ -34,7 +34,7 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 /** The JSON body of the test's first POST. */
-function corpoDoPost(): Record<string, unknown> {
+function postBody(): Record<string, unknown> {
   const chamada = fetchMock.mock.calls[0]
   return JSON.parse((chamada[1] as { body: string }).body)
 }
@@ -51,7 +51,7 @@ describe("useAssistente — a localização no turno", () => {
     )
     await act(async () => { await result.current.enviar("oi") })
 
-    const corpo = corpoDoPost()
+    const corpo = postBody()
     expect(corpo).toEqual({ mensagem: "oi", conversa_id: "c1", workspace_id: "w1" })
     expect("localizacao" in corpo).toBe(false)
   })
@@ -63,7 +63,7 @@ describe("useAssistente — a localização no turno", () => {
     )
     await act(async () => { await result.current.enviar("mapeie o risco perto de mim") })
 
-    expect(corpoDoPost().localizacao).toEqual(LOC)
+    expect(postBody().localizacao).toEqual(LOC)
   })
 
   it("a CONFIRMAÇÃO reenvia a localização — a retomada continua sabendo o 'perto de mim'", async () => {
@@ -76,7 +76,7 @@ describe("useAssistente — a localização no turno", () => {
 
     await act(async () => { await result.current.confirmar("tu1", "tok", "confirmar") })
 
-    const corpo = corpoDoPost()
+    const corpo = postBody()
     expect(corpo.token).toBe("tok")
     expect(corpo.decisao).toBe("confirmar")
     expect(corpo.localizacao).toEqual(LOC)
@@ -102,47 +102,47 @@ describe("useAssistente — a recusa antes do stream", () => {
 
 describe("useAssistente — o idioma da tela no turno", () => {
   // The language provider wraps the hook like the real Home (the layout mounts it).
-  const comIdioma = (idioma: "pt-BR" | "en" | "es") =>
-    function Embrulho({ children }: { children: React.ReactNode }) {
-      return React.createElement(IdiomaProvider, { inicial: { idioma, detectado: idioma, escolhido: idioma }, children })
+  const withLanguage = (idioma: "pt-BR" | "en" | "es") =>
+    function Wrapper({ children }: { children: React.ReactNode }) {
+      return React.createElement(LanguageProvider, { inicial: { idioma, detectado: idioma, escolhido: idioma }, children })
     }
 
   it("em inglês o turno leva `idioma: en` — o assistente responde nele", async () => {
     const { result } = renderHook(
       () => useAssistente({ conversaId: "c1", workspaceId: "w1", anonimo: true }),
-      { wrapper: comIdioma("en") },
+      { wrapper: withLanguage("en") },
     )
     await act(async () => { await result.current.enviar("hi") })
-    expect(corpoDoPost().idioma).toBe("en")
+    expect(postBody().idioma).toBe("en")
   })
 
   it("em português o corpo segue o de sempre — sem o campo", async () => {
     const { result } = renderHook(
       () => useAssistente({ conversaId: "c1", workspaceId: "w1", anonimo: true }),
-      { wrapper: comIdioma("pt-BR") },
+      { wrapper: withLanguage("pt-BR") },
     )
     await act(async () => { await result.current.enviar("oi") })
-    expect("idioma" in corpoDoPost()).toBe(false)
+    expect("idioma" in postBody()).toBe(false)
   })
 
   it("trocado nas Preferências, o próximo turno já vai no idioma novo — sem recarregar", async () => {
     // `enviar` reads the language through a ref (switching does not recreate it): the effect that keeps
     // the ref up to date is what makes the switch take effect before the page reloads.
     const { result } = renderHook(
-      () => ({ agente: useAssistente({ conversaId: "c1", workspaceId: "w1", anonimo: true }), idioma: useIdioma() }),
-      { wrapper: comIdioma("pt-BR") },
+      () => ({ agente: useAssistente({ conversaId: "c1", workspaceId: "w1", anonimo: true }), idioma: useLanguage() }),
+      { wrapper: withLanguage("pt-BR") },
     )
     act(() => { result.current.idioma.escolher("en") })
     await act(async () => { await result.current.agente.enviar("hi") })
-    expect(corpoDoPost().idioma).toBe("en")
+    expect(postBody().idioma).toBe("en")
   })
 
   it("a CONFIRMAÇÃO também leva o idioma — a retomada continua respondendo nele", async () => {
     const { result } = renderHook(
       () => useAssistente({ conversaId: "c1", workspaceId: "w1", anonimo: true }),
-      { wrapper: comIdioma("es") },
+      { wrapper: withLanguage("es") },
     )
     await act(async () => { await result.current.confirmar("tu1", "tok", "confirmar") })
-    expect(corpoDoPost().idioma).toBe("es")
+    expect(postBody().idioma).toBe("es")
   })
 })

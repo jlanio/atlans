@@ -20,12 +20,12 @@ import { API_URL } from "@/utils/env"
 import { Input } from "@/app/components/ui/input"
 import { Label } from "@/app/components/ui/label"
 import { AuthError } from "@/app/components/auth/AuthError"
-import { useIdiomaDaTela, useTextos } from "@/app/components/home/i18n"
-import { BotaoDoModal } from "./botao-do-modal"
-import { textoDaRecusaDoLink } from "./recusas"
+import { useScreenLanguage, useTexts } from "@/app/components/home/i18n"
+import { ModalButton } from "./botao-do-modal"
+import { linkRejectionText } from "./recusas"
 
 /** What the panel is showing — the modal titles the dialog by it. */
-export type EstadoDaVerificacao = "sem-token" | "verificando" | "falhou"
+export type VerificationState = "sem-token" | "verificando" | "falhou"
 
 interface Props {
   /** The sign-up e-mail — the resend starts prefilled. */
@@ -38,7 +38,7 @@ interface Props {
   /** The account was activated: the modal returns to login with the notice. */
   onVerificou: () => void
   /** The modal header follows the state (title and supporting sentence). */
-  onEstado: (estado: EstadoDaVerificacao) => void
+  onEstado: (estado: VerificationState) => void
   /**
    * The token was just spent — the modal stops passing it. Whoever COMES BACK to
    * this panel later (via the login's 403, or via a failure's "Reenviar") wants
@@ -48,15 +48,15 @@ interface Props {
   onGastouToken: () => void
 }
 
-export function PainelVerificar({ email, token, onEnviando, onEntrar, onVerificou, onEstado, onGastouToken }: Props) {
-  const t = useTextos().entrada.painelVerificar
+export function VerifyPanel({ email, token, onEnviando, onEntrar, onVerificou, onEstado, onGastouToken }: Props) {
+  const t = useTexts().entrada.painelVerificar
   // The server only speaks Portuguese (the token rejection, the resend response):
   // in the other languages, the language's text (see ./recusas).
-  const traduzir = useIdiomaDaTela() !== "pt-BR"
-  const [estado, setEstado] = useState<EstadoDaVerificacao>(token ? "verificando" : "sem-token")
+  const traduzir = useScreenLanguage() !== "pt-BR"
+  const [estado, setAppState] = useState<VerificationState>(token ? "verificando" : "sem-token")
   // The token rejection as it came. The text is produced at render, in the
   // screen's language (the GET effect does not need to depend on it).
-  const [recusaDoToken, setRecusaDoToken] = useState<unknown>(null)
+  const [tokenRejection, setTokenRejection] = useState<unknown>(null)
   const [resendEmail, setResendEmail] = useState(email)
   const [resending, setResending] = useState(false)
   const [resendMsg, setResendMsg] = useState("")
@@ -73,18 +73,18 @@ export function PainelVerificar({ email, token, onEnviando, onEntrar, onVerifico
   // effect twice, and both callbacks would run) would come back "inválido" and
   // erase the first one's success. That is why the mark is set BEFORE sending,
   // not after.
-  const gastou = useRef(false)
+  const spent = useRef(false)
   useEffect(() => {
-    if (!token || gastou.current) return
-    gastou.current = true
+    if (!token || spent.current) return
+    spent.current = true
     onGastouToken()
     axios
       .get(`${API_URL}/auth/verify-email`, { params: { token } })
       .then(() => { if (vivo.current) onVerificou() })
       .catch((err) => {
         if (!vivo.current) return
-        setRecusaDoToken(err)
-        setEstado("falhou")
+        setTokenRejection(err)
+        setAppState("falhou")
       })
   }, [token, onVerificou, onGastouToken])
 
@@ -127,7 +127,7 @@ export function PainelVerificar({ email, token, onEnviando, onEntrar, onVerifico
   return (
     <>
       {estado === "falhou" ? (
-        <AuthError error={{ message: textoDaRecusaDoLink(recusaDoToken, traduzir, t) }} />
+        <AuthError error={{ message: linkRejectionText(tokenRejection, traduzir, t) }} />
       ) : (
         <div className="flex items-start gap-3 rounded-md border border-border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground">
           <TbMailCheck size={20} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
@@ -151,9 +151,9 @@ export function PainelVerificar({ email, token, onEnviando, onEntrar, onVerifico
             className="auth-input h-11 text-sm"
           />
         </div>
-        <BotaoDoModal variant="outline" loading={resending} loadingLabel={t.enviando}>
+        <ModalButton variant="outline" loading={resending} loadingLabel={t.enviando}>
           {t.reenviarEmail}
-        </BotaoDoModal>
+        </ModalButton>
         {resendMsg && (
           <p role={resendOk ? "status" : "alert"} className={`text-xs ${resendOk ? "text-green-400" : "text-red-400"}`}>
             {resendMsg}
@@ -161,9 +161,9 @@ export function PainelVerificar({ email, token, onEnviando, onEntrar, onVerifico
         )}
       </form>
 
-      <BotaoDoModal type="button" onClick={onEntrar}>
+      <ModalButton type="button" onClick={onEntrar}>
         {estado === "falhou" ? t.voltarParaEntrar : t.jaVerifiquei}
-      </BotaoDoModal>
+      </ModalButton>
     </>
   )
 }

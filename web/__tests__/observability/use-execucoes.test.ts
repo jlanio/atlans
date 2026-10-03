@@ -1,18 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, renderHook, waitFor } from "@testing-library/react"
-import { ESTADO_PADRAO, type EstadoDoHistorico } from "@/app/components/observability/historico-url"
+import { DEFAULT_STATE, type HistoryState } from "@/app/components/observability/historico-url"
 
 vi.mock("@/service/GisFlowService", () => ({
   GisFlowService: { getObservabilityRuns: vi.fn() },
 }))
 
 import { GisFlowService } from "@/service/GisFlowService"
-import { TAMANHO_DA_PAGINA, useExecucoes } from "@/app/components/observability/use-execucoes"
+import { PAGE_SIZE, useExecucoes } from "@/app/components/observability/use-execucoes"
 
 const svc = GisFlowService as unknown as { getObservabilityRuns: ReturnType<typeof vi.fn> }
 
-type Deferido<T> = { promise: Promise<T>; resolve: (v: T) => void }
-function deferido<T>(): Deferido<T> {
+type Deferred<T> = { promise: Promise<T>; resolve: (v: T) => void }
+function deferred<T>(): Deferred<T> {
   let resolve!: (v: T) => void
   const promise = new Promise<T>(r => { resolve = r })
   return { promise, resolve }
@@ -20,11 +20,11 @@ function deferido<T>(): Deferido<T> {
 
 const pagina = (ids: string[], extra: Partial<{ total: number | null; has_more: boolean }> = {}) => ({
   success: true, status: 200,
-  data: { total: extra.total ?? null, has_more: extra.has_more ?? false, limit: TAMANHO_DA_PAGINA, offset: 0, runs: ids.map(run_id => ({ run_id, status: "success" })) },
+  data: { total: extra.total ?? null, has_more: extra.has_more ?? false, limit: PAGE_SIZE, offset: 0, runs: ids.map(run_id => ({ run_id, status: "success" })) },
 })
 
-function estado(extra: Partial<EstadoDoHistorico> = {}): EstadoDoHistorico {
-  return { ...ESTADO_PADRAO, ...extra }
+function estado(extra: Partial<HistoryState> = {}): HistoryState {
+  return { ...DEFAULT_STATE, ...extra }
 }
 
 beforeEach(() => { vi.resetAllMocks() })
@@ -62,7 +62,7 @@ describe("useExecucoes", () => {
     const params = svc.getObservabilityRuns.mock.calls[0][0]
     expect(params).toMatchObject({
       status: "failed", workspace_id: "ws1", workflow_id: "wf1", worker_host: "host1", trigger_source: "schedule", q: "timeout",
-      limit: TAMANHO_DA_PAGINA, offset: 0, with_total: true,
+      limit: PAGE_SIZE, offset: 0, with_total: true,
     })
     const dateFrom = Date.parse(params.date_from)
     expect(antes - dateFrom).toBeGreaterThanOrEqual(7 * 24 * 3600 * 1000 - 1000)
@@ -99,9 +99,9 @@ describe("useExecucoes", () => {
   })
 
   it("ignora a resposta velha quando o filtro muda antes de ela chegar", async () => {
-    const lenta = deferido<ReturnType<typeof pagina>>()
-    const rapida = deferido<ReturnType<typeof pagina>>()
-    svc.getObservabilityRuns.mockReturnValueOnce(lenta.promise).mockReturnValueOnce(rapida.promise)
+    const lenta = deferred<ReturnType<typeof pagina>>()
+    const fast = deferred<ReturnType<typeof pagina>>()
+    svc.getObservabilityRuns.mockReturnValueOnce(lenta.promise).mockReturnValueOnce(fast.promise)
 
     const { result, rerender } = renderHook(
       ({ e }) => useExecucoes(e, { habilitado: true }),
@@ -110,7 +110,7 @@ describe("useExecucoes", () => {
     rerender({ e: estado({ status: "failed" }) })
     expect(svc.getObservabilityRuns).toHaveBeenCalledTimes(2)
 
-    await act(async () => { rapida.resolve(pagina(["nova"], { total: 1 })) })
+    await act(async () => { fast.resolve(pagina(["nova"], { total: 1 })) })
     await waitFor(() => expect(result.current.runs.map(r => r.run_id)).toEqual(["nova"]))
 
     await act(async () => { lenta.resolve(pagina(["velha-1", "velha-2"], { total: 2 })) })

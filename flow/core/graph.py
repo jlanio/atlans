@@ -82,9 +82,9 @@ class WorkflowGraph:
         # The filter only makes sense when the workflow has edges — if there are no
         # edges, every node is "isolated" by definition and must run.
         if self.filter_isolated and self.edges:
-            envolvidos = set(self.incoming.keys()) | set(self.outgoing.keys())
+            involved = set(self.incoming.keys()) | set(self.outgoing.keys())
             for nid in list(predecessors.keys()):
-                if nid not in envolvidos:
+                if nid not in involved:
                     predecessors.pop(nid)
 
         # If requested, restricts execution to the nodes reachable from the

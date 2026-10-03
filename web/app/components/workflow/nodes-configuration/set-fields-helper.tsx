@@ -7,7 +7,7 @@ import {
   TbPlus, TbTrash, TbCode, TbArrowRight, TbX,
 } from "react-icons/tb"
 import { FiEdit } from "react-icons/fi"
-import SugestoesDeColunas from "./fields/sugestoes-de-colunas"
+import ColumnSuggestions from "./fields/sugestoes-de-colunas"
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -80,9 +80,9 @@ export default function SetFieldsHelper({
 
   // Each section only offers what it hasn't used yet — offering what is already
   // there is noise (the same rule as the chips field).
-  const sugerirParaDefinir  = sugestoesDeColunas.filter(s => !setEntries.some(e => e.field === s))
-  const sugerirParaRemover  = sugestoesDeColunas.filter(s => !removeFields.includes(s))
-  const sugerirParaRenomear = sugestoesDeColunas.filter(s => !renameEntries.some(e => e.from === s))
+  const suggestToSet  = sugestoesDeColunas.filter(s => !setEntries.some(e => e.field === s))
+  const suggestToRemove  = sugestoesDeColunas.filter(s => !removeFields.includes(s))
+  const suggestToRename = sugestoesDeColunas.filter(s => !renameEntries.some(e => e.from === s))
 
   // ── Mutations ──────────────────────────────────────────────────────────────
 
@@ -125,13 +125,13 @@ export default function SetFieldsHelper({
   // opens a new row — the value (or the "Para" (To)) stays with the person.
   // Never replace an already filled field: the hint must not cost what has
   // already been typed.
-  function escolherParaDefinir(nome: string) {
+  function pickToSet(nome: string) {
     const vazia = setEntries.findIndex(e => e.field.trim() === "")
     if (vazia >= 0) updateSetEntry(vazia, "field", nome)
     else updateSetEntries([...setEntries, { field: nome, value: "" }])
   }
 
-  function escolherParaRenomear(nome: string) {
+  function pickToRename(nome: string) {
     const vazia = renameEntries.findIndex(e => e.from.trim() === "")
     if (vazia >= 0) updateRenameEntry(vazia, "from", nome)
     else updateRenameEntries([...renameEntries, { from: nome, to: "" }])
@@ -221,9 +221,9 @@ export default function SetFieldsHelper({
           </div>
         )}
 
-        <SugestoesDeColunas
-          nomes={sugerirParaDefinir}
-          onEscolher={escolherParaDefinir}
+        <ColumnSuggestions
+          nomes={suggestToSet}
+          onEscolher={pickToSet}
           totalConhecido={sugestoesDeColunas.length}
           desatualizadas={sugestoesDesatualizadas}
           parciais={sugestoesParciais}
@@ -262,8 +262,8 @@ export default function SetFieldsHelper({
           onKeyDown={addRemoveField}
         />
 
-        <SugestoesDeColunas
-          nomes={sugerirParaRemover}
+        <ColumnSuggestions
+          nomes={suggestToRemove}
           onEscolher={nome => updateRemoveFields([...removeFields, nome])}
           totalConhecido={sugestoesDeColunas.length}
           desatualizadas={sugestoesDesatualizadas}
@@ -324,9 +324,9 @@ export default function SetFieldsHelper({
           </div>
         )}
 
-        <SugestoesDeColunas
-          nomes={sugerirParaRenomear}
-          onEscolher={escolherParaRenomear}
+        <ColumnSuggestions
+          nomes={suggestToRename}
+          onEscolher={pickToRename}
           totalConhecido={sugestoesDeColunas.length}
           desatualizadas={sugestoesDesatualizadas}
           parciais={sugestoesParciais}

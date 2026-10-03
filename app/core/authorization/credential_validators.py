@@ -20,20 +20,20 @@ _VALIDATOR_REGISTRY: Dict[str, Callable] = {}
 # validator: the header exists, but it carries the user's session JWT, and the comparison
 # returned "Token inválido" (invalid token) — demanding an external call's token from someone
 # already authenticated by session and holding the operator role.
-_AUTENTICAM_A_REQUISICAO: set = set()
+_AUTHENTICATE_REQUEST: set = set()
 
 
-def register_validator(*ctypes: str, autentica_requisicao: bool = False):
+def register_validator(*ctypes: str, authenticates_request: bool = False):
     """Registers a validation function for one or more credential types.
 
-    `autentica_requisicao=True` marks the validator as INBOUND authentication:
+    `authenticates_request=True` marks the validator as INBOUND authentication:
     it only makes sense on the endpoint that receives the external call.
     """
     def decorator(fn: Callable):
         for ctype in ctypes:
             _VALIDATOR_REGISTRY[ctype] = fn
-            if autentica_requisicao:
-                _AUTENTICAM_A_REQUISICAO.add(ctype)
+            if authenticates_request:
+                _AUTHENTICATE_REQUEST.add(ctype)
         return fn
     return decorator
 
@@ -54,7 +54,7 @@ async def validate_credential_by_type(
         logger.debug("Tipo de credencial '%s' sem validação específica.", ctype)
         return
 
-    if not autenticar_entrada and ctype in _AUTENTICAM_A_REQUISICAO:
+    if not autenticar_entrada and ctype in _AUTHENTICATE_REQUEST:
         logger.debug(
             "Credencial '%s' autentica a requisição — pulada em disparo já autenticado.",
             ctype,
@@ -66,7 +66,7 @@ async def validate_credential_by_type(
 
 # ── Validadores ────────────────────────────────────────────────────────────────
 
-@register_validator("webhook_token", "WebhookAuthToken", autentica_requisicao=True)
+@register_validator("webhook_token", "WebhookAuthToken", authenticates_request=True)
 def _validate_webhook_token(cred: dict, request: Request) -> None:
     if not request:
         raise HTTPException(status_code=401, detail="Request HTTP é necessário para autenticação via token.")
@@ -84,12 +84,12 @@ def _validate_webhook_token(cred: dict, request: Request) -> None:
     if not hmac.compare_digest(token_provided, expected_token):
         raise HTTPException(status_code=403, detail="Token inválido")
 
-    # The SAME rule as resolution (`validade_da_credencial`): before, this copy
+    # The SAME rule as resolution (`credential_validity`): before, this copy
     # compared a timezone-aware `now` to an `expires_at` stored without timezone and raised
     # TypeError (500) instead of 403.
-    from app.core.authorization.credential_loader import validade_da_credencial
+    from app.core.authorization.credential_loader import credential_validity
 
-    validade = validade_da_credencial(expires_at_str)
+    validade = credential_validity(expires_at_str)
     if validade == "expirada":
         raise HTTPException(status_code=403, detail="Token expirado")
     if validade == "invalida":

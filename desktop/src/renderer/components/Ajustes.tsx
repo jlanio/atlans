@@ -12,11 +12,11 @@ import {
   TbAlertTriangle, TbBug, TbCertificate, TbFolder, TbFolderOpen, TbInfoCircle,
   TbLock, TbPower, TbRotate, TbServer,
 } from 'react-icons/tb'
-import type { ConfigExecucao, NivelLog } from '../../main/state/config.js'
-import type { EstadoAutostart } from '../../main/ui/autostart.js'
+import type { RunConfig, LogLevel } from '../../main/state/config.js'
+import type { AutostartState } from '../../main/ui/autostart.js'
 import type { InfoApp } from '../../shared/ipc.js'
-import { DISCO_BAIXO_GB, DISCO_CRITICO_GB, gb, nivelDoDisco } from '../../shared/disco.js'
-import { LIMITES, dentroDaFaixa, type Faixa } from '../../shared/limites.js'
+import { DISCO_BAIXO_GB, DISCO_CRITICO_GB, gb, diskLevel } from '../../shared/disco.js'
+import { LIMITES, withinRange, type Faixa } from '../../shared/limites.js'
 import { useSnapshot } from '../lib/snapshot.js'
 import { BarraSalvar } from './BarraSalvar.js'
 import { Alerta } from './Alerta.js'
@@ -26,7 +26,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { SERVIDOR } from '../../shared/servidor.js'
 import { cn } from '../lib/utils.js'
 
-const NIVEIS: Array<{ v: NivelLog; r: string; d: string }> = [
+const LEVELS: Array<{ v: LogLevel; r: string; d: string }> = [
   { v: 'DEBUG', r: 'Depuração', d: 'Tudo, inclusive detalhe interno. O arquivo cresce rápido.' },
   { v: 'INFO', r: 'Normal', d: 'O que acontece de relevante. É o padrão.' },
   { v: 'WARNING', r: 'Só avisos', d: 'O que merece atenção, e mais nada.' },
@@ -69,7 +69,7 @@ function Numero({
   descricao: string
   aoMudar: (v: number) => void
 }) {
-  const invalido = !dentroDaFaixa(valor, { padrao, min, max })
+  const invalido = !withinRange(valor, { padrao, min, max })
   // No ceiling when the executor does not impose one (the timeout): saying
   // "between 1 and 86400" would invent a rule it does not have.
   const faixa = max === null ? `um valor a partir de ${min}` : `entre ${min} e ${max}`
@@ -187,11 +187,11 @@ function Caminho({
  * a lie. See `main/ui/autostart.ts`.
  */
 function Autostart({ estado, aoAlternar }: {
-  estado: EstadoAutostart | null
+  estado: AutostartState | null
   aoAlternar: (v: boolean) => void
 }) {
   if (!estado) return null
-  const desativadoPeloWindows = estado.ativo && !estado.efetivo
+  const disabledByWindows = estado.ativo && !estado.efetivo
 
   return (
     <div className="flex flex-col gap-3">
@@ -218,7 +218,7 @@ function Autostart({ estado, aoAlternar }: {
         </Aviso>
       )}
 
-      {desativadoPeloWindows && (
+      {disabledByWindows && (
         <Aviso tom="aviso">
           A entrada existe, mas está <strong>desativada</strong> em Gerenciador
           de Tarefas → Inicializar. Enquanto estiver assim, o app não sobe no
@@ -265,7 +265,7 @@ function Disco({ rodando }: { rodando: boolean }) {
   const snapshot = useSnapshot()
   const livre = snapshot?.artifacts_disk_free_gb
   const total = snapshot?.artifacts_disk_total_gb
-  const nivel = nivelDoDisco(livre)
+  const nivel = diskLevel(livre)
 
   // The metric comes from the executor, with the snapshot. When stopped, there
   // is nothing to show — and inventing a "—" with a gray bar would suggest a
@@ -280,7 +280,7 @@ function Disco({ rodando }: { rodando: boolean }) {
     )
   }
 
-  const usadoPct = typeof total === 'number' && total > 0
+  const usedPct = typeof total === 'number' && total > 0
     ? Math.min(100, Math.max(0, ((total - livre) / total) * 100))
     : null
 
@@ -300,10 +300,10 @@ function Disco({ rodando }: { rodando: boolean }) {
           {gb(livre)}{typeof total === 'number' && ` de ${gb(total)}`}
         </span>
       </div>
-      {usadoPct != null && (
+      {usedPct != null && (
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
           <div className={cn('h-full rounded-full transition-[width] duration-500', cor)}
-               style={{ width: `${usadoPct}%` }} />
+               style={{ width: `${usedPct}%` }} />
         </div>
       )}
       {nivel !== 'ok' && (
@@ -332,7 +332,7 @@ function Aviso({ tom, children }: { tom: 'erro' | 'aviso'; children: React.React
   return <Alerta tom={tom} denso titulo={<span className="font-normal select-text">{children}</span>} />
 }
 
-// ── Tela ─────────────────────────────────────────────────────────────────────
+// ── Screen ─────────────────────────────────────────────────────────────────────
 
 /**
  * `memo` for the same reason as GeoSync: the screen stays MOUNTED behind
@@ -347,10 +347,10 @@ export const Ajustes = memo(function Ajustes({
   /** Tells the shell there are unsaved changes, so it can mark the navigation. */
   aoMudarPendencia?: (pendente: boolean) => void
 }) {
-  const [cfg, setCfg] = useState<ConfigExecucao | null>(null)
-  const [original, setOriginal] = useState<ConfigExecucao | null>(null)
-  const [autostart, setAutostart] = useState<EstadoAutostart | null>(null)
-  const [salvo, setSalvo] = useState(false)
+  const [cfg, setCfg] = useState<RunConfig | null>(null)
+  const [original, setOriginal] = useState<RunConfig | null>(null)
+  const [autostart, setAutostart] = useState<AutostartState | null>(null)
+  const [salvo, setSaved] = useState(false)
 
   const carregar = useCallback(() => {
     void window.atlas.execucao().then((c) => { setCfg(c); setOriginal(c) })
@@ -372,18 +372,18 @@ export const Ajustes = memo(function Ajustes({
 
   if (!cfg || !original) return <p className="text-sm text-muted-foreground">Carregando…</p>
 
-  const patch = (p: Partial<ConfigExecucao>) => { setCfg({ ...cfg, ...p }); setSalvo(false) }
+  const patch = (p: Partial<RunConfig>) => { setCfg({ ...cfg, ...p }); setSaved(false) }
   const valido =
-    dentroDaFaixa(cfg.workers, LIMITES.workers) &&
-    dentroDaFaixa(cfg.filaMax, LIMITES.filaMax) &&
-    dentroDaFaixa(cfg.timeoutS, LIMITES.timeoutS) &&
+    withinRange(cfg.workers, LIMITES.workers) &&
+    withinRange(cfg.filaMax, LIMITES.filaMax) &&
+    withinRange(cfg.timeoutS, LIMITES.timeoutS) &&
     cfg.artifactsDir.trim().length > 0
 
   async function salvar() {
     const atual = await window.atlas.salvarExecucao(cfg!)
     setCfg(atual)
     setOriginal(atual)
-    setSalvo(true)
+    setSaved(true)
   }
 
   return (
@@ -467,7 +467,7 @@ export const Ajustes = memo(function Ajustes({
         descricao="Quanto detalhe o executor grava enquanto trabalha."
       >
         <div role="radiogroup" className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-          {NIVEIS.map((n) => {
+          {LEVELS.map((n) => {
             const ativo = cfg.nivelLog === n.v
             return (
               <button
@@ -530,7 +530,7 @@ export const Ajustes = memo(function Ajustes({
         invalido={!valido}
         rodando={rodando}
         aoSalvar={salvar}
-        aoDescartar={() => { setCfg(original); setSalvo(false) }}
+        aoDescartar={() => { setCfg(original); setSaved(false) }}
       />
     </div>
   )

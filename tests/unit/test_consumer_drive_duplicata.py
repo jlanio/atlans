@@ -30,28 +30,28 @@ from app.core.run_result_consumer import _register_artifacts
 
 
 WS = "ws-1"
-TASK_ATUAL = "task-B"
+CURRENT_TASK = "task-B"
 # The reused row holds the key of an old run; the consumer derives the
 # current run's. That mismatch is the heart of the bug.
-S3_ANTIGA = f"artifacts/{WS}/task-ANTIGO/imovel.geojson"
-S3_DERIVADA = f"artifacts/{WS}/{TASK_ATUAL}/imovel.geojson"
+S3_OLD = f"artifacts/{WS}/task-ANTIGO/imovel.geojson"
+S3_DERIVED = f"artifacts/{WS}/{CURRENT_TASK}/imovel.geojson"
 
 
 def _run() -> MagicMock:
-    return MagicMock(workspace_id=WS, task_id=TASK_ATUAL, workflow_hash="wf-1", host=None)
+    return MagicMock(workspace_id=WS, task_id=CURRENT_TASK, workflow_hash="wf-1", host=None)
 
 
 def _meta(**extra) -> dict:
     base = {
         "output_key": "imovel", "format": "geojson", "features": 51,
-        "filename": "imovel.geojson", "context": "drive", "s3_key": S3_ANTIGA,
+        "filename": "imovel.geojson", "context": "drive", "s3_key": S3_OLD,
     }
     base.update(extra)
     return {"node-1": [base]}
 
 
-def _db(*, id_hash_no_banco: str | None = None, workspace_da_linha: str = WS,
-        s3_keys_no_banco: tuple[str, ...] = ()):
+def _db(*, id_hash_in_db: str | None = None, row_workspace: str = WS,
+        s3_keys_in_db: tuple[str, ...] = ()):
     """Test double that answers per QUERY, not a single value for all of them.
 
     Necessary: a double that returns the same result for everything makes the
@@ -79,11 +79,11 @@ def _db(*, id_hash_no_banco: str | None = None, workspace_da_linha: str = WS,
         if "id_hash" in onde:
             # Without the workspace filter in the SQL, an id from ANOTHER workspace would
             # match — and the guard would suppress this run's record.
-            casa_ws = (workspace_da_linha == WS) if "workspace_id" in onde else True
-            achou = bool(id_hash_no_banco) and casa_ws
-            linhas = [MagicMock(id_hash=id_hash_no_banco)] if achou else []
+            casa_ws = (row_workspace == WS) if "workspace_id" in onde else True
+            achou = bool(id_hash_in_db) and casa_ws
+            linhas = [MagicMock(id_hash=id_hash_in_db)] if achou else []
         elif "s3_key" in onde:
-            linhas = [S3_DERIVADA] if S3_DERIVADA in s3_keys_no_banco else []
+            linhas = [S3_DERIVED] if S3_DERIVED in s3_keys_in_db else []
         else:
             linhas = []
         res.scalars.return_value.all.return_value = linhas
@@ -93,7 +93,7 @@ def _db(*, id_hash_no_banco: str | None = None, workspace_da_linha: str = WS,
     return db
 
 
-def _adicionados(db) -> list:
+def _added(db) -> list:
     from app.models.workspace_file import WorkspaceFile
     return [c.args[0] for c in db.add.call_args_list
             if isinstance(c.args[0], WorkspaceFile)]
@@ -106,7 +106,7 @@ def eventos():
 
 
 @pytest.fixture(autouse=True)
-def _sem_io(eventos):
+def _no_io(eventos):
     """No S3 and no WebSocket; the events go to the `eventos` list."""
     async def _emit(workspace_id, action, file_info, **kwargs):
         eventos.append((action, file_info))
@@ -119,22 +119,22 @@ def _sem_io(eventos):
 
 
 @pytest.mark.asyncio
-async def test_nao_duplica_apos_sobrescrita():
+async def test_does_not_duplicate_after_overwrite():
     """Regression: this is exactly where one copy per run was born.
 
     The id_hash matches in the database and the derived s3_key does NOT exist —
     because the reused row kept the old run's key. The s3_key guard alone lets
     it through.
     """
-    db = _db(id_hash_no_banco="file-1", s3_keys_no_banco=())
+    db = _db(id_hash_in_db="file-1", s3_keys_in_db=())
 
     await _register_artifacts(db, _run(), _meta(drive_file_id="file-1"))
 
-    assert _adicionados(db) == []
+    assert _added(db) == []
 
 
 @pytest.mark.asyncio
-async def test_executor_e_avisado_mesmo_sem_criar_linha(eventos):
+async def test_executor_is_notified_even_without_creating_row(eventos):
     """Regression introduced when suppressing the creation: the executor was left without the event.
 
     `agent_confirm_upload` emits with exclude_agent_id=<executor that uploaded>,
@@ -145,19 +145,19 @@ async def test_executor_e_avisado_mesmo_sem_criar_linha(eventos):
     locally. Without this emission, SYNC_MODE download/bidirectional stops
     receiving the file.
     """
-    db = _db(id_hash_no_banco="file-1")
+    db = _db(id_hash_in_db="file-1")
 
     await _register_artifacts(db, _run(), _meta(drive_file_id="file-1", drive_reused=True))
 
-    assert _adicionados(db) == []
+    assert _added(db) == []
     assert len(eventos) == 1
     acao, _info = eventos[0]
     assert acao == "file_updated"
 
 
 @pytest.mark.asyncio
-async def test_arquivo_novo_avisa_como_criacao(eventos):
-    db = _db(id_hash_no_banco="file-1")
+async def test_new_file_notifies_as_creation(eventos):
+    db = _db(id_hash_in_db="file-1")
 
     await _register_artifacts(db, _run(), _meta(drive_file_id="file-1", drive_reused=False))
 
@@ -165,8 +165,8 @@ async def test_arquivo_novo_avisa_como_criacao(eventos):
 
 
 @pytest.mark.asyncio
-async def test_linha_criada_aqui_tambem_avisa(eventos):
-    db = _db(id_hash_no_banco=None, s3_keys_no_banco=())
+async def test_row_created_here_also_notifies(eventos):
+    db = _db(id_hash_in_db=None, s3_keys_in_db=())
 
     await _register_artifacts(db, _run(), _meta())
 
@@ -174,55 +174,55 @@ async def test_linha_criada_aqui_tambem_avisa(eventos):
 
 
 @pytest.mark.asyncio
-async def test_id_inexistente_nao_impede_o_registro():
+async def test_nonexistent_id_does_not_prevent_registration():
     """The id comes from the executor, so it is not trusted on its own."""
-    db = _db(id_hash_no_banco=None)
+    db = _db(id_hash_in_db=None)
 
     await _register_artifacts(db, _run(), _meta(drive_file_id="file-forjado"))
 
-    assert len(_adicionados(db)) == 1
+    assert len(_added(db)) == 1
 
 
 @pytest.mark.asyncio
-async def test_id_de_outro_workspace_nao_impede_o_registro():
+async def test_id_from_another_workspace_does_not_prevent_registration():
     """The guard has to restrict to the run's workspace — otherwise a valid id_hash
     from another workspace would suppress this one's record."""
-    db = _db(id_hash_no_banco="file-de-outro", workspace_da_linha="ws-2")
+    db = _db(id_hash_in_db="file-de-outro", row_workspace="ws-2")
 
     await _register_artifacts(db, _run(), _meta(drive_file_id="file-de-outro"))
 
-    assert len(_adicionados(db)) == 1
+    assert len(_added(db)) == 1
 
 
 @pytest.mark.asyncio
-async def test_sem_drive_file_id_mantem_a_guarda_por_s3_key():
+async def test_without_drive_file_id_keeps_the_s3_key_guard():
     """A path that did not go through executor-upload-url is still protected."""
-    db = _db(id_hash_no_banco=None, s3_keys_no_banco=(S3_DERIVADA,))
+    db = _db(id_hash_in_db=None, s3_keys_in_db=(S3_DERIVED,))
 
     await _register_artifacts(db, _run(), _meta())
 
-    assert _adicionados(db) == []
+    assert _added(db) == []
 
 
 @pytest.mark.asyncio
-async def test_cria_a_linha_quando_ninguem_registrou():
-    db = _db(id_hash_no_banco=None, s3_keys_no_banco=())
+async def test_creates_the_row_when_nobody_registered():
+    db = _db(id_hash_in_db=None, s3_keys_in_db=())
 
     await _register_artifacts(db, _run(), _meta())
 
-    criadas = _adicionados(db)
+    criadas = _added(db)
     assert len(criadas) == 1
     # The key is still the DERIVED one — the SEG of _derive_s3_key does not change.
-    assert criadas[0].s3_key == S3_DERIVADA
+    assert criadas[0].s3_key == S3_DERIVED
     assert criadas[0].status == "confirmed"
 
 
 @pytest.mark.asyncio
-async def test_artefato_comum_nao_e_afetado():
+async def test_plain_artifact_is_not_affected():
     """context="artifacts" does not go through the Drive guard."""
     from app.models.workspace_file import WorkspaceFile
 
-    db = _db(id_hash_no_banco="file-1")
+    db = _db(id_hash_in_db="file-1")
 
     await _register_artifacts(db, _run(), _meta(context="artifacts", drive_file_id="file-1"))
 
@@ -231,9 +231,9 @@ async def test_artefato_comum_nao_e_afetado():
 
 
 @pytest.mark.asyncio
-async def test_run_sem_workspace_nao_registra_nada():
-    db = _db(id_hash_no_banco=None)
-    run = MagicMock(workspace_id=None, task_id=TASK_ATUAL, host=None)
+async def test_run_without_workspace_registers_nothing():
+    db = _db(id_hash_in_db=None)
+    run = MagicMock(workspace_id=None, task_id=CURRENT_TASK, host=None)
 
     await _register_artifacts(db, run, _meta(drive_file_id="file-1"))
 

@@ -46,14 +46,14 @@ def _has_min_workspace_role(actual: Optional[str], minimum: str) -> bool:
         return False
 
 
-tem_papel_minimo = _has_min_workspace_role
+has_minimum_role = _has_min_workspace_role
 
 
 def exigir_papel(role: Optional[str], minimo: str, mensagem: Optional[str] = None) -> None:
     """403 if the role does not reach the minimum. The message is the route's, when it has its own.
 
     Every route role comparison goes through here: REST via the
-    `workflow_com_papel` dependency and via `exigir_papel_no_workspace`, MCP directly.
+    `workflow_com_papel` dependency and via `require_workspace_role`, MCP directly.
     """
     if not _has_min_workspace_role(role, minimo):
         raise HTTPException(
@@ -137,7 +137,7 @@ async def get_workspace_member_role(
     return member_result.scalar_one_or_none()
 
 
-async def exigir_papel_no_workspace(
+async def require_workspace_role(
     db: AsyncSession,
     workspace_id: Optional[str],
     user_id: str,
@@ -164,14 +164,14 @@ async def exigir_papel_no_workspace(
 # ── Workflows and runs ────────────────────────────────────────────────────────
 
 
-async def carregar_workflow_acessivel(
+async def load_accessible_workflow(
     service,
     db: AsyncSession,
     id_hash: str,
     user_id: str,
     *,
     decifrar: bool = True,
-    aceitar_sem_papel: bool = False,
+    accept_without_role: bool = False,
 ) -> Tuple[object, Optional[str]]:
     """(workflow, role) — or 404 if it does not exist/is deleted, 403 if the user is not in the workspace.
 
@@ -202,16 +202,16 @@ async def carregar_workflow_acessivel(
         # A member of a workspace WITHOUT an owner (`owner_id` null: old or hand-edited
         # data) has no role, because `get_workspace_member_role` exits early without
         # an owner. But they belong to the workspace, as `listar_workspace_ids` says, and the
-        # listing shows them the workflow. With `aceitar_sem_papel` (REST), they
+        # listing shows them the workflow. With `accept_without_role` (REST), they
         # get (wf, None): reading goes through, and every route with a minimum role
         # refuses them, as before the single guard.
-        if aceitar_sem_papel and wf.workspace_id in await listar_workspace_ids(db, user_id):
+        if accept_without_role and wf.workspace_id in await listar_workspace_ids(db, user_id):
             return wf, None
         raise HTTPException(status_code=403, detail="Acesso negado a este recurso.")
     return wf, role
 
 
-async def papel_no_workspace_do_run(db: AsyncSession, run, user_id: str) -> Optional[str]:
+async def role_in_run_workspace(db: AsyncSession, run, user_id: str) -> Optional[str]:
     """The user's role in the workspace where the run actually ran (`run.workspace_id`).
 
     It is the criterion for canceling/viewing a run: a workflow may have been moved

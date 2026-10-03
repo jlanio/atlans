@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { act, renderHook, waitFor } from "@testing-library/react"
-import type { IConversaResumo } from "@/service/types"
+import type { IConversationSummary } from "@/service/types"
 
 /**
  * The hook for the "Recentes" (the Home's Chats list): the list mirrors the server
@@ -15,15 +15,15 @@ vi.mock("@/service/GisFlowService", () => ({ GisFlowService: servico }))
 
 import { useConversas, comAnuncio } from "@/app/hooks/home/useConversas"
 
-const linha = (id: string, extra: Partial<IConversaResumo> = {}): IConversaResumo => ({
+const linha = (id: string, extra: Partial<IConversationSummary> = {}): IConversationSummary => ({
   id, titulo: `Conversa ${id}`, workflow_id: null, tokens_total: 0,
   created_at: "2026-09-10T12:00:00Z", updated_at: "2026-09-10T12:00:00Z", ...extra,
 })
-const ok = (itens: IConversaResumo[], total: number) => ({ success: true, status: 200, data: { itens, total } })
+const ok = (itens: IConversationSummary[], total: number) => ({ success: true, status: 200, data: { itens, total } })
 const falhou = (status = 500, message = "Erro inesperado.") => ({ success: false, status, error: { message }, data: undefined })
 
 /** A server with `n` conversations, c0 the most recent, paginated like the API (ceiling 100). */
-function servidorCom(n: number) {
+function serverWith(n: number) {
   const todas = Array.from({ length: n }, (_, i) => linha(`c${i}`))
   servico.listarConversas.mockImplementation(async (limit: number, offset = 0) =>
     ok(todas.slice(offset, offset + Math.min(limit, 100)), n),
@@ -88,7 +88,7 @@ describe("comAnuncio — a lista que o servidor devolveria, sem ir buscar", () =
 
 describe("useConversas — o anúncio do stream", () => {
   it("a conversa nova entra no topo e o total sobe 1 — sem rede", async () => {
-    servidorCom(2)
+    serverWith(2)
     const { result } = await montar()
     act(() => { result.current.anunciar({ id: "c9", titulo: "Focos em Rondônia", nova: true }) })
     expect(result.current.conversas.map((c) => c.id)).toEqual(["c9", "c0", "c1"])
@@ -98,7 +98,7 @@ describe("useConversas — o anúncio do stream", () => {
   })
 
   it("a conversa existente sobe; o total não muda", async () => {
-    servidorCom(3)
+    serverWith(3)
     const { result } = await montar()
     act(() => { result.current.anunciar({ id: "c2", titulo: "Conversa c2", nova: false }) })
     expect(result.current.conversas.map((c) => c.id)).toEqual(["c2", "c0", "c1"])
@@ -106,7 +106,7 @@ describe("useConversas — o anúncio do stream", () => {
   })
 
   it("um anúncio 'nova' de conversa que a carga já trouxe não soma ao total", async () => {
-    servidorCom(2)
+    serverWith(2)
     const { result } = await montar()
     act(() => { result.current.anunciar({ id: "c1", titulo: "Conversa c1", nova: true }) })
     expect(result.current.conversas).toHaveLength(2)
@@ -114,7 +114,7 @@ describe("useConversas — o anúncio do stream", () => {
   })
 
   it("renomear troca o título E sobe a linha — o servidor carimba updated_at no PATCH", async () => {
-    servidorCom(3)
+    serverWith(3)
     servico.renomearConversa.mockResolvedValue({ success: true, status: 200, data: {} })
     const { result } = await montar()
     let r: { ok: boolean } | undefined
@@ -125,7 +125,7 @@ describe("useConversas — o anúncio do stream", () => {
   })
 
   it("apagar remove a linha e desconta o total", async () => {
-    servidorCom(3)
+    serverWith(3)
     servico.apagarConversa.mockResolvedValue({ success: true, status: 204 })
     const { result } = await montar()
     await act(async () => { await result.current.apagar("c1") })
@@ -136,8 +136,8 @@ describe("useConversas — o anúncio do stream", () => {
 
 describe("useConversas — a recarga preserva a profundidade", () => {
   /** 237 conversations: 3 pages (100, 100, 37) after two "Ver mais". */
-  async function comTresPaginas() {
-    servidorCom(237)
+  async function withThreePages() {
+    serverWith(237)
     const r = await montar()
     expect(r.result.current.conversas).toHaveLength(100)
     expect(chamadas()).toEqual([[100, 0]])
@@ -150,7 +150,7 @@ describe("useConversas — a recarga preserva a profundidade", () => {
   }
 
   it("a 1ª carga custa um GET só", async () => {
-    servidorCom(5)
+    serverWith(5)
     await montar()
     expect(chamadas()).toEqual([[100, 0]])
   })
@@ -158,7 +158,7 @@ describe("useConversas — a recarga preserva a profundidade", () => {
   it("recarregar relê as três páginas (não só a primeira) e mantém as 237 linhas", async () => {
     // The defect: `recarregar` was always the 1st page and REPLACED the list —
     // after "Ver mais", "Tentar de novo" took the list back to 100.
-    const { result } = await comTresPaginas()
+    const { result } = await withThreePages()
     await act(async () => { result.current.recarregar() })
     await waitFor(() => expect(result.current.atualizando).toBe(false))
     expect(chamadas()).toEqual([[100, 0], [100, 100], [100, 200]])
@@ -167,7 +167,7 @@ describe("useConversas — a recarga preserva a profundidade", () => {
   })
 
   it("uma página ruim deixa a lista como estava, com o erro no rodapé", async () => {
-    const { result } = await comTresPaginas()
+    const { result } = await withThreePages()
     servico.listarConversas.mockImplementation(async (_limit: number, offset = 0) =>
       offset === 100 ? falhou(503) : ok([], 237),
     )
@@ -179,25 +179,25 @@ describe("useConversas — a recarga preserva a profundidade", () => {
   })
 
   it("a resposta de uma recarga superada por outra é descartada", async () => {
-    servidorCom(2)
+    serverWith(2)
     const { result } = await montar()
-    let resolverVelha!: (r: unknown) => void
-    servico.listarConversas.mockImplementationOnce(() => new Promise((r) => { resolverVelha = r }))
+    let resolveStale!: (r: unknown) => void
+    servico.listarConversas.mockImplementationOnce(() => new Promise((r) => { resolveStale = r }))
     act(() => { result.current.recarregar() })
-    servidorCom(3)
+    serverWith(3)
     await act(async () => { result.current.recarregar() })
     await waitFor(() => expect(result.current.conversas).toHaveLength(3))
-    await act(async () => { resolverVelha(ok([linha("velha")], 1)) })
+    await act(async () => { resolveStale(ok([linha("velha")], 1)) })
     expect(result.current.conversas).toHaveLength(3)
   })
 
   it("'Tentar de novo' depois de um 'Ver mais' que falhou pede a PÁGINA, não a lista inteira", async () => {
-    const { result } = await comTresPaginas()
+    const { result } = await withThreePages()
     servico.listarConversas.mockResolvedValueOnce(falhou(503))
     await act(async () => { result.current.carregarMais() })
     await waitFor(() => expect(result.current.erro).toBe("Não foi possível carregar mais conversas."))
     servico.listarConversas.mockClear()
-    servidorCom(300)
+    serverWith(300)
     await act(async () => { result.current.tentarDeNovo() })
     await waitFor(() => expect(result.current.conversas).toHaveLength(300))
     expect(chamadas()).toEqual([[100, 237]])
@@ -205,13 +205,13 @@ describe("useConversas — a recarga preserva a profundidade", () => {
   })
 
   it("'Tentar de novo' depois de uma recarga que falhou refaz a recarga", async () => {
-    servidorCom(2)
+    serverWith(2)
     const { result } = await montar()
     servico.listarConversas.mockResolvedValueOnce(falhou(503))
     await act(async () => { result.current.recarregar() })
     await waitFor(() => expect(result.current.erro).toBeTruthy())
     servico.listarConversas.mockClear()
-    servidorCom(2)
+    serverWith(2)
     await act(async () => { result.current.tentarDeNovo() })
     await waitFor(() => expect(result.current.erro).toBeNull())
     expect(chamadas()).toEqual([[100, 0]])

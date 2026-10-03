@@ -45,7 +45,7 @@ def _agora_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _como_utc(valor: datetime) -> datetime:
+def _as_utc(valor: datetime) -> datetime:
     """Normalizes a user datetime to AWARE, assuming UTC if it comes without a
     time zone — the same pitfall as `_agora_utc`, now coming from `?date_from=`.
 
@@ -57,10 +57,10 @@ def _como_utc(valor: datetime) -> datetime:
 
 
 def _iso(valor: Optional[datetime]) -> Optional[str]:
-    return _como_utc(valor).isoformat() if valor else None
+    return _as_utc(valor).isoformat() if valor else None
 
 
-def _zona(tz: str) -> ZoneInfo:
+def _zone(tz: str) -> ZoneInfo:
     """IANA time zone from `?tz=`. The router already rejects with 422; this is the safety
     net for direct calls to the service."""
     try:
@@ -138,7 +138,7 @@ def _run_filter(user, workspace_ids: List[str], *, como_admin: bool = False) -> 
     return [WorkflowRun.workspace_id.in_(workspace_ids)]
 
 
-async def _resolver_escopo(
+async def _resolve_scope(
     db: AsyncSession,
     user,
     workspace_ids: List[str],

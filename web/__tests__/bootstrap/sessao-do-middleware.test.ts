@@ -72,8 +72,8 @@ describe("handoff de sessão middleware → SSR", () => {
   it("desiste de sessão grande demais em vez de estourar o limite de cabeçalho", () => {
     // A giant header kills the whole request in the proxy/Node; better for the
     // layout to fall back to auth() than for the page not to load.
-    const gorda = { user: { ...sessao.user, access_token: "x".repeat(9000) } }
-    expect(encodeSessionHeader(gorda)).toBeNull()
+    const oversized = { user: { ...sessao.user, access_token: "x".repeat(9000) } }
+    expect(encodeSessionHeader(oversized)).toBeNull()
   })
 
   it("sessão nula não vira cabeçalho", () => {

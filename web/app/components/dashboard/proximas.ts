@@ -9,7 +9,7 @@ import { dayjs, fromBackend } from "@/lib/dayjs"
  * name and schedule text with `projects/gatilho.ts`.
  */
 
-export const MAXIMO_DE_PROXIMAS = 5
+export const MAX_UPCOMING = 5
 
 export function proximas(workflows: IWorkflow[], agora: Date = new Date()): IWorkflow[] {
   const ref = dayjs(agora)
@@ -20,6 +20,6 @@ export function proximas(workflows: IWorkflow[], agora: Date = new Date()): IWor
     .filter(({ wf, proxima }) =>
       Boolean(wf.schedule?.active) && wf.flag_ative && proxima != null && proxima.isAfter(ref))
     .sort((a, b) => a.proxima!.valueOf() - b.proxima!.valueOf())
-    .slice(0, MAXIMO_DE_PROXIMAS)
+    .slice(0, MAX_UPCOMING)
     .map(({ wf }) => wf)
 }

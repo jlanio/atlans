@@ -18,7 +18,7 @@ export interface UploadError {
 }
 
 /** The category of each Drive rejection code (`error` in the body). */
-const TIPO_DO_CODIGO: Record<UploadErrorCode, UploadErrorType> = {
+const TYPE_BY_CODE: Record<UploadErrorCode, UploadErrorType> = {
   extension_not_allowed:     "extension",
   dangerous_inner_extension: "extension",
   empty_file:                "empty",
@@ -39,7 +39,7 @@ export function classifyUploadError(status: number | undefined, codigo: string |
   if (status === 403) return "permission"
   if (status === 413) return "size"
   // `hasOwn`, not the raw index: a code like "constructor" would find the prototype's.
-  return codigo && Object.hasOwn(TIPO_DO_CODIGO, codigo) ? TIPO_DO_CODIGO[codigo as UploadErrorCode] : "other"
+  return codigo && Object.hasOwn(TYPE_BY_CODE, codigo) ? TYPE_BY_CODE[codigo as UploadErrorCode] : "other"
 }
 
 /**
@@ -56,14 +56,14 @@ const ERROR_META: Record<UploadErrorType, { icon: React.ElementType; color: stri
 }
 
 /** The panel's texts. Default: the Drive's Portuguese; the translated Home passes its own. */
-export interface TextosDoResultado {
+export interface ResultTexts {
   enviados: (n: number) => string
   falhas: (n: number) => string
   fechar: string
   tipos: Record<UploadErrorType, string>
 }
 
-export const TEXTOS_DO_RESULTADO_PT: TextosDoResultado = {
+export const TEXTOS_DO_RESULTADO_PT: ResultTexts = {
   enviados: (n) => plural(n, "enviado"),
   falhas: (n) => plural(n, "falha"),
   fechar: "Fechar o resultado do envio",
@@ -77,9 +77,9 @@ export const TEXTOS_DO_RESULTADO_PT: TextosDoResultado = {
 }
 
 /** Result panel of the last upload: how many went through, what failed and why. */
-export function ResultadoDoUpload({
+export function UploadResult({
   sucessos, erros, onFechar, textos = TEXTOS_DO_RESULTADO_PT,
-}: { sucessos: number; erros: UploadError[]; onFechar: () => void; textos?: TextosDoResultado }) {
+}: { sucessos: number; erros: UploadError[]; onFechar: () => void; textos?: ResultTexts }) {
   return (
     <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
       <div className="flex items-center justify-between border-b bg-muted/40 px-4 py-2.5">

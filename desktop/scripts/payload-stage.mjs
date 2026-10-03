@@ -26,7 +26,7 @@ import { REPO, RESOURCES, dirSize, fail, log, mb, ok, sortedEntries, rmrf, step 
 
 // Exclusions per source. Developer secrets (.env, certs/) must NEVER end up
 // in the installer — the app uses %APPDATA%\AtlansExecutor for that.
-const ALVOS = [
+const TARGETS = [
   {
     nome: 'executor',
     excluir: [
@@ -59,7 +59,7 @@ function copiar(origem, destino, excluir) {
 step('Copiando payload Python')
 fs.mkdirSync(RESOURCES, { recursive: true })
 
-for (const alvo of ALVOS) {
+for (const alvo of TARGETS) {
   const origem = path.join(REPO, alvo.nome)
   if (!fs.existsSync(origem)) fail(`nao encontrei ${origem}`)
   const destino = path.join(RESOURCES, alvo.nome)

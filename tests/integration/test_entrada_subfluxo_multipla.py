@@ -30,9 +30,9 @@ def _script(node_id, code, saida="result"):
             "properties": {"code": code, "output_vars": saida, "timeout": 20}}
 
 
-def _rodar_pai(filho, edges_pai_para_sub):
+def _run_parent(filho, parent_to_sub_edges):
     """Parent that feeds the `sub` node with {focos: 'FOCOS', bbox: 'BBOX'} coming
-    from two distinct nodes, through the edges in `edges_pai_para_sub`."""
+    from two distinct nodes, through the edges in `parent_to_sub_edges`."""
     from flow.executor import WorkflowExecutor
 
     pai = {
@@ -47,7 +47,7 @@ def _rodar_pai(filho, edges_pai_para_sub):
         "edges": [
             {"source": "t", "target": "pf"},
             {"source": "t", "target": "pb"},
-            *edges_pai_para_sub,
+            *parent_to_sub_edges,
         ],
     }
     publisher = MagicMock()
@@ -61,13 +61,13 @@ def _rodar_pai(filho, edges_pai_para_sub):
 
 
 # Each source lands on ITS OWN input port of the sub (distinct to_key).
-PAI_PARA_SUB = [
+PARENT_TO_SUB = [
     {"source": "pf", "target": "sub", "from_key": "result", "to_key": "focos"},
     {"source": "pb", "target": "sub", "from_key": "result", "to_key": "bbox"},
 ]
 
 
-def _filho_passthrough():
+def _passthrough_child():
     return {
         "nodes": [
             {"id": "in", "type": "trigger", "name": "SubWorkflowInput", "properties": {"ports": []}},
@@ -77,15 +77,15 @@ def _filho_passthrough():
     }
 
 
-def test_invoke_recebe_duas_entradas_cada_uma_na_sua_chave():
+def test_invoke_receives_two_inputs_each_in_its_own_key():
     """The reported bug: passing 2 values to the sub. With a `to_key` per port,
     each source lands on its own key — no 'last one wins' collision."""
-    saida = _rodar_pai(_filho_passthrough(), PAI_PARA_SUB)["sub"]
+    saida = _run_parent(_passthrough_child(), PARENT_TO_SUB)["sub"]
 
     assert saida["subWorkflowResult"] == {"focos": "FOCOS", "bbox": "BBOX"}
 
 
-def test_trigger_escolhe_o_que_passa_adiante_por_from_key():
+def test_trigger_chooses_what_passes_on_via_from_key():
     """The reported bug: in the sub-workflow, choosing through the edge what the
     trigger sends to each node. Each edge leaving the trigger carries
     `from_key` = the port, so the target receives ONLY that key (here, routed
@@ -102,7 +102,7 @@ def test_trigger_escolhe_o_que_passa_adiante_por_from_key():
             {"source": "in", "target": "out", "from_key": "bbox", "to_key": "b"},
         ],
     }
-    saida = _rodar_pai(filho, PAI_PARA_SUB)["sub"]
+    saida = _run_parent(filho, PARENT_TO_SUB)["sub"]
 
     # `focos` went only to port `a`, `bbox` only to port `b`: if the trigger
     # had spread the whole dict, the rename by to_key would pick the 1st value
@@ -111,24 +111,24 @@ def test_trigger_escolhe_o_que_passa_adiante_por_from_key():
     assert saida["b"] == "BBOX"
 
 
-def test_passthrough_sem_portas_continua_espalhando():
+def test_passthrough_without_ports_keeps_spreading():
     """NON-REGRESSION: a trigger without declared ports keeps spreading the whole
     dict (edge without `from_key`) — existing sub-workflows do not change."""
-    saida = _rodar_pai(_filho_passthrough(), PAI_PARA_SUB)["sub"]
+    saida = _run_parent(_passthrough_child(), PARENT_TO_SUB)["sub"]
 
     assert saida["subWorkflowResult"] == {"focos": "FOCOS", "bbox": "BBOX"}
 
 
-def test_o_defeito_que_a_regra_evita():
+def test_the_defect_the_rule_prevents():
     """Without `to_key`, the two parent->sub edges use the `from_key` ('result')
     as the name and collide in inputs.update() — the last one wins. That is
     why the editor fills `to_key` per named port; the frontend fix avoids this
     state."""
-    sem_to_key = [
+    without_to_key = [
         {"source": "pf", "target": "sub", "from_key": "result"},
         {"source": "pb", "target": "sub", "from_key": "result"},
     ]
-    saida = _rodar_pai(_filho_passthrough(), sem_to_key)["sub"]
+    saida = _run_parent(_passthrough_child(), without_to_key)["sub"]
 
     publico = saida["subWorkflowResult"]
     assert list(publico) == ["result"]
@@ -137,7 +137,7 @@ def test_o_defeito_que_a_regra_evita():
 
 # ── The node contract ────────────────────────────────────────────────────────
 
-def test_subworkflowinput_declara_saidas_por_ports():
+def test_subworkflowinput_declares_outputs_via_ports():
     """`outputs_from_ports` is what makes the editor derive the trigger's OUTPUT
     connection points from the `ports` property — each port becomes an output
     handle, and the edge leaving it carries `from_key`. Without it the trigger

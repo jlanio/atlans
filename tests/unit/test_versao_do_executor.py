@@ -23,19 +23,19 @@ from executor import versao as V
 
 RAIZ = Path(__file__).resolve().parents[2]
 SHA = "3f02f442d1c0ffee0123456789abcdef01234567"  # pragma: allowlist secret
-OUTRO_SHA = "0123456789abcdef0123456789abcdef01234567"  # pragma: allowlist secret
+OTHER_SHA = "0123456789abcdef0123456789abcdef01234567"  # pragma: allowlist secret
 
 
 # ── Which version wins ───────────────────────────────────────────────────────
 
-def test_a_gravada_na_imagem_vence_o_env(tmp_path):
+def test_the_one_stored_in_the_image_wins_over_the_env(tmp_path):
     arquivo = tmp_path / "VERSAO"
     arquivo.write_text("2.15.0+3f02f44\n")
     assert V.versao_do_executor({"EXECUTOR_VERSION": "1.0.0"}, arquivo) == "2.15.0+3f02f44"
 
 
 @pytest.mark.parametrize("conteudo", [None, "", "  \n"])
-def test_sem_a_gravada_vale_o_env_como_no_desktop(tmp_path, conteudo):
+def test_without_the_stored_one_the_env_applies_as_on_desktop(tmp_path, conteudo):
     arquivo = tmp_path / "VERSAO"
     if conteudo is not None:
         arquivo.write_text(conteudo)
@@ -49,26 +49,26 @@ def test_sem_a_gravada_vale_o_env_como_no_desktop(tmp_path, conteudo):
     ("2.15.0+" + "a" * 30).encode(),     # grande demais: o servidor descartaria
     b"2.15\x00.0",                       # not printable
 ])
-def test_arquivo_estragado_nao_derruba_o_executor(tmp_path, conteudo):
+def test_corrupt_file_does_not_break_the_executor(tmp_path, conteudo):
     arquivo = tmp_path / "VERSAO"
     arquivo.write_bytes(conteudo)
     assert V.versao_do_executor({"EXECUTOR_VERSION": "2.15.1"}, arquivo) == "2.15.1"
 
 
-def test_a_gravada_mora_fora_da_arvore_do_codigo():
+def test_the_stored_one_lives_outside_the_code_tree():
     """In the checkout it would beat the EXECUTOR_VERSION of the desktop and the
     CLI — and a local build would leave it behind without git warning."""
     assert not V.ARQUIVO_DA_IMAGEM.is_relative_to(RAIZ)
     assert V.ARQUIVO_DA_IMAGEM.is_absolute()
 
 
-def test_a_config_do_executor_usa_a_resolucao():
+def test_the_executor_config_uses_the_resolution():
     from executor import config
 
     assert config.EXECUTOR_VERSION == V.versao_do_executor()
 
 
-def test_o_enroll_declara_a_mesma_versao_do_handshake(tmp_path, monkeypatch):
+def test_the_enroll_declares_the_same_version_as_the_handshake(tmp_path, monkeypatch):
     """The enroll read `executor.__version__`, which does not exist, and always
     fell back to "1.0.0" — whatever the version of the image or the desktop app."""
     import httpx
@@ -95,7 +95,7 @@ def test_o_enroll_declara_a_mesma_versao_do_handshake(tmp_path, monkeypatch):
     ("2.16.0-release-candidate.12", "1.0.0"),             # no commit to shorten: the default
     ("2.15\x00.0", "1.0.0"),                              # not printable
 ])
-def test_env_fora_da_regua_nao_vai_cru_ao_enroll(tmp_path, no_env, esperada):
+def test_out_of_rule_env_does_not_go_raw_to_enroll(tmp_path, no_env, esperada):
     """The enroll validates `executor_version` (up to 20 characters) and refused
     with 422 the raw `EXECUTOR_VERSION` of a local build — the re-enroll too."""
     from app.schemas.executor_enrollment import EnrollRequest
@@ -115,7 +115,7 @@ def test_env_fora_da_regua_nao_vai_cru_ao_enroll(tmp_path, no_env, esperada):
      "Validation failed (executor_version: String should have at most 20 characters)"),
     (403, {"detail": "OTP inválido"}, "OTP inválido"),
 ])
-def test_a_recusa_do_enroll_diz_o_motivo(tmp_path, monkeypatch, status, corpo, motivo):
+def test_the_enroll_refusal_states_the_reason(tmp_path, monkeypatch, status, corpo, motivo):
     """Only `detail` was read, and the server responds with `message`: the refusal
     came out as "Servidor recusou enrollment (status 401): " — with no reason."""
     import httpx
@@ -144,13 +144,13 @@ def test_a_recusa_do_enroll_diz_o_motivo(tmp_path, monkeypatch, status, corpo, m
     ("2.16.0-release-candidate.12", None, ""),           # nothing acceptable: nothing is written
     ("", SHA, "3f02f44"),
 ])
-def test_compor(base, commit, esperada):
+def test_compose_version(base, commit, esperada):
     versao = V.compor(base, commit)
     assert versao == esperada
-    assert len(versao) <= V.TAMANHO_MAXIMO
+    assert len(versao) <= V.MAX_LENGTH
 
 
-def test_o_servidor_aceita_a_versao_composta():
+def test_the_server_accepts_the_composed_version():
     """Above 20 characters the server discards it and the dashboard has no version."""
     versao = V.compor("2.15.0", SHA)
     assert _sanitize_executor_version("ex-1", versao) == versao
@@ -158,7 +158,7 @@ def test_o_servidor_aceita_a_versao_composta():
 
 # ── The commit comes from the checkout itself ────────────────────────────────
 
-def _pasta_do_build(tmp_path, head, *, soltas=None, empacotadas=None, versao="2.15.0"):
+def _pasta_do_build(tmp_path, head, *, soltas=None, packed=None, versao="2.15.0"):
     """The layout of the Dockerfile's COPY: package.json, HEAD and packed-refs at
     the root, the CONTENTS of .git/refs (heads/, tags/) alongside."""
     pasta = tmp_path / "versao"
@@ -170,58 +170,58 @@ def _pasta_do_build(tmp_path, head, *, soltas=None, empacotadas=None, versao="2.
         caminho = pasta / ref[len("refs/"):]
         caminho.parent.mkdir(parents=True, exist_ok=True)
         caminho.write_text(sha + "\n")
-    if empacotadas:
+    if packed:
         linhas = ["# pack-refs with: peeled fully-peeled sorted"]
-        linhas += [f"{sha} {ref}" for ref, sha in empacotadas.items()]
+        linhas += [f"{sha} {ref}" for ref, sha in packed.items()]
         (pasta / "packed-refs").write_text("\n".join(linhas) + "\n")
     return pasta
 
 
-def test_commit_da_ref_solta(tmp_path):
+def test_commit_from_the_loose_ref(tmp_path):
     pasta = _pasta_do_build(tmp_path, "ref: refs/heads/trabalho/ramo", soltas={"refs/heads/trabalho/ramo": SHA})
     assert V.commit_do_git(pasta) == SHA
 
 
-def test_a_ref_solta_vence_a_empacotada(tmp_path):
+def test_the_loose_ref_wins_over_the_packed_one(tmp_path):
     """install.sh's shallow clone packs the refs; the following `git pull`
     updates only the loose one. Reading the packed one would give the commit
     from before the pull."""
     pasta = _pasta_do_build(
         tmp_path, "ref: refs/heads/main",
-        soltas={"refs/heads/main": SHA}, empacotadas={"refs/heads/main": OUTRO_SHA},
+        soltas={"refs/heads/main": SHA}, packed={"refs/heads/main": OTHER_SHA},
     )
     assert V.commit_do_git(pasta) == SHA
 
 
-def test_commit_da_ref_empacotada(tmp_path):
-    pasta = _pasta_do_build(tmp_path, "ref: refs/heads/main", empacotadas={"refs/heads/main": SHA})
+def test_commit_from_the_packed_ref(tmp_path):
+    pasta = _pasta_do_build(tmp_path, "ref: refs/heads/main", packed={"refs/heads/main": SHA})
     assert V.commit_do_git(pasta) == SHA
 
 
-def test_head_destacado(tmp_path):
+def test_detached_head(tmp_path):
     """The Actions checkout of a tag leaves HEAD detached."""
     assert V.commit_do_git(_pasta_do_build(tmp_path, SHA)) == SHA
 
 
 @pytest.mark.parametrize("head", [None, "ref: refs/heads/sumiu", "lixo", "ref: ../../etc/passwd", "ref: refs/../../etc/passwd"])
-def test_sem_como_saber_o_commit(tmp_path, head):
+def test_no_way_to_know_the_commit(tmp_path, head):
     assert V.commit_do_git(_pasta_do_build(tmp_path, head)) is None
 
 
-def test_gravar_com_o_commit_do_checkout(tmp_path):
+def test_store_with_the_checkout_commit(tmp_path):
     pasta = _pasta_do_build(tmp_path, "ref: refs/heads/main", soltas={"refs/heads/main": SHA})
     destino = tmp_path / "share" / "VERSAO"
     assert V.gravar(pasta, destino) == "2.15.0+3f02f44"
     assert destino.read_text() == "2.15.0+3f02f44"
 
 
-def test_os_argumentos_do_release_valem_mais(tmp_path):
-    pasta = _pasta_do_build(tmp_path, "ref: refs/heads/main", soltas={"refs/heads/main": OUTRO_SHA})
+def test_the_release_arguments_take_precedence(tmp_path):
+    pasta = _pasta_do_build(tmp_path, "ref: refs/heads/main", soltas={"refs/heads/main": OTHER_SHA})
     destino = tmp_path / "VERSAO"
     assert V.gravar(pasta, destino, commit=SHA, base="v1.4.2") == "1.4.2+3f02f44"   # without the tag's "v"
 
 
-def test_gravar_sem_versao_aceitavel_nao_derruba_o_build(tmp_path, capsys):
+def test_store_without_acceptable_version_does_not_break_the_build(tmp_path, capsys):
     pasta = _pasta_do_build(tmp_path, None, versao="2.16.0-release-candidate.12")
     destino = tmp_path / "VERSAO"
     assert V.gravar(pasta, destino) is None
@@ -229,7 +229,7 @@ def test_gravar_sem_versao_aceitavel_nao_derruba_o_build(tmp_path, capsys):
     assert "aviso" in capsys.readouterr().err
 
 
-def test_o_comando_do_dockerfile_grava_no_destino(tmp_path):
+def test_the_dockerfile_command_writes_to_the_destination(tmp_path):
     """The same command as Dockerfile.executor, on a copy of the package and with
     the real version from desktop/package.json."""
     (tmp_path / "executor").mkdir()
@@ -250,7 +250,7 @@ def test_o_comando_do_dockerfile_grava_no_destino(tmp_path):
 
 # ── The build paths ──────────────────────────────────────────────────────────
 
-def test_dockerfile_le_o_commit_do_checkout_e_grava_fora_da_arvore():
+def test_dockerfile_reads_the_checkout_commit_and_stores_outside_the_tree():
     texto = (RAIZ / "Dockerfile.executor").read_text()
     copia = re.search(r"^COPY desktop/package\.json (.+) /tmp/versao/$", texto, re.M)
     assert copia, "o COPY da versão sumiu"
@@ -261,7 +261,7 @@ def test_dockerfile_le_o_commit_do_checkout_e_grava_fora_da_arvore():
     assert texto.index("COPY executor/ ./executor/") < texto.index("RUN python -m executor.versao")
 
 
-def test_dockerignore_deixa_entrar_so_a_ref_do_git():
+def test_dockerignore_lets_in_only_the_git_ref():
     linhas = [l.strip() for l in (RAIZ / ".dockerignore").read_text().splitlines()]
     assert ".git" in linhas
     assert {"!.git/HEAD", "!.git/packed-refs", "!.git/refs"} <= set(linhas)
@@ -269,12 +269,12 @@ def test_dockerignore_deixa_entrar_so_a_ref_do_git():
     assert "**/.env" in linhas       # the builder's executor/.env does not go into the image
 
 
-def test_compose_do_executor_ainda_aceita_forcar_o_commit():
+def test_executor_compose_still_accepts_forcing_the_commit():
     compose = yaml.safe_load((RAIZ / "docker-compose.executor.yml").read_text())
     assert compose["services"]["executor"]["build"]["args"]["EXECUTOR_COMMIT"] == "${EXECUTOR_COMMIT:-}"
 
 
-def test_release_passa_a_versao_da_tag():
+def test_release_passes_the_tag_version():
     fluxo = yaml.safe_load((RAIZ / ".github" / "workflows" / "executor-docker.yml").read_text())
     passos = fluxo["jobs"]["build"]["steps"]
     nomes = [p.get("name") for p in passos]
@@ -283,12 +283,12 @@ def test_release_passa_a_versao_da_tag():
     assert "EXECUTOR_BASE=${{ steps.version.outputs.VERSION }}" in build["with"]["build-args"]
 
 
-def test_env_example_do_executor_nao_fixa_a_versao():
+def test_executor_env_example_does_not_pin_the_version():
     texto = (RAIZ / "executor" / ".env.example").read_text()
     assert not re.search(r"^\s*EXECUTOR_VERSION\s*=", texto, re.M)
 
 
-_AVISO_NO_BOOT = """
+_BOOT_WARNING = """
 import json, sys
 from pathlib import Path
 import executor.versao as V
@@ -303,14 +303,14 @@ print(json.dumps([config.EXECUTOR_VERSION, [m % a for m, a in _ambiente._AVISOS_
     ("1.0.0", False),      # the one from every old installation's .env.example: not a choice
     ("", False),
 ])
-def test_aviso_quando_a_imagem_ignora_uma_versao_escolhida(tmp_path, no_env, avisa):
+def test_warning_when_the_image_ignores_a_chosen_version(tmp_path, no_env, avisa):
     import os
 
     arquivo = tmp_path / "VERSAO"
     arquivo.write_text("2.15.0+3f02f44")
     ambiente = {**os.environ, "PYTHONPATH": str(RAIZ), "EXECUTOR_VERSION": no_env}
     saida = subprocess.run(
-        [sys.executable, "-c", _AVISO_NO_BOOT, str(arquivo)], cwd=RAIZ, env=ambiente,
+        [sys.executable, "-c", _BOOT_WARNING, str(arquivo)], cwd=RAIZ, env=ambiente,
         capture_output=True, text=True, timeout=60, check=True,
     )
     versao, avisos = json.loads(saida.stdout.strip().splitlines()[-1])

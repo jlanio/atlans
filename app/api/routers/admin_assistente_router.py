@@ -38,7 +38,7 @@ router = APIRouter(
 )
 
 
-class ModeloDoCatalogo(BaseModel):
+class CatalogModel(BaseModel):
     id: str
     nome: str
     # `None`, and never 0: a model with no known price cannot show up as
@@ -48,7 +48,7 @@ class ModeloDoCatalogo(BaseModel):
     contexto: Optional[int] = None
 
 
-class SituacaoDoModelo(BaseModel):
+class ModelStatus(BaseModel):
     modelo: str
     origem: Literal["banco", "ambiente"]
     definido_por: Optional[str] = None
@@ -56,13 +56,13 @@ class SituacaoDoModelo(BaseModel):
     padrao_do_ambiente: str
 
 
-class PainelDoModelo(BaseModel):
+class ModelPanel(BaseModel):
     # `allow`: the fields an extension adds to the panel (the plans add
     # `cota`, `custos`, `fatia_de_saida`, `dias_da_janela` and `dias_de_lastro`).
     model_config = ConfigDict(extra="allow")
 
-    atual: SituacaoDoModelo
-    catalogo: list[ModeloDoCatalogo]
+    atual: ModelStatus
+    catalogo: list[CatalogModel]
     catalogo_indisponivel: Optional[str] = Field(
         default=None,
         description="Motivo de o catálogo ter vindo vazio — o provedor fora do ar não "
@@ -70,7 +70,7 @@ class PainelDoModelo(BaseModel):
     )
 
 
-class TrocaDeModelo(BaseModel):
+class ModelSwitch(BaseModel):
     """`extra=forbid`: nothing but the id gets in through here. Price and ceiling belong
     to the server, and silently accepting an unknown field is the first step
     toward someone trying to send one of them."""
@@ -81,15 +81,15 @@ class TrocaDeModelo(BaseModel):
     modelo: Optional[str] = None
 
 
-async def montar_painel(
+async def build_panel(
     db: AsyncSession, *, simular: str | None, consulta: Mapping[str, str],
-) -> PainelDoModelo:
+) -> ModelPanel:
     """The panel: the model in use and the catalog, plus whatever each extension adds.
 
     `consulta` is the URL parameters; the core only reads `simular`, and the rest
     belongs to the extensions.
     """
-    atual = await config_svc.situacao(db=db)
+    atual = await config_svc.get_status(db=db)
 
     catalogo: list[dict[str, Any]] = []
     falha: str | None = None
@@ -105,20 +105,20 @@ async def montar_painel(
         falha = "sem_credencial"
 
     extras: dict[str, Any] = {}
-    for contribuicao in registro().painel_do_modelo:
-        extras.update(await contribuicao(
+    for contribution in registro().painel_do_modelo:
+        extras.update(await contribution(
             db, atual=atual, catalogo=catalogo, simular=simular, consulta=consulta,
         ))
 
-    return PainelDoModelo(
-        atual=SituacaoDoModelo(**atual),
-        catalogo=[ModeloDoCatalogo(**m) for m in catalogo],
+    return ModelPanel(
+        atual=ModelStatus(**atual),
+        catalogo=[CatalogModel(**m) for m in catalogo],
         catalogo_indisponivel=falha,
         **extras,
     )
 
 
-@router.get("/modelo", response_model=PainelDoModelo, summary="Modelo em uso e catálogo")
+@router.get("/modelo", response_model=ModelPanel, summary="Modelo em uso e catálogo")
 async def painel(
     request: Request,
     simular: Optional[str] = Query(
@@ -127,10 +127,10 @@ async def painel(
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    return await montar_painel(db, simular=simular, consulta=request.query_params)
+    return await build_panel(db, simular=simular, consulta=request.query_params)
 
 
-async def _sondar_ou_400(modelo: str | None) -> None:
+async def _probe_or_400(modelo: str | None) -> None:
     """A real call to the provider before saving the choice.
 
     **The catalog lists what EXISTS, not what works.** Among the provider's hundreds
@@ -195,9 +195,9 @@ async def _sondar_ou_400(modelo: str | None) -> None:
         ) from exc
 
 
-@router.put("/modelo", response_model=PainelDoModelo, summary="Trocar o modelo do assistente")
+@router.put("/modelo", response_model=ModelPanel, summary="Trocar o modelo do assistente")
 async def trocar(
-    payload: TrocaDeModelo,
+    payload: ModelSwitch,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -207,15 +207,15 @@ async def trocar(
     resolves the model once, at the start. Switching between two rounds of the same
     reasoning would change the behavior midway.
 
-    **Before saving, the model is PROBED** — see `_sondar_ou_400`.
+    **Before saving, the model is PROBED** — see `_probe_or_400`.
     """
-    await _sondar_ou_400(payload.modelo)
+    await _probe_or_400(payload.modelo)
     try:
-        await config_svc.definir_modelo(
+        await config_svc.set_model(
             db, payload.modelo,
             por=getattr(current_user, "username", None) or getattr(current_user, "id_hash", None),
             redis=infra.redis_ou_none(),
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return await montar_painel(db, simular=None, consulta={})
+    return await build_panel(db, simular=None, consulta={})

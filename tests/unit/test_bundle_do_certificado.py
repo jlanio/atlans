@@ -24,7 +24,7 @@ from executor import enrollment
 
 RAIZ = Path(__file__).resolve().parents[2]
 
-_IDENTIDADE = {
+_IDENTITY = {
     "cert.pem": b"CERT-BOM",
     "chain.pem": b"CHAIN-BOM",
     "ca.pem": b"CA-BOM",
@@ -42,9 +42,9 @@ class _CA:
 
     def __init__(self):
         self.chave = Ed25519PrivateKey.generate()
-        self.cert = self._emitir(self.chave.public_key(), "Atlans Test Root")
+        self.cert = self._emit(self.chave.public_key(), "Atlans Test Root")
 
-    def _emitir(self, publica, cn: str) -> x509.Certificate:
+    def _emit(self, publica, cn: str) -> x509.Certificate:
         agora = datetime.datetime.now(datetime.timezone.utc)
         return (
             x509.CertificateBuilder()
@@ -61,7 +61,7 @@ class _CA:
         csr = x509.load_pem_x509_csr(csr_pem.encode())
         cn = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
         return {
-            "cert_pem": _pem(self._emitir(csr.public_key(), cn)),
+            "cert_pem": _pem(self._emit(csr.public_key(), cn)),
             # O servidor preenche chain com `body.get("ca") or ""`: vazio e legitimo.
             "chain_pem": "",
             "ca_pem": _pem(self.cert),
@@ -71,15 +71,15 @@ class _CA:
         }
 
 
-def _cert_dir_enrolado(tmp_path: Path) -> Path:
+def _enrolled_cert_dir(tmp_path: Path) -> Path:
     cert_dir = tmp_path / "certs"
     cert_dir.mkdir()
-    for nome, conteudo in _IDENTIDADE.items():
+    for nome, conteudo in _IDENTITY.items():
         (cert_dir / nome).write_bytes(conteudo)
     return cert_dir
 
 
-def _servidor_de_enroll(monkeypatch, ca: _CA, **sobrescrever) -> dict:
+def _enroll_server(monkeypatch, ca: _CA, **sobrescrever) -> dict:
     enviado: dict = {}
 
     def _post(url, **kw):
@@ -97,10 +97,10 @@ def _enroll(cert_dir: Path, tmp_path: Path) -> dict:
     )
 
 
-def test_reenroll_com_ca_pem_vazio_nao_sobrescreve_o_ca_bom(tmp_path, monkeypatch):
+def test_reenroll_with_empty_ca_pem_does_not_overwrite_the_good_ca(tmp_path, monkeypatch):
     """O bug: o enroll gravava `bundle.get("ca_pem", "")` direto no ca.pem."""
-    cert_dir = _cert_dir_enrolado(tmp_path)
-    _servidor_de_enroll(monkeypatch, _CA(), ca_pem="")
+    cert_dir = _enrolled_cert_dir(tmp_path)
+    _enroll_server(monkeypatch, _CA(), ca_pem="")
 
     try:
         _enroll(cert_dir, tmp_path)
@@ -110,28 +110,28 @@ def test_reenroll_com_ca_pem_vazio_nao_sobrescreve_o_ca_bom(tmp_path, monkeypatc
         erro = None
 
     assert (cert_dir / "ca.pem").read_bytes() == b"CA-BOM", "o ca.pem bom virou o ca_pem vazio"
-    for nome, conteudo in _IDENTIDADE.items():
+    for nome, conteudo in _IDENTITY.items():
         assert (cert_dir / nome).read_bytes() == conteudo, f"{nome} foi sobrescrito"
     assert erro is not None and "ca_pem" in erro, "o enroll tem de falhar dizendo o porque"
     assert not list(cert_dir.glob("*.new"))
 
 
-def test_enroll_com_cert_de_outra_chave_nao_grava_nada(tmp_path, monkeypatch):
+def test_enroll_with_cert_from_another_key_writes_nothing(tmp_path, monkeypatch):
     """Same validation as renewal: a cert that isn't for the generated key = broken pair."""
-    cert_dir = _cert_dir_enrolado(tmp_path)
+    cert_dir = _enrolled_cert_dir(tmp_path)
     ca = _CA()
     alheio = ca.bundle(enrollment._build_csr(Ed25519PrivateKey.generate(), "executor-x").decode())
-    _servidor_de_enroll(monkeypatch, ca, cert_pem=alheio["cert_pem"])
+    _enroll_server(monkeypatch, ca, cert_pem=alheio["cert_pem"])
 
     with pytest.raises(RuntimeError, match="nao corresponde"):
         _enroll(cert_dir, tmp_path)
     assert (cert_dir / "cert.pem").read_bytes() == b"CERT-BOM"
 
 
-def test_enroll_valido_troca_toda_a_identidade(tmp_path, monkeypatch):
-    cert_dir = _cert_dir_enrolado(tmp_path)
+def test_valid_enroll_replaces_the_whole_identity(tmp_path, monkeypatch):
+    cert_dir = _enrolled_cert_dir(tmp_path)
     ca = _CA()
-    enviado = _servidor_de_enroll(monkeypatch, ca)
+    enviado = _enroll_server(monkeypatch, ca)
 
     info = _enroll(cert_dir, tmp_path)
 
@@ -142,20 +142,20 @@ def test_enroll_valido_troca_toda_a_identidade(tmp_path, monkeypatch):
     chave = serialization.load_pem_private_key((cert_dir / "key.pem").read_bytes(), None)
     assert cert.public_key() == chave.public_key(), "cert.pem e key.pem sao um par"
     chave_x = serialization.load_pem_private_key((cert_dir / "x25519_key.pem").read_bytes(), None)
-    publica_x = chave_x.public_key().public_bytes(
+    public_x = chave_x.public_key().public_bytes(
         serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo,
     ).decode()
-    assert publica_x == enviado["public_key_pem"], "x25519_key.pem e a chave registrada"
+    assert public_x == enviado["public_key_pem"], "x25519_key.pem e a chave registrada"
     assert not list(cert_dir.glob("*.new"))
     if os.name == "posix":
-        for nome in _IDENTIDADE:
+        for nome in _IDENTITY:
             assert (cert_dir / nome).stat().st_mode & 0o777 == 0o600, nome
 
 
-def test_falha_de_escrita_no_meio_nao_troca_arquivo_nenhum(tmp_path, monkeypatch):
+def test_write_failure_midway_replaces_no_file(tmp_path, monkeypatch):
     """Everything goes to .new before the first os.replace: a disk filling up midway
     doesn't leave half the credentials new and half old."""
-    cert_dir = _cert_dir_enrolado(tmp_path)
+    cert_dir = _enrolled_cert_dir(tmp_path)
     ca = _CA()
     chave = Ed25519PrivateKey.generate()
     bundle = ca.bundle(enrollment._build_csr(chave, "executor-abc").decode())
@@ -169,18 +169,18 @@ def test_falha_de_escrita_no_meio_nao_troca_arquivo_nenhum(tmp_path, monkeypatch
 
     monkeypatch.setattr(enrollment, "_write_pem", _write_pem)
     with pytest.raises(OSError):
-        enrollment._persistir_bundle(cert_dir, bundle, chave)
+        enrollment._persist_bundle(cert_dir, bundle, chave)
 
-    for nome, conteudo in _IDENTIDADE.items():
+    for nome, conteudo in _IDENTITY.items():
         assert (cert_dir / nome).read_bytes() == conteudo, nome
     assert not list(cert_dir.glob("*.new")), "os .new da tentativa nao podem sobrar"
 
 
 @pytest.mark.asyncio
-async def test_renewal_valido_passa_pelo_mesmo_caminho(tmp_path, monkeypatch):
+async def test_valid_renewal_goes_through_the_same_path(tmp_path, monkeypatch):
     from executor import renewal
 
-    cert_dir = _cert_dir_enrolado(tmp_path)
+    cert_dir = _enrolled_cert_dir(tmp_path)
     ca = _CA()
     monkeypatch.setattr(renewal, "_days_until_expiry", lambda _p: 1.0)
     monkeypatch.setattr(renewal, "_cert_common_name", lambda _p: "executor-abc")
@@ -202,7 +202,7 @@ async def test_renewal_valido_passa_pelo_mesmo_caminho(tmp_path, monkeypatch):
     assert not list(cert_dir.glob("*.new"))
 
 
-def test_renewal_nao_grava_arquivo_por_conta_propria():
+def test_renewal_does_not_write_files_on_its_own():
     """Writing the credentials has a single place; the second copy was the one that diverged."""
     texto = (RAIZ / "executor" / "renewal.py").read_text(encoding="utf-8")
     assert "_write_pem(" not in texto

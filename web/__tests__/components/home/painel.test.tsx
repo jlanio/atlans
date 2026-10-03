@@ -10,17 +10,17 @@ vi.mock("next/link", () => ({
 }))
 
 import Painel from "@/app/components/home/assistente/painel"
-import { IdiomaProvider } from "@/context/IdiomaContext"
+import { LanguageProvider } from "@/context/IdiomaContext"
 import { useHomeStore } from "@/app/stores/homeStore"
-import type { IAssistenteEstado } from "@/service/types"
-import type { BlocoDoAssistente, TurnoDoAssistente } from "@/app/components/home/assistente/quadros"
+import type { IAssistantState } from "@/service/types"
+import type { AssistantBlock, AssistantTurn } from "@/app/components/home/assistente/quadros"
 
-const ATIVO: IAssistenteEstado = { ativo: true, cota: { gasto: 0, teto: 1_000_000, reabre_em_segundos: null } }
-const turno = (blocos: BlocoDoAssistente[]): TurnoDoAssistente => ({ id: "t1", papel: "assistant", blocos })
+const ATIVO: IAssistantState = { ativo: true, cota: { gasto: 0, teto: 1_000_000, reabre_em_segundos: null } }
+const turno = (blocos: AssistantBlock[]): AssistantTurn => ({ id: "t1", papel: "assistant", blocos })
 
-type PainelProps = React.ComponentProps<typeof Painel>
-function montar(props: Partial<PainelProps> = {}): PainelProps {
-  const p: PainelProps = {
+type PanelProps = React.ComponentProps<typeof Painel>
+function montar(props: Partial<PanelProps> = {}): PanelProps {
+  const p: PanelProps = {
     estado: ATIVO, turnos: [], correndo: false,
     enviar: vi.fn(), confirmar: vi.fn(), parar: vi.fn(), ...props,
   }
@@ -52,9 +52,9 @@ describe("a alça de largura do painel", () => {
 
   it("em inglês, no idioma da Home", () => {
     render(
-      <IdiomaProvider inicial={{ idioma: "en", detectado: "en", escolhido: "en" }}>
+      <LanguageProvider inicial={{ idioma: "en", detectado: "en", escolhido: "en" }}>
         <Painel estado={ATIVO} turnos={[]} correndo={false} enviar={vi.fn()} confirmar={vi.fn()} parar={vi.fn()} />
-      </IdiomaProvider>,
+      </LanguageProvider>,
     )
     expect(alca().getAttribute("aria-label")).toBe("Resize panel")
     expect(alca().getAttribute("title")).toBe("Drag to resize · double-click to restore")
@@ -206,7 +206,7 @@ describe("Painel do assistente", () => {
   })
 })
 
-const respostas = (opcoes: string[]): BlocoDoAssistente => ({ tipo: "respostas_rapidas", opcoes })
+const respostas = (opcoes: string[]): AssistantBlock => ({ tipo: "respostas_rapidas", opcoes })
 
 describe("Painel — respostas rápidas e o item pendente", () => {
   it("os chips do último turno enviam a frase escolhida", () => {

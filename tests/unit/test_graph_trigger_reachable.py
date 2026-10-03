@@ -35,7 +35,7 @@ def ordem(node_defs, edges):
 
 # ── Fonte lateral (o caso reportado) ────────────────────────────────────────────
 
-def test_fonte_lateral_roda_o_ramo_inteiro():
+def test_side_source_runs_the_whole_branch():
     """WFS→Filtro→Caixa with the trigger connected only to Caixa: the whole branch runs."""
     o = ordem(
         nd(trig="trigger", wfs="datasource", filtro="action", caixa="spatial"),
@@ -47,7 +47,7 @@ def test_fonte_lateral_roda_o_ramo_inteiro():
     assert o.index("trig") < o.index("caixa")
 
 
-def test_fonte_lateral_dois_niveis():
+def test_side_source_two_levels():
     """A deeper lateral chain (WFS→f1→f2→Caixa) also goes in whole."""
     o = ordem(
         nd(trig="trigger", wfs="datasource", f1="action", f2="action", caixa="spatial"),
@@ -57,7 +57,7 @@ def test_fonte_lateral_dois_niveis():
     assert o.index("wfs") < o.index("f1") < o.index("f2") < o.index("caixa")
 
 
-def test_todo_predecessor_de_um_no_mantido_tambem_e_mantido():
+def test_every_predecessor_of_a_kept_node_is_also_kept():
     """Leak regression: every predecessor of a kept node is also kept.
 
     Before, `filtro` came out in the ORDER without `wfs`; since the executor counts parents per
@@ -77,7 +77,7 @@ def test_todo_predecessor_de_um_no_mantido_tambem_e_mantido():
 
 # ── What does NOT change ─────────────────────────────────────────────────────────
 
-def test_arvore_totalmente_solta_e_descartada():
+def test_fully_detached_tree_is_dropped():
     """No path to the trigger and not feeding anything that runs: still pruned."""
     o = ordem(
         nd(trig="trigger", a="action", b="datasource", c="action"),
@@ -87,7 +87,7 @@ def test_arvore_totalmente_solta_e_descartada():
     assert "b" not in o and "c" not in o
 
 
-def test_dois_gatilhos_convergindo_num_merge():
+def test_two_triggers_converging_on_a_merge():
     o = ordem(
         nd(t1="trigger", t2="trigger", m="action"),
         [e("t1", "m"), e("t2", "m")],
@@ -96,7 +96,7 @@ def test_dois_gatilhos_convergindo_num_merge():
     assert o.index("t1") < o.index("m") and o.index("t2") < o.index("m")
 
 
-def test_ciclo_levanta_valueerror():
+def test_cycle_raises_valueerror():
     with pytest.raises(ValueError, match="[Cc]iclo"):
         ordem(
             nd(trig="trigger", a="action", b="action"),
@@ -104,7 +104,7 @@ def test_ciclo_levanta_valueerror():
         )
 
 
-def test_sem_trigger_nao_aplica_o_filtro():
+def test_without_trigger_the_filter_is_not_applied():
     """With no trigger at all (e.g. an isolated unit test), everything that has an edge runs."""
     o = ordem(
         nd(a="datasource", b="action"),
@@ -114,7 +114,7 @@ def test_sem_trigger_nao_aplica_o_filtro():
     assert o.index("a") < o.index("b")
 
 
-def test_no_isolado_continua_descartado_mesmo_com_trigger():
+def test_isolated_node_stays_dropped_even_with_trigger():
     """The isolated-node filter (no edge at all) still applies alongside the new closure."""
     o = ordem(
         nd(trig="trigger", caixa="spatial", solto="datasource"),

@@ -38,24 +38,24 @@ logger = get_logger(__name__)
 T = TypeVar("T")
 
 
-def _texto(guardado) -> str:
+def _as_text(guardado) -> str:
     return guardado.decode() if isinstance(guardado, bytes) else str(guardado)
 
 
-def _o_proprio_texto(texto: str) -> str:
+def _text_itself(texto: str) -> str:
     return texto
 
 
-async def gravar_no_cache(
-    redis, chave: str, texto: str, *, ttl_s: int, rotulo: str, so_se_vazio: bool = False,
+async def write_to_cache(
+    redis, chave: str, texto: str, *, ttl_s: int, rotulo: str, only_if_empty: bool = False,
 ) -> None:
     """SET with a TTL. A Redis failure becomes a warning in the log, never an exception.
 
-    `so_se_vazio` is the `NX` of a reader (rule 3)."""
+    `only_if_empty` is the `NX` of a reader (rule 3)."""
     if redis is None:
         return
     try:
-        if so_se_vazio:
+        if only_if_empty:
             await redis.set(chave, texto, ex=ttl_s, nx=True)
         else:
             await redis.set(chave, texto, ex=ttl_s)
@@ -63,7 +63,7 @@ async def gravar_no_cache(
         logger.warning("%s: falha ao gravar o cache (%s).", rotulo, exc.__class__.__name__)
 
 
-async def invalidar_cache(redis, chave: str, *, rotulo: str) -> None:
+async def invalidate_cache(redis, chave: str, *, rotulo: str) -> None:
     """Deletes the key. For callers that don't have the new value in hand to write (someone's
     plan, changed by checkout or webhook) — callers that have it overwrite
     (rule 3)."""
@@ -75,20 +75,20 @@ async def invalidar_cache(redis, chave: str, *, rotulo: str) -> None:
         logger.warning("%s: falha ao invalidar o cache (%s).", rotulo, exc.__class__.__name__)
 
 
-async def ler_com_cache(
+async def read_with_cache(
     redis,
     chave: str,
-    ler_do_banco: Callable[[], Awaitable[Optional[T]]],
+    read_from_db: Callable[[], Awaitable[Optional[T]]],
     *,
     ttl_s: int,
     rotulo: str,
     serializar: Callable[[T], str] = str,
-    desserializar: Callable[[str], Optional[T]] = _o_proprio_texto,
-    so_se_vazio: bool = False,
+    desserializar: Callable[[str], Optional[T]] = _text_itself,
+    only_if_empty: bool = False,
 ) -> Optional[T]:
-    """The value of `chave`: from the cache or, on a miss, from `ler_do_banco()` — written.
+    """The value of `chave`: from the cache or, on a miss, from `read_from_db()` — written.
 
-    `ler_do_banco` returns `None` when it could NOT read (the database failed). That
+    `read_from_db` returns `None` when it could NOT read (the database failed). That
     `None` goes back to the caller, who decides the default, and does not go into the cache
     (rule 2). A cached value that `desserializar` rejects — by returning `None`
     or raising — counts as a miss.
@@ -97,22 +97,22 @@ async def ler_com_cache(
         try:
             guardado = await redis.get(chave)
             if guardado:
-                lido = desserializar(_texto(guardado))
+                lido = desserializar(_as_text(guardado))
                 if lido is not None:
                     return lido
         except Exception as exc:
             logger.warning("%s: cache indisponível (%s) — indo ao banco.", rotulo, exc.__class__.__name__)
 
-    valor = await ler_do_banco()
+    valor = await read_from_db()
     if valor is not None:
-        await gravar_no_cache(
-            redis, chave, serializar(valor), ttl_s=ttl_s, rotulo=rotulo, so_se_vazio=so_se_vazio,
+        await write_to_cache(
+            redis, chave, serializar(valor), ttl_s=ttl_s, rotulo=rotulo, only_if_empty=only_if_empty,
         )
     return valor
 
 
 @dataclass(frozen=True)
-class Carimbo(Generic[T]):
+class Stamp(Generic[T]):
     """The saved value currently in effect, and who saved it and when."""
 
     valor: T
@@ -142,17 +142,17 @@ class ConfigEmCache(Generic[T]):
         self,
         *,
         chave: str,
-        chave_cache: str,
+        cache_key: str,
         ttl_s: int,
         campo: str,
         ler: Callable[[Any], Optional[T]],
         padrao: Callable[[], T],
         rotulo: str,
         serializar: Callable[[T], str] = str,
-        desserializar: Callable[[str], Optional[T]] = _o_proprio_texto,
+        desserializar: Callable[[str], Optional[T]] = _text_itself,
     ) -> None:
         self.chave = chave
-        self.chave_cache = chave_cache
+        self.cache_key = cache_key
         self.ttl_s = ttl_s
         self.campo = campo
         self.ler = ler
@@ -161,21 +161,21 @@ class ConfigEmCache(Generic[T]):
         self.serializar = serializar
         self.desserializar = desserializar
 
-    async def em_uso(self, *, db: AsyncSession | None = None, redis=None) -> T:
+    async def in_use(self, *, db: AsyncSession | None = None, redis=None) -> T:
         """The value in effect now. Never raises and never returns empty: any
         failure — Redis, database, corrupted row — falls back to the default.
 
         `db=None` is the case of the assistant loop, which runs inside an SSE
         generator and has no request session: it opens its own, only on a miss."""
-        valor = await ler_com_cache(
-            redis, self.chave_cache, lambda: self._do_banco(db),
+        valor = await read_with_cache(
+            redis, self.cache_key, lambda: self._from_db(db),
             ttl_s=self.ttl_s, rotulo=self.rotulo,
             serializar=self.serializar, desserializar=self.desserializar,
-            so_se_vazio=True,
+            only_if_empty=True,
         )
         return valor if valor is not None else self.padrao()
 
-    async def _do_banco(self, db: AsyncSession | None) -> Optional[T]:
+    async def _from_db(self, db: AsyncSession | None) -> Optional[T]:
         """The saved value or, if nothing saved is usable, the default — both go into the cache.
         `None` only when the database failed (rule 2)."""
         try:
@@ -209,21 +209,21 @@ class ConfigEmCache(Generic[T]):
         }
         await set_config(db, self.chave, gravado)
         # WRITES instead of just deleting (rule 3).
-        await gravar_no_cache(
-            redis, self.chave_cache,
+        await write_to_cache(
+            redis, self.cache_key,
             self.serializar(valor if valor is not None else self.padrao()),
             ttl_s=self.ttl_s, rotulo=self.rotulo,
         )
 
-    async def carimbo(self, db: AsyncSession) -> Optional[Carimbo[T]]:
+    async def carimbo(self, db: AsyncSession) -> Optional[Stamp[T]]:
         """The saved value in effect, with who and when — or `None` when
         the default applies. It is what the admin screen shows.
 
-        Reads through the same `ler` as `em_uso`: the screen must not say "default"
+        Reads through the same `ler` as `in_use`: the screen must not say "default"
         while the conversation uses a saved value."""
         bruto = await get_config(db, self.chave)
         valor = self.ler(bruto)
         if valor is None:
             return None
         envelope = bruto if isinstance(bruto, dict) else {}
-        return Carimbo(valor=valor, por=envelope.get("por"), em=envelope.get("em"))
+        return Stamp(valor=valor, por=envelope.get("por"), em=envelope.get("em"))

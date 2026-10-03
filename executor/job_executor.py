@@ -56,7 +56,7 @@ _agent_private_key = None
 # pool, and without this lock two concurrent jobs could interleave the check and
 # the registration of the SAME nonce and both pass — a replay accepted. The cost
 # is nil: it is off the data path and validation takes milliseconds.
-_VALIDACAO_LOCK = threading.Lock()
+_VALIDATION_LOCK = threading.Lock()
 
 # Pool DEDICATED to the control plane (signature validation + envelope
 # decryption). It is NOT the loop's default pool, which is where the nodes run —
@@ -72,7 +72,7 @@ _VALIDACAO_LOCK = threading.Lock()
 # node.
 #
 # Two workers are enough: validation takes milliseconds and is serialized by
-# _VALIDACAO_LOCK anyway.
+# _VALIDATION_LOCK anyway.
 _CONTROL_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="atlas-ctrl")
 
 
@@ -87,7 +87,7 @@ def _validar_e_descriptografar(message: dict) -> dict:
     bursts, the pauses added up ahead of the heartbeat and of the events of the
     jobs already in progress.
     """
-    with _VALIDACAO_LOCK:
+    with _VALIDATION_LOCK:
         validate_job(message)
     if _agent_private_key is None:
         raise RuntimeError("Chave privada não inicializada. Chame init_private_key() no startup.")
@@ -143,20 +143,20 @@ _MAX_NODE_STAT_BYTES  = 8 * 1024
 _MAX_NODE_STATS_BYTES = 4 * 1024 * 1024
 _MAX_STAT_ERROR_CHARS = 2_000
 # REDUCED ceiling of columns per port when the stat exceeds _MAX_NODE_STAT_BYTES.
-# The source already cuts at MAX_COLUNAS (200 — flow/executor/utils.py); dropping
+# The source already cuts at MAX_COLUMNS (200 — flow/executor/utils.py); dropping
 # the rest all at once was all-or-nothing: the wider the table, the more certain
 # the drop, and the editor was left without column suggestions exactly where
 # they are worth the most. The first 50 fit comfortably under the ceiling and
 # still feed the suggestions.
-_MAX_STAT_COLUNAS_POR_PORTA = 50
+_MAX_STAT_COLUMNS_PER_PORT = 50
 # Fields without which the node_run_metrics row no longer serves the panel.
-_STAT_CAMPOS_ESSENCIAIS = (
+_STAT_ESSENTIAL_FIELDS = (
     "node_name", "duration_ms", "status", "cache_hit", "started_at",
     "input_features", "output_features",
 )
 
 
-def _tamanho_json(obj) -> int:
+def _json_size(obj) -> int:
     """Tamanho serializado aproximado, em bytes. `default=str` nunca levanta."""
     try:
         return len(json.dumps(obj, default=str))
@@ -164,16 +164,16 @@ def _tamanho_json(obj) -> int:
         return _MAX_NODE_STAT_BYTES + 1  # unreadable = treat as too large
 
 
-def _reduzir_stat_de_no(stat: dict) -> dict:
+def _shrink_node_stat(stat: dict) -> dict:
     """Degrades a node's stat in steps, from the cheapest cut to the crudest.
 
     Order: (1) error message truncated; (2) each output_columns list truncated
-    to the first _MAX_STAT_COLUNAS_POR_PORTA; (3) output_columns dropped;
+    to the first _MAX_STAT_COLUMNS_PER_PORT; (3) output_columns dropped;
     (4) only the essential fields. Each step re-measures and stops as soon as it
     fits — dropping the columns entirely, which used to be the first cut,
     became the second-to-last resort: they feed the editor's column suggestions.
     The cut is flagged with the stat's `__truncated__`, like the others; the
-    truncated list does NOT get a marker item (same rule as `_colunas_das_saidas`:
+    truncated list does NOT get a marker item (same rule as `_output_columns`:
     the UI would render the marker as a clickable suggestion).
     """
     reduzido = dict(stat)
@@ -182,58 +182,58 @@ def _reduzir_stat_de_no(stat: dict) -> dict:
     erro = reduzido.get("error")
     if isinstance(erro, str) and len(erro) > _MAX_STAT_ERROR_CHARS:
         reduzido["error"] = erro[:_MAX_STAT_ERROR_CHARS] + "…[truncado]"
-        if _tamanho_json(reduzido) <= _MAX_NODE_STAT_BYTES:
+        if _json_size(reduzido) <= _MAX_NODE_STAT_BYTES:
             return reduzido
 
     colunas = reduzido.get("output_columns")
     if isinstance(colunas, dict) and any(
-        isinstance(lista, list) and len(lista) > _MAX_STAT_COLUNAS_POR_PORTA
+        isinstance(lista, list) and len(lista) > _MAX_STAT_COLUMNS_PER_PORT
         for lista in colunas.values()
     ):
         reduzido["output_columns"] = {
-            porta: lista[:_MAX_STAT_COLUNAS_POR_PORTA] if isinstance(lista, list) else lista
+            porta: lista[:_MAX_STAT_COLUMNS_PER_PORT] if isinstance(lista, list) else lista
             for porta, lista in colunas.items()
         }
-        if _tamanho_json(reduzido) <= _MAX_NODE_STAT_BYTES:
+        if _json_size(reduzido) <= _MAX_NODE_STAT_BYTES:
             return reduzido
 
     reduzido.pop("output_columns", None)
-    if _tamanho_json(reduzido) <= _MAX_NODE_STAT_BYTES:
+    if _json_size(reduzido) <= _MAX_NODE_STAT_BYTES:
         return reduzido
     # Last resort: only what the nodes panel needs to draw the row.
-    essencial = {k: reduzido.get(k) for k in _STAT_CAMPOS_ESSENCIAIS if k in reduzido}
+    essencial = {k: reduzido.get(k) for k in _STAT_ESSENTIAL_FIELDS if k in reduzido}
     essencial["__truncated__"] = True
     return essencial
 
 
-def _limitar_node_stats(node_stats: dict) -> dict:
+def _cap_node_stats(node_stats: dict) -> dict:
     """Applies a per-node ceiling and an aggregate ceiling to node_stats, preserving order."""
     limitado: dict = {}
     total = 0
-    omitidos = 0
+    omitted = 0
     for node_id, stat in (node_stats or {}).items():
-        if omitidos:
-            omitidos += 1
+        if omitted:
+            omitted += 1
             continue
         if not isinstance(stat, dict):
             limitado[node_id] = stat
             continue
-        tamanho = _tamanho_json(stat)
+        tamanho = _json_size(stat)
         if tamanho > _MAX_NODE_STAT_BYTES:
-            stat = _reduzir_stat_de_no(stat)
-            tamanho = _tamanho_json(stat)
+            stat = _shrink_node_stat(stat)
+            tamanho = _json_size(stat)
         if total + tamanho > _MAX_NODE_STATS_BYTES:
-            omitidos = 1
+            omitted = 1
             continue
         total += tamanho
         limitado[node_id] = stat
-    if omitidos:
+    if omitted:
         logger.warning(
             "node_stats excedeu %d bytes — %d no(s) omitido(s) do resultado.",
-            _MAX_NODE_STATS_BYTES, omitidos,
+            _MAX_NODE_STATS_BYTES, omitted,
         )
         limitado["__truncated__"] = True
-        limitado["__nodes_omitidos__"] = omitidos
+        limitado["__nodes_omitidos__"] = omitted
     return limitado
 
 
@@ -247,10 +247,10 @@ def _collect_stats(executor, status: str) -> dict:
     Each collection is isolated: an error building artifacts cannot cost the
     metrics (nor, on the error path, mask the original exception).
 
-    node_stats leaves here ALREADY bounded (see `_limitar_node_stats`) — the size
+    node_stats leaves here ALREADY bounded (see `_cap_node_stats`) — the size
     of job_result cannot depend on how many nodes the workflow has.
     """
-    stats: dict = _limitar_node_stats(executor.node_stats)
+    stats: dict = _cap_node_stats(executor.node_stats)
 
     try:
         artifacts = collect_artifacts(executor.final_outputs)

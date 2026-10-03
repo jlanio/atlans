@@ -13,14 +13,14 @@ import { useEffect, useState } from "react"
  * without reloading.
  */
 export function usePrefereMenosMovimento(): boolean {
-  const [reduz, setReduz] = useState(false)
+  const [reducedMotion, setReduce] = useState(false)
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return
     const consulta = window.matchMedia("(prefers-reduced-motion: reduce)")
-    setReduz(consulta.matches)
-    const aoMudar = (e: MediaQueryListEvent) => setReduz(e.matches)
+    setReduce(consulta.matches)
+    const aoMudar = (e: MediaQueryListEvent) => setReduce(e.matches)
     consulta.addEventListener?.("change", aoMudar)
     return () => consulta.removeEventListener?.("change", aoMudar)
   }, [])
-  return reduz
+  return reducedMotion
 }

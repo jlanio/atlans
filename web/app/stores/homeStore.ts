@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import type { ModoDeEntrada } from "@/lib/entrada"
+import type { EntryMode } from "@/lib/entrada"
 import type { UploadErrorType } from "@/app/components/drive/resultado-upload"
 
 /**
@@ -69,18 +69,18 @@ import type { UploadErrorType } from "@/app/components/drive/resultado-upload"
  *   uploaded is in the Drive.
  */
 
-const CHAVE_MEU = "atlans:home:meu"
+const MINE_KEY = "atlans:home:meu"
 
 type Painel = "aberto" | "barra"
 
 /** The three items of the Meu group, in the order they appear in the bar. */
-export type ItemDoMeu = "agendamentos" | "artefatos" | "chats"
-export type EstadoDoMeu = Record<ItemDoMeu, boolean>
+export type MyItem = "agendamentos" | "artefatos" | "chats"
+export type MineState = Record<MyItem, boolean>
 /** The usual: only Chats starts open. Also the SSR default. */
-export const MEU_PADRAO: EstadoDoMeu = { agendamentos: false, artefatos: false, chats: true }
+export const DEFAULT_MINE: MineState = { agendamentos: false, artefatos: false, chats: true }
 
 /** A request to show an artifact on the globe. `nome` is the suggested label. */
-export interface PedidoDeCamada {
+export interface LayerRequest {
   artifactId: string
   nome?: string
 }
@@ -90,14 +90,14 @@ export interface PedidoDeCamada {
  * (id, title, whether it was just born) or an accepted confirmation (only the
  * id). The same shape as the `info` of `useAssistente`'s `onConversa`.
  */
-export interface AnuncioDeConversa {
+export interface ConversationAnnouncement {
   id: string
   titulo?: string
   nova: boolean
 }
 
 /** Where a file dropped on the Home is on its journey to the Drive. */
-export type EstadoDoAnexo = "enviando" | "pronto" | "recusado"
+export type AttachmentState = "enviando" | "pronto" | "recusado"
 
 /**
  * A file dropped on the Home.
@@ -114,7 +114,7 @@ export interface Anexo {
   id: string
   nome: string
   bytes: number
-  estado: EstadoDoAnexo
+  estado: AttachmentState
   /** The detail the server returned, when `recusado`. */
   motivo?: string
   tipo?: UploadErrorType
@@ -148,15 +148,15 @@ export interface Localizacao {
  * whose value is boolean: a partial JSON (old version), corrupted or with junk
  * breaks nothing — it falls back to the default key by key.
  */
-function meuLembrado(): EstadoDoMeu | null {
+function rememberedMine(): MineState | null {
   if (typeof window === "undefined") return null
   try {
-    const cru = window.localStorage.getItem(CHAVE_MEU)
+    const cru = window.localStorage.getItem(MINE_KEY)
     if (!cru) return null
     const lido: unknown = JSON.parse(cru)
     if (!lido || typeof lido !== "object") return null
-    const meu = { ...MEU_PADRAO }
-    for (const nome of Object.keys(MEU_PADRAO) as ItemDoMeu[]) {
+    const meu = { ...DEFAULT_MINE }
+    for (const nome of Object.keys(DEFAULT_MINE) as MyItem[]) {
       const valor = (lido as Record<string, unknown>)[nome]
       if (typeof valor === "boolean") meu[nome] = valor
     }
@@ -166,9 +166,9 @@ function meuLembrado(): EstadoDoMeu | null {
   }
 }
 
-function lembrarMeu(meu: EstadoDoMeu): void {
+function rememberMine(meu: MineState): void {
   try {
-    window.localStorage.setItem(CHAVE_MEU, JSON.stringify(meu))
+    window.localStorage.setItem(MINE_KEY, JSON.stringify(meu))
   } catch {
     /* disposable preference */
   }
@@ -180,7 +180,7 @@ interface HomeState {
   /** False until the hydration effect runs — before that, only the SSR default. */
   hidratado: boolean
   /** Pending "show on globe" requests, drained by HomeView. */
-  pedidosDeCamada: PedidoDeCamada[]
+  pedidosDeCamada: LayerRequest[]
   /** `tool_use_id` → decidido. Sobrevive a recolher/reabrir o painel. */
   decididos: Record<string, true>
   /** `tool_use_id` → the server answered 409: decided, but with no effect. */
@@ -188,11 +188,11 @@ interface HomeState {
   /** The text being edited, shared by the panel and the bar. */
   rascunho: string
   /** Open/closed state of each item of the Meu group. Persisted in `atlans:home:meu`. */
-  meu: EstadoDoMeu
+  meu: MineState
   /** The stream's last announcement; `null` until the first message. See the header. */
-  anuncioDeConversa: AnuncioDeConversa | null
+  anuncioDeConversa: ConversationAnnouncement | null
   /** The requested sign-in modal (login or sign-up); `null` = closed. */
-  entrada: ModoDeEntrada | null
+  entrada: EntryMode | null
   /** The message of the first send without a session, waiting for login. */
   envioPendente: string | null
   /** The files dropped on the Home, in the order they arrived. */
@@ -240,13 +240,13 @@ interface HomeActions {
   /** Stores the text being edited (panel and bar write to the same draft). */
   definirRascunho(texto: string): void
   /** Opens/closes an item of the Meu group and remembers the preference. */
-  alternarItemDoMeu(nome: ItemDoMeu): void
+  alternarItemDoMeu(nome: MyItem): void
   /** Opens an item of the Meu group (idempotent) — used by the click on the 3rem rail. */
-  abrirItemDoMeu(nome: ItemDoMeu): void
+  abrirItemDoMeu(nome: MyItem): void
   /** Records an announcement. Always a new object: identity is the contract. */
-  anunciarConversa(anuncio: AnuncioDeConversa): void
+  anunciarConversa(announcement: ConversationAnnouncement): void
   /** Opens the sign-in modal in the requested mode (the bar and the sidebar request it). */
-  pedirEntrada(modo: ModoDeEntrada): void
+  pedirEntrada(modo: EntryMode): void
   /**
    * Closes the modal WITHOUT signing in (Esc, X, click outside): gives up on the
    * pending send — a later login must not fire a forgotten message. The text
@@ -303,7 +303,7 @@ export const useHomeStore = create<HomeState & HomeActions>((set) => ({
   decididos: {},
   expirados: {},
   rascunho: "",
-  meu: MEU_PADRAO,
+  meu: DEFAULT_MINE,
   anuncioDeConversa: null,
   entrada: null,
   envioPendente: null,
@@ -328,7 +328,7 @@ export const useHomeStore = create<HomeState & HomeActions>((set) => ({
   // Reads the Meu group remembered in the browser. Does NOT write: only the
   // person's gesture writes. `painel` is not included: it starts at "barra" on
   // every visit (the hero).
-  hidratar: () => set(() => ({ meu: meuLembrado() ?? MEU_PADRAO, hidratado: true })),
+  hidratar: () => set(() => ({ meu: rememberedMine() ?? DEFAULT_MINE, hidratado: true })),
 
   pedirCamada: (artifactId, nome) =>
     set((state) => ({ pedidosDeCamada: [...state.pedidosDeCamada, { artifactId, nome }] })),
@@ -355,21 +355,21 @@ export const useHomeStore = create<HomeState & HomeActions>((set) => ({
   alternarItemDoMeu: (nome) =>
     set((state) => {
       const meu = { ...state.meu, [nome]: !state.meu[nome] }
-      lembrarMeu(meu)
+      rememberMine(meu)
       return { meu }
     }),
   abrirItemDoMeu: (nome) =>
     set((state) => {
       if (state.meu[nome]) return {}
       const meu = { ...state.meu, [nome]: true }
-      lembrarMeu(meu)
+      rememberMine(meu)
       return { meu }
     }),
 
   // Always a new object, even with the same id: the Chats list only reacts to
   // identity changes, and "the same conversation got another message" IS another
   // announcement.
-  anunciarConversa: (anuncio) => set(() => ({ anuncioDeConversa: { ...anuncio } })),
+  anunciarConversa: (announcement) => set(() => ({ anuncioDeConversa: { ...announcement } })),
 
   pedirEntrada: (modo) => set(() => ({ entrada: modo })),
   fecharEntrada: () => set(() => ({ entrada: null, envioPendente: null })),
@@ -422,9 +422,9 @@ export const useHomeStore = create<HomeState & HomeActions>((set) => ({
       const a = state.localizacao
       if (a) {
         const parado = Math.abs(a.lat - loc.lat) < 0.00025 && Math.abs(a.lon - loc.lon) < 0.00025
-        const precisaoMelhorou =
+        const accuracyImproved =
           loc.precisao_m != null && (a.precisao_m == null || loc.precisao_m < a.precisao_m / 2)
-        if (parado && !precisaoMelhorou) return {}
+        if (parado && !accuracyImproved) return {}
       }
       return { localizacao: loc }
     }),

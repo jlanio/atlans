@@ -255,7 +255,7 @@ export function ChangeAgentQuotaDialog({ user, onCompleted }: { user: IAdminUser
   }, [open, user.id_hash])
 
   // The button and Enter with the same rule: the current quota has nothing to save.
-  const podeSalvar = quota !== user.agent_quota
+  const canSave = quota !== user.agent_quota
 
   // Quota too low to accommodate all existing executors.
   const reducingBelowExisting = created != null && quota < created
@@ -287,7 +287,7 @@ export function ChangeAgentQuotaDialog({ user, onCompleted }: { user: IAdminUser
                 max={100}
                 value={quota}
                 onChange={e => setQuota(Math.max(0, Math.min(100, Number(e.target.value))))}
-                onKeyDown={e => e.key === "Enter" && podeSalvar && acao.executar()}
+                onKeyDown={e => e.key === "Enter" && canSave && acao.executar()}
                 className="tabular-nums max-md:h-10"
               />
               <p className="text-xs text-muted-foreground">
@@ -330,7 +330,7 @@ export function ChangeAgentQuotaDialog({ user, onCompleted }: { user: IAdminUser
 
           <DialogFooter>
             <Button variant="outline" className="max-md:h-10" disabled={acao.executando} onClick={() => handleClose(false)}>Cancelar</Button>
-            <Button className="max-md:h-10" disabled={acao.executando || !podeSalvar} onClick={acao.executar}>
+            <Button className="max-md:h-10" disabled={acao.executando || !canSave} onClick={acao.executar}>
               {acao.executando ? "Salvando…" : "Salvar"}
             </Button>
           </DialogFooter>

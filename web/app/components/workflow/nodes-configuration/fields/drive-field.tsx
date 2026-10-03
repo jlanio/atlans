@@ -13,15 +13,15 @@ type DriveFieldProps = FieldProps
 /** Backend ceiling (`page_size` <= 200). The picker requested the default page
  *  of 50 and filtered extensions on the client: a file uploaded after the
  *  workspace's 50th simply didn't show up to configure the node. */
-const MAX_POR_PAGINA = 200
+const MAX_PER_PAGE = 200
 
 const DriveField = ({ field, values, setNodeField }: DriveFieldProps) => {
   const { current: workspace } = useWorkspace()
   const [files, setFiles] = useState<IDriveFile[]>([])
   const [loading, setLoading] = useState(false)
-  const [truncado, setTruncado] = useState(false)
+  const [truncado, setTruncated] = useState(false)
   // The list didn't arrive: the "no files" notice would be a false statement.
-  const [falhou, setFalhou] = useState(false)
+  const [falhou, setFailed] = useState(false)
 
   const driveExtensions = field.drive_extensions ?? []
 
@@ -38,7 +38,7 @@ const DriveField = ({ field, values, setNodeField }: DriveFieldProps) => {
         workspace_id: workspace.id_hash,
         ext,
         page: 1,
-        page_size: MAX_POR_PAGINA,
+        page_size: MAX_PER_PAGE,
       })),
     )
 
@@ -53,16 +53,16 @@ const DriveField = ({ field, values, setNodeField }: DriveFieldProps) => {
     }
     const completa = listas.length === respostas.length
 
-    const porId = new Map<string, IDriveFile>()
+    const byId = new Map<string, IDriveFile>()
     let cortou = false
     for (const lista of completa ? listas : []) {
       const itens = lista.items ?? []
       if ((lista.total ?? 0) > itens.length) cortou = true
-      for (const f of itens) porId.set(f.id_hash, f)
+      for (const f of itens) byId.set(f.id_hash, f)
     }
-    setFiles([...porId.values()].sort((a, b) => a.original_name.localeCompare(b.original_name)))
-    setTruncado(cortou)
-    setFalhou(!completa)
+    setFiles([...byId.values()].sort((a, b) => a.original_name.localeCompare(b.original_name)))
+    setTruncated(cortou)
+    setFailed(!completa)
     setLoading(false)
   }
 
@@ -120,7 +120,7 @@ const DriveField = ({ field, values, setNodeField }: DriveFieldProps) => {
           in the list. */}
       {truncado && !loading && (
         <p className="text-xs text-muted-foreground mt-1">
-          Mostrando os {MAX_POR_PAGINA} arquivos mais recentes. Se o que procura não
+          Mostrando os {MAX_PER_PAGE} arquivos mais recentes. Se o que procura não
           estiver aqui, localize-o pelo Drive.
         </p>
       )}

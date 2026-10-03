@@ -42,7 +42,7 @@ def _cli_main(argv: list[str]) -> int:
         stream=sys.stderr if args.json else sys.stdout,
     )
 
-    def _emitir(payload: dict, codigo: int) -> int:
+    def _emit(payload: dict, codigo: int) -> int:
         if args.json:
             json.dump(payload, sys.stdout, ensure_ascii=False)
             sys.stdout.write("\n")
@@ -57,14 +57,14 @@ def _cli_main(argv: list[str]) -> int:
     from executor import config
 
     if not config.EXECUTOR_ID:
-        return _emitir({"ok": False, "codigo": "config", "erro": "EXECUTOR_ID nao definido."}, 1)
+        return _emit({"ok": False, "codigo": "config", "erro": "EXECUTOR_ID nao definido."}, 1)
     # Without a server there is no one to ask: it's configuration, not network.
     if not config.SERVER_URL:
-        return _emitir({"ok": False, "codigo": "config", "erro": "EXECUTOR_SERVER_URL nao definido."}, 1)
+        return _emit({"ok": False, "codigo": "config", "erro": "EXECUTOR_SERVER_URL nao definido."}, 1)
 
     from pathlib import Path
     if not Path(config.EXECUTOR_CERT_PATH).exists():
-        return _emitir(
+        return _emit(
             {"ok": False, "codigo": "enrollment",
              "erro": f"Certificado nao encontrado em {config.EXECUTOR_CERT_DIR}."}, 1)
 
@@ -78,22 +78,22 @@ def _cli_main(argv: list[str]) -> int:
                           **mtls_httpx_kwargs(base_url)) as cliente:
             r = cliente.get(f"{base_url}/executores/{config.EXECUTOR_ID}/status")
     except Exception as exc:
-        return _emitir({"ok": False, "codigo": "rede", "erro": f"{type(exc).__name__}: {exc}"}, 1)
+        return _emit({"ok": False, "codigo": "rede", "erro": f"{type(exc).__name__}: {exc}"}, 1)
 
     if r.status_code != 200:
         # A 404 here is the same deny that drops the WebSocket connection with close
         # 4404: the executor was removed or revoked on the server.
         codigo = "revoked" if r.status_code in (401, 403, 404) else "http"
-        return _emitir(
+        return _emit(
             {"ok": False, "codigo": codigo,
              "erro": f"O servidor respondeu {r.status_code}.", "status": r.status_code}, 1)
 
     try:
         dados = r.json()
     except Exception:
-        return _emitir({"ok": False, "codigo": "resposta", "erro": "Resposta nao e JSON."}, 1)
+        return _emit({"ok": False, "codigo": "resposta", "erro": "Resposta nao e JSON."}, 1)
 
-    return _emitir({
+    return _emit({
         "ok": True,
         "executor_id": config.EXECUTOR_ID,
         "server_url": config.SERVER_URL,

@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 
-def _db_com(artifacts=(), files=(), workflows=(), scope="all"):  # noqa: ARG001 — scope kept for clarity in the tests
+def _db_with(artifacts=(), files=(), workflows=(), scope="all"):  # noqa: ARG001 — scope kept for clarity in the tests
     """Fake session that dispatches by SQL, not by the order of the calls.
 
     The sequence of `execute` calls varies with the scope and the content (the
@@ -62,10 +62,10 @@ def _file(**kw):
 
 @pytest.mark.asyncio
 @patch("app.core.storage.delete_strict")
-async def test_purga_artefatos_e_drive_somando_bytes(mock_del):
+async def test_purges_artifacts_and_drive_summing_bytes(mock_del):
     from app.services import storage_purge_service as mod
 
-    db = _db_com(artifacts=[_artifact(size_bytes=100), _artifact(id=2, size_bytes=250)],
+    db = _db_with(artifacts=[_artifact(size_bytes=100), _artifact(id=2, size_bytes=250)],
                  files=[_file(size=50)])
 
     r = await mod.purge_workspace_storage(db, "ws-1", scope="all")
@@ -79,7 +79,7 @@ async def test_purga_artefatos_e_drive_somando_bytes(mock_del):
 
 @pytest.mark.asyncio
 @patch("app.core.storage.delete_strict")
-async def test_purga_zera_refs_de_pin_dos_workflows(mock_del):
+async def test_purge_clears_workflow_pin_refs(mock_del):
     """The pin-cache objects go along with the other artifacts; the ref in the
     workflow must be CLEARED with them — left dangling, it was a permanent 404 on
     every run (the auto-pin only fires with an empty ref). pin_metadata stays: the
@@ -92,27 +92,27 @@ async def test_purga_zera_refs_de_pin_dos_workflows(mock_del):
                "__pin_format__": "parquet"},
         "n2": {},          # pin awaiting rewrite — already as it should be
     }
-    wf_sem_pins = MagicMock()
-    wf_sem_pins.pinned_outputs = None
+    wf_without_pins = MagicMock()
+    wf_without_pins.pinned_outputs = None
     pin_art = _artifact(id=7, s3_key="pin-cache/ws-1/t1/n1_pin.parquet")
-    db = _db_com(artifacts=[pin_art], workflows=[wf, wf_sem_pins])
+    db = _db_with(artifacts=[pin_art], workflows=[wf, wf_without_pins])
 
     with patch("sqlalchemy.orm.attributes.flag_modified") as mock_flag:
         r = await mod.purge_workspace_storage(db, "ws-1", scope="artifacts")
 
     assert r["pins_resetados"] == 1
     assert wf.pinned_outputs == {"n1": {}, "n2": {}}
-    assert wf_sem_pins.pinned_outputs is None
+    assert wf_without_pins.pinned_outputs is None
     mock_flag.assert_called_once_with(wf, "pinned_outputs")
     mock_del.assert_called()          # the pin object left MinIO
 
 
 @pytest.mark.asyncio
 @patch("app.core.storage.delete_strict")
-async def test_scope_drive_nao_toca_artefatos(mock_del):
+async def test_scope_drive_does_not_touch_artifacts(mock_del):
     from app.services import storage_purge_service as mod
 
-    db = _db_com(artifacts=[_artifact()], files=[_file()], scope="drive")
+    db = _db_with(artifacts=[_artifact()], files=[_file()], scope="drive")
     r = await mod.purge_workspace_storage(db, "ws-1", scope="drive")
 
     assert r["artifacts"] == 0
@@ -122,10 +122,10 @@ async def test_scope_drive_nao_toca_artefatos(mock_del):
 
 @pytest.mark.asyncio
 @patch("app.core.storage.delete_strict")
-async def test_scope_artifacts_nao_toca_drive(mock_del):
+async def test_scope_artifacts_does_not_touch_drive(mock_del):
     from app.services import storage_purge_service as mod
 
-    db = _db_com(artifacts=[_artifact()], files=[_file()], scope="artifacts")
+    db = _db_with(artifacts=[_artifact()], files=[_file()], scope="artifacts")
     r = await mod.purge_workspace_storage(db, "ws-1", scope="artifacts")
 
     assert r["artifacts"] == 1
@@ -136,11 +136,11 @@ async def test_scope_artifacts_nao_toca_drive(mock_del):
 
 @pytest.mark.asyncio
 @patch("app.core.storage.delete_strict", side_effect=Exception("MinIO down"))
-async def test_falha_no_s3_preserva_a_linha_no_banco(mock_del):
+async def test_s3_failure_preserves_the_row_in_the_db(mock_del):
     """Never delete from the database before confirming removal from storage."""
     from app.services import storage_purge_service as mod
 
-    db = _db_com(artifacts=[_artifact()], files=[], scope="artifacts")
+    db = _db_with(artifacts=[_artifact()], files=[], scope="artifacts")
     r = await mod.purge_workspace_storage(db, "ws-1", scope="artifacts")
 
     assert r["artifacts"] == 0, "artefato nao pode contar como removido"
@@ -149,11 +149,11 @@ async def test_falha_no_s3_preserva_a_linha_no_banco(mock_del):
 
 @pytest.mark.asyncio
 @patch("app.core.storage.delete_strict")
-async def test_s3_key_local_do_executor_nao_vai_ao_minio(mock_del):
+async def test_executor_local_s3_key_does_not_go_to_minio(mock_del):
     """Local fallback (s3_key starting with '/') does not exist in MinIO."""
     from app.services import storage_purge_service as mod
 
-    db = _db_com(artifacts=[_artifact(s3_key="/data/artifacts/ws/run/a.json")], files=[], scope="artifacts")
+    db = _db_with(artifacts=[_artifact(s3_key="/data/artifacts/ws/run/a.json")], files=[], scope="artifacts")
     r = await mod.purge_workspace_storage(db, "ws-1", scope="artifacts")
 
     mock_del.assert_not_called()
@@ -161,7 +161,7 @@ async def test_s3_key_local_do_executor_nao_vai_ao_minio(mock_del):
 
 
 @pytest.mark.asyncio
-async def test_scope_invalido_e_recusado():
+async def test_invalid_scope_is_rejected():
     from app.services import storage_purge_service as mod
 
     with pytest.raises(ValueError):
@@ -170,10 +170,10 @@ async def test_scope_invalido_e_recusado():
 
 @pytest.mark.asyncio
 @patch("app.core.storage.delete_strict")
-async def test_artefato_publicado_remove_a_camada_do_portal(mock_del):
+async def test_published_artifact_removes_the_portal_layer(mock_del):
     from app.services import storage_purge_service as mod
 
-    db = _db_com(artifacts=[_artifact(is_published=True, workflow_hash="wf-1")], files=[], scope="artifacts")
+    db = _db_with(artifacts=[_artifact(is_published=True, workflow_hash="wf-1")], files=[], scope="artifacts")
     await mod.purge_workspace_storage(db, "ws-1", scope="artifacts")
 
     # SELECT artifacts, DELETE portal_layer, DELETE artifacts
@@ -189,7 +189,7 @@ async def test_artefato_publicado_remove_a_camada_do_portal(mock_del):
 # the dependency, to open everything up. These tests fail the instant that happens.
 
 @pytest.mark.asyncio
-async def test_purge_negado_para_usuario_comum(client):
+async def test_purge_denied_for_regular_user(client):
     """client authenticates with role='user' (see conftest)."""
     resp = await client.post(
         "/admin/storage/workspaces/ws-test-001/purge",
@@ -199,7 +199,7 @@ async def test_purge_negado_para_usuario_comum(client):
 
 
 @pytest.mark.asyncio
-async def test_purge_permitido_para_admin(client, mock_current_user):
+async def test_purge_allowed_for_admin(client, mock_current_user):
     from app.api.dependencies import get_db
     from app.main import app
 
@@ -230,7 +230,7 @@ async def test_purge_permitido_para_admin(client, mock_current_user):
 
 
 @pytest.mark.asyncio
-async def test_admin_com_confirm_divergente_recebe_400(client, mock_current_user):
+async def test_admin_with_mismatched_confirm_gets_400(client, mock_current_user):
     """Guard against clicking the wrong row: the body has to repeat the workspace_id."""
     from app.api.dependencies import get_db
     from app.main import app
@@ -276,16 +276,16 @@ def _artefato_local(**kw):
 
 
 @pytest.mark.asyncio
-async def test_artefato_local_so_e_apagado_depois_da_ordem_entregue():
+async def test_local_artifact_is_deleted_only_after_the_order_is_delivered():
     """Executor ONLINE: order delivered, so the row can go."""
     from app.services import storage_purge_service as mod
 
-    db = _db_com(artifacts=[_artefato_local()])
+    db = _db_with(artifacts=[_artefato_local()])
 
-    async def _entrega_tudo(por_executor):
-        return [i["_id"] for itens in por_executor.values() for i in itens]
+    async def _deliver_all(by_executor):
+        return [i["_id"] for itens in by_executor.values() for i in itens]
 
-    with patch("app.core.artifact_cleanup._ordenar_remocao_local", new=_entrega_tudo):
+    with patch("app.core.artifact_cleanup._ordenar_remocao_local", new=_deliver_all):
         r = await mod.purge_workspace_storage(db, "ws-1", scope="artifacts")
 
     assert r["artifacts"] == 1
@@ -294,16 +294,16 @@ async def test_artefato_local_so_e_apagado_depois_da_ordem_entregue():
 
 
 @pytest.mark.asyncio
-async def test_executor_OFFLINE_mantem_a_linha_em_vez_de_apagar():
+async def test_OFFLINE_executor_keeps_the_row_instead_of_deleting():
     """The central regression: without delivery, the row STAYS and the next pass tries again."""
     from app.services import storage_purge_service as mod
 
-    db = _db_com(artifacts=[_artefato_local()])
+    db = _db_with(artifacts=[_artefato_local()])
 
-    async def _nao_entrega(_por_executor):
+    async def _deliver_nothing(_by_executor):
         return []
 
-    with patch("app.core.artifact_cleanup._ordenar_remocao_local", new=_nao_entrega):
+    with patch("app.core.artifact_cleanup._ordenar_remocao_local", new=_deliver_nothing):
         r = await mod.purge_workspace_storage(db, "ws-1", scope="artifacts")
 
     assert r["artifacts"] == 0, "linha nao pode ser contada como removida"
@@ -319,11 +319,11 @@ async def test_executor_OFFLINE_mantem_a_linha_em_vez_de_apagar():
 
 
 @pytest.mark.asyncio
-async def test_artefato_local_sem_rastro_e_preservado():
+async def test_local_artifact_without_trace_is_preserved():
     """Without executor_id/local_path there is no one to send it to — keep the record."""
     from app.services import storage_purge_service as mod
 
-    db = _db_com(artifacts=[_artefato_local(executor_id=None)])
+    db = _db_with(artifacts=[_artefato_local(executor_id=None)])
 
     r = await mod.purge_workspace_storage(db, "ws-1", scope="artifacts")
 
@@ -332,15 +332,15 @@ async def test_artefato_local_sem_rastro_e_preservado():
 
 
 @pytest.mark.asyncio
-async def test_artefato_local_publicado_remove_a_portal_layer_junto():
+async def test_published_local_artifact_removes_the_portal_layer_too():
     from app.services import storage_purge_service as mod
 
-    db = _db_com(artifacts=[_artefato_local(is_published=True, workflow_hash="wf-1")])
+    db = _db_with(artifacts=[_artefato_local(is_published=True, workflow_hash="wf-1")])
 
-    async def _entrega_tudo(por_executor):
-        return [i["_id"] for itens in por_executor.values() for i in itens]
+    async def _deliver_all(by_executor):
+        return [i["_id"] for itens in by_executor.values() for i in itens]
 
-    with patch("app.core.artifact_cleanup._ordenar_remocao_local", new=_entrega_tudo):
+    with patch("app.core.artifact_cleanup._ordenar_remocao_local", new=_deliver_all):
         r = await mod.purge_workspace_storage(db, "ws-1", scope="artifacts")
 
     assert r["artifacts"] == 1
@@ -349,12 +349,12 @@ async def test_artefato_local_publicado_remove_a_portal_layer_junto():
 
 
 @pytest.mark.asyncio
-async def test_drive_catalogado_e_PRESERVADO_nao_apagado():
+async def test_cataloged_drive_is_PRESERVED_not_deleted():
     """Policy opposite to the artifact's, and deliberate.
 
     A cataloged file belongs to the user, in the folder they chose to sync; the
     platform never had the bytes and it takes up none of its storage.
-    `drive_service._recusar_se_catalogado` refuses to delete it in a single
+    `drive_service._refuse_if_cataloged` refuses to delete it in a single
     deletion — the purge silently deleted the record, contradicting that policy.
 
     Sending `purge_artifacts` does not help either: the executor resolves the path
@@ -363,7 +363,7 @@ async def test_drive_catalogado_e_PRESERVADO_nao_apagado():
     """
     from app.services import storage_purge_service as mod
 
-    db = _db_com(files=[_file(content_location="executor", s3_key=None, size=0)])
+    db = _db_with(files=[_file(content_location="executor", s3_key=None, size=0)])
 
     r = await mod.purge_workspace_storage(db, "ws-1", scope="drive")
 
@@ -377,11 +377,11 @@ async def test_drive_catalogado_e_PRESERVADO_nao_apagado():
 
 
 @pytest.mark.asyncio
-async def test_drive_normal_continua_sendo_purgado():
+async def test_normal_drive_is_still_purged():
     """The guard above must not paralyze the purge of the Drive that lives in MinIO."""
     from app.services import storage_purge_service as mod
 
-    db = _db_com(files=[_file(content_location="minio", size=50)])
+    db = _db_with(files=[_file(content_location="minio", size=50)])
 
     with patch("app.core.storage.delete_strict"):
         r = await mod.purge_workspace_storage(db, "ws-1", scope="drive")

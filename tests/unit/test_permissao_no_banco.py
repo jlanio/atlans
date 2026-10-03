@@ -12,7 +12,7 @@ from app.core.utils.error_handlers import generic_exception_handler
 
 
 @pytest.mark.asyncio
-async def test_permission_denied_vira_mensagem_acionavel():
+async def test_permission_denied_becomes_actionable_message():
     orig = Exception("<class 'asyncpg.exceptions.InsufficientPrivilegeError'>: permission denied for table audit_events")
     exc = ProgrammingError("INSERT INTO audit_events ...", {}, orig)
     resp = await generic_exception_handler(MagicMock(), exc)
@@ -23,7 +23,7 @@ async def test_permission_denied_vira_mensagem_acionavel():
 
 
 @pytest.mark.asyncio
-async def test_must_be_owner_tambem_e_reconhecido():
+async def test_must_be_owner_is_also_recognized():
     orig = Exception("must be owner of table workspaces")
     exc = ProgrammingError("ALTER TABLE workspaces ...", {}, orig)
     corpo = json.loads((await generic_exception_handler(MagicMock(), exc)).body)
@@ -32,6 +32,6 @@ async def test_must_be_owner_tambem_e_reconhecido():
 
 
 @pytest.mark.asyncio
-async def test_outros_erros_continuam_genericos():
+async def test_other_errors_stay_generic():
     corpo = json.loads((await generic_exception_handler(MagicMock(), RuntimeError("x"))).body)
     assert corpo["error"] == "internal_server_error"

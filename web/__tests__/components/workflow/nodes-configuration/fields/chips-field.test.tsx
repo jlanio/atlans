@@ -152,7 +152,7 @@ describe("ChipsField", () => {
 })
 
 describe("sugestões de coluna", () => {
-  function comSugestoes(valor: unknown, sugestoes: string[]) {
+  function withSuggestions(valor: unknown, sugestoes: string[]) {
     const setNodeField = vi.fn()
     render(
       <ChipsField
@@ -166,33 +166,33 @@ describe("sugestões de coluna", () => {
   }
 
   it("oferece as colunas vistas na última execução", () => {
-    comSugestoes("[]", ["populacao", "renda"])
+    withSuggestions("[]", ["populacao", "renda"])
     expect(screen.getByText(/Vistas na última execução/)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "populacao" })).toBeInTheDocument()
   })
 
   it("clicar na sugestão adiciona a ficha", () => {
-    const setNodeField = comSugestoes("[]", ["populacao"])
+    const setNodeField = withSuggestions("[]", ["populacao"])
     fireEvent.click(screen.getByRole("button", { name: "populacao" }))
     expect(setNodeField).toHaveBeenCalledWith("columns", "populacao")
   })
 
   it("não oferece o que já é ficha", () => {
     // Repeating what has already been chosen just becomes noise in the list.
-    comSugestoes('["populacao"]', ["populacao", "renda"])
+    withSuggestions('["populacao"]', ["populacao", "renda"])
     expect(screen.queryByRole("button", { name: "populacao" })).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "renda" })).toBeInTheDocument()
   })
 
   it("sem execução anterior, nenhum bloco de sugestão aparece", () => {
     // The node has never run: making up a list would be worse than showing nothing.
-    comSugestoes("[]", [])
+    withSuggestions("[]", [])
     expect(screen.queryByText(/Vistas na última execução/)).not.toBeInTheDocument()
   })
 
   it("escrever um nome fora da lista continua valendo", () => {
     // It's a hint, not validation: the workflow may have changed since the last run.
-    const setNodeField = comSugestoes("[]", ["populacao"])
+    const setNodeField = withSuggestions("[]", ["populacao"])
     fireEvent.change(entrada(), { target: { value: "coluna_nova" } })
     fireEvent.keyDown(entrada(), { key: "Enter" })
     expect(setNodeField).toHaveBeenCalledWith("columns", "coluna_nova")

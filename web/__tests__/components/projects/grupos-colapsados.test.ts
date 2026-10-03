@@ -9,8 +9,8 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest"
 
 import {
   chaveDosColapsados,
-  gravarColapsados,
-  lerColapsados,
+  saveCollapsed,
+  readCollapsed,
 } from "@/app/components/projects/grupos-colapsados"
 
 beforeEach(() => window.localStorage.clear())
@@ -32,17 +32,17 @@ describe("chaveDosColapsados", () => {
 describe("gravar e ler", () => {
   it("devolve o que foi gravado", () => {
     const chave = chaveDosColapsados("ws-1")
-    gravarColapsados(chave, new Set(["a", "b"]))
-    expect([...lerColapsados(chave)].sort()).toEqual(["a", "b"])
+    saveCollapsed(chave, new Set(["a", "b"]))
+    expect([...readCollapsed(chave)].sort()).toEqual(["a", "b"])
   })
 
   it("chave inexistente devolve conjunto vazio", () => {
-    expect(lerColapsados(chaveDosColapsados("ws-novo")).size).toBe(0)
+    expect(readCollapsed(chaveDosColapsados("ws-novo")).size).toBe(0)
   })
 
   it("um workspace não lê o estado do outro", () => {
-    gravarColapsados(chaveDosColapsados("ws-1"), new Set(["a"]))
-    expect(lerColapsados(chaveDosColapsados("ws-2")).size).toBe(0)
+    saveCollapsed(chaveDosColapsados("ws-1"), new Set(["a"]))
+    expect(readCollapsed(chaveDosColapsados("ws-2")).size).toBe(0)
   })
 })
 
@@ -50,13 +50,13 @@ describe("conteúdo inesperado não derruba a página", () => {
   it("JSON inválido vira conjunto vazio", () => {
     const chave = chaveDosColapsados("ws-1")
     window.localStorage.setItem(chave, "{ isto não é json")
-    expect(lerColapsados(chave).size).toBe(0)
+    expect(readCollapsed(chave).size).toBe(0)
   })
 
   it("JSON válido que não é lista vira conjunto vazio", () => {
     const chave = chaveDosColapsados("ws-1")
     window.localStorage.setItem(chave, '{"a":1}')
-    expect(lerColapsados(chave).size).toBe(0)
+    expect(readCollapsed(chave).size).toBe(0)
   })
 
   it("descarta itens que não são texto", () => {
@@ -64,7 +64,7 @@ describe("conteúdo inesperado não derruba a página", () => {
     // collapsed forever without the click fixing it.
     const chave = chaveDosColapsados("ws-1")
     window.localStorage.setItem(chave, '["a", 3, null, "b"]')
-    expect([...lerColapsados(chave)].sort()).toEqual(["a", "b"])
+    expect([...readCollapsed(chave)].sort()).toEqual(["a", "b"])
   })
 })
 
@@ -73,8 +73,8 @@ describe("localStorage indisponível", () => {
     vi.spyOn(window.localStorage.__proto__, "getItem").mockImplementation(() => {
       throw new Error("SecurityError")
     })
-    expect(() => lerColapsados("x")).not.toThrow()
-    expect(lerColapsados("x").size).toBe(0)
+    expect(() => readCollapsed("x")).not.toThrow()
+    expect(readCollapsed("x").size).toBe(0)
   })
 
   it("gravar não lança", () => {
@@ -82,6 +82,6 @@ describe("localStorage indisponível", () => {
     vi.spyOn(window.localStorage.__proto__, "setItem").mockImplementation(() => {
       throw new Error("QuotaExceededError")
     })
-    expect(() => gravarColapsados("x", new Set(["a"]))).not.toThrow()
+    expect(() => saveCollapsed("x", new Set(["a"]))).not.toThrow()
   })
 })

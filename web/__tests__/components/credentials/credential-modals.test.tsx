@@ -43,7 +43,7 @@ vi.mock("@/context/useCredentialsContext", () => ({
   }),
 }))
 
-const TIPO_PG = {
+const PG_TYPE = {
   type: "postgresql",
   label: "PostgreSQL / PostGIS",
   description: "",
@@ -56,7 +56,7 @@ const TIPO_PG = {
 
 // Fake value of the secrets in the fixtures. Centralized in a single place so
 // detect-secrets does not flag each `password: "..."` scattered across the tests.
-const SEGREDO_FAKE = "s3cr3t" // pragma: allowlist secret
+const FAKE_SECRET = "s3cr3t" // pragma: allowlist secret
 
 import { Dialog } from "@/app/components/ui/dialog"
 import ConfigureCredential from "@/app/components/credentials/dialog-content/configure-credential"
@@ -72,7 +72,7 @@ function renderConfigure() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  getCredentialTypes.mockResolvedValue({ data: [TIPO_PG] })
+  getCredentialTypes.mockResolvedValue({ data: [PG_TYPE] })
 })
 
 afterEach(() => cleanup())
@@ -101,7 +101,7 @@ describe("ConfigureCredential — bloqueio contra perda de segredo", () => {
 
   it("libera o Salvar depois que os segredos chegam", async () => {
     getCredentialData.mockResolvedValue({
-      data: { ...CREDENCIAL, data: { host: "db.local", password: SEGREDO_FAKE } },
+      data: { ...CREDENCIAL, data: { host: "db.local", password: FAKE_SECRET } },
     })
     renderConfigure()
 
@@ -143,7 +143,7 @@ describe("Modais de credencial — botao de teste estavel", () => {
 describe("Resultado do teste — nao pode piscar e desaparecer", () => {
   it("permanece na tela depois do clique em testar", async () => {
     getCredentialData.mockResolvedValue({
-      data: { ...CREDENCIAL, data: { host: "db.local", password: SEGREDO_FAKE } },
+      data: { ...CREDENCIAL, data: { host: "db.local", password: FAKE_SECRET } },
     })
     renderConfigure()
 
@@ -169,16 +169,16 @@ describe("Correcoes de revisao", () => {
     // a security fix applied halfway.
     getCredentialTypes.mockResolvedValue({ data: [] })   // no catalog -> free-form editor
     getCredentialData.mockResolvedValue({
-      data: { ...CREDENCIAL, data: { token_custom: SEGREDO_FAKE } },
+      data: { ...CREDENCIAL, data: { token_custom: FAKE_SECRET } },
     })
     renderConfigure()
 
     const valor = await screen.findByLabelText("Valor de token_custom")
     expect(valor).toHaveAttribute("type", "password")
 
-    const olho = screen.getByRole("button", { name: /mostrar valor de token_custom/i })
-    expect(olho).toHaveAttribute("aria-pressed", "false")
-    fireEvent.click(olho)
+    const eyeButton = screen.getByRole("button", { name: /mostrar valor de token_custom/i })
+    expect(eyeButton).toHaveAttribute("aria-pressed", "false")
+    fireEvent.click(eyeButton)
 
     await waitFor(() => {
       expect(screen.getByLabelText("Valor de token_custom")).toHaveAttribute("type", "text")

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { IWorkflow, IWorkflowSchedule } from "@/service/types"
-import { MAXIMO_DE_PROXIMAS, proximas } from "@/app/components/dashboard/proximas"
+import { MAX_UPCOMING, proximas } from "@/app/components/dashboard/proximas"
 
 // Fixed anchor to make "future/past" deterministic. The `fromBackend` helper
 // treats a string without an offset as UTC, so we use explicit UTC times.
@@ -41,7 +41,7 @@ describe("proximas", () => {
     const lista = Array.from({ length: 8 }, (_, i) =>
       wf(`w${i}`, { schedule: agendamento(`2026-09-07T${String(13 + i).padStart(2, "0")}:00:00Z`) }))
     const r = proximas(lista, AGORA)
-    expect(r).toHaveLength(MAXIMO_DE_PROXIMAS)
+    expect(r).toHaveLength(MAX_UPCOMING)
     expect(r.map(w => w.id_hash)).toEqual(["w0", "w1", "w2", "w3", "w4"])
   })
 

@@ -21,7 +21,7 @@ from flow.utils.code_sandbox import (
 )
 
 
-def _bloqueia(code: str) -> str:
+def _block_message(code: str) -> str:
     """Runs the validator; returns the block message or fails the test."""
     with pytest.raises(UnsafeCodeError) as exc:
         validate_code_ast(code)
@@ -30,7 +30,7 @@ def _bloqueia(code: str) -> str:
 
 # ── Decisao 1: operator/string fora da allowlist ────────────────────────────
 
-def test_operator_e_string_fora_da_allowlist():
+def test_operator_and_string_outside_the_allowlist():
     """Mutation: re-add 'operator'/'string' to ALLOWED_MODULES.
 
     They were the two direct vectors: attrgetter/methodcaller fetch an attribute
@@ -40,23 +40,23 @@ def test_operator_e_string_fora_da_allowlist():
     assert "string" not in ALLOWED_MODULES
 
 
-def test_import_de_operator_bloqueado():
-    _bloqueia("import operator")
+def test_import_of_operator_blocked():
+    _block_message("import operator")
 
 
-def test_import_de_string_bloqueado():
-    _bloqueia("import string")
+def test_import_of_string_blocked():
+    _block_message("import string")
 
 
-def test_fuga_operator_attrgetter_bloqueada():
-    _bloqueia(
+def test_operator_attrgetter_escape_blocked():
+    _block_message(
         "import operator\n"
         "x = operator.attrgetter('__bases__')(().__class__)"
     )
 
 
-def test_fuga_string_formatter_get_field_bloqueada():
-    _bloqueia(
+def test_string_formatter_get_field_escape_blocked():
+    _block_message(
         "import string\n"
         "string.Formatter().get_field('0.__init__.__globals__', [()], {})"
     )
@@ -74,13 +74,13 @@ def test_fuga_string_formatter_get_field_bloqueada():
     "x = f'{obj.__class__.__mro__}'",          # inside an f-string it is also an ast.Attribute
     "x = obj.__globals__",
 ])
-def test_dunder_em_atributo_bloqueado(code):
+def test_dunder_in_attribute_blocked(code):
     """Mutation: replace _e_dunder with the old fixed _BLOCKED_ATTRS list.
 
     The old list lacked __getattribute__/__reduce__ — the demonstrated escape
     used exactly __getattribute__.
     """
-    msg = _bloqueia(code)
+    msg = _block_message(code)
     assert "dunder" in msg
 
 
@@ -93,13 +93,13 @@ def test_dunder_em_atributo_bloqueado(code):
     "x = frame.f_builtins",
     "x = frame.f_locals",
 ])
-def test_atributo_de_introspeccao_bloqueado(code):
+def test_introspection_attribute_blocked(code):
     """Mutation: remove _BLOCKED_ATTR_NAMES.
 
     gi_frame/f_back/f_globals/f_builtins are NOT dunders and would escape the
     predicate; they lead to the real globals and the true __builtins__.
     """
-    _bloqueia(code)
+    _block_message(code)
 
 
 # ── Decisao 4: format/format_map/get_field bloqueados como metodo ───────────
@@ -112,14 +112,14 @@ def test_atributo_de_introspeccao_bloqueado(code):
     # concatenation to dodge the string-literal check — blocked at .format
     "fmt = '{0.__' + 'class__}'\nx = fmt.format(())",
 ])
-def test_metodo_de_format_bloqueado(code):
+def test_format_method_blocked(code):
     """Mutation: remove 'format'/'format_map'/'get_field' from _BLOCKED_METHODS.
 
     str.format resolves `{0.__class__}` through the format-field machinery,
     without an ast.Attribute the check can see; concatenation would dodge even
     the string-literal check.
     """
-    _bloqueia(code)
+    _block_message(code)
 
 
 # ── Decisao 5: dunder contrabandeado em string literal ──────────────────────
@@ -130,18 +130,18 @@ def test_metodo_de_format_bloqueado(code):
     "x = d['__builtins__']",
     "x = algo['__globals__']",
 ])
-def test_dunder_em_string_bloqueado(code):
+def test_dunder_in_string_blocked(code):
     """Mutation: remove the ast.Constant check.
 
     Covers subscript (`d['__builtins__']`), call argument and format string
     all at once — ast.walk visits every ast.Constant.
     """
-    _bloqueia(code)
+    _block_message(code)
 
 
 # ── typing outside the allowlist ────────────────────────────────────────────
 
-def test_typing_fora_da_allowlist():
+def test_typing_outside_the_allowlist():
     """Mutation: re-add 'typing' to ALLOWED_MODULES.
 
     `typing.ForwardRef(s)._evaluate({}, ...)` and `typing.get_type_hints(obj,
@@ -150,13 +150,13 @@ def test_typing_fora_da_allowlist():
     literal containing a dunder.
     """
     assert "typing" not in ALLOWED_MODULES
-    _bloqueia("import typing")
-    _bloqueia("from typing import ForwardRef")
+    _block_message("import typing")
+    _block_message("from typing import ForwardRef")
 
 
-def test_fuga_typing_forwardref_bloqueada():
+def test_typing_forwardref_escape_blocked():
     """The path demonstrated in the review: it passed the AST check."""
-    _bloqueia(
+    _block_message(
         "import typing\n"
         "d = '_' + '_'\n"
         "out = []\n"
@@ -165,7 +165,7 @@ def test_fuga_typing_forwardref_bloqueada():
     )
 
 
-def test_anotacao_de_tipo_sem_typing_passa():
+def test_type_annotation_without_typing_passes():
     """Whoever annotated types loses nothing: the built-in generics are enough."""
     validate_code_ast(
         "def contar(xs: list[int]) -> dict[str, int | None]:\n"
@@ -189,7 +189,7 @@ def test_anotacao_de_tipo_sem_typing_passa():
     "import numpy as np\narr = np.array([1, 2, 3]).reshape(3, 1)",
     "result = gdf[gdf.geometry.is_valid & ~gdf.geometry.is_empty]",
 ])
-def test_codigo_legitimo_passa(code):
+def test_legitimate_code_passes(code):
     """Mutation: any rule that is too broad (e.g. blocking EVERY string with '__',
     or every `.format`-like call) breaks one of these."""
     validate_code_ast(code)  # does not raise
@@ -197,7 +197,7 @@ def test_codigo_legitimo_passa(code):
 
 # ── Builtins perigosos removidos + __import__ trocado ───────────────────────
 
-def test_build_safe_builtins_remove_perigosos_e_troca_import():
+def test_build_safe_builtins_removes_dangerous_and_replaces_import():
     """Mutation: empty BLOCKED_BUILTINS, or do not replace __import__."""
     safe = build_safe_builtins()
     for nome in ("getattr", "setattr", "delattr", "type", "eval", "exec",
@@ -209,7 +209,7 @@ def test_build_safe_builtins_remove_perigosos_e_troca_import():
         assert nome in safe
 
 
-def test_safe_import_barra_modulo_fora_da_allowlist():
+def test_safe_import_blocks_module_outside_the_allowlist():
     """Mutacao: safe_import deixar de checar a allowlist."""
     safe = build_safe_builtins()
     with pytest.raises(ImportError):
@@ -218,7 +218,7 @@ def test_safe_import_barra_modulo_fora_da_allowlist():
     assert safe["__import__"]("math") is not None
 
 
-def test_import_com_erro_de_sintaxe_propaga_syntaxerror():
+def test_import_with_syntax_error_propagates_syntaxerror():
     """Invalid code is not UnsafeCodeError — let the SyntaxError propagate to the
     node's error path."""
     with pytest.raises(SyntaxError):
@@ -242,7 +242,7 @@ import pytest as _pytest
     "import datetime\nx = datetime.sys.modules",
     "import pandas as pd\nx = pd.io.common.os.environ",
 ])
-def test_bloqueia_handle_de_modulo_perigoso(codigo):
+def test_blocks_dangerous_module_handle(codigo):
     with _pytest.raises(UnsafeCodeError):
         validate_code_ast(codigo)
 
@@ -255,5 +255,5 @@ def test_bloqueia_handle_de_modulo_perigoso(codigo):
     "import collections\nresult = dict(collections.Counter([1, 1, 2]))",
     "df = input_data\nresult = df.groupby('c').agg({'v': 'sum'})",
 ])
-def test_permite_manipulacao_de_dados_legitima(codigo):
+def test_allows_legitimate_data_manipulation(codigo):
     validate_code_ast(codigo)  # must not raise

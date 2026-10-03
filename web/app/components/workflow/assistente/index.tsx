@@ -24,24 +24,24 @@ import { Textarea } from "@/app/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { useResizablePanel } from "@/app/hooks/useResizablePanel"
 import { useAssistenteEditor } from "@/app/hooks/workflow/useAssistenteEditor"
-import { useAssistenteEditorStore } from "@/app/stores/assistenteEditorStore"
-import { AvisoDeCotaCheia } from "@/app/components/home/assistente/aviso-de-cota"
-import type { ResultadoDaProposta } from "../utils/aplicar-proposta"
+import { useAssistantEditorStore } from "@/app/stores/assistenteEditorStore"
+import { QuotaFullNotice } from "@/app/components/home/assistente/aviso-de-cota"
+import type { ProposalResult } from "../utils/aplicar-proposta"
 import Conversa from "@/app/components/home/assistente/conversa"
-import CartaoProposta from "./cartao-proposta"
-import UsoDaCota from "@/app/components/home/assistente/uso-da-cota"
+import ProposalCard from "./cartao-proposta"
+import QuotaUsage from "@/app/components/home/assistente/uso-da-cota"
 
-const CHAVE_LARGURA = "atlans:assistente:largura"
+const WIDTH_KEY = "atlans:assistente:largura"
 
 // F4 renamed the width key (it was atlans:copiloto:largura) without a migration.
 // Copies the old one to the new one ONCE, on module load (client only),
 // before any useResizablePanel reads the preference.
-;(function migrarLarguraLegada() {
+;(function migrateLegacyWidth() {
   try {
     if (typeof window === "undefined") return
-    if (window.localStorage.getItem(CHAVE_LARGURA) !== null) return
+    if (window.localStorage.getItem(WIDTH_KEY) !== null) return
     const legada = window.localStorage.getItem("atlans:copiloto:largura")
-    if (legada !== null) window.localStorage.setItem(CHAVE_LARGURA, legada)
+    if (legada !== null) window.localStorage.setItem(WIDTH_KEY, legada)
   } catch { /* disposable preference */ }
 })()
 
@@ -53,23 +53,23 @@ interface Props {
    * screen, where the canvas is born empty and the drawer is the shortest path.
    */
   abrirPorPadrao?: boolean
-  onAplicar: (resultado: ResultadoDaProposta) => void
+  onAplicar: (resultado: ProposalResult) => void
 }
 
-export default function AssistentePainel({ workflowId, abrirPorPadrao = false, onAplicar }: Props) {
-  const aberto = useAssistenteEditorStore(s => s.aberto)
-  const fechar = useAssistenteEditorStore(s => s.fechar)
-  const alternar = useAssistenteEditorStore(s => s.alternar)
-  const hidratar = useAssistenteEditorStore(s => s.hidratar)
+export default function AssistantPanel({ workflowId, abrirPorPadrao = false, onAplicar }: Props) {
+  const aberto = useAssistantEditorStore(s => s.aberto)
+  const fechar = useAssistantEditorStore(s => s.fechar)
+  const alternar = useAssistantEditorStore(s => s.alternar)
+  const hidratar = useAssistantEditorStore(s => s.hidratar)
 
   const { estado, consultando, turnos, correndo, enviar, parar, esquecer } = useAssistenteEditor(workflowId)
-  const [rascunho, setRascunho] = useState("")
+  const [rascunho, setDraft] = useState("")
   // The acceptance to draw on a canvas that ALREADY HAS work, once per conversation.
   // Resets when switching workflows and when restarting the conversation, for the
   // same reasons the conversation resets: it's another conversation, and consent
   // doesn't carry over.
-  const [liberado, setLiberado] = useState(false)
-  useEffect(() => { setLiberado(false) }, [workflowId])
+  const [liberado, setUnlocked] = useState(false)
+  useEffect(() => { setUnlocked(false) }, [workflowId])
 
   useEffect(() => { hidratar(abrirPorPadrao) }, [hidratar, abrirPorPadrao])
 
@@ -92,7 +92,7 @@ export default function AssistentePainel({ workflowId, abrirPorPadrao = false, o
   }, [alternar])
 
   const { width, isResizing, resizeHandleProps } = useResizablePanel({
-    storageKey: CHAVE_LARGURA,
+    storageKey: WIDTH_KEY,
     defaultWidth: 380,
     minWidth: 300,
     maxWidth: 560,
@@ -103,7 +103,7 @@ export default function AssistentePainel({ workflowId, abrirPorPadrao = false, o
   const submeter = useCallback(() => {
     const texto = rascunho.trim()
     if (!texto || correndo) return
-    setRascunho("")
+    setDraft("")
     void enviar(texto)
   }, [rascunho, correndo, enviar])
 
@@ -186,7 +186,7 @@ export default function AssistentePainel({ workflowId, abrirPorPadrao = false, o
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => { setLiberado(false); void esquecer() }}>
+            <DropdownMenuItem onClick={() => { setUnlocked(false); void esquecer() }}>
               Recomeçar a conversa
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -208,11 +208,11 @@ export default function AssistentePainel({ workflowId, abrirPorPadrao = false, o
         turnos={turnos}
         correndo={correndo}
         proposta={(p) => (
-          <CartaoProposta
+          <ProposalCard
             proposta={p}
             onAplicar={onAplicar}
             liberado={liberado}
-            onLiberar={() => setLiberado(true)}
+            onLiberar={() => setUnlocked(true)}
           />
         )}
       />
@@ -224,7 +224,7 @@ export default function AssistentePainel({ workflowId, abrirPorPadrao = false, o
         // extension, see `web/extensoes`) disappeared depending on the screen
         // where the person hit the ceiling, which is precisely what the
         // component exists to prevent.
-        <AvisoDeCotaCheia
+        <QuotaFullNotice
           cota={cota}
           plano={estado.plano}
           assinaturasAtivas={estado.assinaturas_ativas}
@@ -239,7 +239,7 @@ export default function AssistentePainel({ workflowId, abrirPorPadrao = false, o
         <div className="flex items-end gap-2">
           <Textarea
             value={rascunho}
-            onChange={e => setRascunho(e.target.value)}
+            onChange={e => setDraft(e.target.value)}
             // Enter sends, Shift+Enter breaks the line — what every chat field
             // does, and the opposite of what a textarea does on its own.
             onKeyDown={e => {
@@ -281,7 +281,7 @@ export default function AssistentePainel({ workflowId, abrirPorPadrao = false, o
         </div>
         {cota != null && (
           <div className="mt-1.5 flex justify-end">
-            <UsoDaCota cota={cota} superficie="editor" />
+            <QuotaUsage cota={cota} superficie="editor" />
           </div>
         )}
       </form>

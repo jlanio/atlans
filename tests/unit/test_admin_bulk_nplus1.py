@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock as _AsyncMock_seg16
 
 
 @_pytest_seg16.fixture(autouse=True)
-def _patch_revoga_executores(monkeypatch):
+def _patch_revoke_executors(monkeypatch):
     """SEG-16: isolates these tests (token/commit) from executor revocation,
     which makes its own database queries."""
     monkeypatch.setattr(
@@ -34,7 +34,7 @@ def _user(id_hash, status="active"):
 # ── get_users_by_ids: uma query, dict indexado ───────────────────────────────
 
 @pytest.mark.asyncio
-async def test_get_users_by_ids_uma_query():
+async def test_get_users_by_ids_single_query():
     db = MagicMock()
     res = MagicMock()
     res.scalars.return_value.all.return_value = [_user("a"), _user("b")]
@@ -49,7 +49,7 @@ async def test_get_users_by_ids_uma_query():
 
 
 @pytest.mark.asyncio
-async def test_get_users_by_ids_lista_vazia_nao_consulta():
+async def test_get_users_by_ids_empty_list_does_not_query():
     db = MagicMock()
     db.execute = AsyncMock()
     assert await svc.get_users_by_ids(db, []) == {}
@@ -59,7 +59,7 @@ async def test_get_users_by_ids_lista_vazia_nao_consulta():
 # ── bulk mutators: um commit por lote ────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_bulk_suspend_um_commit_para_muitos():
+async def test_bulk_suspend_one_commit_for_many():
     db = MagicMock()
     db.commit = AsyncMock()
     # The access token revocation cascade runs an UPDATE in the same
@@ -75,7 +75,7 @@ async def test_bulk_suspend_um_commit_para_muitos():
 
 
 @pytest.mark.asyncio
-async def test_bulk_reactivate_limpa_suspended_at():
+async def test_bulk_reactivate_clears_suspended_at():
     db = MagicMock()
     db.commit = AsyncMock()
     users = [_user("a", status="suspended")]
@@ -89,7 +89,7 @@ async def test_bulk_reactivate_limpa_suspended_at():
 
 
 @pytest.mark.asyncio
-async def test_bulk_soft_delete_marca_deleted():
+async def test_bulk_soft_delete_marks_deleted():
     db = MagicMock()
     db.commit = AsyncMock()
     db.execute = AsyncMock()  # token revocation cascade (without its own commit)
@@ -103,7 +103,7 @@ async def test_bulk_soft_delete_marca_deleted():
 
 
 @pytest.mark.asyncio
-async def test_bulk_lista_vazia_nao_commita():
+async def test_bulk_empty_list_does_not_commit():
     db = MagicMock()
     db.commit = AsyncMock()
 
@@ -115,7 +115,7 @@ async def test_bulk_lista_vazia_nao_commita():
 # ── Endpoint: uma unica carga, ineligiveis viram erro ────────────────────────
 
 @pytest.mark.asyncio
-async def test_bulk_suspend_endpoint_carrega_uma_vez(client, mock_current_user):
+async def test_bulk_suspend_endpoint_loads_once(client, mock_current_user):
     from app.main import app
     from app.api.dependencies import get_db, require_admin
 

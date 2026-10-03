@@ -6,8 +6,8 @@ import { GisFlowService, IExecutor, IExecutorMetrics } from "@/service/GisFlowSe
 import { useFetchData } from "@/app/hooks/useFetchData"
 import { useExecutorLocal } from "@/app/hooks/useExecutorLocal"
 import { reconciliarExecutores } from "./reconciliar-executores"
-import { type FiltroDeTipo, OPCOES_DE_TIPO } from "./filtro-de-tipo"
-import { estiloDoTipo } from "@/consts/ExecutorTypeStyles"
+import { type TypeFilter, TYPE_OPTIONS } from "./filtro-de-tipo"
+import { typeStyle } from "@/consts/ExecutorTypeStyles"
 import { cn } from "@/lib/utils"
 import PageRoot from "@/app/components/page-root"
 import { Button } from "@/app/components/ui/button"
@@ -19,12 +19,12 @@ import {
   TooltipTrigger,
 } from "@/app/components/ui/tooltip"
 import { TbRefresh, TbInfoCircle } from "react-icons/tb"
-import { formatarInteiro, plural } from "@/lib/formatos"
+import { formatInteger, plural } from "@/lib/formatos"
 import { CreateAgentDialog } from "@/app/components/executores/dialogs"
-import { GrupoDeToggle } from "@/app/components/executores/grupo-de-toggle"
-import { CabecalhoDoTrilho, ExecutorRow } from "@/app/components/executores/trilho"
+import { ToggleGroup } from "@/app/components/executores/grupo-de-toggle"
+import { RailHeader, ExecutorRow } from "@/app/components/executores/trilho"
 import {
-  SkeletonDeExecutores,
+  ExecutorsSkeleton,
   ErroDosExecutores,
   VazioDeExecutores,
   SemResultado,
@@ -35,7 +35,7 @@ import {
 
 type StatusFilter = "all" | "online" | "offline"
 
-const OPCOES_DE_STATUS: { valor: StatusFilter; rotulo: string }[] = [
+const STATUS_OPTIONS: { valor: StatusFilter; rotulo: string }[] = [
   { valor: "all",     rotulo: "Todos" },
   { valor: "online",  rotulo: "Online" },
   { valor: "offline", rotulo: "Offline" },
@@ -50,7 +50,7 @@ const OPCOES_DE_STATUS: { valor: StatusFilter; rotulo: string }[] = [
 function textoDoSubtitulo({ total, online, dedicados }: { total: number; online: number; dedicados: number }): string {
   if (total === 0) return "Nenhum executor ainda"
   const partes = [plural(total, "executor", "executores")]
-  if (online > 0) partes.push(`${formatarInteiro(online)} online`)
+  if (online > 0) partes.push(`${formatInteger(online)} online`)
   if (dedicados > 0) partes.push(plural(dedicados, "dedicado"))
   return partes.join(" · ")
 }
@@ -68,10 +68,10 @@ export default function AgentsPage() {
   const idExecutorLocal = executorLocal?.vinculado ? executorLocal.executorId : null
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
-  const [tipoFiltro, setTipoFiltro] = useState<FiltroDeTipo>("todos")
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("todos")
   // See the header's <Tooltip>: on a phone there is no hover nor keyboard focus,
   // and without controlling the open state the hint had no way to be read there.
-  const [dicaAberta, setDicaAberta] = useState(false)
+  const [tipOpen, setTipOpen] = useState(false)
 
   const { data, firstLoad, loading, refreshing, error, refetch, recarregarEmFundo } = useFetchData(
     () => isAdmin ? GisFlowService.getAgents() : GisFlowService.getMyAgents(),
@@ -89,10 +89,10 @@ export default function AgentsPage() {
   // Content-based reconciliation (see reconciliar-executores.ts): without it,
   // ExecutorRow's React.memo never hit, because every 15s tick brings new
   // objects from the JSON even for executors that did not change at all.
-  const anterioresRef = useRef<IExecutor[]>([])
+  const previousRef = useRef<IExecutor[]>([])
   const executores: IExecutor[] = useMemo(() => {
-    anterioresRef.current = reconciliarExecutores(anterioresRef.current, data ?? [])
-    return anterioresRef.current
+    previousRef.current = reconciliarExecutores(previousRef.current, data ?? [])
+    return previousRef.current
   }, [data])
 
   const metricsMap = useMemo(() => {
@@ -149,15 +149,15 @@ export default function AgentsPage() {
   }), [visibleAgents, statusFilter])
 
   const agentesVisiveis = useMemo(
-    () => tipoFiltro === "todos" ? filteredAgents : filteredAgents.filter(a => a.executor_type === tipoFiltro),
-    [filteredAgents, tipoFiltro],
+    () => typeFilter === "todos" ? filteredAgents : filteredAgents.filter(a => a.executor_type === typeFilter),
+    [filteredAgents, typeFilter],
   )
 
   // In "Todos" (all) the list mixes types, so it gets group headers and the
   // type column. With a type chosen both become redundant.
-  const agrupado = tipoFiltro === "todos"
+  const grouped = typeFilter === "todos"
   const grupos = useMemo<{ tipo: IExecutor["executor_type"]; itens: IExecutor[] }[]>(() => {
-    if (!agrupado) return [{ tipo: tipoFiltro as IExecutor["executor_type"], itens: agentesVisiveis }]
+    if (!grouped) return [{ tipo: typeFilter as IExecutor["executor_type"], itens: agentesVisiveis }]
     // Enumerating a fixed `["default","dedicated"]` hid any other
     // `executor_type` the API might send: it went into the count and
     // passed the empty-list guard, but no group rendered it — the rail
@@ -170,16 +170,16 @@ export default function AgentsPage() {
         return (ix < 0 ? ordem.length : ix) - (iy < 0 ? ordem.length : iy)
       })
     return presentes.map(t => ({ tipo: t, itens: agentesVisiveis.filter(a => a.executor_type === t) }))
-  }, [agrupado, tipoFiltro, agentesVisiveis])
+  }, [grouped, typeFilter, agentesVisiveis])
 
   function limparFiltros() {
     setStatusFilter("all")
-    setTipoFiltro("todos")
+    setTypeFilter("todos")
   }
 
   // Metrics are a SECONDARY source: if they go down, the rail stays complete,
   // just without the history numbers — it becomes an amber notice, not a screen error.
-  const metricasFalharam = metricsData === null && metricsError != null
+  const metricsFailed = metricsData === null && metricsError != null
 
   return (
     <PageRoot>
@@ -196,12 +196,12 @@ export default function AgentsPage() {
                   on keyboard focus, and the phone has neither —
                   the instructions for bringing up the executor were unreachable
                   there. Closes on an outside tap, like any Radix layer. */}
-              <Tooltip open={dicaAberta} onOpenChange={setDicaAberta}>
+              <Tooltip open={tipOpen} onOpenChange={setTipOpen}>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
                     aria-label="Como executar um executor"
-                    onClick={() => setDicaAberta(true)}
+                    onClick={() => setTipOpen(true)}
                     // `p-1 -m-1`: a larger touch target without touching the icon's
                     // alignment with the title.
                     className="mt-0.5 -m-1 rounded-sm p-1 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
@@ -284,17 +284,17 @@ export default function AgentsPage() {
           there is a list; in a first-use empty state there is nothing to filter. */}
       {data !== null && visibleAgents.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <GrupoDeToggle
+          <ToggleGroup
             rotulo="Tipo de executor"
-            valor={tipoFiltro}
-            onChange={setTipoFiltro}
-            opcoes={OPCOES_DE_TIPO}
+            valor={typeFilter}
+            onChange={setTypeFilter}
+            opcoes={TYPE_OPTIONS}
           />
-          <GrupoDeToggle
+          <ToggleGroup
             rotulo="Estado do executor"
             valor={statusFilter}
             onChange={setStatusFilter}
-            opcoes={OPCOES_DE_STATUS}
+            opcoes={STATUS_OPTIONS}
           />
         </div>
       )}
@@ -303,7 +303,7 @@ export default function AgentsPage() {
              first use → content; within the content, no-result and the
              metrics notice. ───────────────────────────────────────────────── */}
       {firstLoad ? (
-        <SkeletonDeExecutores />
+        <ExecutorsSkeleton />
       ) : data === null ? (
         <ErroDosExecutores mensagem={error ?? "Erro ao carregar executores."} onTentar={refetch} />
       ) : visibleAgents.length === 0 ? (
@@ -321,7 +321,7 @@ export default function AgentsPage() {
         />
       ) : (
         <div className="flex flex-col gap-4">
-          {metricasFalharam && <AvisoDeMetricas onTentar={refetchMetrics} />}
+          {metricsFailed && <AvisoDeMetricas onTentar={refetchMetrics} />}
 
           {agentesVisiveis.length === 0 ? (
             <SemResultado onLimpar={limparFiltros} />
@@ -335,18 +335,18 @@ export default function AgentsPage() {
               className="flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card shadow-xs"
             >
               <h2 id="executores-trilho-titulo" className="sr-only">Executores registrados</h2>
-              <CabecalhoDoTrilho mostrarTipo={agrupado} />
+              <RailHeader mostrarTipo={grouped} />
               {grupos.map(grupo => {
-                const estilo = estiloDoTipo(grupo.tipo)
-                const IconeGrupo = estilo.icone
+                const estilo = typeStyle(grupo.tipo)
+                const GroupIcon = estilo.icone
                 return (
                   <div key={grupo.tipo}>
-                    {agrupado && (
+                    {grouped && (
                       <div className={cn(
                         "flex items-center gap-1.5 border-b border-border bg-muted/40 px-3 py-1",
                         "font-mono text-[10px] uppercase tracking-wider", estilo.texto,
                       )}>
-                        <IconeGrupo size={11} aria-hidden="true" />
+                        <GroupIcon size={11} aria-hidden="true" />
                         <span>{estilo.grupo}</span>
                         <span className="tabular-nums opacity-60">· {grupo.itens.length}</span>
                       </div>
@@ -359,7 +359,7 @@ export default function AgentsPage() {
                         onRefresh={refetch}
                         isAdmin={isAdmin}
                         currentUserId={currentUserId}
-                        mostrarTipo={agrupado}
+                        mostrarTipo={grouped}
                         ehEsteComputador={!!idExecutorLocal && idExecutorLocal === executor.id_hash}
                       />
                     ))}

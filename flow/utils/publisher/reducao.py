@@ -34,13 +34,13 @@ from flow.utils.publisher.events import KIND_STDOUT
 #
 # The stdout producer already closes the batch at ~24 KB of text (_STDOUT_FLUSH_BYTES
 # in flow/nodes/action/python_script.py), so going past this is an exception.
-TETO_NODE_EVENT_BYTES = 64 * 1024
+NODE_EVENT_BYTES_CEILING = 64 * 1024
 
 # Fields that survive until the last step — without them the event is useless to
 # the panel. `type` is what routes the message on the server (which removes it
 # before republishing, so there it is not even in the event); `duration_ms` is the
 # node time the panel shows.
-CAMPOS_DE_CONTROLE = (
+CONTROL_FIELDS = (
     "type", "run_id", "node", "status", "kind", "level", "timestamp", "duration_ms",
 )
 
@@ -49,23 +49,23 @@ CAMPOS_DE_CONTROLE = (
 # (`extra` is built by flow/executor/events.py and
 # flow/utils/publisher/events.py). `output_columns` is left OUT on purpose: it is
 # what the editor uses to suggest column names.
-CHAVES_PESADAS_DO_EXTRA = ("traceback", "debug_output", "lines", "schema_drift")
+HEAVY_EXTRA_KEYS = ("traceback", "debug_output", "lines", "schema_drift")
 
 # Character ceiling for each preserved control field, so the reduced event
 # itself cannot be large (nothing guarantees `node` is short — or
 # even a string).
-TETO_POR_CAMPO = 512
+PER_FIELD_CEILING = 512
 
 # Character ceiling for `error` in the first step.
-TETO_DO_ERRO = 8 * 1024
+ERROR_CEILING = 8 * 1024
 
-_MARCA_DE_CORTE = "…[truncado]"
+_CUT_MARKER = "…[truncado]"
 
 
-def reduzir_node_event(
+def shrink_node_event(
     evento: dict,
     payload: str,
-    teto: int = TETO_NODE_EVENT_BYTES,
+    teto: int = NODE_EVENT_BYTES_CEILING,
     *,
     default: Callable[[Any], Any] | None = None,
 ) -> str:
@@ -75,10 +75,10 @@ def reduzir_node_event(
     to measure; if it fits, it comes back as is. Otherwise the event steps down,
     each step measured serialized (never estimated), and the first that fits wins:
 
-      1. Without the weight: what is in CHAVES_PESADAS_DO_EXTRA leaves `extra` and
+      1. Without the weight: what is in HEAVY_EXTRA_KEYS leaves `extra` and
          `error` is shortened; the rest stays — `extra.output_columns`,
          `duration_ms`, the error category.
-      2. Only the CAMPOS_DE_CONTROLE, coerced to short scalars: a value that is
+      2. Only the CONTROL_FIELDS, coerced to short scalars: a value that is
          neither a string nor a scalar becomes a cut repr — otherwise the ceiling
          would be bypassed precisely through the path that enforces it.
       3. Safety net, if not even the coerced fields fit: the bare minimum to
@@ -99,7 +99,7 @@ def reduzir_node_event(
     def _dumps(obj: dict) -> str:
         return json.dumps(obj, default=default)
 
-    marcas = {"__truncated__": True, "__original_size__": len(payload)}
+    badges = {"__truncated__": True, "__original_size__": len(payload)}
     extra = evento.get("extra")
     linhas = extra.get("lines") if isinstance(extra, dict) else None
     if evento.get("kind") != KIND_STDOUT or not isinstance(linhas, list):
@@ -108,51 +108,51 @@ def reduzir_node_event(
     # Step 1 — only when there is something to cut: without a cut the candidate would
     # have the original's size and the dumps would be wasted.
     reduzido = dict(evento)
-    houve_corte = False
-    if isinstance(extra, dict) and any(k in extra for k in CHAVES_PESADAS_DO_EXTRA):
+    was_cut = False
+    if isinstance(extra, dict) and any(k in extra for k in HEAVY_EXTRA_KEYS):
         reduzido["extra"] = {
-            k: v for k, v in extra.items() if k not in CHAVES_PESADAS_DO_EXTRA
+            k: v for k, v in extra.items() if k not in HEAVY_EXTRA_KEYS
         }
-        houve_corte = True
+        was_cut = True
     erro = evento.get("error")
-    if isinstance(erro, str) and len(erro) > TETO_DO_ERRO:
-        reduzido["error"] = erro[:TETO_DO_ERRO] + _MARCA_DE_CORTE
-        houve_corte = True
-    if houve_corte:
-        reduzido.update(marcas)
+    if isinstance(erro, str) and len(erro) > ERROR_CEILING:
+        reduzido["error"] = erro[:ERROR_CEILING] + _CUT_MARKER
+        was_cut = True
+    if was_cut:
+        reduzido.update(badges)
         candidato = _dumps(reduzido)
         if len(candidato) <= teto:
-            return _com_as_linhas_que_cabem(reduzido, linhas, teto, _dumps) or candidato
+            return _with_lines_that_fit(reduzido, linhas, teto, _dumps) or candidato
 
     # Degrau 2.
     minimo: dict = {}
-    for campo in CAMPOS_DE_CONTROLE:
+    for campo in CONTROL_FIELDS:
         if campo not in evento:
             continue
         valor = evento[campo]
         if isinstance(valor, str):
-            minimo[campo] = valor[:TETO_POR_CAMPO]
+            minimo[campo] = valor[:PER_FIELD_CEILING]
         elif valor is None or isinstance(valor, (bool, int, float)):
             minimo[campo] = valor
         else:
-            minimo[campo] = repr(valor)[:TETO_POR_CAMPO]
-    minimo.update(marcas)
-    resultado = _com_as_linhas_que_cabem(minimo, linhas, teto, _dumps) or json.dumps(minimo)
+            minimo[campo] = repr(valor)[:PER_FIELD_CEILING]
+    minimo.update(badges)
+    resultado = _with_lines_that_fit(minimo, linhas, teto, _dumps) or json.dumps(minimo)
     if len(resultado) <= teto:
         return resultado
 
     # Degrau 3.
     seguro = {"type": str(evento["type"])[:64]} if "type" in evento else {}
     seguro.update({
-        "run_id": str(evento.get("run_id", ""))[:TETO_POR_CAMPO],
-        "node": str(evento.get("node", ""))[:TETO_POR_CAMPO],
+        "run_id": str(evento.get("run_id", ""))[:PER_FIELD_CEILING],
+        "node": str(evento.get("node", ""))[:PER_FIELD_CEILING],
         "status": str(evento.get("status", ""))[:64],
-        **marcas,
+        **badges,
     })
     return json.dumps(seguro)
 
 
-def _com_as_linhas_que_cabem(
+def _with_lines_that_fit(
     base: dict, linhas: list, teto: int, dumps: Callable[[dict], str],
 ) -> str | None:
     """`base` with the longest prefix of `linhas` that fits in the ceiling.

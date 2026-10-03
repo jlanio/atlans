@@ -22,18 +22,18 @@ from pathlib import Path
 import pytest
 
 RAIZ = Path(__file__).resolve().parents[2]
-SEMENTE = RAIZ / "catalogo" / "geoservicos"
+SEED_DIR = RAIZ / "catalogo" / "geoservicos"
 VITRINE = RAIZ / "web" / "lib" / "catalogo.ts"
 
 # The CMR belongs to FUNAI: two folders, one institution. That is the difference
 # between the 77 folders with WFS and the 76 institutions `docs/sources.md` announces.
-PASTAS_DA_MESMA_INSTITUICAO = {"FUNAI CMR": "FUNAI"}
+SAME_INSTITUTION_FOLDERS = {"FUNAI CMR": "FUNAI"}
 
 # The seed's country vocabulary (the prefix used to name the folders from
 # outside Brazil). It lives here, and not in the TypeScript, because it lets the
 # test detect the case the showcase has no way to notice on its own: a NEW
 # country gaining WFS and staying out of the strip.
-PREFIXOS_DE_PAIS = (
+COUNTRY_PREFIXES = (
     "Antígua e Barbuda", "Argentina", "Barbados", "Bolivia", "Canadá", "Chile",
     "Colombia", "Costa Rica", "Dominica", "EUA", "Equador", "Granada",
     "Guatemala", "Guiana Francesa", "Haiti", "México", "Nicarágua", "Panamá",
@@ -41,7 +41,7 @@ PREFIXOS_DE_PAIS = (
 )
 
 
-def _tem_endpoint_wfs(pasta: Path) -> bool:
+def _has_wfs_endpoint(pasta: Path) -> bool:
     """The institution note declares a WFS endpoint."""
     for nota in pasta.glob("*.md"):
         if nota.name in ("Camadas.md", "Atributos.md"):
@@ -52,22 +52,22 @@ def _tem_endpoint_wfs(pasta: Path) -> bool:
 
 
 @pytest.fixture(scope="module")
-def pastas_com_wfs() -> dict[str, int]:
+def folders_with_wfs() -> dict[str, int]:
     """`{nome da pasta: camadas}` for what the import actually takes."""
-    if not SEMENTE.is_dir():
+    if not SEED_DIR.is_dir():
         pytest.skip("a semente do catálogo não está neste checkout")
-    achadas: dict[str, int] = {}
-    for pasta in sorted(p for p in SEMENTE.iterdir() if p.is_dir()):
+    found: dict[str, int] = {}
+    for pasta in sorted(p for p in SEED_DIR.iterdir() if p.is_dir()):
         camadas = pasta / "Camadas.md"
         if not camadas.exists() or not (pasta / "Atributos.md").exists():
             continue
-        if not _tem_endpoint_wfs(pasta):
+        if not _has_wfs_endpoint(pasta):
             continue
         total = re.search(r"Total: \*\*(\d+)\*\*", camadas.read_text(encoding="utf-8"))
         if total:
-            achadas[pasta.name] = int(total.group(1))
-    assert achadas, "nenhuma pasta com WFS: o parser deste teste saiu do lugar"
-    return achadas
+            found[pasta.name] = int(total.group(1))
+    assert found, "nenhuma pasta com WFS: o parser deste teste saiu do lugar"
+    return found
 
 
 @pytest.fixture(scope="module")
@@ -75,7 +75,7 @@ def vitrine() -> str:
     return VITRINE.read_text(encoding="utf-8")
 
 
-def _numero(vitrine: str, campo: str) -> int:
+def _number_field(vitrine: str, campo: str) -> int:
     achado = re.search(rf"{campo}:\s*([\d_]+)", vitrine)
     assert achado, f"`{campo}` sumiu de web/lib/catalogo.ts"
     return int(achado.group(1).replace("_", ""))
@@ -89,45 +89,45 @@ def _bases(vitrine: str, constante: str) -> list[tuple[str, str]]:
     return pares
 
 
-def test_camadas(vitrine, pastas_com_wfs):
-    soma = sum(pastas_com_wfs.values())
-    assert _numero(vitrine, "camadas") == soma, (
+def test_layers(vitrine, folders_with_wfs):
+    soma = sum(folders_with_wfs.values())
+    assert _number_field(vitrine, "camadas") == soma, (
         f"a semente agora tem {soma} camadas com WFS — atualize `camadas` em web/lib/catalogo.ts"
     )
 
 
-def test_instituicoes(vitrine, pastas_com_wfs):
-    distintas = {PASTAS_DA_MESMA_INSTITUICAO.get(nome, nome) for nome in pastas_com_wfs}
-    assert _numero(vitrine, "instituicoes") == len(distintas), (
-        f"a semente agora tem {len(distintas)} instituições com WFS ({len(pastas_com_wfs)} pastas) — "
+def test_institutions(vitrine, folders_with_wfs):
+    distintas = {SAME_INSTITUTION_FOLDERS.get(nome, nome) for nome in folders_with_wfs}
+    assert _number_field(vitrine, "instituicoes") == len(distintas), (
+        f"a semente agora tem {len(distintas)} instituições com WFS ({len(folders_with_wfs)} pastas) — "
         "atualize `instituicoes` em web/lib/catalogo.ts"
     )
 
 
-def test_paises(vitrine, pastas_com_wfs):
+def test_countries(vitrine, folders_with_wfs):
     """Brazil plus the countries outside it — and the strip has to name all of them."""
-    de_fora = {
+    from_outside = {
         prefixo
-        for prefixo in PREFIXOS_DE_PAIS
-        for nome in pastas_com_wfs
+        for prefixo in COUNTRY_PREFIXES
+        for nome in folders_with_wfs
         if nome == prefixo or nome.startswith(prefixo + " ")
     }
-    assert _numero(vitrine, "paises") == len(de_fora) + 1, (
-        f"a semente agora tem {len(de_fora)} países com WFS além do Brasil — "
+    assert _number_field(vitrine, "paises") == len(from_outside) + 1, (
+        f"a semente agora tem {len(from_outside)} países com WFS além do Brasil — "
         "atualize `paises` em web/lib/catalogo.ts"
     )
-    na_fita = {pasta for _, pasta in _bases(vitrine, "PAISES")}
-    assert na_fita == de_fora, (
-        f"a fita de países não bate com a semente: falta {sorted(de_fora - na_fita)}, "
-        f"sobra {sorted(na_fita - de_fora)}"
+    in_strip = {pasta for _, pasta in _bases(vitrine, "PAISES")}
+    assert in_strip == from_outside, (
+        f"a fita de países não bate com a semente: falta {sorted(from_outside - in_strip)}, "
+        f"sobra {sorted(in_strip - from_outside)}"
     )
 
 
 @pytest.mark.parametrize("constante", ["ORGAOS_FEDERAIS", "ORGAOS_REGIONAIS", "PAISES"])
-def test_cada_nome_citado_existe_na_semente(constante, vitrine, pastas_com_wfs):
+def test_each_cited_name_exists_in_the_seed(constante, vitrine, folders_with_wfs):
     """No showcase label is fiction: each one has a folder with WFS behind it."""
     for rotulo, pasta in _bases(vitrine, constante):
-        casa = [n for n in pastas_com_wfs if n == pasta or n.startswith(pasta + " ")]
+        casa = [n for n in folders_with_wfs if n == pasta or n.startswith(pasta + " ")]
         assert casa, (
             f'a vitrine mostra "{rotulo}", mas nenhuma pasta com WFS começa por "{pasta}"'
         )

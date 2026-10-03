@@ -2,41 +2,41 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useStore } from "@xyflow/react"
-import { CAMADA_SO_LEITURA } from "./canvas-layers"
+import { READ_ONLY_LAYER } from "./canvas-layers"
 
 /** Wait before showing the animation: a load that finishes before this doesn't
  *  deserve an indicator — it would only blink. */
-export const ATRASO_PARA_MOSTRAR_MS = 150
+export const SHOW_DELAY_MS = 150
 
 /** Once it has appeared, it stays at least this long. Disappearing right after
  *  appearing is the same blink, seen from the other side. */
-export const EXIBICAO_MINIMA_MS = 450
+export const MIN_DISPLAY_MS = 450
 
 /** How long the reveal class stays on the canvas (covers the graph's entrance
  *  animation, in globals.css). */
-const DURACAO_DA_REVELACAO_MS = 700
+const REVEAL_DURATION_MS = 700
 
 /**
  * Translates "the canvas is loading" into "the animation is visible", with the two
  * margins above. If the load becomes pending again while the animation is still
  * on air (quick workflow switch), it simply continues.
  */
-export function useCarregamentoVisivel(carregando: boolean): boolean {
-  const [visivel, setVisivel] = useState(false)
-  const mostradoEm = useRef(0)
+export function useVisibleLoading(carregando: boolean): boolean {
+  const [visivel, setVisible] = useState(false)
+  const shownAt = useRef(0)
 
   useEffect(() => {
     if (carregando) {
       if (visivel) return
       const timer = setTimeout(() => {
-        mostradoEm.current = Date.now()
-        setVisivel(true)
-      }, ATRASO_PARA_MOSTRAR_MS)
+        shownAt.current = Date.now()
+        setVisible(true)
+      }, SHOW_DELAY_MS)
       return () => clearTimeout(timer)
     }
     if (!visivel) return
-    const restante = Math.max(0, EXIBICAO_MINIMA_MS - (Date.now() - mostradoEm.current))
-    const timer = setTimeout(() => setVisivel(false), restante)
+    const restante = Math.max(0, MIN_DISPLAY_MS - (Date.now() - shownAt.current))
+    const timer = setTimeout(() => setVisible(false), restante)
     return () => clearTimeout(timer)
   }, [carregando, visivel])
 
@@ -69,23 +69,23 @@ interface Props {
  */
 export default function CanvasLoading({ carregando }: Props) {
   const domNode = useStore(s => s.domNode)
-  const visivel = useCarregamentoVisivel(carregando)
-  const estavaCarregando = useRef(false)
+  const visivel = useVisibleLoading(carregando)
+  const wasLoading = useRef(false)
 
   useEffect(() => {
     if (!domNode) return
     domNode.classList.toggle("rf-carregando", carregando)
 
     if (carregando) {
-      estavaCarregando.current = true
+      wasLoading.current = true
       return
     }
     // Only reveals what actually waited: opening the create screen, or switching
     // workflows with the graph already in hand, isn't an arrival of anything.
-    if (!estavaCarregando.current) return
-    estavaCarregando.current = false
+    if (!wasLoading.current) return
+    wasLoading.current = false
     domNode.classList.add("rf-revelando")
-    const timer = setTimeout(() => domNode.classList.remove("rf-revelando"), DURACAO_DA_REVELACAO_MS)
+    const timer = setTimeout(() => domNode.classList.remove("rf-revelando"), REVEAL_DURATION_MS)
     return () => {
       clearTimeout(timer)
       domNode.classList.remove("rf-revelando")
@@ -99,7 +99,7 @@ export default function CanvasLoading({ carregando }: Props) {
       role="status"
       aria-live="polite"
       data-role="canvas-loading"
-      className={`${CAMADA_SO_LEITURA} inset-0 flex items-center justify-center`}
+      className={`${READ_ONLY_LAYER} inset-0 flex items-center justify-center`}
     >
       <div className="canvas-carregando -mt-6 flex flex-col items-center gap-3.5">
         <svg viewBox="0 0 232 64" width="232" height="64" aria-hidden="true">

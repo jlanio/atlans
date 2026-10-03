@@ -12,20 +12,20 @@
 // still emits them and the decoder still understands them.
 
 import type {
-  TurnoDoAssistente, CamadaDoAssistente,
+  AssistantTurn, AssistantLayer,
 } from "@/app/components/home/assistente/quadros"
 
 /** The layers the conversation pointed to for the globe, without repeats (the last one wins). */
-export function derivarCamadas(turnos: TurnoDoAssistente[]): CamadaDoAssistente[] {
-  const porId = new Map<string, CamadaDoAssistente>()
+export function derivarCamadas(turnos: AssistantTurn[]): AssistantLayer[] {
+  const byId = new Map<string, AssistantLayer>()
   for (const turno of turnos) {
     for (const bloco of turno.blocos) {
       if (bloco.tipo === "camada" && bloco.camada.artifact_id) {
-        porId.set(bloco.camada.artifact_id, bloco.camada)
+        byId.set(bloco.camada.artifact_id, bloco.camada)
       }
     }
   }
-  return [...porId.values()]
+  return [...byId.values()]
 }
 
 /**

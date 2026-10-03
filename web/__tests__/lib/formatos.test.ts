@@ -2,15 +2,15 @@ import { describe, it, expect } from "vitest"
 import {
   formatarDuracao,
   formatarInicio,
-  formatarDiaCurto,
-  formatarInteiro,
-  formatarPercentual,
-  formatarPontos,
+  formatShortDay,
+  formatInteger,
+  formatPercent,
+  formatPoints,
   plural,
-  rotuloDaCategoria,
-  rotuloDaOrigem,
-  rotuloDoNivel,
-  variacao,
+  categoryLabel,
+  originLabel,
+  tierLabel,
+  variation,
   formatarDuracaoGrossa,
   formatarDecorridoGrosso,
   formatarDolar,
@@ -59,9 +59,9 @@ describe("formatarInicio", () => {
     expect(formatarInicio("", agora)).toBe("—")
   })
   it("dia curto para o eixo do gráfico", () => {
-    expect(formatarDiaCurto("2026-08-08")).toBe("8 ago")
-    expect(formatarDiaCurto("2026-12-25")).toBe("25 dez")
-    expect(formatarDiaCurto("x")).toBe("x")
+    expect(formatShortDay("2026-08-08")).toBe("8 ago")
+    expect(formatShortDay("2026-12-25")).toBe("25 dez")
+    expect(formatShortDay("x")).toBe("x")
   })
 })
 
@@ -78,38 +78,38 @@ describe("rótulos", () => {
     expect(rotuloDoStatus(null)).toBe("—")
   })
   it("origem, categoria e nível", () => {
-    expect(rotuloDaOrigem("schedule")).toBe("agendado")
-    expect(rotuloDaOrigem("retry")).toBe("reexecução")
-    expect(rotuloDaOrigem("mcp")).toBe("agente")
-    expect(rotuloDaOrigem(null)).toBeNull()
-    expect(rotuloDaCategoria("timeout")).toBe("tempo esgotado")
-    expect(rotuloDaCategoria("executor_lost")).toBe("executor caiu")
-    expect(rotuloDaCategoria("qualquer")).toBeNull()
-    expect(rotuloDoNivel("primary")).toBeNull()
-    expect(rotuloDoNivel("fallback")).toBe("reserva")
-    expect(rotuloDoNivel("pool")).toBe("pool")
-    expect(rotuloDoNivel(null)).toBeNull()
+    expect(originLabel("schedule")).toBe("agendado")
+    expect(originLabel("retry")).toBe("reexecução")
+    expect(originLabel("mcp")).toBe("agente")
+    expect(originLabel(null)).toBeNull()
+    expect(categoryLabel("timeout")).toBe("tempo esgotado")
+    expect(categoryLabel("executor_lost")).toBe("executor caiu")
+    expect(categoryLabel("qualquer")).toBeNull()
+    expect(tierLabel("primary")).toBeNull()
+    expect(tierLabel("fallback")).toBe("reserva")
+    expect(tierLabel("pool")).toBe("pool")
+    expect(tierLabel(null)).toBeNull()
   })
 })
 
 describe("números", () => {
   it("variação com percentual, e sem base quando o anterior é zero", () => {
-    expect(variacao(1284, 1147)).toEqual({ pct: expect.closeTo(11.94, 1), delta: 137, direcao: "sobe" })
-    expect(variacao(46, 37)).toMatchObject({ delta: 9, direcao: "sobe" })
-    expect(variacao(100, 100)).toMatchObject({ direcao: "igual" })
-    expect(variacao(100.3, 100)).toMatchObject({ direcao: "igual" })
-    expect(variacao(5, 0)).toEqual({ pct: null, delta: 5, direcao: "sobe" })
-    expect(variacao(0, 0)).toEqual({ pct: null, delta: 0, direcao: "igual" })
-    expect(variacao(null, 3)).toBeNull()
+    expect(variation(1284, 1147)).toEqual({ pct: expect.closeTo(11.94, 1), delta: 137, direcao: "sobe" })
+    expect(variation(46, 37)).toMatchObject({ delta: 9, direcao: "sobe" })
+    expect(variation(100, 100)).toMatchObject({ direcao: "igual" })
+    expect(variation(100.3, 100)).toMatchObject({ direcao: "igual" })
+    expect(variation(5, 0)).toEqual({ pct: null, delta: 5, direcao: "sobe" })
+    expect(variation(0, 0)).toEqual({ pct: null, delta: 0, direcao: "igual" })
+    expect(variation(null, 3)).toBeNull()
   })
   it("formatos pt-BR", () => {
-    expect(formatarInteiro(1284)).toBe("1.284")
-    expect(formatarInteiro(null)).toBe("—")
-    expect(formatarPercentual(0.964)).toBe("96,4%")
-    expect(formatarPercentual(1)).toBe("100,0%")
-    expect(formatarPercentual(null)).toBe("—")
-    expect(formatarPontos(0.964 - 0.975)).toBe("−1,1 pt")
-    expect(formatarPontos(0.02)).toBe("+2,0 pt")
+    expect(formatInteger(1284)).toBe("1.284")
+    expect(formatInteger(null)).toBe("—")
+    expect(formatPercent(0.964)).toBe("96,4%")
+    expect(formatPercent(1)).toBe("100,0%")
+    expect(formatPercent(null)).toBe("—")
+    expect(formatPoints(0.964 - 0.975)).toBe("−1,1 pt")
+    expect(formatPoints(0.02)).toBe("+2,0 pt")
     expect(plural(1, "presa")).toBe("1 presa")
     expect(plural(2, "presa")).toBe("2 presas")
     expect(plural(1, "confirmação atrasada", "confirmações atrasadas")).toBe("1 confirmação atrasada")

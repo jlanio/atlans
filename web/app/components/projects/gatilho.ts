@@ -9,18 +9,18 @@ import { formatarInicio } from "@/lib/formatos"
  * the one that knows about color and size.
  */
 
-export type TipoDeGatilho = "agendado" | "webhook" | "arquivo" | "geofence" | "manual" | "subfluxo"
+export type TriggerKind = "agendado" | "webhook" | "arquivo" | "geofence" | "manual" | "subfluxo"
 
 export interface Gatilho {
   /** The main one, in this precedence: sub-workflow > scheduled > webhook > file > geofence > manual. */
-  tipo: TipoDeGatilho
+  tipo: TriggerKind
   /** "Agendado", "Agendado + webhook", "Só manual", "Chamado por outros workflows"… */
   rotulo: string
   /** Other triggers present, in the same precedence. */
-  extras: TipoDeGatilho[]
+  extras: TriggerKind[]
 }
 
-export const ROTULO_DO_GATILHO: Record<TipoDeGatilho, string> = {
+export const TRIGGER_LABEL: Record<TriggerKind, string> = {
   agendado: "Agendado",
   webhook: "Webhook",
   arquivo: "Por arquivo",
@@ -31,7 +31,7 @@ export const ROTULO_DO_GATILHO: Record<TipoDeGatilho, string> = {
 
 // How the trigger appears when it is the second in the list ("Agendado + webhook"):
 // no preposition and in lowercase, so it reads as a single phrase.
-const ROTULO_DE_EXTRA: Record<TipoDeGatilho, string> = {
+const EXTRA_LABEL: Record<TriggerKind, string> = {
   agendado: "agendado",
   webhook: "webhook",
   arquivo: "arquivo",
@@ -40,28 +40,28 @@ const ROTULO_DE_EXTRA: Record<TipoDeGatilho, string> = {
   subfluxo: "sub-fluxo",
 }
 
-type CamposDoGatilho = Pick<
+type TriggerFields = Pick<
   IWorkflow,
   "is_subworkflow" | "has_schedule_trigger" | "has_webhook_trigger" | "has_file_trigger" | "has_geofence_trigger"
 >
 
-export function derivarGatilho(wf: CamposDoGatilho): Gatilho {
+export function derivarGatilho(wf: TriggerFields): Gatilho {
   // Sub-workflow comes first even with its own trigger: its nature is to be
   // called by another workflow, and that is what changes how the person runs it.
-  const presentes: TipoDeGatilho[] = []
+  const presentes: TriggerKind[] = []
   if (wf.is_subworkflow) presentes.push("subfluxo")
   if (wf.has_schedule_trigger) presentes.push("agendado")
   if (wf.has_webhook_trigger) presentes.push("webhook")
   if (wf.has_file_trigger) presentes.push("arquivo")
   if (wf.has_geofence_trigger) presentes.push("geofence")
-  if (presentes.length === 0) return { tipo: "manual", rotulo: ROTULO_DO_GATILHO.manual, extras: [] }
+  if (presentes.length === 0) return { tipo: "manual", rotulo: TRIGGER_LABEL.manual, extras: [] }
 
   const [tipo, ...extras] = presentes
-  const rotulo = [ROTULO_DO_GATILHO[tipo], ...extras.map(e => ROTULO_DE_EXTRA[e])].join(" + ")
+  const rotulo = [TRIGGER_LABEL[tipo], ...extras.map(e => EXTRA_LABEL[e])].join(" + ")
   return { tipo, rotulo, extras }
 }
 
-export interface ResumoDoAgendamento {
+export interface ScheduleSummary {
   /** pausado = `schedule.active` false (or inactive workflow); calculando = active without `next_run_at`. */
   estado: "ativo" | "pausado" | "calculando"
   /** "todo dia às 06:00" · "a cada 6 h" · raw cron when not recognized · "recorrência (RRULE)". */
@@ -76,9 +76,9 @@ export interface ResumoDoAgendamento {
 
 export function resumirAgendamento(
   schedule: IWorkflowSchedule | null | undefined,
-  flagAtive: boolean,
+  flagActive: boolean,
   agora: Date = new Date(),
-): ResumoDoAgendamento | null {
+): ScheduleSummary | null {
   if (!schedule) return null
 
   // An inactive workflow counts as paused even if the schedule row still
@@ -90,26 +90,26 @@ export function resumirAgendamento(
   // not advanced the mark yet (it runs every ~30 s). Without this the row would
   // say "próxima há 3 h" or "próxima hoje, 06:00" for a time that already passed.
   const proxima = fromBackend(schedule.next_run_at)
-  const proximaNoFuturo = proxima != null && proxima.isAfter(dayjs(agora))
-  const estado: ResumoDoAgendamento["estado"] =
-    !schedule.active || !flagAtive ? "pausado" : proximaNoFuturo ? "ativo" : "calculando"
+  const nextInFuture = proxima != null && proxima.isAfter(dayjs(agora))
+  const estado: ScheduleSummary["estado"] =
+    !schedule.active || !flagActive ? "pausado" : nextInFuture ? "ativo" : "calculando"
 
-  const { descricao, descricaoCrua } = descreverEstrategia(schedule)
+  const { descricao, descricaoCrua } = describeStrategy(schedule)
   return {
     estado,
     descricao,
     descricaoCrua,
     proxima: estado === "ativo" ? formatarProxima(schedule.next_run_at, agora) : null,
-    motivoPausa: estado === "pausado" && !flagAtive ? "workflow inativo" : null,
+    motivoPausa: estado === "pausado" && !flagActive ? "workflow inativo" : null,
   }
 }
 
-function descreverEstrategia(schedule: IWorkflowSchedule): { descricao: string; descricaoCrua: boolean } {
+function describeStrategy(schedule: IWorkflowSchedule): { descricao: string; descricaoCrua: boolean } {
   switch (schedule.strategy) {
     case "cron": {
       const expr = schedule.cron_expression?.trim() ?? ""
       if (!expr) return { descricao: "agendamento", descricaoCrua: false }
-      const traduzido = traduzirCron(expr)
+      const traduzido = translateCron(expr)
       return { descricao: traduzido ?? expr, descricaoCrua: traduzido == null }
     }
     case "interval":
@@ -137,7 +137,7 @@ export function formatarProxima(iso: string | null | undefined, agora: Date = ne
 
 // Weekday as it is spoken: "às segundas", "aos domingos". 7 is Sunday
 // too (both spellings are valid in cron).
-const DIAS_DA_SEMANA = ["aos domingos", "às segundas", "às terças", "às quartas", "às quintas", "às sextas", "aos sábados", "aos domingos"]
+const WEEKDAYS = ["aos domingos", "às segundas", "às terças", "às quartas", "às quintas", "às sextas", "aos sábados", "aos domingos"]
 
 function inteiro(campo: string, min: number, max: number): number | null {
   if (!/^\d+$/.test(campo)) return null
@@ -155,7 +155,7 @@ function hora(h: number, m: number): string {
  * schedule's time zone, unconverted: it is what the person wrote. Returns null
  * for the rest.
  */
-function traduzirCron(expr: string): string | null {
+function translateCron(expr: string): string | null {
   const partes = expr.trim().split(/\s+/)
   if (partes.length !== 5) return null
   const [min, hor, dia, mes, sem] = partes
@@ -163,17 +163,17 @@ function traduzirCron(expr: string): string | null {
 
   if (todos(min, hor, dia, mes, sem)) return "a cada 1 min"
 
-  const aCadaMin = /^\*\/(\d+)$/.exec(min)
-  if (aCadaMin && todos(hor, dia, mes, sem)) {
-    const n = Number(aCadaMin[1])
+  const everyMin = /^\*\/(\d+)$/.exec(min)
+  if (everyMin && todos(hor, dia, mes, sem)) {
+    const n = Number(everyMin[1])
     return n > 0 ? `a cada ${n} min` : null
   }
 
   if (min === "0" && todos(dia, mes, sem)) {
     if (hor === "*") return "a cada 1 h"
-    const aCadaHora = /^\*\/(\d+)$/.exec(hor)
-    if (aCadaHora) {
-      const n = Number(aCadaHora[1])
+    const everyHour = /^\*\/(\d+)$/.exec(hor)
+    if (everyHour) {
+      const n = Number(everyHour[1])
       return n > 0 ? `a cada ${n} h` : null
     }
   }
@@ -187,7 +187,7 @@ function traduzirCron(expr: string): string | null {
     if (sem === "*") return `todo dia às ${as}`
     if (sem === "1-5") return `seg–sex às ${as}`
     const d = inteiro(sem, 0, 7)
-    if (d != null) return `${DIAS_DA_SEMANA[d]} às ${as}`
+    if (d != null) return `${WEEKDAYS[d]} às ${as}`
     return null
   }
   if (sem === "*") {

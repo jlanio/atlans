@@ -9,12 +9,12 @@ import { dayjs } from "@/lib/dayjs"
  * time, and not "3 days ago": a long relative time forces you to do math to
  * know whether it was before or after something else you remember.
  */
-export function rotuloDeSalvo(salvoEm: number, agora: number = Date.now()): string {
-  const decorrido = Math.max(0, agora - salvoEm)
+export function rotuloDeSalvo(savedAt: number, agora: number = Date.now()): string {
+  const decorrido = Math.max(0, agora - savedAt)
   if (decorrido < 60_000) return "Salvo agora"
   if (decorrido < 3_600_000) return `Salvo há ${Math.floor(decorrido / 60_000)} min`
 
-  const momento = dayjs(salvoEm)
+  const momento = dayjs(savedAt)
   if (momento.isSame(dayjs(agora), "day")) return `Salvo às ${momento.format("HH:mm")}`
   return `Salvo em ${momento.format("DD/MM")} às ${momento.format("HH:mm")}`
 }

@@ -18,14 +18,14 @@ pd = pytest.importorskip("pandas")
 gpd = pytest.importorskip("geopandas")
 shapely = pytest.importorskip("shapely")
 
-from flow.utils.jinja_seguro import criar_ambiente_sandbox
+from flow.utils.jinja_seguro import create_sandbox_environment
 
 
 def _ambiente():
-    return criar_ambiente_sandbox(undefined=StrictUndefined)
+    return create_sandbox_environment(undefined=StrictUndefined)
 
 
-def _contexto():
+def _context():
     gdf = gpd.GeoDataFrame(
         {"v": [1, 2]}, geometry=[shapely.Point(0, 0), shapely.Point(1, 1)], crs="EPSG:4326"
     )
@@ -41,9 +41,9 @@ def _contexto():
     "{{ Dados.output.to_parquet(alvo) }}",
     "{{ Dados.output.to_json(path_or_buf=alvo) }}",
 ])
-def test_bloqueia_escrita_de_arquivo_e_nao_cria_o_arquivo(expr):
+def test_blocks_file_write_and_does_not_create_the_file(expr):
     env = _ambiente()
-    ctx = _contexto()
+    ctx = _context()
     alvo = os.path.join(tempfile.gettempdir(), "atl_teste_jinja_io.out")
     if os.path.exists(alvo):
         os.remove(alvo)
@@ -58,13 +58,13 @@ def test_bloqueia_escrita_de_arquivo_e_nao_cria_o_arquivo(expr):
     ("{{ Camada.output.shape[0] }}", "2"),
     ("{{ Dados.output['a'].sum() }}", "3"),
 ])
-def test_permite_uso_legitimo(expr, esperado_contains):
+def test_allows_legitimate_use(expr, esperado_contains):
     env = _ambiente()
-    saida = env.from_string(expr).render(**_contexto())
+    saida = env.from_string(expr).render(**_context())
     assert esperado_contains in saida
 
 
-def test_bloqueia_acesso_a_handle_de_modulo():
+def test_blocks_access_to_module_handle():
     env = _ambiente()
     with pytest.raises(SecurityError):
-        env.from_string("{{ Dados.output.to_csv.__globals__ }}").render(**_contexto())
+        env.from_string("{{ Dados.output.to_csv.__globals__ }}").render(**_context())

@@ -4,7 +4,7 @@ The Atlans MCP server: factory, guards at the edge of calls, and the ASGI app.
 
 Two structural decisions live here.
 
-1. `ServidorAtlans` overrides `list_tools` and `call_tool`, which the SDK exposes
+1. `AtlansServer` overrides `list_tools` and `call_tool`, which the SDK exposes
    as public methods and calls through `self`. `list_tools` filters the catalog
    by the token's scope — a convenience, so the client does not spend a call
    trying a tool it cannot use. `call_tool` is the real guarantee: no tool runs
@@ -30,33 +30,33 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 
 from app.core.utils.logger import get_logger
-from app.mcp.auth import AutenticacaoPAT
-from app.mcp.erros import erro, sem_prefixo_do_sdk
+from app.mcp.auth import PATAuthentication
+from app.mcp.erros import erro, without_sdk_prefix
 from app.mcp.escopo import ESCOPO_ATUAL, escopo_da_chamada
 from app.mcp.guardas import GUARDAS
-from app.mcp.instrucoes import INSTRUCOES
+from app.mcp.instrucoes import INSTRUCTIONS
 from app.mcp.prompts import registrar_prompts
 from app.mcp.resources import registrar_resources
 from app.mcp.tools import registrar_tools
-from app.mcp.tools.base import guarda_da_chamada
+from app.mcp.tools.base import call_guard
 
 # Version of the server's CONTRACT (tools, resources, output format), not of
 # Atlans. A removed tool stays marked as deprecated for at least one minor
 # version before disappearing — see docs/mcp.md.
-VERSAO_MCP = "1.5.0"
+MCP_VERSION = "1.5.0"
 
 logger = get_logger("app.mcp.servidor")
 
 # Where the ASGI app is kept on the server instance — see `criar_app_mcp`.
-_ATRIBUTO_DO_APP = "_app_do_atlans"
+_APP_ATTRIBUTE = "_app_do_atlans"
 
 # Names already reported by `list_tools`: the warning is about a programming
 # defect (a tool registered without a guard), and repeating it on every
 # `tools/list` would flood the log.
-_SEM_GUARDA_AVISADAS: set[str] = set()
+_UNGUARDED_WARNED: set[str] = set()
 
 
-class ServidorAtlans(MCPServer):
+class AtlansServer(MCPServer):
     """`MCPServer` with scope, quota and auditing on every tool call."""
 
     async def list_tools(self):
@@ -77,8 +77,8 @@ class ServidorAtlans(MCPServer):
         for tool in await super().list_tools():
             guarda = GUARDAS.get(tool.name)
             if guarda is None:
-                if tool.name not in _SEM_GUARDA_AVISADAS:
-                    _SEM_GUARDA_AVISADAS.add(tool.name)
+                if tool.name not in _UNGUARDED_WARNED:
+                    _UNGUARDED_WARNED.add(tool.name)
                     logger.error(
                         "Tool %s registrada sem linha em GUARDAS: escondida do catálogo "
                         "e recusada em call_tool.",
@@ -123,7 +123,7 @@ class ServidorAtlans(MCPServer):
         # resolve there is no token or user to name in the audit line.
         escopo = escopo_da_chamada(context)
 
-        async with guarda_da_chamada(name, escopo):
+        async with call_guard(name, escopo):
             try:
                 return await super().call_tool(name, arguments, context)
             except ToolError as exc:
@@ -132,7 +132,7 @@ class ServidorAtlans(MCPServer):
                 # the prefix, the client would receive two formats: plain JSON
                 # when the guard refuses, and JSON preceded by prose when the
                 # tool fails.
-                limpa = sem_prefixo_do_sdk(str(exc))
+                limpa = without_sdk_prefix(str(exc))
                 if limpa != str(exc):
                     raise ToolError(limpa) from exc.__cause__
                 raise
@@ -149,13 +149,13 @@ def hosts_permitidos() -> list[str]:
     return list(config.MCP_ALLOWED_HOSTS)
 
 
-def create_mcp_server() -> ServidorAtlans:
+def create_mcp_server() -> AtlansServer:
     """A new server instance, with tools, resources and prompts registered."""
-    server = ServidorAtlans(
+    server = AtlansServer(
         name="atlans",
         title="Atlans",
-        instructions=INSTRUCOES,
-        version=VERSAO_MCP,
+        instructions=INSTRUCTIONS,
+        version=MCP_VERSION,
     )
     registrar_tools(server)
     registrar_resources(server)
@@ -163,7 +163,7 @@ def create_mcp_server() -> ServidorAtlans:
     return server
 
 
-def criar_app_mcp(server: ServidorAtlans):
+def criar_app_mcp(server: AtlansServer):
     """The `/mcp` ASGI app: streamable HTTP transport behind the PAT middleware.
 
     - `streamable_http_path="/mcp"` matches the exact route mounted in
@@ -182,10 +182,10 @@ def criar_app_mcp(server: ServidorAtlans):
     a session error. That is why the created app is kept on the instance itself
     and returned again, instead of a second one being built silently.
     """
-    existente = getattr(server, _ATRIBUTO_DO_APP, None)
+    existente = getattr(server, _APP_ATTRIBUTE, None)
     if existente is not None:
         return existente
-    app = AutenticacaoPAT(
+    app = PATAuthentication(
         server.streamable_http_app(
             streamable_http_path="/mcp",
             stateless_http=True,
@@ -196,5 +196,5 @@ def criar_app_mcp(server: ServidorAtlans):
             ),
         )
     )
-    setattr(server, _ATRIBUTO_DO_APP, app)
+    setattr(server, _APP_ATTRIBUTE, app)
     return app

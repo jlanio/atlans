@@ -20,19 +20,19 @@
 // offer: without an extension, the server sends `null` and `false`, and the
 // warning is just the warning.
 
-import { IDIOMA_PADRAO, type Idioma } from "@/lib/idioma"
-import { textosDe, useIdiomaDaTela } from "../i18n"
+import { DEFAULT_LANGUAGE, type Idioma } from "@/lib/idioma"
+import { textosDe, useScreenLanguage } from "../i18n"
 import { FORMATOS } from "../i18n/formatos"
 import { EXTENSOES, LimiteDaExtensao } from "@/extensoes"
 import { cn } from "@/lib/utils"
-import type { IAssistenteCota } from "@/service/types"
+import type { IAssistantQuota } from "@/service/types"
 
 /** "reabre em 6 h 12 min" (reopens in 6 h 12 min), or the vague one when the server doesn't know the deadline.
  *
  *  The exact deadline comes in `reabre_em_segundos` and the donut right below
  *  already uses it — saying "algumas horas" (a few hours) here, with the number
  *  at hand, was the screen knowing more than it told. */
-export function quandoReabre(cota: IAssistenteCota, idioma: Idioma = IDIOMA_PADRAO): string {
+export function quandoReabre(cota: IAssistantQuota, idioma: Idioma = DEFAULT_LANGUAGE): string {
   const t = textosDe(idioma).assistente.cota
   return cota.reabre_em_segundos != null
     ? t.reabreEm(FORMATOS[idioma].duracao(cota.reabre_em_segundos))
@@ -40,15 +40,15 @@ export function quandoReabre(cota: IAssistenteCota, idioma: Idioma = IDIOMA_PADR
 }
 
 interface Props {
-  cota: IAssistenteCota
+  cota: IAssistantQuota
   plano: string | null | undefined
   assinaturasAtivas: boolean | undefined
   /** The shell belongs to each surface: capsule in the bar, block in the panel. */
   className?: string
 }
 
-export function AvisoDeCotaCheia({ cota, plano, assinaturasAtivas, className }: Props) {
-  const idioma = useIdiomaDaTela()
+export function QuotaFullNotice({ cota, plano, assinaturasAtivas, className }: Props) {
+  const idioma = useScreenLanguage()
   const t = textosDe(idioma).assistente.cota
 
   return (
@@ -64,9 +64,9 @@ export function AvisoDeCotaCheia({ cota, plano, assinaturasAtivas, className }: 
       <span>
         {t.usou(FORMATOS[idioma].inteiro(cota.teto))} {quandoReabre(cota, idioma)}
       </span>
-      {EXTENSOES.map(({ nome, ofertaDaCota: Oferta }) => Oferta && (
+      {EXTENSOES.map(({ nome, ofertaDaCota: Offer }) => Offer && (
         <LimiteDaExtensao key={nome} nome={nome}>
-          <Oferta plano={plano} assinaturasAtivas={assinaturasAtivas} />
+          <Offer plano={plano} assinaturasAtivas={assinaturasAtivas} />
         </LimiteDaExtensao>
       ))}
     </p>

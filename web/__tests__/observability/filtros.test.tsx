@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { Filtros } from "@/app/components/observability/filtros"
-import { ESTADO_PADRAO, type EstadoDoHistorico } from "@/app/components/observability/historico-url"
+import { DEFAULT_STATE, type HistoryState } from "@/app/components/observability/historico-url"
 import type { IExecutorMetrics, IWorkflowMetricsRow } from "@/service/types"
 
 afterEach(() => {
@@ -9,8 +9,8 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-function estado(extra: Partial<EstadoDoHistorico> = {}): EstadoDoHistorico {
-  return { ...ESTADO_PADRAO, ...extra }
+function estado(extra: Partial<HistoryState> = {}): HistoryState {
+  return { ...DEFAULT_STATE, ...extra }
 }
 
 const contagens = { success: 1235, failed: 46, running: 3, cancelled: 0, pending: 0, other: 0 }

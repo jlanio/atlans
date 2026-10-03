@@ -12,18 +12,18 @@ from app.core.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-from .protocolo import _e_telemetria
+from .protocolo import _is_telemetry
 from .resultados import (
-    _fechar_run_inconclusivo,
+    _close_inconclusive_run,
     _handle_job_result,
     _handle_sync_event,
-    _posse_ja_provada,
+    _ownership_already_proven,
     _publish_node_events,
     _record_job_ack,
 )
 from .orfaos import _reconciliar_inventario
 
-# ── Per-connection dispatch queue (see `_drenar_inbox`) ──────────────────────
+# ── Per-connection dispatch queue (see `_drain_inbox`) ──────────────────────
 # The receive loop used to process each message INLINE: the next
 # `ws.receive_text()` only happened after Redis (and sometimes Postgres)
 # answered. Heartbeat, capacity, ack and the final job_result got stuck behind
@@ -54,10 +54,10 @@ _INBOX_FLUSH_TIMEOUT = 10.0
 _INBOX_DROP_LOG_EVERY = 5.0
 
 # Grace period given to the job_result already being written when the teardown
-# gives up waiting for the drain. See `_drenar_inbox` and the handler's `finally`.
+# gives up waiting for the drain. See `_drain_inbox` and the handler's `finally`.
 _INBOX_CANCEL_GRACE = 5.0
 
-# Queue shutdown sentinel — see `_drenar_inbox`.
+# Queue shutdown sentinel — see `_drain_inbox`.
 _INBOX_STOP = object()
 
 # Ceiling on waiting for a slot when the queue fills up and the message must NOT
@@ -97,7 +97,7 @@ class _InboxQueue(asyncio.Queue):
     # removes the connection from the registry before the queue finishes emptying.
     ip_da_conexao: str | None = None
 
-    def job_results_pendentes(self) -> list[tuple]:
+    def pending_job_results(self) -> list[tuple]:
         """job_results still queued, in order of arrival.
 
         Used on teardown to rescue what the cancelled drainer did not get to
@@ -108,11 +108,11 @@ class _InboxQueue(asyncio.Queue):
             if isinstance(item, tuple) and item[0] == "job_result"
         ]
 
-def _novo_contador_de_descartes() -> dict:
+def _new_drop_counter() -> dict:
     """State of the aggregated per-connection drop WARNING."""
     return {"total": 0, "desde_log": 0, "ultimo_log": 0.0}
 
-def _contabilizar_descarte(
+def _count_drop(
     executor_id: str, descartes: dict, quantidade: int = 1,
 ) -> None:
     """Counts an event dropped because of a full queue, with an aggregated WARNING.
@@ -176,8 +176,8 @@ async def _enfileirar_mensagem(
     # degrades honestly (node 'unknown', bar keeps going) and the client's
     # safety net covers it. Only job_result and sync_complete go ahead.
     # The inventory too: it is periodic, and the next one arrives in a minute.
-    if msg_type in ("node_event", "inventario") or _e_telemetria(msg_type, msg):
-        _contabilizar_descarte(executor_id, descartes)
+    if msg_type in ("node_event", "inventario") or _is_telemetry(msg_type, msg):
+        _count_drop(executor_id, descartes)
         return
 
     # The ACK promotes the run from 'pending' to 'running'. If lost, a job the
@@ -250,7 +250,7 @@ async def _flush_node_events(executor_id: str, eventos: list[dict]) -> None:
             executor_id, len(eventos), exc,
         )
 
-async def _processar_job_result_blindado(
+async def _process_job_result_shielded(
     executor_id: str, msg: dict, frame_bytes: int, inflight: set | None,
     executor_ip: str | None = None,
 ) -> None:
@@ -277,7 +277,7 @@ async def _processar_job_result_blindado(
         tarefa.add_done_callback(inflight.discard)
     await asyncio.shield(tarefa)
 
-async def _drenar_inbox(
+async def _drain_inbox(
     executor_id: str, inbox: asyncio.Queue, inflight: set | None = None,
 ) -> None:
     """Consumes the connection's queue and does the heavy work (Redis/Postgres).
@@ -320,7 +320,7 @@ async def _drenar_inbox(
                 eventos = []
                 try:
                     if msg_type == "job_result":
-                        await _processar_job_result_blindado(
+                        await _process_job_result_shielded(
                             executor_id, msg, frame_bytes, inflight,
                             executor_ip=getattr(inbox, "ip_da_conexao", None),
                         )
@@ -351,7 +351,7 @@ async def _resgatar_job_results_pendentes(executor_id: str, inbox: "_InboxQueue"
     WorkflowRun stays in 'running' forever. We try to write each one here and,
     if even that fails, we close the run as failed instead of leaving it hanging.
     """
-    pendentes = inbox.job_results_pendentes()
+    pendentes = inbox.pending_job_results()
     if not pendentes:
         return
     logger.warning(
@@ -370,8 +370,8 @@ async def _resgatar_job_results_pendentes(executor_id: str, inbox: "_InboxQueue"
                 "Executor '%s': job_result do job '%s' perdido no teardown: %s",
                 executor_id, msg.get("job_id"), exc,
             )
-            if run_id and _posse_ja_provada(executor_id, run_id):
-                await _fechar_run_inconclusivo(
+            if run_id and _ownership_already_proven(executor_id, run_id):
+                await _close_inconclusive_run(
                     executor_id, run_id, f"teardown da conexão ({exc})",
                 )
 

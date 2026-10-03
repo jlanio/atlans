@@ -2,7 +2,7 @@ import { ReactNode } from "react"
 import { SidebarProvider } from "../ui/sidebar"
 import ShellSidebar from "./shell-sidebar"
 import { AppHeader } from "../app-header"
-import { CamadasDasExtensoes } from "./camadas-das-extensoes"
+import { ExtensionLayers } from "./camadas-das-extensoes"
 
 interface SidebarRootProps {
   children: ReactNode
@@ -37,7 +37,7 @@ const SidebarRoot = ({ children, sidebar, defaultOpen = true, defaultWidth }: Si
           would touch a store with nobody subscribed — and nothing would happen.
           Here the layers are mounted once, in both shells, and the portal
           palette comes from whoever opened it. */}
-      <CamadasDasExtensoes />
+      <ExtensionLayers />
     </SidebarProvider>
   )
 }

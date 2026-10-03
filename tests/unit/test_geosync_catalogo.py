@@ -35,7 +35,7 @@ def sync_dir(tmp_path, monkeypatch):
 
 # ── Resolution through the manifest ──────────────────────────────────────────
 
-def test_resolve_dataset_de_arquivo_unico(sync_dir):
+def test_resolves_single_file_dataset(sync_dir):
     (sync_dir / "parcelas.geojson").write_bytes(b'{"type":"FeatureCollection"}')
     _manifesto(sync_dir, {
         "parcelas": {
@@ -54,7 +54,7 @@ def test_resolve_dataset_de_arquivo_unico(sync_dir):
         Path(temp).unlink(missing_ok=True)
 
 
-def test_shapefile_resolve_para_o_shp_e_nao_para_outro_componente(sync_dir):
+def test_shapefile_resolves_to_the_shp_and_not_another_component(sync_dir):
     """A shapefile is a bundle. Returning the `.dbf` would make ReadShapefile fail
     in an incomprehensible way — the scanner's `primary_path` picks the `.shp`, and
     this resolution must agree with it."""
@@ -78,7 +78,7 @@ def test_shapefile_resolve_para_o_shp_e_nao_para_outro_componente(sync_dir):
         Path(temp).unlink(missing_ok=True)
 
 
-def test_copia_e_nao_devolve_o_arquivo_do_usuario(sync_dir):
+def test_copies_and_does_not_return_the_user_file(sync_dir):
     """Same pitfall as the artifacts path: the caller deletes what it receives."""
     import os
 
@@ -97,7 +97,7 @@ def test_copia_e_nao_devolve_o_arquivo_do_usuario(sync_dir):
     assert original.is_file(), "o arquivo do usuario foi apagado pela leitura"
 
 
-def test_procura_em_todas_as_pastas_configuradas(tmp_path, monkeypatch):
+def test_searches_all_configured_folders(tmp_path, monkeypatch):
     a, b = tmp_path / "A", tmp_path / "B"
     a.mkdir(), b.mkdir()
     monkeypatch.setenv("EXECUTOR_SYNC_DIRS", f"{a},{b}")
@@ -119,7 +119,7 @@ def test_procura_em_todas_as_pastas_configuradas(tmp_path, monkeypatch):
 
 # ── Errors with a cause ──────────────────────────────────────────────────────
 
-def test_dataset_de_outro_executor_da_erro_explicativo(sync_dir):
+def test_dataset_from_another_executor_gives_explanatory_error(sync_dir):
     _manifesto(sync_dir, {})
     with pytest.raises(FileNotFoundError) as exc:
         drive_resolver._resolve_do_manifesto_de_sync(
@@ -130,14 +130,14 @@ def test_dataset_de_outro_executor_da_erro_explicativo(sync_dir):
     assert "catalogo" in msg.lower() or "catálogo" in msg.lower()
 
 
-def test_sem_pastas_de_sync_explica_o_que_falta(tmp_path, monkeypatch):
+def test_without_sync_folders_explains_what_is_missing(tmp_path, monkeypatch):
     monkeypatch.setenv("EXECUTOR_SYNC_DIRS", "")
     with pytest.raises(FileNotFoundError) as exc:
         drive_resolver._resolve_do_manifesto_de_sync("id-1", "exec-1", "", "x.geojson")
     assert "EXECUTOR_SYNC_DIRS" in str(exc.value)
 
 
-def test_arquivo_removido_do_disco_da_erro_distinto(sync_dir):
+def test_file_removed_from_disk_gives_distinct_error(sync_dir):
     """The manifest knows the dataset, but the file disappeared — a different diagnosis
     from 'it is on another machine'."""
     _manifesto(sync_dir, {
@@ -149,7 +149,7 @@ def test_arquivo_removido_do_disco_da_erro_distinto(sync_dir):
     assert "movido ou apagado" in str(exc.value)
 
 
-def test_manifesto_corrompido_nao_derruba_a_busca(tmp_path, monkeypatch):
+def test_corrupted_manifest_does_not_break_the_search(tmp_path, monkeypatch):
     """A folder with an unreadable manifest must not prevent finding it in the others."""
     a, b = tmp_path / "A", tmp_path / "B"
     a.mkdir(), b.mkdir()
@@ -169,12 +169,12 @@ def test_manifesto_corrompido_nao_derruba_a_busca(tmp_path, monkeypatch):
 
 # ── Choosing the primary file ────────────────────────────────────────────────
 
-def test_dataset_sem_arquivos_no_manifesto(sync_dir):
-    assert drive_resolver._arquivo_principal(sync_dir, {"type": "geojson", "files": {}}) is None
+def test_dataset_without_files_in_manifest(sync_dir):
+    assert drive_resolver._primary_file(sync_dir, {"type": "geojson", "files": {}}) is None
 
 
-def test_shapefile_sem_shp_no_bundle(sync_dir):
+def test_shapefile_without_shp_in_bundle(sync_dir):
     """Incomplete bundle: better None (which becomes a named error) than returning the
     `.dbf` and failing inside geopandas."""
     ds = {"type": "shapefile", "files": {"lotes.dbf": {}, "lotes.shx": {}}}
-    assert drive_resolver._arquivo_principal(sync_dir, ds) is None
+    assert drive_resolver._primary_file(sync_dir, ds) is None

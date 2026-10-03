@@ -6,39 +6,39 @@
  */
 import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
-import { textosDe, useTextos } from "@/app/components/home/i18n"
-import { rotuloDaFerramenta } from "@/app/components/home/assistente/rotulos"
+import { textosDe, useTexts } from "@/app/components/home/i18n"
+import { toolLabel } from "@/app/components/home/assistente/rotulos"
 import { descreverAlvo } from "@/app/components/home/assistente/cartao-confirmacao"
 import { etapaDaConversa } from "@/app/components/home/assistente/etapa"
 import { textoDoErro } from "@/app/components/home/assistente/conversa"
 import { detalheDaCota } from "@/app/components/home/assistente/uso-da-cota"
 import { quandoReabre } from "@/app/components/home/assistente/aviso-de-cota"
-import { comReferencia, sugestaoParaAnexos } from "@/app/components/home/assistente/anexos"
-import { EscopoPelaRota, IdiomaProvider } from "@/context/IdiomaContext"
-import type { TurnoDoAssistente } from "@/app/components/home/assistente/quadros"
+import { comReferencia, suggestionForAttachments } from "@/app/components/home/assistente/anexos"
+import { ScopeByRoute, LanguageProvider } from "@/context/IdiomaContext"
+import type { AssistantTurn } from "@/app/components/home/assistente/quadros"
 import type { Anexo } from "@/app/stores/homeStore"
 
 const rota = vi.hoisted(() => ({ atual: "/" }))
 vi.mock("next/navigation", () => ({ usePathname: () => rota.atual }))
 
 /** All leaves (path → value), descending into objects and lists. */
-function folhas(valor: unknown, caminho = ""): Array<[string, unknown]> {
+function leaves(valor: unknown, caminho = ""): Array<[string, unknown]> {
   if (valor && typeof valor === "object") {
-    return Object.entries(valor).flatMap(([k, v]) => folhas(v, caminho ? `${caminho}.${k}` : k))
+    return Object.entries(valor).flatMap(([k, v]) => leaves(v, caminho ? `${caminho}.${k}` : k))
   }
   return [[caminho, valor]]
 }
 
 describe("dicionário da Home", () => {
   it("inglês e espanhol têm exatamente as chaves do português", () => {
-    const chaves = (idioma: "pt-BR" | "en" | "es") => folhas(textosDe(idioma)).map(([c]) => c).sort()
+    const chaves = (idioma: "pt-BR" | "en" | "es") => leaves(textosDe(idioma)).map(([c]) => c).sort()
     expect(chaves("en")).toEqual(chaves("pt-BR"))
     expect(chaves("es")).toEqual(chaves("pt-BR"))
   })
 
   it("nenhum texto vazio (a dica vazia dos erros é a única ausência permitida)", () => {
     for (const idioma of ["pt-BR", "en", "es"] as const) {
-      for (const [caminho, valor] of folhas(textosDe(idioma))) {
+      for (const [caminho, valor] of leaves(textosDe(idioma))) {
         if (caminho.startsWith("assistente.erros.") && caminho.endsWith(".hint")) continue
         if (typeof valor === "string") expect(valor.trim(), `${idioma}:${caminho}`).not.toBe("")
       }
@@ -56,22 +56,22 @@ describe("dicionário da Home", () => {
 
 describe("rótulos das ferramentas", () => {
   it("português de sempre por padrão; inglês e espanhol quando pedido", () => {
-    expect(rotuloDaFerramenta("search_nodes")).toBe("Procurando nós")
-    expect(rotuloDaFerramenta("search_nodes", "en")).toBe("Searching nodes")
-    expect(rotuloDaFerramenta("run_workflow", "es")).toBe("Ejecutando el flujo")
+    expect(toolLabel("search_nodes")).toBe("Procurando nós")
+    expect(toolLabel("search_nodes", "en")).toBe("Searching nodes")
+    expect(toolLabel("run_workflow", "es")).toBe("Ejecutando el flujo")
   })
 
   it("as ferramentas de fonte externa não vazam mais o nome cru da API", () => {
     for (const nome of ["search_sources", "describe_source", "probe_source", "register_source"]) {
       for (const idioma of ["pt-BR", "en", "es"] as const) {
-        expect(rotuloDaFerramenta(nome, idioma), `${idioma}:${nome}`).not.toBe(nome)
+        expect(toolLabel(nome, idioma), `${idioma}:${nome}`).not.toBe(nome)
       }
     }
   })
 
   it("nome desconhecido volta cru — inclusive os do protótipo de Object", () => {
-    expect(rotuloDaFerramenta("ferramenta_nova")).toBe("ferramenta_nova")
-    expect(rotuloDaFerramenta("toString", "en")).toBe("toString")
+    expect(toolLabel("ferramenta_nova")).toBe("ferramenta_nova")
+    expect(toolLabel("toString", "en")).toBe("toString")
   })
 })
 
@@ -84,7 +84,7 @@ describe("confirmação, etapa e erros", () => {
   })
 
   it("etapaDaConversa: o 'pensando' no idioma", () => {
-    const turnos: TurnoDoAssistente[] = [{ id: "a", papel: "assistant", blocos: [] }]
+    const turnos: AssistantTurn[] = [{ id: "a", papel: "assistant", blocos: [] }]
     expect(etapaDaConversa(turnos, true)?.rotulo).toBe("Pensando")
     expect(etapaDaConversa(turnos, true, "en")?.rotulo).toBe("Thinking")
   })
@@ -157,23 +157,23 @@ describe("cota e anexos", () => {
   })
 
   it("a sugestão de anexos, com o plural do idioma", () => {
-    expect(sugestaoParaAnexos([pronto("a.shp"), pronto("b.shp")])).toBe("Analise a.shp e mais 1 arquivo")
-    expect(sugestaoParaAnexos([pronto("a.shp"), pronto("b.shp"), pronto("c.shp")], "en")).toBe("Analyze a.shp and 2 more files")
-    expect(sugestaoParaAnexos([pronto("a.shp")], "es")).toBe("Analiza a.shp")
+    expect(suggestionForAttachments([pronto("a.shp"), pronto("b.shp")])).toBe("Analise a.shp e mais 1 arquivo")
+    expect(suggestionForAttachments([pronto("a.shp"), pronto("b.shp"), pronto("c.shp")], "en")).toBe("Analyze a.shp and 2 more files")
+    expect(suggestionForAttachments([pronto("a.shp")], "es")).toBe("Analiza a.shp")
   })
 })
 
 describe("o escopo: só a Home segue o idioma", () => {
-  function Rotulo() {
-    return <span>{useTextos().casca.barraLateral.novaConversa}</span>
+  function Label() {
+    return <span>{useTexts().casca.barraLateral.novaConversa}</span>
   }
   const montar = () =>
     render(
-      <IdiomaProvider inicial={{ idioma: "en", detectado: "en", escolhido: "en" }}>
-        <EscopoPelaRota>
-          <Rotulo />
-        </EscopoPelaRota>
-      </IdiomaProvider>,
+      <LanguageProvider inicial={{ idioma: "en", detectado: "en", escolhido: "en" }}>
+        <ScopeByRoute>
+          <Label />
+        </ScopeByRoute>
+      </LanguageProvider>,
     )
 
   it("na Home (`/`) o texto segue o idioma da pessoa", () => {

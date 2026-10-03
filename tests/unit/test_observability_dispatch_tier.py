@@ -22,7 +22,7 @@ def test_serializa_dispatch_tier():
     assert out["agent_host"] == "pool-a@12345"
 
 
-def test_run_antigo_sem_tier():
+def test_old_run_without_tier():
     r = _run(); del r.dispatch_tier
     r.dispatch_tier = None
     assert _serialize_run(r)["dispatch_tier"] is None

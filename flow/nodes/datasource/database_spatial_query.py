@@ -10,7 +10,7 @@ from flow.utils.logger import get_logger
 from flow.utils.get_asyncpg_pool import get_asyncpg_pool
 from flow.utils.query_param_formatter import prepare_query, resolver_query_params
 from flow.utils.sql_guard import validate_readonly_sql
-from flow.utils.credencial import obter_conexao
+from flow.utils.credencial import get_connection
 
 logger = get_logger(__name__)
 
@@ -20,7 +20,7 @@ def _batch_to_df(batch) -> pd.DataFrame:
     return pd.DataFrame([dict(r) for r in batch])
 
 
-def _montar_gdf(chunks: list, geom_col: str, crs: str) -> gpd.GeoDataFrame:
+def _build_gdf(chunks: list, geom_col: str, crs: str) -> gpd.GeoDataFrame:
     """Concatenates the chunks and converts the WKB to geometry. Runs in a thread.
 
     It's the heaviest part of the node: `pd.concat` copies the entire result and
@@ -101,7 +101,7 @@ class DatabaseSpatialQuery(BaseNode):
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         self.validate()
-        conn_str = obter_conexao(self.parameters)
+        conn_str = get_connection(self.parameters)
         raw_query = self.parameters.get("query")
         query_params = resolver_query_params(inputs, self.parameters)
         crs = self.parameters.get("crs", "EPSG:4326")
@@ -152,7 +152,7 @@ class DatabaseSpatialQuery(BaseNode):
         if not chunks:
             return {"output": gpd.GeoDataFrame([], geometry=None, crs=crs)}
 
-        gdf = await asyncio.to_thread(_montar_gdf, chunks, geom_col, crs)
+        gdf = await asyncio.to_thread(_build_gdf, chunks, geom_col, crs)
 
         logger.info("Query concluída: %d registros em %d chunks.", len(gdf), len(chunks))
 

@@ -19,7 +19,7 @@ def _wf():
     return wf
 
 
-def _sessao(db):
+def _session(db):
     @asynccontextmanager
     async def _ctx():
         yield db
@@ -27,7 +27,7 @@ def _sessao(db):
 
 
 @pytest.mark.asyncio
-async def test_sem_executor_registra_run_failed_e_alerta():
+async def test_without_executor_records_failed_run_and_alert():
     from app.core.async_scheduler import AsyncScheduler
 
     db = MagicMock(); db.add = MagicMock(); db.commit = AsyncMock()
@@ -37,11 +37,11 @@ async def test_sem_executor_registra_run_failed_e_alerta():
         side_effect=NoExecutorAvailableError("Workspace isolado: nenhum dos 2 executores dedicados está disponível. O job NÃO foi enviado ao pool compartilhado.",
                                              category="no_dedicated_executor"),
     )
-    with patch("app.core.async_scheduler.AsyncSessionLocal", _sessao(db)), \
+    with patch("app.core.async_scheduler.AsyncSessionLocal", _session(db)), \
          patch("app.services.workflow_service.WorkflowService", MagicMock(return_value=service)), \
          patch("app.core.run_result_consumer.account_terminal_run", AsyncMock()) as fechar, \
          patch("app.services.execution_alert_service.record_failure", AsyncMock(return_value=True)) as alerta, \
-         patch("app.services.execution_alert_service.record_success", AsyncMock()) as recuperou:
+         patch("app.services.execution_alert_service.record_success", AsyncMock()) as recovered:
         with pytest.raises(NoExecutorAvailableError):
             await AsyncScheduler()._fire_workflow("wf-1", schedule_id=7)
 
@@ -54,29 +54,29 @@ async def test_sem_executor_registra_run_failed_e_alerta():
     fechar.assert_awaited_once()
     alerta.assert_awaited_once()
     assert alerta.await_args.kwargs["category"] == "no_dedicated_executor"
-    recuperou.assert_not_awaited()
+    recovered.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_ocorrencia_que_roda_registra_recuperacao():
+async def test_occurrence_that_runs_records_recovery():
     from app.core.async_scheduler import AsyncScheduler
 
     db = MagicMock(); db.add = MagicMock(); db.commit = AsyncMock()
     service = MagicMock()
     service.get_workflow_by_hash = AsyncMock(return_value=_wf())
     service.start_analysis = AsyncMock(return_value=MagicMock(id="task-1"))
-    with patch("app.core.async_scheduler.AsyncSessionLocal", _sessao(db)), \
+    with patch("app.core.async_scheduler.AsyncSessionLocal", _session(db)), \
          patch("app.services.workflow_service.WorkflowService", MagicMock(return_value=service)), \
-         patch("app.services.execution_alert_service.record_success", AsyncMock(return_value=False)) as recuperou:
+         patch("app.services.execution_alert_service.record_success", AsyncMock(return_value=False)) as recovered:
         await AsyncScheduler()._fire_workflow("wf-1", schedule_id=7)
-    recuperou.assert_awaited_once()
+    recovered.assert_awaited_once()
     db.add.assert_not_called()   # no synthetic run when the dispatch succeeded
     # the already loaded workflow goes into start_analysis (no duplicate SELECT)
     assert service.start_analysis.await_args.kwargs["workflow"] is not None
 
 
 @pytest.mark.asyncio
-async def test_outras_excecoes_tambem_materializam_run_e_alerta():
+async def test_other_exceptions_also_materialize_run_and_alert():
     """Any failure of the scheduled dispatch — not only a missing executor — becomes
     a visible `failed` run + alert, instead of vanishing into the log while
     `next_run_at` advances. The original exception still propagates (the loop logs it)."""
@@ -86,7 +86,7 @@ async def test_outras_excecoes_tambem_materializam_run_e_alerta():
     service = MagicMock()
     service.get_workflow_by_hash = AsyncMock(return_value=_wf())
     service.start_analysis = AsyncMock(side_effect=RuntimeError("boom"))
-    with patch("app.core.async_scheduler.AsyncSessionLocal", _sessao(db)), \
+    with patch("app.core.async_scheduler.AsyncSessionLocal", _session(db)), \
          patch("app.services.workflow_service.WorkflowService", MagicMock(return_value=service)), \
          patch("app.core.run_result_consumer.account_terminal_run", AsyncMock()) as fechar, \
          patch("app.services.execution_alert_service.record_failure", AsyncMock(return_value=True)) as alerta:
@@ -105,7 +105,7 @@ async def test_outras_excecoes_tambem_materializam_run_e_alerta():
 
 
 @pytest.mark.asyncio
-async def test_excecao_com_run_id_nao_materializa_segundo_run():
+async def test_exception_with_run_id_does_not_materialize_a_second_run():
     """`_dispatch_job` already created and closed a `failed` run (dedicated one
     dropped within the grace window, queue full): the scheduler does NOT write
     another — otherwise the history and usage_daily count the same failure twice."""
@@ -117,7 +117,7 @@ async def test_excecao_com_run_id_nao_materializa_segundo_run():
     service.start_analysis = AsyncMock(
         side_effect=NoExecutorAvailableError("Nenhum executor aceitou o job.", category="no_executor_chain", run_id="run-1"),
     )
-    with patch("app.core.async_scheduler.AsyncSessionLocal", _sessao(db)), \
+    with patch("app.core.async_scheduler.AsyncSessionLocal", _session(db)), \
          patch("app.services.workflow_service.WorkflowService", MagicMock(return_value=service)), \
          patch("app.core.run_result_consumer.account_terminal_run", AsyncMock()) as fechar, \
          patch("app.services.execution_alert_service.record_failure", AsyncMock(return_value=True)) as alerta:

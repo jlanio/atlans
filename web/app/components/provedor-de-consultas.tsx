@@ -4,7 +4,7 @@ import type { ReactNode } from "react"
 import { QueryClientProvider, environmentManager, type QueryClient } from "@tanstack/react-query"
 import { criarClienteDeConsultas } from "@/lib/consultas"
 
-let doNavegador: QueryClient | undefined
+let browserQueryClient: QueryClient | undefined
 
 /**
  * On the server, one client per request: the Node process serves different
@@ -17,12 +17,12 @@ let doNavegador: QueryClient | undefined
  * The cache does not carry over from one session to another: logout (`signOut`
  * with redirect) reloads the page, and this module with it.
  */
-function clienteDeConsultas(): QueryClient {
+function queryClientFor(): QueryClient {
   if (environmentManager.isServer()) return criarClienteDeConsultas()
-  return (doNavegador ??= criarClienteDeConsultas())
+  return (browserQueryClient ??= criarClienteDeConsultas())
 }
 
 /** The `QueryClientProvider` for the (dashboard) group's screens — see lib/consultas.ts. */
-export function ProvedorDeConsultas({ children }: { children: ReactNode }) {
-  return <QueryClientProvider client={clienteDeConsultas()}>{children}</QueryClientProvider>
+export function QueryProvider({ children }: { children: ReactNode }) {
+  return <QueryClientProvider client={queryClientFor()}>{children}</QueryClientProvider>
 }

@@ -69,7 +69,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         }
     )
 
-def _permissao_negada_no_banco(exc: Exception) -> str | None:
+def _db_permission_denied(exc: Exception) -> str | None:
     """PostgreSQL's `permission denied for table X` / `must be owner of table X`:
     the API user is not the owner of (or has no GRANT on) the object.
     Returns the readable excerpt, or None if this is not the case."""
@@ -89,7 +89,7 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     # A database permission is not a code bug: it is environment configuration,
     # and "Unexpected error occurred" hid exactly what was missing a grant.
-    permissao = _permissao_negada_no_banco(exc)
+    permissao = _db_permission_denied(exc)
     if permissao:
         return JSONResponse(
             status_code=500,

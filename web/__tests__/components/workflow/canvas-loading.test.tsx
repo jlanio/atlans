@@ -13,10 +13,10 @@ vi.mock("@xyflow/react", () => ({
   useStore: (seletor: (s: { domNode: HTMLDivElement | null }) => unknown) => seletor({ domNode }),
 }))
 
-import CanvasLoading, { ATRASO_PARA_MOSTRAR_MS, EXIBICAO_MINIMA_MS } from "@/app/components/workflow/canvas-loading"
+import CanvasLoading, { SHOW_DELAY_MS, MIN_DISPLAY_MS } from "@/app/components/workflow/canvas-loading"
 
 const overlay = () => screen.queryByRole("status")
-const avancar = (ms: number) => act(() => { vi.advanceTimersByTime(ms) })
+const advance = (ms: number) => act(() => { vi.advanceTimersByTime(ms) })
 
 beforeEach(() => {
   cleanup()
@@ -34,27 +34,27 @@ describe("animação de carga do canvas", () => {
     render(<CanvasLoading carregando />)
     expect(overlay()).toBeNull()
 
-    avancar(ATRASO_PARA_MOSTRAR_MS)
+    advance(SHOW_DELAY_MS)
     expect(overlay()).toHaveTextContent("Carregando workflow…")
   })
 
   it("uma carga que termina antes do atraso nunca mostra nada", () => {
     const { rerender } = render(<CanvasLoading carregando />)
-    avancar(ATRASO_PARA_MOSTRAR_MS - 50)
+    advance(SHOW_DELAY_MS - 50)
     rerender(<CanvasLoading carregando={false} />)
-    avancar(2_000)
+    advance(2_000)
     expect(overlay()).toBeNull()
   })
 
   it("tendo aparecido, fica o tempo mínimo mesmo que a carga acabe antes", () => {
     const { rerender } = render(<CanvasLoading carregando />)
-    avancar(ATRASO_PARA_MOSTRAR_MS)        // aparece
-    avancar(50)
+    advance(SHOW_DELAY_MS)        // aparece
+    advance(50)
     rerender(<CanvasLoading carregando={false} />)
 
-    avancar(EXIBICAO_MINIMA_MS - 50 - 1)    // an instant before the minimum
+    advance(MIN_DISPLAY_MS - 50 - 1)    // an instant before the minimum
     expect(overlay()).not.toBeNull()
-    avancar(1)
+    advance(1)
     expect(overlay()).toBeNull()
   })
 
@@ -67,7 +67,7 @@ describe("animação de carga do canvas", () => {
     expect(domNode!.classList.contains("rf-carregando")).toBe(false)
     expect(domNode!.classList.contains("rf-revelando")).toBe(true)
 
-    avancar(700)
+    advance(700)
     expect(domNode!.classList.contains("rf-revelando")).toBe(false)
   })
 

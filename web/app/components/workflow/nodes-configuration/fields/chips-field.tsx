@@ -20,12 +20,12 @@ import { TbX } from "react-icons/tb"
 import { Badge } from "@/app/components/ui/badge"
 import { Input } from "@/app/components/ui/input"
 import { FieldLabel } from "./field-label"
-import SugestoesDeColunas from "./sugestoes-de-colunas"
+import ColumnSuggestions from "./sugestoes-de-colunas"
 import type { FieldProps } from "./types"
 
-/** Mirrors the executor's ceiling (`MAX_COLUNAS` in flow/executor/utils.py). It
+/** Mirrors the executor's ceiling (`MAX_COLUMNS` in flow/executor/utils.py). It
  *  only serves to warn that the list came truncated — diverging just hides the warning. */
-export const MAX_COLUNAS_SUGERIDAS = 200
+export const MAX_SUGGESTED_COLUMNS = 200
 
 type ChipsFieldProps = FieldProps<{
   /** Names seen in the previous node's last execution, to click instead of
@@ -81,7 +81,7 @@ export function fichasNovas(entrada: string, existentes: string[]): string[] {
 
 const ChipsField = ({ field, values, setNodeField, sugestoes = [], sugestoesDesatualizadas = false, sugestoesParciais = false }: ChipsFieldProps) => {
   const fichas = useMemo(() => lerFichas(values?.[field.name]), [values, field.name])
-  const [rascunho, setRascunho] = useState("")
+  const [rascunho, setDraft] = useState("")
   // Only what hasn't been chosen yet — offering what is already a chip is noise.
   const disponiveis = useMemo(
     () => sugestoes.filter(s => !fichas.includes(s)),
@@ -107,7 +107,7 @@ const ChipsField = ({ field, values, setNodeField, sugestoes = [], sugestoesDesa
   function adicionar(entrada: string) {
     const novas = fichasNovas(entrada, fichas)
     if (novas.length) gravar([...fichas, ...novas])
-    setRascunho("")
+    setDraft("")
   }
 
   function aoTeclar(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -152,7 +152,7 @@ const ChipsField = ({ field, values, setNodeField, sugestoes = [], sugestoesDesa
       <Input
         id={`chips-${field.name}`}
         value={rascunho}
-        onChange={e => setRascunho(e.target.value)}
+        onChange={e => setDraft(e.target.value)}
         onKeyDown={aoTeclar}
         // Leaving the field with something typed adds it: losing what you wrote
         // because you clicked outside is the classic defect of this kind of field.
@@ -161,7 +161,7 @@ const ChipsField = ({ field, values, setNodeField, sugestoes = [], sugestoesDesa
         className="h-8 font-mono text-xs"
       />
 
-      <SugestoesDeColunas
+      <ColumnSuggestions
         nomes={disponiveis}
         onEscolher={adicionar}
         totalConhecido={sugestoes.length}

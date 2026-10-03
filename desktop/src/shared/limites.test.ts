@@ -10,8 +10,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { INTERVALO_SYNC, PADRAO_SYNC } from './geosync.js'
-import { LIMITES, dentroDaFaixa, inteiroDoEnv, type Faixa } from './limites.js'
+import { SYNC_INTERVAL, SYNC_DEFAULTS } from './geosync.js'
+import { LIMITES, withinRange, inteiroDoEnv, type Faixa } from './limites.js'
 
 const SRC = fileURLToPath(new URL('..', import.meta.url))
 const CONFIG_PY = fs.readFileSync(
@@ -21,7 +21,7 @@ const CONFIG_PY = fs.readFileSync(
 const numero = (s: string) => Number(s.replace(/_/g, ''))
 
 /** A faixa de `ler_int("NOME", padrao, minimo=..., maximo=...)` em executor/config.py. */
-function faixaDoExecutor(nome: string): Faixa {
+function executorRange(nome: string): Faixa {
   const m = new RegExp(
     `ler_int\\(\\s*"${nome}"\\s*,\\s*([\\d_]+)\\s*,\\s*minimo=([\\d_]+)(?:\\s*,\\s*maximo=([\\d_]+))?\\s*\\)`,
   ).exec(CONFIG_PY)
@@ -30,7 +30,7 @@ function faixaDoExecutor(nome: string): Faixa {
 }
 
 /** The default of `os.getenv("NOME", "padrão")` in executor/config.py. */
-function textoDoExecutor(nome: string): string {
+function executorText(nome: string): string {
   const m = new RegExp(`os\\.getenv\\(\\s*"${nome}"\\s*,\\s*"([^"]*)"\\s*\\)`).exec(CONFIG_PY)
   if (!m) throw new Error(`não achei a leitura de ${nome} em executor/config.py`)
   return m[1]!
@@ -42,19 +42,19 @@ describe('contrato com executor/config.py', () => {
     ['filaMax', 'EXECUTOR_MAX_QUEUE_SIZE'],
     ['timeoutS', 'EXECUTOR_JOB_TIMEOUT'],
   ] as const)('LIMITES.%s é a faixa de %s', (campo, variavel) => {
-    expect(LIMITES[campo]).toEqual(faixaDoExecutor(variavel))
+    expect(LIMITES[campo]).toEqual(executorRange(variavel))
   })
 
   it('o padrão do GeoSync é o do executor', () => {
-    expect(PADRAO_SYNC).toEqual({
-      modo: textoDoExecutor('EXECUTOR_SYNC_MODE'),
-      conflito: textoDoExecutor('EXECUTOR_SYNC_CONFLICT_STRATEGY'),
+    expect(SYNC_DEFAULTS).toEqual({
+      modo: executorText('EXECUTOR_SYNC_MODE'),
+      conflito: executorText('EXECUTOR_SYNC_CONFLICT_STRATEGY'),
     })
   })
 
   it('o intervalo que o app grava é um que o executor aceita', () => {
     // Out of range, the executor would discard the value and use its default.
-    expect(dentroDaFaixa(INTERVALO_SYNC, faixaDoExecutor('EXECUTOR_SYNC_INTERVAL'))).toBe(true)
+    expect(withinRange(SYNC_INTERVAL, executorRange('EXECUTOR_SYNC_INTERVAL'))).toBe(true)
   })
 })
 
@@ -86,10 +86,10 @@ describe('uma cópia só', () => {
   it('nenhum outro arquivo do desktop redefine as faixas de execução', () => {
     // Main and renderer each had their own table, and both already had the 24 h
     // ceiling the executor does not have.
-    const redefinem = fontes(SRC)
+    const redefiners = fontes(SRC)
       .filter((p) => path.basename(p) !== 'limites.ts')
       .filter((p) => /\b(workers|filaMax|timeoutS):\s*\{\s*(padrao|min|max)\b/.test(fs.readFileSync(p, 'utf8')))
       .map((p) => path.relative(SRC, p))
-    expect(redefinem).toEqual([])
+    expect(redefiners).toEqual([])
   })
 })

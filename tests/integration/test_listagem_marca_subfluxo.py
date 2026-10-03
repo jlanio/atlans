@@ -23,14 +23,14 @@ from app.crud.workflow_crud import WorkflowCRUD
 from app.models.models import Workflow
 from app.schemas.workflow import WorkflowListItem
 
-SO_SAIDA = {
+OUTPUT_ONLY = {
     "nodes": [
         {"id": "in", "name": "SubWorkflowInput"},
         {"id": "out", "name": "SubWorkflowOutput"},
     ],
     "edges": [],
 }
-COMUM = {
+COMMON = {
     "nodes": [
         {"id": "t", "name": "WebhookTrigger"},
         {"id": "p", "name": "PythonScript"},
@@ -49,7 +49,7 @@ async def db():
     await engine.dispose()
 
 
-async def _semear(db, *pares):
+async def _seed(db, *pares):
     for i, (hash_, definition) in enumerate(pares):
         db.add(Workflow(
             id_hash=hash_, name=hash_, definition=definition,
@@ -58,22 +58,22 @@ async def _semear(db, *pares):
     await db.commit()
 
 
-async def _por_hash(db):
+async def _by_hash(db):
     linhas = await WorkflowCRUD(db).get_all_metadata()
     return {linha.id_hash: linha for linha in linhas}
 
 
 @pytest.mark.asyncio
-async def test_marca_quem_declara_saida_de_subfluxo(db):
-    await _semear(db, ("filho", SO_SAIDA), ("comum", COMUM))
-    linhas = await _por_hash(db)
+async def test_marks_whoever_declares_a_subworkflow_output(db):
+    await _seed(db, ("filho", OUTPUT_ONLY), ("comum", COMMON))
+    linhas = await _by_hash(db)
 
     assert linhas["filho"].is_subworkflow is True
     assert linhas["comum"].is_subworkflow is False
 
 
 @pytest.mark.asyncio
-async def test_um_pai_que_apenas_chama_nao_e_marcado(db):
+async def test_a_parent_that_only_calls_is_not_marked(db):
     """A workflow that CALLS a sub-workflow is still a regular workflow in the list.
 
     The flag answers "this one can be called by another", not "this one uses
@@ -84,22 +84,22 @@ async def test_um_pai_que_apenas_chama_nao_e_marcado(db):
         {"id": "t", "name": "WebhookTrigger"},
         {"id": "s", "name": "SubWorkflow", "properties": {"workflowHash": "filho"}},
     ], "edges": []}
-    await _semear(db, ("pai", pai))
+    await _seed(db, ("pai", pai))
 
-    assert (await _por_hash(db))["pai"].is_subworkflow is False
+    assert (await _by_hash(db))["pai"].is_subworkflow is False
 
 
 @pytest.mark.asyncio
-async def test_definition_vazia_nao_quebra_a_listagem(db):
+async def test_empty_definition_does_not_break_the_listing(db):
     # Freshly created workflow, still without any node.
-    await _semear(db, ("novo", {"nodes": [], "edges": []}))
+    await _seed(db, ("novo", {"nodes": [], "edges": []}))
 
-    assert (await _por_hash(db))["novo"].is_subworkflow is False
+    assert (await _by_hash(db))["novo"].is_subworkflow is False
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("definition", [{}, {"edges": []}], ids=["vazia", "sem_a_chave_nodes"])
-async def test_definition_sem_nodes_nao_derruba_a_resposta(db, definition):
+async def test_definition_without_nodes_does_not_break_the_response(db, definition):
     """REGRESSION: without the `nodes` key, `->>` returns NULL, LIKE propagates
     NULL, and Pydantic rejects None in a `bool` field.
 
@@ -111,23 +111,23 @@ async def test_definition_sem_nodes_nao_derruba_a_resposta(db, definition):
     attribute returned None without complaint, and the error only appeared on
     serialization.
     """
-    await _semear(db, ("torto", definition))
+    await _seed(db, ("torto", definition))
 
-    item = WorkflowListItem.model_validate((await _por_hash(db))["torto"])
+    item = WorkflowListItem.model_validate((await _by_hash(db))["torto"])
     assert item.is_subworkflow is False
     # A marca vizinha le a mesma coluna e tinha o mesmo defeito.
     assert item.has_publish_map is False
 
 
 @pytest.mark.asyncio
-async def test_a_marca_convive_com_has_publish_map(db):
+async def test_the_marker_coexists_with_has_publish_map(db):
     """Both expressions read the SAME column; one must not mask the other."""
-    dos_dois = {"nodes": [
+    both_markers = {"nodes": [
         {"id": "out", "name": "SubWorkflowOutput"},
         {"id": "m", "name": "PublishMap"},
     ], "edges": []}
-    await _semear(db, ("ambos", dos_dois))
+    await _seed(db, ("ambos", both_markers))
 
-    linha = (await _por_hash(db))["ambos"]
+    linha = (await _by_hash(db))["ambos"]
     assert linha.is_subworkflow is True
     assert linha.has_publish_map is True

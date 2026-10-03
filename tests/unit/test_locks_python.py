@@ -44,11 +44,11 @@ TRIOS = [
 PARES = [(entrada, saida) for entrada, saida, _ in TRIOS]
 LOCKS = [saida for _, saida in PARES]
 
-_PINO = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]*\])?==([^\s\\;#]+)")
-_NOME = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)")
+_PIN = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]*\])?==([^\s\\;#]+)")
+_NAME = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)")
 
 
-def _normalizar(nome: str) -> str:
+def _normalize(nome: str) -> str:
     return re.sub(r"[-_.]+", "-", nome).lower()
 
 
@@ -57,9 +57,9 @@ def _blocos(caminho: str) -> dict[str, tuple[str, int]]:
     blocos: dict[str, tuple[str, int]] = {}
     atual = None
     for linha in (RAIZ / caminho).read_text(encoding="utf-8").splitlines():
-        m = _PINO.match(linha)
+        m = _PIN.match(linha)
         if m:
-            atual = _normalizar(m.group(1))
+            atual = _normalize(m.group(1))
             blocos[atual] = (m.group(2), 0)
         elif atual and linha.strip().startswith("--hash="):
             versao, n = blocos[atual]
@@ -72,15 +72,15 @@ def _blocos(caminho: str) -> dict[str, tuple[str, int]]:
     return blocos
 
 
-def _pedidos_por(caminho: str) -> dict[str, set[str]]:
+def _requirements_by(caminho: str) -> dict[str, set[str]]:
     """`name -> where it came from`, from pip-compile's `# via` annotations (on one
     line, `# via X`, or on several, `# via` followed by `#   X`)."""
     via: dict[str, set[str]] = {}
     atual, lendo = None, False
     for linha in (RAIZ / caminho).read_text(encoding="utf-8").splitlines():
-        m = _PINO.match(linha)
+        m = _PIN.match(linha)
         if m:
-            atual, lendo = _normalizar(m.group(1)), False
+            atual, lendo = _normalize(m.group(1)), False
             via[atual] = set()
             continue
         uma = re.match(r"^\s+# via\s+(\S.*)$", linha)
@@ -95,58 +95,58 @@ def _pedidos_por(caminho: str) -> dict[str, set[str]]:
     return via
 
 
-def _fonte(caminho: str) -> tuple[dict[str, str], set[str]]:
+def _source(caminho: str) -> tuple[dict[str, str], set[str]]:
     """The `==` pins and all the names requested by a `.in`."""
-    pinos, nomes = {}, set()
+    pins, nomes = {}, set()
     for linha in (RAIZ / caminho).read_text(encoding="utf-8").splitlines():
         if not linha.strip() or linha.lstrip().startswith(("#", "-")):
             continue
-        m = _PINO.match(linha.strip())
+        m = _PIN.match(linha.strip())
         if m:
-            pinos[_normalizar(m.group(1))] = m.group(2)
-        nome = _NOME.match(linha.strip())
+            pins[_normalize(m.group(1))] = m.group(2)
+        nome = _NAME.match(linha.strip())
         if nome:
-            nomes.add(_normalizar(nome.group(1)))
-    return pinos, nomes
+            nomes.add(_normalize(nome.group(1)))
+    return pins, nomes
 
 
 @pytest.mark.parametrize("entrada,saida", PARES, ids=[s for _, s in PARES])
-def test_cada_lock_bate_com_a_sua_fonte(entrada, saida):
-    pinos, nomes = _fonte(entrada)
+def test_each_lock_matches_its_source(entrada, saida):
+    pins, nomes = _source(entrada)
     travados = _blocos(saida)
 
     faltando = sorted(nomes - set(travados))
     assert faltando == [], f"{entrada} pede {faltando}, que não estão em {saida} — regere o lock"
 
-    divergentes = {n: (v, travados[n][0]) for n, v in pinos.items() if travados[n][0] != v}
-    assert divergentes == {}, f"{entrada} x {saida} (fonte, lock): {divergentes} — regere o lock"
+    mismatched = {n: (v, travados[n][0]) for n, v in pins.items() if travados[n][0] != v}
+    assert mismatched == {}, f"{entrada} x {saida} (fonte, lock): {mismatched} — regere o lock"
 
     # And the reverse: what the lock says came from the `.in` and has already left it
     # would still be installed.
-    sobrando = sorted(n for n, fontes in _pedidos_por(saida).items() if f"-r {entrada}" in fontes and n not in nomes)
+    sobrando = sorted(n for n, fontes in _requirements_by(saida).items() if f"-r {entrada}" in fontes and n not in nomes)
     assert sobrando == [], f"{saida} ainda traz {sobrando}, que saíram de {entrada} — regere o lock"
 
 
 @pytest.mark.parametrize("entrada", [e for e, _ in PARES])
-def test_as_fontes_nao_embutem_restricao(entrada):
-    embutidas = [
+def test_sources_do_not_embed_constraints(entrada):
+    embedded = [
         linha for linha in (RAIZ / entrada).read_text(encoding="utf-8").splitlines()
         if re.match(r"^\s*(-c|--constraint)\b", linha)
     ]
-    assert embutidas == [], (
-        f"{entrada}: {embutidas} — o Dependabot compila cada .in sozinho e esbarra no lock "
+    assert embedded == [], (
+        f"{entrada}: {embedded} — o Dependabot compila cada .in sozinho e esbarra no lock "
         "velho da restrição; ela vai em PARES, em scripts/travar_python.py"
     )
 
 
 @pytest.mark.parametrize("lock", LOCKS)
-def test_toda_linha_dos_locks_tem_hash(lock):
-    sem_hash = sorted(n for n, (_, hashes) in _blocos(lock).items() if hashes == 0)
-    assert sem_hash == [], f"{lock}: pacotes sem hash {sem_hash}"
+def test_every_lock_line_has_hash(lock):
+    without_hash = sorted(n for n, (_, hashes) in _blocos(lock).items() if hashes == 0)
+    assert without_hash == [], f"{lock}: pacotes sem hash {without_hash}"
 
 
 @pytest.mark.parametrize("entrada,saida,restricoes", TRIOS, ids=[s for _, s, _ in TRIOS])
-def test_os_locks_saem_do_pip_compile_com_hash(entrada, saida, restricoes):
+def test_locks_come_from_pip_compile_with_hash(entrada, saida, restricoes):
     """The header is the command that regenerates the lock, and it is through it
     (`--output-file`) that Dependabot finds the lock of each `.in`. Whoever reruns it
     must get the same file: with hashes, with the constraints and without the
@@ -159,17 +159,17 @@ def test_os_locks_saem_do_pip_compile_com_hash(entrada, saida, restricoes):
     assert f"--output-file={saida}" in comando, f"{saida}: o cabeçalho não aponta para o próprio lock"
     assert comando.rstrip().endswith(entrada), f"{saida}: o cabeçalho não compila {entrada}"
     assert "--no-index" not in comando.split(), f"{saida}: o cabeçalho traz o --no-index espúrio"
-    for restricao in restricoes:
-        assert f"--constraint={restricao}" in comando, f"{saida}: compilado sem a restrição {restricao}"
+    for constraint in restricoes:
+        assert f"--constraint={constraint}" in comando, f"{saida}: compilado sem a restrição {constraint}"
 
 
-def test_mesma_versao_em_todos_os_locks():
+def test_same_version_in_all_locks():
     visto: dict[str, dict[str, str]] = {}
     for lock in LOCKS:
         for nome, (versao, _) in _blocos(lock).items():
             visto.setdefault(nome, {})[lock] = versao
-    divergentes = {n: v for n, v in visto.items() if len(set(v.values())) > 1}
-    assert divergentes == {}, f"o mesmo pacote em versões diferentes: {divergentes}"
+    mismatched = {n: v for n, v in visto.items() if len(set(v.values())) > 1}
+    assert mismatched == {}, f"o mesmo pacote em versões diferentes: {mismatched}"
 
 
 @pytest.mark.parametrize(
@@ -186,11 +186,11 @@ def test_mesma_versao_em_todos_os_locks():
         ("desktop/scripts/check-lock.mjs", "'--require-hashes', '--only-binary=:all:'"),
     ],
 )
-def test_quem_instala_os_locks_confere_o_hash(arquivo, trecho):
+def test_lock_installers_verify_the_hash(arquivo, trecho):
     assert trecho in (RAIZ / arquivo).read_text(encoding="utf-8"), f"{arquivo} deixou de instalar com hash"
 
 
-def test_o_lock_de_dev_instala_no_windows():
+def test_dev_lock_installs_on_windows():
     """Whoever commits from Windows installs requirements-dev.txt (pre-commit comes
     from it). The lock is produced on Linux, which does not see the colorama that `build`
     (from pip-tools) requires on Windows; without it in the `.in`, --require-hashes rejects

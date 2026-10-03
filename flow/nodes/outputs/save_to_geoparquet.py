@@ -9,10 +9,10 @@ from flow.nodes.base import BaseNode
 from flow.utils.geo_helpers import ensure_extension, validate_file_path, ensure_gdf_crs, slugify_label
 from flow.utils.artifact_helpers import (
     EXECUTOR,
-    descrever_localidade,
+    describe_locality,
     persistir_artefato,
-    propriedade_localidade,
-    resolver_localidade,
+    locality_property,
+    resolve_locality,
 )
 from flow.utils.logger import get_logger
 
@@ -73,7 +73,7 @@ class SaveToGeoParquetNode(BaseNode):
                     # There is no download to protect on an artifact that stays on the executor.
                     'visibleWhen': {'field': 'localidade', 'in': ['herdar']},
                 },
-                propriedade_localidade(),
+                locality_property(),
             ],
         }
 
@@ -84,7 +84,7 @@ class SaveToGeoParquetNode(BaseNode):
         output_path = self.get_param('outputPath', '').strip()
         crs = self.get_param('crs', 'EPSG:4326')
         credential_id = self.get_param('credential_id', '') or None
-        localidade, quem = resolver_localidade(self.get_param('localidade', None))
+        localidade, quem = resolve_locality(self.get_param('localidade', None))
         if localidade == EXECUTOR:
             # There is no download to protect on an artifact that stays on the executor.
             credential_id = None
@@ -151,7 +151,7 @@ class SaveToGeoParquetNode(BaseNode):
             except OSError as exc:
                 logger.debug("Falha ao remover arquivo temporário '%s': %s", tmp_path, exc)
 
-        self.log(descrever_localidade(localidade, quem))
+        self.log(describe_locality(localidade, quem))
         onde = 'neste executor' if localidade == EXECUTOR else 'no MinIO'
         self.log(f"Artefato salvo {onde}: {s3_key} (geoparquet, {features} feicoes)")
 

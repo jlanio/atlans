@@ -8,7 +8,7 @@ import { dayjs } from "@/lib/dayjs"
 import { useNodes, useEdges, useReactFlow, Edge } from "@xyflow/react"
 import { GisFlowService } from "@/service/GisFlowService"
 import { getWsUrl } from "@/utils/env"
-import { useWorkflowExecutionStore, toRunEvent, eventKind, RawEvent, MAX_RUN_EVENTS, RUN_ENCERRADO } from "@/app/stores/workflowExecutionStore"
+import { useWorkflowExecutionStore, toRunEvent, eventKind, RawEvent, MAX_RUN_EVENTS, RUN_TERMINAL } from "@/app/stores/workflowExecutionStore"
 import { useKnownColumnsStore } from "@/app/stores/knownColumnsStore"
 
 /** Synthetic id the backend uses to signal the end of the run. */
@@ -26,12 +26,12 @@ const MAX_RECONEXOES = 8
  *  WITHOUT firing `onclose`: without this watchdog, reconnection (which lives in
  *  `onclose`) was never triggered and the panel spun forever. It is the
  *  transport's safety net; the server heartbeat is the prevention. */
-const SILENCIO_MAX_MS = 50_000
-const WATCHDOG_INTERVALO_MS = 15_000
+const MAX_SILENCE_MS = 50_000
+const WATCHDOG_INTERVAL_MS = 15_000
 
 /** Run status in the backend → panel status. Only the terminal ones are listed:
  *  the others mean "still alive", and absence here is the test itself. */
-const DESFECHO_TERMINAL: Record<string, StatusWorkflow> = {
+const TERMINAL_OUTCOME: Record<string, StatusWorkflow> = {
   success:   "completed",
   failed:    "failed",
   cancelled: "cancelled",
@@ -47,14 +47,14 @@ const DESFECHO_TERMINAL: Record<string, StatusWorkflow> = {
  *  run, also called `startExecution`, wiping the canvas of whoever was already
  *  watching. Whoever triggers without being the owner hands the task_id to the
  *  owner to attach. */
-let anexarNoDono: ((taskId: string) => void) | null = null
+let attachToOwner: ((taskId: string) => void) | null = null
 
 /** Per-frame buffer item, stamped with its source run.
  *
  *  The stamp exists because a delayed flush is asynchronous by nature: the rAF
  *  scheduled while the user was on workflow A fires AFTER the switch to B.
  *  Without the stamp, A's events landed in B's freshly cleared store. */
-interface ItemDoLote {
+interface BatchItem {
   runId: string
   data: RawEvent
 }
@@ -94,50 +94,50 @@ export const useExecuteWorkflow = () => {
   // without this React could not batch anything: a replay of 5000 events
   // became 5000 render cycles of the whole canvas, in sequence, on the same
   // thread — the tab froze for seconds when reopening a run in progress.
-  const bufferRef = useRef<ItemDoLote[]>([])
+  const bufferRef = useRef<BatchItem[]>([])
   const frameRef = useRef<number | null>(null)
   // Run whose socket is active NOW. It is the flush gate: a pending rAF from
   // workflow A that fires after the switch to B finds a different id here (or
   // null) and dumps nothing into B's store. That way correctness no longer
   // depends on every cleanup path being right.
-  const runAtivoRef = useRef<string | null>(null)
+  const activeRunRef = useRef<string | null>(null)
   // Synchronous drain of the active attach. It lives in a ref because the code
   // that needs it (the visibility listener, registered once on mount) does not
   // know the `attachToRun` closure.
-  const drenarAgoraRef = useRef<() => void>(() => {})
+  const drainNowRef = useRef<() => void>(() => {})
 
   // ── Stream recovery ──────────────────────────────────────────────────────
   // None of this existed before, and its absence was the bug: the client treated
   // the channel as lossless, when every layer along the path can drop an event
   // and the socket can die without warning.
   const reconexaoRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const tentativasRef = useRef(0)
+  const attemptsRef = useRef(0)
   // Sockets that WE closed (end of run, workflow switch, new attach).
   // The close code cannot tell them apart: the server closes with 1000 on every
   // normal path — including when the Redis subscription ends without the run
   // having finished, which is exactly the case that needs to reconnect.
-  const fechadosDePropositoRef = useRef(new WeakSet<WebSocket>())
+  const closedOnPurposeRef = useRef(new WeakSet<WebSocket>())
   // Inactivity watchdog: time of the last message received and the timer that
   // watches the silence. It exists because in Safari a dead socket does not fire
   // `onclose` — without this, the drop went unnoticed and the panel spun
   // forever. See `SILENCIO_MAX_MS`.
-  const ultimaMsgRef = useRef(0)
+  const lastMsgRef = useRef(0)
   const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  function fecharDeProposito(sock: WebSocket | null | undefined) {
+  function closeOnPurpose(sock: WebSocket | null | undefined) {
     if (!sock) return
-    fechadosDePropositoRef.current.add(sock)
+    closedOnPurposeRef.current.add(sock)
     sock.close(1000)
   }
 
-  function cancelarReconexao() {
+  function cancelReconnect() {
     if (reconexaoRef.current != null) {
       clearTimeout(reconexaoRef.current)
       reconexaoRef.current = null
     }
   }
 
-  function pararWatchdog() {
+  function stopWatchdog() {
     if (watchdogRef.current != null) {
       clearInterval(watchdogRef.current)
       watchdogRef.current = null
@@ -149,24 +149,24 @@ export const useExecuteWorkflow = () => {
    *  close it (so a late `onclose` does not duplicate) and fall into recovery,
    *  which reconciles through the API or reconnects and rebuilds via the Redis
    *  replay. */
-  function iniciarWatchdog(sock: WebSocket, taskId: string) {
-    pararWatchdog()
+  function startWatchdog(sock: WebSocket, taskId: string) {
+    stopWatchdog()
     watchdogRef.current = setInterval(() => {
       if (wsRef.current !== sock) return          // socket already replaced
-      if (runAtivoRef.current !== taskId) return
+      if (activeRunRef.current !== taskId) return
       if (!useWorkflowExecutionStore.getState().isExecuting) return
-      if (Date.now() - ultimaMsgRef.current <= SILENCIO_MAX_MS) return
+      if (Date.now() - lastMsgRef.current <= MAX_SILENCE_MS) return
       console.warn(
-        `[ws/workflow] ${taskId} sem tráfego há >${SILENCIO_MAX_MS}ms — ` +
+        `[ws/workflow] ${taskId} sem tráfego há >${MAX_SILENCE_MS}ms — ` +
         "socket presumido morto (Safari não dispara onclose) — recuperando",
       )
-      pararWatchdog()
-      fecharDeProposito(sock)
+      stopWatchdog()
+      closeOnPurpose(sock)
       if (wsRef.current === sock) wsRef.current = null
-      recuperarStream(taskId).catch(err =>
+      recoverStream(taskId).catch(err =>
         console.error("[ws/workflow] falha ao recuperar o stream", err),
       )
-    }, WATCHDOG_INTERVALO_MS)
+    }, WATCHDOG_INTERVAL_MS)
   }
 
   /** Closes the panel with the run's REAL outcome, by asking the API.
@@ -174,10 +174,10 @@ export const useExecuteWorkflow = () => {
    *  Returns true when the run has already finished (and the panel was closed).
    *  It is the safety net for a `__workflow_complete__` that did not arrive: the
    *  database knows the outcome even when the live channel failed. */
-  async function reconciliarRun(taskId: string): Promise<boolean> {
+  async function reconcileRun(taskId: string): Promise<boolean> {
     try {
       const detail = await GisFlowService.getRunDetail(taskId)
-      const desfecho = DESFECHO_TERMINAL[detail?.data?.status ?? ""]
+      const desfecho = TERMINAL_OUTCOME[detail?.data?.status ?? ""]
       if (!desfecho) return false
       const store = useWorkflowExecutionStore.getState()
       if (!store.isExecuting) return true
@@ -196,28 +196,28 @@ export const useExecuteWorkflow = () => {
    *  ended and, if not, reconnects with backoff. On reconnecting, the history
    *  replay rebuilds what was lost in the gap — which is why reconnecting is cheap
    *  and correct. */
-  async function recuperarStream(taskId: string) {
+  async function recoverStream(taskId: string) {
     // Applies NOW what has already arrived. The `requestAnimationFrame` frame may
     // have been pending for a long time (a background tab does not run it) and
     // those events are legitimate information: they need to reach the canvas
     // BEFORE settlement, so that `completeExecution` decides on the most recent
     // state. After it the batch is garbage — and it is discarded right below.
-    drenarAgoraRef.current()
-    if (await reconciliarRun(taskId)) {
+    drainNowRef.current()
+    if (await reconcileRun(taskId)) {
       // The run was settled. Anything still in the buffer (or an already
       // scheduled frame) would rewrite the canvas over the outcome, resurrecting
       // as `started` a node that was just resolved.
-      descartarLote()
+      discardBatch()
       return
     }
-    // `reconciliarRun` has an await in the middle: during it the user may have
+    // `reconcileRun` has an await in the middle: during it the user may have
     // switched workflows, or an `attachToRun` may have already reopened the
     // socket (the Executar button, the re-attach). Reconnecting on top would
     // open a second connection for the same run.
-    if (runAtivoRef.current !== taskId) return
+    if (activeRunRef.current !== taskId) return
     if (wsRef.current) return
 
-    if (tentativasRef.current >= MAX_RECONEXOES) {
+    if (attemptsRef.current >= MAX_RECONEXOES) {
       // Giving up on LIVE tracking is not giving up on the run: it keeps going on
       // the server. Saying so is what separates "I lost the connection" from
       // "your workflow failed".
@@ -229,16 +229,16 @@ export const useExecuteWorkflow = () => {
       return
     }
 
-    const base = Math.min(1000 * 2 ** tentativasRef.current, 15_000)
-    tentativasRef.current += 1
-    cancelarReconexao()
+    const base = Math.min(1000 * 2 ** attemptsRef.current, 15_000)
+    attemptsRef.current += 1
+    cancelReconnect()
     // 50-100% jitter, as in the executor's backoff: several tabs that dropped
     // together don't come back in a burst against the same server.
     reconexaoRef.current = setTimeout(() => {
       reconexaoRef.current = null
       // The user may have switched workflows — or reconnected by another route —
       // during the wait.
-      if (runAtivoRef.current !== taskId || wsRef.current) return
+      if (activeRunRef.current !== taskId || wsRef.current) return
       attachToRun(taskId)
     }, base * (0.5 + Math.random() * 0.5))
   }
@@ -246,11 +246,11 @@ export const useExecuteWorkflow = () => {
   // Discards the pending batch. Called at the THREE exit points (new attach,
   // workflow switch, unmount): closing the WebSocket does not stop an already
   // scheduled flush from running on the next frame with the previous run's events.
-  function descartarLote() {
+  function discardBatch() {
     bufferRef.current = []
-    runAtivoRef.current = null
-    cancelarReconexao()
-    pararWatchdog()
+    activeRunRef.current = null
+    cancelReconnect()
+    stopWatchdog()
     if (frameRef.current != null) {
       cancelAnimationFrame(frameRef.current)
       frameRef.current = null
@@ -259,19 +259,19 @@ export const useExecuteWorkflow = () => {
 
   // Whoever arrived first governs the socket; the others only trigger. The ref is
   // always fresh because `attachToRun` is recreated on every render.
-  const souDonoRef = useRef(false)
+  const isOwnerRef = useRef(false)
   const attachRef = useRef<(taskId: string) => void>(() => {})
   attachRef.current = (taskId: string) => { attachToRun(taskId) }
 
   useEffect(() => {
-    if (anexarNoDono === null) {
-      souDonoRef.current = true
-      anexarNoDono = (taskId) => attachRef.current(taskId)
+    if (attachToOwner === null) {
+      isOwnerRef.current = true
+      attachToOwner = (taskId) => attachRef.current(taskId)
     }
     return () => {
-      if (souDonoRef.current) {
-        anexarNoDono = null
-        souDonoRef.current = false
+      if (isOwnerRef.current) {
+        attachToOwner = null
+        isOwnerRef.current = false
       }
     }
   }, [])
@@ -282,15 +282,15 @@ export const useExecuteWorkflow = () => {
     // backgroundThrottling on): the batch would sit in the buffer, growing with no
     // ceiling, until the user came back. Draining when the tab is hidden delivers
     // what has already arrived and empties everything.
-    const aoTrocarVisibilidade = () => {
-      if (document.visibilityState === "hidden") drenarAgoraRef.current()
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") drainNowRef.current()
     }
-    document.addEventListener("visibilitychange", aoTrocarVisibilidade)
+    document.addEventListener("visibilitychange", onVisibilityChange)
     return () => {
-      document.removeEventListener("visibilitychange", aoTrocarVisibilidade)
-      descartarLote()
+      document.removeEventListener("visibilitychange", onVisibilityChange)
+      discardBatch()
     }
-    // Only on mount/unmount. `descartarLote` is recreated on every render, but
+    // Only on mount/unmount. `discardBatch` is recreated on every render, but
     // operates exclusively on refs — declaring it as a dependency would
     // re-register the listener on every render without changing anything.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -354,7 +354,7 @@ export const useExecuteWorkflow = () => {
     // If this instance is not the socket owner (the trigger came from the webhook's
     // "Testar" tab, for example), it hands the run to whoever governs — instead
     // of opening a second socket over the same store.
-    ;(anexarNoDono ?? attachToRun)(taskId)
+    ;(attachToOwner ?? attachToRun)(taskId)
   }
 
   // Opens a run's WebSocket and installs the handlers that feed the store
@@ -365,14 +365,14 @@ export const useExecuteWorkflow = () => {
   function attachToRun(taskId: string): WebSocket {
     // Closes any previous connection (intentionally) before opening the new one, so
     // there are never two WSs writing to the store at the same time.
-    fecharDeProposito(wsRef.current)
+    closeOnPurpose(wsRef.current)
     // Discards what is left of the previous run: a pending flush would apply
     // another run's events (and close the wrong socket) on the next frame.
-    descartarLote()
+    discardBatch()
     const ws = new WebSocket(`${getWsUrl()}/ws/workflow/${taskId}`)
     wsRef.current = ws
-    runAtivoRef.current = taskId
-    drenarAgoraRef.current = drenarAgora
+    activeRunRef.current = taskId
+    drainNowRef.current = drainNow
 
     useWorkflowExecutionStore.getState().setWsState("connecting")
 
@@ -383,12 +383,12 @@ export const useExecuteWorkflow = () => {
       // of inferring from isExecuting, which stayed green with the socket dead.
       useWorkflowExecutionStore.getState().setWsState("open")
       // Connection is up: the next stumble restarts the backoff from zero.
-      tentativasRef.current = 0
+      attemptsRef.current = 0
       // Arms the inactivity watchdog. `onopen` already counts as traffic; from here on
       // the server sends a heartbeat every ~20s, so silence only grows if the
       // socket died (Safari) — and then the watchdog recovers.
-      ultimaMsgRef.current = Date.now()
-      iniciarWatchdog(ws, taskId)
+      lastMsgRef.current = Date.now()
+      startWatchdog(ws, taskId)
     }
 
     // queued → running transition with the real task_id
@@ -398,7 +398,7 @@ export const useExecuteWorkflow = () => {
     // `updateNodeStatuses`, one `appendEvents`. Before, each message paid on its
     // own for the map of ALL nodes, the recomputation of the losing branches over
     // ALL edges and a copy of the events array.
-    function drenarLote() {
+    function drainBatch() {
       const bruto = bufferRef.current
       bufferRef.current = []
       if (bruto.length === 0) return
@@ -406,7 +406,7 @@ export const useExecuteWorkflow = () => {
       // rAF from workflow A ran after the switch to B and dumped A's log into B's
       // store — including A's `__workflow_complete__`, which closed B's panel
       // with "Concluído · 0 nós" (done · 0 nodes) for a workflow that never ran.
-      const ativo = runAtivoRef.current
+      const ativo = activeRunRef.current
       const lote = bruto.filter(item => item.runId === ativo).map(item => item.data)
       if (lote.length === 0) return
 
@@ -423,7 +423,7 @@ export const useExecuteWorkflow = () => {
       // Reads the state AFTER the append — and only once per frame.
       const current = useWorkflowExecutionStore.getState()
       let currentNodes = current.statusWorkflow?.nodes ?? []
-      let porId = current.statusById
+      let byId = current.statusById
       // Defensive recovery: if the store is still empty (initialNodes did not
       // hydrate in time on the click), repopulates it from React Flow.
       if (currentNodes.length === 0 && lote.some(d => d.node && !d.node.startsWith("__"))) {
@@ -434,7 +434,7 @@ export const useExecuteWorkflow = () => {
         }))
         if (live.length > 0) {
           currentNodes = live
-          porId = new Map(live.map(n => [n.id, n as INodeStatusWorkFlow]))
+          byId = new Map(live.map(n => [n.id, n as INodeStatusWorkFlow]))
         }
       }
 
@@ -447,7 +447,7 @@ export const useExecuteWorkflow = () => {
       // `null` = the node completed WITHOUT publishing columns (non-tabular
       // output, or the key cut off in transport): its entry is erased there,
       // because keeping the old value would assert columns this run did not produce.
-      const colunasDoLote = new Map<string, Record<string, string[]> | null>()
+      const batchColumns = new Map<string, Record<string, string[]> | null>()
       let fim: RawEvent | null = null
       for (const data of lote) {
         if (data.node === WF_COMPLETE) {
@@ -455,10 +455,10 @@ export const useExecuteWorkflow = () => {
           continue
         }
         if (eventKind(data) !== "lifecycle") continue
-        const base = alterados.get(data.node ?? "") ?? porId.get(data.node ?? "")
+        const base = alterados.get(data.node ?? "") ?? byId.get(data.node ?? "")
         if (!base) continue
         if (data.status === "completed") {
-          colunasDoLote.set(base.id, data.extra?.output_columns ?? null)
+          batchColumns.set(base.id, data.extra?.output_columns ?? null)
         }
         const updated: INodeStatusWorkFlow = {
           ...base,
@@ -500,8 +500,8 @@ export const useExecuteWorkflow = () => {
 
       // Per-workflow column memory — survives an execution reset/F5 and is
       // what the config modal reads to suggest names.
-      if (colunasDoLote.size > 0) {
-        useKnownColumnsStore.getState().aplicarDeExecucao(id, taskId, colunasDoLote)
+      if (batchColumns.size > 0) {
+        useKnownColumnsStore.getState().aplicarDeExecucao(id, taskId, batchColumns)
       }
 
       if (fim) {
@@ -526,36 +526,36 @@ export const useExecuteWorkflow = () => {
           edgesRef.current,
         )
 
-        fecharDeProposito(ws)
+        closeOnPurpose(ws)
         // The run ended within THIS batch. What is left in the buffer predates the
         // marker and has nowhere to go; a scheduled frame that ran later would
         // reapply `started` over freshly settled nodes.
-        descartarLote()
+        discardBatch()
       }
     }
 
-    function agendarFlush() {
+    function scheduleFlush() {
       if (frameRef.current != null) return
       frameRef.current = requestAnimationFrame(() => {
         frameRef.current = null
-        drenarLote()
+        drainBatch()
       })
     }
 
     // Drains NOW, canceling the pending frame so it does not drain twice.
-    function drenarAgora() {
+    function drainNow() {
       if (frameRef.current != null) {
         cancelAnimationFrame(frameRef.current)
         frameRef.current = null
       }
-      drenarLote()
+      drainBatch()
     }
 
     ws.onmessage = (event) => {
       // ANY frame counts as a sign of life — including the heartbeat (empty batch)
       // and even an unreadable frame: what the watchdog watches is the transport's
       // silence, not the content. That is why it is the FIRST line, before parsing.
-      ultimaMsgRef.current = Date.now()
+      lastMsgRef.current = Date.now()
 
       // The server builds the frame by concatenating raw strings from Redis, so a
       // single corrupted item invalidates the JSON of the ENTIRE batch — including
@@ -600,7 +600,7 @@ export const useExecuteWorkflow = () => {
       // "Cancelar" and the completion toast only showing up minutes later, when
       // returning to the tab.
       if (eventos.some(e => e.node === WF_COMPLETE)) {
-        drenarAgora()
+        drainNow()
         return
       }
 
@@ -609,11 +609,11 @@ export const useExecuteWorkflow = () => {
       // without this a `for i in range(200000): print(i)` piled up hundreds of MB
       // in the buffer.
       if (bufferRef.current.length >= MAX_RUN_EVENTS) {
-        drenarAgora()
+        drainNow()
         return
       }
 
-      agendarFlush()
+      scheduleFlush()
     }
 
     ws.onerror = (err) => {
@@ -629,7 +629,7 @@ export const useExecuteWorkflow = () => {
       // ANOTHER socket).
       if (wsRef.current === ws) {
         wsRef.current = null
-        pararWatchdog()
+        stopWatchdog()
       }
       const storeState = useWorkflowExecutionStore.getState()
       storeState.setWsState("closed")
@@ -637,8 +637,8 @@ export const useExecuteWorkflow = () => {
       // We closed it on purpose (end of run, workflow switch, new attach), or this
       // socket has already been replaced, or the run has already closed: nothing
       // to recover.
-      if (fechadosDePropositoRef.current.has(ws)) return
-      if (runAtivoRef.current !== taskId) return
+      if (closedOnPurposeRef.current.has(ws)) return
+      if (activeRunRef.current !== taskId) return
       if (!storeState.isExecuting) return
 
       // From here down the stream dropped with the run still open. THE CODE DOES NOT
@@ -651,7 +651,7 @@ export const useExecuteWorkflow = () => {
       )
       // `.catch` is mandatory: `void` on an async that rejects becomes an unhandled
       // rejection, which in some browsers brings down the whole page.
-      recuperarStream(taskId).catch(err =>
+      recoverStream(taskId).catch(err =>
         console.error("[ws/workflow] falha ao recuperar o stream", err),
       )
     }
@@ -700,7 +700,7 @@ export const useExecuteWorkflow = () => {
     // modal of a Webhook node during a run mounted a second instance that called
     // `startExecution` (wiping the canvas in progress) and opened a competing
     // socket for the SAME run.
-    if (!souDonoRef.current) return
+    if (!isOwnerRef.current) return
     // Do NOT use the global isExecuting as a gate: it is volatile and, when
     // returning to a workflow, it may be TRUE as a leftover from the previous visit
     // (the reset lives in another effect, in workflow/index.tsx, which runs AFTER
@@ -736,16 +736,16 @@ export const useExecuteWorkflow = () => {
         const detalhe = await GisFlowService.getRunDetail(latest.run_id)
         if (aborted()) return
         const stats = detalhe?.data?.node_stats ?? {}
-        const colunasPorNo: Record<string, { porPorta: Record<string, string[]>; parciais?: boolean }> = {}
+        const columnsByNode: Record<string, { porPorta: Record<string, string[]>; parciais?: boolean }> = {}
         for (const [nodeId, stat] of Object.entries(stats)) {
           if (stat?.output_columns) {
             // `__truncated__` = the executor's 8KB cut reduced each list to the
             // first 50 — the suggestion label warns "lista parcial" (partial list).
-            colunasPorNo[nodeId] = { porPorta: stat.output_columns, parciais: !!stat.__truncated__ }
+            columnsByNode[nodeId] = { porPorta: stat.output_columns, parciais: !!stat.__truncated__ }
           }
         }
-        if (Object.keys(colunasPorNo).length > 0) {
-          useKnownColumnsStore.getState().semearDoHistorico(id, latest.run_id, colunasPorNo)
+        if (Object.keys(columnsByNode).length > 0) {
+          useKnownColumnsStore.getState().semearDoHistorico(id, latest.run_id, columnsByNode)
         }
         return
       }
@@ -769,7 +769,7 @@ export const useExecuteWorkflow = () => {
       // Without re-seeding, the replay would arrive at a run the store considers
       // closed and the `updateNodeStatuses` guard would discard it, leaving the
       // canvas frozen on the wrong outcome.
-      const encerrado = !!store.statusWorkflow && RUN_ENCERRADO.has(store.statusWorkflow.status)
+      const encerrado = !!store.statusWorkflow && RUN_TERMINAL.has(store.statusWorkflow.status)
       if (store.viewingRunId !== latest.run_id || !store.statusWorkflow || encerrado) {
         const source = nodesRef.current.length > 0 ? nodesRef.current : reactFlowInstance.getNodes()
         const liveNodes = source.map((node) => ({ ...node, id: node.id, status: "idle" as const }))
@@ -784,11 +784,11 @@ export const useExecuteWorkflow = () => {
       // Closes the active WS when leaving/switching workflows. Marked as
       // intentional, otherwise `onclose` would treat the screen change as a drop
       // and try to reconnect to a run the user left behind.
-      fecharDeProposito(wsRef.current)
+      closeOnPurpose(wsRef.current)
       // Navigating /workflow/A → /workflow/B does NOT remount the component: the
       // buffer and the pending frame survive the switch. Closing the socket is not
       // enough — messages already queued in the event loop would still be delivered.
-      descartarLote()
+      discardBatch()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])

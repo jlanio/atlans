@@ -137,18 +137,18 @@ async def _fail_orphan_runs(executor_id: str) -> None:
 
 # Age beyond which a run in 'pending' is no longer being dispatched. Dispatch
 # takes milliseconds, sending to the executor has a deadline (see
-# `_prazo_de_envio` in executor_connections) and the executor's ACK promotes the
+# `_send_deadline` in executor_connections) and the executor's ACK promotes the
 # run to 'running' as soon as the job arrives. A 'pending' this old belongs to a
 # worker that died mid-send — and nobody else would close it: the orphan
 # watchdog only looks at 'running', and the run stayed "Na fila" (queued)
 # forever (the September 22 case).
-_PENDING_SEM_ENTREGA_SECONDS = 600
+_PENDING_UNDELIVERED_SECONDS = 600
 
 # Ceiling per sweep: an incident with thousands of stuck runs is drained in
 # batches, one per watchdog cycle, without a giant transaction.
-_PENDING_LOTE = 200
+_PENDING_BATCH = 200
 
-_MSG_NAO_ENTREGUE = (
+_MSG_UNDELIVERED = (
     "O servidor foi interrompido enquanto enviava esta execução ao executor, e "
     "nenhum executor confirmou o recebimento — ela não chegou a rodar."
 )
@@ -159,12 +159,12 @@ _MSG_NAO_ENTREGUE = (
 # inventory, the sweep waits for a job's duration ceiling (1 h by default, plus
 # the queue) before concluding the send did not arrive — otherwise it would
 # close, and order the cancellation of, a healthy job.
-_PENDING_SEM_INVENTARIO_SECONDS = 6 * 3600
+_PENDING_NO_INVENTORY_SECONDS = 6 * 3600
 # "This executor sends inventory": renewed on every inventory received.
-_TTL_MARCA_DE_INVENTARIO_S = 180
+_INVENTORY_MARK_TTL_S = 180
 
 
-def _chave_de_inventario(executor_id: str) -> str:
+def _inventory_key(executor_id: str) -> str:
     return f"executor:{executor_id}:inventario"
 
 
@@ -183,15 +183,15 @@ async def _hosts_sem_inventario(hosts) -> set[str]:
         if await _redis_presence_or_unknown(executor_id) is False:
             continue
         try:
-            fala_inventario = bool(await get_redis_pool().exists(_chave_de_inventario(executor_id)))
+            speaks_inventory = bool(await get_redis_pool().exists(_inventory_key(executor_id)))
         except Exception:
-            fala_inventario = False
-        if not fala_inventario:
+            speaks_inventory = False
+        if not speaks_inventory:
             esperar.add(host)
     return esperar
 
 
-async def _fechar_runs_nao_entregues() -> int:
+async def _close_undelivered_runs() -> int:
     """Closes as 'failed' the runs stuck in 'pending' beyond the deadline. Returns
     how many it closed.
 
@@ -209,7 +209,7 @@ async def _fechar_runs_nao_entregues() -> int:
     from app.services.fechamento_de_run import REPETIVEL, fechar_runs
 
     agora = datetime.now(timezone.utc)
-    corte = agora - timedelta(seconds=_PENDING_SEM_ENTREGA_SECONDS)
+    corte = agora - timedelta(seconds=_PENDING_UNDELIVERED_SECONDS)
     async with get_session_async() as db:
         # The hosts before the runs: filtering after the LIMIT would leave the batch
         # full of runs that are waiting, and the others would never be swept.
@@ -221,20 +221,20 @@ async def _fechar_runs_nao_entregues() -> int:
         esperar = await _hosts_sem_inventario(hosts)
         prazo = _WFRun.start_time < corte
         if esperar:
-            corte_sem_inventario = agora - timedelta(seconds=_PENDING_SEM_INVENTARIO_SECONDS)
+            no_inventory_cutoff = agora - timedelta(seconds=_PENDING_NO_INVENTORY_SECONDS)
             prazo = or_(
                 and_(prazo, or_(_WFRun.host.is_(None), _WFRun.host.notin_(sorted(esperar)))),
-                _WFRun.start_time < corte_sem_inventario,
+                _WFRun.start_time < no_inventory_cutoff,
             )
         result = await db.execute(
             select(_WFRun)
             .where(_WFRun.status == "pending", prazo)
             .order_by(_WFRun.start_time)
-            .limit(_PENDING_LOTE)
+            .limit(_PENDING_BATCH)
         )
         fechados = await fechar_runs(
             db, result.scalars().all(), de=("pending",), para="failed",
-            mensagem=_MSG_NAO_ENTREGUE, categoria="dispatch", extra=REPETIVEL,
+            mensagem=_MSG_UNDELIVERED, categoria="dispatch", extra=REPETIVEL,
         )
 
     if not fechados:
@@ -242,7 +242,7 @@ async def _fechar_runs_nao_entregues() -> int:
     logger.warning(
         "%d run(s) preso(s) em 'pending' há mais de %ds sem confirmação de entrega "
         "— fechados como failed: %s",
-        len(fechados), _PENDING_SEM_ENTREGA_SECONDS,
+        len(fechados), _PENDING_UNDELIVERED_SECONDS,
         [run.task_id for run in fechados[:20]],
     )
     for run in fechados:
@@ -257,22 +257,22 @@ async def _fechar_runs_nao_entregues() -> int:
             logger.debug("Cancel do run não entregue '%s' não enviado: %s", run.task_id, exc)
     return len(fechados)
 
-_MSG_RELAY_NAO_ENTREGUE = (
+_MSG_RELAY_UNDELIVERED = (
     "O executor ainda estava recebendo um envio anterior e esta execução não "
     "chegou a ele — ela não rodou. Tente de novo."
 )
-_MSG_CONEXAO_FECHANDO = (
+_MSG_CONNECTION_CLOSING = (
     "A conexão com o executor estava sendo encerrada e esta execução não "
     "chegou a ele — ela não rodou. Tente de novo."
 )
 
 
 async def fechar_run_nao_entregue(
-    executor_id: str, task_id: str, *, conexao_fechando: bool = False,
+    executor_id: str, task_id: str, *, connection_closing: bool = False,
 ) -> bool:
     """Closes as failed/dispatch the run whose job was PROVABLY not written to the
     executor's socket — the relay dropped it without its turn, or
-    (`conexao_fechando`) because the socket was closing. Returns whether it closed.
+    (`connection_closing`) because the socket was closing. Returns whether it closed.
 
     The worker that published to the relay had already considered the job
     delivered; without this closing the run stayed "Em andamento" (in progress)
@@ -280,12 +280,12 @@ async def fechar_run_nao_entregue(
     Conditional on status and host, like the server's other closings
     (`fechar_runs`).
     """
-    from app.services.fechamento_de_run import ABERTOS, REPETIVEL, fechar_runs
+    from app.services.fechamento_de_run import OPEN_STATUSES, REPETIVEL, fechar_runs
 
-    mensagem = _MSG_CONEXAO_FECHANDO if conexao_fechando else _MSG_RELAY_NAO_ENTREGUE
+    mensagem = _MSG_CONNECTION_CLOSING if connection_closing else _MSG_RELAY_UNDELIVERED
     async with get_session_async() as db:
         fechados = await fechar_runs(
-            db, [task_id], de=ABERTOS, para="failed", mensagem=mensagem,
+            db, [task_id], de=OPEN_STATUSES, para="failed", mensagem=mensagem,
             categoria="dispatch", host=f"executor:{executor_id}", extra=REPETIVEL,
         )
     if not fechados:
@@ -296,7 +296,7 @@ async def fechar_run_nao_entregue(
         logger.debug("ACK pendente do run '%s' não limpo: %s", task_id, exc)
     logger.warning(
         "Run '%s' fechado: o job relayado ao executor '%s' não foi escrito (%s).",
-        task_id, executor_id, "conexão fechando" if conexao_fechando else "sem a vez",
+        task_id, executor_id, "conexão fechando" if connection_closing else "sem a vez",
     )
     return True
 
@@ -337,7 +337,7 @@ async def orphan_runs_watchdog() -> None:
             # Before the orphans in 'running': it is independent of presence, and an
             # error here must not prevent the sweep below.
             try:
-                await _fechar_runs_nao_entregues()
+                await _close_undelivered_runs()
             except Exception as exc:
                 logger.error("Watchdog: falha ao fechar runs não entregues: %s", exc)
 
@@ -419,35 +419,35 @@ async def orphan_runs_watchdog() -> None:
 # Minimum age for a run to be judged lost for not being in the inventory.
 # Above the maximum send deadline (~62 s for a 16 MB frame), with slack: a
 # job still in transit when the executor built the inventory is not a loss.
-_RECONCILIACAO_IDADE_MIN_S = 180
+_RECONCILIATION_MIN_AGE_S = 180
 
 # Minimum interval between two reconciliations of the same executor. An honest
 # executor sends one inventory per minute; a buggy (or hostile) one does not
 # turn the inventory into a SELECT per message.
-_RECONCILIACAO_INTERVALO_S = 30
+_RECONCILIATION_INTERVAL_S = 30
 
 # Grace period after a new connection before closing anything due to ABSENCE.
 # The PREVIOUS connection's inbox may still be draining (10 s flush + grace
 # + rescue, ~20 s) a job_result that went out before the drop: the new
 # session's first inventory does not list it, and closing the run now would get
 # the real result rejected right after. Promoting and stopping zombies don't wait.
-_RECONCILIACAO_CARENCIA_DA_CONEXAO_S = 45
+_RECONCILIATION_CONNECTION_GRACE_S = 45
 
-_INVENTARIO_MAX_IDS = 2000
+_INVENTORY_MAX_IDS = 2000
 _JOB_ID_MAX_CHARS = 64
 
-_MSG_PERDIDO = (
+_MSG_LOST = (
     "O executor não tinha mais esta execução quando o servidor conferiu com ele — "
     "ela se perdeu entre o servidor e o executor (queda da conexão, do servidor "
     "ou do próprio executor)."
 )
 
 
-def _ids_do_inventario(valor) -> set[str] | None:
+def _inventory_ids(valor) -> set[str] | None:
     """Valid ids from an inventory list; None if the list is malformed."""
     if valor is None:
         return set()
-    if not isinstance(valor, list) or len(valor) > _INVENTARIO_MAX_IDS:
+    if not isinstance(valor, list) or len(valor) > _INVENTORY_MAX_IDS:
         return None
     return {v for v in valor if isinstance(v, str) and 0 < len(v) <= _JOB_ID_MAX_CHARS}
 
@@ -462,75 +462,75 @@ async def _reconciliar_inventario(executor_id: str, msg: dict) -> dict:
     """
     from app.core.redis import get_redis_pool
 
-    from .resultados import _promover_para_running
+    from .resultados import _promote_to_running
 
     # Marks that this executor speaks inventory — the 'pending' sweep treats
-    # those that don't differently (see `_PENDING_SEM_INVENTARIO_SECONDS`).
+    # those that don't differently (see `_PENDING_NO_INVENTORY_SECONDS`).
     try:
         await get_redis_pool().setex(
-            _chave_de_inventario(executor_id), _TTL_MARCA_DE_INVENTARIO_S, "1",
+            _inventory_key(executor_id), _INVENTORY_MARK_TTL_S, "1",
         )
     except Exception as exc:
         logger.debug("Marca de inventário do executor '%s' não gravada: %s", executor_id, exc)
 
     conn = executor_registry.get(executor_id)
     if conn is not None:
-        agora_mono = time.monotonic()
-        if agora_mono - conn.ultima_reconciliacao < _RECONCILIACAO_INTERVALO_S:
+        now_mono = time.monotonic()
+        if now_mono - conn.ultima_reconciliacao < _RECONCILIATION_INTERVAL_S:
             return {}
-        conn.ultima_reconciliacao = agora_mono
+        conn.ultima_reconciliacao = now_mono
 
-    ativos = _ids_do_inventario(msg.get("ativos"))
-    resultados = _ids_do_inventario(msg.get("resultados"))
+    ativos = _inventory_ids(msg.get("ativos"))
+    resultados = _inventory_ids(msg.get("resultados"))
     if ativos is None or resultados is None:
         logger.warning("Executor '%s' mandou inventário malformado — ignorado.", executor_id)
         return {}
 
-    promovidos = await _promover_para_running(executor_id, ativos) if ativos else 0
-    parados = await _parar_zumbis(executor_id, ativos) if ativos else 0
+    promovidos = await _promote_to_running(executor_id, ativos) if ativos else 0
+    parados = await _stop_zombies(executor_id, ativos) if ativos else 0
     # Truncated: there is no way to know what was left out, so nothing is closed
     # due to absence — promoting and stopping still apply to what came in. Same
-    # right after connecting (see `_RECONCILIACAO_CARENCIA_DA_CONEXAO_S`).
-    if msg.get("truncado") or _conexao_recente(conn):
+    # right after connecting (see `_RECONCILIATION_CONNECTION_GRACE_S`).
+    if msg.get("truncado") or _recent_connection(conn):
         fechados = 0
     else:
-        fechados = await _fechar_perdidos(executor_id, ativos | resultados)
+        fechados = await _close_lost(executor_id, ativos | resultados)
     return {"promovidos": promovidos, "parados": parados, "fechados": fechados}
 
 
-def _conexao_recente(conn) -> bool:
+def _recent_connection(conn) -> bool:
     from datetime import datetime, timezone
 
     if conn is None:
         return False
-    idade = (datetime.now(timezone.utc) - conn.connected_at).total_seconds()
-    return idade < _RECONCILIACAO_CARENCIA_DA_CONEXAO_S
+    age = (datetime.now(timezone.utc) - conn.connected_at).total_seconds()
+    return age < _RECONCILIATION_CONNECTION_GRACE_S
 
 
 # Strong references to the background cancels (asyncio only keeps weakrefs).
-_cancels_em_curso: set[asyncio.Task] = set()
+_cancels_in_flight: set[asyncio.Task] = set()
 
 
-def _cancelar_em_segundo_plano(executor_id: str, task_ids: list[str], rotulo: str) -> None:
+def _cancel_in_background(executor_id: str, task_ids: list[str], rotulo: str) -> None:
     """Sends `cancel` for each job without holding up the caller: the reconciliation
     runs in the connection's drainer, and with a congested socket each send may
     wait its turn for up to the whole deadline — delaying the drainer's job_results."""
     if not task_ids:
         return
 
-    async def _mandar():
+    async def _send():
         for task_id in task_ids:
             try:
                 await executor_registry.send_json(executor_id, {"type": "cancel", "job_id": task_id})
             except Exception as exc:
                 logger.debug("Cancel do %s '%s' não enviado: %s", rotulo, task_id, exc)
 
-    task = asyncio.create_task(_mandar(), name=f"cancel-{rotulo}-{executor_id[:8]}")
-    _cancels_em_curso.add(task)
-    task.add_done_callback(_cancels_em_curso.discard)
+    task = asyncio.create_task(_send(), name=f"cancel-{rotulo}-{executor_id[:8]}")
+    _cancels_in_flight.add(task)
+    task.add_done_callback(_cancels_in_flight.discard)
 
 
-async def _parar_zumbis(executor_id: str, ativos: set[str]) -> int:
+async def _stop_zombies(executor_id: str, ativos: set[str]) -> int:
     """'cancel' for what the executor keeps running but the server already closed
     (cancelled with the executor offline, failed by disconnection, undelivered).
     The result of those runs would be rejected anyway — running to the end
@@ -545,17 +545,17 @@ async def _parar_zumbis(executor_id: str, ativos: set[str]) -> int:
                 _WFRun.status.in_(("cancelled", "failed")),
             )
         )
-        zumbis = [row[0] for row in result.all()]
-    _cancelar_em_segundo_plano(executor_id, zumbis, "zumbi")
-    if zumbis:
+        zombies = [row[0] for row in result.all()]
+    _cancel_in_background(executor_id, zombies, "zumbi")
+    if zombies:
         logger.warning(
             "Executor '%s' ainda rodava %d job(s) que o servidor já fechou — cancel enviado: %s",
-            executor_id, len(zumbis), zumbis[:20],
+            executor_id, len(zombies), zombies[:20],
         )
-    return len(zumbis)
+    return len(zombies)
 
 
-async def _fechar_perdidos(executor_id: str, tem: set[str]) -> int:
+async def _close_lost(executor_id: str, tem: set[str]) -> int:
     """Closes this executor's runs that it does not have. Returns how many it closed."""
     from datetime import datetime, timedelta, timezone
 
@@ -564,7 +564,7 @@ async def _fechar_perdidos(executor_id: str, tem: set[str]) -> int:
     from app.services.fechamento_de_run import REPETIVEL, fechar_runs
 
     host = f"executor:{executor_id}"
-    corte = datetime.now(timezone.utc) - timedelta(seconds=_RECONCILIACAO_IDADE_MIN_S)
+    corte = datetime.now(timezone.utc) - timedelta(seconds=_RECONCILIATION_MIN_AGE_S)
     async with get_session_async() as db:
         result = await db.execute(
             select(_WFRun.task_id, _WFRun.status).where(
@@ -597,8 +597,8 @@ async def _fechar_perdidos(executor_id: str, tem: set[str]) -> int:
         return 0
     n = len(candidatos)
     candidatos = [
-        c for c, chegou, a_caminho in zip(candidatos, valores[:n], valores[n:])
-        if chegou is None and a_caminho is None
+        c for c, chegou, in_transit in zip(candidatos, valores[:n], valores[n:])
+        if chegou is None and in_transit is None
     ]
     if not candidatos:
         return 0
@@ -609,12 +609,12 @@ async def _fechar_perdidos(executor_id: str, tem: set[str]) -> int:
         # only if it is still in the status in which it was read.
         fechados = await fechar_runs(
             db, [tid for tid, st in candidatos if st == "pending"], de=("pending",),
-            para="failed", mensagem=_MSG_NAO_ENTREGUE, categoria="dispatch", host=host,
+            para="failed", mensagem=_MSG_UNDELIVERED, categoria="dispatch", host=host,
             extra=REPETIVEL,
         )
         fechados += await fechar_runs(
             db, [tid for tid, st in candidatos if st == "running"], de=("running",),
-            para="failed", mensagem=_MSG_PERDIDO, categoria="executor_lost", host=host,
+            para="failed", mensagem=_MSG_LOST, categoria="executor_lost", host=host,
             extra=REPETIVEL,
         )
 
@@ -629,6 +629,6 @@ async def _fechar_perdidos(executor_id: str, tem: set[str]) -> int:
     # the cancel arrives AFTER it on the same socket and interrupts it — or
     # becomes a tombstone, if the job never comes. Without this it would run,
     # with effects, for a run that is already closed.
-    _cancelar_em_segundo_plano(executor_id, [run.task_id for run in fechados], "perdido")
+    _cancel_in_background(executor_id, [run.task_id for run in fechados], "perdido")
     return len(fechados)
 

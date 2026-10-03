@@ -23,32 +23,32 @@ from types import SimpleNamespace
 import pytest
 
 RAIZ = Path(__file__).resolve().parents[2]
-VERSOES = RAIZ / "alembic" / "versions"
+VERSIONS = RAIZ / "alembic" / "versions"
 SQL = (RAIZ / "scripts" / "init_schema.sql").read_text(encoding="utf-8")
 
 
 def _base_zero():
     """Imports the migration by path — `alembic/` is not a package."""
-    (arquivo,) = [p for p in VERSOES.glob("*.py") if p.name != "__init__.py"]
+    (arquivo,) = [p for p in VERSIONS.glob("*.py") if p.name != "__init__.py"]
     spec = importlib.util.spec_from_file_location("base_zero", arquivo)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
 
-def test_ha_exatamente_uma_revisao():
-    arquivos = [p.name for p in VERSOES.glob("*.py") if p.name != "__init__.py"]
+def test_there_is_exactly_one_revision():
+    arquivos = [p.name for p in VERSIONS.glob("*.py") if p.name != "__init__.py"]
     assert len(arquivos) == 1, f"a cadeia voltou a crescer: {sorted(arquivos)}"
 
 
-def test_a_revisao_e_inicial():
+def test_the_revision_is_initial():
     mod = _base_zero()
     assert mod.down_revision is None
 
 
-def test_o_filtro_tira_todo_comando_sobre_alembic_version():
+def test_the_filter_removes_every_statement_on_alembic_version():
     mod = _base_zero()
-    filtrado = mod._sql_sem_alembic_version(SQL)
+    filtrado = mod._sql_without_alembic_version(SQL)
     assert not re.search(
         r"^\s*(DROP|CREATE|INSERT)[^\n]*alembic_version", filtrado, re.M | re.I
     )
@@ -58,7 +58,7 @@ def test_o_filtro_tira_todo_comando_sobre_alembic_version():
     assert "DROP TABLE IF EXISTS users CASCADE" in filtrado
 
 
-def test_o_filtro_nao_engole_o_script_num_regex_guloso():
+def test_the_filter_does_not_swallow_the_script_in_a_greedy_regex():
     """The `CREATE TABLE alembic_version (...)` is removed with re.S; a greedy
     regex would eat from there to the LAST `);` of the file. The neighboring
     tables (audit_events before, the INSERT after) have to survive.
@@ -66,7 +66,7 @@ def test_o_filtro_nao_engole_o_script_num_regex_guloso():
     The count anchors at line start because comments also say
     "CREATE TABLE" — and the filter removes comments on purpose."""
     mod = _base_zero()
-    filtrado = mod._sql_sem_alembic_version(SQL)
+    filtrado = mod._sql_without_alembic_version(SQL)
     assert "CREATE TABLE audit_events" in filtrado
 
     def comandos(texto):
@@ -75,7 +75,7 @@ def test_o_filtro_nao_engole_o_script_num_regex_guloso():
     assert comandos(filtrado) == comandos(SQL) - 1
 
 
-def test_o_carimbo_do_script_e_a_propria_revisao():
+def test_the_script_stamp_is_the_revision_itself():
     carimbo = re.search(
         r"INSERT INTO alembic_version \(version_num\) VALUES \('(\w+)'\)", SQL
     )
@@ -83,13 +83,13 @@ def test_o_carimbo_do_script_e_a_propria_revisao():
     assert carimbo.group(1) == _base_zero().revision
 
 
-def test_upgrade_recusa_banco_populado_sem_carimbo():
+def test_upgrade_refuses_populated_db_without_stamp():
     """The only destructive path: tables present + empty alembic_version is
     the only state in which alembic reaches the zero baseline's body with data in
     the way — and the body is DROP ALL. The guard has to exist, query the database
     (to_regclass) and point to the two remedies. Proven live in the F3
     delivery; here the text pins the guard against accidental removal."""
-    (arquivo,) = [p for p in VERSOES.glob("*.py") if p.name != "__init__.py"]
+    (arquivo,) = [p for p in VERSIONS.glob("*.py") if p.name != "__init__.py"]
     fonte = arquivo.read_text(encoding="utf-8")
     assert "to_regclass('public.users')" in fonte
     assert "APAGARIA" in fonte
@@ -98,7 +98,7 @@ def test_upgrade_recusa_banco_populado_sem_carimbo():
     assert "is_offline_mode" in fonte
 
 
-def test_upgrade_roda_o_schema_de_cada_extensao_depois_do_nucleo(monkeypatch, tmp_path):
+def test_upgrade_runs_each_extension_schema_after_the_core(monkeypatch, tmp_path):
     """An extension's tables (app/extensoes) live in its `schema.sql`: the
     zero baseline runs the core script and, after it, each one — with the same filter.
     Without extensions, only the core one."""
@@ -108,8 +108,8 @@ def test_upgrade_roda_o_schema_de_cada_extensao_depois_do_nucleo(monkeypatch, tm
     esquema.write_text("-- so comentario\nCREATE TABLE de_extensao (id INT);\n", encoding="utf-8")
     mod = _base_zero()
     executados: list[str] = []
-    banco_vazio = SimpleNamespace(execute=lambda *_a, **_k: SimpleNamespace(scalar=lambda: False))
-    monkeypatch.setattr(mod, "op", SimpleNamespace(execute=executados.append, get_bind=lambda: banco_vazio))
+    empty_db = SimpleNamespace(execute=lambda *_a, **_k: SimpleNamespace(scalar=lambda: False))
+    monkeypatch.setattr(mod, "op", SimpleNamespace(execute=executados.append, get_bind=lambda: empty_db))
     monkeypatch.setattr(mod, "context", SimpleNamespace(is_offline_mode=lambda: False))
 
     monkeypatch.setattr(app.extensoes, "esquemas", lambda: [esquema])
@@ -124,20 +124,20 @@ def test_upgrade_roda_o_schema_de_cada_extensao_depois_do_nucleo(monkeypatch, tm
     assert len(executados) == 1
 
 
-def test_downgrade_recusa_com_o_caminho_certo():
+def test_downgrade_refuses_with_the_right_path():
     with pytest.raises(RuntimeError, match="init_schema"):
         _base_zero().downgrade()
 
 
-def test_nenhum_resto_de_atlans_drop():
+def test_no_leftover_of_atlans_drop():
     """The ATLANS_DROP_* flags were the opt-in for destructive downgrade in the
     old migrations; they died with them. A leftover executable mention is
     dead code path coming back."""
-    for arquivo in VERSOES.glob("*.py"):
+    for arquivo in VERSIONS.glob("*.py"):
         assert "ATLANS_DROP" not in arquivo.read_text(encoding="utf-8")
 
 
-def test_guarda_tambem_no_offline():
+def test_guard_also_in_offline():
     """The --sql output is an EXECUTABLE script — and it runs far from alembic's eyes.
 
     The online guard (to_regclass) doesn't exist in offline generation; without
@@ -149,7 +149,7 @@ def test_guarda_tambem_no_offline():
     mod = _base_zero()
     assert "DO $guarda_base_zero$" in mod._GUARDA_OFFLINE
     assert "RAISE EXCEPTION" in mod._GUARDA_OFFLINE
-    fonte = (VERSOES / [p.name for p in VERSOES.glob("*.py") if p.name != "__init__.py"][0]).read_text(
+    fonte = (VERSIONS / [p.name for p in VERSIONS.glob("*.py") if p.name != "__init__.py"][0]).read_text(
         encoding="utf-8"
     )
     assert re.search(r"if context\.is_offline_mode\(\):\s*\n\s*op\.execute\(_GUARDA_OFFLINE\)", fonte), (
@@ -157,8 +157,8 @@ def test_guarda_tambem_no_offline():
     )
 
 
-def test_dockerfile_leva_o_corpo_da_migracao():
-    """The migration reads scripts/init_schema.sql AT RUNTIME (`_RAIZ / "scripts"`).
+def test_dockerfile_ships_the_migration_body():
+    """The migration reads scripts/init_schema.sql AT RUNTIME (`_ROOT / "scripts"`).
 
     Without the copy in Dockerfile.api the body is left OUT of the image: any
     `alembic upgrade head` in production — a new database, or a deploy that

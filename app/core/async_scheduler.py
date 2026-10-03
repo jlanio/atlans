@@ -228,7 +228,7 @@ class AsyncScheduler:
                 # it is the record — a second one would make the history and
                 # usage_daily count the same failure twice.
                 if getattr(exc, "run_id", None) is None:
-                    await self._registrar_falha_agendada(
+                    await self._record_scheduled_failure(
                         db, wf, schedule_id,
                         category="no_executor",
                         message=f"Execução agendada não despachada: {exc.detail}",
@@ -239,8 +239,8 @@ class AsyncScheduler:
                             db, schedule_id=schedule_id, workflow=wf,
                             reason=exc.detail, category=exc.category,
                         )
-                    except Exception as alerta_exc:  # best-effort
-                        logger.warning("AsyncScheduler: falha ao alertar sobre '%s': %s", workflow_hash, alerta_exc)
+                    except Exception as alert_exc:  # best-effort
+                        logger.warning("AsyncScheduler: falha ao alertar sobre '%s': %s", workflow_hash, alert_exc)
                 raise
             except Exception as exc:
                 # Any OTHER failure of the scheduled dispatch (validation, database
@@ -252,7 +252,7 @@ class AsyncScheduler:
                 # `getattr(run_id)` mirrors the no-executor guard: if the dispatch
                 # already created the run, it does not duplicate it.
                 if getattr(exc, "run_id", None) is None:
-                    await self._registrar_falha_agendada(
+                    await self._record_scheduled_failure(
                         db, wf, schedule_id,
                         category="internal",
                         message=f"Execução agendada falhou: {exc}",
@@ -263,16 +263,16 @@ class AsyncScheduler:
                             db, schedule_id=schedule_id, workflow=wf,
                             reason=str(exc), category="internal",
                         )
-                    except Exception as alerta_exc:  # best-effort
-                        logger.warning("AsyncScheduler: falha ao alertar sobre '%s': %s", workflow_hash, alerta_exc)
+                    except Exception as alert_exc:  # best-effort
+                        logger.warning("AsyncScheduler: falha ao alertar sobre '%s': %s", workflow_hash, alert_exc)
                 raise
             if schedule_id is not None:
                 try:
                     await execution_alert_service.record_success(db, schedule_id=schedule_id, workflow=wf)
-                except Exception as alerta_exc:  # best-effort
-                    logger.warning("AsyncScheduler: falha ao registrar recuperação de '%s': %s", workflow_hash, alerta_exc)
+                except Exception as alert_exc:  # best-effort
+                    logger.warning("AsyncScheduler: falha ao registrar recuperação de '%s': %s", workflow_hash, alert_exc)
 
-    async def _registrar_falha_agendada(
+    async def _record_scheduled_failure(
         self, db, wf, schedule_id, *, category: str, message: str,
     ) -> None:
         """Materializes a missed scheduled occurrence as a visible `failed` run.
@@ -334,7 +334,7 @@ class AsyncScheduler:
         didn't take.
 
         Changing this **recreates no schedule at all**: the fallback does not take part in
-        `_mesma_configuracao` (`app/core/scheduling/hooks.py`), which compares the
+        `_same_configuration` (`app/core/scheduling/hooks.py`), which compares the
         STORED value with what the node sends. Anyone with the column filled in
         feels nothing.
         """

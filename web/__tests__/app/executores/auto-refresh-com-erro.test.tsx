@@ -35,13 +35,13 @@ it("1ª carga em erro: o auto-refresh tenta de novo sem tirar o cartão da tela 
   }) as typeof window.setInterval)
 
   // Each inserted `role="alert"` node is a new announcement in the screen reader.
-  let insercoes = 0
-  const observador = new MutationObserver(mutacoes => {
-    for (const m of mutacoes) for (const n of m.addedNodes) {
-      if (n instanceof HTMLElement && (n.getAttribute("role") === "alert" || n.querySelector('[role="alert"]'))) insercoes++
+  let insertions = 0
+  const observer = new MutationObserver(mutations => {
+    for (const m of mutations) for (const n of m.addedNodes) {
+      if (n instanceof HTMLElement && (n.getAttribute("role") === "alert" || n.querySelector('[role="alert"]'))) insertions++
     }
   })
-  observador.observe(document.body, { childList: true, subtree: true })
+  observer.observe(document.body, { childList: true, subtree: true })
 
   render(<AgentsPage />)
   await act(async () => { await Promise.resolve() })
@@ -49,9 +49,9 @@ it("1ª carga em erro: o auto-refresh tenta de novo sem tirar o cartão da tela 
   const cartao = await screen.findByRole("alert")
   expect(cartao.textContent).toContain("Não foi possível carregar os executores")
 
-  const tique = intervalos.find(i => i.ms === 15_000)!
+  const tick = intervalos.find(i => i.ms === 15_000)!
   for (let k = 0; k < 3; k++) {
-    await act(async () => { tique.fn() })
+    await act(async () => { tick.fn() })
     // In flight: the same card, no skeleton.
     expect(screen.getByRole("alert")).toBe(cartao)
     expect(screen.queryByLabelText("Carregando os executores")).toBeNull()
@@ -66,11 +66,11 @@ it("1ª carga em erro: o auto-refresh tenta de novo sem tirar o cartão da tela 
   await act(async () => { pendentes.shift()!(FALHA) })
 
   await new Promise(r => setTimeout(r, 0))
-  observador.disconnect()
-  expect(insercoes).toBe(1)
+  observer.disconnect()
+  expect(insertions).toBe(1)
 
   // The server is back: the list takes the card's place, with no click.
-  await act(async () => { tique.fn() })
+  await act(async () => { tick.fn() })
   await act(async () => { pendentes.shift()!({ success: true, status: 200, data: [] }) })
   expect(screen.queryByRole("alert")).toBeNull()
 })

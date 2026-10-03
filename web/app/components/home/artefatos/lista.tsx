@@ -17,28 +17,28 @@ import { GisFlowService } from "@/service/GisFlowService"
 import { createToast } from "@/utils/createToast"
 import { useHomeStore } from "@/app/stores/homeStore"
 import { ExtIcon } from "@/app/components/drive/ext"
-import { MetadataDialog, type TextosDosMetadados } from "@/app/components/drive/dialogs"
+import { MetadataDialog, type MetadataTexts } from "@/app/components/drive/dialogs"
 import { LocalBadge } from "@/app/components/local-badge"
-import { RetencaoHint, type TextosDaRetencao } from "@/app/components/artifacts/badges"
+import { RetencaoHint, type RetentionTexts } from "@/app/components/artifacts/badges"
 import { AvisoAmbar } from "@/app/components/shared/estados"
 import { useAcervo } from "@/app/hooks/home/useAcervo"
 import { baixarArtefato } from "@/lib/baixar-artefato"
 import { NomeDeArquivo } from "../nome-de-arquivo"
 import { LinhaDoMeu, GatilhoDeAcoes } from "../linha"
-import { useFormatos, useTextosDaCasca } from "../i18n/da-casca"
-import type { ItemDoAcervo } from "./normalizar"
+import { useFormats, useShellTexts } from "../i18n/da-casca"
+import type { CollectionItem } from "./normalizar"
 
 // Above this the list becomes virtual — the collection of a large workspace
 // exceeds hundreds of rows and mounting them all freezes the shell's scroll.
-const VIRTUAL_ACIMA = 150
+const VIRTUAL_ABOVE = 150
 
 // Drive icons cover shp/gpkg; the artifact formats use the same names.
-const ALIAS_DE_ICONE: Record<string, string> = { shapefile: "shp", geoparquet: "gpkg" }
+const ICON_ALIAS: Record<string, string> = { shapefile: "shp", geoparquet: "gpkg" }
 
 // The 3rem rail only fits an icon: `SidebarMenuSub` already hides on its own
 // in icon mode, but the blocks that are NOT a sublist (the virtual list, the
 // warnings) are raw `<div>`s and got clipped inside the rail.
-const SO_EXPANDIDO = "group-data-[collapsible=icon]:hidden"
+const EXPANDED_ONLY = "group-data-[collapsible=icon]:hidden"
 
 /**
  * "Meus → Artefatos" (Mine → Artifacts): the current workspace's collection —
@@ -61,16 +61,16 @@ export function ArtefatosLista() {
   } = useAcervo(current?.id_hash)
   const pedirCamada = useHomeStore((s) => s.pedirCamada)
   const { isMobile, setOpenMobile } = useSidebar()
-  const textos = useTextosDaCasca()
+  const textos = useShellTexts()
   const t = textos.listas
-  const fmt = useFormatos()
+  const fmt = useFormats()
 
-  const [metaAlvo, setMetaAlvo] = useState<ItemDoAcervo | null>(null)
-  const [excluindo, setExcluindo] = useState<ItemDoAcervo | null>(null)
+  const [metadataTarget, setMetadataTarget] = useState<CollectionItem | null>(null)
+  const [excluindo, setDeleting] = useState<CollectionItem | null>(null)
 
   // The sentences of the retention hint (shared with the Artifacts table,
   // which stays in Portuguese) in the Home's language.
-  const retencao = useMemo<TextosDaRetencao>(() => ({
+  const retencao = useMemo<RetentionTexts>(() => ({
     expirado: t.artefatos.retencao.expirado,
     expiraHoje: t.artefatos.retencao.expiraHoje,
     expiraEm: (dias) => t.artefatos.retencao.expiraEm(dias, fmt.inteiro(dias)),
@@ -78,7 +78,7 @@ export function ArtefatosLista() {
   }), [t, fmt])
 
   // The Drive metadata dialog (which stays in Portuguese there) in the Home's language.
-  const metadados = useMemo<TextosDosMetadados>(() => ({
+  const metadados = useMemo<MetadataTexts>(() => ({
     ...t.artefatos.metadadosDialogo,
     fechar: textos.comum.fechar,
     inteiro: fmt.inteiro,
@@ -87,17 +87,17 @@ export function ArtefatosLista() {
 
   // On phones the sidebar is a Sheet that covers the screen: putting a layer on
   // the globe behind the drawer looks like "nothing happened". Same gesture as "Nova conversa".
-  const fecharNoTelefone = useCallback(() => {
+  const closeOnPhone = useCallback(() => {
     if (isMobile) setOpenMobile(false)
   }, [isMobile, setOpenMobile])
 
-  const podeGerir = useCallback(
+  const canManage = useCallback(
     (workspaceId: string | null | undefined) =>
       hasMinRole(workspaces.find((w) => w.id_hash === workspaceId)?.my_role, "editor"),
     [workspaces],
   )
 
-  const baixar = useCallback(async (item: ItemDoAcervo) => {
+  const baixar = useCallback(async (item: CollectionItem) => {
     if (item.fonte === "artefato") {
       // It WAS `window.open(getArtifactDownloadUrl(...))`, and it downloaded
       // nothing: that endpoint returns `{download_url, filename}` as JSON, so the
@@ -114,26 +114,26 @@ export function ArtefatosLista() {
     else createToast.error(t.artefatos.baixarArquivoFalhou, res.error?.message ?? t.geral.tenteDeNovo)
   }, [t])
 
-  const exibirNoGlobo = useCallback((item: ItemDoAcervo) => {
+  const exibirNoGlobo = useCallback((item: CollectionItem) => {
     pedirCamada(item.id, item.nome)
-    fecharNoTelefone()
-  }, [pedirCamada, fecharNoTelefone])
+    closeOnPhone()
+  }, [pedirCamada, closeOnPhone])
 
-  const Linha = useCallback((item: ItemDoAcervo) => {
+  const Linha = useCallback((item: CollectionItem) => {
     const abrir = item.adicionavel
       ? () => exibirNoGlobo(item)
       : item.fonte === "drive"
-        ? () => setMetaAlvo(item)
+        ? () => setMetadataTarget(item)
         : undefined
-    const podeExcluir = podeGerir(item.workspaceId)
-    const temMenu = item.adicionavel || item.estado !== "local" || item.fonte === "drive" || podeExcluir
-    const ext = ALIAS_DE_ICONE[item.formato] ?? item.formato
+    const podeExcluir = canManage(item.workspaceId)
+    const hasMenu = item.adicionavel || item.estado !== "local" || item.fonte === "drive" || podeExcluir
+    const ext = ICON_ALIAS[item.formato] ?? item.formato
     const titulo = `${item.nome}${item.formato ? ` · ${item.formato.toUpperCase()}` : ""}`
     // By the key, not by the sentence stored in the item: the collection lives in
     // the hook, and the sentence must come out in the current language, not the
     // one at load time.
     const motivo = item.motivo ? t.artefatos.semPrevia[item.motivo] : null
-    const primario = (
+    const primaryContent = (
       <>
         <span className="shrink-0 text-sidebar-foreground/55">
           <ExtIcon ext={ext} />
@@ -150,14 +150,14 @@ export function ArtefatosLista() {
             title={item.adicionavel ? `${titulo} — ${t.artefatos.dicaExibirNoGlobo}` : titulo}
             className="flex min-w-0 flex-1 items-center gap-1.5 py-1 text-left text-sidebar-foreground max-md:min-h-10"
           >
-            {primario}
+            {primaryContent}
           </button>
         ) : (
           <div
             title={motivo ? `${titulo} — ${motivo}` : titulo}
             className="flex min-w-0 flex-1 items-center gap-1.5 py-1 text-sidebar-foreground/80 max-md:min-h-10"
           >
-            {primario}
+            {primaryContent}
             {/* `title` only exists on mouse hover: on keyboard and touch the reason
                 for the inert row has to arrive as text. */}
             {motivo && <span className="sr-only">{motivo}</span>}
@@ -167,7 +167,7 @@ export function ArtefatosLista() {
         {item.estado === "local" && <LocalBadge executorId={item.executorId} textos={t.artefatos.local} />}
         {item.estado === "efemero" && <RetencaoHint expiresAt={item.expiresAt} textos={retencao} />}
 
-        {temMenu && (
+        {hasMenu && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <GatilhoDeAcoes rotulo={item.nome} />
@@ -189,13 +189,13 @@ export function ArtefatosLista() {
                 </DropdownMenuItem>
               )}
               {item.fonte === "drive" && (
-                <DropdownMenuItem onSelect={() => setMetaAlvo(item)} className="gap-2 max-md:min-h-10">
+                <DropdownMenuItem onSelect={() => setMetadataTarget(item)} className="gap-2 max-md:min-h-10">
                   <TbInfoCircle className="size-4" /> {t.artefatos.metadados}
                 </DropdownMenuItem>
               )}
               {podeExcluir && (
                 <DropdownMenuItem
-                  onSelect={() => setExcluindo(item)}
+                  onSelect={() => setDeleting(item)}
                   className="gap-2 text-destructive focus:text-destructive max-md:min-h-10"
                 >
                   <TbTrash className="size-4" /> {t.artefatos.excluir}
@@ -206,7 +206,7 @@ export function ArtefatosLista() {
         )}
       </LinhaDoMeu>
     )
-  }, [baixar, exibirNoGlobo, podeGerir, t, retencao])
+  }, [baixar, exibirNoGlobo, canManage, t, retencao])
 
   // The list came cut at the server's ceiling: without stating the total, whoever
   // scrolls to the end concludes they saw everything and that the artifact they
@@ -226,7 +226,7 @@ export function ArtefatosLista() {
     )
   } else if (erro && !jaCarregou) {
     // §3: the error block only takes over the list when there was never an accepted load.
-    corpo = <ErroDaLista mensagem={t.artefatos.carregarFalhou} onTentar={recarregar} />
+    corpo = <ListError mensagem={t.artefatos.carregarFalhou} onTentar={recarregar} />
   } else if (!current) {
     // With no selector here, "selecione um workspace" would tell the person to do
     // something this panel no longer offers. The state is transient (the context
@@ -250,8 +250,8 @@ export function ArtefatosLista() {
         </li>
       </SidebarMenuSub>
     )
-  } else if (itens.length > VIRTUAL_ACIMA) {
-    corpo = <ListaVirtual itens={itens} renderLinha={Linha} />
+  } else if (itens.length > VIRTUAL_ABOVE) {
+    corpo = <VirtualList itens={itens} renderLinha={Linha} />
   } else {
     corpo = (
       <SidebarMenuSub aria-busy={atualizando || undefined}>
@@ -270,7 +270,7 @@ export function ArtefatosLista() {
           virtual list and in the empty branch there is no `<ul>` — it was precisely
           in the large workspace that a source failure went silent. */}
       {(erro || avisos.drive || avisos.artefatos || truncado) && (
-        <div className={`flex flex-col gap-1 px-2 pb-1 ${SO_EXPANDIDO}`}>
+        <div className={`flex flex-col gap-1 px-2 pb-1 ${EXPANDED_ONLY}`}>
           {erro && jaCarregou && (
             <AvisoAmbar
               onTentar={recarregar}
@@ -307,13 +307,13 @@ export function ArtefatosLista() {
           that declares the Home's palette — they opened light over the near-black Home. */}
       <MetadataDialog
         className="home-portal"
-        file={metaAlvo?.driveFile ?? null}
-        open={!!metaAlvo?.driveFile}
-        onClose={() => setMetaAlvo(null)}
+        file={metadataTarget?.driveFile ?? null}
+        open={!!metadataTarget?.driveFile}
+        onClose={() => setMetadataTarget(null)}
         textos={metadados}
       />
 
-      <Dialog open={!!excluindo} onOpenChange={(v) => { if (!v) setExcluindo(null) }}>
+      <Dialog open={!!excluindo} onOpenChange={(v) => { if (!v) setDeleting(null) }}>
         {excluindo && (
           <DeleteDialog
             className="home-portal"
@@ -328,7 +328,7 @@ export function ArtefatosLista() {
             onConfirm={async () => {
               const ok = await remover(excluindo)
               if (!ok) createToast.error(t.artefatos.excluirFalhou, t.geral.tenteDeNovo)
-              setExcluindo(null)
+              setDeleting(null)
             }}
           />
         )}
@@ -342,10 +342,10 @@ export function ArtefatosLista() {
  * in a 16rem rail, so the compact form stays — same semantics
  * (`role="alert"`), same microcopy and the same way out ("Tentar de novo").
  */
-function ErroDaLista({ mensagem, onTentar }: { mensagem: string; onTentar: () => void }) {
-  const { tentarDeNovo } = useTextosDaCasca().comum
+function ListError({ mensagem, onTentar }: { mensagem: string; onTentar: () => void }) {
+  const { tentarDeNovo } = useShellTexts().comum
   return (
-    <div role="alert" className={`flex flex-col items-start gap-1 px-2 py-1.5 ${SO_EXPANDIDO}`}>
+    <div role="alert" className={`flex flex-col items-start gap-1 px-2 py-1.5 ${EXPANDED_ONLY}`}>
       <p className="text-xs text-sidebar-foreground/70">{mensagem}</p>
       <button
         type="button"
@@ -365,12 +365,12 @@ function ErroDaLista({ mensagem, onTentar }: { mensagem: string; onTentar: () =>
  * by hand, and the `aria-setsize`/`aria-posinset` that tells the screen reader
  * the list's real size (only the window exists in the DOM).
  */
-function ListaVirtual({
+function VirtualList({
   itens,
   renderLinha,
 }: {
-  itens: ItemDoAcervo[]
-  renderLinha: (item: ItemDoAcervo) => React.ReactNode
+  itens: CollectionItem[]
+  renderLinha: (item: CollectionItem) => React.ReactNode
 }) {
   const ref = useRef<HTMLDivElement>(null)
   // The list stays MOUNTED when the Mine group item closes (the wrapper becomes
@@ -378,11 +378,11 @@ function ListaVirtual({
   // the virtualizer knowing: on reopening, the computed window was from a stale
   // offset and the rows stayed blank until scrolling. `enabled` tied to
   // visibility — disabling drops the subscription and re-enabling rereads the real `scrollTop`.
-  const [visivel, setVisivel] = useState(true)
+  const [visivel, setVisible] = useState(true)
   useEffect(() => {
     const el = ref.current
     if (!el || typeof ResizeObserver === "undefined") return
-    const ro = new ResizeObserver(([entrada]) => setVisivel(entrada.contentRect.height > 0))
+    const ro = new ResizeObserver(([entrada]) => setVisible(entrada.contentRect.height > 0))
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
@@ -397,7 +397,7 @@ function ListaVirtual({
   return (
     <div
       ref={ref}
-      className={`mx-3.5 max-h-[45vh] overflow-y-auto border-l border-sidebar-border pl-0.5 ${SO_EXPANDIDO}`}
+      className={`mx-3.5 max-h-[45vh] overflow-y-auto border-l border-sidebar-border pl-0.5 ${EXPANDED_ONLY}`}
     >
       <div
         role="list"

@@ -16,22 +16,22 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { renderHook, act, waitFor } from "@testing-library/react"
-import { useWorkflowExecutionStore, RUN_ENCERRADO } from "@/app/stores/workflowExecutionStore"
+import { useWorkflowExecutionStore, RUN_TERMINAL } from "@/app/stores/workflowExecutionStore"
 import type { INodeStatusWorkFlow } from "@/context/useFlowContext"
 
 const RUN = "run-x"
 
-let workflowAtual = "wf-a"
-const runsPorWorkflow: Record<string, { run_id: string; status: string }[]> = {}
+let currentWorkflow = "wf-a"
+const runsByWorkflow: Record<string, { run_id: string; status: string }[]> = {}
 /** Status the API returns for the run — what `onclose` will query. */
 let statusNaApi = "running"
 
-const nosDoCanvas = [
+const canvasNodes = [
   { id: "n1", position: { x: 0, y: 0 }, data: {} },
   { id: "n2", position: { x: 0, y: 0 }, data: {} },
 ]
 
-vi.mock("next/navigation", () => ({ useParams: () => ({ id: workflowAtual }) }))
+vi.mock("next/navigation", () => ({ useParams: () => ({ id: currentWorkflow }) }))
 vi.mock("next-auth/react", () => ({ useSession: () => ({ data: null }) }))
 vi.mock("@/app/hooks/workflow/useSaveWorkflow", () => ({
   useSaveWorkflow: () => ({ saveWorkflow: vi.fn(async () => ({ error: null })) }),
@@ -42,7 +42,7 @@ const getRunDetail = vi.fn(async () => ({ data: { status: statusNaApi } }))
 vi.mock("@/service/GisFlowService", () => ({
   GisFlowService: {
     getObservabilityRuns: vi.fn(async ({ workflow_id }: { workflow_id: string }) => ({
-      data: { runs: runsPorWorkflow[workflow_id] ?? [] },
+      data: { runs: runsByWorkflow[workflow_id] ?? [] },
     })),
     getRunDetail: (...args: unknown[]) => getRunDetail(...(args as [])),
     executeWorkflow: vi.fn(),
@@ -55,13 +55,13 @@ vi.mock("@/utils/createToast", () => ({
 vi.mock("@/utils/env", () => ({ getWsUrl: () => "ws://teste" }))
 vi.mock("@xyflow/react", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useNodes: () => nosDoCanvas,
+  useNodes: () => canvasNodes,
   useEdges: () => [],
-  useReactFlow: () => ({ getNodes: () => nosDoCanvas }),
+  useReactFlow: () => ({ getNodes: () => canvasNodes }),
 }))
 
-class SocketFalso {
-  static abertos: SocketFalso[] = []
+class FakeSocket {
+  static abertos: FakeSocket[] = []
   onopen: (() => void) | null = null
   onmessage: ((ev: { data: string }) => void) | null = null
   onerror: ((err: unknown) => void) | null = null
@@ -69,7 +69,7 @@ class SocketFalso {
   fechadoCom: number | null = null
 
   constructor(public url: string) {
-    SocketFalso.abertos.push(this)
+    FakeSocket.abertos.push(this)
   }
   send() {}
   /** Close requested by the CODE (intentional). */
@@ -84,27 +84,27 @@ class SocketFalso {
 }
 
 const quadros = new Map<number, FrameRequestCallback>()
-let proximoQuadro = 1
+let nextFrame = 1
 
 async function anexar() {
   const { useExecuteWorkflow } = await import("@/app/hooks/workflow/useExecuteWorkflow")
   const view = renderHook(() => useExecuteWorkflow())
-  await waitFor(() => expect(SocketFalso.abertos.length).toBeGreaterThan(0))
-  return { view, ws: SocketFalso.abertos[0] }
+  await waitFor(() => expect(FakeSocket.abertos.length).toBeGreaterThan(0))
+  return { view, ws: FakeSocket.abertos[0] }
 }
 
 describe("recuperação do stream de execução", () => {
   beforeEach(() => {
-    workflowAtual = "wf-a"
+    currentWorkflow = "wf-a"
     statusNaApi = "running"
-    runsPorWorkflow["wf-a"] = [{ run_id: RUN, status: "running" }]
-    SocketFalso.abertos = []
+    runsByWorkflow["wf-a"] = [{ run_id: RUN, status: "running" }]
+    FakeSocket.abertos = []
     quadros.clear()
-    proximoQuadro = 1
+    nextFrame = 1
     getRunDetail.mockClear()
-    vi.stubGlobal("WebSocket", SocketFalso)
+    vi.stubGlobal("WebSocket", FakeSocket)
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-      const id = proximoQuadro++
+      const id = nextFrame++
       quadros.set(id, cb)
       return id
     })
@@ -165,7 +165,7 @@ describe("recuperação do stream de execução", () => {
     })
     expect(getRunDetail).toHaveBeenCalled()
     // Reconciled: it makes no sense to reconnect to a run that already ended.
-    expect(SocketFalso.abertos).toHaveLength(1)
+    expect(FakeSocket.abertos).toHaveLength(1)
 
     view.unmount()
   })
@@ -181,8 +181,8 @@ describe("recuperação do stream de execução", () => {
     // The API query is asynchronous; let the microtask resolve before the timer.
     await act(async () => { await vi.advanceTimersByTimeAsync(1_100) })
 
-    expect(SocketFalso.abertos.length).toBeGreaterThan(1)
-    expect(SocketFalso.abertos[1].url).toContain(RUN)
+    expect(FakeSocket.abertos.length).toBeGreaterThan(1)
+    expect(FakeSocket.abertos[1].url).toContain(RUN)
     // The panel was NOT closed: the run is still live.
     expect(useWorkflowExecutionStore.getState().isExecuting).toBe(true)
 
@@ -198,7 +198,7 @@ describe("recuperação do stream de execução", () => {
     await act(async () => { view.unmount() })
     await act(async () => { await vi.advanceTimersByTimeAsync(5_000) })
 
-    expect(SocketFalso.abertos).toHaveLength(1)
+    expect(FakeSocket.abertos).toHaveLength(1)
     // And it did not go ask the API about a run the user left behind.
     expect(getRunDetail).not.toHaveBeenCalled()
   })
@@ -215,7 +215,7 @@ describe("recuperação do stream de execução", () => {
     const { useExecuteWorkflow } = await import("@/app/hooks/workflow/useExecuteWorkflow")
 
     const dono = renderHook(() => useExecuteWorkflow())
-    await waitFor(() => expect(SocketFalso.abertos).toHaveLength(1))
+    await waitFor(() => expect(FakeSocket.abertos).toHaveLength(1))
 
     const carona = renderHook(() => useExecuteWorkflow())
     // REAL time for the async re-attach chain (API query + waiting for the
@@ -224,7 +224,7 @@ describe("recuperação do stream de execução", () => {
     // second socket would not have been opened yet when the assertion ran.
     await act(async () => { await new Promise(r => setTimeout(r, 60)) })
 
-    expect(SocketFalso.abertos).toHaveLength(1)
+    expect(FakeSocket.abertos).toHaveLength(1)
 
     carona.unmount()
     dono.unmount()
@@ -301,7 +301,7 @@ describe("recuperação do stream de execução", () => {
   // no `isExecuting` and nobody to settle it again. It was what remained of the
   // symptom after the two earlier fixes closed the LOSS paths.
 
-  function rodarQuadrosPendentes() {
+  function runPendingFrames() {
     const pendentes = [...quadros.values()]
     quadros.clear()
     for (const cb of pendentes) cb(0)
@@ -330,7 +330,7 @@ describe("recuperação do stream de execução", () => {
     })
 
     // The user returns to the tab: what was scheduled fires now.
-    act(() => { rodarQuadrosPendentes() })
+    act(() => { runPendingFrames() })
 
     const final = useWorkflowExecutionStore.getState()
     expect(final.statusById.get("n2")?.status).toBe("unknown")
@@ -377,7 +377,7 @@ describe("recuperação do stream de execução", () => {
     await waitFor(() => {
       const estado = useWorkflowExecutionStore.getState()
       expect(estado.isExecuting).toBe(true)
-      expect(RUN_ENCERRADO.has(estado.statusWorkflow?.status ?? "")).toBe(false)
+      expect(RUN_TERMINAL.has(estado.statusWorkflow?.status ?? "")).toBe(false)
     })
 
     view.unmount()

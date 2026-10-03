@@ -25,7 +25,7 @@ import { Skeleton } from "../ui/skeleton"
 import { EntityCard } from "../shared/EntityCard"
 import { plural } from "@/lib/formatos"
 import { ErroDeCarga, SkeletonDeTokens, VazioPrimeiroUso } from "./estados"
-import { ordenarEscopos, rotuloDeEscopo, rotuloDeStatus } from "./escopo-rotulos"
+import { ordenarEscopos, scopeLabel, statusLabel } from "./escopo-rotulos"
 import CreateToken from "./dialog-content/create-token"
 import RevokeToken from "./dialog-content/revoke-token"
 
@@ -34,10 +34,10 @@ import RevokeToken from "./dialog-content/revoke-token"
 // screen would see "2 hours ago". Same precedent as `workflow/buttons/recent-runs`.
 dayjs.locale("pt-br")
 
-const ESCOPO_DA_TELA = "Para agentes e integrações — valem só para o que a sua conta já pode fazer"
+const SCREEN_SCOPE = "Para agentes e integrações — valem só para o que a sua conta já pode fazer"
 
 /** A partir de quantos dias o selo «Ativo» vira «Expira em N dias». */
-const AVISO_DE_EXPIRACAO_DIAS = 14
+const EXPIRY_WARNING_DAYS = 14
 
 /** Whole days until `expires_at` (negative if already past); `null` without a date. */
 export function diasAteExpirar(expiresAt: string | null | undefined, agora = Date.now()): number | null {
@@ -66,12 +66,12 @@ export function textoDeWorkspaces(ids: string[] | null, nomes: ReadonlyMap<strin
 }
 
 /** The list keeps only the metadata: the secret doesn't stay in the page state. */
-function semSegredo(criado: ApiTokenCreated): ApiToken {
+function withoutSecret(criado: ApiTokenCreated): ApiToken {
   const { id, name, token_prefix, scopes, workspace_ids, expires_at, last_used_at, revoked_at, created_at, status } = criado
   return { id, name, token_prefix, scopes, workspace_ids, expires_at, last_used_at, revoked_at, created_at, status }
 }
 
-const TokensDeAcesso = () => {
+const AccessTokens = () => {
   const { status } = useSession()
   const [workspaces, setWorkspaces] = useState<IWorkspace[]>([])
   // The list load is `useFetchData`: `loading` (its `firstLoad`) covers only
@@ -95,23 +95,23 @@ const TokensDeAcesso = () => {
 
   // Only to translate ids into names (cards and the dialog's checkboxes). Failing
   // here is no reason to break the screen: without names, the card shows the count.
-  const carregarWorkspaces = useCallback(async () => {
+  const loadWorkspaces = useCallback(async () => {
     const res = await GisFlowService.listWorkspaces()
     if (!res.error) setWorkspaces(res.data ?? [])
   }, [])
 
   useEffect(() => {
-    if (status === "authenticated") carregarWorkspaces()
-  }, [status, carregarWorkspaces])
+    if (status === "authenticated") loadWorkspaces()
+  }, [status, loadWorkspaces])
 
   function handleRefresh() {
     refetch()
-    carregarWorkspaces()
+    loadWorkspaces()
   }
 
   function handleCreated(criado: ApiTokenCreated) {
     // Most recent first, like the backend's listing.
-    setTokens(prev => [semSegredo(criado), ...(prev ?? [])])
+    setTokens(prev => [withoutSecret(criado), ...(prev ?? [])])
   }
 
   function handleRevoked(revogado: ApiToken) {
@@ -129,7 +129,7 @@ const TokensDeAcesso = () => {
   // Header subtitle: the screen's scope; with tokens, the count goes in
   // front. Zero disappears (contract §7) — "0 ativos" helps nobody.
   function textoDoSubtitulo(): string {
-    if (!hasTokens) return ESCOPO_DA_TELA
+    if (!hasTokens) return SCREEN_SCOPE
     const partes = [plural(tokens.length, "token")]
     if (ativos > 0) partes.push(plural(ativos, "ativo"))
     return `${partes.join(" · ")} — valem só para o que a sua conta já pode fazer`
@@ -138,13 +138,13 @@ const TokensDeAcesso = () => {
   // Status badge: always translated, raw value in `data-status`. Canonical
   // pairs from contract §6 — green (active), amber (expiring), red
   // (expired); revoked is neutral, because it's neither a failure nor a warning.
-  function seloDeStatus(token: ApiToken) {
+  function statusBadge(token: ApiToken) {
     const base = "flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium tabular-nums"
     if (token.status === "revoked") {
       return (
         <span data-status="revoked" className={cn(base, "bg-muted text-muted-foreground")}>
           <TbShieldOff className="size-3" aria-hidden="true" />
-          {rotuloDeStatus("revoked")}
+          {statusLabel("revoked")}
         </span>
       )
     }
@@ -152,12 +152,12 @@ const TokensDeAcesso = () => {
       return (
         <span data-status="expired" className={cn(base, "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400")}>
           <TbAlertTriangle className="size-3" aria-hidden="true" />
-          {rotuloDeStatus("expired")}
+          {statusLabel("expired")}
         </span>
       )
     }
     const dias = diasAteExpirar(token.expires_at)
-    if (dias != null && dias <= AVISO_DE_EXPIRACAO_DIAS) {
+    if (dias != null && dias <= EXPIRY_WARNING_DAYS) {
       return (
         <span data-status="active" className={cn(base, "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400")}>
           <TbClock className="size-3" aria-hidden="true" />
@@ -167,19 +167,19 @@ const TokensDeAcesso = () => {
     }
     return (
       <span data-status="active" className={cn(base, "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400")}>
-        {rotuloDeStatus("active")}
+        {statusLabel("active")}
       </span>
     )
   }
 
   function renderCard(token: ApiToken) {
     const inativo = token.status !== "active"
-    const ultimoUso = token.last_used_at ? `Último uso: ${fromNowLocal(token.last_used_at)}` : "Nunca usado"
+    const lastUse = token.last_used_at ? `Último uso: ${fromNowLocal(token.last_used_at)}` : "Nunca usado"
     return (
       <li key={token.id} data-token-status={token.status} className={cn(inativo && "opacity-75")}>
         <EntityCard
           title={token.name}
-          badge={seloDeStatus(token)}
+          badge={statusBadge(token)}
           leading={
             <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-md", inativo ? "bg-muted" : "bg-primary/10")}>
               <TbKey className={cn("size-4", inativo ? "text-muted-foreground" : "text-primary")} aria-hidden="true" />
@@ -197,7 +197,7 @@ const TokensDeAcesso = () => {
                       key={escopo}
                       className="rounded-full border border-transparent bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground"
                     >
-                      {rotuloDeEscopo(escopo)}
+                      {scopeLabel(escopo)}
                     </li>
                   ))}
                 </ul>
@@ -205,7 +205,7 @@ const TokensDeAcesso = () => {
               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                 <span>{textoDeWorkspaces(token.workspace_ids, nomeDoWorkspace)}</span>
                 <span aria-hidden="true">·</span>
-                <span title={token.last_used_at ? formatLocal(token.last_used_at) : undefined}>{ultimoUso}</span>
+                <span title={token.last_used_at ? formatLocal(token.last_used_at) : undefined}>{lastUse}</span>
                 <span aria-hidden="true">·</span>
                 <span title={formatLocal(token.created_at)}>Criado {fromNowLocal(token.created_at)}</span>
               </div>
@@ -316,4 +316,4 @@ const TokensDeAcesso = () => {
   )
 }
 
-export default TokensDeAcesso
+export default AccessTokens

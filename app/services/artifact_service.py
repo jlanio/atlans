@@ -35,10 +35,10 @@ from app.models.portal_layer import PortalLayer
 # Hard page ceiling, mirroring the `le=200` the route declares in `Query`.
 # Here it is clamped instead of validated: MCP has no Pydantic at the edge, and
 # a large `limit` coming from a tool must not turn into a table scan.
-LIMITE_MAXIMO = 200
+MAX_LIMIT = 200
 
 
-def _filtros(
+def _filters(
     workspace_ids: list[str],
     *,
     workspace_id: Optional[str],
@@ -96,14 +96,14 @@ def _filtros(
 
 def _item(
     artefato: Artifact,
-    nome_do_workflow: Optional[str],
+    workflow_name: Optional[str],
     portal_run_ids: set,
     *,
-    incluir_chave: bool,
+    include_key: bool,
 ) -> dict:
     """One row of the response, with the defensive `getattr`s the route already had.
 
-    `incluir_chave` exists so that the extraction does not change what the screen
+    `include_key` exists so that the extraction does not change what the screen
     receives. The `s3_key` is what lets us decide whether there is an object to
     sign — MCP needs it, the interface does not, and adding it to the REST
     response would widen a contract as a side effect of a refactor.
@@ -112,7 +112,7 @@ def _item(
         "id_hash":        artefato.id_hash,
         "workspace_id":   artefato.workspace_id,
         "workflow_id":    artefato.workflow_hash,
-        "workflow_name":  nome_do_workflow or artefato.workflow_hash or "",
+        "workflow_name":  workflow_name or artefato.workflow_hash or "",
         "run_id":         artefato.run_id,
         "node_id":        artefato.node_id,
         "output_key":     artefato.output_key,
@@ -133,7 +133,7 @@ def _item(
         "is_pinned":          getattr(artefato, "is_pinned", False),
         "created_at":         artefato.created_at.isoformat() if artefato.created_at else None,
         "expires_at":         artefato.expires_at.isoformat() if artefato.expires_at else None,
-        **({"s3_key": getattr(artefato, "s3_key", None)} if incluir_chave else {}),
+        **({"s3_key": getattr(artefato, "s3_key", None)} if include_key else {}),
     }
 
 
@@ -150,7 +150,7 @@ async def listar_artefatos(
     include_pinned: bool = False,
     limit: int = 50,
     offset: int = 0,
-    incluir_chave: bool = False,
+    include_key: bool = False,
 ) -> dict[str, Any]:
     """Page of artifacts from the given workspaces, with a consistent `total`.
 
@@ -162,10 +162,10 @@ async def listar_artefatos(
     `include_pinned` defaults to `False` because a pin-cache artifact is internal
     engine state, not output someone asked for.
     """
-    limite = max(1, min(int(limit), LIMITE_MAXIMO))
+    limite = max(1, min(int(limit), MAX_LIMIT))
     salto = max(0, int(offset))
 
-    filtros = _filtros(
+    filtros = _filters(
         workspace_ids,
         workspace_id=workspace_id,
         workflow_id=workflow_id,
@@ -207,7 +207,7 @@ async def listar_artefatos(
         )
         portal_run_ids = {row[0] for row in portal_result.fetchall()}
 
-    items = [_item(a, nome, portal_run_ids, incluir_chave=incluir_chave) for a, nome in rows]
+    items = [_item(a, nome, portal_run_ids, include_key=include_key) for a, nome in rows]
 
     return {
         "items":  items,

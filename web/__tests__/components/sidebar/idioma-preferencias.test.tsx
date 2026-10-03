@@ -13,31 +13,31 @@ vi.mock("next-auth/react", () => ({
 }))
 
 import { UserPreferencesDialog } from "@/app/components/sidebar/user-preferences-dialog"
-import { IdiomaProvider } from "@/context/IdiomaContext"
-import type { IdiomaResolvido } from "@/lib/idioma"
+import { LanguageProvider } from "@/context/IdiomaContext"
+import type { ResolvedLanguage } from "@/lib/idioma"
 
 afterEach(() => {
   cleanup()
   Cookies.remove("idioma")
 })
 
-const montar = (inicial: IdiomaResolvido) =>
+const montar = (inicial: ResolvedLanguage) =>
   render(
-    <IdiomaProvider inicial={inicial}>
+    <LanguageProvider inicial={inicial}>
       <UserPreferencesDialog open onOpenChange={() => {}} />
-    </IdiomaProvider>,
+    </LanguageProvider>,
   )
 
-const opcao = (nome: RegExp) => screen.getByRole("button", { name: nome })
+const option = (nome: RegExp) => screen.getByRole("button", { name: nome })
 
 describe("Preferências — Idioma", () => {
   it("no automático: Automático marcado, com o idioma detectado à vista", () => {
     montar({ idioma: "pt-BR", detectado: "pt-BR", escolhido: null })
     expect(screen.getByText("Idioma")).toBeTruthy()
-    expect(opcao(/Automático/).getAttribute("aria-pressed")).toBe("true")
+    expect(option(/Automático/).getAttribute("aria-pressed")).toBe("true")
     expect(screen.getByText("Detectado: Português (Brasil)")).toBeTruthy()
     for (const nome of [/^Português \(Brasil\)$/, /^English$/, /^Español$/]) {
-      expect(opcao(nome).getAttribute("aria-pressed")).toBe("false")
+      expect(option(nome).getAttribute("aria-pressed")).toBe("false")
     }
   })
 
@@ -49,14 +49,14 @@ describe("Preferências — Idioma", () => {
 
   it("escolher English grava o cookie e a tela troca na hora", () => {
     montar({ idioma: "pt-BR", detectado: "pt-BR", escolhido: null })
-    fireEvent.click(opcao(/^English$/))
+    fireEvent.click(option(/^English$/))
 
     expect(Cookies.get("idioma")).toBe("en")
     // The dialog itself is already in English — without reloading.
     expect(screen.getByText("Preferences")).toBeTruthy()
     expect(screen.getByText("Language")).toBeTruthy()
-    expect(opcao(/^English$/).getAttribute("aria-pressed")).toBe("true")
-    expect(opcao(/Automatic/).getAttribute("aria-pressed")).toBe("false")
+    expect(option(/^English$/).getAttribute("aria-pressed")).toBe("true")
+    expect(option(/Automatic/).getAttribute("aria-pressed")).toBe("false")
   })
 
   it("a escolha fica para as próximas visitas: cookie de 365 dias, não de sessão", () => {
@@ -65,7 +65,7 @@ describe("Preferências — Idioma", () => {
     // would be lost.
     const set = vi.spyOn(Cookies, "set")
     montar({ idioma: "pt-BR", detectado: "pt-BR", escolhido: null })
-    fireEvent.click(opcao(/^Español$/))
+    fireEvent.click(option(/^Español$/))
     expect(set).toHaveBeenCalledWith("idioma", "es", { expires: 365, sameSite: "lax" })
     set.mockRestore()
   })
@@ -75,7 +75,7 @@ describe("Preferências — Idioma", () => {
     montar({ idioma: "es", detectado: "en", escolhido: "es" })
     expect(screen.getByText("Preferencias")).toBeTruthy()
 
-    fireEvent.click(opcao(/Automático/))
+    fireEvent.click(option(/Automático/))
     expect(Cookies.get("idioma")).toBeUndefined()
     // Back to the detected one (English).
     expect(screen.getByText("Preferences")).toBeTruthy()
@@ -83,10 +83,10 @@ describe("Preferências — Idioma", () => {
   })
 
   it("um router.refresh traz a escolha do servidor (o cookie mudou noutra aba)", () => {
-    const arvore = (inicial: IdiomaResolvido) => (
-      <IdiomaProvider inicial={inicial}>
+    const arvore = (inicial: ResolvedLanguage) => (
+      <LanguageProvider inicial={inicial}>
         <UserPreferencesDialog open onOpenChange={() => {}} />
-      </IdiomaProvider>
+      </LanguageProvider>
     )
     const { rerender } = render(arvore({ idioma: "en", detectado: "pt-BR", escolhido: "en" }))
     expect(screen.getByText("Preferences")).toBeTruthy()
@@ -95,29 +95,29 @@ describe("Preferências — Idioma", () => {
     // again and the provider, which doesn't remount, receives the new `inicial`.
     rerender(arvore({ idioma: "pt-BR", detectado: "pt-BR", escolhido: null }))
     expect(screen.getByText("Preferências")).toBeTruthy()
-    expect(opcao(/Automático/).getAttribute("aria-pressed")).toBe("true")
-    expect(opcao(/^English$/).getAttribute("aria-pressed")).toBe("false")
+    expect(option(/Automático/).getAttribute("aria-pressed")).toBe("true")
+    expect(option(/^English$/).getAttribute("aria-pressed")).toBe("false")
 
     // E o inverso: a escolha feita noutra aba chega aqui.
     rerender(arvore({ idioma: "es", detectado: "pt-BR", escolhido: "es" }))
     expect(screen.getByText("Preferencias")).toBeTruthy()
-    expect(opcao(/^Español$/).getAttribute("aria-pressed")).toBe("true")
+    expect(option(/^Español$/).getAttribute("aria-pressed")).toBe("true")
   })
 
   it("a escolha feita nesta aba sobrevive ao refresh que devolve o mesmo valor", () => {
-    const arvore = (inicial: IdiomaResolvido) => (
-      <IdiomaProvider inicial={inicial}>
+    const arvore = (inicial: ResolvedLanguage) => (
+      <LanguageProvider inicial={inicial}>
         <UserPreferencesDialog open onOpenChange={() => {}} />
-      </IdiomaProvider>
+      </LanguageProvider>
     )
     const { rerender } = render(arvore({ idioma: "pt-BR", detectado: "pt-BR", escolhido: null }))
-    fireEvent.click(opcao(/^English$/))
+    fireEvent.click(option(/^English$/))
     // The refresh from before the switch (the same `inicial`) doesn't undo the choice…
     rerender(arvore({ idioma: "pt-BR", detectado: "pt-BR", escolhido: null }))
     expect(screen.getByText("Preferences")).toBeTruthy()
     // …and the one after returns what the person saved.
     rerender(arvore({ idioma: "en", detectado: "pt-BR", escolhido: "en" }))
     expect(screen.getByText("Preferences")).toBeTruthy()
-    expect(opcao(/^English$/).getAttribute("aria-pressed")).toBe("true")
+    expect(option(/^English$/).getAttribute("aria-pressed")).toBe("true")
   })
 })

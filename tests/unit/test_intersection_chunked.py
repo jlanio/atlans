@@ -20,7 +20,7 @@ def _grid(n, size=1.0, crs="EPSG:3857"):
     )
 
 
-def test_bounded_igual_ao_overlay_direto(monkeypatch):
+def test_bounded_equals_direct_overlay(monkeypatch):
     srcA = _grid(6)
     srcB = gpd.GeoDataFrame({"tag": ["b"]}, geometry=[box(0.5, 0.0, 5.5, 0.5)], crs="EPSG:3857")
 
@@ -36,7 +36,7 @@ def test_bounded_igual_ao_overlay_direto(monkeypatch):
     assert str(bounded.crs) == str(srcA.crs)
 
 
-def test_extents_disjuntos_resultado_vazio_com_crs(monkeypatch):
+def test_disjoint_extents_empty_result_with_crs(monkeypatch):
     srcA = _grid(4)
     srcB = gpd.GeoDataFrame(geometry=[box(100, 100, 101, 101)], crs="EPSG:3857")
     monkeypatch.setattr(_mod, "_TARGET_PAIRS_PER_CHUNK", 1)
@@ -45,7 +45,7 @@ def test_extents_disjuntos_resultado_vazio_com_crs(monkeypatch):
     assert str(out.crs) == "EPSG:3857"
 
 
-def test_estimativa_de_fanout():
+def test_fanout_estimate():
     # A: 5 squares; B: a rectangle covering all of them → fanout ~1 per feature of A.
     srcA = _grid(5)
     srcB = gpd.GeoDataFrame(geometry=[box(0, 0, 5, 1)], crs="EPSG:3857")
@@ -53,7 +53,7 @@ def test_estimativa_de_fanout():
     assert avg >= 1.0
 
 
-def test_clean_layer_remove_vazias_e_preserva_validas():
+def test_clean_layer_removes_empty_and_keeps_valid():
     from shapely.geometry import Polygon
     gdf = gpd.GeoDataFrame(
         {"id": [1, 2, 3]},
@@ -66,7 +66,7 @@ def test_clean_layer_remove_vazias_e_preserva_validas():
 
 
 @pytest.mark.asyncio
-async def test_execute_com_geometria_vazia_nao_quebra(monkeypatch):
+async def test_execute_with_empty_geometry_does_not_break(monkeypatch):
     from shapely.geometry import Polygon
     node = _mod.IntersectionNode("n1", {})
     srcA = gpd.GeoDataFrame({"id": [1, 2]}, geometry=[box(0, 0, 2, 2), Polygon()], crs="EPSG:3857")

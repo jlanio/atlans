@@ -11,7 +11,7 @@ import { describe, it, expect, afterEach, vi } from "vitest"
 import {
   cabeNoEnquadrado,
   semMovimento,
-  FOLGA_DO_ENQUADRAMENTO,
+  FIT_PADDING,
   type Caixa,
 } from "@/app/components/workflow/utils/enquadrar"
 
@@ -52,8 +52,8 @@ describe("cabeNoEnquadrado", () => {
     // jump the rule exists to remove. And too large would swallow a whole
     // node coming in: the layout spaces nodes 180 apart, so the slack has to
     // stay well below that.
-    expect(FOLGA_DO_ENQUADRAMENTO).toBeGreaterThan(0)
-    expect(FOLGA_DO_ENQUADRAMENTO).toBeLessThan(90)
+    expect(FIT_PADDING).toBeGreaterThan(0)
+    expect(FIT_PADDING).toBeLessThan(90)
   })
 
   it("cada borda conta sozinha", () => {

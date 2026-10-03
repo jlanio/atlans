@@ -12,7 +12,7 @@
  * and separator that are not part of the pattern. `aria-busy` marks the section
  * while its source loads.
  */
-export function SecaoDeConfiguracao({
+export function SettingsSection({
   id, titulo, apoio, carregando, children,
 }: {
   id: string

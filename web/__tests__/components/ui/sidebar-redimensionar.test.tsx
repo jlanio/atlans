@@ -32,10 +32,10 @@ function montar({ aberta = true, defaultWidth = SIDEBAR_WIDTH_PADRAO } = {}) {
 const largura = () => Number(screen.getByTestId("largura").textContent)
 const separador = () => screen.getByRole("separator", { name: /redimensionar/i })
 /** The LIVE width, which the drag writes straight into the CSS without going through React. */
-const larguraNoCss = () =>
+const cssWidth = () =>
   document.querySelector<HTMLElement>('[data-slot="sidebar-wrapper"]')!.style.getPropertyValue("--sidebar-width")
 
-function comSeparador() {
+function separatorWithCapture() {
   const sep = separador()
   sep.setPointerCapture = vi.fn()
   sep.releasePointerCapture = vi.fn()
@@ -71,27 +71,27 @@ describe("SidebarRail — expandida, é um separador", () => {
 
   it("arrastar muda a largura, e soltar para de segui-la", () => {
     montar()
-    const sep = comSeparador()
+    const sep = separatorWithCapture()
 
     fireEvent.pointerDown(sep, { button: 0, pointerId: 1 })
     fireEvent.pointerMove(sep, { clientX: 340, pointerId: 1 })
-    expect(larguraNoCss()).toBe("340px")
+    expect(cssWidth()).toBe("340px")
 
     fireEvent.pointerUp(sep, { pointerId: 1 })
     expect(largura()).toBe(340)          // only now does the state receive it
 
     fireEvent.pointerMove(sep, { clientX: 200, pointerId: 1 })
-    expect(larguraNoCss()).toBe("340px") // released, the movement no longer counts
+    expect(cssWidth()).toBe("340px") // released, the movement no longer counts
   })
 
   it("o arrasto respeita os limites", () => {
     montar()
-    const sep = comSeparador()
+    const sep = separatorWithCapture()
     fireEvent.pointerDown(sep, { button: 0, pointerId: 1 })
     fireEvent.pointerMove(sep, { clientX: 20, pointerId: 1 })
-    expect(larguraNoCss()).toBe(`${SIDEBAR_WIDTH_MIN}px`)
+    expect(cssWidth()).toBe(`${SIDEBAR_WIDTH_MIN}px`)
     fireEvent.pointerMove(sep, { clientX: 5000, pointerId: 1 })
-    expect(larguraNoCss()).toBe(`${SIDEBAR_WIDTH_MAX}px`)
+    expect(cssWidth()).toBe(`${SIDEBAR_WIDTH_MAX}px`)
     fireEvent.pointerUp(sep, { pointerId: 1 })
     expect(largura()).toBe(SIDEBAR_WIDTH_MAX)
   })
@@ -105,7 +105,7 @@ describe("SidebarRail — expandida, é um separador", () => {
       configurable: true, get: () => "", set: () => { escritas++ },
     })
     montar()
-    const sep = comSeparador()
+    const sep = separatorWithCapture()
     fireEvent.pointerDown(sep, { button: 0, pointerId: 1 })
     const antes = renders
     escritas = 0

@@ -30,7 +30,7 @@ function artefato(id: string): IArtifactItem {
 
 function embrulho() {
   const cliente = criarClienteDeConsultas()
-  return function Embrulho({ children }: { children: ReactNode }) {
+  return function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={cliente}>{children}</QueryClientProvider>
   }
 }

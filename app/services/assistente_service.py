@@ -12,7 +12,7 @@ it **calls the same tools along the same path**, in process.
     finally:
         ESCOPO_ATUAL.reset(ficha)
 
-`ServidorAtlans.call_tool` accepts `context=None` and `escopo_da_chamada` falls
+`AtlansServer.call_tool` accepts `context=None` and `escopo_da_chamada` falls
 back to the `ContextVar` when there is no request (`app/mcp/escopo.py`). So the
 scope guard, the quota bucket, the minimum role, the exception mapping and the
 audit row happen exactly as they do for an external client. **The rule is one
@@ -59,9 +59,9 @@ from mcp.server.mcpserver.exceptions import ToolError
 from app.core.utils.logger import get_logger
 from app.mcp import cotas
 from app.mcp.erros import erro
-from app.mcp.escopo import ESCOPO_ATUAL, EscopoEfetivo, escopo_do_editor
+from app.mcp.escopo import ESCOPO_ATUAL, EffectiveScope, editor_scope
 from app.mcp.guardas import GUARDAS
-from app.mcp.instrucoes import INSTRUCOES
+from app.mcp.instrucoes import INSTRUCTIONS
 from app.services import (
     assistente_config_service, openrouter, teto_do_assistente, uso_service,
 )
@@ -154,7 +154,7 @@ FERRAMENTA_DO_DESENHO: dict[str, Any] = {
 }
 
 
-def _ja_desenhou(conversa: list[dict[str, Any]]) -> bool:
+def _already_drew(conversa: list[dict[str, Any]]) -> bool:
     """Has anyone already called `desenhar_no_canvas` in this conversation?
 
     Read from the TRANSCRIPT, and not from a loop variable, because the
@@ -230,7 +230,7 @@ ESFORCO_DO_RACIOCINIO = "high"
 # gate reads the workflow's origin; tool bodies query at will) and the process
 # pool is a single one (POOL_SIZE + MAX_OVERFLOW). What decides HOW MANY calls
 # come in the round is the model; what decides how many run AT A TIME is this ceiling.
-TETO_DO_LOTE_EM_PARALELO = 5
+PARALLEL_BATCH_CEILING = 5
 
 # One round = one call to the model. Building a real workflow takes 6 to 12
 # (understand, guide, catalog, `describe_node` for each node, validate, fix,
@@ -243,15 +243,15 @@ TETO_DE_VOLTAS = 24
 # history and is resent on every round. Cutting protects the context and the
 # bill; the cut is announced so the model knows there was a cut — a silent
 # truncation would make the model conclude the data simply does not exist.
-MAX_CHARS_POR_RESULTADO = 60_000
-AVISO_DE_CORTE = "\n\n[resultado cortado: use um filtro mais estreito para ver o resto]"
+MAX_CHARS_PER_RESULT = 60_000
+TRUNCATION_NOTICE = "\n\n[resultado cortado: use um filtro mais estreito para ver o resto]"
 
 
 @dataclass(frozen=True)
 class Uso:
     """What a turn cost, summed over the conversation.
 
-    The keys are the ones `openrouter._uso_do_projeto` produces. `entrada` already
+    The keys are the ones `openrouter._project_usage` produces. `entrada` already
     INCLUDES what came from the cache (`cache_leitura` and `cache_escrita` are
     slices of it, informational), and `raciocinio` is a slice of `saida`. `custo`
     comes in OpenRouter credits (dollars) — it is information for the log and for
@@ -288,7 +288,7 @@ class Uso:
         )
 
     @property
-    def cobravel(self) -> int:
+    def billable(self) -> int:
         """The total that counts toward the quota: everything that went in plus everything that came out.
 
         The cache read COUNTS — it costs 10% of the input price, but it costs,
@@ -297,7 +297,7 @@ class Uso:
         """
         return self.entrada + self.saida
 
-    def como_dict(self) -> dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         return {
             "entrada": self.entrada,
             "saida": self.saida,
@@ -305,7 +305,7 @@ class Uso:
             "cache_escrita": self.cache_escrita,
             "raciocinio": self.raciocinio,
             "custo": round(self.custo, 6),
-            "total": self.cobravel,
+            "total": self.billable,
         }
 
 
@@ -336,13 +336,13 @@ class ContextoLocal:
     each completed node becomes a frame in the SSE the browser is reading.
     """
 
-    def __init__(self, emitir, ferramenta_id: str | None = None) -> None:
-        self._emitir = emitir
+    def __init__(self, emitir, tool_id: str | None = None) -> None:
+        self._emit = emitir
         # The `tool_use_id` of the call that owns this context. With the tools of
         # a round running in PARALLEL, the `progresso` frame needs to say whose
         # it is — without the id, the browser paints the bar on the wrong tool
         # (the reducer matched "the one that is running", and now several run).
-        self._ferramenta_id = ferramenta_id
+        self._ferramenta_id = tool_id
 
     async def report_progress(
         self, progress: float, total: float | None = None, message: str | None = None
@@ -354,7 +354,7 @@ class ContextoLocal:
         }
         if self._ferramenta_id is not None:
             dados["id"] = self._ferramenta_id
-        await self._emitir(Evento("progresso", dados))
+        await self._emit(Evento("progresso", dados))
 
 
 def criar_cliente() -> openrouter.ClienteOpenRouter:
@@ -378,7 +378,7 @@ def criar_cliente() -> openrouter.ClienteOpenRouter:
     )
 
 
-def escopo_do_editor_para(usuario, workspace_ids) -> EscopoEfetivo:
+def escopo_do_editor_para(usuario, workspace_ids) -> EffectiveScope:
     """This conversation's scope, built from the session's user.
 
     A one-line bridge between the database `User` and the pure constructor in
@@ -386,7 +386,7 @@ def escopo_do_editor_para(usuario, workspace_ids) -> EscopoEfetivo:
     route would have to know the names of the user's fields — and would start
     breaking when they changed.
     """
-    return escopo_do_editor(
+    return editor_scope(
         user_id=usuario.id_hash,
         username=getattr(usuario, "username", None),
         workspace_ids=workspace_ids,
@@ -394,7 +394,7 @@ def escopo_do_editor_para(usuario, workspace_ids) -> EscopoEfetivo:
 
 
 async def ferramentas_para_o_modelo(
-    servidor, escopo: EscopoEfetivo, superficie: "Superficie | None" = None
+    servidor, escopo: EffectiveScope, superficie: "Superficie | None" = None
 ) -> list[dict[str, Any]]:
     """The MCP tools in the format the model's API expects.
 
@@ -437,7 +437,7 @@ async def ferramentas_para_o_modelo(
 
 
 # What changes compared to an external MCP client. Short on purpose: it fixes
-# the ONLY point where `INSTRUCOES` stops applying here, which is the sentence
+# the ONLY point where `INSTRUCTIONS` stops applying here, which is the sentence
 # "only call create_workflow/update_workflow after validation passes" — those
 # tools do not exist for the assistant. Without this correction the model looks
 # for a tool that is not in the list and ends the conversation delivering nothing.
@@ -491,7 +491,7 @@ def montar_sistema(
 ) -> list[dict[str, Any]]:
     """The system prompt — the MCP server's instructions, not a second copy.
 
-    `INSTRUCOES` (`app/mcp/instrucoes.py`) already says everything that needs to
+    `INSTRUCTIONS` (`app/mcp/instrucoes.py`) already says everything that needs to
     be said before the first call: validate before saving, ask for confirmation
     before creating or executing, never invent a property, credentials by
     identifier, and — what matters most here — that `untrusted_data` is DATA and
@@ -512,7 +512,7 @@ def montar_sistema(
 
     superficie = superficie or EDITOR
     blocos: list[dict[str, Any]] = [
-        {"type": "text", "text": INSTRUCOES},
+        {"type": "text", "text": INSTRUCTIONS},
         {"type": "text", "text": superficie.instrucoes},
         # The reasoning too: it is SHOWN to the person (the "Raciocínio"
         # (reasoning) section of the panel), and a model that converses in
@@ -544,7 +544,7 @@ def montar_sistema(
         # a rejection on every conversation.
         {
             "type": "text",
-            "text": _guia_do_prefixo(),
+            "text": _prefix_guide(),
             "cache_control": {"type": "ephemeral"},
         },
     ]
@@ -556,7 +556,7 @@ def montar_sistema(
 
 
 @lru_cache(maxsize=1)
-def _guia_do_prefixo() -> str:
+def _prefix_guide() -> str:
     """The two guide topics that go into the prompt, against the six that do not.
 
     `recipes` are FOUR complete workflows, written out. It is the demonstration of
@@ -605,7 +605,7 @@ class EstadoDoLaco:
     field would be a race — the id travels as an argument of the gate.
     """
 
-    escopo: EscopoEfetivo
+    escopo: EffectiveScope
     redis: Any
     conversa_id: str | None
     # Output channel of the tools and the gates: enqueues an `Evento` that the
@@ -646,10 +646,10 @@ class Superficie:
     quadros_extras: Callable[[EstadoDoLaco, str, Any, str, bool], list["Evento"]]
 
 
-async def _desenhar(argumentos: Any, estado: EstadoDoLaco) -> tuple[str, bool]:
+async def _draw(argumentos: Any, estado: EstadoDoLaco) -> tuple[str, bool]:
     """The editor's delivery: puts the workflow on the canvas. Does not go to the server.
 
-    The visible effect is the `proposta` frame (emitted by `_quadros_do_editor`);
+    The visible effect is the `proposta` frame (emitted by `_editor_frames`);
     what goes back to the model is the confirmation that the person is seeing it.
     Sets `estado.desenhou` on success — that is what unlocks `run_workflow` later.
     """
@@ -667,12 +667,12 @@ async def _desenhar(argumentos: Any, estado: EstadoDoLaco) -> tuple[str, bool]:
     )
 
 
-async def _portao_do_editor(
+async def _editor_gate(
     estado: EstadoDoLaco, nome: str, argumentos: Any, tool_use_id: str | None = None
 ) -> tuple[str, bool] | None:
     """The editor's gate: order (draw before executing) + write blocking.
 
-    It is the body that used to live inline in `_executar_ferramenta`. `None` when
+    It is the body that used to live inline in `_execute_tool`. `None` when
     the tool may proceed to the server.
     """
     if nome in EXIGEM_DESENHO_ANTES and not estado.desenhou:
@@ -689,11 +689,11 @@ async def _portao_do_editor(
     return None
 
 
-def _quadros_do_editor(
-    estado: EstadoDoLaco, nome: str, argumentos: Any, resultado: str, deu_erro: bool
+def _editor_frames(
+    estado: EstadoDoLaco, nome: str, argumentos: Any, resultado: str, had_error: bool
 ) -> list["Evento"]:
     """The `proposta` frame — the definition the Apply button receives."""
-    proposta = _proposta_de(nome, argumentos, resultado, deu_erro)
+    proposta = _proposal_from(nome, argumentos, resultado, had_error)
     return [Evento("proposta", proposta)] if proposta is not None else []
 
 
@@ -701,16 +701,16 @@ EDITOR = Superficie(
     nome="editor",
     instrucoes=INSTRUCOES_DO_EDITOR,
     ferramentas_extras=(FERRAMENTA_DO_DESENHO,),
-    executores_locais={NOME_DO_DESENHO: _desenhar},
+    executores_locais={NOME_DO_DESENHO: _draw},
     permitida=lambda nome: not bloqueada_no_editor(nome),
-    portao=_portao_do_editor,
-    quadros_extras=_quadros_do_editor,
+    portao=_editor_gate,
+    quadros_extras=_editor_frames,
 )
 
 
 async def conversar(
     *,
-    escopo: EscopoEfetivo,
+    escopo: EffectiveScope,
     transcrito: list[dict[str, Any]],
     servidor,
     cliente,
@@ -758,10 +758,10 @@ async def conversar(
 class LacoDaConversa:
     """One `conversar` call: what spans the rounds and the phases of each one.
 
-    Each round is a call to the model (`_chamar_modelo`), its charge
-    (`_cobrar`), the response entering the conversation (`_anexar_resposta`) and,
-    if the model asked, the tools (`_executar_chamadas`); `fim` comes out of
-    `_encerrar`. The turn-closing hook, which was a closure of the generator,
+    Each round is a call to the model (`_call_model`), its charge
+    (`_charge`), the response entering the conversation (`_append_response`) and,
+    if the model asked, the tools (`_execute_calls`); `fim` comes out of
+    `_finish`. The turn-closing hook, which was a closure of the generator,
     became a method; the channel for the tools and gates is the queue's `put`.
 
     It is still a generator PULLED by the SSE: the phases that emit frames are
@@ -774,7 +774,7 @@ class LacoDaConversa:
     def __init__(
         self,
         *,
-        escopo: EscopoEfetivo,
+        escopo: EffectiveScope,
         transcrito: list[dict[str, Any]],
         servidor,
         cliente,
@@ -790,7 +790,7 @@ class LacoDaConversa:
         self.superficie = superficie
         self.ao_fechar_turno = ao_fechar_turno
         self.conversa = list(transcrito)
-        self.uso_total = Uso()
+        self.total_usage = Uso()
         self.voltas = 0
         self.falhou = False
 
@@ -812,18 +812,18 @@ class LacoDaConversa:
         # Sentinel put in place when the tool finishes (the `com_batimento` pattern):
         # the loop drains until it sees it, NEVER cancelling `fila.get()` — so no
         # enqueued frame gets lost in a cancellation race.
-        self._fim_da_ferramenta = object()
+        self._tool_end = object()
 
         self.conversa_id = conversa_id
 
-        # Resolved ONCE per conversation, in `_preparar`; the tools' state
+        # Resolved ONCE per conversation, in `_prepare`; the tools' state
         # (`EstadoDoLaco`) is also born there, last.
-        self.teto_de_tokens: int | None = None
+        self.token_ceiling: int | None = None
         self.modelo: str | None = None
         self.ferramentas: list[dict[str, Any]] = []
         self.sistema: list[dict[str, Any]] = []
 
-    async def _fechar_turno(self) -> None:
+    async def _close_turn(self) -> None:
         """Hook called after each message enters the conversation, so the caller can
         persist incrementally (the assistant PR uses it; the editor passes
         nothing). Always in try/except: failing to persist must not bring down
@@ -838,16 +838,16 @@ class LacoDaConversa:
     async def rodar(self, instrucoes_extras: str | None) -> AsyncIterator[Evento]:
         """The loop: one round per model response, until it stops asking for
         tools — or until an error exit, which still ends in `fim`."""
-        await self._preparar(instrucoes_extras)
+        await self._prepare(instrucoes_extras)
         while True:
             self.voltas += 1
             if self.voltas > TETO_DE_VOLTAS:
                 self.falhou = True
-                yield self._erro_do_teto()
+                yield self._ceiling_error()
                 break
 
             resposta: openrouter.Resposta | None = None
-            async with aclosing(self._chamar_modelo()) as pedacos:
+            async with aclosing(self._call_model()) as pedacos:
                 async for pedaco in pedacos:
                     if isinstance(pedaco, openrouter.Resposta):
                         resposta = pedaco
@@ -856,12 +856,12 @@ class LacoDaConversa:
             if resposta is None:
                 break  # the model failed, and the `erro` frame has already gone out
 
-            cota = await self._cobrar(resposta)
+            cota = await self._charge(resposta)
             if cota is not None:
                 yield cota
-            await self._anexar_resposta(resposta)
+            await self._append_response(resposta)
 
-            erro = self._erro_da_parada(resposta.parada)
+            erro = self._stop_reason_error(resposta.parada)
             if erro is not None:
                 self.falhou = True
                 yield erro
@@ -872,13 +872,13 @@ class LacoDaConversa:
             if not chamadas:
                 break
 
-            async with aclosing(self._executar_chamadas(chamadas)) as quadros:
+            async with aclosing(self._execute_calls(chamadas)) as quadros:
                 async for quadro in quadros:
                     yield quadro
 
-        yield self._encerrar()
+        yield self._finish()
 
-    async def _preparar(self, instrucoes_extras: str | None) -> None:
+    async def _prepare(self, instrucoes_extras: str | None) -> None:
         """The quota, the model, the tools and the system — once per conversation."""
         # The ceiling can come from the PLAN, and it is resolved ONCE per
         # conversation: the check now and the `cota` frame of each round use the
@@ -889,9 +889,9 @@ class LacoDaConversa:
         # There is no database session here — this loop runs inside an SSE
         # generator, and the handler's one is already dead. `teto_de` opens its
         # own when it needs one.
-        self.teto_de_tokens = await teto_do_assistente.teto_de(self.escopo.user_id, redis=self.redis)
+        self.token_ceiling = await teto_do_assistente.teto_de(self.escopo.user_id, redis=self.redis)
         await cotas.verificar_tokens_do_assistente(
-            self.redis, self.escopo.user_id, teto=self.teto_de_tokens
+            self.redis, self.escopo.user_id, teto=self.token_ceiling
         )
         # ONCE per conversation, and not on every round: the admin can switch the
         # model in the middle of an ongoing conversation, and switching models
@@ -902,7 +902,7 @@ class LacoDaConversa:
 
         self.ferramentas = await ferramentas_para_o_modelo(self.servidor, self.escopo, self.superficie)
         self.sistema = montar_sistema(instrucoes_extras, superficie=self.superficie)
-        # Last, as before: `_ja_desenhou` reads the transcript, and whatever goes
+        # Last, as before: `_already_drew` reads the transcript, and whatever goes
         # wrong in it comes after the quota (the refusal the route knows how to show).
         self.estado = EstadoDoLaco(
             escopo=self.escopo,
@@ -913,15 +913,15 @@ class LacoDaConversa:
             # turns, and a workflow drawn in the previous message is still on
             # screen. The Home never draws, so for it this is always False (and
             # nobody reads it).
-            desenhou=_ja_desenhou(self.conversa),
+            desenhou=_already_drew(self.conversa),
         )
 
-    def _erro_do_teto(self) -> Evento:
+    def _ceiling_error(self) -> Evento:
         """The `erro` for when the conversation goes past `TETO_DE_VOLTAS`."""
         logger.warning(
             "Assistente interrompido no teto de voltas (usuário %s, %d tokens).",
             self.escopo.user_id,
-            self.uso_total.cobravel,
+            self.total_usage.billable,
         )
         return Evento(
             "erro",
@@ -937,7 +937,7 @@ class LacoDaConversa:
             },
         )
 
-    async def _chamar_modelo(self) -> AsyncIterator[Evento | openrouter.Resposta]:
+    async def _call_model(self) -> AsyncIterator[Evento | openrouter.Resposta]:
         """One call to the model: yields `pensando` and `texto` as they arrive and,
         last, the whole `Resposta`. A failure becomes the `erro` frame — and then
         the `Resposta` does not come."""
@@ -977,11 +977,11 @@ class LacoDaConversa:
             return
         yield resposta
 
-    async def _cobrar(self, resposta: openrouter.Resposta) -> Evento | None:
+    async def _charge(self, resposta: openrouter.Resposta) -> Evento | None:
         """Sums the round's usage, records it and charges the quota. Returns the
         `cota` frame with the window's running total, or `None` without Redis to count."""
-        uso_da_volta = Uso.de(resposta.uso)
-        self.uso_total = self.uso_total + uso_da_volta
+        round_usage = Uso.de(resposta.uso)
+        self.total_usage = self.total_usage + round_usage
         # At the SAME point as the quota charge, and not at the end of the
         # conversation: the two then count the same thing and cannot diverge,
         # and a conversation abandoned midway (tab closed, dead stream) has
@@ -992,23 +992,23 @@ class LacoDaConversa:
             user_id=self.escopo.user_id,
             modelo=self.modelo,
             superficie=self.superficie.nome,
-            entrada=uso_da_volta.entrada,
-            saida=uso_da_volta.saida,
-            cache_leitura=uso_da_volta.cache_leitura,
-            raciocinio=uso_da_volta.raciocinio,
-            custo_usd=uso_da_volta.custo,
+            entrada=round_usage.entrada,
+            saida=round_usage.saida,
+            cache_leitura=round_usage.cache_leitura,
+            raciocinio=round_usage.raciocinio,
+            custo_usd=round_usage.custo,
         )
         acumulado = await cotas.cobrar_tokens_do_assistente(
-            self.redis, self.escopo.user_id, uso_da_volta.cobravel
+            self.redis, self.escopo.user_id, round_usage.billable
         )
         if acumulado is None:
             return None
         # The quota donut goes up DURING the turn, on each model response,
         # with no GET: the running total INCRBY returned goes to the screen now.
         # Without Redis there is no counter — and no frame.
-        return Evento("cota", {"gasto": acumulado, "teto": self.teto_de_tokens})
+        return Evento("cota", {"gasto": acumulado, "teto": self.token_ceiling})
 
-    async def _anexar_resposta(self, resposta: openrouter.Resposta) -> None:
+    async def _append_response(self, resposta: openrouter.Resposta) -> None:
         """The model's response enters the conversation, and the turn closes."""
         # The blocks already come in the project's format (plain dicts): it is
         # what Redis and the database store and what goes back to the model on
@@ -1018,7 +1018,7 @@ class LacoDaConversa:
         # nothing in it for the person to see.
         if resposta.blocos:
             self.conversa.append({"role": "assistant", "content": list(resposta.blocos)})
-            await self._fechar_turno()
+            await self._close_turn()
         else:
             logger.warning(
                 "Modelo devolveu uma resposta sem conteúdo (parada=%s, usuário %s).",
@@ -1026,7 +1026,7 @@ class LacoDaConversa:
                 self.escopo.user_id,
             )
 
-    def _erro_da_parada(self, parada: str) -> Evento | None:
+    def _stop_reason_error(self, parada: str) -> Evento | None:
         """The `erro` for the stops that end the conversation badly — the model's
         refusal and the cut by `max_tokens`. `None` for the others."""
         if parada == "content_filter":
@@ -1055,7 +1055,7 @@ class LacoDaConversa:
             )
         return None
 
-    async def _executar_chamadas(self, chamadas: list[dict[str, Any]]) -> AsyncIterator[Evento]:
+    async def _execute_calls(self, chamadas: list[dict[str, Any]]) -> AsyncIterator[Evento]:
         """The tools the model asked for in a round, with each one's frames;
         the results go back to the conversation, and the turn closes."""
         resultados: list[dict[str, Any]] = []
@@ -1066,30 +1066,30 @@ class LacoDaConversa:
         # batch, the round runs as it always did: in sequence. With no local
         # call, the calls are independent (gate + server, without writing to the
         # state) and run TOGETHER — the round costs the slowest tool, not the sum.
-        tem_local = any(
+        has_local = any(
             self.superficie.executores_locais.get(str(c.get("name") or "")) is not None
             for c in chamadas
         )
-        pista = self._em_fila if tem_local else self._em_paralelo
-        async with aclosing(pista(chamadas, resultados)) as quadros:
+        lane = self._em_fila if has_local else self._in_parallel
+        async with aclosing(lane(chamadas, resultados)) as quadros:
             async for quadro in quadros:
                 yield quadro
 
         # All results in a SINGLE message. Splitting into several silently teaches
         # the model to stop asking for tools in parallel.
         self.conversa.append({"role": "user", "content": resultados})
-        await self._fechar_turno()
+        await self._close_turn()
 
-    def _executar(self, chamada: dict[str, Any]) -> Awaitable[tuple[str, bool]]:
-        """The dispatch of ONE call (`_executar_ferramenta`), with the
+    def _execute(self, chamada: dict[str, Any]) -> Awaitable[tuple[str, bool]]:
+        """The dispatch of ONE call (`_execute_tool`), with the
         `ContextoLocal` that stamps its id on the `progresso` frames."""
         ident = chamada.get("id")
-        return _executar_ferramenta(
+        return _execute_tool(
             servidor=self.servidor,
             escopo=self.escopo,
             nome=chamada.get("name"),
             argumentos=chamada.get("input"),
-            contexto=ContextoLocal(self.fila.put, ferramenta_id=ident),
+            contexto=ContextoLocal(self.fila.put, tool_id=ident),
             superficie=self.superficie,
             estado=self.estado,
             tool_use_id=ident,
@@ -1103,34 +1103,34 @@ class LacoDaConversa:
             ident, nome, argumentos = chamada.get("id"), chamada.get("name"), chamada.get("input")
             yield Evento(
                 "ferramenta",
-                {"id": ident, "nome": nome, "argumentos": _resumo(argumentos)},
+                {"id": ident, "nome": nome, "argumentos": _summarize(argumentos)},
             )
             # The tool runs in a task and the loop yields what it enqueues WHILE
             # it is still running — this is what makes the `report_progress` of a
             # long run arrive live, instead of all at once at the end. The
             # sentinel (put in place when the task finishes) closes the drain; the
             # result comes from the task's `await`, which has already completed.
-            tarefa = asyncio.ensure_future(self._executar(chamada))
-            tarefa.add_done_callback(lambda _: self.fila.put_nowait(self._fim_da_ferramenta))
+            tarefa = asyncio.ensure_future(self._execute(chamada))
+            tarefa.add_done_callback(lambda _: self.fila.put_nowait(self._tool_end))
             while True:
                 enfileirado = await self.fila.get()
-                if enfileirado is self._fim_da_ferramenta:
+                if enfileirado is self._tool_end:
                     break
                 yield enfileirado
-            resultado, deu_erro = await tarefa
-            evento_fim, quadros, bloco = _fecho_da_chamada(
-                self.superficie, self.estado, chamada, resultado, deu_erro
+            resultado, had_error = await tarefa
+            end_event, quadros, bloco = _call_epilogue(
+                self.superficie, self.estado, chamada, resultado, had_error
             )
-            yield evento_fim
+            yield end_event
             for quadro in quadros:
                 yield quadro
             resultados.append(bloco)
 
-    async def _em_paralelo(
+    async def _in_parallel(
         self, chamadas: list[dict[str, Any]], resultados: list[dict[str, Any]]
     ) -> AsyncIterator[Evento]:
         """The parallel lane: the whole batch is announced, runs together (up to
-        `TETO_DO_LOTE_EM_PARALELO` at a time) and closes in the order of the calls."""
+        `PARALLEL_BATCH_CEILING` at a time) and closes in the order of the calls."""
         # Announces all of them BEFORE firing: the browser sees the whole batch
         # "running", and each `progresso` finds the right card by the `id` the
         # call's `ContextoLocal` stamps.
@@ -1140,15 +1140,15 @@ class LacoDaConversa:
                 {
                     "id": chamada.get("id"),
                     "nome": chamada.get("name"),
-                    "argumentos": _resumo(chamada.get("input")),
+                    "argumentos": _summarize(chamada.get("input")),
                 },
             )
         # The concurrency ceiling protects the rest of the worker: N comes from
         # the model, and each task can open its own database session — without
         # the slot, a round with 13+ calls would exhaust the process pool and
         # block requests that are not even from this conversation.
-        vaga = asyncio.Semaphore(TETO_DO_LOTE_EM_PARALELO)
-        tarefas = [asyncio.ensure_future(self._executar_com_vaga(vaga, chamada)) for chamada in chamadas]
+        vaga = asyncio.Semaphore(PARALLEL_BATCH_CEILING)
+        tarefas = [asyncio.ensure_future(self._execute_with_slot(vaga, chamada)) for chamada in chamadas]
         # One sentinel PER task (distinct objects, compared by identity): the
         # drain knows WHICH one finished, and each `ferramenta_fim` goes out
         # IN THE ORDER of the calls but as soon as its task (and the previous
@@ -1172,47 +1172,47 @@ class LacoDaConversa:
                     vistos.append(enfileirado)
                     continue
                 yield enfileirado
-            resultado, deu_erro = await tarefa
-            evento_fim, quadros, bloco = _fecho_da_chamada(
-                self.superficie, self.estado, chamada, resultado, deu_erro
+            resultado, had_error = await tarefa
+            end_event, quadros, bloco = _call_epilogue(
+                self.superficie, self.estado, chamada, resultado, had_error
             )
-            yield evento_fim
+            yield end_event
             for quadro in quadros:
                 yield quadro
             resultados.append(bloco)
 
-    async def _executar_com_vaga(self, vaga: asyncio.Semaphore, chamada: dict[str, Any]) -> tuple[str, bool]:
+    async def _execute_with_slot(self, vaga: asyncio.Semaphore, chamada: dict[str, Any]) -> tuple[str, bool]:
         async with vaga:
-            return await self._executar(chamada)
+            return await self._execute(chamada)
 
-    def _encerrar(self) -> Evento:
+    def _finish(self) -> Evento:
         """The `fim` frame: the transcript (with pending items closed), the summed
         usage, the rounds and whether the conversation ended well."""
         logger.info(
             "Assistente: %d volta(s), %d tokens, US$ %.4f (usuário %s, superfície %s).",
             self.voltas,
-            self.uso_total.cobravel,
-            self.uso_total.custo,
+            self.total_usage.billable,
+            self.total_usage.custo,
             self.escopo.user_id,
             self.superficie.nome,
         )
         return Evento(
             "fim",
             {
-                "transcrito": _fechar_pendencias(self.conversa),
-                "uso": self.uso_total.como_dict(),
+                "transcrito": _close_pending(self.conversa),
+                "uso": self.total_usage.as_dict(),
                 "voltas": self.voltas,
                 "ok": not self.falhou,
             },
         )
 
 
-def _fecho_da_chamada(
+def _call_epilogue(
     superficie: "Superficie",
     estado: EstadoDoLaco,
     chamada: dict[str, Any],
     resultado: str,
-    deu_erro: bool,
+    had_error: bool,
 ) -> tuple[Evento, list[Evento], dict[str, Any]]:
     """The SINGLE epilogue of a call, shared by the loop's two lanes.
 
@@ -1222,21 +1222,21 @@ def _fecho_da_chamada(
     parallel lane.
     """
     ident, nome, argumentos = chamada.get("id"), chamada.get("name"), chamada.get("input")
-    evento_fim = Evento("ferramenta_fim", {"id": ident, "nome": nome, "erro": deu_erro})
-    quadros = list(superficie.quadros_extras(estado, nome, argumentos, resultado, deu_erro))
+    end_event = Evento("ferramenta_fim", {"id": ident, "nome": nome, "erro": had_error})
+    quadros = list(superficie.quadros_extras(estado, nome, argumentos, resultado, had_error))
     bloco = {
         "type": "tool_result",
         "tool_use_id": ident,
         "content": resultado,
-        "is_error": deu_erro,
+        "is_error": had_error,
     }
-    return evento_fim, quadros, bloco
+    return end_event, quadros, bloco
 
 
-async def _executar_ferramenta(
+async def _execute_tool(
     *,
     servidor,
-    escopo: EscopoEfetivo,
+    escopo: EffectiveScope,
     nome: str,
     argumentos: Any,
     contexto: ContextoLocal,
@@ -1286,16 +1286,16 @@ async def _executar_ferramenta(
 
     if not isinstance(argumentos, dict):
         # The argument arrives streamed; when the JSON does not close, the client
-        # returns the raw text instead of an object (`openrouter._argumentos`).
+        # returns the raw text instead of an object (`openrouter._arguments`).
         return ("O argumento não chegou como objeto JSON. Refaça a chamada.", True)
 
     return await chamar_no_servidor(servidor, escopo, nome, argumentos, contexto)
 
 
 async def chamar_no_servidor(
-    servidor, escopo: EscopoEfetivo, nome: str, argumentos: dict[str, Any], contexto
+    servidor, escopo: EffectiveScope, nome: str, argumentos: dict[str, Any], contexto
 ) -> tuple[str, bool]:
-    """Calls the tool through the MCP path and returns `(texto, deu_erro)`.
+    """Calls the tool through the MCP path and returns `(texto, had_error)`.
 
     Public because the Home reuses it on the confirmation click: when the person
     confirms, the server is called with the STORED arguments, along the same path
@@ -1322,10 +1322,10 @@ async def chamar_no_servidor(
     finally:
         ESCOPO_ATUAL.reset(ficha)
 
-    return (_texto_do_resultado(resultado), bool(getattr(resultado, "is_error", False)))
+    return (_result_text(resultado), bool(getattr(resultado, "is_error", False)))
 
 
-def _fechar_pendencias(conversa: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _close_pending(conversa: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Answers the tool calls the loop left without an answer.
 
     Every abnormal exit from the loop — truncated response, model refusal, round
@@ -1369,7 +1369,7 @@ def _fechar_pendencias(conversa: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
-def _texto_do_resultado(resultado) -> str:
+def _result_text(resultado) -> str:
     """The SDK's `CallToolResult` turned into the text the model reads."""
     pedacos: list[str] = []
     for bloco in getattr(resultado, "content", None) or []:
@@ -1377,23 +1377,23 @@ def _texto_do_resultado(resultado) -> str:
         if texto:
             pedacos.append(texto)
     if not pedacos:
-        estruturado = getattr(resultado, "structured_content", None)
-        if estruturado is not None:
-            pedacos.append(json.dumps(estruturado, ensure_ascii=False, default=str))
+        structured = getattr(resultado, "structured_content", None)
+        if structured is not None:
+            pedacos.append(json.dumps(structured, ensure_ascii=False, default=str))
     junto = "\n".join(pedacos) if pedacos else "(sem conteúdo)"
-    if len(junto) > MAX_CHARS_POR_RESULTADO:
-        return junto[:MAX_CHARS_POR_RESULTADO] + AVISO_DE_CORTE
+    if len(junto) > MAX_CHARS_PER_RESULT:
+        return junto[:MAX_CHARS_PER_RESULT] + TRUNCATION_NOTICE
     return junto
 
 
 # Validation stays in the loop — but as a MEANS, not as delivery. What puts it
 # on the canvas is `desenhar_no_canvas`; this constant was kept for the verdict,
 # which the panel shows next to the drawn workflow.
-NOME_DA_VALIDACAO = "validate_workflow"
+VALIDATION_TOOL_NAME = "validate_workflow"
 
 
-def _proposta_de(
-    nome: str, argumentos: Any, resultado: str, deu_erro: bool
+def _proposal_from(
+    nome: str, argumentos: Any, resultado: str, had_error: bool
 ) -> dict[str, Any] | None:
     """The definition that goes to the canvas. `None` when there is none.
 
@@ -1402,7 +1402,7 @@ def _proposta_de(
     what is already drawn. Before, only the second existed, and so putting
     something on screen depended on the model having decided to validate.
 
-    **A deliberate and narrow exception to `_resumo`.** Every other call goes to
+    **A deliberate and narrow exception to `_summarize`.** Every other call goes to
     the SSE with keys and sizes, never content — the stream is someone's log at
     some point. Here the definition goes WHOLE, because without it the "Aplicar"
     (Apply) button has nothing to apply, and the write gate made that button the
@@ -1414,7 +1414,7 @@ def _proposta_de(
     what will be applied. Reading from the result would leave room for the two
     to diverge.
     """
-    if deu_erro or nome not in (NOME_DO_DESENHO, NOME_DA_VALIDACAO):
+    if had_error or nome not in (NOME_DO_DESENHO, VALIDATION_TOOL_NAME):
         return None
     definicao = argumentos.get("definition") if isinstance(argumentos, dict) else None
     if not isinstance(definicao, dict):
@@ -1436,14 +1436,14 @@ def _proposta_de(
             proposta["nota"] = nota.strip()[:200]
         return proposta
 
-    proposta.update(_veredito(resultado))
+    proposta.update(_verdict(resultado))
     return proposta
 
 
-def _veredito(resultado: str) -> dict[str, Any]:
+def _verdict(resultado: str) -> dict[str, Any]:
     """`ok`, `erros` and `avisos` from the report — tolerant of what does not parse.
 
-    The format comes from `_resumo_da_validacao` (`app/mcp/tools/construcao.py`).
+    The format comes from `_validation_summary` (`app/mcp/tools/construcao.py`).
     If it changes some day, the panel loses the count and keeps working: `None`
     becomes "don't know", and the button stays enabled based on what the person
     sees in the explanation. An exception here would bring down the whole
@@ -1462,7 +1462,7 @@ def _veredito(resultado: str) -> dict[str, Any]:
     }
 
 
-def _resumo(argumentos: Any) -> dict[str, Any]:
+def _summarize(argumentos: Any) -> dict[str, Any]:
     """What the panel shows of the call — keys and sizes, never the content.
 
     An argument carries a workflow definition and text from the person using it.
@@ -1494,21 +1494,21 @@ def _resumo(argumentos: Any) -> dict[str, Any]:
 # stores the transcript can rewrite a `tool_result`, and a `tool_result` is the
 # SERVER's word on what happened.
 
-TTL_DA_CONVERSA_S = 24 * 60 * 60
-FLUXO_NOVO = "novo"
+CONVERSATION_TTL_S = 24 * 60 * 60
+NEW_WORKFLOW = "novo"
 
 # Short on purpose: it protects against two tabs on the same workflow, not
 # against a worker that died. An abandoned conversation releases on its own in
 # minutes, instead of leaving the workflow locked until someone notices.
-TTL_DA_TRAVA_S = 300
+LOCK_TTL_S = 300
 
 
-def chave_da_conversa(user_id: str, workflow_id: str | None) -> str:
-    return f"assistente:conversa:{user_id}:{workflow_id or FLUXO_NOVO}"
+def conversation_key(user_id: str, workflow_id: str | None) -> str:
+    return f"assistente:conversa:{user_id}:{workflow_id or NEW_WORKFLOW}"
 
 
-def chave_da_trava(user_id: str, workflow_id: str | None) -> str:
-    return f"assistente:trava:{user_id}:{workflow_id or FLUXO_NOVO}"
+def lock_key(user_id: str, workflow_id: str | None) -> str:
+    return f"assistente:trava:{user_id}:{workflow_id or NEW_WORKFLOW}"
 
 
 async def carregar_conversa(redis, user_id: str, workflow_id: str | None) -> list[dict[str, Any]]:
@@ -1521,7 +1521,7 @@ async def carregar_conversa(redis, user_id: str, workflow_id: str | None) -> lis
     if redis is None:
         return []
     try:
-        cru = await redis.get(chave_da_conversa(user_id, workflow_id))
+        cru = await redis.get(conversation_key(user_id, workflow_id))
     except Exception as exc:  # pragma: no cover - depends on Redis
         logger.warning("Falha ao ler a conversa: %s", exc.__class__.__name__)
         return []
@@ -1545,9 +1545,9 @@ async def salvar_conversa(
         return
     try:
         await redis.set(
-            chave_da_conversa(user_id, workflow_id),
+            conversation_key(user_id, workflow_id),
             json.dumps(transcrito, ensure_ascii=False),
-            ex=TTL_DA_CONVERSA_S,
+            ex=CONVERSATION_TTL_S,
         )
     except Exception as exc:  # pragma: no cover - depends on Redis
         logger.warning("Falha ao salvar a conversa: %s", exc.__class__.__name__)
@@ -1558,20 +1558,20 @@ async def esquecer_conversa(redis, user_id: str, workflow_id: str | None) -> Non
     if redis is None:
         return
     try:
-        await redis.delete(chave_da_conversa(user_id, workflow_id))
+        await redis.delete(conversation_key(user_id, workflow_id))
     except Exception as exc:  # pragma: no cover - depends on Redis
         logger.warning("Falha ao esquecer a conversa: %s", exc.__class__.__name__)
 
 
 # Renews at TTL/3: plenty of margin for one renewal to fail and the next one
 # to still land before expiry.
-_INTERVALO_DE_RENOVACAO_DA_TRAVA_S = TTL_DA_TRAVA_S / 3
+_INTERVALO_DE_RENOVACAO_DA_TRAVA_S = LOCK_TTL_S / 3
 
 
-async def _renovar_trava(redis, chave: str) -> None:
+async def _renew_lock(redis, chave: str) -> None:
     """Reissues the lock's EXPIRE while the section runs.
 
-    The lock expires in `TTL_DA_TRAVA_S` (300 s), but a turn can go beyond that —
+    The lock expires in `LOCK_TTL_S` (300 s), but a turn can go beyond that —
     `TETO_DE_VOLTAS` model rounds at `high` take minutes. Without renewing, the
     lock would expire midway and a 2nd tab would get into the SAME transcript,
     saving over it. Runs until cancelled at the end of the section; since it
@@ -1581,7 +1581,7 @@ async def _renovar_trava(redis, chave: str) -> None:
     while True:
         await asyncio.sleep(_INTERVALO_DE_RENOVACAO_DA_TRAVA_S)
         try:
-            await redis.expire(chave, TTL_DA_TRAVA_S)
+            await redis.expire(chave, LOCK_TTL_S)
         except Exception as exc:  # pragma: no cover - depends on Redis
             logger.warning("Falha ao renovar a trava: %s", exc.__class__.__name__)
             return
@@ -1604,12 +1604,12 @@ async def trava_exclusiva(redis, chave: str) -> AsyncIterator[None]:
         yield
         return
     try:
-        peguei = await redis.set(chave, "1", nx=True, ex=TTL_DA_TRAVA_S)
+        acquired = await redis.set(chave, "1", nx=True, ex=LOCK_TTL_S)
     except Exception as exc:  # pragma: no cover - depends on Redis
         logger.warning("Falha ao travar a conversa: %s", exc.__class__.__name__)
         yield
         return
-    if not peguei:
+    if not acquired:
         raise erro(
             "conversa_em_andamento",
             "Já há uma conversa em andamento para este fluxo.",
@@ -1618,7 +1618,7 @@ async def trava_exclusiva(redis, chave: str) -> AsyncIterator[None]:
     # Keeps the lock alive while the turn runs — without renewing, it would
     # expire in the middle of a long conversation and a 2nd tab would get into
     # the same transcript.
-    renovador = asyncio.create_task(_renovar_trava(redis, chave))
+    renovador = asyncio.create_task(_renew_lock(redis, chave))
     try:
         yield
     finally:
@@ -1633,7 +1633,7 @@ async def trava_exclusiva(redis, chave: str) -> AsyncIterator[None]:
 
 def conversa_exclusiva(redis, user_id: str, workflow_id: str | None):
     """The editor's lock, with today's key. Thin alias of `trava_exclusiva`."""
-    return trava_exclusiva(redis, chave_da_trava(user_id, workflow_id))
+    return trava_exclusiva(redis, lock_key(user_id, workflow_id))
 
 
 __all__ = [

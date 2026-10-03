@@ -32,7 +32,7 @@ from pathlib import Path
 logger = logging.getLogger("executor.artifact_purge")
 
 
-def _seguro(bruto: str) -> bool:
+def _is_safe(bruto: str) -> bool:
     """Rejects what should not even reach path resolution."""
     if not bruto or not isinstance(bruto, str):
         return False
@@ -42,13 +42,13 @@ def _seguro(bruto: str) -> bool:
     if len(bruto) >= 2 and bruto[1] == ":":
         return False                      # 'C:\...' — absoluto Windows
     if ".." in normalizado.split("/"):
-        return False                      # travessia explicita
+        return False                      # travessia explicit
     return True
 
 
-def _sob_a_raiz(local_path: str, raiz: Path) -> Path | None:
+def _under_root(local_path: str, raiz: Path) -> Path | None:
     """Resolves `local_path` under an ALREADY resolved root, or None if it escapes it."""
-    if not _seguro(local_path):
+    if not _is_safe(local_path):
         return None
 
     alvo = (raiz / local_path).resolve()
@@ -59,7 +59,7 @@ def _sob_a_raiz(local_path: str, raiz: Path) -> Path | None:
     return alvo
 
 
-def _limpar_diretorios_vazios(caminho: Path, raiz: Path) -> None:
+def _remove_empty_directories(caminho: Path, raiz: Path) -> None:
     """Walks up removing directories that became empty, without going past the root.
 
     Without this, `artifacts/` accumulates an empty `<workspace>/<run>/` tree per
@@ -98,7 +98,7 @@ def purgar(itens: list) -> int:
         # receive loop, and a retention order with hundreds of
         # artifacts paid one `resolve()` of the root per item — a repeated syscall
         # holding up the loop that also delivers the jobs.
-        alvo = _sob_a_raiz(local_path, raiz)
+        alvo = _under_root(local_path, raiz)
         if alvo is None:
             # LOUD refusal: if this happens, either the server has a path-derivation
             # bug, or someone is trying something.
@@ -112,7 +112,7 @@ def purgar(itens: list) -> int:
             if alvo.is_file():
                 os.unlink(alvo)
                 removidos += 1
-                _limpar_diretorios_vazios(alvo, raiz)
+                _remove_empty_directories(alvo, raiz)
             # A missing file is not an error: it was already deleted by hand, or the
             # previous order arrived and the server did not record the confirmation.
         except OSError as exc:

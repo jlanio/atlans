@@ -10,28 +10,28 @@
 // applies — see IdiomaContext.
 
 import type { Idioma } from "@/lib/idioma"
-import { TEXTOS_DA_CASCA } from "./da-casca"
+import { SHELL_TEXTS } from "./da-casca"
 import * as assistente from "./secoes/assistente"
 import * as entrada from "./secoes/entrada"
-import { useIdiomaDaTela } from "./tela"
+import { useScreenLanguage } from "./tela"
 
 // The shell (comum, casca, listas) comes assembled from ./da-casca — see there for why.
-const TEXTOS = {
-  "pt-BR": { ...TEXTOS_DA_CASCA["pt-BR"], assistente: assistente.pt, entrada: entrada.pt },
-  en: { ...TEXTOS_DA_CASCA.en, assistente: assistente.en, entrada: entrada.en },
-  es: { ...TEXTOS_DA_CASCA.es, assistente: assistente.es, entrada: entrada.es },
+const TEXTS = {
+  "pt-BR": { ...SHELL_TEXTS["pt-BR"], assistente: assistente.pt, entrada: entrada.pt },
+  en: { ...SHELL_TEXTS.en, assistente: assistente.en, entrada: entrada.en },
+  es: { ...SHELL_TEXTS.es, assistente: assistente.es, entrada: entrada.es },
 } satisfies Record<Idioma, unknown>
 
-export type Textos = (typeof TEXTOS)["pt-BR"]
+export type Texts = (typeof TEXTS)["pt-BR"]
 
 /** Outside React (a pure function that receives the language). */
-export function textosDe(idioma: Idioma): Textos {
-  return TEXTOS[idioma]
+export function textosDe(idioma: Idioma): Texts {
+  return TEXTS[idioma]
 }
 
 /** The texts in the screen's language. A stable object per language — usable as a dependency. */
-export function useTextos(): Textos {
-  return TEXTOS[useIdiomaDaTela()]
+export function useTexts(): Texts {
+  return TEXTS[useScreenLanguage()]
 }
 
-export { useIdiomaDaTela } from "./tela"
+export { useScreenLanguage } from "./tela"

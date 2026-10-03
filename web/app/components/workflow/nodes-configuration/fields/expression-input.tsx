@@ -15,7 +15,7 @@ const ALIAS_TRIGGER = new RegExp(`\\$(${ALIAS_PATH})$`, "u")
 const ALIAS_PREFIX = new RegExp(`^${ALIAS_PATH}`, "u")
 
 /** Popup ceiling — enough to scroll without turning into an endless list. */
-const LIMITE_SUGESTOES = 12
+const SUGGESTIONS_LIMIT = 12
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -124,7 +124,7 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
   // `useNodes()/useEdges()`, the three suggestion lists were recomputed on every
   // pointermove of a drag — per expression field on screen. And there is nothing
   // to gain by following the drag: suggestions don't change with position.
-  const [grafo, setGrafo] = useState<{ nodes: INodeContext[]; edges: Edge[] }>(
+  const [grafo, setGraph] = useState<{ nodes: INodeContext[]; edges: Edge[] }>(
     () => ({ nodes: [], edges: [] }),
   )
   const { nodes: allNodes, edges } = grafo
@@ -140,7 +140,7 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
     // The label is what goes into the text: it must be the alias the EXECUTOR
     // registers in the context, not the display label. See utils/node-alias.
     // The description carries the friendly name, when it differs.
-    const descricaoDe = (n: INodeContext, alias: string) => {
+    const descriptionOf = (n: INodeContext, alias: string) => {
       const rotulo = typeof n.data.alias === "string" ? n.data.alias : ""
       // Without a label of its own, the alias already is the node name — repeating it only clutters the row.
       return rotulo && rotulo !== alias ? rotulo : undefined
@@ -159,7 +159,7 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
     allNodes.filter(n => connectedIds.includes(n.id)).forEach(n => {
       const alias = resolveNodeAlias(n.data)
       if (!alias) return
-      adicionar({ label: alias, type: "alias", connected: true, description: descricaoDe(n, alias) })
+      adicionar({ label: alias, type: "alias", connected: true, description: descriptionOf(n, alias) })
       saidasDoNo(n.data).forEach(f => {
         adicionar({ label: `${alias}.${f.name}`, type: "alias-field", connected: true, description: f.description ?? f.type })
       })
@@ -172,7 +172,7 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
     allNodes.filter(n => n.id !== nodeFound.id && !connectedIds.includes(n.id)).forEach(n => {
       const alias = resolveNodeAlias(n.data)
       if (!alias) return
-      adicionar({ label: alias, type: "alias", connected: false, description: descricaoDe(n, alias) })
+      adicionar({ label: alias, type: "alias", connected: false, description: descriptionOf(n, alias) })
       saidasDoNo(n.data).forEach(f => {
         adicionar({ label: `${alias}.${f.name}`, type: "alias-field", connected: false, description: f.description ?? f.type })
       })
@@ -192,14 +192,14 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
     // two equal keys — and the collision became likely once flattening started
     // seeing the fields of the grouped form.
     const suggestions: Suggestion[] = []
-    const porLabel = new Map<string, Suggestion>()
+    const byLabel = new Map<string, Suggestion>()
     const adicionar = (s: Suggestion) => {
-      const anterior = porLabel.get(s.label)
+      const anterior = byLabel.get(s.label)
       if (anterior) {
         anterior.description = `${s.label} — vem de mais de um nó`
         return
       }
-      porLabel.set(s.label, s)
+      byLabel.set(s.label, s)
       suggestions.push(s)
     }
 
@@ -265,10 +265,10 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
     if (!q) {
       const aliases = pool.filter(s => s.type === "alias")
       const demais = pool.filter(s => s.type !== "alias")
-      const cotaAlias = Math.min(aliases.length, Math.ceil(LIMITE_SUGESTOES / 2))
+      const aliasQuota = Math.min(aliases.length, Math.ceil(SUGGESTIONS_LIMIT / 2))
       return [
-        ...aliases.slice(0, cotaAlias),
-        ...demais.slice(0, LIMITE_SUGESTOES - cotaAlias),
+        ...aliases.slice(0, aliasQuota),
+        ...demais.slice(0, SUGGESTIONS_LIMIT - aliasQuota),
       ]
     }
     // The friendly label ("Caixa Delimitadora", bounding box) lives in the
@@ -276,11 +276,11 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
     // the description, the user types the name they see on the canvas and finds
     // nothing. With a dot in the middle they are already navigating a specific
     // alias, so only the label counts.
-    const casaDescricao = !q.includes(".")
+    const matchDescription = !q.includes(".")
     return pool
       .filter(s => s.label.toLowerCase().includes(q)
-        || (casaDescricao && (s.description ?? "").toLowerCase().includes(q)))
-      .slice(0, LIMITE_SUGESTOES)
+        || (matchDescription && (s.description ?? "").toLowerCase().includes(q)))
+      .slice(0, SUGGESTIONS_LIMIT)
   }, [trigger, baseSuggestions, jinjaSuggestions, inputSuggestions])
 
   // Updates the trigger on every value change
@@ -294,7 +294,7 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
     if (detected) {
       // Re-snapshots on every trigger: between one opening of the popup and the next
       // the user may have connected the node to another, and the list must reflect it.
-      setGrafo({ nodes: getNodes(), edges: getEdges() })
+      setGraph({ nodes: getNodes(), edges: getEdges() })
       setTrigger(detected)
       setShowPopup(true)
       setSelectedIndex(0)

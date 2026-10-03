@@ -15,7 +15,7 @@ from sqlalchemy import and_, cast, Date as SaDate, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.utils.busca import contem
-from app.core.utils.estatistica import taxa_de_sucesso
+from app.core.utils.estatistica import success_rate
 from app.core.utils.logger import get_logger
 from app.models.executor import Executor
 from app.models.models import Workflow, WorkflowRun
@@ -32,20 +32,20 @@ logger = get_logger(__name__)
 _METRICS_DEFAULT_DAYS = 90
 
 from app.services.observability.escopo import (  # noqa: F401 — fachada p/ testes e rotas
-    _agora_utc, _cache_get, _cache_set, _como_utc, _e_postgres, _iso, _metrics_cache_key, _resolver_escopo, _run_filter, _wf_filter, _zona, e_admin_global,
+    _agora_utc, _cache_get, _cache_set, _as_utc, _e_postgres, _iso, _metrics_cache_key, _resolve_scope, _run_filter, _wf_filter, _zone, e_admin_global,
 )
 from app.services.observability.estatisticas import (  # noqa: F401 — fachada p/ testes e rotas
-    _p50_por_workflow, _percentis, _percentis_por, _resumir_erro, _ultima_execucao_por_workflow,
+    _p50_por_workflow, _percentis, _percentiles_by, _summarize_error, _last_run_per_workflow,
 )
 from app.services.observability.frota import (  # noqa: F401 — fachada p/ testes e rotas
     _executor_id_do_host, _executores_do_escopo, _presenca,
 )
 from app.services.observability.runs import (  # noqa: F401 — fachada p/ testes e rotas
-    _RUN_LIST_COLUMNS, _contexto_dos_runs, _resolve_workflow_meta, _serialize_run,
+    _RUN_LIST_COLUMNS, _runs_context, _resolve_workflow_meta, _serialize_run,
 )
 from app.services.observability.agregados import (  # noqa: F401 — fachada p/ testes e rotas
-    _STATUS_ATIVOS,
-    _balde_do_status, _bloco_agora, _parse_iso, _top_falhas,
+    _ACTIVE_STATUSES,
+    _status_bucket, _now_block, _parse_iso, _top_failures,
 )
 
 # ── Service ───────────────────────────────────────────────────────────────────
@@ -83,7 +83,7 @@ class ObservabilityService:
 
         This query's WHERE is `max(requested window, 14 days)` because the
         7d/14d cuts live in its `FILTER`s: a 7-day WHERE would make the
-        week-over-week comparison mathematically empty (see `janela_where` below). The
+        week-over-week comparison mathematically empty (see `where_since` below). The
         previous period of the same size (`prev_period`) gets a query of its
         own instead of widening that WHERE to 2×days: with `days=90` that would
         double the cost of the main aggregation to serve four numbers.
@@ -94,7 +94,7 @@ class ObservabilityService:
         no parallelism at all — at best the driver serialized them
         (zero gain), at worst it raised InvalidRequestError under concurrency.
         """
-        run_f, wf_f = await _resolver_escopo(
+        run_f, wf_f = await _resolve_scope(
             db, user, workspace_ids, workspace_id=workspace_id, workflow_id=workflow_id,
             como_admin=como_admin,
         )
@@ -109,9 +109,9 @@ class ObservabilityService:
                 # The window aggregations come from the cache; the "now" block is the
                 # instant of this query and is never served stale — it is what the
                 # Agora strip queries every 30 s.
-                fresco = dict(cached)
-                fresco["now"] = await _bloco_agora(db, user, run_f, now, como_admin=como_admin)
-                return fresco
+                fresh = dict(cached)
+                fresh["now"] = await _now_block(db, user, run_f, now, como_admin=como_admin)
+                return fresh
 
         since     = now - timedelta(days=days)
         since_24h = now - timedelta(hours=24)
@@ -127,14 +127,14 @@ class ObservabilityService:
         # started showing `runs_prev_7d: 0` and `success_rate_prev_7d: null`
         # forever — the trend arrow vanished silently. With `days=1`,
         # worse: `runs_last_7d` was worth the same as `runs_last_24h`.
-        janela_where = min(since, since_14d)
+        where_since = min(since, since_14d)
         # ...and the aggregates that DO belong to the requested window get the cut back
         # as a FILTER, otherwise `total_runs` would inflate to 14 days when the
         # user asked for 7.
-        na_janela = WorkflowRun.start_time >= since
+        in_window = WorkflowRun.start_time >= since
 
-        def _na_janela(status: str):
-            return func.count(WorkflowRun.id).filter(na_janela, WorkflowRun.status == status)
+        def _count_in_window(status: str):
+            return func.count(WorkflowRun.id).filter(in_window, WorkflowRun.status == status)
 
         wf_row = (await db.execute(
             select(
@@ -145,13 +145,13 @@ class ObservabilityService:
 
         row = (await db.execute(
             select(
-                func.count(WorkflowRun.id).filter(na_janela).label("total"),
-                _na_janela("success").label("success"),
-                _na_janela("failed").label("failed"),
-                _na_janela("running").label("running"),
-                _na_janela("pending").label("pending"),
-                _na_janela("cancelled").label("cancelled"),
-                func.avg(WorkflowRun.duration_seconds).filter(na_janela).label("avg_duration"),
+                func.count(WorkflowRun.id).filter(in_window).label("total"),
+                _count_in_window("success").label("success"),
+                _count_in_window("failed").label("failed"),
+                _count_in_window("running").label("running"),
+                _count_in_window("pending").label("pending"),
+                _count_in_window("cancelled").label("cancelled"),
+                func.avg(WorkflowRun.duration_seconds).filter(in_window).label("avg_duration"),
                 func.count(WorkflowRun.id).filter(WorkflowRun.start_time >= since_24h).label("last_24h"),
                 func.count(WorkflowRun.id).filter(WorkflowRun.start_time >= since_7d).label("last_7d"),
                 func.count(WorkflowRun.id).filter(prev_7d).label("prev_7d"),
@@ -161,7 +161,7 @@ class ObservabilityService:
                 func.count(WorkflowRun.id)
                 .filter(prev_7d, WorkflowRun.status == "failed")
                 .label("prev_7d_failed"),
-            ).where(WorkflowRun.start_time >= janela_where, *run_f)
+            ).where(WorkflowRun.start_time >= where_since, *run_f)
         )).one()
 
         # Previous period of the same size: [now-2d, now-d). It is what gives
@@ -175,11 +175,11 @@ class ObservabilityService:
             ).where(*no_prev, *run_f)
         )).one()
 
-        p50, p95 = await _percentis(db, [na_janela, *run_f], [0.5, 0.95])
+        p50, p95 = await _percentis(db, [in_window, *run_f], [0.5, 0.95])
         (prev_p50,) = await _percentis(db, [*no_prev, *run_f], [0.5])
 
-        top_failing = await _top_falhas(db, run_f, since)
-        agora = await _bloco_agora(db, user, run_f, now, como_admin=como_admin)
+        top_failing = await _top_failures(db, run_f, since)
+        agora = await _now_block(db, user, run_f, now, como_admin=como_admin)
 
         total_runs     = row.total or 0
         success_runs   = row.success or 0
@@ -189,7 +189,7 @@ class ObservabilityService:
         cancelled_runs = row.cancelled or 0
         runs_prev_7d   = row.prev_7d or 0
         prev_7d_ok     = row.prev_7d_success or 0
-        prev_7d_falha  = row.prev_7d_failed or 0
+        prev_7d_failures  = row.prev_7d_failed or 0
         prev_success   = prev.success or 0
         prev_failed    = prev.failed or 0
 
@@ -214,7 +214,7 @@ class ObservabilityService:
             # Completed ÷ (completed + failed): in-progress and cancelled ones
             # are not a verdict — with them in the denominator the rate dropped on every
             # load peak.
-            "success_rate":    taxa_de_sucesso(success_runs, failed_runs),
+            "success_rate":    success_rate(success_runs, failed_runs),
             "avg_duration_seconds": round(float(row.avg_duration or 0.0), 3),
             "runs_last_24h":   row.last_24h or 0,
             "runs_last_7d":    row.last_7d or 0,
@@ -222,13 +222,13 @@ class ObservabilityService:
             # `null` (and not 0.0) with no denominator: it is what hides the trend
             # arrow in the Overview instead of showing "dropped to 0%".
             "success_rate_prev_7d": (
-                taxa_de_sucesso(prev_7d_ok, prev_7d_falha) if (prev_7d_ok + prev_7d_falha) else None
+                success_rate(prev_7d_ok, prev_7d_failures) if (prev_7d_ok + prev_7d_failures) else None
             ),
             "prev_period": {
                 "total_runs":   prev.total or 0,
                 "success_runs": prev_success,
                 "failed_runs":  prev_failed,
-                "success_rate": taxa_de_sucesso(prev_success, prev_failed),
+                "success_rate": success_rate(prev_success, prev_failed),
                 "p50_seconds":  prev_p50,
             },
             "duration": {"p50_seconds": p50, "p95_seconds": p95},
@@ -311,7 +311,7 @@ class ObservabilityService:
         success  = sum(1 for r in runs if r.status == "success")
         durations = [r.duration_seconds for r in runs if r.duration_seconds is not None]
 
-        contexto = await _contexto_dos_runs(db, runs)
+        contexto = await _runs_context(db, runs)
         last_runs = [_serialize_run(r, admin=como_admin, **contexto) for r in runs]
 
         # Per-node summary: one SQL aggregation over node_run_metrics, restricted
@@ -361,7 +361,7 @@ class ObservabilityService:
             "failed_runs":           failed,
             # The same rate as the other screens. It was `(total - failed) / total`, which
             # counted in-progress and cancelled runs as successes.
-            "success_rate":          taxa_de_sucesso(success, failed),
+            "success_rate":          success_rate(success, failed),
             "avg_duration_seconds":  round(sum(durations) / len(durations), 3) if durations else 0.0,
             "min_duration_seconds":  round(min(durations), 3) if durations else None,
             "max_duration_seconds":  round(max(durations), 3) if durations else None,
@@ -392,7 +392,7 @@ class ObservabilityService:
         scan of the whole scope on every opening, and the period governs all
         the blocks of the screen.
         """
-        run_f, wf_f = await _resolver_escopo(
+        run_f, wf_f = await _resolve_scope(
             db, user, workspace_ids, workspace_id=workspace_id, como_admin=como_admin,
         )
         cache_key = _metrics_cache_key(
@@ -405,7 +405,7 @@ class ObservabilityService:
 
         now = _agora_utc()
         since = now - timedelta(days=days)
-        na_janela = [WorkflowRun.start_time >= since, *run_f]
+        in_window = [WorkflowRun.start_time >= since, *run_f]
 
         inventario = (await db.execute(
             select(
@@ -429,30 +429,30 @@ class ObservabilityService:
                     func.count(WorkflowRun.id).label("total"),
                     func.count(WorkflowRun.id).filter(WorkflowRun.status == "success").label("success"),
                     func.count(WorkflowRun.id).filter(WorkflowRun.status == "failed").label("failed"),
-                    func.count(WorkflowRun.id).filter(WorkflowRun.status.in_(_STATUS_ATIVOS)).label("running"),
+                    func.count(WorkflowRun.id).filter(WorkflowRun.status.in_(_ACTIVE_STATUSES)).label("running"),
                 )
-                .where(*na_janela)
+                .where(*in_window)
                 .group_by(WorkflowRun.workflow_hash)
             )).all()
         }
-        medianas = await _percentis_por(db, WorkflowRun.workflow_hash, na_janela, [0.5])
-        com_execucao = list(agregados)
-        ultimas = await _ultima_execucao_por_workflow(db, na_janela, workflow_hashes=com_execucao, com_erro=False)
+        medians = await _percentiles_by(db, WorkflowRun.workflow_hash, in_window, [0.5])
+        with_runs = list(agregados)
+        ultimas = await _last_run_per_workflow(db, in_window, workflow_hashes=with_runs, with_error=False)
         # "Last error" is that of the last FAILURE, as in the top failures and the
         # attention list — the last run may have completed and the workflow still
         # have dozens of failures in the window.
-        com_falha = [h for h, row in agregados.items() if (row.failed or 0) > 0]
-        ultimas_falhas = (
-            await _ultima_execucao_por_workflow(
-                db, [WorkflowRun.status == "failed", *na_janela], workflow_hashes=com_falha,
-            ) if com_falha else {}
+        with_failures = [h for h, row in agregados.items() if (row.failed or 0) > 0]
+        last_failures = (
+            await _last_run_per_workflow(
+                db, [WorkflowRun.status == "failed", *in_window], workflow_hashes=with_failures,
+            ) if with_failures else {}
         )
 
         linhas = []
         for wf in inventario:
             agg = agregados.get(wf.id_hash)
             ultima = ultimas.get(wf.id_hash)
-            falha = ultimas_falhas.get(wf.id_hash)
+            falha = last_failures.get(wf.id_hash)
             success = (agg.success or 0) if agg else 0
             failed = (agg.failed or 0) if agg else 0
             linhas.append({
@@ -468,11 +468,11 @@ class ObservabilityService:
                 "success_runs":   success,
                 "failed_runs":    failed,
                 "running_runs":   (agg.running or 0) if agg else 0,
-                "success_rate":   taxa_de_sucesso(success, failed),
-                "p50_seconds":    (medianas.get(wf.id_hash) or [None])[0],
+                "success_rate":   success_rate(success, failed),
+                "p50_seconds":    (medians.get(wf.id_hash) or [None])[0],
                 "last_run_at":    _iso(ultima.start_time) if ultima else None,
                 "last_status":    ultima.status if ultima else None,
-                "last_error":     _resumir_erro(falha.error_message) if falha else None,
+                "last_error":     _summarize_error(falha.error_message) if falha else None,
                 "last_error_category": falha.error_category if falha else None,
             })
 
@@ -506,7 +506,7 @@ class ObservabilityService:
         nothing in the window appear with zeros, otherwise the "Por executor" view would
         only show who worked and would hide precisely the idle ones.
         """
-        run_f, _ = await _resolver_escopo(
+        run_f, _ = await _resolve_scope(
             db, user, workspace_ids, workspace_id=workspace_id, como_admin=como_admin,
         )
         cache_key = _metrics_cache_key(
@@ -518,7 +518,7 @@ class ObservabilityService:
                 return cached
 
         since = _agora_utc() - timedelta(days=days)
-        na_janela = [WorkflowRun.start_time >= since, *run_f]
+        in_window = [WorkflowRun.start_time >= since, *run_f]
 
         result = await db.execute(
             select(
@@ -529,12 +529,12 @@ class ObservabilityService:
                 func.avg(WorkflowRun.duration_seconds).label("avg_duration"),
                 func.max(WorkflowRun.start_time).label("last_run_at"),
             )
-            .where(*na_janela)
+            .where(*in_window)
             .group_by(WorkflowRun.host)
             .order_by(func.count(WorkflowRun.id).desc())
         )
         rows = result.all()
-        medianas = await _percentis_por(db, WorkflowRun.host, na_janela, [0.5])
+        medians = await _percentiles_by(db, WorkflowRun.host, in_window, [0.5])
 
         frota = {
             e["id_hash"]: e
@@ -543,9 +543,9 @@ class ObservabilityService:
         # Hosts with runs that are not in the scope's fleet (executor
         # removed from a workspace, deactivated, or outside the user's access)
         # still need a name — one SELECT IN for all of them.
-        ids_da_frota = list(frota.keys())
-        ids_com_runs = [_executor_id_do_host(row.host) for row in rows if _executor_id_do_host(row.host)]
-        faltantes = [i for i in ids_com_runs if i not in frota]
+        fleet_ids = list(frota.keys())
+        ids_with_runs = [_executor_id_do_host(row.host) for row in rows if _executor_id_do_host(row.host)]
+        faltantes = [i for i in ids_with_runs if i not in frota]
         if faltantes:
             extra = await db.execute(
                 select(
@@ -562,9 +562,9 @@ class ObservabilityService:
         # Presence and capacity ONLY for the accessible fleet: an executor that ran one of
         # the user's runs and then left the scope shows up with a name, but its
         # current state (online, queue) is not the user's information.
-        online, capacidade = await _presenca(ids_da_frota)
+        online, capacidade = await _presenca(fleet_ids)
 
-        def _linha(host: Optional[str], executor_id: Optional[str], row) -> dict:
+        def _row(host: Optional[str], executor_id: Optional[str], row) -> dict:
             info = frota.get(executor_id) if executor_id else None
             total = (row.total_runs or 0) if row is not None else 0
             success = (row.success_runs or 0) if row is not None else 0
@@ -591,20 +591,20 @@ class ObservabilityService:
                 "total_runs":     total,
                 "success_runs":   success,
                 "failed_runs":    failed,
-                "success_rate":   taxa_de_sucesso(success, failed),
+                "success_rate":   success_rate(success, failed),
                 "avg_duration_seconds": (
                     round(float(row.avg_duration), 3) if row is not None and row.avg_duration else None
                 ),
-                "p50_seconds":    (medianas.get(host) or [None])[0] if host is not None else None,
+                "p50_seconds":    (medians.get(host) or [None])[0] if host is not None else None,
                 "last_run_at":    _iso(row.last_run_at) if row is not None and row.last_run_at else None,
             }
 
-        agents_stats = [_linha(row.host or None, _executor_id_do_host(row.host), row) for row in rows]
+        agents_stats = [_row(row.host or None, _executor_id_do_host(row.host), row) for row in rows]
         vistos = {row.host for row in rows if row.host}
         for eid, info in frota.items():
             host = f"executor:{eid}"
             if host not in vistos and online.get(eid):
-                agents_stats.append(_linha(host, eid, None))
+                agents_stats.append(_row(host, eid, None))
 
         agents_stats.sort(key=lambda a: (-a["total_runs"], a["display_name"].casefold()))
 
@@ -628,7 +628,7 @@ class ObservabilityService:
         tier: Optional[str] = None,
         workflow_origem: Optional[str] = None,
         q: Optional[str] = None,
-        q_inclui_erro: bool = True,
+        q_includes_error: bool = True,
         limit: int = 50,
         offset: int = 0,
         with_total: bool = False,
@@ -653,7 +653,7 @@ class ObservabilityService:
         Like `q`, it needs the join with `workflows`; runs of permanently deleted
         workflows are left out of the slice, which is about live workflows.
 
-        `q_inclui_erro=False` removes `error_message` from the search's `or_`, leaving
+        `q_includes_error=False` removes `error_message` from the search's `or_`, leaving
         only the workflow name and the `task_id`. It exists for the caller that does NOT
         hand out the error message as it is in the database: the MCP server only
         publishes it after `scrub_text`, and a substring filter on the raw
@@ -664,7 +664,7 @@ class ObservabilityService:
         `True` because REST shows the whole message on screen: there the search
         reveals nothing the response itself does not already carry.
         """
-        filters, _ = await _resolver_escopo(
+        filters, _ = await _resolve_scope(
             db, user, workspace_ids, workspace_id=workspace_id, workflow_id=workflow_id,
             como_admin=como_admin,
         )
@@ -679,12 +679,12 @@ class ObservabilityService:
             filters.append(WorkflowRun.dispatch_tier == tier)
         if date_from:
             try:
-                filters.append(WorkflowRun.start_time >= _como_utc(_parse_iso(date_from)))
+                filters.append(WorkflowRun.start_time >= _as_utc(_parse_iso(date_from)))
             except ValueError:
                 raise InvalidDateFormatError(f"date_from inválido: {date_from}")
         if date_to:
             try:
-                filters.append(WorkflowRun.start_time <= _como_utc(_parse_iso(date_to)))
+                filters.append(WorkflowRun.start_time <= _as_utc(_parse_iso(date_to)))
             except ValueError:
                 raise InvalidDateFormatError(f"date_to inválido: {date_to}")
 
@@ -695,14 +695,14 @@ class ObservabilityService:
                 # The id pasted from the panel's "Copiar ID" (copy ID) button also finds the run.
                 contem(WorkflowRun.task_id, busca),
             ]
-            if q_inclui_erro:
+            if q_includes_error:
                 alvos.insert(0, contem(WorkflowRun.error_message, busca))
             filters.append(or_(*alvos))
 
         if workflow_origem:
             filters.append(Workflow.origem == workflow_origem)
 
-        def _com_workflows(stmt):
+        def _with_workflows(stmt):
             if busca or workflow_origem:
                 return stmt.outerjoin(Workflow, Workflow.id_hash == WorkflowRun.workflow_hash)
             return stmt
@@ -710,12 +710,12 @@ class ObservabilityService:
         total = None
         if with_total:
             total_result = await db.execute(
-                _com_workflows(select(func.count(WorkflowRun.id)).select_from(WorkflowRun)).where(*filters)
+                _with_workflows(select(func.count(WorkflowRun.id)).select_from(WorkflowRun)).where(*filters)
             )
             total = total_result.scalar() or 0
 
         runs_result = await db.execute(
-            _com_workflows(select(*_RUN_LIST_COLUMNS))
+            _with_workflows(select(*_RUN_LIST_COLUMNS))
             .where(*filters)
             .order_by(WorkflowRun.start_time.desc())
             .limit(limit + 1)
@@ -725,7 +725,7 @@ class ObservabilityService:
         has_more = len(runs) > limit
         runs = runs[:limit]
 
-        contexto = await _contexto_dos_runs(db, runs)
+        contexto = await _runs_context(db, runs)
 
         return {
             # `null` when the client did not ask for `with_total` — the UI uses
@@ -773,7 +773,7 @@ class ObservabilityService:
         if run is None:
             raise RunNotFoundError(f"Execução '{run_id}' não encontrada.")
 
-        contexto = await _contexto_dos_runs(db, [run])
+        contexto = await _runs_context(db, [run])
 
         # The 90-day median (typical_seconds) only matters once the run has FINISHED:
         # it exists so the panel can say "took 8 min; usually takes 40 s".
@@ -781,9 +781,9 @@ class ObservabilityService:
         # with get_run") and recomputing the 90-day percentile on every poll was a scan
         # per call with no value — the comparison does not even make sense yet. Only computes
         # on a terminal (non-ACTIVE) status.
-        tipicos: dict = {}
-        if run.status not in _STATUS_ATIVOS:
-            tipicos = await _p50_por_workflow(db, [run.workflow_hash], _agora_utc())
+        typical_by_workflow: dict = {}
+        if run.status not in _ACTIVE_STATUSES:
+            typical_by_workflow = await _p50_por_workflow(db, [run.workflow_hash], _agora_utc())
 
         detalhe = _serialize_run(
             run, include_workflow_hash=True, include_node_stats=True,
@@ -791,7 +791,7 @@ class ObservabilityService:
         )
         # The workflow's median over the last 90 days: it is what lets the panel
         # say "took 8 min; usually takes 40 s". None while the run has not finished.
-        detalhe["typical_seconds"] = tipicos.get(run.workflow_hash) if isinstance(run.workflow_hash, str) else None
+        detalhe["typical_seconds"] = typical_by_workflow.get(run.workflow_hash) if isinstance(run.workflow_hash, str) else None
         return detalhe
 
     @staticmethod
@@ -814,13 +814,13 @@ class ObservabilityService:
         empty list with `expired=True` so the panel says "the log expired" instead
         of "there was no output".
         """
-        eventos, _ = await ObservabilityService.get_run_events_com_detalhe(
+        eventos, _ = await ObservabilityService.get_run_events_with_detail(
             db, run_id, user, workspace_ids, como_admin=como_admin,
         )
         return eventos
 
     @staticmethod
-    async def get_run_events_com_detalhe(
+    async def get_run_events_with_detail(
         db: AsyncSession,
         run_id: str,
         user,
@@ -904,32 +904,32 @@ class ObservabilityService:
         harness) it projects only `(start_time, status)` of the window and groups in
         Python — the old `CAST(start_time AS DATE)` returned the YEAR on SQLite.
         """
-        zona = _zona(tz)
-        run_f, _ = await _resolver_escopo(
+        zona = _zone(tz)
+        run_f, _ = await _resolve_scope(
             db, user, workspace_ids, workspace_id=workspace_id, workflow_id=workflow_id,
             como_admin=como_admin,
         )
 
         now = _agora_utc()
         hoje = now.astimezone(zona).date()
-        primeiro_dia = hoje - timedelta(days=days - 1)
-        since = datetime.combine(primeiro_dia, dt_time.min, tzinfo=zona).astimezone(timezone.utc)
+        first_day = hoje - timedelta(days=days - 1)
+        since = datetime.combine(first_day, dt_time.min, tzinfo=zona).astimezone(timezone.utc)
         base_filter = [WorkflowRun.start_time >= since, *run_f]
 
         dias = {
-            (primeiro_dia + timedelta(days=i)).isoformat(): {
-                "day": (primeiro_dia + timedelta(days=i)).isoformat(),
+            (first_day + timedelta(days=i)).isoformat(): {
+                "day": (first_day + timedelta(days=i)).isoformat(),
                 "total": 0, "success": 0, "failed": 0, "running": 0, "cancelled": 0, "other": 0,
             }
             for i in range(days)
         }
 
         if _e_postgres(db):
-            dia_local = cast(func.timezone(tz, WorkflowRun.start_time), SaDate)
+            local_day = cast(func.timezone(tz, WorkflowRun.start_time), SaDate)
             result = await db.execute(
-                select(dia_local.label("day"), WorkflowRun.status, func.count(WorkflowRun.id).label("count"))
+                select(local_day.label("day"), WorkflowRun.status, func.count(WorkflowRun.id).label("count"))
                 .where(*base_filter)
-                .group_by(dia_local, WorkflowRun.status)
+                .group_by(local_day, WorkflowRun.status)
             )
             contagens = [(str(row.day), row.status, row.count or 0) for row in result.all()]
         else:
@@ -937,7 +937,7 @@ class ObservabilityService:
                 select(WorkflowRun.start_time, WorkflowRun.status).where(*base_filter)
             )
             contagens = [
-                (_como_utc(row.start_time).astimezone(zona).date().isoformat(), row.status, 1)
+                (_as_utc(row.start_time).astimezone(zona).date().isoformat(), row.status, 1)
                 for row in result.all()
                 if row.start_time is not None
             ]
@@ -947,7 +947,7 @@ class ObservabilityService:
             if balde is None:
                 continue
             balde["total"] += n
-            balde[_balde_do_status(status)] += n
+            balde[_status_bucket(status)] += n
 
         return {"days": list(dias.values())}
 

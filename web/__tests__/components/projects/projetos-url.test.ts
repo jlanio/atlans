@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest"
 import {
-  ESTADO_PADRAO, FILTROS, ORDENS, escreverEstado, filtrosAtivos, lerEstado,
+  DEFAULT_STATE, FILTERS, SORT_ORDERS, escreverEstado, filtrosAtivos, lerEstado,
 } from "@/app/components/projects/projetos-url"
 
 const sp = (s: string) => new URLSearchParams(s)
 
 describe("lerEstado", () => {
   it("sem query string é o padrão: sem busca, Todos, por nome", () => {
-    expect(lerEstado(sp(""))).toEqual(ESTADO_PADRAO)
-    expect(ESTADO_PADRAO).toEqual({ q: "", filtro: "todos", ordem: "nome" })
+    expect(lerEstado(sp(""))).toEqual(DEFAULT_STATE)
+    expect(DEFAULT_STATE).toEqual({ q: "", filtro: "todos", ordem: "nome" })
   })
 
   it("lê busca, filtro e ordem", () => {
@@ -17,10 +17,10 @@ describe("lerEstado", () => {
   })
 
   it("aceita todos os filtros e ordens válidos, inclusive os que só existem na URL", () => {
-    for (const f of FILTROS) expect(lerEstado(sp(`filtro=${f}`)).filtro).toBe(f)
-    for (const o of ORDENS) expect(lerEstado(sp(`ordem=${o}`)).ordem).toBe(o)
-    expect(FILTROS).toContain("pausado")
-    expect(FILTROS).toContain("nunca")
+    for (const f of FILTERS) expect(lerEstado(sp(`filtro=${f}`)).filtro).toBe(f)
+    for (const o of SORT_ORDERS) expect(lerEstado(sp(`ordem=${o}`)).ordem).toBe(o)
+    expect(FILTERS).toContain("pausado")
+    expect(FILTERS).toContain("nunca")
   })
 
   it("valor inválido cai no padrão, não quebra a tela", () => {
@@ -38,8 +38,8 @@ describe("lerEstado", () => {
 
 describe("escreverEstado", () => {
   it("não escreve os defaults", () => {
-    expect(escreverEstado(ESTADO_PADRAO)).toBe("")
-    expect(escreverEstado({ ...ESTADO_PADRAO, q: "   " })).toBe("")
+    expect(escreverEstado(DEFAULT_STATE)).toBe("")
+    expect(escreverEstado({ ...DEFAULT_STATE, q: "   " })).toBe("")
   })
 
   it("escreve só o que difere do padrão", () => {
@@ -57,9 +57,9 @@ describe("escreverEstado", () => {
 
 describe("filtrosAtivos", () => {
   it("conta busca e chip; a ordenação não recorta a lista", () => {
-    expect(filtrosAtivos(ESTADO_PADRAO)).toBe(0)
-    expect(filtrosAtivos({ ...ESTADO_PADRAO, ordem: "alterado" })).toBe(0)
-    expect(filtrosAtivos({ ...ESTADO_PADRAO, q: "x" })).toBe(1)
-    expect(filtrosAtivos({ ...ESTADO_PADRAO, q: "x", filtro: "falha", ordem: "execucao" })).toBe(2)
+    expect(filtrosAtivos(DEFAULT_STATE)).toBe(0)
+    expect(filtrosAtivos({ ...DEFAULT_STATE, ordem: "alterado" })).toBe(0)
+    expect(filtrosAtivos({ ...DEFAULT_STATE, q: "x" })).toBe(1)
+    expect(filtrosAtivos({ ...DEFAULT_STATE, q: "x", filtro: "falha", ordem: "execucao" })).toBe(2)
   })
 })

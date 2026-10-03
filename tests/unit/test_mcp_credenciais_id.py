@@ -17,7 +17,7 @@ import app.mcp.tools.credenciais as tool
 pytestmark = pytest.mark.asyncio
 
 
-async def test_o_id_entregue_e_a_chave_primaria(monkeypatch):
+async def test_the_returned_id_is_the_primary_key(monkeypatch):
     chave = uuid.uuid4()
     credencial = SimpleNamespace(
         id=chave, id_hash=str(uuid.uuid4()), type="geoserver_authkey", owner_id="u1",
@@ -25,16 +25,16 @@ async def test_o_id_entregue_e_a_chave_primaria(monkeypatch):
     )
 
     @asynccontextmanager
-    async def _sessao():
+    async def _session():
         yield object()
 
-    async def _listar(db, owner_id, workspace_ids):
+    async def _list_schedules(db, owner_id, workspace_ids):
         return [credencial]
 
     monkeypatch.setattr(tool, "escopo_da_chamada", lambda ctx: SimpleNamespace(user_id="u1", workspace_ids={"ws1"}))
     monkeypatch.setattr(tool, "exigir_escopo", lambda escopo, permissao: None)
-    monkeypatch.setattr(tool.infra, "sessao", _sessao)
-    monkeypatch.setattr(tool, "list_credential_metadata", _listar)
+    monkeypatch.setattr(tool.infra, "sessao", _session)
+    monkeypatch.setattr(tool, "list_credential_metadata", _list_schedules)
 
     resposta = await tool.list_credentials(ctx=None)
     (item,) = resposta["items"]

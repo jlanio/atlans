@@ -33,9 +33,9 @@ export function useCanvasReadOnly(): boolean {
 
 /** Watches the media query ONCE and distributes the result. */
 export function CanvasInteractionProvider({ children }: PropsWithChildren) {
-  const somenteLeitura = useIsMobile()
+  const readOnly = useIsMobile()
   return (
-    <CanvasReadOnlyContext.Provider value={somenteLeitura}>
+    <CanvasReadOnlyContext.Provider value={readOnly}>
       {children}
     </CanvasReadOnlyContext.Provider>
   )

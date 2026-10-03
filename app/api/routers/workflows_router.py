@@ -14,15 +14,15 @@ from app.services.workflow_service import WorkflowService, WorkflowInactiveError
 from app.core.exceptions import WorkflowNameConflictError
 from app.api.dependencies import (
     get_workflow_service, get_current_user, get_user_workspace_ids,
-    verify_workspace_access, workflow_com_papel, exigir_papel_no_workspace,
+    verify_workspace_access, workflow_com_papel, require_workspace_role,
     get_db,
 )
 from app.core.rate_limiter import limiter
 from app.core.rbac import ROLE_ADMIN, ROLE_EDITOR, ROLE_OPERATOR, ROLE_VIEWER
 from app.core.utils.logger import get_logger
-from app.core.utils.redacao import definition_contem_segredo, params_schema_contem_segredo
+from app.core.utils.redacao import definition_contains_secret, params_schema_contains_secret
 from app.services import pin_service
-from app.services.pin_service import TTL_MAXIMO_HORAS
+from app.services.pin_service import MAX_TTL_HOURS
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/workflows", tags=["workflows"])
@@ -53,8 +53,8 @@ def _recusar_segredo(definition: Any, *, schema: bool = False) -> None:
     the leak it prevents.
     """
     caminhos = (
-        params_schema_contem_segredo(definition) if schema
-        else definition_contem_segredo(definition or {})
+        params_schema_contains_secret(definition) if schema
+        else definition_contains_secret(definition or {})
     )
     if caminhos:
         raise HTTPException(
@@ -78,7 +78,7 @@ async def create_workflow(
 ) -> Dict[str, Any]:
     # The workspace comes from the body, not the path: that is why the check is here, and not
     # in the `workflow_com_papel` dependency of the `/{id_hash}` routes.
-    await exigir_papel_no_workspace(
+    await require_workspace_role(
         db, payload.workspace_id, current_user.id_hash, ROLE_EDITOR,
         "Requer role 'editor' ou superior para criar workflows.",
     )
@@ -140,11 +140,11 @@ async def list_workflows(
     if workspace_id:
         verify_workspace_access(workspace_id, workspace_ids)
         return await service.list_workflows_metadata(
-            workspace_id=workspace_id, incluir_do_assistente=assistente,
+            workspace_id=workspace_id, include_from_assistant=assistente,
         )
     # Without workspace_id: returns workflows from all of the user's workspaces in a single query
     return await service.list_workflows_metadata_by_ids(
-        workspace_ids, incluir_do_assistente=assistente,
+        workspace_ids, include_from_assistant=assistente,
     )
 
 @router.get(
@@ -164,13 +164,13 @@ async def read_workflow(
 ):
     # Audit (SEG-67): the definition comes with the legacy connectionString ALREADY
     # decrypted, and the route is accessible to viewer. Redacts the secrets in a
-    # COPY (redigir_definition) before responding — without touching the ORM object,
+    # COPY (redact_definition) before responding — without touching the ORM object,
     # so the "<REDACTED>" marker is never written by a flush of the GET. Modern
     # workflows use credential_id (resolved only at dispatch) and expose nothing.
-    from app.core.utils.redacao import redigir_definition
+    from app.core.utils.redacao import redact_definition
     dados = WorkflowRead.model_validate(wf)
     if isinstance(dados.definition, dict) and dados.definition:
-        return dados.model_copy(update={"definition": redigir_definition(dados.definition)})
+        return dados.model_copy(update={"definition": redact_definition(dados.definition)})
     return dados
 
 @router.get(
@@ -278,8 +278,8 @@ async def duplicate_workflow(
 # same for "not a member", "workspace does not exist" and "workspace in the trash":
 # `get_workspace_member_role` returns None in all three, and distinguishing them would
 # allow enumerating other people's workspaces by id.
-_MOVER_ORIGEM = "Requer role 'admin' ou 'owner' no workspace de origem para mover workflows."
-_MOVER_DESTINO = "Requer role 'admin' ou 'owner' no workspace de destino para mover workflows."
+_MOVE_SOURCE = "Requer role 'admin' ou 'owner' no workspace de origem para mover workflows."
+_MOVE_DESTINATION = "Requer role 'admin' ou 'owner' no workspace de destino para mover workflows."
 
 
 async def _move(
@@ -294,8 +294,8 @@ async def _move(
     """Common body of /move and /move/preview — only `dry_run` changes."""
     # Only authorization and serialization live here: "destination ≠ origin" is an
     # invariant of the operation and lives in the service (WorkflowMoveTargetError → 400).
-    await exigir_papel_no_workspace(
-        db, payload.target_workspace_id, current_user.id_hash, ROLE_ADMIN, _MOVER_DESTINO,
+    await require_workspace_role(
+        db, payload.target_workspace_id, current_user.id_hash, ROLE_ADMIN, _MOVE_DESTINATION,
     )
 
     resultado = await service.move_workflow(
@@ -324,7 +324,7 @@ async def move_workflow(
     request: Request,
     payload: WorkflowMove,
     service: WorkflowService = Depends(get_workflow_service),
-    wf=Depends(workflow_com_papel(ROLE_ADMIN, _MOVER_ORIGEM)),
+    wf=Depends(workflow_com_papel(ROLE_ADMIN, _MOVE_SOURCE)),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> WorkflowMoveResult:
@@ -351,7 +351,7 @@ async def preview_move_workflow(
     request: Request,
     payload: WorkflowMove,
     service: WorkflowService = Depends(get_workflow_service),
-    wf=Depends(workflow_com_papel(ROLE_ADMIN, _MOVER_ORIGEM)),
+    wf=Depends(workflow_com_papel(ROLE_ADMIN, _MOVE_SOURCE)),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> WorkflowMoveResult:
@@ -382,9 +382,9 @@ async def update_workflow(
     # If the definition changed, validate cross-workflow references against the DB.
     # `WorkflowUpdate` is partial: an absent `definition` means "do not touch it",
     # and refusing there would block even renaming a workflow.
-    novo_schema = getattr(workflow_in, "params_schema", None)
-    if novo_schema is not None:
-        _recusar_segredo(novo_schema, schema=True)   # same reason as the POST
+    new_schema = getattr(workflow_in, "params_schema", None)
+    if new_schema is not None:
+        _recusar_segredo(new_schema, schema=True)   # same reason as the POST
 
     new_def = getattr(workflow_in, "definition", None)
     if new_def is not None:
@@ -653,7 +653,7 @@ class PinOutputPayload(BaseModel):
     ttl_hours: Optional[int] = Field(
         None,
         ge=1,
-        le=TTL_MAXIMO_HORAS,
+        le=MAX_TTL_HOURS,
         description=(
             "Validade do pin em horas, de 1 a 8760 (um ano). Nulo = sem expiração. "
             "O 0 é recusado de propósito: antes ele virava 'sem expiração', o "
@@ -686,7 +686,7 @@ async def pin_node_output(
             user_id=getattr(user, "id_hash", None),
             exigir_no_existente=False,
         )
-    except pin_service.PinEmNoDeSaidaError as exc:
+    except pin_service.PinOnOutputNodeError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
 
@@ -699,7 +699,7 @@ async def unpin_node_output(
     _user=Depends(get_current_user),
 ):
     """Removes a node's pinned output and deletes the cache artifact from MinIO."""
-    return await pin_service.desfixar_saida(db, wf, node_id)
+    return await pin_service.unpin_output(db, wf, node_id)
 
 
 @router.get("/{id_hash}/pins", summary="List pinned nodes")
@@ -717,7 +717,7 @@ async def list_pinned_nodes(
     —, and the MCP `list_pins` tool already required `viewer` (`app/mcp/guardas.py`).
     The same read answered by two standards depending on the entry point.
     """
-    # No `node_ids_existentes`: the route keeps listing everything that is
+    # No `existing_node_ids`: the route keeps listing everything that is
     # saved, including the pin of an already deleted node. It is MCP that filters by the nodes
     # the definition still has — the screen needs to see the orphan to clean it up.
     pins = pin_service.listar_pins(wf.pin_metadata, wf.pinned_outputs)

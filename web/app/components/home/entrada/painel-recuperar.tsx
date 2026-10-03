@@ -12,8 +12,8 @@ import { TbMailCheck } from "react-icons/tb"
 import { API_URL } from "@/utils/env"
 import { Input } from "@/app/components/ui/input"
 import { Label } from "@/app/components/ui/label"
-import { useTextos } from "@/app/components/home/i18n"
-import { BotaoDoModal, LinkDoModal } from "./botao-do-modal"
+import { useTexts } from "@/app/components/home/i18n"
+import { ModalButton, LinkDoModal } from "./botao-do-modal"
 
 interface Props {
   onEnviando: (enviando: boolean) => void
@@ -23,11 +23,11 @@ interface Props {
   onEnviado: (enviado: boolean) => void
 }
 
-export function PainelRecuperar({ onEnviando, onEntrar, onEnviado }: Props) {
-  const t = useTextos().entrada.painelRecuperar
+export function RecoverPanel({ onEnviando, onEntrar, onEnviado }: Props) {
+  const t = useTexts().entrada.painelRecuperar
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
-  const [enviado, setEnviado] = useState(false)
+  const [enviado, setSent] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -42,7 +42,7 @@ export function PainelRecuperar({ onEnviando, onEntrar, onEnviado }: Props) {
     } finally {
       setLoading(false)
       onEnviando(false)
-      setEnviado(true)
+      setSent(true)
       onEnviado(true)
     }
   }
@@ -54,9 +54,9 @@ export function PainelRecuperar({ onEnviando, onEntrar, onEnviado }: Props) {
           <TbMailCheck size={20} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
           <span>{t.avisoDoLink}</span>
         </div>
-        <BotaoDoModal type="button" onClick={onEntrar}>
+        <ModalButton type="button" onClick={onEntrar}>
           {t.voltarParaEntrar}
-        </BotaoDoModal>
+        </ModalButton>
       </>
     )
   }
@@ -80,9 +80,9 @@ export function PainelRecuperar({ onEnviando, onEntrar, onEnviado }: Props) {
           />
         </div>
 
-        <BotaoDoModal loading={loading} loadingLabel={t.enviando} className="mt-1">
+        <ModalButton loading={loading} loadingLabel={t.enviando} className="mt-1">
           {t.enviarLink}
-        </BotaoDoModal>
+        </ModalButton>
       </form>
 
       <p className="text-center text-[12.5px] text-muted-foreground">

@@ -85,7 +85,7 @@ async def db(engine):
         yield sessao
 
 
-async def _definition_no_banco(engine) -> dict:
+async def _definition_in_db(engine) -> dict:
     """Reads the row in a NEW session — the other one's identity map is no proof."""
     async with AsyncSession(engine) as outra:
         v = (await outra.execute(
@@ -94,7 +94,7 @@ async def _definition_no_banco(engine) -> dict:
         return v.definition
 
 
-async def test_get_version_devolve_a_definition_redigida(db):
+async def test_get_version_returns_the_redacted_definition(db):
     """The route that consumes this requires no role: it handed the credential to a viewer.
 
     Reading the history is legitimate for someone who only reads; knowing the
@@ -110,24 +110,24 @@ async def test_get_version_devolve_a_definition_redigida(db):
     assert v.definition["nodes"][0]["name"] == "PostgresQuery"
 
 
-async def test_commit_depois_do_get_version_nao_grava_o_segredo_em_claro(db, engine):
+async def test_commit_after_get_version_does_not_store_the_secret_in_plaintext(db, engine):
     """The regression. Before, this commit persisted the readable connection string."""
     await get_version(WorkflowCRUD(db), "wf-1", 1)
     await db.commit()
 
-    gravado = (await _definition_no_banco(engine))["nodes"][0]["properties"]["connectionString"]
+    gravado = (await _definition_in_db(engine))["nodes"][0]["properties"]["connectionString"]
     assert gravado != SEGREDO
     assert gravado.startswith("gAAAA")
 
 
-async def test_get_version_nao_suja_a_sessao(db):
+async def test_get_version_does_not_dirty_the_session(db):
     """There is not even a pending UPDATE for someone else's commit to carry along."""
     await get_version(WorkflowCRUD(db), "wf-1", 1)
 
     assert not db.dirty
 
 
-async def test_update_workflow_grava_o_snapshot_ainda_cifrado(db, engine):
+async def test_update_workflow_stores_the_snapshot_still_encrypted(db, engine):
     """The regression on the other side: WRITING the version.
 
     `update_workflow` fetches `wf` via `get_by_hash` (no decrypt) precisely to
@@ -160,7 +160,7 @@ async def test_update_workflow_grava_o_snapshot_ainda_cifrado(db, engine):
     assert gravado.startswith("gAAAA")
 
 
-async def test_snapshot_cifrado_mesmo_com_a_sessao_ja_decifrada(db, engine):
+async def test_snapshot_encrypted_even_with_the_session_already_decrypted(db, engine):
     """The case the test above did NOT cover — and it is the real route's case.
 
     `update_workflow` fetches with `get_by_hash` (no decrypt) and the code
@@ -201,7 +201,7 @@ async def test_snapshot_cifrado_mesmo_com_a_sessao_ja_decifrada(db, engine):
     assert versao.definition["nodes"][0]["properties"]["connectionString"].startswith("gAAAA")
 
 
-async def test_restore_version_tambem_guarda_o_auto_snapshot_cifrado(db, engine):
+async def test_restore_version_also_stores_the_encrypted_auto_snapshot(db, engine):
     """The same leak at the second call site of `create_version`.
 
     `restore_version` takes an auto-snapshot of the current state before
@@ -239,7 +239,7 @@ async def test_restore_version_tambem_guarda_o_auto_snapshot_cifrado(db, engine)
     assert auto.definition["nodes"][0]["properties"]["connectionString"].startswith("gAAAA")
 
 
-async def test_restore_depois_de_get_version_nao_grava_redacted(db, engine):
+async def test_restore_after_get_version_does_not_store_redacted(db, engine):
     """The redaction must not turn into destruction of the credential.
 
     `set_committed_value` writes to the instance; without detaching it, a
@@ -264,7 +264,7 @@ async def test_restore_depois_de_get_version_nao_grava_redacted(db, engine):
     assert gravado.startswith("gAAAA")
 
 
-async def test_definition_indecifravel_vira_erro_explicito(db, engine):
+async def test_undecryptable_definition_becomes_explicit_error(db, engine):
     """A corrupted token must not slip through as if it were normal text."""
     async with AsyncSession(engine) as outra:
         v = (await outra.execute(

@@ -1,10 +1,10 @@
 from typing import Any, Dict
 from flow.registry import register_node
-from flow.nodes.spatial.sobreposicao_binaria import SobreposicaoBinaria
+from flow.nodes.spatial.sobreposicao_binaria import BinaryOverlay
 
 
 @register_node
-class SymmetricDifferenceNode(SobreposicaoBinaria):
+class SymmetricDifferenceNode(BinaryOverlay):
     """
     Computes the symmetric difference between two vector layers (A △ B).
     """

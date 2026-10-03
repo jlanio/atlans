@@ -31,7 +31,7 @@ _PAYLOADS_ESCAPE = [
 
 @pytest.mark.parametrize("payload", _PAYLOADS_ESCAPE)
 @pytest.mark.asyncio
-async def test_c1_jinja_branch_bloqueia_escape_de_sandbox(payload):
+async def test_c1_jinja_branch_blocks_sandbox_escape(payload):
     from flow.nodes.control.jinja_branch import JinjaBranchNode
 
     node = JinjaBranchNode.__new__(JinjaBranchNode)
@@ -53,7 +53,7 @@ async def test_c1_jinja_branch_bloqueia_escape_de_sandbox(payload):
     ],
 )
 @pytest.mark.asyncio
-async def test_c1_jinja_branch_preserva_expressoes_legitimas(expressao, inputs, esperado):
+async def test_c1_jinja_branch_preserves_legitimate_expressions(expressao, inputs, esperado):
     """The sandbox must not cost the node's normal use — this is the other side of C1."""
     from flow.nodes.control.jinja_branch import JinjaBranchNode
 
@@ -66,7 +66,7 @@ async def test_c1_jinja_branch_preserva_expressoes_legitimas(expressao, inputs, 
     assert resultado["branch"] is esperado
 
 
-def test_c1_gate_de_prerenderizacao_reconhece_statements():
+def test_c1_prerender_gate_recognizes_statements():
     """A param with only `{% %}` has to go through ExpressionService (sandboxed).
 
     The gate required `{{` AND `}}`, so statements escaped pre-rendering and
@@ -85,7 +85,7 @@ def test_c1_gate_de_prerenderizacao_reconhece_statements():
 # ── C3: mass assignment de workspace_id ──────────────────────────────────────
 
 @pytest.mark.parametrize("campo", ["workspace_id", "updated_by_id", "created_by_id", "id_hash"])
-def test_c3_workflow_update_recusa_campos_nao_editaveis(campo):
+def test_c3_workflow_update_rejects_non_editable_fields(campo):
     from app.schemas.workflow import WorkflowUpdate
 
     with pytest.raises(ValidationError) as exc:
@@ -93,7 +93,7 @@ def test_c3_workflow_update_recusa_campos_nao_editaveis(campo):
     assert exc.value.errors()[0]["type"] == "extra_forbidden"
 
 
-def test_c3_workflow_update_aceita_campos_legitimos():
+def test_c3_workflow_update_accepts_legitimate_fields():
     from app.schemas.workflow import WorkflowUpdate
 
     u = WorkflowUpdate(name="novo", description="d", flag_ative=False)
@@ -104,7 +104,7 @@ def test_c3_workflow_update_aceita_campos_legitimos():
 
 # ── C4: s3_key vinda do executor ─────────────────────────────────────────────
 
-def test_c4_valida_s3_key_recusa_workspace_alheio():
+def test_c4_validate_s3_key_rejects_foreign_workspace():
     from app.api.routers.executor_drive_router import _validate_agent_s3_key
 
     with pytest.raises(HTTPException) as exc:
@@ -121,7 +121,7 @@ def test_c4_valida_s3_key_recusa_workspace_alheio():
         "drive/ws-1/arq\x00.csv",       # NUL
     ],
 )
-def test_c4_valida_s3_key_recusa_chave_malformada(chave):
+def test_c4_validate_s3_key_rejects_malformed_key(chave):
     from app.api.routers.executor_drive_router import _validate_agent_s3_key
 
     with pytest.raises(HTTPException):
@@ -129,7 +129,7 @@ def test_c4_valida_s3_key_recusa_chave_malformada(chave):
 
 
 @pytest.mark.parametrize("valor", [123, True, {"a": 1}, ["x"], b"drive/ws-1/a.csv", None])
-def test_c4_valida_s3_key_recusa_tipo_nao_string(valor):
+def test_c4_validate_s3_key_rejects_non_string_type(valor):
     """The payload comes from the executor's JSON — it must reject, not blow up.
 
     The internal comparisons raised TypeError/AttributeError for types that
@@ -143,13 +143,13 @@ def test_c4_valida_s3_key_recusa_tipo_nao_string(valor):
     assert exc.value.status_code == 400
 
 
-def test_c4_valida_s3_key_aceita_chave_do_proprio_workspace():
+def test_c4_validate_s3_key_accepts_key_from_own_workspace():
     from app.api.routers.executor_drive_router import _validate_agent_s3_key
 
     _validate_agent_s3_key("drive/ws-1/pasta/arquivo.csv", ["ws-1"])  # does not raise
 
 
-def test_c4_webhook_response_aceita_do_proprio_workspace():
+def test_c4_webhook_response_accepts_from_own_workspace():
     """Large ResponseNode body: the key `webhook-responses/{ws}/{run}/...` must
     pass when `{ws}` belongs to the scope — the prefix was outside the allowlist
     and `{run}` (wrong segment) failed validation, so a body_ref >1MB got a 403
@@ -159,7 +159,7 @@ def test_c4_webhook_response_aceita_do_proprio_workspace():
     _validate_agent_s3_key("webhook-responses/ws-1/run-abc/deadbeef.bin", ["ws-1"])  # does not raise
 
 
-def test_c4_webhook_response_recusa_workspace_alheio():
+def test_c4_webhook_response_rejects_foreign_workspace():
     from app.api.routers.executor_drive_router import _validate_agent_s3_key
 
     with pytest.raises(HTTPException) as exc:
@@ -170,7 +170,7 @@ def test_c4_webhook_response_recusa_workspace_alheio():
 # ── A3: ownerless credential ─────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_a3_credencial_sem_dono_e_inacessivel():
+async def test_a3_credential_without_owner_is_inaccessible():
     """owner_id NULL curto-circuitava a checagem e liberava a credencial a todos."""
     from unittest.mock import AsyncMock, patch
 
@@ -185,7 +185,7 @@ async def test_a3_credencial_sem_dono_e_inacessivel():
 
 
 @pytest.mark.asyncio
-async def test_a3_dono_continua_acessando_a_propria_credencial():
+async def test_a3_owner_still_accesses_their_own_credential():
     from unittest.mock import AsyncMock, patch
 
     from app.services.credential_service import get_credential_metadata
@@ -208,7 +208,7 @@ async def test_a3_dono_continua_acessando_a_propria_credencial():
         "/data/../etc/passwd",       # traversal apos normalizacao
     ],
 )
-def test_a9_recusa_caminho_fora_da_hierarquia(caminho):
+def test_a9_rejects_path_outside_the_hierarchy(caminho):
     """The check was `str(resolved).startswith(str(allowed_dir))`.
 
     Textual comparison let through a SIBLING directory whose name started the
@@ -222,7 +222,7 @@ def test_a9_recusa_caminho_fora_da_hierarquia(caminho):
 
 
 @pytest.mark.parametrize("caminho", ["/data/ok.shp", "/data/sub/dir/ok.shp", "/tmp/a.shp"])
-def test_a9_aceita_caminho_dentro_da_hierarquia(caminho):
+def test_a9_accepts_path_inside_the_hierarchy(caminho):
     from flow.utils.geo_helpers import validate_file_path
 
     validate_file_path(caminho)  # does not raise

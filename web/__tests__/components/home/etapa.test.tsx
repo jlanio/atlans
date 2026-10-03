@@ -10,13 +10,13 @@ import { describe, it, expect, afterEach } from "vitest"
 import { cleanup, render, screen } from "@testing-library/react"
 
 import { etapaDaConversa, IndicadorDeEtapa } from "@/app/components/home/assistente/etapa"
-import type { BlocoDoAssistente, TurnoDoAssistente } from "@/app/components/home/assistente/quadros"
+import type { AssistantBlock, AssistantTurn } from "@/app/components/home/assistente/quadros"
 
 afterEach(() => cleanup())
 
-const user = (texto: string): TurnoDoAssistente => ({ id: `u-${texto}`, papel: "user", texto, blocos: [] } as TurnoDoAssistente)
-const assist = (blocos: BlocoDoAssistente[]): TurnoDoAssistente => ({ id: "a1", papel: "assistant", blocos } as TurnoDoAssistente)
-const ferramenta = (nome: string, estado: "correndo" | "ok" | "erro", argumentos: Record<string, unknown> = {}): BlocoDoAssistente =>
+const user = (texto: string): AssistantTurn => ({ id: `u-${texto}`, papel: "user", texto, blocos: [] } as AssistantTurn)
+const assist = (blocos: AssistantBlock[]): AssistantTurn => ({ id: "a1", papel: "assistant", blocos } as AssistantTurn)
+const ferramenta = (nome: string, estado: "correndo" | "ok" | "erro", argumentos: Record<string, unknown> = {}): AssistantBlock =>
   ({ tipo: "ferramenta", id: `f-${nome}`, nome, argumentos, estado })
 
 describe("etapaDaConversa", () => {

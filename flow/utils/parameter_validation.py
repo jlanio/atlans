@@ -42,7 +42,7 @@ def _coerce_structured(key: str, value: Any) -> Any:
     )
 
 
-def colunas_pedidas(bruto: Any) -> List[str]:
+def requested_columns(bruto: Any) -> List[str]:
     """List of columns from a chips field, whether it comes as a list,
     JSON, or comma-separated text.
 
@@ -52,7 +52,7 @@ def colunas_pedidas(bruto: Any) -> List[str]:
     columns at once into the new field.
 
     A tolerant parser here avoids a data migration over the definition of every
-    workflow that uses one of these nodes. It was born as `_colunas_pedidas` in
+    workflow that uses one of these nodes. It was born as `_requested_columns` in
     AttributeJoin and moved up here when other nodes gained the same field.
 
     Returns list[str] with no empty entries and no leading/trailing spaces.
@@ -83,11 +83,11 @@ def colunas_pedidas(bruto: Any) -> List[str]:
 # retired (see core.py and docs/specs/edge-data-contract.md §5), so these
 # params no longer have any effect and MUST show up as discarded until they are
 # fixed by hand.
-_CHAVES_DE_PLATAFORMA = frozenset({"alias", "retry_count", "retry_delay_s"})
+_PLATFORM_KEYS = frozenset({"alias", "retry_count", "retry_delay_s"})
 
 
-def _e_de_plataforma(chave: str) -> bool:
-    return chave in _CHAVES_DE_PLATAFORMA
+def _is_platform_key(chave: str) -> bool:
+    return chave in _PLATFORM_KEYS
 
 
 def validate_node_parameters(
@@ -187,7 +187,7 @@ def validate_node_parameters(
 
     descartados = sorted(
         k for k in params
-        if k not in final_params and not _e_de_plataforma(k)
+        if k not in final_params and not _is_platform_key(k)
     )
     if descartados:
         logger.warning(

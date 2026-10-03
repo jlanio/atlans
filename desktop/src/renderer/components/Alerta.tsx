@@ -75,7 +75,7 @@ export function Alerta({
 
   // `role`/`aria-live` apply in both forms: an error embedded in a section is
   // still an error nobody asked to see.
-  const semantica = {
+  const semantics = {
     role: tom === 'erro' ? ('alert' as const) : ('status' as const),
     'aria-live': tom === 'erro' ? ('assertive' as const) : ('polite' as const),
   }
@@ -83,7 +83,7 @@ export function Alerta({
   if (denso) {
     return (
       <div
-        {...semantica}
+        {...semantics}
         className={cn(
           'flex items-start gap-2 rounded-md border px-3 py-2 leading-relaxed',
           // Fades in: the strip appears because of an external event, and a block
@@ -99,7 +99,7 @@ export function Alerta({
   }
 
   return (
-    <Card {...semantica} className={cn('py-3 animate-in fade-in-0 slide-in-from-top-2 duration-300', caixa)}>
+    <Card {...semantics} className={cn('py-3 animate-in fade-in-0 slide-in-from-top-2 duration-300', caixa)}>
       <CardContent className="flex flex-wrap items-start justify-between gap-3 px-4">
         {conteudo}
       </CardContent>

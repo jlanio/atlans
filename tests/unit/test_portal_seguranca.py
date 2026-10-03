@@ -15,16 +15,16 @@ import json
 import pytest
 
 from app.api.routers.portal_router import (
-    _CorpoGrandeDemais,
-    _descomprimir_gzip_com_teto,
+    _BodyTooLarge,
+    _decompress_gzip_with_ceiling,
     _headers_do_tile,
-    _ler_corpo_limitado,
+    _read_limited_body,
 )
 
 
 # ── Tile cache/CORS by visibility ───────────────────────────────────────────
 
-def test_tile_privado_nao_cacheia_nem_abre_cors():
+def test_private_tile_neither_caches_nor_opens_cors():
     """Mutation: always emit `public, max-age` (the old header).
 
     Private -> `private, no-store` and NO Access-Control-Allow-Origin.
@@ -34,7 +34,7 @@ def test_tile_privado_nao_cacheia_nem_abre_cors():
     assert "Access-Control-Allow-Origin" not in h
 
 
-def test_tile_publico_continua_cacheavel():
+def test_public_tile_stays_cacheable():
     h = _headers_do_tile("public")
     assert h["Cache-Control"] == "public, max-age=3600"
     assert h["Access-Control-Allow-Origin"] == "*"
@@ -42,7 +42,7 @@ def test_tile_publico_continua_cacheavel():
 
 # ── Bomba gzip: corte incremental no teto ───────────────────────────────────
 
-def test_bomba_gzip_barrada_sem_materializar():
+def test_gzip_bomb_blocked_without_materializing():
     """Mutation: go back to a whole gzip.decompress() before the size check.
 
     100 MB of zeros compress to ~100 KB; the 1 MB ceiling cuts off before
@@ -52,60 +52,60 @@ def test_bomba_gzip_barrada_sem_materializar():
     """
     import tracemalloc
 
-    bomba = gzip.compress(b"\x00" * (100 * 1024 * 1024))
-    assert len(bomba) < 1 * 1024 * 1024  # a bomba e pequena comprimida
+    bomb = gzip.compress(b"\x00" * (100 * 1024 * 1024))
+    assert len(bomb) < 1 * 1024 * 1024  # a bomb e pequena comprimida
     tracemalloc.start()
     try:
-        with pytest.raises(_CorpoGrandeDemais):
-            _descomprimir_gzip_com_teto(bomba, 1 * 1024 * 1024)
+        with pytest.raises(_BodyTooLarge):
+            _decompress_gzip_with_ceiling(bomb, 1 * 1024 * 1024)
         _, pico = tracemalloc.get_traced_memory()
     finally:
         tracemalloc.stop()
     assert pico < 16 * 1024 * 1024, f"materializou {pico} bytes (perto dos 100 MB)"
 
 
-def test_gzip_legitimo_round_trip():
+def test_legitimate_gzip_round_trip():
     payload = json.dumps({"type": "FeatureCollection", "features": [{"i": i} for i in range(500)]}).encode()
-    out = _descomprimir_gzip_com_teto(gzip.compress(payload), 50 * 1024 * 1024)
+    out = _decompress_gzip_with_ceiling(gzip.compress(payload), 50 * 1024 * 1024)
     assert out == payload
 
 
-def test_gzip_no_limite_exato_passa_e_uma_acima_barra():
+def test_gzip_at_exact_limit_passes_and_one_above_is_blocked():
     dados = b"x" * 1000
-    assert _descomprimir_gzip_com_teto(gzip.compress(dados), 1000) == dados
-    with pytest.raises(_CorpoGrandeDemais):
-        _descomprimir_gzip_com_teto(gzip.compress(dados), 999)
+    assert _decompress_gzip_with_ceiling(gzip.compress(dados), 1000) == dados
+    with pytest.raises(_BodyTooLarge):
+        _decompress_gzip_with_ceiling(gzip.compress(dados), 999)
 
 
-def test_gzip_invalido_nao_vira_corpo_grande():
+def test_invalid_gzip_does_not_become_large_body():
     """Corrupted gzip must raise a zlib error (becomes 400 in the handler), never
-    _CorpoGrandeDemais (which becomes 413)."""
+    _BodyTooLarge (which becomes 413)."""
     with pytest.raises(Exception) as exc:
-        _descomprimir_gzip_com_teto(b"isto nao e gzip", 50 * 1024 * 1024)
-    assert not isinstance(exc.value, _CorpoGrandeDemais)
+        _decompress_gzip_with_ceiling(b"isto nao e gzip", 50 * 1024 * 1024)
+    assert not isinstance(exc.value, _BodyTooLarge)
 
 
 # ── Reading the body with a ceiling ──────────────────────────────────────────
 
-class _ReqFalso:
+class _FakeReq:
     def __init__(self, pedacos):
-        self._pedacos = pedacos
+        self._chunks = pedacos
 
     async def stream(self):
-        for p in self._pedacos:
+        for p in self._chunks:
             yield p
 
 
-async def test_ler_corpo_abaixo_do_teto_junta_os_pedacos():
-    req = _ReqFalso([b"abc", b"def", b"gh"])
-    assert await _ler_corpo_limitado(req, 100) == b"abcdefgh"
+async def test_read_body_below_ceiling_joins_the_chunks():
+    req = _FakeReq([b"abc", b"def", b"gh"])
+    assert await _read_limited_body(req, 100) == b"abcdefgh"
 
 
-async def test_ler_corpo_acima_do_teto_barra_sem_juntar_tudo():
+async def test_read_body_above_ceiling_blocks_without_joining_everything():
     """Mutation: use `await request.body()` (buffers everything) instead of the cutoff.
 
     A body above the ceiling is rejected as soon as it crosses it, without reading the rest.
     """
-    req = _ReqFalso([b"x" * 50, b"y" * 60])  # 110 bytes, teto 100
-    with pytest.raises(_CorpoGrandeDemais):
-        await _ler_corpo_limitado(req, 100)
+    req = _FakeReq([b"x" * 50, b"y" * 60])  # 110 bytes, teto 100
+    with pytest.raises(_BodyTooLarge):
+        await _read_limited_body(req, 100)

@@ -17,22 +17,22 @@ from __future__ import annotations
 import copy
 
 from app.core.constants import FUSO_PADRAO_DO_AGENDAMENTO
-from app.services.fundos_do_mapa import _propriedades
+from app.services.fundos_do_mapa import _property_dicts
 
-NO_DO_AGENDAMENTO = "ScheduleTrigger"
+SCHEDULE_NODE = "ScheduleTrigger"
 
 
 def injetar_fuso_do_agendamento(definition: dict, fuso: str | None = None) -> dict:
     """The definition with the installation time zone in each ScheduleTrigger without one (a copy, if it changes)."""
     nos = definition.get("nodes") if isinstance(definition, dict) else None
-    if not nos or not any(isinstance(n, dict) and n.get("name") == NO_DO_AGENDAMENTO for n in nos):
+    if not nos or not any(isinstance(n, dict) and n.get("name") == SCHEDULE_NODE for n in nos):
         return definition
     fuso = fuso or FUSO_PADRAO_DO_AGENDAMENTO
     enriched = copy.deepcopy(definition)
     for no in enriched["nodes"]:
-        if not isinstance(no, dict) or no.get("name") != NO_DO_AGENDAMENTO:
+        if not isinstance(no, dict) or no.get("name") != SCHEDULE_NODE:
             continue
-        for props in _propriedades(no):
+        for props in _property_dicts(no):
             if not str(props.get("timezone") or "").strip():
                 props["timezone"] = fuso
     return enriched

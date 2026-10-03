@@ -53,10 +53,10 @@ class SyncManifest:
         # orphaned copies in Drive), or it was cleared after (and mutations
         # made DURING the write were forgotten). With a version, we know exactly
         # which snapshot reached the disk.
-        self._versao = 0
-        self._versao_no_disco = 0
-        self._ultimo_flush = 0.0
-        self._gravando = False
+        self._version = 0
+        self._disk_version = 0
+        self._last_flush = 0.0
+        self._writing = False
 
         # Inverted indexes for drive_event routing. Without them,
         # `claims_event` swept every dataset of every folder on EACH push
@@ -105,7 +105,7 @@ class SyncManifest:
 
     # ── Persistencia ─────────────────────────────────────────────────────────
 
-    def _escrever(self, conteudo: str) -> bool:
+    def _write_loop(self, conteudo: str) -> bool:
         """Writes the manifest atomically (.tmp + os.replace).
 
         A crash in the middle of `json.dump` left the file truncated; `_load`
@@ -145,18 +145,18 @@ class SyncManifest:
         # written every cycle for no benefit at all.
         return json.dumps(self._data, default=str)
 
-    def _marcar_sujo(self) -> None:
-        self._versao += 1
+    def _mark_dirty(self) -> None:
+        self._version += 1
 
     @property
-    def _sujo(self) -> bool:
+    def _is_dirty(self) -> bool:
         """Is there a mutation not yet confirmed on disk?"""
-        return self._versao != self._versao_no_disco
+        return self._version != self._disk_version
 
-    async def flush(self, min_intervalo: float = 0.0) -> None:
+    async def flush(self, min_interval: float = 0.0) -> None:
         """Writes the manifest if it changed, off the event loop.
 
-        `min_intervalo` > 0 is the opportunistic flush from inside a batch of
+        `min_interval` > 0 is the opportunistic flush from inside a batch of
         uploads: durability every T seconds, instead of a full reserialization
         per dataset. The end of the cycle calls it with no interval (forced).
 
@@ -169,27 +169,27 @@ class SyncManifest:
         manifest dirty — the end-of-cycle flush carries the newest state.
 
         The written version is captured BEFORE serialization and only becomes
-        `_versao_no_disco` if the write is confirmed. That way: a failing write
+        `_disk_version` if the write is confirmed. That way: a failing write
         (full disk) keeps the manifest dirty and the next flush tries again; and
         a mutation made during the write stays pending, instead of being taken
         as saved along with the previous snapshot.
         """
-        if not self._sujo or self._gravando:
+        if not self._is_dirty or self._writing:
             return
-        if min_intervalo and (time.monotonic() - self._ultimo_flush) < min_intervalo:
+        if min_interval and (time.monotonic() - self._last_flush) < min_interval:
             return
-        versao = self._versao
+        versao = self._version
         conteudo = self._serializar()
         # The rate-limit clock advances even if the write fails: otherwise, with a
         # full disk, every dataset in the batch would pay a full reserialization.
-        self._ultimo_flush = time.monotonic()
-        self._gravando = True
+        self._last_flush = time.monotonic()
+        self._writing = True
         try:
-            gravou = await em_thread(self._escrever, conteudo)
+            gravou = await em_thread(self._write_loop, conteudo)
         finally:
-            self._gravando = False
+            self._writing = False
         if gravou:
-            self._versao_no_disco = versao
+            self._disk_version = versao
 
     # ── Indices invertidos ───────────────────────────────────────────────────
 
@@ -199,9 +199,9 @@ class SyncManifest:
         self._by_file.clear()
         for name, ds in self._data["datasets"].items():
             if isinstance(ds, dict):
-                self._indexar(name, ds)
+                self._index(name, ds)
 
-    def _indexar(self, name: str, ds: dict):
+    def _index(self, name: str, ds: dict):
         rid = ds.get("remote_id_hash")
         if rid:
             self._by_remote_id[rid] = name
@@ -259,13 +259,13 @@ class SyncManifest:
     def set_dataset(self, name: str, dataset: dict):
         self._desindexar(name, self._data["datasets"].get(name))
         self._data["datasets"][name] = dataset
-        self._indexar(name, dataset)
-        self._marcar_sujo()
+        self._index(name, dataset)
+        self._mark_dirty()
 
     def remove_dataset(self, name: str):
         self._desindexar(name, self._data["datasets"].get(name))
         self._data["datasets"].pop(name, None)
-        self._marcar_sujo()
+        self._mark_dirty()
 
     def all_datasets(self) -> dict:
         return self._data["datasets"]
@@ -284,16 +284,16 @@ class SyncManifest:
         if remote_md5:
             ds["remote_md5"] = remote_md5
         self._data["datasets"][name] = ds
-        self._indexar(name, ds)
-        self._marcar_sujo()
+        self._index(name, ds)
+        self._mark_dirty()
 
     def mark_pending(self, name: str, action: str):
         ds = self._data["datasets"].get(name, {})
         ds["status"] = "pending"
         ds["pending_action"] = action
         self._data["datasets"][name] = ds
-        self._indexar(name, ds)
-        self._marcar_sujo()
+        self._index(name, ds)
+        self._mark_dirty()
 
     # ── Queue ────────────────────────────────────────────────────────────────
 
@@ -319,7 +319,7 @@ class SyncManifest:
         if existente is not None:
             if extra:
                 existente.update(extra)
-                self._marcar_sujo()
+                self._mark_dirty()
             return
 
         item = {
@@ -335,13 +335,13 @@ class SyncManifest:
             **(extra or {}),
         }
         self._data["pending_queue"].append(item)
-        self._marcar_sujo()
+        self._mark_dirty()
 
     def dequeue(self, dataset_name: str):
         self._data["pending_queue"] = [
             q for q in self._data["pending_queue"] if q["dataset"] != dataset_name
         ]
-        self._marcar_sujo()
+        self._mark_dirty()
 
     def pending_items(self) -> list[dict]:
         return self._data["pending_queue"]
@@ -358,10 +358,10 @@ class SyncManifest:
         item["retries"] = item.get("retries", 0) + 1
         item["last_attempt"] = datetime.now(timezone.utc).isoformat()
         item["next_attempt_at"] = next_attempt_at
-        self._marcar_sujo()
+        self._mark_dirty()
 
     # ── Scan ─────────────────────────────────────────────────────────────────
 
     def set_last_scan(self):
         self._data["last_full_scan"] = datetime.now(timezone.utc).isoformat()
-        self._marcar_sujo()
+        self._mark_dirty()

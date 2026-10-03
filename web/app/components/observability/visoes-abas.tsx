@@ -2,10 +2,10 @@
 
 import { useRef } from "react"
 import { cn } from "@/lib/utils"
-import { formatarInteiro } from "@/lib/formatos"
-import type { Visao } from "./historico-url"
+import { formatInteger } from "@/lib/formatos"
+import type { ViewKind } from "./historico-url"
 
-export interface ContagensDasVisoes {
+export interface ViewCounts {
   execucoes: number | null
   workflows: number | null
   executores: number | null
@@ -13,16 +13,16 @@ export interface ContagensDasVisoes {
 }
 
 interface Props {
-  visao: Visao
-  onVisao: (v: Visao) => void
-  contagens: ContagensDasVisoes
+  visao: ViewKind
+  onVisao: (v: ViewKind) => void
+  contagens: ViewCounts
   /** "Confirmações" is admin-only: `/pending-acks` answers 403 to everyone else. */
   isAdmin: boolean
   /** There is a late acknowledgment — the Confirmações pill turns red. */
   alerta?: boolean
 }
 
-const ABAS: { id: Visao; rotulo: string; soAdmin?: boolean }[] = [
+const ABAS: { id: ViewKind; rotulo: string; soAdmin?: boolean }[] = [
   { id: "execucoes", rotulo: "Execuções" },
   { id: "workflows", rotulo: "Por workflow" },
   { id: "executores", rotulo: "Por executor" },
@@ -91,7 +91,7 @@ export function VisoesAbas({ visao, onVisao, contagens, isAdmin, alerta = false 
                     : "bg-muted text-muted-foreground",
                 )}
               >
-                {formatarInteiro(n)}
+                {formatInteger(n)}
                 {vermelha && <span className="sr-only"> atrasadas</span>}
               </span>
             )}

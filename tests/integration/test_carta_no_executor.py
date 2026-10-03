@@ -11,7 +11,7 @@ import asyncio
 from unittest.mock import MagicMock, patch
 
 
-ASSINATURA_PNG = b"\x89PNG\r\n\x1a\n"
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 CAMADA = (
     "r = gpd.GeoDataFrame({'a': [1, 2]}, "
@@ -24,26 +24,26 @@ def _script(node_id, x):
             "properties": {"code": CAMADA % {"x": x}, "output_vars": "r", "timeout": 20}}
 
 
-def _carta(node_id, ports):
+def _image_map(node_id, ports):
     return {"id": node_id, "type": "output", "name": "CartaImagem",
             "properties": {"ports": ports, "dpi": 72, "titulo": "Carta do executor"}}
 
 
-def _rodar(nodes, edges):
+def _run(nodes, edges):
     from flow.executor import WorkflowExecutor
 
     publisher = MagicMock()
     publisher.publish_event = MagicMock()
     capturado = {}
 
-    def fake_persistir(**kwargs):
+    def fake_persist(**kwargs):
         capturado.update(kwargs)
         return f"artifacts/ws-1/t/{kwargs['filename']}", {
             "output_key": kwargs["label"], "format": kwargs["fmt"],
             "filename": kwargs["filename"], "size_bytes": len(kwargs["content"]),
         }
 
-    with patch("flow.nodes.outputs.carta_imagem.persistir_artefato", side_effect=fake_persistir):
+    with patch("flow.nodes.outputs.carta_imagem.persistir_artefato", side_effect=fake_persist):
         resultado = asyncio.run(
             WorkflowExecutor({"nodes": nodes, "edges": edges}, task_id="t",
                              publisher=publisher, workspace_id="ws-1").run()
@@ -51,7 +51,7 @@ def _rodar(nodes, edges):
     return resultado, capturado, publisher
 
 
-def _evento_de_conclusao(publisher, node_id):
+def _completion_event(publisher, node_id):
     """The node lifecycle event: `publish_event(task_id, node_id, status,
     ts, duration, error, extra, ...)` — `extra` carries `output_keys` and, only
     when there is drift, `schema_drift`."""
@@ -63,36 +63,36 @@ def _evento_de_conclusao(publisher, node_id):
     raise AssertionError(f"sem evento de conclusao para '{node_id}'")
 
 
-def test_duas_portas_recebem_uma_camada_cada_pelo_to_key():
-    resultado, capturado, publisher = _rodar(
-        [_script("a", -63.0), _script("b", -62.0), _carta("c", ["focos", "municipios"])],
+def test_two_ports_each_receive_one_layer_via_to_key():
+    resultado, capturado, publisher = _run(
+        [_script("a", -63.0), _script("b", -62.0), _image_map("c", ["focos", "municipios"])],
         [{"source": "a", "target": "c", "from_key": "r", "to_key": "focos"},
          {"source": "b", "target": "c", "from_key": "r", "to_key": "municipios"}],
     )
     assert resultado["c"]["camadas"] == 2
     assert capturado["features"] == 4
-    assert capturado["content"].startswith(ASSINATURA_PNG)
+    assert capturado["content"].startswith(PNG_SIGNATURE)
     assert capturado["filename"] == "carta_do_executor.png"
 
-    status, extra = _evento_de_conclusao(publisher, "c")
+    status, extra = _completion_event(publisher, "c")
     assert status != "failed"
     assert "schema_drift" not in extra, extra.get("schema_drift")
     assert "artifact_filename" in extra["output_keys"]
 
 
-def test_uma_porta_com_aresta_anonima_desenha_a_camada_espalhada():
+def test_one_port_with_anonymous_edge_draws_the_spread_layer():
     """With one port the editor does not write `to_key`: the executor spreads the
     parent's dict and the layer arrives as `r`, not as `lotes`. The image map
     draws it anyway, and the legend carries the port name."""
-    resultado, capturado, _ = _rodar(
-        [_script("a", -63.0), _carta("c", ["lotes"])],
+    resultado, capturado, _ = _run(
+        [_script("a", -63.0), _image_map("c", ["lotes"])],
         [{"source": "a", "target": "c", "from_key": "r"}],
     )
     assert resultado["c"]["camadas"] == 1
     assert capturado["features"] == 2
 
 
-def test_o_no_esta_no_catalogo_como_saida_de_entradas_dinamicas():
+def test_node_is_in_catalog_as_output_with_dynamic_inputs():
     from flow.registry import NODE_REGISTRY, auto_discover_nodes
     auto_discover_nodes()
 

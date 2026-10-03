@@ -12,18 +12,18 @@
 // that goes out passes through here, so the redaction (what is safe to expose)
 // can be reviewed in a single place. Nothing beyond these fields crosses — no
 // certificate, OTP, server_url, paths, log, resource metrics or history.
-import type { EstadoApp } from '../main/state/store.js'
-import type { EstadoConfiguracao } from '../main/state/config.js'
+import type { AppState } from '../main/state/store.js'
+import type { ConfigState } from '../main/state/config.js'
 
 /** IPC channels of the bridge. Single source for the preload and main (like ipc.ts). */
-export const CANAIS_WEB = {
+export const WEB_CHANNELS = {
   /** web → main, with a response: the current status (used on the first render). */
   status: 'atlas-web:executor-status',
   /** main → web, push: novo status quando a assinatura muda. */
   statusMudou: 'atlas-web:executor-status-mudou',
 } as const
 
-export type EstadoExecutorLocal = 'online' | 'ocupado' | 'offline' | 'sem-vinculo'
+export type LocalExecutorState = 'online' | 'ocupado' | 'offline' | 'sem-vinculo'
 
 export interface StatusExecutorLocal {
   /** Bumped if the format changes; the web does feature detection on top of this. */
@@ -36,7 +36,7 @@ export interface StatusExecutorLocal {
    */
   executorId: string | null
   vinculado: boolean
-  estado: EstadoExecutorLocal
+  estado: LocalExecutorState
   emExecucao: number
   capacidade: number | null
 }
@@ -50,12 +50,12 @@ export interface StatusExecutorLocal {
  * "offline · 2 em execução" (offline · 2 running).
  */
 export function derivarStatus(
-  estado: Pick<EstadoApp, 'supervisor' | 'snapshot'>,
-  cfg: Pick<EstadoConfiguracao, 'configurado' | 'executorId'>,
+  estado: Pick<AppState, 'supervisor' | 'snapshot'>,
+  cfg: Pick<ConfigState, 'configurado' | 'executorId'>,
 ): StatusExecutorLocal {
   const snap = estado.snapshot
 
-  let est: EstadoExecutorLocal
+  let est: LocalExecutorState
   if (!cfg.configurado) {
     est = 'sem-vinculo'
   } else if (estado.supervisor !== 'running' || !snap || snap.conn_state !== 'connected') {

@@ -15,10 +15,10 @@ import path from "node:path"
 const WEB = path.resolve(__dirname, "../../..")
 const EXTENSOES = ["", ".ts", ".tsx", ".js", ".mjs", "/index.ts", "/index.tsx"]
 
-function resolver(de: string, especificador: string): string | null {
+function resolver(de: string, specifier: string): string | null {
   let base: string
-  if (especificador.startsWith("@/")) base = path.join(WEB, especificador.slice(2))
-  else if (especificador.startsWith(".")) base = path.resolve(path.dirname(de), especificador)
+  if (specifier.startsWith("@/")) base = path.join(WEB, specifier.slice(2))
+  else if (specifier.startsWith(".")) base = path.resolve(path.dirname(de), specifier)
   else return null // pacote
   for (const ext of EXTENSOES) {
     const alvo = base + ext
@@ -29,7 +29,7 @@ function resolver(de: string, especificador: string): string | null {
 
 const IMPORT = /(?:import|export)\s+(type\s+)?(?:[^"'`]*?\sfrom\s+)?["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)/g
 
-function alcancaveis(inicio: string): Set<string> {
+function reachable(inicio: string): Set<string> {
   const vistos = new Set<string>()
   const pilha = [path.join(WEB, inicio)]
   while (pilha.length) {
@@ -47,7 +47,7 @@ function alcancaveis(inicio: string): Set<string> {
 
 describe("o layout do dashboard e os dicionários da Home", () => {
   it("a casca não alcança o índice nem os dicionários do assistente e da entrada", () => {
-    const grafo = alcancaveis("app/(dashboard)/layout.tsx")
+    const grafo = reachable("app/(dashboard)/layout.tsx")
     // The test sees the graph: the Home's sidebar and its texts are there.
     expect(grafo).toContain("app/components/sidebar/home-sidebar.tsx")
     expect(grafo).toContain("app/components/home/i18n/da-casca.ts")
@@ -58,7 +58,7 @@ describe("o layout do dashboard e os dicionários da Home", () => {
   })
 
   it("a Home, sim, alcança todos", () => {
-    const grafo = alcancaveis("app/(dashboard)/page.tsx")
+    const grafo = reachable("app/(dashboard)/page.tsx")
     expect(grafo).toContain("app/components/home/i18n/secoes/assistente.ts")
     expect(grafo).toContain("app/components/home/i18n/secoes/entrada.ts")
   })

@@ -7,10 +7,10 @@ afterEach(cleanup)
 
 // A date far in the future so `resumirAgendamento` marks "ativo" (with an upcoming one),
 // regardless of the clock the test runs on.
-const daquiUmaHora = new Date(Date.now() + 3_600_000).toISOString()
+const inOneHour = new Date(Date.now() + 3_600_000).toISOString()
 
 function agendamento(extra: Partial<IWorkflowSchedule> = {}): IWorkflowSchedule {
-  return { active: true, next_run_at: daquiUmaHora, last_run_at: null, strategy: "interval", interval: 6, unit: "hours", ...extra }
+  return { active: true, next_run_at: inOneHour, last_run_at: null, strategy: "interval", interval: 6, unit: "hours", ...extra }
 }
 
 function wf(id: string, extra: Partial<IWorkflow> = {}): IWorkflow {

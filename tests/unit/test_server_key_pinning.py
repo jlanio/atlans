@@ -35,7 +35,7 @@ def _pub_b64() -> str:
 
 # ── pin_key ───────────────────────────────────────────────────────────────────
 
-def test_pin_grava_e_recarrega(tmp_path):
+def test_pin_writes_and_reloads(tmp_path):
     chave = _pub_b64()
     pin_key(tmp_path, chave, source="teste")
 
@@ -43,7 +43,7 @@ def test_pin_grava_e_recarrega(tmp_path):
     assert pinned_key_path(tmp_path).is_file()
 
 
-def test_pin_repetido_com_a_mesma_chave_e_idempotente(tmp_path):
+def test_repeated_pin_with_the_same_key_is_idempotent(tmp_path):
     chave = _pub_b64()
     pin_key(tmp_path, chave, source="teste")
     pin_key(tmp_path, chave, source="teste")  # must not raise
@@ -51,7 +51,7 @@ def test_pin_repetido_com_a_mesma_chave_e_idempotente(tmp_path):
     assert load_pinned_key(tmp_path) == chave
 
 
-def test_chave_divergente_nao_sobrescreve_o_pin(tmp_path):
+def test_divergent_key_does_not_overwrite_the_pin(tmp_path):
     """O ponto central do S8: aceitar a troca automaticamente reabre o buraco."""
     original = _pub_b64()
     pin_key(tmp_path, original, source="enroll")
@@ -68,7 +68,7 @@ def test_chave_divergente_nao_sobrescreve_o_pin(tmp_path):
     base64.b64encode(b"x" * 64).decode(),         # 64 bytes, not 32
     "",
 ])
-def test_material_invalido_e_recusado(tmp_path, valor):
+def test_invalid_material_is_rejected(tmp_path, valor):
     with pytest.raises(ServerKeyError):
         pin_key(tmp_path, valor, source="teste")
     assert load_pinned_key(tmp_path) is None
@@ -77,7 +77,7 @@ def test_material_invalido_e_recusado(tmp_path, valor):
 # ── resolve_server_signing_key ────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_env_tem_precedencia_e_nao_toca_a_rede(tmp_path, monkeypatch):
+async def test_env_takes_precedence_and_does_not_touch_the_network(tmp_path, monkeypatch):
     chave = _pub_b64()
     monkeypatch.setenv("SERVER_SIGNING_PUBLIC_KEY", chave)
 
@@ -90,7 +90,7 @@ async def test_env_tem_precedencia_e_nao_toca_a_rede(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_pin_existente_dispensa_a_rede(tmp_path, monkeypatch):
+async def test_existing_pin_skips_the_network(tmp_path, monkeypatch):
     """Boots after the first one must not have a TOFU window."""
     monkeypatch.delenv("SERVER_SIGNING_PUBLIC_KEY", raising=False)
     chave = _pub_b64()
@@ -105,7 +105,7 @@ async def test_pin_existente_dispensa_a_rede(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_tofu_acontece_uma_unica_vez(tmp_path, monkeypatch):
+async def test_tofu_happens_only_once(tmp_path, monkeypatch):
     monkeypatch.delenv("SERVER_SIGNING_PUBLIC_KEY", raising=False)
     chave = _pub_b64()
     chamadas = []
@@ -122,7 +122,7 @@ async def test_tofu_acontece_uma_unica_vez(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_falha_ao_obter_a_chave_aborta(tmp_path, monkeypatch):
+async def test_failure_to_obtain_the_key_aborts(tmp_path, monkeypatch):
     """Starting without a trusted key would mean accepting jobs from any origin."""
     monkeypatch.delenv("SERVER_SIGNING_PUBLIC_KEY", raising=False)
 
@@ -136,7 +136,7 @@ async def test_falha_ao_obter_a_chave_aborta(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_pin_vazio_aborta_em_vez_de_refazer_tofu(tmp_path, monkeypatch):
+async def test_empty_pin_aborts_instead_of_redoing_tofu(tmp_path, monkeypatch):
     """A corrupted pin must not turn into "absent" and downgrade trust to TOFU.
 
     A truncated file (disk error, or an adversary with access to the volume)
@@ -156,7 +156,7 @@ async def test_pin_vazio_aborta_em_vez_de_refazer_tofu(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_rotacao_pelo_renewal_para_o_boot_seguinte(tmp_path, monkeypatch):
+async def test_rotation_via_renewal_for_the_next_boot(tmp_path, monkeypatch):
     """Real divergence path: the renewal bundle brings a new key.
 
     `resolve_server_signing_key` never fetches over the network when it has a pin,
@@ -182,7 +182,7 @@ async def test_rotacao_pelo_renewal_para_o_boot_seguinte(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_override_por_ambiente_destrava_o_conflito(tmp_path, monkeypatch):
+async def test_environment_override_unlocks_the_conflict(tmp_path, monkeypatch):
     """O operador confirmou a rotacao com o admin: o env explicito vence."""
     pin_key(tmp_path, _pub_b64(), source="enroll")
     nova = _pub_b64()
@@ -193,7 +193,7 @@ async def test_override_por_ambiente_destrava_o_conflito(tmp_path, monkeypatch):
     assert await resolve_server_signing_key(tmp_path, "wss://x") == nova
 
 
-def test_repin_coerente_limpa_o_marcador(tmp_path):
+def test_consistent_repin_clears_the_marker(tmp_path):
     """Without clearing, the executor would stay stuck even after it was resolved."""
     original = _pub_b64()
     pin_key(tmp_path, original, source="enroll")
@@ -207,7 +207,7 @@ def test_repin_coerente_limpa_o_marcador(tmp_path):
 
 # ── Pin WRITE failure ─────────────────────────────────────────────────────────
 
-def test_pin_em_diretorio_nao_gravavel_vira_erro_acionavel(tmp_path):
+def test_pin_in_unwritable_directory_becomes_actionable_error(tmp_path):
     """A write OSError must not escape as a raw traceback in the middle of boot.
 
     `load_pinned_key` already turned a READ OSError into ServerKeyError; the
@@ -222,7 +222,7 @@ def test_pin_em_diretorio_nao_gravavel_vira_erro_acionavel(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_boot_degrada_para_memoria_quando_nao_consegue_gravar(
+async def test_boot_degrades_to_memory_when_it_cannot_write(
     tmp_path, monkeypatch, caplog
 ):
     """The key came over verified mTLS — bringing the boot down trades risk for an outage."""

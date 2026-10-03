@@ -1,6 +1,6 @@
 # app/mcp/auth.py
 """
-`AutenticacaoPAT` — the edge of `/mcp`.
+`PATAuthentication` — the edge of `/mcp`.
 
 Pure ASGI middleware (not `BaseHTTPMiddleware`) in front of the SDK app. Pure
 because the streamable HTTP transport returns long-lived SSE, and Starlette's
@@ -31,11 +31,11 @@ from __future__ import annotations
 import json
 from urllib.parse import parse_qs
 
-from app.core.authorization.pat import e_segredo_pat
+from app.core.authorization.pat import is_pat_secret
 from app.core.authorization.workflow_access import listar_workspace_ids
 from app.core.utils.logger import get_logger
 from app.mcp import infra
-from app.mcp.escopo import ESCOPO_ATUAL, EscopoEfetivo
+from app.mcp.escopo import ESCOPO_ATUAL, EffectiveScope
 from app.services import api_token_service
 
 logger = get_logger("app.mcp.auth")
@@ -51,17 +51,17 @@ REALM = "atlans-mcp"
 # message says so, without telling anyone to "ask the admin for a token" — the
 # admin only creates tokens for their own account, and handing one over would
 # let someone else act on their behalf.
-MENSAGEM_RECUSA = (
+REFUSAL_MESSAGE = (
     "Token pessoal de acesso ausente ou inválido. Use "
     "Authorization: Bearer atl_pat_… (cada pessoa cria o próprio token em "
     "/settings/tokens, hoje página só de administradores do sistema)."
 )
 
 # Names careless clients use to pass the token in the URL.
-PARAMETROS_DE_TOKEN = ("access_token", "token")
+TOKEN_PARAMETERS = ("access_token", "token")
 
 
-class AutenticacaoPAT:
+class PATAuthentication:
     """Wraps the MCP ASGI app, requiring a valid PAT."""
 
     def __init__(self, app) -> None:
@@ -81,7 +81,7 @@ class AutenticacaoPAT:
                 "O app do MCP recebeu lifespan: o gerenciador de sessões é iniciado "
                 "por app.main, não aqui."
             )
-            await _atender_lifespan(receive, send)
+            await _serve_lifespan(receive, send)
             return
 
         if tipo != "http":
@@ -91,17 +91,17 @@ class AutenticacaoPAT:
 
         if scope.get("method") == "GET":
             # Before the database on purpose — see the module note.
-            await _recusar_metodo(send)
+            await _refuse_method(send)
             return
 
-        if _tem_token_na_query(scope.get("query_string", b"")):
+        if _has_token_in_query(scope.get("query_string", b"")):
             logger.warning("Tentativa de autenticar no MCP com token na query string — recusada.")
-            await _recusar(send)
+            await _refuse(send)
             return
 
-        segredo = _segredo_do_header(scope.get("headers") or [])
-        if not e_segredo_pat(segredo):
-            await _recusar(send)
+        segredo = _secret_from_header(scope.get("headers") or [])
+        if not is_pat_secret(segredo):
+            await _refuse(send)
             return
 
         async with infra.sessao() as db:
@@ -110,17 +110,17 @@ class AutenticacaoPAT:
                 # Right format, token does not resolve: RFC 6750's `error="invalid_token"`
                 # helps the client know it needs ANOTHER token, and not one more
                 # header.
-                await _recusar(send, invalido=True)
+                await _refuse(send, invalido=True)
                 return
             token, usuario = par
-            do_usuario = set(await listar_workspace_ids(db, usuario.id_hash))
+            user_workspaces = set(await listar_workspace_ids(db, usuario.id_hash))
             # `workspace_ids` NULL = "all of the user's workspaces, including
             # the ones they join later". Treating NULL as an empty list would take
             # away from the token precisely the reach the owner chose on the screen.
-            alcance_do_token = token.workspace_ids
-            todos = alcance_do_token is None
-            alcance = do_usuario if todos else do_usuario & set(alcance_do_token)
-            escopo = EscopoEfetivo(
+            token_reach = token.workspace_ids
+            todos = token_reach is None
+            alcance = user_workspaces if todos else user_workspaces & set(token_reach)
+            escopo = EffectiveScope(
                 user_id=usuario.id_hash,
                 username=getattr(usuario, "username", None),
                 token_id=token.id_hash,
@@ -133,7 +133,7 @@ class AutenticacaoPAT:
             if redis is not None:
                 # Best-effort with a 60 s throttle in the service itself; never
                 # raises, and without Redis it simply does not stamp.
-                await api_token_service.marcar_uso(db, redis, token)
+                await api_token_service.mark_used(db, redis, token)
 
         scope.setdefault("state", {})["escopo"] = escopo
         ficha = ESCOPO_ATUAL.set(escopo)
@@ -143,7 +143,7 @@ class AutenticacaoPAT:
             ESCOPO_ATUAL.reset(ficha)
 
 
-async def _atender_lifespan(receive, send) -> None:
+async def _serve_lifespan(receive, send) -> None:
     """Answers the lifecycle protocol without passing it on to the SDK app."""
     while True:
         mensagem = await receive()
@@ -157,7 +157,7 @@ async def _atender_lifespan(receive, send) -> None:
             return
 
 
-def _tem_token_na_query(query_string: bytes) -> bool:
+def _has_token_in_query(query_string: bytes) -> bool:
     """True if the URL carries `access_token=`/`token=` — refuses before reading the value."""
     if not query_string:
         return False
@@ -165,10 +165,10 @@ def _tem_token_na_query(query_string: bytes) -> bool:
         parametros = parse_qs(query_string.decode("latin-1"))
     except Exception:  # pragma: no cover - an unreadable query string is enough to refuse
         return True
-    return any(nome in parametros for nome in PARAMETROS_DE_TOKEN)
+    return any(nome in parametros for nome in TOKEN_PARAMETERS)
 
 
-def _segredo_do_header(headers) -> str | None:
+def _secret_from_header(headers) -> str | None:
     """The secret from `Authorization: Bearer …`, or None if the header is unusable."""
     for nome, valor in headers:
         if nome.lower() != b"authorization":
@@ -184,7 +184,7 @@ def _segredo_do_header(headers) -> str | None:
     return None
 
 
-async def _recusar_metodo(send) -> None:
+async def _refuse_method(send) -> None:
     """405 with `Allow: POST` — the method is not served, whatever the token."""
     corpo = json.dumps(
         {
@@ -210,14 +210,14 @@ async def _recusar_metodo(send) -> None:
     await send({"type": "http.response.body", "body": corpo})
 
 
-async def _recusar(send, *, invalido: bool = False) -> None:
+async def _refuse(send, *, invalido: bool = False) -> None:
     """401 in JSON, with the challenge MCP clients know how to read."""
     corpo = json.dumps(
-        {"error": "unauthorized", "message": MENSAGEM_RECUSA}, ensure_ascii=False
+        {"error": "unauthorized", "message": REFUSAL_MESSAGE}, ensure_ascii=False
     ).encode("utf-8")
-    desafio = f'Bearer realm="{REALM}"'
+    challenge = f'Bearer realm="{REALM}"'
     if invalido:
-        desafio += ', error="invalid_token"'
+        challenge += ', error="invalid_token"'
     await send(
         {
             "type": "http.response.start",
@@ -225,7 +225,7 @@ async def _recusar(send, *, invalido: bool = False) -> None:
             "headers": [
                 (b"content-type", b"application/json; charset=utf-8"),
                 (b"content-length", str(len(corpo)).encode("ascii")),
-                (b"www-authenticate", desafio.encode("ascii")),
+                (b"www-authenticate", challenge.encode("ascii")),
             ],
         }
     )

@@ -14,7 +14,7 @@ The warning is DEFERRED while logging is not configured: executor/config.py is
 imported before configure_logging(), and a warning emitted there would land in
 logging.lastResort (raw stderr, unformatted — with the panel on, garbage drawn
 over the display). It is held until configure_logging() calls
-emitir_avisos_adiados() (via executor.config.flush_startup_warnings). From then
+emit_deferred_warnings() (via executor.config.flush_startup_warnings). From then
 on warnings go out DIRECTLY: job_validator, renewal and sync_config are
 imported after boot, and there would be no other flush to deliver them.
 """
@@ -38,7 +38,7 @@ def avisar(msg: str, *args) -> None:
         _AVISOS_ADIADOS.append((msg, args))
 
 
-def emitir_avisos_adiados() -> None:
+def emit_deferred_warnings() -> None:
     """Emits the held warnings, now that there are real handlers."""
     global _logging_pronto
     for msg, args in _AVISOS_ADIADOS:
@@ -47,7 +47,7 @@ def emitir_avisos_adiados() -> None:
     _logging_pronto = True
 
 
-def _faixa(minimo, maximo) -> str:
+def _range_text(minimo, maximo) -> str:
     return f">= {minimo}" if maximo is None else f"entre {minimo} e {maximo}"
 
 
@@ -70,12 +70,12 @@ def ler_int(nome: str, padrao: int, minimo: int = 1, maximo: int | None = None) 
         return padrao
     if valor < minimo or (maximo is not None and valor > maximo):
         avisar("%s=%d fora da faixa (%s) — usando o padrao %d.",
-               nome, valor, _faixa(minimo, maximo), padrao)
+               nome, valor, _range_text(minimo, maximo), padrao)
         return padrao
     return valor
 
 
-def ler_float(nome: str, padrao: float, minimo: float, maximo: float | None = None) -> float:
+def read_float(nome: str, padrao: float, minimo: float, maximo: float | None = None) -> float:
     """Float version of ler_int. `nan` and `inf` are not numbers for this purpose."""
     bruto = os.getenv(nome)
     if bruto is None or not bruto.strip():
@@ -89,6 +89,6 @@ def ler_float(nome: str, padrao: float, minimo: float, maximo: float | None = No
         return padrao
     if valor < minimo or (maximo is not None and valor > maximo):
         avisar("%s=%s fora da faixa (%s) — usando o padrao %s.",
-               nome, valor, _faixa(minimo, maximo), padrao)
+               nome, valor, _range_text(minimo, maximo), padrao)
         return padrao
     return valor

@@ -47,7 +47,7 @@ A synchronous workflow: whoever calls the webhook gets the result in the respons
       "properties": { "payloadField": "", "payload_schema": {} },
       "position": { "x": 0, "y": 0 } },
     { "id": "filtro", "name": "AttributeFilter", "type": "action", "alias": "Ativos",
-      "properties": { "attributeName": "situacao", "operator": "==", "compareTo": "ativo" },
+      "properties": { "attributeName": "get_status", "operator": "==", "compareTo": "ativo" },
       "position": { "x": 320, "y": 0 } },
     { "id": "resposta", "name": "Response", "type": "output",
       "properties": { "statusCode": "200", "contentType": "application/json", "bodyMode": "field", "bodyField": "output", "headers": {} },

@@ -28,7 +28,7 @@ from flow.nodes.action.python_script import (
     PythonScript,
     _MAX_PYTHONSCRIPT_WORKERS,
     _SCRIPT_POOL,
-    _ScriptInterrompido,
+    _ScriptInterrupted,
     _interromper_thread,
 )
 
@@ -42,7 +42,7 @@ def _no(code: str, timeout: int = 30, saida: str = "result") -> PythonScript:
 
 # ── Pool dedicado e limitado ────────────────────────────────────────────────
 
-def test_pool_dedicado_e_limitado():
+def test_dedicated_pool_is_bounded():
     """Mutation: go back to using asyncio.to_thread (default pool).
 
     The default pool is the same one used by the other nodes and the heartbeat;
@@ -53,7 +53,7 @@ def test_pool_dedicado_e_limitado():
     assert 1 <= _MAX_PYTHONSCRIPT_WORKERS <= 8
 
 
-def test_execute_usa_o_pool_e_nao_wait_for_do_future():
+def test_execute_uses_the_pool_and_not_wait_for_on_the_future():
     """Mutation: `asyncio.wait_for(future, ...)` instead of `asyncio.wait`.
 
     wait_for tries to CANCEL the executor's future; since the thread cannot be
@@ -65,15 +65,15 @@ def test_execute_usa_o_pool_e_nao_wait_for_do_future():
     assert "asyncio.wait(" in codigo
     assert "asyncio.wait_for(future" not in codigo
     assert "asyncio.to_thread(" not in codigo
-    # Mutation: replace the _interromper_thread call with `liberou = False`.
+    # Mutation: replace the _interromper_thread call with `released = False`.
     # Without interrupting, a `while True` holds the worker forever. The
     # behavioral proof that the interruption returns the worker is in
-    # test_interromper_encerra_laco_e_reclama_o_worker; here we ensure the node
+    # test_interrupt_ends_loop_and_reclaims_the_worker; here we ensure the node
     # actually INVOKES it in the timeout branch.
     assert "_interromper_thread(" in codigo
 
 
-def test_run_script_nao_usa_to_thread():
+def test_run_script_does_not_use_to_thread():
     """Mutacao: reintroduzir asyncio.to_thread em qualquer ponto do modulo."""
     codigo = inspect.getsource(ps)
     assert "asyncio.to_thread(" not in codigo
@@ -81,7 +81,7 @@ def test_run_script_nao_usa_to_thread():
 
 # ── Thread interruption ─────────────────────────────────────────────────────
 
-class _FutureFalso:
+class _FakeFuture:
     def __init__(self, done: bool):
         self._done = done
 
@@ -89,20 +89,20 @@ class _FutureFalso:
         return self._done
 
 
-def test_interromper_ignora_ident_nulo():
-    assert _interromper_thread(_FutureFalso(False), None) is False
+def test_interrupt_ignores_null_ident():
+    assert _interromper_thread(_FakeFuture(False), None) is False
 
 
-def test_interromper_ignora_future_ja_concluido():
+def test_interrupt_ignores_already_done_future():
     """Mutation: remove the `future.done()` guard.
 
     Without it, the interruption could land on a NEXT task in the pool after the
     thread had finished ours — killing the wrong script.
     """
-    assert _interromper_thread(_FutureFalso(True), threading.get_ident()) is False
+    assert _interromper_thread(_FakeFuture(True), threading.get_ident()) is False
 
 
-def test_interromper_encerra_laco_e_reclama_o_worker():
+def test_interrupt_ends_loop_and_reclaims_the_worker():
     """Mutation: do not call _interromper_thread in the timeout branch.
 
     Proves the injection ends a pure-Python `while True` and returns the worker:
@@ -134,7 +134,7 @@ def test_interromper_encerra_laco_e_reclama_o_worker():
 
 # ── End-to-end behavior through the node ────────────────────────────────────
 
-async def test_timeout_encerra_e_reclama_pelo_no():
+async def test_timeout_ends_and_reclaims_via_the_node():
     """Mutation: any regression that makes the timeout hang (wait_for) or not
     release the worker.
 
@@ -151,29 +151,29 @@ async def test_timeout_encerra_e_reclama_pelo_no():
     assert r == {"result": "vivo"}
 
 
-async def test_script_normal_funciona():
+async def test_normal_script_works():
     r = await _no("result = 1 + 2").execute({})
     assert r == {"result": 3}
 
 
-async def test_erro_do_script_vira_runtimeerror():
+async def test_script_error_becomes_runtimeerror():
     with pytest.raises(RuntimeError) as exc:
         await _no("result = 1 / 0").execute({})
     assert "division by zero" in str(exc.value)
 
 
-async def test_fuga_bloqueada_pelo_no_antes_de_executar():
+async def test_escape_blocked_by_the_node_before_running():
     """AST validation runs BEFORE compiling/executing: an escape becomes ValueError."""
     with pytest.raises(ValueError) as exc:
         await _no("result = ().__class__").execute({})
     assert "seguran" in str(exc.value).lower()
 
 
-def test_script_interrompido_e_baseexception():
-    """Mutation: _ScriptInterrompido becoming a subclass of Exception.
+def test_interrupted_script_is_baseexception():
+    """Mutation: _ScriptInterrupted becoming a subclass of Exception.
 
     It must be a BaseException to survive an `except Exception` in the user's
     code and actually end the loop.
     """
-    assert issubclass(_ScriptInterrompido, BaseException)
-    assert not issubclass(_ScriptInterrompido, Exception)
+    assert issubclass(_ScriptInterrupted, BaseException)
+    assert not issubclass(_ScriptInterrupted, Exception)

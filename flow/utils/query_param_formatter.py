@@ -55,7 +55,7 @@ def prepare_query(query: str, params: Dict[str, Any]) -> Tuple[str, List[Any]]:
     index_map: Dict[str, int] = {}
     values: List[Any] = []
     pedacos: List[str] = []
-    fim_anterior = 0
+    previous_end = 0
 
     for match in _PLACEHOLDER_PATTERN.finditer(mapa):
         key = match.group("key")
@@ -64,11 +64,11 @@ def prepare_query(query: str, params: Dict[str, Any]) -> Tuple[str, List[Any]]:
         if key not in index_map:
             index_map[key] = len(index_map) + 1
             values.append(params[key])
-        pedacos.append(query[fim_anterior:match.start()])
+        pedacos.append(query[previous_end:match.start()])
         pedacos.append(f"${index_map[key]}")
-        fim_anterior = match.end()
+        previous_end = match.end()
 
-    pedacos.append(query[fim_anterior:])
+    pedacos.append(query[previous_end:])
     return "".join(pedacos), values
 
 
@@ -87,15 +87,15 @@ def resolver_query_params(inputs: Dict[str, Any], parameters: Dict[str, Any]) ->
     key being there means exactly that someone connected an edge pointing
     to `queryParams`.
     """
-    veio_da_aresta = 'queryParams' in inputs
-    valor = inputs['queryParams'] if veio_da_aresta else parameters.get('queryParams', {})
+    came_from_edge = 'queryParams' in inputs
+    valor = inputs['queryParams'] if came_from_edge else parameters.get('queryParams', {})
 
     if valor is None:
         valor = {}
 
     if not isinstance(valor, dict):
         origem = (
-            "recebido do nó anterior" if veio_da_aresta
+            "recebido do nó anterior" if came_from_edge
             else "configurado no campo 'Parâmetros da consulta'"
         )
         raise ValueError(

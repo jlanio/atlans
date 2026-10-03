@@ -63,10 +63,10 @@ export function resolveSourceHandle(
   //    the database. `data.outputs` is the SAME source the rendering uses, and
   //    it arrives synchronously on load (catalog or `ports`).
   if (edge.source_handle) {
-    const eNomeado = outputs.length > 1 && outputs.some(p => p.name === edge.source_handle)
-    const eRoteamento = (edge.source_handle === "true" || edge.source_handle === "false")
+    const isNamed = outputs.length > 1 && outputs.some(p => p.name === edge.source_handle)
+    const isRouting = (edge.source_handle === "true" || edge.source_handle === "false")
       && outputs.some(p => p.name === "true" || p.name === "false")
-    if (eNomeado || eRoteamento) return edge.source_handle
+    if (isNamed || isRouting) return edge.source_handle
     // Ghost handle: falls through to the recovery steps.
   }
 

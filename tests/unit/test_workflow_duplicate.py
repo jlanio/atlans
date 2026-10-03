@@ -25,13 +25,13 @@ from app.services.workflow_service import WorkflowService
 WS = "ws-1"
 # Who is duplicating. The author is mandatory: it is against them that the
 # service checks the copy's credentials (SEG-12).
-QUEM = "usr-1"
+ACTOR = "usr-1"
 
 
-def _definition(com_schedule=True, conn=None):
+def _definition(with_schedule=True, conn=None):
     nodes = [{"id": "n1", "name": "WFS", "type": "datasource",
               "properties": {"credential_id": "cred-1", **({"connectionString": conn} if conn else {})}}]
-    if com_schedule:
+    if with_schedule:
         nodes.insert(0, {
             "id": "t1", "name": "ScheduleTrigger", "type": "trigger",
             "properties": {"strategy": "cron", "cron_expression": "0 6 * * *",
@@ -40,7 +40,7 @@ def _definition(com_schedule=True, conn=None):
     return {"nodes": nodes, "edges": [{"source": "t1", "target": "n1"}]}
 
 
-def _servico(original, nomes_no_workspace=()):
+def _service(original, names_in_workspace=()):
     """Service with the CRUD stubbed; `create` returns what it received."""
     svc = WorkflowService(MagicMock())
     svc.crud = MagicMock()
@@ -57,7 +57,7 @@ def _servico(original, nomes_no_workspace=()):
     svc.crud.create = AsyncMock(side_effect=_create)
 
     resultado = MagicMock()
-    resultado.all.return_value = [(n,) for n in nomes_no_workspace]
+    resultado.all.return_value = [(n,) for n in names_in_workspace]
     svc.crud.db = MagicMock(execute=AsyncMock(return_value=resultado), rollback=AsyncMock())
     return svc
 
@@ -72,7 +72,7 @@ def _original(definition=None, **kw):
 
 
 @pytest.fixture(autouse=True)
-def _sem_schedule_real():
+def _without_real_schedule():
     """`apply_schedule_if_needed` touches the database; the target here is the definition."""
     with patch("app.services.workflow_service.apply_schedule_if_needed",
                new=AsyncMock()) as m:
@@ -80,7 +80,7 @@ def _sem_schedule_real():
 
 
 @pytest.fixture(autouse=True)
-def credenciais_de_quem_duplica():
+def duplicator_credentials():
     """The credential guard (SEG-12) accepting: the target here is the copy, and
     the refusal is proven in test_workflow_credencial_guard.py. The query
     touches the credentials table, which the stubbed CRUD does not have."""
@@ -92,71 +92,71 @@ def credenciais_de_quem_duplica():
 # ── Nome ─────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_nome_derivado_do_original():
-    copia = await _servico(_original()).duplicate_workflow("wf-1", duplicated_by=QUEM)
+async def test_name_derived_from_the_original():
+    copia = await _service(_original()).duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     assert copia.name == "Cópia de Edificações"
 
 
 @pytest.mark.asyncio
-async def test_desambigua_quando_a_copia_ja_existe():
+async def test_disambiguates_when_the_copy_already_exists():
     """There is a UniqueConstraint(name, workspace_id): without this, duplicating
     twice returned 409 before the user saw the copy."""
-    svc = _servico(_original(), nomes_no_workspace=["Edificações", "Cópia de Edificações"])
+    svc = _service(_original(), names_in_workspace=["Edificações", "Cópia de Edificações"])
 
-    copia = await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)
+    copia = await svc.duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     assert copia.name == "Cópia de Edificações (2)"
 
 
 @pytest.mark.asyncio
-async def test_desambigua_repetidamente():
-    svc = _servico(_original(), nomes_no_workspace=[
+async def test_disambiguates_repeatedly():
+    svc = _service(_original(), names_in_workspace=[
         "Cópia de Edificações", "Cópia de Edificações (2)", "Cópia de Edificações (3)",
     ])
 
-    assert (await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)).name == "Cópia de Edificações (4)"
+    assert (await svc.duplicate_workflow("wf-1", duplicated_by=ACTOR)).name == "Cópia de Edificações (4)"
 
 
 @pytest.mark.asyncio
-async def test_nome_explicito_prevalece():
-    copia = await _servico(_original()).duplicate_workflow("wf-1", "Teste 2026", duplicated_by=QUEM)
+async def test_explicit_name_prevails():
+    copia = await _service(_original()).duplicate_workflow("wf-1", "Teste 2026", duplicated_by=ACTOR)
 
     assert copia.name == "Teste 2026"
 
 
 @pytest.mark.asyncio
-async def test_nome_em_branco_cai_no_derivado():
-    copia = await _servico(_original()).duplicate_workflow("wf-1", "   ", duplicated_by=QUEM)
+async def test_blank_name_falls_back_to_the_derived_one():
+    copia = await _service(_original()).duplicate_workflow("wf-1", "   ", duplicated_by=ACTOR)
 
     assert copia.name == "Cópia de Edificações"
 
 
 # ── Collision on INSERT ──────────────────────────────────────────────────────
 #
-# `_nome_de_copia` READS the taken names and the INSERT comes afterwards: there
+# `_copy_name` READS the taken names and the INSERT comes afterwards: there
 # is a window between the two. Two simultaneous duplications read the same set
 # and propose the same name; the second one hits the constraint. No test made
 # `crud.create` fail, so that path stayed uncovered until it became a 409 on
 # the user's screen.
 #
-# `move` already handled the same race (workflow_move_service._aplicar); these
+# `move` already handled the same race (workflow_move_service._apply); these
 # tests pin down the equivalent handling in duplication.
 
 
-def _conflito(nome: str) -> WorkflowNameConflictError:
+def _conflict(nome: str) -> WorkflowNameConflictError:
     return WorkflowNameConflictError(f"Já existe um workflow chamado '{nome}' neste workspace.")
 
 
-def _servico_que_falha(original, falhas: int, nomes_no_workspace=()):
-    """Like `_servico`, but `crud.create` raises a conflict on the first `falhas` calls.
+def _failing_service(original, falhas: int, names_in_workspace=()):
+    """Like `_service`, but `crud.create` raises a conflict on the first `falhas` calls.
 
-    The names already tried go into `nomes_no_workspace` on each failure — that
+    The names already tried go into `names_in_workspace` on each failure — that
     is what the real database would do: the next read sees whoever caused the
     collision.
     """
-    svc = _servico(original, nomes_no_workspace=nomes_no_workspace)
-    ocupados = list(nomes_no_workspace)
+    svc = _service(original, names_in_workspace=names_in_workspace)
+    ocupados = list(names_in_workspace)
     tentativas: list[str] = []
 
     async def _create(name, definition, **kwargs):
@@ -164,7 +164,7 @@ def _servico_que_falha(original, falhas: int, nomes_no_workspace=()):
         if len(tentativas) <= falhas:
             ocupados.append(name)
             svc.crud.db.execute.return_value.all.return_value = [(n,) for n in ocupados]
-            raise _conflito(name)
+            raise _conflict(name)
         m = MagicMock(id_hash="novo", definition=definition,
                       workspace_id=kwargs.get("workspace_id"))
         m.name = name
@@ -176,22 +176,22 @@ def _servico_que_falha(original, falhas: int, nomes_no_workspace=()):
 
 
 @pytest.mark.asyncio
-async def test_colisao_no_insert_e_resolvida_recalculando_o_nome():
+async def test_insert_collision_is_resolved_by_recomputing_the_name():
     """Primeira aposta e recalcular: "(2)" e melhor nome que um hex aleatorio."""
-    svc = _servico_que_falha(_original(), falhas=1)
+    svc = _failing_service(_original(), falhas=1)
 
-    copia = await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)
+    copia = await svc.duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     assert svc.tentativas == ["Cópia de Edificações", "Cópia de Edificações (2)"]
     assert copia.name == "Cópia de Edificações (2)"
 
 
 @pytest.mark.asyncio
-async def test_colisao_persistente_cai_no_sufixo_unico():
+async def test_persistent_collision_falls_back_to_unique_suffix():
     """Colliding twice indicates a real race — the hex competes with nobody."""
-    svc = _servico_que_falha(_original(), falhas=2)
+    svc = _failing_service(_original(), falhas=2)
 
-    copia = await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)
+    copia = await svc.duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     assert len(svc.tentativas) == 3
     assert copia.name.startswith("Cópia de Edificações (")
@@ -201,32 +201,32 @@ async def test_colisao_persistente_cai_no_sufixo_unico():
 
 
 @pytest.mark.asyncio
-async def test_colisao_nas_tres_tentativas_vira_erro_legivel():
+async def test_collision_on_all_three_attempts_becomes_readable_error():
     """Better a 409 with its own message than a raw IntegrityError turning into a 500."""
-    svc = _servico_que_falha(_original(), falhas=99)
+    svc = _failing_service(_original(), falhas=99)
 
     with pytest.raises(WorkflowNameConflictError, match="nome livre para a cópia"):
-        await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)
+        await svc.duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     assert len(svc.tentativas) == 3
 
 
 @pytest.mark.asyncio
-async def test_nome_explicito_nao_e_renomeado_na_colisao():
+async def test_explicit_name_is_not_renamed_on_collision():
     """Whoever typed the name deserves to know it collided.
 
     Renaming on our own would create "Meu Fluxo (2)" for someone who asked for
     "Meu Fluxo" — the collision here is an answer, not an accident of ours.
     """
-    svc = _servico_que_falha(_original(), falhas=1)
+    svc = _failing_service(_original(), falhas=1)
 
     with pytest.raises(WorkflowNameConflictError):
-        await svc.duplicate_workflow("wf-1", "Meu Fluxo", duplicated_by=QUEM)
+        await svc.duplicate_workflow("wf-1", "Meu Fluxo", duplicated_by=ACTOR)
 
     assert svc.tentativas == ["Meu Fluxo"]
 
 
-class _OriginalQueExpira:
+class _ExpiringOriginal:
     """Stub with SQLAlchemy's expiration semantics.
 
     `MagicMock` responds to any attribute forever, so no test based on it sees
@@ -257,9 +257,9 @@ class _OriginalQueExpira:
 
 
 @pytest.mark.asyncio
-async def test_retentativa_nao_le_o_original_depois_do_rollback():
+async def test_retry_does_not_read_the_original_after_the_rollback():
     """Regression: the retry read `original.name` and `original.workspace_id` again."""
-    original = _OriginalQueExpira(
+    original = _ExpiringOriginal(
         id_hash="wf-1", workspace_id=WS, name="Edificações", definition=_definition(),
         description="d", params_schema={}, group_id=None, priority=0, notification_url=None,
         # The copy inherits the original's provenance — read BEFORE the first
@@ -267,7 +267,7 @@ async def test_retentativa_nao_le_o_original_depois_do_rollback():
         origem="usuario",
     )
 
-    svc = _servico(original)
+    svc = _service(original)
     ocupados: list[str] = []
     tentativas: list[str] = []
 
@@ -277,7 +277,7 @@ async def test_retentativa_nao_le_o_original_depois_do_rollback():
             ocupados.append(name)
             svc.crud.db.execute.return_value.all.return_value = [(n,) for n in ocupados]
             original.expirar()          # that is what SQLAlchemy's rollback does
-            raise _conflito(name)
+            raise _conflict(name)
         m = MagicMock(id_hash="novo", definition=definition,
                       workspace_id=kwargs.get("workspace_id"))
         m.name = name
@@ -285,20 +285,20 @@ async def test_retentativa_nao_le_o_original_depois_do_rollback():
 
     svc.crud.create = AsyncMock(side_effect=_create)
 
-    copia = await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)
+    copia = await svc.duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     assert copia.name == "Cópia de Edificações (2)"
     assert copia.workspace_id == WS      # the workspace survived the expiration
 
 
 @pytest.mark.asyncio
-async def test_erro_de_outra_natureza_nao_e_engolido_pelo_retry():
+async def test_error_of_another_kind_is_not_swallowed_by_the_retry():
     """The retry exists for a NAME collision; everything else has to surface intact."""
-    svc = _servico(_original())
+    svc = _service(_original())
     svc.crud.create = AsyncMock(side_effect=RuntimeError("conexão caiu"))
 
     with pytest.raises(RuntimeError, match="conexão caiu"):
-        await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)
+        await svc.duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     assert svc.crud.create.await_count == 1
 
@@ -306,25 +306,25 @@ async def test_erro_de_outra_natureza_nao_e_engolido_pelo_retry():
 # ── Autoria ──────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_a_copia_e_de_quem_copiou_e_as_credenciais_sao_conferidas_contra_ele(
-    credenciais_de_quem_duplica,
+async def test_the_copy_belongs_to_the_copier_and_credentials_are_checked_against_them(
+    duplicator_credentials,
 ):
-    svc = _servico(_original())
+    svc = _service(_original())
 
-    await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)
+    await svc.duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     kw = svc.crud.create.await_args.kwargs
-    assert (kw["created_by_id"], kw["updated_by_id"]) == (QUEM, QUEM)
-    _db, ids, usuario = credenciais_de_quem_duplica.await_args.args
-    assert (ids, usuario) == (["cred-1"], QUEM)
-    assert credenciais_de_quem_duplica.await_args.kwargs == {"shared_workspace_id": WS}
+    assert (kw["created_by_id"], kw["updated_by_id"]) == (ACTOR, ACTOR)
+    _db, ids, usuario = duplicator_credentials.await_args.args
+    assert (ids, usuario) == (["cred-1"], ACTOR)
+    assert duplicator_credentials.await_args.kwargs == {"shared_workspace_id": WS}
 
 
 # ── Workspace ────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_copia_fica_no_mesmo_workspace():
-    copia = await _servico(_original()).duplicate_workflow("wf-1", duplicated_by=QUEM)
+async def test_copy_stays_in_the_same_workspace():
+    copia = await _service(_original()).duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     assert copia.workspace_id == WS
 
@@ -332,8 +332,8 @@ async def test_copia_fica_no_mesmo_workspace():
 # ── Agendamento ──────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_agendamento_acompanha_desligado():
-    copia = await _servico(_original()).duplicate_workflow("wf-1", duplicated_by=QUEM)
+async def test_schedule_comes_along_disabled():
+    copia = await _service(_original()).duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     trigger = next(n for n in copia.definition["nodes"] if n["name"] == "ScheduleTrigger")
     assert trigger["properties"]["active"] is False
@@ -343,22 +343,22 @@ async def test_agendamento_acompanha_desligado():
 
 
 @pytest.mark.asyncio
-async def test_original_continua_agendado():
+async def test_original_stays_scheduled():
     """Regression: the ORM definition is observed by SQLAlchemy — mutating it
     would mark the SOURCE workflow as dirty and turn off its schedule."""
     original = _original()
 
-    await _servico(original).duplicate_workflow("wf-1", duplicated_by=QUEM)
+    await _service(original).duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     trigger = next(n for n in original.definition["nodes"] if n["name"] == "ScheduleTrigger")
     assert trigger["properties"]["active"] is True
 
 
 @pytest.mark.asyncio
-async def test_workflow_sem_agendamento_duplica_normalmente():
-    svc = _servico(_original(definition=_definition(com_schedule=False)))
+async def test_workflow_without_schedule_duplicates_normally():
+    svc = _service(_original(definition=_definition(with_schedule=False)))
 
-    copia = await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)
+    copia = await svc.duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     assert [n["name"] for n in copia.definition["nodes"]] == ["WFS"]
 
@@ -366,16 +366,16 @@ async def test_workflow_sem_agendamento_duplica_normalmente():
 # ── Copied content ───────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_definition_e_copiada_com_as_credenciais():
+async def test_definition_is_copied_with_the_credentials():
     """No mesmo workspace o credential_id continua resolvendo."""
-    copia = await _servico(_original()).duplicate_workflow("wf-1", duplicated_by=QUEM)
+    copia = await _service(_original()).duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     no = next(n for n in copia.definition["nodes"] if n["name"] == "WFS")
     assert no["properties"]["credential_id"] == "cred-1"
 
 
 @pytest.mark.asyncio
-async def test_connection_string_chega_cifrada_na_copia():
+async def test_connection_string_arrives_encrypted_in_the_copy():
     """The cycle is decrypt on get, encrypt on create.
 
     `get_workflow_by_hash` returns the definition IN PLAIN TEXT (it decrypts the
@@ -384,16 +384,16 @@ async def test_connection_string_chega_cifrada_na_copia():
     """
     from app.core.utils.encryption import encrypt_string
 
-    svc = _servico(_original(definition=_definition(conn=encrypt_string("host=db user=x"))))
+    svc = _service(_original(definition=_definition(conn=encrypt_string("host=db user=x"))))
 
-    copia = await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)
+    copia = await svc.duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     no = next(n for n in copia.definition["nodes"] if n["name"] == "WFS")
     assert no["properties"]["connectionString"].startswith("gAAAA")
 
 
 @pytest.mark.asyncio
-async def test_params_schema_acompanha():
+async def test_params_schema_comes_along():
     """Regression: `create_workflow` only received name/definition/workspace.
 
     It is the params_schema that makes the screen ask for the parameters before
@@ -402,21 +402,21 @@ async def test_params_schema_acompanha():
     from the original's.
     """
     esquema = {"ano": {"type": "number", "required": True}}
-    svc = _servico(_original(params_schema=esquema))
+    svc = _service(_original(params_schema=esquema))
 
-    await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)
+    await svc.duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     assert svc.crud.create.await_args.kwargs["params_schema"] == esquema
 
 
 @pytest.mark.asyncio
-async def test_configuracao_do_workflow_acompanha():
-    svc = _servico(_original(
+async def test_workflow_configuration_comes_along():
+    svc = _service(_original(
         description="Valida edificações", group_id="grp-1",
         priority=5, notification_url="https://hook",
     ))
 
-    await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)
+    await svc.duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     kw = svc.crud.create.await_args.kwargs
     assert kw["description"] == "Valida edificações"
@@ -426,13 +426,13 @@ async def test_configuracao_do_workflow_acompanha():
 
 
 @pytest.mark.asyncio
-async def test_pins_e_portal_nao_acompanham():
+async def test_pins_and_portal_do_not_come_along():
     """`create_workflow` receives only name and definition — pins point to the
     original's runs and a published portal must not propagate without someone
     asking."""
-    svc = _servico(_original(pinned_outputs={"n1": "art-1"}, portal_access="public"))
+    svc = _service(_original(pinned_outputs={"n1": "art-1"}, portal_access="public"))
 
-    await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)
+    await svc.duplicate_workflow("wf-1", duplicated_by=ACTOR)
 
     _nome, _definition = svc.crud.create.await_args.args[:2]
     assert "pinned_outputs" not in svc.crud.create.await_args.kwargs

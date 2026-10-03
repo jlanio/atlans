@@ -18,7 +18,7 @@ import pandas as pd
 import pytest
 
 from flow.nodes.action import geocode
-from flow.utils.identidade import site_da_instalacao, user_agent
+from flow.utils.identidade import installation_site, user_agent
 
 
 @pytest.mark.parametrize("ambiente, site", [
@@ -37,8 +37,8 @@ from flow.utils.identidade import site_da_instalacao, user_agent
     ({"EXECUTOR_SERVER_URL": "wss://8.8.8.8:8443"}, "https://8.8.8.8:8443"),
     ({"EXECUTOR_SERVER_URL": "wss://[2001:4860::5]:8443"}, "https://[2001:4860::5]:8443"),
 ])
-def test_o_site_da_instalacao(ambiente, site):
-    assert site_da_instalacao(ambiente) == site
+def test_the_installation_site(ambiente, site):
+    assert installation_site(ambiente) == site
 
 
 @pytest.mark.parametrize("servidor", [
@@ -49,15 +49,15 @@ def test_o_site_da_instalacao(ambiente, site):
     "wss://[fd00::5]:8443",
     "ws://api:8000",           # container name, no domain
 ])
-def test_endereco_interno_nao_vai_para_terceiros(servidor):
+def test_internal_address_is_not_sent_to_third_parties(servidor):
     """Review finding: `ws://10.0.0.5:8000` became
     `Atlans/carta (+http://10.0.0.5:8000)` — the installation's internal network in
     the User-Agent of every tile request, without serving as a contact."""
-    assert site_da_instalacao({"EXECUTOR_SERVER_URL": servidor}) == ""
+    assert installation_site({"EXECUTOR_SERVER_URL": servidor}) == ""
     assert user_agent("carta", {"EXECUTOR_SERVER_URL": servidor}) == "Atlans/carta"
 
 
-def test_o_user_agent_leva_o_site_ou_so_o_produto():
+def test_user_agent_carries_the_site_or_only_the_product():
     assert user_agent("carta", {"EXECUTOR_SERVER_URL": "wss://agents.atlans.example.org"}) == \
         "Atlans/carta (+https://atlans.example.org)"
     assert user_agent("geocode", {}) == "Atlans/geocode"
@@ -68,23 +68,23 @@ def test_o_user_agent_leva_o_site_ou_so_o_produto():
     ("https://nominatim.example.org/", {"domain": "nominatim.example.org", "scheme": "https"}),
     ("http://geo.interno:8080/nominatim", {"domain": "geo.interno:8080/nominatim", "scheme": "http"}),
 ])
-def test_o_servidor_do_nominatim(valor, esperado):
-    assert geocode._servidor_nominatim({"NOMINATIM_URL": valor}) == esperado
+def test_the_nominatim_server(valor, esperado):
+    assert geocode._nominatim_server({"NOMINATIM_URL": valor}) == esperado
 
 
-def test_nominatim_url_que_nao_e_url_explica():
+def test_nominatim_url_that_is_not_a_url_explains():
     with pytest.raises(ValueError, match="NOMINATIM_URL"):
-        geocode._servidor_nominatim({"NOMINATIM_URL": "nominatim.example.org"})
+        geocode._nominatim_server({"NOMINATIM_URL": "nominatim.example.org"})
 
 
 @pytest.fixture
-def geopy_falso(monkeypatch):
+def fake_geopy(monkeypatch):
     """The fake geopy: records how the Nominatim was constructed."""
-    construidos: list[dict] = []
+    constructed: list[dict] = []
 
     class Nominatim:
         def __init__(self, **kw):
-            construidos.append(kw)
+            constructed.append(kw)
 
         def geocode(self, endereco):
             return types.SimpleNamespace(latitude=-10.0, longitude=-50.0)
@@ -95,10 +95,10 @@ def geopy_falso(monkeypatch):
     limitador.RateLimiter = lambda f, **kw: f
     monkeypatch.setitem(sys.modules, "geopy.geocoders", geocoders)
     monkeypatch.setitem(sys.modules, "geopy.extra.rate_limiter", limitador)
-    return construidos
+    return constructed
 
 
-async def test_o_geocode_se_apresenta_com_o_site_da_instalacao(geopy_falso, monkeypatch):
+async def test_geocode_identifies_itself_with_the_installation_site(fake_geopy, monkeypatch):
     monkeypatch.setenv("EXECUTOR_SERVER_URL", "wss://agents.atlans.example.org")
     monkeypatch.delenv("EXECUTOR_PUBLIC_SERVER_URL", raising=False)
     monkeypatch.setenv("NOMINATIM_URL", "https://nominatim.example.org")
@@ -106,23 +106,23 @@ async def test_o_geocode_se_apresenta_com_o_site_da_instalacao(geopy_falso, monk
 
     saida = await no.execute({"output": pd.DataFrame({"address": ["Rua A, 1"]})})
 
-    assert geopy_falso == [{
+    assert fake_geopy == [{
         "user_agent": "Atlans/geocode (+https://atlans.example.org)",
         "domain": "nominatim.example.org", "scheme": "https",
     }]
     assert bool(saida["output"]["geocoded"].iloc[0])
 
 
-def test_o_catalogo_mantem_o_padrao_antigo_do_campo():
+def test_catalog_keeps_the_fields_old_default():
     """Review finding: the web app saves the defaults into the node. With an empty
     default, an executor older than this version called Nominatim with an empty
     User-Agent, and geopy refuses it (ConfigurationError)."""
     campos = {c["name"]: c for c in geocode.GeocodeNode.description()["properties"]}
-    assert campos["user_agent"]["default"] == geocode.USER_AGENT_ANTIGO == "atlas-studio-geocode/1.0"
+    assert campos["user_agent"]["default"] == geocode.LEGACY_USER_AGENT == "atlas-studio-geocode/1.0"
 
 
 @pytest.mark.parametrize("valor", ["", "  ", "atlas-studio-geocode/1.0", " atlas-studio-geocode/1.0 "])
-async def test_vazio_e_o_padrao_antigo_viram_o_da_instalacao(geopy_falso, monkeypatch, valor):
+async def test_empty_and_old_default_become_the_installations(fake_geopy, monkeypatch, valor):
     monkeypatch.setenv("EXECUTOR_SERVER_URL", "wss://agents.atlans.example.org")
     monkeypatch.delenv("EXECUTOR_PUBLIC_SERVER_URL", raising=False)
     monkeypatch.delenv("NOMINATIM_URL", raising=False)
@@ -130,13 +130,13 @@ async def test_vazio_e_o_padrao_antigo_viram_o_da_instalacao(geopy_falso, monkey
 
     await no.execute({"output": pd.DataFrame({"address": ["Rua A, 1"]})})
 
-    assert geopy_falso == [{"user_agent": "Atlans/geocode (+https://atlans.example.org)"}]
+    assert fake_geopy == [{"user_agent": "Atlans/geocode (+https://atlans.example.org)"}]
 
 
-async def test_o_user_agent_do_no_vence(geopy_falso, monkeypatch):
+async def test_the_nodes_user_agent_wins(fake_geopy, monkeypatch):
     monkeypatch.delenv("NOMINATIM_URL", raising=False)
     no = geocode.GeocodeNode(node_id="g1", parameters={"user_agent": "MeuApp/2.0 (eu@example.org)"})
 
     await no.execute({"output": pd.DataFrame({"address": ["Rua A, 1"]})})
 
-    assert geopy_falso == [{"user_agent": "MeuApp/2.0 (eu@example.org)"}]
+    assert fake_geopy == [{"user_agent": "MeuApp/2.0 (eu@example.org)"}]

@@ -1,7 +1,7 @@
 from typing import Any, Dict
 from jinja2 import StrictUndefined, TemplateSyntaxError, UndefinedError
 from jinja2.exceptions import SecurityError
-from flow.utils.jinja_seguro import criar_ambiente_sandbox
+from flow.utils.jinja_seguro import create_sandbox_environment
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
 from flow.utils.logger import get_logger
@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 #
 # Instantiated once at module level: the env is stateless between renders (the
 # context only enters in .render()) and recreating it per run only cost CPU.
-_JINJA_ENV = criar_ambiente_sandbox(undefined=StrictUndefined)
+_JINJA_ENV = create_sandbox_environment(undefined=StrictUndefined)
 
 # Sets of values recognized as truthy/falsy for the result of the Jinja2 expression.
 # Avoids false negatives with casing variations ("TRUE", "Yes", "False", etc.).

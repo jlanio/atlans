@@ -14,25 +14,25 @@ from app.services import execution_alert_service as alert
 
 
 class TestDecideFailure:
-    def test_primeira_falha_notifica(self):
+    def test_first_failure_notifies(self):
         estado, notificar = alert.decide_failure(None, now=1000.0)
         assert notificar is True
         assert estado["failures"] == 1 and estado["first_failure_at"] == 1000.0
 
-    def test_falha_dentro_do_intervalo_nao_notifica(self):
+    def test_failure_within_the_interval_does_not_notify(self):
         estado = {"first_failure_at": 1000.0, "last_notified_at": 1000.0, "failures": 1}
         novo, notificar = alert.decide_failure(estado, now=1000.0 + 60)
         assert notificar is False and novo["failures"] == 2
         assert novo["last_notified_at"] == 1000.0
 
-    def test_lembrete_apos_o_intervalo(self):
+    def test_reminder_after_the_interval(self):
         estado = {"first_failure_at": 1000.0, "last_notified_at": 1000.0, "failures": 5}
         novo, notificar = alert.decide_failure(estado, now=1000.0 + alert.REMINDER_INTERVAL_SECONDS)
         assert notificar is True and novo["last_notified_at"] == 1000.0 + alert.REMINDER_INTERVAL_SECONDS
         assert novo["first_failure_at"] == 1000.0  # the window is the same
 
 
-def _redis_com(estado):
+def _redis_with(estado):
     rc = MagicMock()
     rc.get = AsyncMock(return_value=json.dumps(estado) if estado else None)
     rc.set = AsyncMock()
@@ -46,8 +46,8 @@ def _wf():
 
 
 @pytest.mark.asyncio
-async def test_record_failure_envia_na_primeira_e_grava_estado():
-    rc = _redis_com(None)
+async def test_record_failure_sends_on_first_and_saves_state():
+    rc = _redis_with(None)
     with patch.object(alert, "_get_redis", MagicMock(return_value=rc)), \
          patch.object(alert, "_send_to_workspace", AsyncMock()) as enviar:
         assert await alert.record_failure(MagicMock(), schedule_id=7, workflow=_wf(),
@@ -58,9 +58,9 @@ async def test_record_failure_envia_na_primeira_e_grava_estado():
 
 
 @pytest.mark.asyncio
-async def test_record_failure_repetida_nao_envia():
+async def test_repeated_record_failure_does_not_send():
     import time
-    rc = _redis_com({"first_failure_at": time.time() - 60, "last_notified_at": time.time() - 60, "failures": 1})
+    rc = _redis_with({"first_failure_at": time.time() - 60, "last_notified_at": time.time() - 60, "failures": 1})
     with patch.object(alert, "_get_redis", MagicMock(return_value=rc)), \
          patch.object(alert, "_send_to_workspace", AsyncMock()) as enviar:
         assert await alert.record_failure(MagicMock(), schedule_id=7, workflow=_wf(),
@@ -69,16 +69,16 @@ async def test_record_failure_repetida_nao_envia():
 
 
 @pytest.mark.asyncio
-async def test_record_success_avisa_recuperacao_uma_vez_e_limpa():
-    rc = _redis_com({"first_failure_at": 1.0, "last_notified_at": 1.0, "failures": 3})
+async def test_record_success_announces_recovery_once_and_clears():
+    rc = _redis_with({"first_failure_at": 1.0, "last_notified_at": 1.0, "failures": 3})
     with patch.object(alert, "_get_redis", MagicMock(return_value=rc)), \
          patch.object(alert, "_send_to_workspace", AsyncMock()) as enviar:
         assert await alert.record_success(MagicMock(), schedule_id=7, workflow=_wf()) is True
         rc.delete.assert_awaited_once_with("sched_alert:7")
     enviar.assert_awaited_once()
     # no state, running again does not alert
-    rc2 = _redis_com(None)
+    rc2 = _redis_with(None)
     with patch.object(alert, "_get_redis", MagicMock(return_value=rc2)), \
-         patch.object(alert, "_send_to_workspace", AsyncMock()) as enviar2:
+         patch.object(alert, "_send_to_workspace", AsyncMock()) as send2:
         assert await alert.record_success(MagicMock(), schedule_id=7, workflow=_wf()) is False
-    enviar2.assert_not_awaited()
+    send2.assert_not_awaited()

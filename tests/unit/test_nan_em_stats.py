@@ -18,34 +18,34 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.core.run_result_consumer import _json_seguro, _update_run_status
+from app.core.run_result_consumer import _safe_json, _update_run_status
 
 
 # ── Origin: bbox of an empty GeoDataFrame ────────────────────────────────────
 
-def test_bbox_de_geodataframe_vazio_vira_none():
+def test_bbox_of_empty_geodataframe_becomes_none():
     import geopandas as gpd
-    from flow.metrics.collector import _bbox_finito
+    from flow.metrics.collector import _finite_bbox
 
     vazio = gpd.GeoDataFrame({"geometry": []}, geometry="geometry", crs="EPSG:4326")
 
-    assert _bbox_finito(vazio) is None
+    assert _finite_bbox(vazio) is None
 
 
-def test_bbox_de_geodataframe_com_feicoes_e_preservado():
+def test_bbox_of_geodataframe_with_features_is_preserved():
     import geopandas as gpd
     from shapely.geometry import Point
-    from flow.metrics.collector import _bbox_finito
+    from flow.metrics.collector import _finite_bbox
 
     gdf = gpd.GeoDataFrame(
         {"geometry": [Point(-60.5, -11.5), Point(-60.1, -11.1)]},
         geometry="geometry", crs="EPSG:4326",
     )
 
-    assert _bbox_finito(gdf) == [-60.5, -11.5, -60.1, -11.1]
+    assert _finite_bbox(gdf) == [-60.5, -11.5, -60.1, -11.1]
 
 
-def test_metricas_leves_omitem_bbox_quando_vazio():
+def test_light_metrics_omit_bbox_when_empty():
     import geopandas as gpd
     from flow.metrics.collector import _extract_lightweight_metrics
 
@@ -58,14 +58,14 @@ def test_metricas_leves_omitem_bbox_quando_vazio():
 
 # ── Defense: sanitizing before JSONB ─────────────────────────────────────────
 
-def test_json_seguro_troca_nan_e_infinito_por_none():
+def test_safe_json_replaces_nan_and_infinity_with_none():
     sujo = {
         "spatial": {"bbox": [float("nan")] * 4, "feature_count": 0},
         "lista": [1.5, float("inf"), float("-inf")],
         "ok": {"duration_ms": 12.5, "nome": "WFS", "flag": True, "nada": None},
     }
 
-    limpo = _json_seguro(sujo)
+    limpo = _safe_json(sujo)
 
     assert limpo["spatial"]["bbox"] == [None, None, None, None]
     assert limpo["lista"] == [1.5, None, None]
@@ -73,15 +73,15 @@ def test_json_seguro_troca_nan_e_infinito_por_none():
     assert limpo["ok"] == {"duration_ms": 12.5, "nome": "WFS", "flag": True, "nada": None}
 
 
-def test_json_seguro_produz_json_valido():
+def test_safe_json_produces_valid_json():
     """The real criterion: `allow_nan=False` is what Postgres requires."""
-    limpo = _json_seguro({"bbox": [float("nan"), float("inf")]})
+    limpo = _safe_json({"bbox": [float("nan"), float("inf")]})
 
     json.dumps(limpo, allow_nan=False)   # must not raise
 
 
 @pytest.mark.asyncio
-async def test_update_run_status_grava_com_stats_saneados():
+async def test_update_run_status_writes_sanitized_stats():
     """Regression: this is where the commit blew up and the run stayed 'running'."""
     run, db = MagicMock(), MagicMock(commit=AsyncMock())
     payload = {
@@ -103,7 +103,7 @@ async def test_update_run_status_grava_com_stats_saneados():
 
 
 @pytest.mark.asyncio
-async def test_stats_validos_chegam_intactos():
+async def test_valid_stats_arrive_intact():
     run, db = MagicMock(), MagicMock(commit=AsyncMock())
     stats = {"no-1": {"duration_ms": 2887.09, "spatial": {"bbox": [-63.1, -13.2, -60.5, -10.6]}}}
     payload = {
@@ -121,13 +121,13 @@ async def test_stats_validos_chegam_intactos():
 # ── The metrics: bbox, spatial_summary and operation_types ───────────────────
 
 @pytest.mark.asyncio
-async def test_persist_metrics_saneia_nan_antes_das_colunas_json():
+async def test_persist_metrics_sanitizes_nan_before_the_json_columns():
     """Regression: 37 results in the dead-letter queue with `Token "NaN" is invalid`.
 
     The sanitizing only covered node_stats; node_run_metrics' bbox and
     workflow_run_metrics' spatial_summary are JSON columns too, and their
     INSERT died in Postgres with an old executor (predating
-    `_bbox_finito`).
+    `_finite_bbox`).
     """
     from datetime import datetime, timezone
 
@@ -135,11 +135,11 @@ async def test_persist_metrics_saneia_nan_antes_das_colunas_json():
     from app.models.run_metrics import NodeRunMetrics, WorkflowRunMetrics
 
     adicionados = []
-    sem_linha = MagicMock()
-    sem_linha.scalar_one_or_none.return_value = None
+    no_row = MagicMock()
+    no_row.scalar_one_or_none.return_value = None
     db = MagicMock(
         commit=AsyncMock(),
-        execute=AsyncMock(return_value=sem_linha),
+        execute=AsyncMock(return_value=no_row),
         add=adicionados.append,
     )
     run = MagicMock(

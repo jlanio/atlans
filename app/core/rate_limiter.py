@@ -24,7 +24,7 @@ The `limits` Redis storage is synchronous: it runs on the worker's event loop,
 one short round trip on the compose network per request on rate-limited routes.
 Without a deadline, a stuck Redis (accepts the connection and does not answer)
 holds the whole worker forever — measured: the `hit` is still blocked after
-5 s. Hence the 0.25 s deadline in `_PRAZO_DO_REDIS` (the round trip to Redis in
+5 s. Hence the 0.25 s deadline in `_REDIS_TIMEOUTS` (the round trip to Redis in
 compose takes well under 1 ms; parameters in the URI query, such as
 `?socket_timeout=2`, take precedence). `in_memory_fallback_enabled` makes slowapi
 fall back to memory on the first failure and return on its own when Redis
@@ -51,12 +51,12 @@ logger = get_logger(__name__)
 
 # Deadline of each limiter round trip to Redis, in seconds (see the docstring).
 # redis-py 7 does not retry a timeout.
-_PRAZO_DO_REDIS = {"socket_timeout": 0.25, "socket_connect_timeout": 0.25}
+_REDIS_TIMEOUTS = {"socket_timeout": 0.25, "socket_connect_timeout": 0.25}
 # `limits` schemes that open a direct redis-py connection and accept the deadline.
 # Sentinel and cluster take other parameters: whoever uses them passes the
 # deadline in the URI query.
-_ESQUEMAS_COM_PRAZO = ("redis", "rediss", "redis+unix", "valkey", "valkeys", "valkey+unix")
-_ESQUEMAS_REDIS = ("redis", "rediss")
+_SCHEMES_WITH_TIMEOUT = ("redis", "rediss", "redis+unix", "valkey", "valkeys", "valkey+unix")
+_REDIS_SCHEMES = ("redis", "rediss")
 
 
 def _client_key(request) -> str:
@@ -68,26 +68,26 @@ def _client_key(request) -> str:
 
 def _storage_do_limiter() -> str:
     """URI of the counter storage (see the order in the module docstring)."""
-    explicita = (os.getenv("RATE_LIMIT_STORAGE_URI") or "").strip()
-    if explicita:
-        return explicita
-    redis_da_aplicacao = (os.getenv("REDIS_URL") or "").strip()
-    if not redis_da_aplicacao:
+    explicit = (os.getenv("RATE_LIMIT_STORAGE_URI") or "").strip()
+    if explicit:
+        return explicit
+    app_redis = (os.getenv("REDIS_URL") or "").strip()
+    if not app_redis:
         return "memory://"
-    if _esquema(redis_da_aplicacao) not in _ESQUEMAS_REDIS:
+    if _scheme(app_redis) not in _REDIS_SCHEMES:
         # `unix://` and the like work for redis-py, but `limits` does not know the
         # scheme and would reject it at import — the API would not even start.
         # Here, since it is only the default, memory with a warning; whoever wants
         # the socket sets RATE_LIMIT_STORAGE_URI=redis+unix://...
         logger.warning(
             "Rate limit: REDIS_URL com esquema %r nao serve ao limiter; contadores em memoria de cada worker.",
-            _esquema(redis_da_aplicacao),
+            _scheme(app_redis),
         )
         return "memory://"
-    return redis_da_aplicacao
+    return app_redis
 
 
-def _esquema(uri: str) -> str:
+def _scheme(uri: str) -> str:
     """The URI scheme in lowercase; "" if it cannot even be parsed."""
     try:
         return urlsplit(uri).scheme.lower()
@@ -95,40 +95,40 @@ def _esquema(uri: str) -> str:
         return ""
 
 
-def _onde_ficam_os_contadores(storage_uri: str) -> str:
+def _where_counters_live(storage_uri: str) -> str:
     """For the startup log: scheme, host, port and database — never the password.
 
     The URI path is not emitted whole: a password containing `/` makes `urlsplit`
     push the rest of it into the path.
     """
-    if _esquema(storage_uri) == "memory":
+    if _scheme(storage_uri) == "memory":
         return "memoria de cada worker (cada limite vale por worker)"
     try:
         partes = urlsplit(storage_uri)
         host = partes.hostname or "?"
         porta = f":{partes.port}" if partes.port else ""
     except ValueError:
-        return f"{_esquema(storage_uri) or '?'}://? (compartilhados; memoria se cair)"
+        return f"{_scheme(storage_uri) or '?'}://? (compartilhados; memoria se cair)"
     banco = partes.path if partes.path[1:].isdigit() else ""
     return f"{partes.scheme}://{host}{porta}{banco} (compartilhados; memoria se cair)"
 
 
-def _novo_limiter(storage_uri: str) -> Limiter:
-    esquema = _esquema(storage_uri)
+def _new_limiter(storage_uri: str) -> Limiter:
+    esquema = _scheme(storage_uri)
     return Limiter(
         key_func=_client_key,
         storage_uri=storage_uri,
-        storage_options=dict(_PRAZO_DO_REDIS) if esquema in _ESQUEMAS_COM_PRAZO else {},
+        storage_options=dict(_REDIS_TIMEOUTS) if esquema in _SCHEMES_WITH_TIMEOUT else {},
         # Only makes sense with external storage — in memory there is nothing to "go down".
         in_memory_fallback_enabled=esquema != "memory",
     )
 
 
-def criar_limiter() -> Limiter:
+def create_limiter() -> Limiter:
     """Redis (with in-memory fallback) by default; memory without Redis or with `memory://`."""
     storage_uri = _storage_do_limiter()
     try:
-        limiter = _novo_limiter(storage_uri)
+        limiter = _new_limiter(storage_uri)
     except Exception as exc:
         # Scheme that `limits` does not know, invalid port, uppercase that redis-py
         # rejects: breaking the import would bring down the whole API. Only the
@@ -136,13 +136,13 @@ def criar_limiter() -> Limiter:
         # with them the password ("Port could not be cast to integer value as '<password>'").
         logger.error(
             "Rate limit: storage %s recusado (%s); contadores em memoria de cada worker.",
-            _onde_ficam_os_contadores(storage_uri), type(exc).__name__,
+            _where_counters_live(storage_uri), type(exc).__name__,
         )
         storage_uri = "memory://"
-        limiter = _novo_limiter(storage_uri)
-    logger.info("Rate limit: contadores em %s", _onde_ficam_os_contadores(storage_uri))
+        limiter = _new_limiter(storage_uri)
+    logger.info("Rate limit: contadores em %s", _where_counters_live(storage_uri))
     return limiter
 
 
 # single rate-limiter instance for the whole application
-limiter = criar_limiter()
+limiter = create_limiter()

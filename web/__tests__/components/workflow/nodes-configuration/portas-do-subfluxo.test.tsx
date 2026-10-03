@@ -29,13 +29,13 @@ function montar(variant: "input" | "output", conexoes: number) {
   )
 }
 
-const botaoAdicionar = () => screen.getByRole("button", { name: /adicionar porta/i })
+const addButton = () => screen.getByRole("button", { name: /adicionar porta/i })
 
 describe("SubWorkflowPortsHelper — trava com arestas ligadas", () => {
   it("saída com aresta ligada bloqueia a edição", () => {
     montar("output", 2)
 
-    expect(botaoAdicionar()).toBeDisabled()
+    expect(addButton()).toBeDisabled()
     for (const campo of screen.getAllByRole("textbox")) {
       expect(campo).toBeDisabled()
     }
@@ -57,7 +57,7 @@ describe("SubWorkflowPortsHelper — trava com arestas ligadas", () => {
   it("saída sem aresta continua editável", () => {
     montar("output", 0)
 
-    expect(botaoAdicionar()).not.toBeDisabled()
+    expect(addButton()).not.toBeDisabled()
     expect(screen.queryByText(/Desconecte antes/)).not.toBeInTheDocument()
   })
 
@@ -66,7 +66,7 @@ describe("SubWorkflowPortsHelper — trava com arestas ligadas", () => {
     // the form passes is the node's — locking there would be a block with no cause.
     montar("input", 3)
 
-    expect(botaoAdicionar()).not.toBeDisabled()
+    expect(addButton()).not.toBeDisabled()
     expect(screen.queryByText(/Desconecte antes/)).not.toBeInTheDocument()
   })
 })

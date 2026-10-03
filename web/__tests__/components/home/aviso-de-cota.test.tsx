@@ -16,7 +16,7 @@ import type { ExtensaoDoWeb } from "@/extensoes"
 const registro = vi.hoisted(() => ({ EXTENSOES: [] as ExtensaoDoWeb[] }))
 vi.mock("@/extensoes", async (original) => ({ ...(await original<typeof import("@/extensoes")>()), EXTENSOES: registro.EXTENSOES }))
 
-import { AvisoDeCotaCheia } from "@/app/components/home/assistente/aviso-de-cota"
+import { QuotaFullNotice } from "@/app/components/home/assistente/aviso-de-cota"
 
 const cota = (over = {}) => ({ gasto: 1_500_000, teto: 1_500_000, reabre_em_segundos: 22_320, ...over })
 
@@ -24,7 +24,7 @@ afterEach(() => { cleanup(); registro.EXTENSOES.length = 0 })
 
 describe("a oferta é de uma extensão", () => {
   it("sem extensão, o aviso fica sozinho, sem botão", () => {
-    render(<AvisoDeCotaCheia cota={cota()} plano="free" assinaturasAtivas />)
+    render(<QuotaFullNotice cota={cota()} plano="free" assinaturasAtivas />)
 
     expect(screen.getByTestId("aviso-de-cota").textContent).toContain("Você usou a cota de hoje")
     expect(screen.queryByRole("button")).toBeNull()
@@ -37,7 +37,7 @@ describe("a oferta é de uma extensão", () => {
         <button type="button">oferta {plano} {String(assinaturasAtivas)}</button>
       ),
     })
-    render(<AvisoDeCotaCheia cota={cota()} plano="pro" assinaturasAtivas={false} />)
+    render(<QuotaFullNotice cota={cota()} plano="pro" assinaturasAtivas={false} />)
 
     expect(screen.getByTestId("aviso-de-cota").textContent).toContain("oferta pro false")
   })
@@ -48,7 +48,7 @@ describe("a oferta é de uma extensão", () => {
       nome: "quebrada",
       ofertaDaCota: () => { throw new Error("defeito da extensão") },
     })
-    render(<AvisoDeCotaCheia cota={cota()} plano="free" assinaturasAtivas />)
+    render(<QuotaFullNotice cota={cota()} plano="free" assinaturasAtivas />)
 
     expect(screen.getByTestId("aviso-de-cota").textContent).toContain("Você usou a cota de hoje")
     expect(erro.mock.calls.some(c => String(c[0]).includes("«quebrada»"))).toBe(true)
@@ -58,20 +58,20 @@ describe("a oferta é de uma extensão", () => {
 
 describe("o aviso na tela", () => {
   it("diz o prazo REAL quando o servidor o manda", () => {
-    render(<AvisoDeCotaCheia cota={cota({ reabre_em_segundos: 22_320 })} plano="free" assinaturasAtivas />)
+    render(<QuotaFullNotice cota={cota({ reabre_em_segundos: 22_320 })} plano="free" assinaturasAtivas />)
     // 6 h 12 min. The donut right below already showed this; the warning said
     // "algumas horas" with the number in hand.
     expect(screen.getByTestId("aviso-de-cota").textContent).toMatch(/reabre em .*6/)
   })
 
   it("sem prazo conhecido, volta ao vago em vez de inventar", () => {
-    render(<AvisoDeCotaCheia cota={cota({ reabre_em_segundos: null })} plano="free" assinaturasAtivas />)
+    render(<QuotaFullNotice cota={cota({ reabre_em_segundos: null })} plano="free" assinaturasAtivas />)
     expect(screen.getByTestId("aviso-de-cota").textContent)
       .toContain("algumas horas depois da sua primeira conversa")
   })
 
   it("mostra o teto de quem está olhando, não um número fixo", () => {
-    render(<AvisoDeCotaCheia cota={cota({ teto: 22_500_000 })} plano="pro" assinaturasAtivas />)
+    render(<QuotaFullNotice cota={cota({ teto: 22_500_000 })} plano="pro" assinaturasAtivas />)
     expect(screen.getByTestId("aviso-de-cota").textContent).toContain("22.500.000")
   })
 })

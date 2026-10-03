@@ -55,18 +55,18 @@ describe("reconciliarExecutores", () => {
   it("acompanha entrada, saída e reordenação da lista", () => {
     const primeiro = [executor("a"), executor("b")]
 
-    const comNovo = reconciliarExecutores(primeiro, [executor("a"), executor("b"), executor("c")])
-    expect(comNovo).toHaveLength(3)
-    expect(comNovo[0]).toBe(primeiro[0])
+    const withNew = reconciliarExecutores(primeiro, [executor("a"), executor("b"), executor("c")])
+    expect(withNew).toHaveLength(3)
+    expect(withNew[0]).toBe(primeiro[0])
 
-    const semB = reconciliarExecutores(comNovo, [executor("a"), executor("c")])
-    expect(semB.map(e => e.id_hash)).toEqual(["a", "c"])
+    const withoutB = reconciliarExecutores(withNew, [executor("a"), executor("c")])
+    expect(withoutB.map(e => e.id_hash)).toEqual(["a", "c"])
 
     // The same pair in swapped order is a NEW list (the order is rendered),
     // but the objects are still the same ones.
-    const invertida = reconciliarExecutores(semB, [executor("c"), executor("a")])
-    expect(invertida).not.toBe(semB)
-    expect(invertida[0]).toBe(semB[1])
-    expect(invertida[1]).toBe(semB[0])
+    const invertida = reconciliarExecutores(withoutB, [executor("c"), executor("a")])
+    expect(invertida).not.toBe(withoutB)
+    expect(invertida[0]).toBe(withoutB[1])
+    expect(invertida[1]).toBe(withoutB[0])
   })
 })

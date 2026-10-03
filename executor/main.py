@@ -103,8 +103,8 @@ def _restart_process() -> None:
     # connections of the same executor.
     #
     # If there is a supervisor, restarting is ITS job: just exit with code != 0.
-    from executor.supervisor import VAR_PID, pid_configurado
-    if pid_configurado() is not None:
+    from executor.supervisor import VAR_PID, configured_pid
+    if configured_pid() is not None:
         logger.info(
             "Sob supervisor externo (%s) — encerrando com codigo 1 em vez de "
             "re-executar; o restart e responsabilidade dele.", VAR_PID,
@@ -149,7 +149,7 @@ def _restart_process() -> None:
 # Re-enrollment requires a new OTP — there is no silent auto-registration.
 
 
-def _observar_task(task: asyncio.Task) -> None:
+def _watch_task(task: asyncio.Task) -> None:
     """Logs at ERROR if the background task dies with an exception.
 
     A task created and never observed dies silently: a trivial FileNotFoundError
@@ -173,10 +173,10 @@ def _observar_task(task: asyncio.Task) -> None:
 # Sentinel for "count the whole queue, without discriminating by run". It must be
 # its own object because `None` is a legitimate run_id: it is the bucket for
 # events that belong to no job (GeoSync).
-_QUALQUER_RUN = object()
+_ANY_RUN = object()
 
 
-class _FilaContada(asyncio.Queue):
+class _CountedQueue(asyncio.Queue):
     """asyncio.Queue that counts ENQUEUED and SENT items, per run.
 
     It exists to measure the consumer's REAL progress. `qsize` does not work: in
@@ -207,7 +207,7 @@ class _FilaContada(asyncio.Queue):
     `_event_sender_loop` keeps receiving everything.
 
     The `coletor` keeps the last lifecycle per node that could NOT be sent,
-    for the sender to resend on reconnect (see ColetorDeLifecycle). It lives in
+    for the sender to resend on reconnect (see LifecycleCollector). It lives in
     the queue because the queue is the only object that the producer
     (ExecutorEventPublisher) and the consumer (ExecutorConnection) already share.
     """
@@ -216,11 +216,11 @@ class _FilaContada(asyncio.Queue):
         super().__init__(maxsize)
         self.enfileirados: int = 0
         self.confirmados:  int = 0
-        self.enfileirados_por_run: dict = {}
-        self.confirmados_por_run:  dict = {}
+        self.enqueued_by_run: dict = {}
+        self.confirmed_by_run:  dict = {}
         self._sink = sink
-        from executor.event_publisher import ColetorDeLifecycle
-        self.coletor = ColetorDeLifecycle()
+        from executor.event_publisher import LifecycleCollector
+        self.coletor = LifecycleCollector()
 
     @staticmethod
     def _run_de(item) -> object:
@@ -229,7 +229,7 @@ class _FilaContada(asyncio.Queue):
     def _put(self, item):
         self.enfileirados += 1
         run_id = self._run_de(item)
-        self.enfileirados_por_run[run_id] = self.enfileirados_por_run.get(run_id, 0) + 1
+        self.enqueued_by_run[run_id] = self.enqueued_by_run.get(run_id, 0) + 1
         if self._sink is not None:
             try:
                 self._sink.on_event(item)
@@ -267,32 +267,32 @@ class _FilaContada(asyncio.Queue):
     def _resolver(self, item) -> None:
         self.confirmados += 1
         run_id = self._run_de(item)
-        self.confirmados_por_run[run_id] = self.confirmados_por_run.get(run_id, 0) + 1
+        self.confirmed_by_run[run_id] = self.confirmed_by_run.get(run_id, 0) + 1
 
-    def esquecer_run(self, run_id) -> None:
+    def forget_run(self, run_id) -> None:
         """Purges the counters of a finished run.
 
         Without this both dicts grow forever on a long-lived executor —
         one entry per run executed.
         """
-        self.enfileirados_por_run.pop(run_id, None)
-        self.confirmados_por_run.pop(run_id, None)
+        self.enqueued_by_run.pop(run_id, None)
+        self.confirmed_by_run.pop(run_id, None)
         # The collector keeps lifecycle per (run_id, node) to resend later. Without
         # this purge, a resend hours later revived the per-run entries we
         # just deleted — and nothing would remove them again, reopening the
         # O(runs) leak through the back door.
         coletor = getattr(self, "coletor", None)
         if coletor is not None:
-            coletor.esquecer_run(run_id)
+            coletor.forget_run(run_id)
 
 
-async def _aguardar_confirmacao(
-    fila: _FilaContada,
+async def _await_confirmation(
+    fila: _CountedQueue,
     *,
     rotulo: str,
     timeout: float,
-    estagnado: float,
-    run_id=_QUALQUER_RUN,
+    stall_timeout: float,
+    run_id=_ANY_RUN,
 ) -> bool:
     """Waits for the consumer to send everything that was ALREADY in the queue. True = sent.
 
@@ -308,7 +308,7 @@ async def _aguardar_confirmacao(
     ahead of it in the same queue.
 
     Gives up in two cases:
-      - `estagnado` seconds without ANY confirmation in the WHOLE queue — there
+      - `stall_timeout` seconds without ANY confirmation in the WHOLE queue — there
         is no consumer (WS down, sender canceled, executor reconnecting with
         backoff);
       - total `timeout`, the worst-case ceiling even with a slow sender.
@@ -319,40 +319,40 @@ async def _aguardar_confirmacao(
     being dead with the WebSocket perfectly alive: the queue is a single shared
     FIFO, so a short job's events sit physically behind the backlog of a large
     workflow and of GeoSync. While the sender drained that backlog (easily over
-    3s on a client's upload link), the short job's `confirmados_por_run` did not
+    3s on a client's upload link), the short job's `confirmed_by_run` did not
     budge, the barrier returned False and the `job_result` — which carries
     `__workflow_complete__` — was dispatched ahead of the run's own node_events,
     closing the canvas with the nodes still spinning.
     """
-    if run_id is _QUALQUER_RUN:
+    if run_id is _ANY_RUN:
         enfileirados = lambda: fila.enfileirados          # noqa: E731
         confirmados  = lambda: fila.confirmados           # noqa: E731
     else:
-        enfileirados = lambda: fila.enfileirados_por_run.get(run_id, 0)   # noqa: E731
-        confirmados  = lambda: fila.confirmados_por_run.get(run_id, 0)    # noqa: E731
+        enfileirados = lambda: fila.enqueued_by_run.get(run_id, 0)   # noqa: E731
+        confirmados  = lambda: fila.confirmed_by_run.get(run_id, 0)    # noqa: E731
 
     # Always GLOBAL: it is the evidence that there is a consumer draining.
-    progresso_global = lambda: fila.confirmados                            # noqa: E731
+    global_progress = lambda: fila.confirmados                            # noqa: E731
 
     agora  = asyncio.get_running_loop().time
     limite = agora() + timeout
     alvo   = enfileirados()
-    marca  = progresso_global()
-    ultimo_progresso = agora()
+    marca  = global_progress()
+    last_progress = agora()
 
     while confirmados() < alvo:
         await asyncio.sleep(0.05)
-        if progresso_global() > marca:
-            marca = progresso_global()
-            ultimo_progresso = agora()
+        if global_progress() > marca:
+            marca = global_progress()
+            last_progress = agora()
         pendentes = alvo - confirmados()
         if pendentes <= 0:
             break
-        if agora() - ultimo_progresso >= estagnado:
+        if agora() - last_progress >= stall_timeout:
             logger.warning(
                 "Nenhum %s confirmado em %.0fs — consumidor parado (WS caido ou "
                 "sender encerrado); %d pendente(s) seguem para o proximo envio.",
-                rotulo, estagnado, pendentes,
+                rotulo, stall_timeout, pendentes,
             )
             return False
         if agora() >= limite:
@@ -365,11 +365,11 @@ async def _aguardar_confirmacao(
     return True
 
 
-async def _drenar_eventos_pendentes(
-    fila: _FilaContada,
-    run_id=_QUALQUER_RUN,
+async def _drain_pending_events(
+    fila: _CountedQueue,
+    run_id=_ANY_RUN,
     timeout: float = 30.0,
-    estagnado: float = 3.0,
+    stall_timeout: float = 3.0,
 ) -> None:
     """Waits for the already-emitted node_events to go up before dispatching the result.
 
@@ -378,7 +378,7 @@ async def _drenar_eventos_pendentes(
     graph frozen/incomplete.
 
     The wait covers exactly the events of THIS run that existed when the job
-    finished (see `_aguardar_confirmacao`) — not those of other jobs, nor those
+    finished (see `_await_confirmation`) — not those of other jobs, nor those
     of GeoSync, which share the same queue.
     """
     # ExecutorEventPublisher enqueues via `call_soon_threadsafe` (it publishes from
@@ -387,15 +387,15 @@ async def _drenar_eventos_pendentes(
     # callbacks run before we snapshot the watermark — without it the barrier
     # would exit precisely without the final events it exists to cover.
     await asyncio.sleep(0)
-    await _aguardar_confirmacao(
-        fila, rotulo="node_event", timeout=timeout, estagnado=estagnado, run_id=run_id,
+    await _await_confirmation(
+        fila, rotulo="node_event", timeout=timeout, stall_timeout=stall_timeout, run_id=run_id,
     )
 
 
 async def _drive_event_fanout(
     entrada: asyncio.Queue,
     managers: list,
-    filas: list[asyncio.Queue],
+    queues: list[asyncio.Queue],
 ) -> None:
     """Routes each drive_event received from the server to the SyncManager that owns the folder.
 
@@ -424,7 +424,7 @@ async def _drive_event_fanout(
                         getattr(sm, "sync_dir", "?"), exc,
                     )
             try:
-                filas[destino].put_nowait(msg)
+                queues[destino].put_nowait(msg)
             except asyncio.QueueFull:
                 logger.warning(
                     "Fila de drive_events de '%s' cheia — evento '%s' descartado.",
@@ -435,7 +435,7 @@ async def _drive_event_fanout(
 
 
 
-def _causa_da_interrupcao(estado: str, limite_bytes: int | None) -> str:
+def _interruption_cause(estado: str, limit_bytes: int | None) -> str:
     """Result text for a job that the previous process did not finish.
 
     The executor does not know WHY it died — Docker resets OOMKilled on restart —,
@@ -444,7 +444,7 @@ def _causa_da_interrupcao(estado: str, limite_bytes: int | None) -> str:
     """
     from executor import result_store
 
-    if estado == result_store.ESTADO_NA_FILA:
+    if estado == result_store.STATE_QUEUED:
         base = (
             "O executor foi encerrado antes de começar esta execução — o processo "
             "ou o container reiniciou enquanto ela esperava na fila."
@@ -454,13 +454,13 @@ def _causa_da_interrupcao(estado: str, limite_bytes: int | None) -> str:
             "O executor foi encerrado no meio desta execução e ela não terminou — "
             "o processo ou o container reiniciou."
         )
-    if limite_bytes:
-        gb = f"{limite_bytes / 1024 ** 3:.1f}".replace(".", ",")
+    if limit_bytes:
+        gb = f"{limit_bytes / 1024 ** 3:.1f}".replace(".", ",")
         return f"{base} A causa mais comum é falta de memória: o limite do container é de {gb} GB."
     return f"{base} A causa mais comum é falta de memória na máquina."
 
 
-def _fechar_orfaos_do_boot_anterior() -> int:
+def _close_previous_boot_orphans() -> int:
     """Turns into a failure, with the probable cause, each job the previous
     process accepted and did not finish. Returns how many.
 
@@ -473,7 +473,7 @@ def _fechar_orfaos_do_boot_anterior() -> int:
     """
     from executor import result_store
 
-    if not result_store.tomar_posse_do_diario():
+    if not result_store.take_journal_ownership():
         logger.warning(
             "Outro processo do executor ainda usa este outbox (o anterior drenando?) — "
             "os jobs do diário são dele; nenhum foi convertido em falha."
@@ -493,7 +493,7 @@ def _fechar_orfaos_do_boot_anterior() -> int:
             "job_id":         orfao["job_id"],
             "run_id":         orfao["job_id"],
             "status":         "error",
-            "error":          _causa_da_interrupcao(orfao["estado"], limite),
+            "error":          _interruption_cause(orfao["estado"], limite),
             "error_category": "executor_lost",
         })
     logger.warning(
@@ -541,8 +541,8 @@ async def main():
     # just below. The consumer is a program, not the screen — and an error in
     # phase 0 (server key, cert) must reach it as a `state` event, not as
     # "the process exited with code 1".
-    _dash_modo, _dash_motivo = dashboard.should_enable_from_process()
-    _dash_on = _dash_modo != dashboard.MODO_OFF
+    _dash_mode, _dash_reason = dashboard.should_enable_from_process()
+    _dash_on = _dash_mode != dashboard.MODE_OFF
     stats = (
         ExecutorStats(
             executor_id=config.EXECUTOR_ID,
@@ -563,7 +563,7 @@ async def main():
         logger.info("  GeoSync:   %s", config.SYNC_DIRS)
     if not _dash_on:
         # A dashboard that fails to appear without explanation becomes a support ticket.
-        logger.info("  Painel:    desligado (%s)", _dash_motivo)
+        logger.info("  Painel:    desligado (%s)", _dash_reason)
     logger.info("")
 
     from executor.sysinfo import _collect_system_info
@@ -584,24 +584,24 @@ async def main():
     # the handler later, which would be one more subtle ordering to keep correct.
     _conn_holder: dict = {}
 
-    def _reconectar_agora() -> bool:
+    def _reconnect_now() -> bool:
         conn_ = _conn_holder.get("conn")
-        return bool(conn_.reconectar_agora()) if conn_ is not None else False
+        return bool(conn_.reconnect_now()) if conn_ is not None else False
 
     _dash = None
-    if _dash_modo == dashboard.MODO_JSON:
+    if _dash_mode == dashboard.MODE_JSON:
         _dash = await dashboard.start(
             stats,
-            modo=dashboard.MODO_JSON,
+            modo=dashboard.MODE_JSON,
             # Wired in phase 3 by `vincular_fontes`: the queue does not exist yet.
             capacity_source=None,
             result_queue=None,
             intervalo=config.DASHBOARD_INTERVAL,
-            ao_sair=shutdown_event.set,
-            ao_reconectar=_reconectar_agora,
+            on_exit=shutdown_event.set,
+            ao_reconectar=_reconnect_now,
         )
 
-    def _fase(nome: str, passo: str | None = None, detalhe: str | None = None) -> None:
+    def _phase(nome: str, passo: str | None = None, detalhe: str | None = None) -> None:
         """Reports the boot phase to the supervisor. No-op without a channel.
 
         Without this, a failure in phase 0 reaches the desktop app only as "the
@@ -611,7 +611,7 @@ async def main():
         if _dash is not None and hasattr(_dash, "emitir"):
             _dash.emitir("state", {"phase": nome, "step": passo, "detail": detalhe})
 
-    async def _falhar_boot(passo: str, exc: BaseException) -> None:
+    async def _fail_boot(passo: str, exc: BaseException) -> None:
         """Reports the failure and exits with 1.
 
         Without this, a boot failure reaches the supervisor only as an exit code.
@@ -619,8 +619,8 @@ async def main():
         between the UI offering 'redo enrollment' and offering 'try again' — and
         the exact step only exists here.
         """
-        _fase("failed", passo, detalhe=str(exc))
-        if _dash is not None and _dash_modo == dashboard.MODO_JSON:
+        _phase("failed", passo, detalhe=str(exc))
+        if _dash is not None and _dash_mode == dashboard.MODE_JSON:
             await _dash.stop()          # drains the buffer before the process goes away
         raise SystemExit(1)
 
@@ -639,19 +639,19 @@ async def main():
     #
     # The two steps are separate because the user's action is different:
     # `config` asks to configure EXECUTOR_ID, `enrollment` asks to redo the enroll.
-    _fase("booting", "config")
+    _phase("booting", "config")
     try:
         config.assert_configured()
     except SystemExit as exc:
         logger.error("%s", exc)     # the message only showed up because it was a SystemExit
-        await _falhar_boot("config", exc)
+        await _fail_boot("config", exc)
     try:
         config.assert_enrolled()
     except SystemExit as exc:
         logger.error("%s", exc)
-        await _falhar_boot("enrollment", exc)
+        await _fail_boot("enrollment", exc)
 
-    _fase("booting", "server_key")
+    _phase("booting", "server_key")
 
     # ── 0. Server signing key (pinned locally) ───────────────────────────────
     # This used to be a GET on every boot, without pinning and with
@@ -670,7 +670,7 @@ async def main():
             "ela (rodar sem verificacao de assinatura aceitaria job de qualquer "
             "origem).\n%s", exc,
         )
-        await _falhar_boot("server_key", exc)
+        await _fail_boot("server_key", exc)
 
     # ── 1. Initializes the X25519 private key (envelope decryption) ───────────
     # init_private_key() loads the key via `crypto.load_private_key` (READ-only)
@@ -687,7 +687,7 @@ async def main():
         # give the operator a clear instruction (redo the enroll) — burying it in
         # a raw traceback would defeat its purpose.
         logger.error("%s", exc)
-        await _falhar_boot("private_key", exc)
+        await _fail_boot("private_key", exc)
 
     # ── 2. Own thread pool ────────────────────────────────────────────────────
     # Every `asyncio.to_thread` of the flow engine falls into the loop's DEFAULT
@@ -708,12 +708,12 @@ async def main():
     # nobody drains it, and each retained result holds memory until the next send.
     # Sized for the worst legitimate case — everything that can be in flight
     # (queue + running jobs) plus headroom for the outbox replay at boot.
-    _result_queue = _FilaContada(
+    _result_queue = _CountedQueue(
         maxsize=config.MAX_QUEUE_SIZE + config.MAX_CONCURRENT + 32
     )
     # Node events queue (ExecutorEventPublisher → connection → server).
     # The dashboard's `sink` peeks in passing; with the dashboard off it is a NullStats.
-    _event_queue = _FilaContada(maxsize=500, sink=stats if _dash_on else None)
+    _event_queue = _CountedQueue(maxsize=500, sink=stats if _dash_on else None)
     # Drive push events queue (server → executor via WebSocket). It is the INPUT
     # queue: the fan-out below distributes to each SyncManager's own queue.
     _drive_event_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
@@ -766,7 +766,7 @@ async def main():
             # The barrier is PER RUN: with the shared queue, waiting for the global
             # watermark made this job also wait for the backlog of a large
             # workflow and of GeoSync — up to 30s of "almost done" on the dashboard.
-            await _drenar_eventos_pendentes(_event_queue, result.get("run_id") or job_id)
+            await _drain_pending_events(_event_queue, result.get("run_id") or job_id)
             # 'output' carries the ENTIRE final_outputs (GeoDataFrames, hundreds of
             # MB). The server never uses this field — the sender already dropped it
             # at serialization time — but until then it kept the whole object graph
@@ -786,7 +786,7 @@ async def main():
             # Per-run counters are O(runs) and nothing deletes them on its own: without
             # this purge, a long-lived executor accumulates one entry per job
             # executed in both dicts.
-            _event_queue.esquecer_run((result or {}).get("run_id") or job_id)
+            _event_queue.forget_run((result or {}).get("run_id") or job_id)
             stats.on_job_finished(
                 job_id, status, time.monotonic() - _t0,
                 run_id=(result or {}).get("run_id"),
@@ -796,7 +796,7 @@ async def main():
     # Maximum space the outbox replay may take up in _result_queue. The rest
     # stays reserved for the results of the jobs running NOW — they use
     # put_nowait and would be DROPPED if the historical backlog filled the queue.
-    _RESERVA_OUTBOX = 8
+    _OUTBOX_RESERVE = 8
 
     async def _replay_outbox() -> None:
         """Resends, at the sender's pace, the results left over from the previous boot.
@@ -823,7 +823,7 @@ async def main():
         logger.info("Restaurando %d resultado(s) pendente(s) de execucoes anteriores.", len(pending))
         for r in pending:
             # No await between the check and the put: put_nowait cannot fail.
-            while _result_queue.qsize() >= _RESERVA_OUTBOX:
+            while _result_queue.qsize() >= _OUTBOX_RESERVE:
                 await asyncio.sleep(0.2)
             _result_queue.put_nowait(r)
 
@@ -868,7 +868,7 @@ async def main():
     # ── 4. Connects to the server ─────────────────────────────────────────────
     # `thread_pool`: the connection needs it to report honest capacity —
     # queued/running count JOBS and do not see threads stuck on a node that the
-    # timeout cannot cancel. See ExecutorConnection._pool_saturado.
+    # timeout cannot cancel. See ExecutorConnection._pool_saturated.
     conn = ExecutorConnection(job_queue, _result_queue, event_queue=_event_queue,
                            drive_event_queue=_drive_event_queue, stats=stats,
                            thread_pool=_thread_pool)
@@ -886,7 +886,7 @@ async def main():
     if _dash is not None and hasattr(_dash, "vincular_fontes"):
         _dash.vincular_fontes(capacity_source=job_queue.get_capacity,
                               result_queue=_result_queue)
-    _fase("booting", "connection")
+    _phase("booting", "connection")
 
     # ── 5. Graceful shutdown ──────────────────────────────────────────────────
     # The `shutdown_event` was created up above, before phase 0, so that the
@@ -987,7 +987,7 @@ async def main():
                 _sync_managers.append(sm)
                 _sync_queues.append(sm_queue)
                 task = asyncio.create_task(sm.run(), name=f"geosync-{sync_dir}")
-                _observar_task(task)
+                _watch_task(task)
                 sync_tasks.append(task)
                 logger.info("GeoSync ativado: '%s' → workspace '%s'", sync_dir, _sync_ws_id)
 
@@ -996,7 +996,7 @@ async def main():
                     _drive_event_fanout(_drive_event_queue, _sync_managers, _sync_queues),
                     name="drive-event-fanout",
                 )
-                _observar_task(fanout)
+                _watch_task(fanout)
                 sync_tasks.append(fanout)
 
     # ── 6.5. Renewal automatico do cert mTLS (loop em background) ────────────
@@ -1011,14 +1011,14 @@ async def main():
     # go into the outbox, go out through the replay just below and already show up
     # in the first inventory as "pending result" — the server does not close them
     # as lost.
-    _fechar_orfaos_do_boot_anterior()
+    _close_previous_boot_orphans()
 
     conn_task = asyncio.create_task(conn.run(), name="executor-connection")
 
     # Outbox replay ONLY after the connection exists: it pays out at the pace of
     # _result_sender_loop and has nothing to do before there is a sender.
     replay_task = asyncio.create_task(_replay_outbox(), name="outbox-replay")
-    _observar_task(replay_task)
+    _watch_task(replay_task)
 
     # Dashboard: takes over the screen now, with the whole boot already in the
     # scrollback. From here on the step-by-step log goes to the file — `start()`
@@ -1043,7 +1043,7 @@ async def main():
         made the name an unbound local — `UnboundLocalError` at boot in
         RICH mode, which is the default for anyone running the executor in a terminal.
         """
-        return sum(1 for sm in _sync_managers if sm.sincronizar_agora())
+        return sum(1 for sm in _sync_managers if sm.sync_now())
 
     # The JSON runtime comes up before phase 0 and receives the handler here,
     # through the same door it already uses for capacity and queue. Without this,
@@ -1052,12 +1052,12 @@ async def main():
     # the handler was only delivered to the rich dashboard, which the desktop does
     # not use.
     if _dash is not None and hasattr(_dash, "vincular_fontes"):
-        _dash.vincular_fontes(ao_sincronizar=_sincronizar_agora)
+        _dash.vincular_fontes(on_sync=_sincronizar_agora)
 
-    if _dash_modo == dashboard.MODO_RICH:
+    if _dash_mode == dashboard.MODE_RICH:
         _dash = await dashboard.start(
             stats,
-            modo=dashboard.MODO_RICH,
+            modo=dashboard.MODE_RICH,
             capacity_source=job_queue.get_capacity,
             result_queue=_result_queue,
             intervalo=config.DASHBOARD_INTERVAL,
@@ -1065,16 +1065,16 @@ async def main():
             # shutdown, no shortcut. On Windows this matters even more, because
             # there `add_signal_handler` registers nothing and Ctrl+C can kill
             # the process before any `finally` runs.
-            ao_sair=shutdown_event.set,
+            on_exit=shutdown_event.set,
             # 'r' key: cuts the reconnect backoff short. Whoever presses it knows
             # something the process does not — the network is back, the server is up.
-            ao_reconectar=conn.reconectar_agora,
+            ao_reconectar=conn.reconnect_now,
             # The UI's "Sincronizar agora" (Sync now): wakes the GeoSync cycle without
             # waiting for the interval. Whoever asks knows something the executor has not seen yet.
-            ao_sincronizar=_sincronizar_agora,
+            on_sync=_sincronizar_agora,
         )
 
-    _fase("running")
+    _phase("running")
 
     # Waits for WHICHEVER COMES FIRST: an OS signal or the connection closing on its own.
     #
@@ -1107,9 +1107,9 @@ async def main():
         # It is during draining that the supervisor needs it most — it is what lets
         # the UI show "3 jobs finishing" with a real number instead of a blind
         # spinner, and tell an orderly shutdown from a crash via `state: stopped`.
-        if _dash is not None and _dash_modo == dashboard.MODO_RICH:
+        if _dash is not None and _dash_mode == dashboard.MODE_RICH:
             await _dash.stop()
-        _fase("draining")
+        _phase("draining")
 
     # ── 8. ORDERLY shutdown ───────────────────────────────────────────────────
     # The order here is critical and was inverted: `conn_task.cancel()` came
@@ -1147,10 +1147,10 @@ async def main():
         # all, and the previous `wait_for(join(), 30)` paid the full 30s with
         # nobody on the other side — 150s of shutdown in the worst case, above
         # any default grace period. Instead of guessing from the task state,
-        # we MEASURE: `_aguardar_confirmacao` gives up after 5s if no result is
+        # we MEASURE: `_await_confirmation` gives up after 5s if no result is
         # confirmed, and only keeps waiting while the sender makes progress.
-        await _aguardar_confirmacao(
-            _result_queue, rotulo="resultado", timeout=30, estagnado=5,
+        await _await_confirmation(
+            _result_queue, rotulo="resultado", timeout=30, stall_timeout=5,
         )
 
     conn_task.cancel()
@@ -1194,11 +1194,11 @@ async def main():
     # as `failed` so the supervisor stops instead of restarting against a
     # server that has already said no — it was a restart loop every 2s.
     if conn.terminal_deny:
-        _fase("failed", "revoked", detalhe=conn.terminal_deny)
+        _phase("failed", "revoked", detalhe=conn.terminal_deny)
     else:
-        _fase("stopped", detalhe="restart_requested" if conn.restart_requested else None)
+        _phase("stopped", detalhe="restart_requested" if conn.restart_requested else None)
 
-    if _dash is not None and _dash_modo == dashboard.MODO_JSON:
+    if _dash is not None and _dash_mode == dashboard.MODE_JSON:
         await _dash.stop()
 
     if conn.restart_requested:

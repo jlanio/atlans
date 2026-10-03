@@ -28,7 +28,7 @@ import hmac
 import ipaddress
 import json
 import math
-from flow.utils.backoff import com_jitter
+from flow.utils.backoff import with_jitter
 from app.core.utils.logger import get_logger
 import os
 import re
@@ -92,15 +92,15 @@ _webhook_tasks: set[asyncio.Task] = set()
 # §2): the flow taxonomy plus the server categories. A value outside it is
 # not written — cut at 16 characters it would become "no_executor_chai", a
 # category nobody maps and that the screen would group as if it were another.
-_CATEGORIAS_DE_ERRO = frozenset({
+_ERROR_CATEGORIES = frozenset({
     "user", "validation", "timeout", "resource", "transient", "internal",
     "no_executor", "executor_lost", "isolation", "dispatch",
 })
 
 
-def _categoria_conhecida(valor) -> "str | None":
+def _known_category(valor) -> "str | None":
     texto = str(valor).strip().lower() if valor is not None else ""
-    if texto in _CATEGORIAS_DE_ERRO:
+    if texto in _ERROR_CATEGORIES:
         return texto
     logger.debug("error_category fora do vocabulario ignorada: %r", valor)
     return None
@@ -168,7 +168,7 @@ async def _send_notification_with_retry(url: str, body: dict) -> None:
                 url, attempt, len(_NOTIFY_DELAYS), exc,
             )
         if attempt < len(_NOTIFY_DELAYS):
-            await asyncio.sleep(com_jitter(delay))
+            await asyncio.sleep(with_jitter(delay))
 
     logger.error("Notificação para %s falhou após %d tentativas.", url, len(_NOTIFY_DELAYS))
 
@@ -258,7 +258,7 @@ async def _process_result(db, payload: dict) -> bool:
     if (
         not first_close
         and payload.get("status") != run.status
-        and not _desfecho_inferido_pelo_servidor(run)
+        and not _outcome_inferred_by_server(run)
     ):
         # A DIFFERENT outcome for a run already closed: the result passed the WS
         # idempotence check before the first one was written (both were in the
@@ -307,7 +307,7 @@ async def _process_result(db, payload: dict) -> bool:
     return True
 
 
-def _json_seguro(valor):
+def _safe_json(valor):
     """Replace NaN/Infinity with None, recursively.
 
     Python's `json.dumps` emits NaN and Infinity — an extension the JSON spec
@@ -317,16 +317,16 @@ def _json_seguro(valor):
     run_dead_letter with its status stuck at 'running', even though it finished.
 
     The known source was the bbox of an empty GeoDataFrame (see
-    flow/metrics/collector._bbox_finito), but the queue is an external contract:
+    flow/metrics/collector._finite_bbox), but the queue is an external contract:
     sanitizing here is what keeps a NaN from any other metric from breaking the
     write of the result.
     """
     if isinstance(valor, float):
         return valor if math.isfinite(valor) else None
     if isinstance(valor, dict):
-        return {k: _json_seguro(v) for k, v in valor.items()}
+        return {k: _safe_json(v) for k, v in valor.items()}
     if isinstance(valor, (list, tuple)):
-        return [_json_seguro(v) for v in valor]
+        return [_safe_json(v) for v in valor]
     return valor
 
 
@@ -334,17 +334,17 @@ def _json_seguro(valor):
 # `executor_lost` (disconnected, or reconciliation did not find the job) and `dispatch`
 # (the send was never confirmed). A real result arriving later
 # replaces that outcome — see `_process_result`.
-_CATEGORIAS_INFERIDAS = frozenset({"executor_lost", "dispatch"})
+_INFERRED_CATEGORIES = frozenset({"executor_lost", "dispatch"})
 
 
-def _desfecho_inferido_pelo_servidor(run: WorkflowRun) -> bool:
-    return run.status == "failed" and run.error_category in _CATEGORIAS_INFERIDAS
+def _outcome_inferred_by_server(run: WorkflowRun) -> bool:
+    return run.status == "failed" and run.error_category in _INFERRED_CATEGORIES
 
 
-def _numero_finito(valor):
+def _finite_number(valor):
     """The number, or 0 if it is not a finite number.
 
-    For the usage_daily increments, where `_json_seguro` is not enough: the
+    For the usage_daily increments, where `_safe_json` is not enough: the
     None it returns for NaN would become NULL in the SQL sum (`coluna + NULL`
     nulls out the day's row), and raw NaN is worse — `NaN or 0` is NaN, and
     NaN + x = NaN contaminates the workspace aggregate forever.
@@ -356,7 +356,7 @@ def _numero_finito(valor):
     return 0
 
 
-def _stats_para_coluna(stats: dict) -> dict:
+def _stats_for_column(stats: dict) -> dict:
     """Keep only what the node_stats column exists to store.
 
     The executor sends, inside `stats`, control keys that are NOT per-node
@@ -386,9 +386,9 @@ async def _update_run_status(db, run: WorkflowRun, payload: dict) -> None:
     # (or forged) payload must not stamp a category on a run that succeeded.
     # Cut at 16 because that is the column size: an executor sending something
     # outside the taxonomy must not break the commit of the whole close.
-    _categoria = payload.get("error_category")
+    _category = payload.get("error_category")
     run.error_category   = (
-        _categoria_conhecida(_categoria) if run.status == "failed" and _categoria else None
+        _known_category(_category) if run.status == "failed" and _category else None
     )
     # node_stats is only overwritten when content comes in. On the error,
     # timeout or cancellation path the executor may send empty/missing stats —
@@ -396,7 +396,7 @@ async def _update_run_status(db, run: WorkflowRun, payload: dict) -> None:
     # the panel would lose the history of the nodes that did run.
     stats = payload.get("stats") or {}
     if stats:
-        run.node_stats = _json_seguro(_stats_para_coluna(stats))
+        run.node_stats = _safe_json(_stats_for_column(stats))
     # end_time comes from the queue and goes into a timestamptz column. A naive
     # value would be interpreted by Postgres in the session's time zone (the
     # containers' TZ) and stored shifted — 4h into the future in America/Cuiaba.
@@ -559,12 +559,12 @@ async def _aprender_fontes_if_present(db, run: WorkflowRun, stats: dict, first_c
 
     from app.services import fontes_service
 
-    aprendidas = await fontes_service.aprender_de_execucao(
+    learned = await fontes_service.aprender_de_execucao(
         db, run, stats, wf_obj.definition, first_close=first_close,
     )
-    if aprendidas:
+    if learned:
         await db.commit()
-        logger.info("run %s: %d fonte(s) WFS registrada(s) no catalogo.", run.task_id, aprendidas)
+        logger.info("run %s: %d fonte(s) WFS registrada(s) no catalogo.", run.task_id, learned)
 
 
 async def _persist_pinned_outputs_if_present(db, run: WorkflowRun, stats: dict) -> None:
@@ -609,12 +609,12 @@ async def _persist_pinned_outputs_if_present(db, run: WorkflowRun, stats: dict) 
     # reported the whole pinned_outputs. The declared key is attackable, but
     # using it to DISCARD is fail-safe: lying about the current task_id only leads
     # the ref to the same canonical derivation it would already have.
-    task_atual = run.task_id or "no-task"
+    current_task = run.task_id or "no-task"
     accepted: dict[str, dict] = {}
     for nid, ref in updated_pins.items():
         if not isinstance(ref, dict) or "__pin_s3_key__" not in ref:
             continue
-        if f"/{task_atual}/" not in str(ref.get("__pin_s3_key__", "")):
+        if f"/{current_task}/" not in str(ref.get("__pin_s3_key__", "")):
             logger.debug(
                 "run %s: pin do node '%s' ignorado — ref de uma run anterior (passthrough).",
                 run.task_id, nid,
@@ -716,7 +716,7 @@ async def _upsert_pin_artifact(db, run: WorkflowRun, wf_obj, nid: str, ref: dict
         # like that poisons the whole transaction — and this is the transaction that
         # persists the execution RESULT, on the `job_result` path. The savepoint
         # isolates the failure; the pattern is the one of
-        # `api_token_service.marcar_uso` and `credential_loader`.
+        # `api_token_service.mark_used` and `credential_loader`.
         try:
             async with db.begin_nested():
                 db.add(novo)
@@ -730,7 +730,7 @@ async def _upsert_pin_artifact(db, run: WorkflowRun, wf_obj, nid: str, ref: dict
                 "repontando a existente.",
                 run.task_id, nid,
             )
-            vencedora = (await db.execute(
+            winner = (await db.execute(
                 select(Artifact)
                 .where(
                     Artifact.workflow_hash == run.workflow_hash,
@@ -739,13 +739,13 @@ async def _upsert_pin_artifact(db, run: WorkflowRun, wf_obj, nid: str, ref: dict
                 )
                 .order_by(Artifact.id.desc())
             )).scalars().first()
-            if vencedora is None:  # pragma: no cover - only if the row vanishes midway
+            if winner is None:  # pragma: no cover - only if the row vanishes midway
                 raise
-            vencedora.s3_key = s3_key
-            vencedora.filename = filename
-            vencedora.format = fmt
-            vencedora.run_id = run.task_id
-            vencedora.workspace_id = run.workspace_id or wf_obj.workspace_id or ""
+            winner.s3_key = s3_key
+            winner.filename = filename
+            winner.format = fmt
+            winner.run_id = run.task_id
+            winner.workspace_id = run.workspace_id or wf_obj.workspace_id or ""
 
 
 async def _fire_notification_if_configured(db, run: WorkflowRun) -> None:
@@ -776,9 +776,9 @@ async def _fire_notification_if_configured(db, run: WorkflowRun) -> None:
     # What was saved before this rule (a `*`, a URL with a path) goes through
     # the same validation as saving: what the matcher would not match is ignored.
     from app.core.system_config import get_config
-    from app.core.utils.allowlist import padroes_validos
+    from app.core.utils.allowlist import valid_patterns
 
-    global_list = padroes_validos(await get_config(db, "webhook_whitelist", default=[]) or [])
+    global_list = valid_patterns(await get_config(db, "webhook_whitelist", default=[]) or [])
     if global_list and not hostname_matches_allowlist(target_host, global_list):
         logger.warning(
             "Webhook bloqueado pela whitelist global: host '%s' nao esta em %s.",
@@ -880,7 +880,7 @@ async def _head_sizes(keys: list[str]) -> dict[str, int]:
 
 
 @dataclass(frozen=True)
-class _Resolucao:
+class _Resolution:
     """The destination of each sanitized item, decided BEFORE going to storage (phase 2)."""
 
     a_criar: list[dict]             # vira linha nova: Artifact ou WorkspaceFile
@@ -902,9 +902,9 @@ async def _register_artifacts(db, run: WorkflowRun, artifacts_meta: dict) -> Non
     here from the run's workspace/task (see _derive_s3_key).
 
     Structured in three phases with no IO inside the loop: (1) sanitizes the payload
-    (`_sanear_artefatos`), (2) resolves database and storage IN BATCH
-    (`_resolver_em_lote`), (3) builds the rows and persists with one commit
-    (`_persistir_artefatos`) — and only then notifies the Drive (`_avisar_drive`).
+    (`_sanitize_artifacts`), (2) resolves database and storage IN BATCH
+    (`_resolve_in_batch`), (3) builds the rows and persists with one commit
+    (`_persist_artifacts`) — and only then notifies the Drive (`_notify_drive`).
     The previous version made two queries per Drive item (N+1) and one serial
     HEAD per artifact, all while processing a single queue item.
     """
@@ -924,22 +924,22 @@ async def _register_artifacts(db, run: WorkflowRun, artifacts_meta: dict) -> Non
         executor_id = run.host[len("executor:"):]
 
     known = await _artefatos_ja_registrados(db, run)
-    pendentes = _sanear_artefatos(run, artifacts_meta, known)
+    pendentes = _sanitize_artifacts(run, artifacts_meta, known)
     if not pendentes:
         return
 
-    resolucao = await _resolver_em_lote(db, run, pendentes)
-    novos_no_drive = await _persistir_artefatos(
+    resolucao = await _resolve_in_batch(db, run, pendentes)
+    new_in_drive = await _persist_artifacts(
         db, run, resolucao, expires_at=expires_at, executor_id=executor_id,
     )
     # The file that already existed is notified before the new one: that is the order
     # in which each destination was decided (phase 2, then phase 3).
-    drive_files = resolucao.drive_existentes + novos_no_drive
+    drive_files = resolucao.drive_existentes + new_in_drive
 
     logger.debug("run %s: %d artefato(s) registrado(s) (%d no Drive).",
                  run.task_id, len(resolucao.a_criar), len(drive_files))
 
-    await _avisar_drive(drive_files)
+    await _notify_drive(drive_files)
 
 
 async def _artefatos_ja_registrados(db, run: WorkflowRun) -> set[tuple]:
@@ -961,7 +961,7 @@ async def _artefatos_ja_registrados(db, run: WorkflowRun) -> set[tuple]:
     return {(nid, fn) for nid, fn in known_result.all()}
 
 
-def _sanear_artefatos(run: WorkflowRun, artifacts_meta: dict, known: set[tuple]) -> list[dict]:
+def _sanitize_artifacts(run: WorkflowRun, artifacts_meta: dict, known: set[tuple]) -> list[dict]:
     """Phase 1: sanitize the payload. No IO here.
 
     Returns one dict per item that becomes a record — node_id, raw item, DERIVED
@@ -1037,7 +1037,7 @@ def _sanear_artefatos(run: WorkflowRun, artifacts_meta: dict, known: set[tuple])
     return pendentes
 
 
-async def _resolver_em_lote(db, run: WorkflowRun, pendentes: list[dict]) -> _Resolucao:
+async def _resolve_in_batch(db, run: WorkflowRun, pendentes: list[dict]) -> _Resolution:
     """Phase 2: resolve database and storage in batch.
 
     The executor returns the id_hash of the row that /drive/executor-upload-url
@@ -1055,12 +1055,12 @@ async def _resolver_em_lote(db, run: WorkflowRun, pendentes: list[dict]) -> _Res
     """
     from app.models.workspace_file import WorkspaceFile
 
-    drive_pendentes = [p for p in pendentes if p["context"] == "drive"]
+    pending_drive = [p for p in pendentes if p["context"] == "drive"]
     drive_ids = {
-        p["item"]["drive_file_id"] for p in drive_pendentes if p["item"].get("drive_file_id")
+        p["item"]["drive_file_id"] for p in pending_drive if p["item"].get("drive_file_id")
     }
 
-    linhas_por_id: dict[str, WorkspaceFile] = {}
+    rows_by_id: dict[str, WorkspaceFile] = {}
     if drive_ids:
         res = await db.execute(
             select(WorkspaceFile).where(
@@ -1071,14 +1071,14 @@ async def _resolver_em_lote(db, run: WorkflowRun, pendentes: list[dict]) -> _Res
                 WorkspaceFile.workspace_id == run.workspace_id,
             )
         )
-        linhas_por_id = {linha.id_hash: linha for linha in res.scalars().all()}
+        rows_by_id = {linha.id_hash: linha for linha in res.scalars().all()}
 
     keys_ja_no_drive: set[str] = set()
-    if drive_pendentes:
+    if pending_drive:
         # Safety net for paths that did not go through executor-upload-url.
         res = await db.execute(
             select(WorkspaceFile.s3_key).where(
-                WorkspaceFile.s3_key.in_([p["s3_key"] for p in drive_pendentes])
+                WorkspaceFile.s3_key.in_([p["s3_key"] for p in pending_drive])
             )
         )
         keys_ja_no_drive = set(res.scalars().all())
@@ -1092,7 +1092,7 @@ async def _resolver_em_lote(db, run: WorkflowRun, pendentes: list[dict]) -> _Res
         if p["context"] != "drive":
             a_criar.append(p)
             continue
-        linha = linhas_por_id.get(p["item"].get("drive_file_id"))
+        linha = rows_by_id.get(p["item"].get("drive_file_id"))
         if linha is not None:
             # The row already exists, but the executor still needs to be notified:
             # `agent_confirm_upload` emits the event with exclude_agent_id=<executor
@@ -1112,11 +1112,11 @@ async def _resolver_em_lote(db, run: WorkflowRun, pendentes: list[dict]) -> _Res
         a_criar.append(p)
 
     tamanhos = await _head_sizes([p["s3_key"] for p in a_criar if not p["local"]])
-    return _Resolucao(a_criar=a_criar, drive_existentes=drive_existentes, tamanhos=tamanhos)
+    return _Resolution(a_criar=a_criar, drive_existentes=drive_existentes, tamanhos=tamanhos)
 
 
-async def _persistir_artefatos(
-    db, run: WorkflowRun, resolucao: _Resolucao, *, expires_at, executor_id: str | None,
+async def _persist_artifacts(
+    db, run: WorkflowRun, resolucao: _Resolution, *, expires_at, executor_id: str | None,
 ) -> list[tuple]:
     """Phase 3: build the rows and persist with a single commit.
 
@@ -1125,7 +1125,7 @@ async def _persistir_artefatos(
     """
     from app.models.workspace_file import WorkspaceFile
 
-    novos_no_drive: list[tuple[WorkspaceFile, str]] = []
+    new_in_drive: list[tuple[WorkspaceFile, str]] = []
     for p in resolucao.a_criar:
         item, s3_key, filename = p["item"], p["s3_key"], p["filename"]
 
@@ -1177,7 +1177,7 @@ async def _persistir_artefatos(
                     status        = "confirmed",
                 )
                 db.add(wf)
-                novos_no_drive.append((wf, "file_created"))
+                new_in_drive.append((wf, "file_created"))
         else:
             # Destino: tabela Artifact (disponivel via API de artefatos)
             db.add(Artifact(
@@ -1209,10 +1209,10 @@ async def _persistir_artefatos(
     # was already registered, no longer pays for a pointless transaction.
     if resolucao.a_criar:
         await db.commit()
-    return novos_no_drive
+    return new_in_drive
 
 
-async def _avisar_drive(drive_files: list[tuple]) -> None:
+async def _notify_drive(drive_files: list[tuple]) -> None:
     """Notify executors about files added to the Drive.
 
     Runs after the commit: a notification that fails becomes a WARNING and does
@@ -1301,11 +1301,11 @@ async def _upsert_usage_daily(db, run: WorkflowRun, stats: dict, first_close: bo
     run_data = ((stats or {}).get("__metrics__") or {}).get("run") or {}
 
     duration_ms = (
-        _numero_finito(run_data.get("duration_ms"))
-        or _numero_finito((run.duration_seconds or 0) * 1000)
+        _finite_number(run_data.get("duration_ms"))
+        or _finite_number((run.duration_seconds or 0) * 1000)
     )
-    cpu_avg = _numero_finito(run_data.get("cpu_avg_pct"))
-    mem_avg = _numero_finito(run_data.get("mem_avg_mb"))
+    cpu_avg = _finite_number(run_data.get("cpu_avg_pct"))
+    mem_avg = _finite_number(run_data.get("mem_avg_mb"))
     duration_s = duration_ms / 1000
 
     # A run cancelled by the user is neither a success nor a failure: counting it as
@@ -1320,20 +1320,20 @@ async def _upsert_usage_daily(db, run: WorkflowRun, stats: dict, first_close: bo
 
     # This run's contribution, as a column -> increment map. It serves both the
     # atomic UPDATE (sum in SQL) and the values of the first row (INSERT).
-    incrementos = {
+    increments = {
         "total_runs": 1,
         "successful_runs": 1 if _success else 0,
         "failed_runs": 0 if (_success or _cancelled) else 1,
         "total_cpu_seconds": cpu_avg * duration_s / 100,
         "total_mem_mb_seconds": mem_avg * duration_s,
         "total_duration_ms": duration_ms,
-        "total_input_bytes": _numero_finito(run_data.get("input_bytes")),
-        "total_output_bytes": _numero_finito(run_data.get("output_bytes")),
-        "total_features": _numero_finito(run_data.get("total_features")),
-        "total_nodes_executed": _numero_finito(run_data.get("nodes_executed")),
+        "total_input_bytes": _finite_number(run_data.get("input_bytes")),
+        "total_output_bytes": _finite_number(run_data.get("output_bytes")),
+        "total_features": _finite_number(run_data.get("total_features")),
+        "total_nodes_executed": _finite_number(run_data.get("nodes_executed")),
     }
 
-    async def _incrementar() -> int:
+    async def _increment() -> int:
         # Atomic UPDATE (`coluna = coluna + delta` in SQL), not the earlier
         # read-modify-write in Python: the increment is not lost when the
         # consumer and a concurrent `account_terminal_run` (separate sessions)
@@ -1346,12 +1346,12 @@ async def _upsert_usage_daily(db, run: WorkflowRun, stats: dict, first_close: bo
             )
             .values({
                 getattr(UsageDaily, coluna): getattr(UsageDaily, coluna) + delta
-                for coluna, delta in incrementos.items()
+                for coluna, delta in increments.items()
             })
         )
         return result.rowcount or 0
 
-    if await _incrementar() == 0:
+    if await _increment() == 0:
         # The day's row does not exist yet: create it. SAVEPOINT (not a loose `try`):
         # with UniqueConstraint(date, workspace_id), two sessions read "does not
         # exist" at the same time and the second INSERT violates the constraint — in
@@ -1360,10 +1360,10 @@ async def _upsert_usage_daily(db, run: WorkflowRun, stats: dict, first_close: bo
         # INSERT race retries the atomic UPDATE on the row the winner created.
         try:
             async with db.begin_nested():
-                db.add(UsageDaily(date=today, workspace_id=run.workspace_id, **incrementos))
+                db.add(UsageDaily(date=today, workspace_id=run.workspace_id, **increments))
                 await db.flush()
         except IntegrityError:
-            if await _incrementar() == 0:  # pragma: no cover - the winning row vanished midway
+            if await _increment() == 0:  # pragma: no cover - the winning row vanished midway
                 raise
 
     await db.commit()
@@ -1372,10 +1372,10 @@ async def _upsert_usage_daily(db, run: WorkflowRun, stats: dict, first_close: bo
 
 def _ip_do_payload(payload: dict) -> str | None:
     """The result's `executor_ip`, only if it is an IP that fits the column (45)."""
-    return _ip_valido(payload.get("executor_ip"))
+    return _valid_ip(payload.get("executor_ip"))
 
 
-def _ip_valido(valor) -> str | None:
+def _valid_ip(valor) -> str | None:
     """The IP in canonical form, or None.
 
     The `run_results` queue also receives payloads from outside the WebSocket
@@ -1413,8 +1413,8 @@ async def _persist_metrics(db, run: WorkflowRun, metrics: dict, payload: dict) -
     # workflow_run_metrics are JSON columns, and a NaN coming from ANY metric
     # made Postgres reject the INSERT ("Token NaN is invalid") — 37 results
     # ended up in the dead-letter queue because of it before the collector's
-    # `_bbox_finito`. Here it does not depend on the executor being up to date.
-    metrics = _json_seguro(metrics or {})
+    # `_finite_bbox`. Here it does not depend on the executor being up to date.
+    metrics = _safe_json(metrics or {})
     run_data = metrics.get("run", {})
     nodes_data = metrics.get("nodes", {})
     spatial_summary = metrics.get("spatial_summary")
@@ -1454,7 +1454,7 @@ async def _persist_metrics(db, run: WorkflowRun, metrics: dict, payload: dict) -
                 from app.core.executor_connections import executor_registry
                 _conn = executor_registry.get(_agent_id)
                 if _conn:
-                    _agent_ip = _ip_valido(_conn.executor_ip)
+                    _agent_ip = _valid_ip(_conn.executor_ip)
             except Exception as exc:
                 # In-memory registry: failing here does not justify losing the metric.
                 logger.warning("Falha ao obter IP do executor '%s': %s", _agent_id, exc)
@@ -1609,7 +1609,7 @@ async def run_consumer_loop() -> None:
             logger.info("Consumer run_results encerrado (cancelado).")
             return
         except RedisConnectionError as exc:
-            delay = com_jitter(_RECONNECT_DELAYS[min(attempt, len(_RECONNECT_DELAYS) - 1)])
+            delay = with_jitter(_RECONNECT_DELAYS[min(attempt, len(_RECONNECT_DELAYS) - 1)])
             attempt += 1
             logger.warning(
                 "Consumer: conexao Redis perdida (%s). Reconectando em %.1fs (tentativa %d).",
@@ -1618,7 +1618,7 @@ async def run_consumer_loop() -> None:
             await asyncio.sleep(delay)
         except Exception as exc:
             # Erro inesperado: loga e reconecta. Nao mata o loop.
-            delay = com_jitter(_RECONNECT_DELAYS[min(attempt, len(_RECONNECT_DELAYS) - 1)])
+            delay = with_jitter(_RECONNECT_DELAYS[min(attempt, len(_RECONNECT_DELAYS) - 1)])
             attempt += 1
             logger.error(
                 "Consumer: erro inesperado (%s). Reiniciando em %.1fs.", exc, delay,

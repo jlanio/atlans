@@ -62,7 +62,7 @@ from uuid import UUID
 from flow.nodes.base import BaseNode
 from flow.registry import register_node
 from flow.utils.logger import get_logger
-from flow.utils.parameter_validation import colunas_pedidas
+from flow.utils.parameter_validation import requested_columns
 
 logger = get_logger(__name__)
 
@@ -102,7 +102,7 @@ def _stable_hash(
     Raises ChangeDetectorTypeError if the input contains a type without stable
     canonicalization — better to fail clearly than to silently produce an unstable hash.
     """
-    value = _aplicar_ignorados(value, list(ignore_paths) if ignore_paths else None)
+    value = _apply_ignored(value, list(ignore_paths) if ignore_paths else None)
     canonical = _canonicalize(value, list(fields_filter) if fields_filter else None)
     if isinstance(canonical, bytes):
         return hashlib.sha256(canonical).hexdigest()
@@ -116,17 +116,17 @@ def _e_dataframe(value: Any) -> bool:
     return isinstance(value, pd.DataFrame)
 
 
-def _aplicar_ignorados(value: Any, ignore_paths: list[str] | None) -> Any:
+def _apply_ignored(value: Any, ignore_paths: list[str] | None) -> Any:
     if not ignore_paths:
         return value
     for raw in ignore_paths:
         segmentos = [s for s in raw.split(".") if s]
         if segmentos:
-            value = _sem_caminho(value, segmentos)
+            value = _without_path(value, segmentos)
     return value
 
 
-def _sem_caminho(value: Any, path: list[str]) -> Any:
+def _without_path(value: Any, path: list[str]) -> Any:
     """Removes a dotted path without MUTATING the user's input.
 
     Copies only along the affected path; untouched branches are
@@ -149,13 +149,13 @@ def _sem_caminho(value: Any, path: list[str]) -> Any:
             return value
         novo = dict(value)
         if resto:
-            novo[head] = _sem_caminho(value[head], resto)
+            novo[head] = _without_path(value[head], resto)
         else:
             novo.pop(head)
         return novo
 
     if isinstance(value, (list, tuple)):
-        return [_sem_caminho(item, path) for item in value]
+        return [_without_path(item, path) for item in value]
 
     return value
 
@@ -459,7 +459,7 @@ class ChangeDetector(BaseNode):
             "branches": True,
         }
 
-    def _ttl_horas(self) -> int:
+    def _ttl_hours(self) -> int:
         """TTL in hours, tolerant of a cleared/unreadable field — falls back to the default 168.
 
         `get_param_int` raises ValueError for ""/None, and bringing down the run
@@ -479,13 +479,13 @@ class ChangeDetector(BaseNode):
         scope          = self.get_param("scope", "workflow") or "workflow"
         shared_key_raw = self.get_param("shared_key", "") or ""
         primeira       = (self.get_param("primeira_execucao", "mudou") or "mudou").strip().lower()
-        on_erro        = (self.get_param("on_backend_error", "mudou") or "mudou").strip().lower()
-        ttl_hours      = self._ttl_horas()
+        on_error        = (self.get_param("on_backend_error", "mudou") or "mudou").strip().lower()
+        ttl_hours      = self._ttl_hours()
 
         # Chips fields: accept a list, a JSON string (what the screen writes) and the
         # CSV of old definitions.
-        fields_filter = colunas_pedidas(self.get_param("fields", [])) or None
-        ignore_paths  = colunas_pedidas(self.get_param("ignore_fields", [])) or None
+        fields_filter = requested_columns(self.get_param("fields", [])) or None
+        ignore_paths  = requested_columns(self.get_param("ignore_fields", [])) or None
 
         node_id = self.node_id
 
@@ -550,15 +550,15 @@ class ChangeDetector(BaseNode):
         try:
             previous_hash = await _swap_hash(key, current_hash, ttl_seconds)
         except Exception as exc:
-            if on_erro == "falhar":
+            if on_error == "falhar":
                 raise RuntimeError(
                     f"ChangeDetector({node_id}): backend de estado indisponível "
                     f"({exc}). 'Em erro de backend' está configurado como 'Falhar'."
                 ) from exc
-            branch = on_erro != "sem_mudanca"
+            branch = on_error != "sem_mudanca"
             logger.error(
                 "ChangeDetector(%s): falha ao trocar hash (%s) — decidindo branch=%s por política '%s'.",
-                node_id, exc, branch, on_erro,
+                node_id, exc, branch, on_error,
             )
             return _resultado(branch, None, current_hash, "backend_indisponivel")
 

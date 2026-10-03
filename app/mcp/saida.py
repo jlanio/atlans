@@ -27,14 +27,14 @@ from datetime import datetime
 from typing import Any, Iterable, Mapping
 
 from app.core.utils.logger import _REDACTED, scrub_text
-from app.core.utils.redacao import CHAVES_REDIGIDAS
+from app.core.utils.redacao import REDACTED_KEYS
 
 # Descent ceiling when sanitizing: a pathological structure (or a cycle built
 # by whoever writes the definition) does not turn into infinite recursion.
-_PROFUNDIDADE_MAX = 32
+_MAX_DEPTH = 32
 
 
-def higienizar(valor: Any, profundidade: int = 0) -> Any:
+def sanitize(valor: Any, profundidade: int = 0) -> Any:
     """Copy of the value with every leaf string passed through `scrub_text` and
     every sensitive key replaced by `<REDACTED>`.
 
@@ -43,13 +43,13 @@ def higienizar(valor: Any, profundidade: int = 0) -> Any:
     `{"token": "..."}` inside a `params_schema`, a contract or a node summary —
     would go out in plaintext. The key is the signal left when the value gives
     nothing away, and it is the SAME list as the lint and the definition
-    redaction (`CHAVES_REDIGIDAS`), so that a new header there applies here
+    redaction (`REDACTED_KEYS`), so that a new header there applies here
     without anyone remembering.
 
     Dicts and lists are traversed; whatever exceeds the depth ceiling becomes
     `None` — the server does not hand over what it could not inspect.
     """
-    if profundidade > _PROFUNDIDADE_MAX:
+    if profundidade > _MAX_DEPTH:
         return None
     if isinstance(valor, str):
         return scrub_text(valor)
@@ -57,17 +57,17 @@ def higienizar(valor: Any, profundidade: int = 0) -> Any:
         return {
             chave: (
                 _REDACTED
-                if str(chave).lower() in CHAVES_REDIGIDAS
-                else higienizar(item, profundidade + 1)
+                if str(chave).lower() in REDACTED_KEYS
+                else sanitize(item, profundidade + 1)
             )
             for chave, item in valor.items()
         }
     if isinstance(valor, (list, tuple)):
-        return [higienizar(item, profundidade + 1) for item in valor]
+        return [sanitize(item, profundidade + 1) for item in valor]
     return valor
 
 
-def envelope(dados: dict, **nao_confiavel: Any) -> dict:
+def envelope(dados: dict, **untrusted: Any) -> dict:
     """Joins the trusted fields to the `untrusted_data` block.
 
     A key with a null value is left out: `untrusted_data` only exists when
@@ -76,8 +76,8 @@ def envelope(dados: dict, **nao_confiavel: Any) -> dict:
     """
     saida = dict(dados)
     bloco = {
-        chave: higienizar(valor)
-        for chave, valor in nao_confiavel.items()
+        chave: sanitize(valor)
+        for chave, valor in untrusted.items()
         if valor is not None
     }
     if bloco:
@@ -103,17 +103,17 @@ def iso(valor: Any) -> str | None:
 
 # Edge keys that matter to whoever reads the workflow. `source_handle` is left
 # out: it is canvas drawing, not data semantics.
-_CHAVES_DE_ARESTA = ("from_key", "to_key", "condition")
+_EDGE_KEYS = ("from_key", "to_key", "condition")
 
 
-def _nos(definition: Mapping[str, Any]) -> Iterable[Mapping[str, Any]]:
+def _nodes(definition: Mapping[str, Any]) -> Iterable[Mapping[str, Any]]:
     brutos = definition.get("nodes")
     if not isinstance(brutos, list):
         return []
     return [n for n in brutos if isinstance(n, Mapping)]
 
 
-def resumo_definition(
+def definition_summary(
     definition: Mapping[str, Any], *, pin_metadata: Mapping[str, Any] | None = None
 ) -> dict:
     """The workflow's skeleton: nodes, edges, triggers and pins.
@@ -126,10 +126,10 @@ def resumo_definition(
     definition: a pin is workflow state, not drawing. Only pins of nodes that
     still exist are included — an orphan pin describes a deleted node.
     """
-    nos = list(_nos(definition))
+    nos = list(_nodes(definition))
     ids = {str(no.get("id") or "") for no in nos}
 
-    nos_resumidos = [
+    summarized_nodes = [
         {
             "id": str(no.get("id") or ""),
             "name": no.get("name"),
@@ -146,7 +146,7 @@ def resumo_definition(
             if not isinstance(aresta, Mapping):
                 continue
             item = {"source": aresta.get("source"), "target": aresta.get("target")}
-            for chave in _CHAVES_DE_ARESTA:
+            for chave in _EDGE_KEYS:
                 valor = aresta.get(chave)
                 if valor not in (None, ""):
                     item[chave] = valor
@@ -168,11 +168,11 @@ def resumo_definition(
     )
 
     return {
-        "nodes": nos_resumidos,
+        "nodes": summarized_nodes,
         "edges": arestas,
         "triggers": gatilhos,
         "pins": pins,
-        "node_count": len(nos_resumidos),
+        "node_count": len(summarized_nodes),
         "edge_count": len(arestas),
     }
 
@@ -183,10 +183,10 @@ def resumo_definition(
 # `retry_count` lives): they are platform bookkeeping, not workflow nodes, and
 # handing them over as if they were nodes would make the client invent a step
 # that never existed.
-_PREFIXO_RESERVADO = "__"
+_RESERVED_PREFIX = "__"
 
 
-def nos_de_node_stats(stats: Any, *, summary: bool) -> list[dict]:
+def nodes_from_node_stats(stats: Any, *, summary: bool) -> list[dict]:
     """The nodes of a run, in the shape the client reads.
 
     `summary=True` is enough to understand the outcome — who ran, with what
@@ -207,7 +207,7 @@ def nos_de_node_stats(stats: Any, *, summary: bool) -> list[dict]:
 
     saida: list[dict] = []
     for node_id, bruto in stats.items():
-        if str(node_id).startswith(_PREFIXO_RESERVADO) or not isinstance(bruto, Mapping):
+        if str(node_id).startswith(_RESERVED_PREFIX) or not isinstance(bruto, Mapping):
             continue
         item = {
             "node_id": str(node_id),
@@ -223,7 +223,7 @@ def nos_de_node_stats(stats: Any, *, summary: bool) -> list[dict]:
     return saida
 
 
-def resumo_run(detalhe: Mapping[str, Any], *, node_stats: str = "summary") -> dict:
+def run_summary(detalhe: Mapping[str, Any], *, node_stats: str = "summary") -> dict:
     """A run in MCP shape: what the platform generated, and what was written.
 
     The core's detail mixes the two natures in a single dict — `status` and
@@ -238,7 +238,7 @@ def resumo_run(detalhe: Mapping[str, Any], *, node_stats: str = "summary") -> di
     number); each one's picture goes in `untrusted_data.node_stats`, because it
     carries node names and error messages.
     """
-    nos = nos_de_node_stats(detalhe.get("node_stats"), summary=node_stats != "full")
+    nos = nodes_from_node_stats(detalhe.get("node_stats"), summary=node_stats != "full")
     dados = {
         "run_id": detalhe.get("run_id"),
         # The core calls it `workflow_hash`; for whoever uses the tools it is

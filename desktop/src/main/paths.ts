@@ -75,10 +75,10 @@ export const PYTHON_EXE = IS_DEV
   // In dev we use the packaged runtime if it exists (npm run runtime), and
   // fall back to the system Python if not — that way you can iterate on the
   // UI without rebuilding 390 MB on every change.
-  ? resolverPythonDev()
+  ? resolveDevPython()
   : path.join(RESOURCES, 'python', 'python.exe')
 
-function resolverPythonDev(): string {
+function resolveDevPython(): string {
   const embarcado = path.join(app.getAppPath(), 'resources', 'python', 'python.exe')
   return fs.existsSync(embarcado) ? embarcado : 'python'
 }
@@ -101,10 +101,10 @@ export const ARTIFACTS_DIR_PADRAO = path.join(app.getPath('home'), 'AtlansExecut
 /**
  * Moves the data from a folder with an old name, if there is one. Idempotent.
  *
- * Runs before `garantirDiretorios`: once the directories exist, the migration
+ * Runs before `ensureDirectories`: once the directories exist, the migration
  * becomes a no-op (it does not overwrite current data with the old data).
  */
-export function migrarDadosAntigos(): string | null {
+export function migrateLegacyData(): string | null {
   if (fs.existsSync(USER_DATA)) return null
 
   const raiz = path.dirname(USER_DATA)
@@ -138,7 +138,7 @@ export function migrarDadosAntigos(): string | null {
  */
 export const ICONE_APP = arquivoDoApp('build', 'icon.ico')
 
-export function garantirDiretorios(): void {
+export function ensureDirectories(): void {
   for (const dir of [CONFIG_DIR, CERT_DIR, LOG_DIR]) {
     fs.mkdirSync(dir, { recursive: true })
   }

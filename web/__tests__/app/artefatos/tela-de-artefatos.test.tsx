@@ -86,8 +86,8 @@ function servidor(totais: { execution?: number; publication?: number }) {
   })
 }
 
-type Deferido<T> = { promise: Promise<T>; resolve: (v: T) => void }
-function deferido<T>(): Deferido<T> {
+type Deferred<T> = { promise: Promise<T>; resolve: (v: T) => void }
+function deferred<T>(): Deferred<T> {
   let resolve!: (v: T) => void
   const promise = new Promise<T>(r => { resolve = r })
   return { promise, resolve }
@@ -109,19 +109,19 @@ function renderizar() {
 const linhas = () => document.querySelectorAll("tbody tr").length
 const skeleton = () => screen.queryByRole("status", { name: "Carregando os artefatos" })
 const busca = () => screen.queryByRole("textbox", { name: "Buscar artefatos" })
-const botaoAtualizar = () => screen.getByRole("button", { name: "Atualizar a lista de artefatos" })
+const refreshButton = () => screen.getByRole("button", { name: "Atualizar a lista de artefatos" })
 const verMais = () => screen.queryByRole("button", { name: /^(Ver mais|Carregando…)/ })
 const aba = (nome: string) => within(screen.getByRole("group", { name: "Tipo de artefato" })).getByRole("button", { name: nome })
-const ultimaChamada = () => getArtifacts.mock.calls.at(-1)![0]!
+const lastCall = () => getArtifacts.mock.calls.at(-1)![0]!
 
 /** The sentence under the title, or `null` when it is the skeleton. */
 function subtitulo(): string | null {
-  const irmao = screen.getByRole("heading", { name: "Artefatos" }).nextElementSibling
-  return irmao?.tagName === "P" ? irmao.textContent : null
+  const sibling = screen.getByRole("heading", { name: "Artefatos" }).nextElementSibling
+  return sibling?.tagName === "P" ? sibling.textContent : null
 }
 
 /** The active tab's counter (the server total), or `null` if there is none. */
-function contagemDaAba(): string | null {
+function tabCount(): string | null {
   const ativa = within(screen.getByRole("group", { name: "Tipo de artefato" }))
     .getAllByRole("button")
     .find(b => b.getAttribute("aria-pressed") === "true")!
@@ -129,7 +129,7 @@ function contagemDaAba(): string | null {
 }
 
 /** One more tick so a late response gets the chance to (not) paint. */
-const mais_um_tique = () => act(async () => { await new Promise(r => setTimeout(r, 20)) })
+const one_more_tick = () => act(async () => { await new Promise(r => setTimeout(r, 20)) })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -149,19 +149,19 @@ describe("Artefatos — 1ª carga", () => {
     expect(skeleton()).toBeInTheDocument()
     expect(subtitulo()).toBeNull()
     expect(busca()).toBeNull()
-    expect(botaoAtualizar()).toBeDisabled()
-    await mais_um_tique()
+    expect(refreshButton()).toBeDisabled()
+    await one_more_tick()
     expect(getArtifacts).not.toHaveBeenCalled()
 
     ws.loading = false
     rerenderizar()
     await waitFor(() => expect(linhas()).toBe(3))
     expect(getArtifacts).toHaveBeenCalledTimes(1)
-    expect(ultimaChamada()).toMatchObject({ workspace_id: "ws-a", offset: 0 })
+    expect(lastCall()).toMatchObject({ workspace_id: "ws-a", offset: 0 })
   })
 
   it("skeleton até a resposta; depois a tabela, as contagens e o Ver mais", async () => {
-    const primeira = deferido<Resposta>()
+    const primeira = deferred<Resposta>()
     getArtifacts.mockReturnValueOnce(primeira.promise)
     renderizar()
 
@@ -173,17 +173,17 @@ describe("Artefatos — 1ª carga", () => {
     expect(subtitulo()).toBeNull()
     // The filter bar waits for the 1st load: there is nothing to filter yet.
     expect(busca()).toBeNull()
-    expect(botaoAtualizar()).toBeDisabled()
+    expect(refreshButton()).toBeDisabled()
 
     primeira.resolve(ok(itens("a", 0, 50), 120))
     await waitFor(() => expect(linhas()).toBe(50))
     expect(skeleton()).toBeNull()
     expect(subtitulo()).toBe("120 artefatos de execução")
-    expect(contagemDaAba()).toBe("120")
+    expect(tabCount()).toBe("120")
     expect(screen.getByText("50 de 120 artefatos")).toBeInTheDocument()
     expect(verMais()).toHaveTextContent("Ver mais (70 restantes)")
     expect(busca()).toBeInTheDocument()
-    expect(botaoAtualizar()).toBeEnabled()
+    expect(refreshButton()).toBeEnabled()
   })
 
   it("o Ver mais conta no singular quando falta um só", async () => {
@@ -203,18 +203,18 @@ describe("Artefatos — 1ª carga", () => {
     expect(busca()).toBeNull()
     expect(subtitulo()).toBeNull()
     expect(skeleton()).toBeNull()
-    expect(botaoAtualizar()).toBeEnabled()
-    await mais_um_tique()
+    expect(refreshButton()).toBeEnabled()
+    await one_more_tick()
     expect(getArtifacts).toHaveBeenCalledTimes(1)
 
     // "Tentar de novo" (try again) goes back to the skeleton and requests the 1st page.
-    const segunda = deferido<Resposta>()
+    const segunda = deferred<Resposta>()
     getArtifacts.mockReturnValueOnce(segunda.promise)
     fireEvent.click(within(cartao).getByRole("button", { name: "Tentar de novo" }))
     await waitFor(() => expect(skeleton()).toBeInTheDocument())
     expect(screen.queryByRole("alert")).toBeNull()
     expect(getArtifacts).toHaveBeenCalledTimes(2)
-    expect(ultimaChamada()).toMatchObject({ offset: 0 })
+    expect(lastCall()).toMatchObject({ offset: 0 })
 
     segunda.resolve(ok(itens("a", 0, 3), 3))
     await waitFor(() => expect(linhas()).toBe(3))
@@ -236,7 +236,7 @@ describe("Artefatos — 1ª carga", () => {
     await waitFor(() => expect(subtitulo()).toBe("Nenhum artefato ainda"))
     // The subtitle and the title of the first-use card.
     expect(screen.getAllByText("Nenhum artefato ainda")).toHaveLength(2)
-    expect(contagemDaAba()).toBeNull()
+    expect(tabCount()).toBeNull()
     expect(verMais()).toBeNull()
 
     fireEvent.click(aba("Publicação"))
@@ -252,17 +252,17 @@ describe("Artefatos — Ver mais", () => {
     renderizar()
     await waitFor(() => expect(linhas()).toBe(50))
 
-    const segunda = deferido<Resposta>()
+    const segunda = deferred<Resposta>()
     getArtifacts.mockReturnValueOnce(segunda.promise)
     fireEvent.click(verMais()!)
     await waitFor(() => expect(verMais()).toHaveTextContent("Carregando…"))
     expect(verMais()).toBeDisabled()
-    expect(ultimaChamada()).toMatchObject({ offset: 50, limit: 50 })
+    expect(lastCall()).toMatchObject({ offset: 50, limit: 50 })
     // Paginating is not reloading: the table, the subtitle and Atualizar (refresh) stay.
     expect(linhas()).toBe(50)
     expect(skeleton()).toBeNull()
     expect(subtitulo()).toBe("120 artefatos de execução")
-    expect(botaoAtualizar()).toBeEnabled()
+    expect(refreshButton()).toBeEnabled()
 
     segunda.resolve(ok(itens("a", 50, 50), 120))
     await waitFor(() => expect(linhas()).toBe(100))
@@ -271,7 +271,7 @@ describe("Artefatos — Ver mais", () => {
 
     fireEvent.click(verMais()!)
     await waitFor(() => expect(linhas()).toBe(120))
-    expect(ultimaChamada()).toMatchObject({ offset: 100 })
+    expect(lastCall()).toMatchObject({ offset: 100 })
     expect(verMais()).toBeNull()
     expect(screen.getByText("120 de 120 artefatos")).toBeInTheDocument()
     expect(getArtifacts).toHaveBeenCalledTimes(3)
@@ -291,17 +291,17 @@ describe("Artefatos — Ver mais", () => {
     expect(verMais()).toHaveTextContent("Ver mais (70 restantes)")
     expect(verMais()).toBeEnabled()
     expect(subtitulo()).toBe("120 artefatos de execução")
-    expect(contagemDaAba()).toBe("120")
+    expect(tabCount()).toBe("120")
     // With an error on screen, the "N de M" count leaves the bar.
     expect(screen.queryByText("50 de 120 artefatos")).toBeNull()
 
     // Try again: the warning goes away right on the click, not only when the page arrives.
-    const denovo = deferido<Resposta>()
+    const denovo = deferred<Resposta>()
     getArtifacts.mockReturnValueOnce(denovo.promise)
     fireEvent.click(verMais()!)
     await waitFor(() => expect(verMais()).toHaveTextContent("Carregando…"))
     expect(screen.queryByText("A página 2 caiu")).toBeNull()
-    expect(ultimaChamada()).toMatchObject({ offset: 50 })
+    expect(lastCall()).toMatchObject({ offset: 50 })
 
     denovo.resolve(ok(itens("a", 50, 50), 120))
     await waitFor(() => expect(linhas()).toBe(100))
@@ -320,23 +320,23 @@ describe("Artefatos — recarga", () => {
     await waitFor(() => expect(linhas()).toBe(100))
 
     const antes = getArtifacts.mock.calls.length
-    const recarga = deferido<Resposta>()
+    const recarga = deferred<Resposta>()
     getArtifacts.mockReturnValueOnce(recarga.promise)
-    fireEvent.click(botaoAtualizar())
+    fireEvent.click(refreshButton())
     await waitFor(() => expect(skeleton()).toBeInTheDocument())
     expect(linhas()).toBe(0)
     expect(verMais()).toBeNull()
     expect(subtitulo()).toBeNull()
-    expect(botaoAtualizar()).toBeDisabled()
+    expect(refreshButton()).toBeDisabled()
     // The bar and the counts of what was there stay during the reload.
     expect(busca()).toBeInTheDocument()
     expect(screen.getByText("100 de 120 artefatos")).toBeInTheDocument()
-    expect(contagemDaAba()).toBe("120")
+    expect(tabCount()).toBe("120")
 
     recarga.resolve(ok(itens("n", 0, 50), 121))
     await waitFor(() => expect(linhas()).toBe(50))
     expect(getArtifacts.mock.calls.length).toBe(antes + 1)
-    expect(ultimaChamada()).toMatchObject({ offset: 0, limit: 50 })
+    expect(lastCall()).toMatchObject({ offset: 0, limit: 50 })
     expect(screen.getByLabelText("Selecionar n0.geojson")).toBeInTheDocument()
     expect(subtitulo()).toBe("121 artefatos de execução")
     expect(screen.getByText("50 de 121 artefatos")).toBeInTheDocument()
@@ -344,7 +344,7 @@ describe("Artefatos — recarga", () => {
 
     // The next Ver mais continues from what the reload brought.
     fireEvent.click(verMais()!)
-    await waitFor(() => expect(ultimaChamada()).toMatchObject({ offset: 50 }))
+    await waitFor(() => expect(lastCall()).toMatchObject({ offset: 50 }))
   })
 
   it("Atualizar que falha: a lista inteira fica, com o aviso âmbar; o Tentar de novo do aviso recarrega", async () => {
@@ -355,25 +355,25 @@ describe("Artefatos — recarga", () => {
     await waitFor(() => expect(linhas()).toBe(100))
 
     getArtifacts.mockResolvedValueOnce(falha("Sem conexão com o servidor"))
-    fireEvent.click(botaoAtualizar())
+    fireEvent.click(refreshButton())
     const aviso = await screen.findByText("Sem conexão com o servidor")
-    const linhaAmbar = aviso.closest('[role="status"]') as HTMLElement
-    expect(linhaAmbar).toBeInTheDocument()
+    const amberRow = aviso.closest('[role="status"]') as HTMLElement
+    expect(amberRow).toBeInTheDocument()
     expect(screen.queryByRole("alert")).toBeNull()
     expect(linhas()).toBe(100)
     expect(verMais()).toHaveTextContent("Ver mais (20 restantes)")
     expect(subtitulo()).toBe("120 artefatos de execução")
-    expect(botaoAtualizar()).toBeEnabled()
+    expect(refreshButton()).toBeEnabled()
 
     // The warning's Tentar de novo is the same reload: the warning goes away on the click, the
     // skeleton comes in, and the count of what was there returns to the bar meanwhile.
-    const denovo = deferido<Resposta>()
+    const denovo = deferred<Resposta>()
     getArtifacts.mockReturnValueOnce(denovo.promise)
-    fireEvent.click(within(linhaAmbar).getByRole("button", { name: "Tentar de novo" }))
+    fireEvent.click(within(amberRow).getByRole("button", { name: "Tentar de novo" }))
     await waitFor(() => expect(skeleton()).toBeInTheDocument())
     expect(screen.queryByText("Sem conexão com o servidor")).toBeNull()
     expect(screen.getByText("100 de 120 artefatos")).toBeInTheDocument()
-    expect(ultimaChamada()).toMatchObject({ offset: 0 })
+    expect(lastCall()).toMatchObject({ offset: 0 })
 
     denovo.resolve(ok(itens("a", 0, 50), 120))
     await waitFor(() => expect(linhas()).toBe(50))
@@ -385,19 +385,19 @@ describe("Artefatos — recarga", () => {
     renderizar()
     await waitFor(() => expect(linhas()).toBe(50))
 
-    const pagina2 = deferido<Resposta>()
-    const recarga = deferido<Resposta>()
-    getArtifacts.mockReturnValueOnce(pagina2.promise).mockReturnValueOnce(recarga.promise)
+    const page2 = deferred<Resposta>()
+    const recarga = deferred<Resposta>()
+    getArtifacts.mockReturnValueOnce(page2.promise).mockReturnValueOnce(recarga.promise)
     fireEvent.click(verMais()!)
     await waitFor(() => expect(verMais()).toHaveTextContent("Carregando…"))
-    fireEvent.click(botaoAtualizar())
+    fireEvent.click(refreshButton())
     await waitFor(() => expect(skeleton()).toBeInTheDocument())
-    expect(ultimaChamada()).toMatchObject({ offset: 0 })
+    expect(lastCall()).toMatchObject({ offset: 0 })
 
     recarga.resolve(ok(itens("n", 0, 50), 120))
     await waitFor(() => expect(linhas()).toBe(50))
-    pagina2.resolve(ok(itens("velho", 50, 50), 120))
-    await mais_um_tique()
+    page2.resolve(ok(itens("velho", 50, 50), 120))
+    await one_more_tick()
     expect(linhas()).toBe(50)
     expect(screen.queryByLabelText("Selecionar velho50.geojson")).toBeNull()
     expect(verMais()).toHaveTextContent("Ver mais (70 restantes)")
@@ -421,7 +421,7 @@ describe("Artefatos — recarga", () => {
     await waitFor(() => expect(GisFlowService.deleteArtifact).toHaveBeenCalledWith("a3"))
     await waitFor(() => expect(linhas()).toBe(50))
     expect(getArtifacts.mock.calls.length).toBe(antes + 1)
-    expect(ultimaChamada()).toMatchObject({ offset: 0 })
+    expect(lastCall()).toMatchObject({ offset: 0 })
   })
 })
 
@@ -433,21 +433,21 @@ describe("Artefatos — filtros", () => {
     renderizar()
     await waitFor(() => expect(linhas()).toBe(50))
 
-    const publicacoes = deferido<Resposta>()
-    getArtifacts.mockReturnValueOnce(publicacoes.promise)
+    const publications = deferred<Resposta>()
+    getArtifacts.mockReturnValueOnce(publications.promise)
     fireEvent.click(aba("Publicação"))
     await waitFor(() => expect(skeleton()).toBeInTheDocument())
     expect(linhas()).toBe(0)
     expect(subtitulo()).toBeNull()
-    expect(contagemDaAba()).toBeNull()
+    expect(tabCount()).toBeNull()
     expect(screen.queryByText(/ de 120 artefatos$/)).toBeNull()
     expect(busca()).toBeInTheDocument()
-    expect(ultimaChamada()).toMatchObject({ kind: "publication", offset: 0 })
+    expect(lastCall()).toMatchObject({ kind: "publication", offset: 0 })
 
-    publicacoes.resolve(ok(itens("p", 0, 3, { is_published: true }), 3))
+    publications.resolve(ok(itens("p", 0, 3, { is_published: true }), 3))
     await waitFor(() => expect(linhas()).toBe(3))
     expect(subtitulo()).toBe("3 publicações")
-    expect(contagemDaAba()).toBe("3")
+    expect(tabCount()).toBe("3")
     expect(screen.getByText("3 de 3 publicações")).toBeInTheDocument()
   })
 
@@ -461,16 +461,16 @@ describe("Artefatos — filtros", () => {
     await waitFor(() => expect(linhas()).toBe(3))
     const antes = getArtifacts.mock.calls.length
 
-    const volta = deferido<Resposta>()
+    const volta = deferred<Resposta>()
     getArtifacts.mockReturnValueOnce(volta.promise)
     fireEvent.click(aba("Execução"))
     await waitFor(() => expect(skeleton()).toBeInTheDocument())
     expect(linhas()).toBe(0)
     // Nothing from the previous visit while the list has not arrived: not the tab total,
     // not the "N de M".
-    expect(contagemDaAba()).toBeNull()
+    expect(tabCount()).toBeNull()
     expect(screen.queryByText(/ de 120 artefatos$/)).toBeNull()
-    expect(ultimaChamada()).toMatchObject({ kind: "execution", offset: 0 })
+    expect(lastCall()).toMatchObject({ kind: "execution", offset: 0 })
 
     volta.resolve(ok(itens("a", 0, 50), 120))
     await waitFor(() => expect(linhas()).toBe(50))
@@ -489,14 +489,14 @@ describe("Artefatos — filtros", () => {
     fireEvent.change(busca()!, { target: { value: "  bacia  " } })
     expect(getArtifacts).not.toHaveBeenCalled()
     await waitFor(() => expect(getArtifacts).toHaveBeenCalledTimes(1))
-    expect(ultimaChamada()).toMatchObject({ search: "bacia", offset: 0 })
+    expect(lastCall()).toMatchObject({ search: "bacia", offset: 0 })
 
     await waitFor(() => expect(screen.getByText("Nenhum artefato com «bacia»")).toBeInTheDocument())
     expect(subtitulo()).toBe("Nenhum resultado para o filtro")
 
     fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }))
     await waitFor(() => expect(linhas()).toBe(50))
-    expect(ultimaChamada().search).toBeUndefined()
+    expect(lastCall().search).toBeUndefined()
     expect(busca()).toHaveValue("")
   })
 
@@ -512,7 +512,7 @@ describe("Artefatos — filtros", () => {
     getArtifacts.mockResolvedValueOnce(ok(itens("c", 0, 1, { format: "csv", filename: "c0.csv" }), 1))
     fireEvent.click(within(grupo).getByRole("button", { name: "CSV" }))
     await waitFor(() => expect(linhas()).toBe(1))
-    expect(ultimaChamada()).toMatchObject({ fmt: "csv", offset: 0 })
+    expect(lastCall()).toMatchObject({ fmt: "csv", offset: 0 })
     // The server returned only CSV, and the chips are all still there.
     const depois = screen.getByRole("group", { name: "Formato" })
     expect(within(depois).getAllByRole("button").map(b => b.textContent)).toEqual(["Todos", "CSV", "GEOJSON"])
@@ -523,18 +523,18 @@ describe("Artefatos — filtros", () => {
     renderizar()
     await waitFor(() => expect(linhas()).toBe(50))
 
-    const lenta = deferido<Resposta>()
-    const rapida = deferido<Resposta>()
-    getArtifacts.mockReturnValueOnce(lenta.promise).mockReturnValueOnce(rapida.promise)
+    const lenta = deferred<Resposta>()
+    const fast = deferred<Resposta>()
+    getArtifacts.mockReturnValueOnce(lenta.promise).mockReturnValueOnce(fast.promise)
     fireEvent.change(busca()!, { target: { value: "rio" } })
-    await waitFor(() => expect(ultimaChamada()).toMatchObject({ search: "rio" }))
+    await waitFor(() => expect(lastCall()).toMatchObject({ search: "rio" }))
     fireEvent.change(busca()!, { target: { value: "mar" } })
-    await waitFor(() => expect(ultimaChamada()).toMatchObject({ search: "mar" }))
+    await waitFor(() => expect(lastCall()).toMatchObject({ search: "mar" }))
 
-    rapida.resolve(ok(itens("mar", 0, 2), 2))
+    fast.resolve(ok(itens("mar", 0, 2), 2))
     await waitFor(() => expect(linhas()).toBe(2))
     lenta.resolve(ok(itens("rio", 0, 7), 7))
-    await mais_um_tique()
+    await one_more_tick()
     expect(linhas()).toBe(2)
     expect(screen.getByText("2 de 2 artefatos")).toBeInTheDocument()
     expect(subtitulo()).toBe("2 artefatos de execução")
@@ -547,13 +547,13 @@ describe("Artefatos — filtros", () => {
     fireEvent.click(verMais()!)
     await waitFor(() => expect(linhas()).toBe(100))
 
-    const novo = deferido<Resposta>()
+    const novo = deferred<Resposta>()
     getArtifacts.mockReturnValueOnce(novo.promise)
     ws.current = { id_hash: "ws-b", name: "B" }
     rerenderizar()
     await waitFor(() => expect(skeleton()).toBeInTheDocument())
     expect(linhas()).toBe(0)
-    expect(ultimaChamada()).toMatchObject({ workspace_id: "ws-b", offset: 0 })
+    expect(lastCall()).toMatchObject({ workspace_id: "ws-b", offset: 0 })
 
     novo.resolve(ok(itens("b", 0, 5), 5))
     await waitFor(() => expect(linhas()).toBe(5))

@@ -9,8 +9,8 @@ runs with `--workers N` and every worker starts the same tasks: without it, each
 sweep would run N times per interval.
 
 Usage:
-    from app.core.tarefas_periodicas import laco_periodico
-    await laco_periodico("Cleanup de artefatos", 3600, purge_expired_artifacts,
+    from app.core.tarefas_periodicas import periodic_loop
+    await periodic_loop("Cleanup de artefatos", 3600, purge_expired_artifacts,
                          lock="artifact_cleanup:lock")
 """
 import asyncio
@@ -50,25 +50,25 @@ async def soltar_lock(chave: str) -> None:
         logger.debug("Falha ao soltar o lock %s no Redis: %s", chave, exc)
 
 
-async def laco_periodico(
+async def periodic_loop(
     nome: str,
-    intervalo_s: float,
+    interval_s: float,
     trabalho: Callable[[], Awaitable[object]],
     *,
     lock: str | None = None,
 ) -> None:
-    """Call `trabalho()` every `intervalo_s` seconds, until cancelled.
+    """Call `trabalho()` every `interval_s` seconds, until cancelled.
 
     With `lock`, each round only works on the worker that takes the lock (TTL = the
     interval); the others skip that round. An error in the work is logged and the
     loop goes on. Cancellation (lifespan shutdown) ends the loop, which
     finishes normally.
     """
-    logger.info("%s: iniciado (intervalo=%ss).", nome, intervalo_s)
+    logger.info("%s: iniciado (intervalo=%ss).", nome, interval_s)
     while True:
         try:
-            await asyncio.sleep(intervalo_s)
-            if lock is None or await adquirir_lock(lock, intervalo_s):
+            await asyncio.sleep(interval_s)
+            if lock is None or await adquirir_lock(lock, interval_s):
                 await trabalho()
             else:
                 logger.debug("%s: outro worker pegou o lock deste intervalo — pulando.", nome)

@@ -12,20 +12,20 @@ import { create } from "zustand"
  * the same drawer would diverge at the first change.
  */
 
-/** `localStorage` key. The width uses `CHAVE_LARGURA`, in the component. */
-const CHAVE_ABERTO = "atlans:assistente:aberto"
+/** `localStorage` key. The width uses `WIDTH_KEY`, in the component. */
+const OPEN_KEY = "atlans:assistente:aberto"
 
 function lembrado(): boolean | null {
   if (typeof window === "undefined") return null
   try {
-    let cru = window.localStorage.getItem(CHAVE_ABERTO)
+    let cru = window.localStorage.getItem(OPEN_KEY)
     if (cru === null) {
       // F4 renamed the key (it was atlans:copiloto:aberto) without a migration — the
       // panel "forgot" everyone's preference. Reads the old one once and
       // rewrites it under the new one; the old one stays, for anyone going back to
       // an earlier version.
       cru = window.localStorage.getItem("atlans:copiloto:aberto")
-      if (cru !== null) window.localStorage.setItem(CHAVE_ABERTO, cru)
+      if (cru !== null) window.localStorage.setItem(OPEN_KEY, cru)
     }
     return cru === null ? null : cru === "1"
   } catch {
@@ -36,17 +36,17 @@ function lembrado(): boolean | null {
 
 function lembrar(aberto: boolean): void {
   try {
-    window.localStorage.setItem(CHAVE_ABERTO, aberto ? "1" : "0")
+    window.localStorage.setItem(OPEN_KEY, aberto ? "1" : "0")
   } catch {
     /* disposable preference */
   }
 }
 
-interface AssistenteEditorState {
+interface AssistantEditorState {
   aberto: boolean
 }
 
-interface AssistenteEditorActions {
+interface AssistantEditorActions {
   fechar(): void
   alternar(): void
   /**
@@ -58,7 +58,7 @@ interface AssistenteEditorActions {
   hidratar(padrao: boolean): void
 }
 
-export const useAssistenteEditorStore = create<AssistenteEditorState & AssistenteEditorActions>((set) => ({
+export const useAssistantEditorStore = create<AssistantEditorState & AssistantEditorActions>((set) => ({
   aberto: false,
 
   fechar: () => set(() => { lembrar(false); return { aberto: false } }),
