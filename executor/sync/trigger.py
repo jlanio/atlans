@@ -7,7 +7,7 @@ import fnmatch
 import json
 import logging
 
-from executor.sync.http import ClienteHTTP, TIMEOUT_CONTROLE
+from executor.sync.http import HTTPClient, CONTROL_TIMEOUT
 
 logger = logging.getLogger("executor.sync")
 
@@ -31,7 +31,7 @@ class SyncTrigger:
         self._base_url = ws_to_http(server_url)
         self._agent_id = executor_id
         self._httpx_kwargs = mtls_httpx_kwargs(self._base_url)
-        self._http = ClienteHTTP(self._httpx_kwargs)
+        self._http = HTTPClient(self._httpx_kwargs)
         self._triggers = self._load_triggers()
 
     async def aclose(self):
@@ -101,7 +101,7 @@ class SyncTrigger:
             resp = await self._http().post(
                 url,
                 json={"workflow_id_hash": workflow_id_hash, "inputs": inputs},
-                headers=self._headers(), timeout=TIMEOUT_CONTROLE,
+                headers=self._headers(), timeout=CONTROL_TIMEOUT,
             )
 
             if resp.status_code in (200, 201, 202):

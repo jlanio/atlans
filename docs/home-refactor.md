@@ -47,7 +47,7 @@ at `"aberto"`).
 - More prominence: 56 px tall and 16 px text in the hero (footer: 44 px / 14 px), a discreet orange ring and
   glow, the icon in a tinted circle. On focus the glow rises a little.
 - **Typed-out suggestions** in the field while it is empty, with a blinking orange cursor, cycling through
-  four product phrases (`SUGESTOES` in `barra.tsx`). **Tab** accepts, **Enter** sends (empty
+  four product phrases (`SUGGESTIONS` in `barra.tsx`). **Tab** accepts, **Enter** sends (empty
   sends the current suggestion); any key interrupts; deleting everything brings the suggestion back. Clickable
   chips fill in the field.
 - After the first token, the **same element** slides to the footer and shrinks into today's
@@ -71,7 +71,7 @@ at `"aberto"`).
   the bar and the stack disappear.
 - A single conversation model feeds both views: the stack is the same `Conversa` as the panel,
   clipped to the last turns, and the cards (confirmation, layer) come from the same hook
-  (`useExtrasDoAssistente`). Nothing is duplicated.
+  (`useAssistantExtras`). Nothing is duplicated.
 - The "panel open/collapsed" preference **is no longer saved** in the browser: the hero would ignore it
   anyway, and the panel became on-demand.
 - The reply can bring **quick replies**: up to three chips under the text (`sugerir_respostas`,
@@ -203,7 +203,7 @@ Adjustments from the adversarial review (same day, before the PR):
 - **`localizar()` never toggles to OFF**: MapLibre's `trigger()` is a
   toggle (when already following, it silently turned off tracking); when already active, the handle
   only re-emits the last position.
-- **The confirmation resends the coordinate** (`DecisaoDeConfirmacao.localizacao`): the
+- **The confirmation resends the coordinate** (`ConfirmationDecision.localizacao`): the
   resumption of the loop does not forget the "near me" — the server does not store the
   position (it lives only in the stream's prompt, never in the transcript).
 - **Denied permission releases the hero spin** (MapLibre does not emit
@@ -224,8 +224,8 @@ Where it is in the code:
   (in the store for the same reason as `rascunho`/attachments: Ctrl+I swaps the surfaces).
 - `hooks/home/useAssistente.ts`: reads the location through a ref and includes it in the turn's
   body only when set (without it, the body is the usual one).
-- Backend: `schemas/assistente.py` (`Localizacao` + a field in `MensagemDaHome`),
-  `api/routers/assistente_router.py` (`_localizacao_extra`, folded into
+- Backend: `schemas/assistente.py` (`Localizacao` + a field in `HomeMessage`),
+  `api/routers/assistente_router.py` (`_extra_location`, folded into
   `instrucoes_extras` as the workspace already was) and `services/assistente_superficie.py`
   (one line teaching the model to use the location in relative requests).
 
@@ -256,7 +256,7 @@ detected language); the change takes effect immediately, without reloading. A `r
 brings back the choice the server read — if the cookie changed in another tab, the screen, the
 cookie and "Preferências" agree again.
 
-**Only the Home is translated.** `EscopoPelaRota` limits translation to the `/` route: the
+**Only the Home is translated.** `ScopeByRoute` limits translation to the `/` route: the
 administration area (editor, projects, admin) stays in Portuguese, and the components
 shared with it — the account menu, the editor assistant's conversation,
 the password field — do not end up half in each language. Without a provider (tests, the

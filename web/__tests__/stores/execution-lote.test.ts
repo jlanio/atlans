@@ -107,14 +107,14 @@ describe("workflowExecutionStore — índice por nó e ramos perdedores", () => 
     const store = useWorkflowExecutionStore.getState()
     store.startExecution([no("a", "idle"), no("b", "idle")])
     const nodes = useWorkflowExecutionStore.getState().statusWorkflow!.nodes
-    const bAntes = useWorkflowExecutionStore.getState().statusById.get("b")
+    const bBefore = useWorkflowExecutionStore.getState().statusById.get("b")
 
     // Only "a" changes; "b" is returned by identity, as the WS flush does.
     const atualizados = nodes.map(n => (n.id === "a" ? { ...n, status: "started" as const } : n))
     useWorkflowExecutionStore.getState().updateNodeStatuses(atualizados, [])
 
     // This is what keeps the by-id selector of "b"'s card from re-rendering.
-    expect(useWorkflowExecutionStore.getState().statusById.get("b")).toBe(bAntes)
+    expect(useWorkflowExecutionStore.getState().statusById.get("b")).toBe(bBefore)
     expect(useWorkflowExecutionStore.getState().statusById.get("a")?.status).toBe("started")
   })
 

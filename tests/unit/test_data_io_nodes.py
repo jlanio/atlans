@@ -21,7 +21,7 @@ def _make_data_output(params: dict):
 
 
 @pytest.mark.asyncio
-async def test_dataoutput_publico_ignora_credencial():
+async def test_dataoutput_public_ignores_credential():
     node = _make_data_output({
         "label": "resultado", "context": "artifacts",
         "isPublic": True, "credential_id": "cred-xyz",
@@ -41,7 +41,7 @@ async def test_dataoutput_publico_ignora_credencial():
 
 
 @pytest.mark.asyncio
-async def test_dataoutput_nao_publico_exige_credencial():
+async def test_dataoutput_non_public_requires_credential():
     node = _make_data_output({
         "label": "resultado", "context": "artifacts",
         "isPublic": False, "credential_id": "",
@@ -51,7 +51,7 @@ async def test_dataoutput_nao_publico_exige_credencial():
 
 
 @pytest.mark.asyncio
-async def test_dataoutput_nao_publico_propaga_credencial():
+async def test_dataoutput_non_public_propagates_credential():
     node = _make_data_output({
         "label": "resultado", "context": "artifacts",
         "isPublic": False, "credential_id": "cred-xyz",
@@ -69,7 +69,7 @@ async def test_dataoutput_nao_publico_propaga_credencial():
 
 
 @pytest.mark.asyncio
-async def test_dataoutput_drive_nunca_usa_credencial():
+async def test_dataoutput_drive_never_uses_credential():
     node = _make_data_output({
         "label": "resultado", "context": "drive",
         "isPublic": False, "credential_id": "cred-xyz",

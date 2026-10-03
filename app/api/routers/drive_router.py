@@ -9,7 +9,7 @@ from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import (
-    get_db, get_current_user, get_user_workspace_ids, exigir_papel_no_workspace, verify_workspace_access,
+    get_db, get_current_user, get_user_workspace_ids, require_workspace_role, verify_workspace_access,
 )
 from app.schemas.drive import (
     WorkspaceFileOut, WorkspaceFileList,
@@ -70,7 +70,7 @@ async def upload_file(
     svc:           DriveService = Depends(get_drive_service),
 ):
     verify_workspace_access(workspace_id, workspace_ids)
-    await exigir_papel_no_workspace(db, workspace_id, current_user.id_hash, ROLE_EDITOR)
+    await require_workspace_role(db, workspace_id, current_user.id_hash, ROLE_EDITOR)
 
     original_name = file.filename or "arquivo"
 
@@ -131,7 +131,7 @@ async def delete_file(
 ):
     wf = await svc.get_file(id_hash)
     verify_workspace_access(wf.workspace_id, workspace_ids)
-    await exigir_papel_no_workspace(db, wf.workspace_id, current_user.id_hash, ROLE_EDITOR)
+    await require_workspace_role(db, wf.workspace_id, current_user.id_hash, ROLE_EDITOR)
 
     await svc.delete_file(wf)
     return Response(status_code=204)

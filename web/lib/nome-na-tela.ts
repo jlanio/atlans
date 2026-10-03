@@ -13,11 +13,11 @@
 // map basemaps. NEXT_PUBLIC_* would not work: it would bake the value in at
 // build time, and the web image is the same for every installation.
 
-export const NOME_PADRAO = "Atlans"
+export const DEFAULT_NAME = "Atlans"
 
 /** NOME_NA_TELA cleaned up, or "Atlans" when empty, too long or with an odd character. */
-export function lerNomeNaTelaDoAmbiente(env: Record<string, string | undefined>): string {
+export function readDisplayNameFromEnv(env: Record<string, string | undefined>): string {
   const nome = (env.NOME_NA_TELA ?? "").replace(/\s+/g, " ").trim()
-  if (!nome || nome.length > 40 || /[\p{C}<>]/u.test(nome)) return NOME_PADRAO
+  if (!nome || nome.length > 40 || /[\p{C}<>]/u.test(nome)) return DEFAULT_NAME
   return nome
 }

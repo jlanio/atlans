@@ -23,8 +23,8 @@ describe("rotuloDeSalvo", () => {
   })
 
   it("mais de uma hora, hoje: a hora", () => {
-    const dezEcinco = new Date(2026, 8, 5, 10, 5, 0).getTime()
-    expect(rotuloDeSalvo(dezEcinco, agora)).toBe("Salvo às 10:05")
+    const tenOhFive = new Date(2026, 8, 5, 10, 5, 0).getTime()
+    expect(rotuloDeSalvo(tenOhFive, agora)).toBe("Salvo às 10:05")
   })
 
   it("antes de hoje: dia e hora", () => {

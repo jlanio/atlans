@@ -39,7 +39,7 @@ def move_deps(client):
     """Real app with the service stubbed and the `owner` role at the source.
 
     `get_workspace_member_role` is patched in the guards module
-    (`workflow_access`, where `exigir_papel_no_workspace` looks it up; it is
+    (`workflow_access`, where `require_workspace_role` looks it up; it is
     not an injectable dependency) — it decides the role at the DESTINATION.
     The source's role comes from the override of
     `get_accessible_workflow_with_role`, and the comparison is still the one
@@ -73,8 +73,8 @@ def move_deps(client):
     with patch(
         "app.core.authorization.workflow_access.get_workspace_member_role",
         new=AsyncMock(return_value="owner"),
-    ) as papel_destino:
-        yield client, svc, papel_destino
+    ) as target_role:
+        yield client, svc, target_role
 
     for dep in [get_db, get_workflow_service, get_accessible_workflow_with_role]:
         app.dependency_overrides.pop(dep, None)
@@ -90,7 +90,7 @@ class TestMove:
         )
         assert res.status_code == 200
 
-    async def test_resposta_traz_o_contrato_completo(self, move_deps):
+    async def test_response_carries_the_full_contract(self, move_deps):
         ac, _, _ = move_deps
         res = await ac.post(
             "/workflows/wf-abc123/move", json={"target_workspace_id": DESTINO},
@@ -101,7 +101,7 @@ class TestMove:
         assert corpo["warnings"] == []
         assert corpo["dry_run"] is False
 
-    async def test_avisos_chegam_serializados(self, move_deps):
+    async def test_warnings_arrive_serialized(self, move_deps):
         ac, svc, _ = move_deps
         svc.move_workflow = AsyncMock(return_value=_resultado(warnings=[{
             "code": "credentials_unresolvable", "severity": "warning",
@@ -117,7 +117,7 @@ class TestMove:
         assert aviso["severity"] == "warning"
         assert aviso["details"]["node_ids"] == ["n1"]
 
-    async def test_nome_opcional_e_repassado(self, move_deps):
+    async def test_optional_name_is_passed_through(self, move_deps):
         ac, svc, _ = move_deps
         await ac.post(
             "/workflows/wf-abc123/move",
@@ -125,7 +125,7 @@ class TestMove:
         )
         assert svc.move_workflow.await_args.kwargs["new_name"] == "Novo nome"
 
-    async def test_move_real_nao_e_dry_run(self, move_deps):
+    async def test_real_move_is_not_dry_run(self, move_deps):
         ac, svc, _ = move_deps
         await ac.post("/workflows/wf-abc123/move", json={"target_workspace_id": DESTINO})
         assert svc.move_workflow.await_args.kwargs["dry_run"] is False
@@ -143,7 +143,7 @@ class TestPreview:
         )
         assert res.status_code == 200
 
-    async def test_preview_pede_dry_run_ao_service(self, move_deps):
+    async def test_preview_asks_service_for_dry_run(self, move_deps):
         ac, svc, _ = move_deps
         svc.move_workflow = AsyncMock(return_value=_resultado(dry_run=True))
 
@@ -152,10 +152,10 @@ class TestPreview:
         )
         assert svc.move_workflow.await_args.kwargs["dry_run"] is True
 
-    async def test_preview_exige_a_mesma_permissao(self, move_deps):
+    async def test_preview_requires_the_same_permission(self, move_deps):
         """Otherwise it would become an oracle about the contents of other people's workspaces."""
-        ac, _, papel_destino = move_deps
-        papel_destino.return_value = "editor"
+        ac, _, target_role = move_deps
+        target_role.return_value = "editor"
 
         res = await ac.post(
             "/workflows/wf-abc123/move/preview", json={"target_workspace_id": DESTINO},
@@ -165,10 +165,10 @@ class TestPreview:
 
 # ── Autorizacao ──────────────────────────────────────────────────────────────
 
-class TestAutorizacao:
-    async def test_403_quando_nao_e_admin_no_destino(self, move_deps):
-        ac, svc, papel_destino = move_deps
-        papel_destino.return_value = "editor"
+class TestAuthorization:
+    async def test_403_when_not_admin_at_target(self, move_deps):
+        ac, svc, target_role = move_deps
+        target_role.return_value = "editor"
 
         res = await ac.post(
             "/workflows/wf-abc123/move", json={"target_workspace_id": DESTINO},
@@ -176,16 +176,16 @@ class TestAutorizacao:
         assert res.status_code == 403
         svc.move_workflow.assert_not_awaited()
 
-    async def test_403_quando_nao_e_membro_do_destino(self, move_deps):
-        ac, _, papel_destino = move_deps
-        papel_destino.return_value = None
+    async def test_403_when_not_member_of_target(self, move_deps):
+        ac, _, target_role = move_deps
+        target_role.return_value = None
 
         res = await ac.post(
             "/workflows/wf-abc123/move", json={"target_workspace_id": DESTINO},
         )
         assert res.status_code == 403
 
-    async def test_403_quando_e_apenas_editor_na_origem(self, move_deps):
+    async def test_403_when_only_editor_at_source(self, move_deps):
         """The role at the source alone already blocks it — it does not even get to check the destination."""
         ac, svc, _ = move_deps
         from app.main import app
@@ -205,8 +205,8 @@ class TestAutorizacao:
 
 # ── Body validation ──────────────────────────────────────────────────────────
 
-class TestValidacao:
-    async def test_400_quando_o_destino_e_o_workspace_atual(self, move_deps):
+class TestValidation:
+    async def test_400_when_target_is_the_current_workspace(self, move_deps):
         """The guard lives in the service (an invariant of the operation, not of the
         payload); here we only check that the domain error becomes 400 at the
         HTTP edge."""
@@ -221,12 +221,12 @@ class TestValidacao:
         )
         assert res.status_code == 400
 
-    async def test_422_sem_workspace_de_destino(self, move_deps):
+    async def test_422_without_target_workspace(self, move_deps):
         ac, _, _ = move_deps
         res = await ac.post("/workflows/wf-abc123/move", json={})
         assert res.status_code == 422
 
-    async def test_422_com_campo_desconhecido(self, move_deps):
+    async def test_422_with_unknown_field(self, move_deps):
         """`extra="forbid"`: a silently ignored field would make the client think
         the change was applied."""
         ac, _, _ = move_deps

@@ -9,25 +9,25 @@
 // they appear is `useExtrasDoAssistente` (only on the last turn, outside the
 // stream) — this is only the drawing and the click.
 
-import { useTextos } from "../i18n"
+import { useTexts } from "../i18n"
 
 interface Props {
   opcoes: string[]
-  onEscolher: (opcao: string) => void
+  onEscolher: (option: string) => void
 }
 
-export default function RespostasRapidas({ opcoes, onEscolher }: Props) {
-  const t = useTextos().assistente
+export default function QuickReplies({ opcoes, onEscolher }: Props) {
+  const t = useTexts().assistente
   return (
     <div role="group" aria-label={t.respostasRapidas} className="flex flex-wrap gap-2 pt-0.5">
-      {opcoes.map((opcao) => (
+      {opcoes.map((option) => (
         <button
-          key={opcao}
+          key={option}
           type="button"
-          onClick={() => onEscolher(opcao)}
+          onClick={() => onEscolher(option)}
           className="rounded-full border border-white/10 bg-background/60 px-3 py-1.5 text-[12.5px] text-[#cfcfcf] backdrop-blur hover:border-primary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:min-h-10"
         >
-          {opcao}
+          {option}
         </button>
       ))}
     </div>

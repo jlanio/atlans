@@ -2,15 +2,15 @@
 // This installation's map basemaps, from the root layout down to MapLibreMap.
 // See web/lib/fundos-do-mapa.ts.
 import { createContext, useContext, type ReactNode } from "react"
-import { FUNDOS_PADRAO, type FundosDoMapa } from "@/lib/fundos-do-mapa"
+import { DEFAULT_BASEMAPS, type MapBasemaps } from "@/lib/fundos-do-mapa"
 
-const FundosDoMapaContexto = createContext<FundosDoMapa>(FUNDOS_PADRAO)
+const MapBasemapsContext = createContext<MapBasemaps>(DEFAULT_BASEMAPS)
 
-export function FundosDoMapaProvider({ fundos, children }: { fundos: FundosDoMapa; children: ReactNode }) {
-  return <FundosDoMapaContexto.Provider value={fundos}>{children}</FundosDoMapaContexto.Provider>
+export function MapBasemapsProvider({ fundos, children }: { fundos: MapBasemaps; children: ReactNode }) {
+  return <MapBasemapsContext.Provider value={fundos}>{children}</MapBasemapsContext.Provider>
 }
 
 /** The installation's basemaps; outside the provider (tests), only OpenStreetMap streets. */
-export function useFundosDoMapa(): FundosDoMapa {
-  return useContext(FundosDoMapaContexto)
+export function useFundosDoMapa(): MapBasemaps {
+  return useContext(MapBasemapsContext)
 }

@@ -15,7 +15,7 @@ import { act, renderHook, waitFor } from "@testing-library/react"
 const servico = vi.hoisted(() => ({ uploadDriveFile: vi.fn() }))
 vi.mock("@/service/GisFlowService", () => ({ GisFlowService: servico }))
 
-import { useAnexos, MAXIMO_POR_GESTO } from "@/app/hooks/home/useAnexos"
+import { useAnexos, MAX_PER_GESTURE } from "@/app/hooks/home/useAnexos"
 import { useHomeStore } from "@/app/stores/homeStore"
 
 const estado = () => useHomeStore.getState()
@@ -125,12 +125,12 @@ describe("useAnexos", () => {
   it("apara o gesto no teto e avisa quantos ficaram para trás", async () => {
     servico.uploadDriveFile.mockImplementation(async (_ws: string, f: File) => ok(`h-${f.name}`))
     const { r, aoAvisar } = montar()
-    const muitos = Array.from({ length: MAXIMO_POR_GESTO + 3 }, (_, i) => arquivo(`f${i}.csv`))
+    const muitos = Array.from({ length: MAX_PER_GESTURE + 3 }, (_, i) => arquivo(`f${i}.csv`))
 
     act(() => r.result.current.receber(muitos))
     await waitFor(() => expect(estado().anexos.every((a) => a.estado === "pronto")).toBe(true))
 
-    expect(estado().anexos).toHaveLength(MAXIMO_POR_GESTO)
+    expect(estado().anexos).toHaveLength(MAX_PER_GESTURE)
     expect(aoAvisar).toHaveBeenCalled()
   })
 

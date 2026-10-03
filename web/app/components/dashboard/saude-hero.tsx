@@ -4,18 +4,18 @@ import { TbAlertTriangle, TbArrowRight, TbCircleCheck } from "react-icons/tb"
 import { Skeleton } from "@/app/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import type { INowBlock } from "@/service/types"
-import { ItensAgora } from "../observability/agora-faixa"
-import type { EstadoDoEscopo } from "./dashboard-url"
-import { type ResumoDaAtencao, type TomDeSaude, veredito } from "./saude"
+import { NowItems } from "../observability/agora-faixa"
+import type { ScopeState } from "./dashboard-url"
+import { type AttentionSummary, type HealthTone, veredito } from "./saude"
 
 interface Props {
   now: INowBlock | null | undefined
-  tom: TomDeSaude
+  tom: HealthTone
   /** Count per type of the "Precisa de atenção" list (via `montarAtencao` in `index`); the verdict cites "N workflows falhando" without reimplementing `top_failing`. */
-  resumo: ResumoDaAtencao
+  resumo: AttentionSummary
   /** Scope has workflows but no run: the calm state becomes "nada rodando ainda" (§3.10). */
   semExecucoes: boolean
-  escopo: EstadoDoEscopo
+  escopo: ScopeState
   /** Active workspace when scoped; `null` in "todos". `index` uses it when routing. */
   workspaceId: string | null
   /** 1st load: with no `now` yet, the line becomes a skeleton instead of "sem leitura". */
@@ -29,7 +29,7 @@ interface Props {
  * already use — no loose hex, so both themes stay consistent: green
  * (calm), amber (attention), red (critical).
  */
-const CORES: Record<TomDeSaude, { friso: string; texto: string }> = {
+const COLORS: Record<HealthTone, { friso: string; texto: string }> = {
   calmo: { friso: "bg-green-500", texto: "text-green-700 dark:text-green-400" },
   atencao: { friso: "bg-amber-500", texto: "text-amber-700 dark:text-amber-400" },
   critico: { friso: "bg-red-500", texto: "text-red-700 dark:text-red-400" },
@@ -46,13 +46,13 @@ const CORES: Record<TomDeSaude, { friso: string; texto: string }> = {
  * in two parts ("Precisa de você:" + the 1–2 most serious reasons).
  *
  * The item line ("N em andamento · 1 presa há X · Executores N de M") is the
- * `ItensAgora` extracted from `agora-faixa.tsx`: the same "hide what is zero"
+ * `NowItems` extracted from `agora-faixa.tsx`: the same "hide what is zero"
  * logic, without duplicating it. "Ver em andamento" and the clickable stuck run
  * bubble up as callbacks — the one that routes (with `&workspace=` when scoped)
  * is `index`.
  */
 export function SaudeHero({ now, tom, resumo, semExecucoes, carregando, onVerEmAndamento, onAbrirPresa }: Props) {
-  const cor = CORES[tom]
+  const cor = COLORS[tom]
   const frase = veredito(now, tom, resumo, semExecucoes)
   const calmo = tom === "calmo"
 
@@ -61,7 +61,7 @@ export function SaudeHero({ now, tom, resumo, semExecucoes, carregando, onVerEmA
   const corpo = (
     <div className="flex flex-1 flex-wrap items-center gap-x-3.5 gap-y-2">
       {now ? (
-        <ItensAgora now={now} onAbrirPresa={onAbrirPresa} />
+        <NowItems now={now} onAbrirPresa={onAbrirPresa} />
       ) : carregando ? (
         <Skeleton className="h-4 w-56" />
       ) : (
@@ -99,7 +99,7 @@ export function SaudeHero({ now, tom, resumo, semExecucoes, carregando, onVerEmA
 
   // Attention/critical: the big envelope, with a thick stripe and the verdict in
   // two parts. The identity color only comes in as the stripe — without the diffuse glow.
-  const [prefixo, motivos] = partesDoVeredito(frase)
+  const [prefixo, motivos] = verdictParts(frase)
   return (
     <section
       aria-labelledby="saude-titulo"
@@ -130,7 +130,7 @@ export function SaudeHero({ now, tom, resumo, semExecucoes, carregando, onVerEmA
  * tone's color, the reasons stay in normal text. Without the separator (a
  * single sentence), everything goes into the prefix.
  */
-function partesDoVeredito(frase: string): [string, string | null] {
+function verdictParts(frase: string): [string, string | null] {
   const i = frase.indexOf(": ")
   if (i === -1) return [frase, null]
   return [frase.slice(0, i + 1), frase.slice(i + 1)]

@@ -36,7 +36,7 @@ def _output_vars(bruto: Any) -> list:
     return nomes
 
 
-def _regras(bruto: Any) -> list:
+def _rules(bruto: Any) -> list:
     """Switch's `rules`: native list or JSON serialized by the editor.
     Anything unreadable becomes an empty list — the lint, not this, flags it."""
     if isinstance(bruto, str):
@@ -49,7 +49,7 @@ def _regras(bruto: Any) -> list:
     return [regra for regra in bruto if isinstance(regra, dict)]
 
 
-def _e_saida_utilizavel(campo: Any) -> bool:
+def _is_usable_output(campo: Any) -> bool:
     """Internal protocol keys (`__response__`, `__artifact__`) are not
     outputs an edge can consume — the executor strips them from what the node
     delivers. Same filter as the catalog (app/services/node_service.py)."""
@@ -59,13 +59,13 @@ def _e_saida_utilizavel(campo: Any) -> bool:
     return isinstance(nome, str) and bool(nome) and not nome.startswith("__")
 
 
-def schema_do_catalogo(desc: dict) -> list:
+def catalog_schema(desc: dict) -> list:
     """The descriptor's `outputs` (typed fields) in the simulation's grouped form.
 
     The catalog declares the fields in a flat list `[{"name", "type", ...}]`;
     simulate()'s canonical format is still grouped, so the conversion lives
     here — in one place only."""
-    campos = [c for c in (desc.get("outputs") or []) if _e_saida_utilizavel(c)]
+    campos = [c for c in (desc.get("outputs") or []) if _is_usable_output(c)]
     return [{"fields": campos}]
 
 
@@ -105,7 +105,7 @@ def schema_declarado(node_def: dict, desc: dict) -> Optional[list]:
         if not isinstance(fallback, str):
             raise ValueError("O parâmetro 'fallback_output' deve ser uma string.")
         saidas = [fallback]
-        for regra in _regras(params.get("rules")):
+        for regra in _rules(params.get("rules")):
             saida = regra.get("output")
             if isinstance(saida, str) and saida and saida not in saidas:
                 saidas.append(saida)
@@ -117,6 +117,6 @@ def schema_declarado(node_def: dict, desc: dict) -> Optional[list]:
             return _campos(portas)
 
     if desc.get("outputs") is not None:
-        return schema_do_catalogo(desc)
+        return catalog_schema(desc)
 
     return None

@@ -14,7 +14,7 @@ Order, and the reason for it:
    a nonexistent node and a cycle blew up inside `WorkflowExecutor.__init__` and
    became a generic 500 with the cause masked; a duplicate id silently overwrote the
    node. Now all three become **422** with the report in the body
-   (`DefinicaoInvalidaError`) — and a `credential_id` that is not a UUID too (it was
+   (`InvalidDefinitionError`) — and a `credential_id` that is not a UUID too (it was
    403; fatal by contract, so that whoever only looks at the HTTP status keeps failing it).
 3. Database session only when there is something to check — a credential or `workspace_id`.
    The common case (standalone definition, no credential) still does not open its own
@@ -50,21 +50,21 @@ from app.core.authorization.credential_loader import (
     credential_scope,
     tipos_e_validades,
 )
-from app.core.authorization.workflow_access import get_workspace_member_role, tem_papel_minimo
+from app.core.authorization.workflow_access import get_workspace_member_role, has_minimum_role
 from app.core.db import get_session_async
-from app.core.exceptions import CredentialAccessDeniedError, DefinicaoInvalidaError
+from app.core.exceptions import CredentialAccessDeniedError, InvalidDefinitionError
 from app.core.rbac import ROLE_OPERATOR
 from app.services import fontes_service
-from app.services.credential_resolver import propriedade_que_recebe, tipos_aceitos_do_descriptor
+from app.services.credential_resolver import receiving_property, accepted_types_from_descriptor
 from app.services.disabled_nodes_service import disabled_names
-from flow.utils.definition_lint import FATAIS, RelatorioLint, lint_definition
+from flow.utils.definition_lint import FATAL_CODES, LintReport, lint_definition
 from flow.utils.workflow_contract import validate_subworkflow_references_against_db
 
 HINT_WORKSPACE = (
     "Informe workspace_id para checar nós desabilitados, referências de sub-fluxo "
     "e credenciais compartilhadas com o workspace."
 )
-HINT_PAPEL_OPERATOR = (
+HINT_OPERATOR_ROLE = (
     "Credenciais compartilhadas com o workspace só entram na validação com papel "
     "operator ou superior (o mesmo exigido para executar); o escopo ficou só nas suas."
 )
@@ -72,7 +72,7 @@ HINT_PARAMS_SCHEMA = (
     "suggested_params_schema é heurístico (referências inputs.<nome> em nós trigger e "
     "ports de SubWorkflowInput); revise antes de gravar em params_schema."
 )
-HINT_FONTES = (
+HINT_SOURCES = (
     "Fontes externas (WFS) não são sondadas aqui — a validação não toca a rede. "
     "unknown_source/failing_source dizem o que o catálogo sabe: use search_sources/"
     "describe_source para uma fonte já mapeada, ou probe_source/register_source para "
@@ -92,7 +92,7 @@ class NodeParameter(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _fundir_properties(cls, data: Any) -> Any:
+    def _merge_properties(cls, data: Any) -> Any:
         # The persisted definition uses `properties`; the validate body, `parameters`.
         # Pasting one into the other silently lost all values (extra='ignore').
         # On conflict, `parameters` (this body's format) wins. A `parameters`
@@ -145,7 +145,7 @@ def _payload_para_o_executor(definition: WorkflowDefinition) -> dict:
     return {"nodes": nos, "edges": [e.model_dump() for e in definition.edges]}
 
 
-def _credential_ids_validos(nodes: list) -> set:
+def _valid_credential_ids(nodes: list) -> set:
     """`credential_id` UUIDs that go to the database guard. The malformed ones do not
     reference any credential and have already failed the definition with 422
     (`invalid_credential_id` is fatal in the lint) before getting here — instead of the
@@ -163,7 +163,7 @@ def _credential_ids_validos(nodes: list) -> set:
     return ids
 
 
-def _conferir_credenciais(lint: RelatorioLint, nodes: list, descriptors: Dict[str, dict], credenciais: dict) -> None:
+def _check_credentials(lint: LintReport, nodes: list, descriptors: Dict[str, dict], credenciais: dict) -> None:
     """Diagnostics for the credential that the resolution will NOT deliver to the node:
     of a type it does not accept, or that has nowhere to go in it
     (`credential_type_mismatch`), or expired (`credential_expired`).
@@ -188,7 +188,7 @@ def _conferir_credenciais(lint: RelatorioLint, nodes: list, descriptors: Dict[st
         tipo, validade, expires_at = credenciais[chave]
         descriptor = descriptors.get(n.get("name")) or {}
         declaradas = {p.get("name") for p in descriptor.get("properties") or [] if isinstance(p, dict)}
-        recebe = propriedade_que_recebe(tipo)
+        recebe = receiving_property(tipo)
         # SaveToS3 declares `s3_auth` and also accepts the Webhook Token from the
         # old usage (protects the copy): it consumes the secret only when it is the S3 one.
         consome = bool(declaradas & {"http_auth", "connectionString"}) or (
@@ -200,7 +200,7 @@ def _conferir_credenciais(lint: RelatorioLint, nodes: list, descriptors: Dict[st
             else "o download do artefato protegido por ela será recusado"
         )
         onde = f"nó '{n.get('name')}' (id={n.get('id')})"
-        aceitos = tipos_aceitos_do_descriptor(descriptor)
+        aceitos = accepted_types_from_descriptor(descriptor)
         if aceitos is not None and tipo not in aceitos:
             registrar(
                 "credential_type_mismatch",
@@ -253,8 +253,8 @@ def _item(code: str, severity: str, message: str, *, node_id: Optional[str] = No
     return {"code": code, "severity": severity, "node_id": node_id, "edge": edge, "message": message}
 
 
-def _montar_report(
-    lint: RelatorioLint,
+def _build_report(
+    lint: LintReport,
     nodes: list,
     *,
     disabled_nodes: Optional[list],
@@ -309,7 +309,7 @@ def _montar_report(
     if sugestao:
         dicas.append(HINT_PARAMS_SCHEMA)
     if source_warnings:
-        dicas.append(HINT_FONTES)
+        dicas.append(HINT_SOURCES)
 
     return {
         "ok": not errors,
@@ -322,8 +322,8 @@ def _montar_report(
     }
 
 
-def _mensagem_fatal(lint: RelatorioLint) -> str:
-    fatais = [d.message for d in lint.errors if d.code in FATAIS]
+def _fatal_message(lint: LintReport) -> str:
+    fatais = [d.message for d in lint.errors if d.code in FATAL_CODES]
     mensagem = "Definição inválida: " + "; ".join(fatais[:3])
     if len(fatais) > 3:
         mensagem += f" (+{len(fatais) - 3})"
@@ -349,7 +349,7 @@ async def validar_definicao(
     workspace it is validating (the MCP resolves id-or-name before getting here);
     `None` lets the body's apply, where the field is optional.
 
-    Raises `DefinicaoInvalidaError` (with `.report`) when the executor would not even
+    Raises `InvalidDefinitionError` (with `.report`) when the executor would not even
     build — nonexistent node, duplicate id, cycle, a `credential_id` that is not a
     UUID, build error; `HTTPException(403)` when the user is not a member
     of the workspace; `HTTPException(503)` with an empty registry (boot failure, not
@@ -386,15 +386,15 @@ async def validar_definicao(
 
     lint = lint_definition(nodes, payload["edges"], registry_names=NODE_REGISTRY.keys(), descriptors=descriptors)
     if lint.fatal:
-        raise DefinicaoInvalidaError(_mensagem_fatal(lint), report=_montar_report(
+        raise InvalidDefinitionError(_fatal_message(lint), report=_build_report(
             lint, nodes, disabled_nodes=None, subworkflow_errors=None,
             edge_diagnostics=[], simulated_outputs={}, hints=hints,
         ))
 
-    cred_ids = _credential_ids_validos(nodes)
+    cred_ids = _valid_credential_ids(nodes)
     disabled_nodes: Optional[list] = None
     subworkflow_errors: Optional[list] = None
-    escopo_compartilhado: Optional[str] = None
+    shared_scope: Optional[str] = None
     avisos_de_fonte: list = []
     if cred_ids or workspace_id:
         # ONE session, and only here — no Depends(get_db): most validations
@@ -404,14 +404,14 @@ async def validar_definicao(
                 papel = await get_workspace_member_role(db, workspace_id, user_id)
                 if papel is None:
                     raise HTTPException(status_code=403, detail="Acesso negado a este recurso.")
-                if tem_papel_minimo(papel, ROLE_OPERATOR):
-                    escopo_compartilhado = workspace_id
+                if has_minimum_role(papel, ROLE_OPERATOR):
+                    shared_scope = workspace_id
                 elif cred_ids:
-                    hints.append(HINT_PAPEL_OPERATOR)
+                    hints.append(HINT_OPERATOR_ROLE)
             if cred_ids:
                 try:
                     await assert_credentials_accessible(
-                        db, cred_ids, user_id, shared_workspace_id=escopo_compartilhado,
+                        db, cred_ids, user_id, shared_workspace_id=shared_scope,
                     )
                 except CredentialAccessDeniedError as exc:
                     if workspace_id:
@@ -421,7 +421,7 @@ async def validar_definicao(
                     raise CredentialAccessDeniedError(f"{exc.detail} {HINT_WORKSPACE}") from exc
                 # Accessible is not usable: the type and the validity decide whether
                 # Run resolves it — and it is here, not in the run, that the warning is given.
-                _conferir_credenciais(lint, nodes, descriptors, await tipos_e_validades(db, cred_ids))
+                _check_credentials(lint, nodes, descriptors, await tipos_e_validades(db, cred_ids))
             desabilitados = await disabled_names(db)
             disabled_nodes = sorted(nomes & set(desabilitados))
             if workspace_id:
@@ -443,7 +443,7 @@ async def validar_definicao(
         # Safety net: the lint covers what is known; any other build
         # error also belongs to the definition, not the server.
         lint.erro("construction_error", str(exc))
-        raise DefinicaoInvalidaError(f"Definição inválida: {exc}", report=_montar_report(
+        raise InvalidDefinitionError(f"Definição inválida: {exc}", report=_build_report(
             lint, nodes, disabled_nodes=disabled_nodes, subworkflow_errors=subworkflow_errors,
             edge_diagnostics=[], simulated_outputs={}, hints=hints, source_warnings=avisos_de_fonte,
         ))
@@ -451,7 +451,7 @@ async def validar_definicao(
     # Same scope as the dispatch: the user's credentials plus those shared
     # with the given workspace (for whoever can execute) — and nothing beyond that,
     # even if a new `simulate()` shows up.
-    with credential_scope({user_id}, shared_workspace_id=escopo_compartilhado):
+    with credential_scope({user_id}, shared_workspace_id=shared_scope):
         await executor.simulate_runner()
 
     # Edge diagnostics (stale from_key = error; ambiguous spread = warning).
@@ -461,7 +461,7 @@ async def validar_definicao(
     saida = executor.simulated_outputs
     if diagnostics:
         saida["__edge_diagnostics__"] = diagnostics
-    saida["__report__"] = _montar_report(
+    saida["__report__"] = _build_report(
         lint, nodes, disabled_nodes=disabled_nodes, subworkflow_errors=subworkflow_errors,
         edge_diagnostics=diagnostics, simulated_outputs=saida, hints=hints,
         source_warnings=avisos_de_fonte,

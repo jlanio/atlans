@@ -20,17 +20,17 @@ import pandas as pd
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
 from flow.utils.logger import get_logger
-from flow.utils.parameter_validation import colunas_pedidas
+from flow.utils.parameter_validation import requested_columns
 
 logger = get_logger(__name__)
 
 # The tolerant parser was born here and became a shared utility when other
 # nodes gained chip fields (the history is in the docstring of
-# `colunas_pedidas`). The local name stays as an alias for execute() and the tests.
-_colunas_pedidas = colunas_pedidas
+# `requested_columns`). The local name stays as an alias for execute() and the tests.
+_requested_columns = requested_columns
 
 
-def _familia(serie: "pd.Series") -> str:
+def _dtype_family(serie: "pd.Series") -> str:
     """Groups dtypes into what matters for a merge: number, text or other.
 
     `int64` and `float64` match each other; `object` (text) against any number
@@ -125,7 +125,7 @@ class AttributeJoin(BaseNode):
             ],
         }
 
-    def _tabela(self, inputs: Dict[str, Any], chave: str) -> "pd.DataFrame":
+    def _table(self, inputs: Dict[str, Any], chave: str) -> "pd.DataFrame":
         """Accepts a DataFrame OR a GeoDataFrame.
 
         The base class's `get_input_gdf` requires a GeoDataFrame, and the normal case
@@ -152,14 +152,14 @@ class AttributeJoin(BaseNode):
         key_a = self.get_param("keyA", "").strip()
         key_b = self.get_param("keyB", "").strip() or key_a
         how = self.get_param("how", "left")
-        se_duplicado = self.get_param("seDuplicado", "falhar")
-        colunas = _colunas_pedidas(self.get_param("columns", ""))
+        on_duplicate = self.get_param("seDuplicado", "falhar")
+        colunas = _requested_columns(self.get_param("columns", ""))
 
         if not key_a:
             raise ValueError("Informe a coluna-chave em A.")
 
-        A = self._tabela(inputs, "layerA")
-        B = self._tabela(inputs, "layerB")
+        A = self._table(inputs, "layerA")
+        B = self._table(inputs, "layerB")
 
         if key_a not in A.columns:
             raise ValueError(
@@ -172,7 +172,7 @@ class AttributeJoin(BaseNode):
 
         # Incompatible types match NOTHING and pandas does not complain: the output comes
         # with the whole column null and looks like "no record matched".
-        fam_a, fam_b = _familia(A[key_a]), _familia(B[key_b])
+        fam_a, fam_b = _dtype_family(A[key_a]), _dtype_family(B[key_b])
         if fam_a != fam_b:
             raise ValueError(
                 f"A chave tem tipos diferentes nos dois lados: '{key_a}' em A é "
@@ -200,10 +200,10 @@ class AttributeJoin(BaseNode):
         # redundant anyway: the key is already in A, and the merge drops it at the end.
         colunas = [c for c in colunas if c != key_b]
 
-        colidem = [c for c in colunas if c in A.columns]
-        if colidem:
+        colliding = [c for c in colunas if c in A.columns]
+        if colliding:
             raise ValueError(
-                f"A já tem coluna(s) com este nome: {colidem}. Renomeie antes deste nó "
+                f"A já tem coluna(s) com este nome: {colliding}. Renomeie antes deste nó "
                 "(nó 'Definir Campos'), ou não traga essa coluna."
             )
 
@@ -212,8 +212,8 @@ class AttributeJoin(BaseNode):
         # The duplicate is this node's silent defect: it MULTIPLIES A's features,
         # and the run ends green with more features than went in.
         repetidas = b[key_b][b[key_b].duplicated()].unique()
-        if len(repetidas) and se_duplicado != "todas":
-            if se_duplicado == "falhar":
+        if len(repetidas) and on_duplicate != "todas":
+            if on_duplicate == "falhar":
                 amostra = ", ".join(str(v) for v in repetidas[:5])
                 extra = f" (e mais {len(repetidas) - 5})" if len(repetidas) > 5 else ""
                 raise ValueError(
@@ -235,13 +235,13 @@ class AttributeJoin(BaseNode):
         # sending people to look for a key problem that does not exist.
         MARCA = "__origem_do_join__"
 
-        def _juntar() -> "pd.DataFrame":
+        def _merge() -> "pd.DataFrame":
             # A.merge, and NOT B.merge: called from the GeoDataFrame the
             # result stays a GeoDataFrame, with geometry and CRS. The other way around
             # it would become a plain DataFrame and the following spatial nodes would fail.
             return A.merge(b, left_on=key_a, right_on=key_b, how=how, indicator=MARCA)
 
-        resultado = await asyncio.to_thread(_juntar)
+        resultado = await asyncio.to_thread(_merge)
 
         # B's key becomes a duplicate column when its name differs from A's.
         if key_b != key_a and key_b in resultado.columns:
@@ -250,11 +250,11 @@ class AttributeJoin(BaseNode):
         if isinstance(A, gpd.GeoDataFrame) and not isinstance(resultado, gpd.GeoDataFrame):
             resultado = gpd.GeoDataFrame(resultado, geometry=A.geometry.name, crs=A.crs)
 
-        sem_par = int((resultado[MARCA] == "left_only").sum())
+        unmatched = int((resultado[MARCA] == "left_only").sum())
         resultado = resultado.drop(columns=[MARCA])
         self.log(
             f"Join por '{key_a}': {len(A)} feições entraram, {len(resultado)} saíram"
-            + (f", {sem_par} sem correspondência em B." if how == "left" else ".")
+            + (f", {unmatched} sem correspondência em B." if how == "left" else ".")
         )
 
         return {"output": resultado}

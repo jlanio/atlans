@@ -35,7 +35,7 @@ from shapely.geometry import Point
 RAIZ = Path(__file__).resolve().parents[2]
 
 
-def _gdf_com_datas() -> gpd.GeoDataFrame:
+def _gdf_with_dates() -> gpd.GeoDataFrame:
     return gpd.GeoDataFrame(
         {
             "id": [1, 2],
@@ -52,7 +52,7 @@ def _gdf_com_datas() -> gpd.GeoDataFrame:
 # GDF above (old path: ensure_gdf_crs + in-place astype(str) + to_json).
 # NaT becomes "NaT" and the time zone stays in the text — that is the contract
 # whoever consumes the file already knows.
-GEOJSON_ESPERADO = (
+EXPECTED_GEOJSON = (
     '{"type": "FeatureCollection", "features": ['
     '{"id": "0", "type": "Feature", "properties": {"id": 1, "nome": "S\\u00e9", '
     '"quando": "2024-01-01 10:00:00", "utc": "2024-03-05 12:30:00+00:00"}, '
@@ -65,11 +65,11 @@ GEOJSON_ESPERADO = (
 # The four places that serialized with raw `to_json` (SaveToS3, SendWebhook,
 # HttpRequest, pin fallback) deliver the missing date as `null` — that is what
 # already came out for an all-empty date column, the only one raw `to_json` accepted.
-GEOJSON_ESPERADO_NULO = GEOJSON_ESPERADO.replace('"quando": "NaT"', '"quando": null')
+EXPECTED_GEOJSON_NULL = EXPECTED_GEOJSON.replace('"quando": "NaT"', '"quando": null')
 
 
 @pytest.fixture(autouse=True)
-def _servidor_como_localidade(monkeypatch):
+def _server_as_locality(monkeypatch):
     """Sending machine: the output nodes follow the normal upload path."""
     monkeypatch.delenv("EXECUTOR_SYNC_MODE", raising=False)
 
@@ -83,11 +83,11 @@ async def _save_geojson(gdf) -> str:
     no._workspace_id, no._task_id = "ws-1", "task-1"
     capturado: dict = {}
 
-    def _persistir(**kwargs):
+    def _persist(**kwargs):
         capturado.update(kwargs)
         return "k", {}
 
-    with patch("flow.nodes.outputs.save_geojson.persistir_artefato", side_effect=_persistir):
+    with patch("flow.nodes.outputs.save_geojson.persistir_artefato", side_effect=_persist):
         await no.execute({"pai": gdf})
     return capturado["content"].decode("utf-8")
 
@@ -119,7 +119,7 @@ async def _publish_map(gdf) -> str:
     return publicar.await_args.kwargs["geojson_str"]
 
 
-async def _send_email_anexo(gdf) -> str:
+async def _send_email_attachment(gdf) -> str:
     from flow.nodes.outputs.send_email import SendEmailNode
 
     no = SendEmailNode("n1", {"artifactLabel": "saida", "artifactFormat": "geojson"})
@@ -135,17 +135,17 @@ async def _send_email_anexo(gdf) -> str:
     return capturado["content"].decode("utf-8")
 
 
-NOS_QUE_CONVERTIAM = pytest.mark.parametrize(
+NODES_THAT_CONVERTED = pytest.mark.parametrize(
     "rodar",
-    [_save_geojson, _data_output, _publish_map, _send_email_anexo],
+    [_save_geojson, _data_output, _publish_map, _send_email_attachment],
     ids=["SaveGeoJSON", "DataOutput", "PublishMap", "SendEmail-anexo"],
 )
 
 
-@NOS_QUE_CONVERTIAM
-async def test_no_de_saida_nao_altera_o_gdf_do_no_anterior(rodar):
+@NODES_THAT_CONVERTED
+async def test_output_node_does_not_alter_the_previous_node_gdf(rodar):
     """The input GDF is the parent's output, which siblings and `$Alias` still read."""
-    gdf = _gdf_com_datas()
+    gdf = _gdf_with_dates()
     intacto = gdf.copy()
 
     await rodar(gdf)
@@ -156,14 +156,14 @@ async def test_no_de_saida_nao_altera_o_gdf_do_no_anterior(rodar):
     assert_geodataframe_equal(gdf, intacto)
 
 
-@NOS_QUE_CONVERTIAM
-async def test_texto_geojson_dos_nos_que_ja_funcionavam_nao_muda(rodar):
-    assert await rodar(_gdf_com_datas()) == GEOJSON_ESPERADO
+@NODES_THAT_CONVERTED
+async def test_geojson_text_of_nodes_that_already_worked_does_not_change(rodar):
+    assert await rodar(_gdf_with_dates()) == EXPECTED_GEOJSON
 
 
 # ── The four places that did not handle datetime ─────────────────────────────
 
-async def test_save_to_s3_serializa_gdf_com_datetime():
+async def test_save_to_s3_serializes_gdf_with_datetime():
     from flow.nodes.outputs.save_to_s3 import SaveToS3Node
 
     no = SaveToS3Node("n1", {"key": "saida/a.geojson", "bucketName": "bucket"})
@@ -172,65 +172,65 @@ async def test_save_to_s3_serializa_gdf_com_datetime():
     def _upload(json_str, bucket, key, **_kwargs):
         enviado["json"] = json_str
 
-    gdf = _gdf_com_datas()
+    gdf = _gdf_with_dates()
     with patch("flow.nodes.outputs.save_to_s3._upload_to_s3", side_effect=_upload):
         await no.execute({"pai": gdf})
 
-    assert enviado["json"] == GEOJSON_ESPERADO_NULO
+    assert enviado["json"] == EXPECTED_GEOJSON_NULL
     assert str(gdf["quando"].dtype) == "datetime64[ns]"
 
 
-async def test_send_webhook_serializa_gdf_com_datetime():
+async def test_send_webhook_serializes_gdf_with_datetime():
     from flow.nodes.outputs.send_webhook import SendWebhookNode
 
     no = SendWebhookNode("n1", {"url": "http://hook.example.com", "method": "POST"})
     enviar = AsyncMock(return_value=MagicMock(status_code=200))
-    gdf = _gdf_com_datas()
+    gdf = _gdf_with_dates()
     with patch("flow.nodes.outputs.send_webhook.safe_httpx_request", new=enviar):
         await no.execute({"pai": gdf})
 
-    assert enviar.await_args.kwargs["json"]["data"] == json.loads(GEOJSON_ESPERADO_NULO)
+    assert enviar.await_args.kwargs["json"]["data"] == json.loads(EXPECTED_GEOJSON_NULL)
     assert str(gdf["quando"].dtype) == "datetime64[ns]"
 
 
-async def test_http_request_post_serializa_gdf_com_datetime():
+async def test_http_request_post_serializes_gdf_with_datetime():
     from flow.nodes.action.http_request import HttpRequestNode
 
     no = HttpRequestNode("n1", {"url": "https://api.exemplo.com/x", "method": "POST"})
     resposta = MagicMock(status_code=200, headers={}, is_redirect=False)
     resposta.json.return_value = {"ok": True}
     enviar = AsyncMock(return_value=resposta)
-    gdf = _gdf_com_datas()
+    gdf = _gdf_with_dates()
     with patch("flow.nodes.action.http_request.safe_httpx_request", new=enviar):
         await no.execute({"pai": gdf})
 
-    assert enviar.await_args.kwargs["json"] == json.loads(GEOJSON_ESPERADO_NULO)
+    assert enviar.await_args.kwargs["json"] == json.loads(EXPECTED_GEOJSON_NULL)
     assert str(gdf["quando"].dtype) == "datetime64[ns]"
 
 
-def test_pin_fallback_geojson_serializa_gdf_com_datetime(monkeypatch):
+def test_pin_fallback_geojson_serializes_gdf_with_datetime(monkeypatch):
     """The pin's GeoJSON is plan B when Parquet fails — and it failed along with it."""
     from flow.executor import pin
 
-    def _parquet_falha(self, *args, **kwargs):
+    def _parquet_fails(self, *args, **kwargs):
         raise ValueError("parquet indisponivel")
 
     enviado: dict = {}
-    monkeypatch.setattr(gpd.GeoDataFrame, "to_parquet", _parquet_falha)
+    monkeypatch.setattr(gpd.GeoDataFrame, "to_parquet", _parquet_fails)
     monkeypatch.setattr(
         pin, "upload_pin_to_minio",
         lambda content, s3_key, content_type: enviado.update(content=content),
     )
-    gdf = _gdf_com_datas()
+    gdf = _gdf_with_dates()
 
     ref = pin.upload_pin_artifact("n1", {"output": gdf}, "ws-1", "task-1")
 
     assert ref["__pin_format__"] == "geojson"
-    assert enviado["content"].decode("utf-8") == GEOJSON_ESPERADO_NULO
+    assert enviado["content"].decode("utf-8") == EXPECTED_GEOJSON_NULL
     assert str(gdf["quando"].dtype) == "datetime64[ns]"
 
 
-def _gdf_data_toda_vazia() -> gpd.GeoDataFrame:
+def _gdf_all_empty_date() -> gpd.GeoDataFrame:
     """A DateTime field with no value in any feature (`dt_cancelamento` with only
     active features), read as an all-NaT datetime64."""
     return gpd.GeoDataFrame(
@@ -240,48 +240,48 @@ def _gdf_data_toda_vazia() -> gpd.GeoDataFrame:
     )
 
 
-def test_coluna_de_data_toda_vazia_segue_null_onde_o_to_json_era_cru():
+def test_all_empty_date_column_stays_null_where_to_json_was_raw():
     """SaveToS3, SendWebhook, HttpRequest and the pin already serialized this column
     (raw `to_json` accepts NaT) — as `null`. A daily workflow that used to work
     must not start sending "NaT"."""
     from flow.utils.geo_helpers import gdf_para_geojson
 
-    gdf = _gdf_data_toda_vazia()
+    gdf = _gdf_all_empty_date()
     antes = gdf.to_json()
-    assert gdf_para_geojson(gdf, nat_como_nulo=True) == antes
+    assert gdf_para_geojson(gdf, nat_as_null=True) == antes
     assert json.loads(antes)["features"][0]["properties"]["dt_cancelamento"] is None
 
 
-async def test_save_to_s3_mantem_null_na_coluna_de_data_toda_vazia():
+async def test_save_to_s3_keeps_null_in_all_empty_date_column():
     from flow.nodes.outputs.save_to_s3 import SaveToS3Node
 
     no = SaveToS3Node("n1", {"key": "saida/a.geojson", "bucketName": "bucket"})
     enviado: dict = {}
-    gdf = _gdf_data_toda_vazia()
+    gdf = _gdf_all_empty_date()
     with patch("flow.nodes.outputs.save_to_s3._upload_to_s3",
                side_effect=lambda json_str, *a, **k: enviado.update(json=json_str)):
         await no.execute({"pai": gdf})
     assert enviado["json"] == gdf.to_json()
 
 
-def test_quem_ja_convertia_segue_gravando_nat():
+def test_those_already_converting_keep_writing_nat():
     """SaveGeoJSON, DataOutput, PublishMap e SendEmail sempre gravaram "NaT"."""
     from flow.utils.geo_helpers import gdf_para_geojson
 
-    propriedades = json.loads(gdf_para_geojson(_gdf_data_toda_vazia()))["features"][0]["properties"]
+    propriedades = json.loads(gdf_para_geojson(_gdf_all_empty_date()))["features"][0]["properties"]
     assert propriedades["dt_cancelamento"] == "NaT"
 
 
 # ── O helper ─────────────────────────────────────────────────────────────────
 
-def test_helper_sem_datetime_e_o_to_json_de_sempre():
+def test_helper_without_datetime_is_the_usual_to_json():
     from flow.utils.geo_helpers import gdf_para_geojson
 
     gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(1, 2)], crs="EPSG:4326")
     assert gdf_para_geojson(gdf) == gdf.to_json()
 
 
-def test_helper_sem_crs_de_destino_nao_reprojeta():
+def test_helper_without_target_crs_does_not_reproject():
     from flow.utils.geo_helpers import gdf_para_geojson
 
     gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(500000, 7000000)], crs="EPSG:31983")
@@ -289,7 +289,7 @@ def test_helper_sem_crs_de_destino_nao_reprojeta():
     assert coordenadas == [500000.0, 7000000.0]
 
 
-def test_helper_reprojeta_numa_copia():
+def test_helper_reprojects_on_a_copy():
     from flow.utils.geo_helpers import gdf_para_geojson
 
     gdf = gpd.GeoDataFrame(
@@ -306,7 +306,7 @@ def test_helper_reprojeta_numa_copia():
     assert_geodataframe_equal(gdf, intacto)
 
 
-def test_helper_atribui_o_crs_a_gdf_sem_crs():
+def test_helper_assigns_the_crs_to_gdf_without_crs():
     """Same rule as `ensure_gdf_crs`: without a CRS, the target one is assigned."""
     from flow.utils.geo_helpers import gdf_para_geojson
 
@@ -327,12 +327,12 @@ def test_helper_atribui_o_crs_a_gdf_sem_crs():
     "flow/nodes/outputs/send_webhook.py",
     "flow/nodes/action/http_request.py",
 ])
-def test_no_serializa_pelo_helper(arquivo):
+def test_node_serializes_through_the_helper(arquivo):
     fonte = (RAIZ / arquivo).read_text(encoding="utf-8")
     assert "gdf_para_geojson" in fonte, f"{arquivo} deixou de usar o helper"
     assert ".to_json" not in fonte, f"{arquivo} voltou a chamar to_json direto"
 
 
-def test_conversao_in_place_nao_voltou():
+def test_in_place_conversion_has_not_come_back():
     fonte = (RAIZ / "flow/utils/geo_helpers.py").read_text(encoding="utf-8")
     assert "def stringify_datetime_cols" not in fonte

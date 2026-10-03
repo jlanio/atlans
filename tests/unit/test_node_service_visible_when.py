@@ -34,7 +34,7 @@ def _props(defs, node_name):
 
 
 @pytest.mark.asyncio
-async def test_datainput_pickers_tem_visible_when():
+async def test_datainput_pickers_have_visible_when():
     defs = await _list()
     props = _props(defs, "DataInput")
     assert props["driveFileId"].visibleWhen == {"field": "context", "in": ["drive"]}
@@ -45,7 +45,7 @@ async def test_datainput_pickers_tem_visible_when():
 
 
 @pytest.mark.asyncio
-async def test_dataoutput_credencial_e_publico_tem_visible_when():
+async def test_dataoutput_credential_and_public_have_visible_when():
     defs = await _list()
     props = _props(defs, "DataOutput")
     # isPublic: Artefatos (artifacts) context AND content that leaves the machine. An
@@ -64,7 +64,7 @@ async def test_dataoutput_credencial_e_publico_tem_visible_when():
 
 
 @pytest.mark.asyncio
-async def test_localidade_esta_em_todos_os_nos_que_gravam_artefato():
+async def test_locality_is_in_every_node_that_writes_an_artifact():
     """The `if` that chooses local vs cloud must not exist in a single node.
 
     That is how the policy was born — `keepLocal` on DataOutput and nothing
@@ -82,7 +82,7 @@ async def test_localidade_esta_em_todos_os_nos_que_gravam_artefato():
 
 
 @pytest.mark.asyncio
-async def test_keeplocal_nao_existe_mais_em_no_nenhum():
+async def test_keeplocal_no_longer_exists_in_any_node():
     """Replaced by `localidade`, with no shim. If it showed up again in some
     node, `validate_node_parameters` would accept both and the policy would
     come to depend on which of them the workflow saved."""
@@ -92,7 +92,7 @@ async def test_keeplocal_nao_existe_mais_em_no_nenhum():
 
 
 @pytest.mark.asyncio
-async def test_registro_do_no_de_saida_tem_serializacao_completa():
+async def test_output_node_registry_has_complete_serialization():
     """Sanity: model_dump doesn't lose visibleWhen (what FastAPI sends)."""
     defs = await _list()
     props = _props(defs, "DataInput")
@@ -103,7 +103,7 @@ async def test_registro_do_no_de_saida_tem_serializacao_completa():
 # ── Suggested column fields ──────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_campos_de_coluna_declaram_de_onde_vem_a_sugestao():
+async def test_column_fields_declare_where_the_suggestion_comes_from():
     """`suggest_columns` tells the editor WHICH input to look at to suggest column
     names. In Join the two keys come from different sides: suggesting A's
     columns in B's key field would be worse than suggesting nothing."""
@@ -114,13 +114,13 @@ async def test_campos_de_coluna_declaram_de_onde_vem_a_sugestao():
 
 
 @pytest.mark.asyncio
-async def test_no_de_entrada_unica_sugere_de_todas():
+async def test_single_input_node_suggests_from_all():
     props = _props(await _list(), "AttributeFilter")
     assert props["attributeName"].suggest_columns == "*"
 
 
 @pytest.mark.asyncio
-async def test_campos_de_lista_de_colunas_viraram_fichas_com_sugestao():
+async def test_column_list_fields_became_chips_with_suggestion():
     """The fields that take SEVERAL columns declare type 'chips' (execute
     accepts a list, a JSON string and the old CSV) and `suggest_columns` so the
     editor offers the columns seen in the last run. None of these nodes has
@@ -145,7 +145,7 @@ async def test_campos_de_lista_de_colunas_viraram_fichas_com_sugestao():
 
 
 @pytest.mark.asyncio
-async def test_setfields_sugere_colunas_sem_mudar_o_tipo():
+async def test_setfields_suggests_columns_without_changing_the_type():
     """SetFields keeps type 'object' — a dedicated web helper consumes those
     fields — but all three declare `suggest_columns` so the suggestions block
     shows up there too."""
@@ -156,7 +156,7 @@ async def test_setfields_sugere_colunas_sem_mudar_o_tipo():
 
 
 @pytest.mark.asyncio
-async def test_sort_e_switch_sugerem_colunas_sem_mudar_o_tipo():
+async def test_sort_and_switch_suggest_columns_without_changing_the_type():
     """Sort.sort_by and Switch.rules got dedicated editors in the web app
     (field+direction / field+operator+value+output rows) that persist the SAME
     list execute reads — the type stays 'object' on purpose: changing the
@@ -169,7 +169,7 @@ async def test_sort_e_switch_sugerem_colunas_sem_mudar_o_tipo():
 
 
 @pytest.mark.asyncio
-async def test_todo_campo_string_que_pede_coluna_declara_sugestao():
+async def test_every_string_field_asking_for_a_column_declares_a_suggestion():
     """The node census found `string` fields that ask for a COLUMN NAME without
     the marker — the operator saw the hint in the filter and nothing in the
     Dissolve next to it, which looked like flakiness. Pins the ones with a
@@ -184,7 +184,7 @@ async def test_todo_campo_string_que_pede_coluna_declara_sugestao():
 
 
 @pytest.mark.asyncio
-async def test_campo_sem_relacao_com_coluna_nao_declara_nada():
+async def test_field_unrelated_to_column_declares_nothing():
     """The absence matters: the editor only shows the suggestions block where it
     makes sense, and marking everything would turn the hint into noise."""
     props = _props(await _list(), "AttributeJoin")
@@ -195,7 +195,7 @@ async def test_campo_sem_relacao_com_coluna_nao_declara_nada():
 # ── The defect class, closed for good ────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_nenhuma_chave_declarada_se_perde_no_caminho():
+async def test_no_declared_key_is_lost_along_the_way():
     """NodeService copies the properties field by field (`p.get('x')`), and a
     forgotten line makes the descriptor declare something the frontend never
     receives. It already happened with `visibleWhen` (the reason for this
@@ -212,17 +212,17 @@ async def test_nenhuma_chave_declarada_se_perde_no_caminho():
     # `model_dump` is what allows comparing data with data: nested fields
     # (a select's `options`) arrive as a Pydantic model, and comparing the
     # model with the descriptor's raw dict would flag the catalog's 34 selects.
-    servidos = {
+    served = {
         d.name: {p.name: p.model_dump() for p in d.properties}
         for d in await _list()
     }
 
     perdidas: list[str] = []
     for nome, cls in NODE_REGISTRY.items():
-        if nome not in servidos:
+        if nome not in served:
             continue  # node disabled in the test environment
         for bruta in (cls.description().get("properties") or []):
-            servida = servidos[nome].get(bruta.get("name"))
+            servida = served[nome].get(bruta.get("name"))
             if servida is None:
                 continue
             for chave in set(bruta) & conhecidas:
@@ -245,7 +245,7 @@ def _def(defs, node_name):
 
 
 @pytest.mark.asyncio
-async def test_subworkflowinput_expoe_outputs_from_ports():
+async def test_subworkflowinput_exposes_outputs_from_ports():
     """The sub-workflow trigger declares `outputs_from_ports`: it is what makes the
     editor derive ONE output per declared port and, with that, makes the key
     selector on the edge ('escolher') appear. Without passing the flag through
@@ -257,8 +257,8 @@ async def test_subworkflowinput_expoe_outputs_from_ports():
 
 
 @pytest.mark.asyncio
-async def test_flags_de_topo_do_no_nao_se_perdem():
-    """The sibling of `test_nenhuma_chave_declarada_se_perde_no_caminho`, for
+async def test_node_top_level_flags_are_not_lost():
+    """The sibling of `test_no_declared_key_is_lost_along_the_way`, for
     NodeDefinition's TOP-LEVEL flags (they are not `properties`): a new flag in
     description() that NodeService forgets to map is dropped by Pydantic.
     It already happened with `dynamic_inputs` and again with
@@ -267,11 +267,11 @@ async def test_flags_de_topo_do_no_nao_se_perdem():
     from flow.registry import NODE_REGISTRY
 
     FLAGS = ("dynamic_inputs", "dynamic_output", "outputs_from_ports", "requires_credential")
-    servidos = {d.name: d for d in await _list()}
+    served = {d.name: d for d in await _list()}
 
     perdidas: list[str] = []
     for nome, cls in NODE_REGISTRY.items():
-        servido = servidos.get(nome)
+        servido = served.get(nome)
         if servido is None:
             continue  # node disabled in the test environment
         info = cls.description() or {}

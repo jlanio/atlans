@@ -14,8 +14,8 @@ import { TbAlertTriangle, TbCircleCheck, TbDatabase, TbTrash } from "react-icons
 import { createToast } from "@/utils/createToast"
 import { cn } from "@/lib/utils"
 import { formatBytes } from "@/utils/formatters"
-import { CABECALHO_DE_COLUNAS, CELULA_COM_ROTULO, DESTAQUE_DA_FICHA, LINHA_EMPILHADA } from "@/app/components/shared/tabela-empilhada"
-import { formatarInteiro, plural } from "@/lib/formatos"
+import { COLUMN_HEADER, LABELED_CELL, CARD_HIGHLIGHT, STACKED_ROW } from "@/app/components/shared/tabela-empilhada"
+import { formatInteger, plural } from "@/lib/formatos"
 import { VazioEmCirculo } from "./estados"
 
 // ── Armazenamento (MinIO) ─────────────────────────────────────────────────────
@@ -26,7 +26,7 @@ import { VazioEmCirculo } from "./estados"
  * the server to auto-correct part of it. The pending items come out in the
  * contract's amber/red pattern (§3.4), no longer in a custom block.
  */
-function SaudeDoTracking({ health }: { health: ITrackingHealth }) {
+function TrackingHealth({ health }: { health: ITrackingHealth }) {
   const issues: Array<{ tom: "warn" | "danger"; label: string; detail: string }> = []
 
   if (health.pending_drive_files > 0) {
@@ -131,16 +131,16 @@ function PurgeStorageDialog({
       // matters to whoever administers: a storage failure and an offline executor
       // are solved by repeating the purge; cataloged and untracked are not.
       // Reporting only `skipped_s3_errors` made the rest count as removed.
-      const paraTentarDeNovo =
+      const toRetry =
         (r?.skipped_s3_errors ?? 0) + (r?.pending_executor ?? 0)
       const preservados =
         (r?.skipped_catalogados ?? 0) + (r?.skipped_sem_rastro ?? 0)
 
-      if (paraTentarDeNovo > 0 || preservados > 0) {
+      if (toRetry > 0 || preservados > 0) {
         const partes = [resumo]
-        if (paraTentarDeNovo > 0) {
+        if (toRetry > 0) {
           partes.push(
-            `${paraTentarDeNovo} mantido(s) por falha no storage ou executor offline — repita para tentar de novo.`,
+            `${toRetry} mantido(s) por falha no storage ou executor offline — repita para tentar de novo.`,
           )
         }
         if (preservados > 0) {
@@ -267,13 +267,13 @@ export function StorageUsageSection({ data, onRefresh }: { data: IStorageUsageAd
       )}
 
       {/* Tracking health — optional (the field may be absent in mixed deploys) */}
-      {tracking_health && <SaudeDoTracking health={tracking_health} />}
+      {tracking_health && <TrackingHealth health={tracking_health} />}
 
       {/* Per-workspace table */}
       {by_workspace.length > 0 ? (
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-xs md:min-w-[560px]">
-            <thead className={CABECALHO_DE_COLUNAS}>
+            <thead className={COLUMN_HEADER}>
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">Workspace</th>
                 <th className="px-3 py-2 text-right font-medium text-muted-foreground">Drive</th>
@@ -284,8 +284,8 @@ export function StorageUsageSection({ data, onRefresh }: { data: IStorageUsageAd
             </thead>
             <tbody>
               {by_workspace.map(ws => (
-                <tr key={ws.workspace_id} className={`border-b border-border last:border-b-0 ${LINHA_EMPILHADA}`}>
-                  <td className={`px-3 py-2 ${DESTAQUE_DA_FICHA}`}>
+                <tr key={ws.workspace_id} className={`border-b border-border last:border-b-0 ${STACKED_ROW}`}>
+                  <td className={`px-3 py-2 ${CARD_HIGHLIGHT}`}>
                     <div className="font-medium text-foreground">
                       {ws.workspace_name}
                       {/* Trash and purged are different situations: the first one is
@@ -300,15 +300,15 @@ export function StorageUsageSection({ data, onRefresh }: { data: IStorageUsageAd
                     </div>
                     <div className="text-muted-foreground">{ws.owner_username}</div>
                   </td>
-                  <td data-rotulo="drive" className={`px-3 py-2 text-right tabular-nums text-muted-foreground ${CELULA_COM_ROTULO}`}>
+                  <td data-rotulo="drive" className={`px-3 py-2 text-right tabular-nums text-muted-foreground ${LABELED_CELL}`}>
                     {formatBytes(ws.drive_bytes)}
-                    <span className="ml-1 text-[11px]">({formatarInteiro(ws.drive_files)})</span>
+                    <span className="ml-1 text-[11px]">({formatInteger(ws.drive_files)})</span>
                   </td>
-                  <td data-rotulo="artefatos" className={`px-3 py-2 text-right tabular-nums text-muted-foreground ${CELULA_COM_ROTULO}`}>
+                  <td data-rotulo="artefatos" className={`px-3 py-2 text-right tabular-nums text-muted-foreground ${LABELED_CELL}`}>
                     {formatBytes(ws.artifacts_bytes)}
-                    <span className="ml-1 text-[11px]">({formatarInteiro(ws.artifact_files)})</span>
+                    <span className="ml-1 text-[11px]">({formatInteger(ws.artifact_files)})</span>
                   </td>
-                  <td data-rotulo="total" className={`px-3 py-2 text-right font-medium tabular-nums text-foreground ${CELULA_COM_ROTULO}`}>
+                  <td data-rotulo="total" className={`px-3 py-2 text-right font-medium tabular-nums text-foreground ${LABELED_CELL}`}>
                     {formatBytes(ws.total_bytes)}
                   </td>
                   <td className="px-3 py-2 text-right">

@@ -59,12 +59,12 @@ class Remocao:
         return sum(int(a.size_bytes or 0) for a in self.apagados)
 
 
-async def remover_artefatos(
-    db: AsyncSession, artefatos, *, agendar_pendentes: bool,
+async def remove_artifacts(
+    db: AsyncSession, artefatos, *, schedule_pending: bool,
 ) -> Remocao:
     """Removes `artefatos` (objects from the `db` session) — see the semantics above.
 
-    `agendar_pendentes`: those left on an executor's disk (order not
+    `schedule_pending`: those left on an executor's disk (order not
     delivered, or no trace) are marked as expired, unpinned, for
     retention to finish on its own — that is what the user asked for in the delete routes.
     The pin MUST drop along with it: retention ignores pinned artifacts, and a pinned one
@@ -78,7 +78,7 @@ async def remover_artefatos(
 
     remocao = Remocao()
 
-    por_executor: dict[str, list[dict]] = {}
+    by_executor: dict[str, list[dict]] = {}
     locais: list = []
     for a in artefatos:
         if a.content_location != "executor":
@@ -90,12 +90,12 @@ async def remover_artefatos(
             )
             remocao.sem_rastro.append(a)
             continue
-        por_executor.setdefault(a.executor_id, []).append(
+        by_executor.setdefault(a.executor_id, []).append(
             {"id_hash": a.id_hash, "local_path": a.local_path, "_id": a.id}
         )
         locais.append(a)
-    if por_executor:
-        entregues = set(await _ordenar_remocao_local(por_executor))
+    if by_executor:
+        entregues = set(await _ordenar_remocao_local(by_executor))
         for a in locais:
             (remocao.apagados if a.id in entregues else remocao.pendentes_local).append(a)
 
@@ -112,11 +112,11 @@ async def remover_artefatos(
         remocao.apagados.append(a)
 
     for a in remocao.apagados:
-        await _apagar_camada_do_portal(db, a)
+        await _delete_portal_layer(db, a)
     if remocao.apagados:
         await db.execute(delete(Artifact).where(Artifact.id.in_([a.id for a in remocao.apagados])))
 
-    if agendar_pendentes:
+    if schedule_pending:
         agora = utc_now_naive()
         for a in (*remocao.pendentes_local, *remocao.sem_rastro):
             a.expires_at = agora
@@ -124,7 +124,7 @@ async def remover_artefatos(
     return remocao
 
 
-async def _apagar_camada_do_portal(db: AsyncSession, artefato) -> None:
+async def _delete_portal_layer(db: AsyncSession, artefato) -> None:
     """The artifact's published layer (the features drop by cascade)."""
     if artefato.is_published and artefato.workflow_hash:
         await db.execute(

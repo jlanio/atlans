@@ -28,7 +28,7 @@ from pathlib import Path
 import pytest
 
 from app.api.routers.executores_router import (
-    _LINHA_PIN_CA, _injetar_fingerprint_da_ca, _normalizar_fingerprint,
+    _CA_PIN_LINE, _inject_ca_fingerprint, _normalize_fingerprint,
 )
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -39,26 +39,26 @@ FP = "a" * 64
 
 # ── INJECAO ──────────────────────────────────────────────────────────────────
 
-def test_a_linha_de_pinning_existe_no_script():
+def test_the_pinning_line_exists_in_the_script():
     """Ancora o acoplamento: o servidor substitui esta string exata."""
-    assert _LINHA_PIN_CA in INSTALL_SH.read_text(encoding="utf-8"), (
+    assert _CA_PIN_LINE in INSTALL_SH.read_text(encoding="utf-8"), (
         "static/install.sh perdeu a linha que o servidor substitui — o "
         "fingerprint deixaria de ser publicado, em silencio"
     )
 
 
-def test_fingerprint_configurado_vira_default_no_script(monkeypatch):
+def test_configured_fingerprint_becomes_script_default(monkeypatch):
     monkeypatch.setattr("app.core.config.STEPCA_ROOT_FINGERPRINT", FP)
-    saida = _injetar_fingerprint_da_ca(INSTALL_SH.read_text(encoding="utf-8"))
+    saida = _inject_ca_fingerprint(INSTALL_SH.read_text(encoding="utf-8"))
 
     assert f'CA_SHA256_PIN="${{ATLANS_CA_SHA256:-{FP}}}"' in saida
-    assert _LINHA_PIN_CA not in saida
+    assert _CA_PIN_LINE not in saida
 
 
-def test_o_ambiente_ainda_tem_prioridade_sobre_o_injetado(monkeypatch):
+def test_the_environment_still_takes_precedence_over_the_injected(monkeypatch):
     """`${ATLANS_CA_SHA256:-<fp>}` preserva o override do operador."""
     monkeypatch.setattr("app.core.config.STEPCA_ROOT_FINGERPRINT", FP)
-    saida = _injetar_fingerprint_da_ca(INSTALL_SH.read_text(encoding="utf-8"))
+    saida = _inject_ca_fingerprint(INSTALL_SH.read_text(encoding="utf-8"))
     assert "${ATLANS_CA_SHA256:-" in saida
 
 
@@ -66,35 +66,35 @@ def test_o_ambiente_ainda_tem_prioridade_sobre_o_injetado(monkeypatch):
     ("AB:CD:" + "EF" * 29 + ":01", "abcd" + "ef" * 29 + "01"),
     ("  " + "A" * 64 + "\n", "a" * 64),
 ])
-def test_normalizacao_aceita_os_dois_formatos_de_ferramenta(bruto, esperado):
+def test_normalization_accepts_both_tool_formats(bruto, esperado):
     """`step certificate fingerprint` gives plain hex; `openssl` gives it with ':'."""
-    assert _normalizar_fingerprint(bruto) == esperado
+    assert _normalize_fingerprint(bruto) == esperado
 
 
 # ── DEGRADACAO ───────────────────────────────────────────────────────────────
 
-def test_sem_configuracao_o_script_sai_intacto(monkeypatch):
+def test_without_configuration_the_script_is_untouched(monkeypatch):
     monkeypatch.setattr("app.core.config.STEPCA_ROOT_FINGERPRINT", "")
     original = INSTALL_SH.read_text(encoding="utf-8")
-    assert _injetar_fingerprint_da_ca(original) == original
+    assert _inject_ca_fingerprint(original) == original
 
 
 @pytest.mark.parametrize("invalido", ["abc", "z" * 64, "a" * 63])
-def test_fingerprint_invalido_nao_e_injetado(monkeypatch, invalido):
+def test_invalid_fingerprint_is_not_injected(monkeypatch, invalido):
     """Injecting garbage would make EVERY installer abort on an impossible comparison."""
     monkeypatch.setattr("app.core.config.STEPCA_ROOT_FINGERPRINT", invalido)
     original = INSTALL_SH.read_text(encoding="utf-8")
-    assert _injetar_fingerprint_da_ca(original) == original
+    assert _inject_ca_fingerprint(original) == original
 
 
-def test_script_sem_a_linha_esperada_nao_quebra(monkeypatch):
+def test_script_without_the_expected_line_does_not_break(monkeypatch):
     monkeypatch.setattr("app.core.config.STEPCA_ROOT_FINGERPRINT", FP)
-    assert _injetar_fingerprint_da_ca("#!/bin/bash\necho oi\n") == "#!/bin/bash\necho oi\n"
+    assert _inject_ca_fingerprint("#!/bin/bash\necho oi\n") == "#!/bin/bash\necho oi\n"
 
 
-def test_o_script_continua_sintaticamente_valido_depois_da_injecao(monkeypatch):
+def test_the_script_stays_syntactically_valid_after_injection(monkeypatch):
     monkeypatch.setattr("app.core.config.STEPCA_ROOT_FINGERPRINT", FP)
-    saida = _injetar_fingerprint_da_ca(INSTALL_SH.read_text(encoding="utf-8"))
+    saida = _inject_ca_fingerprint(INSTALL_SH.read_text(encoding="utf-8"))
 
     proc = subprocess.run(["bash", "-n"], input=saida, text=True, capture_output=True)
     assert proc.returncode == 0, f"install.sh injetado nao e bash valido:\n{proc.stderr}"
@@ -166,7 +166,7 @@ def cert(tmp_path):
     return caminho, fp
 
 
-def _rodar(cert_path, pin):
+def _run(cert_path, pin):
     return subprocess.run(
         ["bash", "-c", textwrap.dedent(_BLOCO)],
         env={"PATH": "/usr/bin:/bin:/usr/local/bin", "CERT": str(cert_path), "PIN": pin},
@@ -174,32 +174,32 @@ def _rodar(cert_path, pin):
     )
 
 
-def test_cert_correto_passa_na_verificacao(cert):
+def test_correct_cert_passes_verification(cert):
     caminho, fp = cert
-    r = _rodar(caminho, fp)
+    r = _run(caminho, fp)
     assert r.returncode == 0, r.stderr
     assert "OK conferido" in r.stdout
 
 
-def test_fingerprint_com_dois_pontos_e_maiusculo_tambem_passa(cert):
+def test_fingerprint_with_colons_and_uppercase_also_passes(cert):
     """O operador cola o que a ferramenta dele imprimiu."""
     caminho, fp = cert
-    com_dois_pontos = ":".join(fp[i:i + 2] for i in range(0, len(fp), 2)).upper()
-    assert _rodar(caminho, com_dois_pontos).returncode == 0
+    with_colons = ":".join(fp[i:i + 2] for i in range(0, len(fp), 2)).upper()
+    assert _run(caminho, with_colons).returncode == 0
 
 
-def test_cert_errado_aborta_a_instalacao(cert):
+def test_wrong_cert_aborts_the_install(cert):
     """A propriedade central: CA trocada nao passa."""
     caminho, _ = cert
-    r = _rodar(caminho, "b" * 64)
+    r = _run(caminho, "b" * 64)
     assert r.returncode != 0
     assert "MISMATCH" in r.stderr
 
 
-def test_sem_pin_o_instalador_avisa_e_segue(cert):
+def test_without_pin_the_installer_warns_and_proceeds(cert):
     """Old behavior preserved for a server without the variable."""
     caminho, _ = cert
-    r = _rodar(caminho, "")
+    r = _run(caminho, "")
     assert r.returncode == 0
     assert "WARN sem pin" in r.stdout
 
@@ -215,7 +215,7 @@ def test_sem_pin_o_instalador_avisa_e_segue(cert):
 # long-running service, which does NOT set SSL_CERT_FILE. The path for that is
 # `executor/.env`.
 
-def _bloco_de_persistencia() -> str:
+def _persistence_block() -> str:
     """The install.sh snippet that writes the pin to executor/.env.
 
     Delimited by stable markers instead of slicing by offset: the previous
@@ -228,8 +228,8 @@ def _bloco_de_persistencia() -> str:
     return fonte[inicio:fim]
 
 
-def test_o_instalador_grava_o_pin_no_env_do_executor():
-    bloco = _bloco_de_persistencia()
+def test_the_installer_writes_the_pin_to_the_executor_env():
+    bloco = _persistence_block()
     assert "ATLANS_CA_SHA256=" in bloco, (
         "o instalador nao persiste o pin em executor/.env — sem isso o servico "
         "de longa duracao nunca reconfere a CA"
@@ -240,24 +240,24 @@ def test_o_instalador_grava_o_pin_no_env_do_executor():
     )
 
 
-def test_o_pin_gravado_e_normalizado():
+def test_the_stored_pin_is_normalized():
     """The .env is read by `_expected_pins()`, which expects lowercase hex."""
-    bloco = _bloco_de_persistencia()
+    bloco = _persistence_block()
     assert "tr 'A-Z' 'a-z'" in bloco and "tr -d ': '" in bloco, (
         "o valor gravado no .env precisa da mesma normalizacao da comparacao"
     )
 
 
-def test_gravar_duas_vezes_nao_duplica_a_chave():
+def test_writing_twice_does_not_duplicate_the_key():
     """Running the installer again (--force) must not leave two lines."""
-    bloco = _bloco_de_persistencia()
+    bloco = _persistence_block()
     assert "grep -qE '^[[:space:]]*(export[[:space:]]+)?ATLANS_CA_SHA256='" in bloco, (
         "sem checar a existencia (inclusive com `export`), um segundo run "
         "acrescenta uma linha duplicada"
     )
 
 
-def test_a_doc_nao_promete_verificacao_no_container_de_enrollment():
+def test_the_doc_does_not_promise_verification_in_the_enrollment_container():
     """The docs once claimed a layer that does not run; they must not claim it again."""
     doc = (RAIZ / "docs" / "mtls-bootstrap.md").read_text(encoding="utf-8")
     assert "SSL_CERT_FILE" in doc, (
@@ -280,7 +280,7 @@ _TRUST_VARS = ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "ATLANS_
 
 
 @pytest.fixture(autouse=True)
-def _trust_env_limpo():
+def _clean_trust_env():
     """Isolates the trust store env vars, on entry AND on exit.
 
     monkeypatch is not enough: `_set_env` writes to os.environ directly, and
@@ -329,7 +329,7 @@ def cert_dir(tmp_path, monkeypatch):
     return caminho, fp
 
 
-def test_reuso_com_pin_correto_segue_normalmente(cert_dir, monkeypatch):
+def test_reuse_with_correct_pin_proceeds_normally(cert_dir, monkeypatch):
     from executor import _ca_bootstrap
 
     caminho, fp = cert_dir
@@ -341,7 +341,7 @@ def test_reuso_com_pin_correto_segue_normalmente(cert_dir, monkeypatch):
     assert os.environ.get("SSL_CERT_FILE"), "o trust store deveria ter sido montado"
 
 
-def test_cert_TROCADO_no_volume_para_o_boot(cert_dir, monkeypatch):
+def test_cert_SWAPPED_in_the_volume_stops_the_boot(cert_dir, monkeypatch):
     """The security regression: file swap + restart must not get through."""
     from executor import _ca_bootstrap
 
@@ -361,7 +361,7 @@ def test_cert_TROCADO_no_volume_para_o_boot(cert_dir, monkeypatch):
     assert "ATLANS_CA_SHA256" in str(exc.value) or "casa" in str(exc.value).lower()
 
 
-def test_sem_pin_o_reuso_continua_como_antes(cert_dir, monkeypatch):
+def test_without_pin_reuse_works_as_before(cert_dir, monkeypatch):
     """Whoever has not configured pinning must not have their boot broken by this."""
     from executor import _ca_bootstrap
 
@@ -372,7 +372,7 @@ def test_sem_pin_o_reuso_continua_como_antes(cert_dir, monkeypatch):
     assert os.environ.get("SSL_CERT_FILE")
 
 
-def test_ACRESCIMO_de_CA_ao_bundle_tambem_e_barrado(cert_dir, monkeypatch):
+def test_APPENDING_a_CA_to_the_bundle_is_also_blocked(cert_dir, monkeypatch):
     """The hole that "some cert matches" let through.
 
     `_set_env` concatenates the whole file with the public CAs and publishes the
@@ -402,7 +402,7 @@ def test_ACRESCIMO_de_CA_ao_bundle_tambem_e_barrado(cert_dir, monkeypatch):
     assert "acrescimo" in str(exc.value).lower() or "encontrado" in str(exc.value).lower()
 
 
-def test_pin_vindo_do_env_file_e_respeitado(cert_dir, monkeypatch, tmp_path):
+def test_pin_from_the_env_file_is_honored(cert_dir, monkeypatch, tmp_path):
     """`bootstrap_ca` runs BEFORE the load_dotenv of executor/config.py.
 
     In compose the variable arrives through the container's `env_file` and this
@@ -431,7 +431,7 @@ def test_pin_vindo_do_env_file_e_respeitado(cert_dir, monkeypatch, tmp_path):
         _ca_bootstrap.bootstrap_ca()
 
 
-def test_ambiente_tem_prioridade_sobre_o_env_file(cert_dir, monkeypatch, tmp_path):
+def test_environment_takes_precedence_over_the_env_file(cert_dir, monkeypatch, tmp_path):
     from executor import _ca_bootstrap
 
     env = tmp_path / "com-pin.env"
@@ -442,7 +442,7 @@ def test_ambiente_tem_prioridade_sobre_o_env_file(cert_dir, monkeypatch, tmp_pat
     assert _ca_bootstrap._expected_pins() == frozenset({"a" * 64})
 
 
-def test_emit_de_ERROR_chega_ao_logger(caplog):
+def test_ERROR_emit_reaches_the_logger(caplog):
     """The pin-mismatch message fell into `debug` and vanished from the persisted log."""
     import logging
     from executor import _ca_bootstrap
@@ -455,7 +455,7 @@ def test_emit_de_ERROR_chega_ao_logger(caplog):
     )
 
 
-def test_multiplos_pins_permitem_rotacao_com_sobreposicao(cert_dir, monkeypatch, tmp_path):
+def test_multiple_pins_allow_overlapping_rotation(cert_dir, monkeypatch, tmp_path):
     """The strict pin must not prevent a CA rotation.
 
     During rotation the bundle legitimately carries the old root AND the new one.
@@ -464,7 +464,7 @@ def test_multiplos_pins_permitem_rotacao_com_sobreposicao(cert_dir, monkeypatch,
     """
     from executor import _ca_bootstrap
 
-    caminho, fp_velho = cert_dir
+    caminho, old_fp = cert_dir
 
     novo = caminho.parent / "novo.crt"
     subprocess.run(
@@ -473,14 +473,14 @@ def test_multiplos_pins_permitem_rotacao_com_sobreposicao(cert_dir, monkeypatch,
          "-days", "1", "-subj", "/CN=atlans-novo"],
         check=True, capture_output=True,
     )
-    fp_novo = subprocess.run(
+    new_fp = subprocess.run(
         ["openssl", "x509", "-in", str(novo), "-noout", "-fingerprint", "-sha256"],
         check=True, capture_output=True, text=True,
     ).stdout.split("=", 1)[1].strip().replace(":", "").lower()
 
     # Overlap bundle: both roots.
     caminho.write_bytes(caminho.read_bytes() + b"\n" + novo.read_bytes())
-    monkeypatch.setenv("ATLANS_CA_SHA256", f"{fp_velho},{fp_novo}")
+    monkeypatch.setenv("ATLANS_CA_SHA256", f"{old_fp},{new_fp}")
 
     _ca_bootstrap.bootstrap_ca()  # does not raise
 
@@ -488,7 +488,7 @@ def test_multiplos_pins_permitem_rotacao_com_sobreposicao(cert_dir, monkeypatch,
     assert os.environ.get("SSL_CERT_FILE")
 
 
-def test_rotulo_TRUSTED_CERTIFICATE_tambem_e_contado(cert_dir, monkeypatch):
+def test_TRUSTED_CERTIFICATE_label_is_also_counted(cert_dir, monkeypatch):
     """`CERTIFICATE` is not the only label OpenSSL loads as an anchor.
 
     Recognizing only that one let the append check be bypassed by changing the
@@ -506,16 +506,16 @@ def test_rotulo_TRUSTED_CERTIFICATE_tambem_e_contado(cert_dir, monkeypatch):
          "-days", "1", "-subj", "/CN=atacante"],
         check=True, capture_output=True,
     )
-    disfarcado = intruso.read_bytes() \
+    disguised = intruso.read_bytes() \
         .replace(b"BEGIN CERTIFICATE", b"BEGIN TRUSTED CERTIFICATE") \
         .replace(b"END CERTIFICATE", b"END TRUSTED CERTIFICATE")
-    caminho.write_bytes(caminho.read_bytes() + b"\n" + disfarcado)
+    caminho.write_bytes(caminho.read_bytes() + b"\n" + disguised)
 
     with pytest.raises(Exception):
         _ca_bootstrap.bootstrap_ca()
 
 
-def test_pin_com_comentario_inline_nao_derruba_o_boot(cert_dir, monkeypatch, tmp_path):
+def test_pin_with_inline_comment_does_not_break_the_boot(cert_dir, monkeypatch, tmp_path):
     """`.env` escrito a mao costuma ter comentario na mesma linha."""
     from executor import _ca_bootstrap
 
@@ -528,10 +528,10 @@ def test_pin_com_comentario_inline_nao_derruba_o_boot(cert_dir, monkeypatch, tmp
     assert _ca_bootstrap._expected_pins() == frozenset({fp})
 
 
-def test_a_fixture_de_isolamento_nao_apaga_a_env_do_desenvolvedor(monkeypatch):
+def test_the_isolation_fixture_does_not_wipe_the_developer_env(monkeypatch):
     """Fixture order regression.
 
-    Requested by `cert_dir`, `_trust_env_limpo` was created AFTER monkeypatch and
+    Requested by `cert_dir`, `_clean_trust_env` was created AFTER monkeypatch and
     restored BEFORE its teardown — and monkeypatch, which had recorded "absent"
     for a var the fixture had already removed, then deleted the real value.
     Autouse inverts the order.
@@ -542,7 +542,7 @@ def test_a_fixture_de_isolamento_nao_apaga_a_env_do_desenvolvedor(monkeypatch):
     )
 
 
-def test_instalador_recusa_bundle_com_CA_ACRESCENTADA(cert, tmp_path):
+def test_installer_rejects_bundle_with_APPENDED_CA(cert, tmp_path):
     """The same hole on the executor side, now in the shell.
 
     `openssl x509 -in <arquivo>` reads only the FIRST PEM block. The whole file
@@ -561,12 +561,12 @@ def test_instalador_recusa_bundle_com_CA_ACRESCENTADA(cert, tmp_path):
     juntos = tmp_path / "juntos.crt"
     juntos.write_bytes(caminho.read_bytes() + b"\n" + intruso.read_bytes())
 
-    r = _rodar(juntos, fp)
+    r = _run(juntos, fp)
     assert r.returncode != 0, "bundle com CA acrescentada nao pode passar"
     assert "MISMATCH" in r.stderr
 
 
-def test_instalador_aceita_bundle_de_rotacao_com_dois_pins(cert, tmp_path):
+def test_installer_accepts_rotation_bundle_with_two_pins(cert, tmp_path):
     caminho, fp = cert
     novo = tmp_path / "novo.crt"
     subprocess.run(
@@ -575,7 +575,7 @@ def test_instalador_aceita_bundle_de_rotacao_com_dois_pins(cert, tmp_path):
          "-days", "1", "-subj", "/CN=atlans-novo"],
         check=True, capture_output=True,
     )
-    fp_novo = subprocess.run(
+    new_fp = subprocess.run(
         ["openssl", "x509", "-in", str(novo), "-noout", "-fingerprint", "-sha256"],
         check=True, capture_output=True, text=True,
     ).stdout.split("=", 1)[1].strip().replace(":", "").lower()
@@ -583,12 +583,12 @@ def test_instalador_aceita_bundle_de_rotacao_com_dois_pins(cert, tmp_path):
     juntos = tmp_path / "juntos.crt"
     juntos.write_bytes(caminho.read_bytes() + b"\n" + novo.read_bytes())
 
-    r = _rodar(juntos, f"{fp},{fp_novo}")
+    r = _run(juntos, f"{fp},{new_fp}")
     assert r.returncode == 0, r.stderr
     assert "OK conferido 2" in r.stdout
 
 
-def test_instalador_conta_bloco_com_rotulo_TRUSTED(cert, tmp_path):
+def test_installer_counts_block_with_TRUSTED_label(cert, tmp_path):
     caminho, fp = cert
     intruso = tmp_path / "i.crt"
     subprocess.run(
@@ -597,18 +597,18 @@ def test_instalador_conta_bloco_com_rotulo_TRUSTED(cert, tmp_path):
          "-days", "1", "-subj", "/CN=atacante"],
         check=True, capture_output=True,
     )
-    disfarcado = intruso.read_bytes() \
+    disguised = intruso.read_bytes() \
         .replace(b"BEGIN CERTIFICATE", b"BEGIN TRUSTED CERTIFICATE") \
         .replace(b"END CERTIFICATE", b"END TRUSTED CERTIFICATE")
     juntos = tmp_path / "juntos.crt"
-    juntos.write_bytes(caminho.read_bytes() + b"\n" + disfarcado)
+    juntos.write_bytes(caminho.read_bytes() + b"\n" + disguised)
 
-    assert _rodar(juntos, fp).returncode != 0
+    assert _run(juntos, fp).returncode != 0
 
 
 # ── Edge cases found in the fifth review ─────────────────────────────────────
 
-def test_bloco_ilegivel_vira_intruso_e_nao_mata_o_script(cert, tmp_path):
+def test_unreadable_block_counts_as_intruder_and_does_not_kill_the_script(cert, tmp_path):
     """Under `set -euo pipefail`, a failing openssl aborted the script HERE.
 
     The intruder branch — and with it the bundle's `rm -f` — never ran: the
@@ -622,14 +622,14 @@ def test_bloco_ilegivel_vira_intruso_e_nao_mata_o_script(cert, tmp_path):
         + b"\n-----BEGIN CERTIFICATE-----\nnao-e-base64-valido\n-----END CERTIFICATE-----\n"
     )
 
-    r = _rodar(quebrado, fp)
+    r = _run(quebrado, fp)
     assert r.returncode != 0
     assert "MISMATCH" in r.stderr, (
         f"esperado o ramo de intruso, veio: {r.stderr[:200]!r}"
     )
 
 
-def test_contagem_de_blocos_sem_padding():
+def test_block_count_without_padding():
     """BSD/macOS `wc -l` pads with spaces — the installer already targets macOS.
 
     Running the real block tests nothing here: Linux's GNU `wc` does not pad, so
@@ -648,32 +648,32 @@ def test_contagem_de_blocos_sem_padding():
     assert "wc -l | tr -d '[:space:]'" in fonte
 
 
-def test_servidor_injeta_valor_multi_pin(monkeypatch):
-    """The docs prescribe `<fp_antigo>,<fp_novo>` during rotation.
+def test_server_injects_multi_pin_value(monkeypatch):
+    """The docs prescribe `<fp_antigo>,<new_fp>` during rotation.
 
     The length validation rejected the whole value (129 chars) and the script
     exited WITHOUT pinning — pure TOFU exactly in the window when the CA is changing.
     """
     dois = f"{'a' * 64},{'b' * 64}"
     monkeypatch.setattr("app.core.config.STEPCA_ROOT_FINGERPRINT", dois)
-    saida = _injetar_fingerprint_da_ca(INSTALL_SH.read_text(encoding="utf-8"))
+    saida = _inject_ca_fingerprint(INSTALL_SH.read_text(encoding="utf-8"))
     assert f'CA_SHA256_PIN="${{ATLANS_CA_SHA256:-{dois}}}"' in saida
 
 
-def test_multi_pin_com_uma_entrada_invalida_e_recusado(monkeypatch):
+def test_multi_pin_with_one_invalid_entry_is_rejected(monkeypatch):
     monkeypatch.setattr(
         "app.core.config.STEPCA_ROOT_FINGERPRINT", f"{'a' * 64},nao-e-hex",
     )
     original = INSTALL_SH.read_text(encoding="utf-8")
-    assert _injetar_fingerprint_da_ca(original) == original
+    assert _inject_ca_fingerprint(original) == original
 
 
-def test_normalizacao_de_multi_pin():
-    assert _normalizar_fingerprint(f"AB:{'CD' * 31}:EF, {'a' * 64}") == \
+def test_multi_pin_normalization():
+    assert _normalize_fingerprint(f"AB:{'CD' * 31}:EF, {'a' * 64}") == \
         f"ab{'cd' * 31}ef,{'a' * 64}"
 
 
-def test_env_var_VAZIA_nao_sombreia_o_pin_do_env_file(cert_dir, monkeypatch, tmp_path):
+def test_EMPTY_env_var_does_not_shadow_the_env_file_pin(cert_dir, monkeypatch, tmp_path):
     """`ATLANS_CA_SHA256=` with no value is common in compose.
 
     With `if bruto is None`, it shadowed the pin from .env and turned off
@@ -690,7 +690,7 @@ def test_env_var_VAZIA_nao_sombreia_o_pin_do_env_file(cert_dir, monkeypatch, tmp
     assert _ca_bootstrap._expected_pins() == frozenset({fp})
 
 
-def test_remove_env_var_casa_a_MESMA_linha_que_read_env_var(tmp_path):
+def test_remove_env_var_matches_the_SAME_line_as_read_env_var(tmp_path):
     """The tolerance for `export` had been added only to the read.
 
     `remove_env_var` stopped matching the line the read reported, and the legacy
@@ -706,7 +706,7 @@ def test_remove_env_var_casa_a_MESMA_linha_que_read_env_var(tmp_path):
     assert _env_utils.read_env_var("LEGADO", env) is None
 
 
-def test_persist_env_var_atualiza_linha_com_export(tmp_path):
+def test_persist_env_var_updates_line_with_export(tmp_path):
     """Without this, persist APPENDED a second line, and the read (first
     occurrence wins) kept returning the old value."""
     from executor import _env_utils
@@ -721,7 +721,7 @@ def test_persist_env_var_atualiza_linha_com_export(tmp_path):
     assert _env_utils.read_env_var("CHAVE", env) == "novo"
 
 
-def test_o_bloco_executavel_do_teste_nao_divergiu_do_install_sh():
+def test_the_test_executable_block_has_not_diverged_from_install_sh():
     """`_BLOCO` is a COPY of the install.sh verification snippet.
 
     The copy exists so the real shell can be run against real certs — which
@@ -749,7 +749,7 @@ def test_o_bloco_executavel_do_teste_nao_divergiu_do_install_sh():
         )
 
 
-def test_instalador_ATUALIZA_linha_com_export_em_vez_de_duplicar(tmp_path):
+def test_installer_UPDATES_line_with_export_instead_of_duplicating(tmp_path):
     """CA rotation started refusing the boot right after the installer ran.
 
     install.sh's .env writer only matched `^ATLANS_CA_SHA256=`. With a line
@@ -789,7 +789,7 @@ fi
     assert _env_utils.read_env_var("ATLANS_CA_SHA256", env) == novo
 
 
-def test_persist_env_var_preserva_o_export(tmp_path):
+def test_persist_env_var_preserves_the_export(tmp_path):
     """In a `source`d .env, losing the `export` makes the variable stop reaching
     child processes."""
     from executor import _env_utils

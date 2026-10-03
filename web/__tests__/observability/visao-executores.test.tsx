@@ -38,13 +38,13 @@ describe("VisaoExecutores", () => {
   })
 
   it("abre pelo clique e pelo teclado", () => {
-    const onVer = vi.fn()
-    render(<VisaoExecutores linhas={[executor()]} carregando={false} onVerExecucoes={onVer} />)
+    const onView = vi.fn()
+    render(<VisaoExecutores linhas={[executor()]} carregando={false} onVerExecucoes={onView} />)
     const tr = screen.getByRole("button", { name: "Ver execuções de geo-01" })
     fireEvent.click(tr)
     fireEvent.keyDown(tr, { key: "Enter" })
-    expect(onVer).toHaveBeenCalledTimes(2)
-    expect(onVer).toHaveBeenCalledWith("executor:geo-01")
+    expect(onView).toHaveBeenCalledTimes(2)
+    expect(onView).toHaveBeenCalledWith("executor:geo-01")
   })
 
   it("'Sem executor' não abre e explica por quê", () => {

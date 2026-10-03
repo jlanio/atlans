@@ -39,7 +39,7 @@ from app.core.config import ASSISTENTE_ATIVO
 from app.core.rate_limiter import limiter
 from app.core.utils.logger import get_logger
 from app.mcp import cotas, infra
-from app.schemas.assistente import CotaDoAssistente, EstadoDoAssistente, MensagemDoEditor
+from app.schemas.assistente import AssistantQuota, AssistantState, EditorMessage
 from app.services import assistente_service as assistente
 from app.services import teto_do_assistente
 
@@ -51,19 +51,19 @@ router = APIRouter(
     dependencies=[Depends(get_current_user)],
 )
 
-MOTIVO_DESLIGADO = (
+DISABLED_REASON = (
     "O assistente não está configurado nesta instalação. "
     "Defina LLM_API_KEY (ou OPENROUTER_API_KEY) no ambiente da API para ligá-lo."
 )
 
 
-def _exigir_ligado() -> None:
+def _require_enabled() -> None:
     """503, not 404: whoever installed without the key needs to know the feature exists."""
     if not ASSISTENTE_ATIVO:
-        raise HTTPException(status_code=503, detail=MOTIVO_DESLIGADO)
+        raise HTTPException(status_code=503, detail=DISABLED_REASON)
 
 
-def _quadro(evento: assistente.Evento) -> bytes:
+def _frame(evento: assistente.Evento) -> bytes:
     """An `Evento` turned into an SSE frame.
 
     A named `event:` instead of everything on a single channel: the panel
@@ -78,7 +78,7 @@ def _quadro(evento: assistente.Evento) -> bytes:
 @limiter.limit("60/hour")
 async def conversar(
     request: Request,
-    payload: MensagemDoEditor,
+    payload: EditorMessage,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -88,7 +88,7 @@ async def conversar(
     sends only the new message. See note 2 of `assistente_service.py` — a
     transcript coming from the browser would allow forging a tool result.
     """
-    _exigir_ligado()
+    _require_enabled()
 
     # BEFORE the `return`: the session dies when this handler leaves the scene.
     workspace_ids = await listar_workspace_ids(db, current_user.id_hash)
@@ -144,7 +144,7 @@ async def _transmitir(*, escopo, servidor, workflow_id, mensagem) -> AsyncIterat
                 ):
                     if evento.tipo == "fim":
                         transcrito = evento.dados.get("transcrito") or transcrito
-                    yield _quadro(evento)
+                    yield _frame(evento)
             finally:
                 # Shielded against the generator's CANCELLATION: when the client
                 # closes the tab mid-answer, the `finally` runs with the
@@ -161,20 +161,20 @@ async def _transmitir(*, escopo, servidor, workflow_id, mensagem) -> AsyncIterat
         # Declared refusal (quota exceeded, conversation in progress). It goes out
         # as an error frame, not as an HTTP status, because the response has
         # already started — and because this way the panel has ONE error path only.
-        yield _quadro(assistente.Evento("erro", _corpo_do_erro(exc)))
-        yield _quadro(assistente.Evento("fim", {"transcrito": transcrito, "ok": False}))
+        yield _frame(assistente.Evento("erro", _error_body(exc)))
+        yield _frame(assistente.Evento("fim", {"transcrito": transcrito, "ok": False}))
     except Exception:
         logger.exception("Assistente quebrou no stream (usuário %s).", escopo.user_id)
-        yield _quadro(
+        yield _frame(
             assistente.Evento(
                 "erro",
                 {"code": "erro_interno", "message": "Algo quebrou do nosso lado."},
             )
         )
-        yield _quadro(assistente.Evento("fim", {"transcrito": transcrito, "ok": False}))
+        yield _frame(assistente.Evento("fim", {"transcrito": transcrito, "ok": False}))
 
 
-def _corpo_do_erro(exc: ToolError) -> dict:
+def _error_body(exc: ToolError) -> dict:
     """The JSON that `erro()` builds, or an equivalent envelope when it is not JSON."""
     try:
         corpo = json.loads(str(exc))
@@ -183,21 +183,21 @@ def _corpo_do_erro(exc: ToolError) -> dict:
     return corpo if isinstance(corpo, dict) else {"code": "recusado", "message": str(exc)}
 
 
-@router.get("/estado", response_model=EstadoDoAssistente, summary="O assistente está disponível?")
+@router.get("/estado", response_model=AssistantState, summary="O assistente está disponível?")
 async def estado(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     """What the panel checks before showing up on screen.
 
-    Does not use `_exigir_ligado`: answering 503 here would force the panel to
+    Does not use `_require_enabled`: answering 503 here would force the panel to
     handle an error to find out something that is just a state.
     """
     if not ASSISTENTE_ATIVO:
-        return EstadoDoAssistente(ativo=False, motivo=MOTIVO_DESLIGADO)
+        return AssistantState(ativo=False, motivo=DISABLED_REASON)
 
     redis = infra.redis_ou_none()
-    gasto, falta = await cotas.gasto_e_prazo(redis, current_user.id_hash)
+    gasto, falta = await cotas.spent_and_reset(redis, current_user.id_hash)
     # The ceiling may come from the PLAN (with the plans extension). This handler
     # is ordinary (no SSE generator), so the `Depends` session lives until the
     # `return` and can be reused — it is the conversation loop, which has no
@@ -210,11 +210,11 @@ async def estado(
     plano, teto = await teto_do_assistente.plano_e_teto(
         current_user.id_hash, db=db, redis=redis
     )
-    return EstadoDoAssistente(
+    return AssistantState(
         ativo=True,
         plano=plano,
         assinaturas_ativas=teto_do_assistente.assinaturas_ativas(),
-        cota=CotaDoAssistente(
+        cota=AssistantQuota(
             gasto=gasto,
             teto=teto,
             reabre_em_segundos=falta,
@@ -228,6 +228,6 @@ async def esquecer(
     current_user=Depends(get_current_user),
 ):
     """Starts over from scratch on that workflow. Deletes no workflow — only the history."""
-    _exigir_ligado()
+    _require_enabled()
     await assistente.esquecer_conversa(infra.redis_ou_none(), current_user.id_hash, workflow_id)
     return None

@@ -37,17 +37,17 @@ vi.mock("@/context/ActiveRunsContext", () => ({ ActiveRunsProvider: passthrough 
 import { SESSION_HEADER, encodeSessionHeader } from "@/auth"
 import Layout from "@/app/(dashboard)/layout"
 
-const sessaoDoMiddleware = {
+const middlewareSession = {
   user: { id_hash: "u_1", username: "ana", role: "user", access_token: "TOKEN-RENOVADO" },
   expires: "2026-01-01T00:00:00.000Z",
 }
 
 /** Grabs the `session` prop handed to <Providers>, at whatever depth. */
-function sessionDoElemento(el: unknown): unknown {
+function sessionOfElement(el: unknown): unknown {
   const props = (el as { props?: Record<string, unknown> })?.props
   if (!props) return undefined
   if ("session" in props) return props.session
-  return sessionDoElemento(props.children)
+  return sessionOfElement(props.children)
 }
 
 beforeEach(() => {
@@ -61,26 +61,26 @@ beforeEach(() => {
 describe("layout do dashboard", () => {
   it("usa a sessão do middleware e NÃO chama auth() de novo", async () => {
     headersSpy.mockResolvedValue(
-      new Headers({ [SESSION_HEADER]: encodeSessionHeader(sessaoDoMiddleware) as string }),
+      new Headers({ [SESSION_HEADER]: encodeSessionHeader(middlewareSession) as string }),
     )
 
     const el = await Layout({ children: null })
 
     expect(authSpy).not.toHaveBeenCalled()
-    expect(sessionDoElemento(el)).toEqual(sessaoDoMiddleware)
+    expect(sessionOfElement(el)).toEqual(middlewareSession)
   })
 
   it("cai no auth() quando o middleware não rodou", async () => {
     // Safety net: a route outside the matcher / dev without middleware. Here the
     // duplicate refresh does not exist because the middleware never got to refresh.
-    const daRede = { user: { id_hash: "u_2", access_token: "TOKEN-DO-COOKIE" } }
+    const fromNetwork = { user: { id_hash: "u_2", access_token: "TOKEN-DO-COOKIE" } }
     headersSpy.mockResolvedValue(new Headers())
-    authSpy.mockResolvedValue(daRede)
+    authSpy.mockResolvedValue(fromNetwork)
 
     const el = await Layout({ children: null })
 
     expect(authSpy).toHaveBeenCalledTimes(1)
-    expect(sessionDoElemento(el)).toEqual(daRede)
+    expect(sessionOfElement(el)).toEqual(fromNetwork)
   })
 
   it("cabeçalho corrompido não hidrata o SessionProvider com lixo", async () => {
@@ -90,6 +90,6 @@ describe("layout do dashboard", () => {
     const el = await Layout({ children: null })
 
     expect(authSpy).toHaveBeenCalledTimes(1)
-    expect(sessionDoElemento(el)).toBeNull()
+    expect(sessionOfElement(el)).toBeNull()
   })
 })

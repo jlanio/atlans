@@ -35,9 +35,9 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from app.core.exceptions import (
     AtlasBaseError,
-    ConteudoNoExecutorError,
+    ContentOnExecutorError,
     CredentialAccessDeniedError,
-    DefinicaoInvalidaError,
+    InvalidDefinitionError,
     DisabledNodesInWorkflowError,
     InvalidDateFormatError,
     NoExecutorAvailableError,
@@ -49,11 +49,11 @@ from app.core.exceptions import (
     WorkspaceAccessDeniedError,
 )
 from app.core.utils.logger import scrub_text
-from app.mcp.saida import higienizar
+from app.mcp.saida import sanitize
 
 # HTTP status → MCP `code`. It is the table that translates any `AtlasBaseError`
 # and any `HTTPException` without needing a branch per exception.
-CODIGO_POR_STATUS: dict[int, str] = {
+CODE_BY_STATUS: dict[int, str] = {
     401: "unauthorized",
     403: "forbidden",
     404: "not_found",
@@ -67,7 +67,7 @@ CODIGO_POR_STATUS: dict[int, str] = {
 # ("Já existe um workflow chamado 'X' neste workspace.") — that is where the
 # suggestion comes from. With no match, the error goes without `suggestion`,
 # never with an invented one.
-_NOME_ENTRE_ASPAS = re.compile(r"'([^']{1,120})'")
+_QUOTED_NAME = re.compile(r"'([^']{1,120})'")
 
 
 def erro(code: str, message: str, hint: str | None = None, **extras: Any) -> ToolError:
@@ -81,7 +81,7 @@ def erro(code: str, message: str, hint: str | None = None, **extras: Any) -> Too
     What is NOT a string (the lint report, the candidate list, the number of
     seconds) goes through intact, because descending into those structures here
     would destroy the format the client reads. In exchange, redacting them is
-    the CALLER's responsibility, with `higienizar` from `app.mcp.saida`: the
+    the CALLER's responsibility, with `sanitize` from `app.mcp.saida`: the
     premise that every structure already came clean from its origin failed —
     the lint report built by `validate_service` comes out raw, and the fatal
     message of `invalid_credential_id` echoes the received value, which in this
@@ -103,13 +103,13 @@ def erro(code: str, message: str, hint: str | None = None, **extras: Any) -> Too
 # with "Error executing tool <nome>: ". The prefix is noise for whoever reads
 # the error: the contract published in docs/mcp.md says the message IS the
 # JSON `{code, message, hint}`, and errors raised in the guards (scope, quota)
-# arrive with no prefix at all. `sem_prefixo_do_sdk` brings both forms to the
+# arrive with no prefix at all. `without_sdk_prefix` brings both forms to the
 # same format.
-_PREFIXO_DO_SDK = re.compile(r"^Error executing tool [^:]+: ")
+_SDK_PREFIX = re.compile(r"^Error executing tool [^:]+: ")
 
 
-def sem_prefixo_do_sdk(mensagem: str) -> str:
-    return _PREFIXO_DO_SDK.sub("", mensagem, count=1)
+def without_sdk_prefix(mensagem: str) -> str:
+    return _SDK_PREFIX.sub("", mensagem, count=1)
 
 
 def codigo_do_erro(exc: BaseException) -> str:
@@ -118,7 +118,7 @@ def codigo_do_erro(exc: BaseException) -> str:
     Serves auditing and tests; never changes the error that reaches the client.
     """
     try:
-        corpo = json.loads(sem_prefixo_do_sdk(str(exc)))
+        corpo = json.loads(without_sdk_prefix(str(exc)))
     except (ValueError, TypeError):
         return "erro"
     codigo = corpo.get("code") if isinstance(corpo, dict) else None
@@ -150,7 +150,7 @@ def to_tool_error(exc: BaseException) -> ToolError:
             "nenhum executor online; tente depois",
         )
 
-    if isinstance(exc, DefinicaoInvalidaError):
+    if isinstance(exc, InvalidDefinitionError):
         # The report goes sanitized because it is NOT born clean: the lint items
         # echo the received value so whoever reads finds the wrong field — and
         # `invalid_credential_id` quotes the `credential_id` itself, which only
@@ -163,7 +163,7 @@ def to_tool_error(exc: BaseException) -> ToolError:
             "validation",
             str(exc) or "Definição inválida.",
             "corrija os itens de report.errors e valide de novo",
-            report=higienizar(exc.report) or None,
+            report=sanitize(exc.report) or None,
         )
 
     if isinstance(exc, (WorkflowInputValidationError, DisabledNodesInWorkflowError, InvalidDateFormatError)):
@@ -184,7 +184,7 @@ def to_tool_error(exc: BaseException) -> ToolError:
 
     if isinstance(exc, WorkflowNameConflictError):
         mensagem = str(exc) or "Já existe um workflow com este nome."
-        achado = _NOME_ENTRE_ASPAS.search(mensagem)
+        achado = _QUOTED_NAME.search(mensagem)
         return erro(
             "conflict",
             mensagem,
@@ -192,7 +192,7 @@ def to_tool_error(exc: BaseException) -> ToolError:
             suggestion=f"{achado.group(1)} (2)" if achado else None,
         )
 
-    if isinstance(exc, ConteudoNoExecutorError):
+    if isinstance(exc, ContentOnExecutorError):
         return erro(
             "unavailable_local",
             str(exc) or "O conteúdo está no executor.",
@@ -201,13 +201,13 @@ def to_tool_error(exc: BaseException) -> ToolError:
 
     if isinstance(exc, HTTPException):
         detalhe = exc.detail if isinstance(exc.detail, str) else "Requisição recusada."
-        return erro(CODIGO_POR_STATUS.get(exc.status_code, "erro"), detalhe)
+        return erro(CODE_BY_STATUS.get(exc.status_code, "erro"), detalhe)
 
     if isinstance(exc, AtlasBaseError):
         # `atlas_code` preserves the domain code for integrators who want to
         # distinguish two cases that fall under the same status.
         return erro(
-            CODIGO_POR_STATUS.get(exc.status_code, "erro"),
+            CODE_BY_STATUS.get(exc.status_code, "erro"),
             str(exc) or "Operação recusada.",
             atlas_code=exc.error_code,
         )
@@ -222,7 +222,7 @@ def to_tool_error(exc: BaseException) -> ToolError:
     return erro("internal_error", "Erro interno ao atender a chamada.")
 
 
-def erro_de_segredo(caminhos: list[str]) -> ToolError:
+def secret_error(caminhos: list[str]) -> ToolError:
     """The refusal of a definition that carries a secret in clear text.
 
     It exists as a helper (and not as a call to `erro` scattered across each
@@ -231,7 +231,7 @@ def erro_de_segredo(caminhos: list[str]) -> ToolError:
     to fix it, and returning the value "to help" would make the secret take
     one more trip — through the transport, the client's history and the SDK log.
 
-    `caminhos` is what `definition_contem_segredo` returns
+    `caminhos` is what `definition_contains_secret` returns
     (`nodes[2].properties.connectionString`); even so each one goes through
     `scrub_text`, because a property name is text written by people.
     """

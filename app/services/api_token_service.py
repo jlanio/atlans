@@ -9,7 +9,7 @@ Security rules concentrated here (see app/models/api_token.py):
 - Revocation never deletes; the cascade (password reset, suspension, deletion)
   runs in the caller's session and does NOT commit — whoever opened the
   transaction closes it.
-- `marcar_uso` is best-effort with a throttle in Redis: it never fails a
+- `mark_used` is best-effort with a throttle in Redis: it never fails a
   request, and it COMMITS by default — the request session
   (`get_session_async`) rolls back in the `finally`, so an uncommitted stamp
   would be silently lost.
@@ -24,14 +24,14 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.authorization.pat import (
-    MAX_TOKENS_ATIVOS_POR_USUARIO,
-    VALIDADE_MAX_DIAS,
-    VALIDADE_PADRAO_DIAS,
-    e_segredo_pat,
-    escopos_invalidos,
-    gerar_segredo,
-    hash_segredo,
-    prefixo_exibivel,
+    MAX_ACTIVE_TOKENS_PER_USER,
+    MAX_VALIDITY_DAYS,
+    DEFAULT_VALIDITY_DAYS,
+    is_pat_secret,
+    invalid_scopes,
+    generate_secret,
+    hash_secret,
+    displayable_prefix,
 )
 from app.core.exceptions import AtlasBaseError
 from app.core.utils.datetime_utils import utc_now_naive
@@ -41,7 +41,7 @@ from app.models.user import User
 
 logger = get_logger(__name__)
 
-THROTTLE_ULTIMO_USO_SEGUNDOS = 60
+LAST_USED_THROTTLE_SECONDS = 60
 
 
 class ApiTokenError(AtlasBaseError):
@@ -63,17 +63,17 @@ class ApiTokenNotFoundError(AtlasBaseError):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def _normalizar_escopos(scopes: Iterable[str] | None) -> list[str]:
+def _normalize_scopes(scopes: Iterable[str] | None) -> list[str]:
     unicos = list(dict.fromkeys(s.strip() for s in (scopes or []) if s and s.strip()))
     if not unicos:
         raise ApiTokenError("Informe ao menos um escopo.")
-    invalidos = escopos_invalidos(unicos)
+    invalidos = invalid_scopes(unicos)
     if invalidos:
         raise ApiTokenError(f"Escopo desconhecido: {', '.join(invalidos)}.")
     return unicos
 
 
-async def _contar_ativos(db: AsyncSession, user_id: str, agora) -> int:
+async def _count_active(db: AsyncSession, user_id: str, agora) -> int:
     resultado = await db.execute(
         select(func.count(ApiToken.id)).where(
             ApiToken.user_id == user_id,
@@ -94,7 +94,7 @@ async def criar(
     name: str,
     scopes: Iterable[str],
     workspace_ids: Iterable[str] | None = None,
-    expires_in_days: int = VALIDADE_PADRAO_DIAS,
+    expires_in_days: int = DEFAULT_VALIDITY_DAYS,
 ) -> tuple[ApiToken, str]:
     """Creates a token and returns (persisted row, plaintext secret).
 
@@ -105,9 +105,9 @@ async def criar(
     nome = (name or "").strip()
     if not nome or len(nome) > 80:
         raise ApiTokenError("O nome precisa ter entre 1 e 80 caracteres.")
-    escopos = _normalizar_escopos(scopes)
-    if not isinstance(expires_in_days, int) or not 1 <= expires_in_days <= VALIDADE_MAX_DIAS:
-        raise ApiTokenError(f"A validade precisa ficar entre 1 e {VALIDADE_MAX_DIAS} dias.")
+    escopos = _normalize_scopes(scopes)
+    if not isinstance(expires_in_days, int) or not 1 <= expires_in_days <= MAX_VALIDITY_DAYS:
+        raise ApiTokenError(f"A validade precisa ficar entre 1 e {MAX_VALIDITY_DAYS} dias.")
 
     alcance: list[str] | None = None
     if workspace_ids is not None:
@@ -129,18 +129,18 @@ async def criar(
     # up at 21. A SELECT ... FOR UPDATE on the user's row would close the gap
     # at the cost of serializing every token creation per account — not worth
     # it for a limit that only exists so the list does not become a mess.
-    if await _contar_ativos(db, user.id_hash, agora) >= MAX_TOKENS_ATIVOS_POR_USUARIO:
+    if await _count_active(db, user.id_hash, agora) >= MAX_ACTIVE_TOKENS_PER_USER:
         raise ApiTokenLimitError(
-            f"Limite de {MAX_TOKENS_ATIVOS_POR_USUARIO} tokens ativos atingido. "
+            f"Limite de {MAX_ACTIVE_TOKENS_PER_USER} tokens ativos atingido. "
             "Revogue um token antes de criar outro."
         )
 
-    segredo = gerar_segredo()
+    segredo = generate_secret()
     token = ApiToken(
         user_id=user.id_hash,
         name=nome,
-        token_prefix=prefixo_exibivel(segredo),
-        token_hash=hash_segredo(segredo),
+        token_prefix=displayable_prefix(segredo),
+        token_hash=hash_secret(segredo),
         scopes=escopos,
         workspace_ids=alcance,
         expires_at=agora + timedelta(days=expires_in_days),
@@ -185,7 +185,7 @@ async def revogar(db: AsyncSession, user_id: str, id_hash: str, motivo: str = "u
     return token
 
 
-async def revogar_todos_do_usuario(db: AsyncSession, user_ids: Iterable[str] | str, motivo: str) -> int:
+async def revoke_all_for_user(db: AsyncSession, user_ids: Iterable[str] | str, motivo: str) -> int:
     """Cascade: revokes every active token of the users — ONE UPDATE, NO commit.
 
     Called inside the transaction of whoever changes the account's state
@@ -204,8 +204,8 @@ async def revogar_todos_do_usuario(db: AsyncSession, user_ids: Iterable[str] | s
         .where(ApiToken.user_id.in_(ids), ApiToken.revoked_at.is_(None))
         .values(revoked_at=utc_now_naive(), revoked_reason=motivo)
     )
-    afetadas = getattr(resultado, "rowcount", None)
-    n = afetadas if isinstance(afetadas, int) and afetadas >= 0 else 0
+    affected = getattr(resultado, "rowcount", None)
+    n = affected if isinstance(affected, int) and affected >= 0 else 0
     if n:
         logger.info("%d token(s) de acesso revogado(s) em cascata (%s) para %s.", n, motivo, ", ".join(ids))
     return n
@@ -220,14 +220,14 @@ async def resolver(db: AsyncSession, segredo: str | None) -> tuple[ApiToken, Use
     One query: hash → token not revoked and not expired → user with
     `status == "active"` (the column; `User.is_active` is a property and does not work in SQL).
     """
-    if not e_segredo_pat(segredo):
+    if not is_pat_secret(segredo):
         return None
     agora = utc_now_naive()
     resultado = await db.execute(
         select(ApiToken, User)
         .join(User, User.id_hash == ApiToken.user_id)
         .where(
-            ApiToken.token_hash == hash_segredo(segredo),
+            ApiToken.token_hash == hash_secret(segredo),
             ApiToken.revoked_at.is_(None),
             ApiToken.expires_at > agora,
             User.status == "active",
@@ -239,13 +239,13 @@ async def resolver(db: AsyncSession, segredo: str | None) -> tuple[ApiToken, Use
     return linha[0], linha[1]
 
 
-async def marcar_uso(db: AsyncSession, redis, token: ApiToken, *, commit: bool = True) -> bool:
+async def mark_used(db: AsyncSession, redis, token: ApiToken, *, commit: bool = True) -> bool:
     """Stamps `last_used_at` at most once per minute — best-effort.
 
     The throttle is a `SET NX EX 60` in Redis: whoever wins the lock writes;
     the others do not even touch the database. Redis unavailable = no stamp.
     The UPDATE runs in a SAVEPOINT so as not to poison the caller's
-    transaction (modeled on `credential_loader._marcar_last_used`) and is
+    transaction (modeled on `credential_loader._mark_last_used`) and is
     COMMITTED right here: the request session rolls back in the `finally`,
     and a pending stamp would vanish without anyone noticing. `commit=False`
     only for those already inside their own transaction who will commit it.
@@ -255,11 +255,11 @@ async def marcar_uso(db: AsyncSession, redis, token: ApiToken, *, commit: bool =
     """
     chave = f"pat:lu:{token.id_hash}"
     try:
-        ganhou = await redis.set(chave, "1", nx=True, ex=THROTTLE_ULTIMO_USO_SEGUNDOS)
+        won = await redis.set(chave, "1", nx=True, ex=LAST_USED_THROTTLE_SECONDS)
     except Exception as exc:  # pragma: no cover - depends on Redis
         logger.debug("Throttle de last_used_at indisponível: %s", exc)
         return False
-    if not ganhou:
+    if not won:
         return False
     try:
         async with db.begin_nested():

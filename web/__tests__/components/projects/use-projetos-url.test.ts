@@ -21,7 +21,7 @@ beforeEach(() => {
 })
 afterEach(() => vi.restoreAllMocks())
 
-const ultimaUrl = () => replace.mock.calls.at(-1)![0] as string
+const lastUrl = () => replace.mock.calls.at(-1)![0] as string
 
 describe("useProjetosUrl", () => {
   it("lê o estado da query string com defaults", () => {
@@ -41,7 +41,7 @@ describe("useProjetosUrl", () => {
     url.sp = new URLSearchParams("filtro=falha")
     const { result } = renderHook(() => useProjetosUrl())
     act(() => result.current.atualizar({ filtro: "todos" }))
-    expect(ultimaUrl()).toBe("/projects")
+    expect(lastUrl()).toBe("/projects")
   })
 
   it("duas escritas seguidas, antes de a URL refletir a primeira, se acumulam", () => {
@@ -50,14 +50,14 @@ describe("useProjetosUrl", () => {
     // The URL is still the old one (the router has not responded): the keystroke in the search
     // starts from what was typed, not from what is in the bar.
     act(() => result.current.atualizar({ q: "sic" }))
-    expect(ultimaUrl()).toBe("/projects?q=sic&filtro=falha")
+    expect(lastUrl()).toBe("/projects?q=sic&filtro=falha")
   })
 
   it("limpar filtros zera busca e chip, mas mantém a ordenação", () => {
     url.sp = new URLSearchParams("q=x&filtro=pausado&ordem=alterado")
     const { result } = renderHook(() => useProjetosUrl())
     act(() => result.current.limparFiltros())
-    expect(ultimaUrl()).toBe("/projects?ordem=alterado")
+    expect(lastUrl()).toBe("/projects?ordem=alterado")
   })
 
   it("limpar sem nada ativo não escreve nada", () => {

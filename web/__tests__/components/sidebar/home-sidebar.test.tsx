@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest"
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { CATALOGO, ORGAOS_FEDERAIS } from "@/lib/catalogo"
-import { formatarInteiro } from "@/lib/formatos"
+import { formatInteger } from "@/lib/formatos"
 
 /**
  * The Home shell: New conversation + the Mine group (Schedules, Artifacts,
@@ -66,9 +66,9 @@ vi.mock("@/app/components/home/artefatos/lista", () => ({ ArtefatosLista: () => 
 
 import { SidebarProvider } from "@/app/components/ui/sidebar"
 import HomeSidebar from "@/app/components/sidebar/home-sidebar"
-import { useHomeStore, MEU_PADRAO } from "@/app/stores/homeStore"
+import { useHomeStore, DEFAULT_MINE } from "@/app/stores/homeStore"
 
-const hidratarReal = useHomeStore.getState().hidratar
+const realHydrate = useHomeStore.getState().hidratar
 
 function montar(props: Omit<React.ComponentProps<typeof SidebarProvider>, "children"> = {}) {
   return render(
@@ -82,21 +82,21 @@ beforeEach(() => {
   cleanup()
   window.localStorage.clear()
   largura(1280)
-  useHomeStore.setState({ conversaId: null, hidratado: false, meu: { ...MEU_PADRAO }, hidratar: hidratarReal, entrada: null })
+  useHomeStore.setState({ conversaId: null, hidratado: false, meu: { ...DEFAULT_MINE }, hidratar: realHydrate, entrada: null })
   sessao.papel = "admin"
   sessao.status = undefined
   sessao.erro = undefined
   espiao.chatsMontou.mockClear()
 })
 
-function semSessao() {
+function withoutSession() {
   sessao.papel = undefined
   sessao.status = "unauthenticated"
 }
 
 describe("HomeSidebar — sem sessão", () => {
   it("a casca anônima: vitrine do catálogo no corpo, sem Nova conversa, sem o grupo Meus, sem a conta; Entrar e Criar conta pedem o modal", () => {
-    semSessao()
+    withoutSession()
     montar()
     expect(screen.queryByText("Nova conversa")).toBeNull()
     for (const rotulo of ["Meus", "Chats", "Agendamentos", "Artefatos"]) expect(screen.queryByText(rotulo), rotulo).toBeNull()
@@ -106,7 +106,7 @@ describe("HomeSidebar — sem sessão", () => {
     // The showcase: numbers from the constant (never from a GET — the anonymous
     // shell makes no requests) and the three labeled strips.
     expect(screen.getByText("No catálogo")).toBeTruthy()
-    expect(screen.getByText(formatarInteiro(CATALOGO.camadas))).toBeTruthy()
+    expect(screen.getByText(formatInteger(CATALOGO.camadas))).toBeTruthy()
     expect(screen.getByText(new RegExp(`de ${CATALOGO.instituicoes} instituições em ${CATALOGO.paises} países`))).toBeTruthy()
     expect(screen.getByText(/Pare de procurar dados/i)).toBeTruthy()
     for (const rotulo of ["Brasil", "Fora do Brasil"]) expect(screen.getByText(rotulo), rotulo).toBeTruthy()
@@ -124,7 +124,7 @@ describe("HomeSidebar — sem sessão", () => {
     // The animation runs to -50%: without the copy, the wrap back to the start
     // flickers. But these are names, not decoration, so someone listening by
     // audio hears the list only once.
-    semSessao()
+    withoutSession()
     montar()
     const copias = screen.getAllByText(ORGAOS_FEDERAIS[0].rotulo)
     expect(copias).toHaveLength(2)
@@ -136,7 +136,7 @@ describe("HomeSidebar — sem sessão", () => {
     // ItemColapsavel mounts the list on `hidratado && aberto`: without a session
     // the group can't even exist, otherwise each list would fire its own GET.
     window.localStorage.setItem("atlans:home:meu", JSON.stringify({ agendamentos: true, artefatos: true, chats: true }))
-    semSessao()
+    withoutSession()
     montar()
     expect(screen.queryByTestId("agendamentos-lista")).toBeNull()
     expect(screen.queryByTestId("artefatos-lista")).toBeNull()
@@ -160,7 +160,7 @@ describe("HomeSidebar — sem sessão", () => {
   })
 
   it("no trilho, Entrar e Criar conta têm ícone e o convite some", () => {
-    semSessao()
+    withoutSession()
     montar({ open: false })
     const entrar = screen.getByRole("button", { name: "Entrar" })
     expect(entrar.querySelector("svg")).toBeTruthy()
@@ -315,7 +315,7 @@ describe("HomeSidebar — o grupo Meus", () => {
     fireEvent.click(screen.getByText("Artefatos"))
     unmount()
     // The tree's memory is gone; the store goes back to default — only the browser remembers.
-    useHomeStore.setState({ meu: { ...MEU_PADRAO }, hidratado: false })
+    useHomeStore.setState({ meu: { ...DEFAULT_MINE }, hidratado: false })
     montar()
     expect(screen.getByTestId("artefatos-lista")).toBeTruthy()
   })

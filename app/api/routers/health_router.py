@@ -39,7 +39,7 @@ from app.core.system_config import set_config as _set_config  # noqa: E402
 async def system_health(db: AsyncSession = Depends(get_db)):
     """Only the whitelist: it is what the Settings screen reads.
 
-    The EFFECTIVE list, the same one the trigger applies (`padroes_validos`): an
+    The EFFECTIVE list, the same one the trigger applies (`valid_patterns`): an
     entry saved before validation that would never match (`*`, URL with a path)
     does not appear as a restriction, and the screen shows "sem restrição" (no
     restriction) when that is the case.
@@ -48,10 +48,10 @@ async def system_health(db: AsyncSession = Depends(get_db)):
     runs (old criterion, running > 1 h) — none of that had a screen.
     The truly stuck ones are those on the Dashboard, at /observability/metrics.
     """
-    from app.core.utils.allowlist import padroes_validos
+    from app.core.utils.allowlist import valid_patterns
 
     gravada = await _get_config(db, "webhook_whitelist", default=[]) or []
-    return {"webhook_whitelist": padroes_validos(gravada)}
+    return {"webhook_whitelist": valid_patterns(gravada)}
 
 
 @router.patch("/health/webhook-whitelist", summary="Atualiza whitelist de domínios para webhook")
@@ -65,14 +65,14 @@ async def update_webhook_whitelist(
     host must be in it (and in the workspace allowlist, when there is one) —
     applied at trigger time, in `run_result_consumer._fire_notification_if_configured`.
     """
-    from app.core.utils.allowlist import normalizar_dominio, separar_dominios, validar_allowlist
+    from app.core.utils.allowlist import normalize_domain, split_domains, validate_allowlist
 
     # A pasted URL becomes the HOST (as before: no scheme, path or port), and
     # what the matcher would ignore — `*`, `localhost` — is rejected with 400, the same
     # rule as the workspace allowlist. Now the list is applied at trigger time: a
     # silently accepted `*` would block every webhook on the platform.
     try:
-        cleaned = validar_allowlist([normalizar_dominio(x) for x in separar_dominios(domains)])
+        cleaned = validate_allowlist([normalize_domain(x) for x in split_domains(domains)])
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     await _set_config(db, "webhook_whitelist", cleaned)

@@ -24,7 +24,7 @@ Three decisions shape the module:
 - **The version listing runs its own query.** `list_versions` returns the
   whole definition of each version; in a tool that would be N encrypted blobs
   read from the database only to be discarded. Here only what the question
-  needs is selected — the same reason `_contar_versoes` exists in
+  needs is selected — the same reason `_count_versions` exists in
   `construcao.py`.
 - **No definition leaves here without going through redaction.** A version's
   definition already comes redacted from the service; the one `restore`
@@ -45,13 +45,13 @@ from app.core.rbac import ROLE_EDITOR, ROLE_VIEWER
 from app.core.storage import presigned_get_async
 from app.core.utils.datetime_utils import utc_now_naive
 from app.core.utils.logger import get_logger
-from app.core.utils.redacao import compactar_definition, redigir_definition
+from app.core.utils.redacao import compact_definition, redact_definition
 from app.crud.workflow_crud import WorkflowCRUD
 from app.mcp import infra
 from app.mcp.erros import erro
 from app.mcp.escopo import escopo_da_chamada, exigir_escopo
-from app.mcp.resolucao import carregar_workflow, resolver_workspace
-from app.mcp.saida import envelope, higienizar, iso
+from app.mcp.resolucao import carregar_workflow, resolve_workspace
+from app.mcp.saida import envelope, sanitize, iso
 from app.mcp.tools.base import anotacoes, ferramenta
 from app.models.workflow_version import WorkflowVersion
 from app.services.artifact_service import listar_artefatos
@@ -61,7 +61,7 @@ from flow.utils.workflow_contract import validate_subworkflow_references_against
 
 # Ceiling of the version listing. A heavily edited workflow accumulates hundreds
 # of snapshots, and whoever asks "what changed" wants the latest ones.
-MAX_VERSOES = 50
+MAX_VERSIONS = 50
 
 # Ceiling of the artifact listing per response — the same context budget as the
 # server's other listings.
@@ -69,19 +69,19 @@ MAX_ARTEFATOS = 100
 
 # Validity of the signed URL, the same as the others: the link is a bearer link
 # and travels through a conversation that may be recorded.
-VALIDADE_DO_LINK_S = 300
+LINK_VALIDITY_S = 300
 
 # The two slices the artifact listing understands — the same ones the REST route
 # validates via `pattern`.
-RECORTES = ("execution", "publication")
+SLICES = ("execution", "publication")
 
 logger = get_logger("app.mcp.tools.acervo")
 
-_MENSAGEM_PAPEL_LEITURA = "Requer papel 'viewer' ou superior neste workspace."
-_MENSAGEM_PAPEL_ESCRITA = "Requer papel 'editor' ou superior neste workspace."
+_READ_ROLE_MESSAGE = "Requer papel 'viewer' ou superior neste workspace."
+_WRITE_ROLE_MESSAGE = "Requer papel 'editor' ou superior neste workspace."
 
 
-def _versao_nao_encontrada(numero: Any):
+def _version_not_found(numero: Any):
     return erro(
         "not_found",
         f"Este workflow não tem a versão {numero}.",
@@ -94,7 +94,7 @@ def _versao_nao_encontrada(numero: Any):
 
 @ferramenta
 async def list_workflow_versions(
-    ctx: Context, workflow_id: str, limit: int = MAX_VERSOES, offset: int = 0
+    ctx: Context, workflow_id: str, limit: int = MAX_VERSIONS, offset: int = 0
 ) -> dict:
     """A workflow's snapshot history, from newest to oldest.
 
@@ -113,12 +113,12 @@ async def list_workflow_versions(
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
-    teto = max(1, min(int(limit), MAX_VERSOES))
+    teto = max(1, min(int(limit), MAX_VERSIONS))
     salto = max(0, int(offset))
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_VIEWER, _MENSAGEM_PAPEL_LEITURA)
+        exigir_papel(papel, ROLE_VIEWER, _READ_ROLE_MESSAGE)
         id_hash = wf.id_hash
 
         # Its own query, not `list_versions`: that one brings the `definition`
@@ -178,7 +178,7 @@ async def get_workflow_version(ctx: Context, workflow_id: str, version_number: i
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_VIEWER, _MENSAGEM_PAPEL_LEITURA)
+        exigir_papel(papel, ROLE_VIEWER, _READ_ROLE_MESSAGE)
         id_hash = wf.id_hash
 
         try:
@@ -188,7 +188,7 @@ async def get_workflow_version(ctx: Context, workflow_id: str, version_number: i
             # VERSION. Without translating it, the error arrives with no hint —
             # and the next question from whoever got the number wrong is always
             # the same.
-            raise _versao_nao_encontrada(version_number) from exc
+            raise _version_not_found(version_number) from exc
         except ValueError as exc:
             # A token that does not decrypt. The service reports it instead of
             # returning unreadable text as if it were content, and the tool does
@@ -209,7 +209,7 @@ async def get_workflow_version(ctx: Context, workflow_id: str, version_number: i
         numero = versao.version_number
         nota = versao.change_note
         criada = versao.created_at
-        segura = compactar_definition(versao.definition or {})
+        segura = compact_definition(versao.definition or {})
 
     return envelope(
         {
@@ -244,7 +244,7 @@ async def restore_workflow_version(
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_EDITOR, _MENSAGEM_PAPEL_ESCRITA)
+        exigir_papel(papel, ROLE_EDITOR, _WRITE_ROLE_MESSAGE)
         id_hash = wf.id_hash
 
         antes = await _ultimo_numero_de_versao(db, id_hash)
@@ -257,14 +257,14 @@ async def restore_workflow_version(
                 id_hash, int(version_number), restored_by=escopo.user_id,
             )
         except WorkflowNotFoundError as exc:
-            raise _versao_nao_encontrada(version_number) from exc
+            raise _version_not_found(version_number) from exc
 
         # `restore_version` writes the version's ENCRYPTED blob into the
         # workflow, without opening it — that is what keeps the credential
         # protected at rest. To LEAVE here, however, it has to go through
         # redaction: handing `gAAAA…` to the caller tells it nothing and
         # still costs context.
-        segura = compactar_definition(redigir_definition(restaurado.definition or {}))
+        segura = compact_definition(redact_definition(restaurado.definition or {}))
         nome = restaurado.name
         ativo = bool(restaurado.flag_ative)
 
@@ -347,7 +347,7 @@ async def duplicate_workflow(
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_EDITOR, _MENSAGEM_PAPEL_ESCRITA)
+        exigir_papel(papel, ROLE_EDITOR, _WRITE_ROLE_MESSAGE)
         id_hash = wf.id_hash
 
         # The same check the REST route does, and that the service does NOT: a
@@ -355,11 +355,11 @@ async def duplicate_workflow(
         # original was saved. Without it, the copy is born broken and only
         # fails at run time, with an error much less clear than the list of
         # references.
-        quebradas = await validate_subworkflow_references_against_db(
+        broken = await validate_subworkflow_references_against_db(
             wf.definition or {}, db, workspace_id=wf.workspace_id
         )
-        if quebradas:
-            # Explicit `higienizar`: `erro()` only redacts extras that are STRINGS
+        if broken:
+            # Explicit `sanitize`: `erro()` only redacts extras that are STRINGS
             # (`erros.py`), and this one is a list. The validator's messages
             # echo the node's `id` and the target's hash — both written by
             # whoever edits the workflow —, so without this a command sentence
@@ -370,8 +370,8 @@ async def duplicate_workflow(
                 "validation",
                 "O workflow referencia sub-fluxos que não estão utilizáveis.",
                 "corrija as referências no original antes de duplicar",
-                errors=higienizar(
-                    [{"path": "definition.nodes", "message": m} for m in quebradas]
+                errors=sanitize(
+                    [{"path": "definition.nodes", "message": m} for m in broken]
                 ),
             )
 
@@ -392,9 +392,9 @@ async def duplicate_workflow(
             "is_active": bool(copia.flag_ative),
             "created_by_id": copia.created_by_id,
         }
-        nome_da_copia = copia.name
+        copy_name = copia.name
 
-    return envelope(dados, name=nome_da_copia)
+    return envelope(dados, name=copy_name)
 
 
 # ── Workspace artifacts ──────────────────────────────────────────────────────
@@ -447,21 +447,21 @@ async def list_artifacts(
     # "Execution" capitalized — would become "no filter", returning the ENTIRE
     # collection without saying anything about the slice being ignored. Whoever
     # asked for publications would read runs as publications.
-    if kind is not None and kind not in RECORTES:
+    if kind is not None and kind not in SLICES:
         raise erro(
             "validation",
-            f"`kind` aceita {' ou '.join(sorted(RECORTES))}, ou nada para não recortar.",
+            f"`kind` aceita {' ou '.join(sorted(SLICES))}, ou nada para não recortar.",
             "use kind='publication' para as camadas do portal e kind='execution' para o resto",
             errors=[{"path": "kind", "message": f"valor não reconhecido: {kind!r}"}],
         )
 
     async with infra.sessao() as db:
-        alvo_workspace = (
-            await resolver_workspace(db, escopo, workspace_id)
+        target_workspace = (
+            await resolve_workspace(db, escopo, workspace_id)
             if workspace_id is not None
             else None
         )
-        alvo_workflow = None
+        target_workflow = None
         if workflow_id is not None:
             # Resolved here, and not passed raw to the core, for the same two
             # reasons as `list_runs`: so that the tool accepts the workflow's
@@ -471,26 +471,26 @@ async def list_artifacts(
             # an empty list the caller would read as "never produced
             # anything".
             wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-            exigir_papel(papel, ROLE_VIEWER, _MENSAGEM_PAPEL_LEITURA)
-            alvo_workflow = wf.id_hash
+            exigir_papel(papel, ROLE_VIEWER, _READ_ROLE_MESSAGE)
+            target_workflow = wf.id_hash
 
         pagina = await listar_artefatos(
             db,
             sorted(escopo.workspace_ids),
-            workspace_id=alvo_workspace,
-            workflow_id=alvo_workflow,
+            workspace_id=target_workspace,
+            workflow_id=target_workflow,
             run_id=run_id,
             fmt=fmt,
             search=search,
             kind=kind,
             limit=teto,
             offset=max(0, int(offset)),
-            incluir_chave=True,
+            include_key=True,
         )
 
     itens = []
     nomes = []
-    expira_em = iso(utc_now_naive() + timedelta(seconds=VALIDADE_DO_LINK_S))
+    expires_at = iso(utc_now_naive() + timedelta(seconds=LINK_VALIDITY_S))
     for bruto in pagina["items"]:
         local = bruto.get("content_location") or "minio"
         chave = bruto.get("s3_key")
@@ -522,17 +522,17 @@ async def list_artifacts(
         }
         if disponivel and not protegido:
             item["download_url"] = await presigned_get_async(
-                chave, expires=VALIDADE_DO_LINK_S, filename=bruto["filename"]
+                chave, expires=LINK_VALIDITY_S, filename=bruto["filename"]
             )
-            item["url_expires_at"] = expira_em
+            item["url_expires_at"] = expires_at
         else:
-            item["hint"] = _por_que_sem_link(local, disponivel, protegido)
+            item["hint"] = _why_no_link(local, disponivel, protegido)
 
         itens.append(item)
         # Human text, in the same order as the items. `output_key` goes in
         # here together with the other two: it is the label the person wrote
         # on the output node, not a value the platform generates — and at the
-        # top level it would escape the `envelope`'s `higienizar`. That is
+        # top level it would escape the `envelope`'s `sanitize`. That is
         # what `get_run_artifacts` already does.
         nomes.append({
             "filename": bruto["filename"],
@@ -547,13 +547,13 @@ async def list_artifacts(
             "limit": pagina["limit"],
             "offset": pagina["offset"],
             "has_more": pagina["has_more"],
-            "expires_in_seconds": VALIDADE_DO_LINK_S,
+            "expires_in_seconds": LINK_VALIDITY_S,
         },
         names=nomes or None,
     )
 
 
-def _por_que_sem_link(local: str, disponivel: bool, protegido: bool) -> str:
+def _why_no_link(local: str, disponivel: bool, protegido: bool) -> str:
     """ONE explanation, cascading — the most specific one that fits."""
     if local == "executor":
         return (

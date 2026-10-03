@@ -22,7 +22,7 @@ const ConditionalIcon = ({ id, ...nodeProps }: NodeProps<INodeContext>) => {
 
   // The input is single and has no id, so it is enough to know whether any edge
   // is arriving — that is what decides between a solid and a dashed socket.
-  const entradaLivre = useMemo(
+  const freeInput = useMemo(
     () => !(edges ?? []).some(e => e.target === id),
     [edges, id],
   )
@@ -52,7 +52,7 @@ const ConditionalIcon = ({ id, ...nodeProps }: NodeProps<INodeContext>) => {
 
       </AddConnectionHandle>
 
-      <HandleTarget livre={entradaLivre} />
+      <HandleTarget livre={freeInput} />
 
     </ControlIconRoot>
   )

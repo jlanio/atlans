@@ -68,10 +68,10 @@ def _cond_edge(source, target, condition):
     return {"source": source, "target": target, "condition": condition}
 
 
-def _rodar(ordem_nos):
+def _run(node_order):
     """Builds the diamond with the nodes in the GIVEN ORDER (controls the batch
     interleaving) and runs it. Returns (final_outputs, node_stats)."""
-    node_por_id = {
+    node_by_id = {
         "TX": _trigger("TX"),
         "TA": _trigger("TA"),
         "A": _branch("A"),
@@ -80,7 +80,7 @@ def _rodar(ordem_nos):
         "D": _merge("D", alias="Fim"),
     }
     definition = {
-        "nodes": [node_por_id[i] for i in ordem_nos],
+        "nodes": [node_by_id[i] for i in node_order],
         "edges": [
             _spread("TX", "D"),               # pai vivo independente → merge
             _spread("TA", "A"),               # feeds the fork
@@ -89,30 +89,30 @@ def _rodar(ordem_nos):
             _spread("C", "D"),                # pai skipado → merge
         ],
     }
-    ex = WorkflowExecutor(definition, task_id=f"f2-{'-'.join(ordem_nos)}", publisher=_publisher())
+    ex = WorkflowExecutor(definition, task_id=f"f2-{'-'.join(node_order)}", publisher=_publisher())
     final = asyncio.run(ex.run(initial_inputs={"TX": {"output": _gdf()}, "TA": {"output": _gdf()}}))
     return final, ex.node_stats
 
 
-def test_merge_roda_quando_pai_vivo_decrementa_antes_do_skip():
+def test_merge_runs_when_live_parent_decrements_before_the_skip():
     # Order that triggers the bug: TX (live parent) is processed BEFORE A, so C's
     # skip zeroes D's pending last. Before: D skipped. Now: D runs.
-    final, stats = _rodar(["TX", "TA", "A", "B", "C", "D"])
+    final, stats = _run(["TX", "TA", "A", "B", "C", "D"])
     assert stats["C"]["status"] == "skipped", "C está no ramo não tomado — deve ser skipado"
     assert stats["D"]["status"] != "skipped", "D tem pai vivo (TX) — não pode ser skipado"
     assert "D" in final and final["D"], "D rodou e produziu saída"
 
 
-def test_merge_roda_independente_da_ordem_do_batch():
+def test_merge_runs_regardless_of_batch_order():
     # Reverse order (A/TA before TX): C's skip decrements D first, then TX zeroes
     # it. It already worked before; here it confirms the fix is symmetric.
-    final, stats = _rodar(["TA", "A", "B", "C", "TX", "D"])
+    final, stats = _run(["TA", "A", "B", "C", "TX", "D"])
     assert stats["C"]["status"] == "skipped"
     assert stats["D"]["status"] != "skipped"
     assert "D" in final and final["D"]
 
 
-def test_merge_com_todos_os_pais_skipados_continua_skipado():
+def test_merge_with_all_parents_skipped_stays_skipped():
     # Guard against over-correction: if D has NO live parent (both in the dead
     # branch), it MUST still be skipped.
     #   TA → A ─true─► B

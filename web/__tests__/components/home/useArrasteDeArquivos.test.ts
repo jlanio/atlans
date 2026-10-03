@@ -26,8 +26,8 @@ function evento(tipo: string, tipos: string[], arquivos: File[] = []) {
   return e as DragEvent
 }
 
-const COM_ARQUIVO = ["Files"]
-const SO_TEXTO = ["text/plain"]
+const WITH_FILE = ["Files"]
+const TEXT_ONLY = ["text/plain"]
 
 let aoArrastar: ReturnType<typeof vi.fn<(arrastando: boolean) => void>>
 let aoSoltar: ReturnType<typeof vi.fn<(arquivos: File[]) => void>>
@@ -43,15 +43,15 @@ beforeEach(() => vi.restoreAllMocks())
 describe("useArrasteDeArquivos", () => {
   it("acende ao entrar com arquivo e apaga ao sair", () => {
     montar()
-    window.dispatchEvent(evento("dragenter", COM_ARQUIVO))
+    window.dispatchEvent(evento("dragenter", WITH_FILE))
     expect(aoArrastar).toHaveBeenLastCalledWith(true)
-    window.dispatchEvent(evento("dragleave", COM_ARQUIVO))
+    window.dispatchEvent(evento("dragleave", WITH_FILE))
     expect(aoArrastar).toHaveBeenLastCalledWith(false)
   })
 
   it("ignora arraste que não é de arquivo (texto, link)", () => {
     montar()
-    window.dispatchEvent(evento("dragenter", SO_TEXTO))
+    window.dispatchEvent(evento("dragenter", TEXT_ONLY))
     expect(aoArrastar).not.toHaveBeenCalled()
   })
 
@@ -59,19 +59,19 @@ describe("useArrasteDeArquivos", () => {
     montar()
     // Enters the page, then crosses into a child (2 enters), and leaves
     // one (1 leave): still over the Home.
-    window.dispatchEvent(evento("dragenter", COM_ARQUIVO))
-    window.dispatchEvent(evento("dragenter", COM_ARQUIVO))
-    window.dispatchEvent(evento("dragleave", COM_ARQUIVO))
+    window.dispatchEvent(evento("dragenter", WITH_FILE))
+    window.dispatchEvent(evento("dragenter", WITH_FILE))
+    window.dispatchEvent(evento("dragleave", WITH_FILE))
     expect(aoArrastar).toHaveBeenLastCalledWith(true)
     // Leaves the last one: now it turns off.
-    window.dispatchEvent(evento("dragleave", COM_ARQUIVO))
+    window.dispatchEvent(evento("dragleave", WITH_FILE))
     expect(aoArrastar).toHaveBeenLastCalledWith(false)
   })
 
   it("soltar entrega os arquivos, apaga o realce e barra o navegador (preventDefault)", () => {
     montar()
     const f = new File(["x"], "um.csv")
-    const ev = evento("drop", COM_ARQUIVO, [f])
+    const ev = evento("drop", WITH_FILE, [f])
     window.dispatchEvent(ev)
 
     expect(aoSoltar).toHaveBeenCalledWith([f])
@@ -81,21 +81,21 @@ describe("useArrasteDeArquivos", () => {
 
   it("dragover de arquivo é sempre prevenido — senão o drop nem acontece", () => {
     montar()
-    const ev = evento("dragover", COM_ARQUIVO)
+    const ev = evento("dragover", WITH_FILE)
     window.dispatchEvent(ev)
     expect(ev.defaultPrevented).toBe(true)
   })
 
   it("soltar sem nenhum arquivo não chama aoSoltar", () => {
     montar()
-    window.dispatchEvent(evento("drop", COM_ARQUIVO, []))
+    window.dispatchEvent(evento("drop", WITH_FILE, []))
     expect(aoSoltar).not.toHaveBeenCalled()
   })
 
   it("desligado (ativo=false), não escuta nada", () => {
     montar(false)
-    window.dispatchEvent(evento("dragenter", COM_ARQUIVO))
-    window.dispatchEvent(evento("drop", COM_ARQUIVO, [new File(["x"], "a.csv")]))
+    window.dispatchEvent(evento("dragenter", WITH_FILE))
+    window.dispatchEvent(evento("drop", WITH_FILE, [new File(["x"], "a.csv")]))
     expect(aoArrastar).not.toHaveBeenCalled()
     expect(aoSoltar).not.toHaveBeenCalled()
   })
@@ -106,7 +106,7 @@ describe("useArrasteDeArquivos", () => {
     // The cleanup reports `false` once; and a later event no longer calls anything.
     expect(aoArrastar).toHaveBeenLastCalledWith(false)
     aoArrastar.mockClear()
-    window.dispatchEvent(evento("dragenter", COM_ARQUIVO))
+    window.dispatchEvent(evento("dragenter", WITH_FILE))
     expect(aoArrastar).not.toHaveBeenCalled()
   })
 })

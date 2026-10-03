@@ -62,9 +62,9 @@ def _registry(*, offline=(), unknown=()):
     return reg
 
 
-def _db_legado(dedicado):
+def _legacy_db(dedicado):
     """db.execute for the legacy path: the workspace→executor JOIN returns `dedicado`;
-    the count of in-flight runs (`_contadas_pelo_servidor`, on the session's
+    the count of in-flight runs (`_counted_by_server`, on the session's
     connection, inside a savepoint) comes back empty."""
     res = MagicMock()
     res.scalar_one_or_none = MagicMock(return_value=dedicado)
@@ -79,7 +79,7 @@ def _db_legado(dedicado):
 def _db():
     """Session for the policy path: reading the policy and the pool come from the
     patches; all that reaches the database is the in-flight run count, empty."""
-    return _db_legado(None)
+    return _legacy_db(None)
 
 
 def _policy(primary=(), fallback=(), terminal="fail", floor="none"):
@@ -89,19 +89,19 @@ def _policy(primary=(), fallback=(), terminal="fail", floor="none"):
     )
 
 
-def _espiar_evento():
+def _spy_event():
     """Spy on `dispatch_event` (the JSON line per decision), without silencing it."""
     return patch.object(svc, "_log_dispatch_event", wraps=svc._log_dispatch_event)
 
 
-def _desfecho(evento) -> dict:
+def _outcome(evento) -> dict:
     """Policy, tier and outcome of the SINGLE `dispatch_event` emitted."""
     evento.assert_called_once()
     return {chave: evento.call_args.kwargs[chave] for chave in ("mode", "tier", "outcome")}
 
 
 @pytest.fixture(autouse=True)
-def _desempate_estavel():
+def _stable_tiebreak():
     """Ties broken by input order. The golden test compares TWO lists, and random
     choice among equally busy executors would make them differ with nothing wrong."""
     with patch.object(svc, "_desempate", lambda: 0.0):
@@ -112,9 +112,9 @@ def _desempate_estavel():
 # Candidate resolution
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestDourado:
+class TestGolden:
     @pytest.mark.asyncio
-    async def test_flag_on_com_backfill_e_identica_ao_legado(self):
+    async def test_flag_on_with_backfill_is_identical_to_legacy(self):
         ded = _executor("geo-01")
         pool = [_executor("pool-a", is_default=True), _executor("pool-b", is_default=True)]
         reg = _registry()
@@ -123,7 +123,7 @@ class TestDourado:
              patch.object(svc, "get_default_agents", AsyncMock(return_value=pool)), \
              patch("app.services.user_executor_service.get_default_agents", AsyncMock(return_value=pool)):
             with patch.object(svc, "policy_routing_enabled", lambda: False):
-                legado = await svc._resolve_candidates(_db_legado(ded), _wf())
+                legado = await svc._resolve_candidates(_legacy_db(ded), _wf())
             with patch.object(svc, "policy_routing_enabled", lambda: True), \
                  patch.object(svc.politica, "load_policy_by_id",
                               AsyncMock(return_value=_policy(primary=[ded], terminal="pool"))):
@@ -133,7 +133,7 @@ class TestDourado:
         assert legado.tiers == novo.tiers == {"geo-01": "primary", "pool-a": "pool", "pool-b": "pool"}
 
     @pytest.mark.asyncio
-    async def test_modo_pool_inalterado(self):
+    async def test_pool_mode_unchanged(self):
         pool = [_executor("pool-a", is_default=True)]
         with patch.object(svc, "executor_registry", _registry()), \
              patch.object(svc, "get_default_agents", AsyncMock(return_value=pool)), \
@@ -144,9 +144,9 @@ class TestDourado:
         assert [e.id_hash for e in cadeia] == ["pool-a"] and cadeia.mode == "pool"
 
 
-class TestContratoPorPolitica:
+class TestContractPerPolicy:
     @pytest.mark.asyncio
-    async def test_isolado_com_grupo_fora_falha_sem_tocar_o_pool(self):
+    async def test_isolated_with_group_down_fails_without_touching_the_pool(self):
         ded = [_executor("geo-01"), _executor("geo-02")]
         pool = [_executor("pool-a", is_default=True)]
         reg = _registry(offline=("geo-01", "geo-02"))
@@ -154,17 +154,17 @@ class TestContratoPorPolitica:
              patch.object(svc, "get_default_agents", AsyncMock(return_value=pool)) as pool_lookup, \
              patch.object(svc, "policy_routing_enabled", lambda: True), \
              patch.object(svc.politica, "load_policy_by_id", AsyncMock(return_value=_policy(primary=ded))), \
-             _espiar_evento() as evento:
+             _spy_event() as evento:
             with pytest.raises(NoExecutorAvailableError) as exc:
                 await svc._resolve_candidates(_db(), _wf())
         assert exc.value.category == "no_dedicated_executor"
         assert "NÃO foi enviado ao pool" in exc.value.detail
         pool_lookup.assert_not_awaited()        # the pool was not even queried
         reg.send_job.assert_not_awaited()
-        assert _desfecho(evento) == {"mode": "isolated", "tier": None, "outcome": "no_candidates"}
+        assert _outcome(evento) == {"mode": "isolated", "tier": None, "outcome": "no_candidates"}
 
     @pytest.mark.asyncio
-    async def test_fallback_nivel_2_antes_do_pool_e_pool_por_ultimo(self):
+    async def test_fallback_tier_2_before_the_pool_and_pool_last(self):
         p1 = _executor("lic-01"); p2 = _executor("lic-02")
         pool = [_executor("pool-a", is_default=True)]
         with patch.object(svc, "executor_registry", _registry()), \
@@ -180,7 +180,7 @@ class TestContratoPorPolitica:
         assert cadeia.allowed == {"lic-01", "lic-02", "pool-a"}
 
     @pytest.mark.asyncio
-    async def test_piso_no_pool_ignora_terminal_pool_do_banco(self):
+    async def test_pool_floor_ignores_db_terminal_pool(self):
         ded = _executor("geo-01")
         pool = [_executor("pool-a", is_default=True)]
         reg = _registry(offline=("geo-01",))
@@ -194,7 +194,7 @@ class TestContratoPorPolitica:
         assert exc.value.category == "no_dedicated_executor"
 
     @pytest.mark.asyncio
-    async def test_presenca_desconhecida_mantem_o_candidato(self):
+    async def test_unknown_presence_keeps_the_candidate(self):
         """Redis blip or reconnection in progress: the executor is TRIED (spec §5.1)."""
         ded = _executor("geo-01")
         with patch.object(svc, "executor_registry", _registry(unknown=("geo-01",))), \
@@ -226,7 +226,7 @@ def _definition():
 
 class TestDispatchTierEBarreira:
     @pytest.mark.asyncio
-    async def test_grava_dispatch_tier_no_insert_e_reescreve_no_failover(self):
+    async def test_writes_dispatch_tier_on_insert_and_rewrites_on_failover(self):
         p1 = _executor("lic-01"); pool = _executor("pool-a", is_default=True)
         cadeia = svc.CandidateList([p1, pool], tiers={"lic-01": "primary", "pool-a": "pool"},
                                    allowed={"lic-01", "pool-a"}, mode="dedicated_pool")
@@ -237,16 +237,16 @@ class TestDispatchTierEBarreira:
              patch.object(svc, "inject_credentials", AsyncMock(side_effect=lambda d, **k: d)), \
              patch.object(svc, "build_job_message", MagicMock(return_value={"envelope": {}})), \
              patch("app.core.run_result_consumer.account_terminal_run", AsyncMock()), \
-             _espiar_evento() as evento:
+             _spy_event() as evento:
             result = await svc._dispatch_job(_wf(), _definition(), cadeia, {}, False, db=db)
         run = db.add.call_args.args[0]
         assert result.id == run.task_id
         assert run.host == "executor:pool-a"
         assert run.dispatch_tier == "pool"          # rewritten on failover
-        assert _desfecho(evento) == {"mode": "dedicated_pool", "tier": "pool", "outcome": "dispatched"}
+        assert _outcome(evento) == {"mode": "dedicated_pool", "tier": "pool", "outcome": "dispatched"}
 
     @pytest.mark.asyncio
-    async def test_candidato_fora_do_conjunto_permitido_nao_sai(self):
+    async def test_candidate_outside_the_allowed_set_is_not_chosen(self):
         intruso = _executor("pool-a", is_default=True)
         cadeia = svc.CandidateList([intruso], tiers={"pool-a": "pool"}, allowed={"geo-01"}, mode="isolated")
         reg = _registry()
@@ -256,7 +256,7 @@ class TestDispatchTierEBarreira:
              patch.object(svc, "inject_credentials", AsyncMock(side_effect=lambda d, **k: d)), \
              patch.object(svc, "build_job_message", cifra), \
              patch("app.core.run_result_consumer.account_terminal_run", AsyncMock()) as fechar, \
-             _espiar_evento() as evento:
+             _spy_event() as evento:
             with pytest.raises(NoExecutorAvailableError) as exc:
                 await svc._dispatch_job(_wf(), _definition(), cadeia, {}, False, db=db)
         assert exc.value.category == "isolation_violation"
@@ -265,10 +265,10 @@ class TestDispatchTierEBarreira:
         run = db.add.call_args.args[0]
         assert run.status == "failed" and "isolamento" in run.error_message
         fechar.assert_awaited_once()
-        assert _desfecho(evento) == {"mode": "isolated", "tier": "pool", "outcome": "isolation_violation"}
+        assert _outcome(evento) == {"mode": "isolated", "tier": "pool", "outcome": "isolation_violation"}
 
     @pytest.mark.asyncio
-    async def test_todos_recusam_usa_a_mensagem_da_politica(self):
+    async def test_all_reject_uses_the_policy_message(self):
         ded = _executor("geo-01")
         cadeia = svc.CandidateList([ded], tiers={"geo-01": "primary"}, allowed={"geo-01"}, mode="isolated",
                                    exhausted_message="Workspace isolado: nenhum dos 1 executores dedicados está disponível. O job NÃO foi enviado ao pool compartilhado.",
@@ -286,7 +286,7 @@ class TestDispatchTierEBarreira:
         assert run.status == "failed" and run.error_message.startswith("Workspace isolado")
 
     @pytest.mark.asyncio
-    async def test_lista_crua_sem_politica_continua_funcionando(self):
+    async def test_raw_list_without_policy_still_works(self):
         """Compatibility: whoever passes a plain `list` (old tests, legacy path without
         annotations) does not break — no tier, no barrier."""
         ag = _executor("ag-1")

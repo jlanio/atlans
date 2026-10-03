@@ -24,7 +24,7 @@ import { useEffect, useRef } from "react"
 
 /** Does the drag carry FILES? Selected text and links also fire these
  *  events, and lighting up the box for them would be a false promise. */
-function temArquivos(e: DragEvent): boolean {
+function hasFiles(e: DragEvent): boolean {
   const tipos = e.dataTransfer?.types
   if (!tipos) return false
   return Array.from(tipos).includes("Files")
@@ -44,44 +44,44 @@ export function useArrasteDeArquivos({
   // from a `useCallback` whose dependencies change (the active workspace, for
   // example), and resubscribing in the middle of a drag would reset the counter —
   // the highlight would stay lit forever.
-  const refArrastar = useRef(aoArrastar)
-  const refSoltar = useRef(aoSoltar)
-  refArrastar.current = aoArrastar
-  refSoltar.current = aoSoltar
+  const refDrag = useRef(aoArrastar)
+  const refDrop = useRef(aoSoltar)
+  refDrag.current = aoArrastar
+  refDrop.current = aoSoltar
 
   useEffect(() => {
     if (!ativo) return
     let profundidade = 0
 
     function entrou(e: DragEvent) {
-      if (!temArquivos(e)) return
+      if (!hasFiles(e)) return
       profundidade++
-      refArrastar.current(true)
+      refDrag.current(true)
     }
     function sobre(e: DragEvent) {
-      if (!temArquivos(e)) return
+      if (!hasFiles(e)) return
       // Without this the `drop` never even happens — the browser handles the file.
       e.preventDefault()
       if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"
     }
     function saiu(e: DragEvent) {
-      if (!temArquivos(e)) return
+      if (!hasFiles(e)) return
       profundidade = Math.max(0, profundidade - 1)
-      if (profundidade === 0) refArrastar.current(false)
+      if (profundidade === 0) refDrag.current(false)
     }
     function soltou(e: DragEvent) {
-      if (!temArquivos(e)) return
+      if (!hasFiles(e)) return
       e.preventDefault()
       profundidade = 0
-      refArrastar.current(false)
+      refDrag.current(false)
       const arquivos = e.dataTransfer?.files
-      if (arquivos && arquivos.length > 0) refSoltar.current(Array.from(arquivos))
+      if (arquivos && arquivos.length > 0) refDrop.current(Array.from(arquivos))
     }
     // Leaving the window with the file still in hand does not fire `dragleave` in
     // every browser; `dragend` is the safety net so the highlight does not stay lit.
     function acabou() {
       profundidade = 0
-      refArrastar.current(false)
+      refDrag.current(false)
     }
 
     window.addEventListener("dragenter", entrou)
@@ -96,7 +96,7 @@ export function useArrasteDeArquivos({
       window.removeEventListener("drop", soltou)
       window.removeEventListener("dragend", acabou)
       // Unmounting in the middle of a drag would leave the highlight on in the store.
-      refArrastar.current(false)
+      refDrag.current(false)
     }
   }, [ativo])
 }

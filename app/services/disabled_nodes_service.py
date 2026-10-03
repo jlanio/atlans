@@ -57,8 +57,8 @@ _CONFIG_KEY = "disabled_nodes"
 _EPOCH_KEY = "disabled_nodes:epoch"
 _CACHE_TTL_S = 30.0
 _cache: dict[str, dict[str, Any]] | None = None
-_cache_epoca: str | None = None
-_cache_expira_em: float = 0.0
+_cache_epoch: str | None = None
+_cache_expires_at: float = 0.0
 
 
 def _redis():
@@ -66,7 +66,7 @@ def _redis():
     return get_redis_pool()
 
 
-async def _ler_epoca() -> str | None:
+async def _read_epoch() -> str | None:
     """Current epoch, or None when Redis cannot be queried.
 
     A missing key counts as "0" (initial state, no write yet) — and is different
@@ -82,7 +82,7 @@ async def _ler_epoca() -> str | None:
     return valor if valor is not None else "0"
 
 
-async def _publicar_invalidacao() -> None:
+async def _publish_invalidation() -> None:
     """Tells the OTHER workers that the map changed, by incrementing the epoch."""
     try:
         await _redis().incr(_EPOCH_KEY)
@@ -96,10 +96,10 @@ async def _publicar_invalidacao() -> None:
 
 def invalidate_cache() -> None:
     """Discards the process cache. Every write calls it; so do tests."""
-    global _cache, _cache_epoca, _cache_expira_em
+    global _cache, _cache_epoch, _cache_expires_at
     _cache = None
-    _cache_epoca = None
-    _cache_expira_em = 0.0
+    _cache_epoch = None
+    _cache_expires_at = 0.0
 
 
 async def list_disabled(db: AsyncSession) -> dict[str, dict[str, Any]]:
@@ -108,20 +108,20 @@ async def list_disabled(db: AsyncSession) -> dict[str, dict[str, Any]]:
     The returned dict is the cached object itself — whoever needs to change it
     copies it first (see `set_disabled`/`set_enabled`).
     """
-    global _cache, _cache_epoca, _cache_expira_em
+    global _cache, _cache_epoch, _cache_expires_at
 
     # The epoch is read BEFORE the SELECT on purpose: if a write comes in between,
     # the new map is stored under the old epoch and the next read reloads it
     # (cost: one extra SELECT). Reading the epoch AFTER would stamp old data as
     # current and the cache would stay stale until the TTL expired.
-    epoca = await _ler_epoca()
+    epoch = await _read_epoch()
     agora = monotonic()
 
     if _cache is not None:
-        if epoca is not None:
-            if epoca == _cache_epoca:
+        if epoch is not None:
+            if epoch == _cache_epoch:
                 return _cache
-        elif agora < _cache_expira_em:
+        elif agora < _cache_expires_at:
             return _cache
 
     raw = await get_config(db, _CONFIG_KEY, default={})
@@ -130,8 +130,8 @@ async def list_disabled(db: AsyncSession) -> dict[str, dict[str, Any]]:
         raw = {}
 
     _cache = raw
-    _cache_epoca = epoca
-    _cache_expira_em = agora + _CACHE_TTL_S
+    _cache_epoch = epoch
+    _cache_expires_at = agora + _CACHE_TTL_S
     return _cache
 
 
@@ -156,7 +156,7 @@ async def set_disabled(
     invalidate_cache()
     # After set_config's commit: whoever reads the new epoch must find the new
     # map in the database, never the other way around.
-    await _publicar_invalidacao()
+    await _publish_invalidation()
     return entry
 
 
@@ -168,5 +168,5 @@ async def set_enabled(db: AsyncSession, name: str) -> bool:
     cfg.pop(name)
     await set_config(db, _CONFIG_KEY, cfg)
     invalidate_cache()
-    await _publicar_invalidacao()
+    await _publish_invalidation()
     return True

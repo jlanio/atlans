@@ -7,7 +7,7 @@ import pkgutil
 import importlib
 from flow import nodes
 from flow.nodes.base import BaseNode
-from flow.nodes.contrato import validar_description
+from flow.nodes.contrato import validate_description
 from flow.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -17,7 +17,7 @@ def register_node(cls):
     """
     Decorates a node class, registering it by the 'name' field of its description().
 
-    The whole description is validated here, at import (`validar_description`):
+    The whole description is validated here, at import (`validate_description`):
     category, property types, output fields and known keys. A malformed
     node dies in CI with the exact cause — not on screen, as a field without
     an editor or a port without a type.
@@ -26,7 +26,7 @@ def register_node(cls):
         raise ValueError(f"{cls.__name__} não herda de BaseNode")
     desc = cls.description()
     try:
-        validar_description(desc)
+        validate_description(desc)
     except ValueError as exc:
         raise ValueError(f"{cls.__name__}: {exc}") from None
     name = desc['name']

@@ -24,14 +24,14 @@ from mcp.server.mcpserver.exceptions import ToolError
 from app.mcp import cotas
 from app.mcp.escopo import (
     ESCOPO_ATUAL,
-    ESCOPOS_DO_EDITOR,
-    PREFIXO_DO_EDITOR,
-    escopo_do_editor,
+    EDITOR_SCOPES,
+    EDITOR_PREFIX,
+    editor_scope,
 )
 from app.services import assistente_service as cs
 from app.services import openrouter
 
-from ._mcp_harness import RedisFalso, escopo_falso
+from ._mcp_harness import FakeRedis, fake_scope
 
 pytestmark = pytest.mark.asyncio
 
@@ -39,7 +39,7 @@ pytestmark = pytest.mark.asyncio
 # ── Doubles ───────────────────────────────────────────────────────────────────
 
 
-def _uso(entrada=100, saida=50, cache_leitura=0, cache_escrita=0):
+def _usage(entrada=100, saida=50, cache_leitura=0, cache_escrita=0):
     """The `uso` as the OpenRouter client returns it: in the project's keys, with
     `entrada` already INCLUDING what came from the cache."""
     return {
@@ -52,21 +52,21 @@ def _uso(entrada=100, saida=50, cache_leitura=0, cache_escrita=0):
     }
 
 
-def _texto(txt: str):
+def _as_text(txt: str):
     """A text block in the project's format — the same one the client reassembles
     from the stream and that the transcript stores."""
     return {"type": "text", "text": txt}
 
 
-def _chamada(nome: str, argumentos, ident: str = "tu-1"):
+def _tool_call(nome: str, argumentos, ident: str = "tu-1"):
     return {"type": "tool_use", "id": ident, "name": nome, "input": argumentos}
 
 
-def _resposta(*, conteudo=None, parada="stop", uso=None):
-    return openrouter.Resposta(blocos=list(conteudo or []), parada=parada, uso=uso or _uso())
+def _response(*, conteudo=None, parada="stop", uso=None):
+    return openrouter.Resposta(blocos=list(conteudo or []), parada=parada, uso=uso or _usage())
 
 
-class ClienteFalso:
+class FakeClient:
     """The model, scripted: one `(deltas, resposta)` per loop turn.
 
     It has the shape of `openrouter.ClienteOpenRouter`: `transmitir(**kw)` yields
@@ -74,50 +74,50 @@ class ClienteFalso:
     """
 
     def __init__(self, voltas):
-        self._voltas = list(voltas)
+        self._turns = list(voltas)
         self.parametros: list[dict] = []
 
     async def transmitir(self, **kw):
         # Deep copy: the loop keeps mutating `conversa` after the call,
         # and the test wants to see what the client RECEIVED on that turn.
         self.parametros.append(copy.deepcopy(kw))
-        if not self._voltas:
+        if not self._turns:
             raise AssertionError("o laço pediu mais voltas do que o roteiro previa")
-        deltas, resposta = self._voltas.pop(0)
+        deltas, resposta = self._turns.pop(0)
         for delta in deltas:
             yield delta
         yield resposta
 
 
-class _ToolFalsa:
+class _FakeTool:
     def __init__(self, nome, descricao="faz coisa", schema=None):
         self.name = nome
         self.description = descricao
         self.input_schema = schema or {"type": "object", "properties": {}}
 
 
-class ServidorFalso:
-    """A `ServidorAtlans` the size of what the assistant uses.
+class FakeServer:
+    """A `AtlansServer` the size of what the assistant uses.
 
     Records the scope it saw on each call — that is how the `ContextVar` tests
     observe what happened inside.
     """
 
     def __init__(self, tools=None, resultados=None):
-        self._tools = tools or [_ToolFalsa("search_nodes"), _ToolFalsa("create_workflow")]
-        self._resultados = dict(resultados or {})
-        self.escopos_vistos: list[object] = []
+        self._tools = tools or [_FakeTool("search_nodes"), _FakeTool("create_workflow")]
+        self._results = dict(resultados or {})
+        self.seen_scopes: list[object] = []
         self.chamadas: list[tuple[str, dict]] = []
-        self.escopo_no_list_tools = "nao-chamado"
+        self.scope_in_list_tools = "nao-chamado"
 
     async def list_tools(self):
-        self.escopo_no_list_tools = ESCOPO_ATUAL.get()
+        self.scope_in_list_tools = ESCOPO_ATUAL.get()
         return list(self._tools)
 
     async def call_tool(self, nome, argumentos, context=None):
-        self.escopos_vistos.append(ESCOPO_ATUAL.get())
+        self.seen_scopes.append(ESCOPO_ATUAL.get())
         self.chamadas.append((nome, argumentos))
-        acao = self._resultados.get(nome, "ok")
+        acao = self._results.get(nome, "ok")
         if isinstance(acao, Exception):
             raise acao
         if callable(acao):
@@ -129,8 +129,8 @@ class ServidorFalso:
         )
 
 
-async def _colher(gerador):
-    eventos = [evento async for evento in gerador]
+async def _collect(generator):
+    eventos = [evento async for evento in generator]
     # The module's contract: the last frame is ALWAYS `fim`, even when the
     # conversation ended badly — it is what carries the transcript. Checking it
     # here applies the rule to every test in the file at once.
@@ -138,19 +138,19 @@ async def _colher(gerador):
     return eventos
 
 
-def _o_erro(eventos) -> dict:
+def _the_error(eventos) -> dict:
     """The conversation's error frame — and the guarantee that there was exactly one."""
     erros = [e for e in eventos if e.tipo == "erro"]
     assert len(erros) == 1, f"esperava um erro, vieram {len(erros)}"
     return erros[0].dados
 
 
-def _conversar(**kw):
+def _converse(**kw):
     base = {
-        "escopo": escopo_falso(scopes=ESCOPOS_DO_EDITOR),
+        "escopo": fake_scope(scopes=EDITOR_SCOPES),
         "transcrito": [{"role": "user", "content": "monta um fluxo"}],
-        "servidor": ServidorFalso(),
-        "cliente": ClienteFalso([([], _resposta())]),
+        "servidor": FakeServer(),
+        "cliente": FakeClient([([], _response())]),
         "redis": None,
     }
     base.update(kw)
@@ -160,7 +160,7 @@ def _conversar(**kw):
 # ── The assistant's scope ───────────────────────────────────────────────────────
 
 
-async def test_o_escopo_do_editor_nao_carrega_os_escopos_destrutivos():
+async def test_the_editor_scope_does_not_carry_the_destructive_scopes():
     """`triggers:manage` and `drive:write` were left out of v1, by the owner's decision.
 
     Deleting a schedule and deleting a Drive file destroy another workspace
@@ -168,31 +168,31 @@ async def test_o_escopo_do_editor_nao_carrega_os_escopos_destrutivos():
     without thinking. If they ever get in, let it be by choice — and this test is
     the place where the choice shows up.
     """
-    assert "triggers:manage" not in ESCOPOS_DO_EDITOR
-    assert "drive:write" not in ESCOPOS_DO_EDITOR
+    assert "triggers:manage" not in EDITOR_SCOPES
+    assert "drive:write" not in EDITOR_SCOPES
     assert {"workflows:read", "workflows:write", "runs:execute", "drive:read"} == set(
-        ESCOPOS_DO_EDITOR
+        EDITOR_SCOPES
     )
 
 
-async def test_o_escopo_do_editor_tem_balde_de_cota_separado_do_PAT():
+async def test_the_editor_scope_has_a_quota_bucket_separate_from_the_PAT():
     """The synthetic `token_id` is what separates the buckets and tags the audit."""
-    escopo = escopo_do_editor(user_id="usr-9", username="ana", workspace_ids={"ws-1", "ws-2"})
+    escopo = editor_scope(user_id="usr-9", username="ana", workspace_ids={"ws-1", "ws-2"})
 
-    assert escopo.token_id == f"{PREFIXO_DO_EDITOR}:usr-9"
-    assert escopo.token_prefix == PREFIXO_DO_EDITOR
+    assert escopo.token_id == f"{EDITOR_PREFIX}:usr-9"
+    assert escopo.token_prefix == EDITOR_PREFIX
     assert escopo.user_id == "usr-9"
     assert escopo.workspace_ids == frozenset({"ws-1", "ws-2"})
     # With no token restricting it, the reach is the user's — today and tomorrow.
     assert escopo.todos_os_workspaces is True
     # And never administrator, for the usual reason.
-    assert escopo.como_usuario().role == "user"
+    assert escopo.as_user().role == "user"
 
 
 # ── The write gate ────────────────────────────────────────────────────────────
 
 
-async def test_a_regra_do_portao_sai_das_GUARDAS_e_nao_de_uma_lista_a_mao():
+async def test_the_gate_rule_comes_from_the_GUARDS_and_not_from_a_hand_written_list():
     """A hand-written list goes stale with the first new tool.
 
     The derived rule makes a write tool be born BLOCKED — failing closed. This
@@ -224,18 +224,18 @@ async def test_a_regra_do_portao_sai_das_GUARDAS_e_nao_de_uma_lista_a_mao():
     assert not cs.bloqueada_no_editor("search_nodes")
 
 
-async def test_ferramenta_sem_guarda_nasce_bloqueada():
+async def test_tool_without_guard_starts_blocked():
     """Fail closed: a name that isn't in GUARDAS doesn't run."""
     assert cs.bloqueada_no_editor("ferramenta_que_nao_existe")
 
 
-async def test_a_ferramenta_barrada_some_da_lista_que_o_modelo_ve():
-    servidor = ServidorFalso(
-        tools=[_ToolFalsa("search_nodes"), _ToolFalsa("create_workflow"), _ToolFalsa("validate_workflow")]
+async def test_the_blocked_tool_disappears_from_the_list_the_model_sees():
+    servidor = FakeServer(
+        tools=[_FakeTool("search_nodes"), _FakeTool("create_workflow"), _FakeTool("validate_workflow")]
     )
-    cliente = ClienteFalso([([], _resposta())])
+    cliente = FakeClient([([], _response())])
 
-    await _colher(_conversar(servidor=servidor, cliente=cliente))
+    await _collect(_converse(servidor=servidor, cliente=cliente))
 
     ferramentas = cliente.parametros[0]["ferramentas"]
     nomes = {f["function"]["name"] for f in ferramentas}
@@ -245,7 +245,7 @@ async def test_a_ferramenta_barrada_some_da_lista_que_o_modelo_ve():
     assert ferramentas[0]["function"]["name"] == cs.NOME_DO_DESENHO
 
 
-async def test_o_portao_barra_no_DESPACHO_e_nao_so_na_lista():
+async def test_the_gate_blocks_at_DISPATCH_and_not_only_in_the_list():
     """The guarantee, not the comfort.
 
     Hiding it from the list keeps the model from WANTING the tool. Refusing here
@@ -254,24 +254,24 @@ async def test_o_portao_barra_no_DESPACHO_e_nao_so_na_lista():
     in the text of a shared workflow. Without this refusal, the whole gate is
     decoration.
 
-    `ServidorFalso` would gladly accept the call: if it got there, the workflow
+    `FakeServer` would gladly accept the call: if it got there, the workflow
     would be saved.
     """
-    servidor = ServidorFalso(tools=[_ToolFalsa("search_nodes")])
-    cliente = ClienteFalso(
+    servidor = FakeServer(tools=[_FakeTool("search_nodes")])
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
-                    conteudo=[_chamada("create_workflow", {"name": "n", "definition": {}})],
+                _response(
+                    conteudo=[_tool_call("create_workflow", {"name": "n", "definition": {}})],
                     parada="tool_calls",
                 ),
             ),
-            ([], _resposta(conteudo=[_texto("entendi, vou so mostrar")])),
+            ([], _response(conteudo=[_as_text("entendi, vou so mostrar")])),
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
 
     assert servidor.chamadas == [], "create_workflow chegou ao servidor: o portao nao vale nada"
     resultado = eventos[-1].dados["transcrito"][2]["content"][0]
@@ -280,8 +280,8 @@ async def test_o_portao_barra_no_DESPACHO_e_nao_so_na_lista():
     assert "aplicar" in resultado["content"]
 
 
-async def test_o_sistema_avisa_que_o_assistente_nao_grava():
-    """`INSTRUCOES` says "call create_workflow after validating", and here that
+async def test_the_system_warns_that_the_assistant_does_not_save():
+    """`INSTRUCTIONS` says "call create_workflow after validating", and here that
     tool doesn't exist. Without the correction, the model looks for what isn't
     there and ends the conversation without delivering the workflow."""
     blocos = cs.montar_sistema()
@@ -297,7 +297,7 @@ async def test_o_sistema_avisa_que_o_assistente_nao_grava():
     assert "pode rodar" in texto
 
 
-async def test_o_roteiro_do_assistente_consulta_o_catalogo_antes_de_prospectar():
+async def test_the_assistant_script_checks_the_catalog_before_prospecting():
     """"Catalog first": for external data the step is `search_sources` ->
     `describe_source`, BEFORE `search_nodes`, the drawing and the validation;
     `probe_source`/`register_source` only come in when the catalog lacks the source."""
@@ -309,7 +309,7 @@ async def test_o_roteiro_do_assistente_consulta_o_catalogo_antes_de_prospectar()
 
 # ── The delivery: `desenhar_no_canvas` ───────────────────────────────────────
 
-async def test_desenhar_poe_o_fluxo_na_tela_sem_precisar_validar():
+async def test_drafting_puts_the_workflow_on_screen_without_needing_validation():
     """The defect that motivated everything: putting it on the screen depended on the model VALIDATING.
 
     Before, the panel read the definition from the `validate_workflow` argument. A
@@ -318,83 +318,83 @@ async def test_desenhar_poe_o_fluxo_na_tela_sem_precisar_validar():
     name, and validating is a means again.
     """
     definicao = {"nodes": [{"id": "n1", "name": "DriveReader"}], "edges": []}
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
-            ([], _resposta(
-                conteudo=[_chamada(cs.NOME_DO_DESENHO, {"definition": definicao, "nota": "li o shapefile"})],
+            ([], _response(
+                conteudo=[_tool_call(cs.NOME_DO_DESENHO, {"definition": definicao, "nota": "li o shapefile"})],
                 parada="tool_calls",
             )),
-            ([], _resposta(conteudo=[_texto("pronto")])),
+            ([], _response(conteudo=[_as_text("pronto")])),
         ]
     )
 
-    eventos = await _colher(_conversar(cliente=cliente))
+    eventos = await _collect(_converse(cliente=cliente))
 
-    propostas = [e for e in eventos if e.tipo == "proposta"]
-    assert len(propostas) == 1
-    assert propostas[0].dados["definicao"] == definicao
-    assert propostas[0].dados["desenhar"] is True, "o painel precisa saber que e para desenhar AGORA"
-    assert propostas[0].dados["nos"] == 1
-    assert propostas[0].dados["nota"] == "li o shapefile"
+    proposals = [e for e in eventos if e.tipo == "proposta"]
+    assert len(proposals) == 1
+    assert proposals[0].dados["definicao"] == definicao
+    assert proposals[0].dados["desenhar"] is True, "o painel precisa saber que e para desenhar AGORA"
+    assert proposals[0].dados["nos"] == 1
+    assert proposals[0].dados["nota"] == "li o shapefile"
 
 
-async def test_desenhar_varias_vezes_emite_varias_propostas():
+async def test_drafting_several_times_emits_several_proposals():
     """It is what makes the workflow incremental: the person watches it grow.
 
     A single drawing at the end would be the old behavior with a new name.
     """
     um = {"nodes": [{"id": "n1"}], "edges": []}
     dois = {"nodes": [{"id": "n1"}, {"id": "n2"}], "edges": [{"source": "n1", "target": "n2"}]}
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
-            ([], _resposta(conteudo=[_chamada(cs.NOME_DO_DESENHO, {"definition": um})], parada="tool_calls")),
-            ([], _resposta(conteudo=[_chamada(cs.NOME_DO_DESENHO, {"definition": dois})], parada="tool_calls")),
-            ([], _resposta(conteudo=[_texto("pronto")])),
+            ([], _response(conteudo=[_tool_call(cs.NOME_DO_DESENHO, {"definition": um})], parada="tool_calls")),
+            ([], _response(conteudo=[_tool_call(cs.NOME_DO_DESENHO, {"definition": dois})], parada="tool_calls")),
+            ([], _response(conteudo=[_as_text("pronto")])),
         ]
     )
 
-    eventos = await _colher(_conversar(cliente=cliente))
+    eventos = await _collect(_converse(cliente=cliente))
 
-    propostas = [e.dados for e in eventos if e.tipo == "proposta"]
-    assert [p["nos"] for p in propostas] == [1, 2]
-    assert [p["arestas"] for p in propostas] == [0, 1]
+    proposals = [e.dados for e in eventos if e.tipo == "proposta"]
+    assert [p["nos"] for p in proposals] == [1, 2]
+    assert [p["arestas"] for p in proposals] == [0, 1]
 
 
-async def test_desenhar_nao_vai_ao_servidor_MCP():
+async def test_drafting_does_not_go_to_the_MCP_server():
     """The canvas belongs to the editor: there is nothing for the server to execute.
 
     And it doesn't exist in MCP — an external client never sees it, because it
     has no canvas at all.
     """
-    servidor = ServidorFalso(tools=[_ToolFalsa("validate_workflow")])
-    cliente = ClienteFalso(
+    servidor = FakeServer(tools=[_FakeTool("validate_workflow")])
+    cliente = FakeClient(
         [
-            ([], _resposta(
-                conteudo=[_chamada(cs.NOME_DO_DESENHO, {"definition": {"nodes": [], "edges": []}})],
+            ([], _response(
+                conteudo=[_tool_call(cs.NOME_DO_DESENHO, {"definition": {"nodes": [], "edges": []}})],
                 parada="tool_calls",
             )),
-            ([], _resposta(conteudo=[_texto("ok")])),
+            ([], _response(conteudo=[_as_text("ok")])),
         ]
     )
 
-    await _colher(_conversar(servidor=servidor, cliente=cliente))
+    await _collect(_converse(servidor=servidor, cliente=cliente))
 
     assert cs.NOME_DO_DESENHO not in [nome for nome, _ in servidor.chamadas]
 
 
-async def test_definicao_torta_no_desenho_volta_como_erro_e_nao_derruba():
+async def test_malformed_definition_in_the_draft_returns_as_error_and_does_not_crash():
     """The model reads the error and corrects it — which is what should happen."""
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
-            ([], _resposta(
-                conteudo=[_chamada(cs.NOME_DO_DESENHO, {"definition": "isto nao e um objeto"})],
+            ([], _response(
+                conteudo=[_tool_call(cs.NOME_DO_DESENHO, {"definition": "isto nao e um objeto"})],
                 parada="tool_calls",
             )),
-            ([], _resposta(conteudo=[_texto("corrigindo")])),
+            ([], _response(conteudo=[_as_text("corrigindo")])),
         ]
     )
 
-    eventos = await _colher(_conversar(cliente=cliente))
+    eventos = await _collect(_converse(cliente=cliente))
 
     assert not [e for e in eventos if e.tipo == "proposta"], "definicao torta nao vai para a tela"
     fins = [e for e in eventos if e.tipo == "ferramenta_fim"]
@@ -404,7 +404,7 @@ async def test_definicao_torta_no_desenho_volta_como_erro_e_nao_derruba():
 
 # ── The execute-before-drawing gate ──────────────────────────────────────────
 
-async def test_executar_antes_de_desenhar_e_recusado():
+async def test_running_before_drafting_is_refused():
     """The path that produced the GeoJSON answer.
 
     Reading the Drive, running and returning the artifact fulfills the request
@@ -412,15 +412,15 @@ async def test_executar_antes_de_desenhar_e_recusado():
     the start, it was the shortest path. Refusing until there is a workflow on the
     screen closes that door without taking execution out of scope.
     """
-    servidor = ServidorFalso(tools=[_ToolFalsa("run_workflow")])
-    cliente = ClienteFalso(
+    servidor = FakeServer(tools=[_FakeTool("run_workflow")])
+    cliente = FakeClient(
         [
-            ([], _resposta(conteudo=[_chamada("run_workflow", {"workflow_id": "w1"})], parada="tool_calls")),
-            ([], _resposta(conteudo=[_texto("ok, vou desenhar primeiro")])),
+            ([], _response(conteudo=[_tool_call("run_workflow", {"workflow_id": "w1"})], parada="tool_calls")),
+            ([], _response(conteudo=[_as_text("ok, vou desenhar primeiro")])),
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
 
     # By NAMES: `chamadas` stores `(nome, argumentos)` tuples, and comparing the
     # string against the list of tuples would always pass — a green that measures
@@ -432,26 +432,26 @@ async def test_executar_antes_de_desenhar_e_recusado():
     assert fins[0].dados["erro"] is True
 
 
-async def test_depois_de_desenhar_a_execucao_passa():
+async def test_after_drafting_the_run_goes_through():
     """The refusal is about ORDER, not scope: once drawn, it can run."""
-    servidor = ServidorFalso(tools=[_ToolFalsa("run_workflow")])
-    cliente = ClienteFalso(
+    servidor = FakeServer(tools=[_FakeTool("run_workflow")])
+    cliente = FakeClient(
         [
-            ([], _resposta(
-                conteudo=[_chamada(cs.NOME_DO_DESENHO, {"definition": {"nodes": [], "edges": []}})],
+            ([], _response(
+                conteudo=[_tool_call(cs.NOME_DO_DESENHO, {"definition": {"nodes": [], "edges": []}})],
                 parada="tool_calls",
             )),
-            ([], _resposta(conteudo=[_chamada("run_workflow", {"workflow_id": "w1"})], parada="tool_calls")),
-            ([], _resposta(conteudo=[_texto("rodou")])),
+            ([], _response(conteudo=[_tool_call("run_workflow", {"workflow_id": "w1"})], parada="tool_calls")),
+            ([], _response(conteudo=[_as_text("rodou")])),
         ]
     )
 
-    await _colher(_conversar(servidor=servidor, cliente=cliente))
+    await _collect(_converse(servidor=servidor, cliente=cliente))
 
     assert "run_workflow" in [nome for nome, _ in servidor.chamadas]
 
 
-async def test_o_desenho_do_turno_anterior_conta_na_retomada():
+async def test_the_previous_turns_draft_counts_on_resume():
     """The conversation is resumed across turns, and the workflow stays on the screen.
 
     An in-memory counter would say "hasn't drawn yet" in a conversation that
@@ -469,14 +469,14 @@ async def test_o_desenho_do_turno_anterior_conta_na_retomada():
         },
         {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t1", "content": "ok"}]},
     ]
-    assert cs._ja_desenhou(anterior) is True
-    assert cs._ja_desenhou([{"role": "user", "content": "monta o fluxo"}]) is False
+    assert cs._already_drew(anterior) is True
+    assert cs._already_drew([{"role": "user", "content": "monta o fluxo"}]) is False
 
 
 # ── The `proposta` frame: the bridge to the Apply button ──────────────────────
 
 
-def _validou(ok=True, erros=0, avisos=1):
+def _validated(ok=True, erros=0, avisos=1):
     """The envelope `validate_workflow` returns, in its real shape."""
     return json.dumps(
         {"workspace_id": "ws-1", "ok": ok, "error_count": erros, "warning_count": avisos},
@@ -493,34 +493,34 @@ DEFINICAO = {
 }
 
 
-async def test_a_definicao_validada_chega_inteira_ao_painel():
+async def test_the_validated_definition_reaches_the_panel_whole():
     """Without this frame the "Aplicar" (Apply) button has nothing to apply.
 
-    It is a deliberate exception to `_resumo`, which collapses every argument to
+    It is a deliberate exception to `_summarize`, which collapses every argument to
     keys and sizes. The definition has to go WHOLE because the write gate made
     Apply the only bridge between the conversation and the workflow.
     """
-    servidor = ServidorFalso(
-        tools=[_ToolFalsa("validate_workflow")], resultados={"validate_workflow": _validou()}
+    servidor = FakeServer(
+        tools=[_FakeTool("validate_workflow")], resultados={"validate_workflow": _validated()}
     )
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
-                    conteudo=[_chamada("validate_workflow", {"definition": DEFINICAO})],
+                _response(
+                    conteudo=[_tool_call("validate_workflow", {"definition": DEFINICAO})],
                     parada="tool_calls",
                 ),
             ),
-            ([], _resposta(conteudo=[_texto("pronto, pode aplicar")])),
+            ([], _response(conteudo=[_as_text("pronto, pode aplicar")])),
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
 
-    propostas = [e for e in eventos if e.tipo == "proposta"]
-    assert len(propostas) == 1
-    dados = propostas[0].dados
+    proposals = [e for e in eventos if e.tipo == "proposta"]
+    assert len(proposals) == 1
+    dados = proposals[0].dados
     assert dados["definicao"] == DEFINICAO
     assert dados["nos"] == 2
     assert dados["arestas"] == 1
@@ -533,76 +533,76 @@ async def test_a_definicao_validada_chega_inteira_ao_painel():
     assert tipos.index("ferramenta_fim") < tipos.index("proposta")
 
 
-async def test_so_a_validacao_produz_proposta():
+async def test_only_validation_produces_a_proposal():
     """The summary still applies to everything else — the stream is not a JSON dump."""
-    servidor = ServidorFalso(tools=[_ToolFalsa("search_nodes")])
-    cliente = ClienteFalso(
+    servidor = FakeServer(tools=[_FakeTool("search_nodes")])
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
-                    conteudo=[_chamada("search_nodes", {"definition": DEFINICAO, "query": "x"})],
+                _response(
+                    conteudo=[_tool_call("search_nodes", {"definition": DEFINICAO, "query": "x"})],
                     parada="tool_calls",
                 ),
             ),
-            ([], _resposta(conteudo=[_texto("achei")])),
+            ([], _response(conteudo=[_as_text("achei")])),
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
 
     assert not [e for e in eventos if e.tipo == "proposta"]
     chamada = next(e for e in eventos if e.tipo == "ferramenta")
     assert chamada.dados["argumentos"]["definition"] == {"__campos__": 2}
 
 
-async def test_validacao_que_falhou_nao_vira_proposta():
+async def test_failed_validation_does_not_become_a_proposal():
     """Applying what the tool rejected would be saving what didn't pass."""
-    servidor = ServidorFalso(
-        tools=[_ToolFalsa("validate_workflow")],
+    servidor = FakeServer(
+        tools=[_FakeTool("validate_workflow")],
         resultados={"validate_workflow": ToolError("definição inválida")},
     )
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
-                    conteudo=[_chamada("validate_workflow", {"definition": DEFINICAO})],
+                _response(
+                    conteudo=[_tool_call("validate_workflow", {"definition": DEFINICAO})],
                     parada="tool_calls",
                 ),
             ),
-            ([], _resposta(conteudo=[_texto("vou corrigir")])),
+            ([], _response(conteudo=[_as_text("vou corrigir")])),
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
 
     assert not [e for e in eventos if e.tipo == "proposta"]
 
 
-async def test_relatorio_ilegivel_nao_derruba_a_conversa():
+async def test_unreadable_report_does_not_crash_the_conversation():
     """If the report format changes, the panel loses the count and stays alive.
 
     An exception here would bring down the whole conversation because of a label.
     """
-    servidor = ServidorFalso(
-        tools=[_ToolFalsa("validate_workflow")],
+    servidor = FakeServer(
+        tools=[_FakeTool("validate_workflow")],
         resultados={"validate_workflow": "isto não é JSON"},
     )
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
-                    conteudo=[_chamada("validate_workflow", {"definition": DEFINICAO})],
+                _response(
+                    conteudo=[_tool_call("validate_workflow", {"definition": DEFINICAO})],
                     parada="tool_calls",
                 ),
             ),
-            ([], _resposta(conteudo=[_texto("ok")])),
+            ([], _response(conteudo=[_as_text("ok")])),
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
 
     proposta = next(e for e in eventos if e.tipo == "proposta")
     assert proposta.dados["definicao"] == DEFINICAO
@@ -610,31 +610,31 @@ async def test_relatorio_ilegivel_nao_derruba_a_conversa():
     assert proposta.dados["erros"] is None
 
 
-async def test_validacao_com_erro_vira_proposta_mas_marcada():
+async def test_validation_with_error_becomes_a_flagged_proposal():
     """The panel decides what to do; the service doesn't hide the definition.
 
     What fails it is the count, and it goes along — disabling the button is an
     interface decision, and hiding the definition would take from the person the
     chance to apply it and fix it by hand.
     """
-    servidor = ServidorFalso(
-        tools=[_ToolFalsa("validate_workflow")],
-        resultados={"validate_workflow": _validou(ok=False, erros=2, avisos=0)},
+    servidor = FakeServer(
+        tools=[_FakeTool("validate_workflow")],
+        resultados={"validate_workflow": _validated(ok=False, erros=2, avisos=0)},
     )
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
-                    conteudo=[_chamada("validate_workflow", {"definition": DEFINICAO})],
+                _response(
+                    conteudo=[_tool_call("validate_workflow", {"definition": DEFINICAO})],
                     parada="tool_calls",
                 ),
             ),
-            ([], _resposta(conteudo=[_texto("faltam duas coisas")])),
+            ([], _response(conteudo=[_as_text("faltam duas coisas")])),
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
 
     proposta = next(e for e in eventos if e.tipo == "proposta")
     assert proposta.dados["ok"] is False
@@ -644,79 +644,79 @@ async def test_validacao_com_erro_vira_proposta_mas_marcada():
 # ── ContextVar: the defect with the worst consequence ─────────────────────────
 
 
-async def test_o_ContextVar_volta_a_ficar_vazio_depois_da_conversa():
+async def test_the_ContextVar_is_empty_again_after_the_conversation():
     """Without the `reset`, the scope survives into this worker's NEXT task.
 
     This is the test that kills the mutation of deleting the `finally` of
-    `_executar_ferramenta`: with it gone, the variable stays set here.
+    `_execute_tool`: with it gone, the variable stays set here.
     """
-    servidor = ServidorFalso()
-    cliente = ClienteFalso(
+    servidor = FakeServer()
+    cliente = FakeClient(
         [
-            ([], _resposta(conteudo=[_chamada("search_nodes", {"query": "buffer"})], parada="tool_calls")),
-            ([], _resposta(conteudo=[_texto("pronto")])),
+            ([], _response(conteudo=[_tool_call("search_nodes", {"query": "buffer"})], parada="tool_calls")),
+            ([], _response(conteudo=[_as_text("pronto")])),
         ]
     )
 
     assert ESCOPO_ATUAL.get() is None
-    await _colher(_conversar(servidor=servidor, cliente=cliente))
+    await _collect(_converse(servidor=servidor, cliente=cliente))
 
     assert ESCOPO_ATUAL.get() is None, "o escopo ficou pendurado depois da conversa"
 
 
-async def test_o_ContextVar_volta_a_ficar_vazio_mesmo_quando_a_ferramenta_quebra():
+async def test_the_ContextVar_is_empty_again_even_when_the_tool_breaks():
     """The error path is the one that usually forgets to clean up."""
-    servidor = ServidorFalso(resultados={"search_nodes": RuntimeError("estourou")})
-    cliente = ClienteFalso(
+    servidor = FakeServer(resultados={"search_nodes": RuntimeError("estourou")})
+    cliente = FakeClient(
         [
-            ([], _resposta(conteudo=[_chamada("search_nodes", {"q": "x"})], parada="tool_calls")),
-            ([], _resposta(conteudo=[_texto("segui em frente")])),
+            ([], _response(conteudo=[_tool_call("search_nodes", {"q": "x"})], parada="tool_calls")),
+            ([], _response(conteudo=[_as_text("segui em frente")])),
         ]
     )
 
-    await _colher(_conversar(servidor=servidor, cliente=cliente))
+    await _collect(_converse(servidor=servidor, cliente=cliente))
 
     assert ESCOPO_ATUAL.get() is None
 
 
-async def test_duas_conversas_seguidas_nao_misturam_escopo():
+async def test_two_consecutive_conversations_do_not_mix_scope():
     """The second conversation sees its own scope, not the leftovers of the first."""
-    servidor = ServidorFalso()
+    servidor = FakeServer()
     for user_id in ("usr-a", "usr-b"):
-        escopo = escopo_do_editor(user_id=user_id, username=user_id, workspace_ids={"ws-1"})
-        cliente = ClienteFalso(
+        escopo = editor_scope(user_id=user_id, username=user_id, workspace_ids={"ws-1"})
+        cliente = FakeClient(
             [
-                ([], _resposta(conteudo=[_chamada("search_nodes", {})], parada="tool_calls")),
-                ([], _resposta(conteudo=[_texto("fim")])),
+                ([], _response(conteudo=[_tool_call("search_nodes", {})], parada="tool_calls")),
+                ([], _response(conteudo=[_as_text("fim")])),
             ]
         )
-        await _colher(_conversar(escopo=escopo, servidor=servidor, cliente=cliente))
+        await _collect(_converse(escopo=escopo, servidor=servidor, cliente=cliente))
 
-    assert [e.user_id for e in servidor.escopos_vistos] == ["usr-a", "usr-b"]
+    assert [e.user_id for e in servidor.seen_scopes] == ["usr-a", "usr-b"]
 
 
-async def test_a_ferramenta_e_o_catalogo_veem_o_escopo_de_quem_chamou():
+async def test_the_tool_and_the_catalog_see_the_callers_scope():
     """`list_tools` filters by the same `ContextVar` — that is what gives the right catalog."""
-    servidor = ServidorFalso()
-    escopo = escopo_do_editor(user_id="usr-7", username="ana", workspace_ids={"ws-3"})
-    cliente = ClienteFalso(
+    servidor = FakeServer()
+    escopo = editor_scope(user_id="usr-7", username="ana", workspace_ids={"ws-3"})
+    cliente = FakeClient(
         [
-            ([], _resposta(conteudo=[_chamada("search_nodes", {})], parada="tool_calls")),
-            ([], _resposta(conteudo=[_texto("fim")])),
+            ([], _response(conteudo=[_tool_call("search_nodes", {})], parada="tool_calls")),
+            ([], _response(conteudo=[_as_text("fim")])),
         ]
     )
 
-    await _colher(_conversar(escopo=escopo, servidor=servidor, cliente=cliente))
+    await _collect(_converse(escopo=escopo, servidor=servidor, cliente=cliente))
 
-    assert servidor.escopo_no_list_tools is not None
-    assert servidor.escopo_no_list_tools.user_id == "usr-7"
-    assert servidor.escopos_vistos[0].user_id == "usr-7"
+    assert servidor.scope_in_list_tools is not None
+    assert servidor.scope_in_list_tools.user_id == "usr-7"
+    assert servidor.seen_scopes[0].user_id == "usr-7"
 
 
 # ── Parity with MCP: the refusal is the same ──────────────────────────────────
 
 
-async def test_recusa_de_ferramenta_vira_resultado_de_erro_e_nao_derruba_a_conversa():
+async def test_tool_refusal_becomes_error_result_and_does_not_crash_the_conversation():
     """`ToolError` is information for the model to correct, not an exception for the user.
 
     The body of the refusal is the JSON that `erro()` builds — the same one an
@@ -735,17 +735,17 @@ async def test_recusa_de_ferramenta_vira_resultado_de_erro_e_nao_derruba_a_conve
             ensure_ascii=False,
         )
     )
-    servidor = ServidorFalso(
-        tools=[_ToolFalsa("validate_workflow")], resultados={"validate_workflow": recusa}
+    servidor = FakeServer(
+        tools=[_FakeTool("validate_workflow")], resultados={"validate_workflow": recusa}
     )
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
-            ([], _resposta(conteudo=[_chamada("validate_workflow", {"definition": {}})], parada="tool_calls")),
-            ([], _resposta(conteudo=[_texto("não tenho permissão para isso")])),
+            ([], _response(conteudo=[_tool_call("validate_workflow", {"definition": {}})], parada="tool_calls")),
+            ([], _response(conteudo=[_as_text("não tenho permissão para isso")])),
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
 
     fins = [e for e in eventos if e.tipo == "ferramenta_fim"]
     assert fins and fins[0].dados["erro"] is True
@@ -760,34 +760,34 @@ async def test_recusa_de_ferramenta_vira_resultado_de_erro_e_nao_derruba_a_conve
 # ── A armadilha do argumento em stream ───────────────────────────────────────
 
 
-async def test_resposta_truncada_por_max_tokens_nao_executa_ferramenta_nenhuma():
+async def test_response_truncated_by_max_tokens_runs_no_tool():
     """An argument cut off midway still looks well-formed — and saving it destroys the workflow.
 
     The argument arrives drop by drop. A definition that lost half its nodes
     because generation hit the ceiling may still close as a valid JSON object. The
     only defense is the `length` stop, and this test is what keeps it.
     """
-    servidor = ServidorFalso()
-    cliente = ClienteFalso(
+    servidor = FakeServer()
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
-                    conteudo=[_chamada("create_workflow", {"name": "meio", "definition": {"nodes": []}})],
+                _response(
+                    conteudo=[_tool_call("create_workflow", {"name": "meio", "definition": {"nodes": []}})],
                     parada="length",
                 ),
             )
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
 
     assert servidor.chamadas == [], "uma resposta truncada não pode chegar a create_workflow"
-    assert _o_erro(eventos)["code"] == "resposta_truncada"
+    assert _the_error(eventos)["code"] == "resposta_truncada"
     assert eventos[-1].tipo == "fim" and eventos[-1].dados["ok"] is False
 
 
-async def test_o_transcrito_de_uma_conversa_interrompida_continua_retomavel():
+async def test_the_transcript_of_an_interrupted_conversation_stays_resumable():
     """Every abnormal exit happens with the model's message already in the conversation.
 
     If it asked for a tool, an orphaned `tool_use` is left over — and the API
@@ -796,15 +796,15 @@ async def test_o_transcrito_de_uma_conversa_interrompida_continua_retomavel():
     person sends brings everything down. This test is what guarantees that the
     returned transcript can be resent.
     """
-    servidor = ServidorFalso()
-    cliente = ClienteFalso(
+    servidor = FakeServer()
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
+                _response(
                     conteudo=[
-                        _texto("vou criar o fluxo"),
-                        _chamada("create_workflow", {"name": "x"}, "tu-orfa"),
+                        _as_text("vou criar o fluxo"),
+                        _tool_call("create_workflow", {"name": "x"}, "tu-orfa"),
                     ],
                     parada="length",
                 ),
@@ -812,7 +812,7 @@ async def test_o_transcrito_de_uma_conversa_interrompida_continua_retomavel():
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
     transcrito = eventos[-1].dados["transcrito"]
 
     pedidos = [
@@ -822,7 +822,7 @@ async def test_o_transcrito_de_uma_conversa_interrompida_continua_retomavel():
         for b in (m["content"] or [])
         if b.get("type") == "tool_use"
     ]
-    respondidos = [
+    answered = [
         b["tool_use_id"]
         for m in transcrito
         if m["role"] == "user" and isinstance(m["content"], list)
@@ -830,7 +830,7 @@ async def test_o_transcrito_de_uma_conversa_interrompida_continua_retomavel():
         if isinstance(b, dict) and b.get("type") == "tool_result"
     ]
     assert pedidos == ["tu-orfa"]
-    assert respondidos == ["tu-orfa"], "o tool_use ficou sem resposta: a retomada seria recusada"
+    assert answered == ["tu-orfa"], "o tool_use ficou sem resposta: a retomada seria recusada"
     # And the text the model managed to write is still there.
     assert any(
         b.get("type") == "text"
@@ -840,7 +840,7 @@ async def test_o_transcrito_de_uma_conversa_interrompida_continua_retomavel():
     )
 
 
-async def test_o_transcrito_sai_em_JSON_puro_e_o_raciocinio_mantem_os_detalhes():
+async def test_the_transcript_comes_out_as_plain_JSON_and_the_reasoning_keeps_the_details():
     """The transcript crosses Redis, and the reasoning block goes back to the provider.
 
     Two invariants in a single test, because they fail together: the transcript
@@ -851,21 +851,21 @@ async def test_o_transcrito_sai_em_JSON_puro_e_o_raciocinio_mantem_os_detalhes()
     the orphaned `tool_use`).
     """
     detalhes = [{"type": "reasoning.text", "text": "pensei", "signature": "assin-123", "index": 0}]
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
+                _response(
                     conteudo=[
                         {"type": "thinking", "thinking": "pensei", "reasoning_details": detalhes},
-                        _texto("pronto"),
+                        _as_text("pronto"),
                     ]
                 ),
             )
         ]
     )
 
-    eventos = await _colher(_conversar(cliente=cliente))
+    eventos = await _collect(_converse(cliente=cliente))
     transcrito = eventos[-1].dados["transcrito"]
 
     # Serializable: this is what Redis requires.
@@ -873,39 +873,39 @@ async def test_o_transcrito_sai_em_JSON_puro_e_o_raciocinio_mantem_os_detalhes()
 
     blocos = transcrito[1]["content"]
     assert all(isinstance(b, dict) for b in blocos)
-    pensamento = next(b for b in blocos if b["type"] == "thinking")
-    assert pensamento["reasoning_details"] == detalhes
-    assert pensamento["thinking"] == "pensei"
+    thinking = next(b for b in blocos if b["type"] == "thinking")
+    assert thinking["reasoning_details"] == detalhes
+    assert thinking["thinking"] == "pensei"
     # And the next turn resends it as it came: the client translates, not the loop.
     [_, assistente] = openrouter.montar_mensagens([], transcrito)
     assert assistente["reasoning_details"] == detalhes
 
 
-async def test_conversa_que_termina_bem_nao_ganha_resultado_inventado():
+async def test_conversation_that_ends_well_gets_no_invented_result():
     """Closing a pending item only acts when there is one pending — the counterpoint."""
-    cliente = ClienteFalso([([], _resposta(conteudo=[_texto("pronto")]))])
+    cliente = FakeClient([([], _response(conteudo=[_as_text("pronto")]))])
 
-    eventos = await _colher(_conversar(cliente=cliente))
+    eventos = await _collect(_converse(cliente=cliente))
     transcrito = eventos[-1].dados["transcrito"]
 
     assert eventos[-1].dados["ok"] is True
     assert len(transcrito) == 2, "nada deve ser acrescentado a uma conversa que fechou sozinha"
 
 
-async def test_argumento_que_nao_e_objeto_vira_erro_em_vez_de_chamada():
+async def test_non_object_argument_becomes_error_instead_of_call():
     """The client returns the raw text when the argument's JSON doesn't close
-    (`openrouter._argumentos`) — and what is not an object cannot become a call.
+    (`openrouter._arguments`) — and what is not an object cannot become a call.
     """
-    quebrado = _chamada("search_nodes", "definiti")
-    servidor = ServidorFalso()
-    cliente = ClienteFalso(
+    quebrado = _tool_call("search_nodes", "definiti")
+    servidor = FakeServer()
+    cliente = FakeClient(
         [
-            ([], _resposta(conteudo=[quebrado], parada="tool_calls")),
-            ([], _resposta(conteudo=[_texto("refiz")])),
+            ([], _response(conteudo=[quebrado], parada="tool_calls")),
+            ([], _response(conteudo=[_as_text("refiz")])),
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
 
     assert servidor.chamadas == []
     fim = eventos[-1]
@@ -915,39 +915,39 @@ async def test_argumento_que_nao_e_objeto_vira_erro_em_vez_de_chamada():
 # ── Freios ────────────────────────────────────────────────────────────────────
 
 
-async def test_o_teto_de_voltas_fecha_o_laco_sem_depender_do_redis():
+async def test_the_turn_ceiling_closes_the_loop_without_depending_on_redis():
     """The brake that doesn't fail open: a tool cycle spends real money."""
-    servidor = ServidorFalso()
+    servidor = FakeServer()
     voltas = [
-        ([], _resposta(conteudo=[_chamada("search_nodes", {})], parada="tool_calls"))
+        ([], _response(conteudo=[_tool_call("search_nodes", {})], parada="tool_calls"))
         for _ in range(cs.TETO_DE_VOLTAS + 5)
     ]
-    cliente = ClienteFalso(voltas)
+    cliente = FakeClient(voltas)
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente, redis=None))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente, redis=None))
 
-    assert _o_erro(eventos)["code"] == "loop_limit"
+    assert _the_error(eventos)["code"] == "loop_limit"
     # O numero vai a parte: a Home traduz a frase e precisa cita-lo.
-    assert _o_erro(eventos)["teto"] == len(servidor.chamadas)
+    assert _the_error(eventos)["teto"] == len(servidor.chamadas)
     assert eventos[-1].dados["ok"] is False
     assert len(servidor.chamadas) == cs.TETO_DE_VOLTAS
 
 
-async def test_a_cota_estourada_recusa_antes_de_falar_com_o_modelo():
+async def test_exceeded_quota_refuses_before_talking_to_the_model():
     """Refusing after the call would be paying the bill and throwing away the answer."""
-    redis = RedisFalso()
+    redis = FakeRedis()
     redis.dados["assistente:tokens:usr-1"] = cotas.TETO_DE_TOKENS_DO_ASSISTENTE_POR_DIA
-    cliente = ClienteFalso([])  # any turn here is a test failure
+    cliente = FakeClient([])  # any turn here is a test failure
 
     with pytest.raises(ToolError) as exc:
-        await _colher(_conversar(cliente=cliente, redis=redis))
+        await _collect(_converse(cliente=cliente, redis=redis))
 
     corpo = json.loads(str(exc.value))
     assert corpo["code"] == "rate_limited"
     assert cliente.parametros == []
 
 
-async def test_o_teto_da_conversa_vem_do_PLANO_de_quem_fala(registro_de_teste):
+async def test_the_conversation_ceiling_comes_from_the_speakers_PLAN(empty_registry):
     """The same spend that is refused at the installation's ceiling passes on the bigger
     plan — and the `cota` frame shows the plan's ceiling, not the global constant. The
     plan comes from the extension registry.
@@ -957,47 +957,47 @@ async def test_o_teto_da_conversa_vem_do_PLANO_de_quem_fala(registro_de_teste):
     showing the plan's ceiling when the screen opens and the installation's during
     the response. That is why the loop resolves the plan ONCE and carries it to billing.
     """
-    redis = RedisFalso()
+    redis = FakeRedis()
     redis.dados["assistente:tokens:usr-1"] = cotas.TETO_DE_TOKENS_DO_ASSISTENTE_POR_DIA
-    teto_do_plano = 10 * cotas.TETO_DE_TOKENS_DO_ASSISTENTE_POR_DIA
+    plan_ceiling = 10 * cotas.TETO_DE_TOKENS_DO_ASSISTENTE_POR_DIA
 
     async def plano_e_teto(user_id, *, db=None, redis=None):
-        return "maior", teto_do_plano
+        return "maior", plan_ceiling
 
-    registro_de_teste.plano_e_teto = plano_e_teto
+    empty_registry.plano_e_teto = plano_e_teto
 
-    eventos = await _colher(
-        _conversar(
-            servidor=ServidorFalso(),
-            cliente=ClienteFalso([([], _resposta(conteudo=[_texto("fim")], uso=_uso(entrada=10, saida=5)))]),
+    eventos = await _collect(
+        _converse(
+            servidor=FakeServer(),
+            cliente=FakeClient([([], _response(conteudo=[_as_text("fim")], uso=_usage(entrada=10, saida=5)))]),
             redis=redis,
         )
     )
 
-    assert [e.dados["teto"] for e in eventos if e.tipo == "cota"] == [teto_do_plano]
+    assert [e.dados["teto"] for e in eventos if e.tipo == "cota"] == [plan_ceiling]
     assert eventos[-1].tipo == "fim" and eventos[-1].dados["ok"] is True
 
 
-async def test_o_uso_e_somado_e_cobrado_na_cota():
+async def test_usage_is_summed_and_charged_to_the_quota():
     """Billing is by accumulated token: everything that went in (the cache is already
     inside `entrada`, and it costs) plus everything that came out."""
-    redis = RedisFalso()
-    servidor = ServidorFalso()
-    cliente = ClienteFalso(
+    redis = FakeRedis()
+    servidor = FakeServer()
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
-                    conteudo=[_chamada("search_nodes", {})],
+                _response(
+                    conteudo=[_tool_call("search_nodes", {})],
                     parada="tool_calls",
-                    uso=_uso(entrada=1000, saida=200, cache_leitura=5000, cache_escrita=100),
+                    uso=_usage(entrada=1000, saida=200, cache_leitura=5000, cache_escrita=100),
                 ),
             ),
-            ([], _resposta(conteudo=[_texto("fim")], uso=_uso(entrada=10, saida=20))),
+            ([], _response(conteudo=[_as_text("fim")], uso=_usage(entrada=10, saida=20))),
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente, redis=redis))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente, redis=redis))
 
     uso = eventos[-1].dados["uso"]
     assert uso["entrada"] == 1010
@@ -1007,22 +1007,22 @@ async def test_o_uso_e_somado_e_cobrado_na_cota():
     assert uso["total"] == 1010 + 220
     assert redis.dados["assistente:tokens:usr-1"] == uso["total"]
     # The window needs an expiry, otherwise the user loses the assistant forever.
-    assert redis.ttls["assistente:tokens:usr-1"] == cotas.JANELA_DO_ASSISTENTE_SEGUNDOS
+    assert redis.ttls["assistente:tokens:usr-1"] == cotas.ASSISTANT_WINDOW_SECONDS
 
 
-async def test_o_acumulado_da_cota_vai_ao_stream_a_cada_resposta_do_modelo():
+async def test_the_quota_total_goes_to_the_stream_on_each_model_response():
     """The donut rises DURING the turn: after each model response a `cota` frame goes
     out with the window's running total (what INCRBY returned) and the ceiling —
     before the tool runs, and `fim` is still the last one. Without Redis there is
     no counter, and no frame."""
-    redis = RedisFalso()
+    redis = FakeRedis()
     redis.dados["assistente:tokens:usr-1"] = 500
     respostas = [
-        ([], _resposta(conteudo=[_chamada("search_nodes", {})], parada="tool_calls", uso=_uso(entrada=100, saida=20))),
-        ([], _resposta(conteudo=[_texto("fim")], uso=_uso(entrada=10, saida=5))),
+        ([], _response(conteudo=[_tool_call("search_nodes", {})], parada="tool_calls", uso=_usage(entrada=100, saida=20))),
+        ([], _response(conteudo=[_as_text("fim")], uso=_usage(entrada=10, saida=5))),
     ]
 
-    eventos = await _colher(_conversar(servidor=ServidorFalso(), cliente=ClienteFalso(list(respostas)), redis=redis))
+    eventos = await _collect(_converse(servidor=FakeServer(), cliente=FakeClient(list(respostas)), redis=redis))
 
     teto = cotas.TETO_DE_TOKENS_DO_ASSISTENTE_POR_DIA
     assert [e.dados for e in eventos if e.tipo == "cota"] == [
@@ -1033,14 +1033,14 @@ async def test_o_acumulado_da_cota_vai_ao_stream_a_cada_resposta_do_modelo():
     assert tipos.index("cota") < tipos.index("ferramenta")
     assert tipos[-1] == "fim"
 
-    sem_redis = await _colher(_conversar(servidor=ServidorFalso(), cliente=ClienteFalso(list(respostas)), redis=None))
-    assert "cota" not in [e.tipo for e in sem_redis]
+    without_redis = await _collect(_converse(servidor=FakeServer(), cliente=FakeClient(list(respostas)), redis=None))
+    assert "cota" not in [e.tipo for e in without_redis]
 
 
 # ── What goes out on the SSE ──────────────────────────────────────────────────
 
 
-async def test_o_progresso_da_execucao_vira_quadro_no_SSE():
+async def test_run_progress_becomes_an_SSE_frame():
     """`run_workflow` is the only tool that uses `ctx`, and this is what for."""
 
     async def executando(context):
@@ -1051,23 +1051,23 @@ async def test_o_progresso_da_execucao_vira_quadro_no_SSE():
             is_error=False,
         )
 
-    servidor = ServidorFalso(
-        tools=[_ToolFalsa("run_workflow")], resultados={"run_workflow": executando}
+    servidor = FakeServer(
+        tools=[_FakeTool("run_workflow")], resultados={"run_workflow": executando}
     )
     # Draws BEFORE executing: `run_workflow` is refused while there is no
     # workflow on the canvas, which is the gate against "execute to answer with data".
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
-            ([], _resposta(
-                conteudo=[_chamada(cs.NOME_DO_DESENHO, {"definition": {"nodes": [], "edges": []}})],
+            ([], _response(
+                conteudo=[_tool_call(cs.NOME_DO_DESENHO, {"definition": {"nodes": [], "edges": []}})],
                 parada="tool_calls",
             )),
-            ([], _resposta(conteudo=[_chamada("run_workflow", {"workflow_id": "w1"})], parada="tool_calls")),
-            ([], _resposta(conteudo=[_texto("rodou")])),
+            ([], _response(conteudo=[_tool_call("run_workflow", {"workflow_id": "w1"})], parada="tool_calls")),
+            ([], _response(conteudo=[_as_text("rodou")])),
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
 
     progresso = [e for e in eventos if e.tipo == "progresso"]
     assert progresso, "o andamento nó a nó não chegou ao SSE"
@@ -1083,54 +1083,54 @@ async def test_o_progresso_da_execucao_vira_quadro_no_SSE():
     # A raw `index` would look at the drawing's `ferramenta_fim`, which happens
     # before execution starts — and would pass by accident, measuring something else.
     tipos = [e.tipo for e in eventos]
-    i_progresso = tipos.index("progresso")
-    fins_depois = [i for i, t in enumerate(tipos) if t == "ferramenta_fim" and i > i_progresso]
-    assert fins_depois, "o progresso saiu depois do fim da execucao"
+    i_progress = tipos.index("progresso")
+    ends_after = [i for i, t in enumerate(tipos) if t == "ferramenta_fim" and i > i_progress]
+    assert ends_after, "o progresso saiu depois do fim da execucao"
 
 
-async def test_texto_e_pensamento_saem_em_quadros_distintos():
-    cliente = ClienteFalso(
+async def test_text_and_thinking_come_out_in_separate_frames():
+    cliente = FakeClient(
         [
             (
                 [
                     openrouter.Delta("pensando", "preciso do catálogo"),
                     openrouter.Delta("texto", "Vou montar"),
                 ],
-                _resposta(conteudo=[_texto("Vou montar")]),
+                _response(conteudo=[_as_text("Vou montar")]),
             )
         ]
     )
 
-    eventos = await _colher(_conversar(cliente=cliente))
+    eventos = await _collect(_converse(cliente=cliente))
 
     assert [e.tipo for e in eventos[:2]] == ["pensando", "texto"]
     assert eventos[0].dados["texto"] == "preciso do catálogo"
     assert eventos[1].dados["texto"] == "Vou montar"
 
 
-async def test_os_resultados_das_ferramentas_vao_numa_unica_mensagem():
+async def test_the_tool_results_go_in_a_single_message():
     """Splitting into several silently teaches the model to stop asking in parallel."""
-    servidor = ServidorFalso()
-    cliente = ClienteFalso(
+    servidor = FakeServer()
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
+                _response(
                     conteudo=[
-                        _chamada("search_nodes", {"query": "buffer"}, "tu-1"),
-                        _chamada("search_nodes", {"query": "dissolve"}, "tu-2"),
+                        _tool_call("search_nodes", {"query": "buffer"}, "tu-1"),
+                        _tool_call("search_nodes", {"query": "dissolve"}, "tu-2"),
                     ],
                     parada="tool_calls",
                 ),
             ),
-            ([], _resposta(conteudo=[_texto("achei os dois")])),
+            ([], _response(conteudo=[_as_text("achei os dois")])),
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
 
     transcrito = eventos[-1].dados["transcrito"]
-    mensagens_de_resultado = [
+    result_messages = [
         m
         for m in transcrito
         if m["role"] == "user"
@@ -1139,13 +1139,13 @@ async def test_os_resultados_das_ferramentas_vao_numa_unica_mensagem():
         and isinstance(m["content"][0], dict)
         and m["content"][0].get("type") == "tool_result"
     ]
-    assert len(mensagens_de_resultado) == 1
-    assert [r["tool_use_id"] for r in mensagens_de_resultado[0]["content"]] == ["tu-1", "tu-2"]
+    assert len(result_messages) == 1
+    assert [r["tool_use_id"] for r in result_messages[0]["content"]] == ["tu-1", "tu-2"]
 
 
-async def test_o_resumo_da_chamada_nao_vaza_o_conteudo_do_argumento():
+async def test_the_call_summary_does_not_leak_the_argument_content():
     """The SSE frame is someone's log at some point — and the argument carries the definition."""
-    resumo = cs._resumo(
+    resumo = cs._summarize(
         {
             "workflow_id": "w-1",
             "definition": {"nodes": [1, 2, 3], "edges": []},
@@ -1159,30 +1159,30 @@ async def test_o_resumo_da_chamada_nao_vaza_o_conteudo_do_argumento():
     assert len(resumo["change_note"]) <= 120
 
 
-async def test_resultado_gigante_e_cortado_com_aviso():
+async def test_huge_result_is_cut_with_warning():
     """Truncating silently would make the model conclude the data doesn't exist."""
     gigante = SimpleNamespace(
-        content=[SimpleNamespace(type="text", text="a" * (cs.MAX_CHARS_POR_RESULTADO + 500))],
+        content=[SimpleNamespace(type="text", text="a" * (cs.MAX_CHARS_PER_RESULT + 500))],
         structured_content=None,
         is_error=False,
     )
 
-    texto = cs._texto_do_resultado(gigante)
+    texto = cs._result_text(gigante)
 
-    assert len(texto) == cs.MAX_CHARS_POR_RESULTADO + len(cs.AVISO_DE_CORTE)
-    assert texto.endswith(cs.AVISO_DE_CORTE)
+    assert len(texto) == cs.MAX_CHARS_PER_RESULT + len(cs.TRUNCATION_NOTICE)
+    assert texto.endswith(cs.TRUNCATION_NOTICE)
 
 
 # ── Model call parameters ─────────────────────────────────────────────────────
 
 
-async def test_a_chamada_ao_modelo_leva_modelo_esforco_sistema_e_transcrito():
+async def test_the_model_call_carries_model_effort_system_and_transcript():
     """The loop hands the client exactly what it translates: the configured model,
     high reasoning effort, the system with the cache breakpoint and the whole
     transcript."""
-    cliente = ClienteFalso([([], _resposta())])
+    cliente = FakeClient([([], _response())])
 
-    await _colher(_conversar(cliente=cliente))
+    await _collect(_converse(cliente=cliente))
 
     from app.core.config import ASSISTENTE_MODELO
 
@@ -1198,13 +1198,13 @@ async def test_a_chamada_ao_modelo_leva_modelo_esforco_sistema_e_transcrito():
     assert params["conversa"] == [{"role": "user", "content": "monta um fluxo"}]
 
 
-async def test_as_ferramentas_saem_no_formato_function_com_o_esquema_do_MCP():
-    servidor = ServidorFalso(
-        tools=[_ToolFalsa("validate_workflow", "valida", {"type": "object", "required": ["definition"]})]
+async def test_the_tools_come_out_in_function_format_with_the_MCP_schema():
+    servidor = FakeServer(
+        tools=[_FakeTool("validate_workflow", "valida", {"type": "object", "required": ["definition"]})]
     )
-    cliente = ClienteFalso([([], _resposta())])
+    cliente = FakeClient([([], _response())])
 
-    await _colher(_conversar(servidor=servidor, cliente=cliente))
+    await _collect(_converse(servidor=servidor, cliente=cliente))
 
     ferramentas = cliente.parametros[0]["ferramentas"]
     assert ferramentas[0]["function"]["name"] == cs.NOME_DO_DESENHO
@@ -1222,23 +1222,23 @@ async def test_as_ferramentas_saem_no_formato_function_com_o_esquema_do_MCP():
     ]
 
 
-async def test_o_sistema_e_o_texto_do_MCP_e_nao_uma_segunda_politica():
+async def test_the_system_is_the_MCP_text_and_not_a_second_policy():
     """Two copies of the policy diverge on the first careless edit.
 
     And the `untrusted_data` warning is what separates "data written by someone in
     the workspace" from "an order for the model" — the defense against injection
     via workflow name or error message.
     """
-    from app.mcp.instrucoes import INSTRUCOES
+    from app.mcp.instrucoes import INSTRUCTIONS
 
     blocos = cs.montar_sistema()
 
-    assert blocos[0]["text"] == INSTRUCOES
+    assert blocos[0]["text"] == INSTRUCTIONS
     assert "untrusted_data" in blocos[0]["text"]
     assert "DADO" in blocos[0]["text"]
 
 
-async def test_o_sistema_pede_resposta_E_raciocinio_no_idioma_configurado(monkeypatch):
+async def test_the_system_asks_for_answer_AND_reasoning_in_the_configured_language(monkeypatch):
     """The reasoning is shown to the person (the panel's "Raciocínio" section), and a
     model that converses in Portuguese tends to think in English. No API chooses
     the language of the reasoning: asking in the system is the only control."""
@@ -1252,7 +1252,7 @@ async def test_o_sistema_pede_resposta_E_raciocinio_no_idioma_configurado(monkey
     assert "Raciocine também em português do Brasil" in idioma[0]
 
 
-async def test_o_prefixo_estavel_tem_um_ponto_de_corte_de_cache():
+async def test_the_stable_prefix_has_a_cache_breakpoint():
     """The prefix (~15k tokens: tools + the system blocks) is IDENTICAL across every
     conversation and every user. Without an explicit breakpoint, each new
     conversation rewrites the prefix at full price.
@@ -1264,14 +1264,14 @@ async def test_o_prefixo_estavel_tem_um_ponto_de_corte_de_cache():
     blocos = cs.montar_sistema()
 
     # Exactly one breakpoint, and on the last block.
-    com_corte = [i for i, b in enumerate(blocos) if "cache_control" in b]
-    assert com_corte == [len(blocos) - 1]
+    with_breakpoint = [i for i, b in enumerate(blocos) if "cache_control" in b]
+    assert with_breakpoint == [len(blocos) - 1]
     assert blocos[-1]["cache_control"] == {"type": "ephemeral"}
     # O bloco marcado continua sendo o guia, com o texto intacto.
-    assert blocos[-1]["text"] == cs._guia_do_prefixo()
+    assert blocos[-1]["text"] == cs._prefix_guide()
 
 
-async def test_instrucoes_extras_fica_fora_do_prefixo_cacheado():
+async def test_extra_instructions_stay_outside_the_cached_prefix():
     """`instrucoes_extras` is optional and may be dynamic: it must never push the
     breakpoint past it, nor enter the cached prefix. The breakpoint stays on the
     guide block, and the extra comes after, with no marker."""
@@ -1280,24 +1280,24 @@ async def test_instrucoes_extras_fica_fora_do_prefixo_cacheado():
     assert blocos[-1]["text"] == "contexto so desta conversa"
     assert "cache_control" not in blocos[-1]
     # The breakpoint stays on the guide — the second-to-last block now.
-    com_corte = [i for i, b in enumerate(blocos) if "cache_control" in b]
-    assert com_corte == [len(blocos) - 2]
-    assert blocos[com_corte[0]]["text"] == cs._guia_do_prefixo()
+    with_breakpoint = [i for i, b in enumerate(blocos) if "cache_control" in b]
+    assert with_breakpoint == [len(blocos) - 2]
+    assert blocos[with_breakpoint[0]]["text"] == cs._prefix_guide()
 
 
-async def test_a_recusa_do_modelo_termina_a_conversa_como_recusado():
+async def test_the_model_refusal_ends_the_conversation_as_refused():
     """`content_filter` is OpenRouter's normalized `finish_reason` for a refusal."""
-    cliente = ClienteFalso([([], _resposta(parada="content_filter"))])
+    cliente = FakeClient([([], _response(parada="content_filter"))])
 
-    eventos = await _colher(_conversar(cliente=cliente))
+    eventos = await _collect(_converse(cliente=cliente))
 
-    erro = _o_erro(eventos)
+    erro = _the_error(eventos)
     assert erro["code"] == "recusado"
     assert eventos[-1].dados["ok"] is False
 
 
 @pytest.mark.parametrize("parada", ["content_filter", "stop"])
-async def test_resposta_sem_bloco_nenhum_nao_entra_no_transcrito(parada):
+async def test_response_without_any_block_does_not_enter_the_transcript(parada):
     """An empty assistant message is rejected by the provider on every resume, and
     there is nothing in it for the person to see. The transcript stays as it was."""
     tamanhos: list[int] = []
@@ -1305,9 +1305,9 @@ async def test_resposta_sem_bloco_nenhum_nao_entra_no_transcrito(parada):
     async def gancho(conversa):
         tamanhos.append(len(conversa))
 
-    cliente = ClienteFalso([([], _resposta(conteudo=[], parada=parada))])
+    cliente = FakeClient([([], _response(conteudo=[], parada=parada))])
 
-    eventos = await _colher(_conversar(cliente=cliente, ao_fechar_turno=gancho))
+    eventos = await _collect(_converse(cliente=cliente, ao_fechar_turno=gancho))
 
     transcrito = eventos[-1].dados["transcrito"]
     assert transcrito == [{"role": "user", "content": "monta um fluxo"}]
@@ -1315,14 +1315,14 @@ async def test_resposta_sem_bloco_nenhum_nao_entra_no_transcrito(parada):
     assert eventos[-1].dados["ok"] is (parada == "stop")
 
 
-async def test_falha_ao_falar_com_o_modelo_vira_erro_e_nao_excecao():
-    class ClienteQuebrado(ClienteFalso):
+async def test_failure_talking_to_the_model_becomes_error_not_exception():
+    class BrokenClient(FakeClient):
         def transmitir(self, **kw):
             raise openrouter.ErroDoOpenRouter("falha de rede ao falar com o OpenRouter (sem rota)")
 
-    eventos = await _colher(_conversar(cliente=ClienteQuebrado([])))
+    eventos = await _collect(_converse(cliente=BrokenClient([])))
 
-    erro = _o_erro(eventos)
+    erro = _the_error(eventos)
     assert erro["code"] == "modelo_indisponivel"
     # Never the exception text: it carries URL, host and sometimes headers.
     assert "sem rota" not in json.dumps(erro)
@@ -1333,34 +1333,34 @@ async def test_falha_ao_falar_com_o_modelo_vira_erro_e_nao_excecao():
 # only these tests break, not the 59 above that prove the editor.
 
 
-async def test_o_sistema_da_home_troca_o_bloco_de_instrucoes_e_mantem_o_cache():
+async def test_the_home_system_swaps_the_instructions_block_and_keeps_the_cache():
     """The Home surface changes block [1] (the instructions), and nothing else of the shape."""
-    from app.mcp.instrucoes import INSTRUCOES
+    from app.mcp.instrucoes import INSTRUCTIONS
     from app.services.assistente_superficie import HOME, INSTRUCOES_DA_HOME
 
     blocos = cs.montar_sistema(superficie=HOME)
 
     # [0] is still the MCP policy — the same for both.
-    assert blocos[0]["text"] == INSTRUCOES
+    assert blocos[0]["text"] == INSTRUCTIONS
     # [1] is now the Home block, not the editor's.
     assert blocos[1]["text"] == INSTRUCOES_DA_HOME
     assert blocos[1]["text"] != cs.INSTRUCOES_DO_EDITOR
     # The cache breakpoint stays on the last block (the guide), as in the editor: two
     # stable prefixes, one per surface.
-    com_corte = [i for i, b in enumerate(blocos) if "cache_control" in b]
-    assert com_corte == [len(blocos) - 1]
+    with_breakpoint = [i for i, b in enumerate(blocos) if "cache_control" in b]
+    assert with_breakpoint == [len(blocos) - 1]
     assert blocos[-1]["cache_control"] == {"type": "ephemeral"}
-    assert blocos[-1]["text"] == cs._guia_do_prefixo()
+    assert blocos[-1]["text"] == cs._prefix_guide()
 
 
-async def test_as_ferramentas_da_home_incluem_criar_e_abrem_com_o_globo():
+async def test_the_home_tools_include_create_and_open_with_the_globe():
     """The Home allows the whole catalog (what the editor blocks), and the delivery opens the list."""
     from app.services.assistente_superficie import HOME, NOME_DO_GLOBO
 
-    servidor = ServidorFalso(
-        tools=[_ToolFalsa("search_nodes"), _ToolFalsa("create_workflow"), _ToolFalsa("run_workflow")]
+    servidor = FakeServer(
+        tools=[_FakeTool("search_nodes"), _FakeTool("create_workflow"), _FakeTool("run_workflow")]
     )
-    ferramentas = await cs.ferramentas_para_o_modelo(servidor, escopo_falso(), HOME)
+    ferramentas = await cs.ferramentas_para_o_modelo(servidor, fake_scope(), HOME)
     nomes = [f["function"]["name"] for f in ferramentas]
 
     # The Home delivery opens the list — what the model reads first.
@@ -1373,18 +1373,18 @@ async def test_as_ferramentas_da_home_incluem_criar_e_abrem_com_o_globo():
     assert cs.NOME_DO_DESENHO not in nomes
 
 
-async def test_o_gancho_ao_fechar_turno_e_chamado_com_a_conversa_crescendo():
+async def test_the_turn_close_hook_is_called_with_the_growing_conversation():
     """The incremental persistence hook is called after each message comes in.
 
     The editor passes no hook at all (it is `None` and becomes a no-op); whoever
     persists conversation by conversation — the Home assistant — gets the
     conversation on every turn.
     """
-    servidor = ServidorFalso()
-    cliente = ClienteFalso(
+    servidor = FakeServer()
+    cliente = FakeClient(
         [
-            ([], _resposta(conteudo=[_chamada("search_nodes", {})], parada="tool_calls")),
-            ([], _resposta(conteudo=[_texto("pronto")])),
+            ([], _response(conteudo=[_tool_call("search_nodes", {})], parada="tool_calls")),
+            ([], _response(conteudo=[_as_text("pronto")])),
         ]
     )
     tamanhos: list[int] = []
@@ -1392,21 +1392,21 @@ async def test_o_gancho_ao_fechar_turno_e_chamado_com_a_conversa_crescendo():
     async def gancho(conversa):
         tamanhos.append(len(conversa))
 
-    await _colher(_conversar(servidor=servidor, cliente=cliente, ao_fechar_turno=gancho))
+    await _collect(_converse(servidor=servidor, cliente=cliente, ao_fechar_turno=gancho))
 
     # The conversation starts with 1 (the user's message). Called after: the assistant
     # of turn 1 (2), the tool_results of turn 1 (3), the assistant of turn 2 (4).
     assert tamanhos == [2, 3, 4]
 
 
-async def test_o_gancho_que_quebra_nao_derruba_a_conversa():
+async def test_a_breaking_hook_does_not_crash_the_conversation():
     """Failing to persist must not lose the response that is already on the air."""
-    cliente = ClienteFalso([([], _resposta(conteudo=[_texto("pronto")]))])
+    cliente = FakeClient([([], _response(conteudo=[_as_text("pronto")]))])
 
     async def gancho(conversa):
         raise RuntimeError("banco fora")
 
-    eventos = await _colher(_conversar(cliente=cliente, ao_fechar_turno=gancho))
+    eventos = await _collect(_converse(cliente=cliente, ao_fechar_turno=gancho))
 
     # A conversa termina bem, apesar do gancho ter estourado.
     assert eventos[-1].tipo == "fim"
@@ -1421,11 +1421,11 @@ async def test_o_gancho_que_quebra_nao_derruba_a_conversa():
 # `tool_result` never arrived, so the NEXT message hit a 400 from the API.
 
 
-def _superficie_que_quebra(*, no_portao: bool) -> cs.Superficie:
+def _breaking_surface(*, no_portao: bool) -> cs.Superficie:
     async def _explode(*_a, **_kw):
         raise RuntimeError("defeito no pacote da superficie")
 
-    async def _portao_ok(_estado, _nome, _args, _tool_use_id=None):
+    async def _gate_ok(_estado, _nome, _args, _tool_use_id=None):
         return None
 
     return cs.Superficie(
@@ -1434,97 +1434,97 @@ def _superficie_que_quebra(*, no_portao: bool) -> cs.Superficie:
         ferramentas_extras=(),
         executores_locais={} if no_portao else {"search_nodes": _explode},
         permitida=lambda _n: True,
-        portao=_explode if no_portao else _portao_ok,
+        portao=_explode if no_portao else _gate_ok,
         quadros_extras=lambda *_a: [],
     )
 
 
-def _estado_nu() -> cs.EstadoDoLaco:
-    async def _emitir(_ev):
+def _bare_state() -> cs.EstadoDoLaco:
+    async def _emit(_ev):
         return None
 
     return cs.EstadoDoLaco(
-        escopo=escopo_falso(scopes=ESCOPOS_DO_EDITOR),
+        escopo=fake_scope(scopes=EDITOR_SCOPES),
         redis=None,
         conversa_id=None,
-        emitir=_emitir,
+        emitir=_emit,
     )
 
 
 @pytest.mark.parametrize("no_portao", [True, False])
-async def test_defeito_no_portao_ou_no_executor_local_vira_resultado_de_erro(no_portao):
+async def test_defect_in_the_gate_or_local_executor_becomes_error_result(no_portao):
     """Becomes `(texto, True)` — never an exception that propagates and kills the conversation.
 
     Mutation: removing the try/except from the dispatch lets the `RuntimeError`
     escape and breaks both cases.
     """
-    texto, deu_erro = await cs._executar_ferramenta(
-        servidor=ServidorFalso(),
-        escopo=escopo_falso(scopes=ESCOPOS_DO_EDITOR),
+    texto, had_error = await cs._execute_tool(
+        servidor=FakeServer(),
+        escopo=fake_scope(scopes=EDITOR_SCOPES),
         nome="search_nodes",
         argumentos={"query": "x"},
         contexto=None,
-        superficie=_superficie_que_quebra(no_portao=no_portao),
-        estado=_estado_nu(),
+        superficie=_breaking_surface(no_portao=no_portao),
+        estado=_bare_state(),
     )
 
-    assert deu_erro is True
+    assert had_error is True
     assert "search_nodes" in texto and "RuntimeError" in texto
 
 
-async def test_recusa_declarada_pelo_portao_continua_chegando_ao_modelo():
+async def test_refusal_declared_by_the_gate_still_reaches_the_model():
     """The fix must not swallow the verdict: a gate that REFUSES keeps refusing."""
 
-    async def _recusa(_estado, _nome, _args, _tool_use_id=None):
+    async def _refuse(_estado, _nome, _args, _tool_use_id=None):
         return ("nao pode", True)
 
     superficie = cs.Superficie(
         nome="teste", instrucoes="", ferramentas_extras=(), executores_locais={},
-        permitida=lambda _n: True, portao=_recusa, quadros_extras=lambda *_a: [],
+        permitida=lambda _n: True, portao=_refuse, quadros_extras=lambda *_a: [],
     )
 
-    resultado = await cs._executar_ferramenta(
-        servidor=ServidorFalso(),
-        escopo=escopo_falso(scopes=ESCOPOS_DO_EDITOR),
+    resultado = await cs._execute_tool(
+        servidor=FakeServer(),
+        escopo=fake_scope(scopes=EDITOR_SCOPES),
         nome="search_nodes",
         argumentos={"query": "x"},
         contexto=None,
         superficie=superficie,
-        estado=_estado_nu(),
+        estado=_bare_state(),
     )
 
     assert resultado == ("nao pode", True)
 
 
-async def test_as_respostas_rapidas_entram_na_lista_da_home_depois_do_globo():
+async def test_the_quick_replies_join_the_home_list_after_the_globe():
     """The Home's second local tool: in the model's list, right after the delivery."""
     from app.services.assistente_superficie import HOME, NOME_DAS_RESPOSTAS, NOME_DO_GLOBO
 
-    servidor = ServidorFalso(tools=[_ToolFalsa("search_nodes")])
-    ferramentas = await cs.ferramentas_para_o_modelo(servidor, escopo_falso(), HOME)
+    servidor = FakeServer(tools=[_FakeTool("search_nodes")])
+    ferramentas = await cs.ferramentas_para_o_modelo(servidor, fake_scope(), HOME)
     nomes = [f["function"]["name"] for f in ferramentas]
 
     assert nomes[:2] == [NOME_DO_GLOBO, NOME_DAS_RESPOSTAS]
 
 
-async def test_sugerir_respostas_nao_vai_ao_servidor_e_vira_quadro_depois_do_fim_da_ferramenta():
+async def test_suggest_replies_does_not_go_to_the_server_and_becomes_a_frame_after_the_tool_end():
     """In the Home loop: `ferramenta` -> `ferramenta_fim` -> `respostas_rapidas`, with no
     `call_tool`; the `tool_result` stays in the transcript, which is what replay reuses."""
     from app.services.assistente_superficie import HOME, NOME_DAS_RESPOSTAS
 
-    servidor = ServidorFalso(tools=[_ToolFalsa("search_nodes")])
+    servidor = FakeServer(tools=[_FakeTool("search_nodes")])
     opcoes = ["Só os últimos 7 dias", "Cruzar com o CAR"]
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
-            ([], _resposta(
-                conteudo=[_texto("Achei 128 focos."), _chamada(NOME_DAS_RESPOSTAS, {"opcoes": opcoes})],
+            ([], _response(
+                conteudo=[_as_text("Achei 128 focos."), _tool_call(NOME_DAS_RESPOSTAS, {"opcoes": opcoes})],
                 parada="tool_calls",
             )),
-            ([], _resposta(conteudo=[_texto("Pronto.")])),
+            ([], _response(conteudo=[_as_text("Pronto.")])),
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente, superficie=HOME))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente, superficie=HOME))
 
     tipos = [e.tipo for e in eventos]
     i = tipos.index("respostas_rapidas")
@@ -1542,26 +1542,26 @@ async def test_sugerir_respostas_nao_vai_ao_servidor_e_vira_quadro_depois_do_fim
 # ── A trava se renova enquanto a secao corre (PR 5, #2) ───────────────────────
 
 
-async def test_a_trava_renova_o_prazo_enquanto_a_secao_corre(monkeypatch):
-    """The lock expires in `TTL_DA_TRAVA_S`, but a long turn (`TETO_DE_VOLTAS`
+async def test_the_lock_renews_the_deadline_while_the_section_runs(monkeypatch):
+    """The lock expires in `LOCK_TTL_S`, but a long turn (`TETO_DE_VOLTAS`
     turns at `high`) goes past that. Without renewal, it would expire midway and a
     2nd tab would enter the SAME transcript. The watchdog reissues the EXPIRE while it runs."""
     monkeypatch.setattr(cs, "_INTERVALO_DE_RENOVACAO_DA_TRAVA_S", 0.01)
-    redis = RedisFalso()
+    redis = FakeRedis()
     chave = "assistente:trava:u:w"
 
     async with cs.trava_exclusiva(redis, chave):
         await asyncio.sleep(0.05)  # tempo para o watchdog reemitir o EXPIRE >= 1x
 
-    assert ("expire", chave, cs.TTL_DA_TRAVA_S) in redis.chamadas, "o watchdog nao renovou"
+    assert ("expire", chave, cs.LOCK_TTL_S) in redis.chamadas, "o watchdog nao renovou"
     assert chave not in redis.dados  # and released on exit
 
 
-async def test_o_renovador_da_trava_morre_ao_soltar(monkeypatch):
+async def test_the_lock_renewer_dies_on_release(monkeypatch):
     """The watchdog is cancelled at the end of the section: no task is left alive
     reissuing EXPIRE on an already released lock."""
     monkeypatch.setattr(cs, "_INTERVALO_DE_RENOVACAO_DA_TRAVA_S", 0.01)
-    redis = RedisFalso()
+    redis = FakeRedis()
     chave = "assistente:trava:u:w"
 
     async with cs.trava_exclusiva(redis, chave):
@@ -1576,7 +1576,7 @@ async def test_o_renovador_da_trava_morre_ao_soltar(monkeypatch):
 # ── Tool progress arrives live, not buffered (PR 5, #5) ───────────────────────
 
 
-async def test_o_progresso_chega_ao_vivo_antes_de_a_ferramenta_terminar():
+async def test_progress_arrives_live_before_the_tool_finishes():
     """The tool runs in a task and the loop yields the `report_progress` WHILE it is
     still running. With the old `list` queue (drained only after the tool's
     `await`), a long run's progress stayed buffered and arrived all at once, at
@@ -1592,22 +1592,22 @@ async def test_o_progresso_chega_ao_vivo_antes_de_a_ferramenta_terminar():
             is_error=False,
         )
 
-    servidor = ServidorFalso(
-        tools=[_ToolFalsa("run_workflow")], resultados={"run_workflow": executando}
+    servidor = FakeServer(
+        tools=[_FakeTool("run_workflow")], resultados={"run_workflow": executando}
     )
     # Draws BEFORE executing: `run_workflow` is refused without a workflow on the canvas.
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
-            ([], _resposta(
-                conteudo=[_chamada(cs.NOME_DO_DESENHO, {"definition": {"nodes": [], "edges": []}})],
+            ([], _response(
+                conteudo=[_tool_call(cs.NOME_DO_DESENHO, {"definition": {"nodes": [], "edges": []}})],
                 parada="tool_calls",
             )),
-            ([], _resposta(conteudo=[_chamada("run_workflow", {"workflow_id": "w1"})], parada="tool_calls")),
-            ([], _resposta(conteudo=[_texto("rodou")])),
+            ([], _response(conteudo=[_tool_call("run_workflow", {"workflow_id": "w1"})], parada="tool_calls")),
+            ([], _response(conteudo=[_as_text("rodou")])),
         ]
     )
 
-    gen = _conversar(servidor=servidor, cliente=cliente)
+    gen = _converse(servidor=servidor, cliente=cliente)
     vistos = []
     try:
         # Drains until the `progresso` WITHOUT releasing the tool. With the fix it arrives
@@ -1627,7 +1627,7 @@ async def test_o_progresso_chega_ao_vivo_antes_de_a_ferramenta_terminar():
     assert resto and resto[-1].tipo == "fim"
 
 
-async def test_cada_volta_e_registrada_no_uso_com_o_modelo_que_a_produziu():
+async def test_each_turn_is_recorded_in_usage_with_the_model_that_produced_it():
     """The record follows the quota BILLING, turn by turn.
 
     Two reasons, and both are about not losing sight of money: writing at the same
@@ -1646,22 +1646,22 @@ async def test_cada_volta_e_registrada_no_uso_com_o_modelo_que_a_produziu():
     async def _registrar(**kw):
         registradas.append(kw)
 
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
-                    conteudo=[_chamada("search_nodes", {})],
+                _response(
+                    conteudo=[_tool_call("search_nodes", {})],
                     parada="tool_calls",
-                    uso=_uso(entrada=1000, saida=200, cache_leitura=800),
+                    uso=_usage(entrada=1000, saida=200, cache_leitura=800),
                 ),
             ),
-            ([], _resposta(conteudo=[_texto("fim")], uso=_uso(entrada=10, saida=20))),
+            ([], _response(conteudo=[_as_text("fim")], uso=_usage(entrada=10, saida=20))),
         ]
     )
 
     with patch("app.services.uso_service.registrar_volta", _registrar):
-        await _colher(_conversar(servidor=ServidorFalso(), cliente=cliente, redis=RedisFalso()))
+        await _collect(_converse(servidor=FakeServer(), cliente=cliente, redis=FakeRedis()))
 
     assert len(registradas) == 2, "uma linha por volta, não uma por conversa"
     assert [(r["entrada"], r["saida"]) for r in registradas] == [(1000, 200), (10, 20)]
@@ -1677,7 +1677,7 @@ async def test_cada_volta_e_registrada_no_uso_com_o_modelo_que_a_produziu():
 # `run_workflow` matters.
 
 
-def _resultado_ok(texto="ok"):
+def _ok_result(texto="ok"):
     return SimpleNamespace(
         content=[SimpleNamespace(type="text", text=texto)],
         structured_content=None,
@@ -1685,15 +1685,15 @@ def _resultado_ok(texto="ok"):
     )
 
 
-def _blocos_de_resultado(cliente) -> list[dict]:
+def _result_blocks(cliente) -> list[dict]:
     """The `tool_result`s the model received on the turn after the batch."""
     conversa = cliente.parametros[-1]["conversa"]
-    do_lote = [m for m in conversa if m.get("role") == "user" and isinstance(m.get("content"), list)]
-    assert do_lote, "nenhuma mensagem de tool_result chegou ao modelo"
-    return do_lote[-1]["content"]
+    from_batch = [m for m in conversa if m.get("role") == "user" and isinstance(m.get("content"), list)]
+    assert from_batch, "nenhuma mensagem de tool_result chegou ao modelo"
+    return from_batch[-1]["content"]
 
 
-async def test_ferramentas_da_mesma_volta_rodam_juntas_e_respondem_na_ordem():
+async def test_tools_of_the_same_turn_run_together_and_answer_in_order():
     """Each call in the batch only finishes when all THREE have started.
 
     In the sequential lane the first would wait for the others forever — the
@@ -1702,100 +1702,100 @@ async def test_ferramentas_da_mesma_volta_rodam_juntas_e_respondem_na_ordem():
     the `tool_use`s, whatever the order of completion.
     """
     juntas = asyncio.Event()
-    comecaram = 0
+    started = 0
 
-    def _sincronizada(nome):
-        async def _corre(_ctx):
-            nonlocal comecaram
-            comecaram += 1
-            if comecaram == 3:
+    def _synchronized(nome):
+        async def _runs(_ctx):
+            nonlocal started
+            started += 1
+            if started == 3:
                 juntas.set()
             await asyncio.wait_for(juntas.wait(), timeout=2)
-            return _resultado_ok(f"{nome} pronto")
+            return _ok_result(f"{nome} pronto")
 
-        return _corre
+        return _runs
 
-    servidor = ServidorFalso(
-        tools=[_ToolFalsa("search_nodes"), _ToolFalsa("describe_node"), _ToolFalsa("get_authoring_guide")],
+    servidor = FakeServer(
+        tools=[_FakeTool("search_nodes"), _FakeTool("describe_node"), _FakeTool("get_authoring_guide")],
         resultados={
-            "search_nodes": _sincronizada("search_nodes"),
-            "describe_node": _sincronizada("describe_node"),
-            "get_authoring_guide": _sincronizada("get_authoring_guide"),
+            "search_nodes": _synchronized("search_nodes"),
+            "describe_node": _synchronized("describe_node"),
+            "get_authoring_guide": _synchronized("get_authoring_guide"),
         },
     )
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
+                _response(
                     conteudo=[
-                        _chamada("search_nodes", {"query": "x"}, "tu-1"),
-                        _chamada("describe_node", {"name": "Buffer"}, "tu-2"),
-                        _chamada("get_authoring_guide", {"topic": "overview"}, "tu-3"),
+                        _tool_call("search_nodes", {"query": "x"}, "tu-1"),
+                        _tool_call("describe_node", {"name": "Buffer"}, "tu-2"),
+                        _tool_call("get_authoring_guide", {"topic": "overview"}, "tu-3"),
                     ],
                     parada="tool_calls",
                 ),
             ),
-            ([], _resposta(conteudo=[_texto("feito")])),
+            ([], _response(conteudo=[_as_text("feito")])),
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
 
     # Announces the WHOLE batch before the first end: the browser sees the three
     # cards running together.
-    tipos_e_ids = [(e.tipo, e.dados.get("id")) for e in eventos if e.tipo in ("ferramenta", "ferramenta_fim")]
-    anuncios = [par for par in tipos_e_ids if par[0] == "ferramenta"]
-    primeiro_fim = tipos_e_ids.index(next(par for par in tipos_e_ids if par[0] == "ferramenta_fim"))
+    types_and_ids = [(e.tipo, e.dados.get("id")) for e in eventos if e.tipo in ("ferramenta", "ferramenta_fim")]
+    anuncios = [par for par in types_and_ids if par[0] == "ferramenta"]
+    first_end = types_and_ids.index(next(par for par in types_and_ids if par[0] == "ferramenta_fim"))
     assert [ident for _, ident in anuncios] == ["tu-1", "tu-2", "tu-3"]
-    assert all(tipos_e_ids.index(par) < primeiro_fim for par in anuncios)
+    assert all(types_and_ids.index(par) < first_end for par in anuncios)
 
-    resultados = _blocos_de_resultado(cliente)
+    resultados = _result_blocks(cliente)
     assert [r["tool_use_id"] for r in resultados] == ["tu-1", "tu-2", "tu-3"]
     assert all(r["is_error"] is False for r in resultados), (
         "alguma ferramenta estourou o timeout do dublê — o lote não rodou junto"
     )
 
 
-async def test_progresso_do_lote_carrega_o_id_da_chamada_dona():
+async def test_batch_progress_carries_the_owning_calls_id():
     """With several tools running, the `progresso` frame says whose it is."""
 
-    async def _com_progresso(ctx):
+    async def _with_progress(ctx):
         await ctx.report_progress(1, 2, "andando")
-        return _resultado_ok("fim")
+        return _ok_result("fim")
 
-    servidor = ServidorFalso(
-        tools=[_ToolFalsa("search_nodes"), _ToolFalsa("describe_node")],
-        resultados={"search_nodes": "ok", "describe_node": _com_progresso},
+    servidor = FakeServer(
+        tools=[_FakeTool("search_nodes"), _FakeTool("describe_node")],
+        resultados={"search_nodes": "ok", "describe_node": _with_progress},
     )
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
+                _response(
                     conteudo=[
-                        _chamada("search_nodes", {"query": "x"}, "tu-1"),
-                        _chamada("describe_node", {"name": "Buffer"}, "tu-2"),
+                        _tool_call("search_nodes", {"query": "x"}, "tu-1"),
+                        _tool_call("describe_node", {"name": "Buffer"}, "tu-2"),
                     ],
                     parada="tool_calls",
                 ),
             ),
-            ([], _resposta(conteudo=[_texto("feito")])),
+            ([], _response(conteudo=[_as_text("feito")])),
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
 
-    progressos = [e.dados for e in eventos if e.tipo == "progresso"]
-    assert progressos and progressos[0]["id"] == "tu-2"
+    progress_updates = [e.dados for e in eventos if e.tipo == "progresso"]
+    assert progress_updates and progress_updates[0]["id"] == "tu-2"
 
 
-async def test_o_portao_recebe_o_id_da_propria_chamada():
+async def test_the_gate_receives_its_own_calls_id():
     """The contract that kills the race: the id travels with the call, not in a
     shared field. Each result in the batch carries the id the gate saw."""
     vistos: set[str] = set()
 
-    async def _portao(_estado, _nome, _args, tool_use_id):
+    async def _gate(_estado, _nome, _args, tool_use_id):
         vistos.add(tool_use_id)
         return (f"aguardando {tool_use_id}", False)
 
@@ -1805,62 +1805,62 @@ async def test_o_portao_recebe_o_id_da_propria_chamada():
         ferramentas_extras=(),
         executores_locais={},
         permitida=lambda _n: True,
-        portao=_portao,
+        portao=_gate,
         quadros_extras=lambda *_a: [],
     )
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
+                _response(
                     conteudo=[
-                        _chamada("search_nodes", {"query": "a"}, "tu-A"),
-                        _chamada("search_nodes", {"query": "b"}, "tu-B"),
+                        _tool_call("search_nodes", {"query": "a"}, "tu-A"),
+                        _tool_call("search_nodes", {"query": "b"}, "tu-B"),
                     ],
                     parada="tool_calls",
                 ),
             ),
-            ([], _resposta(conteudo=[_texto("feito")])),
+            ([], _response(conteudo=[_as_text("feito")])),
         ]
     )
 
-    await _colher(_conversar(cliente=cliente, superficie=superficie))
+    await _collect(_converse(cliente=cliente, superficie=superficie))
 
     assert vistos == {"tu-A", "tu-B"}
-    resultados = _blocos_de_resultado(cliente)
-    por_id = {r["tool_use_id"]: r["content"] for r in resultados}
-    assert por_id["tu-A"] == "aguardando tu-A"
-    assert por_id["tu-B"] == "aguardando tu-B"
+    resultados = _result_blocks(cliente)
+    by_task_id = {r["tool_use_id"]: r["content"] for r in resultados}
+    assert by_task_id["tu-A"] == "aguardando tu-A"
+    assert by_task_id["tu-B"] == "aguardando tu-B"
 
 
-async def test_volta_com_desenho_fica_em_fila_e_o_run_ve_o_desenho():
+async def test_turn_with_draft_stays_queued_and_the_run_sees_the_draft():
     """[drawing, run_workflow] on the SAME turn: the local lane preserves the order —
     the run's gate reads the `desenhou` the drawing has just written."""
-    servidor = ServidorFalso(
-        tools=[_ToolFalsa("run_workflow")],
+    servidor = FakeServer(
+        tools=[_FakeTool("run_workflow")],
         resultados={"run_workflow": "rodou"},
     )
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
+                _response(
                     conteudo=[
-                        _chamada(
+                        _tool_call(
                             cs.NOME_DO_DESENHO,
                             {"definition": {"nodes": [{"id": "n1"}], "edges": []}},
                             "tu-1",
                         ),
-                        _chamada("run_workflow", {"workflow_id": "wf-1"}, "tu-2"),
+                        _tool_call("run_workflow", {"workflow_id": "wf-1"}, "tu-2"),
                     ],
                     parada="tool_calls",
                 ),
             ),
-            ([], _resposta(conteudo=[_texto("feito")])),
+            ([], _response(conteudo=[_as_text("feito")])),
         ]
     )
 
-    eventos = await _colher(_conversar(servidor=servidor, cliente=cliente))
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
 
     # In sequence: the drawing's end comes BEFORE the run's announcement.
     ordem = [(e.tipo, e.dados.get("id")) for e in eventos if e.tipo in ("ferramenta", "ferramenta_fim")]
@@ -1872,42 +1872,42 @@ async def test_volta_com_desenho_fica_em_fila_e_o_run_ve_o_desenho():
     ]
     # And the run passed the gate: the server was touched.
     assert [nome for nome, _ in servidor.chamadas] == ["run_workflow"]
-    resultados = _blocos_de_resultado(cliente)
+    resultados = _result_blocks(cliente)
     assert all(r["is_error"] is False for r in resultados)
 
 
-async def test_o_fim_do_rapido_nao_espera_o_lento_que_veio_depois():
+async def test_the_fast_ones_end_does_not_wait_for_the_slow_one_that_came_after():
     """The ends go out IN THE ORDER of the calls, but each one as soon as its own task
     (and the earlier ones) finished — the fast task closes the card and delivers the
     frames with the slow one still running. With the "all sentinels first" drain, the
     first end would only go out after the slow one — and this test hits the timeout."""
     liberar = asyncio.Event()
 
-    async def _lento(_ctx):
+    async def _slow(_ctx):
         await liberar.wait()
-        return _resultado_ok("lento pronto")
+        return _ok_result("lento pronto")
 
-    servidor = ServidorFalso(
-        tools=[_ToolFalsa("search_nodes"), _ToolFalsa("describe_node")],
-        resultados={"search_nodes": "rapido pronto", "describe_node": _lento},
+    servidor = FakeServer(
+        tools=[_FakeTool("search_nodes"), _FakeTool("describe_node")],
+        resultados={"search_nodes": "rapido pronto", "describe_node": _slow},
     )
-    cliente = ClienteFalso(
+    cliente = FakeClient(
         [
             (
                 [],
-                _resposta(
+                _response(
                     conteudo=[
-                        _chamada("search_nodes", {"query": "x"}, "tu-1"),
-                        _chamada("describe_node", {"name": "Buffer"}, "tu-2"),
+                        _tool_call("search_nodes", {"query": "x"}, "tu-1"),
+                        _tool_call("describe_node", {"name": "Buffer"}, "tu-2"),
                     ],
                     parada="tool_calls",
                 ),
             ),
-            ([], _resposta(conteudo=[_texto("feito")])),
+            ([], _response(conteudo=[_as_text("feito")])),
         ]
     )
 
-    gen = _conversar(servidor=servidor, cliente=cliente)
+    gen = _converse(servidor=servidor, cliente=cliente)
     vistos = []
     try:
         while True:

@@ -39,14 +39,14 @@ class ExecutorCRUD:
             ag.last_seen_at = utc_now_naive()
             await self.db.commit()
 
-    async def touch_last_seen_if_later(self, executor_id: str, visto_em: datetime) -> None:
-        """Writes `visto_em` only if it is later than the current `last_seen_at`, in
+    async def touch_last_seen_if_later(self, executor_id: str, seen_at: datetime) -> None:
+        """Writes `seen_at` only if it is later than the current `last_seen_at`, in
         a single UPDATE (the condition and the write are atomic)."""
         await self.db.execute(
             update(Executor)
             .where(Executor.id_hash == executor_id)
-            .where(or_(Executor.last_seen_at.is_(None), Executor.last_seen_at < visto_em))
-            .values(last_seen_at=visto_em)
+            .where(or_(Executor.last_seen_at.is_(None), Executor.last_seen_at < seen_at))
+            .values(last_seen_at=seen_at)
             .execution_options(synchronize_session=False)
         )
         await self.db.commit()

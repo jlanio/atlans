@@ -29,7 +29,7 @@ _EXECUTOR_ID = "executor-de-teste"
 
 
 @pytest.fixture
-def servidor_confiavel(monkeypatch):
+def trusted_server(monkeypatch):
     """Establishes executor↔server trust and returns a command signer.
 
     Deliberately uses the server's REAL signer (`app.core.control_crypto`)
@@ -63,12 +63,12 @@ class _FakeWS:
     """WebSocket that delivers a fixed list of messages and records the sends."""
 
     def __init__(self, mensagens):
-        self._mensagens = [json.dumps(m) for m in mensagens]
+        self._messages = [json.dumps(m) for m in mensagens]
         self.enviadas = []
 
     def __aiter__(self):
         async def _gen():
-            for m in self._mensagens:
+            for m in self._messages:
                 yield m
         return _gen()
 
@@ -76,20 +76,20 @@ class _FakeWS:
         self.enviadas.append(json.loads(raw))
 
 
-def _conexao():
+def _connection():
     return ExecutorConnection(job_queue=None, result_queue=asyncio.Queue())
 
 
 # ── control encerra o receive_loop e marca a intencao correta ─────────────────
 
 @pytest.mark.asyncio
-async def test_config_changed_pede_restart_sem_emitir_sinal(monkeypatch, servidor_confiavel):
+async def test_config_changed_requests_restart_without_sending_signal(monkeypatch, trusted_server):
     """Must not depend on os.kill: on Windows there is no registered handler."""
-    matou = []
-    monkeypatch.setattr("os.kill", lambda *a: matou.append(a))
+    killed = []
+    monkeypatch.setattr("os.kill", lambda *a: killed.append(a))
 
-    conn = _conexao()
-    ws = _FakeWS([servidor_confiavel(
+    conn = _connection()
+    ws = _FakeWS([trusted_server(
         {"type": "control", "action": "config_changed", "reason": "workspace atribuiu"}
     )])
 
@@ -97,11 +97,11 @@ async def test_config_changed_pede_restart_sem_emitir_sinal(monkeypatch, servido
 
     assert conn.restart_requested is True
     assert conn._should_reconnect is False
-    assert matou == [], "o executor nao deve auto-enviar sinal para reiniciar"
+    assert killed == [], "o executor nao deve auto-enviar sinal para reiniciar"
 
 
 @pytest.mark.asyncio
-async def test_revoked_encerra_e_marca_deny_terminal(servidor_confiavel):
+async def test_revoked_ends_and_marks_terminal_deny(trusted_server):
     """A revoked executor does not request a restart AND sets `terminal_deny`.
 
     The flag exists for whoever supervises the process. Without it the executor
@@ -110,8 +110,8 @@ async def test_revoked_encerra_e_marca_deny_terminal(servidor_confiavel):
     had already answered 4404. The symptom was a restart loop every 2s, with the
     log repeating "Executor nao encontrado" (executor not found) forever.
     """
-    conn = _conexao()
-    ws = _FakeWS([servidor_confiavel(
+    conn = _connection()
+    ws = _FakeWS([trusted_server(
         {"type": "control", "action": "revoked", "reason": "revogado pelo admin"}
     )])
 
@@ -124,14 +124,14 @@ async def test_revoked_encerra_e_marca_deny_terminal(servidor_confiavel):
 
 
 @pytest.mark.asyncio
-async def test_shutdown_encerra_sem_marcar_deny(servidor_confiavel):
+async def test_shutdown_ends_without_marking_deny(trusted_server):
     """`shutdown` is NOT deny: the enrollment remains valid.
 
     Confusing the two would make the app offer "redo enrollment" — discarding
     the certificate — for a perfectly normal maintenance stop.
     """
-    conn = _conexao()
-    ws = _FakeWS([servidor_confiavel(
+    conn = _connection()
+    ws = _FakeWS([trusted_server(
         {"type": "control", "action": "shutdown", "reason": "manutencao"}
     )])
 
@@ -143,10 +143,10 @@ async def test_shutdown_encerra_sem_marcar_deny(servidor_confiavel):
 
 
 @pytest.mark.asyncio
-async def test_config_changed_nao_marca_deny(servidor_confiavel):
+async def test_config_changed_does_not_mark_deny(trusted_server):
     """Workspace reassignment requests a restart, not re-enrollment."""
-    conn = _conexao()
-    ws = _FakeWS([servidor_confiavel(
+    conn = _connection()
+    ws = _FakeWS([trusted_server(
         {"type": "control", "action": "config_changed", "reason": "workspace alterado"}
     )])
 
@@ -156,7 +156,7 @@ async def test_config_changed_nao_marca_deny(servidor_confiavel):
     assert conn.terminal_deny is None
 
 
-def test_close_4404_e_classificado_como_terminal():
+def test_close_4404_is_classified_as_terminal():
     """The other path of the same problem: the deny arrives as a close code, not
     as a `control` message, when the server refuses right at accept()."""
     from websockets.exceptions import ConnectionClosedError
@@ -175,9 +175,9 @@ def test_close_4404_e_classificado_como_terminal():
 
 
 @pytest.mark.asyncio
-async def test_acao_de_control_desconhecida_nao_derruba_a_conexao(servidor_confiavel):
-    conn = _conexao()
-    ws = _FakeWS([servidor_confiavel({"type": "control", "action": "acao_futura_qualquer"})])
+async def test_unknown_control_action_does_not_drop_the_connection(trusted_server):
+    conn = _connection()
+    ws = _FakeWS([trusted_server({"type": "control", "action": "acao_futura_qualquer"})])
 
     await conn._receive_loop(ws)
 
@@ -188,9 +188,9 @@ async def test_acao_de_control_desconhecida_nao_derruba_a_conexao(servidor_confi
 # ── S7: a command without a valid signature must have no effect ──────────────
 
 @pytest.mark.asyncio
-async def test_control_sem_assinatura_e_ignorado(servidor_confiavel):
+async def test_unsigned_control_is_ignored(trusted_server):
     """The original hole: writing to the WS was enough to bring the executor down."""
-    conn = _conexao()
+    conn = _connection()
     ws = _FakeWS([{"type": "control", "action": "shutdown", "reason": "injetado"}])
 
     await conn._receive_loop(ws)
@@ -200,7 +200,7 @@ async def test_control_sem_assinatura_e_ignorado(servidor_confiavel):
 
 
 @pytest.mark.asyncio
-async def test_purge_artifacts_sem_assinatura_nao_apaga_nada(tmp_path, monkeypatch):
+async def test_unsigned_purge_artifacts_deletes_nothing(tmp_path, monkeypatch):
     """`purge_artifacts` DELETES FILES from the user's disk.
 
     Without the signature requirement, anyone able to write to the WebSocket
@@ -213,7 +213,7 @@ async def test_purge_artifacts_sem_assinatura_nao_apaga_nada(tmp_path, monkeypat
     alvo.write_bytes(b"dado do cliente")
     monkeypatch.setenv("EXECUTOR_ARTIFACTS_DIR", str(raiz))
 
-    conn = _conexao()
+    conn = _connection()
     ws = _FakeWS([{
         "type": "control", "action": "purge_artifacts", "reason": "injetado",
         "artifacts": [{"id_hash": "a1", "local_path": "ws-1/run-1/dado.geojson"}],
@@ -226,8 +226,8 @@ async def test_purge_artifacts_sem_assinatura_nao_apaga_nada(tmp_path, monkeypat
 
 
 @pytest.mark.asyncio
-async def test_purge_artifacts_assinado_apaga_e_mantem_a_conexao(
-    tmp_path, monkeypatch, servidor_confiavel,
+async def test_signed_purge_artifacts_deletes_and_keeps_the_connection(
+    tmp_path, monkeypatch, trusted_server,
 ):
     """Limpeza nao e deny: o executor apaga e continua trabalhando."""
     raiz = tmp_path / "artifacts"
@@ -236,8 +236,8 @@ async def test_purge_artifacts_assinado_apaga_e_mantem_a_conexao(
     alvo.write_bytes(b"expirado")
     monkeypatch.setenv("EXECUTOR_ARTIFACTS_DIR", str(raiz))
 
-    conn = _conexao()
-    ws = _FakeWS([servidor_confiavel({
+    conn = _connection()
+    ws = _FakeWS([trusted_server({
         "type": "control", "action": "purge_artifacts", "reason": "Retencao expirada.",
         "artifacts": [{"id_hash": "a1", "local_path": "ws-1/run-1/dado.geojson"}],
     })])
@@ -250,10 +250,10 @@ async def test_purge_artifacts_assinado_apaga_e_mantem_a_conexao(
 
 
 @pytest.mark.asyncio
-async def test_control_assinado_para_outro_executor_e_ignorado(servidor_confiavel):
+async def test_control_signed_for_another_executor_is_ignored(trusted_server):
     """A legitimate command captured on another executor's channel must not be reusable."""
-    conn = _conexao()
-    ws = _FakeWS([servidor_confiavel(
+    conn = _connection()
+    ws = _FakeWS([trusted_server(
         {"type": "control", "action": "shutdown"}, executor_id="outro-executor",
     )])
 
@@ -263,12 +263,12 @@ async def test_control_assinado_para_outro_executor_e_ignorado(servidor_confiave
 
 
 @pytest.mark.asyncio
-async def test_control_com_payload_adulterado_e_ignorado(servidor_confiavel):
+async def test_control_with_tampered_payload_is_ignored(trusted_server):
     """A assinatura cobre a mensagem inteira, nao so o bloco `auth`."""
-    msg = servidor_confiavel({"type": "control", "action": "config_changed"})
+    msg = trusted_server({"type": "control", "action": "config_changed"})
     msg["action"] = "shutdown"  # troca a acao mantendo auth+signature originais
 
-    conn = _conexao()
+    conn = _connection()
     ws = _FakeWS([msg])
 
     await conn._receive_loop(ws)
@@ -278,21 +278,21 @@ async def test_control_com_payload_adulterado_e_ignorado(servidor_confiavel):
 
 
 @pytest.mark.asyncio
-async def test_replay_do_mesmo_control_e_rejeitado(servidor_confiavel):
+async def test_replay_of_the_same_control_is_rejected(trusted_server):
     """A second use of the same nonce does not pass — the first one already consumed it."""
-    msg = servidor_confiavel({"type": "control", "action": "shutdown"})
+    msg = trusted_server({"type": "control", "action": "shutdown"})
 
-    conn1 = _conexao()
+    conn1 = _connection()
     await conn1._receive_loop(_FakeWS([msg]))
     assert conn1._should_reconnect is False, "o primeiro envio deve valer"
 
-    conn2 = _conexao()
+    conn2 = _connection()
     await conn2._receive_loop(_FakeWS([msg]))
     assert conn2._should_reconnect is True, "replay do mesmo comando deve ser recusado"
 
 
 @pytest.mark.asyncio
-async def test_cancel_sem_assinatura_nao_chega_na_fila(servidor_confiavel):
+async def test_unsigned_cancel_does_not_reach_the_queue(trusted_server):
     """`cancel` tambem muda estado (interrompe job) — exige assinatura."""
     cancelados = []
 
@@ -306,7 +306,7 @@ async def test_cancel_sem_assinatura_nao_chega_na_fila(servidor_confiavel):
     assert cancelados == [], "cancel nao assinado nao pode interromper job"
 
     await conn._receive_loop(_FakeWS([
-        servidor_confiavel({"type": "cancel", "job_id": "job-legitimo"}),
+        trusted_server({"type": "cancel", "job_id": "job-legitimo"}),
     ]))
     assert cancelados == ["job-legitimo"]
 
@@ -314,7 +314,7 @@ async def test_cancel_sem_assinatura_nao_chega_na_fila(servidor_confiavel):
 # ── main(): watch the end of the connection, not just the signal ─────────────
 
 @pytest.mark.asyncio
-async def test_fim_da_conexao_libera_o_wait_sem_sinal():
+async def test_connection_end_releases_the_wait_without_signal():
     """Reproduces main()'s await: the end of conn_task must release it on its own.
 
     Before, a lone `await shutdown_event.wait()` never returned — the process
@@ -322,10 +322,10 @@ async def test_fim_da_conexao_libera_o_wait_sem_sinal():
     """
     shutdown_event = asyncio.Event()  # never set: nobody sends a signal
 
-    async def _conexao_que_encerra():
+    async def _connection_that_ends():
         await asyncio.sleep(0)  # simulates run() returning due to control
 
-    conn_task = asyncio.create_task(_conexao_que_encerra())
+    conn_task = asyncio.create_task(_connection_that_ends())
     stop_task = asyncio.create_task(shutdown_event.wait())
 
     done, _ = await asyncio.wait(
@@ -338,7 +338,7 @@ async def test_fim_da_conexao_libera_o_wait_sem_sinal():
 
 # ── Auto-restart when there is no supervisor (running directly in python) ────
 
-def test_argv_de_restart_preserva_execucao_como_modulo(monkeypatch):
+def test_restart_argv_preserves_running_as_module(monkeypatch):
     """`python -m executor` must not become `python .../__main__.py` — it would
     break the package imports."""
     import __main__ as main_mod
@@ -354,7 +354,7 @@ def test_argv_de_restart_preserva_execucao_como_modulo(monkeypatch):
     assert argv[1:3] == ["-m", "executor"]
 
 
-def test_argv_de_restart_para_script_direto(monkeypatch):
+def test_restart_argv_for_direct_script(monkeypatch):
     import __main__ as main_mod
     from executor import main as executor_main
 
@@ -365,7 +365,7 @@ def test_argv_de_restart_para_script_direto(monkeypatch):
     assert argv[1:] == ["executor/main.py", "--flag"]
 
 
-def test_em_container_nao_faz_exec_e_deixa_o_supervisor_reiniciar(monkeypatch):
+def test_in_container_does_not_exec_and_lets_the_supervisor_restart(monkeypatch):
     from executor import main as executor_main
 
     chamou = []
@@ -377,7 +377,7 @@ def test_em_container_nao_faz_exec_e_deixa_o_supervisor_reiniciar(monkeypatch):
     assert chamou == [], "em container o restart e do supervisor (exit 1)"
 
 
-def test_fora_de_container_executa_exec(monkeypatch):
+def test_outside_container_runs_exec(monkeypatch):
     from executor import main as executor_main
 
     chamou = []
@@ -389,7 +389,7 @@ def test_fora_de_container_executa_exec(monkeypatch):
     assert len(chamou) == 1, "rodando direto no python, o executor precisa se re-executar"
 
 
-def test_guarda_anti_loop_interrompe_apos_limite(monkeypatch):
+def test_anti_loop_guard_stops_after_limit(monkeypatch):
     """If the cause persists, stopping is better than an infinite re-exec spin."""
     from executor import main as executor_main
     import time
@@ -405,7 +405,7 @@ def test_guarda_anti_loop_interrompe_apos_limite(monkeypatch):
     assert chamou == []
 
 
-def test_contador_reseta_apos_a_janela(monkeypatch):
+def test_counter_resets_after_the_window(monkeypatch):
     from executor import main as executor_main
     import time
 
@@ -424,7 +424,7 @@ def test_contador_reseta_apos_a_janela(monkeypatch):
     assert len(chamou) == 1
 
 
-def test_modo_never_desabilita(monkeypatch):
+def test_never_mode_disables(monkeypatch):
     from executor import main as executor_main
 
     chamou = []

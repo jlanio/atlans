@@ -3,28 +3,28 @@
 import { useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 
-type TransicaoDeVisao = {
+type ViewTransitionLike = {
   skipTransition: () => void
   ready?: Promise<void>
 }
 
-type DocumentoComTransicao = Document & {
-  startViewTransition?: (cb: () => void | Promise<void>) => TransicaoDeVisao
+type DocumentWithTransition = Document & {
+  startViewTransition?: (cb: () => void | Promise<void>) => ViewTransitionLike
 }
 
 // Ceiling on the wait for the route commit. Routes already in cache commit in a
 // few frames; the editor's (`/workflow/[id]`) downloads React Flow and Monaco and
 // takes seconds — holding the transition for all that time would leave the
 // screen frozen on a static snapshot, which is worse than no transition at all.
-const TETO_DE_ESPERA_MS = 200
+const MAX_WAIT_MS = 200
 // Polling via `setTimeout`, and NOT via `requestAnimationFrame`: while the
 // `startViewTransition` callback has not resolved, the browser suspends
 // rendering of the document and rAF callbacks stop running. Timers don't.
-const INTERVALO_DA_SONDA_MS = 16
+const PROBE_INTERVAL_MS = 16
 
-function documentoComTransicao(): DocumentoComTransicao | null {
+function documentWithTransition(): DocumentWithTransition | null {
   if (typeof document === "undefined") return null
-  const doc = document as DocumentoComTransicao
+  const doc = document as DocumentWithTransition
   return typeof doc.startViewTransition === "function" ? doc : null
 }
 
@@ -44,8 +44,8 @@ function documentoComTransicao(): DocumentoComTransicao | null {
  * the animation: with no DOM change there is nothing to animate, and animating
  * anyway is the bug.
  */
-function navegarComTransicao(navegar: () => void, href: string) {
-  const doc = documentoComTransicao()
+function navigateWithTransition(navegar: () => void, href: string) {
+  const doc = documentWithTransition()
   if (!doc) {
     navegar()
     return
@@ -59,7 +59,7 @@ function navegarComTransicao(navegar: () => void, href: string) {
   // `startViewTransition` itself returns. It is only called after the assignment
   // has happened, but writing the direct reference inside the variable's own
   // initializer does not pass TS.
-  const transicao: { atual?: TransicaoDeVisao } = {}
+  const transicao: { atual?: ViewTransitionLike } = {}
 
   transicao.atual = doc.startViewTransition(
     () =>
@@ -80,11 +80,11 @@ function navegarComTransicao(navegar: () => void, href: string) {
 
         const verificar = () => {
           if (window.location.pathname === destino) return encerrar(true)
-          if (Date.now() - inicio >= TETO_DE_ESPERA_MS) return encerrar(false)
-          sonda = setTimeout(verificar, INTERVALO_DA_SONDA_MS)
+          if (Date.now() - inicio >= MAX_WAIT_MS) return encerrar(false)
+          sonda = setTimeout(verificar, PROBE_INTERVAL_MS)
         }
 
-        sonda = setTimeout(verificar, INTERVALO_DA_SONDA_MS)
+        sonda = setTimeout(verificar, PROBE_INTERVAL_MS)
       }),
   )
 
@@ -103,7 +103,7 @@ export function useViewTransitionRouter() {
   const router = useRouter()
 
   const push = useCallback(
-    (href: string) => navegarComTransicao(() => router.push(href), href),
+    (href: string) => navigateWithTransition(() => router.push(href), href),
     [router],
   )
 

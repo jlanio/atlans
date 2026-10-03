@@ -60,17 +60,17 @@ def _publisher():
 # ── P7: log lazy ─────────────────────────────────────────────────────────────
 
 class TestLazySummary:
-    def test_str_resume_dict_sem_materializar_payload(self):
+    def test_str_summarizes_dict_without_materializing_payload(self):
         """__str__ returns the per-key summary, not the payload's repr."""
         payload = {"body": "x" * 10_000}
         resumo = str(_LazySummary(payload))
         assert "body" in resumo
         assert len(resumo) < 1_000, "resumo não pode carregar o payload inteiro"
 
-    def test_nao_dict_nao_explode(self):
+    def test_non_dict_does_not_blow_up(self):
         assert str(_LazySummary(["a", "b"])) == "<list>"
 
-    def test_logger_acima_de_debug_nao_chama_str(self, caplog):
+    def test_logger_above_debug_does_not_call_str(self, caplog):
         """
         With the level above DEBUG, logging does not even touch the argument — that is
         what makes the per-node log free. If someone goes back to using an f-string,
@@ -78,17 +78,17 @@ class TestLazySummary:
         """
         chamadas = []
 
-        class _Espiao(_LazySummary):
+        class _Spy(_LazySummary):
             def __str__(self):
                 chamadas.append(1)
                 return "!"
 
         logger = logging.getLogger("teste.lazy.summary")
         logger.setLevel(logging.WARNING)
-        logger.debug("inputs %s", _Espiao({"a": 1}))
+        logger.debug("inputs %s", _Spy({"a": 1}))
         assert chamadas == [], "o resumo foi construído mesmo com nível acima de DEBUG"
 
-    def test_run_node_nao_loga_inputs_em_info(self, caplog):
+    def test_run_node_does_not_log_inputs_at_info(self, caplog):
         """The inputs payload must not appear in INFO-level logs."""
         definition = {"nodes": [_node("n1")], "edges": []}
         executor = WorkflowExecutor(definition, task_id="fix-core-log-1", publisher=_publisher())
@@ -99,8 +99,8 @@ class TestLazySummary:
 
 # ── P3: spill returns the light reference ────────────────────────────────────
 
-class TestSpillSubstituiPayload:
-    def test_alias_e_final_outputs_recebem_o_payload_real(self, tmp_path, monkeypatch):
+class TestSpillReplacesPayload:
+    def test_alias_and_final_outputs_receive_the_real_payload(self, tmp_path, monkeypatch):
         """The spill must NOT leak the light reference into `named`/`final_outputs`.
 
         Regression guard. Returning the spilled dict would lower peak RAM,
@@ -121,7 +121,7 @@ class TestSpillSubstituiPayload:
         # n1's output through that path, so the Parquet must exist. What
         # this test proves is that the light ref does not leak into `named`/
         # `final_outputs`; the load failure path has its own test
-        # (test_executor_correcao_auditoria::test_spill_nao_restaurado_levanta).
+        # (test_executor_correcao_auditoria::test_unrestored_spill_raises).
         real = tmp_path / "leve.parquet"
         _gdf(3).to_parquet(real)
         leve = {"output": {"__spilled__": True, "__spill_path__": str(real),
@@ -158,7 +158,7 @@ class TestSpillSubstituiPayload:
             "`named` antes do Jinja"
         )
 
-    def test_sem_spill_devolve_o_proprio_dict(self, monkeypatch):
+    def test_without_spill_returns_the_same_dict(self, monkeypatch):
         """Without spill (identical return), nothing changes: returns the original dict."""
         monkeypatch.setattr("flow.executor.core._spill_to_disk",
                             lambda task_id, node_id, outputs: outputs)
@@ -196,14 +196,14 @@ class TestSpillReal:
         monkeypatch.setattr(spill_mod, "_SPILL_BASE_DIR", str(tmp_path / "spill"))
         monkeypatch.setattr(spill_mod, "_SPILL_THRESHOLD_MB", 0.001)
 
-    def test_alias_entrega_o_dado_real_e_o_parquet_e_limpo(self, tmp_path, monkeypatch):
+    def test_alias_delivers_real_data_and_parquet_is_cleaned(self, tmp_path, monkeypatch):
         gpd = pytest.importorskip("geopandas")
         self._tmp_spill(tmp_path, monkeypatch)
 
         real_spill = spill_mod._spill_to_disk
         paths: list[str] = []
 
-        def _espia(task_id, node_id, outputs):
+        def _spy(task_id, node_id, outputs):
             resultado = real_spill(task_id, node_id, outputs)
             for valor in resultado.values():
                 if isinstance(valor, dict) and valor.get("__spilled__"):
@@ -213,7 +213,7 @@ class TestSpillReal:
                     )
             return resultado
 
-        monkeypatch.setattr("flow.executor.core._spill_to_disk", _espia)
+        monkeypatch.setattr("flow.executor.core._spill_to_disk", _spy)
 
         origem = _gdf(200)
         definition = {
@@ -248,7 +248,7 @@ class TestSpillReal:
             "_spill_cache continua segurando os GeoDataFrames relidos"
         )
 
-    def test_run_cancelado_nao_deixa_parquet_orfao(self, tmp_path, monkeypatch):
+    def test_cancelled_run_leaves_no_orphan_parquet(self, tmp_path, monkeypatch):
         """P3.1b: the cleanup's rmtree must not run before the spill thread.
 
         `asyncio.to_thread` is not cancellable. Without the drain, the `finally` of
@@ -263,23 +263,23 @@ class TestSpillReal:
         self._tmp_spill(tmp_path, monkeypatch)
         real_spill = spill_mod._spill_to_disk
 
-        def _lento(task_id, node_id, outputs):
+        def _slow(task_id, node_id, outputs):
             # Ensures the thread is still alive when wait_for times out.
             time.sleep(0.4)
             return real_spill(task_id, node_id, outputs)
 
-        monkeypatch.setattr("flow.executor.core._spill_to_disk", _lento)
+        monkeypatch.setattr("flow.executor.core._spill_to_disk", _slow)
 
         definition = {"nodes": [_trigger("n1")], "edges": []}
         executor = WorkflowExecutor(definition, task_id="spill-cancel-1", publisher=_publisher())
 
-        async def _corre():
+        async def _runs():
             with pytest.raises(asyncio.TimeoutError):
                 await asyncio.wait_for(
                     executor.run(initial_inputs={"gdf": _gdf(200)}), timeout=0.1
                 )
 
-        asyncio.run(_corre())
+        asyncio.run(_runs())
 
         assert list(tmp_path.rglob("*.parquet")) == [], (
             "o cleanup correu antes da thread de spill terminar — Parquet órfão"
@@ -288,8 +288,8 @@ class TestSpillReal:
 
 # ── P3: context without duplicated references ────────────────────────────────
 
-class TestContextoSemDuplicatas:
-    def test_nodes_do_contexto_e_o_dict_vivo(self):
+class TestContextWithoutDuplicates:
+    def test_context_nodes_is_the_live_dict(self):
         definition = {
             "nodes": [_node("n1"), _node("n2")],
             "edges": [_edge("n1", "n2")],
@@ -299,7 +299,7 @@ class TestContextoSemDuplicatas:
 
         assert executor.expression_context["nodes"] is executor.all_node_outputs
 
-    def test_alias_vive_apenas_em_named(self):
+    def test_alias_lives_only_in_named(self):
         definition = {"nodes": [_node("n1", alias="Alvo")], "edges": []}
         executor = WorkflowExecutor(definition, task_id="fix-core-ctx-2", publisher=_publisher())
         asyncio.run(executor.run(initial_inputs={}))
@@ -312,8 +312,8 @@ class TestContextoSemDuplicatas:
 
 # ── P3: spill cleanup on the failure path ────────────────────────────────────
 
-class TestCleanupEmFalha:
-    def test_cleanup_roda_quando_no_falha(self, monkeypatch):
+class TestCleanupOnFailure:
+    def test_cleanup_runs_when_node_fails(self, monkeypatch):
         chamadas = []
         monkeypatch.setattr("flow.executor.core._cleanup_spill",
                             lambda task_id, is_nested=False: chamadas.append(task_id))

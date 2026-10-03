@@ -22,35 +22,35 @@ import copy
 
 from app.core import config
 
-NO_DA_CARTA = "CartaImagem"
+IMAGE_MAP_NODE = "CartaImagem"
 
 
-SEM_FUNDO: dict[str, str] = {"url": "", "credito": ""}
+NO_BASEMAP: dict[str, str] = {"url": "", "credito": ""}
 
 
-def _propriedades(no: dict) -> list[dict]:
+def _property_dicts(no: dict) -> list[dict]:
     """Every property dictionary of the node: the executor reads `properties`,
     and the canvas writes to `data.properties`."""
-    achadas = []
+    found = []
     if isinstance(no.get("properties"), dict):
-        achadas.append(no["properties"])
+        found.append(no["properties"])
     dados = no.get("data")
     if isinstance(dados, dict) and isinstance(dados.get("properties"), dict):
-        achadas.append(dados["properties"])
-    return achadas
+        found.append(dados["properties"])
+    return found
 
 
-def injetar_fundos_de_mapa(definition: dict, fundos: dict[str, dict[str, str]] | None = None) -> dict:
+def inject_basemaps(definition: dict, fundos: dict[str, dict[str, str]] | None = None) -> dict:
     """The definition with the installation basemap in each Carta node (a copy, if it changes)."""
     nos = definition.get("nodes") if isinstance(definition, dict) else None
-    if not nos or not any(isinstance(n, dict) and n.get("name") == NO_DA_CARTA for n in nos):
+    if not nos or not any(isinstance(n, dict) and n.get("name") == IMAGE_MAP_NODE for n in nos):
         return definition
     fundos = config.MAPA_FUNDOS if fundos is None else fundos
     enriched = copy.deepcopy(definition)
     for no in enriched["nodes"]:
-        if not isinstance(no, dict) or no.get("name") != NO_DA_CARTA:
+        if not isinstance(no, dict) or no.get("name") != IMAGE_MAP_NODE:
             continue
-        for props in _propriedades(no):
+        for props in _property_dicts(no):
             fundo = str(props.get("fundo") or "nenhum").strip().lower()
-            props["fundo_da_instalacao"] = dict(fundos.get(fundo) or SEM_FUNDO)
+            props["fundo_da_instalacao"] = dict(fundos.get(fundo) or NO_BASEMAP)
     return enriched

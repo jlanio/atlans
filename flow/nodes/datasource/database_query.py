@@ -9,7 +9,7 @@ from flow.utils.get_asyncpg_pool import get_asyncpg_pool
 from flow.utils.logger import get_logger
 from flow.utils.query_param_formatter import prepare_query, resolver_query_params
 from flow.utils.sql_guard import validate_readonly_sql
-from flow.utils.credencial import obter_conexao
+from flow.utils.credencial import get_connection
 
 logger = get_logger(__name__)
 
@@ -89,7 +89,7 @@ class DatabaseQuery(BaseNode):
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         self.validate()
-        conn_str     = obter_conexao(self.parameters)
+        conn_str     = get_connection(self.parameters)
         raw_query    = self.parameters.get('query', '')
         query_params = resolver_query_params(inputs, self.parameters)
 

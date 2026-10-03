@@ -48,13 +48,13 @@ TIPOS = ("string", "number", "boolean", "object")
 # Pure integer: this is what decides between `int` and `float`. Without it, "3"
 # would become `3.0` and a node that indexes a list or builds pagination would
 # receive a float.
-_INTEIRO = re.compile(r"^-?\d+$")
+_INTEGER = re.compile(r"^-?\d+$")
 
 # Accepted spellings for a boolean in text. Includes `nao` without the accent
 # because people writing on the command line rarely use accents, and refusing
 # because of the tilde would be an error with no gain at all.
-_VERDADEIRO = frozenset({"true", "1", "yes", "sim"})
-_FALSO = frozenset({"false", "0", "no", "não", "nao"})
+_TRUTHY = frozenset({"true", "1", "yes", "sim"})
+_FALSY = frozenset({"false", "0", "no", "não", "nao"})
 
 # Nesting ceiling for an `object`. A real workflow parameter stays far below
 # it — a FeatureCollection of MultiPolygons reaches 8 levels. Up to Python 3.11
@@ -63,12 +63,12 @@ _FALSO = frozenset({"false", "0", "no", "não", "nao"})
 # 2000 levels pass — the object went on and blew the stack in whoever traversed
 # it later (validation, copying, the executor), far from this layer, which
 # exists to return `validation`. Explicit, it holds the same in any version.
-_PROFUNDIDADE_MAXIMA = 100
+_MAX_DEPTH = 100
 
-HINT_SEM_CONTRATO = "params_schema ausente ou malformado: inputs não validados"
+HINT_NO_CONTRACT = "params_schema ausente ou malformado: inputs não validados"
 
 
-def _schema_valido(params_schema: Any) -> bool:
+def _is_valid_schema(params_schema: Any) -> bool:
     """Does the `params_schema` describe a contract? (run screen format)
 
     A non-empty dict whose values are all dicts with a known `type`. The EMPTY
@@ -83,7 +83,7 @@ def _schema_valido(params_schema: Any) -> bool:
     )
 
 
-def _para_numero(valor: Any) -> tuple[Any, str | None]:
+def _to_number(valor: Any) -> tuple[Any, str | None]:
     # `bool` is a subclass of `int` in Python: without this line, `True` would
     # pass as the number 1 and the workflow would receive a boolean where it
     # expects a quantity.
@@ -98,7 +98,7 @@ def _para_numero(valor: Any) -> tuple[Any, str | None]:
     texto = valor.strip()
     if not texto:
         return None, "esperado number; string vazia não é zero"
-    if _INTEIRO.match(texto):
+    if _INTEGER.match(texto):
         # The `try` is not superfluous: since 3.10.7 the interpreter imposes a
         # ceiling of 4300 digits (`sys.set_int_max_str_digits`) for converting
         # text to int, and above it `int()` raises `ValueError`. Letting it
@@ -119,7 +119,7 @@ def _para_numero(valor: Any) -> tuple[Any, str | None]:
     return numero, None
 
 
-def _para_booleano(valor: Any) -> tuple[Any, str | None]:
+def _to_boolean(valor: Any) -> tuple[Any, str | None]:
     if isinstance(valor, bool):
         return valor, None
     if not isinstance(valor, str):
@@ -127,14 +127,14 @@ def _para_booleano(valor: Any) -> tuple[Any, str | None]:
         # boolean writes `true` or sends the string "1".
         return None, "esperado boolean"
     texto = valor.strip().lower()
-    if texto in _VERDADEIRO:
+    if texto in _TRUTHY:
         return True, None
-    if texto in _FALSO:
+    if texto in _FALSY:
         return False, None
     return None, "esperado boolean (true/false, 1/0, yes/no, sim/não)"
 
 
-def _para_texto(valor: Any) -> tuple[Any, str | None]:
+def _to_text(valor: Any) -> tuple[Any, str | None]:
     if isinstance(valor, str):
         return valor, None
     if isinstance(valor, bool):
@@ -147,8 +147,8 @@ def _para_texto(valor: Any) -> tuple[Any, str | None]:
     return None, "esperado string"
 
 
-def _fundo_demais(valor: Any) -> bool:
-    """Does the `object` exceed `_PROFUNDIDADE_MAXIMA` levels? (the root is level 1)
+def _too_deep(valor: Any) -> bool:
+    """Does the `object` exceed `_MAX_DEPTH` levels? (the root is level 1)
 
     Iterative on purpose — measuring recursively would blow the stack in the
     very case the measurement exists to refuse — and one level per pass, with
@@ -157,7 +157,7 @@ def _fundo_demais(valor: Any) -> bool:
     hundreds of milliseconds in the item-by-item loop.
     """
     nivel = [valor]
-    for _ in range(_PROFUNDIDADE_MAXIMA):
+    for _ in range(_MAX_DEPTH):
         nivel = [
             filho
             for conteiner in nivel
@@ -169,7 +169,7 @@ def _fundo_demais(valor: Any) -> bool:
     return True
 
 
-def _para_objeto(valor: Any) -> tuple[Any, str | None]:
+def _to_object(valor: Any) -> tuple[Any, str | None]:
     if isinstance(valor, (dict, list)):
         decodificado = valor
     elif not isinstance(valor, str):
@@ -190,20 +190,20 @@ def _para_objeto(valor: Any) -> tuple[Any, str | None]:
             return None, "esperado object; o texto enviado não é JSON válido"
         if not isinstance(decodificado, (dict, list)):
             return None, "esperado object; o JSON enviado não é objeto nem lista"
-    if _fundo_demais(decodificado):
-        return None, f"esperado object; aninhamento acima de {_PROFUNDIDADE_MAXIMA} níveis"
+    if _too_deep(decodificado):
+        return None, f"esperado object; aninhamento acima de {_MAX_DEPTH} níveis"
     return decodificado, None
 
 
-_COERCOES = {
-    "string": _para_texto,
-    "number": _para_numero,
-    "boolean": _para_booleano,
-    "object": _para_objeto,
+_COERCIONS = {
+    "string": _to_text,
+    "number": _to_number,
+    "boolean": _to_boolean,
+    "object": _to_object,
 }
 
 
-def validar_inputs(params_schema: Any, inputs: dict | None) -> tuple[dict, list[str]]:
+def validate_inputs(params_schema: Any, inputs: dict | None) -> tuple[dict, list[str]]:
     """Checks `inputs` against `params_schema` and returns `(inputs, hints)`.
 
     Errors are AGGREGATED into a single `validation` `ToolError` with
@@ -229,8 +229,8 @@ def validar_inputs(params_schema: Any, inputs: dict | None) -> tuple[dict, list[
             errors=[{"path": "inputs", "message": "esperado object"}],
         )
 
-    if not _schema_valido(params_schema):
-        hints.append(HINT_SEM_CONTRATO)
+    if not _is_valid_schema(params_schema):
+        hints.append(HINT_NO_CONTRACT)
         return recebidos, hints
 
     saida: dict[str, Any] = {}
@@ -238,7 +238,7 @@ def validar_inputs(params_schema: Any, inputs: dict | None) -> tuple[dict, list[
 
     for nome, decl in params_schema.items():
         caminho = f"inputs.{nome}"
-        coagir = _COERCOES[decl["type"]]
+        coerce = _COERCIONS[decl["type"]]
         # An explicit `None` counts as absence: none of the four types accepts
         # null, so treating it as a value would only produce a worse error
         # ("expected string") in place of the right one ("required").
@@ -260,7 +260,7 @@ def validar_inputs(params_schema: Any, inputs: dict | None) -> tuple[dict, list[
                 # The default is coerced too: a `"5"` written in the schema has to
                 # reach the executor as 5, otherwise the omitted value behaves
                 # differently from the typed value.
-                valor, problema = coagir(padrao)
+                valor, problema = coerce(padrao)
                 if problema:
                     erros.append({"path": caminho, "message": f"default do params_schema inválido: {problema}"})
                 else:
@@ -269,19 +269,19 @@ def validar_inputs(params_schema: Any, inputs: dict | None) -> tuple[dict, list[
                 erros.append({"path": caminho, "message": "obrigatório e sem default"})
             continue
 
-        valor, problema = coagir(recebidos[nome])
+        valor, problema = coerce(recebidos[nome])
         if problema:
             erros.append({"path": caminho, "message": problema})
         else:
             saida[nome] = valor
 
-    nao_declaradas = [nome for nome in recebidos if nome not in params_schema]
-    for nome in nao_declaradas:
+    undeclared = [nome for nome in recebidos if nome not in params_schema]
+    for nome in undeclared:
         saida[nome] = recebidos[nome]
-    if nao_declaradas:
+    if undeclared:
         hints.append(
             "chaves fora do params_schema, enviadas sem conferência: "
-            + ", ".join(sorted(nao_declaradas))
+            + ", ".join(sorted(undeclared))
         )
 
     if erros:

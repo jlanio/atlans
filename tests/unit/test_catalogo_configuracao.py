@@ -25,7 +25,7 @@ RAIZ = Path(__file__).resolve().parents[2]
     ("", ""),                          # vazia: desliga
     ("  /dados/vault  ", "/dados/vault"),
 ])
-def test_vazia_desliga_e_ausente_vale_o_padrao(valor, esperado):
+def test_empty_disables_and_absent_uses_the_default(valor, esperado):
     env = {k: v for k, v in os.environ.items() if k != "FONTES_CATALOGO_DIR"}
     if valor is not None:
         env["FONTES_CATALOGO_DIR"] = valor
@@ -37,7 +37,7 @@ def test_vazia_desliga_e_ausente_vale_o_padrao(valor, esperado):
     assert r.stdout.strip() == repr(esperado)
 
 
-def test_o_compose_repassa_as_fontes_e_o_vazio_chega_vazio():
+def test_compose_passes_the_sources_and_empty_arrives_empty():
     compose = (RAIZ / "docker-compose.yml").read_text(encoding="utf-8")
     # Without the colon: `${X-padrao}` only uses the default when X doesn't exist.
     assert "FONTES_CATALOGO_DIR: ${FONTES_CATALOGO_DIR-catalogo/geoservicos}" in compose

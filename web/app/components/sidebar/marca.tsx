@@ -3,7 +3,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
 import { useSidebar } from "../ui/sidebar"
-import { useNomeNaTela } from "../share/nome-na-tela"
+import { useDisplayName } from "../share/nome-na-tela"
 import TitleSidebar from "./title-sidebar"
 
 /**
@@ -32,7 +32,7 @@ import TitleSidebar from "./title-sidebar"
  * the wordmark. Exported because the Home's sign-in modal puts it in the card
  * header — outside the sidebar, without `useSidebar`.
  */
-export function GlifoDaMarca() {
+export function BrandGlyph() {
   return (
     <span
       aria-hidden
@@ -57,9 +57,9 @@ export default function Marca({
   tooltip?: React.ComponentProps<typeof TooltipContent>
 }) {
   const { state, isMobile } = useSidebar()
-  const nome = useNomeNaTela()
+  const nome = useDisplayName()
 
-  const glifo = <GlifoDaMarca />
+  const glyph = <BrandGlyph />
   const wordmark = (
     <TitleSidebar
       title={nome}
@@ -72,7 +72,7 @@ export default function Marca({
   if (!href) {
     return (
       <span className={classe}>
-        {glifo}
+        {glyph}
         {wordmark}
       </span>
     )
@@ -85,7 +85,7 @@ export default function Marca({
       // without a permanent box competing with the list.
       className={cn(classe, "rounded-md transition-opacity hover:opacity-80")}
     >
-      {glifo}
+      {glyph}
       {wordmark}
     </Link>
   )

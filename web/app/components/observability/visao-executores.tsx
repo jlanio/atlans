@@ -3,11 +3,11 @@
 import { TbChevronRight, TbServer } from "react-icons/tb"
 import { Skeleton } from "@/app/components/ui/skeleton"
 import { CartaoDeEstado } from "@/app/components/shared/estados"
-import { CABECALHO_DE_COLUNAS, CELULA_COM_ROTULO, DESTAQUE_DA_FICHA, LINHA_EMPILHADA } from "@/app/components/shared/tabela-empilhada"
+import { COLUMN_HEADER, LABELED_CELL, CARD_HIGHLIGHT, STACKED_ROW } from "@/app/components/shared/tabela-empilhada"
 import { cn } from "@/lib/utils"
 import type { IExecutorMetrics } from "@/service/types"
 import { successRateColor } from "@/utils/formatters"
-import { formatarDuracao, formatarInicio, formatarInteiro, formatarPercentual } from "@/lib/formatos"
+import { formatarDuracao, formatarInicio, formatInteger, formatPercent } from "@/lib/formatos"
 
 interface Props {
   linhas: IExecutorMetrics[]
@@ -17,7 +17,7 @@ interface Props {
 
 /** "2 de 4 em execução · 12 na fila" from the published capacity; "—" without it. */
 /** "geo-01@3f2a1" → name "geo-01", suffix "@3f2a1"; without "@", it is all name. */
-export function nomeDoExecutor(displayName: string): { nome: string; sufixo: string | null } {
+export function executorName(displayName: string): { nome: string; sufixo: string | null } {
   const i = displayName.indexOf("@")
   if (i <= 0) return { nome: displayName, sufixo: null }
   return { nome: displayName.slice(0, i), sufixo: displayName.slice(i) }
@@ -26,7 +26,7 @@ export function nomeDoExecutor(displayName: string): { nome: string; sufixo: str
 export function textoDeAgora(cap: IExecutorMetrics["capacity"]): string {
   if (!cap) return "—"
   const partes = [`${cap.running} de ${cap.max_concurrent} em execução`]
-  if (cap.queued > 0) partes.push(`${formatarInteiro(cap.queued)} na fila`)
+  if (cap.queued > 0) partes.push(`${formatInteger(cap.queued)} na fila`)
   return partes.join(" · ")
 }
 
@@ -67,7 +67,7 @@ export function VisaoExecutores({ linhas, carregando, onVerExecucoes }: Props) {
     <div className="flex flex-col rounded-lg border bg-card shadow-xs">
       <div className="overflow-x-auto rounded-t-lg">
         <table className="w-full text-sm max-md:block md:min-w-[820px]">
-          <thead className={CABECALHO_DE_COLUNAS}>
+          <thead className={COLUMN_HEADER}>
             <tr className="border-b bg-muted/40 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
               <th scope="col" className="px-3 py-2 text-left">Executor</th>
               <th scope="col" className="px-3 py-2 text-left">Agora</th>
@@ -100,10 +100,10 @@ export function VisaoExecutores({ linhas, carregando, onVerExecucoes }: Props) {
                       ? "cursor-pointer hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50"
                       : "text-muted-foreground/80",
                     "max-md:min-h-10",
-                    LINHA_EMPILHADA,
+                    STACKED_ROW,
                   )}
                 >
-                  <td className={cn("px-3 py-2.5 align-middle", DESTAQUE_DA_FICHA)}>
+                  <td className={cn("px-3 py-2.5 align-middle", CARD_HIGHLIGHT)}>
                     <span className="inline-flex min-w-0 items-center gap-2">
                       {!ex.unassigned && (
                         <span
@@ -116,9 +116,9 @@ export function VisaoExecutores({ linhas, carregando, onVerExecucoes }: Props) {
                           with the same name, not what the person recognizes — it
                           stays smaller and dimmed, next to the name. */}
                       <span className="truncate font-medium" title={ex.agent_host ?? undefined}>
-                        {nomeDoExecutor(ex.display_name).nome}
-                        {nomeDoExecutor(ex.display_name).sufixo && (
-                          <span className="ml-1 text-[11px] font-normal text-muted-foreground">{nomeDoExecutor(ex.display_name).sufixo}</span>
+                        {executorName(ex.display_name).nome}
+                        {executorName(ex.display_name).sufixo && (
+                          <span className="ml-1 text-[11px] font-normal text-muted-foreground">{executorName(ex.display_name).sufixo}</span>
                         )}
                       </span>
                       {ex.is_default && (
@@ -132,21 +132,21 @@ export function VisaoExecutores({ linhas, carregando, onVerExecucoes }: Props) {
                     {ex.unassigned ? "—" : textoDeAgora(ex.capacity)}
                     {saturado && <span className="sr-only"> (no teto)</span>}
                   </td>
-                  <td data-rotulo="execuções" className={cn("px-3 py-2.5 text-right align-middle tabular-nums", CELULA_COM_ROTULO)}>
-                    <span className="font-medium">{formatarInteiro(ex.total_runs)}</span>
-                    <span className="ml-1.5 text-xs text-muted-foreground" aria-hidden="true">✓ {formatarInteiro(ex.success_runs)} · ✗ {formatarInteiro(ex.failed_runs)}</span>
-                    <span className="sr-only">, {formatarInteiro(ex.success_runs)} concluídas, {formatarInteiro(ex.failed_runs)} falhas</span>
+                  <td data-rotulo="execuções" className={cn("px-3 py-2.5 text-right align-middle tabular-nums", LABELED_CELL)}>
+                    <span className="font-medium">{formatInteger(ex.total_runs)}</span>
+                    <span className="ml-1.5 text-xs text-muted-foreground" aria-hidden="true">✓ {formatInteger(ex.success_runs)} · ✗ {formatInteger(ex.failed_runs)}</span>
+                    <span className="sr-only">, {formatInteger(ex.success_runs)} concluídas, {formatInteger(ex.failed_runs)} falhas</span>
                   </td>
-                  <td data-rotulo="sucesso" className={cn("px-3 py-2.5 text-right align-middle tabular-nums", CELULA_COM_ROTULO)}>
+                  <td data-rotulo="sucesso" className={cn("px-3 py-2.5 text-right align-middle tabular-nums", LABELED_CELL)}>
                     {ex.total_runs > 0
-                      ? <span className={cn("font-medium", successRateColor(ex.success_rate, "amber"))}>{formatarPercentual(ex.success_rate, 0)}</span>
+                      ? <span className={cn("font-medium", successRateColor(ex.success_rate, "amber"))}>{formatPercent(ex.success_rate, 0)}</span>
                       : <span className="text-muted-foreground">—</span>}
                   </td>
-                  <td data-rotulo="típica" className={cn("px-3 py-2.5 text-right align-middle tabular-nums", CELULA_COM_ROTULO)}>
+                  <td data-rotulo="típica" className={cn("px-3 py-2.5 text-right align-middle tabular-nums", LABELED_CELL)}>
                     {/* Only the median: the mean includes failures, zeros and orphans — the number the redesign took off the screen. */}
                     {formatarDuracao(ex.p50_seconds)}
                   </td>
-                  <td data-rotulo="última" className={cn("px-3 py-2.5 align-middle text-xs tabular-nums whitespace-nowrap text-muted-foreground", CELULA_COM_ROTULO)} title={ex.last_run_at ?? undefined}>
+                  <td data-rotulo="última" className={cn("px-3 py-2.5 align-middle text-xs tabular-nums whitespace-nowrap text-muted-foreground", LABELED_CELL)} title={ex.last_run_at ?? undefined}>
                     {formatarInicio(ex.last_run_at)}
                   </td>
                   <td className="w-8 px-2 py-2.5 text-right align-middle text-muted-foreground max-md:hidden">

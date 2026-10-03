@@ -20,7 +20,7 @@ import WFSHelper from "@/app/components/workflow/nodes-configuration/wfs-helper"
 type Valores = Record<string, string | number | boolean>
 
 const URL_WFS = "https://geo.exemplo.gov.br/geoserver/ows"
-const CAMADAS = [
+const LAYERS = [
   { name: "ns:publica", title: "Pública" },
   { name: "ns:protegida", title: "Protegida" },
 ]
@@ -38,7 +38,7 @@ function buscar() {
 
 beforeEach(() => {
   http.get.mockReset()
-  http.get.mockResolvedValue({ data: { layers: CAMADAS } })
+  http.get.mockResolvedValue({ data: { layers: LAYERS } })
 })
 afterEach(cleanup)
 

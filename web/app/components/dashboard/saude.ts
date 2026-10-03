@@ -5,7 +5,7 @@ import { formatarDuracao, plural } from "@/lib/formatos"
  * Dashboard health — the tone and the ONE-sentence verdict at the top of the
  * Dashboard (docs/specs/dashboard.md §3.4). Pure: receives the instant (`now`)
  * the metrics already bring, a `temAtencao` (for the tone) and the count per
- * type of the items in the "Precisa de atenção" list (`ResumoDaAtencao`), both
+ * type of the items in the "Precisa de atenção" list (`AttentionSummary`), both
  * derived in `index` from `observability/atencao.ts` — so health doesn't
  * reimplement `top_failing` and still says "2 workflows falhando" instead of
  * something generic.
@@ -15,7 +15,7 @@ import { formatarDuracao, plural } from "@/lib/formatos"
  * envelope is `saude-hero.tsx`; only the decision lives here.
  */
 
-export type TomDeSaude = "calmo" | "atencao" | "critico"
+export type HealthTone = "calmo" | "atencao" | "critico"
 
 /**
  * Count per type of the "Precisa de atenção" items (`index` counts the list
@@ -23,7 +23,7 @@ export type TomDeSaude = "calmo" | "atencao" | "critico"
  * rereading `top_failing`. Stuck runs do NOT go in here: they have their own
  * reason (with the "há X"), and counting them again would duplicate the verdict.
  */
-export interface ResumoDaAtencao {
+export interface AttentionSummary {
   /** Workflows with repeated failures in the list. */
   falhas: number
   /** Executors at their ceiling in the list. */
@@ -38,7 +38,7 @@ export interface ResumoDaAtencao {
  *   there are items in the "Precisa de atenção" list (`temAtencao`, from `index`).
  * - calm: none of the above.
  */
-export function tomDeSaude(now: INowBlock | null | undefined, temAtencao: boolean): TomDeSaude {
+export function tomDeSaude(now: INowBlock | null | undefined, temAtencao: boolean): HealthTone {
   const { online, total } = now?.executors ?? { online: 0, total: 0 }
   const presas = now?.stuck_count ?? 0
   if (presas > 0 || (total > 0 && online === 0)) return "critico"
@@ -57,15 +57,15 @@ export function tomDeSaude(now: INowBlock | null | undefined, temAtencao: boolea
  * `resumo` (the list already built in `index`), so we say "2 workflows
  * falhando" instead of something generic, without rereading `top_failing`.
  */
-export function motivosDeSaude(now: INowBlock | null | undefined, resumo: ResumoDaAtencao): string[] {
+export function motivosDeSaude(now: INowBlock | null | undefined, resumo: AttentionSummary): string[] {
   const motivos: string[] = []
 
   // 1. Stuck runs: `now.stuck` already comes oldest to newest; the "há X" is the
   // oldest one's. Without the list (only the count) we show just the number.
   const presas = now?.stuck_count ?? 0
   if (presas > 0) {
-    const maisAntiga = now?.stuck?.[0]
-    const quanto = maisAntiga ? ` há ${formatarDuracao(maisAntiga.elapsed_seconds)}` : ""
+    const oldest = now?.stuck?.[0]
+    const quanto = oldest ? ` há ${formatarDuracao(oldest.elapsed_seconds)}` : ""
     motivos.push(`${plural(presas, "execução presa", "execuções presas")}${quanto}`)
   }
 
@@ -108,8 +108,8 @@ export function motivosDeSaude(now: INowBlock | null | undefined, resumo: Resumo
  */
 export function veredito(
   now: INowBlock | null | undefined,
-  tom: TomDeSaude,
-  resumo: ResumoDaAtencao,
+  tom: HealthTone,
+  resumo: AttentionSummary,
   semExecucoes = false,
 ): string {
   if (tom === "calmo") {

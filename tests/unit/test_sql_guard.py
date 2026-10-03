@@ -22,38 +22,38 @@ from flow.utils.sql_guard import (
 class TestStripSqlLiterals:
     """The scanner must be a single pass — comments and strings delimit each other."""
 
-    def test_comentario_de_linha_vira_espaco(self):
+    def test_line_comment_becomes_space(self):
         assert strip_sql_literals("SELECT 1 -- nota\nFROM t").split() == ["SELECT", "1", "FROM", "t"]
 
-    def test_comentario_de_linha_no_fim_sem_quebra(self):
+    def test_line_comment_at_end_without_newline(self):
         assert "nota" not in strip_sql_literals("SELECT 1 FROM t -- nota")
 
-    def test_bloco_aninhado(self):
+    def test_nested_block(self):
         # Postgres allows /* a /* b */ c */ — count depth, do not stop at the 1st */
         assert strip_sql_literals("SELECT /* a /* b */ c */ 1").split() == ["SELECT", "1"]
 
-    def test_traco_duplo_dentro_de_string_nao_e_comentario(self):
+    def test_double_dash_inside_string_is_not_a_comment(self):
         codigo = strip_sql_literals("SELECT * FROM t WHERE obs = 'a--b' AND id = 1")
         assert "AND" in codigo and "id" in codigo
 
-    def test_fecha_bloco_dentro_de_comentario_de_linha_nao_conta(self):
+    def test_block_close_inside_line_comment_does_not_count(self):
         # The `*/` is inside the line comment: it closes no block.
         assert "carro" not in strip_sql_literals("SELECT 1 -- fim */ do carro\nFROM t")
 
-    def test_aspa_dobrada_escapa(self):
+    def test_doubled_quote_escapes(self):
         assert "b" not in strip_sql_literals("SELECT 'a''b' FROM t")
 
-    def test_string_e_com_backslash(self):
+    def test_e_string_with_backslash(self):
         codigo = strip_sql_literals(r"SELECT * FROM t WHERE x = E'a\'--' AND y = 2")
         assert "AND" in codigo and "y" in codigo
 
-    def test_identificador_quotado(self):
+    def test_quoted_identifier(self):
         assert "do" not in strip_sql_literals('SELECT t."do" FROM t')
 
     def test_dollar_quoting(self):
         assert "carro" not in strip_sql_literals("SELECT $$do carro$$ FROM t")
 
-    def test_dollar_quoting_com_tag(self):
+    def test_dollar_quoting_with_tag(self):
         assert "carro" not in strip_sql_literals("SELECT $tag$do carro$tag$ FROM t")
 
     @pytest.mark.parametrize("query, trecho", [
@@ -62,13 +62,13 @@ class TestStripSqlLiterals:
         ("SELECT 1 /* aberto FROM t", "bloco"),
         ("SELECT $$aberto FROM t", "Dollar-quoting"),
     ])
-    def test_construcao_nao_terminada_levanta(self, query, trecho):
+    def test_unterminated_construct_raises(self, query, trecho):
         # Silently consuming to the end would hide the rest of the query.
         with pytest.raises(ValueError, match=trecho):
             strip_sql_literals(query)
 
 
-class TestQueriesLegitimas:
+class TestLegitimateQueries:
     """Regression of the bug: user text must not become a command."""
 
     @pytest.mark.parametrize("query", [
@@ -95,11 +95,11 @@ class TestQueriesLegitimas:
         "TABLE municipios",
         "VALUES (1), (2)",
     ])
-    def test_passa(self, query):
+    def test_passes(self, query):
         validate_readonly_sql(query)
 
 
-class TestQueriesBloqueadas:
+class TestBlockedQueries:
 
     @pytest.mark.parametrize("query, trecho", [
         ("DROP TABLE alvo", "SELECT ou WITH"),
@@ -111,7 +111,7 @@ class TestQueriesBloqueadas:
         ("CREATE TABLE x (id int)", "SELECT ou WITH"),
         ("GRANT ALL ON t TO publico", "SELECT ou WITH"),
     ])
-    def test_statement_de_escrita(self, query, trecho):
+    def test_write_statement(self, query, trecho):
         with pytest.raises(ValueError, match=trecho):
             validate_readonly_sql(query)
 
@@ -121,11 +121,11 @@ class TestQueriesBloqueadas:
         # the old hole: the `--` inside the string erased the rest of the validation
         "SELECT * FROM t WHERE obs = 'a--b' ; DROP TABLE alvo",
     ])
-    def test_multiplos_statements(self, query):
+    def test_multiple_statements(self, query):
         with pytest.raises(ValueError, match="mais de um comando"):
             validate_readonly_sql(query)
 
-    def test_cte_de_escrita(self):
+    def test_write_cte(self):
         # Starts with WITH and would pass the leading-statement test.
         with pytest.raises(ValueError, match="comando de escrita: 'DELETE'"):
             validate_readonly_sql("WITH d AS (DELETE FROM t RETURNING *) SELECT * FROM d")
@@ -140,35 +140,35 @@ class TestQueriesBloqueadas:
         ("SELECT lo_export(1, '/tmp/x')", "lo_export"),
         ("SELECT pg_sleep(600)", "pg_sleep"),
     ])
-    def test_funcao_perigosa(self, query, nome):
+    def test_dangerous_function(self, query, nome):
         # dblink opens ANOTHER connection — the local transaction's READ ONLY does not apply there.
         with pytest.raises(ValueError, match=nome):
             validate_readonly_sql(query)
 
-    def test_funcao_perigosa_so_como_chamada(self):
+    def test_dangerous_function_only_as_call(self):
         # The name as text is data, not a call: it must not block.
         validate_readonly_sql("SELECT * FROM logs WHERE fn = 'pg_read_file'")
 
 
-class TestLimites:
+class TestLimits:
 
-    def test_limite_de_caracteres(self):
+    def test_character_limit(self):
         assert _MAX_QUERY_LENGTH == 20_000
         query = "SELECT " + ("a" * _MAX_QUERY_LENGTH)
         with pytest.raises(ValueError, match="20000 caracteres"):
             validate_readonly_sql(query)
 
-    def test_query_grande_dentro_do_limite_passa(self):
+    def test_large_query_within_the_limit_passes(self):
         query = "SELECT * FROM t WHERE nome IN (" + ",".join(f"'v{i}'" for i in range(2000)) + ")"
         assert 10_000 < len(query) <= _MAX_QUERY_LENGTH
         validate_readonly_sql(query)
 
-    def test_excesso_de_selects(self):
+    def test_too_many_selects(self):
         query = "SELECT " + " + ".join(f"(SELECT {i})" for i in range(_MAX_SUBQUERY_DEPTH + 5))
         with pytest.raises(ValueError, match="muito complexa"):
             validate_readonly_sql(query)
 
-    def test_selects_em_comentario_e_string_nao_contam(self):
+    def test_selects_in_comment_and_string_do_not_count(self):
         # Before, a SELECT inside a string counted toward the complexity limit.
         query = "SELECT " + " + ".join(f"'SELECT {i}'" for i in range(_MAX_SUBQUERY_DEPTH + 5))
         validate_readonly_sql(query)

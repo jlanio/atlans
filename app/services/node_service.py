@@ -10,7 +10,7 @@ from app.services.disabled_nodes_service import disabled_names
 
 
 @lru_cache(maxsize=1)
-def _catalogo_completo() -> List[tuple]:
+def _full_catalog() -> List[tuple]:
     """Catalog built ONCE from NODE_REGISTRY.
 
     `cls.description()` is literal/pure (already called at import, in flow/registry.py)
@@ -22,7 +22,7 @@ def _catalogo_completo() -> List[tuple]:
     Returns (registry_name, NodeDefinition) pairs: the key is the REGISTRY name
     — the same one the disabled filter uses —, not the description's `name`.
     Tests that touch NODE_REGISTRY clear this cache with
-    `_catalogo_completo.cache_clear()`.
+    `_full_catalog.cache_clear()`.
     """
     catalogo: List[tuple] = []
     for name, cls in NODE_REGISTRY.items():
@@ -96,10 +96,10 @@ class NodeService:
     the canvas drawer does not see them. The canonical entity is still
     NODE_REGISTRY; the filter is an overlay via SystemConfig.disabled_nodes.
 
-    The base catalog is built once (`_catalogo_completo`, cached); here
+    The base catalog is built once (`_full_catalog`, cached); here
     we only apply the disabled overlay, which is a cheap read (already cached
     in disabled_nodes_service).
     """
     async def list_nodes(self, db: AsyncSession) -> List[NodeDefinition]:
         disabled = await disabled_names(db)
-        return [defn for name, defn in _catalogo_completo() if name not in disabled]
+        return [defn for name, defn in _full_catalog() if name not in disabled]

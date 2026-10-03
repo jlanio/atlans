@@ -92,7 +92,7 @@ def _rowcount(n: int) -> MagicMock:
     return r
 
 
-class _SavepointFalso:
+class _FakeSavepoint:
     """`db.begin_nested()` as an async context manager.
 
     `AsyncMock` returns a coroutine, and `async with` on a coroutine blows up.
@@ -115,7 +115,7 @@ def _mock_db(execute_results=None) -> AsyncMock:
     db.rollback = AsyncMock()
     db.refresh = AsyncMock()
     db.flush = AsyncMock()
-    db.begin_nested = MagicMock(return_value=_SavepointFalso())
+    db.begin_nested = MagicMock(return_value=_FakeSavepoint())
     db.execute = AsyncMock(side_effect=list(execute_results or []))
     return db
 
@@ -123,7 +123,7 @@ def _mock_db(execute_results=None) -> AsyncMock:
 # ── A corrida que o indice unico passou a expor ───────────────────────────────
 
 
-class TestUpsertPinCorrida:
+class TestUpsertPinRace:
     """Two runs of the same workflow finishing together, with the unique index in place.
 
     Before the index, both inserted and the database ended up with two rows — the
@@ -135,19 +135,19 @@ class TestUpsertPinCorrida:
     """
 
     @pytest.mark.asyncio
-    async def test_o_perdedor_da_corrida_reaponta_a_linha_vencedora(self):
+    async def test_the_race_loser_repoints_to_the_winning_row(self):
         from sqlalchemy.exc import IntegrityError
 
         run = _make_run(workspace_id="ws-alvo")
         wf_obj = MagicMock()
         wf_obj.workspace_id = "ws-alvo"
 
-        vencedora = MagicMock()
-        vencedora.s3_key = "pin-cache/ws-alvo/run-do-outro/n1_pin.json"
+        winner = MagicMock()
+        winner.s3_key = "pin-cache/ws-alvo/run-do-outro/n1_pin.json"
 
         db = _mock_db([
             _scalars([]),            # 1a leitura: ninguem tinha inserido ainda
-            _scalars([vencedora]),   # 2nd read, already after the violation
+            _scalars([winner]),   # 2nd read, already after the violation
         ])
         db.flush = AsyncMock(side_effect=IntegrityError("INSERT", {}, Exception("unique")))
 
@@ -159,12 +159,12 @@ class TestUpsertPinCorrida:
 
         # The other run's row is the truth; this call only repoints it to the
         # newest object — exactly what the UPDATE branch already did.
-        assert vencedora.s3_key == f"pin-cache/ws-alvo/{run.task_id}/n1_pin.json"
-        assert vencedora.run_id == run.task_id
-        assert vencedora.workspace_id == "ws-alvo"
+        assert winner.s3_key == f"pin-cache/ws-alvo/{run.task_id}/n1_pin.json"
+        assert winner.run_id == run.task_id
+        assert winner.workspace_id == "ws-alvo"
 
     @pytest.mark.asyncio
-    async def test_a_violacao_nao_escapa_do_savepoint(self):
+    async def test_the_violation_does_not_escape_the_savepoint(self):
         """Sem `begin_nested`, a `IntegrityError` sobe e derruba o `job_result`."""
         from sqlalchemy.exc import IntegrityError
 
@@ -183,8 +183,8 @@ class TestUpsertPinCorrida:
         db.begin_nested.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_sem_corrida_o_insert_normal_acontece(self):
-        """O caminho feliz continua sendo um INSERT, e nao um UPDATE disfarcado."""
+    async def test_without_race_the_normal_insert_happens(self):
+        """O caminho feliz continua sendo um INSERT, e nao um UPDATE disguised."""
         run = _make_run(workspace_id="ws-alvo")
         wf_obj = MagicMock()
         wf_obj.workspace_id = "ws-alvo"
@@ -204,29 +204,29 @@ class TestUpsertPinCorrida:
 
 class TestDeriveS3Key:
 
-    def test_key_canonica(self):
+    def test_canonical_key(self):
         key = rrc._derive_s3_key("artifacts", "ws-1", "task-1", "saida.geojson")
         assert key == "artifacts/ws-1/task-1/saida.geojson"
 
-    def test_path_traversal_no_filename_vira_basename(self):
+    def test_path_traversal_in_filename_becomes_basename(self):
         # '../../outro-ws/segredo.json' must not escape the workspace prefix.
         key = rrc._derive_s3_key("artifacts", "ws-1", "task-1", "../../outro/segredo.json")
         assert key == "artifacts/ws-1/task-1/segredo.json"
 
-    def test_filename_vazio_rejeitado(self):
+    def test_empty_filename_rejected(self):
         assert rrc._derive_s3_key("artifacts", "ws-1", "task-1", "") is None
         assert rrc._derive_s3_key("artifacts", "ws-1", "task-1", "..") is None
 
-    def test_workspace_ausente_rejeitado(self):
+    def test_missing_workspace_rejected(self):
         assert rrc._derive_s3_key("artifacts", "", "task-1", "a.json") is None
 
-    def test_charset_invalido_e_normalizado_nao_descartado(self):
+    def test_invalid_charset_is_normalized_not_dropped(self):
         # A space is not in the S3-safe charset of _validate_agent_s3_key, but
         # discarding the whole artifact because of it made it vanish from the UI.
         assert (rrc._derive_s3_key("artifacts", "ws-1", "task-1", "nome com espaco.json")
                 == "artifacts/ws-1/task-1/nome_com_espaco.json")
 
-    def test_acento_vira_ascii(self):
+    def test_accent_becomes_ascii(self):
         """Regression: a pt-BR label ('Relatorio 2026') is the common case, not the exception.
 
         slugify_label in the executor uses str.isalnum(), which PRESERVES accents; the
@@ -238,16 +238,16 @@ class TestDeriveS3Key:
         assert rrc._derive_s3_key("artifacts", "ws-1", "task-1", "Parcelas_Ação.geojson") \
             == "artifacts/ws-1/task-1/Parcelas_Acao.geojson"
 
-    def test_ponto_duplo_no_meio_do_nome_e_colapsado(self):
+    def test_double_dot_in_the_middle_of_the_name_is_collapsed(self):
         # '..' em QUALQUER posicao e recusado por _validate_agent_s3_key.
         assert (rrc._derive_s3_key("artifacts", "ws-1", "task-1", "saida..final.json")
                 == "artifacts/ws-1/task-1/saida.final.json")
 
 
-class TestRegisterArtifactsIgnoraS3KeyDoExecutor:
+class TestRegisterArtifactsIgnoresExecutorS3Key:
 
     @pytest.mark.asyncio
-    async def test_s3_key_forjada_e_substituida(self):
+    async def test_forged_s3_key_is_replaced(self):
         """Executor sends a key from ANOTHER workspace — the server writes its own."""
         run = _make_run(workspace_id="ws-alvo")
         db = _mock_db([
@@ -275,7 +275,7 @@ class TestRegisterArtifactsIgnoraS3KeyDoExecutor:
         assert added[0].workspace_id == "ws-alvo"
 
     @pytest.mark.asyncio
-    async def test_nome_acentuado_ainda_gera_linha_artifact(self):
+    async def test_accented_name_still_creates_artifact_row(self):
         """Regression: with an accent the artifact vanished from the UI (only a WARNING in the log)."""
         run = _make_run(workspace_id="ws-alvo")
         db = _mock_db([_result(None), _scalars([])])
@@ -294,7 +294,7 @@ class TestRegisterArtifactsIgnoraS3KeyDoExecutor:
         assert added[0].filename == "Area_Util.geojson"
 
     @pytest.mark.asyncio
-    async def test_key_ja_registrada_nao_duplica(self):
+    async def test_already_registered_key_does_not_duplicate(self):
         run = _make_run(workspace_id="ws-alvo")
         db = _mock_db([
             _result(None),                       # _get_retention_days
@@ -310,7 +310,7 @@ class TestRegisterArtifactsIgnoraS3KeyDoExecutor:
         assert not [c for c in db.add.call_args_list if isinstance(c.args[0], Artifact)]
 
     @pytest.mark.asyncio
-    async def test_run_sem_workspace_nao_registra(self):
+    async def test_run_without_workspace_does_not_register(self):
         run = _make_run(workspace_id=None)
         db = _mock_db([])
         await rrc._register_artifacts(db, run, {"n1": [{"filename": "x.json"}]})
@@ -319,7 +319,7 @@ class TestRegisterArtifactsIgnoraS3KeyDoExecutor:
 
 class TestSafePinRef:
 
-    def test_pin_s3_key_do_executor_e_ignorada(self):
+    def test_executor_pin_s3_key_is_ignored(self):
         run = _make_run(workspace_id="ws-alvo")
         ref = rrc._safe_pin_ref(run, "node-1", {
             "__pin_s3_key__": "pin-cache/ws-vitima/outro-run/node-1_pin.json",
@@ -329,14 +329,14 @@ class TestSafePinRef:
         assert ref["__pin_s3_key__"] == f"pin-cache/ws-alvo/{run.task_id}/node-1_pin.json"
         assert ref["__pin_filename__"] == "node-1_pin.json"
 
-    def test_formato_desconhecido_rejeitado(self):
+    def test_unknown_format_rejected(self):
         run = _make_run()
         assert rrc._safe_pin_ref(run, "n1", {
             "__pin_s3_key__": "pin-cache/x/y/z", "__pin_format__": "../../etc",
         }) is None
 
     @pytest.mark.asyncio
-    async def test_pinned_outputs_persistido_com_key_do_servidor(self):
+    async def test_pinned_outputs_persisted_with_server_key(self):
         """A workspace forged in the key is neutralized — but the ref must belong to THIS
         run (current task_id in the key): pins written now are accepted and re-derived."""
         run = _make_run(workspace_id="ws-alvo")
@@ -359,7 +359,7 @@ class TestSafePinRef:
         assert gravado == f"pin-cache/ws-alvo/{run.task_id}/n1_pin.json"
 
     @pytest.mark.asyncio
-    async def test_pin_passthrough_de_run_antiga_e_ignorado(self):
+    async def test_pin_passthrough_from_old_run_is_ignored(self):
         """A ref the executor merely passed along (written in a previous run) must NOT
         be re-persisted: `_safe_pin_ref` would derive the key with the CURRENT task_id,
         repointing the pin to an object that was never uploaded — a permanent 404,
@@ -380,7 +380,7 @@ class TestSafePinRef:
         db.add.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_pin_descartado_se_o_workflow_mudou_de_workspace(self):
+    async def test_pin_dropped_if_the_workflow_changed_workspace(self):
         """The workflow may have been moved while the run was going. The s3_keys are
         derived from `run.workspace_id` (the ORIGIN), so writing them would leave the
         workflow — already at the destination — with pins pointing to the old tenant,
@@ -401,7 +401,7 @@ class TestSafePinRef:
         db.add.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_upsert_de_pin_realinha_o_workspace_do_artefato(self):
+    async def test_pin_upsert_realigns_the_artifact_workspace(self):
         """The lookup is by (workflow_hash, node_id) and does not filter by tenant: a row
         left over from before a move would be repointed to an object of the
         new workspace while keeping the old `workspace_id` — and the download uses the
@@ -421,7 +421,7 @@ class TestSafePinRef:
         assert antigo.s3_key == f"pin-cache/ws-destino/{run.task_id}/n1_pin.json"
 
     @pytest.mark.asyncio
-    async def test_upsert_colapsa_linhas_de_pin_duplicadas(self):
+    async def test_upsert_collapses_duplicate_pin_rows(self):
         """`scalar_one_or_none()` here raised `MultipleResultsFound` — and it is
         THIS function that creates the second row.
 
@@ -452,12 +452,12 @@ class TestSafePinRef:
         db.add.assert_not_called()
 
 
-# ── B11: rollback e isolamento de fases ───────────────────────────────────────
+# ── B11: rollback e isolamento de phases ───────────────────────────────────────
 
 class TestRunPhase:
 
     @pytest.mark.asyncio
-    async def test_falha_faz_rollback_e_refresh(self):
+    async def test_failure_does_rollback_and_refresh(self):
         run = _make_run()
         db = _mock_db([])
 
@@ -472,14 +472,14 @@ class TestRunPhase:
         db.refresh.assert_awaited_once_with(run)
 
     @pytest.mark.asyncio
-    async def test_fase_ok_nao_e_reportada_como_perda(self):
+    async def test_ok_phase_is_not_reported_as_loss(self):
         async def _ok(*_a):
             return None
 
         assert await rrc._run_phase(_mock_db([]), _make_run(), "t", "teste", _ok) == rrc.PHASE_OK
 
     @pytest.mark.asyncio
-    async def test_rollback_que_falha_interrompe_pipeline(self):
+    async def test_failing_rollback_stops_pipeline(self):
         run = _make_run()
         db = _mock_db([])
         db.rollback = AsyncMock(side_effect=RuntimeError("sessao morta"))
@@ -500,7 +500,7 @@ class TestRunPhase:
         }
 
     @pytest.mark.asyncio
-    async def test_falha_em_metricas_nao_impede_artefatos_nem_webhook(self):
+    async def test_metrics_failure_blocks_neither_artifacts_nor_webhook(self):
         """B11 regression: an except without rollback brought down ALL the rest of the payload.
 
         The phase that failed is still REPORTED (PhaseFailure -> dead letter):
@@ -533,7 +533,7 @@ class TestRunPhase:
         db.rollback.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_todas_as_fases_ok_nao_levanta(self):
+    async def test_all_phases_ok_does_not_raise(self):
         run = _make_run(status="running")
         db = _mock_db([_result(run)])
 
@@ -548,7 +548,7 @@ class TestRunPhase:
             assert await rrc._process_result(db, self._payload_de(run)) is True
 
     @pytest.mark.asyncio
-    async def test_sessao_morta_reporta_todas_as_fases_restantes(self):
+    async def test_dead_session_reports_all_remaining_phases(self):
         run = _make_run(status="running")
         db = _mock_db([_result(run)])
         db.rollback = AsyncMock(side_effect=RuntimeError("sessao morta"))
@@ -575,7 +575,7 @@ class TestConsumeOneDeadLetter:
     """B11: a lost phase must leave a reprocessable trail, not just a log."""
 
     @pytest.mark.asyncio
-    async def test_phase_failure_vai_para_dead_letter_anotado(self):
+    async def test_phase_failure_goes_to_dead_letter_annotated(self):
         import json
 
         redis = AsyncMock()
@@ -590,12 +590,12 @@ class TestConsumeOneDeadLetter:
 
         fila, corpo = redis.lpush.await_args.args
         assert fila == rrc.QUEUE_DEAD_LETTER
-        anotado = json.loads(corpo)
-        assert anotado["task_id"] == "t-1"
-        assert anotado["_phases_failed"] == ["artefatos", "notificacao"]
+        annotated = json.loads(corpo)
+        assert annotated["task_id"] == "t-1"
+        assert annotated["_phases_failed"] == ["artefatos", "notificacao"]
 
     @pytest.mark.asyncio
-    async def test_sucesso_nao_gera_dead_letter(self):
+    async def test_success_produces_no_dead_letter(self):
         import json
 
         redis = AsyncMock()
@@ -621,7 +621,7 @@ class TestUsageDaily:
     # here, the mock covers the branch logic and the UTC date.
 
     @pytest.mark.asyncio
-    async def test_falha_sem_metricas_conta_como_erro(self):
+    async def test_failure_without_metrics_counts_as_error(self):
         """B9 regression: without metrics the upsert did not even run → error rate 0% forever.
         With no row for the day (atomic UPDATE with rowcount 0), the INSERT creates the 1st."""
         from app.models.run_metrics import UsageDaily
@@ -639,7 +639,7 @@ class TestUsageDaily:
         assert criado[0].successful_runs == 0
 
     @pytest.mark.asyncio
-    async def test_cancelado_nao_conta_como_falha(self):
+    async def test_cancelled_does_not_count_as_failure(self):
         from app.models.run_metrics import UsageDaily
 
         run = _make_run(status="cancelled")
@@ -649,7 +649,7 @@ class TestUsageDaily:
         assert criado.failed_runs == 0 and criado.successful_runs == 0 and criado.total_runs == 1
 
     @pytest.mark.asyncio
-    async def test_reentrega_nao_reconta(self):
+    async def test_redelivery_does_not_recount(self):
         run = _make_run(status="failed")
         db = _mock_db([])
         await rrc._upsert_usage_daily(db, run, {}, False)
@@ -657,7 +657,7 @@ class TestUsageDaily:
         db.execute.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_sem_workspace_nao_conta(self):
+    async def test_without_workspace_does_not_count(self):
         run = _make_run(status="failed", workspace_id=None)
         db = _mock_db([])
         await rrc._upsert_usage_daily(db, run, {}, True)
@@ -665,7 +665,7 @@ class TestUsageDaily:
         db.execute.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_agregado_existente_atualiza_no_sql_sem_inserir(self):
+    async def test_existing_aggregate_updates_in_sql_without_inserting(self):
         """The day's row already exists: the atomic UPDATE matches (rowcount 1) and NO
         INSERT runs — the increment is in SQL, no read-modify-write in Python."""
         run = _make_run(status="failed")
@@ -678,7 +678,7 @@ class TestUsageDaily:
         assert db.execute.await_count == 1  # a single UPDATE, no SELECT or INSERT
 
     @pytest.mark.asyncio
-    async def test_usa_data_utc_e_nao_a_local(self):
+    async def test_uses_utc_date_not_local(self):
         """Time zone: the row uses the UTC date (utc_now_naive), not the local `date.today()` —
         previously the count landed on the wrong day near midnight."""
         from app.models.run_metrics import UsageDaily
@@ -695,7 +695,7 @@ class TestUsageDaily:
 class TestUpdateRunStatus:
 
     @pytest.mark.asyncio
-    async def test_stats_vazio_preserva_node_stats(self):
+    async def test_empty_stats_preserves_node_stats(self):
         run = _make_run()
         run.node_stats = {"n1": {"status": "success"}}
         db = _mock_db([])
@@ -707,7 +707,7 @@ class TestUpdateRunStatus:
         assert run.status == "failed"
 
     @pytest.mark.asyncio
-    async def test_stats_parcial_sobrescreve(self):
+    async def test_partial_stats_overwrites(self):
         run = _make_run()
         run.node_stats = {"n1": {"status": "success"}}
         db = _mock_db([])
@@ -721,10 +721,10 @@ class TestUpdateRunStatus:
 
 # ── B13: run zumbi em 'pending' ───────────────────────────────────────────────
 
-class TestDispatchNaoDeixaRunPendente:
+class TestDispatchDoesNotLeaveRunPending:
 
     @pytest.mark.asyncio
-    async def test_excecao_inesperada_marca_run_failed(self):
+    async def test_unexpected_exception_marks_run_failed(self):
         from app.services import workflow_execution_service as wes
 
         wf = MagicMock()
@@ -752,7 +752,7 @@ class TestDispatchNaoDeixaRunPendente:
         assert runs[0].end_time is not None
 
     @pytest.mark.asyncio
-    async def test_falha_de_despacho_entra_no_usage_daily(self):
+    async def test_dispatch_failure_goes_into_usage_daily(self):
         """B9: a run closed OUTSIDE the run_results queue must also be counted."""
         from app.models.run_metrics import UsageDaily
         from app.services import workflow_execution_service as wes
@@ -775,7 +775,7 @@ class TestDispatchNaoDeixaRunPendente:
         assert usos[0].workspace_id == "ws-1"
 
     @pytest.mark.asyncio
-    async def test_send_job_que_estoura_faz_failover(self):
+    async def test_send_job_that_blows_up_fails_over(self):
         """A TypeError coming from send_job was fatal — now it counts as a refusal."""
         from app.services import workflow_execution_service as wes
 
@@ -807,10 +807,10 @@ class TestDispatchNaoDeixaRunPendente:
         assert runs[0].host == "executor:ag-2"
 
 
-class TestCancelRunPendente:
+class TestCancelPendingRun:
 
     @pytest.mark.asyncio
-    async def test_run_pending_sem_host_e_cancelado_localmente(self):
+    async def test_pending_run_without_host_is_cancelled_locally(self):
         from app.services import workflow_execution_service as wes
 
         run = _make_run(status="pending", host=None)
@@ -832,7 +832,7 @@ class TestCancelRunPendente:
         db.commit.assert_awaited()
 
     @pytest.mark.asyncio
-    async def test_fechamento_local_e_condicional(self):
+    async def test_local_close_is_conditional(self):
         """The UPDATE must carry the guard, otherwise the race with the dispatch comes back.
 
         The guard is just `status='pending'`: the host now goes in already in the run's
@@ -851,7 +851,7 @@ class TestCancelRunPendente:
         assert "status = :status_1" in stmt   # WHERE status='pending'
 
     @pytest.mark.asyncio
-    async def test_corrida_perdida_para_o_dispatch_vira_pedido_ao_executor(self):
+    async def test_race_lost_to_dispatch_becomes_request_to_executor(self):
         """Regression: the local cancel overwrote the run that the dispatch had just
         delivered — the user saw 'cancelled' and the workflow ran to the end."""
         from app.services import workflow_execution_service as wes
@@ -877,7 +877,7 @@ class TestCancelRunPendente:
         )
 
     @pytest.mark.asyncio
-    async def test_dispatch_aborta_running_se_run_foi_cancelado(self):
+    async def test_dispatch_aborts_running_if_run_was_cancelled(self):
         """Symmetric: if the cancel won, the dispatch does not resurrect the run."""
         from app.services import workflow_execution_service as wes
 
@@ -903,7 +903,7 @@ class TestCancelRunPendente:
         )
 
     @pytest.mark.asyncio
-    async def test_run_terminal_continua_idempotente(self):
+    async def test_terminal_run_stays_idempotent(self):
         from app.services import workflow_execution_service as wes
 
         run = _make_run(status="success", host=None)
@@ -963,7 +963,7 @@ class _FakeClient:
 class TestSignCsrRootCert:
 
     @pytest.mark.asyncio
-    async def test_root_cert_ausente_levanta_em_vez_de_ca_pem_vazio(self, tmp_path, monkeypatch):
+    async def test_missing_root_cert_raises_instead_of_empty_ca_pem(self, tmp_path, monkeypatch):
         from app.services import executor_enrollment_service as ees
 
         cert_pem = _self_signed_pem()
@@ -979,7 +979,7 @@ class TestSignCsrRootCert:
             await ees.sign_csr_via_stepca("csr", "ag-1")
 
     @pytest.mark.asyncio
-    async def test_root_cert_vazio_levanta(self, tmp_path, monkeypatch):
+    async def test_empty_root_cert_raises(self, tmp_path, monkeypatch):
         from app.services import executor_enrollment_service as ees
 
         cert_pem = _self_signed_pem()
@@ -997,7 +997,7 @@ class TestSignCsrRootCert:
             await ees.sign_csr_via_stepca("csr", "ag-1")
 
     @pytest.mark.asyncio
-    async def test_root_cert_valido_devolve_bundle(self, tmp_path, monkeypatch):
+    async def test_valid_root_cert_returns_bundle(self, tmp_path, monkeypatch):
         from app.services import executor_enrollment_service as ees
 
         cert_pem = _self_signed_pem()
@@ -1015,10 +1015,10 @@ class TestSignCsrRootCert:
         assert bundle["ca_pem"] == cert_pem
         assert bundle["cert_pem"] == cert_pem
 
-    def test_token_e_leitura_do_root_cert_saem_do_event_loop(self):
+    def test_token_and_root_cert_read_leave_the_event_loop(self):
         """B-enroll: the PBKDF2 (via _build_stepca_token) and the root cert read
         run in asyncio.to_thread, not on the event loop that serves the executors'
-        WebSockets. The effect is about timing (not observable in a test; RedisFalso/
+        WebSockets. The effect is about timing (not observable in a test; FakeRedis/
         doubles have no clock), so the proof is in the SOURCE CODE — the same pattern
         as the sandbox/timeout PR. The three tests above already run via to_thread and
         prove that behavior is preserved. Mutation: removing either of the two wraps

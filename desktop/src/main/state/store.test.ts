@@ -14,7 +14,7 @@
 // Neither is visible in code review — both come back if someone replaces
 // `agendar()` with a direct call "to simplify".
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AppStore, type EstadoApp, type LoteLog } from './store.js'
+import { AppStore, type AppState, type LogBatch } from './store.js'
 import type { ExecutorEvent } from '../../shared/events.js'
 
 function log(msg: string, level = 'INFO'): ExecutorEvent {
@@ -22,8 +22,8 @@ function log(msg: string, level = 'INFO'): ExecutorEvent {
 }
 
 let store: AppStore
-let estados: EstadoApp[]
-let lotes: LoteLog[]
+let estados: AppState[]
+let lotes: LogBatch[]
 
 beforeEach(() => {
   vi.useFakeTimers()

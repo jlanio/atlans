@@ -24,7 +24,7 @@
 // locked down with tests when the decision is separate from the effect.
 import { Notification } from 'electron'
 import { ICONE_APP } from '../paths.js'
-import type { EstadoApp } from '../state/store.js'
+import type { AppState } from '../state/store.js'
 // The thresholds live in `shared/` because the SCREEN needs them too and
 // cannot import values from here (this module pulls in `electron`). A green
 // bar while the notification has already warned would be worse than sharing
@@ -54,7 +54,7 @@ export interface Aviso {
  * One condition at a time, by priority: an executor stopped by an error makes
  * disk space irrelevant, and two stacked toasts compete with each other.
  */
-export function avaliarNotificacao(estado: EstadoApp): Aviso | null {
+export function avaliarNotificacao(estado: AppState): Aviso | null {
   // ── 1. Revoked ─────────────────────────────────────────────────────────────
   // The most serious case: it is not a failure that passes. The executor is
   // down until someone redoes the link, and nothing in the system will fix
@@ -112,7 +112,7 @@ export function avaliarNotificacao(estado: EstadoApp): Aviso | null {
 
 // ── Efeito ───────────────────────────────────────────────────────────────────
 
-let ultimaChave: string | null = null
+let lastKey: string | null = null
 
 /**
  * Notifies when the condition CHANGES.
@@ -124,15 +124,15 @@ let ultimaChave: string | null = null
  * `aoClicar` leads to the panel: a notification that says "open the panel"
  * and opens nothing when clicked is worse than none at all.
  */
-export function notificarSeMudou(estado: EstadoApp, aoClicar: () => void): void {
+export function notificarSeMudou(estado: AppState, aoClicar: () => void): void {
   const aviso = avaliarNotificacao(estado)
   const chave = aviso?.chave ?? null
 
   // Going back to normal RE-ARMS: if the problem returns after being resolved,
   // it is reported again. Without this, an executor that fails, is restarted
   // and fails again would stay silent the second time.
-  if (chave === ultimaChave) return
-  ultimaChave = chave
+  if (chave === lastKey) return
+  lastKey = chave
   if (!aviso) return
 
   if (!Notification.isSupported()) return
@@ -155,5 +155,5 @@ export function notificarSeMudou(estado: EstadoApp, aoClicar: () => void): void 
 
 /** For the tests: discards the memory of the last condition. */
 export function _resetarMemoria(): void {
-  ultimaChave = null
+  lastKey = null
 }

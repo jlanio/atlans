@@ -28,7 +28,7 @@ import collections
 import hashlib
 import hmac
 import json
-from flow.utils.backoff import com_jitter
+from flow.utils.backoff import with_jitter
 from app.core.utils.logger import get_logger
 import os
 import time
@@ -391,28 +391,28 @@ return 1
 #     on those that reach it through the relay. A truly dead connection drops out through
 #     the heartbeat timeout and presence.
 _PRAZO_DE_ENVIO_BASE_S = 30.0
-_PRAZO_DE_ENVIO_BYTES_POR_S = 512 * 1024
+_SEND_DEADLINE_BYTES_PER_S = 512 * 1024
 # The stall mark in Redis expires on its own if nobody renews it (worker died
 # in the middle of a late write); the writer renews it while the delay lasts.
-_TTL_DA_PARADA_S = 60
-_RENOVA_PARADA_S = 30.0
+_STALL_TTL_S = 60
+_STALL_RENEW_S = 30.0
 
 
-def _prazo_de_envio(n_bytes: int) -> float:
-    return _PRAZO_DE_ENVIO_BASE_S + n_bytes / _PRAZO_DE_ENVIO_BYTES_POR_S
+def _send_deadline(n_bytes: int) -> float:
+    return _PRAZO_DE_ENVIO_BASE_S + n_bytes / _SEND_DEADLINE_BYTES_PER_S
 
 
-def _chave_de_parada(executor_id: str) -> str:
+def _stall_key(executor_id: str) -> str:
     return f"executor:parada:{executor_id}"
 
 
-async def _redis_parada(executor_id: str) -> bool:
+async def _redis_stalled(executor_id: str) -> bool:
     """The worker holding this executor's socket has a late write
-    (see `_Saida._sinalizar_atraso`). Redis down: False — the mark is an optimization,
+    (see `_Saida._signal_delay`). Redis down: False — the mark is an optimization,
     not a safety lock."""
     try:
         rc = await _get_redis()
-        return bool(await rc.exists(_chave_de_parada(executor_id)))
+        return bool(await rc.exists(_stall_key(executor_id)))
     except Exception:
         return False
 
@@ -428,47 +428,47 @@ async def _redis_parada(executor_id: str) -> bool:
 # That is why each socket has a `_Saida`: a queue and ONE task that writes, in
 # order, with no deadline at all on the drain. The sender waits for its own outcome
 # with a deadline that counts what is ahead of it (the send in progress and the queue):
-#   ENVIADO   went out whole;
+#   SENT   went out whole;
 #   ESCOANDO  the write started (the frame is in the buffer) and passed the deadline —
 #             it keeps going out; for the sender, delivered without confirmation;
-#   OCUPADO   the deadline ran out while still in the queue: the sender gives up and NOTHING is written;
-#   FECHANDO  the socket is being closed: nothing is written.
+#   BUSY   the deadline ran out while still in the queue: the sender gives up and NOTHING is written;
+#   CLOSING  the socket is being closed: nothing is written.
 # A socket error (dead connection) propagates to the waiter. The waiter never
 # receives the writer's CancelledError: the outcome is a Future of its own.
-ENVIADO = "enviado"
+SENT = "enviado"
 ESCOANDO = "escoando"
-OCUPADO = "ocupado"
-FECHANDO = "fechando"
+BUSY = "ocupado"
+CLOSING = "fechando"
 
 # ws → _Saida. Removed from here at the end of the connection handler (see `encerrar_saida`).
-_saidas: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
+_outboxes: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 # Strong references to loose tasks (asyncio only keeps weakrefs).
-_tarefas_soltas: set = set()
+_detached_tasks: set = set()
 
 
-def _em_segundo_plano(coro, nome: str) -> "asyncio.Task":
+def _in_background(coro, nome: str) -> "asyncio.Task":
     tarefa = asyncio.create_task(coro, name=nome)
-    _tarefas_soltas.add(tarefa)
+    _detached_tasks.add(tarefa)
 
-    def _fim(t: "asyncio.Task") -> None:
-        _tarefas_soltas.discard(t)
+    def _on_done(t: "asyncio.Task") -> None:
+        _detached_tasks.discard(t)
         if not t.cancelled() and t.exception() is not None:
             logger.debug("Tarefa '%s' terminou com erro: %r", nome, t.exception())
 
-    tarefa.add_done_callback(_fim)
+    tarefa.add_done_callback(_on_done)
     return tarefa
 
 
-async def _redis_marcar_parada(executor_id: str) -> None:
+async def _redis_mark_stall(executor_id: str) -> None:
     try:
-        await (await _get_redis()).setex(_chave_de_parada(executor_id), _TTL_DA_PARADA_S, "1")
+        await (await _get_redis()).setex(_stall_key(executor_id), _STALL_TTL_S, "1")
     except Exception as exc:
         logger.debug("Marca de parada de '%s' não gravada: %s", executor_id, exc)
 
 
-async def _redis_limpar_parada(executor_id: str) -> None:
+async def _redis_clear_stall(executor_id: str) -> None:
     try:
-        await (await _get_redis()).delete(_chave_de_parada(executor_id))
+        await (await _get_redis()).delete(_stall_key(executor_id))
     except Exception as exc:
         logger.debug("Marca de parada de '%s' não limpa: %s", executor_id, exc)
 
@@ -493,35 +493,35 @@ class _Saida:
         self.fechando = False
         # Closed because another session took over the executor (takeover, ownership
         # lost): whatever arrives now is delivered by it — see
-        # `_conexao_para_envio` and `_encaminhar`.
-        self.substituida = False
+        # `_connection_for_send` and `_forward`.
+        self.replaced = False
         # Closed by the takeover NOTICE this listener received: whatever
         # was in the queue was published before the new session subscribed (see
-        # `register`), so it only existed here — see `_fechar_nao_entregue`.
-        self.avisada = False
+        # `register`), so it only existed here — see `_close_undelivered`.
+        self.notified = False
         self.erro: BaseException | None = None
-        self._tem_item = asyncio.Event()
-        self._alarme: "asyncio.TimerHandle | None" = None
-        self._marcou_parada = False
-        self.escritor = asyncio.create_task(self._escrever(), name="saida-executor")
+        self._has_item = asyncio.Event()
+        self._alarm: "asyncio.TimerHandle | None" = None
+        self._marked_stall = False
+        self.writer = asyncio.create_task(self._write_loop(), name="saida-executor")
 
     # ── the sender ────────────────────────────────────────────────────────────
     def enfileirar(self, texto: str) -> "_Envio | str":
-        """Enqueues and returns the send — or FECHANDO. Synchronous on purpose:
+        """Enqueues and returns the send — or CLOSING. Synchronous on purpose:
         whoever enqueues in sequence (the relay listener) preserves the order."""
         if self.fechando:
-            return FECHANDO
+            return CLOSING
         if self.erro is not None:
             raise self.erro
         feito = asyncio.get_running_loop().create_future()
         # An error delivered to someone who already gave up does not become "exception never retrieved".
         feito.add_done_callback(lambda f: f.cancelled() or f.exception())
-        envio = _Envio(texto=texto, prazo=_prazo_de_envio(len(texto)), feito=feito)
+        envio = _Envio(texto=texto, prazo=_send_deadline(len(texto)), feito=feito)
         self.fila.append(envio)
-        self._tem_item.set()
+        self._has_item.set()
         return envio
 
-    def _espera(self, envio: _Envio) -> float:
+    def _wait_time(self, envio: _Envio) -> float:
         """Its own deadline plus what is ahead: what remains of the deadline of the
         send in progress and the queue's BYTES before it, at the design floor
         (512 KB/s). The 30 s base is counted only once: added per message, a
@@ -534,53 +534,53 @@ class _Saida:
             if outro is envio:
                 break
             if outro.estado == "na_fila":
-                espera += len(outro.texto) / _PRAZO_DE_ENVIO_BYTES_POR_S
+                espera += len(outro.texto) / _SEND_DEADLINE_BYTES_PER_S
         return espera
 
-    async def aguardar(self, envio: _Envio) -> str:
-        await asyncio.wait({envio.feito}, timeout=self._espera(envio))
+    async def await_outcome(self, envio: _Envio) -> str:
+        await asyncio.wait({envio.feito}, timeout=self._wait_time(envio))
         if envio.feito.done():
-            return envio.feito.result()   # ENVIADO, ESCOANDO, FECHANDO — or the socket error
+            return envio.feito.result()   # SENT, ESCOANDO, CLOSING — or the socket error
         if envio.estado == "na_fila":
             envio.estado = "desistiu"     # the writer skips it: nothing is written
-            return OCUPADO
+            return BUSY
         return ESCOANDO                   # the write started: the frame is in the buffer
 
     async def enviar(self, texto: str) -> str:
         if self.atrasada() and not self.fechando:
             # The link is below the floor: in the queue, the message would wait behind the
-            # late frame for the whole deadline and come out OCUPADO anyway.
-            return OCUPADO
+            # late frame for the whole deadline and come out BUSY anyway.
+            return BUSY
         envio = self.enfileirar(texto)
         if isinstance(envio, str):
             return envio
-        return await self.aguardar(envio)
+        return await self.await_outcome(envio)
 
     def atrasada(self) -> bool:
         """The write in progress passed its own deadline (link below the floor)."""
         atual = self.atual
         return atual is not None and time.monotonic() - atual.inicio > atual.prazo
 
-    def encerrar(self, *, substituida: bool = False, avisada: bool = False) -> None:
+    def encerrar(self, *, replaced: bool = False, notified: bool = False) -> None:
         """No new sends; the writer's WAIT is canceled — what it already put
         in the buffer keeps going out before the close frame. The queue is resolved right
         here: a writer canceled before its first step never reaches its
-        own `except`, and whoever was waiting would wait the whole deadline for an OCUPADO."""
+        own `except`, and whoever was waiting would wait the whole deadline for an BUSY."""
         self.fechando = True
-        self.substituida = self.substituida or substituida or avisada
-        self.avisada = self.avisada or avisada
-        if not self.escritor.done():
-            self.escritor.cancel()
-        self._resolver_fila(FECHANDO)
+        self.replaced = self.replaced or replaced or notified
+        self.notified = self.notified or notified
+        if not self.writer.done():
+            self.writer.cancel()
+        self._resolve_queue(CLOSING)
 
-    # ── o escritor ────────────────────────────────────────────────────────────
-    async def _escrever(self) -> None:
+    # ── o writer ────────────────────────────────────────────────────────────
+    async def _write_loop(self) -> None:
         envio: _Envio | None = None
         try:
             while True:
                 while not self.fila:
-                    self._tem_item.clear()
-                    await self._tem_item.wait()
+                    self._has_item.clear()
+                    await self._has_item.wait()
                 envio = self.fila.popleft()
                 if envio.estado != "na_fila":     # the sender gave up
                     envio = None
@@ -588,30 +588,30 @@ class _Saida:
                 envio.estado = "escrevendo"
                 envio.inicio = time.monotonic()
                 self.atual = envio
-                self._armar_alarme(envio)
+                self._arm_alarm(envio)
                 try:
                     await self.ws.send_text(envio.texto)
                 finally:
-                    self._desarmar_alarme()
+                    self._disarm_alarm()
                     self.atual = None
                 envio.estado = "fim"
                 if not envio.feito.done():
-                    envio.feito.set_result(ENVIADO)
+                    envio.feito.set_result(SENT)
                 envio = None
         except asyncio.CancelledError:
             # Closing: what was being written is already in the buffer.
             if envio is not None and envio.estado == "escrevendo" and not envio.feito.done():
                 envio.feito.set_result(ESCOANDO)
-            self._resolver_fila(FECHANDO)
+            self._resolve_queue(CLOSING)
             raise
         except Exception as exc:
             # Dead socket: whoever was waiting gets the error, and so do the next ones.
             self.erro = exc
             if envio is not None and not envio.feito.done():
                 envio.feito.set_exception(exc)
-            self._resolver_fila(exc)
+            self._resolve_queue(exc)
 
-    def _resolver_fila(self, desfecho) -> None:
+    def _resolve_queue(self, desfecho) -> None:
         while self.fila:
             envio = self.fila.popleft()
             if envio.feito.done():
@@ -626,25 +626,25 @@ class _Saida:
     # finishes: the other workers stop relaying ONLY while the link is
     # actually below the floor — not a fixed minute after a large,
     # healthy transfer.
-    def _armar_alarme(self, envio: _Envio) -> None:
+    def _arm_alarm(self, envio: _Envio) -> None:
         if self.executor_id:
-            self._alarme = asyncio.get_running_loop().call_later(envio.prazo, self._sinalizar_atraso)
+            self._alarm = asyncio.get_running_loop().call_later(envio.prazo, self._signal_delay)
 
-    def _sinalizar_atraso(self) -> None:
-        self._marcou_parada = True
-        _em_segundo_plano(_redis_marcar_parada(self.executor_id), "marca-parada")
-        self._alarme = asyncio.get_running_loop().call_later(_RENOVA_PARADA_S, self._sinalizar_atraso)
+    def _signal_delay(self) -> None:
+        self._marked_stall = True
+        _in_background(_redis_mark_stall(self.executor_id), "marca-parada")
+        self._alarm = asyncio.get_running_loop().call_later(_STALL_RENEW_S, self._signal_delay)
 
-    def _desarmar_alarme(self) -> None:
-        if self._alarme is not None:
-            self._alarme.cancel()
-            self._alarme = None
-        if self._marcou_parada:
-            self._marcou_parada = False
-            _em_segundo_plano(_redis_limpar_parada(self.executor_id), "limpa-parada")
+    def _disarm_alarm(self) -> None:
+        if self._alarm is not None:
+            self._alarm.cancel()
+            self._alarm = None
+        if self._marked_stall:
+            self._marked_stall = False
+            _in_background(_redis_clear_stall(self.executor_id), "limpa-parada")
 
 
-def _ws_aberto(ws) -> bool:
+def _ws_open(ws) -> bool:
     """The app has not requested the close yet and the executor has not disconnected."""
     return (
         getattr(ws, "application_state", None) != WebSocketState.DISCONNECTED
@@ -652,25 +652,25 @@ def _ws_aberto(ws) -> bool:
     )
 
 
-def _saida_de(ws, executor_id: str | None = None) -> _Saida:
-    saida = _saidas.get(ws)
+def _outbox_of(ws, executor_id: str | None = None) -> _Saida:
+    saida = _outboxes.get(ws)
     if saida is None:
-        saida = _saidas[ws] = _Saida(ws, executor_id)
+        saida = _outboxes[ws] = _Saida(ws, executor_id)
     elif executor_id and not saida.executor_id:
         saida.executor_id = executor_id
     return saida
 
 
-async def enviar_ao_executor(ws, texto: str, executor_id: str | None = None) -> str:
+async def send_to_executor(ws, texto: str, executor_id: str | None = None) -> str:
     """Sends `texto` through the socket's output — see `_Saida`."""
-    return await _saida_de(ws, executor_id).enviar(texto)
+    return await _outbox_of(ws, executor_id).enviar(texto)
 
 
 def enfileirar_ao_executor(ws, texto: str, executor_id: str | None = None) -> bool:
     """Puts `texto` on the socket's output and moves on, without waiting its turn (for the
     receive loop, which must not get stuck behind a slow frame). With the send
     in progress running late, it discards and returns False: it would only swell the queue."""
-    saida = _saida_de(ws, executor_id)
+    saida = _outbox_of(ws, executor_id)
     if saida.atrasada():
         return False
     return not isinstance(saida.enfileirar(texto), str)
@@ -678,28 +678,28 @@ def enfileirar_ao_executor(ws, texto: str, executor_id: str | None = None) -> bo
 
 def encerrar_envios(ws) -> None:
     """The connection handler is finishing: nothing else goes out through this socket. The
-    output stays in the map — whoever sends gets FECHANDO and the relay treats the job as not
+    output stays in the map — whoever sends gets CLOSING and the relay treats the job as not
     delivered, instead of hitting the dead socket — until `encerrar_saida`, at the end of the
     same handler."""
-    _saida_de(ws).encerrar()
+    _outbox_of(ws).encerrar()
 
 
 def encerrar_saida(ws) -> None:
     """End of the socket's life (the connection handler finished): its output leaves
     the map. It holds the ws, so the WeakKeyDictionary alone would not release it."""
-    saida = _saidas.pop(ws, None)
+    saida = _outboxes.pop(ws, None)
     if saida is not None:
         saida.encerrar()
 
 
-async def _fechar_depois_do_escritor(ws, saida: "_Saida | None", code: int, reason: str) -> None:
+async def _close_after_writer(ws, saida: "_Saida | None", code: int, reason: str) -> None:
     if saida is not None:
-        await asyncio.gather(saida.escritor, return_exceptions=True)
+        await asyncio.gather(saida.writer, return_exceptions=True)
     await ws.close(code=code, reason=reason)
 
 
 async def fechar_ws_do_executor(
-    ws, code: int = 1000, reason: str = "", *, substituida: bool = False, avisada: bool = False,
+    ws, code: int = 1000, reason: str = "", *, replaced: bool = False, notified: bool = False,
 ) -> None:
     """Closes an executor's WebSocket. Every executor socket close goes
     through here.
@@ -712,26 +712,26 @@ async def fechar_ws_do_executor(
     The close runs in its own task: a caller's `wait_for` does not
     abandon it midway (it reaches the abort even if the requester gives up waiting).
 
-    `substituida`: another session took over the executor — whatever comes for it goes
-    through the relay to the new session (see `_conexao_para_envio`). `avisada`: it was the
-    takeover notice that arrived (see `_Saida.avisada`).
+    `replaced`: another session took over the executor — whatever comes for it goes
+    through the relay to the new session (see `_connection_for_send`). `notified`: it was the
+    takeover notice that arrived (see `_Saida.notified`).
     """
-    saida = _marcar_fechando(ws, substituida=substituida, avisada=avisada)
-    fechamento = _em_segundo_plano(_fechar_depois_do_escritor(ws, saida, code, reason), "fecha-ws")
+    saida = _mark_closing(ws, replaced=replaced, notified=notified)
+    fechamento = _in_background(_close_after_writer(ws, saida, code, reason), "fecha-ws")
     await asyncio.shield(fechamento)
 
 
-def _marcar_fechando(ws, *, substituida: bool, avisada: bool = False) -> "_Saida | None":
+def _mark_closing(ws, *, replaced: bool, notified: bool = False) -> "_Saida | None":
     """Shuts down the socket's output — creating it, if nothing has gone out through it yet: whoever
-    sends during the close gets FECHANDO. Without it, the relay created a new
+    sends during the close gets CLOSING. Without it, the relay created a new
     output, the writer hit the closed socket and the relayed job was silently lost
     (the socket error does not close the run). What removes it from the map is the end of the handler
     (`encerrar_saida`); on an already-closed socket nothing is created."""
-    saida = _saidas.get(ws)
-    if saida is None and _ws_aberto(ws):
-        saida = _saida_de(ws)
+    saida = _outboxes.get(ws)
+    if saida is None and _ws_open(ws):
+        saida = _outbox_of(ws)
     if saida is not None:
-        saida.encerrar(substituida=substituida, avisada=avisada)
+        saida.encerrar(replaced=replaced, notified=notified)
     return saida
 
 
@@ -967,7 +967,7 @@ async def _redis_delete_capacity(executor_id: str) -> None:
         await _reset_redis_singleton()
 
 
-def _capacidade_de(raw) -> dict | None:
+def _capacity_of(raw) -> dict | None:
     """The value of `executor:capacity:{id}` as a dict; None if absent or unreadable."""
     if not raw:
         return None
@@ -984,7 +984,7 @@ async def _redis_read_capacity(executor_id: str) -> dict | None:
     """Capacity published by the worker that holds the WS; None = unknown."""
     try:
         rc = await _get_redis()
-        return _capacidade_de(await rc.get(_capacity_key(executor_id)))
+        return _capacity_of(await rc.get(_capacity_key(executor_id)))
     except Exception as exc:
         logger.warning("Redis: falha ao ler capacidade do executor '%s': %s", executor_id, exc)
         await _reset_redis_singleton()
@@ -1000,7 +1000,7 @@ async def _redis_read_capacities(executor_ids: list[str]) -> dict[str, dict | No
         logger.warning("Redis: falha ao ler a capacidade de %d executores: %s", len(executor_ids), exc)
         await _reset_redis_singleton()
         return dict.fromkeys(executor_ids)
-    return {i: _capacidade_de(v) for i, v in zip(executor_ids, valores)}
+    return {i: _capacity_of(v) for i, v in zip(executor_ids, valores)}
 
 
 # Default capacity reported before the executor's first capacity heartbeat
@@ -1058,7 +1058,7 @@ class ExecutorConnection:
         return _capacity_is_full(self.capacity)
 
 
-async def _redis_outra_sessao(executor_id: str, owner_token: str | None) -> bool | None:
+async def _redis_other_session(executor_id: str, owner_token: str | None) -> bool | None:
     """Does another session hold ownership of this executor? None: couldn't tell."""
     try:
         dono = await (await _get_redis()).get(_conn_owner_key(executor_id))
@@ -1068,7 +1068,7 @@ async def _redis_outra_sessao(executor_id: str, owner_token: str | None) -> bool
     return dono is not None and dono != owner_token
 
 
-async def _fechar_nao_entregue(
+async def _close_undelivered(
     executor_id: str, job_id: str, motivo: str, dono: str | None, *, so_aqui: bool = False,
 ) -> None:
     """Whoever published on the relay already treated the job as delivered (the run goes to 'running'):
@@ -1083,7 +1083,7 @@ async def _fechar_nao_entregue(
     inventory order the running job to stop: it is left to reconciliation.
     """
     if not so_aqui:
-        outra = await _redis_outra_sessao(executor_id, dono)
+        outra = await _redis_other_session(executor_id, dono)
         if outra is not False:
             logger.warning(
                 "Job '%s' não saiu pelo socket do executor '%s' (%s), mas %s — a reconciliação decide o run.",
@@ -1093,12 +1093,12 @@ async def _fechar_nao_entregue(
             return
     from app.api.routers.executor_ws.orfaos import fechar_run_nao_entregue
     try:
-        await fechar_run_nao_entregue(executor_id, job_id, conexao_fechando=motivo != OCUPADO)
+        await fechar_run_nao_entregue(executor_id, job_id, connection_closing=motivo != BUSY)
     except Exception as exc:
         logger.error("Run '%s' não entregue pelo relay não pôde ser fechado: %s", job_id, exc)
 
 
-async def _acompanhar_encaminhamento(
+async def _track_forwarding(
     executor_id: str, saida: _Saida, envio: _Envio, canal: str, tipo: str | None,
     job_id: str | None, dono: str | None,
 ) -> None:
@@ -1106,15 +1106,15 @@ async def _acompanhar_encaminhamento(
     the listener, which handles ALL of the executor's messages (including the close
     marker) and must not let them age behind a large frame."""
     try:
-        resultado = await saida.aguardar(envio)
+        resultado = await saida.await_outcome(envio)
     except Exception as exc:
         # Dead socket: nothing went out through it (a frame cut off midway is never
         # read by the executor).
         logger.debug("%s: mensagem ao executor '%s' não saiu: %s", canal, executor_id, exc)
         if job_id:
-            await _fechar_nao_entregue(executor_id, job_id, "erro do socket", dono)
+            await _close_undelivered(executor_id, job_id, "erro do socket", dono)
         return
-    if resultado == ENVIADO:
+    if resultado == SENT:
         return
     if resultado == ESCOANDO:
         logger.warning("%s: envio ao executor '%s' passou do prazo — link lento; o frame segue saindo.",
@@ -1122,34 +1122,34 @@ async def _acompanhar_encaminhamento(
         return
     logger.warning("%s: mensagem '%s' ao executor '%s' não saiu (%s).", canal, tipo or "?", executor_id, resultado)
     if job_id:
-        # FECHANDO here belongs to a message that was already in the queue when the socket
+        # CLOSING here belongs to a message that was already in the queue when the socket
         # started closing.
-        await _fechar_nao_entregue(
-            executor_id, job_id, resultado, dono, so_aqui=resultado == FECHANDO and saida.avisada,
+        await _close_undelivered(
+            executor_id, job_id, resultado, dono, so_aqui=resultado == CLOSING and saida.notified,
         )
 
 
-def _encaminhar(
+def _forward(
     executor_id: str, ws, payload: str, canal: str, tipo: str | None, job_id: str | None, dono: str | None,
 ) -> None:
-    saida = _saida_de(ws, executor_id)
+    saida = _outbox_of(ws, executor_id)
     try:
         envio = saida.enfileirar(payload)
     except Exception:
         # Dead socket: the error propagates (the listener ends), but whoever published
         # counted on this listener.
         if job_id:
-            _em_segundo_plano(
-                _fechar_nao_entregue(executor_id, job_id, "erro do socket", dono), f"nao-entregue-{job_id[:8]}",
+            _in_background(
+                _close_undelivered(executor_id, job_id, "erro do socket", dono), f"nao-entregue-{job_id[:8]}",
             )
         raise
     if not isinstance(envio, str):
-        _em_segundo_plano(
-            _acompanhar_encaminhamento(executor_id, saida, envio, canal, tipo, job_id, dono),
+        _in_background(
+            _track_forwarding(executor_id, saida, envio, canal, tipo, job_id, dono),
             f"encaminha-{executor_id[:8]}",
         )
         return
-    if saida.substituida:
+    if saida.replaced:
         # Arrived after the takeover: the new session's listener also receives it.
         # Rare window: published between the notice and its subscription (one round
         # trip to Redis, more if the subscription fails), nobody delivers it — the
@@ -1163,7 +1163,7 @@ def _encaminhar(
         logger.debug("%s: socket do executor '%s' fechando — '%s' descartado.", canal, executor_id, tipo or "?")
         return
     logger.warning("%s: socket do executor '%s' fechando — job '%s' não encaminhado.", canal, executor_id, job_id)
-    _em_segundo_plano(_fechar_nao_entregue(executor_id, job_id, FECHANDO, dono), f"nao-entregue-{job_id[:8]}")
+    _in_background(_close_undelivered(executor_id, job_id, CLOSING, dono), f"nao-entregue-{job_id[:8]}")
 
 
 async def _handle_relay_message(
@@ -1217,7 +1217,7 @@ async def _handle_relay_message(
                 # 4409 (conflict) is NOT terminal on the client: if this socket is still
                 # alive on its side, reconnecting is the correct behavior.
                 await fechar_ws_do_executor(
-                    ws, code=4409, reason="Conexao assumida por outra sessao.", avisada=True,
+                    ws, code=4409, reason="Conexao assumida por outra sessao.", notified=True,
                 )
             except Exception as exc:
                 logger.debug(
@@ -1261,11 +1261,11 @@ async def _handle_relay_message(
     # Forwards the payload to the client. If it is a job and the client's queue is full,
     # it replies with a `job_result` error "back-pressure" and the server marks the run
     # failed via `_handle_job_result` (executor_ws_router.py). Enqueues and moves on:
-    # the outcome is tracked outside the listener (see `_acompanhar_encaminhamento`).
+    # the outcome is tracked outside the listener (see `_track_forwarding`).
     tipo = parsed_payload.get("type") if isinstance(parsed_payload, dict) else None
     job_id = ((parsed_payload or {}).get("envelope") or {}).get("job_id") if tipo == "job" else None
     try:
-        _encaminhar(executor_id, ws, payload, "Relay", tipo, str(job_id) if job_id else None, owner_token)
+        _forward(executor_id, ws, payload, "Relay", tipo, str(job_id) if job_id else None, owner_token)
     except Exception as exc:
         logger.warning(
             "Relay: falha ao encaminhar mensagem ao executor '%s': %s", executor_id, exc,
@@ -1299,7 +1299,7 @@ async def _handle_drive_message(executor_id: str, ws: "WebSocket", raw: str) -> 
             executor_id,
         )
         return True
-    saida = _saidas.get(ws)
+    saida = _outboxes.get(ws)
     if saida is not None and saida.atrasada():
         # Link below the floor: the event would only swell the queue behind the late
         # frame. A drive event is best-effort — GeoSync resynchronizes.
@@ -1307,7 +1307,7 @@ async def _handle_drive_message(executor_id: str, ws: "WebSocket", raw: str) -> 
         return True
     try:
         # Same listener as the job relay: enqueues and moves on.
-        _encaminhar(executor_id, ws, payload, "Drive event", "drive_event", None, None)
+        _forward(executor_id, ws, payload, "Drive event", "drive_event", None, None)
     except Exception as exc:
         logger.warning("Drive event: falha ao encaminhar ao executor '%s': %s", executor_id, exc)
         return False
@@ -1449,7 +1449,7 @@ async def _executor_pubsub_listener(executor_id: str, ws: "WebSocket", owner_tok
         # Spread out the wait (50–100%) — see flow/utils/backoff.py. All the
         # listeners of an API that lost Redis restart together; without jitter
         # they hit it again at the same instant.
-        await asyncio.sleep(com_jitter(backoff))
+        await asyncio.sleep(with_jitter(backoff))
 
     logger.debug("Pubsub listener encerrado para executor '%s'.", executor_id)
 
@@ -1557,7 +1557,7 @@ class ExecutorConnectionRegistry:
             # New socket, nothing draining: a stop mark from the previous session
             # would refuse the relay to a healthy executor for up to 60 s.
             try:
-                await (await _get_redis()).delete(_chave_de_parada(executor_id))
+                await (await _get_redis()).delete(_stall_key(executor_id))
             except Exception as exc:
                 logger.debug("Marca de parada de '%s' não limpa no registro: %s", executor_id, exc)
             # Publish the initial (empty) capacity: the relay of other workers
@@ -1576,7 +1576,7 @@ class ExecutorConnectionRegistry:
             #
             # The notice goes out BEFORE this session's listener exists: whatever
             # was published before it stays only with the old session, which on
-            # closing treats it as undelivered (see `_Saida.avisada`) — never
+            # closing treats it as undelivered (see `_Saida.notified`) — never
             # with both.
             await self._announce_takeover(executor_id, conn.owner_token)
 
@@ -1700,7 +1700,7 @@ class ExecutorConnectionRegistry:
         # without the takeover notice, the new session may have received it
         # too — a rare case: it requires the lost notice and a full queue at
         # this very instant.)
-        _marcar_fechando(conn.websocket, substituida=True)
+        _mark_closing(conn.websocket, replaced=True)
         await self.unregister(conn.executor_id, expected_ws=conn.websocket)
 
     async def unregister(
@@ -1713,9 +1713,9 @@ class ExecutorConnectionRegistry:
         async with self._register_lock:
             await self._unregister_locked(executor_id, expected_ws=expected_ws)
 
-    def _conexao_para_envio(self, executor_id: str) -> "ExecutorConnection | str | None":
+    def _connection_for_send(self, executor_id: str) -> "ExecutorConnection | str | None":
         """The local connection, if it is still usable for sending; None to go
-        through the relay (the executor is not on this worker); FECHANDO if it
+        through the relay (the executor is not on this worker); CLOSING if it
         is going away — the sender returns False and dispatch tries the next one.
 
         A connection being closed is not usable. If it was REPLACED (another
@@ -1728,10 +1728,10 @@ class ExecutorConnectionRegistry:
         conn = self._connections.get(executor_id)
         if conn is None:
             return None
-        saida = _saidas.get(conn.websocket)
+        saida = _outboxes.get(conn.websocket)
         if saida is None or not saida.fechando:
             return conn
-        return None if saida.substituida else FECHANDO
+        return None if saida.replaced else CLOSING
 
     async def presence_or_unknown(self, executor_id: str) -> bool | None:
         """TRI-STATE presence for DISPATCH (spec §5.1).
@@ -1757,8 +1757,8 @@ class ExecutorConnectionRegistry:
             return True
         if presenca is None:
             return None
-        desconectou_em = self._recent_disconnects.get(executor_id)
-        if desconectou_em is not None and (now - desconectou_em) < _DISPATCH_GRACE_SECONDS:
+        disconnected_at = self._recent_disconnects.get(executor_id)
+        if disconnected_at is not None and (now - disconnected_at) < _DISPATCH_GRACE_SECONDS:
             return None
         self._recent_disconnects.pop(executor_id, None)
         return False
@@ -1774,17 +1774,17 @@ class ExecutorConnectionRegistry:
         """`read_capacity` for several executors: local ones from memory, the rest
         in a single round trip to Redis. Dispatch reads every candidate of a tier
         for each job — one GET per candidate opened one Redis connection per executor."""
-        capacidades: dict[str, dict | None] = {}
-        remotos: list[str] = []
+        capacities: dict[str, dict | None] = {}
+        remotes: list[str] = []
         for eid in executor_ids:
             conn = self._connections.get(eid)
             if conn is not None:
-                capacidades[eid] = dict(conn.capacity)
+                capacities[eid] = dict(conn.capacity)
             else:
-                remotos.append(eid)
-        if remotos:
-            capacidades.update(await _redis_read_capacities(remotos))
-        return capacidades
+                remotes.append(eid)
+        if remotes:
+            capacities.update(await _redis_read_capacities(remotes))
+        return capacities
 
     async def read_presence_and_capacities(
         self, executor_ids: list[str],
@@ -1817,12 +1817,12 @@ class ExecutorConnectionRegistry:
             await _reset_redis_singleton()
             return dict.fromkeys(executor_ids, False), dict.fromkeys(executor_ids)
         online: dict[str, bool] = {}
-        capacidades: dict[str, dict | None] = {}
+        capacities: dict[str, dict | None] = {}
         for n, eid in enumerate(executor_ids):
             presenca, capacidade = valores[2 * n], valores[2 * n + 1]
             online[eid] = presenca is not None
-            capacidades[eid] = _capacidade_de(capacidade) if online[eid] else None
-        return online, capacidades
+            capacities[eid] = _capacity_of(capacidade) if online[eid] else None
+        return online, capacities
 
     async def is_online(self, executor_id: str) -> bool:
         """Check presence in Redis with a short-lived POSITIVE cache.
@@ -2032,8 +2032,8 @@ class ExecutorConnectionRegistry:
         wire_text    = json.dumps(wire_message)
         job_id       = job_message.get("envelope", {}).get("job_id", "?")
 
-        conn = self._conexao_para_envio(executor_id)
-        if conn is FECHANDO:
+        conn = self._connection_for_send(executor_id)
+        if conn is CLOSING:
             logger.warning(
                 "Executor '%s' desconectando — job '%s' vai ao próximo candidato.", executor_id, job_id,
             )
@@ -2041,7 +2041,7 @@ class ExecutorConnectionRegistry:
 
         # ── Direct path: WS is on this worker ────────────────────────────────
         if conn is not None:
-            saida = _saida_de(conn.websocket, executor_id)
+            saida = _outbox_of(conn.websocket, executor_id)
             if saida.atrasada():
                 # The link is below the floor: the next candidate gets this job
                 # instead of it queuing behind the delayed frame.
@@ -2067,7 +2067,7 @@ class ExecutorConnectionRegistry:
                 # cause another reconnection.
                 await self.unregister(executor_id, expected_ws=conn.websocket)
                 return False
-            if resultado in (OCUPADO, FECHANDO):
+            if resultado in (BUSY, CLOSING):
                 # Nothing was written: the next candidate gets the job.
                 logger.warning(
                     "Job '%s' não saiu para o executor '%s' (%s) — vai ao próximo candidato.",
@@ -2104,7 +2104,7 @@ class ExecutorConnectionRegistry:
                 capacidade.get("queued", 0), capacidade.get("running", 0),
             )
             return False
-        if await _redis_parada(executor_id):
+        if await _redis_stalled(executor_id):
             # The worker holding the socket is stuck behind a stalled frame:
             # a job published now would wait its turn and be discarded for age.
             logger.warning(
@@ -2167,8 +2167,8 @@ class ExecutorConnectionRegistry:
             )
             return False
 
-        conn = self._conexao_para_envio(executor_id)
-        if conn is FECHANDO:
+        conn = self._connection_for_send(executor_id)
+        if conn is CLOSING:
             logger.warning(
                 "Mensagem '%s' ao executor '%s' não enviada: conexão fechando.", data.get("type"), executor_id,
             )
@@ -2177,26 +2177,26 @@ class ExecutorConnectionRegistry:
         # Caminho direto: WS neste worker.
         if conn is not None:
             try:
-                resultado = await enviar_ao_executor(conn.websocket, json.dumps(data), executor_id)
+                resultado = await send_to_executor(conn.websocket, json.dumps(data), executor_id)
             except Exception as exc:
                 logger.warning("Falha ao enviar mensagem direta ao executor '%s': %r", executor_id, exc)
                 await self.unregister(executor_id, expected_ws=conn.websocket)
                 return False
-            if resultado == ENVIADO:
+            if resultado == SENT:
                 return True
             logger.warning(
                 "Mensagem '%s' ao executor '%s': %s.", data.get("type"), executor_id,
                 "link lento; o frame segue saindo" if resultado == ESCOANDO else f"não saiu ({resultado})",
             )
             # ESCOANDO: for the caller — a cancel, for example — the message was
-            # delivered. OCUPADO (including right away, with an earlier send
-            # delayed) and FECHANDO: nothing went out.
+            # delivered. BUSY (including right away, with an earlier send
+            # delayed) and CLOSING: nothing went out.
             return resultado == ESCOANDO
 
         # Caminho relay: WS em outro worker uvicorn.
         if not await _redis_check_presence(executor_id):
             return False
-        if await _redis_parada(executor_id):
+        if await _redis_stalled(executor_id):
             # Published now, it would wait its turn behind the stalled frame and be
             # discarded for age — the caller (cancel_run) needs to know.
             return False

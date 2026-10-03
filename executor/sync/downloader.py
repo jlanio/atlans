@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from executor.sync.http import ClienteHTTP, TIMEOUT_CONTROLE
+from executor.sync.http import HTTPClient, CONTROL_TIMEOUT
 from executor.sync.pool import em_thread_io
 
 logger = logging.getLogger("executor.sync")
@@ -39,7 +39,7 @@ class DriveDownloader:
         self.executor_id = executor_id
         self.workspace_id = workspace_id
         self._httpx_kwargs = mtls_httpx_kwargs(self.base_url)
-        self._http = ClienteHTTP(self._httpx_kwargs)
+        self._http = HTTPClient(self._httpx_kwargs)
 
     async def aclose(self):
         """Closes the shared HTTP client (called at manager shutdown)."""
@@ -58,7 +58,7 @@ class DriveDownloader:
             resp = await self._http().get(
                 f"{self.base_url}/drive/executor-list",
                 params={"workspace_id": self.workspace_id},
-                headers=self._headers(), timeout=TIMEOUT_CONTROLE,
+                headers=self._headers(), timeout=CONTROL_TIMEOUT,
             )
 
             if resp.status_code != 200:
@@ -92,7 +92,7 @@ class DriveDownloader:
             # 1. Pede pre-signed GET URL
             resp = await cliente.get(
                 f"{self.base_url}/drive/executor-download/{id_hash}",
-                headers=self._headers(), timeout=TIMEOUT_CONTROLE,
+                headers=self._headers(), timeout=CONTROL_TIMEOUT,
             )
             if resp.status_code != 200:
                 logger.warning("Falha ao obter download URL '%s' (HTTP %d).", id_hash, resp.status_code)

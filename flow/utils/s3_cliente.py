@@ -16,12 +16,12 @@ An empty field is not passed to boto3: without keys, its default chain applies
 from typing import Any, Mapping
 
 
-def _texto(valor: Any) -> str | None:
+def _as_text(valor: Any) -> str | None:
     texto = str(valor).strip() if valor not in (None, "") else ""
     return texto or None
 
 
-def cliente_s3(
+def s3_client(
     auth: Mapping[str, Any] | None = None,
     *,
     region: str | None = None,
@@ -37,20 +37,20 @@ def cliente_s3(
     import boto3
 
     auth = auth or {}
-    chave = _texto(auth.get("access_key_id"))
-    segredo = _texto(auth.get("secret_access_key"))
+    chave = _as_text(auth.get("access_key_id"))
+    segredo = _as_text(auth.get("secret_access_key"))
     if not chave and not segredo:
-        chave, segredo = _texto(access_key_id), _texto(secret_access_key)
+        chave, segredo = _as_text(access_key_id), _as_text(secret_access_key)
 
     kwargs: dict[str, Any] = {}
-    regiao = _texto(region) or _texto(auth.get("region"))
+    regiao = _as_text(region) or _as_text(auth.get("region"))
     if regiao:
         kwargs["region_name"] = regiao
     if chave:
         kwargs["aws_access_key_id"] = chave
     if segredo:
         kwargs["aws_secret_access_key"] = segredo
-    endpoint = _texto(auth.get("endpoint_url"))
+    endpoint = _as_text(auth.get("endpoint_url"))
     if endpoint:
         kwargs["endpoint_url"] = endpoint
     # One session per call, not the module's default session: it is not

@@ -22,14 +22,14 @@ vi.mock("@/utils/createToast", () => ({
 
 import { createToast } from "@/utils/createToast"
 import { Dialog } from "@/app/components/ui/dialog"
-import CreateToken, { CLIENTES, DOCS_MCP, URL_DO_MCP, snippetCom, urlDoMcp } from "@/app/components/tokens/dialog-content/create-token"
+import CreateToken, { CLIENTES, DOCS_MCP, URL_DO_MCP, snippetWithUrl, urlDoMcp } from "@/app/components/tokens/dialog-content/create-token"
 import RevokeToken from "@/app/components/tokens/dialog-content/revoke-token"
 
 const ok = <T,>(data: T) => ({ success: true, status: 200, data })
 const falhou = (message: string, status = 500) => ({ success: false, status, error: { name: "AxiosError", message } })
 
 // Synthetic secret, in a single place, so detect-secrets doesn't flag the fixture.
-const SEGREDO_FAKE = "atl_teste_0000000000000000000000000000" // pragma: allowlist secret
+const FAKE_SECRET = "atl_teste_0000000000000000000000000000" // pragma: allowlist secret
 
 const WORKSPACES: IWorkspace[] = [
   { id_hash: "ws-1", name: "Bacia", description: null, owner_id: "me", is_default: true, my_role: "owner" },
@@ -40,7 +40,7 @@ const TOKEN: ApiToken = {
   id: "t1", name: "agente", token_prefix: "atl_ab12cd", scopes: ["workflows:read"], workspace_ids: null,
   expires_at: "2027-01-01T00:00:00", last_used_at: null, revoked_at: null, created_at: "2026-09-01T00:00:00", status: "active",
 }
-const CRIADO: ApiTokenCreated = { ...TOKEN, token: SEGREDO_FAKE }
+const CREATED: ApiTokenCreated = { ...TOKEN, token: FAKE_SECRET }
 
 let writeText: ReturnType<typeof vi.fn>
 
@@ -52,11 +52,11 @@ beforeEach(() => {
   vi.clearAllMocks()
   writeText = vi.fn().mockResolvedValue(undefined)
   clipboard({ writeText })
-  svc.createApiToken.mockResolvedValue(ok(CRIADO))
+  svc.createApiToken.mockResolvedValue(ok(CREATED))
 })
 afterEach(cleanup)
 
-function renderCriar(workspaces: IWorkspace[] = WORKSPACES) {
+function renderCreate(workspaces: IWorkspace[] = WORKSPACES) {
   const onCreated = vi.fn()
   const onClose = vi.fn()
   render(
@@ -72,7 +72,7 @@ const criar = (dialogo: HTMLElement) => fireEvent.click(within(dialogo).getByRol
 const nomear = (dialogo: HTMLElement, nome: string) => fireEvent.change(within(dialogo).getByLabelText("Nome"), { target: { value: nome } })
 
 /** Cria com nome e um escopo, e espera o passo 2. */
-async function criarBasico(dialogo: HTMLElement) {
+async function createBasic(dialogo: HTMLElement) {
   nomear(dialogo, "Agente")
   fireEvent.click(escopo(dialogo, "Ler fluxos"))
   criar(dialogo)
@@ -81,7 +81,7 @@ async function criarBasico(dialogo: HTMLElement) {
 
 describe("CreateToken — passo 1 (formulário)", () => {
   it("valida nome e escopo antes de chamar a API", async () => {
-    const { dialogo } = renderCriar()
+    const { dialogo } = renderCreate()
     criar(dialogo)
     expect(await within(dialogo).findByText("O nome do token é obrigatório")).toBeInTheDocument()
     expect(within(dialogo).getByText("Escolha pelo menos um escopo")).toBeInTheDocument()
@@ -89,7 +89,7 @@ describe("CreateToken — passo 1 (formulário)", () => {
   })
 
   it("envia o payload certo: nome aparado, escopos na ordem canônica, workspaces todos marcados, 90 dias", async () => {
-    const { dialogo, onCreated } = renderCriar()
+    const { dialogo, onCreated } = renderCreate()
     nomear(dialogo, "  Agente de relatórios  ")
     // Clicks out of order on purpose: the payload comes out in canonical order.
     const executar = escopo(dialogo, "Executar fluxos")
@@ -107,12 +107,12 @@ describe("CreateToken — passo 1 (formulário)", () => {
       workspace_ids: ["ws-1", "ws-2"],
       expires_in_days: 90,
     }))
-    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(CRIADO))
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(CREATED))
     expect(createToast.success).toHaveBeenCalledWith("Token criado", "agente")
   })
 
   it("«Somente leitura» marca só ler fluxos e ler o Drive", async () => {
-    const { dialogo } = renderCriar()
+    const { dialogo } = renderCreate()
     fireEvent.click(escopo(dialogo, "Executar fluxos"))
     fireEvent.click(within(dialogo).getByRole("button", { name: "Somente leitura" }))
     expect(escopo(dialogo, "Ler fluxos")).toHaveAttribute("aria-pressed", "true")
@@ -128,7 +128,7 @@ describe("CreateToken — passo 1 (formulário)", () => {
   })
 
   it("«Todos os workspaces» desabilita a lista e envia null", async () => {
-    const { dialogo } = renderCriar()
+    const { dialogo } = renderCreate()
     fireEvent.click(within(dialogo).getByRole("checkbox", { name: /todos os workspaces, inclusive os que eu entrar depois/i }))
     expect(within(dialogo).getByRole("checkbox", { name: "Bacia" })).toBeDisabled()
     expect(within(dialogo).getByRole("checkbox", { name: "Cadastro" })).toBeDisabled()
@@ -140,7 +140,7 @@ describe("CreateToken — passo 1 (formulário)", () => {
   })
 
   it("desmarcar um workspace tira-o do payload; desmarcar todos bloqueia o envio", async () => {
-    const { dialogo } = renderCriar()
+    const { dialogo } = renderCreate()
     nomear(dialogo, "Agente")
     fireEvent.click(escopo(dialogo, "Ler fluxos"))
     fireEvent.click(within(dialogo).getByRole("checkbox", { name: "Bacia" }))
@@ -149,7 +149,7 @@ describe("CreateToken — passo 1 (formulário)", () => {
   })
 
   it("sem nenhum workspace marcado (e sem «Todos»), não envia e explica", async () => {
-    const { dialogo } = renderCriar()
+    const { dialogo } = renderCreate()
     nomear(dialogo, "Agente")
     fireEvent.click(escopo(dialogo, "Ler fluxos"))
     fireEvent.click(within(dialogo).getByRole("checkbox", { name: "Bacia" }))
@@ -160,14 +160,14 @@ describe("CreateToken — passo 1 (formulário)", () => {
   })
 
   it("sem workspaces carregados, orienta a marcar «Todos»", () => {
-    const { dialogo } = renderCriar([])
+    const { dialogo } = renderCreate([])
     expect(within(dialogo).getByText(/nenhum workspace carregado/i)).toBeInTheDocument()
     expect(within(dialogo).queryByRole("list", { name: "Workspaces do token" })).toBeNull()
   })
 
   it("erro da API (409 no teto) mantém o passo 1 e mostra a mensagem do backend", async () => {
     svc.createApiToken.mockResolvedValue(falhou("Você já tem 20 tokens ativos", 409))
-    const { dialogo, onCreated } = renderCriar()
+    const { dialogo, onCreated } = renderCreate()
     nomear(dialogo, "Agente")
     fireEvent.click(escopo(dialogo, "Ler fluxos"))
     criar(dialogo)
@@ -180,15 +180,15 @@ describe("CreateToken — passo 1 (formulário)", () => {
 
 describe("CreateToken — passo 2 (segredo e conexão)", () => {
   it("mostra o segredo uma vez, avisa, copia pela área de transferência e «Concluir» fecha", async () => {
-    const { dialogo, onClose } = renderCriar()
-    const segredo = await criarBasico(dialogo)
-    expect(segredo).toHaveTextContent(SEGREDO_FAKE)
+    const { dialogo, onClose } = renderCreate()
+    const segredo = await createBasic(dialogo)
+    expect(segredo).toHaveTextContent(FAKE_SECRET)
     expect(within(dialogo).getByText("Token criado")).toBeInTheDocument()
     expect(within(dialogo).getByText("Este segredo não será mostrado de novo. Guarde-o agora.")).toBeInTheDocument()
 
     const copiar = within(dialogo).getByRole("button", { name: "Copiar" })
     fireEvent.click(copiar)
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith(SEGREDO_FAKE))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(FAKE_SECRET))
     expect(await within(dialogo).findByRole("button", { name: "Copiado" })).toBeInTheDocument()
 
     fireEvent.click(within(dialogo).getByRole("button", { name: "Concluir" }))
@@ -197,8 +197,8 @@ describe("CreateToken — passo 2 (segredo e conexão)", () => {
 
   it("sem navigator.clipboard, avisa em vez de falhar em silêncio", async () => {
     clipboard(undefined)
-    const { dialogo } = renderCriar()
-    await criarBasico(dialogo)
+    const { dialogo } = renderCreate()
+    await createBasic(dialogo)
     fireEvent.click(within(dialogo).getByRole("button", { name: "Copiar" }))
     const aviso = await within(dialogo).findByRole("alert")
     expect(aviso).toHaveTextContent(/não foi possível copiar automaticamente/i)
@@ -215,8 +215,8 @@ describe("CreateToken — passo 2 (segredo e conexão)", () => {
   })
 
   it("os snippets trocam com o toggle, apontam para o MCP desta instalação e nunca embutem o segredo", async () => {
-    const { dialogo } = renderCriar()
-    await criarBasico(dialogo)
+    const { dialogo } = renderCreate()
+    await createBasic(dialogo)
     const grupo = within(dialogo).getByRole("group", { name: "Cliente MCP" })
     const snippet = () => dialogo.querySelector("pre")!.textContent ?? ""
     // The address is that of the open page, not one hard-coded.
@@ -238,7 +238,7 @@ describe("CreateToken — passo 2 (segredo e conexão)", () => {
 
     // None of the three carries the real secret; all point to the same server.
     for (const c of CLIENTES) {
-      expect(c.snippet).not.toContain(SEGREDO_FAKE)
+      expect(c.snippet).not.toContain(FAKE_SECRET)
       expect(c.snippet).toContain(URL_DO_MCP)
     }
     // The server is already up: the footer says to connect and points to the docs.
@@ -246,12 +246,12 @@ describe("CreateToken — passo 2 (segredo e conexão)", () => {
 
     // Copying the command copies the snippet with this installation's address, not the secret.
     fireEvent.click(within(dialogo).getByRole("button", { name: "Copiar comando" }))
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith(snippetCom(CLIENTES[2].snippet, mcp)))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(snippetWithUrl(CLIENTES[2].snippet, mcp)))
   })
 })
 
 describe("RevokeToken", () => {
-  function renderRevogar() {
+  function renderRevoke() {
     const onRevoked = vi.fn()
     const onClose = vi.fn()
     render(
@@ -265,7 +265,7 @@ describe("RevokeToken", () => {
   it("diz o que acontece, usa o verbo certo e devolve o token revogado", async () => {
     const revogado: ApiToken = { ...TOKEN, status: "revoked", revoked_at: "2026-09-13T12:00:00" }
     svc.revokeApiToken.mockResolvedValue(ok(revogado))
-    const { dialogo, onRevoked, onClose } = renderRevogar()
+    const { dialogo, onRevoked, onClose } = renderRevoke()
     expect(dialogo).toHaveTextContent("Revogar o token «agente»")
     expect(dialogo).toHaveTextContent("Agentes que usam «agente» param de funcionar na hora.")
     expect(within(dialogo).queryByRole("button", { name: /excluir/i })).toBeNull()
@@ -279,7 +279,7 @@ describe("RevokeToken", () => {
 
   it("com corpo vazio no 200, marca como revogado localmente", async () => {
     svc.revokeApiToken.mockResolvedValue(ok(undefined))
-    const { dialogo, onRevoked } = renderRevogar()
+    const { dialogo, onRevoked } = renderRevoke()
     fireEvent.click(within(dialogo).getByRole("button", { name: "Revogar" }))
     await waitFor(() => expect(onRevoked).toHaveBeenCalled())
     const enviado = onRevoked.mock.calls[0][0] as ApiToken
@@ -289,7 +289,7 @@ describe("RevokeToken", () => {
 
   it("falha avisa, não fecha e não mexe na lista", async () => {
     svc.revokeApiToken.mockResolvedValue(falhou("token não encontrado", 404))
-    const { dialogo, onRevoked, onClose } = renderRevogar()
+    const { dialogo, onRevoked, onClose } = renderRevoke()
     fireEvent.click(within(dialogo).getByRole("button", { name: "Revogar" }))
     await waitFor(() => expect(createToast.error).toHaveBeenCalledWith("Não foi possível revogar o token", "token não encontrado"))
     expect(onRevoked).not.toHaveBeenCalled()

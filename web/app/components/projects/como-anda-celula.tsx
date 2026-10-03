@@ -3,7 +3,7 @@
 import type { ReactNode } from "react"
 import { cn } from "@/lib/utils"
 import { formatarDuracaoGrossa, plural } from "@/lib/formatos"
-import { JANELA_EM_DIAS, type ComoAnda } from "./como-anda"
+import { WINDOW_IN_DAYS, type HowItsGoing } from "./como-anda"
 
 /**
  * The row's "como anda" (how it is going) column (docs/specs/projects.md §3.5).
@@ -19,14 +19,14 @@ import { JANELA_EM_DIAS, type ComoAnda } from "./como-anda"
  */
 
 interface Props {
-  comoAnda: ComoAnda
+  comoAnda: HowItsGoing
   className?: string
 }
 
 /** "61 execuções em 30 d · 3 falhas · mediana 3 min" — "nenhuma falha" at zero; the median disappears when there is none. */
 export function textoDaContagem(c: { total: number; falhas: number; mediana: number | null }): string {
   const partes = [
-    `${plural(c.total, "execução", "execuções")} em ${JANELA_EM_DIAS} d`,
+    `${plural(c.total, "execução", "execuções")} em ${WINDOW_IN_DAYS} d`,
     c.falhas === 0 ? "nenhuma falha" : plural(c.falhas, "falha"),
   ]
   if (c.mediana != null) partes.push(`mediana ${formatarDuracaoGrossa(c.mediana)}`)
@@ -52,11 +52,11 @@ type Leitura = {
   segundaEmAlerta: boolean
 }
 
-function ler(c: ComoAnda): Leitura {
+function ler(c: HowItsGoing): Leitura {
   switch (c.tipo) {
     case "executando":
       return {
-        marcador: <PontoVivo />,
+        marcador: <LiveDot />,
         tom: "text-blue-700 dark:text-blue-400",
         primeira: c.desde ? `Em execução ${c.desde}` : "Em execução",
         segunda: textoDaExecucao(c),
@@ -64,7 +64,7 @@ function ler(c: ComoAnda): Leitura {
       }
     case "concluida":
       return {
-        marcador: <Ponto className="bg-green-500" />,
+        marcador: <StatusDot className="bg-green-500" />,
         tom: "text-green-700 dark:text-green-400",
         primeira: `Concluída ${c.quando}`,
         segunda: textoDaContagem(c),
@@ -74,7 +74,7 @@ function ler(c: ComoAnda): Leitura {
       // With no error text (the backend recorded the failure without a message), the
       // count still says something; an empty space would say nothing.
       return {
-        marcador: <Ponto className="bg-red-500" />,
+        marcador: <StatusDot className="bg-red-500" />,
         tom: "text-red-600 dark:text-red-400",
         primeira: `Falhou ${c.quando}`,
         segunda: c.erro ?? textoDaContagem(c),
@@ -82,7 +82,7 @@ function ler(c: ComoAnda): Leitura {
       }
     case "cancelada":
       return {
-        marcador: <Ponto className="bg-muted-foreground/50" />,
+        marcador: <StatusDot className="bg-muted-foreground/50" />,
         tom: "text-muted-foreground",
         primeira: `Cancelada ${c.quando}`,
         segunda: textoDaContagem(c),
@@ -90,15 +90,15 @@ function ler(c: ComoAnda): Leitura {
       }
     case "sem-execucoes":
       return {
-        marcador: <PontoVazio />,
+        marcador: <EmptyDot />,
         tom: "text-muted-foreground",
-        primeira: `Sem execuções em ${JANELA_EM_DIAS} dias`,
+        primeira: `Sem execuções em ${WINDOW_IN_DAYS} dias`,
         segunda: null,
         segundaEmAlerta: false,
       }
     case "nunca":
       return {
-        marcador: <PontoVazio />,
+        marcador: <EmptyDot />,
         tom: "text-muted-foreground",
         primeira: "Ainda não executou",
         segunda: "execute uma vez para validar",
@@ -106,7 +106,7 @@ function ler(c: ComoAnda): Leitura {
       }
     case "indisponivel":
       return {
-        marcador: <Traco />,
+        marcador: <Dash />,
         tom: "text-muted-foreground",
         primeira: "Sem dados de execução",
         segunda: null,
@@ -137,12 +137,12 @@ export function ComoAndaCelula({ comoAnda, className }: Props) {
   )
 }
 
-function Ponto({ className }: { className: string }) {
+function StatusDot({ className }: { className: string }) {
   return <span aria-hidden="true" className={cn("inline-block size-2 shrink-0 rounded-full", className)} />
 }
 
 /** Blue with the same ping as the in-progress `StatusBadge` — under `motion-safe`. */
-function PontoVivo() {
+function LiveDot() {
   return (
     <span aria-hidden="true" className="relative flex size-2 shrink-0">
       <span className="absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-60 motion-safe:animate-ping" />
@@ -152,10 +152,10 @@ function PontoVivo() {
 }
 
 /** Hollow dot: "there is no run" is different from "ended in gray". */
-function PontoVazio() {
+function EmptyDot() {
   return <span aria-hidden="true" className="inline-block size-2 shrink-0 rounded-full border border-muted-foreground/60" />
 }
 
-function Traco() {
+function Dash() {
   return <span aria-hidden="true" className="inline-block h-px w-2 shrink-0 bg-muted-foreground/60" />
 }

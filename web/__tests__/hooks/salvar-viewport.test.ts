@@ -40,7 +40,7 @@ vi.mock("@/utils/createToast", () => ({
   createToast: { error: vi.fn(), success: vi.fn(), info: vi.fn(), loading: vi.fn(), warning: vi.fn() },
 }))
 
-import { useSaveWorkflow, montarPayloadDoGrafo } from "@/app/hooks/workflow/useSaveWorkflow"
+import { useSaveWorkflow, buildGraphPayload } from "@/app/hooks/workflow/useSaveWorkflow"
 import { useWorkflowSaveStore } from "@/app/stores/workflowSaveStore"
 import { createToast } from "@/utils/createToast"
 import type { INodeContext } from "@/context/useFlowContext"
@@ -52,7 +52,7 @@ const no = (id: string, x = 0) => ({
 })
 
 const store = () => useWorkflowSaveStore.getState()
-const payloadDoUltimoPut = () =>
+const lastPutPayload = () =>
   put.mock.calls[0][1] as { definition: { viewport: Viewport } }
 
 beforeEach(() => {
@@ -70,7 +70,7 @@ beforeEach(() => {
   })
   // Hydrated: graph equal to the saved one, known saved viewport, self-correction
   // window closed.
-  const { nodesReq, edgesReq } = montarPayloadDoGrafo(nodes as INodeContext[], [])
+  const { nodesReq, edgesReq } = buildGraphPayload(nodes as INodeContext[], [])
   store().initSnapshot(nodesReq, edgesReq, "wf", 1_000, { x: 0, y: 0, zoom: 1 })
   useWorkflowSaveStore.setState({ snapshotIniciadoEm: null })
 })
@@ -83,7 +83,7 @@ describe("save explícito com o grafo intacto", () => {
     await act(async () => { await result.current.saveWorkflow() })
 
     expect(put).toHaveBeenCalledTimes(1)
-    expect(payloadDoUltimoPut().definition.viewport).toEqual({ x: -240, y: 80, zoom: 1.5 })
+    expect(lastPutPayload().definition.viewport).toEqual({ x: -240, y: 80, zoom: 1.5 })
     expect(store().lastSavedViewport).toEqual({ x: -240, y: 80, zoom: 1.5 })
     expect(store().saveStatus).toBe("saved")
   })
@@ -123,7 +123,7 @@ describe("save com o grafo alterado", () => {
     await act(async () => { await result.current.saveWorkflow() })
 
     expect(put).toHaveBeenCalledTimes(1)
-    expect(payloadDoUltimoPut().definition.viewport).toEqual({ x: 10, y: 10, zoom: 0.75 })
+    expect(lastPutPayload().definition.viewport).toEqual({ x: 10, y: 10, zoom: 0.75 })
     expect(store().lastSavedViewport).toEqual({ x: 10, y: 10, zoom: 0.75 })
   })
 })

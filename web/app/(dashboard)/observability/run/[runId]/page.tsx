@@ -8,7 +8,7 @@ import PageRoot from "@/app/components/page-root"
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card"
 import { Button } from "@/app/components/ui/button"
 import { StatusBadge } from "@/app/components/shared/StatusBadge"
-import { CABECALHO_DE_COLUNAS, CELULA_COM_ROTULO, DESTAQUE_DA_FICHA, LINHA_EMPILHADA } from "@/app/components/shared/tabela-empilhada"
+import { COLUMN_HEADER, LABELED_CELL, CARD_HIGHLIGHT, STACKED_ROW } from "@/app/components/shared/tabela-empilhada"
 import { formatDuration } from "@/utils/formatters"
 import {
   TbArrowLeft, TbClock, TbRefresh, TbCalendar, TbServer,
@@ -16,7 +16,7 @@ import {
   TbShieldLock, TbUser, TbBuildingFactory2,
 } from "react-icons/tb"
 import { formatLocal } from "@/lib/dayjs"
-import { rotuloDaCategoria, rotuloDaOrigem } from "@/lib/formatos"
+import { categoryLabel, originLabel } from "@/lib/formatos"
 
 function formatDateTime(iso: string | null) {
   return formatLocal(iso, "DD/MM/YYYY HH:mm:ss")
@@ -98,14 +98,14 @@ export default function RunDetailPage() {
               <TbUser size={12} /> Dono: <span className="text-foreground">{run.owner_username}</span>
             </span>
           )}
-          {rotuloDaOrigem(run.trigger_source) && (
+          {originLabel(run.trigger_source) && (
             <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-              Origem: <span className="text-foreground">{rotuloDaOrigem(run.trigger_source)}{run.triggered_by_username ? ` · ${run.triggered_by_username}` : ""}</span>
+              Origem: <span className="text-foreground">{originLabel(run.trigger_source)}{run.triggered_by_username ? ` · ${run.triggered_by_username}` : ""}</span>
             </span>
           )}
-          {rotuloDaCategoria(run.error_category) && (
+          {categoryLabel(run.error_category) && (
             <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-              Categoria do erro: <span className="text-foreground">{rotuloDaCategoria(run.error_category)}</span>
+              Categoria do erro: <span className="text-foreground">{categoryLabel(run.error_category)}</span>
             </span>
           )}
           {run.workspace_name && (
@@ -212,7 +212,7 @@ export default function RunDetailPage() {
                       up — below that the row becomes a stacked card (see
                       tabela-empilhada.ts). */}
                   <table className="w-full text-sm md:min-w-[680px]">
-                    <thead className={CABECALHO_DE_COLUNAS}>
+                    <thead className={COLUMN_HEADER}>
                       <tr className="text-xs text-muted-foreground border-b">
                         <th className="pb-2 pl-6 text-left font-medium">No</th>
                         <th className="pb-2 text-left font-medium">Status</th>
@@ -224,8 +224,8 @@ export default function RunDetailPage() {
                     </thead>
                     <tbody>
                       {nodeEntries.map(([nodeId, node]) => (
-                        <tr key={nodeId} className={`border-b last:border-0 hover:bg-accent/30 ${LINHA_EMPILHADA}`}>
-                          <td className={`py-2.5 pl-6 ${DESTAQUE_DA_FICHA}`}>
+                        <tr key={nodeId} className={`border-b last:border-0 hover:bg-accent/30 ${STACKED_ROW}`}>
+                          <td className={`py-2.5 pl-6 ${CARD_HIGHLIGHT}`}>
                             <div className="flex flex-col gap-1">
                               <span className="font-medium">{node.node_name}</span>
                               <div className="h-1 w-full max-w-[120px] bg-muted rounded-full overflow-hidden">
@@ -239,20 +239,20 @@ export default function RunDetailPage() {
                           <td className="py-2.5">
                             <StatusBadge status={node.status} />
                           </td>
-                          <td data-rotulo="duração" className={`py-2.5 text-right font-mono text-xs ${CELULA_COM_ROTULO}`}>
+                          <td data-rotulo="duração" className={`py-2.5 text-right font-mono text-xs ${LABELED_CELL}`}>
                             {formatDuration(node.duration_ms)}
                           </td>
-                          <td data-rotulo="cache" className={`py-2.5 text-right ${CELULA_COM_ROTULO}`}>
+                          <td data-rotulo="cache" className={`py-2.5 text-right ${LABELED_CELL}`}>
                             {node.cache_hit
                               ? <span className="text-purple-600 flex items-center justify-end gap-1"><TbBolt className="h-3 w-3" />Hit</span>
                               : <span className="text-muted-foreground">—</span>}
                           </td>
-                          <td data-rotulo="entrada" className={`py-2.5 text-right text-muted-foreground ${CELULA_COM_ROTULO}`}>
+                          <td data-rotulo="entrada" className={`py-2.5 text-right text-muted-foreground ${LABELED_CELL}`}>
                             {node.input_features != null
                               ? <span className="flex items-center justify-end gap-1"><TbDatabase className="h-3 w-3" />{node.input_features.toLocaleString()}</span>
                               : "—"}
                           </td>
-                          <td data-rotulo="saída" className={`py-2.5 pr-6 text-right text-muted-foreground ${CELULA_COM_ROTULO}`}>
+                          <td data-rotulo="saída" className={`py-2.5 pr-6 text-right text-muted-foreground ${LABELED_CELL}`}>
                             {node.output_features != null
                               ? <span className="flex items-center justify-end gap-1"><TbDatabase className="h-3 w-3" />{node.output_features.toLocaleString()}</span>
                               : "—"}

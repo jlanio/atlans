@@ -21,14 +21,14 @@ import { useDashboardDados } from "@/app/components/dashboard/use-dashboard-dado
 const svc = GisFlowService as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 /** Default window passed by `index` (from `?periodo=`, default 30). */
-const DIAS = 30
+const DAYS = 30
 
 const ok = <T,>(data: T) => ({ success: true, status: 200, data })
 const falhou = (message = "boom") => ({ success: false, status: 500, error: { name: "AxiosError", message } })
 
 const metrics = (total_runs = 1) => ({ total_runs, active_workflows: 3, top_failing_workflows: [] } as unknown as IObservabilityMetrics)
 
-function respostasBoas() {
+function goodResponses() {
   svc.getObservabilityMetrics.mockResolvedValue(ok(metrics(1)))
   svc.getRunsByDay.mockResolvedValue(ok({ days: [{ day: "2026-09-01", total: 2, success: 2, failed: 0, running: 0 }] }))
   svc.getObservabilityRuns.mockResolvedValue(ok({ total: 1, limit: 6, offset: 0, runs: [{ run_id: "r1", status: "success", started_at: null, finished_at: null, duration_seconds: 1, retry_count: 0, agent_host: null }] }))
@@ -45,15 +45,15 @@ afterEach(() => {
 
 describe("useDashboardDados", () => {
   it("cinco fontes escopadas partem juntas, com janela de 30 dias", async () => {
-    respostasBoas()
+    goodResponses()
     const { result } = renderHook(({ escopo, dias }) => useDashboardDados(escopo, dias), { initialProps: { escopo: "ws1" as string | null, dias: 30 } })
     expect(result.current.carregando).toBe(true)
     await waitFor(() => expect(result.current.carregando).toBe(false))
 
-    expect(svc.getObservabilityMetrics).toHaveBeenCalledWith(DIAS, false, { workspace_id: "ws1" })
-    expect(svc.getRunsByDay).toHaveBeenCalledWith(DIAS, expect.objectContaining({ workspace_id: "ws1" }))
+    expect(svc.getObservabilityMetrics).toHaveBeenCalledWith(DAYS, false, { workspace_id: "ws1" })
+    expect(svc.getRunsByDay).toHaveBeenCalledWith(DAYS, expect.objectContaining({ workspace_id: "ws1" }))
     expect(svc.getObservabilityRuns).toHaveBeenCalledWith(expect.objectContaining({ limit: 6, workspace_id: "ws1" }))
-    expect(svc.getExecutorMetrics).toHaveBeenCalledWith(DIAS, false, { workspace_id: "ws1" })
+    expect(svc.getExecutorMetrics).toHaveBeenCalledWith(DAYS, false, { workspace_id: "ws1" })
     expect(svc.getWorkflows).toHaveBeenCalledWith("ws1", { incluirDoAssistente: true })
 
     expect(result.current.metrics?.total_runs).toBe(1)
@@ -66,17 +66,17 @@ describe("useDashboardDados", () => {
   })
 
   it("escopo 'todos' (null) manda workspace_id undefined a todas as fontes", async () => {
-    respostasBoas()
+    goodResponses()
     const { result, rerender } = renderHook(({ escopo, dias }) => useDashboardDados(escopo, dias), { initialProps: { escopo: "ws1" as string | null, dias: 30 } })
     await waitFor(() => expect(result.current.carregando).toBe(false))
 
     rerender({ escopo: null, dias: 30 })
     await waitFor(() => expect(svc.getWorkflows).toHaveBeenLastCalledWith(undefined, { incluirDoAssistente: true }))
-    expect(svc.getObservabilityMetrics).toHaveBeenLastCalledWith(DIAS, false, { workspace_id: undefined })
+    expect(svc.getObservabilityMetrics).toHaveBeenLastCalledWith(DAYS, false, { workspace_id: undefined })
   })
 
   it("trocar o período recarrega as três fontes de janela na nova janela", async () => {
-    respostasBoas()
+    goodResponses()
     const { result, rerender } = renderHook(({ escopo, dias }) => useDashboardDados(escopo, dias), { initialProps: { escopo: "ws1" as string | null, dias: 30 } })
     await waitFor(() => expect(result.current.carregando).toBe(false))
 
@@ -89,7 +89,7 @@ describe("useDashboardDados", () => {
   })
 
   it("falha de metrics na 1ª carga liga erroEspinha", async () => {
-    respostasBoas()
+    goodResponses()
     svc.getObservabilityMetrics.mockResolvedValue(falhou("Sem permissão"))
     const { result } = renderHook(({ escopo, dias }) => useDashboardDados(escopo, dias), { initialProps: { escopo: "ws1" as string | null, dias: 30 } })
     await waitFor(() => expect(result.current.carregando).toBe(false))
@@ -100,7 +100,7 @@ describe("useDashboardDados", () => {
   })
 
   it("falha de dias/runs vira falhas.* sem zerar o que já estava na tela", async () => {
-    respostasBoas()
+    goodResponses()
     const { result } = renderHook(({ escopo, dias }) => useDashboardDados(escopo, dias), { initialProps: { escopo: "ws1" as string | null, dias: 30 } })
     await waitFor(() => expect(result.current.carregando).toBe(false))
     expect(result.current.dias).toHaveLength(1)
@@ -119,7 +119,7 @@ describe("useDashboardDados", () => {
   })
 
   it("executores que falha vira [] e NÃO vira aviso", async () => {
-    respostasBoas()
+    goodResponses()
     svc.getExecutorMetrics.mockResolvedValue(falhou())
     const { result } = renderHook(({ escopo, dias }) => useDashboardDados(escopo, dias), { initialProps: { escopo: "ws1" as string | null, dias: 30 } })
     await waitFor(() => expect(result.current.carregando).toBe(false))
@@ -131,9 +131,9 @@ describe("useDashboardDados", () => {
 
   it("resposta atrasada do escopo anterior é descartada (carimbo de sequência)", async () => {
     // ws1 responds AFTER ws2: the screen has to stay with ws2.
-    let soltarWs1: (v: unknown) => void = () => {}
+    let releaseWs1: (v: unknown) => void = () => {}
     svc.getObservabilityMetrics.mockImplementation((_d: number, _f: boolean, filtros: { workspace_id?: string }) =>
-      filtros.workspace_id === "ws1" ? new Promise(r => { soltarWs1 = r }) : Promise.resolve(ok(metrics(2))))
+      filtros.workspace_id === "ws1" ? new Promise(r => { releaseWs1 = r }) : Promise.resolve(ok(metrics(2))))
     svc.getRunsByDay.mockResolvedValue(ok({ days: [] }))
     svc.getObservabilityRuns.mockResolvedValue(ok({ total: 0, limit: 6, offset: 0, runs: [] }))
     svc.getExecutorMetrics.mockResolvedValue(ok({ executores: [] }))
@@ -143,7 +143,7 @@ describe("useDashboardDados", () => {
     rerender({ escopo: "ws2", dias: 30 })
     await waitFor(() => expect(result.current.metrics?.total_runs).toBe(2))
 
-    await act(async () => { soltarWs1(ok(metrics(1))) })
+    await act(async () => { releaseWs1(ok(metrics(1))) })
     expect(result.current.metrics?.total_runs).toBe(2)
     expect(result.current.erroEspinha).toBeNull()
   })

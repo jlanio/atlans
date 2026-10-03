@@ -11,21 +11,21 @@
 import { describe, it, expect } from "vitest"
 
 import {
-  PORTA_RESERVADA,
+  RESERVED_PORT,
   problemaNaPorta,
 } from "@/app/components/workflow/nodes-configuration/sub-workflow-ports-helper"
 
 describe("problemaNaPorta", () => {
   it("recusa o nome reservado na saída", () => {
-    const problema = problemaNaPorta(PORTA_RESERVADA, "output", false)
-    expect(problema).toContain(PORTA_RESERVADA)
+    const problema = problemaNaPorta(RESERVED_PORT, "output", false)
+    expect(problema).toContain(RESERVED_PORT)
     expect(problema).toContain("reservado")
   })
 
   it("aceita o mesmo nome na entrada", () => {
     // On the input side the name doesn't reach the parent — there's no envelope
     // to collide with, and blocking it there would be a rule with no cause.
-    expect(problemaNaPorta(PORTA_RESERVADA, "input", false)).toBeNull()
+    expect(problemaNaPorta(RESERVED_PORT, "input", false)).toBeNull()
   })
 
   it("aceita nome normal", () => {
@@ -56,7 +56,7 @@ describe("problemaNaPorta", () => {
     // Two messages don't fit on the line, and there's no point talking about a
     // name collision while the name isn't even a valid identifier.
     expect(problemaNaPorta("com espaço", "output", true)).toContain("Espaços")
-    expect(problemaNaPorta(`${PORTA_RESERVADA} `, "output", false)).toContain("Espaços")
+    expect(problemaNaPorta(`${RESERVED_PORT} `, "output", false)).toContain("Espaços")
   })
 
   it("aponta a duplicata", () => {

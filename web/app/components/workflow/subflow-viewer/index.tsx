@@ -74,12 +74,12 @@ function Conteudo({ path, rootLabel }: Props & { path: SubflowLevel[] }) {
   // anyway would flag ALL executed nodes as "no longer in the graph" — a false
   // alarm on every opening, from the very warning that exists to keep the
   // screen from passing for complete.
-  const grafoPronto = !!workflow
+  const graphReady = !!workflow
   const { estadoPorId, semCorrespondencia } = useMemo(() => {
-    if (!grafoPronto) return { estadoPorId: new Map(), semCorrespondencia: [] }
-    const idsDoGrafo = new Set(nodes.map(n => n.id))
-    return recortarNivel(timeline.nodes, caminho, idsDoGrafo)
-  }, [timeline.nodes, caminho, nodes, grafoPronto])
+    if (!graphReady) return { estadoPorId: new Map(), semCorrespondencia: [] }
+    const graphIds = new Set(nodes.map(n => n.id))
+    return recortarNivel(timeline.nodes, caminho, graphIds)
+  }, [timeline.nodes, caminho, nodes, graphReady])
 
   // Esc closes the whole descent — the expected gesture for leaving an overlay.
   useEffect(() => {
@@ -199,7 +199,7 @@ function Conteudo({ path, rootLabel }: Props & { path: SubflowLevel[] }) {
       <div className="relative min-h-0 flex-1">
         {erro ? (
           <p className="p-6 text-center text-xs text-destructive">{erro}</p>
-        ) : !grafoPronto ? (
+        ) : !graphReady ? (
           <p className="p-6 text-center text-xs text-muted-foreground/60">
             Carregando o sub-fluxo…
           </p>

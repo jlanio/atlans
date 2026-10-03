@@ -13,14 +13,14 @@ import {
  * autocomplete navigate.
  */
 
-const CAMPOS = [
+const FIELDS = [
   { name: "output", type: "geodataframe", description: "Polígonos de bbox" },
   { name: "bbox_string", type: "string" },
 ]
 
 describe("getCandidateKeys", () => {
   it("oferece os campos declarados, na ordem", () => {
-    const nomes = getCandidateKeys({ saidas: CAMPOS }).map(f => f.name)
+    const nomes = getCandidateKeys({ saidas: FIELDS }).map(f => f.name)
 
     expect(nomes).toEqual(["output", "bbox_string"])
   })
@@ -34,7 +34,7 @@ describe("getCandidateKeys", () => {
   })
 
   it("nó de ramo não oferece true/false: os campos são o dado", () => {
-    // Conditional: handles true/false roteiam; a aresta carrega os CAMPOS.
+    // Conditional: handles true/false roteiam; a aresta carrega os FIELDS.
     const nomes = getCandidateKeys({
       saidas: [{ name: "result", type: "any" }, { name: "branch", type: "boolean" }],
     }).map(f => f.name)
@@ -45,7 +45,7 @@ describe("getCandidateKeys", () => {
 
 describe("resolveFromKey", () => {
   it("usa o próprio handle quando ele é porta de dado", () => {
-    expect(resolveFromKey("bbox_string", getCandidateKeys({ saidas: CAMPOS })))
+    expect(resolveFromKey("bbox_string", getCandidateKeys({ saidas: FIELDS })))
       .toBe("bbox_string")
   })
 
@@ -54,7 +54,7 @@ describe("resolveFromKey", () => {
   })
 
   it("devolve undefined na ambiguidade — o chamador abre o seletor", () => {
-    expect(resolveFromKey(null, getCandidateKeys({ saidas: CAMPOS })))
+    expect(resolveFromKey(null, getCandidateKeys({ saidas: FIELDS })))
       .toBeUndefined()
   })
 })
@@ -67,10 +67,10 @@ describe("resolveFromKey", () => {
  * stays empty forever — only the filter's "*" escaped, which looked like flakiness.
  */
 describe("resolveToKey", () => {
-  const doisInputs = [{ name: "layerA" }, { name: "layerB" }]
+  const twoInputs = [{ name: "layerA" }, { name: "layerB" }]
 
   it("usa o handle quando o destino declara múltiplos inputs nomeados", () => {
-    expect(resolveToKey("layerB", doisInputs)).toBe("layerB")
+    expect(resolveToKey("layerB", twoInputs)).toBe("layerB")
   })
 
   it("input único → undefined (o executor resolve sozinho; to_key seria ruído)", () => {
@@ -80,12 +80,12 @@ describe("resolveToKey", () => {
   })
 
   it("handle que não é porta declarada → undefined", () => {
-    expect(resolveToKey("outra", doisInputs)).toBeUndefined()
+    expect(resolveToKey("outra", twoInputs)).toBeUndefined()
   })
 
   it("sem handle → undefined", () => {
-    expect(resolveToKey(null, doisInputs)).toBeUndefined()
-    expect(resolveToKey(undefined, doisInputs)).toBeUndefined()
+    expect(resolveToKey(null, twoInputs)).toBeUndefined()
+    expect(resolveToKey(undefined, twoInputs)).toBeUndefined()
   })
 })
 

@@ -46,7 +46,7 @@ def _validate_wfs_url(url: str) -> str:
     return url
 
 
-async def _workspace_do_fluxo(db, workflow_id: str) -> str:
+async def _workflow_workspace(db, workflow_id: str) -> str:
     """The workspace of the workflow being edited — 404 if it does not exist
     (or is in the trash). The client names the WORKFLOW, which is what the editor
     has at hand, and the server derives the workspace from it; the reach is that
@@ -65,7 +65,7 @@ async def _workspace_do_fluxo(db, workflow_id: str) -> str:
     return workspace_id
 
 
-async def _credencial_do_wfs(credential_id: str, workflow_id: str | None, user_id: str):
+async def _wfs_credential(credential_id: str, workflow_id: str | None, user_id: str):
     """The WFS node's credential, ready to sign the GetCapabilities — or 4xx.
 
     The scope is the SAME as definition validation (`validate_service`): the
@@ -77,11 +77,11 @@ async def _credencial_do_wfs(credential_id: str, workflow_id: str | None, user_i
     from uuid import UUID
 
     from app.core.authorization.credential_loader import resolve_credentials_from_ids
-    from app.core.authorization.workflow_access import get_workspace_member_role, tem_papel_minimo
+    from app.core.authorization.workflow_access import get_workspace_member_role, has_minimum_role
     from app.core.db import get_session_async
     from app.core.rbac import ROLE_OPERATOR
-    from app.services.credential_resolver import http_auth_da_credencial
-    from flow.utils.credencial_wfs import autenticacao_wfs
+    from app.services.credential_resolver import http_auth_from_credential
+    from flow.utils.credencial_wfs import wfs_authentication
 
     try:
         # The canonical form is the key of what the resolver returns.
@@ -92,11 +92,11 @@ async def _credencial_do_wfs(credential_id: str, workflow_id: str | None, user_i
     compartilhado = None
     async with get_session_async() as db:
         if workflow_id:
-            workspace_id = await _workspace_do_fluxo(db, workflow_id)
+            workspace_id = await _workflow_workspace(db, workflow_id)
             papel = await get_workspace_member_role(db, workspace_id, user_id)
             if papel is None:
                 raise HTTPException(status_code=403, detail="Acesso negado a este recurso.")
-            if tem_papel_minimo(papel, ROLE_OPERATOR):
+            if has_minimum_role(papel, ROLE_OPERATOR):
                 compartilhado = workspace_id
         resolvidas = await resolve_credentials_from_ids(
             [credential_id], allowed_owner_ids={user_id}, shared_workspace_id=compartilhado, db=db,
@@ -115,7 +115,7 @@ async def _credencial_do_wfs(credential_id: str, workflow_id: str | None, user_i
         )
     try:
         # A database credential does not become `http_auth`; the type is enough for the refusal.
-        return autenticacao_wfs(None, http_auth_da_credencial(cred) or {"type": cred.get("type") or "?"})
+        return wfs_authentication(None, http_auth_from_credential(cred) or {"type": cred.get("type") or "?"})
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -152,16 +152,16 @@ async def wfs_discover_layers(
     - Response size limit and timeout
     - Requires JWT authentication
     """
-    from flow.utils.credencial_wfs import sem_segredo
+    from flow.utils.credencial_wfs import without_secret
     from flow.utils.geo_helpers import normalize_ows_endpoint_url
     from app.services import fontes_service
 
     url = normalize_ows_endpoint_url(url)
     _validate_wfs_url(url)
-    auth = await _credencial_do_wfs(credential_id, workflow_id, user.id_hash) if credential_id else None
+    auth = await _wfs_credential(credential_id, workflow_id, user.id_hash) if credential_id else None
     try:
         layers = await fontes_service.listar_camadas_wfs(url, auth=auth)
-    except fontes_service.SondagemError as exc:
-        status, detail = exc.como_http()
-        raise HTTPException(status_code=status, detail=sem_segredo(detail, auth)) from None
+    except fontes_service.ProbeError as exc:
+        status, detail = exc.as_http()
+        raise HTTPException(status_code=status, detail=without_secret(detail, auth)) from None
     return {"layers": layers}

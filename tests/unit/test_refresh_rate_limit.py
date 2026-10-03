@@ -15,22 +15,22 @@ from app.core.utils.jwt_utils import (
     _REFRESH_RATE_WINDOW,
     _REFRESH_RATE_PREFIX,
 )
-from tests.unit._mcp_harness import RedisFalso
+from tests.unit._mcp_harness import FakeRedis
 
 CHAVE = f"{_REFRESH_RATE_PREFIX}fam-1"
 
 
-def _redis(contagem_anterior: int | None = None) -> RedisFalso:
-    """In-memory Redis; `contagem_anterior` is what the family has already spent in the window."""
-    r = RedisFalso()
-    if contagem_anterior is not None:
-        r.dados[CHAVE] = contagem_anterior
+def _redis(previous_count: int | None = None) -> FakeRedis:
+    """In-memory Redis; `previous_count` is what the family has already spent in the window."""
+    r = FakeRedis()
+    if previous_count is not None:
+        r.dados[CHAVE] = previous_count
         r.ttls[CHAVE] = _REFRESH_RATE_WINDOW
     return r
 
 
 @pytest.mark.asyncio
-async def test_dentro_do_teto_nao_excede():
+async def test_within_the_ceiling_does_not_exceed():
     r = _redis()
     with patch("app.core.redis.get_redis_pool", return_value=r):
         assert await refresh_rate_exceeded("fam-1") is False
@@ -40,7 +40,7 @@ async def test_dentro_do_teto_nao_excede():
 
 
 @pytest.mark.asyncio
-async def test_no_teto_ainda_permite():
+async def test_at_the_ceiling_still_allows():
     r = _redis(_REFRESH_RATE_LIMIT - 1)
     with patch("app.core.redis.get_redis_pool", return_value=r):
         assert await refresh_rate_exceeded("fam-1") is False
@@ -48,14 +48,14 @@ async def test_no_teto_ainda_permite():
 
 
 @pytest.mark.asyncio
-async def test_acima_do_teto_excede():
+async def test_above_the_ceiling_exceeds():
     r = _redis(_REFRESH_RATE_LIMIT)
     with patch("app.core.redis.get_redis_pool", return_value=r):
         assert await refresh_rate_exceeded("fam-1") is True
 
 
 @pytest.mark.asyncio
-async def test_contagens_seguintes_nao_empurram_a_janela():
+async def test_subsequent_counts_do_not_push_the_window():
     # From the 2nd count on it does NOT re-arm the TTL (fixed window): otherwise a
     # session in a loop would never see the window close.
     r = _redis(1)
@@ -66,7 +66,7 @@ async def test_contagens_seguintes_nao_empurram_a_janela():
 
 
 @pytest.mark.asyncio
-async def test_familias_distintas_baldes_distintos():
+async def test_distinct_families_distinct_buckets():
     # Two families → two different keys; one does not consume the other's quota.
     r = _redis()
     with patch("app.core.redis.get_redis_pool", return_value=r):

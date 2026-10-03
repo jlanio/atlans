@@ -23,7 +23,7 @@ interface Props {
  * destructive "Excluir N" action to the right of everything. Before, Refresh
  * was outline.
  */
-export function CabecalhoDeArtefatos({
+export function ArtifactsHeader({
   subtitulo, atualizando, aExcluir, podeExcluir, onAtualizar, onExcluir,
 }: Props) {
   return (

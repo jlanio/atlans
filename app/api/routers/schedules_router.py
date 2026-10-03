@@ -25,7 +25,7 @@ router = APIRouter(
 # Today only the PUT remains (pause/resume, on Home): schedules are born from the
 # ScheduleTrigger node when the workflow is saved, and MCP uses ScheduleService directly.
 # Listing, creating and deleting through here were removed — they had no caller.
-_GERENCIAR_AGENDAMENTOS = workflow_com_papel(
+_MANAGE_SCHEDULES = workflow_com_papel(
     ROLE_OPERATOR, "Requer role 'operator' ou superior para gerenciar agendamentos.",
 )
 
@@ -37,6 +37,6 @@ async def update_schedule(
     job_id: str,
     schedule_in: ScheduleUpdate,
     service: ScheduleService = Depends(get_schedule_service),
-    wf=Depends(_GERENCIAR_AGENDAMENTOS),
+    wf=Depends(_MANAGE_SCHEDULES),
 ):
     return await service.update_schedule(job_id, schedule_in, owner_workflow_hash=wf.id_hash)

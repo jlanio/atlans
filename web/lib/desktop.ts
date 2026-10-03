@@ -10,27 +10,27 @@
 
 /** Mirrors `StatusExecutorLocal` from desktop/src/shared/executor-status.ts.
  *  Duplicated on purpose: they are two packages with no shared code. */
-export type EstadoExecutorLocal = 'online' | 'ocupado' | 'offline' | 'sem-vinculo'
+export type LocalExecutorState = 'online' | 'ocupado' | 'offline' | 'sem-vinculo'
 
 export interface StatusExecutorLocal {
   versaoContrato: number
   executorId: string | null
   vinculado: boolean
-  estado: EstadoExecutorLocal
+  estado: LocalExecutorState
   emExecucao: number
   capacidade: number | null
 }
 
-interface PonteDesktop {
+interface DesktopBridge {
   versao: number
   obterStatus: () => Promise<StatusExecutorLocal>
   aoMudarStatus: (fn: (s: StatusExecutorLocal) => void) => () => void
 }
 
 /** The desktop bridge, or `null` outside of it. */
-export function ponteDesktop(): PonteDesktop | null {
+export function ponteDesktop(): DesktopBridge | null {
   if (typeof window === 'undefined') return null
-  const p = (window as unknown as { atlansDesktop?: PonteDesktop }).atlansDesktop
+  const p = (window as unknown as { atlansDesktop?: DesktopBridge }).atlansDesktop
   return p && typeof p.obterStatus === 'function' && typeof p.aoMudarStatus === 'function'
     ? p
     : null

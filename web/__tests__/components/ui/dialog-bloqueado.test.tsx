@@ -28,12 +28,12 @@ function montar(bloqueado: boolean, extra: Partial<React.ComponentProps<typeof D
  * click one tick after opening, and with the primary button it defers the
  * dismissal from `pointerdown` to the `click` that follows.
  */
-async function clicarFora() {
-  const tique = () => act(async () => { await new Promise(r => setTimeout(r, 0)) })
-  await tique()
+async function clickOutside() {
+  const tick = () => act(async () => { await new Promise(r => setTimeout(r, 0)) })
+  await tick()
   fireEvent.pointerDown(document.body, { button: 0 })
   fireEvent.click(document.body, { button: 0 })
-  await tique()
+  await tick()
 }
 
 describe("DialogContent — bloqueado", () => {
@@ -42,7 +42,7 @@ describe("DialogContent — bloqueado", () => {
     const dialogo = screen.getByRole("dialog")
 
     fireEvent.keyDown(dialogo, { key: "Escape", code: "Escape" })
-    await clicarFora()
+    await clickOutside()
 
     expect(onOpenChange).not.toHaveBeenCalled()
     expect(screen.getByRole("button", { name: "Fechar" })).toBeDisabled()
@@ -55,7 +55,7 @@ describe("DialogContent — bloqueado", () => {
     expect(onOpenChange).toHaveBeenLastCalledWith(false)
 
     onOpenChange.mockClear()
-    await clicarFora()
+    await clickOutside()
     expect(onOpenChange).toHaveBeenLastCalledWith(false)
 
     const fechar = screen.getByRole("button", { name: "Fechar" })

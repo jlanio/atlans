@@ -13,7 +13,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
 
-exports.default = async function antesDeEmpacotar() {
+exports.default = async function beforePack() {
   const { conferirMarcaDoBuild } = await import('../scripts/enderecos.mjs')
   let marca = null
   try {

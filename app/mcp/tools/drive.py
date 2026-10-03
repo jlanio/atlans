@@ -11,14 +11,14 @@ from mcp_types import ToolAnnotations
 from app.core.authorization.workflow_access import verify_workspace_access
 # See the note in `drive_escrita.py`: this is NOT the builtin and does not
 # inherit from it.
-from app.core.exceptions import FileNotFoundError as ArquivoNaoEncontradoError
+from app.core.exceptions import FileNotFoundError as AppFileNotFoundError
 from app.core.storage import presigned_get_async
 from app.core.utils.datetime_utils import utc_now_naive
 from app.mcp import infra
 from app.mcp.erros import erro
 from app.mcp.escopo import escopo_da_chamada, exigir_escopo
-from app.mcp.resolucao import resolver_workspace
-from app.mcp.saida import envelope, higienizar, iso
+from app.mcp.resolucao import resolve_workspace
+from app.mcp.saida import envelope, sanitize, iso
 from app.mcp.tools.base import ferramenta
 from app.services.drive_service import DriveService
 
@@ -26,18 +26,18 @@ from app.services.drive_service import DriveService
 # for the browser of someone who is logged in; here the link travels through a
 # conversation and may be recorded in a client log, so it lasts the minimum
 # needed to download the file.
-VALIDADE_DO_LINK_S = 300
+LINK_VALIDITY_S = 300
 
 # Ceiling of files per page — the same context-budget reason as the other
 # listings.
-PAGE_SIZE_MAXIMO = 100
+MAX_PAGE_SIZE = 100
 
 # How many columns of the spatial metadata go out per file. A 300-column table
 # would describe the file better than the entire rest of the response.
-MAX_COLUNAS = 50
+MAX_COLUMNS = 50
 
 
-def _resumo_espacial(bruto: Any) -> dict | None:
+def _spatial_summary(bruto: Any) -> dict | None:
     """CRS, extent, count and the first columns — never the whole list."""
     if not isinstance(bruto, Mapping):
         return None
@@ -51,7 +51,7 @@ def _resumo_espacial(bruto: Any) -> dict | None:
     if isinstance(colunas, list):
         # A column name is written by whoever produced the file: it goes through
         # the sanitizer like any other text of human origin.
-        resumo["columns"] = higienizar(colunas[:MAX_COLUNAS])
+        resumo["columns"] = sanitize(colunas[:MAX_COLUMNS])
         resumo["columns_total"] = len(colunas)
     return {chave: valor for chave, valor in resumo.items() if valor is not None}
 
@@ -75,10 +75,10 @@ async def list_drive_files(
     exigir_escopo(escopo, "drive:read")
 
     pagina = max(1, int(page))
-    tamanho = max(1, min(int(page_size), PAGE_SIZE_MAXIMO))
+    tamanho = max(1, min(int(page_size), MAX_PAGE_SIZE))
 
     async with infra.sessao() as db:
-        ws = await resolver_workspace(db, escopo, workspace_id)
+        ws = await resolve_workspace(db, escopo, workspace_id)
         arquivos, total = await DriveService(db).list_files(
             ws, search=search, ext=ext, page=pagina, page_size=tamanho
         )
@@ -89,7 +89,7 @@ async def list_drive_files(
                 "mime_type": a.mime_type,
                 "size": a.size,
                 "content_location": a.content_location or "minio",
-                "spatial_metadata": _resumo_espacial(a.spatial_metadata),
+                "spatial_metadata": _spatial_summary(a.spatial_metadata),
                 "updated_at": iso(a.content_written_at or a.updated_at or a.created_at),
                 "original_name": a.original_name,
             }
@@ -132,7 +132,7 @@ async def get_drive_download_url(ctx: Context, file_id: str) -> dict:
     async with infra.sessao() as db:
         try:
             arquivo = await DriveService(db).get_file(str(file_id))
-        except ArquivoNaoEncontradoError as exc:
+        except AppFileNotFoundError as exc:
             raise erro(
                 "not_found",
                 "Nenhum arquivo do Drive com este identificador.",
@@ -168,14 +168,14 @@ async def get_drive_download_url(ctx: Context, file_id: str) -> dict:
             filename=nome,
         )
 
-    url = await presigned_get_async(chave, expires=VALIDADE_DO_LINK_S, filename=nome)
+    url = await presigned_get_async(chave, expires=LINK_VALIDITY_S, filename=nome)
     return envelope(
         {
             **dados,
             "available": True,
             "download_url": url,
-            "expires_in_seconds": VALIDADE_DO_LINK_S,
-            "expires_at": iso(utc_now_naive() + timedelta(seconds=VALIDADE_DO_LINK_S)),
+            "expires_in_seconds": LINK_VALIDITY_S,
+            "expires_at": iso(utc_now_naive() + timedelta(seconds=LINK_VALIDITY_S)),
         },
         filename=nome,
     )

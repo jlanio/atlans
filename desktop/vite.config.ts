@@ -2,7 +2,7 @@
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
-import { defineDosEnderecos, enderecosDoBuild } from './scripts/enderecos.mjs'
+import { addressDefines, buildAddresses } from './scripts/enderecos.mjs'
 
 /**
  * Blocks `electron` and `node:*` in the renderer bundle.
@@ -10,7 +10,7 @@ import { defineDosEnderecos, enderecosDoBuild } from './scripts/enderecos.mjs'
  * The renderer runs in Chromium, with `sandbox: true` and no Node integration.
  * None of that exists there. The way to fall into this trap is importing a
  * VALUE from a main-process module —
- * `import { INTERVALO_SYNC } from '../../main/state/config'` — which in turn
+ * `import { SYNC_INTERVAL } from '../../main/state/config'` — which in turn
  * imports `node:fs` and `paths.ts`. Types are safe (they vanish at compile
  * time); values drag the whole tree along.
  *
@@ -22,14 +22,14 @@ import { defineDosEnderecos, enderecosDoBuild } from './scripts/enderecos.mjs'
  *
  * Here it becomes a build error, pointing at who imported what.
  */
-function proibirModulosDoMain(): Plugin {
+function forbidMainModules(): Plugin {
   return {
     name: 'atlans:proibir-modulos-do-main',
     enforce: 'pre',
-    resolveId(id, importador) {
+    resolveId(id, importer) {
       if (id !== 'electron' && !id.startsWith('node:')) return null
       throw new Error(
-        `O renderer não pode importar "${id}" (via ${importador ?? 'desconhecido'}).\n`
+        `O renderer não pode importar "${id}" (via ${importer ?? 'desconhecido'}).\n`
         + 'Isso acontece ao importar um VALOR de src/main — só `import type` é seguro.\n'
         + 'Mova a constante para src/shared/.',
       )
@@ -41,11 +41,11 @@ export default defineConfig(({ command }) => ({
   root: 'src/renderer',
   // The installation's server and UI (scripts/enderecos.mjs): `vite build`
   // requires those from the environment; the dev server falls back to the local ones.
-  define: defineDosEnderecos(enderecosDoBuild({ dev: command === 'serve' })),
+  define: addressDefines(buildAddresses({ dev: command === 'serve' })),
   // A relative path is mandatory: packaged, the window loads via `file://`, and
   // Vite's default absolute `/assets/...` would point to the root of the disk.
   base: './',
-  plugins: [proibirModulosDoMain(), tailwindcss(), react()],
+  plugins: [forbidMainModules(), tailwindcss(), react()],
   build: {
     outDir: '../../dist/renderer',
     emptyOutDir: true,

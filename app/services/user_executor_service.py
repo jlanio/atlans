@@ -65,7 +65,7 @@ async def get_user_accessible_agents(db: AsyncSession, user_id: str) -> list[dic
     # policy editor must show up here, otherwise the owner can neither see nor
     # remove an executor that runs their workflows.
     from app.services.workspace_executor_service import executor_ids_for_workspaces
-    meus_ws = await db.execute(
+    my_ws = await db.execute(
         select(Workspace.id_hash).where(
             Workspace.deleted_at.is_(None),
             or_(
@@ -76,7 +76,7 @@ async def get_user_accessible_agents(db: AsyncSession, user_id: str) -> list[dic
             ),
         )
     )
-    ws_agent_ids |= await executor_ids_for_workspaces(db, list(meus_ws.scalars().all()))
+    ws_agent_ids |= await executor_ids_for_workspaces(db, list(my_ws.scalars().all()))
 
     # Fetch the workspaces' executors
     ws_agents: list[Executor] = []
@@ -160,12 +160,12 @@ async def get_user_bindable_agents(db: AsyncSession, user_id: str) -> list[dict]
     )
     ids |= set(atrib.scalars().all())
     # Executors of workspaces THE USER OWNS (legacy pointer + policy).
-    meus_ws = await db.execute(
+    my_ws = await db.execute(
         select(Workspace.id_hash).where(
             Workspace.owner_id == user_id, Workspace.deleted_at.is_(None)
         )
     )
-    meus_ws_ids = list(meus_ws.scalars().all())
+    my_ws_ids = list(my_ws.scalars().all())
     ptr = await db.execute(
         select(Workspace.target_executor_id).where(
             Workspace.owner_id == user_id,
@@ -174,7 +174,7 @@ async def get_user_bindable_agents(db: AsyncSession, user_id: str) -> list[dict]
         )
     )
     ids |= set(ptr.scalars().all())
-    ids |= await executor_ids_for_workspaces(db, meus_ws_ids)
+    ids |= await executor_ids_for_workspaces(db, my_ws_ids)
 
     ids -= seen
     if ids:

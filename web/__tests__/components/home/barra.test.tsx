@@ -4,13 +4,13 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import Barra from "@/app/components/home/assistente/barra"
 import { pt } from "@/app/components/home/i18n/secoes/assistente"
 import { useHomeStore } from "@/app/stores/homeStore"
-import type { IAssistenteEstado } from "@/service/types"
+import type { IAssistantState } from "@/service/types"
 
 // The sentences typed into the empty field and the hero chips, in Portuguese — the
 // dictionary the bar reads with no language provider.
-const { sugestoes: SUGESTOES, chips: CHIPS } = pt.barra
+const { sugestoes: SUGGESTIONS, chips: CHIPS } = pt.barra
 
-const ATIVO: IAssistenteEstado = { ativo: true, cota: { gasto: 0, teto: 1_000_000, reabre_em_segundos: null } }
+const ATIVO: IAssistantState = { ativo: true, cota: { gasto: 0, teto: 1_000_000, reabre_em_segundos: null } }
 
 // The draft lives in the store (it survives the panel↔bar switch): each test
 // starts over with an empty box, otherwise the text of one leaks into the next.
@@ -28,7 +28,7 @@ function digitar(texto: string) {
  * React only applies the `setState`s at the end, so one `advanceTimersByTime(1600)`
  * fired a single timer (the effect that schedules the next one never re-ran).
  */
-function avancar(ms: number, passo = 26) {
+function advance(ms: number, passo = 26) {
   for (let t = 0; t < ms; t += passo) act(() => { vi.advanceTimersByTime(passo) })
 }
 
@@ -126,17 +126,17 @@ describe("Barra de comando — hero", () => {
     // O placeholder sai da frente: a frase digitada ocupa o lugar dele.
     expect((screen.getByLabelText(/Mensagem para o assistente/i) as HTMLInputElement).placeholder).toBe("")
 
-    const primeira = SUGESTOES[0]
-    avancar(26 * 3)
+    const primeira = SUGGESTIONS[0]
+    advance(26 * 3)
     expect(sugestao.textContent).toBe(primeira.slice(0, 3))
-    avancar(26 * primeira.length)
+    advance(26 * primeira.length)
     expect(sugestao.textContent).toBe(primeira)
 
     // Read for 2.3 s, erased (14 ms per letter) and replaced by the next one.
-    avancar(2300 + 14 * primeira.length + 420 + 26 * 4, 14)
+    advance(2300 + 14 * primeira.length + 420 + 26 * 4, 14)
     const agora = sugestao.textContent ?? ""
     expect(agora.length).toBeGreaterThan(0)
-    expect(SUGESTOES[1].startsWith(agora)).toBe(true)
+    expect(SUGGESTIONS[1].startsWith(agora)).toBe(true)
   })
 
   it("Tab aceita a sugestão da vez", () => {
@@ -145,7 +145,7 @@ describe("Barra de comando — hero", () => {
 
     fireEvent.keyDown(campo, { key: "Tab" })
 
-    expect(useHomeStore.getState().rascunho).toBe(SUGESTOES[0])
+    expect(useHomeStore.getState().rascunho).toBe(SUGGESTIONS[0])
     // With text in the box the suggestion goes away.
     expect(screen.queryByTestId("sugestao")).toBeNull()
   })
@@ -156,7 +156,7 @@ describe("Barra de comando — hero", () => {
 
     fireEvent.keyDown(screen.getByLabelText(/Mensagem para o assistente/i), { key: "Enter" })
 
-    expect(enviar).toHaveBeenCalledWith(SUGESTOES[0])
+    expect(enviar).toHaveBeenCalledWith(SUGGESTIONS[0])
     expect(useHomeStore.getState().painel).toBe("barra")
   })
 
@@ -193,7 +193,7 @@ describe("Barra de comando — hero", () => {
  * and React falls back to the prefixed name (`webkitAnimationEnd`). Firing both
  * covers both environments; whichever is not listened to is ignored.
  */
-function fimDaAnimacao(el: Element) {
+function endAnimation(el: Element) {
   fireEvent.animationEnd(el)
   fireEvent(el, new Event("webkitAnimationEnd", { bubbles: true }))
 }
@@ -209,9 +209,9 @@ describe("Barra — o envio tem sinal, e a saída apaga", () => {
     expect(caixa.getAttribute("data-flash")).toBe("true")
 
     // An animated child (the chevron, the cursor) finishing does not count.
-    fimDaAnimacao(screen.getByRole("button", { name: /abrir o assistente/i }))
+    endAnimation(screen.getByRole("button", { name: /abrir o assistente/i }))
     expect(caixa.getAttribute("data-flash")).toBe("true")
-    fimDaAnimacao(caixa)
+    endAnimation(caixa)
     expect(caixa.getAttribute("data-flash")).toBe("false")
   })
 

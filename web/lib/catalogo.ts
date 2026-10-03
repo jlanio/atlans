@@ -24,7 +24,7 @@
  * bar, but the folder is `Bolivia INRA`, without the accent. The test uses this
  * field to check that no name here has become fiction.
  */
-export interface BaseCitada {
+export interface CitedBase {
   rotulo: string
   pasta: string
 }
@@ -41,7 +41,7 @@ export const CATALOGO = {
 } as const
 
 /** The first strip: the most recognizable federal agencies. */
-export const ORGAOS_FEDERAIS: readonly BaseCitada[] = [
+export const ORGAOS_FEDERAIS: readonly CitedBase[] = [
   { rotulo: "IBGE", pasta: "IBGE" },
   { rotulo: "IBAMA", pasta: "IBAMA" },
   { rotulo: "FUNAI", pasta: "FUNAI" },
@@ -56,7 +56,7 @@ export const ORGAOS_FEDERAIS: readonly BaseCitada[] = [
  * The second strip: states and agencies. It exists to undo the impression that
  * the catalog is only federal — INEA and Sisema alone are 22% of the layers.
  */
-export const ORGAOS_REGIONAIS: readonly BaseCitada[] = [
+export const ORGAOS_REGIONAIS: readonly CitedBase[] = [
   { rotulo: "INEA (RJ)", pasta: "INEA RJ" },
   { rotulo: "Sisema (MG)", pasta: "Sisema MG" },
   { rotulo: "SEPLAN (TO)", pasta: "SEPLAN TO" },
@@ -74,7 +74,7 @@ export const ORGAOS_REGIONAIS: readonly BaseCitada[] = [
  * a single layer, the railway network — drops out of any honest cut by size,
  * but it is true that it is there.
  */
-export const PAISES: readonly BaseCitada[] = [
+export const PAISES: readonly CitedBase[] = [
   { rotulo: "Equador", pasta: "Equador" },
   { rotulo: "Nicarágua", pasta: "Nicarágua" },
   { rotulo: "Guiana Francesa", pasta: "Guiana Francesa" },

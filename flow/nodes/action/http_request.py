@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 # Retrying a POST/PATCH that already reached the server duplicates the effect —
 # the response may have been lost on the way back, not on the way out. The
 # others are idempotent by the protocol's definition.
-_METODOS_REPETIVEIS = frozenset({'GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE'})
+_RETRYABLE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE'})
 
 # Failures where retrying makes sense: the server said "I'm overloaded" or
 # "try again". 4xx (except 429) is a request error — retrying gives the same error.
@@ -28,10 +28,10 @@ _STATUS_REPETIVEIS = frozenset({429, 500, 502, 503, 504})
 # offers, the wait doesn't come close, but the shared policy requires a
 # declared ceiling — and a high `tentativas` configured on the canvas must not
 # be able to hold the workflow for minutes.
-_TETO_DE_ESPERA_S = 30.0
+_WAIT_CEILING_S = 30.0
 
 
-def _inteiro(valor: Any, padrao: int) -> int:
+def _int(valor: Any, padrao: int) -> int:
     """Number coming from the form, which arrives as a string when typed."""
     try:
         return int(valor)
@@ -39,7 +39,7 @@ def _inteiro(valor: Any, padrao: int) -> int:
         return padrao
 
 
-def _juntar_query(url: str, params: Any) -> List[Tuple[str, str]]:
+def _merge_query(url: str, params: Any) -> List[Tuple[str, str]]:
     """Merges the query already in the URL with the one from the `Parametros de query` field.
 
     httpx treats `params` as the whole query: handing it a dictionary
@@ -58,37 +58,37 @@ def _juntar_query(url: str, params: Any) -> List[Tuple[str, str]]:
     correcting what came in the URL — so the occurrences of that key that came
     from the URL are dropped, instead of being added to the typed value.
     """
-    do_campo = [(str(k), str(v)) for k, v in (params or {}).items()]
-    sobrescritas = {chave for chave, _ in do_campo}
+    from_field = [(str(k), str(v)) for k, v in (params or {}).items()]
+    overridden = {chave for chave, _ in from_field}
     da_url = [
         (chave, valor)
         for chave, valor in parse_qsl(urlparse(url).query, keep_blank_values=True)
-        if chave not in sobrescritas
+        if chave not in overridden
     ]
-    return da_url + do_campo
+    return da_url + from_field
 
 
 # Headers that carry a credential and must not cross a change of origin.
 # It's the same list curl and requests drop when following a 3xx.
-_CABECALHOS_DE_CREDENCIAL = frozenset({'authorization', 'cookie', 'proxy-authorization'})
+_CREDENTIAL_HEADERS = frozenset({'authorization', 'cookie', 'proxy-authorization'})
 
 
-def _mesma_origem(a: str, b: str) -> bool:
+def _same_origin(a: str, b: str) -> bool:
     """Compares origin in the RFC 6454 sense: scheme, host and effective port."""
-    _PADRAO = {'http': 80, 'https': 443}
+    _DEFAULT_PORTS = {'http': 80, 'https': 443}
     def origem(u: str):
         p = urlparse(u)
         esquema = (p.scheme or '').lower()
-        return (esquema, (p.hostname or '').lower(), p.port or _PADRAO.get(esquema))
+        return (esquema, (p.hostname or '').lower(), p.port or _DEFAULT_PORTS.get(esquema))
     return origem(a) == origem(b)
 
 
-def _sem_credenciais(headers: Dict[str, str]) -> Dict[str, str]:
+def _without_credentials(headers: Dict[str, str]) -> Dict[str, str]:
     """Copy of the headers without the ones that carry a secret."""
-    return {k: v for k, v in headers.items() if k.lower() not in _CABECALHOS_DE_CREDENCIAL}
+    return {k: v for k, v in headers.items() if k.lower() not in _CREDENTIAL_HEADERS}
 
 
-def _aplicar_auth(headers: Dict[str, str], auth: Any) -> Dict[str, str]:
+def _apply_auth(headers: Dict[str, str], auth: Any) -> Dict[str, str]:
     """Builds the `Authorization` header from the resolved credential.
 
     The credential wins over an `Authorization` written by hand in the headers:
@@ -298,16 +298,16 @@ class HttpRequestNode(BaseNode):
         body    = self.parameters.get('body', '').strip()
         timeout = self.parameters.get('timeout', 30)
 
-        seguir_redirect = bool(self.parameters.get('followRedirects', False))
-        max_redirects   = _inteiro(self.parameters.get('maxRedirects'), 3)
-        max_mb          = _inteiro(self.parameters.get('maxResponseMb'), 32)
-        tentativas      = max(0, _inteiro(self.parameters.get('retries'), 0))
+        follow_redirect = bool(self.parameters.get('followRedirects', False))
+        max_redirects   = _int(self.parameters.get('maxRedirects'), 3)
+        max_mb          = _int(self.parameters.get('maxResponseMb'), 32)
+        tentativas      = max(0, _int(self.parameters.get('retries'), 0))
 
         # `http_auth` is injected by the server from the chosen credential
         # (see credential_resolver). The secret does NOT travel in the workflow
         # definition — that's why authenticating here is better than writing
         # the header by hand, which is stored in plain text in the database and in the history.
-        headers = _aplicar_auth(headers, self.parameters.get('http_auth'))
+        headers = _apply_auth(headers, self.parameters.get('http_auth'))
 
         if not url:
             raise ValueError("Parâmetro 'url' é obrigatório para HttpRequest.")
@@ -336,7 +336,7 @@ class HttpRequestNode(BaseNode):
         #
         # The merge happens here, and not in the transport, because `safe_httpx_request`
         # also serves WFS and the webhook, which build the query on their own.
-        params = _juntar_query(url, params)
+        params = _merge_query(url, params)
 
         host    = urlparse(url).netloc or url
         breaker = get_circuit_breaker(f"http:{host}")
@@ -375,7 +375,7 @@ class HttpRequestNode(BaseNode):
                 first_payload = next(iter(inputs.values()))
                 if isinstance(first_payload, gpd.GeoDataFrame):
                     try:
-                        request_kwargs['json'] = json.loads(gdf_para_geojson(first_payload, nat_como_nulo=True))
+                        request_kwargs['json'] = json.loads(gdf_para_geojson(first_payload, nat_as_null=True))
                     except Exception as e:
                         raise ValueError(f"Falha ao converter GeoDataFrame para GeoJSON: {e}")
                 else:
@@ -410,8 +410,8 @@ class HttpRequestNode(BaseNode):
         # 0.25–0.5s, 0.5–1s, 1–2s…) so as not to retry in a burst against a server
         # that already said it's overloaded; the jitter within the range is what
         # keeps several workflows from hitting at once (see flow/utils/backoff.py).
-        pode_repetir = method in _METODOS_REPETIVEIS and tentativas > 0
-        total = tentativas + 1 if pode_repetir else 1
+        can_retry = method in _RETRYABLE_METHODS and tentativas > 0
+        total = tentativas + 1 if can_retry else 1
         response = None
 
         for tentativa in range(total):
@@ -439,7 +439,7 @@ class HttpRequestNode(BaseNode):
                 )
 
             await asyncio.sleep(
-                espera_exponencial(tentativa, inicial=0.5, teto=_TETO_DE_ESPERA_S)
+                espera_exponencial(tentativa, inicial=0.5, teto=_WAIT_CEILING_S)
             )
 
         logger.info("Recebido HTTP %s de %s", response.status_code, url)
@@ -449,7 +449,7 @@ class HttpRequestNode(BaseNode):
         # 3xx pointing to an internal address would turn the platform into an SSRF
         # proxy. Following HERE keeps the defense, because each hop goes back
         # through the same function, which revalidates the URL and redoes the IP pinning.
-        if seguir_redirect:
+        if follow_redirect:
             saltos = 0
             while response.is_redirect and saltos < max_redirects:
                 destino = response.headers.get('location')
@@ -465,8 +465,8 @@ class HttpRequestNode(BaseNode):
                 # secret to leave the platform. On the SAME origin the header goes along:
                 # it's the common case of `/api` → `/api/`, and dropping it there would
                 # only make the request come back 401.
-                if not _mesma_origem(url, destino):
-                    request_kwargs['headers'] = _sem_credenciais(request_kwargs['headers'])
+                if not _same_origin(url, destino):
+                    request_kwargs['headers'] = _without_credentials(request_kwargs['headers'])
 
                 # The `Location` is already the complete target, query included. Continuing
                 # to pass `params` — which was built from the ORIGINAL URL —
@@ -492,11 +492,11 @@ class HttpRequestNode(BaseNode):
                 # continuing to use the original address's breaker counted the
                 # destination's failures against the one that only redirected, and
                 # stopped consulting the circuit of the host actually being called.
-                salto_breaker = get_circuit_breaker(
+                hop_breaker = get_circuit_breaker(
                     f"http:{urlparse(destino).netloc or destino}"
                 )
                 try:
-                    response = await salto_breaker.call(_do_request)
+                    response = await hop_breaker.call(_do_request)
                 except CircuitOpenError as e:
                     raise RuntimeError(str(e))
                 saltos += 1

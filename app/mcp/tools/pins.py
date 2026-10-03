@@ -50,11 +50,11 @@ from app.mcp.saida import envelope
 from app.mcp.tools.base import anotacoes, ferramenta
 from app.services import pin_service
 
-_MENSAGEM_PAPEL_LEITURA = "Requer papel 'viewer' ou superior neste workspace."
-_MENSAGEM_PAPEL_ESCRITA = "Requer papel 'editor' ou superior neste workspace."
+_READ_ROLE_MESSAGE = "Requer papel 'viewer' ou superior neste workspace."
+_WRITE_ROLE_MESSAGE = "Requer papel 'editor' ou superior neste workspace."
 
 
-def _ids_dos_nos(definition: Any) -> set[str]:
+def _node_ids(definition: Any) -> set[str]:
     """The `id`s of the nodes the definition has now."""
     if not isinstance(definition, dict):
         return set()
@@ -95,16 +95,16 @@ async def list_pins(ctx: Context, workflow_id: str) -> dict:
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_VIEWER, _MENSAGEM_PAPEL_LEITURA)
+        exigir_papel(papel, ROLE_VIEWER, _READ_ROLE_MESSAGE)
         pins = pin_service.listar_pins(
             wf.pin_metadata,
             wf.pinned_outputs,
-            node_ids_existentes=_ids_dos_nos(wf.definition),
+            existing_node_ids=_node_ids(wf.definition),
         )
-        id_do_fluxo = wf.id_hash
+        workflow_id_hash = wf.id_hash
 
     return envelope({
-        "workflow_id": id_do_fluxo,
+        "workflow_id": workflow_id_hash,
         "items": pins,
         "total": len(pins),
         "cached_count": sum(1 for p in pins if p["cached"]),
@@ -146,8 +146,8 @@ async def pin_node_output(
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_EDITOR, _MENSAGEM_PAPEL_ESCRITA)
-        id_do_fluxo = wf.id_hash
+        exigir_papel(papel, ROLE_EDITOR, _WRITE_ROLE_MESSAGE)
+        workflow_id_hash = wf.id_hash
         try:
             resultado = await pin_service.fixar_saida(
                 db, wf, node_id,
@@ -157,24 +157,24 @@ async def pin_node_output(
                 user_id=escopo.user_id,
                 exigir_no_existente=True,
             )
-        except pin_service.NoInexistenteError as exc:
+        except pin_service.NodeNotFoundError as exc:
             raise erro(
                 "not_found",
                 str(exc),
                 "use get_workflow(workflow_id) para ver os ids dos nós",
             )
-        except pin_service.PinEmNoDeSaidaError as exc:
+        except pin_service.PinOnOutputNodeError as exc:
             raise erro(
                 "validation",
                 str(exc),
                 "fixe o nó que ALIMENTA a saída, não o de saída em si",
             )
         except ValueError as exc:
-            # `_validar_ttl` — range or type.
+            # `_validate_ttl` — range or type.
             raise erro("validation", str(exc), "ttl_hours de 1 a 8760, ou omitido")
 
     return envelope({
-        "workflow_id": id_do_fluxo,
+        "workflow_id": workflow_id_hash,
         "node_id": node_id,
         "pinned_at": resultado["pinned_at"],
         "expires_at": resultado["expires_at"],
@@ -213,13 +213,13 @@ async def unpin_node_output(ctx: Context, workflow_id: str, node_id: str) -> dic
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_EDITOR, _MENSAGEM_PAPEL_ESCRITA)
-        id_do_fluxo = wf.id_hash
-        resultado = await pin_service.desfixar_saida(db, wf, node_id)
+        exigir_papel(papel, ROLE_EDITOR, _WRITE_ROLE_MESSAGE)
+        workflow_id_hash = wf.id_hash
+        resultado = await pin_service.unpin_output(db, wf, node_id)
 
     aviso = resultado.get("storage_warning")
     return envelope({
-        "workflow_id": id_do_fluxo,
+        "workflow_id": workflow_id_hash,
         "node_id": node_id,
         "outcome": resultado["outcome"],
         "total_pinned": resultado["total_pinned"],

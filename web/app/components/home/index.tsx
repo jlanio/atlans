@@ -20,13 +20,13 @@ import { etapaDaConversa } from "./assistente/etapa"
 import Pilha from "./assistente/pilha"
 import PainelCamadas from "./painel-camadas"
 import ModalDeEntrada from "./entrada/modal-de-entrada"
-import { ehPainelDeEmail, type ModoDeEntrada } from "@/lib/entrada"
+import { ehPainelDeEmail, type EntryMode } from "@/lib/entrada"
 import { baixarArtefato } from "@/lib/baixar-artefato"
 import { createToast } from "@/utils/createToast"
-import { useIdiomaDaTela, useTextos } from "./i18n"
+import { useScreenLanguage, useTexts } from "./i18n"
 
 /** The bar takes 900 ms from the center to the footer and the veil 15% longer (globals.css). */
-export const DURACAO_DA_TRANSICAO_MS = 1050
+export const TRANSITION_DURATION_MS = 1050
 /** A faixa e a barra saindo quando o painel abre: `--home-dur × .33` (globals.css). */
 export const SAIDA_MS = 300
 
@@ -71,7 +71,7 @@ export default function HomeView({
   paisDaConexao,
 }: {
   /** O modal de entrada nasce aberto neste painel (`?entrar=1`, `?redefinir=1`…). */
-  entrada?: ModoDeEntrada
+  entrada?: EntryMode
   /** The token from the e-mail link (`?redefinir=1&token=…`, `?verificar=1&token=…`). */
   tokenDoLink?: string
   /** Where to go after login (internal; comes sanitized from the page). */
@@ -82,8 +82,8 @@ export default function HomeView({
   const conversaId = useHomeStore((s) => s.conversaId)
   const painel = useHomeStore((s) => s.painel)
   const hidratado = useHomeStore((s) => s.hidratado)
-  const idioma = useIdiomaDaTela()
-  const t = useTextos()
+  const idioma = useScreenLanguage()
+  const t = useTexts()
   const hidratar = useHomeStore((s) => s.hidratar)
   const alternar = useHomeStore((s) => s.alternarPainel)
   const selecionar = useHomeStore((s) => s.selecionarConversa)
@@ -96,10 +96,10 @@ export default function HomeView({
   // here may hit `/terra` (/estado would go out without a token, or with the
   // expired one, and become a 401). The SessionProvider receives the session from
   // the server (`null` included), so the status is known from the first render.
-  const { data: sessao, status: statusDaSessao } = useSession()
-  const anonimo = statusDaSessao === "unauthenticated" || sessao?.error === "RefreshTokenExpired"
+  const { data: sessao, status: sessionStatus } = useSession()
+  const anonimo = sessionStatus === "unauthenticated" || sessao?.error === "RefreshTokenExpired"
   const router = useRouter()
-  const entradaPedida = useHomeStore((s) => s.entrada)
+  const requestedSignIn = useHomeStore((s) => s.entrada)
   const envioPendente = useHomeStore((s) => s.envioPendente)
   const pedirEntrada = useHomeStore((s) => s.pedirEntrada)
   const fecharEntrada = useHomeStore((s) => s.fecharEntrada)
@@ -145,7 +145,7 @@ export default function HomeView({
   // same `POST /drive/upload` and translates the rejection. The state lives in the
   // store because Ctrl+I unmounts the bar and the chips would go with it.
   const definirArrastandoArquivo = useHomeStore((s) => s.definirArrastandoArquivo)
-  const receberAnexos = useAnexos({
+  const receiveAttachments = useAnexos({
     workspaceId: current?.id_hash ?? null,
     // `canEdit` mirrors the `editor` role the Drive requires: predicting the 403 spares
     // the network for those who are only readers. Anonymous is `false` here, but
@@ -160,7 +160,7 @@ export default function HomeView({
     // same door as the first submission), instead of the browser opening the file.
     ativo: true,
     aoArrastar: definirArrastandoArquivo,
-    aoSoltar: receberAnexos.receber,
+    aoSoltar: receiveAttachments.receber,
   })
 
   // Switching the active workspace empties the attachments: they are "what I just
@@ -198,19 +198,19 @@ export default function HomeView({
   // conversation (or starts a new one), not when the ongoing conversation learns
   // its own id — then the layers on screen are its own.
   const escopo = useRef("nova:0")
-  const conversaAnterior = useRef<string | null | undefined>(undefined)
+  const previousConversation = useRef<string | null | undefined>(undefined)
   const novas = useRef(0)
-  if (conversaAnterior.current !== conversaId) {
+  if (previousConversation.current !== conversaId) {
     const anunciado = idDoStream.current
     idDoStream.current = null // consumed: it holds for THIS switch, and only for it
     if (!conversaId || conversaId !== anunciado) {
       escopo.current = conversaId ?? `nova:${++novas.current}`
     }
-    conversaAnterior.current = conversaId
+    previousConversation.current = conversaId
   }
 
   const camadas = useCamadas(assistente.turnos, escopo.current)
-  const { adicionar: adicionarCamada } = camadas
+  const { adicionar: addLayer } = camadas
 
   // The "+"'s "Usar minha localização" turns sharing on AND triggers the SAME
   // globe control (the corner button): the globe follows the person and
@@ -220,7 +220,7 @@ export default function HomeView({
   // trigger is a toggle). `refMapa` is stable (useCamadas' useRef), so the
   // callback is not recreated.
   const refMapa = camadas.refMapa
-  const pedirLocalizacao = useCallback(() => {
+  const requestLocation = useCallback(() => {
     ligarLocalizacao()
     refMapa.current?.localizar()
   }, [ligarLocalizacao, refMapa])
@@ -231,7 +231,7 @@ export default function HomeView({
   // suggestion again) and the sign-in modal opens over the globe. When login
   // succeeds, it goes out on its own (the effect below). Closing the modal
   // without signing in abandons the submission, but the text stays in the bar.
-  const exigirLogin = useCallback((texto: string) => {
+  const requireLogin = useCallback((texto: string) => {
     definirRascunho(texto)
     definirEnvioPendente(texto)
     pedirEntrada("entrar")
@@ -241,11 +241,11 @@ export default function HomeView({
   // session (logged in, the query is ignored). The panels that come from an
   // E-MAIL LINK (password and verification) are the exception — see
   // `ehPainelDeEmail`, which explains why.
-  const pediuDaUrl = useRef(false)
+  const requestedFromUrl = useRef(false)
   const doEmail = ehPainelDeEmail(entrada)
   useEffect(() => {
-    if (pediuDaUrl.current || !entrada || (!anonimo && !doEmail)) return
-    pediuDaUrl.current = true
+    if (requestedFromUrl.current || !entrada || (!anonimo && !doEmail)) return
+    requestedFromUrl.current = true
     pedirEntrada(entrada)
   }, [anonimo, entrada, doEmail, pedirEntrada])
 
@@ -254,13 +254,13 @@ export default function HomeView({
   // for the same reason — closing them from under someone using the link is
   // burning a single-use token.
   useEffect(() => {
-    if (!anonimo && entradaPedida && !ehPainelDeEmail(entradaPedida)) concluirEntrada()
-  }, [anonimo, entradaPedida, concluirEntrada])
+    if (!anonimo && requestedSignIn && !ehPainelDeEmail(requestedSignIn)) concluirEntrada()
+  }, [anonimo, requestedSignIn, concluirEntrada])
 
   // Login succeeded inside the modal. With `callbackUrl` (the admin who requested
   // /projects without a session) the person goes there — and the pending message
   // makes no sense outside the Home.
-  const aoEntrar = useCallback(() => {
+  const onSignIn = useCallback(() => {
     concluirEntrada()
     if (callbackUrl && callbackUrl !== "/") {
       definirEnvioPendente(null)
@@ -273,15 +273,15 @@ export default function HomeView({
   // to "authenticated" (signIn without redirect), `anonimo` drops, useAssistente
   // queries /estado and only THEN can it send. An exceeded quota follows the
   // bar's rule: the message stays in the box, with the notice.
-  const { enviar: enviarAoAgente, correndo, parar, estado } = assistente
+  const { enviar: sendToAgent, correndo, parar, estado } = assistente
   useEffect(() => {
     if (anonimo || !envioPendente || correndo || estado?.ativo !== true) return
     const cota = estado.cota
     if (cota && cota.gasto >= cota.teto) return
     definirEnvioPendente(null)
     definirRascunho("")
-    void enviarAoAgente(envioPendente)
-  }, [anonimo, envioPendente, correndo, estado, enviarAoAgente, definirEnvioPendente, definirRascunho])
+    void sendToAgent(envioPendente)
+  }, [anonimo, envioPendente, correndo, estado, sendToAgent, definirEnvioPendente, definirRascunho])
 
   // Logout done in another tab during a stream: the Home becomes anonymous without
   // remounting, and a stream that kept running would go against a session that
@@ -309,37 +309,37 @@ export default function HomeView({
   // to see. Once ended it does not come back in this load — "nova conversa"
   // falls into the normal, empty layout.
   const [hero, setHero] = useState(true)
-  const heroAcaba =
+  const heroEnds =
     assistente.correndo || assistente.turnos.length > 0 || assistente.carregandoReplay ||
     painel === "aberto" || pedidosDeCamada.length > 0
   useEffect(() => {
-    if (hero && heroAcaba) setHero(false)
-  }, [hero, heroAcaba])
+    if (hero && heroEnds) setHero(false)
+  }, [hero, heroEnds])
 
   // The title and the sentence leave the DOM after the transition, or immediately
   // without motion: mounted and invisible, they would be ghost focus targets.
-  const reduzMovimento = usePrefereMenosMovimento()
-  const [heroNoDom, setHeroNoDom] = useState(true)
+  const reduceMotion = usePrefereMenosMovimento()
+  const [heroInDom, setHeroInDom] = useState(true)
   useEffect(() => {
     if (hero) return
-    if (reduzMovimento) { setHeroNoDom(false); return }
-    const t = setTimeout(() => setHeroNoDom(false), DURACAO_DA_TRANSICAO_MS)
+    if (reduceMotion) { setHeroInDom(false); return }
+    const t = setTimeout(() => setHeroInDom(false), TRANSITION_DURATION_MS)
     return () => clearTimeout(t)
-  }, [hero, reduzMovimento])
+  }, [hero, reduceMotion])
 
   // Esc interrupts the answer in progress (the status's "Esc para parar"). Not from
   // inside a dialog or menu: there Esc already has an owner, and closing both at
   // once would be a surprise.
   useEffect(() => {
     if (!correndo) return
-    function aoEscapar(e: KeyboardEvent) {
+    function onEscape(e: KeyboardEvent) {
       if (e.key !== "Escape" || e.defaultPrevented) return
       const alvo = e.target as HTMLElement | null
       if (alvo?.closest?.('[role="dialog"], [role="menu"], [role="listbox"]')) return
       parar()
     }
-    window.addEventListener("keydown", aoEscapar)
-    return () => window.removeEventListener("keydown", aoEscapar)
+    window.addEventListener("keydown", onEscape)
+    return () => window.removeEventListener("keydown", onEscape)
   }, [correndo, parar])
 
   // Ctrl+I toggles open/bar. The effect lives HERE, not in the Painel: collapsing
@@ -373,10 +373,10 @@ export default function HomeView({
   // render and the effect would be erased without ever reaching the globe.
   useEffect(() => {
     if (pedidosDeCamada.length === 0) return
-    const despachados = pedidosDeCamada.length
-    for (const p of pedidosDeCamada) void adicionarCamada(p.artifactId, p.nome)
-    consumirFila(despachados)
-  }, [pedidosDeCamada, adicionarCamada, consumirFila])
+    const dispatchedCount = pedidosDeCamada.length
+    for (const p of pedidosDeCamada) void addLayer(p.artifactId, p.nome)
+    consumirFila(dispatchedCount)
+  }, [pedidosDeCamada, addLayer, consumirFila])
 
   // On the phone the panel is opaque and covers the whole screen: the new layer
   // was framed on the globe BEHIND it, and nothing said there was a result.
@@ -387,25 +387,25 @@ export default function HomeView({
   // going to look for the same thing in the Artefatos list. The panel only offers
   // the action when the server said there is a file (`baixavel`), so getting here
   // and failing is an exception, not routine: hence the toast instead of a row state.
-  const baixarCamada = useCallback(async (artifactId: string, nome: string) => {
+  const downloadLayer = useCallback(async (artifactId: string, nome: string) => {
     const erro = await baixarArtefato(artifactId, t.listas.artefatos.download)
     if (erro) createToast.error(t.casca.baixarCamadaFalhou(nome), erro)
   }, [t])
 
   const isMobile = useIsMobile()
   const recolherBarra = useHomeStore((s) => s.recolherBarra)
-  const quantasCamadas = camadas.camadas.length
-  const camadasAntes = useRef(0)
+  const layerCount = camadas.camadas.length
+  const previousLayerCount = useRef(0)
   useEffect(() => {
-    if (isMobile && quantasCamadas > camadasAntes.current) recolherBarra()
-    camadasAntes.current = quantasCamadas
-  }, [isMobile, quantasCamadas, recolherBarra])
+    if (isMobile && layerCount > previousLayerCount.current) recolherBarra()
+    previousLayerCount.current = layerCount
+  }, [isMobile, layerCount, recolherBarra])
 
   // Toggling panel/bar unmounts whatever had focus and it falls to <body>. Only a
   // REQUESTED swap returns focus — on page load it would be focus theft.
-  const painelAnterior = useRef<string | null>(null)
-  const autoFoco = painelAnterior.current !== null && painelAnterior.current !== painel
-  if (hidratado) painelAnterior.current = painel
+  const previousPanel = useRef<string | null>(null)
+  const autoFoco = previousPanel.current !== null && previousPanel.current !== painel
+  if (hidratado) previousPanel.current = painel
 
   return (
     <div lang={idioma} className="home dark relative h-svh w-full overflow-hidden bg-background text-foreground">
@@ -425,7 +425,7 @@ export default function HomeView({
 
       {/* The veil: the globe in view to the north, fading out toward the south. Disappears with the hero. */}
       <div className="home-veu" data-visivel={hero} aria-hidden="true" />
-      {heroNoDom && (
+      {heroInDom && (
         <div className="home-hero-texto" data-visivel={hero} aria-hidden={!hero}>
           {/* The second half in the brand's terracotta (`--primary`, the same
               orange as the button and the focus ring): "Menos ferramentas"
@@ -462,28 +462,28 @@ export default function HomeView({
         onRemover={camadas.remover}
         onEnquadrar={camadas.enquadrar}
         onDispensarAviso={camadas.dispensarAviso}
-        onBaixar={baixarCamada}
+        onBaixar={downloadLayer}
       />
 
-      <AssistenteOuAviso
+      <AssistantOrNotice
         assistente={assistente}
         painel={painel}
         autoFoco={autoFoco}
         hero={hero}
         anonimo={anonimo}
-        enviar={anonimo ? exigirLogin : assistente.enviar}
-        aoAnexar={receberAnexos.receber}
-        aoPedirLocalizacao={pedirLocalizacao}
+        enviar={anonimo ? requireLogin : assistente.enviar}
+        aoAnexar={receiveAttachments.receber}
+        aoPedirLocalizacao={requestLocation}
       />
 
       {/* The sign-in (login, sign-up, verification and the password path),
           portaled to <body> with the Home palette. */}
       <ModalDeEntrada
-        modo={entradaPedida}
+        modo={requestedSignIn}
         tokenDoLink={tokenDoLink}
         comEnvioPendente={envioPendente !== null}
         onFechar={fecharEntrada}
-        onEntrou={aoEntrar}
+        onEntrou={onSignIn}
       />
     </div>
   )
@@ -501,7 +501,7 @@ export default function HomeView({
  * purpose), and the bar shows up all the same — `enviar` there is the gate that
  * opens the sign-in modal, not the stream.
  */
-function AssistenteOuAviso({
+function AssistantOrNotice({
   assistente, painel, autoFoco, hero, anonimo, enviar, aoAnexar, aoPedirLocalizacao,
 }: {
   assistente: ReturnType<typeof useAssistente>
@@ -520,19 +520,19 @@ function AssistenteOuAviso({
   // for a moment, leaving (the strip slides to the side, the bar fades out), while
   // the panel enters from the right. Without motion the delay is zero. Hooks
   // BEFORE the early returns below (the order must be the same on every render).
-  const t = useTextos()
-  const idiomaDaTela = useIdiomaDaTela()
-  const reduzMovimento = usePrefereMenosMovimento()
-  const { montado: centroMontado, saindo } = useSaida(painel === "aberto", reduzMovimento ? 0 : SAIDA_MS)
+  const t = useTexts()
+  const screenLanguage = useScreenLanguage()
+  const reduceMotion = usePrefereMenosMovimento()
+  const { montado: centerMounted, saindo } = useSaida(painel === "aberto", reduceMotion ? 0 : SAIDA_MS)
 
   // The height of the bar's extras (chips/invitation/rejected notice/step),
   // measured by it and passed to the strip as clearance: without it the bar would
   // grow upward and cover the strip's "Expandir" (the same bug as the quota pill).
-  const [folgaExtras, setFolgaExtras] = useState(0)
+  const [folgaExtras, setExtrasSlack] = useState(0)
 
   // The current step (reasoning or the tool in progress), for the bar to show in
   // the footer while the assistant works. `null` when stopped or writing.
-  const etapa = etapaDaConversa(assistente.turnos, assistente.correndo, idiomaDaTela)
+  const etapa = etapaDaConversa(assistente.turnos, assistente.correndo, screenLanguage)
 
   if (!anonimo) {
     if (assistente.consultando) {
@@ -561,7 +561,7 @@ function AssistenteOuAviso({
     if (assistente.estado?.ativo !== true) {
       // The server's `motivo` is for administrators, and in Portuguese ("defina
       // OPENROUTER_API_KEY"): in the other languages the dictionary notice applies.
-      const motivo = idiomaDaTela === "pt-BR" ? assistente.estado?.motivo : null
+      const motivo = screenLanguage === "pt-BR" ? assistente.estado?.motivo : null
       return <Aviso texto={motivo || t.casca.assistenteIndisponivel} />
     }
   }
@@ -582,7 +582,7 @@ function AssistenteOuAviso({
           aoPedirLocalizacao={aoPedirLocalizacao}
         />
       )}
-      {centroMontado && (
+      {centerMounted && (
         <>
           {/* The last exchange in the center. Not during the hero: there what you see is the status. */}
           {!hero && (
@@ -614,7 +614,7 @@ function AssistenteOuAviso({
             variante={hero ? "hero" : "rodape"}
             parar={assistente.parar}
             saindo={saindo}
-            aoMedirExtras={setFolgaExtras}
+            aoMedirExtras={setExtrasSlack}
             etapa={etapa}
             aoAnexar={aoAnexar}
             aoPedirLocalizacao={aoPedirLocalizacao}
@@ -639,14 +639,14 @@ function AssistenteOuAviso({
  * steal focus from the freshly mounted panel.
  */
 function useSaida(aberto: boolean, ms: number): { montado: boolean; saindo: boolean } {
-  const [montado, setMontado] = useState(!aberto)
+  const [montado, setMounted] = useState(!aberto)
   useEffect(() => {
     if (!aberto) {
-      setMontado(true)
+      setMounted(true)
       return
     }
     if (!montado) return
-    const timer = setTimeout(() => setMontado(false), ms)
+    const timer = setTimeout(() => setMounted(false), ms)
     return () => clearTimeout(timer)
   }, [aberto, montado, ms])
   return { montado, saindo: aberto && montado }

@@ -40,13 +40,13 @@ New fields, all with defaults; no existing consumer breaks
 `id_hash`/`name`/`description`).
 
 ```python
-# Triggers — same mechanism as has_publish_map/is_subworkflow (`_tem_node`,
+# Triggers — same mechanism as has_publish_map/is_subworkflow (`_has_node`,
 # LIKE over definition->>'nodes', which the query already parses). Known and
 # accepted substring collisions (documented in the CRUD).
-has_webhook_trigger:  bool = False   # _tem_node("WebhookTrigger",  "has_webhook_trigger")
-has_schedule_trigger: bool = False   # _tem_node("ScheduleTrigger", "has_schedule_trigger")
-has_file_trigger:     bool = False   # _tem_node("FileTrigger",     "has_file_trigger")
-has_geofence_trigger: bool = False   # _tem_node("GeofenceTrigger", "has_geofence_trigger")
+has_webhook_trigger:  bool = False   # _has_node("WebhookTrigger",  "has_webhook_trigger")
+has_schedule_trigger: bool = False   # _has_node("ScheduleTrigger", "has_schedule_trigger")
+has_file_trigger:     bool = False   # _has_node("FileTrigger",     "has_file_trigger")
+has_geofence_trigger: bool = False   # _has_node("GeofenceTrigger", "has_geofence_trigger")
 # "Manual only" = none of the four and not a sub-workflow — derived on the web.
 
 # Schedule — one extra query, batched, merged in Python:
@@ -98,7 +98,7 @@ A single aggregation (`count(*)` + `count(*) FILTER (WHERE flag_ative)`, or
   `IWorkflowMetricsRow` per workflow: `last_run_at`, `last_status`, `last_error`,
   `last_error_category`, `total_runs`, `success_runs`, `failed_runs`,
   `running_runs`, `success_rate`, `p50_seconds`. Always with `workspace_id`. The
-  30 days (`days=30`) are the web's choice (`JANELA_EM_DIAS` in `como-anda.ts`); the
+  30 days (`days=30`) are the web's choice (`WINDOW_IN_DAYS` in `como-anda.ts`); the
   endpoint itself accepts any `days` and defaults to 90.
 - `GET /observability/runs?status=running&limit=200` (already consumed by
   `ActiveRunsContext`): the context now also stores `started_at`,
@@ -126,7 +126,7 @@ Projetos                                                  [Atualizar]  [Novo gru
 ┌ ⋮⋮ ▸ Entregas de campo  2 workflows · 1 ativo  (collapsed)                                            ⋯ ┐
 ┌ ⋮⋮ ▾ Rascunhos  vazio                                                                                ⋯ ┐
 │     Nenhum workflow aqui. Arraste um para cá ou use "Mover para grupo" no menu do workflow.              │
-SEM GRUPO  4 workflows · 3 ativos
+SEM GROUP  4 workflows · 3 ativos
    [Ta] Recorte por município  (Sub-fluxo)                    ● Concluída há 15 min          [▶ dimmed]  [⋯]
    …
 ```
@@ -157,13 +157,13 @@ two buttons (40px) on the right; the description disappears; the drag handle dis
 
 Formatters reused from `web/lib/formatos.ts`: `formatarInicio`
 ("há 3 h" / "hoje, 18:00" / "ontem" / "4 set, 03:00" — "3 h ago" / "today, 18:00" / "yesterday" / "Sep 4, 03:00"), `formatarDuracao`,
-`rotuloDaOrigem`, `formatarInteiro`, `plural`. Status
+`originLabel`, `formatInteger`, `plural`. Status
 label via `shared/status-rotulos.ts` (`rotuloDoStatus`).
 
 ### 3.3 Data (`use-projetos-dados.ts`)
 
 ```ts
-interface DadosDeProjetos {
+interface ProjectsData {
   workflows: IWorkflow[]            // GET /workflows?workspace_id
   grupos: IWorkflowGroup[]          // GET /workflow-groups?workspace_id
   metricas: Map<string, IWorkflowMetricsRow> | null   // by workflow_hash; null = unavailable
@@ -173,7 +173,7 @@ interface DadosDeProjetos {
   metricasIndisponiveis: boolean    // only the metrics failed (discreet notice)
   atualizadoEm: number | null       // stamp of the last accepted response
   recarregar: (opcoes?: { force?: boolean }) => void
-  // local (optimistic) mutations, used by the index: setWorkflows/setGrupos or equivalents
+  // local (optimistic) mutations, used by the index: setWorkflows/setGroups or equivalents
 }
 ```
 
@@ -190,22 +190,22 @@ interface DadosDeProjetos {
 ### 3.4 Trigger (`gatilho.ts`)
 
 ```ts
-type TipoDeGatilho = "agendado" | "webhook" | "arquivo" | "geofence" | "manual" | "subfluxo"
+type TriggerKind = "agendado" | "webhook" | "arquivo" | "geofence" | "manual" | "subfluxo"
 interface Gatilho {
-  tipo: TipoDeGatilho              // the main one, in this precedence: subfluxo > agendado > webhook > arquivo > geofence > manual
+  tipo: TriggerKind              // the main one, in this precedence: subfluxo > agendado > webhook > arquivo > geofence > manual
   rotulo: string                   // "Agendado" | "Webhook" | "Por arquivo" | "Por geofence" | "Só manual" | "Chamado por outros workflows"
-  extras: TipoDeGatilho[]          // other triggers present (e.g. agendado + webhook) — the label becomes "Agendado + webhook"
+  extras: TriggerKind[]          // other triggers present (e.g. agendado + webhook) — the label becomes "Agendado + webhook"
 }
 function derivarGatilho(wf: Pick<IWorkflow, "is_subworkflow" | "has_schedule_trigger" | "has_webhook_trigger" | "has_file_trigger" | "has_geofence_trigger">): Gatilho
 
-interface ResumoDoAgendamento {
+interface ScheduleSummary {
   estado: "ativo" | "pausado" | "calculando"   // pausado = schedule.active false; calculando = active without next_run_at
   descricao: string                            // "todo dia às 06:00" · "a cada 6 h" · "a cada 15 min" · "dia 1 às 08:00" · "seg–sex às 07:30" · "aos domingos às 02:00" · raw cron when not recognized · "recorrência (RRULE)"
   descricaoCrua: boolean                       // descricao is the untranslated cron expression — the component shows it in `code`
   proxima: string | null                       // formatarInicio(next_run_at) → "hoje, 18:00" / "amanhã, 06:00" / "1 out, 08:00"; null when pausado/calculando
   motivoPausa: "workflow inativo" | null       // when paused and the workflow is inactive
 }
-function resumirAgendamento(schedule: IWorkflowSchedule | null | undefined, flagAtive: boolean, agora?: Date): ResumoDoAgendamento | null
+function resumirAgendamento(schedule: IWorkflowSchedule | null | undefined, flagActive: boolean, agora?: Date): ScheduleSummary | null
 ```
 
 Recognized cron (5 fields): `M H * * *` → "todo dia às HH:MM" (every day at HH:MM); `M H * * 1-5` →
@@ -223,14 +223,14 @@ indigo (same color as `SeloSubFluxo`).
 ### 3.5 How it is doing (`como-anda.ts`)
 
 ```ts
-type ComoAnda =
+type HowItsGoing =
   | { tipo: "executando"; desde: string; instante: number; origem: string | null; executor: string | null; tipica: number | null }
   | { tipo: "concluida" | "falhou" | "cancelada"; quando: string; instante: number; erro: string | null; total: number; falhas: number; mediana: number | null }
   // `instante` (ms) is the stamp used to sort by "last run" (§3.6).
   | { tipo: "sem-execucoes" }        // no metrics row in the window, or last_run_at null, and the workflow is more than 30 days old
   | { tipo: "nunca" }                // total_runs 0 and created less than 30 days ago → "Ainda não executou · execute uma vez para validar"
   | { tipo: "indisponivel" }         // metrics failed
-function derivarComoAnda(wf: IWorkflow, metrica: IWorkflowMetricsRow | undefined, emExecucao: RunningRun | undefined, metricasIndisponiveis: boolean, agora?: Date): ComoAnda
+function derivarComoAnda(wf: IWorkflow, metrica: IWorkflowMetricsRow | undefined, emExecucao: RunningRun | undefined, metricasIndisponiveis: boolean, agora?: Date): HowItsGoing
 ```
 
 Rendering (`como-anda-celula.tsx`), two lines:
@@ -251,8 +251,8 @@ normal count. (The mockup showed "via «Mapa de risco»"; it stays out.)
 ```ts
 type Filtro = "todos" | "ativos" | "inativos" | "executando" | "falha" | "agendados" | "webhook" | "subfluxos" | "portal" | "pausado" | "nunca"
 type Ordem = "nome" | "execucao" | "alterado"
-interface EstadoDeProjetos { q: string; filtro: Filtro; ordem: Ordem }
-const ESTADO_PADRAO = { q: "", filtro: "todos", ordem: "nome" }
+interface ProjectsState { q: string; filtro: Filtro; ordem: Ordem }
+const DEFAULT_STATE = { q: "", filtro: "todos", ordem: "nome" }
 // URL: ?q=&filtro=&ordem=  (omitted when equal to the default) — replace, not push, as in Histórico
 ```
 
@@ -293,8 +293,8 @@ const ESTADO_PADRAO = { q: "", filtro: "todos", ordem: "nome" }
 > `montarAtencao`). The design below is the target, should the strip ever be ported.
 
 ```ts
-interface ItemDeAtencao { chave: "falha" | "pausado" | "nunca"; n: number; texto: string; filtro: Filtro }
-function montarAtencao(workflows, comoAndaPorHash, resumoPorHash): ItemDeAtencao[]  // only items with n > 0; order: falha, pausado, nunca
+interface AttentionItem { chave: "falha" | "pausado" | "nunca"; n: number; texto: string; filtro: Filtro }
+function montarAtencao(workflows, comoAndaPorHash, resumoPorHash): AttentionItem[]  // only items with n > 0; order: falha, pausado, nunca
 ```
 
 Copy: "2 falharam na última execução" (2 failed on the last run) · "1 agendamento pausado" (1 schedule paused) · "1 ainda

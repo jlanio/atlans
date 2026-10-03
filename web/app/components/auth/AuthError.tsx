@@ -1,7 +1,7 @@
 "use client";
 
 import { TbAlertCircle, TbLock, TbMailExclamation } from "react-icons/tb";
-import { useTextos } from "@/app/components/home/i18n";
+import { useTexts } from "@/app/components/home/i18n";
 
 /* Inline error surface of the authentication screens, extracted from login. It
    is a persistent block with `role="alert"` (sign-up used an ephemeral toast,
@@ -28,7 +28,7 @@ export function AuthError({
      appear: whoever has nowhere to send it should not offer the path. */
   onReenviarVerificacao?: () => void;
 }) {
-  const t = useTextos().entrada.auth;
+  const t = useTexts().entrada.auth;
   return (
     <div
       role="alert"

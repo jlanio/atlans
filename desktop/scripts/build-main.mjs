@@ -13,7 +13,7 @@
 import { build } from 'esbuild'
 import fs from 'node:fs'
 import path from 'node:path'
-import { defineDosEnderecos, enderecosDoBuild, marcaDoBuild } from './enderecos.mjs'
+import { addressDefines, buildAddresses, buildBrand } from './enderecos.mjs'
 import { DESKTOP, log, ok, step } from './lib.mjs'
 
 const dev = process.argv.includes('--dev')
@@ -22,7 +22,7 @@ const saida = path.join(DESKTOP, 'dist')
 step('Empacotando main e preload')
 fs.mkdirSync(saida, { recursive: true })
 
-const enderecos = enderecosDoBuild({ dev })
+const enderecos = buildAddresses({ dev })
 
 const comum = {
   bundle: true,
@@ -36,7 +36,7 @@ const comum = {
   define: {
     'process.env.NODE_ENV': JSON.stringify(dev ? 'development' : 'production'),
     // The installation's server and UI, baked into the executable (enderecos.mjs).
-    ...defineDosEnderecos(enderecos),
+    ...addressDefines(enderecos),
   },
 }
 
@@ -76,7 +76,7 @@ for (const arquivo of ['index.cjs', 'preload.cjs', 'web-preload.cjs']) {
 // one (build/antes-de-empacotar.cjs).
 fs.writeFileSync(
   path.join(saida, 'main', 'build.json'),
-  JSON.stringify(marcaDoBuild({ dev, ...enderecos }), null, 2) + '\n',
+  JSON.stringify(buildBrand({ dev, ...enderecos }), null, 2) + '\n',
 )
 
 ok('main e preload prontos em dist/main/')

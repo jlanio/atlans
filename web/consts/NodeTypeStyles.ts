@@ -27,7 +27,7 @@ export const TYPE_INFO: Record<string, { nome: string; descricao: string }> = {
 }
 
 /** Display name of the type, falling back to the identifier itself. */
-export const nomeDoTipo = (tipo: string): string =>
+export const typeName = (tipo: string): string =>
   (Object.prototype.hasOwnProperty.call(TYPE_INFO, tipo) ? TYPE_INFO[tipo]?.nome : undefined)
   ?? tipo.charAt(0).toUpperCase() + tipo.slice(1)
 
@@ -39,7 +39,7 @@ export const DEFAULT_STYLE = {
 }
 
 /** Description of the type, empty for what the map does not know. */
-export const descricaoDoTipo = (tipo: string): string =>
+export const typeDescription = (tipo: string): string =>
   (Object.prototype.hasOwnProperty.call(TYPE_INFO, tipo) ? TYPE_INFO[tipo]?.descricao : undefined) ?? ""
 
 /** The type's style, falling back to neutral.
@@ -47,5 +47,5 @@ export const descricaoDoTipo = (tipo: string): string =>
  *  `TYPE_STYLES[t] ?? DEFAULT_STYLE` read through the prototype chain: a type
  *  coming from the API named `constructor` returned the `Object` function, which
  *  is truthy — the `??` did not fire and `estilo.bg` came out `undefined`. */
-export const estiloDoTipo = (tipo: string) =>
+export const typeStyle = (tipo: string) =>
   Object.prototype.hasOwnProperty.call(TYPE_STYLES, tipo) ? TYPE_STYLES[tipo] : DEFAULT_STYLE

@@ -29,7 +29,7 @@ function Abrir() {
   return <button onClick={() => setOpenMobile(true)}>abrir</button>
 }
 
-function montarNoTelefone() {
+function mountOnPhone() {
   Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 375 })
   return render(
     <SidebarProvider>
@@ -41,7 +41,7 @@ function montarNoTelefone() {
   )
 }
 
-function painelDoSheet() {
+function sheetPanel() {
   return document.querySelector('[data-slot="sidebar"][data-mobile="true"]')
 }
 
@@ -49,9 +49,9 @@ beforeEach(() => cleanup())
 
 describe("Sidebar no telefone", () => {
   it("repassa o className do <Sidebar> para a superfície do Sheet", () => {
-    montarNoTelefone()
+    mountOnPhone()
     fireEvent.click(screen.getByText("abrir"))
-    const painel = painelDoSheet()
+    const painel = sheetPanel()
     expect(painel).toBeTruthy()
     // Home's palette has to reach the element that paints the background.
     expect(painel!.className).toContain("home")
@@ -61,7 +61,7 @@ describe("Sidebar no telefone", () => {
   })
 
   it("o diálogo do Sheet se apresenta em pt-BR", () => {
-    montarNoTelefone()
+    mountOnPhone()
     fireEvent.click(screen.getByText("abrir"))
     expect(screen.getByText("Barra lateral")).toBeTruthy()
   })

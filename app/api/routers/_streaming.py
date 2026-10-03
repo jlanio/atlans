@@ -20,26 +20,26 @@ from typing import AsyncIterator
 
 
 async def com_batimento(
-    gerador: AsyncIterator[bytes], intervalo: float = 15.0
+    generator: AsyncIterator[bytes], intervalo: float = 15.0
 ) -> AsyncIterator[bytes]:
-    """Yields what `gerador` emits and, after each `intervalo` of silence, a `: ping`.
+    """Yields what `generator` emits and, after each `intervalo` of silence, a `: ping`.
 
-    `gerador` already emits bytes with SSE framing (`event:`/`data:`); the ping
+    `generator` already emits bytes with SSE framing (`event:`/`data:`); the ping
     is a comment, so it does not become a frame on the client. `intervalo` is a
     parameter so the tests can force the timeout without waiting 15 s of wall clock.
     """
     fila: asyncio.Queue = asyncio.Queue()
 
-    async def bombear() -> None:
+    async def pump() -> None:
         try:
-            async for item in gerador:
+            async for item in generator:
                 await fila.put(("dado", item))
         except Exception as exc:  # pragma: no cover - the generator already handles its own
             await fila.put(("erro", exc))
         finally:
             await fila.put(("fim", None))
 
-    tarefa = asyncio.create_task(bombear())
+    tarefa = asyncio.create_task(pump())
     try:
         while True:
             try:

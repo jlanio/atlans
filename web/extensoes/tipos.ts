@@ -6,12 +6,12 @@
 // is no extension at all — the free distribution.
 
 import type { ComponentType, ReactNode } from "react"
-import type { IPainelDoModelo } from "@/service/types"
+import type { IModelPanel } from "@/service/types"
 
 /** The props of the wrapper of the assistant's model panel (admin). */
-export interface PropsDoEnvoltorioDoPainel {
+export interface PanelWrapperProps {
   /** The panel as the server sent it, with the fields the extension adds. */
-  painel: IPainelDoModelo
+  painel: IModelPanel
   /** The model chosen in the list, not yet saved (what is being simulated). */
   escolhido: string
   /** A save in progress, in the core or in the extension: the buttons wait together. */
@@ -35,7 +35,7 @@ export interface ExtensaoDoWeb {
   /** The admin panel for the assistant's model. */
   painelDoModelo?: {
     /** Wraps the model selector with what the extension adds to the screen. */
-    Envoltorio: ComponentType<PropsDoEnvoltorioDoPainel>
+    Envoltorio: ComponentType<PanelWrapperProps>
     /** One more sentence in the section's introduction. */
     apoio?: string
   }

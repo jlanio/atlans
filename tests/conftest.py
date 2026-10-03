@@ -36,37 +36,37 @@ os.environ["RATE_LIMIT_STORAGE_URI"] = "memory://"
 # it during collection (the module calls `configure_logging()` on import).
 import logging as _logging
 
-_FABRICA_ORIGINAL = _logging.getLogRecordFactory()
+_ORIGINAL_FACTORY = _logging.getLogRecordFactory()
 
 
-def _fabrica_limpa() -> None:
+def _reset_factory() -> None:
     from flow.utils import redacao_log, segredos_vivos
 
-    _logging.setLogRecordFactory(_FABRICA_ORIGINAL)
+    _logging.setLogRecordFactory(_ORIGINAL_FACTORY)
     # `segredos_vivos` installs itself once and remembers that it did: the flag is
     # restored too, otherwise it would never reinstall itself on the clean factory.
-    redacao_log._instalada = False
-    segredos_vivos._instalada = False
+    redacao_log._installed = False
+    segredos_vivos._installed = False
 
 
 @pytest.fixture(autouse=True)
-def _fabrica_de_logrecord_isolada():
+def _isolated_logrecord_factory():
     """The executor's secret redaction lives in the PROCESS's LogRecord factory
-    (`flow.utils.redacao_log.instalar_no_processo`). Without this reset, an
+    (`flow.utils.redacao_log.install_in_process`). Without this reset, an
     import of `executor.main` would leave it on for the whole suite, and tests
     that check the `***` from `segredos_vivos` (or a token prefix in an audit
     line) would see `<REDACTED>` depending on the suite order. Tests of the
     redaction install it inside the test itself."""
-    _fabrica_limpa()
+    _reset_factory()
     yield
-    _fabrica_limpa()
+    _reset_factory()
 
 
 # ── Extensions ────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture
-def registro_de_teste(monkeypatch):
+def empty_registry(monkeypatch):
     """An EMPTY extension registry in place of the real one (app/extensoes).
 
     It is the core alone, as in the free distribution — and the test hangs on

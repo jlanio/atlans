@@ -20,7 +20,7 @@ import pytest
 from app.core import artifact_cleanup
 
 
-def _itens(n=2):
+def _items(n=2):
     return {
         "exec-1": [
             {"id_hash": f"h{i}", "local_path": f"a/{i}.gpkg", "_id": 100 + i}
@@ -54,18 +54,18 @@ def registry(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_entrega_confirmada_libera_a_linha_do_banco(registry):
+async def test_confirmed_delivery_releases_the_db_row(registry):
     registry(True)
-    entregues = await artifact_cleanup._ordenar_remocao_local(_itens())
+    entregues = await artifact_cleanup._ordenar_remocao_local(_items())
     assert entregues == [100, 101]
 
 
 @pytest.mark.asyncio
-async def test_executor_OFFLINE_nao_libera_a_linha(registry):
+async def test_OFFLINE_executor_does_not_release_the_row(registry):
     # The bug case: send_json returns False, with no exception. Before, the ids were
     # treated as delivered and the row was deleted — an orphaned file on disk.
     registry(False)
-    entregues = await artifact_cleanup._ordenar_remocao_local(_itens())
+    entregues = await artifact_cleanup._ordenar_remocao_local(_items())
     assert entregues == [], (
         "ordem NAO entregue nao pode liberar a remocao da linha: o arquivo "
         "continua no disco do executor e a linha e o unico rastro dele"
@@ -73,22 +73,22 @@ async def test_executor_OFFLINE_nao_libera_a_linha(registry):
 
 
 @pytest.mark.asyncio
-async def test_excecao_no_envio_tambem_nao_libera(registry):
+async def test_exception_on_send_also_does_not_release(registry):
     registry(RuntimeError("websocket fechado"))
-    assert await artifact_cleanup._ordenar_remocao_local(_itens()) == []
+    assert await artifact_cleanup._ordenar_remocao_local(_items()) == []
 
 
 @pytest.mark.asyncio
-async def test_um_executor_offline_nao_impede_os_outros(registry, monkeypatch):
+async def test_one_offline_executor_does_not_block_the_others(registry, monkeypatch):
     # Failure per executor, not per batch: one machine that is turned off must not
     # delay the retention of the others.
-    class _Parcial(_Registry):
+    class _Partial(_Registry):
         async def send_json(self, executor_id, data):
             self.enviados.append((executor_id, data))
             return executor_id != "exec-offline"
 
     import app.core.executor_connections as ec
-    r = _Parcial(None)
+    r = _Partial(None)
     # Via monkeypatch, so the double goes away at the end: assigned directly on the
     # module, it outlived the test and broke whoever used the registry afterwards
     # (the "now" block of the History metrics called `list_pending_acks` on it).
@@ -102,13 +102,13 @@ async def test_um_executor_offline_nao_impede_os_outros(registry, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_a_ordem_vai_como_control_assinavel(registry):
+async def test_the_order_goes_as_signable_control(registry):
     # `purge_artifacts` must go out as `type: control` — that is what makes the
     # server sign it with Ed25519 (sign_if_needed) and the executor require it
     # signed. An unsigned order to delete files would be a data-destruction
     # channel for whoever won the connection.
     r = registry(True)
-    await artifact_cleanup._ordenar_remocao_local(_itens(1))
+    await artifact_cleanup._ordenar_remocao_local(_items(1))
 
     _, msg = r.enviados[0]
     assert msg["type"] == "control"

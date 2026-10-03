@@ -7,9 +7,9 @@ import type { IObservabilityMetrics, INowBlock } from "@/service/types"
 // URL and router: the scope lives in the query (`?escopo=`) and the actions route via
 // push. `replace` is what the toggle uses (same screen, without stacking history).
 const url = vi.hoisted(() => ({ sp: new URLSearchParams(""), pathname: "/dashboard" }))
-const roteador = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), prefetch: vi.fn() }))
+const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), prefetch: vi.fn() }))
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ ...roteador, back: vi.fn(), forward: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ ...router, back: vi.fn(), forward: vi.fn(), refresh: vi.fn() }),
   usePathname: () => url.pathname,
   useSearchParams: () => url.sp,
 }))
@@ -49,7 +49,7 @@ const ok = <T,>(data: T) => ({ success: true, status: 200, data })
 const falhou = (message = "boom") => ({ success: false, status: 500, error: { name: "AxiosError", message } })
 
 // ── Massa ────────────────────────────────────────────────────────────────────
-const daquiUmaHora = new Date(Date.now() + 3_600_000).toISOString()
+const inOneHour = new Date(Date.now() + 3_600_000).toISOString()
 
 function now(extra: Partial<INowBlock> = {}): INowBlock {
   return {
@@ -68,7 +68,7 @@ function metrics(extra: Partial<IObservabilityMetrics> = {}): IObservabilityMetr
 }
 
 function agendamento(extra: Partial<IWorkflowSchedule> = {}): IWorkflowSchedule {
-  return { active: true, next_run_at: daquiUmaHora, last_run_at: null, strategy: "interval", interval: 6, unit: "hours", ...extra }
+  return { active: true, next_run_at: inOneHour, last_run_at: null, strategy: "interval", interval: 6, unit: "hours", ...extra }
 }
 
 function wf(id: string, extra: Partial<IWorkflow> = {}): IWorkflow {
@@ -79,7 +79,7 @@ function wf(id: string, extra: Partial<IWorkflow> = {}): IWorkflow {
   }
 }
 
-function respostasBoas() {
+function goodResponses() {
   svc.getObservabilityMetrics.mockResolvedValue(ok(metrics()))
   svc.getRunsByDay.mockResolvedValue(ok({ days: [{ day: "2026-09-01", total: 2, success: 2, failed: 0, running: 0, cancelled: 0 }] }))
   svc.getObservabilityRuns.mockResolvedValue(ok({
@@ -92,13 +92,13 @@ function respostasBoas() {
 
 beforeEach(() => {
   vi.resetAllMocks()
-  respostasBoas()
+  goodResponses()
   url.sp = new URLSearchParams("")
   workspace.current = { id_hash: "ws-1", name: "Bacia" }
 })
 afterEach(cleanup)
 
-const ultimaReplace = () => roteador.replace.mock.calls.at(-1)![0] as string
+const lastReplace = () => router.replace.mock.calls.at(-1)![0] as string
 
 // ── Testes ───────────────────────────────────────────────────────────────────
 describe("Dashboard — página", () => {
@@ -129,7 +129,7 @@ describe("Dashboard — página", () => {
 
     const grupo = screen.getByRole("group", { name: "Escopo do painel" })
     fireEvent.click(within(grupo).getByRole("button", { name: "Todos os workspaces" }))
-    expect(ultimaReplace()).toBe("/dashboard?escopo=todos")
+    expect(lastReplace()).toBe("/dashboard?escopo=todos")
   })
 
   it("o seletor de período troca a janela e vai à URL (replace, sem empilhar)", async () => {
@@ -138,7 +138,7 @@ describe("Dashboard — página", () => {
 
     const grupo = screen.getByRole("group", { name: "Período" })
     fireEvent.click(within(grupo).getByRole("button", { name: "Últimos 7 dias" }))
-    expect(ultimaReplace()).toBe("/dashboard?periodo=7")
+    expect(lastReplace()).toBe("/dashboard?periodo=7")
   })
 
   it("período da URL escopa as fontes de janela e ecoa no resumo (?periodo=90)", async () => {
@@ -180,7 +180,7 @@ describe("Dashboard — página", () => {
 
     await waitFor(() => expect(screen.getByText(/Precisa de você:/)).toBeInTheDocument())
     fireEvent.click(screen.getByRole("button", { name: /Abrir a execução presa/ }))
-    expect(roteador.push).toHaveBeenCalledWith("/observability/run/run-presa")
+    expect(router.push).toHaveBeenCalledWith("/observability/run/run-presa")
   })
 
   it("atenção roteia: uma falha repetida deep-linka ao Histórico filtrado", async () => {
@@ -196,7 +196,7 @@ describe("Dashboard — página", () => {
     const atencao = await screen.findByRole("region", { name: "Precisa de atenção" })
     fireEvent.click(within(atencao).getByRole("button", { name: /Ver falhas/ }))
     // The default view (runs) applies workflow+status; `&workspace=` preserves the active scope.
-    expect(roteador.push).toHaveBeenCalledWith("/observability?workflow=wf-fail&status=failed&workspace=ws-1")
+    expect(router.push).toHaveBeenCalledWith("/observability?workflow=wf-fail&status=failed&workspace=ws-1")
   })
 
   it("vazio de primeiro uso: sem workflows nem execuções, só o convite", async () => {
@@ -208,7 +208,7 @@ describe("Dashboard — página", () => {
     expect(await screen.findByText("Nada rodou ainda")).toBeInTheDocument()
     expect(screen.queryByRole("region", { name: "Precisa de atenção" })).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: "Criar workflow" }))
-    expect(roteador.push).toHaveBeenCalledWith("/workflow/create")
+    expect(router.push).toHaveBeenCalledWith("/workflow/create")
   })
 
   it("erro de espinha: métricas caem na 1ª carga e o bloco de erro toma a tela", async () => {

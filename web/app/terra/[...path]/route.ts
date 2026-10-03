@@ -39,7 +39,7 @@ const HOP_BY_HOP = new Set([
 // appended, and whatever the client (or a Worker) writes to the left does not
 // change the resolved one. Without the XFF, the API saw only the web container's
 // IP and all users shared a single rate-limit bucket.
-function isCabecalhoDeConfianca(k: string): boolean {
+function isTrustedHeader(k: string): boolean {
   if (k === "x-forwarded-for") return false
   return (
     k.startsWith("x-forwarded-") ||
@@ -56,7 +56,7 @@ function isCabecalhoDeConfianca(k: string): boolean {
 // control characters. fetch's URL parser treats "\" as "/" and strips
 // TAB/LF, so a reconstructed "..\\" or ".%09." would escape the public prefix
 // list and reach routes not published in Traefik (/openapi.json, /docs).
-function segmentoSuspeito(seg: string): boolean {
+function suspiciousSegment(seg: string): boolean {
   return (
     seg === "" || seg === "." || seg === ".." ||
     seg.includes("\\") || /[\u0000-\u001f\u007f]/.test(seg) || seg.includes("/")
@@ -67,7 +67,7 @@ function segmentoSuspeito(seg: string): boolean {
 // checking the origin. A top-level POST from another site (an auto-submitted
 // form) would arrive authenticated. For state-changing methods, it requires a
 // same origin: blocks cross-site Sec-Fetch-Site and an Origin from another host.
-function csrfBloqueado(req: NextRequest): boolean {
+function csrfBlocked(req: NextRequest): boolean {
   const secFetchSite = req.headers.get("sec-fetch-site")
   if (secFetchSite === "cross-site") return true
   // Modern browsers assert same-origin: trust it and avoid comparing Host
@@ -95,7 +95,7 @@ async function proxy(
 
   // Rejects path traversal BEFORE building the upstream URL or testing the
   // public prefixes (SEG-18).
-  if (path.some(segmentoSuspeito)) {
+  if (path.some(suspiciousSegment)) {
     return NextResponse.json({ detail: "Caminho inválido" }, { status: 400 })
   }
   const pathStr = path.join("/")
@@ -106,8 +106,8 @@ async function proxy(
 
   // CSRF on state-changing methods, outside the public paths (auth/ has
   // NextAuth's own CSRF; the portal is read-only).
-  const mudaEstado = req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS"
-  if (mudaEstado && !isPublic && csrfBloqueado(req)) {
+  const changesState = req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS"
+  if (changesState && !isPublic && csrfBlocked(req)) {
     return NextResponse.json({ detail: "Origem não permitida" }, { status: 403 })
   }
 
@@ -134,7 +134,7 @@ async function proxy(
   req.headers.forEach((value, key) => {
     const k = key.toLowerCase()
     if (HOP_BY_HOP.has(k)) return
-    if (isCabecalhoDeConfianca(k)) return // does not let the client forge the mTLS cert
+    if (isTrustedHeader(k)) return // does not let the client forge the mTLS cert
     headers.set(key, value)
   })
   // SESSION_HEADER is for internal use (middleware → handler): it never leaks to the upstream.
@@ -215,8 +215,8 @@ async function proxy(
         // semantics. A streamed body has already been consumed and cannot be
         // resent anyway. In both cases, fail loudly instead of sending the
         // browser a Location pointing to the internal host.
-        const preservaMetodoECorpo = res.status === 307 || res.status === 308
-        if (body != null && (!bodyReenviavel || !preservaMetodoECorpo)) {
+        const preservesMethodAndBody = res.status === 307 || res.status === 308
+        if (body != null && (!bodyReenviavel || !preservesMethodAndBody)) {
           console.warn(`[terra] redirect ${res.status} em ${req.method} com corpo não reenviável: ${redirectUrl}`)
           return NextResponse.json({ detail: "Redirect não suportado neste método" }, { status: 502 })
         }

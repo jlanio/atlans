@@ -323,7 +323,7 @@ async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
     return {"output": result}
 ```
 
-> Database nodes usually use the helper `flow/utils/credencial.py::obter_conexao(self.parameters)`,
+> Database nodes usually use the helper `flow/utils/credencial.py::get_connection(self.parameters)`,
 > which reads and validates `parameters["connectionString"]`.
 
 ### Publishing output to the user's log terminal

@@ -25,7 +25,7 @@ _PRESIGN_EXPIRY = int(os.getenv("MINIO_PRESIGN_EXPIRY", "3600"))
 
 # Hosts that only resolve from inside Docker (or from the machine itself): a
 # pre-signed URL generated with them is useless to a browser, remote executor or MCP.
-_HOSTS_LOCAIS = frozenset({"localhost", "127.0.0.1", "::1", "minio"})
+_LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "minio"})
 
 
 def endpoint_externo_e_local() -> bool:
@@ -48,10 +48,10 @@ def endpoint_externo_e_local() -> bool:
         # An address that does not even parse (malformed IPv6, for example): no
         # pre-signed URL will work, so the warning stands — and boot does not fail over it.
         return True
-    return not host or host in _HOSTS_LOCAIS
+    return not host or host in _LOCAL_HOSTS
 
 
-def endpoint_externo() -> str:
+def external_endpoint() -> str:
     """Effective value of `MINIO_EXTERNAL_ENDPOINT` (falls back to the internal one when absent).
 
     Exists for those who only need to SHOW the endpoint — the boot warning in

@@ -44,7 +44,7 @@ function post(path: string, headers: Record<string, string> = {}): NextRequest {
     body: null,
   } as unknown as NextRequest
 }
-const authHeaderEnviado = () =>
+const sentAuthHeader = () =>
   (fetchMock.mock.calls[0][1] as RequestInit).headers as Headers
 
 describe("proxy /terra — autenticação", () => {
@@ -66,9 +66,9 @@ describe("proxy /terra — autenticação", () => {
     expect(authMock).not.toHaveBeenCalled()             // the normal path does not call auth()
     expect(decodeMock).toHaveBeenCalledWith("HDR")
     // Upstream authenticated with the server's token, not with the client's Bearer
-    expect(authHeaderEnviado().get("authorization")).toBe("Bearer SERVIDOR-FRESCO")
+    expect(sentAuthHeader().get("authorization")).toBe("Bearer SERVIDOR-FRESCO")
     // and the internal header never leaks to the upstream
-    expect(authHeaderEnviado().get("x-atlans-session")).toBeNull()
+    expect(sentAuthHeader().get("x-atlans-session")).toBeNull()
     // passes the path on to the upstream
     expect(String(fetchMock.mock.calls[0][0]).endsWith("/workflows")).toBe(true)
   })
@@ -79,7 +79,7 @@ describe("proxy /terra — autenticação", () => {
     const res = await GET(req("workflows"), ctx(["workflows"]))
     expect(res.status).toBe(200)
     expect(authMock).toHaveBeenCalled()
-    expect(authHeaderEnviado().get("authorization")).toBe("Bearer VIA-AUTH")
+    expect(sentAuthHeader().get("authorization")).toBe("Bearer VIA-AUTH")
   })
 
   it("path público: não exige sessão, não chama auth, e preserva o Bearer do cliente", async () => {
@@ -90,7 +90,7 @@ describe("proxy /terra — autenticação", () => {
     expect(res.status).toBe(200)
     expect(authMock).not.toHaveBeenCalled()
     expect(decodeMock).not.toHaveBeenCalled()
-    expect(authHeaderEnviado().get("authorization")).toBe("Bearer CLIENTE")
+    expect(sentAuthHeader().get("authorization")).toBe("Bearer CLIENTE")
   })
 })
 
@@ -115,7 +115,7 @@ describe("proxy /terra — endurecimento (auditoria)", () => {
       ctx(["workflows"]),
     )
     expect(res.status).toBe(200)
-    const h = authHeaderEnviado()
+    const h = sentAuthHeader()
     expect(h.get("x-forwarded-tls-client-cert-info")).toBeNull()
     expect(h.get("x-forwarded-host")).toBeNull()
     expect(h.get("x-real-ip")).toBeNull()
@@ -131,7 +131,7 @@ describe("proxy /terra — endurecimento (auditoria)", () => {
       ctx(["workflows"]),
     )
     expect(res.status).toBe(200)
-    expect(authHeaderEnviado().get("x-forwarded-for")).toBe("9.9.9.9, 203.0.113.7, 162.158.1.1")
+    expect(sentAuthHeader().get("x-forwarded-for")).toBe("9.9.9.9, 203.0.113.7, 162.158.1.1")
   })
 
   it("SEG-63: POST cross-site (Sec-Fetch-Site) é bloqueado com 403, sem chamar o upstream", async () => {

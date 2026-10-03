@@ -20,16 +20,16 @@ import pytest
 from shapely.geometry import Point, Polygon
 
 from flow.nodes.outputs import carta_imagem
-from flow.nodes.outputs.carta_imagem import MENSAGEM_SEM_MATPLOTLIB, CartaImagem
+from flow.nodes.outputs.carta_imagem import NO_MATPLOTLIB_MESSAGE, CartaImagem
 from flow.registry import NODE_REGISTRY, auto_discover_nodes
 from flow.utils import carta
 
 auto_discover_nodes()
 
-ASSINATURA = {"png": b"\x89PNG\r\n\x1a\n", "jpg": b"\xff\xd8\xff", "pdf": b"%PDF-"}
+SIGNATURE = {"png": b"\x89PNG\r\n\x1a\n", "jpg": b"\xff\xd8\xff", "pdf": b"%PDF-"}
 MIME = {"png": "image/png", "jpg": "image/jpeg", "pdf": "application/pdf"}
-RAPIDO = {"dpi": 72}
-CHAVES_DECLARADAS = {
+FAST = {"dpi": 72}
+DECLARED_KEYS = {
     "artifact_filename", "artifact_s3_key", "format", "size_bytes",
     "camadas", "largura_px", "altura_px",
 }
@@ -57,7 +57,7 @@ def poligonos():
 
 
 def _no(params: dict, node_id: str = "n1", ctx: dict | None = None) -> CartaImagem:
-    node = CartaImagem(node_id, {**RAPIDO, **params})
+    node = CartaImagem(node_id, {**FAST, **params})
     node._task_id = "task-1"
     node._workspace_id = "ws-1"
     node._workflow_hash = "wf"
@@ -121,11 +121,11 @@ def test_contrato_do_no():
     assert props["fundo_url"]["visibleWhen"] == {"field": "fundo", "in": ["personalizado"]}
     assert props["rotulos"]["type"] == "keyvalue" and props["cores"]["type"] == "keyvalue"
     declaradas = {f["name"] for f in d["outputs"]}
-    assert declaradas == CHAVES_DECLARADAS
+    assert declaradas == DECLARED_KEYS
 
 
-def test_options_batem_com_as_tabelas_da_carta():
-    """execute indexes FORMATOS, TAMANHOS and FUNDOS_COM_NOME directly by the select's
+def test_options_match_the_image_map_tables():
+    """execute indexes FORMATOS, TAMANHOS and NAMED_BASEMAPS directly by the select's
     value, without checking: what guarantees the value is one of the options is
     `validate()`. So each option needs its own entry in the table."""
     props = {p["name"]: p for p in CartaImagem.description()["properties"]}
@@ -135,17 +135,17 @@ def test_options_batem_com_as_tabelas_da_carta():
 
     assert valores("formato") == set(carta.FORMATOS)
     assert valores("tamanho") == set(carta.TAMANHOS)
-    assert valores("fundo") - {"nenhum", "personalizado"} == set(carta.FUNDOS_COM_NOME)
+    assert valores("fundo") - {"nenhum", "personalizado"} == set(carta.NAMED_BASEMAPS)
 
 
 @pytest.mark.asyncio
-async def test_o_catalogo_projeta_o_no_com_as_entradas_dinamicas():
+async def test_the_catalog_projects_the_node_with_dynamic_inputs():
     from app.services.node_service import NodeService
 
-    async def _sem_desabilitados(_db):
+    async def _no_disabled(_db):
         return set()
 
-    with patch("app.services.node_service.disabled_names", _sem_desabilitados):
+    with patch("app.services.node_service.disabled_names", _no_disabled):
         defs = await NodeService().list_nodes(db=None)
     d = next(x for x in defs if x.name == "CartaImagem")
     assert d.type == "output"
@@ -156,11 +156,11 @@ async def test_o_catalogo_projeta_o_no_com_as_entradas_dinamicas():
 # ── Duas portas, tres formatos ───────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_duas_portas_desenham_duas_camadas(persistido, pontos, poligonos):
+async def test_two_ports_draw_two_layers(persistido, pontos, poligonos):
     resultado = await _no({"ports": ["focos", "municipios"]}).execute(
         {"focos": pontos, "municipios": poligonos}
     )
-    assert persistido["content"].startswith(ASSINATURA["png"])
+    assert persistido["content"].startswith(SIGNATURE["png"])
     assert persistido["content_type"] == "image/png"
     assert persistido["fmt"] == "png"
     assert persistido["filename"] == "carta.png"
@@ -168,7 +168,7 @@ async def test_duas_portas_desenham_duas_camadas(persistido, pontos, poligonos):
     assert persistido["features"] == len(pontos) + len(poligonos)
     assert persistido["workspace_id"] == "ws-1" and persistido["task_id"] == "task-1"
     # FLAT keys, the declared ones — and the artifact's meta.
-    assert set(resultado) == CHAVES_DECLARADAS | {"__artifact__"}
+    assert set(resultado) == DECLARED_KEYS | {"__artifact__"}
     assert resultado["camadas"] == 2
     assert resultado["format"] == "png"
     assert resultado["artifact_filename"] == "carta.png"
@@ -181,11 +181,11 @@ async def test_duas_portas_desenham_duas_camadas(persistido, pontos, poligonos):
 
 @pytest.mark.parametrize("formato", ["jpg", "pdf"])
 @pytest.mark.asyncio
-async def test_formato_decide_extensao_mime_e_assinatura(persistido, pontos, poligonos, formato):
+async def test_format_decides_extension_mime_and_signature(persistido, pontos, poligonos, formato):
     resultado = await _no({"ports": ["a", "b"], "formato": formato, "titulo": "Minha carta"}).execute(
         {"a": pontos, "b": poligonos}
     )
-    assert persistido["content"].startswith(ASSINATURA[formato])
+    assert persistido["content"].startswith(SIGNATURE[formato])
     assert persistido["content_type"] == MIME[formato]
     assert persistido["fmt"] == formato
     assert persistido["filename"] == f"minha_carta.{formato}"
@@ -195,7 +195,7 @@ async def test_formato_decide_extensao_mime_e_assinatura(persistido, pontos, pol
 # ── One port, no port ────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_uma_porta_com_aresta_anonima_desenha_com_o_nome_da_porta(persistido, render, poligonos):
+async def test_one_port_with_anonymous_edge_draws_with_the_port_name(persistido, render, poligonos):
     """With ONE port the editor doesn't store `to_key`: the parent's dict arrives
     spread out (`output`), not under the port name. The layer has to get in
     anyway, and the legend carries the port name."""
@@ -206,14 +206,14 @@ async def test_uma_porta_com_aresta_anonima_desenha_com_o_nome_da_porta(persisti
 
 
 @pytest.mark.asyncio
-async def test_sem_portas_desenha_a_camada_que_chegar(persistido, render, pontos):
+async def test_without_ports_draws_whatever_layer_arrives(persistido, render, pontos):
     resultado = await _no({"ports": []}).execute({"output": pontos})
     assert resultado["camadas"] == 1
     assert render["render"].camadas[0].rotulo == "Camada"
 
 
 @pytest.mark.asyncio
-async def test_porta_nao_ligada_e_pulada_com_aviso(persistido, pontos):
+async def test_unconnected_port_is_skipped_with_warning(persistido, pontos):
     node = _no({"ports": ["a", "b"]})
     avisos: list[str] = []
     node.log = avisos.append
@@ -223,7 +223,7 @@ async def test_porta_nao_ligada_e_pulada_com_aviso(persistido, pontos):
 
 
 @pytest.mark.asyncio
-async def test_nenhuma_camada_e_erro(persistido):
+async def test_no_layer_is_error(persistido):
     with pytest.raises(ValueError, match="Nenhuma camada"):
         await _no({"ports": ["a", "b"]}).execute({})
     with pytest.raises(ValueError, match="Nenhuma camada"):
@@ -233,7 +233,7 @@ async def test_nenhuma_camada_e_erro(persistido):
 # ── Estilo ───────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_rotulos_e_cores_por_porta(persistido, render, pontos, poligonos):
+async def test_labels_and_colors_per_port(persistido, render, pontos, poligonos):
     await _no({
         "ports": ["focos_de_calor", "municipios"],
         "rotulos": {"focos_de_calor": "Focos de calor"},
@@ -245,13 +245,13 @@ async def test_rotulos_e_cores_por_porta(persistido, render, pontos, poligonos):
 
 
 @pytest.mark.asyncio
-async def test_cor_invalida_nomeia_a_porta(persistido, pontos):
+async def test_invalid_color_names_the_port(persistido, pontos):
     with pytest.raises(ValueError, match="focos"):
         await _no({"ports": ["focos", "b"], "cores": {"focos": "laranja"}}).execute({"focos": pontos})
 
 
 @pytest.mark.asyncio
-async def test_dpi_e_teto_de_pixels(persistido, pontos, monkeypatch):
+async def test_dpi_and_pixel_ceiling(persistido, pontos, monkeypatch):
     with pytest.raises(ValueError, match="dpi"):
         await _no({"dpi": 600}).execute({"output": pontos})
     monkeypatch.setattr(carta, "TETO_DE_PIXELS", 100_000)
@@ -260,7 +260,7 @@ async def test_dpi_e_teto_de_pixels(persistido, pontos, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_titulo_repetido_no_mesmo_run_e_erro_mas_retry_nao(persistido, pontos):
+async def test_repeated_title_in_same_run_is_error_but_retry_is_not(persistido, pontos):
     ctx: dict = {}
     await _no({"titulo": "Repetida"}, node_id="n1", ctx=ctx).execute({"output": pontos})
     with pytest.raises(ValueError, match="titulos diferentes"):
@@ -272,7 +272,7 @@ async def test_titulo_repetido_no_mesmo_run_e_erro_mas_retry_nao(persistido, pon
 # ── CRS ──────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_camada_sem_crs_e_tratada_como_4326(persistido, render, poligonos):
+async def test_layer_without_crs_is_treated_as_4326(persistido, render, poligonos):
     sem_crs = poligonos.set_crs(None, allow_override=True)
     node = _no({})
     avisos: list[str] = []
@@ -286,7 +286,7 @@ async def test_camada_sem_crs_e_tratada_como_4326(persistido, render, poligonos)
 
 
 @pytest.mark.asyncio
-async def test_crs_geografico_pula_a_escala_com_aviso(persistido, render, poligonos):
+async def test_geographic_crs_skips_the_scale_with_warning(persistido, render, poligonos):
     node = _no({"crs": "EPSG:4326"})
     avisos: list[str] = []
     node.log = avisos.append
@@ -298,16 +298,16 @@ async def test_crs_geografico_pula_a_escala_com_aviso(persistido, render, poligo
 # ── Basemap ──────────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def sem_espera(monkeypatch):
+def no_wait(monkeypatch):
     monkeypatch.setattr(carta_imagem, "espera_exponencial", lambda *a, **k: 0.0)
 
 
 # The hybrid a configured server would inject into the node (MAPA_HIBRIDO_*).
-HIBRIDO_DE_TESTE = {"url": "https://hibrido.example.org/{z}/{x}/{y}.jpg", "credito": "© Hibrido de Teste"}
+TEST_HYBRID = {"url": "https://hibrido.example.org/{z}/{x}/{y}.jpg", "credito": "© Hibrido de Teste"}
 
 
 @pytest.mark.asyncio
-async def test_fundo_baixa_tiles_forca_3857_e_credita_o_osm(persistido, render, pontos, poligonos):
+async def test_basemap_downloads_tiles_forces_3857_and_credits_osm(persistido, render, pontos, poligonos):
     chamadas: list[dict] = []
     tile = _tile_png()
 
@@ -333,18 +333,18 @@ async def test_fundo_baixa_tiles_forca_3857_e_credita_o_osm(persistido, render, 
 
 
 @pytest.mark.asyncio
-async def test_tile_5xx_e_retentado_e_404_e_definitivo(persistido, sem_espera, pontos):
+async def test_tile_5xx_is_retried_and_404_is_final(persistido, no_wait, pontos):
     tile = _tile_png()
     vistas: dict[str, int] = {}
 
-    async def instavel(method, url, **kwargs):
+    async def flaky(method, url, **kwargs):
         vistas[url] = vistas.get(url, 0) + 1
         status = 503 if vistas[url] < 3 else 200
         return httpx.Response(status, content=tile if status == 200 else b"", request=httpx.Request(method, url))
 
-    with patch("flow.nodes.outputs.carta_imagem.safe_httpx_request", side_effect=instavel), \
+    with patch("flow.nodes.outputs.carta_imagem.safe_httpx_request", side_effect=flaky), \
          patch("flow.nodes.outputs.carta_imagem.validate_url_ssrf", return_value=("1.2.3.4", "h")):
-        resultado = await _no({"fundo": "hibrido", "fundo_da_instalacao": HIBRIDO_DE_TESTE}).execute({"output": pontos})
+        resultado = await _no({"fundo": "hibrido", "fundo_da_instalacao": TEST_HYBRID}).execute({"output": pontos})
     assert resultado["camadas"] == 1
     assert all(n == 3 for n in vistas.values())
 
@@ -356,12 +356,12 @@ async def test_tile_5xx_e_retentado_e_404_e_definitivo(persistido, sem_espera, p
     with patch("flow.nodes.outputs.carta_imagem.safe_httpx_request", side_effect=sumido), \
          patch("flow.nodes.outputs.carta_imagem.validate_url_ssrf", return_value=("1.2.3.4", "h")):
         with pytest.raises(ValueError, match="404"):
-            await _no({"fundo": "hibrido", "fundo_da_instalacao": HIBRIDO_DE_TESTE}).execute({"output": pontos})
+            await _no({"fundo": "hibrido", "fundo_da_instalacao": TEST_HYBRID}).execute({"output": pontos})
     assert all(n == 1 for n in vistas.values()), "4xx nao e retentado"
 
 
 @pytest.mark.asyncio
-async def test_template_personalizado_sem_marcadores_e_erro(persistido, pontos):
+async def test_custom_template_without_placeholders_is_error(persistido, pontos):
     with pytest.raises(ValueError, match="marcadores"):
         await _no({"fundo": "personalizado", "fundo_url": "https://t.exemplo.org/{z}/{x}.png"}).execute(
             {"output": pontos}
@@ -369,7 +369,7 @@ async def test_template_personalizado_sem_marcadores_e_erro(persistido, pontos):
 
 
 @pytest.mark.asyncio
-async def test_template_para_a_rede_interna_e_barrado(persistido, pontos):
+async def test_template_to_internal_network_is_blocked(persistido, pontos):
     """The SSRF guard of the HTTP nodes applies here: a template written in the workflow
     doesn't reach the cloud metadata nor the internal network."""
     chamou = []
@@ -388,7 +388,7 @@ async def test_template_para_a_rede_interna_e_barrado(persistido, pontos):
 # ── Localidade e executor antigo ─────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_localidade_executor_grava_no_disco_sem_rede(tmp_path, monkeypatch, pontos):
+async def test_executor_locality_writes_to_disk_without_network(tmp_path, monkeypatch, pontos):
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", "catalog")
     monkeypatch.setenv("EXECUTOR_ARTIFACTS_DIR", str(tmp_path))
 
@@ -402,7 +402,7 @@ async def test_localidade_executor_grava_no_disco_sem_rede(tmp_path, monkeypatch
 
     resultado = await _no({"credential_id": "cred-1"}).execute({"output": pontos})
     arquivo = tmp_path / "ws-1" / "task-1" / "carta.png"
-    assert arquivo.read_bytes().startswith(ASSINATURA["png"])
+    assert arquivo.read_bytes().startswith(SIGNATURE["png"])
     assert resultado["artifact_s3_key"] == "ws-1/task-1/carta.png"
     meta = resultado["__artifact__"]
     assert meta["content_location"] == "executor" and meta["s3_key"] is None
@@ -410,11 +410,11 @@ async def test_localidade_executor_grava_no_disco_sem_rede(tmp_path, monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_sem_matplotlib_o_erro_diz_para_atualizar_o_executor(persistido, pontos, monkeypatch):
-    def sem_lib():
+async def test_without_matplotlib_the_error_says_to_update_the_executor(persistido, pontos, monkeypatch):
+    def without_lib():
         raise ImportError("No module named 'matplotlib'")
 
-    monkeypatch.setattr(carta_imagem, "_importar_matplotlib", sem_lib)
+    monkeypatch.setattr(carta_imagem, "_importar_matplotlib", without_lib)
     with pytest.raises(RuntimeError) as e:
         await _no({}).execute({"output": pontos})
-    assert str(e.value) == MENSAGEM_SEM_MATPLOTLIB
+    assert str(e.value) == NO_MATPLOTLIB_MESSAGE

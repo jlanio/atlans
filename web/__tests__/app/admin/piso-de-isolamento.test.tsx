@@ -13,7 +13,7 @@ vi.mock("@/utils/createToast", () => ({
 }))
 
 import { GisFlowService } from "@/service/GisFlowService"
-import { IsolationFloorSection, semOndeRodar } from "@/app/components/admin/isolation-floor-section"
+import { IsolationFloorSection, hasNowhereToRun } from "@/app/components/admin/isolation-floor-section"
 import type { IWorkspacePolicyAdmin } from "@/service/types"
 
 const setFloor = vi.mocked(GisFlowService.setWorkspaceIsolationFloor)
@@ -71,9 +71,9 @@ describe("piso de isolamento", () => {
   })
 
   it("piso sem principal é o caso que vira pendência na visão geral", () => {
-    expect(semOndeRodar(linha({ isolation_floor: "no_pool", primary_count: 0 }))).toBe(true)
-    expect(semOndeRodar(linha({ isolation_floor: "no_pool", primary_count: 1 }))).toBe(false)
-    expect(semOndeRodar(linha({ isolation_floor: "none", primary_count: 0 }))).toBe(false)
+    expect(hasNowhereToRun(linha({ isolation_floor: "no_pool", primary_count: 0 }))).toBe(true)
+    expect(hasNowhereToRun(linha({ isolation_floor: "no_pool", primary_count: 1 }))).toBe(false)
+    expect(hasNowhereToRun(linha({ isolation_floor: "none", primary_count: 0 }))).toBe(false)
     render(<IsolationFloorSection items={[linha({ isolation_floor: "no_pool", mode: "isolated", primary_count: 0 })]} onChanged={() => {}} />)
     expect(screen.getByText(/sem executor principal: nada roda/)).toBeTruthy()
   })

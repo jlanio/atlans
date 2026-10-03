@@ -41,7 +41,7 @@ import { SelectCard } from "./dialogs"
 // convention), the commands carry this placeholder, and the screen warns that
 // it must be replaced.
 
-export const SERVIDOR_A_PREENCHER = "https://agents.SEU-DOMINIO"
+export const SERVER_PLACEHOLDER = "https://agents.SEU-DOMINIO"
 
 export type RunMode = "app" | "quickstart" | "python" | "docker"
 export type OsMode = "linux" | "windows"
@@ -72,7 +72,7 @@ export function fetchInstallerOnce() {
 export function EnrollConnect({ otp }: {
   otp: IExecutorEnrollmentOtpResponse
 }) {
-  const servidor = otp.server_url || SERVIDOR_A_PREENCHER
+  const servidor = otp.server_url || SERVER_PLACEHOLDER
   const site = otp.public_url || (typeof window !== "undefined" ? window.location.origin : "")
   // Preselects based on the OS of the operator who opened the dialog (best-effort);
   // the operator can switch manually.
@@ -87,18 +87,18 @@ export function EnrollConnect({ otp }: {
   // operator's — best-effort only for the OS toggle).
   const [runMode, setRunMode] = useState<RunMode>(() => ponteDesktop() != null ? "app" : "quickstart")
   const [appInfo, setAppInfo] = useState<{ versao: string; tamanho: number; url: string } | null>(null)
-  const [appIndisponivel, setAppIndisponivel] = useState(false)
+  const [appUnavailable, setAppUnavailable] = useState(false)
   const [copied, setCopied]   = useState(false)
 
   // Windows installer metadata — only when the app tab is visible.
   useEffect(() => {
-    if (runMode !== "app" || appInfo || appIndisponivel) return
+    if (runMode !== "app" || appInfo || appUnavailable) return
     fetchInstallerOnce().then(data => {
       // 404 is a normal state: no version published yet.
-      if (!data) setAppIndisponivel(true)
+      if (!data) setAppUnavailable(true)
       else setAppInfo(data)
     })
-  }, [runMode, appInfo, appIndisponivel])
+  }, [runMode, appInfo, appUnavailable])
 
   // Python local: grava EXECUTOR_ID em ./executor/.env automaticamente.
   const pythonLinux = otp
@@ -154,14 +154,14 @@ export function EnrollConnect({ otp }: {
   // Keeps the timer id: without this, closing the dialog before 2s lets the
   // setTimeout fire setCopied on an already unmounted component. We clear it on
   // rearm and on unmount.
-  const timerCopiado = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  useEffect(() => () => clearTimeout(timerCopiado.current), [])
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(copiedTimer.current), [])
 
   function copyCmd() {
     navigator.clipboard.writeText(enrollCommand)
     setCopied(true)
-    clearTimeout(timerCopiado.current)
-    timerCopiado.current = setTimeout(() => setCopied(false), 2000)
+    clearTimeout(copiedTimer.current)
+    copiedTimer.current = setTimeout(() => setCopied(false), 2000)
   }
 
   const methods: { v: RunMode; icon: React.ReactNode; title: string; desc: string; badge?: string }[] = [
@@ -180,7 +180,7 @@ export function EnrollConnect({ otp }: {
           <TbAlertTriangle className="mt-0.5 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden="true" />
           <span>
             Este servidor não sabe o endereço do host dos executores (<code>AGENTS_URL</code>). Nos
-            comandos abaixo, troque <code>{SERVIDOR_A_PREENCHER}</code> por ele.
+            comandos abaixo, troque <code>{SERVER_PLACEHOLDER}</code> por ele.
           </span>
         </div>
       )}
@@ -212,7 +212,7 @@ export function EnrollConnect({ otp }: {
             </li>
           </ol>
 
-          {appIndisponivel ? (
+          {appUnavailable ? (
             <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-[11px]">
               <TbAlertTriangle className="mt-0.5 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden="true" />
               <div>

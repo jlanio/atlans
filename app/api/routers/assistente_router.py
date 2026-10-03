@@ -40,19 +40,19 @@ from app.core.config import ASSISTENTE_ATIVO
 from app.core.rate_limiter import limiter
 from app.core.utils.logger import get_logger
 from app.mcp import cotas, infra
-from app.mcp.escopo import escopo_do_assistente
+from app.mcp.escopo import assistant_scope
 from app.schemas.assistente import (
-    ConversaDetalhe,
-    ConversaLista,
-    ConversaResumo,
-    DecisaoDeConfirmacao,
+    ConversationDetail,
+    ConversationList,
+    ConversationSummary,
+    ConfirmationDecision,
     Localizacao,
-    MensagemDaHome,
-    QuadroDoReplay,
-    RenomearConversa,
+    HomeMessage,
+    ReplayFrame,
+    RenameConversation,
 )
 from app.api.routers._streaming import com_batimento
-from app.schemas.assistente import CotaDoAssistente, EstadoDoAssistente
+from app.schemas.assistente import AssistantQuota, AssistantState
 from app.services import assistente_conversas
 from app.services import assistente_superficie as agente
 from app.services import assistente_service as assistente
@@ -66,7 +66,7 @@ router = APIRouter(
     dependencies=[Depends(get_current_user)],
 )
 
-MOTIVO_DESLIGADO = (
+DISABLED_REASON = (
     "O assistente nao esta configurado nesta instalacao. "
     "Defina LLM_API_KEY (ou OPENROUTER_API_KEY) no ambiente da API para liga-lo."
 )
@@ -78,18 +78,18 @@ MOTIVO_DESLIGADO = (
 # spelling.
 
 
-def _exigir_ligado() -> None:
+def _require_enabled() -> None:
     if not ASSISTENTE_ATIVO:
-        raise HTTPException(status_code=503, detail=MOTIVO_DESLIGADO)
+        raise HTTPException(status_code=503, detail=DISABLED_REASON)
 
 
-def _quadro(evento: assistente.Evento) -> bytes:
+def _frame(evento: assistente.Evento) -> bytes:
     """Um `Evento` virando quadro SSE (`event:`/`data:` JSON, datas em ISO)."""
     corpo = json.dumps(evento.dados, ensure_ascii=False, default=str)
     return f"event: {evento.tipo}\ndata: {corpo}\n\n".encode("utf-8")
 
 
-def _corpo_do_erro(exc: ToolError) -> dict:
+def _error_body(exc: ToolError) -> dict:
     try:
         corpo = json.loads(str(exc))
     except (TypeError, ValueError):
@@ -97,8 +97,8 @@ def _corpo_do_erro(exc: ToolError) -> dict:
     return corpo if isinstance(corpo, dict) else {"code": "recusado", "message": str(exc)}
 
 
-def _resumo_da_conversa(conv) -> ConversaResumo:
-    return ConversaResumo(
+def _conversation_summary(conv) -> ConversationSummary:
+    return ConversationSummary(
         id=conv.id_hash,
         titulo=conv.titulo,
         workflow_id=conv.workflow_id,
@@ -108,7 +108,7 @@ def _resumo_da_conversa(conv) -> ConversaResumo:
     )
 
 
-def _chave_da_trava(user_id: str, conversa_id: str) -> str:
+def _lock_key(user_id: str, conversa_id: str) -> str:
     return f"agente:trava:{user_id}:{conversa_id}"
 
 
@@ -118,7 +118,7 @@ def _workspace_extra(workspace_id: str | None) -> str | None:
     return f"Workspace preferido para os fluxos que voce criar: {workspace_id}."
 
 
-def _localizacao_extra(loc: Localizacao | None) -> str | None:
+def _extra_location(loc: Localizacao | None) -> str | None:
     if loc is None:
         return None
     precisao = f" (precisao ~{loc.precisao_m:.0f} m)" if loc.precisao_m is not None else ""
@@ -132,16 +132,16 @@ def _localizacao_extra(loc: Localizacao | None) -> str | None:
 # The name of each language in the instruction that overrides the installation
 # default. Portuguese is left out: it is the default, and its prompt stays byte
 # for byte the usual one.
-_NOME_DO_IDIOMA = {"en": "ingles (English)", "es": "espanhol (espanol)"}
+_LANGUAGE_NAME = {"en": "ingles (English)", "es": "espanhol (espanol)"}
 
 
-def _idioma_extra(idioma: str | None) -> str | None:
+def _extra_language(idioma: str | None) -> str | None:
     """The person's screen in another language: the answer and the reasoning go in it.
 
     Goes in the EXTRA block (not cached), after the system's language rule — and
     says explicitly that it replaces it, so the model is not caught between the two.
     """
-    nome = _NOME_DO_IDIOMA.get(idioma or "")
+    nome = _LANGUAGE_NAME.get(idioma or "")
     if not nome:
         return None
     return (
@@ -151,7 +151,7 @@ def _idioma_extra(idioma: str | None) -> str | None:
     )
 
 
-def _instrucoes_extras(
+def _extra_instructions(
     workspace_id: str | None, localizacao: Localizacao | None, idioma: str | None = None
 ) -> str | None:
     """Joins the optional system prompt extras into a single string — or None.
@@ -163,13 +163,13 @@ def _instrucoes_extras(
     """
     partes = [
         p
-        for p in (_workspace_extra(workspace_id), _localizacao_extra(localizacao), _idioma_extra(idioma))
+        for p in (_workspace_extra(workspace_id), _extra_location(localizacao), _extra_language(idioma))
         if p
     ]
     return "\n\n".join(partes) if partes else None
 
 
-def _workspace_valido(pedido: str | None, workspace_ids) -> str | None:
+def _valid_workspace(pedido: str | None, workspace_ids) -> str | None:
     """The client's `workspace_id`, only if it really is one of the person's workspaces.
 
     The value becomes SYSTEM prompt text (`_workspace_extra`), outside the
@@ -182,7 +182,7 @@ def _workspace_valido(pedido: str | None, workspace_ids) -> str | None:
     return pedido if pedido in set(workspace_ids or ()) else None
 
 
-# ── Persistencia incremental (nos ganchos, sessao propria) ───────────────────
+# ── Persistencia incremental (nos hooks, sessao propria) ───────────────────
 
 
 class _Cursor:
@@ -202,18 +202,18 @@ class _Cursor:
         self.ja = ja
 
 
-async def _persistir_turno(conversa_id: str, conversa: list[dict], cursor: _Cursor) -> None:
+async def _persist_turn(conversa_id: str, conversa: list[dict], cursor: _Cursor) -> None:
     """Writes the messages this stream has not written yet."""
     if len(conversa) <= cursor.ja:
         return
     novas = list(conversa[cursor.ja:])
     try:
         async with infra.sessao() as db:
-            await assistente_conversas.anexar_mensagens(
+            await assistente_conversas.append_messages(
                 db,
                 conversa_id,
                 novas,
-                ordem_inicial=await assistente_conversas.proxima_ordem(db, conversa_id),
+                initial_order=await assistente_conversas.next_order(db, conversa_id),
             )
         # Only advances AFTER the commit: a failure leaves the same messages
         # pending for the next attempt, instead of losing them.
@@ -222,9 +222,9 @@ async def _persistir_turno(conversa_id: str, conversa: list[dict], cursor: _Curs
         logger.exception("Falha ao persistir turno (conversa %s).", conversa_id)
 
 
-async def _fechar_persistencia(
+async def _close_persistence(
     conversa_id: str,
-    transcrito_final: list[dict],
+    final_transcript: list[dict],
     cursor: _Cursor,
     tokens_total: int | None,
 ) -> None:
@@ -234,27 +234,27 @@ async def _fechar_persistencia(
     stamped, instead of adding 0 (or, as before, zeroing the conversation's total).
     """
     try:
-        await _persistir_turno(conversa_id, transcrito_final, cursor)
+        await _persist_turn(conversa_id, final_transcript, cursor)
         async with infra.sessao() as db:
-            await assistente_conversas.tocar_conversa(db, conversa_id, tokens_total=tokens_total)
+            await assistente_conversas.touch_conversation(db, conversa_id, tokens_total=tokens_total)
     except Exception:  # pragma: no cover
         logger.exception("Falha ao fechar a persistencia (conversa %s).", conversa_id)
 
 
 async def _fechar_protegido(
     conversa_id: str,
-    transcrito_final: list[dict],
+    final_transcript: list[dict],
     cursor: _Cursor,
     tokens_total: int | None,
 ) -> None:
-    """`_fechar_persistencia` shielded against the generator's CANCELLATION.
+    """`_close_persistence` shielded against the generator's CANCELLATION.
 
     When the client disconnects, the `finally` runs with the cancellation pending
     and the first `await` inside it would raise `CancelledError` before any
     write. The `shield` lets the task finish anyway.
     """
     tarefa = asyncio.ensure_future(
-        _fechar_persistencia(conversa_id, transcrito_final, cursor, tokens_total)
+        _close_persistence(conversa_id, final_transcript, cursor, tokens_total)
     )
     with suppress(asyncio.CancelledError):
         await asyncio.shield(tarefa)
@@ -267,11 +267,11 @@ async def _fechar_protegido(
 @limiter.limit("120/hour")
 async def conversar(
     request: Request,
-    payload: MensagemDaHome,
+    payload: HomeMessage,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    _exigir_ligado()
+    _require_enabled()
     if agente.parece_sintetica(payload.mensagem):
         # Only the server writes this prefix (confirmation). Rejecting it here is
         # what prevents the person (or a client) from forging it.
@@ -279,7 +279,7 @@ async def conversar(
 
     # BEFORE the return: the session dies when this handler leaves the scene.
     workspace_ids = await listar_workspace_ids(db, current_user.id_hash)
-    escopo = escopo_do_assistente(
+    escopo = assistant_scope(
         user_id=current_user.id_hash,
         username=getattr(current_user, "username", None),
         workspace_ids=workspace_ids,
@@ -290,14 +290,14 @@ async def conversar(
 
     nova = payload.conversa_id is None
     if nova:
-        conv = await assistente_conversas.criar_conversa(
+        conv = await assistente_conversas.create_conversation(
             db,
             user_id=current_user.id_hash,
-            workspace_id=_workspace_valido(payload.workspace_id, workspace_ids),
-            titulo=assistente_conversas.titulo_automatico(payload.mensagem),
+            workspace_id=_valid_workspace(payload.workspace_id, workspace_ids),
+            titulo=assistente_conversas.automatic_title(payload.mensagem),
         )
     else:
-        conv = await assistente_conversas.carregar_conversa_da_pessoa(
+        conv = await assistente_conversas.load_user_conversation(
             db, current_user.id_hash, payload.conversa_id
         )
 
@@ -307,7 +307,7 @@ async def conversar(
     # corrupted the order.
     return StreamingResponse(
         com_batimento(
-            _transmitir_conversa(
+            _stream_conversation(
                 escopo=escopo,
                 servidor=servidor,
                 conversa_id=conv.id_hash,
@@ -324,37 +324,37 @@ async def conversar(
     )
 
 
-async def _transmitir_conversa(
+async def _stream_conversation(
     *, escopo, servidor, conversa_id, titulo, nova, mensagem, workspace_id, localizacao, idioma=None
 ) -> AsyncIterator[bytes]:
     redis = infra.redis_ou_none()
     transcrito: list[dict] = []
-    transcrito_final: list[dict] = []
+    final_transcript: list[dict] = []
     cursor = _Cursor(0)
     tokens_total: int | None = None
     # 1st frame: the conversation's identity (the client learns the id of a new one).
-    yield _quadro(assistente.Evento("conversa", {"conversa_id": conversa_id, "titulo": titulo, "nova": nova}))
+    yield _frame(assistente.Evento("conversa", {"conversa_id": conversa_id, "titulo": titulo, "nova": nova}))
     try:
-        async with assistente.trava_exclusiva(redis, _chave_da_trava(escopo.user_id, conversa_id)):
+        async with assistente.trava_exclusiva(redis, _lock_key(escopo.user_id, conversa_id)):
             # Read the history and write the person's message, already under the lock.
             async with infra.sessao() as db:
-                transcrito = await assistente_conversas.transcrito_de(db, conversa_id, persistir_fecho=True)
-                await assistente_conversas.anexar_mensagens(
+                transcrito = await assistente_conversas.transcript_of(db, conversa_id, persist_closing=True)
+                await assistente_conversas.append_messages(
                     db,
                     conversa_id,
                     [{"role": "user", "content": mensagem}],
-                    ordem_inicial=await assistente_conversas.proxima_ordem(db, conversa_id),
+                    initial_order=await assistente_conversas.next_order(db, conversa_id),
                 )
             transcrito.append({"role": "user", "content": mensagem})
             # Everything in the transcript has already been written — the cursor starts here.
             cursor.ja = len(transcrito)
-            transcrito_final = list(transcrito)
+            final_transcript = list(transcrito)
 
             async def _hook(conversa: list[dict]) -> None:
-                await _persistir_turno(conversa_id, conversa, cursor)
+                await _persist_turn(conversa_id, conversa, cursor)
 
             # The wrap-up runs UNDER the lock: `_fechar_protegido` recomputes
-            # `proxima_ordem` and stamps tokens; in the OUTER `finally`, after
+            # `next_order` and stamps tokens; in the OUTER `finally`, after
             # the lock is released, a 2nd tab that grabbed it in this window
             # would collide on UNIQUE(conversa, ordem) — the message was lost
             # in the except.
@@ -367,22 +367,22 @@ async def _transmitir_conversa(
                     redis=redis,
                     superficie=agente.HOME,
                     conversa_id=conversa_id,
-                    instrucoes_extras=_instrucoes_extras(workspace_id, localizacao, idioma),
+                    instrucoes_extras=_extra_instructions(workspace_id, localizacao, idioma),
                     ao_fechar_turno=_hook,
                 ):
                     if evento.tipo == "fim":
-                        transcrito_final = evento.dados.get("transcrito") or transcrito_final
+                        final_transcript = evento.dados.get("transcrito") or final_transcript
                         tokens_total = (evento.dados.get("uso") or {}).get("total", 0)
-                    yield _quadro(evento)
+                    yield _frame(evento)
             finally:
-                await _fechar_protegido(conversa_id, transcrito_final, cursor, tokens_total)
+                await _fechar_protegido(conversa_id, final_transcript, cursor, tokens_total)
     except ToolError as exc:
-        yield _quadro(assistente.Evento("erro", _corpo_do_erro(exc)))
-        yield _quadro(assistente.Evento("fim", {"ok": False}))
+        yield _frame(assistente.Evento("erro", _error_body(exc)))
+        yield _frame(assistente.Evento("fim", {"ok": False}))
     except Exception:
         logger.exception("Assistente quebrou no stream (conversa %s).", conversa_id)
-        yield _quadro(assistente.Evento("erro", {"code": "erro_interno", "message": "Algo quebrou do nosso lado."}))
-        yield _quadro(assistente.Evento("fim", {"ok": False}))
+        yield _frame(assistente.Evento("erro", {"code": "erro_interno", "message": "Algo quebrou do nosso lado."}))
+        yield _frame(assistente.Evento("fim", {"ok": False}))
 
 
 # ── POST /assistente/conversas/{id}/confirmacoes/{tool_use_id} ───────────────────
@@ -400,16 +400,16 @@ async def _transmitir_conversa(
 async def confirmar(
     conversa_id: str,
     tool_use_id: str,
-    payload: DecisaoDeConfirmacao,
+    payload: ConfirmationDecision,
     request: Request,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    _exigir_ligado()
-    conv = await assistente_conversas.carregar_conversa_da_pessoa(db, current_user.id_hash, conversa_id)
+    _require_enabled()
+    conv = await assistente_conversas.load_user_conversation(db, current_user.id_hash, conversa_id)
 
     redis = infra.redis_ou_none()
-    guardado = await assistente_conversas.ler_confirmacao(redis, current_user.id_hash, conv.id_hash, tool_use_id)
+    guardado = await assistente_conversas.read_confirmation(redis, current_user.id_hash, conv.id_hash, tool_use_id)
     if guardado is None:
         # The key expired (15 min) or never existed — there is nothing to confirm.
         raise HTTPException(status_code=409, detail="Confirmacao expirada ou ja decidida.")
@@ -424,7 +424,7 @@ async def confirmar(
     # without the action having happened. Here it is only validated (read).
 
     workspace_ids = await listar_workspace_ids(db, current_user.id_hash)
-    escopo = escopo_do_assistente(
+    escopo = assistant_scope(
         user_id=current_user.id_hash,
         username=getattr(current_user, "username", None),
         workspace_ids=workspace_ids,
@@ -433,13 +433,13 @@ async def confirmar(
     if servidor is None:  # pragma: no cover
         raise HTTPException(status_code=503, detail="Servidor de ferramentas indisponivel.")
 
-    # The transcript is NOT read here: `persistir_fecho=True` WRITES (the closing
-    # tool_result, via `anexar_mensagens`, which commits) and the lock is only
+    # The transcript is NOT read here: `persist_closing=True` WRITES (the closing
+    # tool_result, via `append_messages`, which commits) and the lock is only
     # taken inside the generator. The read lives there, under the lock — as in
     # the sibling conversation route.
     return StreamingResponse(
         com_batimento(
-            _transmitir_confirmacao(
+            _stream_confirmation(
                 escopo=escopo,
                 servidor=servidor,
                 conversa_id=conv.id_hash,
@@ -456,91 +456,91 @@ async def confirmar(
     )
 
 
-async def _transmitir_confirmacao(
+async def _stream_confirmation(
     *, escopo, servidor, conversa_id, tool_use_id, guardado, decisao, workspace_id, localizacao=None,
     idioma=None,
 ) -> AsyncIterator[bytes]:
     redis = infra.redis_ou_none()
     transcrito: list[dict] = []
-    transcrito_final: list[dict] = []
+    final_transcript: list[dict] = []
     cursor = _Cursor(0)
     tokens_total: int | None = None
     tool = guardado.get("tool")
     args = guardado.get("args") or {}
-    deu_erro = False
+    had_error = False
     try:
-        async with assistente.trava_exclusiva(redis, _chave_da_trava(escopo.user_id, conversa_id)):
+        async with assistente.trava_exclusiva(redis, _lock_key(escopo.user_id, conversa_id)):
             # Consumes the confirmation HERE — under the lock and before any effect,
             # not in the handler. If the client drops after the handler returns
             # but before this, the key SURVIVES and the person can reconfirm,
             # instead of the confirmed action vanishing with no retry. The lock
             # serializes the tabs, so the DELETE decides the race: 0 = another
             # tab already consumed it.
-            if not await assistente_conversas.consumir_confirmacao(
+            if not await assistente_conversas.consume_confirmation(
                 redis, escopo.user_id, conversa_id, tool_use_id
             ):
-                yield _quadro(
+                yield _frame(
                     assistente.Evento(
                         "erro",
                         {"code": "confirmacao_ja_decidida", "message": "Esta acao ja foi decidida."},
                     )
                 )
-                yield _quadro(assistente.Evento("fim", {"ok": False}))
+                yield _frame(assistente.Evento("fim", {"ok": False}))
                 return
-            # Read the history already under the lock. `persistir_fecho=True` WRITES
+            # Read the history already under the lock. `persist_closing=True` WRITES
             # the closing tool_result; outside the lock, a tab that clicked a card
             # while another was still running the loop wrote that synthetic
             # closing and then had the real tool_result written over it — two
             # results for the same `tool_use`, and the API rejecting the
             # conversation forever.
             async with infra.sessao() as db:
-                transcrito = await assistente_conversas.transcrito_de(db, conversa_id, persistir_fecho=True)
+                transcrito = await assistente_conversas.transcript_of(db, conversa_id, persist_closing=True)
             # Everything in the transcript has already been written — the cursor starts here.
             cursor.ja = len(transcrito)
-            transcrito_final = list(transcrito)
+            final_transcript = list(transcrito)
 
             if decisao == "confirmar":
                 # Executes the STORED args, through the same path as the loop and under
                 # the assistant's scope — never the args the client sent in the click.
                 fila: list[assistente.Evento] = []
 
-                async def _emitir(evento: assistente.Evento) -> None:
+                async def _emit(evento: assistente.Evento) -> None:
                     fila.append(evento)
 
                 # With the call id: this path's `progresso` frame goes out
                 # with the same label as the loop's, and the reducer does not
                 # depend on the legacy "the one that is running" criterion.
-                contexto = assistente.ContextoLocal(_emitir, ferramenta_id=tool_use_id)
-                yield _quadro(
-                    assistente.Evento("ferramenta", {"id": tool_use_id, "nome": tool, "argumentos": assistente._resumo(args)})
+                contexto = assistente.ContextoLocal(_emit, tool_id=tool_use_id)
+                yield _frame(
+                    assistente.Evento("ferramenta", {"id": tool_use_id, "nome": tool, "argumentos": assistente._summarize(args)})
                 )
-                resultado, deu_erro = await assistente.chamar_no_servidor(servidor, escopo, tool, args, contexto)
+                resultado, had_error = await assistente.chamar_no_servidor(servidor, escopo, tool, args, contexto)
                 while fila:
-                    yield _quadro(fila.pop(0))
-                yield _quadro(assistente.Evento("ferramenta_fim", {"id": tool_use_id, "nome": tool, "erro": deu_erro}))
-                for evento in agente.HOME.quadros_extras(None, tool, args, resultado, deu_erro):
-                    yield _quadro(evento)
-                sintetica = (
+                    yield _frame(fila.pop(0))
+                yield _frame(assistente.Evento("ferramenta_fim", {"id": tool_use_id, "nome": tool, "erro": had_error}))
+                for evento in agente.HOME.quadros_extras(None, tool, args, resultado, had_error):
+                    yield _frame(evento)
+                synthetic = (
                     f"{agente.MENSAGEM_CONFIRMADA}\n"
                     f"Ferramenta: {tool}\nResultado:\n{resultado}"
                 )
             else:
-                sintetica = agente.MENSAGEM_RECUSADA
+                synthetic = agente.MENSAGEM_RECUSADA
 
             # Writes the synthetic message (with `meta`) and appends it to the
             # transcript, and leaves the AUDITABLE TRAIL of what the assistant
             # just wrote — the transcript does not serve as a trail: the person
             # deletes it with DELETE.
             async with infra.sessao() as db:
-                ordem = await assistente_conversas.proxima_ordem(db, conversa_id)
-                await assistente_conversas.anexar_mensagens(
+                ordem = await assistente_conversas.next_order(db, conversa_id)
+                await assistente_conversas.append_messages(
                     db,
                     conversa_id,
-                    [{"role": "user", "content": sintetica}],
-                    ordem_inicial=ordem,
+                    [{"role": "user", "content": synthetic}],
+                    initial_order=ordem,
                     metas={ordem: {"tipo": "confirmacao", "decisao": decisao, "tool": tool}},
                 )
-                await assistente_conversas.registrar_acao_confirmada(
+                await assistente_conversas.record_confirmed_action(
                     db,
                     user_id=escopo.user_id,
                     conversa_id=conversa_id,
@@ -548,23 +548,23 @@ async def _transmitir_confirmacao(
                     args=args,
                     tool_use_id=tool_use_id,
                     decisao=decisao,
-                    erro=deu_erro,
-                    workspace_padrao=workspace_id,
+                    erro=had_error,
+                    default_workspace=workspace_id,
                     # The target only resolves its workspace if it is one of the ACTOR's:
                     # otherwise the assistant's trail would land in a workspace
                     # the person is not even a member of.
                     workspace_ids=escopo.workspace_ids,
                 )
-            transcrito.append({"role": "user", "content": sintetica})
-            transcrito_final = list(transcrito)
+            transcrito.append({"role": "user", "content": synthetic})
+            final_transcript = list(transcrito)
             cursor.ja = len(transcrito)
 
             # RESUMES the loop on the SAME SSE — the model continues from the outcome.
             async def _hook(conversa: list[dict]) -> None:
-                await _persistir_turno(conversa_id, conversa, cursor)
+                await _persist_turn(conversa_id, conversa, cursor)
 
             # The wrap-up runs UNDER the lock (as in the conversation route): outside
-            # it, `_fechar_protegido` would recompute `proxima_ordem` in a window
+            # it, `_fechar_protegido` would recompute `next_order` in a window
             # in which another tab would already hold the lock, colliding on
             # UNIQUE(conversa, ordem).
             try:
@@ -580,28 +580,28 @@ async def _transmitir_confirmacao(
                     # resends the shared location in the decision body
                     # (the server does not keep it — it lives only in the
                     # stream's prompt).
-                    instrucoes_extras=_instrucoes_extras(workspace_id, localizacao, idioma),
+                    instrucoes_extras=_extra_instructions(workspace_id, localizacao, idioma),
                     ao_fechar_turno=_hook,
                 ):
                     if evento.tipo == "fim":
-                        transcrito_final = evento.dados.get("transcrito") or transcrito_final
+                        final_transcript = evento.dados.get("transcrito") or final_transcript
                         tokens_total = (evento.dados.get("uso") or {}).get("total", 0)
-                    yield _quadro(evento)
+                    yield _frame(evento)
             finally:
-                await _fechar_protegido(conversa_id, transcrito_final, cursor, tokens_total)
+                await _fechar_protegido(conversa_id, final_transcript, cursor, tokens_total)
     except ToolError as exc:
-        yield _quadro(assistente.Evento("erro", _corpo_do_erro(exc)))
-        yield _quadro(assistente.Evento("fim", {"ok": False}))
+        yield _frame(assistente.Evento("erro", _error_body(exc)))
+        yield _frame(assistente.Evento("fim", {"ok": False}))
     except Exception:
         logger.exception("Confirmacao quebrou no stream (conversa %s).", conversa_id)
-        yield _quadro(assistente.Evento("erro", {"code": "erro_interno", "message": "Algo quebrou do nosso lado."}))
-        yield _quadro(assistente.Evento("fim", {"ok": False}))
+        yield _frame(assistente.Evento("erro", {"code": "erro_interno", "message": "Algo quebrou do nosso lado."}))
+        yield _frame(assistente.Evento("fim", {"ok": False}))
 
 
 # ── Leitura e gestao das conversas (JSON) ────────────────────────────────────
 
 
-@router.get("/conversas", response_model=ConversaLista, summary="Minhas conversas")
+@router.get("/conversas", response_model=ConversationList, summary="Minhas conversas")
 async def listar(
     limit: int = 50,
     offset: int = 0,
@@ -610,43 +610,43 @@ async def listar(
 ):
     limit = max(1, min(int(limit), 100))
     offset = max(0, int(offset))
-    linhas, total = await assistente_conversas.listar_conversas(
+    linhas, total = await assistente_conversas.list_conversations(
         db, current_user.id_hash, limit=limit, offset=offset
     )
-    return ConversaLista(itens=[_resumo_da_conversa(c) for c in linhas], total=total)
+    return ConversationList(itens=[_conversation_summary(c) for c in linhas], total=total)
 
 
-@router.get("/conversas/{conversa_id}", response_model=ConversaDetalhe, summary="Uma conversa (replay)")
+@router.get("/conversas/{conversa_id}", response_model=ConversationDetail, summary="Uma conversa (replay)")
 async def detalhe(
     conversa_id: str,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    conv = await assistente_conversas.carregar_conversa_da_pessoa(db, current_user.id_hash, conversa_id)
-    quadros = await assistente_conversas.quadros_do_replay(
+    conv = await assistente_conversas.load_user_conversation(db, current_user.id_hash, conversa_id)
+    quadros = await assistente_conversas.replay_frames(
         db,
         conv.id_hash,
         redis=infra.redis_ou_none(),
         user_id=current_user.id_hash,
         tokens_total=conv.tokens_total or 0,
     )
-    return ConversaDetalhe(
+    return ConversationDetail(
         id=conv.id_hash,
         titulo=conv.titulo,
         workflow_id=conv.workflow_id,
-        quadros=[QuadroDoReplay(**q) for q in quadros],
+        quadros=[ReplayFrame(**q) for q in quadros],
     )
 
 
-@router.patch("/conversas/{conversa_id}", response_model=ConversaResumo, summary="Renomear")
+@router.patch("/conversas/{conversa_id}", response_model=ConversationSummary, summary="Renomear")
 async def renomear(
     conversa_id: str,
-    payload: RenomearConversa,
+    payload: RenameConversation,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    conv = await assistente_conversas.renomear_conversa(db, current_user.id_hash, conversa_id, payload.titulo)
-    return _resumo_da_conversa(conv)
+    conv = await assistente_conversas.rename_conversation(db, current_user.id_hash, conversa_id, payload.titulo)
+    return _conversation_summary(conv)
 
 
 @router.delete("/conversas/{conversa_id}", status_code=204, summary="Apagar (soft)")
@@ -655,24 +655,24 @@ async def apagar(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    await assistente_conversas.apagar_conversa(db, current_user.id_hash, conversa_id)
+    await assistente_conversas.delete_conversation(db, current_user.id_hash, conversa_id)
     return None
 
 
-@router.get("/estado", response_model=EstadoDoAssistente, summary="O assistente esta disponivel?")
+@router.get("/estado", response_model=AssistantState, summary="O assistente esta disponivel?")
 async def estado(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """No `_exigir_ligado`: answering 503 would force the panel to handle an error
+    """No `_require_enabled`: answering 503 would force the panel to handle an error
     to find out something that is just a state. The token quota is the SAME as the
     editor's (`assistente:tokens:{user}`), shared — and that is why the ceiling
     must come from the SAME place there and here, otherwise the same donut would
     show two ceilings depending on the screen that asked for it."""
     if not ASSISTENTE_ATIVO:
-        return EstadoDoAssistente(ativo=False, motivo=MOTIVO_DESLIGADO)
+        return AssistantState(ativo=False, motivo=DISABLED_REASON)
     redis = infra.redis_ou_none()
-    gasto, falta = await cotas.gasto_e_prazo(redis, current_user.id_hash)
+    gasto, falta = await cotas.spent_and_reset(redis, current_user.id_hash)
     # Both together, and not the plan followed by its ceiling: with plans, the
     # ceiling that applies may be the CONTRACTED one (higher than the current one,
     # after a downgrade), and showing the current one here would make the donut
@@ -681,11 +681,11 @@ async def estado(
     plano, teto = await teto_do_assistente.plano_e_teto(
         current_user.id_hash, db=db, redis=redis
     )
-    return EstadoDoAssistente(
+    return AssistantState(
         ativo=True,
         plano=plano,
         assinaturas_ativas=teto_do_assistente.assinaturas_ativas(),
-        cota=CotaDoAssistente(
+        cota=AssistantQuota(
             gasto=gasto,
             teto=teto,
             reabre_em_segundos=falta,

@@ -20,7 +20,7 @@ def _nd(*ids):
     return {i: {"id": i, "type": "x"} for i in ids}
 
 
-def test_target_orfao_nao_estoura_compute_order():
+def test_orphan_target_does_not_crash_compute_order():
     # Antes: KeyError('ghost') em predecessors[edge['target']].
     g = WorkflowGraph(
         _nd("a", "b"),
@@ -32,7 +32,7 @@ def test_target_orfao_nao_estoura_compute_order():
     assert "ghost" not in order
 
 
-def test_source_orfao_nao_vaza_para_a_ordem():
+def test_orphan_source_does_not_leak_into_the_order():
     # Before: 'ghost' went into predecessors[b] as a value and came out in static_order,
     # then blew up at instantiation (node_defs['ghost']).
     g = WorkflowGraph(
@@ -45,7 +45,7 @@ def test_source_orfao_nao_vaza_para_a_ordem():
     assert "ghost" not in order
 
 
-def test_aresta_orfa_nao_entra_no_incoming_outgoing():
+def test_orphan_edge_does_not_enter_incoming_outgoing():
     g = WorkflowGraph(
         _nd("a", "b"),
         [
@@ -61,7 +61,7 @@ def test_aresta_orfa_nao_entra_no_incoming_outgoing():
     assert len(g.orphan_edges) == 2
 
 
-def test_aresta_com_os_dois_endpoints_orfaos_e_descartada():
+def test_edge_with_both_endpoints_orphaned_is_dropped():
     g = WorkflowGraph(
         _nd("a", "b"),
         [{"source": "a", "target": "b"}, {"source": "x", "target": "y"}],
@@ -71,7 +71,7 @@ def test_aresta_com_os_dois_endpoints_orfaos_e_descartada():
     assert len(g.orphan_edges) == 1
 
 
-def test_grafo_valido_permanece_intacto():
+def test_valid_graph_stays_intact():
     # Guard against false positives: no legitimate edge may be discarded.
     g = WorkflowGraph(
         _nd("a", "b", "c"),
@@ -83,7 +83,7 @@ def test_grafo_valido_permanece_intacto():
     assert order.index("a") < order.index("b") < order.index("c")
 
 
-def test_orfa_logada_uma_vez(caplog):
+def test_orphan_logged_once(caplog):
     import logging
     with caplog.at_level(logging.WARNING, logger="flow.core.graph"):
         WorkflowGraph(

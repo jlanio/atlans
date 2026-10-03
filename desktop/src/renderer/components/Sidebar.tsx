@@ -12,7 +12,7 @@ import {
   TbActivity, TbAdjustments, TbCloudDataConnection, TbHandStop, TbLayoutDashboard,
   TbLoader2, TbPlayerPlayFilled, TbPlayerStopFilled,
 } from 'react-icons/tb'
-import type { EstadoApp } from '../../main/state/store.js'
+import type { AppState } from '../../main/state/store.js'
 import { Button } from './ui/button.js'
 import { cn } from '../lib/utils.js'
 
@@ -23,9 +23,9 @@ import { cn } from '../lib/utils.js'
  * footer bar button, which is how it is used — followed alongside something
  * else, not visited in its place.
  */
-export type Aba = 'painel' | 'execucoes' | 'geosync' | 'ajustes'
+export type Tab = 'painel' | 'execucoes' | 'geosync' | 'ajustes'
 
-const ITENS: Array<{ id: Aba; rotulo: string; icone: ReactNode }> = [
+const ITEMS: Array<{ id: Tab; rotulo: string; icone: ReactNode }> = [
   { id: 'painel', rotulo: 'Painel', icone: <TbLayoutDashboard size={17} /> },
   { id: 'execucoes', rotulo: 'Execuções', icone: <TbActivity size={17} /> },
   { id: 'geosync', rotulo: 'GeoSync', icone: <TbCloudDataConnection size={17} /> },
@@ -39,7 +39,7 @@ const ITENS: Array<{ id: Aba; rotulo: string; icone: ReactNode }> = [
  * click is no longer accidental, and below it the destructive button would
  * inherit the second click of someone who only wanted to stop.
  */
-const MS_ATE_LIBERAR_FORCAR = 500
+const MS_UNTIL_FORCE_ENABLED = 500
 
 /**
  * The lifecycle control — a single button that changes role with the state.
@@ -60,10 +60,10 @@ const MS_ATE_LIBERAR_FORCAR = 500
  * the force button, which is the way out of the wait. What remains is local to
  * each button, below.
  */
-function ControleExecutor({
+function ExecutorControl({
   estado, aoIniciar, aoParar, aoForcar,
 }: {
-  estado: EstadoApp
+  estado: AppState
   aoIniciar: () => void
   aoParar: () => void
   aoForcar: () => void
@@ -80,10 +80,10 @@ function ControleExecutor({
   // "Parar" and remained clickable: the second click of a double click got in
   // and requested a SECOND stop. This flag disables ONLY this button — never
   // "Forçar", which appears next.
-  const [paradaPedida, setParadaPedida] = useState(false)
+  const [stopRequested, setStopRequested] = useState(false)
   useEffect(() => {
     // Left `running`/`starting`: the request arrived and the button is already another one.
-    if (fase !== 'running' && fase !== 'starting') setParadaPedida(false)
+    if (fase !== 'running' && fase !== 'starting') setStopRequested(false)
   }, [fase])
 
   // "Forçar parada" (force stop) starts inert for half a second.
@@ -91,18 +91,18 @@ function ControleExecutor({
   // It occupies the SAME position on screen as the "Parar" that just vanished;
   // without this interval, the second click of a double click would land on it
   // and kill the runs in progress cold, without anyone having asked for that.
-  const [forcarLiberado, setForcarLiberado] = useState(false)
+  const [forceEnabled, setForceEnabled] = useState(false)
   useEffect(() => {
     if (fase !== 'draining') {
-      setForcarLiberado(false)
+      setForceEnabled(false)
       return
     }
-    const t = setTimeout(() => setForcarLiberado(true), MS_ATE_LIBERAR_FORCAR)
+    const t = setTimeout(() => setForceEnabled(true), MS_UNTIL_FORCE_ENABLED)
     return () => clearTimeout(t)
   }, [fase])
 
-  function pedirParada() {
-    setParadaPedida(true)
+  function requestStop() {
+    setStopRequested(true)
     aoParar()
   }
 
@@ -113,7 +113,7 @@ function ControleExecutor({
     case 'draining':
       return (
         <Button size="sm" variant="destructive" className={comum}
-                onClick={aoForcar} disabled={!forcarLiberado}
+                onClick={aoForcar} disabled={!forceEnabled}
                 title="Encerra agora, interrompendo as execuções em andamento">
           <TbHandStop size={15} /> Forçar parada
         </Button>
@@ -131,21 +131,21 @@ function ControleExecutor({
     case 'starting':
       return (
         <Button size="sm" variant="outline" className={comum}
-                onClick={pedirParada} disabled={paradaPedida}
+                onClick={requestStop} disabled={stopRequested}
                 title="Cancela a inicialização">
           <TbLoader2 size={15} className="animate-spin" />
-          {paradaPedida ? 'Parando…' : 'Iniciando…'}
+          {stopRequested ? 'Parando…' : 'Iniciando…'}
         </Button>
       )
 
     case 'running':
-      return paradaPedida ? (
+      return stopRequested ? (
         <Button size="sm" variant="outline" className={comum} disabled>
           <TbLoader2 size={15} className="animate-spin" /> Parando…
         </Button>
       ) : (
         <Button size="sm" variant="outline" className={comum}
-                onClick={pedirParada}
+                onClick={requestStop}
                 title="Encerra depois que as execuções em andamento terminarem">
           <TbPlayerStopFilled size={15} className="text-destructive" />
           Parar
@@ -168,11 +168,11 @@ function ControleExecutor({
 export function Sidebar({
   aba, aoTrocar, pendencias, estado, aoIniciar, aoParar, aoForcar,
 }: {
-  aba: Aba
-  aoTrocar: (a: Aba) => void
+  aba: Tab
+  aoTrocar: (a: Tab) => void
   /** Screens with unsaved changes — they get a dot in the navigation. */
-  pendencias?: Partial<Record<Aba, boolean>>
-  estado: EstadoApp
+  pendencias?: Partial<Record<Tab, boolean>>
+  estado: AppState
   aoIniciar: () => void
   aoParar: () => void
   aoForcar: () => void
@@ -181,7 +181,7 @@ export function Sidebar({
   return (
     <aside className="flex w-48 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
       <nav aria-label="Seções do aplicativo" className="flex flex-1 flex-col gap-0.5 p-2">
-        {ITENS.map((item) => {
+        {ITEMS.map((item) => {
           const ativo = aba === item.id
           const emExecucao = estado.snapshot?.running_count ?? 0
           return (
@@ -248,7 +248,7 @@ export function Sidebar({
           It sits in the bar, not in a tab header, so it stays visible while
           the user reads the log or changes the settings. */}
       <div className="border-t border-sidebar-border p-2">
-        <ControleExecutor
+        <ExecutorControl
           estado={estado}
           aoIniciar={aoIniciar} aoParar={aoParar} aoForcar={aoForcar}
         />

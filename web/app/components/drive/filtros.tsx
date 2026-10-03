@@ -19,7 +19,7 @@ interface Props {
  * text-foreground`, with the `ring-[3px]` focus pair and a 40px target on phones.
  * Before they were buttons with a literal orange border and no pressed state.
  */
-export function FiltrosDoDrive({ busca, onBusca, ext, onExt, extensoes }: Props) {
+export function DriveFilters({ busca, onBusca, ext, onExt, extensoes }: Props) {
   return (
     <div className="flex flex-wrap gap-2">
       <div className="relative min-w-[200px] flex-1">

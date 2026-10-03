@@ -18,7 +18,7 @@ import * as Estado from "@/app/components/shared/estados"
  */
 
 /** First load: the real header sits on top (`index` always renders it). */
-export function SkeletonDeExecutores() {
+export function ExecutorsSkeleton() {
   return (
     <section
       role="status"

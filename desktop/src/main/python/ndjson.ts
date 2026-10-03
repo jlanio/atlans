@@ -16,8 +16,8 @@
 //    becoming a parse error.
 import { FRAMING, type ExecutorEvent } from '../../shared/events.js'
 
-/** Ceiling for one line. Mirrors _LINHA_MAX in json_runtime.py, with headroom. */
-const LINHA_MAX = 1024 * 1024
+/** Ceiling for one line. Mirrors _LINE_MAX in json_runtime.py, with headroom. */
+const MAX_LINE = 1024 * 1024
 
 export interface NdjsonHandlers {
   /** Valid line, already parsed. */
@@ -55,7 +55,7 @@ export class NdjsonParser {
     // bound until the app process dies of memory. The remainder retained above
     // is the ONLY place where a line without `\n` can grow, so the guard lives
     // here.
-    if (this.buffer.length > LINHA_MAX) {
+    if (this.buffer.length > MAX_LINE) {
       this.handlers.onRaw(
         `[linha descartada: ${this.buffer.length} bytes sem quebra de linha]`,
       )
@@ -120,7 +120,7 @@ export class LineSplitter {
       const linha = parte.replace(/\r$/, '')
       if (linha.trim()) this.onLine(linha)
     }
-    if (this.buffer.length > LINHA_MAX) this.buffer = ''
+    if (this.buffer.length > MAX_LINE) this.buffer = ''
   }
 
   flush(): void {

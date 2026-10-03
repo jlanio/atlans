@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.core.constants import MAX_EVENTOS_NO_HISTORICO, REDIS_TTL_1H, WORKFLOW_COMPLETE_NODE
+from app.core.constants import MAX_EVENTS_IN_HISTORY, REDIS_TTL_1H, WORKFLOW_COMPLETE_NODE
 from app.models.workflow_run import WorkflowRun
 from app.services import run_events_service as RES
 
@@ -44,7 +44,7 @@ class _Pipeline:
         self.dono.executados.append(self.comandos)
 
 
-class _RedisFalso:
+class _FakeRedis:
     def __init__(self):
         self.executados = []
 
@@ -55,14 +55,14 @@ class _RedisFalso:
 
 @pytest.fixture
 def redis(monkeypatch):
-    falso = _RedisFalso()
+    falso = _FakeRedis()
     monkeypatch.setattr(RES, "get_redis_pool", lambda: falso)
     return falso
 
 
 # ── O publicador ─────────────────────────────────────────────────────────────
 
-async def test_cancelado_sai_no_formato_do_job_result(redis):
+async def test_cancelled_goes_out_in_job_result_format(redis):
     """Same format that job_result publishes for a canceled job: level
     `info`, no error taxonomy — a cancellation is not a failure."""
     await RES.publicar_conclusao(["run-1"], status="cancelled", mensagem="Cancelado antes.")
@@ -70,7 +70,7 @@ async def test_cancelado_sai_no_formato_do_job_result(redis):
     [comandos] = redis.executados
     assert [c[0] for c in comandos] == ["rpush", "ltrim", "expire", "publish"]
     assert comandos[0][1] == "workflow:run-1:history"
-    assert comandos[1][2:] == (-MAX_EVENTOS_NO_HISTORICO, -1)
+    assert comandos[1][2:] == (-MAX_EVENTS_IN_HISTORY, -1)
     assert comandos[2][2] == REDIS_TTL_1H
     assert comandos[3][1] == "workflow:run-1:events"
     # The history and the channel receive the SAME event: whoever opens the panel
@@ -85,7 +85,7 @@ async def test_cancelado_sai_no_formato_do_job_result(redis):
     assert evento["extra"] is None
 
 
-async def test_falha_leva_nivel_de_erro_e_a_taxonomia(redis):
+async def test_failure_carries_error_level_and_taxonomy(redis):
     await RES.publicar_conclusao(
         ["run-1"], status="failed", mensagem="perdido",
         extra={"error_category": "transient", "retryable": True},
@@ -96,25 +96,25 @@ async def test_falha_leva_nivel_de_erro_e_a_taxonomia(redis):
     assert evento["extra"] == {"error_category": "transient", "retryable": True}
 
 
-async def test_centenas_de_runs_vao_em_blocos(redis):
+async def test_hundreds_of_runs_go_in_batches(redis):
     """One pipeline per batch: an executor that drops with 201 runs does not turn
     into 804 sequential Redis round trips, nor a command buffer with no ceiling."""
-    ids = [f"run-{i}" for i in range(RES._BLOCO_DE_PUBLICACAO + 1)]
+    ids = [f"run-{i}" for i in range(RES._PUBLISH_CHUNK + 1)]
 
     await RES.publicar_conclusao(ids, status="failed", mensagem="x")
 
-    assert [len(p) // 4 for p in redis.executados] == [RES._BLOCO_DE_PUBLICACAO, 1]
+    assert [len(p) // 4 for p in redis.executados] == [RES._PUBLISH_CHUNK, 1]
     publicados = [c[1] for p in redis.executados for c in p if c[0] == "publish"]
     assert publicados == [f"workflow:{i}:events" for i in ids]
 
 
-async def test_lista_vazia_nao_toca_no_redis(monkeypatch):
+async def test_empty_list_does_not_touch_redis(monkeypatch):
     monkeypatch.setattr(RES, "get_redis_pool", MagicMock(side_effect=AssertionError("tocou")))
 
     await RES.publicar_conclusao([], status="failed", mensagem="x")
 
 
-async def test_orfaos_publicam_falha_repetivel(monkeypatch):
+async def test_orphans_publish_retryable_failure(monkeypatch):
     """No run closed by the watchdog failed because of its content: retrying is safe."""
     from contextlib import asynccontextmanager
 
@@ -130,11 +130,11 @@ async def test_orfaos_publicam_falha_repetivel(monkeypatch):
     db.execute = AsyncMock(side_effect=[selecionados, MagicMock(rowcount=1), MagicMock(rowcount=1)])
 
     @asynccontextmanager
-    async def _sessao():
+    async def _session():
         yield db
 
     publica = AsyncMock()
-    monkeypatch.setattr(ORF, "get_session_async", _sessao)
+    monkeypatch.setattr(ORF, "get_session_async", _session)
     monkeypatch.setattr(RES, "publicar_conclusao", publica)
     monkeypatch.setattr("app.core.run_result_consumer.account_terminal_run", AsyncMock())
 
@@ -166,7 +166,7 @@ def _db(run, rowcount=1):
     return db
 
 
-async def _cancelar(run, *, entregue, rowcount=1, publica=None, presenca=False):
+async def _cancel_run(run, *, entregue, rowcount=1, publica=None, presenca=False):
     from app.services import workflow_execution_service as svc
 
     publica = publica or AsyncMock()
@@ -182,8 +182,8 @@ async def _cancelar(run, *, entregue, rowcount=1, publica=None, presenca=False):
     return outcome, publica
 
 
-async def test_cancelar_run_na_fila_publica_a_conclusao():
-    outcome, publica = await _cancelar(_run("pending"), entregue=True)
+async def test_cancel_queued_run_publishes_the_completion():
+    outcome, publica = await _cancel_run(_run("pending"), entregue=True)
 
     assert outcome == "cancelled"
     publica.assert_awaited_once_with(
@@ -192,8 +192,8 @@ async def test_cancelar_run_na_fila_publica_a_conclusao():
     )
 
 
-async def test_cancelar_com_o_executor_fora_do_ar_publica_a_conclusao():
-    outcome, publica = await _cancelar(_run("running"), entregue=False)
+async def test_cancel_with_executor_offline_publishes_the_completion():
+    outcome, publica = await _cancel_run(_run("running"), entregue=False)
 
     assert outcome == "cancelled"
     publica.assert_awaited_once()
@@ -201,28 +201,28 @@ async def test_cancelar_com_o_executor_fora_do_ar_publica_a_conclusao():
     assert "fora do ar" in publica.await_args.kwargs["mensagem"]
 
 
-async def test_pedido_entregue_ao_executor_nao_publica():
+async def test_request_delivered_to_executor_does_not_publish():
     """The one that closes it is the executor's job_result, which publishes the
     real completion — publishing here too would be a premature 'canceled' (the
     job may finish in the meantime)."""
-    outcome, publica = await _cancelar(_run("running"), entregue=True)
+    outcome, publica = await _cancel_run(_run("running"), entregue=True)
 
     assert outcome == "requested"
     publica.assert_not_awaited()
 
 
-async def test_perder_a_corrida_para_o_resultado_nao_publica():
+async def test_losing_the_race_to_the_result_does_not_publish():
     run = _run("running")
-    outcome, publica = await _cancelar(run, entregue=False, rowcount=0)
+    outcome, publica = await _cancel_run(run, entregue=False, rowcount=0)
 
     assert outcome == "already_finished"
     publica.assert_not_awaited()
 
 
-async def test_redis_fora_nao_desfaz_o_cancelamento():
+async def test_redis_down_does_not_undo_the_cancellation():
     """Best-effort: the run is already closed in the database; the panel finds
     out when it reopens."""
-    outcome, _ = await _cancelar(
+    outcome, _ = await _cancel_run(
         _run("running"), entregue=False, publica=AsyncMock(side_effect=ConnectionError("redis")),
     )
 
@@ -230,7 +230,7 @@ async def test_redis_fora_nao_desfaz_o_cancelamento():
 
 
 @pytest.mark.parametrize("presenca", [True, None])
-async def test_envio_que_falha_com_o_executor_vivo_nao_fecha_o_run(presenca):
+async def test_failed_send_with_executor_alive_does_not_close_the_run(presenca):
     """`send_json` also fails with the executor online (signing key missing,
     relay restarting, Redis erroring). Closing the run in those cases would
     report "cancelado" with the job running — it stays a 503, as before."""
@@ -238,6 +238,6 @@ async def test_envio_que_falha_com_o_executor_vivo_nao_fecha_o_run(presenca):
 
     run = _run("running")
     with pytest.raises(NoExecutorAvailableError):
-        await _cancelar(run, entregue=False, presenca=presenca)
+        await _cancel_run(run, entregue=False, presenca=presenca)
 
     assert run.status == "running"

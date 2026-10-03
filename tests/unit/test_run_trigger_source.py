@@ -49,11 +49,11 @@ def _db_dispatch(rowcount=1):
     return db
 
 
-def _runs_adicionados(db) -> list[WorkflowRun]:
+def _added_runs(db) -> list[WorkflowRun]:
     return [c.args[0] for c in db.add.call_args_list if isinstance(c.args[0], WorkflowRun)]
 
 
-def _servico_com_dispatch_capturado():
+def _service_with_captured_dispatch():
     """WorkflowService with everything before dispatch mocked; returns (service, kwargs)."""
     wf = _wf()
     db = MagicMock()
@@ -82,8 +82,8 @@ def _patches_do_start_analysis():
 # ══════════════════════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio
-async def test_start_analysis_repassa_origem_autor_e_agendamento():
-    service, capturado = _servico_com_dispatch_capturado()
+async def test_start_analysis_passes_source_author_and_schedule():
+    service, capturado = _service_with_captured_dispatch()
     a, b, c = _patches_do_start_analysis()
     with a, b, c:
         await service.start_analysis(
@@ -96,8 +96,8 @@ async def test_start_analysis_repassa_origem_autor_e_agendamento():
 
 
 @pytest.mark.asyncio
-async def test_start_analysis_agendado_leva_schedule_id():
-    service, capturado = _servico_com_dispatch_capturado()
+async def test_scheduled_start_analysis_carries_schedule_id():
+    service, capturado = _service_with_captured_dispatch()
     a, b, c = _patches_do_start_analysis()
     with a, b, c:
         await service.start_analysis(
@@ -110,9 +110,9 @@ async def test_start_analysis_agendado_leva_schedule_id():
 
 
 @pytest.mark.asyncio
-async def test_chamador_antigo_sem_os_parametros_novos_continua_funcionando():
+async def test_old_caller_without_the_new_parameters_keeps_working():
     """Compatibility: a caller that passes nothing falls back to "manual" with no author."""
-    service, capturado = _servico_com_dispatch_capturado()
+    service, capturado = _service_with_captured_dispatch()
     a, b, c = _patches_do_start_analysis()
     with a, b, c:
         result = await service.start_analysis("wf-1", inputs={}, autenticar_entrada=False)
@@ -136,7 +136,7 @@ def _patches_do_dispatch(reg):
 
 
 @pytest.mark.asyncio
-async def test_insert_do_run_pending_grava_os_tres_rotulos():
+async def test_pending_run_insert_writes_the_three_labels():
     reg = MagicMock(); reg.send_job = AsyncMock(return_value=True)
     db = _db_dispatch()
     a, b, c, d = _patches_do_dispatch(reg)
@@ -145,7 +145,7 @@ async def test_insert_do_run_pending_grava_os_tres_rotulos():
             _wf(), _wf().definition, [_executor()], {}, False, db=db,
             trigger_source="schedule", triggered_by=None, schedule_id=7,
         )
-    run = _runs_adicionados(db)[0]
+    run = _added_runs(db)[0]
     assert result.id == run.task_id
     assert run.trigger_source == "schedule"
     assert run.triggered_by is None
@@ -157,19 +157,19 @@ async def test_insert_do_run_pending_grava_os_tres_rotulos():
 
 
 @pytest.mark.asyncio
-async def test_dispatch_sem_rotulos_grava_nulos():
+async def test_dispatch_without_labels_writes_nulls():
     """`_dispatch_job` chamado direto (testes antigos, chamadores legados)."""
     reg = MagicMock(); reg.send_job = AsyncMock(return_value=True)
     db = _db_dispatch()
     a, b, c, d = _patches_do_dispatch(reg)
     with a, b, c, d:
         await wes._dispatch_job(_wf(), _wf().definition, [_executor()], {}, False, db=db)
-    run = _runs_adicionados(db)[0]
+    run = _added_runs(db)[0]
     assert run.trigger_source is None and run.triggered_by is None and run.schedule_id is None
 
 
 @pytest.mark.asyncio
-async def test_despacho_esgotado_marca_no_executor():
+async def test_exhausted_dispatch_marks_no_executor():
     """All of them refuse: the column's category is the FIXED one ("no_executor"),
     not the exception's granular one — "no_executor_chain" does not even fit in VARCHAR(16)."""
     reg = MagicMock(); reg.send_job = AsyncMock(return_value=False)
@@ -182,7 +182,7 @@ async def test_despacho_esgotado_marca_no_executor():
     with a, b, c, d:
         with pytest.raises(NoExecutorAvailableError) as exc:
             await wes._dispatch_job(_wf(), _wf().definition, cadeia, {}, False, db=db, trigger_source="manual")
-    run = _runs_adicionados(db)[0]
+    run = _added_runs(db)[0]
     assert run.status == "failed"
     assert run.error_category == "no_executor"
     assert len(run.error_category) <= 16
@@ -191,7 +191,7 @@ async def test_despacho_esgotado_marca_no_executor():
 
 
 @pytest.mark.asyncio
-async def test_barreira_de_isolamento_marca_isolation():
+async def test_isolation_barrier_marks_isolation():
     intruso = _executor("pool-a")
     cadeia = wes.CandidateList([intruso], tiers={"pool-a": "pool"}, allowed={"geo-01"}, mode="isolated")
     reg = MagicMock(); reg.send_job = AsyncMock(return_value=True)
@@ -200,14 +200,14 @@ async def test_barreira_de_isolamento_marca_isolation():
     with a, b, c, d:
         with pytest.raises(NoExecutorAvailableError):
             await wes._dispatch_job(_wf(), _wf().definition, cadeia, {}, False, db=db)
-    run = _runs_adicionados(db)[0]
+    run = _added_runs(db)[0]
     assert run.status == "failed"
     assert run.error_category == "isolation"
     reg.send_job.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_excecao_no_despacho_marca_dispatch():
+async def test_exception_in_dispatch_marks_dispatch():
     reg = MagicMock(); reg.send_job = AsyncMock(return_value=True)
     db = _db_dispatch()
     with patch.object(wes, "executor_registry", reg), \
@@ -215,13 +215,13 @@ async def test_excecao_no_despacho_marca_dispatch():
          patch("app.core.run_result_consumer.account_terminal_run", AsyncMock()):
         with pytest.raises(TypeError):
             await wes._dispatch_job(_wf(), _wf().definition, [_executor()], {}, False, db=db)
-    run = _runs_adicionados(db)[0]
+    run = _added_runs(db)[0]
     assert run.status == "failed"
     assert run.error_category == "dispatch"
 
 
 @pytest.mark.asyncio
-async def test_rede_de_seguranca_nao_reescreve_categoria_do_despacho_esgotado():
+async def test_safety_net_does_not_rewrite_the_exhausted_dispatch_category():
     """`_close_orphan_dispatch` is idempotent: path (4) already closed the run
     with "no_executor" and the outer except must not change it to "dispatch"."""
     reg = MagicMock(); reg.send_job = AsyncMock(return_value=False)
@@ -230,7 +230,7 @@ async def test_rede_de_seguranca_nao_reescreve_categoria_do_despacho_esgotado():
     with a, b, c, d:
         with pytest.raises(NoExecutorAvailableError):
             await wes._dispatch_job(_wf(), _wf().definition, [_executor()], {}, False, db=db)
-    assert _runs_adicionados(db)[0].error_category == "no_executor"
+    assert _added_runs(db)[0].error_category == "no_executor"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -238,7 +238,7 @@ async def test_rede_de_seguranca_nao_reescreve_categoria_do_despacho_esgotado():
 # ══════════════════════════════════════════════════════════════════════════════
 
 @pytest.fixture
-def rota_com_servico(client, mock_current_user):
+def route_with_service(client, mock_current_user):
     from app.api.dependencies import (
         get_accessible_workflow_with_role,
         get_workflow_service,
@@ -252,18 +252,18 @@ def rota_com_servico(client, mock_current_user):
     async def _svc():
         return svc
 
-    async def _wf_com_papel(id_hash: str):
+    async def _wf_with_role(id_hash: str):
         return _wf(id_hash), "owner"
 
     app.dependency_overrides[get_workflow_service] = _svc
-    app.dependency_overrides[get_accessible_workflow_with_role] = _wf_com_papel
+    app.dependency_overrides[get_accessible_workflow_with_role] = _wf_with_role
     yield client, svc, mock_current_user
     for dep in (get_workflow_service, get_accessible_workflow_with_role):
         app.dependency_overrides.pop(dep, None)
 
 
-async def test_execute_dispara_como_manual_com_o_usuario(rota_com_servico):
-    ac, svc, usuario = rota_com_servico
+async def test_execute_triggers_as_manual_with_the_user(route_with_service):
+    ac, svc, usuario = route_with_service
     resp = await ac.post("/workflows/wf-1/execute", json={"inputs": {}})
     assert resp.status_code == 202, resp.text
     kwargs = svc.start_analysis.await_args.kwargs
@@ -272,8 +272,8 @@ async def test_execute_dispara_como_manual_com_o_usuario(rota_com_servico):
     assert "schedule_id" not in kwargs or kwargs["schedule_id"] is None
 
 
-async def test_retry_dispara_como_retry_com_o_usuario(rota_com_servico):
-    ac, svc, usuario = rota_com_servico
+async def test_retry_triggers_as_retry_with_the_user(route_with_service):
+    ac, svc, usuario = route_with_service
     # The route validates that the run exists and belongs to the workflow.
     from app.api.dependencies import get_db
     from app.main import app
@@ -295,7 +295,7 @@ async def test_retry_dispara_como_retry_com_o_usuario(rota_com_servico):
     assert kwargs["triggered_by"] == usuario.id_hash
 
 
-async def test_webhook_dispara_como_webhook_sem_usuario(client):
+async def test_webhook_triggers_as_webhook_without_user(client):
     """No `triggered_by`: the caller is an external system — inventing an owner
     would open private credentials to whoever only holds the trigger token."""
     from app.api.dependencies import get_workflow_service
@@ -320,7 +320,7 @@ async def test_webhook_dispara_como_webhook_sem_usuario(client):
 # Scheduler: schedule + schedule_id on the happy path AND on the failure one
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _sessao(db):
+def _session(db):
     @asynccontextmanager
     async def _ctx():
         yield db
@@ -328,14 +328,14 @@ def _sessao(db):
 
 
 @pytest.mark.asyncio
-async def test_agendador_rotula_o_despacho_normal():
+async def test_scheduler_labels_the_normal_dispatch():
     from app.core.async_scheduler import AsyncScheduler
 
     db = MagicMock(); db.add = MagicMock(); db.commit = AsyncMock()
     service = MagicMock()
     service.get_workflow_by_hash = AsyncMock(return_value=_wf())
     service.start_analysis = AsyncMock(return_value=MagicMock(id="task-1"))
-    with patch("app.core.async_scheduler.AsyncSessionLocal", _sessao(db)), \
+    with patch("app.core.async_scheduler.AsyncSessionLocal", _session(db)), \
          patch("app.services.workflow_service.WorkflowService", MagicMock(return_value=service)), \
          patch("app.services.execution_alert_service.record_success", AsyncMock(return_value=False)):
         await AsyncScheduler()._fire_workflow("wf-1", schedule_id=7)
@@ -346,7 +346,7 @@ async def test_agendador_rotula_o_despacho_normal():
 
 
 @pytest.mark.asyncio
-async def test_agendador_sem_executor_rotula_o_run_sintetico():
+async def test_scheduler_without_executor_labels_the_synthetic_run():
     from app.core.async_scheduler import AsyncScheduler
 
     db = MagicMock(); db.add = MagicMock(); db.commit = AsyncMock()
@@ -355,7 +355,7 @@ async def test_agendador_sem_executor_rotula_o_run_sintetico():
     service.start_analysis = AsyncMock(
         side_effect=NoExecutorAvailableError("Pool vazio.", category="no_dedicated_executor"),
     )
-    with patch("app.core.async_scheduler.AsyncSessionLocal", _sessao(db)), \
+    with patch("app.core.async_scheduler.AsyncSessionLocal", _session(db)), \
          patch("app.services.workflow_service.WorkflowService", MagicMock(return_value=service)), \
          patch("app.core.run_result_consumer.account_terminal_run", AsyncMock()), \
          patch("app.services.execution_alert_service.record_failure", AsyncMock(return_value=True)):
@@ -383,7 +383,7 @@ def _payload(status, categoria=None):
 
 
 @pytest.mark.asyncio
-async def test_consumer_grava_categoria_do_flow_no_run_failed():
+async def test_consumer_writes_the_flow_category_on_the_failed_run():
     from app.core.run_result_consumer import _update_run_status
 
     run, db = MagicMock(), MagicMock(commit=AsyncMock())
@@ -392,7 +392,7 @@ async def test_consumer_grava_categoria_do_flow_no_run_failed():
 
 
 @pytest.mark.asyncio
-async def test_consumer_nao_carimba_categoria_em_sucesso_nem_cancelamento():
+async def test_consumer_does_not_stamp_category_on_success_or_cancellation():
     from app.core.run_result_consumer import _update_run_status
 
     for status in ("success", "cancelled"):
@@ -403,7 +403,7 @@ async def test_consumer_nao_carimba_categoria_em_sucesso_nem_cancelamento():
 
 
 @pytest.mark.asyncio
-async def test_consumer_ignora_categoria_fora_do_vocabulario():
+async def test_consumer_ignores_category_outside_the_vocabulary():
     """An executor outside the taxonomy must not bring down the closing commit —
     nor store a mangled text ("no_executor_chai") that the screen would group
     as if it were another category: outside the vocabulary, it stays None."""
@@ -427,7 +427,7 @@ async def test_consumer_ignora_categoria_fora_do_vocabulario():
 # ══════════════════════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio
-async def test_orfaos_do_executor_recebem_executor_lost(monkeypatch):
+async def test_executor_orphans_get_executor_lost(monkeypatch):
     from app.api.routers.executor_ws import orfaos as R
 
     orfao = WorkflowRun(
@@ -448,13 +448,13 @@ async def test_orfaos_do_executor_recebem_executor_lost(monkeypatch):
         async def execute(self): return []
 
     rc = MagicMock(); rc.pipeline = MagicMock(return_value=_Pipe())
-    monkeypatch.setattr(R, "get_session_async", _sessao(db))
+    monkeypatch.setattr(R, "get_session_async", _session(db))
     with patch("app.core.redis.get_redis_pool", return_value=rc), \
-         patch("app.core.run_result_consumer.account_terminal_run", AsyncMock()) as contabiliza:
+         patch("app.core.run_result_consumer.account_terminal_run", AsyncMock()) as account_terminal:
         await R._fail_orphan_runs("ex-1")
 
     assert orfao.status == "failed"
     assert orfao.error_category == "executor_lost"
     assert orfao.error_message == "Executor desconectou durante a execução."
-    contabiliza.assert_awaited_once()
+    account_terminal.assert_awaited_once()
     db.commit.assert_awaited()

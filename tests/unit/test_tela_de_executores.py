@@ -23,18 +23,18 @@ import pytest
 from app.api.routers import executores_router as R
 from app.core import executor_connections as ec
 
-from ._mcp_harness import RedisFalso, banco_de_executores
-from ._rotas import rotas_efetivas
+from ._mcp_harness import FakeRedis, executors_db
+from ._rotas import effective_routes
 
-_AGORA = datetime(2026, 9, 27, 12, 0, tzinfo=timezone.utc)
-_CONECTOU = _AGORA - timedelta(days=3)
+_NOW = datetime(2026, 9, 27, 12, 0, tzinfo=timezone.utc)
+_CONNECTED_AT = _NOW - timedelta(days=3)
 
 
 # ── Factories ─────────────────────────────────────────────────────────────────
 
 @pytest.fixture
 def redis(monkeypatch):
-    rc = RedisFalso()
+    rc = FakeRedis()
 
     async def _get_redis():
         return rc
@@ -51,15 +51,15 @@ def _executor(id_hash: str, *, last_seen_at: datetime | None = None, system_info
         max_concurrent_jobs=4, max_queue_size=50, executor_version="2.0",
         system_info=system_info,
         last_seen_at=last_seen_at.replace(tzinfo=None) if last_seen_at else None,
-        created_at=_AGORA.replace(tzinfo=None) - timedelta(days=30), created_by="usr-1",
+        created_at=_NOW.replace(tzinfo=None) - timedelta(days=30), created_by="usr-1",
     )
 
 
-def _capacidade(running: int, queued: int = 0, **extra) -> dict:
+def _capacity(running: int, queued: int = 0, **extra) -> dict:
     return {"queued": queued, "running": running, "max_concurrent": 4, "max_queue": 50, **extra}
 
 
-async def _no_ar(redis, executor_id: str, capacidade: dict, *, conectou_em=_CONECTOU) -> ec.ExecutorConnection:
+async def _no_ar(redis, executor_id: str, capacidade: dict, *, conectou_em=_CONNECTED_AT) -> ec.ExecutorConnection:
     """What the WebSocket's worker leaves in Redis — presence and capacity — and
     the connection that only it has."""
     redis.dados[ec._presence_key(executor_id)] = "1"
@@ -76,7 +76,7 @@ def _worker(*conexoes: ec.ExecutorConnection) -> ec.ExecutorConnectionRegistry:
     return reg
 
 
-async def _listar(monkeypatch, worker, executores) -> dict[str, dict]:
+async def _list_schedules(monkeypatch, worker, executores) -> dict[str, dict]:
     monkeypatch.setattr(R, "executor_registry", worker)
     monkeypatch.setattr(R.executor_service, "list_agents", AsyncMock(return_value=executores))
     resposta = await R.list_agents(executor_type=None, db=MagicMock(), _=None)
@@ -86,27 +86,27 @@ async def _listar(monkeypatch, worker, executores) -> dict[str, dict]:
 # ── The regression: the same response on any worker ─────────────────────────
 
 @pytest.mark.asyncio
-async def test_lista_e_a_mesma_no_worker_do_websocket_e_nos_outros(redis, monkeypatch):
-    lotado = _capacidade(4, queued=2, disk_free_gb=120.5, ram_available_gb=7.25)
+async def test_list_is_the_same_on_the_websocket_worker_and_the_others(redis, monkeypatch):
+    full_capacity = _capacity(4, queued=2, disk_free_gb=120.5, ram_available_gb=7.25)
     # The connection is created a few ms before the handshake stamp in the
     # database: if the WebSocket's worker used its `connected_at`, the responses
     # differed and the row re-rendered on every refresh that landed on a
     # different worker.
-    conn = await _no_ar(redis, "ex-1", lotado, conectou_em=_CONECTOU - timedelta(milliseconds=300))
+    conn = await _no_ar(redis, "ex-1", full_capacity, conectou_em=_CONNECTED_AT - timedelta(milliseconds=300))
     conn.system_info = {"hostname": "so-na-memoria"}
-    executores = [_executor("ex-1", last_seen_at=_CONECTOU,
+    executores = [_executor("ex-1", last_seen_at=_CONNECTED_AT,
                             system_info={"hostname": "maq-1", "disk_total_gb": 500})]
 
-    no_worker_do_ws = await _listar(monkeypatch, _worker(conn), executores)
-    em_outro_worker = await _listar(monkeypatch, _worker(), executores)
+    no_worker_do_ws = await _list_schedules(monkeypatch, _worker(conn), executores)
+    on_other_worker = await _list_schedules(monkeypatch, _worker(), executores)
 
-    assert em_outro_worker == no_worker_do_ws
-    item = em_outro_worker["ex-1"]
+    assert on_other_worker == no_worker_do_ws
+    item = on_other_worker["ex-1"]
     assert item["online"] is True
     # Before: capacity None outside the WS worker — the gauge showed "0/4".
     assert item["capacity"]["running"] == 4 and item["capacity"]["queued"] == 2
     # Before: connected_at None — the cell fell back to "visto há 3 dias".
-    assert datetime.fromisoformat(item["connected_at"]) == _CONECTOU
+    assert datetime.fromisoformat(item["connected_at"]) == _CONNECTED_AT
     # Free disk and RAM also come from the published capacity.
     assert item["system_info"] == {
         "hostname": "maq-1", "disk_total_gb": 500, "disk_free_gb": 120.5, "ram_available_gb": 7.25,
@@ -114,14 +114,14 @@ async def test_lista_e_a_mesma_no_worker_do_websocket_e_nos_outros(redis, monkey
 
 
 @pytest.mark.asyncio
-async def test_offline_nao_mostra_capacidade_que_sobrou_no_redis(redis, monkeypatch):
+async def test_offline_does_not_show_capacity_left_in_redis(redis, monkeypatch):
     """The copy of the capacity in Redis can outlive the presence (the removal on
     unregister failed; the keys expire at different moments): it must not
     show up as the current load of someone who has already left."""
-    await ec._redis_store_capacity("ex-caiu", _capacidade(4))   # no presence
-    executores = [_executor("ex-caiu", last_seen_at=_CONECTOU)]
+    await ec._redis_store_capacity("ex-caiu", _capacity(4))   # no presence
+    executores = [_executor("ex-caiu", last_seen_at=_CONNECTED_AT)]
 
-    item = (await _listar(monkeypatch, _worker(), executores))["ex-caiu"]
+    item = (await _list_schedules(monkeypatch, _worker(), executores))["ex-caiu"]
 
     assert item["online"] is False
     assert item["capacity"] is None
@@ -129,17 +129,17 @@ async def test_offline_nao_mostra_capacidade_que_sobrou_no_redis(redis, monkeypa
 
 
 @pytest.mark.asyncio
-async def test_presenca_e_capacidade_numa_ida_so_ao_redis(redis, monkeypatch):
+async def test_presence_and_capacity_in_a_single_redis_round_trip(redis, monkeypatch):
     """One MGET with both keys of each executor — not one EXISTS and one GET per
     executor —, including the one whose WebSocket is on this worker."""
-    local = await _no_ar(redis, "ex-local", _capacidade(1))
-    await _no_ar(redis, "ex-a", _capacidade(2))
-    await _no_ar(redis, "ex-b", _capacidade(3))
+    local = await _no_ar(redis, "ex-local", _capacity(1))
+    await _no_ar(redis, "ex-a", _capacity(2))
+    await _no_ar(redis, "ex-b", _capacity(3))
     redis.chamadas.clear()
     ids = ("ex-local", "ex-a", "ex-b")
-    executores = [_executor(i, last_seen_at=_CONECTOU) for i in ids]
+    executores = [_executor(i, last_seen_at=_CONNECTED_AT) for i in ids]
 
-    itens = await _listar(monkeypatch, _worker(local), executores)
+    itens = await _list_schedules(monkeypatch, _worker(local), executores)
 
     assert {i: itens[i]["capacity"]["running"] for i in itens} == {"ex-local": 1, "ex-a": 2, "ex-b": 3}
     leituras = [c for c in redis.chamadas if c[0] in ("get", "mget", "exists")]
@@ -148,32 +148,32 @@ async def test_presenca_e_capacidade_numa_ida_so_ao_redis(redis, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_cache_de_presenca_do_worker_nao_vale_para_a_tela(redis, monkeypatch):
+async def test_worker_presence_cache_does_not_apply_to_the_screen(redis, monkeypatch):
     """`is_online` caches "online" for 5 s on a worker: right after the drop,
     that worker showed the executor as up ("no ar há 1 s", "0/4") and the others
     did not. The screen reads presence from Redis, the same for everyone."""
     import time
 
-    await ec._redis_store_capacity("ex-1", _capacidade(2))   # left over; the presence is already gone
+    await ec._redis_store_capacity("ex-1", _capacity(2))   # left over; the presence is already gone
     worker = _worker()
     worker._presence_cache["ex-1"] = (True, time.monotonic())
-    executores = [_executor("ex-1", last_seen_at=_CONECTOU)]
+    executores = [_executor("ex-1", last_seen_at=_CONNECTED_AT)]
 
-    item = (await _listar(monkeypatch, worker, executores))["ex-1"]
+    item = (await _list_schedules(monkeypatch, worker, executores))["ex-1"]
 
     assert (item["online"], item["capacity"], item["connected_at"]) == (False, None, None)
 
 
 @pytest.mark.asyncio
-async def test_redis_fora_todos_offline(monkeypatch):
-    async def _redis_fora():
+async def test_redis_down_all_offline(monkeypatch):
+    async def _redis_down():
         raise ConnectionError("redis fora")
 
-    monkeypatch.setattr(ec, "_get_redis", _redis_fora)
+    monkeypatch.setattr(ec, "_get_redis", _redis_down)
     monkeypatch.setattr(ec, "_reset_redis_singleton", AsyncMock())
-    executores = [_executor(i, last_seen_at=_CONECTOU) for i in ("ex-1", "ex-2")]
+    executores = [_executor(i, last_seen_at=_CONNECTED_AT) for i in ("ex-1", "ex-2")]
 
-    itens = await _listar(monkeypatch, _worker(), executores)
+    itens = await _list_schedules(monkeypatch, _worker(), executores)
 
     assert {i: (itens[i]["online"], itens[i]["capacity"]) for i in itens} == {
         "ex-1": (False, None), "ex-2": (False, None),
@@ -181,7 +181,7 @@ async def test_redis_fora_todos_offline(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_sessao_substituida_nao_publica_capacidade_por_cima_da_nova(redis, monkeypatch):
+async def test_replaced_session_does_not_publish_capacity_over_the_new_one(redis, monkeypatch):
     """The presence renewal discovers that another session is the owner and drops
     this one; publishing the capacity right afterwards overwrote the new
     session's capacity in Redis — on the screen and in dispatch — until it
@@ -189,40 +189,40 @@ async def test_sessao_substituida_nao_publica_capacidade_por_cima_da_nova(redis,
     import json
 
     antiga = ec.ExecutorConnection(executor_id="ex-1", websocket=MagicMock())
-    worker_antigo = _worker(antiga)
+    old_worker = _worker(antiga)
 
-    async def _perdeu_a_posse(conn):
-        worker_antigo._connections.pop(conn.executor_id, None)   # what unregister does
+    async def _lost_ownership(conn):
+        old_worker._connections.pop(conn.executor_id, None)   # what unregister does
 
-    worker_antigo._renew_presence_or_drop = _perdeu_a_posse
-    await ec._redis_store_capacity("ex-1", _capacidade(1))       # the new session's one
+    old_worker._renew_presence_or_drop = _lost_ownership
+    await ec._redis_store_capacity("ex-1", _capacity(1))       # the new session's one
 
-    await worker_antigo.update_capacity("ex-1", _capacidade(3, queued=5))
+    await old_worker.update_capacity("ex-1", _capacity(3, queued=5))
 
     assert json.loads(redis.dados[ec._capacity_key("ex-1")])["running"] == 1
 
 
 @pytest.mark.asyncio
-async def test_disco_e_ram_iguais_em_todos_os_workers(redis, monkeypatch):
+async def test_disk_and_ram_equal_on_all_workers(redis, monkeypatch):
     """The copy in Redis is only rewritten when the load changes (or every 30 s):
     with the load idle and RAM dropping, the WebSocket's worker read 3.2 GB from
     memory and the others 7.9 GB from Redis — the number changed on every list
     refresh."""
-    conn = await _no_ar(redis, "ex-1", _capacidade(2, ram_available_gb=7.9, disk_free_gb=100.0))
+    conn = await _no_ar(redis, "ex-1", _capacity(2, ram_available_gb=7.9, disk_free_gb=100.0))
     dono = _worker(conn)
     dono._renew_presence_or_drop = AsyncMock()
     for ram in (6.1, 3.2):                          # two reports, same load
-        await dono.update_capacity("ex-1", _capacidade(2, ram_available_gb=ram, disk_free_gb=100.0))
-    executores = [_executor("ex-1", last_seen_at=_CONECTOU, system_info={"ram_total_gb": 16})]
+        await dono.update_capacity("ex-1", _capacity(2, ram_available_gb=ram, disk_free_gb=100.0))
+    executores = [_executor("ex-1", last_seen_at=_CONNECTED_AT, system_info={"ram_total_gb": 16})]
 
-    no_worker_do_ws = await _listar(monkeypatch, dono, executores)
-    em_outro_worker = await _listar(monkeypatch, _worker(), executores)
+    no_worker_do_ws = await _list_schedules(monkeypatch, dono, executores)
+    on_other_worker = await _list_schedules(monkeypatch, _worker(), executores)
 
-    assert em_outro_worker == no_worker_do_ws
+    assert on_other_worker == no_worker_do_ws
 
 
 @pytest.mark.asyncio
-async def test_copia_do_redis_e_revalidada_antes_de_ir_para_a_tela(redis, monkeypatch):
+async def test_redis_copy_is_revalidated_before_reaching_the_screen(redis, monkeypatch):
     """Redis is not trusted territory: a field outside the contract does not get
     through, an invalid measurement becomes None and an invalid counter discards
     the capacity."""
@@ -231,11 +231,11 @@ async def test_copia_do_redis_e_revalidada_antes_de_ir_para_a_tela(redis, monkey
     redis.dados[ec._presence_key("ex-1")] = "1"
     redis.dados[ec._presence_key("ex-2")] = "1"
     redis.dados[ec._capacity_key("ex-1")] = json.dumps(
-        {**_capacidade(2), "ram_available_gb": "muito", "disk_free_gb": -1, "html": "<b>x</b>"})
-    redis.dados[ec._capacity_key("ex-2")] = json.dumps({**_capacidade(2), "running": "dois"})
-    executores = [_executor(i, last_seen_at=_CONECTOU, system_info={"hostname": "maq"}) for i in ("ex-1", "ex-2")]
+        {**_capacity(2), "ram_available_gb": "muito", "disk_free_gb": -1, "html": "<b>x</b>"})
+    redis.dados[ec._capacity_key("ex-2")] = json.dumps({**_capacity(2), "running": "dois"})
+    executores = [_executor(i, last_seen_at=_CONNECTED_AT, system_info={"hostname": "maq"}) for i in ("ex-1", "ex-2")]
 
-    itens = await _listar(monkeypatch, _worker(), executores)
+    itens = await _list_schedules(monkeypatch, _worker(), executores)
 
     assert itens["ex-1"]["capacity"] == {"queued": 0, "running": 2, "max_concurrent": 4, "max_queue": 50,
                                          "disk_free_gb": None, "ram_available_gb": None}
@@ -244,12 +244,12 @@ async def test_copia_do_redis_e_revalidada_antes_de_ir_para_a_tela(redis, monkey
 
 
 @pytest.mark.asyncio
-async def test_meus_executores_le_de_qualquer_worker(redis, monkeypatch):
+async def test_my_executors_reads_from_any_worker(redis, monkeypatch):
     """The non-admin route builds dicts (last_seen_at already in ISO, no time zone)."""
-    await _no_ar(redis, "ex-1", _capacidade(2))
+    await _no_ar(redis, "ex-1", _capacity(2))
     monkeypatch.setattr(R, "executor_registry", _worker())
     monkeypatch.setattr(R.user_executor_service, "get_user_accessible_agents", AsyncMock(return_value=[
-        {"id_hash": "ex-1", "last_seen_at": _CONECTOU.replace(tzinfo=None).isoformat()},
+        {"id_hash": "ex-1", "last_seen_at": _CONNECTED_AT.replace(tzinfo=None).isoformat()},
         {"id_hash": "ex-2", "last_seen_at": None},
     ]))
 
@@ -257,7 +257,7 @@ async def test_meus_executores_le_de_qualquer_worker(redis, monkeypatch):
 
     assert itens["ex-1"]["online"] is True
     assert itens["ex-1"]["capacity"]["running"] == 2
-    assert datetime.fromisoformat(itens["ex-1"]["connected_at"]) == _CONECTOU
+    assert datetime.fromisoformat(itens["ex-1"]["connected_at"]) == _CONNECTED_AT
     assert itens["ex-2"] == {"id_hash": "ex-2", "last_seen_at": None,
                              "online": False, "capacity": None, "connected_at": None}
 
@@ -265,23 +265,23 @@ async def test_meus_executores_le_de_qualquer_worker(redis, monkeypatch):
 # ── "Conectado desde" ─────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("last_seen_at", [
-    _CONECTOU.replace(tzinfo=None),                 # database column: UTC without time zone
-    _CONECTOU.replace(tzinfo=None).isoformat(),     # dict from `my_agents`
-    _CONECTOU,                                      # already with time zone
+    _CONNECTED_AT.replace(tzinfo=None),                 # database column: UTC without time zone
+    _CONNECTED_AT.replace(tzinfo=None).isoformat(),     # dict from `my_agents`
+    _CONNECTED_AT,                                      # already with time zone
 ])
-def test_conectado_desde_e_o_last_seen_em_utc(last_seen_at):
-    desde = R._conectado_desde(True, last_seen_at)
+def test_connected_since_is_the_last_seen_in_utc(last_seen_at):
+    desde = R._connected_since(True, last_seen_at)
     assert desde.endswith("+00:00")                 # the front end reads no-time-zone as UTC; with a time zone there is no doubt
-    assert datetime.fromisoformat(desde) == _CONECTOU
+    assert datetime.fromisoformat(desde) == _CONNECTED_AT
 
 
-def test_offline_nao_tem_sessao():
-    assert R._conectado_desde(False, _CONECTOU) is None
-    assert R._conectado_desde(True, None) is None
+def test_offline_has_no_session():
+    assert R._connected_since(False, _CONNECTED_AT) is None
+    assert R._connected_since(True, None) is None
 
 
 @pytest.mark.asyncio
-async def test_fim_de_sessao_so_avanca_o_last_seen():
+async def test_session_end_only_advances_the_last_seen():
     """The end of a replaced session arrives after the new one's handshake;
     written unconditionally, it erased the new one's "no ar desde" (up since) on
     the other workers."""
@@ -290,29 +290,29 @@ async def test_fim_de_sessao_so_avanca_o_last_seen():
     from app.models.executor import Executor
     from app.services.executor_service import registrar_fim_da_sessao
 
-    inicio_da_nova = _CONECTOU.replace(tzinfo=None)
-    async with banco_de_executores() as Sessao:
-        async with Sessao() as db:
-            db.add(Executor(id_hash="ex-1", name="ex-1", last_seen_at=inicio_da_nova))
+    new_session_start = _CONNECTED_AT.replace(tzinfo=None)
+    async with executors_db() as SessionMaker:
+        async with SessionMaker() as db:
+            db.add(Executor(id_hash="ex-1", name="ex-1", last_seen_at=new_session_start))
             await db.commit()
 
-        async def _gravado():
-            async with Sessao() as db:
+        async def _stored_last_seen():
+            async with SessionMaker() as db:
                 return (await db.execute(select(Executor.last_seen_at).where(Executor.id_hash == "ex-1"))).scalar_one()
 
         # The old session ends now, but its last contact is earlier.
-        async with Sessao() as db:
-            await registrar_fim_da_sessao(db, "ex-1", inicio_da_nova - timedelta(seconds=40))
-        assert await _gravado() == inicio_da_nova
+        async with SessionMaker() as db:
+            await registrar_fim_da_sessao(db, "ex-1", new_session_start - timedelta(seconds=40))
+        assert await _stored_last_seen() == new_session_start
         # The end of the current session moves forward.
-        async with Sessao() as db:
-            await registrar_fim_da_sessao(db, "ex-1", inicio_da_nova + timedelta(hours=5))
-        assert await _gravado() == inicio_da_nova + timedelta(hours=5)
+        async with SessionMaker() as db:
+            await registrar_fim_da_sessao(db, "ex-1", new_session_start + timedelta(hours=5))
+        assert await _stored_last_seen() == new_session_start + timedelta(hours=5)
 
 
 # ── Revocations close the WebSocket from any worker ──────────────────────────
 
-def _registro_sem_o_ws():
+def _registry_without_the_ws():
     """A worker that does NOT hold the WebSocket: `get` does not find the connection."""
     reg = MagicMock()
     reg.get = MagicMock(return_value=None)
@@ -322,9 +322,9 @@ def _registro_sem_o_ws():
 
 
 @pytest.mark.asyncio
-async def test_revogar_cert_fecha_o_websocket_em_outro_worker(monkeypatch):
-    reg = _registro_sem_o_ws()
-    # The notice and the close are those of every revocation (`concluir_revogacoes`).
+async def test_revoke_cert_closes_the_websocket_on_another_worker(monkeypatch):
+    reg = _registry_without_the_ws()
+    # The notice and the close are those of every revocation (`complete_revocations`).
     monkeypatch.setattr(R.executor_service, "executor_registry", reg)
     monkeypatch.setattr(R.executor_enrollment_service, "revoke_cert", AsyncMock())
     ag = SimpleNamespace(id_hash="ex-1", name="ex-1", cert_serial="abc", cert_expires_at=None)
@@ -339,8 +339,8 @@ async def test_revogar_cert_fecha_o_websocket_em_outro_worker(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_revogar_cert_fecha_mesmo_se_o_aviso_falhar(monkeypatch):
-    reg = _registro_sem_o_ws()
+async def test_revoke_cert_closes_even_if_the_notice_fails(monkeypatch):
+    reg = _registry_without_the_ws()
     reg.send_json = AsyncMock(side_effect=RuntimeError("relay fora"))
     monkeypatch.setattr(R.executor_service, "executor_registry", reg)
     monkeypatch.setattr(R.executor_enrollment_service, "revoke_cert", AsyncMock())
@@ -379,7 +379,7 @@ class _SocketDoExecutor:
 
 
 @pytest.mark.asyncio
-async def test_revogacao_fecha_de_verdade_o_websocket_de_outro_worker(monkeypatch):
+async def test_revocation_really_closes_the_websocket_of_another_worker(monkeypatch):
     """No fake registry: the route runs on the admin's worker, which does not have
     the WebSocket; what it publishes on the relay reaches the listener of the
     worker that does, and that worker closes the socket with 4403 and removes
@@ -414,14 +414,14 @@ async def test_revogacao_fecha_de_verdade_o_websocket_de_outro_worker(monkeypatc
 
 
 @pytest.mark.asyncio
-async def test_revogar_operador_fecha_os_websockets_em_outros_workers(monkeypatch):
+async def test_revoke_operator_closes_the_websockets_on_other_workers(monkeypatch):
     from app.api.routers import admin_users_router as A
     from app.core.rate_limiter import limiter
     from app.services import execution_alert_service
     from app.services import workspace_executor_service as politica
 
     monkeypatch.setattr(limiter, "enabled", False)
-    reg = _registro_sem_o_ws()
+    reg = _registry_without_the_ws()
     reg.send_json = AsyncMock(side_effect=[RuntimeError("relay fora"), True])
     monkeypatch.setattr(R.executor_service, "executor_registry", reg)
     monkeypatch.setattr(R.executor_enrollment_service, "revoke_cert", AsyncMock())
@@ -454,17 +454,17 @@ async def test_revogar_operador_fecha_os_websockets_em_outros_workers(monkeypatc
 # ── last_seen_at: enrollment writes it; renewal does not (see test_revogacao_de_executor) ──
 
 @pytest.mark.asyncio
-async def test_enrollment_grava_last_seen(monkeypatch):
+async def test_enrollment_stores_last_seen(monkeypatch):
     from app.core import redis as redis_mod
     from app.services import executor_enrollment_service as E
 
     monkeypatch.setattr(redis_mod, "get_redis_pool", lambda: MagicMock(delete=AsyncMock()))
-    antes = _CONECTOU.replace(tzinfo=None)
+    antes = _CONNECTED_AT.replace(tzinfo=None)
     ag = SimpleNamespace(id_hash="ex-1", last_seen_at=antes)
     resultado = MagicMock()
     resultado.scalar_one_or_none.return_value = ag
     db = MagicMock(execute=AsyncMock(return_value=resultado), commit=AsyncMock(), refresh=AsyncMock())
-    cert = {"serial": "s2", "fingerprint": "f2", "issued_at": _AGORA, "expires_at": _AGORA + timedelta(days=90)}
+    cert = {"serial": "s2", "fingerprint": "f2", "issued_at": _NOW, "expires_at": _NOW + timedelta(days=90)}
 
     await E.attach_cert_to_agent(db, "ex-1", cert)
 
@@ -486,7 +486,7 @@ async def test_enrollment_grava_last_seen(monkeypatch):
     ({"v": "2.3.1"}, None),
     (None, None),
 ])
-def test_versao_do_handshake(bruta, esperada):
+def test_handshake_version(bruta, esperada):
     from app.api.routers.executor_ws.protocolo import _sanitize_executor_version
 
     assert _sanitize_executor_version("ex-1", bruta) == esperada
@@ -494,14 +494,14 @@ def test_versao_do_handshake(bruta, esperada):
 
 # ── No partial snapshot of the fleet ─────────────────────────────────────────
 
-def test_rotas_que_so_viam_o_proprio_worker_nao_existem():
+def test_routes_that_only_saw_their_own_worker_do_not_exist():
     """`GET /executores/connections` and `/ws/executores-status` listed only the
     connections of the worker that served the request: a different slice of the
     fleet on each call. Nothing used them; a dashboard built on top of them
     would lie."""
     from app.main import app
 
-    caminhos = {getattr(rota, "path", None) for rota in rotas_efetivas(app)}
+    caminhos = {getattr(rota, "path", None) for rota in effective_routes(app)}
     assert "/executores/connections" not in caminhos
     assert "/ws/executores-status" not in caminhos
     assert not hasattr(ec.executor_registry, "status_summary")

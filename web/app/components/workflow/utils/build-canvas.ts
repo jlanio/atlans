@@ -18,7 +18,7 @@ import { v4 as uuid } from "uuid"
 import { INodeContext } from "@/context/useFlowContext"
 import { CanvasDefinition, INodePortAPI, INodesAPI } from "@/service/types"
 import { getTypeIcon } from "@/utils/getTypeIconsUtils"
-import { contratoDoNo, handleDeEntrada } from "./node-ports"
+import { contratoDoNo, inputHandle } from "./node-ports"
 import { resolveSourceHandle } from "./edge-persistence"
 
 /**
@@ -98,7 +98,7 @@ export function buildEdges(
     source: edge.source,
     target: edge.target,
     sourceHandle: resolveSourceHandle(edge, outputsByNodeId),
-    targetHandle: handleDeEntrada(edge, inputsByNodeId),
+    targetHandle: inputHandle(edge, inputsByNodeId),
     type: "custom",
     data: {
       ...(edge.from_key ? { from_key: edge.from_key } : {}),

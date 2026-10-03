@@ -63,17 +63,17 @@ export function useSubWorkflowContractSync(nodes: INodeContext[]) {
       // resolves them all together; only then applies the ports per node, reading
       // the cache. Order across nodes does not matter (each applyPorts targets a
       // disjoint id and is idempotent).
-      const aBuscar = new Set<string>()
+      const toFetch = new Set<string>()
       for (const node of subworkflowNodes) {
         const hash = hashDoNo(node)
         if (hash && cacheRef.current.get(hash) === undefined && !inflightRef.current.has(hash)) {
-          aBuscar.add(hash)
+          toFetch.add(hash)
         }
       }
 
-      if (aBuscar.size > 0) {
+      if (toFetch.size > 0) {
         await Promise.all(
-          [...aBuscar].map(async (hash) => {
+          [...toFetch].map(async (hash) => {
             inflightRef.current.add(hash)
             try {
               const resp = await GisFlowService.getWorkflowContract(hash)

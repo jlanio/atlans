@@ -304,7 +304,7 @@ export function buildHudTimeline(
   canvasNodes: INodeStatusWorkFlow[],
   runStartedTs: number | null,
   outcome: RunOutcome | null,
-  temEventos: boolean,
+  hasEvents: boolean,
 ): RunTimeline {
   const nodes: NodeRun[] = []
   const problems: NodeRun[] = []
@@ -334,7 +334,7 @@ export function buildHudTimeline(
     slowest,
     counts,
     workflow: {
-      status: outcome?.status ?? (temEventos ? "running" : "idle"),
+      status: outcome?.status ?? (hasEvents ? "running" : "idle"),
       durationMs: outcome?.durationMs ?? null,
       error: outcome?.error ?? null,
       category: outcome?.category ?? null,

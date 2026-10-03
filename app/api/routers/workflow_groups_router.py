@@ -10,7 +10,7 @@ from app.schemas.workflow_group import (
 )
 from app.api.dependencies import (
     get_db, get_current_user, get_user_workspace_ids, verify_workspace_access,
-    exigir_papel_no_workspace,
+    require_workspace_role,
 )
 from app.core.rate_limiter import limiter
 from app.core.rbac import ROLE_EDITOR
@@ -45,7 +45,7 @@ def _alvos_agrupaveis(workflow_ids, group) -> list:
     ]
 
 
-def _recusar_ids_fora_do_grupo(pedidos, encontrados) -> None:
+def _reject_ids_outside_group(pedidos, encontrados) -> None:
     """404 for an id that does not exist, is in the trash or belongs to another workspace.
 
     Refuse, rather than silently ignore: writing only the known part would leave the
@@ -105,7 +105,7 @@ async def create_group(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    await exigir_papel_no_workspace(db, payload.workspace_id, current_user.id_hash, ROLE_EDITOR)
+    await require_workspace_role(db, payload.workspace_id, current_user.id_hash, ROLE_EDITOR)
 
     # End of the line: without this every new group is born at `position=0`, tied
     # with the existing ones, and the order among them again depends on the tiebreak.
@@ -131,7 +131,7 @@ async def create_group(
             select(Workflow).where(*_alvos_agrupaveis(payload.workflow_ids, group))
         )
         workflows = result.scalars().all()
-        _recusar_ids_fora_do_grupo(payload.workflow_ids, workflows)
+        _reject_ids_outside_group(payload.workflow_ids, workflows)
         for wf in workflows:
             wf.group_id = group.id_hash
 
@@ -207,7 +207,7 @@ async def reorder_groups(
             detail="Todos os grupos reordenados precisam ser do mesmo workspace.",
         )
     workspace_id = espacos.pop()
-    await exigir_papel_no_workspace(db, workspace_id, current_user.id_hash, ROLE_EDITOR)
+    await require_workspace_role(db, workspace_id, current_user.id_hash, ROLE_EDITOR)
 
     for indice, gid in enumerate(payload.group_ids):
         grupos[gid].position = indice
@@ -231,7 +231,7 @@ async def update_group(
     group = result.scalars().first()
     if not group:
         raise HTTPException(status_code=404, detail="Grupo não encontrado")
-    await exigir_papel_no_workspace(db, group.workspace_id, current_user.id_hash, ROLE_EDITOR)
+    await require_workspace_role(db, group.workspace_id, current_user.id_hash, ROLE_EDITOR)
 
     if payload.name is not None:
         group.name = payload.name
@@ -256,7 +256,7 @@ async def update_group(
                 select(Workflow).where(*_alvos_agrupaveis(payload.workflow_ids, group))
             )
             encontrados = new_result.scalars().all()
-            _recusar_ids_fora_do_grupo(payload.workflow_ids, encontrados)
+            _reject_ids_outside_group(payload.workflow_ids, encontrados)
             for wf in encontrados:
                 wf.group_id = group.id_hash
 
@@ -278,7 +278,7 @@ async def delete_group(
     group = result.scalars().first()
     if not group:
         raise HTTPException(status_code=404, detail="Grupo não encontrado")
-    await exigir_papel_no_workspace(db, group.workspace_id, current_user.id_hash, ROLE_EDITOR)
+    await require_workspace_role(db, group.workspace_id, current_user.id_hash, ROLE_EDITOR)
 
     # Unlinks workflows before deleting. The workspace filter prevents
     # deleting one's own group from touching another tenant's workflow.
@@ -310,7 +310,7 @@ async def add_workflow_to_group(
     group = group_result.scalars().first()
     if not group:
         raise HTTPException(status_code=404, detail="Grupo não encontrado")
-    await exigir_papel_no_workspace(db, group.workspace_id, current_user.id_hash, ROLE_EDITOR)
+    await require_workspace_role(db, group.workspace_id, current_user.id_hash, ROLE_EDITOR)
 
     # Same criterion as the batch routes — see `_alvos_agrupaveis`.
     wf_result = await db.execute(
@@ -338,7 +338,7 @@ async def remove_workflow_from_group(
     group = group_result.scalars().first()
     if not group:
         raise HTTPException(status_code=404, detail="Grupo não encontrado")
-    await exigir_papel_no_workspace(db, group.workspace_id, current_user.id_hash, ROLE_EDITOR)
+    await require_workspace_role(db, group.workspace_id, current_user.id_hash, ROLE_EDITOR)
 
     wf_result = await db.execute(
         select(Workflow).where(

@@ -13,82 +13,82 @@
 // person wrote) and the next run through the Home's `quando`, with "amanhã"
 // (tomorrow) named as in `formatarProxima`.
 
-import { resumirAgendamento, type ResumoDoAgendamento } from "@/app/components/projects/gatilho"
+import { resumirAgendamento, type ScheduleSummary } from "@/app/components/projects/gatilho"
 import { dayjs, fromBackend } from "@/lib/dayjs"
 import type { Idioma } from "@/lib/idioma"
 import type { IWorkflowSchedule } from "@/service/types"
-import { textosDaCascaDe, type TextosDaCasca } from "../i18n/da-casca"
+import { shellTextsFor, type ShellTexts } from "../i18n/da-casca"
 import { FORMATOS } from "../i18n/formatos"
 
-type Frases = TextosDaCasca["listas"]["agendamentos"]["resumo"]
+type Phrases = ShellTexts["listas"]["agendamentos"]["resumo"]
 
 /** The summary with the pause reason already in the language (the trigger types it as the Portuguese text). */
-export type ResumoNoIdioma = Omit<ResumoDoAgendamento, "motivoPausa"> & { motivoPausa: string | null }
+export type LocalizedSummary = Omit<ScheduleSummary, "motivoPausa"> & { motivoPausa: string | null }
 
 export function resumirNoIdioma(
   schedule: IWorkflowSchedule | null | undefined,
-  flagAtive: boolean,
+  flagActive: boolean,
   idioma: Idioma,
   agora: Date = new Date(),
-): ResumoNoIdioma | null {
-  const resumo = resumirAgendamento(schedule, flagAtive, agora)
+): LocalizedSummary | null {
+  const resumo = resumirAgendamento(schedule, flagActive, agora)
   if (idioma === "pt-BR" || !resumo || !schedule) return resumo
-  return traduzirResumo(resumo, schedule, idioma, agora)
+  return translateSummary(resumo, schedule, idioma, agora)
 }
 
 /**
  * The sentences of a trigger summary rebuilt in a language. Exported for the
  * template test: in Portuguese it returns exactly what the trigger returned.
  */
-export function traduzirResumo(
-  resumo: ResumoDoAgendamento,
+export function translateSummary(
+  resumo: ScheduleSummary,
   schedule: IWorkflowSchedule,
   idioma: Idioma,
   agora: Date = new Date(),
-): ResumoNoIdioma {
-  const t = textosDaCascaDe(idioma).listas.agendamentos.resumo
+): LocalizedSummary {
+  const t = shellTextsFor(idioma).listas.agendamentos.resumo
   return {
     ...resumo,
     descricao: resumo.descricaoCrua ? resumo.descricao : descrever(schedule, idioma, t),
-    proxima: resumo.proxima == null ? null : proximaExecucao(schedule.next_run_at, idioma, t, agora),
-    motivoPausa: resumo.motivoPausa == null ? null : MOTIVO_DA_PAUSA[resumo.motivoPausa](t),
+    proxima: resumo.proxima == null ? null : nextRun(schedule.next_run_at, idioma, t, agora),
+    motivoPausa: resumo.motivoPausa == null ? null : PAUSE_REASON[resumo.motivoPausa](t),
   }
 }
 
 // A new reason in the trigger becomes a type error here — and not a
 // Portuguese reason on an English screen.
-const MOTIVO_DA_PAUSA: Record<NonNullable<ResumoDoAgendamento["motivoPausa"]>, (t: Frases) => string> = {
+const PAUSE_REASON: Record<NonNullable<ScheduleSummary["motivoPausa"]>, (t: Phrases) => string> = {
   "workflow inativo": (t) => t.workflowInativo,
 }
 
 // The clock time for each language: Portuguese with the usual two digits
 // ("06:00", like the trigger); English and Spanish with the options of the
 // Home's `quando` ("6:00 AM", "6:00" — see i18n/formatos).
-const OPCOES_DA_HORA: Record<Idioma, Intl.DateTimeFormatOptions> = {
+const TIME_OPTIONS: Record<Idioma, Intl.DateTimeFormatOptions> = {
   "pt-BR": { hour: "2-digit", minute: "2-digit" },
   en: { hour: "numeric", minute: "2-digit" },
   es: { hour: "numeric", minute: "2-digit" },
 }
 
-const RELOGIOS = new Map<string, Intl.DateTimeFormat>()
+const CLOCKS = new Map<string, Intl.DateTimeFormat>()
 
 /** In the browser's time zone (the next run) or in UTC (the cron time, which is a clock time and isn't converted). */
 function relogio(idioma: Idioma, fuso?: "UTC"): Intl.DateTimeFormat {
   const chave = `${idioma}|${fuso ?? ""}`
-  let formato = RELOGIOS.get(chave)
+  let formato = CLOCKS.get(chave)
   if (!formato) {
-    formato = new Intl.DateTimeFormat(idioma, { ...OPCOES_DA_HORA[idioma], timeZone: fuso })
-    RELOGIOS.set(chave, formato)
+    formato = new Intl.DateTimeFormat(idioma, { ...TIME_OPTIONS[idioma], timeZone: fuso })
+    CLOCKS.set(chave, formato)
   }
   return formato
 }
 
 /** "06:00" / "6:00 AM" — the time the person wrote in the cron, without time zone conversion. */
-function horaDoCron(idioma: Idioma, h: number, m: number): string {
+function cronTime(idioma: Idioma, h: number, m: number): string {
   return relogio(idioma, "UTC").format(new Date(Date.UTC(2000, 0, 1, h, m)))
 }
 
-function proximaExecucao(iso: string | null, idioma: Idioma, t: Frases, agora: Date): string {
+function nextRun(iso: string | null, idioma: Idioma, t: Phrases, agora: Date): string {
   const d = fromBackend(iso)
   if (!d) return "—"
   if (d.isSame(dayjs(agora).add(1, "day"), "day")) return `${t.amanha}, ${relogio(idioma).format(d.toDate())}`
@@ -97,12 +97,12 @@ function proximaExecucao(iso: string | null, idioma: Idioma, t: Frases, agora: D
   return FORMATOS[idioma].quando(iso, agora)
 }
 
-function descrever(schedule: IWorkflowSchedule, idioma: Idioma, t: Frases): string {
+function descrever(schedule: IWorkflowSchedule, idioma: Idioma, t: Phrases): string {
   switch (schedule.strategy) {
     case "cron": {
       const expr = schedule.cron_expression?.trim() ?? ""
       if (!expr) return t.agendamento
-      return traduzirCron(expr, idioma, t) ?? expr
+      return translateCron(expr, idioma, t) ?? expr
     }
     case "interval":
       return descreverIntervalo(schedule.interval, schedule.unit, t)
@@ -120,12 +120,12 @@ function inteiro(campo: string, min: number, max: number): number | null {
 }
 
 /**
- * The forms the trigger translates (`traduzirCron` in projects/gatilho), in the
+ * The forms the trigger translates (`translateCron` in projects/gatilho), in the
  * same order and with the same refusals. A test checks that what the trigger
  * translates, this one translates too; the reverse can't happen, because a cron
  * the trigger doesn't translate is shown raw before reaching here. Null for the rest.
  */
-function traduzirCron(expr: string, idioma: Idioma, t: Frases): string | null {
+function translateCron(expr: string, idioma: Idioma, t: Phrases): string | null {
   const partes = expr.trim().split(/\s+/)
   if (partes.length !== 5) return null
   const [min, hor, dia, mes, sem] = partes
@@ -133,17 +133,17 @@ function traduzirCron(expr: string, idioma: Idioma, t: Frases): string | null {
 
   if (todos(min, hor, dia, mes, sem)) return t.aCadaMinutos(1)
 
-  const aCadaMin = /^\*\/(\d+)$/.exec(min)
-  if (aCadaMin && todos(hor, dia, mes, sem)) {
-    const n = Number(aCadaMin[1])
+  const everyMin = /^\*\/(\d+)$/.exec(min)
+  if (everyMin && todos(hor, dia, mes, sem)) {
+    const n = Number(everyMin[1])
     return n > 0 ? t.aCadaMinutos(n) : null
   }
 
   if (min === "0" && todos(dia, mes, sem)) {
     if (hor === "*") return t.aCadaHoras(1)
-    const aCadaHora = /^\*\/(\d+)$/.exec(hor)
-    if (aCadaHora) {
-      const n = Number(aCadaHora[1])
+    const everyHour = /^\*\/(\d+)$/.exec(hor)
+    if (everyHour) {
+      const n = Number(everyHour[1])
       return n > 0 ? t.aCadaHoras(n) : null
     }
   }
@@ -151,7 +151,7 @@ function traduzirCron(expr: string, idioma: Idioma, t: Frases): string | null {
   const m = inteiro(min, 0, 59)
   const h = inteiro(hor, 0, 23)
   if (m == null || h == null || mes !== "*") return null
-  const as = horaDoCron(idioma, h, m)
+  const as = cronTime(idioma, h, m)
 
   if (dia === "*") {
     if (sem === "*") return t.todoDia(as)
@@ -169,7 +169,7 @@ function traduzirCron(expr: string, idioma: Idioma, t: Frases): string | null {
 }
 
 /** The trigger's `descreverIntervalo`, with the scheduler's units (`seconds|minutes|hours|days`). */
-function descreverIntervalo(interval: number | null | undefined, unit: string | null | undefined, t: Frases): string {
+function descreverIntervalo(interval: number | null | undefined, unit: string | null | undefined, t: Phrases): string {
   if (interval == null || !Number.isFinite(interval) || interval <= 0) return t.intervalo
   const n = Math.round(interval)
   switch (unit) {

@@ -11,7 +11,7 @@ import {
 import { useTheme } from "@/context/ThemeContext";
 import { TbSun, TbMoon } from "react-icons/tb";
 import { formatLocal } from "@/lib/dayjs";
-import { formatarInteiro, plural } from "@/lib/formatos";
+import { formatInteger, plural } from "@/lib/formatos";
 import { CartaoDeEstado } from "@/app/components/shared/estados";
 import { BrandLogo } from "./BrandLogo";
 import type { MapLayer, MapLibreMapHandle } from "./MapLibreMap";
@@ -113,7 +113,7 @@ export default function WorkflowShareViewer({ data, workflowHash }: { data: Port
 
   // Shared class for the header icon buttons: standard focus ring (§5) and a
   // 40px target on the phone (size-10/p-2.5), shrinking on desktop.
-  const botaoHeader =
+  const headerButton =
     "flex items-center justify-center rounded-lg p-2.5 sm:p-1.5 max-md:size-10 text-muted-foreground transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
   return (
@@ -150,7 +150,7 @@ export default function WorkflowShareViewer({ data, workflowHash }: { data: Port
           <button
             type="button"
             onClick={handleCopyLink}
-            className={botaoHeader}
+            className={headerButton}
             aria-label="Copiar link"
             title="Copiar link do portal"
           >
@@ -162,7 +162,7 @@ export default function WorkflowShareViewer({ data, workflowHash }: { data: Port
           <button
             type="button"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className={botaoHeader}
+            className={headerButton}
             aria-label={theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}
           >
             {theme === "dark" ? <TbSun className="size-4" aria-hidden="true" /> : <TbMoon className="size-4" aria-hidden="true" />}
@@ -205,7 +205,7 @@ export default function WorkflowShareViewer({ data, workflowHash }: { data: Port
                 Camadas
               </div>
               <span className="text-[10px] tabular-nums text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-                {formatarInteiro(layers.length)}
+                {formatInteger(layers.length)}
               </span>
             </div>
           </div>

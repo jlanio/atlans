@@ -25,7 +25,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from app.crud.workflow_crud import WorkflowCRUD, _e_colisao_de_versao
+from app.crud.workflow_crud import WorkflowCRUD, _is_version_collision
 from app.core.exceptions import WorkflowVersionConflictError
 from app.models.models import Workflow, WorkflowGroup, WorkflowVersion
 
@@ -49,14 +49,14 @@ async def db():
     await eng.dispose()
 
 
-async def _plantar(db, *numeros):
+async def _seed_versions(db, *numeros):
     """The versions the WINNING session has already written."""
     for n in numeros:
         db.add(WorkflowVersion(workflow_hash=HASH, version_number=n, definition={"n": n}))
     await db.commit()
 
 
-class _MaximoVelho:
+class _StaleMax:
     """Makes the first N reads of the max return a stale value.
 
     That is what the losing session actually sees: it read before the winner
@@ -65,7 +65,7 @@ class _MaximoVelho:
     """
 
     def __init__(self, db, valor=0, vezes=1):
-        self.db, self.valor, self.restam = db, valor, vezes
+        self.db, self.valor, self.remaining = db, valor, vezes
         self.original = db.execute
         self.leituras = 0
 
@@ -73,9 +73,9 @@ class _MaximoVelho:
         async def execute(stmt, *a, **kw):
             if "max" in str(stmt).lower():
                 self.leituras += 1
-                if self.restam > 0:
-                    self.restam -= 1
-                    return _Resultado(self.valor)
+                if self.remaining > 0:
+                    self.remaining -= 1
+                    return _ScalarResult(self.valor)
             return await self.original(stmt, *a, **kw)
 
         self.db.execute = execute
@@ -86,27 +86,27 @@ class _MaximoVelho:
         return False
 
 
-class _Resultado:
+class _ScalarResult:
     def __init__(self, valor):
-        self._valor = valor
+        self._value = valor
 
     def scalar(self):
-        return self._valor
+        return self._value
 
 
 class TestReconvergencia:
 
     @pytest.mark.asyncio
-    async def test_colisao_de_numero_reconverge_em_vez_de_levantar(self, db):
+    async def test_number_collision_reconverges_instead_of_raising(self, db):
         """The loser of the race rereads the max and takes the next number.
 
         Against today's code: the IntegrityError escapes `create_version` and
         goes up to the global handler, which responds 500 — and the save is lost.
         """
-        await _plantar(db, 1)
+        await _seed_versions(db, 1)
         crud = WorkflowCRUD(db)
 
-        with _MaximoVelho(db, valor=0, vezes=1):
+        with _StaleMax(db, valor=0, vezes=1):
             versao = await crud.create_version(HASH, {"x": 1}, "nota")
 
         assert versao.version_number == 2
@@ -118,7 +118,7 @@ class TestReconvergencia:
         assert sorted(numeros) == [1, 2], "nenhuma versão pode ter sido perdida"
 
     @pytest.mark.asyncio
-    async def test_o_retry_rele_o_maximo_em_vez_de_incrementar_o_que_falhou(self, db):
+    async def test_the_retry_rereads_the_max_instead_of_incrementing_the_failed_one(self, db):
         """Incrementing the number that failed would collide with the neighbor again.
 
         With 1..5 planted and a stale max of 0: by rereading, the second attempt
@@ -127,16 +127,16 @@ class TestReconvergencia:
         is what tells the two implementations apart — and that is why this test
         plants five rows and not one.
         """
-        await _plantar(db, 1, 2, 3, 4, 5)
+        await _seed_versions(db, 1, 2, 3, 4, 5)
         crud = WorkflowCRUD(db)
 
-        with _MaximoVelho(db, valor=0, vezes=1):
+        with _StaleMax(db, valor=0, vezes=1):
             versao = await crud.create_version(HASH, {"x": 9})
 
         assert versao.version_number == 6
 
     @pytest.mark.asyncio
-    async def test_a_violacao_nao_escapa_do_savepoint(self, db):
+    async def test_the_violation_does_not_escape_the_savepoint(self, db):
         """The CALLER's transaction survives the collision and still commits.
 
         It is the difference between fixing and masking. In PostgreSQL a
@@ -148,10 +148,10 @@ class TestReconvergencia:
         Mutation this test kills: replacing `async with db.begin_nested()` with
         a bare `try` around `flush()`.
         """
-        await _plantar(db, 1)
+        await _seed_versions(db, 1)
         crud = WorkflowCRUD(db)
 
-        with _MaximoVelho(db, valor=0, vezes=1):
+        with _StaleMax(db, valor=0, vezes=1):
             await crud.create_version(HASH, {"x": 1})
 
         # The work the caller would do afterwards — in move, the UPDATE on
@@ -164,17 +164,17 @@ class TestReconvergencia:
         )).scalar() == "outro"
 
     @pytest.mark.asyncio
-    async def test_tentativas_esgotadas_viram_conflito_de_dominio(self, db):
+    async def test_exhausted_attempts_become_domain_conflict(self, db):
         """Three collisions in a row stop being bad luck — and 409 is honest, 500 is not.
 
         The stale max is always returned, so every attempt recomputes the same
         number and collides. The client gets something actionable instead of
         "Unexpected error occurred".
         """
-        await _plantar(db, 1)
+        await _seed_versions(db, 1)
         crud = WorkflowCRUD(db)
 
-        with _MaximoVelho(db, valor=0, vezes=99) as espiao:
+        with _StaleMax(db, valor=0, vezes=99) as espiao:
             with pytest.raises(WorkflowVersionConflictError) as exc:
                 await crud.create_version(HASH, {"x": 1})
 
@@ -183,7 +183,7 @@ class TestReconvergencia:
         assert exc.value.error_code == "workflow_version_conflict"
 
     @pytest.mark.asyncio
-    async def test_integrityerror_de_outra_constraint_nao_e_engolida(self, db):
+    async def test_integrityerror_from_another_constraint_is_not_swallowed(self, db):
         """Only the version collision reconverges; everything else surfaces.
 
         Without the filter, a broken FK (or any other violation) would turn into
@@ -193,14 +193,14 @@ class TestReconvergencia:
         crud = WorkflowCRUD(db)
         original = db.flush
 
-        async def flush_que_quebra(*a, **kw):
+        async def failing_flush(*a, **kw):
             raise IntegrityError(
                 "INSERT ...",
                 {},
                 Exception('violates foreign key constraint "workflow_versions_workflow_hash_fkey"'),
             )
 
-        db.flush = flush_que_quebra
+        db.flush = failing_flush
         try:
             with pytest.raises(IntegrityError):
                 await crud.create_version("fantasma", {"x": 1})
@@ -208,28 +208,28 @@ class TestReconvergencia:
             db.flush = original
 
 
-class TestReconhecimentoDaViolacao:
+class TestViolationRecognition:
     """The filter has to recognize BOTH messages — that is what makes the fix hold
     in tests and in production at the same time."""
 
-    def _erro(self, texto):
+    def _error(self, texto):
         return IntegrityError("INSERT ...", {}, Exception(texto))
 
-    def test_mensagem_do_postgres_nomeia_a_constraint(self):
-        assert _e_colisao_de_versao(self._erro(
+    def test_postgres_message_names_the_constraint(self):
+        assert _is_version_collision(self._error(
             'duplicate key value violates unique constraint "uq_workflow_version"'
         ))
 
-    def test_mensagem_do_sqlite_nomeia_as_colunas(self):
-        assert _e_colisao_de_versao(self._erro(
+    def test_sqlite_message_names_the_columns(self):
+        assert _is_version_collision(self._error(
             "UNIQUE constraint failed: workflow_versions.workflow_hash, "
             "workflow_versions.version_number"
         ))
 
-    def test_violacao_de_outra_constraint_nao_casa(self):
-        assert not _e_colisao_de_versao(self._erro(
+    def test_violation_of_another_constraint_does_not_match(self):
+        assert not _is_version_collision(self._error(
             'duplicate key value violates unique constraint "uq_workflow_name_workspace"'
         ))
-        assert not _e_colisao_de_versao(self._erro(
+        assert not _is_version_collision(self._error(
             "UNIQUE constraint failed: workflows.name, workflows.workspace_id"
         ))

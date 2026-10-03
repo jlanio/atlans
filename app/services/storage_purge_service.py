@@ -10,7 +10,7 @@ Two uses:
    artifacts were left pointing to a nonexistent workspace: inaccessible
    (`verify_workspace_access` never matches) and taking up disk forever.
 
-Artifacts go out through `remocao_de_artefatos.remover_artefatos`, the same rule
+Artifacts go out through `remocao_de_artefatos.remove_artifacts`, the same rule
 as the delete routes and retention: MinIO object first (a failure keeps the
 row, and repeating the purge fixes it), local content only with the order DELIVERED to the
 executor (offline keeps the row and the next pass resends), portal layer
@@ -19,7 +19,7 @@ along with it. Here we only add up the counters.
 A cataloged Drive file (`content_location='executor'`) does NOT follow these
 semantics, and the difference is deliberate: it is the user's own file,
 in a folder they chose to sync, whose bytes the platform never had
-and which takes up no storage. `drive_service._recusar_se_catalogado` refuses
+and which takes up no storage. `drive_service._refuse_if_cataloged` refuses
 to delete it in a standalone deletion; here it is preserved and counted in
 `skipped_catalogados`.
 """
@@ -32,7 +32,7 @@ from app.core.utils.datetime_utils import utc_now_naive
 from app.core.utils.logger import get_logger
 from app.models.artifact import Artifact
 from app.models.workspace_file import WorkspaceFile
-from app.services.remocao_de_artefatos import remover_artefatos
+from app.services.remocao_de_artefatos import remove_artifacts
 
 logger = get_logger(__name__)
 
@@ -79,7 +79,7 @@ async def purge_workspace_storage(
     # ── Artefatos ─────────────────────────────────────────────────────────────
     if scope in ("all", "artifacts"):
         result = await db.execute(select(Artifact).where(Artifact.workspace_id == workspace_id))
-        remocao = await remover_artefatos(db, result.scalars().all(), agendar_pendentes=False)
+        remocao = await remove_artifacts(db, result.scalars().all(), schedule_pending=False)
         removed["artifacts"] += len(remocao.apagados)
         removed["artifact_bytes"] += remocao.bytes
         removed["skipped_s3_errors"] += len(remocao.falhas_s3)
@@ -129,7 +129,7 @@ async def purge_workspace_storage(
             # nothing and would destroy the only record of the link; telling the
             # executor to delete it would destroy user data that never
             # belonged to the platform. It is the same refusal that
-            # `drive_service._recusar_se_catalogado` applies in a standalone deletion —
+            # `drive_service._refuse_if_cataloged` applies in a standalone deletion —
             # here the record used to be deleted silently, contradicting that
             # policy. It also takes up no platform storage at all,
             # so preserving it does not conflict with the purpose of the purge.

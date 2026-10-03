@@ -13,7 +13,7 @@ limit of 5/min.
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from tests.unit._mcp_harness import RedisFalso
+from tests.unit._mcp_harness import FakeRedis
 
 
 @pytest.fixture
@@ -28,7 +28,7 @@ def login_client(client):
     from app.api.dependencies import get_db
     from app.api.routers.auth_router import get_redis
 
-    fake_redis = RedisFalso()
+    fake_redis = FakeRedis()
 
     async def _fake_db():
         db = MagicMock()
@@ -47,7 +47,7 @@ def login_client(client):
 
 
 @pytest.mark.asyncio
-async def test_tentativas_com_caixas_diferentes_compartilham_o_balde(login_client):
+async def test_attempts_with_different_cases_share_the_bucket(login_client):
     client, fake_redis = login_client
 
     await client.post("/auth/login", json={"identifier": "Admin", "password": "x"})
@@ -63,7 +63,7 @@ async def test_tentativas_com_caixas_diferentes_compartilham_o_balde(login_clien
 
 
 @pytest.mark.asyncio
-async def test_conta_bloqueada_barra_mesmo_com_caixa_diferente(login_client):
+async def test_locked_account_blocks_even_with_different_case(login_client):
     """If the account is already locked (normalized bucket), varying the case
     doesn't get around the 429."""
     client, fake_redis = login_client

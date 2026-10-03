@@ -15,7 +15,7 @@ import type { IExecutor } from "@/service/types"
 
 export type ExecutorType = IExecutor["executor_type"]
 
-export interface EstiloDeTipo {
+export interface TypeStyle {
   /** Singular label — the plural is built by whoever displays it. */
   nome: string
   /** Short phrase for the group header. */
@@ -29,7 +29,7 @@ export interface EstiloDeTipo {
   borda: string
 }
 
-export const TIPOS_DE_EXECUTOR: Record<ExecutorType, EstiloDeTipo> = {
+export const EXECUTOR_TYPES: Record<ExecutorType, TypeStyle> = {
   default: {
     nome:  "Compartilhado",
     grupo: "Pool compartilhado",
@@ -48,7 +48,7 @@ export const TIPOS_DE_EXECUTOR: Record<ExecutorType, EstiloDeTipo> = {
   },
 }
 
-const NEUTRO: EstiloDeTipo = {
+const NEUTRAL: TypeStyle = {
   nome:  "Executor",
   grupo: "Executores",
   icone: TbUsers,
@@ -59,11 +59,11 @@ const NEUTRO: EstiloDeTipo = {
 
 /** The type's style, falling back to neutral.
  *
- *  Reading through the prototype chain is what makes `TIPOS[t] ?? NEUTRO` return
+ *  Reading through the prototype chain is what makes `TIPOS[t] ?? NEUTRAL` return
  *  the `Object` function — which is truthy — for an unexpected `executor_type`
  *  coming from the API, and then the classes come out `undefined`. */
-export function estiloDoTipo(tipo: string): EstiloDeTipo {
-  return Object.prototype.hasOwnProperty.call(TIPOS_DE_EXECUTOR, tipo)
-    ? TIPOS_DE_EXECUTOR[tipo as ExecutorType]
-    : NEUTRO
+export function typeStyle(tipo: string): TypeStyle {
+  return Object.prototype.hasOwnProperty.call(EXECUTOR_TYPES, tipo)
+    ? EXECUTOR_TYPES[tipo as ExecutorType]
+    : NEUTRAL
 }

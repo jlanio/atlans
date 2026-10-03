@@ -41,14 +41,14 @@ from pathlib import Path
 from typing import Any
 
 # A person's (plan | None, ceiling). Receives `user_id` and, by name, `db` and `redis`.
-PlanoETeto = Callable[..., Awaitable[tuple[str | None, int]]]
+PlanAndCeiling = Callable[..., Awaitable[tuple[str | None, int]]]
 # Extra fields in the model panel. Receives `db` and, by name, `atual`, `catalogo`,
 # `simular` and `consulta` (the URL parameters); returns what to add to the panel.
-ContribuicaoAoPainel = Callable[..., Awaitable[dict[str, Any]]]
-TarefaDeFundo = tuple[str, Callable[[], Awaitable[object]]]
+PanelContribution = Callable[..., Awaitable[dict[str, Any]]]
+BackgroundTask = tuple[str, Callable[[], Awaitable[object]]]
 
 
-def _nenhuma() -> bool:
+def _none_active() -> bool:
     return False
 
 
@@ -56,13 +56,13 @@ def _nenhuma() -> bool:
 class Registro:
     nomes: list[str] = field(default_factory=list)
     rotas: list[Any] = field(default_factory=list)
-    tarefas_de_fundo: list[TarefaDeFundo] = field(default_factory=list)
-    plano_e_teto: PlanoETeto | None = None
+    tarefas_de_fundo: list[BackgroundTask] = field(default_factory=list)
+    plano_e_teto: PlanAndCeiling | None = None
     # A function, not a boolean: the value depends on the extension's
     # configuration, read when the screen asks.
-    assinaturas_ativas: Callable[[], bool] = field(default=_nenhuma)
+    assinaturas_ativas: Callable[[], bool] = field(default=_none_active)
     templates: list[Path] = field(default_factory=list)
-    painel_do_modelo: list[ContribuicaoAoPainel] = field(default_factory=list)
+    painel_do_modelo: list[PanelContribution] = field(default_factory=list)
 
 
 _registro: Registro | None = None
@@ -73,7 +73,7 @@ def desligadas() -> bool:
     return os.getenv("ATLANS_SEM_EXTENSOES", "").strip().lower() in ("1", "true", "sim", "yes", "on")
 
 
-def _nomes() -> list[str]:
+def _names() -> list[str]:
     if desligadas():
         return []
     return sorted(
@@ -87,7 +87,7 @@ def registro() -> Registro:
     global _registro
     if _registro is None:
         novo = Registro()
-        for nome in _nomes():
+        for nome in _names():
             modulo = importlib.import_module(f"{__name__}.{nome}")
             registrar = getattr(modulo, "registrar", None)
             if registrar is None:
@@ -100,7 +100,7 @@ def registro() -> Registro:
 
 def importar_modelos() -> None:
     """Imports `<extensão>/modelos` from each extension that has it."""
-    for nome in _nomes():
+    for nome in _names():
         alvo = f"{__name__}.{nome}.modelos"
         try:
             importlib.import_module(alvo)
@@ -117,7 +117,7 @@ def esquemas() -> list[Path]:
     it needs is the file, not the code.
     """
     achados = []
-    for nome in _nomes():
+    for nome in _names():
         for raiz in __path__:
             alvo = Path(raiz) / nome / "schema.sql"
             if alvo.is_file():

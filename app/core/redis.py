@@ -13,8 +13,8 @@ Usage:
     await redis.get("chave")
 
     # Rate limit / quota counter over a time window:
-    from app.core.redis import contar_na_janela
-    contagem, ttl = await contar_na_janela("ratelimit:x:chave", 60)
+    from app.core.redis import count_in_window
+    contagem, ttl = await count_in_window("ratelimit:x:chave", 60)
 
 Note: executor_connections.py and run_result_consumer.py keep their own
 connections on purpose (persistent pub/sub and blocking brpop).
@@ -59,15 +59,15 @@ def new_pubsub_client() -> aioredis.Redis:
     return aioredis.from_url(REDIS_URL, decode_responses=True)
 
 
-async def contar_na_janela(
+async def count_in_window(
     chave: str,
-    janela_s: int,
+    window_s: int,
     *,
-    incremento: int = 1,
-    deslizante: bool = False,
+    increment: int = 1,
+    sliding: bool = False,
     redis: aioredis.Redis | None = None,
 ) -> tuple[int, int]:
-    """Add `incremento` to the counter `chave` and return (count, ttl in seconds).
+    """Add `increment` to the counter `chave` and return (count, ttl in seconds).
 
     It is the counter behind every per-window rate limit and quota in the API.
     `INCRBY`, `EXPIRE` and `TTL` go out in a single transaction (MULTI/EXEC):
@@ -83,16 +83,16 @@ async def contar_na_janela(
     running: otherwise the window would never close while there was traffic.
     `NX` requires Redis 7 (compose uses `redis:7-alpine`).
 
-    `deslizante=True` renews the expiry on every count: the window only closes
-    after `janela_s` seconds with NO count (the per-account login lockout).
+    `sliding=True` renews the expiry on every count: the window only closes
+    after `window_s` seconds with NO count (the per-account login lockout).
 
     `redis`: a client already at hand; without one, the global pool. Redis
     errors propagate to the caller, which decides whether to fail open or closed.
     """
     rc = redis if redis is not None else get_redis_pool()
     async with rc.pipeline(transaction=True) as pipe:
-        pipe.incrby(chave, incremento)
-        pipe.expire(chave, janela_s, nx=not deslizante)
+        pipe.incrby(chave, increment)
+        pipe.expire(chave, window_s, nx=not sliding)
         pipe.ttl(chave)
         contagem, _, ttl = await pipe.execute()
     return int(contagem), int(ttl)

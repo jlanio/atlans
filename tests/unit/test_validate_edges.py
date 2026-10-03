@@ -33,7 +33,7 @@ def _schema(*names):
 
 # ── validate_edges ────────────────────────────────────────────────────────────
 
-def test_from_key_defasado_vira_erro():
+def test_stale_from_key_becomes_error():
     ex = _executor([_n("a", ntype="action"), _n("b")],
                    [{"source": "a", "target": "b", "from_key": "nope"}])
     ex.simulated_outputs = {"a": {"status": "ok", "schema": _schema("output")}}
@@ -43,14 +43,14 @@ def test_from_key_defasado_vira_erro():
     assert diag[0]["source"] == "a" and diag[0]["target"] == "b"
 
 
-def test_from_key_valido_nao_gera_diagnostico():
+def test_valid_from_key_produces_no_diagnostic():
     ex = _executor([_n("a", ntype="action"), _n("b")],
                    [{"source": "a", "target": "b", "from_key": "output"}])
     ex.simulated_outputs = {"a": {"status": "ok", "schema": _schema("output", "meta")}}
     assert ex.validate_edges() == []
 
 
-def test_spread_de_origem_multi_saida_vira_aviso():
+def test_spread_from_multi_output_source_becomes_warning():
     ex = _executor([_n("a", ntype="action"), _n("b")],
                    [{"source": "a", "target": "b"}])  # no from_key/to_key
     ex.simulated_outputs = {"a": {"status": "ok", "schema": _schema("x", "y")}}
@@ -58,14 +58,14 @@ def test_spread_de_origem_multi_saida_vira_aviso():
     assert len(diag) == 1 and diag[0]["severity"] == "warning"
 
 
-def test_spread_de_origem_unica_saida_nao_avisa():
+def test_spread_from_single_output_source_does_not_warn():
     ex = _executor([_n("a", ntype="action"), _n("b")],
                    [{"source": "a", "target": "b"}])
     ex.simulated_outputs = {"a": {"status": "ok", "schema": _schema("output")}}
     assert ex.validate_edges() == []
 
 
-def test_aresta_de_ramo_nao_e_ambigua():
+def test_branch_edge_is_not_ambiguous():
     # bool condition → it is a branch edge, not an ambiguous spread.
     ex = _executor([_n("a", ntype="action"), _n("b")],
                    [{"source": "a", "target": "b", "condition": True}])
@@ -73,7 +73,7 @@ def test_aresta_de_ramo_nao_e_ambigua():
     assert ex.validate_edges() == []
 
 
-def test_origem_sem_schema_conhecido_nao_diagnostica():
+def test_source_without_known_schema_is_not_diagnosed():
     # No declared outputs (a dynamic one that did not simulate) → cannot flag a typo.
     ex = _executor([_n("a", ntype="action"), _n("b")],
                    [{"source": "a", "target": "b", "from_key": "qualquer"}])
@@ -83,7 +83,7 @@ def test_origem_sem_schema_conhecido_nao_diagnostica():
 
 # ── F11: schema == [] does not cascade an error in the preview ───────────────
 
-class _PaiSemSaida(BaseNode):
+class _ParentWithoutOutput(BaseNode):
     @classmethod
     def description(cls):
         return {"name": "PaiSemSaida", "type": "action", "properties": [], "outputs": []}
@@ -92,7 +92,7 @@ class _PaiSemSaida(BaseNode):
         return {}
 
 
-class _FilhoDinamico(BaseNode):
+class _DynamicChild(BaseNode):
     @classmethod
     def description(cls):
         return {"name": "FilhoDinamico", "type": "action", "properties": [], "dynamic_output": True}
@@ -106,10 +106,10 @@ class _FilhoDinamico(BaseNode):
 
 
 @pytest.fixture
-def _registra_nos():
+def _register_nodes():
     from flow.registry import NODE_REGISTRY
-    NODE_REGISTRY["PaiSemSaida"] = _PaiSemSaida
-    NODE_REGISTRY["FilhoDinamico"] = _FilhoDinamico
+    NODE_REGISTRY["PaiSemSaida"] = _ParentWithoutOutput
+    NODE_REGISTRY["FilhoDinamico"] = _DynamicChild
     try:
         yield
     finally:
@@ -117,7 +117,7 @@ def _registra_nos():
         NODE_REGISTRY.pop("FilhoDinamico", None)
 
 
-def test_schema_vazio_do_pai_nao_cascateia_erro(_registra_nos):
+def test_empty_parent_schema_does_not_cascade_error(_register_nodes):
     # Parent with outputs=[] (like SubWorkflowInput/Output). Before:
     # schema[0] on [] → IndexError → child marked 'error' and a cascade. Now ok.
     ex = _executor(

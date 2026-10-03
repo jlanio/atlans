@@ -5,28 +5,28 @@
  * from the detail and a link pasted in chat reopen exactly the same view. The
  * defaults do not go into the URL, so it stays clean when nothing was touched.
  */
-export type Periodo = 7 | 30 | 90
-export const PERIODOS: Periodo[] = [7, 30, 90]
+export type Period = 7 | 30 | 90
+export const PERIODS: Period[] = [7, 30, 90]
 
-export type Visao = "execucoes" | "workflows" | "executores" | "confirmacoes"
-export const VISOES: Visao[] = ["execucoes", "workflows", "executores", "confirmacoes"]
+export type ViewKind = "execucoes" | "workflows" | "executores" | "confirmacoes"
+export const VIEWS: ViewKind[] = ["execucoes", "workflows", "executores", "confirmacoes"]
 
-export type StatusFiltro = "failed" | "running" | "success" | "cancelled"
-const STATUS: StatusFiltro[] = ["failed", "running", "success", "cancelled"]
+export type StatusFilter = "failed" | "running" | "success" | "cancelled"
+const STATUS: StatusFilter[] = ["failed", "running", "success", "cancelled"]
 
-export type OrigemFiltro = "manual" | "retry" | "webhook" | "schedule" | "mcp"
+export type SourceFilter = "manual" | "retry" | "webhook" | "schedule" | "mcp"
 /** Origins the URL accepts. The UI list (`filtros.tsx`) has the same
  *  set in another order — a test guarantees they do not diverge. */
-export const ORIGENS: OrigemFiltro[] = ["manual", "retry", "webhook", "schedule", "mcp"]
+export const ORIGENS: SourceFilter[] = ["manual", "retry", "webhook", "schedule", "mcp"]
 
-export interface EstadoDoHistorico {
-  periodo: Periodo
-  visao: Visao
-  status: StatusFiltro | null
+export interface HistoryState {
+  periodo: Period
+  visao: ViewKind
+  status: StatusFilter | null
   workspace: string | null
   workflow: string | null
   executor: string | null
-  origem: OrigemFiltro | null
+  origem: SourceFilter | null
   /**
    * "Assistente" chip: only runs of workflows CREATED by the assistant. It is
    * not called `origem` because that name already belongs to the trigger
@@ -38,7 +38,7 @@ export interface EstadoDoHistorico {
   execucao: string | null
 }
 
-export const ESTADO_PADRAO: EstadoDoHistorico = {
+export const DEFAULT_STATE: HistoryState = {
   periodo: 30,
   visao: "execucoes",
   status: null,
@@ -61,15 +61,15 @@ function texto(sp: Leitor, nome: string): string | null {
 }
 
 /** Reads the query string; any invalid value falls back to the default. */
-export function lerEstado(sp: Leitor): EstadoDoHistorico {
-  const periodoBruto = Number(sp.get("periodo"))
-  const periodo = (PERIODOS as number[]).includes(periodoBruto) ? (periodoBruto as Periodo) : ESTADO_PADRAO.periodo
-  const visaoBruta = sp.get("visao")
-  const visao = (VISOES as string[]).includes(visaoBruta ?? "") ? (visaoBruta as Visao) : ESTADO_PADRAO.visao
-  const statusBruto = sp.get("status")
-  const status = (STATUS as string[]).includes(statusBruto ?? "") ? (statusBruto as StatusFiltro) : null
-  const origemBruta = sp.get("origem")
-  const origem = (ORIGENS as string[]).includes(origemBruta ?? "") ? (origemBruta as OrigemFiltro) : null
+export function lerEstado(sp: Leitor): HistoryState {
+  const rawPeriod = Number(sp.get("periodo"))
+  const periodo = (PERIODS as number[]).includes(rawPeriod) ? (rawPeriod as Period) : DEFAULT_STATE.periodo
+  const rawView = sp.get("visao")
+  const visao = (VIEWS as string[]).includes(rawView ?? "") ? (rawView as ViewKind) : DEFAULT_STATE.visao
+  const rawStatus = sp.get("status")
+  const status = (STATUS as string[]).includes(rawStatus ?? "") ? (rawStatus as StatusFilter) : null
+  const rawSource = sp.get("origem")
+  const origem = (ORIGENS as string[]).includes(rawSource ?? "") ? (rawSource as SourceFilter) : null
   return {
     periodo,
     visao,
@@ -85,10 +85,10 @@ export function lerEstado(sp: Leitor): EstadoDoHistorico {
 }
 
 /** Query string (without "?") with only what differs from the default. */
-export function escreverEstado(estado: EstadoDoHistorico): string {
+export function escreverEstado(estado: HistoryState): string {
   const sp = new URLSearchParams()
-  if (estado.periodo !== ESTADO_PADRAO.periodo) sp.set("periodo", String(estado.periodo))
-  if (estado.visao !== ESTADO_PADRAO.visao) sp.set("visao", estado.visao)
+  if (estado.periodo !== DEFAULT_STATE.periodo) sp.set("periodo", String(estado.periodo))
+  if (estado.visao !== DEFAULT_STATE.visao) sp.set("visao", estado.visao)
   if (estado.status) sp.set("status", estado.status)
   if (estado.workspace) sp.set("workspace", estado.workspace)
   if (estado.workflow) sp.set("workflow", estado.workflow)
@@ -101,7 +101,7 @@ export function escreverEstado(estado: EstadoDoHistorico): string {
 }
 
 /** How many filters (apart from period, view and open run) are active. */
-export function filtrosAtivos(estado: EstadoDoHistorico): number {
+export function filtrosAtivos(estado: HistoryState): number {
   return [
     estado.status, estado.workspace, estado.workflow, estado.executor, estado.origem,
     estado.assistente || null, estado.q.trim() || null,
@@ -109,6 +109,6 @@ export function filtrosAtivos(estado: EstadoDoHistorico): number {
 }
 
 /** ISO date (UTC) of the window start, for the `date_from` of `/runs`. */
-export function inicioDaJanela(periodo: Periodo, agora: Date = new Date()): string {
+export function windowStart(periodo: Period, agora: Date = new Date()): string {
   return new Date(agora.getTime() - periodo * 24 * 60 * 60 * 1000).toISOString()
 }

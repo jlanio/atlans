@@ -17,7 +17,7 @@ import { Label } from "@/app/components/ui/label"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/components/ui/tooltip"
 import { INodesPropertyAPI } from "@/service/types"
 
-interface AjudaProps {
+interface HelpProps {
   texto: string
   /** For the trigger's accessible name — "Ajuda: Nome do arquivo". */
   rotulo: string
@@ -30,7 +30,7 @@ interface AjudaProps {
  * everyone and took space from everyone; now it is the reverse, without taking
  * from anyone.
  */
-export const AjudaDoCampo = ({ texto, rotulo }: AjudaProps) => (
+export const FieldHelp = ({ texto, rotulo }: HelpProps) => (
   // `delayDuration` above zero (our Tooltip's default) because the icons sit in
   // the label column, right in the path of the mouse going down the form: with
   // instant opening, crossing the panel fires one tooltip after another. 300ms
@@ -76,7 +76,7 @@ export const FieldLabel = ({ field, htmlFor }: FieldLabelProps) => {
             not a block: the hard validation stays in the backend. */}
         {field.required && <span aria-label="obrigatório" className="text-destructive ml-0.5">*</span>}
       </Label>
-      {field.description && <AjudaDoCampo texto={field.description} rotulo={texto} />}
+      {field.description && <FieldHelp texto={field.description} rotulo={texto} />}
     </div>
   )
 }

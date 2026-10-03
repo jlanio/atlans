@@ -69,7 +69,7 @@ def _make_executor(params: dict = None):
 class TestTimeoutConstants:
     """M3 — Timeout constants must exist and have the correct defaults."""
 
-    def test_constantes_existem(self):
+    def test_constants_exist(self):
         import flow.executor.pin as mod
         assert hasattr(mod, "_PIN_PRESIGN_TIMEOUT")
         assert hasattr(mod, "_PIN_UPLOAD_TIMEOUT")
@@ -84,7 +84,7 @@ class TestTimeoutConstants:
         assert mod._PIN_RETRY_COUNT == int(os.getenv("PIN_UPLOAD_MAX_RETRIES", "2"))
         assert mod._PIN_RETRY_MAX_DELAY == int(os.getenv("PIN_UPLOAD_RETRY_MAX_DELAY", "30"))
 
-    def test_env_var_lida_no_import(self, monkeypatch):
+    def test_env_var_read_on_import(self, monkeypatch):
         """After a reload with a custom env var, the constant must reflect the value."""
         import importlib
         import flow.executor.pin as pin_mod
@@ -107,7 +107,7 @@ class TestTimeoutConstants:
 class TestSpillFileUniqueness:
     """M2 — Spill files must have a UUID suffix to avoid collisions."""
 
-    def test_padrao_do_nome_tem_sufixo_hex(self):
+    def test_name_pattern_has_hex_suffix(self):
         """The node_key_<8hex>.parquet pattern must be valid."""
         import uuid
         node_id = "nó-abc"
@@ -118,14 +118,14 @@ class TestSpillFileUniqueness:
             f"'{filename}' não termina com 8 chars hex + .parquet"
         )
 
-    def test_dois_sufixos_consecutivos_sao_distintos(self):
+    def test_two_consecutive_suffixes_are_distinct(self):
         """Two UUIDs generated in a row must differ (astronomically high probability)."""
         import uuid
         s1 = uuid.uuid4().hex[:8]
         s2 = uuid.uuid4().hex[:8]
         assert s1 != s2
 
-    def test_spill_gera_paths_unicos_para_mesmo_no(self, tmp_path, monkeypatch):
+    def test_spill_generates_unique_paths_for_same_node(self, tmp_path, monkeypatch):
         """_spill_to_disk called twice for the same node generates distinct paths."""
         import geopandas as gpd
         from shapely.geometry import Point
@@ -137,15 +137,15 @@ class TestSpillFileUniqueness:
         monkeypatch.setattr(spill, "_SPILL_THRESHOLD_MB", 1e-9)
 
         gdf = gpd.GeoDataFrame({"n": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
-        paths_gravados = [
+        written_paths = [
             spill._spill_to_disk("task-999", "node-X", {"data": gdf})["data"]["__spill_path__"]
             for _ in range(2)
         ]
 
-        assert paths_gravados[0] != paths_gravados[1], (
+        assert written_paths[0] != written_paths[1], (
             "Dois spills do mesmo nó devem gerar paths únicos"
         )
-        for p in paths_gravados:
+        for p in written_paths:
             basename = os.path.basename(p)
             assert re.match(r"node-X_data_[0-9a-f]{8}\.parquet$", basename), (
                 f"'{basename}' não segue o padrão node_key_<8hex>.parquet"
@@ -163,7 +163,7 @@ class TestUploadPinRetry:
         monkeypatch.setenv("EXECUTOR_API_KEY", "test-key")
         monkeypatch.setenv("EXECUTOR_SERVER_URL", "http://localhost:8000")
 
-    def test_sucesso_sem_retry(self):
+    def test_success_without_retry(self):
         """An upload that succeeds on the 1st attempt must not call time.sleep."""
         from flow.executor import pin
 
@@ -177,7 +177,7 @@ class TestUploadPinRetry:
 
         mock_sleep.assert_not_called()
 
-    def test_retenta_apos_falha_transitoria(self):
+    def test_retries_after_transient_failure(self):
         """A failure on the 1st PUT attempt must trigger a retry and succeed on the 2nd."""
         from flow.executor import pin
 
@@ -206,7 +206,7 @@ class TestUploadPinRetry:
         (espera,), _ = mock_sleep.call_args
         assert 0.5 <= espera <= 1.0
 
-    def test_levanta_excecao_ao_esgotar_retries(self):
+    def test_raises_exception_when_retries_run_out(self):
         """After exhausting _PIN_RETRY_COUNT attempts, it must re-raise the last exception."""
         from flow.executor import pin
 
@@ -219,7 +219,7 @@ class TestUploadPinRetry:
             with pytest.raises(OSError, match="Storage indisponível"):
                 pin.upload_pin_to_minio(b"data", "key.json", "application/json")
 
-    def test_backoff_exponencial(self):
+    def test_exponential_backoff(self):
         """The wait must double on each attempt, within the jitter range."""
         from flow.executor import pin
 
@@ -244,7 +244,7 @@ class TestUploadPinRetry:
             assert 0.5 * (2 ** k) <= espera <= 2 ** k, (k, espera)
         assert sleep_delays == sorted(sleep_delays)
 
-    def test_backoff_respeitado_cap(self):
+    def test_backoff_respects_cap(self):
         """The delay must not exceed _PIN_RETRY_MAX_DELAY."""
         from flow.executor import pin
 
@@ -276,7 +276,7 @@ class TestUploadPinWithPath:
         monkeypatch.setenv("EXECUTOR_API_KEY", "test-key")
         monkeypatch.setenv("EXECUTOR_SERVER_URL", "http://localhost:8000")
 
-    def test_path_e_lido_e_bytes_enviados(self, tmp_path):
+    def test_path_is_read_and_bytes_sent(self, tmp_path):
         """When content is a path (str), the file's bytes must be sent in the PUT."""
         from flow.executor import pin
 
@@ -300,7 +300,7 @@ class TestUploadPinWithPath:
 
         assert captured["content"] == expected
 
-    def test_arquivo_temp_removido_apos_upload_agente(self, tmp_path):
+    def test_temp_file_removed_after_agent_upload(self, tmp_path):
         """The temporary file must be deleted after upload in the executor context."""
         from flow.executor import pin
 
@@ -317,12 +317,12 @@ class TestUploadPinWithPath:
 
         assert not f.exists(), "Arquivo temporário deve ser removido após upload"
 
-    def test_bytes_direto_nao_remove_nada(self, tmp_path):
+    def test_direct_bytes_removes_nothing(self, tmp_path):
         """When content is bytes, no file must be removed."""
         from flow.executor import pin
 
-        sentinela = tmp_path / "nao_deve_ser_removido.txt"
-        sentinela.write_text("preservado")
+        sentinel = tmp_path / "nao_deve_ser_removido.txt"
+        sentinel.write_text("preservado")
 
         with patch("flow.executor.pin._PIN_RETRY_COUNT", 0), \
              patch("time.sleep"), \
@@ -332,7 +332,7 @@ class TestUploadPinWithPath:
                    return_value=("http://localhost:8000", {}, True)):
             pin.upload_pin_to_minio(b"raw bytes", "pin/key.json", "application/json")
 
-        assert sentinela.exists()
+        assert sentinel.exists()
 
 
 # ── M5: async _render_node_parameters ────────────────────────────────────────
@@ -340,7 +340,7 @@ class TestUploadPinWithPath:
 class TestRenderNodeParameters:
     """M5 — _render_node_parameters deve continuar renderizando corretamente via to_thread."""
 
-    def test_jinja2_renderizado(self):
+    def test_jinja2_rendered(self):
         """A simple Jinja2 expression must be processed."""
         executor = _make_executor({"msg": "{{ 1 + 1 }}"})
         context = {
@@ -352,7 +352,7 @@ class TestRenderNodeParameters:
         rendered = executor._render_node_parameters("node-1", {}, context)
         assert rendered["msg"] == "2"
 
-    def test_sem_jinja2_nao_modifica(self):
+    def test_without_jinja2_does_not_modify(self):
         """Parameters without expressions must not be changed."""
         executor = _make_executor({"url": "https://example.com", "count": 42})
         context = {
@@ -381,7 +381,7 @@ class TestRenderNodeParameters:
         rendered = asyncio.run(run())
         assert rendered["val"] == "21"
 
-    def test_expressao_invalida_levanta_value_error(self):
+    def test_invalid_expression_raises_value_error(self):
         """A Jinja2 expression with an undefined variable must raise ValueError."""
         # StrictUndefined makes Jinja2 raise UndefinedError → caught as ValueError
         executor = _make_executor({"x": "{{ variavel_que_nao_existe_xyz }}"})
@@ -406,7 +406,7 @@ class TestSpillToDiskAsync:
         "edges": [],
     }
 
-    def test_executor_completa_sem_erro(self):
+    def test_executor_completes_without_error(self):
         """A minimal workflow must complete without errors after the async changes."""
         from flow.executor import WorkflowExecutor
 
@@ -417,16 +417,16 @@ class TestSpillToDiskAsync:
         asyncio.run(executor.run(initial_inputs={}))
         assert executor.node_stats["m1"]["status"] == "completed"
 
-    def test_spill_nao_bloqueia_tarefas_paralelas(self):
+    def test_spill_does_not_block_parallel_tasks(self):
         """The spill of the node output goes through asyncio.to_thread."""
         from flow.executor import WorkflowExecutor
 
-        spill_foi_chamado = {"via_thread": False}
+        spill_was_called = {"via_thread": False}
         original_to_thread = asyncio.to_thread
 
         async def spy_to_thread(func, *args, **kwargs):
             if getattr(func, "__name__", "") == "_spill_to_disk":
-                spill_foi_chamado["via_thread"] = True
+                spill_was_called["via_thread"] = True
             return await original_to_thread(func, *args, **kwargs)
 
         executor = WorkflowExecutor(
@@ -436,4 +436,4 @@ class TestSpillToDiskAsync:
         with patch("flow.executor.core.asyncio.to_thread", side_effect=spy_to_thread), \
              patch("flow.executor.spill._SPILL_THRESHOLD_MB", 0):  # 0 = spill disabled, does not test the real path
             asyncio.run(executor.run(initial_inputs={}))
-        assert spill_foi_chamado["via_thread"]
+        assert spill_was_called["via_thread"]

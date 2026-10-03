@@ -19,10 +19,10 @@ FUSO_DE_RESERVA = "UTC"
 
 # Files in the time zone database that zoneinfo opens but that are not time zones:
 # the browser does not know them, and the screen would show a zone it cannot draw.
-_NAO_SAO_FUSOS = frozenset({"localtime", "posixrules", "Factory"})
+_NOT_TIMEZONES = frozenset({"localtime", "posixrules", "Factory"})
 
 
-def fuso_padrao_do_agendamento() -> str:
+def default_schedule_timezone() -> str:
     """AGENDAMENTO_FUSO_PADRAO (an IANA time zone), or UTC when empty.
 
     A value that is not a time zone STOPS startup, instead of falling back to UTC: in an
@@ -36,7 +36,7 @@ def fuso_padrao_do_agendamento() -> str:
     erro = ValueError(
         f"AGENDAMENTO_FUSO_PADRAO={valor!r} não é um fuso IANA (ex.: America/Sao_Paulo, Europe/Lisbon, UTC)."
     )
-    if valor in _NAO_SAO_FUSOS:
+    if valor in _NOT_TIMEZONES:
         raise erro
     try:
         ZoneInfo(valor)

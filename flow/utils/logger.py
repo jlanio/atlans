@@ -11,12 +11,12 @@ import logging
 
 from flow.utils.redacao_log import SecretScrubFilter
 
-_filtro = SecretScrubFilter()
+_scrub_filter = SecretScrubFilter()
 
 
 def get_logger(name: str) -> logging.Logger:
     """Retorna logger configurado para o modulo flow."""
     logger = logging.getLogger(name)
-    if _filtro not in logger.filters:
-        logger.addFilter(_filtro)
+    if _scrub_filter not in logger.filters:
+        logger.addFilter(_scrub_filter)
     return logger

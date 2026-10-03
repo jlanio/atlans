@@ -93,11 +93,11 @@ const EXCECOES: { arquivo: string; motivo: string }[] = [
   },
 ]
 
-function arquivosTs(dir: string, acc: string[] = []): string[] {
+function tsFiles(dir: string, acc: string[] = []): string[] {
   for (const nome of readdirSync(dir)) {
     if (nome === "node_modules" || nome === ".next") continue
     const caminho = join(dir, nome)
-    if (statSync(caminho).isDirectory()) arquivosTs(caminho, acc)
+    if (statSync(caminho).isDirectory()) tsFiles(caminho, acc)
     else if (/\.tsx?$/.test(nome)) acc.push(caminho)
   }
   return acc
@@ -107,7 +107,7 @@ describe("camada HTTP central", () => {
   it("nenhuma página do dashboard chama axios/fetch direto", () => {
     const violacoes: string[] = []
 
-    for (const caminho of arquivosTs(join(RAIZ, "app"))) {
+    for (const caminho of tsFiles(join(RAIZ, "app"))) {
       const rel = relative(RAIZ, caminho).replace(/\\/g, "/")
       if (EXCECOES.some(e => rel.startsWith(e.arquivo))) continue
 
@@ -115,9 +115,9 @@ describe("camada HTTP central", () => {
       fonte.split("\n").forEach((linha, i) => {
         // Ignores comments and example strings shown to the user
         // (webhook-helper builds a snippet with `fetch(` inside a template).
-        const semComentario = linha.replace(/\/\/.*$/, "")
-        if (/\baxios\.(get|post|put|patch|delete)\s*\(/.test(semComentario)
-            || /\bawait\s+fetch\s*\(/.test(semComentario)) {
+        const withoutComment = linha.replace(/\/\/.*$/, "")
+        if (/\baxios\.(get|post|put|patch|delete)\s*\(/.test(withoutComment)
+            || /\bawait\s+fetch\s*\(/.test(withoutComment)) {
           violacoes.push(`${rel}:${i + 1} — ${linha.trim()}`)
         }
       })
@@ -142,13 +142,13 @@ describe("camada HTTP central", () => {
 
   it("o Authorization não é montado à mão em nenhuma página", () => {
     const violacoes: string[] = []
-    for (const caminho of arquivosTs(join(RAIZ, "app"))) {
+    for (const caminho of tsFiles(join(RAIZ, "app"))) {
       const rel = relative(RAIZ, caminho).replace(/\\/g, "/")
       if (EXCECOES.some(e => rel.startsWith(e.arquivo))) continue
       const fonte = readFileSync(caminho, "utf8")
       fonte.split("\n").forEach((linha, i) => {
-        const semComentario = linha.replace(/\/\/.*$/, "")
-        if (/Authorization["']?\s*[:=]\s*[`"']Bearer/.test(semComentario)) {
+        const withoutComment = linha.replace(/\/\/.*$/, "")
+        if (/Authorization["']?\s*[:=]\s*[`"']Bearer/.test(withoutComment)) {
           violacoes.push(`${rel}:${i + 1} — ${linha.trim()}`)
         }
       })

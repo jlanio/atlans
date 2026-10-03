@@ -27,7 +27,7 @@ import os
 import pytest
 
 from flow.utils import artifact_helpers
-from flow.utils.artifact_helpers import EnvioBloqueadoError
+from flow.utils.artifact_helpers import SendBlockedError
 
 
 @pytest.fixture
@@ -55,78 +55,78 @@ def maquina(tmp_path, monkeypatch):
     ("download", "servidor"),
     ("", "servidor"),
 ])
-def test_politica_vem_do_modo_do_geosync(monkeypatch, modo, esperado):
+def test_policy_comes_from_geosync_mode(monkeypatch, modo, esperado):
     """Reuses `EXECUTOR_SYNC_MODE`, which is what the desktop screen already writes under
     the label "Localidade dos dados" (data locality). A variable of its own would be a
     second source of truth for the same decision."""
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", modo)
-    assert artifact_helpers.localidade_padrao() == esperado
+    assert artifact_helpers.default_locality() == esperado
 
 
-def test_sem_a_variavel_o_padrao_e_servidor(monkeypatch):
+def test_without_the_variable_default_is_server(monkeypatch):
     """This is the server's case, where `flow/` also runs in-process: the content is
     already there. It is the long-standing behavior for every existing executor."""
     monkeypatch.delenv("EXECUTOR_SYNC_MODE", raising=False)
-    assert artifact_helpers.localidade_padrao() == "servidor"
+    assert artifact_helpers.default_locality() == "servidor"
 
 
 @pytest.mark.parametrize("escolha", [None, "", "herdar", "  HERDAR "])
-def test_herdar_segue_a_maquina(monkeypatch, escolha):
+def test_inherit_follows_the_machine(monkeypatch, escolha):
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", "catalog")
-    assert artifact_helpers.resolver_localidade(escolha) == ("executor", "executor")
+    assert artifact_helpers.resolve_locality(escolha) == ("executor", "executor")
 
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", "upload")
-    assert artifact_helpers.resolver_localidade(escolha) == ("servidor", "executor")
+    assert artifact_helpers.resolve_locality(escolha) == ("servidor", "executor")
 
 
-def test_no_pode_APERTAR_a_politica(monkeypatch):
+def test_node_can_TIGHTEN_the_policy(monkeypatch):
     """Machine allows sending, node asks for local → it stays local. Tightening is always
     accepted; it is the only direction in which the node's choice counts."""
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", "upload")
-    assert artifact_helpers.resolver_localidade("executor") == ("executor", "nó")
+    assert artifact_helpers.resolve_locality("executor") == ("executor", "nó")
 
 
-def test_no_NAO_pode_afrouxar_a_politica(monkeypatch):
+def test_node_CANNOT_loosen_the_policy(monkeypatch):
     """The central case. Neither an invented value, nor an old workflow, nor an edit
     outside the UI can make an executor in catalog mode send."""
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", "catalog")
     for escolha in (None, "herdar", "servidor", "minio", "qualquer", "EXECUTOR"):
-        efetiva, _ = artifact_helpers.resolver_localidade(escolha)
+        efetiva, _ = artifact_helpers.resolve_locality(escolha)
         assert efetiva == "executor", f"escolha {escolha!r} furou a política"
 
 
-def test_o_schema_NAO_oferece_a_opcao_de_enviar():
+def test_schema_does_NOT_offer_the_upload_option():
     """If it offered it, it would be the only choice the executor silently ignores —
     the person ticks it, believes it, and the behavior is something else."""
-    valores = [o["value"] for o in artifact_helpers.propriedade_localidade()["options"]]
+    valores = [o["value"] for o in artifact_helpers.locality_property()["options"]]
     assert valores == ["herdar", "executor"]
     assert "servidor" not in valores
 
 
-def test_frase_do_log_diz_o_destino_e_quem_decidiu(monkeypatch):
+def test_log_sentence_states_destination_and_who_decided(monkeypatch):
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", "catalog")
-    efetiva, quem = artifact_helpers.resolver_localidade("herdar")
-    frase = artifact_helpers.descrever_localidade(efetiva, quem)
+    efetiva, quem = artifact_helpers.resolve_locality("herdar")
+    frase = artifact_helpers.describe_locality(efetiva, quem)
     assert "apenas neste executor" in frase and "executor" in frase
 
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", "upload")
-    efetiva, quem = artifact_helpers.resolver_localidade("executor")
-    frase = artifact_helpers.descrever_localidade(efetiva, quem)
+    efetiva, quem = artifact_helpers.resolve_locality("executor")
+    frase = artifact_helpers.describe_locality(efetiva, quem)
     assert "apenas neste executor" in frase and "nó" in frase
 
 
 # ── Nodes that only work by sending ──────────────────────────────────────────
 
-def test_envio_permitido_passa_quando_a_maquina_permite(monkeypatch):
+def test_allowed_upload_passes_when_machine_allows(monkeypatch):
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", "bidirectional")
     artifact_helpers.exigir_envio_permitido("PublishMap 'X'", "publicar exige enviar")
 
 
-def test_envio_bloqueado_explica_configuracao_causa_e_saida(monkeypatch):
+def test_blocked_upload_explains_setting_cause_and_way_out(monkeypatch):
     """The message is the only feedback the person gets. It has to say WHERE the
     setting is, WHY the node needs to send, and WHAT to do."""
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", "catalog")
-    with pytest.raises(EnvioBloqueadoError) as e:
+    with pytest.raises(SendBlockedError) as e:
         artifact_helpers.exigir_envio_permitido(
             "PublishMap 'Lotes'", "publicar uma camada exige enviar a geometria ao portal",
         )
@@ -140,15 +140,15 @@ def test_envio_bloqueado_explica_configuracao_causa_e_saida(monkeypatch):
     msg.encode("cp1252")
 
 
-def test_bloqueio_nao_e_erro_de_configuracao_do_no():
+def test_block_is_not_a_node_configuration_error():
     """A dedicated exception: whoever reads the log needs to distinguish "you set it up wrong"
     from "this machine does not allow it"."""
-    assert issubclass(EnvioBloqueadoError, RuntimeError)
-    assert not issubclass(EnvioBloqueadoError, ValueError)
+    assert issubclass(SendBlockedError, RuntimeError)
+    assert not issubclass(SendBlockedError, ValueError)
 
 
 @pytest.mark.parametrize("no", ["PublishMap", "SendEmail"])
-def test_nos_que_enviam_chamam_a_guarda(no):
+def test_uploading_nodes_call_the_guard(no):
     """Reads the code: the defect would be one of FLOW — the guard existing and not being
     called — and exercising the two nodes would require a portal, SMTP and a GeoDataFrame."""
     import pathlib
@@ -157,7 +157,7 @@ def test_nos_que_enviam_chamam_a_guarda(no):
     assert "exigir_envio_permitido(" in src
 
 
-def test_publishmap_barra_ANTES_de_serializar():
+def test_publishmap_blocks_BEFORE_serializing():
     """Serializing a large GeoDataFrame only to refuse it afterwards wastes CPU and memory
     on a result already known to be denied."""
     import pathlib
@@ -168,7 +168,7 @@ def test_publishmap_barra_ANTES_de_serializar():
 
 # ── Despacho compartilhado ───────────────────────────────────────────────────
 
-def test_persistir_artefato_local_nao_faz_nenhuma_chamada_http(maquina, monkeypatch):
+def test_persisting_local_artifact_makes_no_http_call(maquina, monkeypatch):
     """The `if` that chooses the destination lives in a single place precisely for this:
     each copy of it would be a new point through which personal data could leak."""
     import httpx
@@ -188,14 +188,14 @@ def test_persistir_artefato_local_nao_faz_nenhuma_chamada_http(maquina, monkeypa
     assert chave == "ws-1/run-1/a.json"
 
 
-def test_persistir_artefato_servidor_vai_para_o_upload(maquina, monkeypatch):
+def test_persisting_server_artifact_goes_to_upload(maquina, monkeypatch):
     chamados: list[str] = []
 
-    def falso_upload(**kw):
+    def fake_upload(**kw):
         chamados.append(kw["filename"])
         return "artifacts/ws-1/run-1/a.json", {"content_location": "minio"}
 
-    monkeypatch.setattr(artifact_helpers, "upload_artifact_to_minio", falso_upload)
+    monkeypatch.setattr(artifact_helpers, "upload_artifact_to_minio", fake_upload)
     artifact_helpers.persistir_artefato(
         localidade="servidor", content=b"x", filename="a.json",
         workspace_id="ws-1", task_id="run-1",
@@ -206,14 +206,14 @@ def test_persistir_artefato_servidor_vai_para_o_upload(maquina, monkeypatch):
 # ── Local Drive: write to the GeoSync folder ─────────────────────────────────
 
 @pytest.fixture
-def retendo(maquina, monkeypatch):
+def retaining(maquina, monkeypatch):
     """The folder only receives a local file when the machine is in catalog mode."""
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", "catalog")
     return maquina
 
 
 @pytest.mark.parametrize("modo", ["upload", "bidirectional", "download", ""])
-def test_NAO_grava_na_pasta_quando_o_geosync_ENVIARIA(maquina, monkeypatch, modo):
+def test_does_NOT_write_to_folder_when_geosync_WOULD_SEND(maquina, monkeypatch, modo):
     """The bug this guard exists to prevent.
 
     In `upload`/`bidirectional` GeoSync scans the folder every 10 s and SENDS the
@@ -226,7 +226,7 @@ def test_NAO_grava_na_pasta_quando_o_geosync_ENVIARIA(maquina, monkeypatch, modo
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", modo)
 
     with pytest.raises(ValueError) as e:
-        artifact_helpers.salvar_na_pasta_do_geosync(b"sigiloso", "a.geojson", "ws-1")
+        artifact_helpers.save_to_geosync_folder(b"sigiloso", "a.geojson", "ws-1")
 
     assert list(pasta.iterdir()) == [], "arquivo gravado numa pasta que sincroniza"
     msg = str(e.value)
@@ -234,20 +234,20 @@ def test_NAO_grava_na_pasta_quando_o_geosync_ENVIARIA(maquina, monkeypatch, modo
     assert "Artefatos" in msg, "a mensagem precisa oferecer a saída que funciona"
 
 
-def test_grava_na_pasta_e_deixa_o_geosync_catalogar(retendo):
-    _, pasta = retendo
-    destino = artifact_helpers.salvar_na_pasta_do_geosync(
+def test_writes_to_folder_and_lets_geosync_catalog(retaining):
+    _, pasta = retaining
+    destino = artifact_helpers.save_to_geosync_folder(
         b'{"a":1}', "cadastro.geojson", "ws-1",
     )
     assert (pasta / "cadastro.geojson").read_bytes() == b'{"a":1}'
     assert destino == str(pasta / "cadastro.geojson")
 
 
-def test_escrita_e_ATOMICA_e_nao_deixa_temporario(retendo, monkeypatch):
+def test_write_is_ATOMIC_and_leaves_no_temp_file(retaining, monkeypatch):
     """The scanner scans every 10 s and recognizes by size+mtime; caught in the middle
     of the write, it catalogs a half-written file. The temporary file starts with a dot,
     which the scanner ignores, and `os.replace` publishes it all at once."""
-    _, pasta = retendo
+    _, pasta = retaining
     vistos: list[str] = []
     replace_real = os.replace
 
@@ -257,7 +257,7 @@ def test_escrita_e_ATOMICA_e_nao_deixa_temporario(retendo, monkeypatch):
         return replace_real(origem, destino)
 
     monkeypatch.setattr(os, "replace", espiao)
-    artifact_helpers.salvar_na_pasta_do_geosync(b"conteudo", "saida.geojson", "ws-1")
+    artifact_helpers.save_to_geosync_folder(b"conteudo", "saida.geojson", "ws-1")
 
     assert all(n.startswith(".") for n in vistos), (
         f"arquivo visivel ao scanner durante a escrita: {vistos}"
@@ -266,64 +266,64 @@ def test_escrita_e_ATOMICA_e_nao_deixa_temporario(retendo, monkeypatch):
     assert [p.name for p in pasta.iterdir()] == ["saida.geojson"]
 
 
-def test_temporario_e_removido_quando_a_escrita_falha(retendo, monkeypatch):
+def test_temp_file_is_removed_when_write_fails(retaining, monkeypatch):
     """An orphaned `.atlans-tmp-*` is invisible to the user AND to the scanner: it would
     keep taking up disk forever without anyone noticing."""
-    _, pasta = retendo
+    _, pasta = retaining
 
-    def replace_que_falha(*a, **k):
+    def failing_replace(*a, **k):
         raise OSError("disco cheio")
 
-    monkeypatch.setattr(os, "replace", replace_que_falha)
+    monkeypatch.setattr(os, "replace", failing_replace)
     with pytest.raises(OSError):
-        artifact_helpers.salvar_na_pasta_do_geosync(b"x", "saida.geojson", "ws-1")
+        artifact_helpers.save_to_geosync_folder(b"x", "saida.geojson", "ws-1")
 
     assert list(pasta.iterdir()) == []
 
 
-def test_sem_pasta_configurada_o_erro_diz_o_que_fazer(retendo, monkeypatch):
+def test_without_configured_folder_error_says_what_to_do(retaining, monkeypatch):
     monkeypatch.setenv("EXECUTOR_SYNC_DIRS", "")
     with pytest.raises(ValueError) as e:
-        artifact_helpers.salvar_na_pasta_do_geosync(b"x", "a.geojson", "ws-1")
+        artifact_helpers.save_to_geosync_folder(b"x", "a.geojson", "ws-1")
     assert "GeoSync" in str(e.value) and "Configure" in str(e.value)
 
 
-def test_workspace_divergente_e_barrado(retendo, monkeypatch):
+def test_mismatched_workspace_is_blocked(retaining, monkeypatch):
     """GeoSync syncs against ONE workspace. Writing here with another would publish
     the file to another customer's Drive."""
     monkeypatch.setenv("EXECUTOR_WORKSPACE_ID", "ws-outro")
     with pytest.raises(ValueError) as e:
-        artifact_helpers.salvar_na_pasta_do_geosync(b"x", "a.geojson", "ws-1")
+        artifact_helpers.save_to_geosync_folder(b"x", "a.geojson", "ws-1")
     assert "ws-outro" in str(e.value) and "ws-1" in str(e.value)
 
 
-def test_workspace_vazio_significa_auto_deteccao(retendo, monkeypatch):
+def test_empty_workspace_means_auto_detection(retaining, monkeypatch):
     """Empty only happens when there is a single accessible workspace
     (executor/main.py), so it matches by construction."""
     monkeypatch.delenv("EXECUTOR_WORKSPACE_ID", raising=False)
-    artifact_helpers.salvar_na_pasta_do_geosync(b"x", "a.geojson", "ws-1")
+    artifact_helpers.save_to_geosync_folder(b"x", "a.geojson", "ws-1")
 
 
-def test_nao_sobrescreve_arquivo_do_usuario_sem_permissao(retendo):
-    """E a pasta DELE. Sobrescrever em silencio destroi dado; inventar
+def test_does_not_overwrite_user_file_without_permission(retaining):
+    """E a pasta HIS. Sobrescrever em silencio destroi dado; inventar
     'saida (1).geojson' produz lixo que ninguem pediu."""
-    _, pasta = retendo
+    _, pasta = retaining
     (pasta / "saida.geojson").write_bytes(b"do usuario")
 
     with pytest.raises(ValueError) as e:
-        artifact_helpers.salvar_na_pasta_do_geosync(b"novo", "saida.geojson", "ws-1")
+        artifact_helpers.save_to_geosync_folder(b"novo", "saida.geojson", "ws-1")
     assert "Sobrescrever" in str(e.value)
     assert (pasta / "saida.geojson").read_bytes() == b"do usuario", "arquivo destruído"
 
 
-def test_com_overwrite_substitui(retendo):
-    _, pasta = retendo
+def test_with_overwrite_replaces(retaining):
+    _, pasta = retaining
     (pasta / "saida.geojson").write_bytes(b"antigo")
-    artifact_helpers.salvar_na_pasta_do_geosync(b"novo", "saida.geojson", "ws-1", overwrite=True)
+    artifact_helpers.save_to_geosync_folder(b"novo", "saida.geojson", "ws-1", overwrite=True)
     assert (pasta / "saida.geojson").read_bytes() == b"novo"
 
 
-def test_formatos_dos_nos_sao_todos_visiveis_ao_scanner():
+def test_node_formats_are_all_visible_to_scanner():
     """A format outside `SUPPORTED_EXTENSIONS` would be written to the folder and NEVER
     cataloged — the file would exist and the Drive would never know about it."""
     from executor.sync.scanner import SUPPORTED_EXTENSIONS
@@ -332,7 +332,7 @@ def test_formatos_dos_nos_sao_todos_visiveis_ao_scanner():
         assert ext in SUPPORTED_EXTENSIONS, ext
 
 
-def test_drive_local_nao_devolve_caminho_absoluto():
+def test_local_drive_does_not_return_absolute_path():
     """`artifact_s3_key` circulates through the workflow and is stored in the run. Returning
     the path of the user's folder would leak the machine's directory structure —
     the same reason `local_relative_path` is relative."""
@@ -344,7 +344,7 @@ def test_drive_local_nao_devolve_caminho_absoluto():
     assert "destino," not in trecho.split('"output"')[1]
 
 
-def test_drive_local_nao_emite_artifact():
+def test_local_drive_does_not_emit_artifact():
     """The one that creates the row in the Drive is GeoSync. Emitting `__artifact__` would
     make the server derive an s3_key for an object that never existed, and the UI
     would offer a 404 download."""
@@ -359,19 +359,19 @@ def test_drive_local_nao_emite_artifact():
 
 # ── Download guard on the server ─────────────────────────────────────────────
 
-def test_download_de_conteudo_local_e_recusado():
+def test_local_content_download_is_rejected():
     from types import SimpleNamespace
 
-    from app.core.exceptions import ConteudoNoExecutorError
+    from app.core.exceptions import ContentOnExecutorError
     from app.services import drive_service
 
-    with pytest.raises(ConteudoNoExecutorError):
+    with pytest.raises(ContentOnExecutorError):
         drive_service._recusar_se_local(
             SimpleNamespace(content_location="executor", s3_key=None, original_name="a.gpkg")
         )
 
 
-def test_download_de_arquivo_normal_passa():
+def test_normal_file_download_passes():
     from types import SimpleNamespace
 
     from app.services import drive_service
@@ -381,7 +381,7 @@ def test_download_de_arquivo_normal_passa():
     )
 
 
-def test_guarda_vive_no_SERVICE_e_nao_no_router():
+def test_guard_lives_in_SERVICE_not_in_router():
     """Regression: `GET /drive/{id}/download` called `generate_download_url`
     directly and reached boto3 with `s3_key=None` — ParamValidationError, which is not
     a ClientError, escapes every except and becomes a silent 500. The UI hid the button;
@@ -393,49 +393,49 @@ def test_guarda_vive_no_SERVICE_e_nao_no_router():
     assert "_recusar_se_local" in inspect.getsource(DriveService.generate_download_url)
 
 
-def test_replace_retenta_quando_o_scanner_segura_o_arquivo(retendo, monkeypatch):
+def test_replace_retries_when_scanner_holds_the_file(retaining, monkeypatch):
     """On Windows, `os.replace` over a file opened by another handle fails —
     and the GeoSync scanner opens the folder's files, in a thread of this same
     process, to compute MD5. Without a retry, the run would die with a
     "[WinError 5] Acesso negado" (access denied) that says nothing."""
-    _, pasta = retendo
+    _, pasta = retaining
     tentativas = {"n": 0}
     replace_real = os.replace
 
-    def instavel(origem, destino):
+    def flaky(origem, destino):
         tentativas["n"] += 1
         if tentativas["n"] < 3:
             raise PermissionError(5, "Acesso negado")
         return replace_real(origem, destino)
 
-    monkeypatch.setattr(os, "replace", instavel)
+    monkeypatch.setattr(os, "replace", flaky)
     monkeypatch.setattr("time.sleep", lambda _s: None)
 
-    artifact_helpers.salvar_na_pasta_do_geosync(b"x", "a.geojson", "ws-1")
+    artifact_helpers.save_to_geosync_folder(b"x", "a.geojson", "ws-1")
     assert tentativas["n"] == 3
     assert (pasta / "a.geojson").read_bytes() == b"x"
 
 
-def test_replace_desiste_e_propaga_se_nao_for_transitorio(retendo, monkeypatch):
+def test_replace_gives_up_and_propagates_if_not_transient(retaining, monkeypatch):
     """An infinite retry would hide a genuinely locked file (antivirus, another
     program with it open) and the run would hang without explanation."""
-    _, pasta = retendo
+    _, pasta = retaining
 
-    def sempre_falha(origem, destino):
+    def always_fails(origem, destino):
         raise PermissionError(5, "Acesso negado")
 
-    monkeypatch.setattr(os, "replace", sempre_falha)
+    monkeypatch.setattr(os, "replace", always_fails)
     monkeypatch.setattr("time.sleep", lambda _s: None)
 
     with pytest.raises(PermissionError):
-        artifact_helpers.salvar_na_pasta_do_geosync(b"x", "a.geojson", "ws-1")
+        artifact_helpers.save_to_geosync_folder(b"x", "a.geojson", "ws-1")
     # And without leaving the temporary file behind.
     assert list(pasta.iterdir()) == []
 
 
 # ── E-mail with a reference that has no download ─────────────────────────────
 
-def test_email_nao_embute_link_morto():
+def test_email_does_not_embed_dead_link():
     """`_build_artifact_html` puts whatever it receives into an `href`. Without presign, that
     would be the previous node's raw reference — a RELATIVE link in an HTML e-mail,
     which leads nowhere. The e-mail would go out announcing "anexo disponivel
@@ -453,7 +453,7 @@ def test_email_nao_embute_link_morto():
     assert guarda > 0
 
 
-def test_anexo_sem_presign_nem_endpoint_publico_sai_sem_link(monkeypatch):
+def test_attachment_without_presign_or_public_endpoint_goes_without_link(monkeypatch):
     """The "auto" mode passes the raw key when the presign fails. Without
     MINIO_EXTERNAL_ENDPOINT, it went into a relative `href`: a dead link."""
     from unittest.mock import MagicMock
@@ -472,7 +472,7 @@ def test_anexo_sem_presign_nem_endpoint_publico_sai_sem_link(monkeypatch):
 
 # ── PublishMap: fallback e degradacao, nao politica ──────────────────────────
 
-def test_publishmap_fallback_registra_que_FOI_falha():
+def test_publishmap_fallback_records_that_it_WAS_a_failure():
     """`content_location` says WHERE the content is; `local_fallback` says WHY.
     Setting False on the fallback would count a portal failure as if it were a
     privacy decision."""

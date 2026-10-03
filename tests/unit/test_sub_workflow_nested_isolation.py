@@ -23,12 +23,12 @@ def spill_de_um_run(tmp_path, monkeypatch):
     task_id = "run-123"
     d = base / task_id
     d.mkdir(parents=True)
-    arquivo_do_pai = d / "no_do_pai_out_abc.parquet"
-    arquivo_do_pai.write_bytes(b"dados grandes do pai")
-    return task_id, arquivo_do_pai
+    parent_file = d / "no_do_pai_out_abc.parquet"
+    parent_file.write_bytes(b"dados grandes do pai")
+    return task_id, parent_file
 
 
-def test_cleanup_do_filho_nao_pode_apagar_spill_do_pai(spill_de_um_run):
+def test_child_cleanup_cannot_delete_parent_spill(spill_de_um_run):
     """REGRESSION: the nested executor must not clean up the run's spill.
 
     Real scenario:
@@ -37,28 +37,28 @@ def test_cleanup_do_filho_nao_pode_apagar_spill_do_pai(spill_de_um_run):
       3. child finishes -> _cleanup_spill('run-123') -> rmtree
       4. parent tries to read its own spill -> file is gone
     """
-    task_id, arquivo_do_pai = spill_de_um_run
+    task_id, parent_file = spill_de_um_run
 
     # The child finishing must NOT remove the shared directory.
     _cleanup_spill(task_id, is_nested=True)
 
-    assert arquivo_do_pai.exists(), (
+    assert parent_file.exists(), (
         "spill do pai foi apagado pelo fim do sub-fluxo — o pai perderia os dados"
     )
 
 
-def test_cleanup_do_pai_continua_limpando(spill_de_um_run):
+def test_parent_cleanup_keeps_cleaning(spill_de_um_run):
     """The root executor remains responsible for the cleanup — without it /tmp grows."""
-    task_id, arquivo_do_pai = spill_de_um_run
+    task_id, parent_file = spill_de_um_run
 
     _cleanup_spill(task_id)
 
-    assert not arquivo_do_pai.exists()
+    assert not parent_file.exists()
     assert not os.path.isdir(os.path.join(_SPILL_BASE_DIR, task_id)) or True
 
 
 @pytest.mark.asyncio
-async def test_subworkflow_marca_o_executor_filho_como_aninhado():
+async def test_subworkflow_marks_the_child_executor_as_nested():
     """The node must pass is_nested=True — and the flag only exists to prevent
     the child from cleaning up resources indexed by the shared task_id."""
     from unittest.mock import MagicMock, patch

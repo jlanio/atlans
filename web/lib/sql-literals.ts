@@ -53,12 +53,12 @@ export function mascararLiteraisSql(sql: string): string {
     // 'string' — a doubled quote ('') escapes; with the E'' prefix, backslash does too
     if (c === "'") {
       const anterior = sql[i - 1]
-      const escapaBarra =
+      const escapesBackslash =
         (anterior === "e" || anterior === "E") &&
         (i < 2 || !/[0-9A-Za-z]/.test(sql[i - 2]))
       i++
       while (i < n) {
-        if (escapaBarra && sql[i] === "\\") { i += 2; continue }
+        if (escapesBackslash && sql[i] === "\\") { i += 2; continue }
         if (sql[i] === "'") {
           if (sql[i + 1] === "'") { i += 2; continue }
           i++

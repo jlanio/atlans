@@ -33,7 +33,7 @@ export type {
   INodeStatSummary, IExecutorCapacity, IExecutorSystemInfo,
   IAdminUser, IAdminUserListParams, IAdminUserListResponse, IAdminBulkActionResponse,
   IStorageUsage, IStorageUsageAdmin, IStorageWorkspaceUsage,
-  IAssistenteEstado, IAssistenteCota,
+  IAssistantState, IAssistantQuota,
   IWorkspace, IWorkspaceTrash, IWorkspaceRestoreResult,
   IWorkspaceMember, IUserSearchResult,
   IWorkspaceNotifications, IWorkspaceNotificationTarget,

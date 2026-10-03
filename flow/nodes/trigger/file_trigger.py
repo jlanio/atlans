@@ -2,7 +2,7 @@
 import asyncio
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
-from flow.utils.leitura_geo import ler_geodataframe
+from flow.utils.leitura_geo import read_geodataframe
 from flow.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -54,9 +54,9 @@ class FileTrigger(BaseNode):
                 raise FileNotFoundError(f"Caminho não encontrado: {p}")
 
         # Loads shapefiles asynchronously so as not to block the loop.
-        # `ler_geodataframe` rejects VRT content / GDAL virtual paths.
-        gdf1 = await asyncio.to_thread(ler_geodataframe, str(safe_a))
-        gdf2 = await asyncio.to_thread(ler_geodataframe, str(safe_b))
+        # `read_geodataframe` rejects VRT content / GDAL virtual paths.
+        gdf1 = await asyncio.to_thread(read_geodataframe, str(safe_a))
+        gdf2 = await asyncio.to_thread(read_geodataframe, str(safe_b))
 
         logger.info(f"Arquivos carregados: {safe_a}, {safe_b}")
         return {"file_a": gdf1, "file_b": gdf2}

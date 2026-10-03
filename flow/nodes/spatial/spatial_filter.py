@@ -128,11 +128,11 @@ class SpatialFilterNode(BaseNode):
                     # (e.g. output of a previous SpatialJoin), which would
                     # otherwise make sjoin itself raise ValueError.
                     base = gdf.reset_index(drop=True)
-                    casados = gpd.sjoin(
+                    matched = gpd.sjoin(
                         base[["geometry"]], mask_gdf[["geometry"]],
                         predicate="intersects", how="inner",
                     ).index.unique()
-                    hits = base.index.isin(casados)  # np.ndarray[bool], by position
+                    hits = base.index.isin(matched)  # np.ndarray[bool], by position
                     return gdf[~hits] if invert else gdf[hits]
                 # within/contains/overlaps are NOT monotonic under union (being
                 # "inside the union" ≠ "inside a feature"), so they keep the

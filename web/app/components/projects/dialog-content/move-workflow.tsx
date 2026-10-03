@@ -78,8 +78,8 @@ export default function MoveWorkflowDialog({
   // Different execution policy between source and destination: the workflow
   // starts following the destination's, and whoever moves from an Isolated
   // workspace to the pool needs to know the data changes executor.
-  const [avisoPolitica, setAvisoPolitica] = useState<string | null>(null);
-  const origemId = current?.id_hash ?? null;
+  const [policyNotice, setPolicyNotice] = useState<string | null>(null);
+  const sourceId = current?.id_hash ?? null;
 
   // Same list the menu uses to decide whether to offer the action; that is why
   // the dialog never opens without an eligible destination.
@@ -116,16 +116,16 @@ export default function MoveWorkflowDialog({
   useEffect(() => {
     // Clear BEFORE fetching: the previous destination's warning must not stay on
     // screen while the new destination's loads.
-    setAvisoPolitica(null);
-    if (!target || !origemId) return;
+    setPolicyNotice(null);
+    if (!target || !sourceId) return;
     let cancelado = false;
     Promise.all([
-      GisFlowService.getWorkspacePolicy(origemId),
+      GisFlowService.getWorkspacePolicy(sourceId),
       GisFlowService.getWorkspacePolicy(target),
     ]).then(([origem, destino]) => {
       if (cancelado) return;
       // Informational: if one of the reads fails, there is no warning — the move goes on.
-      setAvisoPolitica(avisoDeMudancaDePolitica(
+      setPolicyNotice(avisoDeMudancaDePolitica(
         origem?.error ? null : origem?.data ?? null,
         destino?.error ? null : destino?.data ?? null,
       ));
@@ -133,7 +133,7 @@ export default function MoveWorkflowDialog({
     return () => {
       cancelado = true;
     };
-  }, [target, origemId]);
+  }, [target, sourceId]);
 
   async function handleMove() {
     if (!target) return;
@@ -150,15 +150,15 @@ export default function MoveWorkflowDialog({
       return;
     }
 
-    const nomeDestino = destinos.find((w) => w.id_hash === target)?.name ?? "outro workspace";
+    const targetName = destinos.find((w) => w.id_hash === target)?.name ?? "outro workspace";
     onMoved(res.data);
 
     if (res.data.warnings.length > 0) {
       setReport(res.data);
-      createToast.info(`Workflow movido para ${nomeDestino}`, "Revise os avisos.");
+      createToast.info(`Workflow movido para ${targetName}`, "Revise os avisos.");
       return;
     }
-    createToast.success(`Workflow movido para ${nomeDestino}`);
+    createToast.success(`Workflow movido para ${targetName}`);
     onOpenChange(false);
   }
 
@@ -241,8 +241,8 @@ export default function MoveWorkflowDialog({
                       : "."}
                   </li>
                   <li>O workflow sai do grupo atual e os dados fixados sao removidos.</li>
-                  {avisoPolitica && (
-                    <li className="font-medium text-amber-700 dark:text-amber-400">{avisoPolitica}</li>
+                  {policyNotice && (
+                    <li className="font-medium text-amber-700 dark:text-amber-400">{policyNotice}</li>
                   )}
                 </ul>
               </div>

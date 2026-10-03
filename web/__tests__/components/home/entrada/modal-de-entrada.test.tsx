@@ -15,8 +15,8 @@ const auth = vi.hoisted(() => ({ signIn: vi.fn() }))
 vi.mock("next-auth/react", () => ({ signIn: auth.signIn }))
 
 import ModalDeEntrada from "@/app/components/home/entrada/modal-de-entrada"
-import { CodigoFonteProvider } from "@/app/components/share/codigo-fonte"
-import { NomeNaTelaProvider } from "@/app/components/share/nome-na-tela"
+import { SourceCodeProvider } from "@/app/components/share/codigo-fonte"
+import { DisplayNameProvider } from "@/app/components/share/nome-na-tela"
 
 const onFechar = vi.fn()
 const onEntrou = vi.fn()
@@ -117,7 +117,7 @@ describe("ModalDeEntrada — entrar", () => {
 })
 
 describe("ModalDeEntrada — criar conta", () => {
-  function preencherCadastro(confirmacao = "S3nha-forte") {
+  function fillSignUp(confirmacao = "S3nha-forte") {
     preencher(/^Usuário$/i, "fulana")
     preencher(/^E-mail$/i, "fulana@exemplo.com")
     preencher(/^Senha$/i, "S3nha-forte")
@@ -126,7 +126,7 @@ describe("ModalDeEntrada — criar conta", () => {
 
   it("senhas diferentes: erro inline, sem POST", async () => {
     montar({ modo: "cadastro" })
-    submeter(preencherCadastro("outra"))
+    submeter(fillSignUp("outra"))
     expect((await screen.findByRole("alert")).textContent).toContain("As senhas não coincidem.")
     expect(http.post).not.toHaveBeenCalled()
   })
@@ -134,7 +134,7 @@ describe("ModalDeEntrada — criar conta", () => {
   it("cadastro ok → 'Verifique seu e-mail', reenvio já preenchido, e a volta ao Entrar", async () => {
     http.post.mockResolvedValueOnce({ data: { message: "Conta criada." } })
     montar({ modo: "cadastro" })
-    submeter(preencherCadastro())
+    submeter(fillSignUp())
 
     expect(await screen.findByRole("dialog", { name: "Verifique seu e-mail" })).toBeTruthy()
     expect(http.post).toHaveBeenCalledWith(expect.stringMatching(/\/auth\/register$/), {
@@ -353,9 +353,9 @@ describe("ModalDeEntrada — o código-fonte da instalação (AGPL §13)", () =>
   // without CODIGO_FONTE_URL there is no link, because the code carries no address at all.
   it("com a URL no provider, o cabeçalho tem o link, que abre fora", () => {
     render(
-      <CodigoFonteProvider url="https://codigo.example.org/fulana/atlans">
+      <SourceCodeProvider url="https://codigo.example.org/fulana/atlans">
         <ModalDeEntrada modo="entrar" onFechar={onFechar} onEntrou={onEntrou} />
-      </CodigoFonteProvider>,
+      </SourceCodeProvider>,
     )
     const link = screen.getByRole("link", { name: "Código-fonte" })
     expect(link.getAttribute("href")).toBe("https://codigo.example.org/fulana/atlans")
@@ -375,9 +375,9 @@ describe("ModalDeEntrada — o nome da instalação no cabeçalho", () => {
     expect(screen.getByText(/^\s*Atlans\s*$/)).toBeTruthy()
     cleanup()
     render(
-      <NomeNaTelaProvider nome="Geo Exemplo">
+      <DisplayNameProvider nome="Geo Exemplo">
         <ModalDeEntrada modo="entrar" onFechar={onFechar} onEntrou={onEntrou} />
-      </NomeNaTelaProvider>,
+      </DisplayNameProvider>,
     )
     expect(screen.getByText(/Geo Exemplo/)).toBeTruthy()
   })

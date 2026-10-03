@@ -18,7 +18,7 @@ export const ESCOPOS = [
   "drive:write",
 ] as const satisfies readonly ApiTokenScope[]
 
-export const ESCOPO_ROTULOS: Record<ApiTokenScope, string> = {
+export const SCOPE_LABELS: Record<ApiTokenScope, string> = {
   "workflows:read":  "Ler fluxos",
   "workflows:write": "Criar e editar fluxos",
   "runs:execute":    "Executar fluxos",
@@ -27,7 +27,7 @@ export const ESCOPO_ROTULOS: Record<ApiTokenScope, string> = {
   "drive:write":     "Enviar arquivos ao Drive",
 }
 
-export const ESCOPO_DESCRICOES: Record<ApiTokenScope, string> = {
+export const SCOPE_DESCRIPTIONS: Record<ApiTokenScope, string> = {
   "workflows:read":  "Listar fluxos e ver as definições e o histórico de execuções.",
   "workflows:write": "Criar fluxos novos e alterar os existentes.",
   "runs:execute":    "Disparar execuções e acompanhar o resultado.",
@@ -37,10 +37,10 @@ export const ESCOPO_DESCRICOES: Record<ApiTokenScope, string> = {
 }
 
 /** The dialog's "Somente leitura" (read-only) shortcut: the smallest useful set for an agent. */
-export const ESCOPOS_SOMENTE_LEITURA: readonly ApiTokenScope[] = ["workflows:read", "drive:read"]
+export const READ_ONLY_SCOPES: readonly ApiTokenScope[] = ["workflows:read", "drive:read"]
 
-export function rotuloDeEscopo(escopo: ApiTokenScope | string): string {
-  return ESCOPO_ROTULOS[escopo as ApiTokenScope] ?? escopo
+export function scopeLabel(escopo: ApiTokenScope | string): string {
+  return SCOPE_LABELS[escopo as ApiTokenScope] ?? escopo
 }
 
 /** Returns the scopes in canonical order, ignoring what isn't known. */
@@ -48,13 +48,13 @@ export function ordenarEscopos(escopos: readonly string[]): ApiTokenScope[] {
   return ESCOPOS.filter(e => escopos.includes(e))
 }
 
-const STATUS_ROTULOS: Record<ApiTokenStatus, string> = {
+const STATUS_LABELS: Record<ApiTokenStatus, string> = {
   active:  "Ativo",
   expired: "Expirado",
   revoked: "Revogado",
 }
 
-export function rotuloDeStatus(status: ApiTokenStatus | string | null | undefined): string {
+export function statusLabel(status: ApiTokenStatus | string | null | undefined): string {
   if (!status) return "—"
-  return STATUS_ROTULOS[status as ApiTokenStatus] ?? status
+  return STATUS_LABELS[status as ApiTokenStatus] ?? status
 }

@@ -21,24 +21,24 @@ from app.services.validate_service import EdgeDefinition, WorkflowDefinition
 
 # ── 1. The preview needs to receive the edge's keys ──────────────────────────
 
-def test_edge_definition_preserva_as_chaves():
+def test_edge_definition_preserves_the_keys():
     edge = EdgeDefinition(source="a", target="b", from_key="bbox_string", to_key="layerA")
 
     assert edge.from_key == "bbox_string"
     assert edge.to_key == "layerA"
 
 
-def test_edge_definition_preserva_a_condicao_do_ramo():
+def test_edge_definition_preserves_the_branch_condition():
     assert EdgeDefinition(source="a", target="b", condition=False).condition is False
 
 
-def test_chaves_sao_opcionais():
+def test_keys_are_optional():
     edge = EdgeDefinition(source="a", target="b")
 
     assert edge.from_key is None and edge.to_key is None and edge.condition is None
 
 
-def test_chaves_sobrevivem_ao_dict_que_vai_para_o_executor():
+def test_keys_survive_the_dict_sent_to_the_executor():
     """Regression: this is where they got lost, before WorkflowExecutor(payload)."""
     d = WorkflowDefinition(
         nodes=[{"id": "n1", "name": "WFS", "type": "datasource"}],
@@ -49,7 +49,7 @@ def test_chaves_sobrevivem_ao_dict_que_vai_para_o_executor():
     assert d["edges"][0]["to_key"] == "layer"
 
 
-def test_properties_vira_parameters_e_alias_sobrevive_ao_model_dump():
+def test_properties_becomes_parameters_and_alias_survives_model_dump():
     """The persisted definition uses `properties` and keeps `alias` at the top
     level; pasting it into validation must not lose either (the alias lint
     depends on it)."""
@@ -62,7 +62,7 @@ def test_properties_vira_parameters_e_alias_sobrevive_ao_model_dump():
     assert "properties" not in d
 
 
-def test_parameters_vence_properties_em_conflito():
+def test_parameters_wins_over_properties_on_conflict():
     from app.services.validate_service import NodeParameter
 
     d = NodeParameter(
@@ -75,7 +75,7 @@ def test_parameters_vence_properties_em_conflito():
 
 # ── 2. The catalog publishes the fields of `outputs` ─────────────────────────
 
-async def _catalogo(outputs) -> list[str]:
+async def _catalog(outputs) -> list[str]:
     """Exercises the real NodeService, with a node whose descriptor is controlled."""
     from unittest.mock import AsyncMock, patch
     from app.services.node_service import NodeService
@@ -90,63 +90,63 @@ async def _catalogo(outputs) -> list[str]:
         async def execute(self, inputs):
             return {}
 
-    from app.services.node_service import _catalogo_completo
+    from app.services.node_service import _full_catalog
 
     # The catalog is cached (@lru_cache): clear it BEFORE, to build from the fake
     # registry, and AFTER, so that registry does not leak into the next tests.
     with patch("app.services.node_service.NODE_REGISTRY", {"_NoFalso": _NoFalso}), \
          patch("app.services.node_service.disabled_names", new=AsyncMock(return_value=set())):
-        _catalogo_completo.cache_clear()
+        _full_catalog.cache_clear()
         defs = await NodeService().list_nodes(db=None)
-    _catalogo_completo.cache_clear()
+    _full_catalog.cache_clear()
 
     return [f.name for f in (defs[0].outputs or [])]
 
 
 @pytest.mark.asyncio
-async def test_catalogo_le_os_campos_na_ordem():
+async def test_catalog_reads_the_fields_in_order():
     campos = [{"name": "output", "type": "geodataframe"}, {"name": "branch", "type": "boolean"}]
 
-    assert await _catalogo(campos) == ["output", "branch"]
+    assert await _catalog(campos) == ["output", "branch"]
 
 
 @pytest.mark.asyncio
-async def test_catalogo_tolera_lixo():
-    assert await _catalogo([None, {"type": "x"}, 42]) == []
-    assert await _catalogo(None) == []
+async def test_catalog_tolerates_garbage():
+    assert await _catalog([None, {"type": "x"}, 42]) == []
+    assert await _catalog(None) == []
 
 
 @pytest.mark.asyncio
-async def test_chaves_internas_do_protocolo_ficam_de_fora():
+async def test_internal_protocol_keys_are_left_out():
     """`__response__` and `__artifact__` are protocol keys, not outputs: the
     executor removes them from what the node delivers (core.py::_actual_keys).
     Without the filter, the Response's `__response__` would show up in the
     schema panel and in autocomplete as if it could be referenced."""
-    assert await _catalogo([{"name": "__response__"}, {"name": "status_code"}]) == ["status_code"]
+    assert await _catalog([{"name": "__response__"}, {"name": "status_code"}]) == ["status_code"]
 
 
 @pytest.mark.asyncio
-async def test_response_nao_expoe_a_chave_interna():
+async def test_response_does_not_expose_the_internal_key():
     from flow.nodes.outputs.response_node import ResponseNode
 
-    campos = await _catalogo(ResponseNode.description().get("outputs"))
+    campos = await _catalog(ResponseNode.description().get("outputs"))
 
     assert campos == []
 
 
 @pytest.mark.asyncio
-async def test_change_detector_deixa_de_sair_sem_campos():
+async def test_change_detector_no_longer_outputs_without_fields():
     """The node promised 4 keys and the catalog delivered none."""
     from flow.nodes.control.change_detector import ChangeDetector
 
-    campos = await _catalogo(ChangeDetector.description().get("outputs"))
+    campos = await _catalog(ChangeDetector.description().get("outputs"))
 
     assert "output" in campos and "branch" in campos
 
 
 # ── 3. An ambiguous layer choice needs to show up in the panel ───────────────
 
-def _no_com_log():
+def _node_with_log():
     """Minimal node that records the panel messages in a list."""
     from flow.nodes.base import BaseNode
 
@@ -170,17 +170,17 @@ def _gdf(n=1):
     return gpd.GeoDataFrame({"geometry": [Point(i, i) for i in range(n)]}, crs="EPSG:4326")
 
 
-def test_uma_camada_nao_avisa():
-    no, linhas = _no_com_log()
+def test_one_layer_does_not_warn():
+    no, linhas = _node_with_log()
 
     no.get_first_gdf({"output": _gdf()})
 
     assert linhas == []
 
 
-def test_duas_camadas_avisam_no_painel():
+def test_two_layers_warn_on_the_panel():
     """Regression: it processed one and ignored the other without saying anything."""
-    no, linhas = _no_com_log()
+    no, linhas = _node_with_log()
 
     escolhido = no.get_first_gdf({"cadastro": _gdf(2), "visitas": _gdf(3)})
 
@@ -189,16 +189,16 @@ def test_duas_camadas_avisam_no_painel():
     assert "cadastro" in linhas[0] and "visitas" in linhas[0]
 
 
-def test_gdf_vazio_nao_conta_como_candidato():
-    no, linhas = _no_com_log()
+def test_empty_gdf_does_not_count_as_candidate():
+    no, linhas = _node_with_log()
 
     no.get_first_gdf({"vazio": _gdf(0), "cheio": _gdf(2)})
 
     assert linhas == []
 
 
-def test_sem_camada_nenhuma_continua_falhando_alto():
-    no, _linhas = _no_com_log()
+def test_with_no_layer_still_fails_loudly():
+    no, _lines = _node_with_log()
 
     with pytest.raises(ValueError, match="Nenhum GeoDataFrame"):
         no.get_first_gdf({"texto": "abc"})

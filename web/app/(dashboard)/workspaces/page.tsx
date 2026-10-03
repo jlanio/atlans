@@ -30,7 +30,7 @@ export default function WorkspacesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   // Target of the settings panel and the section it opens on: the shortcuts on
   // the active one's panel ("Membros") jump straight to the right section.
-  const [painel, setPainel] = useState<{ id: string; secao: SectionId } | null>(null);
+  const [painel, setPanel] = useState<{ id: string; secao: SectionId } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   // Each workspace's executor: changed in one step on the active one's panel,
@@ -46,7 +46,7 @@ export default function WorkspacesPage() {
   // would survive the workspace's disappearance — and would reopen the panel on
   // its own if it came back to the list. The reset has to be explicit.
   useEffect(() => {
-    if (painel && !settingsTarget) setPainel(null);
+    if (painel && !settingsTarget) setPanel(null);
   }, [painel, settingsTarget]);
 
   // Re-fetch on mount — without it, workspaces deleted by OTHER owners or
@@ -92,10 +92,10 @@ export default function WorkspacesPage() {
   }
 
   function abrirPainel(id: string, secao: SectionId = "geral") {
-    setPainel({ id, secao });
+    setPanel({ id, secao });
   }
 
-  function leituraDoExecutor(ws: Workspace) {
+  function executorReading(ws: Workspace) {
     return {
       executores: executor.executores,
       alvo: executor.alvos[ws.id_hash],
@@ -105,7 +105,7 @@ export default function WorkspacesPage() {
     };
   }
 
-  const carregandoInicial = loading && workspaces.length === 0;
+  const initialLoading = loading && workspaces.length === 0;
 
   // The active one comes from the LIST, not from the context: `current` may lag
   // for an instant after a deletion, and the panel must not show a workspace the
@@ -151,7 +151,7 @@ export default function WorkspacesPage() {
         </div>
       )}
 
-      {!error && !carregandoInicial && workspaces.length === 0 && (
+      {!error && !initialLoading && workspaces.length === 0 && (
         <VazioPrimeiroUso
           icone={TbBuildingFactory2}
           titulo="Nenhum workspace encontrado"
@@ -160,7 +160,7 @@ export default function WorkspacesPage() {
         />
       )}
 
-      {carregandoInicial ? (
+      {initialLoading ? (
         <>
           <Skeleton className="h-48 w-full rounded-xl" />
           <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
@@ -176,7 +176,7 @@ export default function WorkspacesPage() {
             <WorkspaceHero
               key={ativo.id_hash}
               workspace={ativo}
-              {...leituraDoExecutor(ativo)}
+              {...executorReading(ativo)}
               salvandoExecutor={executor.salvando.has(ativo.id_hash)}
               podeGerenciar={hasMinRole(ativo.my_role, "admin")}
               onTrocarExecutor={valor => executor.trocar(ativo.id_hash, valor, ativo.name)}
@@ -200,7 +200,7 @@ export default function WorkspacesPage() {
                   <WorkspaceRow
                     key={ws.id_hash}
                     workspace={ws}
-                    {...leituraDoExecutor(ws)}
+                    {...executorReading(ws)}
                     onUsar={() => setCurrent(ws)}
                     onConfigurar={() => abrirPainel(ws.id_hash)}
                   />
@@ -224,7 +224,7 @@ export default function WorkspacesPage() {
         initialSection={painel?.secao}
         currentUserId={currentUserId}
         onClose={() => {
-          setPainel(null);
+          setPanel(null);
           // The executor may have changed in there; the active one's panel and the
           // row need to reflect it.
           executor.recarregar();

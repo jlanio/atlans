@@ -14,9 +14,9 @@ import { Label } from "@/app/components/ui/label"
 import { AuthError, type AuthErrorInfo } from "@/app/components/auth/AuthError"
 import { AuthPasswordField } from "@/app/components/auth/AuthPasswordField"
 import { AuthPasswordStrength } from "@/app/components/auth/AuthPasswordStrength"
-import { useIdiomaDaTela, useTextos } from "@/app/components/home/i18n"
-import { BotaoDoModal, LinkDoModal } from "./botao-do-modal"
-import { ehRecusaDoServidor } from "./recusas"
+import { useScreenLanguage, useTexts } from "@/app/components/home/i18n"
+import { ModalButton, LinkDoModal } from "./botao-do-modal"
+import { isServerRejection } from "./recusas"
 
 interface Props {
   onEnviando: (enviando: boolean) => void
@@ -26,11 +26,11 @@ interface Props {
   onEntrar: () => void
 }
 
-export function FormularioDeCadastro({ onEnviando, onCadastrou, onEntrar }: Props) {
-  const t = useTextos().entrada.formularioDeCadastro
+export function SignUpForm({ onEnviando, onCadastrou, onEntrar }: Props) {
+  const t = useTexts().entrada.formularioDeCadastro
   // In Portuguese the server's rejection as it came; in the others, the language's
   // text (see ./recusas).
-  const traduzir = useIdiomaDaTela() !== "pt-BR"
+  const traduzir = useScreenLanguage() !== "pt-BR"
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -66,7 +66,7 @@ export function FormularioDeCadastro({ onEnviando, onCadastrou, onEntrar }: Prop
         setError({ message: (traduzir ? null : data?.message) ?? t.muitasTentativas })
       } else if (data?.error === "validation_error" && Array.isArray(data.details)) {
         setError({ message: data.details.map((d) => d.msg).join(" • ") || t.dadosInvalidos })
-      } else if (traduzir && !ehRecusaDoServidor(data)) {
+      } else if (traduzir && !isServerRejection(data)) {
         // The proxy down, an unexpected 500, a CDN's error page.
         setError({ message: t.erroAoCriarConta })
       } else if (traduzir && status === 400) {
@@ -149,9 +149,9 @@ export function FormularioDeCadastro({ onEnviando, onCadastrou, onEntrar }: Prop
 
         {error && <AuthError error={error} />}
 
-        <BotaoDoModal loading={loading} loadingLabel={t.cadastrando} disabled={passwordMismatch} className="mt-1">
+        <ModalButton loading={loading} loadingLabel={t.cadastrando} disabled={passwordMismatch} className="mt-1">
           {t.criarConta}
-        </BotaoDoModal>
+        </ModalButton>
       </form>
 
       <p className="text-center text-[12.5px] text-muted-foreground">

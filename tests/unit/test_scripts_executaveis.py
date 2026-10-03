@@ -17,18 +17,18 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[2]
 
 
-def _chamados_pelo_makefile() -> list[str]:
+def _called_by_makefile() -> list[str]:
     texto = (RAIZ / "Makefile").read_text(encoding="utf-8")
     return sorted(set(re.findall(r"^\t\./(scripts/[\w.-]+)", texto, re.M)))
 
 
-def test_ha_scripts_chamados_pelo_makefile():
-    assert len(_chamados_pelo_makefile()) >= 4, _chamados_pelo_makefile()
+def test_there_are_scripts_called_by_makefile():
+    assert len(_called_by_makefile()) >= 4, _called_by_makefile()
 
 
-def test_os_scripts_do_makefile_sao_executaveis_no_git():
+def test_makefile_scripts_are_executable_in_git():
     modos = {}
-    for script in _chamados_pelo_makefile():
+    for script in _called_by_makefile():
         linha = subprocess.run(
             ["git", "-C", str(RAIZ), "ls-files", "-s", "--", script],
             check=True, capture_output=True, text=True,

@@ -4,7 +4,7 @@ import { act, renderHook } from "@testing-library/react"
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 vi.mock("@/utils/createToast", () => ({ createToast: toast }))
 
-import { useAcaoDeDialogo, type OpcoesDaAcao } from "@/app/hooks/useAcaoDeDialogo"
+import { useAcaoDeDialogo, type ActionOptions } from "@/app/hooks/useAcaoDeDialogo"
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -94,7 +94,7 @@ describe("useAcaoDeDialogo", () => {
   it("vale o que estava na tela quando se CONFIRMOU, não o que mudou durante a espera", async () => {
     const { fn, resolver } = lenta<{ data: null }>()
     const { result, rerender } = renderHook(
-      (opcoes: OpcoesDaAcao<null>) => useAcaoDeDialogo(fn, opcoes),
+      (opcoes: ActionOptions<null>) => useAcaoDeDialogo(fn, opcoes),
       { initialProps: { sucesso: "Role alterado para admin.", erro: () => "erro" } },
     )
     let rodada!: Promise<void>

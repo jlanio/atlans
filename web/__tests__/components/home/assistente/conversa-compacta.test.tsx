@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
 import { cleanup, render, screen } from "@testing-library/react"
 
-import Conversa, { type ContextoDoBloco } from "@/app/components/home/assistente/conversa"
-import type { BlocoDoAssistente, TurnoDoAssistente } from "@/app/components/home/assistente/quadros"
+import Conversa, { type BlockContext } from "@/app/components/home/assistente/conversa"
+import type { AssistantBlock, AssistantTurn } from "@/app/components/home/assistente/quadros"
 
 /**
  * The same Conversa in two modes: the usual one (editor and panel: the whole
@@ -12,45 +12,45 @@ import type { BlocoDoAssistente, TurnoDoAssistente } from "@/app/components/home
  * goes into the caption and who stays out, and that the default is still everything.
  */
 
-const PERGUNTA = "cruze os focos de hoje com as terras indígenas e me dê um resumo por município"
+const QUESTION = "cruze os focos de hoje com as terras indígenas e me dê um resumo por município"
 const T1 = "Vou contar os focos por terra indígena."
 const T2 = "Encontrei 128 focos em 9 terras indígenas."
 
-function pergunta(id: string, texto = PERGUNTA): TurnoDoAssistente {
+function pergunta(id: string, texto = QUESTION): AssistantTurn {
   return { id, papel: "user", texto, blocos: [] }
 }
 
-function resposta(id: string, blocos: BlocoDoAssistente[]): TurnoDoAssistente {
+function resposta(id: string, blocos: AssistantBlock[]): AssistantTurn {
   return { id, papel: "assistant", blocos }
 }
 
-function texto(t: string): BlocoDoAssistente {
+function texto(t: string): AssistantBlock {
   return { tipo: "texto", texto: t }
 }
 
-function pensando(): BlocoDoAssistente {
+function pensando(): AssistantBlock {
   return { tipo: "pensando", texto: "Counting the hotspots first." }
 }
 
-function ferramenta(id: string, estado: "correndo" | "ok" | "erro" = "ok", nome = "search_nodes"): BlocoDoAssistente {
+function ferramenta(id: string, estado: "correndo" | "ok" | "erro" = "ok", nome = "search_nodes"): AssistantBlock {
   return { tipo: "ferramenta", id, nome, argumentos: {}, estado }
 }
 
-const CAMADA: BlocoDoAssistente = {
+const CAMADA: AssistantBlock = {
   tipo: "camada",
   camada: { artifact_id: "art1", nome: "Focos de calor", available: true },
 }
-const ERRO: BlocoDoAssistente = {
+const ERRO: AssistantBlock = {
   tipo: "erro",
   erro: { code: "sem_conexao", message: "Resposta interrompida." },
 }
 
 /** A finished turn with the whole timeline: reasoning, steps, two texts, card. */
-const CONCLUIDO: BlocoDoAssistente[] = [
+const COMPLETED: AssistantBlock[] = [
   pensando(), ferramenta("f1"), ferramenta("f2"), texto(T1), ferramenta("f3"), texto(T2), CAMADA,
 ]
 
-const extras = (bloco: BlocoDoAssistente) =>
+const extras = (bloco: AssistantBlock) =>
   bloco.tipo === "camada" ? <span data-testid="cartao-camada">{bloco.camada.nome}</span> : null
 
 function passos(container: HTMLElement) {
@@ -67,13 +67,13 @@ describe("Conversa — o padrão (editor e painel) é a linha do tempo inteira",
   it("a pergunta é a bolha, e todo passo, raciocínio, texto e cartão aparecem", () => {
     const { container } = render(
       <Conversa
-        turnos={[pergunta("u1"), resposta("a1", CONCLUIDO), resposta("a2", [ERRO])]}
+        turnos={[pergunta("u1"), resposta("a1", COMPLETED), resposta("a2", [ERRO])]}
         correndo={false}
         extras={extras}
       />,
     )
 
-    const bolha = screen.getByText(PERGUNTA)
+    const bolha = screen.getByText(QUESTION)
     expect(bolha.tagName).toBe("P")
     expect(bolha.classList.contains("bg-primary/10")).toBe(true)
     expect(bolha.getAttribute("title")).toBeNull()
@@ -92,7 +92,7 @@ describe("Conversa — a legenda da faixa (`compacta`)", () => {
   /** The label of the live reasoning: the full text is still "Trabalhando…", but the "…"
    * lives in an sr-only next to the typed ellipsis — the exact string
    * matcher does not see it as a single node. */
-  const pensandoVivo = (raiz: ParentNode = document) =>
+  const liveThinking = (raiz: ParentNode = document) =>
     [...raiz.querySelectorAll("summary .texto-pensando")]
       .filter((el) => el.textContent?.replace(/\s+/g, "") === "Trabalhando…")
 
@@ -100,19 +100,19 @@ describe("Conversa — a legenda da faixa (`compacta`)", () => {
     render(<Conversa turnos={[pergunta("u1")]} correndo={false} compacta />)
 
     // The sentence sits in its own span: it is what gets read and what gets found.
-    const frase = screen.getByText(PERGUNTA)
+    const frase = screen.getByText(QUESTION)
     expect(frase.tagName).toBe("SPAN")
     const linha = frase.closest("p")!
     expect(linha.classList.contains("truncate")).toBe(true)
     expect(linha.classList.contains("bg-primary/10")).toBe(false)
-    expect(linha.getAttribute("title")).toBe(PERGUNTA)
-    expect(linha.textContent).toBe(`Você · ${PERGUNTA}`)
+    expect(linha.getAttribute("title")).toBe(QUESTION)
+    expect(linha.textContent).toBe(`Você · ${QUESTION}`)
   })
 
   it("da resposta concluída fica só o último texto (cortado em 4 linhas), o cartão e o erro — sem passos nem raciocínio", () => {
     const { container } = render(
       <Conversa
-        turnos={[pergunta("u1"), resposta("a1", CONCLUIDO), resposta("a2", [ERRO])]}
+        turnos={[pergunta("u1"), resposta("a1", COMPLETED), resposta("a2", [ERRO])]}
         correndo={false}
         extras={extras}
         compacta
@@ -139,9 +139,9 @@ describe("Conversa — a legenda da faixa (`compacta`)", () => {
   })
 
   it("enquanto o turno corre mostra só o passo em curso; quando o texto chega, o passo sai", () => {
-    const emCurso = [pensando(), texto(T1), ferramenta("f1"), ferramenta("f2", "correndo", "run_workflow")]
+    const inProgress = [pensando(), texto(T1), ferramenta("f1"), ferramenta("f2", "correndo", "run_workflow")]
     const { container, rerender } = render(
-      <Conversa turnos={[pergunta("u1"), resposta("a1", emCurso)]} correndo compacta />,
+      <Conversa turnos={[pergunta("u1"), resposta("a1", inProgress)]} correndo compacta />,
     )
 
     const vivos = passos(container)
@@ -152,7 +152,7 @@ describe("Conversa — a legenda da faixa (`compacta`)", () => {
     // The last text so far stays in view: it is what remained.
     expect(screen.getByText(T1)).toBeTruthy()
 
-    const depois = [...emCurso.slice(0, 3), ferramenta("f2", "ok", "run_workflow"), texto(T2)]
+    const depois = [...inProgress.slice(0, 3), ferramenta("f2", "ok", "run_workflow"), texto(T2)]
     rerender(<Conversa turnos={[pergunta("u1"), resposta("a1", depois)]} correndo compacta />)
     expect(passos(container).length).toBe(0)
     expect(screen.queryByText(T1)).toBeNull()
@@ -163,7 +163,7 @@ describe("Conversa — a legenda da faixa (`compacta`)", () => {
     const { rerender } = render(
       <Conversa turnos={[pergunta("u1"), resposta("a1", [pensando()])]} correndo compacta />,
     )
-    const [rotulo] = pensandoVivo()
+    const [rotulo] = liveThinking()
     expect(rotulo).toBeTruthy()
     // The owner's choice (thinking-indicator previewer): the label has the
     // sweeping shimmer and the typed ellipsis lives in a separate ::after —
@@ -171,7 +171,7 @@ describe("Conversa — a legenda da faixa (`compacta`)", () => {
     expect(rotulo.querySelector(".tic-pensando")).toBeTruthy()
 
     rerender(<Conversa turnos={[pergunta("u1"), resposta("a1", [pensando(), texto(T2)])]} correndo compacta />)
-    expect(pensandoVivo().length).toBe(0)
+    expect(liveThinking().length).toBe(0)
     expect(screen.queryByText("Raciocínio")).toBeNull()
     expect(screen.getByText(T2)).toBeTruthy()
   })
@@ -182,7 +182,7 @@ describe("Conversa — a legenda da faixa (`compacta`)", () => {
     render(
       <Conversa turnos={[pergunta("u1"), resposta("a1", [pensando(), ferramenta("f1"), pensando()])]} correndo compacta />,
     )
-    expect(pensandoVivo().length).toBe(1)
+    expect(liveThinking().length).toBe(1)
     expect(screen.queryByText("Raciocínio")).toBeNull()
     expect(document.querySelectorAll("li[data-ferramenta]").length).toBe(0)
   })
@@ -199,7 +199,7 @@ describe("Conversa — a legenda da faixa (`compacta`)", () => {
 
 describe("Conversa — o contexto dos extras e o indicador do item pendente", () => {
   it("os extras sabem se o bloco está no ÚLTIMO turno", () => {
-    const espiao = vi.fn<(bloco: BlocoDoAssistente, contexto: ContextoDoBloco) => React.ReactNode>(() => null)
+    const espiao = vi.fn<(bloco: AssistantBlock, contexto: BlockContext) => React.ReactNode>(() => null)
     render(
       <Conversa
         turnos={[pergunta("u1"), resposta("a1", [CAMADA]), pergunta("u2"), resposta("a2", [CAMADA])]}
@@ -214,12 +214,12 @@ describe("Conversa — o contexto dos extras e o indicador do item pendente", ()
 
   it("o item pendente usa o ExecActivity por padrão e o indicador passado quando há um — no turno sem bloco e no raciocínio vivo", () => {
     const Marca = ({ size }: { size?: number }) => <svg data-testid="marca" width={size} />
-    const semBloco = [pergunta("u1"), resposta("a1", [])]
-    const { container, rerender } = render(<Conversa turnos={semBloco} correndo />)
+    const withoutBlocks = [pergunta("u1"), resposta("a1", [])]
+    const { container, rerender } = render(<Conversa turnos={withoutBlocks} correndo />)
     expect(container.querySelector("svg.exec-activity")).toBeTruthy()
     expect(screen.queryByTestId("marca")).toBeNull()
 
-    rerender(<Conversa turnos={semBloco} correndo indicador={Marca} />)
+    rerender(<Conversa turnos={withoutBlocks} correndo indicador={Marca} />)
     expect(container.querySelector("svg.exec-activity")).toBeNull()
     expect(screen.getByTestId("marca").getAttribute("width")).toBe("13")
 

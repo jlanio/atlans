@@ -40,19 +40,19 @@ from app.mcp.servidor import create_mcp_server
 from app.mcp.tools.catalogo import get_authoring_guide
 from app.models.workflow import Workflow
 from tests.unit._mcp_harness import (
-    RedisFalso,
-    banco_em_memoria,
-    criar_run,
-    criar_usuario,
-    criar_workspace,
-    ctx_falso,
-    escopo_falso,
-    sessao_de,
+    FakeRedis,
+    in_memory_db,
+    create_run,
+    create_user,
+    create_workspace,
+    fake_ctx,
+    fake_scope,
+    session_from,
 )
 
 # A definition with a cleartext secret: if some resource delivers the definition
 # without redacting, this is where it shows up.
-DEFINITION_COM_SEGREDO = {
+DEFINITION_WITH_SECRET = {
     "nodes": [
         {
             "id": "n1",
@@ -90,7 +90,7 @@ NODE_STATS = {
 }
 
 
-async def _criar_workflow(db, *, id_hash: str, workspace_id: str, name: str, definition: dict):
+async def _create_workflow(db, *, id_hash: str, workspace_id: str, name: str, definition: dict):
     wf = Workflow(
         id_hash=id_hash,
         name=name,
@@ -111,29 +111,29 @@ async def ambiente(monkeypatch):
     The second workspace exists to prove what the first doesn't: that a valid id
     from ANOTHER workspace is not delivered.
     """
-    async with banco_em_memoria() as fabrica:
+    async with in_memory_db() as fabrica:
         async with fabrica() as db:
-            await criar_usuario(db, "usr-1", "ana")
-            await criar_usuario(db, "usr-2", "bruno")
-            await criar_workspace(db, "ws-1", "usr-1", "Principal")
-            await criar_workspace(db, "ws-2", "usr-2", "De outra pessoa")
-            await _criar_workflow(
+            await create_user(db, "usr-1", "ana")
+            await create_user(db, "usr-2", "bruno")
+            await create_workspace(db, "ws-1", "usr-1", "Principal")
+            await create_workspace(db, "ws-2", "usr-2", "De outra pessoa")
+            await _create_workflow(
                 db,
                 id_hash="11111111-1111-4111-8111-111111111111",
                 workspace_id="ws-1",
                 name="Meu fluxo",
-                definition=DEFINITION_COM_SEGREDO,
+                definition=DEFINITION_WITH_SECRET,
             )
-            await _criar_workflow(
+            await _create_workflow(
                 db,
                 id_hash="22222222-2222-4222-8222-222222222222",
                 workspace_id="ws-2",
                 name="Fluxo alheio",
                 definition={"nodes": [], "edges": []},
             )
-            await criar_run(
+            await create_run(
                 db,
-                task_id=RUN_DO_MEU,
+                task_id=MY_RUN,
                 workflow_hash="11111111-1111-4111-8111-111111111111",
                 workspace_id="ws-1",
                 status="failed",
@@ -141,34 +141,34 @@ async def ambiente(monkeypatch):
                 error_category="transient",
                 node_stats=NODE_STATS,
             )
-            await criar_run(
+            await create_run(
                 db,
-                task_id=RUN_ALHEIO,
+                task_id=OTHERS_RUN,
                 workflow_hash="22222222-2222-4222-8222-222222222222",
                 workspace_id="ws-2",
             )
-        monkeypatch.setattr(infra, "sessao", sessao_de(fabrica))
-        monkeypatch.setattr(infra, "redis_ou_none", lambda: RedisFalso())
+        monkeypatch.setattr(infra, "sessao", session_from(fabrica))
+        monkeypatch.setattr(infra, "redis_ou_none", lambda: FakeRedis())
         # No disabled node: the configuration lives in a table the harness's SQLite
         # doesn't create, and what this file investigates is not the overlay.
         monkeypatch.setattr(
             "app.services.node_service.disabled_names",
-            _sem_desabilitados,
+            _no_disabled,
         )
         yield fabrica
 
 
-async def _sem_desabilitados(_db):
+async def _no_disabled(_db):
     return set()
 
 
-ID_DO_MEU = "11111111-1111-4111-8111-111111111111"
-ID_DO_ALHEIO = "22222222-2222-4222-8222-222222222222"
-RUN_DO_MEU = "run-1111"
-RUN_ALHEIO = "run-2222"
+MY_ID = "11111111-1111-4111-8111-111111111111"
+OTHERS_ID = "22222222-2222-4222-8222-222222222222"
+MY_RUN = "run-1111"
+OTHERS_RUN = "run-2222"
 
 
-async def _ler(uri: str, escopo=None) -> str:
+async def _read(uri: str, escopo=None) -> str:
     """Reads a URI as a client would, with the scope in the `ContextVar`.
 
     The failure is kept and re-raised AFTER closing the client: letting it
@@ -176,7 +176,7 @@ async def _ler(uri: str, escopo=None) -> str:
     exception group, and the error message — which is the contract these tests
     check — would disappear behind the exception group's "unhandled errors".
     """
-    escopo = escopo or escopo_falso(scopes={"workflows:read", "drive:read"})
+    escopo = escopo or fake_scope(scopes={"workflows:read", "drive:read"})
     token = ESCOPO_ATUAL.set(escopo)
     falha: BaseException | None = None
     resultado = None
@@ -196,9 +196,9 @@ async def _ler(uri: str, escopo=None) -> str:
 # ── Registro ──────────────────────────────────────────────────────────────────
 
 
-async def test_as_sete_uris_estao_registradas_com_mime_explicito():
+async def test_the_seven_uris_are_registered_with_explicit_mime():
     server = create_mcp_server()
-    por_uri = {t.uri_template: t for t in await server.list_resource_templates()}
+    by_uri = {t.uri_template: t for t in await server.list_resource_templates()}
     esperado = {
         "atlans://guide/authoring/{topic}": "text/markdown",
         "atlans://catalog/nodes{?type}": "application/json",
@@ -208,9 +208,9 @@ async def test_as_sete_uris_estao_registradas_com_mime_explicito():
         "atlans://workflows/{id}/contract": "application/json",
         "atlans://runs/{id}": "application/json",
     }
-    assert set(esperado) <= set(por_uri)
+    assert set(esperado) <= set(by_uri)
     for uri, mime in esperado.items():
-        assert por_uri[uri].mime_type == mime, f"{uri} sem o mime declarado"
+        assert by_uri[uri].mime_type == mime, f"{uri} sem o mime declarado"
 
 
 @pytest.mark.parametrize(
@@ -221,39 +221,39 @@ async def test_as_sete_uris_estao_registradas_com_mime_explicito():
         "atlans://catalog/nodes?type=spatial",
         "atlans://catalog/nodes/Buffer",
         "atlans://workspaces/ws-1/workflows",
-        f"atlans://workflows/{ID_DO_MEU}",
-        f"atlans://workflows/{ID_DO_MEU}/contract",
-        f"atlans://runs/{RUN_DO_MEU}",
+        f"atlans://workflows/{MY_ID}",
+        f"atlans://workflows/{MY_ID}/contract",
+        f"atlans://runs/{MY_RUN}",
     ],
 )
-async def test_cada_uri_responde(ambiente, uri):
-    conteudo = await _ler(uri)
+async def test_each_uri_answers(ambiente, uri):
+    conteudo = await _read(uri)
     assert conteudo.strip(), f"{uri} devolveu vazio"
 
 
 # ── Guide: the resource is an alias of the tool ───────────────────────────────
 
 
-@pytest.mark.parametrize("topico", guia.TOPICOS)
-async def test_guia_do_resource_e_identico_ao_da_tool(ambiente, topico):
-    escopo = escopo_falso(scopes={"workflows:read"})
-    do_resource = await _ler(f"atlans://guide/authoring/{topico}", escopo)
-    da_tool = (await get_authoring_guide(ctx_falso(escopo), topic=topico))["markdown"]
+@pytest.mark.parametrize("topico", guia.TOPICS)
+async def test_resource_guide_is_identical_to_the_tools(ambiente, topico):
+    escopo = fake_scope(scopes={"workflows:read"})
+    do_resource = await _read(f"atlans://guide/authoring/{topico}", escopo)
+    da_tool = (await get_authoring_guide(fake_ctx(escopo), topic=topico))["markdown"]
     assert do_resource == da_tool == guia.ler_topico(topico)
 
 
-async def test_topico_desconhecido_nao_e_entregue(ambiente):
+async def test_unknown_topic_is_not_delivered(ambiente):
     with pytest.raises(Exception) as exc:
-        await _ler("atlans://guide/authoring/nao-existe")
+        await _read("atlans://guide/authoring/nao-existe")
     assert "not_found" in str(exc.value)
 
 
 # ── Catalog ───────────────────────────────────────────────────────────────────
 
 
-async def test_catalogo_sem_type_nao_entrega_o_catalogo_inteiro(ambiente):
+async def test_catalog_without_type_does_not_deliver_the_whole_catalog(ambiente):
     """Without a filter, only the group map — the whole index doesn't fit in one blob."""
-    corpo = json.loads(await _ler("atlans://catalog/nodes"))
+    corpo = json.loads(await _read("atlans://catalog/nodes"))
     assert "items" not in corpo
     assert corpo["hint"]
     assert corpo["total"] > 0
@@ -261,55 +261,55 @@ async def test_catalogo_sem_type_nao_entrega_o_catalogo_inteiro(ambiente):
     assert {"trigger", "spatial", "output"} <= tipos
     assert sum(t["count"] for t in corpo["types"]) == corpo["total"]
     # And the body really is small: the compact index alone exceeds 4 KB.
-    assert len(await _ler("atlans://catalog/nodes")) < 2000
+    assert len(await _read("atlans://catalog/nodes")) < 2000
 
 
-async def test_catalogo_com_type_traz_so_aquele_grupo(ambiente):
-    corpo = json.loads(await _ler("atlans://catalog/nodes?type=trigger"))
+async def test_catalog_with_type_carries_only_that_group(ambiente):
+    corpo = json.loads(await _read("atlans://catalog/nodes?type=trigger"))
     assert corpo["type"] == "trigger"
     assert corpo["items"]
     assert {i["type"] for i in corpo["items"]} == {"trigger"}
     assert corpo["total"] == len(corpo["items"])
 
 
-async def test_no_do_catalogo_traz_a_ficha_completa(ambiente):
-    corpo = json.loads(await _ler("atlans://catalog/nodes/Buffer"))
+async def test_catalog_node_carries_the_full_card(ambiente):
+    corpo = json.loads(await _read("atlans://catalog/nodes/Buffer"))
     assert corpo["name"] == "Buffer"
     assert {p["name"] for p in corpo["properties"]} >= {"distance", "distanceUnit"}
 
 
-async def test_no_inexistente_e_recusado(ambiente):
+async def test_nonexistent_node_is_refused(ambiente):
     with pytest.raises(Exception) as exc:
-        await _ler("atlans://catalog/nodes/NaoExiste")
+        await _read("atlans://catalog/nodes/NaoExiste")
     assert "not_found" in str(exc.value)
 
 
 # ── Workflows ─────────────────────────────────────────────────────────────────
 
 
-async def test_listagem_do_workspace_traz_o_fluxo_com_o_nome_em_quarentena(ambiente):
-    corpo = json.loads(await _ler("atlans://workspaces/ws-1/workflows"))
+async def test_workspace_listing_carries_the_workflow_with_the_name_quarantined(ambiente):
+    corpo = json.loads(await _read("atlans://workspaces/ws-1/workflows"))
     assert corpo["total"] == 1
     item = corpo["items"][0]
-    assert item["id"] == ID_DO_MEU
+    assert item["id"] == MY_ID
     assert item["workspace_id"] == "ws-1"
     # Text written by people never rises to the top of the response.
     assert item["untrusted_data"]["name"] == "Meu fluxo"
     assert "name" not in item
 
 
-async def test_workflow_sai_com_a_definition_redigida(ambiente):
-    conteudo = await _ler(f"atlans://workflows/{ID_DO_MEU}")
+async def test_workflow_comes_out_with_the_definition_redacted(ambiente):
+    conteudo = await _read(f"atlans://workflows/{MY_ID}")
     corpo = json.loads(conteudo)
-    assert corpo["id"] == ID_DO_MEU
+    assert corpo["id"] == MY_ID
     definicao = corpo["untrusted_data"]["definition"]
     propriedades = definicao["nodes"][0]["properties"]
     assert propriedades["connectionString"] == "<REDACTED>"
     assert "senha-secreta" not in conteudo
 
 
-async def test_contrato_traz_as_portas_declaradas(ambiente):
-    corpo = json.loads(await _ler(f"atlans://workflows/{ID_DO_MEU}/contract"))
+async def test_contract_carries_the_declared_ports(ambiente):
+    corpo = json.loads(await _read(f"atlans://workflows/{MY_ID}/contract"))
     # What the platform derives from the definition stays at the top; the NAME of each
     # port is written by whoever edits the workflow and goes down into `untrusted_data`.
     assert corpo["has_output_node"] is True
@@ -319,17 +319,17 @@ async def test_contrato_traz_as_portas_declaradas(ambiente):
 # ── Runs ──────────────────────────────────────────────────────────────────────
 
 
-async def test_execucao_traz_o_retrato_completo_dos_nos(ambiente):
+async def test_run_carries_the_full_picture_of_the_nodes(ambiente):
     """`full`, not `summary`: whoever attaches a run is investigating.
 
     Each node's outputs (`output_keys`/`output_columns`) are what show where the
     chain stopped producing what the next node expected — and they are precisely
     what the summary omits.
     """
-    corpo = json.loads(await _ler(f"atlans://runs/{RUN_DO_MEU}"))
+    corpo = json.loads(await _read(f"atlans://runs/{MY_RUN}"))
 
-    assert corpo["run_id"] == RUN_DO_MEU
-    assert corpo["workflow_id"] == ID_DO_MEU
+    assert corpo["run_id"] == MY_RUN
+    assert corpo["workflow_id"] == MY_ID
     assert corpo["status"] == "failed"
     assert corpo["error_category"] == "transient"
     nos = corpo["untrusted_data"]["node_stats"]
@@ -337,9 +337,9 @@ async def test_execucao_traz_o_retrato_completo_dos_nos(ambiente):
     assert nos[0]["output_columns"] == {"gdf": ["id", "geometry"]}
 
 
-async def test_execucao_sai_com_o_erro_redigido_e_fora_do_topo(ambiente):
+async def test_run_comes_out_with_the_error_redacted_and_off_the_top(ambiente):
     """The error message is the field through which a password leaves a run."""
-    conteudo = await _ler(f"atlans://runs/{RUN_DO_MEU}")
+    conteudo = await _read(f"atlans://runs/{MY_RUN}")
     corpo = json.loads(conteudo)
 
     assert "error_message" not in corpo
@@ -349,12 +349,12 @@ async def test_execucao_sai_com_o_erro_redigido_e_fora_do_topo(ambiente):
     assert "<REDACTED>" in corpo["untrusted_data"]["node_stats"][0]["error"]
 
 
-async def test_execucao_de_outro_workspace_nao_e_entregue(ambiente):
+async def test_run_of_another_workspace_is_not_delivered(ambiente):
     """A valid id of a run that exists — and the response is the nonexistent id's."""
     with pytest.raises(Exception) as alheia:
-        await _ler(f"atlans://runs/{RUN_ALHEIO}")
+        await _read(f"atlans://runs/{OTHERS_RUN}")
     with pytest.raises(Exception) as inexistente:
-        await _ler("atlans://runs/run-que-nunca-existiu")
+        await _read("atlans://runs/run-que-nunca-existiu")
 
     assert "not_found" in str(alheia.value)
     assert str(alheia.value) == str(inexistente.value)
@@ -370,40 +370,40 @@ async def test_execucao_de_outro_workspace_nao_e_entregue(ambiente):
         "atlans://catalog/nodes",
         "atlans://catalog/nodes/Buffer",
         "atlans://workspaces/ws-1/workflows",
-        f"atlans://workflows/{ID_DO_MEU}",
-        f"atlans://workflows/{ID_DO_MEU}/contract",
-        f"atlans://runs/{RUN_DO_MEU}",
+        f"atlans://workflows/{MY_ID}",
+        f"atlans://workflows/{MY_ID}/contract",
+        f"atlans://runs/{MY_RUN}",
     ],
 )
-async def test_escopo_insuficiente_e_recusado(ambiente, uri):
+async def test_insufficient_scope_is_refused(ambiente, uri):
     """A Drive-only token reads nothing from workflows — not even via resource."""
-    sem_leitura = escopo_falso(scopes={"drive:read"})
+    without_read = fake_scope(scopes={"drive:read"})
     with pytest.raises(Exception) as exc:
-        await _ler(uri, sem_leitura)
+        await _read(uri, without_read)
     mensagem = str(exc.value)
     assert "forbidden_scope" in mensagem
     assert "workflows:read" in mensagem
 
 
-async def test_workflow_de_outro_workspace_nao_e_entregue(ambiente):
+async def test_workflow_of_another_workspace_is_not_delivered(ambiente):
     """A valid id, an existing workflow — and still nothing comes out, not even the name."""
-    for uri in (f"atlans://workflows/{ID_DO_ALHEIO}", f"atlans://workflows/{ID_DO_ALHEIO}/contract"):
+    for uri in (f"atlans://workflows/{OTHERS_ID}", f"atlans://workflows/{OTHERS_ID}/contract"):
         with pytest.raises(Exception) as exc:
-            await _ler(uri)
+            await _read(uri)
         mensagem = str(exc.value)
         assert "Fluxo alheio" not in mensagem
         assert "forbidden" in mensagem or "not_found" in mensagem
 
 
-async def test_workspace_fora_do_alcance_do_token_nao_lista(ambiente):
+async def test_workspace_out_of_token_reach_is_not_listed(ambiente):
     with pytest.raises(Exception) as exc:
-        await _ler("atlans://workspaces/ws-2/workflows")
+        await _read("atlans://workspaces/ws-2/workflows")
     mensagem = str(exc.value)
     assert "Fluxo alheio" not in mensagem
     assert "forbidden" in mensagem or "not_found" in mensagem
 
 
-async def test_leitura_sem_identidade_nenhuma_e_recusada(ambiente):
+async def test_read_without_any_identity_is_refused(ambiente):
     """Without a resolved PAT there is no scope, and a resource is not an alternative path."""
     token = ESCOPO_ATUAL.set(None)
     try:
@@ -418,7 +418,7 @@ async def test_leitura_sem_identidade_nenhuma_e_recusada(ambiente):
 # ── Auditoria ─────────────────────────────────────────────────────────────────
 
 
-def _linhas_de_auditoria(caplog) -> list[str]:
+def _audit_lines(caplog) -> list[str]:
     return [r.getMessage() for r in caplog.records if r.name == "app.mcp.auditoria"]
 
 
@@ -426,43 +426,43 @@ def _linhas_de_auditoria(caplog) -> list[str]:
     "uri,guarda",
     [
         ("atlans://workspaces/ws-1/workflows", "list_workflows"),
-        (f"atlans://workflows/{ID_DO_MEU}", "get_workflow"),
-        (f"atlans://workflows/{ID_DO_MEU}/contract", "get_workflow_contract"),
-        (f"atlans://runs/{RUN_DO_MEU}", "get_run"),
+        (f"atlans://workflows/{MY_ID}", "get_workflow"),
+        (f"atlans://workflows/{MY_ID}/contract", "get_workflow_contract"),
+        (f"atlans://runs/{MY_RUN}", "get_run"),
     ],
 )
-async def test_leitura_de_dados_de_workspace_deixa_linha_de_auditoria(ambiente, caplog, uri, guarda):
+async def test_reading_workspace_data_leaves_an_audit_line(ambiente, caplog, uri, guarda):
     """The resource is cheap to repeat — and that is why it can't be the traceless path."""
     with caplog.at_level("INFO", logger="app.mcp.auditoria"):
-        await _ler(uri)
-    linhas = _linhas_de_auditoria(caplog)
+        await _read(uri)
+    linhas = _audit_lines(caplog)
     assert len(linhas) == 1
     assert f"resource={guarda}" in linhas[0]
     assert "desfecho=ok" in linhas[0]
     # The workflow id is a client argument: it doesn't go into the row.
-    assert ID_DO_MEU not in linhas[0]
+    assert MY_ID not in linhas[0]
 
 
-async def test_recusa_de_resource_tambem_e_auditada(ambiente, caplog):
-    sem_leitura = escopo_falso(scopes={"drive:read"})
+async def test_resource_refusal_is_also_audited(ambiente, caplog):
+    without_read = fake_scope(scopes={"drive:read"})
     with caplog.at_level("INFO", logger="app.mcp.auditoria"):
         with pytest.raises(Exception):
-            await _ler(f"atlans://workflows/{ID_DO_MEU}", sem_leitura)
-    linhas = _linhas_de_auditoria(caplog)
+            await _read(f"atlans://workflows/{MY_ID}", without_read)
+    linhas = _audit_lines(caplog)
     assert linhas and "desfecho=recusa:forbidden_scope" in linhas[0]
 
 
-async def test_catalogo_e_guia_nao_gastam_linha_de_auditoria(ambiente, caplog):
+async def test_catalog_and_guide_spend_no_audit_line(ambiente, caplog):
     """Fixed installation text, the same for every token: there is nobody's data in it."""
     with caplog.at_level("INFO", logger="app.mcp.auditoria"):
-        await _ler("atlans://catalog/nodes")
-        await _ler("atlans://guide/authoring/overview")
-    assert _linhas_de_auditoria(caplog) == []
+        await _read("atlans://catalog/nodes")
+        await _read("atlans://guide/authoring/overview")
+    assert _audit_lines(caplog) == []
 
 
-async def test_resource_nao_consome_o_balde_de_cota(ambiente, monkeypatch):
+async def test_resource_does_not_consume_the_quota_bucket(ambiente, monkeypatch):
     """The exemption is a documented decision: the resource is an alias of a tool that already counts."""
-    redis = RedisFalso()
+    redis = FakeRedis()
     monkeypatch.setattr(infra, "redis_ou_none", lambda: redis)
-    await _ler(f"atlans://workflows/{ID_DO_MEU}")
+    await _read(f"atlans://workflows/{MY_ID}")
     assert not [c for c in redis.chamadas if c[0] == "incr"]

@@ -29,10 +29,10 @@ import { useCallback } from "react"
 import { classifyUploadError } from "@/app/components/drive/resultado-upload"
 import { useHomeStore, type Anexo } from "@/app/stores/homeStore"
 import { GisFlowService } from "@/service/GisFlowService"
-import { useTextos } from "@/app/components/home/i18n"
+import { useTexts } from "@/app/components/home/i18n"
 
 /** How many files a single gesture can bring. Beyond that it is a mistake. */
-export const MAXIMO_POR_GESTO = 10
+export const MAX_PER_GESTURE = 10
 
 // Sequence of chip ids. **MODULE-level, not a `useRef`**: the attachments live
 // in the store (persists), but a `useRef` resets when HomeView unmounts and
@@ -40,9 +40,9 @@ export const MAXIMO_POR_GESTO = 10
 // the store, the next gesture would create another `anexo-0` — a duplicate
 // React key and an `atualizarAnexo` that would match BOTH rows. A module
 // counter is monotonic for the life of the tab, so it never collides.
-let _sequencia = 0
+let _sequence = 0
 
-export interface UseAnexos {
+export interface UseAttachments {
   /** Receives what was dropped (or chosen in the picker) and takes it to Drive. */
   receber: (arquivos: File[]) => void
 }
@@ -63,13 +63,13 @@ export function useAnexos({
   aoExigirLogin: () => void
   /** Rejections that never even become a chip (no workspace, no role, large batch). */
   aoAvisar: (titulo: string, detalhe?: string) => void
-}): UseAnexos {
+}): UseAttachments {
   // Store actions only: this hook does not READ the attachments (the bar and
   // the panel draw them), so it does not subscribe to them — that way it does
   // not re-render the Home on every byte of progress.
   const adicionarAnexos = useHomeStore((s) => s.adicionarAnexos)
   const atualizarAnexo = useHomeStore((s) => s.atualizarAnexo)
-  const t = useTextos().assistente.anexos
+  const t = useTexts().assistente.anexos
 
   const receber = useCallback((arquivos: File[]) => {
     if (arquivos.length === 0) return
@@ -87,16 +87,16 @@ export function useAnexos({
       return
     }
 
-    const lote = arquivos.slice(0, MAXIMO_POR_GESTO)
+    const lote = arquivos.slice(0, MAX_PER_GESTURE)
     if (arquivos.length > lote.length) {
-      aoAvisar(t.lote(MAXIMO_POR_GESTO), t.loteDica(arquivos.length))
+      aoAvisar(t.lote(MAX_PER_GESTURE), t.loteDica(arquivos.length))
     }
 
     // The id cannot come from the name: dropping the same file twice is legitimate
     // (the person fixed the content and dropped it again) and the two rows must
     // exist separately.
     const novos: Anexo[] = lote.map((arquivo) => ({
-      id: `anexo-${_sequencia++}`,
+      id: `anexo-${_sequence++}`,
       nome: arquivo.name,
       bytes: arquivo.size,
       estado: "enviando",

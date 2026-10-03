@@ -13,7 +13,7 @@ import { useSubflowReadOnly, useSubflowStatus } from "../subflow-viewer/scope"
 
 // The Conditional's routing handles. Only decides whether the badge becomes a key
 // selector — the COLOR comes from `tomDaAresta`, which already knows these same handles.
-const HANDLE_DE_RAMO = new Set(["true", "false"])
+const BRANCH_HANDLE = new Set(["true", "false"])
 
 const CustomEdge = ({
   id,
@@ -28,19 +28,19 @@ const CustomEdge = ({
   data,
 }: EdgeProps) => {
   const [hovered, setHovered] = useState(false)
-  const [editando, setEditando] = useState(false)
+  const [editando, setEditing] = useState(false)
   const store = useStoreApi()
   const { toolState, handleToolState } = useTools()
   // Filled in only when the edge is being drawn inside the sub-workflow viewer —
   // see subflow-viewer/scope. Zero cost in the editor: `useContext` without a
   // provider returns the literal default and never re-renders.
-  const noVisualizador = useSubflowReadOnly()
+  const inViewer = useSubflowReadOnly()
   const subflowStatus = useSubflowStatus()
   // Scalar selectors by id: subscribing to `statusWorkflow` (a new object on every
   // WS message) re-rendered ALL visible edges, and each one also rebuilt its own
   // Map over the whole node list.
   const statusCanvas = useWorkflowExecutionStore(s => s.statusById.get(source)?.status)
-  const emRamoPerdedor = useWorkflowExecutionStore(s => !!s.losingEdgeIds?.has(id))
+  const inLosingBranch = useWorkflowExecutionStore(s => !!s.losingEdgeIds?.has(id))
 
   // Same rule as the card (see icon-root): inside the viewer the state comes from
   // the scope. `statusById` only knows the nodes of the editor canvas — the
@@ -50,7 +50,7 @@ const CustomEdge = ({
   // `losingEdgeIds` is computed over the editor canvas edges and doesn't know the
   // child's graph — applying it in here would dash edges by id
   // coincidence.
-  const isLosing = !noVisualizador && emRamoPerdedor
+  const isLosing = !inViewer && inLosingBranch
 
   // Its own lane when more than one edge connects the same pair of nodes.
   // `getState()` instead of `useEdges()` on purpose: it doesn't create a
@@ -76,7 +76,7 @@ const CustomEdge = ({
   // Hover and execution no longer share the same effect. Before, hovering over an
   // IDLE edge during a run made it look alive — the canvas's strongest channel
   // ("data flowing") triggered by a reading gesture.
-  const arestaAtiva = sourceStatus === "started" && !isLosing
+  const edgeActive = sourceStatus === "started" && !isLosing
   // A rejected branch recedes via dashes + neutral + a bit of opacity. DEEP
   // opacity remains reserved for the path highlight: the two channels
   // multiply, and overdoing it here would completely erase a rejected edge that
@@ -96,9 +96,9 @@ const CustomEdge = ({
   const candidatos = getCandidateKeys(
     store.getState().nodeLookup.get(source)?.data as Parameters<typeof getCandidateKeys>[0],
   )
-  const podeTrocar = candidatos.length > 1 && !HANDLE_DE_RAMO.has(handleKey)
+  const canSwitch = candidatos.length > 1 && !BRANCH_HANDLE.has(handleKey)
 
-  const escolherChave = (nome: string) => {
+  const chooseKey = (nome: string) => {
     const atual = store.getState().edgeLookup.get(id)
     if (!atual) return
     // F9: on a multi-output node the invariant is sourceHandle == from_key; changing
@@ -115,7 +115,7 @@ const CustomEdge = ({
     // otherwise the named handle or `null` (anonymous, which still clears a ghost
     // handle already stored).
     const saidas = (store.getState().nodeLookup.get(source)?.data as { outputs?: Array<{ name?: string }> } | undefined)?.outputs
-    const novoHandle = sourceHandleDaChave(saidas, nome)
+    const newHandle = sourceHandleDaChave(saidas, nome)
     // Emits as an EdgeChange instead of a direct setEdges: that's what makes the
     // change go through `handleEdgesChange` on the canvas and enter the
     // undo/redo history. With setEdges, the change was persisted (autosave watches
@@ -125,11 +125,11 @@ const CustomEdge = ({
       type: "replace",
       item: {
         ...atual,
-        sourceHandle: novoHandle === undefined ? atual.sourceHandle : novoHandle,
+        sourceHandle: newHandle === undefined ? atual.sourceHandle : newHandle,
         data: { ...atual.data, from_key: nome },
       },
     }])
-    setEditando(false)
+    setEditing(false)
   }
 
   return (
@@ -139,7 +139,7 @@ const CustomEdge = ({
             `filter: blur()`: an SVG filter per edge is expensive and creates its
             own surface. It comes FIRST because in SVG whatever is drawn earlier
             stays behind. */}
-        {arestaAtiva && (
+        {edgeActive && (
           <path
             data-role="edge-glow"
             d={edgePath}
@@ -175,7 +175,7 @@ const CustomEdge = ({
 
             Under the cursor: ONE stream and no glow. Crisp enough to teach the
             direction, without passing for a live edge. */}
-        {arestaAtiva ? (
+        {edgeActive ? (
           <>
             <path
               data-role="edge-flow"
@@ -232,13 +232,13 @@ const CustomEdge = ({
             to fix the key later, since before, choosing wrong forced you to
             delete the edge and redo the connection. On hover it moves up a line
             to make room for the delete button, instead of disappearing. */}
-        {(label || podeTrocar) && (
+        {(label || canSwitch) && (
           <div
             data-edge-id={id}
             data-role="edge-label"
             className={cn(
               "absolute z-[20] transition-transform duration-150",
-              podeTrocar ? "pointer-events-auto" : "pointer-events-none",
+              canSwitch ? "pointer-events-auto" : "pointer-events-none",
             )}
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`
@@ -250,11 +250,11 @@ const CustomEdge = ({
             onMouseEnter={() => { setHovered(true); handleToolState("onFocus") }}
             onMouseLeave={() => { setHovered(false); handleToolState("leave") }}
           >
-            {podeTrocar ? (
+            {canSwitch ? (
               <button
                 type="button"
                 title="Trocar a saída que passa por esta aresta"
-                onClick={() => setEditando(v => !v)}
+                onClick={() => setEditing(v => !v)}
                 className="text-[10px] font-mono px-1 rounded cursor-pointer hover:brightness-125"
                 // `color-mix` and not a hex alpha suffix: the color is now a
                 // token (`var(--exec-*)`), and appending "22" to it isn't a color.
@@ -283,13 +283,13 @@ const CustomEdge = ({
               <div
                 className="absolute left-1/2 top-full mt-1 -translate-x-1/2 z-[30] min-w-36
                            rounded-md border border-border bg-popover shadow-md overflow-hidden"
-                onMouseLeave={() => setEditando(false)}
+                onMouseLeave={() => setEditing(false)}
               >
                 {candidatos.map(porta => (
                   <button
                     key={porta.name}
                     type="button"
-                    onClick={() => escolherChave(porta.name)}
+                    onClick={() => chooseKey(porta.name)}
                     className={cn(
                       "block w-full text-left px-2 py-1 text-[11px] font-mono transition-colors",
                       porta.name === data?.from_key

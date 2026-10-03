@@ -29,10 +29,10 @@ from app.services import observability_service as osvc
 from app.services.observability.agregados import _execucoes_presas
 from app.services.observability_service import (
     ObservabilityService,
-    _bloco_agora,
+    _now_block,
     _metrics_cache_key,
     _percentis,
-    _resolver_escopo,
+    _resolve_scope,
     _serialize_run,
 )
 
@@ -46,7 +46,7 @@ def _user(role="admin", id_hash="usr-1"):
     return u
 
 
-class _LinhaVazia:
+class _EmptyRow:
     """Aggregation row with no data: any column reads as None."""
 
     def __getattr__(self, _nome):
@@ -55,7 +55,7 @@ class _LinhaVazia:
 
 def _resultado(*, linha=None, linhas=None, escalar=None):
     r = MagicMock()
-    r.one.return_value = linha if linha is not None else _LinhaVazia()
+    r.one.return_value = linha if linha is not None else _EmptyRow()
     r.all.return_value = list(linhas or [])
     r.scalars.return_value.all.return_value = list(linhas or [])
     r.scalar_one_or_none.return_value = escalar
@@ -63,26 +63,26 @@ def _resultado(*, linha=None, linhas=None, escalar=None):
     return r
 
 
-def _db(*respostas, dialeto="sqlite"):
+def _db(*respostas, sql_dialect="sqlite"):
     """Session double: returns `respostas` in order and, once exhausted, empty
-    results. `dialeto` decides between PostgreSQL SQL and the Python fallback."""
+    results. `sql_dialect` decides between PostgreSQL SQL and the Python fallback."""
     fila = list(respostas)
 
     async def _execute(stmt):
         return fila.pop(0) if fila else _resultado()
 
     db = MagicMock(execute=AsyncMock(side_effect=_execute))
-    db.bind.dialect.name = dialeto
+    db.bind.dialect.name = sql_dialect
     return db
 
 
-def _sql(db, chamada=0, dialeto=postgresql.dialect()) -> str:
+def _sql(db, chamada=0, sql_dialect=postgresql.dialect()) -> str:
     stmt = db.execute.await_args_list[chamada].args[0]
-    return str(stmt.compile(dialect=dialeto, compile_kwargs={"literal_binds": False}))
+    return str(stmt.compile(dialect=sql_dialect, compile_kwargs={"literal_binds": False}))
 
 
 @pytest.fixture(autouse=True)
-def _sem_redis():
+def _no_redis():
     """Presence, capacity and ACKs come from Redis; here nothing is up."""
     with patch.object(executor_registry, "is_online", AsyncMock(return_value=False)), \
          patch.object(executor_registry, "read_capacity", AsyncMock(return_value=None)), \
@@ -103,12 +103,12 @@ AGORA = datetime(2026, 9, 6, 12, 0, tzinfo=timezone.utc)
     ([1, 2, 3, 4, 5], 0.95, 4.8),         # 0.95 * 4 = 3.8 → 4 + 0.8 * (5 - 4)
     ([5, 1, 3], 0.5, 3.0),                # does not depend on input order
 ])
-def test_percentil_continuo_segue_o_percentile_cont_do_postgres(valores, p, esperado):
+def test_continuous_percentile_follows_postgres_percentile_cont(valores, p, esperado):
     assert percentil_linear(valores, p) == esperado
 
 
 @pytest.mark.asyncio
-async def test_percentis_em_python_so_olham_concluidas_com_duracao_positiva():
+async def test_python_percentiles_only_look_at_completed_with_positive_duration():
     """Outside PostgreSQL the median is computed in Python, but the slice
     (status success, duration > 0) must be in the SQL — otherwise the projected
     volume would be the whole window."""
@@ -124,9 +124,9 @@ async def test_percentis_em_python_so_olham_concluidas_com_duracao_positiva():
 
 
 @pytest.mark.asyncio
-async def test_percentis_no_postgres_usam_percentile_cont_within_group():
+async def test_postgres_percentiles_use_percentile_cont_within_group():
     linha = SimpleNamespace(p0=42.0, p1=190.0)
-    db = _db(_resultado(linha=linha), dialeto="postgresql")
+    db = _db(_resultado(linha=linha), sql_dialect="postgresql")
 
     assert await _percentis(db, [], [0.5, 0.95]) == [42.0, 190.0]
     sql = _sql(db)
@@ -137,15 +137,15 @@ async def test_percentis_no_postgres_usam_percentile_cont_within_group():
 # ── Filtros comuns e cache ───────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_workspace_fora_do_escopo_e_403_para_usuario_comum():
+async def test_out_of_scope_workspace_is_403_for_regular_user():
     with pytest.raises(WorkspaceAccessDeniedError):
-        await _resolver_escopo(_db(), _user("user"), ["ws-1"], workspace_id="ws-2")
+        await _resolve_scope(_db(), _user("user"), ["ws-1"], workspace_id="ws-2")
 
 
 @pytest.mark.asyncio
-async def test_admin_filtra_qualquer_workspace_sem_consultar_o_banco():
+async def test_admin_filters_any_workspace_without_querying_the_db():
     db = _db()
-    run_f, wf_f = await _resolver_escopo(
+    run_f, wf_f = await _resolve_scope(
         db, _user("admin"), [], workspace_id="ws-qualquer", como_admin=True,
     )
 
@@ -155,32 +155,32 @@ async def test_admin_filtra_qualquer_workspace_sem_consultar_o_banco():
 
 
 @pytest.mark.asyncio
-async def test_workflow_fora_do_escopo_e_404():
+async def test_out_of_scope_workflow_is_404():
     """"No access" and "does not exist" fall into the same 404: a 403 would confirm
     the existence of another tenant's workflows."""
     db = _db(_resultado(escalar=None))
     with pytest.raises(WorkflowNotFoundError):
-        await _resolver_escopo(db, _user("user"), ["ws-1"], workflow_id="wf-x")
+        await _resolve_scope(db, _user("user"), ["ws-1"], workflow_id="wf-x")
     assert "workflows.workspace_id IN" in _sql(db)
 
 
-def test_chave_de_cache_inclui_os_filtros():
+def test_cache_key_includes_the_filters():
     """Without the filters in the key, "all workspaces" would be served to whoever
     asked for "only workspace X" for the next 45 s."""
     base = _metrics_cache_key("metrics", _user("admin"), [], 30, como_admin=True)
-    com_ws = _metrics_cache_key("metrics", _user("admin"), [], 30, como_admin=True, workspace_id="ws-1")
-    com_wf = _metrics_cache_key(
+    with_ws = _metrics_cache_key("metrics", _user("admin"), [], 30, como_admin=True, workspace_id="ws-1")
+    with_wf = _metrics_cache_key(
         "metrics", _user("admin"), [], 30, como_admin=True, workspace_id="ws-1", workflow_id="wf-1",
     )
 
-    assert len({base, com_ws, com_wf}) == 3
+    assert len({base, with_ws, with_wf}) == 3
     assert _metrics_cache_key("metrics", _user("admin"), [], 30, como_admin=True, workspace_id=None) == base
 
 
 # ── /metrics: formulas ───────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_taxa_de_sucesso_ignora_em_andamento_e_canceladas():
+async def test_success_rate_ignores_in_progress_and_cancelled():
     principal = SimpleNamespace(
         total=17, success=8, failed=2, running=5, pending=1, cancelled=1,
         avg_duration=12.0, last_24h=3, last_7d=9, prev_7d=4, prev_7d_success=3, prev_7d_failed=1,
@@ -210,7 +210,7 @@ async def test_taxa_de_sucesso_ignora_em_andamento_e_canceladas():
 
 
 @pytest.mark.asyncio
-async def test_sem_execucoes_a_taxa_e_zero_e_a_anterior_de_7d_e_nula():
+async def test_without_runs_the_rate_is_zero_and_the_previous_7d_is_null():
     """0.0 (spec) for the window rate; `null` for the 7-day one, which is what
     hides the Overview's trend arrow instead of showing "dropped to 0%"."""
     db = _db(_resultado(linha=SimpleNamespace(total=0, ativos=0)))
@@ -226,7 +226,7 @@ async def test_sem_execucoes_a_taxa_e_zero_e_a_anterior_de_7d_e_nula():
 
 
 @pytest.mark.asyncio
-async def test_periodo_anterior_tem_janela_propria_de_mesmo_tamanho():
+async def test_previous_period_has_its_own_window_of_same_size():
     """The comparison is against [now-2d, now-d): it lives in its own query instead
     of widening the main WHERE (which the window tests pin at max(days, 14))."""
     db = _db(_resultado(linha=SimpleNamespace(total=0, ativos=0)))
@@ -234,15 +234,15 @@ async def test_periodo_anterior_tem_janela_propria_de_mesmo_tamanho():
     await ObservabilityService.get_metrics(db, _user("admin"), [], days=30, force=True, como_admin=True)
 
     stmt = db.execute.await_args_list[2].args[0]
-    momentos = sorted(v for v in stmt.compile().params.values() if isinstance(v, datetime))
-    assert len(momentos) == 2
-    assert all(m.tzinfo is not None for m in momentos)
-    assert timedelta(days=29, hours=23) < momentos[1] - momentos[0] < timedelta(days=30, hours=1)
-    assert timedelta(days=59) < datetime.now(timezone.utc) - momentos[0] < timedelta(days=61)
+    instants = sorted(v for v in stmt.compile().params.values() if isinstance(v, datetime))
+    assert len(instants) == 2
+    assert all(m.tzinfo is not None for m in instants)
+    assert timedelta(days=29, hours=23) < instants[1] - instants[0] < timedelta(days=30, hours=1)
+    assert timedelta(days=59) < datetime.now(timezone.utc) - instants[0] < timedelta(days=61)
 
 
 @pytest.mark.asyncio
-async def test_top_falhas_traz_nome_taxa_e_ultimo_erro_resumido():
+async def test_top_failures_brings_name_rate_and_summarized_last_error():
     agregado = SimpleNamespace(workflow_hash="wf-1", total_runs=20, failure_count=5)
     ultima = SimpleNamespace(
         workflow_hash="wf-1", status="failed", error_message="x" * 300,
@@ -254,7 +254,7 @@ async def test_top_falhas_traz_nome_taxa_e_ultimo_erro_resumido():
     )
     db = _db(_resultado(linhas=[agregado]), _resultado(linhas=[ultima]), _resultado(linhas=[meta]))
 
-    (item,) = await osvc._top_falhas(db, [], AGORA - timedelta(days=30))
+    (item,) = await osvc._top_failures(db, [], AGORA - timedelta(days=30))
 
     assert item["workflow_name"] == "Integração SICAR"
     assert item["failure_rate"] == 0.25
@@ -267,7 +267,7 @@ async def test_top_falhas_traz_nome_taxa_e_ultimo_erro_resumido():
 
 # ── Stuck runs ───────────────────────────────────────────────────────────────
 
-def _candidata(task_id, wf, minutos, host="executor:ex-2"):
+def _candidate(task_id, wf, minutos, host="executor:ex-2"):
     return SimpleNamespace(
         task_id=task_id, id=1, workflow_hash=wf, host=host,
         start_time=AGORA - timedelta(minutes=minutos),
@@ -275,16 +275,16 @@ def _candidata(task_id, wf, minutos, host="executor:ex-2"):
 
 
 @pytest.mark.asyncio
-async def test_presa_usa_3x_a_mediana_com_piso_de_900s_e_3600s_sem_mediana():
-    candidatas = [
-        _candidata("lenta-sem-p50", "wf-a", 70),   # 4200 s > 3600 (no p50)    → stuck
-        _candidata("curta-sem-p50", "wf-a", 50),   # 3000 s < 3600             → no
-        _candidata("piso", "wf-b", 16),            # p50 100 → max(300, 900) = 900 < 960 → presa
-        _candidata("multiplo", "wf-c", 40),        # p50 1000 → 3000 > 2400    → no
-        _candidata("multiplo-2", "wf-c", 60),      # 3600 > 3000               → presa
+async def test_stuck_uses_3x_the_median_with_900s_floor_and_3600s_without_median():
+    candidates = [
+        _candidate("lenta-sem-p50", "wf-a", 70),   # 4200 s > 3600 (no p50)    → stuck
+        _candidate("curta-sem-p50", "wf-a", 50),   # 3000 s < 3600             → no
+        _candidate("piso", "wf-b", 16),            # p50 100 → max(300, 900) = 900 < 960 → presa
+        _candidate("multiplo", "wf-c", 40),        # p50 1000 → 3000 > 2400    → no
+        _candidate("multiplo-2", "wf-c", 60),      # 3600 > 3000               → presa
     ]
     nomes = [SimpleNamespace(id_hash="ex-2", name="geo-02")]
-    db = _db(_resultado(linhas=candidatas), _resultado(), _resultado(linhas=nomes))
+    db = _db(_resultado(linhas=candidates), _resultado(), _resultado(linhas=nomes))
 
     with patch("app.services.observability.agregados._p50_por_workflow", AsyncMock(return_value={"wf-b": 100.0, "wf-c": 1000.0})):
         quantas, presas = await _execucoes_presas(db, [], AGORA)
@@ -300,9 +300,9 @@ async def test_presa_usa_3x_a_mediana_com_piso_de_900s_e_3600s_sem_mediana():
 
 
 @pytest.mark.asyncio
-async def test_presas_limita_a_cinco_mais_antigas_mas_conta_todas():
-    candidatas = [_candidata(f"r{i}", "wf-a", 120 - i) for i in range(7)]
-    db = _db(_resultado(linhas=candidatas))
+async def test_stuck_limits_to_five_oldest_but_counts_all():
+    candidates = [_candidate(f"r{i}", "wf-a", 120 - i) for i in range(7)]
+    db = _db(_resultado(linhas=candidates))
 
     with patch("app.services.observability.agregados._p50_por_workflow", AsyncMock(return_value={})):
         quantas, presas = await _execucoes_presas(db, [], AGORA)
@@ -314,27 +314,27 @@ async def test_presas_limita_a_cinco_mais_antigas_mas_conta_todas():
 # ── "Now" block ──────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_agora_conta_frota_online_fila_publicada_e_acks_so_para_admin():
+async def test_now_counts_online_fleet_published_queue_and_acks_only_for_admin():
     frota = [
         SimpleNamespace(id_hash="ex-1", name="a", executor_type="dedicated", is_default=False, status="active"),
         SimpleNamespace(id_hash="ex-2", name="b", executor_type="dedicated", is_default=False, status="active"),
         SimpleNamespace(id_hash="ex-3", name="c", executor_type="default", is_default=True, status="active"),
     ]
     ativos = SimpleNamespace(running=2, pending=1)
-    capacidades = {"ex-1": {"running": 2, "queued": 5, "max_concurrent": 4, "max_queue": 50, "extra": 1}, "ex-2": None}
+    capacities = {"ex-1": {"running": 2, "queued": 5, "max_concurrent": 4, "max_queue": 50, "extra": 1}, "ex-2": None}
     acks = [{"job_id": "j1", "elapsed_seconds": 20.0}, {"job_id": "j2", "elapsed_seconds": 3.0}]
 
     with patch.object(executor_registry, "is_online", AsyncMock(side_effect=lambda eid: eid in ("ex-1", "ex-2"))), \
-         patch.object(executor_registry, "read_capacity", AsyncMock(side_effect=lambda eid: capacidades.get(eid))), \
+         patch.object(executor_registry, "read_capacity", AsyncMock(side_effect=lambda eid: capacities.get(eid))), \
          patch.object(executor_registry, "list_pending_acks", AsyncMock(return_value=acks)):
         db = _db(_resultado(linha=ativos), _resultado(), _resultado(linhas=frota))
-        admin = await _bloco_agora(db, _user("admin"), [], AGORA, como_admin=True)
+        admin = await _now_block(db, _user("admin"), [], AGORA, como_admin=True)
 
         db = _db(_resultado(linha=ativos), _resultado(), _resultado(linhas=frota))
         with patch("app.services.user_executor_service.get_user_accessible_agents",
                    AsyncMock(return_value=[{"id_hash": "ex-1", "name": "a", "status": "active"},
                                            {"id_hash": "ex-9", "name": "z", "status": "inactive"}])):
-            comum = await _bloco_agora(db, _user("user"), [], AGORA)
+            comum = await _now_block(db, _user("user"), [], AGORA)
 
     assert (admin["running"], admin["pending"], admin["stuck_count"]) == (2, 1, 0)
     assert admin["executors"] == {"online": 2, "total": 3}
@@ -348,13 +348,13 @@ async def test_agora_conta_frota_online_fila_publicada_e_acks_so_para_admin():
 # ── /runs-by-day ─────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_runs_por_dia_traz_todos_os_dias_cortados_no_fuso():
+async def test_runs_per_day_brings_all_days_cut_in_the_timezone():
     """In São Paulo (UTC-3), 01:00 UTC is still the previous day; `pending` adds
     into `running`, `cancelled` stays separate and the rest goes to `other`."""
     hoje = datetime.now(timezone.utc)
-    ontem_0100_utc = (hoje - timedelta(days=1)).replace(hour=1, minute=0, second=0, microsecond=0)
+    yesterday_0100_utc = (hoje - timedelta(days=1)).replace(hour=1, minute=0, second=0, microsecond=0)
     linhas = [
-        SimpleNamespace(start_time=ontem_0100_utc, status="success"),
+        SimpleNamespace(start_time=yesterday_0100_utc, status="success"),
         SimpleNamespace(start_time=hoje - timedelta(hours=2) if hoje.hour >= 5 else hoje, status="pending"),
         SimpleNamespace(start_time=hoje, status="running"),
         SimpleNamespace(start_time=hoje, status="cancelled"),
@@ -376,8 +376,8 @@ async def test_runs_por_dia_traz_todos_os_dias_cortados_no_fuso():
     # zone, not by a fixed index: when the test runs between 00:00–03:00 UTC,
     # "today in SP" is still the previous day and `dias[-3]` slipped by one day
     # (it failed only in that window).
-    dia_do_sucesso = ontem_0100_utc.astimezone(ZoneInfo("America/Sao_Paulo")).date().isoformat()
-    balde = next(d for d in dias if d["day"] == dia_do_sucesso)
+    success_day = yesterday_0100_utc.astimezone(ZoneInfo("America/Sao_Paulo")).date().isoformat()
+    balde = next(d for d in dias if d["day"] == success_day)
     assert balde["success"] == 1 and balde["total"] == 1
     assert sum(d["total"] for d in dias) == 6
     assert sum(d["running"] for d in dias) == 2
@@ -390,8 +390,8 @@ async def test_runs_por_dia_traz_todos_os_dias_cortados_no_fuso():
 
 
 @pytest.mark.asyncio
-async def test_runs_por_dia_no_postgres_corta_o_dia_com_at_time_zone():
-    db = _db(_resultado(linhas=[SimpleNamespace(day="2026-09-06", status="success", count=2)]), dialeto="postgresql")
+async def test_postgres_runs_per_day_cuts_the_day_with_at_time_zone():
+    db = _db(_resultado(linhas=[SimpleNamespace(day="2026-09-06", status="success", count=2)]), sql_dialect="postgresql")
 
     with patch.object(osvc, "_agora_utc", return_value=AGORA):
         saida = await ObservabilityService.get_runs_by_day(
@@ -407,16 +407,16 @@ async def test_runs_por_dia_no_postgres_corta_o_dia_com_at_time_zone():
 
 
 @pytest.mark.asyncio
-async def test_tz_invalido_e_422_no_router(client):
+async def test_invalid_tz_is_422_in_the_router(client):
     """Validation stays at the edge: an invalid name would become an SQL error in
     `AT TIME ZONE` (500) instead of a 422 the web app understands."""
     from app.api.dependencies import get_db
     from app.main import app
 
-    async def _db_falso():
+    async def _fake_db():
         yield _db()
 
-    app.dependency_overrides[get_db] = _db_falso
+    app.dependency_overrides[get_db] = _fake_db
     try:
         resp = await client.get("/observability/runs-by-day", params={"days": 7, "tz": "Marte/Olimpo"})
         assert resp.status_code == 422
@@ -442,7 +442,7 @@ def _run_row(**over):
     return SimpleNamespace(**base)
 
 
-def test_serializacao_traz_os_campos_novos_e_reserva_os_admin_only():
+def test_serialization_brings_the_new_fields_and_reserves_the_admin_only():
     meta = {"wf-1": {
         "workflow_name": "Integração", "workflow_active": True, "owner_username": "ana",
         "workspace_id": "ws-novo", "workspace_name": "Novo", "origem": "assistente",
@@ -469,7 +469,7 @@ def test_serializacao_traz_os_campos_novos_e_reserva_os_admin_only():
     assert comum["workflow_origem"] == "assistente"
 
 
-def test_serializacao_sem_host_e_sem_meta_devolve_nulos():
+def test_serialization_without_host_and_meta_returns_nulls():
     out = _serialize_run(_run_row(host=None, triggered_by=None, workspace_id=None))
     assert out["executor_id"] is None and out["executor_name"] is None and out["agent_host"] is None
     assert out["triggered_by_username"] is None and out["workspace_name"] is None
@@ -479,7 +479,7 @@ def test_serializacao_sem_host_e_sem_meta_devolve_nulos():
 
 
 @pytest.mark.asyncio
-async def test_filtro_de_origem_do_fluxo_junta_workflows_e_nao_e_o_disparo():
+async def test_workflow_origin_filter_joins_workflows_and_is_not_the_trigger():
     """The History's "Assistente" chip slices by the WORKFLOW (`workflows.origem`),
     not by the trigger (`workflow_runs.trigger_source`) — they are different and
     combinable axes."""
@@ -505,27 +505,27 @@ async def test_filtro_de_origem_do_fluxo_junta_workflows_e_nao_e_o_disparo():
 
 
 @pytest.mark.asyncio
-async def test_lista_so_junta_workflows_quando_ha_busca():
+async def test_list_only_joins_workflows_when_there_is_a_search():
     db = _db()
     await ObservabilityService.list_runs(
         db, _user("admin"), [], q="GDAL", tier="pool", trigger_source="schedule", como_admin=True,
     )
-    com_busca = _sql(db, 0)
-    assert "JOIN workflows" in com_busca
-    assert "workflow_runs.error_message ILIKE" in com_busca and "workflows.name ILIKE" in com_busca
-    assert "workflow_runs.dispatch_tier = " in com_busca and "workflow_runs.trigger_source = " in com_busca
+    with_search = _sql(db, 0)
+    assert "JOIN workflows" in with_search
+    assert "workflow_runs.error_message ILIKE" in with_search and "workflows.name ILIKE" in with_search
+    assert "workflow_runs.dispatch_tier = " in with_search and "workflow_runs.trigger_source = " in with_search
     padrao = [v for v in db.execute.await_args_list[0].args[0].compile().params.values() if v == "%GDAL%"]
     assert padrao, "o termo vira %termo% nos dois ILIKE"
 
     db = _db()
     await ObservabilityService.list_runs(db, _user("user"), ["ws-1"], workspace_id="ws-1")
-    sem_busca = _sql(db, 0)
-    assert "JOIN workflows" not in sem_busca
-    assert "workflow_runs.workspace_id = " in sem_busca
+    without_search = _sql(db, 0)
+    assert "JOIN workflows" not in without_search
+    assert "workflow_runs.workspace_id = " in without_search
 
 
 @pytest.mark.asyncio
-async def test_busca_escapa_curingas_do_usuario():
+async def test_search_escapes_user_wildcards():
     db = _db()
     await ObservabilityService.list_runs(db, _user("admin"), [], q="100%_a", como_admin=True)
     params = db.execute.await_args_list[0].args[0].compile().params.values()
@@ -533,7 +533,7 @@ async def test_busca_escapa_curingas_do_usuario():
 
 
 @pytest.mark.asyncio
-async def test_lista_resolve_nomes_em_lote_e_nao_por_linha():
+async def test_list_resolves_names_in_batch_not_per_row():
     """A page of N runs costs the listing + 4 SELECT ... IN (executors,
     workflows, workspaces, users), regardless of N."""
     linhas = [_run_row(task_id=f"t-{i}", triggered_by=f"usr-{i}", workspace_id=f"ws-{i}") for i in range(10)]
@@ -547,7 +547,7 @@ async def test_lista_resolve_nomes_em_lote_e_nao_por_linha():
 
 
 @pytest.mark.asyncio
-async def test_detalhe_traz_typical_seconds_do_workflow():
+async def test_detail_brings_the_workflow_typical_seconds():
     run = _run_row()
     db = _db(_resultado(escalar=run))
 
@@ -560,10 +560,10 @@ async def test_detalhe_traz_typical_seconds_do_workflow():
 
 
 @pytest.mark.asyncio
-async def test_detalhe_de_run_ativo_nao_recomputa_a_mediana():
+async def test_active_run_detail_does_not_recompute_the_median():
     """While the run is RUNNING (the frequent poll that run_workflow instructs), the
     90-day median makes no sense — it is not computed. Mutation: removing the gate
-    on `_STATUS_ATIVOS` makes `_p50_por_workflow` run on every poll."""
+    on `_ACTIVE_STATUSES` makes `_p50_por_workflow` run on every poll."""
     p50 = AsyncMock(return_value={"wf-1": 38.5})
     for estado in ("running", "pending"):
         run = _run_row(status=estado, end_time=None)
@@ -577,7 +577,7 @@ async def test_detalhe_de_run_ativo_nao_recomputa_a_mediana():
 # ── /metrics/executores ──────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_executores_incluem_sem_executor_e_frota_online_com_zeros():
+async def test_executors_include_no_executor_and_online_fleet_with_zeros():
     linhas = [
         SimpleNamespace(host="executor:ex-1", total_runs=4, success_runs=3, failed_runs=1, avg_duration=10.0, last_run_at=AGORA),
         SimpleNamespace(host=None, total_runs=2, success_runs=0, failed_runs=2, avg_duration=None, last_run_at=AGORA),
@@ -596,19 +596,19 @@ async def test_executores_incluem_sem_executor_e_frota_online_com_zeros():
             db, _user("admin"), [], days=30, force=True, como_admin=True,
         )
 
-    por_host = {e["agent_host"]: e for e in saida["executores"]}
-    assert set(por_host) == {"executor:ex-1", None, "executor:ex-2"}   # ex-3 offline and without runs is left out
+    by_host = {e["agent_host"]: e for e in saida["executores"]}
+    assert set(by_host) == {"executor:ex-1", None, "executor:ex-2"}   # ex-3 offline and without runs is left out
 
-    sem = por_host[None]
+    sem = by_host[None]
     assert sem["display_name"] == "Sem executor" and sem["unassigned"] is True
     assert (sem["executor_id"], sem["online"], sem["capacity"], sem["p50_seconds"]) == (None, False, None, None)
 
-    ex1 = por_host["executor:ex-1"]
+    ex1 = by_host["executor:ex-1"]
     assert (ex1["executor_id"], ex1["executor_type"], ex1["is_default"], ex1["status"]) == ("ex-1", "dedicated", False, "active")
     assert ex1["online"] is True and ex1["capacity"] == cap["ex-1"]
     assert ex1["success_rate"] == 0.75 and ex1["unassigned"] is False
 
-    ex2 = por_host["executor:ex-2"]
+    ex2 = by_host["executor:ex-2"]
     assert ex2["total_runs"] == 0 and ex2["online"] is True and ex2["last_run_at"] is None
     assert ex2["display_name"] == "geo-02@ex-2"
 
@@ -616,7 +616,7 @@ async def test_executores_incluem_sem_executor_e_frota_online_com_zeros():
 # ── /metrics/workflows ───────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_visao_por_workflow_lista_todos_com_zeros_e_ordena():
+async def test_per_workflow_view_lists_all_with_zeros_and_sorts():
     inventario = [
         SimpleNamespace(id_hash="wf-b", name="Beta", flag_ative=True, workspace_id="ws-1", workspace_name="Um", origem="usuario"),
         SimpleNamespace(id_hash="wf-a", name="alfa", flag_ative=False, workspace_id="ws-1", workspace_name="Um", origem="assistente"),
@@ -628,11 +628,11 @@ async def test_visao_por_workflow_lista_todos_com_zeros_e_ordena():
     # The last run completed; the last ERROR is the one from the last failure (a
     # separate query, only for those with a failure in the window).
     ultimas = [SimpleNamespace(workflow_hash="wf-c", status="success", error_message=None, error_category=None, start_time=AGORA)]
-    ultimas_falhas = [SimpleNamespace(workflow_hash="wf-c", status="failed", error_message="Timeout", error_category="timeout", start_time=AGORA)]
+    last_failures = [SimpleNamespace(workflow_hash="wf-c", status="failed", error_message="Timeout", error_category="timeout", start_time=AGORA)]
     db = _db(
         _resultado(linhas=inventario), _resultado(linhas=agregados),
         _resultado(linhas=[SimpleNamespace(grupo="wf-c", duration_seconds=170.0)]),
-        _resultado(linhas=ultimas), _resultado(linhas=ultimas_falhas),
+        _resultado(linhas=ultimas), _resultado(linhas=last_failures),
     )
 
     saida = await ObservabilityService.get_workflows_metrics(
@@ -658,7 +658,7 @@ async def test_visao_por_workflow_lista_todos_com_zeros_e_ordena():
 # cache key (the executor fleet is not a function of the workspaces alone)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def test_parse_iso_aceita_o_sufixo_z_que_a_web_manda():
+def test_parse_iso_accepts_the_z_suffix_the_web_sends():
     from app.services.observability_service import _parse_iso
     d = _parse_iso("2026-08-07T22:05:13.123Z")
     assert d.tzinfo is not None and d.utcoffset().total_seconds() == 0
@@ -666,7 +666,7 @@ def test_parse_iso_aceita_o_sufixo_z_que_a_web_manda():
 
 
 @pytest.mark.asyncio
-async def test_list_runs_aceita_date_from_em_iso_com_z():
+async def test_list_runs_accepts_date_from_in_iso_with_z():
     """`toISOString()` ends in Z; 3.10's `fromisoformat` rejected it and the History
     table never loaded in production."""
     db = _db()
@@ -676,7 +676,7 @@ async def test_list_runs_aceita_date_from_em_iso_com_z():
     assert "start_time >=" in _sql(db, 0)
 
 
-def test_chave_de_cache_distingue_usuarios_com_os_mesmos_workspaces():
+def test_cache_key_distinguishes_users_with_the_same_workspaces():
     ana = _metrics_cache_key("metrics", _user("user", "ana"), ["ws-1"], 30)
     bia = _metrics_cache_key("metrics", _user("user", "bia"), ["ws-1"], 30)
     assert ana != bia

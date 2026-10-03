@@ -3,7 +3,7 @@ from typing import Any, Dict
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
 from flow.utils.drive_resolver import read_drive_file_as
-from flow.utils.leitura_geo import ler_geodataframe
+from flow.utils.leitura_geo import read_geodataframe
 from flow.utils.logger import get_logger
 from flow.utils.geo_helpers import ensure_gdf_crs
 logger = get_logger(__name__)
@@ -56,7 +56,7 @@ class ReadShapefileNode(BaseNode):
             raise ValueError("Parametro 'driveFileId' e obrigatorio.")
 
         gdf, original_name = await read_drive_file_as(
-            drive_file_id, ler_geodataframe, label="Shapefile"
+            drive_file_id, read_geodataframe, label="Shapefile"
         )
         logger.info("Lendo Shapefile do Drive: '%s'", original_name)
 

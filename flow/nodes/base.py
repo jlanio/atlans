@@ -22,7 +22,7 @@ class BaseNode(ABC):
             'properties': [              # Configurable parameters (form widgets)
                 {
                     'name': 'param1',       # Parameter key
-                    'type': 'string',       # TIPOS_DE_PROPRIEDADE (contrato.py): string|number|
+                    'type': 'string',       # PROPERTY_TYPES (contrato.py): string|number|
                                             #   integer|boolean|object|select|chips|credential|
                                             #   keyvalue|code|ports|drive|artifact|sql
                     'default': '',          # Default value when not provided
@@ -34,7 +34,7 @@ class BaseNode(ABC):
             'outputs': [                 # OUTPUT fields — the single, typed source:
                 {                        #   the keys of the dict that execute() returns
                     'name': 'output',
-                    'type': 'geodataframe',  # TIPOS_DE_CAMPO: geodataframe|string|number|
+                    'type': 'geodataframe',  # FIELD_TYPES: geodataframe|string|number|
                                              #   boolean|object|list|any
                     'description': '...',
                     # 'port': True on fields with their own connection point on the
@@ -230,12 +230,12 @@ class BaseNode(ABC):
     def get_pair(
         self,
         inputs: Dict[str, Any],
-        chave_a: str = "layerA",
-        chave_b: str = "layerB",
+        key_a: str = "layerA",
+        key_b: str = "layerB",
         *,
         operacao: str = "operação",
         crs: str | None = "exigir_igual",
-        tipos_suportados: bool = False,
+        supported_types: bool = False,
         nomes: tuple[str, str] | None = None,
     ):
         """
@@ -249,8 +249,8 @@ class BaseNode(ABC):
                            is the node's job, with `align_crs`, INSIDE the worker
                            thread: to_crs is O(n) and doesn't run on the event loop.
           None           → no check: the node handles the CRS on its own
-                           (e.g.: `para_crs_metrico`).
-        tipos_suportados: refuses GeometryCollection/null geometry on both.
+                           (e.g.: `to_metric_crs`).
+        supported_types: refuses GeometryCollection/null geometry on both.
         nomes: how each layer appears in missing-CRS messages
                (default: "camada '<chave>'").
         operacao: how the operation appears in refusal messages.
@@ -260,18 +260,18 @@ class BaseNode(ABC):
             require_crs,
             require_same_crs,
         )
-        a = self.get_input_gdf(inputs, chave_a)
-        b = self.get_input_gdf(inputs, chave_b)
+        a = self.get_input_gdf(inputs, key_a)
+        b = self.get_input_gdf(inputs, key_b)
         if crs == "exigir_igual":
             require_same_crs(a, b, operation=operacao)
         elif crs == "alinhar":
-            nome_a, nome_b = nomes or (f"camada '{chave_a}'", f"camada '{chave_b}'")
-            require_crs(a, name=nome_a)
-            require_crs(b, name=nome_b)
+            name_a, name_b = nomes or (f"camada '{key_a}'", f"camada '{key_b}'")
+            require_crs(a, name=name_a)
+            require_crs(b, name=name_b)
         elif crs is not None:
             # A typo here would silently turn off the check.
             raise ValueError(f"Política de CRS desconhecida: {crs!r}.")
-        if tipos_suportados:
+        if supported_types:
             reject_unsupported_geom_types(a, b, operation=operacao)
         return a, b
 

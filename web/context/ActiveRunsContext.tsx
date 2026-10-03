@@ -39,7 +39,7 @@ export interface RunningRun {
 // What is kept of each live run between one poll and the next. Besides the
 // name, the three fields the Projects list shows on the "running" row (projects
 // spec §2.3) — `/observability/runs` already returns them, so they cost nothing.
-type RunVivo = Pick<RunningRun, "name" | "startedAt" | "triggerSource" | "executorName"> & { hash: string }
+type LiveRun = Pick<RunningRun, "name" | "startedAt" | "triggerSource" | "executorName"> & { hash: string }
 
 interface ActiveRunsValue {
   /** Set of id_hash of the workflows with a live run in the workspace. */
@@ -97,11 +97,11 @@ export function ActiveRunsProvider({ children }: { children: ReactNode }) {
     // consistency). Without expiry, it would stay nameless for the rest of the
     // session; with the TTL, a later tick retries and the name appears as soon
     // as the backend lists it.
-    const tentados = new Map<string, number>()
-    const TENTADO_TTL_MS = 60_000
+    const attempted = new Map<string, number>()
+    const ATTEMPTED_TTL_MS = 60_000
     // run_id -> {hash, name} of the live runs in the LAST poll. Rebuilt every
     // tick → size bounded by the number of live runs (does not grow forever).
-    let prevLive = new Map<string, RunVivo>()
+    let prevLive = new Map<string, LiveRun>()
     // The first poll only seeds prevLive (it does not notify about runs that had
     // already finished before the app opened / before switching workspace).
     let seeded = false
@@ -150,7 +150,7 @@ export function ActiveRunsProvider({ children }: { children: ReactNode }) {
       const inéditos = raw.filter((r) =>
         r.workflow_hash
         && !namesByHash.has(r.workflow_hash)
-        && agora - (tentados.get(r.workflow_hash) ?? 0) > TENTADO_TTL_MS
+        && agora - (attempted.get(r.workflow_hash) ?? 0) > ATTEMPTED_TTL_MS
       )
       if (inéditos.length > 0) {
         const ok = await loadNames()
@@ -161,13 +161,13 @@ export function ActiveRunsProvider({ children }: { children: ReactNode }) {
         // tries again.
         if (ok) {
           for (const r of inéditos) {
-            if (!namesByHash.has(r.workflow_hash!)) tentados.set(r.workflow_hash!, agora)
+            if (!namesByHash.has(r.workflow_hash!)) attempted.set(r.workflow_hash!, agora)
           }
         }
       }
 
       // Scopes to the current workspace (only workflows it knows about).
-      const nextLive = new Map<string, RunVivo>()
+      const nextLive = new Map<string, LiveRun>()
       for (const r of raw) {
         const hash = r.workflow_hash
         if (!hash || !namesByHash.has(hash)) continue

@@ -12,16 +12,16 @@
 import { useCallback } from "react"
 
 import { useHomeStore } from "@/app/stores/homeStore"
-import type { ContextoDoBloco } from "@/app/components/home/assistente/conversa"
-import type { BlocoDoAssistente } from "@/app/components/home/assistente/quadros"
-import type { ResultadoDaDecisao } from "@/app/hooks/home/useAssistente"
-import CartaoConfirmacao from "./cartao-confirmacao"
+import type { BlockContext } from "@/app/components/home/assistente/conversa"
+import type { AssistantBlock } from "@/app/components/home/assistente/quadros"
+import type { DecisionResult } from "@/app/hooks/home/useAssistente"
+import ConfirmationCard from "./cartao-confirmacao"
 import CartaoCamada from "./cartao-camada"
-import RespostasRapidas from "./respostas-rapidas"
+import QuickReplies from "./respostas-rapidas"
 
 export type Confirmar = (
   toolUseId: string, token: string, decisao: "confirmar" | "recusar",
-) => Promise<ResultadoDaDecisao> | void
+) => Promise<DecisionResult> | void
 
 export type Enviar = (mensagem: string) => Promise<void> | void
 
@@ -31,7 +31,7 @@ export type Enviar = (mensagem: string) => Promise<void> | void
  * hides the quick replies (the hook's `enviar` returns silently during the
  * stream, and a chip that does nothing is a dead button).
  */
-export function useExtrasDoAssistente({
+export function useAssistantExtras({
   confirmar, correndo, enviar,
 }: { confirmar: Confirmar; correndo: boolean; enviar: Enviar }) {
   // Already-clicked confirmations live in the store, not here: collapsing the panel
@@ -60,10 +60,10 @@ export function useExtrasDoAssistente({
   )
 
   return useCallback(
-    (bloco: BlocoDoAssistente, contexto: ContextoDoBloco) => {
+    (bloco: AssistantBlock, contexto: BlockContext) => {
       if (bloco.tipo === "confirmacao") {
         return (
-          <CartaoConfirmacao
+          <ConfirmationCard
             confirmacao={bloco.confirmacao}
             decidido={!!decididos[bloco.confirmacao.tool_use_id]}
             expirado={!!expirados[bloco.confirmacao.tool_use_id]}
@@ -79,7 +79,7 @@ export function useExtrasDoAssistente({
         // removes the chips from the screen on its own; so does typing. On replay
         // the last turn's chips come back: the conversation IS at that point.
         if (!contexto.ultimoTurno || correndo) return null
-        return <RespostasRapidas opcoes={bloco.opcoes} onEscolher={enviar} />
+        return <QuickReplies opcoes={bloco.opcoes} onEscolher={enviar} />
       }
       // `fluxo` is NOT rendered anywhere — not here, nor in the badges strip, which
       // shows the artifacts. The Home is the only page for people who do not

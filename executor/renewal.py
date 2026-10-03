@@ -5,7 +5,7 @@ Automatic renewal of the executor's mTLS cert.
 Periodic loop that checks the current cert's expiry and, if less than
 RENEW_BEFORE_DAYS remain, generates a new keypair, sends a CSR authenticated
 by the current cert (mTLS) and swaps the files atomically — validation and
-writing are the same as enroll's (executor/enrollment.py::_persistir_bundle).
+writing are the same as enroll's (executor/enrollment.py::_persist_bundle).
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from executor._ambiente import ler_int
-from executor.enrollment import CERT_FILE, _build_csr, _persistir_bundle, _ws_to_http
+from executor.enrollment import CERT_FILE, _build_csr, _persist_bundle, _ws_to_http
 
 logger = logging.getLogger(__name__)
 
@@ -128,10 +128,10 @@ async def maybe_renew(server_url: str, cert_dir: str | Path) -> bool:
         return False
 
     # Validates EVERYTHING before writing and swaps via .new + os.replace — the
-    # same path as enroll (enrollment._persistir_bundle). A partial bundle that
+    # same path as enroll (enrollment._persist_bundle). A partial bundle that
     # overwrites the good credentials leaves the executor offline with no
     # chance of self-correction.
-    problema = _persistir_bundle(cert_dir, bundle, new_ed)
+    problema = _persist_bundle(cert_dir, bundle, new_ed)
     if problema:
         logger.error(
             "Renewal abortado — bundle invalido (%s). Nenhum arquivo foi alterado; "

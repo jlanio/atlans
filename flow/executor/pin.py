@@ -57,7 +57,7 @@ def upload_pin_artifact(node_id: str, outputs: Dict[str, Any], workspace_id: str
             # GeoDataFrame through the single helper (datetime becomes text in a copy —
             # the raw `to_json` failed on a datetime column, taking down the pin
             # along with the Parquet). A plain DataFrame still goes through pandas' `to_json`.
-            geojson_str = gdf_para_geojson(geo_val, nat_como_nulo=True) if isinstance(geo_val, gpd.GeoDataFrame) else geo_val.to_json()
+            geojson_str = gdf_para_geojson(geo_val, nat_as_null=True) if isinstance(geo_val, gpd.GeoDataFrame) else geo_val.to_json()
             content = geojson_str.encode("utf-8")
             filename = f"{node_id}_pin.geojson"
             fmt = "geojson"
@@ -178,9 +178,9 @@ def download_pin_artifact(pinned: Dict[str, Any]) -> Dict[str, Any]:
             outputs[geo_key or "output"] = df
     elif fmt == "geojson":
         # `driver="GeoJSON"` does NOT restrict the driver when reading with pyogrio;
-        # `ler_geodataframe` rejects VRT content based on the content itself.
-        from flow.utils.leitura_geo import ler_geodataframe
-        gdf = ler_geodataframe(_io.BytesIO(content))
+        # `read_geodataframe` rejects VRT content based on the content itself.
+        from flow.utils.leitura_geo import read_geodataframe
+        gdf = read_geodataframe(_io.BytesIO(content))
         outputs[geo_key or "output"] = gdf
     else:
         outputs = json.loads(content.decode("utf-8"))

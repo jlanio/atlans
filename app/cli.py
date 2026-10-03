@@ -21,8 +21,8 @@ import sys
 # text of every workflow and every version): the API's query deadline (60 s,
 # app/core/config.py) would cut them off midway. In this process, no deadline — unless
 # the operator sets one. Before any import of app.core.
-for _variavel in ("DB_STATEMENT_TIMEOUT", "DB_COMMAND_TIMEOUT"):
-    os.environ[_variavel] = os.environ.get(_variavel) or "0"
+for _env_var in ("DB_STATEMENT_TIMEOUT", "DB_COMMAND_TIMEOUT"):
+    os.environ[_env_var] = os.environ.get(_env_var) or "0"
 
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -100,13 +100,13 @@ def _cmd_create_admin(args: argparse.Namespace) -> int:
     return asyncio.run(_create_admin(email=email, password=password, username=args.username))
 
 
-async def _migrar_nos(aplicar: bool) -> int:
+async def _migrate_nodes(aplicar: bool) -> int:
     from app.core.db import get_session_async
-    from app.services.nos_renomeados import migrar_nos, nomes_antigos_desabilitados
+    from app.services.nos_renomeados import migrate_nodes, disabled_old_names
 
     async with get_session_async() as db:
-        desabilitados = await nomes_antigos_desabilitados(db)
-        relatorio = await migrar_nos(db, aplicar=aplicar)
+        desabilitados = await disabled_old_names(db)
+        relatorio = await migrate_nodes(db, aplicar=aplicar)
     if not relatorio:
         print("Nenhuma definicao usa nome antigo de no. Nada a fazer.")
         return 0
@@ -141,8 +141,8 @@ async def _migrar_nos(aplicar: bool) -> int:
     return 0
 
 
-def _cmd_migrar_nos(args: argparse.Namespace) -> int:
-    return asyncio.run(_migrar_nos(aplicar=args.aplicar))
+def _cmd_migrate_nodes(args: argparse.Namespace) -> int:
+    return asyncio.run(_migrate_nodes(aplicar=args.aplicar))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -155,15 +155,15 @@ def main(argv: list[str] | None = None) -> int:
     p_admin.add_argument("--username", help="Username opcional. Default: parte antes do @ do email.")
     p_admin.set_defaults(func=_cmd_create_admin)
 
-    p_nos = sub.add_parser(
+    p_nodes = sub.add_parser(
         "migrar-nos",
         help="Reescreve fluxos salvos que usam nomes antigos de nos (DriveTrigger, ArtifactOutput).",
     )
-    p_nos.add_argument(
+    p_nodes.add_argument(
         "--aplicar", action="store_true",
         help="Grava as mudancas. Sem ele, so lista o que mudaria.",
     )
-    p_nos.set_defaults(func=_cmd_migrar_nos)
+    p_nodes.set_defaults(func=_cmd_migrate_nodes)
 
     args = parser.parse_args(argv)
     return args.func(args)

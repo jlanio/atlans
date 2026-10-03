@@ -26,7 +26,7 @@ import pytest
 from sqlalchemy.dialects import postgresql
 
 
-def _sessao(db):
+def _session(db):
     @asynccontextmanager
     async def _ctx():
         yield db
@@ -34,7 +34,7 @@ def _sessao(db):
 
 
 @pytest.mark.asyncio
-async def test_process_schedule_trava_com_for_no_key_update_skip_locked():
+async def test_process_schedule_locks_with_for_no_key_update_skip_locked():
     from app.core.async_scheduler import AsyncScheduler
 
     capturado: dict = {}
@@ -55,7 +55,7 @@ async def test_process_schedule_trava_com_for_no_key_update_skip_locked():
     sched.id = 1
     sched.job_id = "job-1"
 
-    with patch("app.core.async_scheduler.AsyncSessionLocal", _sessao(db)):
+    with patch("app.core.async_scheduler.AsyncSessionLocal", _session(db)):
         await AsyncScheduler()._process_schedule(sched, datetime(2026, 1, 1))
 
     sql = str(capturado["stmt"].compile(dialect=postgresql.dialect()))

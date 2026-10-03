@@ -14,7 +14,7 @@ import math
 from typing import Optional, Sequence
 
 
-def taxa_de_sucesso(sucesso: int, falha: int) -> float:
+def success_rate(sucesso: int, falha: int) -> float:
     """Completed ÷ (completed + failed), to 4 decimal places; 0.0 with no denominator.
 
     Running and canceled runs stay OUT of the denominator (spec

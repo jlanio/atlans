@@ -54,7 +54,7 @@ from app.api.routers.admin_workspaces_router import router as admin_workspaces_r
 from app.api.routers.internal_email_router import router as internal_email_router
 from app.api.routers.change_detector_router import router as change_detector_router
 from app.core.rate_limiter import limiter
-from app.extensoes import registro as registro_das_extensoes
+from app.extensoes import registro as extension_registry
 from app.core.config import ALLOWED_ORIGINS
 from app.core.constants import HSTS_MAX_AGE
 
@@ -65,9 +65,9 @@ logger = logging.getLogger("uvicorn.error")
 # one API replica starting together (deploy, orchestrator restart), all of them
 # re-queried the database at the same instant — precisely when it is
 # recovering.
-_DB_TENTATIVAS = 10
-_DB_ESPERA_INICIAL_S = 2.0
-_DB_ESPERA_MAX_S = 30.0
+_DB_ATTEMPTS = 10
+_DB_INITIAL_WAIT_S = 2.0
+_DB_MAX_WAIT_S = 30.0
 
 
 async def _wait_for_db() -> None:
@@ -78,20 +78,20 @@ async def _wait_for_db() -> None:
     import asyncio
     from flow.utils.backoff import espera_exponencial
 
-    for attempt in range(1, _DB_TENTATIVAS + 1):
+    for attempt in range(1, _DB_ATTEMPTS + 1):
         try:
             async with engine.begin() as conn:
                 await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
             return
         except Exception as exc:
-            if attempt == _DB_TENTATIVAS:
+            if attempt == _DB_ATTEMPTS:
                 raise
             espera = espera_exponencial(
-                attempt - 1, inicial=_DB_ESPERA_INICIAL_S, teto=_DB_ESPERA_MAX_S
+                attempt - 1, inicial=_DB_INITIAL_WAIT_S, teto=_DB_MAX_WAIT_S
             )
             logger.warning(
                 "Banco indisponível (tentativa %d/%d): %s — aguardando %.1fs...",
-                attempt, _DB_TENTATIVAS, exc, espera,
+                attempt, _DB_ATTEMPTS, exc, espera,
             )
             await asyncio.sleep(espera)
 
@@ -135,7 +135,7 @@ def _tarefas_de_fundo() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
         # in Redis and marks them as failed.
         ("Watchdog de runs órfãos", orphan_runs_watchdog),
         # The extensions' ones (app/extensoes), with the same teardown.
-        *registro_das_extensoes().tarefas_de_fundo,
+        *extension_registry().tarefas_de_fundo,
     ]
 
 
@@ -171,7 +171,7 @@ async def lifespan(app: FastAPI):
             "MINIO_EXTERNAL_ENDPOINT=%s aponta para a rede local: URLs pré-assinadas "
             "(Drive, artefatos, MCP) não funcionam fora do Docker; em produção use o "
             "endereço público do S3 (ex.: https://s3.seu-dominio)",
-            _storage.endpoint_externo(),
+            _storage.external_endpoint(),
         )
 
     # Background tasks (see `_tarefas_de_fundo`) and the schedule scheduler
@@ -258,8 +258,8 @@ app.include_router(admin_workspaces_router)     # Admin: lixeira de workspaces �
 app.include_router(internal_email_router)       # Interno: envio de email via Resend (executor API key auth)
 app.include_router(change_detector_router)      # Interno: hash store do node ChangeDetector (executor API key auth)
 # The extensions' routes (app/extensoes), after the core's.
-for _rota_da_extensao in registro_das_extensoes().rotas:
-    app.include_router(_rota_da_extensao)
+for _extension_route in extension_registry().rotas:
+    app.include_router(_extension_route)
 
 
 # ── MCP server (/mcp) ─────────────────────────────────────────────────────────
@@ -273,7 +273,7 @@ for _rota_da_extensao in registro_das_extensoes().rotas:
 # Traefik uvicorn runs without `--proxy-headers`, so the hop would go out as
 # `http://` — a client following it would resend the token outside TLS. With
 # both routes there is no hop to follow, and Traefik's `PathPrefix(/mcp)`
-# already delivers both to the same process. `_CaminhoSemBarraFinal` normalizes
+# already delivers both to the same process. `_NoTrailingSlashPath` normalizes
 # "/mcp/" to the "/mcp" the SDK app matches, without duplicating transport or
 # session manager.
 #
@@ -286,7 +286,7 @@ for _rota_da_extensao in registro_das_extensoes().rotas:
 from app.mcp import create_mcp_server, criar_app_mcp
 
 
-class _CaminhoSemBarraFinal:
+class _NoTrailingSlashPath:
     """Delegates to the inner ASGI app with the path's trailing slash removed.
 
     An object, not a function: Starlette's `Route` treats a function as an
@@ -313,7 +313,7 @@ mcp_server = create_mcp_server()
 app.state.mcp_server = mcp_server
 _app_mcp = criar_app_mcp(mcp_server)
 app.add_route("/mcp", _app_mcp, include_in_schema=False)
-app.add_route("/mcp/", _CaminhoSemBarraFinal(_app_mcp), include_in_schema=False)
+app.add_route("/mcp/", _NoTrailingSlashPath(_app_mcp), include_in_schema=False)
 
 
 @app.get("/ping", include_in_schema=False, tags=["health"])
@@ -373,7 +373,7 @@ _CSP = (
 #
 # Downgrading the Content-Type would be the alternative, but it would silently
 # break every workflow that today picks "HTML (text/html)" on the canvas.
-_CSP_CORPO_NAO_CONFIAVEL = (
+_CSP_UNTRUSTED_BODY = (
     "sandbox; "
     "default-src 'none'; "
     "style-src 'unsafe-inline'; "
@@ -394,7 +394,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # header does not work as a channel because this line overwrites the CSP of
         # any response.
         if getattr(request.state, "corpo_nao_confiavel", False):
-            response.headers["Content-Security-Policy"] = _CSP_CORPO_NAO_CONFIAVEL
+            response.headers["Content-Security-Policy"] = _CSP_UNTRUSTED_BODY
         else:
             response.headers["Content-Security-Policy"] = _CSP
         # HSTS — only when explicit origins are configured (not in local dev)
@@ -406,7 +406,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 
 # ── GZip — comprime respostas > 1KB automaticamente ──────────────────────────
-# PERF: GZip comprime respostas > 1 KB — reduz ~70% em JSON/GeoJSON grandes.
+# PERF: GZip comprime respostas > 1 KB — reducedMotion ~70% em JSON/GeoJSON grandes.
 # Ativado para observabilidade, portal e artefatos.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 

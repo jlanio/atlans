@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from "vitest"
 
-import { contratoDoNo, handleDeEntrada, lerPortas, portasDeEntrada, portasDeSaida, reconciliarPortas, reancorarArestasDoNo, NOME_DE_PORTA } from
+import { contratoDoNo, inputHandle, lerPortas, portasDeEntrada, portasDeSaida, reconciliarPortas, reancorarArestasDoNo, NOME_DE_PORTA } from
   "@/app/components/workflow/utils/node-ports"
 
 const CATALOGO = { inputs: [{ name: "layerA" }, { name: "layerB" }], dynamic_inputs: false }
@@ -84,15 +84,15 @@ describe("targetHandle só é restaurado para porta que existe", () => {
   const portas = new Map([["n1", ["pontos", "poligonos"]], ["n2", []], ["n3", ["unica"]]])
 
   it("porta declarada (nó de 2+ portas) vira handle", () => {
-    expect(handleDeEntrada({ target: "n1", to_key: "pontos" }, portas)).toBe("pontos")
+    expect(inputHandle({ target: "n1", to_key: "pontos" }, portas)).toBe("pontos")
   })
 
   it("porta que não existe mais NÃO vira handle", () => {
-    expect(handleDeEntrada({ target: "n1", to_key: "removida" }, portas)).toBeUndefined()
+    expect(inputHandle({ target: "n1", to_key: "removida" }, portas)).toBeUndefined()
   })
 
   it("nó sem portas declaradas NÃO vira handle", () => {
-    expect(handleDeEntrada({ target: "n2", to_key: "output" }, portas)).toBeUndefined()
+    expect(inputHandle({ target: "n2", to_key: "output" }, portas)).toBeUndefined()
   })
 
   it("porta ÚNICA NÃO vira handle: ancora no anônimo (espelha o `> 1` da renderização)", () => {
@@ -100,11 +100,11 @@ describe("targetHandle só é restaurado para porta que existe", () => {
     // Returning "unica" would point the edge at a nonexistent handle and it would
     // disappear from the canvas while still executing. REGRESSION: removing the
     // `> 1` from handleDeEntrada brings back "unica" and breaks ONLY this test.
-    expect(handleDeEntrada({ target: "n3", to_key: "unica" }, portas)).toBeUndefined()
+    expect(inputHandle({ target: "n3", to_key: "unica" }, portas)).toBeUndefined()
   })
 
   it("aresta sem to_key continua anônima", () => {
-    expect(handleDeEntrada({ target: "n1" }, portas)).toBeUndefined()
+    expect(inputHandle({ target: "n1" }, portas)).toBeUndefined()
   })
 })
 
@@ -253,15 +253,15 @@ describe("reancorarArestasDoNo", () => {
   })
 
   it("não mexe em aresta já ancorada nem em to_key sem porta correspondente", () => {
-    const jaAncorada = aresta({ target: "sub", targetHandle: "layerA", data: { to_key: "layerA" } })
+    const alreadyAnchored = aresta({ target: "sub", targetHandle: "layerA", data: { to_key: "layerA" } })
     const orfa = aresta({ target: "sub", targetHandle: null, data: { to_key: "inexistente" } })
-    const outroNo = aresta({ target: "outro", targetHandle: null, data: { to_key: "layerA" } })
-    const edges = [jaAncorada, orfa, outroNo]
+    const otherNode = aresta({ target: "outro", targetHandle: null, data: { to_key: "layerA" } })
+    const edges = [alreadyAnchored, orfa, otherNode]
     expect(reancorarArestasDoNo(edges, "sub", ["layerA"], [])).toBe(edges)
   })
 
   it("entrada ÚNICA: NÃO re-ancora o targetHandle (fica anônimo)", () => {
-    // Same reason as handleDeEntrada: with a single input the handle is anonymous
+    // Same reason as inputHandle: with a single input the handle is anonymous
     // (no id). Re-anchoring by name would point at a nonexistent id and the edge
     // would disappear. Nothing changes → returns the SAME array. MUTATION: removing
     // the `inputs.length > 1` sets "layerA" (and swaps the array) and breaks ONLY this test.

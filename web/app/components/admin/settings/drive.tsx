@@ -10,7 +10,7 @@ import { Button } from "@/app/components/ui/button"
 import { Input } from "@/app/components/ui/input"
 import { TbPackage, TbPlus, TbTrash } from "react-icons/tb"
 import { createToast } from "@/utils/createToast"
-import { AvisoDeSecao, CartaoDeErro, SkeletonDeFormulario, VazioEmCirculo } from "./estados"
+import { AvisoDeSecao, CartaoDeErro, FormSkeleton, VazioEmCirculo } from "./estados"
 
 // ── Drive: global upload settings ────────────────────────────────────────────
 
@@ -88,7 +88,7 @@ export function DriveSettingsSection() {
   // 1st load: body skeleton. The error only takes over the section when NOTHING
   // loaded — either of the two reads is enough to show the form. Before, the
   // `error` was ignored and the section stayed blank.
-  if (settingsFirst || extFirst) return <SkeletonDeFormulario rotulo="Carregando as configurações do Drive" />
+  if (settingsFirst || extFirst) return <FormSkeleton rotulo="Carregando as configurações do Drive" />
   if (settingsError && !settings && extError && !extensions) {
     return <CartaoDeErro mensagem={settingsError} onTentar={() => { refetchSettings(); refetchExt() }} />
   }

@@ -28,13 +28,13 @@ from app.models.artifact import Artifact
 from app.models.models import Workflow
 from app.models.portal_layer import PortalLayer
 from app.models.run_metrics import NodeRunMetrics
-from app.schemas.assistente import CamadaDoGlobo
+from app.schemas.assistente import GlobeLayer
 
 router = APIRouter(prefix="/assistente", tags=["assistente"])
 
 # Expiry of the GeoJSON's pre-signed link. Same as the collection tools': short,
 # because the web app fetches it right away and keeps the FeatureCollection in memory.
-VALIDADE_DO_LINK_S = 900
+LINK_VALIDITY_S = 900
 
 
 def _e_4326(crs: Optional[str]) -> bool:
@@ -50,10 +50,10 @@ def _e_4326(crs: Optional[str]) -> bool:
     return crs.strip().upper().replace("EPSG:", "").strip() == "4326"
 
 
-def _chave_da_camada(filename: Optional[str]) -> Optional[str]:
+def _layer_key(filename: Optional[str]) -> Optional[str]:
     """The `layer_key` THIS artifact would have, derived from the file name.
 
-    Same normalization as `portal_router._publicar` (which rewrites the received
+    Same normalization as `portal_router._publish` (which rewrites the received
     `layer_key` before saving), so both ends agree even when the layer
     title had characters outside [a-z0-9-_].
     """
@@ -65,10 +65,10 @@ def _chave_da_camada(filename: Optional[str]) -> Optional[str]:
     return "".join(c if c.isalnum() or c in "-_" else "_" for c in bruto).lower()
 
 
-async def _camada_publicada(db: AsyncSession, art: Artifact):
+async def _published_layer(db: AsyncSession, art: Artifact):
     """THIS artifact's `PortalLayer`, or None when there is no way to tell which one it is.
 
-    The slice is always the artifact's RUN. `portal_router._publicar` UPSERTs on
+    The slice is always the artifact's RUN. `portal_router._publish` UPSERTs on
     `(workflow_hash, layer_key)` and rewrites the row in place (geojson, bbox,
     geometry_type, run_id): the row ALWAYS reflects the latest publication of that
     key. Matching only on `(workflow_hash, layer_key)` made the artifact of run
@@ -101,7 +101,7 @@ async def _camada_publicada(db: AsyncSession, art: Artifact):
     if not do_run:
         return None
 
-    chave = _chave_da_camada(art.filename)
+    chave = _layer_key(art.filename)
     if chave:
         exata = next((linha for linha in do_run if linha.layer_key == chave), None)
         if exata is not None:
@@ -112,7 +112,7 @@ async def _camada_publicada(db: AsyncSession, art: Artifact):
 
 @router.get(
     "/camadas/{artifact_id}",
-    response_model=CamadaDoGlobo,
+    response_model=GlobeLayer,
     summary="Metadados de uma saida de execucao para o globo da Home",
 )
 @limiter.limit("60/minute")
@@ -137,7 +137,7 @@ async def camada_do_globo(
     # multi-output node what remains is the metadata of the LAST GeoDataFrame iterated,
     # which may not be this artifact's.
     metrics = None
-    saidas_do_no = 0
+    node_outputs = 0
     if art.run_id and art.node_id:
         metrics = (
             await db.execute(
@@ -152,7 +152,7 @@ async def camada_do_globo(
                 )
             )
         ).first()
-        saidas_do_no = int(
+        node_outputs = int(
             (
                 await db.execute(
                     select(func.count(Artifact.id)).where(
@@ -168,10 +168,10 @@ async def camada_do_globo(
     # framing and not labeling. The `crs`, on the other hand, is KEPT: it only serves
     # the guard in step 2, and erring on the side of refusing a layer is safer
     # than drawing it in the wrong place.
-    ambiguo = saidas_do_no > 1
-    geometry_type = metrics.geometry_type if metrics and not ambiguo else None
+    ambiguous = node_outputs > 1
+    geometry_type = metrics.geometry_type if metrics and not ambiguous else None
     crs = metrics.crs if metrics else None
-    bbox = metrics.bbox if metrics and not ambiguo else None
+    bbox = metrics.bbox if metrics and not ambiguous else None
 
     base = dict(
         artifact_id=art.id_hash,
@@ -196,8 +196,8 @@ async def camada_do_globo(
         baixavel=art.content_location != "executor" and bool(art.s3_key),
     )
 
-    def indisponivel(hint: str) -> CamadaDoGlobo:
-        return CamadaDoGlobo(tipo="indisponivel", available=False, hint=hint, **base)
+    def indisponivel(hint: str) -> GlobeLayer:
+        return GlobeLayer(tipo="indisponivel", available=False, hint=hint, **base)
 
     # 1) Published on the portal (PublishMap): vector tiles served to the member.
     #    Matched by (workflow_hash, the artifact's RUN) and, within the run, by the
@@ -214,17 +214,17 @@ async def camada_do_globo(
     #    when publishing, so the published layer is always 4326, whatever
     #    CRS the source node's metrics recorded.
     if art.is_published and art.workflow_hash:
-        camada_pub = await _camada_publicada(db, art)
-        if camada_pub is not None:
-            return CamadaDoGlobo(
+        pub_layer = await _published_layer(db, art)
+        if pub_layer is not None:
+            return GlobeLayer(
                 **{
                     **base,
                     "tipo": "mvt",
                     "available": True,
-                    "mvt": {"workflow_id": art.workflow_hash, "layer_key": camada_pub.layer_key},
+                    "mvt": {"workflow_id": art.workflow_hash, "layer_key": pub_layer.layer_key},
                     # The PortalLayer bbox is always 4326 (forced at publication).
-                    "bbox": camada_pub.bbox,
-                    "geometry_type": camada_pub.geometry_type or geometry_type,
+                    "bbox": pub_layer.bbox,
+                    "geometry_type": pub_layer.geometry_type or geometry_type,
                 }
             )
 
@@ -239,15 +239,15 @@ async def camada_do_globo(
                 "e a versao atual nao a reprojeta para o globo"
             )
         url = await presigned_get_async(
-            art.s3_key, expires=VALIDADE_DO_LINK_S, filename=art.filename
+            art.s3_key, expires=LINK_VALIDITY_S, filename=art.filename
         )
-        return CamadaDoGlobo(
+        return GlobeLayer(
             **{
                 **base,
                 "tipo": "geojson",
                 "available": True,
                 "download_url": url,
-                "url_expires_in": VALIDADE_DO_LINK_S,
+                "url_expires_in": LINK_VALIDITY_S,
             }
         )
 

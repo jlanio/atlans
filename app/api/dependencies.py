@@ -19,9 +19,9 @@ from app.core.rbac import require_role, Role
 # unchanged.
 from app.core.authorization.workflow_access import (  # noqa: F401
     _has_min_workspace_role,
-    carregar_workflow_acessivel,
+    load_accessible_workflow,
     exigir_papel,
-    exigir_papel_no_workspace,
+    require_workspace_role,
     get_workspace_member_role,
     listar_workspace_ids,
     verify_workspace_access,
@@ -187,9 +187,9 @@ async def _ws_pre_accept_rate_check(
     the post-accept check_ws_rate_limit).
     """
     try:
-        from app.core.redis import contar_na_janela
+        from app.core.redis import count_in_window
         key = _ws_rate_key(ws, prefix="ratelimit:ws_open", scope=scope, identity=None)
-        count, _ = await contar_na_janela(key, period)
+        count, _ = await count_in_window(key, period)
         if count > limit:
             # Pre-accept close: nao chama accept(); fecha o handshake imediato.
             try:
@@ -281,9 +281,9 @@ async def check_ws_rate_limit(
     do not collapse. See `_ws_rate_key`.
     """
     try:
-        from app.core.redis import contar_na_janela
+        from app.core.redis import count_in_window
         key = _ws_rate_key(ws, prefix="ratelimit:ws", scope=scope, identity=identity)
-        count, _ = await contar_na_janela(key, period)
+        count, _ = await count_in_window(key, period)
         if count > limit:
             await _ws_safe_close(ws, 1013, "Rate limit excedido.")
             return False
@@ -588,16 +588,16 @@ async def get_accessible_workflow_with_role(
 ):
     """
     Returns (workflow, role_str), or (workflow, None) for the member of a
-    workspace without an owner, who reads but does not act (see `carregar_workflow_acessivel`).
+    workspace without an owner, who reads but does not act (see `load_accessible_workflow`).
     Raises 404 if not found/inactive, 403 if there is no access to the workspace.
-    The rule lives in `workflow_access.carregar_workflow_acessivel`.
+    The rule lives in `workflow_access.load_accessible_workflow`.
 
     Routes do not request it directly: they request `workflow_com_papel`, which uses it and
     already compares the role. It remains the `dependency_overrides` point for the
     tests — replacing it replaces the (workflow, role) and the comparison still applies.
     """
-    return await carregar_workflow_acessivel(
-        service, db, id_hash, current_user.id_hash, aceitar_sem_papel=True,
+    return await load_accessible_workflow(
+        service, db, id_hash, current_user.id_hash, accept_without_role=True,
     )
 
 
@@ -606,7 +606,7 @@ def workflow_com_papel(minimo: str | None, mensagem: str | None = None):
     authorized. `wf = Depends(workflow_com_papel(ROLE_EDITOR))`.
 
     404 if it does not exist or is in the trash, 403 if the user is not in the workspace
-    (`carregar_workflow_acessivel`, in that order) and 403 if their role does not
+    (`load_accessible_workflow`, in that order) and 403 if their role does not
     reach `minimo` — with `mensagem` when the route has its own, or the default
     from `exigir_papel`. `minimo=None` is read access: belonging to the workspace is enough.
 
@@ -620,10 +620,10 @@ def workflow_com_papel(minimo: str | None, mensagem: str | None = None):
     invalid body — the 422 is for those who can use the route.
     """
 
-    async def _workflow_com_papel(
-        wf_com_papel=Depends(get_accessible_workflow_with_role),
+    async def _workflow_with_role(
+        wf_with_role=Depends(get_accessible_workflow_with_role),
     ):
-        wf, papel = wf_com_papel
+        wf, papel = wf_with_role
         if minimo is not None:
             if papel is None:
                 # Member of a workspace without an owner: reads, but does not act. It is the 403 of
@@ -632,6 +632,6 @@ def workflow_com_papel(minimo: str | None, mensagem: str | None = None):
             exigir_papel(papel, minimo, mensagem)
         return wf
 
-    _workflow_com_papel.papel_minimo = minimo
-    _workflow_com_papel.mensagem = mensagem
-    return _workflow_com_papel
+    _workflow_with_role.papel_minimo = minimo
+    _workflow_with_role.mensagem = mensagem
+    return _workflow_with_role

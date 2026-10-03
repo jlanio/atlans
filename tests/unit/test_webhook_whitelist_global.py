@@ -12,7 +12,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.core import run_result_consumer as rrc
-from app.core.utils.allowlist import normalizar_dominio, padroes_validos, validar_allowlist
+from app.core.utils.allowlist import normalize_domain, valid_patterns, validate_allowlist
 
 
 # ── Normalization and validation ─────────────────────────────────────────────
@@ -24,28 +24,28 @@ from app.core.utils.allowlist import normalizar_dominio, padroes_validos, valida
     ("  *.Interno.Corp ", "*.interno.corp"),
     ("exemplo.com", "exemplo.com"),
 ])
-def test_normalizar_dominio_fica_so_com_o_host(entrada, esperado):
-    assert normalizar_dominio(entrada) == esperado
+def test_normalize_domain_keeps_only_the_host(entrada, esperado):
+    assert normalize_domain(entrada) == esperado
 
 
 @pytest.mark.parametrize("entrada", ["*", "localhost", "*.com", "*exemplo.com"])
-def test_validar_recusa_o_que_o_matcher_ignoraria(entrada):
+def test_validate_refuses_what_the_matcher_would_ignore(entrada):
     with pytest.raises(ValueError):
-        validar_allowlist([entrada])
+        validate_allowlist([entrada])
 
 
-def test_padroes_validos_descarta_o_legado_que_nunca_casou():
+def test_valid_patterns_discards_the_legacy_that_never_matched():
     """A `*` saved earlier (to "allow everything") must not start blocking everything."""
-    assert padroes_validos(["*", "https://hooks.slack.com/x", "localhost", "hooks.slack.com"]) == [
+    assert valid_patterns(["*", "https://hooks.slack.com/x", "localhost", "hooks.slack.com"]) == [
         "hooks.slack.com",
     ]
-    assert padroes_validos(["*"]) == []
+    assert valid_patterns(["*"]) == []
 
 
 # ── Admin PATCH ─────────────────────────────────────────────────────────────
 
 
-async def test_patch_grava_o_host_da_url_colada():
+async def test_patch_stores_the_host_of_the_pasted_url():
     from app.api.routers import health_router
 
     with patch.object(health_router, "_set_config", new=AsyncMock()) as gravar:
@@ -56,7 +56,7 @@ async def test_patch_grava_o_host_da_url_colada():
     gravar.assert_awaited_once()
 
 
-async def test_get_devolve_a_lista_efetiva():
+async def test_get_returns_the_effective_list():
     """The screen shows what the trigger applies: the legacy `*` does not show up
     as a restriction (and the screen warns "sem restrição" (no restriction))."""
     from app.api.routers import health_router
@@ -70,7 +70,7 @@ async def test_get_devolve_a_lista_efetiva():
         assert await health_router.system_health(db=MagicMock()) == {"webhook_whitelist": []}
 
 
-async def test_patch_recusa_curinga_sozinho_com_400():
+async def test_patch_refuses_lone_wildcard_with_400():
     from app.api.routers import health_router
 
     with patch.object(health_router, "_set_config", new=AsyncMock()) as gravar:
@@ -103,27 +103,27 @@ async def _disparar(url: str, global_list, workspace_allowlist=None):
     return agendar
 
 
-async def test_host_fora_da_whitelist_global_nao_recebe_o_webhook():
+async def test_host_outside_the_global_whitelist_does_not_receive_the_webhook():
     agendar = await _disparar("https://coletor.atacante.exemplo/hook", ["hooks.slack.com"])
     agendar.assert_not_called()
 
 
-async def test_host_na_whitelist_global_recebe():
+async def test_host_in_the_global_whitelist_receives():
     agendar = await _disparar("https://hooks.slack.com/services/x", ["hooks.slack.com"])
     agendar.assert_called_once()
 
 
-async def test_whitelist_global_vazia_nao_restringe():
+async def test_empty_global_whitelist_does_not_restrict():
     agendar = await _disparar("https://qualquer.exemplo/hook", [])
     agendar.assert_called_once()
 
 
-async def test_legado_so_com_curinga_nao_bloqueia_tudo():
+async def test_legacy_with_only_wildcard_does_not_block_everything():
     agendar = await _disparar("https://qualquer.exemplo/hook", ["*"])
     agendar.assert_called_once()
 
 
-async def test_as_duas_listas_valem_juntas():
+async def test_both_lists_apply_together():
     """In the global list but not in the workspace's: blocked by the workspace's."""
     agendar = await _disparar(
         "https://hooks.slack.com/services/x", ["hooks.slack.com"], workspace_allowlist=["api.exemplo.com"],
@@ -134,17 +134,17 @@ async def test_as_duas_listas_valem_juntas():
 @pytest.mark.parametrize("entrada", [
     "hooks.slack.com, api.exemplo.com", "a b.com", "exemplo.com;", ".x.com", "x..com",
 ])
-def test_entrada_que_nunca_casaria_e_recusada(entrada):
+def test_entry_that_would_never_match_is_refused(entrada):
     """With the list enforced, an entry like this would block EVERY webhook without explanation."""
     with pytest.raises(ValueError):
-        validar_allowlist([entrada])
+        validate_allowlist([entrada])
 
 
-def test_linha_colada_com_varios_dominios_vira_varios_itens():
-    assert padroes_validos(["hooks.slack.com, api.exemplo.com"]) == ["hooks.slack.com", "api.exemplo.com"]
+def test_pasted_line_with_several_domains_becomes_several_items():
+    assert valid_patterns(["hooks.slack.com, api.exemplo.com"]) == ["hooks.slack.com", "api.exemplo.com"]
 
 
-async def test_patch_divide_a_linha_colada():
+async def test_patch_splits_the_pasted_line():
     from app.api.routers import health_router
 
     with patch.object(health_router, "_set_config", new=AsyncMock()):

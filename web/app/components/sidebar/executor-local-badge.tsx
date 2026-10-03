@@ -9,14 +9,14 @@
 // tip of the read-only bridge (see web/lib/desktop.ts).
 'use client'
 import { useExecutorLocal } from '@/app/hooks/useExecutorLocal'
-import type { EstadoExecutorLocal } from '@/lib/desktop'
+import type { LocalExecutorState } from '@/lib/desktop'
 import { SidebarMenuItem } from '@/app/components/ui/sidebar'
 import { cn } from '@/lib/utils'
 
 // Status dots in the contract's canonical literals (§6): online = green,
 // busy = amber; no signal (offline / not linked) uses the neutral token
 // `bg-muted-foreground` instead of a raw gray. No emerald/zinc.
-const ESTILO: Record<EstadoExecutorLocal, { cor: string; texto: string }> = {
+const STYLE: Record<LocalExecutorState, { cor: string; texto: string }> = {
   online:        { cor: 'bg-green-500',          texto: 'Online' },
   ocupado:       { cor: 'bg-amber-500',          texto: 'Ocupado' },
   offline:       { cor: 'bg-muted-foreground',   texto: 'Offline' },
@@ -30,7 +30,7 @@ export default function ExecutorLocalBadge() {
   // Defensive fallback: `estado` arrives over IPC (a boundary with no runtime type)
   // and the type is duplicated between two independently deployed packages — an
   // unexpected value from contract skew must not bring down the sidebar.
-  const estilo = ESTILO[status.estado] ?? ESTILO.offline
+  const estilo = STYLE[status.estado] ?? STYLE.offline
   const sufixo = status.estado === 'ocupado' && status.capacidade
     ? ` · ${status.emExecucao}/${status.capacidade}`
     : ''

@@ -12,8 +12,8 @@ export function duracao(s: number | null | undefined): string {
   // Rounds BEFORE deciding the range. Doing it after, 59.97s fell into `< 60`
   // and toFixed(1) printed "60.0s"; and 3599.7s became "59m 60s" — two values
   // that do not exist on a clock, in a dashboard people check at a glance.
-  const decimos = Math.round(s * 10) / 10
-  if (decimos < 60) return `${decimos.toFixed(1)}s`
+  const tenths = Math.round(s * 10) / 10
+  if (tenths < 60) return `${tenths.toFixed(1)}s`
   const totalSeg = Math.round(s)
   const m = Math.floor(totalSeg / 60)
   return m < 60

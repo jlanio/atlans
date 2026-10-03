@@ -19,7 +19,7 @@
 export const DEV = { servidor: 'ws://localhost:8000', ui: 'http://localhost:3000' }
 
 /** Tests: an example domain, which belongs to no installation. */
-export const TESTE = { servidor: 'wss://agents.atlans.example.org', ui: 'https://atlans.example.org' }
+export const TEST = { servidor: 'wss://agents.atlans.example.org', ui: 'https://atlans.example.org' }
 
 function validar(nome, valor, protocolos) {
   let url
@@ -42,7 +42,7 @@ function validar(nome, valor, protocolos) {
  * environment does not bring its own, and accepts ws/http; a real build
  * requires wss/https and fails without them.
  */
-export function enderecosDoBuild({ dev = false } = {}) {
+export function buildAddresses({ dev = false } = {}) {
   const servidor = process.env.ATLANS_DESKTOP_SERVIDOR?.trim() || (dev ? DEV.servidor : '')
   const ui = process.env.ATLANS_DESKTOP_UI_URL?.trim() || (dev ? DEV.ui : '')
   const faltando = [!servidor && 'ATLANS_DESKTOP_SERVIDOR', !ui && 'ATLANS_DESKTOP_UI_URL'].filter(Boolean)
@@ -59,7 +59,7 @@ export function enderecosDoBuild({ dev = false } = {}) {
 }
 
 /** The esbuild/vite `define` that replaces the two global constants. */
-export function defineDosEnderecos({ servidor, ui }) {
+export function addressDefines({ servidor, ui }) {
   return {
     __ATLANS_SERVIDOR__: JSON.stringify(servidor),
     __ATLANS_UI_URL__: JSON.stringify(ui),
@@ -67,7 +67,7 @@ export function defineDosEnderecos({ servidor, ui }) {
 }
 
 /** What build-main.mjs writes to dist/main/build.json: which mode the bundle was built in. */
-export function marcaDoBuild({ dev = false, servidor, ui }) {
+export function buildBrand({ dev = false, servidor, ui }) {
   return { modo: dev ? 'dev' : 'producao', servidor, ui }
 }
 

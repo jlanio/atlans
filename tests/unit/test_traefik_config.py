@@ -45,7 +45,7 @@ _MIDDLEWARES_DA_LABEL = re.compile(
 )
 
 
-def _texto(caminho: Path) -> str:
+def _as_text(caminho: Path) -> str:
     return caminho.read_text(encoding="utf-8")
 
 
@@ -54,31 +54,31 @@ def _texto(caminho: Path) -> str:
 # `requirements.in` (it only arrives transitively), and an `importorskip`
 # would make this whole file silently VANISH from CI — the same kind of
 # silent failure it exists to catch.
-_INICIO_DOS_MIDDLEWARES = re.compile(r"^  middlewares:\s*$", re.M)
-_NOME_DO_MIDDLEWARE = re.compile(r"^    ([A-Za-z][\w-]*):\s*$", re.M)
-_FIM_DO_BLOCO = re.compile(r"^(?:\S|  [A-Za-z])", re.M)
+_MIDDLEWARES_START = re.compile(r"^  middlewares:\s*$", re.M)
+_MIDDLEWARE_NAME = re.compile(r"^    ([A-Za-z][\w-]*):\s*$", re.M)
+_BLOCK_END = re.compile(r"^(?:\S|  [A-Za-z])", re.M)
 
 
-def _middlewares_definidos() -> set[str]:
+def _defined_middlewares() -> set[str]:
     """The names the file provider publishes as `<nome>@file`."""
-    texto = _texto(DINAMICO)
-    inicio = _INICIO_DOS_MIDDLEWARES.search(texto)
+    texto = _as_text(DINAMICO)
+    inicio = _MIDDLEWARES_START.search(texto)
     assert inicio, "bloco `http.middlewares` nao encontrado em dynamic.yml"
     resto = texto[inicio.end() :]
-    fim = _FIM_DO_BLOCO.search(resto)
+    fim = _BLOCK_END.search(resto)
     bloco = resto[: fim.start()] if fim else resto
-    return set(_NOME_DO_MIDDLEWARE.findall(bloco))
+    return set(_MIDDLEWARE_NAME.findall(bloco))
 
 
-def test_a_leitura_do_arquivo_dinamico_enxerga_os_middlewares():
+def test_reading_the_dynamic_file_sees_the_middlewares():
     """If the parsing breaks, the integrity test would pass vacuously."""
-    definidos = _middlewares_definidos()
+    definidos = _defined_middlewares()
     assert len(definidos) >= 4, f"leitura suspeita de dynamic.yml: {sorted(definidos)}"
     # The ones the MCP router uses (one variant per edge) — if they vanish from here, the route goes down.
     assert {"rate-mcp-borda-aberta", "rate-mcp-cloudflare-only", "strip-executor-cert-header"} <= definidos
 
 
-def test_o_rate_limit_conta_pelo_ip_do_cliente_em_cada_borda():
+def test_the_rate_limit_counts_by_client_ip_on_each_edge():
     """Without a CDN, `ipStrategy.depth: 1` is NOT "per IP": Traefik strips the
     X-Forwarded-For of anyone not in trustedIPs before the middlewares and only
     appends the client IP after them, so the limit's source was empty and all
@@ -87,7 +87,7 @@ def test_o_rate_limit_conta_pelo_ip_do_cliente_em_cada_borda():
     That is why each limit of the public routers has one variant per edge,
     chosen by the same BORDA_MIDDLEWARE as the labels; and /internal, which the
     executors reach directly in any installation, counts per connection."""
-    middlewares = yaml.safe_load(_texto(DINAMICO))["http"]["middlewares"]
+    middlewares = yaml.safe_load(_as_text(DINAMICO))["http"]["middlewares"]
     assert "sourceCriterion" not in middlewares["rate-internal"]["rateLimit"]
     for limite in ("rate-mcp", "rate-download"):
         aberta = middlewares[f"{limite}-borda-aberta"]["rateLimit"]
@@ -96,56 +96,56 @@ def test_o_rate_limit_conta_pelo_ip_do_cliente_em_cada_borda():
         assert cloudflare["sourceCriterion"]["ipStrategy"]["depth"] == 1
         # The same quota in both: the edge changes the source, not the limit.
         assert {k: v for k, v in aberta.items()} == {k: v for k, v in cloudflare.items() if k != "sourceCriterion"}
-    compose = _texto(COMPOSE)
+    compose = _as_text(COMPOSE)
     for limite in ("rate-mcp", "rate-download"):
         assert f"{limite}-${{BORDA_MIDDLEWARE:-borda-aberta}}@file" in compose, f"a label do {limite} nao segue a borda"
         assert f",{limite}@file" not in compose, f"a label antiga do {limite} voltou"
 
 
-_VARIAVEL = re.compile(r"\$\{(?P<nome>[A-Z_][A-Z0-9_]*)(?::-(?P<padrao>[^}]*))?\}")
+_ENV_VARIABLE = re.compile(r"\$\{(?P<nome>[A-Z_][A-Z0-9_]*)(?::-(?P<padrao>[^}]*))?\}")
 
 
 def _resolver(texto: str, ambiente: dict[str, str] | None = None) -> str:
     """Interpolates `${VAR:-padrao}` like compose: the environment value or the default."""
     ambiente = ambiente or {}
-    return _VARIAVEL.sub(lambda m: ambiente.get(m.group("nome"), m.group("padrao") or ""), texto)
+    return _ENV_VARIABLE.sub(lambda m: ambiente.get(m.group("nome"), m.group("padrao") or ""), texto)
 
 
-def _referencias_por_router(ambiente: dict[str, str] | None = None) -> dict[str, list[str]]:
+def _references_by_router(ambiente: dict[str, str] | None = None) -> dict[str, list[str]]:
     """`{router: [middleware, ...]}` read from the compose labels, already interpolated."""
-    referencias: dict[str, list[str]] = {}
-    for achado in _MIDDLEWARES_DA_LABEL.finditer(_resolver(_texto(COMPOSE), ambiente)):
+    references: dict[str, list[str]] = {}
+    for achado in _MIDDLEWARES_DA_LABEL.finditer(_resolver(_as_text(COMPOSE), ambiente)):
         nomes = [n.strip() for n in achado.group("lista").split(",") if n.strip()]
-        referencias.setdefault(achado.group("router"), []).extend(nomes)
-    return referencias
+        references.setdefault(achado.group("router"), []).extend(nomes)
+    return references
 
 
-def test_ha_routers_com_middleware_para_conferir():
+def test_there_are_routers_with_middleware_to_check():
     """If the regex stops matching, the tests below would pass vacuously."""
-    referencias = _referencias_por_router()
-    assert referencias, "nenhuma label de middleware encontrada no docker-compose.yml"
-    assert "api-mcp" in referencias, "o router do servidor MCP sumiu do compose"
+    references = _references_by_router()
+    assert references, "nenhuma label de middleware encontrada no docker-compose.yml"
+    assert "api-mcp" in references, "o router do servidor MCP sumiu do compose"
 
 
 # The edge of the public routers changes with the .env: no CDN (the default)
 # and behind Cloudflare. Each one's middleware has to exist in the dynamic file.
-_BORDAS = {
+_EDGES = {
     "sem CDN": {},
     "Cloudflare": {"BORDA_MIDDLEWARE": "cloudflare-only"},
 }
 
 
-@pytest.mark.parametrize("borda", sorted(_BORDAS))
-def test_todo_middleware_referenciado_existe_no_arquivo_dinamico(borda):
+@pytest.mark.parametrize("borda", sorted(_EDGES))
+def test_every_referenced_middleware_exists_in_the_dynamic_file(borda):
     """The test that would have prevented the incident.
 
     It applies to all routers at once: any new label that invents a name — or
     gets one letter wrong — fails here, and not in production by returning the
     wrong page.
     """
-    definidos = _middlewares_definidos()
+    definidos = _defined_middlewares()
     faltando: list[str] = []
-    for router, nomes in sorted(_referencias_por_router(_BORDAS[borda]).items()):
+    for router, nomes in sorted(_references_by_router(_EDGES[borda]).items()):
         for nome in nomes:
             # Only the file provider is checked here: a middleware without a
             # suffix, or with `@docker`, comes from another source and has another rule.
@@ -160,9 +160,9 @@ def test_todo_middleware_referenciado_existe_no_arquivo_dinamico(borda):
     )
 
 
-def test_o_compose_monta_o_diretorio_e_nao_o_arquivo_solto():
+def test_the_compose_mounts_the_directory_and_not_the_loose_file():
     """Going back to the single-file mount reopens the inode pitfall."""
-    compose = _texto(COMPOSE)
+    compose = _as_text(COMPOSE)
     assert "./traefik-dynamic:/etc/traefik/dynamic:ro" in compose
     assert "--providers.file.directory=/etc/traefik/dynamic" in compose
     # Sem `watch`, mudar o arquivo volta a exigir recriar o container.
@@ -172,7 +172,7 @@ def test_o_compose_monta_o_diretorio_e_nao_o_arquivo_solto():
     assert "--providers.file.filename=" not in compose
 
 
-def test_o_diretorio_dinamico_fica_na_raiz_e_fora_de_traefik():
+def test_the_dynamic_directory_is_at_the_root_and_outside_traefik():
     """The INSTALLATION side: `traefik/` belongs to the operator, and the update does not write there.
 
     The first version of this fix put the directory in `traefik/dynamic/`, which
@@ -190,7 +190,7 @@ def test_o_diretorio_dinamico_fica_na_raiz_e_fora_de_traefik():
         "o diretorio voltou para dentro de traefik/, onde o usuario do deploy nao escreve"
     )
     # The compose file has to agree with the location.
-    assert "./traefik/dynamic" not in _texto(COMPOSE)
+    assert "./traefik/dynamic" not in _as_text(COMPOSE)
 
 
 # ── The edge middleware goes in front of every public router ───────────────
@@ -207,70 +207,70 @@ def test_o_diretorio_dinamico_fica_na_raiz_e_fora_de_traefik():
 # edge (BORDA_MIDDLEWARE).
 
 # `traefik.http.routers.<router>.rule=Host(`...`) && ...`
-_REGRA_DA_LABEL = re.compile(
+_LABEL_RULE = re.compile(
     r"traefik\.http\.routers\.(?P<router>[\w-]+)\.rule=(?P<regra>[^\"']+)"
 )
 _HOSTS_PROXIED = ("Host(`${PUBLIC_HOST:-localhost}`)", "Host(`${S3_HOST:-s3.localhost}`)")
-_HOST_DOS_EXECUTORES = "Host(`${AGENTS_HOST:-agents.localhost}`)"
-_LISTA = "${BORDA_MIDDLEWARE:-borda-aberta}@file"
+_EXECUTORS_HOST = "Host(`${AGENTS_HOST:-agents.localhost}`)"
+_EDGE_LIST_REF = "${BORDA_MIDDLEWARE:-borda-aberta}@file"
 
 
-def _referencias_cruas() -> dict[str, list[str]]:
+def _raw_references() -> dict[str, list[str]]:
     """The references as written in the compose file, without interpolation."""
-    referencias: dict[str, list[str]] = {}
-    for achado in _MIDDLEWARES_DA_LABEL.finditer(_texto(COMPOSE)):
+    references: dict[str, list[str]] = {}
+    for achado in _MIDDLEWARES_DA_LABEL.finditer(_as_text(COMPOSE)):
         nomes = [n.strip() for n in achado.group("lista").split(",") if n.strip()]
-        referencias.setdefault(achado.group("router"), []).extend(nomes)
-    return referencias
+        references.setdefault(achado.group("router"), []).extend(nomes)
+    return references
 
 
-def _regras_por_router() -> dict[str, str]:
+def _rules_by_router() -> dict[str, str]:
     return {
         achado.group("router"): achado.group("regra")
-        for achado in _REGRA_DA_LABEL.finditer(_texto(COMPOSE))
+        for achado in _LABEL_RULE.finditer(_as_text(COMPOSE))
     }
 
 
-def test_ha_routers_proxied_e_de_executores_para_conferir():
+def test_there_are_proxied_and_executor_routers_to_check():
     """If the rules regex stops matching, the two tests below would pass vacuously."""
-    regras = _regras_por_router()
+    regras = _rules_by_router()
     proxied = {r for r, g in regras.items() if any(h in g for h in _HOSTS_PROXIED)}
-    executores = {r for r, g in regras.items() if _HOST_DOS_EXECUTORES in g}
+    executores = {r for r, g in regras.items() if _EXECUTORS_HOST in g}
     assert {"web-prod", "api-mcp", "minio-s3"} <= proxied, sorted(proxied)
     assert {"executores-ws", "executores-enroll"} <= executores, sorted(executores)
 
 
-def test_todo_router_publico_leva_a_borda_na_frente():
+def test_every_public_router_carries_the_edge_in_front():
     """First position, not "somewhere": whatever comes before it runs for
     anyone — a rate limit in front, for example, would still spend the bucket
     of a forged IP."""
-    regras = _regras_por_router()
-    referencias = _referencias_cruas()
-    sem_lista = [
+    regras = _rules_by_router()
+    references = _raw_references()
+    without_list = [
         r for r, g in sorted(regras.items())
         if any(h in g for h in _HOSTS_PROXIED)
-        and (referencias.get(r) or [""])[0] != _LISTA
+        and (references.get(r) or [""])[0] != _EDGE_LIST_REF
     ]
-    assert not sem_lista, (
-        f"router de host proxied sem `{_LISTA}` na primeira posicao: " + ", ".join(sem_lista)
+    assert not without_list, (
+        f"router de host proxied sem `{_EDGE_LIST_REF}` na primeira posicao: " + ", ".join(without_list)
     )
 
 
-def test_os_routers_dos_executores_nao_levam_a_lista_da_cloudflare():
+def test_the_executor_routers_do_not_carry_the_cloudflare_list():
     """Executors connect from any network — the list would lock them out."""
-    regras = _regras_por_router()
-    referencias = _referencias_cruas()
-    com_lista = [
+    regras = _rules_by_router()
+    references = _raw_references()
+    with_list = [
         r for r, g in sorted(regras.items())
-        if _HOST_DOS_EXECUTORES in g
-        and ({_LISTA, "cloudflare-only@file"} & set(referencias.get(r, [])))
+        if _EXECUTORS_HOST in g
+        and ({_EDGE_LIST_REF, "cloudflare-only@file"} & set(references.get(r, [])))
     ]
-    assert not com_lista, "router de executor com a borda: " + ", ".join(com_lista)
+    assert not with_list, "router de executor com a borda: " + ", ".join(with_list)
 
 
-def test_toda_regra_de_host_vem_do_env():
+def test_every_host_rule_comes_from_the_env():
     """No installation host hard-coded in the rules: only the three from the .env."""
-    for router, regra in sorted(_regras_por_router().items()):
+    for router, regra in sorted(_rules_by_router().items()):
         hosts = re.findall(r"Host\(`([^`]*)`\)", regra)
         assert hosts, f"{router} sem Host() na regra"
         for host in hosts:
@@ -279,8 +279,8 @@ def test_toda_regra_de_host_vem_do_env():
             )
 
 
-def test_o_compose_nao_traz_o_dominio_nem_o_registry_de_uma_instalacao():
-    compose = _texto(COMPOSE)
+def test_the_compose_does_not_carry_the_domain_or_registry_of_an_installation():
+    compose = _as_text(COMPOSE)
     assert not re.search(r"ghcr\.io/[a-z0-9-]+/atlans-", compose)
 
 
@@ -289,16 +289,16 @@ def test_o_compose_nao_traz_o_dominio_nem_o_registry_de_uma_instalacao():
 _CIDR = re.compile(r"^\s+-\s+([0-9a-fA-F.:]+/\d+)\s*$", re.M)
 
 
-def _faixas_da_lista() -> set[str]:
-    texto = _texto(DINAMICO)
+def _list_ranges() -> set[str]:
+    texto = _as_text(DINAMICO)
     marca = "    cloudflare-only:\n"
     resto = texto[texto.index(marca) + len(marca):]
-    fim = _NOME_DO_MIDDLEWARE.search(resto)
+    fim = _MIDDLEWARE_NAME.search(resto)
     bloco = resto[: fim.start()] if fim else resto
     return set(_CIDR.findall(bloco))
 
 
-def test_as_faixas_da_cloudflare_sao_as_mesmas_nos_tres_lugares():
+def test_the_cloudflare_ranges_are_the_same_in_the_three_places():
     """The list lives in three files, and a divergence opens or closes the wrong door.
 
     One range too few in the allowlist is a 403 for some of the users
@@ -310,17 +310,17 @@ def test_as_faixas_da_cloudflare_sao_as_mesmas_nos_tres_lugares():
     """
     from app.core.trusted_proxy import CLOUDFLARE_RANGES
 
-    faixas = _faixas_da_lista()
+    faixas = _list_ranges()
     assert len(faixas) >= 20, f"leitura suspeita da allowlist: {sorted(faixas)}"
     assert faixas == set(CLOUDFLARE_RANGES.split(","))
-    exemplo = re.search(r"^#BORDA_FAIXAS_CONFIAVEIS=(\S+)$", _texto(RAIZ / ".env.example"), re.M)
+    exemplo = re.search(r"^#BORDA_FAIXAS_CONFIAVEIS=(\S+)$", _as_text(RAIZ / ".env.example"), re.M)
     assert exemplo, "o exemplo da Cloudflare sumiu do .env.example"
     assert set(exemplo.group(1).split(",")) == {f for f in faixas if ":" not in f}
 
 
-def test_sem_cdn_o_traefik_nao_confia_em_ninguem_alem_do_loopback():
+def test_without_cdn_traefik_trusts_no_one_but_the_loopback():
     """The trustedIPs default: without a CDN, Traefik is the edge and rewrites the XFF."""
-    compose = _texto(COMPOSE)
+    compose = _as_text(COMPOSE)
     for entrypoint in ("web", "websecure"):
         achado = re.search(
             rf"entrypoints\.{entrypoint}\.forwardedHeaders\.trustedIPs=([^\"]+)", compose
@@ -329,20 +329,20 @@ def test_sem_cdn_o_traefik_nao_confia_em_ninguem_alem_do_loopback():
         assert achado.group(1) == "${BORDA_FAIXAS_CONFIAVEIS:-127.0.0.1/32}", entrypoint
 
 
-def test_a_borda_aberta_aceita_qualquer_ip():
-    texto = _texto(DINAMICO)
+def test_the_open_edge_accepts_any_ip():
+    texto = _as_text(DINAMICO)
     marca = "    borda-aberta:\n"
     resto = texto[texto.index(marca) + len(marca):]
-    fim = _NOME_DO_MIDDLEWARE.search(resto)
+    fim = _MIDDLEWARE_NAME.search(resto)
     bloco = resto[: fim.start()] if fim else resto
     assert set(_CIDR.findall(bloco)) == {"0.0.0.0/0", "::/0"}
 
 
-def test_o_cert_dos_executores_tem_nome_fixo_e_o_legado_segue_ate_a_troca():
+def test_the_executors_cert_has_a_fixed_name_and_the_legacy_one_stays_until_the_swap():
     """bootstrap-stepca.sh writes agents.crt; the old name stays only during the transition."""
-    dinamico = _texto(DINAMICO)
+    dinamico = _as_text(DINAMICO)
     assert "certFile: /etc/ssl/atlans-ca/agents.crt" in dinamico
     assert "keyFile:  /etc/ssl/atlans-ca/agents.key" in dinamico
-    bootstrap = _texto(RAIZ / "scripts" / "bootstrap-stepca.sh")
+    bootstrap = _as_text(RAIZ / "scripts" / "bootstrap-stepca.sh")
     assert 'CRT_PATH="traefik/atlans-ca/agents.crt"' in bootstrap
     assert 'KEY_PATH="traefik/atlans-ca/agents.key"' in bootstrap

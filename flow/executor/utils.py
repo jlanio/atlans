@@ -22,10 +22,10 @@ def _count_gdf_features(data: dict) -> "int | None":
 # nobody picks among a thousand — truncating here avoids bloating every run's record.
 #
 # Public because the UI warns that the list was cut when it arrives at the limit.
-MAX_COLUNAS = 200
+MAX_COLUMNS = 200
 
 
-def _coluna_de_geometria(valor) -> "str | None":
+def _geometry_column(valor) -> "str | None":
     """Name of the ACTIVE geometry column, when there is one.
 
     Ask the GeoDataFrame instead of guessing by name: the geopandas
@@ -36,7 +36,7 @@ def _coluna_de_geometria(valor) -> "str | None":
     return str(nome) if nome else None
 
 
-def _colunas_das_saidas(data: dict) -> "dict | None":
+def _output_columns(data: dict) -> "dict | None":
     """ATTRIBUTE columns of each tabular output of a node.
 
     Exists so the editor stops requiring guesswork: whoever configures a Join or
@@ -56,18 +56,18 @@ def _colunas_das_saidas(data: dict) -> "dict | None":
     try:
         import pandas as pd
 
-        achadas = {}
+        found = {}
         for chave, valor in (data or {}).items():
             if not isinstance(valor, pd.DataFrame):
                 continue
-            geometria = _coluna_de_geometria(valor)
+            geometria = _geometry_column(valor)
             nomes = [str(c) for c in valor.columns if str(c) != geometria]
             # Truncate without inventing an item in the list: the cut marker that used
             # to be here ("… (+312)") went along with the columns, and the UI renders
             # EACH item as a clickable suggestion — you could insert the marker as if
             # it were a column name. Whoever displays it infers the cut from the size.
-            achadas[str(chave)] = nomes[:MAX_COLUNAS]
-        return achadas or None
+            found[str(chave)] = nomes[:MAX_COLUMNS]
+        return found or None
     except Exception as exc:
         logger.debug("Falha ao listar colunas das saidas: %s", exc)
         return None

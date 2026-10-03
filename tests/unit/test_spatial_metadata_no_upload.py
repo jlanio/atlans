@@ -29,7 +29,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 META = {"crs": "EPSG:4326", "bbox": [0, 0, 1, 1], "feature_count": 7}
 
 
-def _teto_folgado():
+def _generous_ceiling():
     """The confirm checks the size ceiling before accepting the object.
 
     The `db` double in these tests answers ANY query with the same
@@ -51,7 +51,7 @@ def _teto_folgado():
 # ── The propagation chain ────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("funcao", ["upload", "_upload_file", "_upload_shapefile"])
-def test_cada_elo_da_cadeia_usa_o_parametro(funcao):
+def test_each_link_of_the_chain_uses_the_parameter(funcao):
     """Um elo que aceita e ignora e exatamente o bug original."""
     from executor.sync.uploader import DriveUploader
 
@@ -70,7 +70,7 @@ def test_cada_elo_da_cadeia_usa_o_parametro(funcao):
     assert usado, f"{funcao} aceita spatial_metadata e NAO usa — o dado morre aqui"
 
 
-def test_o_confirm_envia_o_metadado_no_corpo():
+def test_the_confirm_sends_the_metadata_in_the_body():
     from executor.sync.uploader import DriveUploader
 
     fonte = inspect.getsource(DriveUploader._upload_file)
@@ -83,7 +83,7 @@ def test_o_confirm_envia_o_metadado_no_corpo():
 # ── O servidor persiste ──────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_confirm_upload_grava_o_metadado_recebido():
+async def test_confirm_upload_writes_the_received_metadata():
     from unittest.mock import AsyncMock, MagicMock, patch
 
     from app.services.drive_service import DriveService
@@ -96,7 +96,7 @@ async def test_confirm_upload_grava_o_metadado_recebido():
 
     svc = DriveService(db)
     with patch("app.core.storage.head_async", new=AsyncMock(return_value={"size": 10, "etag": "e"})), \
-            _teto_folgado(), \
+            _generous_ceiling(), \
             patch("app.services.drive_service.emit_drive_event", new=AsyncMock()):
         await svc.confirm_upload("f-1", spatial_metadata=META)
 
@@ -104,7 +104,7 @@ async def test_confirm_upload_grava_o_metadado_recebido():
 
 
 @pytest.mark.asyncio
-async def test_confirm_sem_metadado_nao_apaga_o_que_ja_existia():
+async def test_confirm_without_metadata_does_not_erase_what_existed():
     """An old executor confirms with no body — it must not wipe what was already stored."""
     from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -118,7 +118,7 @@ async def test_confirm_sem_metadado_nao_apaga_o_que_ja_existia():
 
     svc = DriveService(db)
     with patch("app.core.storage.head_async", new=AsyncMock(return_value={"size": 10, "etag": "e"})), \
-            _teto_folgado(), \
+            _generous_ceiling(), \
             patch("app.services.drive_service.emit_drive_event", new=AsyncMock()):
         await svc.confirm_upload("f-1")
 
@@ -127,7 +127,7 @@ async def test_confirm_sem_metadado_nao_apaga_o_que_ja_existia():
 
 # ── Compatibility with old executors ─────────────────────────────────────────
 
-def test_o_endpoint_tolera_confirm_sem_corpo():
+def test_the_endpoint_tolerates_confirm_without_body():
     """An upload already stored in MinIO must not stay 'pending' because of the JSON.
 
     Executors prior to this version confirm with no body at all; an unguarded
@@ -139,5 +139,5 @@ def test_o_endpoint_tolera_confirm_sem_corpo():
     assert "try:" in fonte and "request.json()" in fonte, (
         "a leitura do corpo precisa continuar tolerante a ausencia"
     )
-    corpo_apos_json = fonte.split("request.json()", 1)[1]
-    assert "except" in corpo_apos_json, "sem except, executor antigo quebra o confirm"
+    body_after_json = fonte.split("request.json()", 1)[1]
+    assert "except" in body_after_json, "sem except, executor antigo quebra o confirm"

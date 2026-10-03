@@ -124,8 +124,8 @@ describe("_syncLayers — inferência de tipo", () => {
     // a polygon) and a `fill` triangulates even a LineString — on the public portal that
     // turns into a cloud of dots over the field plot.
     const map = fakeMap([], {})
-    const semTipo = camada({ id: "art:3", geomType: undefined, mvt: { workflowHash: "wf", layerKey: "k" } })
-    _syncLayers(asMap(map), [semTipo], true)
+    const withoutType = camada({ id: "art:3", geomType: undefined, mvt: { workflowHash: "wf", layerKey: "k" } })
+    _syncLayers(asMap(map), [withoutType], true)
     expect(map._layer("fill-art:3")?.filter).toEqual(_filtroGeom("Polygon"))
     expect(map._layer("line-art:3")?.filter).toEqual(_filtroGeom("Polygon", "LineString"))
     expect(map._layer("circle-art:3")?.filter).toEqual(_filtroGeom("Point"))
@@ -210,10 +210,10 @@ describe("_sniffGeomType / _estenderBounds", () => {
     expect(extend).toHaveBeenCalledTimes(2) // sudoeste + nordeste
 
     extend.mockClear()
-    const comPonto = camada({
+    const withPoint = camada({
       geojson: { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [10, 20] } }] },
     })
-    expect(_estenderBounds(bounds, comPonto)).toBe(true)
+    expect(_estenderBounds(bounds, withPoint)).toBe(true)
     expect(extend).toHaveBeenCalled()
 
     extend.mockClear()

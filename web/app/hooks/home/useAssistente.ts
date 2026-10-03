@@ -13,17 +13,17 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import { GisFlowService } from "@/service/GisFlowService"
-import type { IAssistenteEstado, IQuadroDoReplay } from "@/service/types"
+import type { IAssistantState, IQuadroDoReplay } from "@/service/types"
 import { useHomeStore } from "@/app/stores/homeStore"
-import { useIdiomaDaTela } from "@/app/components/home/i18n"
+import { useScreenLanguage } from "@/app/components/home/i18n"
 import { API_URL } from "@/utils/env"
 import {
-  aplicarQuadro, turnoVazio,
-  type QuadroSSE, type TurnoDoAssistente,
+  aplicarQuadro, emptyTurn,
+  type SSEFrame, type AssistantTurn,
 } from "@/app/components/home/assistente/quadros"
 import {
-  SEM_CONEXAO, aplicarCota, aplicarNoTurno, erroDaResposta, lerQuadrosSSE, proximoIdDeTurno,
-  type ErrosDaRota,
+  NO_CONNECTION, applyQuota, applyToTurn, erroDaResposta, lerQuadrosSSE, nextTurnId,
+  type RouteErrors,
 } from "@/app/components/home/assistente/stream"
 
 /**
@@ -40,10 +40,10 @@ import {
  *   not consume the key) — the card becomes clickable again, otherwise the
  *   action has no way at all to be redone.
  */
-export type ResultadoDaDecisao = "valeu" | "expirada" | "falhou"
+export type DecisionResult = "valeu" | "expirada" | "falhou"
 
 export interface Agente {
-  estado: IAssistenteEstado | null
+  estado: IAssistantState | null
   consultando: boolean
   /**
    * The state query FAILED (network, 502, timeout). Distinct from `estado` with
@@ -53,17 +53,17 @@ export interface Agente {
   falhou: boolean
   /** Redoes the state query — the Home's "Tentar de novo" (try again). */
   reconsultar: () => void
-  turnos: TurnoDoAssistente[]
+  turnos: AssistantTurn[]
   /** The replay of the selected conversation is on its way. */
   carregandoReplay: boolean
   correndo: boolean
   enviar: (mensagem: string) => Promise<void>
   /** Tells the card what to do: lock, lock as expired, or unlock. */
-  confirmar: (toolUseId: string, token: string, decisao: "confirmar" | "recusar") => Promise<ResultadoDaDecisao>
+  confirmar: (toolUseId: string, token: string, decisao: "confirmar" | "recusar") => Promise<DecisionResult>
   parar: () => void
 }
 
-interface Opcoes {
+interface Choices {
   /** A conversa selecionada (dos Chats); `null`/ausente = conversa nova. */
   conversaId?: string | null
   /** Preferred workspace for the workflows the assistant creates. */
@@ -86,28 +86,28 @@ interface Opcoes {
   anonimo?: boolean
 }
 
-export function useAssistente({ conversaId, workspaceId, onConversa, anonimo = false }: Opcoes): Agente {
-  const [estado, setEstado] = useState<IAssistenteEstado | null>(null)
-  const [consultando, setConsultando] = useState(true)
-  const [falhou, setFalhou] = useState(false)
-  const [turnos, setTurnos] = useState<TurnoDoAssistente[]>([])
-  const [carregandoReplay, setCarregandoReplay] = useState(false)
-  const [correndo, setCorrendo] = useState(false)
-  const [tentativa, setTentativa] = useState(0)
+export function useAssistente({ conversaId, workspaceId, onConversa, anonimo = false }: Choices): Agente {
+  const [estado, setAppState] = useState<IAssistantState | null>(null)
+  const [consultando, setQuerying] = useState(true)
+  const [falhou, setFailed] = useState(false)
+  const [turnos, setTurns] = useState<AssistantTurn[]>([])
+  const [carregandoReplay, setLoadingReplay] = useState(false)
+  const [correndo, setRunning] = useState(false)
+  const [tentativa, setAttempt] = useState(0)
 
-  const abortoRef = useRef<AbortController | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
   // The screen language goes with the turn (the assistant answers in it). By ref,
   // read at send time like the location: switching language does not recreate `enviar`.
-  const idiomaDaTela = useIdiomaDaTela()
-  const idiomaRef = useRef(idiomaDaTela)
-  useEffect(() => { idiomaRef.current = idiomaDaTela }, [idiomaDaTela])
+  const screenLanguage = useScreenLanguage()
+  const languageRef = useRef(screenLanguage)
+  useEffect(() => { languageRef.current = screenLanguage }, [screenLanguage])
   /** The assistant turn being written — to mark it if it stops. */
-  const turnoCorrenteRef = useRef<string | null>(null)
+  const currentTurnRef = useRef<string | null>(null)
   // The conversation currently ON SCREEN. Distinct from the prop: the prop changes
   // by external selection (Chats) AND by onConversa (new id) — only external selection reloads.
-  const carregadoRef = useRef<string | null | undefined>(undefined)
-  const onConversaRef = useRef(onConversa)
-  onConversaRef.current = onConversa
+  const loadedRef = useRef<string | null | undefined>(undefined)
+  const onConversationRef = useRef(onConversa)
+  onConversationRef.current = onConversa
 
   // The service's `get()` never rejects: a 502 comes back as `success: false`
   // with `data` undefined. Reading only `data` turned the transient outage into
@@ -120,86 +120,86 @@ export function useAssistente({ conversaId, workspaceId, onConversa, anonimo = f
   // available in this installation) notice.
   useEffect(() => {
     if (anonimo) {
-      setEstado(null)
-      setFalhou(false)
-      setConsultando(false)
+      setAppState(null)
+      setFailed(false)
+      setQuerying(false)
       return
     }
     let vivo = true
-    setConsultando(true)
+    setQuerying(true)
     GisFlowService.estadoDoAgente().then(({ success, data }) => {
       if (!vivo) return
-      setFalhou(!success || !data)
-      if (success && data) setEstado(data)
-      setConsultando(false)
+      setFailed(!success || !data)
+      if (success && data) setAppState(data)
+      setQuerying(false)
     })
     return () => { vivo = false }
   }, [tentativa, anonimo])
 
-  const reconsultar = useCallback(() => setTentativa((n) => n + 1), [])
+  const reconsultar = useCallback(() => setAttempt((n) => n + 1), [])
 
   const parar = useCallback(() => {
-    if (!abortoRef.current) return
-    abortoRef.current.abort()
-    abortoRef.current = null
+    if (!abortRef.current) return
+    abortRef.current.abort()
+    abortRef.current = null
     // A turn cut off mid-sentence looks exactly like a completed one. Without
     // this mark the person thinks the answer is over — or that the execution
     // stopped, which is not true on the server side.
-    if (turnoCorrenteRef.current) {
-      aplicarNoTurno(setTurnos, turnoCorrenteRef.current, { evento: "erro", dados: INTERROMPIDA })
-      turnoCorrenteRef.current = null
+    if (currentTurnRef.current) {
+      applyToTurn(setTurns, currentTurnRef.current, { evento: "erro", dados: INTERRUPTED })
+      currentTurnRef.current = null
     }
-    setCorrendo(false)
+    setRunning(false)
   }, [])
 
   // The stream has to die with the Home: without this, leaving for /projects kept
   // the `for(;;)` reading, the connection open and the server generating tokens
   // against the quota for a response nobody is going to read anymore.
-  useEffect(() => () => { abortoRef.current?.abort() }, [])
+  useEffect(() => () => { abortRef.current?.abort() }, [])
 
   const carregar = useCallback(async (id: string) => {
     parar()
     // Clear BEFORE the network trip: the panel kept drawing the previous
     // conversation while the replay was coming, and on a slow network you could
     // read and reply thinking you were already in the new chat.
-    setTurnos([])
-    setCarregandoReplay(true)
+    setTurns([])
+    setLoadingReplay(true)
     const { success, data } = await GisFlowService.lerConversa(id)
     // Only apply if it is still the requested conversation (quick chat switch).
-    if (carregadoRef.current !== id) return
-    setTurnos(success && data ? reconstruirTurnos(data.quadros) : [])
-    setCarregandoReplay(false)
+    if (loadedRef.current !== id) return
+    setTurns(success && data ? reconstruirTurnos(data.quadros) : [])
+    setLoadingReplay(false)
   }, [parar])
 
   // Conversation selection: reload the replay (or clear for a new one). An id that
   // came from onConversa (stream in progress) already matches carregadoRef → no reload.
   useEffect(() => {
     const alvo = conversaId ?? null
-    if (alvo === carregadoRef.current) return
+    if (alvo === loadedRef.current) return
     parar()
-    carregadoRef.current = alvo
+    loadedRef.current = alvo
     if (alvo) void carregar(alvo)
-    else { setTurnos([]); setCarregandoReplay(false) }
+    else { setTurns([]); setLoadingReplay(false) }
   }, [conversaId, carregar, parar])
 
-  const recarregarCota = useCallback(() => {
-    void GisFlowService.estadoDoAgente().then(({ data }) => { if (data) setEstado(data) })
+  const reloadQuota = useCallback(() => {
+    void GisFlowService.estadoDoAgente().then(({ data }) => { if (data) setAppState(data) })
   }, [])
 
-  /** Consumes an SSE from `/assistente`, applying the frames to the `idDoTurno` turn. */
-  const consumir = useCallback(async (resposta: Response, idDoTurno: string) => {
+  /** Consumes an SSE from `/assistente`, applying the frames to the `turnId` turn. */
+  const consumir = useCallback(async (resposta: Response, turnId: string) => {
     if (!resposta.ok || !resposta.body) {
-      aplicarNoTurno(setTurnos, idDoTurno, { evento: "erro", dados: await erroDaResposta(resposta, ERROS_DA_ROTA) })
+      applyToTurn(setTurns, turnId, { evento: "erro", dados: await erroDaResposta(resposta, ROUTE_ERRORS) })
       return
     }
-    const tratar = (quadro: QuadroSSE) => {
-      if (aplicarCota(setEstado, quadro)) return
+    const tratar = (quadro: SSEFrame) => {
+      if (applyQuota(setAppState, quadro)) return
       if (quadro.evento === "conversa") {
         const id = String(quadro.dados.conversa_id ?? "")
         if (id) {
           // The new id is already the "loaded" one: keeps the echo selection from reloading.
-          carregadoRef.current = id
-          onConversaRef.current?.({
+          loadedRef.current = id
+          onConversationRef.current?.({
             id,
             titulo: typeof quadro.dados.titulo === "string" ? quadro.dados.titulo : undefined,
             nova: quadro.dados.nova === true,
@@ -207,25 +207,25 @@ export function useAssistente({ conversaId, workspaceId, onConversa, anonimo = f
         }
         return
       }
-      aplicarNoTurno(setTurnos, idDoTurno, quadro)
+      applyToTurn(setTurns, turnId, quadro)
     }
     await lerQuadrosSSE(resposta.body, tratar)
   }, [])
 
   const enviar = useCallback(async (mensagem: string) => {
     const texto = mensagem.trim()
-    if (!texto || abortoRef.current) return
+    if (!texto || abortRef.current) return
 
     const controle = new AbortController()
-    abortoRef.current = controle
-    const idDoTurno = proximoIdDeTurno()
-    turnoCorrenteRef.current = idDoTurno
-    setTurnos((anteriores) => [
+    abortRef.current = controle
+    const turnId = nextTurnId()
+    currentTurnRef.current = turnId
+    setTurns((anteriores) => [
       ...anteriores,
-      { id: proximoIdDeTurno(), papel: "user", texto, blocos: [] },
-      turnoVazio(idDoTurno),
+      { id: nextTurnId(), papel: "user", texto, blocos: [] },
+      emptyTurn(turnId),
     ])
-    setCorrendo(true)
+    setRunning(true)
 
     try {
       // The location goes into the body only when the person SHARED it (the "+"
@@ -242,45 +242,45 @@ export function useAssistente({ conversaId, workspaceId, onConversa, anonimo = f
       const { compartilharLocalizacao, localizacao } = useHomeStore.getState()
       if (compartilharLocalizacao && localizacao) corpo.localizacao = localizacao
       // In Portuguese the body stays byte for byte as before (the server's default).
-      if (idiomaRef.current !== "pt-BR") corpo.idioma = idiomaRef.current
+      if (languageRef.current !== "pt-BR") corpo.idioma = languageRef.current
       const resposta = await fetch(`${API_URL}/assistente/conversa`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
         body: JSON.stringify(corpo),
         signal: controle.signal,
       })
-      await consumir(resposta, idDoTurno)
+      await consumir(resposta, turnId)
     } catch (erro) {
       if (!(erro instanceof DOMException && erro.name === "AbortError")) {
-        aplicarNoTurno(setTurnos, idDoTurno, { evento: "erro", dados: SEM_CONEXAO })
+        applyToTurn(setTurns, turnId, { evento: "erro", dados: NO_CONNECTION })
       }
     } finally {
-      if (abortoRef.current === controle) abortoRef.current = null
-      if (turnoCorrenteRef.current === idDoTurno) turnoCorrenteRef.current = null
-      setCorrendo(false)
-      recarregarCota()
+      if (abortRef.current === controle) abortRef.current = null
+      if (currentTurnRef.current === turnId) currentTurnRef.current = null
+      setRunning(false)
+      reloadQuota()
     }
-  }, [conversaId, workspaceId, consumir, recarregarCota])
+  }, [conversaId, workspaceId, consumir, reloadQuota])
 
   const confirmar = useCallback(async (
     toolUseId: string, token: string, decisao: "confirmar" | "recusar",
-  ): Promise<ResultadoDaDecisao> => {
-    const id = carregadoRef.current
-    if (!id || abortoRef.current) return "falhou"
+  ): Promise<DecisionResult> => {
+    const id = loadedRef.current
+    if (!id || abortRef.current) return "falhou"
 
     const controle = new AbortController()
-    abortoRef.current = controle
-    const idDoTurno = proximoIdDeTurno()
-    turnoCorrenteRef.current = idDoTurno
+    abortRef.current = controle
+    const turnId = nextTurnId()
+    currentTurnRef.current = turnId
     // A new assistant turn for the executed action and the resumed response.
-    setTurnos((anteriores) => [...anteriores, turnoVazio(idDoTurno)])
-    setCorrendo(true)
+    setTurns((anteriores) => [...anteriores, emptyTurn(turnId)])
+    setRunning(true)
 
     // It stays OUTSIDE the try: when "Parar" aborts the stream read the decision
     // has already taken effect on the server, and this is the value the catch
     // returns. Reading `false` there unlocked a card whose key the server had
     // just consumed.
-    let resultado: ResultadoDaDecisao = "falhou"
+    let resultado: DecisionResult = "falhou"
 
     try {
       // The confirmation RESUMES the model's loop — and the resumption must still
@@ -290,7 +290,7 @@ export function useAssistente({ conversaId, workspaceId, onConversa, anonimo = f
       const corpo: Record<string, unknown> = { token, decisao }
       const { compartilharLocalizacao, localizacao } = useHomeStore.getState()
       if (compartilharLocalizacao && localizacao) corpo.localizacao = localizacao
-      if (idiomaRef.current !== "pt-BR") corpo.idioma = idiomaRef.current
+      if (languageRef.current !== "pt-BR") corpo.idioma = languageRef.current
       const resposta = await fetch(
         `${API_URL}/assistente/conversas/${encodeURIComponent(id)}/confirmacoes/${encodeURIComponent(toolUseId)}`,
         {
@@ -312,20 +312,20 @@ export function useAssistente({ conversaId, workspaceId, onConversa, anonimo = f
       // The accepted decision is activity in the conversation (the server stamps
       // `updated_at` when closing the stream): notify whoever lists, as the
       // `conversa` frame would — no title, just the id.
-      if (resultado === "valeu") onConversaRef.current?.({ id, nova: false })
-      await consumir(resposta, idDoTurno)
+      if (resultado === "valeu") onConversationRef.current?.({ id, nova: false })
+      await consumir(resposta, turnId)
       return resultado
     } catch (erro) {
       if (erro instanceof DOMException && erro.name === "AbortError") return resultado
-      aplicarNoTurno(setTurnos, idDoTurno, { evento: "erro", dados: SEM_CONEXAO })
+      applyToTurn(setTurns, turnId, { evento: "erro", dados: NO_CONNECTION })
       return "falhou"
     } finally {
-      if (abortoRef.current === controle) abortoRef.current = null
-      if (turnoCorrenteRef.current === idDoTurno) turnoCorrenteRef.current = null
-      setCorrendo(false)
-      recarregarCota()
+      if (abortRef.current === controle) abortRef.current = null
+      if (currentTurnRef.current === turnId) currentTurnRef.current = null
+      setRunning(false)
+      reloadQuota()
     }
-  }, [consumir, recarregarCota])
+  }, [consumir, reloadQuota])
 
   return {
     estado, consultando, falhou, reconsultar,
@@ -333,11 +333,11 @@ export function useAssistente({ conversaId, workspaceId, onConversa, anonimo = f
   }
 }
 
-const INTERROMPIDA = { code: "interrompida", message: "Resposta interrompida.", hint: "o que já foi disparado no servidor continua" }
+const INTERRUPTED = { code: "interrompida", message: "Resposta interrompida.", hint: "o que já foi disparado no servidor continua" }
 
 /** The statuses that `/assistente` (and the confirmation) rejects before the stream.
  *  It is not the editor's table on purpose — see `erroDaResposta`. */
-const ERROS_DA_ROTA: ErrosDaRota = {
+const ROUTE_ERRORS: RouteErrors = {
   403: { code: "token_invalido", message: "Esta confirmação não confere mais." },
   404: { code: "nao_encontrada", message: "Conversa não encontrada." },
   409: { code: "expirada", message: "A confirmação expirou ou já foi decidida." },
@@ -350,9 +350,9 @@ const ERROS_DA_ROTA: ErrosDaRota = {
 }
 
 /** Rebuilds the turns from the replay frames (`GET /conversas/{id}`). */
-export function reconstruirTurnos(quadros: IQuadroDoReplay[]): TurnoDoAssistente[] {
-  const turnos: TurnoDoAssistente[] = []
-  let assistente: TurnoDoAssistente | null = null
+export function reconstruirTurnos(quadros: IQuadroDoReplay[]): AssistantTurn[] {
+  const turnos: AssistantTurn[] = []
+  let assistente: AssistantTurn | null = null
 
   for (const q of quadros) {
     const meta = q.dados?.meta as { tipo?: string } | undefined
@@ -361,7 +361,7 @@ export function reconstruirTurnos(quadros: IQuadroDoReplay[]): TurnoDoAssistente
       // person speaking — it does not become a bubble. The assistant's reply to it stays below.
       if (meta?.tipo === "confirmacao") continue
       if (assistente) { turnos.push(assistente); assistente = null }
-      turnos.push({ id: proximoIdDeTurno(), papel: "user", texto: String(q.dados.texto ?? ""), blocos: [] })
+      turnos.push({ id: nextTurnId(), papel: "user", texto: String(q.dados.texto ?? ""), blocos: [] })
       continue
     }
     if (q.tipo === "conversa") continue // hook metadata, not a turn
@@ -369,7 +369,7 @@ export function reconstruirTurnos(quadros: IQuadroDoReplay[]): TurnoDoAssistente
       if (assistente) assistente = aplicarQuadro(assistente, { evento: "fim", dados: q.dados })
       continue
     }
-    if (!assistente) assistente = turnoVazio(proximoIdDeTurno())
+    if (!assistente) assistente = emptyTurn(nextTurnId())
     assistente = aplicarQuadro(assistente, { evento: q.tipo, dados: q.dados })
   }
   if (assistente) turnos.push(assistente)

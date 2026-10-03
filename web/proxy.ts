@@ -30,7 +30,7 @@ export default auth((req) => {
     // Only STATIC ASSET extensions bypass the session/role gate. The old
     // pattern (any `.ext`) let a path like `/algo.json` slip past the gate;
     // restricting it to the allowlist closes that bypass (SEG-120).
-    const pareceArquivo = /\.(?:js|mjs|css|map|png|jpe?g|gif|svg|webp|avif|ico|bmp|woff2?|ttf|otf|eot|wasm|txt|xml|webmanifest|pdf)$/i.test(pathname);
+    const looksLikeFile = /\.(?:js|mjs|css|map|png|jpe?g|gif|svg|webp|avif|ico|bmp|woff2?|ttf|otf|eot|wasm|txt|xml|webmanifest|pdf)$/i.test(pathname);
 
     // Without a session (or with an expired refresh token), every PAGE other than
     // the Home goes to the entry — which is the Home itself with the login modal
@@ -43,7 +43,7 @@ export default auth((req) => {
     // the destination is INSIDE the matcher and the expired cookie would come
     // again on the next request — the old /login was outside the matcher, which
     // is why it did not loop.
-    if (pathname !== "/" && !pareceArquivo && (!isLoggedIn || sessionError === "RefreshTokenExpired")) {
+    if (pathname !== "/" && !looksLikeFile && (!isLoggedIn || sessionError === "RefreshTokenExpired")) {
       return NextResponse.redirect(new URL(destinoDaEntrada("entrar", pathname), req.url));
     }
 
@@ -65,7 +65,7 @@ export default auth((req) => {
     // is `/`, not because it has a role). "For now" lives only in this
     // condition — to reopen a route to non-admins, it gets an exception here.
     const role = (req.auth as { user?: { role?: string } })?.user?.role;
-    if (role !== "admin" && pathname !== "/" && !pareceArquivo) {
+    if (role !== "admin" && pathname !== "/" && !looksLikeFile) {
       return NextResponse.redirect(new URL("/", req.url));
     }
   }

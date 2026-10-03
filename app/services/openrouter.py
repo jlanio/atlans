@@ -81,12 +81,12 @@ CAMINHO = "/chat/completions"
 # unsaid, and the loop treats the drop as `modelo_indisponivel`.
 TENTATIVAS = 3
 RETENTAVEIS = frozenset({408, 429, 500, 502, 503, 504})
-ESPERA_MAXIMA_S = 10.0
+MAX_WAIT_S = 10.0
 
 # Streaming with a large `max_tokens` takes minutes; what matters is the silence BETWEEN
 # two chunks (`read`), and OpenRouter sends `: OPENROUTER PROCESSING` comments
 # while the provider has not started answering yet.
-TEMPO_LIMITE = httpx.Timeout(connect=30.0, read=180.0, write=60.0, pool=30.0)
+TIMEOUT = httpx.Timeout(connect=30.0, read=180.0, write=60.0, pool=30.0)
 
 # What the model reads in a tool result that failed. The wire format
 # has no `is_error` flag; without the prefix, a scope refusal and a
@@ -209,29 +209,29 @@ def montar_mensagens(
     """
     mensagens: list[dict[str, Any]] = []
     if sistema and cache:
-        mensagens.append({"role": "system", "content": [_parte_de_texto(b) for b in sistema]})
+        mensagens.append({"role": "system", "content": [_text_part(b) for b in sistema]})
     elif sistema:
         mensagens.append({
             "role": "system",
             "content": "\n\n".join(str(b.get("text") or "") for b in sistema),
         })
 
-    ultima_humana = _indice_da_ultima_mensagem_humana(conversa) if cache else None
+    last_human = _last_human_message_index(conversa) if cache else None
     for indice, mensagem in enumerate(conversa):
         papel = mensagem.get("role")
         conteudo = mensagem.get("content")
         if papel == "assistant":
-            traduzida = _do_assistente(conteudo)
+            traduzida = _from_assistant(conteudo)
             if traduzida is not None:
                 mensagens.append(traduzida)
         elif papel == "user":
-            mensagens.extend(_da_pessoa(conteudo, marcar_cache=(indice == ultima_humana)))
+            mensagens.extend(_from_human(conteudo, mark_cache=(indice == last_human)))
         else:
             logger.warning("Mensagem de papel desconhecido no transcrito (%r); ignorada.", papel)
     return mensagens
 
 
-def _parte_de_texto(bloco: dict[str, Any]) -> dict[str, Any]:
+def _text_part(bloco: dict[str, Any]) -> dict[str, Any]:
     parte: dict[str, Any] = {"type": "text", "text": str(bloco.get("text") or "")}
     if bloco.get("cache_control"):
         # Only the type: the TTL is the decision of the provider behind the router, and a field
@@ -240,7 +240,7 @@ def _parte_de_texto(bloco: dict[str, Any]) -> dict[str, Any]:
     return parte
 
 
-def _e_humana(mensagem: dict[str, Any]) -> bool:
+def _is_human(mensagem: dict[str, Any]) -> bool:
     """Human text (or the server's synthetic one) — not a list of `tool_result`s."""
     if mensagem.get("role") != "user":
         return False
@@ -252,19 +252,19 @@ def _e_humana(mensagem: dict[str, Any]) -> bool:
     )
 
 
-def _indice_da_ultima_mensagem_humana(conversa: list[dict[str, Any]]) -> int | None:
+def _last_human_message_index(conversa: list[dict[str, Any]]) -> int | None:
     for indice in range(len(conversa) - 1, -1, -1):
-        if _e_humana(conversa[indice]):
+        if _is_human(conversa[indice]):
             return indice
     return None
 
 
-def _da_pessoa(conteudo: Any, *, marcar_cache: bool) -> list[dict[str, Any]]:
+def _from_human(conteudo: Any, *, mark_cache: bool) -> list[dict[str, Any]]:
     """A `user` message from the transcript: the person's text, or tool results."""
     if isinstance(conteudo, str):
-        return [_mensagem_humana(conteudo, marcar_cache)]
+        return [_human_message(conteudo, mark_cache)]
     if not isinstance(conteudo, list):
-        return [_mensagem_humana(str(conteudo or ""), marcar_cache)]
+        return [_human_message(str(conteudo or ""), mark_cache)]
 
     saida: list[dict[str, Any]] = []
     textos: list[str] = []
@@ -276,18 +276,18 @@ def _da_pessoa(conteudo: Any, *, marcar_cache: bool) -> list[dict[str, Any]]:
                 {
                     "role": "tool",
                     "tool_call_id": str(bloco.get("tool_use_id") or ""),
-                    "content": _texto_do_resultado(bloco),
+                    "content": _result_text(bloco),
                 }
             )
         elif bloco.get("type") == "text" and bloco.get("text"):
             textos.append(str(bloco["text"]))
     if textos:
-        saida.append(_mensagem_humana("\n".join(textos), marcar_cache))
+        saida.append(_human_message("\n".join(textos), mark_cache))
     return saida
 
 
-def _mensagem_humana(texto: str, marcar_cache: bool) -> dict[str, Any]:
-    if not marcar_cache:
+def _human_message(texto: str, mark_cache: bool) -> dict[str, Any]:
+    if not mark_cache:
         return {"role": "user", "content": texto}
     return {
         "role": "user",
@@ -295,7 +295,7 @@ def _mensagem_humana(texto: str, marcar_cache: bool) -> dict[str, Any]:
     }
 
 
-def _texto_do_resultado(bloco: dict[str, Any]) -> str:
+def _result_text(bloco: dict[str, Any]) -> str:
     conteudo = bloco.get("content")
     if isinstance(conteudo, list):
         texto = "\n".join(
@@ -310,7 +310,7 @@ def _texto_do_resultado(bloco: dict[str, Any]) -> str:
     return texto
 
 
-def _do_assistente(conteudo: Any) -> dict[str, Any] | None:
+def _from_assistant(conteudo: Any) -> dict[str, Any] | None:
     """A model message: text + `tool_calls` + `reasoning_details` verbatim.
 
     `None` when it has neither text nor a call — only reasoning, or nothing (a
@@ -338,7 +338,7 @@ def _do_assistente(conteudo: Any) -> dict[str, Any] | None:
                     "type": "function",
                     "function": {
                         "name": str(bloco.get("name") or ""),
-                        "arguments": _argumentos_como_texto(bloco.get("input")),
+                        "arguments": _arguments_as_text(bloco.get("input")),
                     },
                 }
             )
@@ -360,11 +360,11 @@ def _do_assistente(conteudo: Any) -> dict[str, Any] | None:
     return mensagem
 
 
-def _argumentos_como_texto(argumentos: Any) -> str:
+def _arguments_as_text(argumentos: Any) -> str:
     """The `input` of a `tool_use` as the JSON string of `function.arguments`.
 
     Only an OBJECT goes as is. The raw text of a call cut off by
-    `max_tokens` (what `_argumentos` returns when the JSON does not close) stays in the
+    `max_tokens` (what `_arguments` returns when the JSON does not close) stays in the
     transcript for the replay, but on the way out becomes `{}`: resent as it came, it would be
     invalid JSON on every following round, and the provider would refuse the whole
     conversation. The paired error `tool_result` already told the model that that
@@ -375,14 +375,14 @@ def _argumentos_como_texto(argumentos: Any) -> str:
     return "{}"
 
 
-def _tem_raciocinio(corpo: dict[str, Any]) -> bool:
+def _has_reasoning(corpo: dict[str, Any]) -> bool:
     return any(
         m.get("role") == "assistant" and m.get("reasoning_details")
         for m in corpo.get("messages") or []
     )
 
 
-def _sem_raciocinio(corpo: dict[str, Any]) -> dict[str, Any]:
+def _without_reasoning(corpo: dict[str, Any]) -> dict[str, Any]:
     """The same request without the `reasoning_details` — the 400 plan B."""
     mensagens = [
         {k: v for k, v in m.items() if k != "reasoning_details"} for m in corpo.get("messages") or []
@@ -393,7 +393,7 @@ def _sem_raciocinio(corpo: dict[str, Any]) -> dict[str, Any]:
 # ── Inbound: from SSE to response ────────────────────────────────────────────
 
 
-async def _linhas(resposta: httpx.Response) -> AsyncIterator[str]:
+async def _lines(resposta: httpx.Response) -> AsyncIterator[str]:
     """The body's lines, split ONLY on `\\n`, `\\r\\n` and `\\r` — the three
     terminators the SSE specification defines.
 
@@ -428,7 +428,7 @@ async def _linhas(resposta: httpx.Response) -> AsyncIterator[str]:
         yield resto.decode("utf-8", "replace")
 
 
-async def _eventos_sse(resposta: httpx.Response) -> AsyncIterator[dict[str, Any]]:
+async def _sse_events(resposta: httpx.Response) -> AsyncIterator[dict[str, Any]]:
     """The stream's `data:` frames, already decoded. Stops at `[DONE]`.
 
     Lines starting with `:` are comments — OpenRouter sends
@@ -437,7 +437,7 @@ async def _eventos_sse(resposta: httpx.Response) -> AsyncIterator[dict[str, Any]
     specification says) and ends at a blank line.
     """
     dados: list[str] = []
-    async for linha in _linhas(resposta):
+    async for linha in _lines(resposta):
         if linha == "":
             if dados:
                 carga = "\n".join(dados)
@@ -469,7 +469,7 @@ def _decodificar(carga: str) -> dict[str, Any]:
     return evento
 
 
-def _texto_de(valor: Any) -> str:
+def _text_of(valor: Any) -> str:
     """`content`/`reasoning` of a delta: a string, or a list of text parts."""
     if isinstance(valor, str):
         return valor
@@ -480,14 +480,14 @@ def _texto_de(valor: Any) -> str:
     return ""
 
 
-def _inteiro(valor: Any) -> int:
+def _int(valor: Any) -> int:
     try:
         return int(valor or 0)
     except (TypeError, ValueError):
         return 0
 
 
-def _uso_do_projeto(cru: Any) -> dict[str, Any]:
+def _project_usage(cru: Any) -> dict[str, Any]:
     """OpenRouter's `usage` in the project's keys.
 
     `prompt_tokens` already INCLUDES what came from the cache — `cached_tokens` is a
@@ -502,11 +502,11 @@ def _uso_do_projeto(cru: Any) -> dict[str, Any]:
     except (TypeError, ValueError):
         custo = 0.0
     return {
-        "entrada": _inteiro(cru.get("prompt_tokens")),
-        "saida": _inteiro(cru.get("completion_tokens")),
-        "cache_leitura": _inteiro(entrada.get("cached_tokens")),
-        "cache_escrita": _inteiro(entrada.get("cache_write_tokens") or entrada.get("cache_creation_tokens")),
-        "raciocinio": _inteiro(saida.get("reasoning_tokens")),
+        "entrada": _int(cru.get("prompt_tokens")),
+        "saida": _int(cru.get("completion_tokens")),
+        "cache_leitura": _int(entrada.get("cached_tokens")),
+        "cache_escrita": _int(entrada.get("cache_write_tokens") or entrada.get("cache_creation_tokens")),
+        "raciocinio": _int(saida.get("reasoning_tokens")),
         "custo": custo,
     }
 
@@ -514,7 +514,7 @@ def _uso_do_projeto(cru: Any) -> dict[str, Any]:
 _avisou_sem_uso = False
 
 
-def _avisar_sem_uso() -> None:
+def _warn_no_usage() -> None:
     """Once per process: the response arrived without `usage`.
 
     Without the count, the assistant's daily quota does not charge the turn — the ceiling
@@ -533,8 +533,8 @@ def _avisar_sem_uso() -> None:
     )
 
 
-class _Acumulador:
-    """Reassembles the `chunks` of ONE response. Each call to `absorver` returns the
+class _Accumulator:
+    """Reassembles the `chunks` of ONE response. Each call to `absorb` returns the
     visible deltas of that frame; `resposta()` settles the account.
 
     Tool calls arrive by `index`: the `id` and the `name` in the first
@@ -555,7 +555,7 @@ class _Acumulador:
         self.modelo: str | None = None
         self.provedor: str | None = None
 
-    def absorver(self, evento: dict[str, Any]) -> list[Delta]:
+    def absorb(self, evento: dict[str, Any]) -> list[Delta]:
         erro = evento.get("error")
         if erro:
             mensagem = erro.get("message") if isinstance(erro, dict) else str(erro)
@@ -573,24 +573,24 @@ class _Acumulador:
             if not isinstance(escolha, dict):
                 continue
             delta = escolha.get("delta") or escolha.get("message") or {}
-            conteudo = _texto_de(delta.get("content"))
+            conteudo = _text_of(delta.get("content"))
             if conteudo:
                 self.texto.append(conteudo)
                 deltas.append(Delta("texto", conteudo))
-            pensamento = _texto_de(delta.get("reasoning"))
-            if pensamento:
-                self.raciocinio.append(pensamento)
-                deltas.append(Delta("pensando", pensamento))
+            thinking = _text_of(delta.get("reasoning"))
+            if thinking:
+                self.raciocinio.append(thinking)
+                deltas.append(Delta("pensando", thinking))
             for item in delta.get("reasoning_details") or []:
-                self._absorver_detalhe(item)
+                self._absorb_detail(item)
             for chamada in delta.get("tool_calls") or []:
-                self._absorver_chamada(chamada)
+                self._absorb_call(chamada)
             parada = escolha.get("finish_reason")
             if parada:
                 self.parada = str(parada)
         return deltas
 
-    def _absorver_chamada(self, chamada: Any) -> None:
+    def _absorb_call(self, chamada: Any) -> None:
         if not isinstance(chamada, dict):
             return
         indice = chamada.get("index")
@@ -612,7 +612,7 @@ class _Acumulador:
         elif isinstance(argumentos, (dict, list)):
             atual["argumentos"].append(json.dumps(argumentos, ensure_ascii=False))
 
-    def _absorver_detalhe(self, item: Any) -> None:
+    def _absorb_detail(self, item: Any) -> None:
         if not isinstance(item, dict):
             return
         tipo = str(item.get("type") or "reasoning.text")
@@ -660,7 +660,7 @@ class _Acumulador:
                     "type": "tool_use",
                     "id": chamada["id"] or f"call_{uuid4().hex[:16]}",
                     "name": chamada["name"] or "",
-                    "input": _argumentos(chamada["argumentos"]),
+                    "input": _arguments(chamada["argumentos"]),
                 }
             )
 
@@ -675,17 +675,17 @@ class _Acumulador:
         if parada == "error":
             raise ErroDoOpenRouter("o provedor encerrou o stream com erro")
         if not self.uso:
-            _avisar_sem_uso()
+            _warn_no_usage()
         return Resposta(
             blocos=blocos,
             parada=parada,
-            uso=_uso_do_projeto(self.uso),
+            uso=_project_usage(self.uso),
             modelo=self.modelo,
             provedor=self.provedor,
         )
 
 
-def _argumentos(pedacos: list[str]) -> Any:
+def _arguments(pedacos: list[str]) -> Any:
     """The call's argument: an object when the JSON closes; otherwise, the raw text.
 
     The raw text is NOT an object, and the loop treats it as a call error — the
@@ -703,16 +703,16 @@ def _argumentos(pedacos: list[str]) -> Any:
 # ── O cliente ────────────────────────────────────────────────────────────────
 
 
-def _espera(tentativa: int, retry_after: str | None = None) -> float:
+def _wait_time(tentativa: int, retry_after: str | None = None) -> float:
     if retry_after:
         try:
-            return min(max(float(retry_after), 0.0), ESPERA_MAXIMA_S)
+            return min(max(float(retry_after), 0.0), MAX_WAIT_S)
         except ValueError:
             pass
-    return min(0.5 * (2 ** (tentativa - 1)), ESPERA_MAXIMA_S)
+    return min(0.5 * (2 ** (tentativa - 1)), MAX_WAIT_S)
 
 
-async def _ler_erro(resposta: httpx.Response) -> tuple[Any, str]:
+async def _read_error(resposta: httpx.Response) -> tuple[Any, str]:
     """`(code, message)` from OpenRouter's error envelope, or the raw body, shortened."""
     try:
         bruto = await resposta.aread()
@@ -736,19 +736,19 @@ async def _ler_erro(resposta: httpx.Response) -> tuple[Any, str]:
 _http_compartilhado: httpx.AsyncClient | None = None
 
 
-def _http_padrao() -> httpx.AsyncClient:
+def _default_http() -> httpx.AsyncClient:
     global _http_compartilhado
     if _http_compartilhado is None or _http_compartilhado.is_closed:
-        _http_compartilhado = httpx.AsyncClient(timeout=TEMPO_LIMITE)
+        _http_compartilhado = httpx.AsyncClient(timeout=TIMEOUT)
     return _http_compartilhado
 
 
-CAMINHO_DOS_MODELOS = "/models"
+MODELS_PATH = "/models"
 
 # The catalog is large and changes slowly. This limit exists so the request does not hang
 # on an admin screen: it is not a conversation path, and failing fast
 # there is better than a three-minute spinner.
-TEMPO_LIMITE_DO_CATALOGO = httpx.Timeout(connect=10.0, read=20.0, write=10.0, pool=10.0)
+CATALOG_TIMEOUT = httpx.Timeout(connect=10.0, read=20.0, write=10.0, pool=10.0)
 
 
 async def listar_modelos(
@@ -770,7 +770,7 @@ async def listar_modelos(
     base = (base_url or URL_PADRAO).rstrip("/")
     if base.endswith(CAMINHO):
         base = base[: -len(CAMINHO)]
-    cliente = http if http is not None else _http_padrao()
+    cliente = http if http is not None else _default_http()
     # Other compatible servers (a gateway, a vLLM with a key) require on the
     # catalog the same key as the conversation. With no price in the response (a local
     # server), the cost columns stay `None`.
@@ -778,9 +778,9 @@ async def listar_modelos(
     if chave:
         cabecalhos["Authorization"] = f"Bearer {chave}"
     resposta = await cliente.get(
-        base + CAMINHO_DOS_MODELOS,
+        base + MODELS_PATH,
         headers=cabecalhos,
-        timeout=TEMPO_LIMITE_DO_CATALOGO,
+        timeout=CATALOG_TIMEOUT,
     )
     if resposta.status_code >= 400:
         raise ErroDoOpenRouter(
@@ -796,18 +796,18 @@ async def listar_modelos(
     for linha in linhas:
         if not isinstance(linha, dict) or not linha.get("id"):
             continue
-        precos = linha.get("pricing") if isinstance(linha.get("pricing"), dict) else {}
+        prices = linha.get("pricing") if isinstance(linha.get("pricing"), dict) else {}
         catalogo.append({
             "id": str(linha["id"]),
             "nome": str(linha.get("name") or linha["id"]),
-            "entrada_por_milhao": _por_milhao(precos.get("prompt")),
-            "saida_por_milhao": _por_milhao(precos.get("completion")),
+            "entrada_por_milhao": _per_million(prices.get("prompt")),
+            "saida_por_milhao": _per_million(prices.get("completion")),
             "contexto": linha.get("context_length"),
         })
     return catalogo
 
 
-def _por_milhao(valor: Any) -> float | None:
+def _per_million(valor: Any) -> float | None:
     """Price per token → per million. `None` when there is no way to know."""
     if valor is None or valor == "":
         return None
@@ -834,7 +834,7 @@ class ClienteOpenRouter:
     ) -> None:
         if not chave:
             raise ValueError("LLM_API_KEY vazia: o assistente não pode falar com o modelo.")
-        self._chave = chave
+        self._key = chave
         # `base_url` is the BASE (`.../api/v1`); the path is ours. But whoever
         # configures the endpoint's full URL must not be punished with
         # `/chat/completions/chat/completions` on every request.
@@ -843,20 +843,20 @@ class ClienteOpenRouter:
         self._openrouter = e_openrouter(base)
         self._http = http
         self._referer = referer
-        self._titulo = titulo
-        self._tentativas = max(1, int(tentativas))
-        self._dormir = dormir
+        self._title = titulo
+        self._attempts = max(1, int(tentativas))
+        self._sleep = dormir
 
-    def _cabecalhos(self) -> dict[str, str]:
+    def _headers(self) -> dict[str, str]:
         cabecalhos = {
-            "Authorization": f"Bearer {self._chave}",
+            "Authorization": f"Bearer {self._key}",
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
         }
         # App attribution in the OpenRouter dashboard: only when the installation
         # wants it (ASSISTENTE_ATRIBUICAO), and the caller passes the title and referer.
-        if self._titulo:
-            cabecalhos["X-Title"] = self._titulo
+        if self._title:
+            cabecalhos["X-Title"] = self._title
         if self._referer:
             cabecalhos["HTTP-Referer"] = self._referer
         return cabecalhos
@@ -881,37 +881,37 @@ class ClienteOpenRouter:
             esforco=esforco,
             openrouter=self._openrouter,
         )
-        http = self._http if self._http is not None else _http_padrao()
-        async for pedaco in self._transmitir_com(http, corpo):
+        http = self._http if self._http is not None else _default_http()
+        async for pedaco in self._stream_with(http, corpo):
             yield pedaco
 
-    async def _transmitir_com(
+    async def _stream_with(
         self, http: httpx.AsyncClient, corpo: dict[str, Any]
     ) -> AsyncIterator[Delta | Resposta]:
-        resposta = await self._abrir(http, corpo)
+        resposta = await self._open(http, corpo)
         try:
-            acumulador = _Acumulador()
-            async for evento in _eventos_sse(resposta):
-                for delta in acumulador.absorver(evento):
+            accumulator = _Accumulator()
+            async for evento in _sse_events(resposta):
+                for delta in accumulator.absorb(evento):
                     yield delta
-            yield acumulador.resposta()
+            yield accumulator.resposta()
         finally:
             await resposta.aclose()
 
-    async def _abrir(self, http: httpx.AsyncClient, corpo: dict[str, Any]) -> httpx.Response:
+    async def _open(self, http: httpx.AsyncClient, corpo: dict[str, Any]) -> httpx.Response:
         """The POST, up to the headers. Retries network/429/5xx; a 400 with stored
         reasoning is redone once without it. Returns the response with the body still
         unread (stream)."""
         tentativa = 0
-        ja_tirou_raciocinio = False
+        reasoning_already_stripped = False
         while True:
             tentativa += 1
-            pedido = http.build_request("POST", self._url, json=corpo, headers=self._cabecalhos())
+            pedido = http.build_request("POST", self._url, json=corpo, headers=self._headers())
             try:
                 resposta = await http.send(pedido, stream=True)
             except httpx.TransportError as exc:
-                if tentativa < self._tentativas:
-                    await self._dormir(_espera(tentativa))
+                if tentativa < self._attempts:
+                    await self._sleep(_wait_time(tentativa))
                     continue
                 raise ErroDoOpenRouter(
                     f"falha de rede ao falar com o OpenRouter ({exc.__class__.__name__})"
@@ -921,17 +921,17 @@ class ClienteOpenRouter:
             if status < 400:
                 return resposta
 
-            codigo, mensagem = await _ler_erro(resposta)
-            if status in RETENTAVEIS and tentativa < self._tentativas:
-                await self._dormir(_espera(tentativa, resposta.headers.get("retry-after")))
+            codigo, mensagem = await _read_error(resposta)
+            if status in RETENTAVEIS and tentativa < self._attempts:
+                await self._sleep(_wait_time(tentativa, resposta.headers.get("retry-after")))
                 continue
-            if status == 400 and not ja_tirou_raciocinio and _tem_raciocinio(corpo):
+            if status == 400 and not reasoning_already_stripped and _has_reasoning(corpo):
                 logger.warning(
                     "OpenRouter recusou o pedido (400: %s); refazendo sem o raciocínio guardado.",
                     mensagem,
                 )
-                corpo = _sem_raciocinio(corpo)
-                ja_tirou_raciocinio = True
+                corpo = _without_reasoning(corpo)
+                reasoning_already_stripped = True
                 continue
             raise ErroDoOpenRouter(
                 f"OpenRouter respondeu {status}: {mensagem}", status=status, codigo=codigo
@@ -942,7 +942,7 @@ class ClienteOpenRouter:
 # in any way?", and the answer does not change with how many or which. It is declared
 # here, and not built from the MCP server, because the probe runs on an admin screen —
 # there is no conversation scope nor workspace to build the real catalog.
-_FERRAMENTA_DA_SONDA: dict[str, Any] = {
+_PROBE_TOOL: dict[str, Any] = {
     "type": "function",
     "function": {
         "name": "ping",
@@ -995,7 +995,7 @@ async def sondar_modelo(
         modelo=modelo,
         sistema=[{"type": "text", "text": "Responda apenas: ok."}],
         conversa=[{"role": "user", "content": "ok"}],
-        ferramentas=[_FERRAMENTA_DA_SONDA],
+        ferramentas=[_PROBE_TOOL],
         max_tokens=max_tokens,
         esforco=esforco,
     )

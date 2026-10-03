@@ -36,7 +36,7 @@ router = APIRouter(
 _svc = ObservabilityService
 
 
-def _tz_valido(
+def _valid_tz(
     tz: str = Query("UTC", description="Fuso IANA para cortar o dia (ex.: America/Sao_Paulo)"),
 ) -> str:
     """Validates `?tz=` at the edge: an invalid name would become an SQL error in
@@ -232,7 +232,7 @@ async def runs_by_day(
     days: int = Query(7, ge=1, le=90, description="Quantos dias incluir, contando hoje"),
     workspace_id: Optional[str] = Query(None, description="Restringe a um workspace acessível"),
     workflow_id:  Optional[str] = Query(None, description="Restringe a um workflow acessível"),
-    tz: str = Depends(_tz_valido),
+    tz: str = Depends(_valid_tz),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
     workspace_ids: List[str] = Depends(get_user_workspace_ids),

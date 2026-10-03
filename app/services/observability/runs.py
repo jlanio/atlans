@@ -13,7 +13,7 @@ from app.models.workspace import Workspace
 
 
 from app.services.observability.escopo import _iso
-from app.services.observability.frota import _executor_id_do_host, _nomes_de_usuarios, _nomes_de_workspaces, _resolve_agent_names
+from app.services.observability.frota import _executor_id_do_host, _nomes_de_usuarios, _workspace_names, _resolve_agent_names
 
 # ── Run serialization ─────────────────────────────────────────────────────────
 
@@ -189,13 +189,13 @@ async def _resolve_workflow_meta(
     }
 
 
-async def _contexto_dos_runs(db: AsyncSession, runs) -> dict:
+async def _runs_context(db: AsyncSession, runs) -> dict:
     """The four batch lookups that serializing a page of runs
     needs — one SELECT ... IN each (executors, workflows, workspaces,
     users), regardless of the number of rows."""
     return {
         "agent_names":     await _resolve_agent_names(db, runs),
         "workflow_meta":   await _resolve_workflow_meta(db, [r.workflow_hash for r in runs]),
-        "workspace_names": await _nomes_de_workspaces(db, [getattr(r, "workspace_id", None) for r in runs]),
+        "workspace_names": await _workspace_names(db, [getattr(r, "workspace_id", None) for r in runs]),
         "user_names":      await _nomes_de_usuarios(db, [getattr(r, "triggered_by", None) for r in runs]),
     }

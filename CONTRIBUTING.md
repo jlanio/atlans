@@ -39,7 +39,7 @@ Whatever comes from third parties goes in with its origin and license, and the l
 has to be compatible with the AGPL-3.0:
 
 - **A file copied into the repository** (code, font, icon): the license text
-  next to it and an entry in `NO_REPOSITORIO`, in
+  next to it and an entry in `IN_REPOSITORY`, in
   `scripts/avisos_de_terceiros.py`.
 - **A new npm or PyPI dependency**: after updating the lock, run
   `python scripts/avisos_de_terceiros.py`. The [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
@@ -1000,7 +1000,7 @@ Four situations call for a human hand:
   Windows (`win_amd64`, `cp312`), or asks there for a dependency that the lock, resolved
   on Linux, does not have. `desktop/README.md` ("Troubleshooting") says what to do
   in each case.
-- **`test_mesma_versao_em_todos_os_locks` failed.** Dependabot regenerates each lock
+- **`test_same_version_in_all_locks` failed.** Dependabot regenerates each lock
   on its own, and a transitive dependency may have come out at different versions. Run
   `python scripts/travar_python.py` on the PR branch and commit the locks.
 - **numpy, pandas or pyproj.** They are pinned at the version production has run since the

@@ -3,7 +3,7 @@ import geopandas as gpd
 from typing import Any, Dict
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
-from flow.utils.geo_helpers import para_crs_metrico
+from flow.utils.geo_helpers import to_metric_crs
 from flow.utils.logger import get_logger
 logger = get_logger(__name__)
 
@@ -57,7 +57,7 @@ class OverlapPercentage(BaseNode):
         # fell on opposite sides of a zone meridian, and the overlay between different
         # CRSs only warns — the percentage came out wrong, with no error.
         try:
-            gdfA, gdfB = await asyncio.to_thread(para_crs_metrico, gdfA, gdfB)
+            gdfA, gdfB = await asyncio.to_thread(to_metric_crs, gdfA, gdfB)
         except Exception as e:
             logger.warning(f"Falha ao reprojetar as camadas para um CRS métrico comum: {e}")
 

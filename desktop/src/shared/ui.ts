@@ -67,7 +67,7 @@ export function ehOrigemInterna(
 }
 
 /** Schemes that may go to the system browser via `shell.openExternal`. */
-const ESQUEMAS_EXTERNOS = ['https:', 'http:', 'mailto:']
+const EXTERNAL_SCHEMES = ['https:', 'http:', 'mailto:']
 
 /**
  * Is an EXTERNAL target safe to hand to `shell.openExternal`?
@@ -85,5 +85,5 @@ export function ehExternoSeguro(bruta: string): boolean {
   } catch {
     return false
   }
-  return ESQUEMAS_EXTERNOS.includes(url.protocol)
+  return EXTERNAL_SCHEMES.includes(url.protocol)
 }

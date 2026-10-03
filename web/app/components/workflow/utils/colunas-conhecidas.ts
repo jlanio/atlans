@@ -13,19 +13,19 @@
 // blocked for not being listed here.
 
 /** Per-node state this lookup needs — what the canvas already keeps. */
-export interface NoComColunas {
+export interface NodeWithColumns {
   id: string
   output_columns?: Record<string, string[]> | null
 }
 
 /** Edge, in the format React Flow keeps on the canvas. */
-export interface ArestaComChave {
+export interface KeyedEdge {
   source: string
   target: string
   data?: { from_key?: string; to_key?: string } | Record<string, unknown>
 }
 
-function chaveDeOrigem(aresta: ArestaComChave): string | undefined {
+function sourceKeyOf(aresta: KeyedEdge): string | undefined {
   const dados = (aresta.data ?? {}) as { from_key?: string }
   return dados.from_key || undefined
 }
@@ -42,14 +42,14 @@ function chaveDeOrigem(aresta: ArestaComChave): string | undefined {
  * then the columns of all of them apply.
  */
 export function colunasQueChegam(
-  arestas: ArestaComChave[],
-  nos: NoComColunas[],
+  arestas: KeyedEdge[],
+  nos: NodeWithColumns[],
   alvo: string,
 ): Record<string, string[]> {
-  const porId = new Map(nos.map(n => [n.id, n]))
+  const byId = new Map(nos.map(n => [n.id, n]))
   const saida: Record<string, string[]> = {}
 
-  const acrescentar = (porta: string, colunas: string[] | undefined) => {
+  const appendColumns = (porta: string, colunas: string[] | undefined) => {
     if (!colunas?.length) return
     const atuais = saida[porta] ?? []
     // No repeats: two edges can bring the same column to the same port.
@@ -59,20 +59,20 @@ export function colunasQueChegam(
   for (const aresta of arestas) {
     if (aresta.target !== alvo) continue
 
-    const origem = porId.get(aresta.source)
-    const colunasPorChave = origem?.output_columns
-    if (!colunasPorChave) continue
+    const origem = byId.get(aresta.source)
+    const columnsByKey = origem?.output_columns
+    if (!columnsByKey) continue
 
     const dados = (aresta.data ?? {}) as { to_key?: string }
-    const deChave = chaveDeOrigem(aresta)
+    const fromKey = sourceKeyOf(aresta)
 
-    if (deChave) {
-      acrescentar(dados.to_key || deChave, colunasPorChave[deChave])
+    if (fromKey) {
+      appendColumns(dados.to_key || fromKey, columnsByKey[fromKey])
       continue
     }
     // No `from_key`: the previous node spreads everything it produced.
-    for (const [chave, colunas] of Object.entries(colunasPorChave)) {
-      acrescentar(dados.to_key || chave, colunas)
+    for (const [chave, colunas] of Object.entries(columnsByKey)) {
+      appendColumns(dados.to_key || chave, colunas)
     }
   }
 
@@ -80,7 +80,7 @@ export function colunasQueChegam(
 }
 
 /** A node's known columns, as `knownColumnsStore` keeps them. */
-export interface ColunasConhecidasDoNo {
+export interface NodeKnownColumns {
   porPorta: Record<string, string[]>
   /** false = came from rehydrating the last persisted run, and the workflow may
    *  have changed since then — the suggestion's label warns about it. */
@@ -90,14 +90,14 @@ export interface ColunasConhecidasDoNo {
   parciais?: boolean
 }
 
-export interface SugestaoDeColunas {
+export interface ColumnSuggestion {
   porPorta: Record<string, string[]>
   todas: string[]
   desatualizadas: boolean
   parciais: boolean
 }
 
-export const SEM_SUGESTAO: SugestaoDeColunas = { porPorta: {}, todas: [], desatualizadas: false, parciais: false }
+export const NO_SUGGESTION: ColumnSuggestion = { porPorta: {}, todas: [], desatualizadas: false, parciais: false }
 
 /**
  * Everything the configuration modal needs to know about the columns reaching
@@ -110,12 +110,12 @@ export const SEM_SUGESTAO: SugestaoDeColunas = { porPorta: {}, todas: [], desatu
  * common case.
  */
 export function sugestaoParaNo(
-  arestas: ArestaComChave[],
-  porNo: ReadonlyMap<string, ColunasConhecidasDoNo>,
+  arestas: KeyedEdge[],
+  porNo: ReadonlyMap<string, NodeKnownColumns>,
   alvo: string,
-): SugestaoDeColunas {
-  if (porNo.size === 0) return SEM_SUGESTAO
-  const nos: NoComColunas[] = []
+): ColumnSuggestion {
+  if (porNo.size === 0) return NO_SUGGESTION
+  const nos: NodeWithColumns[] = []
   for (const [id, colunas] of porNo) nos.push({ id, output_columns: colunas.porPorta })
   const porPorta = colunasQueChegam(arestas, nos, alvo)
   const todas = [...new Set(Object.values(porPorta).flat())]

@@ -26,7 +26,7 @@ vi.mock("@/app/components/home/artefatos/lista", () => ({ ArtefatosLista: () => 
 
 import { SidebarProvider } from "@/app/components/ui/sidebar"
 import HomeSidebar from "@/app/components/sidebar/home-sidebar"
-import { IdiomaProvider } from "@/context/IdiomaContext"
+import { LanguageProvider } from "@/context/IdiomaContext"
 import { CATALOGO } from "@/lib/catalogo"
 import type { Idioma } from "@/lib/idioma"
 
@@ -34,11 +34,11 @@ beforeEach(cleanup)
 
 const montar = (idioma: Idioma) =>
   render(
-    <IdiomaProvider inicial={{ idioma, detectado: idioma, escolhido: idioma }}>
+    <LanguageProvider inicial={{ idioma, detectado: idioma, escolhido: idioma }}>
       <SidebarProvider>
         <HomeSidebar />
       </SidebarProvider>
-    </IdiomaProvider>,
+    </LanguageProvider>,
   )
 
 describe("HomeSidebar — em inglês", () => {

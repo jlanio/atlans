@@ -11,17 +11,17 @@ expr_svc = ExpressionService()
 # Nesting ceiling when descending through dicts/lists. A form parameter does not
 # come close to this; the limit exists only so a pathological structure does not
 # turn into infinite recursion.
-_PROFUNDIDADE_MAX = 12
+_MAX_DEPTH = 12
 
 # What the SERVER injects from the saved credential (see
 # app/services/credential_resolver.py): a secret, never a template. Rendering
 # would silently alter a password with `{{`, `{%` or `$Alias.campo` inside — and
 # the rendering failure would repeat the secret in the error message, which goes
 # to the screen, the database and the log (the DEBUG here would also write it raw).
-_INJETADOS_PELO_SERVIDOR = frozenset({"connectionString", "http_auth", "s3_auth"})
+_SERVER_INJECTED = frozenset({"connectionString", "http_auth", "s3_auth"})
 
 
-def _tem_expressao(raw: str, named: Dict[str, Any]) -> bool:
+def _has_expression(raw: str, named: Dict[str, Any]) -> bool:
     """Does the string call for rendering?
 
     `{% %}` statements count as Jinja just as much as `{{ }}` expressions.
@@ -67,7 +67,7 @@ def _renderizar(
     or repeated key would silently break the dict.
     """
     if isinstance(valor, str):
-        if not _tem_expressao(valor, named):
+        if not _has_expression(valor, named):
             return valor
         logger.debug("[%s] Param raw (%s): %s", node_id, caminho, valor)
         try:
@@ -97,7 +97,7 @@ def _renderizar(
         logger.debug("[%s] Param rendered (%s): %s", node_id, caminho, renderizado)
         return renderizado
 
-    if profundidade >= _PROFUNDIDADE_MAX:
+    if profundidade >= _MAX_DEPTH:
         return valor
 
     if isinstance(valor, dict):
@@ -135,7 +135,7 @@ def render_node_parameters(
     """
     context.update(named)
     return {
-        chave: valor if chave in _INJETADOS_PELO_SERVIDOR else _renderizar(
+        chave: valor if chave in _SERVER_INJECTED else _renderizar(
             valor, node_id=node_id, caminho=chave,
             named=named, context=context,
         )

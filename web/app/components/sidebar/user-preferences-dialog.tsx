@@ -10,11 +10,11 @@ import { Separator } from "@/app/components/ui/separator"
 import { Avatar, AvatarFallback } from "@/app/components/ui/avatar"
 import { TbMoon, TbSun, TbUser, TbPalette, TbLanguage } from "react-icons/tb"
 import { useTheme } from "@/context/ThemeContext"
-import { useIdioma } from "@/context/IdiomaContext"
+import { useLanguage } from "@/context/IdiomaContext"
 import { useSession } from "next-auth/react"
 import { cn } from "@/lib/utils"
-import { IDIOMAS, NOME_DO_IDIOMA, type Idioma } from "@/lib/idioma"
-import { useTextosDaCasca } from "../home/i18n/da-casca"
+import { LANGUAGES, LANGUAGE_NAME, type Idioma } from "@/lib/idioma"
+import { useShellTexts } from "../home/i18n/da-casca"
 
 interface UserPreferencesDialogProps {
   open: boolean
@@ -25,9 +25,9 @@ interface UserPreferencesDialogProps {
 
 export function UserPreferencesDialog({ open, onOpenChange, className }: UserPreferencesDialogProps) {
   const { theme, setTheme } = useTheme()
-  const { detectado, escolhido, escolher } = useIdioma()
+  const { detectado, escolhido, escolher } = useLanguage()
   const { data: session } = useSession()
-  const textos = useTextosDaCasca()
+  const textos = useShellTexts()
   const t = textos.casca.preferencias
 
   const username = session?.user?.username ?? textos.casca.conta.usuario
@@ -145,18 +145,18 @@ export function UserPreferencesDialog({ open, onOpenChange, className }: UserPre
           </div>
 
           <div role="group" aria-labelledby="preferencias-idioma" className="grid grid-cols-2 gap-2">
-            <OpcaoDeIdioma
+            <LanguageOption
               marcada={escolhido === null}
               onEscolher={() => escolher(null)}
               rotulo={t.automatico}
-              detalhe={t.detectado(NOME_DO_IDIOMA[detectado])}
+              detalhe={t.detectado(LANGUAGE_NAME[detectado])}
             />
-            {IDIOMAS.map((idioma: Idioma) => (
-              <OpcaoDeIdioma
+            {LANGUAGES.map((idioma: Idioma) => (
+              <LanguageOption
                 key={idioma}
                 marcada={escolhido === idioma}
                 onEscolher={() => escolher(idioma)}
-                rotulo={NOME_DO_IDIOMA[idioma]}
+                rotulo={LANGUAGE_NAME[idioma]}
                 lang={idioma}
               />
             ))}
@@ -172,7 +172,7 @@ export function UserPreferencesDialog({ open, onOpenChange, className }: UserPre
   )
 }
 
-function OpcaoDeIdioma({
+function LanguageOption({
   marcada,
   onEscolher,
   rotulo,

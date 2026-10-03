@@ -25,7 +25,7 @@ import pytest
 
 from app.core.exceptions import NoExecutorAvailableError
 from app.services import workflow_execution_service as wes
-from app.services.fechamento_de_run import ABERTOS, REPETIVEL
+from app.services.fechamento_de_run import OPEN_STATUSES, REPETIVEL
 
 
 # ── Factories ─────────────────────────────────────────────────────────────────
@@ -49,40 +49,40 @@ def _executor(id_hash, name=None):
 _DEFINICAO = {"id": "raiz", "nodes": [{"id": "r", "name": "Response"}], "edges": []}
 
 
-class _Banco:
+class _FakeDb:
     """Fake session that records INSERT, commit (with the host stored at that
     instant) and the pending→running UPDATE in the same list as the other effects."""
 
-    def __init__(self, efeitos, *, rowcount=1, falhar_no_commit=None):
-        self.efeitos = efeitos
+    def __init__(self, effects, *, rowcount=1, fail_on_commit=None):
+        self.effects = effects
         self.run = None
         self.rowcount = rowcount
-        self.falhar_no_commit = falhar_no_commit
+        self.fail_on_commit = fail_on_commit
         self.commits = 0
 
     def add(self, obj):
         self.run = obj
-        self.efeitos.append(("insert", obj.host, obj.dispatch_tier, obj.status))
+        self.effects.append(("insert", obj.host, obj.dispatch_tier, obj.status))
 
     async def commit(self):
         self.commits += 1
-        if self.falhar_no_commit == self.commits:
+        if self.fail_on_commit == self.commits:
             raise RuntimeError("banco caiu")
-        self.efeitos.append(("commit", self.run.host))
+        self.effects.append(("commit", self.run.host))
 
     async def execute(self, stmt):
         sql = str(stmt.compile(compile_kwargs={"literal_binds": True}))
-        self.efeitos.append(("update", sql.split()[0], "status IN ('pending', 'running')" in sql))
+        self.effects.append(("update", sql.split()[0], "status IN ('pending', 'running')" in sql))
         return MagicMock(rowcount=self.rowcount)
 
     async def rollback(self):
-        self.efeitos.append(("rollback",))
+        self.effects.append(("rollback",))
 
 
 @pytest.fixture
 def cenario(monkeypatch):
-    """Everything the dispatch touches, recorded in `efeitos` in the order it happens."""
-    efeitos: list = []
+    """Everything the dispatch touches, recorded in `effects` in the order it happens."""
+    effects: list = []
     estado = {
         "envios": {},          # executor_id -> True | False | Exception
         "falha_cifra": set(),  # executores cuja cifra levanta RuntimeError
@@ -90,36 +90,36 @@ def cenario(monkeypatch):
         "cifras": [],          # kwargs of each build_job_message
     }
 
-    async def _credenciais(definicao, *, pre_resolved=None):
-        efeitos.append(("credenciais", definicao.get("id"), pre_resolved))
+    async def _credentials(definicao, *, pre_resolved=None):
+        effects.append(("credenciais", definicao.get("id"), pre_resolved))
         return {**definicao, "injetado": True}
 
     def _cifra(**kwargs):
-        efeitos.append(("cifra", kwargs["executor_id"]))
+        effects.append(("cifra", kwargs["executor_id"]))
         estado["cifras"].append(kwargs)
         if kwargs["executor_id"] in estado["falha_cifra"]:
             raise RuntimeError("chave inválida")
         return {"envelope": kwargs["executor_id"]}
 
     async def _thread(func, /, *args, **kwargs):
-        efeitos.append(("thread", getattr(func, "__name__", "?")))
+        effects.append(("thread", getattr(func, "__name__", "?")))
         return func(*args, **kwargs)
 
-    async def _envio(executor_id, _msg):
-        efeitos.append(("envio", executor_id))
+    async def _send(executor_id, _msg):
+        effects.append(("envio", executor_id))
         comportamento = estado["envios"][executor_id]
         if isinstance(comportamento, Exception):
             raise comportamento
         return comportamento
 
-    async def _aviso(executor_id, msg):
-        efeitos.append(("aviso", executor_id, msg))
+    async def _notify(executor_id, msg):
+        effects.append(("aviso", executor_id, msg))
         if estado["aviso_falha"]:
             raise RuntimeError("socket fechado")
         return True
 
-    async def _fechar(db, runs, *, de, para, mensagem, categoria, extra=None, **_k):
-        efeitos.append(("fechar", para, categoria, mensagem, extra, de))
+    async def _close(db, runs, *, de, para, mensagem, categoria, extra=None, **_k):
+        effects.append(("fechar", para, categoria, mensagem, extra, de))
         fechados = [r for r in runs if r.status in de]
         for r in fechados:
             r.status = para
@@ -127,31 +127,31 @@ def cenario(monkeypatch):
 
     def _evento(**kwargs):
         assert isinstance(kwargs.pop("decision_ms"), float)
-        efeitos.append(("evento", kwargs.pop("outcome"), kwargs))
+        effects.append(("evento", kwargs.pop("outcome"), kwargs))
 
     reg = MagicMock()
-    reg.send_job = AsyncMock(side_effect=_envio)
-    reg.send_json = AsyncMock(side_effect=_aviso)
+    reg.send_job = AsyncMock(side_effect=_send)
+    reg.send_json = AsyncMock(side_effect=_notify)
 
-    monkeypatch.setattr(wes, "inject_credentials", _credenciais)
+    monkeypatch.setattr(wes, "inject_credentials", _credentials)
     monkeypatch.setattr(wes, "build_job_message", _cifra)
     monkeypatch.setattr(wes.asyncio, "to_thread", _thread)
     monkeypatch.setattr(wes, "executor_registry", reg)
-    monkeypatch.setattr(wes, "fechar_runs", _fechar)
+    monkeypatch.setattr(wes, "fechar_runs", _close)
     monkeypatch.setattr(wes, "_log_dispatch_event", _evento)
-    return efeitos, estado
+    return effects, estado
 
 
 # ── Happy path with failover ─────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_sequencia_completa_com_failover(cenario):
+async def test_full_sequence_with_failover(cenario):
     """ag-1 refuses, ag-2's encryption fails, ag-3 accepts: the INSERT carries the
     first one's host; the credentials (root and sub-workflow) and the
     serialization come after the commit; only the failover that REACHES the send
     rewrites the host, and before sending; the conditional UPDATE and the commit
     come after the accepted send."""
-    efeitos, estado = cenario
+    effects, estado = cenario
     estado["envios"] = {"ag-1": False, "ag-3": True}
     estado["falha_cifra"] = {"ag-2"}
     cadeia = wes.CandidateList(
@@ -159,7 +159,7 @@ async def test_sequencia_completa_com_failover(cenario):
         tiers={"ag-1": "primary", "ag-2": "fallback", "ag-3": "pool"},
         allowed={"ag-1", "ag-2", "ag-3"}, mode="dedicated_pool",
     )
-    db = _Banco(efeitos)
+    db = _FakeDb(effects)
     wf = _wf()
 
     result = await wes._dispatch_job(
@@ -167,7 +167,7 @@ async def test_sequencia_completa_com_failover(cenario):
         pre_resolved={"c": {}}, subworkflow_definitions={"sub-1": {"id": "sub", "nodes": []}},
     )
 
-    assert efeitos == [
+    assert effects == [
         ("insert", "executor:ag-1", "primary", "pending"),
         ("commit", "executor:ag-1"),
         ("credenciais", "raiz", {"c": {}}),
@@ -191,12 +191,12 @@ async def test_sequencia_completa_com_failover(cenario):
 
 
 @pytest.mark.asyncio
-async def test_envelope_e_argumentos_da_cifra(cenario):
+async def test_envelope_and_encryption_arguments(cenario):
     """The payload is serialized ONCE (the same `bytes` for each candidate) and
     carries what the executor needs; an absent `workspace_id` becomes an empty string."""
-    efeitos, estado = cenario
+    effects, estado = cenario
     estado["envios"] = {"ag-1": False, "ag-2": True}
-    db = _Banco(efeitos)
+    db = _FakeDb(effects)
 
     result = await wes._dispatch_job(
         _wf(workspace_id=None), _DEFINICAO, [_executor("ag-1", "maquina"), _executor("ag-2")],
@@ -225,14 +225,14 @@ async def test_envelope_e_argumentos_da_cifra(cenario):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("limiar, cifra_em_thread", [(1, True), (10**9, False)])
-async def test_cifra_vai_para_thread_so_acima_do_limiar(cenario, monkeypatch, limiar, cifra_em_thread):
-    efeitos, estado = cenario
+async def test_encryption_goes_to_thread_only_above_the_threshold(cenario, monkeypatch, limiar, cifra_em_thread):
+    effects, estado = cenario
     estado["envios"] = {"ag-1": False, "ag-2": True}
     monkeypatch.setattr(wes, "_LIMIAR_CIFRA_EM_THREAD", limiar)
 
-    await wes._dispatch_job(_wf(), _DEFINICAO, [_executor("ag-1"), _executor("ag-2")], {}, False, db=_Banco(efeitos))
+    await wes._dispatch_job(_wf(), _DEFINICAO, [_executor("ag-1"), _executor("ag-2")], {}, False, db=_FakeDb(effects))
 
-    threads = [e[1] for e in efeitos if e[0] == "thread"]
+    threads = [e[1] for e in effects if e[0] == "thread"]
     # Serialization always goes to the thread; encryption, per candidate, only above the threshold.
     assert threads == (["<lambda>", "_cifra", "_cifra"] if cifra_em_thread else ["<lambda>"])
 
@@ -240,15 +240,15 @@ async def test_cifra_vai_para_thread_so_acima_do_limiar(cenario, monkeypatch, li
 # ── No candidate accepts: closing, event, exception ─────────────────────────
 
 @pytest.mark.asyncio
-async def test_esgotado_com_mensagem_da_politica_e_ultimo_motivo(cenario):
-    efeitos, estado = cenario
+async def test_exhausted_with_policy_message_and_last_reason(cenario):
+    effects, estado = cenario
     estado["envios"] = {"abcdef-12345": False, "ag-2": RuntimeError("is_full quebrado")}
     cadeia = wes.CandidateList(
         [_executor("abcdef-12345", "maquina"), _executor("ag-2")],
         tiers={"abcdef-12345": "primary"}, allowed=None, mode="isolated",
         exhausted_message="Workspace isolado: nenhum disponível.", exhausted_category="no_dedicated_executor",
     )
-    db = _Banco(efeitos)
+    db = _FakeDb(effects)
     wf = _wf()
 
     with pytest.raises(NoExecutorAvailableError) as exc:
@@ -256,17 +256,17 @@ async def test_esgotado_com_mensagem_da_politica_e_ultimo_motivo(cenario):
 
     mensagem = ("Workspace isolado: nenhum disponível. Último motivo: "
                 "Erro ao enviar job para 'ag-2': is_full quebrado")
-    assert efeitos[-3:] == [
-        ("fechar", "failed", "no_executor", mensagem, REPETIVEL, ABERTOS),
+    assert effects[-3:] == [
+        ("fechar", "failed", "no_executor", mensagem, REPETIVEL, OPEN_STATUSES),
         ("evento", "all_refused", {
             "wf": wf, "mode": "isolated", "candidates_total": 2, "chosen": None,
             "tier": None, "failovers": 2, "category": "no_dedicated_executor", "run_id": db.run.task_id,
         }),
         # The `except` safety net goes through the `raise` of path (4); the run
         # is already closed, so it rewrites nothing.
-        ("fechar", "failed", "dispatch", f"Falha no despacho: {mensagem}", None, ABERTOS),
+        ("fechar", "failed", "dispatch", f"Falha no despacho: {mensagem}", None, OPEN_STATUSES),
     ]
-    assert [e for e in efeitos if e[0] == "envio"] == [("envio", "abcdef-12345"), ("envio", "ag-2")]
+    assert [e for e in effects if e[0] == "envio"] == [("envio", "abcdef-12345"), ("envio", "ag-2")]
     assert (exc.value.detail, exc.value.category, exc.value.run_id) == (
         mensagem, "no_dedicated_executor", db.run.task_id,
     )
@@ -279,25 +279,25 @@ async def test_esgotado_com_mensagem_da_politica_e_ultimo_motivo(cenario):
     (RuntimeError("boom"), False, "Erro ao enviar job para 'maquina@12345': boom"),
     (True, True, "Falha ao cifrar job para 'maquina@12345': chave inválida"),
 ])
-async def test_ultimo_motivo_por_tipo_de_recusa(cenario, comportamento, falha_cifra, mensagem):
-    efeitos, estado = cenario
+async def test_last_reason_by_rejection_kind(cenario, comportamento, falha_cifra, mensagem):
+    effects, estado = cenario
     estado["envios"] = {"abcdef-12345": comportamento}
     if falha_cifra:
         estado["falha_cifra"] = {"abcdef-12345"}
 
     with pytest.raises(NoExecutorAvailableError) as exc:
-        await wes._dispatch_job(_wf(), _DEFINICAO, [_executor("abcdef-12345", "maquina")], {}, False, db=_Banco(efeitos))
+        await wes._dispatch_job(_wf(), _DEFINICAO, [_executor("abcdef-12345", "maquina")], {}, False, db=_FakeDb(effects))
 
     assert exc.value.detail == mensagem and exc.value.category == "no_executor"
-    assert [e[3] for e in efeitos if e[0] == "fechar"][0] == mensagem
+    assert [e[3] for e in effects if e[0] == "fechar"][0] == mensagem
 
 
 @pytest.mark.asyncio
-async def test_sem_nome_o_rotulo_e_o_id(cenario):
-    efeitos, estado = cenario
+async def test_without_name_the_label_is_the_id(cenario):
+    effects, estado = cenario
     estado["envios"] = {"ag-sem-nome": False}
     with pytest.raises(NoExecutorAvailableError) as exc:
-        await wes._dispatch_job(_wf(), _DEFINICAO, [_executor("ag-sem-nome")], {}, False, db=_Banco(efeitos))
+        await wes._dispatch_job(_wf(), _DEFINICAO, [_executor("ag-sem-nome")], {}, False, db=_FakeDb(effects))
     assert exc.value.detail == "Executor 'ag-sem-nome' não aceitou o job (fila cheia ou desconectado)."
 
 
@@ -307,25 +307,25 @@ async def test_sem_nome_o_rotulo_e_o_id(cenario):
     (wes.CandidateList([], exhausted_message="Nenhum executor do pool.", exhausted_category="no_pool_executor"),
      "Nenhum executor do pool.", "no_pool_executor"),
 ])
-async def test_lista_vazia_fecha_sem_host(cenario, candidatos, mensagem, categoria):
-    efeitos, _ = cenario
-    db = _Banco(efeitos)
+async def test_empty_list_closes_without_host(cenario, candidatos, mensagem, categoria):
+    effects, _ = cenario
+    db = _FakeDb(effects)
     wf = _wf()
 
     with pytest.raises(NoExecutorAvailableError) as exc:
         await wes._dispatch_job(wf, _DEFINICAO, candidatos, {}, False, db=db)
 
-    assert efeitos == [
+    assert effects == [
         ("insert", None, None, "pending"),
         ("commit", None),
         ("credenciais", "raiz", None),
         ("thread", "<lambda>"),
-        ("fechar", "failed", "no_executor", mensagem, REPETIVEL, ABERTOS),
+        ("fechar", "failed", "no_executor", mensagem, REPETIVEL, OPEN_STATUSES),
         ("evento", "all_refused", {
             "wf": wf, "mode": None, "candidates_total": 0, "chosen": None,
             "tier": None, "failovers": 0, "category": categoria, "run_id": db.run.task_id,
         }),
-        ("fechar", "failed", "dispatch", f"Falha no despacho: {mensagem}", None, ABERTOS),
+        ("fechar", "failed", "dispatch", f"Falha no despacho: {mensagem}", None, OPEN_STATUSES),
     ]
     assert (exc.value.category, exc.value.run_id) == (categoria, db.run.task_id)
 
@@ -333,17 +333,17 @@ async def test_lista_vazia_fecha_sem_host(cenario, candidatos, mensagem, categor
 # ── Isolation barrier ────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_barreira_depois_de_um_failover(cenario):
+async def test_barrier_after_a_failover(cenario):
     """The intruder is the SECOND: the first was already tried; the intruder is not
     encrypted for, the host is not rewritten for it, and the event counts the
     failover."""
-    efeitos, estado = cenario
+    effects, estado = cenario
     estado["envios"] = {"geo-01": False}
     cadeia = wes.CandidateList(
         [_executor("geo-01"), _executor("pool-x")], tiers={"geo-01": "primary", "pool-x": "pool"},
         allowed={"geo-01"}, mode="isolated",
     )
-    db = _Banco(efeitos)
+    db = _FakeDb(effects)
     wf = _wf()
 
     with pytest.raises(NoExecutorAvailableError) as exc:
@@ -351,15 +351,15 @@ async def test_barreira_depois_de_um_failover(cenario):
 
     barreira = ("Barreira de isolamento: o roteamento escolheu um executor fora da "
                 "política do workspace. O job não foi enviado.")
-    assert efeitos[4:] == [
+    assert effects[4:] == [
         ("cifra", "geo-01"),
         ("envio", "geo-01"),
-        ("fechar", "failed", "isolation", barreira, None, ABERTOS),
+        ("fechar", "failed", "isolation", barreira, None, OPEN_STATUSES),
         ("evento", "isolation_violation", {
             "wf": wf, "mode": "isolated", "candidates_total": 2, "chosen": "pool-x",
             "tier": "pool", "failovers": 1, "category": "isolation_violation", "run_id": db.run.task_id,
         }),
-        ("fechar", "failed", "dispatch", f"Falha no despacho: {barreira}", None, ABERTOS),
+        ("fechar", "failed", "dispatch", f"Falha no despacho: {barreira}", None, OPEN_STATUSES),
     ]
     assert (exc.value.category, exc.value.run_id) == ("isolation_violation", db.run.task_id)
     assert db.run.host == "executor:geo-01"
@@ -369,18 +369,18 @@ async def test_barreira_depois_de_um_failover(cenario):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("aviso_falha", [False, True])
-async def test_cancelado_durante_o_envio_avisa_o_executor_e_devolve(cenario, aviso_falha):
+async def test_cancelled_during_send_notifies_the_executor_and_returns(cenario, aviso_falha):
     """UPDATE with no row = the user canceled: the executor that already accepted
     gets the 'cancel' (failing to notify only becomes a log line), the run is not
     promoted and there is no dispatch event nor closing."""
-    efeitos, estado = cenario
+    effects, estado = cenario
     estado["envios"] = {"ag-1": True}
     estado["aviso_falha"] = aviso_falha
-    db = _Banco(efeitos, rowcount=0)
+    db = _FakeDb(effects, rowcount=0)
 
     result = await wes._dispatch_job(_wf(), _DEFINICAO, [_executor("ag-1")], {}, False, db=db)
 
-    assert efeitos[-4:] == [
+    assert effects[-4:] == [
         ("envio", "ag-1"),
         ("update", "UPDATE", True),
         ("commit", "executor:ag-1"),
@@ -393,29 +393,29 @@ async def test_cancelado_durante_o_envio_avisa_o_executor_e_devolve(cenario, avi
 # ── Infrastructure failures ─────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_falha_no_insert_sobe_sem_passar_pela_rede_de_seguranca(cenario):
+async def test_insert_failure_propagates_without_going_through_the_safety_net(cenario):
     """The INSERT is OUTSIDE the try: if its commit fails there is no run to close."""
-    efeitos, _ = cenario
-    db = _Banco(efeitos, falhar_no_commit=1)
+    effects, _ = cenario
+    db = _FakeDb(effects, fail_on_commit=1)
 
     with pytest.raises(RuntimeError, match="banco caiu"):
         await wes._dispatch_job(_wf(), _DEFINICAO, [_executor("ag-1")], {}, False, db=db)
 
-    assert efeitos == [("insert", "executor:ag-1", None, "pending")]
+    assert effects == [("insert", "executor:ag-1", None, "pending")]
 
 
 @pytest.mark.asyncio
-async def test_falha_ao_regravar_o_host_no_failover_fecha_como_dispatch(cenario):
-    efeitos, estado = cenario
+async def test_failure_rewriting_the_host_on_failover_closes_as_dispatch(cenario):
+    effects, estado = cenario
     estado["envios"] = {"ag-1": False, "ag-2": True}
-    db = _Banco(efeitos, falhar_no_commit=2)   # 1 = INSERT; 2 = failover host
+    db = _FakeDb(effects, fail_on_commit=2)   # 1 = INSERT; 2 = failover host
 
     with pytest.raises(RuntimeError, match="banco caiu"):
         await wes._dispatch_job(_wf(), _DEFINICAO, [_executor("ag-1"), _executor("ag-2")], {}, False, db=db)
 
-    assert efeitos[-3:] == [
+    assert effects[-3:] == [
         ("envio", "ag-1"),
         ("cifra", "ag-2"),
-        ("fechar", "failed", "dispatch", "Falha no despacho: banco caiu", None, ABERTOS),
+        ("fechar", "failed", "dispatch", "Falha no despacho: banco caiu", None, OPEN_STATUSES),
     ]
-    assert ("envio", "ag-2") not in efeitos
+    assert ("envio", "ag-2") not in effects

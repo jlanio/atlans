@@ -17,7 +17,7 @@ import * as Estado from "@/app/components/shared/estados"
  * renders them) and here goes the table's outline — five rows with the real
  * height — so the swap to the content does not make the page jump.
  */
-export function SkeletonDeUsuarios() {
+export function UsersSkeleton() {
   return (
     <div
       role="status"

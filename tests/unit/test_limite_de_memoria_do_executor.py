@@ -23,7 +23,7 @@ COMPOSE = RAIZ / "docker-compose.executor.yml"
 GIB = 1024 ** 3
 
 
-def _funcao():
+def _function():
     trecho = re.search(r"# >>> limite_de_memoria.*?\n(.*?)# <<< limite_de_memoria", INSTALL_SH, re.S)
     assert trecho, "o install.sh perdeu os marcadores da função limite_de_memoria"
     return trecho.group(1)
@@ -31,12 +31,12 @@ def _funcao():
 
 def _bash(chamada: str) -> subprocess.CompletedProcess:
     return subprocess.run(
-        ["bash", "-c", "set -euo pipefail\n" + _funcao() + "\n" + chamada],
+        ["bash", "-c", "set -euo pipefail\n" + _function() + "\n" + chamada],
         capture_output=True, text=True, timeout=30,
     )
 
 
-def _limite(total_bytes: int) -> str:
+def _column_limit(total_bytes: int) -> str:
     r = _bash(f'limite_de_memoria "{total_bytes}"')
     assert r.returncode == 0, r.stderr
     return r.stdout
@@ -54,8 +54,8 @@ def _limite(total_bytes: int) -> str:
     (int(1.93 * GIB), "2G"),
     (512 * 1024 ** 2, "2G"),
 ])
-def test_limite_e_75_por_cento_da_memoria_do_docker(total, esperado):
-    assert _limite(total) == esperado
+def test_limit_is_75_percent_of_docker_memory(total, esperado):
+    assert _column_limit(total) == esperado
 
 
 @pytest.mark.parametrize("valor,aceito", [
@@ -65,11 +65,11 @@ def test_limite_e_75_por_cento_da_memoria_do_docker(total, esperado):
     ("256M", False), ("0G", False),
     ("12", False), ("12GB", False), ("1.5G", False), ("", False),
 ])
-def test_memoria_manual_respeita_a_reserva_do_compose(valor, aceito):
+def test_manual_memory_respects_compose_reservation(valor, aceito):
     assert (_bash(f'memoria_valida "{valor}"').returncode == 0) is aceito
 
 
-def test_avisa_quando_o_compose_local_nao_le_o_limite(tmp_path):
+def test_warns_when_local_compose_does_not_read_limit(tmp_path):
     """Compose with a local edit: `git pull --ff-only` aborts and the file keeps
     the fixed `memory: 2G` — writing the .env alone changes nothing."""
     velho = tmp_path / "docker-compose.executor.yml"
@@ -80,13 +80,13 @@ def test_avisa_quando_o_compose_local_nao_le_o_limite(tmp_path):
     assert _bash(f'compose_le_o_limite "{tmp_path / "nao-existe.yml"}"').returncode != 0
 
 
-def test_compose_le_o_limite_do_env_com_2g_de_padrao():
+def test_compose_reads_limit_from_env_with_2g_default():
     compose = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
     memoria = compose["services"]["executor"]["deploy"]["resources"]["limits"]["memory"]
     assert memoria == "${EXECUTOR_MEMORIA:-2G}"
 
 
-def test_o_instalador_grava_o_limite_no_env_do_projeto():
+def test_installer_writes_limit_to_project_env():
     """Compose interpolates from the .env NEXT TO it — not from executor/.env, which is the
     container's environment."""
     assert "EXECUTOR_MEMORIA=%s" in INSTALL_SH

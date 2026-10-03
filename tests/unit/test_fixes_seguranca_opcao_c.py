@@ -6,7 +6,7 @@ Each test fails WITHOUT the corresponding fix:
  - item 18: the 422 handler does not echo the value submitted by the client (input/ctx).
 
 (Item 11 — idempotency covering 'cancelled' — has its regression test in
- test_fix_ws_router.py::test_job_result_de_run_cancelado_e_ignorado.)
+ test_fix_ws_router.py::test_job_result_of_cancelled_run_is_ignored.)
 """
 import json
 
@@ -25,7 +25,7 @@ from app.models.workspace_member import WorkspaceMember
 
 # ── Item 18: 422 does not leak the client's input ───────────────────────────
 
-async def test_422_nao_ecoa_input_nem_ctx_do_cliente():
+async def test_422_does_not_echo_client_input_or_ctx():
     from app.core.utils.error_handlers import validation_exception_handler
 
     exc = RequestValidationError([
@@ -55,7 +55,7 @@ async def test_422_nao_ecoa_input_nem_ctx_do_cliente():
 
 # ── Item 10: telemetria exige admin ─────────────────────────────────────────
 
-async def test_telemetria_ws_exige_admin(monkeypatch):
+async def test_ws_telemetry_requires_admin(monkeypatch):
     from app.api.routers import telemetry_router as TR
 
     capturado = {}
@@ -77,7 +77,7 @@ async def test_telemetria_ws_exige_admin(monkeypatch):
 # ── Item 13: cancel_run authorizes by the RUN's workspace ───────────────────
 
 @pytest_asyncio.fixture
-async def banco_do_cancelamento():
+async def cancellation_db():
     """A MOVED workflow: the run happened in ws-A, the workflow now belongs to ws-B.
 
     It is the situation that separates the two authorization criteria — and, with a
@@ -113,7 +113,7 @@ async def banco_do_cancelamento():
     await eng.dispose()
 
 
-async def test_cancel_run_recusa_quem_so_tem_papel_no_workspace_atual(banco_do_cancelamento):
+async def test_cancel_run_refuses_role_only_in_the_current_workspace(cancellation_db):
     """An operator in TODAY's workspace does not cancel a run that executed in ANOTHER.
 
     A workflow can be moved from A to B after the trigger. Whoever controls B
@@ -122,12 +122,12 @@ async def test_cancel_run_recusa_quem_so_tem_papel_no_workspace_atual(banco_do_c
     from app.services.workflow_execution_service import cancel_run
 
     with pytest.raises(HTTPException) as exc:
-        await cancel_run(banco_do_cancelamento, "run-1", user_id="u-1")
+        await cancel_run(cancellation_db, "run-1", user_id="u-1")
 
     assert exc.value.status_code == 403
 
 
-async def test_cancel_run_recusa_papel_insuficiente_no_workspace_do_run(banco_do_cancelamento):
+async def test_cancel_run_refuses_insufficient_role_in_the_run_workspace(cancellation_db):
     """Being a member of the run's workspace is not enough: the minimum is `operator`.
 
     Without this case, the 403 above could come from "not a member" and the ROLE
@@ -135,18 +135,18 @@ async def test_cancel_run_recusa_papel_insuficiente_no_workspace_do_run(banco_do
     """
     from app.services.workflow_execution_service import cancel_run
 
-    banco_do_cancelamento.add(
+    cancellation_db.add(
         WorkspaceMember(workspace_id="ws-A", user_id="u-3", role="viewer")
     )
-    await banco_do_cancelamento.commit()
+    await cancellation_db.commit()
 
     with pytest.raises(HTTPException) as exc:
-        await cancel_run(banco_do_cancelamento, "run-1", user_id="u-3")
+        await cancel_run(cancellation_db, "run-1", user_id="u-3")
 
     assert exc.value.status_code == 403
 
 
-async def test_cancel_run_aceita_quem_tem_papel_no_workspace_do_run(banco_do_cancelamento, monkeypatch):
+async def test_cancel_run_accepts_role_in_the_run_workspace(cancellation_db, monkeypatch):
     """The other side: with the role in the right workspace, the cancellation proceeds.
 
     Without this pair, the test above would pass with a refusal that refuses everyone.
@@ -158,14 +158,14 @@ async def test_cancel_run_aceita_quem_tem_papel_no_workspace_do_run(banco_do_can
     """
     from app.services import workflow_execution_service as WES
 
-    banco_do_cancelamento.add(
+    cancellation_db.add(
         WorkspaceMember(workspace_id="ws-A", user_id="u-2", role="operator")
     )
-    run = (await banco_do_cancelamento.execute(
+    run = (await cancellation_db.execute(
         select(WorkflowRun).where(WorkflowRun.task_id == "run-1")
     )).scalar_one()
     run.host = "executor:ag-1"
-    await banco_do_cancelamento.commit()
+    await cancellation_db.commit()
 
     enviados = []
 
@@ -175,13 +175,13 @@ async def test_cancel_run_aceita_quem_tem_papel_no_workspace_do_run(banco_do_can
 
     monkeypatch.setattr(WES.executor_registry, "send_json", _send)
 
-    outcome = await WES.cancel_run(banco_do_cancelamento, "run-1", user_id="u-2")
+    outcome = await WES.cancel_run(cancellation_db, "run-1", user_id="u-2")
 
     assert outcome == "requested"
     assert enviados == [("ag-1", {"type": "cancel", "job_id": "run-1"})]
 
 
-async def test_cancel_run_exige_user_id(banco_do_cancelamento):
+async def test_cancel_run_requires_user_id(cancellation_db):
     """The signature is the guard: forgetting the parameter breaks at the call.
 
     That was the defect — `cancel_run(db, run_id)` had no authorization at all, and
@@ -193,12 +193,12 @@ async def test_cancel_run_exige_user_id(banco_do_cancelamento):
     from app.services.workflow_execution_service import cancel_run
 
     with pytest.raises(TypeError, match="user_id"):
-        await cancel_run(banco_do_cancelamento, "run-1")
+        await cancel_run(cancellation_db, "run-1")
 
 
 # ── Item 13b: the route passes the right identity to the service ────────────
 
-async def test_rota_de_cancelamento_passa_o_usuario_e_o_atalho_de_admin(monkeypatch):
+async def test_cancel_route_passes_the_user_and_the_admin_shortcut(monkeypatch):
     """The rule lives in the service; the WIRING lives in the route, and that is what regresses.
 
     Moving authorization into the service left the route with no test at all: swapping
@@ -222,19 +222,19 @@ async def test_rota_de_cancelamento_passa_o_usuario_e_o_atalho_de_admin(monkeypa
     # the coroutine directly with request=None, which the body does not use.
     monkeypatch.setattr(WR.limiter, "enabled", False)
 
-    class _Usuario:
+    class _FakeUser:
         def __init__(self, role):
             self.role = role
             self.id_hash = "u-1"
 
     out = await WR.cancel_run(
-        request=None, run_id="run-1", db=None, current_user=_Usuario(None),
+        request=None, run_id="run-1", db=None, current_user=_FakeUser(None),
     )
     assert out == {"run_id": "run-1", "outcome": "requested"}
     assert recebido["user_id"] == "u-1"
     assert recebido["como_admin"] is False       # non-admin does NOT skip the check
 
     await WR.cancel_run(
-        request=None, run_id="run-1", db=None, current_user=_Usuario(WR.ROLE_ADMIN),
+        request=None, run_id="run-1", db=None, current_user=_FakeUser(WR.ROLE_ADMIN),
     )
     assert recebido["como_admin"] is True        # admin global, sim

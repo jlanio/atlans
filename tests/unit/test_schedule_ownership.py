@@ -33,7 +33,7 @@ def _schedule(job_id="job-1", workflow_hash="wf-do-dono"):
 # ── DELETE ────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_delete_de_outro_workflow_recusado():
+async def test_delete_from_another_workflow_refused():
     svc = _service_with(_schedule(workflow_hash="wf-DO-DONO"))
 
     with pytest.raises(ScheduleNotFoundError):
@@ -43,7 +43,7 @@ async def test_delete_de_outro_workflow_recusado():
 
 
 @pytest.mark.asyncio
-async def test_delete_do_proprio_workflow_permitido():
+async def test_delete_from_own_workflow_allowed():
     svc = _service_with(_schedule(workflow_hash="wf-do-dono"))
 
     await svc.delete_schedule("job-1", owner_workflow_hash="wf-do-dono")
@@ -54,7 +54,7 @@ async def test_delete_do_proprio_workflow_permitido():
 # ── UPDATE ────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_update_de_outro_workflow_recusado():
+async def test_update_from_another_workflow_refused():
     svc = _service_with(_schedule(workflow_hash="wf-do-dono"))
     payload = MagicMock()
     payload.dict = MagicMock(return_value={"active": False})
@@ -66,7 +66,7 @@ async def test_update_de_outro_workflow_recusado():
 
 
 @pytest.mark.asyncio
-async def test_update_do_proprio_workflow_permitido():
+async def test_update_from_own_workflow_allowed():
     svc = _service_with(_schedule(workflow_hash="wf-do-dono"))
     payload = MagicMock()
     payload.dict = MagicMock(return_value={"active": False})
@@ -79,7 +79,7 @@ async def test_update_do_proprio_workflow_permitido():
 # ── O dono e obrigatorio ──────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_omitir_o_dono_quebra_na_chamada():
+async def test_omitting_the_owner_breaks_at_call():
     """It was optional, and with `None` the ownership check was SKIPPED.
 
     The IDOR defense was off by default — it took only a new caller (a tool of
@@ -97,7 +97,7 @@ async def test_omitir_o_dono_quebra_na_chamada():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("metodo", ["delete", "update"])
-async def test_dono_None_explicito_falha_fechado(metodo):
+async def test_explicit_None_owner_fails_closed(metodo):
     """The case the mandatory signature does NOT cover — and it is the dangerous one.
 
     Making the parameter mandatory catches whoever OMITS it. It does not catch
@@ -125,7 +125,7 @@ async def test_dono_None_explicito_falha_fechado(metodo):
 
 
 @pytest.mark.asyncio
-async def test_schedule_inexistente_404():
+async def test_nonexistent_schedule_404():
     svc = _service_with(None)
 
     with pytest.raises(ScheduleNotFoundError):

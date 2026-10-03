@@ -25,7 +25,7 @@ const AGORA = 1_000_000_000_000
 const now = () => AGORA
 
 /** Valid token, already authenticated, with the access EXPIRED (forces the refresh branch). */
-function tokenExpirado(over: Partial<JWT> = {}): JWT {
+function expiredToken(over: Partial<JWT> = {}): JWT {
   return {
     id_hash: "u1", username: "ana", role: "user", agent_quota: 0, workspace_id: null,
     access_token: "acc-velho", refresh_token: "ref-velho",
@@ -59,14 +59,14 @@ describe("jwtCallback — renovação e distinção transitório × terminal", (
   })
 
   it("dentro da validade: retorna sem renovar (sem fetch)", async () => {
-    const out = await jwtCallback({ token: tokenExpirado({ access_token_expires_at: AGORA + 60_000 }) }, { fetchFn, now })
+    const out = await jwtCallback({ token: expiredToken({ access_token_expires_at: AGORA + 60_000 }) }, { fetchFn, now })
     expect(fetchFn).not.toHaveBeenCalled()
     expect(out.access_token).toBe("acc-velho")
   })
 
   it("refresh 200: troca os tokens e limpa erro grudado", async () => {
     fetchFn.mockResolvedValue(resposta(200, { access_token: "acc-novo", refresh_token: "ref-novo" }))
-    const out = await jwtCallback({ token: tokenExpirado({ error: "RefreshTokenExpired" }) }, { fetchFn, now })
+    const out = await jwtCallback({ token: expiredToken({ error: "RefreshTokenExpired" }) }, { fetchFn, now })
     expect(out.access_token).toBe("acc-novo")
     expect(out.refresh_token).toBe("ref-novo")
     expect(out.access_token_expires_at).toBe(AGORA + ACCESS_TTL_MS)
@@ -75,14 +75,14 @@ describe("jwtCallback — renovação e distinção transitório × terminal", (
 
   it("refresh 200 sem refresh_token novo: preserva o refresh_token atual", async () => {
     fetchFn.mockResolvedValue(resposta(200, { access_token: "acc-novo" }))
-    const out = await jwtCallback({ token: tokenExpirado() }, { fetchFn, now })
+    const out = await jwtCallback({ token: expiredToken() }, { fetchFn, now })
     expect(out.access_token).toBe("acc-novo")
     expect(out.refresh_token).toBe("ref-velho")
   })
 
   it("401 (refresh inválido/expirado/reusado): TERMINAL — seta RefreshTokenExpired", async () => {
     fetchFn.mockResolvedValue(resposta(401, { detail: "Refresh token inválido ou expirado." }))
-    const out = await jwtCallback({ token: tokenExpirado() }, { fetchFn, now })
+    const out = await jwtCallback({ token: expiredToken() }, { fetchFn, now })
     expect(out.error).toBe("RefreshTokenExpired")
     // tokens are not swapped; the session will be ended by the middleware/SessionSync
     expect(out.access_token).toBe("acc-velho")
@@ -90,7 +90,7 @@ describe("jwtCallback — renovação e distinção transitório × terminal", (
 
   it("429 (rate limit): TRANSITÓRIO — não desloga, mantém tokens e reagenda", async () => {
     fetchFn.mockResolvedValue(resposta(429, { detail: "Muitas renovações." }))
-    const out = await jwtCallback({ token: tokenExpirado() }, { fetchFn, now })
+    const out = await jwtCallback({ token: expiredToken() }, { fetchFn, now })
     expect(out.error).toBeUndefined()          // ← does NOT log out because of the rate limit
     expect(out.access_token).toBe("acc-velho")
     expect(out.refresh_token).toBe("ref-velho")
@@ -100,7 +100,7 @@ describe("jwtCallback — renovação e distinção transitório × terminal", (
   it("500/503 (erro do servidor): TRANSITÓRIO — não desloga", async () => {
     for (const status of [500, 502, 503, 504]) {
       fetchFn.mockResolvedValue(resposta(status))
-      const out = await jwtCallback({ token: tokenExpirado() }, { fetchFn, now })
+      const out = await jwtCallback({ token: expiredToken() }, { fetchFn, now })
       expect(out.error, `status ${status}`).toBeUndefined()
       expect(out.access_token_expires_at).toBe(AGORA + REFRESH_BACKOFF_MS)
     }
@@ -108,7 +108,7 @@ describe("jwtCallback — renovação e distinção transitório × terminal", (
 
   it("erro de rede/timeout: TRANSITÓRIO — não desloga", async () => {
     fetchFn.mockRejectedValue(new Error("ECONNRESET"))
-    const out = await jwtCallback({ token: tokenExpirado() }, { fetchFn, now })
+    const out = await jwtCallback({ token: expiredToken() }, { fetchFn, now })
     expect(out.error).toBeUndefined()
     expect(out.access_token).toBe("acc-velho")
     expect(out.access_token_expires_at).toBe(AGORA + REFRESH_BACKOFF_MS)

@@ -171,7 +171,7 @@ const ConfigureCredential = ({ configureCredentialId, setConfigureCredentialId }
   }
 
   const { isSubmitting } = form.formState
-  const camposBloqueados = secretsState !== "ready" || isSubmitting
+  const fieldsLocked = secretsState !== "ready" || isSubmitting
   const canTest = !!selectedType && Object.keys(dataFields ?? {}).length > 0 && secretsState === "ready"
 
   return (
@@ -226,14 +226,14 @@ const ConfigureCredential = ({ configureCredentialId, setConfigureCredentialId }
               <span className="sr-only">Carregando dados da credencial…</span>
             </div>
           ) : activeSchema ? (
-            <SchemaFieldsInput form={form} schema={activeSchema} disabled={camposBloqueados} />
+            <SchemaFieldsInput form={form} schema={activeSchema} disabled={fieldsLocked} />
           ) : selectedType ? (
             <PropsInput form={form} />
           ) : null}
 
           {/* Optional metadata — only after the secrets load, and locked along
               with the rest in the meantime. */}
-          {secretsState === "ready" && <MetaInputs form={form} disabled={camposBloqueados} />}
+          {secretsState === "ready" && <MetaInputs form={form} disabled={fieldsLocked} />}
 
           <TestResultBanner result={testResult} />
 
@@ -245,7 +245,7 @@ const ConfigureCredential = ({ configureCredentialId, setConfigureCredentialId }
               type="button"
               variant="secondary"
               onClick={handleTest}
-              disabled={isTesting || camposBloqueados || !canTest}
+              disabled={isTesting || fieldsLocked || !canTest}
               title={canTest ? undefined : "Preencha os campos da credencial para testar"}
               aria-busy={isTesting}
               className="gap-1 max-md:h-10"
@@ -255,7 +255,7 @@ const ConfigureCredential = ({ configureCredentialId, setConfigureCredentialId }
                 : <TbPlugConnected className="size-4" aria-hidden="true" />}
               {isTesting ? "Testando…" : "Testar credencial"}
             </Button>
-            <Button type="submit" disabled={camposBloqueados} className="gap-1 max-md:h-10">
+            <Button type="submit" disabled={fieldsLocked} className="gap-1 max-md:h-10">
               {isSubmitting && <TbLoader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />}
               {isSubmitting ? "Salvando…" : "Salvar"}
             </Button>

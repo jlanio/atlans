@@ -18,7 +18,7 @@ import pytest
 from app.api.routers.internal_email_router import SendEmailRequest
 
 
-def _limpa(html: str) -> str:
+def _clean(html: str) -> str:
     return SendEmailRequest(to=["a@b.com"], subject="s", html=html).html
 
 
@@ -26,11 +26,11 @@ def _limpa(html: str) -> str:
 # is rejected by `validate_html_not_empty` — which would test the wrong
 # validator. With the anchor, the body stays valid and we can assert on what
 # came out (and what remained).
-_ANCORA = "<p>relatório pronto</p>"
+_ANCHOR = "<p>relatório pronto</p>"
 
 
-def _limpa_com_ancora(html: str) -> str:
-    saida = _limpa(_ANCORA + html)
+def _clean_with_anchor(html: str) -> str:
+    saida = _clean(_ANCHOR + html)
     assert "relatório pronto" in saida, "a âncora benigna não sobreviveu"
     return saida
 
@@ -46,8 +46,8 @@ def _limpa_com_ancora(html: str) -> str:
         '<a href="java\tscript:alert(1)">x</a>',            # tab in the middle of the scheme
     ],
 )
-def test_protocolo_javascript_nunca_sobrevive(payload):
-    saida = _limpa_com_ancora(payload).lower().replace("\t", "").replace("\n", "")
+def test_javascript_protocol_never_survives(payload):
+    saida = _clean_with_anchor(payload).lower().replace("\t", "").replace("\n", "")
     assert "javascript:" not in saida
 
 
@@ -60,8 +60,8 @@ def test_protocolo_javascript_nunca_sobrevive(payload):
         "<script>alert(1)",                    # not closed
     ],
 )
-def test_script_nunca_sobrevive(payload):
-    assert "<script" not in _limpa_com_ancora(payload).lower()
+def test_script_never_survives(payload):
+    assert "<script" not in _clean_with_anchor(payload).lower()
 
 
 @pytest.mark.parametrize(
@@ -73,8 +73,8 @@ def test_script_nunca_sobrevive(payload):
         "<body onload=alert(1)>",
     ],
 )
-def test_manipulador_de_evento_nunca_sobrevive(payload):
-    saida = _limpa_com_ancora(payload).lower()
+def test_event_handler_never_survives(payload):
+    saida = _clean_with_anchor(payload).lower()
     assert "onerror" not in saida
     assert "onload" not in saida
 
@@ -93,8 +93,8 @@ def test_manipulador_de_evento_nunca_sobrevive(payload):
         ('<p style="background:url(http://mal.co/rastreio)">x</p>', "style"),
     ],
 )
-def test_tag_ou_atributo_fora_da_allowlist_e_removido(payload, proibido):
-    assert proibido not in _limpa_com_ancora(payload).lower()
+def test_tag_or_attribute_outside_allowlist_is_removed(payload, proibido):
+    assert proibido not in _clean_with_anchor(payload).lower()
 
 
 @pytest.mark.parametrize(
@@ -104,54 +104,54 @@ def test_tag_ou_atributo_fora_da_allowlist_e_removido(payload, proibido):
         '<a href="data:text/html,<script>alert(1)</script>">x</a>',
     ],
 )
-def test_data_uri_e_removido(payload):
+def test_data_uri_is_removed(payload):
     """`data:` in <img>/<a> smuggles SVG with script into clients that render it."""
-    assert "data:" not in _limpa_com_ancora(payload).lower()
+    assert "data:" not in _clean_with_anchor(payload).lower()
 
 
 # ── The other side: legitimate e-mail has to keep working ────────────────────
 
-def test_html_legitimo_e_preservado():
+def test_legitimate_html_is_preserved():
     entrada = (
         "<p>Olá <strong>Maria</strong>,</p>"
         '<p>O relatório <em>Uso do solo</em> ficou pronto. '
         '<a href="https://atlans.example.org/runs/abc">Ver execução</a>.</p>'
         "<ul><li>128 feições</li><li>3,4 s</li></ul>"
     )
-    saida = _limpa(entrada)
+    saida = _clean(entrada)
 
     for trecho in ["<strong>Maria</strong>", "<em>Uso do solo</em>",
                    "https://atlans.example.org/runs/abc", "<li>128 feições</li>"]:
         assert trecho in saida
 
 
-def test_tabela_e_imagem_https_sao_preservadas():
+def test_table_and_https_image_are_preserved():
     entrada = (
         '<table border="1"><tr><th colspan="2">Resumo</th></tr>'
         '<tr><td>ok</td><td>2</td></tr></table>'
         '<img src="https://atlans.example.org/logo.png" alt="Atlans" width="120">'
     )
-    saida = _limpa(entrada)
+    saida = _clean(entrada)
 
     assert "<table" in saida and "<th" in saida and "colspan" in saida
     assert "https://atlans.example.org/logo.png" in saida
 
 
-def test_link_externo_recebe_rel_seguro():
+def test_external_link_gets_safe_rel():
     """`link_rel` closes tabnabbing without depending on the workflow author."""
-    saida = _limpa('<a href="https://exemplo.com">x</a>')
+    saida = _clean('<a href="https://exemplo.com">x</a>')
 
     assert "noopener" in saida and "noreferrer" in saida
 
 
 @pytest.mark.parametrize("esquema", ["https://atlans.example.org/x", "http://exemplo.com", "mailto:s@atlans.example.org"])
-def test_protocolos_permitidos_passam(esquema):
-    assert esquema in _limpa(f'<a href="{esquema}">x</a>')
+def test_allowed_protocols_pass(esquema):
+    assert esquema in _clean(f'<a href="{esquema}">x</a>')
 
 
 # ── Interaction with the empty-body validator ────────────────────────────────
 
-def test_corpo_que_fica_vazio_apos_sanitizacao_e_recusado():
+def test_body_left_empty_after_sanitization_is_rejected():
     """Validator order: sanitize_html runs before validate_html_not_empty.
 
     Without that, a body with only forbidden tags went empty to Resend, came
@@ -161,4 +161,4 @@ def test_corpo_que_fica_vazio_apos_sanitizacao_e_recusado():
     from pydantic import ValidationError
 
     with pytest.raises(ValidationError):
-        _limpa("<script>alert(1)</script>")
+        _clean("<script>alert(1)</script>")

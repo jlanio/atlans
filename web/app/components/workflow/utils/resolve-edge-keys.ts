@@ -147,9 +147,9 @@ export function sourceHandleDaChave(
  */
 export function limitadoAUmaAresta(
   nodeName: string | undefined,
-  portasDeclaradas: number,
+  declaredPorts: number,
 ): boolean {
-  return nodeName !== undefined && NOS_DE_UMA_ARESTA.has(nodeName) && portasDeclaradas < 2
+  return nodeName !== undefined && SINGLE_EDGE_NODES.has(nodeName) && declaredPorts < 2
 }
 
 /**
@@ -160,4 +160,4 @@ export function limitadoAUmaAresta(
  * layer — without the node being able to notice the loss. From two ports on,
  * each layer arrives under its own port's name.
  */
-const NOS_DE_UMA_ARESTA: ReadonlySet<string> = new Set(["SubWorkflowOutput", "CartaImagem"])
+const SINGLE_EDGE_NODES: ReadonlySet<string> = new Set(["SubWorkflowOutput", "CartaImagem"])

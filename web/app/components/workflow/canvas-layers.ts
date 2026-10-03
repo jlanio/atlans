@@ -19,7 +19,7 @@
  * `absolute` with a fixed position on both sides) — `pointer-events-none`
  * solves the click, but a giant rectangle still gets in the way of debugging.
  */
-export const CAMADA_SOBRE_O_CANVAS =
+export const LAYER_ABOVE_CANVAS =
   "pointer-events-none absolute z-10 [&>*]:pointer-events-auto"
 
 /**
@@ -28,4 +28,4 @@ export const CAMADA_SOBRE_O_CANVAS =
  * With no interactive children, the whole container gets out of the mouse's way —
  * it can cover the entire canvas without blocking drag or click.
  */
-export const CAMADA_SO_LEITURA = "pointer-events-none absolute z-10"
+export const READ_ONLY_LAYER = "pointer-events-none absolute z-10"

@@ -26,7 +26,7 @@ afterEach(() => { cleanup(); largura(1280) })
 
 import { SidebarProvider } from "@/app/components/ui/sidebar"
 import Marca from "@/app/components/sidebar/marca"
-import { NomeNaTelaProvider } from "@/app/components/share/nome-na-tela"
+import { DisplayNameProvider } from "@/app/components/share/nome-na-tela"
 
 function montar(ui: React.ReactNode, props: Omit<React.ComponentProps<typeof SidebarProvider>, "children"> = {}) {
   return render(<SidebarProvider {...props}>{ui}</SidebarProvider>)
@@ -72,7 +72,7 @@ describe("O wordmark é o nome da instalação", () => {
     montar(<Marca />)
     expect(screen.getByText("Atlans").getAttribute("title") ?? screen.getByText("Atlans").textContent).toContain("Atlans")
     cleanup()
-    montar(<NomeNaTelaProvider nome="Geo Exemplo"><Marca /></NomeNaTelaProvider>)
+    montar(<DisplayNameProvider nome="Geo Exemplo"><Marca /></DisplayNameProvider>)
     expect(screen.getByText("Geo Exemplo")).toBeTruthy()
     expect(screen.queryByText("Atlans")).toBeNull()
   })

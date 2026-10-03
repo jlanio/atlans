@@ -28,7 +28,7 @@ Four decisions shape the module:
   and asking for a click for every new source would bring back the cost the
   catalog came to remove.
 - **What the model pastes is what the node declares.** `node_snippet` carries
-  only the properties `WFSNode` knows today (`fontes_service.trecho_do_no`);
+  only the properties `WFSNode` knows today (`fontes_service.node_snippet`);
   `version` stays in the catalog until the node declares it.
 - **Human-written text goes down in `untrusted_data`.** Title, description,
   hints and tags are written by people (in the Vault or in `register_source`);
@@ -51,24 +51,24 @@ from app.core.utils.datetime_utils import utc_now_naive
 from app.mcp import infra
 from app.mcp.erros import erro
 from app.mcp.escopo import escopo_da_chamada, exigir_escopo
-from app.mcp.resolucao import resolver_workspace
-from app.mcp.saida import envelope, higienizar, iso
+from app.mcp.resolucao import resolve_workspace
+from app.mcp.saida import envelope, sanitize, iso
 from app.mcp.tools.base import anotacoes, ferramenta
 from app.services import fontes_service
-from app.services.fontes_vault import CANDIDATOS_A_SORTBY
+from app.services.fontes_vault import SORTBY_CANDIDATES
 
 # Context-budget ceilings — the same reasons as the other listings.
-LIMITE_PADRAO = 20
-LIMITE_MAXIMO = 50
-MAX_COLUNAS = 50
-MAX_CAMADAS = 50
+DEFAULT_LIMIT = 20
+MAX_LIMIT = 50
+MAX_COLUMNS = 50
+MAX_LAYERS = 50
 
-_MENSAGEM_PAPEL_ESCRITA = (
+_WRITE_ROLE_MESSAGE = (
     "Requer papel 'editor' ou superior neste workspace — registrar uma fonte é mexer no acervo."
 )
 
 
-async def _exigir_editor_para_atualizar(db, escopo, ws) -> None:
+async def _require_editor_to_update(db, escopo, ws) -> None:
     """Requires the editor role for the probe to WRITE to the catalog.
 
     Workspace source: editor in that workspace. Platform source (ws=None,
@@ -78,37 +78,37 @@ async def _exigir_editor_para_atualizar(db, escopo, ws) -> None:
     """
     if ws is not None:
         papel = await get_workspace_member_role(db, ws, escopo.user_id)
-        exigir_papel(papel, ROLE_EDITOR, _MENSAGEM_PAPEL_ESCRITA)
+        exigir_papel(papel, ROLE_EDITOR, _WRITE_ROLE_MESSAGE)
         return
     for w in sorted(escopo.workspace_ids):
         papel = await get_workspace_member_role(db, w, escopo.user_id)
         if _has_min_workspace_role(papel, ROLE_EDITOR):
             return
-    exigir_papel(None, ROLE_EDITOR, _MENSAGEM_PAPEL_ESCRITA)  # none: 403
+    exigir_papel(None, ROLE_EDITOR, _WRITE_ROLE_MESSAGE)  # none: 403
 
 
 # ── Formas ────────────────────────────────────────────────────────────────────
 
 
-def _escopo_de_fonte(fonte) -> str:
+def _source_scope(fonte) -> str:
     return "platform" if fonte.workspace_id is None else "workspace"
 
 
-def _item_leve(fonte) -> dict:
+def _light_item(fonte) -> dict:
     """What is enough to choose: id, state, priority, institution, layer."""
     return envelope(
         {
             "id": fonte.id_hash,
             "kind": fonte.tipo,
             "node": fonte.no,
-            "scope": _escopo_de_fonte(fonte),
+            "scope": _source_scope(fonte),
             "workspace_id": fonte.workspace_id,
             "state": fonte.estado,
             "verified_at": iso(fonte.verificada_em),
             "uses": int(fonte.usos or 0),
             "priority": int(fonte.prioridade or 2),
-            "institution": higienizar(fonte.instituicao),
-            "group": higienizar(fonte.grupo),
+            "institution": sanitize(fonte.instituicao),
+            "group": sanitize(fonte.grupo),
             "type_name": fonte.type_name,
             "host": _host(fonte.url),
         },
@@ -126,7 +126,7 @@ def _host(url: str | None) -> str | None:
         return None
 
 
-def _esquema_resumido(bruto: Any) -> dict | None:
+def _summarized_schema(bruto: Any) -> dict | None:
     """CRS, extent, geometry, count and the first columns — never the whole list."""
     if not isinstance(bruto, dict):
         return None
@@ -140,33 +140,33 @@ def _esquema_resumido(bruto: Any) -> dict | None:
         "columns_source": bruto.get("columns_source"),
     }
     if isinstance(colunas, list):
-        resumo["columns"] = higienizar([
+        resumo["columns"] = sanitize([
             {k: c.get(k) for k in ("name", "type") if c.get(k) is not None} if isinstance(c, dict) else c
-            for c in colunas[:MAX_COLUNAS]
+            for c in colunas[:MAX_COLUMNS]
         ])
         resumo["columns_total"] = len(colunas)
     return {chave: valor for chave, valor in resumo.items() if valor is not None}
 
 
-def _ficha(fonte, **extras: Any) -> dict:
+def _source_sheet(fonte, **extras: Any) -> dict:
     """The full record: the node snippet, the schema, the state — and the human-written text set apart."""
     return envelope(
         {
             "id": fonte.id_hash,
             "kind": fonte.tipo,
             "node": fonte.no,
-            "scope": _escopo_de_fonte(fonte),
+            "scope": _source_scope(fonte),
             "workspace_id": fonte.workspace_id,
             "state": fonte.estado,
             "origin": fonte.origem,
             "verified_at": iso(fonte.verificada_em),
             "uses": int(fonte.usos or 0),
             "priority": int(fonte.prioridade or 2),
-            "institution": higienizar(fonte.instituicao),
-            "group": higienizar(fonte.grupo),
-            "node_snippet": higienizar(fontes_service.trecho_do_no(fonte)),
-            "schema": _esquema_resumido(fonte.esquema),
-            "last_error": higienizar(fonte.ultimo_erro) if fonte.estado == "falhando" else None,
+            "institution": sanitize(fonte.instituicao),
+            "group": sanitize(fonte.grupo),
+            "node_snippet": sanitize(fontes_service.node_snippet(fonte)),
+            "schema": _summarized_schema(fonte.esquema),
+            "last_error": sanitize(fonte.ultimo_erro) if fonte.estado == "falhando" else None,
             **extras,
         },
         title=fonte.titulo,
@@ -176,7 +176,7 @@ def _ficha(fonte, **extras: Any) -> dict:
     )
 
 
-def _erro_de_sondagem(exc: fontes_service.SondagemError):
+def _probe_error(exc: fontes_service.ProbeError):
     dica = {
         "timeout": "o servidor não respondeu a tempo; tente de novo mais tarde ou confira a URL",
         "ssrf": "endereços privados, loopback e link-local são recusados; use a URL pública do serviço",
@@ -186,23 +186,23 @@ def _erro_de_sondagem(exc: fontes_service.SondagemError):
     extras: dict[str, Any] = {"reason": exc.codigo}
     if exc.status is not None:
         extras["http_status"] = exc.status
-    if exc.candidatas:
-        extras["candidates"] = exc.candidatas
+    if exc.candidates:
+        extras["candidates"] = exc.candidates
     return erro("source_unreachable", exc.mensagem, dica, **extras)
 
 
-async def _fontes_do_endpoint(db, url: str, workspace_ids) -> int:
+async def _endpoint_sources(db, url: str, workspace_ids) -> int:
     # Count directly by URL: `buscar` does not filter by URL (it only pages), so
     # it is not worth it — each use of this function is a single query, not three.
     from sqlalchemy import func, select
 
-    from app.models.fonte_de_dados import FonteDeDados
+    from app.models.fonte_de_dados import DataSource
 
     resultado = await db.execute(
-        select(func.count()).select_from(FonteDeDados).where(
-            FonteDeDados.url == url,
-            FonteDeDados.deleted_at.is_(None),
-            fontes_service._no_escopo(workspace_ids),
+        select(func.count()).select_from(DataSource).where(
+            DataSource.url == url,
+            DataSource.deleted_at.is_(None),
+            fontes_service._in_scope(workspace_ids),
         )
     )
     return int(resultado.scalar_one())
@@ -210,7 +210,7 @@ async def _fontes_do_endpoint(db, url: str, workspace_ids) -> int:
 
 def _sort_by(esquema: dict | None) -> str | None:
     nomes = {str(c.get("name", "")).lower(): c.get("name") for c in (esquema or {}).get("columns", []) if isinstance(c, dict)}
-    for candidato in CANDIDATOS_A_SORTBY:
+    for candidato in SORTBY_CANDIDATES:
         if candidato in nomes:
             return nomes[candidato]
     return None
@@ -226,7 +226,7 @@ async def search_sources(
     workspace_id: Optional[str] = None,
     kind: Optional[str] = None,
     institution: Optional[str] = None,
-    limit: int = LIMITE_PADRAO,
+    limit: int = DEFAULT_LIMIT,
 ) -> dict:
     """Searches the catalog of pre-mapped sources — WITHOUT touching the network.
 
@@ -245,16 +245,16 @@ async def search_sources(
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
 
-    teto = max(1, min(int(limit), LIMITE_MAXIMO))
+    teto = max(1, min(int(limit), MAX_LIMIT))
     async with infra.sessao() as db:
         if workspace_id is not None:
-            alcance = [await resolver_workspace(db, escopo, workspace_id)]
+            alcance = [await resolve_workspace(db, escopo, workspace_id)]
         else:
             alcance = sorted(escopo.workspace_ids)
         fontes, total = await fontes_service.buscar(
             db, alcance, query=query, kind=kind, institution=institution, limit=teto,
         )
-        itens = [_item_leve(f) for f in fontes]
+        itens = [_light_item(f) for f in fontes]
 
     saida: dict[str, Any] = {
         "items": itens,
@@ -294,7 +294,7 @@ async def describe_source(ctx: Context, source_id: str) -> dict:
                 "Nenhuma fonte com este identificador está ao alcance do token.",
                 "use search_sources para achar o id",
             )
-        return _ficha(fonte)
+        return _source_sheet(fonte)
 
 
 # ── Probing (the only read that talks to the internet) ────────────────────────
@@ -319,23 +319,23 @@ async def probe_source(
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:write")
 
-    endereco = fontes_service.normalizar_url(url)
-    versao = fontes_service.normalizar_versao(version)
+    endereco = fontes_service.normalize_url(url)
+    versao = fontes_service.normalize_version(version)
     camada = (type_name or "").strip() or None
     try:
         sondagem = await fontes_service.sondar_wfs(endereco, camada, versao)
-    except fontes_service.SondagemError as exc:
-        raise _erro_de_sondagem(exc)
+    except fontes_service.ProbeError as exc:
+        raise _probe_error(exc)
 
     async with infra.sessao() as db:
-        ja_catalogadas = await _fontes_do_endpoint(db, endereco, escopo.workspace_ids)
-        no_catalogo = None
+        already_cataloged = await _endpoint_sources(db, endereco, escopo.workspace_ids)
+        in_catalog = None
         if sondagem.camada is not None:
             # If this layer is already in the catalog within reach, the probe updates
             # it: it is the same work the check loop would do, for free.
             for ws in (*sorted(escopo.workspace_ids), None):
-                chave = fontes_service.chave_da_fonte(ws, fontes_service.TIPO_WFS, endereco, sondagem.camada.name)
-                fonte = await fontes_service.obter_por_chave(db, chave)
+                chave = fontes_service.source_key(ws, fontes_service.KIND_WFS, endereco, sondagem.camada.name)
+                fonte = await fontes_service.get_by_key(db, chave)
                 if fonte is not None and fonte.deleted_at is None:
                     # Updating state/schema/verificada_em IS a WRITE to the catalog:
                     # it requires the editor role, like register_source. The
@@ -346,13 +346,13 @@ async def probe_source(
                     # workspace. Platform source (ws=None, global, with no single
                     # workspace to check): editor in at least one workspace within
                     # reach.
-                    await _exigir_editor_para_atualizar(db, escopo, ws)
+                    await _require_editor_to_update(db, escopo, ws)
                     fonte.estado, fonte.ultimo_erro = "ok", None
-                    fonte.esquema = fontes_service.fundir_esquema(fonte.esquema, sondagem.esquema)
+                    fonte.esquema = fontes_service.merge_schema(fonte.esquema, sondagem.esquema)
                     fonte.verificada_em = utc_now_naive()
-                    fontes_service._recalcular_busca(fonte)
+                    fontes_service._recompute_search(fonte)
                     await db.commit()
-                    no_catalogo = {"source_id": fonte.id_hash, "scope": _escopo_de_fonte(fonte), "state": fonte.estado}
+                    in_catalog = {"source_id": fonte.id_hash, "scope": _source_scope(fonte), "state": fonte.estado}
                     break
 
     dados: dict[str, Any] = {
@@ -361,26 +361,26 @@ async def probe_source(
         "server_version": sondagem.capabilities.version,
         "layer_count": len(sondagem.capabilities.layers),
     }
-    if ja_catalogadas:
+    if already_cataloged:
         dados["catalog_hint"] = (
-            f"este endpoint já está catalogado com {ja_catalogadas} camada(s) ao seu alcance: "
+            f"este endpoint já está catalogado com {already_cataloged} camada(s) ao seu alcance: "
             "search_sources com o tema (ou institution=...) evita a sondagem"
         )
     if sondagem.camada is None:
-        camadas = [{"name": c.name, "title": c.title or c.name} for c in sondagem.capabilities.layers[:MAX_CAMADAS]]
+        camadas = [{"name": c.name, "title": c.title or c.name} for c in sondagem.capabilities.layers[:MAX_LAYERS]]
         dados["outcome"] = "layers_listed"
-        if len(sondagem.capabilities.layers) > MAX_CAMADAS:
+        if len(sondagem.capabilities.layers) > MAX_LAYERS:
             dados["hint"] = (
-                f"só as {MAX_CAMADAS} primeiras de {len(sondagem.capabilities.layers)} camadas; "
+                f"só as {MAX_LAYERS} primeiras de {len(sondagem.capabilities.layers)} camadas; "
                 "chame de novo com type_name quando souber a camada"
             )
         return envelope(dados, layers=camadas)
 
     dados["outcome"] = "layer_described"
     dados["layer"] = sondagem.camada.name
-    dados["schema"] = _esquema_resumido(sondagem.esquema)
-    dados["catalog"] = no_catalogo
-    dados["node_snippet"] = higienizar({
+    dados["schema"] = _summarized_schema(sondagem.esquema)
+    dados["catalog"] = in_catalog
+    dados["node_snippet"] = sanitize({
         "name": fontes_service.NO_WFS,
         "type": "datasource",
         "properties": {
@@ -389,7 +389,7 @@ async def probe_source(
             }.items() if v
         },
     })
-    if no_catalogo is None:
+    if in_catalog is None:
         dados["hint"] = "fonte fora do catálogo: register_source(url, type_name) a guarda para a próxima vez"
     return envelope(dados, title=sondagem.camada.title, description=sondagem.camada.abstract,
                     keywords=list(sondagem.camada.keywords) or None)
@@ -423,32 +423,32 @@ async def register_source(
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:write")
 
-    endereco = fontes_service.normalizar_url(url)
-    versao = fontes_service.normalizar_versao(version)
+    endereco = fontes_service.normalize_url(url)
+    versao = fontes_service.normalize_version(version)
     camada = (type_name or "").strip()
     if not camada:
         raise erro("validation", "Informe type_name: a camada que o nó WFS vai ler.",
                    "use probe_source(url) para listar as camadas do serviço")
 
     async with infra.sessao() as db:
-        ws = await resolver_workspace(db, escopo, workspace_id)
+        ws = await resolve_workspace(db, escopo, workspace_id)
         papel = await get_workspace_member_role(db, ws, escopo.user_id)
-        exigir_papel(papel, ROLE_EDITOR, _MENSAGEM_PAPEL_ESCRITA)
+        exigir_papel(papel, ROLE_EDITOR, _WRITE_ROLE_MESSAGE)
 
         try:
             sondagem = await fontes_service.sondar_wfs(endereco, camada, versao)
-        except fontes_service.SondagemError as exc:
-            raise _erro_de_sondagem(exc)
+        except fontes_service.ProbeError as exc:
+            raise _probe_error(exc)
 
         assert sondagem.camada is not None
         propriedades = {"version": versao}
-        ordenacao = _sort_by(sondagem.esquema)
-        if ordenacao:
-            propriedades["sortBy"] = ordenacao
-        fonte, desfecho = await fontes_service.upsert_fonte(
+        sort_order = _sort_by(sondagem.esquema)
+        if sort_order:
+            propriedades["sortBy"] = sort_order
+        fonte, desfecho = await fontes_service.upsert_source(
             db,
             workspace_id=ws,
-            tipo=fontes_service.TIPO_WFS,
+            tipo=fontes_service.KIND_WFS,
             url=endereco,
             type_name=sondagem.camada.name,
             propriedades=propriedades,
@@ -464,7 +464,7 @@ async def register_source(
             verificada_em=utc_now_naive(),
         )
         await db.commit()
-        return _ficha(fonte, outcome=desfecho)
+        return _source_sheet(fonte, outcome=desfecho)
 
 
 def registrar(server) -> None:

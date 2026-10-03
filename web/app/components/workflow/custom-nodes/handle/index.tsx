@@ -22,12 +22,12 @@ import { corDoTom, tomDoHandle } from "../../utils/exec-colors"
  * kept the caller from overriding anything.
  */
 
-export type DirecaoDaPorta = "saida" | "entrada"
+export type PortDirection = "saida" | "entrada"
 
-interface PortaProps
+interface PortProps
   extends Omit<HandleProps, "type" | "position">,
     Omit<HTMLAttributes<HTMLDivElement>, "id"> {
-  direcao: DirecaoDaPorta
+  direcao: PortDirection
   /** Port with no edge attached.
    *
    *  The only thing that carried this information was the "+" stub beside it,
@@ -35,7 +35,7 @@ interface PortaProps
   livre?: boolean
 }
 
-const Porta = ({ direcao, livre, className, style, ...props }: PortaProps) => {
+const Porta = ({ direcao, livre, className, style, ...props }: PortProps) => {
   const saida = direcao === "saida"
   // The Conditional's `true`/`false` are born green/red and STAY THAT WAY: the port
   // says which branch it is, and the edge says what happened to it. See the
@@ -71,11 +71,11 @@ const Porta = ({ direcao, livre, className, style, ...props }: PortaProps) => {
 }
 
 /** Node output — solid pin, on the right. */
-export const HandleSource = (props: Omit<PortaProps, "direcao">) => (
+export const HandleSource = (props: Omit<PortProps, "direcao">) => (
   <Porta {...props} direcao="saida" />
 )
 
 /** Node input — hollow socket, on the left. */
-export const HandleTarget = (props: Omit<PortaProps, "direcao">) => (
+export const HandleTarget = (props: Omit<PortProps, "direcao">) => (
   <Porta {...props} direcao="entrada" />
 )

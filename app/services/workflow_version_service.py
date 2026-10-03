@@ -13,7 +13,7 @@ from app.core.utils.encryption import (
     decrypt_workflow_connections,
     encrypt_workflow_connections,
 )
-from app.core.utils.redacao import redigir_definition
+from app.core.utils.redacao import redact_definition
 from app.crud.workflow_crud import WorkflowCRUD
 from flow.utils.workflow_contract import _node_properties
 
@@ -43,7 +43,7 @@ def _has_substantial_changes(old_def: dict, new_def: dict) -> bool:
 
     # Properties of some node changed. The PERSISTED/PUT definition is flat
     # (`{id, name, type, properties, position}` — no `data` wrapper, see
-    # `montarPayloadDoGrafo` in the web app), so reading `node["data"]["properties"]`
+    # `buildGraphPayload` in the web app), so reading `node["data"]["properties"]`
     # on each side saw `{}` vs `{}` and a property-only edit (changing the cron,
     # the URL of an HttpRequest, the SQL, the credential_id) never became a
     # version. `_node_properties` accepts both formats (the flat production one
@@ -120,7 +120,7 @@ async def get_version(crud: WorkflowCRUD, id_hash: str, version_number: int):
             f"Não foi possível descriptografar a versão {version_number} do workflow {id_hash}."
         ) from e
     crud.db.expunge(v)
-    set_committed_value(v, "definition", redigir_definition(em_claro))
+    set_committed_value(v, "definition", redact_definition(em_claro))
     return v
 
 
@@ -153,7 +153,7 @@ async def restore_version(crud: WorkflowCRUD, id_hash: str, version_number: int)
     # readable form to `workflow_versions`. Encrypting explicitly solves it in
     # both states, because `encrypt_workflow_connections` skips what already
     # starts with `gAAAA`. Same remedy as in `update_workflow` and
-    # `workflow_move_service._aplicar`.
+    # `workflow_move_service._apply`.
     await crud.create_version(
         workflow_hash=id_hash,
         definition=encrypt_workflow_connections(copy.deepcopy(wf.definition or {})),

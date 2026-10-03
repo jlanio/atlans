@@ -144,14 +144,14 @@ def collect_subworkflow_references(definition: Dict[str, Any]) -> list[Dict[str,
 # Maximum depth of the sub-workflow chain. SubWorkflowNode imports it from here
 # so it can EXPLAIN the overflow: without the shared constant, exceeding the limit
 # reached the operator as "workflow nao encontrado" (workflow not found).
-MAX_PROFUNDIDADE = 10
+MAX_DEPTH = 10
 
 
 async def collect_subworkflow_definitions_recursive(
     root_definition: Dict[str, Any],
     db,
     workspace_id: str | None = None,
-    max_depth: int = MAX_PROFUNDIDADE,
+    max_depth: int = MAX_DEPTH,
 ) -> Dict[str, Dict[str, Any]]:
     """Recursively collects the definitions of the referenced sub-workflows.
 

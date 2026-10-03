@@ -13,10 +13,10 @@ import UserSidebar from "./user-sidebar"
 import { ChatsLista } from "../home/chats/lista"
 import { AgendamentosLista } from "../home/agendamentos/lista"
 import { ArtefatosLista } from "../home/artefatos/lista"
-import { useHomeStore, type ItemDoMeu } from "@/app/stores/homeStore"
-import { useFormatos, useIdiomaDaTela, useTextosDaCasca } from "../home/i18n/da-casca"
-import { CATALOGO, ORGAOS_FEDERAIS, ORGAOS_REGIONAIS, PAISES, type BaseCitada } from "@/lib/catalogo"
-import type { ModoDeEntrada } from "@/lib/entrada"
+import { useHomeStore, type MyItem } from "@/app/stores/homeStore"
+import { useFormats, useScreenLanguage, useShellTexts } from "../home/i18n/da-casca"
+import { CATALOGO, ORGAOS_FEDERAIS, ORGAOS_REGIONAIS, PAISES, type CitedBase } from "@/lib/catalogo"
+import type { EntryMode } from "@/lib/entrada"
 
 /**
  * The Home's side shell, in Claude Code style: brand at the top, "Nova conversa"
@@ -26,7 +26,7 @@ import type { ModoDeEntrada } from "@/lib/entrada"
  *
  * **Without a session** (the Home opens anonymous; sign-in is a modal on the first
  * send) the shell shrinks: brand and trigger at the top, the **catalog showcase**
- * in the body (`VitrineDoCatalogo`, below) and, in the footer, **Entrar** and
+ * in the body (`CatalogShowcase`, below) and, in the footer, **Entrar** and
  * **Criar conta** — buttons that request the modal through the store, not links.
  * The Meus group does not MOUNT (it isn't just `hidden`): Chats does its GET on
  * mount, and an `atlans:home:meu` remembered from another person in the same
@@ -63,11 +63,11 @@ import type { ModoDeEntrada } from "@/lib/entrada"
  * dialogs the lists open.
  */
 export default function HomeSidebar() {
-  const t = useTextosDaCasca().casca.barraLateral
+  const t = useShellTexts().casca.barraLateral
   // The bar is a sibling of HomeView, not a child: its `lang` doesn't reach here,
   // and the <html> one only changes in an effect, after hydration. Without its
   // own, the server HTML put the bar's English under the root's `lang="pt-BR"`.
-  const idioma = useIdiomaDaTela()
+  const idioma = useScreenLanguage()
   const { isMobile, setOpenMobile } = useSidebar()
   const novaConversa = useHomeStore((s) => s.novaConversa)
   const hidratar = useHomeStore((s) => s.hidratar)
@@ -84,7 +84,7 @@ export default function HomeSidebar() {
   // read as HomeView): nothing here may fire a request.
   const anonimo = status === "unauthenticated" || session?.error === "RefreshTokenExpired"
   const pedirEntrada = useHomeStore((s) => s.pedirEntrada)
-  function entrar(modo: ModoDeEntrada) {
+  function entrar(modo: EntryMode) {
     if (isMobile) setOpenMobile(false)
     pedirEntrada(modo)
   }
@@ -144,7 +144,7 @@ export default function HomeSidebar() {
                 {t.noCatalogo}
               </SidebarGroupLabel>
               <SidebarGroupContent>
-                <VitrineDoCatalogo />
+                <CatalogShowcase />
               </SidebarGroupContent>
             </SidebarGroup>
           ) : (
@@ -252,7 +252,7 @@ function ItemColapsavel({
   label,
   children,
 }: {
-  nome: ItemDoMeu
+  nome: MyItem
   icone: React.ElementType
   label: string
   children: React.ReactNode
@@ -262,14 +262,14 @@ function ItemColapsavel({
   const aberto = useHomeStore((s) => s.meu[nome])
   const alternar = useHomeStore((s) => s.alternarItemDoMeu)
   const abrir = useHomeStore((s) => s.abrirItemDoMeu)
-  const idDaLista = useId()
-  const noTrilho = state === "collapsed" && !isMobile
+  const listId = useId()
+  const inRail = state === "collapsed" && !isMobile
 
-  const [montado, setMontado] = useState(false)
-  useEffect(() => { if (hidratado && aberto) setMontado(true) }, [hidratado, aberto])
+  const [montado, setMounted] = useState(false)
+  useEffect(() => { if (hidratado && aberto) setMounted(true) }, [hidratado, aberto])
 
   function aoClicar() {
-    if (noTrilho) {
+    if (inRail) {
       setOpen(true)
       abrir(nome)
       return
@@ -282,8 +282,8 @@ function ItemColapsavel({
       <SidebarMenuButton
         onClick={aoClicar}
         tooltip={{ children: label, className: "home-portal" }}
-        aria-expanded={noTrilho ? undefined : aberto}
-        aria-controls={idDaLista}
+        aria-expanded={inRail ? undefined : aberto}
+        aria-controls={listId}
         // 40px on the phone (§5 of the screen patterns); 36px with a fine pointer.
         className="h-9 max-md:h-10"
       >
@@ -296,7 +296,7 @@ function ItemColapsavel({
           )}
         />
       </SidebarMenuButton>
-      <div id={idDaLista} hidden={!aberto} className="group-data-[collapsible=icon]:hidden">
+      <div id={listId} hidden={!aberto} className="group-data-[collapsible=icon]:hidden">
         {montado && children}
       </div>
     </SidebarMenuItem>
@@ -325,7 +325,7 @@ function ItemColapsavel({
  * globe that already spins — hence the mismatched durations of `.home-fita` and
  * the full stop under `prefers-reduced-motion`.
  *
- * **The BRASIL and FORA DO BRASIL labels are not decoration.** Without them
+ * **The BRASIL and OUTSIDER DO BRASIL labels are not decoration.** Without them
  * "Equador" comes out in the same pill as "Embrapa" and becomes an agency called
  * Ecuador. The alternative was to solve it in the text ("em 11 países"), which
  * the second line already says — the two together cost two lines and remove the
@@ -334,9 +334,9 @@ function ItemColapsavel({
  * All of this disappears on the 3rem rail: the whole group is
  * `group-data-[collapsible=icon]:hidden` (set by the caller), as the invitation was.
  */
-function VitrineDoCatalogo() {
-  const t = useTextosDaCasca().casca.barraLateral
-  const f = useFormatos()
+function CatalogShowcase() {
+  const t = useShellTexts().casca.barraLateral
+  const f = useFormats()
   // Countries change name with the language; agencies (IBGE, INEA…) are proper names.
   const paises = PAISES.map((base) => ({ ...base, rotulo: t.paises[base.pasta] ?? base.rotulo }))
   return (
@@ -355,11 +355,11 @@ function VitrineDoCatalogo() {
       </p>
 
       <div className="flex flex-col gap-1.5 pt-3">
-        <RotuloDaFita>{t.brasil}</RotuloDaFita>
-        <Fita bases={ORGAOS_FEDERAIS} />
-        <Fita bases={ORGAOS_REGIONAIS} volta />
-        <RotuloDaFita className="pt-1">{t.foraDoBrasil}</RotuloDaFita>
-        <Fita bases={paises} devagar />
+        <RibbonLabel>{t.brasil}</RibbonLabel>
+        <Ribbon bases={ORGAOS_FEDERAIS} />
+        <Ribbon bases={ORGAOS_REGIONAIS} volta />
+        <RibbonLabel className="pt-1">{t.foraDoBrasil}</RibbonLabel>
+        <Ribbon bases={paises} devagar />
       </div>
 
       <div className="mx-2 mt-4 h-px bg-sidebar-border" />
@@ -370,7 +370,7 @@ function VitrineDoCatalogo() {
   )
 }
 
-function RotuloDaFita({ children, className }: { children: React.ReactNode; className?: string }) {
+function RibbonLabel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <span className={cn("px-2 font-mono text-[10px] uppercase tracking-[0.1em] text-sidebar-foreground/50", className)}>
       {children}
@@ -387,12 +387,12 @@ function RotuloDaFita({ children, className }: { children: React.ReactNode; clas
  * screen reader reads the list — once, not twice. That's also why there is no
  * `role="img"` with an `aria-label` reciting everything: the text is already here.
  */
-function Fita({
+function Ribbon({
   bases,
   volta = false,
   devagar = false,
 }: {
-  bases: readonly BaseCitada[]
+  bases: readonly CitedBase[]
   /** Runs the other way — that's what keeps the strips from looking like a table. */
   volta?: boolean
   /** 34s instead of 26s, for the countries ticker. */
@@ -402,17 +402,17 @@ function Fita({
     <div className="home-fita">
       <div className={cn("home-fita-trilho", volta && "volta", devagar && "devagar")}>
         {bases.map((base) => (
-          <Pilula key={base.pasta} rotulo={base.rotulo} />
+          <Pill key={base.pasta} rotulo={base.rotulo} />
         ))}
         {bases.map((base) => (
-          <Pilula key={`eco-${base.pasta}`} rotulo={base.rotulo} aria-hidden />
+          <Pill key={`eco-${base.pasta}`} rotulo={base.rotulo} aria-hidden />
         ))}
       </div>
     </div>
   )
 }
 
-function Pilula({ rotulo, ...resto }: { rotulo: string } & React.HTMLAttributes<HTMLSpanElement>) {
+function Pill({ rotulo, ...resto }: { rotulo: string } & React.HTMLAttributes<HTMLSpanElement>) {
   return (
     <span
       className="shrink-0 rounded-full border border-sidebar-border bg-sidebar-accent/45 px-2 py-[3px] text-[11px] text-sidebar-foreground/80"

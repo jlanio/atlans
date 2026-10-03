@@ -11,7 +11,7 @@ import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react"
 import { TbAlertTriangle, TbCheck, TbSearch } from "react-icons/tb"
 import { EXTENSOES, LimiteDaExtensao } from "@/extensoes"
 import { GisFlowService } from "@/service/GisFlowService"
-import type { IPainelDoModelo, IModeloDoCatalogo } from "@/service/types"
+import type { IModelPanel, ICatalogModel } from "@/service/types"
 import { createToast } from "@/utils/createToast"
 import { cn } from "@/lib/utils"
 import { Button } from "@/app/components/ui/button"
@@ -19,20 +19,20 @@ import { Input } from "@/app/components/ui/input"
 import { formatarDolar } from "@/lib/formatos"
 
 interface Props {
-  painel: IPainelDoModelo
+  painel: IModelPanel
   onTrocado: () => void
 }
 
-export function ModeloDoAssistente({ painel, onTrocado }: Props) {
-  const [escolhido, setEscolhido] = useState<string>(painel.atual.modelo)
-  const [filtro, setFiltro] = useState("")
+export function AssistantModel({ painel, onTrocado }: Props) {
+  const [escolhido, setChosen] = useState<string>(painel.atual.modelo)
+  const [filtro, setFilter] = useState("")
   // A save in progress — the model's, here, or an extension's. A single state,
   // so the buttons of both wait together.
-  const [salvando, setSalvando] = useState(false)
+  const [salvando, setSaving] = useState(false)
 
   // The parent's new load is the truth: after saving, the chosen model has to
   // follow, otherwise the button keeps offering to save what is already there.
-  useEffect(() => { setEscolhido(painel.atual.modelo) }, [painel.atual.modelo])
+  useEffect(() => { setChosen(painel.atual.modelo) }, [painel.atual.modelo])
 
   const catalogo = useMemo(() => {
     const busca = filtro.trim().toLowerCase()
@@ -41,9 +41,9 @@ export function ModeloDoAssistente({ painel, onTrocado }: Props) {
   }, [painel.catalogo, filtro])
 
   async function salvar(modelo: string | null) {
-    setSalvando(true)
+    setSaving(true)
     const res = await GisFlowService.trocarModelo(modelo)
-    setSalvando(false)
+    setSaving(false)
     if (res.error) {
       createToast.error("Não foi possível trocar o modelo", res.error.message)
       return
@@ -64,7 +64,7 @@ export function ModeloDoAssistente({ painel, onTrocado }: Props) {
         <Input
           id="modelo-busca"
           value={filtro}
-          onChange={e => setFiltro(e.target.value)}
+          onChange={e => setFilter(e.target.value)}
           placeholder="filtrar por nome ou fornecedor…"
           className="h-9 pl-8 text-[13px]"
           autoComplete="off"
@@ -81,7 +81,7 @@ export function ModeloDoAssistente({ painel, onTrocado }: Props) {
               type="button"
               role="option"
               aria-selected={m.id === escolhido}
-              onClick={() => setEscolhido(m.id)}
+              onClick={() => setChosen(m.id)}
               className={cn(
                 "flex w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-b px-3 py-2 text-left text-xs last:border-b-0 hover:bg-muted",
                 m.id === escolhido && "bg-primary/10 shadow-[inset_2px_0_0_var(--primary)]",
@@ -92,7 +92,7 @@ export function ModeloDoAssistente({ painel, onTrocado }: Props) {
                 {m.id === painel.atual.modelo && <span className="text-muted-foreground"> · em uso</span>}
               </span>
               <span className="tabular-nums whitespace-nowrap text-muted-foreground">
-                {precoDoModelo(m)}
+                {modelPrice(m)}
               </span>
             </button>
           </li>
@@ -114,7 +114,7 @@ export function ModeloDoAssistente({ painel, onTrocado }: Props) {
           painel={painel}
           escolhido={escolhido}
           ocupado={salvando}
-          aoOcupar={setSalvando}
+          aoOcupar={setSaving}
           aoTrocar={onTrocado}
         >
           {filho}
@@ -179,7 +179,7 @@ export function ModeloDoAssistente({ painel, onTrocado }: Props) {
   )
 }
 
-function precoDoModelo(m: IModeloDoCatalogo): string {
+function modelPrice(m: ICatalogModel): string {
   if (m.entrada_por_milhao == null || m.saida_por_milhao == null) return "preço não informado"
   return `${formatarDolar(m.entrada_por_milhao)} ent · ${formatarDolar(m.saida_por_milhao)} saí / M`
 }

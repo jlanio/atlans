@@ -12,15 +12,15 @@ type ArtifactFieldProps = FieldProps
 /** The picker shows the most recent ones, not the whole history: downloading
  *  all of the user's artifacts just to pick one held the node modal until the
  *  complete list arrived. */
-const LIMITE = 50
+const LIMIT = 50
 
 const ArtifactField = ({ field, values, setNodeField }: ArtifactFieldProps) => {
   const { current: workspace } = useWorkspace()
   const [items, setItems] = useState<IArtifactItem[]>([])
   const [loading, setLoading] = useState(false)
-  const [truncado, setTruncado] = useState(false)
+  const [truncado, setTruncated] = useState(false)
   // The list didn't arrive: the "no artifacts" notice would be a false statement.
-  const [falhou, setFalhou] = useState(false)
+  const [falhou, setFailed] = useState(false)
 
   async function fetchArtifacts() {
     if (!workspace) return
@@ -30,13 +30,13 @@ const ArtifactField = ({ field, values, setNodeField }: ArtifactFieldProps) => {
     // discard almost everything.
     const res = await GisFlowService.getArtifacts({
       workspace_id: workspace.id_hash,
-      limit: LIMITE,
+      limit: LIMIT,
     })
     const dados = dadoOuAviso(res, "Erro ao carregar artefatos")
     const itens = dados?.items ?? []
     setItems(itens)
-    setTruncado((dados?.total ?? 0) > itens.length)
-    setFalhou(dados === null)
+    setTruncated((dados?.total ?? 0) > itens.length)
+    setFailed(dados === null)
     setLoading(false)
   }
 
@@ -91,7 +91,7 @@ const ArtifactField = ({ field, values, setNodeField }: ArtifactFieldProps) => {
 
       {truncado && !loading && (
         <p className="text-xs text-muted-foreground mt-1">
-          Mostrando os {LIMITE} artefatos mais recentes deste workspace.
+          Mostrando os {LIMIT} artefatos mais recentes deste workspace.
         </p>
       )}
 

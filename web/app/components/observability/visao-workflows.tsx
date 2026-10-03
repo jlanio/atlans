@@ -11,11 +11,11 @@ import { Switch } from "@/app/components/ui/switch"
 import { CartaoDeEstado } from "@/app/components/shared/estados"
 import { SeloAssistente } from "@/app/components/shared/selo-assistente"
 import { StatusBadge } from "@/app/components/shared/StatusBadge"
-import { CABECALHO_DE_COLUNAS, CELULA_COM_ROTULO, DESTAQUE_DA_FICHA, LINHA_EMPILHADA } from "@/app/components/shared/tabela-empilhada"
+import { COLUMN_HEADER, LABELED_CELL, CARD_HIGHLIGHT, STACKED_ROW } from "@/app/components/shared/tabela-empilhada"
 import { cn } from "@/lib/utils"
 import type { IWorkflowMetricsRow } from "@/service/types"
 import { successRateColor } from "@/utils/formatters"
-import { formatarDuracao, formatarInicio, formatarInteiro, formatarPercentual, rotuloDaCategoria } from "@/lib/formatos"
+import { formatarDuracao, formatarInicio, formatInteger, formatPercent, categoryLabel } from "@/lib/formatos"
 
 interface Props {
   linhas: IWorkflowMetricsRow[]
@@ -42,19 +42,19 @@ export function VisaoWorkflows({ linhas, carregando, isAdmin, onVerExecucoes, on
   // the new list arrives, because that list already carries the saved value.
   const [overrides, setOverrides] = useState<Record<string, boolean>>({})
   useEffect(() => { setOverrides({}) }, [linhas])
-  const [confirmando, setConfirmando] = useState<IWorkflowMetricsRow | null>(null)
-  const [salvando, setSalvando] = useState(false)
+  const [confirming, setConfirming] = useState<IWorkflowMetricsRow | null>(null)
+  const [salvando, setSaving] = useState(false)
 
   async function aplicar(wf: IWorkflowMetricsRow, ativo: boolean) {
     setOverrides(prev => ({ ...prev, [wf.workflow_hash]: ativo }))
-    setSalvando(true)
+    setSaving(true)
     let ok = true
     try {
       ok = (await onAlternarAtivo(wf.workflow_hash, ativo)) !== false
     } catch {
       ok = false
     }
-    setSalvando(false)
+    setSaving(false)
     if (!ok) {
       setOverrides(prev => {
         const clone = { ...prev }
@@ -62,12 +62,12 @@ export function VisaoWorkflows({ linhas, carregando, isAdmin, onVerExecucoes, on
         return clone
       })
     }
-    setConfirmando(null)
+    setConfirming(null)
   }
 
   function aoAlternar(wf: IWorkflowMetricsRow, proximo: boolean) {
     if (proximo) void aplicar(wf, true)
-    else setConfirmando(wf)
+    else setConfirming(wf)
   }
 
   if (carregando && linhas.length === 0) {
@@ -97,7 +97,7 @@ export function VisaoWorkflows({ linhas, carregando, isAdmin, onVerExecucoes, on
     <div className="flex flex-col rounded-lg border bg-card shadow-xs">
       <div className="overflow-x-auto rounded-t-lg">
         <table className="w-full text-sm max-md:block md:min-w-[860px]">
-          <thead className={CABECALHO_DE_COLUNAS}>
+          <thead className={COLUMN_HEADER}>
             <tr className="border-b bg-muted/40 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
               <th scope="col" className="px-3 py-2 text-left">Workflow</th>
               <th scope="col" className="px-3 py-2 text-right">Execuções</th>
@@ -112,9 +112,9 @@ export function VisaoWorkflows({ linhas, carregando, isAdmin, onVerExecucoes, on
           <tbody className="max-md:block">
             {linhas.map(wf => {
               const ativo = overrides[wf.workflow_hash] ?? wf.active
-              const ultimoErro = wf.last_error?.trim() || null
-              const categoria = rotuloDaCategoria(wf.last_error_category)
-              const erroTexto = ultimoErro ? (categoria ? `${categoria} · ${ultimoErro}` : ultimoErro) : null
+              const lastError = wf.last_error?.trim() || null
+              const categoria = categoryLabel(wf.last_error_category)
+              const errorText = lastError ? (categoria ? `${categoria} · ${lastError}` : lastError) : null
               return (
                 <tr
                   key={wf.workflow_hash}
@@ -122,10 +122,10 @@ export function VisaoWorkflows({ linhas, carregando, isAdmin, onVerExecucoes, on
                   className={cn(
                     "cursor-pointer border-b transition-colors last:border-0 hover:bg-accent/50",
                     !ativo && "text-muted-foreground",
-                    LINHA_EMPILHADA,
+                    STACKED_ROW,
                   )}
                 >
-                  <td className={cn("px-3 py-2.5 align-middle", DESTAQUE_DA_FICHA)}>
+                  <td className={cn("px-3 py-2.5 align-middle", CARD_HIGHLIGHT)}>
                     <div className="flex min-w-0 flex-col">
                       <div className="flex min-w-0 items-center gap-1.5">
                         {/* The button is the keyboard target; the whole row is the mouse's. */}
@@ -145,19 +145,19 @@ export function VisaoWorkflows({ linhas, carregando, isAdmin, onVerExecucoes, on
                       </span>
                     </div>
                   </td>
-                  <td data-rotulo="execuções" className={cn("px-3 py-2.5 text-right align-middle tabular-nums", CELULA_COM_ROTULO)}>
-                    {formatarInteiro(wf.total_runs)}
+                  <td data-rotulo="execuções" className={cn("px-3 py-2.5 text-right align-middle tabular-nums", LABELED_CELL)}>
+                    {formatInteger(wf.total_runs)}
                     {wf.running_runs > 0 && <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">· {wf.running_runs} agora</span>}
                   </td>
-                  <td data-rotulo="sucesso" className={cn("px-3 py-2.5 text-right align-middle tabular-nums", CELULA_COM_ROTULO)}>
+                  <td data-rotulo="sucesso" className={cn("px-3 py-2.5 text-right align-middle tabular-nums", LABELED_CELL)}>
                     {wf.total_runs > 0
-                      ? <span className={cn("font-medium", successRateColor(wf.success_rate, "amber"))}>{formatarPercentual(wf.success_rate, 0)}</span>
+                      ? <span className={cn("font-medium", successRateColor(wf.success_rate, "amber"))}>{formatPercent(wf.success_rate, 0)}</span>
                       : <span className="text-muted-foreground">—</span>}
                   </td>
-                  <td data-rotulo="típica" className={cn("px-3 py-2.5 text-right align-middle tabular-nums", CELULA_COM_ROTULO)}>
+                  <td data-rotulo="típica" className={cn("px-3 py-2.5 text-right align-middle tabular-nums", LABELED_CELL)}>
                     {formatarDuracao(wf.p50_seconds)}
                   </td>
-                  <td data-rotulo="última" className={cn("px-3 py-2.5 align-middle whitespace-nowrap", CELULA_COM_ROTULO)}>
+                  <td data-rotulo="última" className={cn("px-3 py-2.5 align-middle whitespace-nowrap", LABELED_CELL)}>
                     {wf.last_run_at ? (
                       <span className="inline-flex items-center gap-2">
                         <span className="tabular-nums text-xs" title={wf.last_run_at}>{formatarInicio(wf.last_run_at)}</span>
@@ -170,13 +170,13 @@ export function VisaoWorkflows({ linhas, carregando, isAdmin, onVerExecucoes, on
                   {/* Limit on the inner block, not on the <td>: `max-width` on a table
                       cell is not defined by the specification (see the Erro
                       column of tabela-execucoes.tsx). */}
-                  <td data-rotulo="falhas" className={cn("px-3 py-2.5 align-middle max-md:basis-full", CELULA_COM_ROTULO)}>
+                  <td data-rotulo="falhas" className={cn("px-3 py-2.5 align-middle max-md:basis-full", LABELED_CELL)}>
                     <div className="flex min-w-0 max-w-[240px] items-baseline gap-2 max-md:max-w-full">
                       <span className={cn("tabular-nums font-medium", wf.failed_runs > 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
-                        {formatarInteiro(wf.failed_runs)}
+                        {formatInteger(wf.failed_runs)}
                       </span>
-                      {erroTexto && (
-                        <span className="truncate text-[12px] text-muted-foreground" title={erroTexto}>{erroTexto}</span>
+                      {errorText && (
+                        <span className="truncate text-[12px] text-muted-foreground" title={errorText}>{errorText}</span>
                       )}
                     </div>
                   </td>
@@ -188,7 +188,7 @@ export function VisaoWorkflows({ linhas, carregando, isAdmin, onVerExecucoes, on
                       <label className="inline-flex items-center justify-center max-md:min-h-10 max-md:min-w-10">
                         <Switch
                           checked={ativo}
-                          disabled={salvando && confirmando?.workflow_hash === wf.workflow_hash}
+                          disabled={salvando && confirming?.workflow_hash === wf.workflow_hash}
                           onCheckedChange={proximo => aoAlternar(wf, proximo)}
                           aria-label={`${ativo ? "Desativar" : "Ativar"} ${wf.workflow_name}`}
                         />
@@ -205,15 +205,15 @@ export function VisaoWorkflows({ linhas, carregando, isAdmin, onVerExecucoes, on
         </table>
       </div>
 
-      <Dialog open={!!confirmando} onOpenChange={aberto => { if (!aberto && !salvando) setConfirmando(null) }}>
+      <Dialog open={!!confirming} onOpenChange={aberto => { if (!aberto && !salvando) setConfirming(null) }}>
         <DialogContent closeDisabled={salvando}>
           <DialogHeader>
-            <DialogTitle>Desativar «{confirmando?.workflow_name}»?</DialogTitle>
+            <DialogTitle>Desativar «{confirming?.workflow_name}»?</DialogTitle>
             <DialogDescription>Novas execuções, inclusive agendadas, não vão rodar.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmando(null)} disabled={salvando}>Cancelar</Button>
-            <Button variant="destructive" onClick={() => confirmando && aplicar(confirmando, false)} disabled={salvando}>
+            <Button variant="outline" onClick={() => setConfirming(null)} disabled={salvando}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => confirming && aplicar(confirming, false)} disabled={salvando}>
               {salvando ? "Desativando…" : "Desativar"}
             </Button>
           </DialogFooter>

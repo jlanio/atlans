@@ -6,7 +6,7 @@ import { useUpdateNodeInternals } from "@xyflow/react"
 import { INodeContext } from "@/context/useFlowContext"
 
 /** Signature of a node's connection points: which ones exist, and in what order. */
-function assinaturaDeHandles(n: INodeContext): string {
+function handlesSignature(n: INodeContext): string {
   const portas = (lista: unknown) =>
     ((lista ?? []) as { name: string }[]).map(p => p.name).join(",")
   return `${n.id}:${portas(n.data?.inputs)}>${portas(n.data?.outputs)}`
@@ -39,7 +39,7 @@ export function useHandleRegistrySync(nodes: INodeContext[]) {
   // drag frame, and on theme or save-status changes. The canvas hands over a
   // projection that only changes identity when a node enters, leaves or has its
   // `data` replaced, and that is what gives the useMemo here its value.
-  const assinatura = useMemo(() => nodes.map(assinaturaDeHandles).join("|"), [nodes])
+  const assinatura = useMemo(() => nodes.map(handlesSignature).join("|"), [nodes])
 
   useEffect(() => {
     if (!nodes.length) return

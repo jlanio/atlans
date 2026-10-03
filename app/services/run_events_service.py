@@ -22,7 +22,7 @@ Two contracts live here:
 
 And the WRITER's side lives here too: the history and channel keys
 (`chave_do_historico`, `canal_do_run`), the pipeline that writes a batch of events
-(`anexar_eventos`) and the `__workflow_complete__` JSON (`evento_de_conclusao`)
+(`append_events`) and the `__workflow_complete__` JSON (`evento_de_conclusao`)
 — used by the executor WS publishers and by `publicar_conclusao`.
 """
 from __future__ import annotations
@@ -40,7 +40,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.constants import (
-    MAX_EVENTOS_NO_HISTORICO,
+    MAX_EVENTS_IN_HISTORY,
     REDIS_TTL_1H,
     WORKFLOW_COMPLETE_NODE,
 )
@@ -54,7 +54,7 @@ logger = get_logger(__name__)
 # Events per replay BATCH. The gain that matters is this: one WS frame (or one
 # consumer iteration) per batch instead of one per event — the densest burst
 # on the channel was precisely the moment the panel needs to show up. The
-# READ, however, is a single one (see `_ler_historico`): paginating the LRANGE by absolute
+# READ, however, is a single one (see `_read_history`): paginating the LRANGE by absolute
 # index lost events, because the publisher does LTRIM(-5000,-1) on every batch and
 # the list slides between pages.
 _REPLAY_CHUNK = 500
@@ -107,7 +107,7 @@ _POLL_POS_COMPLETE_S = 0.5
 # traded a database hiccup for an error in the caller's face. The counter
 # resets on every successful read, so only a real outage (three
 # in a row) propagates.
-_POLL_FALHAS_CONSECUTIVAS_MAX = 3
+_POLL_MAX_CONSECUTIVE_FAILURES = 3
 
 # What counts as a TRANSIENT poll failure. `asyncio.TimeoutError` covers the
 # pool checkout that timed out (up to 3.10 it was a class separate from
@@ -115,11 +115,11 @@ _POLL_FALHAS_CONSECUTIVAS_MAX = 3
 # `OSError` is the database socket dropping.
 # `CancelledError` is NOT included: it inherits from `BaseException` and must keep
 # propagating to cancel the task.
-_ERROS_POLL_TRANSITORIOS = (SQLAlchemyError, OSError, asyncio.TimeoutError, TimeoutError)
+_TRANSIENT_POLL_ERRORS = (SQLAlchemyError, OSError, asyncio.TimeoutError, TimeoutError)
 
 # TERMINAL vocabulary of `WorkflowRun.status` — the same one
 # `executor_ws_router` uses to avoid regressing an already closed run.
-_STATUS_TERMINAIS = frozenset({"success", "failed", "cancelled"})
+_TERMINAL_STATUSES = frozenset({"success", "failed", "cancelled"})
 
 
 # ── Where a run's events live ────────────────────────────────────────────────
@@ -140,12 +140,12 @@ def canal_do_run(run_id: str) -> str:
     return f"workflow:{run_id}:events"
 
 
-def anexar_eventos(pipe, run_id: str, payloads: list[str]) -> None:
+def append_events(pipe, run_id: str, payloads: list[str]) -> None:
     """Queues on `pipe` the writing of `payloads` (ready JSON) to the run.
 
     History BEFORE the channel and in the same pipeline: that is what makes the
     duplicates at the replay↔live boundary a prefix of the stream (see
-    `_stream_ao_vivo`). The `ltrim` holds the `MAX_EVENTOS_NO_HISTORICO` ceiling and
+    `_live_stream`). The `ltrim` holds the `MAX_EVENTS_IN_HISTORY` ceiling and
     the `expire` renews the TTL on every write.
 
     The pipeline belongs to the caller, who also executes it: that is how the
@@ -154,7 +154,7 @@ def anexar_eventos(pipe, run_id: str, payloads: list[str]) -> None:
     """
     historico = chave_do_historico(run_id)
     pipe.rpush(historico, *payloads)
-    pipe.ltrim(historico, -MAX_EVENTOS_NO_HISTORICO, -1)
+    pipe.ltrim(historico, -MAX_EVENTS_IN_HISTORY, -1)
     pipe.expire(historico, REDIS_TTL_1H)
     canal = canal_do_run(run_id)
     for payload in payloads:
@@ -166,7 +166,7 @@ def anexar_eventos(pipe, run_id: str, payloads: list[str]) -> None:
 # job_result and the inconclusive run always published it, null when there is no
 # known start. Readers treat both forms the same (`?? null` in the panel),
 # so each path keeps publishing what it used to publish.
-_SEM_DURACAO = object()
+_NO_DURATION = object()
 
 
 def evento_de_conclusao(
@@ -175,10 +175,10 @@ def evento_de_conclusao(
     *,
     erro: str | None = None,
     extra: dict | None = None,
-    duration_ms=_SEM_DURACAO,
+    duration_ms=_NO_DURATION,
     timestamp: float | None = None,
 ) -> str:
-    """The `__workflow_complete__` JSON, ready for `anexar_eventos`.
+    """The `__workflow_complete__` JSON, ready for `append_events`.
 
     `status` is what the panel shows (`completed`, `failed`, `cancelled`); the
     level derives from it — `error` only on failure, because cancelling is not an error. `extra`
@@ -193,7 +193,7 @@ def evento_de_conclusao(
         "status":    status,
         "timestamp": time.time() if timestamp is None else timestamp,
     }
-    if duration_ms is not _SEM_DURACAO:
+    if duration_ms is not _NO_DURATION:
         evento["duration_ms"] = duration_ms
     evento["error"] = erro
     evento["extra"] = extra
@@ -323,7 +323,7 @@ class _EventBuffer:
         return events
 
 
-async def _ler_historico(run_id: str, history_key: str) -> tuple[list[str], bool]:
+async def _read_history(run_id: str, history_key: str) -> tuple[list[str], bool]:
     """Snapshot of the history, cut at the 1st `__workflow_complete__`.
 
     Returns (historico, run_ja_terminou).
@@ -382,7 +382,7 @@ async def iter_run_events(
                 # Subscribes BEFORE reading the history so as not to lose events that
                 # arrive while the replay happens.
                 await pubsub.subscribe(channel)
-                history, already_complete = await _ler_historico(run_id, history_key)
+                history, already_complete = await _read_history(run_id, history_key)
             except (RuntimeError, RedisError, OSError) as exc:
                 # RuntimeError is `get_redis_pool()` with no pool (shutdown/rolling
                 # deploy, lifespan that did not run); the other two are Redis
@@ -417,10 +417,10 @@ async def iter_run_events(
             # closed, `esperar_run` on the completion batch) and a `break` in an
             # `async for` does NOT finalize the generator — without this, the pub/sub
             # producer would only be cancelled when the garbage collector came by.
-            async with aclosing(_stream_ao_vivo(
+            async with aclosing(_live_stream(
                 pubsub, run_id, pendentes, deadline=deadline, heartbeat_s=heartbeat_s,
-            )) as ao_vivo:
-                async for lote in ao_vivo:
+            )) as live:
+                async for lote in live:
                     yield lote
             # The unsubscribe/reset is left to the pubsub's `async with` — calling it by
             # hand after a cancellation only risks talking on an already
@@ -429,7 +429,7 @@ async def iter_run_events(
         await sub_client.aclose()
 
 
-async def _stream_ao_vivo(
+async def _live_stream(
     pubsub,
     run_id: str,
     pendentes: Counter | None,
@@ -501,8 +501,8 @@ async def _stream_ao_vivo(
                 continue
             if events:
                 dropped = buf.take_dropped()
-                perdidos_lifecycle = buf.take_dropped_lifecycle()
-                if perdidos_lifecycle:
+                dropped_lifecycle = buf.take_dropped_lifecycle()
+                if dropped_lifecycle:
                     # ERROR, and separate from the telemetry warning: each of these is
                     # a node that will keep spinning forever on the canvas. The previous
                     # line said "stdout descartados" (stdout discarded) for both cases,
@@ -512,13 +512,13 @@ async def _stream_ao_vivo(
                         "por saturação do buffer (%d slots) — o canvas do usuário vai "
                         "ficar com nó(s) sem conclusão. Consumidor não acompanha o "
                         "ritmo do run.",
-                        run_id, perdidos_lifecycle, _QUEUE_MAXSIZE,
+                        run_id, dropped_lifecycle, _QUEUE_MAXSIZE,
                     )
-                if dropped > perdidos_lifecycle:
+                if dropped > dropped_lifecycle:
                     logger.warning(
                         "Eventos do run %s: %d evento(s) de stdout descartados — "
                         "consumidor nao acompanha o ritmo do run.",
-                        run_id, dropped - perdidos_lifecycle,
+                        run_id, dropped - dropped_lifecycle,
                     )
                 # The producer closes the buffer in the same step in which it pushes the
                 # complete, so the batch that contains it already goes out marked.
@@ -556,7 +556,7 @@ async def ler_status_do_run(db, run_id: str) -> tuple[str | None, WorkflowRun | 
 
 
 @dataclass
-class ResultadoEspera:
+class WaitResult:
     """What `esperar_run` returns.
 
     `status`/`run` are what the `workflow_runs` row said on the last read
@@ -564,10 +564,10 @@ class ResultadoEspera:
     with `completed`/`failed` seen in the events; `eventos_descartados` sums the
     `dropped` of the batches. `redis_indisponivel=True` says only the poll worked.
 
-    `concluidos` is NOT comparable with `total_nos` as "x of N finished": a node
+    `concluidos` is NOT comparable with `total_nodes` as "x of N finished": a node
     skipped by a branch (`run.node_stats[no]["status"] == "skipped"`) and a node that
     never got to run after a failure publish no event at all, so
-    `concluidos < total_nos` at the end is the NORMAL case for a graph with branches.
+    `concluidos < total_nodes` at the end is the NORMAL case for a graph with branches.
     The real picture of who ran is in `run.node_stats`; `concluidos` serves
     for incremental progress, not for checking completeness.
 
@@ -589,10 +589,10 @@ class ResultadoEspera:
     viu_complete: bool = False
 
 
-ProgressoCallback = Callable[[int, int, str], Awaitable[None]]
+ProgressCallback = Callable[[int, int, str], Awaitable[None]]
 
 
-def _formatar_duracao(duration_ms) -> str | None:
+def _format_duration(duration_ms) -> str | None:
     try:
         ms = float(duration_ms)
     except (TypeError, ValueError):
@@ -606,10 +606,10 @@ async def esperar_run(
     run_id: str,
     *,
     timeout_s: float,
-    total_nos: int,
-    on_progress: ProgressoCallback | None = None,
+    total_nodes: int,
+    on_progress: ProgressCallback | None = None,
     poll_s: float = 2.0,
-) -> ResultadoEspera:
+) -> WaitResult:
     """Waits for the run to finish, with per-node progress and the database as the truth.
 
     Two tasks: A consumes `iter_run_events` (progress + fast ending via the
@@ -624,48 +624,48 @@ async def esperar_run(
     - A died without complete (Redis down, subscriber dropped) → only B continues;
     - neither of them by `timeout_s` → `timed_out=True` with what the row says.
 
-    `total_nos` is only the denominator of the progress delivered to `on_progress` (the
+    `total_nodes` is only the denominator of the progress delivered to `on_progress` (the
     number of nodes in the definition). Do not expect the numerator to reach it: a node
     skipped by a branch (`node_stats[no]["status"] == "skipped"`) and a node that never
     ran after a failure do NOT publish an event, so finishing with
-    `concluidos < total_nos` is normal in a graph with branches — the real total of
+    `concluidos < total_nodes` is normal in a graph with branches — the real total of
     who ran comes from `run.node_stats`.
 
     A transient poll failure (pool checkout timed out, `SQLAlchemyError`,
     `OSError`) does not bring down the wait: up to
-    `_POLL_FALHAS_CONSECUTIVAS_MAX` in a row are tolerated, with a warning; beyond that (or at
+    `_POLL_MAX_CONSECUTIVE_FAILURES` in a row are tolerated, with a warning; beyond that (or at
     the end of the deadline) the error propagates.
 
     `on_progress` runs inside the event consumption: if it raises, the exception
     is logged ONCE and the notifications stop, but the counting and the wait continue
     — a broken callback from the caller cannot cost the run's outcome.
 
-    `ResultadoEspera.viu_complete` distinguishes the two "non-terminals": without
+    `WaitResult.viu_complete` distinguishes the two "non-terminals": without
     complete the run may really be running; WITH complete and a non-terminal status
     the run is over and it is the row write that is late (see the docstring of
-    `ResultadoEspera`).
+    `WaitResult`).
 
-    The wait's state and the two tasks live in `_Espera`; the order lives here.
+    The wait's state and the two tasks live in `_Wait`; the order lives here.
     """
-    espera = _Espera(
-        run_id, timeout_s=timeout_s, total_nos=total_nos,
+    espera = _Wait(
+        run_id, timeout_s=timeout_s, total_nodes=total_nodes,
         on_progress=on_progress, poll_s=poll_s,
     )
-    status, run = await espera.disputar()
-    if espera.viu_complete and status not in _STATUS_TERMINAIS:
+    status, run = await espera.race()
+    if espera.viu_complete and status not in _TERMINAL_STATUSES:
         # The consumer publishes the event and ONLY THEN writes the row: short poll so as
         # not to return "running" for a run that has just finished.
-        status, run = await espera.poll_pos_complete(status, run)
+        status, run = await espera.poll_after_complete(status, run)
     return espera.resultado(status, run)
 
 
-class _Espera:
+class _Wait:
     """One call of `esperar_run`: what the two tasks share.
 
-    Task A (`consumir_eventos`) counts the progress and sees the fast ending via the
-    `__workflow_complete__`; B (`poll_ate_terminal`) reads `WorkflowRun.status`
-    until terminal or the deadline. `disputar` races the two and keeps the outcome
-    of whichever counts; `poll_pos_complete` and `resultado` close the wait.
+    Task A (`consume_events`) counts the progress and sees the fast ending via the
+    `__workflow_complete__`; B (`poll_until_terminal`) reads `WorkflowRun.status`
+    until terminal or the deadline. `race` races the two and keeps the outcome
+    of whichever counts; `poll_after_complete` and `resultado` close the wait.
     """
 
     def __init__(
@@ -673,23 +673,23 @@ class _Espera:
         run_id: str,
         *,
         timeout_s: float,
-        total_nos: int,
-        on_progress: ProgressoCallback | None,
+        total_nodes: int,
+        on_progress: ProgressCallback | None,
         poll_s: float,
     ):
         self.run_id = run_id
-        self.total_nos = total_nos
+        self.total_nodes = total_nodes
         self.on_progress = on_progress
         self.poll_s = poll_s
         self.loop = asyncio.get_running_loop()
         self.deadline = self.loop.time() + timeout_s
         self.concluidos: set[str] = set()
         self.descartados = 0
-        # Turned off on the first exception from the caller's callback (see `absorver_lote`).
+        # Turned off on the first exception from the caller's callback (see `absorb_batch`).
         self.notificar = on_progress is not None
         # Last database read that ran to completion, even if the poll task was
-        # cancelled right after (see `ler_status_inteiro`).
-        self.ultima_leitura: tuple[str | None, WorkflowRun | None] | None = None
+        # cancelled right after (see `read_full_status`).
+        self.last_read: tuple[str | None, WorkflowRun | None] | None = None
         self.redis_indisponivel = False
         self.viu_complete = False
 
@@ -698,7 +698,7 @@ class _Espera:
 
     # ── A: eventos ────────────────────────────────────────────────────────────
 
-    async def absorver_lote(self, lote: Lote) -> None:
+    async def absorb_batch(self, lote: Lote) -> None:
         """Counts the nodes that finished and notifies the caller of each one.
 
         Only lifecycle counts: stdout/debug, invalid JSON, events without a node, the
@@ -724,11 +724,11 @@ class _Espera:
             self.concluidos.add(node)
             if self.notificar:
                 msg = f"{node}: {status}"
-                duracao = _formatar_duracao(ev.get("duration_ms"))
+                duracao = _format_duration(ev.get("duration_ms"))
                 if duracao:
                     msg = f"{msg} ({duracao})"
                 try:
-                    await self.on_progress(len(self.concluidos), self.total_nos, msg)
+                    await self.on_progress(len(self.concluidos), self.total_nodes, msg)
                 except Exception as exc:
                     # The callback belongs to the CALLER (an MCP progress
                     # notification, a send on a socket that has already died): breaking here
@@ -742,21 +742,21 @@ class _Espera:
                         "notificar.", self.run_id, exc, exc_info=exc,
                     )
 
-    async def consumir_eventos(self) -> bool:
+    async def consume_events(self) -> bool:
         """True if the `__workflow_complete__` went through the events."""
         eventos = iter_run_events(self.run_id, timeout_s=max(self.restante(), 0.0))
         # `aclosing`: leaving the loop on the completion batch does not finalize the generator
         # on its own, and it is its `finally` that closes the subscriber's connection.
         async with aclosing(eventos):
             async for lote in eventos:
-                await self.absorver_lote(lote)
+                await self.absorb_batch(lote)
                 if lote.completo:
                     return True
         return False
 
     # ── B: database poll ──────────────────────────────────────────────────────
 
-    async def ler_status(self) -> tuple[str | None, WorkflowRun | None]:
+    async def read_status(self) -> tuple[str | None, WorkflowRun | None]:
         async with get_session_async() as db:
             status, run = await ler_status_do_run(db, self.run_id)
             if run is not None:
@@ -767,8 +767,8 @@ class _Espera:
                 db.expunge(run)
             return status, run
 
-    async def ler_status_inteiro(self) -> tuple[str | None, WorkflowRun | None]:
-        """`ler_status` that a cancellation does not interrupt midway.
+    async def read_full_status(self) -> tuple[str | None, WorkflowRun | None]:
+        """`read_status` that a cancellation does not interrupt midway.
 
         The poll task is cancelled as soon as the events see the complete — and the
         cancellation lands wherever it is, including in the middle of a statement.
@@ -776,49 +776,49 @@ class _Espera:
         (the pool invalidates it, at best). The `shield` lets the read in
         progress finish and close the session; the cancellation propagates right after.
 
-        The read that survives the cancellation is KEPT in `ultima_leitura`:
+        The read that survives the cancellation is KEPT in `last_read`:
         it cost a round-trip to the database and is, by definition, the most recent
         one there is. Discarding it only to open another session right away and
         ask the same thing doubled the latency of the most common path (the
         events see the complete while the poll is already reading).
         """
-        leitura = asyncio.ensure_future(self.ler_status())
+        leitura = asyncio.ensure_future(self.read_status())
         try:
-            self.ultima_leitura = await asyncio.shield(leitura)
-            return self.ultima_leitura
+            self.last_read = await asyncio.shield(leitura)
+            return self.last_read
         except asyncio.CancelledError:
             await asyncio.gather(leitura, return_exceptions=True)
             if leitura.done() and not leitura.cancelled() and leitura.exception() is None:
-                self.ultima_leitura = leitura.result()
+                self.last_read = leitura.result()
             raise
 
-    async def poll_ate_terminal(self) -> tuple[str | None, WorkflowRun | None]:
+    async def poll_until_terminal(self) -> tuple[str | None, WorkflowRun | None]:
         """Polls until a terminal status or the deadline; returns the last read.
 
         A database failure here is almost always transient (pool with no free connection
         at peak, recycled connection, network blip) and the event channel keeps
         delivering progress: bringing down the wait on the first of them traded a
-        hiccup for an error. Tolerates up to `_POLL_FALHAS_CONSECUTIVAS_MAX` in a row
+        hiccup for an error. Tolerates up to `_POLL_MAX_CONSECUTIVE_FAILURES` in a row
         — the counter resets on every good read — and only propagates on exceeding that
         ceiling or the deadline.
         """
         falhas = 0
         while True:
             try:
-                status, run = await self.ler_status_inteiro()
-            except _ERROS_POLL_TRANSITORIOS as exc:
+                status, run = await self.read_full_status()
+            except _TRANSIENT_POLL_ERRORS as exc:
                 falhas += 1
                 restante = self.restante()
-                if falhas >= _POLL_FALHAS_CONSECUTIVAS_MAX or restante <= 0:
+                if falhas >= _POLL_MAX_CONSECUTIVE_FAILURES or restante <= 0:
                     raise
                 logger.warning(
                     "Poll do run %s falhou (%d/%d): %s",
-                    self.run_id, falhas, _POLL_FALHAS_CONSECUTIVAS_MAX, exc,
+                    self.run_id, falhas, _POLL_MAX_CONSECUTIVE_FAILURES, exc,
                 )
                 await asyncio.sleep(min(self.poll_s, restante))
                 continue
             falhas = 0
-            if status in _STATUS_TERMINAIS:
+            if status in _TERMINAL_STATUSES:
                 return status, run
             restante = self.restante()
             if restante <= 0:
@@ -827,48 +827,48 @@ class _Espera:
 
     # ── A disputa e o fim ─────────────────────────────────────────────────────
 
-    async def disputar(self) -> tuple[str | None, WorkflowRun | None]:
+    async def race(self) -> tuple[str | None, WorkflowRun | None]:
         """Races A and B and returns the `(status, linha)` (status, row) of whichever decides.
 
         Whichever finishes first cancels the other; A without complete (Redis down,
         subscriber dropped) lets B continue alone until terminal or the deadline.
         """
-        tarefa_eventos = asyncio.create_task(self.consumir_eventos())
-        tarefa_poll = asyncio.create_task(self.poll_ate_terminal())
-        pendentes = {tarefa_eventos, tarefa_poll}
+        events_task = asyncio.create_task(self.consume_events())
+        poll_task = asyncio.create_task(self.poll_until_terminal())
+        pendentes = {events_task, poll_task}
         try:
             while pendentes:
                 done, pendentes = await asyncio.wait(pendentes, return_when=asyncio.FIRST_COMPLETED)
-                if tarefa_eventos not in done:
+                if events_task not in done:
                     # Only B finished (terminal status or deadline): the outcome is its.
                     break
                 # A finished — alone or in the SAME step as B. Reading its result
                 # here, BEFORE any `break`, is what guarantees an accurate
                 # `viu_complete`: with both in the same `done`, exiting straight through the poll lost
                 # the information that the graph had finished.
-                self.anotar_fim_dos_eventos(tarefa_eventos)
-                if self.viu_complete or tarefa_poll in done:
+                self.note_events_end(events_task)
+                if self.viu_complete or poll_task in done:
                     break
                 # No complete: the poll continues alone until terminal or the deadline.
         finally:
-            for tarefa in (tarefa_eventos, tarefa_poll):
+            for tarefa in (events_task, poll_task):
                 tarefa.cancel()
-            await asyncio.gather(tarefa_eventos, tarefa_poll, return_exceptions=True)
+            await asyncio.gather(events_task, poll_task, return_exceptions=True)
 
-        if tarefa_poll.done() and not tarefa_poll.cancelled():
+        if poll_task.done() and not poll_task.cancelled():
             # `.result()` re-raises the poll's giving up (consecutive failures beyond
             # the ceiling): without a database there is no outcome to return.
-            return tarefa_poll.result()
-        if self.ultima_leitura is not None:
+            return poll_task.result()
+        if self.last_read is not None:
             # The poll was cancelled (the events saw the complete), but the read that
             # it had in progress ran to completion — it is the freshest there is. Opening
             # another session to ask the same thing cost an entire round-trip on the
             # MOST common path. If it is not terminal yet, the short poll
-            # (`poll_pos_complete`) continues from where it left off.
-            return self.ultima_leitura
-        return await self.ler_status()
+            # (`poll_after_complete`) continues from where it left off.
+            return self.last_read
+        return await self.read_status()
 
-    def anotar_fim_dos_eventos(self, tarefa: asyncio.Task) -> None:
+    def note_events_end(self, tarefa: asyncio.Task) -> None:
         """How A finished: with the complete, without Redis or with an error."""
         exc = tarefa.exception()
         if exc is None:
@@ -886,7 +886,7 @@ class _Espera:
                 self.run_id, exc, exc_info=exc,
             )
 
-    async def poll_pos_complete(
+    async def poll_after_complete(
         self, status: str | None, run: WorkflowRun | None,
     ) -> tuple[str | None, WorkflowRun | None]:
         """Short poll, up to `_POLL_POS_COMPLETE_MAX_S`, for the terminal row.
@@ -896,33 +896,33 @@ class _Espera:
         """
         fim = self.loop.time() + _POLL_POS_COMPLETE_MAX_S
         falhas = 0
-        while status not in _STATUS_TERMINAIS and self.loop.time() < fim:
+        while status not in _TERMINAL_STATUSES and self.loop.time() < fim:
             await asyncio.sleep(_POLL_POS_COMPLETE_S)
             try:
-                status, run = await self.ler_status()
-            except _ERROS_POLL_TRANSITORIOS as exc:
+                status, run = await self.read_status()
+            except _TRANSIENT_POLL_ERRORS as exc:
                 # Same reasoning as the long poll, and here the bet is even
                 # better: the graph has provably finished, only the row is missing.
                 # Giving up over a database hiccup would throw away the only
                 # information the wait already has.
                 falhas += 1
-                if falhas >= _POLL_FALHAS_CONSECUTIVAS_MAX:
+                if falhas >= _POLL_MAX_CONSECUTIVE_FAILURES:
                     raise
                 logger.warning(
                     "Poll pós-complete do run %s falhou (%d/%d): %s",
-                    self.run_id, falhas, _POLL_FALHAS_CONSECUTIVAS_MAX, exc,
+                    self.run_id, falhas, _POLL_MAX_CONSECUTIVE_FAILURES, exc,
                 )
                 continue
             falhas = 0
         return status, run
 
-    def resultado(self, status: str | None, run: WorkflowRun | None) -> ResultadoEspera:
-        return ResultadoEspera(
+    def resultado(self, status: str | None, run: WorkflowRun | None) -> WaitResult:
+        return WaitResult(
             status=status,
             run=run,
             concluidos=len(self.concluidos),
             eventos_descartados=self.descartados,
-            timed_out=status not in _STATUS_TERMINAIS and self.loop.time() >= self.deadline,
+            timed_out=status not in _TERMINAL_STATUSES and self.loop.time() >= self.deadline,
             redis_indisponivel=self.redis_indisponivel,
             viu_complete=self.viu_complete,
         )
@@ -932,7 +932,7 @@ class _Espera:
 
 # Runs per pipeline. The block caps the command buffer when an incident
 # closes hundreds of runs at once.
-_BLOCO_DE_PUBLICACAO = 200
+_PUBLISH_CHUNK = 200
 
 
 async def publicar_conclusao(
@@ -955,12 +955,12 @@ async def publicar_conclusao(
         return
     rc = get_redis_pool()
     ts = time.time()
-    for inicio in range(0, len(run_ids), _BLOCO_DE_PUBLICACAO):
-        bloco = run_ids[inicio:inicio + _BLOCO_DE_PUBLICACAO]
+    for inicio in range(0, len(run_ids), _PUBLISH_CHUNK):
+        bloco = run_ids[inicio:inicio + _PUBLISH_CHUNK]
         async with rc.pipeline(transaction=False) as pipe:
             for run_id in bloco:
                 evento = evento_de_conclusao(
                     run_id, status, erro=mensagem, extra=extra, timestamp=ts,
                 )
-                anexar_eventos(pipe, run_id, [evento])
+                append_events(pipe, run_id, [evento])
             await pipe.execute()

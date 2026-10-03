@@ -56,7 +56,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from executor._ambiente import avisar, emitir_avisos_adiados, ler_float, ler_int
+from executor._ambiente import avisar, emit_deferred_warnings, read_float, ler_int
 from executor.versao import versao_do_executor
 
 # Carrega .env — EXECUTOR_ENV_PATH permite ao Electron definir um path customizado.
@@ -73,12 +73,12 @@ _gdal_skip = {s for s in os.environ.get("GDAL_SKIP", "").split(",") if s}
 os.environ["GDAL_SKIP"] = ",".join(sorted(_gdal_skip | {"OGR_VRT", "VRT"}))
 
 
-# Numbers from the environment are read by executor/_ambiente.py (ler_int/ler_float):
+# Numbers from the environment are read by executor/_ambiente.py (ler_int/read_float):
 # an invalid value becomes the default with a warning, never a ValueError at import. This
 # module runs BEFORE logging is configured, so the warnings are held
 # there until configure_logging() calls flush_startup_warnings() — the name
 # that executor/logging_setup.py imports from here.
-flush_startup_warnings = emitir_avisos_adiados
+flush_startup_warnings = emit_deferred_warnings
 
 
 # Server URL. No default: an executor never talks to an installation that
@@ -111,7 +111,7 @@ EXECUTOR_PRIVATE_KEY_PATH: str = os.getenv("EXECUTOR_PRIVATE_KEY_PATH", EXECUTOR
 def _cleanup_renewal_orphans() -> None:
     """
     Removes orphan `.new` files in EXECUTOR_CERT_DIR. They are left behind when
-    enroll or renewal (enrollment._persistir_bundle) writes the `<nome>.new` files
+    enroll or renewal (enrollment._persist_bundle) writes the `<nome>.new` files
     but the process dies before the atomic `os.replace`. Without cleanup, they pile up
     forever. The 10 min threshold avoids racing with a renewal in progress.
     """
@@ -180,12 +180,12 @@ def assert_enrolled() -> None:
 # In the Docker image the version written at build applies, over the .env (see
 # executor/versao.py); outside it, EXECUTOR_VERSION — the desktop app sets it.
 EXECUTOR_VERSION:            str = versao_do_executor()
-_versao_no_env = (os.getenv("EXECUTOR_VERSION") or "").strip()
+_env_version = (os.getenv("EXECUTOR_VERSION") or "").strip()
 # The 1.0.0 is the one from the .env.example every old installation has: not a choice.
-if _versao_no_env and _versao_no_env not in (EXECUTOR_VERSION, "1.0.0"):
+if _env_version and _env_version not in (EXECUTOR_VERSION, "1.0.0"):
     avisar(
         "EXECUTOR_VERSION=%s ignorada: vale a versao gravada na imagem (%s).",
-        _versao_no_env, EXECUTOR_VERSION,
+        _env_version, EXECUTOR_VERSION,
     )
 # Minimum 1 because zero does not fail, it works wrong: an executor with no worker, a queue
 # that never accepts, a job that times out immediately (see executor/_ambiente.py::ler_int).
@@ -262,7 +262,7 @@ LOG_DIR: str = os.getenv("EXECUTOR_LOG_DIR") or _default_log_dir()
 #         Never inferred: emitting JSON on the stdout of something expecting human logs
 #         would break the consumer silently. See executor/dashboard/json_runtime.py
 #         for the event format and the list of commands accepted on stdin.
-DASHBOARD_INTERVAL: float = ler_float("EXECUTOR_DASHBOARD_INTERVAL", 1.0, minimo=0.25)
+DASHBOARD_INTERVAL: float = read_float("EXECUTOR_DASHBOARD_INTERVAL", 1.0, minimo=0.25)
 
 # ── GeoSync — sync of local folders with the Workspace Drive ──────────────────
 # Comma-separated folders. Empty = sync disabled.

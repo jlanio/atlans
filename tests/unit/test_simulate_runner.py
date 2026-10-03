@@ -13,7 +13,7 @@ from flow.executor.core import WorkflowExecutor
 from flow.nodes.base import BaseNode
 from flow.registry import NODE_REGISTRY
 
-_RECEBIDO: dict = {}
+_RECEIVED: dict = {}
 
 
 class NoDinamicoTeste(BaseNode):
@@ -33,7 +33,7 @@ class NoDinamicoTeste(BaseNode):
 
     @classmethod
     async def simulate(cls, parameters: dict, simulated_inputs: dict = None) -> list:
-        _RECEBIDO["params"] = parameters
+        _RECEIVED["params"] = parameters
         if parameters.get("query") == "__boom__":
             raise ValueError("credencial ausente")
         return [{"fields": [{"name": "col", "type": "string"}]}]
@@ -57,9 +57,9 @@ class NoEstaticoTeste(BaseNode):
 
 
 @pytest.fixture(autouse=True)
-def _registra_nos_de_teste():
+def _register_test_nodes():
     """The factory resolves through the global NODE_REGISTRY — registers and cleans up afterwards."""
-    _RECEBIDO.clear()
+    _RECEIVED.clear()
     NODE_REGISTRY["NoDinamicoTeste"] = NoDinamicoTeste
     NODE_REGISTRY["NoEstaticoTeste"] = NoEstaticoTeste
     yield
@@ -71,7 +71,7 @@ def _executor(node: dict) -> WorkflowExecutor:
     return WorkflowExecutor({"nodes": [node], "edges": []})
 
 
-async def test_simulate_e_chamado_com_os_parametros_do_no():
+async def test_simulate_is_called_with_the_node_parameters():
     """`parameters` format — what the validation (`validate_service`) sends."""
     ex = _executor({
         "id": "n1", "name": "NoDinamicoTeste", "type": "datasource",
@@ -82,11 +82,11 @@ async def test_simulate_e_chamado_com_os_parametros_do_no():
 
     assert out["n1"]["status"] == "ok", out["n1"]
     assert out["n1"]["schema"][0]["fields"][0]["name"] == "col"
-    assert _RECEBIDO["params"]["query"] == "SELECT 1"
-    assert _RECEBIDO["params"]["limite"] == 5
+    assert _RECEIVED["params"]["query"] == "SELECT 1"
+    assert _RECEIVED["params"]["limite"] == 5
 
 
-async def test_aceita_o_formato_properties_da_definition_salva():
+async def test_accepts_the_properties_format_of_the_saved_definition():
     """The persisted definition uses `properties`, not `parameters`."""
     ex = _executor({
         "id": "n1", "name": "NoDinamicoTeste", "type": "datasource",
@@ -96,20 +96,20 @@ async def test_aceita_o_formato_properties_da_definition_salva():
     out = await ex.simulate_runner()
 
     assert out["n1"]["status"] == "ok", out["n1"]
-    assert _RECEBIDO["params"]["query"] == "SELECT 2"
+    assert _RECEIVED["params"]["query"] == "SELECT 2"
 
 
-async def test_defaults_das_propriedades_sao_aplicados():
+async def test_property_defaults_are_applied():
     ex = _executor({
         "id": "n1", "name": "NoDinamicoTeste", "type": "datasource", "parameters": {},
     })
 
     await ex.simulate_runner()
 
-    assert _RECEBIDO["params"]["limite"] == 10
+    assert _RECEIVED["params"]["limite"] == 10
 
 
-async def test_erro_no_simulate_vira_status_error():
+async def test_simulate_error_becomes_status_error():
     """One node with a problem must not bring down the whole validation."""
     ex = _executor({
         "id": "n1", "name": "NoDinamicoTeste", "type": "datasource",
@@ -122,7 +122,7 @@ async def test_erro_no_simulate_vira_status_error():
     assert "credencial ausente" in out["n1"]["error"]
 
 
-async def test_erro_no_simulate_e_logado_e_os_demais_nos_seguem(caplog):
+async def test_simulate_error_is_logged_and_the_other_nodes_continue(caplog):
     """The exception was swallowed without a trace: a broken simulate() showed up as
     "node without schema" and nobody found out why. The warning identifies the node
     and the cause — and the simulation of the other nodes goes on."""
@@ -146,7 +146,7 @@ async def test_erro_no_simulate_e_logado_e_os_demais_nos_seguem(caplog):
     assert out["n2"]["status"] == "ok", "a falha de um nó não pode parar a simulação"
 
 
-async def test_no_estatico_usa_o_schema_declarado():
+async def test_static_node_uses_the_declared_schema():
     ex = _executor({
         "id": "n1", "name": "NoEstaticoTeste", "type": "datasource", "parameters": {},
     })

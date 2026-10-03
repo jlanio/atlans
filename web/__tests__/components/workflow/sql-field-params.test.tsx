@@ -22,7 +22,7 @@ vi.mock("@/app/components/workflow/nodes-configuration/fields/monaco-code-editor
 
 const campo = { name: "query", label: "Consulta SQL", type: "sql" } as never
 
-function Anfitriao({ sql, params = {} }: { sql: string; params?: Record<string, string> }) {
+function Host({ sql, params = {} }: { sql: string; params?: Record<string, string> }) {
   const [values, setValues] = useState<Record<string, unknown>>({
     query: sql, queryParams: params,
   })
@@ -43,19 +43,19 @@ const gravado = () => JSON.parse(screen.getByTestId("gravado").textContent || "{
 
 describe("SqlField — parâmetros detectados", () => {
   it("mostra um campo por placeholder da query", () => {
-    render(<Anfitriao sql="SELECT * FROM t WHERE a = :aa AND b = :bb" />)
+    render(<Host sql="SELECT * FROM t WHERE a = :aa AND b = :bb" />)
     expect(screen.getByPlaceholderText("Valor para :aa")).toBeInTheDocument()
     expect(screen.getByPlaceholderText("Valor para :bb")).toBeInTheDocument()
   })
 
   it("não oferece placeholder que está dentro de um literal", () => {
-    render(<Anfitriao sql="SELECT * FROM notas WHERE obs = 'urgente:revisar' AND id = :id" />)
+    render(<Host sql="SELECT * FROM notas WHERE obs = 'urgente:revisar' AND id = :id" />)
     expect(screen.queryByPlaceholderText("Valor para :revisar")).toBeNull()
     expect(screen.getByPlaceholderText("Valor para :id")).toBeInTheDocument()
   })
 
   it("grava o valor digitado", () => {
-    render(<Anfitriao sql="SELECT * FROM t WHERE b = :bairro" />)
+    render(<Host sql="SELECT * FROM t WHERE b = :bairro" />)
     fireEvent.change(screen.getByPlaceholderText("Valor para :bairro"), {
       target: { value: "Centro" },
     })
@@ -64,7 +64,7 @@ describe("SqlField — parâmetros detectados", () => {
 
   it("o parâmetro renomeado sai da definição salva", () => {
     render(
-      <Anfitriao
+      <Host
         sql="SELECT * FROM t WHERE b = :bairro"
         params={{ bairro: "Centro" }}
       />,
@@ -84,7 +84,7 @@ describe("SqlField — parâmetros detectados", () => {
 
   it("editar um valor não derruba os outros parâmetros da query", () => {
     render(
-      <Anfitriao
+      <Host
         sql="SELECT * FROM t WHERE a = :aa AND b = :bb"
         params={{ aa: "1", bb: "2" }}
       />,
@@ -100,7 +100,7 @@ describe("SqlField — parâmetros detectados", () => {
     // pruning here would erase `:bairro` the instant the query said `:bairr`, in
     // the middle of a rename.
     render(
-      <Anfitriao sql="SELECT * FROM t WHERE b = :bairro" params={{ bairro: "Centro" }} />,
+      <Host sql="SELECT * FROM t WHERE b = :bairro" params={{ bairro: "Centro" }} />,
     )
     fireEvent.change(screen.getByLabelText("sql"), {
       target: { value: "SELECT * FROM t WHERE b = :bairr" },

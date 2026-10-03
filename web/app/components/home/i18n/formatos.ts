@@ -8,7 +8,7 @@
 // PM"/"ayer, 14:03"), with month and time via each language's `Intl`.
 
 import { dayjs, formatLocal, fromBackend } from "@/lib/dayjs"
-import { formatarDuracao, formatarInteiro, formatarQuando } from "@/lib/formatos"
+import { formatarDuracao, formatInteger, formatarQuando } from "@/lib/formatos"
 import type { Idioma } from "@/lib/idioma"
 
 export interface Formatos {
@@ -27,7 +27,7 @@ export interface Formatos {
   dataEHora: (iso: string | null | undefined) => string
 }
 
-interface PalavrasDoQuando {
+interface WhenWords {
   agora: string
   haMinutos: (m: number) => string
   haHoras: (h: number) => string
@@ -35,10 +35,10 @@ interface PalavrasDoQuando {
   ontem: string
 }
 
-function _quandoPor(idioma: Idioma, p: PalavrasDoQuando) {
+function _whenFor(idioma: Idioma, p: WhenWords) {
   const hora = new Intl.DateTimeFormat(idioma, { hour: "numeric", minute: "2-digit" })
   const dia = new Intl.DateTimeFormat(idioma, { day: "numeric", month: "short" })
-  const diaComAno = new Intl.DateTimeFormat(idioma, { day: "numeric", month: "short", year: "numeric" })
+  const dayWithYear = new Intl.DateTimeFormat(idioma, { day: "numeric", month: "short", year: "numeric" })
   return (iso: string | null | undefined, agora: Date = new Date()): string => {
     const d = fromBackend(iso)
     // An invalid one becomes "—": `Intl` THROWS on an invalid date, and one
@@ -52,12 +52,12 @@ function _quandoPor(idioma: Idioma, p: PalavrasDoQuando) {
     const h = hora.format(data)
     if (d.isSame(ref, "day")) return `${p.hoje}, ${h}`
     if (d.isSame(ref.subtract(1, "day"), "day")) return `${p.ontem}, ${h}`
-    const quando = d.year() === ref.year() ? dia.format(data) : diaComAno.format(data)
+    const quando = d.year() === ref.year() ? dia.format(data) : dayWithYear.format(data)
     return `${quando}, ${h}`
   }
 }
 
-function _dataEHoraPor(idioma: Idioma, opcoes: Intl.DateTimeFormatOptions) {
+function _dateTimeFor(idioma: Idioma, opcoes: Intl.DateTimeFormatOptions) {
   const formato = new Intl.DateTimeFormat(idioma, opcoes)
   return (iso: string | null | undefined): string => {
     const d = fromBackend(iso)
@@ -65,7 +65,7 @@ function _dataEHoraPor(idioma: Idioma, opcoes: Intl.DateTimeFormatOptions) {
   }
 }
 
-function _inteiroPor(idioma: Idioma) {
+function _integerFor(idioma: Idioma) {
   const numero = new Intl.NumberFormat(idioma)
   return (n: number | null | undefined): string =>
     n == null || !Number.isFinite(n) ? "—" : numero.format(Math.round(n))
@@ -73,33 +73,33 @@ function _inteiroPor(idioma: Idioma) {
 
 export const FORMATOS: Record<Idioma, Formatos> = {
   "pt-BR": {
-    inteiro: formatarInteiro,
+    inteiro: formatInteger,
     duracao: formatarDuracao,
     quando: formatarQuando,
     dataEHora: (iso) => formatLocal(iso),
   },
   en: {
-    inteiro: _inteiroPor("en"),
+    inteiro: _integerFor("en"),
     duracao: formatarDuracao,
-    quando: _quandoPor("en", {
+    quando: _whenFor("en", {
       agora: "now",
       haMinutos: (m) => `${m} min ago`,
       haHoras: (h) => `${h} h ago`,
       hoje: "today",
       ontem: "yesterday",
     }),
-    dataEHora: _dataEHoraPor("en", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }),
+    dataEHora: _dateTimeFor("en", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }),
   },
   es: {
-    inteiro: _inteiroPor("es"),
+    inteiro: _integerFor("es"),
     duracao: formatarDuracao,
-    quando: _quandoPor("es", {
+    quando: _whenFor("es", {
       agora: "ahora",
       haMinutos: (m) => `hace ${m} min`,
       haHoras: (h) => `hace ${h} h`,
       hoje: "hoy",
       ontem: "ayer",
     }),
-    dataEHora: _dataEHoraPor("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "numeric", minute: "2-digit" }),
+    dataEHora: _dateTimeFor("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "numeric", minute: "2-digit" }),
   },
 }

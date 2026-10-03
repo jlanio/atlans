@@ -25,15 +25,15 @@ import { FUSOS, PAISES } from "./fusos.gerado"
  * Africa and the Atlantic. (It used to be Brazil, the country of the first
  * installation.)
  */
-export const CENTRO_PADRAO_DO_GLOBO: [number, number] = [0, 20]
+export const DEFAULT_GLOBE_CENTER: [number, number] = [0, 20]
 
 // At the hero zoom the whole globe shows; centered on a pole it would show
 // almost nothing but ice. The latitude is clamped to a strip in which the
 // person's continent stays in frame (Oslo, Helsinki and Moscow fall at 50° N).
 const LATITUDE_MAXIMA = 50
-const LATITUDE_MINIMA = -45
+const MIN_LATITUDE = -45
 
-const CONTINENTES: Readonly<Record<string, readonly [number, number]>> = {
+const CONTINENTS: Readonly<Record<string, readonly [number, number]>> = {
   Europe: [15, 50],
   Africa: [20, 5],
   Asia: [90, 30],
@@ -51,7 +51,7 @@ const CONTINENTES: Readonly<Record<string, readonly [number, number]>> = {
 // opened the globe over the North Atlantic, and the connection's country was
 // never consulted. Only Iceland itself (by connection country) keeps the zone;
 // with no country, the neutral center applies, as for "UTC".
-const FUSOS_DOS_MODOS_DE_PRIVACIDADE = new Set(["Atlantic/Reykjavik", "Iceland"])
+const PRIVACY_MODE_TIMEZONES = new Set(["Atlantic/Reykjavik", "Iceland"])
 
 /** The browser's time zone, or `null` where there is none (`Intl` missing, exotic SSR). */
 export function fusoDoNavegador(): string | null {
@@ -65,12 +65,12 @@ export function fusoDoNavegador(): string | null {
 export function centroDaRegiao(sinais: { fuso?: string | null; pais?: string | null }): [number, number] {
   const pais = sinais.pais?.trim().toUpperCase() || null
   const informado = sinais.fuso?.trim() || null
-  const fuso = informado && FUSOS_DOS_MODOS_DE_PRIVACIDADE.has(informado) && pais !== "IS" ? null : informado
+  const fuso = informado && PRIVACY_MODE_TIMEZONES.has(informado) && pais !== "IS" ? null : informado
   const alvo =
     (fuso ? FUSOS[fuso] : undefined)
     ?? (pais ? PAISES[pais] : undefined)
-    ?? (fuso ? CONTINENTES[fuso.split("/")[0]] : undefined)
-    ?? CENTRO_PADRAO_DO_GLOBO
+    ?? (fuso ? CONTINENTS[fuso.split("/")[0]] : undefined)
+    ?? DEFAULT_GLOBE_CENTER
   const [lon, lat] = alvo
-  return [lon, Math.min(LATITUDE_MAXIMA, Math.max(LATITUDE_MINIMA, lat))]
+  return [lon, Math.min(LATITUDE_MAXIMA, Math.max(MIN_LATITUDE, lat))]
 }

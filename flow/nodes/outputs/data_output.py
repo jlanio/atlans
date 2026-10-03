@@ -8,11 +8,11 @@ from flow.registry import register_node
 from flow.nodes.base import BaseNode
 from flow.utils.artifact_helpers import (
     EXECUTOR,
-    descrever_localidade,
+    describe_locality,
     persistir_artefato,
-    propriedade_localidade,
-    resolver_localidade,
-    salvar_na_pasta_do_geosync,
+    locality_property,
+    resolve_locality,
+    save_to_geosync_folder,
     upload_artifact_to_minio,
 )
 from flow.utils.executor_http import slugify
@@ -107,7 +107,7 @@ class DataOutput(BaseNode):
                 # Applies to BOTH destinations: a Drive file can also stay only
                 # on the executor, cataloged — the same outcome as GeoSync in
                 # catalog mode, for a file the workflow has just produced.
-                propriedade_localidade(),
+                locality_property(),
                 {
                     "name":        "crs",
                     "label":       "CRS de destino",
@@ -127,7 +127,7 @@ class DataOutput(BaseNode):
         # `validate()` above already guarantees a bool for type=boolean properties
         # (parameter_validation rejects strings), so there is no coercion here.
         overwrite   = self.get_param("overwrite", False)
-        localidade, quem = resolver_localidade(self.get_param("localidade", None))
+        localidade, quem = resolve_locality(self.get_param("localidade", None))
         manter_local = localidade == EXECUTOR
 
         if not label:
@@ -193,7 +193,7 @@ class DataOutput(BaseNode):
 
         # Before any destination message: this is the only place where whoever
         # built the workflow sees what "Herdar do executor" became on this machine.
-        self.log(descrever_localidade(localidade, quem))
+        self.log(describe_locality(localidade, quem))
 
         if manter_local and create_drive_entry:
             # Writes to the synced folder and lets GeoSync catalog it on the next
@@ -201,7 +201,7 @@ class DataOutput(BaseNode):
             # Drive row, and emitting would make the server derive an s3_key for
             # an object that never existed — the UI would offer a 404 download.
             destino = await asyncio.to_thread(
-                salvar_na_pasta_do_geosync,
+                save_to_geosync_folder,
                 content.encode("utf-8"), filename, workspace_id, overwrite,
             )
             self.log(

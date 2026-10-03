@@ -23,7 +23,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 # Imports in the real executor's order (executor/main.py): config first, then
 # the flush that configure_logging() does, and only then the module — which
 # main imports with logging already up. The collector sits on root from the start.
-_IMPORTAR = """
+_IMPORT_SCRIPT = """
 import importlib, json, logging, sys
 avisos = []
 class _Coletor(logging.Handler):
@@ -48,10 +48,10 @@ print(json.dumps({"valor": getattr(modulo, sys.argv[2]), "avisos": avisos}))
     ("executor.job_validator", "EXECUTOR_CLOCK_SKEW_SECONDS", "_CLOCK_SKEW_TOLERANCE_SECONDS", 300, "-60"),
     ("executor.renewal", "EXECUTOR_CERT_RENEW_CHECK_SECONDS", "RENEW_CHECK_INTERVAL_SECONDS", 3600, "-1"),
 ])
-def test_valor_invalido_no_ambiente_nao_derruba_o_import(modulo, variavel, atributo, padrao, bruto):
+def test_invalid_env_value_does_not_break_the_import(modulo, variavel, atributo, padrao, bruto):
     ambiente = {**os.environ, "PYTHONPATH": str(RAIZ), variavel: bruto}
     saida = subprocess.run(
-        [sys.executable, "-c", _IMPORTAR, modulo, atributo], cwd=RAIZ, env=ambiente,
+        [sys.executable, "-c", _IMPORT_SCRIPT, modulo, atributo], cwd=RAIZ, env=ambiente,
         capture_output=True, text=True, timeout=60,
     )
     assert saida.returncode == 0, f"import de {modulo} caiu:\n{saida.stderr[-1500:]}"
@@ -62,7 +62,7 @@ def test_valor_invalido_no_ambiente_nao_derruba_o_import(modulo, variavel, atrib
     assert any(variavel in a and bruto in a for a in resultado["avisos"]), resultado["avisos"]
 
 
-def test_ler_int_valida_a_faixa(monkeypatch):
+def test_read_int_validates_the_range(monkeypatch):
     """MAX_CONCURRENT=0 left the executor online, with capacity 0 (preferred by
     the least-loaded scheduler), accepting jobs that would never run."""
     from executor._ambiente import ler_int
@@ -81,15 +81,15 @@ def test_ler_int_valida_a_faixa(monkeypatch):
     assert ler_int("_TESTE_INT", 5, minimo=0, maximo=3600) == 0
 
 
-def test_ler_float_recusa_o_que_nao_e_numero_finito(monkeypatch):
-    from executor._ambiente import ler_float
+def test_read_float_rejects_what_is_not_a_finite_number(monkeypatch):
+    from executor._ambiente import read_float
 
     for bruto, esperado in (("0.5", 0.5), ("0.1", 1.0), ("abc", 1.0), ("nan", 1.0), ("inf", 1.0)):
         monkeypatch.setenv("_TESTE_FLOAT", bruto)
-        assert ler_float("_TESTE_FLOAT", 1.0, minimo=0.25) == esperado, bruto
+        assert read_float("_TESTE_FLOAT", 1.0, minimo=0.25) == esperado, bruto
 
 
-def test_aviso_fica_retido_ate_o_logging_subir_e_sai_direto_depois(monkeypatch, caplog):
+def test_warning_is_held_until_logging_starts_and_goes_straight_out_after(monkeypatch, caplog):
     """config.py is imported before any handler exists: its warning waits for the
     flush. But job_validator, renewal and sync_config are imported AFTER the
     flush — if their warning were also held back, nobody would deliver it."""
@@ -103,7 +103,7 @@ def test_aviso_fica_retido_ate_o_logging_subir_e_sai_direto_depois(monkeypatch, 
         assert _ambiente.ler_int("_TESTE_INT", 7) == 7
         assert not caplog.records
 
-        _ambiente.emitir_avisos_adiados()
+        _ambiente.emit_deferred_warnings()
         assert "_TESTE_INT='abc'" in caplog.text
 
         caplog.clear()
@@ -113,7 +113,7 @@ def test_aviso_fica_retido_ate_o_logging_subir_e_sai_direto_depois(monkeypatch, 
     assert _ambiente._AVISOS_ADIADOS == []
 
 
-def test_nenhuma_copia_do_leitor_sobrou():
+def test_no_copy_of_the_reader_is_left():
     """The copies diverged once; the guard keeps them from coming back."""
     for arquivo in ("config.py", "sync/sync_config.py", "job_validator.py", "renewal.py"):
         texto = (RAIZ / "executor" / arquivo).read_text(encoding="utf-8")

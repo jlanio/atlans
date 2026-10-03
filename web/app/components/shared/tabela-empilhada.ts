@@ -19,25 +19,25 @@
  * Usage:
  *
  *   <table className="w-full md:min-w-[720px]">   // min-w only where there are columns
- *     <thead className={CABECALHO_DE_COLUNAS}>    // a label without a column is noise
- *     <tr className={LINHA_EMPILHADA}>
- *       <td className={cn(DESTAQUE_DA_FICHA, "…")}>   // optional: a line of its own
+ *     <thead className={COLUMN_HEADER}>    // a label without a column is noise
+ *     <tr className={STACKED_ROW}>
+ *       <td className={cn(CARD_HIGHLIGHT, "…")}>   // optional: a line of its own
  *
- * `DESTAQUE_DA_FICHA` on the cell that identifies the record (the name, the id)
+ * `CARD_HIGHLIGHT` on the cell that identifies the record (the name, the id)
  * gives the card a title: without it the seven slices all go into the same
  * paragraph and there is nowhere to start reading.
  */
 
 /** `<thead>`: disappears where there are no columns to label. */
-export const CABECALHO_DE_COLUNAS = "max-md:hidden"
+export const COLUMN_HEADER = "max-md:hidden"
 
 /** Data `<tr>`. */
-export const LINHA_EMPILHADA =
+export const STACKED_ROW =
   "max-md:flex max-md:flex-wrap max-md:items-center max-md:gap-x-3 max-md:gap-y-1 " +
   "max-md:px-3 max-md:py-3 max-md:[&>td]:p-0"
 
 /** `<td>` that takes the card's first line by itself. */
-export const DESTAQUE_DA_FICHA = "max-md:basis-full"
+export const CARD_HIGHLIGHT = "max-md:basis-full"
 
 /**
  * Numeric `<td>` that carries its own label in the card. Without the column
@@ -45,9 +45,9 @@ export const DESTAQUE_DA_FICHA = "max-md:basis-full"
  * artifacts or total — the label is what separates a data point from a loose
  * number. It disappears at `md`, where the header says the same thing again.
  *
- *   <td data-rotulo="Falhas" className={cn(CELULA_COM_ROTULO, "…")}>
+ *   <td data-rotulo="Falhas" className={cn(LABELED_CELL, "…")}>
  */
-export const CELULA_COM_ROTULO =
+export const LABELED_CELL =
   "max-md:before:content-[attr(data-rotulo)] max-md:before:mr-1 " +
   "max-md:before:text-muted-foreground max-md:before:font-normal"
 
@@ -56,4 +56,4 @@ export const CELULA_COM_ROTULO =
  * `colSpan`): it isn't a card, it's a block — `flex-wrap` would squeeze it into
  * slices.
  */
-export const LINHA_EXPANDIDA = "max-md:block"
+export const EXPANDED_ROW = "max-md:block"

@@ -14,7 +14,7 @@ from typing import Any
 logger = logging.getLogger("flow.metrics")
 
 
-def _bbox_finito(gdf) -> list[float] | None:
+def _finite_bbox(gdf) -> list[float] | None:
     """The GeoDataFrame's bounding box, or None when it is not representable.
 
     An EMPTY GeoDataFrame has `total_bounds == [nan, nan, nan, nan]`, and
@@ -139,7 +139,7 @@ def extract_spatial_metrics(obj: Any) -> dict:
             except Exception:
                 crs_str = str(obj.crs)
 
-        bbox = _bbox_finito(obj)
+        bbox = _finite_bbox(obj)
 
         return {
             "geometry_types": geom_types,
@@ -162,7 +162,7 @@ def _extract_lightweight_metrics(gdf) -> dict:
             result["crs"] = f"EPSG:{epsg}" if epsg else str(gdf.crs)
     except Exception:
         pass
-    bbox = _bbox_finito(gdf)
+    bbox = _finite_bbox(gdf)
     if bbox is not None:
         result["bbox"] = bbox
     return result

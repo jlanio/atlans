@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest"
-import { JANELA_EM_DIAS, derivarComoAnda } from "@/app/components/projects/como-anda"
+import { WINDOW_IN_DAYS, derivarComoAnda } from "@/app/components/projects/como-anda"
 import { formatarQuando } from "@/lib/formatos"
 import type { RunningRun } from "@/context/ActiveRunsContext"
 import type { IWorkflowMetricsRow } from "@/service/types"
 
 const agora = new Date("2026-09-07T12:00:00Z")
 const haMin = (min: number) => new Date(agora.getTime() - min * 60_000).toISOString()
-const haDias = (dias: number) => new Date(agora.getTime() - dias * 86_400_000).toISOString()
+const daysAgo = (dias: number) => new Date(agora.getTime() - dias * 86_400_000).toISOString()
 
 function metrica(extra: Partial<IWorkflowMetricsRow> = {}): IWorkflowMetricsRow {
   return {
@@ -23,8 +23,8 @@ function run(extra: Partial<RunningRun> = {}): RunningRun {
   }
 }
 
-const novo = { created_at: haDias(2) }
-const antigo = { created_at: haDias(45) }
+const novo = { created_at: daysAgo(2) }
+const antigo = { created_at: daysAgo(45) }
 
 describe("derivarComoAnda", () => {
   it("run vivo vence a métrica — inclusive uma falha registrada", () => {
@@ -75,8 +75,8 @@ describe("derivarComoAnda", () => {
     const r = derivarComoAnda(antigo, metrica({ last_status: "failed", last_error: "  Timeout no WFS  ", last_run_at: haMin(40) }), undefined, false, agora)
     expect(r).toMatchObject({ tipo: "falhou", quando: "há 40 min", erro: "Timeout no WFS", total: 61, falhas: 3 })
     // `error` (per-node status the backend also uses) counts as a failure; an empty error becomes null.
-    const semTexto = derivarComoAnda(antigo, metrica({ last_status: "error", last_error: "   " }), undefined, false, agora)
-    expect(semTexto).toMatchObject({ tipo: "falhou", erro: null })
+    const withoutText = derivarComoAnda(antigo, metrica({ last_status: "error", last_error: "   " }), undefined, false, agora)
+    expect(withoutText).toMatchObject({ tipo: "falhou", erro: null })
   })
 
   it("cancelada", () => {
@@ -91,12 +91,12 @@ describe("derivarComoAnda", () => {
   it("nunca: nada na janela e criado há menos de 30 dias", () => {
     expect(derivarComoAnda(novo, undefined, undefined, false, agora)).toEqual({ tipo: "nunca" })
     expect(derivarComoAnda(novo, metrica({ total_runs: 0, last_run_at: null, last_status: null }), undefined, false, agora)).toEqual({ tipo: "nunca" })
-    expect(derivarComoAnda({ created_at: haDias(JANELA_EM_DIAS - 1) }, undefined, undefined, false, agora)).toEqual({ tipo: "nunca" })
+    expect(derivarComoAnda({ created_at: daysAgo(WINDOW_IN_DAYS - 1) }, undefined, undefined, false, agora)).toEqual({ tipo: "nunca" })
   })
 
   it("sem execuções: nada na janela e o workflow é antigo (ou não se sabe quando nasceu)", () => {
     expect(derivarComoAnda(antigo, undefined, undefined, false, agora)).toEqual({ tipo: "sem-execucoes" })
-    expect(derivarComoAnda({ created_at: haDias(JANELA_EM_DIAS) }, undefined, undefined, false, agora)).toEqual({ tipo: "sem-execucoes" })
+    expect(derivarComoAnda({ created_at: daysAgo(WINDOW_IN_DAYS) }, undefined, undefined, false, agora)).toEqual({ tipo: "sem-execucoes" })
     expect(derivarComoAnda({}, undefined, undefined, false, agora)).toEqual({ tipo: "sem-execucoes" })
     // A row with runs but no `last_run_at` is not "never": there were runs.
     expect(derivarComoAnda(novo, metrica({ total_runs: 3, last_run_at: null }), undefined, false, agora)).toEqual({ tipo: "sem-execucoes" })

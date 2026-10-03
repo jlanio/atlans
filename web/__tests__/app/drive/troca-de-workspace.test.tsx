@@ -9,9 +9,9 @@ vi.mock("@/service/GisFlowService", () => ({
 
 // Switchable workspace — the header selector switches the context WITHOUT remounting the
 // page, which is the reason the page/filter state survives the switch.
-const workspaceAtual = { current: { id_hash: "ws-a", name: "A" } }
+const currentWorkspace = { current: { id_hash: "ws-a", name: "A" } }
 vi.mock("@/context/WorkspaceContext", () => ({
-  useWorkspace: () => ({ current: workspaceAtual.current, canEdit: true }),
+  useWorkspace: () => ({ current: currentWorkspace.current, canEdit: true }),
 }))
 
 import { GisFlowService } from "@/service/GisFlowService"
@@ -42,13 +42,13 @@ function responder() {
   }) as any)
 }
 
-const ultimaChamada = () => getDriveFiles.mock.calls.at(-1)![0]
+const lastCall = () => getDriveFiles.mock.calls.at(-1)![0]
 
 beforeEach(() => { getDriveFiles.mockReset(); responder(); cleanup() })
 
 describe("Drive — troca de workspace", () => {
   it("volta para a primeira página em vez de deixar o usuário numa lista vazia", async () => {
-    workspaceAtual.current = { id_hash: "ws-a", name: "A" }
+    currentWorkspace.current = { id_hash: "ws-a", name: "A" }
     const { rerender } = render(<DrivePage />)
 
     await waitFor(() => expect(getDriveFiles).toHaveBeenCalled())
@@ -61,17 +61,17 @@ describe("Drive — troca de workspace", () => {
       fireEvent.click(proximo)
       await screen.findByText(alvo)
     }
-    await waitFor(() => expect(ultimaChamada().page).toBe(4))
+    await waitFor(() => expect(lastCall().page).toBe(4))
 
     // Switch workspace in the selector: no remount, only the context changes.
-    workspaceAtual.current = { id_hash: "ws-b", name: "B" }
+    currentWorkspace.current = { id_hash: "ws-b", name: "B" }
     rerender(<DrivePage />)
 
     // The bug: the fetch went out with `workspace_id=B&page=4`, B only has 20 files, the
     // response came back empty and the pagination footer was not even mounted
     // (`total > PAGE_SIZE` is false with 20) — no control to get out of there.
-    await waitFor(() => expect(ultimaChamada().workspace_id).toBe("ws-b"))
-    await waitFor(() => expect(ultimaChamada().page).toBe(1))
+    await waitFor(() => expect(lastCall().workspace_id).toBe("ws-b"))
+    await waitFor(() => expect(lastCall().page).toBe(1))
     expect(getDriveFiles.mock.calls.every(([p]) => !(p.workspace_id === "ws-b" && (p.page ?? 1) > 1))).toBe(true)
   })
 })

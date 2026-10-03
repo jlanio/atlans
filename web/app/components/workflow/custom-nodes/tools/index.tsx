@@ -37,17 +37,17 @@ const ToolsIcon = ({ open, nodeId }: ToolsIconProps) => {
   // Only offer drilling down when the loaded run actually executed something in there:
   // without an execution there is nothing to paint, and the viewer would show a
   // gray graph that passes for "nothing ran" when the truth is "no run is open".
-  const executouSubfluxo = useWorkflowExecutionStore(s => s.subflowRoots.has(nodeId))
-  const abrirSubfluxo = useSubflowDrilldownStore(s => s.open)
-  const noVisualizador = useSubflowReadOnly()
-  const somenteLeitura = useCanvasReadOnly()
+  const ranSubflow = useWorkflowExecutionStore(s => s.subflowRoots.has(nodeId))
+  const openSubflow = useSubflowDrilldownStore(s => s.open)
+  const inViewer = useSubflowReadOnly()
+  const readOnly = useCanvasReadOnly()
 
-  function handleAbrirSubfluxo() {
+  function handleOpenSubflow() {
     const node = getNode(nodeId)
     const props = (node?.data?.properties ?? {}) as Record<string, unknown>
     const hash = String(props.workflowHash ?? "").trim()
     if (!hash) return
-    abrirSubfluxo([{
+    openSubflow([{
       canvasNodeId: nodeId,
       workflowHash: hash,
       label: (props.alias as string) || (node?.data?.alias as string) || "Sub-fluxo",
@@ -109,7 +109,7 @@ const ToolsIcon = ({ open, nodeId }: ToolsIconProps) => {
   // touch doesn't produce. On a phone it would be dead code anyway: it showed up
   // for an instant after a tap, with edit/copy/delete that the canvas there
   // doesn't even allow. The configuration is still reachable by tapping the node.
-  if (noVisualizador || somenteLeitura) return null
+  if (inViewer || readOnly) return null
 
   return (
     <>
@@ -123,9 +123,9 @@ const ToolsIcon = ({ open, nodeId }: ToolsIconProps) => {
           onClick={() => setConfigNodeParam(nodeId)}
           size={16} className="cursor-pointer hover:text-primary" />
 
-        {executouSubfluxo && (
+        {ranSubflow && (
           <button
-            onClick={handleAbrirSubfluxo}
+            onClick={handleOpenSubflow}
             title="Ver o que rodou dentro do sub-fluxo"
             className="flex items-center"
           >
