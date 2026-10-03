@@ -2,7 +2,7 @@ import { INodeContext } from "@/context/useFlowContext"
 import React, { useMemo } from "react"
 import dynamic from "next/dynamic"
 
-// Campos reutilizados do painel legado
+// Fields reused from the legacy panel
 import CredentialField from "../nodes-configuration/fields/credential-field"
 import StringField from "../nodes-configuration/fields/string-field"
 import PayloadSchemaEditor from "../nodes-configuration/fields/payload-schema-editor"
@@ -30,9 +30,9 @@ import SubWorkflowPortsHelper from "../nodes-configuration/sub-workflow-ports-he
 import { INodePortAPI, INodesPropertyAPI } from "@/service/types"
 import { useEdges } from "@xyflow/react"
 
-// O editor de objeto arrasta o json-edit-react (~54 KB minificado) junto, e a
-// maioria dos nós não tem um único campo do tipo `object`. Carregado sob demanda
-// ele sai até do chunk do modal.
+// The object editor drags json-edit-react (~54 KB minified) along, and most
+// nodes don't have a single field of type `object`. Loaded on demand, it even
+// leaves the modal's chunk.
 const ObjectField = dynamic(() => import("../nodes-configuration/fields/object-field"), {
   ssr: false,
   loading: () => <div className="h-24 rounded-sm border bg-muted/40 animate-pulse" />,
@@ -48,48 +48,50 @@ interface NodeConfigFormProps {
   workflowId?: string
 }
 
-/** O que todo helper especializado recebe. */
+/** What every specialized helper receives. */
 interface HelperProps {
   values: NodeConfigFormProps["values"]
   setNodeField: NodeConfigFormProps["setNodeField"]
   saveNodeConfig: NodeConfigFormProps["saveNodeConfig"]
   hasUnsaved: boolean
   workflowId?: string
-  // SubWorkflowHelper usa para descobrir, pelas arestas que chegam neste nó,
-  // quais chaves de input existem de fato — em vez de o operador digitá-las.
+  // SubWorkflowHelper uses it to find out, from the edges arriving at this node,
+  // which input keys actually exist — instead of the operator typing them.
   nodeId?: string
-  // Os campos do nó no catálogo do servidor, com os `default` da instalação (o
-  // ScheduleTrigger tira daqui o fuso padrão).
+  // The node's fields in the server catalog, with the installation's `default`s
+  // (ScheduleTrigger takes the default time zone from here).
   campos?: INodesPropertyAPI[]
-  // O editor de portas do SubWorkflowOutput trava enquanto houver aresta
-  // ligada: lá as portas são pontos de conexão, e mudá-las deixaria as
-  // arestas apontando para um ponto que não existe mais.
+  // The SubWorkflowOutput port editor locks while there is a connected
+  // edge: there the ports are connection points, and changing them would leave
+  // the edges pointing at a point that no longer exists.
   //
-  // OBRIGATÓRIO de propósito: com valor opcional, esquecer de passar aqui
-  // destravaria o editor em silêncio — e o defeito só apareceria como aresta
-  // sumida no canvas de alguém. Assim, esquecer não compila.
+  // REQUIRED on purpose: with an optional value, forgetting to pass it here
+  // would silently unlock the editor — and the defect would only show up as an
+  // edge gone from someone's canvas. This way, forgetting doesn't compile.
   conexoesDeEntrada: number
-  // Colunas conhecidas dos nós anteriores, para os helpers cujos campos pedem
-  // nome de coluna (o SetFields inteiro é isso). Sem passar por aqui, o nó
-  // "redefinir campos" era o único do fluxo que nunca via uma sugestão — o
-  // helper substitui o renderizador de campos, onde a dica nasce.
+  // Known columns from the upstream nodes, for the helpers whose fields ask for
+  // a column name (the whole of SetFields is that). Without passing through
+  // here, the "redefinir campos" (redefine fields) node was the only one in the
+  // workflow that never saw a suggestion — the helper replaces the field
+  // renderer, where the hint originates.
   //
-  // OBRIGATÓRIAS pela mesma razão do campo acima: opcional, um helper novo
-  // esqueceria de recebê-las e a ausência viraria "a sugestão não funciona
-  // neste nó" — indistinguível, para quem usa, do defeito que motivou tudo.
+  // REQUIRED for the same reason as the field above: if optional, a new helper
+  // would forget to receive them and the absence would become "suggestions
+  // don't work on this node" — indistinguishable, to the user, from the defect
+  // that motivated all this.
   sugestoesDeColunas: string[]
   sugestoesDesatualizadas: boolean
   sugestoesParciais: boolean
 }
 
-// Os dois editores de porta são o MESMO componente com uma variante fixa, e por
-// isso precisam de um nome próprio aqui em cima.
+// The two port editors are the SAME component with a fixed variant, and that
+// is why they need a name of their own up here.
 //
-// Como wrappers inline dentro do formulário, eram uma função nova a cada render:
-// o tipo do elemento mudava de identidade, o React desmontava e remontava a
-// subárvore inteira, e o campo de texto — recriado do zero — perdia o foco a
-// cada tecla. Digitar o nome de uma porta só era possível uma letra por vez,
-// clicando de volta no campo entre elas.
+// As inline wrappers inside the form, they were a new function on every render:
+// the element type changed identity, React unmounted and remounted the whole
+// subtree, and the text field — recreated from scratch — lost focus on every
+// keystroke. Typing a port name was only possible one letter at a time,
+// clicking back into the field between them.
 const SubWorkflowInputPorts = (props: HelperProps) => (
   <SubWorkflowPortsHelper {...props} variant="input" />
 )
@@ -97,10 +99,10 @@ const SubWorkflowOutputPorts = (props: HelperProps) => (
   <SubWorkflowPortsHelper {...props} variant="output" />
 )
 
-/** Helpers que substituem a renderização padrão dos campos, por tipo de nó.
+/** Helpers that replace the default field rendering, by node type.
  *
- * No escopo do módulo: recriar o mapa a cada render remontaria o helper montado,
- * perdendo foco e estado interno dele. */
+ * At module scope: recreating the map on every render would remount the mounted
+ * helper, losing its focus and internal state. */
 const HELPER_MAP: Record<string, React.ComponentType<HelperProps>> = {
   ScheduleTrigger: ScheduleTriggerHelper,
   SetFields: SetFieldsHelper,
@@ -110,8 +112,8 @@ const HELPER_MAP: Record<string, React.ComponentType<HelperProps>> = {
 }
 
 /**
- * Painel central do modal — renderiza os campos de configuração do nó.
- * Reutiliza exatamente os mesmos componentes de campo do painel legado.
+ * Central panel of the modal — renders the node's configuration fields.
+ * Reuses exactly the same field components as the legacy panel.
  */
 const NodeConfigForm = ({
   nodeFound,
@@ -123,30 +125,31 @@ const NodeConfigForm = ({
   workflowId,
 }: NodeConfigFormProps) => {
 
-  // Quantas arestas chegam a este nó. O editor de portas trava enquanto houver
-  // alguma: mudar as portas com ligações feitas as deixaria apontando para um
-  // ponto de conexão inexistente, e elas somem do canvas sem como apagar.
+  // How many edges arrive at this node. The port editor locks while there is
+  // any: changing the ports with connections made would leave them pointing at
+  // a nonexistent connection point, and they vanish from the canvas with no way
+  // to delete them.
   const edges = useEdges()
   const conexoesDeEntrada = edges.filter(e => e.target === nodeFound?.id).length
 
-  // Colunas conhecidas dos nós ANTERIORES a este — de um run desta sessão ou
-  // re-hidratadas do último run persistido. Vira sugestão nos campos que pedem
-  // nome de coluna — antes a única forma de saber o que chega aqui era
-  // executar o fluxo, olhar o resultado e voltar.
+  // Known columns of the nodes UPSTREAM of this one — from a run in this session
+  // or re-hydrated from the last persisted run. They become suggestions in the
+  // fields that ask for a column name — before, the only way to know what
+  // arrives here was to run the workflow, look at the result and come back.
   //
-  // FOTOGRAFIA, não assinatura. A store troca o Map a cada lote de eventos,
-  // então assinar re-renderizaria o formulário inteiro — com Monaco e todos os
-  // campos — a cada evento de nó enquanto uma execução acontece com este
-  // diálogo aberto. E não há o que ganhar: o botão de executar fica atrás do
-  // overlay, então não se dispara um run daqui; o que vale é o estado do
-  // momento em que o diálogo abriu.
+  // A SNAPSHOT, not a subscription. The store swaps the Map on every batch of
+  // events, so subscribing would re-render the whole form — with Monaco and
+  // every field — on each node event while an execution happens with this
+  // dialog open. And there is nothing to gain: the run button sits behind the
+  // overlay, so no run is fired from here; what matters is the state at the
+  // moment the dialog opened.
   const colunasSugeridas = useMemo(() => {
     if (!nodeFound?.id) return SEM_SUGESTAO
     return sugestaoParaNo(edges, useKnownColumnsStore.getState().porNo, nodeFound.id)
-    // `edges` entra porque religar o nó muda de onde as colunas vêm.
+    // `edges` is included because rewiring the node changes where the columns come from.
   }, [edges, nodeFound?.id])
 
-  /** Colunas a oferecer neste campo, conforme o lado que ele declara. */
+  /** Columns to offer in this field, according to the side it declares. */
   function sugerirColunas(field: INodesPropertyAPI): string[] {
     const de = field.suggest_columns
     if (!de) return []
@@ -155,8 +158,8 @@ const NodeConfigForm = ({
 
   const hasUnsaved = JSON.stringify(nodeFound?.data.properties) !== JSON.stringify(values)
 
-  // Visibilidade condicional declarativa: um campo com `visibleWhen` só aparece
-  // quando o valor atual do campo referenciado está em `in`. Lista → AND.
+  // Declarative conditional visibility: a field with `visibleWhen` only appears
+  // when the referenced field's current value is in `in`. List → AND.
   const isFieldVisible = (field: INodesPropertyAPI): boolean => {
     const vw = field.visibleWhen
     if (!vw) return true
@@ -164,7 +167,7 @@ const NodeConfigForm = ({
     return rules.every(r => r.in.includes(values?.[r.field] as string | number | boolean))
   }
 
-  // Nó sem campos — mostra apenas o helper de operação
+  // Node without fields — shows only the operation helper
   if (nodeFound?.data.fields.length === 0) {
     return (
       <div className="overflow-y-auto flex-1 p-4">
@@ -174,16 +177,16 @@ const NodeConfigForm = ({
           description={nodeFound.data.description}
           type={nodeFound.data.type as string}
           inputs={(nodeFound.data.inputs ?? []) as INodePortAPI[]}
-          // Os CAMPOS de saída (saidasDoNo), não os handles: um nó linear tem
-          // ponto de conexão anônimo (outputs = []) mas continua entregando
-          // `output` — e é isso que este painel existe para dizer.
+          // The output FIELDS (saidasDoNo), not the handles: a linear node has an
+          // anonymous connection point (outputs = []) but still delivers
+          // `output` — and that is what this panel exists to say.
           outputs={saidasDoNo(nodeFound.data)}
         />
       </div>
     )
   }
 
-  // Nó com helper especializado (ScheduleTrigger, SetFields, etc.)
+  // Node with a specialized helper (ScheduleTrigger, SetFields, etc.)
   if (HELPER_MAP[nodeName]) {
     const Helper = HELPER_MAP[nodeName]
     return (
@@ -205,13 +208,13 @@ const NodeConfigForm = ({
     )
   }
 
-  // Renderização padrão dos campos
+  // Default field rendering
   return (
-    // `gap-4`, e nao `gap-3`: sem os paragrafos de descricao (agora tooltip no
-    // rotulo) as linhas encurtaram e ficaram todas com a mesma altura, entao a
-    // separacao entre campos passou a ser o unico ritmo da lista.
+    // `gap-4`, not `gap-3`: without the description paragraphs (now a tooltip on
+    // the label) the rows got shorter and all the same height, so the spacing
+    // between fields became the list's only rhythm.
     <div className="flex flex-col gap-4 p-4 overflow-y-auto flex-1">
-      {/* Helper WFS: discovery de camadas com dropdown */}
+      {/* WFS helper: layer discovery with a dropdown */}
       {nodeName === "WFS" && (
         <WFSHelper values={values} setNodeField={setNodeField} workflowId={workflowId} />
       )}
@@ -220,32 +223,32 @@ const NodeConfigForm = ({
         const fieldProps = { field, setNodeField, values }
         const key = `${nodeFound.id}-${field.name}`
 
-        // Visibilidade condicional declarativa (substitui as regras hardcoded de
-        // Conditional/Response, agora expressas via `visibleWhen` no schema do nó).
-        // Avaliado ANTES dos casos especiais para valer inclusive p/ credential_id
-        // (ex.: DataOutput oculta a credencial quando o artefato é público).
+        // Declarative conditional visibility (replaces the hardcoded rules of
+        // Conditional/Response, now expressed via `visibleWhen` in the node schema).
+        // Evaluated BEFORE the special cases so it applies even to credential_id
+        // (e.g. DataOutput hides the credential when the artifact is public).
         if (!isFieldVisible(field)) return null
 
         // Campos especiais
         if (field.name === "credential_id")
           return <CredentialField key={key} {...fieldProps} nodeFound={nodeFound} required={requiresCredential} />
-        // Campos preenchidos pelo SERVIDOR, nunca pela pessoa: o alias, a DSN
-        // resolvida da credencial e a autenticacao HTTP/S3 resolvida. A checagem e
-        // pelo NOME e nao pelo tipo — `http_auth` e `object`, e a condicao antiga
-        // (`type === "string"`) o teria deixado passar, desenhando um editor de
-        // JSON vazio chamado "Autenticacao resolvida" no meio do formulario.
+        // Fields filled by the SERVER, never by the person: the alias, the DSN
+        // resolved from the credential and the resolved HTTP/S3 authentication.
+        // The check is by NAME, not by type — `http_auth` is `object`, and the old
+        // condition (`type === "string"`) would have let it through, drawing an
+        // empty JSON editor called "Autenticacao resolvida" in the middle of the form.
         if (["alias", "credential_id", "connectionString", "http_auth", "s3_auth", "fundo_da_instalacao"].includes(field.name))
           return null
 
-        // queryParams é renderizado pelo SqlField (inputs nomeados) — pular aqui
+        // queryParams is rendered by SqlField (named inputs) — skip here
         const hasSqlSibling = nodeFound.data.fields.some(f => f.type === "sql")
         if (field.name === "queryParams" && hasSqlSibling) return null
 
-        // url e typeName do WFS são gerenciados pelo WFSHelper — pular aqui
+        // The WFS url and typeName are managed by WFSHelper — skip here
         const isWFS = nodeName === "WFS"
         if (isWFS && (field.name === "url" || field.name === "typeName")) return null
 
-        // Campos por tipo
+        // Fields by type
         switch (field.type) {
           case "string":  return <StringField key={key} {...fieldProps} nodeFound={nodeFound} sugestoes={sugerirColunas(field)} sugestoesDesatualizadas={colunasSugeridas.desatualizadas} sugestoesParciais={colunasSugeridas.parciais} />
           case "number":  return <NumericField key={key} {...fieldProps} variant="number" />
@@ -260,10 +263,10 @@ const NodeConfigForm = ({
           case "chips":   return <ChipsField key={key} {...fieldProps} sugestoes={sugerirColunas(field)} sugestoesDesatualizadas={colunasSugeridas.desatualizadas} sugestoesParciais={colunasSugeridas.parciais} />
           case "keyvalue": return <KeyValueField key={key} {...fieldProps} />
           case "object":
-            // Editores dedicados no lugar do JSON cru — mesmo despacho por
-            // nome do payload_schema. O formato persistido não muda: gravam a
-            // MESMA lista que o execute lê, então fluxos salvos abrem aqui e
-            // os daqui rodam em executor antigo.
+            // Dedicated editors instead of raw JSON — same dispatch by
+            // payload_schema name. The persisted format doesn't change: they
+            // write the SAME list that execute reads, so saved workflows open
+            // here and the ones made here run on an old executor.
             if (nodeName === "Sort" && field.name === "sort_by")
               return <SortByField key={key} {...fieldProps} sugestoes={sugerirColunas(field)} sugestoesDesatualizadas={colunasSugeridas.desatualizadas} sugestoesParciais={colunasSugeridas.parciais} />
             if (nodeName === "Switch" && field.name === "rules")

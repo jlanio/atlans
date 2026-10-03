@@ -1,24 +1,24 @@
 """
-Regressoes do GeoSync (executor/sync/**).
+GeoSync regressions (executor/sync/**).
 
-Cobre os achados da auditoria do subsistema executor:
-  B5  — file_deleted apagava arquivo local mesmo em SYNC_MODE=upload
-  B6  — delete remoto acontecia ANTES do upload e o manifesto perdia remote_id_hash
-  B10 — o '<dataset>.zip' do shapefile nunca casava no manifesto e colidia de chave
-  S4  — scanner/uploader seguiam symlinks (vazamento de arquivo de fora da pasta)
-  P4  — I/O pesado sincrono dentro do event loop
-  D1  — o laco do SyncManager.run() morria em silencio
-  B8  — contrato claims_event() para o fan-out de drive_events
+Covers the findings of the executor subsystem audit:
+  B5  — file_deleted deleted the local file even in SYNC_MODE=upload
+  B6  — the remote delete happened BEFORE the upload and the manifest lost remote_id_hash
+  B10 — the shapefile's '<dataset>.zip' never matched in the manifest and collided on key
+  S4  — scanner/uploader followed symlinks (leak of files from outside the folder)
+  P4  — heavy synchronous I/O inside the event loop
+  D1  — the SyncManager.run() loop died silently
+  B8  — claims_event() contract for the drive_events fan-out
 
-E os achados da revisao adversarial das PROPRIAS correcoes:
-  R1  — o push gravava um dataset de arquivo unico por cima do bundle shapefile
-  R2  — falha ao mover para a lixeira apagava a entrada do manifesto assim mesmo
-  R3  — o retry pela SyncQueue nunca deletava a copia remota antiga
-  R5  — a lixeira quebrava o stem do shapefile (um carimbo por arquivo)
-  R6  — a lixeira crescia sem expurgo dentro da pasta do tecnico
-  R7  — o push nao tinha verificacao de conflito nenhuma
-  R8  — um '<ds>.zip' alheio sequestrava o remote_id_hash do bundle
-  R9  — o watcher nunca chamava on_change: o sync so acordava no tick de 30s
+And the findings of the adversarial review of the fixes THEMSELVES:
+  R1  — the push wrote a single-file dataset over the shapefile bundle
+  R2  — a failure to move to the trash deleted the manifest entry anyway
+  R3  — the retry through SyncQueue never deleted the old remote copy
+  R5  — the trash broke the shapefile stem (one timestamp per file)
+  R6  — the trash grew without purging inside the technician's folder
+  R7  — the push had no conflict check at all
+  R8  — someone else's '<ds>.zip' hijacked the bundle's remote_id_hash
+  R9  — the watcher never called on_change: sync only woke up on the 30s tick
 """
 import asyncio
 import hashlib
@@ -43,8 +43,8 @@ LOCAL_URL = "ws://localhost:8000"  # is_local_server → sem exigir cert mTLS
 @pytest.fixture
 def sem_validacao_espacial(monkeypatch):
     """
-    Neutraliza validator/metadata: os fixtures gravam bytes falsos e o objetivo
-    destes testes e a ORDEM das operacoes de sync, nao a leitura via GDAL.
+    Neutralizes validator/metadata: the fixtures write fake bytes and the goal
+    of these tests is the ORDER of the sync operations, not reading via GDAL.
     """
     from executor.sync import manager as manager_mod
     from executor.sync.validator import ValidationResult
@@ -54,7 +54,7 @@ def sem_validacao_espacial(monkeypatch):
 
 
 def _make_manager(tmp_path: Path, mode: str = "upload"):
-    """SyncManager real com uploader/downloader/trigger substituidos por mocks."""
+    """Real SyncManager with uploader/downloader/trigger replaced by mocks."""
     from executor.sync import manager as manager_mod
     from executor.sync.manager import SyncManager
 
@@ -73,7 +73,7 @@ def _make_manager(tmp_path: Path, mode: str = "upload"):
     sm.downloader.download = AsyncMock(return_value=True)
     sm.downloader.list_remote = AsyncMock(return_value=[])
     sm.trigger._triggers = []
-    assert manager_mod  # silencia linters sobre import nao usado
+    assert manager_mod  # silences linters about an unused import
     return sm
 
 
@@ -88,16 +88,16 @@ def _created_event(id_hash: str, name: str, content_md5: str = "md5-remoto") -> 
 
 
 def _capturar_eventos(sm) -> list[tuple[str, str]]:
-    """Substitui o emissor por um coletor — o SyncManager de teste nao tem fila."""
+    """Replaces the emitter with a collector — the test SyncManager has no queue."""
     eventos: list[tuple[str, str]] = []
     sm.events.emit = lambda event, dataset="", **kw: eventos.append((event, dataset))
     return eventos
 
 
-# ── B5 — gate de modo no drive_event ──────────────────────────────────────────
+# ── B5 — mode gate on drive_event ─────────────────────────────────────────────
 
 def test_b5_file_deleted_nao_apaga_nada_em_modo_upload(tmp_path):
-    """SYNC_MODE=upload (padrao) nao pode consumir delecoes vindas do Drive."""
+    """SYNC_MODE=upload (the default) must not consume deletions coming from the Drive."""
     alvo = tmp_path / "parcelas.shp"
     alvo.write_bytes(b"x" * 32)
 
@@ -116,7 +116,7 @@ def test_b5_file_deleted_nao_apaga_nada_em_modo_upload(tmp_path):
 
 @pytest.mark.parametrize("modo", ["download", "bidirectional"])
 def test_b5_file_deleted_move_para_lixeira_e_nao_unlink(tmp_path, modo):
-    """Nos modos que consomem o Drive, o arquivo vai para .atlans-trash/."""
+    """In the modes that consume the Drive, the file goes to .atlans-trash/."""
     alvo = tmp_path / "parcelas.geojson"
     alvo.write_text("{}")
 
@@ -137,7 +137,7 @@ def test_b5_file_deleted_move_para_lixeira_e_nao_unlink(tmp_path, modo):
 
 
 def test_b5_lixeira_nao_colide_nem_sobrescreve(tmp_path):
-    """Dois descartes do mesmo dataset geram duas pastas distintas na lixeira."""
+    """Two discards of the same dataset produce two distinct folders in the trash."""
     for conteudo in (b"primeiro", b"segundo"):
         f = tmp_path / "dados.geojson"
         f.write_bytes(conteudo)
@@ -169,10 +169,10 @@ def test_b5_watcher_ignora_eventos_dentro_da_lixeira(tmp_path):
     assert h._should_process(str(tmp_path / TRASH_DIR_NAME / "dados_20260101T000000.geojson")) is False
 
 
-# ── B6 — upload antes do delete + merge do manifesto ──────────────────────────
+# ── B6 — upload before delete + manifest merge ────────────────────────────────
 
 def test_b6_upload_acontece_antes_do_delete_da_copia_antiga(tmp_path, sem_validacao_espacial):
-    """Um crash entre DELETE e PUT sumia com o arquivo do Drive para sempre."""
+    """A crash between DELETE and PUT made the file vanish from the Drive forever."""
     from executor.sync.uploader import UploadResult
 
     (tmp_path / "dados.geojson").write_text('{"a":1}')
@@ -216,12 +216,12 @@ def test_b6_delete_nao_roda_se_o_upload_falhar(tmp_path, sem_validacao_espacial)
     asyncio.run(sm._local_to_remote())
 
     sm.uploader.delete.assert_not_awaited()
-    # A copia remota antiga continua referenciada — ainda da para recuperar.
+    # The old remote copy is still referenced — it can still be recovered.
     assert sm.manifest.get_dataset("dados")["remote_id_hash"] == "rid-antigo"
 
 
 def test_b6_estado_uploading_preserva_remote_id_hash_e_files(tmp_path, sem_validacao_espacial):
-    """Se o processo morrer no meio do upload, o manifesto tem que continuar util."""
+    """If the process dies mid-upload, the manifest must remain useful."""
     (tmp_path / "dados.geojson").write_text('{"a":1}')
 
     sm = _make_manager(tmp_path, mode="upload")
@@ -245,8 +245,8 @@ def test_b6_estado_uploading_preserva_remote_id_hash_e_files(tmp_path, sem_valid
 
     assert visto["status"] == "uploading"
     assert visto["remote_id_hash"] == "rid-antigo", "perdeu o id remoto durante o upload"
-    # 'files' NAO pode ter sido atualizado: o diff() concluiria "em dia" e o
-    # arquivo nunca mais subiria.
+    # 'files' must NOT have been updated: diff() would conclude "up to date" and the
+    # file would never be uploaded again.
     assert visto["files"]["dados.geojson"]["md5"] == "hash-antigo"
 
 
@@ -258,7 +258,7 @@ def _shapefile(tmp_path: Path, stem: str = "parcelas"):
 
 
 class _RF:
-    """Stub de RemoteFileInfo."""
+    """RemoteFileInfo stub."""
 
     def __init__(self, id_hash, original_name, content_md5, extension="zip", size=10):
         self.id_hash = id_hash
@@ -312,7 +312,7 @@ def test_b10_zip_do_bundle_nao_e_rebaixado_nem_colide_de_chave(tmp_path):
 
 
 def test_b10_md5_remoto_do_bundle_e_realinhado_sem_download(tmp_path):
-    """Manifesto de versao antiga guardava 'a|b|c' como remote_md5 — so corrigir."""
+    """An old-version manifest stored 'a|b|c' as remote_md5 — just fix it."""
     _shapefile(tmp_path)
     sm = _make_manager(tmp_path, mode="bidirectional")
     sm.manifest.set_dataset("parcelas", {
@@ -341,7 +341,7 @@ def test_b10_chave_de_arquivo_remoto_novo_nao_atropela_o_bundle(tmp_path):
     assert _new_remote_ds_key("SEM_EXTENSAO", existentes) == "sem_extensao"
 
 
-# ── S4 — contencao de symlink no upload ───────────────────────────────────────
+# ── S4 — symlink containment on upload ────────────────────────────────────────
 
 def _symlink_ou_skip(link: Path, alvo: Path):
     try:
@@ -354,8 +354,8 @@ def test_s4_scanner_pula_symlinks(tmp_path):
     from executor.sync.scanner import DatasetScanner
 
     segredo = tmp_path.parent / "client.key"
-    # Isca do teste, nao uma chave: o header vazio basta para o cenario (o
-    # scanner nao pode seguir o symlink para fora da pasta de sync).
+    # Test bait, not a key: the empty header is enough for the scenario (the
+    # scanner must not follow the symlink out of the sync folder).
     segredo.write_text("-----BEGIN PRIVATE KEY-----")  # pragma: allowlist secret
     sync = tmp_path / "gis"
     sync.mkdir()
@@ -367,7 +367,7 @@ def test_s4_scanner_pula_symlinks(tmp_path):
 
 
 def test_s4_uploader_recusa_componente_fora_da_pasta(tmp_path):
-    """TOCTOU: entre o scan e o upload o componente pode virar symlink."""
+    """TOCTOU: between the scan and the upload the component may become a symlink."""
     from executor.sync.scanner import Dataset, FileInfo
     from executor.sync.uploader import DriveUploader
 
@@ -411,7 +411,7 @@ def test_s4_uploader_recusa_arquivo_unico_fora_da_pasta(tmp_path):
 
 
 def test_s4_uploader_recusa_componente_de_fora_sem_precisar_de_symlink(tmp_path):
-    """Mesma contencao do caso symlink, exercitada onde symlink nao esta disponivel."""
+    """Same containment as the symlink case, exercised where symlinks are not available."""
     from executor.sync.scanner import Dataset, FileInfo
     from executor.sync.uploader import DriveUploader
 
@@ -423,7 +423,7 @@ def test_s4_uploader_recusa_componente_de_fora_sem_precisar_de_symlink(tmp_path)
 
     ds = Dataset("parcelas", "shapefile")
     ds.add_file(FileInfo(sync / "parcelas.shp"))
-    ds.add_file(FileInfo(fora))  # componente resolvido fora da pasta de sync
+    ds.add_file(FileInfo(fora))  # component resolved outside the sync folder
 
     up = DriveUploader(LOCAL_URL, "ag-1", "ws-1", str(sync))
     up._upload_file = AsyncMock(return_value="NAO DEVERIA SUBIR")
@@ -439,10 +439,10 @@ def test_s4_is_inside_aceita_arquivo_legitimo(tmp_path):
     assert is_inside(tmp_path, tmp_path / "inexistente.geojson") is False
 
 
-# ── P4 — nada de I/O pesado sincrono no event loop ────────────────────────────
+# ── P4 — no heavy synchronous I/O on the event loop ───────────────────────────
 
 def test_p4_remote_to_local_escaneia_uma_vez_so(tmp_path):
-    """scan() por arquivo remoto era O(n x bytes) dentro da corrotina."""
+    """scan() per remote file was O(n x bytes) inside the coroutine."""
     sm = _make_manager(tmp_path, mode="bidirectional")
     for i in range(5):
         (tmp_path / f"d{i}.geojson").write_text("{}")
@@ -475,7 +475,7 @@ def test_p4_remote_to_local_escaneia_uma_vez_so(tmp_path):
 
 
 def test_p4_upload_transmite_em_streaming_e_hasheia_o_conteudo(tmp_path):
-    """Nada de f.read() do arquivo inteiro; o MD5 tem que ser o do objeto enviado."""
+    """No f.read() of the whole file; the MD5 must be that of the uploaded object."""
     from executor.sync.uploader import _aiter_file, _file_md5
 
     conteudo = b"raster-grande" * 100_000
@@ -495,21 +495,21 @@ def test_p4_upload_transmite_em_streaming_e_hasheia_o_conteudo(tmp_path):
 
 def test_p4_local_to_remote_nao_bloqueia_o_event_loop(tmp_path, sem_validacao_espacial):
     """
-    O heartbeat aplicativo de 30s e o unico keepalive (ping_interval=None): se o
-    scan/diff voltar para dentro da corrotina, a conexao cai com 4408 e o run em
-    andamento morre.
+    The 30s application heartbeat is the only keepalive (ping_interval=None): if the
+    scan/diff goes back inside the coroutine, the connection drops with 4408 and the
+    run in progress dies.
 
-    Chamamos `_local_to_remote` DE VERDADE (a versao anterior deste teste
-    exercitava `asyncio.to_thread` do stdlib e passaria mesmo com o bug) e
-    contamos as voltas do event loop enquanto o scan — deliberadamente lento —
-    esta rodando. Com o scan dentro da corrotina, o loop fica parado a janela
-    inteira e a conta da zero.
+    We call `_local_to_remote` FOR REAL (the previous version of this test
+    exercised the stdlib's `asyncio.to_thread` and would pass even with the bug) and
+    count the event loop's turns while the — deliberately slow — scan
+    is running. With the scan inside the coroutine, the loop stays stopped for the whole
+    window and the count comes out zero.
 
-    Conta de voltas, e nao o MAIOR intervalo entre duas delas: o intervalo mede
-    o runner junto com o codigo. Uma pausa do processo (coleta de lixo com a
-    suite inteira carregada, CPU roubada da VM) chegou a 0,32 s no CI com o scan
-    na thread, e o limite era 0,3 s. A pausa so encurta a janela: o loop volta a
-    girar antes de o scan terminar.
+    A count of turns, and not the LONGEST interval between two of them: the interval
+    measures the runner along with the code. A process pause (garbage collection with
+    the whole suite loaded, CPU stolen from the VM) reached 0.32 s in CI with the scan
+    in the thread, and the limit was 0.3 s. A pause only shortens the window: the loop
+    spins again before the scan finishes.
     """
     for i in range(5):
         (tmp_path / f"d{i}.geojson").write_text('{"a":1}')
@@ -523,7 +523,7 @@ def test_p4_local_to_remote_nao_bloqueia_o_event_loop(tmp_path, sem_validacao_es
     def _scan_lento():
         scan["rodando"] = True
         try:
-            time.sleep(0.5)  # I/O real de uma pasta grande: stat + MD5 de tudo
+            time.sleep(0.5)  # Real I/O of a large folder: stat + MD5 of everything
         finally:
             scan["rodando"] = False
         return scan_real()
@@ -546,7 +546,7 @@ def test_p4_local_to_remote_nao_bloqueia_o_event_loop(tmp_path, sem_validacao_es
     assert scan["voltas_do_loop"] > 0, "o event loop parou durante o scan — scan/diff voltou para a corrotina"
 
 
-# ── D1 — o laco de run() nao pode morrer em silencio ──────────────────────────
+# ── D1 — the run() loop must not die silently ─────────────────────────────────
 
 def test_d1_ciclo_com_excecao_nao_mata_o_sync(tmp_path, caplog):
     import logging
@@ -564,15 +564,15 @@ def test_d1_ciclo_com_excecao_nao_mata_o_sync(tmp_path, caplog):
             raise FileNotFoundError("temporario do QGIS sumiu entre iterdir e md5")
 
     sm._local_to_remote_only = _falha_depois_ok
-    # `sincronizar_agora()` e o unico jeito de acordar o ciclo sem pagar a
-    # espera por estabilizacao: um evento do watcher agora fica ate
-    # SYNC_QUIET_PERIOD segundos aguardando a pasta parar de mudar.
+    # `sincronizar_agora()` is the only way to wake the cycle without paying for the
+    # stabilization wait: a watcher event now waits up to
+    # SYNC_QUIET_PERIOD seconds for the folder to stop changing.
     sm.sincronizar_agora()
 
     async def _rodar():
         with caplog.at_level(logging.ERROR, logger="executor.sync"):
             task = asyncio.create_task(sm.run())
-            # 1 falha → backoff de 2s; esperamos so o suficiente para ver o log.
+            # 1 failure → 2s backoff; we wait just long enough to see the log.
             await asyncio.sleep(0.2)
             task.cancel()
             try:
@@ -636,7 +636,7 @@ def test_b8_claims_event_e_sincrono(tmp_path):
     assert not asyncio.iscoroutinefunction(sm.claims_event)
 
 
-# ── R1 — o push nao pode atropelar uma entrada multi-arquivo ──────────────────
+# ── R1 — the push must not trample a multi-file entry ─────────────────────────
 
 def _manifesto_do_bundle(sm):
     sm.manifest.set_dataset("parcelas", {
@@ -654,10 +654,10 @@ def _manifesto_do_bundle(sm):
 @pytest.mark.parametrize("nome_alheio", ["parcelas.zip", "parcelas.dbf"])
 def test_r1_push_de_homonimo_nao_destroi_o_bundle(tmp_path, nome_alheio):
     """
-    Outro usuario sobe pela web um 'parcelas.zip' (ou um componente solto): o
-    push casava por remote_name/known_by_file, gravava um dataset de arquivo
-    unico na chave do shapefile e, no ciclo seguinte, mandava DELETAR do Drive o
-    arquivo do terceiro.
+    Another user uploads a 'parcelas.zip' (or a loose component) via the web: the
+    push matched by remote_name/known_by_file, wrote a single-file dataset
+    under the shapefile's key and, on the next cycle, ordered the third party's
+    file DELETED from the Drive.
     """
     _shapefile(tmp_path)
     sm = _make_manager(tmp_path, mode="bidirectional")
@@ -672,7 +672,7 @@ def test_r1_push_de_homonimo_nao_destroi_o_bundle(tmp_path, nome_alheio):
     assert set(ds["files"]) == {"parcelas.shp", "parcelas.dbf", "parcelas.shx"}
     assert set(sm.manifest.all_datasets()) == {"parcelas"}
     assert not (tmp_path / "parcelas.zip").exists()
-    # Nem o componente local pode ter sido sobrescrito pelo arquivo do terceiro.
+    # Not even the local component may have been overwritten by the third party's file.
     assert (tmp_path / "parcelas.dbf").read_bytes() == b"\x00" * 16
     assert ("sync_error", nome_alheio) in eventos
 
@@ -694,14 +694,14 @@ def test_r1_push_do_proprio_bundle_so_realinha_o_md5(tmp_path):
 
 def test_r1_bundle_destruido_faria_o_executor_apagar_o_arquivo_alheio(tmp_path, sem_validacao_espacial):
     """
-    Prova do estrago que o guard evita: com o manifesto intacto, o ciclo seguinte
-    nao re-envia nada nem chama delete. (Com a entrada destruida, o diff() via o
-    bundle como modificado e deletava 'rid-alheio' do Drive.)
+    Proof of the damage the guard prevents: with the manifest intact, the next cycle
+    re-sends nothing and does not call delete. (With the entry destroyed, diff() saw the
+    bundle as modified and deleted 'rid-alheio' from the Drive.)
     """
     _shapefile(tmp_path)
     sm = _make_manager(tmp_path, mode="bidirectional")
     _manifesto_do_bundle(sm)
-    # 'files' precisa bater com o disco para o diff() considerar em dia
+    # 'files' must match the disk for diff() to consider it up to date
     scan = sm.scanner.scan()
     sm.manifest.set_dataset("parcelas", {
         **sm.manifest.get_dataset("parcelas"),
@@ -734,13 +734,13 @@ def test_r1_polling_ignora_componente_solto_no_drive(tmp_path):
     assert (tmp_path / "parcelas.dbf").read_bytes() == b"\x00" * 16
 
 
-# ── R8 — o '<ds>.zip' alheio nao sequestra o remote_id_hash do bundle ─────────
+# ── R8 — someone else's '<ds>.zip' does not hijack the bundle's remote_id_hash ─
 
 def test_r8_zip_alheio_nao_sequestra_o_bundle(tmp_path):
     """
-    Manifesto legado (sem remote_name) apontando para rid-A; o Drive tem um
-    'parcelas.zip' alheio (rid-B, mais recente) e a nossa copia rid-A. O casamento
-    por NOME tinha precedencia sobre o id e o manifesto acabava com rid-B.
+    Legacy manifest (no remote_name) pointing to rid-A; the Drive has someone else's
+    'parcelas.zip' (rid-B, more recent) and our copy rid-A. Matching
+    by NAME took precedence over the id and the manifest ended up with rid-B.
     """
     _shapefile(tmp_path)
     sm = _make_manager(tmp_path, mode="bidirectional")
@@ -754,7 +754,7 @@ def test_r8_zip_alheio_nao_sequestra_o_bundle(tmp_path):
         "sync_direction": "local",
     })
     sm.downloader.list_remote = AsyncMock(return_value=[
-        _RF("rid-B", "parcelas.zip", "md5-B"),  # alheio, mais recente
+        _RF("rid-B", "parcelas.zip", "md5-B"),  # someone else's, more recent
         _RF("rid-A", "parcelas.zip", "md5-A"),  # a nossa copia
     ])
 
@@ -766,10 +766,10 @@ def test_r8_zip_alheio_nao_sequestra_o_bundle(tmp_path):
     sm.downloader.download.assert_not_awaited()
 
 
-# ── R2 — falha na lixeira nao pode apagar a entrada do manifesto ─────────────
+# ── R2 — a trash failure must not delete the manifest entry ──────────────────
 
 def _travar_lixeira(monkeypatch):
-    """Simula arquivo travado (QGIS aberto no Windows): nada consegue ser movido."""
+    """Simulates a locked file (QGIS open on Windows): nothing can be moved."""
     from executor.sync import manager as manager_mod
     monkeypatch.setattr(manager_mod, "move_dataset_to_trash",
                         lambda sync_dir, ds_name, files: list(files))
@@ -800,7 +800,7 @@ def test_r2_descarte_que_falha_preserva_manifesto_e_nao_ressuscita(tmp_path, mon
     fila = sm.manifest.pending_items()
     assert [q["action"] for q in fila] == ["discard"]
 
-    # E o ciclo seguinte NAO pode re-enviar o arquivo ao Drive.
+    # And the next cycle must NOT re-send the file to the Drive.
     asyncio.run(sm._local_to_remote())
     sm.uploader.upload.assert_not_awaited()
 
@@ -842,14 +842,14 @@ def test_r2_descarte_nao_duplica_item_na_fila(tmp_path, monkeypatch):
     assert len(sm.manifest.pending_items()) == 1
 
 
-# ── R3 — o retry da fila tambem tem que deletar a copia remota antiga ────────
+# ── R3 — the queue retry must also delete the old remote copy ────────────────
 
 def test_r3_retry_deleta_a_copia_remota_antiga(tmp_path, sem_validacao_espacial):
     """
-    MinIO fora do ar na 1a tentativa: o item vai para a fila e o manifesto
-    preserva rid-antigo (correto). Quando o retry sobe rid-novo, rid-antigo tem
-    que sair do bucket — senao volta depois como "arquivo novo" com o mesmo
-    original_name e ressuscita conteudo obsoleto.
+    MinIO down on the 1st attempt: the item goes to the queue and the manifest
+    keeps rid-antigo (correct). When the retry uploads rid-novo, rid-antigo has
+    to leave the bucket — otherwise it comes back later as a "new file" with the same
+    original_name and resurrects stale content.
     """
     from executor.sync.uploader import UploadResult
 
@@ -915,7 +915,7 @@ def test_r5_dois_descartes_do_mesmo_dataset_nao_se_misturam(tmp_path):
         assert sorted(p.suffix for p in pasta.iterdir()) == [".dbf", ".shp", ".shx"]
 
 
-# ── R6 — expurgo da lixeira ──────────────────────────────────────────────────
+# ── R6 — trash purge ─────────────────────────────────────────────────────────
 
 def test_r6_purge_remove_descartes_antigos_e_mede_o_resto(tmp_path):
     trash = tmp_path / TRASH_DIR_NAME
@@ -948,7 +948,7 @@ def test_r6_manager_expurga_a_lixeira_no_ciclo(tmp_path):
     asyncio.run(sm._maybe_purge_trash())
     assert not velho.exists()
 
-    # Segunda chamada no mesmo ciclo nao varre de novo (I/O em vao a cada 30s).
+    # A second call in the same cycle does not sweep again (wasted I/O every 30s).
     novo = trash / "campo_20260801T000000"
     novo.mkdir()
     os.utime(novo, (antigo_ts, antigo_ts))
@@ -956,14 +956,14 @@ def test_r6_manager_expurga_a_lixeira_no_ciclo(tmp_path):
     assert novo.exists()
 
 
-# ── R7 — o push tambem respeita a politica de conflito ───────────────────────
+# ── R7 — the push also respects the conflict policy ──────────────────────────
 
 def _manager_com_conflito(tmp_path, monkeypatch, estrategia):
     from executor import config as agent_config
 
     monkeypatch.setattr(agent_config, "SYNC_CONFLICT_STRATEGY", estrategia)
     alvo = tmp_path / "levantamento.geojson"
-    alvo.write_text('{"campo":1}')  # ja EDITADO offline pelo tecnico
+    alvo.write_text('{"campo":1}')  # already EDITED offline by the technician
 
     sm = _make_manager(tmp_path, mode="bidirectional")
     sm.manifest.set_dataset("levantamento", {
@@ -972,7 +972,7 @@ def _manager_com_conflito(tmp_path, monkeypatch, estrategia):
         "remote_id_hash": "rid-1",
         "remote_name": "levantamento.geojson",
         "remote_md5": "md5-remoto-antigo",
-        "local_md5": "md5-do-download",  # != MD5 atual do disco
+        "local_md5": "md5-do-download",  # != current MD5 on disk
         "status": "synced",
         "sync_direction": "remote",
     })
@@ -1010,7 +1010,7 @@ def test_r7_push_com_local_wins_nao_baixa(tmp_path, monkeypatch):
 
 
 def test_r7_push_sem_edicao_local_baixa_sem_conflito(tmp_path, monkeypatch):
-    """Sem divergencia local nao ha conflito — o push normal nao pode regredir."""
+    """Without local divergence there is no conflict — the normal push must not regress."""
     from executor import config as agent_config
 
     monkeypatch.setattr(agent_config, "SYNC_CONFLICT_STRATEGY", "keep-both")
@@ -1023,7 +1023,7 @@ def test_r7_push_sem_edicao_local_baixa_sem_conflito(tmp_path, monkeypatch):
         "files": {"levantamento.geojson": {"md5": "x"}},
         "remote_id_hash": "rid-1",
         "remote_name": "levantamento.geojson",
-        "local_md5": hashlib.md5(b'{"campo":1}').hexdigest(),  # disco bate com o manifesto
+        "local_md5": hashlib.md5(b'{"campo":1}').hexdigest(),  # disk matches the manifest
         "sync_direction": "remote",
     })
     eventos = _capturar_eventos(sm)
@@ -1044,9 +1044,9 @@ def test_r7_push_sem_edicao_local_baixa_sem_conflito(tmp_path, monkeypatch):
 
 def test_r9_evento_do_watchdog_acorda_o_sync_a_partir_de_outra_thread(tmp_path):
     """
-    `_change_flag` e um asyncio.Event: seta-lo direto da thread do watchdog nao e
-    thread-safe. Exercita a cadeia real _SyncEventHandler → FileWatcher._handle_event
-    → SyncManager._on_change → _change_flag, com o handler rodando fora do loop.
+    `_change_flag` is an asyncio.Event: setting it directly from the watchdog thread is
+    not thread-safe. Exercises the real chain _SyncEventHandler → FileWatcher._handle_event
+    → SyncManager._on_change → _change_flag, with the handler running outside the loop.
     """
     from executor.sync.watcher import _SyncEventHandler
 
@@ -1066,7 +1066,7 @@ def test_r9_evento_do_watchdog_acorda_o_sync_a_partir_de_outra_thread(tmp_path):
 
 
 def test_r9_watcher_real_acorda_o_sync(tmp_path):
-    """Integracao com o watchdog de verdade: criar um arquivo dispara o ciclo."""
+    """Integration with the real watchdog: creating a file triggers the cycle."""
     sm = _make_manager(tmp_path, mode="upload")
 
     async def _cenario():
@@ -1083,7 +1083,7 @@ def test_r9_watcher_real_acorda_o_sync(tmp_path):
 
 
 def test_r9_evento_na_lixeira_nao_acorda_o_sync(tmp_path):
-    """Agora que on_change existe, o filtro da lixeira deixa de ser decorativo."""
+    """Now that on_change exists, the trash filter is no longer decorative."""
     from executor.sync.watcher import _SyncEventHandler
 
     sm = _make_manager(tmp_path, mode="upload")
@@ -1100,17 +1100,17 @@ def test_r9_evento_na_lixeira_nao_acorda_o_sync(tmp_path):
     assert asyncio.run(_cenario()) is False
 
 
-# ── P5 — o GeoSync parou de comer a maquina sem estar fazendo nada ───────────
+# ── P5 — GeoSync stopped eating the machine while doing nothing ──────────────
 #
-# Os achados de desempenho do subsistema de sync:
-#   P5.1 — diff() rehasheava a pasta inteira a cada 30s, ignorando (size, mtime)
-#   P5.2 — o ciclo acordado pelo watcher nao tinha piso de intervalo
-#   P5.3 — cada mutacao do manifesto reserializava o JSON inteiro em disco
-#   P5.4 — a fila dormia ate 300s DENTRO do ciclo, congelando a pasta
-#   P5.5 — uploads e downloads eram estritamente serializados
+# The performance findings of the sync subsystem:
+#   P5.1 — diff() rehashed the whole folder every 30s, ignoring (size, mtime)
+#   P5.2 — the cycle woken by the watcher had no interval floor
+#   P5.3 — every manifest mutation reserialized the whole JSON to disk
+#   P5.4 — the queue slept up to 300s INSIDE the cycle, freezing the folder
+#   P5.5 — uploads and downloads were strictly serialized
 
 def _semear_manifesto_do_disco(sm):
-    """Grava no manifesto o estado atual da pasta, como um ciclo bem-sucedido."""
+    """Writes the folder's current state to the manifest, like a successful cycle."""
     for nome, ds in sm.scanner.scan().items():
         sm.manifest.set_dataset(nome, {
             "type": ds.type,
@@ -1122,7 +1122,7 @@ def _semear_manifesto_do_disco(sm):
 
 
 def test_p5_diff_nao_rehasheia_quando_size_e_mtime_batem(tmp_path, monkeypatch):
-    """Com o disco intocado, um ciclo nao pode abrir nenhum arquivo."""
+    """With the disk untouched, a cycle must not open any file."""
     from executor.sync import scanner as scanner_mod
 
     sm = _make_manager(tmp_path, mode="upload")
@@ -1143,7 +1143,7 @@ def test_p5_diff_nao_rehasheia_quando_size_e_mtime_batem(tmp_path, monkeypatch):
 
 
 def test_p5_diff_ainda_pega_edicao_de_verdade(tmp_path):
-    """O atalho nao pode esconder mudanca real — o mtime muda na edicao."""
+    """The shortcut must not hide a real change — mtime changes on edit."""
     sm = _make_manager(tmp_path, mode="upload")
     alvo = tmp_path / "campo.geojson"
     alvo.write_text('{"a":1}')
@@ -1158,7 +1158,7 @@ def test_p5_diff_ainda_pega_edicao_de_verdade(tmp_path):
 
 
 def test_p5_varredura_completa_pega_reescrita_com_mtime_preservado(tmp_path):
-    """Rede de seguranca do atalho: `force_hash` reencontra o que ele deixaria passar."""
+    """The shortcut's safety net: `force_hash` finds what it would let through."""
     sm = _make_manager(tmp_path, mode="upload")
     alvo = tmp_path / "campo.geojson"
     alvo.write_text('{"a":1}')
@@ -1176,7 +1176,7 @@ def test_p5_varredura_completa_pega_reescrita_com_mtime_preservado(tmp_path):
 
 
 def test_p5_manifesto_grava_uma_vez_por_lote(tmp_path, sem_validacao_espacial):
-    """Eram TRES reserializacoes do JSON inteiro por dataset enviado — O(N²)."""
+    """There were THREE reserializations of the whole JSON per uploaded dataset — O(N²)."""
     from executor.sync.uploader import UploadResult
 
     sm = _make_manager(tmp_path, mode="upload")
@@ -1197,7 +1197,7 @@ def test_p5_manifesto_grava_uma_vez_por_lote(tmp_path, sem_validacao_espacial):
 
 
 def test_p5_manifesto_grava_de_forma_atomica(tmp_path):
-    """Um crash no meio do json.dump deixava o manifesto truncado."""
+    """A crash in the middle of json.dump left the manifest truncated."""
     from executor.sync.manifest import SyncManifest
 
     m = SyncManifest(str(tmp_path), "ws-1", "ag-1")
@@ -1210,13 +1210,13 @@ def test_p5_manifesto_grava_de_forma_atomica(tmp_path):
 
 
 def test_p5_fila_agenda_o_retry_em_vez_de_dormir(tmp_path):
-    """Um `asyncio.sleep(backoff)` aqui congelava a PASTA, nao so o item."""
+    """An `asyncio.sleep(backoff)` here froze the FOLDER, not just the item."""
     from executor.sync.manifest import SyncManifest
     from executor.sync.queue import SyncQueue
 
     m = SyncManifest(str(tmp_path), "ws-1", "ag-1")
     m.enqueue("upload", "ds1")
-    m._data["pending_queue"][0]["retries"] = 8  # backoff de 256s
+    m._data["pending_queue"][0]["retries"] = 8  # 256s backoff
 
     async def _falha(item):
         return False
@@ -1226,7 +1226,7 @@ def test_p5_fila_agenda_o_retry_em_vez_de_dormir(tmp_path):
     assert time.monotonic() - inicio < 1.0, "a fila dormiu dentro do ciclo"
     assert m.pending_items()[0]["next_attempt_at"] > time.time()
 
-    # Segunda passada: o item ainda nao venceu, entao nem e tentado.
+    # Second pass: the item is not due yet, so it is not even attempted.
     tentativas = {"n": 0}
 
     async def _conta(item):
@@ -1261,7 +1261,7 @@ def test_p5_uploads_acontecem_em_paralelo(tmp_path, sem_validacao_espacial):
 
 
 def test_p5_comando_da_ui_fura_a_espera_por_estabilizacao(tmp_path):
-    """O piso entre ciclos contem a rajada do watchdog, nao o clique do usuario."""
+    """The floor between cycles contains the watchdog burst, not the user's click."""
     sm = _make_manager(tmp_path, mode="upload")
 
     async def _cenario():
@@ -1276,7 +1276,7 @@ def test_p5_comando_da_ui_fura_a_espera_por_estabilizacao(tmp_path):
 
 
 def test_p5_claims_event_nao_varre_o_manifesto(tmp_path):
-    """O roteamento do push virou lookup O(1) nos indices do manifesto."""
+    """Push routing became an O(1) lookup in the manifest's indexes."""
     sm = _make_manager(tmp_path)
     for i in range(50):
         sm.manifest.set_dataset(f"d{i}", {"type": "geojson",
@@ -1286,5 +1286,5 @@ def test_p5_claims_event_nao_varre_o_manifesto(tmp_path):
 
     assert sm.claims_event({"file": {"id_hash": "rid-49", "original_name": "x.geojson"}}) is True
     assert sm.claims_event({"file": {"id_hash": "", "original_name": "d3.geojson"}}) is True
-    # Removido do manifesto tem de sair do indice junto.
+    # Removed from the manifest must leave the index along with it.
     assert sm.claims_event({"file": {"id_hash": "rid-7", "original_name": "d7.geojson"}}) is False

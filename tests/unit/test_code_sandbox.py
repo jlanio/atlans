@@ -1,15 +1,15 @@
-"""Regressao do endurecimento do sandbox do PythonScript (auditoria: critica).
+"""Regression test for the PythonScript sandbox hardening (audit: critical).
 
-O validate_code_ast e a UNICA barreira entre o codigo do usuario e o host do
-executor: o script roda no MESMO processo dos outros nos. A auditoria demonstrou
-que a checagem so olhava ast.Attribute POR NOME, deixando passar dunders
-contrabandeados como string (`obj.__getattribute__('__class__')`),
-`str.format('{0.__class__}')`, e `operator.attrgetter`/`string.Formatter` — todos
-caminhos ate `object.__subclasses__()` e, dali, execucao arbitraria + leitura das
-credenciais mTLS do executor.
+validate_code_ast is the ONLY barrier between the user's code and the
+executor host: the script runs in the SAME process as the other nodes. The
+audit showed that the check only looked at ast.Attribute BY NAME, letting
+through dunders smuggled in as strings (`obj.__getattribute__('__class__')`),
+`str.format('{0.__class__}')`, and `operator.attrgetter`/`string.Formatter` — all
+paths to `object.__subclasses__()` and, from there, arbitrary execution + reading
+the executor's mTLS credentials.
 
-Cada teste falha SEM o fix correspondente; a docstring nomeia a mutacao que
-derruba SO aquele teste.
+Each test fails WITHOUT the corresponding fix; the docstring names the mutation
+that breaks ONLY that test.
 """
 import pytest
 
@@ -22,7 +22,7 @@ from flow.utils.code_sandbox import (
 
 
 def _bloqueia(code: str) -> str:
-    """Roda o validador; devolve a mensagem de bloqueio ou falha o teste."""
+    """Runs the validator; returns the block message or fails the test."""
     with pytest.raises(UnsafeCodeError) as exc:
         validate_code_ast(code)
     return str(exc.value)
@@ -31,10 +31,10 @@ def _bloqueia(code: str) -> str:
 # ── Decisao 1: operator/string fora da allowlist ────────────────────────────
 
 def test_operator_e_string_fora_da_allowlist():
-    """Mutacao: readicionar 'operator'/'string' a ALLOWED_MODULES.
+    """Mutation: re-add 'operator'/'string' to ALLOWED_MODULES.
 
-    Eram os dois vetores diretos: attrgetter/methodcaller buscam atributo por
-    string, Formatter.get_field alcanca globals de funcao.
+    They were the two direct vectors: attrgetter/methodcaller fetch an attribute
+    by string, Formatter.get_field reaches a function's globals.
     """
     assert "operator" not in ALLOWED_MODULES
     assert "string" not in ALLOWED_MODULES
@@ -68,23 +68,23 @@ def test_fuga_string_formatter_get_field_bloqueada():
     "x = ().__class__",
     "x = ().__class__.__bases__[0]",
     "x = obj.__subclasses__()",
-    "x = ().__getattribute__('__class__')",   # __getattribute__ nao estava na lista velha
+    "x = ().__getattribute__('__class__')",   # __getattribute__ was not in the old list
     "x = obj.__reduce__()",
     "x = obj.__reduce_ex__(2)",
-    "x = f'{obj.__class__.__mro__}'",          # dentro de f-string tambem e ast.Attribute
+    "x = f'{obj.__class__.__mro__}'",          # inside an f-string it is also an ast.Attribute
     "x = obj.__globals__",
 ])
 def test_dunder_em_atributo_bloqueado(code):
-    """Mutacao: trocar _e_dunder pela lista fixa _BLOCKED_ATTRS antiga.
+    """Mutation: replace _e_dunder with the old fixed _BLOCKED_ATTRS list.
 
-    A lista antiga nao tinha __getattribute__/__reduce__ — a fuga demonstrada
-    usava exatamente __getattribute__.
+    The old list lacked __getattribute__/__reduce__ — the demonstrated escape
+    used exactly __getattribute__.
     """
     msg = _bloqueia(code)
     assert "dunder" in msg
 
 
-# ── Decisao 3: atributos de frame/codigo/traceback (nao-dunder) ─────────────
+# ── Decision 3: frame/code/traceback attributes (non-dunder) ────────────────
 
 @pytest.mark.parametrize("code", [
     "x = (i for i in []).gi_frame.f_back.f_globals",
@@ -94,10 +94,10 @@ def test_dunder_em_atributo_bloqueado(code):
     "x = frame.f_locals",
 ])
 def test_atributo_de_introspeccao_bloqueado(code):
-    """Mutacao: remover _BLOCKED_ATTR_NAMES.
+    """Mutation: remove _BLOCKED_ATTR_NAMES.
 
-    gi_frame/f_back/f_globals/f_builtins NAO sao dunders e escapariam do
-    predicado; levam aos globals reais e ao __builtins__ verdadeiro.
+    gi_frame/f_back/f_globals/f_builtins are NOT dunders and would escape the
+    predicate; they lead to the real globals and the true __builtins__.
     """
     _bloqueia(code)
 
@@ -109,15 +109,15 @@ def test_atributo_de_introspeccao_bloqueado(code):
     "x = '{}'.format(v)",
     "x = '{k}'.format_map(d)",
     "x = fmt.get_field('0', a, k)",
-    # concatenacao para driblar a checagem de string literal — barrada no .format
+    # concatenation to dodge the string-literal check — blocked at .format
     "fmt = '{0.__' + 'class__}'\nx = fmt.format(())",
 ])
 def test_metodo_de_format_bloqueado(code):
-    """Mutacao: remover 'format'/'format_map'/'get_field' de _BLOCKED_METHODS.
+    """Mutation: remove 'format'/'format_map'/'get_field' from _BLOCKED_METHODS.
 
-    str.format resolve `{0.__class__}` pelo maquinario de format-field, sem um
-    ast.Attribute que a checagem veja; a concatenacao driblaria ate a checagem
-    de string literal.
+    str.format resolves `{0.__class__}` through the format-field machinery,
+    without an ast.Attribute the check can see; concatenation would dodge even
+    the string-literal check.
     """
     _bloqueia(code)
 
@@ -131,23 +131,23 @@ def test_metodo_de_format_bloqueado(code):
     "x = algo['__globals__']",
 ])
 def test_dunder_em_string_bloqueado(code):
-    """Mutacao: remover a checagem de ast.Constant.
+    """Mutation: remove the ast.Constant check.
 
-    Cobre subscript (`d['__builtins__']`), argumento de chamada e format string
-    de uma so vez — ast.walk visita todo ast.Constant.
+    Covers subscript (`d['__builtins__']`), call argument and format string
+    all at once — ast.walk visits every ast.Constant.
     """
     _bloqueia(code)
 
 
-# ── typing fora da allowlist ────────────────────────────────────────────────
+# ── typing outside the allowlist ────────────────────────────────────────────
 
 def test_typing_fora_da_allowlist():
-    """Mutacao: readicionar 'typing' a ALLOWED_MODULES.
+    """Mutation: re-add 'typing' to ALLOWED_MODULES.
 
-    `typing.ForwardRef(s)._evaluate({}, ...)` e `typing.get_type_hints(obj,
-    globalns={})` fazem eval de string com os builtins reais — execucao
-    arbitraria no processo do executor, com a string montada em runtime para
-    nao ser um literal com dunder.
+    `typing.ForwardRef(s)._evaluate({}, ...)` and `typing.get_type_hints(obj,
+    globalns={})` eval a string with the real builtins — arbitrary execution
+    in the executor process, with the string built at runtime so it is not a
+    literal containing a dunder.
     """
     assert "typing" not in ALLOWED_MODULES
     _bloqueia("import typing")
@@ -155,7 +155,7 @@ def test_typing_fora_da_allowlist():
 
 
 def test_fuga_typing_forwardref_bloqueada():
-    """O caminho demonstrado na revisao: passava pela checagem de AST."""
+    """The path demonstrated in the review: it passed the AST check."""
     _bloqueia(
         "import typing\n"
         "d = '_' + '_'\n"
@@ -166,7 +166,7 @@ def test_fuga_typing_forwardref_bloqueada():
 
 
 def test_anotacao_de_tipo_sem_typing_passa():
-    """Quem anotava tipos nao perde nada: os genericos embutidos bastam."""
+    """Whoever annotated types loses nothing: the built-in generics are enough."""
     validate_code_ast(
         "def contar(xs: list[int]) -> dict[str, int | None]:\n"
         "    return {str(x): x for x in xs}\n"
@@ -174,31 +174,31 @@ def test_anotacao_de_tipo_sem_typing_passa():
     )
 
 
-# ── Codigo legitimo continua passando (nao pode virar sandbox inutil) ───────
+# ── Legitimate code still passes (must not become a useless sandbox) ────────
 
 @pytest.mark.parametrize("code", [
     "import pandas as pd\ndf = pd.DataFrame({'a': [1, 2]})",
     "gdf['area_ha'] = gdf.geometry.area / 10_000\nresult = gdf",
     "result = gdf.to_json()",
-    "n = len(gdf)\nmsg = f'total: {n} feicoes'",       # f-string sem atributo
+    "n = len(gdf)\nmsg = f'total: {n} feicoes'",       # f-string without an attribute
     "s = 'valor: %d' % 42",                             # %-formatting continua
     "import math, json, re, collections, itertools, functools",
     "items = sorted(dados, key=lambda x: x[0])",
-    "df2 = df.rename(columns={'old__mid': 'novo'})",    # __ no meio nao e dunder
+    "df2 = df.rename(columns={'old__mid': 'novo'})",    # __ in the middle is not a dunder
     "cols = [c for c in gdf.columns if c.startswith('geo')]",
     "import numpy as np\narr = np.array([1, 2, 3]).reshape(3, 1)",
     "result = gdf[gdf.geometry.is_valid & ~gdf.geometry.is_empty]",
 ])
 def test_codigo_legitimo_passa(code):
-    """Mutacao: qualquer regra ampla demais (ex.: bloquear TODA string com '__',
-    ou todo `.format`-like) derruba um destes."""
-    validate_code_ast(code)  # nao levanta
+    """Mutation: any rule that is too broad (e.g. blocking EVERY string with '__',
+    or every `.format`-like call) breaks one of these."""
+    validate_code_ast(code)  # does not raise
 
 
 # ── Builtins perigosos removidos + __import__ trocado ───────────────────────
 
 def test_build_safe_builtins_remove_perigosos_e_troca_import():
-    """Mutacao: esvaziar BLOCKED_BUILTINS, ou nao substituir __import__."""
+    """Mutation: empty BLOCKED_BUILTINS, or do not replace __import__."""
     safe = build_safe_builtins()
     for nome in ("getattr", "setattr", "delattr", "type", "eval", "exec",
                  "open", "compile", "globals", "vars"):
@@ -219,17 +219,17 @@ def test_safe_import_barra_modulo_fora_da_allowlist():
 
 
 def test_import_com_erro_de_sintaxe_propaga_syntaxerror():
-    """Codigo invalido nao e UnsafeCodeError — deixa o SyntaxError subir para o
-    caminho de erro do no."""
+    """Invalid code is not UnsafeCodeError — let the SyntaxError propagate to the
+    node's error path."""
     with pytest.raises(SyntaxError):
         validate_code_ast("def :\n")
 
 
-# ── Fuga por handle de modulo (auditoria SEG-02) ─────────────────────────────
-# A allowlist deixava passar `uuid.os`, `dataclasses.sys`, `collections._sys` e
-# `importlib.import_module` — atributos NAO-dunder de modulos permitidos que
-# reexportam a stdlib perigosa. A partir de `os`/`sys` chega-se a
-# os.popen/subprocess/importlib. Cada caso abaixo e um one-liner que abria RCE.
+# ── Escape through a module handle (audit SEG-02) ────────────────────────────
+# The allowlist let through `uuid.os`, `dataclasses.sys`, `collections._sys` and
+# `importlib.import_module` — NON-dunder attributes of allowed modules that
+# re-export the dangerous stdlib. From `os`/`sys` one reaches
+# os.popen/subprocess/importlib. Each case below is a one-liner that opened RCE.
 import pytest as _pytest
 
 
@@ -256,4 +256,4 @@ def test_bloqueia_handle_de_modulo_perigoso(codigo):
     "df = input_data\nresult = df.groupby('c').agg({'v': 'sum'})",
 ])
 def test_permite_manipulacao_de_dados_legitima(codigo):
-    validate_code_ast(codigo)  # nao deve levantar
+    validate_code_ast(codigo)  # must not raise

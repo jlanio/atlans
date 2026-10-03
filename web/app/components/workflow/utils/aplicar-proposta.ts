@@ -1,24 +1,25 @@
 // web/app/components/workflow/utils/aplicar-proposta.ts
 //
-// A ponte entre a definição proposta no painel e o canvas.
+// The bridge between the definition proposed in the panel and the canvas.
 //
-// Ela existe por uma razão só, e é a que estraga o trabalho de alguém: a
-// definição proposta **não tem posição**. `buildNodes` cai no default
-// `{x: 180 * indice, y: 0}` (`build-canvas.ts:81`) — uma fila horizontal. Jogar
-// isso num fluxo de doze nós apagaria o desenho que a pessoa arrumou à mão, e
-// "desfazer" não devolve um arranjo feito ao longo de uma tarde.
+// It exists for one reason only, and it is the one that ruins someone's work:
+// the proposed definition **has no position**. `buildNodes` falls back to the
+// default `{x: 180 * indice, y: 0}` (`build-canvas.ts:81`) — a horizontal row.
+// Dropping that onto a twelve-node workflow would erase the layout the person
+// arranged by hand, and "undo" does not bring back an arrangement built over an
+// afternoon.
 //
-// Então a regra é: quem sobreviveu fica exatamente onde estava; só o que é novo
-// ganha posição, pelo mesmo `computeAutoLayout` que o botão de organizar do
-// canvas já usa. O que o layout colocar em cima de um card preservado desce até
-// caber.
+// So the rule is: whoever survived stays exactly where it was; only what is new
+// gets a position, from the same `computeAutoLayout` the canvas's arrange button
+// already uses. Whatever the layout places on top of a preserved card moves down
+// until it fits.
 //
-// Pura de propósito, e por dois motivos. O primeiro é poder testar a
-// preservação de posição sem montar um React Flow. O segundo é que o cartão do
-// painel mostra a contagem (`n novos · n alterados · n removidos`) ANTES do
-// clique: chamando esta mesma função, o número que a pessoa lê é literalmente
-// derivado do que o botão vai aplicar, e não de uma segunda contagem que pode
-// divergir dele.
+// Pure on purpose, for two reasons. The first is being able to test position
+// preservation without mounting a React Flow. The second is that the panel's
+// card shows the count (`n novos · n alterados · n removidos`) BEFORE the
+// click: by calling this same function, the number the person reads is
+// literally derived from what the button will apply, and not from a second
+// count that may diverge from it.
 import { Edge } from "@xyflow/react"
 
 import { INodeContext } from "@/context/useFlowContext"
@@ -27,18 +28,18 @@ import { computeAutoLayout } from "./auto-layout"
 import { buildEdges, buildNodes, CanvasDefinition } from "./build-canvas"
 import { measuredHeight, measuredWidth } from "./node-metrics"
 
-/** Folga mínima entre um card novo e um card preservado, na resolução de choque. */
+/** Minimum gap between a new card and a preserved card, when resolving overlaps. */
 const FOLGA = 24
 
-/** Mesma grade do auto-layout, para os cards empurrados continuarem alinhados. */
+/** Same grid as the auto-layout, so pushed cards stay aligned. */
 const snap = (v: number) => Math.round(v / 8) * 8
 
 export interface ResumoDaProposta {
-  /** Nós da proposta cujo `id` não existe no canvas. */
+  /** Proposal nodes whose `id` does not exist on the canvas. */
   novos: number
-  /** Nós que existem nos dois lados e mudaram de tipo, apelido ou propriedade. */
+  /** Nodes present on both sides that changed type, alias or property. */
   alterados: number
-  /** Nós do canvas que a proposta não tem — somem ao aplicar. */
+  /** Canvas nodes the proposal does not have — they disappear on apply. */
   removidos: number
 }
 
@@ -47,14 +48,14 @@ export interface ResultadoDaProposta {
   edges: Edge[]
   resumo: ResumoDaProposta
   /**
-   * Falso quando o catálogo ainda não chegou. `buildNodes` sem catálogo devolve
-   * lista vazia — aplicar nesse instante ESVAZIARIA o canvas, em silêncio. Quem
-   * chama desliga o botão por aqui.
+   * False when the catalog has not arrived yet. `buildNodes` without a catalog
+   * returns an empty list — applying at that moment would EMPTY the canvas,
+   * silently. The caller disables the button based on this.
    */
   catalogoPronto: boolean
-  /** Ids dos nós que não estavam no canvas antes desta aplicação. */
+  /** Ids of the nodes that were not on the canvas before this apply. */
   idsNovos: Set<string>
-  /** Ids das arestas que tocam pelo menos um nó novo. */
+  /** Ids of the edges that touch at least one new node. */
   idsArestasNovas: Set<string>
 }
 
@@ -66,11 +67,11 @@ interface Caixa {
 }
 
 /**
- * Monta o canvas da proposta preservando a posição de quem já estava lá.
+ * Builds the proposal's canvas preserving the position of whatever was already there.
  *
- * @param definicao  a definição validada que veio no quadro `proposta`
- * @param nodesAPI   o catálogo de nós (`useWorkflowCatalogStore`)
- * @param atuais     os nós que estão no canvas neste momento
+ * @param definicao  the validated definition that came in the `proposta` frame
+ * @param nodesAPI   the node catalog (`useWorkflowCatalogStore`)
+ * @param atuais     the nodes currently on the canvas
  */
 export function aplicarProposta(
   definicao: CanvasDefinition | undefined,
@@ -89,7 +90,7 @@ export function aplicarProposta(
   for (const proposto of propostos) {
     const atual = naTela.get(proposto.id)
     if (atual) {
-      // A posição de lá, e não a do layout: é o desenho que a pessoa arrumou.
+      // The position from there, not the layout's: it is the layout the person arranged.
       preservados.push({ ...proposto, position: { ...atual.position } })
     } else {
       novos.push(proposto)
@@ -102,17 +103,18 @@ export function aplicarProposta(
   const idsNovos = new Set(novos.map(no => no.id))
 
   return {
-    // Ordem da definição, para o canvas não embaralhar a cada aplicação.
+    // Definition order, so the canvas does not shuffle on every apply.
     nodes: propostos.map(p => finais.get(p.id) ?? p),
     edges,
     resumo: contar(propostos, preservados, atuais, naTela),
     catalogoPronto: pedidos === 0 || propostos.length > 0,
-    // Quem chegou AGORA. Serve à animação de entrada: sem a lista, o canvas
-    // teria de animar tudo a cada desenho — e um fluxo que pisca inteiro a cada
-    // nó acrescentado é o oposto de ver o fluxo crescer.
+    // What arrived NOW. Feeds the entry animation: without the list, the canvas
+    // would have to animate everything on every draw — and a workflow that
+    // flashes entirely on each added node is the opposite of watching the
+    // workflow grow.
     idsNovos,
-    // As arestas que tocam um nó novo. Uma aresta entre dois nós que já
-    // estavam ali não é novidade e não deve se redesenhar.
+    // The edges that touch a new node. An edge between two nodes that were
+    // already there is not new and should not redraw.
     idsArestasNovas: new Set(
       edges.filter(e => idsNovos.has(e.source) || idsNovos.has(e.target)).map(e => e.id),
     ),
@@ -120,12 +122,12 @@ export function aplicarProposta(
 }
 
 /**
- * Dá posição aos nós novos: a do `computeAutoLayout` sobre o grafo inteiro,
- * empurrada para baixo enquanto estiver em cima de um card que já existe.
+ * Gives new nodes a position: the one from `computeAutoLayout` over the whole
+ * graph, pushed down while it sits on top of an already existing card.
  *
- * O layout roda sobre TODOS os nós (preservados inclusive) porque um nó novo
- * sozinho não teria de onde tirar o sentido do fluxo — é a aresta que o liga ao
- * que já existe que diz de que lado ele entra.
+ * The layout runs over ALL nodes (preserved ones included) because a new node on
+ * its own would have nowhere to get the workflow's direction from — it is the
+ * edge linking it to what already exists that says which side it comes in on.
  */
 function posicionarOsNovos(
   novos: INodeContext[],
@@ -137,16 +139,17 @@ function posicionarOsNovos(
 
   const layout = computeAutoLayout([...preservados, ...novos], edges)
 
-  // Os cards preservados medidos pelo que está NA TELA (o React Flow já os
-  // mediu); o card novo, pelo cálculo por portas — ele ainda não existe.
+  // Preserved cards measured by what is ON SCREEN (React Flow has already
+  // measured them); the new card, by the per-port calculation — it does not
+  // exist yet.
   const ocupadas: Caixa[] = preservados.map(no => caixaDe(no, naTela.get(no.id)))
 
   return novos.map(novo => {
     const alvo = layout.get(novo.id) ?? novo.position
     const caixa = caixaDe({ ...novo, position: alvo })
 
-    // Cada empurrão desce para além do fundo de todas as caixas que barravam,
-    // então o laço avança sempre e termina em no máximo uma volta por caixa.
+    // Each push moves past the bottom of every box that was in the way, so the
+    // loop always advances and ends after at most one round per box.
     for (let volta = 0; volta <= ocupadas.length; volta++) {
       const batendo = ocupadas.filter(o => colide(caixa, o))
       if (!batendo.length) break
@@ -158,7 +161,7 @@ function posicionarOsNovos(
   })
 }
 
-/** Caixa do card. `medida` é o nó que está na tela, quando houver: ele foi medido de verdade. */
+/** Card box. `medida` is the node on screen, when there is one: it was actually measured. */
 function caixaDe(node: INodeContext, medida?: INodeContext): Caixa {
   const referencia = medida ?? node
   return {
@@ -169,7 +172,7 @@ function caixaDe(node: INodeContext, medida?: INodeContext): Caixa {
   }
 }
 
-/** Sobreposição de duas caixas, com a folga contada dos dois lados. */
+/** Overlap of two boxes, with the gap counted on both sides. */
 function colide(a: Caixa, b: Caixa): boolean {
   return (
     a.x < b.x + b.w + FOLGA &&
@@ -196,12 +199,12 @@ function contar(
 }
 
 /**
- * O nó mudou de verdade?
+ * Did the node really change?
  *
- * Compara só o que a definição carrega — nó de origem, apelido e propriedades.
- * Posição fica de fora de propósito: é justamente o que esta função protege, e
- * anunciar "alterado" por causa dela faria a contagem falar de uma mudança que
- * a pessoa não vai reconhecer como sua.
+ * Compares only what the definition carries — source node, alias and properties.
+ * Position is left out on purpose: it is precisely what this function protects,
+ * and announcing "changed" because of it would make the count talk about a
+ * change the person will not recognize as their own.
  */
 function mudou(proposto: INodeContext, atual: INodeContext | undefined): boolean {
   if (!atual) return false
@@ -211,9 +214,9 @@ function mudou(proposto: INodeContext, atual: INodeContext | undefined): boolean
 }
 
 /**
- * Compara por CHAVE, e não pelo JSON dos dois objetos inteiros: a ordem das
- * chaves depende de quem montou o nó (o editor monta pelo catálogo, o drawer
- * copia o objeto do catálogo inteiro), e ordem diferente não é mudança.
+ * Compares by KEY, and not by the JSON of both whole objects: key order depends
+ * on who built the node (the editor builds it from the catalog, the drawer
+ * copies the whole catalog object), and a different order is not a change.
  */
 function mesmasPropriedades(a: unknown, b: unknown): boolean {
   const esquerda = (a ?? {}) as Record<string, unknown>

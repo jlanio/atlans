@@ -1,6 +1,6 @@
 /**
- * Os caminhos da entrada: só um caminho interno serve de volta (open redirect),
- * e "ir para o login" é "ir para a Home com o modal aberto".
+ * The sign-in paths: only an internal path is valid as the return target (open
+ * redirect), and "go to login" means "go to Home with the modal open".
  */
 import { describe, it, expect } from "vitest"
 import { caminhoInterno, destinoDaEntrada, destinoDaRedefinicao, destinoDaVerificacao, ehPainelDeEmail } from "@/lib/entrada"

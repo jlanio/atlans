@@ -1,5 +1,5 @@
 # flow/executor/node_manager.py
-"""Instanciação e configuração dos nós do workflow."""
+"""Instantiation and configuration of the workflow's nodes."""
 from typing import Dict, Any, List
 from flow.factory import NodeFactory
 

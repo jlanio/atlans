@@ -34,9 +34,9 @@ const ToolsIcon = ({ open, nodeId }: ToolsIconProps) => {
 
   const isPinned = pinnedNodes.some(p => p.node_id === nodeId && !p.expired)
 
-  // Só oferece a descida quando o run carregado de fato executou algo lá dentro:
-  // sem execução não há nada para pintar, e o visualizador mostraria um grafo
-  // cinza que se passa por "nada rodou" quando o certo é "não há run aberto".
+  // Only offer drilling down when the loaded run actually executed something in there:
+  // without an execution there is nothing to paint, and the viewer would show a
+  // gray graph that passes for "nothing ran" when the truth is "no run is open".
   const executouSubfluxo = useWorkflowExecutionStore(s => s.subflowRoots.has(nodeId))
   const abrirSubfluxo = useSubflowDrilldownStore(s => s.open)
   const noVisualizador = useSubflowReadOnly()
@@ -101,13 +101,14 @@ const ToolsIcon = ({ open, nodeId }: ToolsIconProps) => {
     }
   }
 
-  // O visualizador de sub-fluxo desenha o grafo do FILHO: editar, duplicar,
-  // apagar ou fixar aqui agiria sobre o canvas errado — os ids nem existem no
-  // fluxo aberto no editor. Lá dentro descer um nível é o duplo clique.
-  // A barra inteira é revelada por `open`, que vem do hover — um evento que o
-  // toque não produz. No telefone ela seria código morto de qualquer forma:
-  // aparecia por um instante depois de um toque, com editar/copiar/excluir que
-  // o canvas ali nem permite. A configuração continua alcançável tocando o nó.
+  // The sub-workflow viewer draws the CHILD's graph: editing, duplicating,
+  // deleting or pinning here would act on the wrong canvas — the ids don't even
+  // exist in the workflow open in the editor. In there, going down a level is
+  // the double-click.
+  // The whole bar is revealed by `open`, which comes from hover — an event that
+  // touch doesn't produce. On a phone it would be dead code anyway: it showed up
+  // for an instant after a tap, with edit/copy/delete that the canvas there
+  // doesn't even allow. The configuration is still reachable by tapping the node.
   if (noVisualizador || somenteLeitura) return null
 
   return (

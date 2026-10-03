@@ -78,15 +78,16 @@ describe("Filtros", () => {
     const { rerender } = render(<Filtros estado={estado({ status: "failed" })} onEstado={onEstado} contagens={contagens} />)
     const chip = screen.getByRole("button", { name: /Assistente/ })
     expect(chip).toHaveAttribute("aria-pressed", "false")
-    // Sem número: a contagem que a tela tem é de fluxos, e estes chips contam
-    // execuções — um número aqui mentiria ao lado dos outros.
+    // No number: the count the screen has is of workflows, and these chips count
+    // runs — a number here would lie next to the others.
     expect(chip).toHaveTextContent(/^Assistente$/)
 
     fireEvent.click(chip)
     expect(onEstado).toHaveBeenCalledWith({ assistente: true })
 
-    // Ligado, não desliga o status: são eixos diferentes, e "Falhas do
-    // assistente" é justamente a pergunta que a tela precisa responder.
+    // When on, it doesn't turn off the status: they're different axes, and
+    // "Falhas do assistente" (assistant failures) is exactly the question the
+    // screen needs to answer.
     rerender(<Filtros estado={estado({ status: "failed", assistente: true })} onEstado={onEstado} contagens={contagens} />)
     expect(screen.getByRole("button", { name: /Assistente/ })).toHaveAttribute("aria-pressed", "true")
     expect(screen.getByRole("button", { name: /Falhas/ })).toHaveAttribute("aria-pressed", "true")

@@ -1,54 +1,54 @@
 # flow/utils/code_sandbox.py
-# Validacao de seguranca para codigo Python executado pelo PythonScript node.
-# Duas camadas: analise AST pre-execucao + __import__ customizado.
+# Security validation for Python code executed by the PythonScript node.
+# Two layers: pre-execution AST analysis + a custom __import__.
 #
-# ATENCAO — o que este modulo NAO garante. A checagem de AST e uma ALLOWLIST
-# defensiva, nao um isolamento. Ela fecha as fugas CONHECIDAS (cadeia de
-# classes, introspeccao de frame, atributo-por-string), mas o codigo do usuario
-# ainda roda NO MESMO PROCESSO dos outros nos. A defesa correta e um subprocesso
-# com seccomp/rlimits, registrada como follow-up; ate la, trate esta camada como
-# "eleva a barra", nao "impede tudo". Por isso ela e conservadora: na duvida,
-# bloqueia.
+# WARNING — what this module does NOT guarantee. The AST check is a defensive
+# ALLOWLIST, not isolation. It closes the KNOWN escapes (class chain, frame
+# introspection, attribute-by-string), but the user's code still runs IN THE
+# SAME PROCESS as the other nodes. The proper defense is a subprocess with
+# seccomp/rlimits, logged as a follow-up; until then, treat this layer as
+# "raises the bar", not "prevents everything". That is why it is conservative:
+# when in doubt, it blocks.
 
 import ast
 import builtins
 import re
 
-# ── Modulos permitidos ───────────────────────────────────────────────────────
-# Apenas modulos seguros para manipulacao de dados geoespaciais.
-# Qualquer import fora desta lista sera bloqueado.
+# ── Allowed modules ──────────────────────────────────────────────────────────
+# Only modules that are safe for geospatial data manipulation.
+# Any import outside this list will be blocked.
 ALLOWED_MODULES = {
-    # Dados e GIS
-    # `fiona` saiu da lista junto com a dependencia: geopandas 1.x le e escreve
-    # via pyogrio, e manter as duas empacotava duas copias de GDAL no mesmo
-    # processo (~99 MB, com GDAL_DATA/PROJ_LIB globais disputados entre elas).
+    # Data and GIS
+    # `fiona` left the list together with the dependency: geopandas 1.x reads and
+    # writes via pyogrio, and keeping both packaged two copies of GDAL in the same
+    # process (~99 MB, with global GDAL_DATA/PROJ_LIB contended between them).
     "pandas", "geopandas", "numpy", "shapely", "pyproj", "pyogrio",
-    # Stdlib seguros
-    # `operator` e `string` SAIRAM da lista: eram vetores de fuga do sandbox.
-    # `operator.attrgetter('__bases__')(cls)` e `operator.methodcaller(...)`
-    # buscam atributos por STRING, driblando a checagem de ast.Attribute abaixo;
-    # `string.Formatter().get_field('0.__init__.__globals__', ...)` alcanca
-    # globals de funcao pelo maquinario de format-field. Sem eles na allowlist,
-    # os dois caminhos ficam indisponiveis. Substituto do usuario: lambdas no
-    # lugar de attrgetter/itemgetter, f-strings no lugar de Formatter.
+    # Safe stdlib
+    # `operator` and `string` LEFT the list: they were sandbox escape vectors.
+    # `operator.attrgetter('__bases__')(cls)` and `operator.methodcaller(...)`
+    # look up attributes by STRING, sidestepping the ast.Attribute check below;
+    # `string.Formatter().get_field('0.__init__.__globals__', ...)` reaches
+    # function globals through the format-field machinery. Without them in the
+    # allowlist, both paths are unavailable. User substitute: lambdas instead of
+    # attrgetter/itemgetter, f-strings instead of Formatter.
     #
-    # `typing` tambem SAIU: `typing.ForwardRef(texto)._evaluate({}, ...)` e
-    # `typing.get_type_hints(obj, globalns={})` fazem `eval` de uma string com os
-    # builtins VERDADEIROS (um globals sem `__builtins__` ganha os reais) — e a
-    # string montada em runtime (`'_' + '_' + 'import' ...`) nao e literal que a
-    # checagem de dunder veja. Anotacao de tipo nao precisa dele: `list[int]`,
-    # `dict[str, float]` e `X | None` sao embutidos desde o 3.10.
+    # `typing` also LEFT: `typing.ForwardRef(texto)._evaluate({}, ...)` and
+    # `typing.get_type_hints(obj, globalns={})` `eval` a string with the REAL
+    # builtins (a globals without `__builtins__` gets the real ones) — and a
+    # string assembled at runtime (`'_' + '_' + 'import' ...`) is not a literal the
+    # dunder check can see. Type annotations do not need it: `list[int]`,
+    # `dict[str, float]` and `X | None` are built in since 3.10.
     "math", "json", "re", "datetime", "collections", "itertools",
     "functools", "statistics", "decimal", "fractions",
     "copy", "enum", "dataclasses", "textwrap",
     "hashlib", "base64", "uuid", "random",
 }
 
-# ── Builtins perigosos ───────────────────────────────────────────────────────
-# Bloqueados para impedir acesso ao filesystem, execucao de codigo e
-# introspeccao de objetos internos do runtime.
+# ── Dangerous builtins ───────────────────────────────────────────────────────
+# Blocked to prevent filesystem access, code execution and introspection
+# of the runtime's internal objects.
 BLOCKED_BUILTINS = {
-    # Execucao de codigo
+    # Code execution
     "open", "exec", "eval", "__import__", "compile", "breakpoint",
     "input", "memoryview", "reload",
     # Introspeccao perigosa — permite acessar namespace interno,
@@ -57,21 +57,22 @@ BLOCKED_BUILTINS = {
     "getattr", "setattr", "delattr", "type",
 }
 
-# ── Atributos NAO-dunder que expoem internals do interpretador ───────────────
-# O predicado _e_dunder abaixo cobre __class__/__globals__/__subclasses__/etc.
-# Estes NAO tem sublinhados na ponta e escapariam do predicado, mas dao acesso
-# a frames, objetos de codigo e tracebacks — de onde se alcanca os globals reais
-# e o __builtins__ verdadeiro (ex.: `(x for x in []).gi_frame.f_back.f_globals`).
+# ── NON-dunder attributes that expose interpreter internals ──────────────────
+# The _e_dunder predicate below covers __class__/__globals__/__subclasses__/etc.
+# These have NO underscores at the ends and would escape the predicate, but give
+# access to frames, code objects and tracebacks — from which the real globals
+# and the true __builtins__ can be reached (e.g. `(x for x in []).gi_frame.f_back.f_globals`).
 #
-# Alem dos internals de frame, esta lista fecha a fuga por HANDLE DE MODULO: um
-# modulo da allowlist reexporta stdlib perigosa como atributo comum, sem dunder
-# nem `import` que a checagem veja — `uuid.os`, `random._os`, `dataclasses.sys`,
-# `datetime.sys`, `collections._sys`, `enum.sys`. A partir de `os`/`sys` chega-se
-# a `os.system`/`os.popen`/`os.environ`, a `sys.modules['subprocess']` e a
-# `importlib.import_module` (que ignora o safe_import). Como o unico `import`
-# possivel ja passa pela allowlist, barrar o NOME desses atributos corta o
-# ultimo salto ate a stdlib fora da allowlist. A defesa definitiva continua
-# sendo o subprocesso isolado (follow-up); isto fecha os vetores conhecidos.
+# Besides frame internals, this list closes the MODULE HANDLE escape: an
+# allowlisted module re-exports dangerous stdlib as a plain attribute, with no
+# dunder or `import` for the check to see — `uuid.os`, `random._os`,
+# `dataclasses.sys`, `datetime.sys`, `collections._sys`, `enum.sys`. From
+# `os`/`sys` one gets to `os.system`/`os.popen`/`os.environ`, to
+# `sys.modules['subprocess']` and to `importlib.import_module` (which bypasses
+# safe_import). Since the only possible `import` already goes through the
+# allowlist, blocking the NAME of these attributes cuts the last hop to stdlib
+# outside the allowlist. The definitive defense is still the isolated
+# subprocess (follow-up); this closes the known vectors.
 _MODULOS_PERIGOSOS = {
     "os", "sys", "subprocess", "importlib", "imp", "pkgutil", "runpy",
     "socket", "ssl", "ctypes", "cffi", "platform", "posix", "nt", "pty",
@@ -80,10 +81,10 @@ _MODULOS_PERIGOSOS = {
     "signal", "resource", "mmap", "fcntl", "webbrowser",
     "urllib", "http", "ftplib", "smtplib", "requests", "httpx", "aiohttp",
     "gc", "inspect", "traceback", "codeop", "pdb", "bdb", "atexit",
-    # `select`/`selectors`/`code` FORAM removidos: colidem com APIs de dados
-    # legítimas (numpy.select, DataFrame com coluna "code") e não são vetor de
-    # fuga — nenhum deles alcança os/subprocess por atributo; o import direto já
-    # é barrado pela allowlist.
+    # `select`/`selectors`/`code` WERE removed: they collide with legitimate data
+    # APIs (numpy.select, a DataFrame with a "code" column) and are not an escape
+    # vector — none of them reaches os/subprocess by attribute; a direct import is
+    # already blocked by the allowlist.
     "site", "sysconfig", "distutils", "setuptools", "pip", "venv", "modulefinder",
     "commands", "popen2", "_thread", "_io", "_pickle",
     # aliases sublinhados comuns (random._os, collections._sys, etc.)
@@ -91,8 +92,8 @@ _MODULOS_PERIGOSOS = {
     "_ctypes", "_frozen_importlib", "_frozen_importlib_external", "_bootstrap",
     "_bootstrap_external", "_imp", "_warnings",
 }
-# Chamaveis perigosos alcancaveis mesmo sem nomear o modulo (`x.system(...)`,
-# `x.import_module(...)`). Complementa o bloqueio dos handles acima.
+# Dangerous callables reachable even without naming the module (`x.system(...)`,
+# `x.import_module(...)`). Complements the blocking of the handles above.
 _CHAMAVEIS_PERIGOSOS = {
     "system", "popen", "popen2", "popen3", "popen4", "startfile",
     "spawn", "spawnl", "spawnle", "spawnlp", "spawnlpe", "spawnv", "spawnve",
@@ -112,23 +113,23 @@ _BLOCKED_ATTR_NAMES = {
     "modules", "builtins",  # sys.modules / *.builtins → recuperam a stdlib inteira
 } | _MODULOS_PERIGOSOS | _CHAMAVEIS_PERIGOSOS
 
-# ── Metodos bloqueados por nome ──────────────────────────────────────────────
-# `str.format`/`format_map` resolvem campos como `{0.__class__}` pelo maquinario
-# de format-field, alcancando atributos SEM um ast.Attribute que a checagem veja
-# — e um `'{0.__' + 'class__}'.format(x)` montado por concatenacao driblaria ate
-# a checagem de string literal abaixo. `get_field`/`get_value` sao os metodos de
-# `string.Formatter` (o modulo saiu da allowlist, mas bloquear o nome fecha
-# qualquer outro caminho). `attrgetter`/`methodcaller` idem, caso `operator`
-# volte um dia. Alternativa do usuario: f-strings (`f"{x}"`), cujas expressoes
-# viram ast.Attribute de verdade e caem no predicado de dunder.
+# ── Methods blocked by name ──────────────────────────────────────────────────
+# `str.format`/`format_map` resolve fields like `{0.__class__}` through the
+# format-field machinery, reaching attributes WITHOUT an ast.Attribute the check
+# can see — and a `'{0.__' + 'class__}'.format(x)` built by concatenation would
+# even sidestep the string-literal check below. `get_field`/`get_value` are the
+# methods of `string.Formatter` (the module left the allowlist, but blocking the
+# name closes any other path). Same for `attrgetter`/`methodcaller`, in case
+# `operator` comes back some day. User alternative: f-strings (`f"{x}"`), whose
+# expressions become real ast.Attribute nodes and fall under the dunder predicate.
 _BLOCKED_METHODS = {
     "format", "format_map", "get_field", "get_value",
     "attrgetter", "methodcaller",
 }
 
-# Token dunder (`__algo__`) — usado para pegar dunders CONTRABANDEADOS como
+# Dunder token (`__algo__`) — used to catch dunders SMUGGLED in as a
 # string literal (`obj.__getattribute__('__class__')`, `'{0.__init__.__globals__}'`,
-# `d['__builtins__']`). Exige ao menos um caractere entre os pares de sublinhado.
+# `d['__builtins__']`). Requires at least one character between the underscore pairs.
 _DUNDER_EM_STRING = re.compile(r"__\w+__")
 
 
@@ -138,18 +139,18 @@ class UnsafeCodeError(Exception):
 
 
 def _e_dunder(nome: str) -> bool:
-    """True para identificadores no formato dunder (`__algo__`)."""
+    """True for identifiers in dunder format (`__algo__`)."""
     return len(nome) > 4 and nome.startswith("__") and nome.endswith("__")
 
 
 def validate_code_ast(code: str) -> None:
     """
-    Analisa o AST do codigo e rejeita imports nao permitidos, acessos a
-    atributos perigosos e strings que contrabandeiam nomes dunder.
+    Analyzes the code's AST and rejects disallowed imports, access to
+    dangerous attributes and strings that smuggle dunder names.
 
     Raises:
-        UnsafeCodeError: se o codigo contem construtos bloqueados.
-        SyntaxError: se o codigo tem erro de sintaxe.
+        UnsafeCodeError: if the code contains blocked constructs.
+        SyntaxError: if the code has a syntax error.
     """
     tree = ast.parse(code)
     for node in ast.walk(tree):
@@ -164,9 +165,9 @@ def validate_code_ast(code: str) -> None:
         # obj.__subclasses__, obj.format, obj.gi_frame, etc.
         elif isinstance(node, ast.Attribute):
             _check_attr(node.attr)
-        # '__class__', '{0.__init__.__globals__}', d['__builtins__'] — o dunder
-        # viaja como texto. ast.walk visita TODO ast.Constant (arg de chamada,
-        # chave de subscript, spec de format), entao um unico laco cobre os tres.
+        # '__class__', '{0.__init__.__globals__}', d['__builtins__'] — the dunder
+        # travels as text. ast.walk visits EVERY ast.Constant (call argument,
+        # subscript key, format spec), so a single loop covers all three.
         elif isinstance(node, ast.Constant):
             if isinstance(node.value, str) and _DUNDER_EM_STRING.search(node.value):
                 raise UnsafeCodeError(
@@ -177,7 +178,7 @@ def validate_code_ast(code: str) -> None:
 
 
 def _check_attr(attr: str) -> None:
-    """Rejeita atributos que abrem fuga do sandbox."""
+    """Rejects attributes that open a sandbox escape."""
     if _e_dunder(attr):
         raise UnsafeCodeError(
             f"Acesso ao atributo dunder '{attr}' nao e permitido por seguranca."
@@ -196,7 +197,7 @@ def _check_attr(attr: str) -> None:
 
 
 def _check_module(module_name: str) -> None:
-    """Valida se o modulo esta na allowlist."""
+    """Validates that the module is in the allowlist."""
     top_level = module_name.split(".")[0]
     if top_level not in ALLOWED_MODULES:
         raise UnsafeCodeError(
@@ -211,9 +212,9 @@ _original_import = builtins.__import__
 
 def safe_import(name, *args, **kwargs):
     """
-    Substituto de __import__ que valida contra a allowlist.
-    Fecha a brecha de que bloquear __import__ nos builtins nao impede
-    o statement 'import' — porque internamente ele chama __builtins__.__import__.
+    Replacement for __import__ that validates against the allowlist.
+    Closes the gap where blocking __import__ in the builtins does not prevent
+    the 'import' statement — because internally it calls __builtins__.__import__.
     """
     top = name.split(".")[0]
     if top not in ALLOWED_MODULES:
@@ -225,7 +226,7 @@ def safe_import(name, *args, **kwargs):
 
 
 def build_safe_builtins() -> dict:
-    """Constroi dict de builtins seguros com __import__ customizado."""
+    """Builds a dict of safe builtins with a custom __import__."""
     safe = {
         k: v for k, v in vars(builtins).items()
         if k not in BLOCKED_BUILTINS

@@ -1,14 +1,14 @@
 # tests/unit/test_fix_cripto_job.py
 """
-Correcoes do grupo cripto/job do executor.
+Fixes for the executor's crypto/job group.
 
-Cobre:
-  S1  — _ca_bootstrap nao baixa mais o root cert sem verificacao TLS
-  B7  — renewal valida o bundle inteiro antes de sobrescrever as credenciais
-  B12 — chave X25519 nunca e gerada silenciosamente pos-enrollment
-  S9  — anti-replay: teto de expires_at, TTL amarrado, expurgo O(expirados)
-  B9  — jobs que falham produzem stats parciais + __metrics__ com status real
-  S11 — build_mtls_ssl_context soma o bundle publico (certifi) ao ca.pem
+Covers:
+  S1  — _ca_bootstrap no longer downloads the root cert without TLS verification
+  B7  — renewal validates the whole bundle before overwriting the credentials
+  B12 — the X25519 key is never generated silently post-enrollment
+  S9  — anti-replay: expires_at ceiling, bound TTL, O(expired) purge
+  B9  — failing jobs produce partial stats + __metrics__ with the real status
+  S11 — build_mtls_ssl_context adds the public bundle (certifi) to ca.pem
 """
 import asyncio
 import datetime
@@ -29,7 +29,7 @@ from cryptography.x509.oid import NameOID
 
 
 def _self_signed(key: Ed25519PrivateKey, cn: str = "Atlans Test CA") -> x509.Certificate:
-    """Cert Ed25519 autoassinado — barato de gerar e suficiente para parse/fingerprint."""
+    """Self-signed Ed25519 cert — cheap to generate and enough for parse/fingerprint."""
     nome = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
     agora = datetime.datetime.now(datetime.timezone.utc)
     return (
@@ -48,7 +48,7 @@ def _pem(cert: x509.Certificate) -> str:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# S1 — bootstrap da CA sem fallback nao verificado
+# S1 — CA bootstrap without an unverified fallback
 # ══════════════════════════════════════════════════════════════════════════════
 
 
@@ -93,7 +93,7 @@ def _patch_urlopen(monkeypatch, behavior):
 
 
 def test_sem_pin_nao_ha_fallback_sem_verificacao(monkeypatch, tmp_path):
-    """Handshake TLS falhando NAO pode virar download inseguro (o antigo TOFU)."""
+    """A failing TLS handshake must NOT turn into an insecure download (the old TOFU)."""
     from executor import _ca_bootstrap
 
     monkeypatch.delenv(_ca_bootstrap._PIN_ENV, raising=False)
@@ -113,8 +113,8 @@ def test_sem_pin_nao_ha_fallback_sem_verificacao(monkeypatch, tmp_path):
 
 
 def test_http_puro_aborta_sem_tocar_a_rede(monkeypatch, tmp_path):
-    """`--server=ws://...` virava `http://` e o SSLContext era ignorado pelo urllib:
-    o CA chegava em texto claro e virava trust store de todo o host."""
+    """`--server=ws://...` became `http://` and the SSLContext was ignored by urllib:
+    the CA arrived in cleartext and became the trust store of the whole host."""
     from executor import _ca_bootstrap
 
     monkeypatch.delenv(_ca_bootstrap._PIN_ENV, raising=False)
@@ -129,7 +129,7 @@ def test_http_puro_aborta_sem_tocar_a_rede(monkeypatch, tmp_path):
 
 
 def test_http_puro_e_permitido_com_fingerprint_pinado(monkeypatch, tmp_path, ca_pem_bytes):
-    """Com o pin, a integridade nao depende do canal — o on-prem em http segue viavel."""
+    """With the pin, integrity does not depend on the channel — on-prem over http stays viable."""
     from executor import _ca_bootstrap
 
     monkeypatch.setenv(_ca_bootstrap._PIN_ENV, _fingerprint(ca_pem_bytes))
@@ -141,7 +141,7 @@ def test_http_puro_e_permitido_com_fingerprint_pinado(monkeypatch, tmp_path, ca_
 
 
 def test_erro_nao_tls_nao_tenta_de_novo(monkeypatch, tmp_path):
-    """URLError por DNS/conexao sobe direto — trocar de contexto TLS nao ajudaria."""
+    """A URLError from DNS/connection propagates directly — switching TLS context would not help."""
     from executor import _ca_bootstrap
 
     monkeypatch.setenv(_ca_bootstrap._PIN_ENV, "ab" * 32)
@@ -159,7 +159,7 @@ def test_erro_nao_tls_nao_tenta_de_novo(monkeypatch, tmp_path):
 def test_pin_permite_cadeia_nao_validada_mas_confere_fingerprint(
     monkeypatch, tmp_path, ca_pem_bytes
 ):
-    """Com ATLANS_CA_SHA256 correto, o download passa mesmo sem cadeia valida."""
+    """With a correct ATLANS_CA_SHA256, the download goes through even without a valid chain."""
     from executor import _ca_bootstrap
 
     monkeypatch.setenv(_ca_bootstrap._PIN_ENV, _fingerprint(ca_pem_bytes).upper())
@@ -196,7 +196,7 @@ def test_pin_divergente_aborta_sem_gravar(monkeypatch, tmp_path, ca_pem_bytes):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# B7 — renewal valida o bundle antes de sobrescrever
+# B7 — renewal validates the bundle before overwriting
 # ══════════════════════════════════════════════════════════════════════════════
 
 
@@ -234,13 +234,13 @@ def test_bundle_com_campo_obrigatorio_vazio_e_recusado(bundle_valido, campo):
 
 @pytest.mark.parametrize("valor", ["", None])
 def test_chain_pem_vazio_e_aceito(bundle_valido, valor):
-    """chain_pem vazio é emitido LEGITIMAMENTE pelo servidor — não pode barrar o renewal.
+    """An empty chain_pem is LEGITIMATELY issued by the server — it must not block renewal.
 
-    `sign_csr_via_stepca` monta `chain_pem = body.get("ca") or ""`, e o `enroll`
-    grava esse vazio sem reclamar. Um validador mais rígido que o emissor faria
-    todo ciclo de renewal falhar em silêncio até o cert expirar e o executor
-    morrer de vez — pior que o bug que o validador veio consertar. Quem ancora a
-    confiança é o ca_pem, não o chain.
+    `sign_csr_via_stepca` builds `chain_pem = body.get("ca") or ""`, and `enroll`
+    stores that empty value without complaint. A validator stricter than the issuer
+    would make every renewal cycle fail silently until the cert expired and the
+    executor died for good — worse than the bug the validator came to fix. What
+    anchors trust is ca_pem, not the chain.
     """
     from executor.enrollment import _validate_bundle
 
@@ -334,7 +334,7 @@ def test_chave_existente_e_carregada(tmp_path):
 
 
 def test_arquivo_com_chave_errada_e_recusado(tmp_path):
-    """Apontar EXECUTOR_PRIVATE_KEY_PATH para o key.pem (Ed25519) do mTLS."""
+    """Point EXECUTOR_PRIVATE_KEY_PATH at the mTLS key.pem (Ed25519)."""
     from executor.crypto import PrivateKeyMissingError, load_private_key
 
     caminho = tmp_path / "key.pem"
@@ -348,7 +348,7 @@ def test_arquivo_com_chave_errada_e_recusado(tmp_path):
 
 
 def test_crypto_nao_expoe_mais_geracao():
-    """A geracao vive so no fluxo de enrollment."""
+    """Generation lives only in the enrollment flow."""
     from executor import crypto
 
     assert not hasattr(crypto, "load_or_generate_private_key")
@@ -364,12 +364,12 @@ def validador_limpo(monkeypatch):
     from executor import job_validator
 
     job_validator._nonce_cache.clear()
-    # O aviso de skew e throttled por um global — resetar para None ("nunca
-    # avisou") evita que a ordem dos testes decida se o WARNING sai ou nao.
-    # Zerar nao servia: 0.0 significa "avisou no instante monotonico zero", e num
-    # host com uptime < 300s (runner de CI) o proprio reset suprimia o aviso.
+    # The skew warning is throttled by a global — resetting it to None ("never
+    # warned") keeps test order from deciding whether the WARNING fires or not.
+    # Zeroing did not work: 0.0 means "warned at monotonic instant zero", and on a
+    # host with uptime < 300s (a CI runner) the reset itself suppressed the warning.
     monkeypatch.setattr(job_validator, "_last_skew_warn_monotonic", None)
-    # Assinatura ja e coberta por test_job_crypto — aqui interessa o resto.
+    # The signature is already covered by test_job_crypto — here we care about the rest.
     monkeypatch.setattr(job_validator, "verify_signature", lambda *_a, **_kw: True)
     yield job_validator
     job_validator._nonce_cache.clear()
@@ -381,9 +381,9 @@ def _mensagem(
     *,
     skew_seconds: float = 0.0,
 ) -> dict:
-    """Envelope como o servidor emite: `issued_at` = relogio do SERVIDOR,
-    `expires_at` = issued_at + TTL. `skew_seconds` simula o relogio do servidor
-    adiantado em relacao ao do executor (equivalente ao executor atrasado)."""
+    """Envelope as the server issues it: `issued_at` = the SERVER's clock,
+    `expires_at` = issued_at + TTL. `skew_seconds` simulates the server clock
+    running ahead of the executor's (equivalent to the executor running behind)."""
     from executor import config
 
     issued = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
@@ -408,14 +408,14 @@ def test_envelope_dentro_do_horizonte_passa(validador_limpo):
 
 
 def test_envelope_com_validade_absurda_e_rejeitado(validador_limpo):
-    """expires_at daqui a 10 anos valia para sempre — agora bate no teto."""
+    """An expires_at 10 years out was valid forever — now it hits the ceiling."""
     with pytest.raises(validador_limpo.JobValidationError, match="teto"):
         validador_limpo.validate_job(_mensagem(10 * 365 * 86400, nonce="nonce-longo"))
 
 
 def test_envelope_sem_issued_at_e_rejeitado(validador_limpo):
-    """Sem issued_at nao da para medir a duracao declarada — e a unica alternativa
-    seria voltar a ancorar o teto no relogio local, que e o bug do skew."""
+    """Without issued_at there is no way to measure the declared duration — and the only
+    alternative would be to anchor the ceiling on the local clock again, which is the skew bug."""
     msg = _mensagem(120, nonce="sem-issued")
     del msg["envelope"]["issued_at"]
     with pytest.raises(validador_limpo.JobValidationError, match="issued_at"):
@@ -423,22 +423,22 @@ def test_envelope_sem_issued_at_e_rejeitado(validador_limpo):
 
 
 def test_relogio_atrasado_nao_rejeita_job_legitimo(validador_limpo, caplog):
-    """REGRESSAO: a 1a versao do teto comparava expires_at com o relogio LOCAL.
-    Um executor 10 min atrasado rejeitava 100% dos jobs — indisponibilidade total
-    por NTP quebrado. Medindo a duracao declarada, o skew deixa de importar
-    ate o TETO RIGIDO (900s), que e testado logo abaixo."""
+    """REGRESSION: the 1st version of the ceiling compared expires_at with the LOCAL clock.
+    An executor 10 min behind rejected 100% of jobs — total unavailability
+    from broken NTP. By measuring the declared duration, skew stops mattering
+    up to the HARD CEILING (900s), which is tested right below."""
     with caplog.at_level("WARNING"):
         validador_limpo.validate_job(_mensagem(300, nonce="skew", skew_seconds=600))
     assert "Relógio local diverge" in caplog.text, "o operador precisa saber que e o NTP"
 
 
-# ── Teto rigido de skew: falhar RUIDOSO em vez de ficar replayavel ────────────
+# ── Hard skew ceiling: fail LOUDLY instead of staying replayable ──────────────
 
 def test_primeiro_aviso_de_skew_sai_em_host_recem_iniciado(validador_limpo, caplog, monkeypatch):
-    """REGRESSAO: o throttle ancorava em 0.0 e `time.monotonic()` e o uptime da
-    maquina no Linux. Num host com poucos segundos de vida — container subindo
-    numa VM nova, que e exatamente quando o NTP costuma estar torto — o primeiro
-    aviso era engolido, e o operador so via a rejeicao falando em replay."""
+    """REGRESSION: the throttle anchored at 0.0 and `time.monotonic()` is the machine's
+    uptime on Linux. On a host only a few seconds old — a container starting
+    on a new VM, which is exactly when NTP tends to be off — the first
+    warning was swallowed, and the operator only saw the rejection talking about replay."""
     monkeypatch.setattr(validador_limpo.time, "monotonic", lambda: 12.0)
 
     with caplog.at_level("WARNING"):
@@ -448,14 +448,14 @@ def test_primeiro_aviso_de_skew_sai_em_host_recem_iniciado(validador_limpo, capl
 
 
 def test_avisos_de_skew_seguem_throttled(validador_limpo, caplog, monkeypatch):
-    """O aviso é por host, não por job: sem throttle, uma fila cheia com o NTP
-    torto vira um WARNING por job."""
+    """The warning is per host, not per job: without a throttle, a full queue with NTP
+    off becomes one WARNING per job."""
     momento = {"t": 12.0}
     monkeypatch.setattr(validador_limpo.time, "monotonic", lambda: momento["t"])
 
     with caplog.at_level("WARNING"):
         validador_limpo.validate_job(_mensagem(300, nonce="skew-1", skew_seconds=600))
-        momento["t"] += 30.0  # dentro do intervalo de 300s
+        momento["t"] += 30.0  # within the 300s interval
         caplog.clear()
         validador_limpo.validate_job(_mensagem(300, nonce="skew-2", skew_seconds=600))
     assert "Relógio local diverge" not in caplog.text
@@ -467,13 +467,13 @@ def test_avisos_de_skew_seguem_throttled(validador_limpo, caplog, monkeypatch):
 
 
 def test_relogio_muito_atrasado_e_rejeitado_apontando_o_ntp(validador_limpo):
-    """O caso que abria replay em silencio.
+    """The case that silently opened up replay.
 
-    Com o relogio local atras do servidor, `agora_local` nunca alcanca
-    `expires_at`, entao a checagem de expiracao NUNCA dispara e o envelope fica
-    aceitavel por (atraso + duracao) segundos locais — mais do que o TTL do
-    cache de nonce. Passado o TTL, o mesmo envelope assinado volta a ser aceito.
-    O teto rigido troca essa exposicao muda por uma recusa que diz o que fazer.
+    With the local clock behind the server, `agora_local` never reaches
+    `expires_at`, so the expiration check NEVER fires and the envelope stays
+    acceptable for (lag + duration) local seconds — longer than the nonce
+    cache TTL. Once the TTL passes, the same signed envelope is accepted again.
+    The hard ceiling trades that silent exposure for a refusal that says what to do.
     """
     teto = validador_limpo._MAX_CLOCK_SKEW_SECONDS
     msg = _mensagem(300, nonce="atrasado-demais", skew_seconds=teto + 120)
@@ -486,7 +486,7 @@ def test_relogio_muito_atrasado_e_rejeitado_apontando_o_ntp(validador_limpo):
 
 
 def test_relogio_muito_adiantado_e_rejeitado_apontando_o_ntp(validador_limpo):
-    """O teto e simetrico — relogio adiantado tambem para, com a direcao certa."""
+    """The ceiling is symmetric — a clock running ahead also stops, with the right direction."""
     teto = validador_limpo._MAX_CLOCK_SKEW_SECONDS
     msg = _mensagem(300, nonce="adiantado-demais", skew_seconds=-(teto + 120))
     with pytest.raises(validador_limpo.JobValidationError) as exc:
@@ -495,13 +495,13 @@ def test_relogio_muito_adiantado_e_rejeitado_apontando_o_ntp(validador_limpo):
 
 
 def test_ttl_do_nonce_cobre_a_janela_maxima_de_aceitacao(validador_limpo):
-    """INVARIANTE do anti-replay, verificado em vez de confiado.
+    """Anti-replay INVARIANT, verified instead of trusted.
 
-    Um nonce so pode ser esquecido depois que o envelope correspondente deixou
-    de ser aceitavel. A janela de aceitacao medida no relogio LOCAL (que e o que
-    o cache usa) e duracao_maxima + folga_de_expiracao + deriva_maxima_tolerada.
-    Se alguem baixar o TTL ou subir o teto de skew sem reequilibrar os dois,
-    este teste quebra — que e exatamente quando o buraco reapareceria.
+    A nonce may only be forgotten after the corresponding envelope is no longer
+    acceptable. The acceptance window measured on the LOCAL clock (which is what
+    the cache uses) is max_duration + expiration_slack + max_tolerated_drift.
+    If someone lowers the TTL or raises the skew ceiling without rebalancing the two,
+    this test breaks — which is exactly when the hole would reappear.
     """
     janela = (
         validador_limpo._MAX_EXPIRY_HORIZON_SECONDS
@@ -512,7 +512,7 @@ def test_ttl_do_nonce_cobre_a_janela_maxima_de_aceitacao(validador_limpo):
 
 
 def test_envelope_ja_expirado_alem_da_tolerancia_e_rejeitado(validador_limpo):
-    """Relogio local ADIANTADO alem da folga: rejeita, mas apontando o relogio."""
+    """Local clock AHEAD beyond the slack: rejects, but pointing at the clock."""
     msg = _mensagem(300, nonce="velho", skew_seconds=-(300 + 300 + 60))
     with pytest.raises(validador_limpo.JobValidationError, match="NTP"):
         validador_limpo.validate_job(msg)
@@ -525,7 +525,7 @@ def test_replay_do_mesmo_nonce_e_rejeitado(validador_limpo):
 
 
 def test_ttl_do_cache_cobre_o_horizonte_maximo(validador_limpo, monkeypatch):
-    """Nonce nao pode ser esquecido enquanto o envelope ainda for valido."""
+    """A nonce must not be forgotten while the envelope is still valid."""
     from executor import config
 
     monkeypatch.setattr(config, "NONCE_CACHE_TTL", 5)
@@ -546,7 +546,7 @@ def test_expurgo_remove_so_os_expirados(validador_limpo, monkeypatch):
 
 
 def test_descarte_de_nonce_valido_e_logado_em_error(validador_limpo, monkeypatch, caplog):
-    """O furo antigo era o descarte SILENCIOSO de entradas ainda validas."""
+    """The old hole was the SILENT discarding of entries that were still valid."""
     monkeypatch.setattr(validador_limpo, "_NONCE_CACHE_MAX", 2)
     validador_limpo._nonce_seen("a")
     validador_limpo._nonce_seen("b")
@@ -559,7 +559,7 @@ def test_descarte_de_nonce_valido_e_logado_em_error(validador_limpo, monkeypatch
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# B9 — stats/__metrics__ no caminho de erro
+# B9 — stats/__metrics__ on the error path
 # ══════════════════════════════════════════════════════════════════════════════
 
 
@@ -595,7 +595,7 @@ def test_error_result_sempre_tem_stats():
 
 @pytest.mark.asyncio
 async def test_falha_do_workflow_devolve_stats_parciais(monkeypatch):
-    """node_stats dos nos ja executados nao pode virar {} no servidor."""
+    """node_stats of the nodes already executed must not become {} on the server."""
     from executor import job_executor
 
     ex = _fake_executor()
@@ -619,7 +619,7 @@ async def test_falha_do_workflow_devolve_stats_parciais(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_timeout_tambem_devolve_stats_parciais(monkeypatch):
-    """O prazo cancela a corrotina — os stats vem pelo holder, nao pelo retorno."""
+    """The deadline cancels the coroutine — the stats come through the holder, not the return value."""
     from executor import config, job_executor
 
     ex = _fake_executor()
@@ -642,10 +642,11 @@ async def test_timeout_tambem_devolve_stats_parciais(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_timeout_de_um_no_nao_vira_timeout_do_job(monkeypatch):
-    """Do 3.11 em diante `asyncio.TimeoutError` É o TimeoutError embutido. O
-    PythonScript levanta o embutido quando o script estoura o prazo DELE; com o
-    `except asyncio.TimeoutError` do job, o run saía como "Job expirou após
-    3600s" em vez da mensagem do nó. Só o prazo do job, expirado, é o do job."""
+    """From 3.11 on, `asyncio.TimeoutError` IS the built-in TimeoutError. The
+    PythonScript raises the built-in one when the script exceeds ITS OWN deadline; with
+    the job's `except asyncio.TimeoutError`, the run came out as "Job expirou após
+    3600s" (job expired after 3600s) instead of the node's message. Only the job's
+    deadline, when it expires, is the job's."""
     from executor import config, job_executor
 
     ex = _fake_executor()
@@ -664,8 +665,8 @@ async def test_timeout_de_um_no_nao_vira_timeout_do_job(monkeypatch):
 
     assert result["error"] == "Execução do script excedeu o limite de 1 segundos."
     assert "Job expirou" not in result["error"]
-    # A categoria continua "timeout" (classify_error), mas o caminho é o de
-    # erro — o job não expirou — e os stats parciais chegam do mesmo jeito.
+    # The category is still "timeout" (classify_error), but the path is the error
+    # path — the job did not expire — and the partial stats arrive all the same.
     assert result["error_category"] == "timeout"
     assert result["stats"]["no-1"] == {"status": "success"}
 
@@ -710,7 +711,7 @@ async def test_falha_de_validacao_nao_inventa_stats(monkeypatch):
 
 
 def test_contexto_mtls_carrega_certifi_alem_da_ca_interna(monkeypatch):
-    """SSL_CERT_FILE do bootstrap substitui o trust store — certifi tem que voltar."""
+    """The bootstrap's SSL_CERT_FILE replaces the trust store — certifi has to come back."""
     import certifi
 
     from executor import config, utils
@@ -736,5 +737,5 @@ def test_contexto_mtls_carrega_certifi_alem_da_ca_interna(monkeypatch):
 
     assert certifi.where() in carregados
     assert "/tmp/ca.pem" in carregados
-    # A CA interna precisa entrar DEPOIS do bundle publico (soma, nao substitui).
+    # The internal CA must go in AFTER the public bundle (adds to it, does not replace it).
     assert carregados.index(certifi.where()) < carregados.index("/tmp/ca.pem")

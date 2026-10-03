@@ -1,21 +1,22 @@
 # executor/requirements-full.in
-# Dependencias DIRETAS completas do executor Atlas + flow engine. Edite AQUI.
+# Complete DIRECT dependencies of the Atlas executor + flow engine. Edit HERE.
 #
-# Daqui sai o executor/requirements-full.txt, o lock com o hash de cada arquivo
-# (python scripts/travar_python.py). Ele e instalado com --require-hashes pelo
-# Dockerfile.executor (e pelo quickstart, que o constroi) e pelo runtime
-# embarcado do app desktop, no Windows — o job Desktop do CI confere que ele
-# instala la.
+# This produces executor/requirements-full.txt, the lock with each file's hash
+# (python scripts/travar_python.py). It is installed with --require-hashes by
+# Dockerfile.executor (and by the quickstart, which builds it) and by the
+# desktop app's embedded runtime, on Windows — the CI Desktop job checks that
+# it installs there.
 #
-# NAO inclui dependencias exclusivas do servidor API:
+# Does NOT include dependencies exclusive to the API server:
 #   uvicorn, fastapi, pydantic, alembic, PyJWT, slowapi,
 #   apscheduler, pytest, aiosqlite.
 #
-# Estilo: == (exato), igual ao requirements.in da raiz e pelos mesmos motivos.
-# Antes daqui os pins eram soltos (>=), e a divergencia era real: resolvia
-# geopandas 1.1.4 enquanto a raiz pina 1.1.3 — o executor do Docker e o do
-# desktop rodariam bibliotecas diferentes. Ao mexer numa versao aqui, mexa
-# tambem em requirements.in e regere os locks (python scripts/travar_python.py).
+# Style: == (exact), same as the root requirements.in and for the same reasons.
+# Before, the pins here were loose (>=), and the divergence was real: it
+# resolved geopandas 1.1.4 while the root pins 1.1.3 — the Docker executor and
+# the desktop one would run different libraries. When you change a version
+# here, also change it in requirements.in and regenerate the locks
+# (python scripts/travar_python.py).
 
 # ── Comunicacao ──────────────────────────────────────────────────────────────
 websockets==17.1
@@ -27,40 +28,40 @@ cryptography==50.0.1
 # ── Configuracao ─────────────────────────────────────────────────────────────
 python-dotenv==1.2.3
 
-# ── GIS — nos spatial/ ───────────────────────────────────────────────────────
-# geopandas 1.x usa pyogrio como engine de I/O vetorial (read_file/to_file),
-# incluindo Shapefile. `fiona` foi removido: era uma segunda copia de GDAL no
-# bundle e nao havia um unico `import fiona` no codigo.
+# ── GIS — spatial/ nodes ─────────────────────────────────────────────────────
+# geopandas 1.x uses pyogrio as the vector I/O engine (read_file/to_file),
+# including Shapefile. `fiona` was removed: it was a second copy of GDAL in the
+# bundle and there wasn't a single `import fiona` in the code.
 geopandas==1.1.4
 shapely==2.1.2
 pyproj==3.8.0
 pyogrio==0.13.0
-# numpy e pandas chegam pelo geopandas. Pinados na troca para o Python 3.12: no
-# 3.10 o resolvedor parava em numpy 2.2.x e pandas 2.3.x, porque as linhas
-# seguintes exigem 3.11+. Soltos, o 3.12 traria numpy 2.5 e pandas 3.0 —
-# versao maior, com copy-on-write e o dtype de string novo mudando o
-# comportamento dos nos em silencio. Subir cada um e PR proprio, com a suite
-# verde. Mesmas versoes em requirements.in.
+# numpy and pandas come in through geopandas. Pinned during the switch to
+# Python 3.12: on 3.10 the resolver stopped at numpy 2.2.x and pandas 2.3.x,
+# because the following lines require 3.11+. Left loose, 3.12 would bring numpy
+# 2.5 and pandas 3.0 — a major version, with copy-on-write and the new string
+# dtype silently changing the nodes' behavior. Bumping each one is its own PR,
+# with the suite green. Same versions in requirements.in.
 numpy==2.5.3
 pandas==2.3.3
-# Usado por flow/executor/spill.py, pin.py e pelos nos de GeoParquet. Mesma
-# versao em requirements.in.
+# Used by flow/executor/spill.py, pin.py and the GeoParquet nodes. Same
+# version in requirements.in.
 pyarrow==25.0.1
 
-# ── Carta imagem — flow/nodes/outputs/carta_imagem.py ────────────────────────
-# Renderiza a carta (PNG/JPG/PDF) no executor. Backends Agg e PDF embutidos e a
-# fonte DejaVu no proprio pacote: nada de cairo/freetype de sistema no
-# Dockerfile.executor. A linha 3.10.x era a ultima que rodava no Python 3.10 (o
-# runtime ate a troca para o 3.12); subir de linha e PR proprio. Traz pillow,
-# contourpy, cycler, fonttools, kiwisolver e pyparsing (ver o lock do
-# desktop). Mesma versao em requirements.in.
+# ── Image map — flow/nodes/outputs/carta_imagem.py ───────────────────────────
+# Renders the image map (PNG/JPG/PDF) on the executor. Agg and PDF backends are
+# built in and the DejaVu font ships in the package itself: no system
+# cairo/freetype in Dockerfile.executor. The 3.10.x line was the last that ran
+# on Python 3.10 (the runtime until the switch to 3.12); moving to a new line is
+# its own PR. Brings pillow, contourpy, cycler, fonttools, kiwisolver and
+# pyparsing (see the desktop lock). Same version in requirements.in.
 matplotlib==3.11.2
 
 # ── Dados geoespaciais externos ──────────────────────────────────────────────
 OWSLib==0.36.0
 geopy==2.5.0
 
-# ── Banco de dados — nos database_query / save_to_postgis ────────────────────
+# ── Database — database_query / save_to_postgis nodes ────────────────────────
 asyncpg==0.31.0
 sqlalchemy==2.0.54
 geoalchemy2==0.20.0
@@ -84,5 +85,5 @@ cachetools==7.2.0
 psutil==7.2.2
 redis==8.1.0
 
-# ── Painel ao vivo no terminal ───────────────────────────────────────────────
+# ── Live dashboard in the terminal ───────────────────────────────────────────
 rich==15.0.0

@@ -1,15 +1,16 @@
 # app/services/workflow_move_report.py
-"""Relatório de impactos de mover um workflow entre workspaces.
+"""Impact report for moving a workflow between workspaces.
 
-A movimentação nunca falha por dependência quebrada — o que deixaria de
-funcionar no destino sai daqui como aviso. Isso é uma escolha deliberada: o
-`workspace_id` do workflow é a chave de tenant de quase tudo (credenciais,
-Drive, executor, portal, allowlist de webhook), e barrar o move em cada uma
-dessas amarras tornaria a operação inutilizável na prática. Em troca, o usuário
-precisa ver com precisão o que quebra.
+The move never fails because of a broken dependency — whatever would stop
+working at the destination comes out of here as a warning. This is a deliberate
+choice: the workflow's `workspace_id` is the tenant key for almost everything
+(credentials, Drive, executor, portal, webhook allowlist), and blocking the move
+on each of those ties would make the operation unusable in practice. In return,
+the user needs to see precisely what breaks.
 
-Nada aqui escreve no banco, e nada levanta para o chamador: `collect_warnings`
-já embrulha tudo e devolve `report_incomplete` se o próprio cálculo falhar.
+Nothing here writes to the database, and nothing raises to the caller:
+`collect_warnings` already wraps everything and returns `report_incomplete` if
+the computation itself fails.
 """
 
 from typing import Any, Dict, Iterable, List
@@ -33,15 +34,15 @@ from app.models.workspace_file import WorkspaceFile
 
 logger = get_logger(__name__)
 
-# Ids de arquivo que os nós de leitura aceitam. `driveFileId` aponta para
-# WorkspaceFile, `artifactId` para Artifact — ambos presos ao workspace onde
-# foram criados (ver DataInput e os nós Read*).
+# File ids that the read nodes accept. `driveFileId` points to
+# WorkspaceFile, `artifactId` to Artifact — both tied to the workspace where
+# they were created (see DataInput and the Read* nodes).
 _DRIVE_ID_PROP = "driveFileId"
 _ARTIFACT_ID_PROP = "artifactId"
 
 
 def warn(code: str, message: str, *, severity: str = "warning", **details: Any) -> Dict[str, Any]:
-    """Construtor único do formato de aviso — usado também pelo `workflow_move_service`."""
+    """Single builder of the warning format — also used by `workflow_move_service`."""
     return {"code": code, "severity": severity, "message": message, "details": details}
 
 
@@ -50,12 +51,13 @@ def _iter_nodes(definition: dict) -> Iterable[dict]:
 
 
 def _collect_prop(definition: dict, prop: str) -> Dict[str, List[str]]:
-    """Mapa `valor da propriedade -> ids dos nós que a usam`.
+    """Map `property value -> ids of the nodes that use it`.
 
-    Usa `node_props`, que aplica a cadeia `data.properties` → `properties`. O
-    formato do canvas (XYFlow) grava em `data.properties`, então ler só
-    `properties` produziria falso-negativo — e um aviso que não aparece é pior
-    do que nenhum relatório, porque passa a impressão de que está tudo certo.
+    Uses `node_props`, which applies the `data.properties` → `properties` chain.
+    The canvas format (XYFlow) writes to `data.properties`, so reading only
+    `properties` would produce a false negative — and a warning that does not
+    show up is worse than no report at all, because it gives the impression
+    that everything is fine.
     """
     encontrados: Dict[str, List[str]] = {}
     for node in _iter_nodes(definition):
@@ -66,13 +68,13 @@ def _collect_prop(definition: dict, prop: str) -> Dict[str, List[str]]:
 
 
 def _collect_subworkflow_refs(definition: dict) -> Dict[str, List[str]]:
-    """`workflowHash -> ids dos nós SubWorkflow que o referenciam`.
+    """`workflowHash -> ids of the SubWorkflow nodes that reference it`.
 
-    Coletor local em vez de `collect_subworkflow_references` de
-    `flow/utils/workflow_contract.py`: aquele lê apenas `node["properties"]`, sem
-    a cadeia do `node_props`. Não o alteramos porque ele também alimenta a
-    validação de save, que é caminho de segurança — mudar o que ele enxerga
-    mudaria o comportamento de gravação junto.
+    A local collector instead of `collect_subworkflow_references` from
+    `flow/utils/workflow_contract.py`: that one reads only `node["properties"]`,
+    without the `node_props` chain. We do not change it because it also feeds
+    save validation, which is a security path — changing what it sees would
+    change the write behavior along with it.
     """
     refs: Dict[str, List[str]] = {}
     for node in _iter_nodes(definition):
@@ -85,17 +87,19 @@ def _collect_subworkflow_refs(definition: dict) -> Dict[str, List[str]]:
 
 
 async def _avisar_credenciais(db, definition: dict, target_ws: str) -> List[Dict[str, Any]]:
-    """Credenciais que deixam de resolver no destino.
+    """Credentials that stop resolving at the destination.
 
-    O escopo de credenciais é derivado em runtime dos membros do workspace do
-    workflow (`workspace_credential_owners`) — `credentials` não tem coluna de
-    workspace. Se o dono não alcança o destino, a credencial simplesmente some
-    do dispatch, e o único sinal é um WARNING no log do servidor
-    (`_explain_missing`). É o colateral mais silencioso do move.
+    The credential scope is derived at runtime from the members of the
+    workflow's workspace (`workspace_credential_owners`) — `credentials` has no
+    workspace column. If the owner does not reach the destination, the
+    credential simply vanishes from the dispatch, and the only sign is a
+    WARNING in the server log (`_explain_missing`). It is the quietest side
+    effect of the move.
     """
-    # Uma varredura só: as três informações de que o aviso precisa (quais
-    # credenciais, em que nós, e se algum deles é trigger) saem do mesmo passo.
-    # Coletá-las separadamente obrigava a reconciliar mapas que podiam divergir.
+    # A single sweep: the three pieces of information the warning needs (which
+    # credentials, in which nodes, and whether any of them is a trigger) come out
+    # of the same pass. Collecting them separately forced reconciling maps that
+    # could diverge.
     usos: Dict[str, Dict[str, Any]] = {}
     for node in _iter_nodes(definition):
         cid = node_props(node).get("credential_id")
@@ -108,7 +112,7 @@ async def _avisar_credenciais(db, definition: dict, target_ws: str) -> List[Dict
     if not usos:
         return []
 
-    # `Credential.id` é UUID(as_uuid=True); asyncpg não faz cast automático.
+    # `Credential.id` is UUID(as_uuid=True); asyncpg does not cast automatically.
     uuids: List[UUID] = []
     for cid in usos:
         try:
@@ -119,7 +123,7 @@ async def _avisar_credenciais(db, definition: dict, target_ws: str) -> List[Dict
         return []
 
     permitidos = await workspace_credential_owners(db, target_ws)
-    # Só metadados — o relatório nunca toca em `Credential.data`.
+    # Metadata only — the report never touches `Credential.data`.
     linhas = (await db.execute(
         select(Credential.id, Credential.name, Credential.owner_id)
         .where(Credential.id.in_(uuids))
@@ -141,9 +145,9 @@ async def _avisar_credenciais(db, definition: dict, target_ws: str) -> List[Dict
         if dono and dono in permitidos:
             continue
 
-        # Em trigger o efeito é ruidoso: `_validate_trigger_credentials_only` é
-        # fail-closed e devolve 403, derrubando o disparo. Nos demais nós a
-        # credencial só não é injetada e o nó falha lá na frente.
+        # On a trigger the effect is loud: `_validate_trigger_credentials_only` is
+        # fail-closed and returns 403, killing the trigger firing. In the other
+        # nodes the credential is just not injected and the node fails later on.
         efeito = (
             "o disparo por webhook passará a falhar com 403"
             if is_trigger else
@@ -160,10 +164,10 @@ async def _avisar_credenciais(db, definition: dict, target_ws: str) -> List[Dict
 
 
 async def _avisar_subworkflows(db, definition: dict, target_ws: str) -> List[Dict[str, Any]]:
-    """Sub-workflows chamados que ficam fora do destino.
+    """Called sub-workflows that end up outside the destination.
 
-    A execução exige que o alvo viva no mesmo workspace do pai — ver
-    `validate_subworkflow_references_against_db`.
+    Execution requires the target to live in the same workspace as the parent —
+    see `validate_subworkflow_references_against_db`.
     """
     refs = _collect_subworkflow_refs(definition)
     if not refs:
@@ -196,18 +200,19 @@ async def _avisar_subworkflows(db, definition: dict, target_ws: str) -> List[Dic
 
 
 async def _avisar_dependentes(db, id_hash: str, origin_ws: str | None) -> List[Dict[str, Any]]:
-    """Workflows que chamam ESTE como sub-fluxo e ficam para trás.
+    """Workflows that call THIS one as a sub-workflow and are left behind.
 
-    Colateral fácil de esquecer, porque não está na definition do workflow que
-    se move — está na dos outros. Só varremos a origem: dependentes num terceiro
-    workspace já estavam quebrados antes do move.
+    An easy side effect to forget, because it is not in the definition of the
+    workflow being moved — it is in the others'. We only sweep the origin:
+    dependents in a third workspace were already broken before the move.
     """
     if not origin_ws:
         return []
 
-    # Pré-filtro no banco para não trazer a definition de todo o workspace. É só
-    # um LIKE sobre o texto do array de nós: a confirmação real vem do coletor
-    # abaixo, porque o hash pode aparecer em qualquer outro campo do JSON.
+    # Database pre-filter so we don't fetch the definition of the whole workspace.
+    # It is just a LIKE over the text of the nodes array: the real confirmation
+    # comes from the collector below, because the hash may appear in any other
+    # field of the JSON.
     candidatos = (await db.execute(
         select(Workflow.id_hash, Workflow.name, Workflow.definition).where(
             Workflow.deleted_at.is_(None),
@@ -231,7 +236,7 @@ async def _avisar_dependentes(db, id_hash: str, origin_ws: str | None) -> List[D
 
 
 async def _avisar_arquivos(db, definition: dict, target_ws: str) -> List[Dict[str, Any]]:
-    """Arquivos de Drive e artefatos referenciados que pertencem à origem."""
+    """Referenced Drive files and artifacts that belong to the origin."""
     avisos: List[Dict[str, Any]] = []
 
     drive_ids = _collect_prop(definition, _DRIVE_ID_PROP)
@@ -271,10 +276,10 @@ async def _avisar_arquivos(db, definition: dict, target_ws: str) -> List[Dict[st
 
 
 async def _avisar_workspace(db, wf, origin_ws: str | None, target_ws: str) -> List[Dict[str, Any]]:
-    """Diferenças de configuração entre os dois workspaces.
+    """Configuration differences between the two workspaces.
 
-    Executor dedicado e allowlist de notificação são por workspace, então mudam
-    silenciosamente junto com o tenant.
+    Dedicated executor and notification allowlist are per workspace, so they
+    change silently along with the tenant.
     """
     linhas = (await db.execute(
         select(
@@ -318,12 +323,12 @@ async def _avisar_workspace(db, wf, origin_ws: str | None, target_ws: str) -> Li
 
 
 async def _avisar_estado(db, wf, definition: dict) -> List[Dict[str, Any]]:
-    """Consequências determinísticas da operação e estado que fica para trás."""
+    """Deterministic consequences of the operation and state left behind."""
     avisos: List[Dict[str, Any]] = []
     id_hash = wf.id_hash
 
-    # COUNT separado do SELECT de ids: contar o resultado de um `limit(5)` faria
-    # a mensagem dizer "5" para qualquer número acima disso.
+    # COUNT separate from the SELECT of ids: counting the result of a `limit(5)`
+    # would make the message say "5" for any number above that.
     em_andamento = (await db.execute(
         select(func.count()).select_from(WorkflowRun).where(
             WorkflowRun.workflow_hash == id_hash,
@@ -417,12 +422,12 @@ async def _avisar_estado(db, wf, definition: dict) -> List[Dict[str, Any]]:
 
 
 async def collect_warnings(db, wf, definition: dict, origin_ws: str | None, target_ws: str) -> List[Dict[str, Any]]:
-    """Reúne todos os avisos. Nunca levanta.
+    """Gathers all the warnings. Never raises.
 
-    Um relatório que falha não pode derrubar a movimentação — essa é a regra do
-    recurso. Se algo aqui quebrar, o move segue e o usuário recebe
-    `report_incomplete` em vez de uma lista silenciosamente vazia, que ele leria
-    como "não há impacto nenhum".
+    A report that fails must not bring down the move — that is the rule of the
+    feature. If something here breaks, the move goes ahead and the user gets
+    `report_incomplete` instead of a silently empty list, which they would read
+    as "there is no impact at all".
     """
     avisos: List[Dict[str, Any]] = []
     try:
@@ -443,6 +448,6 @@ async def collect_warnings(db, wf, definition: dict, origin_ws: str | None, targ
             "Revise credenciais, sub-fluxos e arquivos referenciados no destino.",
         ))
 
-    # Warnings antes de infos: o que quebra tem de aparecer primeiro na tela.
+    # Warnings before infos: what breaks has to appear first on screen.
     avisos.sort(key=lambda a: 0 if a["severity"] == "warning" else 1)
     return avisos

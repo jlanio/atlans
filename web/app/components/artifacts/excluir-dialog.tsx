@@ -5,14 +5,14 @@ import { DeleteDialog } from "@/app/components/shared/DeleteDialog"
 import { formatarInteiro, plural } from "@/lib/formatos"
 
 /**
- * Confirmação da exclusão em lote de artefatos. Envolve o `shared/DeleteDialog`
- * (que carrega a trava contra duplo clique e o bloqueio de fechar no meio da
- * operação) no lugar do diálogo reimplementado à mão que a tela tinha — e que,
- * de quebra, trazia a microcopy sem acento.
+ * Confirmation of the batch deletion of artifacts. Wraps `shared/DeleteDialog`
+ * (which carries the double-click lock and the block on closing mid-operation)
+ * instead of the hand-reimplemented dialog the screen had — which, on top of
+ * that, had its microcopy without accents.
  *
- * `nomeUnico` é o nome do arquivo quando há um só alvo: mostrado entre aspas
- * angulares, no tom das demais telas. Em lote não se listam os nomes — o número
- * é o que importa.
+ * `nomeUnico` is the file name when there is a single target: shown in angle
+ * quotes, in the tone of the other screens. In a batch the names are not
+ * listed — the number is what matters.
  */
 export function ExcluirArtefatosDialog({
   aberto, quantidade, nomeUnico, onConfirmar, onFechar,

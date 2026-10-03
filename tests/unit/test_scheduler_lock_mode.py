@@ -1,19 +1,20 @@
 # tests/unit/test_scheduler_lock_mode.py
 """
-Regressão de um AUTO-DEADLOCK invisível ao Postgres.
+Regression of a SELF-DEADLOCK invisible to Postgres.
 
-`_process_schedule` abre uma transação e a mantém aberta enquanto
-`_fire_workflow` roda EM OUTRA conexão. Esse disparo insere um `WorkflowRun`
-com FK para `schedules.id` (schedule_id) — e todo INSERT com FK pede um
-`FOR KEY SHARE` na linha referenciada. `FOR UPDATE` conflita com `FOR KEY
-SHARE`: a conexão do disparo bloqueia esperando a linha que a transação de
-fora segura, mas essa transação está `await`-ando o disparo terminar. Trava
-mútua — e como a conexão de fora fica idle-in-transaction (sem esperar lock
-nenhum no nível do banco), o detector de deadlock do PG nunca a vê.
+`_process_schedule` opens a transaction and keeps it open while
+`_fire_workflow` runs ON ANOTHER connection. That trigger inserts a `WorkflowRun`
+with an FK to `schedules.id` (schedule_id) — and every INSERT with an FK takes a
+`FOR KEY SHARE` on the referenced row. `FOR UPDATE` conflicts with `FOR KEY
+SHARE`: the trigger's connection blocks waiting for the row the outer
+transaction holds, but that transaction is `await`-ing the trigger to finish.
+Mutual lock — and since the outer connection sits idle-in-transaction (not
+waiting on any lock at the database level), PG's deadlock detector never sees it.
 
-`FOR NO KEY UPDATE` NÃO conflita com `FOR KEY SHARE` e mantém a exclusividade
-de "um worker por schedule". O bug não aparecia no CI (SQLite ignora o clause),
-então este teste trava o MODO no SQL compilado para o dialeto Postgres.
+`FOR NO KEY UPDATE` does NOT conflict with `FOR KEY SHARE` and keeps the
+"one worker per schedule" exclusivity. The bug did not show up in CI (SQLite
+ignores the clause), so this test pins the MODE in the SQL compiled for the
+Postgres dialect.
 """
 from __future__ import annotations
 
@@ -39,7 +40,7 @@ async def test_process_schedule_trava_com_for_no_key_update_skip_locked():
     capturado: dict = {}
 
     resultado = MagicMock()
-    resultado.scalar_one_or_none = MagicMock(return_value=None)  # sai cedo, sem disparo
+    resultado.scalar_one_or_none = MagicMock(return_value=None)  # exits early, no trigger
 
     db = MagicMock()
 
@@ -60,7 +61,7 @@ async def test_process_schedule_trava_com_for_no_key_update_skip_locked():
     sql = str(capturado["stmt"].compile(dialect=postgresql.dialect()))
     assert "FOR NO KEY UPDATE" in sql, sql
     assert "SKIP LOCKED" in sql, sql
-    # O modo antigo — o que conflitava com o FOR KEY SHARE do INSERT do run.
-    # ("FOR NO KEY UPDATE" não contém a substring "FOR UPDATE".)
+    # The old mode — the one that conflicted with the run INSERT's FOR KEY SHARE.
+    # ("FOR NO KEY UPDATE" does not contain the substring "FOR UPDATE".)
     assert "FOR UPDATE" not in sql, sql
     db.commit.assert_not_awaited()  # scalar_one_or_none None → nenhum commit/disparo

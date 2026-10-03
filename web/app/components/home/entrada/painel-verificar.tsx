@@ -1,16 +1,16 @@
 "use client"
 
-// "Verifique seu e-mail", dentro do modal: o que a página /verify-email fazia,
-// sem sair da Home. São os mesmos dois caminhos dela —
+// "Verifique seu e-mail", inside the modal: what the /verify-email page did,
+// without leaving the Home. These are the same two paths it had —
 //
-//   COM token (o link que chegou por e-mail): o GET /auth/verify-email gasta o
-//   token e ATIVA a conta. No sucesso o modal volta ao login com o aviso; na
-//   falha, a mensagem do servidor e o reenvio, aqui mesmo.
-//   SEM token (recém-cadastrado, ou o acesso direto): a mensagem de "abra o
-//   link do e-mail", o reenvio (POST /auth/resend-verification, já preenchido
-//   com o e-mail do cadastro) e a volta ao login.
+//   WITH a token (the link that arrived by e-mail): GET /auth/verify-email spends
+//   the token and ACTIVATES the account. On success the modal returns to login
+//   with the notice; on failure, the server message and the resend, right here.
+//   WITHOUT a token (just signed up, or direct access): the "open the e-mail
+//   link" message, the resend (POST /auth/resend-verification, already prefilled
+//   with the sign-up e-mail) and the way back to login.
 //
-// — e a mensagem que ficou na barra espera esse login nos dois.
+// — and the message left in the bar waits for that login in both.
 
 import { useEffect, useRef, useState } from "react"
 import axios from "axios"
@@ -24,38 +24,38 @@ import { useIdiomaDaTela, useTextos } from "@/app/components/home/i18n"
 import { BotaoDoModal } from "./botao-do-modal"
 import { textoDaRecusaDoLink } from "./recusas"
 
-/** O que o painel está mostrando — o modal titula o diálogo por ele. */
+/** What the panel is showing — the modal titles the dialog by it. */
 export type EstadoDaVerificacao = "sem-token" | "verificando" | "falhou"
 
 interface Props {
-  /** O e-mail do cadastro — o reenvio já nasce preenchido. */
+  /** The sign-up e-mail — the resend starts prefilled. */
   email: string
-  /** O token do link do e-mail; ausente = a tela de "abra o link". */
+  /** The token from the e-mail link; absent = the "open the link" screen. */
   token?: string
   onEnviando: (enviando: boolean) => void
-  /** "Já verifiquei: entrar" — troca para o painel de login. */
+  /** "Já verifiquei: entrar" — switches to the login panel. */
   onEntrar: () => void
-  /** A conta foi ativada: o modal volta ao login com o aviso. */
+  /** The account was activated: the modal returns to login with the notice. */
   onVerificou: () => void
-  /** O cabeçalho do modal acompanha o estado (título e frase de apoio). */
+  /** The modal header follows the state (title and supporting sentence). */
   onEstado: (estado: EstadoDaVerificacao) => void
   /**
-   * O token acabou de ser gasto — o modal para de passá-lo. Quem VOLTA a este
-   * painel depois (pelo 403 do login, ou pelo "Reenviar" de uma falha) quer
-   * outro e-mail, não gastar de novo o link que já usou: sem isto, o painel
-   * remontava com o mesmo token da URL e repetia o GET.
+   * The token was just spent — the modal stops passing it. Whoever COMES BACK to
+   * this panel later (via the login's 403, or via a failure's "Reenviar") wants
+   * another e-mail, not to spend again the link already used: without this, the
+   * panel remounted with the same token from the URL and repeated the GET.
    */
   onGastouToken: () => void
 }
 
 export function PainelVerificar({ email, token, onEnviando, onEntrar, onVerificou, onEstado, onGastouToken }: Props) {
   const t = useTextos().entrada.painelVerificar
-  // O servidor só fala português (a recusa do token, a resposta do reenvio):
-  // nos outros idiomas, o texto do idioma (ver ./recusas).
+  // The server only speaks Portuguese (the token rejection, the resend response):
+  // in the other languages, the language's text (see ./recusas).
   const traduzir = useIdiomaDaTela() !== "pt-BR"
   const [estado, setEstado] = useState<EstadoDaVerificacao>(token ? "verificando" : "sem-token")
-  // A recusa do token como veio. O texto sai no render, no idioma da tela (o
-  // efeito do GET não precisa depender dele).
+  // The token rejection as it came. The text is produced at render, in the
+  // screen's language (the GET effect does not need to depend on it).
   const [recusaDoToken, setRecusaDoToken] = useState<unknown>(null)
   const [resendEmail, setResendEmail] = useState(email)
   const [resending, setResending] = useState(false)
@@ -63,16 +63,16 @@ export function PainelVerificar({ email, token, onEnviando, onEntrar, onVerifico
   // Sucesso e erro separados: a cor e o `role` acompanham o que aconteceu.
   const [resendOk, setResendOk] = useState(false)
 
-  // Desmontado (o modal fechou, ou trocou de painel) nada mais pode ser escrito
-  // — a resposta do GET ainda pode estar a caminho.
+  // Once unmounted (the modal closed, or switched panels) nothing more may be
+  // written — the GET response may still be on its way.
   const vivo = useRef(true)
   useEffect(() => () => { vivo.current = false }, [])
 
-  // O GET que GASTA o token, uma vez só. A guarda não é zelo: o token é de uso
-  // único, então um segundo GET (o StrictMode em desenvolvimento invoca o
-  // efeito duas vezes, e as duas callbacks correriam) voltaria "inválido" e
-  // apagaria o sucesso do primeiro. Por isso a marca é posta ANTES do envio, e
-  // não depois.
+  // The GET that SPENDS the token, only once. The guard is not overcaution: the
+  // token is single-use, so a second GET (StrictMode in development invokes the
+  // effect twice, and both callbacks would run) would come back "inválido" and
+  // erase the first one's success. That is why the mark is set BEFORE sending,
+  // not after.
   const gastou = useRef(false)
   useEffect(() => {
     if (!token || gastou.current) return
@@ -88,8 +88,8 @@ export function PainelVerificar({ email, token, onEnviando, onEntrar, onVerifico
       })
   }, [token, onVerificou, onGastouToken])
 
-  // O cabeçalho do modal é de lá, não daqui: o `DialogTitle` tem de existir
-  // sempre (é o nome acessível do diálogo), então quem o troca é o modal.
+  // The modal header belongs there, not here: the `DialogTitle` must always
+  // exist (it is the dialog's accessible name), so the one that swaps it is the modal.
   useEffect(() => { onEstado(estado) }, [estado, onEstado])
 
   async function handleResend(e: React.FormEvent) {
@@ -110,11 +110,11 @@ export function PainelVerificar({ email, token, onEnviando, onEntrar, onVerifico
     }
   }
 
-  // O GET em voo. Não trava o fechamento do modal (`onEnviando`) de propósito:
-  // ele começa sozinho, sem ninguém pedir, e prender Esc por causa de uma
-  // requisição que a pessoa não disparou seria surpresa. Fechar no meio também
-  // não custa nada — o backend ativa a conta do mesmo jeito, e o login seguinte
-  // simplesmente funciona.
+  // The GET in flight. It does not lock the modal's closing (`onEnviando`) on
+  // purpose: it starts on its own, without anyone asking, and holding Esc hostage
+  // because of a request the person did not trigger would be a surprise. Closing
+  // midway costs nothing either — the backend activates the account all the same,
+  // and the next login simply works.
   if (estado === "verificando") {
     return (
       <div className="flex items-center gap-3 rounded-md border border-border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground">

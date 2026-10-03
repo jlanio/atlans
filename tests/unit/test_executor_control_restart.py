@@ -1,19 +1,19 @@
 # tests/unit/test_executor_control_restart.py
-"""Encerramento do executor por mensagem `control` do servidor.
+"""Executor shutdown via a `control` message from the server.
 
-Regressao: `main()` aguardava apenas o `shutdown_event`, alimentado unicamente
-por handler de sinal do SO. Quando o servidor encerrava a conexao (revoked /
-shutdown / config_changed), `conn.run()` retornava, o `conn_task` terminava e
-ninguem observava — o processo ficava vivo, desconectado e sem reiniciar,
-porque `restart_requested` so e lido DEPOIS daquele await.
+Regression: `main()` only awaited `shutdown_event`, fed solely by an OS signal
+handler. When the server closed the connection (revoked / shutdown /
+config_changed), `conn.run()` returned, `conn_task` finished and nobody was
+watching — the process stayed alive, disconnected and without restarting,
+because `restart_requested` is only read AFTER that await.
 
-Agravantes por caminho:
-  - revoked / shutdown  -> nao emitiam sinal algum (pendurava em qualquer SO)
-  - config_changed      -> emitia SIGTERM so em POSIX (pendurava no Windows,
-                           onde add_signal_handler nem registra o handler)
+Aggravating factors per path:
+  - revoked / shutdown  -> emitted no signal at all (hung on any OS)
+  - config_changed      -> emitted SIGTERM only on POSIX (hung on Windows,
+                           where add_signal_handler does not even register the handler)
 
-Sintoma relatado: "qualquer alteracao de atribuicao na plataforma quebra o
-executor, sem restart automatico".
+Reported symptom: "any assignment change on the platform breaks the executor,
+with no automatic restart".
 """
 import asyncio
 import base64
@@ -30,13 +30,13 @@ _EXECUTOR_ID = "executor-de-teste"
 
 @pytest.fixture
 def servidor_confiavel(monkeypatch):
-    """Estabelece a confiança executor↔servidor e devolve um assinador de comandos.
+    """Establishes executor↔server trust and returns a command signer.
 
-    Deliberadamente usa o assinador REAL do servidor (`app.core.control_crypto`)
-    contra o verificador REAL do executor (`executor.job_validator`). Se os bytes
-    canônicos dos dois lados divergirem — ordem de chaves, `ensure_ascii`,
-    `separators` — todo comando do servidor passa a ser descartado em produção,
-    e é este teste que precisa quebrar primeiro.
+    Deliberately uses the server's REAL signer (`app.core.control_crypto`)
+    against the executor's REAL verifier (`executor.job_validator`). If the
+    canonical bytes on both sides diverge — key order, `ensure_ascii`,
+    `separators` — every command from the server starts being discarded in
+    production, and this is the test that needs to break first.
     """
     from app.core import control_crypto, job_crypto
 
@@ -48,7 +48,7 @@ def servidor_confiavel(monkeypatch):
         priv.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
     ).decode()
 
-    # Servidor: chave de assinatura. Executor: chave pública fixada + identidade.
+    # Server: signing key. Executor: pinned public key + identity.
     monkeypatch.setattr(job_crypto, "EXECUTOR_SIGNING_KEY", priv_b64)
     monkeypatch.setattr("executor.config.SERVER_SIGNING_PUBLIC_KEY", pub_b64)
     monkeypatch.setattr("executor.config.EXECUTOR_ID", _EXECUTOR_ID)
@@ -60,7 +60,7 @@ def servidor_confiavel(monkeypatch):
 
 
 class _FakeWS:
-    """WebSocket que entrega uma lista fixa de mensagens e grava os envios."""
+    """WebSocket that delivers a fixed list of messages and records the sends."""
 
     def __init__(self, mensagens):
         self._mensagens = [json.dumps(m) for m in mensagens]
@@ -84,7 +84,7 @@ def _conexao():
 
 @pytest.mark.asyncio
 async def test_config_changed_pede_restart_sem_emitir_sinal(monkeypatch, servidor_confiavel):
-    """Nao pode depender de os.kill: no Windows nao ha handler registrado."""
+    """Must not depend on os.kill: on Windows there is no registered handler."""
     matou = []
     monkeypatch.setattr("os.kill", lambda *a: matou.append(a))
 
@@ -102,13 +102,13 @@ async def test_config_changed_pede_restart_sem_emitir_sinal(monkeypatch, servido
 
 @pytest.mark.asyncio
 async def test_revoked_encerra_e_marca_deny_terminal(servidor_confiavel):
-    """Executor revogado nao pede restart E marca `terminal_deny`.
+    """A revoked executor does not request a restart AND sets `terminal_deny`.
 
-    O flag existe para quem supervisiona o processo. Sem ele o executor saia
-    como se tivesse encerrado normalmente, e um supervisor (o app desktop, ou
-    `restart: on-failure` do Docker) o religava — contra um servidor que ja
-    respondeu 4404. O sintoma era um loop de reinicio a cada 2s, com o log
-    repetindo "Executor nao encontrado" para sempre.
+    The flag exists for whoever supervises the process. Without it the executor
+    exited as if it had shut down normally, and a supervisor (the desktop app, or
+    Docker's `restart: on-failure`) brought it back up — against a server that
+    had already answered 4404. The symptom was a restart loop every 2s, with the
+    log repeating "Executor nao encontrado" (executor not found) forever.
     """
     conn = _conexao()
     ws = _FakeWS([servidor_confiavel(
@@ -125,10 +125,10 @@ async def test_revoked_encerra_e_marca_deny_terminal(servidor_confiavel):
 
 @pytest.mark.asyncio
 async def test_shutdown_encerra_sem_marcar_deny(servidor_confiavel):
-    """`shutdown` NAO e deny: o enrollment continua valido.
+    """`shutdown` is NOT deny: the enrollment remains valid.
 
-    Confundir os dois faria o app oferecer "refazer enrollment" — descartando o
-    certificado — para uma parada de manutencao perfeitamente normal.
+    Confusing the two would make the app offer "redo enrollment" — discarding
+    the certificate — for a perfectly normal maintenance stop.
     """
     conn = _conexao()
     ws = _FakeWS([servidor_confiavel(
@@ -144,7 +144,7 @@ async def test_shutdown_encerra_sem_marcar_deny(servidor_confiavel):
 
 @pytest.mark.asyncio
 async def test_config_changed_nao_marca_deny(servidor_confiavel):
-    """Reatribuicao de workspace pede reinicio, nao re-enrollment."""
+    """Workspace reassignment requests a restart, not re-enrollment."""
     conn = _conexao()
     ws = _FakeWS([servidor_confiavel(
         {"type": "control", "action": "config_changed", "reason": "workspace alterado"}
@@ -157,8 +157,8 @@ async def test_config_changed_nao_marca_deny(servidor_confiavel):
 
 
 def test_close_4404_e_classificado_como_terminal():
-    """O outro caminho do mesmo problema: o deny chega como close code, e nao
-    como mensagem `control`, quando o servidor recusa ja no accept()."""
+    """The other path of the same problem: the deny arrives as a close code, not
+    as a `control` message, when the server refuses right at accept()."""
     from websockets.exceptions import ConnectionClosedError
     from websockets.frames import Close
 
@@ -185,11 +185,11 @@ async def test_acao_de_control_desconhecida_nao_derruba_a_conexao(servidor_confi
     assert conn.restart_requested is False
 
 
-# ── S7: comando sem assinatura valida nao pode ter efeito ────────────────────
+# ── S7: a command without a valid signature must have no effect ──────────────
 
 @pytest.mark.asyncio
 async def test_control_sem_assinatura_e_ignorado(servidor_confiavel):
-    """O buraco original: bastava escrever no WS para derrubar o executor."""
+    """The original hole: writing to the WS was enough to bring the executor down."""
     conn = _conexao()
     ws = _FakeWS([{"type": "control", "action": "shutdown", "reason": "injetado"}])
 
@@ -201,11 +201,11 @@ async def test_control_sem_assinatura_e_ignorado(servidor_confiavel):
 
 @pytest.mark.asyncio
 async def test_purge_artifacts_sem_assinatura_nao_apaga_nada(tmp_path, monkeypatch):
-    """`purge_artifacts` APAGA ARQUIVO do disco do usuario.
+    """`purge_artifacts` DELETES FILES from the user's disk.
 
-    Sem a exigencia de assinatura, quem conseguisse escrever no WebSocket teria
-    um canal de destruicao de dados — pior que o buraco original do shutdown,
-    que so derrubava o processo.
+    Without the signature requirement, anyone able to write to the WebSocket
+    would have a data-destruction channel — worse than the original shutdown
+    hole, which only brought the process down.
     """
     raiz = tmp_path / "artifacts"
     (raiz / "ws-1" / "run-1").mkdir(parents=True)
@@ -251,7 +251,7 @@ async def test_purge_artifacts_assinado_apaga_e_mantem_a_conexao(
 
 @pytest.mark.asyncio
 async def test_control_assinado_para_outro_executor_e_ignorado(servidor_confiavel):
-    """Comando legitimo capturado no canal de outro executor nao pode ser reusado."""
+    """A legitimate command captured on another executor's channel must not be reusable."""
     conn = _conexao()
     ws = _FakeWS([servidor_confiavel(
         {"type": "control", "action": "shutdown"}, executor_id="outro-executor",
@@ -279,7 +279,7 @@ async def test_control_com_payload_adulterado_e_ignorado(servidor_confiavel):
 
 @pytest.mark.asyncio
 async def test_replay_do_mesmo_control_e_rejeitado(servidor_confiavel):
-    """Segundo uso do mesmo nonce nao passa — o primeiro ja o consumiu."""
+    """A second use of the same nonce does not pass — the first one already consumed it."""
     msg = servidor_confiavel({"type": "control", "action": "shutdown"})
 
     conn1 = _conexao()
@@ -311,19 +311,19 @@ async def test_cancel_sem_assinatura_nao_chega_na_fila(servidor_confiavel):
     assert cancelados == ["job-legitimo"]
 
 
-# ── main(): observar o fim da conexao, nao so o sinal ────────────────────────
+# ── main(): watch the end of the connection, not just the signal ─────────────
 
 @pytest.mark.asyncio
 async def test_fim_da_conexao_libera_o_wait_sem_sinal():
-    """Reproduz o await de main(): o fim do conn_task tem de liberar sozinho.
+    """Reproduces main()'s await: the end of conn_task must release it on its own.
 
-    Antes, `await shutdown_event.wait()` isolado nunca retornava — o processo
-    ficava pendurado apos o servidor encerrar a conexao.
+    Before, a lone `await shutdown_event.wait()` never returned — the process
+    hung after the server closed the connection.
     """
-    shutdown_event = asyncio.Event()  # nunca setado: ninguem manda sinal
+    shutdown_event = asyncio.Event()  # never set: nobody sends a signal
 
     async def _conexao_que_encerra():
-        await asyncio.sleep(0)  # simula run() retornando por control
+        await asyncio.sleep(0)  # simulates run() returning due to control
 
     conn_task = asyncio.create_task(_conexao_que_encerra())
     stop_task = asyncio.create_task(shutdown_event.wait())
@@ -336,11 +336,11 @@ async def test_fim_da_conexao_libera_o_wait_sem_sinal():
     assert conn_task in done, "o fim da conexao precisa liberar o wait de main()"
 
 
-# ── Auto-restart quando nao ha supervisor (rodando direto no python) ─────────
+# ── Auto-restart when there is no supervisor (running directly in python) ────
 
 def test_argv_de_restart_preserva_execucao_como_modulo(monkeypatch):
-    """`python -m executor` nao pode virar `python .../__main__.py` — quebraria
-    os imports do pacote."""
+    """`python -m executor` must not become `python .../__main__.py` — it would
+    break the package imports."""
     import __main__ as main_mod
     from executor import main as executor_main
 
@@ -390,7 +390,7 @@ def test_fora_de_container_executa_exec(monkeypatch):
 
 
 def test_guarda_anti_loop_interrompe_apos_limite(monkeypatch):
-    """Se a causa persistir, parar e melhor que spin infinito de re-exec."""
+    """If the cause persists, stopping is better than an infinite re-exec spin."""
     from executor import main as executor_main
     import time
 
@@ -414,7 +414,7 @@ def test_contador_reseta_apos_a_janela(monkeypatch):
     monkeypatch.setattr(executor_main, "_in_container", lambda: False)
     monkeypatch.setattr(executor_main.os, "execve", lambda *a: chamou.append(a))
     monkeypatch.setenv(executor_main._RESTART_COUNT_VAR, str(executor_main._MAX_RESTARTS))
-    # Janela antiga: o contador deve zerar e o restart voltar a ser permitido.
+    # Old window: the counter should reset and restart be allowed again.
     monkeypatch.setenv(
         executor_main._RESTART_SINCE_VAR,
         str(int(time.time()) - executor_main._RESTART_WINDOW_SEC - 60),

@@ -1,21 +1,21 @@
 # executor/dashboard/tick.py
 """
-Coleta de um `Snapshot` — o unico lugar que junta os numeros do tick.
+Collection of a `Snapshot` — the only place that gathers the tick's numbers.
 
-Extraido de `runtime.DashboardRuntime._pintar` quando o modo JSON apareceu.
-Duplicar a chamada nos dois runtimes garantiria divergencia: bastaria alguem
-adicionar um argumento em `stats.snapshot()` e lembrar de um lado so, e o painel
-do terminal e a GUI passariam a mostrar numeros diferentes do mesmo executor —
-sem erro, sem log, sem jeito de perceber olhando um deles.
+Extracted from `runtime.DashboardRuntime._pintar` when the JSON mode appeared.
+Duplicating the call in both runtimes would guarantee divergence: it would take
+only someone adding an argument to `stats.snapshot()` and remembering one side,
+and the terminal dashboard and the GUI would start showing different numbers for
+the same executor — no error, no log, no way to notice by looking at either one.
 
-O cache do outbox mora aqui pelo mesmo motivo: e uma consulta SQLite sincrona, e
-faze-la a cada tick seria I/O de disco a 1 Hz dentro do event loop, para um
-numero que muda devagar.
+The outbox cache lives here for the same reason: it is a synchronous SQLite
+query, and running it on every tick would be disk I/O at 1 Hz inside the event
+loop, for a number that changes slowly.
 
-O espaco em disco tinha exatamente o mesmo problema — e pior, porque a pasta de
-artefatos pode estar numa unidade de rede — mas o cache dele mora dentro do
-proprio `sysinfo` (`TTL_DISCO_S`), e nao aqui: `connection._capacity_loop` le as
-mesmas metricas e precisa da mesma protecao sem passar por este modulo.
+Disk space had exactly the same problem — and worse, because the artifacts
+folder may be on a network drive — but its cache lives inside `sysinfo` itself
+(`TTL_DISCO_S`), not here: `connection._capacity_loop` reads the same metrics
+and needs the same protection without going through this module.
 """
 from __future__ import annotations
 
@@ -25,12 +25,12 @@ from executor import sysinfo
 
 logger = logging.getLogger("executor.dashboard")
 
-# Intervalo entre consultas ao outbox. Ver o docstring do modulo.
+# Interval between outbox queries. See the module docstring.
 INTERVALO_OUTBOX_S = 5.0
 
 
 def contar_outbox() -> int:
-    """Pendentes no outbox SQLite. Nunca levanta — 0 e melhor que derrubar o tick."""
+    """Pending items in the SQLite outbox. Never raises — 0 beats bringing down the tick."""
     try:
         from executor import result_store
         return result_store.count_pending()
@@ -39,10 +39,11 @@ def contar_outbox() -> int:
 
 
 class CacheOutbox:
-    """Guarda a ultima contagem e so reconsulta a cada `INTERVALO_OUTBOX_S`.
+    """Keeps the last count and only re-queries every `INTERVALO_OUTBOX_S`.
 
-    Recebe o relogio por parametro (`loop.time`) em vez de chamar
-    `asyncio.get_running_loop()` internamente: assim e testavel sem event loop.
+    Takes the clock as a parameter (`loop.time`) instead of calling
+    `asyncio.get_running_loop()` internally: that way it is testable without an
+    event loop.
     """
 
     def __init__(self, intervalo: float = INTERVALO_OUTBOX_S) -> None:
@@ -58,12 +59,12 @@ class CacheOutbox:
 
 
 def coletar_snapshot(stats, *, capacity_source, result_queue, outbox_pending: int):
-    """Monta o `Snapshot` do tick.
+    """Builds the tick's `Snapshot`.
 
-    `capacity_source` e `result_queue` sao lidos "na hora" de proposito — e o
-    contrato de `stats.snapshot()`, que nao guarda referencia a objeto vivo do
-    executor. Os dois sao tolerantes a falha: uma fila que estourou no `qsize()`
-    nao pode apagar o painel inteiro.
+    `capacity_source` and `result_queue` are read "on the spot" on purpose — that
+    is the contract of `stats.snapshot()`, which keeps no reference to a live
+    executor object. Both are failure-tolerant: a queue that blew up on `qsize()`
+    must not wipe out the whole dashboard.
     """
     try:
         capacity = capacity_source() if capacity_source else None

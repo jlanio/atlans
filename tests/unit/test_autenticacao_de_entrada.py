@@ -1,19 +1,20 @@
 # tests/unit/test_autenticacao_de_entrada.py
 """
-Quando o token do gatilho de webhook deve autenticar quem chamou.
+When the webhook trigger's token should authenticate the caller.
 
-Clicar em "Executar" num fluxo com WebhookTrigger + credencial de token
-respondia 403 "Token invalido": o validador comparava o header `Authorization`
-da requisicao com o token da credencial, e no botao do editor esse header leva
-o JWT de SESSAO do usuario, nao o token do webhook.
+Clicking "Executar" (Run) on a workflow with WebhookTrigger + a token credential
+responded 403 "Token invalido": the validator compared the request's
+`Authorization` header with the credential's token, and on the editor button
+that header carries the user's SESSION JWT, not the webhook token.
 
-O token existe para autenticar CHAMADA EXTERNA ao endpoint de webhook. No
-caminho administrativo quem chama ja passou pela sessao e precisa de papel de
-operator — exigir tambem o token nao protegia nada, so impedia o uso.
+The token exists to authenticate an EXTERNAL CALL to the webhook endpoint. On the
+administrative path the caller has already gone through the session and needs
+the operator role — also requiring the token protected nothing, it only blocked
+use.
 
-A distincao nao e "webhook x manual": e "este validador autentica quem chamou?".
-So o do webhook olha o `request`; os outros cinco apenas conferem se a
-credencial esta completa, e valem em qualquer caminho.
+The distinction is not "webhook vs manual": it is "does this validator
+authenticate the caller?". Only the webhook one looks at the `request`; the other
+five only check whether the credential is complete, and apply on any path.
 """
 from unittest.mock import MagicMock
 
@@ -50,22 +51,22 @@ def _definicao_com_gatilho(cred_id="cred-1") -> dict:
     }
 
 
-# ── O registro sabe quem autentica ───────────────────────────────────────────
+# ── The registry knows who authenticates ─────────────────────────────────────
 
 def test_so_o_webhook_autentica_a_requisicao():
-    """Se outro tipo entrar nesse conjunto sem querer, ele passa a ser pulado
-    no disparo manual — e uma checagem de credencial some sem ninguem ver."""
+    """If another type gets into this set by accident, it starts being skipped on
+    manual triggering — and a credential check vanishes without anyone seeing."""
     assert _AUTENTICAM_A_REQUISICAO == {"webhook_token", "WebhookAuthToken"}
 
 
-# ── O caso do relato ─────────────────────────────────────────────────────────
+# ── The reported case ────────────────────────────────────────────────────────
 
 class TestDisparoJaAutenticado:
 
     @pytest.mark.asyncio
     async def test_jwt_de_sessao_no_header_nao_e_mais_recusado(self):
-        """O caso exato: o header existe e leva o JWT, que obviamente nao bate
-        com o token do webhook."""
+        """The exact case: the header exists and carries the JWT, which obviously
+        doesn't match the webhook token."""
         await validate_credential_by_type(
             _cred_webhook(), request=_requisicao(f"Bearer {JWT_DA_SESSAO}"),
             autenticar_entrada=False,
@@ -73,8 +74,8 @@ class TestDisparoJaAutenticado:
 
     @pytest.mark.asyncio
     async def test_sem_requisicao_nenhuma_tambem_passa(self):
-        """O agendador dispara sem `request`. Antes isso dava 401 "Request HTTP
-        e necessario" em todo fluxo que combinasse cron com gatilho de webhook.
+        """The scheduler triggers without a `request`. Before, that gave 401 "Request
+        HTTP e necessario" on every workflow that combined cron with a webhook trigger.
         """
         await validate_credential_by_type(
             _cred_webhook(), request=None, autenticar_entrada=False,
@@ -82,8 +83,8 @@ class TestDisparoJaAutenticado:
 
     @pytest.mark.asyncio
     async def test_credencial_vencida_nao_bloqueia_o_operador(self):
-        """Colateral aceito: a validade governa o acesso EXTERNO, nao o operador
-        que ja esta autenticado."""
+        """Accepted side effect: the expiry governs EXTERNAL access, not the operator
+        who is already authenticated."""
         await validate_credential_by_type(
             _cred_webhook(expires_at="2020-01-01T00:00:00Z"),
             request=_requisicao(f"Bearer {JWT_DA_SESSAO}"),
@@ -101,8 +102,8 @@ class TestEndpointDeWebhook:
         ("lixo", 500),
     ])
     async def test_a_validade_e_a_mesma_regra_da_resolucao(self, expires_at, status):
-        # `expires_at` gravado sem fuso dava TypeError (500) na comparação com
-        # um `now` com fuso; agora é a regra de `validade_da_credencial`.
+        # `expires_at` stored without a time zone gave a TypeError (500) when compared
+        # with a tz-aware `now`; now it is the `validade_da_credencial` rule.
         chamada = validate_credential_by_type(
             _cred_webhook(expires_at=expires_at), request=_requisicao(f"Bearer {TOKEN}"), autenticar_entrada=True,
         )
@@ -134,14 +135,14 @@ class TestEndpointDeWebhook:
         )
 
 
-# ── Os outros validadores valem em todo caminho ──────────────────────────────
+# ── The other validators apply on every path ─────────────────────────────────
 
 class TestValidadoresQueNaoAutenticam:
 
     @pytest.mark.asyncio
     async def test_credencial_de_banco_incompleta_barra_ate_no_disparo_manual(self):
-        """Conferir se a credencial esta completa nao tem nada a ver com
-        autenticar quem chamou — pular tudo teria levado esta checagem junto."""
+        """Checking whether the credential is complete has nothing to do with
+        authenticating the caller — skipping everything would have taken this check along."""
         with pytest.raises(HTTPException) as exc:
             await validate_credential_by_type(
                 {"type": "postgresql"}, request=None, autenticar_entrada=False,
@@ -156,26 +157,26 @@ class TestValidadoresQueNaoAutenticam:
         )
 
 
-# ── A resolucao fail-closed continua em todos os caminhos ────────────────────
+# ── Fail-closed resolution still applies on every path ───────────────────────
 
 class TestCredencialAusente:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("autenticar", [True, False], ids=["webhook", "manual"])
     async def test_credencial_removida_barra_nos_dois_caminhos(self, autenticar):
-        """E ela que pega credencial apagada; nao pode cair junto com a
-        autenticacao de entrada."""
+        """It is what catches a deleted credential; it must not go down together with
+        inbound authentication."""
         with pytest.raises(HTTPException) as exc:
             await _validate_trigger_credentials_only(
                 _definicao_com_gatilho(), request=_requisicao(f"Bearer {TOKEN}"),
-                pre_resolved={},  # a credencial nao resolveu
+                pre_resolved={},  # the credential did not resolve
                 autenticar_entrada=autenticar,
             )
         assert exc.value.status_code == 403
         assert "não pôde ser resolvida" in exc.value.detail
 
 
-# ── Ponta a ponta na funcao que o dispatch chama ─────────────────────────────
+# ── End to end on the function the dispatch calls ────────────────────────────
 
 class TestValidacaoDeTrigger:
 
@@ -201,8 +202,8 @@ class TestValidacaoDeTrigger:
 
     @pytest.mark.asyncio
     async def test_o_padrao_e_autenticar(self):
-        """Chamador novo que esqueca o parametro exige o token, em vez de abrir
-        o endpoint publico sem autenticacao."""
+        """A new caller that forgets the parameter requires the token, instead of opening
+        the public endpoint without authentication."""
         with pytest.raises(HTTPException):
             await _validate_trigger_credentials_only(
                 _definicao_com_gatilho(),
@@ -214,11 +215,11 @@ class TestValidacaoDeTrigger:
 # ── O padrao do start_analysis protege o endpoint publico ────────────────────
 
 class TestPadraoDoDispatch:
-    """O webhook_router NAO passa `autenticar_entrada` — ele conta com o padrao.
+    """The webhook_router does NOT pass `autenticar_entrada` — it relies on the default.
 
-    Se o padrao virasse `False`, o endpoint publico pararia de autenticar e
-    qualquer um dispararia o fluxo sabendo so a URL. Estes testes exercitam o
-    `start_analysis` de verdade, sem mockar a validacao que esta sob teste.
+    If the default became `False`, the public endpoint would stop authenticating and
+    anyone could trigger the workflow knowing only the URL. These tests exercise
+    the real `start_analysis`, without mocking the validation under test.
     """
 
     def _servico(self, definicao, cred):
@@ -270,7 +271,7 @@ class TestPadraoDoDispatch:
 
     @pytest.mark.asyncio
     async def test_com_autenticar_entrada_false_o_jwt_passa(self):
-        """Como o botao Executar chama — o caso do relato."""
+        """How the Run button calls it — the reported case."""
         r = await self._disparar(
             request=_requisicao(f"Bearer {JWT_DA_SESSAO}"), autenticar_entrada=False,
         )
@@ -282,11 +283,11 @@ class TestPadraoDoDispatch:
         assert r.id == "task-1"
 
 
-# ── Os pontos de chamada que precisam SAIR da autenticacao ───────────────────
+# ── The call sites that must OPT OUT of authentication ───────────────────────
 
 class TestQuemDispensaOToken:
-    """Sem estes, remover o `autenticar_entrada=False` de um chamador traz o
-    defeito de volta em silencio — o bug so reaparece para quem clica Executar.
+    """Without these, removing `autenticar_entrada=False` from a caller brings the
+    defect back silently — the bug only reappears for whoever clicks Run.
     """
 
     @pytest.mark.asyncio
@@ -301,8 +302,8 @@ class TestQuemDispensaOToken:
         wf.id_hash = "wf-1"
 
         await execute_workflow(
-            # `execute_workflow` tem rate limit: o slowapi recusa o que nao for
-            # uma Request de verdade.
+            # `execute_workflow` has a rate limit: slowapi rejects anything that isn't
+            # a real Request.
             request=RequisicaoReal({
                 "type": "http", "method": "POST", "path": "/x",
                 "headers": [], "client": ("127.0.0.1", 0), "query_string": b"",
@@ -315,7 +316,7 @@ class TestQuemDispensaOToken:
         )
 
         assert service.start_analysis.await_args.kwargs["autenticar_entrada"] is False
-        # Escopo D: a rota repassa quem disparou para a resolução de credenciais.
+        # Scope D: the route passes who triggered it on to credential resolution.
         assert service.start_analysis.await_args.kwargs["triggered_by"] == "user-x"
 
     @pytest.mark.asyncio
@@ -324,8 +325,8 @@ class TestQuemDispensaOToken:
         from app.core.async_scheduler import AsyncScheduler
 
         service = MagicMock()
-        # O disparo agendado carrega o workflow uma vez e o repassa ao
-        # start_analysis (como o webhook), em vez de refazer o SELECT lá dentro.
+        # The scheduled trigger loads the workflow once and passes it on to
+        # start_analysis (like the webhook), instead of redoing the SELECT in there.
         service.get_workflow_by_hash = AsyncMock(return_value=MagicMock(id_hash="wf-1", workspace_id="ws-1"))
         service.start_analysis = AsyncMock(return_value=MagicMock(id="task-1"))
         sessao = MagicMock()

@@ -1,16 +1,16 @@
-"""Remover um artefato é o mesmo algoritmo nos cinco caminhos.
+"""Removing an artifact is the same algorithm on all five paths.
 
-O laço — conteúdo local vira ordem ao executor e a linha só cai com a ordem
-ENTREGUE; objeto no MinIO sai primeiro e a falha preserva a linha; a camada do
-portal sai junto; depois a linha — estava escrito no DELETE avulso, no lote, no
-reenvio ao executor que reconecta, na retenção e na purga do workspace. As
-cópias divergiram: só a purga apagava a camada do portal de um artefato LOCAL
-entregue. Nos outros quatro caminhos a linha do artefato sumia e a PortalLayer
-ficava — o mapa publicado continuava no ar, servindo do banco um dado que a
-pessoa tinha mandado apagar (e que, marcado para ficar no executor, nem deveria
-ter saído dele).
+The loop — local content becomes an order to the executor and the row only goes
+once the order is DELIVERED; an object in MinIO goes first and a failure keeps
+the row; the portal layer goes along; then the row — was written out in the
+single DELETE, in the batch one, in the resend to a reconnecting executor, in
+retention and in the workspace purge. The copies diverged: only the purge deleted
+the portal layer of a delivered LOCAL artifact. On the other four paths the
+artifact row vanished and the PortalLayer stayed — the published map stayed
+online, serving from the database data the person had asked to delete (and that,
+marked to stay on the executor, should not even have left it).
 
-Banco de verdade (SQLite): o que importa é o que sobra gravado.
+Real database (SQLite): what matters is what remains stored.
 """
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ async def _banco():
 
 
 async def _publicado_local(Sessao, n: int = 1, *, vencido: bool = False):
-    """Um artefato LOCAL (bytes no disco do executor) publicado no portal."""
+    """A LOCAL artifact (bytes on the executor's disk) published to the portal."""
     async with Sessao() as db:
         db.add_all([
             Artifact(
@@ -70,7 +70,7 @@ async def _sobrou(Sessao) -> tuple[list[str], list[str]]:
 
 @pytest.fixture
 def entrega(monkeypatch):
-    """O executor recebe a ordem de remoção (ou não, com `entrega([])`)."""
+    """The executor receives the removal order (or not, with `entrega([])`)."""
     def instalar(ids=None):
         async def _ordem(por_executor):
             todos = [i["_id"] for itens in por_executor.values() for i in itens]
@@ -82,14 +82,14 @@ def entrega(monkeypatch):
 
 @pytest.fixture
 def pode_editar(monkeypatch):
-    # Onde `exigir_papel_no_workspace` busca o papel (a comparação segue real).
+    # Where `exigir_papel_no_workspace` looks up the role (the comparison stays real).
     monkeypatch.setattr(workflow_access, "get_workspace_member_role", AsyncMock(return_value="owner"))
 
 
 _QUEM = SimpleNamespace(id_hash="u-1")
 
 
-# ── A camada do portal cai junto com o artefato local entregue ───────────────
+# ── The portal layer goes along with the delivered local artifact ────────────
 
 @pytest.mark.asyncio
 async def test_delete_avulso_de_artefato_local_apaga_a_camada(entrega, pode_editar):
@@ -100,7 +100,7 @@ async def test_delete_avulso_de_artefato_local_apaga_a_camada(entrega, pode_edit
                 "art-1", db=db, current_user=_QUEM, workspace_ids=[WS],
             )
 
-        assert resposta is None                        # 204, como antes
+        assert resposta is None                        # 204, as before
         assert await _sobrou(Sessao) == ([], [])
 
 
@@ -139,7 +139,7 @@ async def test_reenvio_ao_executor_que_reconecta_apaga_a_camada(entrega, monkeyp
         assert await _sobrou(Sessao) == ([], [])
 
 
-# ── As respostas de cada caminho não mudaram ─────────────────────────────────
+# ── The responses of each path did not change ────────────────────────────────
 
 async def _publicado_no_minio(Sessao, n: int):
     async with Sessao() as db:
@@ -156,7 +156,7 @@ async def _publicado_no_minio(Sessao, n: int):
 
 @pytest.fixture
 def minio(monkeypatch):
-    """O MinIO falha para as chaves de `quebradas`."""
+    """MinIO fails for the keys in `quebradas`."""
     quebradas: set[str] = set()
 
     def _apagar(chave, allow_missing=True):
@@ -195,13 +195,13 @@ async def test_lote_conta_a_falha_do_minio_como_skipped(minio, pode_editar):
             )
 
         assert resposta == {"deleted": 1, "skipped": 1, "pendentes_no_executor": 0}
-        # A falha preserva a linha E a camada: a próxima tentativa acha as duas.
+        # The failure keeps the row AND the layer: the next attempt finds both.
         assert await _sobrou(Sessao) == (["art-2"], ["camada_2"])
 
 
 @pytest.mark.asyncio
 async def test_ordem_nao_entregue_mantem_artefato_e_camada(entrega, pode_editar):
-    """A camada só sai com a linha: executor offline deixa os dois."""
+    """The layer only goes with the row: an offline executor leaves both."""
     entrega([])
     async with _banco() as Sessao:
         await _publicado_local(Sessao)

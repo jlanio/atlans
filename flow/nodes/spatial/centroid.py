@@ -11,8 +11,8 @@ logger = get_logger(__name__)
 @register_node
 class CentroidNode(BaseNode):
     """
-    Calcula o centróide de cada feição de uma camada vetorial (GeoDataFrame).
-    Ignora feições com geometria inválida ou nula.
+    Computes the centroid of each feature of a vector layer (GeoDataFrame).
+    Ignores features with invalid or null geometry.
     """
 
     @classmethod
@@ -30,12 +30,12 @@ class CentroidNode(BaseNode):
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, gpd.GeoDataFrame]:
         self.validate()
-        # Obtém o GeoDataFrame de entrada via helper da classe base
+        # Gets the input GeoDataFrame via the base class helper
         gdf = self.get_first_gdf(inputs)
 
         require_crs(gdf)
 
-        # Remove feições sem geometria
+        # Removes features without geometry
         gdf_valid = gdf[gdf.geometry.notnull()]
         if len(gdf_valid) < len(gdf):
             logger.warning(f"{len(gdf) - len(gdf_valid)} feições removidas por não possuírem geometria válida.")

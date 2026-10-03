@@ -1,33 +1,35 @@
 # app/mcp/tools/acervo.py
 """
-Tools do acervo: o histórico de um fluxo, a cópia dele, e o que ele produziu.
+Collection tools: a workflow's history, its copy, and what it produced.
 
-É o domínio que torna seguro deixar um agente editar um fluxo de produção. Sem
-`restore_workflow_version`, um erro dele não tem desfazer; sem
-`duplicate_workflow`, experimentar exige mexer no original.
+This is the domain that makes it safe to let an agent edit a production
+workflow. Without `restore_workflow_version`, a mistake of its own has no undo;
+without `duplicate_workflow`, experimenting requires touching the original.
 
-Três decisões moldam o módulo:
+Three decisions shape the module:
 
-- **Nenhum dos serviços daqui autoriza coisa alguma.** `list_versions`,
-  `get_version`, `restore_version` e `duplicate_workflow` não conhecem papel
-  nem workspace — na REST quem barra é o router. As quatro
-  tools que apontam para UM workflow abrem com o par
-  `carregar_workflow(decifrar=False)` + `exigir_papel`, e é essa dupla, não o
-  serviço, que fecha a porta. O que o serviço confere é outra coisa: que as
-  credenciais da definition gravada (cópia ou versão restaurada) estejam ao
-  alcance de quem grava (SEG-12).
-  `list_artifacts` é a exceção, pelo mesmo motivo que `get_run_artifacts`: ela
-  não aponta para um workflow, então não há papel a conferir contra coisa
-  nenhuma. O corte é `escopo.workspace_ids` dentro do WHERE, que já é a
-  interseção entre os workspaces do usuário e o alcance do token — equivalente
-  a exigir `viewer`, que é o menor papel que existe.
-- **A listagem de versões faz a própria consulta.** `list_versions` devolve a
-  definition inteira de cada versão; numa tool isso seriam N blobs cifrados
-  lidos do banco para serem descartados. Aqui se seleciona só o que a pergunta
-  precisa — mesmo motivo de `_contar_versoes` existir em `construcao.py`.
-- **Nenhuma definition sai daqui sem passar pela redação.** A de uma versão já
-  vem redigida do serviço; a que o `restore` devolve, não — ela volta cifrada
-  do banco, e entregá-la crua seria despejar `gAAAA…` no contexto de quem lê.
+- **None of the services here authorizes anything.** `list_versions`,
+  `get_version`, `restore_version` and `duplicate_workflow` know nothing of
+  role or workspace — in REST it is the router that blocks. The four
+  tools that point at ONE workflow open with the pair
+  `carregar_workflow(decifrar=False)` + `exigir_papel`, and it is that pair, not
+  the service, that closes the door. What the service checks is something else:
+  that the credentials of the saved definition (copy or restored version) are
+  within reach of whoever saves (SEG-12).
+  `list_artifacts` is the exception, for the same reason as `get_run_artifacts`:
+  it does not point at a workflow, so there is no role to check against
+  anything. The cut is `escopo.workspace_ids` inside the WHERE, which is
+  already the intersection between the user's workspaces and the token's
+  reach — equivalent to requiring `viewer`, which is the lowest role there is.
+- **The version listing runs its own query.** `list_versions` returns the
+  whole definition of each version; in a tool that would be N encrypted blobs
+  read from the database only to be discarded. Here only what the question
+  needs is selected — the same reason `_contar_versoes` exists in
+  `construcao.py`.
+- **No definition leaves here without going through redaction.** A version's
+  definition already comes redacted from the service; the one `restore`
+  returns does not — it comes back encrypted from the database, and handing it
+  over raw would dump `gAAAA…` into the reader's context.
 """
 from __future__ import annotations
 
@@ -57,20 +59,20 @@ from app.services.workflow_service import WorkflowService
 from app.services.workflow_version_service import get_version
 from flow.utils.workflow_contract import validate_subworkflow_references_against_db
 
-# Teto da listagem de versões. Um fluxo muito editado acumula centenas de
-# snapshots, e quem pergunta "o que mudou" quer os últimos.
+# Ceiling of the version listing. A heavily edited workflow accumulates hundreds
+# of snapshots, and whoever asks "what changed" wants the latest ones.
 MAX_VERSOES = 50
 
-# Teto da listagem de artefatos por resposta — o mesmo orçamento de contexto das
-# outras listagens do servidor.
+# Ceiling of the artifact listing per response — the same context budget as the
+# server's other listings.
 MAX_ARTEFATOS = 100
 
-# Validade da URL assinada, igual à das demais: o link é portador e viaja por
-# uma conversa que pode ficar registrada.
+# Validity of the signed URL, the same as the others: the link is a bearer link
+# and travels through a conversation that may be recorded.
 VALIDADE_DO_LINK_S = 300
 
-# Os dois recortes que a listagem de artefatos entende — os mesmos que a rota
-# REST valida por `pattern`.
+# The two slices the artifact listing understands — the same ones the REST route
+# validates via `pattern`.
 RECORTES = ("execution", "publication")
 
 logger = get_logger("app.mcp.tools.acervo")
@@ -87,26 +89,27 @@ def _versao_nao_encontrada(numero: Any):
     )
 
 
-# ── Versões ──────────────────────────────────────────────────────────────────
+# ── Versions ─────────────────────────────────────────────────────────────────
 
 
 @ferramenta
 async def list_workflow_versions(
     ctx: Context, workflow_id: str, limit: int = MAX_VERSOES, offset: int = 0
 ) -> dict:
-    """O histórico de snapshots de um workflow, do mais novo para o mais antigo.
+    """A workflow's snapshot history, from newest to oldest.
 
-    Devolve só o que identifica cada versão — número, nota da mudança e data.
-    A definition de cada uma sai por `get_workflow_version(workflow_id, n)`, uma
-    por vez e redigida: despejar o conteúdo de todas aqui custaria mais contexto
-    do que qualquer pergunta sobre histórico justifica.
+    Returns only what identifies each version — number, change note and date.
+    Each one's definition comes out through
+    `get_workflow_version(workflow_id, n)`, one at a time and redacted: dumping
+    the content of all of them here would cost more context than any question
+    about history justifies.
 
-    Uma versão nasce quando `update_workflow` muda o conjunto de nós, e também
-    logo antes de um `restore_workflow_version` — o auto-snapshot que torna o
-    restore reversível. Ou seja: usar as tools deste domínio faz o histórico
-    crescer, e por isso `offset` existe. Com `has_more: true`, a página seguinte
-    é `offset = offset + returned`; sem isso, as versões mais antigas de um
-    fluxo muito editado ficariam inalcançáveis por esta tool.
+    A version is born when `update_workflow` changes the set of nodes, and also
+    right before a `restore_workflow_version` — the auto-snapshot that makes the
+    restore reversible. In other words: using the tools in this domain makes the
+    history grow, and that is why `offset` exists. With `has_more: true`, the
+    next page is `offset = offset + returned`; without it, the oldest versions
+    of a heavily edited workflow would be unreachable through this tool.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
@@ -118,10 +121,10 @@ async def list_workflow_versions(
         exigir_papel(papel, ROLE_VIEWER, _MENSAGEM_PAPEL_LEITURA)
         id_hash = wf.id_hash
 
-        # Consulta própria, e não `list_versions`: aquela traz a coluna
-        # `definition` de cada linha — N blobs cifrados lidos do banco só para
-        # serem descartados aqui. A pergunta é "que versões existem", e a
-        # resposta cabe em três colunas.
+        # Its own query, not `list_versions`: that one brings the `definition`
+        # column of each row — N encrypted blobs read from the database only
+        # to be discarded here. The question is "which versions exist", and
+        # the answer fits in three columns.
         linhas = (
             await db.execute(
                 select(
@@ -141,8 +144,8 @@ async def list_workflow_versions(
         {"version_number": numero, "created_at": iso(criada)}
         for numero, _, criada in linhas[:teto]
     ]
-    # A nota da mudança é escrita por gente: desce para `untrusted_data`, na
-    # mesma ordem dos itens do topo.
+    # The change note is written by people: it goes down into
+    # `untrusted_data`, in the same order as the top-level items.
     notas = [nota for _, nota, _ in linhas[:teto]]
 
     return envelope(
@@ -160,14 +163,15 @@ async def list_workflow_versions(
 
 @ferramenta
 async def get_workflow_version(ctx: Context, workflow_id: str, version_number: int) -> dict:
-    """Uma versão do histórico, com a definition REDIGIDA.
+    """A version from the history, with the definition REDACTED.
 
-    Redigida sem exceção: o histórico guarda a connection string cifrada, e
-    abri-la para quem lê entregaria a senha do banco de produção a qualquer
-    membro do workspace. Restaurar não precisa disso — o restore copia o blob
-    cifrado sem abri-lo.
+    Redacted without exception: the history stores the encrypted connection
+    string, and opening it for the reader would hand the production database
+    password to any workspace member. Restoring does not need it — restore
+    copies the encrypted blob without opening it.
 
-    A forma da versão continua inteira: o que se perde é o segredo, não os nós.
+    The shape of the version remains whole: what is lost is the secret, not
+    the nodes.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
@@ -180,25 +184,28 @@ async def get_workflow_version(ctx: Context, workflow_id: str, version_number: i
         try:
             versao = await get_version(WorkflowCRUD(db), id_hash, int(version_number))
         except WorkflowNotFoundError as exc:
-            # O workflow já foi carregado acima, então aqui isto só pode ser a
-            # VERSÃO. Sem traduzir, o erro chega sem dica — e a pergunta
-            # seguinte de quem errou o número é sempre a mesma.
+            # The workflow was already loaded above, so here this can only be the
+            # VERSION. Without translating it, the error arrives with no hint —
+            # and the next question from whoever got the number wrong is always
+            # the same.
             raise _versao_nao_encontrada(version_number) from exc
         except ValueError as exc:
-            # Token que não decifra. O serviço denuncia em vez de devolver texto
-            # ilegível como se fosse conteúdo, e a tool não transforma isso em
-            # "não encontrado": o dado existe, o que falhou foi abri-lo.
+            # A token that does not decrypt. The service reports it instead of
+            # returning unreadable text as if it were content, and the tool does
+            # not turn that into "not found": the data exists, what failed was
+            # opening it.
             raise erro(
                 "internal_error",
                 "A definition desta versão não pôde ser decifrada.",
                 "a chave de criptografia pode ter mudado; procure o administrador",
             ) from exc
 
-        # O objeto vem DESANEXADO do serviço (`expunge`), de propósito: sem
-        # isso, um restore na mesma sessão pegaria esta instância redigida pelo
-        # identity map e gravaria `<REDACTED>` na definition do workflow. O
-        # preço é que nada pode ser lido por lazy load — tudo sai agora, do que
-        # o SELECT já trouxe.
+        # The object comes DETACHED from the service (`expunge`), on purpose:
+        # without that, a restore in the same session would pick up this
+        # redacted instance through the identity map and write `<REDACTED>`
+        # into the workflow's definition. The price is that nothing can be
+        # read by lazy load — everything comes out now, from what the SELECT
+        # already brought.
         numero = versao.version_number
         nota = versao.change_note
         criada = versao.created_at
@@ -219,18 +226,18 @@ async def get_workflow_version(ctx: Context, workflow_id: str, version_number: i
 async def restore_workflow_version(
     ctx: Context, workflow_id: str, version_number: int
 ) -> dict:
-    """Devolve o workflow ao estado de uma versão anterior.
+    """Returns the workflow to the state of a previous version.
 
-    **É reversível.** Antes de restaurar, o estado atual vira um snapshot novo
-    no histórico, então um restore errado se desfaz com outro restore — o número
-    da versão criada volta em `snapshot_version`.
+    **It is reversible.** Before restoring, the current state becomes a new
+    snapshot in the history, so a wrong restore is undone with another restore
+    — the number of the created version comes back in `snapshot_version`.
 
-    O agendamento é ressincronizado a partir da definition restaurada: se a
-    versão antiga tinha outro cron, o agendamento passa a ser o dela; se não
-    tinha gatilho de agenda, ele é removido. Essa sincronia é best-effort no
-    núcleo — se ela falhar, a restauração **ainda assim vale**, e a resposta não
-    tem como avisar. Confirme com `get_workflow(workflow_id)` quando o fluxo
-    depender de agendamento.
+    The schedule is resynchronized from the restored definition: if the old
+    version had a different cron, the schedule becomes that one; if it had no
+    schedule trigger, the schedule is removed. That sync is best-effort in the
+    core — if it fails, the restore **still holds**, and the response has no
+    way to warn about it. Confirm with `get_workflow(workflow_id)` when the
+    workflow depends on scheduling.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:write")
@@ -242,33 +249,36 @@ async def restore_workflow_version(
 
         antes = await _ultimo_numero_de_versao(db, id_hash)
         try:
-            # Pelo serviço, e não pelo `restore_version` do módulo de versões: é
-            # o serviço que confere as credenciais da versão contra quem restaura
-            # (SEG-12) — a mesma guarda da REST.
+            # Through the service, and not through the versions module's
+            # `restore_version`: it is the service that checks the version's
+            # credentials against whoever restores (SEG-12) — the same guard
+            # as REST.
             restaurado = await WorkflowService(db).restore_version(
                 id_hash, int(version_number), restored_by=escopo.user_id,
             )
         except WorkflowNotFoundError as exc:
             raise _versao_nao_encontrada(version_number) from exc
 
-        # `restore_version` grava o blob CIFRADO da versão no workflow, sem
-        # abri-lo — é o que mantém a credencial protegida em repouso. Para SAIR
-        # daqui, porém, ele precisa passar pela redação: entregar `gAAAA…` ao
-        # chamador não informa nada e ainda custa contexto.
+        # `restore_version` writes the version's ENCRYPTED blob into the
+        # workflow, without opening it — that is what keeps the credential
+        # protected at rest. To LEAVE here, however, it has to go through
+        # redaction: handing `gAAAA…` to the caller tells it nothing and
+        # still costs context.
         segura = compactar_definition(redigir_definition(restaurado.definition or {}))
         nome = restaurado.name
         ativo = bool(restaurado.flag_ative)
 
-        # A restauração já commitou neste ponto. A sincronia de agendamento que
-        # vem depois dela é best-effort e engole a própria falha — mas se o que
-        # falhou foi um statement de BANCO, a transação fica abortada e esta
-        # consulta seguinte levantaria, transformando em "erro inesperado" uma
-        # operação que DEU CERTO e está gravada. A docstring promete o
-        # contrário, então o risco é da consulta, não da resposta.
+        # The restore has already committed at this point. The schedule sync
+        # that comes after it is best-effort and swallows its own failure —
+        # but if what failed was a DATABASE statement, the transaction is left
+        # aborted and this next query would raise, turning into an
+        # "unexpected error" an operation that SUCCEEDED and is saved. The
+        # docstring promises the opposite, so the risk belongs to the query,
+        # not to the response.
         try:
             depois = await _ultimo_numero_de_versao(db, id_hash)
             indeterminado = False
-        except Exception:  # noqa: BLE001 — qualquer falha aqui é só de leitura
+        except Exception:  # noqa: BLE001 — any failure here is read-only
             logger.warning(
                 "Restauração de %s gravou, mas o número do snapshot não pôde ser lido.",
                 id_hash, exc_info=True,
@@ -278,17 +288,18 @@ async def restore_workflow_version(
     dados = {
         "workflow_id": id_hash,
         "restored_from_version": int(version_number),
-        # O auto-snapshot só existe se o número subiu; se `create_version` não
-        # chegou a gravar, dizer que existe mandaria o chamador restaurar uma
-        # versão inexistente para desfazer.
+        # The auto-snapshot only exists if the number went up; if
+        # `create_version` never got to write, saying it exists would send the
+        # caller to restore a nonexistent version to undo.
         "snapshot_version": depois if depois and depois != antes else None,
         "is_active": ativo,
     }
-    # Inserção condicional, e não `"hint": … if … else None`: o `envelope`
-    # descarta chave nula apenas dentro de `untrusted_data`, então um
-    # `"hint": None` no topo sobreviveria. `None` no campo acima quer dizer "não
-    # houve snapshot"; esta dica é para o caso diferente — houve, mas não deu
-    # para ler o número —, que sem ela ficaria indistinguível do primeiro.
+    # Conditional insertion, and not `"hint": … if … else None`: the
+    # `envelope` drops null keys only inside `untrusted_data`, so a
+    # `"hint": None` at the top level would survive. `None` in the field above
+    # means "there was no snapshot"; this hint is for the different case —
+    # there was one, but its number could not be read —, which without it
+    # would be indistinguishable from the first.
     if indeterminado:
         dados["hint"] = (
             "a restauração foi gravada, mas o número do snapshot anterior não pôde ser "
@@ -299,7 +310,7 @@ async def restore_workflow_version(
 
 
 async def _ultimo_numero_de_versao(db, workflow_hash: str) -> Optional[int]:
-    """O maior `version_number` do fluxo — como o CRUD o calcula para criar."""
+    """The workflow's highest `version_number` — as the CRUD computes it to create."""
     resultado = await db.execute(
         select(func.max(WorkflowVersion.version_number)).where(
             WorkflowVersion.workflow_hash == workflow_hash
@@ -316,19 +327,20 @@ async def _ultimo_numero_de_versao(db, workflow_hash: str) -> Optional[int]:
 async def duplicate_workflow(
     ctx: Context, workflow_id: str, name: str | None = None
 ) -> dict:
-    """Cria uma cópia do workflow, no MESMO workspace.
+    """Creates a copy of the workflow, in the SAME workspace.
 
-    Serve para experimentar sem arriscar o original: edite a cópia, execute,
-    e o fluxo de produção fica intacto.
+    Used to experiment without risking the original: edit the copy, run it,
+    and the production workflow stays intact.
 
-    O que **não** acompanha a cópia, e não é esquecimento: os pins (apontam para
-    artefatos de execuções que esta cópia nunca teve), o estado do portal (uma
-    cópia não nasce publicada porque o original estava) e o histórico de versões
-    (ele descreve edições que não aconteceram aqui). O agendamento acompanha,
-    mas **desligado** — duplicar costuma preceder uma edição, e nascer
-    disparando sozinho dobraria a carga em silêncio.
+    What does **not** come along with the copy, and not by oversight: the pins
+    (they point at artifacts of runs this copy never had), the portal state (a
+    copy is not born published because the original was) and the version
+    history (it describes edits that did not happen here). The schedule comes
+    along, but **disabled** — duplicating usually precedes an edit, and being
+    born firing on its own would silently double the load.
 
-    Sem `name`, a cópia recebe um nome derivado ("Cópia de X").
+    Without `name`, the copy gets a derived name ("Cópia de X", i.e. "Copy of
+    X").
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:write")
@@ -338,20 +350,22 @@ async def duplicate_workflow(
         exigir_papel(papel, ROLE_EDITOR, _MENSAGEM_PAPEL_ESCRITA)
         id_hash = wf.id_hash
 
-        # A mesma checagem que a rota REST faz, e que o serviço NÃO faz: um
-        # SubWorkflow referenciado pode ter sido desativado ou removido depois
-        # que o original foi salvo. Sem ela, a cópia nasce quebrada e só falha
-        # na execução, com erro bem menos claro do que a lista de referências.
+        # The same check the REST route does, and that the service does NOT: a
+        # referenced SubWorkflow may have been deactivated or removed after the
+        # original was saved. Without it, the copy is born broken and only
+        # fails at run time, with an error much less clear than the list of
+        # references.
         quebradas = await validate_subworkflow_references_against_db(
             wf.definition or {}, db, workspace_id=wf.workspace_id
         )
         if quebradas:
-            # `higienizar` explícito: `erro()` só redige extra que seja STRING
-            # (`erros.py`), e este é uma lista. As mensagens do validador ecoam
-            # o `id` do nó e o hash do alvo — os dois escritos por quem edita o
-            # fluxo —, então sem isto uma frase de comando (ou um segredo de
-            # definição legada) sairia verbatim no corpo do erro e no log do
-            # SDK. Mesmo tratamento que `construcao.py` dá ao `report`.
+            # Explicit `higienizar`: `erro()` only redacts extras that are STRINGS
+            # (`erros.py`), and this one is a list. The validator's messages
+            # echo the node's `id` and the target's hash — both written by
+            # whoever edits the workflow —, so without this a command sentence
+            # (or a secret from a legacy definition) would go out verbatim in
+            # the error body and in the SDK log. Same treatment that
+            # `construcao.py` gives the `report`.
             raise erro(
                 "validation",
                 "O workflow referencia sub-fluxos que não estão utilizáveis.",
@@ -361,10 +375,11 @@ async def duplicate_workflow(
                 ),
             )
 
-        # Autoria vem de quem chamou — "quem criou isto" é a primeira pergunta
-        # de quem encontra um fluxo duplicado meses depois. O carimbo era feito
-        # aqui à mão porque o serviço não o fazia; agora ele faz, e a rota REST
-        # carimba pela mesma porta. Uma regra só, nos dois caminhos.
+        # Authorship comes from the caller — "who created this" is the first
+        # question from whoever finds a duplicated workflow months later. The
+        # stamp used to be applied here by hand because the service did not
+        # do it; now it does, and the REST route stamps through the same door.
+        # A single rule, on both paths.
         copia = await WorkflowService(db).duplicate_workflow(
             id_hash, name, duplicated_by=escopo.user_id,
         )
@@ -382,7 +397,7 @@ async def duplicate_workflow(
     return envelope(dados, name=nome_da_copia)
 
 
-# ── Artefatos do workspace ───────────────────────────────────────────────────
+# ── Workspace artifacts ──────────────────────────────────────────────────────
 
 
 @ferramenta
@@ -397,38 +412,41 @@ async def list_artifacts(
     limit: int = 50,
     offset: int = 0,
 ) -> dict:
-    """Os arquivos que as execuções de um workspace produziram.
+    """The files that a workspace's runs produced.
 
-    Diferente de `get_run_artifacts`, que responde "o que ESTA execução gerou",
-    esta responde "o que existe no acervo" — com filtros por fluxo, execução,
-    formato e texto, e paginação.
+    Unlike `get_run_artifacts`, which answers "what did THIS run generate",
+    this one answers "what exists in the collection" — with filters by
+    workflow, run, format and text, and pagination.
 
-    `kind` recorta entre `execution` (saída de execução) e `publication`
-    (camadas publicadas no portal).
+    `kind` slices between `execution` (run output) and `publication` (layers
+    published on the portal).
 
-    Cada item diz se dá para baixar (`available`). **Um artefato indisponível
-    não é erro**: conteúdo que ficou no executor e nunca subiu para a nuvem
-    aparece com `available: false` e a explicação, porque ele existe — o que não
-    existe é a possibilidade de baixá-lo por aqui.
+    Each item says whether it can be downloaded (`available`). **An unavailable
+    artifact is not an error**: content that stayed on the executor and never
+    went up to the cloud appears with `available: false` and the explanation,
+    because it exists — what does not exist is the possibility of downloading
+    it from here.
 
-    Nem todo item disponível traz link. `protected: true` marca o artefato cujo
-    download exige credencial pela aplicação, e ele sai com `available: true` e
-    **sem** URL: a URL pré-assinada é portadora, e assiná-la passaria por cima
-    justamente da credencial que a aplicação exige. O que falta ali é o direito,
-    não o conteúdo — e o `hint` de cada item diz qual dos casos é.
+    Not every available item comes with a link. `protected: true` marks an
+    artifact whose download requires a credential through the application, and
+    it comes out with `available: true` and **without** a URL: the presigned URL
+    is a bearer link, and signing it would bypass precisely the credential the
+    application requires. What is missing there is the right, not the content —
+    and each item's `hint` says which of the cases it is.
 
-    Artefatos de pin-cache ficam de fora: são estado interno do motor, não saída
-    que alguém pediu.
+    Pin-cache artifacts are left out: they are internal engine state, not
+    output that anyone asked for.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
     teto = max(1, min(int(limit), MAX_ARTEFATOS))
 
-    # A rota REST recusa `kind` fora do par com 422 (`pattern=` no `Query`); aqui
-    # não há Pydantic na borda, e o `if/elif` do núcleo não tem `else`: um valor
-    # errado — "publications" no plural, "Execution" com maiúscula — viraria
-    # "sem filtro", devolvendo o acervo INTEIRO sem nada dizer que o recorte foi
-    # ignorado. Quem pediu publicações leria execuções como publicações.
+    # The REST route refuses a `kind` outside the pair with 422 (`pattern=` in
+    # the `Query`); here there is no Pydantic at the edge, and the core's
+    # `if/elif` has no `else`: a wrong value — "publications" in the plural,
+    # "Execution" capitalized — would become "no filter", returning the ENTIRE
+    # collection without saying anything about the slice being ignored. Whoever
+    # asked for publications would read runs as publications.
     if kind is not None and kind not in RECORTES:
         raise erro(
             "validation",
@@ -445,13 +463,13 @@ async def list_artifacts(
         )
         alvo_workflow = None
         if workflow_id is not None:
-            # Resolvido aqui, e não passado cru ao núcleo, pelos mesmos dois
-            # motivos de `list_runs`: para que a tool aceite o NOME do workflow
-            # como todas as outras — é o que `docs/mcp.md` promete em
-            # "convenções de entrada, valendo para todas" —, e para que um id
-            # fora do alcance responda o mesmo "não encontrado" de sempre, em
-            # vez de uma lista vazia que o chamador leria como "nunca produziu
-            # nada".
+            # Resolved here, and not passed raw to the core, for the same two
+            # reasons as `list_runs`: so that the tool accepts the workflow's
+            # NAME like all the others — which is what `docs/mcp.md` promises
+            # in "Input conventions, applying to all of them" —, and so that an
+            # id out of reach answers with the usual "not found", instead of
+            # an empty list the caller would read as "never produced
+            # anything".
             wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
             exigir_papel(papel, ROLE_VIEWER, _MENSAGEM_PAPEL_LEITURA)
             alvo_workflow = wf.id_hash
@@ -476,9 +494,9 @@ async def list_artifacts(
     for bruto in pagina["items"]:
         local = bruto.get("content_location") or "minio"
         chave = bruto.get("s3_key")
-        # Duas condições, como em `get_run_artifacts`: sem `s3_key` não há
-        # objeto a assinar, mesmo que a localidade diga "minio" — artefato
-        # antigo ou gravação interrompida.
+        # Two conditions, as in `get_run_artifacts`: without `s3_key` there is
+        # no object to sign, even if the location says "minio" — an old
+        # artifact or an interrupted write.
         disponivel = local != "executor" and bool(chave)
         protegido = bool(bruto.get("protected"))
 
@@ -494,11 +512,11 @@ async def list_artifacts(
             "is_published": bruto["is_published"],
             "content_location": local,
             "created_at": bruto["created_at"],
-            # `content_expires_at`, e não `expires_at`: na tool irmã
-            # `get_run_artifacts` essa chave é o prazo do LINK, e aqui seria o
-            # da retenção do arquivo. Duas coisas com ordens de grandeza
-            # diferentes — minutos contra dias — sob o mesmo nome fariam um
-            # cliente concluir que o link dura uma semana.
+            # `content_expires_at`, and not `expires_at`: in the sibling tool
+            # `get_run_artifacts` that key is the LINK's deadline, and here it
+            # would be the file's retention. Two things with different orders
+            # of magnitude — minutes versus days — under the same name would
+            # make a client conclude that the link lasts a week.
             "content_expires_at": bruto["expires_at"],
             "available": disponivel,
         }
@@ -511,10 +529,11 @@ async def list_artifacts(
             item["hint"] = _por_que_sem_link(local, disponivel, protegido)
 
         itens.append(item)
-        # Texto de gente, na mesma ordem dos itens. `output_key` entra aqui
-        # junto dos outros dois: é o rótulo que a pessoa escreveu no nó de
-        # saída, não um valor que a plataforma gera — e no topo ele escaparia
-        # do `higienizar` do `envelope`. É o que `get_run_artifacts` já faz.
+        # Human text, in the same order as the items. `output_key` goes in
+        # here together with the other two: it is the label the person wrote
+        # on the output node, not a value the platform generates — and at the
+        # top level it would escape the `envelope`'s `higienizar`. That is
+        # what `get_run_artifacts` already does.
         nomes.append({
             "filename": bruto["filename"],
             "workflow_name": bruto["workflow_name"],
@@ -535,7 +554,7 @@ async def list_artifacts(
 
 
 def _por_que_sem_link(local: str, disponivel: bool, protegido: bool) -> str:
-    """UMA explicação, em cascata — a mais específica que couber."""
+    """ONE explanation, cascading — the most specific one that fits."""
     if local == "executor":
         return (
             "o conteúdo deste artefato permanece no executor e nunca foi enviado para a "
@@ -547,7 +566,7 @@ def _por_que_sem_link(local: str, disponivel: bool, protegido: bool) -> str:
 
 
 def registrar(server) -> None:
-    """Registra as tools deste domínio."""
+    """Registers this domain's tools."""
     server.tool(
         name="list_workflow_versions",
         title="Histórico de versões",

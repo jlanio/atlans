@@ -13,14 +13,14 @@ from executor.sync.pool import em_thread_io
 
 logger = logging.getLogger("executor.sync")
 
-# Mesmo chunk do uploader: escrever em pedacos de 64 KB fazia um salto de thread
-# a cada 64 KB de raster.
+# Same chunk as the uploader: writing in 64 KB pieces caused a thread hop
+# every 64 KB of raster.
 _CHUNK = 1024 * 1024
 
 
 @dataclass
 class RemoteFileInfo:
-    """Metadados de um arquivo remoto no Drive."""
+    """Metadata of a remote file in Drive."""
     id_hash: str
     original_name: str
     extension: str
@@ -31,7 +31,7 @@ class RemoteFileInfo:
 
 
 class DriveDownloader:
-    """Baixa arquivos do Drive do Workspace via pre-signed URLs."""
+    """Downloads files from the Workspace Drive via pre-signed URLs."""
 
     def __init__(self, server_url: str, executor_id: str, workspace_id: str):
         from executor.utils import ws_to_http, mtls_httpx_kwargs
@@ -42,17 +42,17 @@ class DriveDownloader:
         self._http = ClienteHTTP(self._httpx_kwargs)
 
     async def aclose(self):
-        """Fecha o cliente HTTP compartilhado (chamado no shutdown do manager)."""
+        """Closes the shared HTTP client (called at manager shutdown)."""
         await self._http.aclose()
 
     def _headers(self) -> dict:
-        """Sem headers de auth — identidade vem do cert mTLS."""
+        """No auth headers — identity comes from the mTLS cert."""
         return {}
 
     async def list_remote(self) -> list[RemoteFileInfo] | None:
         """
-        Lista arquivos do workspace no Drive.
-        Retorna lista ou None em caso de erro.
+        Lists the workspace's files in Drive.
+        Returns a list, or None on error.
         """
         try:
             resp = await self._http().get(
@@ -103,13 +103,14 @@ class DriveDownloader:
                 logger.warning("Resposta sem download_url para '%s'.", id_hash)
                 return False
 
-            # 2. Download streaming direto do MinIO.
-            #    A gravacao vai para o pool de I/O, espelhando o `_aiter_file`
-            #    do uploader: com `f.write()` sincrono na corrotina, baixar um
-            #    raster grande segurava o event loop, o heartbeat de 30s
-            #    atrasava e a conexao caia com 4408 — matando o run em curso. E
-            #    e o pool de I/O, nao o pesado: la o zip/validate de outro
-            #    dataset parava este download por minutos.
+            # 2. Streaming download straight from MinIO.
+            #    The write goes to the I/O pool, mirroring the uploader's
+            #    `_aiter_file`: with a synchronous `f.write()` in the coroutine,
+            #    downloading a large raster held the event loop, the 30s
+            #    heartbeat lagged and the connection dropped with 4408 — killing
+            #    the run in progress. And it's the I/O pool, not the heavy one:
+            #    there, another dataset's zip/validate stalled this download for
+            #    minutes.
             tmp_path = dest_path.with_suffix(dest_path.suffix + ".tmp")
             async with cliente.stream("GET", download_url) as stream:
                 if stream.status_code != 200:
@@ -120,7 +121,7 @@ class DriveDownloader:
                     async for chunk in stream.aiter_bytes(chunk_size=_CHUNK):
                         await em_thread_io(f.write, chunk)
 
-            # Entre volumes o rename vira copia — nao pode ficar no loop.
+            # Across volumes the rename becomes a copy — it can't stay on the loop.
             await em_thread_io(os.replace, str(tmp_path), str(dest_path))
             logger.info("Arquivo '%s' baixado para '%s'.", id_hash[:8], dest_path.name)
             return True

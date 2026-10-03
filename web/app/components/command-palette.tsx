@@ -20,15 +20,15 @@ interface CommandItem {
   icon: React.ElementType
   action: () => void
   group: string
-  // Itens só do administrador do sistema. Dashboard, Usuários e Configurações
-  // são rotas de admin: sem esta marca a paleta os oferecia a todos e só o
-  // portão barrava — um caminho que terminava em redirect.
+  // Items for the system administrator only. Dashboard, Users and Settings
+  // are admin routes: without this mark the palette offered them to everyone and
+  // only the gate blocked — a path that ended in a redirect.
   //
-  // HOJE a marca não muda nada: quem não é admin só alcança a Home (`proxy.ts`
-  // devolve `/` em toda outra página), e na Home a paleta não abre para ele
-  // (`paletaDisponivel`) — ele nunca a vê. Ela fica para o dia em que uma rota
-  // for reaberta a quem não é admin (a exceção entra em `proxy.ts`): aí a
-  // paleta volta a abrir para ele, e estes três continuam só do admin.
+  // TODAY the mark changes nothing: a non-admin only reaches the Home (`proxy.ts`
+  // returns `/` on every other page), and on the Home the palette does not open
+  // for them (`paletaDisponivel`) — they never see it. It stays for the day a
+  // route is reopened to non-admins (the exception goes into `proxy.ts`): then
+  // the palette opens for them again, and these three stay admin-only.
   admin?: boolean
 }
 
@@ -46,33 +46,34 @@ export const STATIC_ITEMS = (router: ReturnType<typeof useRouter>): CommandItem[
   { id: "new-workflow",   label: "Novo workflow",    icon: TbPlus,            group: "Ações",      action: () => router.push("/workflow/create"), description: "Criar" },
 ]
 
-// Esconde os itens de admin de quem não é admin. Puro e exportado para teste — a
-// regra de visibilidade não depende de render nem de sessão. No-op enquanto
-// quem não é admin não tiver paleta (ver a marca `admin` acima).
+// Hides admin items from non-admins. Pure and exported for testing — the
+// visibility rule depends on neither render nor session. No-op as long as
+// non-admins have no palette (see the `admin` mark above).
 export function itensVisiveis(itens: CommandItem[], isAdmin: boolean): CommandItem[] {
   return itens.filter(item => !item.admin || isAdmin)
 }
 
 /**
- * A paleta abre aqui? A Home (`/`) não OFERECE saída a quem não administra o
- * sistema — é a direção do dono, que já fechou a marca do sidebar e a linha de
- * Agendamentos.
+ * Does the palette open here? The Home (`/`) does not OFFER a way out to those
+ * who do not administer the system — it is the owner's direction, which already
+ * closed off the sidebar brand and the Schedules line.
  *
- * Por que não abrir, em vez de filtrar item a item: HOJE **todo** item daqui sai
- * da Home. Os oito estáticos não-admin levam a outras rotas, e os dinâmicos são
- * um por fluxo (`/workflow/{id}`) e um por credencial (`/credentials`) — estes
- * nem passam pela `itensVisiveis`. Filtrar deixaria uma caixa vazia, que é pior
- * do que não abrir. De brinde, o `loadItems` não roda: some o `getWorkflows()`
- * que disparava a cada Ctrl+K na Home.
+ * Why not open, instead of filtering item by item: TODAY **every** item here
+ * leaves the Home. The eight static non-admin ones lead to other routes, and the
+ * dynamic ones are one per workflow (`/workflow/{id}`) and one per credential
+ * (`/credentials`) — these do not even go through `itensVisiveis`. Filtering
+ * would leave an empty box, which is worse than not opening. As a bonus,
+ * `loadItems` does not run: gone is the `getWorkflows()` that fired on every
+ * Ctrl+K on the Home.
  *
- * Isto NÃO é controle de acesso: quem barra é o `proxy.ts`, que hoje devolve
- * `/` a quem não é admin em TODA página fora da Home. Então, por enquanto,
- * quem não é admin nunca vê a paleta — aqui ela não abre, e fora daqui ele não
- * chega. O que esta função decide é a OFERTA, e ela volta a importar quando
- * uma rota for reaberta a quem não é admin.
+ * This is NOT access control: what blocks is `proxy.ts`, which today returns
+ * `/` to non-admins on EVERY page outside the Home. So, for now, a non-admin
+ * never sees the palette — here it does not open, and outside here they do not
+ * get. What this function decides is the OFFER, and it matters again when a
+ * route is reopened to non-admins.
  *
- * Igualdade EXATA com `"/"`, nunca `startsWith` — o precedente é o
- * `shell-sidebar.tsx`, onde um prefixo casaria todas as rotas do app.
+ * EXACT equality with `"/"`, never `startsWith` — the precedent is
+ * `shell-sidebar.tsx`, where a prefix would match every app route.
  */
 export function paletaDisponivel(pathname: string | null | undefined, isAdmin: boolean): boolean {
   return pathname !== "/" || isAdmin
@@ -89,29 +90,29 @@ export default function CommandPalette() {
   const [selected, setSelected] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Detecta se estamos no editor de workflow (canvas)
+  // Detects whether we are in the workflow editor (canvas)
   const isOnCanvas = pathname?.includes("/workflow/")
   const disponivel = paletaDisponivel(pathname, isAdmin)
 
-  // Carrega itens dinâmicos ao abrir
+  // Loads dynamic items on open
   const loadItems = useCallback(async () => {
     const staticItems = itensVisiveis(STATIC_ITEMS(router), isAdmin)
     if (status !== "authenticated") { setItems(staticItems); return }
 
-    // Credenciais e catálogo de nós vêm da workflowCatalogStore: são globais do
-    // usuário e ficam em memória com TTL. Antes, cada Ctrl+K rebaixava o
-    // catálogo inteiro (~100 KB) e a lista de credenciais que o canvas ao lado
-    // acabara de buscar. Só a lista de workflows é volátil o bastante para
-    // valer um GET por abertura.
+    // Credentials and the node catalog come from workflowCatalogStore: they are
+    // global to the user and stay in memory with a TTL. Before, every Ctrl+K
+    // re-downloaded the whole catalog (~100 KB) and the credential list the
+    // canvas next to it had just fetched. Only the workflow list is volatile
+    // enough to be worth a GET per open.
     const catalogo = useWorkflowCatalogStore.getState()
     const [wfRes, credenciais, nosDoCatalogo] = await Promise.all([
-      // Com os do assistente: a paleta é o atalho para abrir um fluxo pelo
-      // nome, e não achar o que o assistente criou é o mesmo que não o ter.
+      // Including the assistant's: the palette is the shortcut to open a workflow
+      // by name, and not finding what the assistant created is the same as not having it.
       GisFlowService.getWorkflows(undefined, { incluirDoAssistente: true }),
-      // A busca pode falhar (rede/sessão): a paleta segue útil com os itens
-      // estáticos, então cada lista cai para vazia em vez de derrubar o resto.
+      // The fetch may fail (network/session): the palette stays useful with the
+      // static items, so each list falls back to empty instead of bringing down the rest.
       catalogo.ensureCredentials().catch(() => []),
-      // Fora do canvas os nós não viram item da paleta — não vale baixá-los.
+      // Outside the canvas nodes do not become palette items — not worth downloading them.
       isOnCanvas ? catalogo.ensureNodesAPI().catch(() => []) : Promise.resolve([]),
     ])
 
@@ -119,8 +120,8 @@ export default function CommandPalette() {
       id: `wf-${wf.id_hash}`,
       label: wf.name,
       description: wf.description ?? undefined,
-      // A faísca no lugar da pasta distingue o que o assistente criou, do
-      // mesmo jeito que o selo nas listas — aqui não há espaço para um selo.
+      // The spark instead of the folder distinguishes what the assistant created,
+      // the same way as the badge in the lists — here there is no room for a badge.
       icon: wf.origem === "assistente" ? TbSparkles : TbFolders,
       group: "Workflows",
       action: () => router.push(`/workflow/${wf.id_hash}`),
@@ -134,7 +135,7 @@ export default function CommandPalette() {
       action: () => router.push("/credentials"),
     }))
 
-    // Nós do workflow — só aparece no canvas
+    // Workflow nodes — only appear on the canvas
     const nodeItems: CommandItem[] = isOnCanvas
       ? nosDoCatalogo.map(node => ({
           id: `node-${node.name}`,
@@ -151,30 +152,30 @@ export default function CommandPalette() {
     setItems([...staticItems, ...(isOnCanvas ? nodeItems : []), ...wfItems, ...credItems])
   }, [router, status, isOnCanvas, isAdmin])
 
-  // Atalho global Ctrl+K. `disponivel` é dependência de propósito: ele vira no
-  // máximo uma vez por sessão (quando o `useSession` resolve), então re-registrar
-  // o listener aí é irrelevante perto do que este arquivo evita a cada TECLA
-  // (os refs de `filtered`/`selected`, abaixo).
+  // Global Ctrl+K shortcut. `disponivel` is a dependency on purpose: it flips at
+  // most once per session (when `useSession` resolves), so re-registering the
+  // listener then is irrelevant next to what this file avoids on every KEYSTROKE
+  // (the `filtered`/`selected` refs, below).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
-        // O `preventDefault` fica: sem ele o Ctrl+K do navegador rouba o foco
-        // para a barra de endereço, o que na Home seria um prêmio esquisito por
-        // um atalho que não faz nada.
+        // The `preventDefault` stays: without it the browser's Ctrl+K steals focus
+        // to the address bar, which on the Home would be an odd reward for a
+        // shortcut that does nothing.
         e.preventDefault()
         if (!disponivel) return
         setOpen(v => !v)
       }
-      // Fechar nunca depende de nada: um Esc preso é pior que qualquer regra.
+      // Closing never depends on anything: a stuck Esc is worse than any rule.
       if (e.key === "Escape") setOpen(false)
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [disponivel])
 
-  // Aberta em outra rota e a pessoa navegou para a Home (o `router.push` de um
-  // item, ou qualquer navegação client-side): fecha. Sem isto, a paleta podia
-  // sobreviver à chegada na Home.
+  // Opened on another route and the person navigated to the Home (an item's
+  // `router.push`, or any client-side navigation): it closes. Without this, the
+  // palette could survive the arrival on the Home.
   useEffect(() => {
     if (!disponivel) setOpen(false)
   }, [disponivel])
@@ -188,22 +189,22 @@ export default function CommandPalette() {
     }
   }, [open, loadItems])
 
-  // Memoizado: sem isso filtered seria um array novo a cada render e, como dep
-  // do effect de teclado abaixo, forçaria remove/addEventListener a cada tecla.
+  // Memoized: without it filtered would be a new array on every render and, as a
+  // dep of the keyboard effect below, would force remove/addEventListener on every keystroke.
   const filtered = useMemo(() => items.filter(item => {
     if (!query) return true
     const q = query.toLowerCase()
     return item.label.toLowerCase().includes(q) || item.description?.toLowerCase().includes(q) || item.group.toLowerCase().includes(q)
   }), [items, query])
 
-  // Refs para o handler de teclado ler filtered/selected sem virar dependência
-  // do effect — o listener registra uma vez por abertura, não a cada render.
+  // Refs so the keyboard handler reads filtered/selected without becoming a
+  // dependency of the effect — the listener registers once per open, not every render.
   const filteredRef = useRef(filtered)
   const selectedRef = useRef(selected)
   filteredRef.current = filtered
   selectedRef.current = selected
 
-  // Navegação com teclado
+  // Keyboard navigation
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
@@ -218,9 +219,9 @@ export default function CommandPalette() {
     return () => window.removeEventListener("keydown", onKey)
   }, [open])
 
-  // groups e o índice global de cada item derivam de filtered num único passe:
-  // push (não spread) evita o O(n²) do reduce, e o Map troca o filtered.indexOf
-  // (O(n²) no render) por consulta O(1) por item.
+  // groups and each item's global index derive from filtered in a single pass:
+  // push (not spread) avoids the reduce's O(n²), and the Map replaces
+  // filtered.indexOf (O(n²) in render) with an O(1) lookup per item.
   const { groups, indexOf } = useMemo(() => {
     const groups: Record<string, CommandItem[]> = {}
     const indexOf = new Map<CommandItem, number>()
@@ -243,7 +244,7 @@ export default function CommandPalette() {
         className="w-full max-w-lg bg-popover border border-border rounded-lg shadow-lg overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
-        {/* Campo de busca */}
+        {/* Search field */}
         <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
           <TbSearch size={16} className="text-muted-foreground shrink-0" />
           <input
@@ -261,9 +262,9 @@ export default function CommandPalette() {
           <span className="text-[10px] text-muted-foreground border border-border rounded px-1.5 py-0.5">Esc</span>
         </div>
 
-        {/* Resultados — semântica de listbox: o contêiner é a lista, cada item é
-            uma opção com `aria-selected`, e os grupos viram `role="group"` para
-            o leitor de tela anunciar a faixa ("Navegar", "Workflows"…). */}
+        {/* Results — listbox semantics: the container is the list, each item is
+            an option with `aria-selected`, and the groups become `role="group"` so
+            the screen reader announces the band ("Navegar", "Workflows"…). */}
         <div className="max-h-80 overflow-y-auto py-1.5" role="listbox" aria-label="Resultados da busca">
           {filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">Nenhum resultado para «{query}»</p>
@@ -275,7 +276,7 @@ export default function CommandPalette() {
                     {group}
                   </p>
                   {groupItems.map(item => {
-                    // Índice global via Map O(1) (antes era filtered.indexOf, O(n²))
+                    // Global index via an O(1) Map (it used to be filtered.indexOf, O(n²))
                     const globalIdx = indexOf.get(item)!
                     return (
                       <button
@@ -286,8 +287,8 @@ export default function CommandPalette() {
                         onMouseEnter={() => setSelected(globalIdx)}
                         onClick={() => { item.action(); setOpen(false) }}
                         className={cn(
-                          // Movimento sob motion-safe: e alvo ≥40px no telefone; foco
-                          // visível com o ring padrão do contrato.
+                          // Motion under motion-safe: and a ≥40px target on the phone; visible
+                          // focus with the contract's standard ring.
                           "w-full flex items-center gap-3 px-3 py-2 text-left outline-none motion-safe:transition-colors max-md:min-h-10 focus-visible:ring-[3px] focus-visible:ring-ring/50",
                           globalIdx === selected ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
                         )}
@@ -309,7 +310,7 @@ export default function CommandPalette() {
           )}
         </div>
 
-        {/* Rodapé com dica */}
+        {/* Footer with hint */}
         <div className="border-t border-border px-3 py-1.5 flex gap-3 text-[10px] text-muted-foreground">
           <span>↑↓ navegar</span>
           <span>↵ selecionar</span>

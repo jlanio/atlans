@@ -9,9 +9,9 @@ import type { FieldProps } from "./types"
 
 type ArtifactFieldProps = FieldProps
 
-/** O seletor mostra os mais recentes, não o histórico inteiro: baixar todos os
- *  artefatos do usuário só para escolher um prendia o modal do nó até a lista
- *  completa chegar. */
+/** The picker shows the most recent ones, not the whole history: downloading
+ *  all of the user's artifacts just to pick one held the node modal until the
+ *  complete list arrived. */
 const LIMITE = 50
 
 const ArtifactField = ({ field, values, setNodeField }: ArtifactFieldProps) => {
@@ -19,15 +19,15 @@ const ArtifactField = ({ field, values, setNodeField }: ArtifactFieldProps) => {
   const [items, setItems] = useState<IArtifactItem[]>([])
   const [loading, setLoading] = useState(false)
   const [truncado, setTruncado] = useState(false)
-  // A lista não chegou: o aviso de "nenhum artefato" seria uma afirmação falsa.
+  // The list didn't arrive: the "no artifacts" notice would be a false statement.
   const [falhou, setFalhou] = useState(false)
 
   async function fetchArtifacts() {
     if (!workspace) return
     setLoading(true)
-    // O recorte por workspace é do SERVIDOR: filtrar no cliente obrigava a
-    // baixar os artefatos de todos os workspaces do usuário para descartar
-    // quase tudo.
+    // The per-workspace slice is done by the SERVER: filtering on the client
+    // meant downloading the artifacts of all of the user's workspaces only to
+    // discard almost everything.
     const res = await GisFlowService.getArtifacts({
       workspace_id: workspace.id_hash,
       limit: LIMITE,

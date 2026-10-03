@@ -1,8 +1,8 @@
 /**
- * A Home em três idiomas — o que o dicionário e as funções puras garantem:
- * as mesmas chaves nos três (o `typeof pt` já cobra na compilação; aqui é a
- * rede em tempo de execução, incluindo o que é `Record`), nenhum texto vazio,
- * e o português idêntico ao de antes nas funções que ganharam idioma.
+ * The Home in three languages — what the dictionary and the pure functions guarantee:
+ * the same keys in all three (`typeof pt` already enforces it at compile time; here it is the
+ * runtime net, including what is a `Record`), no empty text,
+ * and Portuguese identical to before in the functions that gained a language.
  */
 import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
@@ -21,7 +21,7 @@ import type { Anexo } from "@/app/stores/homeStore"
 const rota = vi.hoisted(() => ({ atual: "/" }))
 vi.mock("next/navigation", () => ({ usePathname: () => rota.atual }))
 
-/** Todas as folhas (caminho → valor), descendo em objetos e listas. */
+/** All leaves (path → value), descending into objects and lists. */
 function folhas(valor: unknown, caminho = ""): Array<[string, unknown]> {
   if (valor && typeof valor === "object") {
     return Object.entries(valor).flatMap(([k, v]) => folhas(v, caminho ? `${caminho}.${k}` : k))
@@ -98,12 +98,12 @@ describe("confirmação, etapa e erros", () => {
     const erro = { code: "loop_limit", message: "A conversa passou de 28 rodadas…", teto: 28 }
     expect(textoDoErro(erro, "en").message).toBe("The chat went past 28 tool rounds without finishing.")
     expect(textoDoErro(erro, "es").message).toContain("28")
-    // Sem teto no quadro (backend antigo): a frase sem número.
+    // No ceiling in the frame (old backend): the sentence without a number.
     expect(textoDoErro({ code: "loop_limit", message: "…" }, "en").message).not.toMatch(/\d/)
   })
 
   it("textoDoErro: a cota diária não vira 'espere um instante'", () => {
-    // `rate_limited` no stream é a cota DIÁRIA; o 429 da rota é outro código.
+    // `rate_limited` in the stream is the DAILY quota; the route's 429 is another code.
     const cota = { code: "rate_limited", message: "Você atingiu a cota diária do assistente.", hint: "a cota reabre…" }
     expect(textoDoErro(cota, "en")).toEqual({
       message: "You’ve used up the assistant’s daily quota.",
@@ -115,7 +115,7 @@ describe("confirmação, etapa e erros", () => {
   })
 
   it("textoDoErro: a conversa travada por outra aba sai no idioma", () => {
-    // A trava da conversa (assistente_service.trava_exclusiva) — recusa fixa do servidor.
+    // The conversation lock (assistente_service.trava_exclusiva) — a fixed server refusal.
     const trava = {
       code: "conversa_em_andamento",
       message: "Já há uma conversa em andamento para este fluxo.",

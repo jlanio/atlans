@@ -1,19 +1,19 @@
 // web/app/components/home/assistente/stream.ts
 //
-// A leitura do stream do assistente, em um lugar só.
+// Reading the assistant stream, in one place.
 //
-// Os dois consumidores — `useAssistente` (Home) e `useAssistenteEditor` (gaveta
-// do editor) — nasceram um fork do outro, e as cópias já tinham divergido: a do
-// editor não soltava o leitor no `finally`, e um "Parar" (ou a troca de fluxo)
-// que abortava a leitura no meio deixava a conexão pendurada até o servidor
-// desistir sozinho.
+// The two consumers — `useAssistente` (Home) and `useAssistenteEditor` (editor
+// drawer) — were born as forks of each other, and the copies had already
+// diverged: the editor's did not release the reader in `finally`, and a "Parar"
+// (or switching workflows) that aborted the read midway left the connection
+// hanging until the server gave up on its own.
 //
-// O que é de cada hook fica nele: a rota e o corpo do POST, o quadro `conversa`,
-// o replay e a confirmação (só a Home) — e a tabela de status de
-// `erroDaResposta`, que difere DE PROPÓSITO entre as duas rotas e por isso entra
-// aqui por parâmetro.
+// What belongs to each hook stays in it: the route and the POST body, the
+// `conversa` frame, the replay and the confirmation (Home only) — and the
+// `erroDaResposta` status table, which differs ON PURPOSE between the two routes
+// and so comes in here as a parameter.
 //
-// Decodificar os quadros e aplicá-los ao turno é de `quadros.ts`, puro.
+// Decoding the frames and applying them to the turn belongs to `quadros.ts`, pure.
 import type { Dispatch, SetStateAction } from "react"
 
 import type { IAssistenteEstado } from "@/service/types"
@@ -25,7 +25,7 @@ import {
   type TurnoDoAssistente,
 } from "./quadros"
 
-/** O erro do turno que a rede cortou: o `fetch` rejeitou ou o stream rompeu. */
+/** The error of a turn the network cut: the `fetch` rejected or the stream broke. */
 export const SEM_CONEXAO = {
   code: "sem_conexao",
   message: "A conversa foi interrompida.",
@@ -33,10 +33,10 @@ export const SEM_CONEXAO = {
 }
 
 let sequencia = 0
-/** Id de turno — chave de render e alvo de `aplicarNoTurno`. Único na aba. */
+/** Turn id — render key and target of `aplicarNoTurno`. Unique within the tab. */
 export const proximoIdDeTurno = () => `t${++sequencia}`
 
-/** Aplica um quadro ao turno `id`, sem tocar nos outros. */
+/** Applies a frame to turn `id`, without touching the others. */
 export function aplicarNoTurno(
   setTurnos: Dispatch<SetStateAction<TurnoDoAssistente[]>>,
   id: string,
@@ -46,10 +46,11 @@ export function aplicarNoTurno(
 }
 
 /**
- * O quadro `cota` não é bloco de turno: é o acumulado da janela, cobrado a cada
- * resposta do modelo, e sobe o gasto no estado — o donut anda DURANTE o turno.
- * O prazo fica o que era: a releitura do `/estado` ao fim do turno é quem o
- * atualiza. Devolve se o quadro era de cota (e já foi tratado).
+ * The `cota` frame is not a turn block: it is the window's running total,
+ * charged on each model response, and it raises the spend in the state — the
+ * donut moves DURING the turn. The deadline stays as it was: rereading `/estado`
+ * at the end of the turn is what updates it. Returns whether the frame was a
+ * quota frame (and has already been handled).
  */
 export function aplicarCota(
   setEstado: Dispatch<SetStateAction<IAssistenteEstado | null>>,
@@ -64,11 +65,11 @@ export function aplicarCota(
 }
 
 /**
- * Lê o `text/event-stream` até o fim, entregando cada quadro COMPLETO a
- * `tratar` — um quadro partido entre dois `read()` espera o resto.
+ * Reads the `text/event-stream` to the end, handing each COMPLETE frame to
+ * `tratar` — a frame split between two `read()` calls waits for the rest.
  *
- * Rejeita com o erro da leitura: o `AbortError` do "Parar" e a queda de rede
- * chegam a quem chamou, que decide o que cada um vira no turno.
+ * Rejects with the read error: the "Parar" `AbortError` and a network drop
+ * reach the caller, which decides what each one becomes in the turn.
  */
 export async function lerQuadrosSSE(
   corpo: ReadableStream<Uint8Array>,
@@ -76,45 +77,45 @@ export async function lerQuadrosSSE(
 ): Promise<void> {
   const leitor = corpo.getReader()
   const decodificar = criarDecodificador()
-  // `stream: true` no decodificador de texto pelo mesmo motivo do de quadros:
-  // um caractere de vários bytes (e o português é cheio deles) pode nascer num
-  // `read()` e terminar no seguinte.
+  // `stream: true` on the text decoder for the same reason as the frame one:
+  // a multi-byte character (and Portuguese is full of them) can start in one
+  // `read()` and end in the next.
   const utf8 = new TextDecoder()
   try {
     for (;;) {
       const { done, value } = await leitor.read()
       if (done) {
-        // O `decode()` final esvazia o que sobrou de um caractere partido no
-        // último pedaço. Na prática o stream termina no `\n\n` do `fim`, mas
-        // depender disso seria depender do formato do quadro.
+        // The final `decode()` flushes what was left of a character split in the
+        // last chunk. In practice the stream ends at the `\n\n` of `fim`, but
+        // relying on that would be relying on the frame format.
         for (const quadro of decodificar(utf8.decode())) tratar(quadro)
         return
       }
       for (const quadro of decodificar(utf8.decode(value, { stream: true }))) tratar(quadro)
     }
   } finally {
-    // Solta o leitor mesmo quando o abort (ou um quadro que o `tratar` não
-    // digeriu) corta a leitura no meio — senão a conexão fica pendurada até o
-    // servidor desistir sozinho.
+    // Release the reader even when the abort (or a frame `tratar` could not
+    // digest) cuts the read midway — otherwise the connection hangs until the
+    // server gives up on its own.
     await leitor.cancel().catch(() => {})
   }
 }
 
-/** O código e a frase de cada status que a rota recusa ANTES de virar stream. */
+/** The code and the sentence for each status the route rejects BEFORE becoming a stream. */
 export type ErrosDaRota = Record<number, { code: string; message: string }>
 
 /**
- * O corpo de erro da API quando a resposta nem chegou a virar stream.
+ * The API error body when the response did not even become a stream.
  *
- * A forma é `{error, message, status_code}` (`app/core/utils/error_handlers.py`),
- * e o 503 do assistente desligado vem com `detail`: a frase do servidor, quando
- * há, vence a da tabela. O que não puder ser lido vira a frase da tabela (ou um
- * "A API respondeu N." honesto) em vez de "undefined".
+ * The shape is `{error, message, status_code}` (`app/core/utils/error_handlers.py`),
+ * and the 503 for the disabled assistant comes with `detail`: the server's
+ * sentence, when present, wins over the table's. What cannot be read becomes the
+ * table's sentence (or an honest "A API respondeu N.") instead of "undefined".
  *
- * `padroes` é a tabela da ROTA, e as duas diferem de propósito: o 429 da Home é
- * `muitas_requisicoes` porque, no stream dela, `rate_limited` é a cota DIÁRIA;
- * o 409 do editor é a conversa em andamento no fluxo, o da Home é a
- * confirmação que expirou.
+ * `padroes` is the ROUTE's table, and the two differ on purpose: the Home's 429
+ * is `muitas_requisicoes` because, in its stream, `rate_limited` is the DAILY
+ * quota; the editor's 409 is the conversation in progress on the workflow, the
+ * Home's is the confirmation that expired.
  */
 export async function erroDaResposta(resposta: Response, padroes: ErrosDaRota): Promise<Record<string, unknown>> {
   const padrao = padroes[resposta.status] ?? { code: "erro_http", message: `A API respondeu ${resposta.status}.` }

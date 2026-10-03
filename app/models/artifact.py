@@ -5,18 +5,18 @@ from app.models.base import Base
 
 
 class Artifact(Base):
-    """Artefato produzido por um nó DataOutput durante a execução de um workflow."""
+    """Artifact produced by a DataOutput node during a workflow run."""
     __tablename__ = "artifacts"
     __table_args__ = (
         Index("ix_artifact_workspace_created", "workspace_id", "created_at"),
         Index("ix_artifact_run_id", "run_id"),
-        # Um pin-cache por (workflow, nó). A duplicata nascia em
-        # `_upsert_pin_artifact` quando dois runs do mesmo fluxo terminavam
-        # juntos, e a partir dela toda leitura encontrava duas linhas.
+        # One pin cache per (workflow, node). The duplicate was born in
+        # `_upsert_pin_artifact` when two runs of the same workflow finished
+        # together, and from then on every read found two rows.
         #
-        # Parcial porque só a linha FIXADA é única: o mesmo nó produz um
-        # artefato normal por execução, e esses podem repetir à vontade.
-        # `node_id` nulo fica de fora sozinho — `NULL <> NULL` no índice.
+        # Partial because only the PINNED row is unique: the same node produces
+        # a regular artifact per run, and those may repeat freely.
+        # A null `node_id` is left out on its own — `NULL <> NULL` in the index.
         Index(
             "uq_artifact_pin_por_no",
             "workflow_hash",
@@ -34,42 +34,42 @@ class Artifact(Base):
     # Escopo
     workspace_id  = Column(String(36), nullable=False, index=True)
     workflow_hash = Column(String(36), nullable=True, index=True)
-    run_id        = Column(String(36), nullable=True)   # id da execução
+    run_id        = Column(String(36), nullable=True)   # run id
     node_id       = Column(String(255), nullable=True)
 
-    # Metadados do artefato
-    output_key    = Column(String(255), nullable=False)   # label definido no nó
+    # Artifact metadata
+    output_key    = Column(String(255), nullable=False)   # label defined on the node
     filename      = Column(String(512), nullable=False)
     format        = Column(String(32), nullable=True)     # geojson, json, csv, …
     size_bytes    = Column(BigInteger, nullable=True)
-    features      = Column(Integer, nullable=True)        # número de features (GeoDataFrame)
-    s3_key           = Column(String(1024), nullable=True)   # key no MinIO
+    features      = Column(Integer, nullable=True)        # number of features (GeoDataFrame)
+    s3_key           = Column(String(1024), nullable=True)   # key in MinIO
     # Nome SQL "executor_id" (renomeada em 20260716_0001); atributo Python
     # mantido como executor_id ate R2.3.
-    executor_id         = Column("executor_id", String(36), nullable=True)     # id_hash do executor que produziu
+    executor_id         = Column("executor_id", String(36), nullable=True)     # id_hash of the executor that produced it
 
-    # ── Localidade do conteudo (LGPD) ─────────────────────────────────────────
-    # 'minio'    — o objeto esta no storage; s3_key preenchida (o caso de sempre).
-    # 'executor' — os bytes NUNCA sairam da maquina do executor. s3_key e NULL e
-    #              `local_path` diz onde o arquivo esta, relativo ao
-    #              EXECUTOR_ARTIFACTS_DIR daquele executor. O download pela
-    #              plataforma nao existe: servir o arquivo exigiria trazer o
-    #              conteudo ate o servidor, que e exatamente o que a marcacao
-    #              proibe. `executor_id` (derivado de run.host, fonte confiavel)
-    #              identifica qual maquina o tem.
+    # ── Content locality (LGPD) ───────────────────────────────────────────────
+    # 'minio'    — the object is in storage; s3_key filled in (the usual case).
+    # 'executor' — the bytes NEVER left the executor's machine. s3_key is NULL
+    #              and `local_path` says where the file is, relative to that
+    #              executor's EXECUTOR_ARTIFACTS_DIR. Download through the
+    #              platform does not exist: serving the file would require
+    #              bringing the content to the server, which is exactly what
+    #              the marker forbids. `executor_id` (derived from run.host, a
+    #              trusted source) identifies which machine has it.
     content_location = Column(String(16), nullable=False, server_default=text("'minio'"))
     local_path       = Column(String(1024), nullable=True)
 
-    # Controle de acesso ao download
-    credential_id = Column(String(36), nullable=True)     # se definido → download exige token
+    # Download access control
+    credential_id = Column(String(36), nullable=True)     # if set → download requires a token
 
-    # Portal de compartilhamento
+    # Sharing portal
     is_published   = Column(Boolean, nullable=False, server_default=text("false"))
     publish_config = Column(JSON, nullable=True)
 
     # Pin cache
     is_pinned = Column(Boolean, nullable=False, server_default=text("false"))
 
-    # Retenção
+    # Retention
     created_at  = Column(DateTime, server_default=func.now(), nullable=False, index=True)
-    expires_at  = Column(DateTime, nullable=True)         # null = não expira
+    expires_at  = Column(DateTime, nullable=True)         # null = does not expire

@@ -1,8 +1,8 @@
 # tests/integration/test_workflow_contract.py
 """
-Testes de contrato HTTP para o workflows_router.
-Verificam que cada endpoint retorna o status code esperado — não testam lógica de negócio.
-Objetivo: garantir que refatorações (Fase 2+) não alterem os contratos HTTP.
+HTTP contract tests for workflows_router.
+They check that each endpoint returns the expected status code — they do not test business logic.
+Goal: ensure refactorings (Phase 2+) do not change the HTTP contracts.
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock
@@ -41,12 +41,12 @@ def _fake_workflow(id_hash="wf-abc123", workspace_id="ws-test-001"):
 @pytest.fixture
 def override_workflow_deps(client):
     """
-    Injeta mocks do WorkflowService e do acesso ao workflow.
-    Retorna (client, mock_service) para que os testes possam configurar comportamentos.
+    Injects mocks of WorkflowService and of the workflow access.
+    Returns (client, mock_service) so the tests can configure behaviors.
 
-    Todas as rotas `/{id_hash}` pedem `workflow_com_papel(minimo)`, que se
-    apoia em `get_accessible_workflow_with_role`: trocar esta troca o
-    (workflow, papel) de todas, e a comparação do papel continua valendo.
+    Every `/{id_hash}` route asks for `workflow_com_papel(minimo)`, which
+    relies on `get_accessible_workflow_with_role`: swapping this one swaps the
+    (workflow, role) for all of them, and the role comparison still applies.
     """
     from app.main import app
     from app.api.dependencies import (
@@ -97,8 +97,8 @@ class TestReadWorkflow:
         assert res.status_code == 200
 
     async def test_returns_404_when_not_found(self, client):
-        """Sem override do acesso ao workflow: usa a implementação real, que
-        levanta 404 antes de consultar o papel (o `db` nem é tocado)."""
+        """No override of the workflow access: uses the real implementation, which
+        raises 404 before looking up the role (`db` is not even touched)."""
         from unittest.mock import MagicMock
 
         from app.main import app
@@ -128,7 +128,7 @@ class TestReadWorkflow:
         app.dependency_overrides.pop(get_db, None)
 
 
-# ── Exclusão ───────────────────────────────────────────────────────────────────
+# ── Deletion ───────────────────────────────────────────────────────────────────
 
 class TestDeleteWorkflow:
     async def test_returns_200(self, override_workflow_deps):
@@ -142,7 +142,7 @@ class TestDeleteWorkflow:
         svc.delete_workflow.assert_called_once()
 
 
-# ── Versões ────────────────────────────────────────────────────────────────────
+# ── Versions ───────────────────────────────────────────────────────────────────
 
 class TestWorkflowVersions:
     async def test_list_versions_returns_200(self, override_workflow_deps):
@@ -156,14 +156,14 @@ class TestWorkflowVersions:
         assert isinstance(res.json(), list)
 
 
-# ── Execução manual (canvas / UI) ──────────────────────────────────────────────
+# ── Manual execution (canvas / UI) ─────────────────────────────────────────────
 
 class TestExecuteWorkflow:
-    """Contrato do endpoint POST /workflows/{id_hash}/execute — usado pelo
-    botão Executar no canvas. Aceita `inputs` e `debug_mode`; é o caminho
-    autenticado (role operator+) para qualquer workflow ativo, independente
-    do tipo de trigger. Contrasta com /webhook/execute/{id}, que só aceita
-    workflows com WebhookTrigger."""
+    """Contract of the POST /workflows/{id_hash}/execute endpoint — used by the
+    Run button on the canvas. Accepts `inputs` and `debug_mode`; it is the
+    authenticated path (role operator+) for any active workflow, regardless of
+    the trigger type. Contrasts with /webhook/execute/{id}, which only accepts
+    workflows with a WebhookTrigger."""
 
     async def test_returns_202_with_task_id(self, override_workflow_deps):
         ac, svc = override_workflow_deps

@@ -1,11 +1,12 @@
 // desktop/src/renderer/components/Ajustes.tsx
 //
-// Configuração de execução — o que antes só existia como variáveis no `.env`.
+// Execution settings — what used to exist only as variables in `.env`.
 //
-// Os limites vêm de `shared/limites.ts`, o espelho dos de `executor/config.py`,
-// e isso importa: o Python descarta em SILÊNCIO um valor fora da faixa e cai no
-// default. Sem a validação aqui, a tela mostraria 500 workers e o executor
-// rodaria com 4, sem nada explicando a diferença.
+// The limits come from `shared/limites.ts`, the mirror of those in
+// `executor/config.py`, and that matters: Python SILENTLY discards an
+// out-of-range value and falls back to the default. Without the validation
+// here, the screen would show 500 workers and the executor would run with 4,
+// with nothing explaining the difference.
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   TbAlertTriangle, TbBug, TbCertificate, TbFolder, TbFolderOpen, TbInfoCircle,
@@ -32,7 +33,7 @@ const NIVEIS: Array<{ v: NivelLog; r: string; d: string }> = [
   { v: 'ERROR', r: 'Só falhas', d: 'Silêncio até algo dar errado.' },
 ]
 
-// ── Peças ────────────────────────────────────────────────────────────────────
+// ── Building blocks ──────────────────────────────────────────────────────────
 
 function Secao({
   icone, titulo, descricao, children,
@@ -44,9 +45,9 @@ function Secao({
 }) {
   return (
     <Card>
-      {/* `CardHeader` é grid: `flex-row` não o tornava flex, e o ícone caía
-          numa linha inteira ACIMA do título — um glifo solto no canto. O que
-          acompanha o título mora DENTRO de `CardTitle`. */}
+      {/* `CardHeader` is a grid: `flex-row` did not make it flex, and the icon
+          dropped onto a whole row ABOVE the title — a stray glyph in the
+          corner. Whatever accompanies the title lives INSIDE `CardTitle`. */}
       <CardHeader className="gap-1 px-6">
         <CardTitle className="flex min-w-0 items-center gap-2 text-base font-medium">
           <span className="shrink-0 text-muted-foreground">{icone}</span>
@@ -69,24 +70,26 @@ function Numero({
   aoMudar: (v: number) => void
 }) {
   const invalido = !dentroDaFaixa(valor, { padrao, min, max })
-  // Sem teto quando o executor não impõe um (o tempo limite): dizer "entre 1 e
-  // 86400" seria inventar uma regra que ele não tem.
+  // No ceiling when the executor does not impose one (the timeout): saying
+  // "between 1 and 86400" would invent a rule it does not have.
   const faixa = max === null ? `um valor a partir de ${min}` : `entre ${min} e ${max}`
   const alterado = Number.isFinite(valor) && valor !== padrao
-  // `<label>` sem `htmlFor` ao lado de `<input>` sem `id` não associa nada: os
-  // três campos numéricos desta tela chegavam ao leitor de tela como "caixa de
-  // rotação, sem nome". O id vem do rótulo, que é estável e único na tela.
+  // A `<label>` without `htmlFor` next to an `<input>` without `id` associates
+  // nothing: the three numeric fields on this screen reached the screen reader
+  // as "spin button, unnamed". The id comes from the label, which is stable
+  // and unique on the screen.
   const id = `ajuste-${rotulo.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-2">
         <label htmlFor={id} className="text-sm font-medium">{rotulo}</label>
-        {/* "Voltar ao padrão" só aparece quando há o que voltar — um link
-            permanente sugeriria que o valor atual é anormal. */}
-        {/* O system.md proíbe botão ad-hoc por escrito, e a variante `link` do
-            Button existe exatamente para isto — com o anel de foco de graça,
-            que a versão à mão não tinha. */}
+        {/* "Voltar ao padrão" (reset to default) only appears when there is
+            something to reset — a permanent link would suggest the current
+            value is abnormal. */}
+        {/* system.md forbids ad-hoc buttons in writing, and the `link` variant of
+            Button exists exactly for this — with the focus ring for free,
+            which the hand-made version did not have. */}
         {alterado && (
           <Button
             type="button" variant="link" size="sm"
@@ -98,10 +101,10 @@ function Numero({
         )}
       </div>
       <div className="flex items-center gap-2">
-        {/* `ui/input.tsx`, e não mais uma cópia à mão das mesmas classes: a
-            invalidez passa por `aria-invalid`, que o primitivo já pinta E que
-            é o que um leitor de tela anuncia — antes o erro existia só como
-            borda vermelha. */}
+        {/* `ui/input.tsx`, and no longer a hand-made copy of the same classes:
+            invalidity goes through `aria-invalid`, which the primitive
+            already paints AND which is what a screen reader announces —
+            before, the error existed only as a red border. */}
         <Input
           id={id}
           type="number" min={min} max={max ?? undefined} value={Number.isFinite(valor) ? valor : ''}
@@ -114,9 +117,9 @@ function Numero({
         />
         {sufixo && <span className="text-sm text-muted-foreground">{sufixo}</span>}
       </div>
-      {/* `id` casando com o `aria-describedby` do campo: a mensagem de faixa
-          inválida passa a ser lida junto com o valor, em vez de existir só
-          como um parágrafo vermelho abaixo. */}
+      {/* `id` matching the field's `aria-describedby`: the invalid-range
+          message is now read along with the value, instead of existing only
+          as a red paragraph below. */}
       <span
         id={`${id}-ajuda`}
         className={cn('text-xs leading-relaxed', invalido ? 'text-destructive' : 'text-muted-foreground')}
@@ -129,7 +132,7 @@ function Numero({
   )
 }
 
-/** Campo de caminho com "Abrir" ao lado — abrir e editar no mesmo lugar. */
+/** Path field with "Abrir" (Open) next to it — open and edit in the same place. */
 function Caminho({
   valor, aoMudar, aoAbrir, aoEscolher, motivoBloqueio,
 }: {
@@ -138,11 +141,11 @@ function Caminho({
   aoAbrir: () => void
   aoEscolher?: () => void
   /**
-   * Quando presente, "Abrir" fica desabilitado com este motivo.
+   * When present, "Abrir" (Open) is disabled with this reason.
    *
-   * O main só abre caminhos que ELE conhece (ver a allowlist em index.ts), e um
-   * caminho digitado mas ainda não salvo não está lá — sem isto, o botão
-   * simplesmente não faria nada, que é o pior desfecho possível.
+   * The main process only opens paths that IT knows (see the allowlist in
+   * index.ts), and a path typed but not yet saved is not there — without this,
+   * the button would simply do nothing, which is the worst possible outcome.
    */
   motivoBloqueio?: string
 }) {
@@ -173,15 +176,15 @@ function Caminho({
   )
 }
 
-// ── Iniciar com o Windows ────────────────────────────────────────────────────
+// ── Start with Windows ───────────────────────────────────────────────────────
 
 /**
- * Interruptor do autostart.
+ * Autostart toggle.
  *
- * Mostra mais que um "ligado/desligado" porque o Windows tem mais que dois
- * estados aqui: a entrada pode existir no registro e ainda assim não executar,
- * se o usuário desativou o item em Gerenciador de Tarefas → Inicializar. Um
- * checkbox marcado nesse caso seria mentira. Ver `main/ui/autostart.ts`.
+ * Shows more than an "on/off" because Windows has more than two states here:
+ * the entry may exist in the registry and still not run, if the user disabled
+ * the item in Task Manager → Startup. A checked checkbox in that case would be
+ * a lie. See `main/ui/autostart.ts`.
  */
 function Autostart({ estado, aoAlternar }: {
   estado: EstadoAutostart | null
@@ -247,15 +250,16 @@ function Autostart({ estado, aoAlternar }: {
 }
 
 /**
- * Espaço livre do disco onde os artefatos são gravados.
+ * Free space on the disk where artifacts are written.
  *
- * Não é o disco do sistema: a pasta é configurável e pode estar em outra
- * unidade. Vale a tela porque com localidade local (LGPD) o artefato tem uma
- * cópia só, e ela está aqui — disco cheio deixa de ser inconveniente e vira
- * perda de dado do cliente.
+ * It is not the system disk: the folder is configurable and may be on another
+ * drive. It earns its place on the screen because with local locality (LGPD)
+ * the artifact has a single copy, and it is here — a full disk stops being an
+ * inconvenience and becomes loss of customer data.
  *
- * Lê o snapshot do contexto: é o único trecho desta tela que muda a cada
- * segundo, e como prop ele arrastava a tela inteira junto. Ver lib/snapshot.ts.
+ * Reads the snapshot from the context: it is the only part of this screen that
+ * changes every second, and as a prop it dragged the whole screen along. See
+ * lib/snapshot.ts.
  */
 function Disco({ rodando }: { rodando: boolean }) {
   const snapshot = useSnapshot()
@@ -263,8 +267,9 @@ function Disco({ rodando }: { rodando: boolean }) {
   const total = snapshot?.artifacts_disk_total_gb
   const nivel = nivelDoDisco(livre)
 
-  // A métrica vem do executor, com o snapshot. Parado, não há o que mostrar —
-  // e inventar um "—" com barra cinza sugeriria um problema de leitura.
+  // The metric comes from the executor, with the snapshot. When stopped, there
+  // is nothing to show — and inventing a "—" with a gray bar would suggest a
+  // read problem.
   if (!rodando || nivel == null || typeof livre !== 'number') {
     return (
       <span className="mt-1 text-xs text-muted-foreground">
@@ -316,12 +321,12 @@ function Disco({ rodando }: { rodando: boolean }) {
 }
 
 /**
- * Alias local do `Alerta` compartilhado, na forma densa.
+ * Local alias of the shared `Alerta`, in the dense form.
  *
- * Esta tela tinha a própria cópia do padrão — mesmo desenho, outro padding e
- * outro tamanho de texto que os do App e do GeoSync. O mesmo tipo de evento
- * aparecia com peso visual diferente conforme a aba, e o `role="alert"` teria
- * de ser acrescentado três vezes.
+ * This screen had its own copy of the pattern — same design, different padding
+ * and text size from those of App and GeoSync. The same kind of event appeared
+ * with different visual weight depending on the tab, and `role="alert"` would
+ * have had to be added three times.
  */
 function Aviso({ tom, children }: { tom: 'erro' | 'aviso'; children: React.ReactNode }) {
   return <Alerta tom={tom} denso titulo={<span className="font-normal select-text">{children}</span>} />
@@ -330,16 +335,16 @@ function Aviso({ tom, children }: { tom: 'erro' | 'aviso'; children: React.React
 // ── Tela ─────────────────────────────────────────────────────────────────────
 
 /**
- * `memo` pelo mesmo motivo do GeoSync: a tela fica MONTADA atrás de `hidden`
- * para não perder edição não salva, e sem a fronteira o snapshot de 1 Hz
- * redesenhava todos os cartões dela mesmo com a aba invisível.
+ * `memo` for the same reason as GeoSync: the screen stays MOUNTED behind
+ * `hidden` so unsaved edits are not lost, and without the boundary the 1 Hz
+ * snapshot redrew all its cards even with the tab invisible.
  */
 export const Ajustes = memo(function Ajustes({
   info, rodando, aoMudarPendencia,
 }: {
   info: InfoApp | null
   rodando: boolean
-  /** Avisa o shell que há alterações não salvas, para marcar a navegação. */
+  /** Tells the shell there are unsaved changes, so it can mark the navigation. */
   aoMudarPendencia?: (pendente: boolean) => void
 }) {
   const [cfg, setCfg] = useState<ConfigExecucao | null>(null)
@@ -356,9 +361,9 @@ export const Ajustes = memo(function Ajustes({
     void window.atlas.autostart().then(setAutostart)
   }, [carregar])
 
-  // Ver a nota equivalente em GeoSync: derivado, e não avisado a cada edição, e
-  // calculado UMA vez por render — antes eram quatro `JSON.stringify` por
-  // render, num componente que renderizava uma vez por segundo.
+  // See the equivalent note in GeoSync: derived, rather than reported on every
+  // edit, and computed ONCE per render — before, it was four `JSON.stringify`
+  // per render, in a component that rendered once per second.
   const sujo = useMemo(
     () => Boolean(cfg) && JSON.stringify(cfg) !== JSON.stringify(original),
     [cfg, original],
@@ -382,8 +387,9 @@ export const Ajustes = memo(function Ajustes({
   }
 
   return (
-    // O `pb-16` abre espaço para a barra de ações não cobrir o último cartão, e
-    // só existe quando ela existe — senão sobra um vão no fim da página.
+    // The `pb-16` makes room so the action bar does not cover the last card, and
+    // only exists when the bar exists — otherwise a gap is left at the end of
+    // the page.
     <div className={cn('flex flex-col gap-4', (sujo || salvo) && 'pb-16')}>
       <Secao
         icone={<TbPower size={18} />}

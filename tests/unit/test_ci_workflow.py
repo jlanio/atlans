@@ -1,64 +1,63 @@
 # tests/unit/test_ci_workflow.py
 """
-O CI tem de rodar em TODO pull request, qualquer que seja o alvo.
+CI has to run on EVERY pull request, whatever the target.
 
-Em 15/09/2026 um PR empilhado sobre outro — dois PRs tocando os mesmos quatro
-arquivos, o segundo aberto contra a branch do primeiro — chegou a
-pronto-para-mesclar com **zero verificações**. O gatilho era
-`pull_request: branches: [main]`, então nenhum job foi acionado; e o GitHub
-mostra um PR sem checks como `clean`, que na lista é indistinguível de "tudo
-verde". O dono perguntou se podia mesclar, e a resposta honesta só apareceu
-porque alguém foi conferir.
+On 2026-09-15 a PR stacked on top of another — two PRs touching the same four
+files, the second opened against the first one's branch — reached
+ready-to-merge with **zero checks**. The trigger was
+`pull_request: branches: [main]`, so no job was triggered; and GitHub shows a
+PR without checks as `clean`, which in the list is indistinguishable from "all
+green". The owner asked whether it could be merged, and the honest answer only
+showed up because someone went to check.
 
-Retargetear depois não resolve: a mudança de base emite `edited`, que não está
-nas ações padrão do gatilho (`opened`, `synchronize`, `reopened`). A única
-saída era empurrar um commit de verdade só para acordar o CI.
+Retargeting afterwards doesn't fix it: the base change emits `edited`, which is
+not among the trigger's default actions (`opened`, `synchronize`, `reopened`).
+The only way out was to push a real commit just to wake CI up.
 
-Estes testes são de coerência de configuração, no mesmo espírito de
-`test_traefik_config.py` e `test_docs_mcp.py`: baratos em CI, e cobrem uma
-falha que nenhum teste de aplicação alcança — porque a falha é a AUSÊNCIA de
-testes rodando.
+These tests are configuration-consistency tests, in the same spirit as
+`test_traefik_config.py` and `test_docs_mcp.py`: cheap in CI, and they cover a
+failure no application test reaches — because the failure is the ABSENCE of
+tests running.
 """
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
-# Import direto, e NÃO `pytest.importorskip`. PyYAML chega pelo `owslib==0.35.0`,
-# que é dependência direta e pinada do `requirements.in` — o job Backend o
-# instala e o teste roda de verdade. Se um dia o `owslib` sair, um
-# `importorskip` faria este arquivo passar a SER PULADO em silêncio, e a
-# invariante que ele existe para proteger sumiria sem sinal nenhum. Um erro de
-# coleta é barulhento, e barulhento é o que se quer quando um guarda para de
-# funcionar.
+# Direct import, and NOT `pytest.importorskip`. PyYAML comes in via `owslib==0.35.0`,
+# which is a direct, pinned dependency in `requirements.in` — the Backend job
+# installs it and the test really runs. If `owslib` ever goes away, an
+# `importorskip` would make this file start BEING SKIPPED silently, and the
+# invariant it exists to protect would vanish without any signal. A collection
+# error is noisy, and noisy is what you want when a guard stops working.
 import yaml
 
 RAIZ = Path(__file__).resolve().parents[2]
 CI = RAIZ / ".github" / "workflows" / "ci.yml"
 DEPENDABOT = RAIZ / ".github" / "dependabot.yml"
-# `.yml` e `.yaml`: o GitHub roda os dois. As actions compostas locais (hoje não
-# há nenhuma) entram porque os passos delas rodam no mesmo runner.
+# `.yml` and `.yaml`: GitHub runs both. Local composite actions (there are none
+# today) are included because their steps run on the same runner.
 WORKFLOWS = sorted([*(RAIZ / ".github" / "workflows").glob("*.y*ml")])
 ACOES_LOCAIS = sorted([*(RAIZ / ".github").glob("actions/**/action.y*ml")])
 
 
 def _gatilhos(caminho: Path) -> dict:
-    """A seção `on:` de um workflow.
+    """The `on:` section of a workflow.
 
-    Cuidado do YAML 1.1, que o PyYAML implementa: `on` sem aspas é lido como o
-    BOOLEANO `True`, não como a string `"on"`. Um `carregado["on"]` daria
-    `KeyError` e o teste passaria a falhar por um motivo que não é o dele.
+    A YAML 1.1 pitfall, which PyYAML implements: unquoted `on` is read as the
+    BOOLEAN `True`, not as the string `"on"`. A `carregado["on"]` would give
+    `KeyError` and the test would start failing for a reason that isn't its own.
     """
     carregado = yaml.safe_load(caminho.read_text())
     return carregado.get("on") or carregado.get(True)
 
 
 def test_o_CI_roda_em_pull_request_de_qualquer_alvo():
-    """A invariante que custou um PR sem verificação nenhuma.
+    """The invariant that cost a PR with no checks at all.
 
-    `pull_request:` precisa existir e **não** pode ter `branches`. Com filtro,
-    um PR contra qualquer branch fora da lista não aciona job nenhum e aparece
-    como `clean`.
+    `pull_request:` has to exist and must **not** have `branches`. With a filter,
+    a PR against any branch outside the list triggers no job and shows up
+    as `clean`.
     """
     gatilhos = _gatilhos(CI)
 
@@ -71,28 +70,28 @@ def test_o_CI_roda_em_pull_request_de_qualquer_alvo():
 
 
 def test_o_CI_continua_rodando_no_push_da_main():
-    """O contraponto: tirar o filtro do PR não pode ter tirado o push."""
+    """The counterpoint: removing the PR filter must not have removed push."""
     empurrao = _gatilhos(CI)["push"]
 
     assert empurrao["branches"] == ["main"]
 
 
 def test_os_jobs_continuam_declarados_com_os_nomes_de_sempre():
-    """Os nomes que o dono confere antes de mesclar.
+    """The names the owner checks before merging.
 
-    A asserção é de igualdade EXATA, e não de substring: com `in`, renomear
-    `Backend (Python)` para `Backend2 (Python)` passava — medido por mutação.
-    Nome de job não é detalhe aqui, é o contrato com quem revisa: o critério de
-    merge desta equipe é "os quatro verdes", conferido pelo nome na lista do
-    PR — mais a auditoria de dependências, que só informa (ver o teste
-    seguinte). Renomear é legítimo; renomear sem atualizar este teste, e sem
-    reparar que o hábito de quem revisa mudou junto, não é.
+    The assertion is EXACT equality, not substring: with `in`, renaming
+    `Backend (Python)` to `Backend2 (Python)` passed — measured by mutation.
+    The job name is not a detail here, it is the contract with the reviewer: this
+    team's merge criterion is "the four green", checked by name in the PR's list
+    — plus the dependency audit, which is informational only (see the next test).
+    Renaming is legitimate; renaming without updating this test, and without
+    noticing that the reviewer's habit changed along with it, is not.
 
-    O quinto e o sexto entraram com as extensões (lotes E1 e E2 da preparação
-    para software livre): "Backend sem extensões (núcleo)" e "Frontend sem
-    extensões (núcleo)" rodam as suítes com as extensões apagadas, como a
-    distribuição livre as roda, em jobs paralelos para não alongar os de cima.
-    Desde então, "os seis verdes".
+    The fifth and sixth came in with the extensions (batches E1 and E2 of the
+    open-source preparation): "Backend sem extensões (núcleo)" and "Frontend sem
+    extensões (núcleo)" run the suites with the extensions deleted, as the free
+    distribution runs them, in parallel jobs so as not to lengthen the ones above.
+    Since then, "the six green".
     """
     jobs = yaml.safe_load(CI.read_text())["jobs"]
     nomes = {j.get("name", chave) for chave, j in jobs.items()}
@@ -109,14 +108,15 @@ def test_os_jobs_continuam_declarados_com_os_nomes_de_sempre():
 
 
 def test_a_auditoria_de_dependencias_so_informa():
-    """Por ora ela não bloqueia: todo passo do job, fora os de preparo (checkout,
-    setup-* e a instalação das ferramentas), tem `continue-on-error`, e o job
-    fica verde mesmo com achado — que sai como aviso e no resumo da execução.
+    """For now it doesn't block: every step of the job, except the setup ones
+    (checkout, setup-* and the tools installation), has `continue-on-error`, and
+    the job stays green even with a finding — which comes out as a warning and in
+    the run summary.
 
-    A regra é por exclusão, não por nome de ferramenta: um passo novo que audite
-    de outro jeito (uma action, outro scanner) também precisa declarar a chave,
-    ou tornaria a auditoria bloqueante sem ninguém ter decidido. Tirar a chave
-    de propósito é a decisão, e ela passa por aqui.
+    The rule is by exclusion, not by tool name: a new step that audits another
+    way (an action, another scanner) also has to declare the key, or it would
+    make the audit blocking without anyone having decided. Removing the key on
+    purpose is the decision, and it goes through here.
     """
     job = yaml.safe_load(CI.read_text())["jobs"]["audit"]
     preparo = ("actions/checkout@", "actions/setup-python@", "actions/setup-node@")
@@ -132,15 +132,15 @@ def test_a_auditoria_de_dependencias_so_informa():
 
 
 def test_o_dependabot_segue_conservador():
-    """Versão nova no máximo uma vez por mês, e só depois de 14 dias publicada
-    (30 para versão maior), em todos os ecossistemas.
+    """A new version at most once a month, and only after 14 days published
+    (30 for a major version), in every ecosystem.
 
-    É a defesa contra ataque à cadeia de suprimentos: versão maliciosa costuma
-    ser descoberta e retirada em horas ou poucos dias, e quem atualiza assim que
-    ela sai é quem a instala. Voltar ao semanal, encurtar a quarentena ou tirar
-    um pacote dela (`cooldown.exclude`) é uma decisão, e ela passa por aqui.
-    Correção de segurança não segue este arquivo (vem pelas "Dependabot
-    security updates"), então não espera.
+    It is the defense against supply-chain attacks: a malicious version is usually
+    discovered and pulled within hours or a few days, and whoever updates as soon
+    as it comes out is who installs it. Going back to weekly, shortening the
+    quarantine or taking a package out of it (`cooldown.exclude`) is a decision,
+    and it goes through here. Security fixes don't follow this file (they come via
+    "Dependabot security updates"), so they don't wait.
     """
     atualizacoes = yaml.safe_load(DEPENDABOT.read_text())["updates"]
     assert atualizacoes, "o dependabot.yml ficou sem configuração nenhuma"
@@ -165,9 +165,9 @@ def test_o_dependabot_segue_conservador():
 
     assert frouxas == [], frouxas
 
-    # O Dependabot recusa o arquivo INTEIRO — e para de propor atualização em
-    # todos os ecossistemas — se um deles usa chave que não aceita. Medido: para
-    # actions, `semver-*-days` dá "The property ... is not supported for the
+    # Dependabot rejects the WHOLE file — and stops proposing updates in every
+    # ecosystem — if one of them uses a key it doesn't accept. Measured: for
+    # actions, `semver-*-days` gives "The property ... is not supported for the
     # package ecosystem 'github-actions'".
     sem_semver = {"github-actions"}
     invalidas = [
@@ -179,9 +179,9 @@ def test_o_dependabot_segue_conservador():
 
 
 def _passos(caminho: Path):
-    """Todo passo de um workflow ou de uma action composta local — e todo job
-    que chama um workflow reutilizável — como o GitHub os lê: pelo YAML, e não
-    linha a linha (`- {uses: ...}`, recuos e aspas diferentes contam igual)."""
+    """Every step of a workflow or of a local composite action — and every job
+    that calls a reusable workflow — as GitHub reads them: through the YAML, not
+    line by line (`- {uses: ...}`, different indentation and quotes count the same)."""
     doc = yaml.safe_load(caminho.read_text()) or {}
     for nome, job in (doc.get("jobs") or {}).items():
         if job.get("uses"):
@@ -193,14 +193,14 @@ def _passos(caminho: Path):
 
 
 def test_as_actions_estao_fixadas_por_sha():
-    """Toda action de terceiros vai pelo SHA do commit, com a versão no
-    comentário (`dono/action@<40 hex> # vX.Y.Z`).
+    """Every third-party action goes by commit SHA, with the version in the
+    comment (`dono/action@<40 hex> # vX.Y.Z`).
 
-    Uma tag (`@v4`) pode ser movida para outro código pelo dono da action — ou
-    por quem roubar a conta dele. Foi o ataque ao tj-actions/changed-files, em
-    mar/2025: as tags passaram a apontar para um commit que despejava os
-    segredos do runner no log. Um SHA não se move. O Dependabot atualiza o SHA e
-    o comentário juntos, com a mesma quarentena das outras dependências.
+    A tag (`@v4`) can be moved to other code by the action's owner — or by
+    whoever steals their account. That was the attack on tj-actions/changed-files,
+    in Mar/2025: the tags started pointing to a commit that dumped the runner's
+    secrets into the log. A SHA doesn't move. Dependabot updates the SHA and the
+    comment together, with the same quarantine as the other dependencies.
     """
     soltas = []
     for arquivo in [*WORKFLOWS, *ACOES_LOCAIS]:
@@ -220,10 +220,10 @@ def test_as_actions_estao_fixadas_por_sha():
 
 
 def test_o_CI_so_le_o_repositorio():
-    """No ci.yml o token é só de leitura, no topo e em cada job; em todos os
-    workflows o checkout não guarda o token no .git/config. Um script de
-    instalação malicioso (npm, pip) roda dentro desses jobs: não pode encontrar
-    ali credencial que escreva no repositório."""
+    """In ci.yml the token is read-only, at the top and in each job; in every
+    workflow the checkout doesn't keep the token in .git/config. A malicious
+    install script (npm, pip) runs inside these jobs: it must not find there a
+    credential that can write to the repository."""
     ci = yaml.safe_load(CI.read_text())
     assert ci.get("permissions") == {"contents": "read"}
 
@@ -250,9 +250,9 @@ def test_o_CI_so_le_o_repositorio():
 
 
 def _comandos(run: str):
-    """Os comandos de um `run:` como o shell os vê: a barra no fim da linha
-    junta a seguinte, comentário cai fora, e `&&`, `||`, `;`, `|` e quebra de
-    linha separam um comando do outro."""
+    """The commands of a `run:` as the shell sees them: a backslash at the end of the
+    line joins the next one, comments drop out, and `&&`, `||`, `;`, `|` and line
+    breaks separate one command from another."""
     texto = re.sub(r"\\\n", " ", run)
     texto = "\n".join(re.sub(r"(^|\s)#.*$", r"\1", linha) for linha in texto.splitlines())
     for comando in re.split(r"&&|\|\||[;|\n]", texto):
@@ -270,11 +270,11 @@ def _eh_pip_install(tokens: list[str]) -> bool:
 
 
 def test_todo_pip_install_dos_workflows_confere_hash():
-    """Nenhum `pip install` do CI/CD instala sem `--require-hashes` — conferido
-    comando a comando, não por linha: `pip install --upgrade pip && pip install
-    --require-hashes ...` ainda deixaria o primeiro entrar sem hash. Pacote sem
-    conferência, e com as dependências na versão mais nova do dia, é justamente
-    a porta que os locks com hash fecharam. Vale para qualquer passo novo."""
+    """No CI/CD `pip install` installs without `--require-hashes` — checked
+    command by command, not by line: `pip install --upgrade pip && pip install
+    --require-hashes ...` would still let the first one in without a hash. An
+    unchecked package, with dependencies at the day's newest version, is precisely
+    the door the hashed lockfiles closed. Applies to any new step."""
     soltos = [
         f"{arquivo.name}:{job}: {' '.join(tokens)}"
         for arquivo in [*WORKFLOWS, *ACOES_LOCAIS]
@@ -286,11 +286,11 @@ def test_todo_pip_install_dos_workflows_confere_hash():
 
 
 def test_os_hooks_do_pre_commit_usam_as_ferramentas_travadas():
-    """Os hooks rodam na máquina de quem commita. Todos são `repo: local` com
-    `language: system`: usam o pre-commit, o detect-secrets e os
-    pre-commit-hooks do requirements-dev.txt (com hash e quarentena). Um
-    repositório remoto — mesmo fixado por SHA — faz o pre-commit montar um
-    ambiente próprio, resolvendo as dependências no PyPI na hora e sem hash."""
+    """The hooks run on the committer's machine. All of them are `repo: local` with
+    `language: system`: they use pre-commit, detect-secrets and the
+    pre-commit-hooks from requirements-dev.txt (with hashes and quarantine). A
+    remote repository — even pinned by SHA — makes pre-commit build its own
+    environment, resolving the dependencies from PyPI on the spot and without hashes."""
     config = yaml.safe_load((RAIZ / ".pre-commit-config.yaml").read_text())
     fora = []
     for repo in config["repos"]:
@@ -315,11 +315,11 @@ RELEASE_DESKTOP = RAIZ / ".github" / "workflows" / "desktop-windows.yml"
 
 
 def test_o_release_do_desktop_remonta_o_runtime_e_isola_os_segredos():
-    """O runtime Python vai, assinado, para a máquina do usuário. Ele não pode
-    vir do cache do Actions (que código de qualquer job da main consegue
-    envenenar) — só o tarball, que o `python:fetch` confere pelo SHA-256. E o
-    token de escrita e os segredos de assinatura só entram no passo do
-    electron-builder, não no build do app (tsc, esbuild, vite: terceiros)."""
+    """The Python runtime goes, signed, to the user's machine. It must not come
+    from the Actions cache (which code from any job on main can poison) — only
+    the tarball, which `python:fetch` checks by SHA-256. And the write token and
+    the signing secrets only get into the electron-builder step, not into the app
+    build (tsc, esbuild, vite: third parties)."""
     passos = [passo for _, passo in _passos(RELEASE_DESKTOP)]
 
     em_cache = [
@@ -339,18 +339,18 @@ def test_o_release_do_desktop_remonta_o_runtime_e_isola_os_segredos():
 
 
 def test_o_release_do_desktop_grava_os_enderecos_das_variaveis_do_repositorio():
-    """O código não traz o servidor nem a UI de instalação nenhuma: o build os
-    recebe das variáveis do repositório, e o feed do auto-update é o deste
-    repositório (cada fork publica e atualiza nas próprias releases)."""
+    """The code carries neither the server nor the UI of any installation: the build
+    receives them from the repository variables, and the auto-update feed is this
+    repository's (each fork publishes and updates in its own releases)."""
     passos = {passo.get("name"): passo for _, passo in _passos(RELEASE_DESKTOP)}
 
     env = passos["Compilar o app"].get("env") or {}
     assert env.get("ATLANS_DESKTOP_SERVIDOR") == "${{ vars.ATLANS_DESKTOP_SERVIDOR }}"
     assert env.get("ATLANS_DESKTOP_UI_URL") == "${{ vars.ATLANS_DESKTOP_UI_URL }}"
 
-    # O feed vai por env, e não por `-c.publish.owner=...` na linha de comando:
-    # o pwsh do runner Windows parte o argumento no primeiro ponto, e o
-    # electron-builder recebia `-c` e `.publish.owner=...` (build quebrado).
+    # The feed goes via env, not via `-c.publish.owner=...` on the command line:
+    # the Windows runner's pwsh splits the argument at the first dot, and
+    # electron-builder received `-c` and `.publish.owner=...` (broken build).
     gerar = passos["Gerar o instalador"]
     assert (gerar.get("env") or {}).get("ATLANS_RELEASES_DONO") == "${{ github.repository_owner }}"
     assert (gerar.get("env") or {}).get("ATLANS_RELEASES_REPO") == "${{ github.event.repository.name }}"

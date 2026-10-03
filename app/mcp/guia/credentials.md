@@ -1,9 +1,9 @@
-# Credenciais
+# Credentials
 
-**Nunca escreva segredo na definição.** O nó recebe `credential_id` com o UUID
-da credencial, e o servidor injeta o valor decifrado no momento do despacho —
-`connectionString` para os nós de banco, `http_auth` para o `HttpRequest` e para
-o `WFS` — removendo o id antes de executar.
+**Never write a secret into the definition.** The node receives `credential_id` with the
+credential's UUID, and the server injects the decrypted value at dispatch time —
+`connectionString` for the database nodes, `http_auth` for `HttpRequest` and for
+`WFS` — removing the id before executing.
 
 ```json
 { "id": "n1", "name": "DatabaseSpatialQuery", "type": "datasource",
@@ -11,17 +11,17 @@ o `WFS` — removendo o id antes de executar.
                   "query": "SELECT id, geom FROM lotes" } }
 ```
 
-Os UUIDs disponíveis saem de `list_credentials` (que devolve id, tipo, dono e
-validade — nunca o valor). `credential_id` que não é UUID é recusado antes de
-qualquer consulta ao banco, com o código `invalid_credential_id`.
+The available UUIDs come from `list_credentials` (which returns id, type, owner and
+expiry — never the value). A `credential_id` that is not a UUID is rejected before
+any database query, with the code `invalid_credential_id`.
 
-## WFS protegido
+## Protected WFS
 
-Um GeoServer com o módulo **authkey** pede a chave do usuário em cada
-requisição. Ela mora em Credenciais, no tipo `geoserver_authkey` (a chave, o
-nome do parâmetro — quase sempre `authkey` — e se vai na URL ou num
-cabeçalho); usuário e senha (Basic) moram no tipo `wfs`. No nó `WFS`, passe o
-id em `credential_id`, como em qualquer nó — nunca a chave na `url`:
+A GeoServer with the **authkey** module asks for the user's key on every
+request. It lives in Credenciais (Credentials), under the `geoserver_authkey` type (the key, the
+parameter name — almost always `authkey` — and whether it goes in the URL or in a
+header); username and password (Basic) live under the `wfs` type. In the `WFS` node, pass the
+id in `credential_id`, as in any node — never the key in the `url`:
 
 ```json
 { "id": "n1", "name": "WFS", "type": "datasource",
@@ -29,47 +29,47 @@ id em `credential_id`, como em qualquer nó — nunca a chave na `url`:
                   "credential_id": "3f2a7c18-5b90-4c2e-9a44-1d6f8e2b7c05" } }
 ```
 
-O segredo só vai ao endereço do nó: se o GetCapabilities anunciar outro host
-para buscar as feições, ou o servidor redirecionar para outro endereço, o nó
-recusa em vez de levar a chave para lá — a saída é usar no nó o endereço final.
-Credencial recusada pelo servidor (HTTP 401/403) para a execução na hora, sem
-novas tentativas: repetir uma senha errada pode bloquear a conta. A chave e a
-senha precisam ter ao menos 6 caracteres — abaixo disso não há como redigi-las
-nas mensagens de erro e nos logs, e a tela de Credenciais recusa ao gravar.
+The secret only goes to the node's address: if the GetCapabilities announces another host
+for fetching the features, or the server redirects to another address, the node
+refuses instead of taking the key there — the way out is to use the final address in the node.
+A credential rejected by the server (HTTP 401/403) stops the run right away, with no
+retries: repeating a wrong password can lock the account. The key and the
+password must have at least 6 characters — below that there is no way to redact them
+in error messages and logs, and the Credenciais screen rejects them on saving.
 
-## A borda recusa segredo
+## The edge rejects secrets
 
-Escrever `connectionString`, `http_auth`, `token`, `password`, `secret`,
-`api_key`, `authorization` ou `private_key` preenchidos — inclusive dentro de
-`headers` — faz as tools de escrita recusarem a definição com o erro
-`secret_in_definition`, listando os caminhos encontrados. A recusa vem **antes**
-da validação e antes de gravar qualquer coisa. Expressões (`{{ ... }}`,
-`$Alias.campo`) e o esquema de autenticação sozinho (`"Bearer"`) não contam
-como segredo.
+Writing `connectionString`, `http_auth`, `token`, `password`, `secret`,
+`api_key`, `authorization` or `private_key` filled in — including inside
+`headers` — makes the write tools reject the definition with the error
+`secret_in_definition`, listing the paths found. The rejection comes **before**
+validation and before anything is saved. Expressions (`{{ ... }}`,
+`$Alias.campo`) and the authentication scheme alone (`"Bearer"`) do not count
+as a secret.
 
-Isso vale também para o que você lê de volta: toda definition devolvida por
-uma tool sai redigida, com essas chaves substituídas por `<REDACTED>`.
+This also applies to what you read back: every definition returned by
+a tool comes out redacted, with those keys replaced by `<REDACTED>`.
 
-## Quem alcança o quê
+## Who can reach what
 
-A credencial precisa pertencer a quem dispara a execução, ou estar
-compartilhada com o workspace do fluxo. Se não resolver, os nós de banco, o
-`HttpRequest` e o `WFS` recusam antes de enviar.
+The credential must belong to whoever triggers the run, or be
+shared with the workflow's workspace. If it does not resolve, the database nodes,
+`HttpRequest` and `WFS` refuse before sending.
 
-Na validação há uma sutileza: credencial compartilhada com o workspace só
-entra no escopo para quem tem papel `operator` ou superior — o mesmo papel
-exigido para executar, porque a simulação do `DatabaseSpatialQuery` abre
-conexão real com o banco. Abaixo disso vale só o escopo do próprio usuário, e
-`report.hints` avisa.
+In validation there is a subtlety: a credential shared with the workspace only
+enters the scope for those with the `operator` role or higher — the same role
+required to execute, because the simulation of `DatabaseSpatialQuery` opens a
+real connection to the database. Below that, only the user's own scope applies, and
+`report.hints` warns about it.
 
-Alcançável não é usável. A validação também acusa, em `report.errors`, a
-credencial que a execução deixaria de fora em silêncio: de um tipo que o nó
-não aceita (`credential_type_mismatch` — um `postgresql` num nó `WFS`, por
-exemplo) ou vencida (`credential_expired`). Corrija antes de executar: o nó
-recusaria por "credencial não resolvida".
+Reachable is not usable. Validation also flags, in `report.errors`, the
+credential that the run would silently leave out: one of a type the node
+does not accept (`credential_type_mismatch` — a `postgresql` one on a `WFS` node, for
+example) or an expired one (`credential_expired`). Fix it before executing: the node
+would refuse with "credential not resolved".
 
-O `SaveToS3` usa o `credential_id` para a credencial `s3` (chave, segredo,
-região, bucket padrão e endpoint). Com ela escolhida e `registerArtifact`
-ligado, a cópia registrada fica sem token de proteção, e `report.warnings`
-avisa (`artifact_copy_unprotected`). Um `webhook_token` no mesmo campo protege
-a cópia, e o upload usa a cadeia padrão do boto3 no executor.
+`SaveToS3` uses `credential_id` for the `s3` credential (key, secret,
+region, default bucket and endpoint). With it selected and `registerArtifact`
+turned on, the registered copy is left without a protection token, and `report.warnings`
+warns about it (`artifact_copy_unprotected`). A `webhook_token` in the same field protects
+the copy, and the upload uses boto3's default chain on the executor.

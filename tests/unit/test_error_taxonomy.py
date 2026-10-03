@@ -1,7 +1,7 @@
 """
-Taxonomia de erro (flow.utils.error_taxonomy): classifica a falha numa
-categoria estável + deriva retryable. Precisa olhar a CADEIA de exceções, porque
-os nós envolvem o erro original num RuntimeError (`raise ... from e`).
+Error taxonomy (flow.utils.error_taxonomy): classifies the failure into a
+stable category + derives retryable. It must look at the exception CHAIN,
+because nodes wrap the original error in a RuntimeError (`raise ... from e`).
 """
 import asyncio
 
@@ -11,7 +11,7 @@ from flow.utils.error_taxonomy import classify_error, is_retryable
 
 
 def _reraise_from(e: BaseException) -> RuntimeError:
-    """Simula o padrão dos nós: RuntimeError com a causa original encadeada."""
+    """Simulates the nodes' pattern: RuntimeError with the original cause chained."""
     try:
         raise RuntimeError("Erro na operação") from e
     except RuntimeError as re:
@@ -33,7 +33,7 @@ def test_classifica_direto(exc, expected):
 
 
 @pytest.mark.parametrize("cause, expected", [
-    (MemoryError(), "resource"),       # o caso da interseção OOM (RuntimeError <- MemoryError)
+    (MemoryError(), "resource"),       # the OOM intersection case (RuntimeError <- MemoryError)
     (ValueError("coluna ausente"), "user"),
     (ConnectionError(), "transient"),
 ])

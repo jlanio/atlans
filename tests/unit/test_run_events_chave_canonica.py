@@ -1,18 +1,18 @@
-"""A chave do histórico sai do `task_id`, não do que o cliente digitou.
+"""The history key comes from the `task_id`, not from what the client typed.
 
-`get_run_detail` autoriza por DOIS identificadores — o `task_id` e o id
-numérico da linha (o ramo `run_id.isdigit()`) — mas a chave do Redis é
-`workflow:{id}:history`, montada com o id que se passa adiante. Quem entrava
-pelo id numérico autorizava um run e lia a chave de outro.
+`get_run_detail` authorizes by TWO identifiers — the `task_id` and the row's
+numeric id (the `run_id.isdigit()` branch) — but the Redis key is
+`workflow:{id}:history`, built with the id that is passed along. Whoever came in
+through the numeric id authorized one run and read the key of another.
 
-**Não é vazamento**: as chaves são escritas com o `task_id`, que é `uuid4`, e um
-id decimal nunca colide com um uuid. O que acontece é pior de diagnosticar: a
-resposta vem `200` com `expired: true`, afirmando que o log expirou, enquanto
-ele está inteiro no Redis sob a outra chave.
+**It is not a leak**: the keys are written with the `task_id`, which is a `uuid4`,
+and a decimal id never collides with a uuid. What happens is harder to diagnose:
+the response comes back `200` with `expired: true`, claiming the log expired,
+while it is intact in Redis under the other key.
 
-A tool do MCP já se defendia disso por fora (`test_mcp_execucao.py`, o teste do
-id digitado). A REST não — e é o mesmo serviço. Estes testes cobrem o SERVIÇO,
-que é por onde os dois caminhos passam.
+The MCP tool already defended itself against this from the outside
+(`test_mcp_execucao.py`, the typed-id test). The REST API did not — and it is the
+same service. These tests cover the SERVICE, which is where both paths go through.
 """
 import pytest
 import pytest_asyncio
@@ -23,9 +23,9 @@ from app.models.base import Base
 from app.models.models import Workflow, WorkflowRun
 from app.services.observability_service import ObservabilityService
 
-# Reusa a lista do harness do MCP em vez de montar outra: `get_run_detail`
-# cruza com `users` e `workspaces` para resolver autoria e nome do workspace, e
-# descobrir isso tabela a tabela é tempo gasto no lugar errado.
+# Reuses the MCP harness's list instead of building another: `get_run_detail`
+# joins `users` and `workspaces` to resolve authorship and the workspace name, and
+# discovering that table by table is time spent in the wrong place.
 from tests.unit._mcp_harness import TABELAS
 
 TASK = "1f0c9a7e-0000-4a11-9c2e-000000000001"
@@ -34,8 +34,8 @@ WF = "wf-1"
 
 
 class _RedisFalso:
-    """Só o `lrange`, e ele grava as chaves pedidas — é olhando para a chave que
-    se prova de qual run o log foi lido."""
+    """Only `lrange`, and it records the requested keys — looking at the key is
+    how one proves which run the log was read from."""
 
     def __init__(self, itens=None):
         self.itens = itens or []
@@ -87,11 +87,11 @@ class TestChaveCanonica:
 
     @pytest.mark.asyncio
     async def test_entrando_pelo_id_numerico_le_a_chave_do_task_id(self, db, redis):
-        """O defeito, pelo caminho da REST.
+        """The defect, through the REST path.
 
-        Contra o código de hoje: a chave lida é `workflow:{numero}:history`, e a
-        resposta vem vazia com `expired: true` — o log existe, mas debaixo da
-        outra chave.
+        Against today's code: the key read is `workflow:{numero}:history`, and the
+        response comes back empty with `expired: true` — the log exists, but under
+        the other key.
         """
         falso = redis(['{"node": "n1", "kind": "lifecycle"}'])
         numero = await _numero_da_linha(db)
@@ -103,7 +103,7 @@ class TestChaveCanonica:
         )
         assert out["expired"] is False
         assert len(out["events"]) == 1
-        # A resposta também se identifica pelo id canônico.
+        # The response also identifies itself by the canonical id.
         assert out["run_id"] == TASK
 
     @pytest.mark.asyncio
@@ -118,8 +118,8 @@ class TestChaveCanonica:
 
     @pytest.mark.asyncio
     async def test_redis_fora_do_ar_ainda_responde_pelo_id_canonico(self, db, redis):
-        """O ramo de falha também aprendeu o id certo — senão a resposta de erro
-        se identificaria por um id que o cliente não reconhece."""
+        """The failure branch also learned the right id — otherwise the error response
+        would identify itself by an id the client does not recognize."""
         class _Explode(_RedisFalso):
             async def lrange(self, chave, inicio, fim):
                 self.chaves.append(chave)
@@ -143,15 +143,15 @@ class TestUmaAutorizacaoSo:
 
     @pytest.mark.asyncio
     async def test_a_variante_com_detalhe_autoriza_uma_vez_e_devolve_os_dois(self, db, redis):
-        """A tool do MCP precisa dos eventos E do detalhe.
+        """The MCP tool needs the events AND the detail.
 
-        Antes ela carregava o detalhe por fora e o serviço carregava de novo por
-        dentro. `get_run_detail` não tem cache e faz de 3 a 6 consultas — entre
-        elas um join de três tabelas e um percentil sobre janela de 90 dias —,
-        então eram de 6 a 12 idas ao banco por chamada, metade desperdício.
+        Before, it loaded the detail from the outside and the service loaded it
+        again on the inside. `get_run_detail` has no cache and makes 3 to 6
+        queries — among them a three-table join and a percentile over a 90-day
+        window —, so it was 6 to 12 database round trips per call, half of them waste.
 
-        Mutação que este teste mata: o serviço voltar a recarregar o detalhe
-        quando o chamador já o tem.
+        Mutation this test kills: the service going back to reloading the detail
+        when the caller already has it.
         """
         redis(['{"node": "n1"}'])
         chamadas = []
@@ -178,12 +178,12 @@ class TestUmaAutorizacaoSo:
 class TestRetencaoImportada:
 
     def test_a_tool_usa_a_constante_do_nucleo_e_nao_uma_copia(self):
-        """Com o valor duplicado, mudar o TTL no núcleo fazia a tool mentir no
-        `availability` e no `retention_seconds` sem nada quebrar — o pior tipo
-        de divergência, a que não dá sintoma.
+        """With the value duplicated, changing the TTL in the core made the tool lie in
+        `availability` and in `retention_seconds` without anything breaking — the
+        worst kind of divergence, the one with no symptom.
 
-        Mutação: voltar a escrever `3600` à mão em `execucao.py`. Este teste
-        continuaria passando pelo valor, então ele afirma a IDENTIDADE.
+        Mutation: going back to writing `3600` by hand in `execucao.py`. This test
+        would keep passing by value, so it asserts IDENTITY.
         """
         from app.core.constants import REDIS_TTL_1H
         from app.mcp.tools.execucao import RETENCAO_DOS_EVENTOS_S

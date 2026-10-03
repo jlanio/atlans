@@ -3,86 +3,92 @@ import type { ModoDeEntrada } from "@/lib/entrada"
 import type { UploadErrorType } from "@/app/components/drive/resultado-upload"
 
 /**
- * Estado da Home partilhado pela casca (Chats no HomeSidebar), pelo painel
- * flutuante e pelo globo. Numa store porque esses três não têm ancestral comum
- * barato — o HomeSidebar é irmão do painel na árvore da casca, e o atalho de
- * teclado vive num efeito global.
+ * Home state shared by the shell (Chats in HomeSidebar), the floating panel and
+ * the globe. In a store because these three have no cheap common ancestor —
+ * HomeSidebar is a sibling of the panel in the shell tree, and the keyboard
+ * shortcut lives in a global effect.
  *
- * - `conversaId`: a conversa ativa (destacada nos Chats; o painel a abre). Fica
- *   em memória — a seleção é da sessão, não uma preferência a lembrar.
- * - `painel`: "aberto" (a conversa flutuante na lateral) ou "barra" (a barra de
- *   comando, com a última troca da conversa ao centro). Começa em "barra" em
- *   TODO acesso — o painel é sob demanda (Ctrl+I, o chevron, "Expandir") — e
- *   não é gravado: a preferência saiu junto com o hero do primeiro acesso, que
- *   ignoraria qualquer estado lembrado.
- * - `pedidosDeCamada`: uma FILA de pedidos "põe este artefato no globo", escrita
- *   pela lista de Artefatos (no HomeSidebar) e drenada pelo HomeView, que é quem
- *   tem o `useCamadas`. Fila, não um slot só, para não perder cliques rápidos em
- *   artefatos diferentes; o HomeView consome só o que despachou. O estado das
- *   camadas em si vive no `useCamadas` (no HomeView) — a store só carrega o
- *   PEDIDO de um irmão da árvore para o outro, que não têm ancestral comum barato.
- * - `decididos`: as confirmações já clicadas. Fica AQUI, e não no painel, porque
- *   recolher o painel o desmonta e os turnos (com o token) sobrevivem: guardar a
- *   decisão no componente deixava o cartão de novo clicável ao reabrir, e o
- *   segundo clique bate num token já consumido (409).
- * - `expirados`: as confirmações que o servidor recusou com 409 (chave já
- *   consumida ou vencida). Continuam decididas — não há o que refazer —, só que
- *   o cartão troca "Decidido." pela microcópia que explica o porquê.
- * - `rascunho`: o texto em edição do assistente, partilhado pelo painel e pela
- *   barra. Fica AQUI porque Ctrl+I troca um pelo outro e DESMONTA quem estava na
- *   tela: num `useState` de cada caixa, o atalho apagava o que já tinha sido
- *   digitado. Em memória — rascunho é da sessão, não preferência a gravar.
- * - `meu`: quais itens do grupo Meu do HomeSidebar (Agendamentos, Artefatos,
- *   Chats) estão abertos. Persiste em `atlans:home:meu` porque, num `useState`
- *   do item, o aberto/fechado morria a cada abertura da gaveta no telefone (o
- *   Sheet desmonta os filhos ao fechar), ao sair de `/` e voltar (a casca troca
- *   de sidebar) e ao cruzar 768px — e a pessoa reabria tudo de novo.
- * - `anuncioDeConversa`: o último "esta conversa ganhou atividade" que o stream
- *   do assistente anunciou — o 1º quadro `conversa` de cada mensagem (id,
- *   título, se é nova) e a confirmação aceita. A lista de Chats mora no
- *   HomeSidebar, IRMÃO do HomeView: é por aqui que ela fica sabendo, sem GET.
- *   É um SLOT, e não uma fila como `pedidosDeCamada`: a lista pode estar
- *   desmontada (a gaveta do telefone fechada) e uma fila cresceria sem ninguém
- *   para drená-la. O slot guarda um objeto NOVO a cada anúncio, e a lista
- *   compara identidade com o que já existia quando montou — a carga de
- *   montagem traz a verdade. Em memória.
- * - `entrada`: o modal de entrada (login/cadastro) pedido — pela barra, no
- *   primeiro envio sem sessão, ou pelos botões Entrar/Criar conta do
- *   HomeSidebar, irmão do HomeView na árvore (o mesmo motivo de
- *   `pedidosDeCamada`). `null` = fechado. Em memória.
- * - `envioPendente`: a mensagem que o primeiro envio sem sessão deixou
- *   esperando o login — o HomeView a manda sozinho quando a sessão chega.
- *   Fechar o modal sem entrar a descarta (o texto continua em `rascunho`, à
- *   vista na barra); concluir a entrada a mantém. Em memória: disparar num F5
- *   uma mensagem guardada seria surpresa.
- * - `anexos` e `arrastandoArquivo`: os arquivos soltos sobre a Home, a caminho
- *   do Drive do workspace. Ficam AQUI pelo mesmo motivo do `rascunho`: Ctrl+I
- *   troca a barra pelo painel e DESMONTA quem estava na tela — num `useState`
- *   da caixa, os chips (e o `arrastando` que acende a caixa) sumiam no atalho,
- *   enquanto os uploads seguiam correndo sem nada na tela. Em memória: um F5
- *   perde o `File` de qualquer jeito, e o que já subiu está no Drive.
+ * - `conversaId`: the active conversation (highlighted in Chats; the panel opens
+ *   it). Kept in memory — the selection belongs to the session, not a preference
+ *   to remember.
+ * - `painel`: "aberto" (the floating conversation on the side) or "barra" (the
+ *   command bar, with the conversation's last exchange in the center). Starts at
+ *   "barra" on EVERY visit — the panel is on demand (Ctrl+I, the chevron,
+ *   "Expandir") — and is not saved: the preference went away along with the
+ *   first-visit hero, which would ignore any remembered state.
+ * - `pedidosDeCamada`: a QUEUE of "put this artifact on the globe" requests,
+ *   written by the Artifacts list (in HomeSidebar) and drained by HomeView, which
+ *   is the one that has `useCamadas`. A queue, not a single slot, so as not to
+ *   lose quick clicks on different artifacts; HomeView consumes only what it
+ *   dispatched. The layer state itself lives in `useCamadas` (in HomeView) — the
+ *   store only carries the REQUEST from one sibling in the tree to the other,
+ *   which have no cheap common ancestor.
+ * - `decididos`: the confirmations already clicked. Kept HERE, and not in the
+ *   panel, because collapsing the panel unmounts it and the turns (with the
+ *   token) survive: keeping the decision in the component left the card
+ *   clickable again on reopen, and the second click hits an already consumed
+ *   token (409).
+ * - `expirados`: the confirmations the server refused with 409 (key already
+ *   consumed or expired). They stay decided — there is nothing to redo —, except
+ *   that the card swaps "Decidido." (decided) for the microcopy that explains why.
+ * - `rascunho`: the assistant text being edited, shared by the panel and the
+ *   bar. Kept HERE because Ctrl+I swaps one for the other and UNMOUNTS whichever
+ *   was on screen: in a `useState` of each box, the shortcut erased what had
+ *   already been typed. In memory — a draft belongs to the session, not a
+ *   preference to save.
+ * - `meu`: which items of HomeSidebar's Meu (mine) group (Agendamentos,
+ *   Artefatos, Chats) are open. Persisted in `atlans:home:meu` because, in a
+ *   `useState` of the item, the open/closed state died every time the drawer
+ *   opened on the phone (the Sheet unmounts its children on close), when leaving
+ *   `/` and coming back (the shell switches sidebar) and when crossing 768px —
+ *   and the person reopened everything again.
+ * - `anuncioDeConversa`: the last "this conversation got activity" that the
+ *   assistant stream announced — the 1st `conversa` frame of each message (id,
+ *   title, whether it is new) and the accepted confirmation. The Chats list lives
+ *   in HomeSidebar, a SIBLING of HomeView: this is how it finds out, without a GET.
+ *   It is a SLOT, and not a queue like `pedidosDeCamada`: the list may be
+ *   unmounted (the phone drawer closed) and a queue would grow with nobody to
+ *   drain it. The slot holds a NEW object on each announcement, and the list
+ *   compares identity with what already existed when it mounted — the mount load
+ *   brings the truth. In memory.
+ * - `entrada`: the requested sign-in modal (login/sign-up) — by the bar, on the
+ *   first send without a session, or by HomeSidebar's Entrar/Criar conta (sign
+ *   in/create account) buttons, a sibling of HomeView in the tree (the same
+ *   reason as `pedidosDeCamada`). `null` = closed. In memory.
+ * - `envioPendente`: the message that the first send without a session left
+ *   waiting for login — HomeView sends it on its own when the session arrives.
+ *   Closing the modal without signing in discards it (the text stays in
+ *   `rascunho`, visible in the bar); completing sign-in keeps it. In memory:
+ *   firing a stored message on an F5 would be a surprise.
+ * - `anexos` and `arrastandoArquivo`: the files dropped on the Home, on their way
+ *   to the workspace Drive. Kept HERE for the same reason as `rascunho`: Ctrl+I
+ *   swaps the bar for the panel and UNMOUNTS whichever was on screen — in a
+ *   `useState` of the box, the chips (and the `arrastando` that lights up the
+ *   box) vanished on the shortcut, while the uploads kept running with nothing on
+ *   screen. In memory: an F5 loses the `File` anyway, and what has already been
+ *   uploaded is in the Drive.
  */
 
 const CHAVE_MEU = "atlans:home:meu"
 
 type Painel = "aberto" | "barra"
 
-/** Os três itens do grupo Meu, na ordem em que aparecem na barra. */
+/** The three items of the Meu group, in the order they appear in the bar. */
 export type ItemDoMeu = "agendamentos" | "artefatos" | "chats"
 export type EstadoDoMeu = Record<ItemDoMeu, boolean>
-/** O de sempre: só Chats nasce aberto. Também é o default do SSR. */
+/** The usual: only Chats starts open. Also the SSR default. */
 export const MEU_PADRAO: EstadoDoMeu = { agendamentos: false, artefatos: false, chats: true }
 
-/** Um pedido para exibir um artefato no globo. `nome` é o rótulo sugerido. */
+/** A request to show an artifact on the globe. `nome` is the suggested label. */
 export interface PedidoDeCamada {
   artifactId: string
   nome?: string
 }
 
 /**
- * "Esta conversa ganhou atividade": o 1º quadro `conversa` de cada mensagem
- * (id, título, se acabou de nascer) ou uma confirmação aceita (só o id). A
- * mesma forma do `info` do `onConversa` do `useAssistente`.
+ * "This conversation got activity": the 1st `conversa` frame of each message
+ * (id, title, whether it was just born) or an accepted confirmation (only the
+ * id). The same shape as the `info` of `useAssistente`'s `onConversa`.
  */
 export interface AnuncioDeConversa {
   id: string
@@ -90,54 +96,57 @@ export interface AnuncioDeConversa {
   nova: boolean
 }
 
-/** Onde um arquivo solto sobre a Home está na viagem até o Drive. */
+/** Where a file dropped on the Home is on its journey to the Drive. */
 export type EstadoDoAnexo = "enviando" | "pronto" | "recusado"
 
 /**
- * Um arquivo solto sobre a Home.
+ * A file dropped on the Home.
  *
- * `recusado` é sempre veredito do SERVIDOR — os filtros do Drive (extensão
- * permitida, extensão interna perigosa, teto em MB, arquivo vazio, papel no
- * workspace) vivem todos lá, e o cliente não os reescreve. `motivo` é o texto
- * que o servidor devolveu e `tipo` é a classificação de `classifyUploadError`,
- * a mesma da tela `/drive` — por isso os dois rótulos nunca divergem.
+ * `recusado` is always the SERVER's verdict — the Drive filters (allowed
+ * extension, dangerous inner extension, MB ceiling, empty file, role in the
+ * workspace) all live there, and the client does not rewrite them. `motivo` is
+ * the text the server returned and `tipo` is the classification from
+ * `classifyUploadError`, the same as the `/drive` screen's — which is why the
+ * two labels never diverge.
  */
 export interface Anexo {
-  /** Chave de render. Não é o id do Drive: o arquivo pode nem chegar lá. */
+  /** Render key. It is not the Drive id: the file may never even get there. */
   id: string
   nome: string
   bytes: number
   estado: EstadoDoAnexo
-  /** O detalhe que o servidor devolveu, quando `recusado`. */
+  /** The detail the server returned, when `recusado`. */
   motivo?: string
   tipo?: UploadErrorType
 }
 
 /**
- * A ÚLTIMA posição conhecida da pessoa, vinda do controle do MapLibre no globo
- * (o evento `geolocate`). Fica na store pelo mesmo motivo do `rascunho`: o chip
- * que a mostra vive nos DOIS compositores (barra e painel), e Ctrl+I desmonta
- * quem está na tela. Em memória — é a posição física da sessão, não preferência
- * a gravar, e um F5 relocaliza. As chaves espelham o corpo que o backend recebe.
+ * The person's LAST known position, coming from the MapLibre control on the
+ * globe (the `geolocate` event). It is in the store for the same reason as
+ * `rascunho`: the chip that shows it lives in BOTH composers (bar and panel), and
+ * Ctrl+I unmounts whichever is on screen. In memory — it is the session's
+ * physical position, not a preference to save, and an F5 relocates. The keys
+ * mirror the body the backend receives.
  *
- * Posição e INTENÇÃO são estados separados de propósito: o globo escreve a
- * posição a cada tick do seguir, mas ela só vai ao turno do assistente quando
- * `compartilharLocalizacao` está ligado — o que SÓ um gesto da pessoa liga
- * ("Usar minha localização" no "+") e o × do chip desliga. Sem a separação, o
- * próximo tick de GPS desfazia o × sozinho e a coordenada voltava ao turno sem
- * gesto nenhum (achado da revisão adversarial de 2026-09-24).
+ * Position and INTENT are separate states on purpose: the globe writes the
+ * position on every follow tick, but it only goes into the assistant turn when
+ * `compartilharLocalizacao` is on — which ONLY a gesture by the person turns on
+ * ("Usar minha localização" (use my location) in the "+") and the chip's ×
+ * turns off. Without the separation, the next GPS tick undid the × on its own
+ * and the coordinate went back into the turn with no gesture at all (finding
+ * from the 2026-09-24 adversarial review).
  */
 export interface Localizacao {
   lat: number
   lon: number
-  /** Raio de precisão em metros (o `accuracy` do navegador); `null` se ausente. */
+  /** Accuracy radius in meters (the browser's `accuracy`); `null` if absent. */
   precisao_m: number | null
 }
 
 /**
- * Lê o grupo Meu lembrado. Começa do padrão e só copia as chaves cujo valor é
- * booleano: um JSON parcial (versão antiga), corrompido ou com lixo não quebra
- * nada — cai no padrão chave a chave.
+ * Reads the remembered Meu group. Starts from the default and only copies keys
+ * whose value is boolean: a partial JSON (old version), corrupted or with junk
+ * breaks nothing — it falls back to the default key by key.
  */
 function meuLembrado(): EstadoDoMeu | null {
   if (typeof window === "undefined") return null
@@ -161,125 +170,127 @@ function lembrarMeu(meu: EstadoDoMeu): void {
   try {
     window.localStorage.setItem(CHAVE_MEU, JSON.stringify(meu))
   } catch {
-    /* preferência descartável */
+    /* disposable preference */
   }
 }
 
 interface HomeState {
   conversaId: string | null
   painel: Painel
-  /** Falso até o efeito de hidratação rodar — antes disso, só o default do SSR. */
+  /** False until the hydration effect runs — before that, only the SSR default. */
   hidratado: boolean
-  /** Pedidos pendentes de "exibir no globo", drenados pelo HomeView. */
+  /** Pending "show on globe" requests, drained by HomeView. */
   pedidosDeCamada: PedidoDeCamada[]
   /** `tool_use_id` → decidido. Sobrevive a recolher/reabrir o painel. */
   decididos: Record<string, true>
-  /** `tool_use_id` → o servidor respondeu 409: decidido, porém sem efeito. */
+  /** `tool_use_id` → the server answered 409: decided, but with no effect. */
   expirados: Record<string, true>
-  /** O texto em edição, partilhado pelo painel e pela barra. */
+  /** The text being edited, shared by the panel and the bar. */
   rascunho: string
-  /** Aberto/fechado de cada item do grupo Meu. Persiste em `atlans:home:meu`. */
+  /** Open/closed state of each item of the Meu group. Persisted in `atlans:home:meu`. */
   meu: EstadoDoMeu
-  /** O último anúncio do stream; `null` até a primeira mensagem. Ver o cabeçalho. */
+  /** The stream's last announcement; `null` until the first message. See the header. */
   anuncioDeConversa: AnuncioDeConversa | null
-  /** O modal de entrada pedido (login ou cadastro); `null` = fechado. */
+  /** The requested sign-in modal (login or sign-up); `null` = closed. */
   entrada: ModoDeEntrada | null
-  /** A mensagem do primeiro envio sem sessão, esperando o login. */
+  /** The message of the first send without a session, waiting for login. */
   envioPendente: string | null
-  /** Os arquivos soltos sobre a Home, na ordem em que chegaram. */
+  /** The files dropped on the Home, in the order they arrived. */
   anexos: Anexo[]
-  /** Há um arraste COM ARQUIVOS sobre a Home: a caixa acende e convida. */
+  /** A drag WITH FILES is over the Home: the box lights up and invites. */
   arrastandoArquivo: boolean
-  /** A ÚLTIMA posição conhecida (do globo); só vai ao turno com `compartilharLocalizacao`. */
+  /** The LAST known position (from the globe); only goes into the turn with `compartilharLocalizacao`. */
   localizacao: Localizacao | null
-  /** A pessoa PEDIU para a localização ir na conversa ("+ → Usar minha localização"); o × desliga. */
+  /** The person ASKED for the location to go into the conversation ("+ → Usar minha localização"); the × turns it off. */
   compartilharLocalizacao: boolean
 }
 
 interface HomeActions {
   selecionarConversa(id: string | null): void
-  /** Começa uma conversa nova: limpa a seleção. A superfície fica como está. */
+  /** Starts a new conversation: clears the selection. The surface stays as it is. */
   novaConversa(): void
   abrirPainel(): void
-  /** Recolhe o painel à barra (a conversa volta ao centro). */
+  /** Collapses the panel into the bar (the conversation goes back to the center). */
   recolherBarra(): void
   alternarPainel(): void
   /**
-   * Marca o fim do SSR (a partir daqui a troca de superfície devolve o foco) e
-   * lê o grupo Meu lembrado no navegador. NÃO grava.
+   * Marks the end of SSR (from here on, switching surface returns focus) and
+   * reads the Meu group remembered in the browser. Does NOT write.
    */
   hidratar(): void
-  /** Enfileira um artefato para o globo (da lista de Artefatos, no sidebar). */
+  /** Queues an artifact for the globe (from the Artifacts list, in the sidebar). */
   pedirCamada(artifactId: string, nome?: string): void
   /**
-   * Tira da frente da fila os `n` pedidos já despachados. Não é `limparFila`:
-   * um clique que caia entre o render do HomeView e o efeito dele seria apagado
-   * sem nunca ter ido ao globo — o artefato simplesmente não apareceria.
+   * Removes from the front of the queue the `n` requests already dispatched. It
+   * is not `limparFila`: a click that landed between HomeView's render and its
+   * effect would be erased without ever reaching the globe — the artifact simply
+   * would not appear.
    */
   consumirFila(n: number): void
-  /** Marca uma confirmação como decidida (o cartão trava). */
+  /** Marks a confirmation as decided (the card locks). */
   marcarDecidido(toolUseId: string): void
-  /** Devolve o cartão ao estado clicável — a confirmação falhou no servidor. */
+  /** Returns the card to the clickable state — the confirmation failed on the server. */
   desmarcarDecidido(toolUseId: string): void
   /**
-   * A chave já tinha sido consumida (ou venceu) quando o clique chegou: o
-   * cartão CONTINUA travado — refazer só renderia outro 409 —, e a microcópia
-   * passa a dizer o porquê.
+   * The key had already been consumed (or expired) when the click arrived: the
+   * card STAYS locked — redoing it would only render another 409 —, and the
+   * microcopy now says why.
    */
   marcarExpirado(toolUseId: string): void
-  /** Guarda o texto em edição (painel e barra escrevem no mesmo rascunho). */
+  /** Stores the text being edited (panel and bar write to the same draft). */
   definirRascunho(texto: string): void
-  /** Abre/fecha um item do grupo Meu e lembra a preferência. */
+  /** Opens/closes an item of the Meu group and remembers the preference. */
   alternarItemDoMeu(nome: ItemDoMeu): void
-  /** Abre um item do grupo Meu (idempotente) — o clique no trilho de 3rem usa. */
+  /** Opens an item of the Meu group (idempotent) — used by the click on the 3rem rail. */
   abrirItemDoMeu(nome: ItemDoMeu): void
-  /** Registra um anúncio. Sempre um objeto novo: a identidade é o contrato. */
+  /** Records an announcement. Always a new object: identity is the contract. */
   anunciarConversa(anuncio: AnuncioDeConversa): void
-  /** Abre o modal de entrada no modo pedido (a barra e o sidebar pedem). */
+  /** Opens the sign-in modal in the requested mode (the bar and the sidebar request it). */
   pedirEntrada(modo: ModoDeEntrada): void
   /**
-   * Fecha o modal SEM entrar (Esc, X, clique fora): desiste do envio pendente
-   * — um login mais tarde não pode disparar uma mensagem esquecida. O texto
-   * continua em `rascunho`.
+   * Closes the modal WITHOUT signing in (Esc, X, click outside): gives up on the
+   * pending send — a later login must not fire a forgotten message. The text
+   * stays in `rascunho`.
    */
   fecharEntrada(): void
-  /** O login deu certo: fecha o modal e MANTÉM o envio pendente para o HomeView mandar. */
+  /** Login succeeded: closes the modal and KEEPS the pending send for HomeView to send. */
   concluirEntrada(): void
   definirEnvioPendente(texto: string | null): void
-  /** Um arraste com arquivos entrou na Home (ou saiu dela). */
+  /** A drag with files entered the Home (or left it). */
   definirArrastandoArquivo(arrastando: boolean): void
-  /** Enfileira os arquivos recém-soltos, já em `enviando`. */
+  /** Queues the freshly dropped files, already in `enviando`. */
   adicionarAnexos(novos: Anexo[]): void
-  /** O upload de um anexo terminou (ou foi recusado): corrige a linha dele. */
+  /** An attachment's upload finished (or was refused): fixes its row. */
   atualizarAnexo(id: string, mudanca: Partial<Omit<Anexo, "id">>): void
-  /** O × do chip. Não apaga nada do Drive — só tira da barra. */
+  /** The chip's ×. Deletes nothing from the Drive — only removes it from the bar. */
   removerAnexo(id: string): void
   /**
-   * A mensagem foi enviada: os PRONTOS saem (a referência a eles já viajou
-   * junto). Os que ainda sobem ficam, porque não estavam na mensagem; os
-   * recusados também, porque nunca tiveram nada a ver com ela e a pessoa ainda
-   * precisa ler o motivo.
+   * The message was sent: the READY ones leave (the reference to them already
+   * traveled along). The ones still uploading stay, because they were not in the
+   * message; the refused ones too, because they never had anything to do with it
+   * and the person still needs to read the reason.
    */
   limparAnexosProntos(): void
-  /** Fecha o aviso dos recusados. */
+  /** Closes the warning about the refused ones. */
   descartarAnexosRecusados(): void
   /**
-   * Esvazia a lista inteira — usado quando o WORKSPACE ativo muda: os anexos
-   * são "o que acabei de mandar ao Drive DESTE workspace", e a referência da
-   * mensagem (`comReferencia`) casa com o workspace da conversa. Trocado o
-   * workspace, os chips passariam a apontar para arquivos que estão noutro
-   * Drive — o assistente do novo workspace não os acha.
+   * Empties the whole list — used when the active WORKSPACE changes: the
+   * attachments are "what I just sent to THIS workspace's Drive", and the
+   * message's reference (`comReferencia`) matches the conversation's workspace.
+   * Once the workspace changes, the chips would point to files that are in
+   * another Drive — the new workspace's assistant cannot find them.
    */
   limparAnexos(): void
-  /** Guarda a última posição conhecida (do evento `geolocate` do globo). NÃO liga o compartilhar. */
+  /** Stores the last known position (from the globe's `geolocate` event). Does NOT turn on sharing. */
   definirLocalizacao(loc: Localizacao): void
-  /** O gesto do "+": a localização passa a ir nos turnos. */
+  /** The "+" gesture: the location starts going into the turns. */
   ligarLocalizacao(): void
   /**
-   * O × do chip: a localização SAI da conversa e FICA fora — os ticks do seguir
-   * continuam atualizando a posição, mas nada volta ao turno até um novo gesto.
-   * Não desliga o seguir no globo e não apaga a última posição (religar pelo
-   * "+" volta na hora, sem esperar novo fix de GPS).
+   * The chip's ×: the location LEAVES the conversation and STAYS out — the follow
+   * ticks keep updating the position, but nothing goes back into the turn until a
+   * new gesture. Does not turn off follow on the globe and does not erase the last
+   * position (turning it back on via "+" comes back at once, without waiting for
+   * a new GPS fix).
    */
   limparLocalizacao(): void
 }
@@ -301,10 +312,11 @@ export const useHomeStore = create<HomeState & HomeActions>((set) => ({
   localizacao: null,
   compartilharLocalizacao: false,
 
-  // A conversa que troca leva junto as decisões: os tokens são de turnos que
-  // saíram da tela. Um id NOVO vindo do stream (nula → id) é a MESMA conversa,
-  // mas aí não há decisão anterior a perder. O rascunho FICA: é o que a pessoa
-  // acabou de digitar, e sumir com ele por trocar de chat é perder texto dela.
+  // A conversation switch takes the decisions with it: the tokens belong to turns
+  // that left the screen. A NEW id coming from the stream (null → id) is the SAME
+  // conversation, but then there is no earlier decision to lose. The draft STAYS:
+  // it is what the person just typed, and dropping it on a chat switch is losing
+  // their text.
   selecionarConversa: (id) =>
     set((state) => (state.conversaId === id ? {} : { conversaId: id, decididos: {}, expirados: {} })),
   novaConversa: () => set(() => ({ conversaId: null, decididos: {}, expirados: {} })),
@@ -313,8 +325,9 @@ export const useHomeStore = create<HomeState & HomeActions>((set) => ({
   recolherBarra: () => set(() => ({ painel: "barra" })),
   alternarPainel: () => set((state) => ({ painel: state.painel === "aberto" ? "barra" : "aberto" })),
 
-  // Lê o grupo Meu lembrado no navegador. NÃO grava: só o gesto da pessoa
-  // grava. O `painel` não entra: começa em "barra" em todo acesso (o hero).
+  // Reads the Meu group remembered in the browser. Does NOT write: only the
+  // person's gesture writes. `painel` is not included: it starts at "barra" on
+  // every visit (the hero).
   hidratar: () => set(() => ({ meu: meuLembrado() ?? MEU_PADRAO, hidratado: true })),
 
   pedirCamada: (artifactId, nome) =>
@@ -353,9 +366,9 @@ export const useHomeStore = create<HomeState & HomeActions>((set) => ({
       return { meu }
     }),
 
-  // Sempre um objeto novo, mesmo com o mesmo id: a lista de Chats só reage à
-  // troca de identidade, e "a mesma conversa ganhou outra mensagem" É outro
-  // anúncio.
+  // Always a new object, even with the same id: the Chats list only reacts to
+  // identity changes, and "the same conversation got another message" IS another
+  // announcement.
   anunciarConversa: (anuncio) => set(() => ({ anuncioDeConversa: { ...anuncio } })),
 
   pedirEntrada: (modo) => set(() => ({ entrada: modo })),
@@ -369,8 +382,8 @@ export const useHomeStore = create<HomeState & HomeActions>((set) => ({
   adicionarAnexos: (novos) =>
     set((state) => (novos.length === 0 ? {} : { anexos: [...state.anexos, ...novos] })),
 
-  // Por id, e não por índice: os uploads terminam fora de ordem e a pessoa
-  // pode remover um chip no meio do caminho.
+  // By id, not by index: uploads finish out of order and the person may remove
+  // a chip midway.
   atualizarAnexo: (id, mudanca) =>
     set((state) => {
       if (!state.anexos.some((a) => a.id === id)) return {}
@@ -397,13 +410,13 @@ export const useHomeStore = create<HomeState & HomeActions>((set) => ({
 
   limparAnexos: () => set((state) => (state.anexos.length === 0 ? {} : { anexos: [] })),
 
-  // O `geolocate` do globo dispara a cada atualização de posição (o modo
-  // seguir). Histerese de ~25 m (0,00025° ≈ 25 m no equador): o jitter de GPS
-  // de quem está PARADO não troca o valor — o que estabiliza o texto que vai ao
-  // prompt entre turnos (senão cada mensagem invalidava o cache do histórico) e
-  // poupa re-render do chip —, e um deslocamento real atualiza normalmente. Uma
-  // melhora franca de precisão também passa (o primeiro fix grosseiro do IP/wifi
-  // vira o fino do GPS mesmo sem sair do lugar).
+  // The globe's `geolocate` fires on every position update (follow mode).
+  // Hysteresis of ~25 m (0.00025° ≈ 25 m at the equator): the GPS jitter of
+  // someone STANDING STILL does not change the value — which stabilizes the text
+  // that goes into the prompt between turns (otherwise every message invalidated
+  // the history cache) and spares a chip re-render —, and a real displacement
+  // updates normally. A clear improvement in accuracy also passes (the first
+  // coarse IP/wifi fix becomes the fine GPS one even without moving).
   definirLocalizacao: (loc) =>
     set((state) => {
       const a = state.localizacao
@@ -416,8 +429,8 @@ export const useHomeStore = create<HomeState & HomeActions>((set) => ({
       return { localizacao: loc }
     }),
   ligarLocalizacao: () => set((s) => (s.compartilharLocalizacao ? {} : { compartilharLocalizacao: true })),
-  // Desliga SÓ a intenção: a posição fica como última conhecida. É o que faz o
-  // × persistir — antes, com o valor zerado, o próximo tick do seguir regravava
-  // e o chip ressuscitava sozinho.
+  // Turns off ONLY the intent: the position stays as the last known one. That is
+  // what makes the × persist — before, with the value zeroed, the next follow tick
+  // rewrote it and the chip came back to life on its own.
   limparLocalizacao: () => set((s) => (s.compartilharLocalizacao ? { compartilharLocalizacao: false } : {})),
 }))

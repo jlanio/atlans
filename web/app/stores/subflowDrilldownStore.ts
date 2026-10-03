@@ -1,32 +1,33 @@
 import { create } from 'zustand'
 
-/** Um degrau da descida: o nó SubWorkflow atravessado e o fluxo que ele chama. */
+/** One step of the descent: the SubWorkflow node crossed and the workflow it calls. */
 export interface SubflowLevel {
-  /** Id do nó SubWorkflow no canvas em que ele vive (o pai deste nível). */
+  /** Id of the SubWorkflow node in the canvas it lives in (the parent of this level). */
   canvasNodeId: string
-  /** `properties.workflowHash` desse nó — o fluxo a carregar e desenhar. */
+  /** That node's `properties.workflowHash` — the workflow to load and draw. */
   workflowHash: string
-  /** Rótulo do nó SubWorkflow, para a trilha. */
+  /** Label of the SubWorkflow node, for the breadcrumb. */
   label: string
 }
 
 /**
- * Navegação para dentro dos sub-fluxos de uma execução.
+ * Navigation into the sub-workflows of a run.
  *
- * `path` é a cadeia de nós SubWorkflow atravessados: `[]` significa fechado, e
- * `path[i].canvasNodeId` juntos por `::` formam exatamente o prefixo com que os
- * eventos daquele nível chegam ao painel (ver utils/subflow-path).
+ * `path` is the chain of SubWorkflow nodes crossed: `[]` means closed, and
+ * `path[i].canvasNodeId` joined by `::` form exactly the prefix with which that
+ * level's events reach the panel (see utils/subflow-path).
  *
- * Vive numa store, e não em estado local do visualizador, porque quem ABRE está
- * espalhado — o painel de execução, a partir de um erro, e o próprio canvas —
- * enquanto quem RENDERIZA é um só componente montado ao lado do editor.
+ * It lives in a store, and not in the viewer's local state, because whoever
+ * OPENS it is spread out — the execution panel, from an error, and the canvas
+ * itself — while whoever RENDERS it is a single component mounted next to the
+ * editor.
  */
 interface SubflowDrilldownState {
   path: SubflowLevel[]
   /**
-   * Nó (id local) a centralizar assim que o nível abrir. É o que faz "abrir
-   * sub-fluxo" a partir de uma falha cair direto no nó que quebrou, em vez de
-   * largar a pessoa num grafo enquadrado por inteiro para procurar o vermelho.
+   * Node (local id) to center as soon as the level opens. It is what makes "open
+   * sub-workflow" from a failure land straight on the node that broke, instead of
+   * dropping the person into a fully framed graph to look for the red one.
    */
   focusNodeId: string | null
 }
@@ -34,9 +35,9 @@ interface SubflowDrilldownState {
 interface SubflowDrilldownActions {
   /** Abre do zero, substituindo qualquer descida em andamento. */
   open(path: SubflowLevel[], focusNodeId?: string | null): void
-  /** Desce mais um nível a partir do que já está aberto. */
+  /** Goes down one more level from what is already open. */
   push(level: SubflowLevel): void
-  /** Volta para um nível já visitado. Índice -1 volta ao fluxo do editor. */
+  /** Goes back to an already visited level. Index -1 returns to the editor's workflow. */
   popTo(index: number): void
   close(): void
 }

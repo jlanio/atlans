@@ -20,25 +20,26 @@ import { formatarDuracao, formatarInicio, formatarInteiro, formatarPercentual, r
 interface Props {
   linhas: IWorkflowMetricsRow[]
   carregando: boolean
-  /** Só admin vê o interruptor: `PUT /admin/workflows/{id}/status` é admin-only. */
+  /** Only admins see the switch: `PUT /admin/workflows/{id}/status` is admin-only. */
   isAdmin: boolean
   onVerExecucoes: (workflowHash: string) => void
   /**
-   * Chamado depois da confirmação (ao desligar) ou direto (ao ligar). Devolver
-   * `false` — ou rejeitar — desfaz o interruptor; o toast é de quem chama, que
-   * tem a mensagem da API.
+   * Called after the confirmation (when turning off) or directly (when turning
+   * on). Returning `false` — or rejecting — reverts the switch; the toast belongs
+   * to the caller, which has the API's message.
    */
   onAlternarAtivo: (workflowHash: string, ativo: boolean) => void | boolean | Promise<void | boolean>
 }
 
 /**
- * Visão "Por workflow" (spec §4.3): a lista que a aba Workflows antiga não
- * era. A ordem vem do backend (`total_runs` desc, nome asc), e o interruptor
- * pede confirmação só ao DESLIGAR — é isso que para execuções agendadas.
+ * "Por workflow" (by workflow) view (spec §4.3): the list the old Workflows tab
+ * was not. The order comes from the backend (`total_runs` desc, name asc), and
+ * the switch asks for confirmation only when TURNING OFF — that is what stops
+ * scheduled runs.
  */
 export function VisaoWorkflows({ linhas, carregando, isAdmin, onVerExecucoes, onAlternarAtivo }: Props) {
-  // Reflexo imediato do interruptor até o próximo refetch; some quando a lista
-  // nova chega, porque ela já traz o valor gravado.
+  // Immediate reflection of the switch until the next refetch; it goes away when
+  // the new list arrives, because that list already carries the saved value.
   const [overrides, setOverrides] = useState<Record<string, boolean>>({})
   useEffect(() => { setOverrides({}) }, [linhas])
   const [confirmando, setConfirmando] = useState<IWorkflowMetricsRow | null>(null)
@@ -127,7 +128,7 @@ export function VisaoWorkflows({ linhas, carregando, isAdmin, onVerExecucoes, on
                   <td className={cn("px-3 py-2.5 align-middle", DESTAQUE_DA_FICHA)}>
                     <div className="flex min-w-0 flex-col">
                       <div className="flex min-w-0 items-center gap-1.5">
-                        {/* O botão é o alvo do teclado; a linha inteira é o do mouse. */}
+                        {/* The button is the keyboard target; the whole row is the mouse's. */}
                         <button
                           type="button"
                           onClick={e => { e.stopPropagation(); onVerExecucoes(wf.workflow_hash) }}
@@ -166,9 +167,9 @@ export function VisaoWorkflows({ linhas, carregando, isAdmin, onVerExecucoes, on
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
-                  {/* Limite no bloco de dentro, não no <td>: `max-width` em célula
-                      de tabela não é definido pela especificação (ver a coluna
-                      Erro de tabela-execucoes.tsx). */}
+                  {/* Limit on the inner block, not on the <td>: `max-width` on a table
+                      cell is not defined by the specification (see the Erro
+                      column of tabela-execucoes.tsx). */}
                   <td data-rotulo="falhas" className={cn("px-3 py-2.5 align-middle max-md:basis-full", CELULA_COM_ROTULO)}>
                     <div className="flex min-w-0 max-w-[240px] items-baseline gap-2 max-md:max-w-full">
                       <span className={cn("tabular-nums font-medium", wf.failed_runs > 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
@@ -181,9 +182,9 @@ export function VisaoWorkflows({ linhas, carregando, isAdmin, onVerExecucoes, on
                   </td>
                   {isAdmin && (
                     <td className="px-3 py-2.5 text-center align-middle" onClick={e => e.stopPropagation()}>
-                      {/* Alvo de toque de 40px no telefone: é a ação destrutiva da página. */}
-                      {/* <label>: o Switch é um <button>, elemento rotulável — o toque em
-                          qualquer ponto da caixa de 40px aciona o interruptor. */}
+                      {/* 40px touch target on the phone: it is the page's destructive action. */}
+                      {/* <label>: the Switch is a <button>, a labelable element — a tap anywhere
+                          in the 40px box toggles the switch. */}
                       <label className="inline-flex items-center justify-center max-md:min-h-10 max-md:min-w-10">
                         <Switch
                           checked={ativo}

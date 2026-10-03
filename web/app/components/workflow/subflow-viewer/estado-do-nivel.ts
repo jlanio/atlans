@@ -1,37 +1,37 @@
 // web/app/components/workflow/subflow-viewer/estado-do-nivel.ts
 //
-// Recorte da linha do tempo do run correspondente a UM nível de sub-fluxo.
+// Slice of the run's timeline corresponding to ONE sub-workflow level.
 import { NodeRun, NodeRunStatus } from "../run-panel/timeline"
 import { StatusNodeStatusWorkFlow } from "@/context/useFlowContext"
 import { idLocal, pertenceAoNivel } from "../utils/subflow-path"
 import { EstadoDeNo } from "./scope"
 
 /**
- * A linha do tempo fala em quatro estados de execução; o card do nó fala nos do
- * canvas. São a mesma coisa com nomes diferentes, exceto na ponta: "aguardando"
- * no painel é "idle" no canvas — nó desenhado sem anel, que é o que se quer para
- * um nó que o run nem chegou a alcançar.
+ * The timeline speaks in four execution states; the node card speaks in the
+ * canvas's. They are the same thing under different names, except at the edge:
+ * "aguardando" (waiting) in the panel is "idle" on the canvas — a node drawn
+ * without a ring, which is what you want for a node the run never reached.
  */
 const ESTADO_NO_CANVAS: Record<NodeRunStatus, StatusNodeStatusWorkFlow> = {
   pending: "idle",
   running: "started",
   completed: "completed",
   failed: "failed",
-  // Mapeia para si mesmo: o nó do sub-fluxo também precisa poder dizer "comecei
-  // e não sei como terminei" — colapsar em "idle" esconderia que ele executou.
+  // Maps to itself: the sub-workflow node also needs to be able to say "I started
+  // and don't know how I ended" — collapsing into "idle" would hide that it ran.
   unknown: "unknown",
 }
 
 export interface RecorteDoNivel {
-  /** Estado de cada nó daquele nível, pelo id local — pronto para o escopo. */
+  /** State of each node of that level, by local id — ready for the scope. */
   estadoPorId: Map<string, EstadoDeNo>
   /**
-   * Nós que executaram no nível mas não existem no grafo carregado.
+   * Nodes that ran at this level but do not exist in the loaded graph.
    *
-   * Acontece quando o sub-fluxo foi editado depois do run: o grafo mostrado é o
-   * atual, os eventos são os de então. Contá-los é o que impede a tela de passar
-   * por completa quando não é — dizer nada aqui seria afirmar, por omissão, que
-   * tudo o que rodou está desenhado.
+   * Happens when the sub-workflow was edited after the run: the graph shown is
+   * the current one, the events are from back then. Counting them is what keeps
+   * the screen from passing for complete when it is not — saying nothing here
+   * would claim, by omission, that everything that ran is drawn.
    */
   semCorrespondencia: string[]
 }

@@ -5,8 +5,8 @@ import { ProximasLista } from "@/app/components/dashboard/proximas-lista"
 
 afterEach(cleanup)
 
-// Data bem no futuro para `resumirAgendamento` marcar "ativo" (com próxima),
-// independentemente do relógio em que o teste roda.
+// A date far in the future so `resumirAgendamento` marks "ativo" (with an upcoming one),
+// regardless of the clock the test runs on.
 const daquiUmaHora = new Date(Date.now() + 3_600_000).toISOString()
 
 function agendamento(extra: Partial<IWorkflowSchedule> = {}): IWorkflowSchedule {

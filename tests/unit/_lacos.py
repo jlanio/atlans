@@ -1,14 +1,14 @@
 # tests/unit/_lacos.py
-"""A conferência dos laços periódicos com lock, para os do núcleo
-(test_tarefas_de_fundo) e os das extensões (tests/extensoes)."""
+"""The check of the periodic loops with a lock, for the core ones
+(test_tarefas_de_fundo) and the extensions' ones (tests/extensoes)."""
 import asyncio
 
 from tests.unit._mcp_harness import RedisFalso
 
 
 async def conferir_o_lock_do_laco(modulo, laco, intervalo, chave, trabalho, monkeypatch):
-    """O laço pega o lock no pool global (SET NX EX), sem abrir um cliente
-    Redis por volta, e roda o trabalho uma vez antes do cancelamento."""
+    """The loop takes the lock in the global pool (SET NX EX), without opening a
+    Redis client per iteration, and runs the job once before cancellation."""
     import importlib
 
     import redis.asyncio as aioredis
@@ -32,4 +32,4 @@ async def conferir_o_lock_do_laco(modulo, laco, intervalo, chave, trabalho, monk
     assert voltas == [{}]
     assert clientes_novos == [], "o lock abriu um cliente Redis novo em vez de usar o pool"
     assert pool.dados.get(chave) == "1"
-    assert ("set", chave, True, 1) in pool.chamadas  # SET NX EX, TTL = o intervalo (mínimo 1 s)
+    assert ("set", chave, True, 1) in pool.chamadas  # SET NX EX, TTL = the interval (minimum 1 s)

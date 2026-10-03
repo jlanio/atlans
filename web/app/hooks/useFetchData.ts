@@ -4,67 +4,70 @@ import { useCallback, useEffect, useRef, useState } from "react"
 
 interface FetchState<T> {
   data: T | null
-  /** Há requisição em voo — primeira carga OU recarga.
+  /** A request is in flight — first load OR reload.
    *
-   *  É o sinal do botão Atualizar (`disabled` + ícone girando). Ele NÃO pode
-   *  virar "só a primeira carga": quando isso aconteceu, o botão de /admin/settings
-   *  e o das telas de observabilidade nunca mais giraram nem desabilitaram — a
-   *  tela ficava congelada durante os GETs e o usuário clicava de novo achando
-   *  que o primeiro clique não tinha pegado. */
+   *  It is the signal for the Refresh button (`disabled` + spinning icon). It must
+   *  NOT become "first load only": when that happened, the /admin/settings button
+   *  and the ones on the observability screens never spun or got disabled again —
+   *  the screen sat frozen during the GETs and the user clicked again, thinking
+   *  the first click had not registered. */
   loading: boolean
-  /** Primeira carga: ainda não há NADA na tela. É o gate do skeleton. */
+  /** First load: there is NOTHING on screen yet. It is the gate for the skeleton. */
   firstLoad: boolean
-  /** Recarga com dados já na tela (auto-refresh, busca, botão Atualizar).
-   *  Serve para spinner/opacidade; trocar a lista por skeletons aqui é o que
-   *  fazia a tabela piscar a cada tecla digitada e a cada 15 segundos. */
+  /** Reload with data already on screen (auto-refresh, search, Refresh button).
+   *  Meant for a spinner/opacity; swapping the list for skeletons here is what
+   *  made the table flash on every keystroke and every 15 seconds. */
   refreshing: boolean
   error: string | null
-  /** Carimbo (ms) da última resposta ACEITA; `null` enquanto nenhuma foi.
+  /** Timestamp (ms) of the last ACCEPTED response; `null` while there has been none.
    *
-   *  É o gate do cartão de erro (contrato de telas, §3.2): ele só toma a tela
-   *  com `error && atualizadoEm == null`. Uma recarga que falha sobre a lista
-   *  pronta mantém o que havia — quem avisa é o `onErroComDados`. O `setData`
-   *  não mexe nele: um dado posto à mão não é uma resposta do servidor. */
+   *  It is the gate for the error card (screen contract, §3.2): the card only
+   *  takes over the screen with `error && atualizadoEm == null`. A reload that
+   *  fails over a ready list keeps what was there — the warning comes from
+   *  `onErroComDados`. `setData` does not touch it: data set by hand is not a
+   *  server response. */
   atualizadoEm: number | null
-  /** Recarrega. Resolve com o dado aceito NESTA carga, ou `null` se ela falhou
-   *  ou foi superada por uma mais nova (a guarda de geração a descartou). */
+  /** Reloads. Resolves with the data accepted in THIS load, or `null` if it failed
+   *  or was superseded by a newer one (the generation guard discarded it). */
   refetch: () => Promise<T | null>
-  /** Recarga de fundo (auto-refresh, volta à aba): o `refetch`, menos num caso.
-   *  Com a 1ª carga em erro, tenta de novo SEM trocar o cartão pelo skeleton,
-   *  e o cartão só sai se a resposta vier. Pelo `refetch`, cada tique tirava o
-   *  cartão e o punha de volta, e cada volta era um `role="alert"` novo: o
-   *  leitor de tela anunciava a mesma falha a cada 15 s. O "Tentar de novo" do
-   *  cartão segue no `refetch`: ali quem pediu foi a pessoa. */
+  /** Background reload (auto-refresh, returning to the tab): `refetch`, except in one
+   *  case. With the 1st load in error, it retries WITHOUT swapping the card for the
+   *  skeleton, and the card only goes away if the response arrives. Through
+   *  `refetch`, every tick removed the card and put it back, and each return was a
+   *  new `role="alert"`: the screen reader announced the same failure every 15 s.
+   *  The card's "Tentar de novo" (try again) still goes through `refetch`: there it
+   *  was the person who asked. */
   recarregarEmFundo: () => Promise<T | null>
-  /** Troca o dado na tela sem buscar: a atualização otimista, o que um
-   *  POST/PUT devolveu. Aceita a função do valor anterior, como o `setState`. */
+  /** Replaces the data on screen without fetching: the optimistic update, what a
+   *  POST/PUT returned. Accepts a function of the previous value, like `setState`. */
   setData: (valor: T | null | ((anterior: T | null) => T | null)) => void
 }
 
 export interface OpcoesDaCarga<T> {
-  /** Cada resposta ACEITA (já passou pela guarda de geração), no mesmo tique em
-   *  que o hook a guarda. Para quem espelha o dado fora do hook — o contexto
-   *  das credenciais, o rascunho da allowlist — sem um quadro de atraso. */
+  /** Each ACCEPTED response (it already passed the generation guard), in the same
+   *  tick in which the hook stores it. For whoever mirrors the data outside the
+   *  hook — the credentials context, the allowlist draft — without a frame of lag. */
   onDados?: (dados: T) => void
-  /** Carga que falha quando já há resposta aceita na tela: o cartão de erro
-   *  não toma o lugar da lista, e quem avisa é isto (tipicamente um toast).
-   *  Recebe a mensagem do erro. Na 1ª carga não é chamado — ali o erro é o
-   *  cartão. */
+  /** A load that fails when an accepted response is already on screen: the error
+   *  card does not take the list's place, and the warning comes from this
+   *  (typically a toast). Receives the error message. Not called on the 1st load
+   *  — there the error is the card. */
   onErroComDados?: (mensagem: string) => void
-  /** Desligada (`false`), a carga não roda e o estado volta ao inicial — sem
-   *  dado, sem erro, `firstLoad` —, descartando o que estiver em voo; religada,
-   *  carrega do zero. Para o que só busca enquanto aberto (um modal) ou para
-   *  quem pode (uma tela de admin). `true` por padrão. */
+  /** When off (`false`), the load does not run and the state goes back to the
+   *  initial one — no data, no error, `firstLoad` —, discarding whatever is in
+   *  flight; when turned back on, it loads from scratch. For what only fetches
+   *  while open (a modal) or for whoever is allowed (an admin screen). `true` by
+   *  default. */
   ativo?: boolean
 }
 
-// Hook genérico para buscar dados autenticados (aguarda status === "authenticated").
-// debounceMs: intervalo mínimo entre execuções (útil para inputs de busca em tempo real).
+// Generic hook to fetch authenticated data (waits for status === "authenticated").
+// debounceMs: minimum interval between executions (useful for real-time search inputs).
 //
-// As telas que refaziam isto à mão — cada uma com seu loading/refreshing/
-// loadError/atualizadoEm e o gate de sessão — divergiram onde doía: sem a
-// guarda de geração, a resposta de um filtro antigo chegava depois e
-// sobrescrevia a lista do filtro atual (Admin › Usuários).
+// The screens that redid this by hand — each with its own loading/refreshing/
+// loadError/atualizadoEm and the session gate — diverged where it hurt: without
+// the generation guard, the response for an old filter arrived later and
+// overwrote the list for the current filter (Admin › Users).
 export function useFetchData<T>(
   fetcher: () => Promise<{ data?: T | null; error?: { message?: string } | null } | null>,
   errorMsg = "Erro ao carregar dados.",
@@ -81,12 +84,12 @@ export function useFetchData<T>(
   const [atualizadoEm, setAtualizadoEm] = useState<number | null>(null)
   const timerRef                        = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // O chamador recria `fetcher` (e o `errorMsg`) a cada render; lê-los de um ref
-  // é o que permite `executar` ter identidade CONSTANTE. Sem isso, todo
-  // `useEffect(..., [refetch])` — o auto-refresh de 15s de /executores — refazia
-  // clearInterval + setInterval a cada render, e numa tela que renderiza com
-  // frequência o intervalo nunca chegava ao fim: a atualização automática
-  // simplesmente parava, sem sinal nenhum na UI.
+  // The caller recreates `fetcher` (and `errorMsg`) on every render; reading them
+  // from a ref is what lets `executar` have a CONSTANT identity. Without it, every
+  // `useEffect(..., [refetch])` — the 15s auto-refresh of /executores — redid
+  // clearInterval + setInterval on every render, and on a screen that renders
+  // frequently the interval never reached its end: the automatic refresh
+  // simply stopped, with no sign of it in the UI.
   const fetcherRef  = useRef(fetcher)
   const errorMsgRef = useRef(errorMsg)
   const debounceRef = useRef(debounceMs)
@@ -96,22 +99,24 @@ export function useFetchData<T>(
   debounceRef.current = debounceMs
   opcoesRef.current   = opcoes
 
-  // `data` também num ref: `executar` precisa saber se já há algo na tela para
-  // escolher entre skeleton e refresh, e lê-lo do estado prenderia o callback.
-  // Idem o carimbo, que decide entre o cartão de erro e o `onErroComDados`.
+  // `data` in a ref too: `executar` needs to know whether something is already on
+  // screen to choose between skeleton and refresh, and reading it from state would
+  // pin the callback. Same for the timestamp, which decides between the error card
+  // and `onErroComDados`.
   const dataRef         = useRef<T | null>(null)
   const atualizadoEmRef = useRef<number | null>(null)
 
-  // Contador de geração: duas execuções sobrepostas (a URL/deps mudam enquanto a
-  // anterior ainda resolve) não podem deixar a resposta VELHA sobrescrever a nova
-  // — hoje a que resolvesse por último vencia. Cada `executar` leva um número; ao
-  // voltar do await, se a geração já avançou o resultado é obsoleto e é ignorado.
+  // Generation counter: two overlapping executions (the URL/deps change while the
+  // previous one is still resolving) must not let the OLD response overwrite the
+  // new one — before, whichever resolved last won. Each `executar` carries a
+  // number; on returning from the await, if the generation has already advanced
+  // the result is stale and is ignored.
   const geracao = useRef(0)
 
   const executar = useCallback(async (deFundo: boolean): Promise<T | null> => {
     const gen = ++geracao.current
-    // De fundo e sem dado na tela, nada muda enquanto a busca voa: nem
-    // skeleton nem erro apagado (ver `recarregarEmFundo`).
+    // In the background and with no data on screen, nothing changes while the
+    // fetch is in flight: no skeleton and no cleared error (see `recarregarEmFundo`).
     if (!deFundo || dataRef.current !== null) {
       if (dataRef.current === null) setFirstLoad(true)
       else setRefreshing(true)
@@ -133,7 +138,7 @@ export function useFetchData<T>(
         atualizadoEmRef.current = agora
         setDataState(dados)
         setAtualizadoEm(agora)
-        // A recarga de fundo não apaga o erro ao sair: quem apaga é a resposta.
+        // The background reload does not clear the error on its way out: the response does.
         setError(null)
         opcoesRef.current.onDados?.(dados)
         return dados
@@ -145,17 +150,17 @@ export function useFetchData<T>(
       falhou(exc instanceof Error ? exc.message : errorMsgRef.current)
       return null
     } finally {
-      // Sempre limpa — se o fetcher lançar (ex: network error não-axios), o
-      // botão de Atualizar ficaria disabled para sempre. Mas só para a geração
-      // CORRENTE: um resolve obsoleto não pode desligar o spinner do request novo.
+      // Always clears — if the fetcher throws (e.g. a non-axios network error), the
+      // Refresh button would stay disabled forever. But only for the CURRENT
+      // generation: a stale resolve must not turn off the new request's spinner.
       if (gen === geracao.current) {
         setFirstLoad(false)
         setRefreshing(false)
       }
     }
   }, [])
-  // Sem repassar argumentos: o `refetch` desce direto para `onClick`, e o
-  // evento do clique não pode virar o `deFundo`.
+  // Without forwarding arguments: `refetch` goes straight down to `onClick`, and
+  // the click event must not become `deFundo`.
   const refetch = useCallback(() => executar(false), [executar])
   const recarregarEmFundo = useCallback(() => executar(true), [executar])
 
@@ -169,8 +174,8 @@ export function useFetchData<T>(
 
   useEffect(() => {
     if (!ativo) {
-      // Desligada: o que estiver em voo não escreve mais, e a tela volta ao
-      // começo — a próxima vez que ligar é uma 1ª carga, com skeleton.
+      // Off: whatever is in flight no longer writes, and the screen goes back to
+      // the start — the next time it is turned on is a 1st load, with skeleton.
       geracao.current++
       dataRef.current = null
       atualizadoEmRef.current = null
@@ -181,9 +186,9 @@ export function useFetchData<T>(
       setFirstLoad(true)
       return
     }
-    // A sessão pode resolver como "unauthenticated": não há o que buscar, e sem
-    // isto o skeleton ficaria para sempre, porque `firstLoad` nasce true e nada
-    // o desligaria.
+    // The session may resolve as "unauthenticated": there is nothing to fetch, and
+    // without this the skeleton would stay forever, because `firstLoad` starts as
+    // true and nothing would turn it off.
     if (status === "unauthenticated") {
       setFirstLoad(false)
       return
@@ -198,8 +203,9 @@ export function useFetchData<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, refetch, ativo, ...deps])
 
-  // `loading` é a união dos dois: quem só quer saber "está buscando?" (botão
-  // Atualizar) lê `loading`; quem decide entre skeleton e lista lê `firstLoad`.
+  // `loading` is the union of the two: whoever only wants to know "is it fetching?"
+  // (Refresh button) reads `loading`; whoever decides between skeleton and list
+  // reads `firstLoad`.
   return {
     data, loading: firstLoad || refreshing, firstLoad, refreshing, error, atualizadoEm,
     refetch, recarregarEmFundo, setData,

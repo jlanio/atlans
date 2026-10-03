@@ -16,7 +16,7 @@ const HttpRequestIcon = ({ id, ...nodeProps }: NodeProps<INodeContext>) => {
 
   return (
     <ActionsIconRoot id={id} {...nodeProps}>
-      <Icon className="text-3xl text-foreground" /> {/* Ícone centralizado */}
+      <Icon className="text-3xl text-foreground" /> {/* Centered icon */}
     </ActionsIconRoot>
   )
 }

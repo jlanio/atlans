@@ -1,12 +1,13 @@
 // desktop/src/main/python/status.ts
 //
-// Consulta `python -m executor status --json`, que fala com o servidor usando o
-// certificado mTLS do executor.
+// Queries `python -m executor status --json`, which talks to the server using
+// the executor's mTLS certificate.
 //
-// A consulta passa pelo Python de proposito: a chamada exige o cert do
-// executor, o trust store da CA interna e a normalizacao de `wss://` para
-// `https://`. Reimplementar isso em Node seria uma segunda implementacao de
-// autenticacao para manter em dia — e a primeira a divergir quando a CA mudasse.
+// The query goes through Python on purpose: the call requires the executor's
+// cert, the internal CA's trust store and the normalization of `wss://` to
+// `https://`. Reimplementing that in Node would be a second authentication
+// implementation to keep up to date — and the first to diverge when the CA
+// changed.
 import { spawn } from 'node:child_process'
 import {
   ARTIFACTS_DIR_PADRAO, PYTHON_EXE, RESOURCES, ambienteDoSpawn, envDoExecutor,
@@ -25,38 +26,41 @@ const TIMEOUT_MS = 30_000
 
 // ── Cache ────────────────────────────────────────────────────────────────────
 //
-// A consulta paga caro: cold start do interpretador empacotado, `bootstrap_ca()`
-// (que pode montar o trust store), import de httpx/cryptography e um round-trip
-// HTTPS — ate 30 s com a rede ruim. Sem cache, abrir a aba GeoSync repetia tudo,
-// e a tela ficava com esqueleto pulsando enquanto o Python subia.
+// The query is expensive: cold start of the packaged interpreter,
+// `bootstrap_ca()` (which may build the trust store), importing
+// httpx/cryptography and an HTTPS round-trip — up to 30 s on a bad network.
+// Without a cache, opening the GeoSync tab repeated all of it, and the screen
+// sat with a pulsing skeleton while Python started up.
 //
-// So o SUCESSO e guardado: cachear uma falha de rede deixaria o botao
-// "Tentar de novo" mentindo. A lista de workspaces de um executor muda por acao
-// no Studio, e nao sozinha, entao um valor da sessao atual e bom o bastante —
-// e `forcar` cobre quem quiser reconsultar.
+// Only SUCCESS is stored: caching a network failure would make the
+// "Tentar de novo" (try again) button lie. An executor's list of workspaces
+// changes through actions in the Studio, not on its own, so a value from the
+// current session is good enough — and `forcar` covers anyone who wants to
+// query again.
 
 let cache: ResultadoStatus | null = null
-/** Consulta em voo, para dois pedidos simultaneos nao darem dois spawns. */
+/** In-flight query, so that two simultaneous requests do not cause two spawns. */
 let emVoo: Promise<ResultadoStatus> | null = null
 /**
- * Serie da consulta valida.
+ * Serial number of the valid query.
  *
- * Sobe a cada consulta nova E a cada `invalidarStatus()`. Uma consulta leva ate
- * 30 s; nesse intervalo o vinculo pode ter sido refeito (certificado novo,
- * outros workspaces) ou o usuario pode ter clicado "Atualizar". O resultado da
- * consulta vencida ainda e entregue a quem o pediu, mas NAO vira cache — sem
- * isso o `.then` da consulta velha repovoava o cache com os workspaces do
- * vinculo ANTIGO, e a aba GeoSync (que consulta uma vez so e fica montada pela
- * vida do app) oferecia um destino que este certificado nao alcanca mais.
+ * Bumped on every new query AND on every `invalidarStatus()`. A query takes up
+ * to 30 s; in that interval the link may have been redone (new certificate,
+ * other workspaces) or the user may have clicked "Atualizar" (refresh). The
+ * result of the stale query is still delivered to whoever asked for it, but it
+ * does NOT become the cache — without this, the old query's `.then`
+ * repopulated the cache with the workspaces of the OLD link, and the GeoSync
+ * tab (which queries only once and stays mounted for the app's lifetime)
+ * offered a destination this certificate no longer reaches.
  */
 let serie = 0
 
 /**
- * Consulta com cache de sessao.
+ * Query with a session cache.
  *
- * `forcar` e o botao "Atualizar" da tela: quem clica ali esta dizendo que o
- * servidor mudou, e devolver o cache — ou uma consulta em voo iniciada ANTES da
- * mudanca — seria ignorar o pedido.
+ * `forcar` is the screen's "Atualizar" (refresh) button: whoever clicks it is
+ * saying the server changed, and returning the cache — or an in-flight query
+ * started BEFORE the change — would ignore the request.
  */
 export function consultarStatusCacheado(forcar = false): Promise<ResultadoStatus> {
   if (!forcar && cache) return Promise.resolve(cache)
@@ -64,10 +68,10 @@ export function consultarStatusCacheado(forcar = false): Promise<ResultadoStatus
 
   const minhaSerie = ++serie
   const p: Promise<ResultadoStatus> = consultarStatus()
-    // `consultarStatus` resolve ate nos erros, mas o `spawn` pode lancar de
-    // forma sincrona (argumento invalido, cwd inexistente). Sem este catch a
-    // rejeicao vazava para o `invoke` do renderer como erro de IPC — e, pior,
-    // deixava `emVoo` preso para sempre, congelando a tela em "carregando".
+    // `consultarStatus` resolves even on errors, but `spawn` can throw
+    // synchronously (invalid argument, nonexistent cwd). Without this catch the
+    // rejection leaked to the renderer's `invoke` as an IPC error — and, worse,
+    // left `emVoo` stuck forever, freezing the screen on "carregando" (loading).
     .catch((e: unknown): ResultadoStatus => ({
       ok: false, codigo: 'falha', erro: e instanceof Error ? e.message : String(e),
     }))
@@ -76,8 +80,8 @@ export function consultarStatusCacheado(forcar = false): Promise<ResultadoStatus
       return r
     })
     .finally(() => {
-      // So limpa se ainda for a consulta corrente: uma consulta vencida nao
-      // pode derrubar a que a substituiu.
+      // Only clears it if it is still the current query: a stale query must not
+      // take down the one that replaced it.
       if (emVoo === p) emVoo = null
     })
   emVoo = p
@@ -85,14 +89,15 @@ export function consultarStatusCacheado(forcar = false): Promise<ResultadoStatus
 }
 
 /**
- * Esquece o vinculo consultado.
+ * Forgets the queried link.
  *
- * Obrigatorio ao descartar ou refazer o enrollment: os workspaces sao os que
- * AQUELE certificado alcanca, e mostrar a lista do vinculo antigo depois de
- * trocar de executor faria a pessoa escolher um destino que nao existe mais.
+ * Mandatory when discarding or redoing the enrollment: the workspaces are the
+ * ones THAT certificate reaches, and showing the old link's list after
+ * switching executors would make the person pick a destination that no longer
+ * exists.
  *
- * Solta tambem a consulta EM VOO — ela foi feita com o certificado velho, e
- * mante-la era o caminho pelo qual o dado invalidado voltava.
+ * Also drops the IN-FLIGHT query — it was made with the old certificate, and
+ * keeping it was the path through which the invalidated data came back.
  */
 export function invalidarStatus(): void {
   cache = null
@@ -100,7 +105,7 @@ export function invalidarStatus(): void {
   serie++
 }
 
-/** A consulta crua. Privada: quem chama de fora passa pelo cache acima. */
+/** The raw query. Private: outside callers go through the cache above. */
 function consultarStatus(): Promise<ResultadoStatus> {
   return new Promise((resolve) => {
     const proc = spawn(PYTHON_EXE, ['-X', 'utf8', '-m', 'executor', 'status', '--json'], {
@@ -133,8 +138,8 @@ function consultarStatus(): Promise<ResultadoStatus> {
     proc.on('error', (e) => finalizar({ ok: false, codigo: 'falha', erro: e.message }))
 
     proc.on('close', () => {
-      // O `_ca_bootstrap` escreve linhas informativas antes do JSON; pegar a
-      // ultima nao-vazia as ignora.
+      // `_ca_bootstrap` writes informational lines before the JSON; taking the
+      // last non-empty one ignores them.
       const linha = saida.split('\n').map((l) => l.trim()).filter(Boolean).pop()
       if (!linha) {
         finalizar({ ok: false, codigo: 'falha', erro: erro.trim() || 'Sem resposta.' })

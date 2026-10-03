@@ -1,6 +1,6 @@
 "use client"
 
-// Seção «Webhook Whitelist» das Configurações do admin.
+// "Webhook Whitelist" section of the admin Settings.
 
 import { useState } from "react"
 import { Badge } from "@/app/components/ui/badge"
@@ -56,9 +56,9 @@ export function WhitelistSection({
           ))}
         </div>
       ) : (
-        // Não é vazio "de primeiro uso": lista vazia é uma configuração VÁLIDA
-        // (não restringe o destino), então explica o efeito em vez de ilustrar
-        // com ícone-em-círculo, que sugeriria "falta cadastrar".
+        // This is not a "first use" empty state: an empty list is a VALID setting
+        // (it does not restrict the destination), so it explains the effect instead
+        // of illustrating with an icon-in-circle, which would suggest "nothing registered yet".
         <p className="text-xs text-muted-foreground">
           Nenhum domínio configurado — o webhook pode ser enviado a qualquer destino.
         </p>

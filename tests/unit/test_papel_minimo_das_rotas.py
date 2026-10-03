@@ -1,32 +1,33 @@
 # tests/unit/test_papel_minimo_das_rotas.py
 """
-Papel mínimo de cada rota de workspace — uma matriz, lida da própria rota.
+Minimum role for each workspace route — a matrix, read from the route itself.
 
-A checagem de papel era escrita à mão em ~25 rotas: carregar o papel
-(`get_accessible_workflow_with_role` ou `get_workspace_member_role`) e, na
-linha seguinte, `if not _has_min_workspace_role(...): raise HTTPException(403)`.
-O defeito que essa repetição já produziu é a rota que ESQUECE a segunda linha:
-`GET /workflows/{id}/pins` respondia sem papel nenhum (as irmãs pediam
-`editor`), e o `PUT` de agendamento deixava um `viewer` reconfigurar disparos.
-Nenhum teste pegou, porque cada rota tinha o seu — ou nenhum.
+The role check was hand-written in ~25 routes: load the role
+(`get_accessible_workflow_with_role` or `get_workspace_member_role`) and, on the
+next line, `if not _has_min_workspace_role(...): raise HTTPException(403)`.
+The defect this repetition already produced is the route that FORGETS the second
+line: `GET /workflows/{id}/pins` answered with no role at all (its siblings
+required `editor`), and the schedule `PUT` let a `viewer` reconfigure triggers.
+No test caught it, because each route had its own — or none.
 
-Duas metades:
+Two halves:
 
-1. **Rotas de workflow** (`/workflows/{id_hash}...`). O papel mínimo é
-   DECLARADO na dependência, `workflow_com_papel(minimo, mensagem)`, e este
-   teste o lê da rota registrada. Rota nova que carregue o workflow do path sem
-   declarar papel reprova aqui; rota que declare papel diferente do registrado
-   em `PAPEL_DAS_ROTAS_DE_WORKFLOW` também — baixar o papel de uma rota passa a
-   ser uma linha de diff neste arquivo, não um efeito colateral.
-2. **Rotas de workspace** (grupos, membros, artefatos, Drive, criação de
-   workflow). O workspace sai do corpo ou do recurso, então a checagem roda no
-   handler (`exigir_papel_no_workspace`). Toda rota de escrita desses routers
-   tem de estar em `ROTAS_DE_WORKSPACE` — ou em `SEM_PAPEL_DE_WORKSPACE`, com o
-   motivo.
+1. **Workflow routes** (`/workflows/{id_hash}...`). The minimum role is
+   DECLARED in the dependency, `workflow_com_papel(minimo, mensagem)`, and this
+   test reads it from the registered route. A new route that loads the workflow
+   from the path without declaring a role fails here; so does a route that
+   declares a role different from the one registered in
+   `PAPEL_DAS_ROTAS_DE_WORKFLOW` — lowering a route's role becomes a diff line
+   in this file, not a side effect.
+2. **Workspace routes** (groups, members, artifacts, Drive, workflow
+   creation). The workspace comes from the body or the resource, so the check
+   runs in the handler (`exigir_papel_no_workspace`). Every write route of these
+   routers must be in `ROTAS_DE_WORKSPACE` — or in `SEM_PAPEL_DE_WORKSPACE`,
+   with the reason.
 
-Nas duas, a matriz manda a requisição com CADA papel abaixo do mínimo e confere
-o 403 com a mensagem da rota: pela app real, com o papel vindo de
-`workspace_members` num SQLite de verdade, e não de um dublê do papel.
+In both, the matrix sends the request with EACH role below the minimum and
+checks the 403 with the route's message: through the real app, with the role
+coming from `workspace_members` in a real SQLite, not from a role double.
 """
 from __future__ import annotations
 
@@ -52,9 +53,9 @@ GRUPO = "grupo-a"
 ARTEFATO = "art-a"
 ARQUIVO = "arq-a"
 
-# Um usuário por papel no workspace `ws-a`; `u-owner` é o dono (sem linha em
-# `workspace_members`, como em produção). `u-fora` não está em lugar nenhum e
-# `u-alvo` é o membro sobre quem as rotas de membros agem.
+# One user per role in workspace `ws-a`; `u-owner` is the owner (no row in
+# `workspace_members`, as in production). `u-fora` is nowhere and `u-alvo` is
+# the member the member routes act on.
 USUARIO_DO_PAPEL = {
     "owner": "u-owner",
     "admin": "u-admin",
@@ -72,7 +73,7 @@ _NAO_MEMBRO = "Acesso negado a este recurso."
 
 
 def _abaixo_de(minimo: str | None) -> list[str]:
-    """Os papéis que NÃO alcançam `minimo` — os que a rota tem de recusar."""
+    """The roles that do NOT reach `minimo` — the ones the route must refuse."""
     if minimo is None:
         return []
     return WORKSPACE_ROLE_ORDER[: WORKSPACE_ROLE_ORDER.index(minimo)]
@@ -82,9 +83,9 @@ def _abaixo_de(minimo: str | None) -> list[str]:
 # A matriz
 # ══════════════════════════════════════════════════════════════════════════════
 
-#: (método, caminho registrado) → (papel mínimo, mensagem do 403). Papel `None`
-#: é leitura: basta pertencer ao workspace, e quem é de fora leva o 403 de
-#: pertencimento.
+#: (method, registered path) → (minimum role, 403 message). Role `None`
+#: is read access: belonging to the workspace is enough, and outsiders get the
+#: membership 403.
 PAPEL_DAS_ROTAS_DE_WORKFLOW: dict[tuple[str, str], tuple[str | None, str | None]] = {
     ("GET", "/workflows/{id_hash}"): (None, None),
     ("GET", "/workflows/{id_hash}/contract"): (None, None),
@@ -121,12 +122,12 @@ PAPEL_DAS_ROTAS_DE_WORKFLOW: dict[tuple[str, str], tuple[str | None, str | None]
 
 @dataclass(frozen=True)
 class RotaDeWorkspace:
-    """Uma rota cujo workspace vem do corpo ou do recurso.
+    """A route whose workspace comes from the body or the resource.
 
-    `url`/`json`/`arquivo` montam uma requisição VÁLIDA: aqui a checagem roda
-    no handler, depois da validação do corpo, e um corpo inválido pararia no
-    422 sem chegar à guarda. `mensagem_fora` é o que recebe quem não é membro
-    quando a rota confere pertencimento antes do papel (None: a mesma do papel).
+    `url`/`json`/`arquivo` build a VALID request: here the check runs in the
+    handler, after body validation, and an invalid body would stop at the
+    422 without reaching the guard. `mensagem_fora` is what a non-member gets
+    when the route checks membership before the role (None: same as the role's).
     """
 
     metodo: str
@@ -181,8 +182,8 @@ ROTAS_DE_WORKSPACE: list[RotaDeWorkspace] = [
         "PUT", "/workspaces/{id_hash}/members/{user_id}", f"/workspaces/{WS}/members/{ALVO}",
         "admin", _ADMIN_DO_WORKSPACE, json={"role": "editor"},
     ),
-    # Remover OUTRO membro. Sair por conta própria não pede papel (ver
-    # `remove_member`), e por isso o alvo aqui nunca é quem pede.
+    # Removing ANOTHER member. Leaving on your own does not require a role (see
+    # `remove_member`), which is why the target here is never the requester.
     RotaDeWorkspace(
         "DELETE", "/workspaces/{id_hash}/members/{user_id}", f"/workspaces/{WS}/members/{ALVO}",
         "admin", "Requer role 'admin' ou superior para remover membros.",
@@ -225,8 +226,8 @@ ROTAS_DE_WORKSPACE: list[RotaDeWorkspace] = [
     RotaDeWorkspace("DELETE", "/drive/{id_hash}", f"/drive/{ARQUIVO}", "editor", _EDITOR, mensagem_fora=_NAO_MEMBRO),
 ]
 
-#: Rotas de escrita desses routers que NÃO pedem papel de workspace — cada uma
-#: com o motivo. Rota nova sem motivo aqui nem linha acima reprova.
+#: Write routes of these routers that do NOT require a workspace role — each one
+#: with the reason. A new route with no reason here nor a line above fails.
 SEM_PAPEL_DE_WORKSPACE: dict[tuple[str, str], str] = {
     ("POST", "/workflows/runs/{run_id}/cancel"): (
         "a guarda (operator no workspace DO RUN, com atalho de admin da plataforma) "
@@ -250,16 +251,16 @@ _ESCRITA = {"POST", "PUT", "PATCH", "DELETE"}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Leitura das rotas registradas
+# Reading the registered routes
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _rotas() -> list[APIRoute]:
-    """As rotas HTTP do app, também as dos roteadores incluídos.
+    """The app's HTTP routes, including those of the included routers.
 
-    Pelo `rotas_efetivas`: desde o FastAPI 0.141 o `app.routes` guarda um nó
-    por roteador incluído, sem as rotas dele, e a matriz não veria nenhuma
-    (ver `tests/unit/_rotas.py`). `dependant` e `methods` separam as rotas da
-    API das do OpenAPI (sem `dependant`) e das de WebSocket (sem `methods`).
+    Via `rotas_efetivas`: since FastAPI 0.141 `app.routes` keeps one node
+    per included router, without its routes, and the matrix would see none
+    (see `tests/unit/_rotas.py`). `dependant` and `methods` separate the API
+    routes from the OpenAPI ones (no `dependant`) and the WebSocket ones (no `methods`).
     """
     from app.main import app
 
@@ -282,7 +283,7 @@ def _rotas_de_workflow() -> dict[tuple[str, str], APIRoute]:
 
 
 def _papel_declarado(rota: APIRoute):
-    """A dependência `workflow_com_papel` da rota, ou None se ela não declara papel."""
+    """The route's `workflow_com_papel` dependency, or None if it declares no role."""
     for dependencia in rota.dependant.dependencies:
         if hasattr(dependencia.call, "papel_minimo"):
             return dependencia.call
@@ -329,13 +330,13 @@ async def _semear(db) -> None:
 
 @pytest.fixture
 async def cliente(client, monkeypatch):
-    """A app real, com o banco trocado por SQLite e o usuário escolhido por header.
+    """The real app, with the database swapped for SQLite and the user chosen by header.
 
-    Depende do `client` do conftest pelos patches de infraestrutura (e pela
-    limpeza dos overrides no fim), mas fala por um cliente próprio com
-    `raise_app_exceptions=False`: uma rota que esquecesse a guarda seguiria
-    para o handler, e o teste deve reprovar com o status que ela devolveu, não
-    com a exceção de um storage que não existe aqui.
+    Depends on the conftest `client` for the infrastructure patches (and for
+    cleaning up the overrides at the end), but talks through its own client with
+    `raise_app_exceptions=False`: a route that forgot the guard would proceed
+    to the handler, and the test must fail with the status it returned, not
+    with the exception of a storage that does not exist here.
     """
     from app.api.dependencies import get_current_user, get_db, get_user_workspace_ids
     from app.core.rate_limiter import limiter
@@ -362,8 +363,8 @@ async def cliente(client, monkeypatch):
 
     app.dependency_overrides[get_db] = _db
     app.dependency_overrides[get_current_user] = _quem
-    # O `client` do conftest fixa os workspaces num valor de mentira; aqui eles
-    # vêm da tabela de membros, como em produção.
+    # The conftest `client` pins the workspaces to a fake value; here they
+    # come from the members table, as in production.
     app.dependency_overrides.pop(get_user_workspace_ids, None)
     monkeypatch.setattr(limiter, "enabled", False)
 
@@ -378,7 +379,7 @@ def _como(usuario: str) -> dict[str, str]:
 
 
 def _url(caminho: str, id_hash: str) -> str:
-    """O caminho registrado com os parâmetros preenchidos."""
+    """The registered path with the parameters filled in."""
     return (
         caminho.replace("{id_hash}", id_hash)
         .replace("{version_number}", "1")
@@ -398,12 +399,12 @@ def _status_e_mensagem(resposta) -> tuple[int, object]:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 1. Rotas de workflow: o papel é declarado na dependência
+# 1. Workflow routes: the role is declared in the dependency
 # ══════════════════════════════════════════════════════════════════════════════
 
 def test_toda_rota_de_workflow_declara_o_papel_na_dependencia():
-    """Rota que carrega o workflow do path sem `workflow_com_papel` é a rota
-    que pode esquecer a checagem — foi assim com os pins e com o agendamento."""
+    """A route that loads the workflow from the path without `workflow_com_papel` is
+    the route that can forget the check — that is what happened with pins and scheduling."""
     sem_papel = sorted(
         f"{metodo} {caminho}"
         for (metodo, caminho), rota in _rotas_de_workflow().items()
@@ -437,7 +438,7 @@ def test_o_papel_declarado_e_o_da_matriz():
 
 @pytest.mark.parametrize("chave", list(PAPEL_DAS_ROTAS_DE_WORKFLOW), ids=" ".join)
 async def test_a_dependencia_deixa_passar_do_minimo_para_cima(chave):
-    """O outro lado da matriz: a guarda não pode recusar quem tem o papel."""
+    """The other side of the matrix: the guard must not refuse those who have the role."""
     minimo = PAPEL_DAS_ROTAS_DE_WORKFLOW[chave][0]
     dependencia = _papel_declarado(_rotas_de_workflow()[chave])
     assert dependencia is not None, f"{chave} não declara papel"
@@ -456,8 +457,8 @@ _CASOS_DE_WORKFLOW = [
 
 @pytest.mark.parametrize("metodo, caminho, papel", _CASOS_DE_WORKFLOW)
 async def test_rota_de_workflow_recusa_papel_abaixo_do_minimo(cliente, metodo, caminho, papel):
-    """Sem corpo de propósito: a guarda está na dependência e responde antes
-    da validação do corpo, então a matriz não precisa saber montar cada um."""
+    """No body on purpose: the guard is in the dependency and answers before
+    body validation, so the matrix does not need to know how to build each one."""
     mensagem = PAPEL_DAS_ROTAS_DE_WORKFLOW[(metodo, caminho)][1]
     resposta = await cliente.request(metodo, _url(caminho, WF), headers=_como(USUARIO_DO_PAPEL[papel]))
     assert _status_e_mensagem(resposta) == (403, mensagem)
@@ -465,8 +466,8 @@ async def test_rota_de_workflow_recusa_papel_abaixo_do_minimo(cliente, metodo, c
 
 @pytest.mark.parametrize("metodo, caminho", list(PAPEL_DAS_ROTAS_DE_WORKFLOW), ids=" ".join)
 async def test_rota_de_workflow_404_antes_de_403(cliente, metodo, caminho):
-    """De fora do workspace: 403 de pertencimento. Workflow inexistente ou na
-    lixeira: 404 — para quem é de fora E para quem não tem o papel."""
+    """From outside the workspace: membership 403. Nonexistent workflow or one in
+    the trash: 404 — for outsiders AND for those without the role."""
     resposta = await cliente.request(metodo, _url(caminho, WF), headers=_como(FORA))
     assert _status_e_mensagem(resposta) == (403, _NAO_MEMBRO)
 
@@ -479,12 +480,12 @@ async def test_rota_de_workflow_404_antes_de_403(cliente, metodo, caminho):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 2. Rotas de workspace: a checagem roda no handler
+# 2. Workspace routes: the check runs in the handler
 # ══════════════════════════════════════════════════════════════════════════════
 
 def test_toda_rota_de_escrita_de_workspace_esta_na_matriz():
-    """Rota de escrita nova num desses routers precisa dizer o papel que pede
-    — ou, em `SEM_PAPEL_DE_WORKSPACE`, por que não pede nenhum."""
+    """A new write route in one of these routers must state the role it requires
+    — or, in `SEM_PAPEL_DE_WORKSPACE`, why it requires none."""
     registradas = {(r.metodo, r.caminho) for r in ROTAS_DE_WORKSPACE} | set(SEM_PAPEL_DE_WORKSPACE)
     existentes = set()
     for rota in _rotas():

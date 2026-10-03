@@ -1,19 +1,20 @@
 # tests/unit/test_spatial_metadata_no_upload.py
 """
-Propagacao de `spatial_metadata` no modo `upload` do GeoSync.
+Propagation of `spatial_metadata` in GeoSync's `upload` mode.
 
-CRS, bbox e contagem de feicoes so podem ser calculados por quem TEM o arquivo —
-o executor. `DriveUploader.register` (modo catalogo) ja os enviava. `DriveUploader.upload`
-(o modo PADRAO) aceitava o parametro na assinatura, o manager o passava, e ele
-era descartado: nao chegava em `_upload_file`, e o confirm ia sem corpo nenhum.
+CRS, bbox and feature count can only be computed by whoever HAS the file — the
+executor. `DriveUploader.register` (catalog mode) already sent them. `DriveUploader.upload`
+(the DEFAULT mode) accepted the parameter in its signature, the manager passed it,
+and it was discarded: it did not reach `_upload_file`, and the confirm went out with
+no body at all.
 
-Resultado: todo dataset sincronizado pelo caminho normal aparecia no Drive sem
-dado espacial. Nao havia erro, log nem campo vazio obvio — a coluna simplesmente
-ficava nula, e a unica forma de notar era comparar um arquivo sincronizado em
-modo catalogo com um sincronizado em modo upload.
+Result: every dataset synced through the normal path showed up in the Drive with no
+spatial data. There was no error, no log, no obviously empty field — the column
+simply stayed null, and the only way to notice was to compare a file synced in
+catalog mode with one synced in upload mode.
 
-A auditoria classificou o parametro como "morto". Estava certa sobre o fato e
-errada sobre a acao: a correcao e PROPAGAR, nao remover.
+The audit classified the parameter as "dead". It was right about the fact and
+wrong about the action: the fix is to PROPAGATE, not to remove.
 """
 from __future__ import annotations
 
@@ -29,11 +30,11 @@ META = {"crs": "EPSG:4326", "bbox": [0, 0, 1, 1], "feature_count": 7}
 
 
 def _teto_folgado():
-    """O confirm consulta o teto de tamanho antes de aceitar o objeto.
+    """The confirm checks the size ceiling before accepting the object.
 
-    O dublê de `db` destes testes responde a QUALQUER query com o mesmo
-    WorkspaceFile, então a consulta das configurações precisa de resposta
-    própria. Teto folgado de propósito: tamanho não é o assunto aqui — está em
+    The `db` double in these tests answers ANY query with the same
+    WorkspaceFile, so the settings query needs its own answer. A generous
+    ceiling on purpose: size is not the subject here — that is in
     `test_drive_teto_no_confirm.py`.
     """
     from unittest.mock import AsyncMock, patch
@@ -47,7 +48,7 @@ def _teto_folgado():
     )
 
 
-# ── A cadeia de propagacao ───────────────────────────────────────────────────
+# ── The propagation chain ────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("funcao", ["upload", "_upload_file", "_upload_shapefile"])
 def test_cada_elo_da_cadeia_usa_o_parametro(funcao):
@@ -104,7 +105,7 @@ async def test_confirm_upload_grava_o_metadado_recebido():
 
 @pytest.mark.asyncio
 async def test_confirm_sem_metadado_nao_apaga_o_que_ja_existia():
-    """Executor antigo confirma sem corpo — nao pode zerar o que ja foi gravado."""
+    """An old executor confirms with no body — it must not wipe what was already stored."""
     from unittest.mock import AsyncMock, MagicMock, patch
 
     from app.services.drive_service import DriveService
@@ -124,13 +125,13 @@ async def test_confirm_sem_metadado_nao_apaga_o_que_ja_existia():
     assert wf.spatial_metadata == META
 
 
-# ── Compatibilidade com executor antigo ──────────────────────────────────────
+# ── Compatibility with old executors ─────────────────────────────────────────
 
 def test_o_endpoint_tolera_confirm_sem_corpo():
-    """Um upload ja gravado no MinIO nao pode ficar 'pending' por causa do JSON.
+    """An upload already stored in MinIO must not stay 'pending' because of the JSON.
 
-    O executor anterior a esta versao confirma sem corpo nenhum; um
-    `await request.json()` sem guarda levantaria e o arquivo ficaria preso.
+    Executors prior to this version confirm with no body at all; an unguarded
+    `await request.json()` would raise and the file would be stuck.
     """
     fonte = inspect.getsource(
         __import__("app.api.routers.executor_drive_router", fromlist=["x"]).agent_confirm_upload

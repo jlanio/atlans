@@ -14,7 +14,7 @@ router = APIRouter(
 )
 
 def get_node_service() -> NodeService:
-    """Dependência para criar NodeService."""
+    """Dependency to create NodeService."""
     return NodeService()
 
 @router.get("", response_model=List[NodeDefinition])
@@ -24,8 +24,8 @@ async def list_nodes(
     _user=Depends(get_current_user),
 ):
     """
-    Lista todos os nodes registrados, com suas properties configuráveis.
-    Nodes desabilitados pelo admin (/admin/nodes) sao filtrados aqui.
+    Lists all registered nodes, with their configurable properties.
+    Nodes disabled by the admin (/admin/nodes) are filtered out here.
     """
     return await service.list_nodes(db)
 
@@ -33,7 +33,7 @@ async def list_nodes(
 # ── Proxy WFS GetCapabilities (evita bloqueio CORS no browser) ────────────────
 
 def _validate_wfs_url(url: str) -> str:
-    """Valida URL contra SSRF antes de fazer request server-side."""
+    """Validates the URL against SSRF before making a server-side request."""
     from flow.utils.geo_helpers import validate_url_ssrf
     if not url.startswith(("http://", "https://")):
         raise HTTPException(status_code=400, detail="URL inválida. Use http:// ou https://.")
@@ -47,12 +47,12 @@ def _validate_wfs_url(url: str) -> str:
 
 
 async def _workspace_do_fluxo(db, workflow_id: str) -> str:
-    """O workspace do fluxo que está sendo editado — 404 se ele não existe
-    (ou está na lixeira). O cliente nomeia o FLUXO, que é o que o editor tem
-    em mãos, e o servidor tira dele o workspace; o alcance é o de quem pede
-    nesse workspace (a mesma regra do Executar). O servidor não tem como
-    prender a listagem ao nó em edição: quem pode executar num workspace
-    alcança as credenciais compartilhadas com ele por qualquer fluxo de lá."""
+    """The workspace of the workflow being edited — 404 if it does not exist
+    (or is in the trash). The client names the WORKFLOW, which is what the editor
+    has at hand, and the server derives the workspace from it; the reach is that
+    of the requester in that workspace (the same rule as Run). The server has no
+    way to tie the listing to the node being edited: whoever can run in a workspace
+    reaches the credentials shared with it through any workflow there."""
     from sqlalchemy import select
 
     from app.models.workflow import Workflow
@@ -66,13 +66,13 @@ async def _workspace_do_fluxo(db, workflow_id: str) -> str:
 
 
 async def _credencial_do_wfs(credential_id: str, workflow_id: str | None, user_id: str):
-    """A credencial do nó WFS, pronta para assinar o GetCapabilities — ou 4xx.
+    """The WFS node's credential, ready to sign the GetCapabilities — or 4xx.
 
-    O escopo é o MESMO da validação de definição (`validate_service`): as
-    credenciais de quem pede e, quando ele informa o fluxo e pode executar no
-    workspace dele (operator ou acima), as compartilhadas com esse workspace.
-    Nunca a credencial PRIVADA de outro membro, mesmo com o id dela no nó — a
-    listagem não pode alcançar o que o Executar dessa pessoa não alcança.
+    The scope is the SAME as definition validation (`validate_service`): the
+    requester's credentials and, when they give the workflow and can run in its
+    workspace (operator or above), those shared with that workspace.
+    Never another member's PRIVATE credential, even with its id on the node — the
+    listing cannot reach what that person's Run does not reach.
     """
     from uuid import UUID
 
@@ -84,7 +84,7 @@ async def _credencial_do_wfs(credential_id: str, workflow_id: str | None, user_i
     from flow.utils.credencial_wfs import autenticacao_wfs
 
     try:
-        # A forma canônica é a chave do que o resolver devolve.
+        # The canonical form is the key of what the resolver returns.
         credential_id = str(UUID(credential_id))
     except ValueError:
         raise HTTPException(status_code=400, detail="credential_id inválido.")
@@ -101,7 +101,7 @@ async def _credencial_do_wfs(credential_id: str, workflow_id: str | None, user_i
         resolvidas = await resolve_credentials_from_ids(
             [credential_id], allowed_owner_ids={user_id}, shared_workspace_id=compartilhado, db=db,
         )
-        await db.commit()  # o carimbo de `last_used_at`: listar com ela é usá-la
+        await db.commit()  # the `last_used_at` stamp: listing with it is using it
 
     cred = resolvidas.get(credential_id)
     if cred is None:
@@ -114,7 +114,7 @@ async def _credencial_do_wfs(credential_id: str, workflow_id: str | None, user_i
             ),
         )
     try:
-        # Uma credencial de banco não vira `http_auth`; o tipo basta para a recusa.
+        # A database credential does not become `http_auth`; the type is enough for the refusal.
         return autenticacao_wfs(None, http_auth_da_credencial(cred) or {"type": cred.get("type") or "?"})
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -131,26 +131,26 @@ async def wfs_discover_layers(
     ),
     user=Depends(get_current_user),
 ):
-    """Proxy para GetCapabilities — retorna lista de camadas disponíveis.
+    """Proxy for GetCapabilities — returns the list of available layers.
 
-    O corpo é o de sempre (`{layers: [{name, title}]}`, ordenado por título) e
-    os status também (400 URL inválida, 403 SSRF, 502 servidor/erro, 504
-    timeout, 404 sem camadas). O trabalho mora em
-    `app.services.fontes_service.listar_camadas_wfs`, que é a MESMA sondagem
-    que o catálogo de fontes usa — a rota é um wrapper fino.
+    The body is the usual one (`{layers: [{name, title}]}`, sorted by title) and
+    so are the statuses (400 invalid URL, 403 SSRF, 502 server/error, 504
+    timeout, 404 no layers). The work lives in
+    `app.services.fontes_service.listar_camadas_wfs`, which is the SAME probe
+    the source catalog uses — the route is a thin wrapper.
 
-    Com `credential_id`, lista como a execução do nó veria: um GeoServer
-    esconde do anônimo as camadas protegidas. Credencial fora do alcance de
-    quem pede é 403, e de tipo que não serve ao WFS é 400 — nunca uma listagem
-    anônima no lugar. `workflow_id` (o fluxo em edição) estende o alcance às
-    credenciais compartilhadas com o workspace DELE, para quem pode executar
-    ali; fluxo inexistente é 404 e fluxo de um workspace alheio é 403.
+    With `credential_id`, it lists as the node's run would see: a GeoServer
+    hides protected layers from anonymous users. A credential outside the
+    requester's reach is 403, and one of a type that does not serve WFS is 400 — never
+    an anonymous listing in its place. `workflow_id` (the workflow being edited) extends
+    the reach to the credentials shared with ITS workspace, for those who can run
+    there; a nonexistent workflow is 404 and a workflow from someone else's workspace is 403.
 
-    Proteções (todas no serviço):
-    - Normaliza URL: descarta query/fragment do input
-    - Validação SSRF (bloqueia IPs privados, loopback, link-local)
-    - Limite de tamanho da resposta e timeout
-    - Requer autenticação JWT
+    Protections (all in the service):
+    - Normalizes the URL: discards query/fragment from the input
+    - SSRF validation (blocks private, loopback, link-local IPs)
+    - Response size limit and timeout
+    - Requires JWT authentication
     """
     from flow.utils.credencial_wfs import sem_segredo
     from flow.utils.geo_helpers import normalize_ows_endpoint_url

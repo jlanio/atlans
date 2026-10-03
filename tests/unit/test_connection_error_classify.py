@@ -1,18 +1,19 @@
 """
-Classificacao de erros de conexao do executor (_classify_connection_error).
+Classification of executor connection errors (_classify_connection_error).
 
-Regressao: o executor tratava HTTP 401/403/404 no handshake WS como TERMINAL
-(assumia "executor removido") e parava de reconectar — encerrando com exit 0,
-que o `restart: on-failure` do Docker nao reinicia. Mas o app NUNCA nega via
-status HTTP: todo deny autoritativo chega como WS close code 4401/4403/4404.
-Um status HTTP 4xx/5xx no handshake so pode vir da BORDA (Traefik/Cloudflare) e,
-durante um deploy, e transitorio (proxy sem rota / backend subindo).
+Regression: the executor treated HTTP 401/403/404 in the WS handshake as TERMINAL
+(assumed "executor removed") and stopped reconnecting — exiting with exit 0,
+which Docker's `restart: on-failure` does not restart. But the app NEVER denies
+via HTTP status: every authoritative deny arrives as WS close code 4401/4403/4404.
+An HTTP 4xx/5xx status in the handshake can only come from the EDGE
+(Traefik/Cloudflare) and, during a deploy, it is transient (proxy without a
+route / backend starting up).
 
-Contrato agora:
-  - InvalidStatus (qualquer status HTTP)      -> NAO terminal (retry com backoff)
-  - ConnectionClosed com code 4401/4403/4404  -> terminal (deny real do app)
-  - ConnectionClosed com code 1006/1001/...   -> NAO terminal (queda transitoria)
-  - OSError (connection refused, DNS)         -> NAO terminal
+Contract now:
+  - InvalidStatus (any HTTP status)           -> NOT terminal (retry with backoff)
+  - ConnectionClosed with code 4401/4403/4404 -> terminal (real deny from the app)
+  - ConnectionClosed with code 1006/1001/...  -> NOT terminal (transient drop)
+  - OSError (connection refused, DNS)         -> NOT terminal
 """
 import types
 
@@ -34,7 +35,7 @@ def _conn_closed(code: int):
 
 @pytest.mark.parametrize("status", [401, 403, 404, 502, 503])
 def test_http_status_no_handshake_nunca_e_terminal(status):
-    """O bug: 404 do Traefik em deploy nao pode derrubar o executor."""
+    """The bug: a 404 from Traefik during a deploy must not bring the executor down."""
     _msg, _tb, terminal = _classify_connection_error(_invalid_status(status))
     assert terminal is False, f"HTTP {status} no handshake NAO deve ser terminal"
 

@@ -1,9 +1,9 @@
 /**
- * O proxy /terra deixou de chamar `await auth()` (que renovava e DESCARTAVA o
- * cookie rotacionado → logout espúrio): lê a sessão do SESSION_HEADER injetado
- * pelo middleware, e autentica o upstream com o access token do SERVIDOR (fresco)
- * em vez do Bearer possivelmente velho do cliente. Paths públicos seguem sem
- * sessão, com o Bearer do cliente intacto.
+ * The /terra proxy stopped calling `await auth()` (which renewed and DISCARDED the
+ * rotated cookie → spurious logout): it reads the session from the SESSION_HEADER injected
+ * by the middleware, and authenticates the upstream with the SERVER's (fresh) access token
+ * instead of the client's possibly stale Bearer. Public paths still go without a
+ * session, with the client's Bearer intact.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import type { NextRequest } from "next/server"
@@ -34,7 +34,7 @@ function req(path: string, headers: Record<string, string> = {}): NextRequest {
 }
 const ctx = (path: string[]) => ({ params: Promise.resolve({ path }) })
 
-// Requisição que muda estado, com corpo reenviável (arrayBuffer) e método POST.
+// A state-changing request, with a resendable body (arrayBuffer) and POST method.
 function post(path: string, headers: Record<string, string> = {}): NextRequest {
   return {
     url: `http://localhost/terra/${path}`,
@@ -63,13 +63,13 @@ describe("proxy /terra — autenticação", () => {
       ctx(["workflows"]),
     )
     expect(res.status).toBe(200)
-    expect(authMock).not.toHaveBeenCalled()             // caminho normal não chama auth()
+    expect(authMock).not.toHaveBeenCalled()             // the normal path does not call auth()
     expect(decodeMock).toHaveBeenCalledWith("HDR")
-    // Upstream autenticado com o token do servidor, não com o Bearer do cliente
+    // Upstream authenticated with the server's token, not with the client's Bearer
     expect(authHeaderEnviado().get("authorization")).toBe("Bearer SERVIDOR-FRESCO")
-    // e o header interno nunca vaza ao upstream
+    // and the internal header never leaks to the upstream
     expect(authHeaderEnviado().get("x-atlans-session")).toBeNull()
-    // repassa o path ao upstream
+    // passes the path on to the upstream
     expect(String(fetchMock.mock.calls[0][0]).endsWith("/workflows")).toBe(true)
   })
 
@@ -123,8 +123,8 @@ describe("proxy /terra — endurecimento (auditoria)", () => {
   })
 
   it("repassa o X-Forwarded-For: sem ele a API vê só o IP do container web e o rate limit vira um balde único", async () => {
-    // A API lê o XFF da direita para a esquerda; o Traefik anexa o IP real ao
-    // fim, então o que o cliente escreve à esquerda não muda o IP resolvido.
+    // The API reads XFF from right to left; Traefik appends the real IP at the
+    // end, so what the client writes on the left does not change the resolved IP.
     decodeMock.mockReturnValue({ user: { access_token: "T" } })
     const res = await GET(
       req("workflows", { "x-atlans-session": "HDR", "x-forwarded-for": "9.9.9.9, 203.0.113.7, 162.158.1.1" }),

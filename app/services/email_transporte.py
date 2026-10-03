@@ -1,20 +1,20 @@
 # app/services/email_transporte.py
 """
-O transporte dos e-mails: Resend, SMTP ou só o log.
+The email transport: Resend, SMTP or just the log.
 
-Os dois caminhos que mandam e-mail passam por aqui: os do próprio servidor
-(verificação, redefinição de senha, alertas — `email_service.py`) e o do nó
-SendEmail (`internal_email_router.py`). Quem escolhe é EMAIL_BACKEND
+Both paths that send email go through here: the server's own (verification,
+password reset, alerts — `email_service.py`) and the SendEmail node's
+(`internal_email_router.py`). The choice is made by EMAIL_BACKEND
 (`app/core/config.py`):
 
-  resend   a API da Resend (RESEND_API_KEY)
-  smtp     qualquer servidor SMTP (SMTP_HOST, SMTP_PORT, SMTP_USERNAME,
+  resend   the Resend API (RESEND_API_KEY)
+  smtp     any SMTP server (SMTP_HOST, SMTP_PORT, SMTP_USERNAME,
            SMTP_PASSWORD, SMTP_SEGURANCA = starttls | ssl | nenhuma)
-  log      nada sai; quem chama registra o e-mail no log
+  log      nothing goes out; the caller records the email in the log
 
-Vazio = o que estiver configurado: Resend com a chave, SMTP com o host, log
-sem nenhum dos dois — o mesmo comportamento de quando só havia a Resend.
-`enviar` é bloqueante: quem chama roda em thread (`asyncio.to_thread`).
+Empty = whatever is configured: Resend with the key, SMTP with the host, log
+with neither — the same behavior as when there was only Resend.
+`enviar` is blocking: the caller runs it in a thread (`asyncio.to_thread`).
 """
 from __future__ import annotations
 
@@ -30,23 +30,23 @@ logger = get_logger(__name__)
 
 BACKENDS = ("resend", "smtp", "log")
 
-# Por operação da conexão (conectar, TLS, login, envio). O nó SendEmail espera
-# 30 s pela resposta inteira (`flow/nodes/outputs/send_email.py`): com 30 s
-# por operação, um servidor lento estourava o prazo do nó com o e-mail ainda
-# saindo, e o nó falhava com o e-mail enviado.
+# Per connection operation (connect, TLS, login, send). The SendEmail node waits
+# 30 s for the whole response (`flow/nodes/outputs/send_email.py`): with 30 s
+# per operation, a slow server blew the node's deadline with the email still
+# going out, and the node failed with the email sent.
 TEMPO_LIMITE_SMTP_S = 10
 
-# O que, num destinatário, faria dele mais de um: a vírgula separa endereços,
-# `:` e `;` abrem e fecham um grupo, e a quebra de linha injetaria cabeçalho.
+# What, in a recipient, would make it more than one: the comma separates
+# addresses, `:` and `;` open and close a group, and a line break would inject a header.
 _SEPARADORES = frozenset(",;:\r\n")
 
 
 def endereco(destinatario: str) -> str:
-    """O endereço de UM destinatário (`ana@x.org` ou `Ana <ana@x.org>`).
+    """The address of ONE recipient (`ana@x.org` or `Ana <ana@x.org>`).
 
-    Levanta ValueError se o item não for exatamente um endereço. É o que faz
-    valer o teto de destinatários do nó SendEmail: sem isto, um item com
-    vírgulas virava vários `RCPT TO` no SMTP, e a lista de 50 contava um.
+    Raises ValueError if the item is not exactly one address. This is what
+    enforces the SendEmail node's recipient ceiling: without it, an item with
+    commas became several `RCPT TO` in SMTP, and the list of 50 counted as one.
     """
     item = destinatario.strip()
     if not item or any(c in _SEPARADORES for c in item):
@@ -60,9 +60,9 @@ def endereco(destinatario: str) -> str:
 
 
 def backend() -> str:
-    """O transporte em uso: o escolhido em EMAIL_BACKEND ou o configurado.
+    """The transport in use: the one chosen in EMAIL_BACKEND or the configured one.
 
-    Um valor desconhecido nem chega aqui: `app/core/config.py` para a API.
+    An unknown value never even gets here: `app/core/config.py` stops the API.
     """
     escolhido = config.EMAIL_BACKEND
     if escolhido in BACKENDS:
@@ -75,15 +75,15 @@ def backend() -> str:
 
 
 def ativo() -> bool:
-    """Há um transporte de verdade? Em `log`, nenhum e-mail sai."""
+    """Is there a real transport? In `log`, no email goes out."""
     return backend() != "log"
 
 
 def enviar(para: list[str], assunto: str, html: str) -> str | None:
-    """Envia o e-mail pelo transporte em uso e devolve o id da mensagem.
+    """Sends the email through the transport in use and returns the message id.
 
-    Levanta em qualquer falha do transporte, e também em `log`: quem chama
-    decide o que fazer quando não há transporte (`ativo()`).
+    Raises on any transport failure, and also in `log`: the caller decides
+    what to do when there is no transport (`ativo()`).
     """
     qual = backend()
     for destinatario in para:
@@ -109,8 +109,8 @@ def _enviar_resend(para: list[str], assunto: str, html: str) -> str | None:
 
 
 def _enviar_smtp(para: list[str], assunto: str, html: str) -> str | None:
-    # EmailMessage recusa quebra de linha em cabeçalho (ValueError): um assunto
-    # vindo de workflow não injeta cabeçalho nenhum.
+    # EmailMessage rejects line breaks in headers (ValueError): a subject coming
+    # from a workflow injects no header at all.
     mensagem = EmailMessage()
     mensagem["From"] = config.EMAIL_FROM
     mensagem["To"] = ", ".join(para)
@@ -132,7 +132,7 @@ def _enviar_smtp(para: list[str], assunto: str, html: str) -> str | None:
             smtp.starttls(context=contexto)
         if config.SMTP_USERNAME:
             smtp.login(config.SMTP_USERNAME, config.SMTP_PASSWORD)
-        # Os destinatários vão explícitos: sem `to_addrs`, o smtplib os tira de
-        # novo do cabeçalho `To`, e é ali que um item vira vários.
+        # The recipients go explicitly: without `to_addrs`, smtplib takes them again
+        # from the `To` header, and that is where one item becomes several.
         smtp.send_message(mensagem, to_addrs=[endereco(p) for p in para])
     return mensagem["Message-ID"]

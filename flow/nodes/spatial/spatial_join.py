@@ -12,8 +12,8 @@ logger = get_logger(__name__)
 @register_node
 class SpatialJoinNode(BaseNode):
     """
-    Realiza um join espacial entre dois GeoDataFrames usando gpd.sjoin.
-    O GeoDataFrame direito (layerB) é reprojetado para o CRS do esquerdo (layerA) se necessário.
+    Performs a spatial join between two GeoDataFrames using gpd.sjoin.
+    The right GeoDataFrame (layerB) is reprojected to the left one's CRS (layerA) if needed.
     """
 
     @classmethod
@@ -79,11 +79,11 @@ class SpatialJoinNode(BaseNode):
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         self.validate()
 
-        # how/predicate já validados contra as options pelo self.validate().
+        # how/predicate already validated against the options by self.validate().
         how = self.parameters['how']
         predicate = self.parameters['predicate']
 
-        # 'dwithin' exige uma distância (nas unidades do CRS).
+        # 'dwithin' requires a distance (in CRS units).
         distance = None
         if predicate == 'dwithin':
             try:
@@ -96,8 +96,8 @@ class SpatialJoinNode(BaseNode):
                     "nas unidades do CRS (use um CRS métrico para valores em metros)."
                 )
 
-        # Obtém as camadas via helper da classe base; exige CRS nas duas (a
-        # direita é alinhada ao CRS da esquerda dentro da thread, em _sjoin).
+        # Gets the layers via the base class helper; requires a CRS on both (the
+        # right one is aligned to the left one's CRS inside the thread, in _sjoin).
         left_gdf, right_gdf = self.get_pair(inputs, crs="alinhar")
 
         logger.info(
@@ -109,7 +109,7 @@ class SpatialJoinNode(BaseNode):
             left: gpd.GeoDataFrame,
             right: gpd.GeoDataFrame
         ) -> gpd.GeoDataFrame:
-            # Reprojeta o GDF direito para o CRS do esquerdo se forem diferentes
+            # Reprojects the right GDF to the left one's CRS if they differ
             if left.crs != right.crs:
                 logger.info(f"Reprojetando GeoDataFrame direito de {right.crs} para {left.crs}.")
             right = align_crs(left, right)

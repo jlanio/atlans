@@ -1,26 +1,26 @@
 # tests/unit/test_localidade_dos_dados.py
 """
-Localidade dos dados nos nos de saida.
+Data locality in the output nodes.
 
-A politica saiu de um booleano de UM no (`keepLocal` do DataOutput) e virou um
-campo comum a todos os nos que gravam, governado pela maquina. Estes testes
-travam o que faz isso significar alguma coisa:
+The policy went from a boolean on ONE node (DataOutput's `keepLocal`) to a
+field common to all nodes that write, governed by the machine. These tests
+lock down what makes that mean something:
 
-  PROIBE        a politica da maquina nao pode ser afrouxada por um workflow. O
-                campo do no nem oferece a opcao de enviar — se oferecesse, seria
-                uma escolha que o executor ignora em silencio.
+  PROIBE        (forbids) the machine's policy cannot be loosened by a workflow. The
+                node's field does not even offer the option to send — if it did, it
+                would be a choice the executor silently ignores.
 
-  NAO SAI       com localidade `executor` nao ha upload. Vale para o Drive
-                tambem, que ate aqui so tinha o caminho que enviava os bytes.
+  NAO SAI       (does not leave) with `executor` locality there is no upload. This holds
+                for the Drive too, which until now only had the path that sent the bytes.
 
-  FALHA ALTO    `PublishMap` e o anexo automatico do `SendEmail` so funcionam
-                enviando. Numa maquina que retem dados eles param, com mensagem
-                — pular em silencio deixaria o run verde e ninguem saberia que a
-                camada nunca foi publicada.
+  FALHA ALTO    (fails loudly) `PublishMap` and `SendEmail`'s automatic attachment only work
+                by sending. On a machine that retains data they stop, with a message
+                — skipping silently would leave the run green and nobody would know the
+                layer was never published.
 
-  ATOMICO       o arquivo gravado na pasta do GeoSync nao pode ser catalogado
-                pela metade: o scanner passa a cada 10 s e reconhece por tamanho
-                e mtime.
+  ATOMICO       (atomic) the file written to the GeoSync folder must not be cataloged
+                half-written: the scanner passes every 10 s and recognizes by size
+                and mtime.
 """
 import os
 
@@ -32,7 +32,7 @@ from flow.utils.artifact_helpers import EnvioBloqueadoError
 
 @pytest.fixture
 def maquina(tmp_path, monkeypatch):
-    """Executor com raiz de artefatos e pasta de GeoSync temporarias."""
+    """Executor with temporary artifact root and GeoSync folder."""
     raiz = tmp_path / "artifacts"
     raiz.mkdir()
     pasta = tmp_path / "geosync"
@@ -44,7 +44,7 @@ def maquina(tmp_path, monkeypatch):
     return raiz, pasta
 
 
-# ── Politica da maquina ──────────────────────────────────────────────────────
+# ── The machine's policy ─────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("modo,esperado", [
     ("catalog", "executor"),
@@ -56,16 +56,16 @@ def maquina(tmp_path, monkeypatch):
     ("", "servidor"),
 ])
 def test_politica_vem_do_modo_do_geosync(monkeypatch, modo, esperado):
-    """Reusa `EXECUTOR_SYNC_MODE`, que e o que a tela do desktop ja grava sob o
-    rotulo "Localidade dos dados". Uma variavel propria seria uma segunda fonte
-    de verdade para a mesma decisao."""
+    """Reuses `EXECUTOR_SYNC_MODE`, which is what the desktop screen already writes under
+    the label "Localidade dos dados" (data locality). A variable of its own would be a
+    second source of truth for the same decision."""
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", modo)
     assert artifact_helpers.localidade_padrao() == esperado
 
 
 def test_sem_a_variavel_o_padrao_e_servidor(monkeypatch):
-    """E o caso do servidor, onde `flow/` tambem roda in-process: o conteudo ja
-    esta la. E o comportamento de sempre para todo executor existente."""
+    """This is the server's case, where `flow/` also runs in-process: the content is
+    already there. It is the long-standing behavior for every existing executor."""
     monkeypatch.delenv("EXECUTOR_SYNC_MODE", raising=False)
     assert artifact_helpers.localidade_padrao() == "servidor"
 
@@ -80,15 +80,15 @@ def test_herdar_segue_a_maquina(monkeypatch, escolha):
 
 
 def test_no_pode_APERTAR_a_politica(monkeypatch):
-    """Maquina permite enviar, no pede local → fica local. Apertar e sempre
-    aceito; e o unico sentido em que a escolha do no vale."""
+    """Machine allows sending, node asks for local → it stays local. Tightening is always
+    accepted; it is the only direction in which the node's choice counts."""
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", "upload")
     assert artifact_helpers.resolver_localidade("executor") == ("executor", "nó")
 
 
 def test_no_NAO_pode_afrouxar_a_politica(monkeypatch):
-    """O caso central. Nem um valor inventado, nem um fluxo antigo, nem edicao
-    fora da UI conseguem fazer um executor em catalogo enviar."""
+    """The central case. Neither an invented value, nor an old workflow, nor an edit
+    outside the UI can make an executor in catalog mode send."""
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", "catalog")
     for escolha in (None, "herdar", "servidor", "minio", "qualquer", "EXECUTOR"):
         efetiva, _ = artifact_helpers.resolver_localidade(escolha)
@@ -96,8 +96,8 @@ def test_no_NAO_pode_afrouxar_a_politica(monkeypatch):
 
 
 def test_o_schema_NAO_oferece_a_opcao_de_enviar():
-    """Se oferecesse, seria a unica escolha que o executor ignora em silencio —
-    a pessoa marca, acredita, e o comportamento e outro."""
+    """If it offered it, it would be the only choice the executor silently ignores —
+    the person ticks it, believes it, and the behavior is something else."""
     valores = [o["value"] for o in artifact_helpers.propriedade_localidade()["options"]]
     assert valores == ["herdar", "executor"]
     assert "servidor" not in valores
@@ -115,7 +115,7 @@ def test_frase_do_log_diz_o_destino_e_quem_decidiu(monkeypatch):
     assert "apenas neste executor" in frase and "nó" in frase
 
 
-# ── Nos que so funcionam enviando ────────────────────────────────────────────
+# ── Nodes that only work by sending ──────────────────────────────────────────
 
 def test_envio_permitido_passa_quando_a_maquina_permite(monkeypatch):
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", "bidirectional")
@@ -123,8 +123,8 @@ def test_envio_permitido_passa_quando_a_maquina_permite(monkeypatch):
 
 
 def test_envio_bloqueado_explica_configuracao_causa_e_saida(monkeypatch):
-    """A mensagem e o unico feedback que a pessoa recebe. Tem de dizer ONDE esta
-    a configuracao, POR QUE o no precisa enviar, e O QUE fazer."""
+    """The message is the only feedback the person gets. It has to say WHERE the
+    setting is, WHY the node needs to send, and WHAT to do."""
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", "catalog")
     with pytest.raises(EnvioBloqueadoError) as e:
         artifact_helpers.exigir_envio_permitido(
@@ -135,22 +135,22 @@ def test_envio_bloqueado_explica_configuracao_causa_e_saida(monkeypatch):
     assert "GeoSync" in msg and "Manter apenas no executor" in msg
     assert "publicar uma camada exige enviar" in msg
     assert "O que fazer" in msg
-    # Tem de sobreviver a um console cp1252: um UnicodeEncodeError ao explicar
-    # a recusa trocaria a explicacao por um traceback.
+    # It has to survive a cp1252 console: a UnicodeEncodeError while explaining
+    # the refusal would replace the explanation with a traceback.
     msg.encode("cp1252")
 
 
 def test_bloqueio_nao_e_erro_de_configuracao_do_no():
-    """Excecao propria: quem le o log precisa distinguir "voce montou errado" de
-    "esta maquina nao permite"."""
+    """A dedicated exception: whoever reads the log needs to distinguish "you set it up wrong"
+    from "this machine does not allow it"."""
     assert issubclass(EnvioBloqueadoError, RuntimeError)
     assert not issubclass(EnvioBloqueadoError, ValueError)
 
 
 @pytest.mark.parametrize("no", ["PublishMap", "SendEmail"])
 def test_nos_que_enviam_chamam_a_guarda(no):
-    """Ler o codigo: o defeito seria de FLUXO — a guarda existir e nao ser
-    chamada — e exercitar os dois nos exigiria portal, SMTP e um GeoDataFrame."""
+    """Reads the code: the defect would be one of FLOW — the guard existing and not being
+    called — and exercising the two nodes would require a portal, SMTP and a GeoDataFrame."""
     import pathlib
     arquivo = {"PublishMap": "publish_map.py", "SendEmail": "send_email.py"}[no]
     src = pathlib.Path(f"flow/nodes/outputs/{arquivo}").read_text(encoding="utf-8")
@@ -158,8 +158,8 @@ def test_nos_que_enviam_chamam_a_guarda(no):
 
 
 def test_publishmap_barra_ANTES_de_serializar():
-    """Serializar um GeoDataFrame grande para depois recusar gasta CPU e memoria
-    num resultado que ja se sabia que seria negado."""
+    """Serializing a large GeoDataFrame only to refuse it afterwards wastes CPU and memory
+    on a result already known to be denied."""
     import pathlib
     src = pathlib.Path("flow/nodes/outputs/publish_map.py").read_text(encoding="utf-8")
     corpo = src[src.index("async def execute"):]
@@ -169,8 +169,8 @@ def test_publishmap_barra_ANTES_de_serializar():
 # ── Despacho compartilhado ───────────────────────────────────────────────────
 
 def test_persistir_artefato_local_nao_faz_nenhuma_chamada_http(maquina, monkeypatch):
-    """O `if` que escolhe o destino vive num lugar so justamente para isto: cada
-    copia dele seria um ponto novo por onde dado pessoal poderia vazar."""
+    """The `if` that chooses the destination lives in a single place precisely for this:
+    each copy of it would be a new point through which personal data could leak."""
     import httpx
 
     def explode(*a, **k):
@@ -203,24 +203,24 @@ def test_persistir_artefato_servidor_vai_para_o_upload(maquina, monkeypatch):
     assert chamados == ["a.json"]
 
 
-# ── Drive local: gravar na pasta do GeoSync ──────────────────────────────────
+# ── Local Drive: write to the GeoSync folder ─────────────────────────────────
 
 @pytest.fixture
 def retendo(maquina, monkeypatch):
-    """A pasta so recebe arquivo local quando a maquina esta em catalogo."""
+    """The folder only receives a local file when the machine is in catalog mode."""
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", "catalog")
     return maquina
 
 
 @pytest.mark.parametrize("modo", ["upload", "bidirectional", "download", ""])
 def test_NAO_grava_na_pasta_quando_o_geosync_ENVIARIA(maquina, monkeypatch, modo):
-    """O bug que esta guarda existe para impedir.
+    """The bug this guard exists to prevent.
 
-    Em `upload`/`bidirectional` o GeoSync varre a pasta a cada 10 s e ENVIA os
-    bytes de tudo que encontra — `_upload_dataset` so chama `register` quando o
-    modo e `catalog`. Sem esta guarda, marcar "Manter apenas no executor" num nó
-    com destino Drive publicaria o arquivo no MinIO em segundos: o oposto exato
-    do que a opcao promete, e em silencio.
+    In `upload`/`bidirectional` GeoSync scans the folder every 10 s and SENDS the
+    bytes of everything it finds — `_upload_dataset` only calls `register` when the
+    mode is `catalog`. Without this guard, ticking "Manter apenas no executor" (keep
+    only on the executor) on a node with a Drive destination would publish the file to
+    MinIO within seconds: the exact opposite of what the option promises, and silently.
     """
     _, pasta = maquina
     monkeypatch.setenv("EXECUTOR_SYNC_MODE", modo)
@@ -244,15 +244,15 @@ def test_grava_na_pasta_e_deixa_o_geosync_catalogar(retendo):
 
 
 def test_escrita_e_ATOMICA_e_nao_deixa_temporario(retendo, monkeypatch):
-    """O scanner varre a cada 10 s e reconhece por tamanho+mtime; pego no meio
-    da escrita, cataloga um arquivo pela metade. O temporario comeca com ponto,
-    que o scanner ignora, e o `os.replace` publica de uma vez."""
+    """The scanner scans every 10 s and recognizes by size+mtime; caught in the middle
+    of the write, it catalogs a half-written file. The temporary file starts with a dot,
+    which the scanner ignores, and `os.replace` publishes it all at once."""
     _, pasta = retendo
     vistos: list[str] = []
     replace_real = os.replace
 
     def espiao(origem, destino):
-        # Neste instante o conteudo final ainda nao existe sob o nome definitivo.
+        # At this instant the final content does not yet exist under the definitive name.
         vistos.extend(p.name for p in pasta.iterdir())
         return replace_real(origem, destino)
 
@@ -262,13 +262,13 @@ def test_escrita_e_ATOMICA_e_nao_deixa_temporario(retendo, monkeypatch):
     assert all(n.startswith(".") for n in vistos), (
         f"arquivo visivel ao scanner durante a escrita: {vistos}"
     )
-    # Nada de lixo depois.
+    # No leftovers afterwards.
     assert [p.name for p in pasta.iterdir()] == ["saida.geojson"]
 
 
 def test_temporario_e_removido_quando_a_escrita_falha(retendo, monkeypatch):
-    """Um `.atlans-tmp-*` orfao e invisivel ao usuario E ao scanner: ficaria
-    ocupando disco para sempre sem ninguem notar."""
+    """An orphaned `.atlans-tmp-*` is invisible to the user AND to the scanner: it would
+    keep taking up disk forever without anyone noticing."""
     _, pasta = retendo
 
     def replace_que_falha(*a, **k):
@@ -289,8 +289,8 @@ def test_sem_pasta_configurada_o_erro_diz_o_que_fazer(retendo, monkeypatch):
 
 
 def test_workspace_divergente_e_barrado(retendo, monkeypatch):
-    """O GeoSync sincroniza contra UM workspace. Gravar aqui com outro publicaria
-    o arquivo no Drive de outro cliente."""
+    """GeoSync syncs against ONE workspace. Writing here with another would publish
+    the file to another customer's Drive."""
     monkeypatch.setenv("EXECUTOR_WORKSPACE_ID", "ws-outro")
     with pytest.raises(ValueError) as e:
         artifact_helpers.salvar_na_pasta_do_geosync(b"x", "a.geojson", "ws-1")
@@ -298,8 +298,8 @@ def test_workspace_divergente_e_barrado(retendo, monkeypatch):
 
 
 def test_workspace_vazio_significa_auto_deteccao(retendo, monkeypatch):
-    """Vazio so acontece quando ha um unico workspace acessivel
-    (executor/main.py), entao coincide por construcao."""
+    """Empty only happens when there is a single accessible workspace
+    (executor/main.py), so it matches by construction."""
     monkeypatch.delenv("EXECUTOR_WORKSPACE_ID", raising=False)
     artifact_helpers.salvar_na_pasta_do_geosync(b"x", "a.geojson", "ws-1")
 
@@ -324,8 +324,8 @@ def test_com_overwrite_substitui(retendo):
 
 
 def test_formatos_dos_nos_sao_todos_visiveis_ao_scanner():
-    """Um formato fora de `SUPPORTED_EXTENSIONS` seria gravado na pasta e NUNCA
-    catalogado — o arquivo existiria e o Drive nunca saberia dele."""
+    """A format outside `SUPPORTED_EXTENSIONS` would be written to the folder and NEVER
+    cataloged — the file would exist and the Drive would never know about it."""
     from executor.sync.scanner import SUPPORTED_EXTENSIONS
 
     for ext in (".geojson", ".json", ".parquet", ".zip"):
@@ -333,9 +333,9 @@ def test_formatos_dos_nos_sao_todos_visiveis_ao_scanner():
 
 
 def test_drive_local_nao_devolve_caminho_absoluto():
-    """`artifact_s3_key` circula pelo workflow e fica gravado no run. Devolver o
-    caminho da pasta do usuario vazaria a estrutura de diretorios da maquina —
-    a mesma razao pela qual `local_relative_path` e relativo."""
+    """`artifact_s3_key` circulates through the workflow and is stored in the run. Returning
+    the path of the user's folder would leak the machine's directory structure —
+    the same reason `local_relative_path` is relative."""
     import pathlib
     src = pathlib.Path("flow/nodes/outputs/data_output.py").read_text(encoding="utf-8")
     trecho = src[src.index("if manter_local and create_drive_entry:"):]
@@ -345,19 +345,19 @@ def test_drive_local_nao_devolve_caminho_absoluto():
 
 
 def test_drive_local_nao_emite_artifact():
-    """Quem cria a linha no Drive e o GeoSync. Emitir `__artifact__` faria o
-    servidor derivar uma s3_key para um objeto que nunca existiu, e a UI
-    ofereceria um download 404."""
+    """The one that creates the row in the Drive is GeoSync. Emitting `__artifact__` would
+    make the server derive an s3_key for an object that never existed, and the UI
+    would offer a 404 download."""
     import pathlib
     src = pathlib.Path("flow/nodes/outputs/data_output.py").read_text(encoding="utf-8")
     trecho = src[src.index("if manter_local and create_drive_entry:"):]
     trecho = trecho[:trecho.index("if manter_local:")]
-    # A CHAVE, e nao a palavra: o comentario do bloco explica justamente por que
-    # ela nao esta la.
+    # The KEY, not the word: the block's comment explains precisely why
+    # it is not there.
     assert '"__artifact__":' not in trecho
 
 
-# ── Guarda de download no servidor ───────────────────────────────────────────
+# ── Download guard on the server ─────────────────────────────────────────────
 
 def test_download_de_conteudo_local_e_recusado():
     from types import SimpleNamespace
@@ -382,10 +382,10 @@ def test_download_de_arquivo_normal_passa():
 
 
 def test_guarda_vive_no_SERVICE_e_nao_no_router():
-    """Regressao: `GET /drive/{id}/download` chamava `generate_download_url`
-    direto e chegava ao boto3 com `s3_key=None` — ParamValidationError, que nao e
-    ClientError, escapa de todo except e vira 500 mudo. A UI escondia o botao; a
-    rota continuava alcancavel."""
+    """Regression: `GET /drive/{id}/download` called `generate_download_url`
+    directly and reached boto3 with `s3_key=None` — ParamValidationError, which is not
+    a ClientError, escapes every except and becomes a silent 500. The UI hid the button;
+    the route was still reachable."""
     import inspect
 
     from app.services.drive_service import DriveService
@@ -394,10 +394,10 @@ def test_guarda_vive_no_SERVICE_e_nao_no_router():
 
 
 def test_replace_retenta_quando_o_scanner_segura_o_arquivo(retendo, monkeypatch):
-    """No Windows, `os.replace` sobre um arquivo aberto por outro handle falha —
-    e o scanner do GeoSync abre os arquivos da pasta, numa thread deste mesmo
-    processo, para calcular MD5. Sem retry, o run morreria com um
-    "[WinError 5] Acesso negado" que nao diz nada."""
+    """On Windows, `os.replace` over a file opened by another handle fails —
+    and the GeoSync scanner opens the folder's files, in a thread of this same
+    process, to compute MD5. Without a retry, the run would die with a
+    "[WinError 5] Acesso negado" (access denied) that says nothing."""
     _, pasta = retendo
     tentativas = {"n": 0}
     replace_real = os.replace
@@ -417,8 +417,8 @@ def test_replace_retenta_quando_o_scanner_segura_o_arquivo(retendo, monkeypatch)
 
 
 def test_replace_desiste_e_propaga_se_nao_for_transitorio(retendo, monkeypatch):
-    """Retry infinito esconderia um arquivo travado de verdade (antivirus, outro
-    programa com ele aberto) e o run ficaria pendurado sem explicacao."""
+    """An infinite retry would hide a genuinely locked file (antivirus, another
+    program with it open) and the run would hang without explanation."""
     _, pasta = retendo
 
     def sempre_falha(origem, destino):
@@ -429,33 +429,33 @@ def test_replace_desiste_e_propaga_se_nao_for_transitorio(retendo, monkeypatch):
 
     with pytest.raises(PermissionError):
         artifact_helpers.salvar_na_pasta_do_geosync(b"x", "a.geojson", "ws-1")
-    # E sem deixar o temporario para tras.
+    # And without leaving the temporary file behind.
     assert list(pasta.iterdir()) == []
 
 
-# ── E-mail com referencia que nao tem download ───────────────────────────────
+# ── E-mail with a reference that has no download ─────────────────────────────
 
 def test_email_nao_embute_link_morto():
-    """`_build_artifact_html` poe o que receber num `href`. Sem presign, isso
-    seria a referencia crua do no anterior — um link RELATIVO num e-mail HTML,
-    que nao leva a lugar nenhum. O e-mail sairia anunciando "anexo disponivel
-    para download" apontando para o nada.
+    """`_build_artifact_html` puts whatever it receives into an `href`. Without presign, that
+    would be the previous node's raw reference — a RELATIVE link in an HTML e-mail,
+    which leads nowhere. The e-mail would go out announcing "anexo disponivel
+    para download" (attachment available for download) pointing at nothing.
 
-    O caso comum e um artefato mantido no executor: nao ha objeto no storage,
-    entao nao ha o que assinar.
+    The common case is an artifact kept on the executor: there is no object in storage,
+    so there is nothing to sign.
     """
     import pathlib
     src = pathlib.Path("flow/nodes/outputs/send_email.py").read_text(encoding="utf-8")
     bloco = src[src.index('if attach_mode == "link":'):]
     bloco = bloco[:bloco.index("elif attach_mode ==")]
-    # A montagem do HTML tem de estar sob a guarda de "é URL", nao solta.
+    # Building the HTML has to be under the "is a URL" guard, not loose.
     guarda = bloco.index('if artifact_ref.startswith(("http://", "https://")):\n                    body +=')
     assert guarda > 0
 
 
 def test_anexo_sem_presign_nem_endpoint_publico_sai_sem_link(monkeypatch):
-    """O modo "auto" passa a chave crua quando o presign falha. Sem
-    MINIO_EXTERNAL_ENDPOINT, ela ia num `href` relativo: um link morto."""
+    """The "auto" mode passes the raw key when the presign fails. Without
+    MINIO_EXTERNAL_ENDPOINT, it went into a relative `href`: a dead link."""
     from unittest.mock import MagicMock
 
     from flow.nodes.outputs.send_email import SendEmailNode
@@ -473,9 +473,9 @@ def test_anexo_sem_presign_nem_endpoint_publico_sai_sem_link(monkeypatch):
 # ── PublishMap: fallback e degradacao, nao politica ──────────────────────────
 
 def test_publishmap_fallback_registra_que_FOI_falha():
-    """`content_location` diz ONDE o conteudo esta; `local_fallback` diz POR QUE.
-    Marcar False no fallback contaria uma falha do portal como se fosse uma
-    decisao de privacidade."""
+    """`content_location` says WHERE the content is; `local_fallback` says WHY.
+    Setting False on the fallback would count a portal failure as if it were a
+    privacy decision."""
     import pathlib
     src = pathlib.Path("flow/nodes/outputs/publish_map.py").read_text(encoding="utf-8")
     bloco = src[src.index("meta.update({"):]

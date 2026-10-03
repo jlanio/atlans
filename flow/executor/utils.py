@@ -1,12 +1,12 @@
 # flow/executor/utils.py
-"""Helpers de inspeção e debug de outputs."""
+"""Helpers for inspecting and debugging outputs."""
 from flow.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 def _count_gdf_features(data: dict) -> "int | None":
-    """Conta total de features em GeoDataFrames presentes em um dict de outputs/inputs."""
+    """Counts the total features in the GeoDataFrames present in an outputs/inputs dict."""
     try:
         import geopandas as gpd
         total = sum(len(v) for v in data.values() if isinstance(v, gpd.GeoDataFrame))
@@ -16,42 +16,42 @@ def _count_gdf_features(data: dict) -> "int | None":
         return None
 
 
-# Teto por saida. Uma tabela larga (censo, dados brutos de sensor) passa de mil
-# colunas; a lista vai para o node_stats, que e persistido em JSON e devolvido
-# na observabilidade. O que interessa e alimentar sugestao de nome de coluna, e
-# ninguem escolhe entre mil — truncar aqui evita inchar o registro de todo run.
+# Ceiling per output. A wide table (census, raw sensor data) goes past a thousand
+# columns; the list goes into node_stats, which is persisted as JSON and returned
+# in observability. What matters is feeding column name suggestions, and
+# nobody picks among a thousand — truncating here avoids bloating every run's record.
 #
-# Publico porque a UI avisa que a lista foi cortada quando ela vem no limite.
+# Public because the UI warns that the list was cut when it arrives at the limit.
 MAX_COLUNAS = 200
 
 
 def _coluna_de_geometria(valor) -> "str | None":
-    """Nome da coluna de geometria ATIVA, quando ha uma.
+    """Name of the ACTIVE geometry column, when there is one.
 
-    Perguntar ao GeoDataFrame em vez de adivinhar por nome: o padrao do
-    geopandas e "geometry", mas os nos de banco usam "geom", e um atributo
-    chamado "geom" num DataFrame comum nao e geometria nenhuma.
+    Ask the GeoDataFrame instead of guessing by name: the geopandas
+    default is "geometry", but the database nodes use "geom", and an attribute
+    called "geom" in a plain DataFrame is no geometry at all.
     """
     nome = getattr(valor, "_geometry_column_name", None)
     return str(nome) if nome else None
 
 
 def _colunas_das_saidas(data: dict) -> "dict | None":
-    """Colunas de ATRIBUTO de cada saida tabular de um no.
+    """ATTRIBUTE columns of each tabular output of a node.
 
-    Existe para o editor parar de exigir adivinhacao: quem configura um Join ou
-    um filtro precisa saber quais colunas chegam ali, e a unica forma era
-    executar e olhar o resultado. Gravado por execucao, cobre QUALQUER no —
-    inclusive PythonScript, cuja saida nenhuma analise estatica prediz.
+    Exists so the editor stops requiring guesswork: whoever configures a Join or
+    a filter needs to know which columns arrive there, and the only way was to
+    run it and look at the result. Recorded per execution, it covers ANY node —
+    including PythonScript, whose output no static analysis can predict.
 
-    A coluna de geometria fica DE FORA. A lista alimenta campos que pedem nome
-    de coluna de atributo, e a geometria nao serve para nenhum deles: no Join,
-    traze-la de B colide com a de A e o no falha; no filtro, comparar geometria
-    com um valor tambem falha. Sugerir o que sempre da errado e pior que nao
-    sugerir.
+    The geometry column is left OUT. The list feeds fields that ask for an
+    attribute column name, and geometry is useless for all of them: in the Join,
+    bringing it from B collides with A's and the node fails; in the filter,
+    comparing geometry with a value also fails. Suggesting what always goes wrong
+    is worse than not suggesting.
 
-    Devolve None quando nao ha nada tabular: `node_stats` e por no e por run, e
-    uma chave a mais em cada um deles se paga em bytes no banco.
+    Returns None when there is nothing tabular: `node_stats` is per node and per
+    run, and an extra key in each of them is paid for in bytes in the database.
     """
     try:
         import pandas as pd
@@ -62,10 +62,10 @@ def _colunas_das_saidas(data: dict) -> "dict | None":
                 continue
             geometria = _coluna_de_geometria(valor)
             nomes = [str(c) for c in valor.columns if str(c) != geometria]
-            # Truncar sem inventar item na lista: o marcador de corte que havia
-            # aqui ("… (+312)") ia junto das colunas, e a UI renderiza CADA item
-            # como sugestao clicavel — dava para inserir o marcador como se
-            # fosse nome de coluna. Quem exibe deduz o corte pelo tamanho.
+            # Truncate without inventing an item in the list: the cut marker that used
+            # to be here ("… (+312)") went along with the columns, and the UI renders
+            # EACH item as a clickable suggestion — you could insert the marker as if
+            # it were a column name. Whoever displays it infers the cut from the size.
             achadas[str(chave)] = nomes[:MAX_COLUNAS]
         return achadas or None
     except Exception as exc:
@@ -74,19 +74,19 @@ def _colunas_das_saidas(data: dict) -> "dict | None":
 
 
 def _build_debug_summary(data: dict, with_bounds: bool = True) -> dict:
-    """Constrói resumo legível de inputs/outputs para eventos de debug automático.
+    """Builds a readable summary of inputs/outputs for automatic debug events.
 
-    `with_bounds=False` omite o `total_bounds` do GeoDataFrame: ele varre TODAS
-    as geometrias (O(n) — 13,6 ms num GDF de 300k feições) e isso só se paga no
-    evento de debug, que é opt-in por `debug_mode`. O caminho de log por nó
-    (`_LazySummary`) passa False.
+    `with_bounds=False` omits the GeoDataFrame's `total_bounds`: it scans ALL
+    geometries (O(n) — 13.6 ms on a GDF of 300k features) and that only pays off
+    in the debug event, which is opt-in via `debug_mode`. The per-node log path
+    (`_LazySummary`) passes False.
     """
     import json
     resumo: dict = {}
     for key, value in data.items():
         try:
-            # GeoDataFrame tem total_bounds e crs; DataFrame puro nao.
-            # Discrimina os dois para nao cair no except generico.
+            # GeoDataFrame has total_bounds and crs; a plain DataFrame does not.
+            # Tells the two apart so as not to fall into the generic except.
             if hasattr(value, "total_bounds") and hasattr(value, "crs"):
                 colunas = list(value.columns)
                 crs = str(value.crs) if value.crs else "N/A"
@@ -106,10 +106,10 @@ def _build_debug_summary(data: dict, with_bounds: bool = True) -> dict:
             elif isinstance(value, list):
                 resumo[key] = f"list | {len(value)} itens"
             elif isinstance(value, (str, bytes)):
-                # Fatia ANTES de serializar. `json.dumps` de um corpo de 20 MB
-                # (http_request devolve o response cru) materializava os 20 MB
-                # inteiros só para descartar tudo menos 300 chars — medido:
-                # 20 MB de pico para produzir 313 caracteres.
+                # Slice BEFORE serializing. `json.dumps` of a 20 MB body
+                # (http_request returns the raw response) materialized the whole
+                # 20 MB only to discard everything but 300 chars — measured:
+                # 20 MB of peak memory to produce 313 characters.
                 trecho = value[:300]
                 if isinstance(trecho, bytes):
                     trecho = trecho.decode("utf-8", "replace")

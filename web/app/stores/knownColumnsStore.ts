@@ -1,57 +1,57 @@
 import { create } from 'zustand'
 
-// Colunas conhecidas por nó — a memória que alimenta "Vistas na última
-// execução" nos campos que pedem nome de coluna.
+// Known columns per node — the memory that feeds "Vistas na última execução"
+// (seen in the last execution) in the fields that ask for a column name.
 //
-// Vive numa store PRÓPRIA, fora da workflowExecutionStore, de propósito: o
-// ciclo de vida é outro. O estado de execução nasce e morre com o run
-// (`startExecution`/`resetExecution` zeram tudo, e devem zerar); as colunas
-// são conhecimento acumulado sobre o WORKFLOW — clicar em Executar de novo,
-// um erro de save ou a troca de aba não muda o que a última execução viu.
-// Enquanto as colunas moravam no `statusWorkflow`, cada um dos ~6 caminhos de
-// reset as apagava e a sugestão parecia funcionar "às vezes".
+// It lives in its OWN store, outside workflowExecutionStore, on purpose: the
+// lifecycle is different. Execution state is born and dies with the run
+// (`startExecution`/`resetExecution` wipe everything, and should); the columns
+// are accumulated knowledge about the WORKFLOW — clicking Executar again,
+// a save error or a tab switch does not change what the last execution saw.
+// While the columns lived in `statusWorkflow`, each of the ~6 reset paths
+// erased them and the suggestion seemed to work "sometimes".
 //
-// O que zera esta store é UMA coisa só: abrir OUTRO workflow. Node ids são
-// UUIDs, mas um workflow duplicado herda os ids do original — sem o corte por
-// workflow, as colunas de A apareceriam como sugestão em B.
+// What wipes this store is ONE thing only: opening ANOTHER workflow. Node ids
+// are UUIDs, but a duplicated workflow inherits the original's ids — without the
+// per-workflow cut, A's columns would show up as suggestions in B.
 
 export interface ColunasDoNo {
-  /** Colunas por porta de saída — o mesmo formato de `output_columns` que o
-   *  executor publica no evento e grava no `node_stats`. `{}` é uma LÁPIDE:
-   *  o nó completou ao vivo SEM publicar colunas, e a ausência é informação
-   *  (impede a semeadura atrasada de ressuscitar dado mais velho). */
+  /** Columns per output port — the same `output_columns` shape that the
+   *  executor publishes in the event and writes to `node_stats`. `{}` is a
+   *  TOMBSTONE: the node completed live WITHOUT publishing columns, and the
+   *  absence is information (it keeps the late seeding from resurrecting older data). */
   porPorta: Record<string, string[]>
-  /** Run de onde vieram. Rastreio para depuração, não identidade. */
+  /** Run they came from. Tracing for debugging, not identity. */
   runId: string | null
-  /** true  = vistas AO VIVO nesta sessão (evento de run);
-   *  false = re-hidratadas do último run persistido — podem estar
-   *          desatualizadas, e o rótulo da sugestão diz isso. */
+  /** true  = seen LIVE in this session (run event);
+   *  false = re-hydrated from the last persisted run — they may be
+   *          out of date, and the suggestion label says so. */
   fresh: boolean
-  /** true quando o stat de origem veio truncado (corte de 8KB do executor
-   *  reduz cada lista às primeiras 50) — o rótulo avisa "lista parcial" em
-   *  vez de afirmar completude. Só a re-hidratação sabe disso; evento ao
-   *  vivo não carrega a marca. */
+  /** true when the source stat came truncated (the executor's 8KB cut
+   *  reduces each list to the first 50) — the label warns "lista parcial"
+   *  (partial list) instead of asserting completeness. Only re-hydration knows
+   *  this; a live event does not carry the mark. */
   parciais?: boolean
 }
 
 interface KnownColumnsState {
-  /** Workflow dono das entradas de `porNo`. */
+  /** Workflow that owns the `porNo` entries. */
   workflowId: string | null
   porNo: Map<string, ColunasDoNo>
 }
 
 interface KnownColumnsActions {
-  /** Chamado na troca/abertura de workflow: limpa se o workflow mudou, e NÃO
-   *  toca em nada se é o mesmo — reabrir a mesma tela não apaga memória. */
+  /** Called on workflow switch/open: clears if the workflow changed, and does NOT
+   *  touch anything if it is the same — reopening the same screen does not erase memory. */
   prepararParaWorkflow(workflowId: string | null): void
   /**
-   * Escritas de um run AO VIVO, em lote (uma por quadro, como o resto do
-   * pipeline de eventos). `porPorta === null` significa que o nó COMPLETOU sem
-   * publicar colunas — saída não-tabular, ou a chave cortada no transporte — e
-   * a entrada vira uma LÁPIDE (`porPorta: {}`, `fresh: true`): a sugestão para
-   * de afirmar colunas que a última execução não produziu, e a lápide impede a
-   * semeadura atrasada do run ANTERIOR de ressuscitá-las (um delete deixava o
-   * resultado depender de qual resposta de rede chegasse por último).
+   * Writes from a LIVE run, batched (one per frame, like the rest of the
+   * events pipeline). `porPorta === null` means the node COMPLETED without
+   * publishing columns — non-tabular output, or the key cut off in transport —
+   * and the entry becomes a TOMBSTONE (`porPorta: {}`, `fresh: true`): the
+   * suggestion stops asserting columns the last execution did not produce, and
+   * the tombstone keeps the late seeding from the PREVIOUS run from resurrecting
+   * them (a delete left the result depending on which network response arrived last).
    */
   aplicarDeExecucao(
     workflowId: string,
@@ -59,10 +59,10 @@ interface KnownColumnsActions {
     mudancas: Map<string, Record<string, string[]> | null>,
   ): void
   /**
-   * Semeadura a partir do `node_stats` do último run persistido, na abertura
-   * do workflow. Entra como `fresh: false` e NUNCA sobrescreve uma entrada
-   * `fresh: true` (lápides incluídas) — se um run ao vivo já escreveu (a
-   * resposta da API chegou atrasada), o dado mais novo vence.
+   * Seeding from the `node_stats` of the last persisted run, when the workflow
+   * opens. It goes in as `fresh: false` and NEVER overwrites a `fresh: true`
+   * entry (tombstones included) — if a live run has already written (the API
+   * response arrived late), the newer data wins.
    */
   semearDoHistorico(
     workflowId: string,
@@ -86,9 +86,9 @@ export const useKnownColumnsStore = create<KnownColumnsState & KnownColumnsActio
   aplicarDeExecucao: (workflowId, runId, mudancas) => {
     if (mudancas.size === 0) return
     set(state => {
-      // Escrita de outro workflow (rAF atrasado após a troca): recomeça só com
-      // o que chegou — o filtro por run em `drenarLote` já barra quase tudo,
-      // este é o cinto de segurança.
+      // A write from another workflow (late rAF after the switch): starts over with
+      // only what arrived — the per-run filter in `drenarLote` already blocks
+      // almost everything, this is the seat belt.
       const base = state.workflowId === workflowId ? state.porNo : VAZIO
       const porNo = new Map(base)
       for (const [nodeId, porPorta] of mudancas) {
@@ -100,15 +100,15 @@ export const useKnownColumnsStore = create<KnownColumnsState & KnownColumnsActio
 
   semearDoHistorico: (workflowId, runId, colunasPorNo) => {
     set(state => {
-      // Resposta ATRASADA de outro workflow: ignora. A escrita ao vivo pode
-      // adotar o workflow (o evento prova que é ele que está rodando); uma
-      // resposta de API antiga não prova nada — virar a store por ela
-      // colocaria as colunas de A na tela de B.
+      // A LATE response from another workflow: ignore. A live write may adopt the
+      // workflow (the event proves that it is the one running); an old API
+      // response proves nothing — flipping the store over to it would put A's
+      // columns on B's screen.
       if (state.workflowId !== null && state.workflowId !== workflowId) return state
       const porNo = new Map(state.porNo)
       for (const [nodeId, { porPorta, parciais }] of Object.entries(colunasPorNo)) {
-        // Run ao vivo já escreveu neste nó (lápide incluída): a resposta da
-        // API é mais velha.
+        // A live run has already written to this node (tombstone included): the API
+        // response is older.
         if (porNo.get(nodeId)?.fresh) continue
         porNo.set(nodeId, { porPorta, runId, fresh: false, parciais: !!parciais })
       }

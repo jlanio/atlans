@@ -1,10 +1,10 @@
 """
-Testes de app.services.storage_purge_service.
+Tests for app.services.storage_purge_service.
 
-Codigo destrutivo: remove objetos do MinIO e linhas do banco. O invariante mais
-importante e o mesmo de artifact_cleanup.purge_expired_artifacts — se o S3
-falhar por motivo diferente de "not found", a linha do banco PRECISA sobreviver,
-senao o objeto vira orfao invisivel (ocupa disco e ninguem mais sabe que existe).
+Destructive code: removes objects from MinIO and rows from the database. The most
+important invariant is the same as in artifact_cleanup.purge_expired_artifacts — if
+S3 fails for a reason other than "not found", the database row MUST survive,
+otherwise the object becomes an invisible orphan (takes up disk and nobody knows it exists anymore).
 """
 from __future__ import annotations
 
@@ -13,13 +13,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 
-def _db_com(artifacts=(), files=(), workflows=(), scope="all"):  # noqa: ARG001 — scope mantido por clareza nos testes
-    """Sessao fake que despacha pelo SQL, nao pela ordem das chamadas.
+def _db_com(artifacts=(), files=(), workflows=(), scope="all"):  # noqa: ARG001 — scope kept for clarity in the tests
+    """Fake session that dispatches by SQL, not by the order of the calls.
 
-    A sequencia de `execute` varia com o escopo e com o conteudo (o DELETE de
-    portal_layer so acontece para artefato publicado), entao um `side_effect`
-    posicional entrega o resultado errado assim que o caminho muda — foi o que
-    fez a primeira versao destes testes falhar sem que houvesse bug no codigo.
+    The sequence of `execute` calls varies with the scope and the content (the
+    portal_layer DELETE only happens for a published artifact), so a positional
+    `side_effect` returns the wrong result as soon as the path changes — that is
+    what made the first version of these tests fail without any bug in the code.
     """
     db = MagicMock()
     art_res = MagicMock()
@@ -80,17 +80,17 @@ async def test_purga_artefatos_e_drive_somando_bytes(mock_del):
 @pytest.mark.asyncio
 @patch("app.core.storage.delete_strict")
 async def test_purga_zera_refs_de_pin_dos_workflows(mock_del):
-    """Os objetos do pin-cache caem com os demais artefatos; a ref no workflow
-    precisa ser ZERADA junto — pendurada, ela era 404 permanente em toda run
-    (o auto-pin so dispara com a ref vazia). pin_metadata fica: a intencao de
-    pin sobrevive e a proxima execucao regrava o cache."""
+    """The pin-cache objects go along with the other artifacts; the ref in the
+    workflow must be CLEARED with them — left dangling, it was a permanent 404 on
+    every run (the auto-pin only fires with an empty ref). pin_metadata stays: the
+    pin intent survives and the next run rewrites the cache."""
     from app.services import storage_purge_service as mod
 
     wf = MagicMock()
     wf.pinned_outputs = {
         "n1": {"__pin_s3_key__": "pin-cache/ws-1/t1/n1_pin.parquet",
                "__pin_format__": "parquet"},
-        "n2": {},          # pin aguardando regravacao — ja esta como deve ficar
+        "n2": {},          # pin awaiting rewrite — already as it should be
     }
     wf_sem_pins = MagicMock()
     wf_sem_pins.pinned_outputs = None
@@ -104,7 +104,7 @@ async def test_purga_zera_refs_de_pin_dos_workflows(mock_del):
     assert wf.pinned_outputs == {"n1": {}, "n2": {}}
     assert wf_sem_pins.pinned_outputs is None
     mock_flag.assert_called_once_with(wf, "pinned_outputs")
-    mock_del.assert_called()          # objeto do pin saiu do MinIO
+    mock_del.assert_called()          # the pin object left MinIO
 
 
 @pytest.mark.asyncio
@@ -132,12 +132,12 @@ async def test_scope_artifacts_nao_toca_drive(mock_del):
     assert r["drive_files"] == 0
 
 
-# ── Invariantes de seguranca ─────────────────────────────────────────────────
+# ── Safety invariants ────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 @patch("app.core.storage.delete_strict", side_effect=Exception("MinIO down"))
 async def test_falha_no_s3_preserva_a_linha_no_banco(mock_del):
-    """Nunca apagar do banco antes de confirmar a remocao no storage."""
+    """Never delete from the database before confirming removal from storage."""
     from app.services import storage_purge_service as mod
 
     db = _db_com(artifacts=[_artifact()], files=[], scope="artifacts")
@@ -150,7 +150,7 @@ async def test_falha_no_s3_preserva_a_linha_no_banco(mock_del):
 @pytest.mark.asyncio
 @patch("app.core.storage.delete_strict")
 async def test_s3_key_local_do_executor_nao_vai_ao_minio(mock_del):
-    """Fallback local (s3_key comecando com '/') nao existe no MinIO."""
+    """Local fallback (s3_key starting with '/') does not exist in MinIO."""
     from app.services import storage_purge_service as mod
 
     db = _db_com(artifacts=[_artifact(s3_key="/data/artifacts/ws/run/a.json")], files=[], scope="artifacts")
@@ -180,17 +180,17 @@ async def test_artefato_publicado_remove_a_camada_do_portal(mock_del):
     assert db.execute.await_count >= 3
 
 
-# ── Autorizacao dos endpoints (/admin/storage/.../purge) ─────────────────────
+# ── Authorization of the endpoints (/admin/storage/.../purge) ────────────────
 #
-# A purga apaga dados de QUALQUER workspace da plataforma, inclusive de outros
-# usuarios. A garantia vem do router (`dependencies=[Depends(require_admin)]`),
-# nao de codigo no handler — e por isso e fragil: basta alguem mover o endpoint
-# para outro router, ou criar um router novo sem a dependency, para abrir tudo.
-# Estes testes falham no instante em que isso acontecer.
+# The purge deletes data from ANY workspace on the platform, including other
+# users'. The guarantee comes from the router (`dependencies=[Depends(require_admin)]`),
+# not from code in the handler — and that is why it is fragile: it only takes
+# someone moving the endpoint to another router, or creating a new router without
+# the dependency, to open everything up. These tests fail the instant that happens.
 
 @pytest.mark.asyncio
 async def test_purge_negado_para_usuario_comum(client):
-    """client autentica com role='user' (ver conftest)."""
+    """client authenticates with role='user' (see conftest)."""
     resp = await client.post(
         "/admin/storage/workspaces/ws-test-001/purge",
         json={"scope": "all", "confirm": "ws-test-001"},
@@ -231,7 +231,7 @@ async def test_purge_permitido_para_admin(client, mock_current_user):
 
 @pytest.mark.asyncio
 async def test_admin_com_confirm_divergente_recebe_400(client, mock_current_user):
-    """Guarda contra clique na linha errada: o corpo tem de repetir o workspace_id."""
+    """Guard against clicking the wrong row: the body has to repeat the workspace_id."""
     from app.api.dependencies import get_db
     from app.main import app
 
@@ -257,13 +257,13 @@ async def test_admin_com_confirm_divergente_recebe_400(client, mock_current_user
         app.dependency_overrides.pop(get_db, None)
 
 
-# ── Conteudo que vive no disco do executor ────────────────────────────────────
+# ── Content that lives on the executor's disk ─────────────────────────────────
 #
-# A purga nao conhecia `content_location`. Um artefato local tem `s3_key` NULL:
-# o `if` do MinIO nao entrava, o `continue` nao disparava, e a linha era apagada
-# SEM ordenar a remocao — arquivo retido e invisivel no disco do usuario, que e
-# o pior desfecho possivel para dado pessoal. Estes testes travam as duas
-# politicas, que sao deliberadamente DIFERENTES entre artefato e Drive.
+# The purge did not know about `content_location`. A local artifact has a NULL
+# `s3_key`: the MinIO `if` was not entered, the `continue` did not fire, and the
+# row was deleted WITHOUT ordering the removal — a retained, invisible file on the
+# user's disk, which is the worst possible outcome for personal data. These tests
+# lock both policies, which are deliberately DIFFERENT between artifact and Drive.
 
 
 def _artefato_local(**kw):
@@ -277,7 +277,7 @@ def _artefato_local(**kw):
 
 @pytest.mark.asyncio
 async def test_artefato_local_so_e_apagado_depois_da_ordem_entregue():
-    """Executor ONLINE: ordem entregue, entao a linha pode cair."""
+    """Executor ONLINE: order delivered, so the row can go."""
     from app.services import storage_purge_service as mod
 
     db = _db_com(artifacts=[_artefato_local()])
@@ -295,7 +295,7 @@ async def test_artefato_local_so_e_apagado_depois_da_ordem_entregue():
 
 @pytest.mark.asyncio
 async def test_executor_OFFLINE_mantem_a_linha_em_vez_de_apagar():
-    """A regressao central: sem entrega, a linha FICA e a proxima passada tenta de novo."""
+    """The central regression: without delivery, the row STAYS and the next pass tries again."""
     from app.services import storage_purge_service as mod
 
     db = _db_com(artifacts=[_artefato_local()])
@@ -309,7 +309,7 @@ async def test_executor_OFFLINE_mantem_a_linha_em_vez_de_apagar():
     assert r["artifacts"] == 0, "linha nao pode ser contada como removida"
     assert r["pending_executor"] == 1
 
-    # E, sobretudo, nenhum DELETE de artifacts pode ter sido emitido.
+    # And, above all, no artifacts DELETE may have been issued.
     deletes = [
         str(c.args[0]).lower() for c in db.execute.await_args_list
         if str(c.args[0]).lower().lstrip().startswith("delete")
@@ -320,7 +320,7 @@ async def test_executor_OFFLINE_mantem_a_linha_em_vez_de_apagar():
 
 @pytest.mark.asyncio
 async def test_artefato_local_sem_rastro_e_preservado():
-    """Sem executor_id/local_path nao ha para quem mandar — manter o registro."""
+    """Without executor_id/local_path there is no one to send it to — keep the record."""
     from app.services import storage_purge_service as mod
 
     db = _db_com(artifacts=[_artefato_local(executor_id=None)])
@@ -350,16 +350,16 @@ async def test_artefato_local_publicado_remove_a_portal_layer_junto():
 
 @pytest.mark.asyncio
 async def test_drive_catalogado_e_PRESERVADO_nao_apagado():
-    """Politica oposta a do artefato, e deliberada.
+    """Policy opposite to the artifact's, and deliberate.
 
-    Um arquivo catalogado e do proprio usuario, na pasta que ele escolheu
-    sincronizar; a plataforma nunca teve os bytes e ele nao ocupa armazenamento
-    dela. `drive_service._recusar_se_catalogado` recusa apaga-lo na exclusao
-    avulsa — a purga apagava a ficha em silencio, contradizendo aquela politica.
+    A cataloged file belongs to the user, in the folder they chose to sync; the
+    platform never had the bytes and it takes up none of its storage.
+    `drive_service._recusar_se_catalogado` refuses to delete it in a single
+    deletion — the purge silently deleted the record, contradicting that policy.
 
-    Tambem nao adianta mandar `purge_artifacts`: o executor resolve o caminho
-    sob `artifacts_root()`, entao a ordem nao acharia o arquivo de Drive e ainda
-    assim contaria como entregue.
+    Sending `purge_artifacts` does not help either: the executor resolves the path
+    under `artifacts_root()`, so the order would not find the Drive file and would
+    still count as delivered.
     """
     from app.services import storage_purge_service as mod
 
@@ -378,7 +378,7 @@ async def test_drive_catalogado_e_PRESERVADO_nao_apagado():
 
 @pytest.mark.asyncio
 async def test_drive_normal_continua_sendo_purgado():
-    """A guarda acima nao pode paralisar a purga do Drive que vive no MinIO."""
+    """The guard above must not paralyze the purge of the Drive that lives in MinIO."""
     from app.services import storage_purge_service as mod
 
     db = _db_com(files=[_file(content_location="minio", size=50)])

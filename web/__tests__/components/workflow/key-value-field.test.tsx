@@ -1,11 +1,11 @@
 /**
- * Editor de pares chave/valor — `headers` e `params` do nó HttpRequest.
+ * Key/value pair editor — `headers` and `params` of the HttpRequest node.
  *
- * O componente é CONTROLADO: `values` vem do modal e `setNodeField` escreve de
- * volta (node-config-modal/index.tsx:124 — não há estado local em lugar nenhum
- * do caminho). Estes testes montam esse mesmo laço, porque o defeito só aparece
- * quando a volta acontece: a linha nova era descartada na gravação e o
- * componente re-renderizava a partir do valor salvo, sem ela.
+ * The component is CONTROLLED: `values` comes from the modal and `setNodeField`
+ * writes back (node-config-modal/index.tsx:124 — there's no local state anywhere
+ * along the path). These tests build that same loop, because the defect only
+ * shows up when the round trip happens: the new row was discarded on write and
+ * the component re-rendered from the saved value, without it.
  */
 import { useState } from "react"
 import { render, screen, fireEvent } from "@testing-library/react"
@@ -14,7 +14,7 @@ import KeyValueField from "@/app/components/workflow/nodes-configuration/fields/
 
 const campo = { name: "headers", label: "Cabeçalhos", type: "keyvalue" } as never
 
-/** Reproduz o laço controlado real do modal. */
+/** Reproduces the modal's real controlled loop. */
 function Anfitriao({ inicial = {} }: { inicial?: Record<string, string> }) {
   const [values, setValues] = useState<Record<string, unknown>>({ headers: inicial })
   return (
@@ -33,9 +33,9 @@ describe("KeyValueField", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /adicionar/i }))
 
-    // Antes, `gravar` filtrava a chave vazia antes de salvar: o objeto voltava
-    // igual, `pares` recalculava sem a linha e o clique não fazia NADA — os
-    // dois campos do nó HttpRequest eram impreenchíveis pela interface.
+    // Before, `gravar` filtered out the empty key before saving: the object came
+    // back unchanged, `pares` recomputed without the row and the click did
+    // NOTHING — both fields of the HttpRequest node were impossible to fill from the UI.
     expect(screen.getByLabelText("Nome do item 1")).toBeInTheDocument()
   })
 
@@ -57,10 +57,10 @@ describe("KeyValueField", () => {
   it("apagar o nome para renomear não faz a linha sumir", () => {
     render(<Anfitriao inicial={{ "Content-Typo": "application/json" }} />)
 
-    // Passo natural de renomear: limpar o campo antes de digitar o certo.
+    // The natural step when renaming: clear the field before typing the right one.
     fireEvent.change(screen.getByLabelText("Nome do item 1"), { target: { value: "" } })
     expect(screen.getByLabelText("Nome do item 1")).toBeInTheDocument()
-    // E o valor que já estava digitado continua lá para ser aproveitado.
+    // And the value already typed is still there to be reused.
     expect(screen.getByLabelText("Valor do item 1")).toHaveValue("application/json")
 
     fireEvent.change(screen.getByLabelText("Nome do item 1"), {
@@ -106,8 +106,8 @@ describe("KeyValueField", () => {
     fireEvent.click(screen.getByRole("button", { name: /adicionar/i }))
     fireEvent.change(screen.getByLabelText("Valor do item 1"), { target: { value: "orfao" } })
 
-    // A linha existe na tela, mas sem nome não vira cabeçalho: o que sai do
-    // componente continua limpo.
+    // The row exists on the screen, but without a name it doesn't become a
+    // header: what comes out of the component stays clean.
     expect(ultimo).toEqual({})
   })
 })

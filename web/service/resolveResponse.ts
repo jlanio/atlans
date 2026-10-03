@@ -11,7 +11,7 @@ export const resolveResponse = <T>(data?: T) => {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const resolveAxiosError = (e: AxiosError<any, any>) => {
-  // FastAPI retorna { detail: "..." }; outros backends podem usar { message: "..." }
+  // FastAPI returns { detail: "..." }; other backends may use { message: "..." }
   const msg: string | undefined =
     e.response?.data?.detail ??
     e.response?.data?.message ??
@@ -24,8 +24,8 @@ export const resolveAxiosError = (e: AxiosError<any, any>) => {
       error: {
         name: "AxiosError",
         message: msg,
-        // O código e a lista seguem para a tela: e o que permite oferecer
-        // "remover mesmo assim" num 409 da politica de execucao.
+        // The code and the list go on to the screen: that is what makes it possible
+        // to offer "remove anyway" on an execution policy 409.
         ...(typeof corpo.error === "string" ? { code: corpo.error } : {}),
         ...(Array.isArray(corpo.workspaces) ? { workspaces: corpo.workspaces } : {}),
       },

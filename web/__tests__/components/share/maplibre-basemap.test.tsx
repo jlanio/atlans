@@ -2,19 +2,19 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { cleanup, render, screen, fireEvent } from "@testing-library/react"
 
 /**
- * O basemap do MapLibreMap: com que basemap o mapa NASCE (`basemapInicial`), o
- * alternador do portal (Mapa ↔ Satélite, que remenda a fonte raster do estilo
- * montado à mão) e a rede de segurança do `style.load` — um `setStyle` que caia
- * em carga completa apaga sources e layers, e as camadas de dados têm de
- * voltar. A Home nasce em `hybrid` e não alterna.
+ * MapLibreMap's basemap: which basemap the map is BORN with (`basemapInicial`), the
+ * portal's switcher (Mapa ↔ Satélite, which patches the raster source of the hand-built
+ * style) and the `style.load` safety net — a `setStyle` that ends up
+ * in a full load wipes sources and layers, and the data layers have to
+ * come back. The Home is born in `hybrid` and does not switch.
  *
- * Os fundos são os da instalação (MAPA_*, web/lib/fundos-do-mapa.ts); aqui, um
- * satélite e um híbrido de exemplo. Sem eles (o padrão do código), ver
+ * The backgrounds are the install's (MAPA_*, web/lib/fundos-do-mapa.ts); here, a
+ * sample satellite and hybrid. Without them (the code's default), see
  * fundos-do-mapa.test.tsx.
  *
- * jsdom não desenha o MapLibre: o mapa é um dublê que registra as chamadas e
- * dispara `style.load` a cada `setStyle`, como o de verdade faz quando o diff
- * não se aplica e o estilo recarrega inteiro.
+ * jsdom does not draw MapLibre: the map is a double that records the calls and
+ * fires `style.load` on every `setStyle`, as the real one does when the diff
+ * does not apply and the style reloads entirely.
  */
 vi.mock("maplibre-gl/dist/maplibre-gl.css", () => ({}))
 
@@ -29,17 +29,17 @@ type Ouvinte = (e?: unknown) => void
 
 const espiao = vi.hoisted(() => ({
   mapa: null as ReturnType<typeof criarMapa> | null,
-  /** Toda `new AttributionControl(...)` feita pelo componente. Deve ficar VAZIA. */
+  /** Every `new AttributionControl(...)` made by the component. Must stay EMPTY. */
   atribuicoes: [] as Array<Record<string, unknown> | undefined>,
-  /** O último HTML que o Popup recebeu — para conferir as cores do tema corrente. */
+  /** The last HTML the Popup received — to check the current theme's colors. */
   popupHtml: undefined as string | undefined,
-  /** A feature que `queryRenderedFeatures` devolve no clique (vazio por padrão). */
+  /** The feature `queryRenderedFeatures` returns on click (empty by default). */
   feature: undefined as unknown,
 }))
 
 function criarMapa(opcoes: Record<string, unknown>) {
   const ouvintes: Record<string, Ouvinte[]> = {}
-  /** `off(evento, f)` chega com a função ORIGINAL; guardamos o embrulho do `once`. */
+  /** `off(evento, f)` arrives with the ORIGINAL function; we keep the `once` wrapper. */
   const registrados = new Map<Ouvinte, Ouvinte>()
   const estilo = {
     layers: [] as Array<Record<string, unknown>>,
@@ -58,13 +58,13 @@ function criarMapa(opcoes: Record<string, unknown>) {
     _opcoes: opcoes,
     _chamadas: chamadas,
     _estilo: estilo,
-    // Cópia: um `once` se desregistra durante o próprio laço.
+    // Copy: a `once` unregisters itself during the loop itself.
     _disparar: (evento: string, e?: unknown) => [...(ouvintes[evento] ?? [])].forEach((f) => f(e)),
     on: (evento: string, f: Ouvinte) => { (ouvintes[evento] ??= []).push(f) },
-    // `once` DESREGISTRA depois de disparar, como o de verdade. Não é detalhe:
-    // o efeito de `[layers]` também escuta `style.load` uma vez, e um `once`
-    // que ficasse pendurado re-sincronizaria as camadas eternamente — mascarando
-    // exatamente o defeito que o `style.load` do componente conserta.
+    // `once` UNREGISTERS after firing, like the real one. It is not a detail:
+    // the `[layers]` effect also listens to `style.load` once, and a `once`
+    // left hanging would re-sync the layers forever — masking
+    // exactly the defect the component's `style.load` fixes.
     once: (evento: string, f: Ouvinte) => {
       const so = (e?: unknown) => {
         ouvintes[evento] = (ouvintes[evento] ?? []).filter((g) => g !== so)
@@ -80,16 +80,16 @@ function criarMapa(opcoes: Record<string, unknown>) {
     addControl: (c: unknown) => { chamadas.addControl.push(c) },
     removeControl: (c: unknown) => { chamadas.removeControl.push(c) },
     setProjection: (p: unknown) => { chamadas.setProjection.push(p) },
-    // Como o de verdade quando o diff NÃO se aplica: o estilo recarrega
-    // inteiro e termina em `style.load`.
+    // Like the real one when the diff does NOT apply: the style reloads
+    // entirely and ends in `style.load`.
     setStyle: (s: unknown, o?: unknown) => {
       chamadas.setStyle.push(s)
       chamadas.setStyleOpcoes.push(o)
       mapa._disparar("style.load")
     },
     getStyle: () => estilo,
-    // Uma GeoJSONSource de verdade tem `setData` — o `_syncLayers` a usa para
-    // atualizar camada que já existe.
+    // A real GeoJSONSource has `setData` — `_syncLayers` uses it to
+    // update a layer that already exists.
     getSource: (id: string) => {
       const def = (estilo.sources as Record<string, unknown>)[id]
       return def ? { ...(def as object), setData: () => {} } : undefined
@@ -185,19 +185,19 @@ describe("`basemapInicial` — o basemap com que o mapa nasce", () => {
     const estilo = mapa._opcoes.style as EstiloRaster
     expect(estilo.version).toBe(8)
     expect(estilo.sources.basemap.type).toBe("raster")
-    // O híbrido (imagem + vias e rótulos), e não o satélite puro: a esfera
-    // ficaria sem um nome sequer.
+    // The hybrid (imagery + roads and labels), and not plain satellite: the sphere
+    // would be left without a single name.
     expect(estilo.sources.basemap.tiles[0]).toContain("hibrido.example.org")
     expect(estilo.sources.basemap.attribution).toContain("Híbrido de Teste")
     expect(estilo.layers[0]).toMatchObject({ id: "basemap", type: "raster" })
-    // Nasce pronto: nenhum `setStyle` para chegar lá.
+    // Born ready: no `setStyle` to get there.
     expect(mapa._chamadas.setStyle).toEqual([])
   })
 
   it("o estado do alternador nasce no basemapInicial, sem setStyle redundante", () => {
-    // O que este teste pega: um `useState("streets")` fixo com o construtor em
-    // `basemapInicial` — o botão errado apareceria pressionado, e o efeito da
-    // troca faria um `setStyle` logo na montagem.
+    // What this test catches: a fixed `useState("streets")` with the constructor on
+    // `basemapInicial` — the wrong button would show as pressed, and the switch
+    // effect would do a `setStyle` right on mount.
     render(<MapLibreMap layers={[]} basemapInicial="satellite" />)
     expect(screen.getByRole("button", { name: "Satélite" }).getAttribute("aria-pressed")).toBe("true")
     expect(screen.getByRole("button", { name: "Mapa" }).getAttribute("aria-pressed")).toBe("false")
@@ -209,7 +209,7 @@ describe("alternador de basemap — o portal remenda a fonte", () => {
   it("troca as tiles de `sources.basemap` em vez de trocar o estilo", () => {
     render(<MapLibreMap layers={[]} />)
     const mapa = espiao.mapa!
-    // O construtor do portal monta o estilo raster à mão: a fonte existe.
+    // The portal's constructor builds the raster style by hand: the source exists.
     expect((mapa._estilo.sources as Record<string, { tiles: string[] }>).basemap).toBeTruthy()
 
     fireEvent.click(screen.getByRole("button", { name: "Satélite" }))
@@ -238,18 +238,18 @@ describe("`style.load` — a rede de segurança quando o estilo recarrega inteir
   })
 
   it("as camadas de dados VOLTAM quando um setStyle recarrega o estilo", () => {
-    // O defeito que este teste tranca: a carga completa apaga sources e layers,
-    // e o efeito de `[layers]` não roda de novo (as camadas não mudaram). A
-    // troca de basemap pede `diff: true`, mas o MapLibre recarrega tudo quando
-    // o diff não se aplica — e sem a re-sincronização no `style.load`, isso
-    // apagava as camadas de dados do mapa.
+    // The defect this test locks: the full load wipes sources and layers,
+    // and the `[layers]` effect does not run again (the layers did not change). The
+    // basemap switch asks for `diff: true`, but MapLibre reloads everything when
+    // the diff does not apply — and without the re-sync on `style.load`, that
+    // wiped the data layers off the map.
     render(<MapLibreMap layers={[camada()]} />)
     const mapa = espiao.mapa!
     mapa._disparar("style.load") // o estilo inicial carrega e as camadas entram
     expect(mapa._chamadas.addSource).toContain("src-art:1")
 
-    // O estilo recarregado volta só com o basemap: as nossas `src-*` somem,
-    // como na carga completa de verdade.
+    // The reloaded style comes back with only the basemap: our `src-*` disappear,
+    // as in a real full load.
     mapa._estilo.layers = []
     mapa._estilo.sources = { basemap: (mapa._estilo.sources as Record<string, unknown>).basemap }
     mapa._chamadas.addSource.length = 0
@@ -263,29 +263,29 @@ describe("`style.load` — a rede de segurança quando o estilo recarrega inteir
 
 describe("popup — o clique lê o buildPopupHtml corrente ao trocar de tema", () => {
   it("depois de trocar `isDark`, o popup sai nas cores do tema NOVO, não do 1º render", () => {
-    // O handler de clique é registrado uma vez na montagem: se ele capturar o
-    // `buildPopupHtml` do primeiro render, trocar o tema abre o popup com as
-    // cores velhas (o container já vira pelo CSS, as células não). Lê-lo por ref
-    // conserta — e é isto que o teste tranca.
+    // The click handler is registered once on mount: if it captures the
+    // first render's `buildPopupHtml`, switching the theme opens the popup with the
+    // old colors (the container switches through CSS, the cells do not). Reading it through a ref
+    // fixes it — and that is what the test locks.
     espiao.feature = { layer: { id: "fill-art:1" }, properties: { valor: "abc" } }
     const { rerender } = render(<MapLibreMap layers={[camada()]} isDark={false} />)
     const mapa = espiao.mapa!
     mapa._disparar("style.load") // sincroniza: fill-art:1 entra no mapa
     mapa._disparar("click", { point: { x: 1, y: 1 }, lngLat: { lng: 0, lat: 0 } })
-    expect(espiao.popupHtml).toContain("#1a1a1a") // o texto do tema CLARO
+    expect(espiao.popupHtml).toContain("#1a1a1a") // the LIGHT theme's text
     expect(espiao.popupHtml).not.toContain("#e5e5e5")
 
     rerender(<MapLibreMap layers={[camada()]} isDark />)
     mapa._disparar("click", { point: { x: 1, y: 1 }, lngLat: { lng: 0, lat: 0 } })
-    expect(espiao.popupHtml).toContain("#e5e5e5") // agora o texto do tema ESCURO
+    expect(espiao.popupHtml).toContain("#e5e5e5") // now the DARK theme's text
   })
 })
 
 describe("popup — no idioma dos textos que recebe (a Home traduzida)", () => {
   it("em inglês: a contagem de campos, os números e as datas saem em inglês", () => {
-    // O português é o padrão (o portal /share): um popup que ignorasse os
-    // textos recebidos continuaria "3 campos", "1.234,5" e "31/01/2026" na
-    // Home em inglês — e nenhum outro teste veria.
+    // Portuguese is the default (the /share portal): a popup that ignored the
+    // texts it received would keep showing "3 campos", "1.234,5" and "31/01/2026" on the
+    // Home in English — and no other test would see it.
     espiao.feature = {
       layer: { id: "fill-art:1" },
       properties: { nome: "Lote 7", area: 1234.5, prazo: "2026-01-31", vistoria: "2026-01-02T15:04:05Z" },
@@ -295,7 +295,7 @@ describe("popup — no idioma dos textos que recebe (a Home traduzida)", () => {
     mapa._disparar("style.load")
     mapa._disparar("click", { point: { x: 1, y: 1 }, lngLat: { lng: 0, lat: 0 } })
     const html = espiao.popupHtml ?? ""
-    expect(html).toContain("3 fields") // o nome vira cabeçalho; sobram três
+    expect(html).toContain("3 fields") // the name becomes the header; three remain
     expect(html).toContain("1,234.5")
     expect(html).toContain("01/31/2026")
     expect(html).toMatch(/\d{2}\/\d{2}\/2026 \d{1,2}:\d{2}:\d{2} (AM|PM)/)
@@ -304,16 +304,16 @@ describe("popup — no idioma dos textos que recebe (a Home traduzida)", () => {
 
 describe("atribuição — nada de texto nosso por cima", () => {
   it("NUNCA passa `customAttribution`, em nenhum dos dois mapas", () => {
-    // O defeito que isto tranca: o MapLibre CONCATENA `customAttribution` com a
-    // atribuição que a fonte declara, separados por " | ". Com um texto nosso, a
-    // Home mostrava a mesma coisa duas vezes. Quem declara é a fonte.
+    // The defect this locks: MapLibre CONCATENATES `customAttribution` with the
+    // attribution the source declares, separated by " | ". With a text of ours, the
+    // Home showed the same thing twice. The source is what declares it.
     for (const props of [{}, { basemapInicial: "hybrid" as const, basemapToggle: false, controlesDiscretos: true }]) {
       cleanup()
       espiao.atribuicoes = []
       render(<MapLibreMap layers={[]} {...props} />)
       const opcoes = espiao.mapa!._opcoes.attributionControl as Record<string, unknown> | undefined
       expect(opcoes?.customAttribution).toBeUndefined()
-      // Nem por um controle montado à mão.
+      // Not through a hand-built control either.
       expect(espiao.atribuicoes).toEqual([])
     }
   })
@@ -352,15 +352,15 @@ describe("_cssDoMapa", () => {
     for (const alvo of ["maplibregl-ctrl-group", "maplibregl-ctrl-scale", "maplibregl-ctrl-attrib"]) {
       expect(css).toContain(alvo)
     }
-    // Escopado ao container: um seletor solto vazaria para o outro mapa da tela.
+    // Scoped to the container: a loose selector would leak to the other map on the screen.
     for (const linha of css.split("\n").filter((l) => l.includes("maplibregl-"))) {
       expect(linha).toContain("#map-x")
     }
   })
 
   it("no escuro o ícone é invertido; no claro, não", () => {
-    // Os ícones do MapLibre são SVG com a cor ASSADA no data URI (cinza escuro):
-    // sobre o vidro escuro da Home sumiriam. `invert` é o único caminho.
+    // MapLibre's icons are SVG with the color BAKED into the data URI (dark gray):
+    // over the Home's dark glass they would vanish. `invert` is the only way.
     expect(_cssDoMapa("#map-x", true, true)).toContain("filter: invert(1)")
     expect(_cssDoMapa("#map-x", false, true)).not.toContain("invert(1)")
   })
@@ -369,7 +369,7 @@ describe("_cssDoMapa", () => {
     const css = _cssDoMapa("#map-x", true, true)
     expect(css).toMatch(/\.maplibregl-ctrl-icon \{ opacity: 0\.65/)
     expect(css).toContain("opacity: 1")
-    // Sem hover (toque) o piso sobe — senão a chrome fica fraca e sem remédio.
+    // Without hover (touch) the floor goes up — otherwise the chrome stays faint with no remedy.
     expect(css).toContain("@media (hover: none)")
   })
 })

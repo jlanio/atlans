@@ -5,16 +5,16 @@ from flow.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# ── Vocabulário do evento ────────────────────────────────────────────────────
+# ── Event vocabulary ─────────────────────────────────────────────────────────
 #
-# `status` descreve o CICLO DE VIDA do nó e só isso. Severidade e origem da
-# mensagem viajam em campos próprios (`level` e `kind`) — antes tudo era
-# empilhado em `status` ("started"/"completed"/"failed" convivendo com "debug" e
-# "log"), o que forçava o painel de execução a filtrar por negação ("tudo que
-# não é erro nem print") e tornava impossível distinguir stdout de ciclo de vida.
+# `status` describes the node's LIFECYCLE and nothing else. The message's severity
+# and origin travel in their own fields (`level` and `kind`) — before, everything
+# was piled into `status` ("started"/"completed"/"failed" alongside "debug" and
+# "log"), which forced the run panel to filter by negation ("everything that is
+# neither an error nor a print") and made it impossible to tell stdout from lifecycle.
 
-KIND_LIFECYCLE = "lifecycle"   # started / completed / failed de um nó
-KIND_STDOUT    = "stdout"      # linha de print() capturada de dentro do nó
+KIND_LIFECYCLE = "lifecycle"   # started / completed / failed of a node
+KIND_STDOUT    = "stdout"      # print() line captured from inside the node
 KIND_DEBUG     = "debug"       # resumo de inputs/outputs (debug mode)
 
 LEVEL_INFO  = "info"
@@ -24,18 +24,18 @@ LEVEL_ERROR = "error"
 
 class WorkflowEventPublisher(ABC):
     """
-    Interface abstrata para publicação de eventos de workflow.
-    Cada evento deve ter a mesma estrutura JSON:
+    Abstract interface for publishing workflow events.
+    Every event must have the same JSON structure:
       {
         "run_id": str,
-        "node": str,                  # id do nó ou "__workflow_complete__"
+        "node": str,                  # node id or "__workflow_complete__"
         "kind": str,                  # "lifecycle" | "stdout" | "debug"
         "level": str,                 # "info" | "warn" | "error"
         "status": str,                # "started" | "completed" | "failed"
         "timestamp": float,           # epoch seconds UTC
-        "duration_ms": Optional[float], # somente em completed/failed
-        "error": Optional[str],       # só em failed
-        "extra": Optional[dict]       # quaisquer outros metadados (branch, overhead…)
+        "duration_ms": Optional[float], # only on completed/failed
+        "error": Optional[str],       # only on failed
+        "extra": Optional[dict]       # any other metadata (branch, overhead…)
       }
     """
     @abstractmethod
@@ -52,44 +52,44 @@ class WorkflowEventPublisher(ABC):
         level: str = LEVEL_INFO,
     ) -> None:
         """
-        :param run_id:      identificador da execução
-        :param node:        identificador do nó (ou '__workflow_complete__')
-        :param status:      "started", "completed" ou "failed"
-        :param timestamp:   momento do evento (em segundos desde epoch UTC). Se None, será preenchido automaticamente.
-        :param duration_ms: duração do nó em ms (para completed/failed)
-        :param error:       string com stack/message se falhou
-        :param extra:       outros dados (p.ex.: branch, overhead_ms…)
-        :param kind:        origem da linha — lifecycle / stdout / debug
-        :param level:       severidade — info / warn / error
+        :param run_id:      run identifier
+        :param node:        node identifier (or '__workflow_complete__')
+        :param status:      "started", "completed" or "failed"
+        :param timestamp:   moment of the event (in seconds since epoch UTC). If None, it is filled in automatically.
+        :param duration_ms: node duration in ms (for completed/failed)
+        :param error:       string with stack/message if it failed
+        :param extra:       other data (e.g. branch, overhead_ms…)
+        :param kind:        origin of the line — lifecycle / stdout / debug
+        :param level:       severity — info / warn / error
         """
         ...
 
 
 def publish_stdout(publisher, run_id: str, node_id: str, lines: Sequence[str]) -> None:
-    """Publica um LOTE de linhas de print() capturadas de dentro de um nó.
+    """Publishes a BATCH of print() lines captured from inside a node.
 
-    kind=stdout é o que separa isto do ciclo de vida: no painel de execução a
-    saída do usuário vive numa aba própria, agrupada por nó, sem ícone/status/
-    duração por linha (um print não tem nenhuma das três coisas).
+    kind=stdout is what separates this from the lifecycle: in the run panel the
+    user's output lives in its own tab, grouped by node, with no icon/status/
+    duration per line (a print has none of those three things).
 
-    O lote é o ponto: um evento POR LINHA fazia `for i in range(50000): print(i)`
-    estourar a fila de 500 slots — que é compartilhada por todos os jobs e pelo
-    GeoSync — e o rate limit do servidor, derrubando telemetria de OUTROS
-    workflows junto. Quem agrega é o emissor (`_LoggingStream` do PythonScript),
-    que fecha o lote a cada ~200 ms ou a cada N linhas.
+    The batch is the point: one event PER LINE made `for i in range(50000): print(i)`
+    overflow the 500-slot queue — which is shared by all jobs and by
+    GeoSync — and the server's rate limit, taking down telemetry of OTHER
+    workflows along with it. The emitter does the aggregation (PythonScript's
+    `_LoggingStream`), closing the batch every ~200 ms or every N lines.
 
-    `extra['lines']` é a ÚNICA fonte de verdade (uma entrada por linha impressa).
-    Não existe mais `extra['message']`: publicar o mesmo texto duas vezes dobrava
-    o payload e um lote de 200 linhas de ~160 caracteres passava dos 64 KB de
-    `TETO_NODE_EVENT_BYTES` (flow/utils/publisher/reducao.py); o sender então
-    reduzia o evento aos campos de controle — que não incluíam `extra` — e o
-    painel perdia as 200 linhas de uma vez, em silêncio. Hoje a redução guarda o
-    prefixo de `lines` que cabe, mas o lote ainda tem de caber inteiro. Quem
-    consome lê `lines` e junta por \\n se precisar de texto.
+    `extra['lines']` is the ONLY source of truth (one entry per printed line).
+    There is no `extra['message']` anymore: publishing the same text twice doubled
+    the payload, and a batch of 200 lines of ~160 characters exceeded the 64 KB of
+    `TETO_NODE_EVENT_BYTES` (flow/utils/publisher/reducao.py); the sender then
+    reduced the event to the control fields — which did not include `extra` — and
+    the panel lost all 200 lines at once, silently. Today the reduction keeps the
+    prefix of `lines` that fits, but the batch still has to fit whole. Consumers
+    read `lines` and join with \\n if they need text.
 
-    Mora aqui, e não em flow/executor/events.py, porque quem chama é um nó —
-    importar o pacote `flow.executor` de dentro de `flow.nodes` fecharia o ciclo
-    executor → registry → nodes → executor.
+    Lives here, and not in flow/executor/events.py, because the caller is a node —
+    importing the `flow.executor` package from inside `flow.nodes` would close the
+    executor → registry → nodes → executor cycle.
     """
     if not (publisher and run_id and lines):
         return
@@ -104,6 +104,6 @@ def publish_stdout(publisher, run_id: str, node_id: str, lines: Sequence[str]) -
             level=LEVEL_INFO,
         )
     except Exception as exc:
-        # Publicar saída nunca pode derrubar a execução do script do usuário —
-        # mas engolir sem rastro esconderia um publisher quebrado.
+        # Publishing output must never bring down the user's script execution —
+        # but swallowing without a trace would hide a broken publisher.
         logger.debug("Falha ao publicar stdout do nó %s: %s", node_id, exc)

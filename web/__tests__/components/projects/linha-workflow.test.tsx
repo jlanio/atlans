@@ -25,7 +25,7 @@ const grupos: IWorkflowGroup[] = [
   { id: 2, id_hash: "g2", name: "Entregas de campo", workflow_count: 2, created_at: "", updated_at: "" },
 ]
 
-// Amanhã às 06:00 no relógio local: é o que "próxima amanhã, 06:00" espera.
+// Tomorrow at 06:00 on the local clock: it is what "próxima amanhã, 06:00" expects.
 const amanhaAsSeis = new Date(agora)
 amanhaAsSeis.setDate(amanhaAsSeis.getDate() + 1)
 amanhaAsSeis.setHours(6, 0, 0, 0)
@@ -80,10 +80,10 @@ describe("LinhaWorkflow", () => {
     render(<LinhaWorkflow {...props({ workflow })} />)
     expect(screen.getByTitle("Agendado")).toBeInTheDocument()
     expect(screen.getByText("Une as outorgas da ANA e do IGAM")).toBeInTheDocument()
-    // O rótulo do gatilho aparece duas vezes: no tile (só para leitor de tela) e nos metadados.
+    // The trigger label shows up twice: in the tile (screen reader only) and in the metadata.
     const meta = screen.getByText("Agendado", { selector: ".text-foreground" }).closest("p")!
     expect(meta).toHaveTextContent("Agendado · todo dia às 06:00 · próxima amanhã, 06:00 · alterado há 2 d por maria")
-    // Como anda ao lado, e o Executar do lado direito.
+    // "Como anda" beside it, and Executar on the right side.
     expect(screen.getByText("Concluída há 3 h")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Executar Consolidação de outorgas agora" })).toBeInTheDocument()
   })
@@ -153,7 +153,7 @@ describe("LinhaWorkflow", () => {
     expect(p.onVerExecucao).toHaveBeenCalledWith("run-9")
     expect(screen.queryByRole("button", { name: /Executar/ })).toBeNull()
 
-    // Métricas dizem "rodando" mas o contexto ainda não tem o run: sem id, o botão continua Executar.
+    // Metrics say "rodando" (running) but the context does not have the run yet: with no id, the button stays Executar.
     rerender(<LinhaWorkflow {...p} runIdVivo={null} />)
     expect(screen.queryByRole("button", { name: /Ver execução/ })).toBeNull()
     expect(screen.getByRole("button", { name: /Executar/ })).toBeInTheDocument()
@@ -217,7 +217,7 @@ describe("LinhaWorkflow", () => {
 
   it("ponto do tile: verde ativo, cinza inativo, azul pulsando em execução", () => {
     const { container, rerender } = render(<LinhaWorkflow {...props()} />)
-    // `.border-card` distingue o ponto do tile do ponto verde do "como anda".
+    // `.border-card` distinguishes the tile's dot from the green dot of "como anda".
     expect(container.querySelector(".border-card.bg-green-500")).not.toBeNull()
     rerender(<LinhaWorkflow {...props({ workflow: wf({ flag_ative: false }) })} />)
     expect(container.querySelector(".border-card.bg-green-500")).toBeNull()

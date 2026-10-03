@@ -1,26 +1,28 @@
 // web/lib/respostas.ts
 //
-// O que uma tela faz com a `IResponse` que o `GisFlowService` devolve.
+// What a screen does with the `IResponse` that `GisFlowService` returns.
 //
-// O transporte (service/http.ts) NUNCA rejeita: a queda de rede, o 4xx e o 5xx
-// voltam resolvidos, com `error` preenchido e `data` indefinido. Um `try/catch`
-// em volta da chamada é código morto — e quem lê só o `data` transforma a falha
-// numa afirmação falsa. Foi o que aconteceu no editor: o log de uma execução
-// "expirou" quando a rede caiu, e as execuções recentes e os seletores de
-// artefato e de arquivo do Drive diziam "nenhum" quando nem tinham perguntado.
+// The transport (service/http.ts) NEVER rejects: a network drop, a 4xx and a
+// 5xx come back resolved, with `error` filled in and `data` undefined. A
+// `try/catch` around the call is dead code — and whoever reads only `data`
+// turns the failure into a false statement. That is what happened in the
+// editor: a run's log "expired" when the network dropped, and the recent runs
+// and the artifact and Drive file pickers said "none" when they had not even
+// asked.
 //
-// O padrão é o das telas vizinhas do editor (histórico de versões, pins,
-// cancelar execução): um toast com o título da tela e a mensagem do servidor.
+// The pattern is that of the editor's neighboring screens (version history,
+// pins, cancel run): a toast with the screen's title and the server's message.
 
 import type { IResponse } from "@/service/types"
 import { createToast } from "@/utils/createToast"
 
 /**
- * O dado da resposta — ou `null`, depois de avisar a falha num toast.
+ * The response's data — or `null`, after reporting the failure in a toast.
  *
- * `null` quer dizer "não sei", e não "vazio": a lista que o recebe não pode
- * cair no estado de "nenhum item", que é o que a pessoa leria como resposta.
- * Uma resposta sem corpo também volta `null`; é para leituras, que sempre têm.
+ * `null` means "I don't know", not "empty": the list that receives it must not
+ * fall into the "no items" state, which is what the person would read as the
+ * answer. A response without a body also returns `null`; this is for reads,
+ * which always have one.
  */
 export function dadoOuAviso<T>(res: IResponse<T>, titulo: string): T | null {
   if (res.error) {

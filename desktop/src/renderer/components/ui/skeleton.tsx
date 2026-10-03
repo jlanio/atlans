@@ -1,11 +1,12 @@
 // desktop/src/renderer/components/ui/skeleton.tsx
 //
-// Portado de web/app/components/ui/skeleton.tsx, com o keyframe
-// `skeleton-shimmer` copiado para o index.css junto.
+// Ported from web/app/components/ui/skeleton.tsx, with the `skeleton-shimmer`
+// keyframe copied into index.css along with it.
 //
-// O app abre e fica em "Carregando…" — uma frase centralizada — enquanto três
-// chamadas de IPC resolvem. Uma frase não diz onde o conteúdo vai aparecer nem
-// quanto dele vem; o esqueleto diz as duas coisas, e é o que o web usa.
+// The app opens and sits at "Carregando…" (loading) — a centered sentence —
+// while three IPC calls resolve. A sentence does not say where the content will
+// appear or how much of it is coming; the skeleton says both, and it is what the
+// web uses.
 import * as React from 'react'
 
 import { cn } from '../../lib/utils.js'

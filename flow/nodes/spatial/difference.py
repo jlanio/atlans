@@ -6,7 +6,7 @@ from flow.nodes.spatial.sobreposicao_binaria import SobreposicaoBinaria
 @register_node
 class DifferenceNode(SobreposicaoBinaria):
     """
-    Executa a diferença espacial (A - B) entre duas camadas vetoriais.
+    Computes the spatial difference (A - B) between two vector layers.
     """
 
     HOW = 'difference'

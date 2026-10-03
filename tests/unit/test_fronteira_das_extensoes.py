@@ -1,12 +1,12 @@
 # tests/unit/test_fronteira_das_extensoes.py
 """
-O núcleo anda sem as extensões (app/extensoes), e a distribuição livre não as
-traz. Dois jeitos de quebrar isso, e um teste para cada:
+The core runs without the extensions (app/extensoes), and the free distribution does
+not ship them. Two ways to break that, and one test for each:
 
-  IMPORT     um módulo do núcleo (ou um teste dele) importa uma extensão pelo
-             nome, ou a cita num alvo de patch;
-  ARRANQUE   a API, com ATLANS_SEM_EXTENSOES=1, carrega o código de uma
-             extensão mesmo assim, ou fica com rota, tabela ou tarefa dela.
+  IMPORT     a core module (or one of its tests) imports an extension by
+             name, or cites it in a patch target;
+  STARTUP    the API, with ATLANS_SEM_EXTENSOES=1, loads an extension's code
+             anyway, or ends up with one of its routes, tables or tasks.
 """
 from __future__ import annotations
 
@@ -21,13 +21,13 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
 
-# O núcleo: tudo o que a distribuição livre leva.
+# The core: everything the free distribution ships.
 _PASTAS_DO_NUCLEO = ("app", "flow", "executor", "scripts", "alembic", "tests")
-# A API do registro, que o núcleo pode usar.
+# The registry API, which the core may use.
 _API_DO_REGISTRO = {"registro", "importar_modelos", "desligadas", "esquemas", "Registro"}
-# Um nome depois do registro, num texto: `app.extensoes.planos` cita uma
-# extensão; `app.extensoes.registro` é a API. O prefixo sozinho
-# (`app.extensoes.`) é genérico e pode.
+# A name after the registry, in a string: `app.extensoes.planos` cites an
+# extension; `app.extensoes.registro` is the API. The prefix alone
+# (`app.extensoes.`) is generic and allowed.
 _NOME_NO_TEXTO = re.compile(r"app\.extensoes\.([A-Za-z_]\w*)")
 _REGISTRO = "app.extensoes"
 
@@ -57,14 +57,14 @@ def _docstrings(arvore: ast.AST) -> set[int]:
 
 
 def _pacote(relativo: str) -> str:
-    """O pacote de um arquivo, para resolver os imports relativos dele:
-    `app/services/x.py` está em `app.services`, e `app/extensoes/__init__.py`
-    é o próprio `app.extensoes`."""
+    """A file's package, to resolve its relative imports:
+    `app/services/x.py` is in `app.services`, and `app/extensoes/__init__.py`
+    is `app.extensoes` itself."""
     return ".".join(Path(relativo).with_suffix("").parts[:-1])
 
 
 def _pontuado(no: ast.AST) -> str | None:
-    """`app.extensoes.planos.config` de uma cadeia de atributos, ou None."""
+    """`app.extensoes.planos.config` from an attribute chain, or None."""
     partes = []
     while isinstance(no, ast.Attribute):
         partes.append(no.attr)
@@ -76,21 +76,21 @@ def _pontuado(no: ast.AST) -> str | None:
 
 
 def _fora_da_api(resto: str) -> bool:
-    """`planos.config` (o que vem depois do registro) cita uma extensão?"""
+    """Does `planos.config` (what comes after the registry) cite an extension?"""
     primeiro = resto.split(".")[0]
     return not (primeiro in _API_DO_REGISTRO or primeiro.startswith("__"))
 
 
 def citacoes(arvore: ast.AST, relativo: str) -> list[str]:
-    """As citações de uma extensão pelo nome num módulo do núcleo.
+    """The citations of an extension by name in a core module.
 
-    Três caminhos: um import (absoluto ou relativo, resolvido contra o pacote
-    do arquivo), uma cadeia de atributos a partir do registro
-    (`app.extensoes.planos...`, ou um apelido dele, `extensoes.planos...`) e um
-    texto que nomeia a extensão (um alvo de patch, um `import_module`)."""
+    Three paths: an import (absolute or relative, resolved against the file's
+    package), an attribute chain starting from the registry
+    (`app.extensoes.planos...`, or an alias of it, `extensoes.planos...`) and a
+    string that names the extension (a patch target, an `import_module`)."""
     docstrings = _docstrings(arvore)
     pacote = _pacote(relativo)
-    apelidos = {_REGISTRO}  # nomes que apontam para o pacote do registro
+    apelidos = {_REGISTRO}  # names that point to the registry package
     achadas: list[str] = []
     for no in ast.walk(arvore):
         if isinstance(no, ast.Import):
@@ -117,9 +117,9 @@ def citacoes(arvore: ast.AST, relativo: str) -> list[str]:
             and any(_fora_da_api(nome) for nome in _NOME_NO_TEXTO.findall(no.value))
         ):
             achadas.append(f"texto {no.value[:60]!r}")
-    # Os apelidos valem no arquivo todo, então as cadeias vêm numa segunda volta.
-    # Cada cadeia é anotada até o nome da extensão (`app.extensoes.ouro`), uma
-    # vez só: `ast.walk` passa por cada pedaço de `a.b.c.d`.
+    # Aliases apply to the whole file, so the chains come in a second pass.
+    # Each chain is recorded up to the extension name (`app.extensoes.ouro`), only
+    # once: `ast.walk` goes through every piece of `a.b.c.d`.
     cadeias = set()
     for no in ast.walk(arvore):
         if isinstance(no, ast.Attribute) and (nome := _pontuado(no)):
@@ -131,11 +131,11 @@ def citacoes(arvore: ast.AST, relativo: str) -> list[str]:
 
 
 def test_o_detector_ve_os_jeitos_de_citar_uma_extensao():
-    """Os jeitos que o detector tem de ver — e os que o núcleo pode usar."""
+    """The ways the detector must see — and the ones the core may use."""
     def ve(codigo: str, arquivo: str = "app/services/x.py") -> list[str]:
         return citacoes(ast.parse(codigo), arquivo)
 
-    ouro = "ouro"  # uma extensão de mentira; o nome de verdade não pode estar aqui
+    ouro = "ouro"  # a fake extension; the real name must not be here
     assert ve(f"from ..extensoes.{ouro} import config")
     assert ve(f"from . import {ouro}", "app/extensoes/__init__.py")
     assert ve(f"import app.extensoes\napp.extensoes.{ouro}.config.X")
@@ -193,8 +193,8 @@ def test_a_api_sobe_sem_extensoes():
     estado = json.loads(r.stdout.strip().splitlines()[-1])
 
     assert estado["extensoes"] == []
-    # Nenhum código de extensão carregado: um import esquecido no núcleo
-    # puxaria o módulo, e é isso que a distribuição livre não teria.
+    # No extension code loaded: an import forgotten in the core
+    # would pull the module in, and that is what the free distribution would not have.
     assert estado["modulos"] == []
     assert estado["tabelas"] == []
     assert "/admin/assistente/modelo" in estado["rotas"]

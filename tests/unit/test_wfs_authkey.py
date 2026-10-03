@@ -1,17 +1,17 @@
 # tests/unit/test_wfs_authkey.py
-"""Nó WFS com credencial salva: o authkey do GeoServer (na URL ou num
-cabeçalho) e o Basic da credencial "wfs".
+"""WFS node with a saved credential: the GeoServer authkey (in the URL or in a
+header) and the Basic auth of the "wfs" credential.
 
-O cliente é o do owslib de verdade, montado do GetCapabilities enlatado dos
-testes do filtro CQL; o `openURL` é dublado e guarda cada URL e os argumentos
-de cada pedido. O que se protege:
-- o segredo vai em TODO pedido: GetCapabilities, a sondagem do CQL, o
-  DescribeFeatureType e cada página — pelo caminho do owslib e pelo nosso;
-- só ao endereço do nó: anunciado outro host (ou outro esquema), o nó recusa
-  antes do primeiro GetFeature;
-- nunca numa mensagem nem no traceback, que vão à tela e ao banco;
-- o cache de capabilities é por credencial;
-- credencial escolhida e não resolvida não sai anônima.
+The client is the real owslib one, built from the canned GetCapabilities of the
+CQL filter tests; `openURL` is stubbed and records each URL and the arguments of
+each request. What is protected:
+- the secret goes in EVERY request: GetCapabilities, the CQL probe, the
+  DescribeFeatureType and each page — through owslib's path and through ours;
+- only to the node's address: if another host (or another scheme) is
+  advertised, the node refuses before the first GetFeature;
+- never in a message or in the traceback, which go to the screen and the database;
+- the capabilities cache is per credential;
+- a chosen credential that is not resolved does not go out anonymously.
 """
 import base64
 import traceback
@@ -35,7 +35,7 @@ def _authkey(**extra):
 
 
 class _ServidorComArgs(_Servidor):
-    """O servidor dublado, guardando também os argumentos de cada `openURL`."""
+    """The stubbed server, also recording the arguments of each `openURL`."""
 
     def __init__(self):
         super().__init__()
@@ -85,7 +85,7 @@ def test_credencial_escolhida_e_nao_resolvida_nao_sai_anonima():
 def test_padroes_do_authkey_quando_a_tela_nao_gravou():
     auth = autenticacao_wfs(None, {"type": "geoserver_authkey", "token": CHAVE, "parameter": "", "location": ""})
     assert (auth.tipo, auth.nome, auth.no_cabecalho) == ("authkey", "authkey", False)
-    assert CHAVE not in repr(auth)  # nunca o segredo num log
+    assert CHAVE not in repr(auth)  # never the secret in a log
 
 
 @pytest.mark.parametrize("http_auth, erro", [
@@ -108,7 +108,7 @@ def test_credencial_invalida_e_recusada(http_auth, erro):
 
 
 def test_a_chave_fora_do_ascii_so_e_recusada_no_cabecalho():
-    # Na URL ela vai percent-encoded, e o requests a codifica sem reclamar.
+    # In the URL it goes percent-encoded, and requests encodes it without complaint.
     assert autenticacao_wfs(None, {"type": "geoserver_authkey", "token": "chavę-SEGREDA-99"}).segredo == "chavę-SEGREDA-99"
 
 
@@ -130,17 +130,17 @@ def test_a_impressao_nao_colide_entre_usuario_e_senha():
     ("http://h/x", "http://outro/x", False),
 ])
 def test_a_origem_e_a_que_todo_cliente_http_ve(a, b, mesma):
-    # Um GeoServer sem Proxy Base URL anuncia `scheme://host:port` — com a
-    # porta padrão explícita, era recusado como "outro endereço".
+    # A GeoServer without a Proxy Base URL advertises `scheme://host:port` — with
+    # the default port explicit, it was refused as "another address".
     assert (wfs._origem(a) == wfs._origem(b)) is mesma
 
 
 def test_a_chave_so_e_pendurada_nos_enderecos_da_origem_do_no():
     from types import SimpleNamespace
     metodos = [
-        {"type": "Get", "url": "http://x:80/geoserver/ows"},   # a origem do nó (porta padrão explícita)
+        {"type": "Get", "url": "http://x:80/geoserver/ows"},   # the node's origin (explicit default port)
         {"type": "Get", "url": "http://outro-host/geoserver/ows"},
-        {"type": "Post", "url": "https://x/geoserver/ows"},      # mesmo host, outro esquema
+        {"type": "Post", "url": "https://x/geoserver/ows"},      # same host, another scheme
     ]
     cliente = SimpleNamespace(operations=[SimpleNamespace(methods=metodos)])
     wfs._pendurar_a_chave(cliente, "http://x/ows", _authkey())
@@ -149,7 +149,7 @@ def test_a_chave_so_e_pendurada_nos_enderecos_da_origem_do_no():
 
 
 def test_o_pedido_feito_a_mao_recebe_o_segredo_no_lugar_certo():
-    # O que a listagem de camadas do editor usa (httpx, fora do owslib).
+    # What the editor's layer listing uses (httpx, outside owslib).
     assert (_authkey().parametros(), _authkey().cabecalhos()) == ({"authkey": CHAVE}, {})
     no_cabecalho = _authkey(parameter="X-Chave", location="header")
     assert (no_cabecalho.parametros(), no_cabecalho.cabecalhos()) == ({}, {"X-Chave": CHAVE})
@@ -164,7 +164,7 @@ def test_o_no_declara_a_credencial_e_o_campo_injetado():
     assert props["http_auth"]["type"] == "object" and props["http_auth"]["default"] == {}
 
 
-# ── O segredo em todo pedido ─────────────────────────────────────────────────────
+# ── The secret in every request ──────────────────────────────────────────────────
 
 def test_authkey_na_url_vai_em_todo_pedido(servidor):
     auth = _authkey()
@@ -172,13 +172,13 @@ def test_authkey_na_url_vai_em_todo_pedido(servidor):
     assert f"authkey={CHAVE}" in servidor.construcoes[0]["url"]  # o GetCapabilities
     tipos = {"hits" if p.get("resultType") == "hits" else p.get("request") for p in servidor.pedidos}
     assert {"hits", "DescribeFeatureType", "GetFeature"} <= tipos
-    for pedido in servidor.pedidos:  # sondagem, controle, DescribeFeatureType e a página
+    for pedido in servidor.pedidos:  # probe, control, DescribeFeatureType and the page
         assert pedido.get("authkey") == CHAVE
 
 
 def test_authkey_na_url_tambem_no_caminho_do_owslib(servidor):
     wfs._fetch_wfs_features(URL, "ns:rodovias", 10, auth=_authkey())
-    (pagina,) = servidor.paginas_pedidas  # o getfeature do owslib, sem filtro
+    (pagina,) = servidor.paginas_pedidas  # owslib's getfeature, without a filter
     assert pagina.get("authkey") == CHAVE
 
 
@@ -189,7 +189,7 @@ def test_nome_do_parametro_configuravel(servidor):
 
 
 def _assinado(kw: dict) -> dict:
-    """Os cabeçalhos que a assinatura do pedido põe — o que o `requests` enviaria."""
+    """The headers the request signing adds — what `requests` would send."""
     pedido = requests.Request("GET", "http://x/ows").prepare()
     kw["auth"].auth_delegate(pedido)
     return dict(pedido.headers)
@@ -213,21 +213,21 @@ def test_basic_vai_pela_assinatura_do_pedido(servidor):
 
 
 def test_o_refresh_do_getcapabilities_tambem_leva_a_chave(servidor):
-    # Camada fora do GetCapabilities: o nó o refaz UMA vez antes de acusar.
+    # Layer missing from GetCapabilities: the node redoes it ONCE before reporting.
     with pytest.raises(ValueError):
         wfs._fetch_wfs_features(URL, "ns:publicada_agora", 10, auth=_authkey())
     assert len(servidor.construcoes) == 2
     assert all(f"authkey={CHAVE}" in c["url"] for c in servidor.construcoes)
 
 
-# ── Só ao endereço do nó ─────────────────────────────────────────────────────────
+# ── Only to the node's address ───────────────────────────────────────────────────
 
 @pytest.mark.parametrize("endereco_do_no", ["http://outro-host/ows", "https://x/ows"])
 def test_outra_origem_anunciada_recusa_antes_do_getfeature(servidor, endereco_do_no):
-    # O GetCapabilities anuncia http://x/...: outro host, ou o mesmo host sem TLS.
+    # GetCapabilities advertises http://x/...: another host, or the same host without TLS.
     with pytest.raises(ValueError, match="anuncia outro endereço"):
         wfs._fetch_wfs_features(endereco_do_no, "ns:rodovias", 10, auth=_authkey())
-    assert servidor.urls == []  # nenhum GetFeature, nenhuma sondagem
+    assert servidor.urls == []  # no GetFeature, no probe
 
 
 def test_sem_credencial_o_host_anunciado_segue_valendo(servidor):
@@ -235,7 +235,7 @@ def test_sem_credencial_o_host_anunciado_segue_valendo(servidor):
     assert len(servidor.paginas_pedidas) == 1
 
 
-# ── O segredo nunca numa mensagem ────────────────────────────────────────────────
+# ── The secret never in a message ────────────────────────────────────────────────
 
 @pytest.mark.parametrize("chave", [CHAVE, "a+b/c=d&e"])
 def test_o_segredo_nao_sai_na_mensagem_nem_no_traceback(servidor, chave):
@@ -263,7 +263,7 @@ def test_o_segredo_nao_sai_no_log_da_tentativa(servidor, caplog):
 
 
 def test_enquanto_busca_nenhum_log_do_processo_leva_a_chave(monkeypatch, caplog):
-    # O DEBUG do urllib3 (e do owslib) escreve a URL de cada pedido.
+    # The DEBUG of urllib3 (and of owslib) writes the URL of each request.
     import logging
     import geopandas as gpd
 
@@ -278,7 +278,7 @@ def test_enquanto_busca_nenhum_log_do_processo_leva_a_chave(monkeypatch, caplog)
 
 
 def test_nem_no_log_da_tentativa_de_uma_recusa_do_servidor(servidor, caplog):
-    # O ramo da ServiceException (a voz do servidor) tem o seu próprio log.
+    # The ServiceException branch (the server's own voice) has its own log.
     import logging
     from owslib.util import ServiceException
     servidor.paginas = [ServiceException(f"<ows:ExceptionText>pool esgotado em /ows?authkey={CHAVE}</ows:ExceptionText>")]
@@ -289,16 +289,16 @@ def test_nem_no_log_da_tentativa_de_uma_recusa_do_servidor(servidor, caplog):
 
 
 def test_o_erro_de_configuracao_continua_valueerror(servidor):
-    # ValueError é o que o executor NÃO retenta: achatar para RuntimeError na
-    # redação faria a recusa de configuração ser repetida.
+    # ValueError is what the executor does NOT retry: flattening it to RuntimeError
+    # during redaction would make the configuration refusal be repeated.
     with pytest.raises(ValueError, match="anuncia outro endereço"):
         wfs._fetch_with_retry("http://outro-host/ows", "ns:rodovias", 10, None, None, None, 5, 2, 0.0, None, _authkey())
 
 
 def test_a_chave_ecoada_com_entidades_html_tambem_e_redigida_antes_do_corte(servidor):
-    # Um proxy ecoa a chave ESCAPADA (`&amp;`, `&lt;`, `&#x27;`): só depois do
-    # html.unescape ela volta a ser a chave — e o corte de 200 caracteres caía
-    # no meio dela, deixando um pedaço que nenhuma redação reconhece.
+    # A proxy echoes the key ESCAPED (`&amp;`, `&lt;`, `&#x27;`): only after
+    # html.unescape does it become the key again — and the 200-character cut fell
+    # in the middle of it, leaving a fragment that no redaction recognizes.
     import html as _html
     from owslib.util import ServiceException
     chave = "seg&redo<x>'42-ABCDEFGHIJ-KLMNOP"  # pragma: allowlist secret
@@ -314,8 +314,8 @@ def test_a_chave_ecoada_com_entidades_html_tambem_e_redigida_antes_do_corte(serv
 
 
 def test_a_senha_do_basic_tambem_some_na_forma_base64(servidor, caplog):
-    # `Authorization: Basic base64(usuario:senha)` é como a senha VIAJA — e é o
-    # que um proxy ou WAF que ecoa os cabeçalhos põe na página de erro.
+    # `Authorization: Basic base64(usuario:senha)` is how the password TRAVELS — and
+    # it is what a proxy or WAF that echoes headers puts on the error page.
     import logging
     from owslib.util import ServiceException
     from flow.utils.credencial_wfs import formas_do_segredo, sem_segredo
@@ -332,10 +332,10 @@ def test_a_senha_do_basic_tambem_some_na_forma_base64(servidor, caplog):
 
 
 def test_a_pagina_que_repete_a_url_nao_deixa_pedaco_da_chave(servidor):
-    # Uma página HTML de erro (um 400 de proxy ou WAF) chega como a
-    # ServiceException do owslib, com o corpo. A mensagem é cortada em 200
-    # caracteres e o corte cai no meio da chave: sobrariam os 25 primeiros dos
-    # 36 — e nenhuma redação depois reconhece o pedaço.
+    # An HTML error page (a 400 from a proxy or WAF) arrives as owslib's
+    # ServiceException, with the body. The message is cut at 200 characters
+    # and the cut falls in the middle of the key: the first 25 of the 36 would
+    # remain — and no later redaction recognizes the fragment.
     from owslib.util import ServiceException
     chave = "SEGREDO-0123456789-abcdefghij-XYZ-42"  # pragma: allowlist secret
     auth = autenticacao_wfs(None, {"type": "geoserver_authkey", "token": chave})
@@ -344,22 +344,22 @@ def test_a_pagina_que_repete_a_url_nao_deixa_pedaco_da_chave(servidor):
     servidor.paginas = [ServiceException(pagina)]
     with pytest.raises((RuntimeError, ValueError)) as ei:
         wfs._fetch_with_retry(URL, "ns:rodovias", 10, None, None, None, 5, 0, 0.0, None, auth)
-    assert "Unauthorized" in str(ei.value)  # a mensagem é mesmo a da página
+    assert "Unauthorized" in str(ei.value)  # the message really is the page's
     assert chave[:12] not in str(ei.value)
 
 
-# ── Cache por credencial ─────────────────────────────────────────────────────────
+# ── Cache per credential ─────────────────────────────────────────────────────────
 
 def test_o_cache_de_capabilities_e_por_credencial(servidor):
     outra = autenticacao_wfs(None, {"type": "geoserver_authkey", "token": "outra-chave"})
     for auth in (_authkey(), outra, None, _authkey()):
         wfs._fetch_wfs_features(URL, "ns:rodovias", 10, auth=auth)
-    # A mesma chave reaproveita; outra chave e o anônimo constroem o seu.
+    # The same key reuses it; another key and the anonymous one build their own.
     assert len(servidor.construcoes) == 3
-    assert all(CHAVE not in repr(k) for k in wfs._caps_cache)  # a chave do cache não guarda o segredo
+    assert all(CHAVE not in repr(k) for k in wfs._caps_cache)  # the cache key does not store the secret
 
 
-# ── O nó ─────────────────────────────────────────────────────────────────────────
+# ── The node ─────────────────────────────────────────────────────────────────────
 
 async def test_execute_resolve_a_credencial_e_a_repassa(monkeypatch):
     import geopandas as gpd

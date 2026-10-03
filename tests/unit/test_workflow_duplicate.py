@@ -1,16 +1,18 @@
 # tests/unit/test_workflow_duplicate.py
-"""Duplicacao de workflow.
+"""Workflow duplication.
 
-A copia fica no MESMO workspace de proposito: `credential_id` na definition so
-resolve para quem tem acesso ao workspace (ver credential_loader) e
-sub-workflows referenciados precisam viver nele — copiar para outro workspace
-produziria um workflow que parece integro e falha ao executar.
+The copy stays in the SAME workspace on purpose: `credential_id` in the
+definition only resolves for someone with access to the workspace (see
+credential_loader) and referenced sub-workflows need to live in it — copying to
+another workspace would produce a workflow that looks intact and fails when
+executed.
 
-O agendamento acompanha DESLIGADO. Duplicar costuma preceder uma edicao, e uma
-copia que nasce disparando sozinha dobra a carga e a escrita no Drive sem que
-ninguem tenha pedido. O desligamento e feito na propria definition — nao so no
-banco — porque `apply_schedule_if_needed` le o `active` do no: mexer so no banco
-deixaria o canvas dizendo "ativo" e o schedule desligado.
+The schedule comes along TURNED OFF. Duplicating usually precedes an edit, and a
+copy that is born triggering on its own doubles the load and the writes to the
+Drive without anyone asking for it. It is turned off in the definition itself —
+not only in the database — because `apply_schedule_if_needed` reads the node's
+`active`: changing only the database would leave the canvas saying "active" and
+the schedule off.
 """
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -21,8 +23,8 @@ from app.services.workflow_service import WorkflowService
 
 
 WS = "ws-1"
-# Quem duplica. O autor é obrigatório: é contra ele que o serviço confere as
-# credenciais da cópia (SEG-12).
+# Who is duplicating. The author is mandatory: it is against them that the
+# service checks the copy's credentials (SEG-12).
 QUEM = "usr-1"
 
 
@@ -39,14 +41,14 @@ def _definition(com_schedule=True, conn=None):
 
 
 def _servico(original, nomes_no_workspace=()):
-    """Serviço com o CRUD dublado; `create` devolve o que recebeu."""
+    """Service with the CRUD stubbed; `create` returns what it received."""
     svc = WorkflowService(MagicMock())
     svc.crud = MagicMock()
     svc.crud.get_by_hash = AsyncMock(return_value=original)
 
     async def _create(name, definition, **kwargs):
-        # `name` e argumento reservado do MagicMock (nomeia o proprio mock),
-        # entao precisa ser atribuido depois.
+        # `name` is a reserved MagicMock argument (it names the mock itself),
+        # so it needs to be assigned afterwards.
         m = MagicMock(id_hash="novo", definition=definition,
                       workspace_id=kwargs.get("workspace_id"))
         m.name = name
@@ -65,13 +67,13 @@ def _original(definition=None, **kw):
             "definition": definition if definition is not None else _definition()}
     base.update(kw)
     m = MagicMock(**base)
-    m.name = "Edificações"      # reservado no construtor do MagicMock
+    m.name = "Edificações"      # reserved in the MagicMock constructor
     return m
 
 
 @pytest.fixture(autouse=True)
 def _sem_schedule_real():
-    """`apply_schedule_if_needed` toca o banco; o alvo aqui é a definition."""
+    """`apply_schedule_if_needed` touches the database; the target here is the definition."""
     with patch("app.services.workflow_service.apply_schedule_if_needed",
                new=AsyncMock()) as m:
         yield m
@@ -79,9 +81,9 @@ def _sem_schedule_real():
 
 @pytest.fixture(autouse=True)
 def credenciais_de_quem_duplica():
-    """A guarda de credenciais (SEG-12) aceitando: o alvo aqui é a cópia, e a
-    recusa é provada em test_workflow_credencial_guard.py. A consulta toca a
-    tabela de credenciais, que o CRUD dublado não tem."""
+    """The credential guard (SEG-12) accepting: the target here is the copy, and
+    the refusal is proven in test_workflow_credencial_guard.py. The query
+    touches the credentials table, which the stubbed CRUD does not have."""
     with patch("app.services.workflow_service.assert_credentials_accessible",
                new=AsyncMock(return_value=None)) as m:
         yield m
@@ -98,8 +100,8 @@ async def test_nome_derivado_do_original():
 
 @pytest.mark.asyncio
 async def test_desambigua_quando_a_copia_ja_existe():
-    """Há UniqueConstraint(name, workspace_id): sem isto, duplicar duas vezes
-    devolvia 409 antes de o usuário ver a cópia."""
+    """There is a UniqueConstraint(name, workspace_id): without this, duplicating
+    twice returned 409 before the user saw the copy."""
     svc = _servico(_original(), nomes_no_workspace=["Edificações", "Cópia de Edificações"])
 
     copia = await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)
@@ -130,15 +132,16 @@ async def test_nome_em_branco_cai_no_derivado():
     assert copia.name == "Cópia de Edificações"
 
 
-# ── Colisao no INSERT ────────────────────────────────────────────────────────
+# ── Collision on INSERT ──────────────────────────────────────────────────────
 #
-# `_nome_de_copia` LE os nomes ocupados e o INSERT vem depois: entre os dois ha
-# uma janela. Duas duplicacoes simultaneas leem o mesmo conjunto e propoem o
-# mesmo nome; a segunda bate na restricao. Nenhum teste fazia `crud.create`
-# falhar, entao esse caminho ficou descoberto ate virar 409 na tela do usuario.
+# `_nome_de_copia` READS the taken names and the INSERT comes afterwards: there
+# is a window between the two. Two simultaneous duplications read the same set
+# and propose the same name; the second one hits the constraint. No test made
+# `crud.create` fail, so that path stayed uncovered until it became a 409 on
+# the user's screen.
 #
-# O `move` ja tratava a mesma corrida (workflow_move_service._aplicar); estes
-# testes fixam o tratamento equivalente na duplicacao.
+# `move` already handled the same race (workflow_move_service._aplicar); these
+# tests pin down the equivalent handling in duplication.
 
 
 def _conflito(nome: str) -> WorkflowNameConflictError:
@@ -146,10 +149,11 @@ def _conflito(nome: str) -> WorkflowNameConflictError:
 
 
 def _servico_que_falha(original, falhas: int, nomes_no_workspace=()):
-    """Como `_servico`, mas `crud.create` levanta conflito nas `falhas` primeiras.
+    """Like `_servico`, but `crud.create` raises a conflict on the first `falhas` calls.
 
-    Os nomes ja tentados entram em `nomes_no_workspace` a cada falha — e o que o
-    banco real faria: a proxima leitura enxerga quem causou a colisao.
+    The names already tried go into `nomes_no_workspace` on each failure — that
+    is what the real database would do: the next read sees whoever caused the
+    collision.
     """
     svc = _servico(original, nomes_no_workspace=nomes_no_workspace)
     ocupados = list(nomes_no_workspace)
@@ -184,21 +188,21 @@ async def test_colisao_no_insert_e_resolvida_recalculando_o_nome():
 
 @pytest.mark.asyncio
 async def test_colisao_persistente_cai_no_sufixo_unico():
-    """Colidir duas vezes indica corrida real — o hex nao disputa com ninguem."""
+    """Colliding twice indicates a real race — the hex competes with nobody."""
     svc = _servico_que_falha(_original(), falhas=2)
 
     copia = await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)
 
     assert len(svc.tentativas) == 3
     assert copia.name.startswith("Cópia de Edificações (")
-    # Sufixo aleatorio, nao o contador: 6 hex entre parenteses.
+    # Random suffix, not the counter: 6 hex chars in parentheses.
     sufixo = copia.name.rsplit("(", 1)[1].rstrip(")")
     assert len(sufixo) == 6 and all(c in "0123456789abcdef" for c in sufixo)
 
 
 @pytest.mark.asyncio
 async def test_colisao_nas_tres_tentativas_vira_erro_legivel():
-    """Melhor 409 com mensagem propria que IntegrityError cru virando 500."""
+    """Better a 409 with its own message than a raw IntegrityError turning into a 500."""
     svc = _servico_que_falha(_original(), falhas=99)
 
     with pytest.raises(WorkflowNameConflictError, match="nome livre para a cópia"):
@@ -209,10 +213,10 @@ async def test_colisao_nas_tres_tentativas_vira_erro_legivel():
 
 @pytest.mark.asyncio
 async def test_nome_explicito_nao_e_renomeado_na_colisao():
-    """Quem digitou o nome merece saber que colidiu.
+    """Whoever typed the name deserves to know it collided.
 
-    Renomear por conta propria criaria "Meu Fluxo (2)" para quem pediu
-    "Meu Fluxo" — a colisao aqui e resposta, nao acidente nosso.
+    Renaming on our own would create "Meu Fluxo (2)" for someone who asked for
+    "Meu Fluxo" — the collision here is an answer, not an accident of ours.
     """
     svc = _servico_que_falha(_original(), falhas=1)
 
@@ -223,14 +227,15 @@ async def test_nome_explicito_nao_e_renomeado_na_colisao():
 
 
 class _OriginalQueExpira:
-    """Dublê com a semântica de expiração do SQLAlchemy.
+    """Stub with SQLAlchemy's expiration semantics.
 
-    `MagicMock` responde a qualquer atributo para sempre, então nenhum teste
-    baseado nele enxerga o problema real desta retentativa: `create_workflow`
-    chama `rollback()` na colisão, e o rollback expira TODO objeto da sessão —
-    inclusive o `original`, que nem participou da escrita. Numa AsyncSession,
-    ler um atributo expirado não é um SELECT a mais, é `MissingGreenlet`: a
-    retentativa devolveria 500 no lugar do 409 que ela existe para evitar.
+    `MagicMock` responds to any attribute forever, so no test based on it sees
+    the real problem of this retry: `create_workflow` calls `rollback()` on the
+    collision, and the rollback expires EVERY object in the session —
+    including `original`, which did not even take part in the write. In an
+    AsyncSession, reading an expired attribute is not one more SELECT, it is
+    `MissingGreenlet`: the retry would return a 500 instead of the 409 it exists
+    to avoid.
     """
 
     def __init__(self, **campos):
@@ -253,12 +258,12 @@ class _OriginalQueExpira:
 
 @pytest.mark.asyncio
 async def test_retentativa_nao_le_o_original_depois_do_rollback():
-    """Regressão: o retry lia `original.name` e `original.workspace_id` de novo."""
+    """Regression: the retry read `original.name` and `original.workspace_id` again."""
     original = _OriginalQueExpira(
         id_hash="wf-1", workspace_id=WS, name="Edificações", definition=_definition(),
         description="d", params_schema={}, group_id=None, priority=0, notification_url=None,
-        # A cópia herda a proveniência do original — lida ANTES da primeira
-        # escrita (no bloco de captura), como todos os campos aqui.
+        # The copy inherits the original's provenance — read BEFORE the first
+        # write (in the capture block), like all the fields here.
         origem="usuario",
     )
 
@@ -271,7 +276,7 @@ async def test_retentativa_nao_le_o_original_depois_do_rollback():
         if len(tentativas) == 1:
             ocupados.append(name)
             svc.crud.db.execute.return_value.all.return_value = [(n,) for n in ocupados]
-            original.expirar()          # é o que o rollback do SQLAlchemy faz
+            original.expirar()          # that is what SQLAlchemy's rollback does
             raise _conflito(name)
         m = MagicMock(id_hash="novo", definition=definition,
                       workspace_id=kwargs.get("workspace_id"))
@@ -283,12 +288,12 @@ async def test_retentativa_nao_le_o_original_depois_do_rollback():
     copia = await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)
 
     assert copia.name == "Cópia de Edificações (2)"
-    assert copia.workspace_id == WS      # o workspace sobreviveu à expiração
+    assert copia.workspace_id == WS      # the workspace survived the expiration
 
 
 @pytest.mark.asyncio
 async def test_erro_de_outra_natureza_nao_e_engolido_pelo_retry():
-    """O retry existe para colisao de NOME; o resto tem de subir intacto."""
+    """The retry exists for a NAME collision; everything else has to surface intact."""
     svc = _servico(_original())
     svc.crud.create = AsyncMock(side_effect=RuntimeError("conexão caiu"))
 
@@ -332,15 +337,15 @@ async def test_agendamento_acompanha_desligado():
 
     trigger = next(n for n in copia.definition["nodes"] if n["name"] == "ScheduleTrigger")
     assert trigger["properties"]["active"] is False
-    # O resto da configuração fica: o usuário liga sem reconfigurar cron e fuso.
+    # The rest of the configuration stays: the user turns it on without reconfiguring cron and time zone.
     assert trigger["properties"]["cron_expression"] == "0 6 * * *"
     assert trigger["properties"]["timezone"] == "America/Cuiaba"
 
 
 @pytest.mark.asyncio
 async def test_original_continua_agendado():
-    """Regressão: a definition do ORM é observada pelo SQLAlchemy — mutá-la
-    marcaria o workflow de ORIGEM como sujo e desligaria o agendamento dele."""
+    """Regression: the ORM definition is observed by SQLAlchemy — mutating it
+    would mark the SOURCE workflow as dirty and turn off its schedule."""
     original = _original()
 
     await _servico(original).duplicate_workflow("wf-1", duplicated_by=QUEM)
@@ -358,7 +363,7 @@ async def test_workflow_sem_agendamento_duplica_normalmente():
     assert [n["name"] for n in copia.definition["nodes"]] == ["WFS"]
 
 
-# ── Conteúdo copiado ─────────────────────────────────────────────────────────
+# ── Copied content ───────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_definition_e_copiada_com_as_credenciais():
@@ -371,11 +376,11 @@ async def test_definition_e_copiada_com_as_credenciais():
 
 @pytest.mark.asyncio
 async def test_connection_string_chega_cifrada_na_copia():
-    """O ciclo é decrypt no get, encrypt no create.
+    """The cycle is decrypt on get, encrypt on create.
 
-    `get_workflow_by_hash` devolve a definition EM CLARO (descriptografa a
-    connectionString), e `create_workflow` recifra. A cópia não pode guardar a
-    string de conexão em claro no banco.
+    `get_workflow_by_hash` returns the definition IN PLAIN TEXT (it decrypts the
+    connectionString), and `create_workflow` re-encrypts it. The copy must not
+    store the connection string in plain text in the database.
     """
     from app.core.utils.encryption import encrypt_string
 
@@ -389,11 +394,12 @@ async def test_connection_string_chega_cifrada_na_copia():
 
 @pytest.mark.asyncio
 async def test_params_schema_acompanha():
-    """Regressão: `create_workflow` só recebia nome/definition/workspace.
+    """Regression: `create_workflow` only received name/definition/workspace.
 
-    É o params_schema que faz a tela pedir os parâmetros antes de executar
-    (handleRunClick no front). Sem ele, a cópia dispara direto e calada, com
-    schema vazio — comportamento silenciosamente diferente do original.
+    It is the params_schema that makes the screen ask for the parameters before
+    executing (handleRunClick in the front end). Without it, the copy triggers
+    right away and silently, with an empty schema — behavior silently different
+    from the original's.
     """
     esquema = {"ano": {"type": "number", "required": True}}
     svc = _servico(_original(params_schema=esquema))
@@ -421,8 +427,9 @@ async def test_configuracao_do_workflow_acompanha():
 
 @pytest.mark.asyncio
 async def test_pins_e_portal_nao_acompanham():
-    """`create_workflow` recebe só nome e definition — pins apontam para runs do
-    original e portal publicado não pode se propagar sem alguém pedir."""
+    """`create_workflow` receives only name and definition — pins point to the
+    original's runs and a published portal must not propagate without someone
+    asking."""
     svc = _servico(_original(pinned_outputs={"n1": "art-1"}, portal_access="public"))
 
     await svc.duplicate_workflow("wf-1", duplicated_by=QUEM)

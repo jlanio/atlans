@@ -1,19 +1,18 @@
 // web/app/components/workflow/utils/build-canvas.ts
 //
-// Montagem de um canvas a partir de uma `definition` persistida + o catálogo de
-// nós.
+// Building a canvas from a persisted `definition` + the node catalog.
 //
-// A definition guarda só o estado serializável do nó (id, name, properties,
-// position); todo o schema — campos, portas, tipo, descrição — vem do catálogo
-// `GET /nodes` no momento de abrir. Juntar os dois é o que transforma o JSON do
-// banco em algo que o React Flow consegue desenhar.
+// The definition stores only the node's serializable state (id, name, properties,
+// position); the whole schema — fields, ports, type, description — comes from the
+// `GET /nodes` catalog at open time. Joining the two is what turns the database
+// JSON into something React Flow can draw.
 //
-// Puras de propósito: além do editor, o visualizador de sub-fluxo monta o canvas
-// de OUTRO workflow (o filho) para pintar o que aconteceu lá dentro. Enquanto
-// isto vivia dentro do componente, lendo `workflow`/`nodesAPI` do closure e
-// chamando `setNodes`/`setEdges`, não havia como montar um segundo grafo sem
-// duplicar a regra — e o `data` montado em dois lugares é exatamente o defeito
-// que `contratoDoNo` existe para impedir.
+// Pure on purpose: besides the editor, the sub-workflow viewer builds the canvas
+// of ANOTHER workflow (the child) to paint what happened inside it. While this
+// lived inside the component, reading `workflow`/`nodesAPI` from the closure and
+// calling `setNodes`/`setEdges`, there was no way to build a second graph without
+// duplicating the rule — and `data` built in two places is exactly the defect
+// that `contratoDoNo` exists to prevent.
 import { Edge } from "@xyflow/react"
 import { v4 as uuid } from "uuid"
 import { INodeContext } from "@/context/useFlowContext"
@@ -23,11 +22,11 @@ import { contratoDoNo, handleDeEntrada } from "./node-ports"
 import { resolveSourceHandle } from "./edge-persistence"
 
 /**
- * Nós do canvas para uma definition.
+ * Canvas nodes for a definition.
  *
- * `properties` é reconstruído campo a campo a partir do catálogo — e não copiado
- * da definition — para que um campo novo no schema chegue ao nó já com o default
- * do backend, sem migração de dados.
+ * `properties` is rebuilt field by field from the catalog — and not copied from
+ * the definition — so that a new field in the schema reaches the node already
+ * with the backend's default, without a data migration.
  */
 export function buildNodes(
   definition: CanvasDefinition | undefined,
@@ -46,7 +45,7 @@ export function buildNodes(
     return {
       id: node.id,
       data: {
-        // Usa o alias customizado salvo pelo usuário; cai no padrão do schema se não houver
+        // Uses the custom alias saved by the user; falls back to the schema default if there is none
         alias: node.alias ?? nodeApiFound?.alias ?? "",
         description: nodeApiFound?.description ?? "",
         name: node.name,
@@ -60,11 +59,11 @@ export function buildNodes(
           drive_extensions: prop.drive_extensions,
           options: prop.options,
           visibleWhen: prop.visibleWhen,
-          // Sem esta linha o marcador morria AQUI no primeiro reload: o nó
-          // recém-arrastado sugeria colunas (o drawer copia o objeto inteiro do
-          // catálogo) e o mesmo nó, salvo e recarregado, nunca mais — a
-          // projeção descartava o campo e `sugerirColunas()` devolvia [] para
-          // sempre. Era o "às vezes funciona" da sugestão de colunas.
+          // Without this line the marker died HERE on the first reload: the freshly
+          // dragged node suggested columns (the drawer copies the whole catalog
+          // object) and the same node, saved and reloaded, never again — the
+          // projection dropped the field and `sugerirColunas()` returned [] for
+          // good. It was the "sometimes it works" of column suggestions.
           suggest_columns: prop.suggest_columns,
         })) ?? [],
         properties,
@@ -78,8 +77,8 @@ export function buildNodes(
 }
 
 /**
- * Arestas do canvas. Depende dos nós já montados: o handle de origem e o de
- * destino só podem ser resolvidos sabendo quais portas cada nó declara.
+ * Canvas edges. Depends on the nodes already built: the source and target
+ * handles can only be resolved knowing which ports each node declares.
  */
 export function buildEdges(
   definition: CanvasDefinition | undefined,

@@ -4,14 +4,14 @@ import { GisFlowService } from "@/service/GisFlowService"
 import type { IWorkflow } from "@/service/types"
 
 /**
- * Cache por hash, no módulo (e não numa ref do componente): descer e voltar pela
- * trilha remonta o visualizador, e sem isto cada passo refaria a mesma busca.
- * Um sub-fluxo é lido muitas vezes e editado poucas — e o botão de recarregar
- * dá a saída para o caso raro.
+ * Cache by hash, at module level (and not in a component ref): going down and
+ * back via the breadcrumb remounts the viewer, and without this every step would
+ * redo the same fetch. A sub-workflow is read often and edited rarely — and the
+ * reload button provides the way out for the rare case.
  *
- * Teto porque a sessão é longa e uma definition não é pequena: sem ele, visitar
- * muitos sub-fluxos segura todos eles em memória até a página recarregar.
- * Descarte pelo mais antigo, que num drill-down é o nível de que já se saiu.
+ * Ceiling because the session is long and a definition is not small: without it,
+ * visiting many sub-workflows holds all of them in memory until the page reloads.
+ * Evicts the oldest, which in a drill-down is the level already left behind.
  */
 const cache = new Map<string, IWorkflow>()
 const MAX_EM_CACHE = 12
@@ -32,22 +32,22 @@ export interface SubflowDefinition {
 }
 
 /**
- * Carrega o workflow de um sub-fluxo pelo hash.
+ * Loads a sub-workflow's workflow by hash.
  *
- * `workflow` é lido do cache no render, e não guardado em estado: guardado, ele
- * sobrevivia à troca de nível e o visualizador desenhava o grafo do nível
- * ANTERIOR enquanto o novo carregava — com o agravante de que as ressalvas,
- * comparando os eventos do nível novo contra o grafo velho, acusavam todos os
- * nós como "não existem mais no grafo". Lendo do cache, ou o grafo certo já está
- * lá, ou não há grafo — e a tela mostra que está carregando.
+ * `workflow` is read from the cache on render, and not kept in state: kept, it
+ * survived the level change and the viewer drew the PREVIOUS level's graph
+ * while the new one loaded — made worse by the caveats, which, comparing the
+ * new level's events against the old graph, flagged every node as "no longer
+ * in the graph". Reading from the cache, either the right graph is already
+ * there, or there is no graph — and the screen shows that it is loading.
  *
- * Nenhum endpoint novo: `GET /workflows/{hash}` já devolve a definition, e a
- * autorização dele cobre o caso — um sub-fluxo só pode ser chamado de dentro do
- * mesmo workspace do pai (validate_subworkflow_references_against_db), então
- * quem alcança o pai alcança o filho.
+ * No new endpoint: `GET /workflows/{hash}` already returns the definition, and
+ * its authorization covers the case — a sub-workflow can only be called from
+ * within the parent's workspace (validate_subworkflow_references_against_db), so
+ * whoever reaches the parent reaches the child.
  */
 export function useSubflowDefinition(workflowHash: string | null): SubflowDefinition {
-  // Só para repintar quando o fetch popula o cache — o dado em si vem do Map.
+  // Only to repaint when the fetch populates the cache — the data itself comes from the Map.
   const [, repintar] = useReducer((n: number) => n + 1, 0)
   const [versao, setVersao] = useState(0)
   const [carregando, setCarregando] = useState(false)

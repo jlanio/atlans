@@ -1,15 +1,16 @@
 # app/models/uso_do_assistente.py
-"""O que cada volta do assistente consumiu — e custou.
+"""What each turn of the assistant consumed — and cost.
 
-Uma linha por VOLTA do laco, e nao por conversa: e onde a cota ja e cobrada, os
-dois nunca divergem, e uma conversa abandonada no meio ja deixou registrado o
-que gastou ate ali. Somar so no fim perderia essas, e perderia para BAIXO — o
-lado errado de errar numa tabela de custo.
+One row per TURN of the loop, not per conversation: that is where the quota is
+already charged, the two never diverge, and a conversation abandoned midway has
+already recorded what it spent up to that point. Summing only at the end would
+lose those, and lose them on the LOW side — the wrong side to err on in a cost
+table.
 
-**Nenhum conteudo mora aqui.** Contagens, o modelo e o custo. O que esta tabela
-responde e de quanto foi a conta, nao do que se falou.
+**No content lives here.** Counts, the model and the cost. What this table
+answers is how much the bill was, not what was said.
 
-Contrato em docs/assistente-editor.md.
+Contract in docs/editor-assistant.md.
 """
 from uuid import uuid4
 
@@ -21,8 +22,8 @@ from app.models.base import Base
 class UsoDoAssistente(Base):
     __tablename__ = "uso_do_assistente"
     __table_args__ = (
-        # As duas perguntas da tabela: quanto esta pessoa consome por dia, e
-        # quanto entrou na janela dos ultimos 30 dias.
+        # The table's two questions: how much this person consumes per day, and
+        # how much came in over the window of the last 30 days.
         Index("ix_uso_do_assistente_user", "user_id", "created_at"),
         Index("ix_uso_do_assistente_quando", "created_at"),
     )
@@ -33,24 +34,24 @@ class UsoDoAssistente(Base):
 
     user_id = Column(String(36), nullable=False)   # users.id_hash
 
-    # O modelo COM QUE esta volta foi produzida, gravado e nao deduzido: no dia
-    # em que alguem trocar o modelo, o historico precisa continuar dizendo com
-    # qual ele foi feito, senao comparar antes e depois fica impossivel logo na
-    # primeira troca.
+    # The model this turn was produced WITH, stored and not inferred: on the
+    # day someone switches the model, the history must keep saying which one
+    # it was made with, otherwise comparing before and after becomes
+    # impossible right at the first switch.
     modelo = Column(String(120), nullable=False)
     superficie = Column(String(24), nullable=True)   # home | editor
 
-    # `entrada` JA INCLUI o que veio do cache, e `raciocinio` e um recorte de
-    # `saida` — e a mesma convencao de `assistente_service.Uso`, mantida de
-    # proposito para que ninguem precise converter nada ao ler.
+    # `entrada` ALREADY INCLUDES what came from the cache, and `raciocinio` is a
+    # slice of `saida` — it is the same convention as `assistente_service.Uso`,
+    # kept on purpose so nobody needs to convert anything when reading.
     entrada = Column(Integer, nullable=False, server_default=text("0"))
     saida = Column(Integer, nullable=False, server_default=text("0"))
     cache_leitura = Column(Integer, nullable=False, server_default=text("0"))
     raciocinio = Column(Integer, nullable=False, server_default=text("0"))
 
-    # O que o provedor disse que custou. NUMERIC e nao FLOAT: sao somas de
-    # dinheiro sobre milhares de linhas, e o arredondamento binario aparece no
-    # total. E o custo REAL — reprecificar com outro modelo usa as contagens.
+    # What the provider said it cost. NUMERIC and not FLOAT: these are sums of
+    # money over thousands of rows, and binary rounding shows up in the total.
+    # It is the REAL cost — repricing with another model uses the counts.
     custo_usd = Column(Numeric(12, 6), nullable=False, server_default=text("0"))
 
     created_at = Column(DateTime, server_default=func.now(), nullable=False)

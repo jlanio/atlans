@@ -3,9 +3,9 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { VisaoWorkflows } from "@/app/components/observability/visao-workflows"
 import type { IWorkflowMetricsRow } from "@/service/types"
 
-// O StatusBadge em português é colateral de outra frente (spec §4.4); aqui
-// ele é dublado com o mesmo contrato (rotuloDoStatus) para o teste não
-// depender da ordem de integração.
+// The Portuguese StatusBadge is a side effect of another workstream (spec
+// §4.4); here it's doubled with the same contract (rotuloDoStatus) so the test
+// doesn't depend on the integration order.
 vi.mock("@/app/components/shared/StatusBadge", async () => {
   const { rotuloDoStatus } = await import("@/app/components/shared/status-rotulos")
   return { StatusBadge: ({ status }: { status: string }) => <span>{rotuloDoStatus(status)}</span> }
@@ -85,7 +85,7 @@ describe("VisaoWorkflows", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
     expect(screen.getByRole("switch", { name: "Ativar Integração SICAR" })).not.toBeChecked()
 
-    // Ligar de volta: direto.
+    // Turning it back on: direct.
     rerender(<VisaoWorkflows linhas={[linha({ active: false })]} carregando={false} isAdmin onVerExecucoes={() => {}} onAlternarAtivo={onAlternar} />)
     fireEvent.click(screen.getByRole("switch", { name: "Ativar Integração SICAR" }))
     await waitFor(() => expect(onAlternar).toHaveBeenCalledWith("wf-1", true))

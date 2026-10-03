@@ -1,1 +1,1 @@
-# Pacote de apoio do ObservabilityService (F5/A10).
+# Support package for ObservabilityService (F5/A10).

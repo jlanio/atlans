@@ -1,18 +1,18 @@
 # tests/unit/test_observability_metricas_v2.py
-"""Métricas v2 do Histórico (docs/specs/historico-metricas.md §3).
+"""History metrics v2 (docs/specs/metrics-history.md §3).
 
-O que a spec mudou de propósito e que estes testes fixam:
+What the spec changed on purpose and these tests pin down:
 
-- taxa de sucesso = concluídas ÷ (concluídas + falhas) — em andamento e
-  canceladas saem do denominador;
-- percentis só de execuções concluídas com duração > 0, com a MESMA
-  interpolação do `percentile_cont` do PostgreSQL no fallback em Python;
-- filtros comuns (`workspace_id` → 403 fora do escopo, `workflow_id` → 404,
-  `tz` → 422) e chave de cache que os inclui;
-- "presa" = ativa há mais que max(3 × p50, 900 s), ou 3600 s sem p50;
-- gráfico por dia com todos os dias, cortados no fuso pedido;
-- campos novos do run para qualquer usuário, admin-only preservados;
-- linha "Sem executor" e frota online com zeros na visão por executor.
+- success rate = completed ÷ (completed + failed) — running and
+  cancelled are left out of the denominator;
+- percentiles only from completed runs with duration > 0, with the SAME
+  interpolation as PostgreSQL's `percentile_cont` in the Python fallback;
+- common filters (`workspace_id` → 403 outside the scope, `workflow_id` → 404,
+  `tz` → 422) and a cache key that includes them;
+- "stuck" = active for longer than max(3 × p50, 900 s), or 3600 s without p50;
+- per-day chart with every day, cut in the requested time zone;
+- new run fields for any user, admin-only ones preserved;
+- "Sem executor" (no executor) row and online fleet with zeros in the per-executor view.
 """
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -37,7 +37,7 @@ from app.services.observability_service import (
 )
 
 
-# ── Dublês ───────────────────────────────────────────────────────────────────
+# ── Test doubles ─────────────────────────────────────────────────────────────
 
 def _user(role="admin", id_hash="usr-1"):
     u = MagicMock()
@@ -47,7 +47,7 @@ def _user(role="admin", id_hash="usr-1"):
 
 
 class _LinhaVazia:
-    """Linha de agregação sem dados: qualquer coluna lê como None."""
+    """Aggregation row with no data: any column reads as None."""
 
     def __getattr__(self, _nome):
         return None
@@ -64,8 +64,8 @@ def _resultado(*, linha=None, linhas=None, escalar=None):
 
 
 def _db(*respostas, dialeto="sqlite"):
-    """Sessão dublê: devolve `respostas` na ordem e, esgotadas, resultados
-    vazios. `dialeto` decide entre SQL do PostgreSQL e fallback em Python."""
+    """Session double: returns `respostas` in order and, once exhausted, empty
+    results. `dialeto` decides between PostgreSQL SQL and the Python fallback."""
     fila = list(respostas)
 
     async def _execute(stmt):
@@ -83,7 +83,7 @@ def _sql(db, chamada=0, dialeto=postgresql.dialect()) -> str:
 
 @pytest.fixture(autouse=True)
 def _sem_redis():
-    """Presença, capacidade e ACKs vêm do Redis; aqui nada está no ar."""
+    """Presence, capacity and ACKs come from Redis; here nothing is up."""
     with patch.object(executor_registry, "is_online", AsyncMock(return_value=False)), \
          patch.object(executor_registry, "read_capacity", AsyncMock(return_value=None)), \
          patch.object(executor_registry, "list_pending_acks", AsyncMock(return_value=[])):
@@ -98,10 +98,10 @@ AGORA = datetime(2026, 9, 6, 12, 0, tzinfo=timezone.utc)
 @pytest.mark.parametrize("valores, p, esperado", [
     ([], 0.5, None),
     ([42.0], 0.5, 42.0),
-    ([10, 20], 0.5, 15.0),                # interpola entre vizinhos
+    ([10, 20], 0.5, 15.0),                # interpolates between neighbors
     ([1, 2, 3, 4, 5], 0.5, 3.0),
     ([1, 2, 3, 4, 5], 0.95, 4.8),         # 0.95 * 4 = 3.8 → 4 + 0.8 * (5 - 4)
-    ([5, 1, 3], 0.5, 3.0),                # não depende da ordem de entrada
+    ([5, 1, 3], 0.5, 3.0),                # does not depend on input order
 ])
 def test_percentil_continuo_segue_o_percentile_cont_do_postgres(valores, p, esperado):
     assert percentil_linear(valores, p) == esperado
@@ -109,9 +109,9 @@ def test_percentil_continuo_segue_o_percentile_cont_do_postgres(valores, p, espe
 
 @pytest.mark.asyncio
 async def test_percentis_em_python_so_olham_concluidas_com_duracao_positiva():
-    """Fora do PostgreSQL a mediana é calculada em Python, mas o recorte
-    (status success, duração > 0) tem de estar no SQL — senão o volume
-    projetado seria a janela inteira."""
+    """Outside PostgreSQL the median is computed in Python, but the slice
+    (status success, duration > 0) must be in the SQL — otherwise the projected
+    volume would be the whole window."""
     db = _db(_resultado(linhas=[30.0, 10.0, 20.0]))
 
     p50, p95 = await _percentis(db, [], [0.5, 0.95])
@@ -156,8 +156,8 @@ async def test_admin_filtra_qualquer_workspace_sem_consultar_o_banco():
 
 @pytest.mark.asyncio
 async def test_workflow_fora_do_escopo_e_404():
-    """"Sem acesso" e "não existe" caem no mesmo 404: um 403 confirmaria a
-    existência de workflows de outro tenant."""
+    """"No access" and "does not exist" fall into the same 404: a 403 would confirm
+    the existence of another tenant's workflows."""
     db = _db(_resultado(escalar=None))
     with pytest.raises(WorkflowNotFoundError):
         await _resolver_escopo(db, _user("user"), ["ws-1"], workflow_id="wf-x")
@@ -165,8 +165,8 @@ async def test_workflow_fora_do_escopo_e_404():
 
 
 def test_chave_de_cache_inclui_os_filtros():
-    """Sem os filtros na chave, "todos os workspaces" seria servido a quem
-    pediu "só o workspace X" pelos 45 s seguintes."""
+    """Without the filters in the key, "all workspaces" would be served to whoever
+    asked for "only workspace X" for the next 45 s."""
     base = _metrics_cache_key("metrics", _user("admin"), [], 30, como_admin=True)
     com_ws = _metrics_cache_key("metrics", _user("admin"), [], 30, como_admin=True, workspace_id="ws-1")
     com_wf = _metrics_cache_key(
@@ -177,7 +177,7 @@ def test_chave_de_cache_inclui_os_filtros():
     assert _metrics_cache_key("metrics", _user("admin"), [], 30, como_admin=True, workspace_id=None) == base
 
 
-# ── /metrics: fórmulas ───────────────────────────────────────────────────────
+# ── /metrics: formulas ───────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_taxa_de_sucesso_ignora_em_andamento_e_canceladas():
@@ -194,7 +194,7 @@ async def test_taxa_de_sucesso_ignora_em_andamento_e_canceladas():
 
     m = await ObservabilityService.get_metrics(db, _user("admin"), [], days=7, force=True, como_admin=True)
 
-    assert m["success_rate"] == 0.8                    # 8 / (8 + 2), não 8 / 17
+    assert m["success_rate"] == 0.8                    # 8 / (8 + 2), not 8 / 17
     assert m["success_rate_prev_7d"] == 0.75           # 3 / (3 + 1)
     assert m["by_status"] == {
         "success": 8, "failed": 2, "running": 5, "pending": 1, "cancelled": 1, "other": 0,
@@ -204,15 +204,15 @@ async def test_taxa_de_sucesso_ignora_em_andamento_e_canceladas():
         "total_runs": 10, "success_runs": 6, "failed_runs": 4, "success_rate": 0.6, "p50_seconds": None,
     }
     assert m["duration"] == {"p50_seconds": None, "p95_seconds": None}
-    # Campos que a Visão geral ainda usa.
+    # Fields the Overview still uses.
     assert (m["total_workflows"], m["active_workflows"], m["runs_last_24h"], m["runs_last_7d"], m["runs_prev_7d"]) == (3, 2, 3, 9, 4)
     assert m["avg_duration_seconds"] == 12.0
 
 
 @pytest.mark.asyncio
 async def test_sem_execucoes_a_taxa_e_zero_e_a_anterior_de_7d_e_nula():
-    """0.0 (spec) para a taxa da janela; `null` na de 7 dias, que é o que
-    esconde a seta de tendência da Visão geral em vez de mostrar "caiu para 0%"."""
+    """0.0 (spec) for the window rate; `null` for the 7-day one, which is what
+    hides the Overview's trend arrow instead of showing "dropped to 0%"."""
     db = _db(_resultado(linha=SimpleNamespace(total=0, ativos=0)))
 
     m = await ObservabilityService.get_metrics(db, _user("admin"), [], days=30, force=True, como_admin=True)
@@ -227,8 +227,8 @@ async def test_sem_execucoes_a_taxa_e_zero_e_a_anterior_de_7d_e_nula():
 
 @pytest.mark.asyncio
 async def test_periodo_anterior_tem_janela_propria_de_mesmo_tamanho():
-    """A comparação é com [now-2d, now-d): fica numa query própria em vez de
-    alargar o WHERE principal (que os testes de janela fixam em max(days, 14))."""
+    """The comparison is against [now-2d, now-d): it lives in its own query instead
+    of widening the main WHERE (which the window tests pin at max(days, 14))."""
     db = _db(_resultado(linha=SimpleNamespace(total=0, ativos=0)))
 
     await ObservabilityService.get_metrics(db, _user("admin"), [], days=30, force=True, como_admin=True)
@@ -261,11 +261,11 @@ async def test_top_falhas_traz_nome_taxa_e_ultimo_erro_resumido():
     assert len(item["last_error"]) == 200 and item["last_error"].endswith("…")
     assert item["last_error_category"] == "timeout"
     assert item["last_failed_at"] == AGORA.isoformat()
-    # A "última falha" de cada workflow sai de UMA consulta com função de janela.
+    # Each workflow's "last failure" comes from ONE query with a window function.
     assert "row_number() OVER (PARTITION BY workflow_runs.workflow_hash" in _sql(db, 1)
 
 
-# ── Execuções presas ─────────────────────────────────────────────────────────
+# ── Stuck runs ───────────────────────────────────────────────────────────────
 
 def _candidata(task_id, wf, minutos, host="executor:ex-2"):
     return SimpleNamespace(
@@ -277,10 +277,10 @@ def _candidata(task_id, wf, minutos, host="executor:ex-2"):
 @pytest.mark.asyncio
 async def test_presa_usa_3x_a_mediana_com_piso_de_900s_e_3600s_sem_mediana():
     candidatas = [
-        _candidata("lenta-sem-p50", "wf-a", 70),   # 4200 s > 3600 (sem p50)   → presa
-        _candidata("curta-sem-p50", "wf-a", 50),   # 3000 s < 3600             → não
+        _candidata("lenta-sem-p50", "wf-a", 70),   # 4200 s > 3600 (no p50)    → stuck
+        _candidata("curta-sem-p50", "wf-a", 50),   # 3000 s < 3600             → no
         _candidata("piso", "wf-b", 16),            # p50 100 → max(300, 900) = 900 < 960 → presa
-        _candidata("multiplo", "wf-c", 40),        # p50 1000 → 3000 > 2400    → não
+        _candidata("multiplo", "wf-c", 40),        # p50 1000 → 3000 > 2400    → no
         _candidata("multiplo-2", "wf-c", 60),      # 3600 > 3000               → presa
     ]
     nomes = [SimpleNamespace(id_hash="ex-2", name="geo-02")]
@@ -294,7 +294,7 @@ async def test_presa_usa_3x_a_mediana_com_piso_de_900s_e_3600s_sem_mediana():
     assert presas[0]["elapsed_seconds"] == 4200 and presas[0]["typical_seconds"] is None
     assert presas[1]["typical_seconds"] == 100.0
     assert presas[0]["executor_name"] == "geo-02"
-    # A consulta já corta pelo piso: nada abaixo de 900 s pode estar preso.
+    # The query already cuts at the floor: nothing below 900 s can be stuck.
     sql = _sql(db, 0)
     assert "workflow_runs.status IN" in sql and "workflow_runs.start_time <= " in sql
 
@@ -311,7 +311,7 @@ async def test_presas_limita_a_cinco_mais_antigas_mas_conta_todas():
     assert [p["run_id"] for p in presas] == ["r0", "r1", "r2", "r3", "r4"]
 
 
-# ── Bloco "agora" ────────────────────────────────────────────────────────────
+# ── "Now" block ──────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_agora_conta_frota_online_fila_publicada_e_acks_so_para_admin():
@@ -338,9 +338,9 @@ async def test_agora_conta_frota_online_fila_publicada_e_acks_so_para_admin():
 
     assert (admin["running"], admin["pending"], admin["stuck_count"]) == (2, 1, 0)
     assert admin["executors"] == {"online": 2, "total": 3}
-    assert admin["queued_on_executors"] == 5          # só quem publica; ex-2 online sem capacidade não zera
-    assert admin["overdue_acks"] == 1                  # 20 s ≥ JOB_ACK_WARN_SECONDS; 3 s não
-    # Usuário comum: frota acessível (inativos fora) e ACKs nulos.
+    assert admin["queued_on_executors"] == 5          # only those that publish; ex-2 online without capacity does not zero it
+    assert admin["overdue_acks"] == 1                  # 20 s ≥ JOB_ACK_WARN_SECONDS; 3 s is not
+    # Regular user: accessible fleet (inactive ones left out) and null ACKs.
     assert comum["executors"] == {"online": 1, "total": 1}
     assert comum["overdue_acks"] is None
 
@@ -349,8 +349,8 @@ async def test_agora_conta_frota_online_fila_publicada_e_acks_so_para_admin():
 
 @pytest.mark.asyncio
 async def test_runs_por_dia_traz_todos_os_dias_cortados_no_fuso():
-    """Em São Paulo (UTC-3), 01:00 UTC ainda é o dia anterior; `pending` soma
-    em `running`, `cancelled` fica à parte e o resto vai para `other`."""
+    """In São Paulo (UTC-3), 01:00 UTC is still the previous day; `pending` adds
+    into `running`, `cancelled` stays separate and the rest goes to `other`."""
     hoje = datetime.now(timezone.utc)
     ontem_0100_utc = (hoje - timedelta(days=1)).replace(hour=1, minute=0, second=0, microsecond=0)
     linhas = [
@@ -371,10 +371,11 @@ async def test_runs_por_dia_traz_todos_os_dias_cortados_no_fuso():
     assert len(dias) == 7
     assert [d["day"] for d in dias] == sorted(d["day"] for d in dias)
     assert all(set(d) == {"day", "total", "success", "failed", "running", "cancelled", "other"} for d in dias)
-    # O run das 01:00 UTC de ontem cai em "anteontem" no fuso de SP (−3h cruza a
-    # meia-noite). Localiza o balde pela DATA no fuso pedido, não por índice fixo:
-    # quando o teste roda entre 00:00–03:00 UTC, "hoje em SP" ainda é o dia
-    # anterior e o `dias[-3]` escorregava um dia (falha só nessa janela).
+    # Yesterday's 01:00 UTC run falls on "the day before yesterday" in the SP time
+    # zone (−3h crosses midnight). Find the bucket by DATE in the requested time
+    # zone, not by a fixed index: when the test runs between 00:00–03:00 UTC,
+    # "today in SP" is still the previous day and `dias[-3]` slipped by one day
+    # (it failed only in that window).
     dia_do_sucesso = ontem_0100_utc.astimezone(ZoneInfo("America/Sao_Paulo")).date().isoformat()
     balde = next(d for d in dias if d["day"] == dia_do_sucesso)
     assert balde["success"] == 1 and balde["total"] == 1
@@ -383,7 +384,7 @@ async def test_runs_por_dia_traz_todos_os_dias_cortados_no_fuso():
     assert sum(d["cancelled"] for d in dias) == 1
     assert sum(d["other"] for d in dias) == 1
     assert sum(d["failed"] for d in dias) == 1
-    # Fallback: só (start_time, status) da janela vão para o Python.
+    # Fallback: only (start_time, status) of the window go to Python.
     sql = _sql(db)
     assert "count(" not in sql and "workflow_runs.start_time >= " in sql
 
@@ -407,8 +408,8 @@ async def test_runs_por_dia_no_postgres_corta_o_dia_com_at_time_zone():
 
 @pytest.mark.asyncio
 async def test_tz_invalido_e_422_no_router(client):
-    """A validação fica na borda: um nome inválido viraria erro de SQL no
-    `AT TIME ZONE` (500) em vez de um 422 que a web entende."""
+    """Validation stays at the edge: an invalid name would become an SQL error in
+    `AT TIME ZONE` (500) instead of a 422 the web app understands."""
     from app.api.dependencies import get_db
     from app.main import app
 
@@ -428,7 +429,7 @@ async def test_tz_invalido_e_422_no_router(client):
         app.dependency_overrides.pop(get_db, None)
 
 
-# ── /runs e /runs/{id}: serialização e filtros ───────────────────────────────
+# ── /runs and /runs/{id}: serialization and filters ──────────────────────────
 
 def _run_row(**over):
     base = dict(
@@ -459,12 +460,12 @@ def test_serializacao_traz_os_campos_novos_e_reserva_os_admin_only():
     assert (comum["trigger_source"], comum["triggered_by"], comum["triggered_by_username"]) == ("schedule", "usr-9", "bia")
     assert (comum["error_category"], comum["schedule_id"]) == ("timeout", 7)
     assert comum["workflow_name"] == "Integração"
-    # O workspace é o DO RUN (onde a execução aconteceu), não o atual do workflow.
+    # The workspace is the RUN'S (where the run happened), not the workflow's current one.
     assert (comum["workspace_id"], comum["workspace_name"]) == ("ws-antigo", "Antigo")
     assert "workflow_active" not in comum and "owner_username" not in comum
     assert admin["workflow_active"] is True and admin["owner_username"] == "ana"
-    # A origem do FLUXO (quem o criou) vai para QUALQUER usuário: é o selo do
-    # assistente na lista, não um dado de administração.
+    # The WORKFLOW's origin (who created it) goes to ANY user: it is the
+    # assistant badge in the list, not administrative data.
     assert comum["workflow_origem"] == "assistente"
 
 
@@ -473,15 +474,15 @@ def test_serializacao_sem_host_e_sem_meta_devolve_nulos():
     assert out["executor_id"] is None and out["executor_name"] is None and out["agent_host"] is None
     assert out["triggered_by_username"] is None and out["workspace_name"] is None
     assert "workflow_name" not in out
-    # Workflow apagado de vez: sem meta, sem origem — a tela não pinta selo.
+    # Workflow deleted for good: no meta, no origin — the screen paints no badge.
     assert out["workflow_origem"] is None
 
 
 @pytest.mark.asyncio
 async def test_filtro_de_origem_do_fluxo_junta_workflows_e_nao_e_o_disparo():
-    """O chip "Assistente" do Histórico recorta pelo FLUXO (`workflows.origem`),
-    não pelo disparo (`workflow_runs.trigger_source`) — são eixos diferentes e
-    combináveis."""
+    """The History's "Assistente" chip slices by the WORKFLOW (`workflows.origem`),
+    not by the trigger (`workflow_runs.trigger_source`) — they are different and
+    combinable axes."""
     db = _db()
     await ObservabilityService.list_runs(
         db, _user("admin"), [], workflow_origem="assistente", como_admin=True,
@@ -489,11 +490,11 @@ async def test_filtro_de_origem_do_fluxo_junta_workflows_e_nao_e_o_disparo():
     sql = _sql(db, 0)
     assert "JOIN workflows" in sql, "o recorte por origem precisa do join, como a busca"
     assert "workflows.origem = " in sql
-    # `trigger_source` continua na projeção, mas NÃO vira recorte: o chip não
-    # esconde execuções manuais de um fluxo do assistente.
+    # `trigger_source` stays in the projection, but does NOT become a slice: the
+    # chip does not hide manual runs of an assistant workflow.
     assert "workflow_runs.trigger_source = " not in sql
 
-    # Combinado com o chip de status e com a busca, sem join duplicado.
+    # Combined with the status chip and with search, without a duplicate join.
     db = _db()
     await ObservabilityService.list_runs(
         db, _user("admin"), [], workflow_origem="assistente", status="failed", q="GDAL", como_admin=True,
@@ -533,8 +534,8 @@ async def test_busca_escapa_curingas_do_usuario():
 
 @pytest.mark.asyncio
 async def test_lista_resolve_nomes_em_lote_e_nao_por_linha():
-    """Uma página de N runs custa a listagem + 4 SELECT ... IN (executores,
-    workflows, workspaces, usuários), independentemente de N."""
+    """A page of N runs costs the listing + 4 SELECT ... IN (executors,
+    workflows, workspaces, users), regardless of N."""
     linhas = [_run_row(task_id=f"t-{i}", triggered_by=f"usr-{i}", workspace_id=f"ws-{i}") for i in range(10)]
     db = _db(_resultado(linhas=linhas))
 
@@ -560,9 +561,9 @@ async def test_detalhe_traz_typical_seconds_do_workflow():
 
 @pytest.mark.asyncio
 async def test_detalhe_de_run_ativo_nao_recomputa_a_mediana():
-    """Enquanto o run CORRE (o poll frequente que o run_workflow instrui), a
-    mediana de 90 dias nem faz sentido — nao computa. Mutacao: tirar o gate por
-    `_STATUS_ATIVOS` faz o `_p50_por_workflow` rodar a cada poll."""
+    """While the run is RUNNING (the frequent poll that run_workflow instructs), the
+    90-day median makes no sense — it is not computed. Mutation: removing the gate
+    on `_STATUS_ATIVOS` makes `_p50_por_workflow` run on every poll."""
     p50 = AsyncMock(return_value={"wf-1": 38.5})
     for estado in ("running", "pending"):
         run = _run_row(status=estado, end_time=None)
@@ -596,7 +597,7 @@ async def test_executores_incluem_sem_executor_e_frota_online_com_zeros():
         )
 
     por_host = {e["agent_host"]: e for e in saida["executores"]}
-    assert set(por_host) == {"executor:ex-1", None, "executor:ex-2"}   # ex-3 offline e sem runs fica fora
+    assert set(por_host) == {"executor:ex-1", None, "executor:ex-2"}   # ex-3 offline and without runs is left out
 
     sem = por_host[None]
     assert sem["display_name"] == "Sem executor" and sem["unassigned"] is True
@@ -624,8 +625,8 @@ async def test_visao_por_workflow_lista_todos_com_zeros_e_ordena():
     agregados = [
         SimpleNamespace(workflow_hash="wf-c", total=5, success=3, failed=1, running=1),
     ]
-    # A ultima execucao concluiu; o ultimo ERRO e o da ultima falha (uma
-    # consulta a parte, so para quem tem falha na janela).
+    # The last run completed; the last ERROR is the one from the last failure (a
+    # separate query, only for those with a failure in the window).
     ultimas = [SimpleNamespace(workflow_hash="wf-c", status="success", error_message=None, error_category=None, start_time=AGORA)]
     ultimas_falhas = [SimpleNamespace(workflow_hash="wf-c", status="failed", error_message="Timeout", error_category="timeout", start_time=AGORA)]
     db = _db(
@@ -646,15 +647,15 @@ async def test_visao_por_workflow_lista_todos_com_zeros_e_ordena():
     alfa = saida["workflows"][1]
     assert alfa["total_runs"] == 0 and alfa["active"] is False and alfa["last_run_at"] is None
     assert alfa["p50_seconds"] is None and alfa["success_rate"] == 0.0
-    # Cada linha diz quem criou o fluxo: a visão "Por workflow" pinta o selo do
-    # assistente e filtra por ele sem uma segunda chamada.
+    # Each row says who created the workflow: the "Por workflow" view paints the
+    # assistant badge and filters by it without a second call.
     assert (alfa["origem"], gama["origem"]) == ("assistente", "usuario")
     assert "workflows.deleted_at IS NULL" in _sql(db, 0)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Regressões da revisão: date_from com sufixo Z (Python 3.10) e chave de cache
-# por usuário (a frota de executores não é só função dos workspaces)
+# Review regressions: date_from with a Z suffix (Python 3.10) and a per-user
+# cache key (the executor fleet is not a function of the workspaces alone)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def test_parse_iso_aceita_o_sufixo_z_que_a_web_manda():
@@ -666,8 +667,8 @@ def test_parse_iso_aceita_o_sufixo_z_que_a_web_manda():
 
 @pytest.mark.asyncio
 async def test_list_runs_aceita_date_from_em_iso_com_z():
-    """`toISOString()` termina em Z; `fromisoformat` do 3.10 recusava e a tabela
-    do Histórico nunca carregava em produção."""
+    """`toISOString()` ends in Z; 3.10's `fromisoformat` rejected it and the History
+    table never loaded in production."""
     db = _db()
     await ObservabilityService.list_runs(
         db, _user("admin"), [], date_from="2026-08-07T22:05:13.123Z", como_admin=True,
@@ -679,7 +680,7 @@ def test_chave_de_cache_distingue_usuarios_com_os_mesmos_workspaces():
     ana = _metrics_cache_key("metrics", _user("user", "ana"), ["ws-1"], 30)
     bia = _metrics_cache_key("metrics", _user("user", "bia"), ["ws-1"], 30)
     assert ana != bia
-    # A visao total tambem e chaveada pelo usuario: o mesmo admin com e sem
-    # `como_admin` (REST × MCP) nao pode compartilhar a resposta cacheada.
+    # The full view is also keyed by user: the same admin with and without
+    # `como_admin` (REST × MCP) cannot share the cached response.
     assert _metrics_cache_key("metrics", _user("admin", "a"), [], 30, como_admin=True) \
         != _metrics_cache_key("metrics", _user("admin", "b"), [], 30, como_admin=True)

@@ -12,21 +12,21 @@ import { plural } from "@/lib/formatos"
 
 export interface GrupoSecaoProps {
   grupo: IWorkflowGroup
-  /** As linhas a mostrar — já filtradas e ordenadas por quem compõe a página. */
+  /** The rows to show — already filtered and sorted by the page composer. */
   workflows: IWorkflow[]
-  /** Contagens da lista INTEIRA do grupo, não da filtrada. */
+  /** Counts of the group's WHOLE list, not the filtered one. */
   totalNoGrupo: number
   ativosNoGrupo: number
   recolhido: boolean
   onToggle: (groupId: string) => void
   canEdit: boolean
-  /** Alça de reordenar: só `canEdit` e mais de um grupo. */
+  /** Reorder handle: only `canEdit` and more than one group. */
   podeArrastar: boolean
-  /** Este grupo está sendo arrastado (fica a 40%). */
+  /** This group is being dragged (it goes to 40%). */
   arrastandoEste: boolean
-  /** Outro grupo está sendo arrastado por cima deste (tracejado). */
+  /** Another group is being dragged over this one (dashed). */
   alvoDeReordenacao: boolean
-  /** Um workflow está sendo arrastado por cima deste grupo (borda primária). */
+  /** A workflow is being dragged over this group (primary border). */
   recebendoWorkflow: boolean
   nomeDoArrastado: string | null
   onDragOver: (e: DragEvent<HTMLElement>) => void
@@ -36,16 +36,16 @@ export interface GrupoSecaoProps {
   onDragEndGrupo: () => void
   onRenomear: (grupo: IWorkflowGroup) => void
   onExcluir: (grupo: IWorkflowGroup) => void
-  /** Uma linha por workflow; alternativa a `children`. */
+  /** One row per workflow; alternative to `children`. */
   renderLinha?: (workflow: IWorkflow) => ReactNode
-  /** Corpo pronto (o index pode preferir montar as linhas ele mesmo). */
+  /** Ready-made body (the index may prefer to build the rows itself). */
   children?: ReactNode
 }
 
 /**
- * "3 workflows · 2 ativos" (singular "1 workflow · 1 ativo"; "vazio" sem
- * nenhum). Com filtro ativo e menos linhas que o total, acrescenta "· N com
- * este filtro" — a contagem do cabeçalho é sempre a do grupo inteiro.
+ * "3 workflows · 2 ativos" (singular "1 workflow · 1 ativo"; "vazio" with
+ * none). With an active filter and fewer rows than the total, appends "· N com
+ * este filtro" — the header count is always the whole group's.
  */
 export function textoDaContagemDoGrupo(total: number, ativos: number, comFiltro: number | null = null): string {
   if (total === 0) return "vazio"
@@ -54,10 +54,10 @@ export function textoDaContagemDoGrupo(total: number, ativos: number, comFiltro:
 }
 
 /**
- * Um grupo como seção (docs/specs/projetos.md §3.8): cabeçalho com alça,
- * recolher, nome, contagem, descrição e menu; corpo com as linhas; os mesmos
- * alvos e estados de arrasto de antes — "receber um workflow" e "trocar de
- * posição" acontecem sobre o mesmo retângulo, por isso cada um tem a sua cara.
+ * A group as a section (docs/specs/projects.md §3.8): header with handle,
+ * collapse, name, count, description and menu; body with the rows; the same
+ * drag targets and states as before — "receive a workflow" and "change
+ * position" happen over the same rectangle, which is why each has its own look.
  */
 export function GrupoSecao({
   grupo, workflows, totalNoGrupo, ativosNoGrupo, recolhido, onToggle, canEdit, podeArrastar,
@@ -68,8 +68,8 @@ export function GrupoSecao({
   const id = grupo.id_hash
   const tituloId = `grupo-${id}-titulo`
   const corpoId = `grupo-${id}-corpo`
-  // Menos linhas que o total só acontece com busca ou chip ativo: sem filtro
-  // a lista do grupo é o grupo inteiro.
+  // Fewer rows than the total only happens with an active search or chip: with
+  // no filter the group's list is the whole group.
   const comFiltro = workflows.length < totalNoGrupo ? workflows.length : null
   const contagem = textoDaContagemDoGrupo(totalNoGrupo, ativosNoGrupo, comFiltro)
   const vazio = workflows.length === 0
@@ -89,8 +89,8 @@ export function GrupoSecao({
       )}
     >
       <div className="flex min-w-0 items-center gap-1.5">
-        {/* Só a alça arrasta o grupo: o cabeçalho inteiro arrastável roubaria
-            o clique de recolher e o de renomear. */}
+        {/* Only the handle drags the group: a fully draggable header would steal
+            the collapse click and the rename click. */}
         {podeArrastar && (
           <span
             draggable
@@ -118,8 +118,8 @@ export function GrupoSecao({
           <span id={tituloId} className="truncate">{grupo.name}</span>
           <span className="shrink-0 text-xs font-normal text-muted-foreground">{contagem}</span>
         </button>
-        {/* A descrição existe no modelo desde sempre e nunca foi exibida —
-            era pedida na criação e desaparecia. */}
+        {/* The description has always existed in the model and was never shown —
+            it was asked for at creation and disappeared. */}
         {grupo.description && (
           <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground max-md:hidden" title={grupo.description}>
             {grupo.description}
@@ -159,15 +159,15 @@ export function GrupoSecao({
         </p>
       )}
 
-      {/* O corpo existe sempre (só escondido quando recolhido): `aria-controls`
-          do botão precisa apontar para um elemento presente. As linhas, porém,
-          só são montadas quando aberto — não vale renderizar dezenas de cards
-          invisíveis. */}
+      {/* The body always exists (just hidden when collapsed): the button's
+          `aria-controls` must point to an element that is present. The rows,
+          however, are only mounted when open — rendering dozens of invisible
+          cards is not worth it. */}
       <div id={corpoId} hidden={recolhido}>
         {!recolhido && (
           vazio ? (
-            // Ao receber um workflow a mensagem de cima já diz o que fazer;
-            // repetir o convite aqui seria ruído.
+            // When receiving a workflow the message above already says what to do;
+            // repeating the invitation here would be noise.
             !recebendoWorkflow && (
               <p className="py-1.5 pl-6 text-xs text-muted-foreground">
                 {canEdit

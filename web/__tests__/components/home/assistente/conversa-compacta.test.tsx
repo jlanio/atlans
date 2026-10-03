@@ -5,11 +5,11 @@ import Conversa, { type ContextoDoBloco } from "@/app/components/home/assistente
 import type { BlocoDoAssistente, TurnoDoAssistente } from "@/app/components/home/assistente/quadros"
 
 /**
- * A mesma Conversa em dois modos: a de sempre (editor e painel: a linha do
- * tempo inteira) e a LEGENDA da faixa da Home (`compacta`): a pergunta numa
- * linha, e da resposta só o que ficou e o que está vivo. jsdom não faz layout —
- * a linha única e o corte em 4 linhas são classes —; o que se mede aqui é quem
- * entra na legenda e quem fica de fora, e que o padrão continua sendo tudo.
+ * The same Conversa in two modes: the usual one (editor and panel: the whole
+ * timeline) and the CAPTION of the Home strip (`compacta`): the question on one
+ * line, and from the answer only what remained and what is live. jsdom does no layout —
+ * the single line and the 4-line clamp are classes —; what is measured here is who
+ * goes into the caption and who stays out, and that the default is still everything.
  */
 
 const PERGUNTA = "cruze os focos de hoje com as terras indígenas e me dê um resumo por município"
@@ -45,7 +45,7 @@ const ERRO: BlocoDoAssistente = {
   erro: { code: "sem_conexao", message: "Resposta interrompida." },
 }
 
-/** Um turno concluído com a linha do tempo inteira: raciocínio, passos, dois textos, cartão. */
+/** A finished turn with the whole timeline: reasoning, steps, two texts, card. */
 const CONCLUIDO: BlocoDoAssistente[] = [
   pensando(), ferramenta("f1"), ferramenta("f2"), texto(T1), ferramenta("f3"), texto(T2), CAMADA,
 ]
@@ -89,9 +89,9 @@ describe("Conversa — o padrão (editor e painel) é a linha do tempo inteira",
 })
 
 describe("Conversa — a legenda da faixa (`compacta`)", () => {
-  /** O rótulo do raciocínio vivo: o texto inteiro segue "Trabalhando…", mas o "…"
-   * mora num sr-only ao lado das reticências digitadas — o matcher exato de
-   * string não o vê como um nó só. */
+  /** The label of the live reasoning: the full text is still "Trabalhando…", but the "…"
+   * lives in an sr-only next to the typed ellipsis — the exact string
+   * matcher does not see it as a single node. */
   const pensandoVivo = (raiz: ParentNode = document) =>
     [...raiz.querySelectorAll("summary .texto-pensando")]
       .filter((el) => el.textContent?.replace(/\s+/g, "") === "Trabalhando…")
@@ -99,7 +99,7 @@ describe("Conversa — a legenda da faixa (`compacta`)", () => {
   it("a pergunta vira uma linha: Você · pergunta, truncada, com o texto inteiro no title", () => {
     render(<Conversa turnos={[pergunta("u1")]} correndo={false} compacta />)
 
-    // A frase fica num span próprio: é ela que se lê e que se encontra.
+    // The sentence sits in its own span: it is what gets read and what gets found.
     const frase = screen.getByText(PERGUNTA)
     expect(frase.tagName).toBe("SPAN")
     const linha = frase.closest("p")!
@@ -149,7 +149,7 @@ describe("Conversa — a legenda da faixa (`compacta`)", () => {
     expect(vivos[0].getAttribute("data-ferramenta")).toBe("run_workflow")
     expect(vivos[0].getAttribute("data-estado")).toBe("correndo")
     expect(screen.queryByText("Raciocínio")).toBeNull()
-    // O último texto até aqui continua à vista: é o que ficou.
+    // The last text so far stays in view: it is what remained.
     expect(screen.getByText(T1)).toBeTruthy()
 
     const depois = [...emCurso.slice(0, 3), ferramenta("f2", "ok", "run_workflow"), texto(T2)]
@@ -165,9 +165,9 @@ describe("Conversa — a legenda da faixa (`compacta`)", () => {
     )
     const [rotulo] = pensandoVivo()
     expect(rotulo).toBeTruthy()
-    // A escolha do dono (previewer do indicador de pensamento): o rótulo tem o
-    // brilho que varre e as reticências digitadas vivem num ::after à parte —
-    // o "…" que o leitor de tela encontra é o do sr-only.
+    // The owner's choice (thinking-indicator previewer): the label has the
+    // sweeping shimmer and the typed ellipsis lives in a separate ::after —
+    // the "…" the screen reader finds is the sr-only one.
     expect(rotulo.querySelector(".tic-pensando")).toBeTruthy()
 
     rerender(<Conversa turnos={[pergunta("u1"), resposta("a1", [pensando(), texto(T2)])]} correndo compacta />)
@@ -177,8 +177,8 @@ describe("Conversa — a legenda da faixa (`compacta`)", () => {
   })
 
   it("o raciocínio em curso depois de um passo concluído continua sendo Trabalhando… (o índice é o original)", () => {
-    // [pensando, passo ok, pensando vivo]: o filtro tira os dois primeiros, mas o
-    // grupo vivo continua sendo o último ORIGINAL — senão viraria "Raciocínio".
+    // [thinking, step ok, live thinking]: the filter removes the first two, but the
+    // live group is still the last ORIGINAL one — otherwise it would become "Raciocínio".
     render(
       <Conversa turnos={[pergunta("u1"), resposta("a1", [pensando(), ferramenta("f1"), pensando()])]} correndo compacta />,
     )
@@ -223,9 +223,9 @@ describe("Conversa — o contexto dos extras e o indicador do item pendente", ()
     expect(container.querySelector("svg.exec-activity")).toBeNull()
     expect(screen.getByTestId("marca").getAttribute("width")).toBe("13")
 
-    // O raciocínio vivo (o <summary> "Trabalhando…") também troca o indicador — na legenda idem.
+    // The live reasoning (the <summary> "Trabalhando…") also swaps the indicator — likewise in the caption.
     rerender(<Conversa turnos={[pergunta("u1"), resposta("a1", [pensando()])]} correndo indicador={Marca} compacta />)
-    // O "…" mora no sr-only ao lado das reticências digitadas: acha pelo rótulo.
+    // The "…" lives in the sr-only next to the typed ellipsis: find it by the label.
     const rotulo = container.querySelector("summary .texto-pensando")
     expect(rotulo?.textContent?.replace(/\s+/g, "")).toBe("Trabalhando…")
     expect(screen.getByTestId("marca").getAttribute("width")).toBe("12")
@@ -247,7 +247,7 @@ describe("Conversa — o cursor no parágrafo vivo (`cursorAoEscrever`)", () => 
     rerender(<Conversa turnos={turnos} correndo cursorAoEscrever compacta />)
     expect(container.querySelectorAll(".home-caret").length).toBe(1)
 
-    // Uma ferramenta depois do texto leva o cursor com ela; o fim do turno também.
+    // A tool after the text takes the cursor with it; so does the end of the turn.
     rerender(
       <Conversa
         turnos={[...turnos.slice(0, 3), resposta("a2", [texto(T2), ferramenta("f1", "correndo")])]}

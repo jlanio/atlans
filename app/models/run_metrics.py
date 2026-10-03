@@ -1,6 +1,6 @@
 # app/models/run_metrics.py
 """
-Modelos de metricas de execucao para billing, performance e observabilidade.
+Run metrics models for billing, performance and observability.
 """
 from sqlalchemy import (
     Column, Integer, String, Float, BigInteger, Boolean, Text,
@@ -10,13 +10,13 @@ from app.models.base import Base
 
 
 class WorkflowRunMetrics(Base):
-    """Metricas agregadas por execucao de workflow."""
+    """Aggregated metrics per workflow run."""
     __tablename__ = "workflow_run_metrics"
     __table_args__ = (
         Index("ix_run_metrics_workspace", "workspace_id", "started_at"),
         Index("ix_run_metrics_workflow", "workflow_hash", "started_at"),
-        # Indice SQL "ix_run_metrics_executor" (renomeado em 20260716_0001).
-        # Referencia colunas pelo nome SQL — nao pelo atributo Python.
+        # SQL index "ix_run_metrics_executor" (renamed in 20260716_0001).
+        # References columns by their SQL name — not by the Python attribute.
         Index("ix_run_metrics_executor", "executor_id", "started_at"),
     )
 
@@ -66,7 +66,7 @@ class WorkflowRunMetrics(Base):
 
 
 class NodeRunMetrics(Base):
-    """Metricas por no executado dentro de um run."""
+    """Metrics per node executed within a run."""
     __tablename__ = "node_run_metrics"
     __table_args__ = (
         Index("ix_node_metrics_run", "run_id"),
@@ -106,7 +106,7 @@ class NodeRunMetrics(Base):
 
 
 class UsageDaily(Base):
-    """Agregacao diaria de uso por workspace (base para billing)."""
+    """Daily usage aggregation per workspace (basis for billing)."""
     __tablename__ = "usage_daily"
     __table_args__ = (
         UniqueConstraint("date", "workspace_id", name="uq_usage_daily"),

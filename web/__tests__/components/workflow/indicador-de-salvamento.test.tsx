@@ -1,11 +1,11 @@
 /**
- * O chip de salvamento é o único feedback permanente de "isto está salvo?".
+ * The save chip is the only permanent feedback for "is this saved?".
  *
- * A versão anterior sumia 3s depois do save e não mostrava nada em repouso;
- * o erro caía em "Não salvo" e a mensagem ia embora com o toast. Estes testes
- * trancam os estados que o usuário sentia falta: o repouso com "Salvo há N
- * min", a falha com retry no lugar, e a detecção que marca — e desmarca —
- * "Alterações não salvas".
+ * The previous version vanished 3s after the save and showed nothing at rest;
+ * an error fell into "Não salvo" (not saved) and the message went away with the
+ * toast. These tests lock the states the user missed: the resting state with
+ * "Salvo há N min" (saved N min ago), the failure with retry in place, and the
+ * detection that sets — and clears — "Alterações não salvas" (unsaved changes).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup, act, fireEvent } from "@testing-library/react"
@@ -40,8 +40,8 @@ const no = (id: string, x = 0) => ({
 
 const store = () => useWorkflowSaveStore.getState()
 
-/** Baseline "hidratado": snapshot igual ao canvas atual, janela de autocorreção
- *  já fechada (o que se testa aqui é o que vem DEPOIS da hidratação). */
+/** "Hydrated" baseline: snapshot equal to the current canvas, self-correction
+ *  window already closed (what's tested here is what comes AFTER hydration). */
 function hidratar(savedAt: number | null = AGORA - 5 * MIN) {
   const { nodesReq, edgesReq } = montarPayloadDoGrafo(nodes as INodeContext[], [])
   store().initSnapshot(nodesReq, edgesReq, "wf", savedAt)
@@ -111,7 +111,7 @@ describe("chip de salvamento — detecção de alterações", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Alterações não salvas")
     expect(screen.getByRole("status")).toHaveAttribute("aria-live", "polite")
 
-    // Ctrl+Z de volta ao estado salvo: o aviso não tem mais razão de existir.
+    // Ctrl+Z back to the saved state: the warning no longer has a reason to exist.
     nodes = [no("a", 0)]
     rerender(<GlobalSaveIndicator />)
     act(() => { vi.advanceTimersByTime(300) })
@@ -146,9 +146,9 @@ describe("chip de salvamento — falha", () => {
   })
 
   it("a remedição do canvas não rebaixa a falha a 'não salvo'", () => {
-    // Depois de uma falha o grafo segue diferente do snapshot; qualquer troca de
-    // identidade de `nodes` (o ReactFlow medindo) disparava o detector, que
-    // trocava "Falha ao salvar" por "Não salvo" — e o retry sumia junto.
+    // After a failure the graph stays different from the snapshot; any identity
+    // change of `nodes` (ReactFlow measuring) triggered the detector, which
+    // swapped "Falha ao salvar" for "Não salvo" — and the retry vanished with it.
     hidratar()
     nodes = [no("a", 120)]
     useWorkflowSaveStore.setState({ saveStatus: "error", lastError: "500" })

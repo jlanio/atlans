@@ -32,7 +32,7 @@ interface Props {
   workflowId: string;
   workflowName: string;
   portalAccess?: string | null;
-  /** Chamado apos mover com sucesso — o pai remove o card da listagem. */
+  /** Called after a successful move — the parent removes the card from the listing. */
   onMoved: (result: IWorkflowMoveResult) => void;
 }
 
@@ -71,18 +71,18 @@ export default function MoveWorkflowDialog({
   const [preview, setPreview] = useState<IWorkflowMoveResult | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [saving, setSaving] = useState(false);
-  // Relatorio pos-move: o dialogo vira uma tela de leitura em vez de fechar,
-  // porque avisar depois so funciona se o usuario chegar a ler o aviso. Enquanto
-  // preenchido, e ele que manda no corpo — os dois estados sao exclusivos.
+  // Post-move report: the dialog becomes a reading screen instead of closing,
+  // because warning afterwards only works if the user actually reads the
+  // warning. While it is set, it rules the body — the two states are exclusive.
   const [report, setReport] = useState<IWorkflowMoveResult | null>(null);
-  // Politica de execucao diferente entre origem e destino: o workflow passa a
-  // seguir a do destino, e quem move de um workspace Isolado para o pool
-  // precisa saber que os dados mudam de executor.
+  // Different execution policy between source and destination: the workflow
+  // starts following the destination's, and whoever moves from an Isolated
+  // workspace to the pool needs to know the data changes executor.
   const [avisoPolitica, setAvisoPolitica] = useState<string | null>(null);
   const origemId = current?.id_hash ?? null;
 
-  // Mesma lista que o menu usa para decidir se oferece a acao; por isso o
-  // dialogo nunca abre sem destino elegivel.
+  // Same list the menu uses to decide whether to offer the action; that is why
+  // the dialog never opens without an eligible destination.
   const destinos = moveTargets(workspaces, current?.id_hash);
 
   useEffect(() => {
@@ -104,8 +104,8 @@ export default function MoveWorkflowDialog({
     GisFlowService.previewMoveWorkflow(workflowId, target).then((res) => {
       if (cancelado) return;
       setLoadingPreview(false);
-      // Preview e informativo: se falhar, o move segue disponivel — o relatorio
-      // definitivo volta na propria resposta do POST.
+      // The preview is informational: if it fails, the move stays available — the
+      // definitive report comes back in the POST response itself.
       setPreview(res?.error ? null : res.data ?? null);
     });
     return () => {
@@ -114,8 +114,8 @@ export default function MoveWorkflowDialog({
   }, [target, workflowId]);
 
   useEffect(() => {
-    // Limpa ANTES de buscar: o aviso do destino anterior nao pode ficar na
-    // tela enquanto o do novo destino carrega.
+    // Clear BEFORE fetching: the previous destination's warning must not stay on
+    // screen while the new destination's loads.
     setAvisoPolitica(null);
     if (!target || !origemId) return;
     let cancelado = false;
@@ -124,7 +124,7 @@ export default function MoveWorkflowDialog({
       GisFlowService.getWorkspacePolicy(target),
     ]).then(([origem, destino]) => {
       if (cancelado) return;
-      // Informativo: se uma das leituras falhar, nao ha aviso — o move segue.
+      // Informational: if one of the reads fails, there is no warning — the move goes on.
       setAvisoPolitica(avisoDeMudancaDePolitica(
         origem?.error ? null : origem?.data ?? null,
         destino?.error ? null : destino?.data ?? null,
@@ -166,9 +166,9 @@ export default function MoveWorkflowDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="max-w-md"
-        // Fechar no meio do move deixa o usuario sem saber se ele aconteceu —
-        // e o relatorio de impacto so aparece depois. As tres saidas: Esc,
-        // clique-fora e o X.
+        // Closing in the middle of the move leaves the user not knowing whether it
+        // happened — and the impact report only appears afterwards. The three
+        // exits: Esc, click-outside and the X.
         bloqueado={saving}
       >
         <DialogHeader>
@@ -269,8 +269,8 @@ export default function MoveWorkflowDialog({
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
                 Cancelar
               </Button>
-              {/* Nunca desabilitado por causa dos avisos: a decisao de mover
-                  mesmo assim e do usuario, e o relatorio ja explicou o custo. */}
+              {/* Never disabled because of the warnings: the decision to move
+                  anyway is the user's, and the report already explained the cost. */}
               <Button onClick={handleMove} disabled={!target || saving}>
                 {saving ? "Movendo..." : "Mover"}
               </Button>

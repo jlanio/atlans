@@ -17,39 +17,39 @@ interface IconRootProps extends React.HTMLProps<HTMLDivElement> {
   id: string
   children: ReactNode
   className?: string
-  /** Tipo do nó — define a cor de acento. Ex: "action", "trigger", "spatial" */
+  /** Node type — sets the accent color. E.g.: "action", "trigger", "spatial" */
   nodeType?: string
-  /** Título exibido dentro do card */
+  /** Title shown inside the card */
   title?: string
 }
 
-// Sem `memo` de propósito: `children` é um array JSX novo a cada render do pai,
-// então a comparação rasa nunca segurava nada — o memo cobrava um custo e não
-// entregava. O re-render em massa é resolvido na origem: os pais leem `selected`
-// da prop do React Flow (em vez de assinar o array de nós inteiro) e o estado de
-// execução é lido daqui por seletores POR ID, que só disparam para o nó que
-// realmente mudou.
+// No `memo` on purpose: `children` is a new JSX array on every parent render,
+// so the shallow comparison never held anything back — the memo had a cost and
+// delivered nothing. Mass re-rendering is solved at the source: parents read
+// `selected` from the React Flow prop (instead of subscribing to the whole node
+// array) and the execution state is read here through PER-ID selectors, which
+// only fire for the node that actually changed.
 const IconRoot = ({ id, children, className, nodeType, title, onDoubleClick, ...props }: IconRootProps) => {
 
   const pinnedNodes = useWorkflowCatalogStore(s => s.pinnedNodes)
   const newlyAddedNodeId = useWorkflowCatalogStore(s => s.newlyAddedNodeId)
   const setNewlyAddedNodeId = useWorkflowCatalogStore(s => s.setNewlyAddedNodeId)
-  // Seletores escalares/por-id: `updateNodeStatuses` preserva a identidade dos
-  // nós NÃO alterados, então o Object.is do Zustand corta o render de todo nó
-  // que não mudou. Assinar `statusWorkflow` (objeto novo a cada mensagem) fazia
-  // os N cards re-renderizarem — e cada um reconstruía o próprio Map sobre a
-  // lista inteira de nós.
+  // Scalar/per-id selectors: `updateNodeStatuses` preserves the identity of
+  // UNCHANGED nodes, so Zustand's Object.is cuts the render of every node
+  // that didn't change. Subscribing to `statusWorkflow` (a new object on every
+  // message) made all N cards re-render — and each one rebuilt its own Map over
+  // the whole node list.
   const statusCanvas = useWorkflowExecutionStore(s => s.statusById.get(id))
   const workflowStatus = useWorkflowExecutionStore(s => s.statusWorkflow?.status)
   const emRamoPerdedor = useWorkflowExecutionStore(s => !!s.losingNodeIds?.has(id))
-  // Preenchidos só quando o nó está sendo desenhado dentro do visualizador de
-  // sub-fluxo — ver subflow-viewer/scope.
+  // Filled only when the node is being drawn inside the sub-workflow
+  // viewer — see subflow-viewer/scope.
   const noVisualizador = useSubflowReadOnly()
   const somenteLeitura = useCanvasReadOnly()
   const subflowStatus = useSubflowStatus()
   const isNew = id === newlyAddedNodeId
 
-  // Limpa destaque após a animação terminar
+  // Clears the highlight after the animation ends
   useEffect(() => {
     if (!isNew) return
     const timer = setTimeout(() => {
@@ -58,27 +58,28 @@ const IconRoot = ({ id, children, className, nodeType, title, onDoubleClick, ...
     return () => clearTimeout(timer)
   }, [isNew, setNewlyAddedNodeId])
 
-  // Dentro de um sub-fluxo o estado vem do escopo, que o derivou da linha do
-  // tempo do run: `statusById` só conhece os nós do canvas do editor, porque é
-  // semeado a partir deles e depois atualizado por id — e os ids dos nós do
-  // filho chegam prefixados, sem casar com nenhum.
+  // Inside a sub-workflow the state comes from the scope, which derived it from
+  // the run timeline: `statusById` only knows the editor canvas's nodes, because
+  // it is seeded from them and then updated by id — and the child's node ids
+  // arrive prefixed, matching none of them.
   const statusNode = subflowStatus ? subflowStatus.get(id) : statusCanvas
   const isPinned = pinnedNodes?.some(p => p.node_id === id && !p.expired)
   const { configNodeIdParam, removeConfigNodeParam, setConfigNodeParam } = useConfigNodeParams()
 
-  // "Pendente" é todo nó que ainda não começou enquanto o run está de pé — e
-  // não só a janela de `queued`, que dura o intervalo entre o POST e o task_id
-  // chegar: `setTaskId` promove o workflow a "running" assim que ele responde.
-  // Restrito a `queued`, o tratamento era tecnicamente correto e praticamente
-  // invisível; marcar o resto do run é o que torna legível "o que ainda falta"
-  // num grafo grande.
+  // "Pending" is every node that hasn't started yet while the run is alive — and
+  // not just the `queued` window, which lasts from the POST until the task_id
+  // arrives: `setTaskId` promotes the workflow to "running" as soon as it replies.
+  // Restricted to `queued`, the treatment was technically correct and practically
+  // invisible; marking the rest of the run is what makes "what is still left"
+  // readable in a large graph.
   const runDePe = workflowStatus === "queued" || workflowStatus === "running"
   const isPending = runDePe && (statusNode?.status ?? "idle") === "idle"
 
   const abrirConfiguracao = useCallback((e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-    // No visualizador de sub-fluxo o duplo clique pertence à navegação (descer
-    // um nível), e o nó nem é editável dali. Abrir a configuração aqui apontaria
-    // o modal para um id que não existe no canvas do editor.
+    // In the sub-workflow viewer, double-click belongs to navigation (going down
+    // one level), and the node isn't even editable from there. Opening the
+    // configuration here would point the modal at an id that doesn't exist on
+    // the editor canvas.
     if (noVisualizador) return
     if (configNodeIdParam === id)
       return removeConfigNodeParam()
@@ -87,22 +88,22 @@ const IconRoot = ({ id, children, className, nodeType, title, onDoubleClick, ...
     setConfigNodeParam(id)
   }, [configNodeIdParam, id, removeConfigNodeParam, onDoubleClick, setConfigNodeParam, noVisualizador])
 
-  // No telefone o gesto é TOQUE SIMPLES. O duplo toque existe no navegador, mas
-  // disputa com o zoom do canvas e é lento por natureza (o navegador espera o
-  // segundo toque antes de decidir). E ali é o único caminho que sobra: a barra
-  // de ferramentas do nó, que no desktop também abre a configuração, depende de
-  // hover e não aparece. O React Flow separa toque de arraste, então dar pan
-  // com o dedo sobre um nó não abre o modal.
+  // On a phone the gesture is a SINGLE TAP. Double tap exists in the browser, but
+  // it competes with the canvas zoom and is slow by nature (the browser waits for
+  // the second tap before deciding). And there it is the only path left: the
+  // node toolbar, which on desktop also opens the configuration, depends on
+  // hover and doesn't appear. React Flow tells a tap from a drag, so panning
+  // with a finger over a node doesn't open the modal.
   const gestoDeAbrir = somenteLeitura
     ? { onClick: abrirConfiguracao }
     : { onDoubleClick: abrirConfiguracao }
 
   const style = TYPE_STYLES[nodeType ?? ""] ?? DEFAULT_STYLE
 
-  // `losingNodeIds` é calculado sobre as arestas do canvas do editor e não
-  // conhece o grafo do filho. Aplicá-lo dentro do visualizador dessaturaria um
-  // nó do sub-fluxo só porque o id local dele coincide com o de um ramo
-  // perdedor do pai — ramos perdedores lá dentro ficam sem marcação.
+  // `losingNodeIds` is computed over the editor canvas's edges and doesn't know
+  // the child's graph. Applying it inside the viewer would desaturate a
+  // sub-workflow node just because its local id matches that of a losing branch
+  // of the parent — losing branches in there stay unmarked.
   const isLosing = !noVisualizador && emRamoPerdedor
 
   return (
@@ -114,36 +115,36 @@ const IconRoot = ({ id, children, className, nodeType, title, onDoubleClick, ...
       data-pending={isPending ? "true" : "false"}
       data-new={isNew ? "true" : "false"}
       className={cn(
-        // Card base. `exec-card` é o escopo das camadas de execução, que vivem
-        // em globals.css — ver o bloco "Estados de execução no canvas".
+        // Base card. `exec-card` is the scope of the execution layers, which live
+        // in globals.css — see the "Estados de execução no canvas" block.
         "exec-card group relative isolate flex items-stretch bg-card border border-border rounded-lg shadow-sm",
         "w-[158px] h-[60px]",
-        // Só SELEÇÃO mora aqui. IMPORTANTE: sem `ring-offset-*` — o offset do
-        // Tailwind preenche o gap entre card e ring com `--tw-ring-offset-color`
-        // (default = background), o que aparece como uma linha fina "descolada".
+        // Only SELECTION lives here. IMPORTANT: no `ring-offset-*` — Tailwind's
+        // offset fills the gap between card and ring with `--tw-ring-offset-color`
+        // (default = background), which shows up as a thin "detached" line.
         //
-        // O anel de ESTADO saiu daqui de propósito: `ring-*`, `shadow-sm` e os
-        // keyframes de brilho disputavam a mesma propriedade `box-shadow`, e um
-        // keyframe substitui a declaração inteira — o pulso apagava o anel de
-        // seleção e a sombra do card enquanto rodava. Agora um nó selecionado E
-        // em execução mostra os dois anéis.
+        // The STATE ring was moved out of here on purpose: `ring-*`, `shadow-sm`
+        // and the glow keyframes competed for the same `box-shadow` property, and
+        // a keyframe replaces the whole declaration — the pulse erased the
+        // selection ring and the card shadow while it ran. Now a node that is
+        // selected AND executing shows both rings.
         "data-[selected=true]:ring-2 data-[selected=true]:ring-muted-foreground/50",
         className,
       )}
     >
 
-      {/* Stripe colorida à esquerda */}
+      {/* Colored stripe on the left */}
       <div className={cn("w-1 shrink-0 rounded-tl-lg rounded-bl-lg", style.stripe)} />
 
-      {/* Seção do ícone */}
+      {/* Icon section */}
       <div className={cn("flex items-center justify-center w-12 shrink-0", style.bg)}>
         <div className={cn("text-xl flex items-center justify-center", style.icon)}>
           {children}
         </div>
       </div>
 
-      {/* Seção de texto — `data-role` são ganchos do LOD por zoom (globals.css):
-          com o canvas afastado o subtítulo some e o título cresce. */}
+      {/* Text section — `data-role` are hooks for the zoom LOD (globals.css):
+          with the canvas zoomed out the subtitle disappears and the title grows. */}
       <div className="flex flex-col justify-center px-2.5 flex-1 min-w-0">
         <p data-role="node-title" className="text-sm font-medium text-foreground truncate leading-tight">
           {title ?? ""}
@@ -154,10 +155,10 @@ const IconRoot = ({ id, children, className, nodeType, title, onDoubleClick, ...
       </div>
 
       {/* ── Indicador de pin (canto superior direito) ─────────────────────── */}
-      {/* key={`pin-${id}`} faz o ícone remontar quando o node muda, mas a
-          animação forwards só é disparada no ponto em que isPinned vira
-          true (primeira render do TooltipTrigger). Dá feedback tátil
-          ao pinar sem rodar em loop. */}
+      {/* key={`pin-${id}`} makes the icon remount when the node changes, but the
+          forwards animation only fires at the point where isPinned becomes
+          true (first render of the TooltipTrigger). Gives tactile feedback
+          when pinning without looping. */}
       {isPinned && (
         <Tooltip>
           <TooltipTrigger data-role="node-badge" className="absolute top-1 right-1.5">
@@ -172,9 +173,9 @@ const IconRoot = ({ id, children, className, nodeType, title, onDoubleClick, ...
       {/* ── Indicadores de status (canto inferior direito) ───────────────── */}
       {statusNode?.status === "started" && (
         <Tooltip>
-          {/* A cor fica no gatilho porque `ExecActivity` pinta com
-              `currentColor` — é o que deixa o glifo seguir o token do estado
-              sem precisar recebê-lo por prop. */}
+          {/* The color lives on the trigger because `ExecActivity` paints with
+              `currentColor` — that is what lets the glyph follow the state token
+              without receiving it as a prop. */}
           <TooltipTrigger data-role="node-badge" className="absolute bottom-1 right-1.5 text-exec-running">
             <ExecActivity size={14} />
           </TooltipTrigger>

@@ -26,14 +26,14 @@ from app.services.remocao_de_artefatos import remover_artefatos
 
 logger = get_logger(__name__)
 
-# ── Router protegido por JWT (listagem, exclusão e config) ────────────────────
+# ── JWT-protected router (listing, deletion and config) ───────────────────────
 router = APIRouter(
     prefix="/artifacts",
     tags=["artifacts"],
     dependencies=[Depends(get_current_user)],
 )
 
-# ── Router público (download por id_hash) ─────────────────────────────────────
+# ── Public router (download by id_hash) ───────────────────────────────────────
 public_router = APIRouter(
     prefix="/artifacts",
     tags=["artifacts"],
@@ -49,16 +49,16 @@ def _artifact_or_404(artifact: Artifact | None) -> Artifact:
 
 
 def _recusar_se_local(artifact: Artifact) -> None:
-    """Barra o download de artefato que mora no disco do executor.
+    """Blocks the download of an artifact that lives on the executor's disk.
 
-    Servir este arquivo exigiria que o servidor buscasse o conteudo no executor
-    — exatamente o que a marcacao `keepLocal` proibe. Nao ha proxy possivel que
-    preserve a garantia: o dado passaria pelo servidor no caminho.
+    Serving this file would require the server to fetch the content from the executor
+    — exactly what the `keepLocal` flag forbids. No proxy could preserve the
+    guarantee: the data would pass through the server on the way.
 
-    409 (conflito com o estado do recurso) em vez de 404: o artefato EXISTE e o
-    usuario tem permissao; o que nao existe e a possibilidade de baixa-lo.
-    Devolver 404 mandaria o suporte procurar um arquivo perdido em vez de
-    explicar uma politica.
+    409 (conflict with the resource state) instead of 404: the artifact EXISTS and the
+    user has permission; what does not exist is the possibility of downloading it.
+    Returning 404 would send support looking for a lost file instead of
+    explaining a policy.
     """
     if getattr(artifact, "content_location", "minio") != "executor":
         return
@@ -75,20 +75,20 @@ def _recusar_se_local(artifact: Artifact) -> None:
 
 async def _jwt_has_workspace_access(token: str, workspace_id: str, db: AsyncSession) -> bool:
     """
-    Retorna True se o token for um JWT válido e o usuário tiver acesso ao workspace do artefato.
-    Usado para permitir que usuários logados baixem artefatos protegidos sem o token de artefato.
+    Returns True if the token is a valid JWT and the user has access to the artifact's workspace.
+    Used to let logged-in users download protected artifacts without the artifact token.
     """
     from app.api.dependencies import resolve_access_token
     from app.models.workspace import Workspace
     from app.models.workspace_member import WorkspaceMember
 
-    # decode + audience + type + blacklist + user ativo, no ponto único.
+    # decode + audience + type + blacklist + active user, at the single point.
     user = await resolve_access_token(token, db)
     if user is None:
         return False
 
-    # Workspace na lixeira nao concede acesso a ninguem — nem ao dono, nem aos
-    # membros (WorkspaceMember sobrevive ao soft delete, so cai no purge).
+    # A workspace in the trash grants access to nobody — not the owner, not the
+    # members (WorkspaceMember survives the soft delete, it only goes away on purge).
     alive = await db.execute(
         select(Workspace.id_hash).where(
             Workspace.id_hash == workspace_id,
@@ -119,14 +119,14 @@ async def _jwt_has_workspace_access(token: str, workspace_id: str, db: AsyncSess
 async def _resolve_bearer_credential(
     credential_id: str, db: AsyncSession
 ) -> tuple[str | None, str | None]:
-    """Retorna (token descriptografado, expires_at ISO) da credencial.
+    """Returns (decrypted token, ISO expires_at) of the credential.
 
-    Devolve (None, None) em qualquer falha. `expires_at` vem em claro do banco:
-    `Credential.encrypt_and_store` cifra todos os campos string **exceto** este.
+    Returns (None, None) on any failure. `expires_at` comes in clear text from the database:
+    `Credential.encrypt_and_store` encrypts every string field **except** this one.
     """
     from uuid import UUID as _UUID
     try:
-        # CredentialField armazena credential.id (UUID primary key), não id_hash
+        # CredentialField stores credential.id (UUID primary key), not id_hash
         result = await db.execute(
             select(Credential).where(Credential.id == _UUID(credential_id))
         )
@@ -145,11 +145,11 @@ async def _resolve_bearer_credential(
 
 
 def _recusar_se_token_expirado(expires_at_str: str | None) -> None:
-    """Recusa o acesso quando o `expires_at` da credencial já passou.
+    """Denies access when the credential's `expires_at` has already passed.
 
-    Mesma semântica de `_validate_webhook_token`
-    (app/core/authorization/credential_validators.py): 403 quando expirado,
-    500 quando o formato é inválido, e liberado quando o campo está vazio.
+    Same semantics as `_validate_webhook_token`
+    (app/core/authorization/credential_validators.py): 403 when expired,
+    500 when the format is invalid, and allowed when the field is empty.
     """
     if not expires_at_str:
         return
@@ -157,8 +157,8 @@ def _recusar_se_token_expirado(expires_at_str: str | None) -> None:
         expires_at = datetime.fromisoformat(expires_at_str.replace("Z", "+00:00"))
     except (ValueError, AttributeError):
         raise HTTPException(status_code=500, detail="Formato inválido de expires_at")
-    # Um expires_at ingênuo é interpretado como UTC — comparar ingênuo com
-    # ciente levantaria TypeError e viraria 500 num caminho de autorização.
+    # A naive expires_at is interpreted as UTC — comparing naive with
+    # aware would raise TypeError and become a 500 on an authorization path.
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     if datetime.now(tz=timezone.utc) > expires_at:
@@ -166,25 +166,25 @@ def _recusar_se_token_expirado(expires_at_str: str | None) -> None:
 
 
 async def _autorizar_download(artifact: Artifact, request: Request, db: AsyncSession) -> None:
-    """Autoriza o download de um artefato, se ele for protegido por credencial.
+    """Authorizes the download of an artifact, if it is protected by a credential.
 
-    Ponto único da autorização do download público. O bloco chegou a ser
-    replicado em dois endpoints (o outro, por task_id, saiu por não ter
-    cliente), e a divergência entre as cópias foi o que deixou passar o
-    download com token expirado.
+    Single point of authorization for the public download. The block was once
+    replicated in two endpoints (the other one, by task_id, was removed for having no
+    client), and the divergence between the copies is what let the download
+    with an expired token through.
 
-    A ordem é significativa e não pode ser trocada: JWT de usuário com acesso ao
-    workspace primeiro, token Bearer da credencial depois.
+    The order matters and cannot be swapped: a user JWT with access to the
+    workspace first, the credential's Bearer token second.
     """
     if not artifact.credential_id:
-        return  # artefato público
+        return  # public artifact
 
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Token de autenticação não informado.")
     provided_token = auth_header.removeprefix("Bearer ").strip()
 
-    # JWT de usuário autenticado tem prioridade
+    # An authenticated user's JWT takes priority
     if await _jwt_has_workspace_access(provided_token, artifact.workspace_id, db):
         return  # acesso concedido via JWT
 
@@ -195,21 +195,21 @@ async def _autorizar_download(artifact: Artifact, request: Request, db: AsyncSes
 
 
 async def _url_de_download(artifact: Artifact) -> dict:
-    """Resolve a URL pré-assinada de download de um artefato já autorizado."""
+    """Resolves the pre-signed download URL of an already authorized artifact."""
     _recusar_se_local(artifact)
 
     if not artifact.s3_key:
         raise HTTPException(status_code=404, detail="Arquivo nao encontrado no storage.")
 
-    # Detecta s3_key com path local absoluto (fallback antigo de executor)
-    # e reconstroi o s3_key correto
+    # Detect an s3_key with an absolute local path (old executor fallback)
+    # and rebuild the correct s3_key
     s3_key = artifact.s3_key
     if s3_key.startswith("/") or s3_key.startswith("\\"):
         safe_name = os.path.basename(artifact.filename).replace("..", "_")
         s3_key = f"artifacts/{artifact.workspace_id}/{artifact.run_id}/{safe_name}"
 
     from app.core import storage as _s3
-    # Verifica se o objeto existe no MinIO
+    # Check whether the object exists in MinIO
     if not await _s3.head_async(s3_key):
         raise HTTPException(
             status_code=404,
@@ -239,21 +239,21 @@ async def list_artifacts(
     db: AsyncSession           = Depends(get_db),
     workspace_ids: List[str]   = Depends(get_user_workspace_ids),
 ):
-    """Lista artefatos dos workspaces acessíveis ao usuário, paginada.
+    """Lists artifacts of the workspaces accessible to the user, paginated.
 
-    Antes esta rota devolvia a tabela INTEIRA dos workspaces do usuário: sem
-    LIMIT, sem OFFSET, e com `total = len(items)` — ou seja, não existia
-    conceito de página. `artifacts` cresce a cada nó de saída de cada execução
-    e só sai por `expires_at`, então a resposta crescia monotonicamente até a
-    aba congelar renderizando tudo de uma vez.
+    This route used to return the user's workspaces' ENTIRE table: no
+    LIMIT, no OFFSET, and with `total = len(items)` — that is, there was no
+    concept of a page. `artifacts` grows with every output node of every run
+    and only leaves via `expires_at`, so the response grew monotonically until the
+    tab froze rendering everything at once.
 
-    Filtro e busca também são do SERVIDOR agora: filtrar no cliente exigia
-    baixar tudo, que é exatamente o que se quer evitar.
+    Filtering and search are also done by the SERVER now: filtering on the client
+    required downloading everything, which is exactly what we want to avoid.
 
-    A consulta em si mora em `app/services/artifact_service.py` desde que
-    ganhou um segundo chamador — o servidor MCP, que não passa por request
-    nenhuma. O que sobra aqui é a porta: quem pergunta (`get_current_user`) e
-    com que alcance (`get_user_workspace_ids`). A forma da resposta não mudou.
+    The query itself lives in `app/services/artifact_service.py` since it
+    gained a second caller — the MCP server, which goes through no request
+    at all. What remains here is the door: who is asking (`get_current_user`) and
+    with what reach (`get_user_workspace_ids`). The response shape did not change.
     """
     return await listar_artefatos(
         db,
@@ -291,12 +291,12 @@ async def delete_artifact(
         db, artifact.workspace_id, current_user.id_hash, ROLE_EDITOR, _EXCLUIR_ARTEFATOS,
     )
 
-    # Conteudo no disco de um executor, objeto no MinIO, camada do portal: a
-    # regra e a de toda remocao (`remover_artefatos`); aqui so a resposta.
+    # Content on an executor's disk, object in MinIO, portal layer: the
+    # rule is that of every removal (`remover_artefatos`); here only the response.
     remocao = await remover_artefatos(db, [artifact], agendar_pendentes=True)
     if remocao.falhas_s3:
-        # O MinIO falhou (fora "ja nao existe") e o registro ficou: o objeto
-        # segue alcancavel pela reconciliacao, e repetir o pedido resolve.
+        # MinIO failed (other than "already gone") and the record stayed: the object
+        # remains reachable by reconciliation, and repeating the request solves it.
         logger.error(
             "Delete cancelado para artefato %s: S3 falhou. "
             "Registro preservado; reconcile/cleanup tentara de novo.",
@@ -306,12 +306,12 @@ async def delete_artifact(
             status_code=502,
             detail="Falha ao remover do storage; tente novamente em alguns segundos.",
         )
-    # Commit tambem sem nada apagado: persiste o `expires_at` dos pendentes.
+    # Commit even with nothing deleted: persists the pending ones' `expires_at`.
     await db.commit()
     if remocao.pendentes_local or remocao.sem_rastro:
-        # 202 com corpo, e nao HTTPException: nao e erro. O pedido foi aceito
-        # e vai se concluir sozinho — usar o caminho de excecao faria a UI
-        # pintar de vermelho um desfecho normal.
+        # 202 with a body, not HTTPException: it is not an error. The request was accepted
+        # and will complete on its own — using the exception path would make the UI
+        # paint a normal outcome red.
         return JSONResponse(
             status_code=status.HTTP_202_ACCEPTED,
             content={
@@ -334,7 +334,7 @@ async def batch_delete_artifacts(
     current_user              = Depends(get_current_user),
     workspace_ids: List[str]  = Depends(get_user_workspace_ids),
 ):
-    """Remove multiplos artefatos de uma vez. Apenas owners/admins do workspace."""
+    """Removes multiple artifacts at once. Workspace owners/admins only."""
     body = await request.json()
     id_hashes: List[str] = body.get("id_hashes", [])
     if not id_hashes:
@@ -348,51 +348,51 @@ async def batch_delete_artifacts(
     if not artifacts:
         raise HTTPException(status_code=404, detail="Nenhum artefato encontrado.")
 
-    # Verifica permissao: todos devem pertencer a workspaces do usuario com role editor+
+    # Check permission: all must belong to the user's workspaces with role editor+
     for a in artifacts:
         if a.workspace_id not in workspace_ids:
             raise HTTPException(status_code=403, detail=f"Acesso negado ao artefato {a.id_hash}.")
 
-    # Um papel por WORKSPACE envolvido, não por artefato (evita N+1). A
-    # mensagem é a mesma qualquer que seja o workspace que barra, então a ordem
-    # em que eles são conferidos não aparece na resposta.
+    # One role per WORKSPACE involved, not per artifact (avoids N+1). The
+    # message is the same whichever workspace blocks, so the order in which
+    # they are checked does not show in the response.
     for ws_id in sorted({a.workspace_id for a in artifacts}):
         await exigir_papel_no_workspace(
             db, ws_id, current_user.id_hash, ROLE_EDITOR, _EXCLUIR_ARTEFATOS,
         )
 
-    # A regra e a de toda remocao (`remover_artefatos`): os locais viram UMA
-    # ordem por executor, o MinIO sai primeiro e a falha dele preserva a linha
-    # (a reconciliacao tenta de novo), a camada do portal cai junto.
+    # The rule is that of every removal (`remover_artefatos`): local ones become ONE
+    # order per executor, MinIO goes first and its failure preserves the row
+    # (reconciliation tries again), the portal layer goes along.
     remocao = await remover_artefatos(db, artifacts, agendar_pendentes=True)
     if remocao.falhas_s3:
         logger.error(
             "Batch-delete: %d artefato(s) pulado(s) por falha no S3. Reconcile tentara depois.",
             len(remocao.falhas_s3),
         )
-    # Pendentes NAO entram em `skipped`: ali significa "falhou, tente de novo",
-    # e estes vao acontecer sozinhos. Contar nos dois faria a UI somar o mesmo
-    # artefato como erro E como pendente.
+    # Pending ones do NOT go into `skipped`: there it means "failed, try again",
+    # and these will happen on their own. Counting them in both would make the UI add
+    # up the same artifact as an error AND as pending.
     pendentes = len(remocao.pendentes_local) + len(remocao.sem_rastro)
 
-    # O commit roda tambem quando so ha pendentes. Com todos os artefatos
-    # locais e o executor offline — o caso comum deste caminho — nada e
-    # apagado, e um commit condicionado ao que foi apagado descartava o
-    # `expires_at` que acabara de ser posto nos objetos ORM: a API respondia
-    # "remocao pendente" e nada era agendado.
+    # The commit also runs when there are only pending ones. With all artifacts
+    # local and the executor offline — the common case on this path — nothing is
+    # deleted, and a commit conditioned on what was deleted discarded the
+    # `expires_at` just set on the ORM objects: the API answered
+    # "remoção pendente" (removal pending) and nothing was scheduled.
     if remocao.apagados or pendentes:
         await db.commit()
 
     return {
         "deleted": len(remocao.apagados),
         "skipped": len(remocao.falhas_s3),
-        # Distingue "falhou, tente de novo" de "vai acontecer sozinho" — sem
-        # isso a UI mostraria os dois como erro.
+        # Distinguishes "failed, try again" from "will happen on its own" — without
+        # it the UI would show both as errors.
         "pendentes_no_executor": pendentes,
     }
 
 
-# ── GET /artifacts/{id_hash}/download (público) ───────────────────────────────
+# ── GET /artifacts/{id_hash}/download (public) ────────────────────────────────
 
 @public_router.get("/{id_hash}/download")
 @limiter.limit("10/minute")
@@ -402,14 +402,14 @@ async def download_artifact(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Faz download de um artefato.
-    - Sem credential_id → público (sem autenticação).
-    - Com credential_id → aceita JWT de usuário autenticado OU token de artefato Bearer.
+    Downloads an artifact.
+    - Without credential_id → public (no authentication).
+    - With credential_id → accepts an authenticated user's JWT OR a Bearer artifact token.
     """
     result = await db.execute(select(Artifact).where(Artifact.id_hash == id_hash))
     artifact = result.scalar_one_or_none()
 
-    # Fallback: busca na portal_layers (GeoJSON armazenado no banco)
+    # Fallback: look it up in portal_layers (GeoJSON stored in the database)
     if not artifact:
         from app.models.portal_layer import PortalLayer
         from app.models.workflow import Workflow
@@ -418,12 +418,12 @@ async def download_artifact(
         pl_result = await db.execute(select(PortalLayer).where(PortalLayer.id_hash == id_hash))
         pl = pl_result.scalar_one_or_none()
         if pl:
-            # SEG: mesmo gate da rota gemea /artifacts/portal/layers/{id}/download.
-            # Este caminho e o que a UI do portal realmente chama, e servia o
-            # GeoJSON inteiro sem checagem nenhuma: quem tivesse o UUID da camada
-            # (devolvido publicamente por GET /artifacts/portal/{workflow_hash})
-            # continuava baixando as geometrias mesmo depois de o dono marcar o
-            # portal como privado/desabilitado ou desativar o workflow.
+            # SEC: same gate as the twin route /artifacts/portal/layers/{id}/download.
+            # This path is the one the portal UI actually calls, and it served the
+            # whole GeoJSON with no check at all: whoever had the layer's UUID
+            # (returned publicly by GET /artifacts/portal/{workflow_hash})
+            # kept downloading the geometries even after the owner marked the
+            # portal as private/disabled or deactivated the workflow.
             wf_result = await db.execute(
                 select(Workflow).where(Workflow.id_hash == pl.workflow_hash)
             )
@@ -434,17 +434,17 @@ async def download_artifact(
             )
         raise HTTPException(status_code=404, detail="Artefato não encontrado.")
 
-    # Validação de token quando artefato é protegido
+    # Token validation when the artifact is protected
     await _autorizar_download(artifact, request, db)
 
     return await _url_de_download(artifact)
 
 
-# ── GET/PUT /artifacts/admin/settings (config de retenção) ───────────────────
+# ── GET/PUT /artifacts/admin/settings (retention config) ─────────────────────
 
 @router.get("/admin/settings", dependencies=[Depends(require_admin)])
 async def get_artifact_settings(db: AsyncSession = Depends(get_db)):
-    """Retorna configuração global de retenção de artefatos."""
+    """Returns the global artifact retention configuration."""
     result = await db.execute(
         select(SystemConfig).where(SystemConfig.key == "artifact_retention_days")
     )
@@ -459,9 +459,9 @@ async def update_artifact_settings(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Atualiza configuração global de retenção.
+    Updates the global retention configuration.
     Body: { "artifact_retention_days": <int|null> }
-    null = sem expiração automática.
+    null = no automatic expiration.
     """
     days = body.get("artifact_retention_days")
     if days is not None and (not isinstance(days, int) or days < 1):

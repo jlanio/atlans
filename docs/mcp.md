@@ -1,139 +1,139 @@
-# Servidor MCP do Atlans
+# Atlans MCP server
 
-O Atlans expõe um servidor **MCP** (Model Context Protocol) no caminho `/mcp`
-do próprio site: numa instalação em `atlans.example.org`,
-**`https://atlans.example.org/mcp`**. Os exemplos abaixo usam esse domínio; a
-tela de tokens mostra os comandos já com o endereço da sua instalação. Qualquer
-cliente que fale MCP sobre HTTP
-(*streamable HTTP*) conecta com uma URL e um token pessoal, e passa a enxergar
-os workspaces, os fluxos, o catálogo de nós, as credenciais e o Drive da conta
-dona do token — **nada além do que essa conta já alcançava pela interface**.
+Atlans exposes an **MCP** (Model Context Protocol) server at the `/mcp` path
+of the site itself: on an installation at `atlans.example.org`,
+**`https://atlans.example.org/mcp`**. The examples below use that domain; the
+tokens screen shows the commands already filled in with your installation's address. Any
+client that speaks MCP over HTTP
+(*streamable HTTP*) connects with a URL and a personal access token, and from then on sees
+the workspaces, workflows, node catalog, credentials and Drive of the account
+that owns the token — **nothing beyond what that account could already reach through the UI**.
 
-Este documento é a fonte única para quem conecta um cliente: URL, token,
-ferramentas, limites, erros e o que fazer quando não funciona.
+This document is the single source for anyone connecting a client: URL, token,
+tools, limits, errors and what to do when it does not work.
 
-## Sumário
+## Contents
 
-- [O que é e o que dá para fazer](#o-que-é-e-o-que-dá-para-fazer)
-- [Conectar](#conectar)
-- [Autenticação](#autenticação)
-- [Snippets por cliente](#snippets-por-cliente)
-- [Escopos e ferramentas](#escopos-e-ferramentas)
-- [Executar um fluxo](#executar-um-fluxo)
+- [What it is and what you can do with it](#what-it-is-and-what-you-can-do-with-it)
+- [Connecting](#connecting)
+- [Authentication](#authentication)
+- [Snippets per client](#snippets-per-client)
+- [Scopes and tools](#scopes-and-tools)
+- [Running a workflow](#running-a-workflow)
 - [Resources](#resources)
 - [Prompts](#prompts)
-- [Limites](#limites)
-- [Erros](#erros)
-- [Segurança](#segurança)
+- [Limits](#limits)
+- [Errors](#errors)
+- [Security](#security)
 - [Troubleshooting](#troubleshooting)
-- [Changelog e versionamento](#changelog-e-versionamento)
+- [Changelog and versioning](#changelog-and-versioning)
 
 ---
 
-## O que é e o que dá para fazer
+## What it is and what you can do with it
 
-MCP é um protocolo aberto para dar a um programa cliente acesso a *ferramentas*
-(chamadas de função), *resources* (documentos endereçáveis por URI) e *prompts*
-(roteiros prontos) de um sistema externo. O servidor do Atlans publica os três.
+MCP is an open protocol for giving a client program access to *tools*
+(function calls), *resources* (documents addressable by URI) and *prompts*
+(ready-made scripts) of an external system. The Atlans server publishes all three.
 
-Com um token de leitura, o cliente conectado consegue:
+With a read token, the connected client can:
 
-- listar os workspaces e os fluxos que a conta alcança, com gatilhos,
-  agendamento, estado do portal e data da última alteração;
-- abrir um fluxo — resumo dos nós e das arestas, `params_schema`, pins,
-  número de versões — e, sob pedido, a definition inteira **redigida**;
-- ler o contrato de entrada e saída de um fluxo (`inputs`/`outputs`);
-- pesquisar os 63 nós nativos e ler o schema de propriedades de cada um;
-- listar credenciais (só metadados — nunca o segredo) e arquivos do Drive,
-  e gerar uma URL de download temporária;
-- ler o guia de autoria, tópico a tópico.
+- list the workspaces and workflows the account can reach, with triggers,
+  schedule, portal status and date of last change;
+- open a workflow — summary of its nodes and edges, `params_schema`, pins,
+  number of versions — and, on request, the whole **redacted** definition;
+- read a workflow's input and output contract (`inputs`/`outputs`);
+- search the 63 built-in nodes and read each one's properties schema;
+- list credentials (metadata only — never the secret) and Drive files,
+  and generate a temporary download URL;
+- read the authoring guide, topic by topic.
 
-Com `workflows:write`, além disso:
+With `workflows:write`, in addition:
 
-- validar uma definition sem gravar nada e receber o relatório por nó e por
-  aresta (erros, avisos, schema de saída, `params_schema` sugerido);
-- criar e atualizar fluxos — sempre validando antes, por padrão;
-- ativar e desativar um fluxo, e publicá-lo (ou despublicá-lo) no portal.
+- validate a definition without saving anything and get the report per node and per
+  edge (errors, warnings, output schema, suggested `params_schema`);
+- create and update workflows — always validating first, by default;
+- activate and deactivate a workflow, and publish it to (or unpublish it from) the portal.
 
-Com `runs:execute`, disparar uma execução e, se quiser, **esperar o desfecho**
-na mesma chamada, com progresso nó a nó (ver
-[Executar um fluxo](#executar-um-fluxo)).
+With `runs:execute`, trigger a run and, if you want, **wait for the outcome**
+in the same call, with node-by-node progress (see
+[Running a workflow](#running-a-workflow)).
 
-Ler execuções — histórico, detalhe de uma delas e os artefatos que produziu —
-pede só `workflows:read`, como na interface.
+Reading runs — history, the detail of one of them and the artifacts it produced —
+requires only `workflows:read`, as in the UI.
 
-O que **não** entra, por decisão: apagar fluxo, CRUD de credenciais (nem
-leitura do segredo), gestão de membros, de executores e de política de
-workspace, mover fluxo entre workspaces e qualquer rota de `/admin`.
+What is **not** included, by decision: deleting a workflow, credential CRUD (nor
+reading the secret), managing members, executors and workspace
+policy, moving a workflow between workspaces and any `/admin` route.
 
 ---
 
-## Conectar
+## Connecting
 
-| Item | Valor |
+| Item | Value |
 |---|---|
-| URL canônica | `https://<site>/mcp` (ex.: `https://atlans.example.org/mcp`) |
-| Transporte | streamable HTTP (`POST` com SSE de resposta) |
-| Autenticação | `Authorization: Bearer atl_pat_…` |
-| Sessão | sem estado (*stateless*) — não há back-channel do servidor para o cliente |
+| Canonical URL | `https://<site>/mcp` (e.g. `https://atlans.example.org/mcp`) |
+| Transport | streamable HTTP (`POST` with an SSE response) |
+| Authentication | `Authorization: Bearer atl_pat_…` |
+| Session | *stateless* — there is no back-channel from the server to the client |
 
-`https://atlans.example.org/mcp/`, com barra final, atende igual: as duas grafias são
-rotas exatas para o mesmo servidor e **nenhuma das duas redireciona**. Isso é
-deliberado — um `307` faria o cliente repetir a requisição, e com ela o header
-`Authorization`, para o endereço do `Location`. Prefira a forma sem barra, que é
-a que os clientes trazem escrita.
+`https://atlans.example.org/mcp/`, with a trailing slash, works the same: both spellings are
+exact routes to the same server and **neither of them redirects**. This is
+deliberate — a `307` would make the client repeat the request, and with it the
+`Authorization` header, to the `Location` address. Prefer the form without the slash, which is
+the one clients ship with.
 
-O servidor recusa qualquer requisição que traga o header `Origin`, com `403`:
-nesta fase só clientes que não são navegador se conectam (ver
-[403 com menção a `Origin`](#403-com-menção-a-origin)).
+The server rejects any request that carries the `Origin` header, with `403`:
+in this phase only clients that are not browsers connect (see
+[403 mentioning `Origin`](#403-mentioning-origin)).
 
-Em desenvolvimento, com a API local, a URL é `http://localhost:8000/mcp`.
-
----
-
-## Autenticação
-
-O acesso é por **token pessoal** (PAT): cada conta cria, lista e revoga só os
-próprios tokens, em **`/settings/tokens`** (pela paleta Ctrl+K, «Tokens de
-acesso», ou pela URL), e o token age em nome de quem o criou — nunca use o de
-outra pessoa, porque tudo o que ele fizer fica registrado em nome dela. Por
-enquanto só o administrador do sistema alcança páginas fora da Home (o
-`web/proxy.ts` devolve `/` aos demais, e o item saiu do menu da conta), então
-hoje só administradores conseguem criar tokens; as mensagens de recusa do MCP
-dizem isso. Ao criar você escolhe:
-
-- **nome** — para reconhecer o token na lista e revogá-lo depois;
-- **escopos** — `workflows:read`, `workflows:write`, `runs:execute`,
-  `triggers:manage`, `drive:read`, `drive:write`. Dê só o que for usar;
-- **workspaces** — a lista explícita dos atuais, ou «todos, inclusive os que
-  eu entrar depois»;
-- **validade** — 30, 90, 180 ou 365 dias.
-
-O segredo (`atl_pat_` + 43 caracteres) aparece **uma única vez**, no momento da
-criação. Guarde-o num gerenciador de segredos ou numa variável de ambiente.
-
-Regras do envio:
-
-- o token vai **sempre** no header `Authorization: Bearer atl_pat_…`;
-- **nunca** em query string (`?token=`/`?access_token=`) — a requisição é
-  recusada com 401 de propósito: query string vaza em log de proxy e histórico
-  de navegador;
-- o servidor **não** aceita o JWT de sessão da interface;
-- toda falha de autenticação responde `401` com o header
-  `WWW-Authenticate: Bearer realm="atlans-mcp"` (e `error="invalid_token"`
-  quando o formato do segredo está certo mas o token não resolve — revogado,
-  expirado, ou de um usuário suspenso).
-
-O token é revogado automaticamente quando a senha do dono muda, quando a conta
-é suspensa e quando a conta é excluída. Revogar na lista de tokens derruba o
-acesso na hora.
+In development, with the local API, the URL is `http://localhost:8000/mcp`.
 
 ---
 
-## Snippets por cliente
+## Authentication
 
-Todos os exemplos leem o segredo de `ATLANS_TOKEN`, nunca da linha de comando:
-um comando com o segredo literal fica no `~/.bash_history` e aparece em `ps`.
+Access is through a **personal access token** (PAT): each account creates, lists and revokes only its
+own tokens, at **`/settings/tokens`** (through the Ctrl+K palette, "Tokens de
+acesso" (Access tokens), or through the URL), and the token acts on behalf of whoever created it — never use
+someone else's, because everything it does is recorded in their name. For
+now only the system administrator can reach pages outside the Home (the
+`web/proxy.ts` sends everyone else back to `/`, and the item was removed from the account menu), so
+today only administrators can create tokens; the MCP rejection messages
+say so. When creating one you choose:
+
+- **name** — to recognize the token in the list and revoke it later;
+- **scopes** — `workflows:read`, `workflows:write`, `runs:execute`,
+  `triggers:manage`, `drive:read`, `drive:write`. Grant only what you will use;
+- **workspaces** — the explicit list of current ones, or "todos, inclusive os que
+  eu entrar depois" (all, including the ones I join later);
+- **expiration** — 30, 90, 180 or 365 days.
+
+The secret (`atl_pat_` + 43 characters) appears **only once**, at the moment of
+creation. Keep it in a secrets manager or in an environment variable.
+
+Rules for sending it:
+
+- the token **always** goes in the `Authorization: Bearer atl_pat_…` header;
+- **never** in a query string (`?token=`/`?access_token=`) — the request is
+  rejected with 401 on purpose: query strings leak into proxy logs and browser
+  history;
+- the server does **not** accept the UI's session JWT;
+- every authentication failure responds `401` with the header
+  `WWW-Authenticate: Bearer realm="atlans-mcp"` (and `error="invalid_token"`
+  when the secret's format is right but the token does not resolve — revoked,
+  expired, or belonging to a suspended user).
+
+The token is revoked automatically when the owner's password changes, when the account
+is suspended and when the account is deleted. Revoking it in the token list cuts off
+access immediately.
+
+---
+
+## Snippets per client
+
+All the examples read the secret from `ATLANS_TOKEN`, never from the command line:
+a command with the literal secret stays in `~/.bash_history` and shows up in `ps`.
 
 ```bash
 export ATLANS_TOKEN='atl_pat_…'   # do gerenciador de segredos, não do histórico
@@ -145,9 +145,9 @@ export ATLANS_TOKEN='atl_pat_…'   # do gerenciador de segredos, não do histó
 claude mcp add --transport http atlans https://atlans.example.org/mcp --header "Authorization: Bearer ${ATLANS_TOKEN}"
 ```
 
-### Cursor, VS Code e Windsurf
+### Cursor, VS Code and Windsurf
 
-No `mcp.json` do cliente:
+In the client's `mcp.json`:
 
 ```json
 {
@@ -162,25 +162,25 @@ No `mcp.json` do cliente:
 }
 ```
 
-Alguns clientes não interpolam variáveis de ambiente dentro do `mcp.json`;
-nesses, substitua `${ATLANS_TOKEN}` pelo segredo e trate o arquivo como
-segredo (fora do controle de versão, permissão `600`).
+Some clients do not interpolate environment variables inside `mcp.json`;
+in those, replace `${ATLANS_TOKEN}` with the secret and treat the file as a
+secret (out of version control, permission `600`).
 
 ### mcp-remote
 
-Para clientes que só falam MCP por stdio:
+For clients that only speak MCP over stdio:
 
 ```bash
 npx mcp-remote https://atlans.example.org/mcp --header "Authorization:${AUTH_HEADER}"
 ```
 
-Defina `AUTH_HEADER="Bearer atl_pat_…"` no ambiente. A quebra em duas variáveis
-é do próprio `mcp-remote`: ele corta o argumento no primeiro espaço.
+Set `AUTH_HEADER="Bearer atl_pat_…"` in the environment. The split into two variables
+comes from `mcp-remote` itself: it cuts the argument at the first space.
 
-### Conector MCP da API da Anthropic
+### Anthropic API MCP connector
 
-O bloco `mcp_servers` não vale sozinho — é preciso declarar também o
-`mcp_toolset` correspondente, com o mesmo `name`:
+The `mcp_servers` block does not work on its own — you also have to declare the
+corresponding `mcp_toolset`, with the same `name`:
 
 ```python
 import os
@@ -222,338 +222,338 @@ agente = Agent(name="Atlans", mcp_servers=[servidor])
 
 ---
 
-## Escopos e ferramentas
+## Scopes and tools
 
-A autorização tem duas camadas, e as duas precisam passar:
+Authorization has two layers, and both have to pass:
 
-1. **escopo do token** — o que o token pede na criação;
-2. **papel no workspace** — o que a conta tem lá dentro
+1. **token scope** — what the token requests at creation;
+2. **workspace role** — what the account has inside it
    (`viewer` < `editor` < `operator` < `admin` < `owner`).
 
-Uma ferramenta fora do escopo do token nem aparece em `tools/list`, e chamada
-diretamente responde `forbidden_scope` nomeando o escopo que falta. Papel
-insuficiente responde `forbidden`. Não existe escopo de administrador: um PAT
-nunca atravessa o escopo de membro, mesmo que a conta seja admin da plataforma.
+A tool outside the token's scope does not even show up in `tools/list`, and when called
+directly it responds `forbidden_scope`, naming the missing scope. An insufficient role
+responds `forbidden`. There is no administrator scope: a PAT
+never goes beyond member scope, even if the account is a platform admin.
 
-| Ferramenta | Escopo | Papel mínimo | O que faz |
+| Tool | Scope | Minimum role | What it does |
 |---|---|---|---|
-| `list_workspaces` | `workflows:read` | membro | Workspaces alcançados pelo token, com o papel em cada um |
-| `list_workflows` | `workflows:read` | membro | Fluxos do workspace (ou de todos), em itens leves |
-| `get_workflow` | `workflows:read` | membro | Resumo do fluxo; `include_definition=true` traz a definition redigida |
-| `get_workflow_contract` | `workflows:read` | membro | `inputs`/`outputs` declarados do fluxo |
-| `search_nodes` | `workflows:read` | — | Índice compacto do catálogo de nós |
-| `describe_node` | `workflows:read` | — | Propriedades, entradas e saídas de um nó |
-| `list_credentials` | `workflows:read` | membro | Metadados das credenciais — nunca o segredo |
-| `list_drive_files` | `drive:read` | membro | Arquivos do Drive do workspace |
-| `get_drive_download_url` | `drive:read` | membro | URL pré-assinada de download (5 min) |
-| `get_portal_info` | `workflows:read` | membro | Estado do portal do fluxo e a URL de compartilhamento |
-| `get_authoring_guide` | `workflows:read` | — | Um tópico do guia de autoria |
-| `validate_workflow` | `workflows:write` | editor | Valida uma definition sem gravar nada: relatório por nó e por aresta, nós desabilitados, sub-fluxos e `params_schema` sugerido. Recusa na entrada a definition com segredo em claro |
-| `create_workflow` | `workflows:write` | editor | Cria um fluxo no workspace; valida antes por padrão e carimba a autoria com o dono do token |
-| `update_workflow` | `workflows:write` | editor | Atualiza definition, nome, descrição ou `params_schema` — só os campos enviados mudam |
-| `set_workflow_active` | `workflows:write` | editor | Ativa ou desativa o fluxo, sincronizando os agendamentos. Único caminho para `is_active` |
-| `set_portal_access` | `workflows:write` | editor | Publica ou despublica no portal (`disabled`/`public`/`private`) e devolve a URL absoluta |
-| `run_workflow` | `runs:execute` | operator | Dispara uma execução e, por padrão, espera o desfecho notificando o progresso |
-| `get_run` | `workflows:read` | membro | Detalhe de uma execução: status, tempo, erro e o retrato de cada nó |
-| `list_runs` | `workflows:read` | membro | Histórico de execuções, com filtros de workflow, workspace, status, origem, data e texto |
-| `get_run_artifacts` | `workflows:read` | membro | Artefatos de uma execução, com URL temporária de download (5 min) |
-| `get_run_events` | `workflows:read` | membro | Log bruto de uma execução — **dura 1 hora**; `availability` diz por que veio vazio |
-| `cancel_run` | `runs:execute` | operator | Interrompe uma execução em andamento; `outcome` distingue pedido enviado, fechada e já terminada |
-| `retry_run` | `runs:execute` | operator | Dispara execução NOVA do mesmo workflow — **não repete a anterior**: definição atual e padrões do `params_schema`, nunca os inputs originais |
-| `list_workflow_versions` | `workflows:read` | viewer | Snapshots de um workflow: número, nota e data — sem a definition de cada um |
-| `get_workflow_version` | `workflows:read` | viewer | Uma versão do histórico, com a definition **redigida** |
-| `restore_workflow_version` | `workflows:write` | editor | Volta o workflow a uma versão anterior. **Reversível**: o estado atual vira snapshot antes da troca |
-| `duplicate_workflow` | `workflows:write` | editor | Cópia no mesmo workspace. Pins, portal e histórico não acompanham; o agendamento acompanha desligado |
-| `list_artifacts` | `workflows:read` | viewer | Os arquivos que as execuções produziram, no workspace indicado (ou em todos os do token), com filtros e paginação |
-| `list_pins` | `workflows:read` | viewer | Quais saídas de nó estão congeladas. `cached` diz se o cache já existe; `expired` é relato, não ação |
-| `pin_node_output` | `workflows:write` | editor | Congela a saída de um nó a partir da próxima execução. `ttl_hours` de 1 a 8760. Nó que grava arquivo é recusado |
-| `unpin_node_output` | `workflows:write` | editor | Descongela e apaga o cache. `outcome=not_pinned`, sem erro, quando não havia pin |
-| `list_schedules` | `workflows:read` | viewer | Quando o fluxo dispara sozinho. Traz `workflow_active`, porque o agendador ignora agendamento de fluxo inativo |
-| `create_schedule` | `triggers:manage` | **operator** | Cron (5 campos), intervalo ou RRULE. Agendar é executar — daí o papel |
-| `update_schedule` | `triggers:manage` | **operator** | Só os campos enviados. `active=false` pausa sem perder a configuração |
-| `delete_schedule` | `triggers:manage` | **operator** | Exige `confirm=true`; sem ele, descreve o que seria apagado e não apaga |
-| `create_drive_upload_url` | `drive:write` | editor | Passo 1 de 3: devolve URL que aceita PUT. **Não envia o arquivo** — quem faz o PUT é quem tem os bytes |
-| `confirm_drive_upload` | `drive:write` | editor | Passo 3: mede o objeto real e publica no Drive. Acima do teto, recusa e apaga os bytes |
-| `delete_drive_file` | `drive:write` | editor | Exige `confirm=true`. Sem lixeira. É também como se substitui um arquivo |
-| `search_sources` | `workflows:read` | viewer | Busca no catálogo de fontes pré-mapeadas (camadas WFS conhecidas) por tema, SEM rede. Chame antes de preencher `url`/`typeName` |
-| `describe_source` | `workflows:read` | viewer | A ficha de uma fonte: `node_snippet` pronto para colar, esquema (CRS, extensão, colunas) e estado da última verificação |
-| `probe_source` | `workflows:write` | editor | Sonda um WFS fora do catálogo: camadas (GetCapabilities) e, com `type_name`, o esquema. Só metadados; não cria fonte, mas atualiza o estado de uma já catalogada e fala com a internet (balde `probe`, `openWorldHint`) |
-| `register_source` | `workflows:write` | editor | Sonda e guarda uma camada no catálogo do workspace, com título, temas e dicas. Idempotente: a mesma URL+camada atualiza a linha |
+| `list_workspaces` | `workflows:read` | member | Workspaces reached by the token, with the role in each one |
+| `list_workflows` | `workflows:read` | member | Workflows of the workspace (or of all of them), as lightweight items |
+| `get_workflow` | `workflows:read` | member | Workflow summary; `include_definition=true` brings the redacted definition |
+| `get_workflow_contract` | `workflows:read` | member | The workflow's declared `inputs`/`outputs` |
+| `search_nodes` | `workflows:read` | — | Compact index of the node catalog |
+| `describe_node` | `workflows:read` | — | Properties, inputs and outputs of a node |
+| `list_credentials` | `workflows:read` | member | Credential metadata — never the secret |
+| `list_drive_files` | `drive:read` | member | Files in the workspace's Drive |
+| `get_drive_download_url` | `drive:read` | member | Presigned download URL (5 min) |
+| `get_portal_info` | `workflows:read` | member | The workflow's portal status and the sharing URL |
+| `get_authoring_guide` | `workflows:read` | — | One topic of the authoring guide |
+| `validate_workflow` | `workflows:write` | editor | Validates a definition without saving anything: report per node and per edge, disabled nodes, sub-workflows and suggested `params_schema`. Rejects up front a definition with a plaintext secret |
+| `create_workflow` | `workflows:write` | editor | Creates a workflow in the workspace; validates first by default and stamps authorship with the token's owner |
+| `update_workflow` | `workflows:write` | editor | Updates definition, name, description or `params_schema` — only the fields sent change |
+| `set_workflow_active` | `workflows:write` | editor | Activates or deactivates the workflow, syncing its schedules. The only path to `is_active` |
+| `set_portal_access` | `workflows:write` | editor | Publishes or unpublishes on the portal (`disabled`/`public`/`private`) and returns the absolute URL |
+| `run_workflow` | `runs:execute` | operator | Triggers a run and, by default, waits for the outcome while reporting progress |
+| `get_run` | `workflows:read` | member | Detail of a run: status, time, error and the snapshot of each node |
+| `list_runs` | `workflows:read` | member | Run history, with filters for workflow, workspace, status, origin, date and text |
+| `get_run_artifacts` | `workflows:read` | member | Artifacts of a run, with a temporary download URL (5 min) |
+| `get_run_events` | `workflows:read` | member | Raw log of a run — **lasts 1 hour**; `availability` says why it came back empty |
+| `cancel_run` | `runs:execute` | operator | Stops a run in progress; `outcome` distinguishes request sent, closed and already finished |
+| `retry_run` | `runs:execute` | operator | Triggers a NEW run of the same workflow — **it does not repeat the previous one**: current definition and `params_schema` defaults, never the original inputs |
+| `list_workflow_versions` | `workflows:read` | viewer | Snapshots of a workflow: number, note and date — without each one's definition |
+| `get_workflow_version` | `workflows:read` | viewer | One version from the history, with the **redacted** definition |
+| `restore_workflow_version` | `workflows:write` | editor | Rolls the workflow back to an earlier version. **Reversible**: the current state becomes a snapshot before the switch |
+| `duplicate_workflow` | `workflows:write` | editor | Copy in the same workspace. Pins, portal and history do not come along; the schedule comes along switched off |
+| `list_artifacts` | `workflows:read` | viewer | The files that runs produced, in the given workspace (or in all of the token's), with filters and pagination |
+| `list_pins` | `workflows:read` | viewer | Which node outputs are frozen. `cached` says whether the cache already exists; `expired` is a report, not an action |
+| `pin_node_output` | `workflows:write` | editor | Freezes a node's output starting with the next run. `ttl_hours` from 1 to 8760. A node that writes a file is rejected |
+| `unpin_node_output` | `workflows:write` | editor | Unfreezes and deletes the cache. `outcome=not_pinned`, without an error, when there was no pin |
+| `list_schedules` | `workflows:read` | viewer | When the workflow triggers on its own. Includes `workflow_active`, because the scheduler ignores schedules of an inactive workflow |
+| `create_schedule` | `triggers:manage` | **operator** | Cron (5 fields), interval or RRULE. Scheduling is executing — hence the role |
+| `update_schedule` | `triggers:manage` | **operator** | Only the fields sent. `active=false` pauses without losing the configuration |
+| `delete_schedule` | `triggers:manage` | **operator** | Requires `confirm=true`; without it, describes what would be deleted and does not delete it |
+| `create_drive_upload_url` | `drive:write` | editor | Step 1 of 3: returns a URL that accepts PUT. **It does not send the file** — whoever has the bytes does the PUT |
+| `confirm_drive_upload` | `drive:write` | editor | Step 3: measures the actual object and publishes it to the Drive. Above the ceiling, rejects it and deletes the bytes |
+| `delete_drive_file` | `drive:write` | editor | Requires `confirm=true`. No trash bin. It is also how you replace a file |
+| `search_sources` | `workflows:read` | viewer | Searches the catalog of pre-mapped sources (known WFS layers) by theme, WITHOUT network. Call it before filling in `url`/`typeName` |
+| `describe_source` | `workflows:read` | viewer | A source's record: ready-to-paste `node_snippet`, schema (CRS, extent, columns) and status of the last check |
+| `probe_source` | `workflows:write` | editor | Probes a WFS outside the catalog: layers (GetCapabilities) and, with `type_name`, the schema. Metadata only; it does not create a source, but it updates the status of an already cataloged one and talks to the internet (`probe` bucket, `openWorldHint`) |
+| `register_source` | `workflows:write` | editor | Probes and stores a layer in the workspace's catalog, with title, themes and hints. Idempotent: the same URL+layer updates the row |
 
-As quatro ferramentas de fontes vivem em torno do **catálogo interno** de camadas
-WFS pré-mapeadas (`docs/fontes.md`): a regra do guia é consultar `search_sources`
-antes de preencher qualquer `url`/`typeName`, e só sondar (`probe_source`) e
-registrar (`register_source`) o que o catálogo não tem. Essas duas são as únicas
-ferramentas anotadas com `openWorldHint: true` — fazem o servidor falar com uma
-URL pública (IP privado, loopback e link-local continuam bloqueados) — e gastam
-o balde `probe`.
+The four source tools revolve around the **internal catalog** of pre-mapped WFS
+layers (`docs/sources.md`): the guide's rule is to consult `search_sources`
+before filling in any `url`/`typeName`, and to probe (`probe_source`) and
+register (`register_source`) only what the catalog does not have. Those two are the only
+tools annotated with `openWorldHint: true` — they make the server talk to a
+public URL (private IPs, loopback and link-local are still blocked) — and they spend
+the `probe` bucket.
 
-Ler execuções pede `workflows:read`, e não `runs:execute`: é a mesma exigência
-da interface, onde acompanhar o histórico só depende de ser membro do workspace
-do run. Um token de leitura acompanha o que outros dispararam; disparar é que
-exige o escopo de execução e papel `operator`.
+Reading runs requires `workflows:read`, not `runs:execute`: it is the same requirement
+as in the UI, where following the history only depends on being a member of the run's
+workspace. A read token follows what others triggered; it is triggering that
+requires the execution scope and the `operator` role.
 
-Duas coisas sobre execuções que a tool diz, e que valem estar aqui também porque
-quem lê o doc costuma ser quem escreve o agente:
+Two things about runs that the tool says, and that are worth stating here too because
+whoever reads the doc is usually whoever writes the agent:
 
-**O log dura uma hora.** `get_run_events` lê o histórico do Redis, com TTL de
-3600 s. Depois disso os eventos não existem em lugar nenhum — o que resta da
-execução é o `node_stats` de `get_run`, que está no banco e não expira. Quando a
-lista vem vazia, `availability` diz o motivo (`em_andamento`, `expirada`,
-`sem_eventos`, `indeterminada`) em vez de deixar o agente concluir sozinho que
-"não houve saída".
+**The log lasts one hour.** `get_run_events` reads the history from Redis, with a TTL of
+3600 s. After that the events do not exist anywhere — what remains of the
+run is the `node_stats` of `get_run`, which is in the database and does not expire. When the
+list comes back empty, `availability` gives the reason (`em_andamento`, `expirada`,
+`sem_eventos`, `indeterminada`) instead of letting the agent conclude on its own that
+"there was no output".
 
-**`retry_run` não repete a execução.** O Atlans não guarda os `inputs` de um run,
-então reexecutar aquele exatamente não é possível: a tool dispara o workflow com
-a **definição atual** e com os padrões que o `params_schema` declara — nunca os
-inputs originais. A resposta traz `reused_inputs: false` e
-`inputs_sent` com o que de fato foi mandado, para que isso não passe
-despercebido. Um fluxo com parâmetro obrigatório sem padrão é recusado com
-`validation`, em vez de gastar um executor numa execução condenada. Quem precisa
-repetir de verdade usa `run_workflow(workflow_id, inputs=…)`. A execução nova é
-marcada como origem `mcp`, e não `retry`: ela é indistinguível de um disparo
-comum, e rotulá-la de outro jeito contaria no Histórico uma reexecução que não
-aconteceu.
+**`retry_run` does not repeat the run.** Atlans does not store a run's `inputs`,
+so re-running exactly that one is not possible: the tool triggers the workflow with
+the **current definition** and with the defaults that the `params_schema` declares — never the
+original inputs. The response includes `reused_inputs: false` and
+`inputs_sent` with what was actually sent, so that this does not go
+unnoticed. A workflow with a required parameter without a default is rejected with
+`validation`, instead of spending an executor on a doomed run. Whoever needs
+a true repeat uses `run_workflow(workflow_id, inputs=…)`. The new run is
+marked with origin `mcp`, not `retry`: it is indistinguishable from an ordinary
+trigger, and labeling it otherwise would record in the "Histórico" (History) a re-run that did not
+happen.
 
-**`cancel_run` responde `already_finished` em dois casos diferentes**, porque o
-núcleo usa um rótulo só: a execução já tinha terminado, ou não há executor
-associado a ela — e no segundo caso ela pode continuar em `running`. Por isso a
-resposta traz `status_before`, o estado no instante anterior ao pedido, e um
-`hint` avisando quando os dois discordam. E chamar duas vezes é seguro, mas não
-devolve necessariamente a mesma coisa: quem fecha uma execução já entregue é o
-executor, de volta, então as duas chamadas costumam responder `requested`.
+**`cancel_run` responds `already_finished` in two different cases**, because the
+core uses a single label: the run had already finished, or there is no executor
+associated with it — and in the second case it may stay in `running`. That is why the
+response includes `status_before`, the state at the instant before the request, and a
+`hint` warning when the two disagree. And calling it twice is safe, but it does not
+necessarily return the same thing: what closes a run that was already delivered is the
+executor, on its way back, so both calls usually respond `requested`.
 
-Três coisas sobre o acervo, pelo mesmo motivo:
+Three things about the collection, for the same reason:
 
-**`restore_workflow_version` é reversível, e a resposta diz como.** Antes de
-trocar a definition, o estado atual vira um snapshot novo no histórico — o
-número dele volta em `snapshot_version`, e restaurar esse número
-desfaz a operação. O que **não** é garantido é a ressincronização do
-agendamento: ela é best-effort no núcleo, e se falhar a restauração ainda assim
-vale, sem aviso na resposta. Para fluxo que depende de agenda, confirme com
+**`restore_workflow_version` is reversible, and the response says how.** Before
+switching the definition, the current state becomes a new snapshot in the history — its
+number comes back in `snapshot_version`, and restoring that number
+undoes the operation. What is **not** guaranteed is the resynchronization of the
+schedule: it is best-effort in the core, and if it fails the restore still
+holds, with no warning in the response. For a workflow that depends on a schedule, confirm with
 `get_workflow`.
 
-**A definition de uma versão sai sempre redigida.** O histórico guarda a
-connection string cifrada; `get_workflow_version` a decifra para conferir que o
-token não está corrompido e então **apaga o valor** antes de devolver. Não há
-parâmetro para pedir o segredo — restaurar não precisa dele, porque o restore
-copia o blob cifrado sem abri-lo.
+**A version's definition always comes out redacted.** The history stores the
+connection string encrypted; `get_workflow_version` decrypts it to check that the
+token is not corrupted and then **erases the value** before returning it. There is no
+parameter to ask for the secret — restoring does not need it, because the restore
+copies the encrypted blob without opening it.
 
-**`list_artifacts` distingue as duas datas que a tool irmã confunde.** Um item
-traz `content_expires_at` (quando o ARQUIVO sai da retenção — dias) e
-`url_expires_at` (quando o LINK assinado vence — 5 minutos). Em
-`get_run_artifacts`, `expires_at` significa a segunda; reaproveitar o nome aqui
-para a primeira faria quem lê concluir que o download vale uma semana.
+**`list_artifacts` distinguishes the two dates that its sibling tool conflates.** An item
+includes `content_expires_at` (when the FILE leaves retention — days) and
+`url_expires_at` (when the signed LINK expires — 5 minutes). In
+`get_run_artifacts`, `expires_at` means the second one; reusing the name here
+for the first would make the reader conclude that the download is valid for a week.
 
-**`duplicate_workflow` deixa coisas para trás, de propósito.** Pins (apontam
-para artefatos de execuções que a cópia nunca teve), estado do portal (uma cópia
-não nasce publicada porque o original estava) e histórico de versões (descreve
-edições que não aconteceram ali). O agendamento acompanha, mas **desligado**:
-duplicar costuma preceder uma edição, e nascer disparando sozinho dobraria a
-carga em silêncio.
+**`duplicate_workflow` leaves things behind, on purpose.** Pins (they point
+to artifacts of runs the copy never had), portal status (a copy
+is not born published because the original was) and version history (it describes
+edits that did not happen there). The schedule comes along, but **switched off**:
+duplicating usually precedes an edit, and being born triggering on its own would double the
+load silently.
 
-Convenções de entrada, valendo para todas:
+Input conventions, applying to all of them:
 
-- `workflow_id` e `workspace_id` aceitam **id ou nome**; nome que casa com mais
-  de um recurso devolve `ambiguous` com a lista de candidatos;
-- `workspace_id` é **opcional** quando o token alcança exatamente um workspace;
-- texto escrito por gente (nome, descrição, alias, mensagem de erro, nome de
-  arquivo) sai sempre dentro de `untrusted_data`; ids, enums, números e datas
-  ficam no topo da resposta;
-- uma definition enviada a `validate_workflow`, `create_workflow` ou
-  `update_workflow` **não pode carregar segredo em texto claro**: a chamada é
-  recusada com `secret_in_definition`, que lista os caminhos dos campos (nunca
-  os valores). Vale também para a que só valida — recusar na entrada é o que
-  impede a senha de chegar ao caminho de validação. Credencial se referencia
-  por `credential_id` (`list_credentials`);
-- `validate_first=true` é o padrão de `create_workflow` e `update_workflow`:
-  com erros no relatório, nada é gravado. `force=true` grava apesar dos erros
-  comuns, mas **nunca** apesar dos fatais (nó inexistente, id duplicado, ciclo,
-  `credential_id` que não é UUID) — esses recusam sempre, porque geram um fluxo
-  que o executor nem consegue montar.
+- `workflow_id` and `workspace_id` accept **id or name**; a name that matches more
+  than one resource returns `ambiguous` with the list of candidates;
+- `workspace_id` is **optional** when the token reaches exactly one workspace;
+- text written by people (name, description, alias, error message, file
+  name) always comes out inside `untrusted_data`; ids, enums, numbers and dates
+  stay at the top of the response;
+- a definition sent to `validate_workflow`, `create_workflow` or
+  `update_workflow` **cannot carry a secret in plaintext**: the call is
+  rejected with `secret_in_definition`, which lists the field paths (never
+  the values). This also applies to the one that only validates — rejecting up front is what
+  keeps the password from reaching the validation path. A credential is referenced
+  by `credential_id` (`list_credentials`);
+- `validate_first=true` is the default for `create_workflow` and `update_workflow`:
+  with errors in the report, nothing is saved. `force=true` saves despite ordinary
+  errors, but **never** despite fatal ones (nonexistent node, duplicate id, cycle,
+  `credential_id` that is not a UUID) — those are always rejected, because they produce a workflow
+  that the executor cannot even assemble.
 
 ---
 
-## Executar um fluxo
+## Running a workflow
 
 ```text
 run_workflow(workflow_id, inputs?, debug_mode=false, wait=true,
              timeout_seconds=120, idempotency_key?)
 ```
 
-### `inputs` conferidos antes do despacho
+### `inputs` checked before dispatch
 
-`inputs` é conferido contra o `params_schema` do fluxo **antes** de a execução
-ser despachada — um parâmetro trocado descoberto no meio da execução já custou
-executor, escrita em banco e artefato errado. As regras:
+`inputs` is checked against the workflow's `params_schema` **before** the run
+is dispatched — a swapped parameter discovered in the middle of the run has already cost an
+executor, a database write and a wrong artifact. The rules:
 
-- **coerção só a partir de texto.** `"5"` vira `5` (inteiro se for dígito puro,
-  senão decimal), `"true"`/`"1"`/`"sim"` viram `true`, `"false"`/`"0"`/`"não"`
-  viram `false`, e um `object` aceita objeto, lista ou o JSON correspondente em
-  string. Quem manda `1` onde se declarou `boolean` recebe erro: em JSON,
-  número é número;
-- **string vazia nunca vira valor.** `""` num campo `number` é erro, não zero;
-- **obrigatório sem valor e sem `default` é erro**; com `default`, o padrão é
-  preenchido (e coagido pelas mesmas regras);
-- **chave não declarada passa intacta** e é listada em `hints` — o gatilho de
-  webhook tem o próprio `payload_schema`, validado no despacho;
-- **`params_schema` ausente ou malformado não é erro**: os `inputs` seguem sem
-  conferência e um aviso em `hints` diz que ninguém os conferiu.
+- **coercion only from text.** `"5"` becomes `5` (integer if it is pure digits,
+  otherwise decimal), `"true"`/`"1"`/`"sim"` become `true`, `"false"`/`"0"`/`"não"`
+  become `false`, and an `object` accepts an object, a list or the corresponding JSON as a
+  string. Whoever sends `1` where `boolean` was declared gets an error: in JSON,
+  a number is a number;
+- **an empty string never becomes a value.** `""` in a `number` field is an error, not zero;
+- **required with no value and no `default` is an error**; with a `default`, the default is
+  filled in (and coerced by the same rules);
+- **an undeclared key passes through untouched** and is listed in `hints` — the webhook
+  trigger has its own `payload_schema`, validated at dispatch;
+- **a missing or malformed `params_schema` is not an error**: the `inputs` go through without
+  checking and a warning in `hints` says nobody checked them.
 
-Os problemas voltam agregados num único erro `validation`, com
-`errors: [{path, message}]` — corrija tudo de uma vez. A mensagem nomeia o
-campo e o tipo esperado e **nunca ecoa o valor recebido**.
+The problems come back aggregated in a single `validation` error, with
+`errors: [{path, message}]` — fix everything at once. The message names the
+field and the expected type and **never echoes the value received**.
 
-### `wait`, prazos e status
+### `wait`, timeouts and status
 
-Com `wait=true` (padrão) a chamada segura a resposta até a execução terminar,
-notificando o progresso nó a nó, e devolve o desfecho completo: status,
-duração, o retrato de cada nó, o erro e a lista de artefatos (sem link — para
-baixar, chame `get_run_artifacts`). O prazo é `timeout_seconds`, entre **5 e
-300 segundos**, com **120 s** por padrão; valor fora da faixa é ajustado para o
-limite mais próximo.
+With `wait=true` (the default) the call holds the response until the run finishes,
+reporting node-by-node progress, and returns the complete outcome: status,
+duration, the snapshot of each node, the error and the list of artifacts (without links — to
+download, call `get_run_artifacts`). The timeout is `timeout_seconds`, between **5 and
+300 seconds**, with **120 s** by default; a value outside the range is clamped to the
+nearest limit.
 
-Os status possíveis — e a diferença entre os dois últimos importa:
+The possible statuses — and the difference between the last two matters:
 
-| `status` | Significa | O que fazer |
+| `status` | Meaning | What to do |
 |---|---|---|
-| `success` / `failed` / `cancelled` | Desfecho gravado | Ler o resultado |
-| `running` | Ainda executando, ou o prazo acabou antes do fim | Consultar `get_run(run_id)`; a execução **continua** no servidor |
-| `unknown` | O fluxo **terminou**, mas o desfecho ainda não foi gravado | Consultar `get_run(run_id)` daqui a pouco — **não execute de novo** |
+| `success` / `failed` / `cancelled` | Outcome recorded | Read the result |
+| `running` | Still executing, or the timeout ran out before the end | Query `get_run(run_id)`; the run **continues** on the server |
+| `unknown` | The workflow **finished**, but the outcome has not been recorded yet | Query `get_run(run_id)` again shortly — **do not run it again** |
 
-`unknown` é o caso em que o evento de conclusão chegou antes de a linha do
-histórico ser escrita. Chamá-lo de `running` faria o cliente esperar por um fim
-que já aconteceu, e poderia convencê-lo a disparar a mesma execução outra vez.
+`unknown` is the case where the completion event arrived before the history
+row was written. Calling it `running` would make the client wait for an end
+that has already happened, and could convince it to trigger the same run again.
 
-Com `wait=false` a resposta volta na hora, com o `run_id` e `status: "running"`.
+With `wait=false` the response comes back immediately, with the `run_id` and `status: "running"`.
 
-Na resposta com desfecho, `events_dropped` diz quantos eventos o buffer
-descartou durante a espera: o progresso pode ter pulado nós. O desfecho, esse,
-vem do banco e está inteiro.
+In a response with an outcome, `events_dropped` says how many events the buffer
+discarded during the wait: the progress may have skipped nodes. The outcome itself
+comes from the database and is complete.
 
-### Idempotência e recusas
+### Idempotency and rejections
 
-`idempotency_key` protege contra disparo repetido do mesmo fluxo pelo mesmo
-usuário por 24 horas: a segunda chamada com a mesma chave devolve a execução
-original, **mesmo que ela tenha falhado**. A chave vale por usuário — duas
-pessoas com a mesma chave fazem duas execuções.
+`idempotency_key` protects against repeated triggering of the same workflow by the same
+user for 24 hours: the second call with the same key returns the
+original run, **even if it failed**. The key is per user — two
+people with the same key make two runs.
 
-Recusas que acontecem antes de qualquer custo: fluxo desativado responde
-`workflow_inactive` (ative com `set_workflow_active`), `inputs` inválidos
-respondem `validation`, e o teto de esperas simultâneas responde `wait_limit`
-sem despachar nada. Se não houver executor online, a resposta é `no_executor`.
+Rejections that happen before any cost: a deactivated workflow responds
+`workflow_inactive` (activate it with `set_workflow_active`), invalid `inputs`
+respond `validation`, and the ceiling of concurrent waits responds `wait_limit`
+without dispatching anything. If there is no executor online, the response is `no_executor`.
 
 ---
 
 ## Resources
 
-Resources são leitura endereçável por URI — úteis quando o cliente prefere
-anexar um documento a fazer uma chamada de ferramenta. Todos exigem
-`workflows:read` e respeitam o mesmo escopo de workspace.
+Resources are reads addressable by URI — useful when the client prefers
+attaching a document to making a tool call. All of them require
+`workflows:read` and respect the same workspace scope.
 
-| URI | Tipo | Conteúdo |
+| URI | Type | Content |
 |---|---|---|
-| `atlans://guide/authoring/{topic}` | `text/markdown` | Um tópico do guia: `overview`, `edges`, `credentials`, `expressions`, `inputs`, `sources`, `sql`, `pitfalls`, `recipes` |
-| `atlans://catalog/nodes{?type}` | `application/json` | Índice do catálogo; sem `type`, a lista de tipos com a contagem de cada um |
-| `atlans://catalog/nodes/{name}` | `application/json` | Definição completa de um nó |
-| `atlans://workspaces/{id}/workflows` | `application/json` | Os fluxos de um workspace |
-| `atlans://workflows/{id}` | `application/json` | Resumo do fluxo, com a definition redigida |
-| `atlans://workflows/{id}/contract` | `application/json` | Contrato de entrada e saída do fluxo |
-| `atlans://runs/{id}` | `application/json` | Uma execução com o retrato **completo** de cada nó — o mesmo de `get_run(node_stats="full")` |
+| `atlans://guide/authoring/{topic}` | `text/markdown` | One topic of the guide: `overview`, `edges`, `credentials`, `expressions`, `inputs`, `sources`, `sql`, `pitfalls`, `recipes` |
+| `atlans://catalog/nodes{?type}` | `application/json` | Catalog index; without `type`, the list of types with the count of each |
+| `atlans://catalog/nodes/{name}` | `application/json` | Complete definition of a node |
+| `atlans://workspaces/{id}/workflows` | `application/json` | The workflows of a workspace |
+| `atlans://workflows/{id}` | `application/json` | Workflow summary, with the redacted definition |
+| `atlans://workflows/{id}/contract` | `application/json` | The workflow's input and output contract |
+| `atlans://runs/{id}` | `application/json` | A run with the **complete** snapshot of each node — the same as `get_run(node_stats="full")` |
 
-O catálogo nunca sai como um blob único: `atlans://catalog/nodes` sem `type`
-devolve o índice de tipos e a dica de filtrar, porque o JSON completo dos 63
-nós passa de 78 KB.
+The catalog never comes out as a single blob: `atlans://catalog/nodes` without `type`
+returns the index of types and the hint to filter, because the complete JSON of the 63
+nodes exceeds 78 KB.
 
-`atlans://runs/{id}` traz `node_stats` completo (com `output_keys` e
-`output_columns`) porque quem anexa uma execução ao contexto está investigando
-uma falha; a ferramenta `get_run` continua oferecendo o resumo a quem só quer o
-status. A mensagem de erro do run e a de cada nó saem higienizadas, dentro de
+`atlans://runs/{id}` includes the complete `node_stats` (with `output_keys` and
+`output_columns`) because whoever attaches a run to the context is investigating
+a failure; the `get_run` tool still offers the summary to those who only want the
+status. The run's error message and each node's come out sanitized, inside
 `untrusted_data`.
 
-Todo resource respeita a mesma guarda da ferramenta de que é alias: leitura de
-dados de workspace confere o escopo, exige o papel e deixa linha de auditoria.
-`resources/read` não consome a cota de chamadas de ferramenta (ver
-[Limites](#limites)).
+Every resource respects the same guard as the tool it is an alias of: reading
+workspace data checks the scope, requires the role and leaves an audit row.
+`resources/read` does not consume the tool-call quota (see
+[Limits](#limits)).
 
 ---
 
 ## Prompts
 
-Prompts são roteiros prontos: o cliente pede um pelo nome (`prompts/get`) com os
-argumentos e recebe um texto que ORDENA as chamadas de ferramenta seguintes.
-Não gastam cota e não exigem escopo nenhum do token (a conexão, essa, continua
-exigindo o token): quem exige escopo e papel são as ferramentas que o roteiro
-manda chamar.
+Prompts are ready-made scripts: the client requests one by name (`prompts/get`) with the
+arguments and receives a text that DIRECTS the subsequent tool calls.
+They do not spend quota and do not require any token scope (the connection itself still
+requires the token): what requires scope and role are the tools the script
+tells the client to call.
 
-| Prompt | Argumentos | O que o roteiro faz |
+| Prompt | Arguments | What the script does |
 |---|---|---|
-| `criar_fluxo` | `descricao` (obrigatório), `workspace_id` | Entender os dados → guia e catálogo de nós → rascunho → `validate_workflow` até o relatório ficar limpo → mostrar o JSON → **oferecer** `create_workflow`, nunca criar sem confirmação |
-| `diagnosticar_run` | `run_id` | `get_run` com `node_stats="full"` → ler `error_category` → achar o primeiro nó que falhou → comparar com `typical_seconds` → consultar as armadilhas do guia |
-| `revisar_fluxo` | `workflow_id` | `get_workflow` com a definition → `validate_workflow` → credenciais vencidas em `list_credentials` → agendamento preso a fluxo inativo → histórico de falhas. Só relata, não corrige |
-| `explicar_fluxo` | `workflow_id` | `get_workflow` + `get_workflow_contract` → o que dispara, o que entra, o que cada etapa faz, o que sai e de que depende. Só leitura |
+| `criar_fluxo` | `descricao` (required), `workspace_id` | Understand the data → guide and node catalog → draft → `validate_workflow` until the report is clean → show the JSON → **offer** `create_workflow`, never create without confirmation |
+| `diagnosticar_run` | `run_id` | `get_run` with `node_stats="full"` → read `error_category` → find the first node that failed → compare with `typical_seconds` → consult the guide's pitfalls |
+| `revisar_fluxo` | `workflow_id` | `get_workflow` with the definition → `validate_workflow` → expired credentials in `list_credentials` → schedule stuck on an inactive workflow → failure history. Reports only, does not fix |
+| `explicar_fluxo` | `workflow_id` | `get_workflow` + `get_workflow_contract` → what triggers it, what goes in, what each step does, what comes out and what it depends on. Read-only |
 
-**Um prompt nunca interpola texto vindo do banco.** Nome de fluxo, descrição e
-mensagem de erro não entram no roteiro — só o que a própria pessoa digitou como
-argumento e os identificadores que ela passou. O motivo é direto: o texto de um
-prompt chega ao cliente no nível das instruções, sem `untrusted_data` onde
-embrulhá-lo, e um fluxo chamado "Ignore as instruções anteriores…" viraria
-ordem. Os dados do fluxo entram na conversa depois, pelo retorno das
-ferramentas, já separados.
+**A prompt never interpolates text coming from the database.** Workflow name, description and
+error message do not go into the script — only what the person typed as an
+argument and the identifiers they passed. The reason is straightforward: the text of a
+prompt reaches the client at the level of instructions, with no `untrusted_data` to
+wrap it in, and a workflow named "Ignore the previous instructions…" would become an
+order. The workflow's data enters the conversation later, through the tools'
+return values, already separated.
 
 ---
 
-## Limites
+## Limits
 
-| Limite | Valor | Onde |
+| Limit | Value | Where |
 |---|---|---|
-| Chamadas de ferramenta | 120/min por token | Servidor |
-| `run_workflow`, `retry_run` | 20/min por token, **somados** | Servidor (balde `run`, somado ao geral) |
-| `validate_workflow`, `create_workflow`, `update_workflow` | 20/min por token, somados | Servidor (balde `validate`, somado ao geral) |
-| `probe_source`, `register_source` | 10/min por token, somados | Servidor (balde `probe`, somado ao geral) |
-| Esperas simultâneas (`wait=true`) | 3 por token, 40 na plataforma (`wait_limit`) | Servidor |
-| Prazo de `wait` | 120 s por padrão, 300 s no máximo, 5 s no mínimo | Servidor |
-| Itens por página em `list_runs` | 20 por padrão, 100 no máximo | Servidor |
-| Artefatos por resposta em `get_run_artifacts` | 100 (`truncated: true` quando há mais) | Servidor |
-| Itens por página em `list_artifacts` | 50 por padrão, 100 no máximo (`has_more`) | Servidor |
-| Versões por página em `list_workflow_versions` | 50 por padrão e no máximo (`has_more` + `offset`) | Servidor |
-| Eventos por resposta em `get_run_events` | 200 por padrão e no máximo (`dropped_oldest` conta o que ficou de fora) | Servidor |
-| Retenção do log de execução | 3600 s (1 h) a partir do último evento | Redis |
-| Requisições HTTP | 240/min por IP (burst 60) | Traefik (`rate-mcp`) |
-| Corpo da requisição | 4 MiB | Transporte |
+| Tool calls | 120/min per token | Server |
+| `run_workflow`, `retry_run` | 20/min per token, **combined** | Server (`run` bucket, on top of the general one) |
+| `validate_workflow`, `create_workflow`, `update_workflow` | 20/min per token, combined | Server (`validate` bucket, on top of the general one) |
+| `probe_source`, `register_source` | 10/min per token, combined | Server (`probe` bucket, on top of the general one) |
+| Concurrent waits (`wait=true`) | 3 per token, 40 on the platform (`wait_limit`) | Server |
+| `wait` timeout | 120 s by default, 300 s at most, 5 s at least | Server |
+| Items per page in `list_runs` | 20 by default, 100 at most | Server |
+| Artifacts per response in `get_run_artifacts` | 100 (`truncated: true` when there are more) | Server |
+| Items per page in `list_artifacts` | 50 by default, 100 at most (`has_more`) | Server |
+| Versions per page in `list_workflow_versions` | 50 by default and at most (`has_more` + `offset`) | Server |
+| Events per response in `get_run_events` | 200 by default and at most (`dropped_oldest` counts what was left out) | Server |
+| Run log retention | 3600 s (1 h) from the last event | Redis |
+| HTTP requests | 240/min per IP (burst 60) | Traefik (`rate-mcp`) |
+| Request body | 4 MiB | Transport |
 
-`resources/read` e `prompts/get` não contam na cota de 120/min.
+`resources/read` and `prompts/get` do not count toward the 120/min quota.
 
-Nenhum corte é silencioso, e cada tool diz o que cortou: `list_runs`,
-`list_artifacts` e `list_workflow_versions` devolvem `has_more` (as duas
-primeiras com `offset` para pedir a página seguinte; a terceira também);
-`get_run_artifacts` devolve `truncated: true` com uma dica quando a execução
-produziu mais arquivos do que cabe na resposta; e `get_run_events` devolve
-`returned` e `dropped_oldest` — este último contando os eventos mais antigos
-que ficaram de fora, porque quem investiga uma falha quer o fim do log.
+No cut is silent, and each tool says what it cut: `list_runs`,
+`list_artifacts` and `list_workflow_versions` return `has_more` (the first
+two with `offset` to request the next page; the third as well);
+`get_run_artifacts` returns `truncated: true` with a hint when the run
+produced more files than fit in the response; and `get_run_events` returns
+`returned` and `dropped_oldest` — the latter counting the oldest events
+that were left out, because whoever investigates a failure wants the end of the log.
 
-O limite de borda é por **IP** e o de ferramentas é por **token**: vários
-clientes atrás do mesmo NAT dividem o primeiro, e cada token tem o segundo só
-para si. Estourar a cota de chamadas devolve `rate_limited` com
-`retry_after_seconds`; estourar o teto de esperas devolve `wait_limit`; no
-Traefik, um `429` HTTP.
+The edge limit is per **IP** and the tool limit is per **token**: several
+clients behind the same NAT share the first, and each token has the second all
+to itself. Exceeding the call quota returns `rate_limited` with
+`retry_after_seconds`; exceeding the ceiling of waits returns `wait_limit`; at
+Traefik, an HTTP `429`.
 
-`run_workflow(wait=true)` segura a chamada até a execução terminar; passado o
-prazo, a resposta volta com `status: "running"` e o `run_id` para consultar
-depois, e a execução segue no servidor. O teto de esperas simultâneas existe
-porque cada espera segura uma assinatura de eventos e uma resposta aberta: no
-teto, execute com `wait=false` e acompanhe por `get_run(run_id)`. Artefatos
-nunca trafegam pelo MCP — o que volta é uma URL pré-assinada.
+`run_workflow(wait=true)` holds the call until the run finishes; once the
+timeout passes, the response comes back with `status: "running"` and the `run_id` to query
+later, and the run continues on the server. The ceiling of concurrent waits exists
+because each wait holds an event subscription and an open response: at the
+ceiling, run with `wait=false` and follow it through `get_run(run_id)`. Artifacts
+never travel through MCP — what comes back is a presigned URL.
 
-Sem Redis no ar, as cotas **degradam abertas** (com aviso no log do servidor) e
-o teto de esperas cai para um contador por processo: um incidente transitório
-de infraestrutura não vira recusa de toda chamada.
+With Redis down, the quotas **fail open** (with a warning in the server log) and
+the ceiling of waits falls back to a per-process counter: a transient infrastructure
+incident does not turn into a rejection of every call.
 
 ---
 
-## Erros
+## Errors
 
-Toda falha de ferramenta volta como erro de tool do MCP, com a mensagem em JSON:
+Every tool failure comes back as an MCP tool error, with the message in JSON:
 
 ```json
 {
@@ -564,232 +564,232 @@ Toda falha de ferramenta volta como erro de tool do MCP, com a mensagem em JSON:
 }
 ```
 
-`code` e `message` estão sempre presentes; `hint` aparece quando existe uma
-ação óbvia; os demais campos dependem do código.
+`code` and `message` are always present; `hint` appears when there is an
+obvious action; the other fields depend on the code.
 
-| `code` | Quando | Campos extras |
+| `code` | When | Extra fields |
 |---|---|---|
-| `unauthorized` | Token ausente, inválido, expirado ou revogado (chega como 401 HTTP, antes de qualquer ferramenta) | — |
-| `forbidden` | Papel insuficiente no workspace, ou recurso fora do escopo do token | — |
-| `forbidden_scope` | O token não pede o escopo que a ferramenta exige | `missing_scope` |
-| `not_found` | Fluxo, arquivo, nó ou execução que não existe — ou que a conta não alcança | — |
-| `ambiguous` | O nome informado casa com mais de um recurso | `candidates[]` |
-| `validation` | Entrada inválida | `report` quando a recusa vem do lint de uma definition; `errors[{path, message}]` quando vem dos `inputs` ou da forma do corpo |
-| `conflict` | Nome de fluxo já usado no workspace | `suggestion`, um nome alternativo derivado do que foi enviado (ausente quando não dá para deduzi-lo) |
-| `workflow_inactive` | O fluxo está desativado e não pode ser executado | — |
-| `no_executor` | Nenhum executor online para atender a execução | — |
-| `unavailable_local` | O conteúdo só existe no executor; não há download remoto | — |
-| `secret_in_definition` | A definition enviada carrega um segredo em claro | `paths[]` — o caminho de cada campo, nunca o valor |
-| `rate_limited` | Cota de chamadas do token estourada | `retry_after_seconds` |
-| `wait_limit` | Esperas simultâneas (`wait=true`) no teto do token ou da plataforma | — |
-| `unavailable` | Dependência fora do ar (503) | — |
-| `internal_error` | Falha não prevista; a mensagem é genérica de propósito | — |
+| `unauthorized` | Token missing, invalid, expired or revoked (arrives as HTTP 401, before any tool) | — |
+| `forbidden` | Insufficient role in the workspace, or resource outside the token's scope | — |
+| `forbidden_scope` | The token does not request the scope the tool requires | `missing_scope` |
+| `not_found` | Workflow, file, node or run that does not exist — or that the account cannot reach | — |
+| `ambiguous` | The name given matches more than one resource | `candidates[]` |
+| `validation` | Invalid input | `report` when the rejection comes from the lint of a definition; `errors[{path, message}]` when it comes from the `inputs` or the shape of the body |
+| `conflict` | Workflow name already used in the workspace | `suggestion`, an alternative name derived from the one sent (absent when it cannot be derived) |
+| `workflow_inactive` | The workflow is deactivated and cannot be run | — |
+| `no_executor` | No executor online to handle the run | — |
+| `unavailable_local` | The content only exists on the executor; there is no remote download | — |
+| `secret_in_definition` | The definition sent carries a plaintext secret | `paths[]` — the path of each field, never the value |
+| `rate_limited` | The token's call quota was exceeded | `retry_after_seconds` |
+| `wait_limit` | Concurrent waits (`wait=true`) at the token's or the platform's ceiling | — |
+| `unavailable` | Dependency down (503) | — |
+| `internal_error` | Unforeseen failure; the message is generic on purpose | — |
 
-Trate a lista de campos extras como um piso, não como um contrato fechado: um
-campo novo pode aparecer numa versão menor, e o cliente deve ignorar o que não
-conhece. O que não muda é o par `code` + `message`.
+Treat the list of extra fields as a floor, not as a closed contract: a
+new field may appear in a minor version, and the client should ignore what it does not
+know. What does not change is the `code` + `message` pair.
 
-`not_found` vem antes de `forbidden` de propósito, e vai além disso: um fluxo
-que existe no workspace de outra conta responde exatamente o mesmo `not_found`
-de um identificador que nunca existiu — mesma frase, mesmo `hint`. A diferença
-seria um jeito de descobrir, um id por vez, o que há do outro lado do muro.
-Quando o recurso é da sua própria conta e é o *token* que não alcança (um token
-emitido para um workspace só), a resposta é `forbidden`: aí não há existência a
-esconder de quem já a vê na interface, e sim um alcance a explicar.
+`not_found` comes before `forbidden` on purpose, and it goes further than that: a workflow
+that exists in another account's workspace responds exactly the same `not_found`
+as an identifier that never existed — same sentence, same `hint`. The difference
+would be a way to discover, one id at a time, what lies on the other side of the wall.
+When the resource belongs to your own account and it is the *token* that cannot reach it (a token
+issued for a single workspace), the response is `forbidden`: there is then no existence to
+hide from someone who already sees it in the UI, but rather a reach to explain.
 
 ---
 
-## Segurança
+## Security
 
-- **O token não alcança mais do que a conta já alcançava.** Escopo efetivo =
-  escopos do token ∩ workspaces do token ∩ papel real em cada workspace. Não há
-  caminho de administrador: um PAT de um admin da plataforma vê como membro.
-- **Conteúdo de `untrusted_data` é dado, não instrução.** Nome de fluxo,
-  descrição, alias, nome de arquivo e mensagem de erro são texto escrito por
-  pessoas e podem conter qualquer coisa. O servidor os separa do resto da
-  resposta justamente para que o cliente os trate como conteúdo.
-- **Definitions saem redigidas.** `connectionString`, `Authorization` e demais
-  chaves sensíveis viram `<REDACTED>`, inclusive aninhadas e dentro de listas,
-  e toda string folha passa pelo redator de segredos. Credencial se referencia
-  por `credential_id` — nunca colando o segredo na definition: uma definition
-  com segredo em claro é **recusada na entrada** com `secret_in_definition`,
-  antes de qualquer validação ou gravação, nas três ferramentas que recebem
-  definition (`validate_workflow` inclusive). A recusa cita o caminho do campo
-  e jamais o valor.
-- **Mensagem de erro de execução é dado.** `error_message` e o `error` de cada
-  nó saem redigidos (uma string de conexão vira `<REDACTED>`) e sempre dentro
-  de `untrusted_data` — é o campo mais provável de carregar segredo ou uma
-  frase de comando dirigida a quem lê a resposta. Na listagem de execuções ele
-  vem resumido; o texto completo está em `get_run`. As notificações de
-  progresso de `run_workflow` levam o nome do nó e o status, **nunca** o erro.
-- **URL pré-assinada dura 5 minutos** e é uma capability portadora: quem tem o
-  link baixa o arquivo, sem token. Não a registre em log nem a repasse.
-- **Segredo nunca ecoa.** Nem em mensagem de erro, nem em log de auditoria — o
-  que se registra da chamada é o prefixo do token, o usuário, a ferramenta, a
-  duração e o resultado.
+- **The token reaches no more than the account already reached.** Effective scope =
+  token scopes ∩ token workspaces ∩ actual role in each workspace. There is no
+  administrator path: a platform admin's PAT sees as a member.
+- **Content in `untrusted_data` is data, not instructions.** Workflow name,
+  description, alias, file name and error message are text written by
+  people and may contain anything. The server separates them from the rest of the
+  response precisely so that the client treats them as content.
+- **Definitions come out redacted.** `connectionString`, `Authorization` and other
+  sensitive keys become `<REDACTED>`, including when nested and inside lists,
+  and every leaf string goes through the secret redactor. A credential is referenced
+  by `credential_id` — never by pasting the secret into the definition: a definition
+  with a plaintext secret is **rejected up front** with `secret_in_definition`,
+  before any validation or saving, in the three tools that receive a
+  definition (`validate_workflow` included). The rejection cites the field's path
+  and never the value.
+- **A run's error message is data.** `error_message` and each
+  node's `error` come out redacted (a connection string becomes `<REDACTED>`) and always inside
+  `untrusted_data` — it is the field most likely to carry a secret or a
+  command phrase aimed at whoever reads the response. In the run listing it
+  comes summarized; the full text is in `get_run`. The progress notifications
+  of `run_workflow` carry the node name and the status, **never** the error.
+- **A presigned URL lasts 5 minutes** and is a bearer capability: whoever has the
+  link downloads the file, without a token. Do not log it or pass it on.
+- **A secret is never echoed.** Not in an error message, not in the audit log — what
+  is recorded about the call is the token prefix, the user, the tool, the
+  duration and the result.
 
 ---
 
 ## Troubleshooting
 
-### 401 com `WWW-Authenticate: Bearer`
+### 401 with `WWW-Authenticate: Bearer`
 
-O header `Authorization` não chegou, não é `Bearer`, ou o token não resolve.
-Confira, nesta ordem: a variável de ambiente está exportada na sessão que roda
-o cliente; o valor começa com `atl_pat_`; o token não está revogado nem
-expirado (a lista em `/settings/tokens` mostra os dois); a conta não foi
-suspensa. Um `error="invalid_token"` no header quer dizer que o formato está
-certo e o token é que não vale mais — é preciso criar outro.
+The `Authorization` header did not arrive, is not `Bearer`, or the token does not resolve.
+Check, in this order: the environment variable is exported in the session that runs
+the client; the value starts with `atl_pat_`; the token is not revoked or
+expired (the list at `/settings/tokens` shows both); the account has not been
+suspended. An `error="invalid_token"` in the header means the format is
+right and it is the token that is no longer valid — you have to create another one.
 
-Se o token estiver na URL como `?token=`, mova-o para o header: query string é
-recusada mesmo com o segredo correto.
+If the token is in the URL as `?token=`, move it to the header: a query string is
+rejected even with the correct secret.
 
 ### 421 Misdirected Request
 
-O `Host` da requisição não está na lista aceita pelo transporte. Acontece ao
-apontar o cliente para um domínio ou porta diferentes dos configurados. A lista
-padrão aceita o host do `FRONTEND_URL` e, localmente, `localhost` ou `127.0.0.1`.
-Para outro domínio, defina `MCP_ALLOWED_HOSTS`.
+The request's `Host` is not on the list accepted by the transport. It happens when
+pointing the client at a domain or port different from the configured ones. The default
+list accepts the host of `FRONTEND_URL` and, locally, `localhost` or `127.0.0.1`.
+For another domain, set `MCP_ALLOWED_HOSTS`.
 
-### 403 com menção a `Origin`
+### 403 mentioning `Origin`
 
-O cliente mandou um header `Origin`. O servidor recusa qualquer `Origin` de
-propósito: nesta versão só clientes que não são navegador se conectam. Se o seu
-cliente manda `Origin`, ele está rodando dentro de um navegador — esse caminho
-depende de OAuth e ainda não existe.
+The client sent an `Origin` header. The server rejects any `Origin` on
+purpose: in this version only clients that are not browsers connect. If your
+client sends `Origin`, it is running inside a browser — that path
+depends on OAuth and does not exist yet.
 
 ### 429
 
-Duas origens possíveis. Um `429` **HTTP** vem do Traefik: são 240 requisições
-por minuto por IP, e o alívio é esperar ou espalhar as chamadas. Um erro de
-ferramenta com `code: "rate_limited"` vem do servidor: é a cota do token, e
-`retry_after_seconds` diz quanto falta para a janela virar.
+Two possible sources. An **HTTP** `429` comes from Traefik: it is 240 requests
+per minute per IP, and the relief is to wait or spread the calls out. A tool
+error with `code: "rate_limited"` comes from the server: it is the token's quota, and
+`retry_after_seconds` says how long until the window rolls over.
 
-### A ferramenta não aparece na lista
+### The tool does not show up in the list
 
-`tools/list` é filtrado pelo escopo do token. Se `create_workflow` não aparece,
-o token não pede `workflows:write`. Escopo não se edita: crie outro token com os
-escopos certos e revogue o antigo.
+`tools/list` is filtered by the token's scope. If `create_workflow` does not show up,
+the token does not request `workflows:write`. Scopes cannot be edited: create another token with the
+right scopes and revoke the old one.
 
-### URL de download não abre
+### The download URL does not open
 
-Em produção, `MINIO_EXTERNAL_ENDPOINT` precisa ser o endereço público do S3 (ex.:
-`https://s3.atlans.example.org`) — a
-assinatura prende o host, e com `localhost` a URL só resolve de dentro do
-Docker. A API registra um aviso no boot quando o valor aponta para um endereço
-local. Lembre também que a URL vale 5 minutos.
+In production, `MINIO_EXTERNAL_ENDPOINT` has to be the public address of the S3 (e.g.
+`https://s3.atlans.example.org`) — the
+signature pins the host, and with `localhost` the URL only resolves from inside
+Docker. The API logs a warning at boot when the value points to a
+local address. Remember also that the URL is valid for 5 minutes.
 
 ---
 
-## Changelog e versionamento
+## Changelog and versioning
 
-O servidor declara a própria versão no `initialize` (campo `version`), separada
-da versão do protocolo MCP. É por ela que se confere qual contrato está no ar
-depois de um deploy — ferramenta nova sobe a versão menor.
+The server declares its own version in `initialize` (the `version` field), separate
+from the MCP protocol version. It is how you check which contract is live
+after a deploy — a new tool bumps the minor version.
 
 ### 1.5.0
 
-- Ferramentas de escrita no Drive: `create_drive_upload_url`,
-  `confirm_drive_upload` e `delete_drive_file`. Com elas **os seis escopos do
-  token passam a gatilhar alguma coisa** — `drive:write` era o último que a tela
-  oferecia com descrição afirmativa e nada por trás.
-- O upload são **três chamadas**, e o passo do meio não passa pelo MCP: a tool
-  devolve uma URL pré-assinada e quem tem os bytes faz o PUT direto no storage.
-  Mandar arquivo por JSON-RPC significaria base64 dentro da mensagem — um
-  shapefile de 40 MB viraria 54 MB de texto no contexto de quem chamou. A
-  consequência está dita na descrição: **um agente sem o arquivo em disco não
-  consegue enviá-lo**, só repassar a URL.
-- `confirm_drive_upload` mede o objeto REAL, não o tamanho declarado no passo 1.
-  Acima do teto do workspace, recusa **e apaga os bytes**.
-- `delete_drive_file` exige `confirm=true` e não tem lixeira. É também como se
-  substitui um arquivo, porque **sobrescrever não é uma operação do Drive**.
-- Documentado o que o Drive **não** tem, para o agente não descobrir tentando:
-  ele é plano — sem renomear, sem mover, sem pasta.
+- Drive write tools: `create_drive_upload_url`,
+  `confirm_drive_upload` and `delete_drive_file`. With them **all six token
+  scopes now unlock something** — `drive:write` was the last one the screen
+  offered with an affirmative description and nothing behind it.
+- The upload is **three calls**, and the middle step does not go through MCP: the tool
+  returns a presigned URL and whoever has the bytes does the PUT directly to storage.
+  Sending a file over JSON-RPC would mean base64 inside the message — a
+  40 MB shapefile would become 54 MB of text in the caller's context. The
+  consequence is stated in the description: **an agent without the file on disk cannot
+  send it**, only pass the URL along.
+- `confirm_drive_upload` measures the ACTUAL object, not the size declared in step 1.
+  Above the workspace's ceiling, it rejects **and deletes the bytes**.
+- `delete_drive_file` requires `confirm=true` and has no trash bin. It is also how you
+  replace a file, because **overwriting is not a Drive operation**.
+- Documented what the Drive does **not** have, so the agent does not find out by trying:
+  it is flat — no renaming, no moving, no folders.
 
 ### 1.4.0
 
-- Ferramentas de gatilho: `list_schedules`, `create_schedule`, `update_schedule`
-  e `delete_schedule`. É o escopo **`triggers:manage`** deixando de ser um chip
-  no cartão do token sem nada por trás.
-- As três de escrita pedem **`operator`**, não `editor`: agendar é executar —
-  um schedule de um minuto dispara o fluxo com as credenciais do dono,
-  indefinidamente. Mesma régua de `run_workflow` e da rota REST.
-- `delete_schedule` exige `confirm=true`. Sem ele, descreve o que seria apagado
-  e não apaga: a remoção não tem desfazer e falha em silêncio — nada quebra, a
-  rotina só deixa de acontecer.
-- `list_schedules` devolve **`workflow_active`** no topo. O agendador ignora
-  agendamento de fluxo inativo, e nada no agendamento em si denuncia isso: era
-  a causa mais comum de "o cron parou" sem nenhum sinal.
-- **Fuso padrão unificado.** Havia três respostas para "qual fuso vale quando o
-  agendamento não diz o seu?": o nó mandava um fuso fixo, o schema usava
-  outro e a coluna nula caía em **UTC** dentro do agendador —
-  quatro horas de diferença, em silêncio, entre a tela e o disparo. Agora é uma
-  constante só. Sem migração e sem recriar schedule: o valor é o que o nó já
-  mandava, então `_mesma_configuracao` continua concordando.
+- Trigger tools: `list_schedules`, `create_schedule`, `update_schedule`
+  and `delete_schedule`. This is the **`triggers:manage`** scope ceasing to be a chip
+  on the token card with nothing behind it.
+- The three write ones require **`operator`**, not `editor`: scheduling is executing —
+  a one-minute schedule triggers the workflow with the owner's credentials,
+  indefinitely. Same yardstick as `run_workflow` and the REST route.
+- `delete_schedule` requires `confirm=true`. Without it, it describes what would be deleted
+  and does not delete it: removal has no undo and fails silently — nothing breaks, the
+  routine just stops happening.
+- `list_schedules` returns **`workflow_active`** at the top. The scheduler ignores
+  schedules of an inactive workflow, and nothing in the schedule itself gives this away: it was
+  the most common cause of "the cron stopped" without any signal.
+- **Unified default time zone.** There were three answers to "which time zone applies when the
+  schedule does not state its own?": the node sent a fixed time zone, the schema used
+  another and a null column fell back to **UTC** inside the scheduler —
+  four hours of difference, silently, between the screen and the trigger. Now it is a
+  single constant. No migration and no recreating schedules: the value is what the node already
+  sent, so `_mesma_configuracao` keeps agreeing.
 
 ### 1.3.0
 
-- Ferramentas de pin: `list_pins`, `pin_node_output` e `unpin_node_output`. As
-  duas de escrita são **idempotentes** — únicas entre as escritas do servidor:
-  fixar um nó já fixado reescreve a mesma entrada, e desfixar duas vezes não
-  muda nada.
-- `pin_node_output` **recusa nó que grava arquivo** (saída, publicação de mapa,
-  e-mail, resposta de webhook). Congelar a saída deles fazia o executor pular a
-  gravação: o fluxo terminava verde e sem produzir o arquivo. A rota REST
-  passou a recusar no mesmo diff, então o pin fantasma não entra por nenhum
-  caminho.
-- Junto vieram cinco correções na REST de pins, que não tinha teste nenhum: o
-  `GET /pins` deixou de estourar 500 com data malformada, `ttl_hours` ganhou
-  faixa (`0` era aceito e virava "sem expiração"), o unpin passou a commitar
-  ANTES de apagar do storage, a leitura do artefato de cache deixou de levantar
-  com linha duplicada, e o `node_id` do corpo — obrigatório e ignorado — virou
-  opcional com `extra="forbid"`.
+- Pin tools: `list_pins`, `pin_node_output` and `unpin_node_output`. The
+  two write ones are **idempotent** — unique among the server's writes:
+  pinning an already pinned node rewrites the same entry, and unpinning twice does not
+  change anything.
+- `pin_node_output` **rejects a node that writes a file** (output, map publishing,
+  email, webhook response). Freezing their output made the executor skip the
+  write: the workflow finished green without producing the file. The REST route
+  started rejecting it in the same diff, so the phantom pin gets in through no
+  path.
+- Along with it came five fixes to the pins REST API, which had no tests at all: the
+  `GET /pins` stopped blowing up with a 500 on a malformed date, `ttl_hours` got a
+  range (`0` was accepted and became "no expiration"), the unpin started committing
+  BEFORE deleting from storage, reading the cache artifact stopped raising
+  on a duplicate row, and the body's `node_id` — required and ignored — became
+  optional with `extra="forbid"`.
 
 ### 1.2.0
 
-- Ferramentas de acervo: `list_workflow_versions`, `get_workflow_version`
-  (definition redigida), `restore_workflow_version` (com o número do snapshot
-  anterior na resposta), `duplicate_workflow` (que recusa sub-fluxo quebrado
-  antes de copiar e carimba a autoria de quem chamou) e `list_artifacts`.
+- Collection tools: `list_workflow_versions`, `get_workflow_version`
+  (redacted definition), `restore_workflow_version` (with the number of the previous
+  snapshot in the response), `duplicate_workflow` (which rejects a broken sub-workflow
+  before copying and stamps the caller's authorship) and `list_artifacts`.
 
 ### 1.1.0
 
-- Ferramentas de execução: `get_run_events` (log bruto, com `availability`
-  explicando por que a lista veio vazia), `cancel_run` (com `outcome` e
-  `status_before` distinguindo pedido enviado, fechada aqui e já terminada) e
-  `retry_run` (dispara execução nova do mesmo workflow, sem reaproveitar
+- Run tools: `get_run_events` (raw log, with `availability`
+  explaining why the list came back empty), `cancel_run` (with `outcome` and
+  `status_before` distinguishing request sent, closed here and already finished) and
+  `retry_run` (triggers a new run of the same workflow, without reusing
   inputs).
 
 ### 1.0.0
 
-- Servidor em `https://<site>/mcp`, transporte streamable HTTP sem estado.
-- Autenticação por token pessoal no header `Authorization`.
-- Ferramentas de descoberta e leitura: `list_workspaces`, `list_workflows`,
+- Server at `https://<site>/mcp`, stateless streamable HTTP transport.
+- Authentication by personal access token in the `Authorization` header.
+- Discovery and read tools: `list_workspaces`, `list_workflows`,
   `get_workflow`, `get_workflow_contract`, `search_nodes`, `describe_node`,
   `list_credentials`, `list_drive_files`, `get_drive_download_url`,
   `get_portal_info`, `get_authoring_guide`.
-- Ferramentas de construção: `validate_workflow`, `create_workflow`,
-  `update_workflow`, `set_workflow_active`, `set_portal_access` — com recusa de
-  segredo em texto claro na definition (`secret_in_definition`) e validação
-  antes de gravar por padrão.
-- Ferramentas de execução: `run_workflow` (com `wait`, progresso nó a nó e
-  conferência dos `inputs` contra o `params_schema`), `get_run`, `list_runs` e
+- Building tools: `validate_workflow`, `create_workflow`,
+  `update_workflow`, `set_workflow_active`, `set_portal_access` — with rejection of
+  plaintext secrets in the definition (`secret_in_definition`) and validation
+  before saving by default.
+- Run tools: `run_workflow` (with `wait`, node-by-node progress and
+  checking of the `inputs` against the `params_schema`), `get_run`, `list_runs` and
   `get_run_artifacts`.
-- Resources do guia de autoria, do catálogo de nós, dos workspaces, dos fluxos
-  e das execuções (`atlans://runs/{id}`).
-- Prompts `criar_fluxo`, `diagnosticar_run`, `revisar_fluxo` e `explicar_fluxo`.
-- Cotas por token (geral, `validate`, `run` e `probe`), teto de esperas simultâneas e
-  rate limit por IP na borda.
+- Resources for the authoring guide, the node catalog, the workspaces, the workflows
+  and the runs (`atlans://runs/{id}`).
+- Prompts `criar_fluxo`, `diagnosticar_run`, `revisar_fluxo` and `explicar_fluxo`.
+- Per-token quotas (general, `validate`, `run` and `probe`), ceiling of concurrent waits and
+  per-IP rate limit at the edge.
 
-### Política de versionamento
+### Versioning policy
 
-A versão segue *semver* sobre o **contrato das ferramentas**:
+The version follows *semver* over the **tool contract**:
 
-- **maior** — remoção ou mudança incompatível no formato de saída;
-- **menor** — ferramenta, resource, prompt ou campo novo;
-- **correção** — ajuste que não muda o contrato.
+- **major** — removal or incompatible change in the output format;
+- **minor** — new tool, resource, prompt or field;
+- **patch** — an adjustment that does not change the contract.
 
-Ferramenta que vai sair fica **pelo menos uma versão menor** marcada como
-`deprecated` na descrição, dizendo o que usar no lugar, antes de sumir. Campo
-novo pode aparecer a qualquer momento: trate a saída como um objeto aberto e
-ignore o que não conhece.
+A tool that is going away stays marked as `deprecated` in its description for **at least one minor
+version**, saying what to use instead, before it disappears. A new field
+may appear at any time: treat the output as an open object and
+ignore what you do not know.

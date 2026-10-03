@@ -3,37 +3,37 @@ name: CI
 on:
   push:
     branches: [main]
-  # SEM filtro de branch, de proposito. Com `branches: [main]` aqui, um PR
-  # aberto contra QUALQUER outra branch nao aciona job nenhum — e o GitHub
-  # mostra esse PR como "clean", que e indistinguivel de "tudo verde" para quem
-  # olha a lista. Aconteceu em 15/09/2026 com um PR empilhado sobre outro
-  # (dois PRs tocando os mesmos quatro arquivos): ele chegou a pronto-para-
-  # mesclar com ZERO verificacoes.
+  # NO branch filter, on purpose. With `branches: [main]` here, a PR
+  # opened against ANY other branch triggers no job at all — and GitHub
+  # shows that PR as "clean", which is indistinguishable from "all green" to
+  # whoever looks at the list. It happened on 2026-09-15 with a PR stacked on
+  # another (two PRs touching the same four files): it reached ready-to-merge
+  # with ZERO checks.
   #
-  # Retargetear depois nao resolve: a mudanca de base emite `edited`, que nao
-  # esta nas acoes padrao do gatilho (`opened`, `synchronize`, `reopened`).
-  # Sem este conserto, a unica saida era empurrar um commit de verdade so para
-  # acordar o CI.
+  # Retargeting afterwards does not help: the base change emits `edited`, which
+  # is not among the trigger's default activity types (`opened`, `synchronize`,
+  # `reopened`). Without this fix, the only way out was pushing a real commit
+  # just to wake CI up.
   #
-  # O custo de rodar em PR de qualquer alvo e um job a mais de vez em quando;
-  # o custo de nao rodar e mesclar codigo que ninguem verificou.
+  # The cost of running on PRs to any target is an extra job now and then;
+  # the cost of not running is merging code nobody checked.
   pull_request:
 
-# Token só de leitura em todos os jobs, e checkout sem guardar o token no
-# .git/config (`persist-credentials: false`): nenhum job do CI escreve no
-# repositório, e um pacote malicioso rodando dentro de um `npm ci` ou
-# `pip install` não encontra aqui credencial que escreva. As actions vão
-# fixadas pelo SHA do commit (o comentário diz a versão): uma tag pode ser
-# movida para outro código pelo dono da action, ou por quem roubar a conta
-# dele; um SHA não. O Dependabot atualiza os dois juntos.
+# Read-only token in every job, and checkout without storing the token in
+# .git/config (`persist-credentials: false`): no CI job writes to the
+# repository, and a malicious package running inside an `npm ci` or
+# `pip install` finds no credential here that can write. Actions are
+# pinned by commit SHA (the comment states the version): a tag can be
+# moved to other code by the action's owner, or by whoever steals their
+# account; a SHA cannot. Dependabot updates both together.
 permissions:
   contents: read
 
 jobs:
-  # Safety net caso o dev nao tenha rodado `pre-commit install` local.
-  # Falha o build se um secreto novo (fora do .secrets.baseline) aparecer
-  # em qualquer arquivo commitado. Roda antes dos jobs pesados pra falhar
-  # rapido em push de credencial.
+  # Safety net in case the dev has not run `pre-commit install` locally.
+  # Fails the build if a new secret (outside .secrets.baseline) shows up
+  # in any committed file. Runs before the heavy jobs to fail
+  # fast on a credential push.
   secrets-scan:
     name: Secrets scan (detect-secrets)
     runs-on: ubuntu-latest
@@ -47,34 +47,34 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Pelo lock de dev, com hash (a mesma versão do hook do pre-commit). Antes
-      # era `pip install detect-secrets==1.5.0` direto do PyPI: o pacote sem
-      # conferência e as dependências dele na versão mais nova do dia.
+      # From the dev lock, with hashes (the same version as the pre-commit hook).
+      # It used to be `pip install detect-secrets==1.5.0` straight from PyPI: the
+      # package unchecked and its dependencies at that day's newest version.
       - name: Install detect-secrets
         run: |
           pip install --require-hashes --only-binary=:all: -r requirements-dev.txt
 
       - name: Scan against baseline
         run: |
-          # Salva copia do baseline atual antes do scan (detect-secrets
-          # re-escreve o arquivo com timestamp novo em cada run).
+          # Save a copy of the current baseline before the scan (detect-secrets
+          # rewrites the file with a new timestamp on every run).
           cp .secrets.baseline .secrets.baseline.pre
 
           detect-secrets scan --baseline .secrets.baseline
 
-          # Compara so o campo `results` (hits reais) entre pre e pos
-          # scan. Ignora `generated_at` (muda em cada run) e ordem de
-          # plugins (pode variar). Falha SE:
-          #   - Ha arquivos com hits NOVOS (secret nao capturado no
-          #     baseline HEAD)
-          #   - Ha arquivos ja no baseline com um secret que o baseline
-          #     nao conhece
-          # A identidade de um hit e (tipo, hash) — de proposito SEM o
-          # numero da linha. Um secret ja revisado que so mudou de lugar
-          # (linha inserida acima dele) nao e vazamento novo, e antes
-          # disso qualquer edicao num arquivo do baseline quebrava o CI.
-          # NAO falha se ha hits "removidos" — pode ser arquivo deletado
-          # ou secret que saiu do codigo. Ambos sao seguros.
+          # Compare only the `results` field (real hits) between pre and post
+          # scan. Ignores `generated_at` (changes on every run) and plugin
+          # order (may vary). Fails IF:
+          #   - There are files with NEW hits (secret not captured in the
+          #     HEAD baseline)
+          #   - There are files already in the baseline with a secret the
+          #     baseline does not know
+          # A hit's identity is (type, hash) — on purpose WITHOUT the
+          # line number. An already reviewed secret that merely moved
+          # (a line inserted above it) is not a new leak, and before
+          # this any edit to a baseline file broke CI.
+          # Does NOT fail on "removed" hits — that may be a deleted file
+          # or a secret that left the code. Both are safe.
           python -c "
           import json, sys
           with open('.secrets.baseline.pre') as f: before = json.load(f)
@@ -115,19 +115,19 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      # Os dois LOCKS (gerados dos .in por scripts/travar_python.py), com o hash
-      # de cada arquivo: o CI instala exatamente as versões da imagem, e como a
-      # imagem, só de wheel (`--only-binary`) — um pacote que perdesse a wheel
-      # quebraria aqui, no PR, e não no build da imagem depois do merge; e
-      # nenhum setup.py roda no CI. Sem o `pip install --upgrade pip` de antes:
-      # era o único pacote que entrava sem hash e sem quarentena; o pip travado
-      # vem no requirements-dev.txt.
+      # The two LOCKS (generated from the .in files by scripts/travar_python.py), with
+      # each file's hash: CI installs exactly the image's versions, and like the
+      # image, wheels only (`--only-binary`) — a package that lost its wheel
+      # would break here, in the PR, and not in the image build after the merge;
+      # and no setup.py runs in CI. Without the earlier `pip install --upgrade pip`:
+      # it was the only package that came in without a hash or quarantine; the
+      # pinned pip comes in requirements-dev.txt.
       - name: Install dependencies
         run: |
           pip install --require-hashes --only-binary=:all: -r requirements.txt -r requirements-dev.txt
 
-      # Antes dos testes: import quebrado ou nome indefinido falha aqui em
-      # segundos, e não só quando (e se) o caminho roda. Regras em ruff.toml.
+      # Before the tests: a broken import or an undefined name fails here in
+      # seconds, and not only when (and if) the path runs. Rules in ruff.toml.
       - name: Lint (ruff)
         run: ruff check --output-format=github .
 
@@ -135,18 +135,18 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
           APP_SECRET: "dGVzdC1zZWNyZXQta2V5LTMyY2hhcnMtbWluaW11bSE="
-          # Chave descartável, gerada só para os testes: nenhum ambiente real a usa.
+          # Throwaway key, generated only for the tests: no real environment uses it.
           FERNET_KEY: "o1Pjhb7ePrq8e2BSIWIcJsvfz1wZZV1CX6AVVNsBj74="  # pragma: allowlist secret
           SECRET_KEY: "test-secret-key-32chars-minimum!!"
         run: pytest tests/ -v
 
-  # O núcleo do servidor sem extensão nenhuma (app/extensoes), como a
-  # distribuição livre o roda: a pasta de cada extensão e os testes dela são
-  # APAGADOS antes (scripts/sem_extensoes.sh), e a suíte do núcleo roda inteira.
-  # Um import de extensão esquecido no núcleo, uma tabela dela no
-  # init_schema.sql ou um teste do núcleo que dependa dela caem aqui. Job à
-  # parte, e não passos do de cima, para a segunda volta correr ao lado da
-  # primeira.
+  # The server core with no extensions at all (app/extensoes), as the
+  # free distribution runs it: each extension's folder and its tests are
+  # DELETED first (scripts/sem_extensoes.sh), and the core suite runs in full.
+  # A forgotten extension import in the core, one of its tables in
+  # init_schema.sql, or a core test that depends on it fails here. A separate
+  # job, not steps of the one above, so the second pass runs alongside the
+  # first.
   backend-nucleo:
     name: Backend sem extensões (núcleo)
     runs-on: ubuntu-latest
@@ -156,8 +156,8 @@ jobs:
         with:
           persist-credentials: false
 
-      # Sem extensão nenhuma (o repositório público, um fork), o corte não
-      # muda nada e este job repetiria o de cima: ele termina aqui, verde.
+      # With no extensions at all (the public repository, a fork), the cut
+      # changes nothing and this job would repeat the one above: it ends here, green.
       - name: Há extensões?
         id: extensoes
         run: |
@@ -189,31 +189,31 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
           APP_SECRET: "dGVzdC1zZWNyZXQta2V5LTMyY2hhcnMtbWluaW11bSE="
-          # Chave descartável, gerada só para os testes: nenhum ambiente real a usa.
+          # Throwaway key, generated only for the tests: no real environment uses it.
           FERNET_KEY: "o1Pjhb7ePrq8e2BSIWIcJsvfz1wZZV1CX6AVVNsBj74="  # pragma: allowlist secret
           SECRET_KEY: "test-secret-key-32chars-minimum!!"
         run: pytest tests/ -q
 
-  # Vulnerabilidades conhecidas nas dependências. INFORMATIVA por ora: cada
-  # passo de audit tem `continue-on-error`, então o job fica verde; o que ele
-  # acha vira um aviso (anotação `::warning::`) e o relatório vai para o resumo
-  # da execução. No dia em que a lista zerar, tirar o `continue-on-error` a
-  # torna bloqueante. As correções chegam pelos PRs do Dependabot
+  # Known vulnerabilities in the dependencies. INFORMATIONAL for now: each
+  # audit step has `continue-on-error`, so the job stays green; what it
+  # finds becomes a warning (a `::warning::` annotation) and the report goes to
+  # the run summary. Once the list reaches zero, removing `continue-on-error`
+  # makes it blocking. Fixes arrive through the Dependabot PRs
   # (.github/dependabot.yml).
   #
-  # Python: os locks já trazem as transitivas, com hash, então o pip-audit lê
-  # as versões direto deles (`--disable-pip`), sem resolver nem instalar nada.
-  # O lock do executor é o mesmo do app desktop. npm: só as dependências que
-  # vão para produção, direto do package-lock (sem `npm ci`).
+  # Python: the locks already include the transitive ones, with hashes, so pip-audit
+  # reads the versions straight from them (`--disable-pip`), without resolving or
+  # installing anything. The executor lock is the same as the desktop app's. npm: only
+  # the dependencies that go to production, straight from package-lock (no `npm ci`).
   #
-  # E a idade das versões: a quarentena de 14 dias vale para o que o Dependabot
-  # escolhe, não para as transitivas que o pip-compile traz junto no PR dele,
-  # nem para uma atualização de segurança. O passo lista, como aviso, o que
-  # tem menos de 14 dias ou foi retirado do PyPI — é o que o roteiro de revisão
-  # (CONTRIBUTING, "PRs do Dependabot") manda olhar primeiro.
+  # And the age of the versions: the 14-day quarantine applies to what Dependabot
+  # picks, not to the transitive ones pip-compile pulls into its PR, nor to a
+  # security update. The step lists, as a warning, whatever is less than 14 days
+  # old or was yanked from PyPI — that is what the review checklist
+  # (CONTRIBUTING, "Dependabot PRs") says to look at first.
   #
-  # Sem `cache: pip` de propósito: a chave padrão é a do job Backend, e este
-  # job, que termina antes, gravaria um cache pequeno no lugar do dele.
+  # No `cache: pip` on purpose: the default key is the Backend job's, and this
+  # job, which finishes first, would store a small cache in place of its.
   audit:
     name: Auditoria de dependências (informativa)
     runs-on: ubuntu-latest
@@ -293,7 +293,7 @@ jobs:
       run:
         working-directory: web
 
-    # O `next build` manda telemetria de uso à Vercel por padrão.
+    # `next build` sends usage telemetry to Vercel by default.
     env:
       NEXT_TELEMETRY_DISABLED: 1
 
@@ -302,9 +302,9 @@ jobs:
         with:
           persist-credentials: false
 
-      # Node 24, a LTS (até abril de 2028), o mesmo da imagem do web
-      # (web/Dockerfile.ui) e do desktop. O 20 saiu de suporte em abril de 2026,
-      # e o jsdom 30 e o @testing-library/jest-dom 7 já pedem o 22 ou mais.
+      # Node 24, the LTS (until April 2028), the same as the web image
+      # (web/Dockerfile.ui) and the desktop. 20 went out of support in April 2026,
+      # and jsdom 30 and @testing-library/jest-dom 7 already require 22 or later.
       - name: Set up Node.js 24
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -318,10 +318,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # Ate agora a suite Vitest existia mas nada a executava: um teste de
-      # drive-field ficou quebrado por 193 commits porque a CI so rodava lint e
-      # build. Testes que ninguem roda apodrecem — este step e o que os torna
-      # uma garantia em vez de decoracao.
+      # Until now the Vitest suite existed but nothing ran it: a
+      # drive-field test stayed broken for 193 commits because CI only ran lint and
+      # build. Tests nobody runs rot — this step is what makes them
+      # a guarantee instead of decoration.
       - name: Test
         run: npm test
 
@@ -332,12 +332,12 @@ jobs:
           API_INTERNA: "http://localhost:8000"
         run: npm run build
 
-  # O núcleo do web sem extensão nenhuma (web/extensoes), como a distribuição
-  # livre o compila, testa e builda: o scripts/sem_extensoes.sh APAGA as
-  # extensões e os testes delas e esvazia a lista das instaladas, e depois vêm
-  # os passos de sempre. Um import de extensão esquecido no núcleo, com
-  # qualquer grafia, quebra aqui. Job à parte, e não passos do de cima, para a
-  # segunda volta correr ao lado da primeira.
+  # The web core with no extensions at all (web/extensoes), as the free
+  # distribution compiles, tests and builds it: scripts/sem_extensoes.sh DELETES
+  # the extensions and their tests and empties the installed list, and then
+  # the usual steps follow. A forgotten extension import in the core, with
+  # any spelling, breaks here. A separate job, not steps of the one above, so
+  # the second pass runs alongside the first.
   frontend-nucleo:
     name: Frontend sem extensões (núcleo)
     runs-on: ubuntu-latest
@@ -354,7 +354,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # Como no backend-nucleo: sem extensão, o job termina aqui.
+      # As in backend-nucleo: with no extensions, the job ends here.
       - name: Há extensões?
         id: extensoes
         working-directory: .
@@ -398,10 +398,10 @@ jobs:
           API_INTERNA: "http://localhost:8000"
         run: npm run build
 
-  # Verificação rápida do app desktop. NÃO builda o instalador (~180 MB, ~10 min
-  # de runner Windows) — isso fica no desktop-windows.yml, disparado por tag.
-  # Aqui só o que quebra com frequência: tipos, testes e o lock do executor,
-  # que o runtime do desktop instala, no Windows.
+  # Quick check of the desktop app. It does NOT build the installer (~180 MB, ~10 min
+  # of Windows runner) — that stays in desktop-windows.yml, triggered by tag.
+  # Here only what breaks often: types, tests and the executor lock,
+  # which the desktop runtime installs, on Windows.
   desktop:
     name: Desktop (typecheck + testes + lock)
     runs-on: windows-latest
@@ -428,15 +428,15 @@ jobs:
         working-directory: desktop
         run: npm test
 
-      # O runtime do desktop instala o lock do executor
-      # (executor/requirements-full.txt), resolvido no Linux. O check o instala
-      # num CPython do Windows limpo, com --require-hashes e --only-binary: é
-      # aqui que se prova que toda wheel existe para win_amd64 e bate com o
-      # hash, e que o Windows não pede dependência que o lock não tem.
-      # O tarball do CPython (~40 MB) fica em resources/.cache e o `fetch`
-      # confere o SHA-256 antes de reaproveitar — com o cache acertando, o
-      # download não acontece. O desktop-windows.yml já fazia isto para o
-      # runtime montado; aqui só o tarball importa, porque este job não monta.
+      # The desktop runtime installs the executor lock
+      # (executor/requirements-full.txt), resolved on Linux. The check installs it
+      # in a clean Windows CPython, with --require-hashes and --only-binary: this
+      # is where it is proven that every wheel exists for win_amd64 and matches the
+      # hash, and that Windows does not need a dependency the lock lacks.
+      # The CPython tarball (~40 MB) lives in resources/.cache and `fetch`
+      # checks the SHA-256 before reusing it — with a cache hit, the
+      # download does not happen. desktop-windows.yml already did this for the
+      # assembled runtime; here only the tarball matters, because this job does not assemble it.
       - name: Cache do tarball do CPython
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:

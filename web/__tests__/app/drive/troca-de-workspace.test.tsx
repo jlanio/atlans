@@ -7,8 +7,8 @@ vi.mock("@/service/GisFlowService", () => ({
   GisFlowService: { getDriveFiles: vi.fn() },
 }))
 
-// Workspace trocável — o seletor do cabeçalho troca o contexto SEM remontar a
-// página, que é a razão de o estado de página/filtro sobreviver à troca.
+// Switchable workspace — the header selector switches the context WITHOUT remounting the
+// page, which is the reason the page/filter state survives the switch.
 const workspaceAtual = { current: { id_hash: "ws-a", name: "A" } }
 vi.mock("@/context/WorkspaceContext", () => ({
   useWorkspace: () => ({ current: workspaceAtual.current, canEdit: true }),
@@ -28,7 +28,7 @@ function arquivo(id: string, workspaceId: string) {
   }
 }
 
-/** Responde de acordo com o workspace pedido: A tem 300 arquivos, B tem 20. */
+/** Responds according to the requested workspace: A has 300 files, B has 20. */
 function responder() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getDriveFiles.mockImplementation(((params: any) => {
@@ -54,7 +54,7 @@ describe("Drive — troca de workspace", () => {
     await waitFor(() => expect(getDriveFiles).toHaveBeenCalled())
     await screen.findByText("1 / 6")
 
-    // Avança até a página 4 do workspace A.
+    // Advances to page 4 of workspace A.
     for (const alvo of ["2 / 6", "3 / 6", "4 / 6"]) {
       const anterior = screen.getByText(alvo.replace(/^(\d)/, m => String(Number(m) - 1)))
       const proximo  = anterior.parentElement!.querySelectorAll("button")[1]
@@ -63,13 +63,13 @@ describe("Drive — troca de workspace", () => {
     }
     await waitFor(() => expect(ultimaChamada().page).toBe(4))
 
-    // Troca de workspace no seletor: sem remount, só o contexto muda.
+    // Switch workspace in the selector: no remount, only the context changes.
     workspaceAtual.current = { id_hash: "ws-b", name: "B" }
     rerender(<DrivePage />)
 
-    // O bug: a busca ia com `workspace_id=B&page=4`, B só tem 20 arquivos, a
-    // resposta vinha vazia e o rodapé de paginação nem era montado
-    // (`total > PAGE_SIZE` é falso com 20) — nenhum controle para sair de lá.
+    // The bug: the fetch went out with `workspace_id=B&page=4`, B only has 20 files, the
+    // response came back empty and the pagination footer was not even mounted
+    // (`total > PAGE_SIZE` is false with 20) — no control to get out of there.
     await waitFor(() => expect(ultimaChamada().workspace_id).toBe("ws-b"))
     await waitFor(() => expect(ultimaChamada().page).toBe(1))
     expect(getDriveFiles.mock.calls.every(([p]) => !(p.workspace_id === "ws-b" && (p.page ?? 1) > 1))).toBe(true)

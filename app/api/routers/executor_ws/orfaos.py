@@ -1,7 +1,7 @@
 # app/api/routers/executor_ws/orfaos.py
 """
-Runs órfãos: fechar como executor_lost quando o executor some e o
-watchdog periódico que cobre janelas de queda do servidor.
+Orphan runs: closing them as executor_lost when the executor goes away, and
+the periodic watchdog that covers server downtime windows.
 """
 import asyncio
 import time
@@ -16,40 +16,40 @@ from app.core.db import get_session_async
 logger = get_logger(__name__)
 
 
-# Carência antes de considerar que um executor que desconectou realmente sumiu.
-# Ver `_fail_orphan_runs_if_gone`.
+# Grace period before concluding that an executor that disconnected is really gone.
+# See `_fail_orphan_runs_if_gone`.
 _DISCONNECT_GRACE_SECONDS = 20
 
-# Referências fortes para as tasks de verificação pós-desconexão (asyncio só
-# guarda weakrefs; sem isso a task pode sumir no meio do grace period).
+# Strong references to the post-disconnect check tasks (asyncio only keeps
+# weakrefs; without this the task may vanish in the middle of the grace period).
 _orphan_check_tasks: set[asyncio.Task] = set()
 
 async def _fail_orphan_runs_if_gone(executor_id: str) -> None:
-    """Falha os runs órfãos APENAS se o executor tiver realmente sumido.
+    """Fails the orphan runs ONLY if the executor is really gone.
 
-    O `finally` do handler roda em TODA queda de socket, inclusive num blip de
-    rede de 1 segundo. A fila local do executor é independente da conexão: ele
-    continua executando os jobs e reconecta em seguida — mas os N runs já teriam
-    sido marcados 'failed', e o `job_result` verdadeiro seria descartado depois
-    pela checagem de idempotência do `_handle_job_result`. Um blip destruía 20
-    workflows vivos de uma vez.
+    The handler's `finally` runs on EVERY socket drop, including a 1-second
+    network blip. The executor's local queue is independent of the connection: it
+    keeps executing the jobs and reconnects right after — but the N runs would
+    already have been marked 'failed', and the real `job_result` would later be
+    discarded by `_handle_job_result`'s idempotency check. One blip destroyed 20
+    live workflows at once.
 
-    Por isso esperamos um grace period e só falhamos se, passado ele, o executor
-    não estiver registrado neste worker (reconexão local) NEM tiver presença no
-    Redis (reconexão em outro worker uvicorn) — a mesma checagem que o
-    `orphan_runs_watchdog` faz, e que continua sendo a rede de segurança para o
-    caso de o próprio worker morrer sem rodar o `finally`.
+    That is why we wait for a grace period and only fail if, once it has passed,
+    the executor is neither registered on this worker (local reconnection) NOR
+    has presence in Redis (reconnection on another uvicorn worker) — the same
+    check `orphan_runs_watchdog` does, and which remains the safety net for the
+    case where the worker itself dies without running the `finally`.
 
-    A consulta de presença é TRI-ESTADO. `_redis_check_presence` é fail-closed
-    (erro de Redis = offline), o que está certo para dispatch mas é destrutivo
-    aqui: um blip do pool no instante exato da checagem falharia justamente os
-    runs que esta carência existe para salvar. "Não sei" não é "sumiu" — nesse
-    caso não fazemos nada e o watchdog reavalia em ≤180s.
+    The presence query is TRI-STATE. `_redis_check_presence` is fail-closed
+    (Redis error = offline), which is right for dispatch but destructive here: a
+    pool blip at the exact moment of the check would fail precisely the runs this
+    grace period exists to save. "Don't know" is not "gone" — in that case we do
+    nothing and the watchdog re-evaluates in ≤180s.
     """
     from app.core.executor_connections import _redis_presence_or_unknown
 
-    # CancelledError (shutdown do worker) propaga de propósito: nesse cenário
-    # não queremos falhar run nenhum — o watchdog resolve depois.
+    # CancelledError (worker shutdown) propagates on purpose: in that scenario
+    # we do not want to fail any run — the watchdog sorts it out later.
     await asyncio.sleep(_DISCONNECT_GRACE_SECONDS)
 
     if executor_registry.get(executor_id) is not None:
@@ -78,8 +78,8 @@ async def _fail_orphan_runs_if_gone(executor_id: str) -> None:
     try:
         await _fail_orphan_runs(executor_id)
     except Exception as exc:
-        # A task é detached: sem este log a exceção só apareceria como
-        # "Task exception was never retrieved" no shutdown.
+        # The task is detached: without this log the exception would only show up
+        # as "Task exception was never retrieved" at shutdown.
         logger.error(
             "Falha ao limpar runs órfãos do executor '%s' pós-desconexão: %s",
             executor_id, exc,
@@ -87,14 +87,14 @@ async def _fail_orphan_runs_if_gone(executor_id: str) -> None:
 
 async def _fail_orphan_runs(executor_id: str) -> None:
     """
-    Ao desconectar, marca como 'failed' todos os WorkflowRun com status='running'
-    atribuídos a este executor (host = 'executor:{executor_id}').
+    On disconnect, marks as 'failed' every WorkflowRun with status='running'
+    assigned to this executor (host = 'executor:{executor_id}').
 
-    O fechamento é o de todo run fechado pelo servidor (`fechar_runs`): UPDATE
-    condicional por run — o consumer pode gravar o resultado verdadeiro entre o
-    SELECT e o commit, e ele vence —, contabilização no usage_daily (este
-    caminho nunca passa pela fila run_results) e `__workflow_complete__` com
-    status=failed, para que o frontend feche o WebSocket de log e exiba o erro.
+    The closing is the same as for every run closed by the server (`fechar_runs`):
+    a conditional UPDATE per run — the consumer may write the real result between
+    the SELECT and the commit, and it wins —, accounting in usage_daily (this
+    path never goes through the run_results queue) and `__workflow_complete__`
+    with status=failed, so the frontend closes the log WebSocket and shows the error.
     """
     from app.models.models import WorkflowRun as _WFRun
     from app.services.fechamento_de_run import REPETIVEL, fechar_runs
@@ -114,10 +114,10 @@ async def _fail_orphan_runs(executor_id: str) -> None:
             if not candidatos:
                 return
 
-            # `executor_lost` vale para os dois caminhos que chegam aqui — o
-            # finally do WS e o watchdog de presence. O evento publicado
-            # continua "transient" (taxonomia do flow, para o painel de log
-            # oferecer retry); a coluna guarda a causa vista pelo servidor.
+            # `executor_lost` applies to both paths that reach here — the WS
+            # finally and the presence watchdog. The published event stays
+            # "transient" (the flow's taxonomy, so the log panel offers a
+            # retry); the column stores the cause as seen by the server.
             orphans = await fechar_runs(
                 db, candidatos, de=("running",), para="failed",
                 mensagem="Executor desconectou durante a execução.",
@@ -133,18 +133,19 @@ async def _fail_orphan_runs(executor_id: str) -> None:
         logger.error("Erro ao limpar runs órfãos do executor '%s': %s", executor_id, exc)
 
 
-# ── Runs em 'pending' que nenhum executor recebeu ────────────────────────────
+# ── Runs in 'pending' that no executor received ──────────────────────────────
 
-# Idade a partir da qual um run em 'pending' não está mais sendo despachado. O
-# despacho leva milissegundos, o envio ao executor tem prazo (ver
-# `_prazo_de_envio` em executor_connections) e o ACK do executor promove o run
-# para 'running' assim que o job chega. Um 'pending' desta idade é de um worker
-# que morreu no meio do envio — e ninguém mais o fecharia: o watchdog de órfãos
-# só olha 'running', e o run ficava "Na fila" para sempre (caso de 22/09).
+# Age beyond which a run in 'pending' is no longer being dispatched. Dispatch
+# takes milliseconds, sending to the executor has a deadline (see
+# `_prazo_de_envio` in executor_connections) and the executor's ACK promotes the
+# run to 'running' as soon as the job arrives. A 'pending' this old belongs to a
+# worker that died mid-send — and nobody else would close it: the orphan
+# watchdog only looks at 'running', and the run stayed "Na fila" (queued)
+# forever (the September 22 case).
 _PENDING_SEM_ENTREGA_SECONDS = 600
 
-# Teto por varredura: um incidente com milhares de runs presos é drenado em
-# lotes, um a cada ciclo do watchdog, sem uma transação gigante.
+# Ceiling per sweep: an incident with thousands of stuck runs is drained in
+# batches, one per watchdog cycle, without a giant transaction.
 _PENDING_LOTE = 200
 
 _MSG_NAO_ENTREGUE = (
@@ -152,14 +153,14 @@ _MSG_NAO_ENTREGUE = (
     "nenhum executor confirmou o recebimento — ela não chegou a rodar."
 )
 
-# Executor anterior ao inventário não tem como promover um job cujo ACK se
-# perdeu junto com o worker que o despachou (o worker morto derruba também a
-# conexão direta dele). Para os runs de um executor ONLINE que não manda
-# inventário, a varredura espera o teto de duração de um job (1 h por padrão,
-# mais a fila) antes de concluir que o envio não chegou — senão fecharia, e
-# mandaria cancelar, um job saudável.
+# An executor older than the inventory has no way to promote a job whose ACK was
+# lost along with the worker that dispatched it (the dead worker also takes down
+# its direct connection). For the runs of an ONLINE executor that sends no
+# inventory, the sweep waits for a job's duration ceiling (1 h by default, plus
+# the queue) before concluding the send did not arrive — otherwise it would
+# close, and order the cancellation of, a healthy job.
 _PENDING_SEM_INVENTARIO_SECONDS = 6 * 3600
-# "Este executor manda inventário": renovada a cada inventário recebido.
+# "This executor sends inventory": renewed on every inventory received.
 _TTL_MARCA_DE_INVENTARIO_S = 180
 
 
@@ -168,9 +169,9 @@ def _chave_de_inventario(executor_id: str) -> str:
 
 
 async def _hosts_sem_inventario(hosts) -> set[str]:
-    """Dos hosts dados (`executor:{id}`), os que podem ter o job sem ter como
-    dizer: online — ou com presença desconhecida, porque a decisão é destrutiva
-    — e sem inventário recente."""
+    """Of the given hosts (`executor:{id}`), those that may have the job with no way
+    to say so: online — or with unknown presence, because the decision is
+    destructive — and with no recent inventory."""
     from app.core.executor_connections import _redis_presence_or_unknown
     from app.core.redis import get_redis_pool
 
@@ -191,14 +192,14 @@ async def _hosts_sem_inventario(hosts) -> set[str]:
 
 
 async def _fechar_runs_nao_entregues() -> int:
-    """Fecha como 'failed' os runs presos em 'pending' além do prazo. Devolve
-    quantos fechou.
+    """Closes as 'failed' the runs stuck in 'pending' beyond the deadline. Returns
+    how many it closed.
 
-    O fechamento é condicional (`status='pending'`, ver `fechar_runs`), então
-    os 4 workers podem varrer ao mesmo tempo: cada run é fechado — e
-    contabilizado — por um só. O host gravado recebe um 'cancel' mesmo assim: se
-    o job tiver chegado sem ACK, o executor o interrompe; se não, responde que
-    não o conhece.
+    The closing is conditional (`status='pending'`, see `fechar_runs`), so the
+    4 workers can sweep at the same time: each run is closed — and accounted
+    for — by only one. The stored host gets a 'cancel' anyway: if the job did
+    arrive without an ACK, the executor interrupts it; if not, it answers that it
+    does not know it.
     """
     from datetime import datetime, timedelta, timezone
 
@@ -210,8 +211,8 @@ async def _fechar_runs_nao_entregues() -> int:
     agora = datetime.now(timezone.utc)
     corte = agora - timedelta(seconds=_PENDING_SEM_ENTREGA_SECONDS)
     async with get_session_async() as db:
-        # Os hosts antes dos runs: filtrar depois do LIMIT deixaria o lote
-        # cheio de runs que esperam, e os outros nunca seriam varridos.
+        # The hosts before the runs: filtering after the LIMIT would leave the batch
+        # full of runs that are waiting, and the others would never be swept.
         hosts = (await db.execute(
             select(_WFRun.host)
             .where(_WFRun.status == "pending", _WFRun.start_time < corte)
@@ -269,14 +270,15 @@ _MSG_CONEXAO_FECHANDO = (
 async def fechar_run_nao_entregue(
     executor_id: str, task_id: str, *, conexao_fechando: bool = False,
 ) -> bool:
-    """Fecha como failed/dispatch o run cujo job COMPROVADAMENTE não foi escrito
-    no socket do executor — o relay o descartou sem a vez, ou (`conexao_fechando`)
-    porque o socket estava fechando. Devolve se fechou.
+    """Closes as failed/dispatch the run whose job was PROVABLY not written to the
+    executor's socket — the relay dropped it without its turn, or
+    (`conexao_fechando`) because the socket was closing. Returns whether it closed.
 
-    O worker que publicou no relay já tinha dado o job por entregue; sem este
-    fechamento o run ficava "Em andamento" até o ACK pendente vencer (10 min) e
-    só então falhava como perdido. Condicional em status e host, como os outros
-    fechamentos do servidor (`fechar_runs`).
+    The worker that published to the relay had already considered the job
+    delivered; without this closing the run stayed "Em andamento" (in progress)
+    until the pending ACK expired (10 min) and only then failed as lost.
+    Conditional on status and host, like the server's other closings
+    (`fechar_runs`).
     """
     from app.services.fechamento_de_run import ABERTOS, REPETIVEL, fechar_runs
 
@@ -299,31 +301,31 @@ async def fechar_run_nao_entregue(
     return True
 
 
-# ── Watchdog periodico de runs orfaos ────────────────────────────────────────
+# ── Periodic orphan-run watchdog ─────────────────────────────────────────────
 
-# Intervalo entre varreduras. Alinha com _PRESENCE_TTL=120s do registry —
-# pequenas latencias de rede podem levar um heartbeat legitimo a chegar
-# no limite; 180s da folga confortavel sem deixar orfaos vivos por horas.
+# Interval between sweeps. Aligns with the registry's _PRESENCE_TTL=120s —
+# small network latencies can make a legitimate heartbeat arrive right at
+# the limit; 180s gives comfortable slack without leaving orphans alive for hours.
 _ORPHAN_WATCHDOG_INTERVAL = 180
 
 async def orphan_runs_watchdog() -> None:
-    """Task de background que enumera runs 'running' cujo executor NAO tem
-    presence no Redis. Chama `_fail_orphan_runs` para cada.
+    """Background task that enumerates 'running' runs whose executor has NO
+    presence in Redis. Calls `_fail_orphan_runs` for each one.
 
-    Motivacao: o `_fail_orphan_runs` do handler WS so roda no `finally`
-    do `agent_websocket`. Se o worker uvicorn morre (SIGKILL/OOM/crash),
-    o finally nunca executa — runs ficam com status='running' para
-    sempre, apesar de presence expirar em 120s.
+    Motivation: the WS handler's `_fail_orphan_runs` only runs in the
+    `finally` of `agent_websocket`. If the uvicorn worker dies (SIGKILL/OOM/crash),
+    the finally never executes — runs stay with status='running'
+    forever, even though presence expires in 120s.
 
-    Este watchdog e a rede de seguranca.
+    This watchdog is the safety net.
     """
     import asyncio
     import re
     from app.models.models import WorkflowRun as _WFRun
     from app.core.executor_connections import _redis_presence_or_unknown
 
-    # Aceita hash UUID-like (com hifens) e antigos (sem hifens) — evita
-    # matchar valores garbage residuais.
+    # Accepts UUID-like hashes (with hyphens) and old ones (without hyphens) —
+    # avoids matching residual garbage values.
     _HOST_RE = re.compile(r"^executor:([A-Fa-f0-9\-]{8,})$")
 
     logger.info("Watchdog de runs orfaos iniciado (intervalo %ds).", _ORPHAN_WATCHDOG_INTERVAL)
@@ -332,8 +334,8 @@ async def orphan_runs_watchdog() -> None:
         try:
             await asyncio.sleep(_ORPHAN_WATCHDOG_INTERVAL)
 
-            # Antes dos órfãos em 'running': é independente de presença, e um
-            # erro aqui não pode impedir a varredura de baixo.
+            # Before the orphans in 'running': it is independent of presence, and an
+            # error here must not prevent the sweep below.
             try:
                 await _fechar_runs_nao_entregues()
             except Exception as exc:
@@ -359,10 +361,10 @@ async def orphan_runs_watchdog() -> None:
 
             offline: list[str] = []
             for executor_id in candidates:
-                # Tri-estado: se o worker morreu e nao renovou o TTL, a chave
-                # sumiu de fato (False). None e "nao consegui perguntar" — nesse
-                # caso NAO falhamos os runs; o proximo ciclo reavalia. Colapsar
-                # os dois em "offline" faria um blip do Redis destruir runs vivos.
+                # Tri-state: if the worker died and did not renew the TTL, the key
+                # really is gone (False). None is "couldn't ask" — in that case
+                # we do NOT fail the runs; the next cycle re-evaluates. Collapsing
+                # both into "offline" would let a Redis blip destroy live runs.
                 presence = await _redis_presence_or_unknown(executor_id)
                 if presence is False:
                     offline.append(executor_id)
@@ -393,40 +395,42 @@ async def orphan_runs_watchdog() -> None:
             logger.info("Watchdog de runs orfaos encerrado.")
             raise
         except Exception as exc:
-            # Nao deixa loop morrer por erro pontual. Backoff curto.
+            # Does not let the loop die from a one-off error. Short backoff.
             logger.error("Erro no watchdog de runs orfaos: %s", exc)
             await asyncio.sleep(30)
 
 
-# ── Reconciliação pelo inventário do executor ────────────────────────────────
-# O executor manda, ao conectar e a cada minuto, os jobs que TEM: `ativos` (na
-# fila, no semáforo ou rodando) e `resultados` (terminaram, resultado ainda não
-# confirmado). Antes o servidor só descobria um run perdido quando o executor
-# DESCONECTAVA — em 22/09 o titan seguiu conectado com três runs que nunca
-# recebeu, e eles ficaram "Em andamento" até 09:16, para então virarem um
-# "Executor desconectou durante a execução" que culpava quem não tinha culpa.
+# ── Reconciliation from the executor's inventory ─────────────────────────────
+# The executor sends, on connecting and every minute, the jobs it HAS: `ativos`
+# (in the queue, in the semaphore or running) and `resultados` (finished, result
+# not yet confirmed). Before, the server only found out about a lost run when
+# the executor DISCONNECTED — on September 22 titan stayed connected with three
+# runs it never received, and they stayed "Em andamento" (in progress) until
+# 09:16, only to then become an "Executor desconectou durante a execução"
+# (executor disconnected during execution) that blamed someone who was not at
+# fault.
 #
-# Três ações por inventário:
-#   1. promove para 'running' os 'pending' que o executor tem (ACK perdido);
-#   2. manda 'cancel' ao que ele segue rodando mas o servidor já fechou;
-#   3. fecha os runs dele que ele NÃO tem, com mais de 3 min de idade e sem
-#      resultado recém-chegado ao servidor.
+# Three actions per inventory:
+#   1. promotes to 'running' the 'pending' ones the executor has (lost ACK);
+#   2. sends 'cancel' for what it keeps running but the server already closed;
+#   3. closes its runs that it does NOT have, older than 3 min and with no
+#      result freshly arrived at the server.
 
-# Idade mínima para um run ser julgado perdido por não estar no inventário.
-# Acima do prazo máximo de envio (~62 s para um frame de 16 MB), com folga: um
-# job ainda em trânsito quando o executor montou o inventário não é perda.
+# Minimum age for a run to be judged lost for not being in the inventory.
+# Above the maximum send deadline (~62 s for a 16 MB frame), with slack: a
+# job still in transit when the executor built the inventory is not a loss.
 _RECONCILIACAO_IDADE_MIN_S = 180
 
-# Intervalo mínimo entre duas reconciliações do mesmo executor. O executor
-# honesto manda um inventário por minuto; um com bug (ou hostil) não transforma
-# o inventário num SELECT por mensagem.
+# Minimum interval between two reconciliations of the same executor. An honest
+# executor sends one inventory per minute; a buggy (or hostile) one does not
+# turn the inventory into a SELECT per message.
 _RECONCILIACAO_INTERVALO_S = 30
 
-# Carência depois de uma conexão nova antes de fechar algo por AUSÊNCIA. O
-# inbox da conexão ANTERIOR pode ainda estar drenando (flush de 10 s + carência
-# + resgate, ~20 s) um job_result que saiu antes da queda: o primeiro inventário
-# da sessão nova não o lista, e fechar o run agora faria o resultado verdadeiro
-# ser recusado logo depois. Promover e parar zumbis não esperam.
+# Grace period after a new connection before closing anything due to ABSENCE.
+# The PREVIOUS connection's inbox may still be draining (10 s flush + grace
+# + rescue, ~20 s) a job_result that went out before the drop: the new
+# session's first inventory does not list it, and closing the run now would get
+# the real result rejected right after. Promoting and stopping zombies don't wait.
 _RECONCILIACAO_CARENCIA_DA_CONEXAO_S = 45
 
 _INVENTARIO_MAX_IDS = 2000
@@ -440,7 +444,7 @@ _MSG_PERDIDO = (
 
 
 def _ids_do_inventario(valor) -> set[str] | None:
-    """Ids válidos de uma lista do inventário; None se a lista é malformada."""
+    """Valid ids from an inventory list; None if the list is malformed."""
     if valor is None:
         return set()
     if not isinstance(valor, list) or len(valor) > _INVENTARIO_MAX_IDS:
@@ -449,19 +453,19 @@ def _ids_do_inventario(valor) -> set[str] | None:
 
 
 async def _reconciliar_inventario(executor_id: str, msg: dict) -> dict:
-    """Confere os runs deste executor contra o que ele diz ter. Devolve as
-    contagens (para log e teste); {} quando não reconciliou.
+    """Checks this executor's runs against what it says it has. Returns the
+    counts (for logging and tests); {} when it did not reconcile.
 
-    SEG: tudo é restrito aos runs com `host` deste executor. Um inventário
-    mentiroso só afeta runs do próprio executor — que já controla o desfecho
-    deles pelo job_result de qualquer forma.
+    SEC: everything is restricted to runs whose `host` is this executor. A lying
+    inventory only affects the executor's own runs — whose outcome it already
+    controls through the job_result anyway.
     """
     from app.core.redis import get_redis_pool
 
     from .resultados import _promover_para_running
 
-    # Marca que este executor fala inventário — a varredura dos 'pending' trata
-    # diferente quem não fala (ver `_PENDING_SEM_INVENTARIO_SECONDS`).
+    # Marks that this executor speaks inventory — the 'pending' sweep treats
+    # those that don't differently (see `_PENDING_SEM_INVENTARIO_SECONDS`).
     try:
         await get_redis_pool().setex(
             _chave_de_inventario(executor_id), _TTL_MARCA_DE_INVENTARIO_S, "1",
@@ -484,9 +488,9 @@ async def _reconciliar_inventario(executor_id: str, msg: dict) -> dict:
 
     promovidos = await _promover_para_running(executor_id, ativos) if ativos else 0
     parados = await _parar_zumbis(executor_id, ativos) if ativos else 0
-    # Truncado: não dá para saber o que ficou de fora, então nada é fechado por
-    # ausência — promover e parar continuam valendo para o que veio. Idem logo
-    # depois de conectar (ver `_RECONCILIACAO_CARENCIA_DA_CONEXAO_S`).
+    # Truncated: there is no way to know what was left out, so nothing is closed
+    # due to absence — promoting and stopping still apply to what came in. Same
+    # right after connecting (see `_RECONCILIACAO_CARENCIA_DA_CONEXAO_S`).
     if msg.get("truncado") or _conexao_recente(conn):
         fechados = 0
     else:
@@ -503,14 +507,14 @@ def _conexao_recente(conn) -> bool:
     return idade < _RECONCILIACAO_CARENCIA_DA_CONEXAO_S
 
 
-# Referências fortes aos cancels em segundo plano (asyncio só guarda weakrefs).
+# Strong references to the background cancels (asyncio only keeps weakrefs).
 _cancels_em_curso: set[asyncio.Task] = set()
 
 
 def _cancelar_em_segundo_plano(executor_id: str, task_ids: list[str], rotulo: str) -> None:
-    """Manda `cancel` para cada job sem prender quem chamou: a reconciliação
-    roda na drenadora da conexão, e com o socket congestionado cada envio pode
-    esperar a vez por até o prazo inteiro — atrasando os job_results dela."""
+    """Sends `cancel` for each job without holding up the caller: the reconciliation
+    runs in the connection's drainer, and with a congested socket each send may
+    wait its turn for up to the whole deadline — delaying the drainer's job_results."""
     if not task_ids:
         return
 
@@ -527,10 +531,10 @@ def _cancelar_em_segundo_plano(executor_id: str, task_ids: list[str], rotulo: st
 
 
 async def _parar_zumbis(executor_id: str, ativos: set[str]) -> int:
-    """'cancel' para o que o executor segue rodando mas o servidor já fechou
-    (cancelado com o executor fora do ar, falho por desconexão, não entregue).
-    O resultado desses runs seria recusado de qualquer jeito — rodar até o fim
-    só gastaria a máquina e produziria efeitos que ninguém espera."""
+    """'cancel' for what the executor keeps running but the server already closed
+    (cancelled with the executor offline, failed by disconnection, undelivered).
+    The result of those runs would be rejected anyway — running to the end
+    would only waste the machine and produce effects nobody expects."""
     from app.models.models import WorkflowRun as _WFRun
 
     async with get_session_async() as db:
@@ -552,7 +556,7 @@ async def _parar_zumbis(executor_id: str, ativos: set[str]) -> int:
 
 
 async def _fechar_perdidos(executor_id: str, tem: set[str]) -> int:
-    """Fecha os runs deste executor que ele não tem. Devolve quantos fechou."""
+    """Closes this executor's runs that it does not have. Returns how many it closed."""
     from datetime import datetime, timedelta, timezone
 
     from app.core.redis import get_redis_pool
@@ -573,12 +577,12 @@ async def _fechar_perdidos(executor_id: str, tem: set[str]) -> int:
     if not candidatos:
         return 0
 
-    # Dois motivos para não estar no inventário sem estar perdido, ambos no
-    # Redis: o resultado acabou de chegar (`_handle_job_result` grava a chave de
-    # resultado, TTL 300 s, antes de mandá-lo ao consumer), ou o job ainda está
-    # a caminho — um envio que estourou o prazo segue escoando pelo socket por
-    # tempo indefinido, e o ACK pendente (TTL 600 s) é a marca disso. Sem Redis
-    # não há como saber: não fecha nada.
+    # Two reasons for not being in the inventory without being lost, both in
+    # Redis: the result just arrived (`_handle_job_result` writes the result key,
+    # TTL 300 s, before sending it to the consumer), or the job is still on its
+    # way — a send that exceeded the deadline keeps trickling through the socket
+    # for an indefinite time, and the pending ACK (TTL 600 s) is the mark of
+    # that. Without Redis there is no way to know: closes nothing.
     from app.core.executor_connections import _pending_ack_key
 
     try:
@@ -600,9 +604,9 @@ async def _fechar_perdidos(executor_id: str, tem: set[str]) -> int:
         return 0
 
     async with get_session_async() as db:
-        # 'pending' que o executor não tem nunca chegou a ele: é o mesmo caso da
-        # varredura dos não entregues, só detectado mais cedo. Cada grupo fecha
-        # só se ainda estiver no status em que foi lido.
+        # A 'pending' the executor does not have never reached it: it is the same
+        # case as the undelivered sweep, only detected earlier. Each group closes
+        # only if it is still in the status in which it was read.
         fechados = await fechar_runs(
             db, [tid for tid, st in candidatos if st == "pending"], de=("pending",),
             para="failed", mensagem=_MSG_NAO_ENTREGUE, categoria="dispatch", host=host,
@@ -621,9 +625,10 @@ async def _fechar_perdidos(executor_id: str, tem: set[str]) -> int:
         "fechados como failed: %s",
         executor_id, len(fechados), [run.task_id for run in fechados[:20]],
     )
-    # Se o job ainda chegar (um frame que escoava além do ACK pendente), o cancel
-    # chega DEPOIS dele pelo mesmo socket e o interrompe — ou vira lápide, se o
-    # job nunca vier. Sem isso ele rodaria, com efeitos, para um run já fechado.
+    # If the job still arrives (a frame that kept trickling past the pending ACK),
+    # the cancel arrives AFTER it on the same socket and interrupts it — or
+    # becomes a tombstone, if the job never comes. Without this it would run,
+    # with effects, for a run that is already closed.
     _cancelar_em_segundo_plano(executor_id, [run.task_id for run in fechados], "perdido")
     return len(fechados)
 

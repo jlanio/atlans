@@ -1,33 +1,33 @@
 # executor/sync/http.py
 """
-Cliente HTTP de longa duracao para os componentes do GeoSync.
+Long-lived HTTP client for the GeoSync components.
 
-Cada metodo do uploader/downloader abria um `async with httpx.AsyncClient(...)`
-e o fechava ao sair do bloco. Como `mtls_httpx_kwargs` injeta o certificado de
-cliente, isso significava um handshake mTLS COMPLETO por requisicao — e um
-unico `_upload_file` abria tres (pedir URL, PUT no MinIO, confirmar). Numa rede
-de campo com 150ms de latencia, um .geojson de 3 KB custava o mesmo tempo de
-protocolo que um raster de 2 GB.
+Each uploader/downloader method opened an `async with httpx.AsyncClient(...)`
+and closed it on leaving the block. Since `mtls_httpx_kwargs` injects the
+client certificate, that meant a FULL mTLS handshake per request — and a
+single `_upload_file` opened three (request URL, PUT to MinIO, confirm). On a
+field network with 150ms of latency, a 3 KB .geojson cost the same protocol
+time as a 2 GB raster.
 """
 import httpx
 
-# Timeout das requisicoes de CONTROLE (pedir URL, confirmar, listar). Fica curto
-# de proposito: sao chamadas pequenas e a falha precisa aparecer rapido.
+# Timeout for CONTROL requests (request URL, confirm, list). Kept short on
+# purpose: they are small calls and a failure needs to surface fast.
 TIMEOUT_CONTROLE = 30.0
 
-# Timeout de LEITURA/ESCRITA das transferencias (PUT/GET de bytes no MinIO).
+# READ/WRITE timeout for transfers (PUT/GET of bytes to/from MinIO).
 TIMEOUT_TRANSFERENCIA = 300.0
 
 
 class ClienteHTTP:
-    """Guarda um `httpx.AsyncClient` reaproveitavel, criado sob demanda.
+    """Holds a reusable `httpx.AsyncClient`, created on demand.
 
-    Preguicoso porque os componentes do sync sao construidos FORA do event loop
-    (o main.py monta os SyncManagers antes de chamar `run()`): um AsyncClient
-    criado ali nasceria amarrado ao loop errado.
+    Lazy because the sync components are built OUTSIDE the event loop
+    (main.py assembles the SyncManagers before calling `run()`): an AsyncClient
+    created there would be born bound to the wrong loop.
 
-    O timeout padrao ja cobre a transferencia; as chamadas de controle passam
-    `timeout=TIMEOUT_CONTROLE` por requisicao.
+    The default timeout already covers the transfer; the control calls pass
+    `timeout=TIMEOUT_CONTROLE` per request.
     """
 
     def __init__(self, httpx_kwargs: dict):
@@ -49,8 +49,8 @@ class ClienteHTTP:
         return self._cliente
 
     async def aclose(self) -> None:
-        """Fecha o cliente. Um pool compartilhado precisa de fechamento
-        explicito no shutdown, senao os sockets vazam ate o processo morrer."""
+        """Closes the client. A shared pool needs an explicit close at
+        shutdown, otherwise the sockets leak until the process dies."""
         if self._cliente is not None and not self._cliente.is_closed:
             await self._cliente.aclose()
         self._cliente = None

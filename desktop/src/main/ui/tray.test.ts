@@ -1,13 +1,13 @@
 // desktop/src/main/ui/tray.test.ts
 //
-// O tray é notificado a CADA atualização do store — uma vez por segundo
-// enquanto o executor roda.
+// The tray is notified on EVERY store update — once per second while the
+// executor runs.
 //
-// O caso que estes testes protegem: reconstruir o menu de contexto a 1 Hz o
-// fecha na cara de quem acabou de abri-lo, e é um bug que não aparece em
-// nenhum log. A guarda é `assinaturaDoTray`, que precisa ignorar tudo que o
-// tray NÃO mostra (uptime, CPU, memória, contadores) e mudar exatamente quando
-// o que ele mostra muda.
+// The case these tests protect: rebuilding the context menu at 1 Hz closes it
+// in the face of whoever just opened it, and it is a bug that shows up in no
+// log. The guard is `assinaturaDoTray`, which must ignore everything the tray
+// does NOT show (uptime, CPU, memory, counters) and change exactly when what
+// it shows changes.
 import { describe, expect, it, vi } from 'vitest'
 import type { EstadoApp } from '../state/store.js'
 import type { Snapshot } from '../../shared/events.js'
@@ -41,7 +41,7 @@ function estado(over: Partial<EstadoApp> = {}): EstadoApp {
   } as EstadoApp
 }
 
-// ── Ícone ────────────────────────────────────────────────────────────────────
+// ── Icon ─────────────────────────────────────────────────────────────────────
 
 describe('estadoDoIcone', () => {
   it('conectado e ocioso → online', () => {
@@ -53,8 +53,8 @@ describe('estadoDoIcone', () => {
   })
 
   it('conectando ainda é offline', () => {
-    // O ícone diz "dá para receber job agora?". Um executor que subiu mas não
-    // conectou não dá.
+    // The icon says "can it take a job right now?". An executor that started but
+    // did not connect cannot.
     expect(estadoDoIcone(estado({ snapshot: { ...snap(), conn_state: 'reconnecting' } }))).toBe('offline')
   })
 
@@ -77,8 +77,8 @@ describe('resumo', () => {
   })
 
   it('durante a drenagem diz quantas faltam', () => {
-    // É o número que justifica a espera de até 150s; sem ele o usuário acha
-    // que o app travou.
+    // It is the number that justifies the wait of up to 150s; without it the
+    // user thinks the app froze.
     const r = resumo(estado({ supervisor: 'draining', snapshot: { ...snap(), running_count: 2 } }))
     expect(r).toContain('2')
     expect(r.toLowerCase()).toContain('encerrando')
@@ -100,12 +100,12 @@ describe('resumo', () => {
   })
 })
 
-// ── Guarda de reconstrução ───────────────────────────────────────────────────
+// ── Rebuild guard ────────────────────────────────────────────────────────────
 
 describe('assinaturaDoTray', () => {
   it('NÃO muda com métricas que o tray não exibe', () => {
-    // O caso central. Estes campos mudam a cada snapshot; se entrassem na
-    // assinatura, o menu seria reconstruído uma vez por segundo.
+    // The central case. These fields change on every snapshot; if they went into
+    // the signature, the menu would be rebuilt once per second.
     const a = assinaturaDoTray(estado())
     const b = assinaturaDoTray(estado({
       snapshot: { ...snap(), uptime_s: 9999, proc_cpu_pct: 87, proc_rss_mb: 512, total_ok: 42 },
@@ -114,9 +114,9 @@ describe('assinaturaDoTray', () => {
   })
 
   it('NÃO muda com histórico novo nem com erro no log', () => {
-    // O log deixou de viajar no estado (ver store.ts); o que sobrou dele aqui é
-    // o contador de erros, e nem ele pode reconstruir o menu — a bandeja não o
-    // mostra.
+    // The log no longer travels in the state (see store.ts); what is left of it
+    // here is the error counter, and not even that may rebuild the menu — the
+    // tray does not show it.
     const a = assinaturaDoTray(estado())
     const b = assinaturaDoTray(estado({
       errosNoLog: 7,

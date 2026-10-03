@@ -1,9 +1,9 @@
 // web/extensoes/nenhuma.ts
 //
-// Nenhuma extensão: o que `instaladas.ts` é na distribuição livre (o
-// `scripts/sem_extensoes.sh` o reescreve assim). O `tsconfig.nucleo.json` e o
-// `vitest --mode nucleo` apontam `@/extensoes/instaladas` para cá, para
-// conferir o núcleo sem apagar nada.
+// No extensions: what `instaladas.ts` is in the free distribution (the
+// `scripts/sem_extensoes.sh` rewrites it this way). `tsconfig.nucleo.json` and
+// `vitest --mode nucleo` point `@/extensoes/instaladas` here, to check the core
+// without deleting anything.
 
 import type { ExtensaoDoWeb } from "./tipos"
 

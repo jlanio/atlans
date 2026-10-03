@@ -3,10 +3,10 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { Dialog, DialogContent, DialogTitle } from "@/app/components/ui/dialog"
 
 /**
- * `bloqueado` no DialogContent: durante uma operação em voo, as TRÊS saídas do
- * diálogo ficam travadas — Esc, clique fora e o X. Antes cada diálogo copiava o
- * trio `onEscapeKeyDown` + `onInteractOutside` + `closeDisabled`, e quem
- * esquecia uma das três deixava uma porta aberta no meio do envio.
+ * `bloqueado` on DialogContent: during an in-flight operation, the dialog's
+ * THREE exits are locked — Esc, click outside and the X. Previously each dialog
+ * copied the trio `onEscapeKeyDown` + `onInteractOutside` + `closeDisabled`, and
+ * whoever forgot one of the three left a door open in the middle of submitting.
  */
 
 afterEach(cleanup)
@@ -24,9 +24,9 @@ function montar(bloqueado: boolean, extra: Partial<React.ComponentProps<typeof D
 }
 
 /**
- * Um clique de verdade fora do diálogo. O Radix só passa a ouvir o clique fora
- * um tique depois de abrir, e com o botão principal adia a dispensa do
- * `pointerdown` para o `click` que vem em seguida.
+ * A real click outside the dialog. Radix only starts listening for the outside
+ * click one tick after opening, and with the primary button it defers the
+ * dismissal from `pointerdown` to the `click` that follows.
  */
 async function clicarFora() {
   const tique = () => act(async () => { await new Promise(r => setTimeout(r, 0)) })

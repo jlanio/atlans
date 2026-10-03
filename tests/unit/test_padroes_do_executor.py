@@ -1,13 +1,13 @@
 # tests/unit/test_padroes_do_executor.py
 """
-Os padroes do executor escritos fora de executor/config.py tem de bater com ele.
+The executor defaults written outside executor/config.py must match it.
 
-Os mesmos numeros aparecem no `.env.example` (a semente de toda instalacao nova:
-static/install.sh, `python -m executor enroll` e o app desktop), no README e na
-tela de Ajustes do desktop (desktop/src/shared/limites.ts, com o teste do lado
-de la). As copias ja tinham divergido: o `.env.example` semeava
-EXECUTOR_MAX_QUEUE_SIZE=40 com o padrao em 50, e a tela de Ajustes mostrava a
-fila da instalacao nova como "alterada".
+The same numbers appear in `.env.example` (the seed of every new installation:
+static/install.sh, `python -m executor enroll` and the desktop app), in the README
+and in the desktop Settings screen (desktop/src/shared/limites.ts, with the test
+on that side). The copies had already diverged: `.env.example` seeded
+EXECUTOR_MAX_QUEUE_SIZE=40 with the default at 50, and the Settings screen showed
+the new installation's queue as "alterada" (changed).
 """
 import json
 import os
@@ -36,7 +36,7 @@ print(json.dumps({
 
 @pytest.fixture(scope="module")
 def padroes(tmp_path_factory) -> dict:
-    """O que o executor usa quando a variavel NAO esta no ambiente nem no .env."""
+    """What the executor uses when the variable is NOT in the environment nor in .env."""
     vazio = tmp_path_factory.mktemp("env") / ".env"
     vazio.write_text("", encoding="utf-8")
     ambiente = {k: v for k, v in os.environ.items() if not k.startswith("EXECUTOR_")}
@@ -61,8 +61,8 @@ def _env_example() -> dict[str, str]:
     "EXECUTOR_MAX_CONCURRENT", "EXECUTOR_MAX_QUEUE_SIZE", "EXECUTOR_JOB_TIMEOUT",
 ])
 def test_env_example_semeia_os_padroes_de_execucao(padroes, variavel):
-    """A tela de Ajustes marca como "alterado" o que difere do padrao: a semente
-    nao pode nascer diferente dele."""
+    """The Settings screen marks as "alterado" (changed) whatever differs from the
+    default: the seed cannot be born different from it."""
     semeado = _env_example().get(variavel)
     assert semeado is None or int(semeado) == padroes[variavel], (
         f"{variavel}={semeado} no .env.example, mas o padrao do executor e {padroes[variavel]}"
@@ -70,8 +70,8 @@ def test_env_example_semeia_os_padroes_de_execucao(padroes, variavel):
 
 
 def test_env_example_so_semeia_valor_que_o_executor_aceita():
-    """A semente do GeoSync difere do padrao DE PROPOSITO (ver o .env.example),
-    mas tem de ser um valor que o executor usa — senao ele cai no padrao calado."""
+    """The GeoSync seed differs from the default ON PURPOSE (see .env.example),
+    but it has to be a value the executor uses — otherwise it silently falls back to the default."""
     semente = _env_example()
     assert semente["EXECUTOR_SYNC_MODE"] in ("upload", "download", "bidirectional", "catalog")
     assert int(semente["EXECUTOR_SYNC_INTERVAL"]) >= 1

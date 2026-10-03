@@ -1,17 +1,17 @@
 # flow/factory.py
 """
-NodeFactory: fábrica simples e coesa para instanciar nós do workflow.
+NodeFactory: simple, cohesive factory for instantiating workflow nodes.
 """
 from flow.registry import NODE_REGISTRY
 from flow.nodes.base import BaseNode
 from flow.utils.logger import get_logger
 
-# Propriedades que chegam à fábrica JÁ com o segredo em claro: o servidor
-# resolve a credencial e injeta o valor decifrado nas properties do nó antes de
-# instanciá-lo (ver app/services/credential_resolver.py). Nomes em minúsculas —
-# a comparação é feita sem caixa, mas é por NOME EXATO: `awsSecretAccessKey`
-# (campo antigo do SaveToS3) não casava com `secret` e saía em claro no log, na
-# leitura redigida e no lint.
+# Properties that reach the factory ALREADY with the secret in plaintext: the server
+# resolves the credential and injects the decrypted value into the node's properties
+# before instantiating it (see app/services/credential_resolver.py). Lowercase
+# names — the comparison is case-insensitive, but by EXACT NAME: `awsSecretAccessKey`
+# (old SaveToS3 field) did not match `secret` and came out in plaintext in the log,
+# in the redacted read and in the lint.
 _PROPRIEDADES_SECRETAS = frozenset({
     'http_auth', 's3_auth', 'connectionstring', 'token', 'password', 'senha',
     'secret', 'api_key', 'apikey', 'authorization', 'private_key',
@@ -20,13 +20,13 @@ _PROPRIEDADES_SECRETAS = frozenset({
 
 
 def _sem_segredos(props: dict) -> dict:
-    """Cópia das propriedades com os valores sensíveis trocados por marcador.
+    """Copy of the properties with the sensitive values replaced by a marker.
 
-    O log de instanciação imprimia as properties INTEIRAS, e nelas vai o token
-    Bearer decifrado e a senha do banco. Em DEBUG isso é o bastante para o
-    segredo do usuário ficar gravado em texto puro no arquivo de log e em
-    qualquer coletor para onde ele seja enviado — fora do banco, onde está
-    cifrado, e fora do controle de quem o cadastrou.
+    The instantiation log printed the WHOLE properties, and they carry the
+    decrypted Bearer token and the database password. At DEBUG that is enough
+    for the user's secret to end up written in plain text in the log file and in
+    any collector it gets shipped to — outside the database, where it is
+    encrypted, and outside the control of whoever registered it.
     """
     if not isinstance(props, dict):
         return props
@@ -38,9 +38,9 @@ def _sem_segredos(props: dict) -> dict:
 
 class NodeFactory:
     """
-    Responsável por criar instâncias de nós com base em definições JSON.
+    Responsible for creating node instances based on JSON definitions.
 
-    Exemplo de definição:
+    Example definition:
         {
             'id': '1',
             'name': 'MyNode',
@@ -76,6 +76,6 @@ class NodeFactory:
     
     def get(self, name: str):
         """
-        Retorna a classe do nó registrada, sem instanciá-la.
+        Returns the registered node class, without instantiating it.
         """
         return self.registry.get(name)

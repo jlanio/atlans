@@ -19,7 +19,7 @@ describe("tomDaAresta", () => {
   })
 
   it("ignora `cancelled`: é status de workflow, nunca de nó", () => {
-    // O cancelamento devolve os nós a `idle`; a aresta cai no handle/neutro.
+    // Cancellation returns the nodes to `idle`; the edge falls back to the handle/neutral color.
     expect(tomDaAresta("cancelled", "", false)).toBe("idle")
   })
 
@@ -41,11 +41,11 @@ describe("corDoTom", () => {
 })
 
 describe("nome de porta vindo do usuário", () => {
-  // `output_vars` é texto livre e as portas dinâmicas aceitam qualquer
-  // identificador. Com colchete cru no mapa, `constructor` devolvia a função
-  // `Object` em vez de undefined, e a cor da porta virava
-  // `var(--exec-function Object() { [native code] })` — `var()` inválido, a
-  // propriedade é descartada e a porta some do canvas.
+  // `output_vars` is free text and dynamic ports accept any identifier.
+  // With raw bracket access on the map, `constructor` returned the `Object`
+  // function instead of undefined, and the port color became
+  // `var(--exec-function Object() { [native code] })` — an invalid `var()`, the
+  // property is dropped and the port disappears from the canvas.
   it.each(["constructor", "toString", "hasOwnProperty", "valueOf", "__proto__"])(
     "'%s' não vira tom nem cor",
     (nome) => {

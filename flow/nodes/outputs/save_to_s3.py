@@ -30,7 +30,7 @@ def _upload_to_s3(
     aws_secret_access_key: str | None,
 ) -> None:
     """
-    Helper bloqueante: envia uma string JSON para um objeto em bucket S3.
+    Blocking helper: sends a JSON string to an object in an S3 bucket.
     """
     s3 = cliente_s3(
         s3_auth,
@@ -49,22 +49,22 @@ def _upload_to_s3(
 @register_node
 class SaveToS3Node(BaseNode):
     """
-    Serializa um GeoDataFrame como GeoJSON e faz upload para um bucket AWS S3.
+    Serializes a GeoDataFrame as GeoJSON and uploads it to an AWS S3 bucket.
 
-    A autenticação vem de uma credencial `s3` do cofre: o servidor a resolve e
-    injeta em `s3_auth` (chave, segredo, região, bucket padrão e endpoint) — o
-    segredo nunca fica na definition. Sem credencial, vale a cadeia padrão do
-    boto3 (IAM role, variáveis de ambiente, ~/.aws/credentials).
+    Authentication comes from an `s3` credential in the vault: the server resolves
+    it and injects it into `s3_auth` (key, secret, region, default bucket and
+    endpoint) — the secret never stays in the definition. Without a credential, the
+    default boto3 chain applies (IAM role, environment variables, ~/.aws/credentials).
 
-    `awsAccessKeyId`/`awsSecretAccessKey` são os campos antigos, digitados no
-    nó: seguem lidos para o fluxo gravado continuar funcionando com a mesma
-    identidade, mas o segredo gravado ali é recusado ao salvar e redigido na
-    leitura (é chave secreta como `password`).
+    `awsAccessKeyId`/`awsSecretAccessKey` are the old fields, typed into the
+    node: they are still read so a saved workflow keeps working with the same
+    identity, but a secret stored there is rejected on save and redacted on
+    read (it is a secret key, like `password`).
 
-    O `credential_id` aceita também um Webhook Token — o uso antigo do campo, que
-    protege o download da cópia registrada como artefato. O servidor só injeta a
-    do tipo `s3` (e tira o id); qualquer outro id que chegue aqui é tratado como
-    esse token.
+    `credential_id` also accepts a Webhook Token — the old use of the field, which
+    protects the download of the copy registered as an artifact. The server only
+    injects the `s3` kind (and removes the id); any other id that arrives here is
+    treated as that token.
     """
 
     @classmethod
@@ -97,10 +97,10 @@ class SaveToS3Node(BaseNode):
                     'credential_types': ['s3', 'webhook_token'],
                 },
                 {
-                    # Injetada pelo servidor a partir da credencial `s3` (ver
-                    # credential_resolver). Declarada porque `validate()`
-                    # reconstrói os parâmetros a partir desta lista e descartaria
-                    # o que não estivesse nela. A UI a esconde pelo nome.
+                    # Injected by the server from the `s3` credential (see
+                    # credential_resolver). Declared because `validate()`
+                    # rebuilds the parameters from this list and would drop
+                    # whatever was not in it. The UI hides it by name.
                     'name': 's3_auth',
                     'label': 'Credencial S3 resolvida',
                     'type': 'object',
@@ -167,11 +167,11 @@ class SaveToS3Node(BaseNode):
                     'default': '',
                     'description': 'Nome do artefato no MinIO (usado apenas quando registerArtifact=true).',
                 },
-                # Vale so para a COPIA registrada como artefato. O bucket S3
-                # externo e um destino que quem monta o fluxo configurou
-                # explicitamente, com credencial propria — a localidade aqui
-                # trata do armazenamento da plataforma, nao de para onde o
-                # usuario decidiu mandar o dado dele.
+                # Applies only to the COPY registered as an artifact. The external
+                # S3 bucket is a destination that whoever builds the workflow
+                # configured explicitly, with its own credential — locality here
+                # is about the platform's storage, not about where the user
+                # decided to send their data.
                 propriedade_localidade(
                     visible_when={'field': 'registerArtifact', 'in': [True, 'true']}
                 ),
@@ -196,16 +196,16 @@ class SaveToS3Node(BaseNode):
         crs = self.get_param('crs', 'EPSG:4326')
         register_artifact = self.get_param('registerArtifact', False)
         label = self.get_param('label', '').strip()
-        # Com a credencial S3 resolvida o servidor já tirou o id; o que sobra
-        # aqui é o Webhook Token que protege a cópia registrada (uso antigo).
+        # With the S3 credential resolved, the server has already removed the id; what
+        # remains here is the Webhook Token that protects the registered copy (old use).
         credential_id = self.get_param('credential_id', '') or None
 
-        # Sobrou `credential_id` sem `s3_auth`: a credencial escolhida NÃO foi
-        # resolvida (apagada, vencida, de outro tipo, ou privada de quem não
-        # disparou). Sem cópia registrada, esse id não pode ser o Webhook Token
-        # do uso antigo — o servidor o tira nesse caso —, e seguir faria o
-        # upload com OUTRA identidade (as chaves antigas do nó ou a cadeia
-        # padrão do boto3 no executor), em silêncio. Mesma regra do HttpRequest.
+        # `credential_id` left over without `s3_auth`: the chosen credential was NOT
+        # resolved (deleted, expired, of another kind, or private to someone who
+        # did not trigger the run). Without a registered copy, this id cannot be the
+        # Webhook Token of the old use — the server removes it in that case —, and
+        # proceeding would do the upload with ANOTHER identity (the node's old keys
+        # or the default boto3 chain on the executor), silently. Same rule as HttpRequest.
         if credential_id and not s3_auth and not register_artifact:
             raise ValueError(
                 "A credencial escolhida para este nó não pôde ser resolvida — ela pode ter "
@@ -222,8 +222,8 @@ class SaveToS3Node(BaseNode):
 
         endpoint = str(s3_auth.get('endpoint_url') or '').strip()
         if endpoint:
-            # Mesma guarda do teste de conexão da credencial: um endpoint que o
-            # teste recusaria não passa a valer aqui.
+            # Same guard as the credential's connection test: an endpoint the
+            # test would refuse does not become valid here.
             from flow.utils.geo_helpers import validate_url_ssrf
             await asyncio.to_thread(validate_url_ssrf, endpoint)
 
@@ -235,8 +235,8 @@ class SaveToS3Node(BaseNode):
         # Obtem o GeoDataFrame
         data = self.get_first_gdf(inputs)
 
-        # Reprojeta se necessario. Fica FORA do try abaixo: um CRS de destino
-        # invalido nao e erro de serializacao, e a mensagem diria o contrario.
+        # Reprojects if needed. Stays OUTSIDE the try below: an invalid destination
+        # CRS is not a serialization error, and the message would say otherwise.
         data = await asyncio.to_thread(ensure_gdf_crs, data, crs)
 
         features = len(data)
@@ -246,7 +246,7 @@ class SaveToS3Node(BaseNode):
         except Exception as e:
             raise RuntimeError(f"Erro ao serializar GeoDataFrame para GeoJSON: {e}") from e
 
-        # Upload para S3 externo
+        # Upload to external S3
         logger.info(f"Enviando para s3://{bucket}/{key} (regiao: {region})")
         try:
             await asyncio.to_thread(
@@ -268,7 +268,7 @@ class SaveToS3Node(BaseNode):
         output_data: Dict[str, Any] = {'s3Uri': s3_uri, 'artifact_s3_key': ''}
         result: Dict[str, Any] = {}
 
-        # Registro opcional como artefato no MinIO interno
+        # Optional registration as an artifact in the internal MinIO
         if register_artifact:
             workspace_id, task_id = self.require_execution_context()
 
@@ -283,8 +283,8 @@ class SaveToS3Node(BaseNode):
             if localidade == EXECUTOR:
                 credential_id = None
             elif s3_auth and not credential_id:
-                # O `credential_id` foi a credencial S3 (o servidor a injetou e
-                # tirou o id): não sobra Webhook Token para proteger a cópia.
+                # `credential_id` was the S3 credential (the server injected it and
+                # removed the id): no Webhook Token is left to protect the copy.
                 self.log(
                     "Copia registrada sem token de protecao: a credencial escolhida e a "
                     "do S3, e o download da copia fica pelo link."

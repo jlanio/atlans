@@ -11,79 +11,81 @@ import {
 } from "@/app/components/ui/dialog"
 
 interface DeleteDialogProps {
-  /** Pode trazer um ícone junto (a revogação em lote traz o escudo). */
+  /** May carry an icon along (the batch revocation carries the shield). */
   title: React.ReactNode
-  /** Pode trazer marcação: o nome em destaque, o bloco com o texto a digitar. */
+  /** May carry markup: the highlighted name, the block with the text to type. */
   description: React.ReactNode
   /**
-   * Aviso DISCRETO abaixo da descrição (ex: "em uso em N nós"). De propósito uma
-   * linha muted, não um painel colorido — o contexto extra não deve gritar mais
-   * que a própria confirmação.
+   * DISCREET note below the description (e.g. "em uso em N nós"). Deliberately a
+   * muted line, not a colored panel — the extra context must not shout louder
+   * than the confirmation itself.
    */
   note?: React.ReactNode
   /**
-   * Avisos entre a descrição e a confirmação: o que a ação leva junto (os crons
-   * que param, os arquivos que não voltam) ou o conflito que pede o «mesmo
-   * assim». Ao contrário do `note`, são painéis — e o painel é de quem chama.
+   * Warnings between the description and the confirmation: what the action takes
+   * with it (the crons that stop, the files that don't come back) or the conflict
+   * that calls for the "mesmo assim" (anyway). Unlike `note`, these are panels —
+   * and the panel belongs to the caller.
    */
   children?: React.ReactNode
   /**
-   * Confirmação por digitação: o botão só libera quando o campo traz EXATAMENTE
-   * este texto (o nome do recurso, «REVOGAR»). Reservada ao que não se desfaz.
-   * Enter no campo confirma pelo mesmo caminho do botão, com a mesma trava — era
-   * no Enter que o duplo envio escapava nas cópias que cada diálogo tinha disto.
+   * Confirmation by typing: the button only unlocks when the field holds EXACTLY
+   * this text (the resource name, "REVOGAR"). Reserved for what can't be undone.
+   * Enter in the field confirms through the same path as the button, with the same
+   * lock — Enter was where the double submit slipped through in the copies of this
+   * that each dialog had.
    */
   confirmarDigitando?: string
   /**
-   * O pedido acima do campo («Para confirmar, digite …»). Sem ele o pedido fica
-   * na `description`, com o texto em bloco copiável.
+   * The prompt above the field ("Para confirmar, digite …"). Without it the prompt
+   * stays in the `description`, with the text in a copyable block.
    */
   rotuloDigitando?: React.ReactNode
-  /** Pode ser async — o diálogo aguarda e trava os botões enquanto executa. */
+  /** May be async — the dialog awaits and locks the buttons while it runs. */
   onConfirm: () => void | Promise<void>
   /**
-   * Verbo do botão de confirmação. Nem toda ação destrutiva é uma exclusão:
-   * "Remover" um membro e "Sair" de um workspace precisam da mesma trava contra
-   * duplo clique, mas rotulá-las como "Excluir" descreveria a ação errada.
+   * Verb of the confirm button. Not every destructive action is a deletion:
+   * "Remover" a member and "Sair" a workspace need the same lock against a
+   * double click, but labeling them "Excluir" would describe the wrong action.
    */
   confirmLabel?: string
   /**
-   * Rótulo enquanto executa — passe o gerúndio ("Removendo…", "Saindo…").
-   * Sem ele o fallback é `${confirmLabel}…`, que não é português correto para
-   * verbo nenhum além do caso já coberto do "Excluir".
+   * Label while running — pass the gerund ("Removendo…", "Saindo…").
+   * Without it the fallback is `${confirmLabel}…`, which is not correct Portuguese
+   * for any verb other than the already-covered case of "Excluir".
    */
   loadingLabel?: string
   /**
-   * Rótulo do botão que FECHA sem agir. O default serve a quase tudo, mas há
-   * casos em que «Cancelar» ao lado de «Cancelar assinatura» diz duas coisas
-   * opostas com a mesma palavra — ali passe o que a pessoa está escolhendo
-   * («Manter plano»).
+   * Label of the button that CLOSES without acting. The default fits almost
+   * everything, but there are cases where "Cancelar" next to "Cancelar assinatura"
+   * says two opposite things with the same word — there, pass what the person is
+   * choosing ("Manter plano").
    */
   cancelLabel?: string
   /**
-   * O nome do `X` para leitor de tela, repassado ao `DialogContent`. Sem ele, o
-   * "Fechar" de sempre; a Home, que fala três idiomas, passa o do idioma dela.
+   * The screen-reader name of the `X`, passed on to `DialogContent`. Without it,
+   * the usual "Fechar"; the Home, which speaks three languages, passes its own.
    */
   closeLabel?: string
   /**
-   * Classe do `DialogContent`. A Home abre este diálogo sobre uma tela quase
-   * preta e passa `home-portal` (o conteúdo é portado ao <body>, fora da árvore
-   * que declara a paleta dela); os diálogos de ação passam a largura.
+   * Class of the `DialogContent`. The Home opens this dialog over a nearly black
+   * screen and passes `home-portal` (the content is portaled to <body>, outside the
+   * tree that declares its palette); the action dialogs pass the width.
    */
   className?: string
 }
 
-// Dialog de confirmação de exclusão genérico.
+// Generic delete confirmation dialog.
 //
-// O estado de "excluindo" é INTERNO de propósito: os consumidores só entregam um
-// `onConfirm` (que pode ser async) e ganham a trava de graça, sem mudar assinatura.
-// Sem ela, duplo clique em "Excluir" disparava dois DELETEs — e como as ações de
-// exclusão removem o item da lista otimistamente, o segundo request batia num
-// recurso já removido.
+// The "deleting" state is INTERNAL on purpose: consumers only hand over an
+// `onConfirm` (which may be async) and get the lock for free, with no signature change.
+// Without it, a double click on "Excluir" fired two DELETEs — and since the delete
+// actions remove the item from the list optimistically, the second request hit an
+// already-removed resource.
 export function DeleteDialog({ onConfirm, className, closeLabel, ...resto }: DeleteDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false)
-  // Ref e não só estado: o Enter do campo e o clique podem chegar no mesmo
-  // tique, antes de o "excluindo" ser desenhado.
+  // A ref and not just state: the field's Enter and the click can arrive in the
+  // same tick, before "deleting" is drawn.
   const emVoo = useRef(false)
 
   async function handleConfirm() {
@@ -93,16 +95,16 @@ export function DeleteDialog({ onConfirm, className, closeLabel, ...resto }: Del
     try {
       await onConfirm()
     } finally {
-      // Se o onConfirm fechou o diálogo, este setState cai num componente
-      // desmontado e o React ignora; se ele falhou, o botão volta a funcionar.
+      // If onConfirm closed the dialog, this setState lands on an unmounted
+      // component and React ignores it; if it failed, the button works again.
       emVoo.current = false
       setIsDeleting(false)
     }
   }
 
   return (
-    // Fechar no meio da exclusão deixa o usuário sem saber se ela aconteceu:
-    // `bloqueado` trava as três saídas (Esc, clique-fora e o X).
+    // Closing in the middle of the deletion leaves the user not knowing whether it
+    // happened: `bloqueado` locks all three exits (Esc, click-outside and the X).
     <DialogContent className={className} bloqueado={isDeleting} closeLabel={closeLabel}>
       <Confirmacao {...resto} isDeleting={isDeleting} onConfirmar={handleConfirm} />
     </DialogContent>
@@ -110,10 +112,10 @@ export function DeleteDialog({ onConfirm, className, closeLabel, ...resto }: Del
 }
 
 /**
- * O miolo do diálogo, montado DENTRO do portal: desmonta quando o diálogo fecha,
- * e o que foi digitado não sobrevive a uma reabertura. O `DeleteDialog` em si
- * continua montado quando quem o usa o deixa dentro de um `Dialog` fechado — é o
- * caso dos diálogos abertos por um item de menu.
+ * The dialog's core, mounted INSIDE the portal: it unmounts when the dialog closes,
+ * and what was typed doesn't survive a reopen. The `DeleteDialog` itself stays
+ * mounted when its user leaves it inside a closed `Dialog` — which is the case of
+ * dialogs opened from a menu item.
  */
 function Confirmacao({
   title, description, note, children, confirmarDigitando, rotuloDigitando,
@@ -150,15 +152,15 @@ function Confirmacao({
             id={campoId}
             value={digitado}
             onChange={e => setDigitado(e.target.value)}
-            // `repeat`: segurar o Enter não pode virar uma segunda confirmação
-            // quando a primeira volta com o 409 do «mesmo assim».
+            // `repeat`: holding Enter must not turn into a second confirmation
+            // when the first one comes back with the 409 of the "mesmo assim".
             onKeyDown={e => { if (e.key === "Enter" && !e.repeat) confirmar() }}
             placeholder={confirmarDigitando}
             autoComplete="off"
-            // Só leitura, e não `disabled`: o navegador tira o foco de um campo
-            // desabilitado, e depois de uma falha (ou do 409) o Enter não fazia
-            // nada até a pessoa clicar de volta nele. O Enter no meio da ação
-            // cai na trava de `handleConfirm`.
+            // Read-only, and not `disabled`: the browser takes focus away from a
+            // disabled field, and after a failure (or the 409) Enter did
+            // nothing until the person clicked back into it. Enter in the middle
+            // of the action falls into the lock in `handleConfirm`.
             readOnly={isDeleting}
             className="max-md:h-10"
           />

@@ -3,11 +3,11 @@ import { cleanup, render, screen, within } from "@testing-library/react"
 import type { IDriveFile } from "@/service/types"
 
 /**
- * As peças de fora da Home que as listas usam — a marca de conteúdo no
- * executor, o diálogo de metadados do Drive e o erro do download — no idioma
- * da Home. Sem os textos elas continuam o português de sempre (o Drive e a
- * tabela de Artefatos não os passam), e o português do dicionário é o MESMO
- * texto dos padrões delas.
+ * The pieces from outside the Home that the lists use — the content-on-executor
+ * mark, the Drive metadata dialog and the download error — in the Home's
+ * language. Without the texts they stay in the usual Portuguese (the Drive and the
+ * Artifacts table do not pass them), and the dictionary's Portuguese is the SAME
+ * text as their defaults.
  */
 const H = vi.hoisted(() => ({ getArtifactDownload: vi.fn() }))
 vi.mock("@/service/GisFlowService", () => ({
@@ -111,7 +111,7 @@ describe("em inglês", () => {
     expect(within(dialogo).getByText("5,570")).toBeTruthy()
     expect(within(dialogo).getByText("The content isn’t in the cloud.")).toBeTruthy()
     expect(within(dialogo).getByText("executor exec-1234567890")).toBeTruthy()
-    // O X e o botão do rodapé.
+    // The X and the footer button.
     expect(within(dialogo).getAllByRole("button", { name: "Close" })).toHaveLength(2)
     expect(dialogo.textContent).not.toContain("Metadados")
   })

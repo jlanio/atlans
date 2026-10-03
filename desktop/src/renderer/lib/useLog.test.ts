@@ -1,18 +1,20 @@
 // desktop/src/renderer/lib/useLog.test.ts
 //
-// A costura dos lotes de log. Testada como função pura porque a primeira versão
-// vivia dentro do updater do `setState` e escondia três defeitos:
+// The stitching of log batches. Tested as a pure function because the first
+// version lived inside the `setState` updater and hid three defects:
 //
-//   1. o updater roda DEPOIS do handler, e a comparação de `seq` lia um ref já
-//      avançado — nenhum lote incremental entrava, e o log congelava logo após
-//      montar. Um bug que só aparece em uso, e como "o log parou de atualizar";
-//   2. havia um `window.atlas.log()` dentro do updater — efeito colateral numa
-//      função que o React pode chamar duas vezes;
-//   3. o carregamento inicial substituía o buffer e descartava as linhas que
-//      chegassem no intervalo entre o main montar a resposta e ela chegar aqui.
+//   1. the updater runs AFTER the handler, and the `seq` comparison read a ref
+//      that had already advanced — no incremental batch got in, and the log
+//      froze right after mounting. A bug that only shows up in use, and as "the
+//      log stopped updating";
+//   2. there was a `window.atlas.log()` inside the updater — a side effect in a
+//      function React may call twice;
+//   3. the initial load replaced the buffer and discarded the lines arriving in
+//      the interval between the main process building the response and it
+//      arriving here.
 //
-// Os três são invisíveis em leitura casual e voltariam na primeira
-// "simplificação".
+// All three are invisible on a casual read and would come back with the first
+// "simplification".
 import { describe, expect, it } from 'vitest'
 import {
   LOG_VAZIO, MAX_LOG, mesclarLog, type EstadoLog, type LinhaVisivel,
@@ -24,11 +26,11 @@ function linha(seq: number): LinhaLog {
 }
 
 /**
- * Linha já no buffer local — com o texto de busca que `mesclarLog` acrescenta.
+ * A line already in the local buffer — with the search text `mesclarLog` adds.
  *
- * O que chega pelo IPC é `LinhaLog`; o que fica guardado aqui é `LinhaVisivel`,
- * com `msg`+`alias` em minúsculas para o filtro do painel não refazer isso a
- * cada tecla.
+ * What arrives over IPC is `LinhaLog`; what is stored here is `LinhaVisivel`,
+ * with `msg`+`alias` lowercased so the panel filter does not redo it on every
+ * keystroke.
  */
 function guardada(seq: number): LinhaVisivel {
   const l = linha(seq)
@@ -49,9 +51,9 @@ describe('carregamento completo', () => {
   })
 
   it('PRESERVA as linhas que chegaram enquanto o snapshot vinha', () => {
-    // Defeito 3. O push entrega 10 e 11 antes de a resposta de `atlas.log()`
-    // (tirada em 9) chegar. Substituir sem mais perderia as duas para sempre,
-    // porque `ultimoSeq` já passou delas e nenhum lote futuro as reenvia.
+    // Defect 3. The push delivers 10 and 11 before the response of `atlas.log()`
+    // (taken at 9) arrives. Simply replacing would lose both forever, because
+    // `ultimoSeq` has already passed them and no future batch resends them.
     const comPush = mesclarLog(LOG_VAZIO, lote([10, 11], 10), 'incremental').estado
     const { estado } = mesclarLog(comPush, lote([8, 9]), 'completo')
 
@@ -67,7 +69,7 @@ describe('carregamento completo', () => {
 
 describe('lotes incrementais', () => {
   it('emenda as linhas novas', () => {
-    // O caso que o defeito 1 quebrava: em uso, o log parava de atualizar.
+    // The case defect 1 broke: in use, the log stopped updating.
     let e = mesclarLog(LOG_VAZIO, lote([1, 2]), 'completo').estado
     e = mesclarLog(e, lote([3, 4], 1), 'incremental').estado
     e = mesclarLog(e, lote([5], 1), 'incremental').estado
@@ -84,7 +86,7 @@ describe('lotes incrementais', () => {
   })
 
   it('lote inteiramente repetido devolve o MESMO objeto', () => {
-    // É o que permite ao hook não re-renderizar à toa.
+    // It is what lets the hook avoid pointless re-renders.
     const e = mesclarLog(LOG_VAZIO, lote([1, 2, 3]), 'completo').estado
     expect(mesclarLog(e, lote([1, 2, 3], 1), 'incremental').estado).toBe(e)
   })
@@ -99,27 +101,28 @@ describe('lotes incrementais', () => {
 
 describe('buraco no meio', () => {
   it('pede recarga quando o main já descartou o que faltava', () => {
-    // Estávamos em 5; o lote diz que a linha mais antiga que o main ainda tem é
-    // a 900. As linhas 6..899 não existem mais em lugar nenhum, e emendar
-    // produziria um log com um salto invisível.
+    // We were at 5; the batch says the oldest line the main process still has is
+    // 900. Lines 6..899 no longer exist anywhere, and stitching would produce a
+    // log with an invisible jump.
     const e: EstadoLog = { linhas: [guardada(5)], ultimoSeq: 5 }
     const r = mesclarLog(e, lote([1000], 900), 'incremental')
 
     expect(r.recarregar).toBe(true)
-    expect(r.estado).toBe(e)   // não mexe no buffer enquanto a recarga não vem
+    expect(r.estado).toBe(e)   // does not touch the buffer until the reload comes
   })
 
   it('buffer cheio no main, mas SEM buraco, não pede recarga', () => {
-    // O caso normal com o log lotado: o main já aparou o início (primeiroSeq
-    // alto), mas nós estamos em dia. Confundir os dois faria o app recarregar o
-    // log inteiro a cada lote — exatamente o custo que este desenho eliminou.
+    // The normal case with the log full: the main process has already trimmed the
+    // start (high primeiroSeq), but we are up to date. Confusing the two would
+    // make the app reload the whole log on every batch — exactly the cost this
+    // design eliminated.
     const e: EstadoLog = { linhas: [guardada(1200)], ultimoSeq: 1200 }
     expect(mesclarLog(e, lote([1201], 201), 'incremental').recarregar).toBe(false)
   })
 
   it('buffer local vazio nunca pede recarga', () => {
-    // Sem nada aplicado ainda, não há como haver buraco — e pedir recarga aqui
-    // criaria um laço com o carregamento inicial.
+    // With nothing applied yet, there cannot be a gap — and requesting a reload
+    // here would create a loop with the initial load.
     expect(mesclarLog(LOG_VAZIO, lote([500], 500), 'incremental').recarregar).toBe(false)
   })
 })

@@ -1,9 +1,9 @@
 """
-Testes de flow.utils.workflow_contract:
-- extract_contract a partir de definicoes do canvas
-- validate_inputs_mapping contra contrato
-- collect_subworkflow_references identifica nodes SubWorkflow
-- validate_subworkflow_references_against_db (async) faz lookup no DB
+Tests for flow.utils.workflow_contract:
+- extract_contract from canvas definitions
+- validate_inputs_mapping against the contract
+- collect_subworkflow_references identifies SubWorkflow nodes
+- validate_subworkflow_references_against_db (async) does a DB lookup
 """
 from __future__ import annotations
 
@@ -30,8 +30,8 @@ class TestExtractContract:
             "outputs": [],
             "has_input_node": False,
             "has_output_node": False,
-            # Contagens expostas para detectar contrato ambiguo (>1 node do
-            # mesmo tipo torna o retorno indefinido).
+            # Counts exposed to detect an ambiguous contract (>1 node of the
+            # same type makes the return undefined).
             "input_node_count": 0,
             "output_node_count": 0,
         }
@@ -69,7 +69,7 @@ class TestExtractContract:
         assert result["outputs"] == []
 
     def test_dedupe_input_keys_preserves_order(self):
-        """Chaves duplicadas em ports nao duplicam no contrato."""
+        """Duplicate keys in ports are not duplicated in the contract."""
         definition = {
             "nodes": [
                 {"id": "in", "name": "SubWorkflowInput",
@@ -80,8 +80,8 @@ class TestExtractContract:
         assert [p["name"] for p in result["inputs"]] == ["focos", "bbox"]
 
     def test_ports_as_json_string(self):
-        """ports armazenado como JSON serializado (helper UI faz JSON.stringify)
-        e parseado de volta para list[str]."""
+        """ports stored as serialized JSON (the UI helper does JSON.stringify)
+        and parsed back into list[str]."""
         definition = {
             "nodes": [
                 {"id": "in", "name": "SubWorkflowInput",
@@ -95,8 +95,8 @@ class TestExtractContract:
         assert [p["name"] for p in result["outputs"]] == ["resultado"]
 
     def test_node_without_ports_returns_empty(self):
-        """Node SubWorkflowInput presente mas sem ports declaradas: contrato
-        vazio mas has_input_node=True (sinal para UI mostrar 'declare ports')."""
+        """SubWorkflowInput node present but with no declared ports: empty contract
+        but has_input_node=True (signal for the UI to show 'declare ports')."""
         definition = {
             "nodes": [{"id": "in", "name": "SubWorkflowInput", "properties": {}}],
         }
@@ -105,7 +105,7 @@ class TestExtractContract:
         assert result["inputs"] == []
 
     def test_ports_in_data_properties(self):
-        """Canvas as vezes serializa properties dentro de data.properties."""
+        """The canvas sometimes serializes properties inside data.properties."""
         definition = {
             "nodes": [
                 {"id": "in", "name": "SubWorkflowInput",
@@ -126,7 +126,7 @@ class TestValidateInputsMapping:
         assert errors == []
 
     def test_partial_mapping_ok(self):
-        """Caller nao precisa popular TODAS as chaves declaradas."""
+        """The caller does not need to populate ALL the declared keys."""
         contract = {"inputs": [{"name": "focos"}, {"name": "bbox"}]}
         errors = validate_inputs_mapping({"focos": "x"}, contract)
         assert errors == []
@@ -139,7 +139,7 @@ class TestValidateInputsMapping:
         assert "focos" in errors[0]  # lista declaradas
 
     def test_empty_contract_skips_validation(self):
-        """Workflow sem inputs declarados: nao valida (nao temos informacao)."""
+        """Workflow with no declared inputs: not validated (we have no information)."""
         contract = {"inputs": []}
         errors = validate_inputs_mapping({"qualquer": "x"}, contract)
         assert errors == []
@@ -203,14 +203,14 @@ class _FakeWorkflow:
 
 
 def _make_db(targets: dict):
-    """Mock de AsyncSession.execute().scalars().all().
+    """Mock of AsyncSession.execute().scalars().all().
 
-    Implementacao: retorna a lista de targets uma unica vez (validacao
-    agora carrega tudo numa query — fix do N+1). Tests que esperam
-    "nao existe" passam dict vazio.
+    Implementation: returns the list of targets a single time (validation
+    now loads everything in one query — N+1 fix). Tests that expect
+    "does not exist" pass an empty dict.
     """
     db = MagicMock()
-    db.statements = []            # o que foi executado, para inspecionar o SQL
+    db.statements = []            # what was executed, to inspect the SQL
     rows = list(targets.values())
 
     async def execute(stmt):
@@ -243,7 +243,7 @@ class TestValidateSubworkflowReferencesAgainstDb:
                 "properties": {"workflowHash": "ghost", "inputsMapping": {}},
             }],
         }
-        db = _make_db({})  # nao tem nada
+        db = _make_db({})  # has nothing
         errors = await validate_subworkflow_references_against_db(definition, db)
         assert any("nao existe" in e for e in errors)
 
@@ -266,10 +266,11 @@ class TestValidateSubworkflowReferencesAgainstDb:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("ativo", [True, False])
     async def test_target_other_workspace_reads_as_missing(self, ativo):
-        """Com `workspace_id`, a query filtra pelo workspace e um alvo alheio lê
-        como inexistente — ativo ou não. Distinguir "de outro workspace" de
-        "não existe" (ou "desativado") seria um oráculo de existência e estado
-        de workflows alheios para qualquer membro de qualquer workspace."""
+        """With `workspace_id`, the query filters by workspace and a foreign target
+        reads as nonexistent — active or not. Distinguishing "from another
+        workspace" from "does not exist" (or "deactivated") would be an oracle
+        for the existence and state of other people's workflows for any member
+        of any workspace."""
         target = _FakeWorkflow("h1", "ws-OTHER", ativo, {})
         definition = {
             "nodes": [{
@@ -278,7 +279,7 @@ class TestValidateSubworkflowReferencesAgainstDb:
                 "properties": {"workflowHash": "h1", "inputsMapping": {}},
             }],
         }
-        db = _make_db({"h1": target})   # sessão que devolve a linha de fora mesmo assim
+        db = _make_db({"h1": target})   # a session that returns the outside row anyway
         errors = await validate_subworkflow_references_against_db(
             definition, db, workspace_id="ws-1",
         )
@@ -300,7 +301,7 @@ class TestValidateSubworkflowReferencesAgainstDb:
         db = _make_db({})
         await validate_subworkflow_references_against_db(definition, db)
         sql = str(db.statements[0].compile(compile_kwargs={"literal_binds": True}))
-        assert "workflows.workspace_id = " not in sql     # a coluna sai no SELECT; o filtro, não
+        assert "workflows.workspace_id = " not in sql     # the column is in the SELECT; the filter is not
 
     @pytest.mark.asyncio
     async def test_target_missing_contract(self):
@@ -320,8 +321,8 @@ class TestValidateSubworkflowReferencesAgainstDb:
         errors = await validate_subworkflow_references_against_db(
             definition, db, workspace_id="ws-1",
         )
-        # Só a saída é obrigatória: SubWorkflowInput virou opcional, então o
-        # erro deve citar apenas o que de fato impede o uso como sub-fluxo.
+        # Only the output is mandatory: SubWorkflowInput became optional, so the
+        # error should mention only what actually prevents use as a sub-workflow.
         assert any("SubWorkflowOutput" in e for e in errors)
         assert not any("SubWorkflowInput" in e for e in errors)
 

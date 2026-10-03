@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, cleanup, waitFor, fireEvent, within } from "@testing-library/react"
 
-// Tela de admin "Piso de isolamento" (spec §4.5): só o administrador da
-// plataforma fixa `no_pool`. Exigir pede confirmação (muda o que roda onde e
-// pode deixar um workspace sem executor); liberar não.
+// Admin screen "Piso de isolamento" (isolation floor, spec §4.5): only the platform
+// administrator sets `no_pool`. Requiring asks for confirmation (it changes what runs where and
+// can leave a workspace with no executor); releasing does not.
 
 vi.mock("@/service/GisFlowService", () => ({
   GisFlowService: { setWorkspaceIsolationFloor: vi.fn() },
@@ -46,7 +46,7 @@ describe("piso de isolamento", () => {
     fireEvent.click(screen.getByRole("switch", { name: "Exigir isolamento de Bacia" }))
     const dialogo = await screen.findByRole("dialog")
     expect(within(dialogo).getByText(/Exigir isolamento de «Bacia»/)).toBeTruthy()
-    // Hoje usa o pool como último recurso: isso deixa de valer.
+    // Today it uses the pool as a last resort: that stops being true.
     expect(dialogo.textContent).toMatch(/deixa de valer/)
     expect(setFloor).not.toHaveBeenCalled()
 

@@ -1,11 +1,11 @@
 /**
- * Endereço de um nó que executou dentro de um sub-fluxo.
+ * Address of a node that executed inside a sub-workflow.
  *
- * O executor prefixa o id do nó com o nó SubWorkflow que o chamou, e isso se
- * acumula a cada nível. O meta `subworkflow_parent_node` NÃO serve para descer:
- * cada nível o sobrescreve ao republicar, então ele sempre aponta para o nó do
- * canvas raiz. Quem carrega a cadeia inteira é o próprio id — é o que estes
- * testes fixam.
+ * The executor prefixes the node id with the SubWorkflow node that called it,
+ * and this accumulates at each level. The `subworkflow_parent_node` meta is NOT
+ * usable for descending: each level overwrites it when republishing, so it
+ * always points to the root canvas's node. What carries the whole chain is the
+ * id itself — that's what these tests pin down.
  */
 import { describe, it, expect } from "vitest"
 
@@ -27,8 +27,8 @@ describe("endereço de um nó do run", () => {
 
   it("cadeia A→B→C: o id guarda os dois nós atravessados", () => {
     expect(caminhoDeChamada("sA::sB::X")).toEqual(["sA", "sB"])
-    // É este id — e não o endereço completo — que casa com a definition do
-    // sub-fluxo carregada do backend.
+    // It's this id — not the full address — that matches the sub-workflow
+    // definition loaded from the backend.
     expect(idLocal("sA::sB::X")).toBe("X")
   })
 })
@@ -40,8 +40,8 @@ describe("pertenceAoNivel", () => {
   })
 
   it("recusa um nó de nível mais profundo, ainda que compartilhe o prefixo", () => {
-    // Um `startsWith` diria que sim. Se disséssemos, o estado de um nó de C
-    // seria pintado num nó de B que por acaso tem o mesmo id local.
+    // A `startsWith` would say yes. If we said so, the state of a node in C
+    // would be painted on a node in B that happens to have the same local id.
     expect(pertenceAoNivel("sA::sB::X", ["sA"])).toBe(false)
   })
 

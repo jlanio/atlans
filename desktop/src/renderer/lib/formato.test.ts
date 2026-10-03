@@ -1,8 +1,8 @@
 // desktop/src/renderer/lib/formato.test.ts
 //
-// As bordas de faixa são onde o arredondamento errado aparece: um valor logo
-// abaixo de 60 s ou de 60 min que, arredondado depois da escolha da faixa, vira
-// "60.0s" ou "59m 60s".
+// Range boundaries are where wrong rounding shows up: a value just below 60 s
+// or 60 min that, rounded after the range is chosen, becomes "60.0s" or
+// "59m 60s".
 import { describe, expect, it } from 'vitest'
 import { duracao } from './formato.js'
 

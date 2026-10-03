@@ -1,11 +1,11 @@
-"""Taxa de sucesso e percentil: uma conta só para todas as telas.
+"""Success rate and percentile: a single calculation for every screen.
 
-A taxa de sucesso da spec (docs/specs/historico-metricas.md §3) é concluídas ÷
-(concluídas + falhas): em andamento e canceladas ficam fora do denominador. O
-Histórico, a visão por workflow e a por executor já usavam essa conta; o
-detalhe do workflow a reescrevia como `(total - failed) / total`, contando
-cada execução em andamento ou cancelada como sucesso — o mesmo fluxo aparecia
-com duas taxas diferentes conforme a tela.
+The spec's success rate (docs/specs/metrics-history.md §3) is completed ÷
+(completed + failed): in-progress and canceled runs stay out of the
+denominator. History, the per-workflow view and the per-executor view already
+used this calculation; the workflow detail rewrote it as
+`(total - failed) / total`, counting every in-progress or canceled run as a
+success — the same workflow showed two different rates depending on the screen.
 """
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -57,8 +57,8 @@ async def test_detalhe_do_workflow_usa_a_taxa_das_outras_telas():
     m = await ObservabilityService.get_workflow_metrics(db, "wf-1", MagicMock(role="user"), ["ws-1"])
 
     assert (m["total_runs"], m["failed_runs"]) == (5, 1)
-    # 2 / (2 + 1). A conta antiga dava (5 - 1) / 5 = 0.8: a execução em
-    # andamento e a cancelada entravam como sucesso.
+    # 2 / (2 + 1). The old calculation gave (5 - 1) / 5 = 0.8: the in-progress
+    # run and the canceled one counted as successes.
     assert m["success_rate"] == 0.6667
 
 
@@ -69,19 +69,19 @@ async def test_detalhe_so_com_execucoes_em_andamento_nao_mostra_100_por_cento():
 
     m = await ObservabilityService.get_workflow_metrics(db, "wf-1", MagicMock(role="user"), ["ws-1"])
 
-    assert m["success_rate"] == 0.0     # sem denominador, como nas outras telas (antes: 1.0)
+    assert m["success_rate"] == 0.0     # no denominator, as on the other screens (before: 1.0)
 
 
-# ── As peças únicas ──────────────────────────────────────────────────────────
+# ── The single pieces ────────────────────────────────────────────────────────
 
 def test_taxa_de_sucesso_so_olha_concluidas_e_falhas():
     assert taxa_de_sucesso(8, 2) == 0.8
-    assert taxa_de_sucesso(2, 1) == 0.6667          # 4 casas, como a tela recebe
-    assert taxa_de_sucesso(0, 0) == 0.0             # sem denominador não estoura
+    assert taxa_de_sucesso(2, 1) == 0.6667          # 4 decimal places, as the screen receives it
+    assert taxa_de_sucesso(0, 0) == 0.0             # no denominator does not blow up
 
 
 def test_percentil_linear_sem_valores_e_ausencia_e_nao_zero():
-    """O Histórico mostra "—" sem execução concluída; quem quer zero (o custo
-    por plano) decide isso na própria tela."""
+    """History shows "—" with no completed run; whoever wants zero (the cost
+    per plan) decides that on their own screen."""
     assert percentil_linear([], 0.5) is None
     assert percentil_linear([1, 2, 3, 4, 5], 0.95) == 4.8

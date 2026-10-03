@@ -2,22 +2,23 @@
 
 // web/app/hooks/workflow/useAssistenteEditor.ts
 //
-// O consumidor do stream do assistente e a máquina de estado da conversa.
+// The assistant stream consumer and the conversation state machine.
 //
-// **Não é `EventSource`**: ele é GET e não manda corpo, e a conversa precisa de
-// um. E **não é o `axios`** do `GisFlowService`: axios não entrega stream no
-// navegador — o `onDownloadProgress` devolve a resposta acumulada, o que é a
-// mesma coisa que esperar o fim. Então `fetch` + `response.body.getReader()`,
-// padrão novo nesta web (o único streaming de hoje é WebSocket, em
-// `useExecuteWorkflow.ts`). A leitura em si — e o que mais é igual ao da Home —
-// mora em `home/assistente/stream.ts`.
+// **It is not `EventSource`**: that is GET and sends no body, and the
+// conversation needs one. And **it is not the `axios`** of `GisFlowService`:
+// axios does not deliver a stream in the browser — `onDownloadProgress` returns
+// the accumulated response, which is the same as waiting for the end. So
+// `fetch` + `response.body.getReader()`, a new pattern in this web app (the only
+// streaming today is WebSocket, in `useExecuteWorkflow.ts`). The reading itself
+// — and whatever else is the same as the Home's — lives in
+// `home/assistente/stream.ts`.
 //
-// **Sem `Authorization` de propósito.** A rota passa pelo proxy `/terra`, que
-// autentica o upstream com o access token do SERVIDOR, renovado pelo
-// middleware, e IGNORA o header do cliente (`app/terra/[...path]/route.ts`:63).
-// Mandar o token daqui não autenticaria nada e reintroduziria o defeito que
-// aquele comentário registra: numa sessão longa, o token do cliente envelhece e
-// vira 401 no backend sem que ninguém tenha saído.
+// **No `Authorization`, on purpose.** The route goes through the `/terra` proxy,
+// which authenticates upstream with the SERVER's access token, renewed by the
+// middleware, and IGNORES the client header (`app/terra/[...path]/route.ts`:63).
+// Sending the token from here would authenticate nothing and would reintroduce
+// the defect that comment records: in a long session, the client token ages and
+// turns into a 401 in the backend without anyone having logged out.
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import { GisFlowService } from "@/service/GisFlowService"
@@ -34,8 +35,8 @@ import {
   type ErrosDaRota,
 } from "@/app/components/home/assistente/stream"
 
-/** Os status que `/assistente/editor/conversa` recusa antes do stream. Não é a
- *  tabela da Home de propósito — ver `erroDaResposta`. */
+/** The statuses that `/assistente/editor/conversa` refuses before the stream. It
+ *  is not the Home's table on purpose — see `erroDaResposta`. */
 const ERROS_DA_ROTA: ErrosDaRota = {
   409: { code: "conversa_em_andamento", message: "Já há uma conversa em andamento neste fluxo." },
   429: { code: "rate_limited", message: "Muitas mensagens em pouco tempo. Espere um instante." },
@@ -44,7 +45,7 @@ const ERROS_DA_ROTA: ErrosDaRota = {
 
 export interface Assistente {
   estado: IAssistenteEstado | null
-  /** Enquanto o `GET /estado` não volta, o painel não deve decidir nada. */
+  /** Until `GET /estado` comes back, the panel should not decide anything. */
   consultando: boolean
   turnos: TurnoDoAssistente[]
   correndo: boolean
@@ -54,8 +55,9 @@ export interface Assistente {
 }
 
 /**
- * @param workflowId  o fluxo aberto no editor. Ausente na tela de criar — o
- *                    backend guarda essa conversa sob a chave `novo`.
+ * @param workflowId  the workflow open in the editor. Absent on the create
+ *                    screen — the backend stores that conversation under the
+ *                    key `novo`.
  */
 export function useAssistenteEditor(workflowId?: string): Assistente {
   const [estado, setEstado] = useState<IAssistenteEstado | null>(null)
@@ -65,8 +67,9 @@ export function useAssistenteEditor(workflowId?: string): Assistente {
 
   const abortoRef = useRef<AbortController | null>(null)
 
-  // Trocar de fluxo é trocar de conversa: o histórico do fluxo anterior não tem
-  // nada a ver com este, e o stream dele não pode continuar escrevendo aqui.
+  // Switching workflow means switching conversation: the previous workflow's
+  // history has nothing to do with this one, and its stream must not keep
+  // writing here.
   useEffect(() => {
     setTurnos([])
     setCorrendo(false)
@@ -81,8 +84,8 @@ export function useAssistenteEditor(workflowId?: string): Assistente {
     setConsultando(true)
     GisFlowService.estadoDoAssistente().then(({ data }) => {
       if (!vivo) return
-      // Erro de rede aqui não é motivo para esconder o painel para sempre; o
-      // `null` deixa quem chama tratar "não sei" separado de "desligado".
+      // A network error here is no reason to hide the panel forever; `null` lets
+      // the caller treat "don't know" separately from "turned off".
       setEstado(data ?? null)
       setConsultando(false)
     })
@@ -129,25 +132,26 @@ export function useAssistenteEditor(workflowId?: string): Assistente {
           return
         }
 
-        // O quadro `cota` atualiza o estado e não entra na conversa.
+        // The `cota` frame updates the state and does not enter the conversation.
         await lerQuadrosSSE(resposta.body, (quadro) => {
           if (!aplicarCota(setEstado, quadro)) aplicarNoTurno(setTurnos, idDoTurno, quadro)
         })
       } catch (erro) {
-        // Parar é decisão de quem está usando, não falha: o turno fica como
-        // está, com o que já chegou.
+        // Stopping is the user's decision, not a failure: the turn stays as it is,
+        // with whatever has already arrived.
         if (!(erro instanceof DOMException && erro.name === "AbortError")) {
           aplicarNoTurno(setTurnos, idDoTurno, { evento: "erro", dados: SEM_CONEXAO })
         }
       } finally {
-        // Fim do turno é o fechamento do STREAM, e não a chegada do quadro
-        // `fim`. Aba fechada, conexão caída ou proxy que desistiu terminam a
-        // conversa sem quadro nenhum, e o painel não pode ficar girando.
+        // The end of the turn is the closing of the STREAM, not the arrival of the
+        // `fim` frame. A closed tab, a dropped connection or a proxy that gave up
+        // end the conversation with no frame at all, and the panel cannot keep
+        // spinning.
         if (abortoRef.current === controle) abortoRef.current = null
         setCorrendo(false)
-        // A cota foi cobrada durante o turno. Sem esta releitura o painel
-        // mostraria para sempre o gasto da montagem, e a pessoa só descobriria
-        // o teto ao esbarrar nele.
+        // The quota was charged during the turn. Without this re-read the panel
+        // would forever show the spend as of mount, and the person would only
+        // discover the ceiling by running into it.
         void GisFlowService.estadoDoAssistente().then(({ data }) => {
           if (data) setEstado(data)
         })

@@ -1,7 +1,8 @@
 /**
- * O grupo Meu na store da Home: o aberto/fechado dos três itens é lembrado no
- * navegador (`atlans:home:meu`) porque, num estado local do item, ele morria a
- * cada abertura da gaveta no telefone, ao sair de `/` e ao cruzar 768px.
+ * The Meu group in the Home store: the open/closed state of the three items is
+ * remembered in the browser (`atlans:home:meu`) because, in a local state of the
+ * item, it died every time the drawer opened on the phone, on leaving `/` and on
+ * crossing 768px.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { useHomeStore, MEU_PADRAO } from "@/app/stores/homeStore"
@@ -81,7 +82,7 @@ describe("homeStore — a entrada (o modal) e o envio pendente", () => {
   })
 
   it("fechar SEM entrar desiste do envio pendente — o texto continua no rascunho", () => {
-    // Um login mais tarde não pode disparar uma mensagem esquecida.
+    // A later login must not fire a forgotten message.
     estado().definirRascunho("focos em MT")
     estado().definirEnvioPendente("focos em MT")
     estado().pedirEntrada("entrar")
@@ -103,8 +104,9 @@ describe("homeStore — a entrada (o modal) e o envio pendente", () => {
 })
 
 describe("homeStore — o anúncio de conversa", () => {
-  // A lista de Chats só reage à TROCA DE IDENTIDADE do slot: "a mesma conversa
-  // ganhou outra mensagem" tem de ser outro objeto, senão o efeito não roda.
+  // The Chats list only reacts to the slot's IDENTITY CHANGE: "the same
+  // conversation got another message" has to be another object, otherwise the
+  // effect does not run.
   it("nasce vazio e grava um objeto NOVO a cada anúncio, mesmo repetindo o mesmo", () => {
     useHomeStore.setState({ anuncioDeConversa: null })
     expect(estado().anuncioDeConversa).toBeNull()
@@ -131,7 +133,7 @@ describe("homeStore — os anexos soltos sobre a Home", () => {
     expect(estado().arrastandoArquivo).toBe(false)
     estado().definirArrastandoArquivo(true)
     expect(estado().arrastandoArquivo).toBe(true)
-    // Idempotente: um segundo `true` não é uma mudança.
+    // Idempotent: a second `true` is not a change.
     const antes = estado().anexos
     estado().definirArrastandoArquivo(true)
     expect(estado().anexos).toBe(antes)
@@ -178,7 +180,7 @@ describe("homeStore — os anexos soltos sobre a Home", () => {
     estado().atualizarAnexo("a", { estado: "pronto" })
     estado().limparAnexos()
     expect(estado().anexos).toHaveLength(0)
-    // Idempotente: já vazio, não devolve objeto novo (não re-renderiza à toa).
+    // Idempotent: already empty, it does not return a new object (no needless re-render).
     const antes = estado().anexos
     estado().limparAnexos()
     expect(estado().anexos).toBe(antes)
@@ -194,8 +196,8 @@ describe("homeStore — a localização", () => {
   })
 
   it("definir guarda a posição mas NÃO liga o compartilhar — só o gesto do '+' liga", () => {
-    // É o que impede o botão nativo do globo (só "me achar no mapa") de anexar
-    // a coordenada à conversa sem a pessoa pedir.
+    // This is what keeps the globe's native button (just "find me on the map")
+    // from attaching the coordinate to the conversation without the person asking.
     estado().definirLocalizacao({ lat: -23.5505, lon: -46.6333, precisao_m: 18 })
     expect(estado().localizacao).toEqual({ lat: -23.5505, lon: -46.6333, precisao_m: 18 })
     expect(estado().compartilharLocalizacao).toBe(false)
@@ -204,9 +206,9 @@ describe("homeStore — a localização", () => {
   it("histerese: o jitter de GPS parado (<~25 m) não troca o objeto", () => {
     estado().definirLocalizacao({ lat: -23.55, lon: -46.63, precisao_m: 20 })
     const antes = estado().localizacao
-    // ~11 m de deslocamento e precisão parecida: ruído de quem está parado.
+    // ~11 m of displacement and similar accuracy: the noise of someone standing still.
     estado().definirLocalizacao({ lat: -23.5501, lon: -46.63, precisao_m: 22 })
-    expect(estado().localizacao).toBe(antes) // mesma referência
+    expect(estado().localizacao).toBe(antes) // same reference
   })
 
   it("um deslocamento real (>~25 m) atualiza — o modo seguir acompanha", () => {
@@ -228,14 +230,14 @@ describe("homeStore — a localização", () => {
 
     estado().limparLocalizacao()
     expect(estado().compartilharLocalizacao).toBe(false)
-    // A posição continua: religar pelo "+" volta na hora, sem novo fix de GPS.
+    // The position stays: turning it back on via "+" returns at once, with no new GPS fix.
     expect(estado().localizacao).toEqual({ lat: 1, lon: 2, precisao_m: null })
   })
 
   it("o × PERSISTE: ticks do seguir depois de limpar não religam o compartilhar", () => {
-    // O bug que esta separação mata: com o × zerando a posição, o próximo tick
-    // do watchPosition regravava e o chip ressuscitava sozinho — a coordenada
-    // voltava ao turno sem gesto da pessoa.
+    // The bug this separation kills: with the × clearing the position, the next
+    // watchPosition tick wrote it again and the chip came back to life on its
+    // own — the coordinate returned to the turn with no gesture from the person.
     estado().ligarLocalizacao()
     estado().definirLocalizacao({ lat: 1, lon: 2, precisao_m: 10 })
     estado().limparLocalizacao()

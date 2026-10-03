@@ -1,21 +1,21 @@
 // desktop/src/shared/events.ts
 //
-// Espelho tipado do protocolo NDJSON emitido por executor/dashboard/json_runtime.py.
+// Typed mirror of the NDJSON protocol emitted by executor/dashboard/json_runtime.py.
 //
-// A ponte entre os dois lados e um pipe de texto: nao ha type checker que
-// atravesse a fronteira Python -> TypeScript. O que mantem os dois em dia sao
-// os testes de contrato em tests/unit/test_executor_json_ipc.py (lado Python) e
-// os deste diretorio (lado TS). Ao mudar um campo aqui, mude la tambem.
+// The bridge between the two sides is a text pipe: no type checker crosses the
+// Python -> TypeScript boundary. What keeps both in sync are the contract tests
+// in tests/unit/test_executor_json_ipc.py (Python side) and the ones in this
+// directory (TS side). When changing a field here, change it there too.
 //
-// `Snapshot` corresponde 1:1 a `executor.stats.Snapshot` depois de
-// passar por `snapshot_to_dict`. Os unicos campos que nao saem do dataclass
-// direto sao `slowest` e `last_finished`, que la sao tuplas e aqui sao objetos
-// nomeados — ver o docstring de `snapshot_to_dict`.
+// `Snapshot` maps 1:1 to `executor.stats.Snapshot` after going through
+// `snapshot_to_dict`. The only fields that do not come straight from the
+// dataclass are `slowest` and `last_finished`, which are tuples there and named
+// objects here — see the docstring of `snapshot_to_dict`.
 
-/** Versao do protocolo. Sobe junto com PROTOCOLO em executor/dashboard/json_runtime.py. */
+/** Protocol version. Bumped together with PROTOCOLO in executor/dashboard/json_runtime.py. */
 export const PROTOCOLO = 1
 
-/** Prefixo de framing. Toda linha valida comeca com isto. */
+/** Framing prefix. Every valid line starts with this. */
 export const FRAMING = `{"v":${PROTOCOLO},`
 
 // ── Snapshot ─────────────────────────────────────────────────────────────────
@@ -35,7 +35,7 @@ export interface Snapshot {
   version: string
   server_url: string
   uptime_s: number
-  /** Ha quanto tempo os CONTADORES medem — difere do uptime apos um reset. */
+  /** How long the COUNTERS have been measuring — differs from uptime after a reset. */
   contando_ha_s: number
 
   // workflows
@@ -66,11 +66,12 @@ export interface Snapshot {
   disk_free_gb: number | null
   disk_total_gb: number | null
   /**
-   * Disco DA PASTA DE ARTEFATOS — pode ser outra unidade que a do sistema.
+   * Disk OF THE ARTIFACTS FOLDER — may be a different drive from the system's.
    *
-   * É o que decide se um workflow consegue gravar o resultado. Com localidade
-   * local (LGPD) o artefato tem uma cópia só, e ela está nesse disco: encher
-   * deixa de ser inconveniente e vira perda de dado do cliente.
+   * It is what decides whether a workflow can write its result. With local
+   * locality (LGPD) the artifact has a single copy, and it is on this disk:
+   * filling it up stops being an inconvenience and becomes loss of customer
+   * data.
    */
   artifacts_disk_free_gb: number | null
   artifacts_disk_total_gb: number | null
@@ -102,23 +103,24 @@ export interface Snapshot {
   sync_conflicts: number
   sync_current: string | null
   /**
-   * Inventário do manifesto, publicado ao fim de cada ciclo do GeoSync.
+   * Manifest inventory, published at the end of each GeoSync cycle.
    *
-   * `sync_total` é o que o EXECUTOR conhece — não o que existe no Drive. Saber
-   * o total remoto exigiria listar o workspace a cada tick, que é chamada de
-   * rede e não cabe num snapshot de 1 Hz.
+   * `sync_total` is what the EXECUTOR knows — not what exists in the Drive.
+   * Knowing the remote total would require listing the workspace on every tick,
+   * which is a network call and does not fit in a 1 Hz snapshot.
    */
   sync_total: number
   sync_synced: number
   sync_pending: number
 
-  // rodape
+  // footer
   //
-  // Sem `log_tail` (e sem `system`, la em cima): as duas existem para o painel
-  // `rich` do terminal desenhar o rodape, e o JsonRuntime nao desenha nada. O
-  // app tem canal de log proprio, incremental e com `seq` — carregar 200 linhas
-  // por snapshot custava dezenas de KB por segundo no pipe, no JSON.parse e num
-  // structured clone por janela, para nada. O executor parou de emitir os dois.
+  // No `log_tail` (and no `system`, up above): both exist for the terminal's
+  // `rich` panel to draw the footer, and JsonRuntime draws nothing. The app has
+  // its own log channel, incremental and with `seq` — carrying 200 lines per
+  // snapshot cost tens of KB per second in the pipe, in JSON.parse and in a
+  // structured clone per window, for nothing. The executor stopped emitting
+  // both.
   log_warn_count: number
   log_error_count: number
 }
@@ -129,7 +131,7 @@ export type ConnState = 'offline' | 'connecting' | 'connected' | 'reconnecting' 
 
 interface Base {
   v: number
-  /** epoch em segundos, com milissegundos. */
+  /** epoch in seconds, with milliseconds. */
   ts: number
 }
 
@@ -144,8 +146,9 @@ export interface HelloEvent extends Base {
 }
 
 /**
- * `failed` carrega o passo exato (`server_key`, `private_key`) e o motivo — e a
- * diferenca entre a UI oferecer "refazer enrollment" e oferecer "tentar de novo".
+ * `failed` carries the exact step (`server_key`, `private_key`) and the reason —
+ * it is the difference between the UI offering "redo enrollment" and offering
+ * "try again".
  */
 export type Phase = 'booting' | 'running' | 'draining' | 'stopped' | 'failed'
 
@@ -198,7 +201,7 @@ export interface AckEvent extends Base {
   detail: string | null
 }
 
-/** Emitido quando uma linha foi descartada por exceder o teto de tamanho. */
+/** Emitted when a line was discarded for exceeding the size ceiling. */
 export interface WarnEvent extends Base {
   t: 'warn'
   data: { motivo: string; tipo: string; bytes: number }
@@ -210,7 +213,7 @@ export type ExecutorEvent =
 
 // ── Comandos ─────────────────────────────────────────────────────────────────
 
-/** Espelham 1:1 as teclas do painel rich (executor/dashboard/runtime.py). */
+/** Mirror 1:1 the keys of the rich panel (executor/dashboard/runtime.py). */
 export const COMMANDS = [
   'shutdown', 'reconnect', 'reset_stats', 'toggle_debug', 'ping', 'sync_now',
 ] as const
@@ -219,6 +222,6 @@ export type CommandName = (typeof COMMANDS)[number]
 
 export interface Command {
   cmd: CommandName
-  /** Opcional; volta no `ack` correspondente. */
+  /** Optional; comes back in the corresponding `ack`. */
   id?: string
 }

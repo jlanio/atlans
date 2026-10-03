@@ -1,11 +1,11 @@
 """
-Testes de validate_readonly_sql / strip_sql_literals (flow.utils.sql_guard).
+Tests for validate_readonly_sql / strip_sql_literals (flow.utils.sql_guard).
 
-O validador antigo era uma denylist de palavras sobre o texto cru da query.
-Rejeitava literal em português com "do" (`'Rio do Sul'`) como se fosse o comando
-`DO`, e deixava passar `WHERE obs = 'a--b' ; DROP TABLE alvo` porque o `--` da
-string comia o resto na hora de "remover comentários". As duas classes de erro
-estão cobertas aqui.
+The old validator was a word denylist over the raw query text. It rejected a
+Portuguese literal containing "do" (`'Rio do Sul'`) as if it were the `DO`
+command, and let `WHERE obs = 'a--b' ; DROP TABLE alvo` through because the
+string's `--` ate the rest when "removing comments". Both classes of error are
+covered here.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from flow.utils.sql_guard import (
 
 
 class TestStripSqlLiterals:
-    """O scanner precisa ser um passe único — comentário e string se delimitam."""
+    """The scanner must be a single pass — comments and strings delimit each other."""
 
     def test_comentario_de_linha_vira_espaco(self):
         assert strip_sql_literals("SELECT 1 -- nota\nFROM t").split() == ["SELECT", "1", "FROM", "t"]
@@ -29,7 +29,7 @@ class TestStripSqlLiterals:
         assert "nota" not in strip_sql_literals("SELECT 1 FROM t -- nota")
 
     def test_bloco_aninhado(self):
-        # Postgres permite /* a /* b */ c */ — contar profundidade, não parar no 1o */
+        # Postgres allows /* a /* b */ c */ — count depth, do not stop at the 1st */
         assert strip_sql_literals("SELECT /* a /* b */ c */ 1").split() == ["SELECT", "1"]
 
     def test_traco_duplo_dentro_de_string_nao_e_comentario(self):
@@ -37,7 +37,7 @@ class TestStripSqlLiterals:
         assert "AND" in codigo and "id" in codigo
 
     def test_fecha_bloco_dentro_de_comentario_de_linha_nao_conta(self):
-        # O `*/` está dentro do comentário de linha: não fecha bloco nenhum.
+        # The `*/` is inside the line comment: it closes no block.
         assert "carro" not in strip_sql_literals("SELECT 1 -- fim */ do carro\nFROM t")
 
     def test_aspa_dobrada_escapa(self):
@@ -63,25 +63,25 @@ class TestStripSqlLiterals:
         ("SELECT $$aberto FROM t", "Dollar-quoting"),
     ])
     def test_construcao_nao_terminada_levanta(self, query, trecho):
-        # Consumir até o fim silenciosamente esconderia o resto da query.
+        # Silently consuming to the end would hide the rest of the query.
         with pytest.raises(ValueError, match=trecho):
             strip_sql_literals(query)
 
 
 class TestQueriesLegitimas:
-    """Regressão do bug: texto do usuário não pode virar comando."""
+    """Regression of the bug: user text must not become a command."""
 
     @pytest.mark.parametrize("query", [
-        # o caso relatado — "do" em comentário e em texto
+        # the reported case — "do" in a comment and in text
         "-- teste do carro\nSELECT * FROM veiculos",
         "SELECT * FROM veiculos -- teste do carro",
         "SELECT * FROM municipios WHERE nome = 'Rio do Sul'",
         "SELECT * FROM veiculos WHERE modelo LIKE '%do%'",
         "SELECT * FROM clientes WHERE obs = 'documento do cliente'",
-        # auditoria: os comandos aparecem como DADO, não como comando
+        # audit: the commands appear as DATA, not as a command
         "SELECT * FROM auditoria WHERE acao IN ('INSERT','UPDATE','DELETE')",
         "SELECT * FROM logs WHERE msg = 'DROP TABLE executado'",
-        # identificadores que colidiam com a denylist
+        # identifiers that collide with the denylist
         "SELECT id, comment FROM posts",
         'SELECT t."do", t."set" FROM t',
         "SELECT $$do carro$$ AS obs",
@@ -118,7 +118,7 @@ class TestQueriesBloqueadas:
     @pytest.mark.parametrize("query", [
         "SELECT 1; SELECT 2",
         "SELECT * FROM t; DROP TABLE alvo",
-        # o furo antigo: o `--` dentro da string apagava o resto da validação
+        # the old hole: the `--` inside the string erased the rest of the validation
         "SELECT * FROM t WHERE obs = 'a--b' ; DROP TABLE alvo",
     ])
     def test_multiplos_statements(self, query):
@@ -126,7 +126,7 @@ class TestQueriesBloqueadas:
             validate_readonly_sql(query)
 
     def test_cte_de_escrita(self):
-        # Começa com WITH e passaria no teste de statement inicial.
+        # Starts with WITH and would pass the leading-statement test.
         with pytest.raises(ValueError, match="comando de escrita: 'DELETE'"):
             validate_readonly_sql("WITH d AS (DELETE FROM t RETURNING *) SELECT * FROM d")
 
@@ -141,12 +141,12 @@ class TestQueriesBloqueadas:
         ("SELECT pg_sleep(600)", "pg_sleep"),
     ])
     def test_funcao_perigosa(self, query, nome):
-        # dblink abre OUTRA conexão — o READ ONLY da transação local não vale lá.
+        # dblink opens ANOTHER connection — the local transaction's READ ONLY does not apply there.
         with pytest.raises(ValueError, match=nome):
             validate_readonly_sql(query)
 
     def test_funcao_perigosa_so_como_chamada(self):
-        # O nome como texto é dado, não chamada: não pode bloquear.
+        # The name as text is data, not a call: it must not block.
         validate_readonly_sql("SELECT * FROM logs WHERE fn = 'pg_read_file'")
 
 
@@ -169,6 +169,6 @@ class TestLimites:
             validate_readonly_sql(query)
 
     def test_selects_em_comentario_e_string_nao_contam(self):
-        # Antes o SELECT dentro de string contava para o limite de complexidade.
+        # Before, a SELECT inside a string counted toward the complexity limit.
         query = "SELECT " + " + ".join(f"'SELECT {i}'" for i in range(_MAX_SUBQUERY_DEPTH + 5))
         validate_readonly_sql(query)

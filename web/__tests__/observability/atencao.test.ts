@@ -4,7 +4,7 @@ import {
 } from "@/app/components/observability/atencao"
 import type { IExecutorMetrics, IObservabilityMetrics, IStuckRun, ITopFailingWorkflow } from "@/service/types"
 
-// Fixtures mínimas: o que `montarAtencao` lê, mais nada.
+// Minimal fixtures: what `montarAtencao` reads, nothing more.
 function metricas(extra: Partial<IObservabilityMetrics> = {}): IObservabilityMetrics {
   return {
     period_days: 30,
@@ -54,7 +54,7 @@ describe("montarAtencao", () => {
     const porTipo = Object.fromEntries(itens.map(i => [i.tipo, i]))
     expect(porTipo.presa.origem).toBe("assistente")
     expect(porTipo.falhas.origem).toBe("usuario")
-    // Executor no teto não é de um fluxo: não inventa origem.
+    // An executor at its ceiling doesn't belong to a workflow: no made-up origin.
     expect(porTipo.saturado.origem).toBeUndefined()
   })
 

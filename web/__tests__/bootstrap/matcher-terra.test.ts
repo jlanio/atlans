@@ -1,8 +1,8 @@
 /**
- * O proxy /terra precisa passar pelo middleware (bug do logout espúrio): antes
- * ele estava EXCLUÍDO do matcher, então renovava a sessão por conta própria num
- * caminho que descartava o cookie rotacionado. Este teste tranca o contrato do
- * matcher: /terra agora casa; as demais rotas públicas continuam de fora.
+ * The /terra proxy needs to go through the middleware (spurious logout bug): before,
+ * it was EXCLUDED from the matcher, so it renewed the session on its own on a
+ * path that discarded the rotated cookie. This test locks the matcher's
+ * contract: /terra now matches; the other public routes stay out.
  */
 import { describe, it, expect, vi } from "vitest"
 
@@ -25,11 +25,11 @@ describe("matcher do middleware", () => {
     expect(re.test("/projects")).toBe(true)
     expect(re.test("/workflow/create")).toBe(true)
     expect(re.test("/admin/users")).toBe(true)
-    // /dashboard passa pelo middleware (o portão de papel do admin mora lá).
+    // /dashboard goes through the middleware (the admin role gate lives there).
     expect(re.test("/dashboard")).toBe(true)
-    // A Home `/` passa a ser COBERTA: sem o `|$` no matcher ela é protegida por
-    // auth e recebe o SESSION_HEADER, em vez de escapar e cair no auth() do
-    // layout (o double-refresh). Antes deste PR, `/` ficava de fora.
+    // The Home `/` is now COVERED: without the `|$` in the matcher it is protected by
+    // auth and receives the SESSION_HEADER, instead of escaping and landing in the
+    // layout's auth() (the double refresh). Before this PR, `/` was left out.
     expect(re.test("/")).toBe(true)
   })
 
@@ -37,8 +37,8 @@ describe("matcher do middleware", () => {
     for (const p of ["/share/abc", "/api/auth/session", "/api/csp-report", "/login", "/register",
                      "/reset-password", "/verify-email", "/internal/x",
                      "/_next/static/x", "/favicon.ico",
-                     // O editor de código (public/monaco): arquivos públicos do
-                     // pacote, que não precisam de auth() nem de Set-Cookie.
+                     // The code editor (public/monaco): public files from the
+                     // package, which need neither auth() nor Set-Cookie.
                      "/monaco/vs/loader.js", "/monaco/vs/editor/editor.main.css"]) {
       expect(re.test(p), p).toBe(false)
     }

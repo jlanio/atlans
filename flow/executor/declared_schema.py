@@ -1,14 +1,14 @@
 # flow/executor/declared_schema.py
-"""Saídas de um nó DECLARADAS na própria definição, sem executar nada.
+"""A node's outputs DECLARED in its own definition, without executing anything.
 
-Um nó com `dynamic_output` e sem `simulate()` sumia do /workflows/validate em
-silêncio (8 nós do catálogo), e o painel de schema não tinha o que mostrar —
-mesmo quando as saídas reais estão escritas no payload: `output_vars` do
-PythonScript, `fallback_output` + `rules[].output` do Switch, `ports` do
-SubWorkflowInput. Este módulo lê essas declarações e devolve o schema no
-formato canônico da simulação: `[{"fields": [{"name", "type"}, ...]}]`.
+A node with `dynamic_output` and no `simulate()` silently vanished from
+/workflows/validate (8 catalog nodes), and the schema panel had nothing to show —
+even when the real outputs are written in the payload: PythonScript's
+`output_vars`, Switch's `fallback_output` + `rules[].output`, SubWorkflowInput's
+`ports`. This module reads those declarations and returns the schema in the
+simulation's canonical format: `[{"fields": [{"name", "type"}, ...]}]`.
 
-Puro: só stdlib e flow.utils.workflow_contract (também puro).
+Pure: only stdlib and flow.utils.workflow_contract (also pure).
 """
 from __future__ import annotations
 
@@ -19,15 +19,15 @@ from flow.utils.workflow_contract import _parse_ports
 
 
 def _campos(nomes: list) -> list:
-    """Lista de nomes → forma agrupada; o tipo é "any" porque só o run o conhece."""
+    """List of names → grouped form; the type is "any" because only the run knows it."""
     return [{"fields": [{"name": nome, "type": "any"} for nome in nomes]}]
 
 
 def _output_vars(bruto: Any) -> list:
-    """`output_vars` exatamente como o run o trata: `validate()` exige string
-    e o PythonScript recusa a lista vazia — com as MESMAS frases, para o
-    a validação acusar o que o run acusaria. Antes, vazio virava schema `[]`
-    com `ok`, e sem saídas conhecidas o diagnóstico de aresta se desligava."""
+    """`output_vars` exactly as the run treats it: `validate()` requires a string
+    and PythonScript rejects the empty list — with the SAME messages, so that
+    validation flags what the run would flag. Previously, empty became schema `[]`
+    with `ok`, and with no known outputs the edge diagnostics were switched off."""
     if not isinstance(bruto, str):
         raise ValueError("O parâmetro 'output_vars' deve ser uma string.")
     nomes = [item.strip() for item in bruto.split(",") if item.strip()]
@@ -37,8 +37,8 @@ def _output_vars(bruto: Any) -> list:
 
 
 def _regras(bruto: Any) -> list:
-    """`rules` do Switch: lista nativa ou JSON serializado pelo editor.
-    Qualquer coisa ilegível vira lista vazia — o lint, não isto, acusa."""
+    """Switch's `rules`: native list or JSON serialized by the editor.
+    Anything unreadable becomes an empty list — the lint, not this, flags it."""
     if isinstance(bruto, str):
         try:
             bruto = json.loads(bruto)
@@ -50,9 +50,9 @@ def _regras(bruto: Any) -> list:
 
 
 def _e_saida_utilizavel(campo: Any) -> bool:
-    """Chaves internas do protocolo (`__response__`, `__artifact__`) não são
-    saídas que uma aresta possa consumir — o executor as remove do que o nó
-    entrega. Mesmo filtro do catálogo (app/services/node_service.py)."""
+    """Internal protocol keys (`__response__`, `__artifact__`) are not
+    outputs an edge can consume — the executor strips them from what the node
+    delivers. Same filter as the catalog (app/services/node_service.py)."""
     if not isinstance(campo, dict):
         return False
     nome = campo.get("name")
@@ -60,31 +60,31 @@ def _e_saida_utilizavel(campo: Any) -> bool:
 
 
 def schema_do_catalogo(desc: dict) -> list:
-    """`outputs` do descriptor (campos tipados) na forma agrupada da simulação.
+    """The descriptor's `outputs` (typed fields) in the simulation's grouped form.
 
-    O catálogo declara os campos numa lista plana `[{"name", "type", ...}]`;
-    o formato canônico do simulate() continua agrupado, então a conversão mora
-    aqui — num lugar só."""
+    The catalog declares the fields in a flat list `[{"name", "type", ...}]`;
+    simulate()'s canonical format is still grouped, so the conversion lives
+    here — in one place only."""
     campos = [c for c in (desc.get("outputs") or []) if _e_saida_utilizavel(c)]
     return [{"fields": campos}]
 
 
 def schema_declarado(node_def: dict, desc: dict) -> Optional[list]:
-    """Schema de saída que a definição + o descriptor permitem afirmar.
+    """Output schema that the definition + the descriptor allow us to assert.
 
-    Ordem de precedência, da declaração mais específica para a mais genérica:
-      1. `output_vars` (PythonScript): cada variável é uma saída;
-      2. `rules` + `fallback_output` (Switch): fallback e as saídas das regras,
-         que é exatamente o que o run emite (todas, mesmo vazias);
-      3. `outputs_from_ports` (SubWorkflowInput): cada porta é uma saída;
-      4. `outputs` do descriptor (os campos tipados do catálogo);
-      5. None — nada a afirmar (o chamador decide o que fazer).
+    Order of precedence, from the most specific declaration to the most generic:
+      1. `output_vars` (PythonScript): each variable is an output;
+      2. `rules` + `fallback_output` (Switch): the fallback and the rules' outputs,
+         which is exactly what the run emits (all of them, even empty ones);
+      3. `outputs_from_ports` (SubWorkflowInput): each port is an output;
+      4. the descriptor's `outputs` (the catalog's typed fields);
+      5. None — nothing to assert (the caller decides what to do).
 
-    Levanta ValueError, com a frase que o run usaria, quando a declaração é
-    inválida (`output_vars` vazio ou não-string, `fallback_output` não-string).
+    Raises ValueError, with the message the run would use, when the declaration is
+    invalid (`output_vars` empty or non-string, `fallback_output` non-string).
 
-    `parameters` é o formato do corpo da validação; `properties` o da definition
-    salva — mesma tolerância do simulate_runner.
+    `parameters` is the validation body's format; `properties` is the saved
+    definition's — same tolerance as simulate_runner.
     """
     params = node_def.get("parameters") or node_def.get("properties") or {}
     if not isinstance(params, dict):

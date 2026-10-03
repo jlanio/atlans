@@ -19,7 +19,7 @@ import type {
 let _token: string | null = null
 export function setAuthToken(token: string | null) { _token = token }
 
-// Interceptor: anexa token JWT apenas em requisições para a API interna (/terra)
+// Interceptor: attaches the JWT token only to requests to the internal API (/terra)
 axios.interceptors.request.use((config) => {
   if (_token && config.headers && config.url) {
     const isRelative = config.url.startsWith("/")
@@ -46,41 +46,42 @@ export function qs(params: Record<string, string | number | boolean | undefined 
 }
 
 /**
- * GETs idênticos EM VOO compartilham uma única requisição.
+ * Identical GETs IN FLIGHT share a single request.
  *
- * A camada de dados (`lib/consultas.ts`, react-query; padrao-telas §10) ainda
- * cobre poucas telas e não guarda cache por padrão, e vários pontos pedem a
- * mesma lista ao mesmo tempo: abrir /projects disparava dois
- * `GET /workflows/?workspace_id=X` simultâneos (o ActiveRunsProvider do layout
- * e a própria página), e abrir /workspaces disparava dois `GET /workspaces/`.
- * Em rede lenta, o tempo até a lista aparecer era o da resposta mais lenta das
- * duas — e o backend fazia o dobro do trabalho.
+ * The data layer (`lib/consultas.ts`, react-query; screen patterns §10) still
+ * covers few screens and does not cache by default, and several places ask for
+ * the same list at the same time: opening /projects fired two simultaneous
+ * `GET /workflows/?workspace_id=X` (the layout's ActiveRunsProvider and the
+ * page itself), and opening /workspaces fired two `GET /workspaces/`. On a
+ * slow network, the time until the list appeared was that of the slower of the
+ * two responses — and the backend did twice the work.
  *
- * A janela é estritamente "enquanto a requisição está em voo": nada é
- * memorizado depois que ela responde, então a próxima leitura é sempre nova.
+ * The window is strictly "while the request is in flight": nothing is
+ * memoized after it responds, so the next read is always fresh.
  */
 const getsEmVoo = new Map<string, Promise<unknown>>()
 
 /**
- * Época de escrita: incrementada ANTES e DEPOIS de toda mutação, e usada como
- * prefixo da chave de dedup.
+ * Write epoch: incremented BEFORE and AFTER every mutation, and used as the
+ * prefix of the dedup key.
  *
- * Sem ela, a chave era só a URL e a janela de coalescência atravessava a
- * escrita: em /executores, com o tick de 15s de `GET /executores/` já em voo, o
- * `refetch()` disparado no sucesso de um DELETE recebia a MESMA promise — uma
- * resposta calculada no servidor ANTES da exclusão. O card excluído reaparecia
- * na lista logo depois do toast "Executor excluído". Mesma coisa em /projects,
- * onde a cópia recém-duplicada não aparecia no `getProjects()` seguinte.
+ * Without it, the key was just the URL and the coalescing window spanned the
+ * write: on /executores, with the 15s tick of `GET /executores/` already in
+ * flight, the `refetch()` fired on a DELETE's success received the SAME
+ * promise — a response computed on the server BEFORE the deletion. The deleted
+ * card reappeared in the list right after the "Executor excluído" (executor
+ * deleted) toast. Same thing on /projects, where the freshly duplicated copy
+ * did not show up in the following `getProjects()`.
  *
- * Com o prefixo, toda leitura pedida depois de uma escrita usa uma chave nova e
- * vai mesmo à rede; a dedup continua valendo para o caso que ela existe para
- * resolver (dois leitores simultâneos no mount).
+ * With the prefix, every read requested after a write uses a new key and
+ * really goes to the network; dedup still applies to the case it exists to
+ * solve (two simultaneous readers on mount).
  */
 let epocaEscrita = 0
 
-// Nenhum verbo daqui rejeita: queda de rede, 4xx e 5xx voltam resolvidos, com
-// `error` preenchido (`resolveAxiosError`). Um `try/catch` em volta da chamada é
-// código morto — a tela lê a falha em `res.error` (`dadoOuAviso`, em
+// No verb here rejects: a network drop, 4xx and 5xx come back resolved, with
+// `error` filled in (`resolveAxiosError`). A `try/catch` around the call is
+// dead code — the screen reads the failure in `res.error` (`dadoOuAviso`, in
 // lib/respostas.ts).
 export function get<T>(url: string): Promise<IResponse<T>> {
   const chave = `${epocaEscrita}|${url}`
@@ -97,9 +98,9 @@ export function get<T>(url: string): Promise<IResponse<T>> {
   return requisicao
 }
 
-/** Envolve uma mutação abrindo uma época nova antes e depois: nem uma leitura
- *  anterior à escrita, nem uma disparada no meio dela, podem ser reaproveitadas
- *  por quem lê depois que ela terminou. */
+/** Wraps a mutation, opening a new epoch before and after: neither a read
+ *  from before the write nor one fired in the middle of it can be reused by
+ *  whoever reads after it has finished. */
 async function mutar<T>(executar: () => Promise<IResponse<T>>): Promise<IResponse<T>> {
   epocaEscrita++
   try { return await executar() }
@@ -130,9 +131,9 @@ export function del(url: string): Promise<IResponse<undefined>> {
     catch (e) { return resolveAxiosError(e as AxiosError) as IResponse<undefined> }
   })
 }
-/** DELETE que preserva o corpo da resposta. Igual a `del`, e igualmente
- *  envolvido por `mutar` — existe porque alguns DELETEs devolvem payload e
- *  reimplementá-los à mão os deixava fora da época de escrita. */
+/** DELETE that preserves the response body. Same as `del`, and likewise
+ *  wrapped by `mutar` — it exists because some DELETEs return a payload and
+ *  reimplementing them by hand left them outside the write epoch. */
 export function delComRetorno<T>(url: string): Promise<IResponse<T>> {
   return mutar(async () => {
     try { return resolveResponse((await axios.delete(`${API_URL}${url}`)).data) as IResponse<T> }

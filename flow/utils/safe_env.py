@@ -1,10 +1,10 @@
 # flow/utils/safe_env.py
-# Expoe apenas variaveis de ambiente seguras para templates Jinja2.
-# Impede vazamento de segredos (DATABASE_URL, FERNET_KEY, etc.).
+# Exposes only safe environment variables to Jinja2 templates.
+# Prevents leaking secrets (DATABASE_URL, FERNET_KEY, etc.).
 
 import os
 
-# Variaveis seguras por padrao — nenhuma contem credenciais
+# Variables safe by default — none contains credentials
 _DEFAULT_SAFE_KEYS = {
     "TZ", "NODE_ENV", "ALLOWED_FILE_DIRS", "LANG", "LC_ALL",
 }
@@ -16,5 +16,5 @@ if _extra:
 
 
 def safe_env() -> dict:
-    """Retorna dict com apenas as variaveis de ambiente permitidas."""
+    """Returns a dict with only the allowed environment variables."""
     return {k: os.environ[k] for k in _DEFAULT_SAFE_KEYS if k in os.environ}

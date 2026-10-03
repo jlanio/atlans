@@ -1,10 +1,11 @@
 """
-Tokens pessoais de acesso (PAT) — o service, contra um banco de verdade.
+Personal access tokens (PAT) — the service, against a real database.
 
-Vale o SQLite em memória: as regras que importam (só o hash fica no banco,
-escopo de workspaces, teto de tokens ativos, resolução que exige token vivo E
-usuário ativo, cascata de revogação sem commit próprio) são todas sobre o que
-está gravado, não sobre o código de status de uma rota.
+In-memory SQLite is good enough: the rules that matter (only the hash is
+stored in the database, workspace scope, the ceiling on active tokens,
+resolution that requires a live token AND an active user, revocation cascade
+without its own commit) are all about what is stored, not about a route's
+status code.
 """
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock
@@ -29,8 +30,8 @@ from unittest.mock import AsyncMock as _AsyncMock_seg16
 
 @_pytest_seg16.fixture(autouse=True)
 def _patch_revoga_executores(monkeypatch):
-    """SEG-16: isola estes testes (token/commit) da revogacao de executores,
-    que faz suas proprias consultas ao banco."""
+    """SEG-16: isolates these tests (token/commit) from executor revocation,
+    which makes its own database queries."""
     monkeypatch.setattr(
         "app.services.executor_service.revogar_executores_do_usuario",
         _AsyncMock_seg16(return_value=[]),
@@ -51,8 +52,9 @@ async def sessao():
 
 
 async def _semear(sessao):
-    """ana é dona de ws-1 e membro de ws-3; ws-2 é só da bia. Os dois `ws-lixo-*`
-    estão na lixeira — um dela, outro em que ela é membro."""
+    """ana is the owner of ws-1 and a member of ws-3; ws-2 belongs only to bia.
+    The two `ws-lixo-*` are in the trash — one of hers, another she is a
+    member of."""
     ana = User(id_hash="u-ana", username="ana", email="ana@x.test", hashed_password="x")
     bia = User(id_hash="u-bia", username="bia", email="bia@x.test", hashed_password="x")
     sessao.add_all([
@@ -71,13 +73,14 @@ async def _semear(sessao):
 
 @pytest_asyncio.fixture
 async def fabrica_transacional():
-    """Sessões sobre um SQLite que emite BEGIN de verdade.
+    """Sessions over an SQLite that emits a real BEGIN.
 
-    O driver pysqlite (e o aiosqlite por cima dele) comita sozinho ao liberar
-    o SAVEPOINT mais externo: com ele, um UPDATE dentro de `begin_nested()`
-    "persiste" mesmo que o chamador dê rollback depois — e um teste de commit
-    não provaria nada. Este é o workaround documentado pelo SQLAlchemy
-    ("Serializable isolation / Savepoints / Transactional DDL", versão asyncio).
+    The pysqlite driver (and aiosqlite on top of it) commits on its own when
+    releasing the outermost SAVEPOINT: with it, an UPDATE inside
+    `begin_nested()` "persists" even if the caller rolls back afterwards — and
+    a commit test would prove nothing. This is the workaround documented by
+    SQLAlchemy ("Serializable isolation / Savepoints / Transactional DDL",
+    asyncio version).
     """
     from sqlalchemy import event
 
@@ -113,7 +116,7 @@ async def test_criar_devolve_o_segredo_uma_vez_e_guarda_so_o_hash(sessao):
     assert token.token_hash == pat.hash_segredo(segredo)
     assert token.token_prefix == segredo[:12] and token.token_prefix.startswith("atl_pat_")
     assert token.name == "Claude Code"
-    assert token.scopes == ["workflows:read", "runs:execute"]  # sem duplicata, ordem preservada
+    assert token.scopes == ["workflows:read", "runs:execute"]  # no duplicates, order preserved
     assert token.workspace_ids == ["ws-1", "ws-3"]
     assert token.revoked_at is None and token.last_used_at is None
     assert timedelta(days=29) < token.expires_at - utc_now_naive() <= timedelta(days=30)
@@ -139,7 +142,7 @@ async def test_criar_so_aceita_workspaces_do_usuario(sessao):
     with pytest.raises(svc.ApiTokenError, match="ao menos um workspace"):
         await svc.criar(sessao, ana, name="x", scopes=["workflows:read"], workspace_ids=[])
 
-    # Membro (não dono) conta; None = todos, inclusive os futuros.
+    # Member (not owner) counts; None = all, including future ones.
     token, _ = await svc.criar(sessao, ana, name="m", scopes=["workflows:read"], workspace_ids=["ws-3"])
     assert token.workspace_ids == ["ws-3"]
     todos, _ = await svc.criar(sessao, ana, name="t", scopes=["workflows:read"], workspace_ids=None)
@@ -148,8 +151,8 @@ async def test_criar_so_aceita_workspaces_do_usuario(sessao):
 
 @pytest.mark.asyncio
 async def test_criar_recusa_workspace_na_lixeira_mesmo_sendo_dono_ou_membro(sessao):
-    """A lixeira não é um workspace: um token com alcance nele daria acesso a
-    artefatos que a tela já não mostra (mesma regra de `get_user_workspace_ids`)."""
+    """The trash is not a workspace: a token scoped to it would give access to
+    artifacts the screen no longer shows (same rule as `get_user_workspace_ids`)."""
     ana, _ = await _semear(sessao)
     for ws in ("ws-lixo-dono", "ws-lixo-membro"):
         with pytest.raises(svc.ApiTokenError, match="não participa"):
@@ -182,7 +185,7 @@ def _linha(user_id, i, *, expires=None, revoked=None):
 async def test_teto_de_tokens_ativos_ignora_expirados_e_revogados(sessao):
     ana, _ = await _semear(sessao)
     sessao.add_all([_linha("u-ana", i) for i in range(pat.MAX_TOKENS_ATIVOS_POR_USUARIO)])
-    # Um expirado e um revogado a mais não contam.
+    # An extra expired one and an extra revoked one do not count.
     sessao.add(_linha("u-ana", 98, expires=utc_now_naive() - timedelta(minutes=1)))
     sessao.add(_linha("u-ana", 99, revoked=utc_now_naive()))
     await sessao.commit()
@@ -212,7 +215,7 @@ async def test_listar_traz_todos_com_status_e_o_mais_recente_primeiro(sessao):
     tokens = await svc.listar(sessao, "u-ana")
 
     assert [t.name for t in tokens][0] == "novo"
-    assert {t.name for t in tokens} == {"novo", "t1", "t2"}  # nada da bia
+    assert {t.name for t in tokens} == {"novo", "t1", "t2"}  # nothing of bia's
     agora = utc_now_naive()
     por_nome = {t.name: pat.status_de(t.revoked_at, t.expires_at, agora) for t in tokens}
     assert por_nome == {"novo": "active", "t1": "expired", "t2": "revoked"}
@@ -227,7 +230,7 @@ async def test_revogar_e_idempotente_e_nao_alcanca_token_alheio(sessao):
     r1 = await svc.revogar(sessao, "u-ana", meu.id_hash)
     r2 = await svc.revogar(sessao, "u-ana", meu.id_hash)
     assert r1.revoked_at is not None and r1.revoked_reason == "user"
-    assert r2.revoked_at == r1.revoked_at  # segunda chamada não re-carimba
+    assert r2.revoked_at == r1.revoked_at  # second call does not re-stamp
 
     with pytest.raises(svc.ApiTokenNotFoundError):
         await svc.revogar(sessao, "u-ana", dela.id_hash)
@@ -235,7 +238,7 @@ async def test_revogar_e_idempotente_e_nao_alcanca_token_alheio(sessao):
         await svc.revogar(sessao, "u-ana", "nao-existe")
 
 
-# ── resolver (o contrato da autenticação por PAT) ────────────────────────────
+# ── resolver (the PAT authentication contract) ───────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -249,9 +252,9 @@ async def test_resolver_devolve_token_e_usuario_so_para_segredo_vivo(sessao):
     assert tok.id_hash == token.id_hash and usuario.id_hash == "u-ana"
 
     assert await svc.resolver(sessao, None) is None
-    assert await svc.resolver(sessao, "Bearer " + segredo) is None  # formato exato, sem prefixo de header
+    assert await svc.resolver(sessao, "Bearer " + segredo) is None  # exact format, no header prefix
     assert await svc.resolver(sessao, "atl_pat_" + "A" * 43) is None  # hash desconhecido
-    assert await svc.resolver(sessao, segredo[:-1] + "!") is None  # fora do alfabeto
+    assert await svc.resolver(sessao, segredo[:-1] + "!") is None  # outside the alphabet
 
 
 @pytest.mark.asyncio
@@ -303,7 +306,7 @@ async def test_marcar_uso_carimba_uma_vez_por_minuto(sessao):
     primeiro = token.last_used_at
     assert primeiro is not None
 
-    redis.ganha = False  # o lock já existe: ninguém toca no banco
+    redis.ganha = False  # the lock already exists: nobody touches the database
     assert await svc.marcar_uso(sessao, redis, token) is False
     await sessao.refresh(token)
     assert token.last_used_at == primeiro
@@ -312,8 +315,8 @@ async def test_marcar_uso_carimba_uma_vez_por_minuto(sessao):
 
 @pytest.mark.asyncio
 async def test_marcar_uso_persiste_mesmo_com_rollback_do_chamador_depois(fabrica_transacional):
-    """O caminho real: `get_session_async` faz rollback no `finally` da request.
-    Por padrão o carimbo é commitado aqui dentro — o rollback não o leva."""
+    """The real path: `get_session_async` rolls back in the request's `finally`.
+    By default the stamp is committed in here — the rollback does not take it."""
     async with fabrica_transacional() as s:
         ana, _ = await _semear(s)
         criado, _ = await svc.criar(s, ana, name="x", scopes=["workflows:read"])
@@ -330,8 +333,8 @@ async def test_marcar_uso_persiste_mesmo_com_rollback_do_chamador_depois(fabrica
 
 @pytest.mark.asyncio
 async def test_marcar_uso_sem_commit_deixa_o_carimbo_por_conta_do_chamador(fabrica_transacional):
-    """Controle do harness (e do contrato): com `commit=False` e rollback
-    depois, o carimbo se perde — é exatamente o que o default evita."""
+    """Control for the harness (and the contract): with `commit=False` and a
+    rollback afterwards, the stamp is lost — exactly what the default avoids."""
     async with fabrica_transacional() as s:
         ana, _ = await _semear(s)
         criado, _ = await svc.criar(s, ana, name="x", scopes=["workflows:read"])
@@ -359,7 +362,7 @@ async def test_marcar_uso_nunca_levanta_e_devolve_o_lock_quando_o_banco_falha(se
     db_ruim = MagicMock()
     db_ruim.begin_nested = MagicMock(side_effect=RuntimeError("sessão morta"))
     assert await svc.marcar_uso(db_ruim, redis, token) is False
-    # O minuto não fica queimado sem carimbo: a próxima request tenta de novo.
+    # The minute is not burned without a stamp: the next request tries again.
     assert redis.apagadas == [f"pat:lu:{token.id_hash}"]
 
 
@@ -371,7 +374,7 @@ async def test_revogar_todos_do_usuario_so_marca_os_ativos_dos_usuarios_pedidos(
     ana, bia = await _semear(sessao)
     a1, _ = await svc.criar(sessao, ana, name="a1", scopes=["workflows:read"])
     a2, _ = await svc.criar(sessao, ana, name="a2", scopes=["workflows:read"])
-    await svc.revogar(sessao, "u-ana", a2.id_hash)  # já revogado: não re-carimba
+    await svc.revogar(sessao, "u-ana", a2.id_hash)  # already revoked: does not re-stamp
     b1, _ = await svc.criar(sessao, bia, name="b1", scopes=["workflows:read"])
 
     n = await svc.revogar_todos_do_usuario(sessao, ["u-ana", "u-ana", ""], motivo="user_suspended")
@@ -388,8 +391,8 @@ async def test_revogar_todos_do_usuario_so_marca_os_ativos_dos_usuarios_pedidos(
 
 @pytest.mark.asyncio
 async def test_revogar_todos_aceita_um_id_hash_so(sessao):
-    """`"u-ana"` iterado como letras revogaria nada, sem erro — o reset de
-    senha chama com uma string."""
+    """`"u-ana"` iterated as letters would revoke nothing, with no error — the
+    password reset calls it with a string."""
     ana, _ = await _semear(sessao)
     t, _ = await svc.criar(sessao, ana, name="a", scopes=["workflows:read"])
 
@@ -423,7 +426,7 @@ async def test_suspender_usuario_revoga_seus_tokens(sessao):
     await sessao.refresh(token)
     assert token.revoked_reason == "user_suspended"
     assert await svc.resolver(sessao, segredo) is None
-    # Reativar a conta NÃO ressuscita o token.
+    # Reactivating the account does NOT resurrect the token.
     await admin_user_service.reactivate_user(sessao, ana)
     assert await svc.resolver(sessao, segredo) is None
 

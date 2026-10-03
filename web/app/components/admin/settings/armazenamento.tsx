@@ -1,7 +1,7 @@
 "use client"
 
-// Seção «Armazenamento» das Configurações do admin: uso do MinIO por
-// workspace, saúde do tracking e a purga (irreversível) por escopo.
+// "Armazenamento" (Storage) section of the admin Settings: MinIO usage per
+// workspace, tracking health and the (irreversible) purge by scope.
 
 import { useState } from "react"
 import { GisFlowService } from "@/service/GisFlowService"
@@ -21,10 +21,10 @@ import { VazioEmCirculo } from "./estados"
 // ── Armazenamento (MinIO) ─────────────────────────────────────────────────────
 
 /**
- * Indicadores de saúde do tracking: alerta quando há drift silencioso
- * (pending abandonado, artefato sem tamanho, órfãos). Reconciliação roda
- * 1×/hora no servidor para auto-corrigir parte disso. As pendências saem no
- * padrão âmbar/vermelho do contrato (§3.4), não mais num bloco custom.
+ * Tracking health indicators: alerts when there is silent drift (abandoned
+ * pending, artifact without size, orphans). Reconciliation runs 1×/hour on
+ * the server to auto-correct part of it. The pending items come out in the
+ * contract's amber/red pattern (§3.4), no longer in a custom block.
  */
 function SaudeDoTracking({ health }: { health: ITrackingHealth }) {
   const issues: Array<{ tom: "warn" | "danger"; label: string; detail: string }> = []
@@ -95,9 +95,10 @@ function SaudeDoTracking({ health }: { health: ITrackingHealth }) {
 }
 
 /**
- * Diálogo de purga. Ação irreversível: apaga objetos do MinIO e as linhas do
- * banco. Por isso a confirmação exige escolher o escopo e ver o que será
- * removido antes — e o backend ainda revalida o workspace_id no corpo.
+ * Purge dialog. Irreversible action: deletes MinIO objects and the database
+ * rows. That is why the confirmation requires choosing the scope and seeing what
+ * will be removed first — and the backend still revalidates the workspace_id in
+ * the body.
  */
 function PurgeStorageDialog({
   ws, onClose, onPurged,
@@ -126,10 +127,10 @@ function PurgeStorageDialog({
       const r = res.data
       const resumo = `${plural(r?.artifacts ?? 0, "artefato")} e ${plural(r?.drive_files ?? 0, "arquivo")} removidos.`
 
-      // Nem tudo que ficou para trás ficou pelo mesmo motivo, e a diferença
-      // importa para quem administra: falha de storage e executor offline se
-      // resolvem repetindo a purga; catalogado e sem-rastro, não. Reportar só
-      // `skipped_s3_errors` fazia o resto ser contado como removido.
+      // Not everything left behind was left for the same reason, and the difference
+      // matters to whoever administers: a storage failure and an offline executor
+      // are solved by repeating the purge; cataloged and untracked are not.
+      // Reporting only `skipped_s3_errors` made the rest count as removed.
       const paraTentarDeNovo =
         (r?.skipped_s3_errors ?? 0) + (r?.pending_executor ?? 0)
       const preservados =
@@ -251,7 +252,7 @@ export function StorageUsageSection({ data, onRefresh }: { data: IStorageUsageAd
         </div>
       </div>
 
-      {/* Barra de proporção */}
+      {/* Proportion bar */}
       {totals.total_bytes > 0 && (
         <div className="flex flex-col gap-1.5">
           <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
@@ -265,10 +266,10 @@ export function StorageUsageSection({ data, onRefresh }: { data: IStorageUsageAd
         </div>
       )}
 
-      {/* Saúde do tracking — opcional (campo pode estar ausente em deploys mistos) */}
+      {/* Tracking health — optional (the field may be absent in mixed deploys) */}
       {tracking_health && <SaudeDoTracking health={tracking_health} />}
 
-      {/* Tabela por workspace */}
+      {/* Per-workspace table */}
       {by_workspace.length > 0 ? (
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-xs md:min-w-[560px]">
@@ -287,9 +288,9 @@ export function StorageUsageSection({ data, onRefresh }: { data: IStorageUsageAd
                   <td className={`px-3 py-2 ${DESTAQUE_DA_FICHA}`}>
                     <div className="font-medium text-foreground">
                       {ws.workspace_name}
-                      {/* Lixeira e purgado são situações diferentes: o primeiro
-                          ainda é restaurável na seção Lixeira, o segundo já
-                          perdeu a linha e só resta liberar o espaço. */}
+                      {/* Trash and purged are different situations: the first one is
+                          still restorable in the Trash section, the second has
+                          already lost the row and all that is left is freeing the space. */}
                       {ws.workspace_state === "trashed" && (
                         <Badge variant="outline" className="ml-2 px-1 py-0 text-[11px]">na lixeira</Badge>
                       )}

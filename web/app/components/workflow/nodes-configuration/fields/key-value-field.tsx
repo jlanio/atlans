@@ -8,34 +8,34 @@ import { FieldLabel } from "./field-label"
 import type { FieldProps } from "./types"
 
 /**
- * Editor de pares chave/valor — cabeçalhos HTTP, query string e afins.
+ * Key/value pair editor — HTTP headers, query string and the like.
  *
- * O `ObjectField` (editor de árvore JSON) continua certo para estruturas
- * aninhadas, mas cabeçalho não é estrutura: é uma lista rasa de duas colunas.
- * Naquele editor, escrever `Content-Type: application/json` custa navegar uma
- * árvore, escolher o tipo do valor e confirmar — para um dado que o usuário já
- * sabe digitar de cor. Aqui são dois campos e um botão.
+ * `ObjectField` (the JSON tree editor) is still right for nested structures,
+ * but a header isn't a structure: it is a flat two-column list. In that editor,
+ * writing `Content-Type: application/json` costs navigating a tree, choosing
+ * the value type and confirming — for data the user already knows how to type
+ * by heart. Here it is two fields and a button.
  *
- * O valor persistido continua sendo o MESMO objeto de antes; muda só a forma de
- * editá-lo. Trocar o tipo do campo no schema não migra nada e não invalida
- * workflow salvo.
+ * The persisted value is still the SAME object as before; only the way it is
+ * edited changes. Switching the field type in the schema migrates nothing and
+ * doesn't invalidate saved workflows.
  */
 
 type KeyValueFieldProps = FieldProps
 
-/** Aceita objeto ou string JSON — o valor salvo pode vir das duas formas. */
+/** Accepts an object or a JSON string — the saved value may come in either form. */
 function paraObjeto(bruto: unknown): Record<string, string> {
   if (bruto && typeof bruto === "object") return bruto as Record<string, string>
   if (typeof bruto === "string" && bruto.trim()) {
     try {
       const lido = JSON.parse(bruto)
       if (lido && typeof lido === "object") return lido as Record<string, string>
-    } catch { /* string inválida vira objeto vazio, como no editor antigo */ }
+    } catch { /* an invalid string becomes an empty object, as in the old editor */ }
   }
   return {}
 }
 
-/** Pares na ordem em que estão no objeto salvo, com o valor sempre string. */
+/** Pairs in the order they appear in the saved object, with the value always a string. */
 function paraPares(objeto: Record<string, string>): [string, string][] {
   return Object.entries(objeto).map(([k, v]) => [k, String(v ?? "")])
 }
@@ -45,22 +45,23 @@ const KeyValueField = ({ field, values, setNodeField }: KeyValueFieldProps) => {
   const objeto = paraObjeto(values?.[field.name])
   const assinatura = JSON.stringify(objeto)
 
-  // As linhas vivem em ESTADO LOCAL, e não derivadas do objeto salvo.
+  // The rows live in LOCAL STATE, not derived from the saved object.
   //
-  // O objeto não admite chave vazia — e é justamente uma linha de chave vazia
-  // que uma linha recém-criada é. Enquanto a lista era recalculada do valor
-  // salvo, o `Adicionar` gravava a linha em branco, a gravação a descartava, o
-  // componente re-renderizava a partir do valor salvo e a linha não aparecia:
-  // o botão simplesmente não fazia nada, e `headers` e `params` do HttpRequest
-  // eram impreenchíveis pela interface. Pelo mesmo motivo, limpar o nome para
-  // renomear um cabeçalho apagava a linha inteira no meio da edição.
+  // The object doesn't allow an empty key — and an empty-key row is exactly
+  // what a freshly created row is. While the list was recomputed from the saved
+  // value, `Adicionar` (Add) wrote the blank row, the write discarded it, the
+  // component re-rendered from the saved value and the row didn't appear: the
+  // button simply did nothing, and the HttpRequest `headers` and `params` could
+  // not be filled from the interface. For the same reason, clearing the name to
+  // rename a header deleted the whole row mid-edit.
   const [pares, setPares] = useState<[string, string][]>(() => paraPares(objeto))
 
-  // Semente: a última forma do objeto que ESTE componente conhece. O caminho é
-  // controlado (o modal devolve o que gravamos, sem estado próprio), então sem
-  // essa marca toda tecla digitada voltaria como "mudou de fora" e derrubaria a
-  // linha sem nome que o usuário está preenchendo. Quando a diferença é real —
-  // outro nó selecionado, valor reposto de fora — as linhas são resemeadas.
+  // Seed: the last shape of the object THIS component knows. The path is
+  // controlled (the modal hands back what we wrote, with no state of its own), so
+  // without this marker every keystroke would come back as "changed from
+  // outside" and drop the unnamed row the user is filling in. When the
+  // difference is real — another node selected, value reset from outside — the
+  // rows are reseeded.
   const [semente, setSemente] = useState(assinatura)
   if (assinatura !== semente) {
     setSemente(assinatura)
@@ -72,8 +73,8 @@ const KeyValueField = ({ field, values, setNodeField }: KeyValueFieldProps) => {
     const saida: Record<string, string> = {}
     for (const [chave, valor] of novosPares) {
       const limpa = chave.trim()
-      // Linha sem nome fica na tela, mas não vira cabeçalho: o valor que sai do
-      // componente continua sendo só o que dá para enviar.
+      // An unnamed row stays on screen, but doesn't become a header: the value that
+      // leaves the component is still only what can be sent.
       if (limpa) saida[limpa] = valor
     }
     setSemente(JSON.stringify(saida))

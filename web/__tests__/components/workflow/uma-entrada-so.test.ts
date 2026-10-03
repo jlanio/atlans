@@ -1,17 +1,18 @@
 /**
- * Quantas arestas o `SubWorkflowOutput` aceita chegando.
+ * How many incoming edges `SubWorkflowOutput` accepts.
  *
- * Ele define o valor de retorno do sub-fluxo. Sem portas declaradas tem um
- * ponto de conexão anônimo, e duas arestas espalhariam os dois dicts nas mesmas
- * chaves: a última venceria, e o contrato anunciaria uma saída entregando
- * outra conforme a ordem das arestas. A partir de DUAS portas o editor preenche
- * o `to_key` de cada aresta com o nome da porta, cada origem cai na sua própria
- * chave, e várias conexões passam a ser justamente o objetivo — é como o
- * sub-fluxo devolve mais de um valor sem um nó-funil montando o dict.
+ * It defines the sub-workflow's return value. Without declared ports it has an
+ * anonymous connection point, and two edges would spread both dicts over the
+ * same keys: the last one would win, and the contract would announce one output
+ * while delivering another depending on the order of the edges. From TWO ports
+ * on, the editor fills each edge's `to_key` with the port name, each source lands
+ * in its own key, and multiple connections become precisely the goal — it's how
+ * the sub-workflow returns more than one value without a funnel node assembling
+ * the dict.
  *
- * O `SubWorkflowInput` era barrado pela mesma regra, por simetria, e não
- * precisava: cada aresta que sai dele espalha o dict de entrada no seu próprio
- * destino, sem disputa.
+ * `SubWorkflowInput` was blocked by the same rule, for symmetry, and didn't need
+ * to be: each edge leaving it spreads the input dict into its own target, with
+ * no contention.
  */
 import { describe, it, expect } from "vitest"
 
@@ -23,9 +24,9 @@ describe("limitadoAUmaAresta", () => {
   })
 
   it("uma porta só também não libera", () => {
-    // `resolveToKey` só preenche `to_key` quando o destino declara MAIS DE UMA
-    // porta. Com uma, as duas arestas voltariam a disputar a mesma chave —
-    // exatamente o defeito que a regra existe para evitar.
+    // `resolveToKey` only fills `to_key` when the target declares MORE THAN ONE
+    // port. With one, the two edges would go back to competing for the same key —
+    // exactly the defect the rule exists to avoid.
     expect(limitadoAUmaAresta("SubWorkflowOutput", 1)).toBe(true)
   })
 
@@ -34,9 +35,9 @@ describe("limitadoAUmaAresta", () => {
   })
 
   it("a Carta imagem segue a mesma regra: sem portas, ou com uma, aceita uma aresta só", () => {
-    // Com um ponto de conexão anônimo, duas camadas ligadas espalhariam os
-    // dois dicts na mesma chave (`output`) e a carta sairia com uma camada só —
-    // sem que o nó pudesse perceber a perda.
+    // With an anonymous connection point, two connected layers would spread
+    // both dicts over the same key (`output`) and the map would come out with a
+    // single layer — without the node being able to notice the loss.
     expect(limitadoAUmaAresta("CartaImagem", 0)).toBe(true)
     expect(limitadoAUmaAresta("CartaImagem", 1)).toBe(true)
   })
@@ -46,8 +47,8 @@ describe("limitadoAUmaAresta", () => {
   })
 
   it("SubWorkflowInput NÃO é restrito", () => {
-    // O que o usuário pediu antes: ramificar a partir da entrada do sub-fluxo,
-    // como já dá para fazer com o Gatilho por Web.
+    // What the user asked for earlier: branching from the sub-workflow's input,
+    // as is already possible with the Web Trigger.
     expect(limitadoAUmaAresta("SubWorkflowInput", 0)).toBe(false)
   })
 

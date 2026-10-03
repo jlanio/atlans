@@ -1,22 +1,22 @@
 # tests/unit/test_guarda_de_tenant_unica.py
 """
-Ponto unico da guarda de pertencimento a workspace.
+Single point for the workspace membership guard.
 
-`verify_workspace_access` existe em app/api/dependencies.py e ja era usada por
-quatro routers. Outros dois — drive e artifacts — reimplementavam a mesma
-checagem a mao, dez vezes:
+`verify_workspace_access` exists in app/api/dependencies.py and was already used by
+four routers. Two others — drive and artifacts — reimplemented the same
+check by hand, ten times:
 
     if wf.workspace_id not in workspace_ids:
         raise HTTPException(status_code=403, detail="Acesso negado.")
 
-Copia nao e so feiura. A variacao entre as copias foi o que deixou passar o
-download de artefato com token expirado: um caminho conferia expiracao, o outro
-nao, e ninguem comparava os dois. Enquanto a guarda for copiada, a proxima
-correcao de autorizacao vai valer para um subconjunto dos lugares.
+Copying is not just ugliness. The variation between the copies is what let through
+the artifact download with an expired token: one path checked expiration, the other
+did not, and nobody compared the two. As long as the guard is copied, the next
+authorization fix will apply to a subset of the places.
 
-Este teste trava a consolidacao. Ele NAO exige que toda comparacao com
-workspace_ids desapareca — duas sobrevivem de proposito e estao listadas em
-EXCECOES, cada uma com o motivo.
+This test locks in the consolidation. It does NOT require every comparison with
+workspace_ids to disappear — two survive on purpose and are listed in
+EXCECOES, each with its reason.
 """
 from __future__ import annotations
 
@@ -25,15 +25,15 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
 
-# Comparacoes com workspace_ids que NAO sao a guarda e devem permanecer.
+# Comparisons with workspace_ids that are NOT the guard and must remain.
 EXCECOES = {
-    # Laco de exclusao em lote: a mensagem nomeia QUAL artefato foi negado, o
-    # que o helper generico nao faz. Perder isso deixaria o usuario sem saber
-    # qual item do lote barrou a operacao.
+    # Batch deletion loop: the message names WHICH artifact was denied, which
+    # the generic helper does not do. Losing that would leave the user not knowing
+    # which item in the batch blocked the operation.
     ("app/api/routers/artifacts_router.py", "batch_delete_artifacts"),
-    # Filtro de lote no Drive: `continue`, nao `raise`. Pular um arquivo alheio
-    # e seguir com o resto e comportamento pretendido — levantar 403 aqui
-    # derrubaria a exclusao inteira por causa de um item.
+    # Batch filter in the Drive: `continue`, not `raise`. Skipping someone else's file
+    # and carrying on with the rest is the intended behavior — raising 403 here
+    # would bring down the whole deletion because of one item.
     ("app/services/drive_service.py", "batch_delete_files"),
 }
 
@@ -82,8 +82,8 @@ def test_a_guarda_de_tenant_nao_e_reimplementada_a_mao():
 
 
 def test_as_excecoes_registradas_ainda_existem():
-    """Se uma excecao sumir, ela tem de sair da lista — senao o teste afrouxa
-    em silencio e passa a permitir uma copia nova no mesmo lugar."""
+    """If an exception disappears, it must leave the list — otherwise the test loosens
+    silently and starts allowing a new copy in the same place."""
     for rel, funcao in EXCECOES:
         fonte = (RAIZ / rel).read_text(encoding="utf-8")
         arvore = ast.parse(fonte, rel)
@@ -95,13 +95,13 @@ def test_as_excecoes_registradas_ainda_existem():
 
 
 def test_nenhum_depends_de_workspace_ids_fica_sem_uso():
-    """O parametro custa uma query SQL por request.
+    """The parameter costs one SQL query per request.
 
-    Cinco rotas de workflow_groups o declaravam e nunca liam. Nao era furo —
-    todas conferem o papel (hoje por `exigir_papel_no_workspace`), que e
-    superconjunto estrito da checagem — mas era uma query por request para nada,
-    e um `Depends` de autorizacao sem uso passa a impressao de que a rota esta
-    protegida por ele.
+    Five workflow_groups routes declared it and never read it. It was not a hole —
+    all of them check the role (today via `exigir_papel_no_workspace`), which is a
+    strict superset of the check — but it was one query per request for nothing,
+    and an unused authorization `Depends` gives the impression that the route is
+    protected by it.
     """
     violacoes = []
     for rel in ARQUIVOS:

@@ -1,20 +1,21 @@
 // desktop/src/shared/disco.ts
 //
-// Limiares de espaço em disco, compartilhados entre a tela e a notificação.
+// Disk space thresholds, shared between the screen and the notification.
 //
-// Em `shared/` porque os DOIS lados precisam: o renderer para pintar a barra, o
-// main para decidir a notificação. O renderer não pode importar valor de
-// `main/ui/notificacoes.ts` (ele puxa `electron`, e o import derrubaria a
-// página — o plugin do vite.config.ts barra isso no build), e o main importar
-// de `renderer/` seria a dependência invertida.
+// In `shared/` because BOTH sides need them: the renderer to paint the bar, the
+// main process to decide on the notification. The renderer cannot import a
+// value from `main/ui/notificacoes.ts` (it pulls in `electron`, and the import
+// would bring the page down — the vite.config.ts plugin blocks this at build
+// time), and the main process importing from `renderer/` would be the inverted
+// dependency.
 //
-// Divergir os dois números seria pior que duplicá-los: a barra ficaria verde
-// enquanto a notificação já avisou, ou o contrário.
+// Having the two numbers diverge would be worse than duplicating them: the bar
+// would be green while the notification had already warned, or the reverse.
 
-/** Abaixo disto, um workflow razoável já pode não conseguir gravar a saída. */
+/** Below this, a reasonable workflow may already be unable to write its output. */
 export const DISCO_BAIXO_GB = 5
 
-/** Abaixo disto, é questão de tempo até falhar. */
+/** Below this, it is a matter of time until it fails. */
 export const DISCO_CRITICO_GB = 1
 
 export type NivelDisco = 'ok' | 'baixo' | 'critico'
@@ -28,7 +29,7 @@ export function nivelDoDisco(livreGb: number | null | undefined): NivelDisco | n
 
 export function gb(n: number | null | undefined): string {
   if (typeof n !== 'number') return '—'
-  // Abaixo de 10 GB a casa decimal é a diferença entre "dá para hoje" e "não
-  // dá"; acima disso ela só polui.
+  // Below 10 GB the decimal place is the difference between "enough for today"
+  // and "not enough"; above that it is just clutter.
   return n < 10 ? `${n.toFixed(1)} GB` : `${Math.round(n)} GB`
 }

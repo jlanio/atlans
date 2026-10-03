@@ -2,17 +2,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { renderHook, act } from "@testing-library/react"
 
 /**
- * O corpo dos POSTs que a Home manda ao assistente. O foco é a localização:
- * ela só viaja quando a pessoa COMPARTILHOU (o "+" liga, o × desliga) e há
- * posição — lida da store na hora do envio, nem prop nem ref. Sem ela, o corpo
- * é o de sempre. E a CONFIRMAÇÃO reenvia a mesma coordenada: a retomada do laço
- * não pode esquecer o "perto de mim" (o servidor não guarda a posição).
- * O fetch é dublê e a resposta sai cedo do consumidor (sem body).
+ * The body of the POSTs the Home sends to the assistant. The focus is location:
+ * it only travels when the person SHARED it (the "+" turns it on, the × turns it off) and there is a
+ * position — read from the store at send time, neither prop nor ref. Without it, the body
+ * is the usual one. And the CONFIRMATION resends the same coordinate: resuming the loop
+ * must not forget the "near me" (the server does not keep the position).
+ * The fetch is a double and the response exits the consumer early (no body).
  */
 vi.mock("@/service/GisFlowService", () => ({
   GisFlowService: {
     estadoDoAgente: vi.fn().mockResolvedValue({ success: true, data: undefined }),
-    // O `conversaId` dispara o replay; devolve uma conversa vazia para o efeito.
+    // The `conversaId` triggers the replay; returns an empty conversation for the effect.
     lerConversa: vi.fn().mockResolvedValue({ success: true, data: { quadros: [] } }),
   },
 }))
@@ -26,14 +26,14 @@ const fetchMock = vi.fn()
 
 beforeEach(() => {
   fetchMock.mockReset()
-  // `body: null` faz o consumidor sair na hora (não há stream a ler no teste).
+  // `body: null` makes the consumer exit right away (there is no stream to read in the test).
   fetchMock.mockResolvedValue({ ok: true, body: null })
   vi.stubGlobal("fetch", fetchMock)
   useHomeStore.setState({ localizacao: null, compartilharLocalizacao: false })
 })
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
-/** O corpo JSON do primeiro POST do teste. */
+/** The JSON body of the test's first POST. */
 function corpoDoPost(): Record<string, unknown> {
   const chamada = fetchMock.mock.calls[0]
   return JSON.parse((chamada[1] as { body: string }).body)
@@ -43,8 +43,8 @@ const LOC = { lat: -23.5505, lon: -46.6333, precisao_m: 18 }
 
 describe("useAssistente — a localização no turno", () => {
   it("sem compartilhar, o corpo é o de sempre — sem o campo", async () => {
-    // Posição conhecida (o botão do globo gravou), mas a pessoa NÃO pediu para
-    // compartilhar: nada viaja.
+    // Known position (the globe's button recorded it), but the person did NOT ask to
+    // share: nothing travels.
     useHomeStore.setState({ localizacao: LOC, compartilharLocalizacao: false })
     const { result } = renderHook(() =>
       useAssistente({ conversaId: "c1", workspaceId: "w1", anonimo: true }),
@@ -71,7 +71,7 @@ describe("useAssistente — a localização no turno", () => {
     const { result } = renderHook(() =>
       useAssistente({ conversaId: "c1", workspaceId: "w1", anonimo: true }),
     )
-    // Deixa o replay da conversa selecionada assentar (lerConversa dublê).
+    // Lets the selected conversation's replay settle (lerConversa double).
     await act(async () => {})
 
     await act(async () => { await result.current.confirmar("tu1", "tok", "confirmar") })
@@ -85,14 +85,14 @@ describe("useAssistente — a localização no turno", () => {
 
 describe("useAssistente — a recusa antes do stream", () => {
   it("o 429 da rota é `muitas_requisicoes`, não o `rate_limited` da cota diária", async () => {
-    // No stream, `rate_limited` é a cota DIÁRIA; se o 429 da rota usasse o
-    // mesmo código, a tela em inglês diria "espere um instante" a quem só
-    // volta amanhã (e vice-versa).
+    // In the stream, `rate_limited` is the DAILY quota; if the route's 429 used the
+    // same code, the English screen would say "wait a moment" to someone who only
+    // gets back tomorrow (and vice versa).
     fetchMock.mockResolvedValue({ ok: false, status: 429, json: async () => ({}) })
     const { result } = renderHook(() =>
       useAssistente({ conversaId: "c1", workspaceId: "w1", anonimo: true }),
     )
-    await act(async () => {}) // o replay da conversa assenta antes (senão zera os turnos)
+    await act(async () => {}) // the conversation replay settles first (otherwise it resets the turns)
     await act(async () => { await result.current.enviar("oi") })
     const blocos = result.current.turnos.flatMap((t) => t.blocos)
     const erro = blocos.find((b) => b.tipo === "erro")
@@ -101,7 +101,7 @@ describe("useAssistente — a recusa antes do stream", () => {
 })
 
 describe("useAssistente — o idioma da tela no turno", () => {
-  // O provider de idioma embrulha o hook como a Home real (o layout o monta).
+  // The language provider wraps the hook like the real Home (the layout mounts it).
   const comIdioma = (idioma: "pt-BR" | "en" | "es") =>
     function Embrulho({ children }: { children: React.ReactNode }) {
       return React.createElement(IdiomaProvider, { inicial: { idioma, detectado: idioma, escolhido: idioma }, children })
@@ -126,8 +126,8 @@ describe("useAssistente — o idioma da tela no turno", () => {
   })
 
   it("trocado nas Preferências, o próximo turno já vai no idioma novo — sem recarregar", async () => {
-    // `enviar` lê o idioma por ref (trocar não o recria): o efeito que mantém
-    // a ref em dia é o que faz a troca valer antes de a página recarregar.
+    // `enviar` reads the language through a ref (switching does not recreate it): the effect that keeps
+    // the ref up to date is what makes the switch take effect before the page reloads.
     const { result } = renderHook(
       () => ({ agente: useAssistente({ conversaId: "c1", workspaceId: "w1", anonimo: true }), idioma: useIdioma() }),
       { wrapper: comIdioma("pt-BR") },

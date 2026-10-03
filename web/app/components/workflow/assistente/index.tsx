@@ -2,16 +2,16 @@
 
 // web/app/components/workflow/assistente/index.tsx
 //
-// A gaveta do assistente — coluna ANCORADA à direita do canvas.
+// The assistant drawer — a column DOCKED to the right of the canvas.
 //
-// **Não é o `Sheet`** do shadcn: aquilo é sobreposição modal com overlay, e
-// escurecer o canvas seria esconder justamente o que a conversa está montando.
-// Aqui a gaveta é irmã flex do React Flow: o canvas ENCOLHE, os dois ficam
-// visíveis, e dá para ver o fluxo aparecer enquanto se lê a explicação. É o
-// mesmo motivo pelo qual o `run-panel` deixou de ser um Sheet.
+// **It is not shadcn's `Sheet`**: that is a modal overlay with a scrim, and
+// darkening the canvas would hide precisely what the conversation is building.
+// Here the drawer is a flex sibling of React Flow: the canvas SHRINKS, both stay
+// visible, and you can watch the workflow appear while reading the explanation.
+// It's the same reason `run-panel` stopped being a Sheet.
 //
-// O arraste vem do `useResizablePanel`, que já resolve pointer capture,
-// teclado, clamp de viewport e a memória da largura no `localStorage`.
+// Dragging comes from `useResizablePanel`, which already handles pointer capture,
+// keyboard, viewport clamping and remembering the width in `localStorage`.
 
 import { useCallback, useEffect, useState } from "react"
 import { TbDotsVertical, TbPlayerStopFilled, TbSend, TbSparkles, TbX } from "react-icons/tb"
@@ -33,24 +33,24 @@ import UsoDaCota from "@/app/components/home/assistente/uso-da-cota"
 
 const CHAVE_LARGURA = "atlans:assistente:largura"
 
-// A F4 renomeou a chave da largura (era atlans:copiloto:largura) sem migração.
-// Copia a antiga para a nova UMA vez, no carregamento do módulo (só no
-// cliente), antes de qualquer useResizablePanel ler a preferência.
+// F4 renamed the width key (it was atlans:copiloto:largura) without a migration.
+// Copies the old one to the new one ONCE, on module load (client only),
+// before any useResizablePanel reads the preference.
 ;(function migrarLarguraLegada() {
   try {
     if (typeof window === "undefined") return
     if (window.localStorage.getItem(CHAVE_LARGURA) !== null) return
     const legada = window.localStorage.getItem("atlans:copiloto:largura")
     if (legada !== null) window.localStorage.setItem(CHAVE_LARGURA, legada)
-  } catch { /* preferência descartável */ }
+  } catch { /* disposable preference */ }
 })()
 
 interface Props {
-  /** O fluxo aberto. Ausente na tela de criar — o backend guarda essa conversa à parte. */
+  /** The open workflow. Absent on the create screen — the backend keeps that conversation separately. */
   workflowId?: string
   /**
-   * Abre por padrão quando não há preferência guardada. Verdadeiro na tela de
-   * criar, onde o canvas nasce vazio e a gaveta é o caminho mais curto.
+   * Opens by default when there is no stored preference. True on the create
+   * screen, where the canvas is born empty and the drawer is the shortest path.
    */
   abrirPorPadrao?: boolean
   onAplicar: (resultado: ResultadoDaProposta) => void
@@ -64,16 +64,17 @@ export default function AssistentePainel({ workflowId, abrirPorPadrao = false, o
 
   const { estado, consultando, turnos, correndo, enviar, parar, esquecer } = useAssistenteEditor(workflowId)
   const [rascunho, setRascunho] = useState("")
-  // O aceite de desenhar num canvas que JÁ TEM trabalho, uma vez por conversa.
-  // Zera ao trocar de fluxo e ao recomeçar a conversa, pelos mesmos motivos que
-  // a conversa zera: é outra conversa, e o consentimento não atravessa.
+  // The acceptance to draw on a canvas that ALREADY HAS work, once per conversation.
+  // Resets when switching workflows and when restarting the conversation, for the
+  // same reasons the conversation resets: it's another conversation, and consent
+  // doesn't carry over.
   const [liberado, setLiberado] = useState(false)
   useEffect(() => { setLiberado(false) }, [workflowId])
 
   useEffect(() => { hidratar(abrirPorPadrao) }, [hidratar, abrirPorPadrao])
 
-  // Ctrl+I, no molde do Ctrl+` do dock de execução — e com a mesma guarda: sem
-  // ela, o atalho dispararia enquanto alguém digita a query SQL de um nó.
+  // Ctrl+I, on the template of the run dock's Ctrl+` — and with the same guard:
+  // without it, the shortcut would fire while someone types a node's SQL query.
   useEffect(() => {
     function editando(alvo: EventTarget | null) {
       const el = alvo as HTMLElement | null
@@ -106,8 +107,9 @@ export default function AssistentePainel({ workflowId, abrirPorPadrao = false, o
     void enviar(texto)
   }, [rascunho, correndo, enviar])
 
-  // Desligado na instalação: a gaveta não existe, e nada no editor muda. É o
-  // comportamento certo para quem roda o Atlans sem a dependência externa.
+  // Disabled in the installation: the drawer doesn't exist, and nothing in the
+  // editor changes. It's the right behavior for whoever runs Atlans without the
+  // external dependency.
   if (consultando || estado?.ativo !== true) return null
 
   if (!aberto) {
@@ -130,34 +132,35 @@ export default function AssistentePainel({ workflowId, abrirPorPadrao = false, o
 
   return (
     <aside
-      // nowheel/nopan/nodrag: sem eles o React Flow captura a rolagem da
-      // conversa e o arraste da alça, e rolar a lista dava zoom no grafo.
+      // nowheel/nopan/nodrag: without them React Flow captures the conversation's
+      // scrolling and the handle's drag, and scrolling the list zoomed the graph.
       //
-      // `max-h-svh` e o TETO, e sem ele o `overflow-y-auto` da conversa nao
-      // rola nunca. A casca do dashboard e `min-h-svh` (`ui/sidebar.tsx`), que
-      // e PISO e nao teto: como esta gaveta e o unico filho EM FLUXO do
-      // container do editor — todo o resto la dentro e `absolute` —, a
-      // contribuicao intrinseca dela e a conversa inteira, e a altura sobe pela
-      // cadeia ate a pagina crescer. Ai a rolagem vai para o viewport em vez da
-      // lista, e o campo de enviar sai da tela. O teto quebra essa
-      // circularidade num ponto so.
+      // `max-h-svh` is the CEILING, and without it the conversation's
+      // `overflow-y-auto` never scrolls. The dashboard shell is `min-h-svh`
+      // (`ui/sidebar.tsx`), which is a FLOOR and not a ceiling: since this drawer
+      // is the only IN-FLOW child of the editor container — everything else in
+      // there is `absolute` —, its intrinsic contribution is the whole
+      // conversation, and the height climbs up the chain until the page grows.
+      // Then the scrolling goes to the viewport instead of the list, and the send
+      // field leaves the screen. The ceiling breaks that circularity at a single
+      // point.
       //
-      // `h-full` FICA junto: sozinho, o `h-svh` desacoplaria a gaveta da caixa
-      // que a contem e transbordaria no dia em que houvesse um cabecalho
-      // acima. O par diz "seja a altura que te deram, mas nao passe de uma
-      // tela".
+      // `h-full` STAYS alongside: on its own, `h-svh` would decouple the drawer
+      // from the box that contains it and would overflow the day there was a
+      // header above. The pair says "be the height you were given, but don't go
+      // beyond one screen".
       //
-      // `svh` e nao `dvh`, e o motivo esta no piso: `dvh >= svh`, entao um teto
-      // em `dvh` fica ACIMA do `min-h-svh` da casca e o defeito voltaria com a
-      // barra de endereco retraida — intermitente, que e pior. Os usos de
-      // `dvh` do repositorio (`ui/dialog.tsx` e os modais que o usam) sao o
-      // caso oposto: caixas que precisam caber num alvo que se mexe. Esta e casca,
-      // como o `h-svh` do container da sidebar, e casca nao pode refluir no
-      // meio da rolagem.
+      // `svh` and not `dvh`, and the reason is in the floor: `dvh >= svh`, so a
+      // ceiling in `dvh` sits ABOVE the shell's `min-h-svh` and the defect would
+      // come back with the address bar retracted — intermittent, which is worse.
+      // The repository's uses of `dvh` (`ui/dialog.tsx` and the modals that use
+      // it) are the opposite case: boxes that need to fit a moving target. This
+      // is a shell, like the sidebar container's `h-svh`, and a shell can't
+      // reflow in the middle of scrolling.
       className={cn(
         "nowheel nopan nodrag relative z-20 flex h-full max-h-svh shrink-0 flex-col border-l border-border bg-background",
-        // No telefone a gaveta toma a tela: um canvas de 360px dividido em dois
-        // não serve para nenhum dos dois.
+        // On the phone the drawer takes over the screen: a 360px canvas split in two
+        // serves neither half.
         "max-md:absolute max-md:inset-0 max-md:w-full max-md:border-l-0",
         !isResizing && "motion-safe:transition-[width]",
       )}
@@ -215,11 +218,12 @@ export default function AssistentePainel({ workflowId, abrirPorPadrao = false, o
       />
 
       {estourou && cota && (
-        // A TERCEIRA superfície do aviso. Ela tinha ficado com a cópia antiga:
-        // sem a oferta e dizendo «reabre em algumas horas» com o prazo exato
-        // na mão — a oferta (de uma extensão, ver `web/extensoes`) sumia
-        // conforme a tela em que a pessoa bateu no teto, que é justamente o
-        // que o componente existe para impedir.
+        // The THIRD surface of the warning. It had been left with the old copy:
+        // without the offer and saying "reabre em algumas horas" (reopens in a
+        // few hours) with the exact deadline at hand — the offer (from an
+        // extension, see `web/extensoes`) disappeared depending on the screen
+        // where the person hit the ceiling, which is precisely what the
+        // component exists to prevent.
         <AvisoDeCotaCheia
           cota={cota}
           plano={estado.plano}
@@ -236,8 +240,8 @@ export default function AssistentePainel({ workflowId, abrirPorPadrao = false, o
           <Textarea
             value={rascunho}
             onChange={e => setRascunho(e.target.value)}
-            // Enter envia, Shift+Enter quebra linha — o que todo campo de
-            // conversa faz, e o oposto do que um textarea faz sozinho.
+            // Enter sends, Shift+Enter breaks the line — what every chat field
+            // does, and the opposite of what a textarea does on its own.
             onKeyDown={e => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault()

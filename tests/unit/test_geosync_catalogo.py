@@ -1,15 +1,15 @@
 # tests/unit/test_geosync_catalogo.py
 """
-GeoSync em modo catalogo (LGPD).
+GeoSync in catalog mode (LGPD).
 
-O executor registra o dataset no Drive — nome, tipo, tamanho, CRS, bbox — e os
-bytes NUNCA saem da pasta do usuario. Na leitura, o executor reencontra o
-arquivo pelo proprio `.atlans-sync.json`.
+The executor registers the dataset in the Drive — name, type, size, CRS, bbox — and the
+bytes NEVER leave the user's folder. On read, the executor finds the
+file again through its own `.atlans-sync.json`.
 
-O ponto de desenho que estes testes protegem: **nenhum caminho de sistema de
-arquivos trafega pela rede**. O servidor guarda que o arquivo e local e de qual
-executor, e nada mais. Isso elimina de saida a classe de ataque de path
-traversal que o caminho de artefatos precisa tratar explicitamente.
+The design point these tests protect: **no filesystem path travels over the
+network**. The server stores that the file is local and on which
+executor, and nothing else. That eliminates from the start the path traversal
+attack class that the artifacts path has to handle explicitly.
 """
 import json
 from pathlib import Path
@@ -33,7 +33,7 @@ def sync_dir(tmp_path, monkeypatch):
     return pasta
 
 
-# ── Resolucao pelo manifesto ─────────────────────────────────────────────────
+# ── Resolution through the manifest ──────────────────────────────────────────
 
 def test_resolve_dataset_de_arquivo_unico(sync_dir):
     (sync_dir / "parcelas.geojson").write_bytes(b'{"type":"FeatureCollection"}')
@@ -55,16 +55,16 @@ def test_resolve_dataset_de_arquivo_unico(sync_dir):
 
 
 def test_shapefile_resolve_para_o_shp_e_nao_para_outro_componente(sync_dir):
-    """Um shapefile e um bundle. Devolver o `.dbf` faria o ReadShapefile falhar
-    de forma incompreensivel — o `primary_path` do scanner escolhe o `.shp`, e
-    esta resolucao precisa concordar com ele."""
+    """A shapefile is a bundle. Returning the `.dbf` would make ReadShapefile fail
+    in an incomprehensible way — the scanner's `primary_path` picks the `.shp`, and
+    this resolution must agree with it."""
     for ext, conteudo in (("shp", b"GEOMETRIA"), ("dbf", b"ATRIBUTOS"), ("shx", b"INDICE")):
         (sync_dir / f"lotes.{ext}").write_bytes(conteudo)
     _manifesto(sync_dir, {
         "lotes": {
             "type": "shapefile", "remote_id_hash": "id-2",
-            # Ordem proposital: o .dbf vem primeiro para provar que a escolha
-            # nao e "o primeiro do dicionario".
+            # Deliberate order: the .dbf comes first to prove that the choice
+            # is not "the first in the dictionary".
             "files": {"lotes.dbf": {}, "lotes.shp": {}, "lotes.shx": {}},
         },
     })
@@ -79,7 +79,7 @@ def test_shapefile_resolve_para_o_shp_e_nao_para_outro_componente(sync_dir):
 
 
 def test_copia_e_nao_devolve_o_arquivo_do_usuario(sync_dir):
-    """Mesma armadilha do caminho de artefatos: o caller apaga o que recebe."""
+    """Same pitfall as the artifacts path: the caller deletes what it receives."""
     import os
 
     original = sync_dir / "dados.geojson"
@@ -93,7 +93,7 @@ def test_copia_e_nao_devolve_o_arquivo_do_usuario(sync_dir):
         "id-3", "exec-1", "geojson", "dados.geojson",
     )
     assert Path(temp) != original
-    os.unlink(temp)                       # o que `read_drive_file_as` faz
+    os.unlink(temp)                       # what `read_drive_file_as` does
     assert original.is_file(), "o arquivo do usuario foi apagado pela leitura"
 
 
@@ -117,7 +117,7 @@ def test_procura_em_todas_as_pastas_configuradas(tmp_path, monkeypatch):
         Path(temp).unlink(missing_ok=True)
 
 
-# ── Erros com causa ──────────────────────────────────────────────────────────
+# ── Errors with a cause ──────────────────────────────────────────────────────
 
 def test_dataset_de_outro_executor_da_erro_explicativo(sync_dir):
     _manifesto(sync_dir, {})
@@ -138,8 +138,8 @@ def test_sem_pastas_de_sync_explica_o_que_falta(tmp_path, monkeypatch):
 
 
 def test_arquivo_removido_do_disco_da_erro_distinto(sync_dir):
-    """Manifesto conhece o dataset, mas o arquivo sumiu — diagnostico diferente
-    de 'esta em outra maquina'."""
+    """The manifest knows the dataset, but the file disappeared — a different diagnosis
+    from 'it is on another machine'."""
     _manifesto(sync_dir, {
         "sumido": {"type": "geojson", "remote_id_hash": "id-5",
                    "files": {"sumido.geojson": {}}},
@@ -150,7 +150,7 @@ def test_arquivo_removido_do_disco_da_erro_distinto(sync_dir):
 
 
 def test_manifesto_corrompido_nao_derruba_a_busca(tmp_path, monkeypatch):
-    """Uma pasta com manifesto ilegivel nao pode impedir de achar nas outras."""
+    """A folder with an unreadable manifest must not prevent finding it in the others."""
     a, b = tmp_path / "A", tmp_path / "B"
     a.mkdir(), b.mkdir()
     monkeypatch.setenv("EXECUTOR_SYNC_DIRS", f"{a},{b}")
@@ -167,14 +167,14 @@ def test_manifesto_corrompido_nao_derruba_a_busca(tmp_path, monkeypatch):
         Path(temp).unlink(missing_ok=True)
 
 
-# ── Escolha do arquivo principal ─────────────────────────────────────────────
+# ── Choosing the primary file ────────────────────────────────────────────────
 
 def test_dataset_sem_arquivos_no_manifesto(sync_dir):
     assert drive_resolver._arquivo_principal(sync_dir, {"type": "geojson", "files": {}}) is None
 
 
 def test_shapefile_sem_shp_no_bundle(sync_dir):
-    """Bundle incompleto: melhor None (que vira erro nomeado) do que devolver o
-    `.dbf` e falhar dentro do geopandas."""
+    """Incomplete bundle: better None (which becomes a named error) than returning the
+    `.dbf` and failing inside geopandas."""
     ds = {"type": "shapefile", "files": {"lotes.dbf": {}, "lotes.shx": {}}}
     assert drive_resolver._arquivo_principal(sync_dir, ds) is None

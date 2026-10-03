@@ -1,23 +1,23 @@
-// Mapa de estilos visuais por tipo de credencial — fonte única de verdade.
-// Usado pela listagem em /credentials para dar uma âncora visual a cada linha.
+// Map of visual styles per credential type — single source of truth.
+// Used by the listing at /credentials to give each row a visual anchor.
 //
-// Os tipos aqui espelham CREDENTIAL_TYPE_SCHEMAS em app/core/credentials/schemas.py.
-// Se um tipo novo entrar no backend sem entrada aqui, a UI cai no DEFAULT em vez
-// de quebrar — e o teste em __tests__/consts/credential-type-styles.test.ts
-// aponta a divergência.
+// The types here mirror CREDENTIAL_TYPE_SCHEMAS in app/core/credentials/schemas.py.
+// If a new type lands in the backend without an entry here, the UI falls back
+// to DEFAULT instead of breaking — and the test in
+// __tests__/consts/credential-type-styles.test.ts points out the mismatch.
 //
-// Ícone de marca (react-icons/si) onde existe, Tabler no resto. Misturar
-// conjuntos é prática estabelecida no repo (ver WorkflowIcons.ts, que combina
-// oito), e reconhecer "esta é minha credencial do Postgres" de relance é o
-// ponto principal desta tela. O container colorido normaliza a diferença de
-// traço entre os conjuntos.
+// Brand icon (react-icons/si) where one exists, Tabler for the rest. Mixing
+// sets is established practice in the repo (see WorkflowIcons.ts, which
+// combines eight), and recognizing "this is my Postgres credential" at a glance
+// is the main point of this screen. The colored container evens out the stroke
+// difference between the sets.
 //
-// O S3 é o balde do Tabler: o Simple Icons tirou as marcas da Amazon, e o
-// `SiAmazons3` sumiu do react-icons 5.7. Importado, ele vinha `undefined` e
-// derrubava a lista inteira de credenciais no primeiro cartão de S3.
+// S3 is Tabler's bucket: Simple Icons removed the Amazon brands, and
+// `SiAmazons3` disappeared from react-icons 5.7. When imported, it came in as
+// `undefined` and took down the whole credential list at the first S3 card.
 //
-// As classes são escritas por extenso de propósito: o Tailwind varre o código
-// estaticamente e não enxerga classe montada por interpolação.
+// The classes are written out in full on purpose: Tailwind scans the code
+// statically and does not see classes built by interpolation.
 
 import { IconType } from "react-icons";
 import { SiPostgresql, SiMysql } from "react-icons/si";
@@ -25,10 +25,10 @@ import { TbBucket, TbKey, TbUserShield, TbWebhook, TbMail, TbMap2, TbMapPin, TbP
 
 export interface CredentialTypeStyle {
   icon: IconType;
-  /** Fundo do container do ícone. */
+  /** Background of the icon container. */
   bg: string;
-  /** Cor do traço do ícone. Sempre com variante dark: `text-<cor>-600` sozinho
-   *  fica abaixo de 4.5:1 sobre `bg-<cor>-500/10` no tema escuro. */
+  /** Icon stroke color. Always with a dark variant: `text-<cor>-600` alone
+   *  falls below 4.5:1 over `bg-<cor>-500/10` in the dark theme. */
   fg: string;
 }
 

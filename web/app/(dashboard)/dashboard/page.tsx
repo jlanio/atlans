@@ -1,7 +1,7 @@
 import DashboardView from "@/app/components/dashboard"
 
-// Wrapper fino: o escopo, os dados e a composição vivem no `DashboardView`
-// (docs/specs/dashboard.md §3.2). A página só monta a rota.
+// Thin wrapper: the scope, the data and the composition live in `DashboardView`
+// (docs/specs/dashboard.md §3.2). The page only mounts the route.
 export default function DashboardPage() {
   return <DashboardView />
 }

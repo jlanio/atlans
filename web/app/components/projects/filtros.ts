@@ -5,9 +5,9 @@ import type { ComoAnda } from "./como-anda"
 import { resumirAgendamento, type ResumoDoAgendamento } from "./gatilho"
 
 /**
- * Chips, busca e ordenação de Projetos (docs/specs/projetos.md §3.6). Puro:
- * o `index` monta o contexto uma vez por render ("como anda" e resumo do
- * agendamento por workflow) e cada predicado só lê.
+ * Projects chips, search and sorting (docs/specs/projects.md §3.6). Pure:
+ * the `index` builds the context once per render ("como anda" and schedule
+ * summary per workflow) and each predicate only reads.
  */
 
 export interface ContextoDeFiltro {
@@ -15,7 +15,7 @@ export interface ContextoDeFiltro {
   resumoDoAgendamentoPorHash: Map<string, ResumoDoAgendamento | null>
 }
 
-/** Os chips da barra, na ordem da tela. `pausado` e `nunca` só existem na URL. */
+/** The bar's chips, in screen order. `pausado` and `nunca` exist only in the URL. */
 export const FILTROS_DOS_CHIPS: Filtro[] = [
   "todos", "ativos", "inativos", "executando", "falha", "agendados", "webhook", "subfluxos", "portal",
   "assistente",
@@ -42,15 +42,15 @@ export const ROTULO_DA_ORDEM: Record<Ordem, string> = {
   alterado: "Alterado",
 }
 
-/** Portal publicado e acessível — o selo "Portal público/privado" e o chip "Com portal" usam a mesma regra. */
+/** Published and accessible portal — the "Portal público/privado" badge and the "Com portal" chip use the same rule. */
 export function temPortal(wf: Pick<IWorkflow, "has_publish_map" | "portal_access">): boolean {
   return !!wf.has_publish_map && wf.portal_access !== "disabled"
 }
 
 function estaPausado(wf: IWorkflow, contexto: ContextoDeFiltro): boolean {
-  // O resumo do contexto é a fonte; sem ele (workflow que chegou depois de
-  // o contexto ser montado), deriva do próprio item — é barato e evita que
-  // um chip e uma linha discordem.
+  // The context summary is the source; without it (a workflow that arrived after
+  // the context was built), derive from the item itself — it is cheap and keeps
+  // a chip and a row from disagreeing.
   const resumo = contexto.resumoDoAgendamentoPorHash.get(wf.id_hash) ?? resumirAgendamento(wf.schedule, wf.flag_ative)
   return resumo?.estado === "pausado"
 }
@@ -60,24 +60,24 @@ export function predicadoDoFiltro(filtro: Filtro, contexto: ContextoDeFiltro): (
     case "todos": return () => true
     case "ativos": return wf => wf.flag_ative
     case "inativos": return wf => !wf.flag_ative
-    // Lê o "como anda" já derivado, e não `runningHashes` cru: a linha marca
-    // "Em execução" também quando as métricas dizem `running` sem run vivo no
-    // contexto (janela de cache de 45 s). Chip, filtro e linha discordariam.
+    // Reads the already-derived "como anda", not raw `runningHashes`: the row
+    // shows "Em execução" also when the metrics say `running` with no live run
+    // in the context (45 s cache window). Chip, filter and row would disagree.
     case "executando": return wf => contexto.comoAndaPorHash.get(wf.id_hash)?.tipo === "executando"
     case "falha": return wf => contexto.comoAndaPorHash.get(wf.id_hash)?.tipo === "falhou"
     case "agendados": return wf => !!wf.has_schedule_trigger
     case "webhook": return wf => !!wf.has_webhook_trigger
     case "subfluxos": return wf => !!wf.is_subworkflow
     case "portal": return wf => temPortal(wf)
-    // Quem CRIOU o fluxo, não quem o disparou: um fluxo do assistente
-    // executado à mão continua sendo do assistente.
+    // Who CREATED the workflow, not who triggered it: an assistant workflow
+    // run by hand still belongs to the assistant.
     case "assistente": return wf => wf.origem === "assistente"
     case "pausado": return wf => estaPausado(wf, contexto)
     case "nunca": return wf => contexto.comoAndaPorHash.get(wf.id_hash)?.tipo === "nunca"
   }
 }
 
-/** Contagem de cada chip sobre a lista INTEIRA (não a filtrada), como a spec pede. */
+/** Count of each chip over the WHOLE list (not the filtered one), as the spec asks. */
 export function contarPorFiltro(workflows: IWorkflow[], contexto: ContextoDeFiltro): Record<Filtro, number> {
   const contagem = Object.fromEntries(FILTROS.map(f => [f, 0])) as Record<Filtro, number>
   const predicados = FILTROS.map(f => [f, predicadoDoFiltro(f, contexto)] as const)
@@ -87,14 +87,14 @@ export function contarPorFiltro(workflows: IWorkflow[], contexto: ContextoDeFilt
   return contagem
 }
 
-/** Sem acento, sem caixa, sem espaço nas pontas: "Outorgas" casa "outorga", "Bacia do Rio" casa "rio". */
+/** No accents, no case, no leading/trailing spaces: "Outorgas" matches "outorga", "Bacia do Rio" matches "rio". */
 export function normalizarBusca(texto: string | null | undefined): string {
   return (texto ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
 }
 
 /**
- * Nome, descrição e nome do grupo: quem digita "hidrologia" quer ver os
- * workflows do grupo Hidrologia, mesmo que nenhum tenha a palavra no nome.
+ * Name, description and group name: whoever types "hidrologia" wants to see the
+ * workflows in the Hidrologia group, even if none has the word in its name.
  */
 export function casaBusca(wf: IWorkflow, gruposPorId: Map<string, IWorkflowGroup>, q: string): boolean {
   const termo = normalizarBusca(q)
@@ -119,9 +119,9 @@ function instanteDaExecucao(wf: IWorkflow, contexto: ContextoDeFiltro): number |
 }
 
 /**
- * Cópia ordenada. Nome em pt-BR; "execução" põe a mais recente (ou em curso)
- * primeiro e quem nunca rodou por último; "alterado" é `updated_at` desc.
- * Empates caem no nome, para a lista não mudar de lugar entre renders.
+ * Sorted copy. Name in pt-BR; "execução" puts the most recent (or in progress)
+ * first and those that never ran last; "alterado" is `updated_at` desc.
+ * Ties fall back to the name, so the list does not shift between renders.
  */
 export function ordenar(workflows: IWorkflow[], ordem: Ordem, contexto: ContextoDeFiltro): IWorkflow[] {
   const lista = [...workflows]

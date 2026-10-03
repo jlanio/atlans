@@ -35,7 +35,7 @@ class SyncTrigger:
         self._triggers = self._load_triggers()
 
     async def aclose(self):
-        """Fecha o cliente HTTP compartilhado (chamado no shutdown do manager)."""
+        """Closes the shared HTTP client (called at manager shutdown)."""
         await self._http.aclose()
 
     @property
@@ -57,7 +57,7 @@ class SyncTrigger:
         return []
 
     def _headers(self) -> dict:
-        """Sem headers de auth — identidade vem do cert mTLS."""
+        """No auth headers — identity comes from the mTLS cert."""
         return {}
 
     async def on_file_synced(self, dataset_name: str, remote_info: dict):
@@ -78,7 +78,7 @@ class SyncTrigger:
                 await self._execute_workflow(wf_hash, inputs)
 
     def _resolve_inputs(self, template: dict, remote_info: dict, dataset_name: str) -> dict:
-        """Substitui placeholders {{key}} nos inputs."""
+        """Replaces {{key}} placeholders in the inputs."""
         resolved = {}
         context = {
             "dataset_name": dataset_name,

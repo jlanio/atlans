@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, renderHook } from "@testing-library/react"
 
-// `cn`/`ndid`/`ndhid` são params EFÊMEROS de UI (modal de config, drawer de
-// conexão). Escrevê-los com `push` empilhava uma entrada de histórico a cada
-// abrir/fechar, e o Voltar do navegador reabria um modal já fechado. A URL é
-// dublada por um `URLSearchParams` mutável; o teste observa quem foi chamado.
+// `cn`/`ndid`/`ndhid` are EPHEMERAL UI params (config modal, connection
+// drawer). Writing them with `push` stacked a history entry on every
+// open/close, and the browser's Back reopened an already-closed modal. The URL
+// is doubled by a mutable `URLSearchParams`; the test observes what was called.
 const url = { sp: new URLSearchParams(""), pathname: "/workflow/abc" }
 const replace = vi.fn()
 const push = vi.fn()
@@ -44,8 +44,8 @@ describe("useUrlParam — param efêmero usa replace, não push", () => {
 })
 
 describe("useLinkNodeParams — o drawer de conexão usa replace, não push", () => {
-  // Este hook RE-IMPLEMENTA os writers de `ndid`/`ndhid` (não passa pelo
-  // useUrlParam), então tinha o mesmo `push` a corrigir por conta própria.
+  // This hook RE-IMPLEMENTS the `ndid`/`ndhid` writers (it doesn't go through
+  // useUrlParam), so it had the same `push` to fix on its own.
   it("setLinkNodeParam grava ndid/ndhid com replace", () => {
     const { result } = renderHook(() => useLinkNodeParams())
     act(() => result.current.setLinkNodeParam("no-1", "h-2"))

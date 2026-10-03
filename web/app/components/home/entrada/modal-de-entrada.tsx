@@ -2,24 +2,24 @@
 
 // web/app/components/home/entrada/modal-de-entrada.tsx
 //
-// A ENTRADA do site — login e cadastro — como um modal sobre o globo da Home,
-// no tema dela (`home-portal`) e com o fundo levemente ofuscado (o globo
-// continua à vista por trás). Substitui as telas /login e /register, que hoje
-// só redirecionam para cá: a Home abre sem sessão e o primeiro envio à barra
-// abre este modal; o login bem-sucedido o fecha, e a mensagem que ficou
-// pendente vai sozinha (HomeView).
+// The site's SIGN-IN — login and sign-up — as a modal over the Home globe, in
+// its theme (`home-portal`) and with the background slightly dimmed (the globe
+// stays visible behind it). Replaces the /login and /register screens, which
+// now only redirect here: the Home opens without a session and the first
+// submission to the bar opens this modal; a successful login closes it, and the
+// pending message goes out on its own (HomeView).
 //
-// CINCO painéis num só diálogo: Entrar, Criar conta, "Verifique seu e-mail",
-// "Esqueceu a senha?" e "Nova senha". Os três últimos eram as páginas
-// /verify-email, /forgot-password e /reset-password, do modelo antigo de
-// página inteira, que hoje só redirecionam para cá — com elas foi embora a
-// última tela de `AuthShell` deste fluxo. O caminho inteiro da conta acontece
-// sem sair da Home: criar, ativar pelo link do e-mail, pedir o link da senha,
-// voltar do e-mail e gravar a senha nova.
+// FIVE panels in a single dialog: Entrar, Criar conta, "Verifique seu e-mail",
+// "Esqueceu a senha?" and "Nova senha". The last three were the
+// /verify-email, /forgot-password and /reset-password pages, from the old
+// full-page model, which now only redirect here — with them went the last
+// `AuthShell` screen of this flow. The whole account journey happens without
+// leaving the Home: create, activate via the e-mail link, request the password
+// link, come back from the e-mail and save the new password.
 //
-// FECHÁVEL — Esc, o X e o clique fora fecham, decisão do dono —, menos com um
-// envio em voo: aí o X desabilita e Esc/clique fora são ignorados — o
-// `bloqueado` do `DialogContent`.
+// CLOSABLE — Esc, the X and clicking outside close it, the owner's decision —,
+// except with a submission in flight: then the X is disabled and Esc/clicking
+// outside are ignored — the `DialogContent`'s `bloqueado`.
 
 import { useCallback, useEffect, useState } from "react"
 
@@ -41,17 +41,17 @@ interface Props {
   /** O modal pedido; `null` = fechado. */
   modo: ModoDeEntrada | null
   /**
-   * O token do link que trouxe a pessoa — o da redefinição de senha
-   * (`?redefinir=1&token=…`) ou o da verificação (`?verificar=1&token=…`). É
-   * um só porque os painéis são excludentes: quem chega por um não chega pelo
-   * outro.
+   * The token from the link that brought the person — the password reset one
+   * (`?redefinir=1&token=…`) or the verification one (`?verificar=1&token=…`).
+   * It is a single one because the panels are mutually exclusive: whoever
+   * arrives through one does not arrive through the other.
    */
   tokenDoLink?: string
-  /** Há uma mensagem esperando o login (o primeiro envio): muda a frase de apoio. */
+  /** There is a message waiting for login (the first submission): changes the supporting sentence. */
   comEnvioPendente?: boolean
   /** Fechar SEM entrar (Esc, X, clique fora). */
   onFechar: () => void
-  /** O login deu certo — a sessão da aba já está atualizada (`signIn` sem redirect). */
+  /** Login succeeded — the tab's session is already updated (`signIn` without redirect). */
   onEntrou: () => void
 }
 
@@ -65,36 +65,36 @@ export default function ModalDeEntrada({
   const [painel, setPainel] = useState<ModoDeEntrada>(modo ?? "entrar")
   const [enviando, setEnviando] = useState(false)
   const [emailCadastrado, setEmailCadastrado] = useState("")
-  // O pedido do link saiu: o mesmo painel troca de cara, e o cabeçalho com ele.
+  // The link request went out: the same panel changes its face, and the header with it.
   const [linkEnviado, setLinkEnviado] = useState(false)
-  // A senha acabou de ser trocada: o login ganha um aviso em vez de um toast,
-  // que sumiria atrás do modal.
+  // The password was just changed: the login gets a notice instead of a toast,
+  // which would disappear behind the modal.
   const [senhaTrocada, setSenhaTrocada] = useState(false)
-  // A conta acabou de ser ativada pelo link do e-mail — mesmo aviso, mesmo
-  // motivo.
+  // The account was just activated via the e-mail link — same notice, same
+  // reason.
   const [emailVerificado, setEmailVerificado] = useState(false)
-  // Em qual dos três estados o painel de verificação está (o GET do token
-  // começa sozinho): o título e a frase de apoio do diálogo saem daqui.
+  // Which of the three states the verification panel is in (the token GET
+  // starts on its own): the dialog's title and supporting sentence come from here.
   const [estadoDaVerificacao, setEstadoDaVerificacao] = useState<EstadoDaVerificacao>("sem-token")
-  // O token do link vale UMA vez por modal, não uma por montagem do painel: ele
-  // continua na URL depois de gasto, e sem esta marca voltar ao painel (pelo
-  // 403 do login, ou pelo "Reenviar" de uma falha) repetiria o GET com um token
-  // que já não vale.
+  // The link token is valid ONCE per modal, not once per panel mount: it
+  // stays in the URL after being spent, and without this mark going back to the
+  // panel (via the login's 403, or via a failure's "Reenviar") would repeat the
+  // GET with a token that is no longer valid.
   const [tokenGasto, setTokenGasto] = useState(false)
-  // Reabrir noutro modo (Criar conta pelo sidebar depois de um Entrar) troca o
-  // painel; fechado (`null`) nada muda.
+  // Reopening in another mode (Criar conta from the sidebar after an Entrar)
+  // switches the panel; closed (`null`) nothing changes.
   useEffect(() => {
     if (modo) setPainel(modo)
   }, [modo])
 
-  // Estável de propósito: o painel a tem nas dependências do efeito que gasta
-  // o token, e uma identidade nova a cada render o mandaria rodar de novo.
+  // Stable on purpose: the panel has it in the dependencies of the effect that
+  // spends the token, and a new identity on every render would make it run again.
   const marcarTokenGasto = useCallback(() => setTokenGasto(true), [])
 
   function irPara(destino: ModoDeEntrada) {
-    // Sair de um painel zera o que era dele: voltar ao "Esqueceu a senha?" tem
-    // de pedir o e-mail de novo, e o login não pode guardar para sempre o aviso
-    // de uma senha trocada (ou de um e-mail verificado) três painéis atrás.
+    // Leaving a panel resets what was its own: going back to "Esqueceu a senha?"
+    // has to ask for the e-mail again, and the login cannot keep forever the
+    // notice of a changed password (or a verified e-mail) three panels ago.
     if (destino !== "recuperar") setLinkEnviado(false)
     if (destino !== "entrar") { setSenhaTrocada(false); setEmailVerificado(false) }
     if (destino !== "verificar") setEstadoDaVerificacao("sem-token")
@@ -135,7 +135,7 @@ export default function ModalDeEntrada({
     <Dialog open={modo !== null} onOpenChange={(aberto) => { if (!aberto && !enviando) onFechar() }}>
       <DialogContent
         className="home-portal w-full max-w-[calc(100%-2rem)] gap-5 rounded-xl border-border bg-background p-6 text-foreground sm:max-w-sm"
-        // O fundo levemente ofuscado: o globo continua visível por trás.
+        // The slightly dimmed background: the globe stays visible behind it.
         overlayClassName="bg-black/40 backdrop-blur-[2px]"
         bloqueado={enviando}
         closeLabel={textos.comum.fechar}
@@ -145,8 +145,8 @@ export default function ModalDeEntrada({
         <DialogHeader className="gap-3 text-left">
           <p className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
             <GlifoDaMarca /> {nomeNaTela}
-            {/* AGPL §13: quem usa a instalação pela rede acha o código-fonte dela
-                daqui, antes mesmo de entrar. Só quando a instalação o declara. */}
+            {/* AGPL §13: whoever uses the installation over the network finds its
+                source code from here, even before signing in. Only when the installation declares it. */}
             {codigoFonte && (
               <a
                 href={codigoFonte}

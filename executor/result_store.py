@@ -1,24 +1,24 @@
 # executor/result_store.py
 """
-Store persistente de resultados de jobs pendentes de envio ao servidor.
+Persistent store for job results pending delivery to the server.
 
-Motivação: o `_result_queue` do executor é in-memory. Se a conexão WebSocket cai
-e o processo do executor reinicia (ex: docker restart, kernel OOM) antes do
-`_result_sender_loop` conseguir enviar, o resultado é perdido — o workflow
-fica em estado "running" indefinidamente no servidor.
+Motivation: the executor's `_result_queue` is in-memory. If the WebSocket
+connection drops and the executor process restarts (e.g. docker restart, kernel
+OOM) before `_result_sender_loop` manages to send, the result is lost — the
+workflow stays in the "running" state indefinitely on the server.
 
-Este módulo oferece uma camada SQLite leve de "outbox":
-  - `put(result)`    — persiste o resultado ao produzi-lo
-  - `mark_sent(id)`  — remove após o servidor confirmar o recebimento
-  - `load_pending()` — no startup do executor, devolve o que nunca foi enviado
+This module provides a lightweight SQLite "outbox" layer:
+  - `put(result)`    — persists the result when it is produced
+  - `mark_sent(id)`  — removes it after the server confirms receipt
+  - `load_pending()` — at executor startup, returns what was never sent
 
-Sem dependências adicionais: usa sqlite3 da stdlib em modo WAL para
-suportar writes concorrentes entre o executor e o sender_loop.
+No additional dependencies: uses the stdlib sqlite3 in WAL mode to
+support concurrent writes between the executor and the sender_loop.
 
-ROBUSTEZ: qualquer falha (permissão, disco cheio, SQLite corrompido)
-desabilita o store silenciosamente — nunca derruba o executor. Todas as
-operações viram no-op e o comportamento volta a ser "outbox em memória"
-pré-refactor.
+ROBUSTNESS: any failure (permissions, full disk, corrupted SQLite)
+silently disables the store — it never brings the executor down. All
+operations become no-ops and the behavior reverts to the pre-refactor
+"in-memory outbox".
 """
 
 import json
@@ -35,62 +35,64 @@ from executor.utils import ocultar_no_windows
 logger = logging.getLogger(__name__)
 
 
-# Nome do outbox em disco. Era `.agent_results.sqlite`, da epoca em que o
-# componente se chamava "agent"; renomeado junto com o resto para "executor".
-# Sem migracao de proposito: um outbox pendente e trabalho de segundos, e o
-# proximo boot recria o arquivo vazio.
+# Name of the on-disk outbox. It used to be `.agent_results.sqlite`, from the
+# time the component was called "agent"; renamed along with everything else to
+# "executor". No migration on purpose: a pending outbox is seconds' worth of
+# work, and the next boot recreates the file empty.
 _DB_FILENAME = ".executor_results.sqlite"
 
 
 def _default_db_path() -> str:
-    """Caminho do SQLite — em ARTIFACTS_DIR para ficar colocalizado com os artifacts."""
+    """SQLite path — in ARTIFACTS_DIR so it is colocated with the artifacts."""
     base = config.ARTIFACTS_DIR or os.getcwd()
     return os.path.join(base, _DB_FILENAME)
 
 
 _DB_PATH = _default_db_path()
 
-# Sufixos dos arquivos que o SQLite mantem ao lado do banco principal. -wal/-shm
-# existem no modo WAL; -journal aparece quando o WAL NAO engata — ex.: o outbox
-# numa pasta de rede/sincronizada sem memoria compartilhada, onde o SQLite cai
-# SILENCIOSAMENTE para rollback journal e escreve .executor_results.sqlite-journal
-# durante cada transacao. Ocultamos os quatro para que nenhum apareca no Explorer.
+# Suffixes of the files SQLite keeps next to the main database. -wal/-shm
+# exist in WAL mode; -journal shows up when WAL does NOT engage — e.g. the
+# outbox in a network/synced folder without shared memory, where SQLite
+# SILENTLY falls back to rollback journal and writes
+# .executor_results.sqlite-journal during each transaction. We hide all four
+# so none of them shows up in Explorer.
 _DB_SUFIXOS = ("", "-wal", "-shm", "-journal")
 
-# Se ja reaplicamos o hide apos a primeira escrita (ver _ocultar_arquivos_db).
+# Whether we have already reapplied the hide after the first write (see _ocultar_arquivos_db).
 _ocultado_pos_escrita: bool = False
 
 
 def _ocultar_arquivos_db() -> None:
-    """Aplica o atributo oculto (Windows) ao banco e seus arquivos satelite.
+    """Applies the hidden attribute (Windows) to the database and its satellite files.
 
-    No-op fora do Windows. Os -wal/-shm/-journal nascem em momentos diferentes
-    (abertura do WAL, primeira escrita, fallback de rollback): ocultar um que
-    ainda nao existe e inofensivo — GetFileAttributesW falha e o helper desiste.
+    No-op outside Windows. The -wal/-shm/-journal files are born at different
+    moments (WAL open, first write, rollback fallback): hiding one that does
+    not exist yet is harmless — GetFileAttributesW fails and the helper gives up.
     """
     for sufixo in _DB_SUFIXOS:
         ocultar_no_windows(_DB_PATH + sufixo)
 
 
-# SQLite aceita múltiplas threads com check_same_thread=False. Usamos um
-# RLock (reentrant) para serializar writes — as funções públicas pegam o
-# lock e chamam _get_conn() que também precisa pegar o lock para o init
-# lazy; com Lock não-reentrante isso deadlockaria no primeiro uso.
+# SQLite accepts multiple threads with check_same_thread=False. We use an
+# RLock (reentrant) to serialize writes — the public functions take the
+# lock and call _get_conn(), which also needs to take the lock for the lazy
+# init; with a non-reentrant Lock this would deadlock on first use.
 _lock = threading.RLock()
 _conn: sqlite3.Connection | None = None
-# Se a inicialização falhar (permissão, disco cheio, etc.), desabilita o store
-# em vez de propagar — o executor continua funcionando sem persistência.
+# If initialization fails (permissions, full disk, etc.), disable the store
+# instead of propagating — the executor keeps working without persistence.
 _disabled: bool = False
 
 
 def _get_conn() -> sqlite3.Connection | None:
-    """Retorna a conexão singleton, ou None se o store foi desabilitado.
+    """Returns the singleton connection, or None if the store was disabled.
 
-    Todo init (makedirs + connect + pragma + CREATE) é envolvido em try/except
-    genérico: qualquer exceção marca o store como desabilitado em vez de subir.
+    The whole init (makedirs + connect + pragma + CREATE) is wrapped in a
+    generic try/except: any exception marks the store as disabled instead of
+    propagating.
 
-    SEG: o arquivo é criado com modo 0600 (somente o owner lê/grava).
-    Protege payloads persistidos contra leitura por outros processos no host.
+    SEC: the file is created with mode 0600 (only the owner reads/writes).
+    Protects persisted payloads from being read by other processes on the host.
     """
     global _conn, _disabled
     if _disabled:
@@ -104,8 +106,8 @@ def _get_conn() -> sqlite3.Connection | None:
             try:
                 parent = os.path.dirname(_DB_PATH) or "."
                 os.makedirs(parent, exist_ok=True)
-                # Cria o arquivo com 0600 antes de o sqlite3 abrir — se já existe
-                # com outra permissão, força o chmod pra fechar o vetor.
+                # Creates the file with 0600 before sqlite3 opens it — if it already
+                # exists with other permissions, forces chmod to close the vector.
                 if not os.path.exists(_DB_PATH):
                     fd = os.open(_DB_PATH, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
                     os.close(fd)
@@ -115,7 +117,7 @@ def _get_conn() -> sqlite3.Connection | None:
                     except OSError:
                         pass  # filesystems sem suporte a chmod (Windows, etc.)
                 c = sqlite3.connect(_DB_PATH, check_same_thread=False, isolation_level=None)
-                # WAL: leitores não bloqueiam writers; melhor para outbox pattern.
+                # WAL: readers don't block writers; better for the outbox pattern.
                 c.execute("PRAGMA journal_mode=WAL")
                 c.execute("PRAGMA synchronous=NORMAL")
                 c.execute("""
@@ -126,8 +128,8 @@ def _get_conn() -> sqlite3.Connection | None:
                         attempts   INTEGER NOT NULL DEFAULT 0
                     )
                 """)
-                # Diário dos jobs aceitos e ainda SEM resultado (ver
-                # `registrar_em_voo`). Só ids e horários: nada do payload.
+                # Journal of jobs accepted and still WITHOUT a result (see
+                # `registrar_em_voo`). Only ids and timestamps: none of the payload.
                 c.execute("""
                     CREATE TABLE IF NOT EXISTS jobs_em_voo (
                         job_id TEXT PRIMARY KEY,
@@ -135,16 +137,17 @@ def _get_conn() -> sqlite3.Connection | None:
                         desde  REAL NOT NULL
                     )
                 """)
-                # Oculta o outbox no Windows (no Linux/macOS o ponto ja basta).
-                # Fica em ARTIFACTS_DIR (por padrao ~/AtlansExecutor/artifacts, a
-                # pasta do proprio executor; o operador pode aponta-la para uma
-                # pasta de dados que o usuario navega) e apaga-lo joga fora
-                # resultados de jobs ainda nao confirmados pelo servidor. Ocultado
-                # DEPOIS do CREATE TABLE porque so ai os -wal/-shm do modo WAL
-                # existem; o SQLite reabre arquivos ocultos sem problema (winOpen
-                # usa OPEN_EXISTING/OPEN_ALWAYS, nao CREATE_ALWAYS, entao nao
-                # esbarra na restricao de oculto do CreateFile). O primeiro put()
-                # reaplica para pegar o -wal/-journal que so surge na 1a escrita.
+                # Hides the outbox on Windows (on Linux/macOS the dot is enough).
+                # It lives in ARTIFACTS_DIR (by default ~/AtlansExecutor/artifacts,
+                # the executor's own folder; the operator can point it at a data
+                # folder the user browses) and deleting it throws away results of
+                # jobs not yet confirmed by the server. Hidden AFTER the CREATE
+                # TABLE because only then do the WAL-mode -wal/-shm files exist;
+                # SQLite reopens hidden files without trouble (winOpen uses
+                # OPEN_EXISTING/OPEN_ALWAYS, not CREATE_ALWAYS, so it doesn't run
+                # into CreateFile's hidden-file restriction). The first put()
+                # reapplies it to catch the -wal/-journal that only appears on the
+                # 1st write.
                 _ocultar_arquivos_db()
                 _conn = c
             except Exception as exc:
@@ -158,21 +161,21 @@ def _get_conn() -> sqlite3.Connection | None:
     return _conn
 
 
-# Campos seguros para persistir no outbox — OUTPUT e STATS ficam de fora
-# porque podem conter credenciais injetadas (connectionString, tokens) ou
-# outputs sensíveis (GeoJSON de cliente, dados pessoais).
-# O server só consome job_id/run_id/status/error para atualizar o WorkflowRun
-# (a duração ele mede pelo próprio relógio) — os demais campos são enviados
-# diretamente via WS quando a conexão estiver viva (não passa pelo outbox).
-# `error_category` entra porque o replay precisa dela: sem a categoria, a falha
-# reenviada no boot chegava ao servidor como "internal" genérico.
+# Fields safe to persist in the outbox — OUTPUT and STATS are left out
+# because they may contain injected credentials (connectionString, tokens) or
+# sensitive outputs (customer GeoJSON, personal data).
+# The server only consumes job_id/run_id/status/error to update the WorkflowRun
+# (it measures the duration with its own clock) — the other fields are sent
+# directly over WS when the connection is alive (they don't go through the outbox).
+# `error_category` is included because the replay needs it: without the
+# category, the failure resent at boot reached the server as a generic "internal".
 _SAFE_RESULT_FIELDS = {"job_id", "run_id", "status", "error", "error_category"}
 
 
 def _sanitize(result: dict[str, Any]) -> dict[str, Any]:
-    """Remove campos sensíveis antes de persistir em disco."""
+    """Removes sensitive fields before persisting to disk."""
     out = {k: v for k, v in result.items() if k in _SAFE_RESULT_FIELDS}
-    # Trunca error para não inflar o arquivo se vier com stack trace gigante.
+    # Truncates error so the file doesn't bloat if it comes with a huge stack trace.
     err = out.get("error")
     if isinstance(err, str) and len(err) > 500:
         out["error"] = err[:500] + "…"
@@ -180,16 +183,16 @@ def _sanitize(result: dict[str, Any]) -> dict[str, Any]:
 
 
 def put(result: dict[str, Any]) -> None:
-    """Persiste um resultado — idempotente por job_id.
+    """Persists a result — idempotent per job_id.
 
-    Se o mesmo job_id já existe (ex: retry), o payload é substituído.
-    Chamar ANTES de enfileirar para o sender — garante que reinício do executor
-    não perde o resultado. Nunca lança: falhas apenas logam.
+    If the same job_id already exists (e.g. retry), the payload is replaced.
+    Call BEFORE enqueuing for the sender — guarantees that an executor restart
+    does not lose the result. Never raises: failures are only logged.
     """
     global _ocultado_pos_escrita
     job_id = str(result.get("job_id") or "unknown")
     try:
-        # Sanitiza antes de serializar — outbox NUNCA grava output/stats em disco.
+        # Sanitizes before serializing — the outbox NEVER writes output/stats to disk.
         payload = json.dumps(_sanitize(result), default=str)
     except (TypeError, ValueError) as exc:
         logger.warning("result_store.put: payload não-serializável para job '%s': %s", job_id, exc)
@@ -199,12 +202,12 @@ def put(result: dict[str, Any]) -> None:
             conn = _get_conn()
             if conn is None:
                 return
-            # Numa transação: o resultado entra no outbox e o job sai do diário
-            # juntos. Separados, uma queda entre os dois deixaria no boot um
-            # "órfão" que já tem resultado — e o executor reportaria como
-            # interrompido um job que terminou. BEGIN/COMMIT explícitos porque a
-            # conexão é autocommit (`isolation_level=None`): nela o `with conn`
-            # não abre transação nenhuma.
+            # In one transaction: the result enters the outbox and the job leaves the
+            # journal together. Done separately, a crash between the two would
+            # leave at boot an "orphan" that already has a result — and the
+            # executor would report as interrupted a job that finished. Explicit
+            # BEGIN/COMMIT because the connection is autocommit
+            # (`isolation_level=None`): on it `with conn` opens no transaction at all.
             conn.execute("BEGIN")
             try:
                 conn.execute(
@@ -218,20 +221,20 @@ def put(result: dict[str, Any]) -> None:
                 conn.execute("ROLLBACK")
                 raise
             if not _ocultado_pos_escrita:
-                # A 1a escrita materializa o -wal/-shm (e, no fallback sem WAL, o
-                # -journal) que o CREATE TABLE — no-op quando a tabela ja existe —
-                # pode nao ter criado no _get_conn. Reaplicamos UMA vez para pegar
-                # esses arquivos recem-nascidos; as gravacoes seguintes nao pagam
-                # a syscall.
+                # The 1st write materializes the -wal/-shm (and, in the fallback without
+                # WAL, the -journal) that the CREATE TABLE — a no-op when the table
+                # already exists — may not have created in _get_conn. We reapply
+                # ONCE to catch these newborn files; subsequent writes don't pay
+                # for the syscall.
                 _ocultar_arquivos_db()
                 _ocultado_pos_escrita = True
     except Exception as exc:
-        # Não-fatal: store é um upgrade de robustez, não um requisito.
+        # Non-fatal: the store is a robustness upgrade, not a requirement.
         logger.warning("result_store.put falhou para job '%s': %s", job_id, exc)
 
 
 def mark_sent(job_id: str) -> None:
-    """Remove o resultado da store após envio bem-sucedido ao servidor."""
+    """Removes the result from the store after successful delivery to the server."""
     if not job_id:
         return
     try:
@@ -248,7 +251,7 @@ def mark_sent(job_id: str) -> None:
 
 
 def increment_attempts(job_id: str) -> None:
-    """Incrementa o contador de tentativas — útil para logs/telemetria."""
+    """Increments the attempt counter — useful for logs/telemetry."""
     if not job_id:
         return
     try:
@@ -265,10 +268,10 @@ def increment_attempts(job_id: str) -> None:
 
 
 def load_pending() -> list[dict]:
-    """Retorna todos os resultados pendentes, mais antigos primeiro.
+    """Returns all pending results, oldest first.
 
-    Chamar no startup do executor para drenar e reenfileirar o que não foi
-    enviado antes da queda anterior. Nunca lança: falhas retornam [].
+    Call at executor startup to drain and re-enqueue what was not sent
+    before the previous crash. Never raises: failures return [].
     """
     try:
         with _lock:
@@ -292,11 +295,11 @@ def load_pending() -> list[dict]:
 
 
 def count_pending() -> int:
-    """Quantos resultados aguardam envio. Nunca lança: falhas retornam 0.
+    """How many results are awaiting delivery. Never raises: failures return 0.
 
-    Existe para o painel, que precisa do número a cada poucos segundos e não
-    pode usar `load_pending()` — aquele desserializa todos os payloads, o que a
-    1 Hz seria desperdício puro.
+    Exists for the dashboard, which needs the number every few seconds and
+    cannot use `load_pending()` — that one deserializes every payload, which at
+    1 Hz would be pure waste.
     """
     try:
         with _lock:
@@ -311,17 +314,17 @@ def count_pending() -> int:
 
 
 def job_ids_pendentes() -> list[str] | None:
-    """Ids com resultado ainda não confirmado pelo servidor. Nunca lança.
+    """Ids with a result not yet confirmed by the server. Never raises.
 
-    Entra no inventário que o executor manda ao servidor: um job cujo resultado
-    está aqui terminou, e o servidor não pode fechar o run como perdido só
-    porque ele saiu da fila de execução.
+    Goes into the inventory the executor sends to the server: a job whose
+    result is here has finished, and the server must not close the run as lost
+    just because it left the execution queue.
 
-    None quando o outbox existe mas não pôde ser lido (`database is locked`,
-    I/O — plausível no desktop, com a pasta sincronizada ou sob antivírus).
-    Devolver [] nesse caso afirmaria "nada pendente" e o servidor fecharia como
-    perdidos runs cujo resultado está aqui. Outbox desabilitado é [] mesmo: não
-    há nada persistido, e a fila em memória é contada por quem chama.
+    None when the outbox exists but could not be read (`database is locked`,
+    I/O — plausible on desktop, with a synced folder or under antivirus).
+    Returning [] in that case would assert "nothing pending" and the server
+    would close as lost runs whose result is here. A disabled outbox really is
+    []: nothing is persisted, and the in-memory queue is counted by the caller.
     """
     try:
         with _lock:
@@ -335,20 +338,21 @@ def job_ids_pendentes() -> list[str] | None:
         return None
 
 
-# ── Diário dos jobs em voo ────────────────────────────────────────────────────
-# Um job aceito entra aqui e só sai quando o resultado dele entra no outbox
-# (`put` apaga a linha na mesma transação). O que sobrar no boot é de um
-# processo que morreu sem produzir resultado — falta de memória, kill, queda da
-# máquina — e vira falha com a causa provável em vez de um run preso em
-# "Em andamento" no servidor. Caso real: um executor morto pelo OOM do cgroup
-# voltou 6 s depois e ninguém fechou a execução que ele rodava.
+# ── Journal of in-flight jobs ─────────────────────────────────────────────────
+# An accepted job enters here and only leaves when its result enters the outbox
+# (`put` deletes the row in the same transaction). Whatever is left at boot
+# belongs to a process that died without producing a result — out of memory,
+# kill, machine crash — and becomes a failure with the probable cause instead
+# of a run stuck in "Em andamento" (in progress) on the server. Real case: an
+# executor killed by the cgroup OOM came back 6 s later and nobody closed the
+# run it was executing.
 
 ESTADO_NA_FILA = "fila"
 ESTADO_EXECUTANDO = "executando"
 
 
 def registrar_em_voo(job_id: str) -> None:
-    """Anota um job aceito na fila local. Nunca lança."""
+    """Records an accepted job in the local queue. Never raises."""
     if not job_id:
         return
     try:
@@ -365,7 +369,7 @@ def registrar_em_voo(job_id: str) -> None:
 
 
 def marcar_executando(job_id: str) -> None:
-    """O job saiu da fila e começou a rodar. Nunca lança."""
+    """The job left the queue and started running. Never raises."""
     if not job_id:
         return
     try:
@@ -382,12 +386,12 @@ def marcar_executando(job_id: str) -> None:
 
 
 def carregar_em_voo() -> list[dict]:
-    """Jobs do diário que NÃO têm resultado no outbox — os órfãos do processo
-    anterior, mais antigos primeiro. Nunca lança: falhas retornam [].
+    """Journal jobs that have NO result in the outbox — the orphans of the
+    previous process, oldest first. Never raises: failures return [].
 
-    O `NOT IN` é defesa em profundidade: `put` já apaga a linha na mesma
-    transação, mas um banco herdado de uma versão sem essa transação não pode
-    fazer um job concluído ser reportado como interrompido.
+    The `NOT IN` is defense in depth: `put` already deletes the row in the same
+    transaction, but a database inherited from a version without that
+    transaction must not cause a completed job to be reported as interrupted.
     """
     try:
         with _lock:
@@ -408,8 +412,8 @@ def carregar_em_voo() -> list[dict]:
     return [{"job_id": r[0], "estado": r[1], "desde": r[2]} for r in rows]
 
 
-# ── Posse do diário ───────────────────────────────────────────────────────────
-# Arquivo ao lado do outbox, travado pela vida do processo — ver
+# ── Journal ownership ─────────────────────────────────────────────────────────
+# File next to the outbox, locked for the lifetime of the process — see
 # `tomar_posse_do_diario`.
 _trava_do_diario = None
 _esperando_posse = False
@@ -418,7 +422,7 @@ _INTERVALO_DE_POSSE_S = 5.0
 
 
 def _tentar_travar() -> str:
-    """'travou', 'ocupada' (outro processo vivo a segura) ou 'sem_suporte'."""
+    """'travou' (locked), 'ocupada' (another live process holds it) or 'sem_suporte' (unsupported)."""
     global _trava_do_diario
     with _lock_da_posse:
         if _trava_do_diario is not None:
@@ -462,21 +466,21 @@ def _esperar_posse() -> None:
 
 
 def tomar_posse_do_diario() -> bool:
-    """Trava exclusiva do diário para este processo. False se OUTRO processo vivo
-    a segura.
+    """Exclusive lock on the journal for this process. False if ANOTHER live
+    process holds it.
 
-    No desktop, o app morto à força deixa o Python filho drenando (até 150 s), e
-    a reabertura sobe um segundo processo com o mesmo outbox: os jobs no diário
-    são daquele processo, que ainda os está terminando — convertê-los em falha
-    faria o resultado verdadeiro dele ser recusado. O sistema operacional solta
-    a trava quando o processo morre, de qualquer jeito que morra.
+    On desktop, a force-killed app leaves the child Python draining (up to
+    150 s), and reopening starts a second process with the same outbox: the
+    jobs in the journal belong to that process, which is still finishing them —
+    converting them into failures would make its real result be rejected. The
+    operating system releases the lock when the process dies, however it dies.
 
-    Sem a trava agora, este processo segue tentando em segundo plano: quando o
-    outro sair, ele vira o dono — senão um TERCEIRO que subisse depois pegaria a
-    trava livre e converteria os jobs vivos DESTE.
+    Without the lock right now, this process keeps trying in the background:
+    when the other one exits, it becomes the owner — otherwise a THIRD one
+    started later would grab the free lock and convert THIS one's live jobs.
 
-    Sem como travar (plataforma ou sistema de arquivos sem suporte) devolve True:
-    o comportamento de antes.
+    With no way to lock (platform or file system without support) returns True:
+    the previous behavior.
     """
     global _esperando_posse
     if _tentar_travar() != "ocupada":
@@ -489,7 +493,7 @@ def tomar_posse_do_diario() -> bool:
 
 
 def close() -> None:
-    """Fecha a conexão SQLite. Chamar no shutdown do executor."""
+    """Closes the SQLite connection. Call at executor shutdown."""
     global _conn, _ocultado_pos_escrita
     with _lock:
         if _conn is not None:
@@ -498,6 +502,6 @@ def close() -> None:
             except Exception:
                 pass
             _conn = None
-        # Re-arma a reocultacao pos-escrita: um reconnect recria os arquivos WAL
-        # e precisa escondê-los de novo na primeira gravacao seguinte.
+        # Re-arms the post-write re-hiding: a reconnect recreates the WAL files
+        # and needs to hide them again on the next write.
         _ocultado_pos_escrita = False

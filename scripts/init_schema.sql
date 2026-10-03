@@ -1,31 +1,32 @@
 -- =============================================================================
--- Atlas Studio — Schema completo, espelho dos modelos SQLAlchemy
--- Base zero (F3 da simplificação): este arquivo é o CORPO da única revisão
--- alembic (9ed006ca1660 — alembic/versions/20260924_0001_base_zero.py), que o
--- lê e executa. Editar aqui é editar a migração; os testes de convergência
--- (tests/unit/test_init_schema_bootstrap.py) prendem o texto aos models.
--- Uso direto: DROP ALL + CREATE ALL para banco limpo
+-- Atlas Studio — Full schema, a mirror of the SQLAlchemy models
+-- Base zero (F3 of the simplification): this file is the BODY of the only
+-- alembic revision (9ed006ca1660 — alembic/versions/20260924_0001_base_zero.py),
+-- which reads and executes it. Editing here is editing the migration; the
+-- convergence tests (tests/unit/test_init_schema_bootstrap.py) pin the text to
+-- the models.
+-- Direct use: DROP ALL + CREATE ALL for a clean database
 --
--- As tabelas de uma extensao (app/extensoes) NAO estao aqui: moram no
--- `schema.sql` dela, que a base zero roda depois deste. Num reset manual de
--- uma instalacao com extensoes, rode tambem cada um deles, depois deste:
+-- The tables of an extension (app/extensoes) are NOT here: they live in its
+-- `schema.sql`, which base zero runs after this one. On a manual reset of an
+-- installation with extensions, also run each of them, after this one:
 --
 --   psql -U atlans -d atlansdb -f app/extensoes/<nome>/schema.sql
 --
--- IMPORTANTE: este script cria as tabelas com owner igual ao user que o
--- executa. Se voce roda como superuser (ex: psql -U postgres) e a app
--- conecta com user diferente (ex: atlans), descomente a secao de GRANTs
--- no final do arquivo OU rode o script direto como o user da app:
+-- IMPORTANT: this script creates the tables owned by the user that runs
+-- it. If you run it as superuser (e.g. psql -U postgres) and the app
+-- connects with a different user (e.g. atlans), uncomment the GRANTs section
+-- at the end of the file OR run the script directly as the app user:
 --
 --   psql -U atlans -d atlansdb -f scripts/init_schema.sql
 -- =============================================================================
 
--- Extensões necessárias
+-- Required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS postgis;
 
 -- =============================================================================
--- DROP tudo (ordem inversa por dependências)
+-- DROP everything (reverse dependency order)
 -- =============================================================================
 DROP TABLE IF EXISTS uso_do_assistente CASCADE;
 DROP TABLE IF EXISTS fontes_de_dados CASCADE;
@@ -35,10 +36,11 @@ DROP TABLE IF EXISTS portal_features CASCADE;
 DROP TABLE IF EXISTS portal_layers CASCADE;
 DROP TABLE IF EXISTS node_run_metrics CASCADE;
 DROP TABLE IF EXISTS workflow_run_metrics CASCADE;
--- audit_events entrou no CREATE mas ficou fora daqui: reset de um banco que ja
--- tinha a tabela abortava no `CREATE TABLE audit_events` (com ON_ERROR_STOP,
--- depois de TUDO ja ter sido dropado) ou, sem ON_ERROR_STOP, seguia adiante e
--- carimbava a head com as linhas de auditoria do dataset ANTERIOR intactas.
+-- audit_events was added to the CREATE but left out of here: resetting a
+-- database that already had the table aborted at `CREATE TABLE audit_events`
+-- (with ON_ERROR_STOP, after EVERYTHING had already been dropped) or, without
+-- ON_ERROR_STOP, carried on and stamped the head with the PREVIOUS dataset's
+-- audit rows intact.
 DROP TABLE IF EXISTS audit_events CASCADE;
 DROP TABLE IF EXISTS usage_daily CASCADE;
 DROP TABLE IF EXISTS user_executor_assignments CASCADE;
@@ -64,7 +66,7 @@ DROP TABLE IF EXISTS allowed_file_extensions CASCADE;
 DROP TABLE IF EXISTS alembic_version CASCADE;
 
 -- =============================================================================
--- 1. Tabelas independentes (sem FK)
+-- 1. Independent tables (no FK)
 -- =============================================================================
 
 -- users
@@ -99,8 +101,8 @@ CREATE TABLE workspaces (
     description VARCHAR,
     owner_id VARCHAR(36),
     target_executor_id VARCHAR(36),
-    -- Política de execução (docs/specs/executor-isolation-routing.md):
-    -- terminal quando a cadeia de níveis se esgota, e piso do admin da plataforma.
+    -- Execution policy (docs/specs/executor-isolation-routing.md):
+    -- terminal when the tier chain runs out, and the platform admin's floor.
     fallback_terminal VARCHAR(8) NOT NULL DEFAULT 'fail',
     isolation_floor VARCHAR(8) NOT NULL DEFAULT 'none',
     is_default BOOLEAN NOT NULL DEFAULT false,
@@ -156,7 +158,7 @@ CREATE INDEX ix_credentials_owner_id ON credentials (owner_id);
 CREATE INDEX ix_credentials_workspace_id ON credentials (workspace_id);
 
 -- =============================================================================
--- 2. Tabelas com FK simples
+-- 2. Tables with simple FKs
 -- =============================================================================
 
 -- executors
@@ -188,7 +190,7 @@ CREATE TABLE executors (
 CREATE INDEX ix_executors_id_hash ON executors (id_hash);
 CREATE INDEX ix_executors_created_by ON executors (created_by);
 CREATE INDEX ix_executors_deleted_at ON executors (deleted_at);
--- Pool de executors default: multiplos is_default=true permitidos (sem unique index)
+-- Default executor pool: multiple is_default=true allowed (no unique index)
 
 -- executor_enrollment_otp: OTPs single-use para bootstrap via mTLS.
 CREATE TABLE executor_enrollment_otp (
@@ -201,14 +203,15 @@ CREATE TABLE executor_enrollment_otp (
     created_by VARCHAR(36) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT now()
 );
--- A tabela e `executor_enrollment_otp` desde 20260716_0001; o nome antigo aqui
--- fazia o script inteiro estourar com "relation agent_enrollment_otp does not
--- exist" logo na secao 2.
+-- The table is `executor_enrollment_otp` since 20260716_0001; the old name here
+-- made the whole script blow up with "relation agent_enrollment_otp does not
+-- exist" right in section 2.
 CREATE INDEX ix_otp_unused ON executor_enrollment_otp (otp_hash) WHERE consumed_at IS NULL;
 
--- api_tokens: tokens pessoais de acesso (PAT) — identidade de agentes.
--- So o SHA-256 do segredo fica aqui (token_hash, unico = chave do lookup);
--- revogar e marcar revoked_at, nunca apagar. NULL em workspace_ids = todos.
+-- api_tokens: personal access tokens (PAT) — the identity of agents.
+-- Only the SHA-256 of the secret is stored here (token_hash, unique = lookup
+-- key); revoking means setting revoked_at, never deleting. NULL in
+-- workspace_ids = all.
 CREATE TABLE api_tokens (
     id SERIAL PRIMARY KEY,
     id_hash VARCHAR(36) NOT NULL UNIQUE,
@@ -226,8 +229,8 @@ CREATE TABLE api_tokens (
 );
 CREATE INDEX ix_api_tokens_user_id ON api_tokens (user_id);
 
--- conversas + mensagens (assistente da Home; conversa persistida, varias por
--- pessoa, sem prazo). mensagens.blocos guarda o conteudo VERBATIM.
+-- conversas + mensagens (Home assistant; persisted conversation, several per
+-- person, no expiry). mensagens.blocos stores the content VERBATIM.
 CREATE TABLE conversas (
     id SERIAL PRIMARY KEY,
     id_hash VARCHAR(36) NOT NULL UNIQUE,
@@ -257,10 +260,10 @@ CREATE TABLE mensagens (
 );
 CREATE INDEX ix_mensagens_conversa_id ON mensagens (conversa_id);
 
--- fontes_de_dados (catalogo de fontes pre-mapeadas: o assistente consulta antes
--- de prospectar; workspace_id NULL = plataforma, a semente de catalogo/geoservicos).
--- chave = sha256(workspace|tipo|url|type_name), UNIQUE simples de proposito —
--- ver a migracao 20260919_0001.
+-- fontes_de_dados (catalog of pre-mapped sources: the assistant checks it before
+-- prospecting; workspace_id NULL = platform, the catalog/geoservices seed).
+-- chave = sha256(workspace|tipo|url|type_name), a plain UNIQUE on purpose —
+-- see migration 20260919_0001.
 CREATE TABLE fontes_de_dados (
     id SERIAL PRIMARY KEY,
     id_hash VARCHAR(36) NOT NULL UNIQUE,
@@ -296,12 +299,13 @@ CREATE INDEX ix_fontes_de_dados_workspace_id ON fontes_de_dados (workspace_id);
 CREATE INDEX ix_fontes_de_dados_tipo_url ON fontes_de_dados (tipo, url);
 CREATE INDEX ix_fontes_de_dados_instituicao ON fontes_de_dados (instituicao);
 
--- uso_do_assistente (quanto cada volta do assistente consumiu e custou). Uma
--- linha por VOLTA, nao por conversa: e onde a cota ja e cobrada, os dois nunca
--- divergem, e uma conversa abandonada no meio ja deixou registrado o que gastou
--- ate ali. `modelo` e gravado e nao deduzido — sem ele, comparar antes e depois
--- de uma troca de modelo fica impossivel logo na primeira troca. Nenhum
--- conteudo de conversa mora aqui: so contagens, o modelo e o custo.
+-- uso_do_assistente (how much each assistant turn consumed and cost). One
+-- row per TURN, not per conversation: that is where the quota is already
+-- charged, so the two never diverge, and a conversation abandoned midway has
+-- already recorded what it spent up to that point. `modelo` is stored, not
+-- inferred — without it, comparing before and after a model change becomes
+-- impossible on the very first change. No conversation content lives here:
+-- only counts, the model and the cost.
 CREATE TABLE uso_do_assistente (
     id SERIAL PRIMARY KEY,
     id_hash VARCHAR(36) UNIQUE NOT NULL,
@@ -332,14 +336,15 @@ CREATE TABLE workspace_members (
 CREATE INDEX ix_workspace_members_workspace_id ON workspace_members (workspace_id);
 CREATE INDEX ix_workspace_members_user_id ON workspace_members (user_id);
 
--- user_executor_assignments: atribuicao N:N de executores a usuarios.
--- O comentario que estava aqui dizia que a tabela tinha sido "removida" — nao
--- foi: `app/models/user_executor_assignment.py` continua vivo e e lido/escrito
--- por executor_service.create_executor e por todo o user_executor_service.
--- Como o script carimba uma head POSTERIOR as migrations que a criam
--- (20260324_0001 + rename em 20260716_0001), `alembic upgrade head` nunca a
--- criava e qualquer ambiente bootstrapado por aqui devolvia 500
--- (UndefinedTableError) ao atribuir um executor ou ao listar os do usuario.
+-- user_executor_assignments: N:N assignment of executors to users.
+-- The comment that used to be here said the table had been "removed" — it
+-- wasn't: `app/models/user_executor_assignment.py` is still alive and is
+-- read/written by executor_service.create_executor and by all of
+-- user_executor_service. Since the script stamps a head LATER than the
+-- migrations that create it (20260324_0001 + rename in 20260716_0001),
+-- `alembic upgrade head` never created it and any environment bootstrapped
+-- from here returned 500 (UndefinedTableError) when assigning an executor or
+-- listing a user's executors.
 CREATE TABLE user_executor_assignments (
     id SERIAL PRIMARY KEY,
     id_hash VARCHAR(36) UNIQUE NOT NULL,
@@ -371,8 +376,8 @@ CREATE TABLE workspace_files (
     id SERIAL PRIMARY KEY,
     id_hash VARCHAR(36) UNIQUE NOT NULL,
     workspace_id VARCHAR(36) NOT NULL,
-    -- Nulavel desde 20260818_0002: arquivo catalogado que mora no disco de um
-    -- executor nao tem objeto no MinIO.
+    -- Nullable since 20260818_0002: a cataloged file that lives on an
+    -- executor's disk has no object in MinIO.
     s3_key VARCHAR(1024),
     original_name VARCHAR(512) NOT NULL,
     extension VARCHAR(20) NOT NULL,
@@ -383,9 +388,9 @@ CREATE TABLE workspace_files (
     status VARCHAR(16) NOT NULL DEFAULT 'confirmed',
     created_at TIMESTAMP NOT NULL DEFAULT now(),
     updated_at TIMESTAMP,
-    -- Ultima escrita de CONTEUDO. Distinta de updated_at, que qualquer update
-    -- da linha dispara (renomear) e que NAO dispara quando a sobrescrita nao
-    -- muda campo nenhum. E por ela que a listagem do Drive ordena.
+    -- Last CONTENT write. Distinct from updated_at, which any update of the
+    -- row triggers (renaming) and which does NOT fire when the overwrite
+    -- changes no field. This is what the Drive listing sorts by.
     content_written_at TIMESTAMP,
     content_location VARCHAR(16) NOT NULL DEFAULT 'minio',
     content_executor_id VARCHAR(36),
@@ -398,8 +403,8 @@ CREATE INDEX ix_workspace_file_workspace_created ON workspace_files (workspace_i
 CREATE INDEX ix_workspace_file_workspace_written ON workspace_files (workspace_id, content_written_at);
 CREATE INDEX ix_workspace_files_content_md5 ON workspace_files (content_md5);
 CREATE INDEX ix_workspace_files_s3_key ON workspace_files (s3_key);
--- Listagem do Drive e limpeza acham os arquivos catalogados de um executor sem
--- varrer a tabela.
+-- The Drive listing and cleanup find an executor's cataloged files without
+-- scanning the table.
 CREATE INDEX ix_workspace_files_catalogo_por_executor ON workspace_files (content_executor_id)
     WHERE content_location = 'executor';
 
@@ -433,23 +438,24 @@ CREATE INDEX ix_artifacts_workflow_hash ON artifacts (workflow_hash);
 CREATE INDEX ix_artifacts_created_at ON artifacts (created_at);
 CREATE INDEX ix_artifact_run_id ON artifacts (run_id);
 CREATE INDEX ix_artifact_workspace_created ON artifacts (workspace_id, created_at);
--- Lookup de artefatos por workspace + no + workflow
+-- Artifact lookup by workspace + node + workflow
 CREATE INDEX ix_artifacts_workspace_node_wf ON artifacts (workspace_id, node_id, workflow_hash);
 -- FK credential_id — usado em CASCADE e JOINs
 CREATE INDEX ix_artifacts_credential_id ON artifacts (credential_id);
 CREATE INDEX ix_artifacts_s3_key ON artifacts (s3_key);
--- A limpeza por retencao acha os artefatos locais de um executor sem varrer a
--- tabela a cada ciclo.
+-- Retention cleanup finds an executor's local artifacts without scanning the
+-- table on every cycle.
 CREATE INDEX ix_artifacts_local_por_executor ON artifacts (executor_id)
     WHERE content_location = 'executor';
--- Um pin-cache por (workflow, no). Sem ele, dois runs do mesmo fluxo
--- terminando juntos criavam duas linhas e toda leitura seguinte encontrava
--- duas. O consumer ainda colapsa o que encontrar, para a base que nao migrou.
+-- One pin-cache per (workflow, node). Without it, two runs of the same
+-- workflow finishing together created two rows and every later read found
+-- two. The consumer still collapses whatever it finds, for databases that
+-- have not migrated.
 CREATE UNIQUE INDEX uq_artifact_pin_por_no ON artifacts (workflow_hash, node_id)
     WHERE is_pinned;
 
 -- =============================================================================
--- 3. Tabelas com FK compostas (dependem das anteriores)
+-- 3. Tables with composite FKs (depend on the previous ones)
 -- =============================================================================
 
 -- workflows
@@ -461,9 +467,9 @@ CREATE TABLE workflows (
     description TEXT,
     version VARCHAR,
     priority INTEGER DEFAULT 0,
-    -- NOT NULL desde 20260828_0001: enquanto a coluna aceitava NULL, os filtros
-    -- de tenant precisavam de um `OR workspace_id IS NULL` que entregava todo
-    -- workflow legado a qualquer usuario autenticado.
+    -- NOT NULL since 20260828_0001: while the column accepted NULL, the tenant
+    -- filters needed an `OR workspace_id IS NULL` that handed every legacy
+    -- workflow to any authenticated user.
     workspace_id VARCHAR(36) NOT NULL,
     group_id VARCHAR(36) REFERENCES workflow_groups(id_hash) ON DELETE SET NULL,
     params_schema JSON,
@@ -478,23 +484,23 @@ CREATE TABLE workflows (
     updated_at TIMESTAMP NOT NULL DEFAULT now(),
     created_by_id VARCHAR(36),
     updated_by_id VARCHAR(36),
-    -- Proveniencia do fluxo (20260918_0001): "usuario" (padrao) ou "assistente"
-    -- (criado pelo assistente da Home, escondido das listagens por padrao).
+    -- Workflow provenance (20260918_0001): "usuario" (default) or "assistente"
+    -- (created by the Home assistant, hidden from listings by default).
     origem VARCHAR(16) NOT NULL DEFAULT 'usuario'
 );
--- Nome unico apenas entre os VIVOS. O delete de workflow e soft (grava
--- deleted_at e mantem a linha): com restricao total, o nome de tudo que se
--- apaga ficava ocupado para sempre — e invisivel, ja que nenhuma listagem
--- mostra soft-deletados. Duplicar, criar e renomear batiam nisso.
--- Precisa ser INDICE, e nao CONSTRAINT: constraint nao aceita predicado.
--- Mantem o nome da antiga constraint porque workflow_service e
--- workflow_move_service identificam a colisao por
+-- Name unique only among the LIVE ones. Workflow delete is soft (sets
+-- deleted_at and keeps the row): with a full constraint, the name of
+-- everything deleted stayed taken forever — and invisible, since no listing
+-- shows soft-deleted ones. Duplicate, create and rename all ran into this.
+-- It must be an INDEX, not a CONSTRAINT: a constraint does not accept a predicate.
+-- Keeps the old constraint's name because workflow_service and
+-- workflow_move_service identify the collision via
 -- `"uq_workflow_name_workspace" in str(exc.orig)`.
 CREATE UNIQUE INDEX uq_workflow_name_workspace
     ON workflows (name, workspace_id) WHERE deleted_at IS NULL;
 CREATE INDEX ix_workflows_id_hash ON workflows (id_hash);
 CREATE INDEX ix_workflows_workspace_id ON workflows (workspace_id);
--- FK group_id: sem indice, o SET NULL do delete de grupo varre a tabela
+-- FK group_id: without an index, the SET NULL from deleting a group scans the table
 CREATE INDEX ix_workflows_group_id ON workflows (group_id);
 CREATE INDEX ix_workflow_workspace_active ON workflows (workspace_id, flag_ative);
 
@@ -519,13 +525,13 @@ CREATE TABLE schedules (
 CREATE INDEX ix_schedules_id_hash ON schedules (id_hash);
 CREATE INDEX ix_schedules_workflow_hash ON schedules (workflow_hash);
 CREATE INDEX ix_schedules_workspace_id ON schedules (workspace_id);
--- Poll do scheduler (a cada 30s): active=true + next_run_at <= now()
+-- Scheduler poll (every 30s): active=true + next_run_at <= now()
 CREATE INDEX ix_schedules_active_nextrun ON schedules (active, next_run_at ASC);
 CREATE INDEX ix_schedules_workspace_nextrun ON schedules (workspace_id, next_run_at ASC);
 
 -- workflow_runs
--- workspace_executors — níveis de executores dedicados da política de execução
--- (tier 1 = principal, 2 = fallback). Migração 20260907_0002.
+-- workspace_executors — dedicated executor tiers of the execution policy
+-- (tier 1 = primary, 2 = fallback). Migration 20260907_0002.
 CREATE TABLE workspace_executors (
     id SERIAL PRIMARY KEY,
     workspace_id VARCHAR(36) NOT NULL REFERENCES workspaces(id_hash) ON DELETE CASCADE,
@@ -568,14 +574,14 @@ CREATE INDEX ix_workflow_runs_workspace_id ON workflow_runs (workspace_id);
 CREATE INDEX ix_workflow_runs_status ON workflow_runs (status);
 CREATE INDEX ix_workflow_runs_start_time ON workflow_runs (start_time);
 CREATE INDEX ix_wfrun_hash_status_time ON workflow_runs (workflow_hash, status, start_time);
--- Polling de status=running por workspace
+-- Polling of status=running per workspace
 CREATE INDEX ix_wfrun_workspace_status_time ON workflow_runs (workspace_id, status, start_time DESC);
--- Historico sem filtro de status: sem este prefixo o Postgres le todas as
--- linhas do workspace e ordena antes de aplicar o LIMIT.
+-- History without a status filter: without this prefix Postgres reads every
+-- row of the workspace and sorts before applying the LIMIT.
 CREATE INDEX ix_wfrun_workspace_time ON workflow_runs (workspace_id, start_time DESC);
--- Painel por executor (?worker_host=) e GROUP BY host das metricas
+-- Per-executor panel (?worker_host=) and the metrics' GROUP BY host
 CREATE INDEX ix_wfrun_host_time ON workflow_runs (host, start_time DESC);
--- CASCADE DELETE em schedules precisa de indice no FK
+-- CASCADE DELETE on schedules needs an index on the FK
 CREATE INDEX ix_wfrun_schedule_id ON workflow_runs (schedule_id);
 
 -- workflow_versions
@@ -632,7 +638,7 @@ CREATE INDEX ix_portal_feature_layer_bbox ON portal_features (layer_id, min_x, m
 CREATE INDEX ix_portal_features_geom ON portal_features USING gist (geom);
 
 -- =============================================================================
--- 5. Métricas e billing
+-- 5. Metrics and billing
 -- =============================================================================
 
 -- workflow_run_metrics
@@ -696,7 +702,7 @@ CREATE TABLE node_run_metrics (
 );
 CREATE INDEX ix_node_metrics_run ON node_run_metrics (run_id);
 CREATE INDEX ix_node_metrics_name ON node_run_metrics (node_name, started_at);
--- Agregacao do resumo por no em /observability/metrics/workflow/{id}
+-- Aggregation of the per-node summary in /observability/metrics/workflow/{id}
 CREATE INDEX ix_node_metrics_run_node ON node_run_metrics (run_id, node_id);
 
 -- usage_daily
@@ -721,8 +727,8 @@ CREATE TABLE usage_daily (
 CREATE INDEX ix_usage_daily_ws ON usage_daily (workspace_id, date);
 
 -- audit_events
--- Retencao: 90 dias. Particionamento futuro: RANGE por timestamp mensal
--- quando passar de 10M linhas (ver 20260324_1500_optimize_audit_events).
+-- Retention: 90 days. Future partitioning: RANGE by monthly timestamp
+-- once it passes 10M rows (see 20260324_1500_optimize_audit_events).
 CREATE TABLE audit_events (
     id SERIAL PRIMARY KEY,
     workspace_id VARCHAR(36) NOT NULL,
@@ -747,37 +753,37 @@ CREATE TABLE alembic_version (
     CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
 );
 
--- Carimba a UNICA revisao alembic (base zero). O id tem de ser o mesmo do
--- `revision` em alembic/versions/20260924_0001_base_zero.py — a migracao
--- executa este arquivo, entao um banco criado por psql e um criado por
--- `alembic upgrade head` sao o mesmo banco, carimbado igual. O teste
--- test_carimbo_do_alembic_e_a_head_real prende os dois ids.
+-- Stamps the ONLY alembic revision (base zero). The id must be the same as
+-- `revision` in alembic/versions/20260924_0001_base_zero.py — the migration
+-- executes this file, so a database created by psql and one created by
+-- `alembic upgrade head` are the same database, stamped the same way. The test
+-- test_carimbo_do_alembic_e_a_head_real pins the two ids together.
 --
--- Conferido com `Base.metadata`: as 28 tabelas dos models do nucleo estao
--- aqui. As de uma extensao moram no `schema.sql` dela (app/extensoes/<nome>),
--- que a base zero roda depois deste. Ao acrescentar um model novo, acrescente
--- tambem o CREATE aqui E o DROP la em cima, senao o proximo ambiente
--- bootstrapado por este script nasce quebrado do mesmo jeito.
+-- Checked against `Base.metadata`: the 28 tables of the core models are
+-- here. Those of an extension live in its `schema.sql` (app/extensoes/<nome>),
+-- which base zero runs after this one. When adding a new model, also add
+-- the CREATE here AND the DROP up above, otherwise the next environment
+-- bootstrapped by this script is born broken in the same way.
 INSERT INTO alembic_version (version_num) VALUES ('9ed006ca1660');  -- pragma: allowlist secret
 
 
 -- =============================================================================
--- 7. GRANTs para o user da aplicacao (opcional)
+-- 7. GRANTs for the application user (optional)
 -- =============================================================================
--- Se voce executou este script como superuser (postgres) e a aplicacao
--- conecta com user diferente (ex: atlans), DESCOMENTE as linhas abaixo
--- substituindo `:app_user` pelo nome real (ou rode com `-v app_user=atlans`).
+-- If you ran this script as superuser (postgres) and the application
+-- connects with a different user (e.g. atlans), UNCOMMENT the lines below
+-- replacing `:app_user` with the real name (or run with `-v app_user=atlans`).
 --
--- Sem isso, o user da app recebe erros tipo:
+-- Without this, the app user gets errors like:
 --   permission denied for table executor_enrollment_otp
--- ao tentar INSERT/SELECT em tabelas criadas pelo postgres.
+-- when trying to INSERT/SELECT on tables created by postgres.
 --
 -- \set app_user atlans
 --
 -- GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO :app_user;
 -- GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO :app_user;
 --
--- -- Tabelas/sequences futuras criadas pelo postgres herdam permissoes:
+-- -- Future tables/sequences created by postgres inherit the permissions:
 -- ALTER DEFAULT PRIVILEGES IN SCHEMA public
 --     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO :app_user;
 -- ALTER DEFAULT PRIVILEGES IN SCHEMA public

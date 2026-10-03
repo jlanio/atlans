@@ -1,5 +1,5 @@
 # app/mcp/tools/drive.py
-"""Tools de drive. As guardas de cada uma estão em app/mcp/guardas.py."""
+"""Drive tools. The guards for each one are in app/mcp/guardas.py."""
 from __future__ import annotations
 
 from datetime import timedelta
@@ -9,7 +9,8 @@ from mcp.server.mcpserver import Context
 from mcp_types import ToolAnnotations
 
 from app.core.authorization.workflow_access import verify_workspace_access
-# Ver a nota em `drive_escrita.py`: esta NAO e a builtin e nao herda dela.
+# See the note in `drive_escrita.py`: this is NOT the builtin and does not
+# inherit from it.
 from app.core.exceptions import FileNotFoundError as ArquivoNaoEncontradoError
 from app.core.storage import presigned_get_async
 from app.core.utils.datetime_utils import utc_now_naive
@@ -21,23 +22,23 @@ from app.mcp.saida import envelope, higienizar, iso
 from app.mcp.tools.base import ferramenta
 from app.services.drive_service import DriveService
 
-# Validade da URL assinada. O default do módulo de storage é uma hora, pensado
-# para o navegador de quem está logado; aqui o link viaja por uma conversa e
-# pode ser registrado em log de cliente, então dura o mínimo necessário para
-# baixar o arquivo.
+# Validity of the signed URL. The storage module's default is one hour, meant
+# for the browser of someone who is logged in; here the link travels through a
+# conversation and may be recorded in a client log, so it lasts the minimum
+# needed to download the file.
 VALIDADE_DO_LINK_S = 300
 
-# Teto de arquivos por página — o mesmo motivo de orçamento de contexto das
-# demais listagens.
+# Ceiling of files per page — the same context-budget reason as the other
+# listings.
 PAGE_SIZE_MAXIMO = 100
 
-# Quantas colunas do metadado espacial saem por arquivo. Uma tabela de 300
-# colunas descreveria o arquivo melhor do que o restante da resposta inteira.
+# How many columns of the spatial metadata go out per file. A 300-column table
+# would describe the file better than the entire rest of the response.
 MAX_COLUNAS = 50
 
 
 def _resumo_espacial(bruto: Any) -> dict | None:
-    """CRS, extensão, contagem e as primeiras colunas — nunca a lista inteira."""
+    """CRS, extent, count and the first columns — never the whole list."""
     if not isinstance(bruto, Mapping):
         return None
     colunas = bruto.get("columns")
@@ -48,8 +49,8 @@ def _resumo_espacial(bruto: Any) -> dict | None:
         "geometry_type": bruto.get("geometry_type"),
     }
     if isinstance(colunas, list):
-        # Nome de coluna é escrito por quem produziu o arquivo: passa pelo
-        # higienizador como qualquer outro texto de origem humana.
+        # A column name is written by whoever produced the file: it goes through
+        # the sanitizer like any other text of human origin.
         resumo["columns"] = higienizar(colunas[:MAX_COLUNAS])
         resumo["columns_total"] = len(colunas)
     return {chave: valor for chave, valor in resumo.items() if valor is not None}
@@ -64,11 +65,11 @@ async def list_drive_files(
     page: int = 1,
     page_size: int = 50,
 ) -> dict:
-    """Lista os arquivos do Drive de um workspace.
+    """Lists the files in a workspace's Drive.
 
-    É de onde sai o identificador que um nó de entrada de dados consome. O
-    metadado espacial vem resumido: CRS, extensão, contagem de feições e as
-    primeiras colunas.
+    It is where the identifier that a data input node consumes comes from. The
+    spatial metadata comes summarized: CRS, extent, feature count and the first
+    columns.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "drive:read")
@@ -113,16 +114,17 @@ async def list_drive_files(
 
 @ferramenta
 async def get_drive_download_url(ctx: Context, file_id: str) -> dict:
-    """Uma URL de download temporária para um arquivo do Drive.
+    """A temporary download URL for a Drive file.
 
-    A URL é PORTADORA e vale cinco minutos: quem tiver o link baixa o arquivo,
-    sem autenticação. Use e descarte.
+    The URL is a BEARER URL and is valid for five minutes: whoever has the link
+    downloads the file, with no authentication. Use it and discard it.
 
-    Arquivo cujo conteúdo mora no executor volta com `available=false` em vez de
-    erro: não há o que baixar pela plataforma (os bytes nunca foram enviados),
-    mas o arquivo existe e continua utilizável por fluxos que rodem naquele
-    executor — o cliente precisa saber a diferença entre "não existe" e "não dá
-    para baixar daqui".
+    A file whose content lives on the executor comes back with
+    `available=false` instead of an error: there is nothing to download through
+    the platform (the bytes were never uploaded), but the file exists and is
+    still usable by workflows that run on that executor — the client needs to
+    know the difference between "does not exist" and "cannot be downloaded
+    from here".
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "drive:read")
@@ -136,8 +138,9 @@ async def get_drive_download_url(ctx: Context, file_id: str) -> dict:
                 "Nenhum arquivo do Drive com este identificador.",
                 "use list_drive_files para ver os arquivos do workspace",
             ) from exc
-        # 403 quando o arquivo é de outro workspace: a leitura do id já
-        # aconteceu, e o que se protege aqui é o conteúdo, não a existência.
+        # 403 when the file belongs to another workspace: the id lookup has
+        # already happened, and what is protected here is the content, not the
+        # existence.
         verify_workspace_access(arquivo.workspace_id, list(escopo.workspace_ids))
         local = arquivo.content_location or "minio"
         chave = arquivo.s3_key
@@ -179,7 +182,7 @@ async def get_drive_download_url(ctx: Context, file_id: str) -> dict:
 
 
 def registrar(server) -> None:
-    """Registra as tools deste domínio."""
+    """Registers this domain's tools."""
     server.tool(
         name="list_drive_files",
         title="Listar arquivos do Drive",
@@ -207,7 +210,7 @@ def registrar(server) -> None:
         annotations=ToolAnnotations(
             read_only_hint=True,
             destructive_hint=False,
-            # Cada chamada assina uma URL nova, com validade própria.
+            # Each call signs a new URL, with its own validity.
             idempotent_hint=False,
             open_world_hint=False,
         ),

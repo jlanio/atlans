@@ -6,15 +6,15 @@ import type { TurnoDoAssistente } from "@/app/components/home/assistente/quadros
 import { corDaCamada, derivarCamadas, pareceLonLat } from "@/app/components/home/camadas"
 import { useTextos, type Textos } from "@/app/components/home/i18n"
 
-// Acima disto, a prévia é recusada: uma FeatureCollection de 100 MB em memória
-// trava a aba, e o globo não é um visualizador de dados pesados.
+// Above this, the preview is refused: a 100 MB FeatureCollection in memory
+// freezes the tab, and the globe is not a heavy-data viewer.
 const TETO_BYTES = 25 * 1024 * 1024
-// E um teto AGREGADO: cinco camadas de 24 MB passam uma a uma no teto acima e
-// somam ~120 MB de heap (GeoJSON expandido + a cópia no worker do MapLibre).
+// And an AGGREGATE ceiling: five 24 MB layers pass the ceiling above one by one
+// and add up to ~120 MB of heap (expanded GeoJSON + the copy in MapLibre's worker).
 const TETO_TOTAL_BYTES = 60 * 1024 * 1024
 const VAZIO: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] }
 
-/** Por que um artefato não virou camada — com o nome, para a pessoa saber qual. */
+/** Why an artifact did not become a layer — with the name, so the person knows which. */
 export interface AvisoDeCamada {
   nome?: string
   motivo: string
@@ -22,35 +22,36 @@ export interface AvisoDeCamada {
 
 export interface UseCamadas {
   camadas: MapLayer[]
-  /** artifact_id → aviso de "sem prévia" (indisponível, grande demais, erro). */
+  /** artifact_id → "no preview" notice (unavailable, too large, error). */
   avisos: Record<string, AvisoDeCamada>
-  /** artifact_id → rótulo das camadas sendo buscadas agora. */
+  /** artifact_id → label of the layers being fetched right now. */
   carregando: Record<string, string>
   refMapa: React.RefObject<MapLibreMapHandle | null>
   adicionar: (artifactId: string, nome?: string) => Promise<void>
   remover: (id: string) => void
   alternarVisivel: (id: string) => void
   enquadrar: (id: string) => void
-  /** Tira um aviso da tela (o X da linha). */
+  /** Removes a notice from the screen (the row's X). */
   dispensarAviso: (artifactId: string) => void
 }
 
 /**
- * As camadas do globo, derivadas da conversa. Cada ponteiro `camada` (de um
- * `run_workflow` ou de `exibir_no_globo`) é buscado uma vez em
- * `GET /assistente/camadas/{id}` e vira uma `MapLayer`:
- * - geojson: `fetch` da URL pré-assinada → FeatureCollection EM MEMÓRIA (a URL
- *   expira em ~900s; nunca `addSource({data: url})`). Teto por camada e no total.
- * - mvt (publicada): camada vetorial por `/terra/assistente/tiles/…`.
- * - indisponível: um aviso "sem prévia" com a razão.
- * A `bbox` só enquadra quando cabe em lon/lat.
+ * The globe's layers, derived from the conversation. Each `camada` pointer (from
+ * a `run_workflow` or from `exibir_no_globo`) is fetched once from
+ * `GET /assistente/camadas/{id}` and becomes a `MapLayer`:
+ * - geojson: `fetch` of the presigned URL → FeatureCollection IN MEMORY (the URL
+ *   expires in ~900s; never `addSource({data: url})`). Ceiling per layer and in total.
+ * - mvt (published): vector layer via `/terra/assistente/tiles/…`.
+ * - unavailable: a "no preview" notice with the reason.
+ * The `bbox` only frames when it fits in lon/lat.
  *
- * O ciclo de vida é O DO `escopo` (a conversa ativa): trocar de chat zera
- * camadas, avisos e a memória de "já busquei este artefato". Sem isso o globo
- * somava as camadas de A, B e C, o painel não dizia de qual conversa cada uma
- * veio, e uma camada removida nunca mais voltava ao reabrir o chat que a
- * produziu. Quem decide o escopo é o HomeView — só ele sabe distinguir "a
- * pessoa abriu outro chat" de "a conversa nova acabou de ganhar um id".
+ * The lifecycle is THAT OF the `escopo` (the active conversation): switching
+ * chats clears layers, notices and the "already fetched this artifact" memory.
+ * Without that the globe piled up the layers of A, B and C, the panel did not
+ * say which conversation each one came from, and a removed layer never came
+ * back when reopening the chat that produced it. HomeView decides the scope —
+ * only it can tell "the person opened another chat" from "the new conversation
+ * just got an id".
  */
 export function useCamadas(turnos: TurnoDoAssistente[], escopo?: string): UseCamadas {
   const [camadas, setCamadas] = useState<MapLayer[]>([])
@@ -60,30 +61,31 @@ export function useCamadas(turnos: TurnoDoAssistente[], escopo?: string): UseCam
   const buscados = useRef<Set<string>>(new Set())
   const emVoo = useRef<Set<string>>(new Set())
   const indice = useRef(0)
-  // A cor é POR artefato: re-exibir o mesmo artefato tem de manter a cor que a
-  // pessoa já associou à camada, e uma tentativa que falhou não pode queimar
-  // uma cor da paleta.
+  // The color is PER artifact: re-displaying the same artifact has to keep the
+  // color the person already associated with the layer, and a failed attempt
+  // must not burn a palette color.
   const cores = useRef<Map<string, string>>(new Map())
-  // Bytes já baixados por camada, para o teto agregado; sai junto com a camada.
+  // Bytes already downloaded per layer, for the aggregate ceiling; removed along with the layer.
   const bytes = useRef<Map<string, number>>(new Map())
-  // Bytes PROMETIDOS pelas buscas em voo. `bytes` só é escrito depois que o
-  // download termina: sem esta reserva, N adições simultâneas liam todas o
-  // mesmo mapa (ainda vazio) e passavam todas pelo teto agregado. Entra antes
-  // da viagem de rede e sai no fim — a camada que entrou já contabilizou o
-  // número real em `bytes`, e a que não entrou não deve nada.
+  // Bytes PROMISED by in-flight fetches. `bytes` is only written after the
+  // download finishes: without this reservation, N simultaneous additions all
+  // read the same (still empty) map and all got past the aggregate ceiling. It
+  // goes in before the network trip and comes out at the end — the layer that
+  // made it in has already accounted the real number in `bytes`, and the one
+  // that did not owes nothing.
   const reservas = useRef<Map<string, number>>(new Map())
-  // AbortController por download em voo: trocar de conversa ou desmontar ABORTA
-  // a rede. Sem isso o `baixarComTeto` seguia lendo um corpo de centenas de MB
-  // de um chat que a pessoa já fechou, e a promessa do fetch só assentava
-  // quando o download inteiro chegasse. Espelha o `abortoRef` do useAssistente.
+  // AbortController per in-flight download: switching conversations or unmounting
+  // ABORTS the network. Without it `baixarComTeto` kept reading a body of
+  // hundreds of MB from a chat the person had already closed, and the fetch
+  // promise only settled when the whole download arrived. Mirrors useAssistente's `abortoRef`.
   const controladores = useRef<Map<string, AbortController>>(new Map())
   const paraEnquadrar = useRef<string | null>(null)
-  // Sobe a cada limpeza: uma busca que já estava em voo quando a conversa
-  // trocou não pode plantar a camada da conversa anterior no globo da nova.
+  // Goes up on every cleanup: a fetch already in flight when the conversation
+  // switched must not plant the previous conversation's layer on the new one's globe.
   const geracao = useRef(0)
   const assinatura = useRef("")
-  // Os textos dos avisos vão por ref: `adicionar` é dependência do efeito que
-  // busca as camadas, e trocar o idioma não pode mudar a identidade dela.
+  // The notice texts go through a ref: `adicionar` is a dependency of the effect
+  // that fetches the layers, and switching language must not change its identity.
   const textosDaTela = useTextos().assistente.camada
   const textos = useRef(textosDaTela)
   useEffect(() => { textos.current = textosDaTela }, [textosDaTela])
@@ -97,15 +99,15 @@ export function useCamadas(turnos: TurnoDoAssistente[], escopo?: string): UseCam
   }, [])
 
   const adicionar = useCallback(async (artifactId: string, nomeSugerido?: string) => {
-    // Dois cliques no mesmo artefato baixavam duas vezes a URL pré-assinada (o
-    // `get()` do serviço só deduplica a chamada de metadados, não o fetch cru).
+    // Two clicks on the same artifact downloaded the presigned URL twice (the
+    // service's `get()` only deduplicates the metadata call, not the raw fetch).
     if (emVoo.current.has(artifactId)) return
     const id = `art:${artifactId}`
     const minhaGeracao = geracao.current
     const rotuloProvisorio = (nomeSugerido || artifactId).trim()
     emVoo.current.add(artifactId)
     setCarregando((c) => ({ ...c, [artifactId]: rotuloProvisorio }))
-    /** Só escreve estado se a conversa ainda for a mesma de quando começou. */
+    /** Only writes state if the conversation is still the one from when it started. */
     const atual = () => geracao.current === minhaGeracao
 
     try {
@@ -117,37 +119,38 @@ export function useCamadas(turnos: TurnoDoAssistente[], escopo?: string): UseCam
         return
       }
       const nome = (nomeSugerido || c.nome || artifactId).trim()
-      // A bbox NÃO é reinterpretada pelo `crs`: o servidor já zera a que não
-      // merece confiança, e no ramo MVT ela é 4326 por construção. Comparar a
-      // string `crs` com "EPSG:4326" descartava bbox boa de dado publicado em
-      // CRS nativo — a câmera nunca saía do enquadramento inicial.
+      // The bbox is NOT reinterpreted by `crs`: the server already clears the one
+      // that does not deserve trust, and in the MVT branch it is 4326 by
+      // construction. Comparing the `crs` string with "EPSG:4326" discarded good
+      // bboxes of data published in a native CRS — the camera never left the initial framing.
       const bbox = pareceLonLat(c.bbox) ? (c.bbox as number[]) : undefined
 
       if (c.tipo === "geojson" && c.download_url) {
-        // O que sobra do teto agregado conta o que já está NO GLOBO e o que já
-        // foi prometido por outra busca em voo — senão duas adições ao mesmo
-        // tempo enxergam as duas o orçamento inteiro e estouram juntas.
+        // What is left of the aggregate ceiling counts what is already ON THE GLOBE
+        // and what has already been promised by another in-flight fetch —
+        // otherwise two simultaneous additions both see the whole budget and
+        // overflow together.
         const restante = TETO_TOTAL_BYTES - somar(bytes.current, id) - somar(reservas.current, id)
         const teto = Math.min(TETO_BYTES, restante)
         if (c.size_bytes != null && c.size_bytes > teto) {
           avisar(setAvisos, artifactId, nome, motivoDoTeto(restante, textos.current))
           return
         }
-        // Reserva ANTES do fetch. Tamanho desconhecido reserva o `teto` INTEIRO
-        // (o máximo que o corte no fio deixa entrar): reservar 0 fazia N buscas
-        // de tamanho desconhecido não se enxergarem no teto agregado e estourarem
-        // juntas. O valor real corrige em `bytes` quando o download termina.
+        // Reserve BEFORE the fetch. An unknown size reserves the ENTIRE `teto`
+        // (the most the on-the-wire cutoff lets in): reserving 0 made N fetches
+        // of unknown size not see each other in the aggregate ceiling and
+        // overflow together. The real value corrects `bytes` when the download ends.
         reservas.current.set(id, c.size_bytes ?? teto)
         const controle = new AbortController()
         controladores.current.set(artifactId, controle)
         try {
-          // SEM Authorization: a URL é pré-assinada e some em ~900s. A
-          // FeatureCollection fica em memória; nunca addSource({data: url}).
-          // `signal`: a troca de conversa/desmontagem aborta o download em voo.
+          // NO Authorization: the URL is presigned and expires in ~900s. The
+          // FeatureCollection stays in memory; never addSource({data: url}).
+          // `signal`: switching conversation/unmounting aborts the in-flight download.
           const r = await fetch(c.download_url, { signal: controle.signal })
           if (!r.ok) throw new Error(String(r.status))
-          // `size_bytes` nulo NÃO é "pequeno": o consumer grava NULL quando o
-          // head do storage falha. O corte é pelo que chega no fio.
+          // A null `size_bytes` is NOT "small": the consumer writes NULL when the
+          // storage head fails. The cutoff is by what arrives on the wire.
           const baixado = await baixarComTeto(r, teto, controle.signal)
           if (!atual()) return
           if (!baixado) {
@@ -164,13 +167,14 @@ export function useCamadas(turnos: TurnoDoAssistente[], escopo?: string): UseCam
           setCamadas((cs) => comA(cs, layer))
           setAvisos((a) => semAviso(a, artifactId))
         } catch {
-          // Abortado (troca de conversa/desmontagem): `atual()` é falso e não há
-          // aviso — a rede parou de propósito, não é falha de prévia.
+          // Aborted (conversation switch/unmount): `atual()` is false and there is no
+          // notice — the network stopped on purpose, it is not a preview failure.
           if (atual()) avisar(setAvisos, artifactId, nome, textos.current.naoCarregouPrevia)
         } finally {
           controladores.current.delete(artifactId)
-          // A reserva sai por geração: a limpeza da troca de conversa já zerou o
-          // mapa, e apagar aqui derrubaria a reserva da busca NOVA de mesmo id.
+          // The reservation is removed by generation: the conversation-switch cleanup
+          // already cleared the map, and deleting here would drop the reservation
+          // of the NEW fetch with the same id.
           if (atual()) reservas.current.delete(id)
         }
         return
@@ -182,7 +186,7 @@ export function useCamadas(turnos: TurnoDoAssistente[], escopo?: string): UseCam
           geomType: c.geometry_type ?? "", bbox, baixavel: c.baixavel ?? false,
           mvt: { workflowHash: c.mvt.workflow_id, layerKey: c.mvt.layer_key },
         }
-        // Sem bbox não dá para enquadrar (a geometria vem dos tiles, não do estado).
+        // Without a bbox there is no way to frame (the geometry comes from the tiles, not the state).
         paraEnquadrar.current = bbox ? id : null
         setCamadas((cs) => comA(cs, layer))
         setAvisos((a) => semAviso(a, artifactId))
@@ -191,9 +195,9 @@ export function useCamadas(turnos: TurnoDoAssistente[], escopo?: string): UseCam
 
       avisar(setAvisos, artifactId, nome, c.hint ?? textos.current.semPreviaCurto)
     } finally {
-      // Tudo aqui é por GERAÇÃO: a limpeza da troca de conversa já esvaziou o
-      // `emVoo`, e uma busca do escopo ANTIGO chegando depois apagaria a marca
-      // da busca NOVA do mesmo artefato — que então baixaria duas vezes.
+      // Everything here is by GENERATION: the conversation-switch cleanup already
+      // emptied `emVoo`, and a fetch from the OLD scope arriving later would erase
+      // the mark of the NEW fetch of the same artifact — which would then download twice.
       if (atual()) {
         emVoo.current.delete(artifactId)
         setCarregando((c) => semA(c, artifactId))
@@ -201,7 +205,7 @@ export function useCamadas(turnos: TurnoDoAssistente[], escopo?: string): UseCam
     }
   }, [corDe])
 
-  // Troca de escopo: o globo é da conversa.
+  // Scope switch: the globe belongs to the conversation.
   const escopoAnterior = useRef<string | undefined>(undefined)
   useEffect(() => {
     const anterior = escopoAnterior.current
@@ -224,21 +228,21 @@ export function useCamadas(turnos: TurnoDoAssistente[], escopo?: string): UseCam
     setCarregando({})
   }, [escopo])
 
-  // Na desmontagem: aborta a rede em voo e invalida a geração, para uma busca
-  // que resolva depois não tocar no estado de um componente que já saiu.
+  // On unmount: abort in-flight network requests and invalidate the generation,
+  // so a fetch that resolves later does not touch the state of a component that is gone.
   useEffect(() => () => {
     geracao.current += 1
     for (const c of controladores.current.values()) c.abort()
     controladores.current.clear()
   }, [])
 
-  // Reage aos ponteiros `camada` da conversa: cada artifact_id novo é buscado
-  // UMA vez (o ref evita re-buscar a cada delta do stream).
+  // Reacts to the conversation's `camada` pointers: each new artifact_id is fetched
+  // ONCE (the ref avoids re-fetching on every stream delta).
   //
-  // A assinatura evita a varredura completa por TOKEN: durante o stream o
-  // `aplicarQuadro` substitui o último bloco de texto, então nem a contagem de
-  // turnos nem a de blocos do último mudam — e é exatamente aí que não há
-  // camada nova para achar.
+  // The signature avoids the full scan per TOKEN: during the stream
+  // `aplicarQuadro` replaces the last text block, so neither the turn count nor
+  // the last turn's block count changes — and that is exactly when there is no
+  // new layer to find.
   const marca = `${turnos.length}:${turnos[turnos.length - 1]?.blocos.length ?? 0}`
   useEffect(() => {
     if (assinatura.current === marca) return
@@ -250,8 +254,8 @@ export function useCamadas(turnos: TurnoDoAssistente[], escopo?: string): UseCam
     }
   }, [marca, turnos, adicionar])
 
-  // Enquadra a última camada nova DEPOIS que o estado atualizou. fitToLayer usa
-  // a bbox/coords da própria camada, então funciona mesmo antes do sync do mapa.
+  // Frame the last new layer AFTER the state has updated. fitToLayer uses
+  // the layer's own bbox/coords, so it works even before the map sync.
   useEffect(() => {
     if (paraEnquadrar.current) {
       refMapa.current?.fitToLayer(paraEnquadrar.current)
@@ -278,7 +282,7 @@ export function useCamadas(turnos: TurnoDoAssistente[], escopo?: string): UseCam
 
 const semO = (cs: MapLayer[], id: string) => cs.filter((c) => c.id !== id)
 
-/** Substitui NO LUGAR quando o id já existe — re-exibir não reordena a lista. */
+/** Replaces IN PLACE when the id already exists — re-displaying does not reorder the list. */
 function comA(cs: MapLayer[], layer: MapLayer): MapLayer[] {
   return cs.some((c) => c.id === layer.id)
     ? cs.map((c) => (c.id === layer.id ? layer : c))
@@ -318,9 +322,10 @@ function semA<T>(r: Record<string, T>, chave: string): Record<string, T> {
 }
 
 /**
- * Baixa a FeatureCollection cortando no `teto`. Lê em pedaços e ABORTA quando
- * passa do limite: o `JSON.parse` de um corpo de centenas de MB congela a aba,
- * e é justamente esse o caso que escapava quando `size_bytes` vinha nulo.
+ * Downloads the FeatureCollection, cutting off at `teto`. Reads in chunks and
+ * ABORTS when it goes over the limit: `JSON.parse` of a body of hundreds of MB
+ * freezes the tab, and that is precisely the case that slipped through when
+ * `size_bytes` came back null.
  */
 async function baixarComTeto(
   r: Response,
@@ -332,7 +337,7 @@ async function baixarComTeto(
 
   const leitor = r.body?.getReader?.()
   if (!leitor) {
-    // Sem corpo legível em pedaços: resta o Content-Length conferido acima.
+    // No body readable in chunks: what is left is the Content-Length checked above.
     const geojson = (await r.json()) as GeoJSON.FeatureCollection
     return { geojson, bytes: Number.isFinite(declarado) ? declarado : 0 }
   }

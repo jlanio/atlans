@@ -1,29 +1,29 @@
 # app/services/fechamento_de_run.py
 """
-Fechar um run pelo SERVIDOR — sem job_result do executor.
+Closing a run from the SERVER — without a job_result from the executor.
 
-Nove caminhos fecham um run assim: o despacho (nenhum executor aceitou, a
-barreira de isolamento, uma exceção no meio), o cancelamento (run ainda na
-fila, ou com o executor fora do ar) e os vigias de `executor_ws/orfaos.py`
-(executor que sumiu, run preso em 'pending' sem entrega, job descartado no
-relay, run perdido na reconciliação do inventário). Cada um tinha a sua cópia, e
-elas divergiram: os do despacho atribuíam `run.status` e gravavam por PK — o
-"segundo escritor" que os outros evitavam — e não publicavam a conclusão. A
-regra mora aqui, igual para todos:
+Nine paths close a run this way: dispatch (no executor accepted, the
+isolation barrier, an exception midway), cancellation (run still in the
+queue, or with the executor offline) and the watchers in `executor_ws/orfaos.py`
+(executor that vanished, run stuck in 'pending' without delivery, job dropped in the
+relay, run lost in the inventory reconciliation). Each had its own copy, and
+they diverged: the dispatch ones assigned `run.status` and wrote by PK — the
+"second writer" the others avoided — and did not publish the completion. The
+rule lives here, the same for everyone:
 
-1. UPDATE condicional (compare-and-swap) no status: só fecha o run que ainda
-   está num dos estados de `de` (e, com `host`, no executor dado). O desfecho
-   que outro escritor gravou antes — o job_result do executor, o cancelamento
-   do usuário, outro worker — não é sobrescrito, e o run não é contado duas
-   vezes.
-2. Espelho no objeto sem sujá-lo (`set_committed_value`): uma atribuição comum
-   faria o próximo flush reemitir o status por PK, que é justamente o segundo
-   escritor.
-3. Contabilização no usage_daily (`account_terminal_run`): estes runs nunca
-   passam pela fila run_results.
-4. `__workflow_complete__` (`publicar_conclusao`) para o painel aberto, uma vez
-   por run — só quem venceu o UPDATE publica. Best-effort: o run já está
-   fechado no banco, e o painel também o descobre ao reabrir.
+1. Conditional UPDATE (compare-and-swap) on the status: only closes a run that is
+   still in one of the `de` states (and, with `host`, on the given executor). An
+   outcome another writer recorded first — the executor's job_result, the user's
+   cancellation, another worker — is not overwritten, and the run is not counted
+   twice.
+2. Mirror onto the object without dirtying it (`set_committed_value`): a plain
+   assignment would make the next flush re-emit the status by PK, which is exactly
+   the second writer.
+3. Accounting in usage_daily (`account_terminal_run`): these runs never
+   go through the run_results queue.
+4. `__workflow_complete__` (`publicar_conclusao`) for the open panel, once
+   per run — only whoever won the UPDATE publishes. Best-effort: the run is already
+   closed in the database, and the panel also finds out when it reopens.
 """
 from __future__ import annotations
 
@@ -41,12 +41,12 @@ from app.services import run_events_service
 
 logger = get_logger(__name__)
 
-# Os estados de quem ainda não terminou.
+# The states of runs that have not finished yet.
 ABERTOS = ("pending", "running")
 
-# O `extra` do evento de conclusão, na taxonomia do flow, para quem falhou sem
-# culpa do conteúdo (executor sumiu, envio não chegou, nenhum executor aceitou):
-# repetir a execução é seguro — o painel oferece o "tentar de novo".
+# The completion event's `extra`, in the flow taxonomy, for runs that failed through
+# no fault of the content (executor vanished, send never arrived, no executor accepted):
+# repeating the execution is safe — the panel offers "tentar de novo" (try again).
 REPETIVEL = {"error_category": "transient", "retryable": True}
 
 
@@ -62,17 +62,17 @@ async def fechar_runs(
     duracao: bool = False,
     extra: dict | None = None,
 ) -> list[WorkflowRun]:
-    """Fecha como `para` os `runs` (objetos da sessão ou task_ids) que ainda
-    estão em `de`; devolve os que ESTA chamada fechou, já espelhados.
+    """Closes as `para` the `runs` (session objects or task_ids) that are still
+    in `de`; returns the ones THIS call closed, already mirrored.
 
-    `categoria` vai para `error_category` (None num cancelamento — cancelar não
-    é falhar). `duracao` grava `duration_seconds` desde o `start_time`: só faz
-    sentido para quem rodou de verdade. Faz o commit do fechamento: a
-    contabilização e a publicação só valem para o que foi gravado.
+    `categoria` goes to `error_category` (None on a cancellation — cancelling is not
+    failing). `duracao` writes `duration_seconds` since `start_time`: it only makes
+    sense for runs that actually ran. Commits the closing: the
+    accounting and the publication only apply to what was written.
     """
-    # Já terminal no objeto: um desfecho nunca volta a pending/running, então
-    # não há o que disputar — é o run que o despacho acabou de fechar e que
-    # depois passa pela rede de segurança do `except`.
+    # Already terminal on the object: an outcome never goes back to pending/running, so
+    # there is nothing to contend for — it is the run that dispatch just closed and that
+    # then goes through the `except` safety net.
     runs = [run for run in runs if isinstance(run, str) or run.status in de]
     if not runs:
         return []
@@ -103,12 +103,12 @@ async def fechar_runs(
 
     objetos = await _objetos(db, fechados)
     task_ids = [run.task_id for run in objetos]
-    # Uma falha na contabilização faz rollback (ver `account_terminal_run`), e o
-    # rollback EXPIRA todos os objetos da sessão: o próximo run seria contado
-    # com atributos expirados (e perdido), e quem chama leria `run.host` ou
-    # `run.task_id` num objeto sem estado — o cancel ao host e a conclusão do
-    # painel não saíam. O fechamento já está gravado: recarregar traz o mesmo
-    # desfecho.
+    # A failure in the accounting rolls back (see `account_terminal_run`), and the
+    # rollback EXPIRES every object in the session: the next run would be counted
+    # with expired attributes (and lost), and the caller would read `run.host` or
+    # `run.task_id` on a stateless object — the cancel to the host and the panel's
+    # completion did not go out. The closing is already written: reloading brings the same
+    # outcome.
     for run in objetos:
         await _recarregar_se_expirou(db, run)
         await run_result_consumer.account_terminal_run(db, run)
@@ -132,8 +132,8 @@ async def _recarregar_se_expirou(db: AsyncSession, run: WorkflowRun) -> None:
 
 
 async def _objetos(db: AsyncSession, fechados: list) -> list[WorkflowRun]:
-    """Os runs fechados como objetos, com o que foi gravado espelhado. Quem veio
-    por task_id é carregado numa consulta só."""
+    """The closed runs as objects, with what was written mirrored. Those that came
+    by task_id are loaded in a single query."""
     por_id = [run for run, _ in fechados if isinstance(run, str)]
     carregados = {}
     if por_id:

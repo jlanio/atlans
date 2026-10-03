@@ -78,7 +78,7 @@ describe("Painel do assistente", () => {
     })
     fireEvent.click(screen.getByRole("button", { name: /confirmar/i }))
     expect(confirmar).toHaveBeenCalledWith("tu1", "TOK", "confirmar")
-    expect(confirmar.mock.calls[0]).toHaveLength(3) // só id/token/decisão
+    expect(confirmar.mock.calls[0]).toHaveLength(3) // only id/token/decision
     expect(JSON.stringify(confirmar.mock.calls[0])).not.toContain("SEGREDO")
   })
 
@@ -96,27 +96,27 @@ describe("Painel do assistente", () => {
   })
 
   it("fluxo NÃO vira link nenhum — a Home não leva ao editor", () => {
-    // O dublê de `next/link` (topo do arquivo) fica registrado de PROPÓSITO: é
-    // ele que faz esta ausência ter o que pegar. Sem o dublê, "não há link"
-    // passaria por acidente, e devolver o `<Link>` ao badge não derrubaria nada.
+    // The `next/link` double (top of the file) stays registered ON PURPOSE: it is
+    // what gives this absence something to catch. Without the double, "there is no link"
+    // would pass by accident, and putting the `<Link>` back on the badge would break nothing.
     montar({ turnos: [turno([{ tipo: "fluxo", fluxo: { workflow_id: "w9", nome: "Análise" } }])] })
     expect(document.querySelector('a[href^="/workflow/"]')).toBeNull()
-    expect(screen.queryByText(/análise/i)).toBeNull() // nem o nome do fluxo aparece
+    expect(screen.queryByText(/análise/i)).toBeNull() // not even the workflow name shows up
   })
 
   it("artefato da conversa vira badge, e clicar o põe no globo", () => {
     montar({ turnos: [turno([{ tipo: "camada", camada: { artifact_id: "a7", nome: "Talhões", available: true } }])] })
-    // O nome acessível vem do CONTEÚDO do botão; o `title` é só a dica de hover.
+    // The accessible name comes from the button's CONTENT; the `title` is just the hover hint.
     const badge = screen.getByRole("button", { name: /talhões/i })
     expect(badge.getAttribute("title")).toBe("Mostrar Talhões no globo")
     fireEvent.click(badge)
-    // A fila do store é o canal; quem chama `adicionar` é o HomeView.
+    // The store queue is the channel; what calls `adicionar` is the HomeView.
     expect(useHomeStore.getState().pedidosDeCamada).toEqual([{ artifactId: "a7", nome: "Talhões" }])
   })
 
   it("artefato sem prévia não é botão — e diz por quê", () => {
-    // Um botão sem ação prometeria um clique que não acontece, e o leitor de
-    // tela ainda o anunciaria como acionável.
+    // A button with no action would promise a click that does not happen, and the screen
+    // reader would still announce it as actionable.
     montar({ turnos: [turno([{ tipo: "camada", camada: { artifact_id: "a8", nome: "Malha", available: false, hint: "fica no executor" } }])] })
     expect(screen.queryByRole("button", { name: /malha/i })).toBeNull()
     expect(screen.getByTitle("fica no executor")).toBeTruthy()
@@ -159,7 +159,7 @@ describe("Painel do assistente", () => {
     fireEvent.click(screen.getByRole("button", { name: /confirmar/i }))
     expect(useHomeStore.getState().decididos["tu1"]).toBe(true)
 
-    cleanup() // recolher DESMONTA o painel; os turnos (com o token) sobrevivem
+    cleanup() // collapsing UNMOUNTS the panel; the turns (with the token) survive
     render(<Painel {...props} />)
     expect(screen.getByRole("button", { name: /confirmar/i }).hasAttribute("disabled")).toBe(true)
     expect(screen.getByText("Decidido.")).toBeTruthy()
@@ -176,8 +176,8 @@ describe("Painel do assistente", () => {
   })
 
   it("409 NÃO destrava: a chave já foi consumida, e o cartão explica isso", async () => {
-    // Destravar aqui oferecia um clique que só renderia outro 409 — e ainda
-    // sugeria que a ação não tinha acontecido, quando ela pode ter acontecido.
+    // Unlocking here offered a click that would only render another 409 — and also
+    // suggested the action had not happened, when it may have happened.
     const confirmar = vi.fn().mockResolvedValue("expirada")
     montar({ confirmar, turnos: [turno([confirmacao()])] })
     await act(async () => {
@@ -195,7 +195,7 @@ describe("Painel do assistente", () => {
     fireEvent.change(campo, { target: { value: "buffer de 500 m" } })
     expect(useHomeStore.getState().rascunho).toBe("buffer de 500 m")
 
-    cleanup() // é o que Ctrl+I (ou o botão) faz com este painel
+    cleanup() // it is what Ctrl+I (or the button) does with this panel
     expect(useHomeStore.getState().rascunho).toBe("buffer de 500 m")
   })
 

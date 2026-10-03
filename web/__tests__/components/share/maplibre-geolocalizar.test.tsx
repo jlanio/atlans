@@ -3,15 +3,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { act, cleanup, render } from "@testing-library/react"
 
 /**
- * A localização no globo (só a Home): o GeolocateControl do MapLibre entra
- * quando `geolocalizar` liga, no modo SEGUIR, com os textos em pt-BR. E a regra
- * do dono: localizar MANDA no globo — o giro do hero para enquanto seguimos a
- * pessoa, e a volta ao Brasil não dispara. O portal `/share`, que não passa
- * `geolocalizar`, não ganha controle nenhum.
+ * Location on the globe (Home only): MapLibre's GeolocateControl comes in
+ * when `geolocalizar` is on, in FOLLOW mode, with the texts in pt-BR. And the
+ * owner's rule: locating RULES the globe — the hero spin stops while we follow the
+ * person, and the return to Brazil does not fire. The `/share` portal, which does not pass
+ * `geolocalizar`, gets no control at all.
  *
- * jsdom não desenha o MapLibre: o mapa é um dublê que guarda a câmera e as
- * chamadas, e o GeolocateControl é um dublê que deixa o teste disparar os
- * eventos que o de verdade emite (`trackuserlocationstart/end`).
+ * jsdom does not draw MapLibre: the map is a double that keeps the camera and the
+ * calls, and the GeolocateControl is a double that lets the test fire the
+ * events the real one emits (`trackuserlocationstart/end`).
  */
 vi.mock("maplibre-gl/dist/maplibre-gl.css", () => ({}))
 
@@ -23,7 +23,7 @@ const espiao = vi.hoisted(() => ({
     opcoes: Record<string, unknown>
     fire: (ev: string, e?: unknown) => void
     trigger: ReturnType<typeof vi.fn>
-    /** O dublê cru, para o teste pôr o estado interno que o código real consulta. */
+    /** The raw double, so the test can set the internal state the real code consults. */
     duble: {
       _watchState?: string
       _lastKnownPosition?: { coords: { latitude: number; longitude: number; accuracy: number } }
@@ -31,9 +31,9 @@ const espiao = vi.hoisted(() => ({
   },
 }))
 
-// Declaração de função: é içada, então o factory do vi.mock (que também é içado)
-// consegue chamá-la. Uma CLASSE no topo não seria — daí o dublê do controle
-// mora DENTRO do factory.
+// A function declaration: it is hoisted, so the vi.mock factory (which is also hoisted)
+// can call it. A CLASS at the top would not be — hence the control double
+// lives INSIDE the factory.
 function criarMapa(opcoes: Record<string, unknown>) {
   const ouvintes: Record<string, Ouvinte[]> = {}
   const inicial = opcoes.center as [number, number]
@@ -77,7 +77,7 @@ vi.mock("maplibre-gl", () => {
   class GeolocateDuble {
     opcoes: Record<string, unknown>
     _ouvintes: Record<string, Ouvinte[]> = {}
-    /** O código real consulta estes internos do maplibre; o teste os arma. */
+    /** The real code consults these maplibre internals; the test sets them up. */
     _watchState?: string
     _lastKnownPosition?: { coords: { latitude: number; longitude: number; accuracy: number } }
     trigger = vi.fn()
@@ -128,9 +128,9 @@ describe("MapLibreMap — a localização no globo", () => {
     expect(espiao.geo).not.toBeNull()
     const o = espiao.geo!.opcoes
     expect(o.trackUserLocation).toBe(true)     // segue a pessoa
-    expect(o.showAccuracyCircle).toBe(true)    // o círculo de precisão
+    expect(o.showAccuracyCircle).toBe(true)    // the accuracy circle
     expect((o.positionOptions as { enableHighAccuracy?: boolean }).enableHighAccuracy).toBe(true)
-    // e ele foi de fato registrado no mapa (algum control com as opções de seguir)
+    // and it was in fact registered on the map (some control with the follow options)
     const registrado = espiao.mapa!.addControl.mock.calls
       .some((c) => (c[0] as { opcoes?: { trackUserLocation?: boolean } })?.opcoes?.trackUserLocation === true)
     expect(registrado).toBe(true)
@@ -165,14 +165,14 @@ describe("MapLibreMap — a localização no globo", () => {
   it("localizar pausa o giro do hero; ao soltar o seguir, ele retoma", () => {
     montar({ geolocalizar: true, giroLento: true })
     const mapa = espiao.mapa!
-    // O giro do hero saiu na montagem.
+    // The hero spin went out on mount.
     expect(mapa.easeTo).toHaveBeenCalledTimes(1)
 
     // A pessoa toca em localizar → o controle entra em modo seguir.
     act(() => { espiao.geo!.fire("trackuserlocationstart") })
     expect(mapa.stop).toHaveBeenCalled()          // corta o passo em voo
 
-    // Enquanto segue, o giro fica suspenso: o intervalo de retomada não move nada.
+    // While following, the spin stays suspended: the resume interval moves nothing.
     act(() => { vi.advanceTimersByTime(PASSO_DO_GIRO_MS + 1000) })
     expect(mapa.easeTo).toHaveBeenCalledTimes(1)
 
@@ -188,10 +188,10 @@ describe("MapLibreMap — a localização no globo", () => {
     act(() => { espiao.geo!.fire("trackuserlocationstart") })
     const antes = mapa.easeTo.mock.calls.length
 
-    // O hero termina (a pessoa enviou algo), mas ela está sendo seguida.
+    // The hero ends (the person sent something), but they are being followed.
     rerender(<MapLibreMap layers={[]} basemapToggle={false} center={BRASIL} zoom={2.3} geolocalizar giroLento={false} />)
 
-    // Nenhuma "volta ao Brasil": nada de easeTo/jumpTo para o centro do Globo.
+    // No "return to Brazil": no easeTo/jumpTo to the Globo's center.
     expect(mapa.easeTo.mock.calls.length).toBe(antes)
     expect(mapa.jumpTo).not.toHaveBeenCalled()
   })
@@ -223,8 +223,8 @@ describe("MapLibreMap — a localização no globo", () => {
   })
 
   it("já seguindo, `localizar()` NÃO alterna: reemite a última posição sem tocar no trigger", () => {
-    // `trigger()` em ACTIVE_LOCK/WAITING_ACTIVE DESLIGA o rastreio — o "Usar
-    // minha localização" jamais pode desligar. Reanexar depois do × só reemite.
+    // `trigger()` in ACTIVE_LOCK/WAITING_ACTIVE TURNS OFF tracking — "Usar
+    // minha localização" (use my location) must never turn it off. Reattaching after the × only re-emits.
     const ref = createRef<MapLibreMapHandle>()
     const aoLocalizar = vi.fn()
     render(<MapLibreMap ref={ref} layers={[]} basemapToggle={false} center={BRASIL} zoom={2.3} geolocalizar aoLocalizar={aoLocalizar} />)
@@ -238,12 +238,12 @@ describe("MapLibreMap — a localização no globo", () => {
   })
 
   it("permissão negada solta o giro — o hero não fica congelado para sempre", () => {
-    // PERMISSION_DENIED derruba o controle para OFF SEM `trackuserlocationend`;
-    // sem o handler de erro, geolocalizandoRef ficava preso em true.
+    // PERMISSION_DENIED drops the control to OFF WITHOUT `trackuserlocationend`;
+    // without the error handler, geolocalizandoRef stayed stuck at true.
     const aoErro = vi.fn()
     montar({ geolocalizar: true, giroLento: true, aoErroDeLocalizacao: aoErro })
     const mapa = espiao.mapa!
-    expect(mapa.easeTo).toHaveBeenCalledTimes(1) // o passo da montagem
+    expect(mapa.easeTo).toHaveBeenCalledTimes(1) // the mount step
 
     act(() => { espiao.geo!.fire("trackuserlocationstart") })
     act(() => { espiao.geo!.fire("error", { code: 1 }) })
@@ -258,14 +258,14 @@ describe("MapLibreMap — a localização no globo", () => {
     const mapa = espiao.mapa!
     act(() => { espiao.geo!.fire("trackuserlocationstart") })
 
-    // O maplibre dispara trackuserlocationend também no 2º plano — com o
-    // watch ainda ativo. Girar aqui varreria a tela sobre a casa da pessoa.
+    // maplibre also fires trackuserlocationend in the background state — with the
+    // watch still active. Spinning here would sweep the screen over the person's home.
     espiao.geo!.duble._watchState = "BACKGROUND"
     act(() => { espiao.geo!.fire("trackuserlocationend") })
     act(() => { vi.advanceTimersByTime(1500) })
     expect(mapa.easeTo).toHaveBeenCalledTimes(1) // suspenso
 
-    // Só o OFF de verdade libera.
+    // Only a real OFF releases it.
     espiao.geo!.duble._watchState = "OFF"
     act(() => { espiao.geo!.fire("trackuserlocationend") })
     act(() => { vi.advanceTimersByTime(1000) })
@@ -273,9 +273,9 @@ describe("MapLibreMap — a localização no globo", () => {
   })
 
   it("sem movimento NOSSO em voo, o início do seguir não dá stop()", () => {
-    // Parar QUALQUER movimento matava o enquadramento do próprio controle no
-    // reclique a partir do 2º plano (o fitBounds roda antes do evento).
-    montar({ geolocalizar: true }) // sem giro: nada nosso voando
+    // Stopping ANY movement killed the control's own framing on
+    // re-click from the background state (fitBounds runs before the event).
+    montar({ geolocalizar: true }) // no spin: nothing of ours flying
     act(() => { espiao.geo!.fire("trackuserlocationstart") })
     expect(espiao.mapa!.stop).not.toHaveBeenCalled()
   })

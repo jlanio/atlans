@@ -1,22 +1,22 @@
 # tests/unit/test_artifact_local_locality.py
 """
-Localidade de conteudo de artefatos (LGPD).
+Content locality of artifacts (LGPD).
 
-Um artefato marcado como local nasce e permanece no disco do executor. O servidor
-guarda so o catalogo. Estes testes travam as tres propriedades que fazem isso
-valer alguma coisa:
+An artifact marked as local is born and stays on the executor's disk. The server
+keeps only the catalog. These tests lock down the three properties that make
+this worth anything:
 
-  NAO SAI       `save_artifact_local` nao faz UMA chamada HTTP. Se fizer, o dado
-                que foi marcado para nao sair saiu.
+  DOESN'T LEAVE    `save_artifact_local` does not make ONE HTTP call. If it does,
+                   the data that was marked not to leave has left.
 
-  NAO SOME      resolver um artefato local NAO pode apagar o arquivo original.
-                `read_drive_file_as` faz `os.unlink` no `finally` porque ate
-                entao o caminho era sempre um temporario baixado — devolver o
-                arquivo real faria o primeiro workflow que o lesse destruir o
-                dado do cliente, em silencio.
+  DOESN'T VANISH   resolving a local artifact must NOT delete the original file.
+                   `read_drive_file_as` does `os.unlink` in the `finally` because
+                   until now the path was always a downloaded temporary file —
+                   returning the real file would make the first workflow that read
+                   it destroy the customer's data, silently.
 
-  NAO ESCAPA    `local_path` viaja pela rede. Um `../` nao pode virar leitura de
-                arquivo arbitrario da maquina.
+  DOESN'T ESCAPE   `local_path` travels over the network. A `../` must not turn
+                   into reading an arbitrary file on the machine.
 """
 import os
 from pathlib import Path
@@ -53,7 +53,7 @@ def test_save_artifact_local_grava_no_disco(artefatos):
 
 
 def test_save_artifact_local_nao_faz_nenhuma_chamada_http(artefatos, monkeypatch):
-    """O teste central da politica: nenhum byte pode sair da maquina."""
+    """The central test of the policy: not a single byte may leave the machine."""
     import httpx
 
     def explode(*a, **k):
@@ -69,10 +69,10 @@ def test_save_artifact_local_nao_faz_nenhuma_chamada_http(artefatos, monkeypatch
 
 
 def test_save_artifact_local_nao_tem_fallback_para_upload(artefatos, monkeypatch):
-    """Se a gravacao local falhar, a excecao SOBE.
+    """If the local write fails, the exception PROPAGATES.
 
-    Cair para o upload seria enviar para a nuvem exatamente o dado que foi
-    marcado para nao sair — o oposto do que a falha deveria provocar.
+    Falling back to the upload would send to the cloud exactly the data that was
+    marked not to leave — the opposite of what the failure should cause.
     """
     def sem_escrita(*a, **k):
         raise OSError("disco cheio")
@@ -85,9 +85,9 @@ def test_save_artifact_local_nao_tem_fallback_para_upload(artefatos, monkeypatch
 
 
 def test_local_nao_e_confundido_com_fallback_de_falha(artefatos):
-    """`local_fallback` significa "o upload quebrou"; `content_location` significa
-    "foi decidido que fica aqui". Misturar os dois faria uma queda de rede virar
-    conformidade silenciosa no registro do servidor."""
+    """`local_fallback` means "the upload broke"; `content_location` means
+    "it was decided that it stays here". Mixing the two would turn a network
+    outage into silent compliance in the server's records."""
     _, meta = artifact_helpers.save_artifact_local(
         content=b"x", filename="a.json", workspace_id="ws-1", task_id="run-1",
     )
@@ -109,10 +109,10 @@ def _resposta_local(local_path: str, dono: str = "exec-1") -> dict:
 
 
 def test_resolver_local_devolve_copia_e_NAO_apaga_o_original(artefatos):
-    """A armadilha do `os.unlink`.
+    """The `os.unlink` pitfall.
 
-    O caller (`read_drive_file_as`) apaga o caminho devolvido. Se resolvessemos
-    para o arquivo real, o primeiro workflow a le-lo destruiria o dado.
+    The caller (`read_drive_file_as`) deletes the returned path. If we resolved
+    to the real file, the first workflow to read it would destroy the data.
     """
     original = artefatos / "ws-1" / "run-9" / "saida.geojson"
     original.parent.mkdir(parents=True)
@@ -126,7 +126,7 @@ def test_resolver_local_devolve_copia_e_NAO_apaga_o_original(artefatos):
         assert Path(temp).read_bytes() == b"conteudo importante"
         assert ext == "geojson" and nome == "saida.geojson"
 
-        # Simula o que o caller faz com o caminho devolvido.
+        # Simulates what the caller does with the returned path.
         os.unlink(temp)
         assert original.is_file(), "o arquivo do usuario foi apagado pela leitura"
         assert original.read_bytes() == b"conteudo importante"
@@ -135,8 +135,8 @@ def test_resolver_local_devolve_copia_e_NAO_apaga_o_original(artefatos):
 
 
 def test_artefato_de_outro_executor_da_erro_nomeado(artefatos):
-    """Nao pode ser um FileNotFoundError cru: o operador precisa saber que o
-    arquivo esta em OUTRA maquina, e nao procurar um arquivo perdido."""
+    """It must not be a raw FileNotFoundError: the operator needs to know that the
+    file is on ANOTHER machine, and not go looking for a lost file."""
     with pytest.raises(FileNotFoundError) as exc:
         drive_resolver._copy_local_to_temp(
             "ws-1/run-9/ausente.geojson", "exec-outro", "geojson", "ausente.geojson",
@@ -152,8 +152,8 @@ def test_artefato_de_outro_executor_da_erro_nomeado(artefatos):
     "ws-1/run-9/../../../../segredo.txt",
 ])
 def test_path_traversal_no_local_path_e_barrado(artefatos, malicioso):
-    """`local_path` chega pela rede. O servidor o deriva, mas depender disso
-    seria terceirizar a propria seguranca."""
+    """`local_path` arrives over the network. The server derives it, but relying on
+    that would be outsourcing our own security."""
     with pytest.raises(PermissionError):
         drive_resolver._copy_local_to_temp(malicioso, "exec-1", "", "x")
 
@@ -165,8 +165,8 @@ def test_local_path_vazio_da_mensagem_util(artefatos):
 
 
 def test_raiz_dos_artefatos_e_a_mesma_na_escrita_e_na_leitura(artefatos):
-    """Escrita e leitura precisam concordar sobre onde os arquivos moram; se
-    divergirem, todo artefato local vira 'nao encontrado'."""
+    """Writing and reading must agree on where the files live; if they diverge,
+    every local artifact becomes 'not found'."""
     artifact_helpers.save_artifact_local(
         content=b"z", filename="b.json", workspace_id="ws-2", task_id="run-2",
     )

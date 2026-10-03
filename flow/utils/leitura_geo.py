@@ -1,23 +1,23 @@
 # flow/utils/leitura_geo.py
-# Leitura geoespacial SEGURA. O GDAL/pyogrio (engine do geopandas 1.x) detecta o
-# driver pelo CONTEUDO, nao pela extensao. Um documento OGR VRT
-# (<OGRVRTDataSource>) entregue como resposta de um servidor WFS, ou salvo com
-# extensao .geojson/.shp/.gpkg no Drive, faz o GDAL abrir o driver OGR_VRT e
-# seguir o <SrcDataSource> — que pode apontar para um arquivo local do executor
-# (CSV:/data/certs/key.pem) ou para /vsicurl/http://169.254.169.254/... (SSRF).
+# SAFE geospatial reading. GDAL/pyogrio (geopandas 1.x's engine) detects the
+# driver by CONTENT, not by extension. An OGR VRT document
+# (<OGRVRTDataSource>) delivered as a WFS server's response, or saved with a
+# .geojson/.shp/.gpkg extension in the Drive, makes GDAL open the OGR_VRT driver
+# and follow the <SrcDataSource> — which may point to a local file on the executor
+# (CSV:/data/certs/key.pem) or to /vsicurl/http://169.254.169.254/... (SSRF).
 #
-# Duas defesas, ambas antes de qualquer open do GDAL:
-#   1) GDAL_SKIP desabilita os drivers VRT quando este modulo e importado antes
-#      do GDAL registrar os drivers (best-effort; o executor tambem seta cedo).
-#   2) Inspecao de conteudo determinista: recusa fontes cujo conteudo e um VRT,
-#      recusa caminhos virtuais do GDAL (/vsicurl, CSV:..., PG:...) e, em .zip,
-#      recusa quando ha um .vrt embutido. Independe da ordem de import.
+# Two defenses, both before any GDAL open:
+#   1) GDAL_SKIP disables the VRT drivers when this module is imported before
+#      GDAL registers the drivers (best-effort; the executor also sets it early).
+#   2) Deterministic content inspection: refuses sources whose content is a VRT,
+#      refuses GDAL virtual paths (/vsicurl, CSV:..., PG:...) and, for .zip,
+#      refuses when there is an embedded .vrt. Independent of import order.
 
 import io
 import os
 import zipfile
 
-# 1) Desabilita os drivers VRT antes de o GDAL registrar (se importado a tempo).
+# 1) Disables the VRT drivers before GDAL registers them (if imported in time).
 _skip_atual = {s for s in os.environ.get("GDAL_SKIP", "").split(",") if s}
 os.environ["GDAL_SKIP"] = ",".join(sorted(_skip_atual | {"OGR_VRT", "VRT"}))
 
@@ -25,13 +25,13 @@ import geopandas as gpd  # noqa: E402  (import apos configurar GDAL_SKIP)
 
 
 class FonteGeoInseguraError(ValueError):
-    """A fonte geoespacial e um VRT ou caminho virtual — recusada por seguranca."""
+    """The geospatial source is a VRT or a virtual path — refused for security."""
 
 
 # Assinaturas de VRT (vetor e raster). Comparadas em minusculas.
 _ASSINATURAS_VRT = (b"<ogrvrtdatasource", b"<vrtdataset")
-# Prefixos de caminho que o GDAL trata como sistema de arquivos virtual (rede,
-# arquivos aninhados) ou como conexao a datasource externo.
+# Path prefixes that GDAL treats as a virtual file system (network,
+# nested files) or as a connection to an external datasource.
 _PREFIXOS_VIRTUAIS = ("/vsi",)
 _PREFIXOS_CONEXAO = (
     "csv:", "pg:", "mysql:", "oci:", "wfs:", "gtiff:", "gpkg:", "sqlite:",
@@ -84,10 +84,10 @@ def _validar_caminho(caminho: str) -> None:
 
 
 def ler_geodataframe(fonte, **kwargs):
-    """`geopandas.read_file` endurecido: recusa VRT e caminhos virtuais.
+    """Hardened `geopandas.read_file`: refuses VRT and virtual paths.
 
-    `fonte` pode ser um caminho (str/PathLike), bytes ou um buffer binario
-    (io.BytesIO), como o `gpd.read_file` aceita.
+    `fonte` may be a path (str/PathLike), bytes or a binary buffer
+    (io.BytesIO), as `gpd.read_file` accepts.
     """
     if isinstance(fonte, (bytes, bytearray)):
         _validar_bytes(bytes(fonte))

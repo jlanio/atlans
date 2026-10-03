@@ -14,9 +14,9 @@ class WorkflowGroup(Base):
     description = Column(Text, nullable=True)
     workspace_id = Column(String(36), nullable=True, index=True)
 
-    # Ordem escolhida a mao na tela de Projetos. Sem ela o GET nao tinha
-    # `order_by` nenhum: a ordem vinha indefinida do banco e podia mudar entre
-    # dois carregamentos da mesma pagina.
+    # Order chosen by hand on the Projects screen. Without it the GET had no
+    # `order_by` at all: the order came undefined from the database and could
+    # change between two loads of the same page.
     position = Column(Integer, default=0, server_default="0", nullable=False)
 
     created_at = Column(DateTime, server_default=func.now(), nullable=False)

@@ -1,6 +1,6 @@
 "use client"
-// O nome que a tela mostra (NOME_NA_TELA), lido pelo layout raiz e consultado
-// pela marca da barra lateral e pela tela de entrada. Ver lib/nome-na-tela.ts.
+// The name the screen shows (NOME_NA_TELA), read by the root layout and consulted
+// by the sidebar brand and the sign-in screen. See lib/nome-na-tela.ts.
 
 import { createContext, useContext, type ReactNode } from "react"
 import { NOME_PADRAO } from "@/lib/nome-na-tela"
@@ -11,7 +11,7 @@ export function NomeNaTelaProvider({ nome, children }: { nome: string; children:
   return <NomeNaTelaContexto.Provider value={nome}>{children}</NomeNaTelaContexto.Provider>
 }
 
-/** O nome desta instalação na tela; «Atlans» quando ela não o declara. */
+/** This installation's on-screen name; "Atlans" when it doesn't declare one. */
 export function useNomeNaTela(): string {
   return useContext(NomeNaTelaContexto)
 }

@@ -1,28 +1,28 @@
 // web/app/components/home/i18n/formatos.ts
 //
-// Os formatadores que a Home usa, um jogo por idioma. O português DELEGA às
-// funções de `lib/formatos` — a Home em português continua byte a byte a de
-// antes, e a regra de formatação do resto do app segue com um dono só. Inglês e
-// espanhol espelham a MESMA granularidade ("agora" → "now"/"ahora", "há 5 min"
-// → "5 min ago"/"hace 5 min", "ontem, 14:03" → "yesterday, 2:03 PM"/"ayer,
-// 14:03"), com mês e hora pelo `Intl` de cada idioma.
+// The formatters the Home uses, one set per language. Portuguese DELEGATES to
+// the `lib/formatos` functions — the Home in Portuguese stays byte for byte what
+// it was, and the formatting rule for the rest of the app keeps a single owner.
+// English and Spanish mirror the SAME granularity ("agora" → "now"/"ahora",
+// "há 5 min" → "5 min ago"/"hace 5 min", "ontem, 14:03" → "yesterday, 2:03
+// PM"/"ayer, 14:03"), with month and time via each language's `Intl`.
 
 import { dayjs, formatLocal, fromBackend } from "@/lib/dayjs"
 import { formatarDuracao, formatarInteiro, formatarQuando } from "@/lib/formatos"
 import type { Idioma } from "@/lib/idioma"
 
 export interface Formatos {
-  /** Inteiro com o separador de milhar do idioma: 1284 → "1.284" / "1,284". */
+  /** Integer with the language's thousands separator: 1284 → "1.284" / "1,284". */
   inteiro: (n: number | null | undefined) => string
-  /** Duração "31 s", "4 min 02 s", "2 h 14 min" — as unidades valem nos três idiomas. */
+  /** Duration "31 s", "4 min 02 s", "2 h 14 min" — the units hold in all three languages. */
   duracao: (segundos: number | null | undefined) => string
-  /** Quando algo aconteceu: relativo em 24 h, calendário depois. */
+  /** When something happened: relative within 24 h, calendar after that. */
   quando: (iso: string | null | undefined, agora?: Date) => string
   /**
-   * A data e hora EXATAS, no fuso do navegador: "20/10/2026 14:03" (o
-   * `formatLocal` de sempre) / "Oct 20, 2026, 2:03 PM" / "20/10/2026, 14:03".
-   * Em inglês com o mês por extenso: "09/01/2026" é 1º de setembro para quem
-   * lê en-US e 9 de janeiro para quem lê en-GB, en-AU ou en-IN.
+   * The EXACT date and time, in the browser's time zone: "20/10/2026 14:03" (the
+   * usual `formatLocal`) / "Oct 20, 2026, 2:03 PM" / "20/10/2026, 14:03".
+   * In English with the month spelled out: "09/01/2026" is September 1 for an
+   * en-US reader and January 9 for an en-GB, en-AU or en-IN reader.
    */
   dataEHora: (iso: string | null | undefined) => string
 }
@@ -41,8 +41,8 @@ function _quandoPor(idioma: Idioma, p: PalavrasDoQuando) {
   const diaComAno = new Intl.DateTimeFormat(idioma, { day: "numeric", month: "short", year: "numeric" })
   return (iso: string | null | undefined, agora: Date = new Date()): string => {
     const d = fromBackend(iso)
-    // Inválida vira "—": o `Intl` LANÇA com uma data inválida, e uma data
-    // ilegível numa linha derrubava a lista inteira (em português sai texto).
+    // An invalid one becomes "—": `Intl` THROWS on an invalid date, and one
+    // unreadable date in a row took down the whole list (in Portuguese, text comes out).
     if (!d || !d.isValid()) return "—"
     const ref = dayjs(agora)
     const minutos = ref.diff(d, "minute")

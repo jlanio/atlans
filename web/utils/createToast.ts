@@ -1,9 +1,9 @@
 import { toast } from "sonner"
 
 interface ToastAction {
-  /** Texto do botão de ação (ex: "Desfazer"). */
+  /** Action button text (e.g. "Desfazer"). */
   label: string
-  /** Callback chamado ao clicar — deve executar o rollback ou ação inversa. */
+  /** Callback called on click — must perform the rollback or inverse action. */
   onClick: () => void
 }
 
@@ -21,8 +21,8 @@ export const createToast = {
 
   info: (title: string, description?: string, action?: ToastAction) => toast.info(title, { description, action }),
 
-  /** Aviso (âmbar): a ação foi concluída, mas com uma ressalva que o usuário
-   *  precisa saber — ex.: salvou, mas o agendamento não foi aplicado. */
+  /** Warning (amber): the action completed, but with a caveat the user needs
+   *  to know — e.g. it saved, but the schedule was not applied. */
   warning: (title: string, description?: string, action?: ToastAction) => toast.warning(title, {
     description,
     descriptionClassName: "!text-black",

@@ -1,10 +1,11 @@
 // desktop/src/renderer/components/Execucoes.tsx
 //
-// Execuções em andamento e histórico.
+// Runs in progress and history.
 //
-// O histórico vem dos eventos `job` imediatos do canal NDJSON, não do snapshot:
-// o snapshot guarda `last_finished`, que é UM job, e com tick de 1s dois
-// workflows terminando no mesmo segundo fariam o primeiro desaparecer.
+// The history comes from the immediate `job` events of the NDJSON channel, not
+// from the snapshot: the snapshot keeps `last_finished`, which is ONE job, and
+// with a 1s tick two workflows finishing in the same second would make the
+// first disappear.
 import { useMemo, useState } from 'react'
 import {
   TbBan, TbCircleCheck, TbCircleX, TbHistory, TbPlayerPlay,
@@ -20,11 +21,11 @@ function quando(ts: number): string {
 }
 
 /**
- * Desfecho de um job: ícone, rótulo e cor.
+ * Outcome of a job: icon, label and color.
  *
- * Ícone além da cor porque cor sozinha não distingue nada para quem não a
- * enxerga — e num histórico de trinta linhas o ícone também é mais rápido de
- * varrer que ler "Concluída" trinta vezes.
+ * An icon besides the color because color alone distinguishes nothing for
+ * those who cannot see it — and in a thirty-row history the icon is also
+ * quicker to scan than reading "Concluída" (completed) thirty times.
  */
 const DESFECHO: Record<string, { icone: React.ReactNode; rotulo: string; cor: string }> = {
   ok: { icone: <TbCircleCheck size={16} />, rotulo: 'Concluída', cor: 'text-green-500' },
@@ -64,17 +65,19 @@ export function Execucoes({
     <div className="flex flex-col gap-4">
       {/* ── Em andamento ────────────────────────────────────────────── */}
       <Card>
-        {/* O contador acompanha o título e por isso mora DENTRO de `CardTitle`.
-            Solto no header — que é grid — ele virava uma linha própria: uma
-            faixa azul da largura inteira do cartão com um "2" na ponta. */}
+        {/* The counter accompanies the title and therefore lives INSIDE
+            `CardTitle`. Loose in the header — which is a grid — it became a
+            row of its own: a blue strip the full width of the card with a "2"
+            at the end. */}
         <CardHeader className="px-6">
           <CardTitle className="flex items-center gap-2 text-base font-medium">
             Em andamento
             {emAndamento.length > 0 && (
               <span className="flex items-center gap-1.5 rounded-full bg-blue-500/15 px-2 py-0.5 text-xs font-semibold text-blue-400 animate-in fade-in-0 zoom-in-95 duration-200">
-                {/* Respiração, não `animate-ping`: o anel que se expande a cada
-                    segundo, na única tela que fica aberta em segundo plano,
-                    puxa o olho sem ter nada novo a dizer. */}
+                {/* Breathing, not `animate-ping`: the ring that expands every
+                    second, on the only screen that stays open in the
+                    background, pulls the eye without having anything new to
+                    say. */}
                 <span className="size-1.5 rounded-full bg-blue-400 animate-pulso-vivo" />
                 {emAndamento.length}
               </span>
@@ -128,7 +131,7 @@ export function Execucoes({
         </CardContent>
       </Card>
 
-      {/* ── Histórico ───────────────────────────────────────────────── */}
+      {/* ── History ─────────────────────────────────────────────────── */}
       <Card>
         <CardHeader className="items-center px-6">
           <CardTitle className="text-base font-medium">Histórico da sessão</CardTitle>
@@ -140,8 +143,8 @@ export function Execucoes({
                   key={f.v}
                   type="button"
                   aria-pressed={filtro === f.v}
-                  // Um filtro sem nada a mostrar leva a uma tela vazia sem
-                  // motivo aparente; melhor não deixar clicar.
+                  // A filter with nothing to show leads to an empty screen for no
+                  // apparent reason; better not to allow the click.
                   disabled={n === 0 && f.v !== 'todos'}
                   onClick={() => setFiltro(f.v)}
                   className={cn(
@@ -188,8 +191,9 @@ export function Execucoes({
                       </span>
                       <span className="truncate text-xs text-muted-foreground">
                         {quando(j.ts)}
-                        {/* Só aparece quando o executor reportou: nós contados vêm
-                            do bloco `run` das métricas, que nem todo job carrega. */}
+                        {/* Only appears when the executor reported it: counted nodes come
+                            from the `run` block of the metrics, which not every
+                            job carries. */}
                         {typeof j.nodes_executed === 'number' && ` · ${j.nodes_executed} nós`}
                         {typeof j.nodes_failed === 'number' && j.nodes_failed > 0 &&
                           ` · ${j.nodes_failed} com falha`}

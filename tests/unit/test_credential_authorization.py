@@ -1,12 +1,13 @@
 # tests/unit/test_credential_authorization.py
-"""Autorizacao na resolucao de credenciais.
+"""Authorization in credential resolution.
 
-Antes a busca era `WHERE id IN (...)`, sem dono nem workspace. Como o
-credential_id fica em texto puro na definition e e legivel por qualquer membro
-que abra o workflow, bastava copia-lo para um workflow de OUTRO workspace —
-criado pelo proprio atacante — para usar a credencial alheia indefinidamente.
+Before, the lookup was `WHERE id IN (...)`, with no owner and no workspace. Since
+the credential_id sits in plain text in the definition and is readable by any
+member who opens the workflow, it was enough to copy it into a workflow in
+ANOTHER workspace — created by the attacker themselves — to use someone else's
+credential indefinitely.
 
-Estes testes falham no instante em que o filtro de dono sair da query.
+These tests fail the moment the owner filter leaves the query.
 """
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -37,35 +38,36 @@ def _cred(owner_id: str, cid=None) -> MagicMock:
 
 
 def _session_com(credenciais: list) -> MagicMock:
-    """Sessao que devolve apenas o que o WHERE da query deixaria passar.
+    """Session that returns only what the query's WHERE would let through.
 
-    O filtro real e SQL; aqui o teste inspeciona o statement para garantir que
-    o owner_id entrou nele — ver test_query_filtra_por_owner_id.
+    The real filter is SQL; here the test inspects the statement to make sure
+    owner_id went into it — see test_query_filtra_por_owner_id.
     """
     session = MagicMock()
     result = MagicMock()
     result.scalars.return_value.all.return_value = credenciais
     result.all.return_value = []          # _explain_missing
     session.execute = AsyncMock(return_value=result)
-    # commit/rollback async: o resolver commita o carimbo de last_used_at quando
-    # abre a própria sessão. Sem estes AsyncMock, `await session.commit()` cairia
-    # no ramo best-effort e o teste não exerceria o caminho de sucesso.
+    # async commit/rollback: the resolver commits the last_used_at stamp when it
+    # opens its own session. Without these AsyncMocks, `await session.commit()`
+    # would fall into the best-effort branch and the test would not exercise
+    # the success path.
     session.commit = AsyncMock()
     session.rollback = AsyncMock()
-    # begin_nested: o carimbo de last_used_at roda dentro de um SAVEPOINT para
-    # não envenenar a transação do chamador. O mock devolve um CM assíncrono
-    # no-op (não suprime exceção — __aexit__ → False), como o savepoint real.
+    # begin_nested: the last_used_at stamp runs inside a SAVEPOINT so as not to
+    # poison the caller's transaction. The mock returns a no-op async CM (it
+    # does not suppress exceptions — __aexit__ → False), like the real savepoint.
     session.begin_nested = MagicMock(side_effect=lambda: _AsyncNoop())
     return session
 
 
 class _AsyncNoop:
-    """Context manager assíncrono no-op para simular session.begin_nested()."""
+    """No-op async context manager to simulate session.begin_nested()."""
     async def __aenter__(self):
         return self
 
     async def __aexit__(self, *exc):
-        return False   # não suprime a exceção — igual ao savepoint real
+        return False   # does not suppress the exception — same as the real savepoint
 
 
 def _patch_session(session):
@@ -79,10 +81,10 @@ def _patch_session(session):
 
 
 def _sql(session) -> str:
-    """Primeiro statement que passou por session.execute, compilado com literais.
+    """First statement that went through session.execute, compiled with literals.
 
-    Compilar e o unico jeito de checar o filtro: a sessao e falsa, entao o
-    WHERE real nunca roda — e e justamente ele que este arquivo protege.
+    Compiling is the only way to check the filter: the session is fake, so the
+    real WHERE never runs — and it is precisely what this file protects.
     """
     return str(session.execute.await_args_list[0].args[0].compile(
         compile_kwargs={"literal_binds": True},
@@ -90,14 +92,14 @@ def _sql(session) -> str:
 
 
 def _where(session) -> str:
-    """So a clausula WHERE — `select(Credential)` lista owner_id/workspace_id
-    entre as colunas, entao procurar no statement inteiro passaria sem filtro."""
+    """Only the WHERE clause — `select(Credential)` lists owner_id/workspace_id
+    among the columns, so searching the whole statement would pass with no filter."""
     return _sql(session).split("WHERE", 1)[1]
 
 
 def _db_com_linhas(linhas: list) -> MagicMock:
-    """Sessao do request para as guardas do /validate: `.all()` devolve `linhas`,
-    isto e, apenas os ids que o WHERE deixaria passar."""
+    """Request session for the /validate guards: `.all()` returns `linhas`,
+    that is, only the ids the WHERE would let through."""
     db = MagicMock()
     res = MagicMock()
     res.all.return_value = linhas
@@ -123,13 +125,13 @@ async def test_sem_escopo_levanta_em_vez_de_resolver():
 
 
 async def test_escopo_vazio_nao_resolve_nada():
-    """Workflow sem workspace cai aqui — nao pode virar resolucao aberta."""
+    """A workflow without a workspace lands here — it must not become open resolution."""
     with _patch_session(_session_com([])):
         assert await resolve_credentials_from_ids([str(uuid4())], allowed_owner_ids=set()) == {}
 
 
 async def test_contextvar_serve_de_escopo():
-    """Caminho da simulacao: o `simulate()` nao recebe parametros de contexto."""
+    """Simulation path: `simulate()` does not receive context parameters."""
     cred = _cred(DONO)
     with _patch_session(_session_com([cred])), credential_scope({DONO}):
         out = await resolve_credentials_from_ids([str(cred.id)])
@@ -138,10 +140,10 @@ async def test_contextvar_serve_de_escopo():
 
 
 async def test_contextvar_carrega_shared_workspace_id():
-    """/validate com workspace: o `simulate()` nao recebe parametros, entao o
-    ContextVar tem de levar as DUAS dimensoes — dono E workspace compartilhado.
-    Senao a guarda aceitaria a credencial compartilhada e a simulacao nao a
-    resolveria."""
+    """/validate with a workspace: `simulate()` receives no parameters, so the
+    ContextVar has to carry BOTH dimensions — owner AND shared workspace.
+    Otherwise the guard would accept the shared credential and the simulation
+    would not resolve it."""
     session = _session_com([])
     with _patch_session(session), credential_scope({DONO}, shared_workspace_id="ws-1"):
         await resolve_credentials_from_ids([str(uuid4())])
@@ -153,11 +155,11 @@ async def test_contextvar_carrega_shared_workspace_id():
 
 
 async def test_kwargs_explicitos_nao_se_misturam_com_o_contextvar():
-    """Kwargs explicitos sao o escopo INTEIRO: o ContextVar nunca completa a
-    dimensao que faltou. Senao um call site que passasse so `allowed_owner_ids`
-    dentro de um `credential_scope(..., shared_workspace_id=...)` herdaria o
-    workspace sem saber — e vice-versa."""
-    # Dono explicito dentro de um ctx com dono E workspace: so o explicito vale.
+    """Explicit kwargs are the ENTIRE scope: the ContextVar never fills in the
+    missing dimension. Otherwise a call site passing only `allowed_owner_ids`
+    inside a `credential_scope(..., shared_workspace_id=...)` would inherit the
+    workspace without knowing — and vice versa."""
+    # Explicit owner inside a ctx with owner AND workspace: only the explicit one applies.
     session = _session_com([])
     with _patch_session(session), credential_scope({DONO}, shared_workspace_id="ws-1"):
         await resolve_credentials_from_ids([str(uuid4())], allowed_owner_ids={MEMBRO})
@@ -167,7 +169,7 @@ async def test_kwargs_explicitos_nao_se_misturam_com_o_contextvar():
     assert DONO not in where
     assert "ws-1" not in where
 
-    # Workspace explicito sozinho: sem clausula de dono, mesmo com ctx ativo.
+    # Explicit workspace alone: no owner clause, even with an active ctx.
     session = _session_com([])
     with _patch_session(session), credential_scope({DONO}, shared_workspace_id="ws-1"):
         await resolve_credentials_from_ids([str(uuid4())], shared_workspace_id="ws-2")
@@ -179,14 +181,14 @@ async def test_kwargs_explicitos_nao_se_misturam_com_o_contextvar():
     assert "ws-1" not in where
 
 
-# ── Filtro por dono ──────────────────────────────────────────────────────────
+# ── Filter by owner ──────────────────────────────────────────────────────────
 
 async def test_query_filtra_por_owner_id():
-    """O cerco tem de estar no SQL, nao so no chamador.
+    """The fence has to be in the SQL, not just in the caller.
 
-    Checa o WHERE especificamente: `select(Credential)` ja lista owner_id entre
-    as colunas selecionadas, entao procurar no statement inteiro passaria mesmo
-    sem filtro nenhum.
+    Checks the WHERE specifically: `select(Credential)` already lists owner_id
+    among the selected columns, so searching the whole statement would pass
+    even with no filter at all.
     """
     session = _session_com([])
     with _patch_session(session):
@@ -201,7 +203,7 @@ async def test_query_filtra_por_owner_id():
 
 
 async def test_credencial_de_membro_do_workspace_resolve():
-    """B executa o workflow de A: a credencial de A continua valendo."""
+    """B runs A's workflow: A's credential still applies."""
     cred = _cred(DONO)
     with _patch_session(_session_com([cred])):
         out = await resolve_credentials_from_ids(
@@ -212,22 +214,22 @@ async def test_credencial_de_membro_do_workspace_resolve():
 
 
 async def test_credencial_sem_dono_nao_resolve():
-    """owner_id NULL nunca casa com IN — e o comportamento desejado.
+    """A NULL owner_id never matches IN — that is the desired behavior.
 
-    Hoje essas credenciais sao legiveis por QUALQUER usuario autenticado,
-    inclusive os segredos via GET /credentials/{id}/data.
+    Today those credentials are readable by ANY authenticated user,
+    including the secrets via GET /credentials/{id}/data.
     """
-    session = _session_com([])   # o WHERE do banco nao a devolveria
+    session = _session_com([])   # the database WHERE would not return it
     with _patch_session(session):
         out = await resolve_credentials_from_ids([str(uuid4())], allowed_owner_ids={DONO})
 
     assert out == {}
 
 
-# ── Escopo D: dono (quem disparou) OU compartilhado com o workspace ──────────
+# ── Scope D: owner (who triggered) OR shared with the workspace ──────────────
 
 async def test_escopo_d_no_sql_e_dono_ou_workspace_sem_orfa():
-    """A cláusula é (owner IS NOT NULL) AND (owner IN allowed OR workspace_id == ws)."""
+    """The clause is (owner IS NOT NULL) AND (owner IN allowed OR workspace_id == ws)."""
     session = _session_com([])
     with _patch_session(session):
         await resolve_credentials_from_ids(
@@ -236,14 +238,14 @@ async def test_escopo_d_no_sql_e_dono_ou_workspace_sem_orfa():
     where = str(session.execute.await_args_list[0].args[0].compile(
         compile_kwargs={"literal_binds": True},
     )).split("WHERE", 1)[1]
-    assert "owner_id IS NOT NULL" in where          # órfã nunca resolve
-    assert "owner_id IN" in where and DONO in where  # de quem disparou
+    assert "owner_id IS NOT NULL" in where          # an orphan never resolves
+    assert "owner_id IN" in where and DONO in where  # belongs to who triggered
     assert "workspace_id" in where and "ws-1" in where  # compartilhada
     assert " OR " in where
 
 
 async def test_escopo_d_sem_usuario_so_compartilhadas_no_sql():
-    """triggered_by=None (cron/webhook): sem cláusula de dono, só a de workspace."""
+    """triggered_by=None (cron/webhook): no owner clause, only the workspace one."""
     session = _session_com([])
     with _patch_session(session):
         await resolve_credentials_from_ids(
@@ -253,13 +255,13 @@ async def test_escopo_d_sem_usuario_so_compartilhadas_no_sql():
         compile_kwargs={"literal_binds": True},
     )).split("WHERE", 1)[1]
     assert "workspace_id" in where and "ws-1" in where
-    assert "owner_id IN" not in where               # sem usuário → sem cláusula de dono
-    assert "owner_id IS NOT NULL" in where           # mas órfã segue barrada
+    assert "owner_id IN" not in where               # no user → no owner clause
+    assert "owner_id IS NOT NULL" in where           # but an orphan is still blocked
 
 
 async def test_credencial_compartilhada_resolve_mesmo_nao_sendo_de_quem_disparou():
-    """Compartilhada com o workspace resolve para quem disparou, mesmo sendo de
-    outro dono (o banco a devolve pela cláusula de workspace_id)."""
+    """Shared with the workspace resolves for whoever triggered, even when it
+    belongs to another owner (the database returns it via the workspace_id clause)."""
     cred = _cred("outro-dono")
     with _patch_session(_session_com([cred])):
         out = await resolve_credentials_from_ids(
@@ -269,9 +271,10 @@ async def test_credencial_compartilhada_resolve_mesmo_nao_sendo_de_quem_disparou
 
 
 async def test_credencial_privada_de_outro_nao_resolve():
-    """Sem compartilhamento e não sendo de quem disparou, o banco não a devolve —
-    o WHERE a exclui. Simulamos com a sessão que só entrega o que o filtro deixaria."""
-    with _patch_session(_session_com([])):    # o WHERE (dono/ws) não a devolveria
+    """Not shared and not belonging to whoever triggered, the database does not
+    return it — the WHERE excludes it. We simulate this with the session that
+    only delivers what the filter would allow."""
+    with _patch_session(_session_com([])):    # the WHERE (owner/ws) would not return it
         out = await resolve_credentials_from_ids(
             [str(uuid4())], allowed_owner_ids={MEMBRO}, shared_workspace_id="ws-1",
         )
@@ -281,15 +284,15 @@ async def test_credencial_privada_de_outro_nao_resolve():
 # ── last_used_at (F6): carimbo best-effort ───────────────────────────────────
 
 def _statements(session):
-    """Statements SQL que passaram por session.execute, como objetos."""
+    """SQL statements that went through session.execute, as objects."""
     return [c.args[0] for c in session.execute.await_args_list]
 
 
 async def test_last_used_carimbado_e_commitado_na_sessao_propria():
-    """Sessao propria (simulate): emite UPDATE em last_used_at e COMMITA.
+    """Own session (simulate): issues an UPDATE on last_used_at and COMMITS.
 
-    get_session_async faz rollback na saida — sem commit explicito o carimbo
-    nao persistiria.
+    get_session_async rolls back on exit — without an explicit commit the stamp
+    would not persist.
     """
     from sqlalchemy.sql.dml import Update
 
@@ -305,11 +308,11 @@ async def test_last_used_carimbado_e_commitado_na_sessao_propria():
 
 
 async def test_last_used_grava_horario_utc_sem_fuso():
-    """`Credential.last_used_at` é `DateTime` sem fuso: o asyncpg recusa um
-    datetime COM fuso ("can't subtract offset-naive and offset-aware
-    datetimes"), e o savepoint do carimbo engolia o erro — no Postgres o
-    last_used_at nunca era gravado. Os mocks daqui não têm driver, então a
-    garantia é o valor que vai no UPDATE: naive e em UTC."""
+    """`Credential.last_used_at` is a `DateTime` without a time zone: asyncpg
+    rejects a time-zone-AWARE datetime ("can't subtract offset-naive and
+    offset-aware datetimes"), and the stamp's savepoint swallowed the error — on
+    Postgres last_used_at was never written. The mocks here have no driver, so
+    the guarantee is the value that goes into the UPDATE: naive and in UTC."""
     from datetime import datetime, timedelta, timezone
 
     from sqlalchemy.sql.dml import Update
@@ -326,8 +329,8 @@ async def test_last_used_grava_horario_utc_sem_fuso():
 
 
 async def test_last_used_nao_commita_na_sessao_do_request():
-    """Sessao do request (db=): emite o UPDATE mas NAO commita — quem commita e
-    o chamador, para nao gravar por engano o trabalho pendente dele."""
+    """Request session (db=): issues the UPDATE but does NOT commit — the caller
+    commits, so as not to accidentally write its pending work."""
     from sqlalchemy.sql.dml import Update
 
     cred = _cred(DONO)
@@ -342,7 +345,7 @@ async def test_last_used_nao_commita_na_sessao_do_request():
 
 
 async def test_last_used_falha_nao_derruba_resolucao():
-    """Se o UPDATE de auditoria falhar, a resolucao ainda entrega as credenciais."""
+    """If the audit UPDATE fails, the resolution still delivers the credentials."""
     from sqlalchemy.sql.dml import Update
 
     cred = _cred(DONO)
@@ -358,15 +361,16 @@ async def test_last_used_falha_nao_derruba_resolucao():
     with _patch_session(session), credential_scope({DONO}):
         out = await resolve_credentials_from_ids([str(cred.id)])
 
-    # O segredo foi resolvido apesar da falha best-effort no carimbo.
+    # The secret was resolved despite the best-effort failure on the stamp.
     assert out[str(cred.id)]["connectionString"] == "postgres://x"
 
 
 async def test_last_used_falha_na_sessao_do_request_nao_faz_rollback():
-    """Na sessão COMPARTILHADA do request, a falha do carimbo não pode chamar
-    rollback — isso descartaria o trabalho pendente do chamador. O SAVEPOINT já
-    reverteu o que era nosso; a resolução ainda entrega as credenciais e o
-    chamador segue livre para commitar (evita o 500 no dispatch)."""
+    """In the request's SHARED session, the stamp failure must not call
+    rollback — that would discard the caller's pending work. The SAVEPOINT has
+    already reverted what was ours; the resolution still delivers the
+    credentials and the caller remains free to commit (avoids the 500 on
+    dispatch)."""
     from sqlalchemy.sql.dml import Update
 
     cred = _cred(DONO)
@@ -384,16 +388,16 @@ async def test_last_used_falha_na_sessao_do_request_nao_faz_rollback():
     )
 
     assert str(cred.id) in out
-    session.rollback.assert_not_awaited()   # transação do chamador intocada
+    session.rollback.assert_not_awaited()   # caller's transaction untouched
 
 
-# ── Helper de escopo por workspace ───────────────────────────────────────────
+# ── Workspace scope helper ───────────────────────────────────────────────────
 
 async def test_workspace_credential_owners_une_dono_e_membros():
-    """Dono e membros saem de uma consulta so (outerjoin), nao de dois SELECTs."""
+    """Owner and members come from a single query (outerjoin), not two SELECTs."""
     db = MagicMock()
     res = MagicMock()
-    # Uma linha por membro; o dono se repete em todas.
+    # One row per member; the owner repeats in all of them.
     res.all.return_value = [(DONO, MEMBRO), (DONO, None)]
     db.execute = AsyncMock(return_value=res)
 
@@ -402,21 +406,21 @@ async def test_workspace_credential_owners_une_dono_e_membros():
 
 
 async def test_workspace_credential_owners_sem_workspace():
-    """Workflow legado sem workspace: escopo vazio, sem ir ao banco."""
+    """Legacy workflow without a workspace: empty scope, without going to the database."""
     db = MagicMock(execute=AsyncMock())
 
     assert await workspace_credential_owners(db, None) == set()
     db.execute.assert_not_awaited()
 
 
-# ── Guarda de credenciais da validação (assert_credentials_accessible) ──────
+# ── Validation credential guard (assert_credentials_accessible) ─────────────
 
 async def test_assert_recusa_credencial_alheia():
-    """IDOR: a definition vem do corpo e o simulate() conecta ao banco."""
+    """IDOR: the definition comes from the body and simulate() connects to the database."""
     alheia = uuid4()
     db = MagicMock()
     res = MagicMock()
-    res.all.return_value = []            # nenhuma pertence ao usuario
+    res.all.return_value = []            # none belongs to the user
     db.execute = AsyncMock(return_value=res)
 
     with pytest.raises(CredentialAccessDeniedError, match=str(alheia)):
@@ -440,12 +444,12 @@ async def test_assert_recusa_uuid_invalido():
         await assert_credentials_accessible(db, ["nao-e-uuid"], MEMBRO)
 
 
-# ── Guarda da validação com workspace: mesma clausula do dispatch ───────────
+# ── Validation guard with a workspace: same clause as the dispatch ──────────
 #
-# O validate com workspace tem de aceitar EXATAMENTE o que o Executar resolveria:
-# (owner IS NOT NULL) AND (owner == usuario OR workspace_id == ws). Nunca a lista
-# de membros — senao um membro validaria (e o simulate() CONECTARIA) com a
-# credencial PRIVADA de outro membro.
+# Validate with a workspace has to accept EXACTLY what Executar would resolve:
+# (owner IS NOT NULL) AND (owner == user OR workspace_id == ws). Never the member
+# list — otherwise one member would validate (and simulate() would CONNECT) with
+# another member's PRIVATE credential.
 
 async def test_assert_accessible_sql_e_dono_ou_workspace_sem_orfa_e_sem_membros():
     db = _db_com_linhas([])
@@ -455,16 +459,17 @@ async def test_assert_accessible_sql_e_dono_ou_workspace_sem_orfa_e_sem_membros(
         )
 
     where = _where(db)
-    assert "owner_id IS NOT NULL" in where             # orfa compartilhada nao passa
+    assert "owner_id IS NOT NULL" in where             # a shared orphan does not pass
     assert MEMBRO in where                             # o proprio usuario
-    assert "workspace_id" in where and "ws-1" in where  # ou compartilhada com o ws
+    assert "workspace_id" in where and "ws-1" in where  # or shared with the ws
     assert " OR " in where
-    assert "workspace_members" not in _sql(db)         # membros nao entram, nem por join
+    assert "workspace_members" not in _sql(db)         # members do not get in, not even via join
 
 
 async def test_assert_accessible_sem_workspace_so_dono():
-    """Sem workspace a clausula nem entra no SQL — nao vira `workspace_id = NULL`
-    (nunca casaria) nem `IS NULL` (casaria a privada de qualquer dono)."""
+    """Without a workspace the clause does not even enter the SQL — it does not
+    become `workspace_id = NULL` (would never match) nor `IS NULL` (would match
+    any owner's private one)."""
     db = _db_com_linhas([])
     with pytest.raises(CredentialAccessDeniedError):
         await assert_credentials_accessible(db, [str(uuid4())], MEMBRO)
@@ -476,8 +481,8 @@ async def test_assert_accessible_sem_workspace_so_dono():
 
 
 async def test_assert_accessible_aceita_o_que_o_banco_devolve():
-    """A decisao e do SQL: se o WHERE devolveu todos os ids (proprios ou
-    compartilhados), passa em silencio, sem segunda checagem em Python."""
+    """The decision belongs to the SQL: if the WHERE returned all the ids (own or
+    shared), it passes silently, with no second check in Python."""
     minha, compartilhada = uuid4(), uuid4()
     db = _db_com_linhas([(minha,), (compartilhada,)])
 
@@ -487,9 +492,9 @@ async def test_assert_accessible_aceita_o_que_o_banco_devolve():
 
 
 async def test_assert_accessible_mensagem_cita_o_workspace_e_o_uuid():
-    """Quem recebe o 403 precisa saber O QUE foi recusado (o UUID, para achar o
-    no) e que o compartilhamento com o workspace ja foi considerado — a saida e
-    compartilhar a credencial, nao pedir a senha ao dono."""
+    """Whoever gets the 403 needs to know WHAT was rejected (the UUID, to find the
+    node) and that sharing with the workspace was already considered — the way
+    out is to share the credential, not to ask the owner for the password."""
     alheia = uuid4()
     db = _db_com_linhas([])
     with pytest.raises(CredentialAccessDeniedError) as exc:
@@ -503,8 +508,8 @@ async def test_assert_accessible_mensagem_cita_o_workspace_e_o_uuid():
 
 
 async def test_assert_accessible_sem_workspace_nao_cita_workspace():
-    """Sem workspace a guarda e "so dono": a dimensao de workspace nao aparece
-    nem no SQL nem na mensagem de recusa."""
+    """Without a workspace the guard is "owner only": the workspace dimension
+    appears neither in the SQL nor in the rejection message."""
     alheia = uuid4()
     db = _db_com_linhas([])
     with pytest.raises(CredentialAccessDeniedError) as exc:
@@ -516,10 +521,10 @@ async def test_assert_accessible_sem_workspace_nao_cita_workspace():
     assert "workspace_id" not in _where(db)
 
 
-# ── Integracao: start_analysis monta o escopo (opção D) ──────────────────────
+# ── Integration: start_analysis builds the scope (option D) ──────────────────
 #
-# Escopo de execução = {quem disparou (triggered_by)} + credenciais
-# compartilhadas com o workspace do workflow. Ser MEMBRO do workspace não basta.
+# Execution scope = {who triggered (triggered_by)} + credentials shared with
+# the workflow's workspace. Being a MEMBER of the workspace is not enough.
 
 def _svc_com_workflow(workspace_id):
     from app.services.workflow_service import WorkflowService
@@ -530,7 +535,7 @@ def _svc_com_workflow(workspace_id):
 
 
 def _patches_do_dispatch(wf, resolve_fn):
-    """Silencia tudo que start_analysis toca antes e depois do bloco de credencial."""
+    """Silences everything start_analysis touches before and after the credential block."""
     return [
         patch("app.services.workflow_service._load_workflow",
               new=AsyncMock(return_value=(wf, {"nodes": [], "edges": []}))),
@@ -551,8 +556,8 @@ def _patches_do_dispatch(wf, resolve_fn):
 
 
 async def test_start_analysis_escopo_e_quem_disparou_mais_compartilhadas():
-    """Opção D: escopo = {quem disparou} + shared_workspace_id do workflow —
-    NÃO o conjunto de membros do workspace."""
+    """Option D: scope = {who triggered} + the workflow's shared_workspace_id —
+    NOT the set of workspace members."""
     from contextlib import ExitStack
 
     svc, wf = _svc_com_workflow("ws-1")
@@ -569,18 +574,18 @@ async def test_start_analysis_escopo_e_quem_disparou_mais_compartilhadas():
             stack.enter_context(p)
         await svc.start_analysis("wf-1", triggered_by=MEMBRO)
 
-    # Só quem disparou entra como dono; DONO (outro membro) NÃO.
+    # Only whoever triggered enters as owner; DONO (another member) does NOT.
     assert capturado["allowed"] == {MEMBRO}
     assert DONO not in capturado["allowed"]
     assert capturado["shared_ws"] == "ws-1"
-    # A sessao do request vai junto: sem ela o resolver abria uma segunda
-    # conexao do mesmo pool sem soltar a primeira.
+    # The request session goes along: without it the resolver opened a second
+    # connection from the same pool without releasing the first.
     assert capturado["db"] is svc.crud.db
 
 
 async def test_start_analysis_cron_sem_usuario_so_alcanca_compartilhadas():
-    """Disparo sem usuário (triggered_by=None): dono vazio, só resolvem as
-    credenciais compartilhadas com o workspace."""
+    """Trigger without a user (triggered_by=None): empty owner, only the
+    credentials shared with the workspace resolve."""
     from contextlib import ExitStack
 
     svc, wf = _svc_com_workflow("ws-1")
@@ -594,14 +599,14 @@ async def test_start_analysis_cron_sem_usuario_so_alcanca_compartilhadas():
     with ExitStack() as stack:
         for p in _patches_do_dispatch(wf, _resolve):
             stack.enter_context(p)
-        await svc.start_analysis("wf-1")   # sem triggered_by
+        await svc.start_analysis("wf-1")   # no triggered_by
 
     assert capturado["allowed"] == set()
     assert capturado["shared_ws"] == "ws-1"
 
 
 async def test_start_analysis_recusa_workflow_sem_workspace():
-    """Sem workspace nao ha a quem confiar — falha em vez de resolver aberto."""
+    """Without a workspace there is no one to trust — fails instead of resolving openly."""
     from contextlib import ExitStack
 
     svc, wf = _svc_com_workflow(None)

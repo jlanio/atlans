@@ -18,9 +18,9 @@ from app.core.rbac import ROLE_EDITOR
 from app.services.drive_service import DriveService
 
 
-# Tamanho do bloco na leitura do upload — grande o bastante para não penalizar
-# arquivos legítimos, pequeno o bastante para o corte por tamanho acontecer
-# antes de acumular memória demais.
+# Chunk size when reading the upload — large enough not to penalize legitimate
+# files, small enough for the size cutoff to happen before too much memory
+# accumulates.
 _UPLOAD_CHUNK_SIZE = 1024 * 1024  # 1 MB
 
 # ── Dependency ────────────────────────────────────────────────────────────────
@@ -74,12 +74,13 @@ async def upload_file(
 
     original_name = file.filename or "arquivo"
 
-    # O teto vinha sendo aplicado só dentro de `svc.upload_file`, DEPOIS de
-    # `await file.read()` sem argumento — que materializa o arquivo inteiro num
-    # único bytes na memória do worker. Qualquer editor de workspace derrubava a
-    # API mandando um arquivo grande o suficiente. Aqui o limite passa a valer
-    # ANTES de acumular: rejeita cedo pelo Content-Length e, como esse header é
-    # do cliente e portanto não confiável, corta também durante a leitura.
+    # The ceiling used to be applied only inside `svc.upload_file`, AFTER an
+    # argument-less `await file.read()` — which materializes the whole file into a
+    # single bytes object in the worker's memory. Any workspace editor could take
+    # down the API by sending a large enough file. Here the limit applies BEFORE
+    # accumulating: it rejects early via Content-Length and, since that header
+    # comes from the client and is therefore untrusted, it also cuts off during
+    # the read.
     settings = await svc.get_settings()
     max_bytes = settings.max_size_mb * 1024 * 1024
 

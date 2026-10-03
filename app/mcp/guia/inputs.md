@@ -1,10 +1,10 @@
-# Parâmetros de execução (`inputs`)
+# Run parameters (`inputs`)
 
-`inputs` é o dicionário que quem dispara o fluxo passa na hora de executar. O
-contrato desses valores é o `params_schema` do workflow — um campo do
-workflow, **não** da definição.
+`inputs` is the dictionary that whoever triggers the workflow passes at execution time. The
+contract for these values is the workflow's `params_schema` — a field of the
+workflow, **not** of the definition.
 
-## Formato do `params_schema`
+## Format of `params_schema`
 
 ```json
 {
@@ -15,55 +15,55 @@ workflow, **não** da definição.
 }
 ```
 
-Um dicionário `{nome: {type, description?, default?, required?}}`, com
-`type ∈ {string, number, boolean, object}`. Qualquer outra forma conta como
-**sem contrato**: não é erro, mas os `inputs` passam sem validação nenhuma e a
-resposta traz o aviso correspondente em `hints`.
+A dictionary `{nome: {type, description?, default?, required?}}`, with
+`type ∈ {string, number, boolean, object}`. Any other shape counts as
+**no contract**: it is not an error, but the `inputs` pass with no validation at all and the
+response carries the corresponding warning in `hints`.
 
-## Como os valores chegam aos nós
+## How the values reach the nodes
 
-Três caminhos, conforme o gatilho:
+Three paths, depending on the trigger:
 
-- **`{{ inputs.nome }}` em nó de gatilho.** Dentro de um nó `type: "trigger"`,
-  `inputs` são os parâmetros de execução. Nos demais nós, `inputs` é o que
-  chegou pelas ARESTAS — a mesma palavra, dois significados. Referência a
-  parâmetro do usuário fora de um trigger não resolve para o que você espera.
-- **`payloadField` do `WebhookTrigger`.** Com `payloadField` vazio, o corpo do
-  webhook JÁ É o `inputs`. Com `payloadField: "dados"`, o corpo é lido de
-  `inputs["dados"]`. `payload_schema` valida esse corpo no despacho, e é
-  independente do `params_schema`.
-- **`ports` do `SubWorkflowInput`.** Num fluxo chamado como sub-fluxo, as
-  chaves declaradas em `ports` são o contrato de entrada: o pai as preenche
-  pelo `inputsMapping` do nó `SubWorkflow`, e cada porta vira uma saída
-  nomeada do trigger (a aresta que sai leva `from_key` com o nome da porta).
-  Chave fora da lista é descartada.
+- **`{{ inputs.nome }}` in a trigger node.** Inside a `type: "trigger"` node,
+  `inputs` are the run parameters. In all other nodes, `inputs` is what
+  arrived through the EDGES — the same word, two meanings. A reference to a
+  user parameter outside a trigger does not resolve to what you expect.
+- **`payloadField` of the `WebhookTrigger`.** With an empty `payloadField`, the
+  webhook body IS the `inputs`. With `payloadField: "dados"`, the body is read from
+  `inputs["dados"]`. `payload_schema` validates that body at dispatch, and is
+  independent of `params_schema`.
+- **`ports` of the `SubWorkflowInput`.** In a workflow called as a sub-workflow, the
+  keys declared in `ports` are the input contract: the parent fills them
+  through the `inputsMapping` of the `SubWorkflow` node, and each port becomes a named
+  output of the trigger (the outgoing edge carries `from_key` with the port name).
+  A key not in the list is discarded.
 
-## Coerção na execução
+## Coercion at execution
 
-Ao executar, cada valor declarado passa por uma regra fixa:
+On execution, each declared value goes through a fixed rule:
 
-1. Declarado, ausente e `required` sem `default` → erro
-   `inputs.<nome> obrigatório`. Ausente com `default` → o default é usado.
-2. A coerção só acontece **a partir de string** (é o que um formulário ou uma
-   linha de comando entrega):
-   - `number`: `int` quando o texto é só dígitos (com sinal), senão `float`.
-     String vazia é erro, não zero. `bool` não conta como `number`.
+1. Declared, absent and `required` without a `default` → error
+   `inputs.<nome> obrigatório`. Absent with a `default` → the default is used.
+2. Coercion only happens **from a string** (which is what a form or a
+   command line delivers):
+   - `number`: `int` when the text is digits only (with a sign), otherwise `float`.
+     An empty string is an error, not zero. `bool` does not count as `number`.
    - `boolean`: `true/false/1/0/yes/no/sim/não`.
-   - `string`: aceita texto; `int`, `float` e `bool` viram texto; dict e list
-     são erro.
-   - `object`: aceita dict ou list; string é decodificada como JSON e precisa
-     dar dict ou list.
-3. Chave **não declarada** passa intacta e é listada em `hints` — é assim que
-   um payload de webhook mais rico que o `params_schema` continua chegando.
-4. Os erros vêm agregados: `{errors: [{path, message}, ...]}`, todos de uma vez.
+   - `string`: accepts text; `int`, `float` and `bool` become text; dict and list
+     are an error.
+   - `object`: accepts dict or list; a string is decoded as JSON and must
+     yield a dict or list.
+3. An **undeclared** key passes through intact and is listed in `hints` — that is how
+   a webhook payload richer than the `params_schema` keeps arriving.
+4. The errors come aggregated: `{errors: [{path, message}, ...]}`, all at once.
 
 ## `suggested_params_schema`
 
-A validação devolve um `report.suggested_params_schema` heurístico, montado a
-partir das referências `inputs.<nome>` encontradas em nós de gatilho e das
-`ports` de um `SubWorkflowInput`. Cada entrada sai como
-`{"type": "string", "required": true}` — o tipo é um chute pela origem, não uma
-leitura do valor.
+Validation returns a heuristic `report.suggested_params_schema`, built
+from the `inputs.<nome>` references found in trigger nodes and from the
+`ports` of a `SubWorkflowInput`. Each entry comes out as
+`{"type": "string", "required": true}` — the type is a guess based on the origin, not a
+reading of the value.
 
-Use-o como rascunho: revise tipo, `default` e `required` antes de gravar em
-`params_schema`. Quando ele vem não-vazio, `report.hints` diz exatamente isso.
+Use it as a draft: review type, `default` and `required` before saving to
+`params_schema`. When it comes back non-empty, `report.hints` says exactly that.

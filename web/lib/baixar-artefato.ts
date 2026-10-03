@@ -1,28 +1,28 @@
 // web/lib/baixar-artefato.ts
 //
-// BAIXAR UM ARTEFATO, em um lugar só. Três telas precisam disto (a tabela de
-// Artefatos do app, a lista de Artefatos da Home e o painel de camadas do
-// globo), e o caminho certo não é óbvio: `GET /artifacts/{id}/download` NÃO
-// devolve o arquivo — devolve `{download_url, filename}` em JSON, com a URL
-// pré-assinada do MinIO. Navegar até o endpoint da plataforma numa aba nova
-// abre esse JSON na cara da pessoa; quem baixa é a URL pré-assinada, que já
-// carrega o `Content-Disposition: attachment` na assinatura.
+// DOWNLOADING AN ARTIFACT, in a single place. Three screens need this (the
+// app's Artifacts table, the Home's Artifacts list and the globe's layer
+// panel), and the right path is not obvious: `GET /artifacts/{id}/download`
+// does NOT return the file — it returns `{download_url, filename}` as JSON,
+// with MinIO's presigned URL. Navigating to the platform endpoint in a new tab
+// throws that JSON in the person's face; what downloads is the presigned URL,
+// which already carries `Content-Disposition: attachment` in its signature.
 //
-// Duas razões para passar pelo serviço em vez de abrir o endpoint direto:
+// Two reasons to go through the service instead of opening the endpoint directly:
 //
-// 1. O interceptor anexa o JWT. Navegação de topo não leva Bearer, então um
-//    artefato `protected` regrediria para 401.
-// 2. A URL pré-assinada é aberta em aba nova SEM puxar o arquivo para um blob
-//    em memória — o `revokeObjectURL` síncrono abortava downloads grandes no
-//    Firefox e no Safari.
+// 1. The interceptor attaches the JWT. Top-level navigation does not carry a
+//    Bearer, so a `protected` artifact would regress to 401.
+// 2. The presigned URL is opened in a new tab WITHOUT pulling the file into an
+//    in-memory blob — the synchronous `revokeObjectURL` aborted large downloads
+//    in Firefox and Safari.
 //
-// O fetch da URL pré-assinada não passa pelo interceptor, e é de propósito: ela
-// aponta para o MinIO, e mandar o token da plataforma para outra origem seria
-// vazá-lo.
+// The fetch of the presigned URL does not go through the interceptor, on
+// purpose: it points to MinIO, and sending the platform token to another origin
+// would leak it.
 
 import { GisFlowService } from "@/service/GisFlowService"
 
-/** As frases do erro. Padrão: o português da tabela de Artefatos; a Home traduzida passa as dela. */
+/** The error phrases. Default: the Portuguese of the Artifacts table; the translated Home passes its own. */
 export interface TextosDoDownload {
   noExecutor: string
   tenteDeNovo: string
@@ -34,9 +34,10 @@ export const TEXTOS_DO_DOWNLOAD_PT: TextosDoDownload = {
 }
 
 /**
- * Resolve a URL pré-assinada e abre o download. Devolve a mensagem do erro
- * quando não deu — quem chama decide como mostrar (toast, aviso inline) —, e
- * `null` quando deu certo. A mensagem do SERVIDOR, quando vem, passa como veio.
+ * Resolves the presigned URL and opens the download. Returns the error message
+ * when it did not work — the caller decides how to show it (toast, inline
+ * notice) —, and `null` when it worked. The SERVER's message, when there is
+ * one, passes through as it came.
  */
 export async function baixarArtefato(
   idHash: string,
@@ -44,9 +45,9 @@ export async function baixarArtefato(
 ): Promise<string | null> {
   const res = await GisFlowService.getArtifactDownload(idHash)
   if (!res.success || !res.data?.download_url) {
-    // 409 é a política, não uma falha: o arquivo ficou no executor por marcação
-    // `keepLocal` e o servidor não pode buscá-lo. Vale uma frase própria — "não
-    // foi possível baixar" mandaria a pessoa tentar de novo para sempre.
+    // 409 is policy, not a failure: the file stayed on the executor because of the
+    // `keepLocal` flag and the server cannot fetch it. It deserves its own
+    // phrase — "could not download" would send the person retrying forever.
     if (res.status === 409) return textos.noExecutor
     return res.error?.message ?? textos.tenteDeNovo
   }

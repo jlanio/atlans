@@ -10,19 +10,19 @@ dayjs.extend(duration)
 dayjs.extend(relative)
 
 /**
- * Converte uma string ISO vinda do backend em dayjs no timezone LOCAL.
+ * Converts an ISO string coming from the backend into a dayjs in the LOCAL timezone.
  *
- * Contexto: o backend serializa datas com `datetime.utcnow().isoformat()` —
- * que retorna uma string naive (sem `Z` nem offset). Por spec do ECMAScript,
- * `new Date(...)` e `dayjs(...)` interpretam strings sem offset como timezone
- * LOCAL, o que gera horários deslocados (ex.: mostra +3h em UTC-3).
+ * Context: the backend serializes dates with `datetime.utcnow().isoformat()` —
+ * which returns a naive string (no `Z` and no offset). Per the ECMAScript spec,
+ * `new Date(...)` and `dayjs(...)` interpret strings without an offset as the
+ * LOCAL timezone, which produces shifted times (e.g. shows +3h in UTC-3).
  *
- * Este helper força parse como UTC quando não há offset, depois converte
- * para o fuso do navegador. Se o backend algum dia passar a serializar
- * com `Z` ou offset explícito, o código continua correto.
+ * This helper forces parsing as UTC when there is no offset, then converts
+ * to the browser's timezone. If the backend ever starts serializing
+ * with `Z` or an explicit offset, the code stays correct.
  *
- * Retorna `null` se a entrada é `null`/`undefined`/`""` — ideal para
- * usar com `?? "—"` em UI.
+ * Returns `null` if the input is `null`/`undefined`/`""` — ideal for
+ * use with `?? "—"` in the UI.
  */
 export function fromBackend(iso: string | null | undefined) {
   if (!iso) return null
@@ -35,7 +35,7 @@ export function formatLocal(iso: string | null | undefined, pattern = "DD/MM/YYY
   return fromBackend(iso)?.format(pattern) ?? "—"
 }
 
-/** Atalho para "há X min/h" relativo ao agora local. Null-safe. */
+/** Shortcut for "X min/h ago" relative to local now. Null-safe. */
 export function fromNowLocal(iso: string | null | undefined) {
   return fromBackend(iso)?.fromNow() ?? "—"
 }

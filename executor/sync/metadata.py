@@ -1,7 +1,7 @@
 # executor/sync/metadata.py
 """
-MetadataExtractor — extrai metadados espaciais de datasets.
-Usa geopandas para vetoriais e rasterio para rasters.
+MetadataExtractor — extracts spatial metadata from datasets.
+Uses geopandas for vectors and rasterio for rasters.
 """
 import logging
 from pathlib import Path
@@ -14,8 +14,8 @@ logger = logging.getLogger("executor.sync")
 
 def extract_metadata(primary_path: Path, dataset_type: str) -> dict[str, Any]:
     """
-    Extrai metadados espaciais de um dataset.
-    Retorna dict com data_type, geometry_type, crs, feature_count, bbox, columns.
+    Extracts spatial metadata from a dataset.
+    Returns a dict with data_type, geometry_type, crs, feature_count, bbox, columns.
     """
     result: dict[str, Any] = {
         "data_type": classify_dataset_type(dataset_type),

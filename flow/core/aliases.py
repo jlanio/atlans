@@ -1,30 +1,31 @@
 # flow/core/aliases.py
-"""Regra única do alias Jinja de um nó.
+"""Single rule for a node's Jinja alias.
 
-O executor registra as saídas de cada nó no contexto sob um alias
-(`named[alias]`, ver flow/executor/core.py) e o lint estático precisa aplicar
-EXATAMENTE a mesma regra para acusar o que o executor descartaria em silêncio.
-Antes a regra vivia como função privada do executor, e o lint não podia
-importá-la sem puxar o registry inteiro de nós. Aqui é código puro (stdlib).
+The executor registers each node's outputs in the context under an alias
+(`named[alias]`, see flow/executor/core.py) and the static lint has to apply
+EXACTLY the same rule to flag what the executor would silently discard.
+The rule used to live as a private function of the executor, and the lint could
+not import it without pulling in the whole node registry. Here it is pure code (stdlib).
 """
 from __future__ import annotations
 
 from typing import Any, Mapping
 
-# Aliases que colidem com chaves fixas do contexto Jinja (rendering.py).
-# Se o usuário nomear um nó com um destes, ele seria silenciosamente
-# sobrescrito pelas chaves fixas e a expressão {{ alias.x }} apontaria para
-# outra coisa.
+# Aliases that collide with fixed keys of the Jinja context (rendering.py).
+# If the user names a node with one of these, it would be silently
+# overwritten by the fixed keys and the expression {{ alias.x }} would point
+# to something else.
 RESERVED_ALIASES = frozenset({"inputs", "nodes", "named", "now", "uuid", "env"})
 
 
 def alias_declarado(node_def: Mapping[str, Any]) -> str:
-    """Alias escrito pelo usuário: o de topo vence `properties.alias`.
+    """User-written alias: the top-level one beats `properties.alias`.
 
-    A escolha é por VERACIDADE, não por validade: um alias de topo preenchido
-    mas inválido não cai no de `properties` — cai no `name` (em resolve_alias).
-    É o comportamento que o executor sempre teve; mudar isso aqui mudaria sob
-    qual nome um fluxo já salvo registra seus nós.
+    The choice is by TRUTHINESS, not validity: a top-level alias that is filled in
+    but invalid does not fall back to the `properties` one — it falls back to
+    `name` (in resolve_alias). That is how the executor has always behaved;
+    changing it here would change under which name an already-saved workflow
+    registers its nodes.
     """
     props = node_def.get("properties")
     custom = node_def.get("alias") or (props.get("alias") if isinstance(props, dict) else None)
@@ -32,12 +33,12 @@ def alias_declarado(node_def: Mapping[str, Any]) -> str:
 
 
 def alias_e_valido(alias: str) -> bool:
-    """Identificador Python (Unicode vale — "Área" passa) e não reservado."""
+    """Python identifier (Unicode is fine — "Área" passes) and not reserved."""
     return bool(alias) and alias.isidentifier() and alias not in RESERVED_ALIASES
 
 
 def resolve_alias(node_def: Mapping[str, Any]) -> str:
-    """Alias Jinja-safe do nó: o customizado se válido, senão o `name`."""
+    """The node's Jinja-safe alias: the custom one if valid, otherwise `name`."""
     custom = alias_declarado(node_def)
     if alias_e_valido(custom):
         return custom

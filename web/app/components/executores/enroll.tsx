@@ -1,11 +1,11 @@
 "use client"
 
-// Fluxo de enrollment (OTP de uso único, métodos de conexão e app desktop).
+// Enrollment flow (single-use OTP, connection methods and desktop app).
 //
-// PADRONIZAÇÃO, não reescrita: a lógica de OTP, os comandos por método/SO, o
-// cache do instalador e o deep link do app permanecem EXATAMENTE como estavam.
-// Só a apresentação foi alinhada ao contrato: movimento sob `motion-safe:` e
-// foco visível (`ring-[3px] ring-ring/50`) nos toggles próprios.
+// STANDARDIZATION, not a rewrite: the OTP logic, the commands per method/OS,
+// the installer cache and the app deep link remain EXACTLY as they were.
+// Only the presentation was aligned with the contract: motion under
+// `motion-safe:` and visible focus (`ring-[3px] ring-ring/50`) on the custom toggles.
 
 import React, { useEffect, useRef, useState } from "react"
 import { GisFlowService } from "@/service/GisFlowService"
@@ -33,23 +33,24 @@ import type { IExecutor } from "@/service/GisFlowService"
 import type { IExecutorEnrollmentOtpResponse } from "@/service/types"
 import { SelectCard } from "./dialogs"
 
-// ── Endereços do enrollment ──────────────────────────────────────────────────
+// ── Enrollment addresses ─────────────────────────────────────────────────────
 //
-// Nenhum é fixo: o servidor devolve os dele junto com o OTP (`server_url`, o
-// host dos executores; `public_url`, o site). Sem `server_url` (a instalação não
-// configurou AGENTS_URL e não tem domínio para a convenção), os comandos levam
-// este marcador, e a tela avisa que ele precisa ser trocado.
+// None is fixed: the server returns its own along with the OTP (`server_url`,
+// the executors' host; `public_url`, the site). Without `server_url` (the
+// installation didn't configure AGENTS_URL and has no domain for the
+// convention), the commands carry this placeholder, and the screen warns that
+// it must be replaced.
 
 export const SERVIDOR_A_PREENCHER = "https://agents.SEU-DOMINIO"
 
 export type RunMode = "app" | "quickstart" | "python" | "docker"
 export type OsMode = "linux" | "windows"
 
-// ── Cache do instalador Windows ──────────────────────────────────────────────
+// ── Windows installer cache ──────────────────────────────────────────────────
 //
-// Cache de modulo: os metadados do instalador Windows batem na API do GitHub.
-// Buscar uma vez por sessao evita gastar rate limit cada vez que o passo
-// "Conectar" e revisitado (o painel remonta ao navegar entre passos).
+// Module cache: the Windows installer metadata hits the GitHub API.
+// Fetching once per session avoids spending rate limit every time the
+// "Conectar" step is revisited (the panel remounts when navigating between steps).
 let _installerCache: Promise<{ versao: string; tamanho: number; url: string } | null> | null = null
 export function fetchInstallerOnce() {
   if (!_installerCache) {
@@ -60,38 +61,40 @@ export function fetchInstallerOnce() {
   return _installerCache
 }
 
-// ── "Conectar": método de conexão primeiro; a ativação se adapta a ele ───────
+// ── "Conectar": connection method first; activation adapts to it ─────────────
 //
-// A escolha do método vem ANTES de qualquer credencial. O app Windows leva o
-// Executor ID e o OTP embutidos no deep link "Abrir no app" — não há por que
-// exibir o OTP ali. Só os métodos manuais (Docker/Python/Quickstart) mostram o
-// comando, que já traz o OTP embutido; o aviso de uso único acompanha o comando.
+// The method choice comes BEFORE any credential. The Windows app carries the
+// Executor ID and the OTP embedded in the "Abrir no app" deep link — there is no
+// reason to show the OTP there. Only the manual methods (Docker/Python/Quickstart)
+// show the command, which already embeds the OTP; the single-use warning goes
+// with the command.
 
 export function EnrollConnect({ otp }: {
   otp: IExecutorEnrollmentOtpResponse
 }) {
   const servidor = otp.server_url || SERVIDOR_A_PREENCHER
   const site = otp.public_url || (typeof window !== "undefined" ? window.location.origin : "")
-  // Pre-seleciona com base no SO do operador que abriu o dialog (best-effort);
-  // operador pode trocar manualmente.
+  // Preselects based on the OS of the operator who opened the dialog (best-effort);
+  // the operator can switch manually.
   const ehWindows = typeof navigator !== "undefined" && /Win/i.test(navigator.platform)
   const [osMode, setOsMode]   = useState<OsMode>(ehWindows ? "windows" : "linux")
-  // "app" só é pré-selecionado quando a UI roda DENTRO do app desktop (onde o
-  // "Abrir no app" resolve localmente). Num navegador comum — mesmo no Windows —
-  // o padrão cai num método de credencial COPIÁVEL (quickstart): senão um admin
-  // gerando o OTP para um operador remoto abriria a aba do app, que agora não
-  // expõe o OTP, e ficaria sem nada a entregar. Ver a nota de `ehWindows` (é o
-  // SO de quem gera, não o do operador — best-effort só para o toggle de OS).
+  // "app" is only preselected when the UI runs INSIDE the desktop app (where
+  // "Abrir no app" resolves locally). In a regular browser — even on Windows —
+  // the default falls to a method with a COPYABLE credential (quickstart):
+  // otherwise an admin generating the OTP for a remote operator would open the
+  // app tab, which no longer exposes the OTP, and would have nothing to hand
+  // over. See the note on `ehWindows` (it is the OS of whoever generates, not the
+  // operator's — best-effort only for the OS toggle).
   const [runMode, setRunMode] = useState<RunMode>(() => ponteDesktop() != null ? "app" : "quickstart")
   const [appInfo, setAppInfo] = useState<{ versao: string; tamanho: number; url: string } | null>(null)
   const [appIndisponivel, setAppIndisponivel] = useState(false)
   const [copied, setCopied]   = useState(false)
 
-  // Metadados do instalador Windows — so quando a aba do app esta visivel.
+  // Windows installer metadata — only when the app tab is visible.
   useEffect(() => {
     if (runMode !== "app" || appInfo || appIndisponivel) return
     fetchInstallerOnce().then(data => {
-      // 404 e estado normal: nenhuma versao publicada ainda.
+      // 404 is a normal state: no version published yet.
       if (!data) setAppIndisponivel(true)
       else setAppInfo(data)
     })
@@ -105,40 +108,41 @@ export function EnrollConnect({ otp }: {
     ? `python -m executor enroll \`\n    --executor-id=${otp.executor_id} \`\n    --otp=${otp.otp} \`\n    --server=${servidor} \`\n    --cert-dir=.\\certs`
     : ""
 
-  // Docker: bind mount r/w em executor/.env permite que o container grave
-  // EXECUTOR_ID no .env do host (operador nao precisa editar manualmente).
-  // - touch + chmod 666 (Linux): garante que o user do container (uid 1000)
-  //   consiga escrever no .env bind-mountado (preserva owner do host).
-  // - SSL_CERT_FILE = root cert da CA interna (cert do host dos executores e
-  //   assinado pela step-ca privada e o trust store padrao do sistema nao
-  //   confia nela).
+  // Docker: a r/w bind mount on executor/.env lets the container write
+  // EXECUTOR_ID into the host's .env (the operator doesn't need to edit it manually).
+  // - touch + chmod 666 (Linux): ensures the container user (uid 1000)
+  //   can write to the bind-mounted .env (preserves the host owner).
+  // - SSL_CERT_FILE = root cert of the internal CA (the executors' host cert is
+  //   signed by the private step-ca and the system's default trust store
+  //   doesn't trust it).
   const dockerLinux = otp
     ? `touch executor/.env && chmod 666 executor/.env && docker compose -f docker-compose.executor.yml run --rm \\\n    --entrypoint "" \\\n    -v ~/atlans-root.crt:/atlans-root.crt:ro \\\n    -v "$(pwd)/executor/.env:/app/executor/.env" \\\n    -e SSL_CERT_FILE=/atlans-root.crt \\\n    -e REQUESTS_CA_BUNDLE=/atlans-root.crt \\\n    executor \\\n    python -m executor enroll \\\n        --executor-id=${otp.executor_id} \\\n        --otp=${otp.otp} \\\n        --server=${servidor} \\\n        --cert-dir=/data/certs`
     : ""
   // PowerShell:
-  // - Sem chmod (Windows nao usa permissoes POSIX em bind mount; arquivo do
-  //   host fica writeable por padrao para o user do container).
-  // - New-Item -Force trunca conteudo; Test-Path + New-Item idempotente.
-  // - ${HOME} e ${PWD} interpolados explicitamente. Usamos FORWARD SLASHES
-  //   nos paths de mount: backslash + $HOME (= C:\Users\X) gera "C:\Users\X\foo"
-  //   que tem multiplos ":" e confunde o parser do `-v host:container`. Docker
-  //   Desktop aceita "C:/Users/X/foo:/path" sem ambiguidade.
+  // - No chmod (Windows doesn't use POSIX permissions on bind mounts; the host
+  //   file is writable by default for the container user).
+  // - New-Item -Force truncates content; Test-Path + New-Item is idempotent.
+  // - ${HOME} and ${PWD} interpolated explicitly. We use FORWARD SLASHES
+  //   in the mount paths: backslash + $HOME (= C:\Users\X) produces "C:\Users\X\foo"
+  //   which has multiple ":" and confuses the parser of `-v host:container`. Docker
+  //   Desktop accepts "C:/Users/X/foo:/path" without ambiguity.
   const dockerWindows = otp
     ? `if (-not (Test-Path executor/.env)) { New-Item -ItemType File -Path executor/.env | Out-Null }; \`\ndocker compose -f docker-compose.executor.yml run --rm \`\n    --entrypoint '""' \`\n    -v "\${HOME}/atlans-root.crt:/atlans-root.crt:ro" \`\n    -v "\${PWD}/executor/.env:/app/executor/.env" \`\n    -e SSL_CERT_FILE=/atlans-root.crt \`\n    -e REQUESTS_CA_BUNDLE=/atlans-root.crt \`\n    executor \`\n    python -m executor enroll \`\n        --executor-id=${otp.executor_id} \`\n        --otp=${otp.otp} \`\n        --server=${servidor} \`\n        --cert-dir=/data/certs`
     : ""
 
-  // Quickstart: 1 linha que faz git clone + ca-bundle + build + enroll + up.
-  // Operador novo nao precisa nada alem de docker + git instalados. Sem
-  // `server_url`, o install.sh servido sai sem o host dos executores e pede a
-  // flag: o comando ja a leva, com o marcador que o aviso manda trocar.
+  // Quickstart: 1 line that does git clone + ca-bundle + build + enroll + up.
+  // A new operator needs nothing beyond docker + git installed. Without
+  // `server_url`, the served install.sh comes without the executors' host and
+  // asks for the flag: the command already carries it, with the placeholder the
+  // warning says to replace.
   const quickstartLinux = otp
     ? `curl -fsSL ${site}/executores/install | bash -s -- \\\n    --executor-id=${otp.executor_id} \\\n    --otp=${otp.otp}`
       + (otp.server_url ? "" : ` \\\n    --server=${servidor}`)
     : ""
-  // Windows: instala via Git Bash ou WSL (install.sh e bash). O comando e o
-  // mesmo do Linux, mas a UI orienta explicitamente onde colar — em PS puro,
-  // `curl` e alias para Invoke-WebRequest (nao suporta -fsSL), `| bash` nao
-  // existe, e `\` line continuation nao funciona.
+  // Windows: installs via Git Bash or WSL (install.sh is bash). The command is
+  // the same as Linux's, but the UI explicitly says where to paste it — in plain
+  // PS, `curl` is an alias for Invoke-WebRequest (doesn't support -fsSL), `| bash`
+  // doesn't exist, and `\` line continuation doesn't work.
   const quickstartWindows = quickstartLinux
 
   const enrollCommand = (() => {
@@ -147,9 +151,9 @@ export function EnrollConnect({ otp }: {
     return osMode === "windows" ? pythonWindows : pythonLinux
   })()
 
-  // Guarda o id do timer: sem isto, fechar o diálogo antes de 2s deixa o
-  // setTimeout disparar setCopied num componente já desmontado. Limpamos ao
-  // rearmar e no unmount.
+  // Keeps the timer id: without this, closing the dialog before 2s lets the
+  // setTimeout fire setCopied on an already unmounted component. We clear it on
+  // rearm and on unmount.
   const timerCopiado = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   useEffect(() => () => clearTimeout(timerCopiado.current), [])
 
@@ -231,7 +235,7 @@ export function EnrollConnect({ otp }: {
             </div>
           )}
 
-          {/* Para quem JA instalou: abre o app com os dois valores preenchidos. */}
+          {/* For whoever has ALREADY installed: opens the app with both values filled in. */}
           <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2.5">
             <Button asChild size="sm" variant="outline" className="gap-1.5 max-md:h-10">
               <a href={`atlans://enroll?executor_id=${encodeURIComponent(otp.executor_id)}&otp=${encodeURIComponent(otp.otp)}&server=${encodeURIComponent(servidor)}`}>
@@ -245,14 +249,14 @@ export function EnrollConnect({ otp }: {
         </div>
       ) : (
         <div className="flex flex-col gap-2.5">
-          {/* O comando já embute o OTP — o aviso de uso único vem junto dele, não
-              num passo separado. */}
+          {/* The command already embeds the OTP — the single-use warning comes with it,
+              not in a separate step. */}
           <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-[11px]">
             <TbClock className="mt-0.5 size-3.5 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden="true" />
             <span>O comando abaixo já traz o vínculo embutido — <strong>uso único</strong>, expira em {formatLocal(otp.expires_at)}. Se expirar, gere outro.</span>
           </div>
 
-          {/* Toggle de SO do host */}
+          {/* Host OS toggle */}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs text-muted-foreground">Sistema do host do executor</span>
             <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
@@ -297,12 +301,12 @@ export function EnrollConnect({ otp }: {
             </div>
           )}
 
-          {/* Bloco de comando */}
+          {/* Command block */}
           <div className="flex items-start gap-2">
-            {/* `whitespace-pre-wrap break-all`: preserva quebras/indentação E
-                quebra linhas longas (o comando Docker passa de 680px) para caber
-                na largura do modal, em vez de recortar. O botão Copiar entrega o
-                comando exato, então a quebra visual não atrapalha. */}
+            {/* `whitespace-pre-wrap break-all`: preserves line breaks/indentation AND
+                wraps long lines (the Docker command exceeds 680px) to fit the
+                modal width, instead of clipping. The Copiar button delivers the
+                exact command, so the visual wrapping does no harm. */}
             <pre className="min-w-0 flex-1 whitespace-pre-wrap break-all rounded-lg border border-border bg-muted/60 px-3 py-2.5 font-mono text-[11px] leading-relaxed">
               {enrollCommand}
             </pre>
@@ -318,7 +322,7 @@ export function EnrollConnect({ otp }: {
             </Button>
           </div>
 
-          {/* Pre-requisitos por metodo */}
+          {/* Prerequisites per method */}
           {runMode === "quickstart" && osMode === "linux" && (
             <p className="text-[10px] text-muted-foreground">
               Pré-requisitos: <code className="rounded bg-muted px-1 font-mono">docker</code>,{" "}
@@ -356,15 +360,15 @@ export function EnrollConnect({ otp }: {
   )
 }
 
-// ── Dialog de geração de OTP (executores já existentes) ──────────────────────
+// ── OTP generation dialog (existing executors) ───────────────────────────────
 
 interface EnrollmentOtpDialogProps {
   agentId: string
   agentStatus: IExecutor["status"]
   /**
-   * Elemento que dispara a abertura — pode ser DropdownMenuItem ou Button.
-   * Use onSelect={e => e.preventDefault()} em DropdownMenuItem para evitar
-   * que o menu feche prematuramente.
+   * Element that triggers opening — can be a DropdownMenuItem or a Button.
+   * Use onSelect={e => e.preventDefault()} on DropdownMenuItem to prevent
+   * the menu from closing prematurely.
    */
   trigger: React.ReactNode
 }
@@ -379,7 +383,7 @@ export function EnrollmentOtpDialog({ agentId, agentStatus, trigger }: Enrollmen
 
   function handleClose(val: boolean) {
     if (!val) {
-      // Limpa o OTP da memoria ao fechar — defesa em profundidade.
+      // Clears the OTP from memory on close — defense in depth.
       setOtp(null)
       setConfirmActive(false)
     }
@@ -400,8 +404,8 @@ export function EnrollmentOtpDialog({ agentId, agentStatus, trigger }: Enrollmen
 
   function onTriggerOpen() {
     setOpen(true)
-    // Se status='active', exibe a tela de confirmacao antes de gerar.
-    // Caso contrario, gera direto.
+    // If status='active', shows the confirmation screen before generating.
+    // Otherwise, generates directly.
     if (isActive) {
       setConfirmActive(true)
     } else {
@@ -437,7 +441,7 @@ export function EnrollmentOtpDialog({ agentId, agentStatus, trigger }: Enrollmen
           <DialogDescription>{desc}</DialogDescription>
         </DialogHeader>
 
-        {/* ── Confirmação para executores 'active' ─────────────────────────── */}
+        {/* ── Confirmation for 'active' executors ──────────────────────────── */}
         {confirmActive && !otp && (
           <div className="flex flex-col gap-3 py-2">
             <div className="flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
@@ -464,12 +468,12 @@ export function EnrollmentOtpDialog({ agentId, agentStatus, trigger }: Enrollmen
           <div className="py-10 text-center text-sm text-muted-foreground">Gerando OTP…</div>
         )}
 
-        {/* ── Vínculo gerado: método de conexão direto (sem passo de OTP) ───── */}
+        {/* ── Link generated: connection method directly (no OTP step) ─────── */}
         {otp && (
           <>
-            {/* `min-w-0`: filho do grid do DialogContent. Sem isto, um conteúdo largo
-                (o comando Docker) força a largura do grid acima do `max-w-lg` e
-                estoura/recorta o modal em vez de caber. */}
+            {/* `min-w-0`: child of the DialogContent grid. Without this, wide content
+                (the Docker command) forces the grid width above `max-w-lg` and
+                overflows/clips the modal instead of fitting. */}
             <div className="min-w-0 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200">
               <EnrollConnect otp={otp} />
             </div>

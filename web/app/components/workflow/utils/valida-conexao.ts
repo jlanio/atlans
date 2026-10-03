@@ -1,11 +1,11 @@
 // web/app/components/workflow/utils/valida-conexao.ts
 //
-// Validação de conexão NO GESTO (A16) — derivada do catálogo, sem segunda
-// fonte de verdade. Antes o canvas deixava ligar qualquer porta em qualquer
-// porta e o erro só aparecia na validação do servidor; agora a linha proibida
-// nem cola (`isValidConnection` do React Flow) e o `onConnect` explica o
-// motivo. O servidor segue como juiz final: esta camada só recusa o que
-// CERTAMENTE quebraria, nunca o que depende do dado em runtime.
+// Connection validation AT THE GESTURE (A16) — derived from the catalog, with
+// no second source of truth. Before, the canvas let any port be connected to
+// any port and the error only showed up in the server's validation; now the
+// forbidden line does not even stick (React Flow's `isValidConnection`) and
+// `onConnect` explains why. The server remains the final judge: this layer
+// only rejects what would CERTAINLY break, never what depends on runtime data.
 import { Connection, Edge } from "@xyflow/react"
 import { INodeOutputField, INodePortAPI } from "@/service/types"
 import { limitadoAUmaAresta } from "./resolve-edge-keys"
@@ -25,7 +25,7 @@ export const MENSAGEM_DE_RECUSA: Record<MotivoDeRecusa, string> = {
     "A saída escolhida não é uma camada — este nó espera um GeoDataFrame.",
 }
 
-/** Forma mínima de nó que a validação precisa enxergar. */
+/** Minimal node shape the validation needs to see. */
 interface NoParaValidar {
   id: string
   data?: {
@@ -39,13 +39,13 @@ interface NoParaValidar {
 const ESCALARES = new Set(["string", "number", "boolean", "list"])
 
 /**
- * Tipo de dado que SAI pelo handle de origem.
+ * Data type that LEAVES through the source handle.
  *
- * - Ramo (`branches`): o dado repassado é o primeiro campo (`result`) — vale
- *   o tipo dele, e na dúvida `any`.
- * - Handle nomeado: o tipo do campo homônimo.
- * - Handle anônimo: com um campo só, o tipo dele; com vários, o executor
- *   espalha todos — `any`.
+ * - Branch (`branches`): the data passed on is the first field (`result`) — its
+ *   type applies, and when in doubt `any`.
+ * - Named handle: the type of the field with the same name.
+ * - Anonymous handle: with a single field, its type; with several, the executor
+ *   spreads them all — `any`.
  */
 export function tipoEmitido(
   data: NoParaValidar["data"],
@@ -62,7 +62,7 @@ export function tipoEmitido(
   return "any"
 }
 
-/** Tipo de dado que o handle de destino ACEITA (`any` quando não declarado). */
+/** Data type the target handle ACCEPTS (`any` when not declared). */
 export function tipoAceito(
   data: NoParaValidar["data"],
   targetHandle?: string | null,
@@ -71,20 +71,20 @@ export function tipoAceito(
   if (targetHandle) {
     return inputs.find(p => p.name === targetHandle)?.type ?? "any"
   }
-  // Handle anônimo: se TODAS as entradas declaradas exigem o mesmo tipo, ele
-  // vale para a conexão anônima também (nós binários com uma porta ligada).
+  // Anonymous handle: if ALL declared inputs require the same type, it applies
+  // to the anonymous connection too (binary nodes with one port connected).
   const tipos = new Set(inputs.map(p => p.type).filter(Boolean))
   return tipos.size === 1 ? (inputs[0].type as string) : "any"
 }
 
 /**
- * Recusa uma conexão certamente errada; `null` = permitida.
+ * Rejects a certainly wrong connection; `null` = allowed.
  *
- * A regra de tipo é deliberadamente conservadora: só recusa escalar
- * (string/number/boolean/list) entrando onde o catálogo exige geodataframe —
- * o `get_input_gdf` do executor falharia com TypeError. `object` e `any`
- * passam: DataInput emite `object` que PODE ser uma camada (depende do
- * arquivo), e vetá-lo quebraria o fluxo mais comum do produto.
+ * The type rule is deliberately conservative: it only rejects a scalar
+ * (string/number/boolean/list) going where the catalog requires a geodataframe —
+ * the executor's `get_input_gdf` would fail with a TypeError. `object` and `any`
+ * pass: DataInput emits `object`, which MAY be a layer (it depends on the
+ * file), and vetoing it would break the product's most common workflow.
  */
 export function validarConexao(
   conexao: Pick<Connection, "source" | "target" | "sourceHandle" | "targetHandle">,
@@ -93,8 +93,9 @@ export function validarConexao(
 ): MotivoDeRecusa | null {
   if (conexao.source === conexao.target) return "auto-conexao"
 
-  // O React Flow usa `null` para handle anônimo e o load devolve `undefined`;
-  // comparação estrita daria falso negativo (a lição registrada no canvas).
+  // React Flow uses `null` for an anonymous handle and the load returns
+  // `undefined`; strict comparison would give a false negative (the lesson
+  // recorded in the canvas).
   const mesmoHandle = (a?: string | null, b?: string | null) => (a ?? null) === (b ?? null)
   const repetida = edges.some(e =>
     e.source === conexao.source &&

@@ -1,35 +1,35 @@
 /* desktop/src/renderer/index.css
    ─────────────────────────────────────────────────────────────────────────
-   Design system do Atlans Studio, portado de web/app/globals.css.
+   Atlans Studio design system, ported from web/app/globals.css.
 
-   **Somente tema escuro.** O app é uma ferramenta de infraestrutura que fica
-   aberta em segundo plano; um visual só, sempre consistente, dispensa metade
-   dos tokens e todo o código de detecção de tema. Os valores abaixo são os do
-   bloco `.dark` do web — quem usa os dois reconhece a mesma paleta.
+   **Dark theme only.** The app is an infrastructure tool that stays open in
+   the background; a single look, always consistent, does away with half the
+   tokens and all the theme-detection code. The values below are those of the
+   web's `.dark` block — someone who uses both recognizes the same palette.
 
-   Os tokens são COPIADOS, não importados: `web/` é um app Next.js com 2 GB de
-   node_modules, e transformá-lo em pacote publicável só para compartilhar
-   variáveis CSS acoplaria o release do desktop ao do frontend.
+   The tokens are COPIED, not imported: `web/` is a Next.js app with 2 GB of
+   node_modules, and turning it into a publishable package just to share CSS
+   variables would couple the desktop release to the frontend's.
 
-   Fonte da verdade das regras: .interface-design/system.md.
+   Source of truth for the rules: .interface-design/system.md.
    ───────────────────────────────────────────────────────────────────────── */
 @import "tailwindcss";
 
-/* Mesma biblioteca de animação do web (globals.css importa a mesma linha).
-   É de onde vêm `animate-in`, `fade-in-0`, `zoom-in-95` e `slide-in-from-*` —
-   os nomes que a tabela de Animações do system.md usa para descrever a entrada
-   de diálogo, painel e popover. Sem ela, essas classes simplesmente não
-   existiam aqui, e o app inteiro trocava de tela por corte seco. */
+/* Same animation library as the web (globals.css imports the same line).
+   It is where `animate-in`, `fade-in-0`, `zoom-in-95` and `slide-in-from-*`
+   come from — the names the Animations table in system.md uses to describe the
+   entrance of dialogs, panels and popovers. Without it, those classes simply
+   did not exist here, and the whole app switched screens with a hard cut. */
 @import "tw-animate-css";
 
-/* `dark:` vale SEMPRE.
+/* `dark:` applies ALWAYS.
 
-   Por padrão o Tailwind liga `dark:` a `prefers-color-scheme`, e o app não
-   segue mais o tema do sistema — num Windows em tema claro os `dark:` das
-   cores de status (StatusBadge, Logs, GeoSync) simplesmente não aplicariam, e
-   um badge verde-claro apareceria sobre o fundo escuro. Redefinir o variante
-   aqui mantém os componentes portados do web idênticos ao original, sem
-   varrer 18 classes à mão. */
+   By default Tailwind ties `dark:` to `prefers-color-scheme`, and the app no
+   longer follows the system theme — on a Windows in light theme the `dark:`
+   status colors (StatusBadge, Logs, GeoSync) simply would not apply, and a
+   light-green badge would show up on the dark background. Redefining the
+   variant here keeps the components ported from the web identical to the
+   original, without combing through 18 classes by hand. */
 @custom-variant dark (&);
 
 @theme inline {
@@ -69,18 +69,19 @@
   color-scheme: dark;
   --radius: 0.5rem;
 
-  /* Geist não é embarcada: o app roda offline e buscar fonte da rede violaria
-     a CSP do renderer (`default-src 'none'`). A pilha começa pela Segoe UI
-     Variable do Windows 11, a mais próxima em métrica e peso. */
+  /* Geist is not bundled: the app runs offline and fetching a font from the
+     network would violate the renderer CSP (`default-src 'none'`). The stack
+     starts with Windows 11's Segoe UI Variable, the closest in metrics and
+     weight. */
   --font-sans-app: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
 
-  /* Monoespaçada, em ordem de preferência para LER:
-       Cascadia Mono   — a do Windows Terminal, sem ligaduras (ver .log abaixo)
-       Cascadia Code   — mesma família, com ligaduras; só se a Mono não existir
-       Consolas        — sempre presente no Windows, o piso garantido
-     JetBrains Mono e Fira Code entram na frente porque quem desenvolve costuma
-     tê-las instaladas, e as duas têm zero cortado e altura-x maior — o que
-     decide legibilidade num painel de log de 12px. */
+  /* Monospace, in order of preference for READING:
+       Cascadia Mono   — Windows Terminal's, no ligatures (see .log below)
+       Cascadia Code   — same family, with ligatures; only if Mono is missing
+       Consolas        — always present on Windows, the guaranteed floor
+     JetBrains Mono and Fira Code go first because developers usually have
+     them installed, and both have a slashed zero and a larger x-height —
+     which decides legibility in a 12px log panel. */
   --font-mono-app: "JetBrains Mono", "Fira Code", "Cascadia Mono", "Cascadia Code",
                    Consolas, ui-monospace, "Courier New", monospace;
 
@@ -108,11 +109,12 @@
 
   --destructive: oklch(0.65 0.21 22);
 
-  /* Aviso — o único tom que ainda era `yellow-500` cru, repetido em oito
-     arquivos. O valor é o `--exec-unknown` do tema escuro, que a tabela de
-     Execução no canvas (system.md) já calibrou contra este mesmo fundo: amarelo
-     sRGB puro destoa da paleta OKLCH aquecida, e sem token cada tela escolhia
-     sozinha entre `yellow-500`, `yellow-400` e `amber-500`. */
+  /* Warning — the only tone that was still raw `yellow-500`, repeated in eight
+     files. The value is the dark theme's `--exec-unknown`, which the Execution
+     on the canvas table (system.md) already calibrated against this same
+     background: pure sRGB yellow clashes with the warm OKLCH palette, and
+     without a token each screen chose on its own between `yellow-500`,
+     `yellow-400` and `amber-500`. */
   --warning: oklch(0.80 0.14 76);
   --warning-foreground: oklch(0.20 0.02 60);
 
@@ -134,26 +136,26 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     margin: 0;
-    /* A janela não rola: cada painel tem o próprio scroll, como no app web. */
+    /* The window does not scroll: each panel has its own scroll, as in the web app. */
     overflow: hidden;
-    /* Selecionar texto de UI ao arrastar é ruído; log e áreas de conteúdo
-       reabilitam com `select-text`. */
+    /* Selecting UI text while dragging is noise; the log and content areas
+       re-enable it with `select-text`. */
     user-select: none;
   }
 
-  /* Tipografia do painel de log.
+  /* Log panel typography.
      ─────────────────────────────────────────────────────────────────────
-     Log não é código-fonte, e as escolhas divergem:
+     A log is not source code, and the choices differ:
 
-     - `font-variant-ligatures: none` — a ligadura que junta `->` num glifo só
-       ajuda a ler expressões, mas num traceback ou num caminho de arquivo ela
-       ESCONDE quantos caracteres existem de fato. `!=`, `>>`, `--` são
-       exatamente o que se está tentando conferir.
-     - `"zero"` e `"ss01"` — zero cortado, onde a fonte oferecer. Distinguir
-       `0` de `O` importa em id de execução e hash.
-     - `tnum` — dígitos de largura fixa, para a coluna de horário não dançar.
-     - `line-height` folgado: linhas coladas viram uma parede de texto, e a
-       varredura vertical é o modo como o log é lido. */
+     - `font-variant-ligatures: none` — the ligature that merges `->` into a
+       single glyph helps read expressions, but in a traceback or a file path
+       it HIDES how many characters actually exist. `!=`, `>>`, `--` are
+       exactly what one is trying to check.
+     - `"zero"` and `"ss01"` — slashed zero, where the font offers it. Telling
+       `0` from `O` matters in run ids and hashes.
+     - `tnum` — fixed-width digits, so the time column does not dance.
+     - Loose `line-height`: cramped lines become a wall of text, and vertical
+       scanning is how the log is read. */
   .log {
     font-variant-ligatures: none;
     font-feature-settings: "zero" 1, "ss01" 1, "tnum" 1;
@@ -162,8 +164,8 @@
     letter-spacing: 0.005em;
   }
 
-  /* Barra de rolagem discreta. A padrão do Chromium destoa bastante num app
-     escuro, e aparece em quatro áreas roláveis diferentes. */
+  /* Discreet scrollbar. Chromium's default clashes quite a bit in a dark app,
+     and it appears in four different scrollable areas. */
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
@@ -178,17 +180,17 @@
   }
 }
 
-/* ── Movimento ───────────────────────────────────────────────────────────────
-   Regra de uso, para não virar enfeite: uma animação daqui sempre responde a
-   uma MUDANÇA DE ESTADO que o usuário precisaria notar — a tela trocou, um
-   alerta entrou, um número mudou, uma execução terminou. Nada anima porque
-   ficou bonito; num app que fica aberto o dia inteiro em segundo plano,
-   movimento sem significado vira ruído periférico.
+/* ── Motion ──────────────────────────────────────────────────────────────────
+   Usage rule, so it does not become decoration: an animation here always
+   responds to a STATE CHANGE the user would need to notice — the screen
+   changed, an alert came in, a number changed, a run finished. Nothing animates
+   because it looks nice; in an app that stays open all day in the background,
+   meaningless motion becomes peripheral noise.
    ───────────────────────────────────────────────────────────────────────── */
 
-/* Esqueleto de carregamento — copiado do web (globals.css), inclusive a
-   duração. O gradiente corre sobre um fundo `bg-accent/60`; é o `background-position`
-   que anima, não o layout. */
+/* Loading skeleton — copied from the web (globals.css), including the
+   duration. The gradient runs over a `bg-accent/60` background; it is the
+   `background-position` that animates, not the layout. */
 @keyframes skeleton-shimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
@@ -197,8 +199,8 @@
   animation: skeleton-shimmer 1.8s linear infinite;
 }
 
-/* Número que mudou. Curto de propósito: o Painel atualiza a cada segundo, e
-   qualquer coisa mais longa que isso deixaria dois pulsos sobrepostos. */
+/* A number that changed. Short on purpose: the Painel updates every second,
+   and anything longer than this would leave two overlapping pulses. */
 @keyframes valor-muda {
   0%   { color: var(--primary); }
   100% { color: inherit; }
@@ -207,9 +209,9 @@
   animation: valor-muda 900ms cubic-bezier(.22, 1, .36, 1);
 }
 
-/* Batida do LED de "conectado". Não é um `animate-ping` (que dispara um anel
-   para fora, e a 1 Hz vira estroboscópio na barra de status): é a mesma
-   respiração do canvas do web, só na opacidade. */
+/* Beat of the "conectado" (connected) LED. It is not an `animate-ping` (which
+   fires a ring outward, and at 1 Hz becomes a strobe in the status bar): it is
+   the same breathing as the web canvas, on opacity only. */
 @keyframes pulso-vivo {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.45; }
@@ -218,8 +220,8 @@
   animation: pulso-vivo 2.4s cubic-bezier(.45, 0, .55, 1) infinite;
 }
 
-/* Barra de progresso indeterminada — quando há trabalho mas não se sabe
-   quantos nós. Substitui a barra vazia, que é indistinguível de "parado". */
+/* Indeterminate progress bar — when there is work but the number of nodes is
+   unknown. Replaces the empty bar, which is indistinguishable from "stopped". */
 @keyframes progresso-indeterminado {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(300%); }
@@ -229,17 +231,18 @@
 }
 
 /* ── prefers-reduced-motion ──────────────────────────────────────────────────
-   O web tem este bloco; aqui não havia nenhum, e o app já usava `animate-spin`,
-   `animate-ping` e `animate-pulse`.
+   The web has this block; here there was none, and the app already used
+   `animate-spin`, `animate-ping` and `animate-pulse`.
 
-   A regra é a mesma do canvas do web: degrada para o QUADRO INFORMATIVO, nunca
-   para nada. Cada estado precisa continuar distinguível sem movimento — um LED
-   que só existia enquanto piscava desaparece como informação se apagar junto
-   com a animação. Transições de cor e opacidade ficam: não deslocam nada.
+   The rule is the same as the web canvas's: degrade to the INFORMATIVE FRAME,
+   never to nothing. Each state must remain distinguishable without motion — an
+   LED that only existed while blinking disappears as information if it goes
+   dark along with the animation. Color and opacity transitions stay: they do
+   not move anything.
    ───────────────────────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  /* `!important` porque `animation` também é declarada nas utilitárias do
-     tw-animate-css, de mesma especificidade e emitidas depois. */
+  /* `!important` because `animation` is also declared in the tw-animate-css
+     utilities, with the same specificity and emitted later. */
   .animate-skeleton-shimmer,
   .animate-valor-muda,
   .animate-pulso-vivo,
@@ -249,19 +252,19 @@
     animation: none !important;
   }
 
-  /* Congelados no quadro que informa: o esqueleto continua sendo um bloco
-     visível, o LED continua aceso, o pulso de valor não pinta nada. */
+  /* Frozen on the frame that informs: the skeleton remains a visible block,
+     the LED stays lit, the value pulse paints nothing. */
   .animate-skeleton-shimmer { background-position: 0 0; }
   .animate-pulso-vivo { opacity: 1; }
   .animate-ping { opacity: 0.6; }
 
-  /* O spinner é o único que NÃO some: ele é o único sinal de "aguarde" em
-     botões que ficam desabilitados durante a operação. Fica girando devagar,
-     o suficiente para não parecer travado. */
+  /* The spinner is the only one that does NOT disappear: it is the only
+     "please wait" signal on buttons that stay disabled during the operation.
+     It keeps spinning slowly, just enough not to look frozen. */
   .animate-spin { animation: spin 2.4s linear infinite !important; }
 
-  /* Entrada e saída do tw-animate-css: sem deslocamento nem escala, só o
-     esmaecimento — que é o que separa "apareceu" de "sempre esteve lá". */
+  /* tw-animate-css enter and exit: no translation or scale, only the fade —
+     which is what separates "it appeared" from "it was always there". */
   [data-slot] { animation-duration: 1ms !important; }
   .animate-in, .animate-out {
     animation-duration: 140ms !important;

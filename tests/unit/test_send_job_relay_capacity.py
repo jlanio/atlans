@@ -1,9 +1,9 @@
 # tests/unit/test_send_job_relay_capacity.py
 """
-`send_job` no caminho RELAY (WS em outro worker) tem de recusar um executor
-cheio como o caminho direto recusa. Antes publicava sem olhar capacidade: o
-executor rejeitava por fila cheia e o run FALHAVA, em vez de o dispatch tentar
-o próximo candidato — o mesmo estado, desfechos opostos conforme o worker.
+`send_job` on the RELAY path (WS on another worker) has to refuse a full executor
+the way the direct path does. Before, it published without checking capacity: the
+executor rejected it for a full queue and the run FAILED, instead of the dispatch
+trying the next candidate — the same state, opposite outcomes depending on the worker.
 """
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ async def test_relay_publica_quando_ha_folga():
 
 @pytest.mark.asyncio
 async def test_capacidade_desconhecida_nao_e_fail_closed():
-    """Chave ausente = não sei = tenta. Recusar aqui recriaria o 503 espúrio."""
+    """Missing key = don't know = try. Refusing here would recreate the spurious 503."""
     reg = _registry_sem_conexao_local()
     rc = MagicMock(); rc.publish = AsyncMock(return_value=1)
     with patch.object(ec, "_redis_check_presence", AsyncMock(return_value=True)), \

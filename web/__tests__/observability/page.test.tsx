@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import type { IExecutorMetrics, IObservabilityMetrics, IRunSummary, IWorkflowMetricsRow } from "@/service/types"
 
-// ── Dublês ───────────────────────────────────────────────────────────────────
+// ── Doubles ──────────────────────────────────────────────────────────────────
 const sessao = { role: "user" }
 vi.mock("next-auth/react", () => ({
   useSession: () => ({ data: { user: { access_token: "t", role: sessao.role } }, status: "authenticated" }),
@@ -21,7 +21,7 @@ vi.mock("@/context/WorkspaceContext", () => ({
   useWorkspace: () => ({ workspaces: workspaces.lista, current: workspaces.lista[0] }),
 }))
 
-// O Recharts não pinta em jsdom (ResponsiveContainer mede 0×0).
+// Recharts doesn't paint in jsdom (ResponsiveContainer measures 0×0).
 vi.mock("next/dynamic", () => ({
   default: () => function BarrasDubladas({ dias }: { dias: unknown[] }) {
     return <div data-testid="barras">{dias.length} dias</div>
@@ -135,20 +135,20 @@ describe("Histórico — página", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Histórico" })).toBeInTheDocument()
     expect(screen.getByText(/comparado com os 30 dias anteriores/)).toBeInTheDocument()
 
-    // Faixa Agora com o que veio de `now`.
+    // The Now strip with what came from `now`.
     const faixa = await screen.findByLabelText("Agora")
     await waitFor(() => expect(faixa).toHaveTextContent("3 em andamento"))
     expect(faixa).toHaveTextContent("1 na fila")
     expect(faixa).toHaveTextContent("1 presa há 2 h 14 min")
     expect(faixa).toHaveTextContent("Executores 4 de 5 online")
 
-    // Indicadores com número e comparação.
+    // Indicators with a number and comparison.
     expect(screen.getByRole("group", { name: /^Execuções: 1\.284/ })).toBeInTheDocument()
     expect(screen.getByRole("group", { name: /^Taxa de sucesso: 96,4%/ })).toBeInTheDocument()
     expect(screen.getByRole("group", { name: /^Duração típica: 42 s/ })).toBeInTheDocument()
     expect(screen.getByRole("group", { name: /^Falhas: 36/ })).toBeInTheDocument()
 
-    // Gráfico e atenção.
+    // Chart and attention.
     expect(screen.getByRole("heading", { name: "Execuções por dia" })).toBeInTheDocument()
     expect(await screen.findByTestId("barras")).toHaveTextContent("2 dias")
     const atencao = screen.getByRole("region", { name: "Precisa de atenção" })
@@ -156,7 +156,7 @@ describe("Histórico — página", () => {
     expect(atencao).toHaveTextContent("Cadastro rural")
     expect(atencao).toHaveTextContent("Integração SICAR")
 
-    // Abas (sem Confirmações para quem não é admin) e a tabela.
+    // Tabs (no Confirmations for non-admins) and the table.
     expect(screen.getByRole("tab", { name: /Execuções/ })).toHaveAttribute("aria-selected", "true")
     expect(screen.queryByRole("tab", { name: /Confirmações/ })).not.toBeInTheDocument()
     expect(svc.getPendingAcks).not.toHaveBeenCalled()
@@ -166,7 +166,7 @@ describe("Histórico — página", () => {
     expect((await within(painel).findByRole("button", { name: "Abrir execução de Integração SICAR" })).closest("tr")).toHaveTextContent("Falhou")
     expect(painel).toHaveTextContent("Mostrando 1 de 1")
 
-    // As quatro chamadas do topo e a lista, sem filtro de workspace.
+    // The four calls at the top and the list, with no workspace filter.
     expect(svc.getObservabilityMetrics).toHaveBeenCalledWith(30, false, { workspace_id: undefined, workflow_id: undefined })
     expect(svc.getObservabilityRuns).toHaveBeenCalledTimes(1)
     expect(svc.getObservabilityRuns.mock.calls[0][0]).toMatchObject({ limit: 20, offset: 0, with_total: true })
@@ -185,8 +185,8 @@ describe("Histórico — página", () => {
     await waitFor(() => expect(svc.getRunDetail).toHaveBeenCalledWith("run-1"))
     const sheet = await screen.findByRole("dialog")
     await waitFor(() => expect(sheet).toHaveTextContent("Integração SICAR"))
-    // A linha aberta fica marcada (o Sheet põe `aria-hidden` no resto da
-    // página, daí `hidden: true` para enxergar a tabela atrás dele).
+    // The open row stays marked (the Sheet puts `aria-hidden` on the rest of
+    // the page, hence `hidden: true` to see the table behind it).
     const linha = await screen.findByRole("button", { name: "Abrir execução de Integração SICAR", hidden: true })
     expect(linha).toHaveAttribute("aria-current", "true")
 
@@ -208,7 +208,7 @@ describe("Histórico — página", () => {
     expect(painel).toHaveAttribute("aria-labelledby", "visao-aba-workflows")
     fireEvent.click(await within(painel).findByRole("button", { name: "Ver execuções de Integração SICAR" }))
     expect(ultimaUrl()).toBe("/observability?workflow=wf-2")
-    // Sem filtros nem tabela nesta visão.
+    // No filters or table in this view.
     expect(within(painel).queryByRole("searchbox")).not.toBeInTheDocument()
   })
 
@@ -223,9 +223,9 @@ describe("Histórico — página", () => {
   it("ações de atenção: presa abre a execução; falhas repetidas filtram por workflow com status=failed", async () => {
     render(<HistoricoPage />)
     const atencao = screen.getByRole("region", { name: "Precisa de atenção" })
-    // Cada item tem a ação principal E um "dispensar" (que também nomeia o
-    // workflow); os regexes miram a AÇÃO (verbo/estado no nome), não o × de
-    // dispensar ("Dispensar o alerta de …").
+    // Each item has the main action AND a "dismiss" (which also names the
+    // workflow); the regexes target the ACTION (verb/state in the name), not
+    // the dismiss × ("Dispensar o alerta de …").
     const presa = await within(atencao).findByRole("button", { name: /Cadastro rural.*em andamento/ })
     fireEvent.click(presa)
     expect(ultimaUrl()).toBe("/observability?execucao=run-presa")
@@ -271,7 +271,7 @@ describe("Histórico — página", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Desativar" }))
     await waitFor(() => expect(svc.setAdminWorkflowStatus).toHaveBeenCalledWith("wf-2", false))
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Workflow desativado", "«Integração SICAR»"))
-    // A lista volta com force para o cache do backend não devolver o valor antigo.
+    // The list comes back with force so the backend cache doesn't return the old value.
     await waitFor(() => expect(svc.getWorkflowMetricsList).toHaveBeenLastCalledWith(30, true, expect.anything()))
   })
 

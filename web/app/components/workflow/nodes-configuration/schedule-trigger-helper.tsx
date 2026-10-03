@@ -22,12 +22,12 @@ interface Props {
   values: Record<string, string | number | boolean> | undefined
   setNodeField: (field: string, value: string | number | boolean) => void
   hasUnsaved: boolean
-  /** Id do nó — re-inicializa o construtor ao trocar de nó. */
+  /** Node id — re-initializes the builder when switching nodes. */
   nodeId?: string
   /**
-   * Os campos do nó no catálogo do servidor. O `default` do `timezone` é o fuso
-   * padrão da instalação (AGENDAMENTO_FUSO_PADRAO): é ele que vale para um nó
-   * sem fuso, e não um fixo aqui.
+   * The node's fields in the server catalog. The `timezone` `default` is the
+   * installation's default time zone (AGENDAMENTO_FUSO_PADRAO): that is what
+   * applies to a node without a time zone, not a hard-coded one here.
    */
   campos?: INodesPropertyAPI[]
 }
@@ -55,12 +55,13 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
   const eRef = useRef(e)
   eRef.current = e
 
-  // Sincroniza o estado local com os valores salvos. Necessário porque o modal
-  // MONTA este helper com `values=undefined` e só popula os valores num efeito
-  // seguinte (mesmo nodeId), e também reaproveita o componente ao trocar de nó.
-  // Sem isto, abrir um nó salvo mostraria os padrões e a edição gravaria por
-  // cima da regra real. A comparação é canônica (via gerarCampos) para NÃO
-  // re-inicializar no eco das próprias gravações nem por cron equivalente.
+  // Syncs the local state with the saved values. Needed because the modal
+  // MOUNTS this helper with `values=undefined` and only populates the values in
+  // a following effect (same nodeId), and also reuses the component when
+  // switching nodes. Without this, opening a saved node would show the defaults
+  // and the edit would write over the real rule. The comparison is canonical
+  // (via gerarCampos) so as NOT to re-initialize on the echo of its own writes
+  // nor for an equivalent cron.
   useEffect(() => {
     const alvo = lerEstado(values, fusoPadrao)
     if (JSON.stringify(gerarCampos(alvo)) !== JSON.stringify(gerarCampos(eRef.current))) {
@@ -68,9 +69,10 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
     }
   }, [values, nodeId, fusoPadrao])
 
-  /** Grava só os campos que MUDARAM de fato. Evita canonicalizar um cron
-   * equivalente ('00 09' -> '0 9') e fazer o backend (que compara por string)
-   * apagar e recriar o schedule à toa — o que pularia a ocorrência do dia. */
+  /** Writes only the fields that actually CHANGED. Avoids canonicalizing an
+   * equivalent cron ('00 09' -> '0 9') and making the backend (which compares by
+   * string) delete and recreate the schedule for nothing — which would skip the
+   * day's occurrence. */
   function escrever(campos: Record<string, string | number | boolean>) {
     for (const k of Object.keys(campos)) {
       const v = campos[k]
@@ -78,15 +80,16 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
     }
   }
 
-  /** Muda um campo que DEFINE a recorrência e regrava a expressão (diff-only). */
+  /** Changes a field that DEFINES the recurrence and rewrites the expression (diff-only). */
   function atualizar(patch: Partial<EstadoAgenda>) {
     const ne = { ...e, ...patch }
     setE(ne)
     const campos: Record<string, string | number | boolean> = { ...gerarCampos(ne) }
-    // Expressão avançada inválida: NÃO toca em strategy nem em nenhuma das
-    // expressões — senão gravaríamos strategy=cron/rrule + a expressão vazia
-    // da outra aba, apagando o agendamento válido anterior. Só timezone/active/
-    // interval/unit podem mudar; o schedule salvo fica intacto de fato.
+    // Invalid advanced expression: does NOT touch strategy or any of the
+    // expressions — otherwise we would write strategy=cron/rrule + the other
+    // tab's empty expression, erasing the previous valid schedule. Only
+    // timezone/active/interval/unit may change; the saved schedule really stays
+    // intact.
     if (ne.freq === "avancado" && validarAvancado(ne)) {
       delete campos.strategy
       delete campos.cron_expression
@@ -95,8 +98,8 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
     escrever(campos)
   }
 
-  /** Fuso e "ativo" não mexem na expressão — gravam só o próprio campo, para
-   * não regravar (e churnar) o cron/rrule. */
+  /** Time zone and "active" don't touch the expression — they write only their
+   * own field, so as not to rewrite (and churn) the cron/rrule. */
   function setFuso(v: string) {
     setE(p => ({ ...p, timezone: v }))
     if (String(v) !== String(values?.timezone ?? "")) setNodeField("timezone", v)
@@ -113,15 +116,15 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
   }
   function toggleDia(d: number) {
     const tem = e.weekdays.includes(d)
-    if (tem && e.weekdays.length === 1) return // nunca deixa sem nenhum dia
+    if (tem && e.weekdays.length === 1) return // never leaves it with no day at all
     atualizar({ weekdays: tem ? e.weekdays.filter(x => x !== d) : [...e.weekdays, d] })
   }
 
   const frase = descrever(e)
   const erroAvancado = validarAvancado(e)
   const runs = useMemo(() => proximasExecucoes(e, 5), [e])
-  // Todos os fusos IANA (mais o atual, se for um nome antigo). A lista muda só
-  // com o fuso escolhido: montá-la custa ~400 formatações de deslocamento.
+  // All IANA time zones (plus the current one, if it is an old name). The list
+  // only changes with the chosen zone: building it costs ~400 offset formattings.
   const fusos = useMemo(() => opcoesDeFuso(e.timezone), [e.timezone])
   const tzLabel = (fusos.find(t => t.value === e.timezone) || { label: e.timezone }).label
   const fmt = useMemo(() => {
@@ -132,12 +135,12 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
     } catch { return new Intl.DateTimeFormat("pt-BR", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) }
   }, [e.timezone])
 
-  // Guardas honestas, derivadas do que o agendador realmente faz.
+  // Honest guards, derived from what the scheduler actually does.
   const aviso = avisoDe(e)
 
   return (
     <div className="flex flex-col gap-4 mt-1 px-1 pb-4">
-      {/* Frequência */}
+      {/* Frequency */}
       <div className="flex flex-col gap-1.5">
         <Label>Repetir</Label>
         <div role="group" aria-label="Frequência" className="flex flex-wrap gap-1.5">
@@ -280,7 +283,7 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
         </div>
       )}
 
-      {/* ── Avançado ──────────────────────────────────────────────────────── */}
+      {/* ── Advanced ─────────────────────────────────────────────────────── */}
       {e.freq === "avancado" && (
         <div className="flex flex-col gap-2">
           <div className="flex gap-1.5">
@@ -328,7 +331,7 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
         </div>
       )}
 
-      {/* Fuso horário */}
+      {/* Time zone */}
       <div className="flex flex-col gap-1.5">
         <Label>Fuso horário</Label>
         <Select value={e.timezone} onValueChange={setFuso}>
@@ -356,7 +359,7 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
         </div>
       )}
 
-      {/* Prévia */}
+      {/* Preview */}
       <div className="rounded-lg border overflow-hidden">
         <div className="flex items-start gap-2 bg-muted px-3 py-2.5">
           <TbClock className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />

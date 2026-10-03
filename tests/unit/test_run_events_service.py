@@ -1,31 +1,31 @@
-"""`app/services/run_events_service.py` — eventos de um run sem WebSocket.
+"""`app/services/run_events_service.py` — a run's events without WebSocket.
 
-O laço subscribe → LRANGE → dedup → pub/sub saiu do handler do WS para um
-gerador de `Lote`s que o servidor MCP também consome. Cada teste aqui fixa um
-comportamento que o painel de execução já dependia (e que o WS continua a
-observar através do gerador):
+The subscribe → LRANGE → dedup → pub/sub loop moved out of the WS handler into a
+generator of `Lote`s that the MCP server also consumes. Each test here pins a
+behavior the run panel already depended on (and that the WS keeps observing
+through the generator):
 
-- o replay é UMA leitura, cortada no 1º `__workflow_complete__`, e um run já
-  encerrado nunca vai ao vivo;
-- a cauda do replay deduplica a fronteira com o pub/sub, mas um repetido
-  legítimo depois dela passa;
-- quando o buffer enche, stdout cai antes de ciclo de vida e `dropped` conta;
-- canal quieto emite lote vazio de heartbeat; prazo estourado encerra sem
-  `completo`;
-- a conexão dedicada do assinante fecha em toda saída; Redis fora vira
+- the replay is ONE read, cut at the 1st `__workflow_complete__`, and a run
+  that has already ended never goes live;
+- the replay's tail deduplicates the boundary with pub/sub, but a legitimate
+  repeat after it gets through;
+- when the buffer fills up, stdout is dropped before lifecycle and `dropped` counts;
+- a quiet channel emits an empty heartbeat batch; an exceeded deadline ends
+  without `completo`;
+- the subscriber's dedicated connection closes on every exit; Redis down becomes
   `RunEventsUnavailable`.
 
-`esperar_run` combina o gerador com o poll do banco (SQLite em arquivo): o
-complete ao vivo espera a linha ficar terminal; um cancel de run `pending`, que
-não publica evento, termina pelo poll; sem Redis só o poll trabalha; o
-progresso chega por nó distinto.
+`esperar_run` combines the generator with the database poll (file-backed SQLite):
+the live complete waits for the row to become terminal; a cancel of a `pending`
+run, which publishes no event, ends via the poll; without Redis only the poll
+works; progress arrives per distinct node.
 
-O contrato que o consumidor sem socket lê do resultado também está fixado aqui:
-`viu_complete` separa "o grafo terminou, falta a linha" de "ainda rodando"
-(inclusive quando as duas tarefas terminam no mesmo passo); um `on_progress`
-que levanta não derruba a espera; falha transitória do banco é tolerada até o
-teto e só então propaga; e a leitura que o poll já tinha em voo é reaproveitada
-em vez de refeita.
+The contract the socketless consumer reads from the result is also pinned here:
+`viu_complete` separates "the graph finished, the row is missing" from "still
+running" (including when both tasks finish in the same step); an `on_progress`
+that raises does not bring down the wait; a transient database failure is
+tolerated up to the ceiling and only then propagates; and the read the poll
+already had in flight is reused instead of redone.
 """
 from __future__ import annotations
 
@@ -42,15 +42,15 @@ from app.models.workflow_run import WorkflowRun
 from app.services import run_events_service as svc
 
 
-# ── Dublês ────────────────────────────────────────────────────────────────────
+# ── Test doubles ──────────────────────────────────────────────────────────────
 
 
 class FakePubSub:
-    """`segurar=True` simula um run ainda vivo: o `listen()` nunca termina.
+    """`segurar=True` simulates a run still alive: `listen()` never ends.
 
-    `listens` conta quantas vezes o corpo do `listen()` chegou a rodar — é o
-    que prova se o gerador foi ou não ouvir o ao vivo (um `listen()` só
-    chamado, sem ser iterado, nunca executa o corpo).
+    `listens` counts how many times the body of `listen()` actually ran — it is
+    what proves whether or not the generator went to listen live (a `listen()`
+    that is only called, without being iterated, never executes the body).
     """
 
     def __init__(self, mensagens: list[str], *, segurar: bool = False):
@@ -114,7 +114,7 @@ def _redis(historico: list[str]) -> MagicMock:
 
 
 async def _coletar(gen, *, maximo: int | None = None) -> list[svc.Lote]:
-    """Consome o gerador (até `maximo` lotes) fechando-o como um cliente faria."""
+    """Consumes the generator (up to `maximo` batches), closing it as a client would."""
     lotes: list[svc.Lote] = []
     try:
         async for lote in gen:
@@ -145,7 +145,7 @@ async def test_replay_le_o_historico_em_uma_unica_chamada_e_entrega_em_lotes():
 
     rc.lrange.assert_awaited_once_with("workflow:run-1:history", 0, -1)
     assert sub._pubsub.canais == ["workflow:run-1:events"]
-    # O ENVIO continua paginado (500/500/200) e depois vem o complete ao vivo.
+    # SENDING is still paginated (500/500/200) and then comes the live complete.
     assert [len(lote.eventos) for lote in lotes] == [500, 500, 200, 1]
     assert [lote.completo for lote in lotes] == [False, False, False, True]
     assert _nodes(lotes) == [f"n{i}" for i in range(1200)] + [WORKFLOW_COMPLETE_NODE]
@@ -154,9 +154,9 @@ async def test_replay_le_o_historico_em_uma_unica_chamada_e_entrega_em_lotes():
 
 @pytest.mark.asyncio
 async def test_replay_corta_no_complete_e_nao_vai_ao_vivo():
-    """Run já encerrado: último lote com `completo=True`, pub/sub nunca lido."""
+    """Run already ended: last batch with `completo=True`, pub/sub never read."""
     rc = _redis([stdout("n1"), COMPLETE, stdout("n2")])
-    # Se o gerador fosse ao vivo, ficaria preso aqui — o teste travaria.
+    # If the generator went live, it would get stuck here — the test would hang.
     sub = FakeSubClient(FakePubSub([], segurar=True))
 
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
@@ -215,13 +215,13 @@ async def test_dedup_descarta_a_cauda_do_replay_repetida_ao_vivo():
 
     replay, ao_vivo = lotes[0], lotes[1:]
     assert _nodes([replay]) == ["n8", "n8", "n9"]
-    # A `n8` repetida DEPOIS da fronteira é legítima e tem que passar.
+    # The `n8` repeated AFTER the boundary is legitimate and has to get through.
     assert _nodes(ao_vivo) == ["n10", "n8", WORKFLOW_COMPLETE_NODE]
 
 
 @pytest.mark.asyncio
 async def test_dedup_desliga_na_primeira_mensagem_que_nao_casa():
-    """Um repetido no MEIO do run não é engolido: o dedup é só de prefixo."""
+    """A repeat in the MIDDLE of the run is not swallowed: the dedup is prefix-only."""
     cauda = [stdout("n1", "x")]
     rc = _redis(cauda)
     sub = FakeSubClient(FakePubSub([stdout("n2"), stdout("n1", "x"), COMPLETE]))
@@ -246,8 +246,8 @@ async def test_buffer_cheio_descarta_stdout_antes_de_lifecycle_e_conta_dropped()
     rc = _redis([])
     sub = FakeSubClient(FakePubSub(mensagens))
 
-    # O pub/sub falso entrega tudo sem ceder o laço, então o produtor enche o
-    # buffer antes de o consumidor drenar — é o cenário de browser lento.
+    # The fake pub/sub delivers everything without yielding the loop, so the producer
+    # fills the buffer before the consumer drains it — the slow-browser scenario.
     with patch.object(svc, "new_pubsub_client", lambda: sub), \
             patch.object(svc, "get_redis_pool", return_value=rc), \
             patch.object(svc, "_QUEUE_MAXSIZE", 3):
@@ -355,9 +355,9 @@ async def test_falha_no_subscribe_tambem_e_run_events_unavailable():
 
 @pytest.fixture
 async def banco(tmp_path):
-    """SQLite em ARQUIVO: o poll e quem atualiza o run usam sessões próprias, e
-    em memória cada conexão veria um banco vazio diferente (um `StaticPool`
-    compartilharia a mesma transação, e o rollback do poll desfaria o UPDATE)."""
+    """FILE-backed SQLite: the poll and whoever updates the run use their own
+    sessions, and in memory each connection would see a different empty database (a
+    `StaticPool` would share the same transaction, and the poll's rollback would undo the UPDATE)."""
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     from app.models.base import Base
@@ -401,12 +401,12 @@ async def test_ler_status_do_run_por_task_id(banco):
 
 @pytest.mark.asyncio
 async def test_esperar_run_complete_ao_vivo_espera_a_linha_ficar_terminal(banco):
-    """O consumer publica o evento e SÓ DEPOIS grava a linha."""
+    """The consumer publishes the event and ONLY THEN writes the row."""
     mensagens = [
         stdout("n1", "print ignorado"),
         lifecycle("n1", "started"),
         lifecycle("n1", "completed", duration_ms=1234),
-        lifecycle("n1", "completed", duration_ms=1234),  # repetido: conta uma vez
+        lifecycle("n1", "completed", duration_ms=1234),  # repeated: counts once
         lifecycle("n2", "failed", duration_ms=80),
         COMPLETE,
     ]
@@ -437,7 +437,7 @@ async def test_esperar_run_complete_ao_vivo_espera_a_linha_ficar_terminal(banco)
 
 @pytest.mark.asyncio
 async def test_esperar_run_cancel_de_run_pending_termina_pelo_poll(banco):
-    """Sem `__workflow_complete__` publicado: é o poll do banco que encerra."""
+    """No `__workflow_complete__` published: the database poll is what ends it."""
     sub = FakeSubClient(FakePubSub([], segurar=True))
     atualizador = asyncio.create_task(_mudar_status(banco, "cancelled", apos_s=0.05))
 
@@ -451,7 +451,7 @@ async def test_esperar_run_cancel_de_run_pending_termina_pelo_poll(banco):
     assert resultado.status == "cancelled"
     assert resultado.concluidos == 0
     assert resultado.timed_out is False
-    # A task dos eventos foi cancelada e o assinante, fechado.
+    # The events task was cancelled and the subscriber closed.
     assert sub.fechado is True
 
 
@@ -519,12 +519,12 @@ async def test_esperar_run_soma_eventos_descartados(banco):
 
 @pytest.mark.asyncio
 async def test_esperar_run_replay_ja_completo_nao_ouve_o_pubsub(banco):
-    """Histórico já com o marcador: o `listen()` não chega a ser iterado.
+    """History already holding the marker: `listen()` is never iterated.
 
-    O dublê conta as entradas no corpo do `listen()` e ficaria preso nele para
-    sempre (`segurar=True`); o `poll_s` é maior que o prazo do teste, então
-    quem termina a espera é o replay. Se o gerador fosse ao vivo, o
-    `wait_for` de 1 s estouraria em vez de devolver resultado.
+    The double counts the entries into the body of `listen()` and would be stuck
+    in it forever (`segurar=True`); `poll_s` is longer than the test's deadline,
+    so what ends the wait is the replay. If the generator went live, the 1 s
+    `wait_for` would time out instead of returning a result.
     """
     pubsub = FakePubSub([], segurar=True)
     sub = FakeSubClient(pubsub)
@@ -538,7 +538,7 @@ async def test_esperar_run_replay_ja_completo_nao_ouve_o_pubsub(banco):
         )
     await atualizador
 
-    # Inscrito (a ordem SUBSCRIBE-antes-do-LRANGE não muda), mas nunca ouvido.
+    # Subscribed (the SUBSCRIBE-before-LRANGE order does not change), but never listened to.
     assert pubsub.canais == ["workflow:run-1:events"]
     assert pubsub.listens == 0
     assert resultado.viu_complete is True
@@ -551,11 +551,11 @@ async def test_esperar_run_replay_ja_completo_nao_ouve_o_pubsub(banco):
 
 @pytest.mark.asyncio
 async def test_esperar_run_complete_sem_linha_terminal_devolve_viu_complete(banco):
-    """Consumer parado: o grafo terminou, a linha não. Quem chama precisa saber.
+    """Consumer stopped: the graph finished, the row did not. The caller needs to know.
 
-    Sem `viu_complete` o resultado era indistinguível de um run ainda rodando:
-    `status="running"` e `timed_out=False`, porque o prazo geral nem chegou
-    perto de estourar.
+    Without `viu_complete` the result was indistinguishable from a run still
+    running: `status="running"` and `timed_out=False`, because the overall
+    deadline was nowhere near expiring.
     """
     sub = FakeSubClient(FakePubSub([lifecycle("n1", "completed"), COMPLETE]))
 
@@ -575,7 +575,7 @@ async def test_esperar_run_complete_sem_linha_terminal_devolve_viu_complete(banc
 
 @pytest.mark.asyncio
 async def test_esperar_run_sem_complete_nao_marca_viu_complete(banco):
-    """Fim que não publica evento: `viu_complete` fica False mesmo com desfecho."""
+    """An end that publishes no event: `viu_complete` stays False even with an outcome."""
     sub = FakeSubClient(FakePubSub([], segurar=True))
     atualizador = asyncio.create_task(_mudar_status(banco, "cancelled", apos_s=0.02))
 
@@ -592,12 +592,12 @@ async def test_esperar_run_sem_complete_nao_marca_viu_complete(banco):
 
 @pytest.mark.asyncio
 async def test_esperar_run_reaproveita_a_leitura_em_curso_apos_o_complete(banco):
-    """A leitura que o poll já tinha em voo não é jogada fora (latência dobrada).
+    """The read the poll already had in flight is not thrown away (doubled latency).
 
-    A leitura é lenta de propósito, então o complete do replay chega com ela em
-    curso: o `shield` a deixa terminar e o resultado tem que sair DELA. Uma
-    segunda ida ao banco aqui seria um round-trip inteiro no caminho mais
-    comum da espera.
+    The read is slow on purpose, so the replay's complete arrives while it is in
+    progress: the `shield` lets it finish and the result has to come FROM IT. A
+    second trip to the database here would be a whole round trip on the most
+    common path of the wait.
     """
     leituras: list[str] = []
     real = svc.ler_status_do_run
@@ -626,7 +626,7 @@ async def test_esperar_run_reaproveita_a_leitura_em_curso_apos_o_complete(banco)
 
 @pytest.mark.asyncio
 async def test_esperar_run_callback_que_falha_nao_derruba_a_espera(banco, caplog):
-    """`on_progress` do chamador quebrado: avisa uma vez e segue contando."""
+    """The caller's `on_progress` is broken: warns once and keeps counting."""
     mensagens = [
         lifecycle("n1", "completed"),
         lifecycle("n2", "completed"),
@@ -653,7 +653,7 @@ async def test_esperar_run_callback_que_falha_nao_derruba_a_espera(banco, caplog
             )
     await atualizador
 
-    # Notificou uma vez, desistiu de notificar — e contou os três assim mesmo.
+    # Notified once, gave up notifying — and counted all three anyway.
     assert chamadas == [1]
     assert resultado.concluidos == 3
     assert resultado.status == "failed"
@@ -664,7 +664,7 @@ async def test_esperar_run_callback_que_falha_nao_derruba_a_espera(banco, caplog
 
 @pytest.mark.asyncio
 async def test_esperar_run_tolera_falhas_transitorias_do_poll(banco, caplog):
-    """Blip do banco com o canal de eventos são: a espera continua."""
+    """Database blip with the events channel healthy: the wait goes on."""
     from sqlalchemy.exc import SQLAlchemyError
 
     real = svc.ler_status_do_run
@@ -694,7 +694,7 @@ async def test_esperar_run_tolera_falhas_transitorias_do_poll(banco, caplog):
 
 @pytest.mark.asyncio
 async def test_esperar_run_propaga_quando_o_poll_falha_alem_do_teto(banco):
-    """Indisponibilidade real (não um soluço): o erro sobe para quem chamou."""
+    """Real unavailability (not a hiccup): the error propagates to the caller."""
     from sqlalchemy.exc import SQLAlchemyError
 
     chamadas = {"n": 0}
@@ -722,14 +722,14 @@ async def _linha(fabrica) -> WorkflowRun:
 
 @pytest.mark.asyncio
 async def test_esperar_run_viu_complete_quando_as_duas_tarefas_terminam_juntas(banco):
-    """Eventos e poll terminando no MESMO passo do laço.
+    """Events and poll finishing in the SAME loop step.
 
-    É uma corrida real — o `__workflow_complete__` chega enquanto a leitura do
-    poll volta — e nela `asyncio.wait` devolve as DUAS tarefas em `done`. A
-    janela dura um passo do laço, então é forçada aqui por um dublê que espera
-    as duas antes de devolver. Sair direto pelo desfecho do poll, sem olhar o
-    resultado dos eventos, entregava `viu_complete=False` para um run cujo
-    grafo comprovadamente terminou.
+    It is a real race — the `__workflow_complete__` arrives while the poll's
+    read comes back — and in it `asyncio.wait` returns BOTH tasks in `done`. The
+    window lasts one loop step, so it is forced here by a double that waits for
+    both before returning. Exiting straight through the poll's outcome, without
+    looking at the events' result, delivered `viu_complete=False` for a run whose
+    graph had demonstrably finished.
     """
     wait_real = asyncio.wait
 
@@ -757,11 +757,11 @@ async def test_esperar_run_viu_complete_quando_as_duas_tarefas_terminam_juntas(b
     assert resultado.concluidos == 1
 
 
-# ── esperar_run: prazos, desfechos e descarte (caracterização) ───────────────
+# ── esperar_run: deadlines, outcomes and discarding (characterization) ───────
 #
-# Presos antes de dividir o laço em partes: o prazo que chega ao gerador e ao
-# poll, o que volta em cada desfecho (inclusive os de erro) e quais eventos NÃO
-# contam como progresso.
+# Pinned before splitting the loop into parts: the deadline that reaches the
+# generator and the poll, what comes back in each outcome (including the error
+# ones) and which events do NOT count as progress.
 
 
 def _desfecho(resultado: svc.ResultadoEspera) -> tuple:
@@ -784,7 +784,7 @@ async def test_esperar_run_repassa_aos_eventos_so_o_prazo_que_resta(banco):
     async def eventos_falsos(run_id, *, timeout_s):
         prazos.append(timeout_s)
         await asyncio.Event().wait()
-        yield  # pragma: no cover - nunca chega aqui
+        yield  # pragma: no cover - never gets here
 
     atualizador = asyncio.create_task(_mudar_status(banco, "success", apos_s=0.02))
     with patch.object(svc, "iter_run_events", eventos_falsos):
@@ -799,7 +799,7 @@ async def test_esperar_run_repassa_aos_eventos_so_o_prazo_que_resta(banco):
 
 @pytest.mark.asyncio
 async def test_esperar_run_poll_longo_nao_passa_do_prazo(banco):
-    """`poll_s` maior que o prazo: a espera acaba no prazo, não no próximo poll."""
+    """`poll_s` longer than the deadline: the wait ends at the deadline, not at the next poll."""
     sub = FakeSubClient(FakePubSub([], segurar=True))
     inicio = asyncio.get_running_loop().time()
 
@@ -832,7 +832,7 @@ async def test_esperar_run_run_que_nao_existe_estoura_o_prazo_sem_linha(banco):
 async def test_esperar_run_erro_generico_nos_eventos_segue_pelo_poll(banco, caplog):
     async def eventos_quebrados(run_id, *, timeout_s):
         raise ValueError("canal quebrou")
-        yield  # pragma: no cover - gerador
+        yield  # pragma: no cover - generator
 
     atualizador = asyncio.create_task(_mudar_status(banco, "failed", apos_s=0.02))
     with patch.object(svc, "iter_run_events", eventos_quebrados), \
@@ -873,7 +873,7 @@ async def test_esperar_run_redis_fora_avisa_e_marca_redis_indisponivel(banco, ca
 
 @pytest.mark.asyncio
 async def test_esperar_run_devolve_a_linha_desprendida_e_legivel(banco):
-    """`run` volta sem sessão, com os atributos já carregados."""
+    """`run` comes back without a session, with the attributes already loaded."""
     async with banco() as s:
         await s.execute(
             update(WorkflowRun).where(WorkflowRun.task_id == "run-1")
@@ -893,8 +893,8 @@ async def test_esperar_run_devolve_a_linha_desprendida_e_legivel(banco):
 
 
 def _leitura_pos_complete(falhas: int):
-    """1ª leitura: 'running' (o consumer ainda não gravou); depois `falhas`
-    falhas transitórias seguidas; depois a linha de verdade."""
+    """1st read: 'running' (the consumer has not written yet); then `falhas`
+    consecutive transient failures; then the real row."""
     from sqlalchemy.exc import SQLAlchemyError
 
     real = svc.ler_status_do_run
@@ -1001,13 +1001,13 @@ async def test_esperar_run_falha_transitoria_depois_do_prazo_propaga_sem_esperar
 
 @pytest.mark.asyncio
 async def test_esperar_run_so_conta_ciclo_de_vida_valido_e_descarta_o_que_vem_depois_do_complete(banco):
-    """O que NÃO é progresso: stdout/debug, JSON inválido ou que não é objeto,
-    kind que não é ciclo de vida, evento sem nó, status que não é de fim — e o
-    que o histórico guardou DEPOIS do `__workflow_complete__` (outro ciclo)."""
+    """What is NOT progress: stdout/debug, invalid JSON or JSON that is not an
+    object, a kind that is not lifecycle, an event without a node, a non-final
+    status — and what the history stored AFTER `__workflow_complete__` (another cycle)."""
     historico = [
         "nao-e-json",
         "[1, 2]",
-        json.dumps({"node": "n0", "status": "completed"}),  # sem kind: ciclo de vida
+        json.dumps({"node": "n0", "status": "completed"}),  # no kind: counts as lifecycle
         stdout("n1", "print"),
         json.dumps({"node": "n1", "kind": "debug", "status": "completed"}),
         json.dumps({"kind": "lifecycle", "status": "completed"}),

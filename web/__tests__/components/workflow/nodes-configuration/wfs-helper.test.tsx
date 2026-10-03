@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 /**
- * O seletor de camadas do nó WFS lista com a credencial do nó: um GeoServer
- * esconde do anônimo as camadas protegidas, e a lista anônima trocava o campo
- * de texto por um dropdown sem elas — a camada protegida ficava inalcançável.
+ * The WFS node's layer picker lists with the node's credential: a GeoServer
+ * hides protected layers from anonymous users, and the anonymous list swapped
+ * the text field for a dropdown without them — the protected layer became unreachable.
  */
 const http = vi.hoisted(() => ({ get: vi.fn() }))
 vi.mock("axios", () => {
@@ -25,7 +25,7 @@ const CAMADAS = [
   { name: "ns:protegida", title: "Protegida" },
 ]
 
-// `{}` monta sem fluxo (um fluxo ainda não salvo); o padrão é o fluxo "wf1".
+// `{}` mounts without a workflow (a not-yet-saved workflow); the default is workflow "wf1".
 function montar(valores: Valores, { workflowId }: { workflowId?: string } = { workflowId: "wf1" }) {
   const setNodeField = vi.fn()
   const r = render(<WFSHelper values={valores} setNodeField={setNodeField} workflowId={workflowId} />)
@@ -111,7 +111,7 @@ describe("WFSHelper — a credencial do nó na listagem", () => {
     montar({ url: URL_WFS, typeName: "", credential_id: "cred-alheia" })
     buscar()
     expect(await screen.findByText("A credencial deste nó não está ao seu alcance.")).toBeTruthy()
-    // Sem lista: o campo de texto segue disponível.
+    // No list: the text field remains available.
     expect(screen.getByPlaceholderText("namespace:camada")).toBeTruthy()
   })
 })

@@ -1,21 +1,21 @@
 # tests/unit/test_despacho_ocupacao.py
 """
-Ordem dos candidatos no despacho (`_situacoes`/`_chave_de_ordem`/
-`_elegiveis_ordenados` em workflow_execution_service).
+Order of candidates in the dispatch (`_situacoes`/`_chave_de_ordem`/
+`_elegiveis_ordenados` in workflow_execution_service).
 
-Antes, a carga vinha só do `capacity` que o executor manda a cada 10 s, e só
-no worker da API que segura o WebSocket dele: nos outros workers o executor
-contava zero, e numa rajada todos os jobs iam para quem estava vazio no último
-relatório. Com o pool ocioso, o empate caía na ordem do banco — o primeiro
-executor levava tudo.
+Before, the load came only from the `capacity` the executor sends every 10 s,
+and only in the API worker that holds its WebSocket: in the other workers the
+executor counted as zero, and in a burst all jobs went to whoever was empty in
+the last report. With the pool idle, the tie fell to database order — the first
+executor took everything.
 
-  - A carga é a CONTADA pelo servidor (runs `pending`/`running` do host no
-    banco), numa consulta isolada por SAVEPOINT na conexão. A declarada
-    (local ou publicada no Redis) só entra quando a contagem não sai, e para
-    dizer se o executor está cheio.
-  - Com vaga livre: sorteio ponderado pelas vagas livres — decisões
-    simultâneas se espalham. Sem vaga: menor ocupação relativa às vagas.
-    Cheios (pelo relatório ou pela contagem): por último.
+  - The load is the one COUNTED by the server (the host's `pending`/`running`
+    runs in the database), in a query isolated by a SAVEPOINT on the
+    connection. The declared one (local or published in Redis) only comes in
+    when the count fails, and to tell whether the executor is full.
+  - With a free slot: a draw weighted by free slots — simultaneous decisions
+    spread out. No slot: lowest occupancy relative to slots.
+    Full ones (by the report or by the count): last.
 """
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ from app.services import workflow_execution_service as wes
 from ._mcp_harness import RedisFalso, banco_em_memoria
 
 
-# ── Fábricas ──────────────────────────────────────────────────────────────────
+# ── Factories ─────────────────────────────────────────────────────────────────
 
 def _executor(id_hash, *, vagas=4, fila=50):
     return SimpleNamespace(
@@ -51,8 +51,8 @@ def _capacidade(running=0, queued=0, max_concurrent=4, max_queue=50):
 
 
 def _registro(declaradas=None):
-    """Registry falso: todos presentes; a capacidade declarada vem do dict
-    (ausente = nunca declarou), e `send_job` aceita tudo e anota o escolhido."""
+    """Fake registry: all present; the declared capacity comes from the dict
+    (absent = never declared), and `send_job` accepts everything and records the chosen one."""
     declaradas = declaradas or {}
     reg = MagicMock()
     reg.presence_or_unknown = AsyncMock(return_value=True)
@@ -101,7 +101,7 @@ def _erro_do_banco(*, conexao_perdida=False):
 
 
 def _sessao_falsa(execute):
-    """Sessão cuja conexão anota o savepoint e roda `execute` na consulta."""
+    """Session whose connection records the savepoint and runs `execute` on the query."""
     eventos: list[str] = []
 
     class _Ponto:
@@ -132,8 +132,8 @@ async def fabrica():
 
 @pytest.fixture
 def estavel():
-    """Sorteio fixo em 0,5, para as asserções de ordem exata: com vaga, quem
-    tem mais vagas livres vem primeiro; empate fica na ordem de entrada."""
+    """Draw fixed at 0.5, for the exact-order assertions: with slots, whoever has
+    more free slots comes first; a tie stays in input order."""
     with patch.object(wes, "_desempate", lambda: 0.5):
         yield
 
@@ -145,30 +145,30 @@ async def _ordenar(fabrica, reg, pool):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# A carga que ordena
+# The load that orders
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestCarga:
     @pytest.mark.asyncio
     async def test_contada_pelo_servidor_vence_a_declarada_defasada(self, fabrica, estavel):
-        # A declarou 0 no último relatório, mas o servidor já lhe despachou 3.
+        # A declared 0 in the last report, but the server has already dispatched 3 to it.
         await _runs(fabrica, "A", "running", 3)
         reg = _registro({"A": _capacidade(), "B": _capacidade()})
         assert await _ordenar(fabrica, reg, [_executor("A"), _executor("B")]) == ["B", "A"]
 
     @pytest.mark.asyncio
     async def test_declarada_defasada_nao_infla_a_carga(self, fabrica, estavel):
-        # O último relatório de A (até 10 s atrás) dizia 3 rodando; já
-        # terminaram — o banco não mostra nenhum. B tem 1 de verdade. Pela
-        # maior das duas, A parecia mais ocupado que B.
+        # A's last report (up to 10 s ago) said 3 running; they have already
+        # finished — the database shows none. B really has 1. By the larger
+        # of the two, A looked busier than B.
         await _runs(fabrica, "B", "running", 1)
         reg = _registro({"A": _capacidade(running=3), "B": _capacidade()})
         assert await _ordenar(fabrica, reg, [_executor("B"), _executor("A")]) == ["A", "B"]
 
     @pytest.mark.asyncio
     async def test_declarada_e_contada_nao_se_somam(self, fabrica, estavel):
-        # O caso comum: relatório e banco veem os MESMOS 2 jobs de A. Somados,
-        # A pareceria lotado (4 de 4) e perderia para B, que tem 3.
+        # The common case: report and database see the SAME 2 jobs of A. Added up,
+        # A would look full (4 of 4) and lose to B, which has 3.
         await _runs(fabrica, "A", "running", 2)
         await _runs(fabrica, "B", "running", 3)
         reg = _registro({"A": _capacidade(running=2), "B": _capacidade()})
@@ -176,8 +176,8 @@ class TestCarga:
 
     @pytest.mark.asyncio
     async def test_pending_conta_e_terminal_nao(self, fabrica, estavel):
-        # O INSERT do despacho grava `pending` com o host: já ocupa. Runs
-        # encerrados não ocupam ninguém.
+        # The dispatch INSERT writes `pending` with the host: it already occupies.
+        # Finished runs occupy no one.
         await _runs(fabrica, "A", "pending", 2)
         for status in ("success", "failed", "cancelled"):
             await _runs(fabrica, "B", status, 5)
@@ -185,16 +185,16 @@ class TestCarga:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Cheios vão por último
+# Full ones go last
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestCheios:
     @pytest.mark.asyncio
     async def test_cheio_pela_declarada_vai_por_ultimo(self, fabrica, estavel):
-        # Em drenagem o executor se anuncia cheio para sair da frente (queued =
-        # teto da fila + concorrência), sem run nenhum no banco. Pela ocupação
-        # relativa (59/8) ele passava na frente de um executor de 1 vaga com 8
-        # jobs (9/1) — e era tentado só para o send_job recusar.
+        # While draining, the executor announces itself as full to get out of the
+        # way (queued = queue ceiling + concurrency), with no run in the database.
+        # By relative occupancy (59/8) it got ahead of a 1-slot executor with 8
+        # jobs (9/1) — and was tried only for send_job to refuse.
         drenando = _capacidade(running=0, queued=50 + 8, max_concurrent=8)
         await _runs(fabrica, "pequeno", "running", 8)
         reg = _registro({"drenando": drenando, "pequeno": _capacidade(max_concurrent=1)})
@@ -203,12 +203,12 @@ class TestCheios:
 
     @pytest.mark.asyncio
     async def test_fila_cheia_pela_contagem_vai_por_ultimo(self, fabrica):
-        # O relatório de "grande" (16 vagas, fila 50) tem até 10 s e ainda diz
-        # 56 de 66 — mas o servidor já lhe despachou 66: a fila local dele está
-        # cheia, e o próximo job seria RECUSADO por ele depois de o envio ter
-        # sido aceito — run falhado, sem failover. "pequeno" tem 16 de 54.
-        # Pela ocupação relativa (67/16 < 17/4), "grande" vinha primeiro, e
-        # continuava primeiro a cada run falhado. Sem sorteio fixo: não é sorte.
+        # The report of "grande" (16 slots, queue 50) is up to 10 s old and still
+        # says 56 of 66 — but the server has already dispatched 66 to it: its
+        # local queue is full, and the next job would be REFUSED by it after the
+        # send had been accepted — a failed run, no failover. "pequeno" has 16
+        # of 54. By relative occupancy (67/16 < 17/4), "grande" came first, and
+        # stayed first with every failed run. No fixed draw: it is not luck.
         await _runs(fabrica, "grande", "running", 66)
         await _runs(fabrica, "pequeno", "running", 16)
         reg = _registro({
@@ -223,9 +223,9 @@ class TestCheios:
     async def test_executor_em_outro_worker_cheio_pela_capacidade_do_redis(
         self, fabrica, estavel, monkeypatch,
     ):
-        # O registry REAL: "local" tem o WebSocket neste worker; "remoto" está
-        # noutro, e o relatório dele (cheio) só existe no Redis. Antes, daqui,
-        # "remoto" contava zero. A leitura é uma ida só ao Redis (MGET).
+        # The REAL registry: "local" has its WebSocket in this worker; "remoto" is
+        # in another, and its report (full) only exists in Redis. Before, from
+        # here, "remoto" counted as zero. The read is a single Redis trip (MGET).
         redis = RedisFalso()
         await redis.set(ec._capacity_key("remoto"), json.dumps(_capacidade(running=4, queued=50)))
 
@@ -249,9 +249,9 @@ class TestCheios:
 class TestVagas:
     @pytest.mark.asyncio
     async def test_com_vaga_quem_tem_mais_vagas_livres_sai_na_frente(self, fabrica, estavel):
-        # 4 jobs em 8 vagas deixam 4 livres; 1 em 2 deixa 1. O sorteio é
-        # ponderado 4:1 — sem o sorteio fixo, "pequeno" ainda sai na frente 1
-        # vez em 5, e é isso que espalha decisões simultâneas.
+        # 4 jobs in 8 slots leave 4 free; 1 in 2 leaves 1. The draw is weighted
+        # 4:1 — without the fixed draw, "pequeno" still comes out ahead 1 time
+        # in 5, and that is what spreads simultaneous decisions.
         await _runs(fabrica, "grande", "running", 4)
         await _runs(fabrica, "pequeno", "running", 1)
         reg = _registro({
@@ -263,9 +263,9 @@ class TestVagas:
 
     @pytest.mark.asyncio
     async def test_sem_vaga_em_nenhum_vai_para_a_menor_fila_relativa(self, fabrica, estavel):
-        # Os dois lotados: o job vai esperar. 12 jobs em 8 vagas (4 na fila
-        # para 8 rodando) andam mais rápido que 3 em 2 (1 na fila para 2) —
-        # pela contagem absoluta (3 < 12) o job ia para o pequeno.
+        # Both full: the job will wait. 12 jobs in 8 slots (4 queued for 8
+        # running) move faster than 3 in 2 (1 queued for 2) — by the absolute
+        # count (3 < 12) the job went to the small one.
         await _runs(fabrica, "grande", "running", 12)
         await _runs(fabrica, "pequeno", "running", 3)
         reg = _registro({
@@ -277,8 +277,8 @@ class TestVagas:
 
     @pytest.mark.asyncio
     async def test_vagas_declaradas_menores_que_o_teto_do_banco_valem(self, fabrica, estavel):
-        # O banco permite 8, mas o executor sobe com EXECUTOR_MAX_CONCURRENT=2:
-        # com 1 job ele está pela metade, não a um oitavo.
+        # The database allows 8, but the executor starts with EXECUTOR_MAX_CONCURRENT=2:
+        # with 1 job it is at half, not at one eighth.
         await _runs(fabrica, "A", "running", 1)
         await _runs(fabrica, "B", "running", 2)
         reg = _registro({"A": _capacidade(max_concurrent=2), "B": _capacidade(max_concurrent=4)})
@@ -287,9 +287,9 @@ class TestVagas:
 
     @pytest.mark.asyncio
     async def test_vagas_nao_passam_do_teto_do_banco(self, fabrica, estavel):
-        # Antes do primeiro `capacity`, o worker que segura o WebSocket tem um
-        # valor provisório (4). O teto do registro é 1: com 1 job, A está
-        # lotado — em todos os workers, não só nos que não têm o WebSocket.
+        # Before the first `capacity`, the worker holding the WebSocket has a
+        # provisional value (4). The registration's ceiling is 1: with 1 job, A
+        # is full — in every worker, not only in those without the WebSocket.
         await _runs(fabrica, "A", "running", 1)
         await _runs(fabrica, "B", "running", 2)
         reg = _registro({"A": _capacidade(max_concurrent=4), "B": _capacidade(max_concurrent=4)})
@@ -298,7 +298,7 @@ class TestVagas:
 
     @pytest.mark.asyncio
     async def test_sem_capacidade_declarada_as_vagas_vem_do_banco(self, fabrica, estavel):
-        # Nunca mandou `capacity`: vale o teto do registro.
+        # Never sent `capacity`: the registration's ceiling applies.
         await _runs(fabrica, "A", "running", 2)
         await _runs(fabrica, "B", "running", 2)
         ordem = await _ordenar(fabrica, _registro(), [_executor("A", vagas=2), _executor("B", vagas=8)])
@@ -306,12 +306,12 @@ class TestVagas:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Rajadas: o despacho real, com o INSERT de cada run no banco
+# Bursts: the real dispatch, with each run's INSERT in the database
 # ══════════════════════════════════════════════════════════════════════════════
 
 async def _rajada(fabrica, reg, pool, n):
-    """Despacha `n` jobs em sequência pelo `_dispatch_job` real. A capacidade
-    declarada fica congelada (o relatório de 10 s não chega no meio)."""
+    """Dispatches `n` jobs in sequence through the real `_dispatch_job`. The
+    declared capacity stays frozen (the 10 s report does not arrive midway)."""
     wf, definicao = _wf(), {"nodes": [], "edges": []}
     with patch.object(wes, "executor_registry", reg), \
          patch.object(wes, "inject_credentials", AsyncMock(side_effect=lambda d, **_: d)), \
@@ -326,7 +326,7 @@ async def _rajada(fabrica, reg, pool, n):
 class TestRajada:
     @pytest.mark.asyncio
     async def test_rajada_se_divide_entre_executores_ociosos(self, fabrica):
-        # Antes: 30 jobs, 30 para o primeiro do banco.
+        # Before: 30 jobs, 30 to the first in the database.
         reg = _registro({e: _capacidade() for e in ("A", "B", "C")})
         pool = [_executor("A"), _executor("B"), _executor("C")]
         recebidos = await _rajada(fabrica, reg, pool, 30)
@@ -344,10 +344,10 @@ class TestRajada:
 
     @pytest.mark.asyncio
     async def test_rajada_em_pool_misto_nao_passa_da_fila_de_ninguem(self, fabrica, estavel):
-        # 16 vagas + fila 50 (cabem 66) e 4 vagas + fila 50 (cabem 54), relatório
-        # congelado em zero. Pela ocupação relativa, "grande" recebia ~4 jobs
-        # para cada 1 de "pequeno" e passava dos 66 antes de "pequeno" chegar
-        # à metade — cada excedente, um run falhado na fila local dele.
+        # 16 slots + queue 50 (66 fit) and 4 slots + queue 50 (54 fit), report
+        # frozen at zero. By relative occupancy, "grande" got ~4 jobs for every
+        # 1 of "pequeno" and went past 66 before "pequeno" reached half — each
+        # excess one a failed run in its local queue.
         reg = _registro({
             "grande": _capacidade(max_concurrent=16),
             "pequeno": _capacidade(max_concurrent=4),
@@ -359,7 +359,7 @@ class TestRajada:
 
     @pytest.mark.asyncio
     async def test_run_encerrado_libera_a_vaga(self, fabrica, estavel):
-        # A e B com um job cada; o de A termina — o próximo vai para A.
+        # A and B with one job each; A's finishes — the next goes to A.
         reg = _registro({e: _capacidade() for e in ("A", "B")})
         pool = [_executor("A"), _executor("B")]
         await _rajada(fabrica, reg, pool, 2)
@@ -381,9 +381,9 @@ class TestRajada:
 class TestSorteio:
     @pytest.mark.asyncio
     async def test_empate_e_sorteado(self, fabrica):
-        # Com o pool ocioso, qualquer um pode ser o primeiro — não mais o
-        # primeiro do banco sempre. 300 sorteios entre 3: a chance de um deles
-        # nunca liderar é desprezível (~3·(2/3)^300).
+        # With the pool idle, any of them can be first — no longer always the
+        # first in the database. 300 draws among 3: the chance of one of them
+        # never leading is negligible (~3·(2/3)^300).
         reg = _registro({e: _capacidade() for e in ("A", "B", "C")})
         pool = [_executor("A"), _executor("B"), _executor("C")]
         primeiros = collections.Counter()
@@ -395,9 +395,9 @@ class TestSorteio:
 
     @pytest.mark.asyncio
     async def test_decisoes_simultaneas_se_espalham(self, fabrica):
-        # Vários despachos ao mesmo tempo partem do MESMO retrato: nenhum INSERT
-        # entre eles. Com o mínimo estrito, todos iam para A. Agora cada um
-        # sorteia pelas vagas livres (A 4, B 3, C 3): esperado ~40/30/30%.
+        # Several dispatches at the same time start from the SAME snapshot: no INSERT
+        # between them. With the strict minimum, all went to A. Now each one
+        # draws by free slots (A 4, B 3, C 3): expected ~40/30/30%.
         await _runs(fabrica, "B", "running", 1)
         await _runs(fabrica, "C", "running", 1)
         pool = [_executor("A"), _executor("B"), _executor("C")]
@@ -406,14 +406,14 @@ class TestSorteio:
             with patch.object(wes, "executor_registry", _registro()):
                 for _ in range(300):
                     primeiros[(await wes._elegiveis_ordenados(db, pool))[0].id_hash] += 1
-        # Margens de pelo menos 5 desvios-padrão: não é teste de gerador aleatório.
+        # Margins of at least 5 standard deviations: this is not a random-generator test.
         assert 60 <= primeiros["A"] <= 180
         assert primeiros["B"] >= 45 and primeiros["C"] >= 45
 
     @pytest.mark.asyncio
     async def test_sem_vaga_nunca_passa_na_frente_de_quem_tem_vaga(self, fabrica):
-        # O sorteio só vale entre quem tem vaga livre: A lotado (4 de 4) nunca
-        # vem antes de B com uma vaga, por mais que o sorteio favoreça A.
+        # The draw only applies among those with a free slot: a full A (4 of 4) never
+        # comes before B with one slot, however much the draw favors A.
         await _runs(fabrica, "A", "running", 4)
         await _runs(fabrica, "B", "running", 3)
         for _ in range(50):
@@ -438,9 +438,10 @@ class TestConsulta:
 
     @pytest.mark.asyncio
     async def test_banco_falhando_ordena_pela_declarada_num_savepoint(self, estavel):
-        # No Postgres, um erro nesta consulta abortaria a transação do request e
-        # o INSERT do run falharia logo depois. O savepoint — na CONEXÃO, não na
-        # sessão — isola a falha; a ordem cai para a carga declarada.
+        # On Postgres, an error in this query would abort the request's transaction
+        # and the run's INSERT would fail right after. The savepoint — on the
+        # CONNECTION, not the session — isolates the failure; the ordering falls
+        # back to the declared load.
         async def _falha(_consulta):
             raise _erro_do_banco()
 
@@ -456,9 +457,9 @@ class TestConsulta:
 
     @pytest.mark.asyncio
     async def test_conexao_perdida_sobe(self):
-        # Conexão invalidada não é degradação: o INSERT adiante falharia de
-        # todo jeito, e com "Can't reconnect until invalid transaction is
-        # rolled back" no lugar do erro de verdade.
+        # An invalidated connection is not degradation: the INSERT further on would
+        # fail anyway, and with "Can't reconnect until invalid transaction is
+        # rolled back" in place of the real error.
         async def _falha(_consulta):
             raise _erro_do_banco(conexao_perdida=True)
 
@@ -468,8 +469,8 @@ class TestConsulta:
 
     @pytest.mark.asyncio
     async def test_erro_que_nao_e_do_banco_sobe(self):
-        # Só erro do driver vira "ordena pela declarada". Um TypeError aqui é
-        # bug nosso, e engolido ele se esconderia atrás de um aviso.
+        # Only a driver error becomes "order by the declared load". A TypeError here
+        # is our bug, and swallowed it would hide behind a warning.
         async def _bug(_consulta):
             raise TypeError("bug")
 
@@ -479,10 +480,10 @@ class TestConsulta:
 
     @pytest.mark.asyncio
     async def test_contagem_nao_descarrega_o_pendente_da_sessao(self, fabrica):
-        # `Session.begin_nested()` faz flush antes do SAVEPOINT. Se a sessão do
-        # chamador tivesse algo pendente e inválido, o erro do flush seria
-        # engolido aqui como "contagem indisponível", com a transação perdida.
-        # Com o savepoint na conexão, a contagem não toca no que está pendente.
+        # `Session.begin_nested()` flushes before the SAVEPOINT. If the caller's
+        # session had something pending and invalid, the flush error would be
+        # swallowed here as "count unavailable", with the transaction lost.
+        # With the savepoint on the connection, the count does not touch what is pending.
         await _runs(fabrica, "A", "running", 1)
         async with fabrica() as db:
             existente = (await db.execute(select(WorkflowRun))).scalar_one()
@@ -504,8 +505,8 @@ class TestConsulta:
 
     @pytest.mark.asyncio
     async def test_capacidade_malformada_nao_derruba_a_ordem(self, fabrica, estavel):
-        # A capacidade vem de fora (executor → Redis): lixo conta como nada
-        # declarado — nem cheio, nem vagas —, e as vagas vêm do banco.
+        # The capacity comes from outside (executor → Redis): garbage counts as nothing
+        # declared — neither full nor slots —, and the slots come from the database.
         await _runs(fabrica, "B", "running", 1)
         reg = _registro({
             "A": {"running": "muitos", "queued": None, "max_concurrent": True},

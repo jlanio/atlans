@@ -1,12 +1,12 @@
 # tests/unit/test_divida_higiene_borda.py
-"""Higiene de borda: o que aceitava o que não devia, ou escondia o que devia dizer.
+"""Edge hygiene: what accepted what it should not, or hid what it should say.
 
-Itens registrados como pendência nos PRs #96 e #97. Nenhum muda o
-comportamento de quem já usa a API corretamente — mudam o que acontece com a
-entrada torta, com o papel que faltava e com a falha silenciosa.
+Items recorded as pending in PRs #96 and #97. None changes the behavior for
+whoever already uses the API correctly — they change what happens with
+malformed input, with the missing role and with the silent failure.
 
-(O item #99.4 — `UploadUrlRequest` de `POST /drive/upload-url` — saiu junto
-com a rota, removida na F1 da simplificação por não ter consumidor.)
+(Item #99.4 — `UploadUrlRequest` of `POST /drive/upload-url` — left together
+with the route, removed in F1 of the simplification for having no consumer.)
 """
 import pytest
 from pydantic import ValidationError
@@ -14,7 +14,7 @@ from pydantic import ValidationError
 from app.schemas.workflow import WorkflowDuplicate, WorkflowMove
 
 
-# ── #96.5: WorkflowDuplicate sem extra="forbid" ───────────────────────────────
+# ── #96.5: WorkflowDuplicate without extra="forbid" ──────────────────────────
 
 
 class TestWorkflowDuplicate:
@@ -24,30 +24,30 @@ class TestWorkflowDuplicate:
         assert WorkflowDuplicate(name="Cópia").name == "Cópia"
 
     def test_campo_desconhecido_e_recusado(self):
-        """`workspace_id` era descartado em silêncio — e a cópia fica no mesmo
-        workspace do original, então quem o mandou achava que mudou de lugar."""
+        """`workspace_id` was silently discarded — and the copy stays in the same
+        workspace as the original, so whoever sent it thought it had moved."""
         with pytest.raises(ValidationError):
             WorkflowDuplicate(name="Cópia", workspace_id="ws-outro")
 
     def test_alinhado_com_o_irmao_WorkflowMove(self):
-        """O irmão já era estrito; a divergência é que estava registrada."""
+        """The sibling was already strict; it was the divergence that was recorded."""
         assert WorkflowDuplicate.model_config.get("extra") == "forbid"
         assert WorkflowMove.model_config.get("extra") == "forbid"
 
 
-# ── #97.3: GET /pins era a única das três rotas de pin sem papel ──────────────
+# ── #97.3: GET /pins was the only one of the three pin routes without a role ──
 
 
 def test_a_rota_de_listar_pins_exige_papel():
-    """As irmãs `PUT`/`DELETE` pedem `editor`; esta não pedia nada.
+    """The sibling `PUT`/`DELETE` require `editor`; this one required nothing.
 
-    E a tool `list_pins` do MCP já exigia `viewer` (`app/mcp/guardas.py`), então
-    a MESMA leitura respondia com duas réguas conforme a porta de entrada.
+    And the MCP tool `list_pins` already required `viewer` (`app/mcp/guardas.py`),
+    so the SAME read answered by two yardsticks depending on the entry point.
 
-    O papel é declarado na dependência da rota (`workflow_com_papel`), e é essa
-    declaração que se prende aqui — lida da rota registrada, sem montar a app.
-    O 403 de cada papel abaixo do mínimo é exercitado pela matriz de
-    `test_papel_minimo_das_rotas.py`.
+    The role is declared in the route's dependency (`workflow_com_papel`), and it
+    is that declaration that is pinned here — read from the registered route,
+    without building the app. The 403 for each role below the minimum is
+    exercised by the matrix in `test_papel_minimo_das_rotas.py`.
     """
     from app.api.routers import workflows_router
 
@@ -63,23 +63,23 @@ def test_a_rota_de_listar_pins_exige_papel():
 
 
 def test_a_regua_da_rota_e_a_mesma_da_tool():
-    """Divergir aqui é o defeito original, não uma escolha."""
+    """Diverging here is the original defect, not a choice."""
     from app.mcp.guardas import GUARDAS
 
     assert GUARDAS["list_pins"].papel == "viewer"
 
 
-# ── #96.2: a cópia nascia sem dono ───────────────────────────────────────────
+# ── #96.2: the copy was born without an owner ────────────────────────────────
 
 
 def test_duplicar_exige_a_autoria_de_quem_copiou():
-    """`duplicated_by` existe para a REST parar de criar fluxo órfão.
+    """`duplicated_by` exists so that REST stops creating orphan workflows.
 
-    A tool MCP já carimbava à mão; agora as duas portas usam o mesmo parâmetro,
-    e o carimbo mora num lugar só. Era opcional "para chamador interno sem
-    usuário" — que nunca existiu —, e sem ele a cópia também pulava a guarda de
-    credenciais (SEG-12). Passou a ser obrigatório; a regra das quatro escritas
-    está em test_workflow_credencial_guard.py.
+    The MCP tool already stamped it by hand; now both entry points use the same
+    parameter, and the stamp lives in a single place. It was optional "for an
+    internal caller without a user" — which never existed —, and without it the
+    copy also skipped the credentials guard (SEG-12). It is now required; the
+    rule for the four writes is in test_workflow_credencial_guard.py.
     """
     import inspect
 
@@ -94,11 +94,11 @@ def test_duplicar_exige_a_autoria_de_quem_copiou():
 
 
 def test_restaurar_versao_devolve_os_avisos_de_agendamento():
-    """Sem isto, restaurar uma versão com cron quebrado parecia sucesso.
+    """Without this, restoring a version with a broken cron looked like success.
 
-    O sintoma de agendamento que não sincronizou é o SILÊNCIO: nada falha, a
-    rotina só deixa de acontecer. `update_workflow` já devolvia
-    `schedule_notices`; `restore_version` não.
+    The symptom of a schedule that did not sync is SILENCE: nothing fails, the
+    routine just stops happening. `update_workflow` already returned
+    `schedule_notices`; `restore_version` did not.
     """
     import inspect
 

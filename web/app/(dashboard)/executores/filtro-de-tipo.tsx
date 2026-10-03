@@ -7,13 +7,13 @@ import { estiloDoTipo } from "@/consts/ExecutorTypeStyles"
 export type FiltroDeTipo = "todos" | "default" | "dedicated"
 
 /**
- * Opções do filtro por TIPO de executor, prontas para o grupo de toggle padrão
- * do contrato (`GrupoDeToggle`). São três estados úteis, não dois: "Todos" é o
- * comportamento padrão da página (as duas seções empilhadas) e precisa continuar
- * alcançável; por isso um grupo de toggle e não um `Switch`.
+ * Options for the filter by executor TYPE, ready for the contract's standard
+ * toggle group (`GrupoDeToggle`). There are three useful states, not two:
+ * "Todos" (all) is the page's default behavior (the two sections stacked) and
+ * must stay reachable; hence a toggle group and not a `Switch`.
  *
- * O rótulo, o ícone e a cor do tipo vêm de `estiloDoTipo` (fonte única), então
- * o filtro nunca diverge do selo da linha nem do cabeçalho de grupo.
+ * The type's label, icon and color come from `estiloDoTipo` (single source), so
+ * the filter never diverges from the row's badge or the group header.
  */
 export const OPCOES_DE_TIPO: { valor: FiltroDeTipo; rotulo: string; icone: IconType }[] = [
   { valor: "todos",     rotulo: "Todos",                                 icone: TbServer },

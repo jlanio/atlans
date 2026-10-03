@@ -1,27 +1,27 @@
 # executor/artifact_purge.py
 """
-Remocao de artefatos locais por ordem do servidor (retencao).
+Removal of local artifacts on the server's order (retention).
 
-Artefatos marcados com `keepLocal` moram apenas no disco do executor — o
-servidor guarda so o catalogo. Quando a retencao expira, quem tem de apagar o
-arquivo e esta maquina, porque o servidor nao tem acesso a ele.
+Artifacts marked with `keepLocal` live only on the executor's disk — the
+server keeps only the catalog. When retention expires, the one that has to delete the
+file is this machine, because the server has no access to it.
 
-## Modelo de ameaca
+## Threat model
 
-A ordem chega pela rede, num `control` que o `connection.py` so aceita com
-assinatura Ed25519 valida do servidor. Ainda assim, o caminho de cada arquivo e
-tratado como entrada HOSTIL:
+The order arrives over the network, in a `control` that `connection.py` only accepts with
+a valid Ed25519 signature from the server. Even so, the path of each file is
+treated as HOSTILE input:
 
-  - o caminho e montado a partir da raiz LOCAL (`artifacts_root()`), nunca de um
-    valor recebido;
-  - o resultado e confinado a essa raiz com `resolve()` + `is_relative_to`;
-  - `..`, caminho absoluto e letra de unidade sao recusados antes de qualquer
-    coisa.
+  - the path is built from the LOCAL root (`artifacts_root()`), never from a
+    received value;
+  - the result is confined to that root with `resolve()` + `is_relative_to`;
+  - `..`, absolute paths and drive letters are refused before anything
+    else.
 
-Sem isso, `local_path = "../../../../Windows/System32/config/SAM"` transformaria
-a limpeza por retencao num apagador de arquivos arbitrarios — e o servidor
-comprometido, ou qualquer bug de derivacao no lado dele, viraria perda de dados
-na maquina do cliente.
+Without this, `local_path = "../../../../Windows/System32/config/SAM"` would turn
+retention cleanup into an arbitrary file deleter — and a compromised server,
+or any path-derivation bug on its side, would become data loss
+on the customer's machine.
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ logger = logging.getLogger("executor.artifact_purge")
 
 
 def _seguro(bruto: str) -> bool:
-    """Rejeita o que nem deveria chegar ate a resolucao de caminho."""
+    """Rejects what should not even reach path resolution."""
     if not bruto or not isinstance(bruto, str):
         return False
     normalizado = bruto.replace("\\", "/")
@@ -47,38 +47,38 @@ def _seguro(bruto: str) -> bool:
 
 
 def _sob_a_raiz(local_path: str, raiz: Path) -> Path | None:
-    """Resolve `local_path` sob uma raiz JA resolvida, ou None se escapar dela."""
+    """Resolves `local_path` under an ALREADY resolved root, or None if it escapes it."""
     if not _seguro(local_path):
         return None
 
     alvo = (raiz / local_path).resolve()
-    # Segunda barreira, depois do resolve(): cobre symlink apontando para fora,
-    # que a checagem textual acima nao pega.
+    # Second barrier, after resolve(): covers a symlink pointing outside,
+    # which the textual check above does not catch.
     if not alvo.is_relative_to(raiz):
         return None
     return alvo
 
 
 def _limpar_diretorios_vazios(caminho: Path, raiz: Path) -> None:
-    """Sobe removendo diretorios que ficaram vazios, sem passar da raiz.
+    """Walks up removing directories that became empty, without going past the root.
 
-    Sem isto, `artifacts/` acumula uma arvore `<workspace>/<run>/` vazia por
-    execucao, para sempre.
+    Without this, `artifacts/` accumulates an empty `<workspace>/<run>/` tree per
+    execution, forever.
     """
     pai = caminho.parent
     while pai != raiz and pai.is_relative_to(raiz):
         try:
-            pai.rmdir()          # so remove se estiver vazio
+            pai.rmdir()          # only removes it if it is empty
         except OSError:
             return
         pai = pai.parent
 
 
 def purgar(itens: list) -> int:
-    """Apaga os artefatos pedidos. Devolve quantos foram removidos.
+    """Deletes the requested artifacts. Returns how many were removed.
 
-    Nunca levanta: uma falha de limpeza nao pode derrubar a conexao com o
-    servidor nem interromper jobs em andamento.
+    Never raises: a cleanup failure must not bring down the connection with the
+    server nor interrupt jobs in progress.
     """
     from flow.utils.artifact_helpers import artifacts_root
 
@@ -94,14 +94,14 @@ def purgar(itens: list) -> int:
         local_path = item.get("local_path") or ""
         id_hash = item.get("id_hash") or "?"
 
-        # A raiz e resolvida UMA vez para o lote inteiro: `purgar` roda no laco
-        # de recepcao do WebSocket, e uma ordem de retencao com centenas de
-        # artefatos pagava um `resolve()` da raiz por item — syscall repetida
-        # segurando o loop que tambem entrega os jobs.
+        # The root is resolved ONCE for the whole batch: `purgar` runs in the WebSocket
+        # receive loop, and a retention order with hundreds of
+        # artifacts paid one `resolve()` of the root per item — a repeated syscall
+        # holding up the loop that also delivers the jobs.
         alvo = _sob_a_raiz(local_path, raiz)
         if alvo is None:
-            # Recusa RUIDOSA: se isto acontece, ou o servidor esta com um bug de
-            # derivacao de caminho, ou alguem esta tentando algo.
+            # LOUD refusal: if this happens, either the server has a path-derivation
+            # bug, or someone is trying something.
             logger.error(
                 "Ordem de remocao RECUSADA para o artefato %s: caminho %r sai do "
                 "diretorio de artefatos.", id_hash, local_path,
@@ -113,8 +113,8 @@ def purgar(itens: list) -> int:
                 os.unlink(alvo)
                 removidos += 1
                 _limpar_diretorios_vazios(alvo, raiz)
-            # Arquivo ausente nao e erro: ja foi apagado a mao, ou a ordem
-            # anterior chegou e o servidor nao registrou a confirmacao.
+            # A missing file is not an error: it was already deleted by hand, or the
+            # previous order arrived and the server did not record the confirmation.
         except OSError as exc:
             logger.warning("Falha ao remover o artefato local %s (%s): %s", id_hash, alvo, exc)
 

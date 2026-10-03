@@ -1,8 +1,8 @@
 """
-Testes da feature admin habilita/desabilita nodes:
+Tests for the admin feature that enables/disables nodes:
 - service (disabled_nodes_service): list/is/set
-- catalogo: NodeService.list_nodes() filtra disabled
-- dispatch: _validate_no_disabled_nodes levanta 422
+- catalog: NodeService.list_nodes() filters disabled ones
+- dispatch: _validate_no_disabled_nodes raises 422
 """
 from __future__ import annotations
 
@@ -15,13 +15,13 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _sem_cache_entre_testes():
-    """O mapa de nodes desabilitados e cacheado em memoria com TTL.
+    """The map of disabled nodes is cached in memory with a TTL.
 
-    Sem este reset, o {} lido pelo primeiro teste continuaria valendo nos
-    seguintes e o `get_config` mockado por eles nunca seria consultado.
+    Without this reset, the {} read by the first test would still hold in the
+    following ones and the `get_config` they mock would never be queried.
 
-    O catalogo base do NodeService tambem e cacheado (@lru_cache): limpa junto
-    para os testes de filtro nao herdarem um catalogo montado por outro teste.
+    NodeService's base catalog is also cached (@lru_cache): cleared along with it
+    so the filter tests do not inherit a catalog built by another test.
     """
     from app.services import disabled_nodes_service as svc
     from app.services import node_service as ns
@@ -47,7 +47,7 @@ class TestDisabledNodesService:
 
     @pytest.mark.asyncio
     async def test_list_disabled_coerces_non_dict_to_empty(self):
-        """Defesa contra config corrompida no DB (era list em vez de dict)."""
+        """Defense against a corrupted config in the DB (it was a list instead of a dict)."""
         from app.services import disabled_nodes_service as svc
 
         db = MagicMock()
@@ -103,7 +103,7 @@ class TestDisabledNodesService:
 
         assert removed is True
         assert "SendEmail" not in captured["value"]
-        assert "Other" in captured["value"]  # preserva os outros
+        assert "Other" in captured["value"]  # preserves the others
 
     @pytest.mark.asyncio
     async def test_set_enabled_returns_false_for_unknown(self):
@@ -128,14 +128,14 @@ class TestNodeServiceFilter:
 
     @pytest.mark.asyncio
     async def test_list_nodes_omits_disabled(self):
-        # disabled_names foi importado dentro de node_service — patch no namespace local
+        # disabled_names was imported inside node_service — patch in the local namespace
         with patch("app.services.node_service.disabled_names", new=AsyncMock(return_value={"SendEmail"})):
             from app.services.node_service import NodeService
             catalog = await NodeService().list_nodes(MagicMock())
 
-        # SendEmail nao deve aparecer
+        # SendEmail must not appear
         assert all(n.name != "SendEmail" for n in catalog)
-        # Mas outros nodes sim — verifica que filtro nao removeu tudo
+        # But other nodes do — checks that the filter did not remove everything
         assert len(catalog) > 0
 
     @pytest.mark.asyncio
@@ -146,38 +146,38 @@ class TestNodeServiceFilter:
             from app.services.node_service import NodeService
             catalog = await NodeService().list_nodes(MagicMock())
 
-        # Deve listar todos os nodes do registry (todos com nome valido)
+        # Must list all nodes in the registry (all with a valid name)
         registry_names = {name for name in NODE_REGISTRY.keys()}
         catalog_names = {n.name for n in catalog}
         assert catalog_names == registry_names
 
     @pytest.mark.asyncio
     async def test_catalogo_montado_uma_vez_e_reusado(self):
-        """O catalogo base e cacheado (@lru_cache): GET /nodes repetido NAO
-        remonta os NodeDefinition nem re-chama cls.description() (o custo que a
-        auditoria apontou). Espia o description() de um no e afirma que ele e
-        chamado uma unica vez mesmo apos duas listagens."""
+        """The base catalog is cached (@lru_cache): a repeated GET /nodes does NOT
+        rebuild the NodeDefinitions nor re-call cls.description() (the cost the
+        audit pointed out). Spies on a node's description() and asserts it is
+        called only once even after two listings."""
         from app.services import node_service as ns
         from flow.registry import NODE_REGISTRY
 
-        # O fixture ja limpou o cache; monta do zero DENTRO do spy.
+        # The fixture already cleared the cache; build from scratch INSIDE the spy.
         algum = next(iter(NODE_REGISTRY))
         cls = NODE_REGISTRY[algum]
         with patch.object(cls, "description", wraps=cls.description) as espiao, \
              patch("app.services.node_service.disabled_names", new=AsyncMock(return_value=set())):
             await ns.NodeService().list_nodes(MagicMock())
             await ns.NodeService().list_nodes(MagicMock())
-        # Montou UMA vez (1a listagem) e reusou o cache na 2a.
+        # Built ONCE (1st listing) and reused the cache on the 2nd.
         assert espiao.call_count == 1
 
 
-# ── Validacao no dispatch ───────────────────────────────────────────────────
+# ── Validation at dispatch ──────────────────────────────────────────────────
 
 class TestValidateNoDisabledNodes:
 
     def test_returns_silently_when_set_empty(self):
         from app.services.workflow_execution_service import _validate_no_disabled_nodes
-        # Nao levanta
+        # Does not raise
         _validate_no_disabled_nodes({"nodes": [{"name": "A"}]}, set())
 
     def test_returns_silently_when_no_offenders(self):
@@ -196,11 +196,11 @@ class TestValidateNoDisabledNodes:
         msg = str(exc_info.value)
         assert "SendEmail" in msg
         assert "Other" in msg
-        # Status code para virar 422 no handler global
+        # Status code so it becomes a 422 in the global handler
         assert exc_info.value.status_code == 422
 
     def test_offenders_sao_unicos_e_ordenados(self):
-        """Mesmo node aparecendo 2x no workflow nao duplica a mensagem."""
+        """The same node appearing twice in the workflow does not duplicate the message."""
         from app.services.workflow_execution_service import _validate_no_disabled_nodes
         from app.core.exceptions import DisabledNodesInWorkflowError
 
@@ -210,7 +210,7 @@ class TestValidateNoDisabledNodes:
             _validate_no_disabled_nodes(defn, {"A", "B"})
 
         msg = str(exc_info.value)
-        # "A" aparece uma unica vez
+        # "A" appears only once
         assert msg.count("A,") + msg.count("A.") + msg.count("A ") <= 2
 
 
@@ -228,4 +228,4 @@ class TestAdminEndpoint:
         from app.api.routers.admin_nodes_router import NodeToggleBody
 
         body = NodeToggleBody(enabled=False, reason="   ")
-        assert body.reason is None  # vazio depois do strip vira None
+        assert body.reason is None  # empty after strip becomes None

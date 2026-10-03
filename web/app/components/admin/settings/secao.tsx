@@ -1,15 +1,16 @@
 "use client"
 
-// A casca padronizada de cada seção da página de Configurações (contrato §2).
+// The standardized shell of each section of the Settings page (contract §2).
 
-// ── Casca de seção (contrato §2) ─────────────────────────────────────────────
+// ── Section shell (contract §2) ──────────────────────────────────────────────
 
 /**
- * Casca padronizada da seção: `<section aria-labelledby>` com a moldura do
- * contrato (borda + `bg-card` + `shadow-xs`), cabeçalho `px-4 pt-4 pb-1` com o
- * `<h2>` e a linha de apoio, e o corpo em `px-4 pb-4`. Substitui o `SettingCard`
- * (Card + CardHeader + Separator do shadcn), que trazia sombra e separador que
- * não são do padrão. `aria-busy` marca a seção enquanto a fonte dela carrega.
+ * Standardized section shell: `<section aria-labelledby>` with the contract's
+ * frame (border + `bg-card` + `shadow-xs`), a `px-4 pt-4 pb-1` header with the
+ * `<h2>` and the supporting line, and the body in `px-4 pb-4`. Replaces
+ * `SettingCard` (shadcn's Card + CardHeader + Separator), which brought a shadow
+ * and separator that are not part of the pattern. `aria-busy` marks the section
+ * while its source loads.
  */
 export function SecaoDeConfiguracao({
   id, titulo, apoio, carregando, children,

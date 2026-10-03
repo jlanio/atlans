@@ -25,42 +25,44 @@ import { baixarArtefato } from "@/lib/baixar-artefato"
 import { createToast } from "@/utils/createToast"
 import { useIdiomaDaTela, useTextos } from "./i18n"
 
-/** A barra leva 900 ms do centro ao rodapé e o véu 15% a mais (globals.css). */
+/** The bar takes 900 ms from the center to the footer and the veil 15% longer (globals.css). */
 export const DURACAO_DA_TRANSICAO_MS = 1050
 /** A faixa e a barra saindo quando o painel abre: `--home-dur × .33` (globals.css). */
 export const SAIDA_MS = 300
 
 /**
- * A Home: o globo em tela cheia com a conversa flutuante sobre ele. `className=
- * "home dark"` na raiz veste a paleta quase preta (globals.css) e fixa o tema
- * escuro — a Home é SEMPRE escura, independente do tema do app. É full-bleed
- * `h-svh` como o canvas do editor; o AppHeader devolve null em `/`.
+ * The Home: the full-screen globe with the floating conversation over it.
+ * `className="home dark"` on the root applies the near-black palette
+ * (globals.css) and pins the dark theme — the Home is ALWAYS dark, regardless of
+ * the app theme. It is full-bleed `h-svh` like the editor canvas; the AppHeader
+ * returns null on `/`.
  *
- * Esta raiz é `relative` E é o quadro de referência das superfícies flutuantes
- * (painel, barra, camadas), que são `absolute` dentro dela: ela começa depois
- * do sidebar, então nada mais pinta — nem recebe clique — por cima dele.
+ * This root is `relative` AND is the reference frame for the floating surfaces
+ * (panel, bar, layers), which are `absolute` inside it: it starts after the
+ * sidebar, so nothing else paints — or receives clicks — over it.
  *
- * A conversa vive no `useAssistente` (SSE do `/assistente`); as camadas que ela põe no
- * globo, no `useCamadas` (derivadas dos turnos, com o ciclo de vida da conversa
- * ativa).
+ * The conversation lives in `useAssistente` (SSE from `/assistente`); the layers it puts on the
+ * globe, in `useCamadas` (derived from the turns, with the active conversation's
+ * lifecycle).
  *
- * O HERO é o estado inicial de todo acesso: o globo velado rumo ao sul, a barra
- * grande ao centro com sugestões digitadas e chips. Termina no primeiro token
- * visível da primeira resposta — a barra escorrega para o rodapé, o véu some e
- * a última troca da conversa aparece ao centro (a pilha). O painel lateral é
- * sob demanda.
+ * The HERO is the initial state of every visit: the globe veiled toward the
+ * south, the large bar in the center with typed suggestions and chips. It ends
+ * at the first visible token of the first answer — the bar slides to the
+ * footer, the veil disappears and the conversation's last exchange appears in
+ * the center (the stack). The side panel is on demand.
  *
- * SEM SESSÃO a Home abre do mesmo jeito (globo, hero, barra com as sugestões e
- * os chips) e não faz requisição nenhuma: o `useAssistente` não consulta o
- * `/estado` (`anonimo`) e o sidebar não monta as listas. O primeiro envio abre
- * o MODAL DE ENTRADA (`entrada/`) sobre o globo, com a mensagem pendente; o
- * login bem-sucedido troca a sessão da aba sem navegar, o modal fecha e a
- * mensagem vai sozinha — fechar o modal sem entrar desiste dela (o texto fica
- * na barra). `?entrar=1`/`?cadastro=1` (o destino de /login, /register e do
- * middleware) abrem o modal na chegada; `?verificar=1&token=…`,
- * `?recuperar=1` e `?redefinir=1&token=…` (os destinos de /verify-email,
- * /forgot-password e /reset-password) abrem os painéis do e-mail, com sessão
- * ou sem ela; `callbackUrl` leva o admin de volta à página que pediu.
+ * WITHOUT A SESSION the Home opens the same way (globe, hero, bar with the
+ * suggestions and the chips) and makes no request at all: `useAssistente` does
+ * not query `/estado` (`anonimo`) and the sidebar does not mount the lists. The
+ * first submission opens the SIGN-IN MODAL (`entrada/`) over the globe, with the
+ * pending message; a successful login swaps the tab's session without
+ * navigating, the modal closes and the message goes out on its own — closing
+ * the modal without signing in abandons it (the text stays in the bar).
+ * `?entrar=1`/`?cadastro=1` (the destination of /login, /register and the
+ * middleware) open the modal on arrival; `?verificar=1&token=…`,
+ * `?recuperar=1` and `?redefinir=1&token=…` (the destinations of /verify-email,
+ * /forgot-password and /reset-password) open the e-mail panels, with or
+ * without a session; `callbackUrl` takes the admin back to the page they requested.
  */
 export default function HomeView({
   entrada,
@@ -70,11 +72,11 @@ export default function HomeView({
 }: {
   /** O modal de entrada nasce aberto neste painel (`?entrar=1`, `?redefinir=1`…). */
   entrada?: ModoDeEntrada
-  /** O token do link do e-mail (`?redefinir=1&token=…`, `?verificar=1&token=…`). */
+  /** The token from the e-mail link (`?redefinir=1&token=…`, `?verificar=1&token=…`). */
   tokenDoLink?: string
-  /** Para onde ir depois do login (interno; vem sanitizado da página). */
+  /** Where to go after login (internal; comes sanitized from the page). */
   callbackUrl?: string
-  /** O país da conexão (`CF-IPCountry`): a reserva do globo quando o navegador esconde o fuso. */
+  /** The connection's country (`CF-IPCountry`): the globe's fallback when the browser hides the time zone. */
   paisDaConexao?: string | null
 } = {}) {
   const conversaId = useHomeStore((s) => s.conversaId)
@@ -89,11 +91,11 @@ export default function HomeView({
   const consumirFila = useHomeStore((s) => s.consumirFila)
   useEffect(() => { hidratar() }, [hidratar])
 
-  // Sem sessão — ou com a sessão vencida, no instante entre este render e o
-  // `signOut` do SessionSync — a Home é a anônima: nada aqui pode bater no
-  // `/terra` (o /estado sairia sem token, ou com o vencido, e viraria 401). O
-  // SessionProvider recebe a sessão do servidor (`null` inclusive), então o
-  // status é conhecido já no primeiro render.
+  // Without a session — or with an expired session, in the instant between this
+  // render and SessionSync's `signOut` — the Home is the anonymous one: nothing
+  // here may hit `/terra` (/estado would go out without a token, or with the
+  // expired one, and become a 401). The SessionProvider receives the session from
+  // the server (`null` included), so the status is known from the first render.
   const { data: sessao, status: statusDaSessao } = useSession()
   const anonimo = statusDaSessao === "unauthenticated" || sessao?.error === "RefreshTokenExpired"
   const router = useRouter()
@@ -104,30 +106,30 @@ export default function HomeView({
   const concluirEntrada = useHomeStore((s) => s.concluirEntrada)
   const definirEnvioPendente = useHomeStore((s) => s.definirEnvioPendente)
   const definirRascunho = useHomeStore((s) => s.definirRascunho)
-  // A localização: o globo escreve a última posição (aoLocalizar), o "+" liga o
-  // compartilhar, o chip mostra e o × desliga. A HomeView NÃO se inscreve na
-  // posição — cada tick do modo seguir re-renderizava a árvore inteira (globo,
-  // pilha, painel, barra) só para repassar um valor que o useAssistente lê da
-  // store na hora do envio. Só ações (estáveis) entram aqui.
+  // Location: the globe writes the latest position (aoLocalizar), the "+" turns
+  // sharing on, the chip shows it and the × turns it off. HomeView does NOT
+  // subscribe to the position — each follow-mode tick re-rendered the whole tree
+  // (globe, stack, panel, bar) just to pass along a value useAssistente reads from
+  // the store at send time. Only (stable) actions come in here.
   const definirLocalizacao = useHomeStore((s) => s.definirLocalizacao)
   const ligarLocalizacao = useHomeStore((s) => s.ligarLocalizacao)
   const limparLocalizacao = useHomeStore((s) => s.limparLocalizacao)
 
-  // O idioma da página para leitor de tela e hifenização. O `lang` na raiz da
-  // Home cobre a árvore dela; o do <html> cobre o que o Radix porta para o
-  // <body> (menus, diálogos) — e volta ao de antes quando a Home sai, porque o
-  // resto do app segue em português.
+  // The page language for screen readers and hyphenation. The `lang` on the Home
+  // root covers its tree; the one on <html> covers what Radix portals to <body>
+  // (menus, dialogs) — and goes back to the previous one when the Home leaves,
+  // because the rest of the app stays in Portuguese.
   useEffect(() => {
     const anterior = document.documentElement.lang
     document.documentElement.lang = idioma
     return () => { document.documentElement.lang = anterior }
   }, [idioma])
-  // A falha de localização vira toast AQUI porque o único outro sinal é o botão
-  // do controle, no canto do globo — invisível no telefone com o painel aberto.
+  // The location failure becomes a toast HERE because the only other signal is the
+  // control button, in the corner of the globe — invisible on the phone with the panel open.
   const aoErroDeLocalizacao = useCallback((codigo: number) => {
     if (codigo === 1) {
-      // Permissão negada: o pedido de compartilhar não vai se realizar — desliga
-      // para o estado não ficar armado à espera de um fix que nunca vem.
+      // Permission denied: the sharing request will not happen — turn it off so the
+      // state does not stay armed waiting for a fix that never comes.
       limparLocalizacao()
       createToast.error(t.casca.localizacao.negada, t.casca.localizacao.negadaDica)
     } else {
@@ -137,35 +139,35 @@ export default function HomeView({
 
   const { current, canEdit } = useWorkspace()
 
-  // ── Arrastar arquivos para o Drive ─────────────────────────────────────────
-  // A janela inteira aceita o arquivo; quem acende é a caixa do assistente
-  // (`data-arraste`). Os filtros são os do backend — este caminho manda ao
-  // mesmo `POST /drive/upload` e traduz a recusa. O estado vive na store porque
-  // Ctrl+I desmonta a barra e os chips iriam junto.
+  // ── Dragging files to the Drive ────────────────────────────────────────────
+  // The whole window accepts the file; what lights up is the assistant's box
+  // (`data-arraste`). The filters are the backend's — this path sends to the
+  // same `POST /drive/upload` and translates the rejection. The state lives in the
+  // store because Ctrl+I unmounts the bar and the chips would go with it.
   const definirArrastandoArquivo = useHomeStore((s) => s.definirArrastandoArquivo)
   const receberAnexos = useAnexos({
     workspaceId: current?.id_hash ?? null,
-    // `canEdit` espelha o papel `editor` que o Drive exige: prever o 403 poupa a rede
-    // de quem só é leitor. Anônimo é `false` aqui, mas o `receber` já desvia
-    // para o login antes de olhar isto.
+    // `canEdit` mirrors the `editor` role the Drive requires: predicting the 403 spares
+    // the network for those who are only readers. Anonymous is `false` here, but
+    // `receber` already detours to login before looking at this.
     podeEnviar: canEdit,
     anonimo,
     aoExigirLogin: () => pedirEntrada("entrar"),
     aoAvisar: (titulo, detalhe) => createToast.error(titulo, detalhe),
   })
   useArrasteDeArquivos({
-    // Sem sessão o arraste ainda é escutado: soltar abre o login (a mesma
-    // porta do primeiro envio), em vez de o navegador abrir o arquivo.
+    // Without a session the drag is still listened to: dropping opens the login (the
+    // same door as the first submission), instead of the browser opening the file.
     ativo: true,
     aoArrastar: definirArrastandoArquivo,
     aoSoltar: receberAnexos.receber,
   })
 
-  // Trocar o workspace ativo esvazia os anexos: eles são "o que acabei de
-  // mandar ao Drive DESTE workspace", e a referência da mensagem casa com o
-  // workspace da conversa. Mantê-los apontaria para arquivos de outro Drive,
-  // que o assistente do novo workspace não acha. Só na TROCA — o null→ws
-  // inicial (nada para limpar) não conta.
+  // Switching the active workspace empties the attachments: they are "what I just
+  // sent to THIS workspace's Drive", and the message's reference matches the
+  // conversation's workspace. Keeping them would point to files in another
+  // Drive, which the new workspace's assistant does not find. Only on a SWITCH —
+  // the initial null→ws (nothing to clear) does not count.
   const limparAnexos = useHomeStore((s) => s.limparAnexos)
   const workspaceAnterior = useRef(current?.id_hash ?? null)
   useEffect(() => {
@@ -174,33 +176,33 @@ export default function HomeView({
     workspaceAnterior.current = agora
   }, [current?.id_hash, limparAnexos])
 
-  // O id que o STREAM anunciou (1º quadro `conversa`). Guardado porque é o que
-  // distingue "a conversa nova ganhou um id" de "a pessoa abriu outro chat":
-  // nos dois casos o `conversaId` vai de null para um id. É marcador de USO
-  // ÚNICO: a comparação abaixo o consome. Guardado para sempre, ele passava a
-  // significar "qualquer id que o stream já anunciou nesta sessão", e reabrir
-  // essa conversa pelos Chats mais tarde não trocava o escopo das camadas.
+  // The id the STREAM announced (1st `conversa` frame). Kept because it is what
+  // distinguishes "the new conversation got an id" from "the person opened another
+  // chat": in both cases `conversaId` goes from null to an id. It is a SINGLE-USE
+  // marker: the comparison below consumes it. Kept forever, it came to mean
+  // "any id the stream has already announced in this session", and reopening
+  // that conversation from Chats later did not switch the layers' scope.
   const idDoStream = useRef<string | null>(null)
   const anunciar = useHomeStore((s) => s.anunciarConversa)
   const assistente = useAssistente({
     conversaId,
     workspaceId: current?.id_hash ?? null,
-    // O anúncio inteiro (id, título, nova) vai à store ANTES da seleção: a
-    // lista de Chats, no sidebar, insere a linha e o `aria-current` acende nela
-    // no mesmo ciclo. Ver `anunciarConversa`.
+    // The whole announcement (id, title, new) goes to the store BEFORE the
+    // selection: the Chats list, in the sidebar, inserts the row and
+    // `aria-current` lights up on it in the same cycle. See `anunciarConversa`.
     onConversa: (info) => { anunciar(info); idDoStream.current = info.id; selecionar(info.id) },
     anonimo,
   })
 
-  // O escopo das camadas do globo: muda quando a pessoa abre OUTRA conversa (ou
-  // começa uma nova), e não quando a conversa em curso aprende o próprio id —
-  // aí as camadas que estão na tela são dela mesma.
+  // The scope of the globe's layers: it changes when the person opens ANOTHER
+  // conversation (or starts a new one), not when the ongoing conversation learns
+  // its own id — then the layers on screen are its own.
   const escopo = useRef("nova:0")
   const conversaAnterior = useRef<string | null | undefined>(undefined)
   const novas = useRef(0)
   if (conversaAnterior.current !== conversaId) {
     const anunciado = idDoStream.current
-    idDoStream.current = null // consumido: vale para ESTA troca, e só para ela
+    idDoStream.current = null // consumed: it holds for THIS switch, and only for it
     if (!conversaId || conversaId !== anunciado) {
       escopo.current = conversaId ?? `nova:${++novas.current}`
     }
@@ -210,34 +212,35 @@ export default function HomeView({
   const camadas = useCamadas(assistente.turnos, escopo.current)
   const { adicionar: adicionarCamada } = camadas
 
-  // O "Usar minha localização" do "+" liga o compartilhar E aciona o MESMO
-  // controle do globo (o botão do canto): o globo segue a pessoa e o `geolocate`
-  // sobe a coordenada por `aoLocalizar`. A ordem importa: ligar antes, para o
-  // primeiro fix já entrar compartilhado. Já seguindo, o `localizar()` só
-  // reemite a última posição (nunca desliga o rastreio — trigger é alternador).
-  // `refMapa` é estável (useRef do useCamadas), então o callback não se recria.
+  // The "+"'s "Usar minha localização" turns sharing on AND triggers the SAME
+  // globe control (the corner button): the globe follows the person and
+  // `geolocate` lifts the coordinate via `aoLocalizar`. The order matters: turn
+  // on first, so the first fix already goes in shared. When already following,
+  // `localizar()` only re-emits the last position (it never turns tracking off —
+  // trigger is a toggle). `refMapa` is stable (useCamadas' useRef), so the
+  // callback is not recreated.
   const refMapa = camadas.refMapa
   const pedirLocalizacao = useCallback(() => {
     ligarLocalizacao()
     refMapa.current?.localizar()
   }, [ligarLocalizacao, refMapa])
 
-  // ── A entrada: o primeiro envio sem sessão ─────────────────────────────────
-  // A mensagem fica pendente, volta à caixa (o submeter() da barra a esvaziou
-  // — vazia no hero, ela recomeçaria a digitar a sugestão da vez) e o modal de
-  // entrada abre sobre o globo. Quando o login der certo, ela vai sozinha (o
-  // efeito abaixo). Fechar o modal sem entrar desiste do envio, mas o texto
-  // fica na barra.
+  // ── Sign-in: the first submission without a session ────────────────────────
+  // The message stays pending, goes back to the box (the bar's submeter()
+  // emptied it — empty in the hero, it would start typing the current
+  // suggestion again) and the sign-in modal opens over the globe. When login
+  // succeeds, it goes out on its own (the effect below). Closing the modal
+  // without signing in abandons the submission, but the text stays in the bar.
   const exigirLogin = useCallback((texto: string) => {
     definirRascunho(texto)
     definirEnvioPendente(texto)
     pedirEntrada("entrar")
   }, [definirRascunho, definirEnvioPendente, pedirEntrada])
 
-  // `?entrar=1`/`?cadastro=1`: o modal nasce aberto — uma vez, e só sem sessão
-  // (logado, a query é ignorada). Os painéis que vêm de um LINK DE E-MAIL
-  // (senha e verificação) são a exceção — ver `ehPainelDeEmail`, que explica
-  // por quê.
+  // `?entrar=1`/`?cadastro=1`: the modal starts open — once, and only without a
+  // session (logged in, the query is ignored). The panels that come from an
+  // E-MAIL LINK (password and verification) are the exception — see
+  // `ehPainelDeEmail`, which explains why.
   const pediuDaUrl = useRef(false)
   const doEmail = ehPainelDeEmail(entrada)
   useEffect(() => {
@@ -246,17 +249,17 @@ export default function HomeView({
     pedirEntrada(entrada)
   }, [anonimo, entrada, doEmail, pedirEntrada])
 
-  // A sessão chegou (pelo modal, ou por um login noutra aba) com o modal
-  // aberto: fecha, mantendo o pendente. Os painéis do e-mail ficam, pelo mesmo
-  // motivo — fechar por baixo de quem está usando o link é queimar um token de
-  // uso único.
+  // The session arrived (via the modal, or via a login in another tab) with the
+  // modal open: close it, keeping the pending message. The e-mail panels stay,
+  // for the same reason — closing them from under someone using the link is
+  // burning a single-use token.
   useEffect(() => {
     if (!anonimo && entradaPedida && !ehPainelDeEmail(entradaPedida)) concluirEntrada()
   }, [anonimo, entradaPedida, concluirEntrada])
 
-  // O login deu certo dentro do modal. Com `callbackUrl` (o admin que pediu
-  // /projects sem sessão) a pessoa vai para lá — e o pendente não faz sentido
-  // fora da Home.
+  // Login succeeded inside the modal. With `callbackUrl` (the admin who requested
+  // /projects without a session) the person goes there — and the pending message
+  // makes no sense outside the Home.
   const aoEntrar = useCallback(() => {
     concluirEntrada()
     if (callbackUrl && callbackUrl !== "/") {
@@ -266,10 +269,10 @@ export default function HomeView({
     }
   }, [concluirEntrada, callbackUrl, definirEnvioPendente, router])
 
-  // O envio sozinho — um efeito, não um callback: o login troca o status para
-  // "authenticated" (signIn sem redirect), `anonimo` cai, o useAssistente consulta
-  // o /estado e só ENTÃO dá para enviar. A cota estourada segue a regra da
-  // barra: a mensagem fica na caixa, com o aviso.
+  // Sending on its own — an effect, not a callback: the login switches the status
+  // to "authenticated" (signIn without redirect), `anonimo` drops, useAssistente
+  // queries /estado and only THEN can it send. An exceeded quota follows the
+  // bar's rule: the message stays in the box, with the notice.
   const { enviar: enviarAoAgente, correndo, parar, estado } = assistente
   useEffect(() => {
     if (anonimo || !envioPendente || correndo || estado?.ativo !== true) return
@@ -280,31 +283,31 @@ export default function HomeView({
     void enviarAoAgente(envioPendente)
   }, [anonimo, envioPendente, correndo, estado, enviarAoAgente, definirEnvioPendente, definirRascunho])
 
-  // Logout feito noutra aba durante um stream: a Home vira anônima sem
-  // remontar, e um stream que continuasse correndo iria contra uma sessão que
-  // já não existe. A conversa que estava na tela fica até recarregar.
+  // Logout done in another tab during a stream: the Home becomes anonymous without
+  // remounting, and a stream that kept running would go against a session that
+  // no longer exists. The conversation on screen stays until reload.
   useEffect(() => {
     if (anonimo) parar()
   }, [anonimo, parar])
 
-  // ── O hero do primeiro acesso ──────────────────────────────────────────────
-  // Estado inicial de TODO acesso (carregar a página), sem flag nem
-  // localStorage. Termina assim que a pessoa ENVIA — no instante em que o
-  // stream começa (`correndo`), e não só no primeiro token visível: a barra
-  // escorrega para o rodapé e a faixa carrega já com o indicador de raciocínio
-  // (a `Conversa` desenha «Pensando» para o turno ainda sem bloco).
+  // ── The first-visit hero ───────────────────────────────────────────────────
+  // Initial state of EVERY visit (page load), with no flag or localStorage. It
+  // ends as soon as the person SENDS — the instant the stream starts
+  // (`correndo`), and not only at the first visible token: the bar slides to the
+  // footer and the strip loads already with the reasoning indicator (the
+  // `Conversa` draws "Pensando" for the turn that has no block yet).
   //
-  // Antes o gatilho era o primeiro token TEXTO — raciocínio e ferramentas não
-  // contavam, e a barra ficava centrada "processando". Com o assistente
-  // consultando o catálogo e o WFS (várias ferramentas) antes de escrever, essa
-  // fase é longa: a barra parecia travada no meio da tela, sem carregar o
-  // diálogo (relato do dono). Deslizar no envio dá retorno imediato — a
-  // pergunta e o "Pensando" aparecem na faixa, e a barra ganha o "Parar".
+  // Before, the trigger was the first TEXT token — reasoning and tools did not
+  // count, and the bar stayed centered "processing". With the assistant querying
+  // the catalog and WFS (several tools) before writing, that phase is long: the
+  // bar looked stuck in the middle of the screen, without loading the dialog
+  // (the owner's report). Sliding on send gives immediate feedback — the
+  // question and "Pensando" appear in the strip, and the bar gets the "Parar".
   //
-  // Replay (abrir um chat antigo), o painel (Ctrl+I) e um artefato posto no
-  // globo pela lista também encerram: nos três há conversa/camada para ver.
-  // Uma vez encerrado não volta nesta carga — "nova conversa" cai no layout
-  // normal, vazio.
+  // Replay (opening an old chat), the panel (Ctrl+I) and an artifact put on the
+  // globe from the list also end it: in all three there is a conversation/layer
+  // to see. Once ended it does not come back in this load — "nova conversa"
+  // falls into the normal, empty layout.
   const [hero, setHero] = useState(true)
   const heroAcaba =
     assistente.correndo || assistente.turnos.length > 0 || assistente.carregandoReplay ||
@@ -313,8 +316,8 @@ export default function HomeView({
     if (hero && heroAcaba) setHero(false)
   }, [hero, heroAcaba])
 
-  // O título e a frase saem do DOM depois da transição, ou na hora sem
-  // movimento: montados e invisíveis, seriam alvos de foco fantasmas.
+  // The title and the sentence leave the DOM after the transition, or immediately
+  // without motion: mounted and invisible, they would be ghost focus targets.
   const reduzMovimento = usePrefereMenosMovimento()
   const [heroNoDom, setHeroNoDom] = useState(true)
   useEffect(() => {
@@ -324,9 +327,9 @@ export default function HomeView({
     return () => clearTimeout(t)
   }, [hero, reduzMovimento])
 
-  // Esc interrompe a resposta em curso (o "Esc para parar" do status). Não de
-  // dentro de um diálogo ou menu: lá o Esc já tem dono, e fechar os dois de uma
-  // vez seria surpresa.
+  // Esc interrupts the answer in progress (the status's "Esc para parar"). Not from
+  // inside a dialog or menu: there Esc already has an owner, and closing both at
+  // once would be a surprise.
   useEffect(() => {
     if (!correndo) return
     function aoEscapar(e: KeyboardEvent) {
@@ -339,21 +342,21 @@ export default function HomeView({
     return () => window.removeEventListener("keydown", aoEscapar)
   }, [correndo, parar])
 
-  // Ctrl+I alterna aberto/barra. O efeito mora AQUI, e não no Painel: recolher
-  // desmonta o Painel, e com ele ia o listener — o atalho anunciado no próprio
-  // tooltip ("Recolher (Ctrl+I)") só funcionava uma vez e nunca reabria.
+  // Ctrl+I toggles open/bar. The effect lives HERE, not in the Painel: collapsing
+  // unmounts the Painel, and the listener went with it — the shortcut advertised
+  // in the tooltip itself ("Recolher (Ctrl+I)") only worked once and never reopened.
   //
-  // Não há guarda de foco, e não precisa: o campo do assistente é a posição
-  // padrão do cursor nesta tela, e barrar o atalho ali seria barrá-lo quase
-  // sempre. O que o atalho não pode é custar o texto já digitado — por isso o
-  // rascunho vive no homeStore (partilhado pelo painel e pela barra) e não no
-  // `useState` de quem a troca desmonta.
+  // There is no focus guard, and none is needed: the assistant field is the
+  // cursor's default position on this screen, and blocking the shortcut there
+  // would block it almost always. What the shortcut must not do is cost the text
+  // already typed — that is why the draft lives in homeStore (shared by the panel
+  // and the bar) and not in the `useState` of whatever the swap unmounts.
   useEffect(() => {
     function aoTeclar(e: KeyboardEvent) {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return
       if (e.key.toLowerCase() !== "i") return
-      // Dentro do modal de entrada (ou de qualquer diálogo) o atalho não
-      // alterna o painel por trás dele.
+      // Inside the sign-in modal (or any dialog) the shortcut does not
+      // toggle the panel behind it.
       const alvo = e.target as HTMLElement | null
       if (alvo?.closest?.('[role="dialog"]')) return
       e.preventDefault()
@@ -363,11 +366,11 @@ export default function HomeView({
     return () => window.removeEventListener("keydown", aoTeclar)
   }, [alternar])
 
-  // Drena os pedidos "exibir no globo" que a lista de Artefatos (no sidebar)
-  // enfileira: sidebar e globo são irmãos na árvore, então o pedido passa pela
-  // store. `adicionar` deduplica (art:<id>), então um repetido só re-enquadra.
-  // Consome só o que despachou — um clique que caia entre o render e o efeito
-  // seria apagado sem nunca ter ido ao globo.
+  // Drains the "exibir no globo" requests the Artefatos list (in the sidebar)
+  // enqueues: sidebar and globe are siblings in the tree, so the request goes
+  // through the store. `adicionar` deduplicates (art:<id>), so a repeat only
+  // re-frames. It consumes only what it dispatched — a click landing between the
+  // render and the effect would be erased without ever reaching the globe.
   useEffect(() => {
     if (pedidosDeCamada.length === 0) return
     const despachados = pedidosDeCamada.length
@@ -375,15 +378,15 @@ export default function HomeView({
     consumirFila(despachados)
   }, [pedidosDeCamada, adicionarCamada, consumirFila])
 
-  // No telefone o painel é opaco e cobre a tela inteira: a camada nova era
-  // enquadrada no globo ATRÁS dele, e nada dizia que havia resultado. Recolher
-  // à barra mostra a entrega; o cartão "X no globo" continua na conversa e a
-  // barra a traz de volta num toque. Sem gravar a preferência — quem decidiu
-  // foi a tela.
-  // Baixar o arquivo de origem de uma camada, do próprio painel do globo — sem
-  // ir procurar a mesma coisa na lista de Artefatos. O painel só oferece a ação
-  // quando o servidor disse que há arquivo (`baixavel`), então chegar aqui e
-  // falhar é exceção, não rotina: daí o toast em vez de um estado na linha.
+  // On the phone the panel is opaque and covers the whole screen: the new layer
+  // was framed on the globe BEHIND it, and nothing said there was a result.
+  // Collapsing to the bar shows the delivery; the "X no globo" card stays in the
+  // conversation and the bar brings it back in one tap. Without saving the
+  // preference — the screen was what decided.
+  // Download a layer's source file, from the globe panel itself — without
+  // going to look for the same thing in the Artefatos list. The panel only offers
+  // the action when the server said there is a file (`baixavel`), so getting here
+  // and failing is an exception, not routine: hence the toast instead of a row state.
   const baixarCamada = useCallback(async (artifactId: string, nome: string) => {
     const erro = await baixarArtefato(artifactId, t.listas.artefatos.download)
     if (erro) createToast.error(t.casca.baixarCamadaFalhou(nome), erro)
@@ -398,19 +401,19 @@ export default function HomeView({
     camadasAntes.current = quantasCamadas
   }, [isMobile, quantasCamadas, recolherBarra])
 
-  // Alternar painel/barra desmonta quem tinha o foco e ele cai no <body>. Só a
-  // troca PEDIDA devolve o foco — na carga da página seria roubo de foco.
+  // Toggling panel/bar unmounts whatever had focus and it falls to <body>. Only a
+  // REQUESTED swap returns focus — on page load it would be focus theft.
   const painelAnterior = useRef<string | null>(null)
   const autoFoco = painelAnterior.current !== null && painelAnterior.current !== painel
   if (hidratado) painelAnterior.current = painel
 
   return (
     <div lang={idioma} className="home dark relative h-svh w-full overflow-hidden bg-background text-foreground">
-      {/* O `<h1>` é o que o leitor de tela anuncia primeiro e o que o buscador
-          indexa — então ele diz o que a página FAZ, não o que ela mostra. */}
+      {/* The `<h1>` is what the screen reader announces first and what the search
+          engine indexes — so it says what the page DOES, not what it shows. */}
       <h1 className="sr-only">{t.casca.titulo}</h1>
 
-      {/* Girando devagar no hero; no primeiro token volta à região de quem abriu (o `center` do Globo). */}
+      {/* Spinning slowly in the hero; at the first token it returns to the opener's region (the Globo's `center`). */}
       <Globo
         layers={camadas.camadas}
         mapaRef={camadas.refMapa}
@@ -420,27 +423,28 @@ export default function HomeView({
         aoErroDeLocalizacao={aoErroDeLocalizacao}
       />
 
-      {/* O véu: o globo à vista ao norte, apagando-se rumo ao sul. Some com o hero. */}
+      {/* The veil: the globe in view to the north, fading out toward the south. Disappears with the hero. */}
       <div className="home-veu" data-visivel={hero} aria-hidden="true" />
       {heroNoDom && (
         <div className="home-hero-texto" data-visivel={hero} aria-hidden={!hero}>
-          {/* A segunda metade na terracota da marca (`--primary`, o mesmo
-              laranja do botão e do anel de foco): "Menos ferramentas" sozinho
-              pode ser lido como plataforma mais pobre, e é o contraste entre as
-              metades que desfaz isso — elas precisam ser vistas como um par,
-              não como uma frase que continua. `text-wrap:balance` equilibra as
-              linhas quando a tela estreita quebra o par.
+          {/* The second half in the brand's terracotta (`--primary`, the same
+              orange as the button and the focus ring): "Menos ferramentas"
+              alone can read as a poorer platform, and it is the contrast
+              between the halves that undoes that — they need to be seen as a
+              pair, not as a sentence that continues. `text-wrap:balance`
+              balances the lines when a narrow screen breaks the pair.
 
-              A troca do cinza por ela é do DONO, e tem um custo medido: a
-              terracota (#e7723b) tem quase a mesma luminância da nuvem velada
-              (#9e9c96), então sobre nuvem o contraste cai de 1,64:1 para
-              1,11:1 — sobre oceano ele SOBE, de 5,41:1 para 6,19:1. Nenhum dos
-              dois chegava aos 3:1 do WCAG, e lá o que separa glifo de imagem é
-              o halo, não a razão; quem precisar do número tem de mexer no
-              FUNDO. Ver `.home-hero-texto` em globals.css. */}
-          {/* A legibilidade sobre a imagem de satélite (o halo) é do CSS, não
-              daqui: ela precisa de `@supports`, que utilitária arbitrária não
-              expressa. Ver `.home-hero-texto h2, p` em globals.css. */}
+              Swapping the gray for it was the OWNER's call, and it has a
+              measured cost: the terracotta (#e7723b) has almost the same
+              luminance as the veiled cloud (#9e9c96), so over cloud the
+              contrast drops from 1.64:1 to 1.11:1 — over ocean it RISES, from
+              5.41:1 to 6.19:1. Neither reached WCAG's 3:1, and there what
+              separates glyph from image is the halo, not the ratio; whoever
+              needs the number has to change the BACKGROUND. See
+              `.home-hero-texto` in globals.css. */}
+          {/* Legibility over the satellite imagery (the halo) belongs to the CSS,
+              not here: it needs `@supports`, which an arbitrary utility cannot
+              express. See `.home-hero-texto h2, p` in globals.css. */}
           <h2 className="mb-2.5 text-[clamp(24px,3.2vw,32px)] font-semibold leading-[1.22] tracking-tight text-foreground [text-wrap:balance]">
             {t.casca.hero.antes} <span className="text-primary">{t.casca.hero.destaque}</span>
           </h2>
@@ -472,8 +476,8 @@ export default function HomeView({
         aoPedirLocalizacao={pedirLocalizacao}
       />
 
-      {/* A entrada (login, cadastro, verificação e o caminho da senha), em
-          portal no <body> com a paleta da Home. */}
+      {/* The sign-in (login, sign-up, verification and the password path),
+          portaled to <body> with the Home palette. */}
       <ModalDeEntrada
         modo={entradaPedida}
         tokenDoLink={tokenDoLink}
@@ -486,16 +490,16 @@ export default function HomeView({
 }
 
 /**
- * Painel, barra — ou o motivo de não haver nenhum dos dois.
+ * Panel, bar — or the reason there is neither.
  *
- * São TRÊS estados, e antes só havia um gate `ativo === true`: um 502 de dois
- * segundos no `/assistente/estado` deixava a pessoa com o globo e literalmente mais
- * nada — sem campo, sem aviso, sem "tentar de novo", e sem como distinguir
- * "desligado nesta instalação" de "a rede caiu".
+ * There are THREE states, and before there was only an `ativo === true` gate: a
+ * two-second 502 on `/assistente/estado` left the person with the globe and literally
+ * nothing else — no field, no notice, no "try again", and no way to tell
+ * "disabled on this installation" from "the network went down".
  *
- * E um quarto, SEM SESSÃO: nada foi consultado (`estado` nulo, de propósito),
- * e a barra aparece do mesmo jeito — `enviar` aí é o portão que abre o modal
- * de entrada, não o stream.
+ * And a fourth, WITHOUT A SESSION: nothing was queried (`estado` null, on
+ * purpose), and the bar shows up all the same — `enviar` there is the gate that
+ * opens the sign-in modal, not the stream.
  */
 function AssistenteOuAviso({
   assistente, painel, autoFoco, hero, anonimo, enviar, aoAnexar, aoPedirLocalizacao,
@@ -504,30 +508,30 @@ function AssistenteOuAviso({
   painel: "aberto" | "barra"
   autoFoco: boolean
   hero: boolean
-  /** Sem sessão: pula os avisos e mostra a barra; `enviar` é o portão do login. */
+  /** Without a session: skips the notices and shows the bar; `enviar` is the login gate. */
   anonimo: boolean
   enviar: (mensagem: string) => Promise<void> | void
-  /** Anexa arquivos escolhidos no "+" (o mesmo caminho do arraste). */
+  /** Attaches files chosen in the "+" (the same path as dragging). */
   aoAnexar: (arquivos: File[]) => void
-  /** Aciona o controle de localização do globo (o "Usar minha localização" do "+"). */
+  /** Triggers the globe's location control (the "+"'s "Usar minha localização"). */
   aoPedirLocalizacao: () => void
 }) {
-  // Abrir o painel não desmonta a faixa e a barra na hora: elas ficam por um
-  // instante, saindo (a faixa desliza para a lateral, a barra apaga), enquanto
-  // o painel entra da direita. Sem movimento o prazo é zero. Hooks ANTES dos
-  // retornos antecipados abaixo (a ordem tem de ser a mesma em todo render).
+  // Opening the panel does not unmount the strip and the bar right away: they stay
+  // for a moment, leaving (the strip slides to the side, the bar fades out), while
+  // the panel enters from the right. Without motion the delay is zero. Hooks
+  // BEFORE the early returns below (the order must be the same on every render).
   const t = useTextos()
   const idiomaDaTela = useIdiomaDaTela()
   const reduzMovimento = usePrefereMenosMovimento()
   const { montado: centroMontado, saindo } = useSaida(painel === "aberto", reduzMovimento ? 0 : SAIDA_MS)
 
-  // A altura dos extras da barra (chips/convite/aviso de recusados/passo),
-  // medida por ela e repassada à faixa como folga: sem isso a barra cresceria
-  // para cima e cobriria o "Expandir" da faixa (o mesmo bug do pill de cota).
+  // The height of the bar's extras (chips/invitation/rejected notice/step),
+  // measured by it and passed to the strip as clearance: without it the bar would
+  // grow upward and cover the strip's "Expandir" (the same bug as the quota pill).
   const [folgaExtras, setFolgaExtras] = useState(0)
 
-  // O passo da vez (raciocínio ou a ferramenta em curso), para a barra mostrar
-  // no rodapé enquanto o assistente trabalha. `null` quando parado ou escrevendo.
+  // The current step (reasoning or the tool in progress), for the bar to show in
+  // the footer while the assistant works. `null` when stopped or writing.
   const etapa = etapaDaConversa(assistente.turnos, assistente.correndo, idiomaDaTela)
 
   if (!anonimo) {
@@ -555,8 +559,8 @@ function AssistenteOuAviso({
     }
 
     if (assistente.estado?.ativo !== true) {
-      // O `motivo` do servidor é para quem administra, e em português ("defina
-      // OPENROUTER_API_KEY"): nos outros idiomas vale o aviso do dicionário.
+      // The server's `motivo` is for administrators, and in Portuguese ("defina
+      // OPENROUTER_API_KEY"): in the other languages the dictionary notice applies.
       const motivo = idiomaDaTela === "pt-BR" ? assistente.estado?.motivo : null
       return <Aviso texto={motivo || t.casca.assistenteIndisponivel} />
     }
@@ -580,7 +584,7 @@ function AssistenteOuAviso({
       )}
       {centroMontado && (
         <>
-          {/* A última troca ao centro. Não durante o hero: lá o que se vê é o status. */}
+          {/* The last exchange in the center. Not during the hero: there what you see is the status. */}
           {!hero && (
             <Pilha
               turnos={assistente.turnos}
@@ -588,15 +592,15 @@ function AssistenteOuAviso({
               confirmar={assistente.confirmar}
               enviar={enviar}
               saindo={saindo}
-              // Com a cota estourada a barra cresce para cima (o pill âmbar) e
-              // cobriria o rodapé da faixa — a faixa sobe junto (o bug do
-              // "Expandir" encoberto, captura do dono de 2026-09-19).
+              // With the quota exceeded the bar grows upward (the amber pill) and
+              // would cover the strip's footer — the strip moves up with it (the
+              // covered "Expandir" bug, the owner's screenshot from 2026-09-19).
               comAvisoDeCota={
                 assistente.estado?.cota != null && assistente.estado.cota.gasto >= assistente.estado.cota.teto
               }
-              // Os chips de anexo e o aviso de recusados crescem a barra para
-              // cima do mesmo jeito; a folga é MEDIDA porque a altura deles
-              // varia (quebram linha, o card de recusados é alto).
+              // The attachment chips and the rejected notice grow the bar upward
+              // the same way; the clearance is MEASURED because their height
+              // varies (they wrap, the rejected card is tall).
               folgaExtras={folgaExtras}
             />
           )}
@@ -604,8 +608,8 @@ function AssistenteOuAviso({
             enviar={enviar}
             correndo={assistente.correndo}
             estado={assistente.estado}
-            // Saindo, a barra NÃO pode focar: o efeito dela roda depois do do
-            // painel (ordem dos irmãos) e roubaria o cursor recém-posto lá.
+            // While leaving, the bar must NOT take focus: its effect runs after the
+            // panel's (sibling order) and would steal the cursor just placed there.
             autoFoco={autoFoco && !saindo}
             variante={hero ? "hero" : "rodape"}
             parar={assistente.parar}
@@ -622,16 +626,17 @@ function AssistenteOuAviso({
 }
 
 /**
- * A saída animada da faixa e da barra quando o painel abre: as duas ficam
- * montadas por `ms` com `saindo` ligado (o CSS desliza e apaga), e só então
- * desmontam. Abrir e recolher dentro do prazo cancela — o timer é limpo e elas
- * ficam, sem `saindo`. Com `ms = 0` (sem movimento) desmontam no tick seguinte,
- * sem quadro visível. Nascem desmontadas se o painel já está aberto ao montar.
+ * The animated exit of the strip and the bar when the panel opens: both stay
+ * mounted for `ms` with `saindo` on (the CSS slides and fades), and only then
+ * unmount. Opening and collapsing within the delay cancels — the timer is
+ * cleared and they stay, without `saindo`. With `ms = 0` (no motion) they
+ * unmount on the next tick, with no visible frame. They start unmounted if the
+ * panel is already open on mount.
  *
- * `saindo` é DERIVADO (`aberto && montado`), não estado: vale já no render em
- * que o painel abre. Num estado posto por efeito ele chegaria um render depois
- * — e nesse render a barra ainda receberia `autoFoco` e roubaria o foco do
- * painel recém-montado.
+ * `saindo` is DERIVED (`aberto && montado`), not state: it holds already in the
+ * render in which the panel opens. As state set by an effect it would arrive one
+ * render later — and in that render the bar would still receive `autoFoco` and
+ * steal focus from the freshly mounted panel.
  */
 function useSaida(aberto: boolean, ms: number): { montado: boolean; saindo: boolean } {
   const [montado, setMontado] = useState(!aberto)
@@ -647,7 +652,7 @@ function useSaida(aberto: boolean, ms: number): { montado: boolean; saindo: bool
   return { montado, saindo: aberto && montado }
 }
 
-/** No lugar da barra de comando, com o mesmo enquadramento. */
+/** In place of the command bar, with the same framing. */
 function Aviso({ texto, acao }: { texto: string; acao?: React.ReactNode }) {
   return (
     <div

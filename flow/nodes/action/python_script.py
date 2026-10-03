@@ -21,19 +21,20 @@ from flow.utils.code_sandbox import (
 )
 from flow.utils.publisher.events import publish_stdout
 
-# Builtins seguros com __import__ customizado — gerado uma unica vez
+# Safe builtins with a custom __import__ — generated only once
 _SAFE_BUILTINS = build_safe_builtins()
 
-# Pool DEDICADO ao PythonScript, separado do ThreadPoolExecutor default que
-# `asyncio.to_thread` usa — e que TODO no CPU-bound (spatial, to_json, conversao
-# de DataFrame) compartilha. `asyncio.to_thread`/o executor NAO cancelam a
-# thread: um script em `while True: pass` estoura o `wait_for` do no mas deixa a
-# THREAD viva. No pool default, poucas execucoes assim esgotam os workers e
-# TRAVAM os demais nos do processo — o executor ja reconhece isto ao isolar o
-# plano de controle num pool proprio (ver executor/job_executor.py). Aqui o dano
-# fica contido: um laco preso ocupa no maximo os workers do PythonScript, nunca
-# os do resto do executor. O interrupt best-effort abaixo ainda tenta devolver o
-# worker; a defesa completa (subprocesso matavel) e o follow-up registrado.
+# Pool DEDICATED to PythonScript, separate from the default ThreadPoolExecutor
+# that `asyncio.to_thread` uses — and that EVERY CPU-bound node (spatial, to_json,
+# DataFrame conversion) shares. `asyncio.to_thread`/the executor do NOT cancel the
+# thread: a script in `while True: pass` blows the node's `wait_for` but leaves the
+# THREAD alive. In the default pool, a few runs like that exhaust the workers and
+# HANG the other nodes in the process — the executor already acknowledges this by
+# isolating the control plane in its own pool (see executor/job_executor.py). Here
+# the damage is contained: a stuck loop occupies at most the PythonScript workers,
+# never those of the rest of the executor. The best-effort interrupt below still
+# tries to return the worker; the complete defense (killable subprocess) is the
+# recorded follow-up.
 _MAX_PYTHONSCRIPT_WORKERS = min(8, (os.cpu_count() or 2) + 2)
 _SCRIPT_POOL = ThreadPoolExecutor(
     max_workers=_MAX_PYTHONSCRIPT_WORKERS,
@@ -42,32 +43,32 @@ _SCRIPT_POOL = ThreadPoolExecutor(
 
 
 class _ScriptInterrompido(BaseException):
-    """Injetada na thread do script quando o tempo limite estoura.
+    """Injected into the script's thread when the time limit expires.
 
-    Subclasse de BaseException — nao de Exception — para sobreviver a um
-    `except Exception` no codigo do usuario e encerrar mesmo um laco que engole
-    erros comuns.
+    Subclass of BaseException — not of Exception — to survive an
+    `except Exception` in the user's code and end even a loop that swallows
+    common errors.
     """
 
 
 def _interromper_thread(future: "Future", ident: Optional[int]) -> bool:
-    """Melhor-esforco: injeta _ScriptInterrompido na thread do script no timeout.
+    """Best-effort: injects _ScriptInterrompido into the script's thread on timeout.
 
-    `asyncio.wait_for` so cancela a ESPERA; a thread do exec() segue rodando.
-    Para o caso comum de laco puro-Python (`while True: x = 1`) esta injecao
-    encerra a thread no proximo bytecode e devolve o worker ao pool. NAO
-    interrompe codigo preso em extensao C (um numpy gigante) nem em espera de
-    I/O — para esses, o worker so volta ao reiniciar o executor; a defesa
-    completa (subprocesso matavel) e o follow-up registrado.
+    `asyncio.wait_for` only cancels the WAIT; the exec() thread keeps running.
+    For the common case of a pure-Python loop (`while True: x = 1`) this injection
+    ends the thread at the next bytecode and returns the worker to the pool. It does
+    NOT interrupt code stuck in a C extension (a giant numpy call) or waiting on
+    I/O — for those, the worker only comes back when the executor restarts; the
+    complete defense (killable subprocess) is the recorded follow-up.
 
-    Seguranca do alvo: `future.done()` e a chamada de injecao correm com o GIL
-    RETIDO (`ctypes.pythonapi` nao o libera, e nao ha await entre elas). Se o
-    future ainda nao terminou, o worker esta PROVADAMENTE dentro do nosso script
-    — nunca numa proxima tarefa do pool, porque o worker so faz dequeue da
-    proxima apos `set_result`, que e o que marca `done()`. Assim a interrupcao
-    jamais cai numa tarefa alheia.
+    Target safety: `future.done()` and the injection call run with the GIL
+    HELD (`ctypes.pythonapi` doesn't release it, and there is no await between them).
+    If the future hasn't finished yet, the worker is PROVABLY inside our script
+    — never in a next pool task, because the worker only dequeues the next one
+    after `set_result`, which is what marks `done()`. So the interruption
+    never lands on someone else's task.
 
-    Retorna True se a interrupcao foi armada para exatamente uma thread.
+    Returns True if the interruption was armed for exactly one thread.
     """
     if ident is None or future.done():
         return False
@@ -75,18 +76,18 @@ def _interromper_thread(future: "Future", ident: Optional[int]) -> bool:
         ctypes.c_long(ident), ctypes.py_object(_ScriptInterrompido)
     )
     if armadas > 1:
-        # Nunca deveria acontecer (o ident e unico); se acontecer, desfaz para
-        # nao deixar a excecao pendente numa thread errada.
+        # Should never happen (the ident is unique); if it does, undo it so as
+        # not to leave the exception pending in the wrong thread.
         ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(ident), None)
         return False
     return armadas == 1
 
 
 def _descartar_future(f: "Future") -> None:
-    """Consome o resultado/excecao de um future orfao (apos o timeout).
+    """Consumes the result/exception of an orphaned future (after the timeout).
 
-    Sem isto, a _ScriptInterrompido que a injecao poe no future viraria
-    "Future exception was never retrieved" no log do executor.
+    Without this, the _ScriptInterrompido that the injection puts in the future
+    would become "Future exception was never retrieved" in the executor's log.
     """
     try:
         if not f.cancelled():
@@ -95,48 +96,48 @@ def _descartar_future(f: "Future") -> None:
         pass
 
 
-# Janela de agregação do stdout. Um node_event POR LINHA de print() enchia a
-# fila de 500 slots do executor — compartilhada por TODOS os jobs e pelo GeoSync
-# — e estourava o rate limit de 200 eventos/s do servidor: um
-# `for i in range(50000): print(i)` derrubava a telemetria dos outros workflows
-# junto. Com lote de 200 ms / 200 linhas o volume cai de 2 a 3 ordens de grandeza
-# e o "tempo real" percebido continua o mesmo.
+# Stdout aggregation window. One node_event PER print() LINE filled the
+# executor's 500-slot queue — shared by ALL jobs and by GeoSync — and
+# blew the server's rate limit of 200 events/s: a
+# `for i in range(50000): print(i)` took down the telemetry of the other workflows
+# with it. With a batch of 200 ms / 200 lines the volume drops by 2 to 3 orders
+# of magnitude and the perceived "real time" stays the same.
 _STDOUT_FLUSH_SECONDS = 0.2
 _STDOUT_FLUSH_LINES = 200
-# Orçamento de BYTES do lote — e ele fecha ANTES do teto de linhas.
-# Contar só linhas era insuficiente: um node_event acima de 64 KB
-# (TETO_NODE_EVENT_BYTES em flow/utils/publisher/reducao.py, a regra única do
-# executor e do servidor) é reduzido, e das linhas só sobra o prefixo que cabe —
-# o painel perdia o lote INTEIRO, em silêncio, sempre que as linhas eram longas
-# (`for r in gdf.itertuples(): print(r)`, `print(json.dumps(feature))`).
-# 24 KB deixa folga confortável para o overhead de JSON e para escapes (uma
-# linha com acentos/aspas pode quase dobrar de tamanho ao ser serializada).
+# The batch's BYTE budget — and it closes BEFORE the line ceiling.
+# Counting only lines was not enough: a node_event above 64 KB
+# (TETO_NODE_EVENT_BYTES in flow/utils/publisher/reducao.py, the single rule for
+# the executor and the server) is reduced, and of the lines only the prefix that
+# fits remains — the panel lost the ENTIRE batch, silently, whenever lines were
+# long (`for r in gdf.itertuples(): print(r)`, `print(json.dumps(feature))`).
+# 24 KB leaves comfortable headroom for JSON overhead and escapes (a line with
+# accents/quotes can nearly double in size when serialized).
 _STDOUT_FLUSH_BYTES = 24 * 1024
-# Teto de UMA linha. Acima disso ela sozinha estouraria o frame e levaria junto
-# as linhas legítimas do mesmo lote (um `print(gdf.to_json())` de 70 KB matava
-# as outras 199). Truncada individualmente, com marcação explícita — nunca em
-# silêncio.
+# Ceiling for ONE line. Above it, the line alone would blow the frame and take
+# down with it the legitimate lines of the same batch (a 70 KB `print(gdf.to_json())`
+# killed the other 199). Truncated individually, with an explicit marker — never
+# silently.
 _STDOUT_MAX_LINE_CHARS = 8 * 1024
-# Teto por execução de nó. Passado ele, o script continua rodando (e o log local
-# continua completo), mas o painel recebe um aviso único em vez de um dilúvio.
+# Ceiling per node run. Past it, the script keeps running (and the local log
+# stays complete), but the panel receives a single warning instead of a flood.
 _STDOUT_MAX_LINES = 5_000
 
 
 class _LoggingStream(io.TextIOBase):
     """
-    Stream que intercepta chamadas de print() e as redireciona para o logger
-    do nó e para o publisher, fazendo-as aparecer no terminal da UI.
-    Processa linha a linha para respeitar o comportamento padrão de print().
+    Stream that intercepts print() calls and redirects them to the node's
+    logger and to the publisher, making them appear in the UI terminal.
+    Processes line by line to respect print()'s default behavior.
 
-    As linhas são AGRUPADAS antes de virar evento: `publish_fn` recebe uma lista
-    de linhas, não uma linha. O lote fecha por BYTES (_STDOUT_FLUSH_BYTES), por
-    contagem (_STDOUT_FLUSH_LINES) ou por tempo (_STDOUT_FLUSH_SECONDS), o que
-    vier primeiro — nessa ordem de prioridade, porque só o critério de bytes
-    impede o evento de passar do teto de 64 KB e ser reduzido aos campos de
-    controle no caminho (perda TOTAL do lote, sem aviso). O flush por tempo roda
-    num `threading.Timer` porque o script do usuário é dono da thread: sem ele,
-    um script que imprime e depois calcula por 10 s só entregaria as linhas no
-    fim do nó.
+    Lines are GROUPED before becoming an event: `publish_fn` receives a list
+    of lines, not a line. The batch closes by BYTES (_STDOUT_FLUSH_BYTES), by
+    count (_STDOUT_FLUSH_LINES) or by time (_STDOUT_FLUSH_SECONDS), whichever
+    comes first — in that priority order, because only the byte criterion
+    keeps the event from exceeding the 64 KB ceiling and being reduced to the
+    control fields along the way (TOTAL loss of the batch, without warning). The
+    time-based flush runs in a `threading.Timer` because the user's script owns
+    the thread: without it, a script that prints and then computes for 10 s would
+    only deliver the lines at the end of the node.
     """
 
     def __init__(
@@ -147,10 +148,10 @@ class _LoggingStream(io.TextIOBase):
         self._log_fn = log_fn
         self._publish_fn = publish_fn
         self._partial = ""
-        # O buffer é tocado pela thread do script E pela thread do timer.
+        # The buffer is touched by the script's thread AND by the timer's thread.
         self._lock = threading.Lock()
         self._buffer: List[str] = []
-        # Bytes de texto já acumulados no lote atual (ver _STDOUT_FLUSH_BYTES).
+        # Bytes of text already accumulated in the current batch (see _STDOUT_FLUSH_BYTES).
         self._bytes_lote = 0
         self._timer: threading.Timer | None = None
         self._publicadas = 0
@@ -160,11 +161,11 @@ class _LoggingStream(io.TextIOBase):
 
     @staticmethod
     def _cortar_linha(line: str) -> str:
-        """Trunca uma linha isolada grande demais para caber num frame.
+        """Truncates a single line too large to fit in a frame.
 
-        Sem isto um único `print()` de um GeoJSON leva o lote inteiro consigo:
-        o evento passa dos 64 KB e chega ao painel sem `extra` nenhum. A marca
-        é explícita porque truncar em silêncio faria a saída parecer completa.
+        Without this, a single `print()` of a GeoJSON takes the whole batch with it:
+        the event exceeds 64 KB and reaches the panel with no `extra` at all. The
+        marker is explicit because truncating silently would make the output look complete.
         """
         if len(line) <= _STDOUT_MAX_LINE_CHARS:
             return line
@@ -177,13 +178,13 @@ class _LoggingStream(io.TextIOBase):
         self._log_fn(line)
         if self._publish_fn is None:
             return
-        # O log local (acima) recebe a linha INTEIRA; só o que vai para o painel
-        # é cortado.
+        # The local log (above) receives the ENTIRE line; only what goes to the panel
+        # is cut.
         linha = self._cortar_linha(line)
         with self._lock:
             self._buffer.append(linha)
             self._bytes_lote += len(linha)
-            # Bytes primeiro: é o critério que evita o descarte total do lote.
+            # Bytes first: it's the criterion that prevents the total loss of the batch.
             cheio = (
                 self._bytes_lote >= _STDOUT_FLUSH_BYTES
                 or len(self._buffer) >= _STDOUT_FLUSH_LINES
@@ -196,12 +197,12 @@ class _LoggingStream(io.TextIOBase):
             self._flush_lote()
 
     def _flush_lote(self) -> None:
-        """Fecha o lote atual e publica. Chamado pela thread do script ou pelo timer.
+        """Closes the current batch and publishes it. Called by the script's thread or by the timer.
 
-        Publica DENTRO do lock: são duas threads produzindo lotes (a do script,
-        quando enche, e a do timer, quando o tempo fecha) e publicar fora dele
-        deixaria as linhas chegarem trocadas no painel. O custo é irrelevante —
-        publicar é um `call_soon_threadsafe`, não uma ida à rede.
+        Publishes INSIDE the lock: two threads produce batches (the script's,
+        when it fills up, and the timer's, when the time closes it) and publishing
+        outside it would let lines arrive out of order in the panel. The cost is
+        irrelevant — publishing is a `call_soon_threadsafe`, not a network round trip.
         """
         with self._lock:
             if self._timer is not None:
@@ -239,12 +240,12 @@ class _LoggingStream(io.TextIOBase):
         self._partial += text
         while "\n" in self._partial:
             line, self._partial = self._partial.split("\n", 1)
-            if line:  # ignora linhas vazias geradas pelo \n final do print()
+            if line:  # ignores empty lines generated by print()'s trailing \n
                 self._emit(line)
         return len(text)
 
     def flush(self) -> None:
-        # Emite conteúdo parcial que não terminou com \n
+        # Emits partial content that did not end with \n
         if self._partial.strip():
             self._emit(self._partial)
         self._partial = ""
@@ -258,8 +259,8 @@ def _run_script(
     publish_fn: Callable[[List[str]], None] | None = None,
 ) -> None:
     """
-    Executa o script Python no namespace fornecido com builtins restritos.
-    Redireciona stdout para que print() apareça no terminal da UI em tempo real.
+    Executes the Python script in the given namespace with restricted builtins.
+    Redirects stdout so that print() appears in the UI terminal in real time.
     """
     stream = _LoggingStream(log_fn, publish_fn)
     old_stdout = sys.stdout
@@ -268,32 +269,33 @@ def _run_script(
         namespace["__builtins__"] = _SAFE_BUILTINS
         exec(compile(code, "<PythonScript>", "exec"), namespace)  # noqa: S102
     finally:
-        # Restaura o stdout ANTES do flush: se a interrupcao assincrona do
-        # timeout (_ScriptInterrompido) cair neste finally, o stdout global ja
-        # voltou ao normal — nunca fica preso no stream morto do no. O flush
-        # opera sobre o proprio `stream`, nao sobre sys.stdout, entao a ordem
-        # nao muda o que e publicado; no maximo o ultimo lote se perde se a
-        # thread for morta no meio, o que e aceitavel (o no ja falhou).
+        # Restores stdout BEFORE the flush: if the timeout's asynchronous
+        # interruption (_ScriptInterrompido) lands in this finally, the global
+        # stdout is already back to normal — it never stays stuck on the node's
+        # dead stream. The flush operates on `stream` itself, not on sys.stdout,
+        # so the order doesn't change what is published; at most the last batch
+        # is lost if the thread is killed midway, which is acceptable (the node
+        # already failed).
         sys.stdout = old_stdout
-        # O flush final é obrigatório: sem ele o último lote (e a linha sem \n)
-        # morreriam junto com a thread do script.
+        # The final flush is mandatory: without it the last batch (and the line without \n)
+        # would die along with the script's thread.
         stream.flush()
 
 
 @register_node
 class PythonScript(BaseNode):
     """
-    Executa um trecho de código Python para transformar ou processar dados.
+    Executes a snippet of Python code to transform or process data.
 
-    Todos os inputs conectados ficam disponíveis como variáveis no escopo do
-    script (pelo nome da porta de entrada, conforme definido na edge).
+    All connected inputs are available as variables in the script's scope
+    (by the name of the input port, as defined on the edge).
 
-    Bibliotecas disponíveis por padrão: pd, gpd, np, shapely.
+    Libraries available by default: pd, gpd, np, shapely.
 
-    As variáveis listadas em `output_vars` são lidas do namespace ao final da
-    execução e retornadas como outputs nomeados.
+    The variables listed in `output_vars` are read from the namespace at the end
+    of execution and returned as named outputs.
 
-    Exemplo de script (supondo uma porta de entrada chamada `camadas`):
+    Example script (assuming an input port named `camadas`):
         gdf = camadas.copy()
         gdf["area_ha"] = gdf.geometry.area / 10_000
         gdf = gdf[gdf["area_ha"] > 5]
@@ -345,16 +347,16 @@ class PythonScript(BaseNode):
                     "description": "Tempo máximo de execução em segundos",
                 },
             ],
-            # Entradas DECLARADAS PELO USUARIO, via a propriedade `ports`.
+            # Inputs DECLARED BY THE USER, via the `ports` property.
             #
-            # Sem isto o no nao consegue receber duas entradas distintas: o nome da
-            # variavel vem do `to_key` da aresta, o editor so preenche `to_key`
-            # quando o destino declara mais de uma porta, e sem ele o executor cai
-            # no `from_key` — que e "output" em praticamente todo no. As duas
-            # arestas escrevem na mesma chave e a segunda sobrescreve a primeira.
+            # Without this the node cannot receive two distinct inputs: the variable
+            # name comes from the edge's `to_key`, the editor only fills `to_key`
+            # when the target declares more than one port, and without it the executor
+            # falls back to `from_key` — which is "output" in practically every node.
+            # Both edges write to the same key and the second overwrites the first.
             #
-            # Vazio por padrao: no existente continua com uma porta anonima e as
-            # arestas de hoje seguem funcionando exatamente como funcionam.
+            # Empty by default: existing nodes keep a single anonymous port and
+            # today's edges keep working exactly as they do.
             "dynamic_inputs": True,
             # Outputs dinamicos — definidos pelo usuario via output_vars
             "dynamic_output": True,
@@ -373,15 +375,15 @@ class PythonScript(BaseNode):
         if not code.strip():
             raise ValueError("O campo 'code' não pode estar vazio.")
 
-        # ── Validação de segurança (AST) ────────────────────────────
-        # Rejeita imports não permitidos e acessos a atributos perigosos
-        # ANTES de compilar/executar qualquer código.
+        # ── Security validation (AST) ────────────────────────────
+        # Rejects disallowed imports and access to dangerous attributes
+        # BEFORE compiling/executing any code.
         try:
             validate_code_ast(code)
         except UnsafeCodeError as exc:
             raise ValueError(f"Código bloqueado por segurança: {exc}") from exc
 
-        # Nomes das variáveis de saída
+        # Names of the output variables
         output_var_names: List[str] = [
             v.strip() for v in output_vars_raw.split(",") if v.strip()
         ]
@@ -396,27 +398,27 @@ class PythonScript(BaseNode):
             "shapely": shapely,
         }
 
-        # Injeta inputs pelo nome real da porta (to_key/from_key definido na edge)
+        # Injects inputs by the real port name (to_key/from_key defined on the edge)
         for key, value in inputs.items():
             namespace[key] = value
 
-        # Constrói callback que publica print() no terminal da UI via Redis
+        # Builds a callback that publishes print() to the UI terminal via Redis
         publisher = self._publisher
         task_id = self._task_id
         node_id = self.node_id
 
         def _publish_print(linhas: List[str]) -> None:
-            """Publica um LOTE de linhas de print() como um evento kind=stdout."""
+            """Publishes a BATCH of print() lines as a kind=stdout event."""
             publish_stdout(publisher, task_id, node_id, linhas)
 
-        # Executa o script no pool DEDICADO do PythonScript, com tempo limite.
-        # self.log é passado como callback para o logger Python;
-        # _publish_print roteia print() para o terminal da UI via WebSocket.
+        # Runs the script in PythonScript's DEDICATED pool, with a time limit.
+        # self.log is passed as the callback for the Python logger;
+        # _publish_print routes print() to the UI terminal via WebSocket.
         #
-        # A thread do script NAO e cancelavel: no timeout nao ha como para-la.
-        # Por isso (a) rodamos no _SCRIPT_POOL, que isola o dano de um laco preso
-        # dos demais nos, e (b) capturamos o ident da thread para injetar
-        # _ScriptInterrompido e tentar devolver o worker ao pool.
+        # The script's thread is NOT cancelable: on timeout there's no way to stop it.
+        # That's why (a) we run on _SCRIPT_POOL, which isolates the damage of a stuck
+        # loop from the other nodes, and (b) we capture the thread's ident to inject
+        # _ScriptInterrompido and try to return the worker to the pool.
         loop = asyncio.get_running_loop()
         estado_thread: Dict[str, int] = {}
 
@@ -426,25 +428,25 @@ class PythonScript(BaseNode):
             try:
                 _run_script(code, namespace, self.log, _publish_print)
             finally:
-                # Rede de seguranca: se _ScriptInterrompido cair no finally de
-                # _run_script antes de restaurar o stdout, aqui ele volta. Neste
-                # ponto a excecao assincrona ja foi consumida (dispara uma unica
-                # vez), entao este finally roda inteiro, sem risco de nova
-                # interrupcao — o stdout global nunca fica preso no stream do no.
+                # Safety net: if _ScriptInterrompido lands in _run_script's finally
+                # before stdout is restored, it is restored here. At this
+                # point the asynchronous exception has already been consumed (it fires
+                # only once), so this finally runs in full, with no risk of another
+                # interruption — the global stdout never stays stuck on the node's stream.
                 if sys.stdout is not stdout_antes:
                     sys.stdout = stdout_antes
 
         future = loop.run_in_executor(_SCRIPT_POOL, _executar_script)
-        # NAO usar asyncio.wait_for: no timeout ele tenta CANCELAR o future e,
-        # como a thread do executor ja esta rodando (nao cancelavel), ESPERA a
-        # thread terminar — que num `while True` nunca acontece, anulando o
-        # proprio timeout. asyncio.wait apenas OBSERVA: no prazo o future fica em
-        # `pendentes` e nos o tratamos sem cancelar.
+        # Do NOT use asyncio.wait_for: on timeout it tries to CANCEL the future and,
+        # since the executor's thread is already running (not cancelable), WAITS for
+        # the thread to finish — which in a `while True` never happens, nullifying
+        # the timeout itself. asyncio.wait only OBSERVES: at the deadline the future
+        # stays in `pendentes` and we handle it without canceling.
         _, pendentes = await asyncio.wait({future}, timeout=float(timeout))
         if pendentes:
-            # add_done_callback so aqui: apenas o caminho orfao (thread ainda
-            # viva) precisa descartar a excecao — no caminho normal o
-            # future.exception() abaixo ja a consome.
+            # add_done_callback only here: only the orphan path (thread still
+            # alive) needs to discard the exception — on the normal path the
+            # future.exception() below already consumes it.
             future.add_done_callback(_descartar_future)
             liberou = _interromper_thread(future, estado_thread.get("ident"))
             self.log(
@@ -460,7 +462,7 @@ class PythonScript(BaseNode):
                 f"Execução do script excedeu o limite de {timeout} segundos."
             )
 
-        # Concluido dentro do prazo — propaga um erro do script como antes.
+        # Finished within the deadline — propagates a script error as before.
         exc = future.exception()
         if exc is not None:
             _libs = {"pd", "gpd", "np", "shapely"}
@@ -468,7 +470,7 @@ class PythonScript(BaseNode):
             hint = f" Inputs disponíveis no namespace: {available}." if available else " Nenhum input foi conectado a este nó."
             raise RuntimeError(f"Erro ao executar script Python: {exc}.{hint}") from exc
 
-        # Coleta variáveis de saída do namespace
+        # Collects output variables from the namespace
         result: Dict[str, Any] = {}
         for var in output_var_names:
             if var not in namespace:

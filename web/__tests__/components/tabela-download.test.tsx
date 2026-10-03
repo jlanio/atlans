@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 
-// O download da tabela de artefatos: a variante SEGURA busca a URL pré-assinada
-// pelo `getArtifactDownload` (Bearer → respeita `protected`) e NAVEGA até ela,
-// sem puxar o arquivo inteiro para um blob em memória (o `revokeObjectURL`
-// síncrono abortava downloads grandes no Firefox/Safari).
+// The artifacts table download: the SAFE variant fetches the presigned URL
+// through `getArtifactDownload` (Bearer → respects `protected`) and NAVIGATES to
+// it, without pulling the whole file into an in-memory blob (the synchronous
+// `revokeObjectURL` aborted large downloads on Firefox/Safari).
 const getArtifactDownload = vi.fn()
 const getArtifactDownloadUrl = vi.fn((..._a: unknown[]) => "https://plataforma/artifacts/a1/download")
 vi.mock("@/service/GisFlowService", () => ({
@@ -59,9 +59,9 @@ describe("download de artefato — navega para a URL pré-assinada, sem blob", (
     await waitFor(() =>
       expect(window.open).toHaveBeenCalledWith("https://s3/presigned?sig=x", "_blank"),
     )
-    // A variante segura não puxa o arquivo inteiro para um blob (o bug do PR).
+    // The safe variant doesn't pull the whole file into a blob (the PR's bug).
     expect(fetch).not.toHaveBeenCalled()
-    // E respeita o Bearer: passou pelo getArtifactDownload, não pelo endpoint público.
+    // And it respects the Bearer: it went through getArtifactDownload, not the public endpoint.
     expect(getArtifactDownload).toHaveBeenCalledWith("a1")
   })
 })

@@ -1,9 +1,9 @@
 # tests/unit/test_workspace_delete_cascade.py
-"""Nenhum workflow sobrevive ativo ao delete do seu workspace.
+"""No workflow survives as active the deletion of its workspace.
 
-Regressao: o DELETE do workspace nao tocava em workflows nem schedules. O
-workflow sumia da UI (listagem e por workspace acessivel) mas o AsyncScheduler
-continuava disparando — o tick filtra apenas por Schedule.active.
+Regression: the workspace DELETE did not touch workflows or schedules. The
+workflow vanished from the UI (the listing is by accessible workspace) but the
+AsyncScheduler kept triggering it — the tick filters only by Schedule.active.
 """
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -14,7 +14,7 @@ from app.services.workflow_service import (
     soft_delete_workspace_workflows,
 )
 
-# Timestamp compartilhado entre Workspace.deleted_at e os workflows da cascata.
+# Timestamp shared between Workspace.deleted_at and the cascaded workflows.
 _DELETED_AT = datetime(2026, 8, 3, 10, 5, 44)
 
 
@@ -67,23 +67,23 @@ async def test_soft_deleta_pendentes_e_desativa_schedules():
     assert wf_update.table.name == "workflows"
     wf_params = wf_update.compile().params
     assert wf_params["flag_ative"] is False
-    # Mesmo timestamp do workspace — e a marca que o restore usa
+    # Same timestamp as the workspace — it is the mark the restore uses
     assert wf_params["deleted_at"] == _DELETED_AT
 
     assert sched_update.table.name == "schedules"
     assert sched_update.compile().params["active"] is False
 
-    # ChangeDetector so e limpo para quem foi soft-deletado agora
+    # ChangeDetector is only cleared for those soft-deleted just now
     assert {c.args[0] for c in cleanup.await_args_list} == {ativo_a, ativo_b}
 
 
 async def test_desativa_schedule_de_workflow_ja_soft_deletado():
-    """Schedule ativo de workflow ja deletado tambem cai — o cascade cobre todos."""
+    """An active schedule of an already-deleted workflow also goes down — the cascade covers them all."""
     wf_id = str(uuid4())
     db = AsyncMock()
     db.execute = AsyncMock(side_effect=[
         _rows_result([(wf_id, datetime(2026, 4, 9, 13, 43))]),
-        _update_result(1),  # UPDATE schedules — sem UPDATE de workflows
+        _update_result(1),  # UPDATE schedules — no UPDATE of workflows
     ])
 
     with patch(
@@ -98,12 +98,12 @@ async def test_desativa_schedule_de_workflow_ja_soft_deletado():
 
 
 async def test_nao_commita_por_conta_propria():
-    """Quem commita e o delete_workspace.
+    """The one that commits is delete_workspace.
 
-    Sem garantia de atomicidade end-to-end, porem: o router chama
-    `schedule_workspace_data_expiry` logo depois, e ela commita por dentro. Por
-    isso o router marca Workspace.deleted_at ANTES desta funcao — ver
-    test_delete_marca_workspace_antes_do_helper_que_commita.
+    No end-to-end atomicity guarantee, though: the router calls
+    `schedule_workspace_data_expiry` right afterwards, and it commits
+    internally. That is why the router marks Workspace.deleted_at BEFORE this
+    function — see test_delete_marca_workspace_antes_do_helper_que_commita.
     """
     db = AsyncMock()
     db.execute = AsyncMock(side_effect=[
@@ -122,13 +122,14 @@ async def test_nao_commita_por_conta_propria():
 
 
 async def test_delete_marca_workspace_antes_do_helper_que_commita(client, mock_current_user):
-    """A ordem no router e o que garante a atomicidade — nao a ausencia de commit.
+    """The order in the router is what guarantees atomicity — not the absence of a commit.
 
-    `schedule_workspace_data_expiry` commita por dentro (via
-    purge_workspace_storage). Se o router marcasse Workspace.deleted_at depois
-    dela, esse commit confirmaria os workflows ja soft-deletados com o workspace
-    ainda vivo. Esse estado nao aparece na lixeira (o filtro e
-    `deleted_at IS NOT NULL`), entao nem o dono nem o admin o desfazem pela UI.
+    `schedule_workspace_data_expiry` commits internally (via
+    purge_workspace_storage). If the router marked Workspace.deleted_at after
+    it, that commit would confirm the already soft-deleted workflows with the
+    workspace still alive. That state does not show up in the trash (the filter
+    is `deleted_at IS NOT NULL`), so neither the owner nor the admin can undo it
+    through the UI.
     """
     from app.api.dependencies import get_db
     from app.main import app
@@ -157,7 +158,7 @@ async def test_delete_marca_workspace_antes_do_helper_que_commita(client, mock_c
         return {"workflows": 1, "schedules": 1}
 
     async def _fake_expiry(_db, _ws_id):
-        # Ponto do commit interno: o que estiver sujo aqui é confirmado junto.
+        # Internal commit point: whatever is dirty here gets committed along with it.
         visto["ws_deleted_at_no_commit_interno"] = ws.deleted_at
         return {"artifacts": 0, "drive_files": 0}
 
@@ -179,7 +180,7 @@ async def test_delete_marca_workspace_antes_do_helper_que_commita(client, mock_c
 # ── Restore ───────────────────────────────────────────────────────────────────
 
 async def test_restore_devolve_apenas_workflows_do_mesmo_delete():
-    """Workflow deletado individualmente antes nao volta junto com o workspace."""
+    """A workflow deleted individually earlier does not come back with the workspace."""
     ws_id = str(uuid4())
     db = AsyncMock()
     db.execute = AsyncMock(return_value=_update_result(2))
@@ -200,12 +201,12 @@ async def test_restore_devolve_apenas_workflows_do_mesmo_delete():
 
 
 async def test_restore_nao_reativa_workflow():
-    """Regressao: reativar em bloco ressuscitava o que o dono tinha desligado.
+    """Regression: bulk reactivation resurrected what the owner had turned off.
 
-    O cascade zera `flag_ative` de todos, entao no restore nao ha como saber
-    quem ja estava desativado de proposito. Devolver desativado e a unica
-    leitura honesta — e `flag_ative` segue sendo a trava que portal_router,
-    webhook_router e schedule_service checam.
+    The cascade clears `flag_ative` on all of them, so on restore there is no
+    way to know which ones were already deactivated on purpose. Returning them
+    deactivated is the only honest reading — and `flag_ative` remains the lock
+    that portal_router, webhook_router and schedule_service check.
     """
     db = AsyncMock()
     db.execute = AsyncMock(return_value=_update_result(1))
@@ -223,30 +224,30 @@ async def test_restore_nao_reativa_schedules():
 
     await restore_workspace_workflows(db, str(uuid4()), _DELETED_AT)
 
-    # Contar chamadas nao serve de prova aqui: o restore tambem LE os nomes que
-    # voltam, para desviar de nome reocupado enquanto o workspace esteve na
-    # lixeira (o indice de nome e parcial em `deleted_at IS NULL`). Ler nao e
-    # reativar — o que nao pode acontecer e uma escrita em `schedules`.
+    # Counting calls is no proof here: the restore also READS the names coming
+    # back, to steer clear of names re-taken while the workspace was in the
+    # trash (the name index is partial on `deleted_at IS NULL`). Reading is not
+    # reactivating — what must not happen is a write to `schedules`.
     emitidas = [str(c.args[0]) for c in db.execute.await_args_list]
     assert not any("schedules" in sql for sql in emitidas), emitidas
     assert db.execute.await_args.args[0].table.name == "workflows"
 
 
 async def test_restore_desvia_de_nome_reocupado():
-    """O nome de quem esta na lixeira pode ter sido tomado enquanto isso.
+    """The name of something in the trash may have been taken in the meantime.
 
-    O indice de nome e PARCIAL (`deleted_at IS NULL`), entao soft-deletar libera
-    o nome. Se alguem criar um workflow com o nome de um dos que cairam, o
-    UPDATE em lote do restore falharia INTEIRO por violacao de unicidade e
-    derrubaria junto o restore do workspace. Renomear quem volta devolve o
-    workspace; recusar nao devolveria nada.
+    The name index is PARTIAL (`deleted_at IS NULL`), so soft-deleting frees
+    the name. If someone creates a workflow with the name of one of those that
+    went down, the restore's bulk UPDATE would fail ENTIRELY on a uniqueness
+    violation and take the workspace restore down with it. Renaming the ones
+    coming back returns the workspace; refusing would return nothing.
     """
     db = AsyncMock()
     db.execute = AsyncMock(side_effect=[
-        _rows_result([("wf-a", "Edificações")]),   # os que voltam
-        _rows_result([("Edificações",)]),          # nomes ja ocupados por vivos
-        _update_result(1),                         # UPDATE do rename
-        _update_result(1),                         # UPDATE que zera deleted_at
+        _rows_result([("wf-a", "Edificações")]),   # the ones coming back
+        _rows_result([("Edificações",)]),          # names already taken by live ones
+        _update_result(1),                         # rename UPDATE
+        _update_result(1),                         # UPDATE that clears deleted_at
     ])
 
     devolvidos = await restore_workspace_workflows(db, str(uuid4()), _DELETED_AT)
@@ -257,17 +258,17 @@ async def test_restore_desvia_de_nome_reocupado():
 
 
 async def test_restore_preserva_o_nome_quando_ninguem_o_tomou():
-    """Caso normal: sem colisao, o workflow volta com o nome que tinha."""
+    """Normal case: no collision, the workflow comes back with the name it had."""
     db = AsyncMock()
     db.execute = AsyncMock(side_effect=[
-        _rows_result([("wf-a", "Edificações")]),   # os que voltam
+        _rows_result([("wf-a", "Edificações")]),   # the ones coming back
         _rows_result([]),                          # nada ocupado
-        _update_result(1),                         # UPDATE que zera deleted_at
+        _update_result(1),                         # UPDATE that clears deleted_at
     ])
 
     devolvidos = await restore_workspace_workflows(db, str(uuid4()), _DELETED_AT)
 
     assert devolvidos == 1
-    # Sem rename: a unica escrita e a que zera `deleted_at`.
+    # No rename: the only write is the one that clears `deleted_at`.
     assert db.execute.await_count == 3
     assert "name" not in db.execute.await_args.args[0].compile().params

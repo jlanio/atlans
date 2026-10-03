@@ -2,25 +2,25 @@ import { describe, it, expect } from "vitest"
 import { readFileSync } from "fs"
 import { join } from "path"
 
-// A purga precisa contar o que NÃO removeu, e por qual motivo.
+// The purge has to count what it did NOT remove, and for what reason.
 //
-// O diálogo reportava apenas `skipped_s3_errors`. Depois de a purga passar a
-// respeitar `content_location` (o artefato que vive no disco do executor só cai
-// depois que a ordem de remoção é ENTREGUE), surgiram três desfechos novos:
+// The dialog reported only `skipped_s3_errors`. After the purge started
+// respecting `content_location` (an artifact that lives on the executor's disk is only dropped
+// after the removal order is DELIVERED), three new outcomes appeared:
 //
-//   pending_executor     executor offline — a linha fica, a próxima passada
-//                        tenta de novo
-//   skipped_sem_rastro   sem executor_id/local_path: não há para quem mandar a
-//                        ordem, e apagar a linha perderia o rastro do arquivo
-//   skipped_catalogados  Drive catalogado: é arquivo do próprio usuário, na
-//                        pasta que ele sincroniza — preservado por política
+//   pending_executor     executor offline — the row stays, the next pass
+//                        tries again
+//   skipped_sem_rastro   no executor_id/local_path: there is no one to send the
+//                        order to, and deleting the row would lose the file's trace
+//   skipped_catalogados  cataloged Drive: it is the user's own file, in the
+//                        folder they sync — preserved by policy
 //
-// Sem contá-los, o toast dizia "N removidos" e o admin concluía que o
-// armazenamento tinha sido liberado, quando parte continuava lá. A distinção
-// importa porque só os dois primeiros se resolvem repetindo a purga.
+// Without counting them, the toast said "N removidos" (N removed) and the admin concluded that
+// the storage had been freed, when part of it was still there. The distinction
+// matters because only the first two are resolved by repeating the purge.
 
-// O diálogo de purga mora no componente da seção «Armazenamento» (a página de
-// Configurações foi fatiada na F2 da simplificação).
+// The purge dialog lives in the component for the "Armazenamento" (storage) section (the
+// Settings page was split up in F2 of the simplification).
 const SECAO = join(
   __dirname, "..", "..", "..", "app", "components", "admin", "settings", "armazenamento.tsx",
 )
@@ -35,8 +35,8 @@ describe("purga de armazenamento — relato dos desfechos", () => {
   })
 
   it("relata separadamente o que foi preservado por política", () => {
-    // Juntar os dois grupos num número só diria ao admin para repetir a purga
-    // de algo que a plataforma nunca vai remover.
+    // Merging the two groups into a single number would tell the admin to repeat the purge
+    // for something the platform will never remove.
     expect(fonte).toContain("skipped_catalogados")
     expect(fonte).toContain("skipped_sem_rastro")
     expect(fonte).toContain("preservado")
@@ -50,8 +50,8 @@ describe("purga de armazenamento — relato dos desfechos", () => {
   })
 
   it("o caminho de sucesso total continua existindo", () => {
-    // Se todo desfecho virasse "purga parcial", uma purga limpa passaria a
-    // parecer problemática.
+    // If every outcome became a "partial purge", a clean purge would start
+    // looking problematic.
     expect(fonte).toContain("createToast.success")
   })
 })

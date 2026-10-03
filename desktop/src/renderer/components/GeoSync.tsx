@@ -1,17 +1,17 @@
 // desktop/src/renderer/components/GeoSync.tsx
 //
-// Configuração do GeoSync — sincronizar pastas locais com o Drive do workspace.
+// GeoSync settings — syncing local folders with the workspace Drive.
 //
-// Até aqui isso só existia como variáveis no `.env`, editadas à mão, com duas
-// armadilhas que falham em SILÊNCIO:
+// Until now this existed only as variables in `.env`, edited by hand, with two
+// pitfalls that fail SILENTLY:
 //
-//   1. `EXECUTOR_SYNC_DIRS` é separado por vírgula e o Python divide cegamente.
-//      Uma pasta com vírgula no nome vira duas entradas inexistentes.
-//   2. Com mais de um workspace acessível e `EXECUTOR_WORKSPACE_ID` vazio, o
-//      executor DESABILITA o GeoSync com um `logger.warning` e segue rodando
-//      normalmente (executor/main.py). Nada na interface indicava isso.
+//   1. `EXECUTOR_SYNC_DIRS` is comma-separated and Python splits it blindly.
+//      A folder with a comma in its name becomes two nonexistent entries.
+//   2. With more than one accessible workspace and `EXECUTOR_WORKSPACE_ID`
+//      empty, the executor DISABLES GeoSync with a `logger.warning` and keeps
+//      running normally (executor/main.py). Nothing in the UI indicated this.
 //
-// Esta tela existe para tornar as duas visíveis antes de salvar.
+// This screen exists to make both visible before saving.
 import {
   memo, useCallback, useEffect, useMemo, useState,
   type ComponentType, type ReactNode,
@@ -33,11 +33,12 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { cn } from '../lib/utils.js'
 
 /**
- * Uma escolha da lista. `etiqueta` destaca o que muda de natureza, não de grau.
+ * One choice from the list. `etiqueta` highlights what changes in kind, not in
+ * degree.
  *
- * `icone` guarda o COMPONENTE, e não um elemento pronto: a mesma opção é
- * desenhada em tamanhos diferentes pela lista completa (18px) e pelo controle
- * segmentado (14px), e um elemento com `size` embutido serviria só a um deles.
+ * `icone` holds the COMPONENT, not a ready-made element: the same option is
+ * drawn at different sizes by the full list (18px) and by the segmented control
+ * (14px), and an element with a built-in `size` would serve only one of them.
  */
 interface Opcao<T extends string> {
   v: T
@@ -48,16 +49,17 @@ interface Opcao<T extends string> {
 }
 
 /**
- * Localidade: o conteúdo pode sair desta máquina?
+ * Locality: can the content leave this machine?
  *
- * Esta escolha vivia como uma quarta opção de "Direção", e era erro de
- * categoria: as outras três respondem PARA ONDE os arquivos vão, e esta responde
- * SE eles saem. O sintoma dava para ver no próprio código — escolher "só
- * catalogar" precisava desabilitar o cartão de conflito, e uma opção que
- * invalida um cartão irmão não é da mesma natureza que suas vizinhas.
+ * This choice lived as a fourth option of "Direção" (direction), and that was a
+ * category error: the other three answer WHERE the files go, and this one
+ * answers WHETHER they leave. The symptom was visible in the code itself —
+ * choosing "só catalogar" (catalog only) had to disable the conflict card, and
+ * an option that invalidates a sibling card is not of the same nature as its
+ * neighbors.
  *
- * Separada, a decisão com consequência legal vem primeiro e sozinha, e a
- * hierarquia da tela passa a espelhar a do código.
+ * Separated, the decision with legal consequences comes first and alone, and
+ * the hierarchy of the screen now mirrors that of the code.
  */
 type Localidade = 'sincronizar' | 'local'
 
@@ -70,9 +72,9 @@ const LOCALIDADES: Array<Opcao<Localidade>> = [
   },
   {
     v: 'local',
-    // Mesmo rótulo do campo `localidade` dos nós de saída — e agora a MESMA
-    // decisão, não só o mesmo nome: `EXECUTOR_SYNC_MODE=catalog`, que esta opção
-    // grava, é o que os nós leem para saber se podem enviar
+    // Same label as the `localidade` field of the output nodes — and now the SAME
+    // decision, not just the same name: `EXECUTOR_SYNC_MODE=catalog`, which this
+    // option writes, is what the nodes read to know whether they may upload
     // (flow/utils/artifact_helpers.py::localidade_padrao).
     r: 'Manter apenas no executor',
     icone: TbShieldLock,
@@ -83,22 +85,24 @@ const LOCALIDADES: Array<Opcao<Localidade>> = [
 ]
 
 /**
- * O que fica e o que sai, no modo escolhido.
+ * What stays and what leaves, in the chosen mode.
  *
- * As descrições das opções eram um parágrafo de quatro linhas em cinza de 12px
- * — a informação mais importante da tela, no elemento menos visível dela. E
- * texto corrido é ruim justamente para a pergunta que as pessoas faziam ("mas
- * então o arquivo vai PARA ONDE?"): a resposta é uma correspondência entre
- * coisas e lugares, e correspondência se lê melhor em colunas que em prosa.
+ * The option descriptions were a four-line paragraph in 12px gray — the most
+ * important information on the screen, in its least visible element. And
+ * running text is bad precisely for the question people asked ("but then the
+ * file goes WHERE?"): the answer is a mapping between things and places, and a
+ * mapping reads better in columns than in prose.
  *
- * ⚠️ No modo de sincronização o conteúdo depende da DIREÇÃO, que é escolhida no
- * cartão de baixo: em "Só baixar" nada sobe, e um quadro fixo estaria mentindo
- * metade do tempo. Por isso `direcao` entra aqui e o texto acompanha — inclusive
- * ao vivo, quando a pessoa troca a direção logo abaixo.
+ * ⚠️ In sync mode the content depends on the DIRECTION, which is chosen in the
+ * card below: in "Só baixar" (download only) nothing goes up, and a fixed panel
+ * would be lying half the time. That is why `direcao` comes in here and the
+ * text follows it — live, too, when the person changes the direction just
+ * below.
  *
- * Os dois quadros têm peso visual diferente de propósito: o local é realçado
- * porque descreve uma consequência (o dado não sai, o download não existe); o de
- * sincronização é neutro porque descreve o comportamento esperado.
+ * The two panels have different visual weight on purpose: the local one is
+ * highlighted because it describes a consequence (the data does not leave, the
+ * download does not exist); the sync one is neutral because it describes the
+ * expected behavior.
  */
 function QuadroDoModo({
   local, direcao, pasta,
@@ -165,7 +169,7 @@ function QuadroDoModo({
 
   return (
     <div className={cn(
-      // Sem margem própria: o espaçamento é do contêiner do cartão (gap-4).
+      // No margin of its own: the spacing belongs to the card container (gap-4).
       'flex flex-col gap-2.5 rounded-md border p-3',
       local ? 'border-primary/30 bg-primary/[0.04]' : 'bg-muted/30',
     )}>
@@ -179,9 +183,9 @@ function QuadroDoModo({
           icone={<TbCloudUpload size={15} />}
           titulo="Vai para o servidor"
           itens={conteudo.sai}
-          // Só no modo local: sem o realce, a leitura apressada é "sobe alguma
-          // coisa, então sobe o arquivo". Na sincronização subir o arquivo é o
-          // esperado, e destacar seria alarme falso.
+          // Only in local mode: without the highlight, the hasty reading is "something
+          // goes up, so the file goes up". In sync, uploading the file is the
+          // expected behavior, and highlighting it would be a false alarm.
           tom={conteudo.alerta === 'sai' ? 'atencao' : undefined}
         />
       </div>
@@ -204,13 +208,13 @@ function QuadroDoModo({
 }
 
 /**
- * Escolha exclusiva COMPACTA — uma faixa em vez de uma pilha de cartões.
+ * COMPACT exclusive choice — a strip instead of a stack of cards.
  *
- * Direção e conflito usavam a mesma `Opcoes` da localidade e ocupavam seis
- * blocos altos, competindo em peso com a decisão que os governa. Aqui cada
- * grupo cabe numa linha, e a explicação aparece só para a opção ESCOLHIDA —
- * que é a única que descreve o que vai acontecer de fato. As demais continuam
- * alcançáveis pelo rótulo e pelo ícone.
+ * Direction and conflict used the same `Opcoes` as locality and took up six
+ * tall blocks, competing in weight with the decision that governs them. Here
+ * each group fits on one line, and the explanation appears only for the CHOSEN
+ * option — which is the only one that describes what will actually happen. The
+ * others remain reachable through the label and the icon.
  */
 function Segmentado<T extends string>({
   valor, opcoes, aoMudar,
@@ -247,25 +251,26 @@ function Segmentado<T extends string>({
           )
         })}
       </div>
-      {/* A descrição da escolhida fica embaixo, fora da faixa: dentro dela não
-          caberia, e sem ela o controle viraria três rótulos sem consequência. */}
+      {/* The description of the chosen one sits below, outside the strip: it
+          would not fit inside, and without it the control would become three
+          labels with no consequence. */}
       <span className="text-xs leading-relaxed text-muted-foreground">{escolhida?.d}</span>
     </div>
   )
 }
 
 /**
- * Bloco subordinado dentro de um cartão.
+ * Subordinate block inside a card.
  *
- * Título menor que o do cartão e separado por régua: a hierarquia precisa ficar
- * visível, senão o cartão vira uma lista plana de oito opções de rádio em que
- * nada indica quais pertencem a qual pergunta.
+ * Title smaller than the card's and separated by a rule: the hierarchy needs
+ * to be visible, otherwise the card becomes a flat list of eight radio options
+ * where nothing indicates which belong to which question.
  */
 function Subsecao({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-2 border-t pt-3">
-      {/* Rótulo em caixa alta e pequeno: precisa marcar a divisão sem competir
-          com o título do cartão, que é a decisão principal. */}
+      {/* Small uppercase label: it needs to mark the division without competing
+          with the card title, which is the main decision. */}
       <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
         {titulo}
       </span>
@@ -302,7 +307,7 @@ function Coluna({
   )
 }
 
-/** Direções de transferência. Só se aplicam quando o conteúdo pode sair. */
+/** Transfer directions. Only apply when the content may leave. */
 const MODOS: Array<Opcao<Exclude<ModoSync, 'catalog'>>> = [
   {
     v: 'upload',
@@ -352,11 +357,11 @@ const CONFLITOS: Array<Opcao<EstrategiaConflito>> = [
 ]
 
 /**
- * Último segmento do caminho — como a pessoa chama a pasta.
+ * Last segment of the path — what the person calls the folder.
  *
- * Separa por `\` E por `/`: o caminho vem de um diálogo do Windows, mas um
- * `.env` editado à mão pode ter barras normais, e nesse caso o "nome" seria o
- * caminho inteiro.
+ * Splits on `\` AND on `/`: the path comes from a Windows dialog, but a
+ * hand-edited `.env` may have forward slashes, and in that case the "name"
+ * would be the whole path.
  */
 function nomeDaPasta(caminho: string): string {
   const partes = caminho.split(/[\/]/).filter(Boolean)
@@ -364,19 +369,22 @@ function nomeDaPasta(caminho: string): string {
 }
 
 /**
- * Onde a sincronização está agora.
+ * Where the sync stands now.
  *
- * Os números vêm do MANIFESTO do executor, publicado ao fim de cada ciclo
- * (`sync_inventory`). Por isso "no executor", e não "no servidor": saber o total
- * do Drive exigiria listar o workspace a cada tick — chamada de rede que não
- * cabe num snapshot de 1 Hz. O que está aqui é o que esta máquina conhece.
+ * The numbers come from the executor's MANIFEST, published at the end of each
+ * cycle (`sync_inventory`). Hence "no executor" (on the executor), and not "no
+ * servidor" (on the server): knowing the Drive total would require listing the
+ * workspace on every tick — a network call that does not fit in a 1 Hz
+ * snapshot. What is here is what this machine knows.
  *
- * O botão existe porque a varredura é periódica: quem acabou de copiar um
- * arquivo para a pasta não deveria esperar o intervalo para ver o efeito.
+ * The button exists because the scan is periodic: someone who just copied a
+ * file into the folder should not have to wait for the interval to see the
+ * effect.
  *
- * É o ÚNICO ponto desta tela que muda a cada segundo, e por isso lê o snapshot
- * do contexto em vez de recebê-lo por prop: assim o tick re-renderiza este
- * cartão, e não os dez da tela inteira. Ver lib/snapshot.ts.
+ * It is the ONLY part of this screen that changes every second, and that is
+ * why it reads the snapshot from the context instead of receiving it as a
+ * prop: that way the tick re-renders this card, and not the ten of the whole
+ * screen. See lib/snapshot.ts.
  */
 function Situacao() {
   const snapshot = useSnapshot()
@@ -391,12 +399,12 @@ function Situacao() {
       setRetorno(ok ? 'Varredura solicitada.' : 'O executor não aceitou o comando.')
     } finally {
       setPedindo(false)
-      // A mensagem some sozinha: é confirmação de um clique, não estado.
+      // The message disappears on its own: it confirms a click, it is not state.
       setTimeout(() => setRetorno(null), 4000)
     }
   }
 
-  // Executor parado ou ainda sem o primeiro tick: não há situação a relatar.
+  // Executor stopped or still without the first tick: there is no status to report.
   if (!snapshot) return null
 
   const pendentes = snapshot.sync_pending
@@ -404,9 +412,9 @@ function Situacao() {
 
   return (
     <Card>
-      {/* `CardHeader` é grid: o `flex-row` de antes não o tornava flex, e o
-          botão caía numa linha inteira abaixo do subtítulo. `CardAction` é o
-          slot que o primitivo reserva à direita. */}
+      {/* `CardHeader` is a grid: the old `flex-row` did not make it flex, and
+          the button dropped onto a whole row below the subtitle. `CardAction`
+          is the slot the primitive reserves on the right. */}
       <CardHeader className="px-6">
         <CardTitle className="text-base font-medium">Situação</CardTitle>
         <CardDescription className="text-xs">
@@ -432,9 +440,9 @@ function Situacao() {
                   tom={snapshot.sync_errors > 0 ? 'erro' : undefined} />
         </div>
 
-        {/* O arquivo em trânsito. O sync é sequencial — é um por vez, não uma
-            lista, e mostrar "N baixando" seria inventar paralelismo que não
-            existe. */}
+        {/* The file in transit. The sync is sequential — it is one at a time,
+            not a list, and showing "N downloading" would invent parallelism
+            that does not exist. */}
         {emTransito && (
           <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs">
             <TbRefresh size={13} className="shrink-0 animate-spin text-primary" />
@@ -481,15 +489,15 @@ function bytes(n: number): string {
 }
 
 /**
- * Lista de escolha exclusiva.
+ * Exclusive choice list.
  *
- * É um grupo de rádio de fato (`role="radiogroup"`, `aria-checked`), e não uma
- * pilha de botões: são opções mutuamente exclusivas, e o leitor de tela precisa
- * anunciar "1 de N selecionado", e não N botões independentes.
+ * It is an actual radio group (`role="radiogroup"`, `aria-checked`), not a
+ * stack of buttons: they are mutually exclusive options, and the screen reader
+ * needs to announce "1 of N selected", not N independent buttons.
  *
- * A seleção é marcada em três lugares — borda, fundo e ícone colorido — porque
- * um realce só de cor de fundo, num tema escuro, some em monitor de brilho
- * baixo.
+ * The selection is marked in three places — border, background and colored
+ * icon — because a highlight in background color only, on a dark theme,
+ * vanishes on a low-brightness monitor.
  */
 function Opcoes<T extends string>({
   valor, opcoes, aoMudar,
@@ -542,34 +550,34 @@ function Opcoes<T extends string>({
 }
 
 /**
- * `memo` porque esta tela fica MONTADA atrás de `hidden` enquanto o usuário está
- * em outra aba — é o que preserva a edição não salva. Sem a fronteira, o
- * snapshot de 1 Hz redesenhava a árvore inteira dela o tempo todo, mesmo com a
- * aba invisível. O que muda a cada segundo saiu das props e foi para o contexto,
- * então o que sobrou aqui é estável.
+ * `memo` because this screen stays MOUNTED behind `hidden` while the user is on
+ * another tab — that is what preserves the unsaved edits. Without the boundary,
+ * the 1 Hz snapshot redrew its whole tree all the time, even with the tab
+ * invisible. What changes every second moved out of the props and into the
+ * context, so what is left here is stable.
  */
 export const GeoSync = memo(function GeoSync({
   rodando, visivel = true, aoMudarPendencia, aoMudarPasta,
 }: {
-  /** O executor está no ar — decide se a barra oferece "Reiniciar agora". */
+  /** The executor is up — decides whether the bar offers "Reiniciar agora" (restart now). */
   rodando: boolean
   /**
-   * A aba está à mostra.
+   * The tab is showing.
    *
-   * Esta tela fica MONTADA mesmo escondida, para não perder edições ao trocar
-   * de aba — mas a consulta de workspaces spawna um processo Python, e rodá-la
-   * na abertura do app, para quem talvez nunca abra o GeoSync, é custo puro.
-   * Ela espera a primeira exibição.
+   * This screen stays MOUNTED even when hidden, so edits are not lost when
+   * switching tabs — but the workspace query spawns a Python process, and
+   * running it when the app opens, for someone who may never open GeoSync, is
+   * pure cost. It waits for the first display.
    */
   visivel?: boolean
-  /** Avisa o shell que há alterações não salvas, para marcar a navegação. */
+  /** Tells the shell there are unsaved changes, so it can mark the navigation. */
   aoMudarPendencia?: (pendente: boolean) => void
   /**
-   * Avisa a pasta SALVA — a do `.env`, não a que está sendo editada.
+   * Reports the SAVED folder — the one in `.env`, not the one being edited.
    *
-   * O atalho no rodapé abre um caminho pelo IPC, e o main só autoriza os que
-   * ele conhece (ver a allowlist em index.ts). Um caminho ainda não salvo não
-   * está lá, e o botão simplesmente não faria nada.
+   * The shortcut in the footer opens a path over IPC, and the main process only
+   * authorizes the ones it knows (see the allowlist in index.ts). A path not yet
+   * saved is not there, and the button would simply do nothing.
    */
   aoMudarPasta?: (pasta: string | null) => void
 }) {
@@ -580,12 +588,14 @@ export const GeoSync = memo(function GeoSync({
   const [invalidas, setInvalidas] = useState<PastaInvalida[]>([])
   const [salvo, setSalvo] = useState(false)
   /**
-   * Direção escolhida antes de trocar para "manter apenas no executor".
+   * Direction chosen before switching to "manter apenas no executor" (keep
+   * only on the executor).
    *
-   * `catalog` ocupa o MESMO campo `modo` que as direções no `.env`, então
-   * alternar para ele e voltar perderia a escolha anterior — a pessoa cairia
-   * num default que nunca pediu. Guardar aqui torna a troca reversível.
-   * Sem direção anterior (o `.env` já vinha em `catalog`), vale a do executor.
+   * `catalog` occupies the SAME `modo` field as the directions in `.env`, so
+   * switching to it and back would lose the previous choice — the person would
+   * land on a default they never asked for. Keeping it here makes the switch
+   * reversible. Without a previous direction (the `.env` already came with
+   * `catalog`), the executor's applies.
    */
   const [direcaoLembrada, setDirecaoLembrada] = useState<Exclude<ModoSync, 'catalog'>>(PADRAO_SYNC.modo)
 
@@ -596,16 +606,18 @@ export const GeoSync = memo(function GeoSync({
       if (c.modo !== 'catalog') setDirecaoLembrada(c.modo)
       aoMudarPasta?.(c.pasta)
     })
-    // `aoMudarPasta` de fora não deve reexecutar a carga; o efeito é de montagem.
+    // An outside `aoMudarPasta` must not re-run the load; the effect is mount-only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   /**
-   * `atualizar` é o clique explícito em "Atualizar"/"Tentar de novo".
+   * `atualizar` is the explicit click on "Atualizar"/"Tentar de novo"
+   * (refresh/try again).
    *
-   * Sem ele o main responde do cache da sessão: a consulta spawna um segundo
-   * interpretador Python e fala com o servidor por mTLS, e repetir isso a cada
-   * abertura da aba era o esqueleto pulsando por segundos. Ver python/status.ts.
+   * Without it the main process answers from the session cache: the query
+   * spawns a second Python interpreter and talks to the server over mTLS, and
+   * repeating that every time the tab opened meant the skeleton pulsing for
+   * seconds. See python/status.ts.
    */
   const buscarWorkspaces = useCallback((atualizar = false) => {
     setCarregandoWs(true)
@@ -614,8 +626,8 @@ export const GeoSync = memo(function GeoSync({
       .finally(() => setCarregandoWs(false))
   }, [])
 
-  // Uma vez só, na primeira vez que a aba aparece. `buscarWorkspaces` continua
-  // disponível no botão "Atualizar" para quem quiser reconsultar.
+  // Only once, the first time the tab appears. `buscarWorkspaces` remains
+  // available through the "Atualizar" button for anyone who wants to re-query.
   const [jaConsultou, setJaConsultou] = useState(false)
   useEffect(() => {
     if (!visivel || jaConsultou) return
@@ -623,10 +635,11 @@ export const GeoSync = memo(function GeoSync({
     buscarWorkspaces()
   }, [visivel, jaConsultou, buscarWorkspaces])
 
-  // Reportado por efeito, e não dentro do `patch`: é derivado da comparação com
-  // o original, e há caminhos que o zeram sem passar por lá (salvar, descartar,
-  // recarregar). Um `useMemo` só, usado nos dois lugares que precisam dele — a
-  // versão anterior serializava a configuração DUAS vezes por render.
+  // Reported through an effect, not inside `patch`: it is derived from the
+  // comparison with the original, and there are paths that reset it without
+  // going through there (save, discard, reload). A single `useMemo`, used in the
+  // two places that need it — the previous version serialized the
+  // configuration TWICE per render.
   const sujo = useMemo(
     () => Boolean(cfg) && JSON.stringify(cfg) !== original, [cfg, original],
   )
@@ -640,18 +653,19 @@ export const GeoSync = memo(function GeoSync({
 
   const soCatalogo = cfg.modo === 'catalog'
 
-  // A direção que a UI mostra. No modo local o campo `modo` guarda 'catalog',
-  // então a direção vigente é a lembrada. O `if` também é o que estreita o tipo
-  // para o cartão de direção, que não conhece 'catalog'.
+  // The direction the UI shows. In local mode the `modo` field holds 'catalog',
+  // so the effective direction is the remembered one. The `if` is also what
+  // narrows the type for the direction card, which does not know 'catalog'.
   const direcaoAtual: Exclude<ModoSync, 'catalog'> =
     cfg.modo === 'catalog' ? direcaoLembrada : cfg.modo
 
   /**
-   * Alterna a localidade preservando a direção escolhida.
+   * Toggles the locality while preserving the chosen direction.
    *
-   * Voltar de "manter apenas no executor" devolve a direção que estava valendo
-   * antes, e não um default: quem escolheu "só enviar" e experimentou o modo
-   * local não deveria voltar para "nos dois sentidos" sem ter pedido.
+   * Coming back from "manter apenas no executor" (keep only on the executor)
+   * restores the direction that was in effect before, not a default: someone
+   * who chose "só enviar" (upload only) and tried the local mode should not
+   * return to "nos dois sentidos" (both ways) without having asked.
    */
   function trocarLocalidade(v: Localidade) {
     if (v === 'local') {
@@ -663,8 +677,8 @@ export const GeoSync = memo(function GeoSync({
   }
 
   const workspaces: Workspace[] = status?.ok ? status.workspaces : []
-  // A regra do executor: com >1 workspace e nenhum escolhido, o GeoSync é
-  // silenciosamente desabilitado. É o alerta mais importante desta tela.
+  // The executor's rule: with >1 workspace and none chosen, GeoSync is silently
+  // disabled. It is the most important alert on this screen.
   const precisaEscolherWorkspace = workspaces.length > 1 && !cfg.workspaceId
   const semWorkspace = status?.ok === true && workspaces.length === 0
 
@@ -686,15 +700,16 @@ export const GeoSync = memo(function GeoSync({
   }
 
   return (
-    // O `pb-16` abre espaço para a barra de ações não cobrir o último cartão, e
-    // só existe quando ela existe — senão sobra um vão no fim da página.
+    // The `pb-16` makes room so the action bar does not cover the last card, and
+    // only exists when the bar exists — otherwise a gap is left at the end of
+    // the page.
     <div className={cn('flex flex-col gap-4', (sujo || salvo) && 'pb-16')}>
-      {/* ── Alertas que só existiam no log ──────────────────────────── */}
-      {/* Os dois usam o `Alerta` compartilhado: eram cartões remontados à mão,
-          sem ícone (o tom só existia como matiz de borda a 40% de alfa) e sem
-          `role` — e são exatamente os avisos que aparecem sozinhos, por conta
-          de uma consulta ao servidor, enquanto a pessoa olha outra parte da
-          tela. */}
+      {/* ── Alerts that only existed in the log ─────────────────────── */}
+      {/* Both use the shared `Alerta`: they were cards rebuilt by hand,
+          without an icon (the tone existed only as a border hue at 40% alpha)
+          and without `role` — and they are exactly the warnings that show up
+          on their own, because of a server query, while the person is looking
+          at another part of the screen. */}
       {semWorkspace && (
         <Alerta
           tom="aviso"
@@ -718,14 +733,15 @@ export const GeoSync = memo(function GeoSync({
         />
       )}
 
-      {/* ── Localidade dos dados ──────────────────────────────────────
-          PRIMEIRO cartão da tela. É a decisão com consequência legal, e ela
-          governa tudo abaixo: define o título do cartão da pasta ("catalogada"
-          ou "sincronizada") e se direção e conflito chegam a existir.
+      {/* ── Data locality ─────────────────────────────────────────────
+          FIRST card on the screen. It is the decision with legal consequences,
+          and it governs everything below: it defines the title of the folder
+          card ("catalogada" or "sincronizada" — cataloged or synced) and
+          whether direction and conflict exist at all.
 
-          Estava depois da pasta e do workspace, e a leitura de cima para baixo
-          ficava fora de ordem — o título "Pasta catalogada" aparecia antes de
-          qualquer coisa explicar o que é catalogar. */}
+          It used to come after the folder and the workspace, and the
+          top-to-bottom reading was out of order — the title "Pasta catalogada"
+          appeared before anything explained what cataloging is. */}
       <Card>
         <CardHeader className="px-6">
           <CardTitle className="text-base font-medium">Localidade dos dados</CardTitle>
@@ -742,15 +758,15 @@ export const GeoSync = memo(function GeoSync({
           />
           <QuadroDoModo local={soCatalogo} direcao={direcaoAtual} pasta={cfg.pasta} />
 
-          {/* ── Direção e conflito ──────────────────────────────────────
-              DENTRO deste cartão, e não ao lado dele: as duas só existem
-              quando o conteúdo pode sair, e essa dependência é estrutural.
-              Como cartões irmãos, ela ficava expressa só pela vizinhança — e
-              some quando a janela é estreita ou a pessoa rola.
+          {/* ── Direction and conflict ──────────────────────────────────
+              INSIDE this card, not next to it: both only exist when the
+              content may leave, and that dependency is structural. As
+              sibling cards, it was expressed only by proximity — and it
+              vanishes when the window is narrow or the person scrolls.
 
-              Continuam sumindo no modo local: o quadro acima já diz que nada
-              é transferido, e dois blocos apagados repetindo isso em cinza
-              custariam meia janela para explicar a própria inutilidade. */}
+              They still disappear in local mode: the panel above already says
+              nothing is transferred, and two dimmed blocks repeating that in
+              gray would cost half a window to explain their own uselessness. */}
           {!soCatalogo && (
             <>
               <Subsecao titulo="Direção">
@@ -774,14 +790,15 @@ export const GeoSync = memo(function GeoSync({
 
       {/* ── Pasta ───────────────────────────────────────────────────── */}
       <Card>
-        {/* Título e ícone acompanham o MODO. No modo local nada é
-            sincronizado, e chamar a pasta de "sincronizada" ali diz o oposto
-            do que acontece; o ícone repete o da opção escolhida no cartão
-            acima, que é o que amarra visualmente a decisão ao seu efeito.
+        {/* Title and icon follow the MODE. In local mode nothing is synced,
+            and calling the folder "sincronizada" (synced) there says the
+            opposite of what happens; the icon repeats that of the option
+            chosen in the card above, which is what visually ties the decision
+            to its effect.
 
-            O ícone mora DENTRO de `CardTitle` e o botão em `CardAction`: o
-            header é grid, e o `flex-row` de antes era inerte — os três blocos
-            empilhavam em linhas próprias, esticados na largura do cartão. */}
+            The icon lives INSIDE `CardTitle` and the button in `CardAction`:
+            the header is a grid, and the old `flex-row` was inert — the three
+            blocks stacked on rows of their own, stretched to the card width. */}
         <CardHeader className="px-6">
           <CardTitle className="flex min-w-0 items-center gap-2 text-base font-medium">
             <span className={cn(
@@ -812,10 +829,10 @@ export const GeoSync = memo(function GeoSync({
               <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2.5">
                 <div className="flex min-w-0 items-center gap-2.5">
                   <TbFolderFilled size={17} className="shrink-0 text-muted-foreground" />
-                  {/* Nome em cima, caminho completo embaixo. Um caminho longo
-                      truncado no meio não identifica pasta nenhuma — e o nome,
-                      que é como a pessoa a chama, ficava escondido no fim de
-                      uma linha cortada. */}
+                  {/* Name on top, full path below. A long path truncated in the
+                      middle identifies no folder at all — and the name, which
+                      is what the person calls it, was hidden at the end of a
+                      cut-off line. */}
                   <div className="flex min-w-0 flex-col">
                     <span className="truncate text-sm font-medium select-text">
                       {nomeDaPasta(cfg.pasta)}
@@ -851,16 +868,17 @@ export const GeoSync = memo(function GeoSync({
               </div>
             )}
 
-          {/* Sem nota explicativa aqui. O cartão de localidade acima já diz o
-              que acontece com o conteúdo, e o subtítulo deste diz para que
-              serve a pasta.
+          {/* No explanatory note here. The locality card above already says
+              what happens to the content, and this card's subtitle says what
+              the folder is for.
 
-              A nota que existia explicava por que só se aceita UMA pasta. Ela
-              fazia falta quando o botão dizia "Adicionar pasta" e a lista era
-              plural — alguém tentaria a segunda e mereceria o motivo. Com um
-              único lugar de pasta e um botão "Trocar", a restrição já está dita
-              pela própria interface, e o parágrafo virava justificativa de algo
-              que ninguém tentou fazer. */}
+              The note that existed explained why only ONE folder is accepted.
+              It was needed when the button said "Adicionar pasta" (add folder)
+              and the list was plural — someone would try a second one and
+              deserve the reason. With a single folder slot and a "Trocar"
+              (change) button, the restriction is already stated by the
+              interface itself, and the paragraph became a justification for
+              something nobody tried to do. */}
 
           {invalidas.length > 0 && (
             <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2">
@@ -879,13 +897,14 @@ export const GeoSync = memo(function GeoSync({
 
       {/* ── Workspace ───────────────────────────────────────────────── */}
       <Card className="relative">
-        {/* Fixado na quina do cartão, e não na linha do título: é um utilitário
-            de recarregar, não uma ação de igual peso ao conteúdo. Solto no
-            canto ele sai do caminho da leitura e continua sempre no mesmo
-            ponto, independente de o subtítulo ter uma ou duas linhas.
+        {/* Pinned to the card's corner, not on the title line: it is a reload
+            utility, not an action of equal weight to the content. Loose in the
+            corner it gets out of the way of reading and always stays in the
+            same spot, regardless of whether the subtitle has one or two lines.
 
-            Ícone + rótulo FIXO: trocar o texto por "Consultando…" mudava a
-            largura do botão e ele pulava sob o cursor. Quem gira é o ícone. */}
+            Icon + FIXED label: swapping the text for "Consultando…" changed
+            the button width and it jumped under the cursor. The icon is what
+            spins. */}
         <Button size="sm" variant="ghost"
                 className="absolute top-2.5 right-2.5 h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
                 disabled={carregandoWs} onClick={() => buscarWorkspaces(true)}
@@ -919,8 +938,8 @@ export const GeoSync = memo(function GeoSync({
             </div>
           )}
 
-          {/* Primeira consulta ainda em curso: sem isto o cartão fica vazio e
-              parece quebrado nos segundos em que o Python sobe. */}
+          {/* First query still in progress: without this the card stays empty and
+              looks broken during the seconds Python takes to start. */}
           {carregandoWs && workspaces.length === 0 && !status && (
             <div className="flex flex-col gap-2" aria-hidden>
               {[0, 1].map((i) => (
@@ -965,9 +984,9 @@ export const GeoSync = memo(function GeoSync({
         </CardContent>
       </Card>
 
-      {/* ── Intervalo ─────────────────────────────────────────────────
-          Fixo, e mostrado só para explicar o comportamento. Ver
-          INTERVALO_SYNC em shared/geosync.ts. */}
+      {/* ── Interval ──────────────────────────────────────────────────
+          Fixed, and shown only to explain the behavior. See
+          INTERVALO_SYNC in shared/geosync.ts. */}
       <Card>
         <CardHeader className="px-6"><CardTitle className="text-base font-medium">Intervalo de verificação</CardTitle></CardHeader>
         <CardContent className="flex items-baseline gap-3 px-6">
@@ -980,7 +999,7 @@ export const GeoSync = memo(function GeoSync({
         </CardContent>
       </Card>
 
-      {/* ── Situação ────────────────────────────────────────────────── */}
+      {/* ── Status ──────────────────────────────────────────────────── */}
       {rodando && <Situacao />}
 
       <BarraSalvar

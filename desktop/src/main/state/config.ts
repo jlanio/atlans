@@ -1,12 +1,12 @@
 // desktop/src/main/state/config.ts
 //
-// Leitura e escrita do `.env` do executor.
+// Reading and writing the executor's `.env`.
 //
-// A escrita e reimplementada aqui em vez de chamar o Python so para gravar uma
-// linha, e espelha `executor/_env_utils.py::persist_env_var`: preserva
-// comentarios, ordem e chaves que o app nao conhece. Reescrever o arquivo
-// inteiro a partir de um dicionario apagaria EXECUTOR_HOST_ALIASES, MINIO_*,
-// LOG_FILE_AGENT e tudo mais que o usuario ou o enrollment tenham colocado la.
+// Writing is reimplemented here instead of calling Python just to write one
+// line, and it mirrors `executor/_env_utils.py::persist_env_var`: it preserves
+// comments, order and keys the app does not know about. Rewriting the whole
+// file from a dictionary would erase EXECUTOR_HOST_ALIASES, MINIO_*,
+// LOG_FILE_AGENT and everything else the user or the enrollment put there.
 import fs from 'node:fs'
 import path from 'node:path'
 import { CERT_DIR, ENV_FILE } from '../paths.js'
@@ -17,21 +17,21 @@ import {
 } from '../../shared/geosync.js'
 import { LIMITES, inteiroDoEnv } from '../../shared/limites.js'
 
-/** Arquivos que o enrollment produz. Sem os dois, `assert_enrolled` barra o boot. */
+/** Files the enrollment produces. Without both, `assert_enrolled` blocks the boot. */
 const CERT_OBRIGATORIOS = ['cert.pem', 'key.pem']
 
 /**
- * Material de identidade DESTE executor, descartado ao refazer o enrollment.
+ * Identity material of THIS executor, discarded when redoing the enrollment.
  *
- * A lista e explicita, e nao um `rm -rf` do cert dir, porque a pasta guarda
- * tambem coisas que devem SOBREVIVER:
+ * The list is explicit, and not an `rm -rf` of the cert dir, because the
+ * folder also holds things that must SURVIVE:
  *
- *   - `server_signing.pub` — a chave Ed25519 do servidor, fixada por TOFU.
- *     Apaga-la reabriria a janela que o pinning fecha: o proximo boot aceitaria
- *     qualquer chave que respondesse no endereco configurado.
- *   - `atlans-root.crt` / `atlans-ca-bundle.crt` — trust store da CA interna,
- *     montado pelo `_ca_bootstrap`. Nao tem relacao com a identidade do
- *     executor e rebaixa-lo so custa um download a mais.
+ *   - `server_signing.pub` — the server's Ed25519 key, pinned via TOFU.
+ *     Deleting it would reopen the window that pinning closes: the next boot
+ *     would accept any key that answered at the configured address.
+ *   - `atlans-root.crt` / `atlans-ca-bundle.crt` — trust store of the internal
+ *     CA, built by `_ca_bootstrap`. It has nothing to do with the executor's
+ *     identity, and downgrading it only costs one extra download.
  */
 const ARQUIVOS_DE_IDENTIDADE = [
   'cert.pem', 'chain.pem', 'ca.pem', 'key.pem', 'x25519_key.pem',
@@ -40,7 +40,7 @@ const ARQUIVOS_DE_IDENTIDADE = [
 export interface EstadoConfiguracao {
   configurado: boolean
   executorId: string | null
-  /** Passo que falta — espelha o `step` do evento `state: failed`. */
+  /** Missing step — mirrors the `step` of the `state: failed` event. */
   falta: 'config' | 'enrollment' | null
 }
 
@@ -57,17 +57,17 @@ export function lerConfiguracao(): EstadoConfiguracao {
 }
 
 /**
- * Descarta o certificado atual para que um enrollment novo possa ser feito.
+ * Discards the current certificate so that a new enrollment can be done.
  *
- * Necessario porque o enrollment nao e idempotente do ponto de vista do
- * servidor: um executor revogado ou removido continua com cert valido em disco,
- * e o executor sobe, conecta e leva um close 4404 — indefinidamente. Sem apagar
- * o material, o formulario de vinculo nem apareceria (`lerConfiguracao` diria
- * "configurado").
+ * Needed because enrollment is not idempotent from the server's point of
+ * view: a revoked or removed executor still has a valid cert on disk, and the
+ * executor starts, connects and gets a 4404 close — indefinitely. Without
+ * deleting the material, the link form would not even appear
+ * (`lerConfiguracao` would say "configured").
  *
- * O `EXECUTOR_ID` do `.env` e PRESERVADO: vira o valor inicial do formulario.
- * Quando o executor foi recriado no servidor o ID muda, e o usuario o
- * substitui; quando foi apenas revogado, ele continua valendo.
+ * The `EXECUTOR_ID` in `.env` is PRESERVED: it becomes the form's initial
+ * value. When the executor was recreated on the server the ID changes, and the
+ * user replaces it; when it was only revoked, it is still valid.
  */
 export function descartarEnrollment(): { removidos: string[] } {
   const removidos: string[] = []
@@ -78,9 +78,9 @@ export function descartarEnrollment(): { removidos: string[] } {
       fs.rmSync(alvo, { force: true })
       removidos.push(nome)
     } catch {
-      // Arquivo em uso por um executor que ainda nao encerrou. Quem chama para
-      // o processo antes; se mesmo assim falhar, o enrollment seguinte
-      // sobrescreve.
+      // File in use by an executor that has not shut down yet. The caller stops
+      // the process first; if it still fails, the next enrollment overwrites
+      // it.
     }
   }
   return { removidos }
@@ -89,13 +89,13 @@ export function descartarEnrollment(): { removidos: string[] } {
 // ── GeoSync ──────────────────────────────────────────────────────────────────
 
 /**
- * Uma pasta, não uma lista.
+ * One folder, not a list.
  *
- * `EXECUTOR_SYNC_DIRS` aceita várias separadas por vírgula, mas o GeoSync
- * sincroniza tudo contra UM workspace: várias pastas despejam árvores
- * diferentes no mesmo Drive, e o mapeamento de volta (Drive → qual pasta?)
- * fica ambíguo assim que dois arquivos coincidem de nome. Uma pasta raiz
- * mantém a correspondência um-para-um.
+ * `EXECUTOR_SYNC_DIRS` accepts several, comma-separated, but GeoSync syncs
+ * everything against ONE workspace: several folders dump different trees into
+ * the same Drive, and the mapping back (Drive → which folder?) becomes
+ * ambiguous as soon as two files share a name. A single root folder keeps the
+ * correspondence one-to-one.
  */
 export interface ConfigGeoSync {
   pasta: string | null
@@ -110,25 +110,26 @@ export function lerGeoSync(): ConfigGeoSync {
   const conflito = env.EXECUTOR_SYNC_CONFLICT_STRATEGY as EstrategiaConflito
 
   return {
-    // Só a primeira entra: um `.env` com várias pastas (editado à mão, ou
-    // vindo de uma configuração anterior) não deve fazer a tela mostrar algo
-    // que ela não consegue representar.
+    // Only the first one gets in: a `.env` with several folders (hand-edited, or
+    // coming from an earlier configuration) must not make the screen show
+    // something it cannot represent.
     pasta: (env.EXECUTOR_SYNC_DIRS ?? '').split(',').map((p) => p.trim()).filter(Boolean)[0] ?? null,
-    // Sem valor válido, o que o executor usa — ver PADRAO_SYNC.
+    // Without a valid value, whatever the executor uses — see PADRAO_SYNC.
     modo: MODOS_SYNC.includes(modo) ? modo : PADRAO_SYNC.modo,
     conflito: ESTRATEGIAS.includes(conflito) ? conflito : PADRAO_SYNC.conflito,
     workspaceId: (env.EXECUTOR_WORKSPACE_ID || '').trim() || null,
   }
 }
 
-/** Pasta rejeitada na gravação. Ver `validarPasta`. */
+/** Folder rejected on save. See `validarPasta`. */
 export interface PastaInvalida { caminho: string; motivo: string }
 
 /**
- * `EXECUTOR_SYNC_DIRS` é uma lista separada por VÍRGULA, e o Python a divide
- * cegamente (`config.py`: `SYNC_DIRS.split(",")`). Uma pasta com vírgula no nome
- * viraria duas entradas inexistentes, e o GeoSync sincronizaria nada sem dizer
- * por quê. Barrar na UI é o único ponto em que dá para explicar isso.
+ * `EXECUTOR_SYNC_DIRS` is a COMMA-separated list, and Python splits it blindly
+ * (`config.py`: `SYNC_DIRS.split(",")`). A folder with a comma in its name
+ * would become two nonexistent entries, and GeoSync would sync nothing without
+ * saying why. Blocking it in the UI is the only place where this can be
+ * explained.
  */
 export function validarPasta(pasta: string | null): PastaInvalida | null {
   if (!pasta) return null
@@ -145,17 +146,17 @@ export function gravarGeoSync(cfg: ConfigGeoSync): void {
     EXECUTOR_SYNC_MODE: cfg.modo,
     EXECUTOR_SYNC_INTERVAL: String(INTERVALO_SYNC),
     EXECUTOR_SYNC_CONFLICT_STRATEGY: cfg.conflito,
-    // Vazio e valido: significa "auto-detectar", que e o que o executor faz
-    // quando ha exatamente um workspace acessivel.
+    // Empty is valid: it means "auto-detect", which is what the executor does
+    // when there is exactly one accessible workspace.
     EXECUTOR_WORKSPACE_ID: cfg.workspaceId ?? '',
   })
 }
 
-// ── Execução ─────────────────────────────────────────────────────────────────
+// ── Execution ────────────────────────────────────────────────────────────────
 
 /**
- * O servidor não está aqui: ele é a constante {@link SERVIDOR}, e por isso não
- * é ajuste. Ver o cabeçalho de `shared/servidor.ts`.
+ * The server is not here: it is the constant {@link SERVIDOR}, and that is why
+ * it is not a setting. See the header of `shared/servidor.ts`.
  */
 export interface ConfigExecucao {
   workers: number
@@ -169,10 +170,11 @@ export type NivelLog = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR'
 export const NIVEIS_LOG: NivelLog[] = ['DEBUG', 'INFO', 'WARNING', 'ERROR']
 
 /**
- * Os números passam pelas faixas de `shared/limites.ts`, o espelho das de
- * `executor/config.py`: o Python descarta o valor fora da faixa e cai no
- * padrão, então aceitar outro aqui faria a UI mostrar 500 workers com o
- * executor rodando 4, sem nada explicando a diferença.
+ * The numbers go through the ranges in `shared/limites.ts`, the mirror of
+ * those in `executor/config.py`: Python discards an out-of-range value and
+ * falls back to the default, so accepting a different one here would make the
+ * UI show 500 workers with the executor running 4, with nothing explaining the
+ * difference.
  */
 export function lerExecucao(artifactsDirPadrao: string): ConfigExecucao {
   const env = lerEnv()
@@ -192,20 +194,20 @@ export function gravarExecucao(cfg: ConfigExecucao): void {
     EXECUTOR_MAX_QUEUE_SIZE: String(inteiroDoEnv(String(cfg.filaMax), LIMITES.filaMax)),
     EXECUTOR_JOB_TIMEOUT: String(inteiroDoEnv(String(cfg.timeoutS), LIMITES.timeoutS)),
     EXECUTOR_ARTIFACTS_DIR: cfg.artifactsDir.trim(),
-    // Reafirmado a cada gravação, e não lido de `cfg`: se alguém editou o
-    // `.env` à mão para outro endereço, salvar qualquer ajuste devolve o
-    // arquivo ao servidor correto em vez de preservar a alteração.
+    // Reasserted on every save, and not read from `cfg`: if someone hand-edited
+    // the `.env` to another address, saving any setting brings the file back
+    // to the correct server instead of preserving the change.
     EXECUTOR_SERVER_URL: SERVIDOR,
     LOG_LEVEL: NIVEIS_LOG.includes(cfg.nivelLog) ? cfg.nivelLog : 'INFO',
   })
 }
 
 /**
- * Diretório de artefatos que o spawn deve usar.
+ * Artifacts directory the spawn must use.
  *
- * O `.env` vence sobre o padrão: sem isto, configurar a pasta na tela de
- * Ajustes gravava o valor mas o executor continuava escrevendo no diretório
- * padrão — o usuário mudaria e nada aconteceria.
+ * The `.env` wins over the default: without this, setting the folder on the
+ * Settings screen wrote the value but the executor kept writing to the default
+ * directory — the user would change it and nothing would happen.
  */
 export function artifactsDirEfetivo(padrao: string): string {
   return (lerEnv().EXECUTOR_ARTIFACTS_DIR || '').trim() || padrao
@@ -221,11 +223,11 @@ export function lerEnv(): Record<string, string> {
     if (i <= 0) continue
     const chave = t.slice(0, i).trim()
     let valor = t.slice(i + 1).trim()
-    // dotenv aceita valor entre aspas e comentario no fim da linha (` # ...`,
-    // com espaco antes); tira os dois para que a comparacao e o uso batam com
-    // o que o Python enxerga. Sem isto, `EXECUTOR_SYNC_MODE=bidirectional # x`
-    // nao era reconhecido, a tela caia no padrao e salvar o GeoSync trocava o
-    // modo do executor.
+    // dotenv accepts quoted values and a comment at the end of the line (` # ...`,
+    // with a space before it); strip both so that comparison and use match
+    // what Python sees. Without this, `EXECUTOR_SYNC_MODE=bidirectional # x`
+    // was not recognized, the screen fell back to the default and saving
+    // GeoSync changed the executor's mode.
     const entreAspas = /^(["'])(.*)\1(?:\s+#.*)?$/.exec(valor)
     valor = entreAspas ? entreAspas[2]! : valor.replace(/\s+#.*$/, '')
     valores[chave] = valor
@@ -234,13 +236,13 @@ export function lerEnv(): Record<string, string> {
 }
 
 /**
- * Grava (ou atualiza) chaves no `.env`, idempotente.
+ * Writes (or updates) keys in the `.env`, idempotently.
  *
- * Regras, iguais as de `_env_utils.persist_env_var`:
- *   - chave existente e reescrita NO LUGAR, mantendo a posicao no arquivo;
- *   - chave nova vai para o fim;
- *   - comentarios e linhas em branco sobrevivem;
- *   - uma chave comentada (`# EXECUTOR_X=`) NAO conta como existente.
+ * Rules, the same as those of `_env_utils.persist_env_var`:
+ *   - an existing key is rewritten IN PLACE, keeping its position in the file;
+ *   - a new key goes to the end;
+ *   - comments and blank lines survive;
+ *   - a commented-out key (`# EXECUTOR_X=`) does NOT count as existing.
  */
 export function gravarEnv(valores: Record<string, string>): void {
   fs.mkdirSync(path.dirname(ENV_FILE), { recursive: true })
@@ -262,16 +264,17 @@ export function gravarEnv(valores: Record<string, string>): void {
   })
 
   if (pendentes.size) {
-    // Um arquivo que termina em `\n` produz um elemento vazio no fim do split.
-    // Empurrar a chave nova depois dele criaria uma linha em branco — e outra a
-    // cada escrita seguinte, ate o `.env` ficar cheio de vazios. Sao removidos
-    // so no FIM: linhas em branco no meio separam secoes e sao intencionais.
+    // A file that ends in `\n` produces an empty element at the end of the
+    // split. Pushing the new key after it would create a blank line — and
+    // another on every following write, until the `.env` is full of blanks.
+    // They are removed only at the END: blank lines in the middle separate
+    // sections and are intentional.
     while (saida.length && saida[saida.length - 1]!.trim() === '') saida.pop()
     for (const [chave, valor] of pendentes) saida.push(`${chave}=${valor}`)
   }
 
-  // Arquivo sempre termina em quebra de linha: sem isso, a proxima chave
-  // adicionada gruda na ultima linha e vira `A=1B=2`.
+  // The file always ends with a newline: without it, the next key added
+  // sticks to the last line and becomes `A=1B=2`.
   const texto = saida.join('\n').replace(/\n*$/, '\n')
   fs.writeFileSync(ENV_FILE, texto, { encoding: 'utf8', mode: 0o600 })
 }

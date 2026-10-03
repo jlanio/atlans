@@ -1,9 +1,9 @@
-"""Sobrescrita de arquivo do Drive vinda do executor.
+"""Overwriting a Drive file from the executor.
 
-`create_agent_upload_url(overwrite=True)` reaproveita a linha existente em vez
-de criar outra. Manter o mesmo id_hash e a mesma s3_key e o ponto: um DataInput
-apontando para o arquivo continua valido e passa a ler a versao nova, e o objeto
-anterior nao fica orfao no MinIO.
+`create_agent_upload_url(overwrite=True)` reuses the existing row instead of
+creating another one. Keeping the same id_hash and the same s3_key is the point:
+a DataInput pointing to the file stays valid and starts reading the new version,
+and the previous object is not left orphaned in MinIO.
 """
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -35,11 +35,11 @@ def _svc(encontrado=None) -> DriveService:
 
 @pytest.fixture(autouse=True)
 def _teto():
-    """O confirm consulta o teto de tamanho antes de aceitar o objeto.
+    """The confirm checks the size ceiling before accepting the object.
 
-    O dublê de `db` aqui responde a QUALQUER query com o mesmo WorkspaceFile,
-    então a consulta das configurações precisa de resposta própria. Teto
-    folgado de propósito: tamanho não é o assunto deste arquivo — está em
+    The `db` double here answers ANY query with the same WorkspaceFile, so the
+    settings query needs its own answer. A deliberately generous ceiling: size
+    is not the subject of this file — it is in
     `test_drive_teto_no_confirm.py`.
     """
     with patch.object(
@@ -69,7 +69,7 @@ async def test_overwrite_reaproveita_linha_e_s3_key():
         overwrite=True,
     )
 
-    # Nenhuma linha nova.
+    # No new row.
     svc.db.add.assert_not_called()
     # A s3_key ANTIGA prevalece: o PUT sobrescreve o objeto no lugar.
     assert out["s3_key"] == "artifacts/ws-1/task-ANTIGA/resultado.geojson"
@@ -77,14 +77,14 @@ async def test_overwrite_reaproveita_linha_e_s3_key():
 
 
 async def test_overwrite_nao_marca_pending_nem_altera_size():
-    """Regressão de perda de dados.
+    """Data-loss regression.
 
-    Marcar a linha como pending a tornava elegível para
-    cleanup_pending_workspace_files, que apaga pending com created_at anterior
-    ao TTL de 24h — e aqui o created_at é o da criação original, já vencido em
-    qualquer arquivo que esteja sendo sobrescrito. Um upload que falhasse
-    destruiria o arquivo íntegro. O size também fica intocado: quem o atualiza
-    é o confirm_upload, a partir do objeto real no MinIO.
+    Marking the row as pending made it eligible for
+    cleanup_pending_workspace_files, which deletes pending rows with created_at
+    older than the 24h TTL — and here created_at is the original creation time,
+    already expired for any file being overwritten. A failed upload would
+    destroy the intact file. The size also stays untouched: it is updated by
+    confirm_upload, from the actual object in MinIO.
     """
     alvo = _existente(status="confirmed", size=1234)
     svc = _svc(encontrado=alvo)
@@ -101,7 +101,7 @@ async def test_overwrite_nao_marca_pending_nem_altera_size():
 
 
 async def test_sem_overwrite_cria_outra_linha():
-    """Comportamento padrão preservado — é o que gera as cópias por execução."""
+    """Default behavior preserved — it is what produces the per-run copies."""
     svc = _svc(encontrado=_existente())
 
     out = await svc.create_agent_upload_url(
@@ -129,12 +129,12 @@ async def test_overwrite_sem_arquivo_anterior_cria_normalmente():
     assert out["s3_key"] == "artifacts/ws-1/task-NOVA/novo.geojson"
 
 
-# ── O retorno diz o que aconteceu, não o que foi pedido ──────────────────────
+# ── The return value says what happened, not what was requested ──────────────
 
 
 async def test_retorno_marca_reuso():
-    """Sem isso o executor só podia repetir a intenção ("pedi para sobrescrever"),
-    e um overwrite que não achou o arquivo ficava indistinguível de um que achou."""
+    """Without this the executor could only repeat the intent ("I asked to overwrite"),
+    and an overwrite that did not find the file was indistinguishable from one that did."""
     svc = _svc(encontrado=_existente())
 
     out = await svc.create_agent_upload_url(
@@ -161,7 +161,7 @@ async def test_retorno_nao_marca_reuso_quando_nao_havia_arquivo():
 
 
 async def test_retorno_nao_marca_reuso_sem_overwrite():
-    """Há arquivo de mesmo nome, mas a opção está desligada — cria outra linha."""
+    """There is a file with the same name, but the option is off — creates another row."""
     svc = _svc(encontrado=_existente())
 
     out = await svc.create_agent_upload_url(
@@ -174,7 +174,7 @@ async def test_retorno_nao_marca_reuso_sem_overwrite():
     assert out["reused"] is False
 
 
-# ── confirm_upload distingue criação de atualização ──────────────────────────
+# ── confirm_upload distinguishes creation from update ────────────────────────
 
 async def _confirm(content_md5):
     wf = _existente(content_md5=content_md5, workspace_id="ws-1", extension="geojson", size=1)
@@ -197,12 +197,12 @@ async def _confirm(content_md5):
 
 
 async def test_confirm_marca_a_escrita_de_conteudo():
-    """Regressão: sem coluna própria, a listagem dependia de `updated_at`.
+    """Regression: without a dedicated column, the listing depended on `updated_at`.
 
-    Numa sobrescrita com conteúdo IDÊNTICO nenhum campo muda de valor no
-    confirm — o SQLAlchemy não emite UPDATE, o onupdate não dispara, e o
-    arquivo recém-gravado não subia na listagem. O workflow rodava e o Drive
-    não dava sinal nenhum.
+    On an overwrite with IDENTICAL content no field changes value in the
+    confirm — SQLAlchemy emits no UPDATE, onupdate does not fire, and the
+    freshly written file did not move up in the listing. The workflow ran and
+    the Drive gave no sign at all.
     """
     wf = _existente(content_md5="md5-antigo", workspace_id="ws-1",
                     extension="geojson", size=1, content_written_at=None)
@@ -216,13 +216,13 @@ async def test_confirm_marca_a_escrita_de_conteudo():
          patch("app.services.drive_service.emit_drive_event", new=AsyncMock()):
         await DriveService(db).confirm_upload("file-existente")
 
-    # Mesmo com size e md5 inalterados, a data de escrita avança.
+    # Even with size and md5 unchanged, the write date moves forward.
     assert wf.content_written_at is not None
 
 
 async def test_confirm_de_sobrescrita_emite_file_updated():
-    """content_md5 preexistente = linha reaproveitada. O GeoSync trata os dois,
-    mas o evento precisa dizer a verdade sobre o que aconteceu."""
+    """Pre-existing content_md5 = reused row. GeoSync handles both,
+    but the event has to tell the truth about what happened."""
     assert await _confirm("md5-antigo") == ["file_updated"]
 
 
@@ -230,14 +230,14 @@ async def test_confirm_de_upload_novo_emite_file_created():
     assert await _confirm(None) == ["file_created"]
 
 
-# ── Ordenação pela última escrita ────────────────────────────────────────────
+# ── Ordering by last write ───────────────────────────────────────────────────
 
 async def test_listagem_ordena_pela_ultima_escrita():
-    """Sobrescrever mantém o created_at original.
+    """Overwriting keeps the original created_at.
 
-    Ordenar por ele jogaria o conteúdo recém-gravado para o fim da lista, junto
-    dos arquivos mais antigos — exatamente o oposto do que o usuário espera ao
-    reexecutar um workflow.
+    Ordering by it would push freshly written content to the end of the list,
+    alongside the oldest files — exactly the opposite of what the user expects
+    when re-running a workflow.
     """
     db = MagicMock()
     capturadas: list = []

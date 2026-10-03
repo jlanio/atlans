@@ -1,5 +1,5 @@
 # app/services/drive_service.py
-"""Servico de Drive — logica de negocio para gerenciamento de arquivos via MinIO."""
+"""Drive service — business logic for file management via MinIO."""
 import mimetypes
 import os
 import re
@@ -43,38 +43,38 @@ _DANGEROUS_EXTS = frozenset({"php", "exe", "bat", "cmd", "sh", "ps1", "py", "rb"
 # ── Helpers puros ─────────────────────────────────────────────────────────────
 
 def sanitize_name(name: str) -> str:
-    """Slug ASCII estrito — usado na CHAVE S3, onde o alfabeto restrito importa.
+    """Strict ASCII slug — used in the S3 KEY, where the restricted alphabet matters.
 
-    Não usar para `original_name`: destrói acentos e espaços do nome que o
-    usuário vê (`área de risco.gpkg` -> `_rea_de_risco.gpkg`). Para isso existe
-    `safe_display_name`.
+    Do not use for `original_name`: it destroys accents and spaces in the name
+    the user sees (`área de risco.gpkg` -> `_rea_de_risco.gpkg`). That is what
+    `safe_display_name` is for.
     """
-    # Normaliza separadores Windows (\) para POSIX (/) antes de extrair o basename
+    # Normalizes Windows separators (\) to POSIX (/) before extracting the basename
     name = os.path.basename(name.replace("\\", "/"))
     name = _SLUG_RE.sub("_", name)
     return name[:200] or "arquivo"
 
 
-# Caracteres de controle + aspas e ';' — os últimos dois quebrariam o
-# `Content-Disposition: attachment; filename="..."` gerado no presigned GET.
+# Control characters + quotes and ';' — the last two would break the
+# `Content-Disposition: attachment; filename="..."` generated in the presigned GET.
 _UNSAFE_DISPLAY_RE = re.compile(r'[\x00-\x1f\x7f";\\/]')
 
 
 def safe_display_name(name: str) -> str:
-    """Basename seguro PRESERVANDO acentos e espaços — para `original_name`.
+    """Safe basename PRESERVING accents and spaces — for `original_name`.
 
-    SEG: aplicar SEMPRE antes de persistir em `WorkspaceFile.original_name`.
-    Esse campo é propagado ao executor via `emit_drive_event` e usado como
-    destino de escrita no GeoSync (`sync_dir / original_name`) — um nome como
-    `../../../etc/x.geojson`, ou um caminho absoluto, escapava do diretório
-    sincronizado e virava escrita arbitrária de arquivo no host do executor.
+    SEC: ALWAYS apply before persisting into `WorkspaceFile.original_name`.
+    That field is propagated to the executor via `emit_drive_event` and used as
+    the write destination in GeoSync (`sync_dir / original_name`) — a name like
+    `../../../etc/x.geojson`, or an absolute path, escaped the synced directory
+    and became an arbitrary file write on the executor's host.
 
-    O que é removido: componentes de path, separadores, caracteres de controle
-    e os que quebrariam o header Content-Disposition. O que é preservado:
-    tudo o mais, inclusive Unicode — sanitizar demais aqui só degradaria o
-    nome exibido na UI sem ganho de segurança.
+    What is removed: path components, separators, control characters and the
+    ones that would break the Content-Disposition header. What is preserved:
+    everything else, Unicode included — over-sanitizing here would only degrade
+    the name displayed in the UI with no security gain.
     """
-    # Normaliza separadores Windows (\) para POSIX (/) antes de extrair o basename
+    # Normalizes Windows separators (\) to POSIX (/) before extracting the basename
     name = os.path.basename(name.replace("\\", "/"))
     name = _UNSAFE_DISPLAY_RE.sub("_", name)
     # '.' e '..' viram nomes de arquivo comuns; dotfiles continuam permitidos.
@@ -96,11 +96,11 @@ def file_or_404(wf):
 
 
 def _recusar_se_local(wf) -> None:
-    """Barra a LEITURA pela plataforma de conteudo que mora no executor.
+    """Blocks READING, by the platform, of content that lives on the executor.
 
-    Nao ha objeto no storage. Proxiar o download traria o dado ao servidor, que
-    e exatamente o que a politica de localidade proibe — e sem o guard a
-    chamada morre no boto3 com um 500 mudo.
+    There is no object in storage. Proxying the download would bring the data to
+    the server, which is exactly what the locality policy forbids — and without
+    the guard the call dies in boto3 with a silent 500.
     """
     if getattr(wf, "content_location", "minio") != "executor":
         return
@@ -112,16 +112,16 @@ def _recusar_se_local(wf) -> None:
 
 
 def _recusar_se_catalogado(wf) -> None:
-    """Barra operacoes destrutivas sobre um arquivo que so existe no executor.
+    """Blocks destructive operations on a file that only exists on the executor.
 
-    Um arquivo catalogado (GeoSync em modo "Manter apenas no executor") tem
-    `s3_key = NULL`: a plataforma guarda a ficha, nunca os bytes. Apagar este
-    registro nao removeria nada do disco de quem tem o arquivo, e mandar o
-    executor apaga-lo seria destruir dado do usuario que nunca pertenceu a
-    plataforma.
+    A cataloged file (GeoSync in "Manter apenas no executor" (keep only on the
+    executor) mode) has `s3_key = NULL`: the platform keeps the record, never the
+    bytes. Deleting this record would remove nothing from the disk of whoever has
+    the file, and telling the executor to delete it would be destroying user data
+    that never belonged to the platform.
 
-    A saida esta na mensagem, e nao num "tem certeza?": quem quer que o arquivo
-    suma apaga o arquivo, ou tira a pasta do GeoSync.
+    The way out is in the message, and not in an "are you sure?": whoever wants
+    the file gone deletes the file, or removes the folder from GeoSync.
     """
     if getattr(wf, "content_location", "minio") != "executor":
         return
@@ -168,10 +168,11 @@ class DriveService:
     # ── Validacao ─────────────────────────────────────────────────────────
 
     async def validate_upload(self, filename: str, size: int) -> str:
-        """Valida extensao (incluindo double extension) e tamanho. Retorna a extensao.
+        """Validates extension (including double extension) and size. Returns the extension.
 
-        Cada recusa tem a sua subclasse de `FileValidationError` (e o seu
-        `error_code`): e pelo codigo, e nao pela frase, que o web a classifica.
+        Each rejection has its own subclass of `FileValidationError` (and its own
+        `error_code`): it is by the code, not by the sentence, that the web app
+        classifies it.
         """
         ext = Path(filename).suffix.lstrip(".").lower()
         if not ext:
@@ -205,7 +206,7 @@ class DriveService:
         page: int = 1,
         page_size: int = 50,
     ) -> tuple[list[WorkspaceFile], int]:
-        """Retorna tupla (items, total) de arquivos confirmados do workspace."""
+        """Returns a tuple (items, total) of the workspace's confirmed files."""
         query = select(WorkspaceFile).where(
             WorkspaceFile.workspace_id == workspace_id,
             WorkspaceFile.status == "confirmed",
@@ -216,7 +217,7 @@ class DriveService:
         )
 
         if search:
-            # `%` e `_` do usuario sao literais, nao curingas (ver `contem`).
+            # The user's `%` and `_` are literals, not wildcards (see `contem`).
             nome_contem = contem(WorkspaceFile.original_name, search)
             query = query.where(nome_contem)
             count_query = count_query.where(nome_contem)
@@ -225,10 +226,10 @@ class DriveService:
             count_query = count_query.where(WorkspaceFile.extension == ext.lower())
 
         total = (await self.db.execute(count_query)).scalar() or 0
-        # Ordena pela ULTIMA ESCRITA. Um arquivo sobrescrito mantem o
-        # created_at original — ordenar por ele faria o conteudo recem-gravado
-        # aparecer no fim da lista, junto dos arquivos mais antigos.
-        # coalesce cobre linhas que nunca sofreram update (updated_at NULL).
+        # Sorts by LAST WRITE. An overwritten file keeps its original
+        # created_at — sorting by it would make freshly written content
+        # show up at the end of the list, together with the oldest files.
+        # coalesce covers rows that were never updated (updated_at NULL).
         ultima_escrita = sa_func.coalesce(
             WorkspaceFile.content_written_at, WorkspaceFile.created_at
         )
@@ -238,7 +239,7 @@ class DriveService:
         return items, total
 
     async def list_files_for_agent(self, workspace_id: str) -> list[dict]:
-        """Retorna lista simplificada de arquivos confirmados (para executores)."""
+        """Returns a simplified list of confirmed files (for executors)."""
         result = await self.db.execute(
             select(
                 WorkspaceFile.id_hash, WorkspaceFile.original_name,
@@ -280,7 +281,7 @@ class DriveService:
         mime_type, _ = mimetypes.guess_type(original_name)
         s3_key = make_s3_key(workspace_id, original_name)
 
-        # Upload direto ao MinIO
+        # Direct upload to MinIO
         content_md5 = await s3.upload_async(s3_key, content, content_type=mime_type or "application/octet-stream")
 
         wf = WorkspaceFile(
@@ -347,22 +348,22 @@ class DriveService:
         content_type_override: Optional[str] = None,
         overwrite: bool = False,
     ) -> dict:
-        """Cria registro pendente e gera presigned PUT URL (para executores).
+        """Creates a pending record and generates a presigned PUT URL (for executors).
 
-        `overwrite=True` reaproveita o arquivo de mesmo nome que ja exista no
-        workspace em vez de criar outro. Sem isso, um DataOutput agendado
-        acumulava uma copia por execucao, todas com o mesmo nome no Drive.
+        `overwrite=True` reuses the file with the same name that already exists
+        in the workspace instead of creating another. Without it, a scheduled
+        DataOutput piled up one copy per run, all with the same name in the Drive.
 
-        Reaproveitar significa manter a MESMA linha e a MESMA s3_key:
+        Reusing means keeping the SAME row and the SAME s3_key:
 
-        - o `id_hash` nao muda, entao um DataInput apontando para este arquivo
-          continua valido e passa a ler a versao nova — recriar a linha faria a
-          referencia apontar para sempre ao conteudo antigo;
-        - a s3_key preservada faz o PUT sobrescrever o objeto no MinIO, sem
-          deixar o anterior orfao ocupando disco.
+        - the `id_hash` does not change, so a DataInput pointing to this file
+          stays valid and starts reading the new version — recreating the row
+          would make the reference point forever to the old content;
+        - the preserved s3_key makes the PUT overwrite the object in MinIO,
+          without leaving the previous one orphaned taking up disk.
         """
         filename = safe_display_name(filename)
-        # Uploads de artefatos (s3_key_override) pulam validacao de extensao do Drive
+        # Artifact uploads (s3_key_override) skip the Drive's extension validation
         if s3_key_override:
             ext = Path(filename).suffix.lstrip(".").lower() if filename else ""
         else:
@@ -370,14 +371,14 @@ class DriveService:
 
         mime_type, _ = mimetypes.guess_type(filename)
         s3_key = s3_key_override or make_s3_key(workspace_id, filename)
-        # Usa content_type do body (executor envia o tipo exato) ou detectado via mimetypes
+        # Uses the body's content_type (the executor sends the exact type) or one detected via mimetypes
         final_ct = content_type_override or mime_type or "application/octet-stream"
 
         wf = None
         if overwrite:
-            # Mais recente entre os confirmados: se ja houver duplicatas de
-            # execucoes anteriores, sobrescreve a que o usuario ve no topo da
-            # listagem e deixa as antigas intactas para remocao manual.
+            # Most recent among the confirmed ones: if there are already duplicates
+            # from previous runs, it overwrites the one the user sees at the top
+            # of the listing and leaves the old ones intact for manual removal.
             existente = await self.db.execute(
                 select(WorkspaceFile)
                 .where(
@@ -394,15 +395,15 @@ class DriveService:
         if wf is not None:
             s3_key = wf.s3_key          # PUT sobrescreve o objeto existente
 
-            # NAO volta para "pending" e NAO mexe em `size`. Marcar pending
-            # tirava o arquivo da listagem durante o upload e, pior, o tornava
-            # elegivel para cleanup_pending_workspace_files, que apaga pending
-            # com created_at anterior ao TTL — e o created_at aqui e o da
-            # criacao ORIGINAL, ja vencido em qualquer arquivo com mais de 24h.
-            # Um upload que falhasse destruiria o arquivo integro que existia.
-            # O PUT no MinIO e atomico: ou substitui inteiro, ou o conteudo
-            # anterior permanece. size/content_md5 sao atualizados no
-            # confirm_upload, a partir do objeto real.
+            # Does NOT go back to "pending" and does NOT touch `size`. Marking it
+            # pending took the file out of the listing during the upload and,
+            # worse, made it eligible for cleanup_pending_workspace_files, which
+            # deletes pending rows with created_at older than the TTL — and the
+            # created_at here is that of the ORIGINAL creation, already expired
+            # on any file older than 24h. A failed upload would destroy the
+            # intact file that existed. The PUT to MinIO is atomic: either it
+            # replaces the whole thing, or the previous content remains.
+            # size/content_md5 are updated in confirm_upload, from the real object.
             wf.mime_type = final_ct
             wf.uploaded_by = uploaded_by
         else:
@@ -421,12 +422,12 @@ class DriveService:
         await self.db.commit()
         await self.db.refresh(wf)
 
-        # Pre-signed URL para executor (usa MINIO_EXTERNAL_ENDPOINT, acessivel fora do Docker)
+        # Pre-signed URL for the executor (uses MINIO_EXTERNAL_ENDPOINT, reachable outside Docker)
         upload_url = await s3.presigned_put_async(s3_key, content_type=final_ct)
-        # `reused` diz ao chamador o que de fato aconteceu. Sem ele o executor
-        # so podia repetir a intencao ("pedi para sobrescrever"), nunca o
-        # desfecho — e um overwrite que nao encontrou o arquivo era
-        # indistinguivel de um que encontrou.
+        # `reused` tells the caller what actually happened. Without it the executor
+        # could only repeat the intent ("I asked to overwrite"), never the
+        # outcome — and an overwrite that did not find the file was
+        # indistinguishable from one that did.
         return {
             "upload_url": upload_url,
             "id_hash": wf.id_hash,
@@ -434,32 +435,34 @@ class DriveService:
             "reused": reaproveitou,
         }
 
-    # ── Confirmacao de upload ─────────────────────────────────────────────
+    # ── Upload confirmation ───────────────────────────────────────────────
 
     def _e_upload_de_drive_pendente(self, wf: WorkspaceFile) -> bool:
-        """O confirm esta fechando um upload de Drive que ainda nao foi aceito?
+        """Is the confirm closing a Drive upload that has not been accepted yet?
 
-        So esse caso pode ser recusado destrutivamente, e o escopo e estreito de
-        proposito — cada condicao aqui evita um estrago concreto:
+        Only that case can be rejected destructively, and the scope is narrow on
+        purpose — each condition here prevents concrete damage:
 
-        - `status == "pending"`: a linha foi criada para ESTE upload e nunca
-          apareceu na listagem. Sem isso, `confirm_upload` — que nao filtra por
-          status e e alcancavel por qualquer editor do workspace — viraria um
-          botao de apagar: bastava re-confirmar arquivo alheio ja aceito que
-          estivesse acima do teto CORRENTE (o admin pode ter baixado
-          `max_size_mb` depois) para o objeto e o registro sumirem.
-        - chave sob `drive/`: artefatos de execucao entram por
-          `create_agent_upload_url(s3_key_override=...)`, que pula
-          `validate_upload` INTEIRA — extensao e tamanho. Nunca houve teto para
-          eles, e aplica-lo agora derrubaria a run (o executor faz
-          `raise_for_status` no confirm) e, com `overwrite=True`, apagaria o
-          arquivo bom que estava no Drive. O teto aqui existe para espelhar a
-          validacao do tamanho DECLARADO; onde nao houve declaracao validada,
-          nao ha o que reconferir.
-        - workspace da chave igual ao da linha: `_validate_agent_s3_key` confere
-          a chave contra TODOS os workspaces do executor, nao contra o da linha,
-          entao um `s3_key_override` pode apontar para o objeto de outro
-          workspace. Apagar por esse caminho destruiria bytes alheios.
+        - `status == "pending"`: the row was created for THIS upload and never
+          appeared in the listing. Without it, `confirm_upload` — which does not
+          filter by status and is reachable by any editor of the workspace —
+          would become a delete button: re-confirming someone else's already
+          accepted file that was above the CURRENT ceiling (the admin may have
+          lowered `max_size_mb` later) would be enough for the object and the
+          record to vanish.
+        - key under `drive/`: run artifacts come in through
+          `create_agent_upload_url(s3_key_override=...)`, which skips
+          `validate_upload` ENTIRELY — extension and size. There was never a
+          ceiling for them, and applying it now would bring down the run (the
+          executor does `raise_for_status` on the confirm) and, with
+          `overwrite=True`, would delete the good file that was in the Drive.
+          The ceiling here exists to mirror the validation of the DECLARED
+          size; where there was no validated declaration, there is nothing to
+          recheck.
+        - the key's workspace equal to the row's: `_validate_agent_s3_key`
+          checks the key against ALL of the executor's workspaces, not against
+          the row's, so an `s3_key_override` can point to another workspace's
+          object. Deleting through that path would destroy someone else's bytes.
         """
         if wf.status != "pending" or not wf.s3_key:
             return False
@@ -467,15 +470,16 @@ class DriveService:
         return len(partes) > 2 and partes[0] == "drive" and partes[1] == wf.workspace_id
 
     def _e_artefato_de_execucao_pendente(self, wf: WorkspaceFile) -> bool:
-        """O confirm esta fechando um artefato de execucao (via s3_key_override)?
+        """Is the confirm closing a run artifact (via s3_key_override)?
 
-        Artefatos de execucao entram por `create_agent_upload_url(s3_key_override=
-        ...)`, que pula `validate_upload` INTEIRA — extensao E tamanho. Nunca houve
-        tamanho DECLARADO, entao nao ha o que o teto reconferir, e aplica-lo
-        derrubaria a run (o executor faz `raise_for_status` no confirm) — o bug que
-        recusava artefato de execucao grande. A chave mora sob `artifacts/{ws}/...`;
-        exigir o workspace da PROPRIA linha mantem a guarda contra chave
-        cross-workspace, que NAO se enquadra aqui e segue recusada.
+        Run artifacts come in through `create_agent_upload_url(s3_key_override=
+        ...)`, which skips `validate_upload` ENTIRELY — extension AND size. There
+        was never a DECLARED size, so there is nothing for the ceiling to
+        recheck, and applying it would bring down the run (the executor does
+        `raise_for_status` on the confirm) — the bug that rejected large run
+        artifacts. The key lives under `artifacts/{ws}/...`; requiring the
+        workspace of the row ITSELF keeps the guard against cross-workspace keys,
+        which do NOT fit here and are still rejected.
         """
         if wf.status != "pending" or not wf.s3_key:
             return False
@@ -483,35 +487,37 @@ class DriveService:
         return len(partes) > 2 and partes[0] == "artifacts" and partes[1] == wf.workspace_id
 
     async def _recusar_acima_do_teto(self, wf: WorkspaceFile, tamanho_real: int) -> None:
-        """Aplica `max_size_mb` ao objeto REAL, no confirm. Sem isso o teto e opcional.
+        """Applies `max_size_mb` to the REAL object, on confirm. Without it the ceiling is optional.
 
-        No upload por URL pre-assinada quem diz o tamanho e o cliente: o
-        `create_upload_url` valida o numero que veio no corpo e o PUT vai
-        direto ao MinIO, que nao conhece limite nenhum. Declarar 1 KB e enviar
-        5 GB passava — e o `confirm_upload` ainda MEDIA o objeto (`head_async`)
-        e gravava o tamanho verdadeiro em `size` sem nunca compara-lo ao teto.
-        O arquivo entrava na listagem, contava na cota e podia ser baixado.
+        In the upload via presigned URL, the client is the one stating the size:
+        `create_upload_url` validates the number that came in the body and the
+        PUT goes straight to MinIO, which knows no limit at all. Declaring 1 KB
+        and sending 5 GB got through — and `confirm_upload` even MEASURED the
+        object (`head_async`) and wrote the true size to `size` without ever
+        comparing it to the ceiling. The file entered the listing, counted
+        toward the quota and could be downloaded.
 
-        Recusar exige apagar o objeto: ele ja esta no storage, e uma recusa que
-        deixasse os bytes la seria so uma forma mais lenta de aceita-los — o
-        `cleanup_pending_workspace_files` do reconcile apaga a LINHA vencida,
-        nunca o objeto. A linha vai junto porque, sem o objeto, ela nao descreve
-        nada.
+        Rejecting requires deleting the object: it is already in storage, and a
+        rejection that left the bytes there would just be a slower way of
+        accepting them — the reconcile's `cleanup_pending_workspace_files`
+        deletes the expired ROW, never the object. The row goes too because,
+        without the object, it describes nothing.
 
-        Quem NAO se enquadra em `_e_upload_de_drive_pendente` tambem e recusado,
-        mas sem apagar nada: melhor um objeto acima do teto que o reconcile
-        acusa como divergencia do que um caminho de exclusao sem confirmacao e
-        sem lixeira.
+        Whatever does NOT fit `_e_upload_de_drive_pendente` is also rejected,
+        but without deleting anything: better an object above the ceiling that
+        the reconcile flags as drift than a deletion path with no confirmation
+        and no trash.
         """
         settings = await self.get_settings()
         max_bytes = settings.max_size_mb * 1024 * 1024
         if tamanho_real <= max_bytes:
             return
 
-        # Artefato de execucao (s3_key_override) pulou validate_upload: nao
-        # declarou tamanho, entao nao ha o que reconferir. Aceita sem apagar —
-        # aplicar o teto aqui derrubaria a run. Ja-confirmados e chaves
-        # cross-workspace NAO se enquadram e seguem recusados abaixo.
+        # A run artifact (s3_key_override) skipped validate_upload: it did not
+        # declare a size, so there is nothing to recheck. Accepts without
+        # deleting — applying the ceiling here would bring down the run.
+        # Already-confirmed ones and cross-workspace keys do NOT fit and are
+        # still rejected below.
         if self._e_artefato_de_execucao_pendente(wf):
             logger.info(
                 "Drive: artefato de execucao '%s' (ws=%s) tem %s bytes, acima do teto "
@@ -520,8 +526,8 @@ class DriveService:
             )
             return
 
-        # Locais ANTES do delete: depois do commit a instancia esta removida da
-        # sessao e ler atributo dela e erro.
+        # Locals BEFORE the delete: after the commit the instance has been removed
+        # from the session and reading an attribute from it is an error.
         s3_key, nome, ws_id = wf.s3_key, wf.original_name, wf.workspace_id
         excedeu = f"'{nome}' (ws={ws_id}) tem {tamanho_real} bytes, acima do teto de {settings.max_size_mb}MB"
 
@@ -530,11 +536,11 @@ class DriveService:
             raise FileTooLargeError(f"Arquivo excede {settings.max_size_mb}MB.")
 
         logger.warning("Drive: %s — recusado; objeto e registro removidos.", excedeu)
-        # `storage.delete` e best-effort e NUNCA levanta: devolve False. Um
-        # `except` aqui seria codigo morto — o que informa e o retorno.
+        # `storage.delete` is best-effort and NEVER raises: it returns False. An
+        # `except` here would be dead code — what informs is the return value.
         if not await s3.delete_async(s3_key):
-            # A recusa nao depende disso. Os bytes orfaos aparecem no drift do
-            # reconcile; aceitar o arquivo para nao deixar lixo seria pior.
+            # The rejection does not depend on this. The orphan bytes show up in the
+            # reconcile's drift; accepting the file to avoid leaving garbage would be worse.
             logger.error("Drive: falha ao apagar objeto recusado %s — ficou orfao no storage.", s3_key)
 
         await self.db.delete(wf)
@@ -547,13 +553,13 @@ class DriveService:
         exclude_agent_id: Optional[str] = None,
         spatial_metadata: Optional[dict] = None,
     ) -> WorkspaceFile:
-        """Confirma que o upload foi concluido verificando existencia no MinIO.
+        """Confirms that the upload completed by checking existence in MinIO.
 
-        `spatial_metadata` (CRS, bbox, contagem de feicoes) so pode ser calculado
-        por quem tem o arquivo — o executor. No modo `register` ele ja era
-        enviado; no modo `upload`, que e o default do GeoSync, era descartado, e
-        o arquivo aparecia no Drive sem nenhum dado espacial. Vem opcional
-        porque executor antigo confirma sem corpo nenhum.
+        `spatial_metadata` (CRS, bbox, feature count) can only be computed by
+        whoever has the file — the executor. In `register` mode it was already
+        sent; in `upload` mode, which is GeoSync's default, it was discarded, and
+        the file showed up in the Drive with no spatial data at all. It is
+        optional because an old executor confirms with no body at all.
         """
         result = await self.db.execute(select(WorkspaceFile).where(WorkspaceFile.id_hash == id_hash))
         wf = file_or_404(result.scalar_one_or_none())
@@ -564,24 +570,24 @@ class DriveService:
 
         await self._recusar_acima_do_teto(wf, obj["size"])
 
-        # content_md5 so e preenchido aqui, no confirm. Ja vir preenchido
-        # significa que esta linha foi reaproveitada por um upload com
-        # overwrite=True — para o GeoSync do executor isso e file_updated, nao
-        # file_created (ver executor/sync/manager.py, que trata os dois).
+        # content_md5 is only filled in here, on confirm. Arriving already filled
+        # means this row was reused by an upload with overwrite=True — for the
+        # executor's GeoSync that is file_updated, not file_created (see
+        # executor/sync/manager.py, which handles both).
         acao = "file_updated" if wf.content_md5 else "file_created"
 
         wf.status = "confirmed"
         wf.size = obj["size"]
         wf.content_md5 = obj["etag"]
-        # Explicito, e nao via onupdate: numa sobrescrita com conteudo IDENTICO
-        # os tres campos acima recebem os mesmos valores, nenhum atributo fica
-        # sujo, o SQLAlchemy nao emite UPDATE e `updated_at` nao avancaria — o
-        # arquivo recem-gravado nao subiria na listagem e o usuario nao veria
-        # sinal nenhum de que o workflow rodou.
+        # Explicit, and not via onupdate: on an overwrite with IDENTICAL content
+        # the three fields above get the same values, no attribute becomes
+        # dirty, SQLAlchemy emits no UPDATE and `updated_at` would not advance —
+        # the freshly written file would not move up in the listing and the user
+        # would see no sign at all that the workflow ran.
         wf.content_written_at = utc_now_naive()
-        # Só sobrescreve quando veio algo: um confirm sem metadado (executor
-        # antigo, ou dataset sem camada vetorial legível) não pode apagar o que
-        # uma passada anterior já tinha registrado.
+        # Only overwrites when something came: a confirm with no metadata (old
+        # executor, or a dataset with no readable vector layer) must not erase
+        # what an earlier pass had already recorded.
         if spatial_metadata:
             wf.spatial_metadata = spatial_metadata
         await self.db.commit()
@@ -600,13 +606,14 @@ class DriveService:
         return file_or_404(result.scalar_one_or_none())
 
     async def generate_download_url(self, wf: WorkspaceFile) -> dict:
-        # A guarda vive AQUI, e nao no router: o caminho do executor
-        # (/drive/executor-download) ja recusava conteudo local, e o do usuario
-        # (/drive/{id}/download) chegava direto no presign com `s3_key=None` —
-        # o boto3 valida `Key=None` no CLIENTE e levanta ParamValidationError,
-        # que nao e ClientError, escapa de todo `except` do caminho e vira um
-        # 500 que nao explica nada. A UI esconde o botao; a rota continua
-        # alcancavel por atalho, cache da lista ou chamada direta.
+        # The guard lives HERE, and not in the router: the executor's path
+        # (/drive/executor-download) already rejected local content, and the
+        # user's (/drive/{id}/download) went straight to the presign with
+        # `s3_key=None` — boto3 validates `Key=None` on the CLIENT and raises
+        # ParamValidationError, which is not a ClientError, escapes every
+        # `except` along the path and becomes a 500 that explains nothing. The
+        # UI hides the button; the route remains reachable via shortcut, list
+        # cache or direct call.
         _recusar_se_local(wf)
         url = await s3.presigned_get_async(wf.s3_key, filename=wf.original_name)
         return {"download_url": url, "filename": wf.original_name}
@@ -614,13 +621,14 @@ class DriveService:
     # ── Delecao ───────────────────────────────────────────────────────────
 
     async def delete_file(self, wf: WorkspaceFile) -> None:
-        """Deleta arquivo do S3 e do banco, emitindo evento.
+        """Deletes a file from S3 and from the database, emitting an event.
 
-        Politica: S3 PRIMEIRO via delete_strict. Se falhar (exceto 'not found'),
-        nao apaga o registro do DB — assim a reconciliacao tenta de novo e o
-        objeto nao vira orfao no MinIO consumindo disco sem reflexo no relatorio.
+        Policy: S3 FIRST via delete_strict. If it fails (except 'not found'), it
+        does not delete the DB record — so reconciliation tries again and the
+        object does not become an orphan in MinIO consuming disk with no trace in
+        the report.
 
-        Arquivo CATALOGADO (`content_location='executor'`) e recusado: ver
+        A CATALOGED file (`content_location='executor'`) is rejected: see
         `_recusar_se_catalogado`.
         """
         _recusar_se_catalogado(wf)
@@ -630,11 +638,11 @@ class DriveService:
         }
         del_ws = wf.workspace_id
 
-        # `if wf.s3_key` e defensivo, e nao redundante com a guarda acima: sem
-        # ele, uma chave nula chega ao boto3, que valida `Key=None` no CLIENTE e
-        # levanta ParamValidationError — que NAO e ClientError, escapa do
-        # `except` de `delete_strict` e vira 500. Um 500 por chave nula nao pode
-        # depender de um guard a dez linhas de distancia.
+        # `if wf.s3_key` is defensive, and not redundant with the guard above:
+        # without it, a null key reaches boto3, which validates `Key=None` on the
+        # CLIENT and raises ParamValidationError — which is NOT a ClientError,
+        # escapes `delete_strict`'s `except` and becomes a 500. A 500 from a null
+        # key must not depend on a guard ten lines away.
         if wf.s3_key:
             try:
                 await s3.delete_strict_async(wf.s3_key, allow_missing=True)
@@ -651,18 +659,19 @@ class DriveService:
         await emit_drive_event(del_ws, "file_deleted", del_info)
 
     async def delete_agent_file(self, wf: WorkspaceFile, executor_id: str) -> None:
-        """Remove um arquivo do Drive por ordem do executor que sincroniza a pasta.
+        """Removes a file from the Drive on the order of the executor that syncs the folder.
 
-        Espelha `delete_file`, com UMA diferenca deliberada: aceita o arquivo
-        CATALOGADO (`content_location='executor'`). O caminho do usuario o recusa
-        — apaga-lo pelo web nao removeria os bytes, que vivem no executor — e
-        `_recusar_se_catalogado` manda, na propria mensagem, "apague o arquivo na
-        pasta sincronizada do executor". E exatamente esse pedido que chega aqui:
-        o proprio executor dono avisando que o arquivo saiu da pasta. Apagar a
-        ficha e o desfecho correto, nao uma operacao proibida.
+        Mirrors `delete_file`, with ONE deliberate difference: it accepts the
+        CATALOGED file (`content_location='executor'`). The user's path rejects it
+        — deleting it from the web would not remove the bytes, which live on the
+        executor — and `_recusar_se_catalogado` says, in its own message, "apague
+        o arquivo na pasta sincronizada do executor" (delete the file in the
+        executor's synced folder). That is exactly the request that arrives here:
+        the owning executor itself reporting that the file left the folder.
+        Deleting the record is the correct outcome, not a forbidden operation.
 
-        Guarda: so o executor DONO do catalogo pode apaga-lo — um executor nao
-        remove a ficha de conteudo que vive em outro.
+        Guard: only the executor that OWNS the catalog entry can delete it — one
+        executor does not remove the record of content that lives on another.
         """
         if (
             wf.content_location == "executor"
@@ -679,9 +688,9 @@ class DriveService:
         }
         del_ws = wf.workspace_id
 
-        # S3 PRIMEIRO, mesma politica de `delete_file`: se o objeto nao sai, o
-        # registro fica de pe para a reconciliacao tentar de novo, em vez de
-        # virar orfao no MinIO. Catalogo tem `s3_key=None` e pula esta etapa.
+        # S3 FIRST, same policy as `delete_file`: if the object does not go, the
+        # record stays standing for reconciliation to try again, instead of
+        # becoming an orphan in MinIO. Catalog entries have `s3_key=None` and skip this step.
         if wf.s3_key:
             try:
                 await s3.delete_strict_async(wf.s3_key, allow_missing=True)
@@ -695,9 +704,9 @@ class DriveService:
         await self.db.delete(wf)
         await self.db.commit()
 
-        # Exclui o proprio executor do fan-out: ele ja removeu o arquivo
-        # localmente (foi ele quem originou a delecao), entao reenviar o
-        # `file_deleted` so provocaria um `_discard_dataset` redundante nele.
+        # Excludes the executor itself from the fan-out: it has already removed the
+        # file locally (it was the one that originated the deletion), so resending
+        # `file_deleted` would only trigger a redundant `_discard_dataset` on it.
         await emit_drive_event(del_ws, "file_deleted", del_info, exclude_agent_id=executor_id)
 
     async def batch_delete_files(
@@ -706,11 +715,11 @@ class DriveService:
         workspace_ids: list[str],
         current_user_id: str,
     ) -> tuple[int, int]:
-        """Deleta multiplos arquivos.
+        """Deletes multiple files.
 
-        Devolve `(apagados, catalogados_pulados)`. O segundo numero existe para a
-        UI nao dizer "5 arquivos deletados" quando 2 eram catalogados e foram
-        ignorados — uma contagem que mente e pior que nenhuma.
+        Returns `(apagados, catalogados_pulados)`. The second number exists so
+        the UI does not say "5 files deleted" when 2 were cataloged and were
+        ignored — a count that lies is worse than none.
         """
         from app.api.dependencies import _has_min_workspace_role
         from app.models.workspace import Workspace as _Workspace
@@ -726,7 +735,7 @@ class DriveService:
         )
         files = result.scalars().all()
 
-        # Pre-carrega roles para evitar N+1 no loop
+        # Preloads roles to avoid N+1 in the loop
         unique_ws_ids = {f.workspace_id for f in files if f.workspace_id in workspace_ids}
         _owner_result = await self.db.execute(
             select(_Workspace.id_hash).where(
@@ -752,18 +761,18 @@ class DriveService:
         deleted = 0
         skipped_s3 = 0
         skipped_local = 0
-        # Eventos a emitir DEPOIS do commit. Os campos sao capturados enquanto a
-        # instancia esta viva: apos o commit ela esta expirada e ler qualquer
-        # atributo dispararia um refresh de uma linha que ja nao existe.
+        # Events to emit AFTER the commit. The fields are captured while the
+        # instance is alive: after the commit it is expired and reading any
+        # attribute would trigger a refresh of a row that no longer exists.
         eventos: list[tuple[str, dict]] = []
         for wf in files:
             if wf.workspace_id not in workspace_ids:
                 continue
             if not _can_edit_ws(wf.workspace_id):
                 continue
-            # Catalogado: PULA em vez de derrubar o lote. Um lote misto e o caso
-            # normal — selecionar tudo numa pasta que tem os dois tipos — e
-            # falhar inteiro por causa deles impediria apagar o resto.
+            # Cataloged: SKIPS instead of bringing down the batch. A mixed batch is the
+            # normal case — selecting everything in a folder that has both kinds —
+            # and failing entirely because of them would prevent deleting the rest.
             if wf.content_location == "executor":
                 skipped_local += 1
                 continue
@@ -787,14 +796,15 @@ class DriveService:
 
         await self.db.commit()
 
-        # Mesma promessa do `delete_file`: cada remocao confirmada avisa os
-        # executores do workspace (`file_deleted`), para que um executor em
-        # download/bidirectional remova a copia local. Sem isto, a exclusao em
-        # lote pela UI sumia do Drive mas ressuscitava no executor no ciclo
-        # seguinte (ele rebaixava o arquivo, servidor como fonte de verdade).
-        # So DEPOIS do commit — anunciar algo que um rollback desfez seria
-        # mentira — e best-effort: `emit_drive_event` engole as proprias falhas,
-        # entao um Redis fora do ar nao desfaz a remocao ja persistida.
+        # Same promise as `delete_file`: each confirmed removal notifies the
+        # workspace's executors (`file_deleted`), so that an executor in
+        # download/bidirectional mode removes its local copy. Without this, a
+        # batch deletion from the UI vanished from the Drive but came back to
+        # life on the executor on the next cycle (it re-downloaded the file, with
+        # the server as the source of truth). Only AFTER the commit — announcing
+        # something a rollback undid would be a lie — and best-effort:
+        # `emit_drive_event` swallows its own failures, so a Redis outage does
+        # not undo the already persisted removal.
         for ws_id, info in eventos:
             await emit_drive_event(ws_id, "file_deleted", info)
 
@@ -815,9 +825,9 @@ class DriveService:
 
     async def presign_download(self, s3_key: str, agent_ws_ids: list[str]) -> dict:
         """Gera presigned GET URL validando ownership do s3_key."""
-        # pin-cache/ e artifacts/ usam workspace_id no path (artifacts/{ws_id}/{task_id}/file)
-        # Validação direta pelo path — não depende de registro no banco
-        # (artefatos do SendEmail podem não estar na tabela Artifact ainda)
+        # pin-cache/ and artifacts/ use workspace_id in the path (artifacts/{ws_id}/{task_id}/file)
+        # Direct validation via the path — does not depend on a database record
+        # (SendEmail artifacts may not be in the Artifact table yet)
         if s3_key.startswith(("pin-cache/", "artifacts/")):
             parts = s3_key.split("/")
             ws_id_in_key = parts[1] if len(parts) > 1 else ""

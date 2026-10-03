@@ -1,10 +1,10 @@
 /**
- * Sugestões de coluna no editor do SetFields ("redefinir campos").
+ * Column suggestions in the SetFields editor ("redefinir campos", redefine fields).
  *
- * O helper substitui o renderizador de campos — onde a sugestão nasce — e por
- * isso era o único nó de coluna do fluxo que nunca via uma dica. Cada seção
- * oferece as colunas conhecidas e o clique preenche a primeira linha vazia ou
- * abre uma nova; o que já foi digitado nunca é substituído.
+ * The helper replaces the field renderer — where the suggestion is born — and
+ * that's why it was the only column node in the workflow that never saw a hint.
+ * Each section offers the known columns and a click fills the first empty row
+ * or opens a new one; what was already typed is never replaced.
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { render, screen, cleanup, fireEvent, within } from "@testing-library/react"
@@ -54,7 +54,7 @@ describe("SetFieldsHelper — sugestões", () => {
   it("em Remover, o clique adiciona a ficha direto", () => {
     const setNodeField = montar({ removeFields: ["cod"] }, ["cod", "nome"])
     const remover = secao(/Remover campos/i)
-    // "cod" já é ficha — só "nome" é oferecido.
+    // "cod" is already a chip — only "nome" is offered.
     expect(remover.queryByRole("button", { name: "cod" })).not.toBeInTheDocument()
     fireEvent.click(remover.getByRole("button", { name: "nome" }))
     expect(setNodeField).toHaveBeenCalledWith("removeFields", { fields: ["cod", "nome"] })

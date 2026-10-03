@@ -13,14 +13,14 @@ export interface ContagensDoCabecalho {
   grupos: number
   ativos: number
   agendados: number
-  /** Com portal publicado e acessível (`temPortal`). */
+  /** With a published and accessible portal (`temPortal`). */
   portal: number
 }
 
 interface Props {
-  /** Da lista inteira; nulo na primeira carga (o subtítulo vira esqueleto). */
+  /** Of the whole list; null on the first load (the subtitle becomes a skeleton). */
   contagens: ContagensDoCabecalho | null
-  /** Recarga em curso: o botão gira e fica travado. */
+  /** Reload in progress: the button spins and is locked. */
   atualizando: boolean
   canEdit: boolean
   onAtualizar: () => void
@@ -29,9 +29,9 @@ interface Props {
 }
 
 /**
- * "10 workflows em 3 grupos · 8 ativos · 4 agendados · 2 com portal". As
- * partes com zero somem — "0 agendados" não ajuda ninguém —, sem grupos o
- * "em N grupos" sai, e o singular vale para cada número.
+ * "10 workflows em 3 grupos · 8 ativos · 4 agendados · 2 com portal". The
+ * zero parts disappear — "0 agendados" helps nobody —, with no groups the
+ * "em N grupos" goes away, and the singular applies to each number.
  */
 export function textoDoSubtitulo(c: ContagensDoCabecalho): string {
   if (c.workflows === 0) {
@@ -49,13 +49,14 @@ export function textoDoSubtitulo(c: ContagensDoCabecalho): string {
 }
 
 /**
- * Cabeçalho de Projetos (docs/specs/projetos.md §3.1): uma ação primária —
- * criar workflow —, "Novo grupo" em outline e "Atualizar" em ghost. Antes
- * eram três botões do mesmo peso, e criar grupo acontece uma vez por mês.
+ * Projects header (docs/specs/projects.md §3.1): one primary action —
+ * create workflow —, "Novo grupo" (new group) as outline and "Atualizar"
+ * (refresh) as ghost. They used to be three buttons of the same weight, and
+ * creating a group happens once a month.
  *
- * No telefone o primário ocupa a linha, e o resto vai para um menu ⋯: dois
- * botões de texto ao lado de um terceiro não cabem em 390px sem cortar o
- * título.
+ * On the phone the primary takes the row, and the rest goes into a ⋯ menu: two
+ * text buttons next to a third do not fit in 390px without cutting the
+ * title.
  */
 export function CabecalhoDeProjetos({
   contagens, atualizando, canEdit, onAtualizar, onNovoGrupo, onCriarWorkflow,
@@ -92,7 +93,7 @@ export function CabecalhoDeProjetos({
           )}
         </div>
 
-        {/* Telefone: menu ⋯ com o que saiu da linha. */}
+        {/* Phone: ⋯ menu with what left the row. */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button

@@ -6,7 +6,7 @@ function edge(id: string, source: string, target: string): Edge {
   return { id, source, target } as Edge
 }
 
-/** Atalho: monta o grafo e coleta o caminho de uma vez. */
+/** Shortcut: builds the graph and collects the path in one go. */
 function pathOf(edges: Edge[], nodeId: string) {
   const { nodes, edges: touched } = collectPath(buildFocusGraph(edges), nodeId)
   return { nodes: [...nodes].sort(), edges: [...touched].sort() }
@@ -25,7 +25,7 @@ describe("collectPath", () => {
   })
 
   it("não duplica o nó de junção do diamante", () => {
-    // a → {b, c} → d, focando em a: d é alcançado por dois caminhos.
+    // a → {b, c} → d, focusing on a: d is reached by two paths.
     const edges = [
       edge("ab", "a", "b"), edge("ac", "a", "c"),
       edge("bd", "b", "d"), edge("cd", "c", "d"),

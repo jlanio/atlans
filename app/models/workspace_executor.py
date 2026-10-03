@@ -8,22 +8,22 @@ from app.models.base import Base
 
 
 class WorkspaceExecutor(Base):
-    """Membro de um NÍVEL de executores dedicados de um workspace.
+    """Member of a TIER of a workspace's dedicated executors.
 
-    tier 1 = principal; tier 2 = fallback (outros executores dedicados do
-    próprio workspace). Um executor não pode estar nos dois níveis (UNIQUE).
-    "Workspace isolado" não é um flag: é ter ≥1 linha em tier 1 com terminal
-    efetivo `fail` — ver `workspace_executor_service`.
+    tier 1 = primary; tier 2 = fallback (other dedicated executors of the
+    workspace itself). An executor cannot be in both tiers (UNIQUE).
+    "Isolated workspace" is not a flag: it is having ≥1 row in tier 1 with an
+    effective terminal of `fail` — see `workspace_executor_service`.
     """
     __tablename__ = "workspace_executors"
     __table_args__ = (
         UniqueConstraint("workspace_id", "executor_id", name="uq_workspace_executor"),
         CheckConstraint("tier IN (1, 2)", name="ck_workspace_executor_tier"),
-        # Leitura quente do dispatch: os níveis de UM workspace.
+        # Hot read in dispatch: the tiers of ONE workspace.
         Index("ix_workspace_executors_ws_tier", "workspace_id", "tier"),
-        # "Quais workspaces dependem deste executor?" — revogar/apagar um
-        # executor consulta isto para bloquear o esvaziamento de um nível
-        # principal. Nome explícito: é o que a migração e o bootstrap criam.
+        # "Which workspaces depend on this executor?" — revoking/deleting an
+        # executor queries this to block emptying a primary tier. Explicit
+        # name: it is what the migration and the bootstrap create.
         Index("ix_workspace_executors_executor", "executor_id"),
     )
 

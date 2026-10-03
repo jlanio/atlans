@@ -1,28 +1,28 @@
 # tests/unit/test_locks_python.py
 """
-Os locks Python — o que a imagem, o CI, o app desktop e a instalação pela CLI
-instalam — têm de estar em dia com as fontes, trazer hash em toda linha e dar a
-mesma versão para o mesmo pacote em todo lugar.
+The Python locks — what the image, the CI, the desktop app and the CLI install
+install — must be up to date with the sources, carry a hash on every line and give
+the same version for the same package everywhere.
 
-Por que isso é teste, e não só convenção:
+Why this is a test, and not just a convention:
 
-- O CI instala o LOCK. Um `.in` editado sem regerar o `.txt` passaria verde e a
-  mudança simplesmente não aconteceria — um pacote novo não entraria, um que
-  saiu continuaria instalado; um pino mexido à mão no lock divergiria da fonte
-  em silêncio.
-- Sem hash, o pip não confere nada: um lock regerado sem `--generate-hashes`
-  instalaria o que o PyPI entregasse, e é essa conferência que impede um
-  arquivo trocado lá de instalar. (Com hash em parte das linhas, o pip recusa o
-  arquivo inteiro; o risco real é o lock inteiro sair sem.)
-- Mesma versão em todo lugar é o que mantém a API, o executor do Docker e o do
-  app desktop rodando as mesmas bibliotecas — o bug que só aparece num deles é
-  o mais caro de achar.
-- Os flags `--require-hashes`/`--only-binary=:all:` nos Dockerfiles e no CI são
-  uma linha cada; sumir com um deles desliga a proteção sem quebrar nada.
-- Um `-c` dentro de um `.in` faz o Dependabot falhar ao regenerar o lock (ver
-  PARES em scripts/travar_python.py): a restrição vai pela linha de comando.
+- The CI installs the LOCK. A `.in` edited without regenerating the `.txt` would pass
+  green and the change simply would not happen — a new package would not get in, one
+  that was removed would stay installed; a pin changed by hand in the lock would
+  silently diverge from the source.
+- Without a hash, pip checks nothing: a lock regenerated without `--generate-hashes`
+  would install whatever PyPI delivered, and that check is what keeps a file swapped
+  there from being installed. (With hashes on only some lines, pip rejects the whole
+  file; the real risk is the whole lock coming out without them.)
+- The same version everywhere is what keeps the API, the Docker executor and the
+  desktop app's executor running the same libraries — the bug that only shows up in
+  one of them is the most expensive to find.
+- The `--require-hashes`/`--only-binary=:all:` flags in the Dockerfiles and in the CI
+  are one line each; dropping one of them turns off the protection without breaking anything.
+- A `-c` inside a `.in` makes Dependabot fail when regenerating the lock (see
+  PARES in scripts/travar_python.py): the constraint goes on the command line.
 
-Regerar: `python scripts/travar_python.py`. Estático e sem rede, no espírito de
+Regenerate: `python scripts/travar_python.py`. Static and offline, in the spirit of
 `test_ci_workflow.py`.
 """
 from __future__ import annotations
@@ -34,7 +34,7 @@ import pytest
 
 RAIZ = Path(__file__).resolve().parents[2]
 
-# (fonte, lock, restrições) — os PARES de scripts/travar_python.py.
+# (source, lock, constraints) — the PARES of scripts/travar_python.py.
 TRIOS = [
     ("requirements.in", "requirements.txt", []),
     ("requirements-dev.in", "requirements-dev.txt", ["requirements.txt"]),
@@ -53,7 +53,7 @@ def _normalizar(nome: str) -> str:
 
 
 def _blocos(caminho: str) -> dict[str, tuple[str, int]]:
-    """`nome -> (versão, quantos hashes)` de um requirements com hash."""
+    """`name -> (version, how many hashes)` from a hashed requirements file."""
     blocos: dict[str, tuple[str, int]] = {}
     atual = None
     for linha in (RAIZ / caminho).read_text(encoding="utf-8").splitlines():
@@ -65,7 +65,7 @@ def _blocos(caminho: str) -> dict[str, tuple[str, int]]:
             versao, n = blocos[atual]
             blocos[atual] = (versao, n + 1)
         elif linha.strip() and not linha.startswith((" ", "\t", "#")):
-            # Linha de requisito que não é `nome==versão`: um lock não tem isso.
+            # A requirement line that is not `name==version`: a lock does not have that.
             pytest.fail(f"{caminho}: linha fora do formato de lock: {linha!r}")
         else:
             atual = None
@@ -73,8 +73,8 @@ def _blocos(caminho: str) -> dict[str, tuple[str, int]]:
 
 
 def _pedidos_por(caminho: str) -> dict[str, set[str]]:
-    """`nome -> de onde veio`, pelas anotações `# via` do pip-compile (numa
-    linha, `# via X`, ou em várias, `# via` seguido de `#   X`)."""
+    """`name -> where it came from`, from pip-compile's `# via` annotations (on one
+    line, `# via X`, or on several, `# via` followed by `#   X`)."""
     via: dict[str, set[str]] = {}
     atual, lendo = None, False
     for linha in (RAIZ / caminho).read_text(encoding="utf-8").splitlines():
@@ -96,7 +96,7 @@ def _pedidos_por(caminho: str) -> dict[str, set[str]]:
 
 
 def _fonte(caminho: str) -> tuple[dict[str, str], set[str]]:
-    """Os pinos `==` e todos os nomes pedidos por um `.in`."""
+    """The `==` pins and all the names requested by a `.in`."""
     pinos, nomes = {}, set()
     for linha in (RAIZ / caminho).read_text(encoding="utf-8").splitlines():
         if not linha.strip() or linha.lstrip().startswith(("#", "-")):
@@ -121,8 +121,8 @@ def test_cada_lock_bate_com_a_sua_fonte(entrada, saida):
     divergentes = {n: (v, travados[n][0]) for n, v in pinos.items() if travados[n][0] != v}
     assert divergentes == {}, f"{entrada} x {saida} (fonte, lock): {divergentes} — regere o lock"
 
-    # E o contrário: o que o lock diz ter vindo do `.in` e já saiu de lá
-    # continuaria sendo instalado.
+    # And the reverse: what the lock says came from the `.in` and has already left it
+    # would still be installed.
     sobrando = sorted(n for n, fontes in _pedidos_por(saida).items() if f"-r {entrada}" in fontes and n not in nomes)
     assert sobrando == [], f"{saida} ainda traz {sobrando}, que saíram de {entrada} — regere o lock"
 
@@ -147,10 +147,10 @@ def test_toda_linha_dos_locks_tem_hash(lock):
 
 @pytest.mark.parametrize("entrada,saida,restricoes", TRIOS, ids=[s for _, s, _ in TRIOS])
 def test_os_locks_saem_do_pip_compile_com_hash(entrada, saida, restricoes):
-    """O cabeçalho é o comando que regera o lock, e é por ele (`--output-file`)
-    que o Dependabot acha o lock de cada `.in`. Quem o reexecutar tem de obter o
-    mesmo arquivo: com hash, com as restrições e sem o `--no-index` que o
-    pip-tools 7.6.1 escreve por engano (resolveria sem índice nenhum)."""
+    """The header is the command that regenerates the lock, and it is through it
+    (`--output-file`) that Dependabot finds the lock of each `.in`. Whoever reruns it
+    must get the same file: with hashes, with the constraints and without the
+    `--no-index` that pip-tools 7.6.1 writes by mistake (it would resolve with no index at all)."""
     comando = next(
         (l for l in (RAIZ / saida).read_text(encoding="utf-8").splitlines() if re.match(r"^#\s+pip-compile\s", l)),
         "",
@@ -180,7 +180,7 @@ def test_mesma_versao_em_todos_os_locks():
         (".github/workflows/ci.yml",
          "pip install --require-hashes --only-binary=:all: -r requirements.txt -r requirements-dev.txt"),
         (".github/workflows/ci.yml", "pip install --require-hashes --only-binary=:all: -r requirements-dev.txt"),
-        # O desktop instala o lock do executor, e com hash (e confere no Windows).
+        # The desktop installs the executor's lock, with hashes (and checks it on Windows).
         ("desktop/scripts/lib.mjs", "export const LOCK     = path.join(REPO, 'executor', 'requirements-full.txt')"),
         ("desktop/scripts/build-python-runtime.mjs", "'--require-hashes',"),
         ("desktop/scripts/check-lock.mjs", "'--require-hashes', '--only-binary=:all:'"),
@@ -191,8 +191,8 @@ def test_quem_instala_os_locks_confere_o_hash(arquivo, trecho):
 
 
 def test_o_lock_de_dev_instala_no_windows():
-    """Quem commita do Windows instala o requirements-dev.txt (o pre-commit vem
-    dele). O lock sai do Linux, que não vê o colorama que o `build` (do
-    pip-tools) pede no Windows; sem ele no `.in`, o --require-hashes recusa o
-    lock inteiro lá — e ninguém no Linux percebe."""
+    """Whoever commits from Windows installs requirements-dev.txt (pre-commit comes
+    from it). The lock is produced on Linux, which does not see the colorama that `build`
+    (from pip-tools) requires on Windows; without it in the `.in`, --require-hashes rejects
+    the whole lock there — and nobody on Linux notices."""
     assert "colorama" in _blocos("requirements-dev.txt"), "o requirements-dev.in perdeu o colorama (Windows)"

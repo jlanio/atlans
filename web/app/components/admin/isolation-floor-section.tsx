@@ -17,18 +17,19 @@ import {
   CABECALHO_DE_COLUNAS, CELULA_COM_ROTULO, DESTAQUE_DA_FICHA, LINHA_EMPILHADA,
 } from "@/app/components/shared/tabela-empilhada"
 
-/** Sob piso e sem executor principal: nada roda até o dono incluir um. */
+/** Under a floor and with no main executor: nothing runs until the owner adds one. */
 export function semOndeRodar(ws: IWorkspacePolicyAdmin): boolean {
   return ws.isolation_floor === "no_pool" && ws.primary_count === 0
 }
 
 /**
- * Piso de isolamento, por workspace (spec §4.5): só o administrador da
- * plataforma escreve. `no_pool` proíbe o pool compartilhado — o último recurso
- * do dono é forçado a "Falhar" e ele não consegue afrouxar.
+ * Isolation floor, per workspace (spec §4.5): only the platform administrator
+ * writes it. `no_pool` forbids the shared pool — the owner's last resort is
+ * forced to "Falhar" (fail) and they cannot loosen it.
  *
- * Exigir pede confirmação: muda o que roda onde, e pode deixar um workspace
- * sem executor nenhum. Liberar não: só devolve a escolha ao dono.
+ * Requiring asks for confirmation: it changes what runs where, and may leave a
+ * workspace with no executor at all. Releasing does not: it only gives the
+ * choice back to the owner.
  */
 export function IsolationFloorSection({ items, onChanged }: {
   items: IWorkspacePolicyAdmin[]

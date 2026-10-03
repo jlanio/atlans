@@ -1,29 +1,30 @@
 # executor/sync/pool.py
 """
-Pools de threads proprios do GeoSync.
+GeoSync's own thread pools.
 
-Todo `asyncio.to_thread` cai no executor DEFAULT do loop — que o main.py
-dimensiona a partir de MAX_CONCURRENT justamente para dar folga aos JOBS. O
-sync mandava para la a varredura, o MD5 da pasta inteira, o `validate_dataset`
-(geopandas/rasterio), o `extract_metadata` e o zip do shapefile: um `diff` de
-pasta grande segurava uma thread por minutos e os nos de I/O dos workflows
-ficavam esperando thread livre, sem que nada no painel explicasse a lentidao.
+Every `asyncio.to_thread` lands on the loop's DEFAULT executor — which main.py
+sizes from MAX_CONCURRENT precisely to give the JOBS headroom. The sync sent
+there the scan, the whole folder's MD5, `validate_dataset`
+(geopandas/rasterio), `extract_metadata` and the shapefile zip: a `diff` of a
+large folder held a thread for minutes and the workflows' I/O nodes were left
+waiting for a free thread, with nothing on the dashboard explaining the
+slowness.
 
-Com pools separados e pequenos, o sync nunca consome mais que
-`SYNC_THREADS + SYNC_IO_THREADS` threads, aconteca o que acontecer. Eles sao
-UNICOS no processo (nao por pasta): com uma pasta ou com cinco, o teto de
-threads do GeoSync e o mesmo.
+With separate, small pools, the sync never consumes more than
+`SYNC_THREADS + SYNC_IO_THREADS` threads, whatever happens. They are UNIQUE in
+the process (not per folder): with one folder or with five, GeoSync's thread
+ceiling is the same.
 
-Sao DOIS pools porque as cargas nao se parecem:
+There are TWO pools because the loads are nothing alike:
 
-  * `em_thread` — trabalho pesado e demorado: varredura, MD5, validacao,
-    metadados, zip do bundle, gravacao do manifesto. Poucas threads.
-  * `em_thread_io` — os chunks de 1 MB do PUT/GET das transferencias. Cada
-    chamada e curtissima, mas precisa de vazao CONTINUA: com tudo no mesmo pool
-    de 2 threads, bastavam dois `_write_zip`/`extract_metadata` pesados para
-    parar todas as transferencias em voo por minutos. O socket ficava sem dados,
-    o MinIO derrubava a conexao por ociosidade e o upload ia para a fila de
-    retry — perda de vazao exatamente quando havia mais o que enviar.
+  * `em_thread` — heavy, slow work: scan, MD5, validation, metadata, bundle
+    zip, manifest write. Few threads.
+  * `em_thread_io` — the 1 MB chunks of the transfers' PUT/GET. Each call is
+    very short, but needs CONTINUOUS throughput: with everything in the same
+    2-thread pool, two heavy `_write_zip`/`extract_metadata` calls were enough
+    to stall every in-flight transfer for minutes. The socket went without
+    data, MinIO dropped the connection for idleness and the upload went to
+    the retry queue — throughput lost exactly when there was the most to send.
 """
 import asyncio
 import functools
@@ -39,11 +40,11 @@ _pool_io: ThreadPoolExecutor | None = None
 
 
 def _obter_pool() -> ThreadPoolExecutor:
-    """Cria o pool de trabalho pesado na primeira utilizacao.
+    """Creates the heavy-work pool on first use.
 
-    Preguicoso porque os SyncManagers sao construidos antes do event loop subir
-    (e antes de qualquer varredura acontecer) — criar threads ali seria pagar
-    por um GeoSync que talvez nem esteja configurado.
+    Lazy because the SyncManagers are built before the event loop starts (and
+    before any scan happens) — creating threads there would mean paying for a
+    GeoSync that might not even be configured.
     """
     global _pool
     if _pool is None:
@@ -53,7 +54,7 @@ def _obter_pool() -> ThreadPoolExecutor:
 
 
 def _obter_pool_io() -> ThreadPoolExecutor:
-    """Cria o pool de I/O das transferencias na primeira utilizacao."""
+    """Creates the transfers' I/O pool on first use."""
     global _pool_io
     if _pool_io is None:
         _pool_io = ThreadPoolExecutor(max_workers=SYNC_IO_THREADS,
@@ -63,7 +64,7 @@ def _obter_pool_io() -> ThreadPoolExecutor:
 
 
 async def _executar(pool: ThreadPoolExecutor, func, *args, **kwargs):
-    """`run_in_executor` nao aceita kwargs — por isso o `partial`."""
+    """`run_in_executor` doesn't accept kwargs — hence the `partial`."""
     loop = asyncio.get_running_loop()
     if kwargs:
         func = functools.partial(func, **kwargs)
@@ -76,9 +77,10 @@ async def em_thread(func, *args, **kwargs):
 
 
 async def em_thread_io(func, *args, **kwargs):
-    """Leitura/gravacao de bytes das transferencias — pool proprio, com vazao.
+    """Reading/writing the transfers' bytes — its own pool, with throughput.
 
-    Usar `em_thread` aqui acoplava o progresso de todo PUT/GET em voo a duracao
-    do zip/validate que estivesse ocupando as 2 threads do pool pesado.
+    Using `em_thread` here coupled the progress of every in-flight PUT/GET to
+    the duration of whatever zip/validate was occupying the heavy pool's 2
+    threads.
     """
     return await _executar(_obter_pool_io(), func, *args, **kwargs)

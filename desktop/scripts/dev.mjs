@@ -1,11 +1,11 @@
 // desktop/scripts/dev.mjs
 //
-// Modo desenvolvimento: Vite servindo o renderer com HMR + Electron apontado
-// para ele.
+// Development mode: Vite serving the renderer with HMR + Electron pointed at
+// it.
 //
-// Em dev o app usa `resources/python` se existir e cai no Python do sistema se
-// nao — assim da para iterar na UI sem reconstruir 390 MB a cada mudanca (ver
-// `resolverPythonDev` em src/main/paths.ts).
+// In dev the app uses `resources/python` if it exists and falls back to the
+// system Python if not — so you can iterate on the UI without rebuilding 390 MB
+// on every change (see `resolverPythonDev` in src/main/paths.ts).
 //
 //   node scripts/dev.mjs
 import { spawn } from 'node:child_process'
@@ -14,12 +14,12 @@ import path from 'node:path'
 import { createServer } from 'vite'
 import { DESKTOP, log, ok, run, step } from './lib.mjs'
 
-// O binario do Electron nao vem no `npm ci`: o pacote (44+) o baixa na primeira
-// vez que e chamado, e o desktop/.npmrc desliga os scripts de instalacao de
-// qualquer forma. Baixa aqui, uma vez e num passo a vista (e nao escondido no
-// `import('electron')` la embaixo), pelo proprio install.js do pacote — que
-// confere o SHA-256 pelo checksums.json que veio no tarball do npm (este, por
-// sua vez, conferido pelo hash do package-lock).
+// The Electron binary does not come with `npm ci`: the package (44+) downloads
+// it the first time it is called, and desktop/.npmrc turns off install scripts
+// anyway. It is downloaded here, once and in a visible step (not hidden in the
+// `import('electron')` further down), by the package's own install.js — which
+// checks the SHA-256 against the checksums.json that came in the npm tarball
+// (which in turn is checked against the package-lock hash).
 const ELECTRON = path.join(DESKTOP, 'node_modules', 'electron')
 if (!fs.existsSync(path.join(ELECTRON, 'path.txt'))) {
   step('Baixando o binario do Electron (primeira vez depois do npm ci)')
@@ -38,15 +38,15 @@ run(process.execPath, [`${DESKTOP}/scripts/build-main.mjs`, '--dev'], { stdio: '
 
 step('Abrindo o Electron')
 
-// `ELECTRON_RUN_AS_NODE` faz o executavel do Electron virar Node puro: sem
-// modulo `electron`, sem janela, e o processo morre com
-// "Cannot find module 'electron'" — que com `stdio: inherit` some no meio da
-// saida do Vite. Terminais integrados de editor definem essa variavel, e ela e
-// herdada por tudo que roda dali.
+// `ELECTRON_RUN_AS_NODE` turns the Electron executable into plain Node: no
+// `electron` module, no window, and the process dies with
+// "Cannot find module 'electron'" — which with `stdio: inherit` gets lost in the
+// middle of Vite's output. Editors' integrated terminals set this variable, and
+// it is inherited by everything run from there.
 //
-// Removida aqui, e nao documentada como pre-requisito: exigir que o usuario
-// saiba disso para rodar `npm run dev` seria transferir a ele um problema que o
-// script pode resolver sozinho.
+// Removed here, and not documented as a prerequisite: requiring the user to
+// know this to run `npm run dev` would hand them a problem the script can solve
+// on its own.
 const env = { ...process.env, VITE_DEV_SERVER_URL: url }
 if (env.ELECTRON_RUN_AS_NODE) {
   log('ELECTRON_RUN_AS_NODE estava definido no ambiente — removido para este processo.')

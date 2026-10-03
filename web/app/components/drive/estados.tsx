@@ -5,16 +5,16 @@ import { Skeleton } from "@/app/components/ui/skeleton"
 import * as Estado from "@/app/components/shared/estados"
 
 /**
- * Os quatro estados do Drive (contrato §3): skeleton da 1ª carga, erro de
- * espinha, vazio de primeiro uso e sem resultado. A composição (qual mostrar)
- * fica no `page.tsx`; aqui ficam o skeleton e as frases, com a moldura de
- * `shared/estados.tsx`.
+ * The four Drive states (contract §3): 1st-load skeleton, spine error,
+ * first-use empty state and no results. The composition (which one to show)
+ * lives in `page.tsx`; the skeleton and the sentences live here, with the
+ * frame from `shared/estados.tsx`.
  */
 
 /**
- * Primeira carga: desenha a LISTA real — cabeçalho de colunas + linhas com a
- * altura de verdade — para a troca para o conteúdo não pular a página. O
- * cabeçalho real da página fica por cima (o `page.tsx` sempre o renderiza).
+ * First load: draws the real LIST — column header + rows at their real height
+ * — so the swap to the content doesn't make the page jump. The page's real
+ * header sits on top (`page.tsx` always renders it).
  */
 export function SkeletonDoDrive() {
   return (
@@ -24,7 +24,7 @@ export function SkeletonDoDrive() {
       aria-label="Carregando os arquivos"
       className="overflow-hidden rounded-lg border bg-card shadow-xs"
     >
-      {/* Cabeçalho de colunas. */}
+      {/* Column header. */}
       <div className="flex items-center gap-4 border-b bg-muted/40 px-4 py-2.5">
         <Skeleton className="h-3 w-16" />
         <Skeleton className="ml-auto hidden h-3 w-16 lg:block" />
@@ -47,17 +47,17 @@ export function SkeletonDoDrive() {
 }
 
 /**
- * A listagem caiu na 1ª carga: sem ela não há Drive, então o bloco de erro toma
- * o lugar. Só entra quando NUNCA houve carga aceita — uma recarga que falha
- * sobre a lista pronta a mantém (o `page.tsx` faz esse gate).
+ * The listing failed on the 1st load: without it there is no Drive, so the error
+ * block takes its place. Only shown when there was NEVER an accepted load — a
+ * reload that fails over the ready list keeps it (`page.tsx` does this gate).
  */
 export function ErroDeCarga({ mensagem, onTentar }: { mensagem: string; onTentar: () => void }) {
   return <Estado.ErroDeCarga titulo="Não foi possível carregar os arquivos" mensagem={mensagem} onTentar={onTentar} />
 }
 
 /**
- * Primeiro uso: o workspace não tem nenhum arquivo. Convida a enviar quando quem
- * olha pode editar; senão explica que só um editor faz isso.
+ * First use: the workspace has no files at all. Invites an upload when the viewer
+ * can edit; otherwise explains that only an editor can do it.
  */
 export function VazioPrimeiroUso({ canEdit, onEnviar }: { canEdit: boolean; onEnviar: () => void }) {
   return (
@@ -77,12 +77,12 @@ export function VazioPrimeiroUso({ canEdit, onEnviar }: { canEdit: boolean; onEn
   )
 }
 
-/** "Nenhum arquivo com «q»" / "…com este filtro" / "…com «q» e este filtro". */
+/** "Nenhum arquivo com "q"" / "…com este filtro" / "…com "q" e este filtro". */
 export function textoDeSemResultado(busca: string, ext: string): string {
   return Estado.textoDeSemResultado({ nada: "Nenhum arquivo", termo: busca, comFiltro: ext !== "" })
 }
 
-/** Busca ou chip de extensão sem nenhuma linha: a saída óbvia é limpar o recorte. */
+/** Search or extension chip with no rows: the obvious way out is to clear the slice. */
 export function SemResultado({ busca, ext, onLimpar }: { busca: string; ext: string; onLimpar: () => void }) {
   return (
     <Estado.SemResultado

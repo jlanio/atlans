@@ -2,52 +2,53 @@ import { create } from 'zustand'
 
 export type RunPanelTab = 'nodes' | 'output' | 'problems' | 'raw'
 
-/** Altura da barra sempre visível (o "HUD"). */
+/** Height of the always-visible bar (the "HUD"). */
 export const RUN_BAR_HEIGHT = 34
 const DEFAULT_HEIGHT = 320
 const MIN_HEIGHT = 160
 
-/** Fração da janela que o painel pode tomar ao ABRIR, sem o usuário pedir. */
+/** Fraction of the window the panel may take when it OPENS, without the user asking. */
 const FRACAO_INICIAL = 0.45
 
 /**
- * Altura de abertura, limitada pela janela.
+ * Opening height, limited by the window.
  *
- * Os 320px fixos foram escolhidos para um monitor, onde são ~30% da tela. Num
- * telefone de 640px úteis viravam metade do canvas — o usuário abria o painel
- * para acompanhar um run e perdia de vista justamente o grafo que queria
- * acompanhar. O limite só ENCOLHE: num monitor, 45% é bem mais que 320px, e o
- * padrão continua valendo.
+ * The fixed 320px were chosen for a monitor, where they are ~30% of the screen.
+ * On a phone with 640px of usable height they became half the canvas — the user
+ * opened the panel to follow a run and lost sight of precisely the graph they
+ * wanted to follow. The limit only SHRINKS: on a monitor, 45% is well over
+ * 320px, and the default still applies.
  *
- * Não pode virar valor inicial da store: ela é criada na importação do módulo,
- * que também roda no servidor, e ler `window` ali quebraria o SSR (além de
- * congelar a altura da primeira renderização).
+ * It cannot become the store's initial value: the store is created on module
+ * import, which also runs on the server, and reading `window` there would break
+ * SSR (besides freezing the height of the first render).
  */
 function alturaDeAbertura(atual: number): number {
   if (typeof window === "undefined") return atual
   return Math.max(MIN_HEIGHT, Math.min(atual, Math.round(window.innerHeight * FRACAO_INICIAL)))
 }
 
-/** Estado de UI do painel de execução.
+/** UI state of the execution panel.
  *
- * Vive numa store própria (e não local no componente) porque três lugares
- * precisam dele: o painel, a coluna de botões do canvas — que sobe para não
- * ficar embaixo do dock — e o canvas, que revela um nó no painel ao ser clicado.
+ * It lives in its own store (and not locally in the component) because three
+ * places need it: the panel, the canvas button column — which moves up so as
+ * not to sit under the dock — and the canvas, which reveals a node in the panel
+ * when clicked.
  */
 interface RunPanelState {
   open: boolean
   height: number
   tab: RunPanelTab
   search: string
-  /** Nó que o painel deve rolar até e destacar (setado pelo clique no canvas). */
+  /** Node the panel should scroll to and highlight (set by the click on the canvas). */
   revealNodeId: string | null
-  /** Nó sob o cursor no painel — destacado no canvas. */
+  /** Node under the cursor in the panel — highlighted on the canvas. */
   hoveredNodeId: string | null
 }
 
 interface RunPanelActions {
   setOpen(v: boolean): void
-  /** Abre o painel já numa aba específica (ex.: "Problemas" quando falha). */
+  /** Opens the panel straight on a specific tab (e.g. "Problemas" (problems) on failure). */
   openAt(tab: RunPanelTab): void
   setHeight(h: number): void
   setTab(tab: RunPanelTab): void
@@ -64,8 +65,8 @@ export const useRunPanelStore = create<RunPanelState & RunPanelActions>((set) =>
   revealNodeId: null,
   hoveredNodeId: null,
 
-  // O clamp vai no ABRIR, e não no `setHeight`: quem arrastou a alça escolheu
-  // aquela altura e pode passar da fração à vontade.
+  // The clamp goes on OPEN, not on `setHeight`: whoever dragged the handle chose
+  // that height and may exceed the fraction as they please.
   setOpen: (v) => set(state => v ? { open: true, height: alturaDeAbertura(state.height) } : { open: false }),
   openAt: (tab) => set(state => ({ open: true, tab, height: alturaDeAbertura(state.height) })),
   setHeight: (h) => set({ height: Math.max(MIN_HEIGHT, h) }),
@@ -75,15 +76,15 @@ export const useRunPanelStore = create<RunPanelState & RunPanelActions>((set) =>
   setHovered: (hoveredNodeId) => set({ hoveredNodeId }),
 }))
 
-/** Espaço vertical que a coluna de botões do canvas precisa acima do dock. */
+/** Vertical space the canvas button column needs above the dock. */
 const BUTTON_COLUMN_HEIGHT = 300
 
-/** Altura ocupada pelo dock — a coluna de botões do canvas usa para se deslocar.
+/** Height taken by the dock — the canvas button column uses it to shift.
  *
- * Limitada para que, com o painel maximizado, a coluna não seja empurrada para
- * fora do topo do canvas (onde ficava recortada e inalcançável). Passando do
- * limite ela fica atrás do painel, que tem z-index maior — comportamento
- * previsível para quem escolheu maximizar o painel.
+ * Limited so that, with the panel maximized, the column is not pushed out past
+ * the top of the canvas (where it got clipped and unreachable). Past the limit
+ * it sits behind the panel, which has a higher z-index — predictable behavior
+ * for someone who chose to maximize the panel.
  */
 export function useRunDockHeight(): number {
   const open = useRunPanelStore(s => s.open)

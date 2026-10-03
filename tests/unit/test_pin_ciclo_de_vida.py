@@ -1,21 +1,21 @@
 # tests/unit/test_pin_ciclo_de_vida.py
 """
-Regressões do ciclo de vida do pin-cache (executor ⇄ servidor).
+Regressions in the pin-cache lifecycle (executor ⇄ server).
 
-O bug de produção que motivou tudo: `_collect_stats` reportava o
-`pinned_outputs` INTEIRO em `__updated_pinned_outputs__` — inclusive refs que
-vieram do servidor e apenas passaram pela run. O consumer re-deriva a s3_key
-com o task_id ATUAL, então cada run "corrompia" as refs que não regravou,
-apontando-as para objetos que nunca foram enviados. Na run seguinte: 404,
-re-execução do nó, e — como o auto-pin só dispara com a ref vazia — a quebra
-nunca se resolvia sozinha.
+The production bug that motivated all of this: `_collect_stats` reported the
+WHOLE `pinned_outputs` in `__updated_pinned_outputs__` — including refs that
+came from the server and merely passed through the run. The consumer re-derives
+the s3_key with the CURRENT task_id, so each run "corrupted" the refs it did not
+rewrite, pointing them at objects that were never uploaded. On the next run: 404,
+re-execution of the node, and — since auto-pin only fires with an empty ref — the
+breakage never resolved itself.
 
-Três defesas, três grupos de teste:
-  F0: o executor só reporta o que GRAVOU nesta run (`updated_pin_refs`).
-  F1: pin cujo objeto sumiu do storage é zerado na hora e regravado na
-      própria run (auto-cura). Pin EXPIRADO não é regravado — a lacuna é
-      deliberada até alguém re-pinar.
-  (o guard do consumer contra passthrough de executor antigo está em
+Three defenses, three test groups:
+  F0: the executor only reports what it WROTE in this run (`updated_pin_refs`).
+  F1: a pin whose object vanished from storage is cleared right away and rewritten
+      in the same run (self-healing). An EXPIRED pin is not rewritten — the gap is
+      deliberate until someone re-pins.
+  (the consumer's guard against passthrough from an old executor is in
    test_fix_consumer_services.py::test_pin_passthrough_de_run_antiga_e_ignorado)
 """
 import asyncio
@@ -36,14 +36,14 @@ _REF = {"__pin_s3_key__": "pin-cache/ws-1/task-antiga/n1_pin.parquet",
 
 
 def _executor_stub(pinned_outputs, pin_metadata, download=None) -> WorkflowExecutor:
-    """WorkflowExecutor sem __init__ — só o necessário para _resolve_pin_data."""
+    """WorkflowExecutor without __init__ — only what _resolve_pin_data needs."""
     ex = WorkflowExecutor.__new__(WorkflowExecutor)
     ex.pinned_outputs = pinned_outputs
     ex.pin_metadata = pin_metadata
     ex.updated_pin_refs = {}
     ex.logger = logging.getLogger("test-pin")
     if download is not None:
-        # staticmethod na classe; atributo de instância tem precedência.
+        # staticmethod on the class; an instance attribute takes precedence.
         ex._download_pin_artifact = download
     return ex
 
@@ -57,8 +57,8 @@ def _resolve(ex, node_id="n1"):
 class TestAutoCuraDoPin:
 
     def test_download_vazio_zera_a_ref_para_regravar(self):
-        """Objeto sumiu do MinIO (404): a ref precisa ficar vazia para o
-        auto-pin regravar nesta mesma run — senão o 404 se repete para sempre."""
+        """The object vanished from MinIO (404): the ref must become empty so
+        auto-pin rewrites it in this same run — otherwise the 404 repeats forever."""
         ex = _executor_stub({"n1": dict(_REF)}, {"n1": {"pinned_at": "x"}},
                             download=lambda pinned: {})
         assert _resolve(ex) is None
@@ -73,8 +73,8 @@ class TestAutoCuraDoPin:
         assert ex.pinned_outputs["n1"] == {}
 
     def test_pin_expirado_NAO_e_regravado(self):
-        """Expiração é deliberada (TTL do usuário): executa normalmente, mas a
-        ref fica — regravar aqui transformaria o pin num cache de última run."""
+        """Expiration is deliberate (the user's TTL): it runs normally, but the
+        ref stays — rewriting here would turn the pin into a last-run cache."""
         vencido = (utc_now_naive() - timedelta(hours=1)).isoformat()
         ex = _executor_stub(
             {"n1": dict(_REF)},
@@ -84,8 +84,8 @@ class TestAutoCuraDoPin:
         assert ex.pinned_outputs["n1"] == _REF          # intacta
 
     def test_pin_sem_metadata_nao_e_zerado(self):
-        """Sem pin_metadata o auto-pin não dispararia de qualquer forma; zerar a
-        ref só destruiria informação sem ganhar a regravação."""
+        """Without pin_metadata auto-pin would not fire anyway; clearing the
+        ref would only destroy information without gaining the rewrite."""
         ex = _executor_stub({"n1": dict(_REF)}, {}, download=lambda pinned: {})
         assert _resolve(ex) is None
         assert ex.pinned_outputs["n1"] == _REF
@@ -99,25 +99,25 @@ class TestAutoCuraDoPin:
         assert ex.updated_pin_refs == {}
 
 
-# ── F0: só refs gravadas NESTA run voltam ao servidor ────────────────────────
+# ── F0: only refs written in THIS run go back to the server ──────────────────
 
 class TestColetaDePinsAtualizados:
 
     def _stats(self, executor_stub) -> dict:
         from executor import job_executor
-        # build_metrics falhando não pode derrubar a coleta de pins — e aqui
-        # simplesmente não interessa: devolve dict vazio.
+        # A failing build_metrics must not bring down pin collection — and here
+        # it simply does not matter: returns an empty dict.
         executor_stub.metrics_collector = MagicMock()
         executor_stub.metrics_collector.build_metrics.return_value = {}
         executor_stub.node_stats = {}
         return job_executor._collect_stats(executor_stub, status="success")
 
     def test_ref_passthrough_NAO_e_reportada(self):
-        """A regressão de produção: ref que veio do servidor e só passou pela
-        run era reenviada e o consumer a repontava para o task_id atual —
-        objeto inexistente, 404 em toda run seguinte."""
+        """The production regression: a ref that came from the server and only passed
+        through the run was resent and the consumer re-pointed it to the current
+        task_id — a nonexistent object, 404 on every following run."""
         ex = SimpleNamespace(
-            pinned_outputs={"n1": dict(_REF)},   # veio do servidor, não regravada
+            pinned_outputs={"n1": dict(_REF)},   # came from the server, not rewritten
             updated_pin_refs={},
         )
         stats = self._stats(ex)
@@ -134,8 +134,8 @@ class TestColetaDePinsAtualizados:
         assert stats["__updated_pinned_outputs__"] == {"n2": ref_nova}
 
     def test_executor_sem_o_atributo_nao_quebra_a_coleta(self):
-        """flow/ e executor/ são implantados juntos, mas a coleta não pode
-        explodir se um WorkflowExecutor antigo (sem updated_pin_refs) aparecer."""
+        """flow/ and executor/ are deployed together, but collection must not
+        blow up if an old WorkflowExecutor (without updated_pin_refs) shows up."""
         ex = SimpleNamespace(pinned_outputs={"n1": dict(_REF)})
         stats = self._stats(ex)
         assert "__updated_pinned_outputs__" not in stats

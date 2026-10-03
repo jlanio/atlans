@@ -1,10 +1,10 @@
 # tests/unit/test_mcp_credenciais_id.py
-"""`list_credentials` entrega o id que o resolver procura.
+"""`list_credentials` delivers the id the resolver looks for.
 
-A definição leva `credential_id` = `Credential.id` (a chave primária: é o que a
-tela grava e o que `resolve_credentials_from_ids` consulta). A tool entregava o
-`id_hash` — outro UUID, independente —, e toda credencial escolhida pelo
-assistente falhava na resolução: o nó recusava por "credencial não resolvida".
+The definition carries `credential_id` = `Credential.id` (the primary key: it is what the
+screen saves and what `resolve_credentials_from_ids` queries). The tool delivered the
+`id_hash` — another, independent UUID —, and every credential chosen by the
+assistant failed resolution: the node refused with "credencial não resolvida" (unresolved credential).
 """
 import uuid
 from contextlib import asynccontextmanager

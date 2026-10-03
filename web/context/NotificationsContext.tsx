@@ -42,10 +42,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     setNotifications([])
   }, [])
 
-  // Memo pelo mesmo motivo dos demais providers da raiz do dashboard: objeto
-  // novo a cada render arrastava toda a árvore junto. `addNotification` entra
-  // como dep do efeito de polling do ActiveRunsContext, então precisa ser
-  // estável — e é, por já vir de useCallback sem deps.
+  // Memo for the same reason as the other providers at the dashboard root: a new
+  // object on every render dragged the whole tree along. `addNotification` is a
+  // dep of ActiveRunsContext's polling effect, so it needs to be stable — and
+  // it is, since it already comes from a useCallback with no deps.
   const value = useMemo<NotificationsContextValue>(() => ({
     notifications,
     unreadCount: notifications.filter(n => !n.read).length,

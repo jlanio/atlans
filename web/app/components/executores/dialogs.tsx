@@ -1,15 +1,15 @@
 "use client"
 
-// Diálogos de gestão do executor: criar (2 passos), editar, revogar e remover,
-// mais os primitivos que eles compartilham (SelectCard, Stepper) e o aviso de
-// conflito de política.
+// Executor management dialogs: create (2 steps), edit, revoke and remove,
+// plus the primitives they share (SelectCard, Stepper) and the policy
+// conflict warning.
 //
-// PADRONIZAÇÃO, não reescrita: o fluxo de criação em 2 passos, o Stepper, a
-// confirmação por digitação da revogação, o `force` do conflito de política e
-// todas as chamadas de API permanecem intactos. Só a apresentação foi alinhada:
-// tokens, foco visível e movimento sob `motion-safe:`. Editar, revogar e
-// remover seguem o ciclo comum dos diálogos de ação (`useAcaoDeDialogo`), e os
-// dois destrutivos são `DeleteDialog`: Enter e clique passam pela mesma trava.
+// STANDARDIZATION, not a rewrite: the 2-step creation flow, the Stepper, the
+// type-to-confirm of revocation, the policy conflict's `force` and all the API
+// calls remain intact. Only the presentation was aligned: tokens, visible
+// focus and motion under `motion-safe:`. Edit, revoke and remove follow the
+// common cycle of action dialogs (`useAcaoDeDialogo`), and the two
+// destructive ones are `DeleteDialog`: Enter and click go through the same lock.
 
 import React, { useState } from "react"
 import { GisFlowService } from "@/service/GisFlowService"
@@ -40,7 +40,7 @@ import {
 } from "react-icons/tb"
 import { EnrollConnect } from "./enroll"
 
-// ── Card selecionável (tipo de executor / método de conexão) ────────────────
+// ── Selectable card (executor type / connection method) ─────────────────────
 
 export function SelectCard({ active, onClick, icon, title, desc, badge }: {
   active: boolean
@@ -85,7 +85,7 @@ export function SelectCard({ active, onClick, icon, title, desc, badge }: {
   )
 }
 
-// ── Indicador de passos ──────────────────────────────────────────────────────
+// ── Step indicator ───────────────────────────────────────────────────────────
 
 function Stepper({ steps, current }: { steps: string[]; current: number }) {
   return (
@@ -127,9 +127,9 @@ function Stepper({ steps, current }: { steps: string[]; current: number }) {
 }
 
 /**
- * 409 da política de execução: o executor é o ÚNICO principal dos workspaces
- * listados. Sem isto o admin via um toast genérico e não tinha como purgar
- * um executor antigo; com isto ele sabe o custo e decide.
+ * Execution policy 409: the executor is the ONLY primary of the listed
+ * workspaces. Without this the admin saw a generic toast and had no way to
+ * purge an old executor; with this they know the cost and decide.
  */
 export function ConflitoDePolitica({ workspaces, acao }: { workspaces: string[]; acao: "revogar" | "remover" }) {
   return (
@@ -148,7 +148,7 @@ export function ConflitoDePolitica({ workspaces, acao }: { workspaces: string[];
   )
 }
 
-// ── Dialog de criação ─────────────────────────────────────────────────────────
+// ── Creation dialog ───────────────────────────────────────────────────────────
 
 export function CreateAgentDialog({ onCreated, executores, isAdmin, quota, ownedCount }: {
   onCreated: () => void
@@ -162,8 +162,8 @@ export function CreateAgentDialog({ onCreated, executores, isAdmin, quota, owned
   const [name, setName]               = useState("")
   const [description, setDescription] = useState("")
   const [executorType, setExecutorType] = useState<"default" | "dedicated">("dedicated")
-  const [loading, setLoading]         = useState(false)   // criacao do executor
-  const [generating, setGenerating]   = useState(false)   // geracao do OTP
+  const [loading, setLoading]         = useState(false)   // executor creation
+  const [generating, setGenerating]   = useState(false)   // OTP generation
   const [created, setCreated]         = useState<IExecutorCreatedResponse | null>(null)
   const [otp, setOtp]                 = useState<IExecutorEnrollmentOtpResponse | null>(null)
 
@@ -178,7 +178,7 @@ export function CreateAgentDialog({ onCreated, executores, isAdmin, quota, owned
       setStep(1); setName(""); setDescription(""); setExecutorType("dedicated")
       setCreated(null); setOtp(null)
       setLoading(false); setGenerating(false)
-      // A lista so precisa recarregar se um executor chegou a ser criado.
+      // The list only needs to reload if an executor actually got created.
       if (wasCreated) onCreated()
     }
     setOpen(val)
@@ -198,9 +198,9 @@ export function CreateAgentDialog({ onCreated, executores, isAdmin, quota, owned
   async function handleCreate() {
     if (!name.trim() || loading) return
     setLoading(true)
-    // capabilities, max_concurrent_jobs e max_queue_size sao controlados pelo
-    // proprio executor (EXECUTOR_MAX_CONCURRENT / EXECUTOR_MAX_QUEUE_SIZE no .env
-    // do host) — o backend aceita defaults se nao enviarmos.
+    // capabilities, max_concurrent_jobs and max_queue_size are controlled by the
+    // executor itself (EXECUTOR_MAX_CONCURRENT / EXECUTOR_MAX_QUEUE_SIZE in the
+    // host's .env) — the backend accepts defaults if we don't send them.
     const res = await GisFlowService.createAgent({
       name: name.trim(),
       description: description.trim() || undefined,
@@ -214,7 +214,7 @@ export function CreateAgentDialog({ onCreated, executores, isAdmin, quota, owned
     const c = res.data as IExecutorCreatedResponse
     setCreated(c)
     setStep(2)
-    // Gera o OTP na sequencia — o passo "Ativar" ja abre com ele pronto.
+    // Generates the OTP right after — the "Ativar" (activate) step already opens with it ready.
     genOtp(c.executor_id)
   }
 
@@ -231,8 +231,8 @@ export function CreateAgentDialog({ onCreated, executores, isAdmin, quota, owned
         <Button className="max-md:h-10"><TbPlus className="mr-1.5" aria-hidden="true" /> Novo executor</Button>
       </DialogTrigger>
 
-      {/* Travado só durante a criação: fechar no meio dela deixava o executor
-          criado fora da lista e o diálogo, ao reabrir, no passo 2. */}
+      {/* Locked only during creation: closing midway left the created executor
+          out of the list and the dialog, on reopening, at step 2. */}
       <DialogContent bloqueado={loading}>
         <DialogHeader className="pr-6">
           <DialogTitle>{META[step].t}</DialogTitle>
@@ -241,9 +241,9 @@ export function CreateAgentDialog({ onCreated, executores, isAdmin, quota, owned
 
         <Stepper steps={["Configurar", "Conectar"]} current={step} />
 
-        {/* `min-w-0`: filho do grid do DialogContent. Sem isto, um conteúdo largo
-            (o comando Docker do passo Conectar) força a largura do grid acima do
-            `max-w-lg` e estoura/recorta o modal em vez de caber. */}
+        {/* `min-w-0`: child of the DialogContent grid. Without this, wide content
+            (the Docker command of the Conectar step) forces the grid width above
+            `max-w-lg` and overflows/clips the modal instead of fitting. */}
         <div key={step} className="min-w-0 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200">
           {/* ── Passo 1: Configurar ─────────────────────────────────────────── */}
           {step === 1 && (
@@ -365,7 +365,7 @@ export function CreateAgentDialog({ onCreated, executores, isAdmin, quota, owned
   )
 }
 
-// ── Dialog de edição ─────────────────────────────────────────────────────────
+// ── Edit dialog ──────────────────────────────────────────────────────────────
 
 export function EditAgentDialog({ executor, onUpdated }: { executor: IExecutor; onUpdated: () => void }) {
   const [name, setName]               = useState(executor.name)
@@ -379,7 +379,7 @@ export function EditAgentDialog({ executor, onUpdated }: { executor: IExecutor; 
     aoConcluir: onUpdated,
   })
 
-  // O botão e o Enter com a mesma regra: nome com pelo menos 2 caracteres.
+  // The button and Enter follow the same rule: a name with at least 2 characters.
   const podeSalvar = name.trim().length >= 2
 
   function handleClose(val: boolean) {
@@ -433,17 +433,17 @@ export function EditAgentDialog({ executor, onUpdated }: { executor: IExecutor; 
   )
 }
 
-// ── Revogar e remover: o 409 da política ─────────────────────────────────────
+// ── Revoke and remove: the policy 409 ────────────────────────────────────────
 
 /**
- * O ciclo de ação de revogar e de remover, com o 409 da política de execução
- * no lugar de um toast: este executor é o ÚNICO principal de algum workspace.
- * A tela diz QUAIS (`ConflitoDePolitica`) e a confirmação seguinte vai com
- * `force` — o «… mesmo assim». Uma cópia só para os dois diálogos, que
- * repetiam este tratamento linha a linha.
+ * The action cycle of revoke and remove, with the execution policy 409 in
+ * place of a toast: this executor is the ONLY primary of some workspace.
+ * The screen says WHICH ones (`ConflitoDePolitica`) and the next confirmation
+ * goes with `force` — the "… mesmo assim" (anyway). A single copy for both
+ * dialogs, which repeated this handling line by line.
  *
- * O conflito não é limpo ao fechar (como antes): reabrir mostra o aviso da
- * tentativa anterior e já oferece o «mesmo assim».
+ * The conflict is not cleared on close (as before): reopening shows the
+ * warning from the previous attempt and already offers the "mesmo assim".
  */
 function useAcaoComConflito(
   acao: (force: boolean) => Promise<IResponse<unknown>>,
@@ -465,7 +465,7 @@ function useAcaoComConflito(
   return { ...dialogo, conflito }
 }
 
-// ── Dialog de revogação ───────────────────────────────────────────────────────
+// ── Revocation dialog ─────────────────────────────────────────────────────────
 
 export function RevokeAgentDialog({ executor, onRevoked }: { executor: IExecutor; onRevoked: () => void }) {
   const acao = useAcaoComConflito(
@@ -508,7 +508,7 @@ export function RevokeAgentDialog({ executor, onRevoked }: { executor: IExecutor
   )
 }
 
-// ── Dialog de remoção (soft-delete) ──────────────────────────────────────────
+// ── Removal dialog (soft-delete) ─────────────────────────────────────────────
 
 export function DeleteAgentDialog({ executor, onDeleted }: { executor: IExecutor; onDeleted: () => void }) {
   const acao = useAcaoComConflito(

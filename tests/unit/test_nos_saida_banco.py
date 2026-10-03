@@ -1,7 +1,7 @@
-"""Nós de escrita em banco: SaveToPostgres e SaveToPostGIS.
+"""Database write nodes: SaveToPostgres and SaveToPostGIS.
 
-Dois defeitos que só aparecem no caminho feliz de tabelas grandes ou no
-caminho infeliz de uma gravação que falha — nenhum dos dois tinha teste.
+Two defects that only show up on the happy path of large tables or on the
+unhappy path of a write that fails — neither of them had a test.
 """
 import asyncio
 import logging
@@ -16,18 +16,18 @@ from flow.nodes.outputs.save_to_postgis import SaveToPostGIS
 from flow.utils.sql_engine import lote_seguro, _MAX_PARAMETROS_POR_INSTRUCAO
 
 
-# ── Lote seguro ─────────────────────────────────────────────────────────────
+# ── Safe batch ──────────────────────────────────────────────────────────────
 #
-# `method='multi'` monta UM `INSERT ... VALUES (...), (...)` com um parâmetro
-# por célula, e o protocolo do Postgres não aceita mais de 65535 por instrução.
-# O campo de lote vinha com 0 de fábrica e a ajuda dizia "0 = todas de uma vez":
-# o padrão era exatamente o valor que quebra.
+# `method='multi'` builds ONE `INSERT ... VALUES (...), (...)` with one parameter
+# per cell, and the Postgres protocol doesn't accept more than 65535 per statement.
+# The batch field came with 0 out of the box and the help said "0 = todas de uma
+# vez" (0 = all at once): the default was exactly the value that breaks.
 
 @pytest.mark.parametrize("linhas,colunas", [
-    (8_000, 10),      # 80.000 parâmetros — estourava
+    (8_000, 10),      # 80,000 parameters — overflowed
     (100_000, 3),     # 300.000
     (500, 200),       # 100.000
-    (10, 2),          # cabia, e tem de continuar cabendo
+    (10, 2),          # fit, and has to keep fitting
 ])
 def test_o_lote_nunca_estoura_o_limite_do_protocolo(linhas, colunas):
     lote = lote_seguro(colunas, 0)
@@ -40,8 +40,8 @@ def test_lote_escolhido_pelo_usuario_e_respeitado():
 
 
 def test_lote_escolhido_grande_demais_e_cortado():
-    """Quantas linhas vão por instrução é ajuste de desempenho; nenhum valor de
-    desempenho justifica montar uma instrução que o banco recusa."""
+    """How many rows go per statement is performance tuning; no performance
+    value justifies building a statement the database refuses."""
     lote = lote_seguro(10, 50_000)
     assert lote * 10 <= _MAX_PARAMETROS_POR_INSTRUCAO
 
@@ -51,7 +51,7 @@ def test_tabela_com_muitas_colunas_ainda_grava_uma_linha_por_vez():
 
 
 def test_o_no_deriva_o_lote_do_numero_de_colunas(monkeypatch):
-    """Integração: o valor que chega ao `to_sql` tem de caber no protocolo."""
+    """Integration: the value that reaches `to_sql` has to fit in the protocol."""
     recebido = {}
     df = pd.DataFrame({f"c{i}": range(10) for i in range(10)})
 
@@ -67,15 +67,16 @@ def test_o_no_deriva_o_lote_do_numero_de_colunas(monkeypatch):
     assert recebido["method"] == "multi"
 
 
-# ── Atomicidade do "limpar e gravar" ────────────────────────────────────────
+# ── Atomicity of "clear and write" ──────────────────────────────────────────
 #
-# O TRUNCATE abria a SUA transação e commitava sozinho; a gravação vinha depois,
-# em outra. Uma falha no meio — tipo incompatível, queda de rede — deixava a
-# tabela VAZIA: o dado velho já tinha ido e o novo nunca chegou. Numa opção
-# chamada "limpar e gravar", perder as duas pontas é o pior desfecho.
+# TRUNCATE opened ITS OWN transaction and committed on its own; the write came
+# afterwards, in another one. A failure in between — incompatible type, network
+# drop — left the table EMPTY: the old data was already gone and the new never
+# arrived. In an option called "clear and write", losing both ends is the worst
+# outcome.
 #
-# O teste usa sqlite, que não tem TRUNCATE: só o comando é trocado por DELETE.
-# A estrutura de transação exercitada é a do nó, sem simulação.
+# The test uses sqlite, which has no TRUNCATE: only the command is swapped for
+# DELETE. The transaction structure exercised is the node's, with no simulation.
 
 @pytest.fixture
 def banco(tmp_path):
@@ -91,7 +92,7 @@ def _conta(engine, tabela="destino"):
 
 @pytest.fixture
 def truncate_sqlite(monkeypatch):
-    """`TRUNCATE` não existe no sqlite — mesma semântica via DELETE."""
+    """`TRUNCATE` doesn't exist in sqlite — same semantics via DELETE."""
     def falso(conn, schema, table):
         conn.exec_driver_sql(f"DELETE FROM {table}")
         return True
@@ -110,7 +111,7 @@ def test_gravacao_que_falha_nao_deixa_a_tabela_vazia(banco, truncate_sqlite, mon
     with pytest.raises(RuntimeError, match="tipo incompativel"):
         no._save_to_postgres(df, "destino", None, "truncate", False, 0, banco)
 
-    # Antes: 0 — o TRUNCATE já tinha commitado sozinho.
+    # Before: 0 — TRUNCATE had already committed on its own.
     assert _conta(banco) == 3
 
 
@@ -123,15 +124,15 @@ def test_limpar_e_gravar_com_sucesso_substitui_o_conteudo(banco, truncate_sqlite
         assert c.exec_driver_sql("SELECT a FROM destino").scalar() == 7
 
 
-# ── Estrutura: a conexão é compartilhada ────────────────────────────────────
+# ── Structure: the connection is shared ─────────────────────────────────────
 
 @pytest.mark.parametrize("cls,metodo", [
     (SaveToPostgres, "_save_to_postgres"),
     (SaveToPostGIS, "_save_to_postgis"),
 ])
 def test_o_no_grava_dentro_de_uma_transacao(cls, metodo):
-    """Guarda direta da causa: passar a ENGINE para o `to_sql`/`to_postgis` abre
-    uma conexão nova, fora da transação do TRUNCATE."""
+    """Direct guard on the cause: passing the ENGINE to `to_sql`/`to_postgis`
+    opens a new connection, outside the TRUNCATE's transaction."""
     import inspect
     fonte = inspect.getsource(getattr(cls, metodo))
     assert "with engine.begin() as conn:" in fonte
@@ -142,9 +143,9 @@ def test_o_no_grava_dentro_de_uma_transacao(cls, metodo):
 # ── CRS ausente ─────────────────────────────────────────────────────────────
 
 def test_camada_sem_crs_avisa_no_painel_da_run(caplog):
-    """O geopandas grava SRID 0 e avisa por `warnings.warn`, que não aparece
-    para quem disparou o fluxo. A camada fica no banco sem sistema de
-    coordenadas e o problema só aparece quando ela não se alinha com nada."""
+    """geopandas writes SRID 0 and warns via `warnings.warn`, which doesn't show
+    up for whoever triggered the workflow. The layer sits in the database with
+    no coordinate system and the problem only shows when it aligns with nothing."""
     import geopandas as gpd
     from shapely.geometry import Point
 
@@ -160,9 +161,9 @@ def test_camada_sem_crs_avisa_no_painel_da_run(caplog):
     async def falso_thread(fn, *a):
         return None
 
-    # O aviso sai ANTES de qualquer contato com o banco — é essa ordem que
-    # importa, e é ela que o teste fixa. `_get_engine` e a gravação viram no-op
-    # (o ambiente de teste não tem psycopg2, e não precisa ter).
+    # The warning goes out BEFORE any contact with the database — that order is
+    # what matters, and it is what the test pins down. `_get_engine` and the write
+    # become no-ops (the test environment has no psycopg2, and doesn't need it).
     with patch.object(mod_gis, "_get_engine", return_value=object()), \
          patch.object(mod_gis.asyncio, "to_thread", falso_thread), \
          caplog.at_level(logging.INFO):
@@ -194,10 +195,10 @@ def test_camada_com_crs_nao_gera_aviso(caplog):
     assert "SRID 0" not in caplog.text
 
 
-# ── Mesma garantia no PostGIS ───────────────────────────────────────────────
+# ── Same guarantee in PostGIS ───────────────────────────────────────────────
 #
-# O geopandas reaproveita a transação quando recebe uma Connection já aberta
-# (`_get_conn`), então a gravação entra na MESMA transação do TRUNCATE.
+# geopandas reuses the transaction when it receives an already open Connection
+# (`_get_conn`), so the write goes into the SAME transaction as the TRUNCATE.
 
 def test_postgis_gravacao_que_falha_nao_deixa_a_tabela_vazia(banco, monkeypatch):
     import flow.nodes.outputs.save_to_postgis as mod_gis
@@ -224,8 +225,8 @@ def test_postgis_gravacao_que_falha_nao_deixa_a_tabela_vazia(banco, monkeypatch)
 
 
 def test_postgis_passa_o_lote_adiante(banco, monkeypatch):
-    """Sem lote, o geopandas serializa a camada INTEIRA num CSV em memória
-    antes de enviar a primeira linha."""
+    """Without batching, geopandas serializes the WHOLE layer into an in-memory
+    CSV before sending the first row."""
     import flow.nodes.outputs.save_to_postgis as mod_gis
     monkeypatch.setattr(mod_gis, "ensure_schema", lambda conn, schema: None)
 
@@ -243,8 +244,8 @@ def test_postgis_passa_o_lote_adiante(banco, monkeypatch):
 
 
 def test_postgis_renomeia_a_geometria_para_a_coluna_configurada(banco, monkeypatch):
-    """GDF vindo de outros nós chega com geometry.name == 'geometry'; a tabela
-    PostGIS convenciona 'geom'."""
+    """A GDF coming from other nodes arrives with geometry.name == 'geometry'; the
+    PostGIS table convention is 'geom'."""
     import flow.nodes.outputs.save_to_postgis as mod_gis
     monkeypatch.setattr(mod_gis, "ensure_schema", lambda conn, schema: None)
 

@@ -1,6 +1,6 @@
 # flow/nodes/spatial/convex_hull.py
 """
-Nó Convex Hull — calcula o casco convexo (convex hull) de uma camada vetorial.
+Convex Hull node — computes the convex hull of a vector layer.
 """
 import asyncio
 import geopandas as gpd

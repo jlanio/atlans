@@ -4,56 +4,56 @@ import { useCallback, useRef, useState } from "react"
 import type { IResponse } from "@/service/types"
 import { createToast } from "@/utils/createToast"
 
-/** O texto de um toast: a frase, ou título + descrição. */
+/** The text of a toast: the sentence, or title + description. */
 export type TextoDeToast = string | readonly [titulo: string, descricao?: string]
 
-/** O erro do serviço, com o código de domínio quando houver (o 409 da política). */
+/** The service error, with the domain code when there is one (the policy 409). */
 export type ErroDaAcao = NonNullable<IResponse<unknown>["error"]>
 
 /**
- * O que a ação devolve: a resposta do serviço (`data` no sucesso, `error` na
- * falha) — ou nada, para a ação que só lança quando falha. A validação do
- * formulário fica FORA da ação (no `disabled` do botão e no Enter): uma ação
- * que volta sem erro é um sucesso.
+ * What the action returns: the service response (`data` on success, `error` on
+ * failure) — or nothing, for an action that only throws when it fails. Form
+ * validation stays OUTSIDE the action (in the button's `disabled` and in Enter):
+ * an action that returns without an error is a success.
  */
 type RespostaDaAcao<R> = { data?: R; error?: ErroDaAcao | null } | void
 
 export interface OpcoesDaAcao<R> {
-  /** Toast do sucesso: texto fixo, ou função do que o servidor devolveu. `null`: sem toast. */
+  /** Success toast: fixed text, or a function of what the server returned. `null`: no toast. */
   sucesso: TextoDeToast | null | ((dados: R) => TextoDeToast | null)
   /**
-   * Toast da falha, a partir da mensagem do servidor (`undefined` quando não
-   * veio nenhuma). `null`: o diálogo mostra o erro na própria tela — o 409 da
-   * política vira o aviso do «mesmo assim» — e o toast não sai.
+   * Failure toast, built from the server message (`undefined` when none
+   * came). `null`: the dialog shows the error on its own screen — the policy 409
+   * becomes the "anyway" warning — and no toast goes out.
    */
   erro: (mensagem: string | undefined, erro: ErroDaAcao) => TextoDeToast | null
-  /** Depois do sucesso, com o diálogo já fechado — tipicamente recarregar a lista. */
+  /** After success, with the dialog already closed — typically reloading the list. */
   aoConcluir?: (dados: R) => void
 }
 
 export interface AcaoDeDialogo {
   aberto: boolean
-  /** Abrir/fechar. Fechar no meio da ação é ignorado — a mesma trava do `bloqueado`. */
+  /** Open/close. Closing in the middle of the action is ignored — the same lock as `bloqueado`. */
   setAberto: (aberto: boolean) => void
-  /** A ação está em voo: é o `bloqueado` do DialogContent e o `disabled` dos botões. */
+  /** The action is in flight: it is the DialogContent's `bloqueado` and the buttons' `disabled`. */
   executando: boolean
   /**
-   * Roda a ação. Chamada de novo enquanto ela está em voo — o Enter do campo e
-   * o clique do botão, o Enter repetido — devolve a MESMA ação, sem chamar o
-   * serviço outra vez. Resolve depois do toast e do `aoConcluir`.
+   * Runs the action. Called again while it is in flight — the field's Enter and
+   * the button's click, a repeated Enter — it returns the SAME action, without
+   * calling the service again. Resolves after the toast and `aoConcluir`.
    */
   executar: () => Promise<void>
 }
 
 /**
- * O ciclo de um diálogo de ação: aberto → executando → toast → fecha →
- * `aoConcluir`. Os diálogos de Admin › Usuários, de Executores e da lixeira de
- * workspaces repetiam isso cada um com o seu `[open, loading]`, e a cópia
- * divergiu onde doía: o campo chamava a mesma função do botão no Enter, a
- * função não olhava o `loading` — só o botão, por estar `disabled`, ficava
- * protegido —, e Enter duas vezes numa ação lenta disparava a chamada duas
- * vezes. Aqui Enter e clique passam pelo mesmo `executar`, e a guarda vale
- * para os dois.
+ * The lifecycle of an action dialog: open → running → toast → close →
+ * `aoConcluir`. The dialogs of Admin › Users, Executors and the workspace trash
+ * each repeated this with their own `[open, loading]`, and the copies diverged
+ * where it hurt: the field called the same function as the button on Enter,
+ * the function did not look at `loading` — only the button, being `disabled`,
+ * was protected —, and pressing Enter twice on a slow action fired the call
+ * twice. Here Enter and click go through the same `executar`, and the guard
+ * applies to both.
  */
 export function useAcaoDeDialogo<R = unknown>(
   fn: () => Promise<RespostaDaAcao<R>>,
@@ -61,12 +61,12 @@ export function useAcaoDeDialogo<R = unknown>(
 ): AcaoDeDialogo {
   const [aberto, setAbertoState] = useState(false)
   const [executando, setExecutando] = useState(false)
-  // Ref e não só estado: o segundo Enter pode chegar antes de o React desenhar
-  // o "executando" — a guarda tem de valer já no mesmo tique.
+  // A ref and not just state: the second Enter can arrive before React draws
+  // the "running" state — the guard has to hold already within the same tick.
   const emVoo = useRef<Promise<void> | null>(null)
 
-  // Lidos de refs para `executar` ter identidade constante; o valor que vale é
-  // o do render em que a ação foi CONFIRMADA (ver `executar`).
+  // Read from refs so `executar` has a constant identity; the value that counts
+  // is the one from the render in which the action was CONFIRMED (see `executar`).
   const fnRef = useRef(fn)
   const opcoesRef = useRef(opcoes)
   fnRef.current = fn
@@ -79,8 +79,8 @@ export function useAcaoDeDialogo<R = unknown>(
 
   const executar = useCallback(() => {
     if (emVoo.current) return emVoo.current
-    // A ação e os textos de QUANDO se confirmou: mexer no formulário durante a
-    // espera não muda o que foi enviado nem o que o toast vai dizer.
+    // The action and the texts from WHEN it was confirmed: touching the form
+    // during the wait changes neither what was sent nor what the toast will say.
     const acao = fnRef.current
     const { sucesso, erro, aoConcluir } = opcoesRef.current
     setExecutando(true)

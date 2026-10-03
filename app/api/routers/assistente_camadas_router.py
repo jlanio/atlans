@@ -1,16 +1,16 @@
 # app/api/routers/assistente_camadas_router.py
-"""Camadas do globo da Home (superficie `home`), com portao de MEMBRO.
+"""Layers of the Home globe (`home` surface), with a MEMBER gate.
 
-Duas rotas, ambas JWT + membro do workspace do recurso (nunca o portao de
-portal, que exige publicacao/allowlist):
+Two routes, both JWT + member of the resource's workspace (never the portal
+gate, which requires publication/allowlist):
 
-- `GET /assistente/camadas/{artifact_id}` — o que a Home precisa para por uma saida
-  de execucao no globo (geojson por URL assinada, mvt por tiles, ou indisponivel
-  com o motivo). Limiter proprio de 60/min: o teto de 10/min do download publico
-  (`artifacts_router`) estrangularia um globo com varias camadas.
-- `GET /assistente/tiles/{workflow_hash}/{layer_key}/{z}/{x}/{y}.pbf` — os tiles
-  vetoriais de uma camada publicada, servidos ao MEMBRO (o portal so serve
-  publicado/compartilhado). Reusa a query `ST_AsMVT` do portal (`tile_mvt`).
+- `GET /assistente/camadas/{artifact_id}` — what Home needs to put a run output
+  on the globe (geojson via signed URL, mvt via tiles, or unavailable with
+  the reason). Its own limiter of 60/min: the 10/min ceiling of the public download
+  (`artifacts_router`) would strangle a globe with several layers.
+- `GET /assistente/tiles/{workflow_hash}/{layer_key}/{z}/{x}/{y}.pbf` — the vector
+  tiles of a published layer, served to the MEMBER (the portal only serves
+  published/shared ones). Reuses the portal's `ST_AsMVT` query (`tile_mvt`).
 """
 from typing import List, Optional
 
@@ -32,18 +32,18 @@ from app.schemas.assistente import CamadaDoGlobo
 
 router = APIRouter(prefix="/assistente", tags=["assistente"])
 
-# Prazo do link pre-assinado do GeoJSON. Igual ao das tools de acervo: curto,
-# porque a web faz o fetch na hora e guarda a FeatureCollection em memoria.
+# Expiry of the GeoJSON's pre-signed link. Same as the collection tools': short,
+# because the web app fetches it right away and keeps the FeatureCollection in memory.
 VALIDADE_DO_LINK_S = 900
 
 
 def _e_4326(crs: Optional[str]) -> bool:
-    """O CRS e WGS84? Aceita as formas que o pipeline grava ("EPSG:4326", "4326").
+    """Is the CRS WGS84? Accepts the forms the pipeline writes ("EPSG:4326", "4326").
 
-    Só o 4326 vai para o globo: o MapLibre coloca coordenadas como lon/lat, e uma
-    FeatureCollection em CRS nativo apareceria no lugar errado. CRS ausente conta
-    como 4326 — é o default do GeoJSON e o que o pipeline produz salvo escolha
-    explícita.
+    Only 4326 goes to the globe: MapLibre places coordinates as lon/lat, and a
+    FeatureCollection in a native CRS would show up in the wrong place. A missing CRS
+    counts as 4326 — it is the GeoJSON default and what the pipeline produces unless
+    explicitly chosen otherwise.
     """
     if not crs:
         return True
@@ -51,11 +51,11 @@ def _e_4326(crs: Optional[str]) -> bool:
 
 
 def _chave_da_camada(filename: Optional[str]) -> Optional[str]:
-    """O `layer_key` que ESTE artefato teria, a partir do nome do arquivo.
+    """The `layer_key` THIS artifact would have, derived from the file name.
 
-    Mesma normalizacao de `portal_router._publicar` (que reescreve o `layer_key`
-    recebido antes de gravar), para as duas pontas concordarem mesmo quando o
-    titulo da camada tinha caractere fora de [a-z0-9-_].
+    Same normalization as `portal_router._publicar` (which rewrites the received
+    `layer_key` before saving), so both ends agree even when the layer
+    title had characters outside [a-z0-9-_].
     """
     if not filename:
         return None
@@ -66,25 +66,25 @@ def _chave_da_camada(filename: Optional[str]) -> Optional[str]:
 
 
 async def _camada_publicada(db: AsyncSession, art: Artifact):
-    """A `PortalLayer` DESTE artefato, ou None quando nao da para saber qual e.
+    """THIS artifact's `PortalLayer`, or None when there is no way to tell which one it is.
 
-    O recorte e sempre o RUN do artefato. `portal_router._publicar` faz UPSERT em
-    `(workflow_hash, layer_key)` e reescreve a linha no lugar (geojson, bbox,
-    geometry_type, run_id): a linha reflete SEMPRE a ultima publicacao daquela
-    chave. Casar so por `(workflow_hash, layer_key)` fazia o artefato da execucao
-    #1 servir os tiles e a bbox da execucao #5, rotulados como o artefato antigo.
+    The slice is always the artifact's RUN. `portal_router._publicar` UPSERTs on
+    `(workflow_hash, layer_key)` and rewrites the row in place (geojson, bbox,
+    geometry_type, run_id): the row ALWAYS reflects the latest publication of that
+    key. Matching only on `(workflow_hash, layer_key)` made the artifact of run
+    #1 serve the tiles and bbox of run #5, labeled as the old artifact.
 
-    Dentro do run, o `layer_key` derivado do nome do arquivo e o desempate — um
-    fluxo com dois nos PublishMap na mesma execucao produz DUAS linhas do mesmo
-    run, e escolher "a primeira" entregava a camada do outro no. Sem chave que
-    case, aceita a camada do run so quando ela e UNICA; havendo empate, devolve
-    None em vez de escolher em silencio.
+    Within the run, the `layer_key` derived from the file name is the tiebreaker — a
+    workflow with two PublishMap nodes in the same run produces TWO rows of the same
+    run, and picking "the first" delivered the other node's layer. With no matching
+    key, it accepts the run's layer only when it is UNIQUE; on a tie, it returns
+    None instead of choosing silently.
 
-    None manda o artefato para o ramo GeoJSON (o dado daquele run, correto) ou
-    para `indisponivel`.
+    None sends the artifact to the GeoJSON branch (that run's data, correct) or
+    to `indisponivel`.
     """
     if not art.run_id:
-        # Sem run nao ha como saber se a linha publicada e deste artefato.
+        # Without a run there is no way to know whether the published row is this artifact's.
         return None
 
     colunas = (PortalLayer.layer_key, PortalLayer.bbox, PortalLayer.geometry_type)
@@ -128,14 +128,14 @@ async def camada_do_globo(
     ).scalar_one_or_none()
     if art is None:
         raise HTTPException(status_code=404, detail="Artefato nao encontrado.")
-    # Portao de MEMBRO: 403 se o artefato nao e de nenhum workspace do usuario.
+    # MEMBER gate: 403 if the artifact belongs to none of the user's workspaces.
     verify_workspace_access(art.workspace_id, workspace_ids)
 
-    # Metricas espaciais ja calculadas na execucao (bbox/crs/geometry_type), sem
-    # recalculo. A chave e (run_id, node_id) — UMA linha por NO, nao por saida —,
-    # e o coletor sobrescreve `spatial` a cada saida do no: num no multi-saida o
-    # que sobra e o metadado da ULTIMA GeoDataFrame iterada, que pode nao ser
-    # deste artefato.
+    # Spatial metrics already computed during the run (bbox/crs/geometry_type), with no
+    # recomputation. The key is (run_id, node_id) — ONE row per NODE, not per output —,
+    # and the collector overwrites `spatial` on each of the node's outputs: on a
+    # multi-output node what remains is the metadata of the LAST GeoDataFrame iterated,
+    # which may not be this artifact's.
     metrics = None
     saidas_do_no = 0
     if art.run_id and art.node_id:
@@ -163,11 +163,11 @@ async def camada_do_globo(
             or 0
         )
 
-    # Com mais de uma saida no no, `bbox` e `geometry_type` sao ambiguos: enquadrar
-    # a extensao de outra camada ou rotular a geometria errada e pior que nao
-    # enquadrar e nao rotular. O `crs`, ao contrario, e MANTIDO: ele so serve a
-    # guarda do passo 2, e errar para o lado de recusar uma camada e mais seguro
-    # que desenha-la no lugar errado.
+    # With more than one output on the node, `bbox` and `geometry_type` are ambiguous:
+    # framing another layer's extent or labeling the wrong geometry is worse than not
+    # framing and not labeling. The `crs`, on the other hand, is KEPT: it only serves
+    # the guard in step 2, and erring on the side of refusing a layer is safer
+    # than drawing it in the wrong place.
     ambiguo = saidas_do_no > 1
     geometry_type = metrics.geometry_type if metrics and not ambiguo else None
     crs = metrics.crs if metrics else None
@@ -182,36 +182,37 @@ async def camada_do_globo(
         size_bytes=art.size_bytes,
         geometry_type=geometry_type,
         crs=crs,
-        # `bbox` so acompanha quando confiavel (4326); senao a web nao enquadra.
+        # `bbox` only comes along when reliable (4326); otherwise the web app does not frame.
         bbox=bbox if _e_4326(crs) else None,
         workflow_id=art.workflow_hash,
         run_id=art.run_id,
         expires_at=art.expires_at,
-        # As duas condicoes que `_url_de_download` (artifacts_router) impoe, nesta
-        # ordem: `content_location == "executor"` e recusado com 409 (a marcacao
-        # `keepLocal` proibe o servidor de buscar o conteudo) e sem `s3_key` nao
-        # ha objeto no storage (404). Calcular aqui poupa a web de descobrir por
-        # tentativa e erro — e e o que deixa o botao de baixar SUMIR em vez de
-        # falhar no clique.
+        # The two conditions `_url_de_download` (artifacts_router) imposes, in this
+        # order: `content_location == "executor"` is refused with 409 (the `keepLocal`
+        # flag forbids the server from fetching the content) and without `s3_key` there
+        # is no object in storage (404). Computing it here spares the web app from
+        # finding out by trial and error — and it is what makes the download button
+        # DISAPPEAR instead of failing on click.
         baixavel=art.content_location != "executor" and bool(art.s3_key),
     )
 
     def indisponivel(hint: str) -> CamadaDoGlobo:
         return CamadaDoGlobo(tipo="indisponivel", available=False, hint=hint, **base)
 
-    # 1) Publicada no portal (PublishMap): tiles vetoriais servidos ao membro.
-    #    Casada por (workflow_hash, RUN do artefato) e, dentro do run, pelo
-    #    LAYER_KEY: a linha de `portal_layers` e reescrita in place a cada
-    #    publicacao da mesma chave, entao ela so descreve este artefato quando o
-    #    `run_id` dela ainda e o dele; e um fluxo com dois nos PublishMap na mesma
-    #    execucao produz DUAS linhas do mesmo run, onde "a primeira" entregava a
-    #    camada do outro no — a pessoa pedia "rios" e recebia "municipios".
-    #    O discriminador existe: o artefato grava `filename = f"{safe_key}.geojson"`
-    #    e a publicacao usa o mesmo `safe_key` como `layer_key`
+    # 1) Published on the portal (PublishMap): vector tiles served to the member.
+    #    Matched by (workflow_hash, the artifact's RUN) and, within the run, by the
+    #    LAYER_KEY: the `portal_layers` row is rewritten in place on each
+    #    publication of the same key, so it only describes this artifact while
+    #    its `run_id` is still the artifact's; and a workflow with two PublishMap
+    #    nodes in the same run produces TWO rows of the same run, where "the first"
+    #    delivered the other node's layer — the person asked for "rios" (rivers) and
+    #    got "municipios" (municipalities).
+    #    The discriminator exists: the artifact writes `filename = f"{safe_key}.geojson"`
+    #    and the publication uses the same `safe_key` as `layer_key`
     #    (flow/nodes/outputs/publish_map.py, app/api/routers/portal_router.py).
-    #    Vem ANTES da guarda de CRS: o portal forca 4326 (`ST_SetSRID(...,4326)`)
-    #    ao publicar, entao a camada publicada e sempre 4326, qualquer que seja o
-    #    CRS que as metricas do no de origem registraram.
+    #    It comes BEFORE the CRS guard: the portal forces 4326 (`ST_SetSRID(...,4326)`)
+    #    when publishing, so the published layer is always 4326, whatever
+    #    CRS the source node's metrics recorded.
     if art.is_published and art.workflow_hash:
         camada_pub = await _camada_publicada(db, art)
         if camada_pub is not None:
@@ -221,16 +222,16 @@ async def camada_do_globo(
                     "tipo": "mvt",
                     "available": True,
                     "mvt": {"workflow_id": art.workflow_hash, "layer_key": camada_pub.layer_key},
-                    # bbox do PortalLayer e sempre 4326 (forcado na publicacao).
+                    # The PortalLayer bbox is always 4326 (forced at publication).
                     "bbox": camada_pub.bbox,
                     "geometry_type": camada_pub.geometry_type or geometry_type,
                 }
             )
 
-    # 2) GeoJSON no storage: URL pre-assinada, a web faz fetch e guarda em memoria.
-    #    A guarda de CRS mora AQUI: a web le as coordenadas cruas da
-    #    FeatureCollection, e o MapLibre as trata como lon/lat — CRS != 4326
-    #    apareceria no lugar errado, e a v1 nao reprojeta.
+    # 2) GeoJSON in storage: pre-signed URL, the web app fetches it and keeps it in memory.
+    #    The CRS guard lives HERE: the web app reads the raw coordinates of the
+    #    FeatureCollection, and MapLibre treats them as lon/lat — CRS != 4326
+    #    would show up in the wrong place, and v1 does not reproject.
     if art.format == "geojson" and art.content_location != "executor" and art.s3_key:
         if not _e_4326(crs):
             return indisponivel(
@@ -250,7 +251,7 @@ async def camada_do_globo(
             }
         )
 
-    # 3) Sem previa: o motivo mais especifico que couber.
+    # 3) No preview: the most specific reason that applies.
     if art.content_location == "executor":
         return indisponivel(
             "o conteudo desta camada permanece no executor e nunca foi enviado para a "
@@ -267,11 +268,11 @@ async def camada_do_globo(
     "/tiles/{workflow_hash}/{layer_key}/{z}/{x}/{y}.pbf",
     summary="Tile MVT de uma camada publicada, com portao de membro",
 )
-# Teto proprio, e mais alto que os 60/min da irma porque a unidade e outra: um
-# unico pan do globo pede dezenas de tiles, e cada tile custa um ciclo do route
-# handler do Next (`/terra`, com decode de sessao), o SELECT do portao e um
-# `ST_AsMVT`. 600/min deixa o uso normal passar e ainda poe um teto — antes esta
-# era a UNICA rota nova sem limiter nenhum.
+# Its own ceiling, higher than its sibling's 60/min because the unit is different: a
+# single pan of the globe requests dozens of tiles, and each tile costs one cycle of
+# the Next route handler (`/terra`, with session decoding), the gate's SELECT and an
+# `ST_AsMVT`. 600/min lets normal use through and still sets a ceiling — before, this
+# was the ONLY new route with no limiter at all.
 @limiter.limit("600/minute")
 async def tile_do_membro(
     workflow_hash: str,
@@ -284,16 +285,16 @@ async def tile_do_membro(
     _user=Depends(get_current_user),
     workspace_ids: List[str] = Depends(get_user_workspace_ids),
 ):
-    """Mesma consulta do tile do portal, com portao de MEMBRO no lugar do de
-    portal: o dono ve as proprias camadas no globo sem publicar para o mundo.
-    404 uniforme quando o fluxo nao existe, foi apagado, nao e do usuario, ou nao
-    tem a camada — nunca revela qual dos quatro.
+    """Same query as the portal tile, with a MEMBER gate instead of the portal
+    one: the owner sees their own layers on the globe without publishing to the world.
+    Uniform 404 when the workflow does not exist, was deleted, is not the user's, or
+    does not have the layer — never reveals which of the four.
 
-    `deleted_at IS NULL` na consulta: o soft delete tambem nao apaga o
-    `PortalLayer`, entao sem este filtro quem tivesse (ou reconstruisse) a URL
-    continuava recebendo as geometrias de um fluxo apagado, indefinidamente. NAO
-    se filtra por `flag_ative` — diferente do portal publico: um fluxo pausado
-    nao e um fluxo apagado, e o membro segue vendo no globo o que ja existe."""
+    `deleted_at IS NULL` in the query: the soft delete does not delete the
+    `PortalLayer` either, so without this filter whoever had (or reconstructed) the URL
+    kept receiving the geometries of a deleted workflow, indefinitely. It does NOT
+    filter by `flag_ative` — unlike the public portal: a paused workflow
+    is not a deleted workflow, and the member keeps seeing on the globe what already exists."""
     gate = (
         await db.execute(
             select(Workflow.workspace_id, PortalLayer.id.label("layer_id"))
@@ -307,15 +308,15 @@ async def tile_do_membro(
         )
     ).first()
 
-    # 404 uniforme: fluxo inexistente, alheio, ou sem a camada. Nao distingue.
+    # Uniform 404: nonexistent workflow, someone else's, or without the layer. Does not distinguish.
     if gate is None or gate.workspace_id not in workspace_ids or gate.layer_id is None:
         raise HTTPException(status_code=404, detail="Camada nao encontrada.")
 
     tile_data = await tile_mvt(db, layer_id=gate.layer_id, layer_key=layer_key, z=z, x=x, y=y)
     if not tile_data:
         return Response(content=b"", status_code=204)
-    # `private`, NAO `public` como o portal: um tile de camada nao-publicada nao
-    # pode ficar em cache compartilhado. E SEM `Access-Control-Allow-Origin: *`.
+    # `private`, NOT `public` like the portal: a tile of an unpublished layer must not
+    # sit in a shared cache. And WITHOUT `Access-Control-Allow-Origin: *`.
     return Response(
         content=tile_data,
         media_type="application/x-protobuf",

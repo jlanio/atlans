@@ -5,17 +5,17 @@ import { Skeleton } from "@/app/components/ui/skeleton"
 import * as Estado from "@/app/components/shared/estados"
 
 /**
- * Estados da tela de Tokens de acesso (contrato padrao-telas.md §3):
- * carregando, erro de carga e primeiro uso. Não há busca nem filtro aqui, então
- * não existe o «sem resultado». Aqui ficam o skeleton e as frases da tela; a
- * moldura de cada estado é a de `shared/estados.tsx`.
+ * States of the Access tokens screen (contract screen-patterns.md §3):
+ * loading, load error and first use. There is no search or filter here, so
+ * the "no results" state doesn't exist. This holds the skeleton and the screen's
+ * sentences; the frame of each state is the one from `shared/estados.tsx`.
  */
 
 /**
- * Primeira carga: o cabeçalho real fica por cima (o `index` sempre o renderiza,
- * com o subtítulo em esqueleto), e aqui vai o desenho das linhas — com a altura
- * do cartão de verdade (nome, prefixo e a linha de escopos), para a troca não
- * pular.
+ * First load: the real header stays on top (`index` always renders it, with the
+ * subtitle as a skeleton), and here goes the drawing of the rows — with the
+ * height of the real card (name, prefix and the scopes line), so the swap
+ * doesn't jump.
  */
 export function SkeletonDeTokens() {
   return (
@@ -31,8 +31,8 @@ export function SkeletonDeTokens() {
 }
 
 /**
- * Mais alta no telefone: ali o EntityCard empilha o botão «Revogar» numa
- * segunda linha, e um esqueleto baixo encolhia a lista quando os dados chegavam.
+ * Taller on the phone: there the EntityCard stacks the "Revogar" button on a
+ * second line, and a short skeleton shrank the list when the data arrived.
  */
 function LinhaFantasma() {
   return (
@@ -56,9 +56,10 @@ function LinhaFantasma() {
 }
 
 /**
- * A listagem caiu na 1ª carga. Só toma a tela quando nunca houve carga aceita —
- * recarga que falha sobre lista pronta mantém o que havia e avisa por toast
- * (ver `index`). `mensagem` é a do servidor; sem ela, a orientação de sempre.
+ * The listing failed on the 1st load. It only takes over the screen when there
+ * was never an accepted load — a reload that fails over a ready list keeps what
+ * was there and warns via toast (see `index`). `mensagem` is the server's;
+ * without it, the usual guidance.
  */
 export function ErroDeCarga({ mensagem, onTentar }: { mensagem?: string | null; onTentar: () => void }) {
   return (
@@ -71,9 +72,9 @@ export function ErroDeCarga({ mensagem, onTentar }: { mensagem?: string | null; 
 }
 
 /**
- * Sem nenhum token: a tela ensina o que é um token e que ele herda as
- * permissões da conta. Criar é uma ação pessoal — todo mundo pode, então o CTA
- * é incondicional (não há «peça a um editor» aqui).
+ * No tokens at all: the screen teaches what a token is and that it inherits the
+ * account's permissions. Creating is a personal action — everyone can, so the CTA
+ * is unconditional (there's no "peça a um editor" here).
  */
 export function VazioPrimeiroUso({ onCriar }: { onCriar: () => void }) {
   return (

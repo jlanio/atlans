@@ -2,11 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 
 /**
- * No telefone o <Sidebar> vira um <Sheet> portado para o <body>. Quem pinta o
- * painel lá é o SheetContent — e ele precisa receber o `className` do
- * <Sidebar>, senão uma barra temática (a da Home, `home dark`) declara a paleta
- * só nos filhos: texto quase branco sobre o `--sidebar` do tema do app, que no
- * tema claro é quase branco também.
+ * On the phone the <Sidebar> becomes a <Sheet> portaled to <body>. What paints
+ * the panel there is the SheetContent — and it needs to receive the <Sidebar>'s
+ * `className`, otherwise a themed bar (Home's, `home dark`) declares the palette
+ * only on the children: near-white text over the app theme's `--sidebar`, which
+ * in the light theme is near-white too.
  */
 
 beforeAll(() => {
@@ -53,10 +53,10 @@ describe("Sidebar no telefone", () => {
     fireEvent.click(screen.getByText("abrir"))
     const painel = painelDoSheet()
     expect(painel).toBeTruthy()
-    // A paleta da Home tem de chegar ao elemento que pinta o fundo.
+    // Home's palette has to reach the element that paints the background.
     expect(painel!.className).toContain("home")
     expect(painel!.className).toContain("dark")
-    // …sem perder o que o próprio Sheet já trazia.
+    // …without losing what the Sheet itself already brought.
     expect(painel!.className).toContain("bg-sidebar")
   })
 

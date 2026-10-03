@@ -14,9 +14,9 @@ import { nomeDoTipo } from "@/consts/NodeTypeStyles"
 const WorkflowDrawer = () => {
   const drawerAddNodes = useWorkflowCatalogStore(s => s.nodesDrawerState)
   const [filter, setFilter] = useState("")
-  // Só interessa se o canvas está vazio. Assinar `useNodes()` re-renderizava o
-  // drawer inteiro a cada pointermove de um arraste — e ele fica sempre montado,
-  // apenas transladado para fora da tela, então o custo era invisível.
+  // All that matters is whether the canvas is empty. Subscribing to `useNodes()`
+  // re-rendered the whole drawer on every pointermove of a drag — and it is
+  // always mounted, just translated off screen, so the cost was invisible.
   const canvasVazio = useStore(s => s.nodeLookup.size === 0)
   const isOpen = drawerAddNodes !== "closed"
 

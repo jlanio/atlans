@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 
 /**
- * A borda da barra lateral. Ela SEMPRE mostrou `cursor-w-resize` e só sabia
- * RECOLHER — quem arrastava para ler o nome inteiro de um artefato via a barra
- * fechar. Agora ela redimensiona quando expandida, e segue expandindo quando
- * recolhida, que é o único caminho de volta do trilho de 3rem por ali.
+ * The sidebar's edge. It ALWAYS showed `cursor-w-resize` and could only
+ * COLLAPSE — whoever dragged it to read an artifact's full name saw the bar
+ * close. Now it resizes when expanded, and keeps expanding when collapsed,
+ * which is the only way back from the 3rem rail through there.
  */
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: () => false }))
 
@@ -31,7 +31,7 @@ function montar({ aberta = true, defaultWidth = SIDEBAR_WIDTH_PADRAO } = {}) {
 }
 const largura = () => Number(screen.getByTestId("largura").textContent)
 const separador = () => screen.getByRole("separator", { name: /redimensionar/i })
-/** A largura VIVA, que o arrasto escreve direto no CSS sem passar pelo React. */
+/** The LIVE width, which the drag writes straight into the CSS without going through React. */
 const larguraNoCss = () =>
   document.querySelector<HTMLElement>('[data-slot="sidebar-wrapper"]')!.style.getPropertyValue("--sidebar-width")
 
@@ -65,7 +65,7 @@ describe("SidebarRail — expandida, é um separador", () => {
     expect(sep.getAttribute("aria-valuenow")).toBe(String(SIDEBAR_WIDTH_PADRAO))
     expect(sep.getAttribute("aria-valuemin")).toBe(String(SIDEBAR_WIDTH_MIN))
     expect(sep.getAttribute("aria-valuemax")).toBe(String(SIDEBAR_WIDTH_MAX))
-    // Alcançável por Tab: sem isto, redimensionar seria só para quem tem mouse.
+    // Reachable by Tab: without this, resizing would be mouse-only.
     expect(sep.getAttribute("tabindex")).toBe("0")
   })
 
@@ -78,10 +78,10 @@ describe("SidebarRail — expandida, é um separador", () => {
     expect(larguraNoCss()).toBe("340px")
 
     fireEvent.pointerUp(sep, { pointerId: 1 })
-    expect(largura()).toBe(340)          // só agora o estado recebe
+    expect(largura()).toBe(340)          // only now does the state receive it
 
     fireEvent.pointerMove(sep, { clientX: 200, pointerId: 1 })
-    expect(larguraNoCss()).toBe("340px") // solto, o movimento não conta mais
+    expect(larguraNoCss()).toBe("340px") // released, the movement no longer counts
   })
 
   it("o arrasto respeita os limites", () => {
@@ -97,9 +97,9 @@ describe("SidebarRail — expandida, é um separador", () => {
   })
 
   it("um gesto inteiro custa UM render e UM cookie, não um por quadro", () => {
-    // Antes eram 60 e 60 por segundo de arrasto, com nove consumidores de
-    // `useSidebar` (a lista virtualizada de Artefatos entre eles) re-renderizando
-    // junto e uma escrita SÍNCRONA em `document.cookie` a cada quadro.
+    // It used to be 60 and 60 per second of dragging, with nine `useSidebar`
+    // consumers (the virtualized Artifacts list among them) re-rendering along
+    // and a SYNCHRONOUS write to `document.cookie` on every frame.
     let escritas = 0
     Object.defineProperty(document, "cookie", {
       configurable: true, get: () => "", set: () => { escritas++ },
@@ -110,7 +110,7 @@ describe("SidebarRail — expandida, é um separador", () => {
     const antes = renders
     escritas = 0
     for (let i = 0; i < 60; i++) fireEvent.pointerMove(sep, { clientX: 200 + i * 3, pointerId: 1 })
-    expect(renders - antes).toBe(0)      // o gesto não passa pelo React
+    expect(renders - antes).toBe(0)      // the gesture doesn't go through React
     expect(escritas).toBe(0)
 
     fireEvent.pointerUp(sep, { pointerId: 1 })
@@ -138,16 +138,17 @@ describe("SidebarRail — expandida, é um separador", () => {
   })
 
   it("a transição para de animar nos DOIS divs — o que anda e o que empurra", () => {
-    // O `sidebar-gap` reserva o espaço e empurra o <main>; o separador NÃO vive
-    // dentro dele (é irmão), então uma regra `has-…` ancorada no próprio gap
-    // nunca casaria e o conteúdo ficaria 200ms atrás da borda no arrasto.
+    // `sidebar-gap` reserves the space and pushes <main>; the separator does NOT
+    // live inside it (it's a sibling), so a `has-…` rule anchored on the gap
+    // itself would never match and the content would lag 200ms behind the edge
+    // during the drag.
     montar()
     const gap = document.querySelector<HTMLElement>('[data-slot="sidebar-gap"]')!
     const container = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]')!
     const grupo = document.querySelector<HTMLElement>('[data-slot="sidebar"]')!
     const sep = separador()
 
-    expect(gap.contains(sep)).toBe(false)          // a razão de ancorar no grupo
+    expect(gap.contains(sep)).toBe(false)          // the reason for anchoring on the group
     expect(container.contains(sep)).toBe(true)
     expect(grupo.contains(gap) && grupo.contains(sep)).toBe(true)
     for (const el of [gap, container]) {
@@ -163,7 +164,7 @@ describe("SidebarRail — expandida, é um separador", () => {
   })
 
   it("a largura vai para o cookie — é o servidor que a lê no F5", () => {
-    // Pelo teclado a escrita é imediata: o gesto é discreto, não contínuo.
+    // From the keyboard the write is immediate: the gesture is discrete, not continuous.
     montar()
     fireEvent.keyDown(separador(), { key: "End" })
     expect(document.cookie).toContain(`sidebar_width=${SIDEBAR_WIDTH_MAX}`)
@@ -188,8 +189,8 @@ describe("SidebarRail — recolhida, continua o botão que expande", () => {
 
 
 describe("os rótulos: o português da administração por padrão, os da Home quando passados", () => {
-  // A Home traduzida passa os textos do idioma dela; o resto do app (editor,
-  // projetos, admin) segue em português — e é o padrão que isto tranca.
+  // The translated Home passes the texts in its language; the rest of the app
+  // (editor, projects, admin) stays in Portuguese — and that is the default this locks.
   it("sem textos, o trilho e o gatilho falam o português de sempre", () => {
     montar({ aberta: true })
     expect(separador().getAttribute("aria-label")).toBe("Redimensionar a barra lateral")

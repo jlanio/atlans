@@ -1,27 +1,28 @@
 # app/core/fontes_catalogo.py
 """
-Catálogo de fontes: a semente entra no arranque e os endpoints são verificados
-por período.
+Source catalog: the seed is loaded at startup and the endpoints are verified
+periodically.
 
-Duas tarefas de fundo do lifespan da API (o lock e o laço são os de
+Two background tasks of the API lifespan (the lock and the loop are those of
 `app/core/tarefas_periodicas.py`):
 
-- `importar_catalogo_no_arranque()` roda UMA vez na subida: lê
-  `FONTES_CATALOGO_DIR` (a cópia versionada do Vault, `catalogo/geoservicos`)
-  e importa as camadas como fontes da plataforma. É idempotente por hash —
-  com a pasta igual à da última subida custa uma consulta e zero escritas.
-  Lock NX no Redis para que só um worker uvicorn importe; os outros só
-  carregam os sinônimos (`_sinonimos.md`), que vivem na memória de cada
-  processo. Depois, uma verificação inicial só do que está pendente (nunca
-  verificado ou vencido), para a semente nascer com `estado` preenchido.
-- `run_verificacao_loop()` repete a verificação a cada
-  `FONTES_VERIFICACAO_INTERVAL` segundos. 0 desliga as duas — nenhuma
-  sondagem parte do servidor por conta própria.
+- `importar_catalogo_no_arranque()` runs ONCE at startup: reads
+  `FONTES_CATALOGO_DIR` (the versioned copy of the Vault, `catalogo/geoservicos`)
+  and imports the layers as platform sources. It is idempotent by hash —
+  with the folder unchanged since the last startup it costs one query and zero
+  writes. NX lock in Redis so that only one uvicorn worker imports; the others
+  only load the synonyms (`_sinonimos.md`), which live in each process's
+  memory. Then, an initial verification of only what is pending (never
+  verified or stale), so the seed is born with `estado` filled in.
+- `run_verificacao_loop()` repeats the verification every
+  `FONTES_VERIFICACAO_INTERVAL` seconds. 0 turns both off — no probing
+  leaves the server on its own.
 
-A verificação é POR ENDPOINT: um GetCapabilities por URL distinta marca todas
-as camadas daquela URL (77 pedidos para 25 mil linhas na semente), no máximo
-`_PARALELISMO` em paralelo e com uma pausa dispersa entre eles, para não parecer
-varredura a quem hospeda o serviço. Falha de um endpoint não para a rodada.
+Verification is PER ENDPOINT: one GetCapabilities per distinct URL marks all
+the layers of that URL (77 requests for 25 thousand rows in the seed), at most
+`_PARALELISMO` in parallel and with a jittered pause between them, so as not to
+look like a scan to whoever hosts the service. One endpoint's failure does not
+stop the round.
 """
 import asyncio
 from dataclasses import dataclass
@@ -39,16 +40,16 @@ from flow.utils.backoff import com_jitter
 
 logger = get_logger(__name__)
 
-# Redis fora: as duas rotinas prosseguem SEM lock — são idempotentes, então o
-# pior caso é trabalho repetido, não dado errado.
+# Redis down: both routines proceed WITHOUT a lock — they are idempotent, so the
+# worst case is repeated work, not wrong data.
 _LOCK_IMPORTACAO = "fontes_catalogo:lock"
 _LOCK_VERIFICACAO = "fontes_verificacao:lock"
 _TTL_LOCK_IMPORTACAO_S = 600
-# A API sobe com o banco vazio e o guia manda migrar DEPOIS (`alembic upgrade
-# head`): a importação espera a tabela do catálogo aparecer, até este tanto.
+# The API starts with an empty database and the guide says to migrate AFTERWARDS
+# (`alembic upgrade head`): the import waits for the catalog table to appear, up to this long.
 _ESPERA_PELO_SCHEMA_S = 600
 _INTERVALO_DA_ESPERA_S = 5
-# Endpoints sondados ao mesmo tempo e a pausa (com jitter) antes de cada um.
+# Endpoints probed at the same time and the pause (with jitter) before each one.
 _PARALELISMO = 2
 _PAUSA_ENTRE_ENDPOINTS_S = 1.0
 
@@ -58,8 +59,8 @@ class ResumoDaRodada:
     endpoints: int = 0
     ok: int = 0         # camadas marcadas `ok`
     falhando: int = 0   # camadas marcadas `falhando`
-    fora: int = 0       # endpoints que não responderam ao GetCapabilities
-    erros: int = 0      # exceções inesperadas (banco, bug) — a rodada segue
+    fora: int = 0       # endpoints that did not answer GetCapabilities
+    erros: int = 0      # unexpected exceptions (database, bug) — the round goes on
 
     def como_texto(self) -> str:
         return (
@@ -69,11 +70,11 @@ class ResumoDaRodada:
 
 
 async def verificar_endpoints(*, apenas_pendentes: bool = False) -> ResumoDaRodada:
-    """Uma rodada: um GetCapabilities por URL distinta, `_PARALELISMO` por vez.
+    """One round: one GetCapabilities per distinct URL, `_PARALELISMO` at a time.
 
-    `apenas_pendentes`: só as URLs com alguma camada nunca verificada ou mais
-    velha que o intervalo. Cada endpoint tem a própria sessão de banco — um
-    que falhe (rede ou banco) não derruba os outros.
+    `apenas_pendentes`: only the URLs with some layer never verified or older
+    than the interval. Each endpoint has its own database session — one that
+    fails (network or database) does not bring down the others.
     """
     resumo = ResumoDaRodada()
     async with AsyncSessionLocal() as db:
@@ -110,7 +111,7 @@ async def verificar_endpoints(*, apenas_pendentes: bool = False) -> ResumoDaRoda
 
 
 async def _schema_pronto() -> bool:
-    """A tabela do catálogo já existe no banco? (Postgres ou o SQLite dos testes.)"""
+    """Does the catalog table already exist in the database? (Postgres or the tests' SQLite.)"""
     try:
         async with AsyncSessionLocal() as db:
             conexao = await db.connection()
@@ -121,11 +122,12 @@ async def _schema_pronto() -> bool:
 
 
 async def importar_catalogo_no_arranque() -> "fontes_service.ResumoDaImportacao | None":
-    """Importa a pasta do catálogo (se existir) e verifica o que está pendente.
+    """Import the catalog folder (if it exists) and verify what is pending.
 
-    Devolve o resumo da importação, ou None quando não havia o que importar
-    (flag vazia, pasta inexistente, outro worker com o lock) ou quando falhou —
-    a API sobe do mesmo jeito; o catálogo é acessório, não pré-requisito.
+    Returns the import summary, or None when there was nothing to import
+    (empty flag, missing folder, another worker holding the lock) or when it
+    failed — the API starts all the same; the catalog is an extra, not a
+    prerequisite.
     """
     caminho = (FONTES_CATALOGO_DIR or "").strip()
     if not caminho:
@@ -136,17 +138,18 @@ async def importar_catalogo_no_arranque() -> "fontes_service.ResumoDaImportacao 
         logger.info("Fontes: pasta do catálogo não existe (%s) — sem importação.", raiz)
         return None
 
-    # Os sinônimos moram na memória do processo: TODO worker carrega, tenha ou
-    # não ficado com o lock da importação.
+    # The synonyms live in the process memory: EVERY worker loads them, whether
+    # or not it got the import lock.
     try:
         fontes_service.definir_sinonimos(await asyncio.to_thread(fontes_vault.sinonimos_de, raiz))
     except Exception as exc:
         logger.warning("Fontes: não deu para ler %s/_sinonimos.md: %s", raiz, exc)
 
-    # Sem a tabela, a importação falhava uma vez, o lock de 10 minutos ficava
-    # preso e a recriação seguinte da API (a que o guia manda logo depois do
-    # `alembic upgrade head`) pulava a importação: o catálogo nascia vazio, com
-    # o smoke verde. Espera-se o schema; o lock só é tomado na hora de importar.
+    # Without the table, the import failed once, the 10-minute lock stayed
+    # held and the next recreation of the API (the one the guide calls for right
+    # after `alembic upgrade head`) skipped the import: the catalog was born
+    # empty, with the smoke test green. We wait for the schema; the lock is only
+    # taken at import time.
     esperou = 0.0
     while not await _schema_pronto():
         if esperou == 0:
@@ -170,7 +173,7 @@ async def importar_catalogo_no_arranque() -> "fontes_service.ResumoDaImportacao 
         raise
     except Exception as exc:
         logger.error("Fontes: importação do catálogo %s falhou: %s", raiz, exc, exc_info=True)
-        # Quem falhou devolve o lock: a próxima subida tenta de novo, sem esperar o TTL.
+        # Whoever failed releases the lock: the next startup tries again, without waiting for the TTL.
         await tarefas_periodicas.soltar_lock(_LOCK_IMPORTACAO)
         return None
     logger.info("Fontes: catálogo %s importado — %s.", raiz, resumo.como_texto())
@@ -189,9 +192,9 @@ async def importar_catalogo_no_arranque() -> "fontes_service.ResumoDaImportacao 
 
 
 async def run_verificacao_loop() -> None:
-    """Loop infinito: a cada FONTES_VERIFICACAO_INTERVAL segundos, uma rodada de
-    `verificar_endpoints()` — só no worker que pegar o lock Redis do intervalo.
-    Iniciado como background task no lifespan da API; 0 desliga."""
+    """Infinite loop: every FONTES_VERIFICACAO_INTERVAL seconds, one round of
+    `verificar_endpoints()` — only on the worker that takes the interval's Redis lock.
+    Started as a background task in the API lifespan; 0 turns it off."""
     intervalo = FONTES_VERIFICACAO_INTERVAL
     if intervalo <= 0:
         logger.info("Fontes: verificação periódica desligada (FONTES_VERIFICACAO_INTERVAL=0).")

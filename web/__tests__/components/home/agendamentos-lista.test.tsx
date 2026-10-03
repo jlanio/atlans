@@ -3,9 +3,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import type { IAgendamentoMeu } from "@/service/types"
 
 /**
- * O painel "Meu → Agendamentos": lista (com pausados + motivo), pausar/ativar e
- * rodar agora — gatilhos por papel POR ITEM. O menu ⋯ é mockado como passthrough
- * (sem portal/pointer do Radix), então os itens ficam diretamente clicáveis.
+ * The "Meu → Agendamentos" panel: list (with paused ones + reason), pause/activate and
+ * run now — triggers by role PER ITEM. The ⋯ menu is mocked as a passthrough
+ * (no Radix portal/pointer), so the items are directly clickable.
  */
 
 const H = vi.hoisted(() => ({
@@ -27,7 +27,7 @@ vi.mock("@/service/GisFlowService", () => ({
   },
 }))
 vi.mock("@/context/WorkspaceContext", () => {
-  // Definido DENTRO da factory: `vi.mock` é içado acima dos consts do módulo.
+  // Defined INSIDE the factory: `vi.mock` is hoisted above the module's consts.
   const ROLE_ORDER = ["viewer", "editor", "operator", "admin", "owner"]
   return {
     ROLE_ORDER,
@@ -43,15 +43,15 @@ vi.mock("@/context/WorkspaceContext", () => {
 vi.mock("@/context/ActiveRunsContext", () => ({ useActiveRuns: () => ({ refresh: H.refresh }) }))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: H.push }) }))
 vi.mock("@/utils/createToast", () => ({ createToast: { success: vi.fn(), error: vi.fn() } }))
-// O `className` passa de propósito: é por ele que o teste de tema vê o
-// `home-portal` que o painel pede ao diálogo.
+// The `className` passes through on purpose: it is through it that the theme test sees the
+// `home-portal` the panel asks of the dialog.
 vi.mock("@/app/components/workflow/execute-params-dialog", () => ({
   default: (props: { open: boolean; className?: string }) =>
     props.open ? <div data-testid="exec-dialog" className={props.className} /> : null,
 }))
-// Passthrough do menu: sem portal/pointer, os itens ficam no DOM e clicáveis. O
-// `className` PASSA de propósito — é por ele que os testes de tema (`home-portal`)
-// e de alvo de toque (40px) enxergam o que o componente pediu.
+// Menu passthrough: without portal/pointer, the items stay in the DOM and clickable. The
+// `className` PASSES THROUGH on purpose — it is through it that the theme (`home-portal`)
+// and touch target (40px) tests see what the component asked for.
 vi.mock("@/app/components/ui/dropdown-menu", () => ({
   DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -68,7 +68,7 @@ import { AgendamentosLista } from "@/app/components/home/agendamentos/lista"
 
 const ok = <T,>(data: T) => ({ success: true, status: 200, data })
 
-/** O envelope de `GET /me/schedules`: página + TOTAL (o mesmo de Chats). */
+/** The envelope of `GET /me/schedules`: page + TOTAL (the same as Chats). */
 const pagina = (itens: IAgendamentoMeu[], total = itens.length) => ok({ itens, total })
 
 function ag(extra: Partial<IAgendamentoMeu> = {}): IAgendamentoMeu {
@@ -114,14 +114,14 @@ function montar() {
 
 describe("AgendamentosLista", () => {
   it("a linha NÃO leva ao editor — a Home é a única página de quem não é admin", async () => {
-    // O mock de `next/navigation` continua registrado DE PROPÓSITO: se alguém
-    // devolver o `router.push` à linha, `H.push` passa a ser chamado e este
-    // teste cai. Sem o dublê, a asserção de "não navegou" passaria por acidente.
+    // The `next/navigation` mock stays registered ON PURPOSE: if someone
+    // puts `router.push` back on the row, `H.push` starts being called and this
+    // test fails. Without the double, the "did not navigate" assertion would pass by accident.
     montar()
     const nome = await screen.findByText("Fluxo A")
 
-    // Não é um botão: um `<button>` sem ação prometeria um clique que não
-    // acontece, e o leitor de tela ainda o anunciaria como acionável.
+    // It is not a button: a `<button>` with no action would promise a click that does not
+    // happen, and the screen reader would still announce it as actionable.
     expect(nome.closest("button")).toBeNull()
 
     fireEvent.click(nome)
@@ -147,8 +147,8 @@ describe("AgendamentosLista", () => {
   })
 
   it("recarga que falha depois de pausar NÃO apaga os agendamentos", async () => {
-    // O cenário do §3: a recarga secundária que a própria ação dispara falha e
-    // levava as 12 linhas embora, trocando-as por uma linha de erro.
+    // The §3 scenario: the secondary reload the action itself fires fails and
+    // used to take the 12 rows away, replacing them with an error line.
     H.updateSchedule.mockResolvedValue(ok({}))
     montar()
     await screen.findByText("Fluxo A")
@@ -163,7 +163,7 @@ describe("AgendamentosLista", () => {
   it("erro de 1ª carga usa a microcopy da casa e oferece 'Tentar de novo'", async () => {
     H.getMySchedules.mockResolvedValue({ success: false, status: 500, error: { name: "AxiosError", message: "Erro inesperado." } })
     montar()
-    // O `detail` cru de um 500 não chega à tela.
+    // The raw `detail` of a 500 does not reach the screen.
     expect(await screen.findByText("Não foi possível carregar os agendamentos.")).toBeTruthy()
     expect(screen.queryByText("Erro inesperado.")).toBeNull()
 
@@ -172,9 +172,9 @@ describe("AgendamentosLista", () => {
     expect(await screen.findByText("Fluxo A")).toBeTruthy()
   })
 
-  // O agendamento COM HORA: é a hora que o fuso qualifica ("todo dia às 06:00").
+  // The schedule WITH A TIME: it is the time that the time zone qualifies ("todo dia às 06:00").
   const comHora = { strategy: "cron" as const, cron_expression: "0 6 * * *", interval: null, unit: null }
-  // O agendamento SEM HORA: uma cadência vale igual em qualquer fuso.
+  // The schedule WITHOUT A TIME: a cadence is the same in any time zone.
   const semHora = { strategy: "cron" as const, cron_expression: "*/30 * * * *", interval: null, unit: null }
   const FUSO_LOCAL = Intl.DateTimeFormat().resolvedOptions().timeZone
   const OUTRO_FUSO = FUSO_LOCAL === "America/La_Paz" ? "Europe/Lisbon" : "America/La_Paz"
@@ -194,8 +194,8 @@ describe("AgendamentosLista", () => {
   })
 
   it("não gruda o fuso numa descrição SEM hora (cadência)", async () => {
-    // "a cada 30 min (America/La_Paz)" não quer dizer nada: o fuso só
-    // qualifica um horário, não uma cadência.
+    // "a cada 30 min (America/La_Paz)" means nothing: the time zone only
+    // qualifies a time of day, not a cadence.
     H.getMySchedules.mockResolvedValue(pagina([ag({ ...semHora, timezone: OUTRO_FUSO })]))
     montar()
     expect(await screen.findByText(/a cada 30 min/)).toBeTruthy()
@@ -212,8 +212,8 @@ describe("AgendamentosLista", () => {
   })
 
   it("diz quantos agendamentos o servidor tem e o 'Ver mais' traz a página seguinte", async () => {
-    // O teto do servidor truncava em silêncio: 200 linhas na tela e nada dizendo
-    // que havia mais.
+    // The server ceiling truncated silently: 200 rows on screen and nothing saying
+    // there were more.
     H.getMySchedules.mockResolvedValue(pagina([ag()], 3))
     montar()
     await screen.findByText("Fluxo A")
@@ -225,7 +225,7 @@ describe("AgendamentosLista", () => {
     ))
     fireEvent.click(screen.getByText("Ver mais"))
     expect(await screen.findByText("Fluxo B")).toBeTruthy()
-    // A segunda página é pedida a partir do que já está na tela.
+    // The second page is requested starting from what is already on screen.
     expect(H.getMySchedules).toHaveBeenLastCalledWith(200, 1)
     expect(screen.getByText("Fluxo A")).toBeTruthy()
   })
@@ -238,8 +238,8 @@ describe("AgendamentosLista", () => {
   })
 
   it("com a lista VAZIA o rodapé continua na tela — e a falha ali tem onde avisar", async () => {
-    // O ramo da lista vazia saía por `return` ANTES do rodapé: o "Ver mais" que
-    // traria o resto sumia, e uma recarga que falhasse não tinha onde aparecer.
+    // The empty-list branch exited via `return` BEFORE the footer: the "Ver mais" that
+    // would bring the rest disappeared, and a failed reload had nowhere to show up.
     H.getMySchedules.mockResolvedValue(pagina([], 3))
     montar()
     expect(await screen.findByText("Nenhum agendamento.")).toBeTruthy()
@@ -254,23 +254,23 @@ describe("AgendamentosLista", () => {
   it("o menu herda a paleta da Home e seus itens têm alvo de 40px", async () => {
     montar()
     await screen.findByText("Fluxo A")
-    // Portado para o <body>, o menu fica FORA da árvore `.home dark`: sem
-    // `home-portal` ele abre claro sobre a Home quase preta.
+    // Portaled to <body>, the menu sits OUTSIDE the `.home dark` tree: without
+    // `home-portal` it opens light over the near-black Home.
     expect(screen.getByTestId("menu").className).toContain("home-portal")
-    // D5: a regra dos 40px vale para os ITENS, não só para o gatilho.
+    // D5: the 40px rule applies to the ITEMS, not just the trigger.
     for (const rotulo of ["Pausar", "Rodar agora"]) {
       expect(screen.getByText(rotulo).closest("button")?.className).toContain("max-md:min-h-10")
     }
   })
 
   it("dois cliques em Pausar soltam um PUT só", async () => {
-    // O PUT fica em voo de propósito: é nessa janela que o segundo clique caía.
+    // The PUT stays in flight on purpose: it is in that window that the second click landed.
     const adiado: { resolver: ((v: unknown) => void) | null } = { resolver: null }
     H.updateSchedule.mockReturnValue(new Promise((r) => { adiado.resolver = r }))
     montar()
     await screen.findByText("Fluxo A")
     fireEvent.click(screen.getByText("Pausar"))
-    fireEvent.click(screen.getByText("Ativar")) // a linha já virou otimista
+    fireEvent.click(screen.getByText("Ativar")) // the row has already gone optimistic
     expect(H.updateSchedule).toHaveBeenCalledTimes(1)
     adiado.resolver?.(ok({}))
   })
@@ -285,8 +285,8 @@ describe("AgendamentosLista", () => {
   })
 
   it("a linha: o principal ocupa o espaço e o ⋯ é irmão no flex — nunca por cima do texto", async () => {
-    // Era um ⋯ `absolute` com `pr-7` reservado à mão: folga ZERO no desktop e,
-    // no telefone (⋯ de 40px), 16px de texto por baixo do botão.
+    // It was an `absolute` ⋯ with `pr-7` reserved by hand: ZERO slack on desktop and,
+    // on the phone (40px ⋯), 16px of text under the button.
     montar()
     const nome = await screen.findByText("Fluxo A")
     const principal = nome.closest("div[title]")!

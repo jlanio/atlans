@@ -1,7 +1,7 @@
 # app/core/scheduling/__init__.py
 """
-Módulo de agendamento do Atlas Studio.
+Atlas Studio scheduling module.
 
-Responsabilidades:
-  - hooks.py — hook para criar/atualizar schedules ao salvar um workflow
+Responsibilities:
+  - hooks.py — hook to create/update schedules when a workflow is saved
 """

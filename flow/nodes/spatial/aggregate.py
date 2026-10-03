@@ -11,16 +11,16 @@ logger = get_logger(__name__)
 @register_node
 class AggregateNode(BaseNode):
     """
-    Nó espacial que agrega uma lista de GeoDataFrames (proveniente de PartitionNode
-    ou LoopNode) em um único GeoDataFrame.
+    Spatial node that aggregates a list of GeoDataFrames (coming from PartitionNode
+    or LoopNode) into a single GeoDataFrame.
 
-    Operações suportadas:
-      - 'concat':        concatena todos os GDFs com pd.concat e reset_index
-      - 'union':         aplica unary_union na coluna de geometria, retorna GDF de 1 linha
-      - 'intersect_all': interseção iterativa de todos os GDFs
+    Supported operations:
+      - 'concat':        concatenates all GDFs with pd.concat and reset_index
+      - 'union':         applies unary_union to the geometry column, returns a 1-row GDF
+      - 'intersect_all': iterative intersection of all GDFs
 
-    Propriedades:
-      - operation: operação de agregação ('concat', 'union', 'intersect_all')
+    Properties:
+      - operation: aggregation operation ('concat', 'union', 'intersect_all')
     """
 
     @classmethod
@@ -56,17 +56,17 @@ class AggregateNode(BaseNode):
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         # -------------------------------------------------------
-        # 1) Validação e extração de parâmetros
+        # 1) Validation and parameter extraction
         # -------------------------------------------------------
         self.validate()
 
-        # operation já validado contra as options pelo self.validate().
+        # operation already validated against the options by self.validate().
         operation = self.parameters.get('operation', 'concat')
 
         # -------------------------------------------------------
-        # 2) Obtém a lista de GeoDataFrames dos inputs
+        # 2) Gets the list of GeoDataFrames from the inputs
         # -------------------------------------------------------
-        # Suporta tanto um valor de lista diretamente quanto múltiplos GDFs nos inputs
+        # Supports both a list value directly and multiple GDFs in the inputs
         gdf_list_raw = None
         for v in inputs.values():
             if isinstance(v, list):
@@ -74,13 +74,13 @@ class AggregateNode(BaseNode):
                 break
 
         if gdf_list_raw is None:
-            # Fallback: usa todos os GDFs encontrados nos inputs como lista
+            # Fallback: uses all GDFs found in the inputs as the list
             gdf_list_raw = [v for v in inputs.values() if isinstance(v, gpd.GeoDataFrame)]
 
         if not gdf_list_raw:
             raise ValueError("Nenhuma lista de GeoDataFrames encontrada nos inputs.")
 
-        # Filtra apenas GeoDataFrames válidos e não-vazios
+        # Keeps only valid, non-empty GeoDataFrames
         valid_gdfs: List[gpd.GeoDataFrame] = []
         for idx, item in enumerate(gdf_list_raw):
             if not isinstance(item, gpd.GeoDataFrame):
@@ -106,7 +106,7 @@ class AggregateNode(BaseNode):
         )
 
         # -------------------------------------------------------
-        # 3) Executa a operação de agregação em thread separada
+        # 3) Runs the aggregation operation in a separate thread
         # -------------------------------------------------------
         if operation == 'concat':
             result = await asyncio.to_thread(self._concat, valid_gdfs)
@@ -125,12 +125,12 @@ class AggregateNode(BaseNode):
         return {"output": result}
 
     # -------------------------------------------------------
-    # Métodos de agregação (síncronos, para uso em thread)
+    # Aggregation methods (synchronous, for use in a thread)
     # -------------------------------------------------------
 
     @staticmethod
     def _concat(gdfs: List[gpd.GeoDataFrame]) -> gpd.GeoDataFrame:
-        """Concatena todos os GeoDataFrames e reseta o índice."""
+        """Concatenates all GeoDataFrames and resets the index."""
         try:
             result = pd.concat(gdfs, ignore_index=True)
             result = gpd.GeoDataFrame(result, geometry=result.geometry.name)
@@ -143,9 +143,9 @@ class AggregateNode(BaseNode):
 
     @staticmethod
     def _union(gdfs: List[gpd.GeoDataFrame]) -> gpd.GeoDataFrame:
-        """Aplica unary_union em todos os GDFs e retorna um GDF de linha única."""
+        """Applies unary_union to all GDFs and returns a single-row GDF."""
         try:
-            # Concatena primeiro para obter todas as geometrias
+            # Concatenates first to get all geometries
             combined = pd.concat(gdfs, ignore_index=True)
             combined_gdf = gpd.GeoDataFrame(combined, geometry=combined.geometry.name)
             if gdfs[0].crs is not None:
@@ -154,7 +154,7 @@ class AggregateNode(BaseNode):
             # Aplica unary_union
             union_geom = combined_gdf.geometry.union_all()
 
-            # Constrói GDF de uma linha com a geometria resultante
+            # Builds a one-row GDF with the resulting geometry
             result = gpd.GeoDataFrame(
                 [{'geometry': union_geom}],
                 geometry='geometry',
@@ -166,7 +166,7 @@ class AggregateNode(BaseNode):
 
     @staticmethod
     def _intersect_all(gdfs: List[gpd.GeoDataFrame]) -> gpd.GeoDataFrame:
-        """Calcula a interseção iterativa de todos os GeoDataFrames."""
+        """Computes the iterative intersection of all GeoDataFrames."""
         try:
             if len(gdfs) == 1:
                 return gdfs[0].copy()
@@ -175,7 +175,7 @@ class AggregateNode(BaseNode):
             crs = gdfs[0].crs
 
             for i, next_gdf in enumerate(gdfs[1:], start=1):
-                # Alinha CRS se necessário
+                # Aligns the CRS if needed
                 if next_gdf.crs is not None and crs is not None and next_gdf.crs != crs:
                     next_gdf = next_gdf.to_crs(crs)
 

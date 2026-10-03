@@ -1,10 +1,10 @@
-"""A busca do Drive escapa os curingas do LIKE (`%` e `_`).
+"""Drive search escapes the LIKE wildcards (`%` and `_`).
 
-Sem escapar, `list_files(search=...)` trata `_`/`%` do usuario como curinga e
-varre a listagem inteira, dando a impressao de filtro quebrado — o mesmo defeito
-que `artifact_service._filtros` ja consertou. Banco de verdade (SQLite, como em
-`test_drive_teto_no_confirm.py`): o que importa e o comportamento do LIKE, e um
-mock so diria que a chamada aconteceu.
+Without escaping, `list_files(search=...)` treats the user's `_`/`%` as wildcards
+and sweeps the whole listing, giving the impression of a broken filter — the same
+defect that `artifact_service._filtros` already fixed. A real database (SQLite, as
+in `test_drive_teto_no_confirm.py`): what matters is the LIKE behavior, and a
+mock would only say the call happened.
 """
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -46,9 +46,9 @@ async def _semear(db, *nomes):
 
 
 async def test_sublinhado_do_usuario_e_literal_e_nao_varre_tudo(db):
-    # `aXb` casa o PADRAO `a_b` se o `_` for curinga, e nao casa se for literal.
-    # E a linha que discrimina: sem ela, as duas versoes do codigo devolvem o
-    # mesmo e o teste nao prova nada.
+    # `aXb` matches the PATTERN `a_b` if `_` is a wildcard, and does not if it is literal.
+    # This is the row that discriminates: without it, both versions of the code
+    # return the same and the test proves nothing.
     await _semear(db, "aXb.geojson", "a_b.geojson")
 
     items, total = await DriveService(db).list_files(WS, search="a_b")
@@ -58,7 +58,7 @@ async def test_sublinhado_do_usuario_e_literal_e_nao_varre_tudo(db):
 
 
 async def test_porcento_do_usuario_tambem_e_literal(db):
-    # `100X` casa `100%` com o `%` como curinga; so `100%` casa literal.
+    # `100X` matches `100%` with `%` as a wildcard; only `100%` matches literally.
     await _semear(db, "100X.geojson", "100%.geojson")
 
     items, total = await DriveService(db).list_files(WS, search="100%")

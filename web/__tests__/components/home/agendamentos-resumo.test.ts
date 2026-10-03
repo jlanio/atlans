@@ -4,12 +4,12 @@ import { resumirNoIdioma, traduzirResumo } from "@/app/components/home/agendamen
 import type { IWorkflowSchedule } from "@/service/types"
 
 /**
- * O resumo do agendamento na lista da Home, por idioma. Em português é o
- * `resumirAgendamento` do gatilho tal e qual (o painel de administração usa o
- * mesmo); em inglês e espanhol o estado vem de lá e só as frases mudam.
+ * The schedule summary in the Home list, per language. In Portuguese it is the
+ * trigger's `resumirAgendamento` as is (the administration panel uses the
+ * same one); in English and Spanish the state comes from there and only the sentences change.
  *
- * As datas são montadas no fuso LOCAL: "amanhã" e "hoje" não dependem do fuso
- * da máquina que roda o teste.
+ * The dates are built in the LOCAL time zone: "amanhã" (tomorrow) and "hoje" (today) do not depend on the time zone
+ * of the machine running the test.
  */
 
 const AGORA = new Date(2026, 8, 7, 12, 0, 0)
@@ -25,7 +25,7 @@ const cron = (expr: string, extra: Partial<IWorkflowSchedule> = {}) => schedule(
 const intervalo = (interval: number | null, unit: string | null) =>
   schedule({ strategy: "interval", interval, unit, cron_expression: null })
 
-// As formas que o gatilho traduz e as que ele deixa cruas (as mesmas do teste dele).
+// The forms the trigger translates and the ones it leaves raw (the same as in its own test).
 const CRONS = [
   "0 6 * * *", "30 18 * * *", "30 7 * * 1-5", "0 2 * * 0", "0 2 * * 7", "0 9 * * 1", "15 22 * * 6",
   "0 8 1 * *", "0 0 15 * *", "0 */6 * * *", "*/15 * * * *", "0 * * * *", "* * * * *", "  0   6 * * *  ",
@@ -41,7 +41,7 @@ const TODOS: IWorkflowSchedule[] = [
   intervalo(null, "hours"), intervalo(0, "hours"),
   schedule({ strategy: "rrule", rrule_expression: "FREQ=WEEKLY", cron_expression: null }),
   schedule({ strategy: "outra" }),
-  // Os estados: pausado, calculando (sem próxima e com a próxima vencida) e as próximas.
+  // The states: paused, calculating (no next one, and with the next one overdue) and the upcoming ones.
   schedule({ active: false }),
   schedule({ next_run_at: null }),
   schedule({ next_run_at: local(7, 9) }),
@@ -68,8 +68,8 @@ describe("resumirNoIdioma — português", () => {
 
 describe("o molde em português do dicionário", () => {
   it("passado pelo caminho dos outros idiomas, dá exatamente o texto do gatilho", () => {
-    // É o que prova que o reconhecimento de cron daqui espelha o do gatilho:
-    // uma forma que um traduz e o outro não sairia diferente aqui.
+    // This is what proves that the cron recognition here mirrors the trigger's:
+    // a form that one translates and the other does not would come out different here.
     for (const s of TODOS) {
       for (const ativo of [true, false]) {
         const doGatilho = resumirAgendamento(s, ativo, AGORA)!

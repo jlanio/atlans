@@ -1,9 +1,9 @@
-"""A redação de segredos por padrão vale também no executor e no flow.
+"""Default secret redaction also applies in the executor and in flow.
 
-A lista (DSN com senha, Bearer, Basic, PAT...) vivia em `app/core/utils/logger`
-e só os loggers do app a usavam: o executor, que decifra DSN e monta cabeçalho
-de autenticação, logava tudo sem máscara. Agora ela mora no flow/, o app a
-reexporta, e o executor a liga na fábrica de LogRecord.
+The list (DSN with password, Bearer, Basic, PAT...) lived in `app/core/utils/logger`
+and only the app's loggers used it: the executor, which decrypts DSNs and builds
+authentication headers, logged everything unmasked. Now it lives in flow/, the app
+re-exports it, and the executor hooks it into the LogRecord factory.
 """
 import io
 import logging
@@ -44,17 +44,17 @@ def test_app_reexporta_a_mesma_lista():
 
 
 def test_fabrica_redige_logger_de_terceiro_sem_filtro(fabrica_isolada):
-    """O handler/logger de terceiro não tem filtro nenhum: é a fábrica que pega."""
+    """The third-party handler/logger has no filter at all: the factory is what catches it."""
     redacao_log.instalar_no_processo()
     logger, fluxo = _capturar("asyncpg.terceiro")
     logger.error("falhou em %s com %s", DSN, BEARER)
     saida = fluxo.getvalue()
     assert "SenhaForte123" not in saida and "assinaturaassinatura" not in saida
-    assert "db.interno" in saida  # o diagnóstico continua útil
+    assert "db.interno" in saida  # the diagnostic is still useful
 
 
 def test_argumento_que_nao_e_string_tambem_e_redigido(fabrica_isolada):
-    """A exceção do driver traz a DSN no `str()` — `%s` de um objeto."""
+    """The driver exception carries the DSN in its `str()` — `%s` of an object."""
     redacao_log.instalar_no_processo()
     logger, fluxo = _capturar("executor.teste_objeto")
     logger.error("conexão recusada: %s", ConnectionError(f"não conectou em {DSN}"))
@@ -73,7 +73,7 @@ def test_traceback_e_redigido(fabrica_isolada):
 
 
 def test_registro_sem_segredo_mantem_a_forma(fabrica_isolada):
-    """Há formatadores que leem `record.args` (o de acesso do uvicorn)."""
+    """Some formatters read `record.args` (uvicorn's access one)."""
     redacao_log.instalar_no_processo()
     registro = logging.getLogger("x").makeRecord("x", logging.INFO, __file__, 1, "%s %s", ("a", "b"), None)
     assert registro.args == ("a", "b")
@@ -117,17 +117,17 @@ def test_logger_do_flow_leva_o_filtro_mesmo_fora_do_executor():
 
 
 def test_segredo_em_uso_e_trocado_antes_dos_padroes(fabrica_isolada):
-    """Os padrões param no primeiro `%` do valor: rodando antes da troca exata
-    de `segredos_vivos`, cortavam a agulha e a cauda da chave saía no log."""
+    """The patterns stop at the first `%` of the value: running before the exact
+    `segredos_vivos` replacement, they cut the needle and the key's tail leaked to the log."""
     from flow.utils import segredos_vivos
 
     redacao_log.instalar_no_processo()
     chave = "Kq7vT9zR%2BaB3%2FxY5wL%3D%3D"  # pragma: allowlist secret
     logger, fluxo = _capturar("urllib3.teste_ordem")
     with segredos_vivos.em_uso(chave):
-        # Como o urllib3 loga: a URL inteira é UM argumento.
+        # How urllib3 logs: the whole URL is ONE argument.
         logger.warning('"%s %s HTTP/1.1" %s', "GET", f"/ows?service=WFS&token={chave}", 200)
-        # E a mensagem já pronta, sem argumentos.
+        # And the already-formatted message, with no arguments.
         logger.warning(f"falhou em /ows?service=WFS&token={chave}")
     saida = fluxo.getvalue()
     assert "aB3" not in saida and "xY5wL" not in saida
@@ -141,7 +141,7 @@ def test_argumentos_simples_mantem_a_forma_e_nao_reescaneiam(fabrica_isolada, mo
     monkeypatch.setattr(redacao_log, "_scrub", lambda t: chamadas.append(t) or original(t))
     registro = logging.getLogger("x").makeRecord("x", logging.INFO, __file__, 1, "%s de %d", ("a", 3), None)
     assert registro.args == ("a", 3)
-    assert "a de 3" not in chamadas  # a mensagem interpolada não foi reescaneada
+    assert "a de 3" not in chamadas  # the interpolated message was not rescanned
 
 
 def test_traceback_formatado_uma_vez_fica_em_exc_text(fabrica_isolada):
@@ -154,4 +154,4 @@ def test_traceback_formatado_uma_vez_fica_em_exc_text(fabrica_isolada):
             "x", logging.ERROR, __file__, 1, "falhou", (), sys.exc_info(),
         )
     assert registro.exc_text and "RuntimeError: sem segredo" in registro.exc_text
-    assert registro.exc_info is not None  # nada redigido: a exceção continua disponível
+    assert registro.exc_info is not None  # nothing redacted: the exception is still available

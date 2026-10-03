@@ -10,9 +10,9 @@ import type { FieldProps } from "./types"
 
 type DriveFieldProps = FieldProps
 
-/** Teto do backend (`page_size` <= 200). O seletor pedia a página padrão de 50
- *  e filtrava extensões no cliente: um arquivo enviado depois do 50º do
- *  workspace simplesmente não aparecia para configurar o nó. */
+/** Backend ceiling (`page_size` <= 200). The picker requested the default page
+ *  of 50 and filtered extensions on the client: a file uploaded after the
+ *  workspace's 50th simply didn't show up to configure the node. */
 const MAX_POR_PAGINA = 200
 
 const DriveField = ({ field, values, setNodeField }: DriveFieldProps) => {
@@ -20,7 +20,7 @@ const DriveField = ({ field, values, setNodeField }: DriveFieldProps) => {
   const [files, setFiles] = useState<IDriveFile[]>([])
   const [loading, setLoading] = useState(false)
   const [truncado, setTruncado] = useState(false)
-  // A lista não chegou: o aviso de "nenhum arquivo" seria uma afirmação falsa.
+  // The list didn't arrive: the "no files" notice would be a false statement.
   const [falhou, setFalhou] = useState(false)
 
   const driveExtensions = field.drive_extensions ?? []
@@ -28,9 +28,9 @@ const DriveField = ({ field, values, setNodeField }: DriveFieldProps) => {
   async function fetchFiles() {
     if (!workspace) return
     setLoading(true)
-    // O `ext` do backend aceita UMA extensão, então várias viram várias
-    // chamadas em paralelo — e não um filtro no cliente sobre uma página
-    // cortada, que era o que escondia arquivos.
+    // The backend's `ext` accepts ONE extension, so several become several
+    // parallel calls — and not a client-side filter over a truncated page,
+    // which is what was hiding files.
     const filtros: (string | undefined)[] =
       driveExtensions.length > 0 ? [...driveExtensions] : [undefined]
     const respostas = await Promise.all(
@@ -42,8 +42,9 @@ const DriveField = ({ field, values, setNodeField }: DriveFieldProps) => {
       })),
     )
 
-    // Uma extensão que falhou deixaria a lista incompleta sem dizer nada: a
-    // falha de qualquer uma é a falha da lista — e o aviso sai uma vez só.
+    // An extension that failed would leave the list incomplete without saying
+    // anything: the failure of any one is the failure of the list — and the
+    // warning goes out only once.
     const listas: IDriveFileList[] = []
     for (const res of respostas) {
       const dados = dadoOuAviso(res, "Erro ao carregar arquivos do Drive")
@@ -114,9 +115,9 @@ const DriveField = ({ field, values, setNodeField }: DriveFieldProps) => {
         </SelectContent>
       </Select>
 
-      {/* O workspace tem mais arquivos do que cabe numa página: dizer isso é
-          melhor que deixar a pessoa procurar um arquivo que existe e não está
-          na lista. */}
+      {/* The workspace has more files than fit in one page: saying so is
+          better than letting the person look for a file that exists and isn't
+          in the list. */}
       {truncado && !loading && (
         <p className="text-xs text-muted-foreground mt-1">
           Mostrando os {MAX_POR_PAGINA} arquivos mais recentes. Se o que procura não

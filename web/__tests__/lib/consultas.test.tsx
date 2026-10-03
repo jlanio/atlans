@@ -1,7 +1,7 @@
 /**
- * Os padrões do cliente de consultas são os das telas de HOJE: migrar uma tela
- * para o react-query não pode, por herança, fazê-la repetir falhas, reler no
- * foco, pausar sem rede ou guardar cache.
+ * The query client's defaults are those of TODAY's screens: migrating a screen
+ * to react-query must not, by inheritance, make it retry failures, refetch on
+ * focus, pause without network or keep a cache.
  */
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { act, renderHook, waitFor } from "@testing-library/react"

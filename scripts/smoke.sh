@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # scripts/smoke.sh
-# Valida pos-startup que a stack subiu corretamente.
-# Detecta automaticamente se o profile prod esta ativo via presenca de
-# containers api-prod ou step-ca. A API e o web de producao nao publicam porta
-# no host (o Traefik fala com eles pela rede do compose): os checks deles
-# rodam dentro do proprio container.
+# Validates after startup that the stack came up correctly.
+# Automatically detects whether the prod profile is active by the presence of
+# the api-prod or step-ca containers. The production API and web do not publish
+# a port on the host (Traefik talks to them over the compose network): their
+# checks run inside their own container.
 #
-# Exit 0 = todos os checks OK; exit 1 = pelo menos um falhou.
+# Exit 0 = all checks OK; exit 1 = at least one failed.
 
 set -u
 
@@ -37,7 +37,7 @@ else
 fi
 info "Profile detectado: $PROFILE (api service: $API_SVC)"
 
-# Uma URL da API, lida de dentro do container dela (o Python da imagem).
+# An API URL, read from inside its own container (the image's Python).
 api_get() {
     docker compose exec -T "$API_SVC" python -c \
         "import sys, urllib.request; sys.stdout.write(urllib.request.urlopen(sys.argv[1], timeout=10).read().decode())" \
@@ -60,16 +60,16 @@ fi
 
 # 3. Redis ping
 REDIS_PASS=$(grep -E '^REDIS_PASSWORD=' .env 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"')
-# A senha vai pela variavel REDISCLI_AUTH, nao por `-a`: em argv ela aparece em `ps`.
+# The password goes via the REDISCLI_AUTH variable, not `-a`: in argv it shows up in `ps`.
 if [ -n "$REDIS_PASS" ] && docker compose exec -T -e REDISCLI_AUTH="$REDIS_PASS" redis redis-cli --no-auth-warning ping 2>/dev/null | grep -q PONG; then
     pass "Redis responde PONG"
 else
     fail "Redis nao responde (verifique REDIS_PASSWORD no .env e container redis)"
 fi
 
-# 4. MinIO ready (/minio/health/live nao requer auth). De dentro do container
-# da API, pela rede do compose: nao depende de curl no host nem da porta 9000
-# publicada.
+# 4. MinIO ready (/minio/health/live requires no auth). From inside the API
+# container, over the compose network: depends neither on curl on the host
+# nor on port 9000 being published.
 if docker compose exec -T "$API_SVC" python -c \
         "import urllib.request; urllib.request.urlopen('http://minio:9000/minio/health/live', timeout=10)" 2>/dev/null; then
     pass "MinIO healthy"
@@ -86,16 +86,16 @@ if [ "$PROFILE" = "prod" ]; then
     fi
 fi
 
-# 6. Web frontend (o wget do Alpine da imagem)
+# 6. Web frontend (the image's Alpine wget)
 if docker compose exec -T "$WEB_SVC" wget -q -O /dev/null "http://localhost:3000/" 2>/dev/null; then
     pass "Web frontend responde em :3000"
 else
     fail "Web frontend nao responde em :3000 (docker compose logs $WEB_SVC)"
 fi
 
-# 7. install.sh com o fingerprint da CA (apenas prod). O container da API le o
-# .env so quando e criado: depois do bootstrap-stepca, sem recriar a API, o
-# instalador dos executores sai sem a CA fixada.
+# 7. install.sh with the CA fingerprint (prod only). The API container reads
+# .env only when it is created: after bootstrap-stepca, without recreating the
+# API, the executors' installer goes out without the pinned CA.
 if [ "$PROFILE" = "prod" ]; then
     INSTALL_SH=$(api_get /executores/install || true)
     if printf '%s' "$INSTALL_SH" | grep -qiE 'ATLANS_CA_SHA256:-[0-9a-f]{64}'; then
@@ -103,9 +103,9 @@ if [ "$PROFILE" = "prod" ]; then
     else
         fail "install.sh sem o fingerprint da CA: rode o bootstrap-stepca e recrie a API (docker compose --profile prod up -d api-prod)"
     fi
-    # O host que o install.sh anuncia aos executores tem de ser o que o Traefik
-    # roteia (AGENTS_HOST): um AGENTS_URL divergente so apareceria na maquina
-    # do executor, como falha de DNS.
+    # The host that install.sh announces to the executors must be the one Traefik
+    # routes (AGENTS_HOST): a diverging AGENTS_URL would only show up on the
+    # executor's machine, as a DNS failure.
     AGENTS_HOST_ENV=$(grep -E '^AGENTS_HOST=' .env 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"')
     SERVIDO=$(printf '%s' "$INSTALL_SH" | grep -E '^SERVER="' | head -1 | cut -d'"' -f2)
     if [ -z "$AGENTS_HOST_ENV" ]; then
@@ -126,9 +126,9 @@ if [ "$PROFILE" = "prod" ]; then
     elif ! command -v openssl >/dev/null 2>&1; then
         warn "openssl nao instalado no host — pulando DNS-only check"
     else
-        # Pega cert servido e calcula fingerprint do issuer (chain inteira nao acessivel via openssl 1-shot — checamos subject CN).
-        # Validacao mais simples e robusta: o cert remoto deve ser assinado pela CA interna.
-        # Se Cloudflare proxied, o cert remoto sera o do Cloudflare (issuer != step-ca).
+        # Grabs the served cert and computes the issuer fingerprint (the full chain is not reachable via a one-shot openssl — we check the subject CN).
+        # Simpler, more robust validation: the remote cert must be signed by the internal CA.
+        # If Cloudflare is proxied, the remote cert will be Cloudflare's (issuer != step-ca).
         ISSUER=$(echo | openssl s_client -connect "${AGENTS_DOMAIN}:443" -servername "$AGENTS_DOMAIN" 2>/dev/null | openssl x509 -issuer -noout 2>/dev/null | head -1)
         if echo "$ISSUER" | grep -qiE "step|atlans"; then
             pass "${AGENTS_DOMAIN} servido com cert da CA interna (DNS-only OK)"

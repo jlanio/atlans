@@ -4,11 +4,11 @@ import { useWorkflowSaveStore } from "@/app/stores/workflowSaveStore"
 import { Button } from "@/app/components/ui/button"
 import { cn } from "@/lib/utils"
 
-// O texto do estado (Salvando…/Salvo/Alterações não salvas) mora no chip ao
-// lado do caminho do workflow. Este botão só ECOA o estado — um ponto âmbar
-// quando há o que salvar, vermelho quando o último save falhou, um check logo
-// depois de salvar — porque ele fica na coluna de baixo, longe do chip, e é
-// nele que o olho procura "preciso salvar?".
+// The state text (Salvando…/Salvo/Alterações não salvas) lives in the chip next
+// to the workflow path. This button only ECHOES the state — an amber dot
+// when there's something to save, red when the last save failed, a check right
+// after saving — because it sits in the bottom column, far from the chip, and
+// it's where the eye looks for "do I need to save?".
 const SaveWorkflow = () => {
 
   const { isSaving, saveWorkflow } = useSaveWorkflow()

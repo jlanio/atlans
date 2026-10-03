@@ -2,28 +2,28 @@
 
 // web/app/hooks/home/useArrasteDeArquivos.ts
 //
-// O arraste de arquivos sobre a Home.
+// Dragging files over the Home.
 //
-// **A área que ACEITA é a janela inteira; quem ACENDE é a caixa do assistente.**
-// Mirar uma barra de 44 px de altura com o arquivo na mão é hostil — e ancorar
-// o alvo visual na caixa é justamente a escolha da opção C, para não cobrir o
-// globo com um véu a cada arraste. Então o listener é global e o realce é da
-// caixa (`data-arraste` em `barra.tsx` e `painel.tsx`).
+// **The area that ACCEPTS is the whole window; what LIGHTS UP is the assistant box.**
+// Aiming at a 44 px tall bar with a file in hand is hostile — and anchoring
+// the visual target on the box is precisely the choice of option C, so as not
+// to cover the globe with a veil on every drag. So the listener is global and
+// the highlight belongs to the box (`data-arraste` in `barra.tsx` and `painel.tsx`).
 //
-// Escutar em `window` tem um segundo efeito, necessário: sem `preventDefault`
-// no `dragover`/`drop` o navegador ABRE o arquivo solto, trocando a Home por um
-// GeoJSON cru — e perdendo a conversa em curso. Com o listener global, soltar
-// em qualquer canto da página é tratado por nós.
+// Listening on `window` has a second, necessary effect: without `preventDefault`
+// on `dragover`/`drop` the browser OPENS the dropped file, replacing the Home
+// with raw GeoJSON — and losing the ongoing conversation. With the global
+// listener, a drop anywhere on the page is handled by us.
 //
-// O `dragleave` não é confiável sozinho: ele dispara ao cruzar a fronteira de
-// cada elemento filho, então um arraste que atravesse a barra lateral apagaria
-// o realce no meio do caminho. Daí o contador de entradas/saídas — o realce só
-// cai quando o arraste de fato deixou a janela.
+// `dragleave` is not reliable on its own: it fires when crossing the boundary
+// of each child element, so a drag that crosses the sidebar would turn off the
+// highlight midway. Hence the enter/leave counter — the highlight only goes
+// off when the drag has actually left the window.
 
 import { useEffect, useRef } from "react"
 
-/** O arraste traz ARQUIVOS? Texto e links selecionados também disparam estes
- *  eventos, e acender a caixa para eles seria uma promessa falsa. */
+/** Does the drag carry FILES? Selected text and links also fire these
+ *  events, and lighting up the box for them would be a false promise. */
 function temArquivos(e: DragEvent): boolean {
   const tipos = e.dataTransfer?.types
   if (!tipos) return false
@@ -35,15 +35,15 @@ export function useArrasteDeArquivos({
   aoArrastar,
   aoSoltar,
 }: {
-  /** Desligado enquanto a Home não pode receber (ex.: nem montou a barra). */
+  /** Off while the Home cannot receive (e.g. the bar has not even mounted). */
   ativo: boolean
   aoArrastar: (arrastando: boolean) => void
   aoSoltar: (arquivos: File[]) => void
 }): void {
-  // Em refs para o efeito não se reinscrever a cada render: `aoSoltar` vem de
-  // um `useCallback` cujas dependências mudam (o workspace ativo, por exemplo),
-  // e reinscrever no meio de um arraste zeraria o contador — o realce ficaria
-  // aceso para sempre.
+  // In refs so the effect does not resubscribe on every render: `aoSoltar` comes
+  // from a `useCallback` whose dependencies change (the active workspace, for
+  // example), and resubscribing in the middle of a drag would reset the counter —
+  // the highlight would stay lit forever.
   const refArrastar = useRef(aoArrastar)
   const refSoltar = useRef(aoSoltar)
   refArrastar.current = aoArrastar
@@ -60,7 +60,7 @@ export function useArrasteDeArquivos({
     }
     function sobre(e: DragEvent) {
       if (!temArquivos(e)) return
-      // Sem isto o `drop` nem chega a acontecer — o navegador trata o arquivo.
+      // Without this the `drop` never even happens — the browser handles the file.
       e.preventDefault()
       if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"
     }
@@ -77,8 +77,8 @@ export function useArrasteDeArquivos({
       const arquivos = e.dataTransfer?.files
       if (arquivos && arquivos.length > 0) refSoltar.current(Array.from(arquivos))
     }
-    // Sair da janela com o arquivo ainda na mão não dispara `dragleave` em todo
-    // navegador; `dragend` é a rede de segurança para o realce não ficar aceso.
+    // Leaving the window with the file still in hand does not fire `dragleave` in
+    // every browser; `dragend` is the safety net so the highlight does not stay lit.
     function acabou() {
       profundidade = 0
       refArrastar.current(false)
@@ -95,7 +95,7 @@ export function useArrasteDeArquivos({
       window.removeEventListener("dragleave", saiu)
       window.removeEventListener("drop", soltou)
       window.removeEventListener("dragend", acabou)
-      // Desmontar no meio de um arraste deixaria o realce ligado na store.
+      // Unmounting in the middle of a drag would leave the highlight on in the store.
       refArrastar.current(false)
     }
   }, [ativo])

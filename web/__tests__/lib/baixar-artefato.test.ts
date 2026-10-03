@@ -14,8 +14,8 @@ beforeEach(() => {
 
 describe("baixarArtefato", () => {
   it("abre a URL PRÉ-ASSINADA, não o endpoint da plataforma", () => {
-    // O endpoint devolve `{download_url, filename}` em JSON: abri-lo numa aba
-    // mostrava o JSON em vez de baixar, e navegação de topo não leva o Bearer.
+    // The endpoint returns `{download_url, filename}` as JSON: opening it in a tab
+    // showed the JSON instead of downloading, and top-level navigation doesn't carry the Bearer.
     servico.getArtifactDownload.mockResolvedValue({
       success: true, status: 200, data: { download_url: "https://minio/a1.geojson?sig=x", filename: "a1.geojson" },
     })

@@ -1,13 +1,13 @@
 # tests/unit/test_reducao_node_event.py
-"""Redução de node_event acima do teto: uma regra só nos dois lados do fio.
+"""Reducing a node_event above the ceiling: a single rule on both ends of the wire.
 
-Executor e servidor tinham cada um a sua cópia, com regras diferentes. O
-executor (antes de enviar) preservava `duration_ms` e as linhas de stdout que
-coubessem, mas jogava fora o `extra` inteiro; o servidor (antes do Redis)
-cortava só as chaves pesadas do `extra` e mantinha `output_columns`. Como o teto
-é o mesmo, o executor já entregava o evento reduzido e a regra do servidor
-nunca rodava para um executor honesto: um `completed` com traceback grande
-chegava ao painel sem a sugestão de coluna do editor.
+The executor and the server each had their own copy, with different rules. The
+executor (before sending) kept `duration_ms` and whatever stdout lines fit, but
+threw away the whole `extra`; the server (before Redis) cut only the heavy keys
+of `extra` and kept `output_columns`. Since the ceiling is the same, the executor
+already delivered the reduced event and the server's rule never ran for an honest
+executor: a `completed` with a large traceback reached the panel without the
+editor's column suggestion.
 """
 import json
 
@@ -33,7 +33,7 @@ def _completed_com_traceback_grande() -> tuple[dict, dict]:
     return evento, colunas
 
 
-# ── O bug: a redução do executor perdia output_columns ───────────────────────
+# ── The bug: the executor's reduction lost output_columns ────────────────────
 
 def test_completed_com_traceback_grande_mantem_output_columns_na_reducao_do_executor():
     evento, colunas = _completed_com_traceback_grande()
@@ -47,15 +47,15 @@ def test_completed_com_traceback_grande_mantem_output_columns_na_reducao_do_exec
     )
     assert "traceback" not in reduzido["extra"], "o peso tinha que sair"
     assert reduzido["extra"]["node_name"] == "Join"
-    assert reduzido["type"] == "node_event"        # sem isso o servidor não roteia
+    assert reduzido["type"] == "node_event"        # without this the server does not route
     assert reduzido["duration_ms"] == 42.5
     assert reduzido["__truncated__"] is True
     assert reduzido["__original_size__"] == len(json.dumps(evento))
 
 
 def test_failed_com_erro_gigante_chega_com_o_erro_encurtado_e_a_categoria():
-    """O executor derrubava `error` e `extra` juntos: o nó aparecia falho no
-    painel sem mensagem nenhuma e sem dizer se valia repetir."""
+    """The executor dropped `error` and `extra` together: the node showed as failed
+    in the panel with no message at all and without saying whether a retry was worth it."""
     evento = {
         "type": "node_event", "run_id": "run-1", "node": "n1", "status": "failed",
         "kind": "lifecycle", "level": "error", "timestamp": 123.0, "duration_ms": 7.0,
@@ -72,7 +72,7 @@ def test_failed_com_erro_gigante_chega_com_o_erro_encurtado_e_a_categoria():
     assert reduzido["extra"]["retryable"] is False
 
 
-# ── O servidor reaplica como defesa, com as regras dos dois lados ────────────
+# ── The server reapplies it as a defense, with the rules of both sides ───────
 
 def test_evento_reduzido_pelo_executor_passa_pelo_servidor_sem_perder_mais_nada():
     evento, colunas = _completed_com_traceback_grande()
@@ -85,8 +85,8 @@ def test_evento_reduzido_pelo_executor_passa_pelo_servidor_sem_perder_mais_nada(
 
 
 def test_servidor_preserva_as_linhas_de_stdout_de_evento_que_chega_grande():
-    """Executor com bug (ou antigo demais para reduzir): o servidor jogava fora
-    `lines` inteiro como chave pesada e a aba de saída do nó ficava vazia."""
+    """Buggy executor (or too old to reduce): the server threw away the whole
+    `lines` as a heavy key and the node's output tab was left empty."""
     msg = {
         "type": "node_event", "run_id": "r", "node": "n", "kind": "stdout",
         "status": "log", "level": "info", "timestamp": 1.0,
@@ -114,11 +114,11 @@ def test_servidor_reduzindo_aos_campos_de_controle_preserva_duration_ms():
     assert reduzido.get("duration_ms") == 12.0, "o painel perdia a duração do nó"
 
 
-# ── Degraus da regra única ────────────────────────────────────────────────────
+# ── Steps of the single rule ──────────────────────────────────────────────────
 
 def test_degrau_1_serializa_o_extra_leve_com_o_default_do_executor():
-    """O `extra` que sobra pode ter Timestamp/numpy no executor: sem o `default`
-    dele o dumps levantava TypeError e o sender reciclava o evento em laço."""
+    """The remaining `extra` may hold Timestamp/numpy in the executor: without its
+    `default` the dumps raised TypeError and the sender recycled the event in a loop."""
     from datetime import datetime
 
     evento = {
@@ -139,8 +139,8 @@ def test_evento_que_cabe_volta_intacto():
 
 
 def test_degrau_2_ainda_guarda_as_linhas_de_stdout():
-    """Nem sem o peso o evento cabe (campo de controle hostil): cai para os
-    campos de controle coagidos, e as linhas que couberem voltam junto."""
+    """Even without the weight the event does not fit (hostile control field): it
+    falls back to the coerced control fields, and the lines that fit come back with it."""
     evento = {
         "type": "node_event", "run_id": "r", "node": {"lixo": "z" * 80_000},
         "kind": "stdout", "status": "log", "level": "info", "timestamp": 1.0,
@@ -156,7 +156,7 @@ def test_degrau_2_ainda_guarda_as_linhas_de_stdout():
 
 
 def test_rede_de_seguranca_mantem_o_type_que_roteia_a_mensagem():
-    """Sem `type` o servidor não sabe o que fazer com a mensagem e a descarta."""
+    """Without `type` the server does not know what to do with the message and discards it."""
     evento = {
         "type": "node_event", "run_id": "r", "node": "n", "status": "failed",
         "kind": {"k": "x" * 1_000}, "level": {"l": "y" * 1_000}, "timestamp": 1.0,

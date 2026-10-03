@@ -1,66 +1,66 @@
-# Guia de Contribuição — Atlans
+# Contributing Guide — Atlans
 
-Guia completo para desenvolvedores que desejam contribuir com o Atlans, uma plataforma de workflows geoespaciais com execução distribuída via executores.
+A complete guide for developers who want to contribute to Atlans, a platform for geospatial workflows with distributed execution through executors.
 
-## Sumário
+## Contents
 
-- [Licença e acordo de contribuidor](#licença-e-acordo-de-contribuidor)
-- [Configuração do Ambiente](#configuração-do-ambiente)
-- [Estrutura do Projeto](#estrutura-do-projeto)
-- [Workflow de Git](#workflow-de-git)
+- [License and contributor agreement](#license-and-contributor-agreement)
+- [Environment Setup](#environment-setup)
+- [Project Structure](#project-structure)
+- [Git Workflow](#git-workflow)
 - [Backend (FastAPI)](#backend-fastapi)
-- [Motor de Workflow (flow/)](#motor-de-workflow-flow)
-- [Sistema de Executores](#sistema-de-executores)
+- [Workflow Engine (flow/)](#workflow-engine-flow)
+- [Executor System](#executor-system)
 - [Frontend (Next.js)](#frontend-nextjs)
-- [Banco de Dados](#banco-de-dados)
-- [Convenções de Código](#convenções-de-código)
-- [Testes](#testes)
-- [Integração Contínua (CI) e Releases](#integração-contínua-ci-e-releases)
-- [Checklist de PR](#checklist-de-pr)
+- [Database](#database)
+- [Code Conventions](#code-conventions)
+- [Tests](#tests)
+- [Continuous Integration (CI) and Releases](#continuous-integration-ci-and-releases)
+- [PR Checklist](#pr-checklist)
 
 ---
 
-## Licença e acordo de contribuidor
+## License and contributor agreement
 
-O Atlans é distribuído sob a [AGPL-3.0-only](LICENSE), e o titular do projeto
-também o oferece sob outros termos. Por isso toda contribuição entra sob o
-[acordo de contribuidor (CLA)](CLA.md): você continua dono do que escreveu e
-dá ao titular uma licença ampla para usá-lo, e ele se compromete a
-distribuí-lo também como software livre.
+Atlans is distributed under the [AGPL-3.0-only](LICENSE), and the project's holder
+also offers it under other terms. That is why every contribution comes in under the
+[contributor agreement (CLA)](CLA.md): you remain the owner of what you wrote and
+give the holder a broad license to use it, and the holder commits to also
+distributing it as free software.
 
-Versão 1.0, de 2 de outubro de 2026.
-Escreva no seu primeiro PR, na descrição ou num comentário:
+Version 1.0, of October 2, 2026.
+Write in your first PR, in the description or in a comment:
 
-> Li o CLA.md, versão 1.0, e concordo com ele.
+> I have read CLA.md, version 1.0, and I agree to it.
 
-Um PR sem o aceite não entra.
+A PR without the acceptance does not get in.
 
-O que vem de terceiros vai com a origem e a licença, e a licença precisa
-conviver com a AGPL-3.0:
+Whatever comes from third parties goes in with its origin and license, and the license
+has to be compatible with the AGPL-3.0:
 
-- **Um arquivo copiado para o repositório** (código, fonte, ícone): o texto
-  da licença ao lado dele e uma entrada em `NO_REPOSITORIO`, no
+- **A file copied into the repository** (code, font, icon): the license text
+  next to it and an entry in `NO_REPOSITORIO`, in
   `scripts/avisos_de_terceiros.py`.
-- **Uma dependência nova do npm ou do PyPI**: depois de atualizar o lock, rode
-  `python scripts/avisos_de_terceiros.py`. O [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
-  ganha o pacote, e a seção «Para revisar» aponta uma licença fora das
-  compatíveis (`COMPATIVEIS`, no mesmo script).
+- **A new npm or PyPI dependency**: after updating the lock, run
+  `python scripts/avisos_de_terceiros.py`. The [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
+  gains the package, and the "To review" section points out a license outside
+  the compatible ones (`COMPATIVEIS`, in the same script).
 
 ---
 
-## Configuração do Ambiente
+## Environment Setup
 
-### 1. Pré-requisitos
+### 1. Prerequisites
 
-| Ferramenta | Versão mínima |
+| Tool | Minimum version |
 |---|---|
 | Docker | 24+ |
 | Docker Compose | v2+ |
 | Git | 2.x |
-| Node.js (dev local frontend) | 24 (a LTS do CI e da imagem; a suíte exige 22 ou mais) |
-| Python (dev local backend) | 3.12 |
+| Node.js (local frontend dev) | 24 (the LTS of the CI and of the image; the suite requires 22 or later) |
+| Python (local backend dev) | 3.12 |
 
-### 2. Clone e configure
+### 2. Clone and configure
 
 ```bash
 git clone https://github.com/seu-usuario/atlans-studio.git atlans
@@ -68,44 +68,44 @@ cd atlans
 cp .env.example .env
 ```
 
-### 3. Geração de secrets
+### 3. Generating secrets
 
-Edite o `.env` e gere os valores sensíveis:
+Edit `.env` and generate the sensitive values:
 
 ```bash
-# REDIS_PASSWORD — senha do Redis
+# REDIS_PASSWORD — Redis password
 python -c "import secrets; print(secrets.token_hex(32))"
 
-# AUTH_SECRET — secret do NextAuth
+# AUTH_SECRET — NextAuth secret
 openssl rand -base64 32
 
-# APP_SECRET — secret interno da API
+# APP_SECRET — the API's internal secret
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 
-# FERNET_KEY — criptografia de credenciais no banco
+# FERNET_KEY — encryption of credentials in the database
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 
-# EXECUTOR_SIGNING_KEY — semente da chave Ed25519 que assina os jobs e que os
-# executores fixam na matrícula. OBRIGATÓRIA: vazia, nenhum executor matricula
-# (503 em /executores/server-public-key) e nenhum job é despachado. O `make
-# bootstrap` a gera; à mão:
+# EXECUTOR_SIGNING_KEY — seed of the Ed25519 key that signs the jobs and that the
+# executors pin at enrollment. REQUIRED: if empty, no executor enrolls
+# (503 on /executores/server-public-key) and no job is dispatched. `make
+# bootstrap` generates it; by hand:
 openssl rand -base64 32
 ```
 
-### 4. Suba os serviços
+### 4. Start the services
 
 ```bash
-# Stack completa em modo dev (hot-reload em API e frontend)
+# Full stack in dev mode (hot-reload in the API and frontend)
 make up-dev
 
-# Apenas backend
+# Backend only
 docker compose --profile dev up -d api redis
 
-# Apenas frontend (dev local fora do Docker)
+# Frontend only (local dev outside Docker)
 cd web && npm install && npm run dev
 ```
 
-| Serviço | URL |
+| Service | URL |
 |---|---|
 | Frontend | http://localhost:3000 |
 | API (Swagger) | http://localhost:8000/docs |
@@ -114,269 +114,269 @@ cd web && npm install && npm run dev
 ### 5. Logs
 
 ```bash
-make logs                       # todos os serviços
-docker compose logs -f api      # apenas API
-# O executor NÃO faz parte do docker-compose.yml principal — vive no
-# docker-compose.executor.yml. Para acompanhar os logs dele:
+make logs                       # all services
+docker compose logs -f api      # API only
+# The executor is NOT part of the main docker-compose.yml — it lives in
+# docker-compose.executor.yml. To follow its logs:
 docker compose -f docker-compose.executor.yml logs -f
 ```
 
 ### 6. Pre-commit hooks
 
-Todo commit passa por `detect-secrets` (bloqueia PATs/JWTs/API keys) e
-higienizadores basicos (trailing whitespace, EOF, YAML valido). Os hooks são
-`repo: local`: rodam o pre-commit, o detect-secrets e os pre-commit-hooks do
-`requirements-dev.txt`, travados e com hash (ver "Dependências Python"). Instale
-uma vez por clone, no ambiente onde você roda o `git commit` (Linux, macOS ou
-Windows; o ambiente do backend, com os dois locks, já serve):
+Every commit goes through `detect-secrets` (blocks PATs/JWTs/API keys) and
+basic sanitizers (trailing whitespace, EOF, valid YAML). The hooks are
+`repo: local`: they run the pre-commit, detect-secrets and pre-commit-hooks from
+`requirements-dev.txt`, pinned and hashed (see "Python dependencies"). Install
+once per clone, in the environment where you run `git commit` (Linux, macOS or
+Windows; the backend environment, with both locks, already works):
 
 ```bash
 pip install --require-hashes -r requirements-dev.txt
 pre-commit install
 ```
 
-Depois disso, `git commit` roda os hooks automaticamente. Para rodar
-manualmente em todos os arquivos: `pre-commit run --all-files`.
+After that, `git commit` runs the hooks automatically. To run them
+manually on all files: `pre-commit run --all-files`.
 
-Se detect-secrets flagar um falso positivo (chave de exemplo em test
-fixture, hash SHA-256 legítimo), duas opções:
+If detect-secrets flags a false positive (example key in a test
+fixture, legitimate SHA-256 hash), there are two options:
 
-1. **Atualizar o baseline** — se e um secret legitimo que sempre existiu:
+1. **Update the baseline** — if it is a legitimate secret that has always existed:
    ```bash
    detect-secrets scan --baseline .secrets.baseline
    git add .secrets.baseline
    ```
-2. **Marcar inline** — se e um caso pontual:
+2. **Mark it inline** — if it is a one-off case:
    ```python
    API_KEY_EXAMPLE = "sk-example123..."  # pragma: allowlist secret
    ```
 
-O CI roda o mesmo scan como safety net — commits sem `pre-commit install`
-local ainda sao bloqueados no PR.
+The CI runs the same scan as a safety net — commits made without a local
+`pre-commit install` are still blocked in the PR.
 
 ---
 
-## Estrutura do Projeto
+## Project Structure
 
 ```
 atlans/
-├── app/                            # Backend FastAPI
-│   ├── main.py                     # Entry point — registra routers, middleware, lifespan
+├── app/                            # FastAPI backend
+│   ├── main.py                     # Entry point — registers routers, middleware, lifespan
 │   ├── api/
-│   │   ├── dependencies.py         # Dependências injetáveis (get_db, get_current_user)
-│   │   └── routers/                # Um arquivo por domínio
-│   │       ├── auth_router.py          # Registro, login, refresh, /me
-│   │       ├── workflows_router.py     # CRUD de workflows, export/import, execução
-│   │       ├── executores_router.py    # CRUD de executores, enrollment, install.sh
-│   │       ├── executor_ws_router.py   # WebSocket do executor (endpoint; fachada do pacote)
-│   │       ├── executor_ws/            # Protocolo, fila, resultados e órfãos do WS
-│   │       ├── credentials_router.py   # CRUD de credenciais criptografadas
-│   │       ├── schedules_router.py     # Agendamentos (cron, interval, rrule)
-│   │       ├── drive_router.py         # Upload/download de arquivos (MinIO)
-│   │       ├── observability_router.py # Métricas de execução, runs-by-day
-│   │       ├── log_workflows_router.py # WebSocket de logs em tempo real
-│   │       ├── nodes_router.py         # Catálogo de nós disponíveis
-│   │       ├── workspace_router.py     # CRUD de workspaces
-│   │       ├── workflow_groups_router.py # Grupos de workflows
-│   │       ├── artifacts_router.py     # Artefatos gerados por execuções
-│   │       ├── portal_router.py        # Portal público de mapas
+│   │   ├── dependencies.py         # Injectable dependencies (get_db, get_current_user)
+│   │   └── routers/                # One file per domain
+│   │       ├── auth_router.py          # Registration, login, refresh, /me
+│   │       ├── workflows_router.py     # Workflow CRUD, export/import, execution
+│   │       ├── executores_router.py    # Executor CRUD, enrollment, install.sh
+│   │       ├── executor_ws_router.py   # Executor WebSocket (endpoint; facade of the package)
+│   │       ├── executor_ws/            # WS protocol, queue, results and orphans
+│   │       ├── credentials_router.py   # CRUD of encrypted credentials
+│   │       ├── schedules_router.py     # Schedules (cron, interval, rrule)
+│   │       ├── drive_router.py         # File upload/download (MinIO)
+│   │       ├── observability_router.py # Run metrics, runs-by-day
+│   │       ├── log_workflows_router.py # Real-time log WebSocket
+│   │       ├── nodes_router.py         # Catalog of available nodes
+│   │       ├── workspace_router.py     # Workspace CRUD
+│   │       ├── workflow_groups_router.py # Workflow groups
+│   │       ├── artifacts_router.py     # Artifacts generated by runs
+│   │       ├── portal_router.py        # Public map portal
 │   │       ├── health_router.py        # /ping, healthcheck
-│   │       ├── telemetry_router.py     # Telemetria de uso
-│   │       └── webhook_router.py       # Recebe webhooks externos
+│   │       ├── telemetry_router.py     # Usage telemetry
+│   │       └── webhook_router.py       # Receives external webhooks
 │   ├── core/
-│   │   ├── config.py               # Variáveis de ambiente (os.getenv), validadas no import
-│   │   ├── db.py                   # Engine async SQLAlchemy + sessão
-│   │   ├── storage.py              # Integração com MinIO (S3-compatible)
-│   │   ├── async_scheduler.py      # Scheduler async para agendamentos
-│   │   ├── executor_connections.py # Registry de conexões WebSocket de executores
-│   │   ├── job_crypto.py           # Criptografia de jobs (X25519 + AES-GCM)
-│   │   ├── run_result_consumer.py  # Processa resultados recebidos dos executores
-│   │   ├── drive_events.py         # Eventos de sincronização de arquivos
-│   │   ├── rate_limiter.py         # Rate limiting por endpoint
-│   │   ├── rbac.py                 # Controle de acesso baseado em papéis
-│   │   ├── constants.py            # Constantes globais
-│   │   ├── exceptions.py           # Exceções customizadas
-│   │   ├── authorization/          # Middleware e guards de autorização
-│   │   ├── credentials/            # Builders de DSN por tipo (PostgreSQL, S3...)
-│   │   ├── scheduling/             # Estratégias de agendamento
-│   │   └── utils/                  # JWT, logging, handlers de erro
-│   ├── models/                     # Modelos SQLAlchemy (ORM)
-│   │   ├── base.py                 # Base declarativa + mixins
-│   │   ├── user.py                 # Usuário (auth)
-│   │   ├── workspace.py            # Workspace multi-tenant
-│   │   ├── workspace_member.py     # Membros do workspace
-│   │   ├── workflow.py             # Definição do workflow (DAG JSON)
-│   │   ├── workflow_run.py         # Execução de um workflow
-│   │   ├── workflow_version.py     # Versionamento de workflows
-│   │   ├── workflow_group.py       # Grupos/pastas de workflows
-│   │   ├── schedule.py             # Agendamento
-│   │   ├── credential.py           # Credencial criptografada
-│   │   ├── executor.py                # Executor registrado
-│   │   ├── artifact.py             # Artefato gerado
-│   │   └── ...                     # Demais modelos de domínio
-│   ├── schemas/                    # Schemas Pydantic (request/response)
-│   ├── services/                   # Lógica de negócio
-│   │   ├── workflow_service.py     # Orquestração de workflows
-│   │   ├── executor_service.py     # Gestão de executores e dispatch de jobs
-│   │   ├── credential_service.py   # CRUD + criptografia de credenciais
-│   │   ├── schedule_service.py     # CRUD de agendamentos
-│   │   ├── node_service.py         # Catálogo e validação de nós
+│   │   ├── config.py               # Environment variables (os.getenv), validated on import
+│   │   ├── db.py                   # Async SQLAlchemy engine + session
+│   │   ├── storage.py              # MinIO integration (S3-compatible)
+│   │   ├── async_scheduler.py      # Async scheduler for schedules
+│   │   ├── executor_connections.py # Registry of executor WebSocket connections
+│   │   ├── job_crypto.py           # Job encryption (X25519 + AES-GCM)
+│   │   ├── run_result_consumer.py  # Processes results received from the executors
+│   │   ├── drive_events.py         # File synchronization events
+│   │   ├── rate_limiter.py         # Per-endpoint rate limiting
+│   │   ├── rbac.py                 # Role-based access control
+│   │   ├── constants.py            # Global constants
+│   │   ├── exceptions.py           # Custom exceptions
+│   │   ├── authorization/          # Authorization middleware and guards
+│   │   ├── credentials/            # DSN builders per type (PostgreSQL, S3...)
+│   │   ├── scheduling/             # Scheduling strategies
+│   │   └── utils/                  # JWT, logging, error handlers
+│   ├── models/                     # SQLAlchemy models (ORM)
+│   │   ├── base.py                 # Declarative base + mixins
+│   │   ├── user.py                 # User (auth)
+│   │   ├── workspace.py            # Multi-tenant workspace
+│   │   ├── workspace_member.py     # Workspace members
+│   │   ├── workflow.py             # Workflow definition (DAG JSON)
+│   │   ├── workflow_run.py         # A run of a workflow
+│   │   ├── workflow_version.py     # Workflow versioning
+│   │   ├── workflow_group.py       # Workflow groups/folders
+│   │   ├── schedule.py             # Schedule
+│   │   ├── credential.py           # Encrypted credential
+│   │   ├── executor.py                # Registered executor
+│   │   ├── artifact.py             # Generated artifact
+│   │   └── ...                     # Other domain models
+│   ├── schemas/                    # Pydantic schemas (request/response)
+│   ├── services/                   # Business logic
+│   │   ├── workflow_service.py     # Workflow orchestration
+│   │   ├── executor_service.py     # Executor management and job dispatch
+│   │   ├── credential_service.py   # CRUD + encryption of credentials
+│   │   ├── schedule_service.py     # Schedule CRUD
+│   │   ├── node_service.py         # Node catalog and validation
 │   │   └── ...
-│   ├── crud/                       # Operações CRUD genéricas
-│   └── extensoes/                  # O que uma instalação tem além do núcleo (docs/architecture.md)
-│       └── __init__.py             # O registro: cada subpacote é uma extensão, ligada por registrar()
+│   ├── crud/                       # Generic CRUD operations
+│   └── extensoes/                  # What an installation has beyond the core (docs/architecture.md)
+│       └── __init__.py             # The registry: each subpackage is an extension, wired in by registrar()
 │
-├── flow/                           # Motor de execução DAG
-│   ├── executor/                   # Pacote do motor de execução
-│   │   ├── core.py                 # WorkflowExecutor.run() — traversal + execução dos nós
-│   │   ├── node_manager.py         # Instancia e gerencia os nós do run
-│   │   ├── edge_resolver.py        # Resolve arestas (inputs ← outputs dos predecessores)
-│   │   ├── events.py               # Emissão de node_events durante o run
-│   │   ├── rendering.py            # Renderização de parâmetros (Jinja) por nó
-│   │   ├── pin.py                  # Pins de saída (cache de resultados de nó)
-│   │   └── spill.py                # Spill de saídas grandes para o MinIO
-│   ├── factory.py                  # Instancia nó a partir do nome registrado
-│   ├── registry.py                 # NODE_REGISTRY: name → classe (via @register_node + auto-discovery)
+├── flow/                           # DAG execution engine
+│   ├── executor/                   # Execution engine package
+│   │   ├── core.py                 # WorkflowExecutor.run() — traversal + execution of the nodes
+│   │   ├── node_manager.py         # Instantiates and manages the run's nodes
+│   │   ├── edge_resolver.py        # Resolves edges (inputs ← outputs of the predecessors)
+│   │   ├── events.py               # Emission of node_events during the run
+│   │   ├── rendering.py            # Parameter rendering (Jinja) per node
+│   │   ├── pin.py                  # Output pins (cache of node results)
+│   │   └── spill.py                # Spill of large outputs to MinIO
+│   ├── factory.py                  # Instantiates a node from its registered name
+│   ├── registry.py                 # NODE_REGISTRY: name → class (via @register_node + auto-discovery)
 │   ├── core/
-│   │   └── graph.py                # Representação e validação do grafo DAG
+│   │   └── graph.py                # Representation and validation of the DAG graph
 │   ├── nodes/
-│   │   ├── base.py                 # Classe base BaseNode
-│   │   ├── action/                 # HTTP, transformação, geocodificação, scripts
-│   │   ├── spatial/                # Operações GeoPandas (buffer, clip, dissolve, voronoi...)
-│   │   ├── datasource/             # Leitores (PostGIS, GeoJSON, Shapefile, WFS, CSV...)
-│   │   ├── outputs/                # Saídas (arquivo, S3, PostGIS, webhook, e-mail, artefato)
-│   │   ├── control/                # Fluxo (condicional, loop, switch, sub-workflow, merge)
-│   │   └── trigger/                # Gatilhos (schedule, webhook, arquivo, workflow, geofence)
-│   ├── utils/                      # Helpers do motor
-│   │   ├── geo_helpers.py          # Funções utilitárias geoespaciais
-│   │   ├── expression_service.py   # Avaliação de expressões Jinja/Python
-│   │   ├── circuit_breaker.py      # Circuit breaker para chamadas externas
-│   │   ├── get_asyncpg_pool.py     # Pool de conexões asyncpg
-│   │   ├── artifact_helpers.py     # Helpers para geração de artefatos
-│   │   ├── publisher/              # Publicação de eventos de nós
+│   │   ├── base.py                 # BaseNode base class
+│   │   ├── action/                 # HTTP, transformation, geocoding, scripts
+│   │   ├── spatial/                # GeoPandas operations (buffer, clip, dissolve, voronoi...)
+│   │   ├── datasource/             # Readers (PostGIS, GeoJSON, Shapefile, WFS, CSV...)
+│   │   ├── outputs/                # Outputs (file, S3, PostGIS, webhook, e-mail, artifact)
+│   │   ├── control/                # Flow (conditional, loop, switch, sub-workflow, merge)
+│   │   └── trigger/                # Triggers (schedule, webhook, file, workflow, geofence)
+│   ├── utils/                      # Engine helpers
+│   │   ├── geo_helpers.py          # Geospatial utility functions
+│   │   ├── expression_service.py   # Evaluation of Jinja/Python expressions
+│   │   ├── circuit_breaker.py      # Circuit breaker for external calls
+│   │   ├── get_asyncpg_pool.py     # asyncpg connection pool
+│   │   ├── artifact_helpers.py     # Helpers for artifact generation
+│   │   ├── publisher/              # Publishing of node events
 │   │   └── ...
 │   └── metrics/
-│       └── collector.py            # Coleta de métricas de execução
+│       └── collector.py            # Collection of run metrics
 │
-├── executor/                          # Executor externo (execução distribuída)
-│   ├── main.py                     # Entry point do executor
-│   ├── config.py                   # Configuração via env vars
+├── executor/                          # External executor (distributed execution)
+│   ├── main.py                     # Executor entry point
+│   ├── config.py                   # Configuration via env vars
 │   ├── connection.py               # WebSocket client (reconnect, heartbeat, mTLS)
 │   ├── crypto.py                   # X25519/Ed25519/AES-GCM
-│   ├── job_executor.py             # Executa flow/ localmente
-│   ├── job_queue.py                # Fila de jobs com back-pressure
-│   ├── job_validator.py            # Validação de jobs recebidos
-│   ├── event_publisher.py          # Publica eventos de nós via WebSocket
-│   ├── utils.py                    # Utilitários (URL conversion, host aliases)
-│   └── sync/                       # GeoSync — sincronização de arquivos
-│       ├── manager.py              # Orquestrador principal
-│       ├── scanner.py              # Scanner de datasets locais
+│   ├── job_executor.py             # Runs flow/ locally
+│   ├── job_queue.py                # Job queue with back-pressure
+│   ├── job_validator.py            # Validation of received jobs
+│   ├── event_publisher.py          # Publishes node events via WebSocket
+│   ├── utils.py                    # Utilities (URL conversion, host aliases)
+│   └── sync/                       # GeoSync — file synchronization
+│       ├── manager.py              # Main orchestrator
+│       ├── scanner.py              # Scanner of local datasets
 │       ├── watcher.py              # File watcher (inotify/fsevents)
-│       ├── uploader.py             # Upload para o Drive
-│       ├── downloader.py           # Download do Drive
-│       ├── manifest.py             # Manifesto local (estado de sync)
-│       ├── validator.py            # Validação de datasets
-│       ├── metadata.py             # Extração de metadados geoespaciais
-│       ├── trigger.py              # Triggers de sincronização
+│       ├── uploader.py             # Upload to the Drive
+│       ├── downloader.py           # Download from the Drive
+│       ├── manifest.py             # Local manifest (sync state)
+│       ├── validator.py            # Dataset validation
+│       ├── metadata.py             # Extraction of geospatial metadata
+│       ├── trigger.py              # Synchronization triggers
 │       └── ...
 │
-├── web/                            # Frontend Next.js 16
+├── web/                            # Next.js 16 frontend
 │   ├── app/
-│   │   ├── (auth)/                 # Login e registro (sem autenticação)
-│   │   ├── (dashboard)/            # Páginas protegidas (editor, admin, observabilidade)
-│   │   ├── (portal)/               # Portal público de mapas
-│   │   └── layout.tsx              # Layout raiz
+│   │   ├── (auth)/                 # Login and registration (no authentication)
+│   │   ├── (dashboard)/            # Protected pages (editor, admin, observability)
+│   │   ├── (portal)/               # Public map portal
+│   │   └── layout.tsx              # Root layout
 │   ├── app/components/
-│   │   ├── workflow/               # Editor visual (XYFlow), configuração de nós
-│   │   ├── credentials/            # CRUD de credenciais
-│   │   ├── projects/               # Lista e filtros de workflows
-│   │   ├── sidebar/                # Navegação lateral
-│   │   ├── ui/                     # Componentes shadcn/ui reutilizáveis
-│   │   └── shared/                 # Componentes compartilhados
-│   ├── context/                    # Contextos React (FlowContext, etc.)
-│   ├── extensoes/                  # O que uma instalação tem além do núcleo (docs/architecture.md)
-│   │   ├── index.ts                # O registro: o núcleo lê EXTENSOES daqui, e só daqui
-│   │   └── instaladas.ts           # As extensões desta instalação (a distribuição livre: nenhuma.ts)
-│   ├── hooks/                      # Hooks customizados (useExecuteWorkflow, etc.)
-│   ├── service/                    # Cliente HTTP (GisFlowService.ts) e a casa única de tipos (types.ts)
-│   ├── auth.ts                     # Configuração NextAuth
-│   └── proxy.ts                    # Proteção de rotas (o middleware do Next)
+│   │   ├── workflow/               # Visual editor (XYFlow), node configuration
+│   │   ├── credentials/            # Credential CRUD
+│   │   ├── projects/               # Workflow list and filters
+│   │   ├── sidebar/                # Side navigation
+│   │   ├── ui/                     # Reusable shadcn/ui components
+│   │   └── shared/                 # Shared components
+│   ├── context/                    # React contexts (FlowContext, etc.)
+│   ├── extensoes/                  # What an installation has beyond the core (docs/architecture.md)
+│   │   ├── index.ts                # The registry: the core reads EXTENSOES from here, and only from here
+│   │   └── instaladas.ts           # This installation's extensions (the free distribution: nenhuma.ts)
+│   ├── hooks/                      # Custom hooks (useExecuteWorkflow, etc.)
+│   ├── service/                    # HTTP client (GisFlowService.ts) and the single home of types (types.ts)
+│   ├── auth.ts                     # NextAuth configuration
+│   └── proxy.ts                    # Route protection (Next's middleware)
 │
-├── catalogo/                       # Catálogo de fontes: cópia versionada do Vault de geosserviços (docs/fontes.md)
-│   ├── README.md                   # O formato das notas e como atualizar
-│   └── geoservicos/                # Uma pasta por instituição (nota, Camadas.md, Atributos.md)
+├── catalogo/                       # Source catalog: versioned copy of the geoservice Vault (docs/sources.md)
+│   ├── README.md                   # The format of the notes and how to update them
+│   └── geoservicos/                # One folder per institution (note, Camadas.md, Atributos.md)
 │
-├── alembic/                        # Migrações de banco de dados
+├── alembic/                        # Database migrations
 │   ├── env.py
-│   └── versions/                   # Arquivos de migração
+│   └── versions/                   # Migration files
 │
-├── tests/                          # Testes automatizados
-│   ├── conftest.py                 # Fixtures globais
-│   ├── unit/                       # Testes unitários
-│   ├── integration/                # Testes de integração
-│   └── extensoes/                  # Os testes de cada extensão (app/extensoes), fora do núcleo; só existe quando há uma
+├── tests/                          # Automated tests
+│   ├── conftest.py                 # Global fixtures
+│   ├── unit/                       # Unit tests
+│   ├── integration/                # Integration tests
+│   └── extensoes/                  # The tests of each extension (app/extensoes), outside the core; only exists when there is one
 │
-├── docker-compose.yml              # Stack principal (API, Redis, MinIO, frontend)
-├── docker-compose.executor.yml        # Stack do executor (distribuição para clientes)
-├── Dockerfile.api                  # Build do backend
-├── Dockerfile.executor                # Build do executor
-├── Makefile                        # Atalhos (up-dev, logs, etc.)
-├── alembic.ini                     # Configuração do Alembic
-├── requirements.in                 # Dependências Python diretas do backend (edite aqui)
-├── requirements.txt                # Lock gerado do .in, com hash (o que a imagem e o CI instalam)
-├── requirements-dev.in/.txt        # Ferramentas de dev fora da imagem (ruff, pip-audit, detect-secrets, pre-commit, pip-tools)
-├── ruff.toml                       # Regras do lint Python (CI)
-└── pytest.ini                      # Configuração do pytest
+├── docker-compose.yml              # Main stack (API, Redis, MinIO, frontend)
+├── docker-compose.executor.yml        # Executor stack (distribution to clients)
+├── Dockerfile.api                  # Backend build
+├── Dockerfile.executor                # Executor build
+├── Makefile                        # Shortcuts (up-dev, logs, etc.)
+├── alembic.ini                     # Alembic configuration
+├── requirements.in                 # Direct Python dependencies of the backend (edit here)
+├── requirements.txt                # Lock generated from the .in, with hashes (what the image and the CI install)
+├── requirements-dev.in/.txt        # Dev tools outside the image (ruff, pip-audit, detect-secrets, pre-commit, pip-tools)
+├── ruff.toml                       # Python lint rules (CI)
+└── pytest.ini                      # pytest configuration
 ```
 
 ---
 
-## Workflow de Git
+## Git Workflow
 
-### Fluxo padrão
+### Standard flow
 
 ```bash
-# 1. Crie uma branch a partir de main
-# Convenção do repo: o tipo do commit + slug curto (ex.: feat/dashboard-periodo).
+# 1. Create a branch from main
+# Repo convention: the commit type + a short slug (e.g. feat/dashboard-periodo).
 git checkout main && git pull
 git checkout -b feat/nome-da-funcionalidade
 
-# 2. Desenvolva e commite em pequenos passos
+# 2. Develop and commit in small steps
 git add <arquivos>
 git commit -m "feat: descrição curta do que foi feito"
 
-# 3. Mantenha a branch atualizada
+# 3. Keep the branch up to date
 git fetch origin
 git rebase origin/main
 
-# 4. Abra o PR quando estiver pronto
+# 4. Open the PR when it is ready
 ```
 
 ### Conventional Commits
 
-Todos os commits devem seguir o padrão [Conventional Commits](https://www.conventionalcommits.org/):
+All commits must follow the [Conventional Commits](https://www.conventionalcommits.org/) standard:
 
-| Prefixo | Quando usar | Exemplo |
+| Prefix | When to use | Example |
 |---|---|---|
-| `feat:` | Nova funcionalidade | `feat: adicionar nó de dissolve espacial` |
-| `fix:` | Correção de bug | `fix: corrigir timeout no WebSocket do executor` |
-| `docs:` | Apenas documentação | `docs: atualizar guia de contribuição` |
-| `refactor:` | Reestruturação sem mudança de comportamento | `refactor: extrair lógica de dispatch para service` |
-| `test:` | Testes | `test: adicionar testes unitários para buffer node` |
-| `chore:` | Manutenção (deps, CI, configs) | `chore: atualizar dependências do frontend` |
-| `perf:` | Melhoria de performance | `perf: usar asyncpg pool no database_query` |
-| `desktop:` | Mudanças/bump do app desktop (Electron) | `desktop: v2.15.0` |
-| `executor:` | Mudanças específicas do executor | `executor: ocultar no Windows os arquivos internos` |
+| `feat:` | New feature | `feat: adicionar nó de dissolve espacial` |
+| `fix:` | Bug fix | `fix: corrigir timeout no WebSocket do executor` |
+| `docs:` | Documentation only | `docs: atualizar guia de contribuição` |
+| `refactor:` | Restructuring without a change in behavior | `refactor: extrair lógica de dispatch para service` |
+| `test:` | Tests | `test: adicionar testes unitários para buffer node` |
+| `chore:` | Maintenance (deps, CI, configs) | `chore: atualizar dependências do frontend` |
+| `perf:` | Performance improvement | `perf: usar asyncpg pool no database_query` |
+| `desktop:` | Changes/bump of the desktop app (Electron) | `desktop: v2.15.0` |
+| `executor:` | Executor-specific changes | `executor: ocultar no Windows os arquivos internos` |
 
-**Escopo opcional:** `feat(executor): suportar sync bidirecional`
+**Optional scope:** `feat(executor): suportar sync bidirecional`
 
 ---
 
 ## Backend (FastAPI)
 
-### Adicionando um endpoint
+### Adding an endpoint
 
-1. Crie ou edite o router em `app/api/routers/`:
+1. Create or edit the router in `app/api/routers/`:
 
 ```python
 # app/api/routers/exemplo_router.py
@@ -398,20 +398,20 @@ async def listar(
     ...
 ```
 
-2. Registre o router em `app/main.py`:
+2. Register the router in `app/main.py`:
 
 ```python
 from app.api.routers.exemplo_router import router as exemplo_router
 app.include_router(exemplo_router)
 ```
 
-### Adicionando um modelo
+### Adding a model
 
-1. Crie o arquivo em `app/models/`
-2. Herde de `Base` (importado de `app/core/db.py`)
-3. Use `id_hash: str` como chave primária (gerado via `uuid4().hex`)
-4. Inclua `created_at` e `updated_at` com `server_default`
-5. Adicione `workspace_id` se o recurso pertence a um workspace
+1. Create the file in `app/models/`
+2. Inherit from `Base` (imported from `app/core/db.py`)
+3. Use `id_hash: str` as the primary key (generated via `uuid4().hex`)
+4. Include `created_at` and `updated_at` with `server_default`
+5. Add `workspace_id` if the resource belongs to a workspace
 
 ```python
 # app/models/exemplo.py
@@ -429,11 +429,11 @@ class Exemplo(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 ```
 
-### Adicionando um schema Pydantic
+### Adding a Pydantic schema
 
-- Schemas de entrada e saída ficam em `app/schemas/`
-- Use `model_validator(mode="after")` para validações cruzadas
-- Schemas de response definem `model_config = ConfigDict(from_attributes=True)`
+- Input and output schemas live in `app/schemas/`
+- Use `model_validator(mode="after")` for cross-field validation
+- Response schemas define `model_config = ConfigDict(from_attributes=True)`
 
 ```python
 # app/schemas/exemplo.py
@@ -452,34 +452,34 @@ class ExemploResponse(BaseModel):
     workspace_id: str
 ```
 
-### Adicionando um service
+### Adding a service
 
-- Lógica de negócio fica em `app/services/`, nunca diretamente no router
-- Services recebem `AsyncSession` e retornam modelos ou dicts
-- Erros de domínio levantam `HTTPException` com status e mensagem adequados
+- Business logic lives in `app/services/`, never directly in the router
+- Services receive an `AsyncSession` and return models or dicts
+- Domain errors raise `HTTPException` with the appropriate status and message
 
-### Formato de erros da API
+### API error format
 
-Todos os erros seguem formato padronizado (via `app/core/utils/error_handlers.py`):
+All errors follow a standardized format (via `app/core/utils/error_handlers.py`):
 
 ```jsonc
 // HTTP exceptions (400, 401, 403, 404, 429)
 { "error": "http_exception", "message": "Descrição legível.", "status_code": 400 }
 
-// Erros de validação Pydantic (422)
+// Pydantic validation errors (422)
 { "error": "validation_error", "message": "Validation failed", "details": [...] }
 
-// Erro interno (500)
+// Internal error (500)
 { "error": "internal_server_error", "message": "Unexpected error occurred" }
 ```
 
 ---
 
-## Motor de Workflow (flow/)
+## Workflow Engine (flow/)
 
-O motor `flow/` executa DAGs **dentro dos executores** — nunca no processo da API. O servidor importa `flow/` apenas para metadados (registry, `description()`), simulação de schema (`simulate()`) e validação de contrato de sub-workflow. Nós não têm acesso ao banco, ao MinIO nem ao Redis do servidor: tudo passa por endpoints HTTP autenticados por mTLS (`/drive/executor-*`, `/internal/*`) e pre-signed URLs.
+The `flow/` engine executes DAGs **inside the executors** — never in the API process. The server imports `flow/` only for metadata (registry, `description()`), schema simulation (`simulate()`) and validation of the sub-workflow contract. Nodes have no access to the server's database, MinIO or Redis: everything goes through HTTP endpoints authenticated by mTLS (`/drive/executor-*`, `/internal/*`) and pre-signed URLs.
 
-### Ciclo de vida de um nó
+### Lifecycle of a node
 
 ```mermaid
 sequenceDiagram
@@ -488,27 +488,27 @@ sequenceDiagram
     participant Registry as registry.py (NODE_REGISTRY)
     participant Node as BaseNode
 
-    Executor->>Executor: Ordena nós topologicamente (DAG)
-    loop Para cada nó
-        Executor->>Factory: instancia o nó pelo name
+    Executor->>Executor: Sorts nodes topologically (DAG)
+    loop For each node
+        Executor->>Factory: instantiates the node by name
         Factory->>Registry: registry.get(name)
-        Registry-->>Factory: classe do nó
-        Factory-->>Executor: instância do nó (node_id, parameters)
+        Registry-->>Factory: node class
+        Factory-->>Executor: node instance (node_id, parameters)
         Executor->>Node: execute(inputs)
-        Node-->>Executor: dict de saídas
-        Executor->>Executor: Armazena saídas como entradas dos próximos nós
+        Node-->>Executor: dict of outputs
+        Executor->>Executor: Stores outputs as inputs of the next nodes
     end
 ```
 
-1. O `WorkflowExecutor` (`flow/executor/core.py`, método `run()`) faz traversal topológico do DAG definido no workflow JSON
-2. Para cada nó, o `factory.py` consulta o `NODE_REGISTRY` (`registry.py`) e instancia a classe correspondente com `(node_id, parameters)`
-3. A instância recebe os parâmetros do usuário no construtor (acessíveis via `self.parameters` / `self.get_param()`); os `inputs` (saídas dos nós predecessores) chegam no `execute()`
-4. O método `execute(self, inputs)` roda a lógica e retorna um dict de saídas — nós CPU-bound implementam `execute_sync(self, inputs)` (ver abaixo)
-5. As saídas ficam disponíveis como entradas para os nós seguintes no DAG
+1. The `WorkflowExecutor` (`flow/executor/core.py`, method `run()`) does a topological traversal of the DAG defined in the workflow JSON
+2. For each node, `factory.py` looks up the `NODE_REGISTRY` (`registry.py`) and instantiates the corresponding class with `(node_id, parameters)`
+3. The instance receives the user's parameters in the constructor (accessible via `self.parameters` / `self.get_param()`); the `inputs` (outputs of the predecessor nodes) arrive in `execute()`
+4. The `execute(self, inputs)` method runs the logic and returns a dict of outputs — CPU-bound nodes implement `execute_sync(self, inputs)` (see below)
+5. The outputs become available as inputs to the following nodes in the DAG
 
-### Criando um novo nó
+### Creating a new node
 
-1. Crie o arquivo na categoria adequada dentro de `flow/nodes/` e decore a classe com `@register_node`. O nó é descoberto **automaticamente** — `registry.auto_discover_nodes()` varre `flow/nodes/` na importação e dispara os decorators; você **não** edita o `registry.py` manualmente.
+1. Create the file in the appropriate category inside `flow/nodes/` and decorate the class with `@register_node`. The node is discovered **automatically** — `registry.auto_discover_nodes()` scans `flow/nodes/` on import and triggers the decorators; you do **not** edit `registry.py` manually.
 
 ```python
 # flow/nodes/spatial/meu_no.py
@@ -524,10 +524,10 @@ class MeuNoNode(BaseNode):
 
     @classmethod
     def description(cls) -> Dict[str, Any]:
-        # Metadados para descoberta e geração da interface no editor.
+        # Metadata for discovery and for generating the interface in the editor.
         return {
-            "name": "MeuNo",                  # chave ÚNICA de registro (sem espaços)
-            "alias": "Meu Nó",                # nome exibido no editor
+            "name": "MeuNo",                  # UNIQUE registration key (no spaces)
+            "alias": "Meu Nó",                # name displayed in the editor
             "description": "O que o nó faz.",
             "type": "spatial",                # trigger|action|spatial|datasource|output|control
             "properties": [
@@ -541,25 +541,25 @@ class MeuNoNode(BaseNode):
         }
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        self.validate()                       # aplica os defaults declarados em properties
-        gdf = self.get_first_gdf(inputs)      # ou self.get_input_gdf(inputs, "chave")
+        self.validate()                       # applies the defaults declared in properties
+        gdf = self.get_first_gdf(inputs)      # or self.get_input_gdf(inputs, "chave")
         param = self.get_param_float("parametro", 100)
-        # ... lógica ...
+        # ... logic ...
         return {"result": gdf}
 ```
 
-Notas sobre o `BaseNode` (`flow/nodes/base.py`):
+Notes on `BaseNode` (`flow/nodes/base.py`):
 
-- **Parâmetros** vêm do construtor (`__init__(self, node_id, parameters)`) e são lidos por `self.get_param()`, `get_param_float()`, `get_param_int()`, `get_param_bool()` — **não** por um argumento `config` no `execute`.
-- **`execute(self, inputs)`** recebe apenas os `inputs`. Para nós **CPU-bound** (geopandas/pandas/shapely) prefira implementar `execute_sync(self, inputs)`: o `BaseNode.execute()` já o despacha para uma thread (`asyncio.to_thread`), mantendo o event loop do executor livre para heartbeat, eventos e `cancel`. Sobrescreva `execute` diretamente quando o nó aguarda I/O assíncrono (asyncpg, httpx).
-- **`self.validate()`** aplica os defaults de `properties`; chame no início do `execute`.
-- Helpers de input: `get_first_gdf(inputs)` e `get_input_gdf(inputs, "chave")` buscam e validam GeoDataFrames com mensagens de erro claras.
+- **Parameters** come from the constructor (`__init__(self, node_id, parameters)`) and are read through `self.get_param()`, `get_param_float()`, `get_param_int()`, `get_param_bool()` — **not** through a `config` argument to `execute`.
+- **`execute(self, inputs)`** receives only the `inputs`. For **CPU-bound** nodes (geopandas/pandas/shapely), prefer implementing `execute_sync(self, inputs)`: `BaseNode.execute()` already dispatches it to a thread (`asyncio.to_thread`), keeping the executor's event loop free for heartbeat, events and `cancel`. Override `execute` directly when the node awaits asynchronous I/O (asyncpg, httpx).
+- **`self.validate()`** applies the `properties` defaults; call it at the start of `execute`.
+- Input helpers: `get_first_gdf(inputs)` and `get_input_gdf(inputs, "chave")` fetch and validate GeoDataFrames with clear error messages.
 
-2. O frontend carrega o schema do nó automaticamente via `GET /nodes/` — não é necessário criar componente visual na maioria dos casos.
+2. The frontend loads the node's schema automatically via `GET /nodes/` — in most cases there is no need to create a visual component.
 
-### Categorias de nós
+### Node categories
 
-| Categoria | Diretório | Exemplos |
+| Category | Directory | Examples |
 |---|---|---|
 | **spatial** | `flow/nodes/spatial/` | buffer, clip, dissolve, intersection, voronoi, spatial_join |
 | **datasource** | `flow/nodes/datasource/` | database_query, read_geojson, read_shapefile, wfs |
@@ -570,17 +570,17 @@ Notas sobre o `BaseNode` (`flow/nodes/base.py`):
 
 ### Executor — features
 
-- **Métricas:** o `flow/metrics/collector.py` coleta tempo de execução, contagem de linhas e erros por nó
-- **Circuit Breaker:** `flow/utils/circuit_breaker.py` protege chamadas externas (HTTP, banco) contra falhas cascata
-- **Pools asyncpg:** `flow/utils/get_asyncpg_pool.py` reutiliza conexões entre execuções
+- **Metrics:** `flow/metrics/collector.py` collects execution time, row count and errors per node
+- **Circuit Breaker:** `flow/utils/circuit_breaker.py` protects external calls (HTTP, database) against cascading failures
+- **asyncpg pools:** `flow/utils/get_asyncpg_pool.py` reuses connections across runs
 
 ---
 
-## Sistema de Executores
+## Executor System
 
-A execução de workflows no Atlans é **totalmente distribuída via executores**. Não há Celery — os executores conectam via WebSocket, recebem jobs criptografados, executam o `flow/` localmente e retornam resultados.
+Workflow execution in Atlans is **fully distributed through executors**. There is no Celery — the executors connect via WebSocket, receive encrypted jobs, run `flow/` locally and return results.
 
-### Arquitetura
+### Architecture
 
 ```mermaid
 graph LR
@@ -600,76 +600,76 @@ graph LR
     end
 
     API -->|dispatch job| Crypto
-    Crypto -->|criptografado| WS
+    Crypto -->|encrypted| WS
     Scheduler -->|trigger| API
     WS <-->|WebSocket| Conn
     Conn -->|job| Queue
     Queue -->|execute| Exec
     Exec -->|run| Flow
-    Exec -->|resultado| Conn
-    Sync <-->|arquivos| WS
+    Exec -->|result| Conn
+    Sync <-->|files| WS
 ```
 
-### Onde um executor roda
+### Where an executor runs
 
-A stack do servidor não sobe executor nenhum: o primeiro é matriculado pelo
-painel e roda onde se quiser, inclusive no mesmo host (`executor/README.md`).
+The server stack does not start any executor: the first one is enrolled through the
+dashboard and runs wherever you want, including on the same host (`executor/README.md`).
 
-| Jeito | Onde roda | Caso de uso |
+| Way | Where it runs | Use case |
 |---|---|---|
-| **Docker** | Qualquer máquina com Docker (`install.sh` servido pelo painel, ou `docker-compose.executor.yml`) | O caminho padrão: servidores, VMs, o próprio host da stack |
-| **Python nativo** | Uma máquina com Python 3.12 (`python -m executor`) | Acesso a bancos internos e dados locais, desenvolvimento |
-| **Desktop** | Máquina do usuário (app Electron, Windows) | Dados locais, prototipagem, uso individual |
+| **Docker** | Any machine with Docker (`install.sh` served by the dashboard, or `docker-compose.executor.yml`) | The default path: servers, VMs, the stack's own host |
+| **Native Python** | A machine with Python 3.12 (`python -m executor`) | Access to internal databases and local data, development |
+| **Desktop** | The user's machine (Electron app, Windows) | Local data, prototyping, individual use |
 
-Para o servidor, um executor é `default` (atende qualquer workspace) ou
-`dedicated` (só os workspaces a que foi atribuído) — `docs/architecture.md`.
+To the server, an executor is `default` (serves any workspace) or
+`dedicated` (only the workspaces it has been assigned to) — `docs/architecture.md`.
 
-### Dispatch de jobs
+### Job dispatch
 
-1. Usuário clica "Executar" ou um agendamento é disparado
-2. `executor_service.py` seleciona o executor alvo (por workspace, capacidade ou assignment)
-3. `job_crypto.py` criptografa o payload do workflow (X25519 + AES-256-GCM)
-4. O job criptografado é enviado via WebSocket ao executor
-5. O executor descriptografa, executa o `flow/` e retorna o resultado
-6. `run_result_consumer.py` processa o resultado e atualiza o `WorkflowRun`
+1. The user clicks "Executar" (Run) or a schedule fires
+2. `executor_service.py` selects the target executor (by workspace, capacity or assignment)
+3. `job_crypto.py` encrypts the workflow payload (X25519 + AES-256-GCM)
+4. The encrypted job is sent via WebSocket to the executor
+5. The executor decrypts it, runs `flow/` and returns the result
+6. `run_result_consumer.py` processes the result and updates the `WorkflowRun`
 
-### Eventos em tempo real
+### Real-time events
 
-Durante a execução, o executor envia `node_event` a cada nó processado. Esses eventos são retransmitidos via WebSocket para o frontend, permitindo que o canvas mostre o progresso nó a nó em tempo real.
+During execution, the executor sends a `node_event` for each processed node. These events are relayed via WebSocket to the frontend, letting the canvas show progress node by node in real time.
 
-Documentação completa do executor: [`executor/README.md`](executor/README.md)
+Full executor documentation: [`executor/README.md`](executor/README.md)
 
 ---
 
 ## Frontend (Next.js)
 
-### Comandos de desenvolvimento
+### Development commands
 
-Rodados a partir de `web/` (scripts em `web/package.json`):
+Run from `web/` (scripts in `web/package.json`):
 
 ```bash
-npm run dev         # servidor de desenvolvimento (next dev, hot-reload)
-npm run lint        # ESLint (eslint app lib extensoes) — roda no CI
+npm run dev         # development server (next dev, hot-reload)
+npm run lint        # ESLint (eslint app lib extensoes) — runs in CI
 npm run typecheck   # tsc --noEmit
-npm run typecheck:nucleo  # o núcleo sem extensão nenhuma, sem apagar nada (tsconfig.nucleo.json)
-npm test            # Vitest (vitest run) — roda no CI
-npm run test:nucleo # a suíte sem extensão nenhuma, sem apagar nada (vitest --mode nucleo)
-npm run build       # build de produção (next build) — roda no CI
+npm run typecheck:nucleo  # the core without any extension, without deleting anything (tsconfig.nucleo.json)
+npm test            # Vitest (vitest run) — runs in CI
+npm run test:nucleo # the suite without any extension, without deleting anything (vitest --mode nucleo)
+npm run build       # production build (next build) — runs in CI
 ```
 
-### Estrutura de rotas (App Router)
+### Route structure (App Router)
 
-O frontend usa **App Router** do Next.js 16 com grupos de rotas:
+The frontend uses the Next.js 16 **App Router** with route groups:
 
-| Grupo | Autenticação | Conteúdo |
+| Group | Authentication | Content |
 |---|---|---|
-| `(auth)/` | Nenhuma | Login, registro |
-| `(dashboard)/` | NextAuth (JWT) | Editor de workflows, executores, credenciais, observabilidade |
-| `(portal)/` | Pública | Portal de mapas publicados |
+| `(auth)/` | None | Login, registration |
+| `(dashboard)/` | NextAuth (JWT) | Workflow editor, executors, credentials, observability |
+| `(portal)/` | Public | Portal of published maps |
 
-### Chamadas à API
+### API calls
 
-Use `GisFlowService.ts` como cliente HTTP centralizado:
+Use `GisFlowService.ts` as the centralized HTTP client:
 
 ```typescript
 // web/service/GisFlowService.ts
@@ -681,7 +681,7 @@ async getExemplo(workspaceId: string): Promise<IExemplo[]> {
 }
 ```
 
-### Tratamento de erros HTTP
+### Handling HTTP errors
 
 ```typescript
 } catch (err) {
@@ -693,7 +693,7 @@ async getExemplo(workspaceId: string): Promise<IExemplo[]> {
   const data = axiosErr.response?.data;
 
   if (!axiosErr.response) {
-    // Sem rede
+    // No network
   } else if (data?.error === "validation_error" && Array.isArray(data.details)) {
     const msgs = data.details.map((d) => d.msg).join(" | ");
     toast.error(msgs);
@@ -703,65 +703,65 @@ async getExemplo(workspaceId: string): Promise<IExemplo[]> {
 }
 ```
 
-### Componentes do editor visual
+### Visual editor components
 
-| Diretório | Responsabilidade |
+| Directory | Responsibility |
 |---|---|
-| `web/app/components/workflow/` | Editor visual (XYFlow), canvas, painel de configuração |
-| `web/app/components/credentials/` | CRUD de credenciais |
-| `web/app/components/projects/` | Lista de workflows, busca e filtros |
-| `web/app/components/ui/` | Componentes shadcn/ui reutilizáveis |
+| `web/app/components/workflow/` | Visual editor (XYFlow), canvas, configuration panel |
+| `web/app/components/credentials/` | Credential CRUD |
+| `web/app/components/projects/` | Workflow list, search and filters |
+| `web/app/components/ui/` | Reusable shadcn/ui components |
 
-O schema de configuração de cada nó é carregado dinamicamente via `GET /nodes/` — não é necessário codificar campos manualmente no frontend para a maioria dos nós.
+The configuration schema of each node is loaded dynamically via `GET /nodes/` — for most nodes there is no need to hand-code fields in the frontend.
 
-### Token de autenticação
+### Authentication token
 
-O access token JWT está em `session.user.access_token` (configurado em `web/auth.ts`). **Nunca** use `session.accessToken`.
+The JWT access token is in `session.user.access_token` (configured in `web/auth.ts`). **Never** use `session.accessToken`.
 
 ---
 
-## Banco de Dados
+## Database
 
 ### Stack
 
-- **PostgreSQL** com extensão **PostGIS**
-- **SQLAlchemy 2.x** com engine async (`asyncpg`)
-- **Alembic** para migrações
+- **PostgreSQL** with the **PostGIS** extension
+- **SQLAlchemy 2.x** with an async engine (`asyncpg`)
+- **Alembic** for migrations
 
-### Criando uma migração
+### Creating a migration
 
 ```bash
-# Gera migração automática a partir dos modelos
+# Generates an automatic migration from the models
 alembic revision --autogenerate -m "add tabela_exemplos"
 
-# Aplica migrações pendentes
+# Applies pending migrations
 alembic upgrade head
 
-# Reverte a última migração
+# Reverts the last migration
 alembic downgrade -1
 ```
 
-### Padrão async — evitando DetachedInstanceError
+### Async pattern — avoiding DetachedInstanceError
 
-> Este é o bug mais comum no projeto. Sempre extraia atributos do ORM **dentro** do bloco `async with get_session_async()`, antes que a sessão feche.
+> This is the most common bug in the project. Always extract ORM attributes **inside** the `async with get_session_async()` block, before the session closes.
 
 ```python
-# ERRADO — DetachedInstanceError ao acessar user.id_hash fora da sessão
+# WRONG — DetachedInstanceError when accessing user.id_hash outside the session
 async with get_session_async() as session:
     user = await session.get(User, user_id)
-# user.id_hash  <-- ERRO! sessão já fechou
+# user.id_hash  <-- ERROR! the session has already closed
 
-# CORRETO — extraia os valores dentro do bloco
+# CORRECT — extract the values inside the block
 async with get_session_async() as session:
     user = await session.get(User, user_id)
     user_id_hash = user.id_hash
     user_name = user.name
-# use user_id_hash e user_name aqui
+# use user_id_hash and user_name here
 ```
 
-### Relacionamentos lazy
+### Lazy relationships
 
-Ao acessar relacionamentos lazy em contexto async, use `selectinload` ou `joinedload` na query:
+When accessing lazy relationships in an async context, use `selectinload` or `joinedload` in the query:
 
 ```python
 from sqlalchemy.orm import selectinload
@@ -772,81 +772,81 @@ result = await session.execute(stmt)
 
 ---
 
-## Convenções de Código
+## Code Conventions
 
 ### Python
 
-| Regra | Detalhe |
+| Rule | Detail |
 |---|---|
-| Lint | `ruff check .` (regras do pyflakes, em `ruff.toml`; `pip install -r requirements-dev.txt`). O CI roda o mesmo antes do `pytest` e falha com import sem uso, nome indefinido ou variável sem uso. Não há formatador: siga o estilo do código existente (~100 chars/linha como referência). O pre-commit aplica só higiene de arquivo (trailing whitespace, EOF, line endings) |
-| Type hints | Obrigatório em parâmetros e retornos de funções públicas |
-| Async | Todo I/O deve ser `async`. Nunca use `requests` — use `httpx` |
-| Logging | `get_logger(__name__)` de `app/core/utils/logger` ou `logging.getLogger(__name__)` |
-| Exceções | Nunca `except Exception: pass`. Sempre logue ou relance |
-| Paralelismo | Prefira `asyncio.gather()` a chamadas sequenciais `await` |
-| Comentários | **Português do Brasil** |
-| Imports | stdlib, terceiros, locais (separados por linha em branco) |
+| Lint | `ruff check .` (pyflakes rules, in `ruff.toml`; `pip install -r requirements-dev.txt`). The CI runs the same before `pytest` and fails on an unused import, an undefined name or an unused variable. There is no formatter: follow the style of the existing code (~100 chars/line as a reference). The pre-commit applies only file hygiene (trailing whitespace, EOF, line endings) |
+| Type hints | Required on parameters and return values of public functions |
+| Async | All I/O must be `async`. Never use `requests` — use `httpx` |
+| Logging | `get_logger(__name__)` from `app/core/utils/logger` or `logging.getLogger(__name__)` |
+| Exceptions | Never `except Exception: pass`. Always log or re-raise |
+| Parallelism | Prefer `asyncio.gather()` over sequential `await` calls |
+| Comments | **Brazilian Portuguese** |
+| Imports | stdlib, third-party, local (separated by a blank line) |
 
 ### TypeScript / React
 
-| Regra | Detalhe |
+| Rule | Detail |
 |---|---|
-| Formatação | **ESLint** (configuração do projeto) |
-| Componentes | Funcionais com hooks, sem classes |
-| Tipagem | Interfaces para todos os objetos (`web/service/types.ts`, a casa única). Evite `any` |
-| Comentários | **Português do Brasil** |
-| State management | Contextos React (`web/context/`), sem Redux |
+| Formatting | **ESLint** (project configuration) |
+| Components | Functional with hooks, no classes |
+| Typing | Interfaces for all objects (`web/service/types.ts`, the single home). Avoid `any` |
+| Comments | **Brazilian Portuguese** |
+| State management | React contexts (`web/context/`), no Redux |
 | CSS | Tailwind CSS + shadcn/ui |
 
 ---
 
-## Testes
+## Tests
 
-### Estrutura
+### Structure
 
 ```
 tests/
-├── conftest.py                    # Fixtures globais (db, client, auth)
+├── conftest.py                    # Global fixtures (db, client, auth)
 ├── unit/
-│   ├── test_nodes.py              # Testes de nós do flow/
-│   ├── test_storage.py            # Testes de storage (MinIO)
-│   ├── test_sync_manager.py       # Testes do GeoSync
-│   └── test_workflow_crud.py      # Testes de CRUD de workflows
-├── integration/                   # Testes de integração (executor, cripto, cartas)
-├── extensoes/                     # Os de cada extensão; o núcleo não os importa (só existe quando há uma)
-└── test_workflow_happy_paths.py   # Testes de fluxo completo
+│   ├── test_nodes.py              # Tests of the flow/ nodes
+│   ├── test_storage.py            # Storage tests (MinIO)
+│   ├── test_sync_manager.py       # GeoSync tests
+│   └── test_workflow_crud.py      # Workflow CRUD tests
+├── integration/                   # Integration tests (executor, crypto, image maps)
+├── extensoes/                     # Those of each extension; the core does not import them (only exists when there is one)
+└── test_workflow_happy_paths.py   # End-to-end workflow tests
 ```
 
-### Executando
+### Running
 
 ```bash
 # ── Backend (pytest) ──
-# Todos os testes
+# All tests
 pytest
 
-# Apenas testes unitários
+# Unit tests only
 pytest tests/unit/
 
-# Com verbose e último falho
+# Verbose, last failed
 pytest -vv --lf
 
-# Teste específico — test_nodes.py agrupa os casos em classes (TestBufferNode, ...)
+# A specific test — test_nodes.py groups the cases into classes (TestBufferNode, ...)
 pytest "tests/unit/test_nodes.py::TestBufferNode" -v
 
 # ── Frontend (Vitest) ──
-cd web && npm test          # vitest run — é o que o CI executa
-cd web && npm run test:nucleo  # a mesma suíte sem as extensões (web/extensoes), sem apagar nada
+cd web && npm test          # vitest run — this is what the CI runs
+cd web && npm run test:nucleo  # the same suite without the extensions (web/extensoes), without deleting anything
 cd web && npm run test:watch
 
 # ── Desktop (Vitest) ──
-cd desktop && npm test      # vitest run — é o que o CI executa
+cd desktop && npm test      # vitest run — this is what the CI runs
 ```
 
-### Escrevendo testes
+### Writing tests
 
-- Use fixtures do `conftest.py` para banco e autenticação
-- Testes de nós: instancie o nó com `(node_id, parameters)` e chame `execute(inputs)` (os parâmetros vão no construtor, não no `execute`). Metadados são inspecionados via `Node.description()`
-- Testes de API: use o `AsyncClient` do httpx com a app FastAPI
+- Use the `conftest.py` fixtures for the database and authentication
+- Node tests: instantiate the node with `(node_id, parameters)` and call `execute(inputs)` (the parameters go in the constructor, not in `execute`). Metadata is inspected via `Node.description()`
+- API tests: use httpx's `AsyncClient` with the FastAPI app
 
 ```python
 # tests/unit/test_nodes.py
@@ -854,10 +854,10 @@ from flow.nodes.spatial.buffer import BufferNode
 
 
 async def test_buffer_executa_com_distancia():
-    # Metadados do nó (o registro usa description()['name']).
+    # Node metadata (the registry uses description()['name']).
     assert BufferNode.description()["name"] == "Buffer"
 
-    # Parâmetros no construtor; inputs no execute().
+    # Parameters in the constructor; inputs in execute().
     node = BufferNode("buffer-1", {"distance": 100, "distanceUnit": "meters"})
     result = await node.execute({"input": gdf_fixture})
 
@@ -866,183 +866,183 @@ async def test_buffer_executa_com_distancia():
 
 ---
 
-## Integração Contínua (CI) e Releases
+## Continuous Integration (CI) and Releases
 
-### O que o CI valida (`.github/workflows/ci.yml`, em todo push/PR para `main`)
+### What the CI validates (`.github/workflows/ci.yml`, on every push/PR to `main`)
 
-| Job | O que roda |
+| Job | What it runs |
 |---|---|
-| **Secrets scan (detect-secrets)** | `detect-secrets scan --baseline .secrets.baseline` — falha se surgir segredo novo fora do baseline |
-| **Backend (Python)** | `pip install --require-hashes --only-binary=:all: -r requirements.txt -r requirements-dev.txt` → `ruff check .` → `pytest tests/ -v` (Python 3.12; inclui `test_locks_python.py`, que confere os locks). Não há formatador de Python no CI |
-| **Backend sem extensões (núcleo)** | as mesmas dependências → `bash scripts/sem_extensoes.sh` (apaga `app/extensoes/<nome>/` e `tests/extensoes/`, o corte da distribuição livre) → `pytest tests/ -q`: o núcleo do servidor sozinho (`docs/architecture.md`, Extensões). Sem extensão nenhuma no repositório (a cópia pública), o job termina no passo «Há extensões?»: seria idêntico ao de cima |
-| **Auditoria de dependências (informativa)** | `scripts/idade_dos_locks.py` (versões dos locks Python com menos de 14 dias ou retiradas do PyPI); `pip-audit` no lock da API e no do executor (lidos direto, com `--disable-pip`); `npm audit --omit=dev` no `web/` e no `desktop/`. Não bloqueia: cada achado vira um aviso no PR e o relatório vai para o resumo da execução |
-| **Frontend (Next.js)** | `npm ci` → `npm run lint` → `npm test` (Vitest) → `npm run build` (Node 24; o `build` copia o Monaco para `public/monaco`) |
-| **Frontend sem extensões (núcleo)** | `npm ci` → `bash ../scripts/sem_extensoes.sh` (apaga `web/extensoes/<nome>/` e `web/__tests__/extensoes/` e esvazia a lista das instaladas) → `npm run typecheck` → `npm test` → `npm run build`: o núcleo do web como a distribuição livre o roda (`docs/architecture.md`, Extensões do web). Também termina em «Há extensões?» quando não há nenhuma |
-| **Desktop (typecheck + testes + lock)** | `npm run typecheck` → `npm test` (Vitest) → `npm run python:lock:check`, que instala o lock do executor num CPython do Windows (Windows, Node 24) |
+| **Secrets scan (detect-secrets)** | `detect-secrets scan --baseline .secrets.baseline` — fails if a new secret appears outside the baseline |
+| **Backend (Python)** | `pip install --require-hashes --only-binary=:all: -r requirements.txt -r requirements-dev.txt` → `ruff check .` → `pytest tests/ -v` (Python 3.12; includes `test_locks_python.py`, which checks the locks). There is no Python formatter in the CI |
+| **Backend without extensions (core)** | the same dependencies → `bash scripts/sem_extensoes.sh` (deletes `app/extensoes/<nome>/` and `tests/extensoes/`, the cut of the free distribution) → `pytest tests/ -q`: the server core on its own (`docs/architecture.md`, Extensions). With no extension at all in the repository (the public copy), the job ends at the "Há extensões?" (Are there extensions?) step: it would be identical to the one above |
+| **Dependency audit (informational)** | `scripts/idade_dos_locks.py` (versions in the Python locks less than 14 days old or yanked from PyPI); `pip-audit` on the API lock and on the executor lock (read directly, with `--disable-pip`); `npm audit --omit=dev` in `web/` and in `desktop/`. It does not block: each finding becomes a warning on the PR and the report goes to the run summary |
+| **Frontend (Next.js)** | `npm ci` → `npm run lint` → `npm test` (Vitest) → `npm run build` (Node 24; the `build` copies Monaco to `public/monaco`) |
+| **Frontend without extensions (core)** | `npm ci` → `bash ../scripts/sem_extensoes.sh` (deletes `web/extensoes/<nome>/` and `web/__tests__/extensoes/` and empties the list of installed ones) → `npm run typecheck` → `npm test` → `npm run build`: the web core as the free distribution runs it (`docs/architecture.md`, Web extensions). It also ends at "Há extensões?" when there are none |
+| **Desktop (typecheck + tests + lock)** | `npm run typecheck` → `npm test` (Vitest) → `npm run python:lock:check`, which installs the executor lock into a Windows CPython (Windows, Node 24) |
 
-### Dependências Python (locks com hash)
+### Python dependencies (hashed locks)
 
-Cada `.in` é a fonte, o que se edita; o `.txt` ao lado é o LOCK gerado dele, com todas
-as dependências (diretas e transitivas) travadas e o hash de cada arquivo:
+Each `.in` is the source, the thing you edit; the `.txt` next to it is the LOCK generated from it, with all
+dependencies (direct and transitive) pinned and the hash of each file:
 
-| Fonte | Lock | Quem instala |
+| Source | Lock | Who installs it |
 |---|---|---|
-| `requirements.in` | `requirements.txt` | a imagem da API e o CI |
-| `requirements-dev.in` | `requirements-dev.txt` | o CI e quem desenvolve (ruff, pip-audit, detect-secrets, pre-commit, pip-tools, uv) |
-| `executor/requirements-full.in` | `executor/requirements-full.txt` | a imagem do executor (e o quickstart) e o runtime embarcado do app desktop |
-| `executor/requirements.in` | `executor/requirements.txt` | a instalação manual pela CLI |
+| `requirements.in` | `requirements.txt` | the API image and the CI |
+| `requirements-dev.in` | `requirements-dev.txt` | the CI and developers (ruff, pip-audit, detect-secrets, pre-commit, pip-tools, uv) |
+| `executor/requirements-full.in` | `executor/requirements-full.txt` | the executor image (and the quickstart) and the desktop app's embedded runtime |
+| `executor/requirements.in` | `executor/requirements.txt` | manual installation through the CLI |
 
-Tudo instala com `--require-hashes`: um arquivo diferente do revisado (trocado no PyPI
-ou no caminho) não instala, e nenhuma versão entra no build sem ter passado por um PR.
-As imagens usam também `--only-binary=:all:`, então nenhum `setup.py` roda no build.
+Everything installs with `--require-hashes`: a file different from the reviewed one (swapped on PyPI
+or along the way) does not install, and no version gets into the build without having gone through a PR.
+The images also use `--only-binary=:all:`, so no `setup.py` runs in the build.
 
-Para mudar uma dependência:
+To change a dependency:
 
-1. Edite o `.in` (versão exata, `==`, como o resto do arquivo).
-2. Regere os locks em Linux x86_64 com Python 3.12, a plataforma da imagem e do CI:
-   `python scripts/travar_python.py`. Fora do Linux, pelo Docker (o comando está no
-   cabeçalho do script).
-3. Commite o `.in` e os `.txt`. O `tests/unit/test_locks_python.py` confere que os
-   locks batem com as fontes (nos dois sentidos: o que entrou e o que saiu), que
-   toda linha tem hash e que o mesmo pacote tem a mesma versão em todos eles. O job
-   Desktop do CI confere que o lock do executor instala no Windows.
+1. Edit the `.in` (exact version, `==`, like the rest of the file).
+2. Regenerate the locks on Linux x86_64 with Python 3.12, the platform of the image and of the CI:
+   `python scripts/travar_python.py`. Outside Linux, through Docker (the command is in the
+   script's header).
+3. Commit the `.in` and the `.txt` files. `tests/unit/test_locks_python.py` checks that the
+   locks match the sources (in both directions: what came in and what went out), that
+   every line has a hash and that the same package has the same version in all of them. The CI's
+   Desktop job checks that the executor lock installs on Windows.
 
-O script aplica a quarentena de 14 dias ao que o resolvedor escolhe sozinho (as
-transitivas). Uma versão já travada e mais nova que isso (veio de um PR do Dependabot
-ou de segurança, revisado) continua valendo, mas só ela: nada mais novo entra junto,
-e ela não é rebaixada. No fim, toda versão que mudou tem a data conferida no PyPI; se
-alguma furar o corte, o script desfaz tudo. O que você pinou à mão no `.in` entra na
-versão pedida (é uma decisão): confira a data de publicação antes de pinar uma versão
-recém-saída. Não rode o `pip-compile` direto: ele pula a quarentena.
+The script applies the 14-day quarantine to what the resolver picks on its own (the
+transitive ones). A version already pinned and newer than that (it came from a Dependabot
+or security PR, reviewed) stays valid, but only that one: nothing newer comes in with it,
+and it is not downgraded. At the end, every version that changed has its date checked on PyPI; if
+any breaks the cutoff, the script undoes everything. What you pinned by hand in the `.in` goes in at the
+requested version (it is a decision): check the publication date before pinning a
+freshly released version. Do not run `pip-compile` directly: it skips the quarantine.
 
-O Dependabot sobe o que está nos `.in` (e as transitivas com falha de segurança,
-quando as atualizações de segurança estão ligadas). As outras transitivas ficam onde
-estão até alguém rodar `python scripts/travar_python.py --renovar`, que as
-re-resolve com a mesma quarentena. Vale fazer isso de tempos em tempos, num PR próprio.
+Dependabot bumps what is in the `.in` files (and the transitive ones with a security flaw,
+when security updates are turned on). The other transitive ones stay where
+they are until someone runs `python scripts/travar_python.py --renovar`, which
+re-resolves them with the same quarantine. It is worth doing this from time to time, in a PR of its own.
 
-### Dependências npm (sem scripts de instalação)
+### npm dependencies (no install scripts)
 
-O `web/.npmrc` e o `desktop/.npmrc` ligam `ignore-scripts=true`: nenhum pacote roda
-código no `npm install`/`npm ci` — nem no CI, nem no build da imagem, nem na sua
-máquina. É por esses scripts que os worms do npm de 2025 roubavam tokens e se
-republicavam. Versão e hash (`integrity`) de cada pacote já vêm travados no
-`package-lock.json`, e o `npm ci` instala exatamente isso.
+`web/.npmrc` and `desktop/.npmrc` turn on `ignore-scripts=true`: no package runs
+code during `npm install`/`npm ci` — not in the CI, not in the image build, not on your
+machine. It was through these scripts that the 2025 npm worms stole tokens and
+republished themselves. The version and hash (`integrity`) of each package are already pinned in
+`package-lock.json`, and `npm ci` installs exactly that.
 
-- Os pacotes daqui que tinham script de instalação não precisam dele. No esbuild,
-  no `@tailwindcss/oxide` e no unrs-resolver ele é plano B para baixar o binário
-  nativo, que chega pelas dependências opcionais. No sharp ele só compila da fonte
-  (o binário pronto vem de `@img/sharp-*`). No fsevents, só de macOS, o binário
-  compilado já vem dentro do pacote.
-- O Electron não precisa: desde o 44, ele baixa o binário na primeira vez que é
-  chamado, conferindo o SHA-256 pelo `checksums.json` do pacote. O `npm run dev` do
-  desktop faz isso num passo à vista (ou `npm run electron:binario`). O
-  empacotamento baixa o Electron por conta própria.
-- Efeito colateral: o npm também não roda os ganchos `pre`/`post` do `npm run`. Não
-  use `prebuild`/`predev`; chame o passo no próprio script, como o `build` do web faz
-  com o `copiar-monaco.mjs` e o `copiar-maplibre.mjs`.
-- Um pacote novo que precise mesmo do script de instalação: rode-o explicitamente
-  (como o do Electron) e deixe escrito por quê.
+- The packages here that had an install script do not need it. In esbuild,
+  `@tailwindcss/oxide` and unrs-resolver it is a fallback for downloading the native
+  binary, which arrives through the optional dependencies. In sharp it only compiles from source
+  (the prebuilt binary comes from `@img/sharp-*`). In fsevents, macOS-only, the
+  compiled binary already ships inside the package.
+- Electron does not need it: since version 44, it downloads the binary the first time it is
+  called, checking the SHA-256 against the package's `checksums.json`. The desktop's `npm run dev`
+  does this in a visible step (or `npm run electron:binario`). Packaging
+  downloads Electron on its own.
+- Side effect: npm also does not run the `pre`/`post` hooks of `npm run`. Do not
+  use `prebuild`/`predev`; call the step in the script itself, as the web's `build` does
+  with `copiar-monaco.mjs` and `copiar-maplibre.mjs`.
+- A new package that really needs its install script: run it explicitly
+  (like Electron's) and write down why.
 
-### PRs do Dependabot
+### Dependabot PRs
 
-O [`.github/dependabot.yml`](.github/dependabot.yml) abre PRs uma vez por mês (dia 1º),
-e só com versões publicadas há pelo menos 14 dias (30 para versão maior). A cadência
-e a quarentena existem por causa dos ataques à cadeia de suprimentos: versão maliciosa
-costuma ser descoberta e retirada em horas ou poucos dias, e quem atualiza assim que
-ela sai é quem a instala. O `tests/unit/test_ci_workflow.py` segura essa política, então
-encurtar a espera é uma decisão explícita, não um detalhe de configuração. Cada PR
-passa pelo CI como qualquer outro.
+[`.github/dependabot.yml`](.github/dependabot.yml) opens PRs once a month (on the 1st),
+and only with versions published at least 14 days earlier (30 for a major version). The cadence
+and the quarantine exist because of supply-chain attacks: a malicious version
+is usually discovered and pulled within hours or a few days, and whoever updates as soon as
+it comes out is the one who installs it. `tests/unit/test_ci_workflow.py` holds this policy in place, so
+shortening the wait is an explicit decision, not a configuration detail. Each PR
+goes through the CI like any other.
 
-- **Python:** a configuração em `/` lê os pares `.in` → `.txt` (API, dev, executor
-  completo e mínimo), que o Dependabot regenera com o pip-compile. A mesma versão
-  sobe em todos no mesmo PR, e menores e correções vêm num PR por mês. A espera de
-  14 dias vale para o pacote que ele atualiza; as transitivas que o pip-compile traz
-  junto vêm na versão mais nova do dia. O passo "Versões recentes nos locks Python"
-  do CI lista as que têm menos de 14 dias. Ele compila cada `.in` sem a restrição
-  do script, então o `requirements-dev.txt` e o `executor/requirements.txt` perdem
-  no PR as anotações `# via` que a citam: é só comentário, e o próximo
-  `travar_python.py` as devolve.
-- **npm do `web/` e do `desktop/`:** menores agrupados; versão maior vem sozinha.
-- **GitHub Actions:** agrupadas, com 30 dias de espera para qualquer versão: para
-  actions o Dependabot não aceita espera separada por tipo de versão.
+- **Python:** the configuration at `/` reads the `.in` → `.txt` pairs (API, dev, full
+  and minimal executor), which Dependabot regenerates with pip-compile. The same version
+  goes up in all of them in the same PR, and minor versions and patches come in one PR a month. The
+  14-day wait applies to the package it updates; the transitive ones that pip-compile brings
+  along come in at the newest version of the day. The CI's "Versões recentes nos locks Python"
+  (Recent versions in the Python locks) step lists the ones less than 14 days old. It compiles each `.in` without
+  the script's constraint, so `requirements-dev.txt` and `executor/requirements.txt` lose,
+  in the PR, the `# via` annotations that cite it: it is only a comment, and the next
+  `travar_python.py` puts them back.
+- **npm for `web/` and `desktop/`:** minor versions grouped; a major version comes on its own.
+- **GitHub Actions:** grouped, with a 30-day wait for any version: for
+  actions, Dependabot does not accept a separate wait per version type.
 
-**Antes de aprovar.** Abrir o PR não expõe nada: o CI de PR do Dependabot roda com
-token só de leitura e sem os segredos do repositório. O risco está no merge, que leva
-o pacote para a imagem de produção, e em quem instala o branch na própria máquina.
+**Before approving.** Opening the PR exposes nothing: Dependabot's PR CI runs with a
+read-only token and without the repository's secrets. The risk lies in the merge, which takes
+the package into the production image, and in whoever installs the branch on their own machine.
 
-1. Leia as notas da versão e confira se a mudança bate com o que elas descrevem. No
-   Python, comece pelo que o passo "Versões recentes nos locks Python" do CI listou:
-   é o que entrou sem quarentena.
-2. Compare o que foi publicado entre a versão atual e a nova. No npm:
-   `npm diff --diff=<pacote>@<atual> --diff=<pacote>@<nova>`. No PyPI: baixe as duas
-   wheels com `pip download <pacote>==<versão> --no-deps --only-binary=:all:`, descompacte
-   e compare as pastas.
-3. Procure os sinais de ataque:
-   - script de instalação novo (`preinstall`/`postinstall` no npm);
-   - código ofuscado, ou minificado onde antes não era;
-   - acesso a rede, a variáveis de ambiente ou a arquivos fora do que o pacote faz;
-   - dependência nova que ninguém conhece;
-   - mantenedor trocado;
-   - versão sem proveniência quando as anteriores tinham (no npm,
-     `npm audit signatures` confere assinaturas e atestações do que foi instalado).
-4. Na dúvida, feche o PR. O Dependabot não reabre a mesma versão e volta com a
-   seguinte, que terá passado mais tempo exposta a quem procura esse tipo de coisa.
+1. Read the release notes and check whether the change matches what they describe. For
+   Python, start with what the CI's "Versões recentes nos locks Python" step listed:
+   that is what came in without quarantine.
+2. Compare what was published between the current version and the new one. On npm:
+   `npm diff --diff=<pacote>@<atual> --diff=<pacote>@<nova>`. On PyPI: download both
+   wheels with `pip download <pacote>==<versão> --no-deps --only-binary=:all:`, unpack them
+   and compare the folders.
+3. Look for the signs of an attack:
+   - a new install script (`preinstall`/`postinstall` on npm);
+   - obfuscated code, or minified where it was not before;
+   - access to the network, to environment variables or to files beyond what the package does;
+   - a new dependency nobody knows;
+   - a changed maintainer;
+   - a version without provenance when the previous ones had it (on npm,
+     `npm audit signatures` checks signatures and attestations of what was installed).
+4. When in doubt, close the PR. Dependabot does not reopen the same version and comes back with the
+   next one, which will have spent more time exposed to those who look for this kind of thing.
 
-CI verde não prova que a biblioteca nova funciona, só que os testes não a pegaram.
-O bcrypt 5.0 entrou verde e derrubava todo login: o hash de senha era pelo passlib
-1.7.4, que levanta erro com ele, e nenhum teste chamava o hash de verdade (o passlib
-saiu depois; o hash chama o bcrypt direto). Em versão maior,
-confira as notas de quebra contra o uso que o projeto faz do pacote.
+A green CI does not prove that the new library works, only that the tests did not catch it.
+bcrypt 5.0 went in green and broke every login: password hashing went through passlib
+1.7.4, which raises an error with it, and no test called the real hash (passlib
+was removed later; the hash calls bcrypt directly). For a major version,
+check the breaking-change notes against how the project uses the package.
 
-Quatro situações pedem mão:
+Four situations call for a human hand:
 
-- **O job Desktop falhou no `python:lock:check`.** A versão nova não tem wheel para
-  o Windows (`win_amd64`, `cp312`), ou pede lá uma dependência que o lock, resolvido
-  no Linux, não tem. O `desktop/README.md` ("Solução de problemas") diz o que fazer
-  em cada caso.
-- **O `test_mesma_versao_em_todos_os_locks` falhou.** O Dependabot regenera cada lock
-  por conta própria, e uma transitiva pode ter saído em versões diferentes. Rode
-  `python scripts/travar_python.py` no branch do PR e commite os locks.
-- **numpy, pandas ou pyproj.** Estão pinados na versão que a produção roda desde a
-  troca para o Python 3.12. Cada um vem num PR próprio, que é uma migração: rodar a
-  suíte e os fluxos de exemplo antes de aprovar. O salto do pandas para a 3.x fica
-  ignorado: muda o comportamento dos nós (copy-on-write e o dtype de string novo).
-- **Imagens base (Python, Node).** O Dependabot não as toca. A versão do Python anda
-  em quatro lugares (os dois Dockerfiles, o CI e o `desktop/python-runtime.json`) e
-  sobe à mão, junto com o `.python-version`.
+- **The Desktop job failed at `python:lock:check`.** The new version has no wheel for
+  Windows (`win_amd64`, `cp312`), or asks there for a dependency that the lock, resolved
+  on Linux, does not have. `desktop/README.md` ("Troubleshooting") says what to do
+  in each case.
+- **`test_mesma_versao_em_todos_os_locks` failed.** Dependabot regenerates each lock
+  on its own, and a transitive dependency may have come out at different versions. Run
+  `python scripts/travar_python.py` on the PR branch and commit the locks.
+- **numpy, pandas or pyproj.** They are pinned at the version production has run since the
+  switch to Python 3.12. Each one comes in a PR of its own, which is a migration: run the
+  suite and the example workflows before approving. The pandas jump to 3.x stays
+  ignored: it changes the behavior of the nodes (copy-on-write and the new string dtype).
+- **Base images (Python, Node).** Dependabot does not touch them. The Python version lives
+  in four places (the two Dockerfiles, the CI and `desktop/python-runtime.json`) and
+  is bumped by hand, together with `.python-version`.
 
-As atualizações de **segurança** vêm à parte e não esperam o mês nem a quarentena,
-quando o "Dependabot security updates" está ligado em Settings → Code security do
-repositório. Ali a falha já é pública, e esperar custa mais. Elas passam pela mesma
-revisão antes do merge.
+**Security** updates come separately and wait neither for the month nor for the quarantine,
+when "Dependabot security updates" is turned on in the repository's Settings → Code security.
+There the flaw is already public, and waiting costs more. They go through the same
+review before the merge.
 
-### Releases (disparados por tag / push)
+### Releases (triggered by tag / push)
 
-| Workflow | Gatilho | Saída |
+| Workflow | Trigger | Output |
 |---|---|---|
-| `desktop-windows.yml` | tag `desktop/v*` | GitHub Release com o instalador NSIS (Windows x64) + `.blockmap` + `latest.yml` |
-| `executor-docker.yml` | tag `executor/v*` | GitHub Release com `atlans-executor-docker-amd64.tar.gz` |
+| `desktop-windows.yml` | tag `desktop/v*` | GitHub Release with the NSIS installer (Windows x64) + `.blockmap` + `latest.yml` |
+| `executor-docker.yml` | tag `executor/v*` | GitHub Release with `atlans-executor-docker-amd64.tar.gz` |
 
-O deploy é de cada instalação ([docs/operations.md](docs/operations.md#atualizar-a-instalação));
-a instalação mantida pelo titular tem um workflow próprio, documentado à parte.
+Deployment is up to each installation ([docs/operations.md](docs/operations.md#update-the-installation));
+the installation maintained by the holder has a workflow of its own, documented separately.
 
 ---
 
-## Checklist de PR
+## PR Checklist
 
-Antes de abrir um Pull Request, verifique:
+Before opening a Pull Request, check:
 
-- [ ] A branch está atualizada com `main` (`git rebase origin/main`)
-- [ ] O código segue o estilo do projeto (frontend: `npm run lint`; backend: `ruff check .` — sem formatador obrigatório, siga o código existente)
-- [ ] Type hints em todas as funções Python públicas
-- [ ] Não há credenciais, chaves ou segredos no código
-- [ ] `.env.example` atualizado se novas variáveis foram adicionadas
-- [ ] Novos nós decorados com `@register_node` (descoberta automática — não edite `flow/registry.py`)
-- [ ] Novos modelos possuem migração Alembic correspondente
-- [ ] Novos endpoints possuem schema Pydantic de request e response
-- [ ] Testes passando: `pytest` (backend) e, se tocou em `web/` ou `desktop/`, `npm test` na pasta correspondente
-- [ ] Descrição do PR explica **o que** foi feito e **por que**
-- [ ] No primeiro PR: o aceite do [CLA](CLA.md) na descrição
-- [ ] Dependência nova: licença compatível com a AGPL-3.0 (`python scripts/avisos_de_terceiros.py`)
-- [ ] Se alterou a API, os schemas Swagger estão corretos (`/docs`)
-- [ ] Se adicionou nó, informar: tipo, categoria, parâmetros e comportamento
+- [ ] The branch is up to date with `main` (`git rebase origin/main`)
+- [ ] The code follows the project's style (frontend: `npm run lint`; backend: `ruff check .` — no mandatory formatter, follow the existing code)
+- [ ] Type hints on all public Python functions
+- [ ] No credentials, keys or secrets in the code
+- [ ] `.env.example` updated if new variables were added
+- [ ] New nodes decorated with `@register_node` (automatic discovery — do not edit `flow/registry.py`)
+- [ ] New models have a corresponding Alembic migration
+- [ ] New endpoints have a Pydantic request and response schema
+- [ ] Tests passing: `pytest` (backend) and, if you touched `web/` or `desktop/`, `npm test` in the corresponding folder
+- [ ] The PR description explains **what** was done and **why**
+- [ ] On the first PR: the acceptance of the [CLA](CLA.md) in the description
+- [ ] New dependency: license compatible with the AGPL-3.0 (`python scripts/avisos_de_terceiros.py`)
+- [ ] If you changed the API, the Swagger schemas are correct (`/docs`)
+- [ ] If you added a node, state: type, category, parameters and behavior

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, renderHook } from "@testing-library/react"
 
-// A URL é dublada por um `URLSearchParams` mutável: o teste controla o que
-// `useSearchParams` devolve e observa o que `router.replace` recebe.
+// The URL is doubled by a mutable `URLSearchParams`: the test controls what
+// `useSearchParams` returns and observes what `router.replace` receives.
 const url = { sp: new URLSearchParams(""), pathname: "/observability" }
 const replace = vi.fn()
 vi.mock("next/navigation", () => ({
@@ -81,8 +81,8 @@ describe("useHistoricoUrl", () => {
   it("duas escritas seguidas, antes de a URL refletir a primeira, se acumulam", () => {
     const { result } = renderHook(() => useHistoricoUrl())
     act(() => result.current.atualizar({ status: "failed" }))
-    // A URL ainda é a antiga (o router não respondeu): a segunda escrita parte
-    // do que foi escrito, não do que está na barra.
+    // The URL is still the old one (the router hasn't responded): the second
+    // write starts from what was written, not from what's in the bar.
     act(() => result.current.atualizar({ workflow: "wf-1" }))
     expect(ultimaUrl()).toBe("/observability?status=failed&workflow=wf-1")
   })

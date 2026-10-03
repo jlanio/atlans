@@ -35,8 +35,8 @@ export default function WorkFlowCreatePage() {
   }
 
   if (error) {
-    // Cartão de erro do §3.2 do contrato: só toma a tela na 1ª carga (o canvas
-    // ainda não existe aqui). "Tentar de novo" refaz a mesma busca.
+    // Error card from contract §3.2: it only takes over the screen on the 1st load
+    // (the canvas does not exist here yet). "Tentar de novo" redoes the same fetch.
     return (
       <div className="w-full h-full flex items-center justify-center p-4">
         <ErroDeCarga

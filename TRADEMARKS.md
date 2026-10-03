@@ -1,72 +1,72 @@
-# A marca Atlans
+# The Atlans trademark
 
-O código do Atlans é livre: AGPL-3.0-only, ver [LICENSE](LICENSE). O nome
-**Atlans**, a forma **Atlans.app** e os logotipos (o glifo dos dois nós
-ligados, o ícone do web e os do app desktop) não são: são marcas do titular do
-projeto, quem mantém o repositório oficial, e a licença do código não dá
-direito de usá-las. Esta página diz o que dá para fazer sem pedir.
+The Atlans code is free: AGPL-3.0-only, see [LICENSE](LICENSE). The name
+**Atlans**, the form **Atlans.app** and the logos (the glyph of the two connected
+nodes, the web icon and those of the desktop app) are not: they are trademarks of the
+project's holder, the person who maintains the official repository, and the code license grants no
+right to use them. This page states what you may do without asking.
 
-O objetivo é um só: quem vê o nome Atlans saber que está diante do Atlans
-publicado pelo titular, e não de uma versão alterada por outra pessoa.
+The goal is a single one: whoever sees the name Atlans must know they are looking at the Atlans
+published by the holder, and not at a version altered by someone else.
 
-## Pode, sem pedir
+## Allowed, without asking
 
-- Falar do Atlans pelo nome: em textos, aulas, comparações e no código («um
-  fork do Atlans», «baseado no Atlans», «compatível com o Atlans»).
-- Instalar o Atlans, com ou sem modificações, para você ou para a sua
-  organização, e mantê-lo com o nome e os logotipos.
-- Redistribuir, sem modificação, o código ou os instaladores publicados pelo
-  titular, com o nome e os logotipos como vieram.
+- Referring to Atlans by name: in texts, classes, comparisons and in code ("a
+  fork of Atlans", "based on Atlans", "compatible with Atlans").
+- Installing Atlans, with or without modifications, for yourself or for your
+  organization, and keeping it with the name and the logos.
+- Redistributing, without modification, the code or the installers published by the
+  holder, with the name and the logos as they came.
 
-## Precisa trocar o nome e os logotipos
+## You must change the name and the logos
 
-- Ao distribuir uma versão modificada, em código ou em instalador.
-- Ao oferecer o Atlans, modificado ou não, como serviço para pessoas de fora
-  da sua organização.
+- When distributing a modified version, as code or as an installer.
+- When offering Atlans, modified or not, as a service to people outside
+  your organization.
 
-Nesses casos, use outro nome e outros logotipos. Dizer que a sua versão é
-«baseada no Atlans» continua permitido, e a AGPL continua valendo para o código
-(inclusive o dever de oferecer o código-fonte a quem usa pela rede, seção 13).
+In these cases, use a different name and different logos. Saying that your version is
+"based on Atlans" remains permitted, and the AGPL continues to apply to the code
+(including the obligation to offer the source code to those who use it over a network, section 13).
 
-## Nunca, sem autorização por escrito
+## Never, without written authorization
 
-- Usar «Atlans», ou um nome parecido a ponto de confundir, no nome de uma
-  empresa, produto, serviço ou domínio.
-- Sugerir que o titular apoia, certifica ou mantém o seu produto ou serviço.
-- Alterar os logotipos ou usá-los no seu material.
+- Using "Atlans", or a name similar enough to cause confusion, in the name of a
+  company, product, service or domain.
+- Suggesting that the holder endorses, certifies or maintains your product or service.
+- Altering the logos or using them in your materials.
 
-Para pedir uma autorização, abra uma issue no repositório oficial.
+To request an authorization, open an issue in the official repository.
 
-## Onde estão o nome e os logotipos
+## Where the name and the logos are
 
-Para quem vai trocar:
+For those who are going to change them:
 
-- **Logotipos**: `web/app/icon.png`, `web/app/favicon.ico`, o glifo em
-  `web/app/components/sidebar/marca.tsx`, a versão animada dele em
-  `web/app/components/home/assistente/marca-animada.tsx`, e os ícones e a
-  imagem do instalador em `desktop/build/`.
-- **Nome**: o título do web (`web/app/layout.tsx`), a marca da barra lateral
-  (`marca.tsx`), a tela de entrada, os modelos de e-mail
-  (`app/templates/email/`), o remetente padrão (`EMAIL_FROM`) e o app desktop:
-  o `productName` em `desktop/package.json` e, em
-  `desktop/electron-builder.yml`, o `productName`, o `shortcutName`, o nome do
-  protocolo («Atlans Studio») e a linha de `copyright`.
-  `git grep -nw Atlans` acha o resto.
-- **Os identificadores do app desktop**: o `appId` (`app.atlans.executor`, em
-  `desktop/electron-builder.yml`) e o esquema dos links de matrícula,
-  `atlans://` (o mesmo arquivo e o `PROTOCOLO` de
-  `desktop/src/main/deeplink.ts`). Não aparecem como marca, mas um app
-  distribuído com os mesmos se confunde com o oficial no Windows: um instala
-  por cima do outro, e os links abrem o app errado. Um fork que distribui o
-  próprio app troca os dois.
+- **Logos**: `web/app/icon.png`, `web/app/favicon.ico`, the glyph in
+  `web/app/components/sidebar/marca.tsx`, its animated version in
+  `web/app/components/home/assistente/marca-animada.tsx`, and the icons and the
+  installer image in `desktop/build/`.
+- **Name**: the web title (`web/app/layout.tsx`), the sidebar brand
+  (`marca.tsx`), the sign-in screen, the email templates
+  (`app/templates/email/`), the default sender (`EMAIL_FROM`) and the desktop app:
+  the `productName` in `desktop/package.json` and, in
+  `desktop/electron-builder.yml`, the `productName`, the `shortcutName`, the
+  protocol name ("Atlans Studio") and the `copyright` line.
+  `git grep -nw Atlans` finds the rest.
+- **The desktop app's identifiers**: the `appId` (`app.atlans.executor`, in
+  `desktop/electron-builder.yml`) and the scheme of the enrollment links,
+  `atlans://` (the same file and the `PROTOCOLO` in
+  `desktop/src/main/deeplink.ts`). They do not appear as a trademark, but an app
+  distributed with the same ones is confused with the official one on Windows: one installs
+  over the other, and the links open the wrong app. A fork that distributes its
+  own app changes both.
 
-Os outros nomes técnicos (o pacote `atlans-*`, o volume, o provisioner da
-step-ca, as variáveis `ATLANS_*`) não aparecem para quem usa e podem ficar.
+The other technical names (the `atlans-*` package, the volume, the step-ca
+provisioner, the `ATLANS_*` variables) are not visible to users and may stay.
 
-## O nome na tela
+## The name on screen
 
-O código publicado mostra «Atlans» na barra lateral, na tela de entrada e no
-título da aba. A forma com o domínio é a instalação do titular, e não vai no
-código: cada instalação define o nome que mostra em `NOME_NA_TELA`, no `.env`
-([instalação própria](docs/instalacao-propria.md)). Quem precisa trocar o
-nome, pelas regras acima, troca ali — e os logotipos, nos arquivos citados.
+The published code shows "Atlans" in the sidebar, on the sign-in screen and in the
+tab title. The form with the domain is the holder's installation, and does not go into the
+code: each installation defines the name it shows in `NOME_NA_TELA`, in the `.env`
+([self-hosting](docs/self-hosting.md)). Whoever needs to change the
+name, under the rules above, changes it there — and the logos, in the files listed.

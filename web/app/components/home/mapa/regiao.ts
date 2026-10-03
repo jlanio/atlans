@@ -1,34 +1,35 @@
 // web/app/components/home/mapa/regiao.ts
 //
-// De onde o globo da Home começa — e para onde ele volta quando a resposta
-// chega. Antes era sempre a América do Sul; agora é a região de quem abre a
-// página, sem pedir permissão de localização a ninguém:
+// Where the Home globe starts — and where it returns to when the answer
+// arrives. It used to be always South America; now it is the region of whoever
+// opens the page, without asking anyone for location permission:
 //
-//   1. o FUSO do navegador (`Intl…timeZone`) → a cidade de referência do fuso
-//      (tabela IANA em `fusos.gerado.ts`). É o sinal mais fino: distingue o
-//      leste do oeste dos EUA, e Manaus de São Paulo;
-//   2. o PAÍS da conexão (`CF-IPCountry`, quando a Cloudflare o manda) → o
-//      centro dos fusos daquele país. Cobre o navegador que esconde o fuso
-//      (o "UTC", ou o fuso da Islândia, dos modos de privacidade — abaixo);
-//   3. o CONTINENTE do nome do fuso (`Europe/…`, `Asia/…`) para um fuso que a
-//      tabela não conheça;
-//   4. um centro neutro (o meridiano de Greenwich, a 20° N).
+//   1. the browser's TIME ZONE (`Intl…timeZone`) → the zone's reference city
+//      (IANA table in `fusos.gerado.ts`). It is the finest signal: it tells
+//      the eastern from the western US, and Manaus from São Paulo;
+//   2. the connection's COUNTRY (`CF-IPCountry`, when Cloudflare sends it) →
+//      the center of that country's time zones. Covers the browser that hides
+//      the zone (the "UTC", or Iceland's zone, of privacy modes — below);
+//   3. the CONTINENT in the zone name (`Europe/…`, `Asia/…`) for a zone the
+//      table does not know;
+//   4. a neutral center (the Greenwich meridian, at 20° N).
 //
-// É o globo que segue a REGIÃO, não o idioma: uma brasileira com a tela em
-// inglês continua vendo o Brasil.
+// The globe follows the REGION, not the language: a Brazilian woman with her
+// screen in English still sees Brazil.
 
 import { FUSOS, PAISES } from "./fusos.gerado"
 
 /**
- * A reserva quando nenhum sinal diz a região: neutra, sem país de preferência.
- * No zoom do hero, o meridiano de Greenwich a 20° N mostra a Europa, a África e
- * o Atlântico. (Era o Brasil, o país da primeira instalação.)
+ * The fallback when no signal tells the region: neutral, with no preferred
+ * country. At the hero zoom, the Greenwich meridian at 20° N shows Europe,
+ * Africa and the Atlantic. (It used to be Brazil, the country of the first
+ * installation.)
  */
 export const CENTRO_PADRAO_DO_GLOBO: [number, number] = [0, 20]
 
-// No zoom do hero o globo aparece inteiro; centrado num polo ele mostraria
-// quase só gelo. A latitude é contida numa faixa em que o continente da pessoa
-// continua no quadro (Oslo, Helsinque e Moscou caem a 50° N).
+// At the hero zoom the whole globe shows; centered on a pole it would show
+// almost nothing but ice. The latitude is clamped to a strip in which the
+// person's continent stays in frame (Oslo, Helsinki and Moscow fall at 50° N).
 const LATITUDE_MAXIMA = 50
 const LATITUDE_MINIMA = -45
 
@@ -43,16 +44,16 @@ const CONTINENTES: Readonly<Record<string, readonly [number, number]>> = {
   America: [-75, 10],
 }
 
-// Os navegadores que resistem a impressão digital (Firefox com
-// `privacy.resistFingerprinting`, Tor Browser, Mullvad Browser) não dizem
-// "UTC": dizem o fuso da Islândia, que tem offset zero o ano todo. Para eles
-// o fuso não é sinal nenhum — sem isto, todo usuário desses navegadores abria
-// o globo sobre o Atlântico Norte, e o país da conexão nunca era consultado.
-// Só a própria Islândia (pelo país da conexão) mantém o fuso; sem país, vale
-// o centro neutro, como para o "UTC".
+// Browsers that resist fingerprinting (Firefox with
+// `privacy.resistFingerprinting`, Tor Browser, Mullvad Browser) do not say
+// "UTC": they say Iceland's time zone, which has zero offset all year. For them
+// the zone is no signal at all — without this, every user of those browsers
+// opened the globe over the North Atlantic, and the connection's country was
+// never consulted. Only Iceland itself (by connection country) keeps the zone;
+// with no country, the neutral center applies, as for "UTC".
 const FUSOS_DOS_MODOS_DE_PRIVACIDADE = new Set(["Atlantic/Reykjavik", "Iceland"])
 
-/** O fuso do navegador, ou `null` onde não houver (`Intl` ausente, SSR exótico). */
+/** The browser's time zone, or `null` where there is none (`Intl` missing, exotic SSR). */
 export function fusoDoNavegador(): string | null {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || null

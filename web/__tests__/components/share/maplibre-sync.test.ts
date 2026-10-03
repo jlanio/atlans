@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from "vitest"
 
 /**
- * O `_syncLayers` do MapLibreMap ganhou a REMOÇÃO de camadas ausentes (a Home
- * tira camada do globo) e a inferência de geomType (null não renderia nada, em
- * silêncio). jsdom não faz layout do MapLibre — mockamos o módulo e passamos um
- * mapa falso que registra as chamadas.
+ * MapLibreMap's `_syncLayers` gained REMOVAL of absent layers (the Home
+ * removes layers from the globe) and geomType inference (null would render nothing,
+ * silently). jsdom does not do MapLibre layout — we mock the module and pass a
+ * fake map that records the calls.
  */
 vi.mock("maplibre-gl/dist/maplibre-gl.css", () => ({}))
 vi.mock("maplibre-gl", () => ({
@@ -30,7 +30,7 @@ function fakeMap(layers: Layer[], sources: Record<string, unknown>) {
     _calls: calls,
     _layer: achar,
     getStyle: () => { calls.getStyle += 1; return estilo },
-    // Uma GeoJSONSource real tem setData; devolvemos um wrapper com ela.
+    // A real GeoJSONSource has setData; we return a wrapper with it.
     getSource: (id: string) => (estilo.sources[id] ? { ...(estilo.sources[id] as object), setData: () => {} } : undefined),
     getLayer: achar,
     addSource: (id: string, def: unknown) => { estilo.sources[id] = def; calls.addSource.push(id) },
@@ -64,15 +64,15 @@ describe("_syncLayers — remoção", () => {
   it("remove as camadas que sumiram, poupando o que não é nosso (o basemap)", () => {
     const map = fakeMap(
       [
-        { id: "fill-water", source: "terceiros" },  // camada de um estilo que não é nosso
-        { id: "line-old", source: "src-old" },       // nossa camada, agora ausente
+        { id: "fill-water", source: "terceiros" },  // a layer from a style that is not ours
+        { id: "line-old", source: "src-old" },       // our layer, now absent
       ],
       { "src-old": { type: "geojson" }, terceiros: { type: "vector" } },
     )
-    _syncLayers(asMap(map), [], false) // lista vazia: tudo o que é nosso sai
+    _syncLayers(asMap(map), [], false) // empty list: everything of ours goes away
     expect(map._calls.removeLayer).toContain("line-old")
     expect(map._calls.removeSource).toContain("src-old")
-    // O basemap NÃO some, embora "water" não esteja na lista desejada.
+    // The basemap does NOT disappear, even though "water" is not in the desired list.
     expect(map._calls.removeLayer).not.toContain("fill-water")
     expect(map._calls.removeSource).not.toContain("terceiros")
   })
@@ -88,8 +88,8 @@ describe("_syncLayers — remoção", () => {
   })
 
   it("com a lista anterior, fecha o delta sem serializar o estilo", () => {
-    // `getStyle()` serializa TODAS as camadas e fontes do basemap vetorial; o
-    // componente passa os ids da última sincronização justamente para evitá-lo.
+    // `getStyle()` serializes ALL the layers and sources of the vector basemap; the
+    // component passes the ids from the last sync precisely to avoid it.
     const map = fakeMap(
       [{ id: "fill-old", source: "src-old" }, { id: "line-old", source: "src-old" }],
       { "src-old": { type: "geojson" } },
@@ -114,15 +114,15 @@ describe("_syncLayers — inferência de tipo", () => {
     })
     _syncLayers(asMap(map), [poly], true)
     expect(map._calls.addSource).toContain("src-art:2")
-    expect(map._calls.addLayer).toContain("fill-art:2") // polígono → camada fill
-    // Tipo conhecido: nada de filtro — a camada desenha tudo o que vier.
+    expect(map._calls.addLayer).toContain("fill-art:2") // polygon → fill layer
+    // Known type: no filter — the layer draws whatever comes.
     expect(map._layer("fill-art:2")?.filter).toBeUndefined()
   })
 
   it("MVT sem tipo declarado: as três camadas, cada uma filtrada por geometria", () => {
-    // Um layer `circle` sem filtro emite um círculo POR VÉRTICE (inclusive os de
-    // um polígono) e um `fill` triangula até LineString — no portal público isso
-    // vira uma nuvem de bolinhas sobre o talhão.
+    // A `circle` layer without a filter emits a circle PER VERTEX (including those of
+    // a polygon) and a `fill` triangulates even a LineString — on the public portal that
+    // turns into a cloud of dots over the field plot.
     const map = fakeMap([], {})
     const semTipo = camada({ id: "art:3", geomType: undefined, mvt: { workflowHash: "wf", layerKey: "k" } })
     _syncLayers(asMap(map), [semTipo], true)
@@ -148,7 +148,7 @@ describe("_syncLayers — escrita de paint/layout", () => {
     expect(map._calls.setPaint).toEqual([])
     expect(map._calls.setLayout).toEqual([])
 
-    // Mudou de fato (o olho do painel) → escreve só a visibilidade.
+    // It actually changed (the panel's eye) → writes only the visibility.
     _syncLayers(asMap(map), [{ ...poly, visible: false }], true, undefined, undefined, undefined, undefined, ["art:4"])
     expect(map._calls.setLayout).toEqual(["fill-art:4.visibility", "line-art:4.visibility"])
     expect(map._calls.setPaint).toEqual([])
@@ -163,11 +163,11 @@ describe("_idsInterativos", () => {
     )
     const ids = _idsInterativos(asMap(map), [
       camada({ id: "a", visible: true }),
-      camada({ id: "b", visible: false }), // oculta: fora da consulta
-      camada({ id: "c", visible: true }),  // sem camada no mapa
+      camada({ id: "b", visible: false }), // hidden: out of the query
+      camada({ id: "c", visible: true }),  // no layer on the map
     ])
     expect(ids).toEqual(["fill-a", "line-a"])
-    // O ponto do teste: nada de `getStyle()` no caminho do ponteiro.
+    // The point of the test: no `getStyle()` on the pointer path.
     expect(map._calls.getStyle).toBe(0)
   })
 })
@@ -217,6 +217,6 @@ describe("_sniffGeomType / _estenderBounds", () => {
     expect(extend).toHaveBeenCalled()
 
     extend.mockClear()
-    expect(_estenderBounds(bounds, camada())).toBe(false) // sem bbox e sem features
+    expect(_estenderBounds(bounds, camada())).toBe(false) // no bbox and no features
   })
 })

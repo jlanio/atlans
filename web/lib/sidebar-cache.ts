@@ -1,24 +1,25 @@
 /**
- * Cache local (sessionStorage) para o flag "este usuário tem ao menos 1 executor
- * acessível" exibido na sidebar.
+ * Local cache (sessionStorage) for the "this user has at least 1 accessible
+ * executor" flag shown in the sidebar.
  *
- * Motivação:
- *   - Evita flicker no F5: estado inicial do componente sai do cache, não de
- *     um false placeholder que esconde o menu até o fetch terminar.
- *   - Resiliência a race / 401 transitório: se o fetch falhar, o valor
- *     cacheado persiste e o menu permanece consistente até a próxima
- *     atualização bem-sucedida (ou expiração do TTL).
+ * Motivation:
+ *   - Avoids flicker on F5: the component's initial state comes from the cache,
+ *     not from a false placeholder that hides the menu until the fetch finishes.
+ *   - Resilience to races / transient 401s: if the fetch fails, the cached
+ *     value persists and the menu stays consistent until the next successful
+ *     update (or the TTL expires).
  *
- * Segurança / privacidade:
- *   - O cache armazena APENAS um boolean + user_id + timestamp. Sem nomes,
- *     sem IDs de executor, sem tokens.
- *   - É keyed pelo user_id no payload — se o usuário fizer logout e outro
- *     logar na mesma aba, o componente detecta a divergência e descarta.
- *   - sessionStorage é por-origem, expira ao fechar a aba, não acessível a
- *     outros sites.
- *   - TTL curto (1h) limita janela de divergência mesmo em cenários estranhos.
- *   - Backend continua sendo a source-of-truth: o cache só decide se o item de
- *     menu aparece; toda autorização real acontece nos endpoints.
+ * Security / privacy:
+ *   - The cache stores ONLY a boolean + user_id + timestamp. No names,
+ *     no executor IDs, no tokens.
+ *   - It is keyed by the user_id in the payload — if the user logs out and
+ *     another logs in on the same tab, the component detects the mismatch and
+ *     discards it.
+ *   - sessionStorage is per-origin, expires when the tab closes, and is not
+ *     accessible to other sites.
+ *   - A short TTL (1h) limits the mismatch window even in odd scenarios.
+ *   - The backend remains the source of truth: the cache only decides whether
+ *     the menu item appears; all real authorization happens in the endpoints.
  */
 
 const KEY = "atlans:sidebar_has_agents"

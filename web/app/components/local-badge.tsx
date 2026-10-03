@@ -1,31 +1,31 @@
 // web/app/components/local-badge.tsx
 //
-// Marca de conteúdo que permanece no disco de um executor (LGPD).
+// Badge for content that stays on an executor's disk (LGPD).
 //
-// Compartilhado entre o Drive e os Artefatos porque é o MESMO estado, produzido
-// pelas mesmas escolhas — "Manter apenas no executor" no nó de saída, ou a
-// política da máquina no app desktop. As duas telas tinham marcas diferentes
-// (âmbar com "Apenas no executor" ali, laranja com "Executor" aqui) e nada
-// ligava uma à outra; pior, a tela de Artefatos decidia por heurística
-// (`executor_id && !size_bytes`) e justamente os artefatos que a localidade
-// produz — que TÊM tamanho — ficavam sem marca nenhuma.
+// Shared between Drive and Artifacts because it is the SAME state, produced by
+// the same choices — "Manter apenas no executor" (keep only on the executor) on
+// the output node, or the machine policy in the desktop app. The two screens
+// had different badges (amber with "Apenas no executor" there, orange with
+// "Executor" here) and nothing tied one to the other; worse, the Artifacts
+// screen decided by heuristic (`executor_id && !size_bytes`) and precisely the
+// artifacts that locality produces — which DO have a size — got no badge at all.
 //
-// É só o ícone, sem texto: numa lista, uma pílula escrita compete com o nome do
-// arquivo, que é o que a pessoa está procurando. A explicação inteira vai no
-// `title` — quem precisa dela para no ícone, e quem já sabe o que a marca
-// significa lê a lista sem ruído.
+// It is just the icon, no text: in a list, a written pill competes with the
+// file name, which is what the person is looking for. The full explanation goes
+// in the `title` — whoever needs it stops on the icon, and whoever already knows
+// what the badge means reads the list without noise.
 import { TbDeviceDesktop } from "react-icons/tb"
 
-/** O conteúdo mora no disco de um executor, e não no armazenamento da plataforma. */
+/** The content lives on an executor's disk, not in the platform's storage. */
 export function isLocalDoExecutor(item: { content_location?: string | null }): boolean {
   return item.content_location === "executor"
 }
 
-/** Os textos da marca. Padrão: o português do Drive e dos Artefatos; a Home traduzida passa os dela. */
+/** The badge texts. Default: the Portuguese of Drive and Artifacts; the translated Home passes its own. */
 export interface TextosDoLocal {
-  /** O que o leitor de tela anuncia. */
+  /** What the screen reader announces. */
   rotulo: string
-  /** O `title`, com o executor (os 8 primeiros caracteres) quando conhecido. */
+  /** The `title`, with the executor (its first 8 characters) when known. */
   titulo: (executorId: string | null | undefined) => string
 }
 
@@ -46,12 +46,12 @@ export function LocalBadge({
 }: { executorId?: string | null; textos?: TextosDoLocal }) {
   return (
     <span
-      // `inline-flex` e não `inline`: alinha o ícone à linha de base do nome do
-      // arquivo em vez de deixá-lo pendurado.
+      // `inline-flex`, not `inline`: aligns the icon to the file name's baseline
+      // instead of leaving it hanging.
       className="inline-flex shrink-0 items-center text-amber-600 dark:text-amber-400"
       title={textos.titulo(executorId)}
-      // O `title` é tooltip do mouse; o `aria-label` é o que o leitor de tela
-      // anuncia, e sem ele a marca simplesmente não existe para quem não vê.
+      // The `title` is a mouse tooltip; the `aria-label` is what the screen reader
+      // announces, and without it the badge simply does not exist for those who cannot see.
       aria-label={textos.rotulo}
       role="img"
     >

@@ -1,15 +1,15 @@
 # tests/unit/test_schedule_fluxo_inativo.py
-"""Escrever agendamento em fluxo DESATIVADO é recusa de domínio, não 500.
+"""Writing a schedule on a DEACTIVATED workflow is a domain refusal, not a 500.
 
-`ScheduleService._get_workflow_by_hash` recusava workflow inativo com um
-`ValueError` genérico. Não há handler de `ValueError` — `app/main.py` registra
-`AtlasBaseError` e um `Exception` genérico —, então a recusa chegava ao cliente
-como **500**, com mensagem de erro interno. Agora é `WorkflowInactiveError`
-(409), e workflow inexistente é `WorkflowNotFoundError` (404).
+`ScheduleService._get_workflow_by_hash` refused an inactive workflow with a
+generic `ValueError`. There is no `ValueError` handler — `app/main.py` registers
+`AtlasBaseError` and a generic `Exception` —, so the refusal reached the client
+as a **500**, with an internal error message. Now it is `WorkflowInactiveError`
+(409), and a nonexistent workflow is `WorkflowNotFoundError` (404).
 
-Ler os agendamentos de um fluxo parado continua valendo: é pela tool MCP
-`list_schedules` (`app/mcp/tools/gatilhos.py`, testada em
-`test_mcp_gatilhos.py`), que não passa pelo guardião de execução.
+Reading the schedules of a stopped workflow still works: it goes through the MCP
+tool `list_schedules` (`app/mcp/tools/gatilhos.py`, tested in
+`test_mcp_gatilhos.py`), which does not go through the execution guard.
 """
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -46,7 +46,7 @@ async def db():
 
 
 async def test_criar_em_fluxo_inexistente_e_404_de_dominio(db):
-    """`WorkflowNotFoundError` (404), e não `ValueError` — que viraria 500."""
+    """`WorkflowNotFoundError` (404), not `ValueError` — which would become a 500."""
     pedido = ScheduleCreate(strategy="interval", interval=10, unit="minutes",
                             workspace_id=WS, timezone="America/La_Paz")
     with pytest.raises(WorkflowNotFoundError):
@@ -54,11 +54,11 @@ async def test_criar_em_fluxo_inexistente_e_404_de_dominio(db):
 
 
 async def test_criar_em_fluxo_inativo_e_409_de_dominio(db):
-    """Escrever CONTINUA recusando — o que muda é o código, não a regra.
+    """Writing STILL refuses — what changes is the code, not the rule.
 
-    O agendador ignora agendamento de fluxo inativo, então a linha gravada
-    nunca dispararia. `WorkflowInactiveError` carrega 409 e `workflow_inactive`;
-    o `ValueError` de antes chegava ao cliente como "erro interno".
+    The scheduler ignores schedules of inactive workflows, so the stored row
+    would never fire. `WorkflowInactiveError` carries 409 and `workflow_inactive`;
+    the former `ValueError` reached the client as "erro interno" (internal error).
     """
     pedido = ScheduleCreate(strategy="interval", interval=10, unit="minutes",
                             workspace_id=WS, timezone="America/La_Paz")
@@ -67,7 +67,7 @@ async def test_criar_em_fluxo_inativo_e_409_de_dominio(db):
 
 
 async def test_a_recusa_de_escrita_tem_status_e_codigo(db):
-    """Sem isto, trocar a exceção por outra `AtlasBaseError` passaria batido."""
+    """Without this, swapping the exception for another `AtlasBaseError` would go unnoticed."""
     assert WorkflowInactiveError.status_code == 409
     assert WorkflowInactiveError.error_code == "workflow_inactive"
     assert WorkflowNotFoundError.status_code == 404

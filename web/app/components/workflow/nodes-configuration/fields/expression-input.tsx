@@ -8,13 +8,13 @@ import { TbVariable, TbFunction, TbFilter, TbLink } from "react-icons/tb"
 import { resolveNodeAlias, IDENTIFIER_SOURCE } from "../../utils/node-alias"
 import { saidasDoNo } from "../../utils/node-ports"
 
-// `Alias.campo.sub` como aparece no texto. Deriva da mesma regra de identificador
-// do alias — usar \w aqui deixava aliases acentuados fora do gatilho.
+// `Alias.campo.sub` as it appears in the text. Derived from the same identifier
+// rule as the alias — using \w here left accented aliases out of the trigger.
 const ALIAS_PATH = `${IDENTIFIER_SOURCE}(?:\\.[\\p{ID_Continue}]*)*`
 const ALIAS_TRIGGER = new RegExp(`\\$(${ALIAS_PATH})$`, "u")
 const ALIAS_PREFIX = new RegExp(`^${ALIAS_PATH}`, "u")
 
-/** Teto do popup — o suficiente para rolar sem virar uma lista infinita. */
+/** Popup ceiling — enough to scroll without turning into an endless list. */
 const LIMITE_SUGESTOES = 12
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
@@ -34,7 +34,7 @@ interface ExpressionInputProps {
   id?: string
 }
 
-// ── Filtros Jinja disponíveis ────────────────────────────────────────────────
+// ── Available Jinja filters ──────────────────────────────────────────────────
 
 const JINJA_FILTERS: Suggestion[] = [
   { label: "upper", type: "filter", description: "Maiúsculas" },
@@ -52,7 +52,7 @@ const JINJA_FILTERS: Suggestion[] = [
   { label: "replace('a','b')", type: "filter", description: "Substituir texto" },
 ]
 
-// ── Cores e ícones por tipo ──────────────────────────────────────────────────
+// ── Colors and icons by type ─────────────────────────────────────────────────
 
 const TYPE_STYLES: Record<string, { bg: string; text: string; icon: typeof TbLink }> = {
   "alias":       { bg: "bg-green-500/10", text: "text-green-600 dark:text-green-400", icon: TbLink },
@@ -64,43 +64,43 @@ const TYPE_STYLES: Record<string, { bg: string; text: string; icon: typeof TbLin
   "filter":      { bg: "bg-purple-500/10", text: "text-purple-600 dark:text-purple-400", icon: TbFilter },
 }
 
-// ── Detecção de gatilho ──────────────────────────────────────────────────────
+// ── Trigger detection ────────────────────────────────────────────────────────
 
 type TriggerKind = "alias" | "jinja" | "inputs" | "filter" | null
 
 interface TriggerInfo {
   kind: TriggerKind
-  start: number  // posição do gatilho no texto
-  query: string  // texto digitado após o gatilho (para filtrar)
+  start: number  // position of the trigger in the text
+  query: string  // text typed after the trigger (for filtering)
 }
 
 function detectTrigger(text: string, cursorPos: number): TriggerInfo | null {
   const before = text.slice(0, cursorPos)
 
-  // Filtro: detecta | dentro de {{ }}
+  // Filter: detects | inside {{ }}
   const pipeMatch = before.match(/\{\{[^}]*\|\s*(\w*)$/)
   if (pipeMatch) {
     return { kind: "filter", start: before.lastIndexOf("|") + 1, query: pipeMatch[1] }
   }
 
-  // Inputs: detecta {{ inputs. ou {{ inputs
+  // Inputs: detects {{ inputs. or {{ inputs
   const inputsMatch = before.match(/\{\{\s*inputs\.(\w*)$/)
   if (inputsMatch) {
     return { kind: "inputs", start: before.lastIndexOf("inputs.") + 7, query: inputsMatch[1] }
   }
 
-  // Jinja: detecta {{ seguido de texto
+  // Jinja: detects {{ followed by text
   const jinjaMatch = before.match(/\{\{\s*(\w*)$/)
   if (jinjaMatch) {
     return { kind: "jinja", start: before.lastIndexOf("{{") + 2, query: jinjaMatch[1].trim() }
   }
 
-  // Alias: detecta $ seguido de texto
+  // Alias: detects $ followed by text
   const aliasMatch = before.match(ALIAS_TRIGGER)
   if (aliasMatch) {
     return { kind: "alias", start: before.lastIndexOf("$") + 1, query: aliasMatch[1] }
   }
-  // $ acabou de ser digitado
+  // $ was just typed
   if (before.endsWith("$")) {
     return { kind: "alias", start: cursorPos, query: "" }
   }
@@ -119,17 +119,17 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
 
   const { getNodes, getEdges } = useReactFlow<INodeContext, Edge>()
 
-  // Fotografia do grafo tirada quando o gatilho aparece, e não assinatura.
-  // O formulário fica aberto sobre um canvas ainda editável: assinando
-  // `useNodes()/useEdges()`, as três listas de sugestão eram recalculadas a cada
-  // pointermove de um arraste — por campo de expressão da tela. E não há o que
-  // ganhar acompanhando o arraste: as sugestões não mudam por posição.
+  // A snapshot of the graph taken when the trigger appears, not a subscription.
+  // The form stays open over a canvas that is still editable: subscribing to
+  // `useNodes()/useEdges()`, the three suggestion lists were recomputed on every
+  // pointermove of a drag — per expression field on screen. And there is nothing
+  // to gain by following the drag: suggestions don't change with position.
   const [grafo, setGrafo] = useState<{ nodes: INodeContext[]; edges: Edge[] }>(
     () => ({ nodes: [], edges: [] }),
   )
   const { nodes: allNodes, edges } = grafo
 
-  // Monta sugestões base (aliases, variáveis, funções, inputs)
+  // Builds the base suggestions (aliases, variables, functions, inputs)
   const baseSuggestions = useMemo(() => {
     const connectedIds = edges
       .filter(e => e.target === nodeFound.id)
@@ -137,17 +137,17 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
 
     const suggestions: Suggestion[] = []
 
-    // O label é o que vai para o texto: precisa ser o alias que o EXECUTOR
-    // registra no contexto, não o rótulo de exibição. Ver utils/node-alias.
-    // A descrição carrega o nome amigável, quando diferir.
+    // The label is what goes into the text: it must be the alias the EXECUTOR
+    // registers in the context, not the display label. See utils/node-alias.
+    // The description carries the friendly name, when it differs.
     const descricaoDe = (n: INodeContext, alias: string) => {
       const rotulo = typeof n.data.alias === "string" ? n.data.alias : ""
-      // Sem rótulo próprio, o alias já é o nome do nó — repetir só polui a linha.
+      // Without a label of its own, the alias already is the node name — repeating it only clutters the row.
       return rotulo && rotulo !== alias ? rotulo : undefined
     }
 
-    // Dois nós sem alias customizado resolvem para o mesmo `name` — no contexto
-    // do executor eles ocupam a mesma chave, então a lista mostra uma entrada só.
+    // Two nodes without a custom alias resolve to the same `name` — in the
+    // executor's context they occupy the same key, so the list shows a single entry.
     const vistos = new Set<string>()
     const adicionar = (s: Suggestion) => {
       if (vistos.has(s.label)) return
@@ -155,7 +155,7 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
       suggestions.push(s)
     }
 
-    // 1. Aliases dos nós conectados (prioridade)
+    // 1. Aliases of the connected nodes (priority)
     allNodes.filter(n => connectedIds.includes(n.id)).forEach(n => {
       const alias = resolveNodeAlias(n.data)
       if (!alias) return
@@ -165,10 +165,10 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
       })
     })
 
-    // 2. Aliases dos demais nós, com os campos também. Listar só o alias fazia
-    // quem monta o fluxo de trás para frente digitar "{{$Alias." e não ver
-    // nada, sem pista de que conectar mudaria isso — os campos são declarados
-    // pelo nó, não dependem da conexão.
+    // 2. Aliases of the other nodes, with their fields too. Listing only the alias
+    // made whoever builds the workflow back to front type "{{$Alias." and see
+    // nothing, with no hint that connecting would change that — the fields are
+    // declared by the node, they don't depend on the connection.
     allNodes.filter(n => n.id !== nodeFound.id && !connectedIds.includes(n.id)).forEach(n => {
       const alias = resolveNodeAlias(n.data)
       if (!alias) return
@@ -181,16 +181,16 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
     return suggestions
   }, [allNodes, edges, nodeFound.id])
 
-  // Sugestões de inputs (portas + campos dos nós conectados)
+  // Input suggestions (ports + fields of the connected nodes)
   const inputSuggestions = useMemo(() => {
     const connectedIds = edges
       .filter(e => e.target === nodeFound.id)
       .map(e => e.source)
 
-    // `inputs` é um dict só: dois pais que declaram `output` ocupam a mesma
-    // chave. Sem deduplicar, a lista repete a entrada e o React ainda recebe
-    // duas chaves iguais — e a colisão ficou provável quando o achatamento
-    // passou a enxergar os campos da forma agrupada.
+    // `inputs` is a single dict: two parents that declare `output` occupy the same
+    // key. Without deduplicating, the list repeats the entry and React also gets
+    // two equal keys — and the collision became likely once flattening started
+    // seeing the fields of the grouped form.
     const suggestions: Suggestion[] = []
     const porLabel = new Map<string, Suggestion>()
     const adicionar = (s: Suggestion) => {
@@ -203,13 +203,13 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
       suggestions.push(s)
     }
 
-    // Portas de entrada nomeadas
+    // Named input ports
     const inputPorts = (nodeFound.data.inputs ?? []).map(p => p.name)
     inputPorts.forEach(port => {
       adicionar({ label: port, type: "input-port", description: `Porta "${port}"` })
     })
 
-    // Campos de saída dos nós conectados
+    // Output fields of the connected nodes
     allNodes.filter(n => connectedIds.includes(n.id)).forEach(n => {
       saidasDoNo(n.data).forEach(f => {
         adicionar({ label: f.name, type: "input-field", description: `${f.name} de ${n.data.alias || n.data.name}` })
@@ -219,7 +219,7 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
     return suggestions
   }, [allNodes, edges, nodeFound.id, nodeFound.data.inputs])
 
-  // Variáveis e funções Jinja
+  // Jinja variables and functions
   const jinjaSuggestions = useMemo<Suggestion[]>(() => {
     const connectedIds = edges
       .filter(e => e.target === nodeFound.id)
@@ -230,8 +230,8 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
       { label: "env", type: "variable", description: "Variáveis de ambiente" },
     ]
 
-    // Alias direto para cada nó conectado (acessível como variável de primeiro nível).
-    // Dentro de {{ }} o alias é uma variável Jinja — vale a mesma regra do executor.
+    // Direct alias for each connected node (accessible as a top-level variable).
+    // Inside {{ }} the alias is a Jinja variable — the executor's rule applies.
     const vistos = new Set(suggestions.map(s => s.label))
     allNodes.filter(n => connectedIds.includes(n.id)).forEach(n => {
       const alias = resolveNodeAlias(n.data)
@@ -248,7 +248,7 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
     return suggestions
   }, [allNodes, edges, nodeFound.id])
 
-  // Sugestões filtradas com base no gatilho ativo
+  // Suggestions filtered based on the active trigger
   const filteredSuggestions = useMemo(() => {
     if (!trigger) return []
     const q = trigger.query.toLowerCase()
@@ -259,9 +259,9 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
     else if (trigger.kind === "inputs") pool = inputSuggestions
     else if (trigger.kind === "filter") pool = JINJA_FILTERS
 
-    // Sem filtro, um corte reto escondia TODOS os aliases atrás dos campos do
-    // primeiro nó — bastava um nó com 6 saídas para o segundo alias sumir da
-    // lista. Reserva metade das vagas para aliases e completa com o resto.
+    // Without a filter, a straight cut hid ALL aliases behind the first node's
+    // fields — a single node with 6 outputs was enough for the second alias to
+    // vanish from the list. Reserves half the slots for aliases and fills the rest.
     if (!q) {
       const aliases = pool.filter(s => s.type === "alias")
       const demais = pool.filter(s => s.type !== "alias")
@@ -271,10 +271,11 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
         ...demais.slice(0, LIMITE_SUGESTOES - cotaAlias),
       ]
     }
-    // O rótulo amigável ("Caixa Delimitadora") vive na descrição desde que o
-    // label passou a ser o alias do executor — sem casar a descrição, o usuário
-    // digita o nome que vê no canvas e não acha nada. Com ponto no meio ele já
-    // está navegando um alias específico, aí só o label vale.
+    // The friendly label ("Caixa Delimitadora", bounding box) lives in the
+    // description since the label became the executor's alias — without matching
+    // the description, the user types the name they see on the canvas and finds
+    // nothing. With a dot in the middle they are already navigating a specific
+    // alias, so only the label counts.
     const casaDescricao = !q.includes(".")
     return pool
       .filter(s => s.label.toLowerCase().includes(q)
@@ -282,7 +283,7 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
       .slice(0, LIMITE_SUGESTOES)
   }, [trigger, baseSuggestions, jinjaSuggestions, inputSuggestions])
 
-  // Atualiza gatilho a cada mudança de valor
+  // Updates the trigger on every value change
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
     onChange(newValue)
@@ -291,8 +292,8 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
     const detected = detectTrigger(newValue, cursorPos)
 
     if (detected) {
-      // Refotografa a cada gatilho: entre uma abertura do popup e a próxima o
-      // usuário pode ter ligado o nó a outro, e a lista precisa refletir isso.
+      // Re-snapshots on every trigger: between one opening of the popup and the next
+      // the user may have connected the node to another, and the list must reflect it.
       setGrafo({ nodes: getNodes(), edges: getEdges() })
       setTrigger(detected)
       setShowPopup(true)
@@ -303,7 +304,7 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
     }
   }, [onChange, getNodes, getEdges])
 
-  // Insere sugestão no texto
+  // Inserts the suggestion into the text
   const insertSuggestion = useCallback((suggestion: Suggestion) => {
     if (!trigger || !inputRef.current) return
 
@@ -312,19 +313,19 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
 
     let inserted: string
     if (trigger.kind === "alias") {
-      // Limpa o texto que o usuário já digitou após $
+      // Clears the text the user already typed after $
       const afterAlias = value.slice(trigger.start).replace(ALIAS_PREFIX, "")
       inserted = `${before}${suggestion.label}${afterAlias}`
     } else if (trigger.kind === "jinja") {
-      // Insere com espaço e fecha }}
+      // Inserts with a space and closes }}
       const needsClose = !after.trimStart().startsWith("}}")
       inserted = `${before} ${suggestion.label}${needsClose ? " }}" : ""}${after}`
     } else if (trigger.kind === "inputs") {
-      // Completa campo após inputs.
+      // Completes the field after inputs.
       const afterField = value.slice(trigger.start).replace(/^\w*/, "")
       inserted = `${before}${suggestion.label}${afterField}`
     } else if (trigger.kind === "filter") {
-      // Insere filtro após |
+      // Inserts the filter after |
       const trimmedBefore = before.replace(/\s*$/, " ")
       const afterFilter = after.replace(/^\w*/, "")
       inserted = `${trimmedBefore}${suggestion.label}${afterFilter}`
@@ -336,11 +337,11 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
     setShowPopup(false)
     setTrigger(null)
 
-    // Restaura foco no input
+    // Restores focus to the input
     requestAnimationFrame(() => inputRef.current?.focus())
   }, [trigger, value, onChange])
 
-  // Navegação por teclado
+  // Keyboard navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!showPopup || filteredSuggestions.length === 0) return
 
@@ -360,7 +361,7 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
     }
   }, [showPopup, filteredSuggestions, selectedIndex, insertSuggestion])
 
-  // Fecha popup ao clicar fora
+  // Closes the popup when clicking outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
@@ -374,7 +375,7 @@ export default function ExpressionInput({ value, onChange, nodeFound, placeholde
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // Scroll item selecionado para visível
+  // Scrolls the selected item into view
   useEffect(() => {
     if (!popupRef.current) return
     const item = popupRef.current.children[selectedIndex] as HTMLElement | undefined

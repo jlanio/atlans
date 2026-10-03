@@ -7,8 +7,8 @@ from app.models.base import Base
 class UserExecutorAssignment(Base):
     __tablename__ = "user_executor_assignments"
     __table_args__ = (
-        # Constraint referencia colunas pelo nome SQL (executor_id), nao pelo
-        # atributo Python (executor_id ate R2.3).
+        # The constraint references columns by their SQL name (executor_id), not
+        # by the Python attribute (executor_id until R2.3).
         UniqueConstraint("user_id", "executor_id", name="uq_user_executor"),
     )
 
@@ -29,5 +29,5 @@ class UserExecutorAssignment(Base):
         nullable=False,
         index=True,
     )
-    assigned_by = Column(String(36), nullable=True)   # id_hash do admin que atribuiu
+    assigned_by = Column(String(36), nullable=True)   # id_hash of the admin who assigned it
     assigned_at = Column(DateTime, server_default=func.now(), nullable=False)

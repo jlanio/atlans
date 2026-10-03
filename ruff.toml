@@ -1,9 +1,9 @@
-# Lint do Python — o job "Backend (Python)" do CI roda `ruff check` antes do
-# pytest. Por ora só as regras do pyflakes (F): nome indefinido, import
-# quebrado ou sem uso, variável sem uso, f-string sem campo. É o que pega, no
-# PR, o erro que só estouraria em produção quando o caminho rodasse. Outras
-# famílias de regras entram aos poucos, cada uma no seu PR.
-# `py312`: a versão da API, do executor, do CI e do runtime do app desktop.
+# Python lint — the CI's "Backend (Python)" job runs `ruff check` before
+# pytest. For now only the pyflakes rules (F): undefined name, broken or
+# unused import, unused variable, f-string without a field. That is what catches,
+# in the PR, the error that would only blow up in production when the path ran.
+# Other rule families come in gradually, each in its own PR.
+# `py312`: the version of the API, the executor, CI and the desktop app runtime.
 target-version = "py312"
 
 [lint]

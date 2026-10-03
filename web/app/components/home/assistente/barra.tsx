@@ -2,30 +2,31 @@
 
 // web/app/components/home/assistente/barra.tsx
 //
-// A barra de comando da Home, em DUAS variantes do MESMO elemento:
+// The Home's command bar, in TWO variants of the SAME element:
 //
-// - `hero`: o estado inicial de todo acesso. Centrada e maior (56 px, texto de
-//   16 px), com anel e brilho discretos, sugestões DIGITADAS no campo vazio e
-//   três chips abaixo. Enquanto o assistente processa a primeira pergunta, os
-//   chips dão lugar a uma linha de status ("Trabalhando…", Esc para parar).
-// - `rodape`: a barra de sempre, no rodapé, centrada NA ÁREA DO GLOBO (é
-//   `absolute` dentro da raiz da HomeView, que já começa depois do sidebar).
+// - `hero`: the initial state of every visit. Centered and larger (56 px, 16 px
+//   text), with a discreet ring and glow, TYPED suggestions in the empty field
+//   and three chips below. While the assistant processes the first question,
+//   the chips give way to a status line ("Trabalhando…", Esc to stop).
+// - `rodape`: the usual bar, in the footer, centered ON THE GLOBE AREA (it is
+//   `absolute` inside the HomeView root, which already starts after the sidebar).
 //
-// A troca é do MESMO nó do DOM: a HomeView muda `variante` no primeiro token da
-// resposta e o CSS (`.home-barra`, em globals.css) anima posição, largura e
-// altura em 900 ms; com `prefers-reduced-motion` a troca é imediata.
+// The swap is of the SAME DOM node: HomeView changes `variante` on the first
+// token of the response and the CSS (`.home-barra`, in globals.css) animates
+// position, width and height over 900 ms; with `prefers-reduced-motion` the swap
+// is immediate.
 //
-// Enviar NÃO abre o painel: a conversa segue ao centro (a faixa acima da
-// barra). O chevron abre o painel lateral, para ler tudo.
+// Sending does NOT open the panel: the conversation stays in the center (the
+// strip above the bar). The chevron opens the side panel, to read everything.
 //
-// O envio tem sinal: um anel terracota pisca na caixa (`data-flash`, o `::after`
-// de `.home-barra-caixa` em globals.css) e o botão afunda. E quando o painel
-// abre, a barra não desmonta na hora: a HomeView a segura por um instante com
-// `saindo`, e ela apaga com fade (`data-saindo`), sem cliques nem foco.
+// Sending has a signal: a terracotta ring flashes on the box (`data-flash`, the
+// `::after` of `.home-barra-caixa` in globals.css) and the button sinks. And when
+// the panel opens, the bar doesn't unmount right away: HomeView holds it for an
+// instant with `saindo`, and it fades out (`data-saindo`), with no clicks or focus.
 //
-// A caixa também é o ALVO VISUAL do arraste de arquivos (`data-arraste`): quem
-// aceita o arquivo é a janela inteira (`useArrasteDeArquivos`), mas o que
-// acende é ela, e os arquivos viram chips logo acima — ver `anexos.tsx`.
+// The box is also the VISUAL TARGET of file dragging (`data-arraste`): the one
+// that accepts the file is the whole window (`useArrasteDeArquivos`), but what
+// lights up is the box, and the files become chips right above — see `anexos.tsx`.
 
 import { useEffect, useRef, useState } from "react"
 import { TbArrowUp, TbChevronUp, TbPlayerStopFilled, TbSparkles } from "react-icons/tb"
@@ -50,32 +51,32 @@ export type VarianteDaBarra = "hero" | "rodape"
 
 interface Props {
   enviar: (mensagem: string) => Promise<void> | void
-  /** Há um stream em curso — o `enviar` do hook volta em silêncio. */
+  /** A stream is in progress — the hook's `enviar` returns silently. */
   correndo?: boolean
   estado?: IAssistenteEstado | null
-  /** Devolve o foco ao campo quando a barra apareceu por atalho/botão. */
+  /** Returns focus to the field when the bar appeared via shortcut/button. */
   autoFoco?: boolean
-  /** `hero` no primeiro acesso; `rodape` depois da primeira resposta. */
+  /** `hero` on the first visit; `rodape` after the first response. */
   variante?: VarianteDaBarra
-  /** Interrompe o stream: o botão de parar (e o Esc, pela HomeView). */
+  /** Interrupts the stream: the stop button (and Esc, via HomeView). */
   parar?: () => void
-  /** O painel abriu e a barra está saindo: fade, sem cliques, sem roubar o foco. */
+  /** The panel opened and the bar is leaving: fade, no clicks, no stealing focus. */
   saindo?: boolean
   /**
-   * A altura, em px, do que a barra empilha ACIMA da caixa (chips, convite,
-   * aviso de recusados). A faixa (`Pilha`) é ancorada por baixo contando só a
-   * caixa; sem saber desta altura, a barra cresceria para cima e cobriria o
-   * "Expandir" da faixa — o mesmo bug do pill de cota (2026-09-19). A HomeView
-   * repassa isto à faixa como folga. O aviso de cota NÃO entra aqui: ele já tem
-   * a própria folga (`comAvisoDeCota`).
+   * The height, in px, of what the bar stacks ABOVE the box (chips, invitation,
+   * rejected warning). The strip (`Pilha`) is anchored from below counting only
+   * the box; without knowing this height, the bar would grow upward and cover
+   * the strip's "Expandir" — the same bug as the quota pill (2026-09-19). HomeView
+   * passes this to the strip as clearance. The quota warning is NOT included here:
+   * it already has its own clearance (`comAvisoDeCota`).
    */
   aoMedirExtras?: (altura: number) => void
-  /** O passo atual da resposta (raciocínio ou a ferramenta em curso), mostrado
-   *  no rodapé enquanto o assistente trabalha. `null` quando não há passo. */
+  /** The current step of the response (reasoning or the tool in progress), shown
+   *  in the footer while the assistant works. `null` when there is no step. */
   etapa?: Etapa | null
-  /** Anexa arquivos escolhidos no "+" (o mesmo caminho do arraste). */
+  /** Attaches files chosen via "+" (the same path as dragging). */
   aoAnexar?: (arquivos: File[]) => void
-  /** Aciona o controle de localização do globo (o "Usar minha localização" do "+"). */
+  /** Triggers the globe's location control (the "Usar minha localização" of "+"). */
   aoPedirLocalizacao?: () => void
 }
 
@@ -87,61 +88,62 @@ export default function Barra({
   const t = useTextos().assistente
   const sugestoes = t.barra.sugestoes
   const abrir = useHomeStore((s) => s.abrirPainel)
-  // O rascunho vive na store, partilhado com o painel: abrir/recolher (pelo
-  // botão ou por Ctrl+I) desmonta esta caixa, e num estado local o que estava
-  // escrito ia junto. Assim o texto simplesmente continua na caixa do outro.
+  // The draft lives in the store, shared with the panel: opening/collapsing (via
+  // the button or Ctrl+I) unmounts this box, and in local state whatever was
+  // written went with it. This way the text simply continues in the other's box.
   const rascunho = useHomeStore((s) => s.rascunho)
   const definirRascunho = useHomeStore((s) => s.definirRascunho)
-  // Os arquivos soltos sobre a Home. Na store pelo mesmo motivo do rascunho:
-  // Ctrl+I desmonta esta caixa e os chips iriam junto, com os uploads ainda
-  // correndo e nada na tela dizendo isso.
+  // The files dropped on the Home. In the store for the same reason as the draft:
+  // Ctrl+I unmounts this box and the chips would go with it, with the uploads
+  // still running and nothing on screen saying so.
   const anexos = useHomeStore((s) => s.anexos)
   const arrastando = useHomeStore((s) => s.arrastandoArquivo)
   const removerAnexo = useHomeStore((s) => s.removerAnexo)
   const limparAnexosProntos = useHomeStore((s) => s.limparAnexosProntos)
   const descartarAnexosRecusados = useHomeStore((s) => s.descartarAnexosRecusados)
-  // Só para a medição/folga dos extras (o chip lê a store por conta própria).
-  // Booleano DERIVADO de propósito: a posição muda a cada tick do modo seguir,
-  // mas a altura dos extras só muda quando o chip entra/sai — inscrever no
-  // objeto re-renderizava a barra (e re-media) a cada tick de GPS.
+  // Only for measuring/clearance of the extras (the chip reads the store on its
+  // own). A DERIVED boolean on purpose: the position changes on every tick of
+  // follow mode, but the extras' height only changes when the chip enters/leaves
+  // — subscribing to the object re-rendered the bar (and re-measured) on every GPS tick.
   const temLocalizacao = useHomeStore((s) => s.compartilharLocalizacao && s.localizacao !== null)
   const campoRef = useRef<HTMLInputElement>(null)
-  // A régua dos extras acima da caixa: sua altura vira folga da faixa. Medida
-  // em layout (antes da pintura) a cada mudança de conteúdo, e observada para
-  // as quebras de linha que só o resize provoca.
+  // The ruler of the extras above the box: its height becomes the strip's
+  // clearance. Measured in layout (before paint) on every content change, and
+  // observed for the line breaks only a resize causes.
   const extrasRef = useRef<HTMLDivElement>(null)
   const [focado, setFocado] = useState(false)
-  // O flash do envio: liga ao enviar, desliga no fim da animação do `::after`
-  // (o `animationend` do próprio elemento — um filho com animação infinita, como
-  // o cursor, nunca o dispara). Sem movimento a animação é `none`, o flag fica
-  // ligado sem efeito visível e o próximo envio o reusa.
+  // The send flash: turns on when sending, turns off at the end of the `::after`
+  // animation (the element's own `animationend` — a child with an infinite
+  // animation, like the cursor, never fires it). With reduced motion the animation
+  // is `none`, the flag stays on with no visible effect and the next send reuses it.
   const [flash, setFlash] = useState(false)
 
   useEffect(() => {
     if (autoFoco) campoRef.current?.focus()
   }, [autoFoco])
 
-  // O passo atual só no rodapé: no hero o "Trabalhando…" já ocupa esse espaço,
-  // e o hero termina no envio de qualquer forma. Declarado AQUI (antes dos
-  // efeitos) porque a medição abaixo depende dele: o indicador aparecer/sumir
-  // muda a altura dos extras. Booleano de propósito — `etapa` é um objeto novo
-  // por render, e como dep faria a medição rodar a cada quadro do stream; a
-  // ALTURA só muda no aparecer/sumir (o rótulo trunca, nunca quebra linha).
+  // The current step only in the footer: in the hero "Trabalhando…" already
+  // takes that space, and the hero ends on send anyway. Declared HERE (before
+  // the effects) because the measurement below depends on it: the indicator
+  // appearing/disappearing changes the extras' height. A boolean on purpose —
+  // `etapa` is a new object per render, and as a dep it would make the
+  // measurement run on every frame of the stream; the HEIGHT only changes on
+  // appear/disappear (the label truncates, it never wraps).
   const mostrarEtapa = variante !== "hero" && etapa != null
 
-  // Mede os extras a cada mudança de conteúdo (chips entram/saem, o aviso de
-  // recusados abre/fecha, o passo aparece/some). `useEffect` e não
-  // `useLayoutEffect` para não avisar no SSR (a convenção do repo); o atraso de
-  // um quadro é imperceptível — os chips não animam, e o que este cálculo evita
-  // é o overlap PERSISTENTE, não o de um quadro.
+  // Measures the extras on every content change (chips enter/leave, the
+  // rejected warning opens/closes, the step appears/disappears). `useEffect`
+  // and not `useLayoutEffect` to avoid the SSR warning (the repo's convention);
+  // the one-frame delay is imperceptible — the chips don't animate, and what
+  // this calculation prevents is the PERSISTENT overlap, not a one-frame one.
   useEffect(() => {
     if (extrasRef.current) aoMedirExtras?.(extrasRef.current.offsetHeight)
   }, [aoMedirExtras, anexos, arrastando, mostrarEtapa, temLocalizacao])
 
-  // Observa o resize à parte: com muitos chips a fileira quebra em mais linhas
-  // quando a janela estreita, sem que `anexos` mude. Montado uma vez (deps
-  // estáveis), zera a folga só no DESMONTE real — a faixa não pode ficar
-  // suspensa sobre uma barra que já saiu.
+  // Observes resize separately: with many chips the row wraps into more lines
+  // when the window narrows, without `anexos` changing. Mounted once (stable
+  // deps), it resets the clearance only on the real UNMOUNT — the strip can't
+  // stay suspended over a bar that has already left.
   useEffect(() => {
     const el = extrasRef.current
     if (!el || !aoMedirExtras) return
@@ -155,35 +157,36 @@ export default function Barra({
   const bloqueado = correndo || estourou
   const hero = variante === "hero"
 
-  // A pergunta que os anexos sugerem, quando há algum no Drive. Ela toma o
-  // lugar das sugestões digitadas: oferecer "Mostre os focos de calor" a quem
-  // acabou de soltar um shapefile é ignorar o que a pessoa fez.
+  // The question the attachments suggest, when there is one in the Drive. It takes
+  // the place of the typed suggestions: offering "Mostre os focos de calor" to
+  // someone who just dropped a shapefile is ignoring what the person did.
   const sugestaoDeAnexo = sugestaoParaAnexos(anexos, idioma)
   const temAnexoPronto = sugestaoDeAnexo !== null
-  // Há algo acima da caixa (chips, aviso de recusados, o passo, a localização) ou o convite.
+  // There is something above the box (chips, rejected warning, the step, the location) or the invitation.
   const temExtras = anexos.length > 0 || arrastando || mostrarEtapa || temLocalizacao
 
-  // A sugestão digitada só existe no hero, com o campo vazio e nada correndo.
+  // The typed suggestion only exists in the hero, with the field empty and nothing running.
   const sugestaoVisivel = hero && rascunho === "" && !correndo && !estourou && !temAnexoPronto
   const { texto: sugestao, indice } = useSugestaoDigitada(sugestaoVisivel, sugestoes)
 
   function submeter() {
     const digitado = rascunho.trim()
-    // Campo vazio envia a sugestão da vez — é o "Enter envia" da dica. Com
-    // anexo pronto a sugestão é a dele, e vale nas DUAS variantes: quem soltou
-    // um arquivo já disse o que quer, mesmo fora do hero.
+    // An empty field sends the current suggestion — that's the hint's "Enter
+    // envia". With a ready attachment the suggestion is its own, and it applies in
+    // BOTH variants: whoever dropped a file has already said what they want, even
+    // outside the hero.
     const texto = digitado || sugestaoDeAnexo || (sugestaoVisivel ? (sugestoes[indice] ?? "") : "")
     if (!texto) return
-    // Com um stream em curso (ou a cota estourada) o `enviar` do hook volta em
-    // silêncio: a frase digitada sumia para sempre sem nenhum sinal. Aqui o
-    // envio simplesmente não acontece e o rascunho fica à vista, na mesma
-    // caixa, para ir quando o stream acabar.
+    // With a stream in progress (or the quota exceeded) the hook's `enviar` returns
+    // silently: the typed sentence vanished forever without any signal. Here the
+    // send simply doesn't happen and the draft stays in view, in the same box,
+    // to go when the stream ends.
     if (bloqueado) return
     definirRascunho("")
-    // A mensagem leva a lista do que subiu — sem ela, «analise isso» chega ao
-    // assistente sem nenhum «isso». Só os PRONTOS entram, e só eles saem da
-    // caixa: o que ainda sobe não estava na mensagem, e o recusado nunca teve
-    // relação com ela.
+    // The message carries the list of what was uploaded — without it, "analise
+    // isso" reaches the assistant without any "this". Only the READY ones go in,
+    // and only they leave the box: what is still uploading wasn't in the message,
+    // and the rejected one never had anything to do with it.
     void enviar(comReferencia(texto, anexos, idioma))
     limparAnexosProntos()
     setFlash(true)
@@ -196,7 +199,7 @@ export default function Barra({
       return
     }
     if (e.key === "Tab" && !e.shiftKey && sugestaoVisivel) {
-      // Tab aceita a sugestão em vez de sair do campo — é o que a dica promete.
+      // Tab accepts the suggestion instead of leaving the field — that's what the hint promises.
       e.preventDefault()
       definirRascunho(sugestoes[indice] ?? "")
     }
@@ -222,33 +225,33 @@ export default function Barra({
         />
       )}
 
-      {/* Tudo o que empilha ACIMA da caixa mora nesta régua, e é a altura dela
-          que a faixa recebe como folga (aoMedirExtras). O aviso de cota fica
-          FORA dela de propósito — ele já tem folga própria.
+      {/* Everything that stacks ABOVE the box lives in this ruler, and its height
+          is what the strip receives as clearance (aoMedirExtras). The quota
+          warning stays OUTSIDE it on purpose — it already has its own clearance.
 
-          `flex flex-col gap` (não `mb` nos filhos) e `pb` quando há conteúdo:
-          assim o vão até a caixa entra no `offsetHeight`. Com `mb` no último
-          filho, a margem colapsava para FORA da altura medida, e a faixa subia
-          ~6 px de menos — encostando de novo no "Expandir". Vazio, sem `pb`,
-          mede zero. */}
+          `flex flex-col gap` (not `mb` on the children) and `pb` when there is
+          content: that way the gap down to the box goes into `offsetHeight`. With
+          `mb` on the last child, the margin collapsed OUTSIDE the measured height,
+          and the strip rose ~6 px too little — touching "Expandir" again. Empty,
+          with no `pb`, it measures zero. */}
       <div ref={extrasRef} className={cn("flex flex-col gap-1.5", temExtras && "pb-1.5")}>
         <AvisoDeAnexosRecusados anexos={anexos} onFechar={descartarAnexosRecusados} />
 
-        {/* Acima da caixa, e não dentro: ela é um `rounded-full` de 44 px (56 no
-            hero) e não tem onde pôr uma fileira que quebra linha. */}
+        {/* Above the box, not inside: it is a 44 px `rounded-full` (56 in the
+            hero) and has no room for a row that wraps. */}
         {arrastando && <ConviteDeSoltura className="justify-center" />}
         <ChipsDeAnexo anexos={anexos} onRemover={removerAnexo} className="justify-center" />
         <ChipDeLocalizacao className="justify-center" />
-        {/* O passo da vez, enquanto o assistente trabalha. */}
+        {/* The current step, while the assistant works. */}
         {mostrarEtapa && etapa && <IndicadorDeEtapa etapa={etapa} className="justify-center px-1" />}
       </div>
 
       <div
         className="home-barra-caixa flex items-center gap-2 rounded-full border border-border bg-background/95 pl-2.5 pr-1.5 backdrop-blur"
         data-flash={flash}
-        // O realce do arraste. A área que ACEITA o arquivo é a janela inteira
-        // (useArrasteDeArquivos); quem acende é só a caixa — nenhum véu cobre
-        // o globo, que é a escolha desta opção.
+        // The drag highlight. The area that ACCEPTS the file is the whole window
+        // (useArrasteDeArquivos); only the box lights up — no veil covers
+        // the globe, which is this option's choice.
         data-arraste={arrastando}
         onAnimationEnd={(e) => { if (e.target === e.currentTarget) setFlash(false) }}
       >
@@ -312,7 +315,7 @@ export default function Barra({
             size="icon"
             onClick={submeter}
             disabled={(!rascunho.trim() && !sugestaoVisivel && !temAnexoPronto) || bloqueado}
-            // A pressão: afunda mais que o `active:scale-[0.98]` de todo botão.
+            // The press: sinks more than every button's `active:scale-[0.98]`.
             className="home-barra-btn shrink-0 rounded-full active:scale-90"
             aria-label={t.barra.enviar}
           >
@@ -322,11 +325,11 @@ export default function Barra({
       </div>
 
       {(cota != null || sugestaoVisivel) && (
-        // A linha de meta sob a caixa, à direita — o lugar do indicador de
-        // contexto do Claude Code, que foi a referência do dono. A dica de
-        // digitação (visível só com o cursor no campo; fora dele continua no
-        // DOM para o leitor de tela, que é quem não vê a frase digitada) e o
-        // donut da cota dividem a mesma linha para não disputarem o canto.
+        // The meta line under the box, on the right — the place of Claude Code's
+        // context indicator, which was the owner's reference. The typing hint
+        // (visible only with the cursor in the field; outside it, it stays in the
+        // DOM for the screen reader, which is who doesn't see the typed sentence)
+        // and the quota donut share the same line so they don't fight over the corner.
         <div className="home-barra-meta flex items-center justify-end gap-3 pr-2">
           {sugestaoVisivel && (
             <p
@@ -342,8 +345,8 @@ export default function Barra({
 
       {hero && (correndo ? (
         <p role="status" className="home-chips flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          {/* A marca do site pensando (a mesma do item pendente da conversa) e o
-              texto com um brilho que varre — parado, o status parecia travado. */}
+          {/* The site's thinking mark (the same as the conversation's pending item) and
+              the text with a sweeping shimmer — static, the status looked frozen. */}
           <MarcaAnimada size={15} /> <span className="texto-pensando">{t.barra.trabalhando}</span>
           {parar && (
             <button
@@ -374,10 +377,10 @@ export default function Barra({
 }
 
 /**
- * As frases do hero digitadas letra a letra (26–56 ms), lidas por 2,3 s,
- * apagadas depressa (14 ms) e trocadas pela seguinte, em ciclo. Parar e retomar
- * (a pessoa digitou e apagou) continua de onde estava. Com menos movimento, a
- * frase inteira, parada.
+ * The hero's sentences typed letter by letter (26–56 ms), read for 2.3 s,
+ * erased quickly (14 ms) and replaced by the next one, in a cycle. Stopping and
+ * resuming (the person typed and erased) continues from where it was. With
+ * reduced motion, the whole sentence, static.
  */
 function useSugestaoDigitada(ativa: boolean, sugestoes: readonly string[]): { texto: string; indice: number } {
   const [indice, setIndice] = useState(0)

@@ -1,15 +1,15 @@
 # flow/nodes/action/attribute_join.py
 """
-Join por ATRIBUTO — casa duas camadas por uma coluna-chave, nao pela geometria.
+Join by ATTRIBUTE — matches two layers by a key column, not by geometry.
 
-O catalogo nao tinha isso. `Merge` mescla branches do fluxo, `Aggregate` empilha
-linhas ou funde geometrias, e `SpatialJoin` casa por geometria. Trazer a
-populacao de uma tabela para a malha de setores pelo codigo do setor — a
-operacao mais comum de analise — so era possivel escrevendo um `PythonScript`.
+The catalog did not have this. `Merge` merges workflow branches, `Aggregate` stacks
+rows or dissolves geometries, and `SpatialJoin` matches by geometry. Bringing the
+population from a table onto the tract grid by tract code — the most common
+analysis operation — was only possible by writing a `PythonScript`.
 
-As duas entradas sao DECLARADAS (`layerA`/`layerB`). E o que faz o canvas
-desenhar dois handles nomeados e o editor preencher o `to_key` da aresta; um no
-sem portas declaradas recebe as duas arestas na mesma chave e perde uma delas.
+Both inputs are DECLARED (`layerA`/`layerB`). That is what makes the canvas
+draw two named handles and the editor fill in the edge's `to_key`; a node
+with no declared ports receives both edges on the same key and loses one of them.
 """
 import asyncio
 from typing import Any, Dict
@@ -24,17 +24,17 @@ from flow.utils.parameter_validation import colunas_pedidas
 
 logger = get_logger(__name__)
 
-# O parser tolerante nasceu aqui e virou utilitario compartilhado quando outros
-# nos ganharam campos de fichas (a historia esta no docstring de
-# `colunas_pedidas`). O nome local fica como alias para o execute() e os testes.
+# The tolerant parser was born here and became a shared utility when other
+# nodes gained chip fields (the history is in the docstring of
+# `colunas_pedidas`). The local name stays as an alias for execute() and the tests.
 _colunas_pedidas = colunas_pedidas
 
 
 def _familia(serie: "pd.Series") -> str:
-    """Agrupa dtypes no que importa para um merge: numero, texto ou outro.
+    """Groups dtypes into what matters for a merge: number, text or other.
 
-    `int64` e `float64` casam entre si; `object` (texto) contra qualquer numero
-    nao casa NADA — e o pandas nao avisa, devolve a coluna inteira nula.
+    `int64` and `float64` match each other; `object` (text) against any number
+    matches NOTHING — and pandas does not warn, it returns the whole column as null.
     """
     if pd.api.types.is_numeric_dtype(serie):
         return "número"
@@ -45,7 +45,7 @@ def _familia(serie: "pd.Series") -> str:
 
 @register_node
 class AttributeJoin(BaseNode):
-    """Traz colunas de B para A casando por uma coluna-chave."""
+    """Brings columns from B into A by matching on a key column."""
 
     @classmethod
     def description(cls) -> Dict[str, Any]:
@@ -126,11 +126,11 @@ class AttributeJoin(BaseNode):
         }
 
     def _tabela(self, inputs: Dict[str, Any], chave: str) -> "pd.DataFrame":
-        """Aceita DataFrame OU GeoDataFrame.
+        """Accepts a DataFrame OR a GeoDataFrame.
 
-        `get_input_gdf` da classe base exige GeoDataFrame, e o caso normal de B e
-        justamente uma TABELA sem geometria — a planilha de populacao, o retorno
-        de uma consulta SQL.
+        The base class's `get_input_gdf` requires a GeoDataFrame, and the normal case
+        for B is precisely a TABLE without geometry — the population spreadsheet, the
+        result of a SQL query.
         """
         valor = inputs.get(chave)
         if valor is None:
@@ -170,8 +170,8 @@ class AttributeJoin(BaseNode):
                 f"Coluna '{key_b}' não existe em B. Colunas disponíveis: {list(B.columns)}."
             )
 
-        # Tipos incompatíveis não casam NADA e o pandas não reclama: a saída vem
-        # com a coluna inteira nula e parece "nenhum registro bateu".
+        # Incompatible types match NOTHING and pandas does not complain: the output comes
+        # with the whole column null and looks like "no record matched".
         fam_a, fam_b = _familia(A[key_a]), _familia(B[key_b])
         if fam_a != fam_b:
             raise ValueError(
@@ -180,8 +180,8 @@ class AttributeJoin(BaseNode):
                 "Converta um dos lados antes deste nó."
             )
 
-        # Recorta B ANTES do merge. Sem isso vêm colunas que ninguém pediu, e
-        # nomes iguais aos de A viram `_x`/`_y` em silêncio.
+        # Slices B BEFORE the merge. Without this, columns nobody asked for come along,
+        # and names equal to A's silently become `_x`/`_y`.
         if colunas:
             faltando = [c for c in colunas if c not in B.columns]
             if faltando:
@@ -192,12 +192,12 @@ class AttributeJoin(BaseNode):
         else:
             colunas = [c for c in B.columns if c not in (key_b, "geometry")]
 
-        # A chave de B nunca entra como coluna trazida. Pedida explicitamente em
-        # `columns`, ela aparecia duas vezes no recorte `B[[key_b] + colunas]`, e
-        # `b[key_b]` deixava de ser uma Series — a checagem de duplicata quebrava
-        # com "'DataFrame' object has no attribute 'unique'", um erro interno que
-        # não diz nada a quem só pediu uma coluna. Trazê-la seria redundante de
-        # qualquer forma: a chave já está em A, e o merge a descarta no fim.
+        # B's key never comes in as a brought column. Explicitly requested in
+        # `columns`, it showed up twice in the slice `B[[key_b] + colunas]`, and
+        # `b[key_b]` stopped being a Series — the duplicate check broke
+        # with "'DataFrame' object has no attribute 'unique'", an internal error that
+        # tells nothing to someone who just asked for a column. Bringing it would be
+        # redundant anyway: the key is already in A, and the merge drops it at the end.
         colunas = [c for c in colunas if c != key_b]
 
         colidem = [c for c in colunas if c in A.columns]
@@ -209,8 +209,8 @@ class AttributeJoin(BaseNode):
 
         b = B[[key_b] + colunas]
 
-        # A duplicata é o defeito silencioso deste nó: ela MULTIPLICA as feições
-        # de A, e o run termina em verde com mais feições do que entrou.
+        # The duplicate is this node's silent defect: it MULTIPLIES A's features,
+        # and the run ends green with more features than went in.
         repetidas = b[key_b][b[key_b].duplicated()].unique()
         if len(repetidas) and se_duplicado != "todas":
             if se_duplicado == "falhar":
@@ -229,21 +229,21 @@ class AttributeJoin(BaseNode):
                 f"mantida a primeira de cada uma das {len(repetidas)} chaves."
             )
 
-        # `indicator` responde QUEM casou. Antes o "sem correspondência" era
-        # inferido de `resultado[colunas[0]].isna()`, o que conta como falta de
-        # par toda linha em que a coluna trazida é nula POR SER nula em B —
-        # mandando procurar um problema de chave que não existe.
+        # `indicator` answers WHO matched. Previously "no match" was
+        # inferred from `resultado[colunas[0]].isna()`, which counts as unmatched
+        # every row where the brought column is null BECAUSE it is null in B —
+        # sending people to look for a key problem that does not exist.
         MARCA = "__origem_do_join__"
 
         def _juntar() -> "pd.DataFrame":
-            # A.merge, e NÃO B.merge: chamado a partir do GeoDataFrame o
-            # resultado continua GeoDataFrame, com geometria e CRS. Ao contrário
-            # viraria DataFrame comum e os nós espaciais seguintes falhariam.
+            # A.merge, and NOT B.merge: called from the GeoDataFrame the
+            # result stays a GeoDataFrame, with geometry and CRS. The other way around
+            # it would become a plain DataFrame and the following spatial nodes would fail.
             return A.merge(b, left_on=key_a, right_on=key_b, how=how, indicator=MARCA)
 
         resultado = await asyncio.to_thread(_juntar)
 
-        # A chave de B vira coluna duplicada quando tem nome diferente da de A.
+        # B's key becomes a duplicate column when its name differs from A's.
         if key_b != key_a and key_b in resultado.columns:
             resultado = resultado.drop(columns=[key_b])
 

@@ -10,7 +10,7 @@ beforeEach(() => {
   sessao.status = "authenticated"
 })
 
-/** Fetcher controlável: cada chamada devolve uma promise que o teste resolve. */
+/** Controllable fetcher: each call returns a promise the test resolves. */
 function fetcherControlado<T>() {
   const resolvers: ((valor: { data: T }) => void)[] = []
   const fetcher = vi.fn(() => new Promise<{ data: T }>(res => { resolvers.push(res) }))
@@ -22,7 +22,7 @@ describe("useFetchData — sinais de carga", () => {
     const { fetcher, resolverProxima } = fetcherControlado<string[]>()
     const { result } = renderHook(() => useFetchData(fetcher, "erro"))
 
-    // Primeira carga: sem nada na tela, os dois sinais ligados (skeleton + spinner).
+    // First load: nothing on screen, both signals on (skeleton + spinner).
     expect(result.current.firstLoad).toBe(true)
     expect(result.current.loading).toBe(true)
 
@@ -31,13 +31,13 @@ describe("useFetchData — sinais de carga", () => {
     expect(result.current.firstLoad).toBe(false)
     expect(result.current.loading).toBe(false)
 
-    // Recarga (botão Atualizar): `loading` TEM de voltar a true — foi
-    // exatamente o que sumiu e deixou o botão de /admin/settings sem girar e
-    // sem desabilitar, como se o clique não tivesse pegado.
+    // Reload (Refresh button): `loading` MUST go back to true — that's exactly
+    // what went missing and left the /admin/settings button not spinning and
+    // not disabling, as if the click hadn't registered.
     act(() => { result.current.refetch() })
     await waitFor(() => expect(result.current.loading).toBe(true))
     expect(result.current.refreshing).toBe(true)
-    // ...mas sem trocar a lista por skeletons: os dados continuam na tela.
+    // ...but without swapping the list for skeletons: the data stays on screen.
     expect(result.current.firstLoad).toBe(false)
     expect(result.current.data).toEqual(["a"])
 
@@ -66,9 +66,9 @@ describe("useFetchData — sinais de carga", () => {
 
 describe("useFetchData — guarda de geração", () => {
   it("resposta obsoleta NÃO sobrescreve a mais recente", async () => {
-    // Duas execuções se sobrepõem (deps mudam antes de a 1a resolver). A que
-    // resolvesse por último vencia; agora cada execute leva um número e o
-    // resultado de uma geração passada é ignorado.
+    // Two executions overlap (deps change before the 1st resolves). The one
+    // that resolved last used to win; now each execute carries a number and
+    // the result from a past generation is ignored.
     const resolvers: Array<(v: { data: string }) => void> = []
     const fetcher = vi.fn(() => new Promise<{ data: string }>(res => { resolvers.push(res) }))
     const { result } = renderHook(() => useFetchData(fetcher, "erro"))
@@ -77,11 +77,11 @@ describe("useFetchData — guarda de geração", () => {
     act(() => { result.current.refetch() })
     await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2)) // execute#2
 
-    // A 2a resolve primeiro (a nova), e só depois a 1a (a velha).
+    // The 2nd resolves first (the new one), and only then the 1st (the old one).
     await act(async () => { resolvers[1]({ data: "nova" }) })
     await act(async () => { resolvers[0]({ data: "velha" }) })
 
-    // A velha, resolvendo por último, não pode vencer.
+    // The old one, resolving last, must not win.
     expect(result.current.data).toBe("nova")
   })
 
@@ -103,7 +103,7 @@ describe("useFetchData — guarda de geração", () => {
   })
 })
 
-/** Fetcher que responde, na ordem, cada item da fila (dado ou erro). */
+/** Fetcher that answers, in order, each item of the queue (data or error). */
 function fetcherEmFila<T>(...fila: Array<{ data: T } | { error: { message: string } }>) {
   return vi.fn(async () => fila.shift() ?? null)
 }
@@ -121,7 +121,7 @@ describe("useFetchData — cartão de erro × toast da recarga", () => {
     await act(async () => { await result.current.refetch() })
     expect(result.current.error).toBe("caiu")
     expect(result.current.atualizadoEm).toBe(carimbo)
-    // A lista continua: é o `error && atualizadoEm == null` que dá o cartão.
+    // The list stays: it's `error && atualizadoEm == null` that yields the card.
     expect(result.current.data).toEqual(["a"])
   })
 
@@ -158,20 +158,20 @@ describe("useFetchData — recarga de fundo", () => {
     expect(result.current.error).toBe("fora do ar")
     expect(result.current.firstLoad).toBe(false)
 
-    // Em voo: o cartão continua (erro na tela, sem skeleton, sem spinner). Pelo
-    // `refetch`, o cartão saía e voltava — um `role="alert"` novo a cada tique.
+    // In flight: the card stays (error on screen, no skeleton, no spinner). Via
+    // `refetch`, the card left and came back — a new `role="alert"` on every tick.
     act(() => { result.current.recarregarEmFundo() })
     expect(fetcher).toHaveBeenCalledTimes(2)
     expect(result.current.firstLoad).toBe(false)
     expect(result.current.loading).toBe(false)
     expect(result.current.error).toBe("fora do ar")
 
-    // Falhou de novo: o mesmo erro, nada mais muda.
+    // Failed again: the same error, nothing else changes.
     await act(async () => { resolvers.shift()!({ error: { message: "fora do ar" } }) })
     expect(result.current.error).toBe("fora do ar")
     expect(result.current.firstLoad).toBe(false)
 
-    // Voltou: a lista toma o lugar do cartão.
+    // It came back: the list takes the card's place.
     act(() => { result.current.recarregarEmFundo() })
     await act(async () => { resolvers.shift()!({ data: ["a"] }) })
     expect(result.current.data).toEqual(["a"])
@@ -199,8 +199,8 @@ describe("useFetchData — recarga de fundo", () => {
     const { result } = renderHook(() => useFetchData(fetcher, "erro"))
     await waitFor(() => expect(result.current.error).toBe("caiu"))
 
-    // Passado direto ao onClick, o refetch recebe o evento: ele não pode virar
-    // a recarga de fundo.
+    // Passed directly to onClick, refetch receives the event: it must not turn
+    // into the background reload.
     const refetch = result.current.refetch as unknown as (evento: unknown) => Promise<unknown>
     act(() => { refetch({ type: "click" }) })
     expect(result.current.firstLoad).toBe(true)

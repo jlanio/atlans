@@ -1,26 +1,27 @@
 # app/mcp/servidor.py
 """
-O servidor MCP do Atlans: fábrica, guardas na borda das chamadas e o app ASGI.
+The Atlans MCP server: factory, guards at the edge of calls, and the ASGI app.
 
-Duas decisões estruturais moram aqui.
+Two structural decisions live here.
 
-1. `ServidorAtlans` sobrescreve `list_tools` e `call_tool`, que o SDK expõe como
-   métodos públicos e chama por `self`. `list_tools` filtra o catálogo pelo
-   escopo do token — conforto, para o cliente não gastar chamada tentando uma tool
-   que não pode usar. `call_tool` é a garantia de verdade: nenhuma tool roda sem
-   passar por escopo e cota, mesmo que o cliente chame um nome que nunca viu na
-   lista.
+1. `ServidorAtlans` overrides `list_tools` and `call_tool`, which the SDK exposes
+   as public methods and calls through `self`. `list_tools` filters the catalog
+   by the token's scope — a convenience, so the client does not spend a call
+   trying a tool it cannot use. `call_tool` is the real guarantee: no tool runs
+   without going through scope and quota, even if the client calls a name it
+   never saw in the list.
 
-   O default é RECUSAR. Tool sem linha em `GUARDAS` não é chamável e nem sequer
-   aparece no catálogo: uma tool nova que o autor esqueceu de declarar falharia
-   FECHADA (ninguém a usa e o defeito aparece no log) em vez de rodar sem escopo,
-   sem cota e sem papel. O teste de paridade continua existindo como segunda
-   linha de defesa — ele avisa em CI, esta regra protege em produção.
+   The default is to REFUSE. A tool without a row in `GUARDAS` is not callable
+   and does not even appear in the catalog: a new tool that its author forgot
+   to declare would fail CLOSED (nobody uses it and the defect shows up in the
+   log) instead of running without scope, without quota and without role. The
+   parity test still exists as a second line of defense — it warns in CI, this
+   rule protects in production.
 
-2. `create_mcp_server()` é FÁBRICA, não singleton de módulo. `session_manager`
-   é um contexto que só pode ser entrado uma vez por instância; com um singleton,
-   o segundo teste (ou um segundo `lifespan` num reload) encontraria o gerenciador
-   já consumido. Cada processo e cada teste criam a sua instância.
+2. `create_mcp_server()` is a FACTORY, not a module singleton. `session_manager`
+   is a context that can only be entered once per instance; with a singleton,
+   the second test (or a second `lifespan` on a reload) would find the manager
+   already consumed. Each process and each test creates its own instance.
 """
 from __future__ import annotations
 
@@ -39,35 +40,37 @@ from app.mcp.resources import registrar_resources
 from app.mcp.tools import registrar_tools
 from app.mcp.tools.base import guarda_da_chamada
 
-# Versão do CONTRATO do servidor (tools, resources, formato das saídas), não do
-# Atlans. Uma tool removida fica pelo menos uma versão menor marcada como
-# obsoleta antes de sumir — ver docs/mcp.md.
+# Version of the server's CONTRACT (tools, resources, output format), not of
+# Atlans. A removed tool stays marked as deprecated for at least one minor
+# version before disappearing — see docs/mcp.md.
 VERSAO_MCP = "1.5.0"
 
 logger = get_logger("app.mcp.servidor")
 
-# Onde o app ASGI fica guardado na instância do servidor — ver `criar_app_mcp`.
+# Where the ASGI app is kept on the server instance — see `criar_app_mcp`.
 _ATRIBUTO_DO_APP = "_app_do_atlans"
 
-# Nomes já denunciados por `list_tools`: o aviso é de defeito de programação
-# (tool registrada sem guarda), e repeti-lo a cada `tools/list` afogaria o log.
+# Names already reported by `list_tools`: the warning is about a programming
+# defect (a tool registered without a guard), and repeating it on every
+# `tools/list` would flood the log.
 _SEM_GUARDA_AVISADAS: set[str] = set()
 
 
 class ServidorAtlans(MCPServer):
-    """`MCPServer` com escopo, cota e auditoria em toda chamada de tool."""
+    """`MCPServer` with scope, quota and auditing on every tool call."""
 
     async def list_tools(self):
-        """O catálogo filtrado pelo escopo do token da request.
+        """The catalog filtered by the request token's scope.
 
-        Sem escopo no `ContextVar` a lista sai com tudo que É chamável: é o caso
-        do cliente em processo (`Client(server)`), que não passa pelo middleware.
-        Não há perda de segurança — quem decide se a chamada acontece é
+        With no scope in the `ContextVar` the list comes out with everything
+        that IS callable: that is the case of the in-process client
+        (`Client(server)`), which does not go through the middleware. There is
+        no loss of security — what decides whether the call happens is
         `call_tool`.
 
-        Tool sem guarda declarada sai da lista SEMPRE, com ou sem escopo:
-        `call_tool` a recusa, e anunciar o que não se pode chamar só faria o
-        cliente gastar chamada para descobrir isso.
+        A tool without a declared guard is ALWAYS left out of the list, with or
+        without scope: `call_tool` refuses it, and advertising what cannot be
+        called would only make the client spend a call to find that out.
         """
         escopo = ESCOPO_ATUAL.get()
         visiveis = []
@@ -87,26 +90,28 @@ class ServidorAtlans(MCPServer):
         return visiveis
 
     async def call_tool(self, name, arguments, context=None):
-        """Escopo → cota → tool → auditoria.
+        """Scope → quota → tool → audit.
 
-        O mapeamento de exceção de domínio para `ToolError` NÃO acontece aqui: o
-        gerenciador de tools do SDK já embrulhou qualquer exceção antes de a
-        chamada voltar para cá. Ele mora no decorador de cada tool.
+        The mapping from domain exception to `ToolError` does NOT happen here:
+        the SDK's tool manager has already wrapped any exception before the
+        call comes back here. It lives in each tool's decorator.
         """
         if name not in GUARDAS:
-            # Sem guarda declarada não há escopo a exigir, cota a cobrar nem
-            # papel a checar — então não há chamada.
+            # Without a declared guard there is no scope to require, quota to
+            # charge or role to check — so there is no call.
             #
-            # `not_found` e não `forbidden` (que prometeria que a tool existe e
-            # falta permissão) nem `internal_error` (que acusaria defeito nosso
-            # num simples erro de digitação do cliente): do lado de fora, uma
-            # tool que não aparece em tools/list e não roda simplesmente não
-            # existe. E é o MESMO código nos dois casos — nome que nunca existiu
-            # e tool registrada sem a linha da tabela —, para a recusa não virar
-            # um oráculo de quais tools a instalação tem escondidas.
+            # `not_found` and not `forbidden` (which would promise that the tool
+            # exists and permission is missing) nor `internal_error` (which
+            # would blame a defect of ours for a simple client typo): from the
+            # outside, a tool that does not appear in tools/list and does not
+            # run simply does not exist. And it is the SAME code in both cases
+            # — a name that never existed and a tool registered without its
+            # table row —, so the refusal does not become an oracle of which
+            # tools the installation has hidden.
             #
-            # Só o começo do nome no log: ele vem do cliente, e um nome gigante
-            # repetido em laço encheria o log de graça.
+            # Only the beginning of the name goes into the log: it comes from
+            # the client, and a giant name repeated in a loop would fill the
+            # log for free.
             logger.warning("Chamada recusada: %s não tem guarda declarada.", str(name)[:60])
             raise erro(
                 "not_found",
@@ -114,18 +119,19 @@ class ServidorAtlans(MCPServer):
                 "use tools/list para ver o que este token alcança",
             )
 
-        # Fora do bloco cronometrado de propósito: quando a identidade não
-        # resolve não há token nem usuário para nomear na linha de auditoria.
+        # Outside the timed block on purpose: when the identity does not
+        # resolve there is no token or user to name in the audit line.
         escopo = escopo_da_chamada(context)
 
         async with guarda_da_chamada(name, escopo):
             try:
                 return await super().call_tool(name, arguments, context)
             except ToolError as exc:
-                # O SDK prefixa o texto com "Error executing tool <nome>: " ao
-                # re-levantar o erro de dentro da tool. Sem tirar o prefixo, o
-                # cliente receberia dois formatos: o JSON puro quando a guarda
-                # recusa, e o JSON precedido de prosa quando a tool falha.
+                # The SDK prefixes the text with "Error executing tool <nome>: " when
+                # re-raising the error from inside the tool. Without stripping
+                # the prefix, the client would receive two formats: plain JSON
+                # when the guard refuses, and JSON preceded by prose when the
+                # tool fails.
                 limpa = sem_prefixo_do_sdk(str(exc))
                 if limpa != str(exc):
                     raise ToolError(limpa) from exc.__cause__
@@ -133,10 +139,10 @@ class ServidorAtlans(MCPServer):
 
 
 def hosts_permitidos() -> list[str]:
-    """Os `Host` aceitos pelo transporte (defesa contra DNS rebinding).
+    """The `Host` values accepted by the transport (defense against DNS rebinding).
 
-    Lido a cada chamada, e não no import, para que um ajuste de ambiente (ou um
-    teste) valha sem recarregar o módulo.
+    Read on every call, not at import, so that an environment change (or a
+    test) takes effect without reloading the module.
     """
     from app.core import config
 
@@ -144,7 +150,7 @@ def hosts_permitidos() -> list[str]:
 
 
 def create_mcp_server() -> ServidorAtlans:
-    """Uma instância nova do servidor, com tools, resources e prompts registrados."""
+    """A new server instance, with tools, resources and prompts registered."""
     server = ServidorAtlans(
         name="atlans",
         title="Atlans",
@@ -158,23 +164,23 @@ def create_mcp_server() -> ServidorAtlans:
 
 
 def criar_app_mcp(server: ServidorAtlans):
-    """O app ASGI do `/mcp`: transporte streamable HTTP atrás do middleware de PAT.
+    """The `/mcp` ASGI app: streamable HTTP transport behind the PAT middleware.
 
-    - `streamable_http_path="/mcp"` casa com a rota exata montada em `app.main`,
-      sem redirect na URL canônica;
-    - `stateless_http=True` para que vários workers uvicorn atendam o mesmo
-      cliente sem afinidade de sessão;
-    - `json_response=False` é obrigatório: o progresso de uma execução só chega ao
-      cliente pelo SSE da própria request;
-    - `allowed_origins=[]` recusa qualquer `Origin`. Clientes MCP não-navegador
-      não mandam esse cabeçalho; um navegador só entra na fase do OAuth.
+    - `streamable_http_path="/mcp"` matches the exact route mounted in
+      `app.main`, with no redirect on the canonical URL;
+    - `stateless_http=True` so that several uvicorn workers can serve the same
+      client without session affinity;
+    - `json_response=False` is mandatory: a run's progress only reaches the
+      client through the request's own SSE;
+    - `allowed_origins=[]` refuses any `Origin`. Non-browser MCP clients do not
+      send that header; a browser only comes in at the OAuth phase.
 
-    Uma instância tem UM app. `streamable_http_app()` troca o `session_manager`
-    do servidor a cada chamada, e o `lifespan` de `app.main` entra no gerenciador
-    que existia quando ele subiu: uma segunda chamada deixaria o app servido com
-    um gerenciador que ninguém iniciou — toda request responderia erro de sessão.
-    Por isso o app criado fica guardado na própria instância e é devolvido de
-    novo, em vez de um segundo ser construído em silêncio.
+    An instance has ONE app. `streamable_http_app()` swaps the server's
+    `session_manager` on every call, and the `lifespan` of `app.main` enters
+    the manager that existed when it started: a second call would leave the
+    app served with a manager nobody started — every request would answer with
+    a session error. That is why the created app is kept on the instance itself
+    and returned again, instead of a second one being built silently.
     """
     existente = getattr(server, _ATRIBUTO_DO_APP, None)
     if existente is not None:

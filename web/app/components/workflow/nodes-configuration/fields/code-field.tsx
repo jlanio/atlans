@@ -7,7 +7,7 @@ import { TbPackage, TbArrowRight } from "react-icons/tb"
 import dynamic from "next/dynamic"
 import type { FieldProps } from "./types"
 
-// Lazy-load Monaco — pesa ~2.5MB e só é necessário quando a aba do code-field é aberta.
+// Lazy-load Monaco — it weighs ~2.5MB and is only needed when the code-field tab is opened.
 const MonacoCodeEditor = dynamic(() => import("./monaco-code-editor"), {
   ssr: false,
   loading: () => <div className="w-full h-44 animate-pulse rounded-md bg-[#272822]" />,
@@ -20,10 +20,10 @@ type CodeFieldProps = FieldProps<{
 const LIBS = ["pd", "gpd", "np", "shapely"]
 
 const CodeField = ({ field, values, setNodeField }: CodeFieldProps) => {
-  // Função de inserção exposta pelo Monaco via onEditorReady
+  // Insert function exposed by Monaco via onEditorReady
   const insertFnRef = useRef<((text: string) => void) | null>(null)
 
-  // Variáveis de saída definidas pelo usuário em output_vars
+  // Output variables defined by the user in output_vars
   const outputVarsRaw = String(values?.output_vars ?? "result")
   const outputVars = outputVarsRaw.split(",").map(v => v.trim()).filter(Boolean)
 
@@ -33,7 +33,7 @@ const CodeField = ({ field, values, setNodeField }: CodeFieldProps) => {
 
   return (
     <div className="flex flex-col gap-2">
-      {/* `htmlFor={null}`: o Monaco e de terceiros e nao expoe id. */}
+      {/* `htmlFor={null}`: Monaco is third-party and doesn't expose an id. */}
       <FieldLabel field={field} htmlFor={null} />
 
       <MonacoCodeEditor
@@ -43,7 +43,7 @@ const CodeField = ({ field, values, setNodeField }: CodeFieldProps) => {
         label={field.name}
       />
 
-      {/* Painel de hints */}
+      {/* Hints panel */}
       <div className="rounded-md border bg-muted/40 px-3 py-2 flex flex-col gap-2 text-xs">
 
         {/* Libs */}
@@ -65,7 +65,7 @@ const CodeField = ({ field, values, setNodeField }: CodeFieldProps) => {
           ))}
         </div>
 
-        {/* Saídas */}
+        {/* Outputs */}
         {outputVars.length > 0 && (
           <div className="flex flex-wrap items-center gap-1">
             <span className="text-muted-foreground shrink-0 flex items-center gap-1">

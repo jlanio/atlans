@@ -1,19 +1,21 @@
-"""A recusa de um upload do Drive diz o MOTIVO por código, não só por texto.
+"""A Drive upload rejection states the REASON by code, not just by text.
 
-O web classificava a recusa (ícone e rótulo em /drive e nos anexos da Home)
-procurando trechos em português no `detail` — "extensão", "não permitida",
-"vazio". O texto daqui não tem acento ("Extensao '.x' nao permitida."), então a
-recusa por extensão caía em "outra falha". E o `error` do corpo, que é estável,
-era o mesmo `file_validation_error` para extensão proibida, extensão interna
-perigosa e arquivo vazio: não havia como distinguir sem ler a frase.
+The web app classified the rejection (icon and label in /drive and in the Home
+attachments) by searching for Portuguese snippets in `detail` — "extensão", "não
+permitida", "vazio". The text here has no accents ("Extensao '.x' nao
+permitida."), so the extension rejection fell into "other failure". And the
+body's `error`, which is stable, was the same `file_validation_error` for a
+forbidden extension, a dangerous inner extension and an empty file: there was no
+way to tell them apart without reading the sentence.
 
-Cada caso tem agora o seu `error_code`. O status HTTP de cada um continua o de
-antes (422 para as validações, 413 para o teto) — o executor, que olha só o
-status, não percebe a mudança. E todos seguem sendo `FileValidationError`: quem
-captura a classe-mãe (a tool de upload do MCP) continua capturando.
+Each case now has its own `error_code`. The HTTP status of each stays as before
+(422 for the validations, 413 for the ceiling) — the executor, which only looks
+at the status, does not notice the change. And all of them are still
+`FileValidationError`: whoever catches the parent class (the MCP upload tool)
+still catches them.
 
-Banco de verdade (SQLite) porque `validate_upload` lê as extensões permitidas e
-o teto do banco.
+Real database (SQLite) because `validate_upload` reads the allowed extensions
+and the ceiling from the database.
 """
 import json
 from unittest.mock import MagicMock
@@ -34,7 +36,7 @@ UM_MB = 1024 * 1024
 
 @pytest_asyncio.fixture
 async def servico():
-    """Teto de 1 MB e só `.csv`/`.geojson` permitidos."""
+    """1 MB ceiling and only `.csv`/`.geojson` allowed."""
     eng = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
         poolclass=StaticPool,
@@ -59,7 +61,7 @@ async def servico():
 
 
 async def _corpo(exc) -> tuple[int, dict]:
-    """O que o handler global devolve ao cliente para esta exceção."""
+    """What the global handler returns to the client for this exception."""
     resp = await atlas_domain_error_handler(MagicMock(), exc)
     return resp.status_code, json.loads(resp.body)
 
@@ -68,7 +70,7 @@ async def _corpo(exc) -> tuple[int, dict]:
     "nome, codigo",
     [
         ("relatorio.pdf", "extension_not_allowed"),
-        # Sem extensão é extensão fora da lista: o mesmo caso para quem lê.
+        # No extension is an extension outside the list: the same case for the reader.
         ("LEIAME", "extension_not_allowed"),
         ("notas.sh.csv", "dangerous_inner_extension"),
         ("instalador.exe.geojson", "dangerous_inner_extension"),
@@ -81,7 +83,7 @@ async def test_recusa_por_nome_tem_codigo_proprio_e_continua_422(servico, nome, 
     status, corpo = await _corpo(exc.value)
     assert corpo["error"] == codigo
     assert status == 422
-    # A frase continua a mesma — é ela que a pessoa lê no painel.
+    # The sentence stays the same — it is what the person reads in the panel.
     assert corpo["message"] == exc.value.detail
 
 

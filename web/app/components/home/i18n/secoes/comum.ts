@@ -1,7 +1,7 @@
 // web/app/components/home/i18n/secoes/comum.ts
 //
-// As palavras que várias partes da Home repetem. Só o que é GENÉRICO de
-// verdade mora aqui; um texto com contexto próprio fica na seção dele.
+// The words several parts of the Home repeat. Only what is truly GENERIC lives
+// here; a text with its own context stays in its section.
 
 export const pt = {
   cancelar: "Cancelar",
@@ -10,7 +10,7 @@ export const pt = {
   apagar: "Apagar",
   renomear: "Renomear",
   tentarDeNovo: "Tentar de novo",
-  /** O link para o código-fonte da instalação (CODIGO_FONTE_URL, AGPL §13). */
+  /** The link to the installation's source code (CODIGO_FONTE_URL, AGPL §13). */
   codigoFonte: "Código-fonte",
 }
 

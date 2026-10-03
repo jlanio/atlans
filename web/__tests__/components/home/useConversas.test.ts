@@ -3,10 +3,10 @@ import { act, renderHook, waitFor } from "@testing-library/react"
 import type { IConversaResumo } from "@/service/types"
 
 /**
- * O hook dos "Recentes" (a lista de Chats da Home): a lista espelha o servidor
- * sem F5 (o anúncio do stream), renomear sobe, e a recarga preserva a
- * profundidade que o "Ver mais" já carregou — o teto do servidor é 100 e
- * SILENCIOSO (pedir mais devolve 100 sem erro).
+ * The hook for the "Recentes" (the Home's Chats list): the list mirrors the server
+ * without F5 (the stream announcement), renaming moves up, and the reload preserves the
+ * depth that "Ver mais" already loaded — the server ceiling is 100 and
+ * SILENT (asking for more returns 100 without an error).
  */
 const servico = vi.hoisted(() => ({
   listarConversas: vi.fn(), renomearConversa: vi.fn(), apagarConversa: vi.fn(),
@@ -22,7 +22,7 @@ const linha = (id: string, extra: Partial<IConversaResumo> = {}): IConversaResum
 const ok = (itens: IConversaResumo[], total: number) => ({ success: true, status: 200, data: { itens, total } })
 const falhou = (status = 500, message = "Erro inesperado.") => ({ success: false, status, error: { message }, data: undefined })
 
-/** Um servidor com `n` conversas, c0 a mais recente, paginadas como a API (teto 100). */
+/** A server with `n` conversations, c0 the most recent, paginated like the API (ceiling 100). */
 function servidorCom(n: number) {
   const todas = Array.from({ length: n }, (_, i) => linha(`c${i}`))
   servico.listarConversas.mockImplementation(async (limit: number, offset = 0) =>
@@ -31,7 +31,7 @@ function servidorCom(n: number) {
   return todas
 }
 
-/** As chamadas ao serviço como `[limit, offset]` (a 1ª página omite o offset). */
+/** The service calls as `[limit, offset]` (the 1st page omits the offset). */
 const chamadas = () => servico.listarConversas.mock.calls.map((c) => [c[0], c[1] ?? 0])
 
 beforeEach(() => {
@@ -135,7 +135,7 @@ describe("useConversas — o anúncio do stream", () => {
 })
 
 describe("useConversas — a recarga preserva a profundidade", () => {
-  /** 237 conversas: 3 páginas (100, 100, 37) depois de dois "Ver mais". */
+  /** 237 conversations: 3 pages (100, 100, 37) after two "Ver mais". */
   async function comTresPaginas() {
     servidorCom(237)
     const r = await montar()
@@ -156,8 +156,8 @@ describe("useConversas — a recarga preserva a profundidade", () => {
   })
 
   it("recarregar relê as três páginas (não só a primeira) e mantém as 237 linhas", async () => {
-    // O defeito: `recarregar` era sempre a 1ª página e SUBSTITUÍA a lista —
-    // depois do "Ver mais", "Tentar de novo" devolvia a lista a 100.
+    // The defect: `recarregar` was always the 1st page and REPLACED the list —
+    // after "Ver mais", "Tentar de novo" took the list back to 100.
     const { result } = await comTresPaginas()
     await act(async () => { result.current.recarregar() })
     await waitFor(() => expect(result.current.atualizando).toBe(false))

@@ -7,16 +7,17 @@ import type { FieldProps } from "./types"
 
 type StringFieldProps = FieldProps<{
   nodeFound?: INodeContext
-  /** Nomes de coluna vistos na última execução do nó anterior. Oferecidos
-   *  abaixo do campo — clicar preenche. É dica, não validação: o fluxo pode ter
-   *  mudado desde então, e escrever um nome fora da lista continua valendo. */
+  /** Column names seen in the previous node's last execution. Offered below
+   *  the field — clicking fills it in. It is a hint, not validation: the
+   *  workflow may have changed since then, and writing a name outside the list
+   *  is still valid. */
   sugestoes?: string[]
-  /** true quando as sugestões vieram da re-hidratação de um run PERSISTIDO
-   *  (não desta sessão): o rótulo troca para avisar que a lista pode ter
-   *  mudado — afirmar "última execução" com dado antigo seria mentir. */
+  /** true when the suggestions came from re-hydrating a PERSISTED run (not
+   *  from this session): the label changes to warn that the list may have
+   *  changed — claiming "last execution" with old data would be lying. */
   sugestoesDesatualizadas?: boolean
-  /** true quando o stat de origem veio truncado — o rótulo avisa "lista
-   *  parcial" em vez de afirmar completude. */
+  /** true when the source stat came truncated — the label warns "partial
+   *  list" instead of claiming completeness. */
   sugestoesParciais?: boolean
 }>
 
@@ -29,7 +30,7 @@ const StringField = ({ field, values, setNodeField, nodeFound, sugestoes = [], s
     setDragOver(false)
     const text = e.dataTransfer.getData("text/plain")
     if (text) {
-      // Concatena expressão ao valor atual (ou substitui se vazio)
+      // Appends the expression to the current value (or replaces it if empty)
       const newValue = currentValue ? `${currentValue} ${text}` : text
       setNodeField(field.name, newValue)
     }
@@ -50,9 +51,9 @@ const StringField = ({ field, values, setNodeField, nodeFound, sugestoes = [], s
     >
       <FieldLabel field={field} />
       {nodeFound ? (
-        // Sem `placeholder={field.description}`: era a MESMA frase que aparecia
-        // no paragrafo abaixo, entao a descricao inteira era exibida duas vezes.
-        // Placeholder deve ser um exemplo de valor, nao a documentacao do campo.
+        // No `placeholder={field.description}`: it was the SAME sentence that showed
+        // in the paragraph below, so the whole description was displayed twice.
+        // A placeholder should be an example value, not the field's documentation.
         <ExpressionInput
           id={field.name}
           value={currentValue}

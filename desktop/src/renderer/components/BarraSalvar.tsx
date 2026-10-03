@@ -1,21 +1,22 @@
 // desktop/src/renderer/components/BarraSalvar.tsx
 //
-// Barra de ações das telas de configuração (Ajustes e GeoSync).
+// Action bar of the settings screens (Ajustes and GeoSync).
 //
-// Fica FIXA no rodapé da área de conteúdo, e não no fim da página: as duas telas
-// rolam bastante, e um Salvar lá embaixo obriga a percorrer tudo para confirmar
-// uma mudança feita no primeiro cartão.
+// It stays FIXED at the bottom of the content area, not at the end of the page:
+// both screens scroll a lot, and a Save button way down there forces you to go
+// through everything to confirm a change made in the first card.
 //
-// ## O aviso virou botão
+// ## The notice became a button
 //
-// A versão anterior dizia "Reinicie o executor para que passe a valer" — o app
-// instruindo a pessoa a executar à mão uma sequência (Parar, esperar drenar,
-// Iniciar) que ele próprio sabe fazer. Instrução é o que sobra quando falta um
-// botão. Agora o mesmo texto vem com "Reiniciar agora" ao lado.
+// The previous version said "Reinicie o executor para que passe a valer"
+// (restart the executor for it to take effect) — the app instructing the person
+// to perform by hand a sequence (Stop, wait for the drain, Start) that it knows
+// how to do itself. An instruction is what is left when a button is missing.
+// Now the same text comes with "Reiniciar agora" (restart now) next to it.
 //
-// Não é um "salvar e reiniciar" único de propósito: reiniciar DRENA as execuções
-// em andamento e pode levar bem mais que um instante, então continua sendo uma
-// decisão à parte, tomada depois de o salvamento já estar garantido.
+// It is not a single "save and restart" on purpose: restarting DRAINS the runs
+// in progress and can take much more than an instant, so it remains a separate
+// decision, made after the save is already guaranteed.
 import { useState } from 'react'
 import { TbRotate } from 'react-icons/tb'
 import { Button } from './ui/button.js'
@@ -26,19 +27,19 @@ export function BarraSalvar({
 }: {
   mudou: boolean
   salvo: boolean
-  /** Bloqueia o salvamento — há valor fora da faixa aceita. */
+  /** Blocks saving — there is a value outside the accepted range. */
   invalido?: boolean
   motivoInvalido?: string
-  /** O executor está no ar; só então faz sentido oferecer o reinício. */
+  /** The executor is up; only then does offering the restart make sense. */
   rodando: boolean
   aoSalvar: () => Promise<void> | void
   aoDescartar: () => void
 }) {
   const [ocupado, setOcupado] = useState(false)
   const [reiniciado, setReiniciado] = useState(false)
-  // Execuções em andamento — a drenagem espera por elas. Vem do contexto, e não
-  // de prop: assim o tick de 1 Hz do snapshot re-renderiza esta barra, e não as
-  // telas de configuração inteiras que a contêm.
+  // Runs in progress — the drain waits for them. Comes from the context, not
+  // from a prop: that way the 1 Hz snapshot tick re-renders this bar, and not
+  // the whole settings screens that contain it.
   const execucoes = useSnapshot()?.running_count
 
   if (!mudou && !salvo) return null
@@ -46,9 +47,10 @@ export function BarraSalvar({
   async function reiniciar() {
     setOcupado(true)
     try {
-      // Um canal só: o main faz `stop()` e depois `start()`, nesta ordem. Aqui
-      // não dá mais para sequenciar com dois invokes — `parar` volta na hora, e
-      // o `iniciar` seguinte chegaria com o processo antigo ainda drenando.
+      // A single channel: the main process does `stop()` and then `start()`, in
+      // that order. Here it is no longer possible to sequence with two
+      // invokes — `parar` returns right away, and the following `iniciar`
+      // would arrive with the old process still draining.
       await window.atlas.reiniciar()
       setReiniciado(true)
     } finally {
@@ -84,8 +86,8 @@ export function BarraSalvar({
           </Button>
           <span className="text-xs text-muted-foreground">
             Salvo. O executor precisa reiniciar para aplicar
-            {/* A drenagem espera os workflows terminarem — pode não ser
-                instantâneo, e a pessoa merece saber ANTES de clicar. */}
+            {/* The drain waits for the workflows to finish — it may not be
+                instant, and the person deserves to know BEFORE clicking. */}
             {typeof execucoes === 'number' && execucoes > 0
               ? ` — ${execucoes} execução(ões) em andamento terminam antes.`
               : '.'}

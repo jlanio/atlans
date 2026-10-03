@@ -1,9 +1,9 @@
 /**
- * "Quando eu salvo, quero reabrir no mesmo zoom e posição."
+ * "When I save, I want to reopen at the same zoom and position."
  *
- * Pan/zoom não é edição — não marca "não salvo" — mas é parte do que se salva.
- * O save explícito (botão, Ctrl+S) grava o viewport mesmo com o grafo intacto;
- * o save silencioso do Executar não faz PUT por causa dele.
+ * Pan/zoom isn't an edit — it doesn't mark "não salvo" (unsaved) — but it's
+ * part of what gets saved. An explicit save (button, Ctrl+S) writes the viewport
+ * even with the graph untouched; the silent save from Run doesn't PUT because of it.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderHook, act } from "@testing-library/react"
@@ -25,9 +25,9 @@ vi.mock("@/context/WorkspaceContext", () => ({
   useWorkspace: () => ({ current: { id_hash: "ws-1" } }),
 }))
 
-// `vi.hoisted`: a factory do `vi.mock` é içada para o topo do arquivo e roda
-// antes de qualquer `const` daqui — referenciar `put` direto dava
-// "Cannot access 'put' before initialization" conforme a ordem de import.
+// `vi.hoisted`: the `vi.mock` factory is hoisted to the top of the file and runs
+// before any `const` here — referencing `put` directly gave
+// "Cannot access 'put' before initialization" depending on the import order.
 const { put } = vi.hoisted(() => ({
   put: vi.fn<(id: string, body: unknown) => Promise<{ success: boolean; data: { id_hash: string }; error: null }>>(
     async () => ({ success: true, data: { id_hash: "wf-1" }, error: null }),
@@ -68,8 +68,8 @@ beforeEach(() => {
     lastSavedAt: null,
     lastError: null,
   })
-  // Hidratado: grafo igual ao salvo, viewport salvo conhecido, janela de
-  // autocorreção fechada.
+  // Hydrated: graph equal to the saved one, known saved viewport, self-correction
+  // window closed.
   const { nodesReq, edgesReq } = montarPayloadDoGrafo(nodes as INodeContext[], [])
   store().initSnapshot(nodesReq, edgesReq, "wf", 1_000, { x: 0, y: 0, zoom: 1 })
   useWorkflowSaveStore.setState({ snapshotIniciadoEm: null })
@@ -130,7 +130,7 @@ describe("save com o grafo alterado", () => {
 
 describe("avisos de agendamento (schedule_notices)", () => {
   it("mostra um toast âmbar quando o backend diz que o agendamento não foi aplicado", async () => {
-    nodes = [no("a", 300)] // grafo alterado → haverá PUT
+    nodes = [no("a", 300)] // graph changed → there will be a PUT
     put.mockResolvedValueOnce({
       success: true,
       data: {
@@ -146,7 +146,7 @@ describe("avisos de agendamento (schedule_notices)", () => {
     await act(async () => { await result.current.saveWorkflow() })
 
     expect(put).toHaveBeenCalledTimes(1)
-    // Salvou (o chip fica "Salvo") mas o toast avisa da ressalva.
+    // It saved (the chip says "Salvo") but the toast warns about the caveat.
     expect(store().saveStatus).toBe("saved")
     expect(createToast.warning).toHaveBeenCalledWith("Agendamento não aplicado", "O workflow está inativo...")
   })

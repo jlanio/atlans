@@ -11,48 +11,49 @@ import { getWsUrl } from "@/utils/env"
 import { useWorkflowExecutionStore, toRunEvent, eventKind, RawEvent, MAX_RUN_EVENTS, RUN_ENCERRADO } from "@/app/stores/workflowExecutionStore"
 import { useKnownColumnsStore } from "@/app/stores/knownColumnsStore"
 
-/** Id sintético que o backend usa para sinalizar o fim do run. */
+/** Synthetic id the backend uses to signal the end of the run. */
 const WF_COMPLETE = "__workflow_complete__"
 
-/** Tentativas de reconexão antes de desistir do acompanhamento ao vivo.
- *  Com backoff exponencial até 15s, cobre ~2 minutos de instabilidade. */
+/** Reconnection attempts before giving up on live tracking.
+ *  With exponential backoff up to 15s, covers ~2 minutes of instability. */
 const MAX_RECONEXOES = 8
 
-/** Silêncio máximo tolerado no socket antes de assumi-lo morto e recuperar.
+/** Maximum silence tolerated on the socket before assuming it dead and recovering.
  *
- *  O servidor manda um heartbeat (lote vazio) a cada ~20s durante o run, então
- *  uma conexão saudável nunca passa nem perto disto. Só estoura quando o socket
- *  morreu de fato — o caso do Safari, que derruba WebSocket ocioso SEM disparar
- *  `onclose`: sem este watchdog, a reconexão (que vive no `onclose`) nunca era
- *  acionada e o painel girava para sempre. É a rede de segurança do transporte;
- *  o heartbeat do servidor é a prevenção. */
+ *  The server sends a heartbeat (empty batch) every ~20s during the run, so a
+ *  healthy connection never gets anywhere near this. It only fires when the
+ *  socket has actually died — the Safari case, which drops an idle WebSocket
+ *  WITHOUT firing `onclose`: without this watchdog, reconnection (which lives in
+ *  `onclose`) was never triggered and the panel spun forever. It is the
+ *  transport's safety net; the server heartbeat is the prevention. */
 const SILENCIO_MAX_MS = 50_000
 const WATCHDOG_INTERVALO_MS = 15_000
 
-/** Status do run no backend → status do painel. Só os terminais entram: os
- *  demais significam "ainda vivo", e a ausência aqui é o próprio teste. */
+/** Run status in the backend → panel status. Only the terminal ones are listed:
+ *  the others mean "still alive", and absence here is the test itself. */
 const DESFECHO_TERMINAL: Record<string, StatusWorkflow> = {
   success:   "completed",
   failed:    "failed",
   cancelled: "cancelled",
 }
 
-/** Ponte para o DONO do socket.
+/** Bridge to the socket OWNER.
  *
- *  Este hook é montado em mais de um lugar ao mesmo tempo — o botão Executar do
- *  canvas e a aba "Testar" do nó Webhook, dentro do modal de configuração.
- *  Todos podem DISPARAR um run, mas só um pode governar o socket: a store de
- *  execução é global, então uma segunda instância abria um WebSocket
- *  concorrente, escrevia no mesmo `wsState` e, ao montar durante um run, ainda
- *  chamava `startExecution`, zerando o canvas de quem já estava acompanhando.
- *  Quem dispara sem ser dono entrega o task_id para o dono anexar. */
+ *  This hook is mounted in more than one place at the same time — the canvas
+ *  Executar (run) button and the Webhook node's "Testar" (test) tab, inside the
+ *  config modal. All of them can TRIGGER a run, but only one can govern the
+ *  socket: the execution store is global, so a second instance opened a
+ *  competing WebSocket, wrote to the same `wsState` and, when mounting during a
+ *  run, also called `startExecution`, wiping the canvas of whoever was already
+ *  watching. Whoever triggers without being the owner hands the task_id to the
+ *  owner to attach. */
 let anexarNoDono: ((taskId: string) => void) | null = null
 
-/** Item do buffer por quadro, com o run de origem carimbado.
+/** Per-frame buffer item, stamped with its source run.
  *
- *  O carimbo existe porque um flush atrasado é assíncrono por natureza: o rAF
- *  agendado enquanto o usuário estava no workflow A dispara DEPOIS da troca para
- *  B. Sem o carimbo, os eventos de A caíam na store recém-limpa de B. */
+ *  The stamp exists because a delayed flush is asynchronous by nature: the rAF
+ *  scheduled while the user was on workflow A fires AFTER the switch to B.
+ *  Without the stamp, A's events landed in B's freshly cleared store. */
 interface ItemDoLote {
   runId: string
   data: RawEvent
@@ -65,22 +66,22 @@ export const useExecuteWorkflow = () => {
   const nodes = useNodes<INodeContext>()
   const edges = useEdges<Edge>()
   const reactFlowInstance = useReactFlow<INodeContext, Edge>()
-  // Refs sempre sincronizadas — a primeira execução do workflow acontecia
-  // com closures staled capturadas ANTES do canvas hidratar (nodes=[]).
-  // Resultado: initialNodes virava vazio e o feedback visual no canvas não
-  // aparecia na 1ª exec. Lendo via ref, qualquer closure consome o valor
-  // mais recente no momento do click.
+  // Refs always in sync — the workflow's first execution happened with stale
+  // closures captured BEFORE the canvas hydrated (nodes=[]).
+  // Result: initialNodes came out empty and the visual feedback on the canvas
+  // did not appear on the 1st execution. Reading via ref, any closure consumes
+  // the latest value at click time.
   const nodesRef = useRef(nodes)
   useEffect(() => { nodesRef.current = nodes }, [nodes])
   const edgesRef = useRef(edges)
   useEffect(() => { edgesRef.current = edges }, [edges])
-  // WS ativo do run (disparo OU re-anexação). Mantido em ref para (a) fechar a
-  // conexão anterior antes de abrir outra e (b) fechar ao trocar de workflow —
-  // evita conexões duplicadas/órfãs alimentando a store ao mesmo tempo.
+  // The run's active WS (trigger OR re-attach). Kept in a ref to (a) close the
+  // previous connection before opening another and (b) close it when switching
+  // workflows — avoids duplicate/orphan connections feeding the store at once.
   const wsRef = useRef<WebSocket | null>(null)
-  // Se ESTA montagem disparou um run pelo botão. A re-anexação usa isto (e NÃO
-  // o isExecuting global, que é volátil e sobra entre acessos) para decidir se
-  // deve re-anexar — evita clobberar um run recém-disparado.
+  // Whether THIS mount triggered a run via the button. Re-attach uses this (and
+  // NOT the global isExecuting, which is volatile and lingers between visits) to
+  // decide whether to re-attach — avoids clobbering a freshly triggered run.
   const sessionTriggeredRef = useRef(false)
   const { data: session } = useSession()
 
@@ -89,37 +90,37 @@ export const useExecuteWorkflow = () => {
   const debugMode = useWorkflowExecutionStore(s => s.debugMode)
   const setDebugMode = useWorkflowExecutionStore(s => s.setDebugMode)
 
-  // Lote do quadro atual. Cada mensagem do WS é uma macrotask própria, então
-  // sem isto o React não conseguia agrupar nada: um replay de 5000 eventos
-  // virava 5000 ciclos de render do canvas inteiro, em sequência, na mesma
-  // thread — a aba congelava por segundos ao reabrir um run em andamento.
+  // Batch for the current frame. Each WS message is its own macrotask, so
+  // without this React could not batch anything: a replay of 5000 events
+  // became 5000 render cycles of the whole canvas, in sequence, on the same
+  // thread — the tab froze for seconds when reopening a run in progress.
   const bufferRef = useRef<ItemDoLote[]>([])
   const frameRef = useRef<number | null>(null)
-  // Run cujo socket está ativo AGORA. É o gate do flush: um rAF pendente do
-  // workflow A que dispare depois da troca para B encontra aqui outro id (ou
-  // null) e não despeja nada na store de B. Assim a corretude deixa de depender
-  // de todos os caminhos de limpeza estarem certos.
+  // Run whose socket is active NOW. It is the flush gate: a pending rAF from
+  // workflow A that fires after the switch to B finds a different id here (or
+  // null) and dumps nothing into B's store. That way correctness no longer
+  // depends on every cleanup path being right.
   const runAtivoRef = useRef<string | null>(null)
-  // Drenagem síncrona do attach ativo. Vive numa ref porque quem precisa dela
-  // (o listener de visibilidade, registrado uma vez na montagem) não conhece a
-  // closure de `attachToRun`.
+  // Synchronous drain of the active attach. It lives in a ref because the code
+  // that needs it (the visibility listener, registered once on mount) does not
+  // know the `attachToRun` closure.
   const drenarAgoraRef = useRef<() => void>(() => {})
 
-  // ── Recuperação do stream ────────────────────────────────────────────────
-  // Nada aqui existia antes, e a ausência era o bug: o cliente tratava o canal
-  // como se fosse sem perdas, quando toda camada do caminho pode descartar
-  // evento e o socket pode morrer sem aviso.
+  // ── Stream recovery ──────────────────────────────────────────────────────
+  // None of this existed before, and its absence was the bug: the client treated
+  // the channel as lossless, when every layer along the path can drop an event
+  // and the socket can die without warning.
   const reconexaoRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tentativasRef = useRef(0)
-  // Sockets que NÓS fechamos (fim do run, troca de workflow, novo attach).
-  // O close code não serve para distinguir: o servidor encerra com 1000 em todo
-  // caminho normal — inclusive quando a assinatura do Redis termina sem o run
-  // ter acabado, que é exatamente o caso que precisa reconectar.
+  // Sockets that WE closed (end of run, workflow switch, new attach).
+  // The close code cannot tell them apart: the server closes with 1000 on every
+  // normal path — including when the Redis subscription ends without the run
+  // having finished, which is exactly the case that needs to reconnect.
   const fechadosDePropositoRef = useRef(new WeakSet<WebSocket>())
-  // Watchdog de inatividade: horário da última mensagem recebida e o timer que
-  // vigia o silêncio. Existe porque no Safari um socket morto não dispara
-  // `onclose` — sem isto, a queda passava despercebida e o painel girava para
-  // sempre. Ver `SILENCIO_MAX_MS`.
+  // Inactivity watchdog: time of the last message received and the timer that
+  // watches the silence. It exists because in Safari a dead socket does not fire
+  // `onclose` — without this, the drop went unnoticed and the panel spun
+  // forever. See `SILENCIO_MAX_MS`.
   const ultimaMsgRef = useRef(0)
   const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -143,14 +144,15 @@ export const useExecuteWorkflow = () => {
     }
   }
 
-  /** Vigia o silêncio do socket. No Safari uma conexão morta não dispara
-   *  `onclose`; aqui detectamos pela ausência de tráfego e tratamos como queda:
-   *  fecha (para um `onclose` tardio não duplicar) e cai na recuperação, que
-   *  reconcilia pela API ou reconecta e reconstrói pelo replay do Redis. */
+  /** Watches the socket's silence. In Safari a dead connection does not fire
+   *  `onclose`; here we detect it by the absence of traffic and treat it as a drop:
+   *  close it (so a late `onclose` does not duplicate) and fall into recovery,
+   *  which reconciles through the API or reconnects and rebuilds via the Redis
+   *  replay. */
   function iniciarWatchdog(sock: WebSocket, taskId: string) {
     pararWatchdog()
     watchdogRef.current = setInterval(() => {
-      if (wsRef.current !== sock) return          // socket já substituído
+      if (wsRef.current !== sock) return          // socket already replaced
       if (runAtivoRef.current !== taskId) return
       if (!useWorkflowExecutionStore.getState().isExecuting) return
       if (Date.now() - ultimaMsgRef.current <= SILENCIO_MAX_MS) return
@@ -167,11 +169,11 @@ export const useExecuteWorkflow = () => {
     }, WATCHDOG_INTERVALO_MS)
   }
 
-  /** Fecha o painel com o desfecho REAL do run, perguntando à API.
+  /** Closes the panel with the run's REAL outcome, by asking the API.
    *
-   *  Devolve true quando o run já terminou (e o painel foi encerrado). É a rede
-   *  de segurança para o `__workflow_complete__` que não chegou: o banco sabe o
-   *  desfecho mesmo quando o canal ao vivo falhou. */
+   *  Returns true when the run has already finished (and the panel was closed).
+   *  It is the safety net for a `__workflow_complete__` that did not arrive: the
+   *  database knows the outcome even when the live channel failed. */
   async function reconciliarRun(taskId: string): Promise<boolean> {
     try {
       const detail = await GisFlowService.getRunDetail(taskId)
@@ -179,44 +181,46 @@ export const useExecuteWorkflow = () => {
       if (!desfecho) return false
       const store = useWorkflowExecutionStore.getState()
       if (!store.isExecuting) return true
-      // `completeExecution` liquida os nós presos: eles começaram, o run
-      // acabou, e o término deles não chegou — viram `unknown`, não verde.
+      // `completeExecution` settles the stuck nodes: they started, the run ended,
+      // and their completion did not arrive — they become `unknown`, not green.
       store.completeExecution(desfecho, store.statusWorkflow?.nodes ?? [], edgesRef.current)
       return true
     } catch {
-      // Rede ruim: não dá para afirmar nada sobre o run. Deixa a reconexão
-      // tentar — afirmar "falhou" aqui seria inventar um desfecho.
+      // Bad network: nothing can be asserted about the run. Let reconnection
+      // try — asserting "failed" here would be inventing an outcome.
       return false
     }
   }
 
-  /** O stream caiu com o run ainda aberto: descobre se ele já acabou e, se não,
-   *  reconecta com backoff. Ao reconectar, o replay do histórico reconstrói o
-   *  que se perdeu na janela — por isso reconectar é barato e correto. */
+  /** The stream dropped with the run still open: finds out whether it has already
+   *  ended and, if not, reconnects with backoff. On reconnecting, the history
+   *  replay rebuilds what was lost in the gap — which is why reconnecting is cheap
+   *  and correct. */
   async function recuperarStream(taskId: string) {
-    // Aplica AGORA o que já chegou. O quadro do `requestAnimationFrame` pode
-    // estar pendente há muito tempo (aba em segundo plano não o executa) e
-    // esses eventos são informação legítima: precisam entrar no canvas ANTES
-    // da liquidação, para que `completeExecution` decida sobre o estado mais
-    // recente. Depois dela o lote vira lixo — e é descartado logo abaixo.
+    // Applies NOW what has already arrived. The `requestAnimationFrame` frame may
+    // have been pending for a long time (a background tab does not run it) and
+    // those events are legitimate information: they need to reach the canvas
+    // BEFORE settlement, so that `completeExecution` decides on the most recent
+    // state. After it the batch is garbage — and it is discarded right below.
     drenarAgoraRef.current()
     if (await reconciliarRun(taskId)) {
-      // O run foi liquidado. Qualquer coisa ainda no buffer (ou um quadro já
-      // agendado) reescreveria o canvas por cima do desfecho, ressuscitando em
-      // `started` um nó que acabou de ser resolvido.
+      // The run was settled. Anything still in the buffer (or an already
+      // scheduled frame) would rewrite the canvas over the outcome, resurrecting
+      // as `started` a node that was just resolved.
       descartarLote()
       return
     }
-    // `reconciliarRun` tem um await no meio: durante ele o usuário pode ter
-    // trocado de workflow, ou um `attachToRun` pode já ter reaberto o socket
-    // (o botão Executar, a re-anexação). Reconectar por cima abriria uma
-    // segunda conexão para o mesmo run.
+    // `reconciliarRun` has an await in the middle: during it the user may have
+    // switched workflows, or an `attachToRun` may have already reopened the
+    // socket (the Executar button, the re-attach). Reconnecting on top would
+    // open a second connection for the same run.
     if (runAtivoRef.current !== taskId) return
     if (wsRef.current) return
 
     if (tentativasRef.current >= MAX_RECONEXOES) {
-      // Desistir do AO VIVO não é desistir do run: ele segue no servidor. Dizer
-      // isso é o que separa "perdi a conexão" de "seu workflow falhou".
+      // Giving up on LIVE tracking is not giving up on the run: it keeps going on
+      // the server. Saying so is what separates "I lost the connection" from
+      // "your workflow failed".
       useWorkflowExecutionStore.getState().failExecution()
       createToast.error(
         "Acompanhamento ao vivo interrompido",
@@ -228,20 +232,20 @@ export const useExecuteWorkflow = () => {
     const base = Math.min(1000 * 2 ** tentativasRef.current, 15_000)
     tentativasRef.current += 1
     cancelarReconexao()
-    // Jitter de 50-100%, como no backoff do executor: várias abas que caíram
-    // juntas não voltam em rajada contra o mesmo servidor.
+    // 50-100% jitter, as in the executor's backoff: several tabs that dropped
+    // together don't come back in a burst against the same server.
     reconexaoRef.current = setTimeout(() => {
       reconexaoRef.current = null
-      // O usuário pode ter trocado de workflow — ou reconectado por outra via —
-      // durante a espera.
+      // The user may have switched workflows — or reconnected by another route —
+      // during the wait.
       if (runAtivoRef.current !== taskId || wsRef.current) return
       attachToRun(taskId)
     }, base * (0.5 + Math.random() * 0.5))
   }
 
-  // Descarta o lote pendente. Chamada nos TRÊS pontos de saída (novo attach,
-  // troca de workflow, desmontagem): fechar o WebSocket não impede um flush já
-  // agendado de rodar no quadro seguinte com os eventos do run anterior.
+  // Discards the pending batch. Called at the THREE exit points (new attach,
+  // workflow switch, unmount): closing the WebSocket does not stop an already
+  // scheduled flush from running on the next frame with the previous run's events.
   function descartarLote() {
     bufferRef.current = []
     runAtivoRef.current = null
@@ -253,8 +257,8 @@ export const useExecuteWorkflow = () => {
     }
   }
 
-  // Quem chegou primeiro governa o socket; os demais só disparam. Ref sempre
-  // fresca porque `attachToRun` é recriada a cada render.
+  // Whoever arrived first governs the socket; the others only trigger. The ref is
+  // always fresh because `attachToRun` is recreated on every render.
   const souDonoRef = useRef(false)
   const attachRef = useRef<(taskId: string) => void>(() => {})
   attachRef.current = (taskId: string) => { attachToRun(taskId) }
@@ -273,10 +277,11 @@ export const useExecuteWorkflow = () => {
   }, [])
 
   useEffect(() => {
-    // Com a aba em segundo plano o navegador NÃO executa callbacks de
-    // `requestAnimationFrame` (idem no Electron, com backgroundThrottling
-    // ligado): o lote ficaria preso no buffer, crescendo sem teto, até o usuário
-    // voltar. Drenar ao esconder a aba entrega o que já chegou e esvazia tudo.
+    // With the tab in the background the browser does NOT run
+    // `requestAnimationFrame` callbacks (same in Electron, with
+    // backgroundThrottling on): the batch would sit in the buffer, growing with no
+    // ceiling, until the user came back. Draining when the tab is hidden delivers
+    // what has already arrived and empties everything.
     const aoTrocarVisibilidade = () => {
       if (document.visibilityState === "hidden") drenarAgoraRef.current()
     }
@@ -285,9 +290,9 @@ export const useExecuteWorkflow = () => {
       document.removeEventListener("visibilitychange", aoTrocarVisibilidade)
       descartarLote()
     }
-    // Só na montagem/desmontagem. `descartarLote` é recriada a cada render, mas
-    // opera exclusivamente sobre refs — declará-la como dependência
-    // re-registraria o listener a cada render sem mudar nada.
+    // Only on mount/unmount. `descartarLote` is recreated on every render, but
+    // operates exclusively on refs — declaring it as a dependency would
+    // re-register the listener on every render without changing anything.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -296,17 +301,17 @@ export const useExecuteWorkflow = () => {
     const store = useWorkflowExecutionStore.getState()
     if (store.isExecuting)
       return
-    // Marca que esta montagem disparou um run — a re-anexação usa isto para não
-    // clobberar o run recém-disparado caso sua descoberta esteja em voo.
+    // Marks that this mount triggered a run — re-attach uses this so as not to
+    // clobber the freshly triggered run in case its discovery is in flight.
     sessionTriggeredRef.current = true
 
-    // Feedback visual imediato — canvas reage em <16ms, antes do save/POST.
-    // Fonte dos nós em ordem de prioridade:
-    //   1. nodesRef.current — hook useNodes via ref (evita closure stale)
-    //   2. reactFlowInstance.getNodes() — fallback se ref ainda vazio no 1º click
-    //      (hidrata direto do store interno do React Flow, sempre atualizado)
-    // Sem esse fallback o store ficava com nodes=[] e nenhum evento do WS
-    // encontrava match (ver [ws/workflow] evento sem match de node_id).
+    // Immediate visual feedback — the canvas reacts in <16ms, before the save/POST.
+    // Source of the nodes in order of priority:
+    //   1. nodesRef.current — useNodes hook via ref (avoids a stale closure)
+    //   2. reactFlowInstance.getNodes() — fallback if the ref is still empty on the 1st click
+    //      (hydrates straight from React Flow's internal store, always up to date)
+    // Without this fallback the store stayed with nodes=[] and no WS event
+    // found a match (see [ws/workflow] evento sem match de node_id).
     const liveNodes = nodesRef.current.length > 0
       ? nodesRef.current
       : reactFlowInstance.getNodes()
@@ -336,8 +341,8 @@ export const useExecuteWorkflow = () => {
       return
     }
 
-    // Defesa extra: se o backend não devolveu task_id, nunca abrir WS com
-    // "undefined" na URL (seria 4404 garantido). Trata como erro e para.
+    // Extra defense: if the backend did not return a task_id, never open a WS with
+    // "undefined" in the URL (a guaranteed 4404). Treat it as an error and stop.
     const taskId = respExec?.data?.task_id
     if (!taskId) {
       console.error("[useExecuteWorkflow] POST /execute retornou sem task_id", respExec)
@@ -346,23 +351,23 @@ export const useExecuteWorkflow = () => {
       return
     }
 
-    // Se esta instância não é a dona do socket (o disparo veio da aba "Testar"
-    // do webhook, por exemplo), entrega o run para quem governa — em vez de
-    // abrir um segundo socket sobre a mesma store.
+    // If this instance is not the socket owner (the trigger came from the webhook's
+    // "Testar" tab, for example), it hands the run to whoever governs — instead
+    // of opening a second socket over the same store.
     ;(anexarNoDono ?? attachToRun)(taskId)
   }
 
-  // Abre o WebSocket de um run e instala os handlers que alimentam a store
-  // (animação dos nós + console de execução). Usada tanto no disparo quanto na
-  // re-anexação a um run já em andamento — ao conectar, o backend faz replay de
-  // todo o histórico do run (Redis) e depois transmite ao vivo. Retorna o socket
-  // para o chamador poder fechá-lo (ex.: ao trocar de workflow).
+  // Opens a run's WebSocket and installs the handlers that feed the store
+  // (node animation + execution console). Used both on trigger and on
+  // re-attaching to a run already in progress — on connecting, the backend
+  // replays the run's whole history (Redis) and then streams live. Returns the
+  // socket so the caller can close it (e.g. when switching workflows).
   function attachToRun(taskId: string): WebSocket {
-    // Fecha qualquer conexão anterior (intencional) antes de abrir a nova, para
-    // não haver dois WS escrevendo na store simultaneamente.
+    // Closes any previous connection (intentionally) before opening the new one, so
+    // there are never two WSs writing to the store at the same time.
     fecharDeProposito(wsRef.current)
-    // Descarta o que sobrou do run anterior: um flush pendente aplicaria
-    // eventos de outro run (e fecharia o socket errado) no próximo quadro.
+    // Discards what is left of the previous run: a pending flush would apply
+    // another run's events (and close the wrong socket) on the next frame.
     descartarLote()
     const ws = new WebSocket(`${getWsUrl()}/ws/workflow/${taskId}`)
     wsRef.current = ws
@@ -374,53 +379,53 @@ export const useExecuteWorkflow = () => {
     ws.onopen = () => {
       const token = session?.user?.access_token ?? ""
       if (token) ws.send(token)
-      // Estado REAL do socket — o indicador "ao vivo" do painel lê daqui em vez
-      // de inferir de isExecuting, que continuava verde com o socket morto.
+      // The socket's REAL state — the panel's "live" indicator reads from here instead
+      // of inferring from isExecuting, which stayed green with the socket dead.
       useWorkflowExecutionStore.getState().setWsState("open")
-      // Conexão de pé: o próximo tropeço recomeça o backoff do zero.
+      // Connection is up: the next stumble restarts the backoff from zero.
       tentativasRef.current = 0
-      // Arma o watchdog de inatividade. O `onopen` já é tráfego; a partir daqui
-      // o servidor manda heartbeat a cada ~20s, então o silêncio só cresce se o
-      // socket morreu (Safari) — e aí o watchdog recupera.
+      // Arms the inactivity watchdog. `onopen` already counts as traffic; from here on
+      // the server sends a heartbeat every ~20s, so silence only grows if the
+      // socket died (Safari) — and then the watchdog recovers.
       ultimaMsgRef.current = Date.now()
       iniciarWatchdog(ws, taskId)
     }
 
-    // Transição queued → running com task_id real
+    // queued → running transition with the real task_id
     useWorkflowExecutionStore.getState().setTaskId(taskId)
 
-    // Aplica o lote acumulado no quadro: uma passada pelos nós, um
-    // `updateNodeStatuses`, um `appendEvents`. Antes cada mensagem pagava
-    // sozinha o mapa de TODOS os nós, o recálculo dos ramos perdedores sobre
-    // TODAS as arestas e uma cópia do array de eventos.
+    // Applies the batch accumulated in the frame: one pass over the nodes, one
+    // `updateNodeStatuses`, one `appendEvents`. Before, each message paid on its
+    // own for the map of ALL nodes, the recomputation of the losing branches over
+    // ALL edges and a copy of the events array.
     function drenarLote() {
       const bruto = bufferRef.current
       bufferRef.current = []
       if (bruto.length === 0) return
-      // Só entra o que é do run ativo. Sem este filtro, o rAF pendente do
-      // workflow A rodava depois da troca para B e despejava o log de A na store
-      // de B — inclusive o `__workflow_complete__` de A, que fechava o painel de
-      // B com "Concluído · 0 nós" para um workflow que nunca executou.
+      // Only what belongs to the active run gets in. Without this filter, the pending
+      // rAF from workflow A ran after the switch to B and dumped A's log into B's
+      // store — including A's `__workflow_complete__`, which closed B's panel
+      // with "Concluído · 0 nós" (done · 0 nodes) for a workflow that never ran.
       const ativo = runAtivoRef.current
       const lote = bruto.filter(item => item.runId === ativo).map(item => item.data)
       if (lote.length === 0) return
 
-      // Alimenta o painel de execução via store — conexão WS única (antes havia
-      // um segundo WS dentro do componente de log, para o mesmo run_id).
-      // `toRunEvent` normaliza kind/level e converte o timestamp do BACKEND:
-      // carimbar com a hora local quebrava a linha do tempo no replay de
-      // re-anexação, que reentrega o histórico inteiro de uma vez.
-      // Entra ANTES do filtro por `kind` abaixo, para que stdout e debug (que
-      // não mexem no canvas) também apareçam no painel.
+      // Feeds the execution panel via the store — a single WS connection (before there
+      // was a second WS inside the log component, for the same run_id).
+      // `toRunEvent` normalizes kind/level and converts the BACKEND timestamp:
+      // stamping with local time broke the timeline in the re-attach replay,
+      // which redelivers the whole history at once.
+      // It goes in BEFORE the `kind` filter below, so that stdout and debug
+      // (which don't touch the canvas) also show up in the panel.
       const store = useWorkflowExecutionStore.getState()
       store.appendEvents(lote.map(toRunEvent))
 
-      // Lê o state DEPOIS do append — e uma vez só por quadro.
+      // Reads the state AFTER the append — and only once per frame.
       const current = useWorkflowExecutionStore.getState()
       let currentNodes = current.statusWorkflow?.nodes ?? []
       let porId = current.statusById
-      // Recuperação defensiva: se o store ainda está vazio (initialNodes não
-      // hidratou a tempo no click), repopula a partir do React Flow.
+      // Defensive recovery: if the store is still empty (initialNodes did not
+      // hydrate in time on the click), repopulates it from React Flow.
       if (currentNodes.length === 0 && lote.some(d => d.node && !d.node.startsWith("__"))) {
         const live = reactFlowInstance.getNodes().map((n) => ({
           ...n,
@@ -433,15 +438,15 @@ export const useExecuteWorkflow = () => {
         }
       }
 
-      // Só o CICLO DE VIDA mexe no estado dos nós. Linhas de `print()` chegam
-      // com kind="stdout" e status="log": aplicá-las como status apagava o
-      // `started` do nó (o anel azul sumia no primeiro print) e ainda arrastava
-      // toda a cascata de re-render sobre nós e arestas.
+      // Only the LIFECYCLE touches node state. `print()` lines arrive with
+      // kind="stdout" and status="log": applying them as a status erased the
+      // node's `started` (the blue ring vanished on the first print) and also
+      // dragged in the whole re-render cascade over nodes and edges.
       const alterados = new Map<string, INodeStatusWorkFlow>()
-      // Colunas para a store de sugestões — que vive FORA do ciclo do run.
-      // `null` = o nó completou SEM publicar colunas (saída não-tabular, ou a
-      // chave cortada no transporte): a entrada dele é apagada lá, porque
-      // manter o valor antigo afirmaria colunas que este run não produziu.
+      // Columns for the suggestions store — which lives OUTSIDE the run lifecycle.
+      // `null` = the node completed WITHOUT publishing columns (non-tabular
+      // output, or the key cut off in transport): its entry is erased there,
+      // because keeping the old value would assert columns this run did not produce.
       const colunasDoLote = new Map<string, Record<string, string[]> | null>()
       let fim: RawEvent | null = null
       for (const data of lote) {
@@ -467,14 +472,14 @@ export const useExecuteWorkflow = () => {
         if (data.extra?.cache_hit !== undefined) {
           updated.cache_hit = data.extra.cache_hit
         }
-        // Colunas de cada saída — alimentam a sugestão de nome de coluna
-        // nos campos do Join e do filtro. Só chegam de executor 2.4.0 ou
-        // mais novo; versões anteriores não publicam a chave.
+        // Columns of each output — they feed the column-name suggestion in the
+        // Join and filter fields. They only come from executor 2.4.0 or
+        // newer; earlier versions do not publish the key.
         if (data.extra?.output_columns !== undefined) {
           updated.output_columns = data.extra.output_columns
         }
-        // Sem isso, o painel "Saídas" do InputInspector nunca via as keys
-        // reais do output — só via o fallback "output" mesmo após executar.
+        // Without this, the InputInspector's "Saídas" (outputs) panel never saw the
+        // output's real keys — only the "output" fallback, even after running.
         if (data.extra?.output_keys !== undefined) {
           updated.output_keys = data.extra.output_keys
         }
@@ -484,8 +489,8 @@ export const useExecuteWorkflow = () => {
         alterados.set(base.id, updated)
       }
 
-      // Nada mudou no canvas: nem novo array de nós, nem Sets de ramo novos —
-      // é o que impede um run barulhento de re-renderizar o grafo à toa.
+      // Nothing changed on the canvas: no new nodes array, no new branch Sets —
+      // that is what keeps a noisy run from re-rendering the graph for nothing.
       if (alterados.size > 0) {
         current.updateNodeStatuses(
           currentNodes.map(node => alterados.get(node.id) ?? node),
@@ -493,8 +498,8 @@ export const useExecuteWorkflow = () => {
         )
       }
 
-      // Memória de colunas por workflow — sobrevive a reset/F5 de execução e
-      // é o que o modal de configuração lê para sugerir nomes.
+      // Per-workflow column memory — survives an execution reset/F5 and is
+      // what the config modal reads to suggest names.
       if (colunasDoLote.size > 0) {
         useKnownColumnsStore.getState().aplicarDeExecucao(id, taskId, colunasDoLote)
       }
@@ -502,9 +507,9 @@ export const useExecuteWorkflow = () => {
       if (fim) {
         const duration = dayjs.duration(Math.round(fim.duration_ms ?? 0)).format("mm[min ]ss[s ] SSS[ms ]")
 
-        // Toast imediato (efêmero). A entrada persistente no sino de notificações
-        // fica a cargo do ActiveRunsProvider (fonte única), para não duplicar a
-        // notificação de um run que também é detectado pelo polling global.
+        // Immediate (ephemeral) toast. The persistent entry in the notification bell
+        // is left to ActiveRunsProvider (single source), so as not to duplicate the
+        // notification of a run that is also detected by the global polling.
         if (fim.status === "failed") {
           createToast.error("Ocorreu um erro no workflow!", fim.error ?? undefined)
         } else if (fim.status === "cancelled") {
@@ -513,7 +518,7 @@ export const useExecuteWorkflow = () => {
           createToast.success(`Workflow concluído em ${duration}`)
         }
 
-        // Lê de novo — o bloco de status acima acabou de atualizar a store.
+        // Reads again — the status block above just updated the store.
         const finalState = useWorkflowExecutionStore.getState()
         finalState.completeExecution(
           fim.status as StatusWorkflow,
@@ -522,9 +527,9 @@ export const useExecuteWorkflow = () => {
         )
 
         fecharDeProposito(ws)
-        // O run acabou dentro DESTE lote. O que sobrou no buffer é de antes do
-        // marcador e já não tem para onde ir; um quadro agendado que rodasse
-        // depois reaplicaria `started` sobre nós recém-liquidados.
+        // The run ended within THIS batch. What is left in the buffer predates the
+        // marker and has nowhere to go; a scheduled frame that ran later would
+        // reapply `started` over freshly settled nodes.
         descartarLote()
       }
     }
@@ -537,7 +542,7 @@ export const useExecuteWorkflow = () => {
       })
     }
 
-    // Drena AGORA, cancelando o quadro pendente para não drenar duas vezes.
+    // Drains NOW, canceling the pending frame so it does not drain twice.
     function drenarAgora() {
       if (frameRef.current != null) {
         cancelAnimationFrame(frameRef.current)
@@ -547,40 +552,41 @@ export const useExecuteWorkflow = () => {
     }
 
     ws.onmessage = (event) => {
-      // QUALQUER frame conta como sinal de vida — inclusive o heartbeat (lote
-      // vazio) e até um frame ilegível: o que o watchdog vigia é o silêncio do
-      // transporte, não o conteúdo. Por isso é a PRIMEIRA linha, antes de parse.
+      // ANY frame counts as a sign of life — including the heartbeat (empty batch)
+      // and even an unreadable frame: what the watchdog watches is the transport's
+      // silence, not the content. That is why it is the FIRST line, before parsing.
       ultimaMsgRef.current = Date.now()
 
-      // O servidor monta o frame concatenando strings cruas do Redis, então um
-      // único item corrompido invalida o JSON do lote INTEIRO — incluindo o
-      // `__workflow_complete__`, se ele estiver nesse bloco. Sem esta guarda a
-      // exceção subia do onmessage, o socket seguia aberto e o painel ficava em
-      // "Executando" sem nada na tela dizendo que um lote se perdeu.
+      // The server builds the frame by concatenating raw strings from Redis, so a
+      // single corrupted item invalidates the JSON of the ENTIRE batch — including
+      // `__workflow_complete__`, if it is in that block. Without this guard the
+      // exception bubbled up from onmessage, the socket stayed open and the panel
+      // sat at "Executando" (running) with nothing on screen saying a batch was lost.
       let frame: { events?: unknown; dropped?: number } | null = null
       try {
         frame = JSON.parse(event.data)
       } catch (err) {
         console.error("[ws/workflow] frame ilegível — lote descartado", err)
-        // Contabiliza como perda visível: a aba "Bruto" mostra o aviso em vez
-        // de o log parecer completo.
+        // Counts it as a visible loss: the "Bruto" (raw) tab shows the warning instead
+        // of the log looking complete.
         useWorkflowExecutionStore.getState().registrarDescartados(1)
         return
       }
 
-      // Envelope ÚNICO: replay do histórico e stream ao vivo chegam no MESMO
-      // formato — {"type":"events","events":[...],"dropped":N}, com os eventos
-      // crus concatenados pelo servidor. Antes era um frame (e um ciclo de
-      // render do canvas inteiro) por evento — até 5000 deles ao re-anexar.
+      // A SINGLE envelope: history replay and live stream arrive in the SAME
+      // format — {"type":"events","events":[...],"dropped":N}, with the raw
+      // events concatenated by the server. Before, it was one frame (and one
+      // render cycle of the whole canvas) per event — up to 5000 of them on re-attach.
       //
-      // Quem decide se o run acabou é o CONTEÚDO do lote, nunca o envelope:
-      // enquanto o cliente apostava no envelope, o dia em que o servidor passou
-      // a mandar o ao vivo em lote deixou o caminho de conclusão imediata morto.
+      // What decides whether the run ended is the batch's CONTENT, never the
+      // envelope: while the client relied on the envelope, the day the server
+      // started sending the live stream in batches left the immediate-completion
+      // path dead.
       const eventos: RawEvent[] = Array.isArray(frame?.events) ? frame.events : []
 
-      // Back-pressure do SERVIDOR (o buffer de 500 slots evicta stdout antigo).
-      // Sem somar isto, a aba "Bruto" some com o aviso e o usuário conclui que o
-      // script simplesmente não imprimiu aquelas linhas.
+      // SERVER back-pressure (the 500-slot buffer evicts old stdout).
+      // Without adding this up, the "Bruto" tab drops the warning and the user
+      // concludes the script simply did not print those lines.
       if (frame?.dropped) {
         useWorkflowExecutionStore.getState().registrarDescartados(frame.dropped)
       }
@@ -588,18 +594,20 @@ export const useExecuteWorkflow = () => {
       if (eventos.length === 0) return
       for (const evento of eventos) bufferRef.current.push({ runId: taskId, data: evento })
 
-      // O fim do run não pode esperar o próximo quadro: `completeExecution` e o
-      // `ws.close()` acontecem dentro do flush. Com a aba em segundo plano o rAF
-      // não roda — o run ficava preso em "Executando", com o botão em "Cancelar"
-      // e o toast de conclusão só aparecendo minutos depois, ao voltar à aba.
+      // The end of the run cannot wait for the next frame: `completeExecution` and
+      // `ws.close()` happen inside the flush. With the tab in the background the rAF
+      // does not run — the run got stuck at "Executando", with the button at
+      // "Cancelar" and the completion toast only showing up minutes later, when
+      // returning to the tab.
       if (eventos.some(e => e.node === WF_COMPLETE)) {
         drenarAgora()
         return
       }
 
-      // Teto de memória para a aba oculta, onde o rAF nunca chega: a rotação de
-      // MAX_RUN_EVENTS só age DEPOIS do drain, dentro da store, então sem isto um
-      // `for i in range(200000): print(i)` acumulava centenas de MB no buffer.
+      // Memory ceiling for the hidden tab, where the rAF never comes: the
+      // MAX_RUN_EVENTS rotation only acts AFTER the drain, inside the store, so
+      // without this a `for i in range(200000): print(i)` piled up hundreds of MB
+      // in the buffer.
       if (bufferRef.current.length >= MAX_RUN_EVENTS) {
         drenarAgora()
         return
@@ -609,15 +617,16 @@ export const useExecuteWorkflow = () => {
     }
 
     ws.onerror = (err) => {
-      // Não decide nada: o `onclose` vem logo atrás e é lá que mora a
-      // recuperação. Falhar aqui matava o run na primeira instabilidade, antes
-      // mesmo de tentar reconectar.
+      // Decides nothing: `onclose` comes right after, and that is where recovery
+      // lives. Failing here killed the run at the first instability, before
+      // even trying to reconnect.
       console.error("[ws/workflow] erro no socket", err)
     }
 
     ws.onclose = (event) => {
-      // Limpa a ref e para o watchdog se este ainda é o WS ativo (pode já ter
-      // sido substituído — nesse caso o watchdog em curso é de OUTRO socket).
+      // Clears the ref and stops the watchdog if this is still the active WS (it may
+      // already have been replaced — in that case the running watchdog belongs to
+      // ANOTHER socket).
       if (wsRef.current === ws) {
         wsRef.current = null
         pararWatchdog()
@@ -625,22 +634,23 @@ export const useExecuteWorkflow = () => {
       const storeState = useWorkflowExecutionStore.getState()
       storeState.setWsState("closed")
 
-      // Fechamos de propósito (fim do run, troca de workflow, novo attach), ou
-      // este socket já foi substituído, ou o run já fechou: nada a recuperar.
+      // We closed it on purpose (end of run, workflow switch, new attach), or this
+      // socket has already been replaced, or the run has already closed: nothing
+      // to recover.
       if (fechadosDePropositoRef.current.has(ws)) return
       if (runAtivoRef.current !== taskId) return
       if (!storeState.isExecuting) return
 
-      // Daqui para baixo o stream caiu com o run ainda aberto. O CÓDIGO NÃO
-      // DISTINGUE: o servidor encerra com 1000 também quando a assinatura do
-      // Redis termina sem o `__workflow_complete__` — e tratar isso como
-      // encerramento normal era o que deixava os nós girando e o painel em
-      // "Executando" para sempre, sem toast, sem log, sem saída.
+      // From here down the stream dropped with the run still open. THE CODE DOES NOT
+      // TELL THEM APART: the server also closes with 1000 when the Redis
+      // subscription ends without `__workflow_complete__` — and treating that as a
+      // normal close was what left nodes spinning and the panel at
+      // "Executando" forever, with no toast, no log, no output.
       console.warn(
         `[ws/workflow] stream de ${taskId} caiu com o run aberto (code=${event.code}) — recuperando`,
       )
-      // `.catch` obrigatório: `void` numa async que rejeita vira unhandled
-      // rejection, que em alguns navegadores derruba a página inteira.
+      // `.catch` is mandatory: `void` on an async that rejects becomes an unhandled
+      // rejection, which in some browsers brings down the whole page.
       recuperarStream(taskId).catch(err =>
         console.error("[ws/workflow] falha ao recuperar o stream", err),
       )
@@ -650,19 +660,19 @@ export const useExecuteWorkflow = () => {
   }
 
   async function executeWorkflow(inputs: Record<string, unknown> = {}) {
-    // Nota: NÃO checar isExecuting aqui — handleExecuteWorkflow já fez isso
-    // no início e depois chamou store.startExecution() que seta isExecuting=true.
-    // Um guard aqui (que existia pré-refactor Zustand) bloqueia o POST e
-    // deixa respExec=undefined → task_id "undefined" na URL do WebSocket →
-    // 4404. Esse era o bug real observado no canvas.
+    // Note: do NOT check isExecuting here — handleExecuteWorkflow already did so
+    // at the start and then called store.startExecution(), which sets
+    // isExecuting=true. A guard here (which existed before the Zustand refactor)
+    // blocks the POST and leaves respExec=undefined → task_id "undefined" in the
+    // WebSocket URL → 4404. That was the real bug observed on the canvas.
     const data = await GisFlowService.executeWorkflow(id, inputs, debugMode)
     return data
   }
 
-  // Aguarda o canvas hidratar (React Flow popular os nós) antes de semear/anexar,
-  // até `timeoutMs`. Sem isto, o replay do histórico do run podia chegar antes de
-  // existir qualquer nó para pintar — daí a re-anexação animava só às vezes,
-  // dependendo de quem ganhava a corrida (rede vs. hidratação do canvas).
+  // Waits for the canvas to hydrate (React Flow populating the nodes) before
+  // seeding/attaching, up to `timeoutMs`. Without this, the run's history replay
+  // could arrive before any node existed to paint — hence re-attach animated only
+  // sometimes, depending on who won the race (network vs. canvas hydration).
   function waitForCanvasNodes(shouldAbort: () => boolean, timeoutMs = 8000): Promise<boolean> {
     return new Promise((resolve) => {
       const start = Date.now()
@@ -676,25 +686,27 @@ export const useExecuteWorkflow = () => {
     })
   }
 
-  // Re-anexa às animações de um run ainda em andamento ao (re)abrir o workflow.
-  // O canvas anima 100% a partir da store, que é volátil e é zerada ao montar
-  // (workflow/index.tsx). Sem isto, reabrir um workflow "running" mostrava um
-  // canvas estático — parecia que nada acontecia. Aqui descobrimos o run vivo
-  // mais recente e reabrimos o MESMO WebSocket do disparo: o backend faz replay
-  // de todo o histórico do run e segue ao vivo, repintando os nós. Só re-anexa a
-  // runs vivos (running/pending); se o último run já concluiu, o canvas fica limpo.
+  // Re-attaches to the animations of a run still in progress when (re)opening the
+  // workflow. The canvas animates 100% from the store, which is volatile and is
+  // wiped on mount (workflow/index.tsx). Without this, reopening a "running"
+  // workflow showed a static canvas — it looked like nothing was happening. Here
+  // we discover the most recent live run and reopen the SAME WebSocket as the
+  // trigger: the backend replays the run's whole history and continues live,
+  // repainting the nodes. It only re-attaches to live runs (running/pending); if
+  // the last run has already finished, the canvas stays clean.
   useEffect(() => {
     if (!id) return
-    // Só o dono do socket re-anexa. Sem esta guarda, abrir o modal de
-    // configuração de um nó Webhook durante um run montava uma segunda
-    // instância que chamava `startExecution` (zerando o canvas em curso) e
-    // abria um socket concorrente para o MESMO run.
+    // Only the socket owner re-attaches. Without this guard, opening the config
+    // modal of a Webhook node during a run mounted a second instance that called
+    // `startExecution` (wiping the canvas in progress) and opened a competing
+    // socket for the SAME run.
     if (!souDonoRef.current) return
-    // NÃO usar o isExecuting global como gate: ele é volátil e, ao voltar a um
-    // workflow, pode estar TRUE por sobra do acesso anterior (o reset vive noutro
-    // efeito, em workflow/index.tsx, que roda DEPOIS deste). Era o que fazia a
-    // re-anexação alternar entre acessos (funciona/para/funciona). Aqui zeramos o
-    // controle por-montagem; um disparo manual o liga em handleExecuteWorkflow.
+    // Do NOT use the global isExecuting as a gate: it is volatile and, when
+    // returning to a workflow, it may be TRUE as a leftover from the previous visit
+    // (the reset lives in another effect, in workflow/index.tsx, which runs AFTER
+    // this one). That was what made re-attach alternate between visits
+    // (works/stops/works). Here we reset the per-mount control; a manual trigger
+    // turns it on in handleExecuteWorkflow.
     sessionTriggeredRef.current = false
 
     let cancelled = false
@@ -704,31 +716,31 @@ export const useExecuteWorkflow = () => {
     ;(async () => {
       const resp = await GisFlowService.getObservabilityRuns({ workflow_id: id, limit: 1 })
       const latest = resp?.data?.runs?.[0]
-      // Aborta se o workflow mudou durante o await, se não há run, ou se ele não
-      // está vivo. Se um disparo manual começou nesta montagem, não clobbera.
+      // Aborts if the workflow changed during the await, if there is no run, or if it
+      // is not alive. If a manual trigger started in this mount, it does not clobber.
       if (aborted() || !latest) return
       if (latest.status !== "running" && latest.status !== "pending") {
-        // O run mais recente já concluiu: nada para re-anexar — mas o
-        // `node_stats` dele guarda `output_columns`, e semear a store de
-        // sugestões daqui é o que faz as colunas aparecerem ao ABRIR o
-        // workflow, sem executar nada. Antes, elas só existiam enquanto a
-        // sessão do run vivia: F5 e a dica sumia ("às vezes funciona").
+        // The most recent run has already finished: nothing to re-attach — but its
+        // `node_stats` holds `output_columns`, and seeding the suggestions store
+        // from here is what makes the columns appear when OPENING the
+        // workflow, without running anything. Before, they only existed while
+        // the run's session lived: F5 and the hint was gone ("sometimes it works").
         //
-        // Melhor-esforço deliberado: sugestão é dica, não estado — sem run
-        // detalhável (403 de papel restrito, 404, stats sem a chave por
-        // executor antigo ou corte de 8KB), o editor segue como hoje, sem
-        // toast na abertura do workflow.
+        // Deliberately best-effort: a suggestion is a hint, not state — with no
+        // run whose details can be fetched (403 for a restricted role, 404, stats
+        // without the key due to an old executor or the 8KB cut), the editor
+        // carries on as today, with no toast when the workflow opens.
         //
-        // Run VIVO não passa aqui de propósito: o replay do WebSocket reentrega
-        // o histórico e escreve as colunas pelo caminho ao vivo (`fresh`).
+        // A LIVE run does not pass through here on purpose: the WebSocket replay
+        // redelivers the history and writes the columns through the live path (`fresh`).
         const detalhe = await GisFlowService.getRunDetail(latest.run_id)
         if (aborted()) return
         const stats = detalhe?.data?.node_stats ?? {}
         const colunasPorNo: Record<string, { porPorta: Record<string, string[]>; parciais?: boolean }> = {}
         for (const [nodeId, stat] of Object.entries(stats)) {
           if (stat?.output_columns) {
-            // `__truncated__` = o corte de 8KB do executor reduziu cada lista
-            // às primeiras 50 — o rótulo da sugestão avisa "lista parcial".
+            // `__truncated__` = the executor's 8KB cut reduced each list to the
+            // first 50 — the suggestion label warns "lista parcial" (partial list).
             colunasPorNo[nodeId] = { porPorta: stat.output_columns, parciais: !!stat.__truncated__ }
           }
         }
@@ -739,24 +751,24 @@ export const useExecuteWorkflow = () => {
       }
       if (sessionTriggeredRef.current) return
 
-      // Espera o canvas hidratar ANTES de semear — sem isso o replay chegava sem
-      // nós para pintar (a causa da animação intermitente ao reabrir).
+      // Waits for the canvas to hydrate BEFORE seeding — without this the replay
+      // arrived with no nodes to paint (the cause of the intermittent animation on reopen).
       await waitForCanvasNodes(aborted)
       if (aborted() || sessionTriggeredRef.current) return
 
-      // Semeia a store com os nós atuais do canvas (idle) — mas SÓ quando ainda
-      // não há estado deste run. `startExecution` zera nós e eventos, e fazer
-      // isso sobre um run que já estamos acompanhando (segunda montagem do
-      // hook, efeito reexecutado) apaga o progresso já pintado e aposta tudo no
-      // replay chegar. Se o socket cair logo depois, o canvas fica pior do que
-      // estava antes da "recuperação".
+      // Seeds the store with the canvas's current nodes (idle) — but ONLY when there
+      // is no state for this run yet. `startExecution` wipes nodes and events, and
+      // doing that over a run we are already tracking (a second mount of the
+      // hook, a re-run effect) erases the progress already painted and bets
+      // everything on the replay arriving. If the socket drops right after, the
+      // canvas ends up worse than it was before the "recovery".
       const store = useWorkflowExecutionStore.getState()
-      // ...ou quando o estado que temos deste run é um DESFECHO. O servidor
-      // acabou de dizer que ele continua vivo, então o nosso encerramento foi
-      // precipitado (reconciliação em corrida, ou desistência após esgotar as
-      // reconexões). Sem re-semear, o replay chegaria num run que a store
-      // considera fechado e a guarda de `updateNodeStatuses` o descartaria,
-      // deixando o canvas congelado no desfecho errado.
+      // ...or when the state we have for this run is an OUTCOME. The server has
+      // just said it is still alive, so our closing was premature (a racing
+      // reconciliation, or giving up after exhausting the reconnections).
+      // Without re-seeding, the replay would arrive at a run the store considers
+      // closed and the `updateNodeStatuses` guard would discard it, leaving the
+      // canvas frozen on the wrong outcome.
       const encerrado = !!store.statusWorkflow && RUN_ENCERRADO.has(store.statusWorkflow.status)
       if (store.viewingRunId !== latest.run_id || !store.statusWorkflow || encerrado) {
         const source = nodesRef.current.length > 0 ? nodesRef.current : reactFlowInstance.getNodes()
@@ -769,13 +781,13 @@ export const useExecuteWorkflow = () => {
 
     return () => {
       cancelled = true
-      // Fecha o WS ativo ao sair/trocar de workflow. Marcado como intencional,
-      // senão o `onclose` trataria a troca de tela como queda e tentaria
-      // reconectar a um run que o usuário deixou para trás.
+      // Closes the active WS when leaving/switching workflows. Marked as
+      // intentional, otherwise `onclose` would treat the screen change as a drop
+      // and try to reconnect to a run the user left behind.
       fecharDeProposito(wsRef.current)
-      // Navegar /workflow/A → /workflow/B NÃO remonta o componente: buffer e
-      // quadro pendente sobrevivem à troca. Fechar o socket não basta — as
-      // mensagens já enfileiradas no event loop ainda seriam entregues.
+      // Navigating /workflow/A → /workflow/B does NOT remount the component: the
+      // buffer and the pending frame survive the switch. Closing the socket is not
+      // enough — messages already queued in the event loop would still be delivered.
       descartarLote()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

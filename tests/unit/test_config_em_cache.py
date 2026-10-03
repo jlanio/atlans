@@ -1,15 +1,15 @@
 # tests/unit/test_config_em_cache.py
-"""`app/core/config_em_cache.py` — a leitura com cache que o modelo do
-assistente, a forma da cota e o plano de cada pessoa repetiam.
+"""`app/core/config_em_cache.py` — the cached read that the assistant model,
+the quota shape and each person's plan used to repeat.
 
-O que se prende aqui é a peça, com uma configuração de brinquedo (um texto
-qualquer): os testes de cada serviço provam o valor de cada um, e estes provam
-as três regras que valem para todos.
+What is pinned here is the piece, with a toy configuration (any text at
+all): each service's tests prove each one's value, and these prove the three
+rules that hold for all of them.
 
-1. Degradação aberta: Redis ou banco fora do ar nunca viram exceção.
-2. O padrão de uma FALHA do banco não vai para o cache.
-3. Quem só lê grava com `NX`; quem salva grava por cima — e a corrida entre os
-   dois termina com o valor salvo.
+1. Fail open: Redis or the database being down never becomes an exception.
+2. The default from a database FAILURE does not go into the cache.
+3. A reader writes with `NX`; a saver overwrites — and the race between the
+   two ends with the saved value.
 """
 from __future__ import annotations
 
@@ -84,11 +84,11 @@ async def test_miss_le_o_banco_e_grava_com_nx_e_ttl(db):
 
     assert await _config().em_uso(db=db, redis=redis) == "verde"
     assert redis.dados[CACHE] == "verde"
-    assert ("set", CACHE, True, 300) in redis.chamadas     # NX: quem só leu não pisa
+    assert ("set", CACHE, True, 300) in redis.chamadas     # NX: a mere reader does not clobber
 
 
 async def test_hit_nao_toca_o_banco():
-    """`db=None` e nenhuma sessão própria: se fosse ao banco, levantaria."""
+    """`db=None` and no session of its own: if it went to the database, it would raise."""
     redis = RedisFalso()
     redis.dados[CACHE] = "roxo"
     with patch("app.mcp.infra.sessao", side_effect=AssertionError("foi ao banco")):
@@ -96,7 +96,7 @@ async def test_hit_nao_toca_o_banco():
 
 
 async def test_nada_salvo_vale_o_padrao_e_ele_vai_para_o_cache(db):
-    """Sem linha no banco não é falha: o padrão é a resposta certa e pode ficar."""
+    """No row in the database is not a failure: the default is the right answer and can stay."""
     redis = RedisFalso()
     assert await _config().em_uso(db=db, redis=redis) == PADRAO
     assert redis.dados[CACHE] == PADRAO
@@ -120,7 +120,7 @@ async def test_cache_que_nao_se_desserializa_conta_como_miss(db):
     assert await config.em_uso(db=db, redis=redis) == "verde"
 
 
-# ── Degradação aberta ───────────────────────────────────────────────────────
+# ── Fail open ───────────────────────────────────────────────────────────────
 
 async def test_redis_fora_do_ar_le_o_banco(db):
     await set_config(db, CHAVE, {"cor": "verde"})
@@ -128,8 +128,8 @@ async def test_redis_fora_do_ar_le_o_banco(db):
 
 
 async def test_banco_fora_do_ar_da_o_padrao_e_NAO_o_grava_no_cache(db):
-    """A regra 2: gravado, o padrão da falha valeria por um TTL inteiro depois
-    de o banco voltar."""
+    """Rule 2: if written, the failure's default would hold for a whole TTL after
+    the database came back."""
     await set_config(db, CHAVE, {"cor": "verde"})
     redis = RedisFalso()
 
@@ -167,7 +167,7 @@ async def test_definir_grava_o_envelope_com_o_carimbo(db):
 
     salvo = await get_config(db, CHAVE)
     assert (salvo["cor"], salvo["por"]) == ("verde", "ana")
-    assert salvo["em"]                                    # ISO de quando
+    assert salvo["em"]                                    # ISO timestamp of when
 
 
 async def test_definir_none_apaga_e_volta_ao_padrao(db):
@@ -181,34 +181,34 @@ async def test_definir_none_apaga_e_volta_ao_padrao(db):
 
 async def test_definir_grava_por_cima_no_cache(db):
     redis = RedisFalso()
-    await _config().em_uso(db=db, redis=redis)           # popula com o padrão
+    await _config().em_uso(db=db, redis=redis)           # populates with the default
     assert redis.dados[CACHE] == PADRAO
 
     await _config().definir(db, "verde", redis=redis)
-    assert redis.dados[CACHE] == "verde"                  # sem NX: quem salva ganha
+    assert redis.dados[CACHE] == "verde"                  # no NX: the saver wins
     assert await _config().em_uso(db=db, redis=redis) == "verde"
 
     await _config().definir(db, None, redis=redis)
-    assert redis.dados[CACHE] == PADRAO                   # voltar ao padrão também grava
+    assert redis.dados[CACHE] == PADRAO                   # going back to the default also writes
 
 
 async def test_leitor_atrasado_nao_repinta_o_valor_velho(db):
-    """A regra 3, encenada: o leitor dá miss e vai ao banco; ENQUANTO ele lê o
-    valor antigo, o admin salva outro. O leitor termina gravando o que leu — e
-    o `NX` o faz desistir: o valor salvo fica no cache."""
+    """Rule 3, staged: the reader misses and goes to the database; WHILE it reads
+    the old value, the admin saves another. The reader ends by writing what it
+    read — and `NX` makes it give up: the saved value stays in the cache."""
     redis = RedisFalso()
     await set_config(db, CHAVE, {"cor": "velho"})
 
     async def _leitura_atropelada():
-        lido = _ler(await get_config(db, CHAVE))          # o leitor lê o velho...
+        lido = _ler(await get_config(db, CHAVE))          # the reader reads the old one...
         await _config().definir(db, "novo", redis=redis)  # ...e o admin salva no meio
         return lido
 
     lido = await ler_com_cache(
         redis, CACHE, _leitura_atropelada, ttl_s=300, rotulo="Teste", so_se_vazio=True,
     )
-    assert lido == "velho"                  # a conversa em curso usa o que leu
-    assert redis.dados[CACHE] == "novo"     # mas não repinta o cache
+    assert lido == "velho"                  # the ongoing conversation uses what it read
+    assert redis.dados[CACHE] == "novo"     # but does not repaint the cache
     assert await _config().em_uso(db=db, redis=redis) == "novo"
 
 
@@ -222,15 +222,15 @@ async def test_carimbo_traz_valor_quem_e_quando(db):
 
 
 async def test_carimbo_le_pelo_mesmo_ler_das_conversas(db):
-    """Uma linha fora do envelope (edição à mão): se as conversas a usam, a tela
-    não pode dizer que vale o padrão."""
+    """A row outside the envelope (hand-edited): if the conversations use it, the
+    screen cannot say the default applies."""
     await set_config(db, CHAVE, "verde")
     assert await _config().em_uso(db=db) == "verde"
     carimbo = await _config().carimbo(db)
     assert (carimbo.valor, carimbo.por, carimbo.em) == ("verde", None, None)
 
 
-# ── `ler_com_cache` sem NX e `invalidar_cache` (o plano de cada pessoa) ──────
+# ── `ler_com_cache` without NX and `invalidar_cache` (each person's plan) ────
 
 async def test_leitura_sem_nx_sobrescreve_o_lixo_do_cache():
     redis = RedisFalso()

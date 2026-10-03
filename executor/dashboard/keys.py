@@ -1,16 +1,16 @@
 # executor/dashboard/keys.py
 """
-Leitura de teclas do terminal sem bloquear o event loop.
+Reading terminal keys without blocking the event loop.
 
-Uma thread daemon fica bloqueada na leitura e entrega cada tecla ao loop por
-`call_soon_threadsafe`. Poderia ser `loop.add_reader(stdin)` em POSIX, mas isso
-nao existe no Windows (a implementacao Proactor so aceita sockets), e uma unica
-thread cobre os dois sem ramificar o ciclo de vida.
+A daemon thread stays blocked on the read and delivers each key to the loop through
+`call_soon_threadsafe`. It could be `loop.add_reader(stdin)` on POSIX, but that
+does not exist on Windows (the Proactor implementation only accepts sockets), and a single
+thread covers both without branching the lifecycle.
 
-O cuidado central e POSIX: ler tecla a tecla exige tirar o terminal do modo
-canonico, e um terminal que fica em cbreak depois do processo morrer para de
-ecoar o que o usuario digita — o shell parece travado. Por isso a restauracao
-acontece em tres lugares (stop, `finally` da thread e `atexit`) e e idempotente.
+The central concern is POSIX: reading key by key requires taking the terminal out of
+canonical mode, and a terminal left in cbreak after the process dies stops
+echoing what the user types — the shell looks frozen. That is why the restore
+happens in three places (stop, the thread's `finally` and `atexit`) and is idempotent.
 """
 from __future__ import annotations
 
@@ -45,11 +45,11 @@ atexit.register(_restaurar_terminal)
 
 
 def teclado_disponivel() -> bool:
-    """Da para ler teclas deste processo?
+    """Can keys be read from this process?
 
-    O gate do painel ja exige stdout/stderr em TTY, mas stdin pode estar
-    redirecionado (`< /dev/null`, um pipe, um supervisor). Nesse caso o painel
-    continua funcionando — so sem atalhos.
+    The panel gate already requires stdout/stderr on a TTY, but stdin may be
+    redirected (`< /dev/null`, a pipe, a supervisor). In that case the panel
+    keeps working — just without shortcuts.
     """
     try:
         if not sys.stdin or not sys.stdin.isatty():
@@ -71,10 +71,10 @@ def teclado_disponivel() -> bool:
 
 
 class LeitorDeTeclas:
-    """Entrega teclas ao event loop por callback.
+    """Delivers keys to the event loop through a callback.
 
-    O callback roda NO LOOP (via call_soon_threadsafe), entao pode mexer no
-    estado do painel sem sincronizacao extra.
+    The callback runs ON THE LOOP (via call_soon_threadsafe), so it can touch the
+    panel state without extra synchronization.
     """
 
     def __init__(self, ao_receber: Callable[[str], None]):
@@ -84,8 +84,8 @@ class LeitorDeTeclas:
         self._parar = threading.Event()
 
     def start(self) -> bool:
-        """Sobe a thread de leitura. Retorna False se o teclado nao estiver
-        disponivel — o caller segue sem atalhos, sem tratar isso como erro."""
+        """Starts the reader thread. Returns False if the keyboard is not
+        available — the caller carries on without shortcuts, without treating it as an error."""
         if not teclado_disponivel():
             return False
         self._loop = asyncio.get_running_loop()
@@ -100,12 +100,12 @@ class LeitorDeTeclas:
         return True
 
     def stop(self) -> None:
-        """Para de entregar teclas e devolve o terminal ao modo canonico.
+        """Stops delivering keys and returns the terminal to canonical mode.
 
-        A thread nao e aguardada: ela esta bloqueada numa leitura que so retorna
-        na proxima tecla. Como e daemon e o `_parar` a faz descartar o que
-        chegar, deixa-la pendurada nao segura o encerramento nem entrega tecla
-        a um painel que ja morreu.
+        The thread is not awaited: it is blocked on a read that only returns
+        on the next key. Since it is a daemon and `_parar` makes it drop whatever
+        arrives, leaving it hanging neither holds up shutdown nor delivers a key
+        to a panel that has already died.
         """
         self._parar.set()
         _restaurar_terminal()
@@ -115,22 +115,22 @@ class LeitorDeTeclas:
     def _preparar_terminal(self) -> None:
         global _ESTADO_TERMINAL, _FD_TERMINAL
         if os.name == "nt":
-            return  # msvcrt.getwch() ja le sem eco e sem enter
+            return  # msvcrt.getwch() already reads without echo and without enter
         import termios
         import tty
         fd = sys.stdin.fileno()
         _ESTADO_TERMINAL = termios.tcgetattr(fd)
         _FD_TERMINAL = fd
-        # cbreak, e nao raw: preserva o Ctrl+C como SIGINT, que continua sendo
-        # o caminho de encerramento que todo mundo conhece.
+        # cbreak, and not raw: keeps Ctrl+C as SIGINT, which is still
+        # the shutdown path everybody knows.
         tty.setcbreak(fd)
 
     def _ler_uma(self) -> str | None:
         if os.name == "nt":
             import msvcrt
             ch = msvcrt.getwch()
-            # Teclas especiais (setas, F1..) chegam como prefixo + codigo; o
-            # segundo byte precisa ser consumido, senao vira uma tecla fantasma.
+            # Special keys (arrows, F1..) arrive as prefix + code; the
+            # second byte must be consumed, otherwise it becomes a phantom key.
             if ch in ("\x00", "\xe0"):
                 msvcrt.getwch()
                 return None

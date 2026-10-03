@@ -1,10 +1,10 @@
 # tests/unit/test_carta_helpers.py
 """
-A matematica da carta imagem (flow/utils/carta.py), sem renderizar nada.
+The image map math (flow/utils/carta.py), without rendering anything.
 
-Cada numero esperado foi calculado a mao a partir das formulas do Web Mercator
-e das regras do contrato — nao a partir do codigo — para que o teste prenda o
-comportamento e nao a implementacao.
+Each expected number was computed by hand from the Web Mercator formulas and the
+contract rules — not from the code — so that the test pins the behavior and not
+the implementation.
 """
 import math
 
@@ -38,7 +38,7 @@ from flow.utils.carta import (
     zoom_para,
 )
 
-# Uma caixa de ~690 km de largura no fuso UTM 20 Sul (EPSG:32720).
+# A box ~690 km wide in UTM zone 20 South (EPSG:32720).
 BBOX_UTM20S_4326 = (-66.0, -13.0, -59.8, -8.0)
 # A mesma caixa em EPSG:3857 (x = R*rad(lon)).
 BBOX_UTM20S_3857 = (
@@ -127,18 +127,18 @@ def test_sem_zona_utm_cai_em_3857_com_aviso():
 
 def test_extensao_com_margem_e_minimo():
     assert extensao_com_margem((0.0, 0.0, 10_000.0, 10_000.0), True) == (-500.0, -500.0, 10_500.0, 10_500.0)
-    # Um ponto so: 500 m de lado em CRS projetado, mais os 5 % de cada lado.
+    # A single point: 500 m per side in a projected CRS, plus the 5 % on each side.
     assert extensao_com_margem((0.0, 0.0, 0.0, 0.0), True) == (-275.0, -275.0, 275.0, 275.0)
     x0, y0, x1, y1 = extensao_com_margem((-63.0, -10.0, -63.0, -10.0), False)
     assert (x1 - x0) == pytest.approx(0.011) and (y1 - y0) == pytest.approx(0.011)
 
 
 def test_extensao_no_quadro_alarga_e_nunca_corta():
-    # Mais larga que um quadro quadrado: cresce para cima e para baixo.
+    # Wider than a square frame: grows up and down.
     assert extensao_no_quadro((0.0, 0.0, 100.0, 50.0), 1.0) == (0.0, -25.0, 100.0, 75.0)
-    # Mais alta que um quadro 4:1: alarga, centrada.
+    # Taller than a 4:1 frame: widens, centered.
     assert extensao_no_quadro((0.0, 0.0, 100.0, 50.0), 4.0) == (-50.0, 0.0, 150.0, 50.0)
-    # Ja na proporcao: intacta.
+    # Already in proportion: untouched.
     assert extensao_no_quadro((0.0, 0.0, 200.0, 100.0), 2.0) == (0.0, 0.0, 200.0, 100.0)
 
 
@@ -172,12 +172,12 @@ def test_fator_de_escala_3857_e_o_cosseno_da_latitude():
 # ── Tiles ────────────────────────────────────────────────────────────────────
 
 def test_zoom_para_e_o_menor_que_cobre_a_largura_em_pixels():
-    # Uma caixa de ~690 km numa pagina de 1754 px: no zoom 8 o mapa teria ~1128 px
-    # de tiles, no 9 ~2257 — o menor que alcanca 1754 e o 9.
+    # A ~690 km box on a 1754 px page: at zoom 8 the map would have ~1128 px
+    # of tiles, at 9 ~2257 — the smallest that reaches 1754 is 9.
     assert zoom_para(BBOX_UTM20S_3857, 1754) == 9
-    # Um bairro de 1 km pede zoom 19 — o teto do OSM.
+    # A 1 km neighborhood asks for zoom 19 — the OSM ceiling.
     assert zoom_para((0.0, 0.0, 1000.0, 1000.0), 1754) == 19
-    # O mundo inteiro numa pagina de 500 px: dois tiles bastam.
+    # The whole world on a 500 px page: two tiles are enough.
     assert zoom_para((-MERCATOR_MAX, -MERCATOR_MAX, MERCATOR_MAX, MERCATOR_MAX), 500) == 1
 
 

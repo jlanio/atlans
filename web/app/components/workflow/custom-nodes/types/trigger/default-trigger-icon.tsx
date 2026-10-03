@@ -11,7 +11,7 @@ import { INodePortAPI } from "@/service/types";
 import { memo, useCallback, useMemo } from "react";
 import { calcNodeHeight, portTopStyle } from "../../../utils/node-metrics";
 
-// `selected` vem da prop do React Flow — ver o comentário em default-type.tsx.
+// `selected` comes from the React Flow prop — see the comment in default-type.tsx.
 const DefaultTriggerIcon = ({ id, data, selected }: NodeProps<INodeContext>) => {
 
   const { toolState, handleToolState } = useTools()
@@ -21,7 +21,7 @@ const DefaultTriggerIcon = ({ id, data, selected }: NodeProps<INodeContext>) => 
   const onEnter = useCallback(() => handleToolState('onFocus'), [handleToolState])
   const onLeave = useCallback(() => handleToolState('leave'), [handleToolState])
 
-  // PERF: indexa edges por sourceHandle em Set para lookups O(1) por port.
+  // PERF: indexes edges by sourceHandle in a Set for O(1) lookups per port.
   const connectedSources = useMemo(() => {
     const set = new Set<string>()
     for (const e of edges) {

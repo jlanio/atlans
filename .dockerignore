@@ -1,4 +1,4 @@
-# Dependências
+# Dependencies
 node_modules
 .venv
 __pycache__
@@ -17,8 +17,8 @@ yarn-error.log*
 dist/
 build/
 
-# Configurações locais — em qualquer pasta: o `COPY executor/` levava o
-# executor/.env da máquina que builda para dentro da imagem, legível por todos.
+# Local settings — in any folder: `COPY executor/` used to carry the building
+# machine's executor/.env into the image, readable by everyone.
 .env
 **/.env
 .env.local
@@ -32,8 +32,8 @@ agent-config/
 .dockerignore
 Dockerfile*
 .git
-# ...menos o que diz qual commit está sendo buildado (executor/versao.py): a
-# ref atual, sem objetos nem config.
+# ...except what says which commit is being built (executor/versao.py): the
+# current ref, with no objects or config.
 !.git/HEAD
 !.git/packed-refs
 !.git/refs

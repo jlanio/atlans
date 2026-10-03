@@ -41,9 +41,9 @@ class DataOutput(BaseNode):
                 {"name": "artifact_s3_key", "type": "string", "description": "S3 key no MinIO, ou o caminho local quando o conteúdo fica no executor"},
             ],
             "properties": [
-                # Padrao visual simetrico ao DataInput:
-                # 1) Destino/Origem (context)  2) conteudo/identidade (label)
-                # 3) opcoes especificas (isPublic, credential_id)  4) crs por ultimo.
+                # Visual layout symmetric to DataInput:
+                # 1) Destination/Source (context)  2) content/identity (label)
+                # 3) specific options (isPublic, credential_id)  4) crs last.
                 {
                     "name":        "context",
                     "label":       "Destino",
@@ -83,9 +83,9 @@ class DataOutput(BaseNode):
                         "Se ligado, o artefato tem link de download público (sem autenticação). "
                         "Se desligado, exige uma credencial Bearer para o download."
                     ),
-                    # Um artefato local nao tem download para proteger, entao
-                    # oferecer o controle de acesso ali prometeria uma decisao
-                    # que nao existe.
+                    # A local artifact has no download to protect, so offering
+                    # access control there would promise a decision that
+                    # does not exist.
                     "visibleWhen": [
                         {"field": "context", "in": ["artifacts"]},
                         {"field": "localidade", "in": ["herdar"]},
@@ -104,9 +104,9 @@ class DataOutput(BaseNode):
                         {"field": "localidade", "in": ["herdar"]},
                     ],
                 },
-                # Vale nos DOIS destinos: um arquivo do Drive tambem pode ficar
-                # so no executor, catalogado — e o mesmo desfecho do GeoSync em
-                # modo catalogo, para um arquivo que o workflow acabou de gerar.
+                # Applies to BOTH destinations: a Drive file can also stay only
+                # on the executor, cataloged — the same outcome as GeoSync in
+                # catalog mode, for a file the workflow has just produced.
                 propriedade_localidade(),
                 {
                     "name":        "crs",
@@ -124,8 +124,8 @@ class DataOutput(BaseNode):
         crs         = self.get_param("crs", "EPSG:4326").strip() or "EPSG:4326"
         context     = self.get_param("context", "artifacts")
         is_public   = self.get_param("isPublic", True)
-        # `validate()` acima ja garante bool para propriedades type=boolean
-        # (parameter_validation rejeita string), entao nao ha coercao aqui.
+        # `validate()` above already guarantees a bool for type=boolean properties
+        # (parameter_validation rejects strings), so there is no coercion here.
         overwrite   = self.get_param("overwrite", False)
         localidade, quem = resolver_localidade(self.get_param("localidade", None))
         manter_local = localidade == EXECUTOR
@@ -137,13 +137,13 @@ class DataOutput(BaseNode):
 
         safe_label   = slugify(label)
 
-        # Controle de acesso: so faz sentido para o contexto Artefatos.
-        # Publico → sem credencial; nao-publico → exige credencial Bearer.
+        # Access control: only makes sense for the Artifacts context.
+        # Public → no credential; non-public → requires a Bearer credential.
         create_drive_entry = (context == "drive")
         if create_drive_entry or manter_local:
-            # Conteudo local nao tem download pela plataforma — nao ha o que uma
-            # credencial protegesse, e exigi-la barraria o no por uma promessa
-            # que ele nao faz.
+            # Local content has no download through the platform — there is nothing a
+            # credential would protect, and requiring one would block the node
+            # over a promise it does not make.
             credential_id = None
         elif is_public:
             credential_id = None
@@ -154,8 +154,8 @@ class DataOutput(BaseNode):
                     "Artefato não-público exige uma credencial (webhook_token) para proteger o download."
                 )
 
-        # Busca valor nos inputs (GeoDataFrame > DataFrame > dict/list).
-        # GeoDataFrame eh subclasse de DataFrame, entao testa primeiro.
+        # Looks for a value in the inputs (GeoDataFrame > DataFrame > dict/list).
+        # GeoDataFrame is a subclass of DataFrame, so test it first.
         value = None
         for v in inputs.values():
             if isinstance(v, gpd.GeoDataFrame):
@@ -182,7 +182,7 @@ class DataOutput(BaseNode):
             fmt = "geojson"
             content_type = "application/geo+json"
         else:
-            # DataFrame puro vira lista de records antes de serializar.
+            # A plain DataFrame becomes a list of records before serializing.
             if isinstance(value, pd.DataFrame):
                 value = value.to_dict(orient="records")
             filename = f"{safe_label}.json"
@@ -191,15 +191,15 @@ class DataOutput(BaseNode):
             fmt = "json"
             content_type = "application/json"
 
-        # Antes de qualquer mensagem de destino: e o unico lugar onde quem
-        # montou o fluxo ve o que "Herdar do executor" virou nesta maquina.
+        # Before any destination message: this is the only place where whoever
+        # built the workflow sees what "Herdar do executor" became on this machine.
         self.log(descrever_localidade(localidade, quem))
 
         if manter_local and create_drive_entry:
-            # Grava na pasta sincronizada e deixa o GeoSync catalogar no ciclo
-            # seguinte. NAO emite `__artifact__`: quem cria a linha no Drive e o
-            # GeoSync, e emitir faria o servidor derivar uma s3_key para um
-            # objeto que nunca existiu — a UI ofereceria um download 404.
+            # Writes to the synced folder and lets GeoSync catalog it on the next
+            # cycle. Does NOT emit `__artifact__`: GeoSync is what creates the
+            # Drive row, and emitting would make the server derive an s3_key for
+            # an object that never existed — the UI would offer a 404 download.
             destino = await asyncio.to_thread(
                 salvar_na_pasta_do_geosync,
                 content.encode("utf-8"), filename, workspace_id, overwrite,
@@ -214,11 +214,11 @@ class DataOutput(BaseNode):
                     "artifact_filename": filename,
                     "artifact_format":   fmt,
                     "artifact_features": features,
-                    # O NOME, e nao o caminho absoluto que acabou de ser logado:
-                    # este valor circula pelo workflow e fica gravado no run,
-                    # e um caminho absoluto vazaria a estrutura de diretorios da
-                    # maquina do usuario — mesma razao pela qual
-                    # `local_relative_path` e relativo.
+                    # The NAME, not the absolute path that was just logged:
+                    # this value travels through the workflow and is stored in the
+                    # run, and an absolute path would leak the directory structure
+                    # of the user's machine — the same reason
+                    # `local_relative_path` is relative.
                     "artifact_s3_key":   filename,
                 },
             }
@@ -237,7 +237,7 @@ class DataOutput(BaseNode):
                 credential_id=credential_id,
             )
         else:
-            # Upload para MinIO (com fallback local no executor)
+            # Upload to MinIO (with local fallback on the executor)
             s3_key, artifact_meta = await asyncio.to_thread(
                 upload_artifact_to_minio,
                 content=content.encode("utf-8"),
@@ -250,8 +250,8 @@ class DataOutput(BaseNode):
                 features=features,
                 credential_id=credential_id,
                 create_drive_entry=create_drive_entry,
-                # Sobrescrever so existe no Drive: em Artefatos cada execucao ja tem
-                # a sua propria s3_key (inclui o task_id), entao nao ha colisao.
+                # Overwrite only exists in Drive: in Artifacts each run already has
+                # its own s3_key (includes the task_id), so there is no collision.
                 overwrite=overwrite and create_drive_entry,
             )
         artifact_meta["context"] = context
@@ -264,10 +264,10 @@ class DataOutput(BaseNode):
         elif artifact_meta.get("local_fallback"):
             self.log(f"Dados salvos localmente (executor fallback): {filename} ({fmt})")
         elif create_drive_entry:
-            # `drive_reused` vem do servidor e diz o que aconteceu de fato. A
-            # mensagem anterior anunciava a sobrescrita sempre que a opcao
-            # estivesse ligada, mesmo quando o servidor criou linha nova — que e
-            # exatamente o caso que se precisa enxergar.
+            # `drive_reused` comes from the server and says what actually happened. The
+            # previous message announced the overwrite whenever the option was
+            # on, even when the server created a new row — which is exactly
+            # the case one needs to see.
             if artifact_meta.get("drive_reused"):
                 self.log(f"Arquivo sobrescrito no Drive: {filename} ({fmt})")
             elif overwrite:

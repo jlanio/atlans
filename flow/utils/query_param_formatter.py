@@ -5,47 +5,48 @@ from typing import Any, Dict, List, Tuple
 
 from flow.utils.sql_guard import strip_sql_literals
 
-# Regex pré-compilado para encontrar placeholders :nome
+# Precompiled regex to find :name placeholders
 _PLACEHOLDER_PATTERN = re.compile(r'(?<!:):(?P<key>[A-Za-z_]\w*)\b')
 
 def prepare_query(query: str, params: Dict[str, Any]) -> Tuple[str, List[Any]]:
     """
-    Converte placeholders :chave em $1, $2, ... de forma estável (mesmo placeholder → mesmo índice),
-    e retorna (query_preparada, valores_ordenados).
-    
-    Exemplo:
+    Converts :key placeholders into $1, $2, ... stably (same placeholder → same index),
+    and returns (query_preparada, valores_ordenados).
+
+    Example:
         query = "SELECT * FROM imoveis WHERE id = :id AND bairro = :bairro OR fk_id = :id"
         params = {"id": 5, "bairro": "Centro"}
-    
-    Retorna:
+
+    Returns:
         (
             "SELECT * FROM imoveis WHERE id = $1 AND bairro = $2 OR fk_id = $1",
             [5, "Centro"]
         )
 
-    Só conta como placeholder o que está em posição de CÓDIGO. Antes o regex
-    varria o texto cru, e `:nome` dentro de literal ou comentário era tratado
-    como parâmetro — com dois desfechos, ambos silenciosos para quem escreveu:
+    Only what is in CODE position counts as a placeholder. The regex used to
+    scan the raw text, and `:nome` inside a literal or comment was treated
+    as a parameter — with two outcomes, both silent for the author:
 
         WHERE obs = 'urgente:revisar'      -> "Parâmetro SQL 'revisar' não
-                                              fornecido", e uma query
-                                              perfeitamente válida era recusada.
-        WHERE tag = 'nota:importante'      -> virava `'nota$1'` se existisse um
-                                              parâmetro chamado `importante`: o
-                                              conteúdo do literal era trocado por
-                                              um bind, e a consulta passava a
-                                              filtrar outra coisa.
+                                              fornecido" (SQL parameter not
+                                              provided), and a perfectly valid
+                                              query was rejected.
+        WHERE tag = 'nota:importante'      -> became `'nota$1'` if there was a
+                                              parameter named `importante`: the
+                                              literal's content was replaced by
+                                              a bind, and the query started
+                                              filtering something else.
 
-    O mapa de posições vem de `strip_sql_literals`, que preserva o comprimento
-    da query e apaga só o que é texto — o mesmo scanner que o `sql_guard` usa
-    para não confundir português com comando.
+    The position map comes from `strip_sql_literals`, which preserves the query's
+    length and blanks out only what is text — the same scanner `sql_guard` uses
+    so as not to mistake Portuguese for a command.
     """
-    # Mesmo comprimento da query: o índice de um match aqui vale lá.
+    # Same length as the query: a match index here is valid there.
     mapa = strip_sql_literals(query)
-    if len(mapa) != len(query):  # pragma: no cover - invariante do scanner
-        # Se o mascaramento deixar de preservar o comprimento, as posições
-        # deslizam e os recortes abaixo montam uma query ERRADA em silêncio.
-        # Falhar aqui é a única saída aceitável.
+    if len(mapa) != len(query):  # pragma: no cover - scanner invariant
+        # If the masking stops preserving the length, the positions
+        # shift and the slices below silently build a WRONG query.
+        # Failing here is the only acceptable way out.
         raise RuntimeError(
             "strip_sql_literals não preservou o comprimento da query — "
             "as posições dos placeholders não são confiáveis."
@@ -72,19 +73,19 @@ def prepare_query(query: str, params: Dict[str, Any]) -> Tuple[str, List[Any]]:
 
 
 def resolver_query_params(inputs: Dict[str, Any], parameters: Dict[str, Any]) -> Dict[str, Any]:
-    """Decide entre o `queryParams` recebido do nó anterior e o configurado no nó.
+    """Decides between the `queryParams` received from the previous node and the one configured in the node.
 
-    Vale PRESENÇA, e não veracidade. A forma anterior era
-    `inputs.get('queryParams') or parameters.get('queryParams', {})`, e o `or`
-    tratava `{}` como ausência — mas um dicionário vazio vindo de uma aresta é
-    uma resposta, não um silêncio: significa "não há filtro nenhum". O nó
-    ignorava essa resposta e caía no valor estático, então uma consulta que
-    deveria rodar sem filtro rodava com os filtros antigos, gravados no
-    formulário — e o resultado voltava plausível, só que errado.
+    PRESENCE is what counts, not truthiness. The previous form was
+    `inputs.get('queryParams') or parameters.get('queryParams', {})`, and the `or`
+    treated `{}` as absence — but an empty dictionary coming from an edge is
+    an answer, not silence: it means "there is no filter at all". The node
+    ignored that answer and fell back to the static value, so a query that
+    should run with no filter ran with the old filters, saved in the
+    form — and the result came back plausible, just wrong.
 
-    `inputs` é chaveado pelo `to_key` da aresta (ver executor/core.py), então a
-    chave estar ali significa exatamente que alguém ligou uma aresta apontando
-    para `queryParams`.
+    `inputs` is keyed by the edge's `to_key` (see executor/core.py), so the
+    key being there means exactly that someone connected an edge pointing
+    to `queryParams`.
     """
     veio_da_aresta = 'queryParams' in inputs
     valor = inputs['queryParams'] if veio_da_aresta else parameters.get('queryParams', {})

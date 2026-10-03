@@ -1,12 +1,13 @@
 # tests/unit/test_protocolo_ws.py
-"""Vocabulário do protocolo WS executor ↔ servidor, lado a lado.
+"""Vocabulary of the executor ↔ server WS protocol, side by side.
 
-O servidor responde com `{"type": "error", "reason": ...}` a toda mensagem que
-recusa (JSON inválido, campo obrigatório ausente, capacity inválida, mensagem
-antes do handshake, versão não suportada) — "evita loop onde ele aguarda ACK".
-Só que `error` não estava na allowlist do executor: a resposta caía em
-"Mensagem desconhecida", em DEBUG, e o motivo da recusa só existia no log do
-servidor — que o operador do executor, na máquina do cliente, não vê.
+The server responds with `{"type": "error", "reason": ...}` to every message it
+rejects (invalid JSON, missing required field, invalid capacity, message before
+the handshake, unsupported version) — "avoids a loop where it waits for an ACK".
+Except that `error` was not in the executor's allowlist: the response fell into
+"Mensagem desconhecida" (unknown message), at DEBUG, and the reason for the
+rejection only existed in the server log — which the executor's operator, on the
+customer's machine, does not see.
 """
 import asyncio
 import json
@@ -17,7 +18,7 @@ from executor.connection import ExecutorConnection
 
 
 class _WSQueEntrega:
-    """WebSocket que entrega uma lista fixa de mensagens e grava os envios."""
+    """WebSocket that delivers a fixed list of messages and records what is sent."""
 
     def __init__(self, mensagens):
         self._mensagens = [json.dumps(m) for m in mensagens]
@@ -44,7 +45,7 @@ def _avisos(caplog) -> list[str]:
     ]
 
 
-# ── O bug: a resposta de erro do servidor não chegava a ninguém ──────────────
+# ── The bug: the server's error response reached no one ──────────────────────
 
 async def test_executor_registra_em_warning_o_erro_que_o_servidor_devolve(caplog):
     conn = _conexao()
@@ -75,12 +76,12 @@ async def test_erro_do_servidor_leva_o_detalhe_e_nao_muda_o_estado_da_conexao(ca
     assert conn.terminal_deny is None
 
 
-# ── Truncagem de stats: a regra do servidor e a do executor ──────────────────
+# ── Stats truncation: the server's rule and the executor's ───────────────────
 
 def test_truncagem_de_stats_do_executor_informa_o_tamanho_original(monkeypatch):
-    """Nem as chaves de controle couberam: `__original_size__` tem de ser o do
-    job_result inteiro. O executor gravava ali o tamanho da PRIMEIRA redução —
-    o servidor, na mesma situação, grava o original."""
+    """Not even the control keys fit: `__original_size__` must be the size of the
+    whole job_result. The executor stored there the size of the FIRST reduction —
+    the server, in the same situation, stores the original."""
     monkeypatch.setattr(conn_mod, "_MAX_WS_PAYLOAD", 2_000)
     obj = {
         "type": "job_result", "job_id": "j1", "status": "ok",

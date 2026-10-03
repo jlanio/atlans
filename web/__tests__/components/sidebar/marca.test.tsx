@@ -2,10 +2,11 @@ import { describe, it, expect, beforeAll, afterEach } from "vitest"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 
 /**
- * A marca no trilho de 3rem e o wordmark na gaveta do telefone. No app padrão
- * a marca some inteira recolhida; a Home (`glifoNoTrilho`) mantém o glifo —
- * para o admin ele é o link para Projetos, a única saída explícita da Home —
- * e esconde só o wordmark, em `sr-only` (é o nome do link).
+ * The brand on the 3rem rail and the wordmark in the phone drawer. In the
+ * default app the whole brand disappears when collapsed; Home (`glifoNoTrilho`)
+ * keeps the glyph — for the admin it is the link to Projects, the only explicit
+ * way out of Home — and hides only the wordmark, in `sr-only` (it's the link's
+ * name).
  */
 
 beforeAll(() => {
@@ -65,8 +66,9 @@ describe("Marca", () => {
 
 describe("O wordmark é o nome da instalação", () => {
   it("sem NOME_NA_TELA o código mostra «Atlans»; com ela, o nome da instalação", () => {
-    // A forma com o domínio é a instalação do titular (marca dele, ver
-    // TRADEMARKS.md): não vai no código, vem do ambiente de cada instalação.
+    // The form with the domain is the holder's installation (their brand, see
+    // TRADEMARKS.md): it doesn't go in the code, it comes from each
+    // installation's environment.
     montar(<Marca />)
     expect(screen.getByText("Atlans").getAttribute("title") ?? screen.getByText("Atlans").textContent).toContain("Atlans")
     cleanup()
@@ -78,8 +80,8 @@ describe("O wordmark é o nome da instalação", () => {
 
 describe("TitleSidebar", () => {
   it("no desktop recolhido o wordmark apaga; na gaveta do telefone aparece sempre", () => {
-    // `open` é o estado do DESKTOP; com o cookie `sidebar_state=false` o
-    // wordmark ficava em opacity-0 dentro da gaveta, que só existe aberta.
+    // `open` is the DESKTOP state; with the `sidebar_state=false` cookie the
+    // wordmark sat at opacity-0 inside the drawer, which only exists when open.
     montar(<Marca />, { open: false })
     expect(screen.getByText("Atlans").className).toContain("opacity-0")
     cleanup()

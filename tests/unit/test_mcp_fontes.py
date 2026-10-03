@@ -1,12 +1,12 @@
 # tests/unit/test_mcp_fontes.py
-"""As quatro tools do catálogo de fontes, e as decisões que as cercam.
+"""The four source catalog tools, and the decisions around them.
 
-- **Buscar e descrever** leem a tabela: escopo de workspace, itens leves com o
-  texto de gente em `untrusted_data`, a ficha com o trecho pronto para colar.
-- **Sondar e registrar** falam com a internet — aqui dubladas em
-  `fontes_service.sondar_wfs`, o único ponto por onde a tool sai — e são as
-  duas únicas tools open-world do servidor; nascem SEM clique na Home e
-  liberadas no editor por decisão do dono.
+- **Search and describe** read the table: workspace scope, lightweight items with
+  human-written text in `untrusted_data`, the record with the snippet ready to paste.
+- **Probe and register** talk to the internet — stubbed here in
+  `fontes_service.sondar_wfs`, the only point through which the tool goes out —
+  and are the server's only two open-world tools; they are born WITHOUT a click
+  on the Home screen and enabled in the editor by the owner's decision.
 """
 from __future__ import annotations
 
@@ -55,10 +55,10 @@ async def banco(monkeypatch):
         await criar_usuario(db, "usr-2", "bruno")
         await criar_workspace(db, WS_1, "usr-1", "Principal")
         await criar_workspace(db, WS_2, "usr-2", "De outra conta")
-        # ana é só viewer no workspace de bruno.
+        # ana is only a viewer in bruno's workspace.
         db.add(WorkspaceMember(workspace_id=WS_2, user_id="usr-1", role="viewer"))
         await db.commit()
-        # Plataforma: uma fonte do Vault; workspace 1: uma registrada; workspace 2: uma alheia.
+        # Platform: one Vault source; workspace 1: one registered; workspace 2: someone else's.
         await fs.upsert_fonte(
             db, workspace_id=None, tipo="wfs", url=FUNAI, type_name="Funai:tis_poligonais",
             propriedades={"sortBy": "gid", "version": "2.0.0"}, origem="vault", estado="ok",
@@ -99,7 +99,7 @@ def _sondagem(url, type_name=None, version="2.0.0", *, camadas=("Funai:tis_polig
     return sondagem
 
 
-# ── Guardas e superfícies ─────────────────────────────────────────────────────
+# ── Guards and surfaces ───────────────────────────────────────────────────────
 
 
 def test_as_duas_que_sondam_sao_as_unicas_open_world_e_pagam_o_balde_probe():
@@ -126,7 +126,7 @@ async def test_anotacoes_publicadas_batem_com_a_tabela():
 
 
 def test_sondar_e_registrar_sao_livres_na_home_e_no_editor():
-    """Decisão do dono: catálogo primeiro, mas sondar e guardar não pedem clique."""
+    """Owner's decision: catalog first, but probing and saving don't require a click."""
     assert {"probe_source", "register_source"} <= ag.ESCRITAS_SEM_CLIQUE
     assert not ({"probe_source", "register_source"} & ag.CONFIRMAVEIS_SEMPRE)
     assert not cs.bloqueada_no_editor("probe_source")
@@ -149,13 +149,13 @@ async def test_search_devolve_itens_leves_com_o_texto_de_gente_a_parte(banco):
 async def test_search_respeita_o_escopo_e_avisa_quando_nada_casa(banco):
     tudo = await search_sources(ctx())
     assert {i["type_name"] for i in tudo["items"]} == {"Funai:tis_poligonais", "queimadas:focos_24h"}
-    # O workspace 2 está fora do token: a fonte privada não aparece, mesmo pedida.
+    # Workspace 2 is outside the token: the private source doesn't show, even when requested.
     with pytest.raises(ToolError) as exc:
         await search_sources(ctx(), workspace_id=WS_2)
     assert corpo(exc.value)["code"] == "forbidden"
     vazio = await search_sources(ctx(), query="xyzzy")
     assert vazio["items"] == [] and "probe_source" in vazio["hint"]
-    # Sinônimo: "focos de calor" acha a de "queimadas"; o teto é aparado.
+    # Synonym: "focos de calor" finds the "queimadas" one; the ceiling is trimmed.
     focos = await search_sources(ctx(), query="focos de calor", limit=999)
     assert [i["type_name"] for i in focos["items"]] == ["queimadas:focos_24h"] and focos["limit"] == 50
 
@@ -172,7 +172,7 @@ async def test_search_exige_escopo_de_leitura(banco):
 async def test_describe_traz_o_trecho_pronto_o_esquema_cortado_e_as_dicas(banco):
     item = (await search_sources(ctx(), query="terras"))["items"][0]
     ficha = await describe_source(ctx(), item["id"])
-    # `version` fica no catálogo, não no trecho: o nó ainda não a declara.
+    # `version` stays in the catalog, not in the snippet: the node doesn't declare it yet.
     assert ficha["node_snippet"] == {
         "name": "WFS", "type": "datasource",
         "properties": {"url": FUNAI, "typeName": "Funai:tis_poligonais", "sortBy": "gid"},
@@ -186,7 +186,7 @@ async def test_describe_traz_o_trecho_pronto_o_esquema_cortado_e_as_dicas(banco)
 
 async def test_describe_de_fonte_fora_do_alcance_e_not_found(banco):
     async with infra.sessao() as db:
-        # O id sai de dentro da sessão: o rollback do `finally` expira o objeto.
+        # The id is read inside the session: the `finally` rollback expires the object.
         id_da_privada = (await fs.buscar(db, [WS_2], query="privada"))[0][0].id_hash
     with pytest.raises(ToolError) as exc:
         await describe_source(ctx(), id_da_privada)
@@ -210,9 +210,9 @@ async def test_probe_lista_as_camadas_e_avisa_que_o_endpoint_ja_esta_no_catalogo
 
 
 async def test_probe_nao_dispara_a_busca_descartada(banco, monkeypatch):
-    """Mutacao: devolver a chamada `fontes_service.buscar` descartada em
-    `_fontes_do_endpoint`. Ela nao filtra por URL e o resultado nao era usado —
-    so custava duas queries a mais por probe. O count do endpoint segue certo."""
+    """Mutation: bring back the discarded `fontes_service.buscar` call in
+    `_fontes_do_endpoint`. It doesn't filter by URL and the result was unused —
+    it only cost two extra queries per probe. The endpoint's count stays right."""
     monkeypatch.setattr(fs, "sondar_wfs", AsyncMock(side_effect=lambda u, t=None, v="2.0.0": _sondagem(u, t, v)))
     espiao = AsyncMock(wraps=fs.buscar)
     monkeypatch.setattr(fs, "buscar", espiao)
@@ -240,10 +240,10 @@ async def test_probe_com_camada_descreve_e_atualiza_a_fonte_catalogada(banco, mo
 
 
 async def test_probe_recusa_atualizar_fonte_de_workspace_sem_papel_de_editor(banco, monkeypatch):
-    """Mutacao: remover o exigir_papel do probe (voltar a so checar o escopo).
+    """Mutation: remove exigir_papel from the probe (go back to only checking scope).
 
-    Sondar ATUALIZA o catalogo: um viewer no workspace da fonte nao pode mutar.
-    A fonte 'privada:x' e do WS_2, onde ana e apenas viewer.
+    Probing UPDATES the catalog: a viewer in the source's workspace cannot mutate.
+    The source 'privada:x' belongs to WS_2, where ana is only a viewer.
     """
     monkeypatch.setattr(fs, "sondar_wfs", AsyncMock(
         side_effect=lambda u, t=None, v="2.0.0": _sondagem(u, t, v, camadas=("privada:x",))))
@@ -257,7 +257,7 @@ async def test_probe_recusa_atualizar_fonte_de_workspace_sem_papel_de_editor(ban
 
 
 async def test_probe_atualiza_fonte_de_workspace_com_papel_de_editor(banco, monkeypatch):
-    """Editor no workspace da fonte pode atualiza-la pela sondagem (WS_1)."""
+    """An editor in the source's workspace can update it through probing (WS_1)."""
     monkeypatch.setattr(fs, "sondar_wfs", AsyncMock(
         side_effect=lambda u, t=None, v="2.0.0": _sondagem(u, t, v, camadas=("queimadas:focos_24h",))))
     exemplo = "https://geoserver.exemplo.gov.br/ows"
@@ -269,10 +269,10 @@ async def test_probe_atualiza_fonte_de_workspace_com_papel_de_editor(banco, monk
 
 
 async def test_probe_recusa_atualizar_fonte_de_plataforma_sem_editor_no_alcance(banco, monkeypatch):
-    """Mutacao: nao exigir editor no alcance para fonte de plataforma.
+    """Mutation: not requiring editor within reach for a platform source.
 
-    A fonte FUNAI e de plataforma (global). Um usuario que so e viewer no seu
-    alcance (ana no WS_2) nao pode muta-la pela sondagem.
+    The FUNAI source is a platform one (global). A user who is only a viewer
+    within their reach (ana in WS_2) cannot mutate it through probing.
     """
     monkeypatch.setattr(fs, "sondar_wfs", AsyncMock(side_effect=lambda u, t=None, v="2.0.0": _sondagem(u, t, v)))
     with pytest.raises(ToolError) as exc:
@@ -328,7 +328,7 @@ async def test_register_exige_editor_escopo_de_escrita_e_camada(banco, monkeypat
     monkeypatch.setattr(fs, "sondar_wfs", AsyncMock(side_effect=lambda u, t=None, v="2.0.0": _sondagem(u, t, v)))
     with pytest.raises(ToolError) as exc:
         await register_source(ctx(workspace_ids={WS_2}), FUNAI, "Funai:aldeias_pontos", workspace_id=WS_2)
-    assert corpo(exc.value)["code"] == "forbidden"  # viewer lá
+    assert corpo(exc.value)["code"] == "forbidden"  # viewer there
     with pytest.raises(ToolError) as exc:
         await register_source(ctx(scopes={"workflows:read"}), FUNAI, "Funai:aldeias_pontos")
     assert corpo(exc.value)["code"] == "forbidden_scope"

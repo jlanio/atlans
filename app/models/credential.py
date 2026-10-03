@@ -13,42 +13,43 @@ class Credential(Base):
     __tablename__ = "credentials"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
-    # id_hash: identificador público consistente com demais entidades (Workflow, Schedule, etc.)
-    # Derivado do UUID primário — mantém compatibilidade com rotas existentes que usam UUID.
+    # id_hash: public identifier consistent with the other entities (Workflow, Schedule, etc.)
+    # Derived from the primary UUID — keeps compatibility with existing routes that use UUID.
     id_hash = Column(String(36), unique=True, nullable=False, index=True,
                      default=lambda: str(uuid4()))
     name = Column(String, nullable=False)
     type = Column(String, nullable=False)  # ex: "postgresql", "webhook_token", etc.
     data = Column(JSONB, nullable=False)   # Encrypted key-value data
-    owner_id = Column(String(36), nullable=True, index=True)   # User.id_hash do criador
-    # workspace_id: quando preenchido, a credencial é COMPARTILHADA — visível para
-    # todos os membros daquele workspace, não só para o dono. NULL = credencial
-    # privada do dono (comportamento legado). Ver credential_service.list_* e
+    owner_id = Column(String(36), nullable=True, index=True)   # Creator's User.id_hash
+    # workspace_id: when filled in, the credential is SHARED — visible to all
+    # members of that workspace, not only to the owner. NULL = the owner's
+    # private credential (legacy behavior). See credential_service.list_* and
     # credential_loader.resolve_credentials_from_ids.
     workspace_id = Column(String(36), nullable=True, index=True)
-    # Metadados organizacionais, não-secretos — por isso são colunas próprias e
-    # não entram em `data` (que é cifrado por encrypt_and_store).
+    # Organizational, non-secret metadata — that is why they are their own
+    # columns and do not go into `data` (which is encrypted by encrypt_and_store).
     description = Column(String, nullable=True)
-    tags = Column(JSONB, nullable=True)   # lista de strings
-    # Última vez que a credencial foi RESOLVIDA para execução. Escrito best-effort
-    # pelo resolver (credential_loader); nunca é caminho crítico.
+    tags = Column(JSONB, nullable=True)   # list of strings
+    # Last time the credential was RESOLVED for execution. Written best-effort
+    # by the resolver (credential_loader); never a critical path.
     last_used_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
     @property
     def expires_at(self) -> Optional[datetime]:
-        """Expiração derivada de `data['expires_at']` — não é coluna.
+        """Expiry derived from `data['expires_at']` — it is not a column.
 
-        A expiração sempre viveu dentro do JSONB `data` (texto puro; o
-        encrypt_and_store nunca cifra essa chave), e é de lá que o resolver a
-        aplica. Uma coluna paralela seria uma segunda fonte de verdade que o
-        resolver ignoraria. Expor como property mantém uma fonte só e ainda faz
-        o Pydantic (from_attributes) preencher CredentialOut.expires_at — o selo
-        de expiração na UI dependia disso e vinha sempre nulo.
+        Expiry has always lived inside the `data` JSONB (plain text;
+        encrypt_and_store never encrypts that key), and that is where the
+        resolver enforces it from. A parallel column would be a second source
+        of truth the resolver would ignore. Exposing it as a property keeps a
+        single source and still makes Pydantic (from_attributes) fill in
+        CredentialOut.expires_at — the expiry badge in the UI depended on it
+        and always came back null.
 
-        Devolve None quando ausente ou mal formado; validar/recusar é papel de
-        quem escreve, não de quem lê para exibir.
+        Returns None when absent or malformed; validating/refusing is the
+        writer's job, not the job of whoever reads it for display.
         """
         raw = (self.data or {}).get("expires_at")
         if not raw:
@@ -60,25 +61,26 @@ class Credential(Base):
 
     def encrypt_and_store(self, plain_data: dict):
         for k, v in plain_data.items():
-            # ✅ validação: expires_at deve ser string ISO 8601
+            # ✅ validation: expires_at must be an ISO 8601 string
             if k == "expires_at" and v:
                 try:
                     datetime.fromisoformat(v.replace("Z", "+00:00"))
                 except ValueError:
                     raise ValueError("O campo 'expires_at' deve estar em formato ISO 8601.")
 
-        # Auditoria (SEG-19): NÃO pular a cifragem por prefixo "gAAAA". Os
-        # caminhos legítimos (create/update) sempre passam TEXTO CLARO aqui — o
-        # update decifra o blob atual, mescla e recifra. O único jeito de um
-        # valor chegar já com "gAAAA" era o cliente ENVIAR o texto cifrado de
-        # outra pessoa: sem a cifragem, ele ficava gravado como estava e o
-        # GET /credentials/{id}/data o decifrava com a chave da plataforma —
-        # um oráculo que transformava "tenho o ciphertext" em "tenho o segredo".
-        # Cifrar sempre faz um "gAAAA" enviado virar ciphertext de si mesmo:
-        # decifrar devolve a string "gAAAA…", nunca o segredo alheio.
+        # Audit (SEG-19): do NOT skip encryption based on a "gAAAA" prefix. The
+        # legitimate paths (create/update) always pass PLAINTEXT here — update
+        # decrypts the current blob, merges and re-encrypts. The only way for a
+        # value to arrive already starting with "gAAAA" was the client SENDING
+        # someone else's ciphertext: without encryption, it was stored as is
+        # and GET /credentials/{id}/data decrypted it with the platform key —
+        # an oracle that turned "I have the ciphertext" into "I have the
+        # secret". Always encrypting turns a sent "gAAAA" into a ciphertext of
+        # itself: decrypting returns the string "gAAAA…", never someone
+        # else's secret.
         self.data = {
             k: encrypt_string(v)
-            if isinstance(v, str) and k != "expires_at"  # expires_at NÃO é cifrado
+            if isinstance(v, str) and k != "expires_at"  # expires_at is NOT encrypted
             else v
             for k, v in plain_data.items()
         }

@@ -1,11 +1,11 @@
 "use client"
 
-// Diálogo «Novo token» em 2 passos.
+// "Novo token" dialog in 2 steps.
 //
-// Passo 1 é o formulário (nome, escopos, workspaces, validade). Passo 2 mostra
-// o segredo — a ÚNICA vez que ele aparece — e os snippets para conectar um
-// agente. Os snippets nunca embutem o segredo real: levam `${ATLANS_TOKEN}`,
-// para que copiar um comando e colar num chat ou num README não vaze o token.
+// Step 1 is the form (name, scopes, workspaces, expiry). Step 2 shows the
+// secret — the ONLY time it appears — and the snippets to connect an
+// agent. The snippets never embed the real secret: they carry `${ATLANS_TOKEN}`,
+// so that copying a command and pasting it into a chat or a README doesn't leak the token.
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
@@ -37,12 +37,12 @@ import {
 
 // ── Constantes ───────────────────────────────────────────────────────────────
 
-// O MCP é o desta instalação, no caminho /mcp da API: em produção, o proxy
-// reverso o entrega no próprio host do site; no desenvolvimento, a API responde
-// na porta dela (NEXT_PUBLIC_API_PORT), e o `next dev` não repassa /mcp.
-// getExternalApiUrl() cobre os dois. Os snippets levam URL_DO_MCP no lugar do
-// endereço, e a tela o troca por este; docs/mcp.md traz os mesmos snippets com
-// um domínio de exemplo.
+// The MCP is this installation's, at the API's /mcp path: in production, the
+// reverse proxy serves it on the site's own host; in development, the API answers
+// on its own port (NEXT_PUBLIC_API_PORT), and `next dev` doesn't forward /mcp.
+// getExternalApiUrl() covers both. The snippets carry URL_DO_MCP in place of the
+// address, and the screen replaces it with this one; docs/mcp.md has the same
+// snippets with an example domain.
 export const URL_DO_MCP = "{URL_DO_MCP}"
 
 export function urlDoMcp(): string {
@@ -53,8 +53,8 @@ export function snippetCom(snippet: string, url: string): string {
   return snippet.replaceAll(URL_DO_MCP, url)
 }
 
-// Caminho do documento que descreve escopos, limites e erros do servidor.
-// Texto, não link: o documento mora com o código, não nesta instalação.
+// Path of the document that describes the server's scopes, limits and errors.
+// Text, not a link: the document lives with the code, not in this installation.
 export const DOCS_MCP = "docs/mcp.md"
 
 const VALIDADES: readonly ApiTokenExpiresInDays[] = [30, 90, 180, 365]
@@ -75,8 +75,8 @@ const ESCOPO_ICONES: Record<ApiTokenScope, IconType> = {
 
 type Cliente = "claude" | "mcp-json" | "mcp-remote"
 
-// Strings entre aspas simples de propósito: `${ATLANS_TOKEN}` é texto literal
-// para o shell/JSON do usuário, não interpolação nossa.
+// Single-quoted strings on purpose: `${ATLANS_TOKEN}` is literal text for the
+// user's shell/JSON, not our interpolation.
 export const CLIENTES: { id: Cliente; rotulo: string; snippet: string; nota: string }[] = [
   {
     id: "claude",
@@ -102,7 +102,7 @@ export const CLIENTES: { id: Cliente; rotulo: string; snippet: string; nota: str
   },
 ]
 
-// ── Formulário ───────────────────────────────────────────────────────────────
+// ── Form ─────────────────────────────────────────────────────────────────────
 
 const schema = z
   .object({
@@ -128,11 +128,11 @@ function alternar<T>(lista: readonly T[], item: T): T[] {
 }
 
 /**
- * Copiar para a área de transferência com o «Copiado» de 2 s. O timer é limpo
- * ao rearmar e no unmount: fechar o diálogo antes dos 2 s não pode disparar um
- * setState em componente desmontado. Sem `navigator.clipboard` (http simples,
- * iframe sem permissão) a falha vira uma mensagem — o texto continua
- * selecionável para copiar à mão.
+ * Copy to the clipboard with the 2 s "Copiado". The timer is cleared on re-arm
+ * and on unmount: closing the dialog before the 2 s must not fire a setState on
+ * an unmounted component. Without `navigator.clipboard` (plain http, iframe
+ * without permission) the failure becomes a message — the text stays
+ * selectable for copying by hand.
  */
 function useCopiar() {
   const [copiado, setCopiado] = useState(false)
@@ -160,12 +160,12 @@ function useCopiar() {
 }
 
 interface CreateTokenProps {
-  /** Workspaces do usuário — a lista de caixas do passo 1. */
+  /** The user's workspaces — the list of checkboxes in step 1. */
   workspaces: IWorkspace[]
-  /** Chamado assim que o POST responde: a lista já recebe o token, mesmo que
-   *  o usuário saia do passo 2 pelo X ou pelo Esc. */
+  /** Called as soon as the POST responds: the list already receives the token,
+   *  even if the user leaves step 2 via the X or Esc. */
   onCreated: (token: ApiTokenCreated) => void
-  /** «Concluir» do passo 2 — quem monta o diálogo fecha e desmonta. */
+  /** Step 2's "Concluir" — whoever mounts the dialog closes and unmounts it. */
   onClose: () => void
 }
 
@@ -188,8 +188,8 @@ const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
     },
   })
 
-  // A lista de workspaces pode chegar depois de o diálogo abrir. Enquanto o
-  // usuário não mexeu nas caixas, «todos marcados» continua sendo o padrão.
+  // The workspace list may arrive after the dialog opens. As long as the
+  // user hasn't touched the checkboxes, "all checked" remains the default.
   useEffect(() => {
     if (!form.getFieldState("workspace_ids").isDirty) {
       form.setValue("workspace_ids", idsAtuais)
@@ -208,8 +208,8 @@ const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
       expires_in_days: valores.expires_in_days,
     }
     const res = await GisFlowService.createApiToken(payload)
-    // 422 (validação) e 409 (teto de 20 ativos) chegam com a mensagem do
-    // backend; o diálogo fica aberto para o usuário corrigir.
+    // 422 (validation) and 409 (ceiling of 20 active) arrive with the backend's
+    // message; the dialog stays open for the user to fix.
     if (res.error || !res.data) {
       createToast.error("Não foi possível criar o token", res.error?.message)
       return
@@ -224,13 +224,13 @@ const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
 
   return (
     <DialogContent
-      // Fechar no meio do submit desmonta o componente durante o await e deixa
-      // o usuário sem saber se o token foi criado. As três saídas (Esc,
-      // clique-fora e o X) precisam ser cobertas. No passo 2 o clique-fora
-      // também fica travado: um clique acidental apagaria o segredo que só
-      // aparece uma vez — Esc e o X continuam sendo saídas deliberadas.
+      // Closing in the middle of the submit unmounts the component during the await
+      // and leaves the user not knowing whether the token was created. All three
+      // exits (Esc, click-outside and the X) need to be covered. In step 2
+      // click-outside is also locked: an accidental click would erase the secret
+      // that only appears once — Esc and the X remain deliberate exits.
       bloqueado={isSubmitting}
-      // Com o token na tela, o clique fora não fecha: o segredo aparece uma vez só.
+      // With the token on screen, clicking outside doesn't close: the secret appears only once.
       onInteractOutside={e => { if (criado) e.preventDefault() }}
     >
       <DialogHeader className="pr-6">
@@ -243,14 +243,14 @@ const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
       </DialogHeader>
 
       {criado ? (
-        // `min-w-0`: filho do grid do DialogContent. Sem isto, o segredo (uma
-        // palavra longa) forçaria a largura do grid acima do `max-w-lg`.
+        // `min-w-0`: child of the DialogContent grid. Without this, the secret (one
+        // long word) would force the grid width beyond `max-w-lg`.
         <div className="flex min-w-0 flex-col gap-4 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200">
           <div className="flex flex-col gap-2">
             <p className="text-sm font-medium text-foreground">Seu token</p>
             <div className="flex items-start gap-2">
-              {/* `select-all`: um clique seleciona o segredo inteiro para quem
-                  prefere Ctrl+C; `break-all` porque é uma palavra só. */}
+              {/* `select-all`: one click selects the whole secret for whoever
+                  prefers Ctrl+C; `break-all` because it's a single word. */}
               <code
                 tabIndex={0}
                 aria-label="Segredo do token"
@@ -287,8 +287,8 @@ const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
             <h3 id="tk-conectar-titulo" className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Conectar seu agente
             </h3>
-            {/* Toggle canônico do contrato §1: grupo com aria-pressed, ativo em
-                bg-accent, inativo em muted. */}
+            {/* Canonical toggle from contract §1: group with aria-pressed, active in
+                bg-accent, inactive in muted. */}
             <div
               role="group"
               aria-label="Cliente MCP"
@@ -503,9 +503,9 @@ const CreateToken = ({ workspaces, onCreated, onClose }: CreateTokenProps) => {
 }
 
 /**
- * Cartão de escopo: um botão `aria-pressed` (multi-seleção — cada escopo liga
- * e desliga por si), na mesma moldura do `SelectCard` dos executores, mais o
- * check que diz «este está marcado» quando há vários ligados.
+ * Scope card: an `aria-pressed` button (multi-select — each scope toggles on
+ * and off by itself), in the same frame as the executors' `SelectCard`, plus the
+ * check that says "this one is selected" when several are on.
  */
 function EscopoCard({ escopo, ativo, disabled, onToggle }: {
   escopo: ApiTokenScope

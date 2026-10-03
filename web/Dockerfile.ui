@@ -1,52 +1,52 @@
 # ---------- Base ----------
 FROM node:24-alpine AS base
 WORKDIR /app
-# NEXT_TELEMETRY_DISABLED: o `next build` e o `next dev` mandam telemetria de
-# uso à Vercel por padrão; nenhum build deste repositório a manda.
+# NEXT_TELEMETRY_DISABLED: `next build` and `next dev` send usage telemetry
+# to Vercel by default; no build of this repository sends it.
 ENV CI=true \
     NPM_CONFIG_LOGLEVEL=info \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_AUDIT=false \
     NPM_CONFIG_PROGRESS=false \
     NEXT_TELEMETRY_DISABLED=1
-# Se precisa de libs nativas: descomente
+# If native libs are needed: uncomment
 # RUN apk add --no-cache libc6-compat python3 make g++
 
 # ---------- DEV (hot-reload) ----------
 FROM base AS dev
-# O .npmrc vai junto: é ele que desliga os scripts de instalação dos pacotes
-# (ignore-scripts) — sem ele aqui, o build da imagem os rodaria.
+# The .npmrc goes along: it is what turns off the packages' install scripts
+# (ignore-scripts) — without it here, the image build would run them.
 COPY package*.json .npmrc ./
-# npm install (em vez de npm ci) para aceitar novos pacotes sem regenerar lockfile no host
+# npm install (instead of npm ci) to accept new packages without regenerating the lockfile on the host
 RUN echo ">> npm install (dev)..." && npm install
 COPY . .
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
 
-# ---------- DEPS para build ----------
+# ---------- DEPS for build ----------
 FROM base AS deps
 COPY package*.json .npmrc ./
 RUN echo ">> npm ci (deps)..." && npm ci
 
-# ---------- BUILD (produção) ----------
+# ---------- BUILD (production) ----------
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# `public/` é opcional para o Next, mas o estágio runner copia o diretório
-# inteiro: garante que ele exista mesmo sem nenhum arquivo estático no repo.
+# `public/` is optional for Next, but the runner stage copies the whole
+# directory: this makes sure it exists even with no static file in the repo.
 RUN mkdir -p public
 RUN echo ">> npm run build..." && npm run build
 
-# ---------- RUNNER (produção) ----------
-# `output: "standalone"` (next.config.ts) faz o build gerar `.next/standalone`:
-# o `server.js` e SÓ os módulos que ele importa, resolvidos por file tracing.
-# É isso que entra na imagem — e nada mais.
+# ---------- RUNNER (production) ----------
+# `output: "standalone"` (next.config.ts) makes the build generate `.next/standalone`:
+# `server.js` and ONLY the modules it imports, resolved by file tracing.
+# That is what goes into the image — and nothing else.
 #
-# A versão anterior copiava `.next` INTEIRO, e `.next/cache` (o cache do
-# webpack, ~1,4 GB) ia junto para produção sem nunca ser lido. Depois rodava
-# um segundo `npm ci --omit=dev`, que por vir DEPOIS do COPY do `.next` nunca
-# acertava o cache de camada. O tarball da imagem tinha 731 MB; as duas imagens
-# no servidor somavam 7,5 GB.
+# The previous version copied the ENTIRE `.next`, and `.next/cache` (the
+# webpack cache, ~1.4 GB) went to production along with it without ever being read. Then it ran
+# a second `npm ci --omit=dev`, which, coming AFTER the COPY of `.next`, never
+# hit the layer cache. The image tarball was 731 MB; the two images
+# on the server added up to 7.5 GB.
 FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
@@ -57,11 +57,11 @@ RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-# A licenca do Atlans e os avisos de terceiros vao com a imagem (a AGPL pede a
-# licenca junto de cada copia). Vem do contexto nomeado `raiz` (a raiz do
-# repositorio): `additional_contexts` no compose, `build-contexts: raiz=.` no
-# docker/build-push-action, `--build-context raiz=.` num `docker build` dado
-# na raiz do repositorio (o comando esta no .env.example).
+# The Atlans license and the third-party notices go with the image (the AGPL requires the
+# license alongside every copy). They come from the named context `raiz` (the
+# repository root): `additional_contexts` in compose, `build-contexts: raiz=.` in
+# docker/build-push-action, `--build-context raiz=.` in a `docker build` run
+# at the repository root (the command is in .env.example).
 COPY --from=raiz LICENSE THIRD-PARTY-NOTICES.md ./
 USER nextjs
 EXPOSE 3000

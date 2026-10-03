@@ -1,8 +1,8 @@
-# O formato da definição
+# The definition format
 
-Um workflow é um grafo: `nodes` que fazem alguma coisa e `edges` que levam o
-dado de um para o outro. O que está aqui foi lido do executor e dos schemas do
-servidor, não de documentação. Onde há uma armadilha, ela vem com o motivo.
+A workflow is a graph: `nodes` that do something and `edges` that carry the
+data from one to the other. What is here was read from the executor and from the
+server's schemas, not from documentation. Where there is a pitfall, it comes with the reason.
 
 ```json
 {
@@ -18,59 +18,59 @@ servidor, não de documentação. Onde há uma armadilha, ela vem com o motivo.
 }
 ```
 
-- `id` é livre, só precisa ser único dentro do fluxo. Dois nós com o mesmo id
-  não são um aviso: o executor montaria `{id: nó}` e o último venceria, então a
-  validação recusa a definição inteira (`duplicate_node_id`).
-- `name` tem de bater EXATAMENTE com o `name` do catálogo (`search_nodes`).
-  Nome errado é recusado com o código `unknown_node` — junto com todo o resto
-  que estiver errado, num relatório só.
-- `type` é o grupo do nó no catálogo (`trigger`, `datasource`, `spatial`,
-  `control`, `action`, `output`). Copie o que `describe_node` devolve: é por
-  ele que o servidor sabe quais nós leem parâmetros de execução (ver `inputs`).
-- `position` não afeta a execução, mas sem ela os nós empilham no canto do
-  editor. Use um grid: 320 px na horizontal, 180 na vertical.
+- `id` is free-form; it only needs to be unique within the workflow. Two nodes with the same id
+  are not a warning: the executor would build `{id: nó}` and the last one would win, so
+  validation rejects the whole definition (`duplicate_node_id`).
+- `name` has to match the catalog's `name` EXACTLY (`search_nodes`).
+  A wrong name is rejected with the code `unknown_node` — together with everything else
+  that is wrong, in a single report.
+- `type` is the node's group in the catalog (`trigger`, `datasource`, `spatial`,
+  `control`, `action`, `output`). Copy what `describe_node` returns: that is how
+  the server knows which nodes read run parameters (see `inputs`).
+- `position` does not affect execution, but without it the nodes pile up in the corner of the
+  editor. Use a grid: 320 px horizontally, 180 vertically.
 
-## O relatório vem inteiro, de uma vez
+## The report comes whole, all at once
 
-`validate_workflow` roda um lint estático antes de simular, e ele é
-CUMULATIVO: um nome errado não interrompe a checagem dos outros nós. O que
-volta é `report.errors[]` e `report.warnings[]`, cada item com
+`validate_workflow` runs a static lint before simulating, and it is
+CUMULATIVE: a wrong name does not stop the checking of the other nodes. What
+comes back is `report.errors[]` and `report.warnings[]`, each item with
 `{code, severity, node_id, edge, message}`.
 
-Cinco códigos derrubam a definição (a tool devolve o erro `validation` com o
-`report` junto, e nada é gravado):
+Five codes bring down the definition (the tool returns the `validation` error with the
+`report` attached, and nothing is saved):
 
-| `code` | O que é |
+| `code` | What it is |
 |---|---|
-| `unknown_node` | `name` que não existe no catálogo |
-| `duplicate_node_id` | dois nós com o mesmo `id` |
-| `cycle` | o grafo volta sobre si mesmo |
-| `invalid_credential_id` | `credential_id` que não é UUID |
-| `construction_error` | o executor não conseguiu montar o fluxo |
+| `unknown_node` | a `name` that does not exist in the catalog |
+| `duplicate_node_id` | two nodes with the same `id` |
+| `cycle` | the graph loops back on itself |
+| `invalid_credential_id` | a `credential_id` that is not a UUID |
+| `construction_error` | the executor could not build the workflow |
 
-Os demais códigos (alias inválido, propriedade não declarada, aresta órfã, nó
-inalcançável, `from_key` desconhecido) vêm como erro ou aviso no mesmo
-relatório, sem impedir a leitura do resto. `report.ok` é `false` sempre que há
-qualquer erro; aviso não derruba.
+The other codes (invalid alias, undeclared property, orphan edge, unreachable
+node, unknown `from_key`) come as an error or a warning in the same
+report, without preventing the rest from being read. `report.ok` is `false` whenever there is
+any error; a warning does not bring it down.
 
-Corrija tudo o que o relatório apontou e valide de novo — não uma coisa por
-rodada.
+Fix everything the report pointed out and validate again — not one thing per
+round.
 
 ## `properties` × `parameters`
 
-A definição gravada usa **`properties`**. As tools aceitam os dois nomes como
-sinônimos (em conflito, `parameters` vence), e gravam sempre `properties`.
-Escreva `properties` e não pense mais nisso.
+The saved definition uses **`properties`**. The tools accept both names as
+synonyms (on conflict, `parameters` wins), and always save `properties`.
+Write `properties` and don't think about it again.
 
-## Só o que está declarado sobrevive
+## Only what is declared survives
 
-`BaseNode.validate()` RECONSTRÓI os parâmetros do nó a partir das propriedades
-declaradas no catálogo e **descarta toda chave que não esteja lá**. Uma
-propriedade inventada não vira erro de execução: ela desaparece, e o nó roda
-com o default.
+`BaseNode.validate()` REBUILDS the node's parameters from the properties
+declared in the catalog and **discards every key that is not there**. An
+invented property does not become an execution error: it disappears, and the node runs
+with the default.
 
-Consequência prática: confira o nome de cada propriedade com
-`describe_node` antes de escrever — o `name` aceita uma lista (até 8 por
-chamada), então peça as fichas de todos os nós do fluxo numa chamada só. Um `timeOut` no lugar de `timeout` é
-silenciosamente ignorado — na validação isso aparece como o aviso
-`undeclared_property`, que é fácil de ler e fácil de ignorar. Não ignore.
+Practical consequence: check the name of each property with
+`describe_node` before writing — `name` accepts a list (up to 8 per
+call), so ask for the sheets of all the workflow's nodes in a single call. A `timeOut` in place of `timeout` is
+silently ignored — in validation it shows up as the warning
+`undeclared_property`, which is easy to read and easy to ignore. Don't ignore it.

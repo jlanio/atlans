@@ -1,4 +1,4 @@
-# app/api/routers/telemetry.py  (ou no mesmo arquivo do workflow)
+# app/api/routers/telemetry.py  (or in the same file as the workflow)
 
 import os
 import asyncio
@@ -13,16 +13,16 @@ router = APIRouter()
 @router.websocket("/ws/telemetry")
 async def websocket_telemetry(ws: WebSocket):
     """
-    Rota WebSocket para enviar métricas da VM em tempo real.
-    Autenticação JWT via primeira mensagem (frame de texto com o token),
-    não por query param — evita vazamento do token em logs de proxy.
+    WebSocket route to send VM metrics in real time.
+    JWT authentication via the first message (text frame with the token),
+    not via query param — avoids leaking the token in proxy logs.
 
-    Restrita a admin: são métricas de INFRA do host do servidor (CPU, memória,
-    disco, load). Um usuário comum não tem por que vê-las, e expô-las permite
-    inferir janelas de saturação para timing/DoS.
+    Restricted to admin: these are INFRA metrics of the server host (CPU, memory,
+    disk, load). A regular user has no reason to see them, and exposing them allows
+    inferring saturation windows for timing/DoS.
     """
     if await ws_authenticate(ws, require_role=ROLE_ADMIN) is None:
-        return  # conexão já fechada pela ws_authenticate
+        return  # connection already closed by ws_authenticate
     if not await check_ws_rate_limit(ws, limit=5, period=60):
         return
     try:

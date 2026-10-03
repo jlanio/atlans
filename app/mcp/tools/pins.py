@@ -1,35 +1,38 @@
 # app/mcp/tools/pins.py
 """
-Pins: congelar a saída de um nó para a próxima execução reaproveitar.
+Pins: freezing a node's output for the next run to reuse.
 
-É o que torna barato iterar num fluxo caro. Ajustar o nó final de um pipeline
-que começa com uma consulta de quarenta segundos custa quarenta segundos por
-tentativa; com a consulta fixada, custa o nó final. Um agente que edita fluxos
-sem esta ferramenta paga o fluxo inteiro a cada rodada.
+This is what makes iterating on an expensive workflow cheap. Tweaking the final
+node of a pipeline that starts with a forty-second query costs forty seconds
+per attempt; with the query pinned, it costs the final node. An agent that edits
+workflows without this tool pays for the whole workflow every round.
 
-E, na direção contrária, um pin esquecido faz o fluxo devolver **dado velho sem
-avisar ninguém** — a execução termina verde, com o resultado de ontem. Por isso
-`list_pins` existe mesmo para quem nunca vai fixar nada: é a única maneira de
-um agente descobrir que a resposta que ele está lendo foi congelada.
+And, in the opposite direction, a forgotten pin makes the workflow return
+**stale data without warning anyone** — the run finishes green, with
+yesterday's result. That is why `list_pins` exists even for those who will
+never pin anything: it is the only way for an agent to find out that the
+answer it is reading was frozen.
 
-Três decisões moldam o módulo:
+Three decisions shape the module:
 
-- **`pin_node_output` sempre manda `outputs={}`.** `{}` significa "fixe na
-  próxima execução": o nó roda uma vez e o executor grava o cache. A tool não
-  tem como fabricar um payload de saída legítimo — ela não viu os dados — e o
-  campo é gravado sem filtro do outro lado, então deixá-lo aberto seria deixar
-  um agente injetar conteúdo arbitrário no cache de execução de um fluxo de
-  produção. O despacho coage qualquer outra coisa a `{}` de qualquer forma
+- **`pin_node_output` always sends `outputs={}`.** `{}` means "pin on the next
+  run": the node runs once and the executor writes the cache. The tool has no
+  way to fabricate a legitimate output payload — it has not seen the data —
+  and the field is stored unfiltered on the other side, so leaving it open
+  would let an agent inject arbitrary content into the execution cache of a
+  production workflow. Dispatch coerces anything else to `{}` anyway
   (`workflow_execution_service._safe_pinned_outputs`).
-- **Nó de saída é recusado.** Fixar a saída de um nó que grava arquivo faz o
-  executor reaproveitar o valor congelado e PULAR a gravação: o fluxo termina
-  com sucesso e o arquivo não aparece. O pin fica lá parecendo estar ajudando.
-  A regra vale para os dois transportes — a rota REST passou a recusar no mesmo
-  diff, então não há caminho por onde o pin fantasma ainda entre.
-- **`expired` é relato, não ação.** Quem honra o TTL é o executor, e ele
-  deliberadamente NÃO zera a referência ao expirar (contrato fixado em
-  `tests/unit/test_pin_ciclo_de_vida.py`). Uma tool que "limpasse pins
-  vencidos" quebraria esse contrato; esta relata e deixa a decisão com quem lê.
+- **Output nodes are refused.** Pinning the output of a node that writes a
+  file makes the executor reuse the frozen value and SKIP the write: the
+  workflow finishes successfully and the file does not show up. The pin sits
+  there looking like it is helping. The rule holds for both transports — the
+  REST route started refusing in the same diff, so there is no path left
+  through which the phantom pin can get in.
+- **`expired` is a report, not an action.** Whoever honors the TTL is the
+  executor, and it deliberately does NOT clear the reference on expiry
+  (contract pinned in `tests/unit/test_pin_ciclo_de_vida.py`). A tool that
+  "cleaned up expired pins" would break that contract; this one reports and
+  leaves the decision to the reader.
 """
 from __future__ import annotations
 
@@ -52,7 +55,7 @@ _MENSAGEM_PAPEL_ESCRITA = "Requer papel 'editor' ou superior neste workspace."
 
 
 def _ids_dos_nos(definition: Any) -> set[str]:
-    """Os `id` dos nós que a definition tem agora."""
+    """The `id`s of the nodes the definition has now."""
     if not isinstance(definition, dict):
         return set()
     nos = definition.get("nodes")
@@ -66,26 +69,26 @@ def _ids_dos_nos(definition: Any) -> set[str]:
 
 @ferramenta
 async def list_pins(ctx: Context, workflow_id: str) -> dict:
-    """Os nós deste workflow com a saída congelada.
+    """This workflow's nodes with frozen output.
 
-    Um pin faz a próxima execução reaproveitar a saída gravada em vez de
-    recalcular o nó. Chame isto antes de concluir qualquer coisa sobre um
-    resultado: se o nó que produziu o dado está pinado, o que a execução
-    devolveu pode ser de dias atrás, e nada na resposta da execução diz isso.
+    A pin makes the next run reuse the stored output instead of recomputing
+    the node. Call this before concluding anything about a result: if the node
+    that produced the data is pinned, what the run returned may be days old,
+    and nothing in the run's response says so.
 
-    Cada item traz dois estados que não são a mesma coisa:
+    Each item carries two states that are not the same thing:
 
-    - `cached: false` — o pin foi pedido e o cache ainda não existe. A próxima
-      execução roda o nó normalmente e grava. É o estado logo depois de
-      `pin_node_output`.
-    - `cached: true` — o cache existe, e é ele que as execuções estão usando.
+    - `cached: false` — the pin was requested and the cache does not exist
+      yet. The next run executes the node normally and stores it. It is the
+      state right after `pin_node_output`.
+    - `cached: true` — the cache exists, and it is what runs are using.
 
-    `expired` diz se o prazo passou, e é informativo: o executor **não** apaga
-    o cache ao expirar. `expired: null` significa que há uma data gravada e
-    ela não pôde ser lida — não confunda com "não expira", que é
-    `expires_at: null`.
+    `expired` says whether the deadline has passed, and is informational: the
+    executor does **not** delete the cache on expiry. `expired: null` means a
+    date is stored and could not be read — do not confuse it with "does not
+    expire", which is `expires_at: null`.
 
-    Pins de nós que já foram apagados da definition não aparecem aqui.
+    Pins of nodes already deleted from the definition do not appear here.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
@@ -115,25 +118,28 @@ async def list_pins(ctx: Context, workflow_id: str) -> dict:
 async def pin_node_output(
     ctx: Context, workflow_id: str, node_id: str, ttl_hours: Optional[int] = None
 ) -> dict:
-    """Congela a saída de um nó a partir da próxima execução.
+    """Freezes a node's output starting from the next run.
 
-    O nó roda uma vez mais e o resultado dele é gravado; da execução seguinte
-    em diante, o fluxo reaproveita esse resultado em vez de recalcular. Serve
-    para iterar na parte final de um fluxo caro sem repetir a parte cara.
+    The node runs one more time and its result is stored; from the following
+    run onwards, the workflow reuses that result instead of recomputing. It is
+    for iterating on the final part of an expensive workflow without repeating
+    the expensive part.
 
-    `ttl_hours` é de 1 a 8760 (um ano); omitido, o pin não expira. Quando o
-    prazo passa o executor **não** apaga o cache sozinho — o prazo serve para
-    `list_pins` avisar que aquele dado está velho, e desfixar é decisão de quem
-    lê. Não passe `0`: ele é recusado, porque "zero horas de validade" e "sem
-    validade" são pedidos opostos.
+    `ttl_hours` goes from 1 to 8760 (one year); if omitted, the pin does not
+    expire. When the deadline passes the executor does **not** delete the
+    cache on its own — the deadline is there for `list_pins` to warn that the
+    data is stale, and unpinning is the reader's decision. Do not pass `0`: it
+    is refused, because "zero hours of validity" and "no expiry" are opposite
+    requests.
 
-    Não dá para escolher QUAL valor congelar, de propósito: quem grava é a
-    execução. E nós que produzem arquivo (saída, publicação de mapa, e-mail,
-    resposta de webhook) são recusados — congelar a saída deles faria o
-    executor pular a gravação, e o fluxo terminaria verde sem produzir nada.
+    You cannot choose WHICH value to freeze, on purpose: the run is what
+    stores it. And nodes that produce files (output, map publishing, e-mail,
+    webhook response) are refused — freezing their output would make the
+    executor skip the write, and the workflow would finish green without
+    producing anything.
 
-    Depois de fixar, rode o fluxo uma vez para o cache existir: até lá
-    `list_pins` mostra `cached: false` e nada é reaproveitado.
+    After pinning, run the workflow once for the cache to exist: until then
+    `list_pins` shows `cached: false` and nothing is reused.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:write")
@@ -145,7 +151,7 @@ async def pin_node_output(
         try:
             resultado = await pin_service.fixar_saida(
                 db, wf, node_id,
-                # Sempre `{}`: ver o cabeçalho do módulo.
+                # Always `{}`: see the module header.
                 outputs={},
                 ttl_hours=ttl_hours,
                 user_id=escopo.user_id,
@@ -164,7 +170,7 @@ async def pin_node_output(
                 "fixe o nó que ALIMENTA a saída, não o de saída em si",
             )
         except ValueError as exc:
-            # `_validar_ttl` — faixa ou tipo.
+            # `_validar_ttl` — range or type.
             raise erro("validation", str(exc), "ttl_hours de 1 a 8760, ou omitido")
 
     return envelope({
@@ -174,8 +180,8 @@ async def pin_node_output(
         "expires_at": resultado["expires_at"],
         "ttl_hours": resultado["ttl_hours"],
         "total_pinned": resultado["total_pinned"],
-        # O estado logo depois de fixar é SEMPRE este, e dizê-lo evita a
-        # conclusão errada de que o pin já está valendo.
+        # The state right after pinning is ALWAYS this one, and saying so avoids
+        # the wrong conclusion that the pin is already in effect.
         "cached": False,
         "hint": (
             "o cache ainda não existe: rode o fluxo uma vez para o nó gravar a "
@@ -186,21 +192,21 @@ async def pin_node_output(
 
 @ferramenta
 async def unpin_node_output(ctx: Context, workflow_id: str, node_id: str) -> dict:
-    """Descongela a saída de um nó e apaga o cache dele.
+    """Unfreezes a node's output and deletes its cache.
 
-    A partir da próxima execução o nó volta a rodar de verdade. Use isto
-    quando o dado congelado ficou velho, quando o fluxo mudou de forma que o
-    valor gravado não corresponde mais, ou ao terminar a rodada de edição que
-    motivou o pin — deixar um pin para trás faz o fluxo devolver dado antigo
-    sem nenhum sinal.
+    From the next run on, the node really runs again. Use this when the
+    frozen data has gone stale, when the workflow changed so that the stored
+    value no longer matches, or when finishing the editing round that
+    motivated the pin — leaving a pin behind makes the workflow return old
+    data with no signal at all.
 
-    `outcome` distingue os dois desfechos: `unpinned` (havia pin e ele saiu) e
-    `not_pinned` (não havia nada). Nenhum dos dois é erro.
+    `outcome` distinguishes the two outcomes: `unpinned` (there was a pin and
+    it was removed) and `not_pinned` (there was nothing). Neither is an error.
 
-    Se o cache não puder ser apagado do armazenamento, o pin **mesmo assim**
-    sai e a resposta traz `storage_warning`: o objeto que sobra é recolhido
-    depois, e o que não pode acontecer é o fluxo continuar apontando para um
-    cache que não existe mais.
+    If the cache cannot be deleted from storage, the pin is removed **anyway**
+    and the response carries `storage_warning`: the leftover object is
+    collected later, and what must not happen is the workflow still pointing
+    at a cache that no longer exists.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:write")
@@ -217,15 +223,15 @@ async def unpin_node_output(ctx: Context, workflow_id: str, node_id: str) -> dic
         "node_id": node_id,
         "outcome": resultado["outcome"],
         "total_pinned": resultado["total_pinned"],
-        # `envelope` só omite chave NULA, então a inserção é condicional: um
-        # `storage_warning: None` no topo faria o leitor procurar um problema
-        # que não houve.
+        # `envelope` only omits NULL keys, so the insertion is conditional: a
+        # `storage_warning: None` at the top would make the reader look for a
+        # problem that did not happen.
         **({"storage_warning": aviso} if aviso else {}),
     })
 
 
 def registrar(server) -> None:
-    """Registra as tools deste domínio."""
+    """Registers this domain's tools."""
     server.tool(
         name="list_pins",
         title="Saídas congeladas",

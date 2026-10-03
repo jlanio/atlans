@@ -1,9 +1,9 @@
 # tests/unit/test_fontes_catalogo.py
-"""Catálogo no arranque e verificação periódica por endpoint (app/core/fontes_catalogo.py).
+"""Catalog at startup and periodic per-endpoint verification (app/core/fontes_catalogo.py).
 
-SQLite (arquivo temporário, uma conexão por sessão — o módulo abre sessões em
-paralelo) no lugar do Postgres; `obter_capabilities` dublado — nenhum teste toca
-a rede. O lock Redis vira uma função que registra as chamadas.
+SQLite (temporary file, one connection per session — the module opens sessions in
+parallel) in place of Postgres; `obter_capabilities` doubled — no test touches
+the network. The Redis lock becomes a function that records the calls.
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ from app.services import fontes_vault
 VAULT = Path(__file__).resolve().parents[1] / "fixtures" / "vault"
 
 
-# ── Dublês ───────────────────────────────────────────────────────────────────────
+# ── Doubles ──────────────────────────────────────────────────────────────────────
 
 @pytest.fixture
 async def fabrica(monkeypatch, tmp_path):
@@ -46,10 +46,10 @@ async def fabrica(monkeypatch, tmp_path):
 
 @pytest.fixture
 def lock(monkeypatch):
-    """O lock Redis vira uma lista de chamadas; `lock.livre` decide a resposta.
+    """The Redis lock becomes a list of calls; `lock.livre` decides the answer.
 
-    Um ponto só: o arranque chama `tarefas_periodicas.adquirir_lock`, e o laço
-    periódico também (de dentro de `laco_periodico`)."""
+    A single point: startup calls `tarefas_periodicas.adquirir_lock`, and so does the
+    periodic loop (from inside `laco_periodico`)."""
     estado = SimpleNamespace(chamadas=[], livre=True, soltos=[])
 
     async def _adquirir(chave, ttl):
@@ -66,8 +66,8 @@ def lock(monkeypatch):
 
 @pytest.fixture
 def capabilities(monkeypatch):
-    """`obter_capabilities` dublado: por URL, uma `Capabilities` ou uma exceção.
-    URL sem resposta configurada = endpoint fora do ar (`SondagemError`)."""
+    """`obter_capabilities` doubled: per URL, a `Capabilities` or an exception.
+    A URL with no configured response = endpoint down (`SondagemError`)."""
     estado = SimpleNamespace(respostas={}, chamadas=[])
 
     async def _obter(url, version="2.0.0"):
@@ -140,14 +140,14 @@ async def test_importa_a_pasta_e_verifica_o_pendente_por_endpoint(fabrica, lock,
     for r in registros:
         por_url.setdefault(fs.normalizar_url(r.url), []).append(r.type_name)
     funai = next(u for u in por_url if "funai" in u)
-    capabilities.respostas[funai] = _caps(*por_url[funai])  # só a Funai responde
+    capabilities.respostas[funai] = _caps(*por_url[funai])  # only Funai responds
 
     resumo = await fc.importar_catalogo_no_arranque()
 
     assert resumo.criadas == len(registros) and resumo.erros == []
     assert resumo.ignoradas == {"sem_endpoint_wfs": 2}  # ArcGIS (TIGERweb) e o placeholder (DomiNode)
     assert lock.chamadas == [(fc._LOCK_IMPORTACAO, fc._TTL_LOCK_IMPORTACAO_S)]
-    # UM GetCapabilities por URL distinta, não um por camada.
+    # ONE GetCapabilities per distinct URL, not one per layer.
     assert sorted(capabilities.chamadas) == sorted(por_url)
     estados = await _estados(fabrica)
     assert all(estados[t] == "ok" for t in por_url[funai])
@@ -155,7 +155,7 @@ async def test_importa_a_pasta_e_verifica_o_pendente_por_endpoint(fabrica, lock,
     async with fabrica() as db:
         pendentes = await db.scalar(select(fs.func.count()).where(FonteDeDados.verificada_em.is_(None)))
     assert pendentes == 0
-    # Os sinônimos do Vault (`_sinonimos.md`) foram carregados neste processo.
+    # The Vault synonyms (`_sinonimos.md`) were loaded in this process.
     assert fs.sinonimos_de("unidade de conservação") >= {"uc", "parque", "reserva"}
 
 
@@ -164,7 +164,7 @@ async def test_lock_ocupado_pula_a_importacao_mas_carrega_os_sinonimos(fabrica, 
     lock.livre = False
     assert await fc.importar_catalogo_no_arranque() is None
     assert await _estados(fabrica) == {} and capabilities.chamadas == []
-    # Os sinônimos moram na memória de CADA worker: quem não importou também lê.
+    # The synonyms live in the memory of EACH worker: one that did not import also reads them.
     assert fs._sinonimos_extra.get("terra indigena") == {"ti", "indigena", "aldeia"}
 
 
@@ -177,7 +177,7 @@ async def test_segunda_subida_e_zero_escritas_e_nao_reverifica(fabrica, lock, ca
     segundo = await fc.importar_catalogo_no_arranque()
     assert (segundo.criadas, segundo.atualizadas, segundo.removidas) == (0, 0, 0)
     assert segundo.iguais == primeiro.criadas
-    # Tudo foi verificado há instantes: a verificação inicial não refaz.
+    # Everything was verified moments ago: the initial verification does not redo it.
     assert len(capabilities.chamadas) == sondagens
 
 
@@ -198,14 +198,14 @@ async def test_importacao_que_falha_nao_derruba_a_subida(fabrica, lock, capabili
     monkeypatch.setattr(fs, "importar_pasta", _quebra)
     assert await fc.importar_catalogo_no_arranque() is None
     assert capabilities.chamadas == []
-    # Quem falhou devolve o lock: a próxima subida não espera os 10 min do TTL.
+    # Whoever failed gives the lock back: the next startup does not wait the 10 min TTL.
     assert lock.soltos == [fc._LOCK_IMPORTACAO]
 
 
 async def test_a_importacao_espera_o_schema_e_so_entao_pega_o_lock(fabrica, lock, capabilities, monkeypatch):
-    # A API sobe antes do `alembic upgrade head` (a ordem do guia): sem a
-    # tabela, a importação falhava, prendia o lock e a recriação seguinte da
-    # API pulava — o catálogo nascia vazio. Agora espera a tabela aparecer.
+    # The API starts before `alembic upgrade head` (the guide's order): without the
+    # table, the import failed, held on to the lock and the next recreation of the
+    # API skipped it — the catalog was born empty. Now it waits for the table to appear.
     monkeypatch.setattr(fc, "FONTES_CATALOGO_DIR", str(VAULT))
     monkeypatch.setattr(fc, "FONTES_VERIFICACAO_INTERVAL", 0)
     monkeypatch.setattr(fc, "_INTERVALO_DA_ESPERA_S", 0)
@@ -233,7 +233,7 @@ async def test_sem_schema_ate_o_fim_da_espera_nao_pega_lock_e_fica_para_a_proxim
     monkeypatch.setattr(fc, "_schema_pronto", _nunca)
     assert await fc.importar_catalogo_no_arranque() is None
     assert lock.chamadas == [] and capabilities.chamadas == []
-    # Os sinônimos foram carregados mesmo assim.
+    # The synonyms were loaded anyway.
     assert fs._sinonimos_extra.get("terra indigena") == {"ti", "indigena", "aldeia"}
 
 
@@ -244,7 +244,7 @@ async def test_verificacao_inicial_so_sonda_o_pendente_e_a_periodica_sonda_tudo(
     await _semear(
         fabrica,
         ("https://a.gov.br/ows", "a:x", agora),                        # fresca
-        ("https://b.gov.br/ows", "b:y", None),                         # nunca verificada
+        ("https://b.gov.br/ows", "b:y", None),                         # never verified
         ("https://c.gov.br/ows", "c:z", agora - timedelta(days=2)),    # vencida
     )
     for u, t in (("https://a.gov.br/ows", "a:x"), ("https://b.gov.br/ows", "b:y"), ("https://c.gov.br/ows", "c:z")):
@@ -274,7 +274,7 @@ async def test_falha_de_um_endpoint_nao_para_a_rodada(fabrica, capabilities):
     resumo = await fc.verificar_endpoints()
 
     assert (resumo.endpoints, resumo.ok, resumo.falhando, resumo.fora, resumo.erros) == (3, 1, 1, 1, 1)
-    # Endpoint fora do ar marca `falhando`; exceção inesperada deixa a linha como estava.
+    # An endpoint that is down marks `falhando`; an unexpected exception leaves the row as it was.
     assert await _estados(fabrica) == {"a:x": "ok", "b:y": "falhando", "c:z": "nao_verificada"}
 
 
@@ -305,7 +305,7 @@ async def test_catalogo_vazio_e_uma_rodada_sem_sondagem(fabrica, capabilities):
 
 async def test_intervalo_zero_desliga_o_loop(monkeypatch):
     monkeypatch.setattr(fc, "FONTES_VERIFICACAO_INTERVAL", 0)
-    await asyncio.wait_for(fc.run_verificacao_loop(), 1.0)  # volta na hora, sem dormir
+    await asyncio.wait_for(fc.run_verificacao_loop(), 1.0)  # returns right away, without sleeping
 
 
 async def test_loop_verifica_a_cada_intervalo_com_lock_e_sobrevive_a_erro(lock, monkeypatch):
@@ -315,7 +315,7 @@ async def test_loop_verifica_a_cada_intervalo_com_lock_e_sobrevive_a_erro(lock, 
     async def _rodada(**kw):
         rodadas.append(kw)
         if len(rodadas) == 1:
-            raise RuntimeError("banco fora")   # não derruba o loop
+            raise RuntimeError("banco fora")   # does not bring down the loop
         if len(rodadas) == 3:
             raise asyncio.CancelledError       # o shutdown chega
         return fc.ResumoDaRodada()
@@ -344,8 +344,8 @@ async def test_loop_sem_lock_pula_a_rodada(lock, monkeypatch):
 
 
 # ── Lifespan ─────────────────────────────────────────────────────────────────────
-# O lock em si (SET NX EX no pool, Redis fora = prossegue) e o encerramento de
-# cada tarefa de fundo estão em test_tarefas_de_fundo.py.
+# The lock itself (SET NX EX on the pool, Redis down = proceed) and the shutdown of
+# each background task are in test_tarefas_de_fundo.py.
 
 def test_lifespan_sobe_as_duas_tarefas():
     from app import main

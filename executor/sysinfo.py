@@ -1,20 +1,20 @@
 # executor/sysinfo.py
 """
-Metricas de sistema do executor: hardware, limites de container e consumo do
-proprio processo.
+Executor system metrics: hardware, container limits and the process's own
+consumption.
 
-Extraido de connection.py, onde vivia porque o unico consumidor era o payload
-de `capacity` enviado ao servidor. Com o painel local lendo as mesmas coisas a
-1 Hz, faz mais sentido morar num modulo proprio — e evita que o dashboard
-importe o modulo de rede so para pegar RAM livre.
+Extracted from connection.py, where it lived because the only consumer was the
+`capacity` payload sent to the server. With the local panel reading the same
+things at 1 Hz, it makes more sense to live in its own module — and it keeps the
+dashboard from importing the networking module just to get free RAM.
 
-## Custo das leituras
+## Cost of the reads
 
-Tudo aqui e syscall bloqueante e TODOS os chamadores estao no event loop: o
-painel a 1 Hz (`dashboard/tick.py`) e o `_capacity_loop` a cada 10 s. Por isso a
-memoizacao mora NESTE modulo, e nao em cada chamador — assim ninguem precisa
-lembrar de cachear, e o dado nunca diverge entre o painel e o `capacity` enviado
-ao servidor. Ver `TTL_DISCO_S` e os memos de cgroup mais abaixo.
+Everything here is a blocking syscall and ALL callers are on the event loop: the
+panel at 1 Hz (`dashboard/tick.py`) and `_capacity_loop` every 10 s. That is why
+the memoization lives in THIS module, and not in each caller — that way nobody has
+to remember to cache, and the data never diverges between the panel and the
+`capacity` sent to the server. See `TTL_DISCO_S` and the cgroup memos further down.
 """
 from __future__ import annotations
 
@@ -28,11 +28,11 @@ logger = logging.getLogger("executor.sysinfo")
 
 
 def _read_cgroup_value(path: str) -> int | None:
-    """Lê um valor numérico de um arquivo de cgroup (v1 ou v2)."""
+    """Reads a numeric value from a cgroup file (v1 or v2)."""
     try:
         with open(path) as f:
             val = int(f.read().strip())
-            # cgroup v1 usa 'max' ou valor muito alto para "sem limite"
+            # cgroup v1 uses 'max' or a very large value for "no limit"
             if val >= 2**60:
                 return None
             return val
@@ -40,25 +40,25 @@ def _read_cgroup_value(path: str) -> int | None:
         return None
 
 
-# Fora do Linux /sys/fs/cgroup nao existe e nunca vai existir — este SIM e um
-# fato imutavel, e e ele que gerava dois a quatro FileNotFoundError por segundo
-# no Windows/macOS. A guarda de plataforma resolve esse caso sem cache nenhum.
+# Outside Linux /sys/fs/cgroup does not exist and never will — THIS one is an
+# immutable fact, and it is what generated two to four FileNotFoundErrors per
+# second on Windows/macOS. The platform guard solves that case with no cache.
 _EH_LINUX = sys.platform.startswith("linux")
 
-# Ja os limites do container (RAM total e cota de CPU) NAO sao imutaveis, ao
-# contrario do que este modulo assumia: `docker update --memory/--cpus` e o
-# in-place pod resize do k8s (GA no 1.33) reescrevem /sys/fs/cgroup/* com o
-# container no ar, sem recriar nada nem reiniciar o processo. Com o memo
-# permanente, aumentar o limite de 4 para 16 GiB deixava `ram_available_gb`
-# preso em 0.0 para sempre (limite velho menor que o uso corrente), e reduzir de
-# 4 para 2 GiB fazia o executor anunciar ~2,5 GB de folga que nao existem — no
-# painel, no snapshot do desktop e no `capacity` que decide o dispatch.
+# The container limits (total RAM and CPU quota), on the other hand, are NOT
+# immutable, contrary to what this module assumed: `docker update --memory/--cpus`
+# and k8s in-place pod resize (GA in 1.33) rewrite /sys/fs/cgroup/* with the
+# container live, without recreating anything or restarting the process. With
+# the permanent memo, raising the limit from 4 to 16 GiB left `ram_available_gb`
+# stuck at 0.0 forever (old limit lower than current usage), and lowering it from
+# 4 to 2 GiB made the executor advertise ~2.5 GB of headroom that does not exist —
+# in the panel, in the desktop snapshot and in the `capacity` that drives dispatch.
 #
-# Memo com TTL curto: continua cortando ~97% dos open() por tick (o motivo da
-# otimizacao) e volta a se autocorrigir logo depois de uma mudanca de limite.
+# Memo with a short TTL: still cuts ~97% of the open() calls per tick (the reason
+# for the optimization) and self-corrects shortly after a limit change.
 TTL_CGROUP_S = 30.0
 
-_SEM_LEITURA = float("-inf")  # nunca lido; nao usar 0.0 (monotonic pode ser < TTL)
+_SEM_LEITURA = float("-inf")  # never read; do not use 0.0 (monotonic may be < TTL)
 _cache_ram_total: int | None = None
 _cache_ram_total_em = _SEM_LEITURA
 _cache_cpu_cores: float | None = None
@@ -66,14 +66,14 @@ _cache_cpu_cores_em = _SEM_LEITURA
 
 
 def _get_cgroup_ram_total() -> int | None:
-    """Limite de RAM do container via cgroup v2 ou v1. Memoizado por TTL — ver acima."""
+    """Container RAM limit via cgroup v2 or v1. Memoized with a TTL — see above."""
     global _cache_ram_total, _cache_ram_total_em
     if not _EH_LINUX:
         return None
     agora = time.monotonic()
     if agora - _cache_ram_total_em < TTL_CGROUP_S:
         return _cache_ram_total
-    # cgroup v2, com fallback para v1
+    # cgroup v2, with fallback to v1
     val = _read_cgroup_value("/sys/fs/cgroup/memory.max")
     if val is None:
         val = _read_cgroup_value("/sys/fs/cgroup/memory/memory.limit_in_bytes")
@@ -83,7 +83,7 @@ def _get_cgroup_ram_total() -> int | None:
 
 
 def _get_cgroup_ram_available() -> int | None:
-    """Calcula RAM disponível dentro do container via cgroup."""
+    """Computes the RAM available inside the container via cgroup."""
     limit = _get_cgroup_ram_total()
     if limit is None:
         return None
@@ -99,13 +99,13 @@ def _get_cgroup_ram_available() -> int | None:
 
 
 def _get_cgroup_cpu_cores() -> float | None:
-    """Cota de CPU do container via cgroup v2 ou v1. Memoizada por TTL — ver acima.
+    """Container CPU quota via cgroup v2 or v1. Memoized with a TTL — see above.
 
-    `process_metrics()` chama isto a cada tick do painel: sem o memo eram ate
-    tres `open()` por segundo. Com TTL, um `docker update --cpus` volta a ser
-    percebido em ate 30 s, em vez de deixar `cpu_pct_norm` normalizado pela cota
-    antiga (barra de CPU achatada ou estourando 100 e sendo clampada) para
-    sempre.
+    `process_metrics()` calls this on every panel tick: without the memo it was up
+    to three `open()` calls per second. With the TTL, a `docker update --cpus` is
+    noticed again within 30 s, instead of leaving `cpu_pct_norm` normalized by the
+    old quota (CPU bar flattened, or overflowing 100 and getting clamped)
+    forever.
     """
     global _cache_cpu_cores, _cache_cpu_cores_em
     if not _EH_LINUX:
@@ -124,7 +124,7 @@ def _ler_cgroup_cpu_cores() -> float | None:
         with open("/sys/fs/cgroup/cpu.max") as f:
             parts = f.read().strip().split()
             if parts[0] == "max":
-                return None  # sem limite
+                return None  # no limit
             return round(int(parts[0]) / int(parts[1]), 1)
     except (FileNotFoundError, ValueError, OSError, IndexError):
         pass
@@ -137,13 +137,13 @@ def _ler_cgroup_cpu_cores() -> float | None:
 
 
 def _safe_disk_usage(psutil_mod):
-    """psutil.disk_usage cross-platform com fallback silencioso.
+    """Cross-platform psutil.disk_usage with a silent fallback.
 
-    Windows: alguns bindings C do psutil (notavel: Anaconda 3.12+) estouram
-    `SystemError: argument 1 (impossible<bad format char>)` mesmo com path
-    'C:\\'. Tenta varias formas de root (drive do CWD, SystemDrive, C:\\, .\\)
-    e retorna a primeira que funcionar. Se todas falharem, retorna None —
-    system_info sem disk e melhor que loop de reconexao infinito.
+    Windows: some psutil C bindings (notably: Anaconda 3.12+) blow up with
+    `SystemError: argument 1 (impossible<bad format char>)` even with path
+    'C:\\'. Tries several forms of root (CWD drive, SystemDrive, C:\\, .\\)
+    and returns the first one that works. If all of them fail, returns None —
+    system_info without disk is better than an infinite reconnection loop.
     """
     if os.name == "nt":
         candidates = []
@@ -169,30 +169,30 @@ def _safe_disk_usage(psutil_mod):
 
 
 def _collect_system_info() -> dict | None:
-    """Coleta informações estáticas de hardware (CPU, RAM, disco, OS).
+    """Collects static hardware information (CPU, RAM, disk, OS).
 
-    Dentro de containers Docker/K8s, prioriza limites de cgroup para
-    refletir os recursos efetivamente disponíveis ao container.
+    Inside Docker/K8s containers, prefers cgroup limits so as to
+    reflect the resources actually available to the container.
     """
     try:
         import psutil
         import platform
-        # disk pode ser None se psutil.disk_usage falhar em todos os
-        # candidatos (bug C-binding Windows, permissao negada, etc).
-        # Reportamos 0 nesse caso — melhor que abortar system_info.
+        # disk may be None if psutil.disk_usage fails on all the
+        # candidates (Windows C-binding bug, permission denied, etc).
+        # We report 0 in that case — better than aborting system_info.
         disk = _safe_disk_usage(psutil)
 
-        # CPU: prioriza limite de cgroup, fallback para psutil
+        # CPU: prefers the cgroup limit, fallback to psutil
         cpu_cores = _get_cgroup_cpu_cores() or psutil.cpu_count(logical=True)
 
-        # RAM: prioriza limite de cgroup, fallback para psutil
+        # RAM: prefers the cgroup limit, fallback to psutil
         cgroup_ram = _get_cgroup_ram_total()
         ram_total = cgroup_ram if cgroup_ram else psutil.virtual_memory().total
 
-        # Vai no handshake. O servidor so guarda os campos de SYSTEM_INFO_* (a
-        # allowlist do protocolo, em flow/utils/protocolo_ws.py), cada um com o
-        # tipo do seu grupo: campo novo aqui tem de entrar la, senao e
-        # descartado com um WARNING a cada conexao.
+        # Goes in the handshake. The server only keeps the SYSTEM_INFO_* fields (the
+        # protocol allowlist, in flow/utils/protocolo_ws.py), each with its
+        # group's type: a new field here has to be added there, otherwise it is
+        # discarded with a WARNING on every connection.
         return {
             "hostname":      platform.node(),
             "os_name":       platform.system(),
@@ -207,18 +207,18 @@ def _collect_system_info() -> dict | None:
 
 
 def _disco_dos_artefatos(psutil_mod) -> object | None:
-    """Uso do disco ONDE OS ARTEFATOS SÃO GRAVADOS.
+    """Usage of the disk WHERE THE ARTIFACTS ARE WRITTEN.
 
-    Não é o mesmo que `_safe_disk_usage`, que mede o drive do CWD — no app
-    desktop o CWD é a pasta de instalação e os artefatos vão para o perfil do
-    usuário, que pode estar em outra unidade (a pasta é configurável).
+    Not the same as `_safe_disk_usage`, which measures the CWD drive — in the
+    desktop app the CWD is the install folder and the artifacts go to the user
+    profile, which may be on another drive (the folder is configurable).
 
-    Isto passou a importar de verdade com o modo de localidade local: um
-    artefato marcado para não sair da máquina tem UMA cópia, e ela está aqui.
-    Disco cheio deixa de ser inconveniente e vira perda de dado do cliente.
+    This started to really matter with the local locality mode: an artifact
+    marked not to leave the machine has ONE copy, and it is here. A full disk
+    stops being an inconvenience and becomes loss of customer data.
 
-    Sobe a árvore até achar um diretório existente: a pasta configurada pode
-    ainda não ter sido criada, e `disk_usage` num caminho inexistente levanta.
+    Walks up the tree until it finds an existing directory: the configured folder
+    may not have been created yet, and `disk_usage` on a nonexistent path raises.
     """
     from executor.config import ARTIFACTS_DIR
 
@@ -236,49 +236,49 @@ def _disco_dos_artefatos(psutil_mod) -> object | None:
     return None
 
 
-# ── Cache do disco ───────────────────────────────────────────────────────────
-# Espaço livre em disco é a grandeza mais cara e mais lenta que este módulo
-# mede: são dois `disk_usage` (o do CWD ainda tenta vários candidatos quando o
-# binding do Windows falha) precedidos de até 8 `os.path.isdir` subindo a árvore
-# até achar a pasta de artefatos. Com essa pasta numa unidade de rede ou num HD
-# que dormiu, cada coleta bloqueia por centenas de milissegundos — e ela rodava
-# a 1 Hz DENTRO do event loop, atrasando heartbeat, envio de resultados e
-# recepção de jobs.
+# ── Disk cache ───────────────────────────────────────────────────────────────
+# Free disk space is the most expensive and slowest quantity this module
+# measures: it is two `disk_usage` calls (the CWD one also tries several
+# candidates when the Windows binding fails) preceded by up to 8 `os.path.isdir`
+# calls walking up the tree until it finds the artifacts folder. With that folder
+# on a network drive or on a HDD that went to sleep, each collection blocks for
+# hundreds of milliseconds — and it ran at 1 Hz INSIDE the event loop, delaying
+# the heartbeat, result delivery and job reception.
 #
-# A defesa é recoletar numa thread e servir o valor anterior enquanto ela roda:
-# o event loop NUNCA espera por I/O de disco, nem na primeira coleta (numa
-# unidade pendurada ela travaria a subida inteira do executor — sem heartbeat e
-# sem receber job). Até a primeira coleta pousar, as chaves simplesmente não
-# existem e o painel mostra "—".
+# The defense is to recollect in a thread and serve the previous value while it
+# runs: the event loop NEVER waits on disk I/O, not even on the first collection
+# (on a hung drive it would block the whole executor startup — no heartbeat and
+# no jobs received). Until the first collection lands, the keys simply do not
+# exist and the panel shows "—".
 #
-# Sobre esse cache incidem três limites, e cada um existe por um sintoma:
+# Three limits apply to this cache, and each one exists because of a symptom:
 #
-# 1. TTL adaptativo (`_ttl_do_valor`). Longe do fim do disco, 60 s: é o que tira
-#    a coleta do caminho quente. Perto do fim, 5 s — ver o docstring de
-#    `_ttl_do_valor`.
-# 2. Teto de idade (`IDADE_MAXIMA_DISCO_S`). Passado ele o valor vira
-#    DESCONHECIDO (chaves ausentes -> None -> "—" no painel e no desktop) em vez
-#    de continuar sendo servido como se fosse leitura corrente. Servir dado
-#    velho é aceitável; servir dado velho indistinguível de dado fresco não é,
-#    num gauge cuja única função é avisar antes de o artefato se perder.
-# 3. Prazo da coleta em voo (`TIMEOUT_COLETA_DISCO_S`) com teto de threads
-#    (`MAX_COLETAS_DISCO_EM_VOO`). `psutil.disk_usage` num NFS `hard` mount ou
-#    num FUSE travado NÃO retorna nunca: a thread fica pendurada sem chegar a
-#    soltar o contador. Sem prazo, ela seria um cadeado permanente contra
-#    qualquer tentativa futura; só com prazo, o executor passaria a vazar uma
-#    thread pendurada a cada 30 s para sempre. O teto fecha os dois lados —
-#    algumas tentativas de recuperação e depois o número simplesmente vira
-#    desconhecido, que é a resposta honesta.
+# 1. Adaptive TTL (`_ttl_do_valor`). Far from the disk filling up, 60 s: that is
+#    what takes the collection off the hot path. Close to full, 5 s — see the
+#    `_ttl_do_valor` docstring.
+# 2. Age ceiling (`IDADE_MAXIMA_DISCO_S`). Past it the value becomes
+#    UNKNOWN (missing keys -> None -> "—" in the panel and in the desktop) instead
+#    of continuing to be served as if it were a current reading. Serving stale
+#    data is acceptable; serving stale data indistinguishable from fresh data is
+#    not, in a gauge whose only job is to warn before the artifact is lost.
+# 3. Deadline for the in-flight collection (`TIMEOUT_COLETA_DISCO_S`) with a
+#    thread ceiling (`MAX_COLETAS_DISCO_EM_VOO`). `psutil.disk_usage` on an NFS
+#    `hard` mount or a hung FUSE NEVER returns: the thread stays hung without ever
+#    releasing the counter. Without a deadline, it would be a permanent lock
+#    against any future attempt; with only a deadline, the executor would leak a
+#    hung thread every 30 s forever. The ceiling closes both sides — a few
+#    recovery attempts and then the number simply becomes unknown, which is the
+#    honest answer.
 TTL_DISCO_S = 60.0
 TTL_DISCO_APERTADO_S = 5.0
 
-# Espelha DISCO_BAIXO_GB de desktop/src/shared/disco.ts — o limiar a partir do
-# qual o desktop começa a avisar. Divergir os dois faria o executor deixar de
-# refrescar justamente na faixa em que o alerta é decidido.
+# Mirrors DISCO_BAIXO_GB from desktop/src/shared/disco.ts — the threshold at
+# which the desktop starts warning. If the two diverged, the executor would stop
+# refreshing precisely in the range where the alert is decided.
 DISCO_APERTADO_GB = 5.0
 
-# ~3x o TTL longo: absorve uma coleta lenta e uma falha isolada (a retentativa
-# só vem no vencimento do TTL seguinte) sem chegar a apagar o número.
+# ~3x the long TTL: absorbs one slow collection and one isolated failure (the
+# retry only comes when the next TTL expires) without wiping the number.
 IDADE_MAXIMA_DISCO_S = 180.0
 TIMEOUT_COLETA_DISCO_S = 30.0
 MAX_COLETAS_DISCO_EM_VOO = 3
@@ -286,24 +286,25 @@ MAX_COLETAS_DISCO_EM_VOO = 3
 _disco_lock = threading.Lock()
 _disco_valor: dict = {}
 _disco_expira = 0.0
-_disco_em_voo = 0                   # threads de coleta que ainda não voltaram
-_disco_coletado_em = _SEM_LEITURA   # monotonic da última coleta BEM-SUCEDIDA
-_disco_iniciou_em = _SEM_LEITURA    # monotonic do último disparo de coleta
-_disco_obsoleto_logado = False      # o aviso de obsoleto é avaliado a 1 Hz; logar uma vez
+_disco_em_voo = 0                   # collection threads that have not come back yet
+_disco_coletado_em = _SEM_LEITURA   # monotonic of the last SUCCESSFUL collection
+_disco_iniciou_em = _SEM_LEITURA    # monotonic of the last collection trigger
+_disco_obsoleto_logado = False      # the staleness warning is evaluated at 1 Hz; log it once
 
 
 def _ttl_do_valor(valor: dict) -> float:
-    """TTL adaptativo: curto quando o disco está apertado.
+    """Adaptive TTL: short when the disk is tight.
 
-    A premissa antiga ("nenhuma decisão que este número suporta mudaria com o
-    valor de um minuto atrás") é falsa perto do fim do disco. O toast "Disco
-    quase cheio" (desktop/src/main/ui/notificacoes.ts) existe para avisar ANTES
-    de o workflow falhar ao gravar, e um nó GIS gravando um raster consome os
-    últimos GB em segundos: com 60 s fixos o aviso chegava depois da falha, e o
-    texto ("já podem falhar ao gravar") virava constatação em vez de aviso.
+    The old premise ("no decision this number supports would change with the
+    value from a minute ago") is false close to a full disk. The "Disco
+    quase cheio" (disk almost full) toast (desktop/src/main/ui/notificacoes.ts)
+    exists to warn BEFORE the workflow fails to write, and a GIS node writing a
+    raster eats the last GBs in seconds: with a fixed 60 s the warning arrived
+    after the failure, and the text ("já podem falhar ao gravar") became a
+    statement of fact instead of a warning.
 
-    Longe do limiar o TTL longo continua valendo — é ele que tira o I/O de disco
-    do caminho de 1 Hz.
+    Far from the threshold the long TTL still applies — it is what takes disk I/O
+    off the 1 Hz path.
     """
     livres = [v for k, v in valor.items()
               if k.endswith("_free_gb") and isinstance(v, (int, float))]
@@ -313,18 +314,18 @@ def _ttl_do_valor(valor: dict) -> float:
 
 
 def _coletar_disco(psutil_mod) -> dict:
-    """As syscalls de disco propriamente ditas. Roda FORA do lock."""
+    """The actual disk syscalls. Runs OUTSIDE the lock."""
     metrics: dict = {}
     disk = _safe_disk_usage(psutil_mod)
     if disk is not None:
         metrics["disk_free_gb"] = round(disk.free / (1024**3), 1)
 
-    # Disco dos artefatos, reportado à parte: pode ser outra unidade, e é
-    # a que decide se um workflow consegue gravar o resultado.
+    # Artifacts disk, reported separately: it may be another drive, and it is
+    # the one that decides whether a workflow can write its result.
     #
-    # Em try PRÓPRIO: `_disco_dos_artefatos` importa `executor.config`, e um
-    # ImportError ali derrubaria a coleta inteira. O efeito seria perder também
-    # o disco do sistema por causa desta, em silêncio.
+    # In its OWN try: `_disco_dos_artefatos` imports `executor.config`, and an
+    # ImportError there would bring down the whole collection. The effect would
+    # be to also lose the system disk because of this one, silently.
     try:
         art = _disco_dos_artefatos(psutil_mod)
         if art is not None:
@@ -341,9 +342,9 @@ def _refrescar_disco(psutil_mod) -> None:
     try:
         novo = _coletar_disco(psutil_mod)
     except Exception as exc:
-        # WARNING, não DEBUG: uma pasta de artefatos inacessível era totalmente
-        # silenciosa, e é justamente o caso em que o operador precisa saber que
-        # o número do painel parou de ser confiável.
+        # WARNING, not DEBUG: an inaccessible artifacts folder was completely
+        # silent, and it is precisely the case where the operator needs to know
+        # that the panel's number stopped being reliable.
         logger.warning("Falha ao coletar metricas de disco: %s", exc)
         novo = None
     agora = time.monotonic()
@@ -352,18 +353,18 @@ def _refrescar_disco(psutil_mod) -> None:
             _disco_valor = novo
             _disco_coletado_em = agora
             _disco_obsoleto_logado = False
-        # O TTL renova mesmo na falha: o valor antigo continua servindo (até o
-        # teto de idade) e a próxima tentativa vem no vencimento seguinte, sem
-        # martelar uma unidade que sumiu a cada tick.
+        # The TTL renews even on failure: the old value keeps being served (up to the
+        # age ceiling) and the next attempt comes at the following expiry, without
+        # hammering a drive that disappeared on every tick.
         _disco_expira = agora + _ttl_do_valor(_disco_valor)
         _disco_em_voo = max(_disco_em_voo - 1, 0)
 
 
 def _metricas_de_disco(psutil_mod) -> dict:
-    """Espaço em disco memoizado. Ver a nota acima.
+    """Memoized disk space. See the note above.
 
-    Devolve `{}` (chaves ausentes -> `None` nos consumidores) enquanto a
-    primeira coleta não pousa e sempre que o último valor bom passa de
+    Returns `{}` (missing keys -> `None` in the consumers) until the
+    first collection lands and whenever the last good value is older than
     `IDADE_MAXIMA_DISCO_S`.
     """
     global _disco_em_voo, _disco_expira, _disco_iniciou_em, _disco_obsoleto_logado
@@ -371,10 +372,10 @@ def _metricas_de_disco(psutil_mod) -> dict:
     with _disco_lock:
         vencido = agora >= _disco_expira
         atual = _disco_valor
-        # Enquanto uma coleta está em voo não se dispara outra: numa unidade de
-        # rede pendurada, cada tick abriria uma thread nova. Mas com prazo — uma
-        # coleta que passou de TIMEOUT_COLETA_DISCO_S está pendurada e pode não
-        # voltar nunca, e sem essa saída ela travaria toda tentativa futura.
+        # While a collection is in flight no other is triggered: on a hung network
+        # drive, each tick would open a new thread. But with a deadline — a
+        # collection that went past TIMEOUT_COLETA_DISCO_S is hung and may never
+        # come back, and without this way out it would block every future attempt.
         pendurada = _disco_em_voo > 0 and (agora - _disco_iniciou_em) >= TIMEOUT_COLETA_DISCO_S
         disparar = (
             vencido
@@ -384,10 +385,10 @@ def _metricas_de_disco(psutil_mod) -> dict:
         if disparar:
             _disco_em_voo += 1
             _disco_iniciou_em = agora
-            # Empurra o vencimento JÁ no disparo: se a coleta pendurar e nunca
-            # chegar a `_refrescar_disco`, é isto que impede uma nova thread por
-            # tick. O caminho normal sobrescreve isto ao terminar, então o TTL
-            # curto do disco apertado não é perdido.
+            # Push the expiry forward ALREADY at trigger time: if the collection hangs
+            # and never reaches `_refrescar_disco`, this is what prevents a new
+            # thread per tick. The normal path overwrites this when it finishes, so
+            # the short TTL of a tight disk is not lost.
             _disco_expira = agora + max(_ttl_do_valor(atual), TIMEOUT_COLETA_DISCO_S)
         idade = agora - _disco_coletado_em
         obsoleto = bool(atual) and idade >= IDADE_MAXIMA_DISCO_S
@@ -400,8 +401,8 @@ def _metricas_de_disco(psutil_mod) -> dict:
             threading.Thread(target=_refrescar_disco, args=(psutil_mod,),
                              name="sysinfo-disco", daemon=True).start()
         except Exception as exc:
-            # Sem devolver a vaga aqui, um unico "can't start new thread"
-            # congelaria as metricas de disco pelo resto da vida do processo.
+            # Without returning the slot here, a single "can't start new thread"
+            # would freeze the disk metrics for the rest of the process's life.
             with _disco_lock:
                 _disco_em_voo = max(_disco_em_voo - 1, 0)
                 _disco_expira = 0.0
@@ -420,13 +421,13 @@ def _metricas_de_disco(psutil_mod) -> dict:
 
 
 def _resetar_caches() -> None:
-    """Volta todo o estado memoizado do módulo ao ponto de partida.
+    """Resets all of the module's memoized state to its starting point.
 
-    Existe para os TESTES. Sem isto, o primeiro teste que faz monkeypatch de
-    `_read_cgroup_value` ou de `psutil.disk_usage` deixa o resultado gravado nos
-    globais e contamina todos os seguintes do mesmo processo — inclusive os que
-    nem falam de sysinfo, porque `_get_dynamic_metrics` é chamado de vários
-    lugares. Nada em produção chama isto.
+    Exists for the TESTS. Without it, the first test that monkeypatches
+    `_read_cgroup_value` or `psutil.disk_usage` leaves the result stored in the
+    globals and contaminates all the following ones in the same process — even
+    those that have nothing to do with sysinfo, because `_get_dynamic_metrics` is
+    called from several places. Nothing in production calls this.
     """
     global _cache_ram_total, _cache_ram_total_em, _cache_cpu_cores, _cache_cpu_cores_em
     global _disco_valor, _disco_expira, _disco_em_voo
@@ -448,14 +449,14 @@ def _resetar_caches() -> None:
 
 
 def _get_dynamic_metrics() -> dict:
-    """Coleta métricas dinâmicas de sistema (RAM livre, disco livre).
+    """Collects dynamic system metrics (free RAM, free disk).
 
-    Prioriza limites de cgroup dentro de containers.
+    Prefers cgroup limits inside containers.
 
-    O disco vem do cache (`_metricas_de_disco`); a RAM é lida na hora, porque é
-    leitura barata — `GlobalMemoryStatusEx`, /proc/meminfo ou um arquivo local de
-    cgroup, nada que possa parar numa unidade de rede — e é justamente a métrica
-    que o operador espera ver mexer no painel enquanto um job pesado roda.
+    The disk comes from the cache (`_metricas_de_disco`); RAM is read on the spot,
+    because it is a cheap read — `GlobalMemoryStatusEx`, /proc/meminfo or a local
+    cgroup file, nothing that can get stuck on a network drive — and it is precisely
+    the metric the operator expects to see move in the panel while a heavy job runs.
     """
     try:
         import psutil
@@ -474,10 +475,10 @@ def _get_dynamic_metrics() -> dict:
     return metrics
 
 
-# ── Consumo do proprio processo ──────────────────────────────────────────────
-# psutil.Process().cpu_percent(interval=None) devolve a media desde a chamada
-# ANTERIOR no mesmo objeto — por isso o Process e criado uma vez e guardado.
-# Recriar a cada tick faria toda leitura voltar 0.0.
+# ── Process's own consumption ────────────────────────────────────────────────
+# psutil.Process().cpu_percent(interval=None) returns the average since the
+# PREVIOUS call on the same object — that is why the Process is created once and
+# kept. Recreating it on every tick would make every reading return 0.0.
 _PROC = None
 _PROC_FALHOU = False
 
@@ -499,15 +500,15 @@ def _process() -> object | None:
 
 
 def process_metrics() -> dict:
-    """CPU%, RSS e threads do processo do executor. Nao bloqueia.
+    """CPU%, RSS and threads of the executor process. Non-blocking.
 
-    Uma unica medida cobre a carga inteira: os workers sao corrotinas e o flow
-    engine usa `asyncio.to_thread` no ThreadPoolExecutor do proprio processo
-    (main.py), entao nao ha filhos para somar.
+    A single measurement covers the whole load: the workers are coroutines and the
+    flow engine uses `asyncio.to_thread` on the process's own ThreadPoolExecutor
+    (main.py), so there are no children to add up.
 
-    `cpu_pct` pode passar de 100 (soma das threads); `cpu_pct_norm` divide pelo
-    numero de nucleos para caber numa barra de 0 a 100. Retorna {} se o psutil
-    faltar ou falhar — o painel mostra "—" em vez de derrubar o tick.
+    `cpu_pct` may exceed 100 (sum over threads); `cpu_pct_norm` divides by the
+    number of cores to fit a 0 to 100 bar. Returns {} if psutil is missing
+    or fails — the panel shows "—" instead of bringing down the tick.
     """
     proc = _process()
     if proc is None:
@@ -525,8 +526,8 @@ def process_metrics() -> dict:
             "cpu_cores":    cores,
         }
     except Exception as exc:
-        # Mesmo binding C que quebra disk_usage no Anaconda/Windows pode se
-        # manifestar aqui. Degradar em silencio e melhor que um traceback por
-        # segundo no arquivo de log.
+        # The same C binding that breaks disk_usage on Anaconda/Windows can
+        # show up here. Degrading silently is better than one traceback per
+        # second in the log file.
         logger.debug("Falha ao coletar metricas do processo: %s", exc)
         return {}

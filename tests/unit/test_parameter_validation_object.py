@@ -1,17 +1,17 @@
 """
-Parametros de tipo "object" chegando serializados do canvas.
+Parameters of type "object" arriving serialized from the canvas.
 
-Regressao real: ao configurar um SubWorkflow, a execucao falhava com
+Real regression: when configuring a SubWorkflow, the run failed with
 
     O parametro 'inputsMapping' deve ser um objeto (dict).
 
-O editor de nodes so grava primitivos — `setNodeField` tem assinatura
-(field, value: string | number | boolean) — entao os helpers da UI serializam
-estruturas com JSON.stringify. O valor chegava como str e a checagem
-`isinstance(value, dict)` rejeitava algo que a UI tinha gravado corretamente.
+The node editor only stores primitives — `setNodeField` has the signature
+(field, value: string | number | boolean) — so the UI helpers serialize
+structures with JSON.stringify. The value arrived as a str and the check
+`isinstance(value, dict)` rejected something the UI had stored correctly.
 
-`ports` (SubWorkflowInput/Output) expoe a mesma armadilha por outro lado:
-declara type "object" mas o valor legitimo e uma LISTA.
+`ports` (SubWorkflowInput/Output) exposes the same pitfall from another side:
+it declares type "object" but the legitimate value is a LIST.
 """
 import pytest
 
@@ -22,7 +22,7 @@ def _prop(name="inputsMapping", default=None):
     return [{"name": name, "type": "object", "default": default if default is not None else {}}]
 
 
-# ── O caso que quebrava ──────────────────────────────────────────────────────
+# ── The case that used to break ──────────────────────────────────────────────
 
 def test_dict_serializado_pela_ui_e_aceito():
     out = validate_node_parameters(
@@ -40,7 +40,7 @@ def test_lista_serializada_e_aceita():
 
 
 def test_string_vazia_vira_objeto_vazio():
-    """Campo limpo na UI nao pode derrubar a execucao."""
+    """A field cleared in the UI must not bring down the run."""
     out = validate_node_parameters({"inputsMapping": ""}, _prop())
     assert out["inputsMapping"] == {}
 
@@ -57,7 +57,7 @@ def test_lista_nativa_continua_passando():
     assert out["ports"] == ["a"]
 
 
-# ── Entrada invalida ainda e recusada ────────────────────────────────────────
+# ── Invalid input is still rejected ──────────────────────────────────────────
 
 def test_json_malformado_falha_citando_o_valor():
     with pytest.raises(ValueError, match="JSON válido"):
@@ -65,7 +65,7 @@ def test_json_malformado_falha_citando_o_valor():
 
 
 def test_json_escalar_e_recusado():
-    """'123' decodifica, mas nao e estrutura — nao pode virar parametro object."""
+    """'123' decodes, but it is not a structure — it cannot become an object parameter."""
     with pytest.raises(ValueError, match="objeto"):
         validate_node_parameters({"inputsMapping": "123"}, _prop())
 

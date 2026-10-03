@@ -1,7 +1,7 @@
 # app/core/storage.py
 """
-MinIO/S3 storage backend para o Drive e Artifacts.
-Todas as operacoes de arquivo passam por este modulo.
+MinIO/S3 storage backend for the Drive and Artifacts.
+All file operations go through this module.
 """
 import asyncio
 import hashlib
@@ -16,46 +16,46 @@ from botocore.config import Config as BotoConfig
 logger = get_logger(__name__)
 
 _ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://minio:9000")
-# Endpoint externo para pre-signed URLs (acessivel por executores/browsers fora do Docker)
-# Se nao definido, usa o mesmo endpoint interno
+# External endpoint for pre-signed URLs (reachable by executors/browsers outside Docker)
+# If not set, uses the same internal endpoint
 _EXTERNAL_ENDPOINT = os.getenv("MINIO_EXTERNAL_ENDPOINT", _ENDPOINT)
 
 _BUCKET = os.getenv("MINIO_BUCKET", "atlans-drive")
 _PRESIGN_EXPIRY = int(os.getenv("MINIO_PRESIGN_EXPIRY", "3600"))
 
-# Hosts que so resolvem de dentro do Docker (ou da propria maquina): uma URL
-# pre-assinada gerada com eles e inutil para browser, executor remoto ou MCP.
+# Hosts that only resolve from inside Docker (or from the machine itself): a
+# pre-signed URL generated with them is useless to a browser, remote executor or MCP.
 _HOSTS_LOCAIS = frozenset({"localhost", "127.0.0.1", "::1", "minio"})
 
 
 def endpoint_externo_e_local() -> bool:
-    """True se `MINIO_EXTERNAL_ENDPOINT` nao serve para gerar URLs alcancaveis fora do Docker.
+    """True if `MINIO_EXTERNAL_ENDPOINT` cannot generate URLs reachable outside Docker.
 
-    O default do compose e `http://localhost:9000` — funciona no dev e quebra em
-    silencio em producao: o Drive, os artefatos e o MCP entregam links que so
-    abrem na maquina do servidor. O boot avisa (nao derruba: em dev e o esperado).
-    Vazio tambem conta como local — sem endpoint nao ha URL que preste.
+    The compose default is `http://localhost:9000` — it works in dev and breaks
+    silently in production: the Drive, the artifacts and the MCP hand out links
+    that only open on the server machine. Boot warns (does not fail: in dev it is
+    expected). Empty also counts as local — with no endpoint there is no usable URL.
     """
     valor = (_EXTERNAL_ENDPOINT or "").strip()
     if not valor:
         return True
-    # `urlsplit("minio:9000")` leria "minio" como scheme; sem "://" o host vem depois de "//".
+    # `urlsplit("minio:9000")` would read "minio" as the scheme; without "://" the host comes after "//".
     if "://" not in valor:
         valor = "//" + valor
     try:
-        host = urlsplit(valor).hostname  # ja vem minusculo e sem os colchetes de IPv6
+        host = urlsplit(valor).hostname  # already lowercase and without the IPv6 brackets
     except ValueError:
-        # Endereco que nem parseia (IPv6 malformado, por exemplo): nenhuma URL
-        # pre-assinada vai prestar, entao o aviso vale — e o boot nao cai por isso.
+        # An address that does not even parse (malformed IPv6, for example): no
+        # pre-signed URL will work, so the warning stands — and boot does not fail over it.
         return True
     return not host or host in _HOSTS_LOCAIS
 
 
 def endpoint_externo() -> str:
-    """Valor efetivo de `MINIO_EXTERNAL_ENDPOINT` (cai no interno quando ausente).
+    """Effective value of `MINIO_EXTERNAL_ENDPOINT` (falls back to the internal one when absent).
 
-    Existe para quem so precisa MOSTRAR o endpoint — o aviso de boot em
-    `app/main.py` — sem alcancar o `_EXTERNAL_ENDPOINT` privado deste modulo.
+    Exists for those who only need to SHOW the endpoint — the boot warning in
+    `app/main.py` — without reaching into this module's private `_EXTERNAL_ENDPOINT`.
     """
     return _EXTERNAL_ENDPOINT
 
@@ -67,10 +67,10 @@ _external_client = None
 
 
 def _require_credentials() -> tuple[str, str]:
-    """Le as credenciais do MinIO no momento do uso. Falha fechado se ausentes
-    para nao cair em valor default conhecido publicamente (.env.example) e
-    abrir o bucket administrativo. Lazy para nao quebrar import em ambientes
-    de teste que nao tocam o storage."""
+    """Read the MinIO credentials at the time of use. Fails closed if absent
+    so as not to fall back to a publicly known default value (.env.example) and
+    open the administrative bucket. Lazy so as not to break the import in test
+    environments that do not touch storage."""
     access_key = os.getenv("MINIO_ROOT_USER")
     secret_key = os.getenv("MINIO_ROOT_PASSWORD")
     if not access_key or not secret_key:
@@ -97,7 +97,7 @@ def _get_client():
 
 
 def _get_external_client():
-    """Cliente com endpoint externo para gerar pre-signed URLs acessiveis fora do Docker."""
+    """Client with the external endpoint to generate pre-signed URLs reachable outside Docker."""
     global _external_client
     if _external_client is None:
         access_key, secret_key = _require_credentials()
@@ -113,7 +113,7 @@ def _get_external_client():
 
 
 def ensure_bucket():
-    """Cria o bucket se nao existir. Chamar no startup."""
+    """Create the bucket if it does not exist. Call at startup."""
     client = _get_client()
     try:
         client.head_bucket(Bucket=_BUCKET)
@@ -128,7 +128,7 @@ def ensure_bucket():
 
 
 def upload(key: str, content: bytes, content_type: str = "application/octet-stream") -> str:
-    """Upload direto de bytes para o MinIO. Retorna o MD5 do conteudo."""
+    """Upload bytes directly to MinIO. Returns the MD5 of the content."""
     client = _get_client()
     md5 = hashlib.md5(content).hexdigest()
     client.put_object(
@@ -141,19 +141,19 @@ def upload(key: str, content: bytes, content_type: str = "application/octet-stre
 
 
 def download(key: str) -> bytes:
-    """Download do conteudo completo de um objeto."""
+    """Download the full content of an object."""
     client = _get_client()
     resp = client.get_object(Bucket=_BUCKET, Key=key)
     return resp["Body"].read()
 
 
 def delete(key: str) -> bool:
-    """Remove um objeto do MinIO. Best-effort: nunca levanta, retorna False em falha.
+    """Remove an object from MinIO. Best-effort: never raises, returns False on failure.
 
-    Use `delete_strict` quando a falha for relevante (ex: rollback de delete
-    no DB se o objeto nao for removido do S3). Esta variant existe para call
-    sites onde a falha pode ser ignorada (ex: cleanup periodico que tenta
-    de novo na proxima iteracao).
+    Use `delete_strict` when the failure matters (e.g. rolling back a delete
+    in the DB if the object is not removed from S3). This variant exists for call
+    sites where the failure can be ignored (e.g. a periodic cleanup that tries
+    again on the next iteration).
     """
     client = _get_client()
     try:
@@ -165,19 +165,19 @@ def delete(key: str) -> bool:
 
 
 def delete_strict(key: str, allow_missing: bool = True) -> None:
-    """Remove um objeto do MinIO levantando excecao em falha.
+    """Remove an object from MinIO, raising an exception on failure.
 
-    Atomicidade: usar antes de DELETE no DB. Se levantar, o caller NAO deve
-    apagar o registro — assim o objeto fica retornavel via cleanup periodico
-    na proxima rodada.
+    Atomicity: use before the DELETE in the DB. If it raises, the caller must NOT
+    delete the record — that way the object remains retrievable via the periodic
+    cleanup on the next round.
 
     Args:
-        key: chave do objeto no bucket.
-        allow_missing: se True (default), tratar `NoSuchKey`/404 como sucesso
-            (idempotente — alguem ja deletou). Se False, levanta tambem em 404.
+        key: the object's key in the bucket.
+        allow_missing: if True (default), treat `NoSuchKey`/404 as success
+            (idempotent — someone already deleted it). If False, also raises on 404.
 
     Raises:
-        ClientError: qualquer erro do S3 que nao seja "not found" (se
+        ClientError: any S3 error other than "not found" (if
             `allow_missing=True`).
     """
     client = _get_client()
@@ -193,11 +193,11 @@ def delete_strict(key: str, allow_missing: bool = True) -> None:
 
 
 def list_objects(prefix: str = "", max_keys_per_page: int = 1000):
-    """Itera sobre objetos do bucket com `prefix`. Generator paginado.
+    """Iterate over the bucket's objects with `prefix`. Paginated generator.
 
-    Yields dicts com `key`, `size`, `last_modified`. Usado pela reconciliacao
-    para comparar DB vs estado real do MinIO. Cuidado com memoria: nunca
-    materializa a lista inteira.
+    Yields dicts with `key`, `size`, `last_modified`. Used by reconciliation
+    to compare the DB vs the actual MinIO state. Mind the memory: it never
+    materializes the whole list.
     """
     client = _get_client()
     paginator = client.get_paginator("list_objects_v2")
@@ -211,12 +211,12 @@ def list_objects(prefix: str = "", max_keys_per_page: int = 1000):
 
 
 def list_incomplete_multipart_uploads(prefix: str = ""):
-    """Itera sobre multipart uploads incompletos com `prefix`. Generator.
+    """Iterate over incomplete multipart uploads with `prefix`. Generator.
 
-    Multipart abandonado consome disco no MinIO sem aparecer no DB nem em
-    list_objects. Detectar idade > N horas e abortar para liberar bytes.
+    Abandoned multipart uploads consume disk in MinIO without showing up in the DB
+    or in list_objects. Detect age > N hours and abort to free bytes.
 
-    Yields dicts com `key`, `upload_id`, `initiated`.
+    Yields dicts with `key`, `upload_id`, `initiated`.
     """
     client = _get_client()
     paginator = client.get_paginator("list_multipart_uploads")
@@ -241,7 +241,7 @@ def abort_multipart_upload(key: str, upload_id: str) -> bool:
 
 
 def head(key: str) -> dict | None:
-    """Retorna metadados do objeto (size, md5) ou None se nao existir."""
+    """Return the object's metadata (size, md5) or None if it does not exist."""
     client = _get_client()
     try:
         resp = client.head_object(Bucket=_BUCKET, Key=key)
@@ -256,7 +256,7 @@ def head(key: str) -> dict | None:
 
 
 def presigned_put(key: str, content_type: str = "application/octet-stream", expires: int = _PRESIGN_EXPIRY) -> str:
-    """Gera URL pre-assinada para upload (PUT) — usa endpoint externo (browsers e executores)."""
+    """Generate a pre-signed URL for upload (PUT) — uses the external endpoint (browsers and executors)."""
     client = _get_external_client()
     return client.generate_presigned_url(
         "put_object",
@@ -266,7 +266,7 @@ def presigned_put(key: str, content_type: str = "application/octet-stream", expi
 
 
 def presigned_get(key: str, expires: int = _PRESIGN_EXPIRY, filename: str | None = None) -> str:
-    """Gera URL pre-assinada para download direto (GET). Usa endpoint externo."""
+    """Generate a pre-signed URL for direct download (GET). Uses the external endpoint."""
     client = _get_external_client()
     params = {"Bucket": _BUCKET, "Key": key}
     if filename:
@@ -278,10 +278,10 @@ def presigned_get(key: str, expires: int = _PRESIGN_EXPIRY, filename: str | None
     )
 
 
-# ── Wrappers async ────────────────────────────────────────────────────────────
-# boto3 é síncrono: chamado direto num handler/coroutine, cada round-trip de rede
-# BLOQUEIA o event loop do worker (congelando todas as outras requisições dele).
-# Em contexto async, use SEMPRE estas variantes (rodam a chamada em thread).
+# ── Async wrappers ────────────────────────────────────────────────────────────
+# boto3 is synchronous: called directly in a handler/coroutine, each network round
+# trip BLOCKS the worker's event loop (freezing all its other requests).
+# In an async context, ALWAYS use these variants (they run the call in a thread).
 
 async def upload_async(key: str, content: bytes, content_type: str = "application/octet-stream") -> str:
     return await asyncio.to_thread(upload, key, content, content_type)

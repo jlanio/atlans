@@ -1,7 +1,7 @@
 """
-Buffer com unidade de distância explícita (metros/graus):
-- a camada é reprojetada quando o CRS usa outra unidade;
-- o resultado sempre volta ao CRS de entrada.
+Buffer with an explicit distance unit (meters/degrees):
+- the layer is reprojected when the CRS uses another unit;
+- the result always goes back to the input CRS.
 """
 import math
 
@@ -12,7 +12,7 @@ from shapely.geometry import Point  # noqa: E402
 
 from flow.nodes.spatial.buffer import BufferNode  # noqa: E402
 
-# Brasília — bem dentro da zona UTM 23S (EPSG:32723).
+# Brasília — well inside UTM zone 23S (EPSG:32723).
 LON, LAT = -47.9, -15.8
 UTM_X, UTM_Y = 190_000.0, 8_252_000.0
 
@@ -22,18 +22,18 @@ def _pt(x, y, crs):
 
 
 def _area_m2(gdf):
-    """Área em m² independente do CRS de saída."""
+    """Area in m² regardless of the output CRS."""
     metric = gdf if gdf.crs and not gdf.crs.is_geographic else gdf.to_crs(gdf.estimate_utm_crs())
     return float(metric.geometry.area.iloc[0])
 
 
 def _expected_area(radius_m, quad_segs=8):
-    """Área do polígono regular que o Shapely gera com `quad_segs` por quadrante."""
+    """Area of the regular polygon Shapely generates with `quad_segs` per quadrant."""
     n = quad_segs * 4
     return 0.5 * n * radius_m**2 * math.sin(2 * math.pi / n)
 
 
-# ── Camada geográfica (EPSG:4326) ─────────────────────────────────────────────
+# ── Geographic layer (EPSG:4326) ──────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_metros_em_camada_geografica_reprojeta_e_volta():
@@ -41,7 +41,7 @@ async def test_metros_em_camada_geografica_reprojeta_e_volta():
     node = BufferNode("n", {"distance": 100, "distanceUnit": "meters"})
     out = (await node.execute({"input": gdf}))["output"]
 
-    assert out.crs.to_epsg() == 4326  # volta ao CRS de entrada
+    assert out.crs.to_epsg() == 4326  # back to the input CRS
     assert _area_m2(out) == pytest.approx(_expected_area(100), rel=0.02)
 
 
@@ -68,7 +68,7 @@ async def test_metros_em_camada_metrica_nao_reprojeta():
     out = (await node.execute({"input": gdf}))["output"]
 
     assert out.crs.to_epsg() == 32723
-    # Sem ida-e-volta de reprojeção, a área bate com precisão bem maior.
+    # Without a reprojection round trip, the area matches with much higher precision.
     assert float(out.geometry.area.iloc[0]) == pytest.approx(_expected_area(100), rel=1e-6)
 
 
@@ -79,11 +79,11 @@ async def test_graus_em_camada_metrica_volta_ao_crs_de_entrada():
     out = (await node.execute({"input": gdf}))["output"]
 
     assert out.crs.to_epsg() == 32723
-    # 0.001° ≈ 111 m — ordem de grandeza confirma que o buffer foi em graus.
+    # 0.001° ≈ 111 m — the order of magnitude confirms the buffer was in degrees.
     assert _area_m2(out) == pytest.approx(_expected_area(111), rel=0.05)
 
 
-# ── Validação ─────────────────────────────────────────────────────────────────
+# ── Validation ────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_unidade_invalida_da_erro():

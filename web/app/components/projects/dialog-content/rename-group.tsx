@@ -18,14 +18,14 @@ interface RenameGroupProps {
 }
 
 /**
- * Renomear grupo e editar a descrição.
+ * Rename a group and edit its description.
  *
- * O `PUT /workflow-groups/{id}` existe desde sempre e a tela nunca o usou: dava
- * para criar e excluir, e um nome errado só se corrigia recriando o grupo e
- * movendo tudo de novo.
+ * `PUT /workflow-groups/{id}` has always existed and the screen never used it:
+ * you could create and delete, and a wrong name could only be fixed by
+ * recreating the group and moving everything again.
  *
- * Mesmo schema do formulário de criação — os campos são os mesmos, e duas
- * validações separadas divergiriam na primeira mudança.
+ * Same schema as the creation form — the fields are the same, and two separate
+ * validations would diverge on the first change.
  */
 const RenameGroup = ({ group, onSubmit, onDone }: RenameGroupProps) => {
   const [loading, setLoading] = useState(false)

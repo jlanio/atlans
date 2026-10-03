@@ -1,20 +1,20 @@
 "use client"
 
 /**
- * Editor estruturado do `sort_by` do nó Ordenar.
+ * Structured editor for the Sort (Ordenar) node's `sort_by`.
  *
- * Antes o campo era `object` cru: a pessoa digitava
- * `[{"field":"area","direction":"desc"}]` num editor de JSON — hostil mesmo
- * sem sugestão, e sem lugar para oferecer as colunas conhecidas. Aqui cada
- * critério é uma linha campo+direção, com as colunas da última execução a um
- * clique.
+ * The field used to be a raw `object`: the person typed
+ * `[{"field":"area","direction":"desc"}]` into a JSON editor — hostile even
+ * without suggestions, and with no place to offer the known columns. Here each
+ * criterion is a field+direction row, with the last execution's columns one
+ * click away.
  *
- * É um FIELD, não um helper: os campos irmãos do nó continuam visíveis ao
- * lado (a mesma razão registrada no cabeçalho do chips-field).
+ * It is a FIELD, not a helper: the node's sibling fields stay visible
+ * alongside (the same reason recorded in the chips-field header).
  *
- * O valor persiste como a MESMA lista `[{field, direction}]` que o execute do
- * backend já lê — nada de formato novo: um fluxo salvo pelo editor de JSON
- * abre aqui, e um salvo aqui roda em executor antigo.
+ * The value persists as the SAME `[{field, direction}]` list the backend's
+ * execute already reads — no new format: a workflow saved by the JSON editor
+ * opens here, and one saved here runs on an old executor.
  */
 import { Button } from "@/app/components/ui/button"
 import { Input } from "@/app/components/ui/input"
@@ -36,7 +36,7 @@ export interface CriterioDeOrdenacao {
   direction: "asc" | "desc"
 }
 
-/** Lê o valor salvo, venha como lista (ObjectField/definition) ou JSON-string. */
+/** Reads the saved value, whether it comes as a list (ObjectField/definition) or a JSON string. */
 export function lerCriterios(bruto: unknown): CriterioDeOrdenacao[] {
   let lista: unknown = bruto
   if (typeof bruto === "string" && bruto.trim().startsWith("[")) {
@@ -60,16 +60,16 @@ type SortByFieldProps = FieldProps<{
 const SortByField = ({ field, values, setNodeField, sugestoes = [], sugestoesDesatualizadas = false, sugestoesParciais = false }: SortByFieldProps) => {
   const criterios = lerCriterios(values?.[field.name])
 
-  // A lista REAL, não JSON-string: é o que o execute lê hoje — e o cast é o
-  // mesmo do SetFieldsHelper, porque `setNodeField` só tipa escalares.
+  // The REAL list, not a JSON string: it is what execute reads today — and the
+  // cast is the same as in SetFieldsHelper, because `setNodeField` only types scalars.
   const gravar = (next: CriterioDeOrdenacao[]) =>
     setNodeField(field.name, next as unknown as string)
 
   const editar = (idx: number, mudanca: Partial<CriterioDeOrdenacao>) =>
     gravar(criterios.map((c, i) => (i === idx ? { ...c, ...mudanca } : c)))
 
-  // Clique numa sugestão: preenche a primeira linha vazia ou abre uma nova —
-  // nunca substitui o que já foi digitado.
+  // Click on a suggestion: fills the first empty row or opens a new one —
+  // never replaces what has already been typed.
   function escolher(nome: string) {
     const vazia = criterios.findIndex(c => c.field.trim() === "")
     if (vazia >= 0) editar(vazia, { field: nome })

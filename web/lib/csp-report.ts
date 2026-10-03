@@ -1,19 +1,19 @@
 /**
- * Relatos de violação da CSP, nos dois formatos que o navegador manda:
- *   - `report-uri`: um objeto `{ "csp-report": {...} }` por POST (chaves em kebab-case);
- *   - `report-to`:  uma lista `[{ type: "csp-violation", body: {...} }]` (camelCase).
- * Só o que decide a política sai daqui — o resto do relato é ruído no log.
+ * CSP violation reports, in the two formats the browser sends:
+ *   - `report-uri`: one `{ "csp-report": {...} }` object per POST (kebab-case keys);
+ *   - `report-to`:  a list `[{ type: "csp-violation", body: {...} }]` (camelCase).
+ * Only what decides the policy comes out of here — the rest of the report is log noise.
  */
 export interface ViolacaoCsp {
   documento: string;
   diretiva: string;
   bloqueado: string;
-  /** `arquivo:linha` quando o navegador informa; nulo caso contrário. */
+  /** `file:line` when the browser provides it; null otherwise. */
   origem: string | null;
   disposicao: string;
 }
 
-// Endpoint público: um POST forjado não pode virar um log gigante.
+// Public endpoint: a forged POST must not turn into a giant log.
 const TETO_POR_POST = 20;
 const TETO_DO_CAMPO = 512;
 
@@ -33,8 +33,8 @@ function deRelato(r: Record<string, unknown>): ViolacaoCsp | null {
     diretiva,
     bloqueado: texto(r["blocked-uri"] ?? r.blockedURL) ?? "",
     origem: arquivo ? (typeof linha === "number" ? `${arquivo}:${linha}` : arquivo) : null,
-    // A política é bloqueante: relato sem o campo (formato antigo do
-    // report-uri, ou forjado) é do modo em vigor.
+    // The policy is blocking: a report without the field (old report-uri
+    // format, or forged) belongs to the mode in force.
     disposicao: texto(r.disposition) ?? "enforce",
   };
 }

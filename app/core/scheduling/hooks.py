@@ -1,7 +1,7 @@
 # app/core/scheduling/hooks.py
 """
-Hook de agendamento: cria/atualiza schedules ao salvar um workflow.
-Fonte canônica — importar daqui diretamente.
+Scheduling hook: creates/updates schedules when a workflow is saved.
+Canonical source — import directly from here.
 """
 from app.core.constants import FUSO_PADRAO_DO_AGENDAMENTO
 from app.core.exceptions import InvalidScheduleError
@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 
 
 def extract_schedule_node(definition: dict) -> dict | None:
-    """Retorna o primeiro nó ScheduleTrigger encontrado na definição, ou None."""
+    """Return the first ScheduleTrigger node found in the definition, or None."""
     for node in definition.get("nodes", []):
         if node.get("type") == "trigger" and node.get("name") == "ScheduleTrigger":
             return node
@@ -22,12 +22,13 @@ def extract_schedule_node(definition: dict) -> dict | None:
 
 
 def disable_schedule_node(definition: dict) -> bool:
-    """Desliga o ScheduleTrigger na própria definition. Devolve se havia um.
+    """Turn off the ScheduleTrigger in the definition itself. Returns whether there was one.
 
-    Regra comum a duplicar e a mover: o workflow derivado nasce desligado, para
-    não disparar sozinho antes de o usuário revisá-lo. Desligar na definition (e
-    não só na tabela) mantém canvas e schedule coerentes — `apply_schedule_if_needed`
-    lê o `active` do nó, então o que o usuário vê no canvas é o que vale.
+    Rule shared by duplicate and move: the derived workflow is born turned off, so
+    it does not fire on its own before the user reviews it. Turning it off in the
+    definition (and not only in the table) keeps canvas and schedule consistent —
+    `apply_schedule_if_needed` reads the node's `active`, so what the user sees on
+    the canvas is what counts.
     """
     node = extract_schedule_node(definition)
     if node is None:
@@ -37,36 +38,40 @@ def disable_schedule_node(definition: dict) -> bool:
 
 
 def _update_de_active(ativar: bool) -> dict:
-    """Campos a gravar no Schedule ao ligar/desligar o agendamento.
+    """Fields to write to the Schedule when turning scheduling on/off.
 
-    Alias fino de `campos_de_ativacao` (a fonte canônica mora em
-    `schedule_service`, junto do `update_schedule` que a rota REST e a tool MCP
-    usam). Mantido pelo nome antigo para não tocar os chamadores deste módulo.
-    Religar zera `next_run_at` de propósito — ver a docstring da função canônica.
+    Thin alias of `campos_de_ativacao` (the canonical source lives in
+    `schedule_service`, next to the `update_schedule` that the REST route and the
+    MCP tool use). Kept under the old name so the callers of this module are not
+    touched. Turning it back on resets `next_run_at` on purpose — see the
+    canonical function's docstring.
     """
     return campos_de_ativacao(ativar)
 
 
 async def sync_schedules_with_workflow_state(workflow: Workflow, db_session) -> None:
-    """Alinha `Schedule.active` ao `flag_ative` do workflow.
+    """Align `Schedule.active` with the workflow's `flag_ative`.
 
-    Chamada por todo caminho que liga/desliga o workflow SEM passar pela
-    definition: o switch "Ativado/Inativo" da lista de projetos (`PUT
-    /workflows/{id}` só com `flag_ative`) e o override do admin. Nenhum dos dois
-    tocava em schedules, então desativar um workflow deixava o Schedule ativo no
-    banco e o AsyncScheduler seguia tentando disparar a cada ocorrência do cron,
-    colhendo `WorkflowInactiveError` num loop que só existia no log de erro.
+    Called by every path that turns the workflow on/off WITHOUT going through the
+    definition: the "Ativado/Inativo" (Enabled/Inactive) switch in the project
+    list (`PUT /workflows/{id}` with only `flag_ative`) and the admin override.
+    Neither of them touched schedules, so deactivating a workflow left the
+    Schedule active in the database and the AsyncScheduler kept trying to fire on
+    every cron occurrence, reaping `WorkflowInactiveError` in a loop that only
+    existed in the error log.
 
-    Na reativação quem manda é o `active` do nó ScheduleTrigger — o que o
-    usuário vê no canvas, e a mesma fonte que `apply_schedule_if_needed` usa.
-    Religar tudo às cegas ressuscitaria o agendamento que o dono tinha desligado
-    no editor antes de desativar o workflow. Sem nó na definition não há
-    agendamento legítimo: o que sobrou no banco fica desligado.
+    On reactivation, the ScheduleTrigger node's `active` is what decides — what
+    the user sees on the canvas, and the same source `apply_schedule_if_needed`
+    uses. Blindly turning everything back on would resurrect the schedule the
+    owner had turned off in the editor before deactivating the workflow. With no
+    node in the definition there is no legitimate schedule: whatever is left in
+    the database stays off.
 
-    Lê `properties.active` direto de `workflow.definition`, sem descriptografar:
-    a criptografia cobre `connectionString`, e `decrypt_workflow_connections`
-    grava no dict recebido — chamá-la aqui marcaria a definition como suja na
-    sessão e o commit seguinte salvaria o texto claro no banco.
+    Reads `properties.active` directly from `workflow.definition`, without
+    decrypting: encryption covers `connectionString`, and
+    `decrypt_workflow_connections` writes into the dict it receives — calling it
+    here would mark the definition as dirty in the session and the next commit
+    would save the plaintext to the database.
     """
     crud = ScheduleService(db_session).schedule_crud
     existentes = await crud.get_by_workflow_hash(workflow.id_hash)
@@ -85,10 +90,10 @@ async def sync_schedules_with_workflow_state(workflow: Workflow, db_session) -> 
 
 
 def _campo_cron_norm(campo: str) -> str:
-    """Normaliza um campo do cron para comparação: "09" -> "9", "4,2" -> "2,4".
+    """Normalize a cron field for comparison: "09" -> "9", "4,2" -> "2,4".
 
-    Só toca em campos que são lista de inteiros puros — curingas, faixas e
-    passos ("*", "1-5", "*/15") ficam intactos (comparados literalmente).
+    Only touches fields that are lists of plain integers — wildcards, ranges and
+    steps ("*", "1-5", "*/15") stay intact (compared literally).
     """
     partes = campo.split(",")
     if partes and all(p.isdigit() for p in partes):
@@ -97,28 +102,29 @@ def _campo_cron_norm(campo: str) -> str:
 
 
 def _cron_normalizado(expr: str | None) -> str | None:
-    """Forma canônica de um cron para o comparador de configuração."""
+    """Canonical form of a cron for the configuration comparator."""
     if not expr:
         return None
     campos = expr.strip().split()
     if len(campos) != 5:
-        return expr.strip()   # não é um cron de 5 campos: compara literal
+        return expr.strip()   # not a 5-field cron: compare literally
     return " ".join(_campo_cron_norm(c) for c in campos)
 
 
 def _mesma_configuracao(atual: Schedule, desejado: ScheduleCreate) -> bool:
-    """Compara só o que define QUANDO o agendamento dispara.
+    """Compare only what defines WHEN the schedule fires.
 
-    `active` fica de fora de propósito — mudar de ativo para inativo não deve
-    recriar o schedule, só alternar a flag. E cada estratégia olha apenas os
-    seus campos: o nó ScheduleTrigger sempre envia os defaults de todas elas
-    (interval=60, unit="minutes"), enquanto `create_schedule` zera os que não
-    pertencem à estratégia escolhida. Comparar tudo daria diferente sempre.
+    `active` is left out on purpose — changing from active to inactive must not
+    recreate the schedule, only toggle the flag. And each strategy looks only at
+    its own fields: the ScheduleTrigger node always sends the defaults of all of
+    them (interval=60, unit="minutes"), while `create_schedule` clears the ones
+    that do not belong to the chosen strategy. Comparing everything would always
+    differ.
 
-    O cron é comparado NORMALIZADO ("00 09 * * *" == "0 9 * * *", "... 4,2" ==
-    "... 2,4"): croniter trata as duas formas de modo idêntico, então tê-las
-    como "diferentes" recriaria o schedule à toa — o que zera `next_run_at` e
-    faz a ocorrência do dia ser pulada.
+    The cron is compared NORMALIZED ("00 09 * * *" == "0 9 * * *", "... 4,2" ==
+    "... 2,4"): croniter treats both forms identically, so treating them as
+    "different" would recreate the schedule for nothing — which resets
+    `next_run_at` and makes the day's occurrence be skipped.
     """
     if atual.strategy != desejado.strategy:
         return False
@@ -138,22 +144,22 @@ async def apply_schedule_if_needed(
     workflow: Workflow, definition: dict, db_session,
 ) -> list[ScheduleNotice]:
     """
-    Sincroniza os agendamentos do workflow com sua definição atual.
+    Sync the workflow's schedules with its current definition.
 
-    - Sem ScheduleTrigger na definição: remove os agendamentos existentes. Sem
-      isso, remover o nó do canvas deixava o async_scheduler disparando pelo
-      Schedule antigo — o "scheduler zumbi".
-    - Com ScheduleTrigger e configuração INALTERADA: não mexe. Recriar zeraria
-      `next_run_at`, que é recalculado para a próxima ocorrência FUTURA — então
-      salvar o workflow depois do horário do cron fazia o disparo daquele dia
-      ser pulado silenciosamente.
-    - Com ScheduleTrigger e configuração alterada: substitui.
+    - No ScheduleTrigger in the definition: removes the existing schedules.
+      Without this, removing the node from the canvas left the async_scheduler
+      firing from the old Schedule — the "zombie scheduler".
+    - ScheduleTrigger with UNCHANGED configuration: leaves it alone. Recreating
+      would reset `next_run_at`, which is recomputed to the next FUTURE
+      occurrence — so saving the workflow after the cron time made that day's
+      firing be silently skipped.
+    - ScheduleTrigger with changed configuration: replaces it.
 
-    Devolve avisos (`ScheduleNotice`) sobre o que NÃO foi aplicado — workflow
-    inativo, expressão inválida. Antes esses casos só viravam log e o usuário
-    via "salvo com sucesso" sem saber que o agendamento tinha sido preservado
-    (ou, no caso inválido, destruído). O chamador expõe os avisos na resposta
-    do save para virarem toast.
+    Returns notices (`ScheduleNotice`) about what was NOT applied — inactive
+    workflow, invalid expression. Previously these cases only became logs and the
+    user saw "saved successfully" without knowing the schedule had been kept
+    (or, in the invalid case, destroyed). The caller exposes the notices in the
+    save response so they become toasts.
     """
     notices: list[ScheduleNotice] = []
     scheduler = ScheduleService(db_session)
@@ -182,13 +188,13 @@ async def apply_schedule_if_needed(
             await scheduler.schedule_crud.update(atual, _update_de_active(bool(desejado.active)))
         return notices
 
-    # Daqui para baixo o schedule precisaria ser substituído. Duas guardas
-    # ANTES de apagar qualquer coisa — apagar e só então descobrir que não dá
-    # para recriar deixava o workflow sem agendamento nenhum, com a falha
-    # engolida pelo chamador (o usuário via "salvo" e o cron morria).
+    # From here on the schedule would need to be replaced. Two guards
+    # BEFORE deleting anything — deleting and only then finding out it cannot
+    # be recreated left the workflow with no schedule at all, with the failure
+    # swallowed by the caller (the user saw "saved" and the cron died).
 
-    # 1) `create_schedule` recusa workflow desativado. Preserva o schedule atual
-    #    e avisa: a config nova só entra quando o workflow for reativado e salvo.
+    # 1) `create_schedule` rejects a deactivated workflow. Keep the current schedule
+    #    and warn: the new config only takes effect when the workflow is reactivated and saved.
     if not workflow.flag_ative:
         logger.warning(
             "Workflow '%s' está desativado: agendamento preservado como está, "
@@ -207,9 +213,9 @@ async def apply_schedule_if_needed(
         ))
         return notices
 
-    # 2) Config inválida não pode destruir um agendamento válido anterior.
-    #    (O ScheduleTrigger no front já valida; isto é defesa em profundidade
-    #    para payloads legados/de API que cheguem inválidos.)
+    # 2) An invalid config must not destroy a previous valid schedule.
+    #    (The ScheduleTrigger in the front end already validates; this is defense in
+    #    depth for legacy/API payloads that arrive invalid.)
     try:
         validate_schedule_create(desejado)
     except InvalidScheduleError as exc:

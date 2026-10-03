@@ -19,67 +19,69 @@ import { CATALOGO, ORGAOS_FEDERAIS, ORGAOS_REGIONAIS, PAISES, type BaseCitada } 
 import type { ModoDeEntrada } from "@/lib/entrada"
 
 /**
- * A casca lateral da Home, no estilo Claude Code: marca no topo, "Nova conversa"
- * logo abaixo, e o grupo **Meus → Agendamentos, Artefatos, Chats** (decisão 9),
- * cada um uma lista viva. O rodapé é o `UserSidebar` de sempre, sem atalho de
- * navegação (decisão 16).
+ * The Home's side shell, in Claude Code style: brand at the top, "Nova conversa"
+ * right below, and the group **Meus → Agendamentos, Artefatos, Chats** (decision 9),
+ * each one a live list. The footer is the usual `UserSidebar`, with no navigation
+ * shortcut (decision 16).
  *
- * **Sem sessão** (a Home abre anônima; a entrada é um modal no primeiro envio)
- * a casca encolhe: marca e gatilho no topo, a **vitrine do catálogo** no corpo
- * (`VitrineDoCatalogo`, abaixo) e, no rodapé, **Entrar** e **Criar conta** —
- * botões que pedem o modal pela store, não links. O grupo Meus não MONTA (não é
- * só `hidden`): o Chats faz o GET na montagem, e um `atlans:home:meu` lembrado
- * de outra pessoa no mesmo navegador deixaria Agendamentos/Artefatos abertos,
- * cada um com o seu GET. A vitrine, pelo mesmo motivo, é toda constante.
+ * **Without a session** (the Home opens anonymous; sign-in is a modal on the first
+ * send) the shell shrinks: brand and trigger at the top, the **catalog showcase**
+ * in the body (`VitrineDoCatalogo`, below) and, in the footer, **Entrar** and
+ * **Criar conta** — buttons that request the modal through the store, not links.
+ * The Meus group does not MOUNT (it isn't just `hidden`): Chats does its GET on
+ * mount, and an `atlans:home:meu` remembered from another person in the same
+ * browser would leave Schedules/Artifacts open, each with its own GET. The
+ * showcase, for the same reason, is entirely constant.
  *
- * **A marca só é LINK para o admin do sistema.** Ela era a única navegação
- * explícita da Home para o resto do app (`/projects`); por decisão do dono, quem
- * não é admin fica na Home, e a marca vira rótulo — o `Marca` sem `href` já
- * renderiza um `<span>` inerte, sem realce de hover, então some também a
- * AFORDÂNCIA, não só o destino. E ela FICA no trilho de 3rem (`glifoNoTrilho`):
- * recolhida, a barra escondia a marca inteira, e com ela a única saída do admin.
+ * **The brand is only a LINK for the system admin.** It was the Home's only
+ * explicit navigation to the rest of the app (`/projects`); by the owner's
+ * decision, whoever isn't admin stays on the Home, and the brand becomes a label —
+ * `Marca` without `href` already renders an inert `<span>`, with no hover
+ * highlight, so the AFFORDANCE goes away too, not just the destination. And it
+ * STAYS on the 3rem rail (`glifoNoTrilho`): collapsed, the bar hid the whole
+ * brand, and with it the admin's only way out.
  *
- * Isto não é controle de acesso: `/projects` continua aberta a qualquer pessoa
- * autenticada, e a paleta Ctrl+K continua global. O que muda é o que a Home
- * OFERECE.
+ * This is not access control: `/projects` remains open to any authenticated
+ * person, and the Ctrl+K palette remains global. What changes is what the Home
+ * OFFERS.
  *
- * `className="home dark"` veste a paleta quase preta. O wrapper interno repete
- * a classe — e AGORA também `bg-sidebar`: no telefone quem pinta o painel é o
- * `<SheetContent>`, e mesmo com o `className` repassado (ui/sidebar.tsx) este
- * fundo aqui é a rede de segurança que impede texto quase branco sobre o
- * `--sidebar` claro do tema do app.
+ * `className="home dark"` puts on the nearly black palette. The inner wrapper
+ * repeats the class — and NOW also `bg-sidebar`: on the phone what paints the
+ * panel is the `<SheetContent>`, and even with the `className` passed along
+ * (ui/sidebar.tsx) this background here is the safety net that prevents nearly
+ * white text over the app theme's light `--sidebar`.
  *
- * O wrapper também é a landmark nomeada da Home: sem ele a página só teria o
- * `<main>` anônimo, e navegar por regiões não distinguia globo de barra.
+ * The wrapper is also the Home's named landmark: without it the page would only
+ * have the anonymous `<main>`, and navigating by regions didn't tell globe from bar.
  *
- * **Superfícies em portal** (menu, diálogo, tooltip): todo Radix renderiza no
- * `<body>`, FORA desta árvore, e por isso saía no tema do app — branco sobre a
- * Home quase preta quando a pessoa escolhe o tema claro. A saída central é a
- * classe `home-portal` (globals.css): ela traz `.home` + `.dark` de uma vez.
- * Use-a em todo `*Content` aberto a partir da Home — os tooltips abaixo, o menu
- * de conta e as Preferências (`portalClassName` do `UserSidebar`), e os
- * diálogos que as listas abrem.
+ * **Portaled surfaces** (menu, dialog, tooltip): every Radix renders into
+ * `<body>`, OUTSIDE this tree, and so came out in the app theme — white over the
+ * nearly black Home when the person picks the light theme. The central fix is
+ * the `home-portal` class (globals.css): it brings `.home` + `.dark` at once.
+ * Use it on every `*Content` opened from the Home — the tooltips below, the
+ * account menu and Preferences (`portalClassName` of `UserSidebar`), and the
+ * dialogs the lists open.
  */
 export default function HomeSidebar() {
   const t = useTextosDaCasca().casca.barraLateral
-  // A barra é irmã da HomeView, não filha: o `lang` dela não chega aqui, e o
-  // do <html> só troca num efeito, depois da hidratação. Sem o próprio, o HTML
-  // do servidor punha o inglês da barra sob o `lang="pt-BR"` da raiz.
+  // The bar is a sibling of HomeView, not a child: its `lang` doesn't reach here,
+  // and the <html> one only changes in an effect, after hydration. Without its
+  // own, the server HTML put the bar's English under the root's `lang="pt-BR"`.
   const idioma = useIdiomaDaTela()
   const { isMobile, setOpenMobile } = useSidebar()
   const novaConversa = useHomeStore((s) => s.novaConversa)
   const hidratar = useHomeStore((s) => s.hidratar)
-  // O HomeView também hidrata; aqui de novo é idempotente e tira a dependência
-  // da ordem de montagem — o aberto/fechado do grupo Meus vem desta leitura.
+  // HomeView also hydrates; doing it here again is idempotent and removes the
+  // dependency on mount order — the Meus group's open/closed comes from this read.
   useEffect(() => { hidratar() }, [hidratar])
-  // Mesma leitura do `AppSidebar` (`:112`). Enquanto a sessão carrega, `data` é
-  // nulo e a marca fica inerte — falha FECHADA, que é a direção certa para
-  // errar: o contrário piscaria um link que some no render seguinte.
+  // Same read as `AppSidebar` (`:112`). While the session loads, `data` is
+  // null and the brand stays inert — fail CLOSED, which is the right direction
+  // to err in: the opposite would flash a link that disappears on the next render.
   const { data: session, status } = useSession()
   const isAdmin = session?.user?.role === "admin"
-  // Sem sessão — ou com a sessão vencida, no instante entre o render e o
-  // `signOut` do SessionSync — a casca é a anônima (a mesma leitura da
-  // HomeView): nada aqui pode disparar uma requisição.
+  // Without a session — or with an expired session, in the instant between the
+  // render and SessionSync's `signOut` — the shell is the anonymous one (the same
+  // read as HomeView): nothing here may fire a request.
   const anonimo = status === "unauthenticated" || session?.error === "RefreshTokenExpired"
   const pedirEntrada = useHomeStore((s) => s.pedirEntrada)
   function entrar(modo: ModoDeEntrada) {
@@ -89,9 +91,9 @@ export default function HomeSidebar() {
 
   return (
     <Sidebar
-      // No desktop o `lang` cai no contêiner da barra (o nav e o trilho); no
-      // telefone o painel é um Sheet no <body>, montado só depois da
-      // hidratação — o nav leva o dele.
+      // On desktop the `lang` lands on the bar's container (the nav and the rail); on
+      // the phone the panel is a Sheet in <body>, mounted only after
+      // hydration — the nav carries its own.
       lang={idioma}
       collapsible="icon"
       className="home dark border-sidebar-border"
@@ -104,10 +106,10 @@ export default function HomeSidebar() {
         className="home dark bg-sidebar text-sidebar-foreground flex h-full w-full flex-col"
       >
         <SidebarHeader>
-          {/* Marca + gatilho de recolher. No trilho de 3rem os dois EMPILHAM
-              (`flex-col`): glifo (28px) e gatilho (28px) não cabem lado a lado
-              nos 32px úteis, e o glifo fica porque para o admin ele é o link
-              para Projetos. */}
+          {/* Brand + collapse trigger. On the 3rem rail the two STACK
+              (`flex-col`): glyph (28px) and trigger (28px) don't fit side by side
+              in the 32px available, and the glyph stays because for the admin it
+              is the link to Projects. */}
           <div className="app-region-drag flex items-center gap-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:justify-center">
             <Marca
               href={isAdmin ? "/projects" : undefined}
@@ -115,8 +117,8 @@ export default function HomeSidebar() {
               tooltip={{ children: t.projetos, className: "home-portal" }}
             />
             <div className="flex-1 group-data-[collapsible=icon]:hidden" />
-            {/* `max-md:size-10`: no telefone o alvo tem de ter 40px (§5 do
-                padrão de telas) — o size-7 do gatilho dá 28px. */}
+            {/* `max-md:size-10`: on the phone the target must be 40px (§5 of the
+                screen patterns) — the trigger's size-7 gives 28px. */}
             <SidebarTrigger className="app-region-no-drag max-md:size-10" size="sm" label={t.alternar} />
           </div>
           {!anonimo && (
@@ -147,11 +149,11 @@ export default function HomeSidebar() {
             </SidebarGroup>
           ) : (
             <SidebarGroup>
-              {/* "Meus", e não "Meu": o rótulo encabeça três itens no plural
-                  (Agendamentos, Artefatos, Chats) e quem lê monta "meu
-                  agendamentos". A chave persistida continua `atlans:home:meu`
-                  (homeStore) — renomeá-la zeraria o aberto/fechado de quem já
-                  usa o produto, e ninguém vê o nome dela. */}
+              {/* "Meus", not "Meu": the label heads three plural items
+                  (Agendamentos, Artefatos, Chats) and the reader assembles "meu
+                  agendamentos". The persisted key remains `atlans:home:meu`
+                  (homeStore) — renaming it would reset the open/closed state of
+                  existing users, and nobody sees its name. */}
               <SidebarGroupLabel className="font-mono text-[11px] uppercase tracking-[0.12em] text-sidebar-foreground/55">
                 {t.meus}
               </SidebarGroupLabel>
@@ -176,7 +178,7 @@ export default function HomeSidebar() {
           <SidebarMenu>
             {anonimo ? (
               <>
-                {/* Botões, não links: o modal de entrada é da Home e abre pela store. */}
+                {/* Buttons, not links: the sign-in modal belongs to the Home and opens via the store. */}
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => entrar("entrar")}
@@ -199,9 +201,9 @@ export default function HomeSidebar() {
                 </SidebarMenuItem>
               </>
             ) : (
-              /* Reusado (decisão 16): Tema, Configurações, Sair. O menu e as
-                 Preferências são portais, fora desta árvore — sem a classe
-                 abriam claros sobre a Home quase preta. */
+              /* Reused (decision 16): Theme, Settings, Sign out. The menu and
+                 Preferences are portals, outside this tree — without the class
+                 they opened light over the nearly black Home. */
               <SidebarMenuItem>
                 <UserSidebar portalClassName="home-portal" />
               </SidebarMenuItem>
@@ -209,37 +211,40 @@ export default function HomeSidebar() {
           </SidebarMenu>
         </SidebarFooter>
       </nav>
-      {/* A borda arrastável/clicável que reexpande o trilho — o molde do shadcn,
-          que faltava aqui. Só no desktop: entre 640 e 767px o `sm:flex` dele o
-          mostraria dentro do Sheet, sem o `group[data-side]` que o posiciona. */}
+      {/* The draggable/clickable edge that re-expands the rail — the shadcn template,
+          which was missing here. Desktop only: between 640 and 767px its `sm:flex`
+          would show it inside the Sheet, without the `group[data-side]` that
+          positions it. */}
       {!isMobile && <SidebarRail textos={t.trilho} />}
     </Sidebar>
   )
 }
 
 /**
- * Um item do grupo Meus que abre/fecha uma sublista. Três decisões, cada uma
- * por um defeito que existiu:
+ * An item of the Meus group that opens/closes a sublist. Three decisions, each
+ * one because of a defect that existed:
  *
- * 1. **O aberto/fechado vive na store** (`meu`, persistido), não num `useState`:
- *    o estado local morria a cada abertura da gaveta no telefone, ao sair de
- *    `/` e voltar, e ao cruzar 768px.
- * 2. **No trilho de 3rem o clique expande a barra E abre o item.** A sublista
- *    está em `display:none` no modo ícone (o próprio `SidebarMenuSub` se
- *    esconde), então alternar às cegas era um clique morto que ainda CORROMPIA
- *    o estado: ao expandir, o item estava no oposto do que a pessoa deixou.
- *    `aria-expanded` só vale expandido — recolhido, não há nada que expanda.
- * 3. **Fechar ESCONDE, não desmonta.** `{aberto && children}` refazia as
- *    requisições a cada reabertura e perdia as páginas do "Ver mais", o erro e
- *    a rolagem. A lista monta na primeira abertura e fica (`hidden` quando
- *    fechada); o wrapper existe sempre, porque é o alvo do `aria-controls`.
- *    E monta só DEPOIS de hidratar, em EFEITO: no telefone o primeiro render
- *    ainda é o ramo desktop (`useIsMobile` começa indefinido), e montar ali
- *    disparava um GET que ia para o lixo quando o Sheet assumia — em efeito, a
- *    montagem cai na mesma leva de `isMobile`, e o Sheet assume sem lista.
+ * 1. **Open/closed lives in the store** (`meu`, persisted), not in a `useState`:
+ *    local state died on every opening of the drawer on the phone, on leaving
+ *    `/` and coming back, and on crossing 768px.
+ * 2. **On the 3rem rail the click expands the bar AND opens the item.** The
+ *    sublist is `display:none` in icon mode (`SidebarMenuSub` hides itself), so
+ *    toggling blindly was a dead click that still CORRUPTED the state: on
+ *    expanding, the item was the opposite of what the person had left.
+ *    `aria-expanded` only applies when expanded — collapsed, nothing expands.
+ * 3. **Closing HIDES, it doesn't unmount.** `{aberto && children}` redid the
+ *    requests on every reopen and lost the "Ver mais" pages, the error and the
+ *    scroll. The list mounts on first open and stays (`hidden` when closed);
+ *    the wrapper always exists, because it is the `aria-controls` target.
+ *    And it mounts only AFTER hydrating, in an EFFECT: on the phone the first
+ *    render is still the desktop branch (`useIsMobile` starts undefined), and
+ *    mounting there fired a GET that was thrown away when the Sheet took over —
+ *    in an effect, the mount lands in the same batch as `isMobile`, and the
+ *    Sheet takes over with no list.
  *
- * Sem Radix Collapsible (não há wrapper no projeto e não vale uma dependência
- * por isto): `aria-controls` + `hidden` à mão dão o mesmo ao leitor de tela.
+ * No Radix Collapsible (there is no wrapper in the project and it's not worth a
+ * dependency for this): `aria-controls` + `hidden` by hand give the screen
+ * reader the same.
  */
 function ItemColapsavel({
   nome,
@@ -279,7 +284,7 @@ function ItemColapsavel({
         tooltip={{ children: label, className: "home-portal" }}
         aria-expanded={noTrilho ? undefined : aberto}
         aria-controls={idDaLista}
-        // 40px no telefone (§5 do padrão de telas); 36px no ponteiro fino.
+        // 40px on the phone (§5 of the screen patterns); 36px with a fine pointer.
         className="h-9 max-md:h-10"
       >
         <Icone />
@@ -299,46 +304,47 @@ function ItemColapsavel({
 }
 
 /**
- * A VITRINE DO CATÁLOGO: o que a barra mostra a quem ainda não entrou.
+ * THE CATALOG SHOWCASE: what the bar shows to someone who hasn't signed in yet.
  *
- * O que estava aqui era uma frase — "Entre para ver seus chats, artefatos e
- * agendamentos" — e 500px de vazio até o rodapé. Ela falhava duas vezes: pedia
- * a conta antes de dar qualquer motivo, e usava três palavras (chats,
- * artefatos, agendamentos) que não querem dizer nada para quem chegou agora.
+ * What was here was a sentence — "Entre para ver seus chats, artefatos e
+ * agendamentos" — and 500px of emptiness down to the footer. It failed twice: it
+ * asked for the account before giving any reason, and used three words (chats,
+ * artifacts, schedules) that mean nothing to someone who just arrived.
  *
- * No lugar, a prova que o produto já tem: o tamanho do catálogo e quem está
- * nele — vinte e cinco mil camadas de dado público, indexadas com atributos, de
- * IBGE a INEA. É o argumento que fala com quem já perdeu uma tarde
- * adivinhando `url` e `typeName` de um WFS — e é verificável, o que uma
- * promessa de recurso não é. Os números e os nomes vêm de `lib/catalogo.ts`,
- * constantes presas à semente por um teste; nada aqui faz requisição, que é a
- * regra da casca anônima (ver o topo deste arquivo).
+ * In its place, the proof the product already has: the size of the catalog and
+ * who is in it — twenty-five thousand layers of public data, indexed with
+ * attributes, from IBGE to INEA. It's the argument that speaks to whoever has
+ * already lost an afternoon guessing a WFS's `url` and `typeName` — and it's
+ * verifiable, which a feature promise isn't. The numbers and names come from
+ * `lib/catalogo.ts`, constants pinned to the seed by a test; nothing here makes
+ * a request, which is the rule of the anonymous shell (see the top of this file).
  *
- * **Fitas, não lista.** Em 256px uma lista estática mostra seis siglas e corta
- * o resto; as três fitas mostram dezesseis órgãos e dez países no mesmo espaço,
- * porque o tempo faz o trabalho da altura. O custo é movimento ao lado de um
- * globo que já gira — daí as durações desencontradas do `.home-fita` e a parada
- * completa em `prefers-reduced-motion`.
+ * **Tickers, not a list.** At 256px a static list shows six acronyms and cuts
+ * the rest; the three tickers show sixteen agencies and ten countries in the same
+ * space, because time does the work of height. The cost is motion next to a
+ * globe that already spins — hence the mismatched durations of `.home-fita` and
+ * the full stop under `prefers-reduced-motion`.
  *
- * **Os rótulos BRASIL e FORA DO BRASIL não são enfeite.** Sem eles "Equador"
- * sai na mesma pílula que "Embrapa" e vira um órgão chamado Equador. A
- * alternativa era resolver no texto ("em 11 países"), que a segunda linha já
- * diz — os dois juntos custam duas linhas e tiram a ambiguidade de vez.
+ * **The BRASIL and FORA DO BRASIL labels are not decoration.** Without them
+ * "Equador" comes out in the same pill as "Embrapa" and becomes an agency called
+ * Ecuador. The alternative was to solve it in the text ("em 11 países"), which
+ * the second line already says — the two together cost two lines and remove the
+ * ambiguity for good.
  *
- * Tudo isto some no trilho de 3rem: o grupo inteiro é
- * `group-data-[collapsible=icon]:hidden` (quem chama), como era o convite.
+ * All of this disappears on the 3rem rail: the whole group is
+ * `group-data-[collapsible=icon]:hidden` (set by the caller), as the invitation was.
  */
 function VitrineDoCatalogo() {
   const t = useTextosDaCasca().casca.barraLateral
   const f = useFormatos()
-  // Os países mudam de nome com o idioma; os órgãos (IBGE, INEA…) são nomes próprios.
+  // Countries change name with the language; agencies (IBGE, INEA…) are proper names.
   const paises = PAISES.map((base) => ({ ...base, rotulo: t.paises[base.pasta] ?? base.rotulo }))
   return (
     <div className="flex flex-col">
       <p className="flex items-baseline gap-[7px] px-2">
-        {/* Figuras proporcionais, não tabulares: é um número solto, não uma
-            coluna — `tabular-nums` daria a todo dígito a largura do zero e
-            abriria buracos no meio de "25.492". */}
+        {/* Proportional figures, not tabular: it's a loose number, not a
+            column — `tabular-nums` would give every digit the width of zero and
+            open gaps in the middle of "25.492". */}
         <span className="text-[27px] font-semibold leading-none tracking-[-0.02em] text-sidebar-foreground">
           {f.inteiro(CATALOGO.camadas)}
         </span>
@@ -373,13 +379,13 @@ function RotuloDaFita({ children, className }: { children: React.ReactNode; clas
 }
 
 /**
- * Uma fita. O conteúdo vai DUPLICADO porque a emenda do laço depende disso (ver
- * `.home-fita` em globals.css): a animação anda até -50%, onde a segunda cópia
- * está no lugar exato em que a primeira começou.
+ * A ticker. The content goes in DUPLICATED because the loop's seam depends on it
+ * (see `.home-fita` in globals.css): the animation runs to -50%, where the second
+ * copy is at the exact spot where the first one started.
  *
- * A duplicata é `aria-hidden`: são nomes de verdade, não decoração, então o
- * leitor de tela lê a lista — uma vez, não duas. É também por isso que não há
- * `role="img"` com um `aria-label` recitando tudo: o texto já está aqui.
+ * The duplicate is `aria-hidden`: these are real names, not decoration, so the
+ * screen reader reads the list — once, not twice. That's also why there is no
+ * `role="img"` with an `aria-label` reciting everything: the text is already here.
  */
 function Fita({
   bases,
@@ -387,9 +393,9 @@ function Fita({
   devagar = false,
 }: {
   bases: readonly BaseCitada[]
-  /** Anda para o outro lado — é o que impede as faixas de parecerem uma tabela. */
+  /** Runs the other way — that's what keeps the strips from looking like a table. */
   volta?: boolean
-  /** 34s em vez de 26s, para a fita dos países. */
+  /** 34s instead of 26s, for the countries ticker. */
   devagar?: boolean
 }) {
   return (

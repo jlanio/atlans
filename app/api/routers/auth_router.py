@@ -1,10 +1,10 @@
 # app/api/routers/auth_router.py
 """
-Endpoints de autenticação — registro, login e renovação de token JWT.
+Authentication endpoints — registration, login and JWT token renewal.
 
-Proteção contra brute-force:
-  - Rate limit por IP (slowapi): 10 req/min no login
-  - Lockout por username (Redis): 5 tentativas falhas → bloqueio de 15 min
+Brute-force protection:
+  - Rate limit per IP (slowapi): 10 req/min on login
+  - Lockout per username (Redis): 5 failed attempts → 15 min block
 """
 import asyncio
 
@@ -43,22 +43,22 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def get_redis(request: Request) -> aioredis.Redis:
-    """Retorna o pool Redis da aplicação (criado no lifespan)."""
+    """Returns the application's Redis pool (created in the lifespan)."""
     return request.app.state.redis
 
 
-# ── Configurações de lockout ───────────────────────────────────────────────────
-_MAX_ATTEMPTS   = 5        # tentativas falhas antes do bloqueio
-_LOCKOUT_TTL    = 15 * 60  # segundos de bloqueio (15 min)
-_ATTEMPTS_TTL   = 15 * 60  # janela de contagem (reseta junto com o lockout)
+# ── Lockout settings ───────────────────────────────────────────────────────────
+_MAX_ATTEMPTS   = 5        # failed attempts before the lockout
+_LOCKOUT_TTL    = 15 * 60  # lockout seconds (15 min)
+_ATTEMPTS_TTL   = 15 * 60  # counting window (resets along with the lockout)
 
 
 async def _check_lockout(username: str, redis: aioredis.Redis) -> None:
-    """Lança HTTP 429 se o usuário está bloqueado, com tempo restante."""
+    """Raises HTTP 429 if the user is locked out, with the remaining time."""
     locked = await redis.get(f"login_locked:{username}")
     if locked:
         ttl = await redis.ttl(f"login_locked:{username}")
-        mins = (ttl + 59) // 60  # arredonda para cima em minutos
+        mins = (ttl + 59) // 60  # rounds up to minutes
         raise HTTPException(
             status_code=429,
             detail=f"Conta bloqueada por excesso de tentativas. Tente novamente em {mins} minuto(s).",
@@ -67,12 +67,12 @@ async def _check_lockout(username: str, redis: aioredis.Redis) -> None:
 
 
 async def _record_failed(username: str, redis: aioredis.Redis) -> int:
-    """Incrementa contador de falhas. Bloqueia conta ao atingir o limite. Retorna tentativas restantes."""
+    """Increments the failure counter. Locks the account on reaching the limit. Returns the remaining attempts."""
     attempts_key = f"login_failed:{username}"
     locked_key   = f"login_locked:{username}"
 
-    # Janela DESLIZANTE: cada falha renova o prazo, e o contador só zera depois
-    # de _ATTEMPTS_TTL sem falha nenhuma.
+    # SLIDING window: each failure renews the deadline, and the counter only
+    # resets after _ATTEMPTS_TTL without any failure.
     attempts, _ = await contar_na_janela(attempts_key, _ATTEMPTS_TTL, deslizante=True, redis=redis)
 
     if attempts >= _MAX_ATTEMPTS:
@@ -84,24 +84,25 @@ async def _record_failed(username: str, redis: aioredis.Redis) -> int:
 
 
 async def _clear_attempts(username: str, redis: aioredis.Redis) -> None:
-    """Remove contadores após login bem-sucedido."""
+    """Removes the counters after a successful login."""
     await redis.delete(f"login_failed:{username}", f"login_locked:{username}")
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
-# Login e cadastro: 20/min por IP. A chave e o IP publico, e um IP pode ser
-# uma turma, um escritorio ou um CGNAT de operadora movel inteiro. Enquanto os
-# contadores viviam na memoria de cada um dos 4 workers, o teto efetivo ja era
-# esse (4 x 5); com eles no Redis, 5/min trancaria o grupo. Forca bruta contra
-# UMA conta e o bloqueio por conta (_MAX_ATTEMPTS/_LOCKOUT_TTL) que segura.
+# Login and sign-up: 20/min per IP. The key is the public IP, and one IP can be
+# a classroom, an office or a mobile carrier's entire CGNAT. While the counters
+# lived in the memory of each of the 4 workers, the effective ceiling was
+# already this (4 x 5); with them in Redis, 5/min would lock the group out.
+# Brute force against ONE account is held off by the per-account lockout
+# (_MAX_ATTEMPTS/_LOCKOUT_TTL).
 _LIMITE_DE_ENTRADA_POR_IP = "20/minute"
 
 
 @router.post("/register", response_model=UserOut, status_code=201, summary="Criar nova conta")
 @limiter.limit(_LIMITE_DE_ENTRADA_POR_IP)
 async def register(request: Request, payload: UserCreate, db: AsyncSession = Depends(get_db)):
-    # Verifica unicidade de username e email com mensagem unificada (evita user enumeration)
+    # Checks username and email uniqueness with a unified message (avoids user enumeration)
     result = await db.execute(select(User).where(User.username == payload.username))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Usuário ou e-mail já em uso.")
@@ -109,8 +110,8 @@ async def register(request: Request, payload: UserCreate, db: AsyncSession = Dep
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Usuário ou e-mail já em uso.")
 
-    # bcrypt é CPU-bound (~200-300ms) e a lib libera a GIL: fora do event loop
-    # para não congelar heartbeats WS, streaming ao vivo e requests do worker.
+    # bcrypt is CPU-bound (~200-300ms) and the lib releases the GIL: off the event
+    # loop so it does not freeze WS heartbeats, live streaming and the worker's requests.
     hashed = await asyncio.to_thread(hash_password, payload.password)
     user = User(
         username=payload.username,
@@ -118,9 +119,9 @@ async def register(request: Request, payload: UserCreate, db: AsyncSession = Dep
         hashed_password=hashed,
     )
     db.add(user)
-    await db.flush()  # gera user.id_hash sem fechar a transação
+    await db.flush()  # generates user.id_hash without closing the transaction
 
-    # Cria workspace padrão para o novo usuário
+    # Creates a default workspace for the new user
     default_ws = Workspace(
         name=f"Workspace de {user.username}",
         description="Workspace padrão",
@@ -135,7 +136,7 @@ async def register(request: Request, payload: UserCreate, db: AsyncSession = Dep
     await db.commit()
     await db.refresh(user)
 
-    # Envia email de verificação em background
+    # Sends the verification email in the background
     token = await create_email_verification_token(user.id_hash)
     verify_url = f"{FRONTEND_URL}/verify-email?token={token}"
     send_email_background(
@@ -161,19 +162,19 @@ async def login(
     db: AsyncSession = Depends(get_db),
     redis: aioredis.Redis = Depends(get_redis),
 ):
-    # O identificador pode ser e-mail ou username. Normaliza para lowercase: a
-    # busca do usuario usa ident.lower(), entao sem normalizar aqui a chave de
-    # lockout ('Admin' vs 'admin') difere do alvo real e o bloqueio por conta
-    # (defesa contra botnet distribuido) nunca dispara — cada variante de caixa
-    # e um balde separado.
+    # The identifier may be an email or a username. Normalizes to lowercase: the
+    # user lookup uses ident.lower(), so without normalizing here the lockout key
+    # ('Admin' vs 'admin') differs from the real target and the per-account
+    # lockout (defense against a distributed botnet) never fires — each case
+    # variant is a separate bucket.
     ident = payload.identifier.strip().lower()
 
-    # 1. Verifica se a conta está bloqueada por excesso de tentativas
+    # 1. Checks whether the account is locked out due to too many attempts
     await _check_lockout(ident, redis)
 
-    # 2. Valida credenciais — resolve por e-mail (contém '@') ou por username.
-    # E-mails são armazenados normalizados (lowercase), então a comparação é
-    # direta e aproveita o índice da coluna.
+    # 2. Validates credentials — resolves by email (contains '@') or by username.
+    # Emails are stored normalized (lowercase), so the comparison is direct and
+    # uses the column's index.
     if "@" in ident:
         stmt = select(User).where(User.email == ident.lower())
     else:
@@ -181,8 +182,8 @@ async def login(
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
-    # bcrypt fora do event loop (ver register): sob rajada de login, os hashes
-    # passam a rodar em paralelo em vez de serializar e travar o worker.
+    # bcrypt off the event loop (see register): under a login burst, the hashes
+    # run in parallel instead of serializing and stalling the worker.
     senha_ok = bool(user) and await asyncio.to_thread(
         verify_password, payload.password, user.hashed_password,
     )
@@ -204,8 +205,8 @@ async def login(
     if user.status != "active":
         raise HTTPException(status_code=403, detail="Conta desativada.")
 
-    # Sem transporte de e-mail o link de verificacao nunca chega: a instalacao
-    # desliga a exigencia com EXIGIR_EMAIL_VERIFICADO=false.
+    # Without an email transport the verification link never arrives: the
+    # installation turns the requirement off with EXIGIR_EMAIL_VERIFICADO=false.
     if not user.email_verified and config.EXIGIR_EMAIL_VERIFICADO:
         raise HTTPException(
             status_code=403,
@@ -213,12 +214,12 @@ async def login(
             headers={"X-Error-Code": "email_not_verified"},
         )
 
-    # 3. Login bem-sucedido — limpa contadores e atualiza último acesso
+    # 3. Successful login — clears counters and updates last access
     await _clear_attempts(ident, redis)
     user.last_login_at = func.now()
     await db.commit()
 
-    # Abre uma nova família de refresh tokens para esta sessão
+    # Opens a new refresh token family for this session
     family, jti = new_refresh_family()
     await register_refresh_family(family, jti)
 
@@ -231,9 +232,9 @@ async def login(
 
 
 @router.post("/refresh", response_model=Token, summary="Renovar access token")
-# Sem @limiter.limit: o limite por IP transformava o hop interno Next→API num
-# balde único de plataforma. O limite real é por família, aplicado abaixo após
-# validar o token — ver refresh_rate_exceeded em jwt_utils.
+# No @limiter.limit: the per-IP limit turned the internal Next→API hop into a
+# single platform-wide bucket. The real limit is per family, applied below after
+# validating the token — see refresh_rate_exceeded in jwt_utils.
 async def refresh_token(request: Request, payload: TokenRefresh, db: AsyncSession = Depends(get_db)):
     try:
         from app.core.utils.jwt_utils import AUDIENCE_REFRESH
@@ -246,18 +247,18 @@ async def refresh_token(request: Request, payload: TokenRefresh, db: AsyncSessio
     family = claims.get("family")
     jti = claims.get("jti")
     if not family or not jti:
-        # Token em formato antigo (sem família) — sem retrocompat, força re-login
+        # Token in the old format (no family) — no backward compat, forces re-login
         raise HTTPException(status_code=401, detail="Refresh token inválido ou expirado.")
 
-    # Limite por FAMÍLIA (não por IP). 429 é TRANSITÓRIO: o front mantém a sessão
-    # e tenta de novo em instantes, em vez de deslogar.
+    # Limit per FAMILY (not per IP). 429 is TRANSIENT: the front end keeps the
+    # session and retries shortly, instead of logging out.
     if await refresh_rate_exceeded(family):
         raise HTTPException(
             status_code=429,
             detail="Muitas renovações de sessão em sequência. Tente novamente em instantes.",
         )
 
-    # Rotaciona o token; detecta reuso (jti já rotacionado = roubo)
+    # Rotates the token; detects reuse (jti already rotated = theft)
     rot_status, new_jti = await rotate_refresh_family(family, jti)
     if rot_status != "ok":
         if rot_status == "reuse":
@@ -281,7 +282,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
-# ── Verificação de email ──────────────────────────────────────────────────
+# ── Email verification ────────────────────────────────────────────────────
 
 
 @router.get("/verify-email", response_model=MessageResponse, summary="Verificar e-mail via token")
@@ -312,7 +313,7 @@ async def resend_verification(
     payload: ResendVerificationRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    # Resposta genérica sempre (anti-enumeração)
+    # Always a generic response (anti-enumeration)
     msg = MessageResponse(message="Se o e-mail estiver cadastrado e não verificado, um novo link será enviado.")
 
     result = await db.execute(select(User).where(User.email == payload.email))
@@ -335,7 +336,7 @@ async def resend_verification(
     return msg
 
 
-# ── Recuperação de senha ──────────────────────────────────────────────────
+# ── Password recovery ─────────────────────────────────────────────────────
 
 
 @router.post("/forgot-password", response_model=MessageResponse, summary="Solicitar redefinição de senha")
@@ -345,7 +346,7 @@ async def forgot_password(
     payload: ForgotPasswordRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    # Resposta genérica sempre (anti-enumeração)
+    # Always a generic response (anti-enumeration)
     msg = MessageResponse(message="Se o e-mail estiver cadastrado, você receberá instruções para redefinir sua senha.")
 
     result = await db.execute(select(User).where(User.email == payload.email))
@@ -385,9 +386,9 @@ async def reset_password(
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
 
     user.hashed_password = await asyncio.to_thread(hash_password, payload.password)
-    # Cascata: quem redefine a senha (possivelmente porque a conta foi
-    # comprometida) não quer nenhum agente seguindo autenticado com um token
-    # antigo. Mesma transação do commit abaixo.
+    # Cascade: whoever resets the password (possibly because the account was
+    # compromised) does not want any agent staying authenticated with an old
+    # token. Same transaction as the commit below.
     from app.services.api_token_service import revogar_todos_do_usuario
 
     await revogar_todos_do_usuario(db, [user.id_hash], motivo="password_reset")
@@ -401,21 +402,21 @@ async def logout(
     request: Request,
     current_user=Depends(get_current_user),
 ):
-    """Revoga o access token (blacklist) e a família de refresh tokens da sessão."""
+    """Revokes the access token (blacklist) and the session's refresh token family."""
     from app.core.utils.jwt_utils import blacklist_token
 
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         token = auth.removeprefix("Bearer ").strip()
         await blacklist_token(token)
-        # Revoga toda a família de refresh tokens (encerra a sessão de verdade).
-        # O access token carrega o claim 'family' espelhado do refresh associado.
+        # Revokes the whole refresh token family (really ends the session).
+        # The access token carries the 'family' claim mirrored from the associated refresh.
         try:
             from app.core.utils.jwt_utils import AUDIENCE_ACCESS
             family = decode_token(token, expected_audience=AUDIENCE_ACCESS).get("family")
             if family:
                 await revoke_refresh_family(family)
         except Exception:
-            # Token expirado ou invalido — blacklist ja foi feita acima; OK.
+            # Token expired or invalid — the blacklist was already done above; OK.
             pass
     return MessageResponse(message="Logout realizado com sucesso.")

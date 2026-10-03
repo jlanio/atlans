@@ -1,5 +1,5 @@
 # app/api/routers/admin_users_router.py
-"""Endpoints administrativos para gestão de usuários."""
+"""Administrative endpoints for user management."""
 
 import csv
 import io
@@ -40,28 +40,28 @@ router = APIRouter(
 async def _ensure_admin_can_modify_target(
     db: AsyncSession, admin_user, target_user_id_hash: str,
 ) -> None:
-    """Guard de jurisdicao admin sobre o target.
+    """Admin jurisdiction guard over the target.
 
-    Modelo atual: um unico nivel de admin — `role=admin` = admin global,
-    opera sobre qualquer usuario da instalacao. Sem hierarquia
-    workspace_admin/global_admin ainda (previsto em V04). Guard fica como
-    no-op enquanto isso.
+    Current model: a single admin level — `role=admin` = global admin,
+    operates on any user of the installation. No
+    workspace_admin/global_admin hierarchy yet (planned in V04). The guard stays
+    a no-op in the meantime.
 
-    Reativar quando a hierarquia existir:
-      - global_admin: pula esta checagem (return direto)
-      - workspace_admin: exige que admin e alvo compartilhem ao menos um
-        workspace vivo (dono ou membro). Um helper pronto para essa conta,
-        `_admin_shares_workspace_with`, existiu sem nunca ser chamado e saiu;
-        esta no historico do git.
+    Re-enable when the hierarchy exists:
+      - global_admin: skips this check (returns directly)
+      - workspace_admin: requires admin and target to share at least one
+        live workspace (owner or member). A ready-made helper for that check,
+        `_admin_shares_workspace_with`, existed without ever being called and was
+        removed; it is in the git history.
 
-    Auto-acao (admin == target) tambem seria liberada — outros guards
-    do endpoint cuidam disso (ex: nao se auto-suspender).
+    Self-action (admin == target) would also be allowed — other guards
+    of the endpoint take care of that (e.g.: not suspending yourself).
     """
     _ = (db, admin_user, target_user_id_hash)  # noqa: F841 — assinatura preservada
     return
 
 
-# ── Rotas sem path params (ANTES das rotas com {id_hash}) ────────────────────
+# ── Routes without path params (BEFORE the routes with {id_hash}) ────────────
 
 
 @router.get("", response_model=UserListResponse, summary="Listar usuários com paginação e filtros")
@@ -104,17 +104,17 @@ async def export_users_csv(
     role: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Gera CSV com todos os usuários que atendem aos filtros (sem paginação)."""
+    """Generates a CSV with all users matching the filters (no pagination)."""
     users, _ = await svc.list_users(
         db, search=search, status=status, role=role, limit=10_000, offset=0,
     )
 
     def _neutralizar(valor):
-        """Neutraliza injeção de fórmula no CSV (auditoria SEG-121).
+        """Neutralizes formula injection in the CSV (audit SEG-121).
 
-        Um username/e-mail começando com `=`, `+`, `-`, `@` (ou TAB/CR) é
-        executado como fórmula ao abrir no Excel/Sheets. Prefixar com `'`
-        (apóstrofo) faz a planilha tratar a célula como texto.
+        A username/e-mail starting with `=`, `+`, `-`, `@` (or TAB/CR) is
+        executed as a formula when opened in Excel/Sheets. Prefixing it with `'`
+        (apostrophe) makes the spreadsheet treat the cell as text.
         """
         if isinstance(valor, str) and valor[:1] in ("=", "+", "-", "@", "\t", "\r"):
             return "'" + valor
@@ -155,21 +155,21 @@ async def _triar(
     elegivel: Callable[[object], str | None],
     erro_auto: str | None,
 ) -> tuple[list, list[dict]]:
-    """Triagem comum de `bulk/suspend`, `bulk/reactivate` e `bulk/delete`.
+    """Common triage for `bulk/suspend`, `bulk/reactivate` and `bulk/delete`.
 
-    As três repetiam o mesmo laço com ~90% do corpo igual, e a diferença entre
-    elas era só o predicado de elegibilidade e a mensagem de auto-ação. O
-    problema de manter as cópias não é o tamanho: as seis rotas *single*
-    chamavam `_ensure_admin_can_modify_target` e as três bulk **não**. Hoje isso
-    é inócuo (o guard é no-op enquanto a hierarquia de admin do V04 não existe),
-    mas no dia em que ele passar a valer, quem quisesse contornar a jurisdição
-    usaria a rota bulk com um id só.
+    The three repeated the same loop with ~90% of the body identical, and the
+    difference between them was only the eligibility predicate and the self-action
+    message. The problem with keeping the copies is not the size: the six *single*
+    routes called `_ensure_admin_can_modify_target` and the three bulk ones **did not**.
+    Today that is harmless (the guard is a no-op while V04's admin hierarchy does not
+    exist), but the day it starts to apply, anyone wanting to bypass the jurisdiction
+    would use the bulk route with a single id.
 
-    `elegivel(user)` devolve None quando a ação pode ser aplicada, ou a mensagem
-    de erro. `erro_auto` é a mensagem quando o admin é o próprio alvo; None
-    libera a auto-ação (é o caso de `reactivate`).
+    `elegivel(user)` returns None when the action can be applied, or the error
+    message. `erro_auto` is the message when the admin is the target itself; None
+    allows self-action (that is the case for `reactivate`).
 
-    Devolve (elegíveis, erros).
+    Returns (eligible, errors).
     """
     errors: list[dict] = []
     eligible: list = []
@@ -185,9 +185,9 @@ async def _triar(
             errors.append({"user_id": uid, "error": "Usuário não encontrado."})
             continue
 
-        # O guard que faltava. Traduzido para a semântica de lote: uma recusa
-        # vira erro DAQUELE usuário, não uma exceção que derruba o lote inteiro
-        # — nas rotas single ele levanta, e ali derrubar é o certo.
+        # The missing guard. Translated to batch semantics: a refusal
+        # becomes an error for THAT user, not an exception that takes down the whole
+        # batch — on the single routes it raises, and there failing outright is right.
         try:
             await _ensure_admin_can_modify_target(db, current_user, uid)
         except HTTPException as exc:
@@ -238,8 +238,8 @@ async def bulk_reactivate(
             None if u.status == "suspended"
             else f"Usuário com status '{u.status}' não pode ser reativado."
         ),
-        # Reativar a si mesmo é inofensivo: um admin suspenso não consegue
-        # autenticar para chegar aqui.
+        # Reactivating yourself is harmless: a suspended admin cannot
+        # authenticate to get here.
         erro_auto=None,
     )
     await svc.bulk_reactivate(db, eligible)
@@ -261,7 +261,7 @@ async def bulk_delete(
     return UserBulkActionResponse(processed=len(eligible), errors=errors)
 
 
-# ── Rotas com {id_hash} ─────────────────────────────────────────────────────
+# ── Routes with {id_hash} ───────────────────────────────────────────────────
 
 
 @router.post("/{id_hash}/suspend", response_model=UserAdminOut, summary="Suspender usuário")
@@ -360,8 +360,8 @@ async def get_user_agent_stats(
     id_hash: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Usado pelo dialog de cota para avisar quando a redução afeta executores
-    existentes. Leve — 2 SELECTs por chamada, sem efeito colateral."""
+    """Used by the quota dialog to warn when the reduction affects existing
+    executors. Lightweight — 2 SELECTs per call, no side effects."""
     from app.services import executor_service, user_executor_service
 
     user = await svc.get_user(db, id_hash)
@@ -389,18 +389,18 @@ async def revoke_all_user_agents(
     current_user=Depends(require_admin),
 ):
     """
-    Ação destrutiva: revoga cada executor com created_by == user.id_hash que
-    ainda não está revogado — a mesma revogação do DELETE /executores/{id}
-    (`executor_service.revogar_executor`): sai de todos os níveis da política
-    (força — é uma ação de admin sobre a conta inteira), status=revoked, cert
-    anulado e na blacklist, donos dos workspaces cujo nível principal esvaziou
-    avisados por e-mail, `control: revoked` e WS fechado com 4403. Idempotente:
-    executores já revogados são ignorados.
+    Destructive action: revokes each executor with created_by == user.id_hash that
+    is not yet revoked — the same revocation as DELETE /executores/{id}
+    (`executor_service.revogar_executor`): it leaves every policy tier
+    (forced — it is an admin action on the whole account), status=revoked, cert
+    voided and blacklisted, owners of workspaces whose primary tier emptied
+    notified by e-mail, `control: revoked` and WS closed with 4403. Idempotent:
+    already revoked executors are ignored.
 
-    Workflows em execução nos executores continuam até terminar; jobs enfileirados
-    locais são descartados.
+    Workflows running on the executors continue until they finish; locally
+    queued jobs are discarded.
     """
-    # V04: bloqueia admin de outro tenant revogando executores alheios.
+    # V04: blocks an admin of another tenant from revoking someone else's executors.
     await _ensure_admin_can_modify_target(db, current_user, id_hash)
     from app.services import executor_service
     from app.services import workspace_executor_service as politica
@@ -412,8 +412,8 @@ async def revoke_all_user_agents(
     revogacoes = await executor_service.revogar_executores_do_usuario(
         db, user, motivo="operator_revoked", desanexar=True, actor_id=current_user.id_hash,
     )
-    # Workspaces impactados (para o toast/log): os dos níveis de que cada
-    # executor acabou de sair ∪ os que apontam para ele pelo ponteiro legado.
+    # Affected workspaces (for the toast/log): those of the tiers each
+    # executor just left ∪ those pointing to it through the legacy pointer.
     impactados: set[str] = set()
     for r in revogacoes:
         impactados |= {d["workspace_id"] for d in r.afetados}

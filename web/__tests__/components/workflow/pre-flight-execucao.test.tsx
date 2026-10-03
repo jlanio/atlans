@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, cleanup, waitFor } from "@testing-library/react"
 
-// Pré-voo do botão Executar: a política do workspace ativo diz se há para
-// onde despachar. O aviso é informativo — o botão NUNCA depende dele, porque
-// a leitura pode falhar ou estar defasada e o servidor é quem decide.
+// Pre-flight of the Run button: the active workspace's policy says whether
+// there's anywhere to dispatch to. The warning is informational — the button
+// NEVER depends on it, because the read can fail or be stale and the server is
+// the one that decides.
 
 vi.mock("@/service/GisFlowService", () => ({
   GisFlowService: { getWorkspacePolicy: vi.fn(), cancelRun: vi.fn() },

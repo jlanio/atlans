@@ -1,16 +1,16 @@
 // web/app/components/home/assistente/rotulos.ts
 //
-// Nome de ferramenta no idioma da tela, para a linha do tempo do painel. A
-// tabela mora no dicionário da Home (`i18n/secoes/assistente.ts`, `ferramentas`).
+// Tool name in the screen's language, for the panel's timeline. The table
+// lives in the Home dictionary (`i18n/secoes/assistente.ts`, `ferramentas`).
 //
-// `search_nodes` e `get_authoring_guide` são nomes de API; quem está montando
-// um fluxo não tem por que aprendê-los para entender que o assistente está
-// procurando um nó. O padrão da casa é o mesmo de `status-rotulos.ts`: o valor
-// cru nunca vai para a tela.
+// `search_nodes` and `get_authoring_guide` are API names; someone building a
+// workflow has no reason to learn them to understand that the assistant is
+// looking for a node. The house pattern is the same as `status-rotulos.ts`: the
+// raw value never reaches the screen.
 //
-// A tabela cobre as ferramentas todas, e não só as que o assistente alcança, porque
-// o quadro `ferramenta` é emitido ANTES do despacho: um nome que o portão
-// recusa ainda aparece aqui uma vez, seguido do passo em erro.
+// The table covers all tools, not only those the assistant can reach, because
+// the `ferramenta` frame is emitted BEFORE dispatch: a name the gate rejects
+// still shows up here once, followed by the step in error.
 
 import { IDIOMA_PADRAO, type Idioma } from "@/lib/idioma"
 import { textosDe } from "../i18n"
@@ -21,12 +21,12 @@ export function rotuloDaFerramenta(nome: string, idioma: Idioma = IDIOMA_PADRAO)
 }
 
 /**
- * Um detalhe curto da chamada, tirado do resumo dos argumentos.
+ * A short detail of the call, taken from the argument summary.
  *
- * O resumo do servidor já colapsa o que é grande (`definition` vira
- * `{__campos__: 2}`), então aqui só há texto curto — e mesmo assim a escolha é
- * por chave conhecida, não "o primeiro valor que couber": um argumento novo não
- * pode passar a despejar conteúdo na tela por acidente.
+ * The server summary already collapses what is large (`definition` becomes
+ * `{__campos__: 2}`), so there is only short text here — and even so the
+ * selection is by known key, not "the first value that fits": a new argument
+ * must not start dumping content onto the screen by accident.
  */
 const DETALHE = ["query", "topic", "name", "search", "node_name", "workflow_id", "run_id", "file_id"]
 

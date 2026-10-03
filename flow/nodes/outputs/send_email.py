@@ -1,14 +1,14 @@
 # flow/nodes/outputs/send_email.py
 """
-Node de envio de e-mail via Resend API (através do endpoint interno do servidor).
+Node that sends e-mail via the Resend API (through the server's internal endpoint).
 
-O executor não possui RESEND_API_KEY — o envio é delegado ao servidor via
-POST /internal/send-email, autenticado por mTLS (cert client validado
-pelo Traefik e propagado via `X-Forwarded-Tls-Client-Cert-Info`).
+The executor does not hold RESEND_API_KEY — sending is delegated to the server via
+POST /internal/send-email, authenticated by mTLS (client cert validated
+by Traefik and propagated via `X-Forwarded-Tls-Client-Cert-Info`).
 
-Modos de anexo (attachMode):
-  - "link"  → espera URL de artefato no input (vinda de node anterior como DataOutput/SaveToS3)
-  - "auto"  → se houver GeoDataFrame no input, salva como artefato no MinIO e gera link de download
+Attachment modes (attachMode):
+  - "link"  → expects an artifact URL in the input (from a previous node such as DataOutput/SaveToS3)
+  - "auto"  → if there is a GeoDataFrame in the input, saves it as an artifact in MinIO and generates a download link
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ def _get_presigned_url_for_s3_key(s3_key: str) -> str | None:
         return resp.json().get("download_url")
 
     try:
-        # Geracao de presign é idempotente → retry seguro.
+        # Presign generation is idempotent → retry is safe.
         return retry_sync(_fetch, label=f"presign s3_key {s3_key}")
     except Exception as exc:
         logger.warning("Não foi possível gerar presigned URL para s3_key=%s: %s", s3_key, exc)
@@ -59,23 +59,23 @@ def _call_send_email_endpoint(
     workspace_id: str | None = None,
     task_id: str | None = None,
 ) -> dict:
-    """Chama POST /internal/send-email no servidor (bloqueante).
+    """Calls POST /internal/send-email on the server (blocking).
 
-    SEM retry automatico: envio de e-mail NAO e idempotente — re-tentar um
-    request cujo 5xx/timeout veio APOS o servidor ja ter disparado o e-mail
-    duplicaria a mensagem. Para tornar seguro, o endpoint /internal/send-email
-    precisaria de uma idempotency key (ex: hash de to+subject+run_id). Ate la,
-    falha aqui propaga e o operador reenvia conscientemente.
+    NO automatic retry: sending e-mail is NOT idempotent — retrying a request
+    whose 5xx/timeout came AFTER the server had already sent the e-mail would
+    duplicate the message. To make it safe, the /internal/send-email endpoint
+    would need an idempotency key (e.g. a hash of to+subject+run_id). Until then,
+    a failure here propagates and the operator resends deliberately.
     """
     import httpx
     from flow.utils.executor_http import get_agent_http_config
 
     base_url, headers, verify = get_agent_http_config()
 
-    # O remetente e definido pelo servidor (RESEND_FROM_EMAIL) — o executor nao
-    # escolhe o "from" para nao poder forjar enderecos do dominio da plataforma.
-    # workspace_id + task_id atam o envio a uma execucao REAL de um workspace que
-    # o executor atende (auditoria SEG-07): o servidor recusa envio sem run vivo.
+    # The sender is defined by the server (RESEND_FROM_EMAIL) — the executor does not
+    # choose the "from", so it cannot forge addresses on the platform's domain.
+    # workspace_id + task_id tie the send to a REAL run of a workspace the
+    # executor serves (audit SEG-07): the server refuses to send without a live run.
     payload: dict[str, Any] = {
         "to": to,
         "subject": subject,
@@ -93,10 +93,10 @@ def _call_send_email_endpoint(
         timeout=30,
     )
     if resp.status_code >= 400:
-        # raise_for_status() retornava apenas "Server error 'X' for url..."
-        # Extrai o `detail` do JSON (FastAPI HTTPException retorna nesse formato)
-        # para o operador ver o motivo real (ex: "Missing html or text field")
-        # em vez de so o status code.
+        # raise_for_status() returned only "Server error 'X' for url..."
+        # Extracts the `detail` from the JSON (FastAPI HTTPException returns that format)
+        # so the operator sees the real reason (e.g. "Missing html or text field")
+        # instead of just the status code.
         detail = ""
         try:
             payload_err = resp.json()
@@ -119,10 +119,10 @@ def _call_send_email_endpoint(
 @register_node
 class SendEmailNode(BaseNode):
     """
-    Envia e-mail via Resend delegando ao servidor (POST /internal/send-email).
-    Suporta dois modos de anexo:
-      - "link": recebe URL de artefato do input de um node anterior
-      - "auto": salva GeoDataFrame como artefato no MinIO e inclui link no email
+    Sends e-mail via Resend by delegating to the server (POST /internal/send-email).
+    Supports two attachment modes:
+      - "link": receives an artifact URL from a previous node's input
+      - "auto": saves the GeoDataFrame as an artifact in MinIO and includes a link in the e-mail
     """
 
     @classmethod
@@ -201,7 +201,7 @@ class SendEmailNode(BaseNode):
         }
 
     def _resolve_artifact_url_from_inputs(self, inputs: Dict[str, Any]) -> str | None:
-        """Procura URL ou s3_key de artefato nos outputs do node anterior."""
+        """Looks for an artifact URL or s3_key in the previous node's outputs."""
         _url_keys = ("artifactUrl", "artifact_url", "download_url")
         _s3_key = "artifact_s3_key"
 
@@ -211,7 +211,7 @@ class SendEmailNode(BaseNode):
                     return d[key]
             if _s3_key in d and d[_s3_key]:
                 return d[_s3_key]
-            # Busca dentro de "output" wrappado (padrão novo)
+            # Looks inside the wrapped "output" (new pattern)
             if "output" in d and isinstance(d["output"], dict):
                 return _search_dict(d["output"])
             return None
@@ -227,22 +227,22 @@ class SendEmailNode(BaseNode):
 
     async def _auto_save_artifact(self, inputs: Dict[str, Any]) -> tuple[str, str, str | None]:
         """
-        Salva GeoDataFrame do input como artefato no MinIO.
-        Retorna (s3_key, filename, drive_file_id).
+        Saves the input GeoDataFrame as an artifact in MinIO.
+        Returns (s3_key, filename, drive_file_id).
         """
         from flow.utils.artifact_helpers import exigir_envio_permitido, upload_artifact_to_minio
         from flow.utils.executor_http import slugify
 
-        # O anexo automático PRODUZ um arquivo novo e manda o link dele. Não há
-        # versão local disso que ainda signifique alguma coisa: um link que
-        # ninguém consegue abrir não é resultado degradado, é resultado nenhum.
+        # The automatic attachment PRODUCES a new file and sends its link. There is
+        # no local version of that which still means anything: a link that
+        # nobody can open is not a degraded result, it is no result at all.
         #
-        # Falha em vez de enviar. Enviar seria um workflow contrariando a
-        # política da máquina — exatamente o que ela existe para impedir. E falha
-        # em vez de pular: um e-mail que sai sem o anexo, com o run verde,
-        # ninguém descobre.
+        # Fail instead of sending. Sending would be a workflow going against the
+        # machine's policy — exactly what the policy exists to prevent. And fail
+        # instead of skipping: an e-mail that goes out without the attachment, with
+        # a green run, nobody finds out about.
         #
-        # Só este modo é barrado. `none` e `link` não expõem nada de novo.
+        # Only this mode is blocked. `none` and `link` expose nothing new.
         exigir_envio_permitido(
             f"SendEmail (anexo automático de '{self.parameters.get('artifactLabel', 'resultado')}')",
             "o anexo automático precisa enviar o arquivo ao servidor para gerar "
@@ -291,15 +291,15 @@ class SendEmailNode(BaseNode):
         return s3_key, filename, artifact_meta
 
     def _build_artifact_html(self, artifact_ref: str, filename: str | None = None) -> str:
-        """Gera bloco HTML com link de download do artefato."""
+        """Generates an HTML block with the artifact's download link."""
         display_name = filename or artifact_ref.split("/")[-1] if "/" in artifact_ref else artifact_ref
 
         if artifact_ref.startswith("http://") or artifact_ref.startswith("https://"):
             download_link = artifact_ref
         else:
-            # s3_key → URL pública via MinIO externo. Sem MINIO_EXTERNAL_ENDPOINT
-            # não há endereço: a chave crua num `href` seria um link RELATIVO,
-            # morto, e o e-mail sai sem o bloco do anexo (como no modo "link").
+            # s3_key → public URL via the external MinIO. Without MINIO_EXTERNAL_ENDPOINT
+            # there is no address: the raw key in an `href` would be a dead RELATIVE
+            # link, and the e-mail goes out without the attachment block (as in "link" mode).
             minio_ext = os.getenv("MINIO_EXTERNAL_ENDPOINT", "").rstrip("/")
             if not minio_ext:
                 self.log(
@@ -325,12 +325,12 @@ class SendEmailNode(BaseNode):
     }
 
     def _resolve_dynamic_field(self, inputs: Dict[str, Any], field_name: str) -> str | None:
-        """Procura um campo pelo nome exato nos inputs e dentro de dicts aninhados."""
+        """Looks for a field by exact name in the inputs and inside nested dicts."""
         if field_name in inputs and isinstance(inputs[field_name], str):
             return inputs[field_name]
         for value in inputs.values():
             if isinstance(value, dict):
-                # Busca dentro de "output" wrappado (padrão novo)
+                # Looks inside the wrapped "output" (new pattern)
                 wrapped = value.get("output")
                 inner = wrapped if isinstance(wrapped, dict) else value
                 if field_name not in inner:
@@ -341,7 +341,7 @@ class SendEmailNode(BaseNode):
         return None
 
     def _resolve_field(self, inputs: Dict[str, Any], field: str) -> str | None:
-        """Resolve um campo tentando cada alias em ordem até encontrar valor não-vazio."""
+        """Resolves a field by trying each alias in order until it finds a non-empty value."""
         for alias in self._FIELD_ALIASES[field]:
             val = self._resolve_dynamic_field(inputs, alias)
             if val:
@@ -351,13 +351,13 @@ class SendEmailNode(BaseNode):
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         self.validate()
 
-        # Parâmetros do node (propriedades estáticas)
+        # Node parameters (static properties)
         to_raw = self.parameters.get("toAddresses", "").strip()
         subject = self.parameters.get("subject", "").strip()
         body = self.parameters.get("body", "")
         attach_mode = self.parameters.get("attachMode", "none").strip().lower()
 
-        # Inputs dinâmicos (output de node anterior) sobrescrevem propriedades estáticas
+        # Dynamic inputs (previous node's output) override static properties
         if val := self._resolve_field(inputs, "body"):
             body = val
         if val := self._resolve_field(inputs, "subject"):
@@ -369,9 +369,9 @@ class SendEmailNode(BaseNode):
             raise ValueError("Parâmetro 'toAddresses' é obrigatório (propriedade ou input dinâmico 'email_to').")
         if not subject:
             raise ValueError("Parâmetro 'subject' é obrigatório (propriedade ou input dinâmico 'email_subject').")
-        # Body vazio era enviado como html="" e o Resend rejeitava com
-        # "Missing html or text field" — o servidor convertia em 502 e o
-        # operador via apenas "Bad Gateway" sem pista da causa.
+        # An empty body was sent as html="" and Resend rejected it with
+        # "Missing html or text field" — the server turned that into a 502 and the
+        # operator saw only "Bad Gateway" with no clue as to the cause.
         if not body.strip():
             raise ValueError(
                 "Parâmetro 'body' é obrigatório (propriedade ou input dinâmico "
@@ -387,15 +387,15 @@ class SendEmailNode(BaseNode):
         artifact_s3_key = ""
         _artifact_meta = None
 
-        # A autenticacao das chamadas ao servidor acontece via cert mTLS do
-        # executor, montado por get_agent_http_config a partir de
+        # Calls to the server are authenticated via the executor's mTLS
+        # cert, assembled by get_agent_http_config from
         # EXECUTOR_SERVER_URL/EXECUTOR_CERT_DIR.
 
         # ── Modo link: busca URL/s3_key do input ────────────────────────────
         if attach_mode == "link":
             artifact_ref = self._resolve_artifact_url_from_inputs(inputs)
             if artifact_ref:
-                # Se é s3_key (não URL), gera presigned URL
+                # If it is an s3_key (not a URL), generate a presigned URL
                 if not artifact_ref.startswith(("http://", "https://")):
                     presigned = await asyncio.to_thread(
                         _get_presigned_url_for_s3_key, artifact_ref
@@ -406,14 +406,15 @@ class SendEmailNode(BaseNode):
                 if artifact_ref.startswith(("http://", "https://")):
                     body += self._build_artifact_html(artifact_ref)
                 else:
-                    # Sem presign, `artifact_ref` continua sendo a referência
-                    # crua do nó anterior, e `_build_artifact_html` a colocaria
-                    # num `href` — um link RELATIVO num e-mail HTML, que não
-                    # leva a lugar nenhum. O e-mail sairia anunciando "anexo
-                    # disponível para download" com um link morto.
+                    # Without a presign, `artifact_ref` is still the previous node's raw
+                    # reference, and `_build_artifact_html` would put it
+                    # in an `href` — a RELATIVE link in an HTML e-mail, which
+                    # leads nowhere. The e-mail would go out announcing an
+                    # "anexo disponível para download" (attachment available for
+                    # download) with a dead link.
                     #
-                    # O caso comum é justamente um artefato mantido no executor:
-                    # não existe objeto no storage, então não há o que assinar.
+                    # The common case is precisely an artifact kept on the executor:
+                    # there is no object in storage, so there is nothing to sign.
                     self.log(
                         "AVISO: o artefato referenciado não tem link de download "
                         f"('{artifact_ref}') e o e-mail vai sair SEM o anexo. "
@@ -431,7 +432,7 @@ class SendEmailNode(BaseNode):
             s3_key, filename, artifact_meta = await self._auto_save_artifact(inputs)
             artifact_s3_key = s3_key
             _artifact_meta = artifact_meta
-            # Gera presigned URL via s3_key (path-based validation, sem depender da tabela Artifact)
+            # Generates a presigned URL via s3_key (path-based validation, without depending on the Artifact table)
             download_url = await asyncio.to_thread(
                 _get_presigned_url_for_s3_key, s3_key
             )

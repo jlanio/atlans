@@ -1,14 +1,15 @@
 /**
- * O ReactFlow precisa ser avisado quando os pontos de conexão de um nó mudam.
+ * ReactFlow needs to be told when a node's connection points change.
  *
- * Ele MEDE os handles uma vez e guarda posições e ids num registro interno.
- * Handle acrescentado a um nó já renderizado é desenhado pelo React mas não
- * entra nesse registro — e o sintoma não parece bug de estado: o ponto aparece
- * na tela e simplesmente não aceita conexão. Foi assim que as portas do Script
- * Python surgiram inertes.
+ * It MEASURES the handles once and keeps positions and ids in an internal
+ * registry. A handle added to an already-rendered node is drawn by React but
+ * doesn't enter that registry — and the symptom doesn't look like a state bug:
+ * the point appears on the screen and simply doesn't accept connections. That's
+ * how the Python Script ports came out inert.
  *
- * O que se testa: QUANDO a remedição é pedida. Pedir de menos deixa o ponto
- * inerte; pedir a cada render (ou a cada quadro de um arrasto) custa caro à toa.
+ * What's tested: WHEN the re-measurement is requested. Requesting too little
+ * leaves the point inert; requesting on every render (or every frame of a drag)
+ * is expensive for nothing.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderHook } from "@testing-library/react"
@@ -66,7 +67,7 @@ describe("pede remedição quando os handles mudam", () => {
   })
 
   it("também para portas de SAÍDA", () => {
-    // O contrato dos sub-fluxos mexe nas duas listas, e tinha o mesmo defeito.
+    // The sub-workflows' contract touches both lists, and had the same defect.
     const { rerender } = renderHook(({ nodes }) => useHandleRegistrySync(nodes), {
       initialProps: { nodes: [no("n1", [], ["a"])] },
     })
@@ -79,8 +80,8 @@ describe("pede remedição quando os handles mudam", () => {
 
 describe("não pede remedição à toa", () => {
   it("arrastar o nó não dispara", () => {
-    // `nodes` muda a cada quadro de um arrasto. Remedir todos ali custaria caro
-    // e não haveria handle novo para encontrar.
+    // `nodes` changes on every frame of a drag. Re-measuring all of them there
+    // would be expensive and there'd be no new handle to find.
     const { rerender } = renderHook(({ nodes }) => useHandleRegistrySync(nodes), {
       initialProps: { nodes: [no("n1", ["a"], [], { x: 0, y: 0 })] },
     })

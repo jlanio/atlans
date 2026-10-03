@@ -1,16 +1,16 @@
-# Receitas
+# Recipes
 
-Cinco definições completas que passam na validação. Copie, troque os ids de
-arquivo, credencial e sub-fluxo pelos seus (`list_drive_files`,
-`list_credentials`, `list_workflows`) e valide antes de gravar.
+Five complete definitions that pass validation. Copy them, swap the file,
+credential and sub-workflow ids for your own (`list_drive_files`,
+`list_credentials`, `list_workflows`) and validate before saving.
 
-Os UUIDs abaixo são exemplos. Credencial entra SEMPRE por `credential_id` —
-nunca a string de conexão.
+The UUIDs below are examples. A credential ALWAYS goes in through `credential_id` —
+never the connection string.
 
-## 1. Arquivo do Drive → Buffer → GeoJSON
+## 1. Drive file → Buffer → GeoJSON
 
-A espinha mais comum: uma camada do Drive, uma transformação, um arquivo de
-saída.
+The most common backbone: one layer from the Drive, one transformation, one output
+file.
 
 ```json
 {
@@ -32,13 +32,13 @@ saída.
 }
 ```
 
-`from_key: "output"` é obrigatório na primeira aresta: o `DataInput` tem duas
-saídas (`output` e `metadata`) e sem a chave as duas espalhariam para o
+`from_key: "output"` is required on the first edge: `DataInput` has two
+outputs (`output` and `metadata`) and without the key both would spread into the
 `Buffer`.
 
-## 2. Webhook → filtro → resposta HTTP
+## 2. Webhook → filter → HTTP response
 
-Fluxo síncrono: quem chama o webhook recebe o resultado no corpo da resposta.
+A synchronous workflow: whoever calls the webhook gets the result in the response body.
 
 ```json
 {
@@ -60,14 +60,14 @@ Fluxo síncrono: quem chama o webhook recebe o resultado no corpo da resposta.
 }
 ```
 
-Com `payloadField` vazio, o corpo do POST já é o `inputs` do gatilho. O
-`bodyField: "output"` casa com o `from_key` da última aresta: o valor chega ao
-`Response` sob o nome `output`.
+With an empty `payloadField`, the POST body is already the trigger's `inputs`. The
+`bodyField: "output"` matches the `from_key` of the last edge: the value reaches the
+`Response` under the name `output`.
 
-## 3. PostGIS → Dissolve → publicar no mapa
+## 3. PostGIS → Dissolve → publish to the map
 
-Consulta espacial parametrizada, agregação por coluna e publicação no portal
-do fluxo.
+A parameterized spatial query, aggregation by column and publication on the
+workflow's portal.
 
 ```json
 {
@@ -100,17 +100,17 @@ do fluxo.
 }
 ```
 
-O gatilho está aqui por causa do parâmetro: `inputs` só são os valores de quem
-executa DENTRO de um nó `type: "trigger"`. Do gatilho para a frente, o valor é
-referenciado pelo alias — daí `$Chamada.output.municipio` no `queryParams`, que
-vira bind de `:municipio` e preserva o tipo.
+The trigger is here because of the parameter: `inputs` are the values of whoever
+runs the workflow only INSIDE a `type: "trigger"` node. From the trigger onward, the value is
+referenced by the alias — hence `$Chamada.output.municipio` in `queryParams`, which
+becomes a bind of `:municipio` and preserves the type.
 
-## 4. Sub-fluxo: filho e pai
+## 4. Sub-workflow: child and parent
 
-O filho declara o próprio contrato de entrada e de saída; o pai o chama pelo
+The child declares its own input and output contract; the parent calls it by its
 `id_hash`.
 
-**Filho** — grave primeiro e guarde o `id` que a criação devolve:
+**Child** — save it first and keep the `id` that the creation returns:
 
 ```json
 {
@@ -132,8 +132,9 @@ O filho declara o próprio contrato de entrada e de saída; o pai o chama pelo
 }
 ```
 
-**Pai** — `workflowHash` é o `id` do filho; `inputsMapping` liga
-`{porta do filho: chave que chega ao nó}`:
+**Parent** — `workflowHash` is the child's `id`; `inputsMapping` maps
+`{porta do filho: chave que chega ao nó}` (child's port: key that
+arrives at the node):
 
 ```json
 {
@@ -155,19 +156,19 @@ O filho declara o próprio contrato de entrada e de saída; o pai o chama pelo
 }
 ```
 
-Cada porta declarada no `SubWorkflowInput` vira uma saída nomeada do gatilho,
-e a aresta que sai dela leva `from_key` com o nome da porta — é assim que o
-filho escolhe o que passar adiante. No `SubWorkflowOutput`, ao contrário, cada
-aresta que chega precisa de `to_key` distinto: é o nome da porta de saída do
-sub-fluxo. Chave fora das `ports` é descartada nas duas pontas.
+Each port declared in `SubWorkflowInput` becomes a named output of the trigger,
+and the edge leaving it carries a `from_key` with the port's name — that is how the
+child chooses what to pass along. In `SubWorkflowOutput`, conversely, each
+incoming edge needs a distinct `to_key`: it is the name of the sub-workflow's
+output port. A key outside the `ports` is discarded at both ends.
 
-## 5. Fonte catalogada (WFS) filtrada no servidor → publicar no mapa
+## 5. Cataloged source (WFS) filtered on the server → publish to the map
 
-`url` e `typeName` vieram de `describe_source(...).node_snippet`, nunca de
-cabeça (tópico `sources`); `sortBy` pagina a camada no GeoServer e o filtro
-por atributo (`cqlFilter`) roda no servidor, antes da paginação. Se o servidor
-não aplicar CQL (o nó falha dizendo isso), tire o `cqlFilter` e ponha um
-`AttributeFilter` depois da leitura.
+`url` and `typeName` came from `describe_source(...).node_snippet`, never from
+memory (topic `sources`); `sortBy` pages the layer on the GeoServer and the
+attribute filter (`cqlFilter`) runs on the server, before pagination. If the server
+does not apply CQL (the node fails saying so), remove the `cqlFilter` and put an
+`AttributeFilter` after the read.
 
 ```json
 {

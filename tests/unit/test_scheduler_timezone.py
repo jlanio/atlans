@@ -1,10 +1,10 @@
 # tests/unit/test_scheduler_timezone.py
-"""O cron do agendamento tem de disparar no fuso configurado.
+"""The schedule's cron has to fire in the configured time zone.
 
-`schedules.timezone` era gravado pelo nó ScheduleTrigger e nunca lido: o
-_compute_next rodava sobre UTC naive, entao "0 13 * * *" disparava as 13h UTC —
-9h em America/Cuiaba. Quem escolhia o horario na UI nunca via o workflow rodar
-na hora certa, e a diferenca (4h) passava por "o agendamento nao funciona".
+`schedules.timezone` was written by the ScheduleTrigger node and never read:
+_compute_next ran on naive UTC, so "0 13 * * *" fired at 13:00 UTC — 9:00 in
+America/Cuiaba. Whoever picked the time in the UI never saw the workflow run at
+the right time, and the difference (4h) passed for "scheduling does not work".
 """
 from datetime import datetime
 from unittest.mock import MagicMock
@@ -21,22 +21,22 @@ def _sched(**kwargs) -> MagicMock:
         "interval": None,
         "unit": None,
         "rrule_expression": None,
-        "timezone": "America/Cuiaba",   # UTC-4, sem horario de verao
+        "timezone": "America/Cuiaba",   # UTC-4, no daylight saving time
     }
     base.update(kwargs)
     return MagicMock(**base)
 
 
 def test_cron_dispara_no_fuso_do_schedule():
-    """13h em Cuiaba (UTC-4) = 17h UTC, que e como o next_run_at e gravado."""
-    # 04/08 as 12:00 UTC = 08:00 em Cuiaba, antes do horario do cron.
+    """13:00 in Cuiaba (UTC-4) = 17:00 UTC, which is how next_run_at is stored."""
+    # 08-04 at 12:00 UTC = 08:00 in Cuiaba, before the cron time.
     proximo = AsyncScheduler()._compute_next(_sched(), datetime(2026, 8, 4, 12, 0))
 
     assert proximo == datetime(2026, 8, 4, 17, 0)
 
 
 def test_cron_em_utc_permanece_em_utc():
-    """Sem deslocamento quando o schedule ja esta em UTC — evita 'correcao' dupla."""
+    """No offset when the schedule is already in UTC — avoids a double 'correction'."""
     proximo = AsyncScheduler()._compute_next(
         _sched(timezone="UTC"), datetime(2026, 8, 4, 12, 0),
     )
@@ -52,12 +52,12 @@ def test_cron_avanca_para_o_dia_seguinte_no_fuso_local():
 
 
 def test_timezone_invalido_cai_no_padrao_sem_derrubar_o_agendamento():
-    """O fallback era UTC, e isso nao era escolha — era o default do `datetime`.
+    """The fallback was UTC, and that was not a choice — it was the `datetime` default.
 
-    Todo o resto do produto opera em UTC-4 (o no `ScheduleTrigger` e o schema),
-    entao um schedule sem fuso legivel disparava QUATRO HORAS depois do que a
-    tela dizia, sem nada que explicasse a diferenca. O aviso no log continua:
-    ali alguem digitou algo e merece saber que nao pegou.
+    The whole rest of the product operates in UTC-4 (the `ScheduleTrigger` node
+    and the schema), so a schedule without a readable time zone fired FOUR HOURS
+    later than the screen said, with nothing to explain the difference. The log
+    warning stays: someone typed something there and deserves to know it did not take.
     """
     proximo = AsyncScheduler()._compute_next(
         _sched(timezone="Marte/Olympus"), datetime(2026, 8, 4, 12, 0),
@@ -68,8 +68,8 @@ def test_timezone_invalido_cai_no_padrao_sem_derrubar_o_agendamento():
 
 
 def test_timezone_vazio_cai_no_padrao():
-    """A pergunta que o fallback responde e uma so — "nao sei o fuso deste
-    agendamento, qual uso?" — entao as duas saidas dela dao no mesmo lugar."""
+    """The question the fallback answers is a single one — "I don't know this
+    schedule's time zone, which one do I use?" — so both of its exits end up in the same place."""
     proximo = AsyncScheduler()._compute_next(
         _sched(timezone=None), datetime(2026, 8, 4, 12, 0),
     )
@@ -78,10 +78,10 @@ def test_timezone_vazio_cai_no_padrao():
 
 
 def test_o_fuso_padrao_do_fallback_e_o_do_produto():
-    """Prende o fallback a constante, e nao a um literal repetido aqui.
+    """Ties the fallback to the constant, not to a literal repeated here.
 
-    Sem isto, mudar a constante deixaria estes dois testes afirmando um horario
-    que nao e mais o do produto — e eles continuariam verdes ate alguem reparar.
+    Without this, changing the constant would leave these two tests asserting a
+    time that is no longer the product's — and they would stay green until someone noticed.
     """
     from zoneinfo import ZoneInfo
     from unittest.mock import MagicMock as _M
@@ -92,7 +92,7 @@ def test_o_fuso_padrao_do_fallback_e_o_do_produto():
 
 
 def test_intervalo_ignora_fuso():
-    """Soma de delta nao depende de fuso — nao pode ser deslocada."""
+    """Adding a delta does not depend on the time zone — it must not be shifted."""
     proximo = AsyncScheduler()._compute_next(
         _sched(strategy="interval", cron_expression=None, interval=30, unit="minutes"),
         datetime(2026, 8, 4, 12, 0),
@@ -102,7 +102,7 @@ def test_intervalo_ignora_fuso():
 
 
 def test_rrule_tambem_respeita_o_fuso():
-    """BYHOUR de uma rrule tambem e hora local."""
+    """An rrule's BYHOUR is local time too."""
     proximo = AsyncScheduler()._compute_next(
         _sched(
             strategy="rrule",

@@ -12,8 +12,8 @@ import { computeAutoLayout } from "./utils/auto-layout"
 import { CAMADA_SOBRE_O_CANVAS } from "./canvas-layers"
 import { useCanvasReadOnly } from "./canvas-interaction"
 
-// 44px é o alvo de toque mínimo recomendado (iOS HIG e Material). No desktop
-// segue 32px: com ponteiro fino o botão maior só rouba área do canvas.
+// 44px is the recommended minimum touch target (iOS HIG and Material). On desktop
+// it stays 32px: with a fine pointer the bigger button only steals canvas area.
 const BOTAO = "h-11 w-11 sm:h-8 sm:w-8"
 
 interface CanvasToolbarProps {
@@ -25,23 +25,23 @@ interface CanvasToolbarProps {
 }
 
 const CanvasToolbar = ({ onUndo, onRedo, canUndo, canRedo, onSaveSnapshot }: CanvasToolbarProps) => {
-  // Leitura imperativa: o grafo só é usado dentro do "Organizar nós". Assinar
-  // `useNodes()`/`useEdges()` reconciliava os 9 botões e o minimapa a cada
-  // pointermove de um arraste, e ainda recriava `handleAutoLayout` por quadro.
+  // Imperative read: the graph is only used inside "Organizar nós". Subscribing to
+  // `useNodes()`/`useEdges()` reconciled the 9 buttons and the minimap on every
+  // pointermove of a drag, and also recreated `handleAutoLayout` per frame.
   const { zoomIn, zoomOut, fitView, setNodes, getNodes, getEdges } = useReactFlow<INodeContext, Edge>()
   const [minimapOpen, setMinimapOpen] = useState(false)
   const somenteLeitura = useCanvasReadOnly()
   const focusEnabled = useCanvasViewStore(s => s.focusEnabled)
   const toggleFocusEnabled = useCanvasViewStore(s => s.toggleFocusEnabled)
-  // Sobe junto com o dock do painel de execução — ancorados em `bottom-4` fixo,
-  // a toolbar de zoom e o minimapa ficavam por baixo da barra do painel.
+  // Rises together with the run panel dock — anchored at a fixed `bottom-4`,
+  // the zoom toolbar and the minimap sat under the panel's bar.
   const dockHeight = useRunDockHeight()
 
   const handleAutoLayout = useCallback(() => {
-    // Dois snapshots: o primeiro deixa o Ctrl+Z voltar ao layout manual; o
-    // segundo impede que a próxima edição seja mesclada com o passo de layout.
-    // O segundo precisa ir no setTimeout porque `saveSnapshot` lê `getNodes()`
-    // no momento da chamada — antes do commit ele capturaria as posições antigas.
+    // Two snapshots: the first lets Ctrl+Z go back to the manual layout; the
+    // second prevents the next edit from being merged with the layout step.
+    // The second has to go in the setTimeout because `saveSnapshot` reads
+    // `getNodes()` at call time — before the commit it would capture the old positions.
     onSaveSnapshot?.()
 
     const positions = computeAutoLayout(getNodes(), getEdges())
@@ -62,22 +62,22 @@ const CanvasToolbar = ({ onUndo, onRedo, canUndo, canRedo, onSaveSnapshot }: Can
       {minimapOpen && (
         <MiniMap
           className="!right-4 !rounded-lg !border !border-border !shadow-md"
-          // Cores derivadas dos tokens em vez de hex cru: seguem dark/light
-          // sozinhas. O ReactFlow aplica `nodeColor` como `fill` de estilo inline
-          // e `maskColor` como custom property CSS — ambos resolvem `var()`/
-          // `color-mix()`. Nó = superfície neutra; máscara = fundo esmaecido.
+          // Colors derived from the tokens instead of raw hex: they follow dark/light
+          // on their own. ReactFlow applies `nodeColor` as an inline style `fill`
+          // and `maskColor` as a CSS custom property — both resolve `var()`/
+          // `color-mix()`. Node = neutral surface; mask = faded background.
           nodeColor="var(--muted)"
           maskColor="color-mix(in oklab, var(--background) 55%, transparent)"
           style={{ zIndex: 10, bottom: dockHeight + 48 }}
         />
       )}
 
-      {/* Toolbar flutuante.
-          No telefone sobram só os controles de NAVEGAÇÃO. Os nove botões
-          empilhados somavam ~336px de altura — metade da tela útil — e a 32px
-          ficavam bem abaixo do alvo de toque de 44px. Desfazer, refazer e
-          organizar saem porque o canvas ali não edita; o realce de caminho sai
-          porque é acionado por hover, que não existe no toque. */}
+      {/* Floating toolbar.
+          On the phone only the NAVIGATION controls remain. The nine stacked
+          buttons added up to ~336px of height — half the usable screen — and at
+          32px they fell well short of the 44px touch target. Undo, redo and
+          organize go because the canvas there doesn't edit; the path highlight
+          goes because it's triggered by hover, which doesn't exist on touch. */}
       <div
         data-canvas-chrome=""
         className={`${CAMADA_SOBRE_O_CANVAS} right-2 sm:right-4 pr-safe flex flex-col gap-1.5 transition-[bottom] duration-150`}

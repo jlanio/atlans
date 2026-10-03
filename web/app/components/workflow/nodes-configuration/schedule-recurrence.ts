@@ -1,19 +1,19 @@
-// Lógica pura do construtor de agendamento (sem React), para ser testável sem
-// montar tela. O nó ScheduleTrigger guarda os MESMOS campos de sempre
+// Pure logic of the schedule builder (no React), so it is testable without
+// mounting a screen. The ScheduleTrigger node stores the SAME fields as always
 // (`strategy`, `cron_expression`, `interval`, `unit`, `timezone`, `active`,
-// `rrule_expression`) — este módulo só traduz entre esses campos e um estado de
-// "frequência primeiro" que a pessoa entende, e calcula as próximas execuções.
+// `rrule_expression`) — this module only translates between those fields and a
+// "frequency first" state the person understands, and computes the next runs.
 //
-// Mapeamento para o que o agendador (app/core/async_scheduler.py) sabe executar:
-//   • Intervalo (a cada N unidades) → strategy=interval (croniter não entra).
-//   • Diariamente (todo dia às H:M) → cron  "M H * * *".
-//   • A cada N dias às H:M          → rrule "FREQ=DAILY;INTERVAL=N;BYHOUR=H;BYMINUTE=M"
-//        (cron "*/N" no dia-do-mês REINICIA a cada mês — não é "a cada N dias").
-//   • Semanalmente (dias às H:M)    → cron  "M H * * d,d".
-//   • Mensalmente no dia D às H:M   → cron  "M H D * *"  (meses sem o dia D são PULADOS).
-//   • Mensalmente no último dia     → rrule "FREQ=MONTHLY;BYMONTHDAY=-1;BYHOUR=H;BYMINUTE=M"
-//        (cron padrão/croniter não expressa "último dia").
-//   • Avançado                      → cron ou rrule crus, para quem sabe.
+// Mapping to what the scheduler (app/core/async_scheduler.py) can execute:
+//   • Interval (every N units)       → strategy=interval (croniter not involved).
+//   • Daily (every day at H:M)       → cron  "M H * * *".
+//   • Every N days at H:M            → rrule "FREQ=DAILY;INTERVAL=N;BYHOUR=H;BYMINUTE=M"
+//        (cron "*/N" on day-of-month RESTARTS every month — it isn't "every N days").
+//   • Weekly (days at H:M)           → cron  "M H * * d,d".
+//   • Monthly on day D at H:M        → cron  "M H D * *"  (months without day D are SKIPPED).
+//   • Monthly on the last day        → rrule "FREQ=MONTHLY;BYMONTHDAY=-1;BYHOUR=H;BYMINUTE=M"
+//        (standard cron/croniter can't express "last day").
+//   • Advanced                       → raw cron or rrule, for those who know.
 
 export type Frequencia = "intervalo" | "diario" | "semanal" | "mensal" | "avancado"
 export type UnidadeIntervalo = "seconds" | "minutes" | "hours" | "days"
@@ -25,8 +25,8 @@ export interface EstadoAgenda {
   unidade: UnidadeIntervalo
   hora: number        // 0-23
   minuto: number      // 0-59
-  everyDays: number   // "diário": a cada N dias (1 = todo dia)
-  weekdays: number[]  // 0=domingo … 6=sábado (convenção do cron)
+  everyDays: number   // "daily": every N days (1 = every day)
+  weekdays: number[]  // 0=Sunday … 6=Saturday (cron convention)
   monthDay: number    // 1-31
   monthLast: boolean
   timezone: string
@@ -36,20 +36,21 @@ export interface EstadoAgenda {
   advRrule: string
 }
 
-// O fuso padrão é o da INSTALAÇÃO (AGENDAMENTO_FUSO_PADRAO no servidor), e chega
-// aqui pelo catálogo de nós: é o `default` do campo `timezone` do ScheduleTrigger
-// (`fusoPadraoDosCampos`). Assim um nó sem timezone explícito não vê a prévia
-// num fuso diferente do que rodaria. Este é só a reserva para quando o catálogo
-// não veio — o mesmo padrão do servidor sem configuração.
+// The default time zone is the INSTALLATION's (AGENDAMENTO_FUSO_PADRAO on the
+// server), and it arrives here through the node catalog: it is the `default` of
+// the ScheduleTrigger's `timezone` field (`fusoPadraoDosCampos`). That way a
+// node without an explicit timezone doesn't see the preview in a different time
+// zone than it would run in. This is only the fallback for when the catalog
+// didn't come — the same default as a server without configuration.
 export const FUSO_DE_RESERVA = "UTC"
 const CRON_PADRAO = "0 9 * * *"
 
 const DIAS_CURTOS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"]
 const DIAS_LONGOS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"]
-// BYDAY do RRule (RFC 5545): SU=domingo … SA=sábado, no mesmo índice do cron.
+// RRule BYDAY (RFC 5545): SU=Sunday … SA=Saturday, at the same index as cron.
 const BYDAY = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"]
 
-// ── Valores dos campos ────────────────────────────────────────────────────────
+// ── Field values ──────────────────────────────────────────────────────────────
 
 type Valores = Record<string, string | number | boolean> | undefined
 
@@ -70,17 +71,17 @@ function estadoInicial(fusoPadrao: string): EstadoAgenda {
   }
 }
 
-/** O fuso padrão da instalação: o `default` do campo `timezone` no catálogo de nós. */
+/** The installation's default time zone: the `default` of the `timezone` field in the node catalog. */
 export function fusoPadraoDosCampos(campos?: { name: string; default?: unknown }[]): string {
   const padrao = campos?.find(c => c.name === "timezone")?.default
   return typeof padrao === "string" && padrao.trim() ? padrao.trim() : FUSO_DE_RESERVA
 }
 
-/** Traduz os campos gravados no nó para o estado do construtor. */
+/** Translates the fields stored on the node into the builder state. */
 export function lerEstado(valores: Valores, fusoPadrao: string = FUSO_DE_RESERVA): EstadoAgenda {
   const e = estadoInicial(fusoPadrao)
   e.timezone = texto(valores, "timezone", fusoPadrao) || fusoPadrao
-  // `Boolean("false")` é true — coage explicitamente strings/0 (dados legados).
+  // `Boolean("false")` is true — explicitly coerces strings/0 (legacy data).
   const a = valores?.active
   e.active = !(a === false || a === "false" || a === 0 || a === "0")
   e.intervalo = Math.max(1, inteiro(valores, "interval", 15))
@@ -96,15 +97,16 @@ export function lerEstado(valores: Valores, fusoPadrao: string = FUSO_DE_RESERVA
     return e
   }
   if (strategy === "rrule") {
-    // A estratégia salva é rrule: o tipo do modo avançado TEM de ser "rrule".
-    // Sem isto, uma rrule que casa um modo simples (ex.: "a cada 3 dias") carrega
-    // com advTipo="cron" (o default de estadoInicial). Ao abrir "Avançado" a
-    // pessoa cai na aba de cron — não na rrule que estava salva — e um "Salvar"
-    // dali grava strategy=cron com o CRON_PADRAO, apagando a rrule em silêncio.
+    // The saved strategy is rrule: the advanced mode's type MUST be "rrule".
+    // Without this, an rrule that matches a simple mode (e.g. "every 3 days")
+    // loads with advTipo="cron" (the estadoInicial default). Opening "Avançado"
+    // (Advanced) the person lands on the cron tab — not on the rrule that was
+    // saved — and a "Salvar" from there writes strategy=cron with CRON_PADRAO,
+    // silently erasing the rrule.
     e.advTipo = "rrule"
     return aplicarRrule(e, e.advRrule)
   }
-  // strategy === "cron" (ou ausente): tenta mapear para um modo do construtor.
+  // strategy === "cron" (or absent): tries to map to a builder mode.
   return aplicarCron(e, e.advCron)
 }
 
@@ -115,17 +117,17 @@ function aplicarCron(e: EstadoAgenda, expr: string): EstadoAgenda {
   const [min, hora, dom, mes, dow] = p
   const m = /^\d+$/.test(min) ? +min : null
   const h = /^\d+$/.test(hora) ? +hora : null
-  // Minuto e hora fixos são a base de todos os modos de calendário.
+  // Fixed minute and hour are the basis of every calendar mode.
   if (m === null || h === null || m > 59 || h > 23 || mes !== "*") return avancado()
 
-  // Diário: "M H * * *"
+  // Daily: "M H * * *"
   if (dom === "*" && dow === "*") return { ...e, freq: "diario", everyDays: 1, hora: h, minuto: m }
-  // Semanal: "M H * * d,d" (só dia-da-semana)
+  // Weekly: "M H * * d,d" (day-of-week only)
   if (dom === "*" && dow !== "*") {
     const dias = expandirDow(dow)
     return dias ? { ...e, freq: "semanal", weekdays: dias, hora: h, minuto: m } : avancado()
   }
-  // Mensal: "M H D * *" (só dia-do-mês)
+  // Monthly: "M H D * *" (day-of-month only)
   if (dow === "*" && /^\d+$/.test(dom)) {
     const d = +dom
     if (d >= 1 && d <= 31) return { ...e, freq: "mensal", monthDay: d, monthLast: false, hora: h, minuto: m }
@@ -144,7 +146,7 @@ function expandirDow(dow: string): number[] | null {
       for (let x = de; x <= ate; x++) out.push(x % 7)
     } else if (/^\d$/.test(parte)) {
       const n = +parte
-      if (n > 7) return null                            // 8/9 são inválidos p/ croniter → cai em avançado
+      if (n > 7) return null                            // 8/9 are invalid for croniter → falls into advanced
       out.push(n % 7)
     } else {
       return null
@@ -168,7 +170,7 @@ function aplicarRrule(e: EstadoAgenda, expr: string): EstadoAgenda {
 
   if (freq === "DAILY") {
     const n = Math.max(1, /^\d+$/.test(partes.INTERVAL || "") ? +partes.INTERVAL : 1)
-    // Só reconhece a forma que o construtor gera (sem BYDAY/BYMONTHDAY extras).
+    // Only recognizes the shape the builder generates (no extra BYDAY/BYMONTHDAY).
     if (partes.BYDAY || partes.BYMONTHDAY) return avancado()
     return { ...e, freq: "diario", everyDays: n, hora: h, minuto: m }
   }
@@ -204,7 +206,7 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(Number.isFinite(n) ? n : min)))
 }
 
-/** Produz o conjunto COMPLETO e canônico de campos a persistir para o estado. */
+/** Produces the COMPLETE, canonical set of fields to persist for the state. */
 export function gerarCampos(e: EstadoAgenda): CamposAgenda {
   const base: CamposAgenda = {
     strategy: "cron", cron_expression: "", interval: Math.max(1, e.intervalo),
@@ -227,7 +229,7 @@ export function gerarCampos(e: EstadoAgenda): CamposAgenda {
     if (e.monthLast) return { ...base, strategy: "rrule", rrule_expression: `FREQ=MONTHLY;BYMONTHDAY=-1;BYHOUR=${h};BYMINUTE=${m};BYSECOND=0` }
     return { ...base, strategy: "cron", cron_expression: `${m} ${h} ${clamp(e.monthDay, 1, 31)} * *` }
   }
-  // avançado
+  // advanced
   if (e.advTipo === "rrule") return { ...base, strategy: "rrule", rrule_expression: e.advRrule }
   return { ...base, strategy: "cron", cron_expression: e.advCron }
 }
@@ -256,12 +258,12 @@ export function descrever(e: EstadoAgenda): string {
     return `Toda ${ds.map(d => DIAS_CURTOS[d]).join(", ")} às ${hora}`
   }
   if (e.freq === "mensal") return e.monthLast ? `No último dia do mês às ${hora}` : `Todo dia ${e.monthDay} às ${hora}`
-  // avançado
+  // advanced
   if (e.advTipo === "rrule") return e.advRrule ? "Regra RRule personalizada" : "Defina a expressão RRule"
   return descreverCron(e.advCron)
 }
 
-/** Descrição best-effort de um cron cru (modo avançado). */
+/** Best-effort description of a raw cron (advanced mode). */
 export function descreverCron(expr: string): string {
   const p = String(expr || "").trim().split(/\s+/)
   if (p.length !== 5) return "Expressão inválida (5 campos: min hora dia mês dia-semana)"
@@ -284,9 +286,9 @@ export function descreverCron(expr: string): string {
 }
 
 /**
- * Erro de validação do modo AVANÇADO (null = ok). Leve de propósito — espelha o
- * que o agendador rejeitaria (cron ≠ 5 campos; rrule vazia/sem FREQ) para o
- * cliente não gravar uma expressão que apagaria o schedule em silêncio.
+ * Validation error for ADVANCED mode (null = ok). Light on purpose — mirrors
+ * what the scheduler would reject (cron ≠ 5 fields; empty rrule/without FREQ)
+ * so the client doesn't write an expression that would silently erase the schedule.
  */
 export function validarAvancado(e: EstadoAgenda): string | null {
   if (e.freq !== "avancado") return null
@@ -301,7 +303,7 @@ export function validarAvancado(e: EstadoAgenda): string | null {
   return null
 }
 
-/** Resumo do que será salvo (mostrado no "ver o que será salvo"). */
+/** Summary of what will be saved (shown in "ver o que será salvo"). */
 export function resumoSalvo(e: EstadoAgenda): string {
   const c = gerarCampos(e)
   if (c.strategy === "interval") return `intervalo: ${c.interval} (${c.unit})`
@@ -309,7 +311,7 @@ export function resumoSalvo(e: EstadoAgenda): string {
   return `cron: ${c.cron_expression}`
 }
 
-// ── Próximas execuções (mesma semântica do async_scheduler) ───────────────────
+// ── Next runs (same semantics as async_scheduler) ─────────────────────────────
 
 interface ParteFuso { y: number; mo: number; d: number; h: number; mi: number; wd: number }
 
@@ -324,7 +326,7 @@ function partesNoFuso(date: Date, tz: string): ParteFuso {
   return { y: +p.year, mo: +p.month, d: +p.day, h: +(p.hour === "24" ? "0" : p.hour), mi: +p.minute, wd }
 }
 
-/** Instante UTC que corresponde à hora "de parede" (y-mo-d h:mi) no fuso. */
+/** UTC instant matching the "wall clock" time (y-mo-d h:mi) in the time zone. */
 function utcDaParede(y: number, mo: number, d: number, h: number, mi: number, tz: string): Date {
   let ts = Date.UTC(y, mo - 1, d, h, mi, 0)
   for (let i = 0; i < 3; i++) {
@@ -338,13 +340,13 @@ function utcDaParede(y: number, mo: number, d: number, h: number, mi: number, tz
 }
 
 function ultimoDiaDoMes(y: number, mo1: number): number {
-  return new Date(Date.UTC(y, mo1, 0)).getUTCDate() // mo1 = mês 1-12
+  return new Date(Date.UTC(y, mo1, 0)).getUTCDate() // mo1 = month 1-12
 }
 
 /**
- * Próximas `count` execuções a partir de `agora` (default: new Date()), no fuso
- * do estado. Retorna null quando a prévia não é possível (avançado sem forma
- * reconhecida). Espelha o que o async_scheduler calcularia.
+ * Next `count` runs starting from `agora` (default: new Date()), in the state's
+ * time zone. Returns null when the preview isn't possible (advanced without a
+ * recognized shape). Mirrors what async_scheduler would compute.
  */
 export function proximasExecucoes(e: EstadoAgenda, count = 5, agora: Date = new Date()): Date[] | null {
   const out: Date[] = []
@@ -358,7 +360,7 @@ export function proximasExecucoes(e: EstadoAgenda, count = 5, agora: Date = new 
   }
 
   if (e.freq === "avancado") {
-    if (e.advTipo === "rrule") return null       // rrule cru: sem previsão local
+    if (e.advTipo === "rrule") return null       // raw rrule: no local forecast
     return proximasDeCron(e.advCron, tz, count, agora)
   }
 
@@ -370,21 +372,21 @@ export function proximasExecucoes(e: EstadoAgenda, count = 5, agora: Date = new 
       const ult = ultimoDiaDoMes(ano, mesIdx + 1)
       let dia: number
       if (e.monthLast) dia = ult
-      else { if (e.monthDay > ult) continue; dia = e.monthDay }   // mês sem o dia D → PULA
+      else { if (e.monthDay > ult) continue; dia = e.monthDay }   // month without day D → SKIP
       const q = utcDaParede(ano, mesIdx + 1, dia, h, m, tz)
       if (q.getTime() > agora.getTime()) out.push(q)
     }
     return out
   }
 
-  // diário / semanal: varre dia a dia no calendário do fuso.
+  // daily / weekly: scans day by day in the time zone's calendar.
   const t0 = partesNoFuso(agora, tz)
   const ancora = Date.UTC(t0.y, t0.mo - 1, t0.d)
   const nDias = e.freq === "diario" ? Math.max(1, e.everyDays) : 1
   const dias = e.freq === "semanal" ? Array.from(new Set(e.weekdays)) : null
   if (dias && !dias.length) return []
-  // Teto adaptado à cadência: "a cada N dias" com N grande precisa varrer mais
-  // longe para achar `count` execuções.
+  // Ceiling adapted to the cadence: "every N days" with a large N needs to scan
+  // further ahead to find `count` runs.
   const teto = Math.max(1200, (count + 1) * nDias)
   for (let k = 0; out.length < count && k < teto; k++) {
     const cd = new Date(ancora + k * 86400000)
@@ -397,7 +399,7 @@ export function proximasExecucoes(e: EstadoAgenda, count = 5, agora: Date = new 
   return out
 }
 
-/** Prévia para um cron cru — só as formas com minuto e hora fixos. */
+/** Preview for a raw cron — only the shapes with a fixed minute and hour. */
 function proximasDeCron(expr: string, tz: string, count: number, agora: Date): Date[] | null {
   const p = String(expr || "").trim().split(/\s+/)
   if (p.length !== 5) return null
@@ -409,7 +411,7 @@ function proximasDeCron(expr: string, tz: string, count: number, agora: Date): D
   if (dow !== "*" && !diasSemana) return null
   const diaMes = dom === "*" ? null : (/^\d+$/.test(dom) ? +dom : null)
   if (dom !== "*" && diaMes === null) return null
-  if (diaMes !== null && diasSemana) return null   // combinação que não geramos
+  if (diaMes !== null && diasSemana) return null   // a combination we don't generate
 
   const out: Date[] = []
   const t0 = partesNoFuso(agora, tz)
@@ -425,14 +427,14 @@ function proximasDeCron(expr: string, tz: string, count: number, agora: Date): D
   return out
 }
 
-// ── Rótulos para a UI ─────────────────────────────────────────────────────────
+// ── Labels for the UI ─────────────────────────────────────────────────────────
 
 export const NOME_DIA_CURTO = DIAS_CURTOS
 export const NOME_DIA_LONGO = DIAS_LONGOS
 
 // ── Fusos IANA ────────────────────────────────────────────────────────────────
 
-/** "UTC−3", "UTC+5:30", "UTC" — o deslocamento do fuso em `agora`. */
+/** "UTC−3", "UTC+5:30", "UTC" — the time zone's offset at `agora`. */
 export function deslocamentoDoFuso(zona: string, agora: Date = new Date()): string | null {
   try {
     const parte = new Intl.DateTimeFormat("en-US", { timeZone: zona, timeZoneName: "shortOffset" })
@@ -446,15 +448,16 @@ export function deslocamentoDoFuso(zona: string, agora: Date = new Date()): stri
 }
 
 /**
- * Os fusos que o seletor oferece: todos os IANA que o navegador conhece, mais UTC
- * e o valor atual — que pode ser um nome antigo (`America/Buenos_Aires`) gravado
- * antes e que, fora da lista, sumiria do seletor. Ordem alfabética, UTC primeiro.
+ * The time zones the picker offers: every IANA zone the browser knows, plus UTC
+ * and the current value — which may be an old name (`America/Buenos_Aires`)
+ * saved earlier and that, outside the list, would vanish from the picker.
+ * Alphabetical order, UTC first.
  */
 export function opcoesDeFuso(atual?: string, agora: Date = new Date()): { value: string; label: string }[] {
   let zonas: string[] = []
   try {
     zonas = Intl.supportedValuesOf("timeZone")
-  } catch { /* navegador antigo: fica só com UTC e o atual */ }
+  } catch { /* old browser: keeps only UTC and the current one */ }
   const todas = Array.from(new Set([...zonas, ...(atual ? [atual] : [])].filter(z => z !== "UTC"))).sort()
   return ["UTC", ...todas].map(zona => {
     const desloc = deslocamentoDoFuso(zona, agora)

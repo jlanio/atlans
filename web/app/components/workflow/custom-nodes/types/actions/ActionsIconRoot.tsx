@@ -11,7 +11,7 @@ interface ActionsIconRootProps extends NodeProps<INodeContext> {
   children: ReactNode
 }
 
-// `selected` vem da prop do React Flow — ver o comentário em default-type.tsx.
+// `selected` comes from the React Flow prop — see the comment in default-type.tsx.
 const ActionsIconRoot = ({ children, id, data, selected }: ActionsIconRootProps) => {
 
   const { toolState, handleToolState } = useTools()
@@ -19,13 +19,13 @@ const ActionsIconRoot = ({ children, id, data, selected }: ActionsIconRootProps)
   const onEnter = useCallback(() => handleToolState('onFocus'), [handleToolState])
   const onLeave = useCallback(() => handleToolState('leave'), [handleToolState])
 
-  // `useNodeConnections` lê o índice de conexões que o React Flow já mantém por
-  // nó. Antes isto era um efeito que varria TODAS as arestas (O(N·E) somando o
-  // canvas) e chamava setState: além do custo, forçava um segundo commit por
-  // nó, e era por isso que o "+" do handle piscava a cada nova conexão.
+  // `useNodeConnections` reads the connection index React Flow already keeps per
+  // node. This used to be an effect that scanned ALL edges (O(N·E) across the
+  // canvas) and called setState: besides the cost, it forced a second commit per
+  // node, and that is why the handle's "+" flickered on every new connection.
   const saidas = useNodeConnections({ id, handleType: "source" })
-  // Mesma fonte das saídas: a porta de entrada também precisa saber se está
-  // ligada para escolher entre traço sólido e tracejado.
+  // Same source as the outputs: the input port also needs to know whether it is
+  // connected to choose between a solid and a dashed stroke.
   const entradas = useNodeConnections({ id, handleType: "target" })
 
   const title = (data.properties?.["alias"] as string | undefined) || (data.alias as string)
@@ -52,7 +52,8 @@ const ActionsIconRoot = ({ children, id, data, selected }: ActionsIconRootProps)
   )
 }
 
-// memo: evita re-render quando o pai (ex: HttpRequestIcon) re-renderiza sem
-// mudança real nos props do node (shallow compare em id/data/selected/dragging
-// já cobre os casos reais — data é referencialmente estável no ReactFlow).
+// memo: avoids re-rendering when the parent (e.g. HttpRequestIcon) re-renders
+// without a real change in the node's props (shallow compare on
+// id/data/selected/dragging already covers the real cases — data is
+// referentially stable in ReactFlow).
 export default memo(ActionsIconRoot);

@@ -1,17 +1,17 @@
 # tests/unit/test_artifact_service.py
 """
-A listagem de artefatos como serviço — a porta que os dois transportes usam.
+Artifact listing as a service — the door both transports use.
 
-Este arquivo existe por causa de uma medição: com `verify_workspace_access`
-apagado do serviço, a suíte inteira continuava verde. O único teste de tenant
-que havia cobria o caminho SEM `workspace_id`, onde quem segura é o
-`in_(workspace_ids)`; o caminho COM o parâmetro — o único que recebe um valor do
-cliente — não tinha nenhum. E é ele que a rota REST expõe direto da query
-string.
+This file exists because of a measurement: with `verify_workspace_access`
+deleted from the service, the whole suite stayed green. The only tenant test
+there was covered the path WITHOUT `workspace_id`, where what holds the line is
+`in_(workspace_ids)`; the path WITH the parameter — the only one that receives a
+value from the client — had none. And that is the one the REST route exposes
+directly from the query string.
 
-O que se testa aqui é o serviço, não a tool: a tool tem a própria porta
-(`resolver_workspace`) e barraria antes de chegar aqui, mascarando a ausência
-desta. A rota não tem nada além disto.
+What is tested here is the service, not the tool: the tool has its own door
+(`resolver_workspace`) and would block before getting here, masking the absence
+of this one. The route has nothing besides this.
 """
 from __future__ import annotations
 
@@ -44,8 +44,8 @@ async def banco():
 
 
 async def test_pedir_workspace_fora_da_lista_recusa(banco):
-    """A regressão medida: sem esta guarda, `GET /artifacts?workspace_id=<alheio>`
-    devolvia o acervo do vizinho, e nenhum teste caía."""
+    """The measured regression: without this guard, `GET /artifacts?workspace_id=<alheio>`
+    returned the neighbor's collection, and no test failed."""
     async with banco() as db:
         await criar_artefato(db, run_id="r2", workspace_id=WS_2, filename="alheia.geojson")
 
@@ -56,7 +56,7 @@ async def test_pedir_workspace_fora_da_lista_recusa(banco):
 
 
 async def test_o_parametro_estreita_o_escopo_nunca_o_amplia(banco):
-    """Pedir um workspace que ESTÁ na lista continua funcionando, e só ele."""
+    """Asking for a workspace that IS in the list still works, and only that one."""
     async with banco() as db:
         await criar_artefato(db, run_id="r1", workspace_id=WS_1, filename="minha.geojson")
         await criar_artefato(db, run_id="r2", workspace_id=WS_2, filename="alheia.geojson")
@@ -78,7 +78,7 @@ async def test_sem_parametro_o_corte_e_a_lista_inteira_do_chamador(banco):
 
 
 async def test_lista_vazia_de_workspaces_nao_vira_todos(banco):
-    """`in_([])` tem de significar "nada", não "sem filtro"."""
+    """`in_([])` has to mean "nothing", not "no filter"."""
     async with banco() as db:
         await criar_artefato(db, run_id="r1", workspace_id=WS_1)
 
@@ -91,22 +91,22 @@ async def test_lista_vazia_de_workspaces_nao_vira_todos(banco):
 
 
 async def test_curinga_do_usuario_e_literal_e_nao_varre_tudo(banco):
-    """O outro teste de escape olha o SQL, não o TERMO — e é o termo que importa.
+    """The other escape test looks at the SQL, not the TERM — and the term is what matters.
 
-    `test_artifacts_busca_por_workflow.py` afirma que a palavra `ESCAPE` aparece
-    no SQL renderizado, o que prende o `escape="\\\\"` do `ilike`. O que ele NÃO
-    prende é a transformação de `a_b` em `a\\_b`: apagando essa linha, aquele
-    teste continua passando e o `_` volta a ser curinga — buscar por `_` passa a
-    devolver a coleção inteira, exatamente o que o docstring de lá promete que
-    não acontece.
+    `test_artifacts_busca_por_workflow.py` asserts that the word `ESCAPE` appears
+    in the rendered SQL, which pins the `escape="\\\\"` of the `ilike`. What it does
+    NOT pin is the transformation of `a_b` into `a\\_b`: deleting that line, that
+    test keeps passing and `_` becomes a wildcard again — searching for `_` starts
+    returning the whole collection, exactly what the docstring over there promises
+    does not happen.
 
-    Aqui a prova é de comportamento, contra o banco: das duas linhas, só a que
-    tem o sublinhado LITERAL pode voltar.
+    Here the proof is behavioral, against the database: of the two rows, only the
+    one with the LITERAL underscore may come back.
     """
     async with banco() as db:
-        # `aXb` casa o PADRÃO `a_b` se o `_` for curinga, e não casa se for
-        # literal. É a linha que discrimina — sem ela, as duas versões do código
-        # devolvem o mesmo e o teste não prova nada.
+        # `aXb` matches the PATTERN `a_b` if `_` is a wildcard, and does not if it is
+        # literal. It is the row that discriminates — without it, both versions of
+        # the code return the same thing and the test proves nothing.
         await criar_artefato(db, run_id="r1", workspace_id=WS_1, filename="aXb.geojson")
         await criar_artefato(db, run_id="r2", workspace_id=WS_1, filename="a_b.geojson")
 
@@ -118,7 +118,7 @@ async def test_curinga_do_usuario_e_literal_e_nao_varre_tudo(banco):
 
 async def test_porcento_do_usuario_tambem_e_literal(banco):
     async with banco() as db:
-        # `100X` casa `100%` com o `%` como curinga; só `100%` casa literal.
+        # `100X` matches `100%` with `%` as a wildcard; only `100%` matches literally.
         await criar_artefato(db, run_id="r1", workspace_id=WS_1, filename="100X.geojson")
         await criar_artefato(db, run_id="r2", workspace_id=WS_1, filename="100%.geojson")
 
@@ -128,15 +128,15 @@ async def test_porcento_do_usuario_tambem_e_literal(banco):
     assert pagina["items"][0]["filename"] == "100%.geojson"
 
 
-# ── A chave do storage não escapa para a REST ────────────────────────────────
+# ── The storage key does not leak into REST ──────────────────────────────────
 
 
 async def test_a_chave_do_storage_so_sai_sob_pedido(banco):
-    """`incluir_chave` existe para a extração não alargar o contrato da tela.
+    """`incluir_chave` exists so that the extraction does not widen the screen's contract.
 
-    O MCP precisa da `s3_key` para decidir se há objeto a assinar; a interface
-    não. Sem guarda, um refactor futuro a devolveria para todo mundo e ninguém
-    notaria — a resposta só ficaria "um campo maior".
+    MCP needs the `s3_key` to decide whether there is an object to sign; the
+    interface does not. Without a guard, a future refactor would return it to
+    everyone and nobody would notice — the response would just be "a bigger field".
     """
     async with banco() as db:
         await criar_artefato(db, run_id="r1", workspace_id=WS_1)
@@ -148,11 +148,11 @@ async def test_a_chave_do_storage_so_sai_sob_pedido(banco):
     assert com_chave["items"][0]["s3_key"]
 
 
-# ── Paginação ────────────────────────────────────────────────────────────────
+# ── Pagination ───────────────────────────────────────────────────────────────
 
 
 async def test_a_pagina_tem_teto_proprio_porque_o_MCP_nao_tem_pydantic_na_borda(banco):
-    """A rota valida `le=200` no `Query`; o MCP não tem quem o faça."""
+    """The route validates `le=200` in the `Query`; MCP has nobody to do it."""
     async with banco() as db:
         for n in range(3):
             await criar_artefato(db, run_id=f"r{n}", workspace_id=WS_1)
@@ -180,15 +180,15 @@ async def test_has_more_diz_a_verdade_nas_duas_bordas(banco):
 
 
 async def test_a_ordenacao_tem_desempate_explicito(banco):
-    """Sem o desempate por `id`, paginar sobre linhas de mesmo `created_at`
-    repete ou perde registros — e elas nascem no mesmo instante quando uma
-    execução grava vários nós de saída de uma vez.
+    """Without the `id` tie-breaker, paginating over rows with the same `created_at`
+    repeats or loses records — and they are born at the same instant when a run
+    writes several output nodes at once.
 
-    Este teste olha o SQL, e não o resultado, por limitação honesta do ambiente:
-    no SQLite a ordem sem desempate ainda sai estável (ele cai no rowid), então
-    comportamento não distingue as duas versões. Em Postgres, que é o banco de
-    produção, a ordem de linhas empatadas não é garantida. O que dá para
-    afirmar aqui é que a cláusula está escrita.
+    This test looks at the SQL, not the result, because of an honest limitation of
+    the environment: in SQLite the order without a tie-breaker still comes out
+    stable (it falls back to rowid), so behavior does not distinguish the two
+    versions. In Postgres, which is the production database, the order of tied
+    rows is not guaranteed. What can be asserted here is that the clause is written.
     """
     capturadas: list = []
     async with banco() as db:
@@ -202,8 +202,8 @@ async def test_a_ordenacao_tem_desempate_explicito(banco):
         await criar_artefato(db, run_id="r1", workspace_id=WS_1)
         await listar_artefatos(db, [WS_1])
 
-    # A ÚLTIMA consulta é a das camadas do portal; a que interessa é a única
-    # com `ORDER BY`.
+    # The LAST query is the portal layers one; the one that matters is the only
+    # one with `ORDER BY`.
     ordenadas = [
         str(c.compile(compile_kwargs={"literal_binds": True})).lower()
         for c in capturadas

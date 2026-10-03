@@ -1,5 +1,5 @@
-// Copiado de web/lib/utils.ts — mesmo utilitario, para que os primitivos
-// shadcn portados funcionem sem alteracao.
+// Copied from web/lib/utils.ts — same utility, so that the ported shadcn
+// primitives work without changes.
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 

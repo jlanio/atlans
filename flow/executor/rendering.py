@@ -1,5 +1,5 @@
 # flow/executor/rendering.py
-"""Renderização de parâmetros de nós via Jinja2 com sistema de aliases."""
+"""Node parameter rendering via Jinja2 with an aliases system."""
 from typing import Any, Dict
 from flow.utils.expression_service import ExpressionService
 from flow.utils.logger import get_logger
@@ -8,27 +8,27 @@ logger = get_logger(__name__)
 
 expr_svc = ExpressionService()
 
-# Teto de aninhamento na descida por dict/list. Parâmetro de formulário não
-# chega perto disso; o limite existe só para uma estrutura patológica não virar
-# recursão infinita.
+# Nesting ceiling when descending through dicts/lists. A form parameter does not
+# come close to this; the limit exists only so a pathological structure does not
+# turn into infinite recursion.
 _PROFUNDIDADE_MAX = 12
 
-# O que o SERVIDOR injeta a partir da credencial salva (ver
-# app/services/credential_resolver.py): segredo, nunca template. Renderizar
-# mudaria em silêncio uma senha com `{{`, `{%` ou `$Alias.campo` dentro — e a
-# falha de renderização repetiria o segredo na mensagem de erro, que vai à
-# tela, ao banco e ao log (o DEBUG daqui também o escreveria cru).
+# What the SERVER injects from the saved credential (see
+# app/services/credential_resolver.py): a secret, never a template. Rendering
+# would silently alter a password with `{{`, `{%` or `$Alias.campo` inside — and
+# the rendering failure would repeat the secret in the error message, which goes
+# to the screen, the database and the log (the DEBUG here would also write it raw).
 _INJETADOS_PELO_SERVIDOR = frozenset({"connectionString", "http_auth", "s3_auth"})
 
 
 def _tem_expressao(raw: str, named: Dict[str, Any]) -> bool:
-    """A string pede renderização?
+    """Does the string call for rendering?
 
-    Statements `{% %}` contam como Jinja tanto quanto expressões `{{ }}`.
-    Antes o gate exigia `{{` E `}}`, então um parâmetro contendo apenas
-    `{% ... %}` não era renderizado aqui e seguia CRU até o nó — que podia
-    avaliá-lo num ambiente próprio. Passando pelo expr_svc (sandboxed),
-    statement e expressão recebem o mesmo tratamento.
+    `{% %}` statements count as Jinja just as much as `{{ }}` expressions.
+    The gate used to require `{{` AND `}}`, so a parameter containing only
+    `{% ... %}` was not rendered here and went RAW to the node — which could
+    evaluate it in its own environment. Going through expr_svc (sandboxed),
+    statements and expressions get the same treatment.
     """
     has_jinja = ("{{" in raw and "}}" in raw) or ("{%" in raw and "%}" in raw)
     m_alias = expr_svc.find_alias(raw)
@@ -45,42 +45,42 @@ def _renderizar(
     context: Dict[str, Any],
     profundidade: int = 0,
 ) -> Any:
-    """Renderiza um valor de parâmetro, descendo por dicionários e listas.
+    """Renders a parameter value, descending through dicts and lists.
 
-    A versão anterior parava na primeira linha (`if not isinstance(raw, str):
-    continue`) e só renderizava parâmetro string de topo. Quem sofria com isso
-    eram justamente os campos que existem para receber valor dinâmico:
+    The previous version stopped at the first line (`if not isinstance(raw, str):
+    continue`) and only rendered top-level string parameters. Those who suffered
+    from that were precisely the fields that exist to receive a dynamic value:
 
-      - `queryParams` do DatabaseQuery/DatabaseSpatialQuery — os valores dos
-        `:placeholders`, que é ONDE o valor variável do filtro deveria entrar.
-        A UI ainda instrui, logo acima do campo, a usar `{{ $Alias }}`.
-      - `headers` e `params` do HttpRequest.
+      - `queryParams` of DatabaseQuery/DatabaseSpatialQuery — the values of the
+        `:placeholders`, which is WHERE the filter's variable value should go.
+        The UI even instructs, right above the field, to use `{{ $Alias }}`.
+      - `headers` and `params` of HttpRequest.
 
-    E o modo de falha era pior que "não funciona": o dicionário seguia cru até o
-    nó, o template ia como TEXTO para o banco (`WHERE bairro = '{{ ... }}'`), a
-    consulta rodava, voltava vazia e o fluxo continuava. Nenhum erro em lugar
-    nenhum.
+    And the failure mode was worse than "does not work": the dict went raw to the
+    node, the template went as TEXT to the database (`WHERE bairro = '{{ ... }}'`),
+    the query ran, came back empty and the workflow carried on. No error
+    anywhere.
 
-    A chave do dicionário não é renderizada — só o valor. Em `queryParams` a
-    chave é o nome do `:placeholder` e precisa casar com o SQL; em `headers` é o
-    nome do cabeçalho. Não há caso de uso, e um template que produzisse chave
-    vazia ou repetida quebraria o dicionário em silêncio.
+    The dict key is not rendered — only the value. In `queryParams` the
+    key is the name of the `:placeholder` and must match the SQL; in `headers` it
+    is the header name. There is no use case, and a template producing an empty
+    or repeated key would silently break the dict.
     """
     if isinstance(valor, str):
         if not _tem_expressao(valor, named):
             return valor
         logger.debug("[%s] Param raw (%s): %s", node_id, caminho, valor)
         try:
-            # Dentro de dicionário/lista, o tipo é preservado quando o valor é
-            # uma expressão só: `{{ $Filtro.limite }}` com 50 devolve o inteiro
-            # 50, não `'50'`. É o que `queryParams` precisa — ali o valor vira
-            # bind de SQL, e o tipo decide como o Postgres compara com a coluna.
+            # Inside a dict/list, the type is preserved when the value is
+            # a single expression: `{{ $Filtro.limite }}` with 50 returns the integer
+            # 50, not `'50'`. That is what `queryParams` needs — there the value becomes
+            # a SQL bind, and the type decides how Postgres compares it to the column.
             #
-            # No topo (profundidade 0) segue `render`, que devolve texto. Ali já
-            # existe comportamento de que os nós dependem há tempo, e mudá-lo
-            # junto misturaria uma correção com uma quebra: um nó que faz
-            # `.strip()` num parâmetro passaria a receber int. O tratamento
-            # nativo entra só onde nada era renderizado antes.
+            # At the top level (depth 0) it stays `render`, which returns text. There
+            # nodes have long depended on the existing behavior, and changing it
+            # at the same time would mix a fix with a breakage: a node that does
+            # `.strip()` on a parameter would start receiving an int. Native
+            # handling comes in only where nothing was rendered before.
             renderizado = (
                 expr_svc.render_native(valor, context) if profundidade > 0
                 else expr_svc.render(valor, context)
@@ -118,7 +118,7 @@ def _renderizar(
             for i, item in enumerate(valor)
         ]
 
-    # Número, booleano, None, GeoDataFrame fixado — nada a renderizar.
+    # Number, boolean, None, pinned GeoDataFrame — nothing to render.
     return valor
 
 
@@ -128,10 +128,10 @@ def render_node_parameters(
     named: Dict[str, Any],
     context: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Renderiza parâmetros do nó usando Jinja2.
+    """Renders the node's parameters using Jinja2.
 
-    Retorna cópia dos parameters com expressões renderizadas.
-    Não modifica node.parameters diretamente — o caller deve atribuir o resultado.
+    Returns a copy of the parameters with the expressions rendered.
+    Does not modify node.parameters directly — the caller must assign the result.
     """
     context.update(named)
     return {

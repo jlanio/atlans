@@ -9,14 +9,14 @@ _JINJA_ENV = criar_ambiente_sandbox(undefined=Undefined)
 
 
 def _tem_expressao(v: Any) -> bool:
-    """True se o valor é uma string com sintaxe Jinja ({{ }} ou {% %})."""
+    """True if the value is a string with Jinja syntax ({{ }} or {% %})."""
     return isinstance(v, str) and ("{{" in v or "{%" in v)
 
 
 def _coerce_num(rendered: str) -> Any:
-    """Converte o texto renderizado para int/float quando possível.
+    """Converts the rendered text to int/float when possible.
 
-    Ex: "{{ row.area * 1.1 }}" → float; "ativo" → "ativo".
+    E.g.: "{{ row.area * 1.1 }}" → float; "ativo" → "ativo".
     """
     try:
         return int(rendered)
@@ -32,19 +32,19 @@ def _coerce_num(rendered: str) -> Any:
 @register_node
 class SetFields(BaseNode):
     """
-    Adiciona, atualiza, remove ou renomeia campos em um GeoDataFrame.
+    Adds, updates, removes or renames fields in a GeoDataFrame.
 
-    Parâmetros:
-      - setFields (dict): campos e valores a adicionar ou sobrescrever.
-        Suporta expressões Jinja por campo usando {{ row.<coluna> }} e
-        variáveis de contexto do workflow (ex: {{ env.NOME_VAR }}).
-        Ex: {"area_km2": "{{ row.area / 1e6 }}", "status": "ativo"}
+    Parameters:
+      - setFields (dict): fields and values to add or overwrite.
+        Supports per-field Jinja expressions using {{ row.<coluna> }} and
+        workflow context variables (e.g. {{ env.NOME_VAR }}).
+        E.g.: {"area_km2": "{{ row.area / 1e6 }}", "status": "ativo"}
 
-      - removeFields (dict): objeto com chave 'fields' contendo lista de colunas a remover.
-        Ex: {"fields": ["temp", "flag"]}
+      - removeFields (dict): object with a 'fields' key containing the list of columns to remove.
+        E.g.: {"fields": ["temp", "flag"]}
 
-      - renameFields (dict): mapeamento old_name → new_name.
-        Ex: {"old_coluna": "nova_coluna"}
+      - renameFields (dict): mapping old_name → new_name.
+        E.g.: {"old_coluna": "nova_coluna"}
     """
 
     @classmethod
@@ -60,8 +60,8 @@ class SetFields(BaseNode):
                     'name': 'setFields',
                     'label': 'Definir campos',
                     'type': 'object',
-                    # O type continua "object" (um helper dedicado da web consome
-                    # estes campos); o marcador só liga o bloco de sugestões.
+                    # The type stays "object" (a dedicated web helper consumes
+                    # these fields); the marker only turns on the suggestions block.
                     'suggest_columns': '*',
                     'default': {},
                     'description': (
@@ -92,51 +92,51 @@ class SetFields(BaseNode):
             ],
         }
 
-    # CPU-bound puro (Jinja linha a linha sobre o GeoDataFrame inteiro): roda
-    # numa thread do pool, não no event loop que atende o WebSocket do executor.
+    # Pure CPU-bound work (row-by-row Jinja over the whole GeoDataFrame): runs
+    # on a pool thread, not on the event loop serving the executor's WebSocket.
     def execute_sync(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         self.validate()
         gdf = self.get_first_gdf(inputs)
 
-        # Contexto disponível nas expressões Jinja — apenas vars seguras
+        # Context available in Jinja expressions — only safe vars
         jinja_context: dict = {"env": safe_env()}
 
-        # SET FIELDS — suporta valores fixos e expressões Jinja por linha
+        # SET FIELDS — supports fixed values and per-row Jinja expressions
         set_fields: Dict[str, Any] = self.parameters.get('setFields', {})
         if set_fields:
-            # Verifica se algum valor usa Jinja para decidir se precisa iterar linha a linha
+            # Checks whether any value uses Jinja to decide whether it needs to iterate row by row
             has_expressions = any(_tem_expressao(v) for v in set_fields.values())
 
             if has_expressions:
-                # `to_dict(orient='records')` materializa o GeoDataFrame INTEIRO
-                # em dicts Python. Ficava dentro da list comprehension, ou seja,
-                # era refeito uma vez POR CAMPO: com 5 campos sobre 100k linhas
-                # eram 500k dicts construídos para renderizar 500k valores. Uma
-                # vez só, fora do laço.
+                # `to_dict(orient='records')` materializes the WHOLE GeoDataFrame
+                # into Python dicts. It sat inside the list comprehension, that is,
+                # it was redone once PER FIELD: with 5 fields over 100k rows
+                # that was 500k dicts built to render 500k values. Once only,
+                # outside the loop.
                 registros = gdf.to_dict(orient="records")
                 for field, raw_value in set_fields.items():
                     if not _tem_expressao(raw_value):
-                        # Valor fixo no meio de campos com expressão. Escalar →
-                        # broadcast do pandas. Container (lista/tupla/dict/set) →
-                        # replicado por linha, preservando o comportamento antigo
-                        # (_render_value devolvia o valor cru por linha); sem isto
-                        # o pandas tentaria atribuir os elementos coluna a coluna.
+                        # Fixed value amid fields with expressions. Scalar →
+                        # pandas broadcast. Container (list/tuple/dict/set) →
+                        # replicated per row, preserving the old behavior
+                        # (_render_value returned the raw value per row); without this
+                        # pandas would try to assign the elements column by column.
                         if isinstance(raw_value, (list, tuple, dict, set)):
                             gdf[field] = [raw_value] * len(gdf)
                         else:
                             gdf[field] = raw_value
                         continue
-                    # Compila o template UMA vez por campo — compilar
-                    # (source→AST→bytecode) é ordens de magnitude mais caro que
-                    # renderizar. Antes recompilava a cada linha × campo: 100k
-                    # linhas × 3 campos = 300k compilações do MESMO template.
+                    # Compiles the template ONCE per field — compiling
+                    # (source→AST→bytecode) is orders of magnitude more expensive than
+                    # rendering. It used to recompile on every row × field: 100k
+                    # rows × 3 fields = 300k compilations of the SAME template.
                     tpl = _JINJA_ENV.from_string(raw_value)
                     gdf[field] = [
                         _coerce_num(tpl.render(row=row, **jinja_context))
                         for row in registros
                     ]
             else:
-                # Caminho rápido sem Jinja — atribuição vetorial direta
+                # Fast path without Jinja — direct vectorized assignment
                 for field, value in set_fields.items():
                     gdf[field] = value
 

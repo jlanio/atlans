@@ -1,18 +1,18 @@
 "use client"
 
 /**
- * Lista de nomes como fichas — o visual que o "Remover campos" já usa.
+ * List of names as chips — the look "Remover campos" (Remove fields) already uses.
  *
- * Como CAMPO, e não helper: o `HELPER_MAP` do node-config-form substitui o
- * formulário inteiro, e num nó como o Join por Atributo os outros campos
- * (chave, tipo de junção, o que fazer com duplicata) precisam continuar
- * visíveis ao lado.
+ * As a FIELD, not a helper: node-config-form's `HELPER_MAP` replaces the whole
+ * form, and in a node like Join por Atributo (attribute join) the other fields
+ * (key, join type, what to do with duplicates) need to stay visible alongside.
  *
- * O texto separado por vírgula funcionava, mas não mostrava o que já estava
- * lá: uma linha só, com nomes grudados, sem como remover um do meio senão
- * editando a string. Cada nome vira uma ficha com o seu próprio botão.
+ * Comma-separated text worked, but didn't show what was already there: a
+ * single line, with names stuck together, with no way to remove one from the
+ * middle other than editing the string. Each name becomes a chip with its own
+ * button.
  *
- * Colar continua sendo o caminho rápido: "a, b, c" de uma vez vira três fichas.
+ * Pasting is still the fast path: "a, b, c" at once becomes three chips.
  */
 import { useMemo, useState } from "react"
 import { TbX } from "react-icons/tb"
@@ -23,29 +23,29 @@ import { FieldLabel } from "./field-label"
 import SugestoesDeColunas from "./sugestoes-de-colunas"
 import type { FieldProps } from "./types"
 
-/** Espelha o teto do executor (`MAX_COLUNAS` em flow/executor/utils.py). Serve
- *  só para avisar que a lista veio cortada — divergir apenas some com o aviso. */
+/** Mirrors the executor's ceiling (`MAX_COLUNAS` in flow/executor/utils.py). It
+ *  only serves to warn that the list came truncated — diverging just hides the warning. */
 export const MAX_COLUNAS_SUGERIDAS = 200
 
 type ChipsFieldProps = FieldProps<{
-  /** Nomes vistos na última execução do nó anterior, para clicar em vez de
-   *  digitar. É dica, não validação: o fluxo pode ter mudado desde então, e
-   *  nada impede escrever um nome fora da lista. */
+  /** Names seen in the previous node's last execution, to click instead of
+   *  typing. It is a hint, not validation: the workflow may have changed since
+   *  then, and nothing prevents writing a name outside the list. */
   sugestoes?: string[]
-  /** true quando as sugestões vieram da re-hidratação de um run PERSISTIDO
-   *  (não desta sessão): o rótulo troca para avisar que a lista pode ter
-   *  mudado — afirmar "última execução" com dado antigo seria mentir. */
+  /** true when the suggestions came from re-hydrating a PERSISTED run (not
+   *  from this session): the label changes to warn that the list may have
+   *  changed — claiming "last execution" with old data would be lying. */
   sugestoesDesatualizadas?: boolean
-  /** true quando o stat de origem veio truncado — o rótulo avisa "lista
-   *  parcial" em vez de afirmar completude. */
+  /** true when the source stat came truncated — the label warns "partial
+   *  list" instead of claiming completeness. */
   sugestoesParciais?: boolean
 }>
 
 /**
- * Lê o valor guardado, venha como lista, JSON ou texto com vírgulas.
+ * Reads the stored value, whether it comes as a list, JSON or comma-separated text.
  *
- * O formato antigo do campo era texto separado por vírgula, e ele continua nas
- * definitions já salvas — ler os dois é o que dispensa migrar dado.
+ * The field's old format was comma-separated text, and it remains in already
+ * saved definitions — reading both is what makes migrating data unnecessary.
  */
 export function lerFichas(bruto: unknown): string[] {
   if (Array.isArray(bruto)) {
@@ -61,13 +61,13 @@ export function lerFichas(bruto: unknown): string[] {
         return carregado.map(x => String(x).trim()).filter(Boolean)
       }
     } catch {
-      // Cai no formato de texto abaixo.
+      // Falls through to the text format below.
     }
   }
   return texto.split(",").map(c => c.trim()).filter(Boolean)
 }
 
-/** Nomes de uma digitação ou colagem, sem os que já estão na lista. */
+/** Names from a typing or paste, minus those already in the list. */
 export function fichasNovas(entrada: string, existentes: string[]): string[] {
   const vistos = new Set(existentes)
   const saida: string[] = []
@@ -82,20 +82,20 @@ export function fichasNovas(entrada: string, existentes: string[]): string[] {
 const ChipsField = ({ field, values, setNodeField, sugestoes = [], sugestoesDesatualizadas = false, sugestoesParciais = false }: ChipsFieldProps) => {
   const fichas = useMemo(() => lerFichas(values?.[field.name]), [values, field.name])
   const [rascunho, setRascunho] = useState("")
-  // Só o que ainda não foi escolhido — oferecer o que já é ficha vira ruído.
+  // Only what hasn't been chosen yet — offering what is already a chip is noise.
   const disponiveis = useMemo(
     () => sugestoes.filter(s => !fichas.includes(s)),
     [sugestoes, fichas],
   )
 
-  // Grava no formato que TODO leitor entende — inclusive um executor com
-  // flow/ anterior à migração destes campos para fichas, que ainda parseia
-  // com `split(",")`: JSON-string lá viraria colunas fantasmas ('["a"'…) e,
-  // no ChangeDetector, um hash silenciosamente errado. CSV é o formato que o
-  // campo antigo sempre gravou; JSON fica só para o caso que o CSV nunca
-  // representou (nome com vírgula). Vazio grava "" — "[]" no split(",")
-  // virava a coluna fantasma "[]". `lerFichas` e o parser do backend leem os
-  // três formatos.
+  // Writes in the format EVERY reader understands — including an executor with
+  // a flow/ older than the migration of these fields to chips, which still
+  // parses with `split(",")`: a JSON string there would become phantom columns
+  // ('["a"'…) and, in the ChangeDetector, a silently wrong hash. CSV is the
+  // format the old field always wrote; JSON is only for the case CSV never
+  // represented (a name with a comma). Empty writes "" — "[]" under split(",")
+  // became the phantom column "[]". `lerFichas` and the backend parser read all
+  // three formats.
   const gravar = (proximo: string[]) => {
     if (proximo.length === 0) return setNodeField(field.name, "")
     const texto = proximo.some(nome => nome.includes(","))
@@ -116,8 +116,8 @@ const ChipsField = ({ field, values, setNodeField, sugestoes = [], sugestoesDesa
       adicionar(rascunho)
       return
     }
-    // Backspace num campo vazio remove a última — o atalho que se espera de
-    // qualquer campo de fichas.
+    // Backspace in an empty field removes the last one — the shortcut expected of
+    // any chips field.
     if (e.key === "Backspace" && rascunho === "" && fichas.length) {
       gravar(fichas.slice(0, -1))
     }
@@ -154,8 +154,8 @@ const ChipsField = ({ field, values, setNodeField, sugestoes = [], sugestoesDesa
         value={rascunho}
         onChange={e => setRascunho(e.target.value)}
         onKeyDown={aoTeclar}
-        // Sair do campo com algo digitado adiciona: perder o que se escreveu
-        // por ter clicado fora é o defeito clássico deste tipo de campo.
+        // Leaving the field with something typed adds it: losing what you wrote
+        // because you clicked outside is the classic defect of this kind of field.
         onBlur={() => adicionar(rascunho)}
         placeholder={fichas.length ? "Adicionar outra…" : "Nome da coluna + Enter"}
         className="h-8 font-mono text-xs"

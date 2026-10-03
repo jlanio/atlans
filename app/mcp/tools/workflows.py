@@ -1,5 +1,5 @@
 # app/mcp/tools/workflows.py
-"""Tools de workflows. As guardas de cada uma estão em app/mcp/guardas.py."""
+"""Workflow tools. The guards for each one are in app/mcp/guardas.py."""
 from __future__ import annotations
 
 from typing import Any, Mapping
@@ -19,19 +19,19 @@ from app.mcp.tools.base import ferramenta
 from app.services.workflow_service import WorkflowService
 from flow.utils.workflow_contract import extract_contract
 
-# Teto da listagem. Não é economia de banco: é o orçamento de contexto de quem
-# lê do outro lado — 200 itens já são ~40 KB de resposta.
+# Listing ceiling. It is not about saving the database: it is the context budget
+# of whoever reads on the other side — 200 items are already ~40 KB of response.
 LIMITE_MAXIMO = 200
 
 _MENSAGEM_PAPEL = "Requer papel 'viewer' ou superior neste workspace."
 
 
 def _share_url(wf) -> str | None:
-    """A URL do portal, ABSOLUTA.
+    """The portal URL, ABSOLUTE.
 
-    A REST devolve `/share/{id}` porque quem a consome é o próprio navegador da
-    aplicação. Um cliente MCP não tem base nenhuma para completar: uma URL
-    relativa chegaria à pessoa como um caminho que não abre em lugar algum.
+    REST returns `/share/{id}` because its consumer is the application's own
+    browser. An MCP client has no base at all to complete it with: a relative
+    URL would reach the person as a path that opens nowhere.
     """
     if not wf.portal_access or wf.portal_access == "disabled":
         return None
@@ -39,7 +39,7 @@ def _share_url(wf) -> str | None:
 
 
 def _resumo_de_agendamento(bruto: Any) -> dict | None:
-    """O agendamento em campos fechados — sem datas cruas e sem chave extra."""
+    """The schedule in closed fields — no raw dates and no extra keys."""
     if not isinstance(bruto, Mapping):
         return None
     return {
@@ -70,20 +70,21 @@ async def list_workflows(
     limit: int = 100,
     incluir_do_assistente: bool | None = None,
 ) -> dict:
-    """Lista os workflows dos workspaces ao alcance do token.
+    """Lists the workflows of the workspaces within the token's reach.
 
-    `search` e `only_active` são aplicados em processo, e não na consulta: a
-    listagem leve do núcleo não tem esses parâmetros, e acrescentá-los lá só
-    para o MCP mudaria uma consulta que a aplicação inteira usa. O custo é
-    aceitável porque a consulta já é por workspace e não carrega definitions.
+    `search` and `only_active` are applied in-process, not in the query: the
+    core's lightweight listing does not have those parameters, and adding them
+    there just for MCP would change a query the whole application uses. The
+    cost is acceptable because the query is already per workspace and does not
+    load definitions.
 
-    `incluir_do_assistente` espelha o `?assistente=1` da REST. Deixado em `None`,
-    ele se resolve pelo escopo: o assistente da Home carimba
-    `origem="assistente"` em tudo que cria, e com o default `False` ele não
-    enxergava os PRÓPRIOS fluxos — num chat novo, «roda de novo aquele do
-    desmatamento» não encontrava nada e nascia um fluxo duplicado a cada
-    pergunta recorrente. Para um PAT comum o default segue `False`, e o campo
-    `origem` de cada item deixa explícito o que foi omitido.
+    `incluir_do_assistente` mirrors REST's `?assistente=1`. Left as `None`, it
+    is resolved by the scope: the Home assistant stamps `origem="assistente"`
+    on everything it creates, and with the `False` default it could not see
+    its OWN workflows — in a new chat, "roda de novo aquele do desmatamento"
+    (run that deforestation one again) found nothing and a duplicate workflow
+    was born on every recurring question. For a regular PAT the default stays
+    `False`, and each item's `origem` field makes explicit what was omitted.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
@@ -119,9 +120,9 @@ async def list_workflows(
                 "id": item.get("id_hash"),
                 "workspace_id": item.get("workspace_id"),
                 "is_active": bool(item.get("flag_ative")),
-                # A origem distingue o que o assistente criou do que a pessoa
-                # criou — e, com ela, se a ação sobre esse fluxo vai pedir o
-                # clique de confirmação na Home.
+                # The origin distinguishes what the assistant created from what the
+                # person created — and, with it, whether an action on that
+                # workflow will ask for the confirmation click on Home.
                 "origem": item.get("origem") or "usuario",
                 "is_subworkflow": bool(item.get("is_subworkflow")),
                 "has_webhook_trigger": bool(item.get("has_webhook_trigger")),
@@ -145,12 +146,13 @@ async def list_workflows(
 async def get_workflow(
     ctx: Context, workflow_id: str, include_definition: bool = False
 ) -> dict:
-    """Um workflow em detalhe: parâmetros, gatilhos, portal e topologia.
+    """A workflow in detail: parameters, triggers, portal and topology.
 
-    A definition só sai sob pedido (`include_definition=true`) e sai sempre
-    REDIGIDA: o workflow é carregado sem decifrar e o que se entrega passa por
-    `redigir_definition` (segredo vira `<REDACTED>`) e `compactar_definition`
-    (posição e viewport, que só servem ao canvas, não viajam).
+    The definition only goes out on request (`include_definition=true`) and is
+    always REDACTED: the workflow is loaded without decrypting and what is
+    handed over goes through `redigir_definition` (secrets become
+    `<REDACTED>`) and `compactar_definition` (position and viewport, which
+    only serve the canvas, do not travel).
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
@@ -172,22 +174,22 @@ async def get_workflow(
         }
         resumo = resumo_definition(segura, pin_metadata=wf.pin_metadata)
         nome, descricao = wf.name, wf.description
-        # Cru: quem higieniza é o `envelope`, uma vez só, na saída.
+        # Raw: sanitizing is the `envelope`'s job, once, on output.
         esquema = wf.params_schema if wf.params_schema else None
 
     dados["pins"] = resumo["pins"]
     dados["node_count"] = resumo["node_count"]
     dados["edge_count"] = resumo["edge_count"]
-    # Tudo que veio da definition ou do schema de parâmetros é texto de quem
-    # edita o fluxo: o apelido dos nós em `summary`, o NOME dos gatilhos, e as
-    # chaves e descrições de `params_schema` (que o cliente exibe a quem vai
-    # preencher). Nada disso sobe ao topo — o topo é para valor que a
-    # plataforma gera.
-    # Lista vazia CONTINUA aparecendo: `envelope` só omite chave nula, e a
-    # diferença importa aqui — `triggers: []` é "este fluxo não dispara
-    # sozinho", uma resposta; a ausência da chave seria "não perguntei".
-    # `params_schema` é o contrário: sem coluna preenchida não há schema a
-    # descrever, então segue `None` e some.
+    # Everything that came from the definition or the parameter schema is text
+    # from whoever edits the workflow: the nodes' nicknames in `summary`, the
+    # triggers' NAME, and the keys and descriptions of `params_schema` (which
+    # the client shows to whoever will fill them in). None of that rises to
+    # the top — the top is for values the platform generates.
+    # An empty list STILL appears: `envelope` only omits null keys, and the
+    # difference matters here — `triggers: []` is "this workflow does not fire
+    # on its own", an answer; the key's absence would be "I didn't ask".
+    # `params_schema` is the opposite: with no filled-in column there is no
+    # schema to describe, so it stays `None` and disappears.
     return envelope(
         dados,
         name=nome,
@@ -201,12 +203,12 @@ async def get_workflow(
 
 @ferramenta
 async def get_workflow_contract(ctx: Context, workflow_id: str) -> dict:
-    """As entradas e saídas declaradas do workflow como sub-fluxo.
+    """The workflow's declared inputs and outputs as a sub-workflow.
 
-    É o que responde "posso chamar este fluxo de dentro de outro, e com quais
-    chaves?". Lê só as portas declaradas nos nós de contrato — nenhuma
-    propriedade sensível é tocada, e por isso a definition não precisa ser
-    decifrada.
+    It is what answers "can I call this workflow from inside another, and with
+    which keys?". It reads only the ports declared in the contract nodes — no
+    sensitive property is touched, and that is why the definition does not
+    need to be decrypted.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
@@ -219,17 +221,17 @@ async def get_workflow_contract(ctx: Context, workflow_id: str) -> dict:
             "id": wf.id_hash,
             "workspace_id": wf.workspace_id,
             "is_active": bool(wf.flag_ative),
-            # Fechados e gerados pela leitura da definition, não escritos:
-            # ficam no topo, que é o que o cliente pode obedecer.
+            # Closed and generated by reading the definition, not written: they
+            # stay at the top, which is what the client can obey.
             "has_input_node": bool(contrato.get("has_input_node")),
             "has_output_node": bool(contrato.get("has_output_node")),
             "input_node_count": int(contrato.get("input_node_count") or 0),
             "output_node_count": int(contrato.get("output_node_count") or 0),
         }
 
-    # O NOME de cada porta é texto da definition — quem edita o fluxo escolhe.
-    # Lista vazia aparece do mesmo jeito (`envelope` só omite chave nula): um
-    # fluxo sem nó de contrato responde `inputs: []`, e não silêncio.
+    # Each port's NAME is definition text — whoever edits the workflow picks it.
+    # An empty list shows up just the same (`envelope` only omits null keys): a
+    # workflow with no contract node answers `inputs: []`, not silence.
     return envelope(
         dados,
         inputs=contrato.get("inputs") or [],
@@ -239,7 +241,7 @@ async def get_workflow_contract(ctx: Context, workflow_id: str) -> dict:
 
 @ferramenta
 async def get_portal_info(ctx: Context, workflow_id: str) -> dict:
-    """Como este workflow está publicado no portal, e em que endereço."""
+    """How this workflow is published on the portal, and at which address."""
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
 
@@ -255,11 +257,11 @@ async def get_portal_info(ctx: Context, workflow_id: str) -> dict:
         }
         com_quem = list(compartilhado) if isinstance(compartilhado, list) else []
 
-    # `portal_shared_with` é uma coluna de texto livre que QUALQUER editor do
-    # workflow preenche — o canal mais curto entre uma pessoa e o cliente que
-    # lê esta resposta. Uma frase de comando escrita ali sai como dado, dentro
-    # de `untrusted_data`, nunca ao lado dos campos que a plataforma gera.
-    # Lista vazia continua aparecendo: "compartilhado com ninguém" é resposta.
+    # `portal_shared_with` is a free-text column that ANY editor of the
+    # workflow fills in — the shortest channel between a person and the client
+    # reading this response. A command sentence written there goes out as data,
+    # inside `untrusted_data`, never alongside the fields the platform generates.
+    # An empty list still appears: "shared with no one" is an answer.
     return envelope(dados, shared_with=com_quem)
 
 
@@ -272,7 +274,7 @@ _SOMENTE_LEITURA = ToolAnnotations(
 
 
 def registrar(server) -> None:
-    """Registra as tools deste domínio."""
+    """Registers this domain's tools."""
     server.tool(
         name="list_workflows",
         title="Listar workflows",

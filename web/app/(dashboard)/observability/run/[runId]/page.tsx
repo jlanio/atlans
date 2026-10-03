@@ -34,8 +34,8 @@ export default function RunDetailPage() {
     [runId]
   )
 
-  // entries/filter/sort + Math.max(...) rodavam a cada render; memoizados em
-  // `run` (recalculam só quando o detalhe muda), com maxMs derivado do memo.
+  // entries/filter/sort + Math.max(...) ran on every render; memoized on
+  // `run` (they recompute only when the detail changes), with maxMs derived from the memo.
   const { nodeEntries, maxMs } = useMemo(() => {
     const entries = run?.node_stats
       ? Object.entries(run.node_stats)
@@ -78,9 +78,9 @@ export default function RunDetailPage() {
         <div className="rounded-md bg-destructive/10 text-destructive px-4 py-3 text-sm">{error}</div>
       )}
 
-      {/* Contexto da execução: workflow e workspace vêm para qualquer usuário
-       *  no escopo; o dono só para admin. Origem e categoria do erro, quando
-       *  o run já as tem (runs anteriores à coluna ficam sem). */}
+      {/* Run context: workflow and workspace come for any user in
+       *  scope; the owner only for admins. Error origin and category, when
+       *  the run already has them (runs older than the column lack them). */}
       {run && (run.workflow_name || run.workspace_name || run.trigger_source || run.error_category || (isAdmin && run.owner_username)) && (
         <div className="flex flex-wrap items-center gap-4 rounded-md border bg-muted/30 px-4 py-2 text-xs">
           {isAdmin && (
@@ -118,7 +118,7 @@ export default function RunDetailPage() {
 
       {run && (
         <>
-          {/* Cards de resumo */}
+          {/* Summary cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="pb-2">
@@ -182,7 +182,7 @@ export default function RunDetailPage() {
             </Card>
           </div>
 
-          {/* Mensagem de erro */}
+          {/* Error message */}
           {run.error_message && (
             <Card className="border-destructive/30">
               <CardHeader className="pb-2">
@@ -198,7 +198,7 @@ export default function RunDetailPage() {
             </Card>
           )}
 
-          {/* Tabela de node_stats */}
+          {/* node_stats table */}
           {nodeEntries.length > 0 && (
             <Card>
               <CardHeader>
@@ -206,10 +206,10 @@ export default function RunDetailPage() {
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                  {/* min-w força ROLAGEM em vez de compressao: o contêiner ja
-                      tem overflow-x, mas sem isto `w-full` espreme as seis
-                      colunas ate todas virarem reticencias. So de `md` para
-                      cima — abaixo disso a linha vira ficha empilhada (ver
+                  {/* min-w forces SCROLLING instead of compression: the container already
+                      has overflow-x, but without this `w-full` squeezes the six
+                      columns until they all become ellipses. Only from `md`
+                      up — below that the row becomes a stacked card (see
                       tabela-empilhada.ts). */}
                   <table className="w-full text-sm md:min-w-[680px]">
                     <thead className={CABECALHO_DE_COLUNAS}>

@@ -1,19 +1,19 @@
 // desktop/vitest.config.ts
 //
-// Separado do vite.config.ts de proposito: aquele tem `root: 'src/renderer'`
-// para o build da janela, e herdar essa raiz faria o vitest nao enxergar os
-// testes do processo principal, que e onde mora a logica com armadilha.
+// Separate from vite.config.ts on purpose: that one has `root: 'src/renderer'`
+// for the window build, and inheriting that root would make vitest miss the
+// main process tests, which is where the tricky logic lives.
 import { defineConfig } from 'vitest/config'
 import { defineDosEnderecos, TESTE } from './scripts/enderecos.mjs'
 
 export default defineConfig({
-  // Os testes rodam com um domínio de exemplo no lugar do servidor e da UI que
-  // o build grava (scripts/enderecos.mjs).
+  // The tests run with an example domain in place of the server and UI that
+  // the build writes (scripts/enderecos.mjs).
   define: defineDosEnderecos(TESTE),
   test: {
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     environment: 'node',
-    // Falha se um teste esquecer um timer ou um ouvinte pendurado.
+    // Fails if a test leaves a timer or a listener hanging.
     restoreMocks: true,
   },
 })

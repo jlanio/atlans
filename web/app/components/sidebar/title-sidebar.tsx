@@ -11,15 +11,15 @@ interface TitleSidebarProps {
 const TitleSidebar = ({ title, className }: TitleSidebarProps) => {
 
   const { open, isMobile } = useSidebar()
-  // `open` é o estado do DESKTOP. Na gaveta do telefone quem manda é
-  // `openMobile`, e o Sheet só existe aberto — então lá o wordmark aparece
-  // sempre. Sem esta guarda, o cookie `sidebar_state=false` (barra recolhida no
-  // desktop) deixava o wordmark em `opacity-0` dentro da gaveta.
+  // `open` is the DESKTOP state. In the phone drawer what rules is
+  // `openMobile`, and the Sheet only exists while open — so there the wordmark
+  // always shows. Without this guard, the `sidebar_state=false` cookie (bar
+  // collapsed on desktop) left the wordmark at `opacity-0` inside the drawer.
   const visivel = isMobile || open
 
   return (
     <h1 className={cn(
-      // Transição só sob motion-safe: quem pede menos movimento vê a troca seca.
+      // Transition only under motion-safe: whoever asks for less motion sees an abrupt swap.
       "motion-safe:transition text-base font-semibold tracking-[-0.01em]",
       visivel ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
       className,

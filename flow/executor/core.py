@@ -1,5 +1,5 @@
 # flow/executor/core.py
-"""Orquestrador principal do workflow."""
+"""Main workflow orchestrator."""
 import time
 import asyncio
 import traceback as _traceback
@@ -12,10 +12,10 @@ from flow.utils.logger import get_logger
 from flow.utils.publisher.events import WorkflowEventPublisher
 from flow.metrics.collector import MetricsCollector
 from flow.core.graph import WorkflowGraph
-# A regra do alias mora em flow/core/aliases.py (puro) para o lint estático
-# aplicar a MESMA sem puxar o registry de nós. O nome com underscore segue
-# existindo aqui: tests/unit/test_alias_expressions.py importa `_resolve_alias`
-# de flow.executor.core.
+# The alias rule lives in flow/core/aliases.py (pure) so that the static lint
+# applies the SAME one without pulling in the node registry. The underscored
+# name still exists here: tests/unit/test_alias_expressions.py imports
+# `_resolve_alias` from flow.executor.core.
 from flow.core.aliases import resolve_alias as _resolve_alias
 from flow.executor.declared_schema import schema_declarado, schema_do_catalogo
 from flow.utils.parameter_validation import validate_node_parameters
@@ -32,15 +32,15 @@ import flow.executor.events as _events
 
 
 class _LazySummary:
-    """Adia o resumo de um dict de inputs/outputs até o log ser realmente emitido.
+    """Defers summarizing an inputs/outputs dict until the log is actually emitted.
 
-    O `logging` só chama `__str__` de um argumento `%s` quando algum handler
-    aceita o record. Antes o executor logava `f"... com inputs {inputs}"`: a
-    f-string é interpolada EAGER, uma vez por nó, dentro do event loop, mesmo
-    com o nível acima de DEBUG. Como `http_request` devolve o `response.json()`
-    cru e `python_script` devolve qualquer objeto do usuário, um payload de
-    dezenas de MB virava segundos de CPU e centenas de MB de pico só para
-    montar uma string que ninguém ia ler.
+    `logging` only calls `__str__` on a `%s` argument when some handler
+    accepts the record. The executor used to log `f"... com inputs {inputs}"`: the
+    f-string is interpolated EAGERLY, once per node, inside the event loop, even
+    with the level above DEBUG. Since `http_request` returns the raw
+    `response.json()` and `python_script` returns any user object, a payload of
+    tens of MB turned into seconds of CPU and hundreds of MB of peak memory just
+    to build a string nobody was going to read.
     """
     __slots__ = ("_data",)
 
@@ -50,21 +50,21 @@ class _LazySummary:
     def __str__(self) -> str:
         if not isinstance(self._data, dict):
             return f"<{type(self._data).__name__}>"
-        # Resume por chave (contagem/colunas para tabulares, 300 chars para
-        # escalares). `with_bounds=False` tira o `total_bounds` do caminho de
-        # log: é uma varredura O(n) sobre todas as geometrias (13,6 ms num GDF
-        # de 300k feições) que só se justifica no evento de debug, que é opt-in
-        # por `debug_mode`.
-        # Não é custo zero: dicts e listas aninhados ainda passam por
-        # json.dumps. O que se garante é que nada disso roda com o nível acima
-        # de DEBUG, e que strings/bytes gigantes são fatiados ANTES de serem
-        # serializados.
+        # Summarizes per key (count/columns for tabular data, 300 chars for
+        # scalars). `with_bounds=False` takes `total_bounds` off the logging
+        # path: it is an O(n) scan over all geometries (13.6 ms on a GDF
+        # of 300k features) that is only justified in the debug event, which is
+        # opt-in via `debug_mode`.
+        # It is not zero-cost: nested dicts and lists still go through
+        # json.dumps. What is guaranteed is that none of this runs with the level
+        # above DEBUG, and that huge strings/bytes are sliced BEFORE being
+        # serialized.
         return str(_build_debug_summary(self._data, with_bounds=False))
 
 
-# Teto para esperar as threads de spill em voo no encerramento do run. Só é
-# exercido em run cancelado/abortado; escrever um Parquet de ~50 MB fica bem
-# abaixo disso, então o teto existe só para não travar o cleanup para sempre.
+# Ceiling for waiting on in-flight spill threads when the run shuts down. Only
+# exercised on a canceled/aborted run; writing a ~50 MB Parquet is well
+# below this, so the ceiling exists only so cleanup does not hang forever.
 _SPILL_DRAIN_TIMEOUT_S = 30.0
 
 logger = get_logger(__name__)
@@ -72,8 +72,8 @@ logger = get_logger(__name__)
 
 class WorkflowExecutor:
     """
-    Orquestra a execução do workflow, com renderização de parâmetros via Jinja2
-    e sistema de "aliases" ($Alias) para referenciar outputs de nós anteriores.
+    Orchestrates the workflow execution, with parameter rendering via Jinja2
+    and an "aliases" system ($Alias) to reference outputs of previous nodes.
     """
     def __init__(
         self,
@@ -90,8 +90,8 @@ class WorkflowExecutor:
         is_nested: bool = False,
     ):
         self.task_id = task_id
-        # Execucao aninhada (sub-workflow): compartilha task_id com o pai, entao
-        # nao pode limpar recursos indexados por ele — quem limpa e o raiz.
+        # Nested execution (sub-workflow): shares task_id with the parent, so it
+        # cannot clean up resources indexed by it — the root does the cleanup.
         self.is_nested = is_nested
         self.definition = definition
         self.publisher = publisher
@@ -100,39 +100,39 @@ class WorkflowExecutor:
         self.workflow_hash = workflow_hash
         self.pinned_outputs = pinned_outputs or {}
         self.pin_metadata = pin_metadata or {}
-        # Refs de pin GRAVADAS NESTA run (auto-pin). É o que volta ao servidor em
-        # __updated_pinned_outputs__. Não pode ser derivado de pinned_outputs no
-        # fim do run: lá também vivem as refs que vieram do servidor e apenas
-        # passaram pela run — e o consumer re-deriva a s3_key com o task_id
-        # ATUAL, então re-reportar uma ref antiga a repontava para um objeto que
-        # nunca existiu (404 em toda run seguinte).
+        # Pin refs WRITTEN IN THIS run (auto-pin). This is what goes back to the server in
+        # __updated_pinned_outputs__. It cannot be derived from pinned_outputs at
+        # the end of the run: that also holds the refs that came from the server and
+        # merely passed through the run — and the consumer re-derives the s3_key with
+        # the CURRENT task_id, so re-reporting an old ref repointed it to an object that
+        # never existed (404 on every subsequent run).
         self.updated_pin_refs: Dict[str, Any] = {}
         self.logger = get_logger(__name__)
         self.metrics_collector = MetricsCollector()
 
         self.node_stats: Dict[str, Any] = {}
         self.all_node_outputs: Dict[str, Dict[str, Any]] = {}
-        # Contexto compartilhado entre nodes:
-        # - _subflow_ancestors: set de hashes ja na cadeia, para SubWorkflowNode
-        #   detectar loops em qualquer nivel.
-        # - _disabled_nodes: snapshot enviado pelo servidor no envelope do job,
-        #   usado por SubWorkflowNode para bloquear sub-fluxos que contenham
-        #   nodes desabilitados pelo admin.
-        # - _subworkflow_definitions: definitions pre-resolvidas da cadeia
-        #   inteira de sub-workflows (servidor → executor via envelope). O executor
-        #   nao tem acesso ao DB, entao SubWorkflowNode busca aqui.
-        # Filhos copiam este dict e propagam para o executor aninhado.
+        # Context shared between nodes:
+        # - _subflow_ancestors: set of hashes already in the chain, so SubWorkflowNode
+        #   can detect loops at any level.
+        # - _disabled_nodes: snapshot sent by the server in the job envelope,
+        #   used by SubWorkflowNode to block sub-workflows that contain
+        #   nodes disabled by the admin.
+        # - _subworkflow_definitions: pre-resolved definitions of the whole chain
+        #   of sub-workflows (server → executor via envelope). The executor
+        #   has no DB access, so SubWorkflowNode looks them up here.
+        # Children copy this dict and propagate it to the nested executor.
         self.context: Dict[str, Any] = {
             "_disabled_nodes": set(disabled_nodes or []),
             "_subworkflow_definitions": dict(subworkflow_definitions or {}),
-            # O proprio workflow ja esta na cadeia. Sem isto, um fluxo que se
-            # chama a si mesmo so era barrado no SEGUNDO nivel — e ate la ele ja
-            # tinha rodado inteiro mais uma vez, mandando o e-mail e gravando o
-            # artefato de novo. Como o run termina em erro, e facil nao perceber
-            # que os efeitos colaterais aconteceram em dobro.
+            # The workflow itself is already in the chain. Without this, a workflow that
+            # calls itself was only blocked at the SECOND level — and by then it had
+            # already run in full one more time, sending the email and writing the
+            # artifact again. Since the run ends in an error, it is easy to miss
+            # that the side effects happened twice.
             #
-            # O sub-fluxo SOBRESCREVE esta chave com a cadeia que recebeu do pai
-            # (SubWorkflowNode), entao aqui ela so importa para a raiz.
+            # The sub-workflow OVERWRITES this key with the chain it received from the
+            # parent (SubWorkflowNode), so here it only matters for the root.
             "_subflow_ancestors": {workflow_hash} if workflow_hash else set(),
         }
 
@@ -144,10 +144,10 @@ class WorkflowExecutor:
 
         self.node_mgr = NodeManager(node_defs)
         self.node_mgr.instantiate_nodes(self.execution_order)
-        # auto_map_edges (backfill legado de from_key/to_key a partir de
-        # outputKey*/inputKey* nos params) foi aposentado: nenhum nó nem o front
-        # atual emitem esses params, e o front já grava from_key na aresta. A
-        # semântica da aresta agora vem só da própria aresta. Ver
+        # auto_map_edges (legacy backfill of from_key/to_key from
+        # outputKey*/inputKey* in params) was retired: no node nor the current
+        # front end emits those params, and the front end already writes from_key
+        # on the edge. Edge semantics now come only from the edge itself. See
         # docs/specs/edge-data-contract.md §5.
 
         for node in self.node_mgr.nodes.values():
@@ -156,24 +156,24 @@ class WorkflowExecutor:
             node._debug_mode     = self.debug_mode
             node._workspace_id   = self.workspace_id
             node._workflow_hash  = self.workflow_hash
-            # context do node aponta para o mesmo dict do executor — permite
-            # SubWorkflowNode ler/escrever _subflow_ancestors transparente.
+            # the node's context points to the same dict as the executor — lets
+            # SubWorkflowNode read/write _subflow_ancestors transparently.
             node.context         = self.context
 
         self.incoming = {nid: ev for nid, ev in self.graph.incoming.items() if nid in self.execution_order}
         self.outgoing = {nid: ev for nid, ev in self.graph.outgoing.items() if nid in self.execution_order}
-        # Arestas de RAMO desativadas neste run (por id do dict da aresta — o
-        # mesmo objeto vive em incoming e outgoing, ver flow/core/graph.py). A
-        # montagem de inputs consulta este conjunto para NAO injetar no merge o
-        # dado de um ramo que nao foi tomado: filtrar so os pais com status
-        # 'skipped' nao bastava, porque um no de controle vivo (status
-        # 'completed') cuja aresta de ramo foi desativada continuava contribuindo.
+        # BRANCH edges deactivated in this run (by id of the edge dict — the
+        # same object lives in incoming and outgoing, see flow/core/graph.py). The
+        # input assembly checks this set so as NOT to inject into the merge the
+        # data from a branch that was not taken: filtering only parents with status
+        # 'skipped' was not enough, because a live control node (status
+        # 'completed') whose branch edge was deactivated kept contributing.
         self._deactivated_edge_ids: set[int] = set()
 
         self.final_outputs: Dict[str, Any] = {}
-        # Tasks de spill em voo. `asyncio.to_thread` não é cancelável, então
-        # elas sobrevivem ao cancelamento do run e precisam ser drenadas antes
-        # do rmtree do _cleanup_spill — ver _drain_spills.
+        # In-flight spill tasks. `asyncio.to_thread` is not cancelable, so
+        # they survive the run's cancellation and need to be drained before
+        # _cleanup_spill's rmtree — see _drain_spills.
         self._spill_inflight: "set[asyncio.Task]" = set()
 
     # ── Pin data ─────────────────────────────────────────────────────────────
@@ -188,7 +188,7 @@ class WorkflowExecutor:
     # ── Expression rendering ──────────────────────────────────────────────────
 
     def _render_node_parameters(self, node_id: str, named: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Renderiza parâmetros e retorna cópia renderizada (sem mutar o original)."""
+        """Renders parameters and returns a rendered copy (without mutating the original)."""
         return render_node_parameters(self.node_mgr.nodes[node_id], node_id, named, context)
 
     # ── Event publishing ──────────────────────────────────────────────────────
@@ -205,27 +205,27 @@ class WorkflowExecutor:
     # ── Pin data resolution ──────────────────────────────────────────────────
 
     async def _resolve_pin_data(self, node_id: str):
-        """Resolve pin data para um nó. Retorna outputs desserializados ou None."""
+        """Resolves pin data for a node. Returns deserialized outputs or None."""
         pinned = self.pinned_outputs.get(node_id)
         if not pinned:
             return None
 
-        # Verifica expiração
+        # Checks expiration
         node_meta = self.pin_metadata.get(node_id, {})
         expires_at_str = node_meta.get("expires_at")
         if expires_at_str:
             try:
                 if utc_now_naive() > datetime.fromisoformat(expires_at_str):
-                    # O objeto no MinIO nao e removido aqui: o executor nao tem
-                    # credenciais de storage. O servidor apaga em
-                    # DELETE /workflows/{id_hash}/pin/{node_id} e sobrescreve no
-                    # re-pin (mesma s3_key).
+                    # The object in MinIO is not removed here: the executor has no
+                    # storage credentials. The server deletes it on
+                    # DELETE /workflows/{id_hash}/pin/{node_id} and overwrites it on
+                    # re-pin (same s3_key).
                     self.logger.info("[%s] Pin data expirado — executando nó normalmente.", node_id)
                     return None
             except (ValueError, TypeError) as exc:
                 logger.debug("Formato de pin inválido, ignorando: %s", exc)
 
-        # Download do MinIO se necessário
+        # Download from MinIO if needed
         if "__pin_s3_key__" in pinned:
             try:
                 pinned = await asyncio.to_thread(self._download_pin_artifact, pinned)
@@ -241,13 +241,13 @@ class WorkflowExecutor:
         return pinned
 
     def _marcar_pin_para_regravar(self, node_id: str) -> None:
-        """Auto-cura de pin quebrado: zera a ref para o auto-pin regravar já nesta run.
+        """Self-healing of a broken pin: clears the ref so auto-pin rewrites it in this very run.
 
-        Sem isto, uma ref cujo objeto sumiu do MinIO (purga, bucket limpo,
-        upload perdido) ficava presa para sempre: o auto-pin só dispara com a
-        ref VAZIA, então toda run seguinte repetia o 404 e re-executava o nó.
-        Só se aplica a pin com metadata (intenção explícita do usuário) — e NÃO
-        ao pin expirado, cuja lacuna é deliberada até alguém re-pinar.
+        Without this, a ref whose object vanished from MinIO (purge, bucket wiped,
+        lost upload) stayed stuck forever: auto-pin only fires with an
+        EMPTY ref, so every subsequent run repeated the 404 and re-executed the node.
+        Only applies to a pin with metadata (explicit user intent) — and NOT
+        to an expired pin, whose gap is deliberate until someone re-pins.
         """
         if node_id in self.pin_metadata:
             self.pinned_outputs[node_id] = {}
@@ -306,10 +306,10 @@ class WorkflowExecutor:
         node_type_m = node_def.get("type", "") if isinstance(node_def, dict) else ""
         self.metrics_collector.start_node(node_id, node_name_m, node_type_m)
 
-        # Duas linhas, dois níveis, de propósito: o QUE está rodando é a única
-        # pista que `docker logs executor` dá quando o WebSocket para o servidor
-        # cai, então fica em INFO com args %s (custo O(1), sem payload). O
-        # conteúdo dos inputs é caro de resumir e fica em DEBUG.
+        # Two lines, two levels, on purpose: WHAT is running is the only
+        # clue `docker logs executor` gives when the WebSocket to the server
+        # drops, so it stays at INFO with %s args (O(1) cost, no payload). The
+        # content of the inputs is expensive to summarize and stays at DEBUG.
         self.logger.info("Executando nó %s (%s)", node_id, node_def.get("name", node_id))
         self.logger.debug("[%s] inputs: %s", node_id, _LazySummary(inputs))
         start_ts = time.time()
@@ -326,12 +326,12 @@ class WorkflowExecutor:
                     outputs = await node.execute(inputs)
                     break
                 except Exception as _exc:
-                    # MUDANCA DE COMPORTAMENTO: so retenta erro TRANSITORIO
-                    # (rede/timeout, ver flow/utils/error_taxonomy). Antes qualquer
-                    # Exception era retentada, o que (a) reexecutava node.execute()
-                    # inteiro num erro deterministico (validacao, dado ruim) sem
-                    # chance de o resultado mudar e (b) repetia efeitos colaterais
-                    # de nos nao idempotentes. A ultima tentativa tambem cai aqui.
+                    # BEHAVIOR CHANGE: only retries TRANSIENT errors
+                    # (network/timeout, see flow/utils/error_taxonomy). Previously any
+                    # Exception was retried, which (a) re-executed the whole
+                    # node.execute() on a deterministic error (validation, bad data) with
+                    # no chance of the result changing and (b) repeated side effects
+                    # of non-idempotent nodes. The last attempt also lands here.
                     if _attempt >= _retry_count or not is_retryable(classify_error(_exc)):
                         raise
                     self.logger.warning(
@@ -363,9 +363,9 @@ class WorkflowExecutor:
                 "error": str(error) if error else None,
                 "started_at": utc_from_timestamp_naive(start_ts).isoformat(),
                 "output_keys": list(outputs.keys()) if isinstance(outputs, dict) else [],
-                # Quais colunas cada saida tinha. E o que permite ao editor
-                # sugerir nomes de coluna em vez de exigir que a pessoa execute
-                # o fluxo so para descobrir o que chega no proximo no.
+                # Which columns each output had. This is what lets the editor
+                # suggest column names instead of requiring the person to run
+                # the workflow just to find out what reaches the next node.
                 "output_columns": _colunas_das_saidas(outputs) if isinstance(outputs, dict) else None,
             }
             self.all_node_outputs[node_id] = {
@@ -376,25 +376,25 @@ class WorkflowExecutor:
                 },
             }
             if status == "completed" and outputs:
-                # O dict leve de referências fica SÓ em all_node_outputs — é o
-                # caminho de `parent_outputs`, o único que rehidrata via
-                # `_load_from_disk`. `named[alias]`/`final_outputs` continuam
-                # com o payload real de propósito: o contexto Jinja não
-                # rehidrata nada, então devolver `spilled` aqui faria
-                # `{{ Alias.gdf }}` renderizar `{'__spilled__': True, …}` e
-                # deixaria `final_outputs` apontando para Parquets que
-                # `_free_node_outputs` já apagou. Trocar pico de RAM por
-                # corrupção silenciosa de dado é mau negócio.
+                # The lightweight dict of references lives ONLY in all_node_outputs — that is
+                # the `parent_outputs` path, the only one that rehydrates via
+                # `_load_from_disk`. `named[alias]`/`final_outputs` keep the
+                # real payload on purpose: the Jinja context does not
+                # rehydrate anything, so returning `spilled` here would make
+                # `{{ Alias.gdf }}` render `{'__spilled__': True, …}` and
+                # would leave `final_outputs` pointing at Parquets that
+                # `_free_node_outputs` has already deleted. Trading peak RAM for
+                # silent data corruption is a bad deal.
                 spilled = await self._spill_shielded(node_id, outputs)
                 if spilled is not outputs:
                     self.all_node_outputs[node_id]["outputs"] = spilled
             _branch_result = outputs.get("branch") if outputs and isinstance(outputs.get("branch"), bool) else None
 
-            # Schema drift: compara keys retornadas com o declarado no catálogo
-            # (`outputs` do descriptor). A definition salva nunca carregou o
-            # declarado, então a leitura antiga (node_def) comparava com nada.
-            # Nós de saída dinâmica ficam de fora: neles quem manda é o payload
-            # (`output_vars`, `ports`), não o descriptor.
+            # Schema drift: compares the returned keys with what the catalog declares
+            # (the descriptor's `outputs`). The saved definition never carried the
+            # declared ones, so the old read (node_def) compared against nothing.
+            # Dynamic-output nodes are left out: for them the payload rules
+            # (`output_vars`, `ports`), not the descriptor.
             _decl_cls = self.node_mgr.factory.get(node_def.get("name"))
             _decl_desc = getattr(_decl_cls, "description", lambda: {})() if _decl_cls else {}
             _declared_keys: set[str] = set()
@@ -420,13 +420,13 @@ class WorkflowExecutor:
                                     traceback_str=error_traceback,
                                     schema_drift=_schema_drift,
                                     exception=error)
-            # `end_node` faz uma varredura O(n) sobre o GDF de saida
-            # (`total_bounds` sempre; contagem de vertices/tipos no debug) — que
-            # segurava o event loop no fim de cada no. Vai para thread. Com o
-            # batch rodando nos em paralelo (`asyncio.gather`), varios `end_node`
-            # passam a correr de fato concorrentes; o unico estado compartilhado
-            # que tocam e `run_tracker.sample()`, agora protegido por lock em
-            # ResourceTracker (o `nm` e por node_id).
+            # `end_node` does an O(n) scan over the output GDF
+            # (`total_bounds` always; vertex/type counts in debug) — which
+            # held up the event loop at the end of each node. It goes to a thread. With
+            # the batch running nodes in parallel (`asyncio.gather`), several `end_node`
+            # calls now actually run concurrently; the only shared state
+            # they touch is `run_tracker.sample()`, now protected by a lock in
+            # ResourceTracker (`nm` is per node_id).
             await asyncio.to_thread(
                 self.metrics_collector.end_node,
                 node_id=node_id,
@@ -450,22 +450,22 @@ class WorkflowExecutor:
                 self.logger.warning("[%s] Auto-pin falhou: %s", node_id, exc)
 
         if self.debug_mode and self.publisher and status == "completed":
-            # `outputs` é o payload real (o dict leve de spill só foi parar em
-            # all_node_outputs): o resumo de debug precisa das colunas/bounds
-            # do GDF, não da referência.
+            # `outputs` is the real payload (the lightweight spill dict only ended up in
+            # all_node_outputs): the debug summary needs the GDF's columns/bounds,
+            # not the reference.
             self._publish_debug(node_id, inputs, outputs or {})
 
         return node_id, outputs, duration_ms
 
     async def _spill_shielded(self, node_id: str, outputs: Dict[str, Any]) -> Dict[str, Any]:
-        """Roda `_spill_to_disk` numa thread, blindado contra cancelamento.
+        """Runs `_spill_to_disk` in a thread, shielded against cancellation.
 
-        O shield é obrigatório e não é opcional trocar por um await nu: uma
-        thread em execução não é cancelável, então cancelar o future só
-        descartaria o resultado enquanto o Parquet continuaria sendo escrito —
-        e ninguém saberia o path para apagá-lo. Registrando a task em
-        `_spill_inflight` o `finally` de `run()` consegue esperá-la (ver
-        `_drain_spills`) antes de apagar o diretório.
+        The shield is mandatory and swapping it for a bare await is not an option: a
+        running thread is not cancelable, so canceling the future would only
+        discard the result while the Parquet kept being written —
+        and nobody would know the path to delete it. By registering the task in
+        `_spill_inflight`, the `finally` of `run()` can wait for it (see
+        `_drain_spills`) before deleting the directory.
         """
         task = asyncio.ensure_future(
             asyncio.to_thread(_spill_to_disk, self.task_id, node_id, outputs)
@@ -475,41 +475,41 @@ class WorkflowExecutor:
         return await asyncio.shield(task)
 
     async def _drain_spills(self) -> None:
-        """Espera as escritas de spill em voo antes de o diretório ser apagado.
+        """Waits for in-flight spill writes before the directory is deleted.
 
-        Caminho de falha real: `executor/job_executor.py` envolve `run()` num
-        `asyncio.wait_for(..., JOB_TIMEOUT)`. No estouro, o shield devolve
-        CancelledError ao awaiter mas as threads seguem gravando; se o
-        `shutil.rmtree` de `_cleanup_spill` rodar antes delas, cada thread cujo
-        `os.makedirs` ainda não tinha rodado RECRIA o diretório e grava um
-        Parquet que ninguém mais apaga — `_cleanup_spill` é o único ponto de
-        limpeza do processo, não há janitor nem varredura na subida. Medido:
-        5,5 MB órfãos permanentes num único run cancelado; com GDFs reais
-        (>50 MB, o threshold) são centenas de MB no mesmo /tmp do ARTIFACTS_DIR.
+        Real failure path: `executor/job_executor.py` wraps `run()` in an
+        `asyncio.wait_for(..., JOB_TIMEOUT)`. On timeout, the shield returns
+        CancelledError to the awaiter but the threads keep writing; if
+        `_cleanup_spill`'s `shutil.rmtree` runs before them, each thread whose
+        `os.makedirs` had not run yet RECREATES the directory and writes a
+        Parquet that nobody deletes anymore — `_cleanup_spill` is the process's only
+        cleanup point; there is no janitor nor a sweep at startup. Measured:
+        5.5 MB of permanent orphans in a single canceled run; with real GDFs
+        (>50 MB, the threshold) it is hundreds of MB in the same /tmp as ARTIFACTS_DIR.
 
-        No caminho feliz o conjunto está vazio (cada spill é aguardado no nó),
-        então isto custa um `if`.
+        On the happy path the set is empty (each spill is awaited in the node),
+        so this costs one `if`.
         """
         pending = [t for t in self._spill_inflight if not t.done()]
         self._spill_inflight.clear()
         if not pending:
             return
         try:
-            # `asyncio.wait` (e não `wait_for`) porque no timeout ele apenas
-            # devolve o que sobrou em vez de cancelar — cancelar não pararia a
-            # thread e ainda mascararia o erro. O teto evita que um spill
-            # patológico segure o cleanup para sempre.
+            # `asyncio.wait` (and not `wait_for`) because on timeout it just
+            # returns what is left instead of canceling — canceling would not stop the
+            # thread and would also mask the error. The ceiling keeps a
+            # pathological spill from holding up cleanup forever.
             _done, ainda = await asyncio.wait(pending, timeout=_SPILL_DRAIN_TIMEOUT_S)
         except asyncio.CancelledError:
-            # Segundo cancelamento durante o dreno. Não dá para esperar mais,
-            # mas o cleanup logo abaixo precisa rodar; o CancelledError que já
-            # estava propagando pelo `finally` de run() segue seu curso.
+            # Second cancellation during the drain. We cannot wait any longer,
+            # but the cleanup right below must run; the CancelledError that was
+            # already propagating through run()'s `finally` continues on its way.
             self.logger.warning("Dreno do spill cancelado — pode restar Parquet órfão.")
             return
         for task in _done:
-            # Consome a exceção: ninguém mais vai await essas tasks (o awaiter
-            # original levou CancelledError do shield) e o asyncio despejaria
-            # "Task exception was never retrieved" no log do container.
+            # Consumes the exception: nobody else will await these tasks (the original
+            # awaiter got CancelledError from the shield) and asyncio would dump
+            # "Task exception was never retrieved" into the container log.
             if not task.cancelled() and task.exception() is not None:
                 self.logger.warning("Spill falhou durante o encerramento: %s", task.exception())
         if ainda:
@@ -528,10 +528,10 @@ class WorkflowExecutor:
         self.node_stats = {}
 
         named: Dict[str, Any] = {}
-        # `nodes` aponta para o dict vivo de all_node_outputs em vez de uma cópia
-        # populada a cada nó: era um segundo índice node_id → entry que ninguém
-        # lia (o contexto per-node de _run_node_with_tracking já usa
-        # self.all_node_outputs) e que só servia para duplicar referências.
+        # `nodes` points to the live all_node_outputs dict instead of a copy
+        # populated on each node: it was a second node_id → entry index that nobody
+        # read (the per-node context of _run_node_with_tracking already uses
+        # self.all_node_outputs) and that only served to duplicate references.
         context: Dict[str, Any] = {
             "inputs": {},
             "nodes": self.all_node_outputs,
@@ -553,27 +553,27 @@ class WorkflowExecutor:
                 remaining_consumers[edge['source']] += 1
 
         executed = set()
-        # Nós que receberam dado por ALGUMA aresta ATIVA de um pai vivo. Um merge
-        # com um pai vivo e um pai skipado NÃO pode ser skipado só porque o skip
-        # do ramo irmão zerou o pending por último (F2 — antes o resultado
-        # dependia da ordem do batch). "Pai vivo por aresta ativa" ≠ "tem pai
-        # vivo": o próprio nó de bifurcação é vivo, mas o filho do ramo NÃO
-        # tomado chega por aresta desativada e deve ser skipado.
+        # Nodes that received data through SOME ACTIVE edge from a live parent. A merge
+        # with one live parent and one skipped parent must NOT be skipped just because
+        # the sibling branch's skip zeroed the pending count last (F2 — previously the
+        # result depended on the batch order). "Live parent via active edge" ≠ "has a
+        # live parent": the fork node itself is live, but the child of the branch NOT
+        # taken arrives through a deactivated edge and must be skipped.
         has_live_input: set = set()
         ready_nodes = deque([nid for nid in self.execution_order if pending_parents_count[nid] == 0])
 
-        # try/finally: antes, um nó que levantasse exceção abortava o run ANTES
-        # do _cleanup_spill. Os Parquets ficavam em /tmp e — pior — as cópias
-        # relidas continuavam presas no _spill_cache, que é um dict de módulo:
-        # num executor long-running, cada run que falhava vazava GeoDataFrames
-        # inteiros pelo resto da vida do processo.
+        # try/finally: previously, a node that raised an exception aborted the run BEFORE
+        # _cleanup_spill. The Parquets stayed in /tmp and — worse — the reread
+        # copies stayed stuck in _spill_cache, which is a module-level dict:
+        # on a long-running executor, each failed run leaked whole GeoDataFrames
+        # for the rest of the process's life.
         try:
             while ready_nodes:
                 tasks = []
                 current_batch = list(ready_nodes)
                 ready_nodes.clear()
 
-                # Rastreia pais consumidos neste batch para decrementar APÓS execução
+                # Tracks parents consumed in this batch to decrement AFTER execution
                 batch_consumed_parents: list = []
 
                 for node_id in current_batch:
@@ -589,34 +589,35 @@ class WorkflowExecutor:
                         inputs = {}
                         for edge in self.incoming.get(node_id, []):
                             parent_id = edge['source']
-                            # Pai skipado (ramo não tomado) não contribui: a aresta
-                            # some (F14), em vez de injetar None/vazio no merge. O
-                            # resolvedor já omitiria (pai vazio → {}); pular aqui
-                            # evita também um warning espúrio de "from_key ausente"
-                            # sobre um {} esperado.
+                            # A skipped parent (branch not taken) does not contribute: the edge
+                            # disappears (F14), instead of injecting None/empty into the
+                            # merge. The resolver would already omit it (empty parent →
+                            # {}); skipping here also avoids a spurious "from_key
+                            # missing" warning about an expected {}.
                             if self.node_stats.get(parent_id, {}).get("status") == "skipped":
                                 continue
-                            # Aresta de RAMO não tomada: o pai (nó de controle) está
-                            # VIVO (status 'completed'), então o filtro de 'skipped'
-                            # acima não a pega. Sem isto, um merge que também recebe
-                            # dado real de outro pai (has_live_input, por isso RODA
-                            # em vez de ser skipado) juntava silenciosamente a saída
-                            # do ramo REJEITADO — resultado errado, sem erro.
+                            # BRANCH edge not taken: the parent (control node) is
+                            # LIVE (status 'completed'), so the 'skipped' filter
+                            # above does not catch it. Without this, a merge that also
+                            # receives real data from another parent (has_live_input,
+                            # which is why it RUNS instead of being skipped) silently
+                            # joined in the output of the REJECTED branch — wrong
+                            # result, no error.
                             if id(edge) in self._deactivated_edge_ids:
                                 continue
-                            # `_load_from_disk` faz `gpd.read_parquet` (disco +
-                            # desserializacao de geometria): sincrono no loop, um
-                            # GDF derramado de ~200MB o segurava por >1s sem
-                            # agendar heartbeat/cancel de NENHUM job (a ESCRITA do
-                            # spill ja ia para thread via `_spill_shielded`; a
-                            # leitura nao). O cache interno e guardado por
-                            # `_spill_lock`, entao chamar de outra thread e seguro.
+                            # `_load_from_disk` does `gpd.read_parquet` (disk +
+                            # geometry deserialization): synchronous on the loop, a
+                            # ~200MB spilled GDF held it for >1s without
+                            # scheduling heartbeat/cancel for ANY job (the spill
+                            # WRITE already went to a thread via `_spill_shielded`;
+                            # the read did not). The internal cache is guarded by
+                            # `_spill_lock`, so calling it from another thread is safe.
                             parent_outputs = await asyncio.to_thread(
                                 _load_from_disk, self.all_node_outputs[parent_id]['outputs']
                             )
-                            # Fonte única da semântica da aresta (from_key/to_key/spread) —
-                            # a MESMA usada pela simulação de schema abaixo. Ver
-                            # flow/executor/edge_resolver.py e docs/specs/edge-data-contract.md.
+                            # Single source of edge semantics (from_key/to_key/spread) —
+                            # the SAME one used by the schema simulation below. See
+                            # flow/executor/edge_resolver.py and docs/specs/edge-data-contract.md.
                             inputs.update(resolve_edge_inputs(
                                 edge, parent_outputs,
                                 logger=self.logger, node_id=node_id, parent_id=parent_id,
@@ -625,17 +626,17 @@ class WorkflowExecutor:
 
                     tasks.append(self._run_node_with_tracking(node_id, inputs))
 
-                # Cancela os irmaos na PRIMEIRA falha. MUDANCA DE COMPORTAMENTO:
-                # antes (asyncio.gather sozinho) um no que levantava deixava os
-                # irmaos do mesmo batch rodando ate o fim — DEPOIS de o run ja ter
-                # sido reportado como falho —, e eles ainda commitavam insert,
-                # enviavam e-mail, subiam artefato (efeito colateral de um run que o
-                # usuario ve como falho) e disparavam _spill_shielded apos a limpeza
-                # (Parquet orfao). Agora tarefas explicitas: na 1a excecao os
-                # pendentes sao cancelados e aguardados antes de propagar. Uma tarefa
-                # presa em asyncio.to_thread nao morre (a thread segue), mas o
-                # cancelamento impede o no cancelado de COMMITAR o efeito no await
-                # seguinte.
+                # Cancels the siblings on the FIRST failure. BEHAVIOR CHANGE:
+                # previously (asyncio.gather alone) a node that raised left its
+                # siblings in the same batch running to the end — AFTER the run had
+                # already been reported as failed —, and they still committed inserts,
+                # sent emails, uploaded artifacts (side effects of a run the
+                # user sees as failed) and fired _spill_shielded after cleanup
+                # (orphan Parquet). Now explicit tasks: on the 1st exception the
+                # pending ones are canceled and awaited before propagating. A task
+                # stuck in asyncio.to_thread does not die (the thread carries on), but
+                # cancellation keeps the canceled node from COMMITTING the effect at
+                # the next await.
                 task_objs = [asyncio.ensure_future(t) for t in tasks]
                 try:
                     results = await asyncio.gather(*task_objs)
@@ -646,7 +647,7 @@ class WorkflowExecutor:
                     await asyncio.gather(*task_objs, return_exceptions=True)
                     raise
 
-                # Decrementa remaining_consumers APÓS a execução do batch
+                # Decrements remaining_consumers AFTER the batch executes
                 for parent_id in batch_consumed_parents:
                     remaining_consumers[parent_id] -= 1
                     if remaining_consumers[parent_id] <= 0:
@@ -658,22 +659,22 @@ class WorkflowExecutor:
                     executed.add(node_id)
                     self.final_outputs[node_id] = outputs
                     alias = _resolve_alias(node_def)
-                    # Só `named` guarda o alias. O `context[alias]` daqui era morto:
-                    # o contexto que chega no Jinja é o construído por nó em
-                    # _run_node_with_tracking, e render_node_parameters faz
-                    # `context.update(named)` — a chave de topo já vem de `named`.
+                    # Only `named` holds the alias. The `context[alias]` here was dead:
+                    # the context that reaches Jinja is the per-node one built in
+                    # _run_node_with_tracking, and render_node_parameters does
+                    # `context.update(named)` — the top-level key already comes from `named`.
                     named[alias] = outputs
 
-                    # Filtra edges ativas (branch filtering sem mutar self.outgoing).
-                    # O roteamento é gateado pela presença de ARESTAS DE RAMO
-                    # (condition bool), não pelo output cru "branch":
-                    #  - F7: um nó comum (python_script, http_request) cujo output
-                    #    tenha uma chave booleana 'branch' NÃO sequestra o
-                    #    roteamento — sem arestas de ramo, nada é filtrado/skipado.
-                    #  - F8: arestas de DADO (sem condition) permanecem SEMPRE
-                    #    ativas; só as arestas de ramo com condition != branch são
-                    #    desativadas. Antes, condition=None != branch desativava a
-                    #    aresta de dado e skipava o alvo.
+                    # Filters active edges (branch filtering without mutating self.outgoing).
+                    # Routing is gated by the presence of BRANCH EDGES
+                    # (bool condition), not by the raw "branch" output:
+                    #  - F7: an ordinary node (python_script, http_request) whose output
+                    #    has a boolean 'branch' key does NOT hijack
+                    #    routing — without branch edges, nothing is filtered/skipped.
+                    #  - F8: DATA edges (no condition) ALWAYS remain
+                    #    active; only branch edges with condition != branch are
+                    #    deactivated. Previously, condition=None != branch deactivated the
+                    #    data edge and skipped the target.
                     outgoing_edges = self.outgoing.get(node_id, [])
                     active_edges = outgoing_edges
                     branch_edges = [e for e in outgoing_edges if Edge.from_dict(e).is_branch]
@@ -685,14 +686,14 @@ class WorkflowExecutor:
                             if not Edge.from_dict(e).is_branch or e.get("condition") == branch
                         ]
 
-                        # Propaga skip só para o alvo das arestas de RAMO não escolhidas
+                        # Propagates skip only to the target of the BRANCH edges not chosen
                         deactivated = [e for e in branch_edges if e.get("condition") != branch]
                         for edge in deactivated:
-                            # Registra a aresta desativada para a montagem de inputs
-                            # do alvo NAO injetar a saida deste ramo (o alvo pode
-                            # sobreviver por ter outro pai vivo). Feito ANTES de o
-                            # alvo virar ready (proximo batch), entao a montagem ja
-                            # a ve.
+                            # Records the deactivated edge so the target's input assembly
+                            # does NOT inject this branch's output (the target may
+                            # survive by having another live parent). Done BEFORE the
+                            # target becomes ready (next batch), so the assembly
+                            # already sees it.
                             self._deactivated_edge_ids.add(id(edge))
                             self._propagate_skip(
                                 edge["target"], pending_parents_count,
@@ -702,9 +703,9 @@ class WorkflowExecutor:
 
                     for edge in active_edges:
                         child_id = edge["target"]
-                        # Aresta ativa vinda deste nó, que acabou de rodar (vivo):
-                        # o filho recebeu dado real. Marca ANTES do pending para
-                        # que um skip posterior de ramo irmão o veja e não o apague.
+                        # Active edge coming from this node, which just ran (live):
+                        # the child received real data. Marked BEFORE pending so
+                        # that a later skip of a sibling branch sees it and does not erase it.
                         has_live_input.add(child_id)
                         pending_parents_count[child_id] -= 1
                         if pending_parents_count[child_id] == 0 and child_id not in executed:
@@ -729,37 +730,37 @@ class WorkflowExecutor:
         ready_nodes: deque,
         has_live_input: set,
     ) -> None:
-        """Propaga skip para nodes de um branch não selecionado.
+        """Propagates skip to the nodes of an unselected branch.
 
-        Decrementa pending_parents_count e, quando TODOS os pais de `node_id`
-        já foram resolvidos (pending == 0), decide:
-          - se o nó recebeu dado por ALGUMA aresta ATIVA de um pai vivo
-            (`has_live_input`) → tem input real e DEVE rodar: entra em
-            `ready_nodes` em vez de virar skipped. É o merge/diamante em que um
-            ramo morreu mas o outro entregou dado (F2); antes o resultado
-            dependia da ordem do batch — o skip do ramo irmão podia zerar o
-            pending por último e apagar o nó vivo;
-          - senão (todos os pais chegaram por skip / aresta desativada) → marca
-            skipped e propaga recursivamente.
+        Decrements pending_parents_count and, when ALL parents of `node_id`
+        have been resolved (pending == 0), decides:
+          - if the node received data through SOME ACTIVE edge from a live parent
+            (`has_live_input`) → it has real input and MUST run: it goes into
+            `ready_nodes` instead of becoming skipped. This is the merge/diamond where one
+            branch died but the other delivered data (F2); previously the result
+            depended on the batch order — the sibling branch's skip could zero the
+            pending count last and erase the live node;
+          - otherwise (all parents arrived via skip / deactivated edge) → marks it
+            skipped and propagates recursively.
 
-        `pending == 0` garante que todo pai já foi resolvido (executou ou foi
-        skipado), então `has_live_input` está completo aqui.
+        `pending == 0` guarantees that every parent has been resolved (executed or
+        skipped), so `has_live_input` is complete here.
         """
         if node_id in executed:
             return
 
         pending_parents_count[node_id] -= 1
         if pending_parents_count[node_id] > 0:
-            # Ainda tem outro pai pendente — não pode decidir ainda
+            # Still has another pending parent — cannot decide yet
             return
 
         if node_id in has_live_input:
-            # Recebeu dado por aresta ativa de um pai vivo: roda, não skipa.
+            # Received data through an active edge from a live parent: runs, does not skip.
             if node_id not in executed:
                 ready_nodes.append(node_id)
             return
 
-        # Marca como executado (skipped) para não entrar em ready_nodes
+        # Marks as executed (skipped) so it does not enter ready_nodes
         executed.add(node_id)
         self.node_stats[node_id] = {
             "node_name": self.node_mgr.node_defs.get(node_id, {}).get("name", node_id),
@@ -782,7 +783,7 @@ class WorkflowExecutor:
             if remaining_consumers[parent_id] <= 0:
                 self._free_node_outputs(parent_id)
 
-        # Propaga skip para filhos
+        # Propagates skip to children
         for edge in self.outgoing.get(node_id, []):
             self._propagate_skip(
                 edge["target"], pending_parents_count,
@@ -791,16 +792,16 @@ class WorkflowExecutor:
             )
 
     def _free_node_outputs(self, node_id: str) -> None:
-        """Solta a referência em `all_node_outputs` e apaga o spill de um nó já consumido.
+        """Drops the reference in `all_node_outputs` and deletes the spill of an already-consumed node.
 
-        NÃO remove o alias de `named`: ele alimenta o contexto Jinja e precisa
-        continuar disponível para `{{ Alias.x }}` em nós posteriores.
+        Does NOT remove the alias from `named`: it feeds the Jinja context and must
+        remain available for `{{ Alias.x }}` in later nodes.
 
-        Por isso a economia de RAM aqui é parcial e proposital — `named[alias]`
-        e `final_outputs[node_id]` seguem apontando para o payload real, que só
-        morre com o executor. O que esta chamada libera de fato são as CÓPIAS:
-        o Parquet em disco e a cópia relida que o `_spill_cache` (dict de
-        módulo) manteria viva pelo resto da vida do processo.
+        That is why the RAM savings here are partial, on purpose — `named[alias]`
+        and `final_outputs[node_id]` keep pointing at the real payload, which only
+        dies with the executor. What this call actually frees are the COPIES:
+        the Parquet on disk and the reread copy that `_spill_cache` (a module-level
+        dict) would keep alive for the rest of the process's life.
         """
         entry = self.all_node_outputs.get(node_id)
         if entry and entry.get("outputs"):
@@ -819,9 +820,9 @@ class WorkflowExecutor:
 
             desc = getattr(node_cls, "description", lambda: {})()
 
-            # `outputs_from_ports` (SubWorkflowInput) declara `outputs: []`
-            # sem `dynamic_output`, mas as saídas reais são as `ports` do payload:
-            # segue pelo caminho declarado, não pelo estático.
+            # `outputs_from_ports` (SubWorkflowInput) declares `outputs: []`
+            # without `dynamic_output`, but the real outputs are the payload's `ports`:
+            # it takes the declared path, not the static one.
             if not desc.get("dynamic_output") and not desc.get("outputs_from_ports"):
                 self.simulated_outputs[node_id] = {
                     "status": "ok",
@@ -832,30 +833,30 @@ class WorkflowExecutor:
 
             simulate_fn = getattr(node_cls, "simulate", None)
             if not simulate_fn:
-                # Antes era só `continue`, e o nó SUMIA da resposta: oito nós do
-                # catálogo (PythonScript, Switch, ReadGeoJSON, WFS, DataInput...)
-                # têm `dynamic_output` e nenhum `simulate()`, então o /validate
-                # os omitia em silêncio — painel sem schema e `from_key` errado
-                # saindo deles passando sem diagnóstico. As saídas estão escritas
-                # na própria definição (`output_vars`, `rules`/`fallback_output`,
-                # `ports`) ou no `outputs` do catálogo; `schema_source` diz de onde o
-                # schema veio, para o consumidor saber o quanto confiar nele.
+                # It used to be just `continue`, and the node VANISHED from the response: eight
+                # catalog nodes (PythonScript, Switch, ReadGeoJSON, WFS, DataInput...)
+                # have `dynamic_output` and no `simulate()`, so /validate
+                # silently omitted them — panel without a schema and a wrong `from_key`
+                # coming out of them passing with no diagnostic. The outputs are written
+                # in the definition itself (`output_vars`, `rules`/`fallback_output`,
+                # `ports`) or in the catalog's `outputs`; `schema_source` says where the
+                # schema came from, so the consumer knows how much to trust it.
                 try:
                     declarado = schema_declarado(node_def, desc)
                 except ValueError as exc:
-                    # Declaração que o run recusaria em validate() (`output_vars`
-                    # vazio/não-string): mesma frase, status "error". Antes virava
-                    # schema vazio com `ok` — e sem saídas conhecidas o diagnóstico
-                    # de aresta se desligava junto.
+                    # A declaration the run would reject in validate() (`output_vars`
+                    # empty/non-string): same message, status "error". Previously it
+                    # became an empty schema with `ok` — and with no known outputs the
+                    # edge diagnostics were switched off along with it.
                     self.logger.warning(
                         "Saída declarada inválida no nó %s (%s): %s", node_id, node_type, exc,
                     )
                     self.simulated_outputs[node_id] = {"status": "error", "error": str(exc)}
                     continue
                 if declarado is None:
-                    # Sem `outputs` no catálogo e sem nada declarado no payload não há o
-                    # que afirmar — mas o nó fica na resposta, com a origem dizendo
-                    # isso. Omitir era exatamente o silêncio que este ramo remove.
+                    # With no `outputs` in the catalog and nothing declared in the payload there is
+                    # nothing to assert — but the node stays in the response, with the
+                    # source saying so. Omitting it was exactly the silence this branch removes.
                     self.simulated_outputs[node_id] = {
                         "status": "ok", "schema": [], "schema_source": "unknown",
                     }
@@ -866,22 +867,22 @@ class WorkflowExecutor:
                 continue
 
             try:
-                # A assinatura e (parametros_do_no, lista_de_propriedades). Antes
-                # recebia o node_def inteiro e a CLASSE: `for prop in props`
-                # levantava TypeError('type' object is not iterable), que o
-                # except abaixo transformava em {"status": "error"}. Resultado:
-                # `simulate()` nunca era chamado e /workflows/validate devolvia
-                # erro para todo no com dynamic_output.
+                # The signature is (node_parameters, property_list). Previously it
+                # received the whole node_def and the CLASS: `for prop in props`
+                # raised TypeError('type' object is not iterable), which the
+                # except below turned into {"status": "error"}. Result:
+                # `simulate()` was never called and /workflows/validate returned
+                # an error for every node with dynamic_output.
                 #
-                # `parameters` e o formato do corpo da validacao; `properties` e o
-                # da definition salva — mesma tolerancia de `node_props` no
-                # servidor.
+                # `parameters` is the validation body's format; `properties` is the
+                # saved definition's — same tolerance as `node_props` on the
+                # server.
                 params = validate_node_parameters(
                     node_def.get("parameters") or node_def.get("properties") or {},
                     desc.get("properties", []),
-                    # Do descriptor, nao do payload: a validacao aceita
-                    # definition arbitraria, e o nome so entra formatado no log.
-                    # O lookup no registry ja garantiu que o tipo existe.
+                    # From the descriptor, not the payload: validation accepts an
+                    # arbitrary definition, and the name only goes formatted into the log.
+                    # The registry lookup has already guaranteed the type exists.
                     node_name=desc.get("name", node_type),
                 )
                 simulated_inputs: Dict[str, Any] = {}
@@ -891,16 +892,16 @@ class WorkflowExecutor:
                     if not parent_output or parent_output.get("status") != "ok":
                         continue
 
-                    # MESMO resolvedor do run, no plano de schema: as portas que a
-                    # simulação nomeia passam a bater com as que o run produz (antes
-                    # o caso "sem chaves" divergia — run espalhava, sim nomeava por
-                    # parent_id). Ver flow/executor/edge_resolver.py.
+                    # The SAME resolver as the run, on the schema plane: the ports the
+                    # simulation names now match the ones the run produces (previously
+                    # the "no keys" case diverged — the run spread, the simulation named
+                    # by parent_id). See flow/executor/edge_resolver.py.
                     #
-                    # F11: `schema` pode ser [] (SubWorkflowInput/Output têm
-                    # outputs=[]). `.get("schema", [{}])` só usa o default
-                    # quando a CHAVE falta; com lista vazia, [][0] estourava
-                    # IndexError, o except marcava o FILHO como error e cascateava
-                    # por todo o preview. Normaliza a lista vazia aqui.
+                    # F11: `schema` may be [] (SubWorkflowInput/Output have
+                    # outputs=[]). `.get("schema", [{}])` only uses the default
+                    # when the KEY is missing; with an empty list, [][0] raised
+                    # IndexError, the except marked the CHILD as error and it cascaded
+                    # through the whole preview. Normalizes the empty list here.
                     schema_list = parent_output.get("schema") or []
                     parent_fields = schema_list[0].get("fields", []) if schema_list else []
                     simulated_inputs.update(resolve_edge_schema_inputs(edge, parent_fields))
@@ -910,9 +911,9 @@ class WorkflowExecutor:
                     "status": "ok", "schema": schema, "schema_source": "simulated",
                 }
             except Exception as exc:
-                # O preview segue (status "error" so neste no), mas a causa nao
-                # pode ser muda: engolida aqui, um simulate() quebrado aparecia
-                # como "no sem schema" e ninguem descobria o porque.
+                # The preview goes on (status "error" only on this node), but the cause
+                # cannot be silent: swallowed here, a broken simulate() showed up
+                # as "node without schema" and nobody found out why.
                 self.logger.warning(
                     "simulate() falhou no nó %s (%s): %s", node_id, node_type, exc,
                 )
@@ -921,24 +922,24 @@ class WorkflowExecutor:
         return self.simulated_outputs
 
     def validate_edges(self) -> "list[dict]":
-        """Diagnósticos estáticos de aresta a partir do schema simulado.
+        """Static edge diagnostics from the simulated schema.
 
-        Aqui mora o enforcement strict que o RUN não faz (o run só omite a porta,
-        para não derrubar um fluxo por causa de uma saída opcional/dinâmica). A
-        checagem estática tem o schema declarado à mão e pode acusar antes de
-        rodar, sem risco de falso-positivo em runtime:
+        This is where the strict enforcement lives that the RUN does not do (the run
+        only omits the port, so as not to bring down a workflow over an
+        optional/dynamic output). The static check has the hand-declared schema and
+        can flag before running, with no risk of a false positive at runtime:
 
-          - `from_key` que NÃO é saída declarada da origem → **erro** (fiação
-            defasada — a aresta não entregaria nada no run);
-          - aresta de dado sem `from_key`/`to_key` saindo de origem com >1 saída
-            → **aviso** de ambiguidade (espalha tudo; convém nomear a porta).
+          - `from_key` that is NOT a declared output of the source → **error** (stale
+            wiring — the edge would deliver nothing in the run);
+          - data edge without `from_key`/`to_key` coming from a source with >1 output
+            → ambiguity **warning** (spreads everything; better to name the port).
 
-        Exige `simulate_runner()` rodado antes (usa `self.simulated_outputs`).
-        Origem sem schema conhecido (simulate() que falhou, `outputs`
-        vazio, `schema_source: unknown`) não gera diagnóstico — não dá para
-        afirmar typo sem as saídas declaradas. Saídas declaradas na definição
-        (`schema_source: declared`) contam como conhecidas: um `from_key` fora
-        de `output_vars` é erro.
+        Requires `simulate_runner()` to have run first (uses `self.simulated_outputs`).
+        A source with no known schema (simulate() that failed, empty `outputs`,
+        `schema_source: unknown`) produces no diagnostic — a typo cannot be
+        asserted without the declared outputs. Outputs declared in the definition
+        (`schema_source: declared`) count as known: a `from_key` outside
+        `output_vars` is an error.
         """
         diagnostics: "list[dict]" = []
         for node_id in self.execution_order:

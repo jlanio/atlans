@@ -1,13 +1,12 @@
 # tests/unit/test_scripts_executaveis.py
 """
-Todo script que o Makefile chama como `./scripts/...` precisa do bit de
-execução no git.
+Every script the Makefile calls as `./scripts/...` needs the executable bit
+in git.
 
-O `make bootstrap` é o primeiro passo de uma instalação nova
-(docs/instalacao-propria.md), e os quatro scripts do Makefile estavam no git
-sem o bit: num clone limpo, `make bootstrap` parava em «Permission denied»
-antes de fazer qualquer coisa. Conferido no índice do git, e não no disco,
-porque é o modo do índice que chega a cada clone.
+`make bootstrap` is the first step of a fresh install (docs/self-hosting.md),
+and the Makefile's four scripts were in git without the bit: on a clean clone,
+`make bootstrap` stopped at "Permission denied" before doing anything. Checked
+in the git index, not on disk, because the index mode is what reaches every clone.
 """
 from __future__ import annotations
 

@@ -56,7 +56,7 @@ function CodeExample({ code, label }: { code: string; label?: string }) {
       <pre className="bg-zinc-950/80 dark:bg-zinc-950/60 rounded-md px-3 py-2 text-[11px] font-mono leading-relaxed overflow-x-auto whitespace-pre text-emerald-400/90">
         {code}
       </pre>
-      {/* `coarse:`: no telefone não há hover, e copiar o bloco era impossível. */}
+      {/* `coarse:`: a phone has no hover, and copying the block was impossible. */}
       <div className="absolute top-1 right-1 opacity-0 coarse:opacity-70 group-hover:opacity-100 transition-opacity">
         <CopyButton text={code} />
       </div>
@@ -80,7 +80,7 @@ function Callout({ children, variant = "info" }: { children: React.ReactNode; va
   )
 }
 
-// ── Badge de variavel ───────────────────────────────────────────────────────
+// ── Variable badge ──────────────────────────────────────────────────────────
 
 function VarBadge({ name, desc, color = "zinc" }: { name: string; desc: string; color?: "zinc" | "green" | "blue" | "amber" | "purple" }) {
   const colors: Record<string, string> = {
@@ -143,7 +143,7 @@ function Section({
   )
 }
 
-// ── Tabela de filtros ───────────────────────────────────────────────────────
+// ── Filters table ───────────────────────────────────────────────────────────
 
 function FilterRow({ filter, desc }: { filter: string; desc: string }) {
   return (
@@ -166,8 +166,8 @@ interface JinjaExpressionGuideProps {
 export default function JinjaExpressionGuide({ open, onOpenChange }: JinjaExpressionGuideProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      {/* 440px fixos passavam da tela inteira de um telefone, e o Sheet do
-          Radix não encolhe sozinho — o conteúdo saía pela borda direita. */}
+      {/* A fixed 440px exceeded a phone's entire screen, and Radix's Sheet
+          doesn't shrink on its own — the content spilled past the right edge. */}
       <SheetContent side="right" className="w-full sm:w-[440px] sm:max-w-[440px] overflow-y-auto bg-background/95 backdrop-blur-sm !z-[70]">
         <SheetHeader className="pb-1">
           <SheetTitle className="flex items-center gap-2.5 text-base">

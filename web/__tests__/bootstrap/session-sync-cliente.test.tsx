@@ -1,11 +1,11 @@
 /**
- * Contraparte de session-sync-ssr: no CLIENTE o token continua sendo escrito no
- * corpo do render, e não num efeito.
+ * Counterpart of session-sync-ssr: on the CLIENT the token is still written in the
+ * render body, not in an effect.
  *
- * Isso é o que evita a race com os effects dos componentes filhos, que disparam
- * chamadas à API no mesmo tick da hidratação e precisam do Authorization já
- * montado. O teste usa `renderToString` (que não executa efeitos) num ambiente
- * jsdom: se `setAuthToken` foi chamado, foi durante o render.
+ * That is what avoids the race with the child components' effects, which fire
+ * API calls in the same tick as hydration and need the Authorization already
+ * set up. The test uses `renderToString` (which does not run effects) in a
+ * jsdom environment: if `setAuthToken` was called, it was during render.
  */
 import { describe, it, expect, vi } from "vitest"
 import type { ReactNode } from "react"

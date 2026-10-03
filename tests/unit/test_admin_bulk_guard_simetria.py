@@ -1,19 +1,21 @@
 # tests/unit/test_admin_bulk_guard_simetria.py
 """
-Simetria de guards entre as rotas single e as rotas bulk de admin.
+Symmetry of guards between the single and the bulk admin routes.
 
-As seis rotas `/{id_hash}/...` chamam `_ensure_admin_can_modify_target`. As tres
-`/bulk/*` nao chamavam. Hoje isso e inocuo: o guard e um no-op documentado, a
-espera da hierarquia workspace_admin/global_admin prevista no V04.
+The six `/{id_hash}/...` routes call `_ensure_admin_can_modify_target`. The
+three `/bulk/*` ones did not. Today that is harmless: the guard is a
+documented no-op, awaiting the workspace_admin/global_admin hierarchy planned
+in V04.
 
-O problema e o dia em que ele deixar de ser no-op. Nesse momento, quem quisesse
-contornar a jurisdicao usaria a rota bulk com um id so — e a assimetria estaria
-la ha meses, invisivel, porque nenhum teste comparava os dois caminhos.
+The problem is the day it stops being a no-op. At that moment, whoever wanted
+to get around the jurisdiction would use the bulk route with a single id — and
+the asymmetry would have been there for months, invisible, because no test
+compared the two paths.
 
-Aqui a triagem passou a ser uma funcao unica (`_triar`), entao a simetria e
-estrutural. Estes testes travam isso e travam tambem o que a consolidacao NAO
-podia mudar: as tres rotas tem regras de elegibilidade diferentes, e uma recusa
-do guard nao pode derrubar o lote inteiro.
+Here the triage became a single function (`_triar`), so the symmetry is
+structural. These tests lock that in, and also lock what the consolidation
+could NOT change: the three routes have different eligibility rules, and a
+refusal from the guard must not take down the whole batch.
 """
 from __future__ import annotations
 
@@ -33,7 +35,7 @@ from unittest.mock import AsyncMock as _AsyncMock_seg16
 
 @_pytest_seg16.fixture(autouse=True)
 def _patch_revoga_executores(monkeypatch):
-    """SEG-16: isola estes testes da revogacao de executores (consultas proprias)."""
+    """SEG-16: isolates these tests from executor revocation (its own queries)."""
     monkeypatch.setattr(
         "app.services.executor_service.revogar_executores_do_usuario",
         _AsyncMock_seg16(return_value=[]),
@@ -48,7 +50,7 @@ class _Usuario:
     def __init__(self, id_hash="admin-1", status="active"):
         self.id_hash = id_hash
         self.status = status
-        # A rota registra QUEM suspendeu junto com o motivo.
+        # The route records WHO suspended along with the reason.
         self.username = id_hash
 
 
@@ -95,7 +97,7 @@ def test_nenhuma_rota_bulk_reimplementa_o_laco():
     assert not problemas, f"rota(s) bulk sem _triar: {problemas}"
 
 
-# ── Comportamento preservado por rota ────────────────────────────────────────
+# ── Behavior preserved per route ─────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_suspend_recusa_auto_acao_e_status_errado():
@@ -120,7 +122,7 @@ async def test_suspend_recusa_auto_acao_e_status_errado():
 
 @pytest.mark.asyncio
 async def test_reactivate_permite_auto_acao():
-    """A unica das tres sem guarda de auto-acao — a diferenca e proposital."""
+    """The only one of the three without a self-action guard — the difference is intentional."""
     admin = _Usuario("admin-1", "suspended")
 
     with _svc([admin]), patch.object(mod.svc, "bulk_reactivate", new=AsyncMock()):
@@ -145,16 +147,17 @@ async def test_delete_recusa_quem_ja_esta_excluido():
     assert "já está excluído" in resp.errors[0]["error"]
 
 
-# ── Semantica de lote preservada ─────────────────────────────────────────────
+# ── Batch semantics preserved ────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_recusa_do_guard_vira_erro_do_usuario_e_nao_derruba_o_lote():
-    """A diferenca entre single e bulk que a consolidacao tinha de respeitar.
+    """The difference between single and bulk that the consolidation had to respect.
 
-    Na rota single, o guard levanta e a requisicao morre — correto, e um alvo
-    so. No lote, derrubar tudo por causa de um usuario fora da jurisdicao
-    impediria a acao sobre os outros. Este teste antecipa o V04: hoje o guard e
-    no-op, entao sem simulacao nao ha o que verificar.
+    In the single route, the guard raises and the request dies — correct, it
+    is a single target. In the batch, taking everything down because of one
+    user outside the jurisdiction would block the action on the others. This
+    test anticipates V04: today the guard is a no-op, so without simulation
+    there is nothing to check.
     """
     admin = _Usuario("admin-1")
     permitido = _Usuario("u-ok", "active")
@@ -177,12 +180,13 @@ async def test_recusa_do_guard_vira_erro_do_usuario_e_nao_derruba_o_lote():
     assert resp.errors == [{"user_id": "u-fora", "error": "Fora da sua jurisdição."}]
 
 
-# ── O motivo da suspensao para de sumir ──────────────────────────────────────
+# ── The suspension reason stops vanishing ────────────────────────────────────
 #
-# A UI de admin tem um campo "Motivo (opcional)" com placeholder "Ex: Violacao
-# dos termos de uso"; `GisFlowService.suspendUser` envia; `UserSuspendRequest`
-# valida (max_length=500). E a rota descartava. O admin escrevia a
-# justificativa, via "Usuario suspenso" e o texto sumia sem deixar rastro.
+# The admin UI has a "Motivo (opcional)" (reason, optional) field with the
+# placeholder "Ex: Violacao dos termos de uso"; `GisFlowService.suspendUser`
+# sends it; `UserSuspendRequest` validates it (max_length=500). And the route
+# discarded it. The admin wrote the justification, saw "Usuario suspenso" and
+# the text vanished without a trace.
 
 @pytest.mark.asyncio
 async def test_bulk_suspend_repassa_o_motivo_e_o_autor():
@@ -201,7 +205,7 @@ async def test_bulk_suspend_repassa_o_motivo_e_o_autor():
 
 @pytest.mark.asyncio
 async def test_suspend_sem_motivo_continua_funcionando():
-    """O campo e opcional na UI — ausencia nao pode quebrar a suspensao."""
+    """The field is optional in the UI — its absence must not break the suspension."""
     admin = _Usuario("admin-1")
     alvo = _Usuario("u-ativo", "active")
 
@@ -216,19 +220,19 @@ async def test_suspend_sem_motivo_continua_funcionando():
 
 @pytest.mark.asyncio
 async def test_o_servico_registra_motivo_e_autor_no_log(caplog):
-    """O destino e o log estruturado, nao `audit_events`, e isso e deliberado.
+    """The destination is the structured log, not `audit_events`, and that is deliberate.
 
-    A tabela `audit_events` existe, esta indexada e tem retencao documentada —
-    mas o `workspace_id` dela e NOT NULL, e suspender um usuario e acao de
-    PLATAFORMA, sem workspace. Alargar a coluna ou carimbar um sentinela e
-    decisao de produto; ate la o registro fica onde as demais acoes de admin ja
-    sao rastreadas.
+    The `audit_events` table exists, is indexed and has documented retention —
+    but its `workspace_id` is NOT NULL, and suspending a user is a PLATFORM
+    action, with no workspace. Widening the column or stamping a sentinel is a
+    product decision; until then the record stays where the other admin
+    actions are already tracked.
     """
     import logging
     from app.services import admin_user_service
 
     class _U:
-        id_hash = "alvo"  # a cascata de revogacao de tokens le o id_hash
+        id_hash = "alvo"  # the token revocation cascade reads the id_hash
         username = "alvo"
         status = "active"
         suspended_at = None

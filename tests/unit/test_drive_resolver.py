@@ -1,10 +1,10 @@
 """
-drive_resolver: Drive e Artefatos resolvidos sempre via HTTP do executor.
+drive_resolver: Drive and Artifacts always resolved via the executor's HTTP.
 
-O caminho "servidor" (import de app.core.db + download direto do MinIO com
-boto3) foi removido: o motor roda apenas dentro do executor, que nao tem banco
-nem credenciais de storage. Autorizacao e escopo de workspace ficam no servidor,
-que responde com uma pre-signed URL de TTL curto.
+The "server" path (importing app.core.db + downloading directly from MinIO with
+boto3) was removed: the engine runs only inside the executor, which has no
+database or storage credentials. Authorization and workspace scope stay on the
+server, which responds with a short-TTL pre-signed URL.
 """
 from unittest.mock import patch
 
@@ -51,7 +51,7 @@ def test_resolve_usa_endpoint_do_executor(resolve, file_id, endpoint):
         out = resolve(file_id)
 
     assert get.call_args.args[0] == f"https://srv{endpoint}"
-    # extension normalizada para minusculo e repassada ao streaming.
+    # extension normalized to lowercase and passed on to the streaming.
     assert stream.call_args.args[:3] == (_META["download_url"], "geojson", "x.geojson")
     assert out == ("/tmp/x.geojson", "geojson", "x.geojson")
 
@@ -71,7 +71,7 @@ def test_404_vira_file_not_found(resolve):
     drive_resolver.resolve_artifact_file,
 ])
 def test_403_vira_permission_error(resolve):
-    """Autorizacao e decidida pelo servidor — 403 nao deve virar 'arquivo ausente'."""
+    """Authorization is decided by the server — a 403 must not become 'missing file'."""
     with patch("httpx.get", return_value=_Resp(403)):
         with pytest.raises(PermissionError):
             resolve("de-outro-workspace")

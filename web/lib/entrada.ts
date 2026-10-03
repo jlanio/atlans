@@ -1,56 +1,59 @@
 // web/lib/entrada.ts
 //
-// Os caminhos da ENTRADA (login e cadastro). Desde que a Home abre sem sessão
-// e o login virou um modal sobre o globo, "ir para o login" é "ir para a Home
-// com o modal aberto": `/?entrar=1` ou `/?cadastro=1`, mais um `callbackUrl`
-// só quando há para onde voltar depois (o admin que pediu /projects sem
-// sessão). Puro e sem React, de propósito: o middleware (Edge) importa daqui,
-// e as rotas /login e /register (server components) também.
+// The paths of the ENTRY (login and sign-up). Since the Home opens without a
+// session and login became a modal over the globe, "go to login" means "go to
+// the Home with the modal open": `/?entrar=1` or `/?cadastro=1`, plus a
+// `callbackUrl` only when there is somewhere to return to afterwards (the admin
+// who requested /projects without a session). Pure and React-free, on purpose:
+// the middleware (Edge) imports from here, and so do the /login and /register
+// routes (server components).
 
 /**
- * Os cinco painéis do modal. `recuperar` pede o link por e-mail e `redefinir`
- * grava a senha nova com o token que veio nele; `verificar` mostra o "abra o
- * link do e-mail" e, com o token do link, ativa a conta — eram as páginas
- * /forgot-password, /reset-password e /verify-email, do modelo antigo de
- * página inteira.
+ * The modal's five panels. `recuperar` requests the link by e-mail and
+ * `redefinir` stores the new password with the token that came in it;
+ * `verificar` shows the "open the link in the e-mail" and, with the link's
+ * token, activates the account — these were the /forgot-password,
+ * /reset-password and /verify-email pages of the old full-page model.
  */
 export type ModoDeEntrada = "entrar" | "cadastro" | "recuperar" | "redefinir" | "verificar"
 
 /**
- * Os painéis que vêm de um LINK DE E-MAIL, e não do portão de login. Valem
- * duas exceções, as duas pelo mesmo motivo:
+ * The panels that come from an E-MAIL LINK, not from the login gate. Two
+ * exceptions apply, both for the same reason:
  *
- * 1. Eles abrem COM ou SEM sessão. Quem esqueceu a senha — ou ainda não
- *    verificou o e-mail — costuma ter uma sessão velha aberta no mesmo
- *    navegador, e é nele que o link chega. Com o portão de `anonimo` valendo
- *    para todos, esse link abria a Home e não fazia nada: o defeito mais
- *    silencioso possível.
- * 2. Uma sessão que chegue no meio (login noutra aba) não os fecha. O token do
- *    link é de USO ÚNICO: fechar o painel por baixo de quem está usando o
- *    queimaria sem ter feito nada.
+ * 1. They open WITH or WITHOUT a session. Someone who forgot the password — or
+ *    has not verified the e-mail yet — often has an old session open in the
+ *    same browser, and that is where the link arrives. With the `anonimo` gate
+ *    applying to all of them, that link opened the Home and did nothing: the
+ *    quietest bug possible.
+ * 2. A session that shows up midway (login in another tab) does not close them.
+ *    The link's token is SINGLE-USE: closing the panel out from under someone
+ *    using it would burn it without anything having been done.
  */
 export function ehPainelDeEmail(modo: ModoDeEntrada | null | undefined): boolean {
   return modo === "recuperar" || modo === "redefinir" || modo === "verificar"
 }
 
 /**
- * Só um caminho INTERNO serve de volta: começa com `/` e não com `//` nem `/\`
- * (que o navegador leria como outro host — open redirect). O resto vira
- * `undefined`. É a regra que a página de login aplicava ao `callbackUrl`.
+ * Only an INTERNAL path works as a return target: it starts with `/` and not with
+ * `//` or `/\` (which the browser would read as another host — open redirect).
+ * Everything else becomes `undefined`. It is the rule the login page applied to
+ * `callbackUrl`.
  */
 export function caminhoInterno(valor: unknown): string | undefined {
   if (typeof valor !== "string") return undefined
-  // Recusa caracteres de controle (TAB/CR/LF e demais C0/DEL). O navegador os
-  // REMOVE ao navegar, então `/\t/evil.com` viraria `//evil.com` — um host
-  // externo (open redirect). Precisa vir antes do teste de prefixo.
+  // Rejects control characters (TAB/CR/LF and other C0/DEL). The browser
+  // REMOVES them when navigating, so `/\t/evil.com` would become `//evil.com` —
+  // an external host (open redirect). Must come before the prefix test.
   if (/[\u0000-\u001f\u007f]/.test(valor)) return undefined
   if (!/^\/(?![/\\])/.test(valor)) return undefined
   return valor
 }
 
 /**
- * A Home com o modal de entrada aberto. O `callbackUrl` só entra quando é
- * interno e não é a própria Home — voltar a `/` é o que já acontece sem ele.
+ * The Home with the entry modal open. `callbackUrl` is only included when it is
+ * internal and is not the Home itself — returning to `/` is what already
+ * happens without it.
  */
 export function destinoDaEntrada(modo: ModoDeEntrada, callbackUrl?: string): string {
   const params = new URLSearchParams()
@@ -61,9 +64,10 @@ export function destinoDaEntrada(modo: ModoDeEntrada, callbackUrl?: string): str
 }
 
 /**
- * A Home com o painel de nova senha aberto, levando o token do e-mail. Sem
- * token não há o que redefinir: cai no painel que pede um link novo — é o que
- * a tela "Link inválido" oferecia, em um passo a menos.
+ * The Home with the new-password panel open, carrying the token from the
+ * e-mail. Without a token there is nothing to reset: it falls back to the panel
+ * that requests a new link — which is what the "Link inválido" (invalid link)
+ * screen offered, in one step fewer.
  */
 export function destinoDaRedefinicao(token?: string): string {
   if (!token) return destinoDaEntrada("recuperar")
@@ -71,10 +75,11 @@ export function destinoDaRedefinicao(token?: string): string {
 }
 
 /**
- * A Home com o painel de verificação aberto. COM token, o painel o gasta no GET
- * e a conta é ativada; SEM token (o acesso direto, ou o "Reenviar e-mail de
- * verificação" de um cache antigo) ele é a tela de "abra o link do e-mail",
- * com o reenvio — que é o que a página fazia nos dois casos.
+ * The Home with the verification panel open. WITH a token, the panel spends it
+ * on the GET and the account is activated; WITHOUT a token (direct access, or
+ * the "Reenviar e-mail de verificação" (resend verification e-mail) from an old
+ * cache) it is the "open the link in the e-mail" screen, with the resend —
+ * which is what the page did in both cases.
  */
 export function destinoDaVerificacao(token?: string): string {
   if (!token) return destinoDaEntrada("verificar")

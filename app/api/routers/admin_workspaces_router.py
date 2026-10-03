@@ -1,11 +1,11 @@
 # app/api/routers/admin_workspaces_router.py
 """
-Lixeira de workspaces — restaurar ou descartar workspaces soft-deletados.
+Workspace trash — restore or discard soft-deleted workspaces.
 
-Admin-only por decisão de produto: o dono faz o soft delete (DELETE
-/workspaces/{id}), mas só o administrador da plataforma enxerga a lixeira e
-decide o destino. Por isso a listagem NÃO filtra por owner_id — o admin vê o
-que qualquer usuário deletou.
+Admin-only by product decision: the owner does the soft delete (DELETE
+/workspaces/{id}), but only the platform administrator sees the trash and
+decides the outcome. That is why the listing does NOT filter by owner_id — the admin
+sees what any user deleted.
 """
 from typing import List, Optional
 
@@ -39,12 +39,12 @@ class WorkspaceTrashOut(BaseModel):
     owner_username: Optional[str] = None
     owner_email: Optional[str] = None
     deleted_at: str
-    workflows: int = 0   # quantos workflows voltam se este workspace for restaurado
+    workflows: int = 0   # how many workflows come back if this workspace is restored
 
 
 class WorkspacePolicyAdminOut(BaseModel):
-    """Uma linha da tela de admin "Piso de isolamento": o que o admin precisa
-    para decidir onde fixar `no_pool` — e enxergar quem ficaria sem rodar."""
+    """One row of the "Piso de isolamento" (isolation floor) admin screen: what the admin
+    needs to decide where to set `no_pool` — and to see who would be left unable to run."""
     id_hash: str
     name: str
     is_default: bool = False
@@ -67,10 +67,10 @@ class PurgeWorkspaceRequest(BaseModel):
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 async def _get_deleted_workspace(id_hash: str, db: AsyncSession) -> Workspace:
-    """Workspace que está na lixeira, ou 404.
+    """Workspace that is in the trash, or 404.
 
-    Sem checagem de owner — este router é admin-only. Exigir `deleted_at`
-    preenchido é o que impede restaurar/purgar um workspace vivo por engano.
+    No owner check — this router is admin-only. Requiring `deleted_at`
+    to be set is what prevents restoring/purging a live workspace by mistake.
     """
     result = await db.execute(
         select(Workspace).where(
@@ -92,9 +92,9 @@ async def list_workspace_policies(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Só as contagens dos níveis, não os executores: é o suficiente para o
-    modo (a mesma conta de `mode_of`) e para o admin ver, antes de fixar o
-    piso, quem ficaria sem executor principal."""
+    """Only the tier counts, not the executors: that is enough for the
+    mode (the same computation as `mode_of`) and for the admin to see, before setting
+    the floor, who would be left without a primary executor."""
     from app.models.workspace_executor import WorkspaceExecutor
     from app.services import workspace_executor_service as politica
 
@@ -146,10 +146,10 @@ async def list_deleted_workspaces(
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
-    """Todos os workspaces soft-deletados da plataforma, do mais recente ao mais antigo."""
-    # LEFT OUTER JOIN: owner_id e nullable e nao tem FK para users, entao um
-    # INNER JOIN esconderia justamente os workspaces orfaos — os que mais
-    # interessam ao admin.
+    """All soft-deleted workspaces on the platform, from newest to oldest."""
+    # LEFT OUTER JOIN: owner_id is nullable and has no FK to users, so an
+    # INNER JOIN would hide precisely the orphan workspaces — the ones that
+    # matter most to the admin.
     result = await db.execute(
         select(Workspace, User.username, User.email)
         .outerjoin(User, User.id_hash == Workspace.owner_id)
@@ -162,10 +162,10 @@ async def list_deleted_workspaces(
     if not rows:
         return []
 
-    # Quantos workflows voltam no restore: só os que caíram junto com o
-    # workspace, casados pelo deleted_at compartilhado. Contar todos os
-    # deletados inflaria o número com workflows apagados individualmente antes,
-    # que o restore não devolve.
+    # How many workflows come back on restore: only those that went down together with
+    # the workspace, matched by the shared deleted_at. Counting all deleted ones
+    # would inflate the number with workflows deleted individually earlier,
+    # which the restore does not bring back.
     counts = dict((await db.execute(
         select(Workflow.workspace_id, sa_func.count(Workflow.id))
         .join(Workspace, Workspace.id_hash == Workflow.workspace_id)
@@ -197,12 +197,12 @@ async def restore_workspace(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Tira o workspace da lixeira e devolve os workflows que caíram com ele.
+    """Takes the workspace out of the trash and brings back the workflows that went down with it.
 
-    Os workflows voltam DESATIVADOS, e os agendamentos continuam desligados: o
-    delete em cascata não registra quem já estava desativado antes, então
-    religar em bloco reativaria justamente o que o dono tinha desligado de
-    propósito. O dono reativa o que ainda fizer sentido.
+    The workflows come back DEACTIVATED, and the schedules stay off: the
+    cascading delete does not record who was already deactivated before, so
+    turning everything back on would reactivate precisely what the owner had turned
+    off on purpose. The owner reactivates whatever still makes sense.
     """
     ws = await _get_deleted_workspace(id_hash, db)
 
@@ -232,28 +232,28 @@ async def purge_workspace(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Hard delete — apaga a linha de vez. Exige que o workspace esteja na lixeira.
+    """Hard delete — removes the row for good. Requires the workspace to be in the trash.
 
-    A exigência é proposital: purgar direto significaria perder em um clique o
-    que o soft delete existe para proteger. Os membros saem por FK CASCADE.
+    The requirement is deliberate: purging directly would mean losing in one click
+    what the soft delete exists to protect. Members go away via FK CASCADE.
 
-    `confirm` repete o id_hash porque o botão fica ao lado de cada linha da
-    tabela, e agora sobre workspaces de outros usuários.
+    `confirm` repeats the id_hash because the button sits next to each row of the
+    table, and now over other users' workspaces.
     """
     if payload.confirm != id_hash:
         raise HTTPException(status_code=400, detail="Confirmação não confere com o id_hash.")
 
     ws = await _get_deleted_workspace(id_hash, db)
 
-    # Os workflows continuam apontando para o id_hash apos o hard delete — sem
-    # FK, nada os remove. Ja estao soft-deletados pelo delete, entao nao voltam
-    # a executar; a limpeza definitiva deles fica fora deste endpoint (o
-    # historico de runs e metricas ainda referencia esses hashes).
+    # The workflows keep pointing to the id_hash after the hard delete — with no
+    # FK, nothing removes them. They are already soft-deleted by the delete, so they
+    # do not run again; their final cleanup is outside this endpoint (the
+    # history of runs and metrics still references these hashes).
     #
-    # A expiracao de storage aqui e rede de seguranca: o DELETE do workspace ja
-    # rodou o mesmo helper, entao na pratica costuma ser no-op. Ela cobre o caso
-    # do purge_expired_artifacts ainda nao ter passado quando a linha some — sem
-    # isso os artefatos viram orfaos sem nome no /admin/storage.
+    # The storage expiration here is a safety net: the workspace DELETE already
+    # ran the same helper, so in practice it is usually a no-op. It covers the case
+    # where purge_expired_artifacts has not run yet when the row disappears — without
+    # it the artifacts become nameless orphans in /admin/storage.
     from app.services.storage_purge_service import schedule_workspace_data_expiry
     scheduled = await schedule_workspace_data_expiry(db, id_hash)
 
@@ -267,7 +267,7 @@ async def purge_workspace(
     )
 
 
-# ── Piso de isolamento (spec §4.5, Q10) ────────────────────────────────────────
+# ── Isolation floor (spec §4.5, Q10) ───────────────────────────────────────────
 
 class IsolationFloorUpdate(BaseModel):
     floor: str = Field(..., pattern="^(none|no_pool)$")
@@ -280,10 +280,10 @@ async def set_isolation_floor(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """`no_pool` proíbe o fallback para o pool compartilhado: o terminal é
-    forçado a `fail` e o dono/admin do workspace não consegue afrouxar (a API
-    recusa com 403 e o dispatch lê o piso). Só o admin da plataforma escreve —
-    é o que restaura uma garantia dura onde ela é exigência externa."""
+    """`no_pool` forbids the fallback to the shared pool: the terminal is
+    forced to `fail` and the workspace owner/admin cannot loosen it (the API
+    refuses with 403 and dispatch reads the floor). Only the platform admin writes it —
+    it is what restores a hard guarantee where it is an external requirement."""
     from app.services import workspace_executor_service as politica
     from app.services.execution_alert_service import notify_floor_forced
 
@@ -295,8 +295,8 @@ async def set_isolation_floor(
         raise HTTPException(status_code=404, detail="Workspace não encontrado.")
 
     forced = await politica.set_floor(db, ws, payload.floor, actor_id=current_user.id_hash)
-    # Só avisa quem tem nível principal: sem dedicado, "passou a ser isolado"
-    # não descreve nada que o dono reconheça.
+    # Only notify those who have a primary tier: without a dedicated one, "is now isolated"
+    # describes nothing the owner would recognize.
     if forced and (await politica.load_policy(db, ws)).has_primary:
         try:
             await notify_floor_forced(db, ws)

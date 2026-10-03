@@ -6,11 +6,11 @@ import { estiloDoTipo } from "@/consts/ExecutorTypeStyles"
 import type { IExecutor } from "@/service/types"
 
 /**
- * Badge que distingue o tipo do executor.
+ * Badge that distinguishes the executor type.
  *
- * O vocabulário (nome, ícone e cor) mora em `consts/ExecutorTypeStyles` — aqui
- * ficava a única cópia dele, e o filtro por tipo e os cabeçalhos de grupo
- * acabaram criando as suas, já com tonalidades diferentes.
+ * The vocabulary (name, icon and color) lives in `consts/ExecutorTypeStyles` —
+ * the only copy of it used to be here, and the type filter and the group
+ * headers ended up creating their own, already with different shades.
  */
 export function ExecutorTypeBadge({
   type,

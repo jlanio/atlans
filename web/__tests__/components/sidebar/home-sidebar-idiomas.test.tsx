@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest"
 import { cleanup, render, screen } from "@testing-library/react"
 
 /**
- * A casca da Home em inglês e espanhol: a vitrine do catálogo (os PAÍSES
- * mudam de nome; os órgãos, que são nomes próprios, não), e os botões de quem
- * ainda não entrou. Os mocks são os mínimos do home-sidebar.test.
+ * The Home shell in English and Spanish: the catalog showcase (the COUNTRIES
+ * change names; the agencies, being proper nouns, don't), and the buttons for
+ * those who haven't signed in yet. The mocks are the minimal ones from home-sidebar.test.
  */
 beforeAll(() => {
   Object.defineProperty(window, "matchMedia", {
@@ -50,10 +50,10 @@ describe("HomeSidebar — em inglês", () => {
     for (const rotulo of ["Brazil", "Outside Brazil", "Stop searching for data. Ask Atlans."]) {
       expect(screen.getByText(rotulo), rotulo).toBeTruthy()
     }
-    // A fita dos países: "Equador" vira "Ecuador" (duas cópias — a da emenda do laço).
+    // The countries strip: "Equador" becomes "Ecuador" (two copies — the one from the loop's seam).
     expect(screen.getAllByText("Ecuador").length).toBeGreaterThan(0)
     expect(screen.queryByText("Equador")).toBeNull()
-    // Os órgãos são nomes próprios.
+    // Agencies are proper nouns.
     expect(screen.getAllByText("IBGE").length).toBeGreaterThan(0)
     expect(screen.getByRole("navigation", { name: "Home sidebar" })).toBeTruthy()
     expect(screen.getByRole("button", { name: "Sign in" })).toBeTruthy()
@@ -83,8 +83,8 @@ describe("o trilho da borda, no idioma da Home", () => {
 })
 
 describe("o lang da barra, já no HTML do servidor", () => {
-  // A barra é irmã da HomeView: sem o próprio `lang`, o inglês dela ficava sob
-  // o `lang="pt-BR"` da raiz até a hidratação trocar o do <html>.
+  // The bar is a sibling of HomeView: without its own `lang`, its English sat
+  // under the root's `lang="pt-BR"` until hydration swapped the <html> one.
   it.each(["en", "es"] as const)("em %s, a navegação e o trilho declaram o idioma", (idioma) => {
     montar(idioma)
     expect(screen.getByRole("navigation").getAttribute("lang")).toBe(idioma)

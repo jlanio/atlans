@@ -32,18 +32,18 @@ export interface LinhaWorkflowProps {
   canEdit: boolean
   canExecute: boolean
   canManage: boolean
-  /** Há algum workspace de destino elegível para "Mover para workspace". */
+  /** There is some eligible destination workspace for "Mover para workspace". */
   podeMover: boolean
-  /** Arrastar só existe a partir do primeiro grupo criado. */
+  /** Dragging only exists from the first group created on. */
   hasDnd: boolean
   isDragging: boolean
-  /** Disparando ou resolvendo os parâmetros deste workflow. */
+  /** Firing or resolving this workflow's parameters. */
   executando: boolean
   duplicando: boolean
-  /** `run_id` do run vivo (`ActiveRunsContext`): o Executar vira "Ver execução". */
+  /** `run_id` of the live run (`ActiveRunsContext`): Executar becomes "Ver execução". */
   runIdVivo: string | null
   onOpen: (id: string) => void
-  /** Aquece a rota do editor antes do clique (ver `onPointerEnter` abaixo). */
+  /** Warms up the editor route before the click (see `onPointerEnter` below). */
   onPrefetch: (id: string) => void
   onRun: (workflow: IWorkflow) => void
   onVerExecucao: (runId: string) => void
@@ -73,17 +73,17 @@ const ICONE_DO_GATILHO: Record<TipoDeGatilho, IconType> = {
 const TITULO_DO_SUBFLUXO = "Sub-fluxo: executar sozinho normalmente não faz o esperado"
 const VINTE_E_QUATRO_HORAS = 24
 
-/** Criado há menos de 24 h: ganha o selo "Novo". Sem `created_at` não há como afirmar. */
+/** Created less than 24 h ago: gets the "Novo" badge. Without `created_at` there is no way to tell. */
 export function ehNovo(wf: Pick<IWorkflow, "created_at">, agora: Date = new Date()): boolean {
   const criado = fromBackend(wf.created_at)
   return criado != null && dayjs(agora).diff(criado, "hour") < VINTE_E_QUATRO_HORAS
 }
 
 /**
- * "há 2 d" para a lista: `formatarInicio` foi feito para o início de uma
- * execução e passa a data por extenso depois de ontem — "alterado 4 set,
- * 03:00 por maria" lê pior que "alterado há 3 d por maria". A data volta
- * depois de um mês, quando "há 47 d" já não diz nada.
+ * "há 2 d" for the list: `formatarInicio` was made for the start of a run and
+ * switches to the spelled-out date after yesterday — "alterado 4 set, 03:00
+ * por maria" reads worse than "alterado há 3 d por maria". The date comes back
+ * after a month, when "há 47 d" no longer says anything.
  */
 export function formatarHa(iso: string | null | undefined, agora: Date = new Date()): string {
   const d = fromBackend(iso)
@@ -102,17 +102,17 @@ export function formatarHa(iso: string | null | undefined, agora: Date = new Dat
 type CamposDeAutoria = Pick<IWorkflow, "created_at" | "updated_at" | "created_by_username" | "updated_by_username">
 
 /**
- * "alterado há 2 d por maria" — ou "criado há 3 h por joão" quando nunca foi
- * alterado depois de criado; sem nome (usuário apagado) fica só o quando.
- * Nulo quando a listagem não trouxe data nenhuma.
+ * "alterado há 2 d por maria" — or "criado há 3 h por joão" when it was never
+ * changed after creation; with no name (deleted user) only the when remains.
+ * Null when the listing brought no date at all.
  */
 export function textoDeAutoria(wf: CamposDeAutoria, agora: Date = new Date()): string | null {
   const criado = fromBackend(wf.created_at)
   const alterado = fromBackend(wf.updated_at)
   const referencia = alterado ?? criado
   if (!referencia) return null
-  // Comparado por instante, não por string: o backend pode serializar as
-  // duas datas com precisões diferentes.
+  // Compared by instant, not by string: the backend may serialize the two
+  // dates with different precisions.
   const ehCriacao = !alterado || !criado || alterado.valueOf() === criado.valueOf()
   const verbo = ehCriacao ? "criado" : "alterado"
   const quem = ehCriacao ? wf.created_by_username : wf.updated_by_username
@@ -121,15 +121,15 @@ export function textoDeAutoria(wf: CamposDeAutoria, agora: Date = new Date()): s
 }
 
 /**
- * A linha de um workflow na tela de Projetos (docs/specs/projetos.md §3.9).
+ * A workflow's row on the Projects screen (docs/specs/projects.md §3.9).
  *
- * Memoizada de propósito, como o card que ela substitui: as linhas nascem
- * dentro de um `.map`, e QUALQUER render da página (uma tecla na busca, o
- * poll de execuções ativas, o relógio das métricas) recriaria a lista inteira
- * — cada linha com um DropdownMenu do Radix dentro. Com props primitivas e
- * callbacks de identidade estável, só a linha que mudou re-renderiza. Quem
- * compõe a página é responsável por memoizar `gatilho`, `resumoDoAgendamento`
- * e `comoAnda` por workflow.
+ * Memoized on purpose, like the card it replaces: the rows are born inside a
+ * `.map`, and ANY render of the page (a search keystroke, the active-runs
+ * poll, the metrics clock) would recreate the whole list — each row with a
+ * Radix DropdownMenu inside. With primitive props and stable-identity
+ * callbacks, only the row that changed re-renders. The page composer is
+ * responsible for memoizing `gatilho`, `resumoDoAgendamento` and `comoAnda`
+ * per workflow.
  */
 export const LinhaWorkflow = React.memo(function LinhaWorkflow({
   workflow, gatilho, resumoDoAgendamento, comoAnda, grupos,
@@ -141,15 +141,15 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
   const nome = workflow.name
   const inativo = !workflow.flag_ative
   const emExecucao = comoAnda.tipo === "executando"
-  // Viewer vê tudo sem alça (spec §3.10): o `hasDnd` diz que há grupos, o
-  // `canEdit` diz que a pessoa pode mover.
+  // A viewer sees everything without a handle (spec §3.10): `hasDnd` says there
+  // are groups, `canEdit` says the person can move.
   const arrastavel = hasDnd && canEdit
   const Icone = ICONE_DO_GATILHO[gatilho.tipo]
   const subfluxo = gatilho.tipo === "subfluxo"
   const portal = temPortal(workflow)
   const novo = ehNovo(workflow)
   const autoria = textoDeAutoria(workflow)
-  // Um único caminho para "Mover para grupo": todos os grupos menos o atual.
+  // A single path for "Mover para grupo": all groups except the current one.
   const destinos = grupos.filter(g => g.id_hash !== workflow.group_id)
 
   const metadados: ReactNode[] = [
@@ -162,19 +162,20 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
     || (canManage && podeMover && !!workflow.workspace_id)
 
   return (
-    // A linha inteira responde ao clique (mouse e toque); o alvo de teclado e
-    // de leitor de tela é o botão no nome. Sem `role`: um `role="button"` aqui
-    // apagaria o gatilho, o agendamento e o "como anda" para quem ouve a lista.
+    // The whole row responds to clicks (mouse and touch); the keyboard and
+    // screen-reader target is the button on the name. No `role`: a
+    // `role="button"` here would erase the trigger, the schedule and the "como
+    // anda" for those who listen to the list.
     <div
       draggable={arrastavel}
-      // `setData` é obrigatório para o Firefox iniciar o arrasto; o valor não
-      // é usado (o alvo lê o id do estado), mas sem ele o `dragstart` é ignorado.
+      // `setData` is required for Firefox to start the drag; the value is not
+      // used (the target reads the id from state), but without it `dragstart` is ignored.
       onDragStart={arrastavel ? e => { e.dataTransfer?.setData("text/plain", id); onDragStart(id) } : undefined}
       onDragEnd={arrastavel ? onDragEnd : undefined}
       onClick={() => onOpen(id)}
-      // O editor é a rota mais pesada da aplicação e a lista navega por
-      // `onClick`, não por <Link> — o App Router nunca a pré-carregaria
-      // sozinho. O ponteiro sobre a linha é o aviso mais antecipado do clique.
+      // The editor is the heaviest route in the application and the list navigates
+      // via `onClick`, not via <Link> — the App Router would never prefetch it
+      // on its own. The pointer over the row is the earliest hint of the click.
       onPointerEnter={() => onPrefetch(id)}
       data-workflow={id}
       className={cn(
@@ -198,16 +199,16 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
         </span>
       )}
 
-      {/* Tile do gatilho, com o ponto de estado no canto: verde ativo, cinza
-          inativo, azul pulsando em execução. */}
+      {/* Trigger tile, with the state dot in the corner: green active, gray
+          inactive, pulsing blue while running. */}
       <span
         title={gatilho.rotulo}
         className={cn(
           "relative flex size-[34px] shrink-0 items-center justify-center rounded-lg",
           subfluxo ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "bg-muted text-muted-foreground",
-          // Inativo fica esmaecido (o selo "Inativo" e o ponto cinza reforçam);
-          // "como anda" e as ações ficam legíveis — a falha de um inativo ainda
-          // precisa ser lida.
+          // Inactive is dimmed (the "Inativo" badge and the gray dot reinforce it);
+          // "como anda" and the actions stay legible — an inactive workflow's
+          // failure still needs to be read.
           inativo && "opacity-60",
         )}
       >
@@ -244,10 +245,10 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
             {workflow.description}
           </p>
         )}
-        {/* Cada parte leva o próprio separador, preso a ela por um espaço
-            inquebrável: numa linha que quebra (telefone), o "·" nunca fica
-            sozinho no começo da linha seguinte. O espaço normal antes dele
-            é o que o texto copiado precisa para sair "Agendado · todo dia". */}
+        {/* Each part carries its own separator, tied to it by a non-breaking
+            space: in a line that wraps (phone), the "·" is never left alone
+            at the start of the next line. The normal space before it is what
+            the copied text needs to come out as "Agendado · todo dia". */}
         <p className="flex min-w-0 flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
           {metadados.map((parte, i) => (
             <span key={i} className="min-w-0">
@@ -258,8 +259,8 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
         </p>
       </div>
 
-      {/* No telefone, "como anda" desce para baixo do principal, alinhado
-          com ele (a coluna do tile fica vazia). */}
+      {/* On the phone, "como anda" moves down below the main block, aligned
+          with it (the tile column stays empty). */}
       <ComoAndaCelula comoAnda={comoAnda} className="max-md:col-span-2 max-md:col-start-2 max-md:row-start-2" />
 
       <div
@@ -290,9 +291,9 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
               <TbDotsVertical size={16} aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
-          {/* O conteúdo vive num portal, mas os eventos do React sobem pela
-              árvore de componentes: sem isto, escolher um item abriria o
-              editor pelo `onClick` da linha. */}
+          {/* The content lives in a portal, but React events bubble up through
+              the component tree: without this, picking an item would open the
+              editor via the row's `onClick`. */}
           <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
             <DropdownMenuItem onClick={() => onOpen(id)}>
               <TbPencil aria-hidden="true" /> Abrir no editor
@@ -310,8 +311,8 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
                 <TbSettings aria-hidden="true" /> Configurar
               </DropdownMenuItem>
             )}
-            {/* `has_publish_map` vem da própria listagem; a condição não pode
-                ler `definition.nodes`, que o schema leve não traz. */}
+            {/* `has_publish_map` comes from the listing itself; the condition must not
+                read `definition.nodes`, which the light schema does not carry. */}
             {canEdit && workflow.has_publish_map && (
               <DropdownMenuItem onClick={() => onPortal(workflow)}>
                 <TbWorld aria-hidden="true" /> Configurar portal
@@ -337,10 +338,10 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
                 <TbFolderOpen aria-hidden="true" /> Remover do grupo
               </DropdownMenuItem>
             )}
-            {/* Mover atravessa a fronteira de tenant e exige admin/owner nos
-                DOIS workspaces — por isso fora do gate `canEdit`. `workspace_id`
-                é exigido porque a listagem também traz workflows legados sem
-                workspace: para eles a rota responderia 403. */}
+            {/* Moving crosses the tenant boundary and requires admin/owner in
+                BOTH workspaces — hence outside the `canEdit` gate. `workspace_id`
+                is required because the listing also brings legacy workflows with
+                no workspace: for them the route would answer 403. */}
             {canManage && podeMover && workflow.workspace_id && (
               <DropdownMenuItem onClick={() => onMove(workflow)}>
                 <TbArrowsExchange aria-hidden="true" /> Mover para workspace
@@ -368,7 +369,7 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
   )
 })
 
-/** Descrição do agendamento e o que vem depois dela: a próxima, a pausa (âmbar) ou "calculando…". */
+/** Schedule description and what comes after it: the next run, the pause (amber) or "calculando…". */
 function partesDoAgendamento(resumo: ResumoDoAgendamento): ReactNode[] {
   const partes: ReactNode[] = [
     resumo.descricaoCrua
@@ -390,9 +391,10 @@ function partesDoAgendamento(resumo: ResumoDoAgendamento): ReactNode[] {
 }
 
 /**
- * O botão da vez, no mesmo lugar em toda linha: "Ver execução" quando há run
- * vivo (é o que a pessoa está esperando), "Ativar" na inativa (o interruptor
- * saiu do card e a ação segura fica a um clique), "Executar" no resto.
+ * The button of the moment, in the same place on every row: "Ver execução"
+ * when there is a live run (it is what the person is waiting for), "Ativar" on
+ * the inactive one (the switch left the card and the safe action stays one
+ * click away), "Executar" on the rest.
  */
 function AcaoPrincipal({
   nome, inativo, subfluxo, canEdit, canExecute, executando, runIdVivo, onRun, onVerExecucao, onAtivar,
@@ -443,8 +445,8 @@ function AcaoPrincipal({
         variant="outline"
         size="icon"
         aria-label={`Executar ${nome} agora`}
-        // O sub-fluxo continua clicável (há quem o teste sozinho), mas
-        // apagado e com o aviso: o run que ele dispara não faz o esperado.
+        // The sub-workflow stays clickable (some people test it on its own), but
+        // dimmed and with the warning: the run it fires does not do what is expected.
         title={subfluxo ? TITULO_DO_SUBFLUXO : "Executar agora"}
         onClick={onRun}
         disabled={executando}
@@ -454,8 +456,8 @@ function AcaoPrincipal({
       </Button>
     )
   }
-  // Sem ação (viewer, ou inativo sem permissão de editar): o espaço fica,
-  // para o menu ⋯ alinhar de linha em linha.
+  // No action (viewer, or inactive without edit permission): the space stays,
+  // so the ⋯ menu lines up from row to row.
   return <span aria-hidden="true" className={classe} />
 }
 

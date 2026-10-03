@@ -1,10 +1,10 @@
 # flow/executor/result_helpers.py
-"""Funções compartilhadas para coleta de artefatos e respostas dos outputs do executor."""
+"""Shared functions for collecting artifacts and responses from the executor's outputs."""
 from typing import Any, Dict, List, Optional
 
 
 def collect_artifacts(final_outputs: Dict[str, Any]) -> Dict[str, List[dict]]:
-    """Coleta metadados __artifact__ dos outputs de cada nó."""
+    """Collects __artifact__ metadata from each node's outputs."""
     artifacts: Dict[str, List[dict]] = {}
     for node_id, outputs in (final_outputs or {}).items():
         if isinstance(outputs, dict) and "__artifact__" in outputs:
@@ -21,12 +21,12 @@ def collect_response(final_outputs: Dict[str, Any]) -> Optional[dict]:
 
 
 def collect_subworkflow_output(final_outputs: Dict[str, Any]) -> Optional[dict]:
-    """Coleta o primeiro __subworkflow_output__ — API publica do workflow filho.
+    """Collects the first __subworkflow_output__ — the child workflow's public API.
 
-    Usado pelo SubWorkflowNode para expor outputs nomeados ao workflow chamador
-    em vez do dict de UUIDs do final_outputs cru. Retorna None quando o
-    SubWorkflowOutput do filho nao executou nesta rodada; o caller trata isso
-    como erro (o contrato do sub-fluxo ja exige o node).
+    Used by SubWorkflowNode to expose named outputs to the calling workflow
+    instead of the raw final_outputs dict of UUIDs. Returns None when the
+    child's SubWorkflowOutput did not run in this round; the caller treats that
+    as an error (the sub-workflow contract already requires the node).
     """
     for outputs in (final_outputs or {}).values():
         if isinstance(outputs, dict) and "__subworkflow_output__" in outputs:

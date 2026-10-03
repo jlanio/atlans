@@ -1,6 +1,6 @@
 # executor/sync/queue.py
 """
-SyncQueue — fila resiliente com retry exponencial para operacoes de sync.
+SyncQueue — resilient queue with exponential retry for sync operations.
 """
 import logging
 import time
@@ -17,14 +17,14 @@ _MAX_BACKOFF = 300  # 5 minutos
 
 
 class SyncQueue:
-    """Processa operacoes pendentes do manifesto com retry exponencial.
+    """Processes the manifest's pending operations with exponential retry.
 
-    O backoff e AGENDADO, nunca dormido: `process_pending()` roda no topo do
-    ciclo, antes da deteccao de mudanca local, e um `asyncio.sleep(300)` aqui
-    dentro congelava a pasta inteira — com 5 itens falhando, ela podia ficar
-    ~25 minutos sem reagir a nenhum arquivo novo, mesmo com a rede ja de volta.
-    O tick de `SYNC_INTERVAL` (30s) e a batida natural do retry: cada ciclo so
-    PULA o que ainda nao venceu.
+    The backoff is SCHEDULED, never slept: `process_pending()` runs at the top
+    of the cycle, before local change detection, and an `asyncio.sleep(300)`
+    in here froze the whole folder — with 5 items failing, it could go ~25
+    minutes without reacting to any new file, even with the network back.
+    The `SYNC_INTERVAL` tick (30s) is the retry's natural beat: each cycle
+    only SKIPS what isn't due yet.
     """
 
     def __init__(self, manifest: SyncManifest, executor: Callable[[dict], Awaitable[bool]]):
@@ -32,7 +32,7 @@ class SyncQueue:
         self.executor = executor
 
     async def process_pending(self):
-        """Processa os itens da fila cujo horario de tentativa ja venceu."""
+        """Processes the queue items whose attempt time is already due."""
         items = self.manifest.pending_items()
         if not items:
             return
@@ -47,27 +47,28 @@ class SyncQueue:
                 logger.error("Sync '%s': limite de retries (%d) atingido — desistindo.",
                              dataset_name, _MAX_RETRIES)
                 self.manifest.dequeue(dataset_name)
-                # Sair da fila nao basta para uma operacao de DELETE: o dataset
-                # continuava no manifesto, o proximo `diff` o via de novo como
-                # "removido localmente" (ele ja nao esta no disco), enfileirava
-                # de novo — e o ciclo recomecava do zero a cada varredura, para
-                # sempre. Desistir precisa significar parar de tentar.
+                # Leaving the queue isn't enough for a DELETE operation: the dataset
+                # stayed in the manifest, the next `diff` saw it again as
+                # "removed locally" (it is no longer on disk), enqueued it
+                # again — and the cycle restarted from zero on every scan,
+                # forever. Giving up has to mean stopping trying.
                 if item.get("action") == "delete":
                     self.manifest.remove_dataset(dataset_name)
                 continue
 
-            # Item sem `next_attempt_at` (fila gravada antes do agendamento)
-            # conta como "tentar agora".
+            # An item without `next_attempt_at` (queue written before scheduling existed)
+            # counts as "try now".
             proxima = item.get("next_attempt_at") or 0.0
 
-            # O agendamento e epoch de RELOGIO DE PAREDE e sobrevive a reinicios
-            # dentro do manifesto. Num notebook de campo que boota adiantado (CMOS
-            # ruim) e depois e corrigido pelo NTP, o item ficava agendado para um
-            # futuro que nunca chega — congelado para sempre. Para 'upload' e
-            # 'delete' o diff acabava re-dirigindo a operacao; o 'discard' nao tem
-            # outro motor, e o arquivo que o Drive mandou apagar ficava no disco do
-            # tecnico sem nenhum erro no log. Nenhum agendamento legitimo passa de
-            # `agora + _MAX_BACKOFF`: mais que isso so pode ser relogio bagunçado.
+            # The schedule is a WALL-CLOCK epoch and survives restarts inside
+            # the manifest. On a field laptop that boots with the clock ahead
+            # (bad CMOS) and is later corrected by NTP, the item stayed scheduled
+            # for a future that never comes — frozen forever. For 'upload' and
+            # 'delete' the diff ended up re-driving the operation; 'discard' has
+            # no other engine, and the file Drive ordered deleted stayed on the
+            # technician's disk with no error in the log. No legitimate schedule
+            # goes beyond `agora + _MAX_BACKOFF`: anything more can only be a
+            # messed-up clock.
             if proxima > agora + _MAX_BACKOFF:
                 logger.warning(
                     "Sync '%s': agendamento de retry no futuro impossivel (%.0fs a frente) — "

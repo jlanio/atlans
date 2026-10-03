@@ -2,26 +2,26 @@ import { headers } from "next/headers"
 import HomeView from "../components/home"
 import { caminhoInterno, type ModoDeEntrada } from "@/lib/entrada"
 
-// A Home (`/`). Vive no grupo (dashboard) — o grupo não contribui segmento,
-// então a rota é `/`. O `app/page.tsx` da raiz foi APAGADO (dois arquivos para
-// a mesma rota quebram o build). Nada é lido do ambiente aqui: o fundo do
-// globo é o MAPA_HIBRIDO_URL (ou o satélite, ou as ruas), que o layout raiz lê
-// a cada pedido e entrega pelo FundosDoMapaProvider.
+// The Home (`/`). It lives in the (dashboard) group — the group contributes no
+// segment, so the route is `/`. The root `app/page.tsx` was DELETED (two files for
+// the same route break the build). Nothing is read from the environment here: the
+// globe's background is MAPA_HIBRIDO_URL (or the satellite, or the streets), which
+// the root layout reads on every request and delivers via FundosDoMapaProvider.
 //
-// A query decide se o modal de entrada nasce aberto, e em qual painel:
-// `/?entrar=1` e `/?cadastro=1` são os destinos de /login, /register e do
-// middleware (quem pede uma página sem sessão cai aqui, com o `callbackUrl`
-// para voltar depois); `/?recuperar=1`, `/?redefinir=1&token=…` e
-// `/?verificar=1&token=…` são os de /forgot-password, /reset-password e
-// /verify-email — os links que chegam por e-mail.
+// The query decides whether the sign-in modal is born open, and on which panel:
+// `/?entrar=1` and `/?cadastro=1` are the destinations of /login, /register and
+// the middleware (whoever asks for a page without a session lands here, with the
+// `callbackUrl` to return later); `/?recuperar=1`, `/?redefinir=1&token=…` and
+// `/?verificar=1&token=…` are those of /forgot-password, /reset-password and
+// /verify-email — the links that arrive by email.
 //
-// Lida AQUI, no servidor, e entregue como prop: a HomeView não precisa de
-// `useSearchParams` (nem de Suspense, nem de mais um mock nos testes). Só um
-// `callbackUrl` interno passa (open redirect).
+// Read HERE, on the server, and delivered as a prop: HomeView does not need
+// `useSearchParams` (nor Suspense, nor one more mock in the tests). Only an
+// internal `callbackUrl` passes (open redirect).
 //
-// O `token` é repassado CRU: quem julga é o backend, no POST. Ele não é
-// guardado, não vai para o histórico de navegação além da própria URL, e some
-// da tela assim que o painel troca.
+// The `token` is passed through RAW: the backend is the judge, in the POST. It
+// is not stored, does not go into the browsing history beyond the URL itself,
+// and leaves the screen as soon as the panel changes.
 export default async function HomePage({
   searchParams,
 }: {
@@ -35,8 +35,9 @@ export default async function HomePage({
           : "cadastro" in sp ? "cadastro"
             : "entrar" in sp ? "entrar"
               : undefined
-  // O país da conexão, quando a Cloudflare o manda: o globo começa na região
-  // pelo fuso do navegador e só cai no país quando o fuso não diz nada.
+  // The connection's country, when Cloudflare sends it: the globe starts on the
+  // region from the browser's time zone and only falls back to the country when
+  // the time zone says nothing.
   const paisDaConexao = (await headers()).get("cf-ipcountry")
   return (
     <HomeView

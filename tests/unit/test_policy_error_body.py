@@ -1,6 +1,7 @@
 # tests/unit/test_policy_error_body.py
-"""O 409 da política carrega a lista de workspaces que esvaziariam: é o que
-permite à tela oferecer "remover mesmo assim" sabendo o que vai acontecer."""
+"""The policy's 409 carries the list of workspaces that would be left empty: that
+is what lets the screen offer "remover mesmo assim" (remove anyway) knowing what
+will happen."""
 import json
 from unittest.mock import MagicMock
 

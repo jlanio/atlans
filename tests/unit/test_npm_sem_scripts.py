@@ -1,23 +1,24 @@
 # tests/unit/test_npm_sem_scripts.py
 """
-Nenhum pacote npm roda código na instalação — no CI, no build da imagem do web
-ou na máquina de quem desenvolve.
+No npm package runs code on install — in CI, in the web image build or on a
+developer's machine.
 
-É a porta dos worms do npm de 2025: a versão maliciosa de um pacote rodava
-no `npm install` (preinstall/postinstall), roubava tokens (npm, GitHub,
-nuvem) e se republicava. O `web/.npmrc` e o `desktop/.npmrc` ligam
-`ignore-scripts=true`; estes testes seguram as pontas que desligariam a
-proteção sem quebrar nada visível:
+It is the door the 2025 npm worms came through: a package's malicious version
+ran on `npm install` (preinstall/postinstall), stole tokens (npm, GitHub,
+cloud) and republished itself. `web/.npmrc` and `desktop/.npmrc` turn on
+`ignore-scripts=true`; these tests hold down the loose ends that would turn
+the protection off without breaking anything visible:
 
-- o `.npmrc` deixar de valer `true` (linha removida, ou um `false` depois);
-- o Dockerfile do web instalar sem o `.npmrc` no estágio (o build da imagem
-  voltaria a rodar os scripts), ou reverter o valor por variável/flag;
-- um workflow reverter o valor por variável ou flag;
-- um script de ciclo de vida no package.json. Com `ignore-scripts` o npm
-  também deixa de rodar os do próprio projeto — `postinstall`, `prepare`,
-  e os ganchos `pre`/`post` do `npm run` — e o passo sumiria em silêncio. Foi
-  o caso do `prebuild` que copia o Monaco, que virou chamada explícita no
-  próprio `build`.
+- the `.npmrc` no longer being `true` (line removed, or a `false` after it);
+- the web Dockerfile installing without the `.npmrc` in the stage (the image
+  build would go back to running the scripts), or reverting the value via
+  variable/flag;
+- a workflow reverting the value via variable or flag;
+- a lifecycle script in package.json. With `ignore-scripts` npm also stops
+  running the project's own ones — `postinstall`, `prepare`, and the
+  `pre`/`post` hooks of `npm run` — and the step would silently vanish. That
+  was the case of the `prebuild` that copies Monaco, which became an explicit
+  call in `build` itself.
 """
 from __future__ import annotations
 
@@ -32,23 +33,23 @@ PROJETOS = ["web", "desktop"]
 DOCKERFILE_WEB = RAIZ / "web" / "Dockerfile.ui"
 WORKFLOWS = sorted((RAIZ / ".github" / "workflows").glob("*.y*ml"))
 
-# Os scripts que o npm roda sozinho no `npm install`/`npm ci` do próprio
-# projeto — e que o ignore-scripts cala.
+# The scripts npm runs on its own on the project's own `npm install`/`npm ci`
+# — and that ignore-scripts silences.
 CICLO_DE_VIDA = {
     "preinstall", "install", "postinstall", "prepublish",
     "preprepare", "prepare", "postprepare", "dependencies",
 }
-# Subcomandos do npm que instalam pacotes (com os apelidos que o npm aceita).
+# npm subcommands that install packages (with the aliases npm accepts).
 _NPM_INSTALA = re.compile(
     r"\bnpm\s+(?:-\S+\s+)*(?:ci|clean-install|ic|install-clean|isntall-clean"
     r"|i|in|ins|inst|insta|instal|install|isnt|isnta|isntal|isntall|add)\b"
 )
-# O que reverteria o .npmrc: a flag na linha de comando ou a variável.
+# What would revert the .npmrc: the command-line flag or the variable.
 _REVERTE = re.compile(r"--ignore-scripts[= ]false|--no-ignore-scripts|npm_config_ignore_scripts", re.I)
 
 
 def _valor_efetivo(npmrc: Path, chave: str) -> str | None:
-    """Como o npm lê: `chave = valor`, com ou sem espaços; vale a última."""
+    """As npm reads it: `chave = valor`, with or without spaces; the last one wins."""
     valor = None
     for linha in npmrc.read_text(encoding="utf-8").splitlines():
         m = re.match(rf"^\s*{re.escape(chave)}\s*=\s*(\S*)\s*$", linha)
@@ -83,8 +84,8 @@ def test_o_build_do_web_copia_o_monaco_explicitamente():
 
 
 def _instrucoes(dockerfile: Path):
-    """(INSTRUÇÃO, argumentos) de um Dockerfile: a barra no fim da linha junta
-    a seguinte, comentário cai fora, instrução em qualquer caixa."""
+    """(INSTRUCTION, arguments) of a Dockerfile: a backslash at the end of the line
+    joins the next one, comments are dropped, instructions in any case."""
     texto = re.sub(r"\\\n", " ", dockerfile.read_text(encoding="utf-8"))
     for linha in texto.splitlines():
         linha = linha.strip()
@@ -95,7 +96,7 @@ def _instrucoes(dockerfile: Path):
 
 
 def test_a_imagem_do_web_instala_com_o_npmrc():
-    # `COPY . .` também leva o .npmrc — desde que o .dockerignore não o tire.
+    # `COPY . .` also takes the .npmrc — as long as .dockerignore doesn't exclude it.
     ignorados = (RAIZ / "web" / ".dockerignore").read_text(encoding="utf-8").splitlines()
     assert not any(re.fullmatch(r"\s*/?\.npmrc\s*", linha) for linha in ignorados), \
         "web/.dockerignore tira o .npmrc do contexto do build"
@@ -115,8 +116,8 @@ def test_a_imagem_do_web_instala_com_o_npmrc():
 
 
 def test_nada_reverte_o_ignore_scripts():
-    """Nem o Dockerfile do web nem um workflow podem desligar a proteção por
-    fora do .npmrc (`--ignore-scripts=false`, `NPM_CONFIG_IGNORE_SCRIPTS`)."""
+    """Neither the web Dockerfile nor a workflow may turn off the protection
+    outside the .npmrc (`--ignore-scripts=false`, `NPM_CONFIG_IGNORE_SCRIPTS`)."""
     revertidos = [
         f"{arquivo.relative_to(RAIZ)}: {linha.strip()}"
         for arquivo in [DOCKERFILE_WEB, *WORKFLOWS]

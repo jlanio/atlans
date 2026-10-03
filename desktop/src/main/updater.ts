@@ -1,19 +1,21 @@
 // desktop/src/main/updater.ts
 //
-// Auto-update via electron-updater, consumindo os mesmos GitHub Releases que o
-// workflow do executor Docker ja usa.
+// Auto-update via electron-updater, consuming the same GitHub Releases that
+// the Docker executor workflow already uses.
 //
-// A regra que dita todo o desenho: **nunca atualizar no meio de uma execucao**.
-// O update substitui o `python.exe` e a arvore inteira de `resources/`; fazer
-// isso com um workflow rodando mataria o job sem confirmar o resultado ao
-// servidor, que o marcaria como orfao. Por isso o `quitAndInstall` so acontece
-// depois de um shutdown ORDENADO do executor, e so quando nao ha job em curso.
+// The rule that dictates the whole design: **never update in the middle of a
+// run**. The update replaces `python.exe` and the whole `resources/` tree;
+// doing that with a workflow running would kill the job without confirming the
+// result to the server, which would mark it as orphaned. That is why
+// `quitAndInstall` only happens after an ORDERLY shutdown of the executor, and
+// only when there is no job in progress.
 //
-// O download diferencial vem do `.blockmap` que o alvo NSIS gera: se
-// `resources/python` nao mudou entre releases, seus blocos sao identicos e nao
-// sao baixados. E o que torna viavel um app de ~400 MB se atualizar sem
-// rebaixar tudo — e o motivo de o lock do executor (com hash) e a release do
-// python-build-standalone serem pinados.
+// The differential download comes from the `.blockmap` the NSIS target
+// generates: if `resources/python` did not change between releases, its
+// blocks are identical and are not downloaded. That is what makes it viable
+// for a ~400 MB app to update itself without downloading everything again —
+// and the reason the executor's lock (with hashes) and the
+// python-build-standalone release are pinned.
 import { app } from 'electron'
 import type { AppUpdater } from 'electron-updater'
 
@@ -34,21 +36,22 @@ export function estadoDoUpdate(): EstadoUpdate {
 }
 
 /**
- * @param aoMudar  notificado quando um update termina de baixar.
+ * @param aoMudar  notified when an update finishes downloading.
  */
 export async function iniciarUpdater(aoMudar: (e: EstadoUpdate) => void): Promise<void> {
-  // Em dev nao ha o que atualizar, e o electron-updater loga um erro chamativo
-  // ("dev-app-update.yml not found") que so confunde.
+  // In dev there is nothing to update, and electron-updater logs a flashy error
+  // ("dev-app-update.yml not found") that only confuses.
   if (!app.isPackaged) return
 
   // Import dinamico: o pacote inteiro so e carregado no app empacotado.
   const { autoUpdater } = await import('electron-updater')
   updater = autoUpdater
 
-  // O download comeca sozinho; a INSTALACAO e que espera. Baixar cedo faz o
-  // update estar pronto quando a janela de oportunidade aparecer.
+  // The download starts by itself; it is the INSTALLATION that waits.
+  // Downloading early makes the update ready when the window of opportunity
+  // shows up.
   autoUpdater.autoDownload = true
-  autoUpdater.autoInstallOnAppQuit = false   // ver `instalarAgora`
+  autoUpdater.autoInstallOnAppQuit = false   // see `instalarAgora`
 
   autoUpdater.on('update-downloaded', (info) => {
     estado.baixado = true
@@ -56,14 +59,14 @@ export async function iniciarUpdater(aoMudar: (e: EstadoUpdate) => void): Promis
     aoMudar(estadoDoUpdate())
   })
 
-  // Falha de update NAO pode derrubar nem alarmar: o app funciona igual sem
-  // atualizar. O listener existe mesmo sem ninguem ler o erro: sem nenhum, o
-  // EventEmitter LANCA o `error` — e o electron-updater o emite de dentro do
-  // `quitAndInstall`, no caminho de saida do app.
-  autoUpdater.on('error', () => { /* ver acima */ })
+  // An update failure must NOT crash or alarm: the app works the same without
+  // updating. The listener exists even with nobody reading the error: without
+  // any, the EventEmitter THROWS the `error` — and electron-updater emits it
+  // from inside `quitAndInstall`, on the app's exit path.
+  autoUpdater.on('error', () => { /* see above */ })
 
   const verificar = () => {
-    void autoUpdater.checkForUpdates().catch(() => { /* o handler de erro cobre */ })
+    void autoUpdater.checkForUpdates().catch(() => { /* the error handler covers it */ })
   }
 
   verificar()
@@ -71,9 +74,9 @@ export async function iniciarUpdater(aoMudar: (e: EstadoUpdate) => void): Promis
 }
 
 /**
- * Instala e reinicia. Devolve `false` se ainda nao ha update baixado — a
- * decisao de "pode reiniciar agora?" e de quem chama, que precisa parar o
- * executor de forma ordenada ANTES.
+ * Installs and restarts. Returns `false` if there is no downloaded update yet
+ * — the "can we restart now?" decision belongs to the caller, which must stop
+ * the executor in an orderly way BEFORE.
  */
 export function instalarAgora(): boolean {
   if (!updater || !estado.baixado) return false

@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react"
 
 /**
- * `prefers-reduced-motion: reduce`, para quem decide em JS o que o CSS não
- * alcança (desmontar depois de uma transição, digitar letra a letra).
+ * `prefers-reduced-motion: reduce`, for code that decides in JS what CSS cannot
+ * reach (unmounting after a transition, typing letter by letter).
  *
- * `false` no SSR e no primeiro render, de propósito: ler `matchMedia` no
- * inicializador do estado faria o cliente renderizar diferente do servidor e
- * descasar a hidratação. O valor real entra no efeito, um quadro depois — e
- * acompanha a troca em tempo real, que o sistema permite mudar sem recarregar.
+ * `false` in SSR and on the first render, on purpose: reading `matchMedia` in
+ * the state initializer would make the client render differently from the
+ * server and break hydration. The real value comes in the effect, one frame
+ * later — and follows changes in real time, since the system allows changing it
+ * without reloading.
  */
 export function usePrefereMenosMovimento(): boolean {
   const [reduz, setReduz] = useState(false)

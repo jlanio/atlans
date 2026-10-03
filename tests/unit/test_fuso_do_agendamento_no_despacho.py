@@ -1,12 +1,12 @@
 # tests/unit/test_fuso_do_agendamento_no_despacho.py
 """
-O fuso padrão dos agendamentos vai no ScheduleTrigger despachado.
+The default schedule time zone goes into the dispatched ScheduleTrigger.
 
-O `default` do campo `timezone` do nó é lido do ambiente de quem importa o nó:
-no servidor, AGENDAMENTO_FUSO_PADRAO; no executor, que não tem a variável,
-UTC. Num gatilho sem fuso explícito, o servidor agendava num fuso e o executor
-repetia outro na saída do nó (`info.timezone`). O servidor passa a preencher o
-fuso ao despachar, como faz com os fundos de mapa.
+The `default` of the node's `timezone` field is read from the environment of whoever imports the node:
+on the server, AGENDAMENTO_FUSO_PADRAO; on the executor, which does not have the variable,
+UTC. On a trigger with no explicit time zone, the server scheduled in one time zone and the
+executor repeated another in the node's output (`info.timezone`). The server now fills in the
+time zone on dispatch, as it does with the basemaps.
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def test_sem_fuso_o_despacho_poe_o_da_instalacao_nas_duas_formas():
     gatilho = enriched["nodes"][0]
     assert gatilho["properties"]["timezone"] == FUSO_PADRAO_DO_AGENDAMENTO
     assert gatilho["data"]["properties"]["timezone"] == FUSO_PADRAO_DO_AGENDAMENTO
-    # Cópia: a definição salva não muda; o outro nó não é tocado.
+    # A copy: the saved definition does not change; the other node is not touched.
     assert "timezone" not in original["nodes"][0]["properties"]
     assert enriched["nodes"][1] == original["nodes"][1]
 
@@ -51,7 +51,7 @@ def test_sem_gatilho_a_definicao_volta_igual_e_e_o_mesmo_objeto():
 
 
 def test_o_despacho_passa_pela_injecao():
-    # O mesmo lugar em que os fundos de mapa entram: o envelope que vai ao executor.
+    # The same place the basemaps go in: the envelope that goes to the executor.
     fonte = open(workflow_execution_service.__file__, encoding="utf-8").read()
     assert "injetar_fuso_do_agendamento(enriched)" in fonte
     assert "injetar_fuso_do_agendamento(sub)" in fonte

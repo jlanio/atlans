@@ -1,4 +1,4 @@
-// Do shadcn/ui (MIT): ver app/components/ui/LICENSE.shadcn-ui.txt.
+// From shadcn/ui (MIT): see app/components/ui/LICENSE.shadcn-ui.txt.
 import * as React from "react"
 
 const MOBILE_BREAKPOINT = 768

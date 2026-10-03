@@ -30,7 +30,7 @@ describe("workflowExecutionStore — rotação de eventos", () => {
 
   it("preserva eventos de ciclo de vida ao estourar o teto, descartando stdout", () => {
     const store = useWorkflowExecutionStore.getState()
-    // 40 de ciclo de vida no começo, depois muito stdout até passar do teto.
+    // 40 lifecycle events at the start, then lots of stdout until past the ceiling.
     for (let i = 0; i < 40; i++) store.appendEvents([event("lifecycle", i)])
     for (let i = 40; i < 2_400; i++) store.appendEvents([event("stdout", i)])
 
@@ -39,7 +39,7 @@ describe("workflowExecutionStore — rotação de eventos", () => {
     expect(lifecycleKept).toBe(40)
     expect(state.droppedEvents).toBeGreaterThan(0)
     expect(state.events.length).toBeLessThanOrEqual(2_000)
-    // O início do run continua sendo o primeiro evento de verdade.
+    // The run's start is still the first real event.
     expect(state.runStartedTs).toBe(T0)
   })
 
@@ -62,8 +62,8 @@ describe("workflowExecutionStore — rotação de eventos", () => {
   })
 
   it("queda de conexão preserva os eventos já recebidos", () => {
-    // failExecution (e não resetExecution) no fechamento inesperado: apagar o
-    // log no momento em que a conexão cai é exatamente quando ele importa.
+    // failExecution (and not resetExecution) on an unexpected close: erasing the
+    // log the moment the connection drops is exactly when it matters.
     const store = useWorkflowExecutionStore.getState()
     store.startExecution([])
     store.appendEvents([event("lifecycle", 0)])

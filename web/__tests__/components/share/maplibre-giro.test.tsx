@@ -2,14 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { act, cleanup, render } from "@testing-library/react"
 
 /**
- * O giro lento do globo (o hero da Home): meio grau por segundo para oeste, em
- * passos de um segundo encadeados no `moveend`; pausa depois de um gesto da
- * pessoa; nada com `prefers-reduced-motion`; e, ao desligar, a volta a
- * `center`/`zoom` — o Brasil — em 900 ms.
+ * The globe's slow spin (the Home hero): half a degree per second westward, in
+ * one-second steps chained on `moveend`; pauses after a gesture by the
+ * person; nothing with `prefers-reduced-motion`; and, when turned off, the return to
+ * `center`/`zoom` — Brazil — in 900 ms.
  *
- * jsdom não desenha o MapLibre: o mapa é um dublê que guarda a câmera e as
- * chamadas de `easeTo`/`jumpTo`/`stop`, e termina um movimento sob comando
- * (`_terminarMovimento`), como o `moveend` do de verdade.
+ * jsdom does not draw MapLibre: the map is a double that keeps the camera and the
+ * `easeTo`/`jumpTo`/`stop` calls, and ends a movement on command
+ * (`_terminarMovimento`), like the real one's `moveend`.
  */
 vi.mock("maplibre-gl/dist/maplibre-gl.css", () => ({}))
 
@@ -34,7 +34,7 @@ function criarMapa(opcoes: Record<string, unknown>) {
     isMoving: () => movendo,
     getCenter: () => ({ ...centro }),
     getZoom: () => zoom,
-    /** O fim de um movimento, como o mapa de verdade anuncia. */
+    /** The end of a movement, as the real map announces it. */
     _terminarMovimento: () => { movendo = false; mapa._disparar("moveend") },
     _disparar: (evento: string, e?: unknown) => [...(ouvintes[evento] ?? [])].forEach((f) => f(e)),
     on: (evento: string, f: Ouvinte) => { (ouvintes[evento] ??= []).push(f) },
@@ -99,7 +99,7 @@ describe("MapLibreMap — o giro lento do hero", () => {
     expect(primeiro.easing(0.25)).toBe(0.25) // linear: velocidade constante
     expect(primeiro.essential).toBe(true)
 
-    // O seguinte encadeia no fim do anterior, sempre para oeste.
+    // The next one chains onto the end of the previous one, always westward.
     act(() => { mapa._terminarMovimento() })
     expect(mapa.easeTo).toHaveBeenCalledTimes(2)
     const segundo = mapa.easeTo.mock.calls[1][0] as { center: [number, number] }
@@ -111,12 +111,12 @@ describe("MapLibreMap — o giro lento do hero", () => {
     const mapa = espiao.mapa!
     expect(mapa.easeTo).toHaveBeenCalledTimes(1)
 
-    // Ela pega o globo: o passo em voo termina, e nenhum outro sai.
+    // The person grabs the globe: the step in flight finishes, and no other one goes out.
     act(() => { mapa._disparar("mousedown"); mapa._terminarMovimento() })
     act(() => { vi.advanceTimersByTime(PAUSA_APOS_GESTO_MS - 500) })
     expect(mapa.easeTo).toHaveBeenCalledTimes(1)
 
-    // Passada a pausa, o intervalo de retomada põe o globo a girar de novo.
+    // Once the pause is over, the resume interval sets the globe spinning again.
     act(() => { vi.advanceTimersByTime(1000) })
     expect(mapa.easeTo).toHaveBeenCalledTimes(2)
   })
@@ -134,11 +134,11 @@ describe("MapLibreMap — o giro lento do hero", () => {
     expect(volta.center).toEqual(BRASIL)
     expect(volta.zoom).toBe(2.3)
     expect(volta.duration).toBe(DURACAO_DA_VOLTA_MS)
-    // ease-in-out: começa devagar, passa pela metade na metade.
+    // ease-in-out: starts slowly, passes the halfway point at half time.
     expect(volta.easing(0.5)).toBeCloseTo(0.5)
     expect(volta.easing(0.25)).toBeLessThan(0.25)
 
-    // E nada mais gira: terminar a volta não encadeia passo nenhum.
+    // And nothing spins anymore: finishing the return chains no step at all.
     act(() => { mapa._terminarMovimento() })
     act(() => { vi.advanceTimersByTime(5000) })
     expect(mapa.easeTo).toHaveBeenCalledTimes(2)

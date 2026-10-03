@@ -1,21 +1,22 @@
 /**
- * Gera a folha de estilo do realce de caminho.
+ * Generates the stylesheet for path highlighting.
  *
- * A alternativa óbvia — um selector Zustand dentro de cada nó — reclassificaria
- * os ~50 nós do canvas a cada hover, exatamente a cascata de re-renders que os
- * `memo` de `icon-root.tsx` e `custom-edges/index.tsx` existem para evitar.
- * A alternativa imperativa (`classList.add`) quebra com `onlyRenderVisibleElements`,
- * porque um nó que entra na viewport durante o pan monta sem a classe.
+ * The obvious alternative — a Zustand selector inside each node — would
+ * reclassify the canvas's ~50 nodes on every hover, exactly the re-render
+ * cascade the `memo`s in `icon-root.tsx` and `custom-edges/index.tsx` exist to
+ * avoid. The imperative alternative (`classList.add`) breaks with
+ * `onlyRenderVisibleElements`, because a node entering the viewport during a
+ * pan mounts without the class.
  *
- * Aqui, trocar o foco re-renderiza um único componente e substitui o texto de
- * uma tag `<style>`: quem está no caminho recebe `--rf-focus-dim: 1`, e quem
- * não está cai no fallback da regra estática de `globals.css`.
+ * Here, changing the focus re-renders a single component and replaces the text of
+ * a `<style>` tag: whoever is on the path gets `--rf-focus-dim: 1`, and whoever is
+ * not falls back to the static rule in `globals.css`.
  */
 
-/** Caracteres que quebrariam a string CSS ou o texto da tag `<style>`. */
+/** Characters that would break the CSS string or the `<style>` tag's text. */
 const UNSAFE = /[<>\u0000-\u001F\u007F]/g
 
-/** Escapa um id para uso dentro de `[attr="…"]`, preservando hífens de UUID. */
+/** Escapes an id for use inside `[attr="…"]`, preserving UUID hyphens. */
 export function escapeId(id: string): string {
   return id.replace(UNSAFE, "").replace(/["\\]/g, char => "\\" + char)
 }
@@ -36,8 +37,8 @@ export function buildFocusCss(
   for (const id of edgeIds) {
     const escaped = escapeId(id)
     selectors.push(`.rf-focus .react-flow__edge[data-id="${escaped}"]`)
-    // O badge de label e o botão de excluir vivem num portal fora do <g> da
-    // aresta, então precisam do próprio gancho.
+    // The label badge and the delete button live in a portal outside the edge's
+    // <g>, so they need their own hook.
     selectors.push(`.rf-focus [data-edge-id="${escaped}"]`)
   }
 

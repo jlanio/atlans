@@ -3,9 +3,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import Cookies from "js-cookie"
 
 /**
- * O seletor de idioma das Preferências: Automático é uma opção de verdade (o
- * caminho de volta a seguir o navegador), cada idioma no próprio nome, a
- * escolha grava o cookie e a tela troca NA HORA, sem recarregar.
+ * The Preferences language picker: Automatic is a real option (the way back to
+ * following the browser), each language in its own name, the choice writes the
+ * cookie and the screen switches RIGHT AWAY, without reloading.
  */
 vi.mock("@/context/ThemeContext", () => ({ useTheme: () => ({ theme: "dark", setTheme: vi.fn() }) }))
 vi.mock("next-auth/react", () => ({
@@ -52,7 +52,7 @@ describe("Preferências — Idioma", () => {
     fireEvent.click(opcao(/^English$/))
 
     expect(Cookies.get("idioma")).toBe("en")
-    // O próprio diálogo já está em inglês — sem recarregar.
+    // The dialog itself is already in English — without reloading.
     expect(screen.getByText("Preferences")).toBeTruthy()
     expect(screen.getByText("Language")).toBeTruthy()
     expect(opcao(/^English$/).getAttribute("aria-pressed")).toBe("true")
@@ -60,8 +60,9 @@ describe("Preferências — Idioma", () => {
   })
 
   it("a escolha fica para as próximas visitas: cookie de 365 dias, não de sessão", () => {
-    // Pelo `document.cookie` não se lê a validade — só o valor. Sem `expires`
-    // o cookie morreria ao fechar o navegador e a escolha se perderia.
+    // `document.cookie` doesn't expose the expiry — only the value. Without
+    // `expires` the cookie would die when the browser closed and the choice
+    // would be lost.
     const set = vi.spyOn(Cookies, "set")
     montar({ idioma: "pt-BR", detectado: "pt-BR", escolhido: null })
     fireEvent.click(opcao(/^Español$/))
@@ -76,7 +77,7 @@ describe("Preferências — Idioma", () => {
 
     fireEvent.click(opcao(/Automático/))
     expect(Cookies.get("idioma")).toBeUndefined()
-    // Voltou ao detectado (inglês).
+    // Back to the detected one (English).
     expect(screen.getByText("Preferences")).toBeTruthy()
     expect(screen.getByText("Detected: English")).toBeTruthy()
   })
@@ -90,8 +91,8 @@ describe("Preferências — Idioma", () => {
     const { rerender } = render(arvore({ idioma: "en", detectado: "pt-BR", escolhido: "en" }))
     expect(screen.getByText("Preferences")).toBeTruthy()
 
-    // Noutra aba a pessoa voltou ao Automático; o layout resolve de novo e o
-    // provider, que não remonta, recebe o `inicial` novo.
+    // In another tab the person went back to Automatic; the layout resolves
+    // again and the provider, which doesn't remount, receives the new `inicial`.
     rerender(arvore({ idioma: "pt-BR", detectado: "pt-BR", escolhido: null }))
     expect(screen.getByText("Preferências")).toBeTruthy()
     expect(opcao(/Automático/).getAttribute("aria-pressed")).toBe("true")
@@ -111,10 +112,10 @@ describe("Preferências — Idioma", () => {
     )
     const { rerender } = render(arvore({ idioma: "pt-BR", detectado: "pt-BR", escolhido: null }))
     fireEvent.click(opcao(/^English$/))
-    // O refresh de antes da troca (o mesmo `inicial`) não desfaz a escolha…
+    // The refresh from before the switch (the same `inicial`) doesn't undo the choice…
     rerender(arvore({ idioma: "pt-BR", detectado: "pt-BR", escolhido: null }))
     expect(screen.getByText("Preferences")).toBeTruthy()
-    // …e o de depois devolve o que ela gravou.
+    // …and the one after returns what the person saved.
     rerender(arvore({ idioma: "en", detectado: "pt-BR", escolhido: "en" }))
     expect(screen.getByText("Preferences")).toBeTruthy()
     expect(opcao(/^English$/).getAttribute("aria-pressed")).toBe("true")

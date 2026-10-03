@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { cleanup, render, screen } from "@testing-library/react"
 
-/** O diálogo é portado ao <body>: aberto do menu de conta da Home, leva `home-portal`. */
+/** The dialog is portaled to <body>: opened from Home's account menu, it gets `home-portal`. */
 vi.mock("@/context/ThemeContext", () => ({ useTheme: () => ({ theme: "light", setTheme: vi.fn() }) }))
 vi.mock("next-auth/react", () => ({
   useSession: () => ({ data: { user: { username: "fulana", email: "fulana@exemplo.com", role: "user" } }, status: "authenticated" }),

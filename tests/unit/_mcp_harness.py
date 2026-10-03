@@ -1,31 +1,31 @@
 # tests/unit/_mcp_harness.py
 """
-Ferramental compartilhado dos testes do servidor MCP.
+Shared tooling for the MCP server tests.
 
-O nome começa com `_` de propósito: o pytest não coleta este arquivo, que não
-tem teste nenhum — só o banco, o Redis de mentira e os atalhos que os testes de
-`app/mcp/` usam.
+The name starts with `_` on purpose: pytest does not collect this file, which
+has no tests at all — only the database, the fake Redis and the shortcuts that
+the `app/mcp/` tests use.
 
-Três decisões que valem para todos os testes daqui:
+Three decisions that apply to every test here:
 
-- **Banco de verdade, em memória.** O middleware de PAT faz JOIN entre token,
-  usuário e workspaces; um mock de `db.execute` só provaria que o mock devolve o
-  que se mandou. SQLite cobre as tabelas envolvidas (nenhuma delas usa JSONB,
-  que o SQLite não compila).
-- **Infra por dois patches.** `app.mcp.infra.sessao` e `app.mcp.infra.redis_ou_none`
-  são os únicos pontos de contato do MCP com Postgres e Redis; trocá-los troca a
-  infraestrutura inteira sem tocar em nenhum outro módulo.
-- **Cliente que atravessa a pilha.** `cliente_mcp` fala com o app ASGI real
-  (middleware de PAT + transporte streamable HTTP), não com o servidor em
-  processo — é a única forma de provar que o token chega, que o `Host` é
-  checado e que o escopo filtra o catálogo.
+- **A real database, in memory.** The PAT middleware JOINs token, user and
+  workspaces; a mock of `db.execute` would only prove that the mock returns
+  what it was told to. SQLite covers the tables involved (none of them uses
+  JSONB, which SQLite does not compile).
+- **Infra via two patches.** `app.mcp.infra.sessao` and `app.mcp.infra.redis_ou_none`
+  are the MCP's only points of contact with Postgres and Redis; swapping them
+  swaps the whole infrastructure without touching any other module.
+- **A client that goes through the stack.** `cliente_mcp` talks to the real
+  ASGI app (PAT middleware + streamable HTTP transport), not to the in-process
+  server — it is the only way to prove that the token arrives, that `Host` is
+  checked and that the scope filters the catalog.
 
-Uma limitação que vale conhecer antes de escrever teste de execução: o
-`RedisFalso` NÃO tem pub/sub. Ele cobre os comandos de chave (cotas,
-idempotência, replay por `LRANGE`) e mais nada — quem testa `run_workflow(wait)`
-deve trocar `esperar_run` por um dublê (`patch` no módulo que a tool importa) e
-descrever o desfecho com `resultado_de_espera(...)`. Testar a espera de verdade
-é papel de `test_run_events_service.py`, que tem o `FakePubSub` para isso.
+A limitation worth knowing before writing an execution test: `RedisFalso` does
+NOT have pub/sub. It covers the key commands (quotas, idempotency, replay via
+`LRANGE`) and nothing else — whoever tests `run_workflow(wait)` should swap
+`esperar_run` for a stub (`patch` in the module the tool imports) and describe
+the outcome with `resultado_de_espera(...)`. Testing the real wait is the job
+of `test_run_events_service.py`, which has `FakePubSub` for that.
 """
 from __future__ import annotations
 
@@ -67,8 +67,8 @@ TABELAS_DAS_EXTENSOES = [
     )
 ]
 
-# As tabelas que o MCP toca e que compilam no SQLite. `Credential` e `Executor`
-# ficam de fora: usam JSONB, que só existe no Postgres.
+# The tables the MCP touches that compile on SQLite. `Credential` and `Executor`
+# are left out: they use JSONB, which only exists in Postgres.
 TABELAS = [
     User.__table__,
     Workspace.__table__,
@@ -79,30 +79,32 @@ TABELAS = [
     WorkflowVersion.__table__,
     Schedule.__table__,
     Artifact.__table__,
-    # A listagem de artefatos cruza com as camadas do portal para marcar qual
-    # versão está publicada; sem a tabela, o SELECT quebra na coleta.
+    # The artifact listing cross-references the portal layers to mark which
+    # version is published; without the table, the SELECT breaks at collection.
     PortalLayer.__table__,
-    # O Drive. `PlatformFileSettings` e `AllowedFileExtension` entram junto
-    # porque `validate_upload` consulta as duas ANTES de gravar qualquer coisa:
-    # o teto de tamanho e a lista de extensões permitidas. Sem elas, a primeira
-    # chamada de escrita quebra na coleta, não na asserção.
+    # The Drive. `PlatformFileSettings` and `AllowedFileExtension` come along
+    # because `validate_upload` queries both BEFORE writing anything: the size
+    # ceiling and the list of allowed extensions. Without them, the first write
+    # call breaks at collection, not at the assertion.
     WorkspaceFile.__table__,
     PlatformFileSettings.__table__,
     AllowedFileExtension.__table__,
-    # A configuração do sistema (o modelo do assistente e, com os planos, a
-    # cota de cada um). Sem a tabela o serviço degrada aberto e devolve o
-    # padrão — um teste que editasse a configuração passaria sem nada ler.
+    # The system configuration (the assistant's model and, with the plans, each
+    # plan's quota). Without the table the service degrades open and returns
+    # the default — a test that edited the configuration would pass without
+    # reading anything.
     SystemConfig.__table__,
-    # As tabelas das extensões presentes (app/extensoes): com os planos, a cota
-    # do assistente consulta a assinatura para resolver o teto, e sem elas
-    # qualquer teste que exercite `conversar()` quebraria na coleta.
+    # The tables of the extensions present (app/extensoes): with the plans, the
+    # assistant quota queries the subscription to resolve the ceiling, and
+    # without them any test that exercises `conversar()` would break at
+    # collection.
     *TABELAS_DAS_EXTENSOES,
 ]
 
 
 @asynccontextmanager
 async def banco_em_memoria():
-    """Um engine SQLite novo com as tabelas criadas; devolve a fábrica de sessões."""
+    """A new SQLite engine with the tables created; returns the session factory."""
     engine = create_async_engine("sqlite+aiosqlite://")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all, tables=TABELAS)
@@ -114,11 +116,12 @@ async def banco_em_memoria():
 
 @asynccontextmanager
 async def banco_de_executores():
-    """Um SQLite novo com a tabela `executors`; devolve a fábrica de sessões.
+    """A new SQLite with the `executors` table; returns the session factory.
 
-    Ela fica fora de `TABELAS` porque usa JSONB, que o SQLite não compila: aqui
-    vai uma cópia da tabela com JSON no lugar. As consultas do código usam o
-    modelo `Executor` de verdade — só o nome da tabela e das colunas importa."""
+    It stays out of `TABELAS` because it uses JSONB, which SQLite does not
+    compile: here goes a copy of the table with JSON instead. The code's
+    queries use the real `Executor` model — only the table and column names
+    matter."""
     from sqlalchemy import JSON, MetaData
     from sqlalchemy.dialects.postgresql import JSONB
 
@@ -138,10 +141,10 @@ async def banco_de_executores():
 
 
 def sessao_de(fabrica):
-    """Substituto de `app.mcp.infra.sessao` ligado a esta fábrica.
+    """Replacement for `app.mcp.infra.sessao` bound to this factory.
 
-    Imita o original: rollback no `finally`, para que quem escreve precise
-    commitar — exatamente como em produção.
+    Mimics the original: rollback in the `finally`, so whoever writes has to
+    commit — exactly as in production.
     """
 
     @asynccontextmanager
@@ -176,11 +179,11 @@ async def criar_workspace(db, id_hash: str, owner_id: str, name: str = "Principa
 
 
 async def criar_pat(db, user_id: str, scopes, workspace_ids=None) -> str:
-    """Emite um PAT de verdade e devolve o segredo em texto claro.
+    """Issues a real PAT and returns the secret in plain text.
 
-    Passa pelo service real (`criar`), não por um INSERT à mão: é o service que
-    decide prefixo, hash e validade, e um teste que replicasse isso validaria a
-    própria cópia.
+    Goes through the real service (`criar`), not a hand-written INSERT: the
+    service is what decides prefix, hash and validity, and a test that
+    replicated that would be validating its own copy.
     """
     usuario = SimpleNamespace(id_hash=user_id)
     _, segredo = await api_token_service.criar(
@@ -202,16 +205,16 @@ async def criar_run(
     status: str = "success",
     **campos,
 ) -> WorkflowRun:
-    """Uma linha de `workflow_runs` já terminada, pronta para leitura.
+    """A `workflow_runs` row that has already finished, ready to be read.
 
-    Os horários vêm fixos (e não de `now()`) porque o que os testes de execução
-    conferem é a serialização — `duration_seconds`, ordem da listagem, janela de
-    data — e um relógio real faria a asserção depender do instante do teste.
-    `node_stats` nasce vazio, nunca nulo: é o formato que a serialização espera
-    e o nulo só aparece em runs antigos. Run não terminal (`running`, `pending`)
-    nasce sem `end_time`, como em produção — pedir `status="running"` e receber
-    uma linha com hora de término faria o teste concordar com um estado que o
-    banco nunca tem.
+    The times are fixed (and not from `now()`) because what the execution
+    tests check is the serialization — `duration_seconds`, listing order, date
+    window — and a real clock would make the assertion depend on the moment of
+    the test. `node_stats` starts empty, never null: that is the shape the
+    serialization expects, and null only appears in old runs. A non-terminal
+    run (`running`, `pending`) starts without `end_time`, as in production —
+    asking for `status="running"` and getting a row with an end time would make
+    the test agree with a state the database never has.
     """
     inicio = campos.pop("start_time", datetime(2026, 9, 14, 12, 0, tzinfo=timezone.utc))
     termina = status in ("success", "failed", "cancelled")
@@ -236,11 +239,12 @@ async def criar_run(
 
 
 async def criar_artefato(db, *, run_id: str, workspace_id: str, **campos) -> Artifact:
-    """Um artefato no storage, do jeito que o nó de saída o grava.
+    """An artifact in storage, the way the output node writes it.
 
-    O default é o caso comum (`content_location="minio"` com `s3_key`), que é o
-    único que rende URL assinada; o caso do conteúdo que ficou no executor se
-    escreve passando `content_location="executor", s3_key=None`.
+    The default is the common case (`content_location="minio"` with `s3_key`),
+    which is the only one that yields a signed URL; the case of content that
+    stayed on the executor is written by passing
+    `content_location="executor", s3_key=None`.
     """
     campos.setdefault("output_key", "saida")
     campos.setdefault("filename", "saida.geojson")
@@ -256,11 +260,12 @@ async def criar_artefato(db, *, run_id: str, workspace_id: str, **campos) -> Art
 
 
 def resultado_de_espera(**kw) -> ResultadoEspera:
-    """O `ResultadoEspera` que um `esperar_run` dublado devolveria.
+    """The `ResultadoEspera` that a stubbed `esperar_run` would return.
 
-    O default descreve o caso feliz — terminou em `success`, sem timeout, com o
-    `__workflow_complete__` visto. Cada teste sobrescreve só o campo que
-    investiga (`timed_out=True`, `status="failed"`, `redis_indisponivel=True`).
+    The default describes the happy case — finished with `success`, no
+    timeout, with `__workflow_complete__` seen. Each test overrides only the
+    field it investigates (`timed_out=True`, `status="failed"`,
+    `redis_indisponivel=True`).
     """
     campos = {
         "status": "success",
@@ -276,7 +281,7 @@ def resultado_de_espera(**kw) -> ResultadoEspera:
 
 
 def escopo_falso(**kw) -> EscopoEfetivo:
-    """Um `EscopoEfetivo` pronto; sobrescreva só o campo que o teste investiga."""
+    """A ready-made `EscopoEfetivo`; override only the field the test investigates."""
     campos = {
         "user_id": "usr-1",
         "username": "ana",
@@ -293,7 +298,7 @@ def escopo_falso(**kw) -> EscopoEfetivo:
 
 
 def ctx_falso(escopo: EscopoEfetivo | None):
-    """O `ctx` que uma tool recebe — só o que `escopo_da_chamada` e o progresso leem."""
+    """The `ctx` a tool receives — only what `escopo_da_chamada` and the progress read."""
     estado = SimpleNamespace(escopo=escopo) if escopo is not None else SimpleNamespace()
     return SimpleNamespace(
         request_context=SimpleNamespace(request=SimpleNamespace(state=estado)),
@@ -302,10 +307,10 @@ def ctx_falso(escopo: EscopoEfetivo | None):
 
 
 def cliente_mcp(app_mcp, segredo: str, *, host: str = "localhost:8000", cabecalhos: dict | None = None) -> Client:
-    """Cliente MCP moderno falando com o app ASGI inteiro, por dentro do processo.
+    """Modern MCP client talking to the whole ASGI app, inside the process.
 
-    O `host` precisa casar com `MCP_ALLOWED_HOSTS` (o default cobre
-    `localhost:*`): o transporte recusa qualquer outro com 421.
+    `host` has to match `MCP_ALLOWED_HOSTS` (the default covers
+    `localhost:*`): the transport rejects any other with 421.
     """
     extras = {"Authorization": f"Bearer {segredo}"} if segredo else {}
     extras.update(cabecalhos or {})
@@ -322,14 +327,15 @@ def cliente_mcp(app_mcp, segredo: str, *, host: str = "localhost:8000", cabecalh
 
 
 class RedisFalso:
-    """Redis de mentira: só os comandos que o MCP usa, num dicionário.
+    """Fake Redis: only the commands the MCP uses, in a dictionary.
 
-    TTL é contado como "foi pedido tanto", não pelo relógio: os testes checam
-    que o `EXPIRE` aconteceu e que o `retry_after_seconds` sai do TTL, não a
-    passagem do tempo. "Passou tempo" se escreve à mão, em `ttls[chave]`.
+    TTL is counted as "this much was requested", not by the clock: the tests
+    check that the `EXPIRE` happened and that `retry_after_seconds` comes from
+    the TTL, not the passage of time. "Time passed" is written by hand, in
+    `ttls[chave]`.
 
-    Também serve aos testes do contador de janela (`contar_na_janela`), que é
-    um MULTI/EXEC com `EXPIRE ... NX`: daí o `pipeline()` e o `nx`.
+    It also serves the tests of the window counter (`contar_na_janela`), which
+    is a MULTI/EXEC with `EXPIRE ... NX`: hence `pipeline()` and `nx`.
     """
 
     def __init__(self) -> None:
@@ -381,7 +387,7 @@ class RedisFalso:
     async def expire(self, chave, segundos, nx: bool = False):
         self.chamadas.append(("expire", chave, segundos))
         if nx and (chave not in self.dados or chave in self.ttls):
-            # NX: só arma o prazo de uma chave que existe e não tem nenhum.
+            # NX: only sets the expiry of a key that exists and has none.
             return False
         self.ttls[chave] = segundos
         return True
@@ -415,10 +421,11 @@ class RedisFalso:
 
 
 class _PipelineFalso:
-    """O `pipeline()` do `RedisFalso`: cada comando entra na fila e `execute()`
-    roda a fila inteira em ordem, sem ceder o loop no meio — que é, aqui, a
-    atomicidade do MULTI/EXEC. Anota `("exec", [comandos])` em `chamadas` para
-    o teste ver o que saiu junto na mesma transação."""
+    """`RedisFalso`'s `pipeline()`: each command enters the queue and `execute()`
+    runs the whole queue in order, without yielding the loop midway — which
+    is, here, the atomicity of MULTI/EXEC. Records `("exec", [comandos])` in
+    `chamadas` so the test can see what went out together in the same
+    transaction."""
 
     def __init__(self, redis: RedisFalso, transacao: bool) -> None:
         self._redis = redis

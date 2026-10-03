@@ -1,26 +1,26 @@
 # executor/stats.py
 """
-Coletor de estatisticas do executor.
+Executor statistics collector.
 
-Agrega em memoria tudo que o painel mostra. Stdlib pura, sem psutil e sem
-rich: `connection.py` e `main.py` importam este modulo, e nao podem depender
-de nada que sugira interface grafica.
+Aggregates in memory everything the dashboard shows. Pure stdlib, no psutil
+and no rich: `connection.py` and `main.py` import this module, and cannot
+depend on anything that suggests a graphical interface.
 
-Duas metades:
+Two halves:
 
-  ESCRITA  — metodos `on_*`, chamados dos hooks. Todos O(1), todos
-             best-effort (nunca levantam: telemetria quebrada nao pode
-             derrubar a execucao de um workflow).
+  WRITE    — `on_*` methods, called from the hooks. All O(1), all
+             best-effort (they never raise: broken telemetry must not
+             bring down a workflow execution).
 
-  LEITURA  — `snapshot()`, chamado uma vez por tick do painel. Recebe por
-             parametro os valores que sao lidos "na hora" (capacidade da fila,
-             recursos do sistema), para nao guardar referencias a objetos
-             vivos do executor.
+  READ     — `snapshot()`, called once per dashboard tick. Receives as
+             parameters the values that are read "on the spot" (queue
+             capacity, system resources), so as not to hold references to
+             live executor objects.
 
-Nada aqui parseia mensagem de log. As duracoes, estados e contadores vem dos
-dados estruturados que ja circulam pelo executor — mensagem de log e texto em
-portugues que muda sem aviso, e uma metrica que depende disso quebra em
-silencio na primeira reescrita.
+Nothing here parses log messages. The durations, states and counters come
+from the structured data that already flows through the executor — a log
+message is Portuguese text that changes without notice, and a metric that
+depends on it breaks silently at the first rewrite.
 """
 from __future__ import annotations
 
@@ -36,19 +36,19 @@ from typing import Callable, Mapping, Sequence
 logger = logging.getLogger("executor.stats")
 
 _JANELA_PADRAO_S = 3600.0     # "ultima hora"
-_MAX_AMOSTRAS = 5000          # teto de memoria num executor de alta vazao
-_TAIL_PADRAO = 200            # linhas de log guardadas para o rodape
-_DEDUPE_SYNC = 256            # eventos de sync recentes, para ignorar reenvio
+_MAX_AMOSTRAS = 5000          # memory ceiling on a high-throughput executor
+_TAIL_PADRAO = 200            # log lines kept for the footer
+_DEDUPE_SYNC = 256            # recent sync events, to ignore resends
 
 
-# ── Estruturas de saida ──────────────────────────────────────────────────────
+# ── Output structures ────────────────────────────────────────────────────────
 
 @dataclass(frozen=True, slots=True)
 class RunningJob:
     job_id: str
     run_id: str | None
     elapsed_s: float
-    node: str | None          # nome do no em execucao
+    node: str | None          # name of the node being executed
     nodes_done: int
     nodes_total: int | None
 
@@ -69,9 +69,10 @@ class Snapshot:
     server_url: str
     system: Mapping[str, object]
     uptime_s: float
-    # Ha quanto tempo as contagens medem. Igual ao uptime, exceto depois de um
-    # reset pela tecla 'z' — e o que permite o painel dizer "zerado ha 5m" em
-    # vez de deixar o operador achando que o executor acabou de subir.
+    # How long the counts have been measuring. Same as uptime, except after a
+    # reset via the 'z' key — that is what lets the dashboard say "zerado ha 5m"
+    # (reset 5m ago) instead of leaving the operator thinking the executor just
+    # started.
     contando_ha_s: float
 
     # workflows
@@ -83,7 +84,7 @@ class Snapshot:
     last_hour_error: int
     throughput_per_min: float
 
-    # tempos (janela de 1 h, exceto `slowest`, que e desde o boot)
+    # timings (1 h window, except `slowest`, which is since boot)
     avg_duration_s: float | None
     p50_duration_s: float | None
     p95_duration_s: float | None
@@ -101,9 +102,10 @@ class Snapshot:
     ram_total_gb: float | None
     disk_free_gb: float | None
     disk_total_gb: float | None
-    # Disco DA PASTA DE ARTEFATOS — pode ser outra unidade que a do sistema, e
-    # e a que decide se um workflow consegue gravar o resultado. Com localidade
-    # local (LGPD) o artefato tem uma copia so, e ela esta nesse disco.
+    # Disk OF THE ARTIFACTS FOLDER — may be a different drive than the system's,
+    # and it is the one that decides whether a workflow can write its result.
+    # With local locality (LGPD) the artifact has a single copy, and it is on
+    # this disk.
     artifacts_disk_free_gb: float | None
     artifacts_disk_total_gb: float | None
     wf_cpu_peak_pct: float | None
@@ -133,9 +135,9 @@ class Snapshot:
     sync_errors: int
     sync_conflicts: int
     sync_current: str | None
-    # Inventario do manifesto, publicado pelo manager ao fim de cada ciclo.
-    # `total` e o que o executor CONHECE — nao o que existe no Drive, que
-    # exigiria uma chamada de rede a cada tick.
+    # Manifest inventory, published by the manager at the end of each cycle.
+    # `total` is what the executor KNOWS — not what exists in Drive, which
+    # would require a network call on every tick.
     sync_total: int
     sync_synced: int
     sync_pending: int
@@ -146,28 +148,29 @@ class Snapshot:
     log_error_count: int
 
 
-# ── Serializacao ─────────────────────────────────────────────────────────────
-# Esta e a mesma metade de LEITURA descrita no topo do modulo, so que para um
-# consumidor que nao e o terminal. Mora aqui, e nao no pacote dashboard/, para
-# que a fonte do dado e o formato do dado nao possam divergir: quem adiciona um
-# campo ao Snapshot ganha o campo no JSON sem fazer nada, e ha teste que falha
-# se um campo ficar de fora.
+# ── Serialization ────────────────────────────────────────────────────────────
+# This is the same READ half described at the top of the module, only for a
+# consumer that is not the terminal. It lives here, and not in the dashboard/
+# package, so that the data's source and the data's format cannot diverge:
+# whoever adds a field to Snapshot gets the field in the JSON without doing
+# anything, and there is a test that fails if a field is left out.
 #
-# `json` nao viola a regra de "nada que sugira interface grafica" do cabecalho:
-# e stdlib de serializacao, nao de apresentacao.
+# `json` doesn't violate the header's "nothing that suggests a graphical
+# interface" rule: it is a serialization stdlib module, not a presentation one.
 
 def _json_safe(valor, casas: int):
-    """Converte recursivamente para tipos que o `json` aceita.
+    """Recursively converts to types that `json` accepts.
 
-    Arredondar corta ruido: `uptime_s` com 12 casas muda a cada tick e nao diz
-    nada. O fallback para `str` e deliberado — um valor exotico vindo de
-    `system` (que e montado por sysinfo e pode mudar) degrada para texto em vez
-    de derrubar a serializacao inteira e, com ela, o canal com o app.
+    Rounding cuts noise: `uptime_s` with 12 decimal places changes every tick
+    and says nothing. The fallback to `str` is deliberate — an exotic value
+    coming from `system` (which is built by sysinfo and may change) degrades to
+    text instead of breaking the whole serialization and, with it, the channel
+    to the app.
     """
     if valor is None or isinstance(valor, (bool, int, str)):
         return valor
     if isinstance(valor, float):
-        # inf/nan nao sao JSON valido; viram null em vez de quebrar o parser.
+        # inf/nan are not valid JSON; they become null instead of breaking the parser.
         return round(valor, casas) if valor == valor and abs(valor) != float("inf") else None
     if isinstance(valor, dict):
         return {str(k): _json_safe(v, casas) for k, v in valor.items()}
@@ -177,13 +180,14 @@ def _json_safe(valor, casas: int):
 
 
 def snapshot_to_dict(s: Snapshot, *, casas: int = 3) -> dict:
-    """Serializa um `Snapshot` para dict pronto para `json.dumps`.
+    """Serializes a `Snapshot` into a dict ready for `json.dumps`.
 
-    Os unicos campos que nao saem do `asdict` direto sao `slowest` e
-    `last_finished`: no dataclass sao tuplas heterogeneas, que em JSON virariam
-    arrays posicionais do tipo `["run-7","error",12.4]`. Do outro lado da ponte
-    isso vira `snap.slowest[1]` — um indice sem nome que ninguem consegue ler e
-    que quebra em silencio se a ordem mudar. Viram objetos nomeados.
+    The only fields that don't come straight out of `asdict` are `slowest` and
+    `last_finished`: in the dataclass they are heterogeneous tuples, which in
+    JSON would become positional arrays like `["run-7","error",12.4]`. On the
+    other side of the bridge that becomes `snap.slowest[1]` — an unnamed index
+    nobody can read and that breaks silently if the order changes. They become
+    named objects.
     """
     d = dataclasses.asdict(s)
 
@@ -201,11 +205,12 @@ def snapshot_to_dict(s: Snapshot, *, casas: int = 3) -> dict:
 # ── Percentil ────────────────────────────────────────────────────────────────
 
 def percentile(ordenados: Sequence[float], q: float) -> float | None:
-    """Percentil por interpolacao linear (mesma convencao do numpy).
+    """Percentile by linear interpolation (same convention as numpy).
 
-    `statistics.quantiles` nao serve aqui: ele exige n >= 2 e devolve os cortes
-    de uma distribuicao, nao o valor em q. Com poucas amostras — o caso comum
-    num executor que acabou de subir — precisamos de algo que funcione com n=1.
+    `statistics.quantiles` doesn't work here: it requires n >= 2 and returns
+    the cut points of a distribution, not the value at q. With few samples —
+    the common case on an executor that just started — we need something that
+    works with n=1.
     """
     n = len(ordenados)
     if n == 0:
@@ -224,7 +229,7 @@ def _fmt_ts(epoch: float) -> str:
 
 
 def _travado(metodo):
-    """Serializa o acesso ao estado do coletor — ver a nota do `_lock`."""
+    """Serializes access to the collector's state — see the note on `_lock`."""
     @functools.wraps(metodo)
     def wrapper(self, *args, **kwargs):
         with self._lock:
@@ -236,7 +241,7 @@ def _travado(metodo):
 
 @dataclass
 class _RunState:
-    """Estado vivo de um job em execucao, montado a partir dos node events."""
+    """Live state of a running job, built from the node events."""
     job_id: str
     run_id: str | None = None
     started_at: float = 0.0
@@ -246,7 +251,7 @@ class _RunState:
 
 
 class ExecutorStats:
-    """Agregador. Uma instancia por processo, criada em main() quando o painel liga."""
+    """Aggregator. One instance per process, created in main() when the dashboard is on."""
 
     def __init__(
         self,
@@ -263,43 +268,44 @@ class ExecutorStats:
         self.executor_id = executor_id
         self.version = version
         self.server_url = server_url
-        # Recebe (tipo, dados) a cada mudanca de estado relevante, para quem
-        # precisa do evento na hora em vez de esperar o proximo tick — o painel
-        # rich nao precisa (ele repinta o snapshot inteiro), mas o app desktop
-        # sim: `last_finished` guarda UM job, entao dois terminando dentro do
-        # mesmo segundo fariam o primeiro sumir do historico.
+        # Receives (type, data) on every relevant state change, for whoever
+        # needs the event right away instead of waiting for the next tick — the
+        # rich dashboard doesn't (it repaints the whole snapshot), but the
+        # desktop app does: `last_finished` holds ONE job, so two finishing
+        # within the same second would make the first vanish from the history.
         #
-        # CONTRATO: o observer roda com o `_lock` segurado e e chamado de
-        # qualquer thread. Ele PRECISA ser O(1) e nao-bloqueante — tipicamente
-        # um append em buffer limitado. Um observer que faz I/O aqui trava
-        # `on_log_record`, que e chamado das threads do flow engine, e o
-        # executor inteiro para.
+        # CONTRACT: the observer runs with `_lock` held and is called from any
+        # thread. It MUST be O(1) and non-blocking — typically an append to a
+        # bounded buffer. An observer that does I/O here blocks
+        # `on_log_record`, which is called from the flow engine's threads, and
+        # the whole executor stalls.
         self._observer = observer
         self._clock = clock
         self._janela = janela_s
         self._t0 = clock()
 
-        # A maior parte dos hooks roda no event loop, mas `on_log_record` nao:
-        # o flow engine loga de dentro dos `asyncio.to_thread`, entao ele chega
-        # pela thread que emitiu o registro. Sem o lock, um `append` durante o
-        # `snapshot()` levanta "deque mutated during iteration" — e como o
-        # runtime desliga o painel apos 3 falhas seguidas de render, um executor
-        # com log ativo o suficiente perdia o painel sozinho.
-        # Reentrante porque `on_job_cancelled` delega para `on_job_finished`.
+        # Most hooks run on the event loop, but `on_log_record` doesn't: the
+        # flow engine logs from inside `asyncio.to_thread`, so it arrives on
+        # the thread that emitted the record. Without the lock, an `append`
+        # during `snapshot()` raises "deque mutated during iteration" — and
+        # since the runtime turns the dashboard off after 3 consecutive render
+        # failures, an executor with active enough logging lost the dashboard
+        # on its own.
+        # Reentrant because `on_job_cancelled` delegates to `on_job_finished`.
         self._lock = threading.RLock()
 
         self.system: dict = {}
         self.sync_dirs: tuple[str, ...] = ()
 
-        # Marco dos CONTADORES, separado do `_t0` do processo. A tecla 'z' move
-        # so este: o uptime continua sendo ha quanto tempo o executor esta no ar
-        # (informacao de sistema), enquanto as contagens recomecam do zero. Sem
-        # a separacao, a vazao logo apos um reset dividiria 0 execucoes por
-        # horas de uptime e mostraria ~0 wf/min para sempre.
+        # Baseline of the COUNTERS, separate from the process's `_t0`. The 'z' key
+        # moves only this one: uptime remains how long the executor has been up
+        # (system information), while the counts restart from zero. Without
+        # the separation, throughput right after a reset would divide 0 runs by
+        # hours of uptime and show ~0 wf/min forever.
         self._contadores_desde = self._t0
 
-        # workflows — contadores acumulados vivem FORA da janela deslizante,
-        # senao "total desde o boot" viraria "total na ultima hora".
+        # workflows — cumulative counters live OUTSIDE the sliding window,
+        # otherwise "total since boot" would become "total in the last hour".
         self._ok = 0
         self._erro = 0
         self._cancelado = 0
@@ -318,9 +324,9 @@ class ExecutorStats:
         # jobs em execucao
         self._running: dict[str, _RunState] = {}
         self._run_para_job: dict[str, str] = {}
-        # Ids ja contabilizados. Um job cancelado em execucao chega DUAS vezes:
-        # pelo `finally` do on_execute e pelo on_cancelled da fila. Sem esta
-        # memoria curta ele apareceria duas vezes no total.
+        # Ids already counted. A job cancelled while running arrives TWICE:
+        # through on_execute's `finally` and through the queue's on_cancelled.
+        # Without this short memory it would appear twice in the total.
         self._finalizados: deque[str] = deque(maxlen=256)
         self._finalizados_set: set[str] = set()
 
@@ -342,9 +348,9 @@ class ExecutorStats:
         self._sync_total = 0
         self._sync_synced = 0
         self._sync_pending = 0
-        # Reenvio de evento pelo _requeue_event da connection faria o MESMO
-        # upload contar duas vezes. O timestamp e fixado no emit e sobrevive
-        # a requeue, entao serve de chave de identidade.
+        # Resending an event via the connection's _requeue_event would make the SAME
+        # upload count twice. The timestamp is fixed at emit and survives the
+        # requeue, so it serves as an identity key.
         self._sync_vistos: deque[tuple] = deque(maxlen=_DEDUPE_SYNC)
         self._sync_vistos_set: set[tuple] = set()
 
@@ -354,11 +360,11 @@ class ExecutorStats:
 
     @_travado
     def reset(self) -> None:
-        """Zera as contagens da sessao sem tocar no estado vivo.
+        """Resets the session counts without touching the live state.
 
-        O que ZERA: workflows, tempos, metricas de no, GeoSync, reconexoes e o
-        buffer de alertas. O que PERMANECE: os jobs em execucao (estao rodando
-        de verdade), o estado da conexao e o uptime do processo.
+        What is RESET: workflows, timings, node metrics, GeoSync, reconnections
+        and the alert buffer. What REMAINS: the running jobs (they really are
+        running), the connection state and the process uptime.
         """
         agora = self._clock()
         self._contadores_desde = agora
@@ -380,26 +386,27 @@ class ExecutorStats:
         self._tail.clear()
         self._janela_logs.clear()
 
-        # `_finalizados` e `_sync_vistos` NAO sao zerados: sao memorias de
-        # deduplicacao, nao contadores. Limpa-las faria um evento reenviado
-        # logo apos o reset contar de novo.
+        # `_finalizados` and `_sync_vistos` are NOT reset: they are deduplication
+        # memories, not counters. Clearing them would make an event resent
+        # right after the reset count again.
 
     def set_observer(self, observer: Callable[[str, dict], None] | None) -> None:
-        """Liga (ou desliga) o observer depois da construcao.
+        """Attaches (or detaches) the observer after construction.
 
-        Existe por uma dependencia circular no boot: o coletor e criado em
-        `main()` para que as filas e a conexao ja nascam com ele, mas quem
-        consome os eventos — o runtime do canal NDJSON — so existe depois, e
-        precisa do proprio coletor como argumento. Um dos dois tem de ser
-        ligado em dois tempos.
+        Exists because of a circular dependency at boot: the collector is
+        created in `main()` so that the queues and the connection are born with
+        it, but whoever consumes the events — the NDJSON channel runtime — only
+        exists later, and needs the collector itself as an argument. One of the
+        two has to be wired in two steps.
 
-        Vale o mesmo CONTRATO do parametro do construtor: O(1) e nao-bloqueante.
+        The same CONTRACT as the constructor parameter applies: O(1) and
+        non-blocking.
         """
         self._observer = observer
 
     def _emitir(self, tipo: str, dados: dict) -> None:
-        """Entrega ao observer, best-effort. Mesma regra dos hooks `on_*`:
-        telemetria quebrada nunca derruba a execucao de um workflow."""
+        """Delivers to the observer, best-effort. Same rule as the `on_*` hooks:
+        broken telemetry never brings down a workflow execution."""
         obs = self._observer
         if obs is None:
             return
@@ -446,8 +453,8 @@ class ExecutorStats:
         self._janela_jobs.append((agora, duracao_s, status))
         self._last_finished = (rid, status, duracao_s)
 
-        # Cancelado nao entra na media: um job morto aos 2s nao diz nada sobre
-        # quanto tempo um workflow leva, e puxaria a media para baixo.
+        # Cancelled doesn't count toward the average: a job killed at 2s says
+        # nothing about how long a workflow takes, and would drag the average down.
         if status != "cancelled":
             self._soma_duracoes += duracao_s
             self._n_duracoes += 1
@@ -466,18 +473,18 @@ class ExecutorStats:
 
     @_travado
     def on_job_cancelled(self, job_id: str, motivo: str | None = None) -> None:
-        """Cancelamento reportado pela fila.
+        """Cancellation reported by the queue.
 
-        Chega para o job que foi interrompido em execucao (ja contado pelo
-        `finally` do on_execute) e para o que foi descartado sem nunca rodar
-        (nao contado em lugar nenhum). Distinguimos pela memoria de ids
-        finalizados: sem isso, o primeiro caso somaria duas vezes.
+        Arrives for the job that was interrupted while running (already counted
+        by on_execute's `finally`) and for the one discarded without ever
+        running (not counted anywhere). We tell them apart by the memory of
+        finished ids: without it, the first case would be added twice.
         """
         if job_id in self._finalizados_set:
             return
         if job_id in self._running:
-            # Delega — e o on_job_finished que emite, senao o evento sairia
-            # duplicado para o mesmo cancelamento.
+            # Delegates — on_job_finished is the one that emits, otherwise the event
+            # would go out twice for the same cancellation.
             self.on_job_finished(job_id, "cancelled", 0.0)
             return
         self._marcar_finalizado(job_id)
@@ -511,7 +518,7 @@ class ExecutorStats:
             if mem is not None:
                 self._wf_mem_peak = max(self._wf_mem_peak or 0.0, float(mem))
         except Exception:
-            pass  # telemetria malformada nao e motivo para nada quebrar
+            pass  # malformed telemetry is no reason for anything to break
 
     # ── Escrita: eventos da fila (node events + sync events) ─────────────────
 
@@ -532,10 +539,11 @@ class ExecutorStats:
         job_id = self._run_para_job.get(run_id)
         st = self._running.get(job_id) if job_id else None
         if st is None:
-            # O payload trouxe um run_id diferente do job_id. Casa por eliminacao
-            # — mas SO se houver exatamente um candidato: com varios jobs
-            # simultaneos sem run_id, escolher "o primeiro" atribuiria o no de um
-            # job ao outro, e um painel que mente e pior que um painel incompleto.
+            # The payload brought a run_id different from the job_id. Match by
+            # elimination — but ONLY if there is exactly one candidate: with
+            # several concurrent jobs without run_id, picking "the first" would
+            # attribute one job's node to another, and a dashboard that lies is
+            # worse than an incomplete one.
             candidatos = [c for c in self._running.values() if c.run_id is None]
             if len(candidatos) != 1:
                 return
@@ -563,7 +571,7 @@ class ExecutorStats:
     def _on_sync_event(self, event: Mapping) -> None:
         chave = (event.get("event"), event.get("dataset"), event.get("timestamp"))
         if chave in self._sync_vistos_set:
-            return  # reenvio pelo _requeue_event — ja contabilizado
+            return  # resend via _requeue_event — already counted
         if len(self._sync_vistos) == self._sync_vistos.maxlen:
             self._sync_vistos_set.discard(self._sync_vistos[0])
         self._sync_vistos.append(chave)
@@ -596,8 +604,8 @@ class ExecutorStats:
         elif nome in ("sync_complete", "sync_started"):
             self._sync_atual = None
         elif nome == "sync_inventory":
-            # Substitui, nao acumula: e uma fotografia do manifesto, nao um
-            # contador de eventos.
+            # Replaces, doesn't accumulate: it is a snapshot of the manifest, not an
+            # event counter.
             try:
                 self._sync_total = int(event.get("total") or 0)
                 self._sync_synced = int(event.get("synced") or 0)
@@ -684,13 +692,13 @@ class ExecutorStats:
         hora_erro = sum(1 for _, _, s in self._janela_jobs if s == "error")
 
         finalizados = self._ok + self._erro + self._cancelado
-        # 1.0 num executor recem-subido: mostrar "0% de sucesso" antes da
-        # primeira execucao seria alarme falso.
+        # 1.0 on a freshly started executor: showing "0% de sucesso" (0% success)
+        # before the first run would be a false alarm.
         taxa = (self._ok / finalizados) if finalizados else 1.0
 
         uptime = agora - self._t0
-        # A vazao mede desde o marco dos CONTADORES, nao do processo: depois de
-        # um reset, dividir as execucoes novas por horas de uptime daria ~0.
+        # Throughput measures from the COUNTERS baseline, not the process's: after
+        # a reset, dividing the new runs by hours of uptime would give ~0.
         medindo_ha = agora - self._contadores_desde
         vazao = (hora_total / (min(medindo_ha, self._janela) / 60.0)) if medindo_ha > 1 else 0.0
 
@@ -770,11 +778,11 @@ class ExecutorStats:
 
 
 class NullStats:
-    """Mesma superficie, tudo no-op.
+    """Same surface, everything a no-op.
 
-    Existe para que `connection.py` e `main.py` chamem `self._stats.on_X()` sem
-    nenhum `if stats is not None` espalhado — com o painel desligado, o custo e
-    uma chamada de funcao vazia por evento.
+    Exists so that `connection.py` and `main.py` call `self._stats.on_X()`
+    without any `if stats is not None` scattered around — with the dashboard
+    off, the cost is one empty function call per event.
     """
     executor_id = ""
     version = ""
@@ -782,13 +790,13 @@ class NullStats:
     system: dict = {}
     sync_dirs: tuple = ()
 
-    # Aceita os mesmos kwargs do ExecutorStats (inclusive `observer`) para que a
-    # troca entre os dois seja um `if` no construtor, e nada alem disso.
+    # Accepts the same kwargs as ExecutorStats (including `observer`) so that
+    # switching between the two is an `if` in the constructor, and nothing more.
     def __init__(self, *a, **k) -> None: ...
 
-    # `reset` faltava: o painel chama `stats.reset()` na tecla 'z' e o comando
-    # `reset_stats` do IPC faz o mesmo. Com o coletor desligado isso levantava
-    # AttributeError em vez de nao fazer nada.
+    # `reset` was missing: the dashboard calls `stats.reset()` on the 'z' key and
+    # the IPC `reset_stats` command does the same. With the collector off this
+    # raised AttributeError instead of doing nothing.
     def reset(self, *a, **k) -> None: ...
     def set_observer(self, *a, **k) -> None: ...
     def on_job_started(self, *a, **k) -> None: ...

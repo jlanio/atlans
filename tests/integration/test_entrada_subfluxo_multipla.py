@@ -1,22 +1,23 @@
 # tests/integration/test_entrada_subfluxo_multipla.py
 """
-Varios dados ENTRANDO num sub-fluxo, e o trigger escolhendo o que passa adiante.
+Several data items ENTERING a sub-workflow, and the trigger choosing what passes on.
 
-Espelho de test_saida_subfluxo_multipla.py, no lado da ENTRADA. Dois defeitos
-que apareciam ao passar mais de um argumento:
+Mirror of test_saida_subfluxo_multipla.py, on the INPUT side. Two defects that
+showed up when passing more than one argument:
 
-  1. Entrar com 2+ valores no node SubWorkflow (invoke): sem `to_key` por porta,
-     duas arestas com o mesmo nome de chave colidem em `inputs.update()` e a
-     ultima vence — depois o `inputsMapping` reclama de chave que "nao chegou".
-  2. Dentro do sub-fluxo, o SubWorkflowInput (trigger) so conseguia espalhar o
-     dict inteiro para cada node seguinte — nao dava para dizer, pela aresta,
-     "esta leva focos, aquela leva bbox".
+  1. Entering the SubWorkflow node (invoke) with 2+ values: without a `to_key`
+     per port, two edges with the same key name collide in `inputs.update()`
+     and the last one wins — then `inputsMapping` complains about a key that
+     "did not arrive".
+  2. Inside the sub-workflow, the SubWorkflowInput (trigger) could only spread
+     the whole dict to each following node — there was no way to say, through
+     the edge, "this one carries focos, that one carries bbox".
 
-A correcao torna o trigger e o invoke simetricos ao SubWorkflowOutput (que ja
-funcionava): portas declaradas viram pontos de conexao nomeados, e cada aresta
-carrega uma chave distinta (`from_key` na saida do trigger, `to_key` na entrada
-do invoke). O EXECUTOR ja roteava por nome — estes testes exercitam o grafo de
-verdade e travam esse contrato.
+The fix makes the trigger and the invoke symmetric with SubWorkflowOutput
+(which already worked): declared ports become named connection points, and
+each edge carries a distinct key (`from_key` on the trigger's output, `to_key`
+on the invoke's input). The EXECUTOR already routed by name — these tests
+exercise the real graph and lock that contract in.
 """
 import asyncio
 from unittest.mock import MagicMock
@@ -30,8 +31,8 @@ def _script(node_id, code, saida="result"):
 
 
 def _rodar_pai(filho, edges_pai_para_sub):
-    """Pai que alimenta o node `sub` com {focos: 'FOCOS', bbox: 'BBOX'} vindos de
-    dois nodes distintos, pelas arestas em `edges_pai_para_sub`."""
+    """Parent that feeds the `sub` node with {focos: 'FOCOS', bbox: 'BBOX'} coming
+    from two distinct nodes, through the edges in `edges_pai_para_sub`."""
     from flow.executor import WorkflowExecutor
 
     pai = {
@@ -59,7 +60,7 @@ def _rodar_pai(filho, edges_pai_para_sub):
     )
 
 
-# Cada origem cai na SUA porta de entrada do sub (to_key distinto).
+# Each source lands on ITS OWN input port of the sub (distinct to_key).
 PAI_PARA_SUB = [
     {"source": "pf", "target": "sub", "from_key": "result", "to_key": "focos"},
     {"source": "pb", "target": "sub", "from_key": "result", "to_key": "bbox"},
@@ -77,17 +78,18 @@ def _filho_passthrough():
 
 
 def test_invoke_recebe_duas_entradas_cada_uma_na_sua_chave():
-    """Bug do relato: passar 2 valores para o sub. Com `to_key` por porta, cada
-    origem cai na sua chave — sem colisao 'ultima vence'."""
+    """The reported bug: passing 2 values to the sub. With a `to_key` per port,
+    each source lands on its own key — no 'last one wins' collision."""
     saida = _rodar_pai(_filho_passthrough(), PAI_PARA_SUB)["sub"]
 
     assert saida["subWorkflowResult"] == {"focos": "FOCOS", "bbox": "BBOX"}
 
 
 def test_trigger_escolhe_o_que_passa_adiante_por_from_key():
-    """Bug do relato: no sub-fluxo, escolher pela aresta o que o trigger manda a
-    cada node. Cada aresta que sai do trigger leva `from_key` = a porta, entao o
-    destino recebe SO aquela chave (aqui, roteada a portas nomeadas da saida)."""
+    """The reported bug: in the sub-workflow, choosing through the edge what the
+    trigger sends to each node. Each edge leaving the trigger carries
+    `from_key` = the port, so the target receives ONLY that key (here, routed
+    to named ports of the output)."""
     filho = {
         "nodes": [
             {"id": "in", "type": "trigger", "name": "SubWorkflowInput",
@@ -102,25 +104,26 @@ def test_trigger_escolhe_o_que_passa_adiante_por_from_key():
     }
     saida = _rodar_pai(filho, PAI_PARA_SUB)["sub"]
 
-    # `focos` foi so para a porta `a`, `bbox` so para a porta `b`: se o trigger
-    # tivesse espalhado o dict inteiro, o rename por to_key pegaria o 1o valor e
-    # as duas portas ficariam iguais.
+    # `focos` went only to port `a`, `bbox` only to port `b`: if the trigger
+    # had spread the whole dict, the rename by to_key would pick the 1st value
+    # and both ports would end up equal.
     assert saida["a"] == "FOCOS"
     assert saida["b"] == "BBOX"
 
 
 def test_passthrough_sem_portas_continua_espalhando():
-    """NAO-REGRESSAO: trigger sem portas declaradas segue espalhando o dict
-    inteiro (aresta sem `from_key`) — os sub-fluxos que ja existem nao mudam."""
+    """NON-REGRESSION: a trigger without declared ports keeps spreading the whole
+    dict (edge without `from_key`) — existing sub-workflows do not change."""
     saida = _rodar_pai(_filho_passthrough(), PAI_PARA_SUB)["sub"]
 
     assert saida["subWorkflowResult"] == {"focos": "FOCOS", "bbox": "BBOX"}
 
 
 def test_o_defeito_que_a_regra_evita():
-    """Sem `to_key`, as duas arestas pai->sub usam o `from_key` ('result') como
-    nome e colidem em inputs.update() — a ultima vence. E a razao de o editor
-    preencher `to_key` por porta nomeada; o fix do frontend evita este estado."""
+    """Without `to_key`, the two parent->sub edges use the `from_key` ('result')
+    as the name and collide in inputs.update() — the last one wins. That is
+    why the editor fills `to_key` per named port; the frontend fix avoids this
+    state."""
     sem_to_key = [
         {"source": "pf", "target": "sub", "from_key": "result"},
         {"source": "pb", "target": "sub", "from_key": "result"},
@@ -132,14 +135,15 @@ def test_o_defeito_que_a_regra_evita():
     assert publico["result"] in ("FOCOS", "BBOX")
 
 
-# ── O contrato do node ───────────────────────────────────────────────────────
+# ── The node contract ────────────────────────────────────────────────────────
 
 def test_subworkflowinput_declara_saidas_por_ports():
-    """`outputs_from_ports` e o que faz o editor derivar os pontos de conexao de
-    SAIDA do trigger da propriedade `ports` — cada porta vira um handle de saida,
-    e a aresta que sai dela leva `from_key`. Sem isso o trigger volta a ter um
-    unico handle anonimo: o executor nao muda, mas no canvas nao ha como escolher
-    o que passar adiante. Simetrico ao `dynamic_inputs` do SubWorkflowOutput."""
+    """`outputs_from_ports` is what makes the editor derive the trigger's OUTPUT
+    connection points from the `ports` property — each port becomes an output
+    handle, and the edge leaving it carries `from_key`. Without it the trigger
+    goes back to a single anonymous handle: the executor does not change, but
+    on the canvas there is no way to choose what to pass on. Symmetric with
+    SubWorkflowOutput's `dynamic_inputs`."""
     from flow.registry import auto_discover_nodes, NODE_REGISTRY
     auto_discover_nodes()
 

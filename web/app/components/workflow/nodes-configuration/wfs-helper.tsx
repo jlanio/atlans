@@ -23,15 +23,16 @@ interface WFSLayer {
 interface WFSHelperProps {
   values: Record<string, string | number | boolean> | undefined
   setNodeField(field: string, value: string | number | boolean): void
-  // O fluxo em edição: é por ele (e não por um workspace escolhido aqui) que o
-  // servidor alcança as credenciais compartilhadas com o workspace do fluxo.
+  // The workflow being edited: it is through it (and not through a workspace
+  // chosen here) that the server reaches the credentials shared with the
+  // workflow's workspace.
   workflowId?: string
 }
 
 /**
- * Extrai o endpoint base de uma URL OWS (WFS/WMS/WMTS), descartando query e
- * fragment. Espelha flow/utils/geo_helpers.normalize_ows_endpoint_url no
- * backend — operacao idempotente, segura aplicar sempre.
+ * Extracts the base endpoint of an OWS URL (WFS/WMS/WMTS), dropping query and
+ * fragment. Mirrors flow/utils/geo_helpers.normalize_ows_endpoint_url in the
+ * backend — an idempotent operation, safe to always apply.
  */
 function normalizeOwsEndpoint(raw: string): string {
   const trimmed = raw.trim()
@@ -52,8 +53,9 @@ const WFSHelper = ({ values, setNodeField, workflowId }: WFSHelperProps) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [discovered, setDiscovered] = useState(false)
-  // A credencial com que a lista foi buscada. Trocada a do nó, a lista deixa de
-  // valer: um GeoServer mostra camadas diferentes a cada chave (e ao anônimo).
+  // The credential the list was fetched with. Once the node's credential changes,
+  // the list no longer holds: a GeoServer shows different layers for each key
+  // (and to anonymous users).
   const [listadaCom, setListadaCom] = useState("")
 
   const url = String(values?.url ?? "").trim()
@@ -66,8 +68,8 @@ const WFSHelper = ({ values, setNodeField, workflowId }: WFSHelperProps) => {
       return
     }
 
-    // Normaliza antes do fetch e ja persiste no node (caso usuario clicou
-    // sem disparar onBlur do input).
+    // Normalizes before the fetch and persists it in the node right away (in case
+    // the user clicked without triggering the input's onBlur).
     const normalized = normalizeOwsEndpoint(url)
     if (normalized !== url) {
       setNodeField("url", normalized)
@@ -76,13 +78,13 @@ const WFSHelper = ({ values, setNodeField, workflowId }: WFSHelperProps) => {
     setLoading(true)
     setError(null)
     setLayers([])
-    // A busca é com a credencial de agora: se ela falhar, o aviso de "a
-    // credencial mudou" não tem mais o que pedir — fica só o erro.
+    // The fetch uses the current credential: if it fails, the "credential
+    // changed" warning has nothing left to ask for — only the error remains.
     setListadaCom(credentialId)
 
     try {
-      // Com a credencial do nó, a lista é a que a execução vai ver — as camadas
-      // protegidas incluídas. O fluxo alcança as compartilhadas com o workspace dele.
+      // With the node's credential, the list is the one the run will see — protected
+      // layers included. The workflow reaches the ones shared with its workspace.
       const params: Record<string, string> = { url: normalized }
       if (credentialId) params.credential_id = credentialId
       if (credentialId && workflowId) params.workflow_id = workflowId
@@ -97,7 +99,7 @@ const WFSHelper = ({ values, setNodeField, workflowId }: WFSHelperProps) => {
       setLayers(parsed)
       setDiscovered(true)
     } catch (err) {
-      // O corpo de erro da API é `{message}`; `detail` fica para respostas antigas.
+      // The API error body is `{message}`; `detail` is kept for older responses.
       const doServidor = axios.isAxiosError(err)
         ? (err.response?.data?.message ?? err.response?.data?.detail)
         : undefined
@@ -113,13 +115,14 @@ const WFSHelper = ({ values, setNodeField, workflowId }: WFSHelperProps) => {
   }, [url, credentialId, workflowId, setNodeField])
 
   const currentTypeName = String(values?.typeName ?? "")
-  // A camada gravada fora da lista (buscada com outra chave, ou sem chave): sem
-  // um item com este valor o Select cairia no placeholder e pareceria vazio.
+  // The saved layer is outside the list (fetched with another key, or no key):
+  // without an item with this value the Select would fall back to the
+  // placeholder and look empty.
   const gravadaForaDaLista = !!currentTypeName && !layers.some(l => l.name === currentTypeName)
 
   return (
     <div className="flex flex-col gap-2">
-      {/* URL do WFS */}
+      {/* WFS URL */}
       <div className="flex flex-col gap-1">
         <Label>URL do serviço WFS</Label>
         <div className="flex gap-1">
@@ -167,7 +170,7 @@ const WFSHelper = ({ values, setNodeField, workflowId }: WFSHelperProps) => {
         <p className="text-xs text-destructive">{error}</p>
       )}
 
-      {/* Camada: dropdown se descobriu, input manual caso contrário */}
+      {/* Layer: dropdown if discovered, manual input otherwise */}
       <div className="flex flex-col gap-1">
         <Label>Camada (typeName)</Label>
         {listaValida ? (

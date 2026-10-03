@@ -1,10 +1,10 @@
-"""IP do executor nas métricas das execuções.
+"""Executor IP in the run metrics.
 
-O consumer de `run_results` roda nos quatro workers da API e procurava o IP no
-registro de conexões LOCAL: só o worker que segura o WebSocket do executor o
-tem, então ~3 de cada 4 execuções gravavam `workflow_run_metrics.executor_ip`
-vazio. Agora o worker do WebSocket escreve o IP no resultado que enfileira, e o
-consumer o lê de lá.
+The `run_results` consumer runs in the API's four workers and looked up the IP in
+the LOCAL connection registry: only the worker holding the executor's WebSocket
+has it, so ~3 out of 4 runs stored an empty `workflow_run_metrics.executor_ip`.
+Now the WebSocket worker writes the IP into the result it enqueues, and the
+consumer reads it from there.
 """
 import json
 from datetime import datetime, timezone
@@ -67,7 +67,7 @@ async def test_o_resultado_enfileirado_leva_o_ip_da_conexao(worker_do_websocket)
 
 @pytest.mark.asyncio
 async def test_o_executor_nao_declara_o_proprio_ip(worker_do_websocket):
-    """O que o executor manda no job_result não chega à chave do servidor."""
+    """What the executor sends in the job_result does not reach the server's key."""
     rc, _ = worker_do_websocket
     await RES._handle_job_result("ex-1", {
         "type": "job_result", "job_id": "run-1", "run_id": "run-1", "status": "ok",
@@ -89,7 +89,7 @@ def _banco():
     sem_metricas.scalar_one_or_none.return_value = None
     db = MagicMock(
         commit=AsyncMock(),
-        # 1ª consulta: métricas já gravadas? 2ª: o nome do executor.
+        # 1st query: metrics already stored? 2nd: the executor's name.
         execute=AsyncMock(side_effect=[sem_metricas, nome]),
         add=adicionados.append,
     )
@@ -106,7 +106,7 @@ def _run():
 
 
 async def _metricas_gravadas(payload, monkeypatch, *, registro_local=None):
-    """Roda o consumer num worker cujo registro local só tem `registro_local`."""
+    """Runs the consumer in a worker whose local registry only has `registro_local`."""
     monkeypatch.setattr(executor_registry, "get", lambda _id: registro_local)
     db, adicionados = _banco()
     await CONS._persist_metrics(db, _run(), {"run": {}}, payload)
@@ -121,14 +121,14 @@ async def test_consumer_em_outro_worker_grava_o_ip_do_payload(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_resultado_antigo_sem_a_chave_ainda_tenta_o_registro_local(monkeypatch):
-    """Enfileirado antes deste campo existir (deploy no meio, dead letter)."""
+    """Enqueued before this field existed (mid-deploy, dead letter)."""
     wrm = await _metricas_gravadas({}, monkeypatch, registro_local=_conexao("198.51.100.4"))
     assert wrm.executor_ip == "198.51.100.4"
 
 
 INVALIDOS = [
     "não é ip", "10.0.0.1; DROP TABLE", "x" * 100, 12345, None,
-    # IPv6 com zona: a zona é texto livre e estourava o VARCHAR(45) da coluna.
+    # IPv6 with a zone: the zone is free text and overflowed the column's VARCHAR(45).
     "fe80:1234:5678:9abc:def0:1234:5678:9abc%eeeeeeeeeeeeeee",
     "fe80::1%" + "A" * 200,
 ]
@@ -144,8 +144,8 @@ async def test_o_que_nao_e_ip_nunca_chega_a_coluna(monkeypatch, valor):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("valor", INVALIDOS)
 async def test_sem_ip_valido_no_payload_tenta_o_registro_local(monkeypatch, valor):
-    """O worker do WebSocket pode não ter o IP (conexão já fora do registro
-    num takeover): o registro local ainda vale quando for o mesmo worker."""
+    """The WebSocket worker may not have the IP (connection already out of the registry
+    in a takeover): the local registry still applies when it is the same worker."""
     wrm = await _metricas_gravadas({"executor_ip": valor}, monkeypatch, registro_local=_conexao("198.51.100.4"))
     assert wrm.executor_ip == "198.51.100.4"
 
@@ -161,12 +161,12 @@ def test_ip_sai_na_forma_canonica():
     assert CONS._ip_do_payload({"executor_ip": "::ffff:10.0.0.1"}) == "::ffff:10.0.0.1"
 
 
-# ── O IP é o da conexão que recebeu o frame ──────────────────────────────────
+# ── The IP is that of the connection that received the frame ─────────────────
 
 @pytest.mark.asyncio
 async def test_com_a_conexao_fora_do_registro_vale_o_ip_da_sessao(worker_do_websocket):
-    """Takeover: o listener já tirou esta conexão do registro enquanto a fila
-    dela ainda esvazia. O IP vem da sessão, não do registro."""
+    """Takeover: the listener has already removed this connection from the registry
+    while its queue is still draining. The IP comes from the session, not the registry."""
     rc, conexoes = worker_do_websocket
     conexoes.clear()
     await RES._handle_job_result("ex-1", {

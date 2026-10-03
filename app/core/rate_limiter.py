@@ -1,43 +1,43 @@
 # app/core/rate_limiter.py
-"""Rate limiter global da aplicacao.
+"""Application-wide rate limiter.
 
-`get_remote_address` do slowapi devolve `request.client.host`, que atras do
-Traefik e SEMPRE o IP do proxy — todos os limites (`10/hour` no enrollment,
-`10/minute` no patch de executor, etc.) viravam um unico balde compartilhado
-pela plataforma inteira. Qualquer cliente conseguia esgotar a cota de todos.
+slowapi's `get_remote_address` returns `request.client.host`, which behind
+Traefik is ALWAYS the proxy's IP — every limit (`10/hour` on enrollment,
+`10/minute` on the executor patch, etc.) became a single bucket shared by
+the whole platform. Any client could exhaust everyone's quota.
 
-`_client_key` resolve o IP real via X-Forwarded-For, confiando no header apenas
-quando o peer e um proxy listado em TRUSTED_PROXIES (ver app/core/trusted_proxy.py).
+`_client_key` resolves the real IP via X-Forwarded-For, trusting the header only
+when the peer is a proxy listed in TRUSTED_PROXIES (see app/core/trusted_proxy.py).
 
-Storage dos contadores. Com `uvicorn --workers 4` (api-prod) e contadores
-em memoria, cada worker tem o proprio balde e um `10/minute` vale, na pratica,
-ate 4x isso — o Traefik espalha as conexoes entre os workers — e tudo zera a
-cada deploy. Por isso, sem configuracao, os contadores vao para o Redis da
-aplicacao (`REDIS_URL`) e valem para a API inteira. Ordem de escolha:
+Counter storage. With `uvicorn --workers 4` (api-prod) and in-memory
+counters, each worker has its own bucket and a `10/minute` is, in practice,
+up to 4x that — Traefik spreads connections across the workers — and everything
+resets on each deploy. That is why, with no configuration, the counters go to
+the application's Redis (`REDIS_URL`) and apply to the whole API. Order of choice:
 
-1. `RATE_LIMIT_STORAGE_URI`, se definida: `redis://...` ou `memory://` (a
-   saida explicita para memoria por worker);
-2. `REDIS_URL`, se definida e for `redis://` ou `rediss://`;
-3. memoria do processo (testes, dev sem Redis).
+1. `RATE_LIMIT_STORAGE_URI`, if set: `redis://...` or `memory://` (the
+   explicit way out to per-worker memory);
+2. `REDIS_URL`, if set and it is `redis://` or `rediss://`;
+3. process memory (tests, dev without Redis).
 
-O storage Redis do `limits` e sincrono: roda no event loop do worker, um
-round-trip curto na rede do compose por request nas rotas com limite. Sem
-prazo, um Redis travado (aceita a conexao e nao responde) prende o worker
-inteiro sem fim — medido: o `hit` segue bloqueado depois de 5 s. Por isso o
-prazo de 0,25 s em `_PRAZO_DO_REDIS` (a ida ao Redis no compose leva bem
-menos de 1 ms; parametros na query da URI, como `?socket_timeout=2`, valem
-mais). `in_memory_fallback_enabled` faz o slowapi cair para memoria na
-primeira falha e voltar sozinho quando o Redis responder, em vez de derrubar
-a API junto. Com o Redis travado, o custo e: a primeira falha para o loop
-por duas idas (o `hit` e uma conferencia imediata) e, depois, o slowapi
-confere o Redis de novo com 2, 4, 8, 16 e 32 s de intervalo, e recomeca —
-cada conferencia para o loop por ate um prazo. A resolucao do nome `redis`
-(DNS) nao entra no prazo: com o container fora do ar, o Docker repassa a
-consulta ao DNS do host.
+The `limits` Redis storage is synchronous: it runs on the worker's event loop,
+one short round trip on the compose network per request on rate-limited routes.
+Without a deadline, a stuck Redis (accepts the connection and does not answer)
+holds the whole worker forever — measured: the `hit` is still blocked after
+5 s. Hence the 0.25 s deadline in `_PRAZO_DO_REDIS` (the round trip to Redis in
+compose takes well under 1 ms; parameters in the URI query, such as
+`?socket_timeout=2`, take precedence). `in_memory_fallback_enabled` makes slowapi
+fall back to memory on the first failure and return on its own when Redis
+answers, instead of bringing the API down with it. With Redis stuck, the cost
+is: the first failure stalls the loop for two round trips (the `hit` and an
+immediate check) and, after that, slowapi checks Redis again at 2, 4, 8, 16 and
+32 s intervals, and starts over — each check stalls the loop for up to one
+deadline. Resolving the `redis` name (DNS) is not covered by the deadline: with
+the container down, Docker forwards the query to the host's DNS.
 
-Uma URI que o `limits` recusa (esquema desconhecido, porta invalida, typo
-como `memory` sem `://`) cai em memoria com erro no log, em vez de derrubar a
-importacao — e com ela os quatro workers.
+A URI that `limits` rejects (unknown scheme, invalid port, a typo such as
+`memory` without `://`) falls back to memory with an error in the log, instead
+of breaking the import — and with it the four workers.
 """
 import os
 from urllib.parse import urlsplit
@@ -49,12 +49,12 @@ from app.core.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Prazo de cada ida ao Redis do limiter, em segundos (ver a docstring). O
-# redis-py 7 nao repete um timeout.
+# Deadline of each limiter round trip to Redis, in seconds (see the docstring).
+# redis-py 7 does not retry a timeout.
 _PRAZO_DO_REDIS = {"socket_timeout": 0.25, "socket_connect_timeout": 0.25}
-# Esquemas do `limits` que abrem uma conexao redis-py direta e aceitam o prazo.
-# Sentinel e cluster levam outros parametros: quem os usar passa o prazo na
-# query da URI.
+# `limits` schemes that open a direct redis-py connection and accept the deadline.
+# Sentinel and cluster take other parameters: whoever uses them passes the
+# deadline in the URI query.
 _ESQUEMAS_COM_PRAZO = ("redis", "rediss", "redis+unix", "valkey", "valkeys", "valkey+unix")
 _ESQUEMAS_REDIS = ("redis", "rediss")
 
@@ -67,7 +67,7 @@ def _client_key(request) -> str:
 
 
 def _storage_do_limiter() -> str:
-    """URI do storage dos contadores (ver a ordem na docstring do modulo)."""
+    """URI of the counter storage (see the order in the module docstring)."""
     explicita = (os.getenv("RATE_LIMIT_STORAGE_URI") or "").strip()
     if explicita:
         return explicita
@@ -75,10 +75,10 @@ def _storage_do_limiter() -> str:
     if not redis_da_aplicacao:
         return "memory://"
     if _esquema(redis_da_aplicacao) not in _ESQUEMAS_REDIS:
-        # `unix://` e afins valem para o redis-py, mas o `limits` nao conhece o
-        # esquema e recusaria na importacao — a API nem subiria. Aqui, que e
-        # so o padrao, memoria com aviso; quem quiser o socket define
-        # RATE_LIMIT_STORAGE_URI=redis+unix://...
+        # `unix://` and the like work for redis-py, but `limits` does not know the
+        # scheme and would reject it at import — the API would not even start.
+        # Here, since it is only the default, memory with a warning; whoever wants
+        # the socket sets RATE_LIMIT_STORAGE_URI=redis+unix://...
         logger.warning(
             "Rate limit: REDIS_URL com esquema %r nao serve ao limiter; contadores em memoria de cada worker.",
             _esquema(redis_da_aplicacao),
@@ -88,7 +88,7 @@ def _storage_do_limiter() -> str:
 
 
 def _esquema(uri: str) -> str:
-    """Esquema da URI em minusculas; "" se ela nem se deixa analisar."""
+    """The URI scheme in lowercase; "" if it cannot even be parsed."""
     try:
         return urlsplit(uri).scheme.lower()
     except ValueError:
@@ -96,10 +96,10 @@ def _esquema(uri: str) -> str:
 
 
 def _onde_ficam_os_contadores(storage_uri: str) -> str:
-    """Para o log de arranque: esquema, host, porta e banco — nunca a senha.
+    """For the startup log: scheme, host, port and database — never the password.
 
-    O caminho da URI nao sai inteiro: uma senha com `/` faz o `urlsplit`
-    empurrar o resto dela para o caminho.
+    The URI path is not emitted whole: a password containing `/` makes `urlsplit`
+    push the rest of it into the path.
     """
     if _esquema(storage_uri) == "memory":
         return "memoria de cada worker (cada limite vale por worker)"
@@ -119,21 +119,21 @@ def _novo_limiter(storage_uri: str) -> Limiter:
         key_func=_client_key,
         storage_uri=storage_uri,
         storage_options=dict(_PRAZO_DO_REDIS) if esquema in _ESQUEMAS_COM_PRAZO else {},
-        # So faz sentido com storage externo — em memoria nao ha o que "cair".
+        # Only makes sense with external storage — in memory there is nothing to "go down".
         in_memory_fallback_enabled=esquema != "memory",
     )
 
 
 def criar_limiter() -> Limiter:
-    """Redis (com fallback em memoria) por padrao; memoria sem Redis ou com `memory://`."""
+    """Redis (with in-memory fallback) by default; memory without Redis or with `memory://`."""
     storage_uri = _storage_do_limiter()
     try:
         limiter = _novo_limiter(storage_uri)
     except Exception as exc:
-        # Esquema que o `limits` nao conhece, porta invalida, maiusculas que o
-        # redis-py recusa: derrubar a importacao derrubaria a API inteira. So o
-        # TIPO da excecao vai para o log: a mensagem cita pedacos da URI, e com
-        # eles a senha ("Port could not be cast to integer value as '<senha>'").
+        # Scheme that `limits` does not know, invalid port, uppercase that redis-py
+        # rejects: breaking the import would bring down the whole API. Only the
+        # exception TYPE goes to the log: the message quotes pieces of the URI, and
+        # with them the password ("Port could not be cast to integer value as '<password>'").
         logger.error(
             "Rate limit: storage %s recusado (%s); contadores em memoria de cada worker.",
             _onde_ficam_os_contadores(storage_uri), type(exc).__name__,
@@ -144,5 +144,5 @@ def criar_limiter() -> Limiter:
     return limiter
 
 
-# instância única de rate-limiter para toda a aplicação
+# single rate-limiter instance for the whole application
 limiter = criar_limiter()

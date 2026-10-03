@@ -4,8 +4,8 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import Cookies from "js-cookie";
 
-// No servidor não existe layout a medir e o React avisa em toda renderização.
-// A escolha é constante por ambiente, então não quebra a ordem dos hooks.
+// On the server there is no layout to measure and React warns on every render.
+// The choice is constant per environment, so it does not break hook order.
 const useEfeitoDeLayout = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 type Theme = "light" | "dark";
@@ -14,7 +14,7 @@ const ThemeContext = createContext<{
   theme: Theme;
   setTheme: (theme: Theme) => void;
 }>({
-  // Dark é o padrão da plataforma (ver o fallback do cookie em app/layout.tsx).
+  // Dark is the platform default (see the cookie fallback in app/layout.tsx).
   theme: "dark",
   setTheme: () => { },
 });
@@ -22,26 +22,27 @@ const ThemeContext = createContext<{
 export const useTheme = () => useContext(ThemeContext);
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  // Placeholder até o useLayoutEffect abaixo ler a classe real do <html> (antes
-  // do paint). Dark por ser o padrão da plataforma — ver app/layout.tsx.
+  // Placeholder until the useLayoutEffect below reads the real class of <html>
+  // (before paint). Dark because it is the platform default — see app/layout.tsx.
   const [theme, setThemeState] = useState<Theme>("dark");
 
-  // O root layout já resolveu o tema pelo cookie no servidor e carimbou a classe
-  // `dark` no <html> — a classe é a resposta, e reler o cookie aqui só duplicaria
-  // a fonte da verdade.
+  // The root layout has already resolved the theme from the cookie on the server
+  // and stamped the `dark` class on <html> — the class is the answer, and
+  // re-reading the cookie here would only duplicate the source of truth.
   //
-  // useLayoutEffect, e não useEffect: quem usa tema escuro via um lampejo de
-  // componentes claros depois da hidratação, porque a correção só chegava depois
-  // do primeiro paint. Aqui ela entra ANTES — o reconcílio continua existindo,
-  // mas ninguém o enxerga. (Eliminá-lo de vez exige o layout passar o tema
-  // resolvido no servidor como prop, o que não dá para fazer só daqui.)
+  // useLayoutEffect, not useEffect: dark-theme users saw a flash of light
+  // components after hydration, because the correction only arrived after the
+  // first paint. Here it comes in BEFORE — the reconciliation still exists, but
+  // nobody sees it. (Eliminating it altogether requires the layout to pass the
+  // theme resolved on the server as a prop, which cannot be done from here
+  // alone.)
   useEfeitoDeLayout(() => {
     const resolvido: Theme = document.documentElement.classList.contains("dark") ? "dark" : "light";
     setThemeState(resolvido);
   }, []);
 
-  // Estável: sem isto, `value` seria um objeto novo a cada render do provider e
-  // todo consumidor de useTheme() reconciliaria por identidade nova.
+  // Stable: without this, `value` would be a new object on every provider render
+  // and every useTheme() consumer would reconcile because of the new identity.
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);
     Cookies.set("theme", newTheme, { expires: 365 });

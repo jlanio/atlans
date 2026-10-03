@@ -44,18 +44,19 @@ from executor import config as agent_config
 
 logger = logging.getLogger("executor.sync")
 
-# Teto do backoff aplicado quando um ciclo inteiro de sync falha.
+# Backoff ceiling applied when a whole sync cycle fails.
 _MAX_CYCLE_BACKOFF = 300
 
-# Teto de transferencias simultaneas do PROCESSO, nao de cada pasta. O motivo do
-# teto e o LINK (em conexao de campo, concorrencia alta piora o tempo total e
-# arrisca estourar o timeout de 300s do PUT/GET) e o link e um so: com um
-# semaforo por manager, tres pastas configuradas viravam 3xSYNC_CONCURRENCY
-# transferencias disputando a mesma banda e as threads que as alimentam.
+# Ceiling on simultaneous transfers for the PROCESS, not for each folder. The
+# reason for the ceiling is the LINK (on a field connection, high concurrency
+# worsens the total time and risks blowing the 300s PUT/GET timeout) and there
+# is only one link: with one semaphore per manager, three configured folders
+# became 3xSYNC_CONCURRENCY transfers competing for the same bandwidth and the
+# threads that feed them.
 #
-# E indexado pelo event loop porque um `asyncio.Semaphore` de modulo se prende
-# ao primeiro loop que o aguarda — o que quebraria qualquer processo (ou teste)
-# que rode mais de um loop na vida.
+# It is keyed by event loop because a module-level `asyncio.Semaphore` binds to
+# the first loop that awaits it — which would break any process (or test) that
+# runs more than one loop in its lifetime.
 _semaforos_de_transferencia: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 
 
@@ -67,15 +68,15 @@ def _semaforo_de_transferencia() -> asyncio.Semaphore:
         _semaforos_de_transferencia[loop] = semaforo
     return semaforo
 
-# Intervalo entre expurgos da lixeira. O ciclo roda a cada `interval` (30s por
-# padrao); varrer a lixeira nesse ritmo seria I/O puro em vao.
+# Interval between trash purges. The cycle runs every `interval` (30s by
+# default); sweeping the trash at that pace would be pure wasted I/O.
 _TRASH_PURGE_INTERVAL = 6 * 3600
 
 
 class SyncManager:
     """
-    Gerencia a sincronizacao de uma pasta local com o Drive do Workspace.
-    Suporta modos: upload, download, bidirectional.
+    Manages the synchronization of a local folder with the Workspace Drive.
+    Supports the modes: upload, download, bidirectional.
     """
 
     def __init__(
@@ -92,7 +93,7 @@ class SyncManager:
         self.workspace_id = workspace_id
         self.interval = interval
 
-        # Cria pasta se nao existir
+        # Creates the folder if it doesn't exist
         self.sync_dir.mkdir(parents=True, exist_ok=True)
 
         # Componentes — autenticacao via mTLS (cert + chave do EXECUTOR_CERT_DIR).
@@ -109,19 +110,19 @@ class SyncManager:
         self.sync_mode = agent_config.SYNC_MODE  # upload | download | bidirectional
 
         self._change_flag = asyncio.Event()
-        self._drive_events = drive_event_queue  # Fila de eventos push do servidor
+        self._drive_events = drive_event_queue  # Queue of push events from the server
         self._drive_task: asyncio.Task | None = None
-        self._syncing = False  # Flag para ignorar eventos do watcher durante sync
+        self._syncing = False  # Flag to ignore watcher events during sync
         self._last_trash_purge = 0.0
-        # Ritmo do ciclo: `_ultimo_ciclo` sustenta o piso entre varreduras
-        # disparadas pelo watcher e `_forcar_ciclo` e o furo do comando da UI.
+        # Cycle pacing: `_ultimo_ciclo` sustains the floor between sweeps
+        # triggered by the watcher and `_forcar_ciclo` is the UI command's bypass.
         self._ultimo_ciclo = 0.0
         self._forcar_ciclo = False
-        # None = ainda nao houve varredura com hash nesta execucao. Nao serve
-        # 0.0 como "nunca": `time.monotonic()` e o uptime da maquina, e num
-        # notebook ligado ha 5 minutos a conta daria "faz pouco tempo".
+        # None = there has been no hashed sweep yet in this execution. 0.0 doesn't
+        # work as "never": `time.monotonic()` is the machine's uptime, and on a
+        # laptop switched on 5 minutes ago the math would say "a short while ago".
         self._ultimo_hash_completo: float | None = None
-        # Scan compartilhado pelos itens de UMA passada da fila de retry.
+        # Scan shared by the items of ONE pass over the retry queue.
         self._scan_da_fila: dict[str, Dataset] | None = None
         try:
             self._loop: asyncio.AbstractEventLoop | None = asyncio.get_running_loop()
@@ -129,15 +130,15 @@ class SyncManager:
             self._loop = None  # construido fora do loop — run() preenche
 
     def sincronizar_agora(self) -> bool:
-        """Acorda o ciclo sem esperar o intervalo. Devolve se conseguiu.
+        """Wakes the cycle without waiting for the interval. Returns whether it succeeded.
 
-        O loop dorme em `_change_flag` com timeout de `interval` — o mesmo
-        mecanismo que o watcher usa para avisar de mudanca local. Um comando
-        vindo da UI e so mais um jeito de bater nessa porta.
+        The loop sleeps on `_change_flag` with an `interval` timeout — the same
+        mechanism the watcher uses to signal a local change. A command coming
+        from the UI is just another way of knocking on that door.
 
-        Diferenca: `_forcar_ciclo` fura o piso de intervalo e a espera por
-        estabilizacao. O piso existe para conter a rajada do watchdog durante
-        uma copia; um clique do usuario e intencao explicita e nao pode esperar.
+        Difference: `_forcar_ciclo` bypasses the interval floor and the wait
+        for stabilization. The floor exists to contain the watchdog burst during
+        a copy; a user click is an explicit intent and cannot wait.
         """
         loop = self._loop
         if loop is None:
@@ -148,22 +149,22 @@ class SyncManager:
             loop.call_soon_threadsafe(self._acordar_forcado)
             return True
         except RuntimeError:
-            return False  # loop ja fechado
+            return False  # loop already closed
 
     def _acordar_forcado(self):
         self._forcar_ciclo = True
         self._change_flag.set()
 
     def _emitir_inventario(self) -> None:
-        """Publica quantos datasets ha, quantos em dia e quantos na fila.
+        """Publishes how many datasets there are, how many are up to date and how many are queued.
 
-        Sai como evento de sync, e nao como leitura direta do manifesto pelo
-        stats: o manifesto e de outro processo logico (a task de sync) e le/grava
-        em disco — consulta-lo a 1 Hz a partir do coletor de metricas colocaria
-        I/O no caminho do snapshot. Emitir ao fim do ciclo custa nada e o dado
-        so muda quando o ciclo roda.
+        Goes out as a sync event, and not as a direct read of the manifest by
+        stats: the manifest belongs to another logical process (the sync task)
+        and reads/writes disk — querying it at 1 Hz from the metrics collector
+        would put I/O on the snapshot's path. Emitting at the end of the cycle
+        costs nothing and the data only changes when the cycle runs.
 
-        Best-effort: um inventario que falhe nao pode derrubar a sincronizacao.
+        Best-effort: a failing inventory must not bring down the sync.
         """
         try:
             datasets = self.manifest.all_datasets()
@@ -183,13 +184,13 @@ class SyncManager:
 
     def _on_change(self):
         """
-        Callback do watcher — sinaliza que houve mudanca (ignorado durante sync).
+        Watcher callback — signals that there was a change (ignored during sync).
 
-        Roda na THREAD do watchdog, nunca no event loop: `asyncio.Event.set()`
-        agenda os callbacks dos waiters com `loop.call_soon`, que nao e
-        thread-safe (mexe na fila de prontos sem acordar o selector). Marshalamos
-        com `call_soon_threadsafe`; sem loop (uso sincrono em teste) setamos
-        direto.
+        Runs on the watchdog's THREAD, never on the event loop:
+        `asyncio.Event.set()` schedules the waiters' callbacks with
+        `loop.call_soon`, which is not thread-safe (it touches the ready queue
+        without waking the selector). We marshal with `call_soon_threadsafe`;
+        with no loop (synchronous use in tests) we set it directly.
         """
         if self._syncing:
             return
@@ -200,22 +201,22 @@ class SyncManager:
         try:
             loop.call_soon_threadsafe(self._change_flag.set)
         except RuntimeError:
-            pass  # loop ja fechado (shutdown) — nao ha ciclo para acordar
+            pass  # loop already closed (shutdown) — there is no cycle to wake
 
-    # ── Fan-out de drive events ──────────────────────────────────────────────
+    # ── Drive event fan-out ──────────────────────────────────────────────────
 
     def claims_event(self, msg: dict) -> bool:
         """
-        Diz se ESTE manager e o dono de um drive_event.
+        Says whether THIS manager owns a drive_event.
 
-        Com varias pastas de sync, o main.py entrega cada evento push a um
-        manager so. Este predicado e a peca que decide qual: True quando o
-        arquivo do evento ja e conhecido por esta pasta (mesmo id remoto, mesmo
-        objeto remoto, mesmo nome de arquivo local, ou mesmo nome de dataset).
+        With several sync folders, main.py delivers each push event to a single
+        manager. This predicate is the piece that decides which one: True when
+        the event's file is already known to this folder (same remote id, same
+        remote object, same local file name, or same dataset name).
 
-        Contrato: sincrono, barato (tres lookups O(1) nos indices do manifesto)
-        e NUNCA levanta — na duvida devolve False e o fan-out entrega ao
-        primario.
+        Contract: synchronous, cheap (three O(1) lookups in the manifest's
+        indexes) and NEVER raises — when in doubt it returns False and the
+        fan-out delivers to the primary.
         """
         try:
             file_info = msg.get("file") or {}
@@ -228,33 +229,33 @@ class SyncManager:
                 return True
 
             if original_name:
-                # Nome ainda nao sincronizado mas que casa com um dataset desta
-                # pasta (ex: 'parcelas.geojson' e o dataset 'parcelas').
+                # Name not yet synced but that matches a dataset in this
+                # folder (e.g. 'parcelas.geojson' and the dataset 'parcelas').
                 stem = original_name.rsplit(".", 1)[0].lower()
                 if stem in self.manifest.all_datasets():
                     return True
             return False
-        except Exception:  # noqa: BLE001 — predicado de roteamento nunca pode quebrar o fan-out
+        except Exception:  # noqa: BLE001 — a routing predicate must never break the fan-out
             return False
 
     def _find_dataset(self, id_hash: str = "", original_name: str = "") -> str | None:
-        """Delega aos indices invertidos do manifesto (ver SyncManifest.find)."""
+        """Delegates to the manifest's inverted indexes (see SyncManifest.find)."""
         return self.manifest.find(id_hash, original_name)
 
     async def run(self):
-        """Loop principal de sync."""
+        """Main sync loop."""
         logger.info("GeoSync iniciado: pasta='%s' workspace='%s' modo='%s' intervalo=%ds",
                     self.sync_dir, self.workspace_id, self.sync_mode, self.interval)
 
-        # O watcher entrega eventos de outra thread — `_on_change` precisa saber
-        # para qual loop marshalar.
+        # The watcher delivers events from another thread — `_on_change` needs to know
+        # which loop to marshal to.
         self._loop = asyncio.get_running_loop()
         self.watcher.start()
 
         try:
-            # Reconciliacao inicial (unica chamada a list_remote). Uma falha aqui
-            # (Drive fora do ar, disco com arquivo em transito) nao pode impedir
-            # o loop periodico de comecar.
+            # Initial reconciliation (the only call to list_remote). A failure here
+            # (Drive down, disk with a file in transit) must not prevent the
+            # periodic loop from starting.
             try:
                 await self._full_sync()
             except asyncio.CancelledError:
@@ -263,22 +264,22 @@ class SyncManager:
                 logger.error("Reconciliacao inicial de '%s' falhou — seguindo para o loop periodico.",
                              self.sync_dir, exc_info=True)
 
-            # Task dedicada para drive events (roda em paralelo com o loop).
-            # Guardamos a referencia: sem isso o GC pode coletar a task.
+            # Dedicated task for drive events (runs in parallel with the loop).
+            # We keep the reference: without it the GC may collect the task.
             if self._drive_events:
                 self._drive_task = asyncio.create_task(self._drive_event_loop(), name="drive-event-loop")
 
-            # Um ciclo que morre por excecao matava a sincronizacao da pasta em
-            # silencio ate o processo reiniciar — bastava um FileNotFoundError de
-            # temporario do QGIS. O ciclo agora e isolado e o erro fica visivel.
+            # A cycle dying from an exception silently killed the folder's sync
+            # until the process restarted — a FileNotFoundError from a QGIS temp
+            # file was enough. The cycle is now isolated and the error is visible.
             consecutive_errors = 0
             while True:
                 try:
                     await self._maybe_purge_trash()
 
-                    # Processa fila pendente (retry). O scan e compartilhado por
-                    # todos os itens da passada: antes cada item `upload`
-                    # escaneava a pasta INTEIRA para achar um dataset so.
+                    # Processes the pending queue (retry). The scan is shared by
+                    # all the items in the pass: before, each `upload` item
+                    # scanned the ENTIRE folder to find a single dataset.
                     self._scan_da_fila = None
                     try:
                         await self.queue.process_pending()
@@ -286,11 +287,11 @@ class SyncManager:
                         self._scan_da_fila = None
                     await self.manifest.flush()
 
-                    # Antes de dormir: o estado do manifesto agora e o que a UI
-                    # deve mostrar ate o proximo ciclo.
+                    # Before sleeping: the manifest state is now what the UI
+                    # should show until the next cycle.
                     self._emitir_inventario()
 
-                    # Aguarda mudanca local ou timeout
+                    # Waits for a local change or timeout
                     acordou_por_evento = False
                     try:
                         await asyncio.wait_for(self._change_flag.wait(), timeout=self.interval)
@@ -328,11 +329,12 @@ class SyncManager:
             await self._fechar_clientes()
 
     async def _fechar_clientes(self):
-        """Fecha os clientes httpx de longa duracao.
+        """Closes the long-lived httpx clients.
 
-        Eles vivem enquanto o manager vive (keep-alive e o ponto). Sem
-        fechamento explicito no encerramento, os sockets vazam ate o processo
-        morrer — e no desktop o executor e religado sem reiniciar o Electron.
+        They live as long as the manager lives (keep-alive is the point).
+        Without an explicit close at shutdown, the sockets leak until the
+        process dies — and on desktop the executor is restarted without
+        restarting Electron.
         """
         for componente in (self.uploader, self.downloader, self.trigger):
             fechar = getattr(componente, "aclose", None)
@@ -346,21 +348,21 @@ class SyncManager:
 
     async def _esperar_pasta_estabilizar(self):
         """
-        Segura o ciclo ate a pasta parar de mudar.
+        Holds the cycle until the folder stops changing.
 
-        Sem isto, copiar um arquivo grande para dentro da pasta fazia o executor
-        varrer+hashear tudo a cada ~2 segundos, em ciclos encostados um no
-        outro: a copia disputava I/O com a varredura e a maquina travava. Duas
-        barreiras, ambas so para ciclos acordados pelo WATCHER:
+        Without this, copying a large file into the folder made the executor
+        scan+hash everything every ~2 seconds, in back-to-back cycles: the copy
+        competed for I/O with the scan and the machine froze. Two barriers,
+        both only for cycles woken by the WATCHER:
 
-          * piso de `SYNC_MIN_CYCLE` entre o fim de um ciclo e o inicio do
-            proximo;
-          * debounce de CICLO (nao de caminho): so libera quando nao chegar
-            evento novo por `SYNC_QUIET_PERIOD`, com teto de
-            `SYNC_MAX_QUIET_WAIT` para uma copia de horas nao adiar o sync para
-            sempre.
+          * a floor of `SYNC_MIN_CYCLE` between the end of one cycle and the
+            start of the next;
+          * CYCLE debounce (not per path): only releases when no new event has
+            arrived for `SYNC_QUIET_PERIOD`, with a ceiling of
+            `SYNC_MAX_QUIET_WAIT` so an hours-long copy doesn't postpone the
+            sync forever.
 
-        `sincronizar_agora()` fura as duas — e comando do usuario.
+        `sincronizar_agora()` bypasses both — it is a user command.
         """
         loop = asyncio.get_running_loop()
         limite = loop.time() + SYNC_MAX_QUIET_WAIT
@@ -378,18 +380,18 @@ class SyncManager:
                 await asyncio.wait_for(self._change_flag.wait(), timeout=espera)
             except asyncio.TimeoutError:
                 if loop.time() >= piso:
-                    return  # piso cumprido e nenhum evento novo na janela
+                    return  # floor met and no new event in the window
 
     async def _maybe_purge_trash(self):
         """
-        Expurga descartes antigos da lixeira, no maximo uma vez a cada 6h.
+        Purges old discards from the trash, at most once every 6h.
 
-        A lixeira mora dentro do sync_dir (para o move ser um rename no mesmo
-        volume) e por isso consome a cota do notebook de campo, sem nada que a
-        mostre ao tecnico: pasta com ponto, ignorada por scanner e watcher. Numa
-        pasta bidirectional com rotatividade normal — raster diario substituido
-        no Drive — sao dezenas de GB em algumas semanas, e o unico sintoma seria
-        o manifesto parando de salvar.
+        The trash lives inside sync_dir (so the move is a rename on the same
+        volume) and therefore eats into the field laptop's quota, with nothing
+        showing it to the technician: a dot folder, ignored by scanner and
+        watcher. In a bidirectional folder with normal turnover — a daily
+        raster replaced in Drive — that's tens of GB in a few weeks, and the
+        only symptom would be the manifest no longer saving.
         """
         agora = time.monotonic()
         if self._last_trash_purge and agora - self._last_trash_purge < _TRASH_PURGE_INTERVAL:
@@ -407,7 +409,7 @@ class SyncManager:
                              error=f"Lixeira do sync ocupando {_format_size(restantes)}")
 
     async def _drive_event_loop(self):
-        """Loop dedicado para processar drive events push do servidor."""
+        """Dedicated loop to process push drive events from the server."""
         logger.info("Drive event loop iniciado.")
         while True:
             try:
@@ -432,12 +434,12 @@ class SyncManager:
             logger.warning("drive_event sem id_hash ou original_name — ignorado.")
             return
 
-        # Gate de MODO antes de QUALQUER acao. O gate vivia dentro do branch de
-        # file_created/file_updated, entao 'file_deleted' rodava tambem em
-        # SYNC_MODE=upload (o padrao): um admin limpando arquivos antigos no
-        # Drive disparava unlink() nos originais no disco do tecnico, incluindo
-        # todos os componentes .shp/.dbf/.shx/.prj. O caminho por polling sempre
-        # respeitou o modo — a divergencia era o bug.
+        # MODE gate before ANY action. The gate lived inside the
+        # file_created/file_updated branch, so 'file_deleted' also ran in
+        # SYNC_MODE=upload (the default): an admin cleaning up old files in
+        # Drive triggered unlink() on the originals on the technician's disk,
+        # including all the .shp/.dbf/.shx/.prj components. The polling path
+        # always respected the mode — the divergence was the bug.
         if self.sync_mode not in ("download", "bidirectional"):
             logger.debug("drive_event '%s' ignorado: SYNC_MODE=%s nao consome mudancas do Drive.",
                          action, self.sync_mode)
@@ -446,14 +448,14 @@ class SyncManager:
         self._syncing = True
         try:
             if action == "file_deleted":
-                # Casa SO por id remoto: descartar arquivo local por semelhanca
-                # de nome seria destrutivo demais para um evento push.
+                # Matches ONLY by remote id: discarding a local file by name
+                # similarity would be too destructive for a push event.
                 ds_name = self._find_dataset(id_hash=id_hash)
                 if ds_name:
                     self._discard_dataset(ds_name, "push: deletado no Drive")
 
             elif action in ("file_created", "file_updated"):
-                # Ignora extensões não reconhecidas pelo scanner
+                # Ignores extensions not recognized by the scanner
                 if Path(original_name).suffix.lower() not in SUPPORTED_EXTENSIONS:
                     logger.debug("Push event '%s' ignorado (extensão não suportada).", original_name)
                     return
@@ -462,28 +464,28 @@ class SyncManager:
                 if not self.sync_config.should_download(original_name, id_hash):
                     return
 
-                # Reaproveita a chave do dataset ja conhecido — derivar uma chave
-                # nova a cada push duplicava a entrada no manifesto.
+                # Reuses the key of the already-known dataset — deriving a new key
+                # on every push duplicated the entry in the manifest.
                 ds_key = self._find_dataset(id_hash, original_name)
                 ds_info = (self.manifest.get_dataset(ds_key) or {}) if ds_key else {}
 
-                # Mesmo guard do caminho por polling: o push consome mudancas do
-                # Drive exatamente como ele, e nao pode gravar um dataset de
-                # arquivo unico por cima de uma entrada multi-arquivo.
+                # Same guard as the polling path: push consumes Drive changes
+                # exactly like it does, and must not write a single-file
+                # dataset over a multi-file entry.
                 if ds_key and self._bundle_blocks_download(ds_key, ds_info, id_hash,
                                                            original_name, content_md5):
                     return
 
-                # Baixa o arquivo — destino sempre contido no sync_dir.
+                # Downloads the file — destination always contained in sync_dir.
                 dest = safe_join_or_none(self.sync_dir, original_name, context="push download")
                 if dest is None:
                     self.events.emit("sync_error", dataset=original_name,
                                      error="Nome de arquivo rejeitado por seguranca")
                     return
 
-                # Conflito: o push herdava so metade do contrato do polling —
-                # gravava por cima da edicao de campo sem emitir conflict_detected
-                # e sem respeitar SYNC_CONFLICT_STRATEGY.
+                # Conflict: push inherited only half of polling's contract —
+                # it wrote over the field edit without emitting conflict_detected
+                # and without respecting SYNC_CONFLICT_STRATEGY.
                 if ds_key and self.sync_mode == "bidirectional":
                     locais = [
                         p for p in (
@@ -506,8 +508,8 @@ class SyncManager:
                     ds_key = ds_key or _new_remote_ds_key(original_name, self.manifest.all_datasets())
                     ext = original_name.rsplit(".", 1)[-1].lower() if "." in original_name else ""
 
-                    # size/mtime do arquivo NO DISCO: sao eles que o atalho do
-                    # `diff` compara no proximo ciclo.
+                    # size/mtime of the file ON DISK: those are what the `diff`
+                    # shortcut compares on the next cycle.
                     from executor.sync.scanner import entrada_de_manifesto
                     self.manifest.set_dataset(ds_key, {
                         "type": ext,
@@ -525,27 +527,28 @@ class SyncManager:
                     self.events.emit("sync_error", dataset=original_name, error="Download falhou")
         finally:
             await self.manifest.flush()
-            # Ordem importa: limpar o flag ANTES de reabrir `_syncing`. Ao
-            # contrario, um evento de arquivo que chegasse nessa fresta era
-            # apagado pelo clear() e a mudanca so seria vista 30s depois.
+            # Order matters: clear the flag BEFORE reopening `_syncing`. The
+            # other way around, a file event arriving in that gap was wiped by
+            # clear() and the change would only be seen 30s later.
             self._change_flag.clear()
             self._syncing = False
 
     def _discard_dataset(self, ds_name: str, reason: str) -> bool:
         """
-        Descarta um dataset local por ordem do Drive — para a lixeira, nao unlink
-        — e SO entao remove a entrada do manifesto. Devolve True se concluiu.
+        Discards a local dataset on Drive's orders — to the trash, not unlink
+        — and ONLY then removes the manifest entry. Returns True if it completed.
 
-        Nao existe lixeira do SO nesse caminho nem re-download de recuperacao: um
-        engano do lado do servidor apagaria trabalho de campo irreversivelmente.
+        There is no OS trash on this path and no recovery re-download: a
+        mistake on the server side would erase field work irreversibly.
 
-        A entrada do manifesto so cai quando TODOS os arquivos sairam do disco.
-        Removendo-a mesmo com o move falhando (QGIS com o .geojson aberto: no
-        Windows o handle sem FILE_SHARE_DELETE faz o rename levantar
-        PermissionError), o arquivo ficava no disco sem manifesto — e o
-        _local_to_remote seguinte o via como dataset NOVO e o re-enviava ao
-        Drive, disparando ate o trigger de ingestao. O admin apagava de novo e o
-        ciclo se repetia. Falhou: mantem a entrada e reenfileira o descarte.
+        The manifest entry is only dropped when ALL the files have left the
+        disk. Removing it even when the move failed (QGIS with the .geojson
+        open: on Windows a handle without FILE_SHARE_DELETE makes the rename
+        raise PermissionError), the file stayed on disk without a manifest
+        entry — and the following _local_to_remote saw it as a NEW dataset and
+        re-sent it to Drive, even firing the ingestion trigger. The admin
+        deleted it again and the cycle repeated. On failure: keeps the entry
+        and re-enqueues the discard.
         """
         ds_info = self.manifest.get_dataset(ds_name) or {}
         alvos: list[Path] = []
@@ -559,8 +562,8 @@ class SyncManager:
             logger.warning("Dataset '%s' mantido no manifesto: %d de %d arquivo(s) nao foram "
                            "para a lixeira (%s).", ds_name, len(falhos), len(alvos), reason)
             self.manifest.mark_pending(ds_name, "discard")
-            # `enqueue` e idempotente por (action, dataset): reenfileirar o mesmo
-            # descarte a cada tentativa nao duplica o item nem zera o backoff.
+            # `enqueue` is idempotent per (action, dataset): re-enqueuing the same
+            # discard on every attempt neither duplicates the item nor resets the backoff.
             self.manifest.enqueue("discard", ds_name)
             self.events.emit("sync_error", dataset=ds_name,
                              error="Arquivo em uso — descarte local adiado")
@@ -576,28 +579,29 @@ class SyncManager:
     def _bundle_blocks_download(self, ds_name: str, ds_info: dict, remote_id: str,
                                 remote_name: str, remote_md5: str | None) -> bool:
         """
-        Protege uma entrada MULTI-ARQUIVO do manifesto de um download de arquivo
-        unico. True = nao baixe (o caso ja foi tratado ou recusado aqui).
+        Protects a MULTI-FILE manifest entry from a single-file download.
+        True = don't download (the case has already been handled or refused
+        here).
 
-        Um shapefile vive no Drive como um unico '<dataset>.zip' que NOS
-        enviamos, enquanto o manifesto guarda os componentes .shp/.dbf/.shx.
-        Gravar qualquer download nessa chave troca 'files' por um dataset de
-        arquivo unico — e o estrago nao para no manifesto: o diff() do ciclo
-        seguinte acusa o bundle como modificado, re-envia com id novo e manda
-        deletar o id que ficou na entrada, que pode ser o objeto de OUTRO usuario
-        do workspace. Dois casos, mesma resposta:
+        A shapefile lives in Drive as a single '<dataset>.zip' that WE upload,
+        while the manifest keeps the .shp/.dbf/.shx components. Writing any
+        download to that key replaces 'files' with a single-file dataset — and
+        the damage doesn't stop at the manifest: the next cycle's diff() flags
+        the bundle as modified, re-uploads it with a new id and asks to delete
+        the id that was left in the entry, which may be ANOTHER workspace
+        user's object. Two cases, same answer:
 
-          * mesmo id remoto → e o nosso proprio bundle voltando; nada a baixar,
-            so realinhamos o MD5 remoto (o hash do zip nunca bate com o hash
-            combinado dos componentes, entao a comparacao normal mandaria
-            baixa-lo por cima para sempre);
-          * id diferente → objeto alheio que apenas COLIDE de nome, seja com o
-            '<ds>.zip' derivado, seja com o nome de um componente. Nao ha destino
-            seguro: o scanner agrupa tudo pelo stem, o arquivo ficaria orfao no
-            disco e voltaria a ser baixado todo ciclo. Recusamos e avisamos o
-            painel — adotar o id alheio (o que o codigo fazia) deixava a nossa
-            copia real orfa no Drive e apontava o dataset para conteudo de
-            terceiro.
+          * same remote id → it's our own bundle coming back; nothing to
+            download, we just realign the remote MD5 (the zip's hash never
+            matches the combined hash of the components, so the normal
+            comparison would have it downloaded over them forever);
+          * different id → someone else's object that merely COLLIDES by name,
+            either with the derived '<ds>.zip' or with a component's name.
+            There is no safe destination: the scanner groups everything by
+            stem, the file would be orphaned on disk and downloaded again every
+            cycle. We refuse and notify the dashboard — adopting the other id
+            (what the code used to do) left our real copy orphaned in Drive and
+            pointed the dataset at a third party's content.
         """
         if ds_info.get("type") != "shapefile" and len(ds_info.get("files") or {}) <= 1:
             return False
@@ -618,12 +622,13 @@ class SyncManager:
         return True
 
     def _emit_downloaded(self, dataset: str, dest: Path) -> None:
-        """Emite `file_downloaded` com o tamanho do arquivo que acabou de chegar.
+        """Emits `file_downloaded` with the size of the file that just arrived.
 
-        O downloader escreve em streaming e nao contabiliza nada; medir o
-        arquivo pronto e mais simples que somar chunks no hot loop, e da o
-        mesmo numero. Best-effort: um `stat` que falhe nao pode impedir o
-        evento, que e o que a UI usa para saber que o download terminou.
+        The downloader writes in streaming and doesn't tally anything;
+        measuring the finished file is simpler than summing chunks in the hot
+        loop, and gives the same number. Best-effort: a failing `stat` must not
+        prevent the event, which is what the UI uses to know the download
+        finished.
         """
         try:
             total = dest.stat().st_size
@@ -634,13 +639,14 @@ class SyncManager:
     def _resolve_conflict(self, ds_name: str, ds_info: dict, local_md5_now: str,
                           local_paths: list[Path]) -> bool:
         """
-        Politica de conflito quando o objeto remoto E os arquivos locais mudaram
-        desde o ultimo sync. Devolve True se o download pode prosseguir.
+        Conflict policy when the remote object AND the local files have changed
+        since the last sync. Returns True if the download may proceed.
 
-        Vive fora dos dois caminhos que consomem o Drive (polling e push) de
-        proposito: o push ia direto de `should_download` para `download` e
-        gravava por cima da edicao de campo — sem `conflict_detected` no painel e
-        sem o backup `_local_<timestamp>` que keep-both promete.
+        Lives outside the two paths that consume Drive (polling and push) on
+        purpose: push went straight from `should_download` to `download` and
+        wrote over the field edit — with no `conflict_detected` on the
+        dashboard and without the `_local_<timestamp>` backup that keep-both
+        promises.
         """
         saved_local_md5 = ds_info.get("local_md5") or ""
         if not saved_local_md5 or local_md5_now == saved_local_md5:
@@ -660,8 +666,8 @@ class SyncManager:
                 try:
                     path.rename(backup)
                 except OSError as exc:
-                    # Sem backup nao existe "keep both": abortar o download e o
-                    # unico desfecho que nao perde a versao local.
+                    # Without a backup there is no "keep both": aborting the download is
+                    # the only outcome that doesn't lose the local version.
                     logger.error("Backup de '%s' falhou (%s) — download de '%s' abortado.",
                                  path.name, exc, ds_name)
                     self.events.emit("sync_error", dataset=ds_name, error="Backup local falhou")
@@ -679,8 +685,8 @@ class SyncManager:
             await self.manifest.flush()
             self._change_flag.clear()
             self._syncing = False
-            # Marca o fim do ciclo DEPOIS do trabalho: o piso conta a partir
-            # daqui, senao uma varredura de 2 minutos ja nasceria vencida.
+            # Marks the end of the cycle AFTER the work: the floor counts from
+            # here, otherwise a 2-minute sweep would already be born expired.
             self._ultimo_ciclo = asyncio.get_running_loop().time()
 
     async def _full_sync(self):
@@ -689,10 +695,10 @@ class SyncManager:
         try:
             self.events.emit("sync_started")
 
-            # ── 1. Upload local → remoto ─────────────────────────────────────
-            # `catalog` entra aqui: registra o dataset no servidor. NAO entra
-            # no bloco de download — nao ha objeto remoto para baixar, e o
-            # arquivo de origem ja esta nesta maquina.
+            # ── 1. Upload local → remote ─────────────────────────────────────
+            # `catalog` goes here: it registers the dataset on the server. It
+            # does NOT go in the download block — there is no remote object to
+            # download, and the source file is already on this machine.
             if self.sync_mode in ("upload", "bidirectional", "catalog"):
                 await self._local_to_remote()
 
@@ -709,19 +715,19 @@ class SyncManager:
             self._syncing = False
 
     async def _em_paralelo(self, corrotinas: list, contexto: str):
-        """Roda as transferencias com teto de concorrencia, sem derrubar o lote.
+        """Runs the transfers with a concurrency ceiling, without killing the batch.
 
-        O teto e baixo (SYNC_CONCURRENCY) de proposito: em link de campo,
-        concorrencia alta piora o tempo total e arrisca estourar o timeout de
-        300s da transferencia. `return_exceptions=True` porque um dataset que
-        falha nao pode cancelar os outros — cada `_upload_dataset` ja cuida do
-        proprio enfileiramento para retry.
+        The ceiling is low (SYNC_CONCURRENCY) on purpose: on a field link, high
+        concurrency worsens the total time and risks blowing the transfer's
+        300s timeout. `return_exceptions=True` because a failing dataset must
+        not cancel the others — each `_upload_dataset` already takes care of
+        its own enqueuing for retry.
         """
         if not corrotinas:
             return
-        # Semaforo do PROCESSO (ver `_semaforo_de_transferencia`): o teto vale
-        # para o link, que todas as pastas compartilham. Obtido aqui, e nao no
-        # __init__, porque o manager e construido antes do event loop existir.
+        # PROCESS semaphore (see `_semaforo_de_transferencia`): the ceiling applies
+        # to the link, which all folders share. Obtained here, and not in
+        # __init__, because the manager is built before the event loop exists.
         semaforo = _semaforo_de_transferencia()
 
         async def _limitada(coro):
@@ -739,54 +745,55 @@ class SyncManager:
 
     async def _local_to_remote(self):
         """Detecta mudancas locais e faz upload para o Drive."""
-        # scan() e I/O sincrono pesado (stat de tudo): fora do event loop.
-        # O executor usa ping_interval=None, entao o heartbeat aplicativo de 30s
-        # e o UNICO keepalive — bloquear o loop derruba a conexao (close 4408) e
-        # mata o run em andamento.
+        # scan() is heavy synchronous I/O (stat of everything): off the event loop.
+        # The executor uses ping_interval=None, so the 30s application heartbeat
+        # is the ONLY keepalive — blocking the loop drops the connection (close
+        # 4408) and kills the run in progress.
         current_datasets = await em_thread(self.scanner.scan)
         manifest_datasets = self.manifest.all_datasets()
 
-        # Rede de seguranca do atalho (size, mtime): de tempos em tempos o diff
-        # rehasheia tudo, para pegar a reescrita rara que preserva o mtime.
+        # Safety net for the (size, mtime) shortcut: every so often the diff
+        # rehashes everything, to catch the rare rewrite that preserves mtime.
         agora = time.monotonic()
         hash_completo = (self._ultimo_hash_completo is None
                          or (agora - self._ultimo_hash_completo) >= SYNC_FULL_HASH_INTERVAL)
 
-        # diff() tambem vai para a thread: e ele que dispara `file_hashes()` e,
-        # com ele, o MD5 dos arquivos candidatos (o scan so faz stat).
+        # diff() also goes to the thread: it is what triggers `file_hashes()` and,
+        # with it, the MD5 of the candidate files (the scan only does stat).
         new_ds, modified_ds, removed_ds = await em_thread(
             self.scanner.diff, current_datasets, manifest_datasets, hash_completo
         )
 
-        # O marcador so e carimbado DEPOIS do diff concluir. Marcado antes, ele
-        # era consumido por uma passada que talvez nunca acontecesse: o diff com
-        # force_hash abre TODOS os arquivos da pasta e qualquer OSError levava o
-        # ciclo inteiro para o backoff do `run()` — mas a rede de seguranca ja
-        # constava como cumprida e so voltaria 1h depois (no boot, nunca). Um
-        # arquivo reescrito com (size, mtime) preservados ficava horas sem subir.
+        # The marker is only stamped AFTER the diff completes. Stamped before, it
+        # was consumed by a pass that might never happen: the diff with
+        # force_hash opens ALL the files in the folder and any OSError sent the
+        # whole cycle into `run()`'s backoff — but the safety net was already
+        # recorded as done and would only come back 1h later (at boot, never).
+        # A file rewritten with (size, mtime) preserved went hours without upload.
         if hash_completo:
             self._ultimo_hash_completo = agora
 
-        # Novos datasets — so faz upload se nao veio do remoto.
-        # A lista guarda (nome, dataset) e nao corrotinas: ainda ha um `await`
-        # ate o gather, e uma corrotina criada e nunca aguardada vira warning.
+        # New datasets — only uploads if it didn't come from remote.
+        # The list holds (name, dataset) and not coroutines: there is still an
+        # `await` before the gather, and a coroutine created and never awaited
+        # becomes a warning.
         a_enviar: list[tuple[str, Dataset]] = []
         for name in new_ds:
             old = manifest_datasets.get(name, {})
             if old.get("sync_direction") == "remote":
-                continue  # Acabou de ser baixado do Drive, nao re-uplodar
+                continue  # Was just downloaded from Drive, don't re-upload
             a_enviar.append((name, current_datasets[name]))
 
-        # Modificados — ignora se veio do remoto e nao foi editado localmente
+        # Modified — ignores it if it came from remote and wasn't edited locally
         for name in modified_ds:
             ds = current_datasets[name]
             old = manifest_datasets.get(name, {})
 
             if old.get("sync_direction") == "remote":
-                # Calcula MD5 atual do arquivo local. Le o disco de novo, entao
-                # tem a mesma janela do diff: se o arquivo sumiu ou esta travado
-                # agora, deixa para o proximo ciclo em vez de derrubar o ciclo
-                # inteiro (o `run()` cairia no backoff e a pasta pararia).
+                # Computes the local file's current MD5. It reads the disk again, so
+                # it has the same window as the diff: if the file vanished or is
+                # locked now, leave it for the next cycle instead of killing the
+                # whole cycle (`run()` would fall into backoff and the folder would stop).
                 try:
                     local_md5 = await em_thread(_dataset_md5, ds)
                 except OSError as exc:
@@ -795,16 +802,15 @@ class SyncManager:
                     continue
                 saved_md5 = old.get("local_md5", "")
                 if local_md5 == saved_md5:
-                    continue  # Nao mudou desde o download — nao re-uplodar
+                    continue  # Unchanged since the download — don't re-upload
 
-            # O DELETE da copia antiga acontece DENTRO de _upload_dataset: e o
-            # unico ponto por onde passam tanto o upload direto quanto o retry
-            # da fila.
+            # The DELETE of the old copy happens INSIDE _upload_dataset: it is the
+            # only point both the direct upload and the queue retry go through.
             a_enviar.append((name, ds))
 
-        # Os uploads sao I/O independente entre si: em serie, a primeira
-        # sincronizacao de 200 arquivos pequenos passava o tempo todo esperando
-        # round-trip com o link ocioso.
+        # Uploads are mutually independent I/O: serially, the first sync of
+        # 200 small files spent the whole time waiting on round-trips with
+        # the link idle.
         await self._em_paralelo(
             [self._upload_dataset(nome, dataset) for nome, dataset in a_enviar], "upload")
 
@@ -812,11 +818,11 @@ class SyncManager:
         for name in removed_ds:
             old = manifest_datasets.get(name, {})
 
-            # Arquivo que veio do remoto — re-baixar (servidor e fonte de verdade)
+            # File that came from remote — re-download (the server is the source of truth)
             if old.get("sync_direction") == "remote" and self.sync_mode in ("download", "bidirectional"):
                 rid = old.get("remote_id_hash")
                 if rid:
-                    # Reconstroi nome do arquivo a partir do manifest
+                    # Rebuilds the file name from the manifest
                     fnames = list(old.get("files", {}).keys())
                     fname = fnames[0] if fnames else f"{name}.{old.get('type', 'bin')}"
                     dest = safe_join_or_none(self.sync_dir, fname, context="re-download")
@@ -852,24 +858,24 @@ class SyncManager:
         """Detecta mudancas no Drive e baixa/remove localmente."""
         all_remote = await self.downloader.list_remote()
         if all_remote is None:
-            return  # Erro de conexao — nao tomar decisoes de delecao
+            return  # Connection error — don't make deletion decisions
 
-        # all_remote pode ser [] se Drive vazio — ainda precisamos detectar delecoes
+        # all_remote may be [] if Drive is empty — we still need to detect deletions
 
         manifest_datasets = self.manifest.all_datasets()
 
-        # A correspondencia manifesto ↔ objeto remoto sai dos indices invertidos
-        # do proprio manifesto (id remoto → nome do objeto remoto → nome de
-        # arquivo local). Reconstrui-los aqui a cada ciclo era O(datasets) em vao
-        # — e o casamento por 'remote_name', que impede o '<dataset>.zip' de um
-        # shapefile de ser confundido com arquivo novo, e o mesmo dos dois lados.
+        # The manifest ↔ remote object mapping comes from the manifest's own
+        # inverted indexes (remote id → remote object name → local file name).
+        # Rebuilding them here every cycle was O(datasets) for nothing — and
+        # the 'remote_name' match, which keeps a shapefile's '<dataset>.zip'
+        # from being mistaken for a new file, is the same on both sides.
         conhecido = self.manifest.find_by_remote_id
 
-        # Deduplica por original_name: mantém apenas o mais recente (lista ja vem
-        # ordenada por created_at desc do endpoint) — EXCETO quando um dos
-        # homonimos e justamente o objeto que o manifesto ja referencia. Um
-        # 'parcelas.zip' alheio, mais novo, descartava da iteracao a nossa
-        # propria copia e o dataset acabava reapontado para o arquivo do outro.
+        # Deduplicates by original_name: keeps only the most recent (the list already
+        # comes sorted by created_at desc from the endpoint) — EXCEPT when one of
+        # the namesakes is precisely the object the manifest already references.
+        # Someone else's newer 'parcelas.zip' dropped our own copy from the
+        # iteration and the dataset ended up repointed at the other's file.
         latest_by_name: dict[str, object] = {}
         for rf in all_remote:
             anterior = latest_by_name.get(rf.original_name)
@@ -878,19 +884,19 @@ class SyncManager:
                 latest_by_name[rf.original_name] = rf
 
         remote_files = list(latest_by_name.values())
-        # Set de TODOS os IDs remotos (para deteccao de delecao, inclui duplicados)
+        # Set of ALL remote IDs (for deletion detection, includes duplicates)
         all_remote_ids = {rf.id_hash for rf in all_remote}
 
-        # UM unico scan para todo o laco. Antes, scanner.scan() era chamado
-        # DENTRO do laco por-arquivo-remoto: O(n x bytes) de leitura sincrona
-        # dentro da corrotina, suficiente para estourar o heartbeat de 30s.
+        # A SINGLE scan for the whole loop. Before, scanner.scan() was called
+        # INSIDE the per-remote-file loop: O(n x bytes) of synchronous reading
+        # inside the coroutine, enough to blow the 30s heartbeat.
         local_datasets: dict[str, Dataset] = {}
         if self.sync_mode == "bidirectional":
             local_datasets = await em_thread(self.scanner.scan)
 
         pendentes = []
         for rf in remote_files:
-            # Ignora extensões não reconhecidas pelo scanner (evita loop de re-download)
+            # Ignores extensions not recognized by the scanner (avoids a re-download loop)
             if Path(rf.original_name).suffix.lower() not in SUPPORTED_EXTENSIONS:
                 logger.debug("Arquivo remoto '%s' ignorado (extensão não suportada).", rf.original_name)
                 continue
@@ -901,37 +907,37 @@ class SyncManager:
 
             pendentes.append(self._sincronizar_remoto(rf, manifest_datasets, local_datasets))
 
-        # Downloads tambem sao I/O independente: em serie, entrar num workspace
-        # novo mostrava um `file_downloading` de cada vez com o link ocioso.
+        # Downloads are also independent I/O: serially, entering a new workspace
+        # showed one `file_downloading` at a time with the link idle.
         await self._em_paralelo(pendentes, "download")
 
-        # ── Detecta delecoes remotas ─────────────────────────────────────────
-        # Se o remote_id_hash do manifest nao existe mais no Drive, remove localmente.
-        # No modo bidirectional: remove independente de quem criou (servidor e fonte de verdade).
-        # No modo download: idem.
+        # ── Detects remote deletions ─────────────────────────────────────────
+        # If the manifest's remote_id_hash no longer exists in Drive, removes it locally.
+        # In bidirectional mode: removes regardless of who created it (the server is the source of truth).
+        # In download mode: same.
         for ds_name, ds_info in list(manifest_datasets.items()):
             rid = ds_info.get("remote_id_hash")
             if not rid:
-                continue  # Nunca foi sincronizado com o remoto
+                continue  # Was never synced with remote
             if rid not in all_remote_ids:
                 self._discard_dataset(ds_name, "deletado no Drive")
 
     async def _sincronizar_remoto(self, rf, manifest_datasets: dict,
                                   local_datasets: dict[str, Dataset]):
-        """Decide e executa o que fazer com UM objeto do Drive.
+        """Decides and does what to do with ONE Drive object.
 
-        Extraido do laco de `_remote_to_local` para poder rodar em paralelo com
-        os demais. Nao ha corrida na alocacao de chave: entre `_new_remote_ds_key`
-        e o `set_dataset` nao existe `await`, entao a segunda corrotina ja
-        enxerga a chave que a primeira acabou de ocupar.
+        Extracted from the `_remote_to_local` loop so it can run in parallel
+        with the others. There is no race in key allocation: between
+        `_new_remote_ds_key` and `set_dataset` there is no `await`, so the
+        second coroutine already sees the key the first one just took.
         """
         ds_name = self.manifest.find(rf.id_hash, rf.original_name)
         ds_info = manifest_datasets.get(ds_name, {}) if ds_name else {}
 
-        # Verifica se precisa baixar
+        # Checks whether it needs downloading
         if ds_name and ds_info:
-            # Entrada multi-arquivo (bundle shapefile): nunca gravar um
-            # download por cima dela — ver _bundle_blocks_download.
+            # Multi-file entry (shapefile bundle): never write a download
+            # over it — see _bundle_blocks_download.
             if self._bundle_blocks_download(ds_name, ds_info, rf.id_hash,
                                             rf.original_name, rf.content_md5):
                 return
@@ -942,9 +948,9 @@ class SyncManager:
             # Mesmo ID e MD5? Nada mudou.
             if saved_remote_id == rf.id_hash:
                 if not rf.content_md5 or rf.content_md5 == saved_remote_md5:
-                    return  # Sem mudanca
+                    return  # No change
 
-            # MD5 diferente ou ID diferente → mudou no remoto
+            # Different MD5 or different ID → changed on remote
             if rf.content_md5 and saved_remote_md5 and rf.content_md5 == saved_remote_md5:
                 # Mesmo conteudo, ID diferente (re-upload identico) — atualiza ID no manifest
                 self.manifest.mark_synced(
@@ -953,7 +959,7 @@ class SyncManager:
                 )
                 return
 
-            # Sem MD5 remoto? Nao da pra comparar — pula (evita loop infinito)
+            # No remote MD5? Can't compare — skip (avoids an infinite loop)
             if not rf.content_md5:
                 return
 
@@ -982,14 +988,14 @@ class SyncManager:
             return
 
         self._emit_downloaded(rf.original_name, dest)
-        # Calcula MD5 do arquivo baixado (para comparacao futura)
+        # Computes the MD5 of the downloaded file (for future comparison)
         from executor.sync.scanner import _compute_md5
         downloaded_md5 = await em_thread(_compute_md5, dest)
 
         ds_key = ds_name or _new_remote_ds_key(rf.original_name, manifest_datasets)
-        # size/mtime saem do arquivo que esta NO DISCO, nao do que o servidor
-        # declarou: sao eles que o atalho do `diff` compara no proximo ciclo, e
-        # um tamanho divergente faria o arquivo ser rehasheado para sempre.
+        # size/mtime come from the file that is ON DISK, not from what the server
+        # declared: those are what the `diff` shortcut compares on the next
+        # cycle, and a diverging size would make the file be rehashed forever.
         from executor.sync.scanner import entrada_de_manifesto
         self.manifest.set_dataset(ds_key, {
             "type": rf.extension,
@@ -1008,8 +1014,8 @@ class SyncManager:
     async def _upload_dataset(self, name: str, ds: Dataset,
                               enqueue_on_failure: bool = True) -> UploadResult | None:
         """Valida, extrai metadados e faz upload de um dataset."""
-        # validate_dataset abre o arquivo com geopandas/rasterio e extract_metadata
-        # le o dataset inteiro: I/O + CPU pesados, fora do event loop.
+        # validate_dataset opens the file with geopandas/rasterio and extract_metadata
+        # reads the whole dataset: heavy I/O + CPU, off the event loop.
         result = await em_thread(validate_dataset, ds)
         if not result.valid:
             for err in result.errors:
@@ -1025,15 +1031,15 @@ class SyncManager:
             except Exception as e:
                 logger.warning("Metadados de '%s' indisponiveis: %s", name, e)
 
-        # Calcula MD5 local antes do upload (tambem popula o cache de FileInfo).
+        # Computes the local MD5 before the upload (also populates the FileInfo cache).
         local_md5 = await em_thread(_dataset_md5, ds)
 
-        # Marca como uploading MESCLANDO na entrada existente. Substituir a
-        # entrada perdia 'remote_id_hash' — a copia antiga ficava orfa no Drive e
-        # o _remote_to_local ignorava um dataset sem id remoto.
-        # E 'files' NAO e gravado aqui de proposito: se o processo morrer antes do
-        # upload confirmar, um manifesto com os MD5 novos faz o diff() concluir
-        # "em dia" e o arquivo nunca mais sobe.
+        # Marks as uploading by MERGING into the existing entry. Replacing the
+        # entry lost 'remote_id_hash' — the old copy was orphaned in Drive and
+        # _remote_to_local ignored a dataset without a remote id.
+        # And 'files' is NOT written here on purpose: if the process dies before
+        # the upload is confirmed, a manifest with the new MD5s makes diff()
+        # conclude "up to date" and the file never gets uploaded again.
         ds_info = dict(self.manifest.get_dataset(name) or {})
         old_id = ds_info.get("remote_id_hash")
         ds_info["type"] = ds.type
@@ -1041,9 +1047,9 @@ class SyncManager:
         ds_info["sync_direction"] = "local"
         self.manifest.set_dataset(name, ds_info)
 
-        # Modo catalogo (LGPD): registra os metadados e NAO envia os bytes. O
-        # arquivo permanece na pasta do usuario e so pode ser lido por workflows
-        # que rodem neste executor.
+        # Catalog mode (LGPD): registers the metadata and does NOT send the bytes.
+        # The file stays in the user's folder and can only be read by workflows
+        # running on this executor.
         if self.sync_mode == "catalog":
             self.events.emit("file_cataloging", dataset=name, total_bytes=ds.total_size)
             upload = await self.uploader.register(ds, spatial_meta)
@@ -1052,8 +1058,8 @@ class SyncManager:
             upload = await self.uploader.upload(ds, spatial_meta)
 
         if upload:
-            # So agora o estado local vira "a versao no Drive": grava os arquivos
-            # e o nome/MD5 do OBJETO remoto (para shapefile, o '<dataset>.zip').
+            # Only now does the local state become "the version in Drive": writes the
+            # files and the name/MD5 of the remote OBJECT (for a shapefile, the '<dataset>.zip').
             ds_info = dict(self.manifest.get_dataset(name) or {})
             ds_info["files"] = {fname: finfo.to_dict() for fname, finfo in ds.files.items()}
             ds_info["remote_name"] = upload.remote_name
@@ -1064,38 +1070,39 @@ class SyncManager:
                 local_md5=local_md5,
                 remote_md5=upload.remote_md5,
             )
-            # Flush OPORTUNISTA: durabilidade a cada SYNC_FLUSH_INTERVAL
-            # segundos, em vez de reserializar o manifesto inteiro por dataset
-            # (era isso que fazia a sincronizacao inicial de uma pasta grande
-            # ficar mais lenta a cada arquivo). O flush do fim do ciclo fecha a
-            # conta. A ordem documentada acima segue valendo: o que fica na
-            # janela e o estado ANTIGO, que so causa re-upload, nunca um MD5
-            # novo dado como confirmado.
+            # OPPORTUNISTIC flush: durability every SYNC_FLUSH_INTERVAL
+            # seconds, instead of reserializing the whole manifest per dataset
+            # (that was what made the initial sync of a large folder get
+            # slower with every file). The end-of-cycle flush settles the
+            # account. The order documented above still holds: what sits in
+            # the window is the OLD state, which only causes a re-upload, never
+            # a new MD5 taken as confirmed.
             await self.manifest.flush(min_intervalo=SYNC_FLUSH_INTERVAL)
 
-            # UPLOAD PRIMEIRO, delete da copia antiga depois — e AQUI, nao no
-            # chamador. Deletar antes do PUT abria janela de perda TOTAL (um
-            # crash entre o DELETE e o PUT sumia com o arquivo do Drive enquanto
-            # o disco continuava batendo com o manifesto: o diff() considerava
-            # "em dia" e ninguem re-enviava). Mas deletar no _local_to_remote
-            # deixava o retry da SyncQueue de fora — ele chama _upload_dataset
-            # direto e nao conhece o id antigo — e a copia obsoleta ficava no
-            # bucket para sempre com o MESMO original_name, voltando depois como
-            # "arquivo novo" no _remote_to_local e ressuscitando conteudo velho.
+            # UPLOAD FIRST, delete the old copy afterwards — and HERE, not in the
+            # caller. Deleting before the PUT opened a window of TOTAL loss (a
+            # crash between the DELETE and the PUT made the file vanish from
+            # Drive while the disk still matched the manifest: diff() considered
+            # it "up to date" and nobody re-sent it). But deleting in
+            # _local_to_remote left out the SyncQueue retry — it calls
+            # _upload_dataset directly and doesn't know the old id — and the
+            # obsolete copy stayed in the bucket forever with the SAME
+            # original_name, later coming back as a "new file" in
+            # _remote_to_local and resurrecting old content.
             if old_id and old_id != upload.id_hash:
                 if not await self.uploader.delete(old_id):
                     logger.warning("Versao antiga de '%s' (%s) permanece no Drive — delete falhou.",
                                    name, old_id[:8])
 
-            # total_bytes/file_count vao no evento porque o painel acumula o
-            # volume transferido na sessao; os dois valores ja estao em maos
-            # (o log da linha seguinte usa ambos).
+            # total_bytes/file_count go in the event because the dashboard accumulates
+            # the volume transferred in the session; both values are already at
+            # hand (the log on the next line uses both).
             self.events.emit("file_uploaded", dataset=name,
                              total_bytes=ds.total_size, file_count=len(ds.files))
             logger.info("Dataset '%s' sincronizado → %s (%d arquivo(s), %s).",
                         name, upload.id_hash, len(ds.files), _format_size(ds.total_size))
 
-            # Dispara workflow se configurado
+            # Triggers a workflow if configured
             if self.trigger.enabled:
                 primary = ds.primary_path
                 await self.trigger.on_file_synced(name, {
@@ -1114,13 +1121,13 @@ class SyncManager:
         return None
 
     async def _execute_pending(self, item: dict) -> bool:
-        """Executor para a SyncQueue."""
+        """Executor for the SyncQueue."""
         action = item["action"]
         dataset_name = item["dataset"]
 
         if action == "upload":
-            # Um scan por PASSADA da fila, nao por item: com 5 itens pendentes,
-            # o retry varria a pasta inteira 5 vezes so para achar 5 datasets.
+            # One scan per queue PASS, not per item: with 5 pending items, the
+            # retry swept the whole folder 5 times just to find 5 datasets.
             if self._scan_da_fila is None:
                 self._scan_da_fila = await em_thread(self.scanner.scan)
             current = self._scan_da_fila
@@ -1128,9 +1135,9 @@ class SyncManager:
             if not ds:
                 logger.info("Dataset '%s' nao existe mais — removendo da fila.", dataset_name)
                 return True
-            # Reusa o caminho normal para o retry gravar 'files'/'remote_name'
-            # exatamente como o upload direto. enqueue_on_failure=False porque o
-            # item ja esta na fila — a SyncQueue cuida do retry.
+            # Reuses the normal path so the retry writes 'files'/'remote_name'
+            # exactly like the direct upload. enqueue_on_failure=False because
+            # the item is already in the queue — the SyncQueue handles the retry.
             upload = await self._upload_dataset(dataset_name, ds, enqueue_on_failure=False)
             return upload is not None
 
@@ -1141,9 +1148,9 @@ class SyncManager:
             return True
 
         elif action == "discard":
-            # Descarte local adiado: o arquivo estava travado por outro processo
-            # (QGIS com o .shp aberto). Enquanto nao sair do disco, a entrada do
-            # manifesto continua de pe para o diff() nao re-enviar o arquivo.
+            # Deferred local discard: the file was locked by another process
+            # (QGIS with the .shp open). Until it leaves the disk, the manifest
+            # entry stays in place so diff() doesn't re-send the file.
             if self.manifest.get_dataset(dataset_name) is None:
                 return True
             return self._discard_dataset(dataset_name, "retry: deletado no Drive")
@@ -1153,16 +1160,16 @@ class SyncManager:
 
 def _new_remote_ds_key(original_name: str, existing: dict) -> str:
     """
-    Chave de manifesto para um arquivo remoto ainda desconhecido.
+    Manifest key for a remote file not yet known.
 
-    O stem puro colide entre um bundle ('parcelas', com .shp/.dbf/.shx) e um
-    objeto homonimo do Drive ('parcelas.zip'): a segunda gravacao sobrescrevia
-    'files'/'local_md5' do primeiro e o ciclo seguinte deletava + reenviava com
-    um id novo, quebrando qualquer no que referenciasse o id antigo. Quando o
-    stem ja esta ocupado, qualifica a chave com a extensao.
+    The bare stem collides between a bundle ('parcelas', with .shp/.dbf/.shx)
+    and a same-named Drive object ('parcelas.zip'): the second write overwrote
+    the first's 'files'/'local_md5' and the next cycle deleted + re-sent with
+    a new id, breaking any node that referenced the old id. When the stem is
+    already taken, qualifies the key with the extension.
     """
     stem, _, ext = original_name.rpartition(".")
-    if not stem:  # nome sem extensao
+    if not stem:  # name without extension
         stem, ext = original_name, ""
     stem = stem.lower()
     if stem not in existing:
@@ -1171,7 +1178,7 @@ def _new_remote_ds_key(original_name: str, existing: dict) -> str:
 
 
 def _dataset_md5(ds: Dataset) -> str:
-    """Calcula MD5 combinado de todos os arquivos de um dataset."""
+    """Computes the combined MD5 of all files in a dataset."""
     hashes = ds.file_hashes()
     if len(hashes) == 1:
         return next(iter(hashes.values()))
@@ -1180,10 +1187,10 @@ def _dataset_md5(ds: Dataset) -> str:
 
 def _paths_md5(paths: list[Path]) -> str:
     """
-    Mesmo hash combinado de `_dataset_md5`, mas a partir de caminhos soltos —
-    o caminho de push conhece os arquivos pelo manifesto, nao por um Dataset
-    escaneado (escanear a pasta inteira a cada evento push seria caro demais).
-    Sincrono: o chamador roda em thread.
+    Same combined hash as `_dataset_md5`, but from loose paths — the push
+    path knows the files through the manifest, not through a scanned Dataset
+    (scanning the whole folder on every push event would be too expensive).
+    Synchronous: the caller runs it in a thread.
     """
     from executor.sync.scanner import _compute_md5
 

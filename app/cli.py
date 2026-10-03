@@ -1,12 +1,12 @@
 """
 app/cli.py
-CLI administrativo do Atlans. Invocacao:
+Atlans administrative CLI. Invocation:
     docker compose exec api-prod python -m app.cli <comando> [args]
 
-Comandos disponiveis:
-    create-admin   Cria o primeiro usuario admin (idempotente).
-    migrar-nos     Reescreve fluxos salvos com nomes antigos de nos (simula
-                   por padrao; grava com --aplicar). Ver app/services/nos_renomeados.py.
+Available commands:
+    create-admin   Creates the first admin user (idempotent).
+    migrar-nos     Rewrites saved workflows with old node names (dry run
+                   by default; writes with --aplicar). See app/services/nos_renomeados.py.
 """
 from __future__ import annotations
 
@@ -17,10 +17,10 @@ import os
 import re
 import sys
 
-# Comandos de manutenção varrem tabelas inteiras (o `migrar-nos` faz LIKE no
-# texto de todo fluxo e de toda versão): o prazo das consultas da API (60 s,
-# app/core/config.py) os cortaria no meio. Neste processo, sem prazo — a menos
-# que o operador defina um. Antes de qualquer import de app.core.
+# Maintenance commands scan entire tables (`migrar-nos` does a LIKE on the
+# text of every workflow and every version): the API's query deadline (60 s,
+# app/core/config.py) would cut them off midway. In this process, no deadline — unless
+# the operator sets one. Before any import of app.core.
 for _variavel in ("DB_STATEMENT_TIMEOUT", "DB_COMMAND_TIMEOUT"):
     os.environ[_variavel] = os.environ.get(_variavel) or "0"
 
@@ -29,7 +29,7 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 async def _create_admin(email: str, password: str, username: str | None) -> int:
-    # Imports lazy — assim `python -m app.cli --help` nao exige .env carregado.
+    # Lazy imports — so `python -m app.cli --help` does not require a loaded .env.
     from sqlalchemy import select
     from app.core.db import get_session_async
     from app.core.utils.jwt_utils import hash_password
@@ -46,7 +46,7 @@ async def _create_admin(email: str, password: str, username: str | None) -> int:
     derived_username = username or email.split("@", 1)[0]
 
     async with get_session_async() as db:
-        # Idempotente: se ja existe admin com este email, apenas relata.
+        # Idempotent: if an admin with this email already exists, just report it.
         existing = (
             await db.execute(select(User).where(User.email == email))
         ).scalar_one_or_none()
@@ -54,7 +54,7 @@ async def _create_admin(email: str, password: str, username: str | None) -> int:
             if existing.role == "admin" and existing.status == "active":
                 print(f"Admin com email {email} ja existe (id_hash={existing.id_hash}).")
                 return 0
-            # Usuario existe mas nao e admin/ativo — promove.
+            # User exists but is not admin/active — promote.
             existing.role = "admin"
             existing.status = "active"
             existing.email_verified = True
@@ -130,8 +130,8 @@ async def _migrar_nos(aplicar: bool) -> int:
     if aplicar:
         print(f"{len(relatorio)} definicao(oes) migrada(s).")
     else:
-        # A reescrita e no lugar: "restaurar versao" nao a desfaz (as versoes
-        # tambem sao migradas). O backup e a volta.
+        # The rewrite is in place: "restore version" does not undo it (the versions
+        # are migrated too). The backup is the way back.
         print(
             f"{len(relatorio)} definicao(oes) a migrar. Antes de rodar com --aplicar, guarde as "
             "tabelas (no host, com o DATABASE_URL do .env): "

@@ -1,11 +1,11 @@
 # tests/unit/test_openrouter.py
 """
-O cliente do OpenRouter — a única fronteira do assistente com a rede.
+The OpenRouter client — the assistant's only boundary with the network.
 
-Tudo aqui roda contra um `httpx.MockTransport`: o que se mede é a TRADUÇÃO nos
-dois sentidos (o transcrito do projeto virando o pedido; o SSE virando blocos)
-e a disciplina de falha (retentar só antes do corpo, nunca devolver resposta
-pela metade). Nenhum teste toca a rede.
+Everything here runs against an `httpx.MockTransport`: what is measured is the
+TRANSLATION in both directions (the project's transcript becoming the request;
+the SSE becoming blocks) and the failure discipline (retry only before the body,
+never return a half-finished response). No test touches the network.
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ SISTEMA = [
 FERRAMENTAS = [openrouter.ferramenta("search_nodes", "procura", {"type": "object", "properties": {}})]
 
 
-# ── Dublês ────────────────────────────────────────────────────────────────────
+# ── Test doubles ──────────────────────────────────────────────────────────────
 
 
 def _sse(*eventos, done: bool = True, comentarios: bool = False) -> bytes:
@@ -69,7 +69,7 @@ def _stream(corpo: bytes, status: int = 200) -> httpx.Response:
 
 
 class Roteiro:
-    """O servidor de mentira: uma resposta (ou exceção) por pedido, na ordem."""
+    """The fake server: one response (or exception) per request, in order."""
 
     def __init__(self, respostas):
         self._respostas = list(respostas)
@@ -128,7 +128,7 @@ def test_o_pedido_leva_modelo_stream_uso_raciocinio_e_ferramentas():
     assert corpo["model"] == "openai/gpt-5"
     assert corpo["stream"] is True
     assert corpo["max_tokens"] == 4321
-    # A contagem (e o custo) vem no último quadro do stream: é a fonte da cota.
+    # The count (and the cost) comes in the stream's last frame: it is the quota's source.
     assert corpo["usage"] == {"include": True}
     assert corpo["reasoning"] == {"effort": "high"}
     assert corpo["tools"] == FERRAMENTAS
@@ -152,8 +152,8 @@ def test_sem_esforco_nem_ferramentas_o_pedido_nao_leva_os_campos():
 
 
 def test_o_sistema_vai_em_partes_e_o_corte_de_cache_perde_o_ttl():
-    """Só o tipo: a duração do cache é do provedor por trás do roteador, e um
-    campo que ele não reconhece seria uma recusa a cada conversa."""
+    """Only the type: the cache duration belongs to the provider behind the router,
+    and a field it does not recognize would be a rejection on every conversation."""
     mensagens = montar_mensagens(SISTEMA, [])
 
     assert mensagens == [
@@ -168,8 +168,8 @@ def test_o_sistema_vai_em_partes_e_o_corte_de_cache_perde_o_ttl():
 
 
 def test_a_ultima_mensagem_humana_leva_o_segundo_corte_e_os_resultados_viram_tool():
-    """O prefixo que é o mesmo em todas as voltas de um turno termina na pergunta
-    da pessoa. Resultados de ferramenta viram mensagens `tool`, com o texto cru."""
+    """The prefix that is the same across all rounds of a turn ends at the person's
+    question. Tool results become `tool` messages, with the raw text."""
     conversa = [
         {"role": "user", "content": "primeira pergunta"},
         {"role": "assistant", "content": [{"type": "text", "text": "certo"}]},
@@ -190,7 +190,7 @@ def test_a_ultima_mensagem_humana_leva_o_segundo_corte_e_os_resultados_viram_too
 
     assert mensagens[0] == {"role": "user", "content": "primeira pergunta"}
     assert mensagens[1] == {"role": "assistant", "content": "certo"}
-    # A ÚLTIMA humana, e só ela, leva o corte.
+    # The LAST human message, and only it, carries the breakpoint.
     assert mensagens[2] == {
         "role": "user",
         "content": [{"type": "text", "text": "monta um fluxo", "cache_control": {"type": "ephemeral"}}],
@@ -228,15 +228,15 @@ def test_o_assistente_leva_texto_chamadas_e_o_raciocinio_verbatim():
 
     assert assistente["content"] == "vou montar"
     assert assistente["reasoning_details"] == detalhes
-    # O texto cru de uma chamada cortada fica no transcrito, mas na ida vira `{}`:
-    # reenviado como veio seria JSON inválido em toda volta seguinte.
+    # The raw text of a truncated call stays in the transcript, but on the way out
+    # it becomes `{}`: resent as it came it would be invalid JSON on every later round.
     assert [c["function"]["arguments"] for c in assistente["tool_calls"]] == ['{"q": "x"}', "{}"]
 
 
 def test_mensagem_do_assistente_sem_texto_e_sem_chamada_e_omitida_na_ida():
-    """Só raciocínio (corte por `length` ainda pensando), lista vazia (recusa sem
-    saída) ou string vazia: mandar `content: ""` é recusa certa do provedor, e
-    recusa que o plano B do 400 não conserta."""
+    """Reasoning only (cut off by `length` while still thinking), an empty list
+    (refusal with no output) or an empty string: sending `content: ""` is a
+    certain rejection by the provider, and one the 400 plan B does not fix."""
     conversa = [
         {"role": "user", "content": "oi"},
         {"role": "assistant", "content": [
@@ -252,14 +252,15 @@ def test_mensagem_do_assistente_sem_texto_e_sem_chamada_e_omitida_na_ida():
     mensagens = montar_mensagens([], conversa)
 
     assert [m["role"] for m in mensagens] == ["user", "user", "user", "user"]
-    # O corte de cache continua na ÚLTIMA humana.
+    # The cache breakpoint stays on the LAST human message.
     assert mensagens[-1]["content"][0]["cache_control"] == {"type": "ephemeral"}
     assert all(isinstance(m["content"], str) for m in mensagens[:-1])
 
 
 def test_o_raciocinio_antigo_com_assinatura_e_omitido_na_ida():
-    """Um bloco `thinking` de outra API (com `signature`, sem `reasoning_details`)
-    fica no transcrito para o replay e não vai ao provedor."""
+    """A `thinking` block from another API (with `signature`, without
+    `reasoning_details`) stays in the transcript for replay and does not go to
+    the provider."""
     conversa = [
         {"role": "user", "content": "oi"},
         {
@@ -278,8 +279,8 @@ def test_o_raciocinio_antigo_com_assinatura_e_omitido_na_ida():
 
 
 def test_resultado_com_erro_ganha_o_prefixo_e_lista_de_blocos_e_juntada():
-    """O formato de rede não tem `is_error`; sem o prefixo, uma recusa de escopo
-    chegaria ao modelo igual a um resultado normal."""
+    """The wire format has no `is_error`; without the prefix, a scope refusal
+    would reach the model just like a normal result."""
     conversa = [
         {"role": "user", "content": "roda"},
         {"role": "assistant", "content": [{"type": "tool_use", "id": "c1", "name": "run_workflow", "input": {}}]},
@@ -305,9 +306,9 @@ def test_resultado_com_erro_ganha_o_prefixo_e_lista_de_blocos_e_juntada():
 
 
 async def test_o_stream_remonta_texto_raciocinio_e_chamadas_por_indice():
-    """Chamadas chegam por `index` — `id`/`name` no primeiro pedaço, argumentos gota
-    a gota, DUAS intercaladas; o `reasoning_details` também vem por índice, e a
-    `signature` só no fim. O que sai é o formato do projeto, inteiro."""
+    """Calls arrive by `index` — `id`/`name` in the first chunk, arguments drop
+    by drop, TWO interleaved; `reasoning_details` also comes by index, and the
+    `signature` only at the end. What comes out is the project's format, whole."""
     corpo = _sse(
         _quadro({"role": "assistant", "reasoning": "preciso ", "reasoning_details": [
             {"type": "reasoning.text", "text": "preciso ", "format": "anthropic-claude-v1", "index": 0}]}),
@@ -359,14 +360,14 @@ async def test_o_stream_remonta_texto_raciocinio_e_chamadas_por_indice():
         {"type": "tool_use", "id": "call_a", "name": "search_nodes", "input": {"q": "buffer"}},
         {"type": "tool_use", "id": "call_b", "name": "describe_node", "input": {"name": "Buffer"}},
     ]
-    # `entrada` já inclui o cache; `cache_leitura` é um recorte informativo.
+    # `entrada` already includes the cache; `cache_leitura` is an informative slice.
     assert resposta.uso == {
         "entrada": 1500, "saida": 80, "cache_leitura": 1200, "cache_escrita": 0,
         "raciocinio": 30, "custo": 0.0123,
     }
     assert esperas == [], "sucesso de primeira não espera nada"
-    # E o pedido que saiu é o traduzido: o cabeçalho de autenticação, e nenhum
-    # de atribuição — sem título nem referer, nada identifica a instalação.
+    # And the request that went out is the translated one: the auth header, and no
+    # attribution header — no title or referer, nothing identifies the installation.
     pedido = roteiro.pedidos[0]
     assert pedido.headers["authorization"] == "Bearer sk-or-v1-teste"
     assert "x-title" not in pedido.headers and "http-referer" not in pedido.headers
@@ -375,8 +376,8 @@ async def test_o_stream_remonta_texto_raciocinio_e_chamadas_por_indice():
 
 
 async def test_argumento_que_nao_fecha_vira_texto_cru_e_nao_objeto():
-    """Metade de uma definição não pode chegar à ferramenta como se fosse inteira.
-    O laço trata o que não é objeto como erro de chamada."""
+    """Half a definition cannot reach the tool as if it were whole.
+    The loop treats anything that is not an object as a call error."""
     corpo = _sse(
         _quadro({"tool_calls": [{"index": 0, "id": "call_a", "type": "function",
                                  "function": {"name": "validate_workflow", "arguments": '{"definition": {"nodes": ['}}]}),
@@ -409,9 +410,9 @@ async def test_argumento_vazio_vira_objeto_e_chamada_sem_indice_e_aceita():
 
 
 async def test_stream_sem_finish_reason_e_erro_e_nao_resposta_vazia():
-    """O OpenRouter sempre manda `finish_reason` antes do `[DONE]`. Sem ele, o que
-    chegou não é resposta — e inferir `stop` gravaria uma mensagem vazia do
-    assistente e emitiria um `fim` ok."""
+    """OpenRouter always sends `finish_reason` before `[DONE]`. Without it, what
+    arrived is not a response — and inferring `stop` would record an empty
+    assistant message and emit an ok `fim`."""
     corpo = _sse(_quadro({"content": "pronto"}))
     cliente, _ = _cliente(Roteiro([_stream(corpo)]))
 
@@ -422,7 +423,7 @@ async def test_stream_sem_finish_reason_e_erro_e_nao_resposta_vazia():
 
 
 async def test_200_de_gateway_com_html_e_erro_e_nao_resposta_vazia():
-    """Um proxy que responde 200 com HTML não tem quadro SSE nenhum."""
+    """A proxy that responds 200 with HTML has no SSE frame at all."""
     roteiro = Roteiro([httpx.Response(200, content=b"<html>gateway</html>", headers={"content-type": "text/html"})])
     cliente, _ = _cliente(roteiro)
 
@@ -431,9 +432,9 @@ async def test_200_de_gateway_com_html_e_erro_e_nao_resposta_vazia():
 
 
 async def test_separador_de_linha_unicode_dentro_do_JSON_nao_corta_o_quadro():
-    """U+2028, U+2029 e U+0085 são válidos SEM escape numa string JSON, e o
-    `aiter_lines()` do httpx quebrava a linha neles (`str.splitlines()`). O
-    leitor próprio quebra só em `\\n`, `\\r\\n` e `\\r`."""
+    """U+2028, U+2029 and U+0085 are valid WITHOUT escaping in a JSON string, and
+    httpx's `aiter_lines()` broke the line on them (`str.splitlines()`). The
+    custom reader breaks only on `\\n`, `\\r\\n` and `\\r`."""
     texto = "antes\u2028meio\u2029fim\u0085ponto"
     corpo = _sse(_quadro({"content": texto}), _quadro({}, parada="stop"))
     cliente, _ = _cliente(Roteiro([_stream(corpo)]))
@@ -445,13 +446,13 @@ async def test_separador_de_linha_unicode_dentro_do_JSON_nao_corta_o_quadro():
 
 
 async def test_terminadores_CRLF_e_pedacos_partidos_no_meio_sao_remontados():
-    """`\\r\\n` como terminador, um `\\r\\n` partido entre dois pedaços da rede e um
-    caractere multibyte partido entre dois pedaços: tudo remonta igual."""
+    """`\\r\\n` as terminator, a `\\r\\n` split between two network chunks and a
+    multibyte character split between two chunks: everything reassembles the same."""
     quadro_a = json.dumps(_quadro({"content": "olá ção"}), ensure_ascii=False).encode("utf-8")
     quadro_b = json.dumps(_quadro({}, parada="stop")).encode("utf-8")
     corpo = b"data: " + quadro_a + b"\r\n\r\ndata: " + quadro_b + b"\r\n\r\ndata: [DONE]\r\n\r\n"
-    # Parte o corpo em pedaços pequenos: um deles cai no meio do `ção` e outro
-    # entre o `\r` e o `\n`.
+    # Splits the body into small chunks: one of them lands in the middle of `ção`
+    # and another between the `\r` and the `\n`.
     corte_no_multibyte = corpo.index("ção".encode("utf-8")) + 1
     corte_no_crlf = corpo.index(b"\r\n") + 1
     cortes = sorted({corte_no_multibyte, corte_no_crlf, len(corpo) - 7})
@@ -471,9 +472,9 @@ async def test_terminadores_CRLF_e_pedacos_partidos_no_meio_sao_remontados():
 
 
 async def test_reasoning_details_sem_indice_mas_com_id_nao_se_fundem():
-    """Itens distintos sem `index` (o raciocínio criptografado de alguns
-    provedores) ficam distintos, chaveados pelo `id`; pedaços sem `index` e sem
-    `id` continuam sendo do mesmo bloco."""
+    """Distinct items without `index` (the encrypted reasoning of some
+    providers) stay distinct, keyed by `id`; chunks with neither `index` nor
+    `id` keep belonging to the same block."""
     corpo = _sse(
         _quadro({"reasoning_details": [{"type": "reasoning.encrypted", "data": "AAA", "id": "rs_1"}]}),
         _quadro({"reasoning_details": [{"type": "reasoning.encrypted", "data": "BBB", "id": "rs_2"}]}),
@@ -506,8 +507,8 @@ async def test_stream_so_de_texto_termina_em_stop_e_sem_bloco_de_raciocinio():
 
 
 async def test_erro_no_meio_do_stream_vira_excecao_e_nao_resposta():
-    """Um quadro `error` depois de texto já emitido: o que saiu, saiu; mas não
-    há `Resposta` — o laço não grava uma mensagem pela metade."""
+    """An `error` frame after text was already emitted: what went out, went out; but
+    there is no `Resposta` — the loop does not record a half-finished message."""
     corpo = _sse(
         _quadro({"content": "Vou "}),
         {"id": "gen-1", "error": {"code": 502, "message": "Provider returned error"},
@@ -530,7 +531,7 @@ async def test_quadro_ilegivel_vira_excecao():
         await _colher(cliente)
 
 
-# ── Falhas antes do corpo: retentar; depois do corpo: nunca ───────────────────
+# ── Failures before the body: retry; after the body: never ────────────────────
 
 
 async def test_429_e_5xx_sao_retentados_com_espera_e_o_retry_after_manda():
@@ -546,7 +547,7 @@ async def test_429_e_5xx_sao_retentados_com_espera_e_o_retry_after_manda():
 
     assert pedacos[-1].blocos == [{"type": "text", "text": "ok"}]
     assert len(roteiro.pedidos) == 3
-    # O `Retry-After` do 429 manda; o 503 cai no recuo exponencial (2ª tentativa).
+    # The 429's `Retry-After` rules; the 503 falls to exponential backoff (2nd attempt).
     assert esperas == [2.0, 1.0]
 
 
@@ -567,7 +568,7 @@ async def test_depois_da_ultima_tentativa_o_erro_sobe_com_o_status():
 
 
 async def test_401_e_402_nao_sao_retentados():
-    """Chave errada e crédito zerado não melhoram esperando."""
+    """A wrong key and zero credit do not get better by waiting."""
     for status in (401, 402):
         roteiro = Roteiro([httpx.Response(status, json={"error": {"code": status, "message": "nope"}})])
         cliente, esperas = _cliente(roteiro)
@@ -614,8 +615,8 @@ async def test_erro_de_corpo_nao_json_e_encurtado_na_mensagem():
 
 
 async def test_400_com_raciocinio_guardado_e_refeito_uma_vez_sem_ele():
-    """Se o provedor recusar o raciocínio guardado, a conversa perde o raciocínio
-    antigo — não a conversa."""
+    """If the provider rejects the stored reasoning, the conversation loses the old
+    reasoning — not the conversation."""
     conversa = [
         {"role": "user", "content": "oi"},
         {"role": "assistant", "content": [
@@ -638,7 +639,7 @@ async def test_400_com_raciocinio_guardado_e_refeito_uma_vez_sem_ele():
     primeiro, segundo = roteiro.corpo(0), roteiro.corpo(1)
     assert "reasoning_details" in primeiro["messages"][2]
     assert "reasoning_details" not in segundo["messages"][2]
-    # Fora do raciocínio, o pedido é o MESMO.
+    # Apart from the reasoning, the request is the SAME.
     assert segundo["messages"][2]["tool_calls"] == primeiro["messages"][2]["tool_calls"]
     assert segundo["tools"] == primeiro["tools"]
 
@@ -676,7 +677,7 @@ async def test_o_400_refeito_e_recusado_de_novo_sobe_sem_terceiro_pedido():
     assert len(roteiro.pedidos) == 2
 
 
-# ── Construção e ciclo de vida ────────────────────────────────────────────────
+# ── Construction and lifecycle ────────────────────────────────────────────────
 
 
 def test_chave_vazia_e_recusada_na_construcao():
@@ -692,21 +693,21 @@ def test_a_base_url_e_o_referer_sao_respeitados():
 
 
 def test_a_url_completa_do_endpoint_na_configuracao_nao_duplica_o_caminho():
-    """`OPENROUTER_BASE_URL` é a base, mas quem colar a URL do endpoint inteira
-    não pode ganhar `/chat/completions/chat/completions` em todo pedido."""
+    """`OPENROUTER_BASE_URL` is the base, but whoever pastes the whole endpoint URL
+    must not get `/chat/completions/chat/completions` on every request."""
     cliente = ClienteOpenRouter("sk-or-v1-x", base_url="https://openrouter.ai/api/v1/chat/completions")
 
     assert cliente._url == "https://openrouter.ai/api/v1/chat/completions"
 
 
 async def test_sem_http_injetado_as_conversas_compartilham_um_pool(monkeypatch):
-    """Um `AsyncClient` por processo, criado na primeira conversa e reaproveitado:
-    abrir um por chamada custava um handshake TCP+TLS a cada volta de ferramenta."""
+    """One `AsyncClient` per process, created on the first conversation and reused:
+    opening one per call cost a TCP+TLS handshake on every tool round."""
     corpo_ok = _sse(_quadro({"content": "ok"}), _quadro({}, parada="stop"))
     roteiro = Roteiro([_stream(corpo_ok), _stream(corpo_ok)])
     criados: list[httpx.AsyncClient] = []
-    # `openrouter.httpx` E o modulo `httpx`: guardar a classe real antes de
-    # trocar, senao a fabrica chama a si mesma.
+    # `openrouter.httpx` IS the `httpx` module: keep the real class before
+    # swapping, or the factory calls itself.
     ClienteReal = httpx.AsyncClient
 
     def fabrica(**kw):
@@ -739,15 +740,15 @@ def test_o_uso_do_projeto_le_o_usage_do_openrouter_com_tolerancia():
     assert openrouter._uso_do_projeto(None)["entrada"] == 0
 
 
-# ── O catálogo de modelos ────────────────────────────────────────────────────
+# ── The model catalog ────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_listar_modelos_converte_o_preco_de_TOKEN_para_MILHAO():
-    """O provedor devolve o preço por token, em string (`"0.000003"`). Quem lê
-    uma tabela de custo pensa em milhão, e deixar a conversão para cada
-    chamador é esperar que um deles erre o fator de um milhão — silenciosamente,
-    numa tela de dinheiro."""
+    """The provider returns the price per token, as a string (`"0.000003"`). Whoever
+    reads a cost table thinks in millions, and leaving the conversion to each
+    caller is waiting for one of them to get the factor of a million wrong —
+    silently, on a money screen."""
     def handler(pedido: httpx.Request) -> httpx.Response:
         assert pedido.url.path.endswith("/models")
         return httpx.Response(200, json={"data": [
@@ -768,14 +769,14 @@ async def test_listar_modelos_converte_o_preco_de_TOKEN_para_MILHAO():
 
 @pytest.mark.asyncio
 async def test_preco_ausente_vira_None_e_NUNCA_zero():
-    """Zero numa tabela de custo parece «de graça» — e é exatamente a leitura
-    que faria alguém escolher o modelo errado."""
+    """Zero in a cost table looks like "free" — and that is exactly the reading
+    that would make someone pick the wrong model."""
     def handler(pedido: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"data": [
             {"id": "a/sem-preco", "pricing": {}},
             {"id": "b/preco-quebrado", "pricing": {"prompt": "grátis", "completion": None}},
-            {"id": "", "pricing": {"prompt": "1"}},          # sem id: não entra
-            "isto não é um objeto",                            # lixo: não entra
+            {"id": "", "pricing": {"prompt": "1"}},          # no id: left out
+            "isto não é um objeto",                            # garbage: left out
         ]})
 
     catalogo = await openrouter.listar_modelos(
@@ -786,14 +787,14 @@ async def test_preco_ausente_vira_None_e_NUNCA_zero():
     assert [m["id"] for m in catalogo] == ["a/sem-preco", "b/preco-quebrado"]
     assert all(m["entrada_por_milhao"] is None for m in catalogo)
     assert all(m["saida_por_milhao"] is None for m in catalogo)
-    # Sem nome, o id serve de nome — a lista não pode ter linha em branco.
+    # Without a name, the id serves as the name — the list cannot have a blank row.
     assert catalogo[0]["nome"] == "a/sem-preco"
 
 
 @pytest.mark.asyncio
 async def test_a_url_do_catalogo_nao_herda_o_caminho_de_conversa():
-    """Quem configurou `OPENROUTER_BASE_URL` com a URL COMPLETA do endpoint de
-    conversa não pode acabar pedindo `/chat/completions/models`."""
+    """Whoever configured `OPENROUTER_BASE_URL` with the FULL URL of the chat
+    endpoint must not end up requesting `/chat/completions/models`."""
     visto = {}
 
     def handler(pedido: httpx.Request) -> httpx.Response:
@@ -813,8 +814,8 @@ async def test_a_url_do_catalogo_nao_herda_o_caminho_de_conversa():
     httpx.Response(200, json={"modelos": []}),        # formato inesperado
 ])
 async def test_catalogo_que_falha_vira_erro_tipado(resposta):
-    """Quem chama é uma tela de admin, e ela sabe degradar — mas só se o erro
-    chegar como erro, e não como lista vazia que parece «nenhum modelo»."""
+    """The caller is an admin screen, and it knows how to degrade — but only if the
+    error arrives as an error, and not as an empty list that looks like "no models"."""
     with pytest.raises(openrouter.ErroDoOpenRouter):
         await openrouter.listar_modelos(
             base_url="https://or.exemplo/api/v1",

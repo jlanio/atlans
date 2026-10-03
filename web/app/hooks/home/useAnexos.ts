@@ -2,27 +2,27 @@
 
 // web/app/hooks/home/useAnexos.ts
 //
-// Os arquivos soltos sobre a Home, a caminho do Drive do workspace.
+// Files dropped on the Home, on their way to the workspace Drive.
 //
-// **Por que isto existe.** A tela `/drive` tem a zona de envio desde sempre,
-// mas o middleware devolve `/` para quem não administra o sistema
-// (`web/proxy.ts`), então na prática o usuário comum nunca alcançou um
-// campo de upload. A Home é a única página dele — e a regra da casa manda todo
-// fluxo visual para dentro dela.
+// **Why this exists.** The `/drive` screen has always had the upload zone,
+// but the middleware sends anyone who does not administer the system back to
+// `/` (`web/proxy.ts`), so in practice a regular user never reached an
+// upload field. The Home is their only page — and the house rule sends every
+// visual flow into it.
 //
-// **Os filtros são os mesmos, e é o servidor quem os aplica.** Extensão
-// permitida, extensão interna perigosa (`notas.sh.csv`), teto em MB, arquivo
-// vazio e papel no workspace vivem todos no backend (`drive_service.py`,
-// `drive_router.py`), valem para qualquer caminho de upload e não são
-// reescritos aqui: este hook manda o arquivo e traduz a recusa com o MESMO
-// `classifyUploadError` da tela `/drive` — pelo código que o servidor manda,
-// não pela frase. Duas cópias da regra divergiriam — e a que estivesse errada
-// seria a do cliente, que é a que a pessoa lê.
+// **The filters are the same, and it is the server that applies them.**
+// Allowed extension, dangerous inner extension (`notas.sh.csv`), size ceiling
+// in MB, empty file and workspace role all live in the backend
+// (`drive_service.py`, `drive_router.py`), apply to any upload path and are
+// not rewritten here: this hook sends the file and translates the rejection
+// with the SAME `classifyUploadError` as the `/drive` screen — by the code the
+// server sends, not by the sentence. Two copies of the rule would diverge —
+// and the wrong one would be the client's, which is the one the person reads.
 //
-// A única coisa julgada ANTES de mandar é o papel no workspace, porque ele já
-// está no cliente (`useWorkspace().canEdit`, o espelho do papel `editor` que o
-// Drive exige): subir um arquivo inteiro para colher um 403 que
-// dava para prever é desperdício de rede de quem está do outro lado.
+// The only thing judged BEFORE sending is the workspace role, because it is
+// already on the client (`useWorkspace().canEdit`, the mirror of the `editor`
+// role that Drive requires): uploading a whole file to reap a 403 that could
+// have been predicted wastes the network of the person on the other end.
 
 import { useCallback } from "react"
 
@@ -31,19 +31,19 @@ import { useHomeStore, type Anexo } from "@/app/stores/homeStore"
 import { GisFlowService } from "@/service/GisFlowService"
 import { useTextos } from "@/app/components/home/i18n"
 
-/** Quantos arquivos um único gesto pode trazer. Além disso é engano. */
+/** How many files a single gesture can bring. Beyond that it is a mistake. */
 export const MAXIMO_POR_GESTO = 10
 
-// Sequência dos ids de chip. **De MÓDULO, não um `useRef`**: os anexos vivem na
-// store (persiste), mas um `useRef` zera quando a HomeView desmonta e remonta
-// (o admin sai de `/` e volta). Se sobrasse um `anexo-0` na store, o próximo
-// gesto criaria outro `anexo-0` — chave de React duplicada e um
-// `atualizarAnexo` que casaria as DUAS linhas. Um contador de módulo é
-// monotônico pela vida da aba, então nunca colide.
+// Sequence of chip ids. **MODULE-level, not a `useRef`**: the attachments live
+// in the store (persists), but a `useRef` resets when HomeView unmounts and
+// remounts (the admin leaves `/` and comes back). If an `anexo-0` were left in
+// the store, the next gesture would create another `anexo-0` — a duplicate
+// React key and an `atualizarAnexo` that would match BOTH rows. A module
+// counter is monotonic for the life of the tab, so it never collides.
 let _sequencia = 0
 
 export interface UseAnexos {
-  /** Recebe o que foi solto (ou escolhido no seletor) e leva ao Drive. */
+  /** Receives what was dropped (or chosen in the picker) and takes it to Drive. */
   receber: (arquivos: File[]) => void
 }
 
@@ -54,19 +54,19 @@ export function useAnexos({
   aoExigirLogin,
   aoAvisar,
 }: {
-  /** O workspace ativo da Home. `null` enquanto a lista não chegou. */
+  /** The Home's active workspace. `null` while the list has not arrived. */
   workspaceId: string | null
-  /** `canEdit` do workspace ativo: o espelho do papel `editor` que o Drive exige. */
+  /** `canEdit` of the active workspace: the mirror of the `editor` role that Drive requires. */
   podeEnviar: boolean
-  /** Sem sessão a Home abre anônima — arrastar pede a entrada. */
+  /** Without a session the Home opens anonymous — dragging asks for sign-in. */
   anonimo: boolean
   aoExigirLogin: () => void
-  /** Recusas que nem chegam a virar chip (sem workspace, sem papel, lote grande). */
+  /** Rejections that never even become a chip (no workspace, no role, large batch). */
   aoAvisar: (titulo: string, detalhe?: string) => void
 }): UseAnexos {
-  // Ações da store só: este hook não LÊ os anexos (a barra e o painel os
-  // desenham), então não se inscreve neles — assim não re-renderiza a Home a
-  // cada byte de progresso.
+  // Store actions only: this hook does not READ the attachments (the bar and
+  // the panel draw them), so it does not subscribe to them — that way it does
+  // not re-render the Home on every byte of progress.
   const adicionarAnexos = useHomeStore((s) => s.adicionarAnexos)
   const atualizarAnexo = useHomeStore((s) => s.atualizarAnexo)
   const t = useTextos().assistente.anexos
@@ -92,9 +92,9 @@ export function useAnexos({
       aoAvisar(t.lote(MAXIMO_POR_GESTO), t.loteDica(arquivos.length))
     }
 
-    // O id não pode vir do nome: soltar o mesmo arquivo duas vezes é legítimo
-    // (a pessoa corrigiu o conteúdo e soltou de novo) e as duas linhas precisam
-    // existir separadas.
+    // The id cannot come from the name: dropping the same file twice is legitimate
+    // (the person fixed the content and dropped it again) and the two rows must
+    // exist separately.
     const novos: Anexo[] = lote.map((arquivo) => ({
       id: `anexo-${_sequencia++}`,
       nome: arquivo.name,
@@ -103,9 +103,9 @@ export function useAnexos({
     }))
     adicionarAnexos(novos)
 
-    // Em série, como a tela `/drive` sempre fez: em paralelo, dez arquivos
-    // grandes disputam a mesma banda e todos demoram mais — e o servidor
-    // acumula cada corpo na memória do worker enquanto lê.
+    // Serially, as the `/drive` screen always did: in parallel, ten large files
+    // compete for the same bandwidth and all take longer — and the server
+    // accumulates each body in the worker's memory while reading.
     void (async () => {
       for (let i = 0; i < lote.length; i++) {
         const arquivo = lote[i]

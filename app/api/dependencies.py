@@ -12,11 +12,11 @@ from app.models.user import User
 from typing import AsyncGenerator, List
 import jwt as _jwt
 from app.core.rbac import require_role, Role
-# As guardas puras moram em app.core.authorization.workflow_access (também
-# consumidas pelo servidor MCP). Os nomes continuam exportados daqui: todo
-# router que faz `from app.api.dependencies import verify_workspace_access`
-# (ou get_workspace_member_role, _has_min_workspace_role) segue funcionando
-# sem mudar.
+# The pure guards live in app.core.authorization.workflow_access (also
+# consumed by the MCP server). The names are still exported from here: every
+# router that does `from app.api.dependencies import verify_workspace_access`
+# (or get_workspace_member_role, _has_min_workspace_role) keeps working
+# unchanged.
 from app.core.authorization.workflow_access import (  # noqa: F401
     _has_min_workspace_role,
     carregar_workflow_acessivel,
@@ -27,12 +27,12 @@ from app.core.authorization.workflow_access import (  # noqa: F401
     verify_workspace_access,
 )
 
-# Corrige a forma de expor a sessão como dependência
+# Fixes the way the session is exposed as a dependency
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with get_session_async() as session:
         yield session
 
-# Usa a dependência correta acima
+# Uses the correct dependency above
 async def get_workflow_service(db: AsyncSession = Depends(get_db)) -> WorkflowService:
     return WorkflowService(db)
 
@@ -40,17 +40,17 @@ async def get_schedule_service(db: AsyncSession = Depends(get_db)) -> ScheduleSe
     return ScheduleService(db)
 
 
-# ── Autenticação JWT ──────────────────────────────────────────────────────────
+# ── JWT authentication ────────────────────────────────────────────────────────
 _bearer = HTTPBearer(auto_error=False)
 
 async def validate_access_token_claims(token: str) -> dict | None:
     """decode + audience(ACCESS) + `type == "access"` + blacklist (logout).
 
-    Retorna os claims, ou None em qualquer falha. NÃO faz lookup de User — usado
-    pelo portal, que autoriza pela própria claim. É a base de segurança comum
-    (a checagem de blacklist já divergiu entre os caminhos no passado)."""
-    # Import local (não o de topo) para que os testes que dão patch em
-    # app.core.utils.jwt_utils.decode_token alcancem esta chamada.
+    Returns the claims, or None on any failure. Does NOT look up the User — used
+    by the portal, which authorizes by the claim itself. It is the common security
+    base (the blacklist check has diverged between the paths in the past)."""
+    # Local import (not the top-level one) so that tests patching
+    # app.core.utils.jwt_utils.decode_token reach this call.
     from app.core.utils.jwt_utils import AUDIENCE_ACCESS, decode_token, is_token_blacklisted
     try:
         claims = decode_token(token, expected_audience=AUDIENCE_ACCESS)
@@ -64,11 +64,11 @@ async def validate_access_token_claims(token: str) -> dict | None:
 
 
 async def resolve_access_token(token: str, db: AsyncSession) -> User | None:
-    """Ponto ÚNICO de validação de JWT de acesso → User ativo.
+    """SINGLE point of access-JWT validation → active User.
 
-    validate_access_token_claims + User existente e ativo. Retorna o User, ou
-    None em qualquer falha — o caller decide a resposta (HTTP 401, WS close, bool).
-    Usado por get_current_user, ws_authenticate e _jwt_has_workspace_access."""
+    validate_access_token_claims + existing, active User. Returns the User, or
+    None on any failure — the caller decides the response (HTTP 401, WS close, bool).
+    Used by get_current_user, ws_authenticate and _jwt_has_workspace_access."""
     claims = await validate_access_token_claims(token)
     if claims is None:
         return None
@@ -84,8 +84,8 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Extrai e valida o Bearer token JWT.
-    Retorna o User autenticado ou lança HTTP 401.
+    Extracts and validates the JWT Bearer token.
+    Returns the authenticated User or raises HTTP 401.
     """
     if not credentials:
         raise HTTPException(status_code=401, detail="Token de autenticação não informado.")
@@ -95,8 +95,8 @@ async def get_current_user(
     return user
 
 
-# Alias mantido para compatibilidade com routers existentes.
-# Internamente delega ao require_role do rbac.py, eliminando a checagem duplicada.
+# Alias kept for compatibility with existing routers.
+# Internally delegates to rbac.py's require_role, eliminating the duplicated check.
 require_admin = require_role(Role.ADMIN)
 
 
@@ -105,25 +105,25 @@ async def get_user_workspace_ids(
     current_user=Depends(get_current_user),
 ) -> List[str]:
     """
-    Retorna a lista de id_hash de workspaces acessíveis ao usuário:
-    - Workspaces criados pelo usuário (owner_id)
-    - Workspaces dos quais o usuário é membro (WorkspaceMember)
+    Returns the list of id_hash of the workspaces accessible to the user:
+    - Workspaces created by the user (owner_id)
+    - Workspaces the user is a member of (WorkspaceMember)
 
-    A query mora em `workflow_access.listar_workspace_ids` (uma só, dono OU
-    membro, sem workspaces na lixeira); aqui é só o encaixe FastAPI.
+    The query lives in `workflow_access.listar_workspace_ids` (a single one, owner OR
+    member, excluding workspaces in the trash); this is just the FastAPI plumbing.
     """
     return await listar_workspace_ids(db, current_user.id_hash)
 
 
-# `verify_workspace_access` vive em app.core.authorization.workflow_access e é
-# re-exportada no topo deste módulo (mesmo nome, mesmas mensagens).
+# `verify_workspace_access` lives in app.core.authorization.workflow_access and is
+# re-exported at the top of this module (same name, same messages).
 
 
 _WS_AUTH_TIMEOUT = float(os.getenv("WS_AUTH_TIMEOUT", "5"))
 
 
 async def _ws_safe_close(ws: WebSocket, code: int, reason: str) -> None:
-    """Fecha o WS sem levantar se já estiver desconectado (evita double-close no ASGI)."""
+    """Closes the WS without raising if it is already disconnected (avoids double-close in ASGI)."""
     if ws.client_state != WebSocketState.DISCONNECTED:
         try:
             await ws.close(code=code, reason=reason)
@@ -132,11 +132,11 @@ async def _ws_safe_close(ws: WebSocket, code: int, reason: str) -> None:
 
 
 def _ws_endpoint_scope(ws: WebSocket) -> str:
-    """Escopo derivado da rota, para os callers que nao passam um explicito.
+    """Scope derived from the route, for callers that do not pass an explicit one.
 
-    Usa o nome do endpoint casado pelo router, NUNCA o path cru: o path de
-    /ws/workflow/{run_id} carrega o run_id e daria um balde por execucao — ou
-    seja, limite nenhum na pratica.
+    Uses the endpoint name matched by the router, NEVER the raw path: the path of
+    /ws/workflow/{run_id} carries the run_id and would give one bucket per run — that
+    is, no limit at all in practice.
     """
     endpoint = ws.scope.get("endpoint")
     return getattr(endpoint, "__name__", None) or "ws"
@@ -145,22 +145,22 @@ def _ws_endpoint_scope(ws: WebSocket) -> str:
 def _ws_rate_key(
     ws: WebSocket, *, prefix: str, scope: str | None, identity: str | None
 ) -> str:
-    """Chave do balde de rate limit de WebSocket.
+    """WebSocket rate limit bucket key.
 
-    Fecha dois furos que faziam o painel de execucao ser recusado com close 1013
-    em uso normal, com pouquissimos usuarios:
+    Closes two holes that made the run panel get refused with close 1013
+    under normal use, with very few users:
 
-      - `ws.client.host` cru: atras do Traefik e o IP do proxy para TODOS os
-        clientes, entao o balde era um contador GLOBAL da plataforma.
-        `get_client_ip` so aceita o X-Forwarded-For quando o peer e um proxy
-        confiavel (senao o proprio cliente forjaria uma identidade nova a cada
-        conexao e anularia o limite).
-      - chave sem namespace de endpoint: /ws/workflow e /ws/telemetry dividiam o
-        MESMO balde — e o TTL era o do primeiro que incrementasse —, logo abrir
-        o painel de execucao gastava a cota da telemetria e vice-versa.
+      - raw `ws.client.host`: behind Traefik it is the proxy's IP for ALL
+        clients, so the bucket was a GLOBAL counter for the platform.
+        `get_client_ip` only accepts X-Forwarded-For when the peer is a trusted
+        proxy (otherwise the client itself would forge a new identity on each
+        connection and nullify the limit).
+      - key without an endpoint namespace: /ws/workflow and /ws/telemetry shared
+        the SAME bucket — and the TTL was that of whichever incremented first —,
+        so opening the run panel spent the telemetry quota and vice versa.
 
-    `identity` (ex.: user_id_hash, quando a autenticacao ja rodou) e preferido
-    ao IP por ser imune a NAT e ao proxy.
+    `identity` (e.g.: user_id_hash, when authentication has already run) is preferred
+    over the IP because it is immune to NAT and to the proxy.
     """
     if identity:
         who = f"u:{identity}"
@@ -176,15 +176,15 @@ def _ws_rate_key(
 async def _ws_pre_accept_rate_check(
     ws: WebSocket, *, scope: str | None = None, limit: int = 30, period: int = 60
 ) -> bool:
-    """Rate limit por IP ANTES do accept — defesa anti-DoS contra abrir
-    centenas de sockets sem fornecer token (cada um custaria _WS_AUTH_TIMEOUT
-    de buffers alocados no servidor).
+    """Per-IP rate limit BEFORE the accept — anti-DoS defense against opening
+    hundreds of sockets without providing a token (each would cost _WS_AUTH_TIMEOUT
+    of buffers allocated on the server).
 
-    Sem accept previo, `ws.close()` envia 403 + close handshake. Cliente
-    bem comportado interpreta; clientes maliciosos veem TCP RST.
+    Without a prior accept, `ws.close()` sends 403 + close handshake. A
+    well-behaved client interprets it; malicious clients see a TCP RST.
 
-    Redis indisponivel -> permite (degradacao graciosa, alinhado com
-    check_ws_rate_limit pos-accept).
+    Redis unavailable -> allow (graceful degradation, aligned with
+    the post-accept check_ws_rate_limit).
     """
     try:
         from app.core.redis import contar_na_janela
@@ -207,24 +207,24 @@ async def ws_authenticate(
     ws: WebSocket, *, scope: str | None = None, require_role: str | None = None
 ) -> User | None:
     """
-    Autentica uma conexão WebSocket pela PRIMEIRA mensagem (frame de texto com o JWT).
+    Authenticates a WebSocket connection by its FIRST message (a text frame with the JWT).
 
-    Mais seguro que query param: o token nunca aparece em logs de proxy/servidor
-    (a query string vai para access logs; o corpo de mensagens WS, não).
+    Safer than a query param: the token never appears in proxy/server logs
+    (the query string goes to access logs; the body of WS messages does not).
 
-    Antes do accept: aplica rate limit por IP (30 abre/min), num balde proprio
-    do endpoint. `scope` nomeia esse balde; sem ele, o nome do endpoint da rota
-    e usado — o que importa e que rotas distintas nao compartilhem contador.
+    Before the accept: applies a per-IP rate limit (30 opens/min), in the
+    endpoint's own bucket. `scope` names that bucket; without it, the route's
+    endpoint name is used — what matters is that distinct routes do not share a counter.
 
-    Apos accept: aguarda o token por _WS_AUTH_TIMEOUT segundos — o timeout
-    fecha a janela de socket aberto não-autenticado (anti-DoS pos-accept).
+    After the accept: waits for the token for _WS_AUTH_TIMEOUT seconds — the timeout
+    closes the window of an open unauthenticated socket (post-accept anti-DoS).
 
-    require_role: se setado, exige user.role == require_role (ex.: "admin").
+    require_role: if set, requires user.role == require_role (e.g.: "admin").
 
-    Retorna o User autenticado, ou None com a conexão JÁ FECHADA (o caller deve
-    apenas `return` quando receber None).
+    Returns the authenticated User, or None with the connection ALREADY CLOSED (the
+    caller should just `return` when it gets None).
     """
-    # Defesa anti-DoS: bloqueia IP que abre WS em rajada antes mesmo do accept.
+    # Anti-DoS defense: blocks an IP that opens WS in bursts even before the accept.
     if not await _ws_pre_accept_rate_check(ws, scope=scope, limit=30, period=60):
         return None
 
@@ -236,20 +236,20 @@ async def ws_authenticate(
         await _ws_safe_close(ws, 4401, "Token não enviado.")
         return None
     except Exception as exc:
-        # Catch-all: cliente fechou no meio do receive (ex: React StrictMode
-        # remonta e descarta a 1a conexao -> Starlette levanta RuntimeError, nao
-        # WebSocketDisconnect). Sem isso, a excecao propaga e o cliente ve 1006.
+        # Catch-all: the client closed in the middle of the receive (e.g.: React StrictMode
+        # remounts and discards the 1st connection -> Starlette raises RuntimeError, not
+        # WebSocketDisconnect). Without this, the exception propagates and the client sees 1006.
         from app.core.utils.logger import get_logger as _gl
         _gl("app.api.dependencies.ws").debug("Falha ao receber token WS: %s", exc)
         await _ws_safe_close(ws, 4401, "Token não recebido.")
         return None
 
-    # Mesma validação do HTTP (decode + audience + type + blacklist + user ativo),
-    # via o ponto único resolve_access_token — o WS antes NÃO checava blacklist.
+    # Same validation as HTTP (decode + audience + type + blacklist + active user),
+    # via the single point resolve_access_token — the WS used NOT to check the blacklist.
     async with get_session_async() as db:
         user = await resolve_access_token(token, db)
-        # Extrai role dentro da sessão e destaca o objeto (os atributos já
-        # carregados permanecem acessíveis fora da sessão, sem DetachedInstanceError).
+        # Extract the role inside the session and detach the object (the already loaded
+        # attributes remain accessible outside the session, without DetachedInstanceError).
         role = user.role if user is not None else None
         if user is not None:
             db.expunge(user)
@@ -272,13 +272,13 @@ async def check_ws_rate_limit(
     identity: str | None = None,
 ) -> bool:
     """
-    Rate limit via Redis, chamado APÓS o accept (para que ws.close funcione).
-    Fecha a conexão e retorna False se exceder. Redis indisponível = degrada
-    graciosamente (permite a conexão). Retorna True se dentro do limite.
+    Rate limit via Redis, called AFTER the accept (so that ws.close works).
+    Closes the connection and returns False if exceeded. Redis unavailable = degrades
+    gracefully (allows the connection). Returns True if within the limit.
 
-    `scope` separa o balde por endpoint; `identity` (user_id_hash, quando a
-    autenticação já rodou) troca o IP por uma chave que o NAT e o proxy não
-    colapsam. Ver `_ws_rate_key`.
+    `scope` separates the bucket per endpoint; `identity` (user_id_hash, when
+    authentication has already run) swaps the IP for a key that NAT and the proxy
+    do not collapse. See `_ws_rate_key`.
     """
     try:
         from app.core.redis import contar_na_janela
@@ -297,16 +297,16 @@ import re as _re
 import urllib.parse as _urllib_parse
 
 
-# Traefik passTLSClientCert injeta um header com Subject, Issuer, SerialNumber etc.
-# Formato observado (URL-encoded): Subject="CN=executor-abc";SerialNumber="123456789..."
-# Aspas em torno do valor sao opcionais. SerialNumber vem em DECIMAL.
+# Traefik passTLSClientCert injects a header with Subject, Issuer, SerialNumber etc.
+# Observed format (URL-encoded): Subject="CN=executor-abc";SerialNumber="123456789..."
+# Quotes around the value are optional. SerialNumber comes in DECIMAL.
 #
-# O CN e extraido de dentro do campo Subject=... especificamente — buscar
-# `CN=` no header inteiro faria um CN vindo de Issuer (se algum dia habilitado
-# no middleware) ser aceito como identidade do executor.
+# The CN is extracted specifically from inside the Subject=... field — searching for
+# `CN=` in the whole header would let a CN coming from Issuer (if it is ever enabled
+# in the middleware) be accepted as the executor's identity.
 #
-# As aspas sao OPCIONAIS aqui, igual ao _SERIAL_RE: exigir `Subject="..."`
-# quebraria todos os executores de uma vez caso o Traefik emita sem aspas.
+# The quotes are OPTIONAL here, same as _SERIAL_RE: requiring `Subject="..."`
+# would break every executor at once if Traefik emits it without quotes.
 _SUBJECT_RE = _re.compile(r'Subject=(?:"([^"]*)"|([^;]*))')
 _CN_RE      = _re.compile(r'CN=([^,";]+)')
 _SERIAL_RE  = _re.compile(r'SerialNumber=(?:"([^"]+)"|([0-9a-fA-F]+))')
@@ -314,17 +314,17 @@ _SERIAL_RE  = _re.compile(r'SerialNumber=(?:"([^"]+)"|([0-9a-fA-F]+))')
 
 def _serial_to_int(serial_str: str | None, *, source: str) -> int | None:
     """
-    Converte serial em string para int com base explicita.
+    Converts a serial in string form to int with an explicit base.
 
-    `source` (obrigatório):
-      - "db"     : serial vindo do DB (armazenado em hex, ex:
+    `source` (required):
+      - "db"     : serial coming from the DB (stored in hex, e.g.:
                    '2acb673f0a8341df762af990ff29e76b').  # pragma: allowlist secret
-      - "header" : serial vindo do header Traefik (decimal, ex:
+      - "header" : serial coming from the Traefik header (decimal, e.g.:
                    '56883706168065981647801696766709589867').
 
-    A base explícita evita o bug histórico da heurística "auto" (um serial hex
-    com só dígitos 0-9 era lido como decimal → nunca casava com o header decimal
-    → executor rejeitado indefinidamente). `source` é sempre conhecido nos
+    The explicit base avoids the historical bug of the "auto" heuristic (a hex serial
+    with only digits 0-9 was read as decimal → never matched the decimal header
+    → executor rejected indefinitely). `source` is always known at the
     call sites (validate_executor_mtls).
     """
     if not serial_str:
@@ -343,12 +343,12 @@ def _serial_to_int(serial_str: str | None, *, source: str) -> int | None:
 
 
 def _parse_traefik_client_cert(header_value: str) -> tuple[str | None, str | None]:
-    """Extrai (cn, serial_str) do header `X-Forwarded-Tls-Client-Cert-Info` de Traefik."""
+    """Extracts (cn, serial_str) from Traefik's `X-Forwarded-Tls-Client-Cert-Info` header."""
     if not header_value:
         return None, None
     decoded = _urllib_parse.unquote(header_value)
 
-    # CN so vale se estiver dentro de Subject=... — nunca de outro campo.
+    # The CN only counts if it is inside Subject=... — never from another field.
     subject_match = _SUBJECT_RE.search(decoded)
     cn = None
     if subject_match:
@@ -357,7 +357,7 @@ def _parse_traefik_client_cert(header_value: str) -> tuple[str | None, str | Non
         cn = cn_match.group(1).strip().strip('"') if cn_match else None
 
     sn_match = _SERIAL_RE.search(decoded)
-    # SERIAL_RE tem 2 grupos alternativos (com aspas / sem aspas) — pega o que matched.
+    # SERIAL_RE has 2 alternative groups (with quotes / without quotes) — take whichever matched.
     serial = None
     if sn_match:
         serial = sn_match.group(1) or sn_match.group(2)
@@ -366,12 +366,12 @@ def _parse_traefik_client_cert(header_value: str) -> tuple[str | None, str | Non
 
 def assert_request_from_trusted_proxy(client_host: str | None, path: str) -> None:
     """
-    Fail-closed: o header de cert mTLS so vale se a conexao veio do proxy.
+    Fail-closed: the mTLS cert header only counts if the connection came from the proxy.
 
-    Camada 2 da defesa contra spoofing de `X-Forwarded-Tls-Client-Cert-Info`
-    (camada 1 e o middleware `strip-executor-cert-header@file` no Traefik).
-    Necessaria porque o `passTLSClientCert` do Traefik apenas sobrescreve o
-    header quando ha client cert — ele nunca remove um header ja presente.
+    Layer 2 of the defense against spoofing of `X-Forwarded-Tls-Client-Cert-Info`
+    (layer 1 is the `strip-executor-cert-header@file` middleware in Traefik).
+    Needed because Traefik's `passTLSClientCert` only overwrites the
+    header when there is a client cert — it never removes a header already present.
     """
     from app.core.trusted_proxy import is_trusted_proxy
     if is_trusted_proxy(client_host):
@@ -386,8 +386,8 @@ def assert_request_from_trusted_proxy(client_host: str | None, path: str) -> Non
 
 
 class ExecutorMtlsError(Exception):
-    """Falha na autenticação mTLS de executor. `reason` mapeia para o status
-    específico de cada camada (HTTP 4xx via _MTLS_HTTP_STATUS, WS close 44xx via
+    """Executor mTLS authentication failure. `reason` maps to the specific status
+    of each layer (HTTP 4xx via _MTLS_HTTP_STATUS, WS close 44xx via
     _MTLS_WS_CODE)."""
     def __init__(self, reason: str, detail: str):
         self.reason = reason
@@ -395,8 +395,8 @@ class ExecutorMtlsError(Exception):
         super().__init__(detail)
 
 
-# Mapeia motivo → status. Preserva EXATAMENTE o comportamento anterior de cada
-# camada (que divergia: ex. revogado era 401 no HTTP e 4403 no WS).
+# Maps reason → status. Preserves EXACTLY each layer's previous behavior
+# (which diverged: e.g. revoked was 401 on HTTP and 4403 on WS).
 _MTLS_HTTP_STATUS = {
     "missing_cert": 401, "not_found": 401, "inactive": 403,
     "serial_mismatch": 401, "expired": 401, "revoked": 401,
@@ -417,14 +417,14 @@ async def validate_executor_mtls(
     expected_executor_id: str | None = None,
     require_public_key: bool = False,
 ) -> "Executor":  # noqa: F821
-    """Pipeline ÚNICO de autenticação mTLS de executor (HTTP e WebSocket).
+    """SINGLE executor mTLS authentication pipeline (HTTP and WebSocket).
 
-    Traefik valida o cert contra a CA interna e injeta o header
-    X-Forwarded-Tls-Client-Cert-Info. Aqui: valida proxy confiável → parse do
-    CN(`executor-{id}`)/serial → executor ativo no DB → serial confere → cert
-    não expirado → não revogado. Levanta ExecutorMtlsError(reason, detail); cada
-    camada traduz `reason` para HTTP/WS. `expected_executor_id` (WS) exige que o
-    CN bata com o id da URL; `require_public_key` (WS) exige chave pública.
+    Traefik validates the cert against the internal CA and injects the
+    X-Forwarded-Tls-Client-Cert-Info header. Here: validate trusted proxy → parse the
+    CN(`executor-{id}`)/serial → executor active in the DB → serial matches → cert
+    not expired → not revoked. Raises ExecutorMtlsError(reason, detail); each
+    layer translates `reason` to HTTP/WS. `expected_executor_id` (WS) requires the
+    CN to match the id in the URL; `require_public_key` (WS) requires a public key.
     """
     from app.services import executor_enrollment_service
     from app.models.executor import Executor
@@ -452,12 +452,12 @@ async def validate_executor_mtls(
     if require_public_key and not ag.public_key:
         raise ExecutorMtlsError("no_public_key", "Executor sem chave publica registrada.")
 
-    # Defesa em profundidade: Traefik já valida o cert no handshake, mas checamos
-    # validade e serial contra o banco aqui também.
+    # Defense in depth: Traefik already validates the cert in the handshake, but we
+    # check validity and serial against the database here too.
     if ag.cert_expires_at is not None and ag.cert_expires_at < utc_now_naive():
         raise ExecutorMtlsError("expired", "Cert mTLS expirado.")
 
-    # Normaliza ambos serials para int — Traefik manda em decimal, DB tem em hex.
+    # Normalize both serials to int — Traefik sends decimal, the DB has hex.
     db_serial_int     = _serial_to_int(ag.cert_serial, source="db")
     header_serial_int = _serial_to_int(serial, source="header")
     if db_serial_int is None or header_serial_int is None or db_serial_int != header_serial_int:
@@ -473,8 +473,8 @@ async def get_agent_from_mtls(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Dependency HTTP que autentica o executor via cert mTLS (ver
-    validate_executor_mtls). Sem fallback para X-Api-Key — 401/403 em falha."""
+    """HTTP dependency that authenticates the executor via mTLS cert (see
+    validate_executor_mtls). No fallback to X-Api-Key — 401/403 on failure."""
     header_value = request.headers.get("X-Forwarded-Tls-Client-Cert-Info", "")
     try:
         return await validate_executor_mtls(
@@ -496,22 +496,22 @@ async def get_agent_from_mtls(
 
 
 class ExecutorOuUsuario:
-    """Quem autenticou numa rota que aceita as duas identidades.
+    """Who authenticated on a route that accepts both identities.
 
-    Exatamente um dos dois vem preenchido. Existe porque `agent_mtls_or_user_auth`
-    antes devolvia `None`: o handler sabia que ALGUEM se autenticou, mas nao quem
-    — e por isso nao tinha como decidir se aquele chamador podia ver AQUELE
-    recurso. As rotas de leitura de executor ficaram abertas a qualquer conta
-    justamente por causa disso.
+    Exactly one of the two is filled in. It exists because `agent_mtls_or_user_auth`
+    used to return `None`: the handler knew that SOMEONE had authenticated, but not who
+    — and so it had no way to decide whether that caller could see THAT
+    resource. The executor read routes were left open to any account
+    precisely because of that.
     """
 
     __slots__ = ("executor", "user")
 
     def __init__(self, *, executor=None, user: User | None = None):
-        # Sem esta guarda, um `ExecutorOuUsuario()` vazio chegaria aos helpers de
-        # autorizacao e estouraria em `None.role` — AttributeError vira 500 no
-        # handler generico, que e o pior desfecho possivel numa checagem de
-        # acesso (nao nega, nao concede, so quebra).
+        # Without this guard, an empty `ExecutorOuUsuario()` would reach the
+        # authorization helpers and blow up on `None.role` — AttributeError becomes a 500 in
+        # the generic handler, which is the worst possible outcome for an access
+        # check (it does not deny, does not grant, it just breaks).
         if (executor is None) == (user is None):
             raise ValueError("ExecutorOuUsuario exige exatamente um entre executor e user.")
         self.executor = executor
@@ -527,11 +527,11 @@ async def agent_mtls_or_user_auth(
     db: AsyncSession = Depends(get_db),
 ) -> ExecutorOuUsuario:
     """
-    Aceita autenticacao por cert mTLS (executor) ou Bearer JWT (usuario).
-    Substituto do antigo `agent_or_user_auth` (X-Api-Key) — sem retrocompat.
+    Accepts authentication by mTLS cert (executor) or Bearer JWT (user).
+    Replacement for the old `agent_or_user_auth` (X-Api-Key) — no backward compatibility.
 
-    Devolve `ExecutorOuUsuario` com a identidade resolvida. AUTENTICA apenas: a
-    autorizacao (qual executor/workspace aquele chamador alcanca) e do handler.
+    Returns `ExecutorOuUsuario` with the resolved identity. It only AUTHENTICATES:
+    authorization (which executor/workspace that caller can reach) is the handler's job.
     """
     # Tenta mTLS primeiro
     header_value = request.headers.get("X-Forwarded-Tls-Client-Cert-Info", "")
@@ -540,14 +540,14 @@ async def agent_mtls_or_user_auth(
             executor = await get_agent_from_mtls(request, db)
             return ExecutorOuUsuario(executor=executor)
         except HTTPException:
-            # Cai para Bearer JWT — pode ser um humano usando navegador.
+            # Fall back to Bearer JWT — it may be a human using a browser.
             pass
 
-    # Tenta Bearer JWT. `resolve_access_token` e o ponto unico: decode +
-    # audience + type + BLACKLIST + usuario existente e ativo. O `decode_token`
-    # solto que existia aqui pulava a blacklist e o lookup do User, entao um
-    # token de sessao ja encerrada por /auth/logout — ou de usuario suspenso —
-    # seguia valendo nestas rotas ate expirar sozinho.
+    # Try Bearer JWT. `resolve_access_token` is the single point: decode +
+    # audience + type + BLACKLIST + existing, active user. The standalone
+    # `decode_token` that used to be here skipped the blacklist and the User lookup, so a
+    # token from a session already ended by /auth/logout — or from a suspended user —
+    # kept working on these routes until it expired on its own.
     _bearer_scheme = HTTPBearer(auto_error=False)
     credentials = await _bearer_scheme(request)
     if not credentials:
@@ -563,8 +563,8 @@ async def get_agent_or_404(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Dependency reutilizável: busca executor por id_hash.
-    Lança HTTP 404 se não encontrado ou deletado.
+    Reusable dependency: fetches an executor by id_hash.
+    Raises HTTP 404 if not found or deleted.
     """
     from app.services import executor_service
     ag = await executor_service.get_agent(db, executor_id)
@@ -573,11 +573,11 @@ async def get_agent_or_404(
     return ag
 
 
-# ── RBAC de workspace member ──────────────────────────────────────────────────
+# ── Workspace member RBAC ─────────────────────────────────────────────────────
 
-# `WORKSPACE_ROLE_ORDER`, `_has_min_workspace_role` e `get_workspace_member_role`
-# vivem em app.core.authorization.workflow_access (os dois últimos re-exportados
-# no topo).
+# `WORKSPACE_ROLE_ORDER`, `_has_min_workspace_role` and `get_workspace_member_role`
+# live in app.core.authorization.workflow_access (the last two re-exported
+# at the top).
 
 
 async def get_accessible_workflow_with_role(
@@ -587,14 +587,14 @@ async def get_accessible_workflow_with_role(
     current_user=Depends(get_current_user),
 ):
     """
-    Retorna (workflow, role_str), ou (workflow, None) para o membro de um
-    workspace sem dono, que lê mas não age (ver `carregar_workflow_acessivel`).
-    Lança 404 se não encontrado/inativo, 403 se sem acesso ao workspace.
-    A regra mora em `workflow_access.carregar_workflow_acessivel`.
+    Returns (workflow, role_str), or (workflow, None) for the member of a
+    workspace without an owner, who reads but does not act (see `carregar_workflow_acessivel`).
+    Raises 404 if not found/inactive, 403 if there is no access to the workspace.
+    The rule lives in `workflow_access.carregar_workflow_acessivel`.
 
-    As rotas não a pedem direto: pedem `workflow_com_papel`, que a usa e já
-    compara o papel. Continua sendo o ponto de `dependency_overrides` dos
-    testes — trocá-la troca o (workflow, papel) e a comparação segue valendo.
+    Routes do not request it directly: they request `workflow_com_papel`, which uses it and
+    already compares the role. It remains the `dependency_overrides` point for the
+    tests — replacing it replaces the (workflow, role) and the comparison still applies.
     """
     return await carregar_workflow_acessivel(
         service, db, id_hash, current_user.id_hash, aceitar_sem_papel=True,
@@ -602,22 +602,22 @@ async def get_accessible_workflow_with_role(
 
 
 def workflow_com_papel(minimo: str | None, mensagem: str | None = None):
-    """Dependency das rotas `/workflows/{id_hash}...`: o workflow do path, já
-    autorizado. `wf = Depends(workflow_com_papel(ROLE_EDITOR))`.
+    """Dependency for the `/workflows/{id_hash}...` routes: the workflow from the path, already
+    authorized. `wf = Depends(workflow_com_papel(ROLE_EDITOR))`.
 
-    404 se não existe ou está na lixeira, 403 se o usuário não é do workspace
-    (`carregar_workflow_acessivel`, nessa ordem) e 403 se o papel dele não
-    alcança `minimo` — com `mensagem` quando a rota tem uma própria, ou a padrão
-    de `exigir_papel`. `minimo=None` é leitura: basta pertencer ao workspace.
+    404 if it does not exist or is in the trash, 403 if the user is not in the workspace
+    (`carregar_workflow_acessivel`, in that order) and 403 if their role does not
+    reach `minimo` — with `mensagem` when the route has its own, or the default
+    from `exigir_papel`. `minimo=None` is read access: belonging to the workspace is enough.
 
-    O papel mínimo fica DECLARADO na assinatura da rota, e não numa linha do
-    corpo que pode ser esquecida — foi o que aconteceu com `GET /pins` e com o
-    `PUT` de agendamento. A declaração fica exposta em `papel_minimo`, e
-    `tests/unit/test_papel_minimo_das_rotas.py` a confere rota a rota.
+    The minimum role is DECLARED in the route signature, not in a line of the
+    body that can be forgotten — which is what happened with `GET /pins` and with the
+    schedule `PUT`. The declaration is exposed in `papel_minimo`, and
+    `tests/unit/test_papel_minimo_das_rotas.py` checks it route by route.
 
-    Como a guarda roda na resolução das dependências, ela responde ANTES da
-    validação do corpo: quem não tem o papel recebe o 403 mesmo mandando um
-    corpo inválido — o 422 fica para quem pode usar a rota.
+    Since the guard runs during dependency resolution, it responds BEFORE body
+    validation: whoever lacks the role gets the 403 even when sending an
+    invalid body — the 422 is for those who can use the route.
     """
 
     async def _workflow_com_papel(
@@ -626,8 +626,8 @@ def workflow_com_papel(minimo: str | None, mensagem: str | None = None):
         wf, papel = wf_com_papel
         if minimo is not None:
             if papel is None:
-                # Membro de workspace sem dono: lê, mas não age. É o 403 de quem
-                # não está no workspace, o mesmo de antes da guarda única.
+                # Member of a workspace without an owner: reads, but does not act. It is the 403 of
+                # someone not in the workspace, the same as before the single guard.
                 raise HTTPException(status_code=403, detail="Acesso negado a este recurso.")
             exigir_papel(papel, minimo, mensagem)
         return wf

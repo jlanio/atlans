@@ -1,9 +1,9 @@
 // desktop/src/renderer/components/StatusBadge.tsx
 //
-// Mesmas cores de status do StatusBadge do app web (.interface-design/system.md,
-// secao "Status colors"). Sao a excecao aceita a regra de usar so tokens
-// semanticos: verde/vermelho/azul/amarelo comunicam desfecho de execucao de
-// forma que `--primary` nao comunica.
+// Same status colors as the web app's StatusBadge (.interface-design/system.md,
+// "Status colors" section). They are the accepted exception to the rule of using
+// only semantic tokens: green/red/blue/yellow communicate run outcome in a way
+// that `--primary` does not.
 import { cn } from '../lib/utils.js'
 
 const CORES: Record<string, string> = {

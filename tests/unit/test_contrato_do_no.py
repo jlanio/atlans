@@ -1,11 +1,12 @@
 # tests/unit/test_contrato_do_no.py
-"""O description() de um nó é validado NA IMPORTAÇÃO (A14).
+"""A node's description() is validated AT IMPORT (A14).
 
-O campo `type` acumulava três papéis (categoria do nó, tipo de campo de
-saída, widget de propriedade) e nenhum era conferido: um typo passava mudo
-pelo registro e virava defeito visual longe da causa — nó sem ícone, campo
-sem editor, porta sem tipo. Agora `register_node` chama
-`validar_description` e o nó malformado morre no CI com a causa exata.
+The `type` field piled up three roles (node category, output field type,
+property widget) and none was checked: a typo slipped silently through the
+registry and became a visual defect far from its cause — a node without an
+icon, a field without an editor, a port without a type. Now `register_node`
+calls `validar_description` and the malformed node dies in CI with the exact
+cause.
 """
 import pytest
 
@@ -49,8 +50,8 @@ def test_categoria_fora_do_vocabulario_e_recusada():
 
 
 def test_chave_desconhecida_no_topo_e_recusada():
-    # O typo clássico: 'output' (singular) em vez de 'outputs' — antes o campo
-    # simplesmente deixava de existir para o editor.
+    # The classic typo: 'output' (singular) instead of 'outputs' — before, the
+    # field simply ceased to exist for the editor.
     with pytest.raises(ValueError, match="chaves desconhecidas.*output"):
         d = _desc()
         d["output"] = d.pop("outputs")
@@ -73,7 +74,7 @@ def test_credential_sem_tipos_e_recusado():
 
 
 def test_campo_de_saida_sem_type_e_recusado():
-    # A regra que o A13 institui: campo de saída SEM tipo não entra mais.
+    # The rule that A13 establishes: an output field WITHOUT a type is no longer accepted.
     with pytest.raises(ValueError, match="campo de saída 'output' com type inválido: None"):
         validar_description(_desc(outputs=[{"name": "output"}]))
 
@@ -95,7 +96,7 @@ def test_nome_com_espaco_e_recusado():
         validar_description(_desc(name="No De Teste"))
 
 
-# ── register_node aplica a validação na importação ───────────────────────────
+# ── register_node applies the validation at import ──────────────────────────
 
 def test_register_node_recusa_no_malformado():
     class NoTorto(BaseNode):
@@ -127,7 +128,7 @@ def test_register_node_registra_no_valido():
         NODE_REGISTRY.pop("NoReto", None)
 
 
-# ── O catálogo real inteiro respeita o contrato ──────────────────────────────
+# ── The entire real catalog honors the contract ─────────────────────────────
 
 def test_os_63_nos_do_catalogo_passam_no_contrato():
     assert len(NODE_REGISTRY) >= 63
@@ -136,7 +137,7 @@ def test_os_63_nos_do_catalogo_passam_no_contrato():
 
 
 def test_vocabularios_sao_fechados_e_documentados():
-    """Os três papéis do antigo 'type', agora com vocabulário próprio."""
+    """The three roles of the old 'type', now each with its own vocabulary."""
     assert CATEGORIAS == {"trigger", "action", "spatial", "datasource", "output", "control"}
     assert "geodataframe" in TIPOS_DE_CAMPO and "select" not in TIPOS_DE_CAMPO
     assert "select" in TIPOS_DE_PROPRIEDADE and "geodataframe" not in TIPOS_DE_PROPRIEDADE

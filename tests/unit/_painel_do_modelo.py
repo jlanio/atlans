@@ -1,6 +1,6 @@
 # tests/unit/_painel_do_modelo.py
-"""O que os testes do painel do modelo (núcleo e extensões) dividem: o banco em
-memória atrás da API e o catálogo e a sonda do provedor dublados."""
+"""What the model panel tests (core and extensions) share: the in-memory
+database behind the API and the stubbed provider catalog and probe."""
 from contextlib import ExitStack, asynccontextmanager
 from unittest.mock import patch
 
@@ -12,8 +12,8 @@ from app.models.system_config import SystemConfig
 from app.models.uso_do_assistente import UsoDoAssistente
 from tests.unit._mcp_harness import TABELAS_DAS_EXTENSOES
 
-# A configuração (o modelo) e o uso medido; com os planos, as tabelas deles,
-# que o custo por plano consulta.
+# The configuration (the model) and the measured usage; with the plans, their
+# tables, which the per-plan cost queries.
 TABELAS = [SystemConfig.__table__, UsoDoAssistente.__table__, *TABELAS_DAS_EXTENSOES]
 
 CATALOGO = [
@@ -26,8 +26,8 @@ CATALOGO = [
 
 @asynccontextmanager
 async def api_com_banco(client, usuario):
-    """O cliente da API como admin, com o banco em memória no lugar do real.
-    Cada arquivo de teste o embrulha na própria fixture `api`."""
+    """The API client as admin, with the in-memory database in place of the real
+    one. Each test file wraps it in its own `api` fixture."""
     from app.api.dependencies import get_db
     from app.main import app
 
@@ -51,11 +51,11 @@ async def api_com_banco(client, usuario):
 
 
 def com_catalogo(catalogo=CATALOGO, erro=None, sonda=None):
-    """O catálogo dublado e a SONDA dublada.
+    """The stubbed catalog and the stubbed PROBE.
 
-    A sonda faz uma chamada real ao provedor antes de salvar um modelo — é ela
-    que impede a tela de aceitar um id que não funciona. Aqui ela é um no-op por
-    padrão; `sonda=<exceção>` faz a recusa acontecer.
+    The probe makes a real call to the provider before saving a model — it is
+    what stops the screen from accepting an id that does not work. Here it is a
+    no-op by default; `sonda=<exceção>` makes the refusal happen.
     """
     async def _listar(**kw):
         if erro is not None:

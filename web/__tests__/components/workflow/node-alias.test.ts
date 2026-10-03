@@ -7,15 +7,15 @@ import {
 } from "@/app/components/workflow/utils/node-alias"
 
 /**
- * Regressão: o autocomplete de expressões sugeria `data.alias` — o rótulo de
- * exibição — e inseria `{{$Caixa Delimitadora.bbox}}` no campo. O executor
- * registra o nó sob `_resolve_alias` (flow/executor/core.py), que exige
- * identificador válido e senão cai no `name` da classe, então a expressão
- * apontava para uma chave inexistente no contexto.
+ * Regression: the expression autocomplete suggested `data.alias` — the display
+ * label — and inserted `{{$Caixa Delimitadora.bbox}}` into the field. The
+ * executor registers the node under `_resolve_alias` (flow/executor/core.py),
+ * which requires a valid identifier and otherwise falls back to the class's
+ * `name`, so the expression pointed to a key that didn't exist in the context.
  *
- * Efeito colateral do espaço: o gatilho do autocomplete varre identificadores,
- * então depois de inserir o rótulo o próprio texto deixava de casar e o "."
- * nunca listava os campos de saída.
+ * Side effect of the space: the autocomplete trigger scans identifiers, so after
+ * inserting the label the text itself stopped matching and the "." never listed
+ * the output fields.
  */
 
 describe("isValidAlias", () => {
@@ -64,8 +64,8 @@ describe("resolveNodeAlias", () => {
   })
 
   it("data.alias preenchido descarta properties.alias, como o `or` do executor", () => {
-    // O executor escolhe por veracidade: com `alias` preenchido ele nem olha
-    // properties.alias, e o rótulo com espaço o joga direto no `name`.
+    // The executor picks by truthiness: with `alias` filled in it doesn't even
+    // look at properties.alias, and the label with a space sends it straight to `name`.
     expect(resolveNodeAlias({
       alias: "Caixa Delimitadora",
       properties: { alias: "Caixa" },
@@ -74,8 +74,8 @@ describe("resolveNodeAlias", () => {
   })
 
   it("acompanha a promoção do alias feita ao salvar o modal", () => {
-    // saveNodeConfig copia o alias digitado para data.alias — é esse o estado
-    // que chega ao banco e, portanto, ao executor.
+    // saveNodeConfig copies the typed alias to data.alias — that's the state
+    // that reaches the database and, therefore, the executor.
     expect(resolveNodeAlias({
       alias: "Caixa",
       properties: { alias: "Caixa" },
@@ -126,10 +126,10 @@ describe("IDENTIFIER_SOURCE", () => {
     const trigger = new RegExp(`\\$(${IDENTIFIER_SOURCE}(?:\\.[\\p{ID_Continue}]*)*)$`, "u")
 
     expect("{{$ComputeBoundingBox.bbox".match(trigger)?.[1]).toBe("ComputeBoundingBox.bbox")
-    // Depois do ponto, ainda sem campo: é aqui que a lista de saídas aparece.
+    // After the dot, still without a field: this is where the output list appears.
     expect("{{$ComputeBoundingBox.".match(trigger)?.[1]).toBe("ComputeBoundingBox.")
     expect("{{$Área.total".match(trigger)?.[1]).toBe("Área.total")
-    // O espaço corta o gatilho — motivo pelo qual o rótulo nunca pode ir ao texto.
+    // The space cuts the trigger — the reason the label can never go into the text.
     expect("{{$Caixa Delimitadora".match(trigger)).toBeNull()
   })
 })

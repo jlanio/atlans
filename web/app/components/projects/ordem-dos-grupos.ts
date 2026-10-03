@@ -1,13 +1,14 @@
 /**
- * Nova ordem dos grupos ao soltar um grupo sobre outro.
+ * New group order when dropping a group on another.
  *
- * O arrastado assume a posição do alvo, e o resto desliza. Separado da tela por
- * ser o único pedaço com lógica: tirar de um índice e inserir em outro tem uma
- * armadilha — depois da remoção, os índices à frente do original andaram uma
- * casa para trás, e usar o índice antigo insere no lugar errado.
+ * The dragged one takes the target's position, and the rest slide. Separated
+ * from the screen for being the only piece with logic: removing from one index
+ * and inserting at another has a pitfall — after the removal, the indexes ahead
+ * of the original moved back one slot, and using the old index inserts in the
+ * wrong place.
  *
- * Devolve a MESMA lista quando não há o que mover, para que quem chama possa
- * comparar por identidade antes de disparar a gravação no servidor.
+ * Returns the SAME list when there is nothing to move, so the caller can
+ * compare by identity before firing the save on the server.
  */
 export function moverGrupo(
   ordem: string[],
@@ -18,8 +19,8 @@ export function moverGrupo(
 
   const de = ordem.indexOf(origemId)
   const para = ordem.indexOf(alvoId)
-  // Id fora da lista: a tela está trabalhando com um conjunto diferente do que
-  // tem em mãos. Mover às cegas gravaria uma ordem inventada.
+  // Id not in the list: the screen is working with a different set than the
+  // one at hand. Moving blindly would save a made-up order.
   if (de < 0 || para < 0) return ordem
 
   const proximo = [...ordem]

@@ -3,11 +3,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import type { IAdminUser, IAdminUserListParams, IAdminUserListResponse } from "@/service/types"
 
 /**
- * Admin › Usuários: cada troca de filtro, de página ou da busca (debounce)
- * dispara uma busca nova, e a anterior continua em voo. Sem guarda, a que
- * RESOLVESSE por último vencia: a resposta de um filtro antigo chegava depois
- * e sobrescrevia a lista do filtro atual — «Excluídos» selecionado, e na tela
- * os suspensos.
+ * Admin › Users: every change of filter, page or search (debounced)
+ * fires a new fetch, and the previous one stays in flight. Without a guard, whichever
+ * RESOLVED last won: the response for an old filter arrived later
+ * and overwrote the current filter's list — "Excluídos" (deleted) selected, and on screen
+ * the suspended users.
  */
 
 const svc = vi.hoisted(() => ({ getAdminUsers: vi.fn(), exportUsersCSV: vi.fn() }))
@@ -33,7 +33,7 @@ function usuario(username: string, status: IAdminUser["status"]): IAdminUser {
 const pagina = (...items: IAdminUser[]): { success: true; status: 200; data: IAdminUserListResponse } =>
   ({ success: true, status: 200, data: { items, total: items.length, limit: 25, offset: 0 } })
 
-/** Cada busca fica pendente até o teste resolvê-la — na ordem que ele quiser. */
+/** Each fetch stays pending until the test resolves it — in whatever order it wants. */
 let pendentes: { params: IAdminUserListParams; resolver: (r: unknown) => void }[] = []
 function resolverDoFiltro(status: string | undefined, resposta: unknown) {
   const i = pendentes.findIndex(p => p.params.status === status)
@@ -57,12 +57,12 @@ describe("Admin › Usuários — resposta de filtro antigo", () => {
     await resolverDoFiltro("active", pagina(usuario("ana", "active")))
     expect(await screen.findByText("ana")).toBeInTheDocument()
 
-    // Duas trocas de filtro seguidas: as duas buscas ficam em voo juntas.
+    // Two filter changes in a row: both fetches are in flight together.
     fireEvent.click(screen.getByRole("button", { name: "Suspensos" }))
     fireEvent.click(screen.getByRole("button", { name: "Excluídos" }))
     await waitFor(() => expect(pendentes.map(p => p.params.status)).toEqual(["suspended", "deleted"]))
 
-    // A do filtro atual chega primeiro; a do filtro antigo, depois.
+    // The current filter's arrives first; the old filter's, afterward.
     await resolverDoFiltro("deleted", pagina(usuario("carla", "deleted")))
     await resolverDoFiltro("suspended", pagina(usuario("bruno", "suspended")))
 

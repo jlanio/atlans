@@ -1,13 +1,13 @@
 # tests/unit/test_carta_imagem.py
 """
-O no CartaImagem (flow/nodes/outputs/carta_imagem.py) — contrato, os dois
-modos de entrada, os tres formatos, o fundo de mapa, a localidade e as guardas.
+The CartaImagem node (flow/nodes/outputs/carta_imagem.py) — contract, the two
+input modes, the three formats, the basemap, locality and the guards.
 
-`persistir_artefato` e substituido por um dublê que captura o que o no manda:
-sem ele o no tentaria o presign no servidor (o conftest nao define
-EXECUTOR_SYNC_MODE). O render e real, em 72 dpi, para o teste ser rapido; o
-que se afirma sobre a imagem sao os bytes de assinatura de cada formato e o
-`_Render` que o no montou — capturado por um dublê que envolve o render real.
+`persistir_artefato` is replaced by a double that captures what the node sends:
+without it the node would try the presign on the server (the conftest doesn't
+define EXECUTOR_SYNC_MODE). The render is real, at 72 dpi, so the test is fast;
+what is asserted about the image is each format's signature bytes and the
+`_Render` the node built — captured by a double that wraps the real render.
 """
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ def _no(params: dict, node_id: str = "n1", ctx: dict | None = None) -> CartaImag
 
 @pytest.fixture
 def persistido():
-    """Captura os kwargs de `persistir_artefato`; nada sai para a rede."""
+    """Captures the kwargs of `persistir_artefato`; nothing goes out to the network."""
     capturado: dict = {}
 
     def fake(**kwargs):
@@ -85,7 +85,7 @@ def persistido():
 
 @pytest.fixture
 def render():
-    """O `_Render` que o no montou, capturado ao redor do render real."""
+    """The `_Render` the node built, captured around the real render."""
     capturado: dict = {}
     original = carta_imagem._renderizar
 
@@ -125,9 +125,9 @@ def test_contrato_do_no():
 
 
 def test_options_batem_com_as_tabelas_da_carta():
-    """O execute indexa FORMATOS, TAMANHOS e FUNDOS_COM_NOME direto pelo valor
-    do select, sem conferir: quem garante que o valor e uma das options e o
-    `validate()`. Entao cada option precisa ter a sua entrada na tabela."""
+    """execute indexes FORMATOS, TAMANHOS and FUNDOS_COM_NOME directly by the select's
+    value, without checking: what guarantees the value is one of the options is
+    `validate()`. So each option needs its own entry in the table."""
     props = {p["name"]: p for p in CartaImagem.description()["properties"]}
 
     def valores(nome):
@@ -167,7 +167,7 @@ async def test_duas_portas_desenham_duas_camadas(persistido, pontos, poligonos):
     assert persistido["label"] == "Carta"
     assert persistido["features"] == len(pontos) + len(poligonos)
     assert persistido["workspace_id"] == "ws-1" and persistido["task_id"] == "task-1"
-    # Chaves PLANAS, as declaradas — e o meta do artefato.
+    # FLAT keys, the declared ones — and the artifact's meta.
     assert set(resultado) == CHAVES_DECLARADAS | {"__artifact__"}
     assert resultado["camadas"] == 2
     assert resultado["format"] == "png"
@@ -192,13 +192,13 @@ async def test_formato_decide_extensao_mime_e_assinatura(persistido, pontos, pol
     assert resultado["format"] == formato
 
 
-# ── Uma porta, nenhuma porta ─────────────────────────────────────────────────
+# ── One port, no port ────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_uma_porta_com_aresta_anonima_desenha_com_o_nome_da_porta(persistido, render, poligonos):
-    """Com UMA porta o editor nao grava `to_key`: o dict do pai chega
-    espalhado (`output`), nao pelo nome da porta. A camada tem de entrar
-    mesmo assim, e a legenda leva o nome da porta."""
+    """With ONE port the editor doesn't store `to_key`: the parent's dict arrives
+    spread out (`output`), not under the port name. The layer has to get in
+    anyway, and the legend carries the port name."""
     resultado = await _no({"ports": ["lotes"]}).execute({"output": poligonos})
     assert resultado["camadas"] == 1
     camada = render["render"].camadas[0]
@@ -237,7 +237,7 @@ async def test_rotulos_e_cores_por_porta(persistido, render, pontos, poligonos):
     await _no({
         "ports": ["focos_de_calor", "municipios"],
         "rotulos": {"focos_de_calor": "Focos de calor"},
-        "cores": '{"focos_de_calor": "#eb5757"}',   # JSON em string tambem vale
+        "cores": '{"focos_de_calor": "#eb5757"}',   # JSON in a string also works
     }).execute({"focos_de_calor": pontos, "municipios": poligonos})
     a, b = render["render"].camadas
     assert (a.rotulo, a.cor) == ("Focos de calor", "#eb5757")
@@ -265,7 +265,7 @@ async def test_titulo_repetido_no_mesmo_run_e_erro_mas_retry_nao(persistido, pon
     await _no({"titulo": "Repetida"}, node_id="n1", ctx=ctx).execute({"output": pontos})
     with pytest.raises(ValueError, match="titulos diferentes"):
         await _no({"titulo": "Repetida"}, node_id="n2", ctx=ctx).execute({"output": pontos})
-    # O MESMO no rodando de novo (retry) nao e colisao.
+    # The SAME node running again (retry) is not a collision.
     await _no({"titulo": "Repetida"}, node_id="n1", ctx=ctx).execute({"output": pontos})
 
 
@@ -281,7 +281,7 @@ async def test_camada_sem_crs_e_tratada_como_4326(persistido, render, poligonos)
     r = render["render"]
     assert r.crs_texto == "EPSG:32720"
     x0, _, x1, _ = r.extensao
-    assert x1 - x0 > 10_000            # metros, nao graus
+    assert x1 - x0 > 10_000            # meters, not degrees
     assert any("sem CRS" in a for a in avisos)
 
 
@@ -295,14 +295,14 @@ async def test_crs_geografico_pula_a_escala_com_aviso(persistido, render, poligo
     assert any("Escala grafica pulada" in a for a in avisos)
 
 
-# ── Fundo de mapa ────────────────────────────────────────────────────────────
+# ── Basemap ──────────────────────────────────────────────────────────────────
 
 @pytest.fixture
 def sem_espera(monkeypatch):
     monkeypatch.setattr(carta_imagem, "espera_exponencial", lambda *a, **k: 0.0)
 
 
-# O hibrido que um servidor configurado injetaria no no (MAPA_HIBRIDO_*).
+# The hybrid a configured server would inject into the node (MAPA_HIBRIDO_*).
 HIBRIDO_DE_TESTE = {"url": "https://hibrido.example.org/{z}/{x}/{y}.jpg", "credito": "© Hibrido de Teste"}
 
 
@@ -370,8 +370,8 @@ async def test_template_personalizado_sem_marcadores_e_erro(persistido, pontos):
 
 @pytest.mark.asyncio
 async def test_template_para_a_rede_interna_e_barrado(persistido, pontos):
-    """A guarda de SSRF dos nos de HTTP vale aqui: um template escrito no fluxo
-    nao alcanca os metadados da nuvem nem a rede interna."""
+    """The SSRF guard of the HTTP nodes applies here: a template written in the workflow
+    doesn't reach the cloud metadata nor the internal network."""
     chamou = []
 
     async def nunca(method, url, **kwargs):

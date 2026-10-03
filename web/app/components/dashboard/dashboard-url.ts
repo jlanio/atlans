@@ -1,15 +1,15 @@
 /**
- * Estado do Dashboard na URL (docs/specs/dashboard.md §1 e §3.9).
+ * Dashboard state in the URL (docs/specs/dashboard.md §1 and §3.9).
  *
- * Dois recortes vivem na query string, para que F5, o botão voltar e um link
- * colado reabram a mesma visão — mesmo padrão de `observability/historico-url.ts`
- * e `projects/projetos-url.ts`:
- *   - o ESCOPO: o painel é do workspace ATIVO por padrão; "Todos os workspaces"
- *     troca (`?escopo=todos`);
- *   - o PERÍODO: a janela dos indicadores/gráfico e das falhas em "Precisa de
- *     atenção" — 7, 30 (padrão) ou 90 dias (`?periodo=`), o mesmo conjunto do
- *     Histórico, de onde o tipo é reusado.
- * Os defaults não vão para a URL, para ela ficar limpa quando nada foi tocado.
+ * Two slices live in the query string, so that F5, the back button and a
+ * pasted link reopen the same view — same pattern as `observability/historico-url.ts`
+ * and `projects/projetos-url.ts`:
+ *   - the SCOPE: the dashboard is for the ACTIVE workspace by default; "Todos os
+ *     workspaces" (all workspaces) switches it (`?escopo=todos`);
+ *   - the PERIOD: the window of the indicators/chart and of the failures in
+ *     "Precisa de atenção" — 7, 30 (default) or 90 days (`?periodo=`), the same
+ *     set as History, whose type is reused.
+ * Defaults don't go into the URL, so it stays clean when nothing was touched.
  */
 
 import { PERIODOS, type Periodo } from "../observability/historico-url"
@@ -20,7 +20,7 @@ export type { Periodo }
 export type EstadoDoEscopo = "ativo" | "todos"
 
 export const ESCOPO_PADRAO: EstadoDoEscopo = "ativo"
-/** A mesma janela padrão do Histórico (spec §3.1). */
+/** The same default window as History (spec §3.1). */
 export const PERIODO_PADRAO: Periodo = 30
 
 export interface EstadoDoDashboard {
@@ -30,23 +30,23 @@ export interface EstadoDoDashboard {
 
 type Leitor = { get(nome: string): string | null }
 
-/** Só `escopo=todos` vira "todos"; qualquer outro valor (ou ausência) → "ativo". */
+/** Only `escopo=todos` becomes "todos"; any other value (or absence) → "ativo". */
 export function lerEscopo(sp: Leitor): EstadoDoEscopo {
   return sp.get("escopo") === "todos" ? "todos" : ESCOPO_PADRAO
 }
 
-/** `periodo` só vale 7/30/90 (o conjunto do Histórico); qualquer outro (ou ausência) → 30. */
+/** `periodo` is only valid as 7/30/90 (History's set); anything else (or absence) → 30. */
 export function lerPeriodo(sp: Leitor): Periodo {
   const bruto = Number(sp.get("periodo"))
   return (PERIODOS as number[]).includes(bruto) ? (bruto as Periodo) : PERIODO_PADRAO
 }
 
-/** Lê os dois recortes da query string; valor inválido cai no default de cada um. */
+/** Reads both slices from the query string; an invalid value falls back to each one's default. */
 export function lerEstado(sp: Leitor): EstadoDoDashboard {
   return { escopo: lerEscopo(sp), periodo: lerPeriodo(sp) }
 }
 
-/** Query string (sem "?") dos dois recortes; omite cada default para a URL ficar limpa. */
+/** Query string (without "?") of both slices; omits each default so the URL stays clean. */
 export function escreverEstado(estado: EstadoDoDashboard): string {
   const sp = new URLSearchParams()
   if (estado.escopo !== ESCOPO_PADRAO) sp.set("escopo", estado.escopo)

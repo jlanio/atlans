@@ -11,37 +11,40 @@ import { CAMADA_SOBRE_O_CANVAS } from "./canvas-layers"
 
 interface Props {
   /**
-   * Workspace a que o workflow ABERTO pertence (`IWorkflow.workspace_id`).
-   * Ausente em /workflow/create, onde ainda não há workflow: lá o destino é o
-   * workspace ativo, que é o que `useSaveWorkflow` envia ao criar.
+   * Workspace the OPEN workflow belongs to (`IWorkflow.workspace_id`).
+   * Absent on /workflow/create, where there is no workflow yet: there the
+   * destination is the active workspace, which is what `useSaveWorkflow` sends
+   * on create.
    */
   workspaceId?: string | null
-  /** O workflow ainda não chegou: a trilha mostra esqueletos no lugar do
-   *  workspace e do nome, em vez de afirmar "Sem nome" e o workspace ativo
-   *  (que pode nem ser o do workflow — ver `dono` abaixo). */
+  /** The workflow has not arrived yet: the breadcrumb shows skeletons in place
+   *  of the workspace and the name, instead of claiming "Sem nome" (untitled)
+   *  and the active workspace (which may not even be the workflow's — see
+   *  `dono` below). */
   carregando?: boolean
-  /** O que fica na mesma fileira, à direita da trilha — o chip de salvamento.
-   *  Filho direto do contêiner, para receber o `pointer-events` da camada. */
+  /** What sits in the same row, to the right of the breadcrumb — the save chip.
+   *  A direct child of the container, to receive the layer's `pointer-events`. */
   children?: ReactNode
 }
 
 /**
- * Onde este workflow está: workspace › nome.
+ * Where this workflow is: workspace › name.
  *
- * Substitui o campo de nome que ficava aqui. Renomear é operação de catálogo,
- * não de edição de grafo — já existe em "Configurar projeto" (/projects), e um
- * input solto sobre o canvas oferecia a mesma coisa num lugar onde ninguém a
- * procura. Um workflow ainda sem nome continua sendo nomeado no primeiro save:
- * `useSaveWorkflow` marca `needs_name` e o UnsavedDialog pergunta.
+ * Replaces the name field that used to be here. Renaming is a catalog
+ * operation, not a graph-editing one — it already exists in "Configurar
+ * projeto" (/projects), and a loose input over the canvas offered the same
+ * thing in a place where nobody looks for it. A workflow still without a name
+ * keeps being named on the first save: `useSaveWorkflow` sets `needs_name` and
+ * the UnsavedDialog asks.
  *
- * O que faltava aqui era o inverso — saber ONDE se está. O editor é a única
- * tela sem o cabeçalho do dashboard (`AppHeader` devolve null em /workflow/*,
- * porque a barra sticky cobria o botão de adicionar nó) e ainda recolhe a
- * sidebar sozinho ao abrir, de modo que nada na tela dizia o workspace — bem
- * onde se dispara a execução.
+ * What was missing here was the opposite — knowing WHERE you are. The editor is
+ * the only screen without the dashboard header (`AppHeader` returns null on
+ * /workflow/*, because the sticky bar covered the add-node button) and it also
+ * collapses the sidebar on its own when opening, so nothing on screen said the
+ * workspace — right where the run is triggered.
  *
- * Mesma trilha do visualizador de sub-fluxo: separador `TbChevronRight` em
- * `text-muted-foreground/40`, degrau final em `font-medium text-foreground`.
+ * Same breadcrumb as the sub-workflow viewer: `TbChevronRight` separator in
+ * `text-muted-foreground/40`, final step in `font-medium text-foreground`.
  */
 export default function WorkflowLocation({ workspaceId, carregando = false, children }: Props) {
   const workflowName = useWorkflowSaveStore(s => s.workflowName)
@@ -49,28 +52,29 @@ export default function WorkflowLocation({ workspaceId, carregando = false, chil
 
   const nome = workflowName?.trim() ?? ""
 
-  // O workspace do WORKFLOW, não o selecionado na barra. Nada sincroniza um com
-  // o outro: /workflow/[id] busca por id, sem filtro de workspace, e o ativo
-  // pode ter mudado em outra aba (ele é reidratado do localStorage). Sem esta
-  // resolução, a trilha afirmaria um workspace ao qual o workflow não pertence
-  // — ao lado do botão de executar, que é justamente o que ela existe para
-  // proteger. Enquanto a lista não chegou, não afirma nada.
+  // The WORKFLOW's workspace, not the one selected in the bar. Nothing syncs
+  // one with the other: /workflow/[id] fetches by id, with no workspace filter,
+  // and the active one may have changed in another tab (it is rehydrated from
+  // localStorage). Without this resolution, the breadcrumb would claim a
+  // workspace the workflow does not belong to — next to the run button, which
+  // is precisely what it exists to protect. Until the list arrives, it claims
+  // nothing.
   const dono = workspaceId
     ? workspaces.find(w => w.id_hash === workspaceId) ?? null
     : current
 
   return (
     <div
-      // Largura limitada e camada própria: um contêiner em fluxo normal ocupava
-      // a largura inteira do canvas e engolia clique e arrasto numa faixa
-      // invisível — foi o defeito que o campo de nome já teve aqui. O teto
-      // para antes do botão de adicionar nó, no canto direito. `flex-wrap`: o
-      // chip de salvamento desce para a linha de baixo quando os dois não
-      // cabem, em vez de espremer o nome do workflow.
+      // Limited width and its own layer: a container in normal flow took the
+      // canvas's full width and swallowed clicks and drags in an invisible
+      // strip — the defect the name field once had here. The ceiling stops
+      // before the add-node button, in the right corner. `flex-wrap`: the
+      // save chip drops to the line below when the two do not fit, instead of
+      // squeezing the workflow name.
       className={`${CAMADA_SOBRE_O_CANVAS} left-2 top-2 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-2 pl-safe sm:left-4 sm:top-3 sm:max-w-[min(44rem,calc(100%-6rem))]`}
     >
-      {/* `min-h-8`: com os esqueletos (mais baixos que o texto) a caixa
-          encolhia e a fileira saltava quando o nome chegava. */}
+      {/* `min-h-8`: with the skeletons (shorter than the text) the box
+          shrank and the row jumped when the name arrived. */}
       <div className="flex min-h-8 min-w-0 items-center gap-1.5 rounded-lg border border-border bg-background/85 py-1.5 pr-3 pl-1.5 shadow-xs backdrop-blur-sm">
         {carregando ? (
           <>
@@ -89,10 +93,10 @@ export default function WorkflowLocation({ workspaceId, carregando = false, chil
           {dono ? (
             <>
               <WorkspaceBadge workspace={dono} size="sm" className="shrink-0" />
-              {/* Sem teto fixo: quando os dois cabem, nada é cortado. Quando não
-                  cabem, o workspace encolhe ~3x mais rápido — é o degrau menos
-                  específico da trilha, e quem precisa continuar legível é o nome
-                  do workflow. O `title` devolve o valor inteiro nos dois casos. */}
+              {/* No fixed ceiling: when both fit, nothing is cut. When they do not
+                  fit, the workspace shrinks ~3x faster — it is the least
+                  specific step of the breadcrumb, and what must stay readable
+                  is the workflow name. `title` gives back the full value in both cases. */}
               <span
                 aria-hidden="true"
                 title={dono.name}

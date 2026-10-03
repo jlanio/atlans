@@ -1,14 +1,15 @@
 # tests/unit/test_artifact_purge.py
 """
-Remocao de artefatos locais por ordem do servidor.
+Removal of local artifacts by order of the server.
 
-Isto apaga arquivo do disco do usuario a partir de uma mensagem que chega pela
-REDE. O `connection.py` so aceita `control` com assinatura Ed25519 valida, mas
-a assinatura garante QUEM mandou, nao que o conteudo esteja correto — um bug de
-derivacao de caminho no servidor, ou um servidor comprometido, viraria perda de
-dados na maquina do cliente.
+This deletes files from the user's disk based on a message that arrives over the
+NETWORK. `connection.py` only accepts `control` with a valid Ed25519 signature,
+but the signature guarantees WHO sent it, not that the content is correct — a
+path-derivation bug on the server, or a compromised server, would turn into data
+loss on the customer's machine.
 
-Por isso o caminho e tratado como entrada hostil, e e o que estes casos travam.
+That is why the path is treated as hostile input, and that is what these cases
+lock down.
 """
 from pathlib import Path
 
@@ -55,7 +56,7 @@ def test_remove_varios_de_uma_vez(artefatos):
 
 
 def test_diretorios_vazios_sao_removidos(artefatos):
-    """Sem isso, `artifacts/` acumula uma arvore vazia por execucao, para sempre."""
+    """Without this, `artifacts/` accumulates an empty tree per run, forever."""
     _criar(artefatos, "ws-1/run-1/a.json")
     artifact_purge.purgar([{"id_hash": "a", "local_path": "ws-1/run-1/a.json"}])
 
@@ -73,11 +74,11 @@ def test_diretorio_com_outros_arquivos_e_preservado(artefatos):
 
 
 def test_arquivo_ja_ausente_nao_e_erro(artefatos):
-    """Ordem repetida, ou arquivo apagado a mao: nao ha o que corrigir."""
+    """Repeated order, or a file deleted by hand: there is nothing to fix."""
     assert artifact_purge.purgar([{"id_hash": "a", "local_path": "ws-1/run-1/sumiu.json"}]) == 0
 
 
-# ── Travessia de caminho ─────────────────────────────────────────────────────
+# ── Path traversal ───────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("malicioso", [
     "../../../etc/passwd",
@@ -99,7 +100,7 @@ def test_caminho_que_escapa_da_raiz_e_recusado(artefatos, tmp_path, malicioso):
 
 
 def test_caminho_recusado_nao_impede_os_demais(artefatos):
-    """Uma entrada hostil no lote nao pode abortar a limpeza legitima."""
+    """One hostile entry in the batch must not abort the legitimate cleanup."""
     ok = _criar(artefatos, "ws-1/run-1/ok.json")
 
     n = artifact_purge.purgar([
@@ -111,7 +112,7 @@ def test_caminho_recusado_nao_impede_os_demais(artefatos):
 
 
 def test_symlink_apontando_para_fora_nao_apaga_o_alvo(artefatos, tmp_path):
-    """A checagem textual nao pega symlink — quem pega e o `resolve()`."""
+    """The textual check doesn't catch symlinks — what catches them is `resolve()`."""
     vitima = tmp_path / "segredo.txt"
     vitima.write_bytes(b"dado")
 

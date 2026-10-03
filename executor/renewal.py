@@ -1,11 +1,11 @@
 # executor/renewal.py
 """
-Renovacao automatica do cert mTLS do executor.
+Automatic renewal of the executor's mTLS cert.
 
-Loop periodico que checa o vencimento do cert atual e, se faltar menos
-que RENEW_BEFORE_DAYS, gera novo keypair, envia CSR autenticado pelo
-cert atual (mTLS) e troca os arquivos atomicamente — validacao e escrita
-sao as do enroll (executor/enrollment.py::_persistir_bundle).
+Periodic loop that checks the current cert's expiry and, if less than
+RENEW_BEFORE_DAYS remain, generates a new keypair, sends a CSR authenticated
+by the current cert (mTLS) and swaps the files atomically — validation and
+writing are the same as enroll's (executor/enrollment.py::_persistir_bundle).
 """
 from __future__ import annotations
 
@@ -24,10 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-# Leitura tolerante (executor/_ambiente.py): um `sete` no .env vira o padrao com
-# aviso, em vez de ValueError no import. Minimo 1 dia porque, com zero, o
-# renewal so tentaria com o cert ja vencido — e o /renew-cert se autentica
-# justamente por ele.
+# Tolerant parsing (executor/_ambiente.py): a `sete` in .env becomes the default
+# with a warning, instead of a ValueError on import. Minimum 1 day because, with
+# zero, renewal would only be attempted with the cert already expired — and
+# /renew-cert authenticates precisely with that cert.
 
 RENEW_BEFORE_DAYS = ler_int("EXECUTOR_CERT_RENEW_BEFORE_DAYS", 7, minimo=1)
 RENEW_CHECK_INTERVAL_SECONDS = ler_int("EXECUTOR_CERT_RENEW_CHECK_SECONDS", 3600, minimo=1)
@@ -37,7 +37,7 @@ RENEW_CHECK_INTERVAL_SECONDS = ler_int("EXECUTOR_CERT_RENEW_CHECK_SECONDS", 3600
 
 
 def _cert_expires_at(cert_path: Path) -> datetime | None:
-    """Le cert.pem e retorna not_valid_after_utc. None se nao existir/falhar."""
+    """Reads cert.pem and returns not_valid_after_utc. None if missing/failed."""
     try:
         cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
         return cert.not_valid_after_utc
@@ -47,7 +47,7 @@ def _cert_expires_at(cert_path: Path) -> datetime | None:
 
 
 def _cert_common_name(cert_path: Path) -> str | None:
-    """Le o CN do cert atual (usado para preservar identidade no renewal)."""
+    """Reads the current cert's CN (used to preserve identity on renewal)."""
     try:
         from cryptography.x509.oid import NameOID
         cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
@@ -70,8 +70,8 @@ def _days_until_expiry(cert_path: Path) -> float | None:
 
 async def maybe_renew(server_url: str, cert_dir: str | Path) -> bool:
     """
-    Checa o cert atual e renova se faltar menos que RENEW_BEFORE_DAYS.
-    Retorna True se renovou, False caso contrario.
+    Checks the current cert and renews it if less than RENEW_BEFORE_DAYS remain.
+    Returns True if it renewed, False otherwise.
     """
     cert_dir = Path(cert_dir)
     days_left = _days_until_expiry(cert_dir / CERT_FILE)
@@ -84,8 +84,8 @@ async def maybe_renew(server_url: str, cert_dir: str | Path) -> bool:
 
     logger.info("Cert vence em %.1f dias — iniciando renewal...", days_left)
 
-    # Preserva o CN do cert atual no novo CSR — step-ca exige match com o
-    # sub do OTT que o backend gera com base no executor_id.
+    # Preserves the current cert's CN in the new CSR — step-ca requires it to
+    # match the sub of the OTT that the backend generates from the executor_id.
     cn = _cert_common_name(cert_dir / CERT_FILE)
     if not cn:
         logger.error("Nao foi possivel extrair CN do cert atual — renewal abortado.")
@@ -103,10 +103,10 @@ async def maybe_renew(server_url: str, cert_dir: str | Path) -> bool:
 
     try:
         from flow.utils.http_retry import async_request_with_retry
-        # Renovacao de cert e critica (falha repetida = executor expira e cai).
-        # Retry de transitorios (502/503/504/connect/read) recupera de blips sem
-        # esperar o proximo ciclo do renewal_loop. 5xx de gateway = request nao
-        # processado pelo backend → reenvio seguro.
+        # Cert renewal is critical (repeated failure = executor expires and drops).
+        # Retrying transient errors (502/503/504/connect/read) recovers from
+        # blips without waiting for the next renewal_loop cycle. Gateway 5xx =
+        # request not processed by the backend → safe to resend.
         resp = await async_request_with_retry(
             "POST", url,
             client_kwargs={"verify": ssl_ctx, "timeout": 30.0},
@@ -127,10 +127,10 @@ async def maybe_renew(server_url: str, cert_dir: str | Path) -> bool:
         logger.error("Resposta do renewal nao e JSON valido: %s", exc)
         return False
 
-    # Valida TUDO antes de escrever e troca via .new + os.replace — o mesmo
-    # caminho do enroll (enrollment._persistir_bundle). Um bundle parcial que
-    # sobrescreve as credenciais boas deixa o executor offline sem chance de
-    # autocorrecao.
+    # Validates EVERYTHING before writing and swaps via .new + os.replace — the
+    # same path as enroll (enrollment._persistir_bundle). A partial bundle that
+    # overwrites the good credentials leaves the executor offline with no
+    # chance of self-correction.
     problema = _persistir_bundle(cert_dir, bundle, new_ed)
     if problema:
         logger.error(
@@ -140,16 +140,16 @@ async def maybe_renew(server_url: str, cert_dir: str | Path) -> bool:
         )
         return False
 
-    # Fixa a chave de assinatura do servidor se ainda nao houver pin. O renewal e
-    # autenticado por mTLS, entao o bundle e uma fonte confiavel — e para um
-    # executor enrolado ANTES do pinning existir, este e o caminho que fecha a
-    # janela de TOFU sem exigir re-enroll.
+    # Pins the server's signing key if there is no pin yet. Renewal is
+    # authenticated by mTLS, so the bundle is a trusted source — and for an
+    # executor enrolled BEFORE pinning existed, this is the path that closes the
+    # TOFU window without requiring a re-enroll.
     #
-    # DIVERGENCIA nao interrompe o renewal (o cert novo ja esta em disco e e
-    # valido) nem derruba o processo em execucao, que segue com a chave que
-    # carregou no boot. Mas `pin_key` grava um marcador de conflito, e o PROXIMO
-    # boot para com mensagem clara em vez de subir com o pin obsoleto rejeitando
-    # todo job. `pin_key` recusa a troca automatica de proposito.
+    # A MISMATCH does not interrupt the renewal (the new cert is already on disk
+    # and is valid) nor kill the running process, which carries on with the key
+    # it loaded at boot. But `pin_key` writes a conflict marker, and the NEXT
+    # boot stops with a clear message instead of starting with the stale pin and
+    # rejecting every job. `pin_key` refuses the automatic swap on purpose.
     _pin_key = bundle.get("server_signing_public_key")
     if _pin_key:
         from executor.server_key import ServerKeyError, ServerKeyPersistError, pin_key
@@ -163,8 +163,8 @@ async def maybe_renew(server_url: str, cert_dir: str | Path) -> bool:
                 "boot deste executor vai abortar ate o operador agir: %s", exc,
             )
 
-    # .get: metadados so servem para log — nao vale estourar KeyError depois do
-    # swap ja ter dado certo.
+    # .get: the metadata is only for logging — not worth raising KeyError after
+    # the swap has already succeeded.
     logger.info("Renewal concluido — serial novo %s expira %s",
                 bundle.get("serial", "?"), bundle.get("expires_at", "?"))
     return True
@@ -172,9 +172,9 @@ async def maybe_renew(server_url: str, cert_dir: str | Path) -> bool:
 
 async def renewal_loop(server_url: str, cert_dir: str | Path) -> None:
     """
-    Loop infinito chamado pelo executor main: checa renewal a cada
-    RENEW_CHECK_INTERVAL_SECONDS (default 1h). Resiliente a erros — apenas
-    logga e tenta de novo no proximo tick.
+    Infinite loop called by the executor main: checks renewal every
+    RENEW_CHECK_INTERVAL_SECONDS (default 1h). Resilient to errors — it just
+    logs and tries again on the next tick.
     """
     while True:
         try:

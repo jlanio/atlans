@@ -1,23 +1,24 @@
 # executor/job_validator.py
 """
-Validação de jobs recebidos antes de qualquer descriptografia.
+Validation of received jobs before any decryption.
 
-Ordem obrigatória (falha cedo, falha seguro):
-  1. Assinatura Ed25519                — autenticidade do servidor
+Mandatory order (fail early, fail safe):
+  1. Ed25519 signature                 — server authenticity
   2. target_executor_id                   — anti-misrouting
-  3. frescor temporal                  — anti-replay temporal
-  4. nonce único (cache em memória)    — anti-replay de nonce
-  5. Descriptografia (em job_executor) — integridade via GCM tag
+  3. temporal freshness                — temporal anti-replay
+  4. unique nonce (in-memory cache)    — nonce anti-replay
+  5. Decryption (in job_executor)      — integrity via GCM tag
 
-Env opcional:
-  EXECUTOR_MAX_JOB_EXPIRY_SECONDS — teto da DURAÇÃO declarada do envelope
+Optional env:
+  EXECUTOR_MAX_JOB_EXPIRY_SECONDS — ceiling on the envelope's declared DURATION
                                     (`expires_at - issued_at`, default 900s).
-                                    Também entra no piso do TTL do cache de nonces.
-  EXECUTOR_CLOCK_SKEW_SECONDS     — folga aceita entre o relógio do servidor e o
-                                    local ao checar expiração (default 300s).
+                                    Also goes into the floor of the nonce cache TTL.
+  EXECUTOR_CLOCK_SKEW_SECONDS     — slack accepted between the server clock and
+                                    the local one when checking expiry (default 300s).
 
-Lidas por executor/_ambiente.py::ler_int: valor inválido (`abc`, negativo) vira o
-default com aviso, em vez de derrubar o import do executor com ValueError.
+Read by executor/_ambiente.py::ler_int: an invalid value (`abc`, negative) becomes
+the default with a warning, instead of bringing down the executor import with
+ValueError.
 """
 import logging
 import time
@@ -31,52 +32,54 @@ from executor.crypto import verify_signature
 logger = logging.getLogger(__name__)
 
 
-# ── Teto da DURAÇÃO declarada de um envelope ──────────────────────────────────
-# O servidor emite envelopes com TTL de EXECUTOR_JOB_TTL_SECONDS (default 300s,
-# ver app/core/job_crypto.py) e comandos com 120s (app/core/control_crypto.py).
-# Sem teto deste lado, um envelope assinado com `expires_at` daqui a 10 anos
-# passava na checagem temporal para sempre — e como o cache de nonce é finito,
-# bastava esperar a entrada sair do cache para reproduzi-lo.
+# ── Ceiling on an envelope's declared DURATION ────────────────────────────────
+# The server issues envelopes with a TTL of EXECUTOR_JOB_TTL_SECONDS (default 300s,
+# see app/core/job_crypto.py) and commands with 120s (app/core/control_crypto.py).
+# Without a ceiling on this side, an envelope signed with `expires_at` 10 years
+# from now passed the temporal check forever — and since the nonce cache is
+# finite, it was enough to wait for the entry to leave the cache to replay it.
 #
-# O teto é aplicado sobre `expires_at - issued_at`, NÃO sobre `expires_at` menos
-# o relógio local. A diferença é decisiva: os dois carimbos vêm do MESMO relógio
-# (o do servidor), então a medida é imune a clock skew. A primeira versão deste
-# fix comparava `expires_at` com `datetime.now()` local e, com isso, um host com
-# NTP quebrado 10 min atrasado passava a rejeitar 100% dos jobs — indisponibilidade
-# total causada por um problema que não é de segurança. Medir a duração declarada
-# barra exatamente o mesmo envelope eterno sem depender de relógio nenhum.
-# 900s = 3x o TTL padrão do servidor: dá folga para o operador aumentar o TTL.
-# Mínimo 1: com zero, todo envelope (duração > 0) seria recusado.
+# The ceiling is applied to `expires_at - issued_at`, NOT to `expires_at` minus
+# the local clock. The difference is decisive: both timestamps come from the SAME
+# clock (the server's), so the measure is immune to clock skew. The first version
+# of this fix compared `expires_at` with the local `datetime.now()` and, as a
+# result, a host with broken NTP running 10 min behind started rejecting 100% of
+# jobs — total unavailability caused by a problem that is not a security one.
+# Measuring the declared duration blocks exactly the same eternal envelope without
+# depending on any clock. 900s = 3x the server's default TTL: leaves room for the
+# operator to raise the TTL. Minimum 1: with zero, every envelope (duration > 0)
+# would be rejected.
 _MAX_EXPIRY_HORIZON_SECONDS = ler_int("EXECUTOR_MAX_JOB_EXPIRY_SECONDS", 900, minimo=1)
 
-# ── Tolerância de clock skew ──────────────────────────────────────────────────
-# A checagem de EXPIRAÇÃO (`agora_local > expires_at`) é inerentemente dependente
-# do relógio local — não há como ancorar frescor absoluto sem ele. Por isso ela
-# ganha uma folga explícita e configurável, em vez de zero folga: alguns minutos
-# de deriva de NTP não podem derrubar o executor inteiro. Zero é aceito (é
-# escolha do operador); negativo recusaria o envelope antes de ele vencer.
+# ── Clock skew tolerance ──────────────────────────────────────────────────────
+# The EXPIRY check (`agora_local > expires_at`) inherently depends on the local
+# clock — there is no way to anchor absolute freshness without it. That is why it
+# gets explicit, configurable slack instead of zero slack: a few minutes of NTP
+# drift cannot bring down the whole executor. Zero is accepted (it is the
+# operator's choice); negative would reject the envelope before it expires.
 _CLOCK_SKEW_TOLERANCE_SECONDS = ler_int("EXECUTOR_CLOCK_SKEW_SECONDS", 300, minimo=0)
 
-# ── Teto RÍGIDO de clock skew ─────────────────────────────────────────────────
-# A tolerância acima é assimétrica por construção: ela solta o envelope que já
-# passou de `expires_at`, mas nada barra o caso oposto — relógio local ATRASADO.
-# Com o relógio para trás, `agora_local` nunca alcança `expires_at` e o envelope
-# permanece aceitável por (atraso + duração) segundos LOCAIS, enquanto o nonce só
-# é lembrado pelo TTL do cache. Passado o TTL, o mesmo envelope assinado volta a
-# ser aceito: replay, silencioso, sem nada no log ligando a falha ao relógio.
+# ── HARD clock skew ceiling ───────────────────────────────────────────────────
+# The tolerance above is asymmetric by construction: it lets through the envelope
+# that is already past `expires_at`, but nothing blocks the opposite case — a local
+# clock that is BEHIND. With the clock set back, `agora_local` never reaches
+# `expires_at` and the envelope stays acceptable for (lag + duration) LOCAL
+# seconds, while the nonce is only remembered for the cache TTL. Once the TTL has
+# passed, the same signed envelope is accepted again: a replay, silent, with
+# nothing in the log linking the failure to the clock.
 #
-# O teto fecha isso nos DOIS sentidos, medindo |agora_local - issued_at|. Acima
-# dele o envelope é REJEITADO com mensagem de NTP. É uma escolha deliberada de
-# falhar RUIDOSO em vez de ficar silenciosamente replayável: um host com mais de
-# 15 min de deriva está quebrado de um jeito que o operador precisa saber, e a
-# mensagem diz exatamente o que corrigir. Entre a tolerância e o teto o envelope
-# é aceito, mas `_warn_on_clock_skew` já avisa.
+# The ceiling closes this in BOTH directions, measuring |agora_local - issued_at|.
+# Above it the envelope is REJECTED with an NTP message. It is a deliberate choice
+# to fail LOUDLY instead of staying silently replayable: a host with more than
+# 15 min of drift is broken in a way the operator needs to know about, and the
+# message says exactly what to fix. Between the tolerance and the ceiling the
+# envelope is accepted, but `_warn_on_clock_skew` already warns.
 _MAX_CLOCK_SKEW_SECONDS = ler_int("EXECUTOR_MAX_CLOCK_SKEW_SECONDS", 900, minimo=0)
 
 if _MAX_CLOCK_SKEW_SECONDS < _CLOCK_SKEW_TOLERANCE_SECONDS:
-    # Configuração contraditória: o teto rejeitaria antes de a folga ser usada.
-    # Alinhar em vez de abortar — o executor não pode deixar de subir por causa
-    # de duas env vars mal combinadas.
+    # Contradictory configuration: the ceiling would reject before the slack is used.
+    # Align instead of aborting — the executor cannot fail to start because of
+    # two badly combined env vars.
     logger.warning(
         "EXECUTOR_MAX_CLOCK_SKEW_SECONDS (%ds) é menor que "
         "EXECUTOR_CLOCK_SKEW_SECONDS (%ds) — o teto rígido venceria a tolerância. "
@@ -88,21 +91,21 @@ if _MAX_CLOCK_SKEW_SECONDS < _CLOCK_SKEW_TOLERANCE_SECONDS:
 
 def _nonce_ttl_seconds() -> float:
     """
-    TTL efetivo do cache de nonces.
+    Effective TTL of the nonce cache.
 
-    AMARRAÇÃO OBRIGATÓRIA: um nonce só pode ser esquecido DEPOIS que o envelope
-    correspondente deixou de ser aceitável — senão abre-se uma janela em que o
-    mesmo job ainda passa na checagem temporal mas o cache já não lembra dele
-    (replay). Portanto o TTL cobre a JANELA MÁXIMA DE ACEITAÇÃO medida no relógio
-    LOCAL, que é o que o cache usa (`time.monotonic`):
+    MANDATORY BINDING: a nonce may only be forgotten AFTER the corresponding
+    envelope is no longer acceptable — otherwise a window opens in which the
+    same job still passes the temporal check but the cache no longer remembers
+    it (replay). Therefore the TTL covers the MAXIMUM ACCEPTANCE WINDOW measured
+    on the LOCAL clock, which is what the cache uses (`time.monotonic`):
 
-        duração declarada máxima  (_MAX_EXPIRY_HORIZON_SECONDS)
-      + folga concedida na expiração (_CLOCK_SKEW_TOLERANCE_SECONDS)
-      + deriva máxima tolerada do relógio (_MAX_CLOCK_SKEW_SECONDS)
+        maximum declared duration  (_MAX_EXPIRY_HORIZON_SECONDS)
+      + slack granted on expiry (_CLOCK_SKEW_TOLERANCE_SECONDS)
+      + maximum tolerated clock drift (_MAX_CLOCK_SKEW_SECONDS)
 
-    O terceiro termo é o que a primeira versão esquecia: sem o teto rígido a
-    deriva era ilimitada e nenhum TTL finito conseguia cobrir a janela. Com o
-    teto, a soma é finita e o invariante volta a valer por construção.
+    The third term is what the first version forgot: without the hard ceiling
+    the drift was unbounded and no finite TTL could cover the window. With the
+    ceiling, the sum is finite and the invariant holds again by construction.
     """
     return max(
         config.NONCE_CACHE_TTL,
@@ -112,30 +115,30 @@ def _nonce_ttl_seconds() -> float:
     )
 
 
-# ── Cache de nonces em memória ────────────────────────────────────────────────
-# OrderedDict em ordem de inserção: (nonce → timestamp_de_inserção monotônico).
-# Limitado para evitar crescimento ilimitado.
+# ── In-memory nonce cache ─────────────────────────────────────────────────────
+# OrderedDict in insertion order: (nonce → monotonic insertion_timestamp).
+# Bounded to avoid unbounded growth.
 #
-# LIMITAÇÃO CONHECIDA: o cache é só em memória, então um restart do executor o
-# zera. A defesa remanescente nessa janela é o `expires_at` com teto acima — um
-# replay só funciona dentro do horizonte curto e apenas se o processo reiniciar
-# exatamente nesse intervalo.
+# KNOWN LIMITATION: the cache is in memory only, so an executor restart wipes
+# it. The remaining defense in that window is the capped `expires_at` above — a
+# replay only works within the short horizon and only if the process restarts
+# exactly in that interval.
 _nonce_cache: OrderedDict[str, float] = OrderedDict()
 _NONCE_CACHE_MAX = 10_000
 
 
 def _nonce_seen(nonce: str) -> bool:
     """
-    Retorna True se o nonce já foi processado (replay detectado).
-    Registra o nonce se for novo.
+    Returns True if the nonce has already been processed (replay detected).
+    Registers the nonce if it is new.
     """
     now = time.monotonic()
     ttl = _nonce_ttl_seconds()
 
-    # PERF: o OrderedDict está em ordem de inserção e o TTL é fixo, então os
-    # expirados são sempre um prefixo. Expurgar pelo início até achar o primeiro
-    # ainda válido custa O(expirados) — a versão anterior varria as 10k entradas
-    # a cada job, no caminho quente.
+    # PERF: the OrderedDict is in insertion order and the TTL is fixed, so the
+    # expired ones are always a prefix. Purging from the start until the first
+    # still-valid one costs O(expired) — the previous version scanned the 10k
+    # entries on every job, on the hot path.
     while _nonce_cache:
         oldest_nonce, oldest_ts = next(iter(_nonce_cache.items()))
         if now - oldest_ts <= ttl:
@@ -145,11 +148,11 @@ def _nonce_seen(nonce: str) -> bool:
     if nonce in _nonce_cache:
         return True  # replay
 
-    # Estouro de capacidade só acontece com >10k jobs LEGÍTIMOS (a assinatura já
-    # foi verificada antes daqui) dentro da janela de TTL. Descartar em silêncio
-    # o mais antigo — como era feito antes — remove um nonce AINDA VÁLIDO e abre
-    # buraco de replay sem deixar rastro. Mantemos o limite de memória, mas o
-    # descarte vira ruidoso para o operador poder subir NONCE_CACHE_TTL/capacidade.
+    # A capacity overflow only happens with >10k LEGITIMATE jobs (the signature has
+    # already been verified before this point) within the TTL window. Silently
+    # discarding the oldest — as was done before — removes a STILL VALID nonce and
+    # opens a replay hole without leaving a trace. We keep the memory limit, but
+    # the discard becomes loud so the operator can raise NONCE_CACHE_TTL/capacity.
     if len(_nonce_cache) >= _NONCE_CACHE_MAX:
         evicted, _ = _nonce_cache.popitem(last=False)
         logger.error(
@@ -163,29 +166,31 @@ def _nonce_seen(nonce: str) -> bool:
     return False
 
 
-# ── Validação principal ───────────────────────────────────────────────────────
+# ── Main validation ───────────────────────────────────────────────────────────
 
 class JobValidationError(Exception):
-    """Levantada quando uma validação de segurança falha."""
+    """Raised when a security validation fails."""
 
 
 # ── Frescor temporal (compartilhado por job e control) ────────────────────────
 
-# Intervalo mínimo entre dois avisos de clock skew. O aviso é diagnóstico e roda
-# no caminho quente de todo job — sem throttle viraria uma linha de WARNING por
-# job e afogaria o log justamente quando o operador precisa lê-lo.
+# Minimum interval between two clock skew warnings. The warning is diagnostic and
+# runs on the hot path of every job — without throttling it would become one
+# WARNING line per job and drown the log precisely when the operator needs to
+# read it.
 _SKEW_WARN_INTERVAL_SECONDS = 300.0
-# None = nunca avisou. Ancorar em 0.0 fazia `agora_mono - 0.0 < 300` engolir o
-# PRIMEIRO aviso enquanto o host tivesse menos de 5 min de vida — no Linux
-# `time.monotonic()` e o uptime da maquina. Ou seja, o aviso sumia justamente no
-# cenario em que ele importa: container subindo numa VM recem-criada, com o NTP
-# ainda torto. Depois do primeiro aviso o throttle funciona normalmente.
+# None = never warned. Anchoring at 0.0 made `agora_mono - 0.0 < 300` swallow the
+# FIRST warning while the host had less than 5 min of uptime — on Linux
+# `time.monotonic()` is the machine's uptime. In other words, the warning vanished
+# precisely in the scenario where it matters: a container starting on a freshly
+# created VM, with NTP still off. After the first warning the throttle works
+# normally.
 _last_skew_warn_monotonic: float | None = None
 
 
 def _parse_iso_utc(value: str, field: str) -> datetime:
-    """ISO8601 → datetime tz-aware. Sem timezone, assume UTC (o servidor sempre
-    manda offset, mas um envelope naive não pode virar TypeError na subtração)."""
+    """ISO8601 → tz-aware datetime. Without a timezone, assumes UTC (the server always
+    sends an offset, but a naive envelope cannot become a TypeError in the subtraction)."""
     try:
         parsed = datetime.fromisoformat(value)
     except (TypeError, ValueError) as exc:
@@ -196,11 +201,12 @@ def _parse_iso_utc(value: str, field: str) -> datetime:
 
 
 def _warn_on_clock_skew(now_utc: datetime, issued_at: datetime) -> None:
-    """Avisa quando o relógio local diverge do servidor além da tolerância.
+    """Warns when the local clock diverges from the server's beyond the tolerance.
 
-    Puramente diagnóstico: não rejeita nada. Existe porque a falha por relógio se
-    disfarça de ataque — sem este aviso o operador só vê a rejeição, que fala em
-    replay, e vai caçar um adversário que não existe.
+    Purely diagnostic: rejects nothing. It exists because a clock failure
+    disguises itself as an attack — without this warning the operator only sees
+    the rejection, which talks about replay, and goes hunting for an adversary
+    that does not exist.
     """
     global _last_skew_warn_monotonic
 
@@ -233,21 +239,23 @@ def _assert_fresh(
     kind: str,
     prefix: str = "",
 ) -> None:
-    """Valida o frescor de um envelope assinado. Lança JobValidationError.
+    """Validates the freshness of a signed envelope. Raises JobValidationError.
 
-    Duas checagens de naturezas diferentes:
+    Two checks of different natures:
 
-    (a) DURAÇÃO DECLARADA — `expires_at - issued_at` contra o teto. Comparação
-        entre dois instantes do mesmo relógio (o do servidor), portanto imune a
-        clock skew. É ela que fecha o buraco de replay do envelope "eterno".
+    (a) DECLARED DURATION — `expires_at - issued_at` against the ceiling. A
+        comparison between two instants of the same clock (the server's), hence
+        immune to clock skew. It is what closes the replay hole of the "eternal"
+        envelope.
 
-    (b) EXPIRAÇÃO — `agora_local > expires_at`, com folga explícita de skew.
-        Depende do relógio local por definição; a folga impede que NTP quebrado
-        vire rejeição de 100% dos jobs.
+    (b) EXPIRY — `agora_local > expires_at`, with explicit skew slack.
+        Depends on the local clock by definition; the slack keeps broken NTP
+        from turning into a 100% job rejection.
 
-    `issued_at` é OBRIGATÓRIO: sem ele não há como medir (a) e a única alternativa
-    seria voltar a ancorar o teto no relógio local. Servidor e executor sobem
-    juntos e ambos os emissores (job_crypto e control_crypto) já o enviam.
+    `issued_at` is MANDATORY: without it there is no way to measure (a) and the
+    only alternative would be to go back to anchoring the ceiling on the local
+    clock. Server and executor ship together and both issuers (job_crypto and
+    control_crypto) already send it.
     """
     if not expires_at_str:
         raise JobValidationError(f"{kind} sem campo '{prefix}expires_at'.")
@@ -277,16 +285,16 @@ def _assert_fresh(
 
     now_utc = datetime.now(timezone.utc)
 
-    # (c) TETO RÍGIDO DE SKEW — antes da expiração, de propósito: quando o
-    # relógio está muito fora, "expirado" é sintoma e "relógio" é a causa, e é a
-    # causa que o operador precisa ler. Simétrico: pega tanto o relógio adiantado
-    # (que rejeitaria tudo como expirado) quanto o ATRASADO — este último não
-    # dispara nenhuma outra checagem e é justamente o que abria a janela de
-    # replay descrita em _nonce_ttl_seconds.
+    # (c) HARD SKEW CEILING — before expiry, on purpose: when the clock is way
+    # off, "expired" is the symptom and "clock" is the cause, and the cause is
+    # what the operator needs to read. Symmetric: it catches both a clock that is
+    # ahead (which would reject everything as expired) and one that is BEHIND —
+    # the latter triggers no other check and is precisely what opened the replay
+    # window described in _nonce_ttl_seconds.
     skew = (now_utc - issued_at).total_seconds()
     if abs(skew) > _MAX_CLOCK_SKEW_SECONDS:
-        # skew = agora_local - issued_at. Negativo => o relógio local ainda não
-        # chegou no instante em que o servidor emitiu, ou seja, está ATRASADO.
+        # skew = agora_local - issued_at. Negative => the local clock has not yet
+        # reached the instant at which the server issued, i.e. it is BEHIND.
         direcao = "atrasado" if skew < 0 else "adiantado"
         raise JobValidationError(
             f"{kind} rejeitado: o relógio local está {abs(skew):.0f}s {direcao} em "
@@ -311,10 +319,10 @@ def _assert_fresh(
 
 def validate_job(message: dict) -> None:
     """
-    Executa todas as validações de segurança em sequência.
-    Lança JobValidationError com motivo detalhado se qualquer verificação falhar.
+    Runs all security validations in sequence.
+    Raises JobValidationError with a detailed reason if any check fails.
 
-    NÃO descriptografa o payload — isso é responsabilidade do executor.
+    Does NOT decrypt the payload — that is the executor's responsibility.
     """
     envelope = message.get("envelope")
     if not isinstance(envelope, dict):
@@ -324,7 +332,7 @@ def validate_job(message: dict) -> None:
     if not verify_signature(message, config.SERVER_SIGNING_PUBLIC_KEY):
         raise JobValidationError("Assinatura Ed25519 inválida — job rejeitado.")
 
-    # ── 2. Destinatário correto ───────────────────────────────────────────────
+    # ── 2. Correct recipient ──────────────────────────────────────────────────
     if envelope.get("target_executor_id") != config.EXECUTOR_ID:
         raise JobValidationError(
             f"Job destinado a '{envelope.get('target_executor_id')}', "
@@ -334,29 +342,29 @@ def validate_job(message: dict) -> None:
     # ── 3. Validade temporal ──────────────────────────────────────────────────
     _assert_fresh(envelope.get("issued_at"), envelope.get("expires_at"), kind="Job")
 
-    # ── 4. Nonce único (anti-replay) ──────────────────────────────────────────
+    # ── 4. Unique nonce (anti-replay) ─────────────────────────────────────────
     nonce = envelope.get("nonce")
     if not nonce:
         raise JobValidationError("Envelope sem campo 'nonce'.")
     if _nonce_seen(nonce):
         raise JobValidationError(f"Nonce '{nonce[:16]}…' já foi processado — replay rejeitado.")
 
-    # ── 5. Campos obrigatórios ────────────────────────────────────────────────
+    # ── 5. Required fields ────────────────────────────────────────────────────
     for field in ("job_id", "job_type", "workspace_id"):
         if not envelope.get(field):
             raise JobValidationError(f"Campo obrigatório ausente no envelope: '{field}'.")
 
 
-# ── Comandos servidor → executor (control / cancel) ───────────────────────────
-# Contraparte de app/core/control_crypto.py. Ver a docstring de lá para o
-# formato na rede e o motivo de existir.
+# ── Server → executor commands (control / cancel) ─────────────────────────────
+# Counterpart of app/core/control_crypto.py. See the docstring there for the
+# wire format and the reason it exists.
 
 def _control_canonical_bytes(message: dict) -> bytes:
-    """Bytes assinados: a mensagem inteira menos `signature`.
+    """Signed bytes: the whole message minus `signature`.
 
-    Precisa produzir EXATAMENTE os mesmos bytes que
-    `app.core.control_crypto.canonical_bytes` — daí `sort_keys`, `ensure_ascii`
-    e `separators` fixos nos dois lados.
+    Must produce EXACTLY the same bytes as
+    `app.core.control_crypto.canonical_bytes` — hence the fixed `sort_keys`,
+    `ensure_ascii` and `separators` on both sides.
     """
     import json
     unsigned = {k: v for k, v in message.items() if k != "signature"}
@@ -366,16 +374,16 @@ def _control_canonical_bytes(message: dict) -> bytes:
 
 
 def validate_control_message(message: dict) -> None:
-    """Valida a assinatura e o frescor de um `control`/`cancel` do servidor.
+    """Validates the signature and freshness of a `control`/`cancel` from the server.
 
-    Mesma ordem de checagem do job (falha cedo, falha seguro): assinatura →
-    destinatário → prazo → nonce. Compartilha o cache anti-replay de
-    `validate_job`: o espaço de nonce é o mesmo (32 bytes aleatórios do
-    servidor), então uma entrada só pode ser consumida uma vez, seja por job ou
-    por comando.
+    Same check order as the job (fail early, fail safe): signature →
+    recipient → deadline → nonce. Shares the anti-replay cache of
+    `validate_job`: the nonce space is the same (32 random bytes from the
+    server), so an entry can only be consumed once, whether by a job or by a
+    command.
 
-    Lança JobValidationError. NÃO retorna bool: um `if not valida(...)` esquecido
-    em algum caller viraria bypass silencioso.
+    Raises JobValidationError. Does NOT return a bool: a forgotten
+    `if not valida(...)` in some caller would become a silent bypass.
     """
     import base64
 
@@ -410,27 +418,27 @@ def validate_control_message(message: dict) -> None:
             f"Assinatura inválida no comando '{message.get('type')}': {exc}"
         ) from exc
 
-    # ── 2. Destinatário correto ───────────────────────────────────────────────
-    # Sem isto, um comando legítimo capturado no canal de um executor poderia ser
-    # reproduzido contra qualquer outro.
+    # ── 2. Correct recipient ──────────────────────────────────────────────────
+    # Without this, a legitimate command captured on one executor's channel could
+    # be replayed against any other.
     target = auth.get("target_executor_id")
     if target != config.EXECUTOR_ID:
         raise JobValidationError(
             f"Comando destinado a '{target}', mas este executor é '{config.EXECUTOR_ID}'."
         )
 
-    # ── 3. Validade temporal ──────────────────────────────────────────────────
-    # Mesmo critério do job: teto sobre a duração declarada (imune a skew) e
-    # expiração com folga de skew. Vale sublinhar por que a folga aqui é segura:
-    # revogar um executor NÃO depende dele obedecer ao `control/revoked` — o
-    # servidor fecha o WS com 4403 e a blacklist de cert barra a reconexão (ver
-    # app/api/routers/executores_router.py). A checagem temporal do comando é
-    # defesa contra replay, não o mecanismo de revogação.
+    # ── 3. Temporal validity ──────────────────────────────────────────────────
+    # Same criterion as the job: a ceiling on the declared duration (immune to
+    # skew) and expiry with skew slack. It is worth stressing why the slack here
+    # is safe: revoking an executor does NOT depend on it obeying `control/revoked`
+    # — the server closes the WS with 4403 and the cert blacklist blocks the
+    # reconnect (see app/api/routers/executores_router.py). The command's temporal
+    # check is a defense against replay, not the revocation mechanism.
     _assert_fresh(
         auth.get("issued_at"), auth.get("expires_at"), kind="Comando", prefix="auth.",
     )
 
-    # ── 4. Nonce único (anti-replay) ──────────────────────────────────────────
+    # ── 4. Unique nonce (anti-replay) ─────────────────────────────────────────
     nonce = auth.get("nonce")
     if not nonce:
         raise JobValidationError("Comando sem 'auth.nonce'.")

@@ -20,7 +20,7 @@ describe("textoDoSubtitulo", () => {
   it("escopo ativo: nome do workspace e a contagem de ativos", () => {
     expect(textoDoSubtitulo("ativo", { workspaceNome: "Bacia do Rio Doce", workspaces: 3, ativos: 8 }))
       .toBe("«Bacia do Rio Doce» · 8 workflows ativos")
-    // Singular do número.
+    // Singular of the number.
     expect(textoDoSubtitulo("ativo", { workspaceNome: "Cadastro", workspaces: 1, ativos: 1 }))
       .toBe("«Cadastro» · 1 workflow ativo")
   })
@@ -55,7 +55,7 @@ describe("CabecalhoDoDashboard", () => {
     render(<CabecalhoDoDashboard {...base} periodo={30} onPeriodo={onPeriodo} />)
     const grupo = screen.getByRole("group", { name: "Período" })
     expect(within(grupo).getAllByRole("button")).toHaveLength(3)
-    // A janela ativa fica pressionada; as outras, não.
+    // The active window stays pressed; the others do not.
     expect(screen.getByRole("button", { name: "Últimos 30 dias" })).toHaveAttribute("aria-pressed", "true")
     expect(screen.getByRole("button", { name: "Últimos 7 dias" })).toHaveAttribute("aria-pressed", "false")
     fireEvent.click(screen.getByRole("button", { name: "Últimos 90 dias" }))

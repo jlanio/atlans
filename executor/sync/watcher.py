@@ -16,15 +16,15 @@ logger = logging.getLogger("executor.sync")
 
 
 class _SyncEventHandler(FileSystemEventHandler):
-    """Handler do watchdog que repassa ao FileWatcher os eventos relevantes.
+    """Watchdog handler that forwards the relevant events to the FileWatcher.
 
-    Sem debounce por caminho: o piso de intervalo entre ciclos (SYNC_MIN_CYCLE)
-    e a espera por estabilizacao vivem no SyncManager, que e quem tem como
-    adiar trabalho de verdade. O dict `caminho -> timestamp` que existia aqui
-    nunca era podado — cada temporario do QGIS deixava uma entrada para sempre,
-    e o RSS do executor crescia sem causa aparente — e ainda DESCARTAVA o
-    evento em vez de adia-lo, atrasando ate 30s uma gravacao que terminasse
-    dentro da janela. O unico papel do watcher e acordar o ciclo.
+    No per-path debounce: the minimum interval between cycles (SYNC_MIN_CYCLE)
+    and the wait for stabilization live in the SyncManager, which is what can
+    actually defer work. The `caminho -> timestamp` dict that used to live here
+    was never pruned — every QGIS temp file left an entry forever, and the
+    executor's RSS grew for no apparent reason — and it also DISCARDED the
+    event instead of deferring it, delaying by up to 30s a write that finished
+    within the window. The watcher's only job is to wake the cycle up.
     """
 
     def __init__(self, callback: Callable[[str, str], None], ignore_filter=None):
@@ -36,9 +36,9 @@ class _SyncEventHandler(FileSystemEventHandler):
         name = p.name
         if name.startswith(".") or name in {".atlans-sync.json", ".DS_Store", "Thumbs.db"}:
             return False
-        # Mover um arquivo para a lixeira gera um evento com dest_path la dentro.
-        # Sem este filtro, descartar uma copia obsoleta acordaria o sync — e o
-        # scanner nem enxerga a lixeira, entao seria trabalho puro em vao.
+        # Moving a file to the trash produces an event with dest_path inside it.
+        # Without this filter, discarding an obsolete copy would wake the sync — and
+        # the scanner does not even see the trash, so it would be pure wasted work.
         if TRASH_DIR_NAME in p.parts:
             return False
         if self._ignore and self._ignore.should_ignore(p):
@@ -66,7 +66,7 @@ class _SyncEventHandler(FileSystemEventHandler):
 
 
 class FileWatcher:
-    """Monitora uma pasta com watchdog e dispara callbacks para o SyncManager."""
+    """Watches a folder with watchdog and fires callbacks for the SyncManager."""
 
     def __init__(self, sync_dir: str, on_change: Callable[[], None], ignore_filter=None):
         self.sync_dir = sync_dir
@@ -75,15 +75,15 @@ class FileWatcher:
         self._observer: Observer | None = None
 
     def _handle_event(self, action: str, path: str):
-        # Recarrega filtros se o .atlans-ignore foi modificado
+        # Reloads the filters if .atlans-ignore was modified
         if Path(path).name == ".atlans-ignore" and self._ignore:
             self._ignore.reload()
         logger.debug("Watcher: %s → %s", action, Path(path).name)
-        # Acorda o SyncManager. Sem esta chamada o watcher inteiro era
-        # decorativo — os filtros e o `_syncing` existiam, mas `on_change` nunca
-        # era invocado e o sync so acontecia no timeout de `interval` (30s).
-        # Roda na THREAD do watchdog: quem recebe o callback e que precisa
-        # marshalar para o event loop.
+        # Wakes the SyncManager up. Without this call the whole watcher was
+        # decorative — the filters and `_syncing` existed, but `on_change` was never
+        # invoked and the sync only happened on the `interval` timeout (30s).
+        # Runs on the watchdog THREAD: whoever receives the callback is the one
+        # that has to marshal it onto the event loop.
         self.on_change()
 
     def start(self):

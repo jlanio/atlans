@@ -3,14 +3,14 @@ import { cleanup, render, screen } from "@testing-library/react"
 import type { ExtensaoDoWeb } from "@/extensoes"
 
 /**
- * O aviso de cota cheia, no núcleo.
+ * The full-quota warning, in the core.
  *
- * Ele diz o prazo REAL: o servidor manda `reabre_em_segundos`, o donut logo
- * abaixo já o usava, e «algumas horas» era a tela sabendo mais do que contava.
+ * It states the REAL time: the server sends `reabre_em_segundos`, the donut right
+ * below already used it, and "algumas horas" (a few hours) was the screen knowing more than it said.
  *
- * E é o encaixe da oferta de uma extensão (`ofertaDaCota`): sem extensão, o
- * aviso é só o aviso; com uma, a oferta recebe o plano e se há o que vender. A
- * oferta dos planos tem testes na pasta da extensão.
+ * And it is the slot for an extension's offer (`ofertaDaCota`): without an extension, the
+ * warning is just the warning; with one, the offer receives the plan and whether there is something to sell. The
+ * plans' offer has tests in the extension's folder.
  */
 
 const registro = vi.hoisted(() => ({ EXTENSOES: [] as ExtensaoDoWeb[] }))
@@ -59,8 +59,8 @@ describe("a oferta é de uma extensão", () => {
 describe("o aviso na tela", () => {
   it("diz o prazo REAL quando o servidor o manda", () => {
     render(<AvisoDeCotaCheia cota={cota({ reabre_em_segundos: 22_320 })} plano="free" assinaturasAtivas />)
-    // 6 h 12 min. O donut logo abaixo já mostrava isto; o aviso dizia
-    // «algumas horas» com o número na mão.
+    // 6 h 12 min. The donut right below already showed this; the warning said
+    // "algumas horas" with the number in hand.
     expect(screen.getByTestId("aviso-de-cota").textContent).toMatch(/reabre em .*6/)
   })
 

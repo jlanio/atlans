@@ -11,11 +11,11 @@ import { useRunPanelStore } from "@/app/stores/runPanelStore"
 import { SubflowLevel, useSubflowDrilldownStore } from "@/app/stores/subflowDrilldownStore"
 import { caminhoDeChamada, idLocal } from "../utils/subflow-path"
 
-/** Rótulos PT-BR das categorias da taxonomia de erro do backend.
+/** PT-BR labels for the categories of the backend's error taxonomy.
  *
- * O backend publica a categoria estável (string); a tradução vive aqui para o
- * painel poder dizer "não adianta repetir, corrija a entrada" em vez de só
- * despejar o stack trace.
+ * The backend publishes the stable category (string); the translation lives here
+ * so the panel can say "retrying won't help, fix the input" instead of just
+ * dumping the stack trace.
  */
 export const ERROR_CATEGORY_LABEL: Record<string, string> = {
   user:       "Entrada ou configuração inválida",
@@ -28,7 +28,7 @@ export const ERROR_CATEGORY_LABEL: Record<string, string> = {
 
 const MINUTE_MS = 60_000
 
-/** Acima de um minuto, `m:ss` — "2m07s" se lê de imediato; "127.40s" não. */
+/** Above one minute, `m:ss` — "2m07s" reads at a glance; "127.40s" does not. */
 function longForm(ms: number): string {
   const minutes = Math.floor(ms / MINUTE_MS)
   const seconds = Math.floor((ms % MINUTE_MS) / 1000)
@@ -49,17 +49,17 @@ export function formatMs(ms?: number | null): string {
   return `${(ms / 1000).toFixed(2)}s`
 }
 
-// O painel e o card do nó falam do MESMO estado, a poucos centímetros um do
-// outro, então usam o mesmo glifo e a mesma cor. O `running` mostrava um
-// spinner girando enquanto o card mostrava as barras de atividade, e as cores
-// vinham de classes fixas do Tailwind em vez dos tokens `--exec-*` — que, ao
-// contrário delas, acompanham o tema.
+// The panel and the node card talk about the SAME state, a few centimeters
+// apart, so they use the same glyph and the same color. `running` showed a
+// spinning spinner while the card showed the activity bars, and the colors
+// came from fixed Tailwind classes instead of the `--exec-*` tokens — which,
+// unlike those, follow the theme.
 export function NodeStatusIcon({ status, size = 13 }: { status: NodeRunStatus; size?: number }) {
   if (status === "completed") return <TbCircleCheck size={size} className="text-exec-success shrink-0" />
   if (status === "failed")    return <TbCircleX size={size} className="text-exec-error shrink-0" />
   if (status === "running")   return <ExecActivity size={size} className="text-exec-running shrink-0" />
-  // `unknown` NÃO pode cair no ícone de "aguardando": o nó começou, o run
-  // acabou, e o que falta é a notícia do término — não o trabalho.
+  // `unknown` must NOT fall into the "waiting" icon: the node started, the run
+  // ended, and what is missing is the news of completion — not the work.
   if (status === "unknown")   return <TbHelpCircle size={size} className="text-exec-unknown shrink-0" />
   return <TbCircleDashed size={size} className="text-muted-foreground/40 shrink-0" />
 }
@@ -79,11 +79,11 @@ export function DriftBadge({ drift }: { drift: { missing: string[]; extra: strin
   )
 }
 
-/** Cronômetro auto-contido — só monta enquanto algo está de fato rodando.
+/** Self-contained stopwatch — only mounts while something is actually running.
  *
- * O painel antigo derivava `startedAt` de `Date.now()` dentro de um `useMemo`
- * que dependia do array de nós, e esse array muda a cada mensagem do WebSocket:
- * o contador voltava para zero a cada evento de qualquer nó.
+ * The old panel derived `startedAt` from `Date.now()` inside a `useMemo`
+ * that depended on the nodes array, and that array changes on every WebSocket
+ * message: the counter reset to zero on every event from any node.
  */
 export function Elapsed({ since }: { since: number }) {
   const [now, setNow] = useState(() => Date.now())
@@ -98,19 +98,19 @@ export function Elapsed({ since }: { since: number }) {
   return <span className="tabular-nums">{text}</span>
 }
 
-/** Linha do painel que sabe a qual nó do CANVAS corresponde.
+/** A panel row that knows which CANVAS node it corresponds to.
  *
- * Só `canvasNodeId` — nunca `nodeId`. Para um nó de dentro de sub-fluxo os dois
- * são diferentes: o id do filho não existe no canvas do pai, e usá-lo aqui era
- * um no-op silencioso (nem foco, nem destaque, nem configuração). Pedir a linha
- * inteira em vez de uma string tira a escolha de quem chama — passar o id
- * errado deixa de compilar.
+ * Only `canvasNodeId` — never `nodeId`. For a node inside a sub-workflow the two
+ * differ: the child's id does not exist on the parent's canvas, and using it here
+ * was a silent no-op (no focus, no highlight, no configuration). Asking for the
+ * whole row instead of a string takes the choice away from the caller — passing
+ * the wrong id no longer compiles.
  */
 export interface AlvoNoCanvas {
   canvasNodeId: string
 }
 
-/** Ações de correlação painel → canvas. */
+/** Panel → canvas correlation actions. */
 export function useNodeFocus() {
   const reactFlow = useReactFlow()
   const guardarHover = useRunPanelStore(s => s.setHovered)
@@ -119,14 +119,14 @@ export function useNodeFocus() {
     guardarHover(alvo?.canvasNodeId ?? null)
   }
 
-  /** Seleciona e centraliza o nó no canvas — possível porque o painel deixou
-   *  de ser modal: antes o overlay do Sheet cobria e desabilitava o canvas. */
+  /** Selects and centers the node on the canvas — possible because the panel is
+   *  no longer modal: before, the Sheet's overlay covered and disabled the canvas. */
   function focusNode(alvo: AlvoNoCanvas) {
     const nodeId = alvo.canvasNodeId
     const exists = reactFlow.getNodes().some(n => n.id === nodeId)
     if (!exists) return
-    // Só realoca os nós cuja seleção MUDOU. Recriar o array inteiro fazia todo
-    // o grafo re-renderizar a cada clique numa linha do painel.
+    // Only reallocates the nodes whose selection CHANGED. Recreating the whole
+    // array made the entire graph re-render on every click on a panel row.
     reactFlow.setNodes(nodes => nodes.map(n => {
       const selected = n.id === nodeId
       return n.selected === selected ? n : { ...n, selected }
@@ -138,23 +138,23 @@ export function useNodeFocus() {
 }
 
 /**
- * Painel → canvas do sub-fluxo: abre o grafo do filho no nó que esta linha
- * representa.
+ * Panel → sub-workflow canvas: opens the child's graph at the node this row
+ * represents.
  *
- * Complementa `focusNode`, que para uma linha de dentro de sub-fluxo só consegue
- * centralizar o nó SubWorkflow do pai — o único id daquela linha que existe no
- * canvas do editor. Aqui o destino é o nó de verdade.
+ * Complements `focusNode`, which for a row from inside a sub-workflow can only
+ * center the parent's SubWorkflow node — the only id of that row that exists on
+ * the editor canvas. Here the destination is the actual node.
  *
- * O caminho sai do `nodeId` da linha, que é o endereço completo (`sA::sB::X`);
- * o `workflowHash` de cada degrau vem dos nós SubWorkflow atravessados. Só o
- * primeiro degrau está no canvas do editor: os seguintes vivem dentro de fluxos
- * ainda não carregados, e o visualizador os resolve ao descer.
+ * The path comes from the row's `nodeId`, which is the full address (`sA::sB::X`);
+ * each step's `workflowHash` comes from the SubWorkflow nodes traversed. Only the
+ * first step is on the editor canvas: the following ones live inside workflows
+ * not yet loaded, and the viewer resolves them on the way down.
  */
 export function useAbrirSubfluxo() {
   const reactFlow = useReactFlow()
   const open = useSubflowDrilldownStore(s => s.open)
 
-  /** A linha veio de dentro de um sub-fluxo E dá para montar o caminho? */
+  /** Did the row come from inside a sub-workflow AND can the path be built? */
   function podeAbrir(node: NodeRun): boolean {
     return caminhoDeChamada(node.nodeId).length > 0 && !!hashDoNoNoCanvas(node)
   }
@@ -171,9 +171,10 @@ export function useAbrirSubfluxo() {
     if (caminho.length === 0) return
 
     const nosDoCanvas = reactFlow.getNodes()
-    // Só o degrau raiz é resolvível daqui. Os mais fundos entram com hash vazio
-    // e o visualizador os preenche ao descer — mas a descida direta para um nível
-    // profundo pararia no primeiro degrau sem hash, então abrimos até ali.
+    // Only the root step can be resolved from here. Deeper ones go in with an
+    // empty hash and the viewer fills them in on the way down — but descending
+    // straight to a deep level would stop at the first step without a hash, so
+    // we open up to there.
     const degraus: SubflowLevel[] = []
     for (const canvasNodeId of caminho) {
       const noCanvas = nosDoCanvas.find(n => n.id === canvasNodeId)
@@ -189,8 +190,8 @@ export function useAbrirSubfluxo() {
     }
     if (degraus.length === 0) return
 
-    // Centraliza o nó da linha só quando chegamos ao nível dele; parando antes,
-    // o alvo não existe no grafo aberto e o visualizador enquadra o todo.
+    // Centers the row's node only when we reach its level; stopping earlier,
+    // the target does not exist in the open graph and the viewer frames the whole.
     const chegou = degraus.length === caminho.length
     open(degraus, chegou ? idLocal(node.nodeId) : null)
   }
@@ -198,10 +199,10 @@ export function useAbrirSubfluxo() {
   return { abrir, podeAbrir }
 }
 
-/** Destaca no DOM o nó sob o cursor no painel.
+/** Highlights in the DOM the node under the cursor in the panel.
  *
- * Alterna uma classe direto no elemento do React Flow em vez de passar por
- * `setNodes` — mudar o array de nós a cada hover re-renderizaria o grafo inteiro.
+ * Toggles a class directly on the React Flow element instead of going through
+ * `setNodes` — changing the nodes array on every hover would re-render the whole graph.
  */
 export function useCanvasHoverHighlight() {
   const hoveredNodeId = useRunPanelStore(s => s.hoveredNodeId)
@@ -213,7 +214,7 @@ export function useCanvasHoverHighlight() {
   }, [hoveredNodeId])
 }
 
-/** Destaca termos da busca dentro de um texto. */
+/** Highlights search terms inside a text. */
 export function Highlight({ text, term }: { text: string; term: string }) {
   if (!term) return <>{text}</>
   const index = text.toLowerCase().indexOf(term.toLowerCase())

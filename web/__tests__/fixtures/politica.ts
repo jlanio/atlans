@@ -1,6 +1,6 @@
 import type { IPolicyMember, IWorkspacePolicy } from "@/service/types"
 
-/** Membro de nível com defaults sãos — sobrescreva só o que o teste quer provar. */
+/** Tier member with sane defaults — override only what the test wants to prove. */
 export function membro(extra: Partial<IPolicyMember> = {}): IPolicyMember {
   return {
     id_hash: "ex-1", name: "geo-01", executor_type: "dedicated", status: "active",
@@ -10,10 +10,10 @@ export function membro(extra: Partial<IPolicyMember> = {}): IPolicyMember {
 }
 
 /**
- * Política com defaults de workspace Compartilhado saudável (pool com 2 online,
- * roteamento por política ligado). `available_*` NÃO é derivado dos membros de
- * propósito: é o servidor quem conta, e o teste diz explicitamente o que ele
- * respondeu.
+ * Policy with the defaults of a healthy Shared workspace (pool with 2 online,
+ * policy routing on). `available_*` is NOT derived from the members on
+ * purpose: the server is the one that counts, and the test states explicitly
+ * what it answered.
  */
 export function politica(extra: Partial<IWorkspacePolicy> = {}): IWorkspacePolicy {
   return {
@@ -33,7 +33,7 @@ export function politica(extra: Partial<IWorkspacePolicy> = {}): IWorkspacePolic
   }
 }
 
-/** Isolado com um principal online: o caso "simples" que ainda cabe no seletor rápido. */
+/** Isolated with one primary online: the "simple" case that still fits in the quick picker. */
 export function isolada(extra: Partial<IWorkspacePolicy> = {}): IWorkspacePolicy {
   return politica({
     mode: "isolated",

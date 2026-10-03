@@ -23,8 +23,8 @@ logger = get_logger(__name__)
 
 def _save_shapefile(gdf: gpd.GeoDataFrame, file_path: str) -> None:
     """
-    Helper bloqueante: salva o GeoDataFrame em um Shapefile ESRI.
-    Avisa sobre truncamento de nomes de colunas (limite de 10 caracteres do Shapefile).
+    Blocking helper: saves the GeoDataFrame to an ESRI Shapefile.
+    Warns about column-name truncation (the Shapefile's 10-character limit).
     """
     long_cols = [col for col in gdf.columns if len(col) > 10 and col != gdf.geometry.name]
     if long_cols:
@@ -36,7 +36,7 @@ def _save_shapefile(gdf: gpd.GeoDataFrame, file_path: str) -> None:
 
 
 def _zip_shapefile_dir(shp_dir: str, zip_path: str) -> None:
-    """Compacta todos os arquivos do diretorio do Shapefile em um unico .zip."""
+    """Packs all the files in the Shapefile's directory into a single .zip."""
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
         for fname in os.listdir(shp_dir):
             fpath = os.path.join(shp_dir, fname)
@@ -47,8 +47,8 @@ def _zip_shapefile_dir(shp_dir: str, zip_path: str) -> None:
 @register_node
 class SaveToShapefileNode(BaseNode):
     """
-    Salva um GeoDataFrame como Shapefile ESRI, compacta em .zip
-    e faz upload para o MinIO como artefato.
+    Saves a GeoDataFrame as an ESRI Shapefile, packs it into a .zip
+    and uploads it to MinIO as an artifact.
     """
 
     @classmethod
@@ -96,7 +96,7 @@ class SaveToShapefileNode(BaseNode):
                     'default': '',
                     'description': 'Token Bearer para proteger o download. Sem credencial, o artefato e publico.',
                     'credential_types': ['webhook_token'],
-                    # Nao ha download a proteger num artefato que fica no executor.
+                    # There is no download to protect on an artifact that stays on the executor.
                     'visibleWhen': {'field': 'localidade', 'in': ['herdar']},
                 },
                 propriedade_localidade(),
@@ -112,11 +112,11 @@ class SaveToShapefileNode(BaseNode):
         credential_id = self.get_param('credential_id', '') or None
         localidade, quem = resolver_localidade(self.get_param('localidade', None))
         if localidade == EXECUTOR:
-            # Nao ha download a proteger num artefato que fica no executor.
+            # There is no download to protect on an artifact that stays on the executor.
             credential_id = None
 
-        # Mesma regra de save_geojson: label explicito, senao o basename do
-        # outputPath, senao erro. `BaseNode.derive_label` e o ponto unico.
+        # Same rule as save_geojson: explicit label, otherwise the basename of
+        # outputPath, otherwise an error. `BaseNode.derive_label` is the single point.
         label = self.derive_label(label, output_path)
 
         workspace_id, task_id = self.require_execution_context()
@@ -124,7 +124,7 @@ class SaveToShapefileNode(BaseNode):
         # Obtem o GeoDataFrame
         data = self.get_first_gdf(inputs)
 
-        # Reprojeta se necessario
+        # Reprojects if needed
         data = await asyncio.to_thread(ensure_gdf_crs, data, crs)
 
         features = len(data)
@@ -153,14 +153,14 @@ class SaveToShapefileNode(BaseNode):
             zip_path = os.path.join(zip_dir, f"{safe_label}.zip")
             await asyncio.to_thread(_zip_shapefile_dir, shp_dir, zip_path)
 
-            # Upload do zip para MinIO
+            # Upload of the zip to MinIO
             filename = f"{safe_label}.zip"
 
-            # `persistir_artefato` le o fileobj inteiro nos dois caminhos
-            # (executor e MinIO), entao o ramo `if tamanho > 10MB: fileobj
-            # else: content` que existia aqui produzia exatamente o mesmo
-            # resultado nas duas pontas — 12 linhas duplicadas e um
-            # comentario de "streaming" que nunca foi verdade.
+            # `persistir_artefato` reads the whole fileobj on both paths
+            # (executor and MinIO), so the `if tamanho > 10MB: fileobj
+            # else: content` branch that existed here produced exactly the same
+            # result at both ends — 12 duplicated lines and a
+            # "streaming" comment that was never true.
             with open(zip_path, 'rb') as zf:
                 s3_key, artifact_meta = await asyncio.to_thread(
                     persistir_artefato,

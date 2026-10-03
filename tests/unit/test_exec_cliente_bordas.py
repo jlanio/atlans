@@ -1,27 +1,28 @@
 # tests/unit/test_exec_cliente_bordas.py
-"""Bordas do executor-cliente expostas pela auditoria do lote de otimizacoes.
+"""Executor-client edges exposed by the audit of the optimization batch.
 
-Cada teste fixa uma invariante que a otimizacao correspondente quebrou sem que
-nenhum teste percebesse:
+Each test pins down an invariant that the corresponding optimization broke
+without any test noticing:
 
-  A2  — o backoff de reconexao so pode recuar por causa de uma SESSAO que
-        existiu. Medindo a tentativa inteira, um upgrade WS pendurado por 10s
-        contava como "sessao que progrediu", o delay caia pela metade, o caller
-        dobrava e o executor refazia handshake mTLS a cada ~1s por horas.
-  A18/A26 — o lote de stdout tem que caber no frame: sem `extra['message']`
-        duplicando o texto e fechando por BYTES antes de fechar por contagem.
-        Acima de 64 KB o evento e reduzido aos campos de controle (sem `extra`)
-        e o painel perde o lote inteiro em silencio.
-  A19 — a barreira de fim de job mede "quanto falta" por RUN, mas "existe
-        consumidor?" pela fila INTEIRA. Com o detector por run, um job curto
-        atras do backlog de um job grande acusava sender morto com o WS vivo.
-  A20 — validacao/descriptografia nao pode dividir pool com os nos, e capacity
-        tem que ser honesto quando o pool dos nos satura.
-  A44 — lifecycle descartado por PRESSAO (WS vivo) precisa ser reenviado assim
-        que a fila folga; e `esquecer_run` tem que limpar o coletor tambem.
-  A59 — todo re-enfileiramento e todo descarte definitivo fecham a conta da
-        marca d'agua. Sem isso `alvo` era inalcancavel e a barreira cobrava o
-        timeout de estagnacao inteiro em todo job com uma falha de envio.
+  A2  — the reconnect backoff may only back off because of a SESSION that
+        existed. Measuring the whole attempt, a WS upgrade hung for 10s counted
+        as a "session that made progress", the delay was halved, the caller
+        doubled it and the executor redid the mTLS handshake every ~1s for hours.
+  A18/A26 — the stdout batch has to fit in the frame: no `extra['message']`
+        duplicating the text, and closing by BYTES before closing by count.
+        Above 64 KB the event is reduced to the control fields (no `extra`)
+        and the panel silently loses the whole batch.
+  A19 — the end-of-job barrier measures "how much is left" per RUN, but "is
+        there a consumer?" across the WHOLE queue. With the per-run detector, a
+        short job behind a large job's backlog reported a dead sender with the
+        WS alive.
+  A20 — validation/decryption must not share a pool with the nodes, and
+        capacity has to be honest when the nodes' pool saturates.
+  A44 — lifecycle discarded due to PRESSURE (WS alive) must be resent as soon
+        as the queue has room; and `esquecer_run` has to clear the collector too.
+  A59 — every re-enqueue and every final discard settles the high-water mark
+        account. Without it `alvo` was unreachable and the barrier charged the
+        whole stall timeout on every job with one send failure.
 """
 import asyncio
 import json
@@ -42,11 +43,11 @@ def _conn():
 
 
 def test_backoff_nao_recua_quando_o_handshake_nunca_abriu(monkeypatch):
-    """Upgrade pendurado: `_sessao_iniciada_em` fica None e o delay se mantem.
+    """Hung upgrade: `_sessao_iniciada_em` stays None and the delay is kept.
 
-    Era o cenario critico: `open_timeout` de 10s contava como sessao de 10s,
-    caia na faixa do meio e o backoff exponencial deixava de existir justamente
-    para a falha mais cara para o servidor.
+    It was the critical scenario: a 10s `open_timeout` counted as a 10s session,
+    fell into the middle band and the exponential backoff ceased to exist
+    precisely for the failure that is most expensive for the server.
     """
     c = _conn()
     c._sessao_iniciada_em = None
@@ -54,10 +55,10 @@ def test_backoff_nao_recua_quando_o_handshake_nunca_abriu(monkeypatch):
 
 
 def test_backoff_recua_de_verdade_apos_sessao_media(monkeypatch):
-    """Faixa do meio: tem que sobreviver ao dobro que o `run()` aplica depois.
+    """Middle band: it has to survive the doubling that `run()` applies afterwards.
 
-    Com /2 o saldo era exatamente neutro (halve-then-double) e o delay oscilava
-    entre dois valores para sempre.
+    With /2 the net effect was exactly neutral (halve-then-double) and the delay
+    oscillated between two values forever.
     """
     c = _conn()
     agora = conn_mod.time.monotonic()
@@ -84,7 +85,7 @@ def test_backoff_mantem_acumulado_em_sessao_que_morre_no_nascimento(monkeypatch)
     assert c._apply_session_backoff_reset(4) == 4
 
 
-# ── A18/A26: o lote de stdout cabe no frame ───────────────────────────────────
+# ── A18/A26: the stdout batch fits in the frame ───────────────────────────────
 
 def _stream(publicados):
     from flow.nodes.action.python_script import _LoggingStream
@@ -93,11 +94,11 @@ def _stream(publicados):
 
 
 def test_lote_de_stdout_fecha_por_bytes_antes_do_teto_do_frame():
-    """200 linhas longas nao podem virar um evento acima de 64 KB.
+    """200 long lines must not become an event above 64 KB.
 
-    O `for r in gdf.itertuples(): print(r)` do usuario: linhas de ~200 chars.
-    Antes o lote so fechava em 200 linhas e, com o texto duplicado em
-    `message`, o evento passava dos 64 KB e chegava ao painel sem `extra`.
+    The user's `for r in gdf.itertuples(): print(r)`: lines of ~200 chars.
+    Before, the batch only closed at 200 lines and, with the text duplicated in
+    `message`, the event went past 64 KB and reached the panel without `extra`.
     """
     from flow.nodes.action.python_script import _STDOUT_FLUSH_LINES
 
@@ -118,7 +119,7 @@ def test_lote_de_stdout_fecha_por_bytes_antes_do_teto_do_frame():
 
 
 def test_linha_unica_gigante_e_truncada_com_marcacao():
-    """`print(gdf.to_json())` de 70 KB nao pode levar junto as outras linhas."""
+    """A 70 KB `print(gdf.to_json())` must not take the other lines down with it."""
     publicados = []
     stream = _stream(publicados)
     stream.write("a" * 70_000 + "\n")
@@ -133,10 +134,10 @@ def test_linha_unica_gigante_e_truncada_com_marcacao():
 
 
 def test_reducao_de_evento_preserva_as_linhas_de_stdout():
-    """Ultima rede: se ainda assim estourar, `extra['lines']` sobrevive cortado.
+    """Last safety net: if it still overflows, `extra['lines']` survives truncated.
 
-    Zerar `extra` fazia o painel mostrar kind=stdout com zero conteudo — a aba
-    de saida do no ficava vazia, sem nenhum aviso.
+    Clearing `extra` made the panel show kind=stdout with zero content — the
+    node's output tab was empty, with no warning at all.
     """
     evento = {
         "type": "node_event", "run_id": "r", "node": "n",
@@ -151,11 +152,11 @@ def test_reducao_de_evento_preserva_as_linhas_de_stdout():
 
 
 def test_reducao_respeita_o_teto_mesmo_com_linhas_nao_ascii():
-    """Corte por serializacao real, nao por contagem de caracteres.
+    """Truncation by real serialization, not by character count.
 
-    `json.dumps` escapa com ensure_ascii: uma linha de emoji cresce ate 6x. Uma
-    estimativa em `len(str)` deixaria o evento reduzido estourar o teto de novo,
-    justamente no ramo que existe para salvar o conteudo.
+    `json.dumps` escapes with ensure_ascii: a line of emoji grows up to 6x. An
+    estimate based on `len(str)` would let the reduced event overflow the ceiling
+    again, precisely in the branch that exists to save the content.
     """
     evento = {
         "type": "node_event", "run_id": "r", "node": "n",
@@ -167,15 +168,15 @@ def test_reducao_respeita_o_teto_mesmo_com_linhas_nao_ascii():
     assert json.loads(bruto)["extra"]["lines"]
 
 
-# ── A19: estagnacao e propriedade da FILA, nao do run ─────────────────────────
+# ── A19: stalling is a property of the QUEUE, not of the run ──────────────────
 
 @pytest.mark.asyncio
 async def test_barreira_nao_desiste_enquanto_o_sender_drena_outro_run():
-    """Job curto atras do backlog de um job grande na fila FIFO compartilhada.
+    """Short job behind a large job's backlog in the shared FIFO queue.
 
-    O detector por run acusava "consumidor parado (WS caido)" com o WebSocket
-    perfeitamente vivo, e o `job_result` — que carrega o
-    `__workflow_complete__` — era despachado na frente dos node_events do run.
+    The per-run detector reported "consumer stopped (WS down)" with the
+    WebSocket perfectly alive, and the `job_result` — which carries
+    `__workflow_complete__` — was dispatched ahead of the run's node_events.
     """
     fila = _FilaContada()
     for i in range(40):
@@ -186,13 +187,13 @@ async def test_barreira_nao_desiste_enquanto_o_sender_drena_outro_run():
     async def _sender():
         while True:
             ev = await fila.get()
-            await asyncio.sleep(0.02)   # sender lento, mas VIVO
+            await asyncio.sleep(0.02)   # slow sender, but ALIVE
             fila.confirmar_envio(ev)
             fila.task_done()
 
     task = asyncio.create_task(_sender())
     try:
-        # 0,3s de estagnacao contra ~0,9s de backlog de B na frente de A.
+        # 0.3s of stalling against ~0.9s of B's backlog ahead of A.
         await asyncio.wait_for(
             _drenar_eventos_pendentes(fila, run_id="A", timeout=10.0, estagnado=0.3),
             timeout=5.0,
@@ -208,7 +209,7 @@ async def test_barreira_nao_desiste_enquanto_o_sender_drena_outro_run():
 
 @pytest.mark.asyncio
 async def test_barreira_ainda_desiste_quando_ninguem_drena():
-    """A defesa original continua valendo: sem consumidor, nao se espera 30s."""
+    """The original defense still holds: with no consumer, we don't wait 30s."""
     fila = _FilaContada()
     for i in range(3):
         fila.put_nowait({"run_id": "A", "node": f"a{i}"})
@@ -223,11 +224,11 @@ async def test_barreira_ainda_desiste_quando_ninguem_drena():
 
 @pytest.mark.asyncio
 async def test_requeue_nao_desbalanceia_a_marca_dagua(monkeypatch):
-    """Uma falha transitoria de envio nao pode custar o timeout de estagnacao.
+    """A transient send failure must not cost the stall timeout.
 
-    `_put` conta todo put (inclusive o re-enfileiramento) e `confirmar_envio` so
-    conta sucesso: sem contrapeso, `alvo` ficava 1 acima do alcancavel para
-    sempre e a barreira so saia por estagnacao.
+    `_put` counts every put (including the re-enqueue) and `confirmar_envio` only
+    counts success: without a counterweight, `alvo` stayed 1 above what was
+    reachable forever and the barrier only exited by stalling.
     """
     monkeypatch.setattr(conn_mod, "_SEND_RETRY_PAUSE", 0)
 
@@ -262,7 +263,7 @@ async def test_requeue_nao_desbalanceia_a_marca_dagua(monkeypatch):
 
 
 def test_descarte_definitivo_fecha_a_conta():
-    """Evento que nunca sera enviado nao pode deixar `alvo` inalcancavel."""
+    """An event that will never be sent must not leave `alvo` unreachable."""
     fila = _FilaContada(maxsize=500)
     item = {"run_id": "A", "node": "n1"}
     fila.put_nowait(item)
@@ -273,11 +274,11 @@ def test_descarte_definitivo_fecha_a_conta():
 # ── A44: coletor drenado com a sessao viva ────────────────────────────────────
 
 def test_coletor_e_drenado_quando_a_fila_folga():
-    """Lifecycle descartado por PRESSAO nao pode esperar uma reconexao.
+    """Lifecycle discarded due to PRESSURE must not wait for a reconnection.
 
-    A fila enche por producao (workflow de 300 nos em debug_mode) muito mais
-    vezes do que a sessao cai; drenar so na reconexao deixava os nos girando ate
-    o fim do run e os eventos retidos em memoria.
+    The queue fills up from production (a 300-node workflow in debug_mode) far
+    more often than the session drops; draining only on reconnection left the
+    nodes spinning until the end of the run and the events held in memory.
     """
     fila = _FilaContada(maxsize=10)
     c = ExecutorConnection(job_queue=None, result_queue=asyncio.Queue(), event_queue=fila)
@@ -300,7 +301,7 @@ def test_coletor_e_drenado_quando_a_fila_folga():
 
 
 def test_esquecer_run_limpa_o_coletor():
-    """Sem isto, um reenvio tardio recriava as entradas por-run ja expurgadas."""
+    """Without this, a late resend recreated the already purged per-run entries."""
     fila = _FilaContada()
     fila.coletor.registrar({"run_id": "A", "node": "n1", "kind": "lifecycle"})
     fila.coletor.registrar({"run_id": "B", "node": "n1", "kind": "lifecycle"})
@@ -318,15 +319,15 @@ def test_coletor_esquece_run_isoladamente():
     assert len(coletor) == 0
 
 
-# ── A20: pool do plano de controle separado e capacity honesto ────────────────
+# ── A20: separate control-plane pool and honest capacity ──────────────────────
 
 def test_validacao_nao_usa_o_pool_dos_nos():
-    """Thread orfa de PythonScript nao pode impedir o executor de aceitar job.
+    """An orphaned PythonScript thread must not stop the executor from accepting jobs.
 
-    `asyncio.to_thread` cai no pool DEFAULT do loop, que e onde rodam os nos —
-    inclusive o script arbitrario do usuario, que o timeout do no nao consegue
-    cancelar. Com a validacao ali, 16 threads presas faziam todo job novo travar
-    antes mesmo de ser aceito ou recusado.
+    `asyncio.to_thread` falls into the loop's DEFAULT pool, which is where the
+    nodes run — including the user's arbitrary script, which the node timeout
+    cannot cancel. With validation there, 16 stuck threads made every new job
+    hang before it was even accepted or rejected.
     """
     import inspect
     from executor import job_executor
@@ -355,17 +356,17 @@ class _FilaDeJobsFalsa:
 
 
 def test_capacity_anuncia_saturacao_quando_o_pool_dos_nos_trava(monkeypatch):
-    """Threads presas nao aparecem em queued/running, que contam JOBS.
+    """Stuck threads do not show up in queued/running, which count JOBS.
 
-    O executor continuava se anunciando ocioso com o pipeline inteiro parado e o
-    servidor seguia despachando jobs que morriam pendurados em 'running'.
+    The executor kept announcing itself as idle with the whole pipeline stopped
+    and the server kept dispatching jobs that died hanging in 'running'.
     """
     monkeypatch.setattr(conn_mod, "_get_dynamic_metrics", lambda: {})
     c = ExecutorConnection(
         job_queue=_FilaDeJobsFalsa(), result_queue=asyncio.Queue(),
         thread_pool=_PoolFalso(workers=16, vivas=16, pendentes=5),
     )
-    # A primeira amostra nao basta — um pico de despacho satura por instantes.
+    # The first sample is not enough — a dispatch spike saturates for a moment.
     assert c._montar_capacity()["queued"] == 0
     cap = c._montar_capacity()
     assert cap["queued"] >= cap["max_queue"] + cap["max_concurrent"]

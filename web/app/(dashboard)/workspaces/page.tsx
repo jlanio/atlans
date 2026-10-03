@@ -16,7 +16,7 @@ import { useWorkspaceExecutors } from "@/app/components/workspace/use-workspace-
 import { CreateWorkspaceDialog } from "@/app/components/workspace/dialog-content/create-workspace";
 import { WorkspaceSettingsSheet, type SectionId } from "@/app/components/workspace/settings-sheet";
 
-/** Janela mínima entre reloads automáticos — ver o listener de foco abaixo. */
+/** Minimum window between automatic reloads — see the focus listener below. */
 const RELOAD_THROTTLE_MS = 10_000;
 
 export default function WorkspacesPage() {
@@ -28,36 +28,36 @@ export default function WorkspacesPage() {
   const searchParams = useSearchParams();
 
   const [createOpen, setCreateOpen] = useState(false);
-  // Alvo do painel de configuração e a seção em que ele abre: os atalhos do
-  // painel do ativo ("Membros") pulam direto para a seção certa.
+  // Target of the settings panel and the section it opens on: the shortcuts on
+  // the active one's panel ("Membros") jump straight to the right section.
   const [painel, setPainel] = useState<{ id: string; secao: SectionId } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Executor de cada workspace: troca em um passo no painel do ativo, status
-  // por texto na fileira dos outros.
+  // Each workspace's executor: changed in one step on the active one's panel,
+  // status as text on the others' row.
   const executor = useWorkspaceExecutors(workspaces);
 
-  // Derivado da lista, e não guardado: assim o painel acompanha uma renomeação
-  // feita lá dentro e se fecha sozinho se o workspace sair da lista (saída,
-  // exclusão, ou remoção feita por outra pessoa).
+  // Derived from the list, and not stored: that way the panel follows a rename
+  // made inside it and closes on its own if the workspace leaves the list
+  // (leaving, deletion, or removal done by someone else).
   const settingsTarget = workspaces.find(w => w.id_hash === painel?.id) ?? null;
 
-  // Fechar por `open={false}` não dispara `onOpenChange`, então o id do alvo
-  // sobreviveria ao desaparecimento do workspace — e reabriria o painel sozinho
-  // se ele voltasse à lista. O reset tem de ser explícito.
+  // Closing via `open={false}` does not fire `onOpenChange`, so the target id
+  // would survive the workspace's disappearance — and would reopen the panel on
+  // its own if it came back to the list. The reset has to be explicit.
   useEffect(() => {
     if (painel && !settingsTarget) setPainel(null);
   }, [painel, settingsTarget]);
 
-  // Re-fetch ao montar — sem isso, workspaces deletadas por OUTROS donos ou
-  // remoções de membership feitas em outra sessão ficam visíveis até relogar.
+  // Re-fetch on mount — without it, workspaces deleted by OTHER owners or
+  // membership removals made in another session stay visible until re-login.
   useEffect(() => { reload(); }, [reload]);
 
   const lastReloadRef = useRef(0);
   useEffect(() => {
-    // O intervalo cobre "usuário fica parado na tela enquanto o dono apaga"; o
-    // listener de foco cobre "usuário volta de outra aba". O throttle existe
-    // porque alt-tab repetido chamaria reload a cada volta.
+    // The interval covers "user sits on the screen while the owner deletes"; the
+    // focus listener covers "user comes back from another tab". The throttle
+    // exists because repeated alt-tab would call reload on every return.
     function maybeReload() {
       const agora = Date.now();
       if (agora - lastReloadRef.current < RELOAD_THROTTLE_MS) return;
@@ -80,7 +80,7 @@ export default function WorkspacesPage() {
   useEffect(() => {
     if (searchParams.get("new") !== "1") return;
     setCreateOpen(true);
-    // Limpa o parâmetro: sem isso, cancelar o diálogo e dar F5 o reabria.
+    // Clears the parameter: without this, canceling the dialog and pressing F5 reopened it.
     router.replace("/workspaces");
   }, [searchParams, router]);
 
@@ -107,15 +107,15 @@ export default function WorkspacesPage() {
 
   const carregandoInicial = loading && workspaces.length === 0;
 
-  // O ativo sai da LISTA, não do context: `current` pode ficar defasado por um
-  // instante após uma exclusão, e o painel não pode mostrar um workspace que a
-  // fileira já não tem.
+  // The active one comes from the LIST, not from the context: `current` may lag
+  // for an instant after a deletion, and the panel must not show a workspace the
+  // row no longer has.
   const ativo = current ? workspaces.find(w => w.id_hash === current.id_hash) ?? null : null;
   const outros = workspaces.filter(w => w.id_hash !== ativo?.id_hash);
 
   return (
     <PageRoot>
-      {/* Cabeçalho — mesmo padrão de Artefatos/Executores/Histórico. */}
+      {/* Header — same pattern as Artifacts/Executors/History. */}
       <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Workspaces</h1>
@@ -135,9 +135,9 @@ export default function WorkspacesPage() {
         </div>
       </div>
 
-      {/* Erro precede o estado vazio: sem esta distinção, um 401/500 renderizava
-          "Nenhum workspace encontrado" para quem tem dez — a tela afirmava um
-          fato sobre os dados quando não tinha dado nenhum. */}
+      {/* Error precedes the empty state: without this distinction, a 401/500 rendered
+          "Nenhum workspace encontrado" for someone who has ten — the screen asserted
+          a fact about the data when it had no data at all. */}
       {error && (
         <div
           role="alert"
@@ -169,9 +169,9 @@ export default function WorkspacesPage() {
         </>
       ) : workspaces.length > 0 && (
         <>
-          {/* `key` pelo id: trocar de workspace remonta o painel, e a entrada
-              animada é o que mostra que o escolhido subiu — sem ela a tela só
-              "piscava" com outro conteúdo no mesmo lugar. */}
+          {/* `key` by id: switching workspace remounts the panel, and the animated
+              entrance is what shows the chosen one moved up — without it the
+              screen just "flashed" with other content in the same place. */}
           {ativo && (
             <WorkspaceHero
               key={ativo.id_hash}
@@ -215,9 +215,9 @@ export default function WorkspacesPage() {
         {createOpen && <CreateWorkspaceDialog onClose={() => setCreateOpen(false)} />}
       </Dialog>
 
-      {/* `key` remonta o painel a cada abertura — sem isso o estado das seções
-          (rascunho da allowlist, seção ativa) e os dados já buscados vazariam de
-          uma abertura para a outra, e reabrir mostraria membros obsoletos. */}
+      {/* `key` remounts the panel on every open — without it the sections' state
+          (allowlist draft, active section) and the already-fetched data would leak
+          from one open to the next, and reopening would show stale members. */}
       <WorkspaceSettingsSheet
         key={painel?.id ?? "none"}
         workspace={settingsTarget}
@@ -225,8 +225,8 @@ export default function WorkspacesPage() {
         currentUserId={currentUserId}
         onClose={() => {
           setPainel(null);
-          // O executor pode ter mudado lá dentro; o painel do ativo e a fileira
-          // precisam refletir.
+          // The executor may have changed in there; the active one's panel and the
+          // row need to reflect it.
           executor.recarregar();
         }}
       />

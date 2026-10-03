@@ -9,7 +9,7 @@ export const TAMANHO_DA_PAGINA = 20
 
 export interface Execucoes {
   runs: IRunSummary[]
-  /** Só a primeira página conta (COUNT é a parte cara); nulo até ela chegar. */
+  /** Only the first page counts (COUNT is the expensive part); null until it arrives. */
   total: number | null
   hasMore: boolean
   carregando: boolean
@@ -20,17 +20,17 @@ export interface Execucoes {
 }
 
 /**
- * Lista paginada de execuções recortada pelo estado da URL (spec §4.3).
+ * Paginated list of runs sliced by the URL state (spec §4.3).
  *
- * Herdeiro do `useRunsQuery` da página antiga, com as mesmas defesas: carimbo
- * de sequência (trocar de filtro dispara uma busca antes de a anterior
- * responder, e a mais lenta não pode vencer), `with_total` só na primeira
- * página, offset em ref para o `carregarMais` não trocar de identidade a cada
- * página, e erro como booleano — a tabela decide o texto.
+ * Heir of the old page's `useRunsQuery`, with the same defenses: a sequence
+ * stamp (switching filters fires a fetch before the previous one responds,
+ * and the slower one must not win), `with_total` only on the first page,
+ * offset in a ref so `carregarMais` does not change identity on every page,
+ * and the error as a boolean — the table decides the text.
  *
- * Qualquer mudança de filtro (período, status, workspace, workflow, executor,
- * origem, assistente, busca) recomeça da primeira página. A visão e a execução aberta não
- * entram: trocar de aba ou abrir o painel não refaz a lista.
+ * Any filter change (period, status, workspace, workflow, executor, origin,
+ * assistant, search) restarts from the first page. The view and the open run
+ * are not included: switching tabs or opening the panel does not redo the list.
  */
 export function useExecucoes(estado: EstadoDoHistorico, { habilitado }: { habilitado: boolean }): Execucoes {
   const [runs, setRuns] = useState<IRunSummary[]>([])
@@ -56,8 +56,8 @@ export function useExecucoes(estado: EstadoDoHistorico, { habilitado }: { habili
       workflow_id: workflow ?? undefined,
       worker_host: executor ?? undefined,
       trigger_source: origem ?? undefined,
-      // Chip "Assistente": recorta pelo FLUXO, e não pelo disparo — combina
-      // com `trigger_source` em vez de competir com ele.
+      // "Assistente" chip: slices by WORKFLOW, not by trigger — it combines
+      // with `trigger_source` instead of competing with it.
       workflow_origem: assistente ? "assistente" : undefined,
       q: q || undefined,
       limit: TAMANHO_DA_PAGINA,
@@ -70,8 +70,8 @@ export function useExecucoes(estado: EstadoDoHistorico, { habilitado }: { habili
     if (dados) {
       if (!acumular && typeof dados.total === "number") setTotal(dados.total)
       setHasMore(!!dados.has_more)
-      // Uma execução que começa entre a página 1 e a 2 desloca o offset e o
-      // último item da página anterior volta na seguinte: fica só a primeira.
+      // A run that starts between page 1 and page 2 shifts the offset and the
+      // last item of the previous page comes back in the next: keep only the first.
       setRuns(prev => {
         if (!acumular) return dados.runs
         const vistos = new Set(prev.map(r => r.run_id))
@@ -85,8 +85,8 @@ export function useExecucoes(estado: EstadoDoHistorico, { habilitado }: { habili
 
   useEffect(() => {
     if (!habilitado) return
-    // Zera antes de buscar: a lista do filtro anterior não pode ficar na tela
-    // sob o chip do novo enquanto a resposta não chega.
+    // Reset before fetching: the previous filter's list must not stay on screen
+    // under the new chip while the response has not arrived.
     setRuns([])
     setTotal(null)
     setHasMore(false)

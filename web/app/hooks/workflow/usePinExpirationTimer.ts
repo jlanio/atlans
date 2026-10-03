@@ -2,14 +2,14 @@ import { useEffect } from 'react'
 
 import { useWorkflowCatalogStore } from '@/app/stores/workflowCatalogStore'
 
-// A expiração de pin é medida em horas; 60s de granularidade basta e evita
-// acordar a aba a cada 10s. Como os demais pollers da base, pausa com a aba
-// oculta e recompõe ao voltar o foco.
+// Pin expiration is measured in hours; 60s granularity is enough and avoids
+// waking the tab every 10s. Like the other pollers in the codebase, it pauses
+// while the tab is hidden and recomputes when focus returns.
 const TICK_MS = 60_000
 
-// Mantém o flag `expired` dos pins em dia sem refetch. Necessário porque o
-// backend só pré-computa `expired` no GET inicial — sem este timer o ícone de
-// pin permanece visível até F5 ou troca de workflow.
+// Keeps the pins' `expired` flag up to date without a refetch. Needed because
+// the backend only precomputes `expired` on the initial GET — without this timer
+// the pin icon stays visible until F5 or a workflow switch.
 export function usePinExpirationTimer() {
   const recompute = useWorkflowCatalogStore(s => s.recomputeExpiredPins)
   useEffect(() => {
@@ -18,7 +18,7 @@ export function usePinExpirationTimer() {
       if (typeof document === "undefined" || document.visibilityState === "visible") recompute()
     }
     const id = setInterval(tick, TICK_MS)
-    // Voltar o foco pode ter deixado pins vencidos: recompõe na hora, sem esperar o tick.
+    // Focus returning may have left expired pins: recompute right away, without waiting for the tick.
     document.addEventListener("visibilitychange", tick)
     return () => {
       clearInterval(id)

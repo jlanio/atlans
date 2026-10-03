@@ -44,7 +44,7 @@ dayjs.locale("pt-br")
 const _stagger = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } }
 const _fadeUp  = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0, transition: { duration: 0.25 } } }
 
-// Overlay de fade que cobre a tela inteira durante a restauração
+// Fade overlay covering the whole screen during the restore
 function RestoreOverlay({ visible, version }: { visible: boolean; version: number | null }) {
   const [opacity, setOpacity] = useState(0)
   const [mounted, setMounted] = useState(false)
@@ -83,7 +83,7 @@ const VersionHistory = () => {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [versions, setVersions] = useState<IWorkflowVersion[]>([])
   const [loading, setLoading] = useState(false)
-  // A lista não chegou: "nenhuma versão salva" seria uma afirmação falsa.
+  // The list didn't arrive: "nenhuma versão salva" would be a false statement.
   const [falhou, setFalhou] = useState(false)
   const [restoring, setRestoring] = useState<number | null>(null)
   const [confirmVersion, setConfirmVersion] = useState<number | null>(null)
@@ -127,8 +127,8 @@ const VersionHistory = () => {
           </Button>
         </SheetTrigger>
 
-        {/* `w-96` fixo (384px) é mais largo que um telefone de 360px, e o painel
-            vazava a lateral em vez de ocupar a tela. */}
+        {/* A fixed `w-96` (384px) is wider than a 360px phone, and the panel
+            spilled past the side instead of taking up the screen. */}
         <SheetContent side="right" className="w-full sm:w-96 flex flex-col gap-0 p-0">
           <SheetHeader className="px-5 pt-5 pb-3 border-b">
             <SheetTitle className="flex items-center gap-2 text-base pr-8">
@@ -163,7 +163,7 @@ const VersionHistory = () => {
               </ul>
             )}
 
-            {/* Empty state — ou a falha, que não é a mesma coisa */}
+            {/* Empty state — or the failure, which is not the same thing */}
             {!loading && versions.length === 0 && (
               <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
                 <div className="rounded-full bg-muted/60 p-5">
@@ -187,7 +187,7 @@ const VersionHistory = () => {
               </div>
             )}
 
-            {/* Lista — timeline com cards */}
+            {/* List — timeline with cards */}
             {!loading && versions.length > 0 && (
               <motion.ul
                 className="flex flex-col gap-2 relative"
@@ -195,21 +195,21 @@ const VersionHistory = () => {
                 initial="hidden"
                 animate="show"
               >
-                {/* Linha vertical da timeline */}
+                {/* Timeline vertical line */}
                 <div className="absolute left-[5px] top-2 bottom-2 w-px bg-border" aria-hidden />
 
                 <AnimatePresence>
                   {versions.map((v, i) => {
                     const isLatest = i === 0
                     return (
-                      // Sem `layout`: a projeção medida por render (layout thrash)
-                      // não é necessária — entrada/saída seguem por variants.
+                      // No `layout`: the per-render measured projection (layout thrash)
+                      // isn't needed — enter/exit go through variants.
                       <motion.li
                         key={v.version_number ?? `${v.created_at}-${i}`}
                         variants={_fadeUp}
                         className="flex gap-3 group"
                       >
-                        {/* Ponto da timeline */}
+                        {/* Timeline dot */}
                         <div className="relative z-10 mt-2.5 shrink-0">
                           <div
                             className={
@@ -287,7 +287,7 @@ const VersionHistory = () => {
         </SheetContent>
       </Sheet>
 
-      {/* Diálogo de confirmação de restauração */}
+      {/* Restore confirmation dialog */}
       <Dialog open={confirmVersion !== null} onOpenChange={() => setConfirmVersion(null)}>
         <DialogContent>
           <DialogHeader>

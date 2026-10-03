@@ -1,23 +1,23 @@
 /**
- * Port de `app/core/utils/allowlist.py` — mantenha os dois em sincronia.
+ * Port of `app/core/utils/allowlist.py` — keep the two in sync.
  *
- * Existe para que a tela de notificações mostre o efeito de uma allowlist
- * ENQUANTO ela é editada, antes de salvar. Sem isso o usuário só descobriria
- * quais workflows passou a bloquear depois de gravar — e a coluna já falha em
- * silêncio o suficiente.
+ * It exists so the notifications screen can show the effect of an allowlist
+ * WHILE it is being edited, before saving. Without it the user would only find
+ * out which workflows they started blocking after saving — and the column
+ * already fails silently enough.
  *
- * O backend continua sendo a autoridade: o que esta função calcula é um preview,
- * reconciliado pela resposta do PUT. `web/__tests__/lib/hostname-allowlist.test.ts`
- * espelha os casos do Python; se as regras lá mudarem, ele quebra aqui.
+ * The backend remains the authority: what this function computes is a preview,
+ * reconciled by the PUT response. `web/__tests__/lib/hostname-allowlist.test.ts`
+ * mirrors the Python cases; if the rules there change, it breaks here.
  */
 
 /**
- * Padrões aceitos:
- *   - "exemplo.com"   → match exato
- *   - "*.exemplo.com" → qualquer subdomínio (a.exemplo.com, foo.bar.exemplo.com)
- *                       mas NÃO o domínio nu (exemplo.com)
+ * Accepted patterns:
+ *   - "exemplo.com"   → exact match
+ *   - "*.exemplo.com" → any subdomain (a.exemplo.com, foo.bar.exemplo.com)
+ *                       but NOT the bare domain (exemplo.com)
  *
- * Comparação case-insensitive.
+ * Case-insensitive comparison.
  */
 export function hostnameMatchesAllowlist(hostname: string, allowlist: string[]): boolean {
   const host = (hostname ?? "").toLowerCase().trim()
@@ -29,8 +29,8 @@ export function hostnameMatchesAllowlist(hostname: string, allowlist: string[]):
 
     if (pattern.startsWith("*.")) {
       const suffix = pattern.slice(1) // ".exemplo.com"
-      // `host !== suffix.slice(1)` é o que exclui o domínio nu: "*.exemplo.com"
-      // cobre os subdomínios, não "exemplo.com".
+      // `host !== suffix.slice(1)` is what excludes the bare domain: "*.exemplo.com"
+      // covers the subdomains, not "exemplo.com".
       if (host.endsWith(suffix) && host !== suffix.slice(1)) return true
     } else if (host === pattern) {
       return true
@@ -40,12 +40,12 @@ export function hostnameMatchesAllowlist(hostname: string, allowlist: string[]):
 }
 
 /**
- * Um host é permitido quando a allowlist está vazia.
+ * A host is allowed when the allowlist is empty.
  *
- * Espelha o `if allowlist:` do consumer: sem lista não há política adicional, e
- * tudo que passa na verificação de SSRF é aceito. É a semântica invertida da
- * coluna — aplicar `hostnameMatchesAllowlist` direto marcaria tudo como
- * bloqueado no estado em que hoje tudo passa.
+ * Mirrors the consumer's `if allowlist:`: without a list there is no additional
+ * policy, and everything that passes the SSRF check is accepted. It is the
+ * column's inverted semantics — applying `hostnameMatchesAllowlist` directly
+ * would mark everything as blocked in the state where everything passes today.
  */
 export function isHostAllowed(hostname: string, allowlist: string[]): boolean {
   if (!allowlist || allowlist.length === 0) return true
@@ -53,11 +53,12 @@ export function isHostAllowed(hostname: string, allowlist: string[]): boolean {
 }
 
 /**
- * Valida um padrão antes de virar chip, com as mesmas regras de
- * `_normalize_allowlist` no backend. Devolve a mensagem de erro, ou null.
+ * Validates a pattern before it becomes a chip, with the same rules as
+ * `_normalize_allowlist` in the backend. Returns the error message, or null.
  *
- * Duplicar a validação aqui é o que permite errar barato: colar a URL inteira é
- * o engano óbvio, e descobri-lo só no 400 do servidor custa um round-trip.
+ * Duplicating the validation here is what makes mistakes cheap: pasting the
+ * whole URL is the obvious slip, and discovering it only at the server's 400
+ * costs a round-trip.
  */
 export function validateAllowlistPattern(raw: string): string | null {
   const pattern = (raw ?? "").trim().toLowerCase()

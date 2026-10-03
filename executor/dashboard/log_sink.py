@@ -1,6 +1,6 @@
 # executor/dashboard/log_sink.py
 """
-Handler que alimenta o rodape de alertas do painel.
+Handler that feeds the dashboard's alerts footer.
 """
 from __future__ import annotations
 
@@ -10,17 +10,18 @@ from executor.logging_setup import LEVEL_LABEL, alias_for
 
 
 class LogTailHandler(logging.Handler):
-    """Encaminha WARNING+ para o coletor, que os guarda num ring buffer.
+    """Forwards WARNING+ to the collector, which keeps them in a ring buffer.
 
-    E o unico ponto em que o painel toca o pipeline de logging — e de proposito:
-    aqui o texto da mensagem *e* o dado. Nenhuma estatistica sai daqui; elas vem
-    dos hooks estruturados.
+    This is the only point where the dashboard touches the logging pipeline — on
+    purpose: here the message text *is* the data. No statistics come from here;
+    they come from the structured hooks.
 
-    Sem este bloco o painel seria ativamente pior que o log: um executor em loop
-    de reconexao mostraria contadores subindo e nenhuma pista da causa.
+    Without this block the dashboard would be actively worse than the log: an
+    executor stuck in a reconnect loop would show counters going up and no clue
+    to the cause.
 
-    Formata no `emit`, e nao no render: guardar `LogRecord` vivo seguraria
-    tambem tudo que `record.args` referencia, por minutos.
+    Formats in `emit`, not in render: keeping a live `LogRecord` would also hold
+    on to everything `record.args` references, for minutes.
     """
 
     def __init__(self, stats, level: int = logging.WARNING):
@@ -35,18 +36,18 @@ class LogTailHandler(logging.Handler):
                 LEVEL_LABEL.get(record.levelno, record.levelname[:5]),
             )
         except Exception:
-            pass  # handleError() escreveria no stderr — exatamente o que o painel ocupa
+            pass  # handleError() would write to stderr — exactly what the dashboard occupies
 
 
 class JsonLogHandler(LogTailHandler):
-    """Alem de alimentar o ring buffer, emite `{"t":"log"}` no canal NDJSON.
+    """Besides feeding the ring buffer, emits `{"t":"log"}` on the NDJSON channel.
 
-    Herda de `LogTailHandler` de proposito: o painel de alertas da GUI e o
-    rodape do painel rich mostram a MESMA informacao, e ter duas extracoes do
-    `LogRecord` seria a porta de entrada para elas divergirem.
+    Inherits from `LogTailHandler` on purpose: the GUI's alerts panel and the
+    rich dashboard's footer show the SAME information, and having two extractions
+    of the `LogRecord` would be the gateway for them to diverge.
 
-    O `emit` do pai nunca levanta, entao o evento sai mesmo que o coletor
-    engasgue com o registro.
+    The parent's `emit` never raises, so the event goes out even if the collector
+    chokes on the record.
     """
 
     def __init__(self, stats, runtime, level: int = logging.WARNING):
@@ -64,6 +65,6 @@ class JsonLogHandler(LogTailHandler):
                 "msg": record.getMessage(),
             })
         except Exception:
-            # Nao logar aqui: um logger.error() dentro de um handler de log e
-            # recursao — o proximo emit chamaria este mesmo bloco.
+            # Do not log here: a logger.error() inside a log handler is
+            # recursion — the next emit would call this very block.
             pass

@@ -1,9 +1,9 @@
 """
-Testes de normalize_ows_endpoint_url (flow.utils.geo_helpers).
+Tests for normalize_ows_endpoint_url (flow.utils.geo_helpers).
 
-Objetivo: descartar query/fragment de URLs OWS (WFS/WMS/WMTS) coladas
-pelo usuario para nao conflitar com os params que o cliente (owslib,
-httpx) injeta na hora de chamar GetCapabilities/GetFeature.
+Goal: discard the query/fragment of OWS URLs (WFS/WMS/WMTS) pasted
+by the user so they do not conflict with the params that the client (owslib,
+httpx) injects when calling GetCapabilities/GetFeature.
 """
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ class TestNormalizeOwsEndpointUrl:
         assert normalize_ows_endpoint_url("https://teste.com/wfs?a=1") == "https://teste.com/wfs"
 
     def test_url_so_com_host(self):
-        # Sem path: scheme://host (com path vazio apos rstrip)
+        # No path: scheme://host (with an empty path after rstrip)
         assert normalize_ows_endpoint_url("https://teste.com") == "https://teste.com"
         assert normalize_ows_endpoint_url("https://teste.com/") == "https://teste.com"
 
@@ -59,7 +59,7 @@ class TestNormalizeOwsEndpointUrl:
         assert normalize_ows_endpoint_url(raw) == "https://exemplo.com/wfs"
 
     def test_url_sem_scheme_devolve_original(self):
-        # Sem scheme nao tem como parsear — devolve para validacao downstream.
+        # Without a scheme there is no way to parse — returns it for downstream validation.
         raw = "exemplo.com/wfs?a=1"
         result = normalize_ows_endpoint_url(raw)
         assert "exemplo.com" in result

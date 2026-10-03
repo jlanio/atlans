@@ -12,10 +12,10 @@ import { TbError404 } from "react-icons/tb"
 import { INodePortAPI } from "@/service/types"
 import { calcNodeHeight, portTopStyle } from "../../utils/node-metrics"
 
-// `selected` vem da prop do React Flow. Ler `useNodes()` só para descobrir isso
-// assinava o array inteiro de nós: durante um arraste o React Flow emite uma
-// mudança de posição por pointermove, o array troca de identidade e os N cards
-// re-renderizavam — cada um varrendo os N nós, O(N²) por quadro.
+// `selected` comes from the React Flow prop. Reading `useNodes()` just to find
+// that out subscribed to the whole node array: during a drag React Flow emits a
+// position change per pointermove, the array changes identity and the N cards
+// re-rendered — each one scanning the N nodes, O(N²) per frame.
 const DefaultTypeIcon = ({ id, data, selected }: NodeProps<INodeContext>) => {
 
   const { toolState, handleToolState } = useTools()
@@ -25,7 +25,7 @@ const DefaultTypeIcon = ({ id, data, selected }: NodeProps<INodeContext>) => {
   const onEnter = useCallback(() => handleToolState('onFocus'), [handleToolState])
   const onLeave = useCallback(() => handleToolState('leave'), [handleToolState])
 
-  // PERF: indexa edges por source/target para lookups O(1) em vez de O(n) por porta
+  // PERF: indexes edges by source/target for O(1) lookups instead of O(n) per port
   const connectedSources = useMemo(() => {
     const set = new Set<string>()
     for (const e of edges) {
@@ -48,8 +48,8 @@ const DefaultTypeIcon = ({ id, data, selected }: NodeProps<INodeContext>) => {
 
   const title = (data.properties?.["alias"] as string | undefined) || (data.alias as string)
   const nodeHeight = calcNodeHeight(Math.max(isOutputNode ? 0 : outputs.length, inputs.length))
-  // Objeto estável: recriá-lo por render invalidava a comparação de props do
-  // card a cada quadro.
+  // Stable object: recreating it per render invalidated the card's props
+  // comparison on every frame.
   const cardStyle = useMemo(() => ({ height: nodeHeight }), [nodeHeight])
 
   return (
@@ -66,7 +66,7 @@ const DefaultTypeIcon = ({ id, data, selected }: NodeProps<INodeContext>) => {
 
       <Icon className="text-xl" />
 
-      {/* ── Outputs (direita) — nós do tipo output são terminais, sem saída ── */}
+      {/* ── Outputs (right) — output-type nodes are terminal, with no output ── */}
       {!isOutputNode && (
         outputs.length > 1 ? (
           outputs.map((port, i) => {
@@ -99,7 +99,7 @@ const DefaultTypeIcon = ({ id, data, selected }: NodeProps<INodeContext>) => {
         )
       )}
 
-      {/* ── Inputs (esquerda) — linha tracejada distingue de saídas ── */}
+      {/* ── Inputs (left) — a dashed line distinguishes them from outputs ── */}
       {inputs.length > 1 ? (
         inputs.map((port, i) => {
           const ts = portTopStyle(i, inputs.length, nodeHeight)

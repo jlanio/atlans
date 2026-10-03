@@ -5,10 +5,10 @@ from app.core.config import FERNET_KEYS
 if not FERNET_KEYS:
     raise RuntimeError("❌ Nenhuma chave Fernet definida (FERNET_KEY/FERNET_KEYS).")
 
-# MultiFernet: encrypt() usa a PRIMEIRA chave; decrypt() tenta todas na ordem.
-# Com uma única chave é indistinguível do Fernet(chave) de antes — o caminho de
-# rotação (F4) é aditivo e não muda nada quando FERNET_KEYS não é usado.
-# Uma chave inválida faz Fernet(...) levantar já no import: falha cedo, como antes.
+# MultiFernet: encrypt() uses the FIRST key; decrypt() tries all of them in order.
+# With a single key it is indistinguishable from the former Fernet(key) — the
+# rotation path (F4) is additive and changes nothing when FERNET_KEYS is not used.
+# An invalid key makes Fernet(...) raise right at import: fail early, as before.
 fernet = MultiFernet([Fernet(k.encode()) for k in FERNET_KEYS])
 
 
@@ -30,11 +30,11 @@ def encrypt_workflow_connections(definition: dict) -> dict:
 
 
 def decrypt_credential_data(raw_data: dict) -> dict:
-    """Descriptografa valores com prefixo 'gAAAA' em um dicionário de credenciais.
+    """Decrypts values with the 'gAAAA' prefix in a credentials dictionary.
 
-    Roda apenas no servidor: as credenciais sao descriptografadas antes de
-    entrarem no envelope cifrado do job, entao o executor recebe os valores
-    em claro e nunca precisa da FERNET_KEY.
+    Runs only on the server: credentials are decrypted before they go into
+    the job's encrypted envelope, so the executor receives the values in
+    the clear and never needs the FERNET_KEY.
     """
     return {
         k: (decrypt_string(v) if isinstance(v, str) and v.startswith("gAAAA") else v)

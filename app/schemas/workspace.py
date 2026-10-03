@@ -1,13 +1,13 @@
 # app/schemas/workspace.py
 """
-Schemas de Workspace compartilhados entre a REST e os services.
+Workspace schemas shared between REST and the services.
 
-`WorkspaceOut` nasceu dentro de `workspace_router.py`. Saiu de lá porque a
-listagem de workspaces do usuário virou service (`workspace_service.py`) e um
-service não pode importar um router — a direção de dependência é router →
-service, nunca o inverso (e o router puxa `app.api.dependencies`, que puxa
-meio mundo). O router continua re-exportando o nome, então quem importava
-`WorkspaceOut` dali segue funcionando.
+`WorkspaceOut` was born inside `workspace_router.py`. It moved out because the
+user's workspace listing became a service (`workspace_service.py`) and a
+service cannot import a router — the dependency direction is router →
+service, never the reverse (and the router pulls in `app.api.dependencies`,
+which pulls in half the world). The router keeps re-exporting the name, so
+whoever imported `WorkspaceOut` from there keeps working.
 """
 from __future__ import annotations
 

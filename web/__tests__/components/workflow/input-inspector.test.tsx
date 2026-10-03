@@ -1,12 +1,12 @@
 /**
- * A caixa de Entrada precisa dizer o nome com que o dado CHEGA.
+ * The Input box needs to state the name under which the data ARRIVES.
  *
- * Para o Script Python o painel mostra o nome da variável — é o texto que se
- * arrasta para dentro do código. Antes das portas nomeadas esse nome era a
- * chave de saída do PAI, e estava certo: era assim que o executor batizava a
- * entrada. Com portas, a regra passou a ser `to_key if to_key else from_key`, e
- * o painel ficou instruindo a usar `output` quando a variável se chamava
- * `pontos` — deixou de faltar informação e passou a dar informação errada.
+ * For the Python Script the panel shows the variable name — it's the text that
+ * gets dragged into the code. Before named ports that name was the PARENT's
+ * output key, and it was right: that's how the executor named the input. With
+ * ports, the rule became `to_key if to_key else from_key`, and the panel kept
+ * telling people to use `output` when the variable was called `pontos` — it
+ * went from missing information to giving wrong information.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, cleanup } from "@testing-library/react"
@@ -55,15 +55,15 @@ describe("nome da variável", () => {
     edges.push({ id: "e", source: "pai", target: "py", data: { from_key: "output", to_key: "pontos" } })
     render(<InputInspector nodeFound={python(["pontos"])} />)
 
-    // A chave do pai continua visível como procedência…
+    // The parent's key stays visible as provenance…
     expect(screen.getByText("output")).toBeInTheDocument()
-    // …mas o nome que se leva para o script é o da porta.
+    // …but the name that goes into the script is the port's.
     expect(screen.getByText("pontos")).toBeInTheDocument()
   })
 
   it("sem to_key continua usando a chave do pai", () => {
-    // Fluxo antigo, sem portas: o executor batiza pelo `from_key`, e o painel
-    // precisa continuar concordando com ele.
+    // Old workflow, no ports: the executor names by `from_key`, and the panel
+    // needs to keep agreeing with it.
     edges.push({ id: "e", source: "pai", target: "py", data: { from_key: "output" } })
     render(<InputInspector nodeFound={python([])} />)
 
@@ -74,8 +74,8 @@ describe("nome da variável", () => {
 
 describe("portas configuradas aparecem antes de qualquer conexão", () => {
   it("lista as portas declaradas com nada ligado", () => {
-    // Quem acabou de configurá-las não tinha onde conferir os nomes — e são
-    // eles que viram as variáveis do script.
+    // Whoever just configured them had nowhere to check the names — and they're
+    // what become the script's variables.
     render(<InputInspector nodeFound={python(["pontos", "poligonos"])} />)
 
     expect(screen.getByText("Entradas deste nó")).toBeInTheDocument()
@@ -91,8 +91,8 @@ describe("portas configuradas aparecem antes de qualquer conexão", () => {
   })
 
   it("com uma porta ligada, a outra aparece como pendente", () => {
-    // A lista de pais só mostra a que está ligada; sem isto a porta que falta
-    // fica invisível justamente para quem ainda precisa ligá-la.
+    // The parents list only shows the connected one; without this the missing
+    // port stays invisible precisely to whoever still needs to connect it.
     edges.push({ id: "e", source: "pai", target: "py", data: { from_key: "output", to_key: "pontos" } })
     render(<InputInspector nodeFound={python(["pontos", "poligonos"])} />)
 
@@ -108,13 +108,13 @@ describe("portas configuradas aparecem antes de qualquer conexão", () => {
   })
 })
 
-// ── Achados da revisão da própria mudança ───────────────────────────────────
+// ── Findings from reviewing the change itself ───────────────────────────────
 
 describe("mesmo pai alimentando duas portas", () => {
   it("mostra uma linha por aresta, não por chave", () => {
-    // As duas arestas carregam o mesmo `from_key` (o pai só tem uma saída).
-    // Listando por chave, a segunda porta ficava invisível — justamente no
-    // cenário que as portas nomeadas criaram.
+    // Both edges carry the same `from_key` (the parent has only one output).
+    // Listing by key, the second port stayed invisible — precisely in the
+    // scenario that named ports created.
     edges.push(
       { id: "e1", source: "pai", target: "py", data: { from_key: "output", to_key: "pontos" } },
       { id: "e2", source: "pai", target: "py", data: { from_key: "output", to_key: "poligonos" } },
@@ -127,8 +127,8 @@ describe("mesmo pai alimentando duas portas", () => {
   })
 
   it("aresta sem from_key ainda usa o to_key como nome", () => {
-    // Pai sem saídas declaradas: a aresta nasce sem `from_key` e o executor
-    // espalha tudo. O `to_key`, quando existe, continua sendo o nome de chegada.
+    // Parent with no declared outputs: the edge is born without `from_key` and
+    // the executor spreads everything. `to_key`, when present, is still the arrival name.
     edges.push({ id: "e", source: "pai", target: "py", data: { to_key: "dados" } })
     render(<InputInspector nodeFound={python(["dados"])} />)
 

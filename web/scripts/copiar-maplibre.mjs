@@ -1,24 +1,25 @@
 #!/usr/bin/env node
 // web/scripts/copiar-maplibre.mjs
 //
-// Copia o worker do MapLibre (`maplibre-gl-worker.mjs` e o
-// `maplibre-gl-shared.mjs` que ele importa) de `node_modules/maplibre-gl/dist`
-// para `public/maplibre`. O MapLibreMap aponta o `setWorkerUrl` para lá.
+// Copies the MapLibre worker (`maplibre-gl-worker.mjs` and the
+// `maplibre-gl-shared.mjs` it imports) from `node_modules/maplibre-gl/dist`
+// to `public/maplibre`. MapLibreMap points `setWorkerUrl` there.
 //
-// Por quê: o maplibre-gl 6 só sai em ESM e roda o worker a partir de uma URL.
-// Com bundler ele não acha o arquivo sozinho: cria o worker com a URL da
-// própria página, o worker morre em silêncio e os tiles vetoriais nunca
-// carregam. O `new URL(..., import.meta.url)` também não serve, porque o
-// Turbopack (e o `next build --webpack`) emite o worker sem o `shared` ao lado,
-// e o worker cai no primeiro import. A receita do MapLibre para o Next é esta:
-// servir os dois do `public/`, na mesma pasta.
+// Why: maplibre-gl 6 ships only as ESM and runs the worker from a URL. With a
+// bundler it does not find the file on its own: it creates the worker with the
+// page's own URL, the worker dies silently and the vector tiles never load.
+// `new URL(..., import.meta.url)` does not work either, because Turbopack (and
+// `next build --webpack`) emits the worker without `shared` next to it, and the
+// worker fails on the first import. MapLibre's recipe for Next is this: serve
+// both from `public/`, in the same folder.
 //
-// Roda no começo do `npm run build` e do `npm run dev`, como o
-// copiar-monaco.mjs (chamado no script, e não por gancho: o web/.npmrc liga
-// ignore-scripts, e com ele o npm não roda ganchos pre/post). A pasta de
-// destino é gerada: está no .gitignore e no .dockerignore do web.
+// Runs at the start of `npm run build` and `npm run dev`, like
+// copiar-monaco.mjs (called from the script, not via a hook: web/.npmrc turns
+// on ignore-scripts, and with it npm does not run pre/post hooks). The
+// destination folder is generated: it is in the web's .gitignore and
+// .dockerignore.
 //
-// Uso: node scripts/copiar-maplibre.mjs
+// Usage: node scripts/copiar-maplibre.mjs
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs"
 import { createRequire } from "node:module"
@@ -27,7 +28,7 @@ import { fileURLToPath } from "node:url"
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), "..")
 const require = createRequire(join(WEB, "package.json"))
-// O `exports` do maplibre-gl expõe o package.json e a pasta dist.
+// maplibre-gl's `exports` exposes package.json and the dist folder.
 const pacote = dirname(require.resolve("maplibre-gl/package.json"))
 const { version } = JSON.parse(readFileSync(join(pacote, "package.json"), "utf8"))
 
@@ -42,9 +43,9 @@ for (const arquivo of ARQUIVOS) {
   }
 }
 
-// Todo import relativo dos arquivos copiados tem de estar na lista. Se uma
-// versão nova dividir o worker em mais pedaços, o build para aqui, em vez de
-// subir um mapa que nunca carrega os tiles.
+// Every relative import of the copied files must be in the list. If a new
+// version splits the worker into more pieces, the build stops here, instead of
+// shipping a map that never loads the tiles.
 for (const arquivo of ARQUIVOS) {
   const codigo = readFileSync(join(ORIGEM, arquivo), "utf8")
   for (const [, importado] of codigo.matchAll(/(?:\bfrom|\bimport\s*\(?)\s*["'`]\.\/([^"'`]+)["'`]/g)) {
@@ -55,12 +56,12 @@ for (const arquivo of ARQUIVOS) {
   }
 }
 
-// A pasta sai inteira antes: nenhum arquivo de uma versão anterior fica para trás.
+// The folder is removed entirely first: no file from a previous version is left behind.
 rmSync(DESTINO, { recursive: true, force: true })
 mkdirSync(DESTINO, { recursive: true })
 for (const arquivo of ARQUIVOS) copyFileSync(join(ORIGEM, arquivo), join(DESTINO, arquivo))
-// A licença do MapLibre (BSD-3-Clause pede o aviso junto do binário) vai ao
-// lado do worker servido, como o copiar-monaco.mjs faz com a do Monaco.
+// MapLibre's license (BSD-3-Clause requires the notice alongside the binary)
+// goes next to the served worker, as copiar-monaco.mjs does with Monaco's.
 if (!existsSync(join(pacote, "LICENSE.txt"))) {
   console.error(`copiar-maplibre: ${join(pacote, "LICENSE.txt")} não existe — o maplibre-gl ${version} mudou de layout?`)
   process.exit(1)

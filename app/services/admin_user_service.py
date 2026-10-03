@@ -1,5 +1,5 @@
 # app/services/admin_user_service.py
-"""Camada de serviço para gestão administrativa de usuários."""
+"""Service layer for administrative user management."""
 
 from sqlalchemy import select, func, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,8 +26,8 @@ async def list_users(
     offset: int = 0,
 ) -> tuple[list[User], int]:
     """
-    Lista usuários com filtros, busca, ordenação e paginação.
-    Retorna (lista_de_usuarios, total_count).
+    Lists users with filters, search, sorting and pagination.
+    Returns (lista_de_usuarios, total_count).
     """
     # Query base
     query = select(User)
@@ -35,20 +35,20 @@ async def list_users(
 
     conditions = []
 
-    # Filtro de busca (username ou email). O termo é literal: com `%`/`_` como
-    # curinga, "___" listava qualquer conta.
+    # Search filter (username or email). The term is literal: with `%`/`_` as
+    # wildcards, "___" listed any account.
     if search:
         conditions.append(or_(contem(User.username, search), contem(User.email, search)))
 
-    # Filtro de status
+    # Status filter
     if status:
         conditions.append(User.status == status)
 
-    # Filtro de role
+    # Role filter
     if role:
         conditions.append(User.role == role)
 
-    # Filtro de intervalo de data de criação
+    # Creation date range filter
     if date_from:
         conditions.append(User.created_at >= date_from)
     if date_to:
@@ -59,16 +59,16 @@ async def list_users(
         query = query.where(combined)
         count_query = count_query.where(combined)
 
-    # Ordenação
+    # Sorting
     _sortable = {"username", "email", "created_at", "last_login_at", "status", "role"}
     col = getattr(User, sort_by) if sort_by in _sortable else User.created_at
     order_col = col.asc() if sort_order == "asc" else col.desc()
     query = query.order_by(order_col)
 
-    # Paginação
+    # Pagination
     query = query.offset(offset).limit(limit)
 
-    # Execução (duas queries — simples e eficiente)
+    # Execution (two queries — simple and efficient)
     result = await db.execute(query)
     users = list(result.scalars().all())
 
@@ -79,15 +79,15 @@ async def list_users(
 
 
 async def get_user(db: AsyncSession, id_hash: str) -> User | None:
-    """Busca um usuário pelo id_hash."""
+    """Fetches a user by id_hash."""
     result = await db.execute(select(User).where(User.id_hash == id_hash))
     return result.scalar_one_or_none()
 
 
 async def get_users_by_ids(db: AsyncSession, ids: list[str]) -> dict[str, User]:
-    """Carrega vários usuários numa unica query (id_hash -> User).
+    """Loads several users in a single query (id_hash -> User).
 
-    Substitui o N+1 dos endpoints bulk, que faziam um get_user por id.
+    Replaces the N+1 of the bulk endpoints, which did one get_user per id.
     """
     if not ids:
         return {}
@@ -96,15 +96,15 @@ async def get_users_by_ids(db: AsyncSession, ids: list[str]) -> dict[str, User]:
 
 
 async def _revogar_executores(db: AsyncSession, users: list[User], *, motivo: str) -> list:
-    """Auditoria (SEG-16): os executores de cada conta caem junto, na transação
-    de quem chama — senão seguiam conectados, recebendo jobs com código e
-    credenciais e renovando o próprio cert. Status revogado, cert anulado e,
-    depois do commit (`executor_service.concluir_revogacoes`), blacklist,
-    `control: revoked` e a sessão derrubada.
+    """Audit (SEG-16): each account's executors go down with it, in the caller's
+    transaction — otherwise they stayed connected, receiving jobs with code and
+    credentials and renewing their own cert. Status revoked, cert voided and,
+    after the commit (`executor_service.concluir_revogacoes`), blacklist,
+    `control: revoked` and the session dropped.
 
-    Os níveis da política ficam (`desanexar=False`): o executor pode estar no
-    nível principal de workspaces de outros donos, e esvaziá-lo rebaixaria um
-    workspace Isolado para o pool compartilhado — ver
+    The policy tiers stay (`desanexar=False`): the executor may be in the
+    primary tier of workspaces of other owners, and emptying it would
+    downgrade an Isolated workspace to the shared pool — see
     `executor_service.revogar_executores_do_usuario`."""
     revogados: list = []
     for user in users:
@@ -117,15 +117,15 @@ async def _revogar_executores(db: AsyncSession, users: list[User], *, motivo: st
 async def bulk_suspend(
     db: AsyncSession, users: list[User], *, motivo: str | None = None, por: str | None = None,
 ) -> None:
-    """Suspende varios usuarios ja validados, com UM unico commit."""
+    """Suspends several already-validated users, with ONE single commit."""
     if not users:
         return
     now = utc_now_naive()
     for user in users:
         user.status = "suspended"
         user.suspended_at = now
-    # Cascata: conta suspensa não pode seguir agindo por um agente. Mesma
-    # transação (o service NÃO commita — este commit abaixo fecha as duas).
+    # Cascade: a suspended account must not keep acting through an agent. Same
+    # transaction (the service does NOT commit — the commit below closes both).
     from app.services.api_token_service import revogar_todos_do_usuario
 
     await revogar_todos_do_usuario(db, [u.id_hash for u in users], motivo="user_suspended")
@@ -168,20 +168,20 @@ async def bulk_soft_delete(db: AsyncSession, users: list[User]) -> None:
 async def suspend_user(
     db: AsyncSession, user: User, *, motivo: str | None = None, por: str | None = None,
 ) -> User:
-    """Suspende um usuário ativo.
+    """Suspends an active user.
 
-    `motivo` vinha da UI ("Motivo (opcional)"), era validado por
-    `UserSuspendRequest` e descartado pela rota: o admin escrevia a
-    justificativa, via "Usuário suspenso", e o texto sumia. Agora ele é
-    registrado com o autor e o alvo.
+    `motivo` came from the UI ("Motivo (opcional)", reason (optional)), was
+    validated by `UserSuspendRequest` and discarded by the route: the admin
+    wrote the justification, saw "Usuário suspenso" (user suspended), and the
+    text vanished. Now it is recorded with the author and the target.
 
-    NOTA DE DESIGN, para quem for adiante: o destino natural disto é a tabela
-    `audit_events`, que existe, está indexada e tem retenção de 90 dias
-    documentada — mas o `workspace_id` dela é NOT NULL, e suspender um usuário é
-    ação de PLATAFORMA, sem workspace. Escolher entre alargar a coluna ou
-    carimbar um sentinela é decisão de produto, não de refatoração; até lá o
-    registro fica no log estruturado, onde as demais ações de admin já são
-    rastreadas.
+    DESIGN NOTE, for whoever takes this further: the natural destination for
+    this is the `audit_events` table, which exists, is indexed and has a
+    documented 90-day retention — but its `workspace_id` is NOT NULL, and
+    suspending a user is a PLATFORM action, with no workspace. Choosing between
+    widening the column or stamping a sentinel is a product decision, not a
+    refactoring one; until then the record stays in the structured log, where
+    the other admin actions are already tracked.
     """
     user.status = "suspended"
     user.suspended_at = utc_now_naive()
@@ -200,7 +200,7 @@ async def suspend_user(
 
 
 async def reactivate_user(db: AsyncSession, user: User) -> User:
-    """Reativa um usuário suspenso."""
+    """Reactivates a suspended user."""
     user.status = "active"
     user.suspended_at = None
     await db.commit()
@@ -210,7 +210,7 @@ async def reactivate_user(db: AsyncSession, user: User) -> User:
 
 
 async def soft_delete_user(db: AsyncSession, user: User) -> User:
-    """Marca um usuário como deletado (soft delete)."""
+    """Marks a user as deleted (soft delete)."""
     user.status = "deleted"
     user.deleted_at = utc_now_naive()
     from app.services.api_token_service import revogar_todos_do_usuario
@@ -228,7 +228,7 @@ async def soft_delete_user(db: AsyncSession, user: User) -> User:
 
 
 async def update_role(db: AsyncSession, user: User, new_role: str) -> User:
-    """Altera o role de um usuário."""
+    """Changes a user's role."""
     old_role = user.role
     user.role = new_role
     await db.commit()
@@ -238,7 +238,7 @@ async def update_role(db: AsyncSession, user: User, new_role: str) -> User:
 
 
 async def update_agent_quota(db: AsyncSession, user: User, new_quota: int) -> User:
-    """Altera a cota de executores dedicados que o usuário pode criar."""
+    """Changes the quota of dedicated executors the user can create."""
     old_quota = user.agent_quota
     user.agent_quota = new_quota
     await db.commit()

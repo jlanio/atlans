@@ -1,9 +1,9 @@
 /**
- * A animação de carga do canvas tem duas folgas: só aparece se a espera passa
- * de um atraso (uma carga rápida não merece indicador — piscaria) e, tendo
- * aparecido, fica um tempo mínimo (sumir logo depois é o mesmo piscar). Além
- * disso marca o contêiner do React Flow, que é como as colunas de botões
- * esmaecem e o grafo entra em fade.
+ * The canvas loading animation has two allowances: it only appears if the wait
+ * goes past a delay (a fast load doesn't deserve an indicator — it would
+ * flicker) and, once it has appeared, it stays for a minimum time (vanishing
+ * right after is the same flicker). It also marks the React Flow container,
+ * which is how the button columns dim and the graph fades in.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup, act } from "@testing-library/react"
@@ -52,7 +52,7 @@ describe("animação de carga do canvas", () => {
     avancar(50)
     rerender(<CanvasLoading carregando={false} />)
 
-    avancar(EXIBICAO_MINIMA_MS - 50 - 1)    // um instante antes do mínimo
+    avancar(EXIBICAO_MINIMA_MS - 50 - 1)    // an instant before the minimum
     expect(overlay()).not.toBeNull()
     avancar(1)
     expect(overlay()).toBeNull()

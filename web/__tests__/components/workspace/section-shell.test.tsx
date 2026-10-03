@@ -3,17 +3,17 @@ import { render, screen, cleanup } from "@testing-library/react"
 
 import { SheetSection } from "@/app/components/workspace/settings-sheet/section-shell"
 
-// A casca de seção do painel do workspace. O contrato que interessa aqui é o
-// posicionamento da `action`:
+// The section shell of the workspace panel. The contract that matters here is
+// the placement of the `action`:
 //
-// - por padrão ela fica no canto superior direito, na MESMA linha do título
-//   (dentro do flex `justify-between`);
-// - com `actionBelow`, ela desce para uma linha própria, FORA daquele flex —
-//   para ações largas (link + botão) que espremiam o título num painel
-//   estreito (a "Política de execução").
+// - by default it sits in the top-right corner, on the SAME line as the title
+//   (inside the `justify-between` flex);
+// - with `actionBelow`, it drops to a line of its own, OUTSIDE that flex —
+//   for wide actions (link + button) that squeezed the title in a narrow
+//   panel (the "Política de execução" one).
 //
-// Em ambos os casos a ação continua sempre visível (fica no cabeçalho, acima
-// da troca carregando/erro/conteúdo).
+// In both cases the action stays always visible (it lives in the header, above
+// the loading/error/content switch).
 
 afterEach(cleanup)
 
@@ -25,7 +25,7 @@ describe("SheetSection — posição da ação", () => {
       </SheetSection>,
     )
     const acao = screen.getByRole("button", { name: "Adicionar" })
-    // Está dentro do flex `justify-between` que também carrega o título.
+    // It's inside the `justify-between` flex that also holds the title.
     const linha = acao.closest(".justify-between")
     expect(linha).not.toBeNull()
     expect(linha?.textContent).toContain("Membros")
@@ -43,9 +43,9 @@ describe("SheetSection — posição da ação", () => {
       </SheetSection>,
     )
     const acao = screen.getByRole("button", { name: "Gerenciar executores" })
-    // NÃO está no flex do título — está numa linha própria abaixo dele.
+    // It's NOT in the title's flex — it's on its own line below it.
     expect(acao.closest(".justify-between")).toBeNull()
-    // O título continua presente e não perde a ação.
+    // The title is still present and doesn't lose the action.
     expect(screen.getByText("Política de execução")).toBeTruthy()
   })
 
@@ -55,7 +55,7 @@ describe("SheetSection — posição da ação", () => {
         <div>corpo</div>
       </SheetSection>,
     )
-    // Corpo trocado pelo esqueleto, mas a ação permanece.
+    // Body replaced by the skeleton, but the action remains.
     expect(screen.queryByText("corpo")).toBeNull()
     expect(screen.getByRole("button", { name: "Atualizar" })).toBeTruthy()
   })

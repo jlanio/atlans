@@ -13,29 +13,29 @@ import { TbX, TbAlertTriangle } from "react-icons/tb"
 import { useWorkspace } from "@/context/WorkspaceContext"
 import { dayjs, fromBackend } from "@/lib/dayjs"
 
-// Tipos cujo segredo o nó envia adiante (Authorization, a chave authkey, o
-// Basic do WFS). Quem pode USAR a credencial num nó controla a URL de destino
-// e, portanto, consegue EXTRAIR o segredo apontando para um servidor próprio —
-// o SSRF-guard só barra alvo interno. Logo, para estes tipos "compartilhar para
-// uso" equivale a "confiar o segredo". Credenciais de BANCO não têm esse
-// problema (o destino é embutido no DSN, não é parâmetro do autor).
+// Types whose secret the node forwards (Authorization, the authkey key, the
+// WFS Basic). Whoever can USE the credential in a node controls the destination
+// URL and can therefore EXTRACT the secret by pointing at their own server —
+// the SSRF guard only blocks internal targets. Hence, for these types "share for
+// use" amounts to "entrust the secret". DATABASE credentials do not have that
+// problem (the destination is embedded in the DSN, not an author parameter).
 const TOKEN_TYPES = ["http_bearer", "http_basic", "wfs", "geoserver_authkey"]
 
 interface MetaInputsProps {
   form: UseFormReturn<z.infer<typeof formCredentialSchema>>
-  /** Bloqueia tudo — usado no editar enquanto os segredos carregam. */
+  /** Locks everything — used in edit while the secrets load. */
   disabled?: boolean
 }
 
 const MAX_TAGS = 10
 
 /**
- * Campos OPCIONAIS de uma credencial: descrição, tags, expiração e
- * compartilhamento com o workspace. Compartilhados entre criar e editar.
+ * OPTIONAL fields of a credential: description, tags, expiration and sharing
+ * with the workspace. Shared between create and edit.
  *
- * `expires_at` mora dentro de `data` (data.expires_at) — mesma convenção do
- * backend, que lê dali e é onde o resolver aplica a expiração. Os demais são
- * campos de topo do formulário (viram colunas próprias).
+ * `expires_at` lives inside `data` (data.expires_at) — same convention as the
+ * backend, which reads it from there and is where the resolver applies the
+ * expiration. The others are top-level form fields (they become their own columns).
  */
 const MetaInputs = ({ form, disabled }: MetaInputsProps) => {
   const { current } = useWorkspace()
@@ -47,8 +47,8 @@ const MetaInputs = ({ form, disabled }: MetaInputsProps) => {
   const workspaceId = form.watch("workspace_id")
   const isTokenType = TOKEN_TYPES.includes(form.watch("type"))
 
-  // ── expiração ───────────────────────────────────────────────────────────
-  // ISO (UTC) guardado em data.expires_at ⇄ valor local do <input datetime-local>.
+  // ── expiration ──────────────────────────────────────────────────────────
+  // ISO (UTC) stored in data.expires_at ⇄ local value of the <input datetime-local>.
   const expiryLocal = fromBackend(data.expires_at)?.format("YYYY-MM-DDTHH:mm") ?? ""
 
   function setExpiry(localValue: string) {
@@ -56,8 +56,8 @@ const MetaInputs = ({ form, disabled }: MetaInputsProps) => {
     if (!localValue) {
       delete next.expires_at
     } else {
-      // O input entrega hora LOCAL; guardamos em UTC (com Z) para casar com o
-      // que o backend espera e o resolver compara.
+      // The input delivers LOCAL time; we store it in UTC (with Z) to match what
+      // the backend expects and the resolver compares.
       next.expires_at = dayjs(localValue).toISOString()
     }
     form.setValue("data", next, { shouldDirty: true })
@@ -81,8 +81,8 @@ const MetaInputs = ({ form, disabled }: MetaInputsProps) => {
 
   // ── compartilhamento ──────────────────────────────────────────────────────
   function toggleShare(on: boolean) {
-    // string = compartilha com o workspace atual; null = remove (semântica
-    // PATCH do backend: null limpa, undefined não mexeria).
+    // string = shares with the current workspace; null = removes (the backend's
+    // PATCH semantics: null clears, undefined would leave it untouched).
     form.setValue("workspace_id", on && current?.id_hash ? current.id_hash : null, { shouldDirty: true })
   }
 
@@ -94,7 +94,7 @@ const MetaInputs = ({ form, disabled }: MetaInputsProps) => {
         <Separator className="flex-1" />
       </div>
 
-      {/* Descrição */}
+      {/* Description */}
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="cred-description">Descrição</Label>
         <Textarea
@@ -147,7 +147,7 @@ const MetaInputs = ({ form, disabled }: MetaInputsProps) => {
         />
       </div>
 
-      {/* Expiração */}
+      {/* Expiration */}
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="cred-expiry">Expiração</Label>
         <div className="flex items-center gap-2">
@@ -177,7 +177,7 @@ const MetaInputs = ({ form, disabled }: MetaInputsProps) => {
         </p>
       </div>
 
-      {/* Compartilhamento com o workspace */}
+      {/* Sharing with the workspace */}
       {current?.id_hash && (
         <div className="flex flex-col gap-2 rounded-md border px-3 py-2">
           <div className="flex items-start justify-between gap-3">
@@ -198,8 +198,8 @@ const MetaInputs = ({ form, disabled }: MetaInputsProps) => {
             />
           </div>
 
-          {/* Aviso honesto para tipos de token: "usar" ≡ "poder extrair". Não é
-              um alerta de erro (não usa role=alert), é orientação de confiança. */}
+          {/* Honest warning for token types: "use" ≡ "able to extract". It is not
+              an error alert (it does not use role=alert), it is trust guidance. */}
           {isTokenType && (
             <p className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
               <TbAlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden="true" />

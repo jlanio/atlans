@@ -10,23 +10,24 @@ interface Snapshot {
 const MAX_HISTORY = 50
 
 /**
- * Hook de undo/redo para o canvas ReactFlow.
- * - Chame `saveSnapshot()` após cada operação que deve ser desfeita (adicionar/remover nó, etc.)
- * - Registra Ctrl+Z / Ctrl+Y automaticamente.
+ * Undo/redo hook for the ReactFlow canvas.
+ * - Call `saveSnapshot()` after each operation that should be undoable (add/remove node, etc.)
+ * - Registers Ctrl+Z / Ctrl+Y automatically.
  */
 export function useCanvasHistory() {
   const { getNodes, getEdges, setNodes, setEdges } = useReactFlow<INodeContext, Edge>()
 
   const history = useRef<Snapshot[]>([])
-  const pointer = useRef(-1)  // -1 = nenhum snapshot ainda
+  const pointer = useRef(-1)  // -1 = no snapshot yet
   const isTravelingRef = useRef(false)  // evita salvar durante undo/redo
 
-  // `history`/`pointer` são refs para não re-renderizar o canvas a cada snapshot,
-  // mas `canUndo`/`canRedo` derivam deles — sem este bump os botões da toolbar
-  // ficavam presos em `disabled` até que algo *outro* re-renderizasse o canvas.
+  // `history`/`pointer` are refs so the canvas does not re-render on every
+  // snapshot, but `canUndo`/`canRedo` derive from them — without this bump the
+  // toolbar buttons stayed stuck at `disabled` until something *else* re-rendered
+  // the canvas.
   const [, bumpVersion] = useReducer((v: number) => v + 1, 0)
 
-  /** Salva o estado atual no histórico (descarta futuros após o ponteiro). */
+  /** Saves the current state to history (discards future entries after the pointer). */
   const saveSnapshot = useCallback(() => {
     if (isTravelingRef.current) return
 
@@ -35,11 +36,11 @@ export function useCanvasHistory() {
       edges: getEdges(),
     }
 
-    // Remove snapshots "futuros" (após desfazer e depois mudar)
+    // Removes "future" snapshots (after undoing and then changing)
     history.current = history.current.slice(0, pointer.current + 1)
     history.current.push(snapshot)
 
-    // Limita o tamanho do histórico
+    // Limits the history size
     if (history.current.length > MAX_HISTORY) {
       history.current = history.current.slice(-MAX_HISTORY)
     }
@@ -49,12 +50,12 @@ export function useCanvasHistory() {
   }, [getNodes, getEdges])
 
   /**
-   * Reinicia o histórico com o estado ATUAL do canvas como baseline (pointer=0).
-   * Chamar UMA vez após a hidratação de um workflow. Sem um baseline, o histórico
-   * começa vazio (pointer=-1) e o primeiro snapshot é o estado PÓS-edição; como
-   * `undo()` guarda `pointer <= 0`, a PRIMEIRA edição de aresta (delete / troca de
-   * from_key) ficava presa e nunca era desfeita (F10). Resetar também evita que o
-   * histórico de um workflow vaze para o próximo ao trocar de workflow.
+   * Resets the history with the CURRENT canvas state as baseline (pointer=0).
+   * Call ONCE after a workflow is hydrated. Without a baseline, the history
+   * starts empty (pointer=-1) and the first snapshot is the POST-edit state; since
+   * `undo()` guards `pointer <= 0`, the FIRST edge edit (delete / from_key change)
+   * got stuck and was never undone (F10). Resetting also keeps one workflow's
+   * history from leaking into the next when switching workflows.
    */
   const captureBaseline = useCallback(() => {
     history.current = [{ nodes: getNodes() as INodeContext[], edges: getEdges() }]
@@ -87,10 +88,10 @@ export function useCanvasHistory() {
   const canUndo = pointer.current > 0
   const canRedo = pointer.current < history.current.length - 1
 
-  // Registra atalhos globais de teclado no canvas
+  // Registers global keyboard shortcuts on the canvas
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      // Ignora quando o foco está em input/textarea
+      // Ignores when focus is on an input/textarea
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable) return
 

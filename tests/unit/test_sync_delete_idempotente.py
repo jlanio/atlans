@@ -1,28 +1,29 @@
 # tests/unit/test_sync_delete_idempotente.py
 """
-Remocao no Drive pelo executor: rota mTLS correta + 404 idempotente.
+Deletion in the Drive by the executor: correct mTLS route + idempotent 404.
 
-Sintoma real, colhido do log de um executor em uso:
+Real symptom, taken from the log of an executor in use:
 
     SYNC  Falha ao remover f4ee8c0b-...: HTTP 404
     SYNC  Sync 'teste_imoveld - copia (24)': falhou (tentativa 9) —
           proximo retry em 256s.
 
-O 404 NAO era "o arquivo ja foi apagado". Era a delecao apontando para o
-endpoint errado: `DELETE /drive/{id}` exige JWT (o executor so tem mTLS) e, no
-host `agents.atlans.example.org`, o Traefik roteia para a API apenas `/drive/executor-*`
-(compose: `executores-rest.rule`). Um `/drive/{id}` cru morria no Traefik com
-404 — o pedido nem chegava ao backend, e o WorkspaceFile continuava listado na
-UI mesmo apos F5.
+The 404 was NOT "the file was already deleted". It was the deletion pointing at
+the wrong endpoint: `DELETE /drive/{id}` requires a JWT (the executor only has
+mTLS) and, on the `agents.atlans.example.org` host, Traefik routes only
+`/drive/executor-*` to the API (compose: `executores-rest.rule`). A bare
+`/drive/{id}` died at Traefik with a 404 — the request never even reached the
+backend, and the WorkspaceFile stayed listed in the UI even after F5.
 
-Duas coisas fecham o caso, e este arquivo tranca as duas:
+Two things close the case, and this file locks both down:
 
-  * a delecao vai para `/drive/executor-file/{id}` (rota mTLS de executor);
-  * 404 continua contando como sucesso — no endpoint CERTO, ele significa que o
-    registro ja nao existe (apagado pelo Drive web, ou por tentativa anterior).
-    Tratar 404 como falha criava um retry que nunca converge, e ao esgotar as
-    tentativas o dataset saia da fila mas PERMANECIA no manifesto — o proximo
-    `diff` o via de novo como removido e reenfileirava, para sempre.
+  * the deletion goes to `/drive/executor-file/{id}` (the executor mTLS route);
+  * 404 still counts as success — on the RIGHT endpoint, it means the record
+    no longer exists (deleted via the Drive web UI, or by an earlier attempt).
+    Treating 404 as a failure created a retry that never converges, and once
+    the attempts ran out the dataset left the queue but REMAINED in the
+    manifest — the next `diff` saw it again as removed and re-enqueued it,
+    forever.
 """
 import pytest
 
@@ -47,7 +48,7 @@ class _Client:
 
 @pytest.fixture
 def uploader():
-    """Constroi um DriveUploader com o HTTP dublado por status."""
+    """Builds a DriveUploader with HTTP stubbed per status."""
     from executor.sync import uploader as mod
 
     def montar(status):
@@ -55,8 +56,8 @@ def uploader():
         up.base_url = "https://servidor"
         up._httpx_kwargs = {}
         up._headers = lambda: {}
-        # O uploader nao abre mais um AsyncClient por requisicao: ele pede o
-        # cliente compartilhado a `self._http()`.
+        # The uploader no longer opens an AsyncClient per request: it asks
+        # `self._http()` for the shared client.
         cliente = _Client(status)
         up._http = lambda: cliente
         return up
@@ -66,11 +67,11 @@ def uploader():
 
 @pytest.mark.asyncio
 async def test_delete_usa_a_rota_mtls_de_executor(uploader):
-    """A remocao PRECISA ir para /drive/executor-* — o unico prefixo que o
-    Traefik roteia para a API no host dos executores. Um /drive/{id} cru morre
-    no Traefik com 404, e o 404-como-sucesso fazia o executor desistir com o
-    arquivo ainda no Drive. Este teste tranca a rota contra um refactor que a
-    devolvesse ao caminho quebrado."""
+    """The deletion MUST go to /drive/executor-* — the only prefix that Traefik
+    routes to the API on the executors' host. A bare /drive/{id} dies at
+    Traefik with a 404, and 404-as-success made the executor give up with the
+    file still in the Drive. This test locks the route down against a refactor
+    that would send it back to the broken path."""
     up = uploader(204)
     await up.delete("f4ee8c0b")
     url = up._http().ultimo_url
@@ -86,16 +87,17 @@ async def test_remocao_bem_sucedida(uploader, status):
 
 @pytest.mark.asyncio
 async def test_404_conta_como_REMOVIDO(uploader):
-    """O caso do bug. Ja nao estar la e o mesmo que ter sido apagado — mesma
-    politica do `allow_missing=True` que o servidor usa no `delete_strict`."""
+    """The bug's case. No longer being there is the same as having been deleted —
+    the same policy as the `allow_missing=True` the server uses in
+    `delete_strict`."""
     assert await uploader(404).delete("abc") is True
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("status", [403, 409, 500, 502])
 async def test_outros_erros_continuam_sendo_falha(uploader, status):
-    """Idempotencia vale so para "nao existe". Um 500 e transitorio e merece
-    retry; um 403 e problema de permissao que precisa aparecer."""
+    """Idempotency applies only to "does not exist". A 500 is transient and
+    deserves a retry; a 403 is a permission problem that needs to surface."""
     assert await uploader(status).delete("abc") is False
 
 
@@ -122,9 +124,9 @@ class _Manifesto:
 
 @pytest.mark.asyncio
 async def test_delete_esgotado_sai_do_MANIFESTO_tambem():
-    """Sair so da fila deixava o dataset no manifesto. Como ele tambem ja nao
-    esta no disco, o proximo `diff` o classificava de novo como removido
-    localmente e reenfileirava — o ciclo recomecava do zero, indefinidamente."""
+    """Leaving only the queue left the dataset in the manifest. Since it is also
+    no longer on disk, the next `diff` classified it again as removed locally
+    and re-enqueued it — the cycle started over from scratch, indefinitely."""
     from executor.sync.queue import SyncQueue, _MAX_RETRIES
 
     manifesto = _Manifesto([
@@ -142,9 +144,10 @@ async def test_delete_esgotado_sai_do_MANIFESTO_tambem():
 
 @pytest.mark.asyncio
 async def test_upload_esgotado_NAO_some_do_manifesto():
-    """So o delete limpa o manifesto. Um upload que esgotou tentativas se refere
-    a um arquivo que EXISTE no disco — apaga-lo do manifesto o faria voltar como
-    "novo" e reiniciar o mesmo upload que ja falhou dez vezes."""
+    """Only the delete cleans the manifest. An upload that ran out of attempts
+    refers to a file that EXISTS on disk — removing it from the manifest would
+    bring it back as "new" and restart the same upload that already failed ten
+    times."""
     from executor.sync.queue import SyncQueue, _MAX_RETRIES
 
     manifesto = _Manifesto([

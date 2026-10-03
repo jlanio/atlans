@@ -1,5 +1,5 @@
 # flow/nodes/spatial/filter_by_geometry_type.py
-"""Separa GeoDataFrame por tipo de geometria (Point, LineString, Polygon)."""
+"""Splits a GeoDataFrame by geometry type (Point, LineString, Polygon)."""
 import asyncio
 import geopandas as gpd
 from typing import Any, Dict

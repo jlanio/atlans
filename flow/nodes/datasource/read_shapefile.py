@@ -12,8 +12,8 @@ logger = get_logger(__name__)
 @register_node
 class ReadShapefileNode(BaseNode):
     """
-    Le um Shapefile ESRI do Drive do Workspace e retorna um GeoDataFrame.
-    Suporta arquivos .shp e .zip contendo shapefile.
+    Reads an ESRI Shapefile from the Workspace Drive and returns a GeoDataFrame.
+    Supports .shp files and .zip files containing a shapefile.
     """
 
     @classmethod

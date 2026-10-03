@@ -1,15 +1,15 @@
 # tests/unit/test_colunas_sugeridas.py
-"""Campos de lista de colunas viraram fichas ("chips") com parser compartilhado.
+"""Column-list fields became chips with a shared parser.
 
-O campo de fichas grava JSON-string (JSON.stringify); as definitions ja salvas
-guardam lista de verdade (editor de objeto) ou texto separado por virgula. O
-parser tolerante que nasceu no AttributeJoin subiu para
-`flow.utils.parameter_validation.colunas_pedidas`, e cada no migrado tem de se
-comportar IGUAL com qualquer um dos tres formatos — sem migration de dados.
+The chips field stores a JSON string (JSON.stringify); the definitions already
+saved hold a real list (object editor) or comma-separated text. The tolerant
+parser that was born in AttributeJoin moved up to
+`flow.utils.parameter_validation.colunas_pedidas`, and every migrated node must
+behave THE SAME with any of the three formats — no data migration.
 
-ChangeDetector e testado em test_change_detector.py (que ja tem o backend
-fake); as assercoes de descriptor (type "chips" + `suggest_columns`) moram em
-test_node_service_visible_when.py, junto das demais do catalogo.
+ChangeDetector is tested in test_change_detector.py (which already has the fake
+backend); the descriptor assertions (type "chips" + `suggest_columns`) live in
+test_node_service_visible_when.py, alongside the rest of the catalog's.
 """
 import pytest
 
@@ -24,9 +24,9 @@ from flow.utils.parameter_validation import colunas_pedidas  # noqa: E402
 # ── O parser compartilhado ───────────────────────────────────────────────────
 
 def test_join_delegou_para_o_utilitario_sem_mudar_de_nome():
-    """`_colunas_pedidas` continua importavel do join (execute e testes o
-    referenciam), mas e o MESMO objeto do utilitario: um parser so para todos
-    os campos de fichas."""
+    """`_colunas_pedidas` is still importable from the join (execute and tests
+    reference it), but it is the SAME object as the utility: a single parser
+    for every chips field."""
     from flow.nodes.action.attribute_join import _colunas_pedidas
     assert _colunas_pedidas is colunas_pedidas
 
@@ -42,9 +42,9 @@ def test_parser_aceita_lista_json_csv_e_none():
 # ── RemoveDuplicates: `fields` em fichas ─────────────────────────────────────
 
 def _gdf_com_duplicatas():
-    # ("a", 1) aparece duas vezes; ("a", 2) so difere no valor. Assim o subset
-    # ["cod"] e o subset ["cod", "valor"] dao resultados DIFERENTES — prova que
-    # o parser leu as duas colunas, nao so a primeira.
+    # ("a", 1) appears twice; ("a", 2) differs only in the value. So the subset
+    # ["cod"] and the subset ["cod", "valor"] give DIFFERENT results — proof
+    # that the parser read both columns, not just the first.
     return gpd.GeoDataFrame(
         {"cod": ["a", "a", "a", "b"], "valor": [1, 1, 2, 9]},
         geometry=[Point(0, 0), Point(1, 1), Point(2, 2), Point(3, 3)],
@@ -53,9 +53,9 @@ def _gdf_com_duplicatas():
 
 
 @pytest.mark.parametrize("guardado", [
-    ["cod"],         # lista de verdade (editor de objeto)
-    '["cod"]',       # JSON-string — o que o campo de fichas grava
-    "cod",           # texto — formato antigo, ja salvo
+    ["cod"],         # a real list (object editor)
+    '["cod"]',       # JSON string — what the chips field stores
+    "cod",           # text — old format, already saved
 ])
 async def test_remove_duplicates_mesmo_resultado_nos_tres_formatos(guardado):
     saida = await RemoveDuplicates("n", {"fields": guardado}).execute(
@@ -80,8 +80,8 @@ async def test_remove_duplicates_duas_colunas_nos_tres_formatos(guardado):
 
 
 async def test_remove_duplicates_vazio_continua_usando_todas_as_colunas():
-    """Campo vazio mantem o comportamento de sempre: unicidade por todas as
-    colunas nao-geometricas."""
+    """An empty field keeps the usual behavior: uniqueness over all the
+    non-geometry columns."""
     saida = await RemoveDuplicates("n", {"fields": ""}).execute(
         {"input": _gdf_com_duplicatas()}
     )
@@ -91,7 +91,7 @@ async def test_remove_duplicates_vazio_continua_usando_todas_as_colunas():
 # ── PublishMap: `visible_fields` em fichas ───────────────────────────────────
 
 async def _publicar(monkeypatch, guardado):
-    """Roda o no com o portal mockado e devolve o visible_fields enviado."""
+    """Runs the node with the portal mocked and returns the visible_fields sent."""
     capturado: dict = {}
 
     async def _fake_publish(self, **kwargs):
@@ -99,7 +99,7 @@ async def _publicar(monkeypatch, guardado):
         return "layer-1"
 
     monkeypatch.setattr(PublishMap, "_publish_to_api", _fake_publish)
-    # Politica da maquina nao pode bloquear o envio neste teste.
+    # The machine's policy must not block the submission in this test.
     monkeypatch.delenv("EXECUTOR_SYNC_MODE", raising=False)
 
     no = PublishMap("n", {"title": "Lotes", "visible_fields": guardado})
@@ -116,7 +116,7 @@ async def _publicar(monkeypatch, guardado):
 @pytest.mark.parametrize("guardado", [
     ["nome", "area"],
     '["nome","area"]',
-    "nome, area",        # formato antigo, ja salvo nas definitions
+    "nome, area",        # old format, already saved in the definitions
 ])
 async def test_publish_map_mesmos_campos_nos_tres_formatos(monkeypatch, guardado):
     assert await _publicar(monkeypatch, guardado) == ["nome", "area"]

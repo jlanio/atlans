@@ -1,25 +1,28 @@
 # app/mcp/cotas.py
 """
-Cotas por token: o teto que impede um cliente em laço de derrubar a plataforma.
+Per-token quotas: the ceiling that keeps a client in a loop from taking the platform down.
 
-Um cliente MCP repete chamadas sozinho — reescreve a definição, valida de novo,
-executa de novo — e um laço mal fechado do outro lado vira tempestade aqui. Os
-baldes são chaveados pelo `token_id`, nunca pelo IP: clientes atrás do mesmo NAT
-ou da mesma nuvem colapsariam num balde só, e o IP do cliente sequer é confiável.
+An MCP client repeats calls on its own — rewrites the definition, validates
+again, executes again — and a poorly closed loop on the other side becomes a
+storm here. The buckets are keyed by `token_id`, never by IP: clients behind the
+same NAT or the same cloud would collapse into a single bucket, and the client's
+IP is not even trustworthy.
 
-Dois tipos de teto:
-- contagem por minuto (`verificar`), com um balde geral e baldes extras para as
-  operações caras (validar conecta em banco, executar despacha para um executor);
-- esperas simultâneas (`espera`), porque cada `wait` de execução segura uma
-  assinatura pub/sub e uma resposta SSE aberta — recurso que não se mede por
-  requisições por minuto.
+Two kinds of ceiling:
+- count per minute (`verificar`), with a general bucket and extra buckets for
+  the expensive operations (validating connects to a database, executing
+  dispatches to an executor);
+- simultaneous waits (`espera`), because each run `wait` holds a pub/sub
+  subscription and an open SSE response — a resource that is not measured in
+  requests per minute.
 
-Sem Redis, tudo degrada ABERTO. É a mesma política do WebSocket de logs
-(`dependencies.py`): a API nem sobe sem Redis, então "Redis fora" é um incidente
-transitório de segundos — recusar toda chamada nesse intervalo transformaria uma
-degradação em queda total, e o teto existe contra laço acidental, não contra
-adversário. O aviso sai no máximo uma vez por minuto por processo para que o
-incidente não afogue o log justamente quando ele é preciso.
+Without Redis, everything degrades OPEN. It is the same policy as the logs
+WebSocket (`dependencies.py`): the API does not even start without Redis, so
+"Redis down" is a transient incident lasting seconds — refusing every call in
+that interval would turn a degradation into a total outage, and the ceiling
+exists against accidental loops, not against an adversary. The warning goes out
+at most once per minute per process so the incident does not flood the log
+precisely when it is needed.
 """
 from __future__ import annotations
 
@@ -37,38 +40,38 @@ logger = get_logger("app.mcp.cotas")
 JANELA_SEGUNDOS = 60
 
 LIMITE_GERAL = 120
-# `probe` é I/O contra servidores de terceiros (GetCapabilities/DescribeFeatureType
-# de um WFS): metade do balde de validação, que já é o mais apertado.
+# `probe` is I/O against third-party servers (GetCapabilities/DescribeFeatureType
+# of a WFS): half of the validation bucket, which is already the tightest.
 LIMITES_POR_COTA: dict[str, int] = {"validate": 20, "run": 20, "probe": 10}
 
 MAX_ESPERAS_POR_TOKEN = 3
 MAX_ESPERAS_GLOBAL = 40
 
-# Cota do assistente da web. Aqui o teto não é sobre carga: é sobre DINHEIRO — a
-# plataforma paga os tokens do modelo. Por isso a unidade é token acumulado numa
-# janela de 24 h, e não chamada por minuto.
+# The web assistant's quota. Here the ceiling is not about load: it is about MONEY
+# — the platform pays for the model's tokens. That is why the unit is tokens
+# accumulated over a 24 h window, and not calls per minute.
 #
-# O número saiu de uma medição (com 38 ferramentas; hoje são 42): as
-# definições de ferramenta somam ~6,9 k
-# tokens, e o que domina uma conversa são os RESULTADOS (o índice de nós tem
-# ~10 KB, uma definição inteira outro tanto). Montar um fluxo de verdade custa
-# na ordem de 150 k a 400 k tokens somando todos os turnos. 1,5 M dá uma margem
-# folgada de alguns fluxos por dia por pessoa, e ainda assim põe um teto no que
-# uma conta sozinha pode gastar.
+# The number came from a measurement (with 38 tools; today there are 42): the
+# tool definitions add up to ~6.9 k
+# tokens, and what dominates a conversation is the RESULTS (the node index is
+# ~10 KB, a whole definition about as much). Building a real workflow costs
+# on the order of 150 k to 400 k tokens summing all turns. 1.5 M gives a
+# comfortable margin of a few workflows per day per person, and still puts a
+# ceiling on what a single account can spend.
 #
-# Revise com o número real: `docs/assistente-editor.md` registra o custo medido, e este
-# valor deve sair de lá, não de estimativa. Cada instalação pode trocá-lo por
-# ASSISTENTE_TETO_DE_TOKENS_POR_DIA (`app/core/config.py`).
+# Revise with the real number: `docs/editor-assistant.md` records the measured
+# cost, and this value should come from there, not from an estimate. Each
+# installation can change it via ASSISTENTE_TETO_DE_TOKENS_POR_DIA (`app/core/config.py`).
 JANELA_DO_ASSISTENTE_SEGUNDOS = 24 * 60 * 60
 TETO_DE_TOKENS_DO_ASSISTENTE_POR_DIA = ASSISTENTE_TETO_DE_TOKENS_POR_DIA
 
-# Um aviso por minuto por processo — ver a nota do módulo.
+# One warning per minute per process — see the module note.
 _INTERVALO_AVISO = 60.0
 _ultimo_aviso = 0.0
 
-# Sem Redis não há contador compartilhado entre workers; o teto de esperas cai
-# para este semáforo, que vale só dentro do processo. É menos do que o desenho
-# pede e mais do que nada: segura o laço de um único cliente.
+# Without Redis there is no counter shared across workers; the wait ceiling falls
+# back to this semaphore, which only holds within the process. It is less than the
+# design asks for and more than nothing: it holds back a single client's loop.
 _esperas_locais: dict[str, int] = {}
 _esperas_locais_total = 0
 
@@ -87,12 +90,12 @@ def _limite_da_cota(cota: str) -> int:
 
 
 async def verificar(redis, token_id: str, cota: str | None = None) -> None:
-    """Consome uma unidade do balde geral e, se houver, do balde da cota.
+    """Consumes one unit from the general bucket and, if there is one, from the quota's bucket.
 
-    Janela fixa de um minuto (`contar_na_janela`), o mesmo contador do rate
-    limit do WebSocket: o prazo nasce na primeira chamada e não anda. Estourou:
-    levanta `ToolError rate_limited` com `retry_after_seconds` lido do TTL, para
-    o cliente saber esperar em vez de repetir.
+    Fixed one-minute window (`contar_na_janela`), the same counter as the
+    WebSocket rate limit: the deadline starts at the first call and does not
+    move. Exceeded: raises `ToolError rate_limited` with `retry_after_seconds`
+    read from the TTL, so the client knows to wait instead of retrying.
     """
     if redis is None:
         _avisar_sem_redis("pool Redis indisponível")
@@ -105,7 +108,7 @@ async def verificar(redis, token_id: str, cota: str | None = None) -> None:
     for chave, limite in baldes:
         try:
             contador, ttl = await contar_na_janela(chave, JANELA_SEGUNDOS, redis=redis)
-        except Exception as exc:  # pragma: no cover - depende do Redis
+        except Exception as exc:  # pragma: no cover - depends on Redis
             _avisar_sem_redis(f"falha ao contar: {exc.__class__.__name__}")
             return
         if contador <= limite:
@@ -121,48 +124,51 @@ async def verificar(redis, token_id: str, cota: str | None = None) -> None:
 async def verificar_tokens_do_assistente(
     redis, user_id: str, *, teto: int = TETO_DE_TOKENS_DO_ASSISTENTE_POR_DIA
 ) -> None:
-    """Recusa a conversa quando o usuário já gastou a cota de tokens do dia.
+    """Refuses the conversation when the user has already spent the day's token quota.
 
-    `teto` é injetado porque ele pode depender do PLANO de quem conversa
-    (`teto_do_assistente.teto_de`), e resolvê-lo aqui obrigaria este módulo — que é
-    só Redis — a conhecer banco e assinatura. O default preserva o
-    comportamento de quem não passa nada: o teto da instalação.
+    `teto` is injected because it may depend on the PLAN of whoever is chatting
+    (`teto_do_assistente.teto_de`), and resolving it here would force this
+    module — which is Redis only — to know about the database and subscriptions.
+    The default preserves the behavior for callers that pass nothing: the
+    installation's ceiling.
 
-    Por que TOKENS e não mensagens: uma mensagem que dispara dez chamadas de
-    ferramenta custa dez vezes uma que não dispara nenhuma, e o que a plataforma
-    paga é token, não mensagem. Contar mensagens mediria a coisa errada e daria
-    a mesma cota para o "obrigado!" e para o fluxo de vinte nós.
+    Why TOKENS and not messages: a message that fires ten tool calls costs ten
+    times one that fires none, and what the platform pays for is tokens, not
+    messages. Counting messages would measure the wrong thing and give the same
+    quota to "obrigado!" (thanks!) and to the twenty-node workflow.
 
-    A conferência é ANTES da chamada e a cobrança é DEPOIS (`cobrar_tokens_do_
-    assistente`), porque o custo só se conhece no `usage` da resposta. A
-    consequência aceita é que a última conversa do dia pode passar do teto —
-    nunca por mais de um turno, e o teto existe contra gasto acumulado, não
-    contra o centavo.
+    The check is BEFORE the call and the charge is AFTER (`cobrar_tokens_do_
+    assistente`), because the cost is only known in the response's `usage`. The
+    accepted consequence is that the day's last conversation can go over the
+    ceiling — never by more than one turn, and the ceiling exists against
+    accumulated spending, not against the last cent.
     """
     if redis is None:
         _avisar_sem_redis("pool Redis indisponível")
         return
     try:
         gasto = await redis.get(chave_de_tokens(user_id))
-    except Exception as exc:  # pragma: no cover - depende do Redis
+    except Exception as exc:  # pragma: no cover - depends on Redis
         _avisar_sem_redis(f"falha ao ler a cota do assistente: {exc.__class__.__name__}")
         return
     if gasto is None:
         return
     try:
         acumulado = int(gasto)
-    except (TypeError, ValueError):  # pragma: no cover - valor corrompido
+    except (TypeError, ValueError):  # pragma: no cover - corrupted value
         return
     if acumulado < teto:
         return
-    # «assistente», e não «assistente»: este mesmo caminho serve a Home e o
-    # editor, e quem não administra o sistema só alcança a Home — para essa
-    # pessoa, «assistente» nomeia algo que ela nunca viu. Pelo mesmo motivo saiu
-    # o «enquanto isso o editor continua inteiro»: era consolo sobre uma tela
-    # que ela não pode abrir.
+    # "assistente", and not "assistente": this same path serves Home and the
+    # editor, and whoever does not administer the system only reaches Home — for
+    # that person, "assistente" names something they have never seen. For the
+    # same reason "enquanto isso o editor continua inteiro" (meanwhile the editor
+    # remains intact) was removed: it was consolation about a screen they cannot
+    # open.
     #
-    # «da SUA primeira conversa», e não «do dia»: o prazo nasce na primeira
-    # cobrança (é ali que o EXPIRE é posto), então não há virada de meia-noite.
+    # "da SUA primeira conversa" (of YOUR first conversation), and not "do dia"
+    # (of the day): the deadline starts at the first charge (that is where the
+    # EXPIRE is set), so there is no midnight rollover.
     raise erro(
         "rate_limited",
         "Você atingiu a cota diária do assistente.",
@@ -172,19 +178,21 @@ async def verificar_tokens_do_assistente(
 
 
 async def cobrar_tokens_do_assistente(redis, user_id: str, tokens: int) -> int | None:
-    """Soma o que este turno gastou. Nunca levanta — cobrar não pode perder o trabalho.
+    """Adds up what this turn spent. Never raises — charging must not lose the work.
 
-    Devolve o acumulado da janela DEPOIS desta cobrança (o que o INCRBY
-    respondeu): é o que o stream manda à tela no quadro `cota`, para o donut
-    subir durante o turno sem consultar `/estado`. `None` quando não houve
-    cobrança — sem Redis, nada a cobrar, ou o Redis falhou.
+    Returns the window's running total AFTER this charge (what INCRBY
+    answered): it is what the stream sends to the screen in the `cota` frame,
+    so the donut goes up during the turn without querying `/estado`. `None`
+    when there was no charge — no Redis, nothing to charge, or Redis failed.
 
-    A janela de 24 h nasce na primeira cobrança e não anda (`contar_na_janela`,
-    que arma o prazo na mesma transação do INCRBY — a chave não fica imortal).
+    The 24 h window starts at the first charge and does not move
+    (`contar_na_janela`, which sets the deadline in the same transaction as the
+    INCRBY — the key does not become immortal).
 
-    Se o Redis falhar aqui, o gasto some da contagem e o teto do dia fica mais
-    frouxo. É o lado certo para errar: o outro seria descartar uma resposta que
-    o modelo já produziu (e que a plataforma já pagou) por causa de um contador.
+    If Redis fails here, the spending drops out of the count and the day's
+    ceiling gets looser. It is the right side to err on: the other would be
+    discarding a response the model has already produced (and the platform has
+    already paid for) because of a counter.
     """
     if redis is None or tokens <= 0:
         return None
@@ -193,90 +201,93 @@ async def cobrar_tokens_do_assistente(redis, user_id: str, tokens: int) -> int |
             chave_de_tokens(user_id), JANELA_DO_ASSISTENTE_SEGUNDOS, incremento=int(tokens), redis=redis
         )
         return acumulado
-    except Exception as exc:  # pragma: no cover - depende do Redis
+    except Exception as exc:  # pragma: no cover - depends on Redis
         _avisar_sem_redis(f"falha ao cobrar a cota do assistente: {exc.__class__.__name__}")
         return None
 
 
-# A chave é a MESMA (`assistente:tokens:…`)
-# tanto para o assistente do editor quanto para o assistente da Home — os dois
-# compartilham o orçamento de tokens do modelo por pessoa, e é isso que o teto
-# diário mede.
+# The key is the SAME (`assistente:tokens:…`)
+# for both the editor assistant and the Home assistant — the two share the
+# per-person model token budget, and that is what the daily ceiling measures.
 #
-# O balde único é DELIBERADO (o modelo é o mesmo e o orçamento por pessoa é um
-# só), mas desde que a Home virou a primeira tela após o login ele passou a ser
-# consumido sem intenção: quem conversa no globo pela manhã pode achar o assistente
-# do editor esgotado à tarde sem nunca o ter aberto. Separar as chaves aqui
-# resolveria a surpresa e dobraria o gasto máximo por pessoa — decisão de
-# produto, não de código. O medidor das duas superfícies (`uso-da-cota.tsx`, que
-# lê `GET /assistente/estado` e `GET /assistente/estado`, ambos nesta mesma chave)
-# mostra só gasto, teto e prazo: dizer ali que o orçamento é único foi tentado
-# e retirado — é ruído para quem lê um medidor. O fato fica registrado em
-# docs/assistente.md, "Limites conhecidos".
+# The single bucket is DELIBERATE (the model is the same and the per-person
+# budget is a single one), but since Home became the first screen after login it
+# started being consumed unintentionally: someone who chats on the globe in the
+# morning may find the editor assistant exhausted in the afternoon without ever
+# having opened it. Separating the keys here would resolve the surprise and
+# double the maximum spending per person — a product decision, not a code one.
+# The meter on both surfaces (`uso-da-cota.tsx`, which reads
+# `GET /assistente/estado` and `GET /assistente/estado`, both on this same key)
+# shows only spending, ceiling and deadline: saying there that the budget is
+# shared was tried and removed — it is noise for someone reading a meter. The
+# fact is recorded in docs/assistant.md, "Known limits".
 def chave_de_tokens(user_id: str) -> str:
     return f"assistente:tokens:{user_id}"
 
 
 async def gasto_e_prazo(redis, user_id: str) -> tuple[int, int | None]:
-    """Quanto já foi gasto na janela e em quantos segundos ela reabre. Nunca levanta.
+    """How much has been spent in the window and in how many seconds it reopens. Never raises.
 
-    É o que `GET /assistente/editor/estado` mostra sem recusar nada — e o que o
-    `GET /assistente/estado` do assistente vai ler. Vive aqui, junto do resto da
-    contabilidade de tokens, para as duas rotas lerem a MESMA fonte em vez de
-    cada uma reimplementar a leitura da chave.
+    It is what `GET /assistente/editor/estado` shows without refusing anything
+    — and what the assistant's `GET /assistente/estado` will read. It lives
+    here, next to the rest of the token accounting, so both routes read the
+    SAME source instead of each one reimplementing the key read.
     """
     if redis is None:
         return (0, None)
     chave = chave_de_tokens(user_id)
     try:
         cru = await redis.get(chave)
-        # Chave antiga sem prazo (a cobrança de antes de `contar_na_janela`
-        # fazia INCRBY e EXPIRE em dois comandos, e o segundo podia se perder):
-        # o NX dá a ela a janela e não mexe numa chave com prazo. Tem de ser
-        # aqui, e não só na recusa: com a cota cheia, a interface lê este
-        # estado e trava o envio, a recusa nunca roda, e a chave nunca expiraria.
+        # An old key with no deadline (the charge from before `contar_na_janela`
+        # did INCRBY and EXPIRE in two commands, and the second could get lost):
+        # NX gives it the window and does not touch a key that has a deadline.
+        # It has to be here, and not only in the refusal: with the quota full,
+        # the interface reads this state and locks sending, the refusal never
+        # runs, and the key would never expire.
         if cru is not None:
             await redis.expire(chave, JANELA_DO_ASSISTENTE_SEGUNDOS, nx=True)
         ttl = await redis.ttl(chave)
-    except Exception as exc:  # pragma: no cover - depende do Redis
+    except Exception as exc:  # pragma: no cover - depends on Redis
         logger.warning("Falha ao ler a cota do assistente: %s", exc.__class__.__name__)
         return (0, None)
     try:
         gasto = int(cru) if cru is not None else 0
-    except (TypeError, ValueError):  # pragma: no cover - valor corrompido
+    except (TypeError, ValueError):  # pragma: no cover - corrupted value
         gasto = 0
     return (gasto, int(ttl) if isinstance(ttl, int) and ttl > 0 else None)
 
 
 async def _quanto_falta(redis, chave: str) -> int:
-    """TTL da janela, para a recusa dizer quando reabre. Nunca levanta.
+    """The window's TTL, so the refusal can say when it reopens. Never raises.
 
-    O `EXPIRE ... NX` antes de ler só age numa chave SEM prazo — uma que a
-    cobrança de antes de `contar_na_janela` (INCRBY e EXPIRE em dois comandos)
-    deixou imortal. É na recusa que isso importa: recusado, o turno não chega à
-    cobrança, que é quem arma o prazo, e quem cruzou o teto com uma chave dessas
-    nunca mais teria o assistente. Numa chave com prazo, o NX não mexe em nada.
+    The `EXPIRE ... NX` before reading only acts on a key WITHOUT a deadline —
+    one that the charge from before `contar_na_janela` (INCRBY and EXPIRE in two
+    commands) left immortal. It is in the refusal that this matters: once
+    refused, the turn never reaches the charge, which is what sets the
+    deadline, and whoever crossed the ceiling with such a key would never have
+    the assistant again. On a key with a deadline, NX touches nothing.
     """
     try:
         await redis.expire(chave, JANELA_DO_ASSISTENTE_SEGUNDOS, nx=True)
         ttl = await redis.ttl(chave)
-    except Exception:  # pragma: no cover - depende do Redis
+    except Exception:  # pragma: no cover - depends on Redis
         return JANELA_DO_ASSISTENTE_SEGUNDOS
     return int(ttl) if isinstance(ttl, int) and ttl > 0 else JANELA_DO_ASSISTENTE_SEGUNDOS
 
 
 @asynccontextmanager
 async def espera(redis, token_id: str, ttl_s: int) -> AsyncIterator[None]:
-    """Reserva uma das esperas simultâneas — e devolve sempre, mesmo com erro.
+    """Reserves one of the simultaneous waits — and always gives it back, even on error.
 
-    O TTL das chaves é `ttl_s + 60`: se um worker morrer no meio da espera, o
-    contador se conserta sozinho um minuto depois do prazo máximo da execução,
-    em vez de deixar o teto travado para o token até alguém perceber.
+    The keys' TTL is `ttl_s + 60`: if a worker dies in the middle of the wait,
+    the counter fixes itself one minute after the run's maximum deadline,
+    instead of leaving the ceiling stuck for the token until someone notices.
 
-    A reserva são dois `INCR` em chaves diferentes, e uma falha entre eles não
-    pode deixar a primeira pendurada: o que foi de fato incrementado é anotado
-    e devolvido no tratamento do erro. Sem isso, um Redis que cai no meio da
-    reserva consumiria uma vaga do token a cada tentativa até o TTL expirar.
+    The reservation is two `INCR`s on different keys, and a failure between
+    them must not leave the first one dangling: what was actually incremented
+    is noted and given back in the error handling. Without that, a Redis that
+    goes down in the middle of the reservation would consume one of the
+    token's slots on every attempt until the TTL expired.
     """
     if redis is None:
         _avisar_sem_redis("pool Redis indisponível")
@@ -295,7 +306,7 @@ async def espera(redis, token_id: str, ttl_s: int) -> AsyncIterator[None]:
         do_global = await redis.incr(chave_global)
         incrementadas.append(chave_global)
         await redis.expire(chave_global, expiracao)
-    except Exception as exc:  # pragma: no cover - depende do Redis
+    except Exception as exc:  # pragma: no cover - depends on Redis
         _avisar_sem_redis(f"falha ao reservar espera: {exc.__class__.__name__}")
         await _devolver(redis, *incrementadas)
         async with _espera_local(token_id):
@@ -323,17 +334,17 @@ async def espera(redis, token_id: str, ttl_s: int) -> AsyncIterator[None]:
 
 
 async def _devolver(redis, *chaves: str) -> None:
-    """Solta a reserva. Nunca levanta: falhar aqui só faria perder o resultado."""
+    """Releases the reservation. Never raises: failing here would only lose the result."""
     for chave in chaves:
         try:
             await redis.decr(chave)
-        except Exception as exc:  # pragma: no cover - depende do Redis
+        except Exception as exc:  # pragma: no cover - depends on Redis
             logger.warning("Falha ao devolver a espera de %s: %s", chave, exc.__class__.__name__)
 
 
 @asynccontextmanager
 async def _espera_local(token_id: str) -> AsyncIterator[None]:
-    """Teto por processo, usado só quando não há Redis."""
+    """Per-process ceiling, used only when there is no Redis."""
     global _esperas_locais_total
     do_token = _esperas_locais.get(token_id, 0) + 1
     if do_token > MAX_ESPERAS_POR_TOKEN or _esperas_locais_total + 1 > MAX_ESPERAS_GLOBAL:

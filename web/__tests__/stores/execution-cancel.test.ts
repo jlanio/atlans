@@ -13,8 +13,8 @@ describe("workflowExecutionStore — cancelamento e modo debug", () => {
   })
 
   it("cancelar tira do ar o nó que estava em execução", () => {
-    // O executor interrompe a task e não emite evento de término para o nó em
-    // curso; sem tratar aqui ele giraria para sempre no canvas.
+    // The executor interrupts the task and doesn't emit an end event for the
+    // node in progress; without handling it here it would spin forever on the canvas.
     const store = useWorkflowExecutionStore.getState()
     store.startExecution([node("a", "idle"), node("b", "idle")])
     store.updateNodeStatuses([node("a", "completed"), node("b", "started")], [])
@@ -37,9 +37,9 @@ describe("workflowExecutionStore — cancelamento e modo debug", () => {
   })
 
   it("limpar o run preserva o modo debug", () => {
-    // O botão Executar limpa o run anterior antes de disparar o novo. Quando
-    // resetExecution zerava debugMode, o toggle apagava no exato clique em que
-    // o debug deveria valer.
+    // The Run button clears the previous run before firing the new one. When
+    // resetExecution zeroed debugMode, the toggle switched off on the very
+    // click in which debug was supposed to take effect.
     const store = useWorkflowExecutionStore.getState()
     store.setDebugMode(true)
     useWorkflowExecutionStore.getState().resetExecution()

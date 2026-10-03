@@ -2,19 +2,19 @@
 
 // web/app/components/home/assistente/etapa.tsx
 //
-// O passo ATUAL da resposta, mostrado na barra do rodapé enquanto o assistente
-// trabalha.
+// The CURRENT step of the answer, shown in the footer bar while the assistant
+// works.
 //
-// **Por que existe.** A barra desce ao rodapé assim que a pessoa envia — antes
-// do primeiro token de texto (ver o hero na HomeView). Durante o raciocínio e
-// as chamadas de ferramenta (catálogo, WFS), que podem levar segundos, a barra
-// ficaria sem dizer nada. Este indicador conta o que está acontecendo AGORA:
-// "Pensando…", ou o rótulo da ferramenta em curso ("Consultando o guia · edges").
-// A faixa (a `Pilha`) mostra a linha do tempo inteira; a barra mostra só o passo
-// da vez, pertinho de onde a pessoa escreve.
+// **Why it exists.** The bar drops to the footer as soon as the person sends —
+// before the first text token (see the hero in HomeView). During reasoning and
+// tool calls (catalog, WFS), which can take seconds, the bar would say nothing.
+// This indicator tells what is happening NOW: "Pensando…", or the label of the
+// tool in progress ("Consultando o guia · edges"). The strip (the `Pilha`) shows
+// the whole timeline; the bar shows only the current step, right next to where
+// the person types.
 //
-// Os rótulos são os MESMOS do painel (`assistente/rotulos.ts` e `Passo`): o nome
-// cru da ferramenta nunca vai para a tela.
+// The labels are the SAME as the panel's (`assistente/rotulos.ts` and `Passo`):
+// the raw tool name never reaches the screen.
 
 import MarcaAnimada from "./marca-animada"
 import { detalheDaChamada, rotuloDaFerramenta } from "@/app/components/home/assistente/rotulos"
@@ -30,14 +30,14 @@ export interface Etapa {
 }
 
 /**
- * O passo atual, a partir dos turnos e do `correndo`.
+ * The current step, derived from the turns and `correndo`.
  *
- * - Parado (`!correndo`) ou sem turno do assistente → `null`.
- * - Turno ainda sem bloco, último bloco de raciocínio, ou ferramenta já
- *   CONCLUÍDA (o modelo está digerindo o resultado) → "Pensando".
- * - Ferramenta EM CURSO → o rótulo dela, com o detalhe da chamada.
- * - Já escrevendo a resposta (último bloco de texto/cartão) → `null`: o texto
- *   aparece na faixa, e um "passo" ali seria ruído.
+ * - Stopped (`!correndo`) or no assistant turn → `null`.
+ * - Turn with no block yet, last block is reasoning, or tool already
+ *   FINISHED (the model is digesting the result) → "Pensando".
+ * - Tool IN PROGRESS → its label, with the call's detail.
+ * - Already writing the answer (last block is text/card) → `null`: the text
+ *   shows up in the strip, and a "step" there would be noise.
  */
 export function etapaDaConversa(
   turnos: TurnoDoAssistente[],
@@ -62,7 +62,7 @@ export function etapaDaConversa(
   return null
 }
 
-/** A linha do passo: a marca do site animada + o rótulo (o "…" varre no pensar). */
+/** The step line: the site's animated logo + the label (the "…" sweeps while thinking). */
 export function IndicadorDeEtapa({ etapa, className }: { etapa: Etapa; className?: string }) {
   return (
     <p

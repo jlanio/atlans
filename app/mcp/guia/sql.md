@@ -1,8 +1,8 @@
 # SQL
 
-Os nós `DatabaseQuery` e `DatabaseSpatialQuery` recebem a consulta em `query` e
-os valores em `queryParams`. A credencial entra por `credential_id` — nunca a
-string de conexão (ver o tópico `credentials`).
+The `DatabaseQuery` and `DatabaseSpatialQuery` nodes take the query in `query` and
+the values in `queryParams`. The credential goes in through `credential_id` — never the
+connection string (see the `credentials` topic).
 
 ```json
 { "id": "n1", "name": "DatabaseSpatialQuery", "type": "datasource",
@@ -15,21 +15,21 @@ string de conexão (ver o tópico `credentials`).
   } }
 ```
 
-`:placeholder` é o caminho seguro: o valor vira bind, não texto concatenado.
-Interpolar com Jinja direto no SQL também funciona, mas monta a query por
-concatenação — prefira o bind.
+`:placeholder` is the safe path: the value becomes a bind, not concatenated text.
+Interpolating with Jinja directly in the SQL also works, but it builds the query by
+concatenation — prefer the bind.
 
-`:nome` dentro de string ou de comentário SQL **não** é tratado como
-placeholder, então `WHERE obs = 'as :10 horas'` não vira parâmetro nenhum.
+`:nome` inside a string or an SQL comment is **not** treated as a
+placeholder, so `WHERE obs = 'as :10 horas'` does not become any parameter.
 
-`queryParams` é renderizado com Jinja antes do bind e preserva o TIPO quando o
-valor é uma expressão só: `{{ inputs.minima }}` com 500 entrega o inteiro 500.
+`queryParams` is rendered with Jinja before the bind and preserves the TYPE when the
+value is a single expression: `{{ inputs.minima }}` with 500 delivers the integer 500.
 
-Duas notas de operação:
+Two operational notes:
 
-- `timeout` (segundos) existe nos dois nós e vale a pena ajustar em consulta
-  pesada; o default é 120.
-- O `DatabaseSpatialQuery` declara saída dinâmica E implementa simulação: ele
-  **conecta ao banco da credencial durante a validação** para descobrir as
-  colunas. Não escreve nada, mas abre conexão — é por isso que a credencial
-  compartilhada só entra no escopo da validação a partir do papel `operator`.
+- `timeout` (seconds) exists in both nodes and is worth tuning for a heavy
+  query; the default is 120.
+- `DatabaseSpatialQuery` declares a dynamic output AND implements simulation: it
+  **connects to the credential's database during validation** to discover the
+  columns. It writes nothing, but it opens a connection — that is why the shared
+  credential only enters the validation scope from the `operator` role up.

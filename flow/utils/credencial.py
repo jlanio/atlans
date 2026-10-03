@@ -1,28 +1,28 @@
 # flow/utils/credencial.py
 #
-# Leitura da credencial de banco já resolvida nos parâmetros do nó.
+# Reading of the database credential already resolved in the node's parameters.
 #
-# O executor nunca vê a credencial: o servidor troca `credential_id` pelo DSN
-# (`connectionString`) ao montar o envelope do job, e remove o id. Aqui só
-# sobra checar se essa troca aconteceu.
+# The executor never sees the credential: the server swaps `credential_id` for
+# the DSN (`connectionString`) when building the job envelope, and removes the
+# id. All that is left here is checking whether that swap happened.
 #
-# A checagem existia repetida em cada nó, sempre como "'connectionString' é
-# obrigatório (deve ser resolvido antes da execução)". A frase descreve um
-# problema do SERVIDOR com a forma de um erro de configuração do nó — e as duas
-# causas possíveis pedem ações opostas: escolher uma credencial no editor, ou
-# investigar por que o servidor não a injetou. Distinguir as duas é o motivo
-# deste módulo.
+# The check was repeated in each node, always as "'connectionString' é
+# obrigatório (deve ser resolvido antes da execução)". The sentence describes a
+# SERVER problem in the shape of a node configuration error — and the two
+# possible causes call for opposite actions: picking a credential in the editor,
+# or investigating why the server did not inject it. Telling the two apart is
+# the reason for this module.
 from typing import Any, Dict
 
 
 def obter_conexao(parameters: Dict[str, Any]) -> str:
-    """DSN de conexão do nó, ou erro dizendo qual das duas coisas faltou."""
+    """The node's connection DSN, or an error saying which of the two things was missing."""
     conn = str(parameters.get("connectionString") or "").strip()
     if conn:
         return conn
 
-    # `credential_id` presente é o rastro de que o servidor NÃO fez a troca:
-    # `inject_credentials` remove o id justamente ao injetar o DSN.
+    # A present `credential_id` is the trace that the server did NOT do the swap:
+    # `inject_credentials` removes the id precisely when injecting the DSN.
     if str(parameters.get("credential_id") or "").strip():
         raise ValueError(
             "A credencial está selecionada no nó, mas o servidor não a resolveu "

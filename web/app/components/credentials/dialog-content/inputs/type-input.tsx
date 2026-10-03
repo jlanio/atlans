@@ -8,9 +8,9 @@ import { ICredentialTypeSchema } from "@/service/types"
 interface TypeInputProps {
   form: UseFormReturn<z.infer<typeof formCredentialSchema>>
   credentialTypes: ICredentialTypeSchema[]
-  /** Restringe a seleção a um único tipo (ex: ao criar inline num nó específico) */
+  /** Restricts the selection to a single type (e.g. when creating inline from a specific node) */
   allowedTypes?: string[]
-  /** Quando true, exibe o tipo como somente leitura — não pode ser alterado ao editar */
+  /** When true, shows the type as read-only — it cannot be changed while editing */
   disabled?: boolean
 }
 

@@ -1,62 +1,62 @@
 # flow/utils/publisher/reducao.py
 """
-Redução de um node_event que passou do teto de bytes do protocolo WS.
+Reduction of a node_event that exceeded the WS protocol's byte ceiling.
 
-Regra ÚNICA dos dois lados do fio: o executor a aplica antes de enviar
-(`_dumps_event` em executor/connection.py) e o servidor a reaplica antes de
-republicar no Redis (`_serialize_node_event` em
-app/api/routers/executor_ws/resultados.py) — defesa contra executor com bug ou
-comprometido, para quem a auto-limitação do executor não vale nada.
+A SINGLE rule for both sides of the wire: the executor applies it before sending
+(`_dumps_event` in executor/connection.py) and the server re-applies it before
+republishing to Redis (`_serialize_node_event` in
+app/api/routers/executor_ws/resultados.py) — a defense against a buggy or
+compromised executor, for which the executor's self-limiting is worth nothing.
 
-Eram duas cópias, e divergiram: o executor preservava `duration_ms` e as linhas
-de stdout que coubessem, mas jogava fora o `extra` inteiro; o servidor cortava
-só as chaves pesadas do `extra` e mantinha `output_columns`. Com o mesmo teto
-dos dois lados, o executor entregava o evento já reduzido e a regra do servidor
-nunca rodava: um `completed` com traceback grande chegava ao painel sem a
-sugestão de coluna do editor.
+There were two copies, and they diverged: the executor preserved `duration_ms` and
+the stdout lines that fit, but threw away the whole `extra`; the server cut
+only the heavy keys of `extra` and kept `output_columns`. With the same ceiling
+on both sides, the executor delivered the event already reduced and the server's
+rule never ran: a `completed` with a large traceback reached the panel without
+the editor's column suggestion.
 
-Teto e listas de campos são parte do protocolo. Servidor e executores são
-atualizados em momentos diferentes, e o evento que um lado reduz o outro tem de
-aceitar como está.
+The ceiling and the field lists are part of the protocol. Server and executors are
+updated at different times, and the event one side reduces the other must
+accept as is.
 """
 import json
 from typing import Any, Callable
 
 from flow.utils.publisher.events import KIND_STDOUT
 
-# Teto de BYTES de um node_event (`json.dumps` escapa com ensure_ascii, então
-# len(str) == bytes). Vale nos dois lados: no executor, um `print()` de um
-# GeoJSON grande estourava o frame do WS e o servidor fechava com 1009,
-# derrubando a sessão inteira; no servidor, o histórico do run tem teto de
-# QUANTIDADE de eventos, não de bytes, e o Redis do compose não tem maxmemory —
-# evento de MB crescia até o OOM-kill, levando junto dispatch, auth e o consumer
-# de resultados.
+# BYTE ceiling of a node_event (`json.dumps` escapes with ensure_ascii, so
+# len(str) == bytes). Applies on both sides: on the executor, a `print()` of a
+# large GeoJSON overflowed the WS frame and the server closed with 1009,
+# bringing down the whole session; on the server, the run history has a ceiling
+# on the NUMBER of events, not bytes, and the compose Redis has no maxmemory —
+# an MB-sized event grew until the OOM-kill, taking dispatch, auth and the
+# results consumer down with it.
 #
-# O produtor de stdout já fecha o lote em ~24 KB de texto (_STDOUT_FLUSH_BYTES
-# em flow/nodes/action/python_script.py), então passar daqui é exceção.
+# The stdout producer already closes the batch at ~24 KB of text (_STDOUT_FLUSH_BYTES
+# in flow/nodes/action/python_script.py), so going past this is an exception.
 TETO_NODE_EVENT_BYTES = 64 * 1024
 
-# Campos que sobrevivem até o último degrau — sem eles o evento é inútil para o
-# painel. `type` é o que roteia a mensagem no servidor (que o tira antes de
-# republicar, então lá ele nem está no evento); `duration_ms` é o tempo do nó
-# que o painel mostra.
+# Fields that survive until the last step — without them the event is useless to
+# the panel. `type` is what routes the message on the server (which removes it
+# before republishing, so there it is not even in the event); `duration_ms` is the
+# node time the panel shows.
 CAMPOS_DE_CONTROLE = (
     "type", "run_id", "node", "status", "kind", "level", "timestamp", "duration_ms",
 )
 
-# Chaves de `extra` que carregam o peso do evento: stack de erro, resumo de
-# inputs/outputs do debug mode, lote de linhas de stdout e o diff de schema
-# drift (quem monta o `extra` é flow/executor/events.py e
-# flow/utils/publisher/events.py). `output_columns` fica DE FORA de propósito: é
-# o que o editor usa para sugerir nome de coluna.
+# Keys of `extra` that carry the event's weight: error stack, debug mode's
+# inputs/outputs summary, batch of stdout lines and the schema drift diff
+# (`extra` is built by flow/executor/events.py and
+# flow/utils/publisher/events.py). `output_columns` is left OUT on purpose: it is
+# what the editor uses to suggest column names.
 CHAVES_PESADAS_DO_EXTRA = ("traceback", "debug_output", "lines", "schema_drift")
 
-# Teto de caracteres de cada campo de controle preservado, para o próprio
-# evento reduzido não poder ser grande (nada garante que `node` seja curto — ou
-# sequer uma string).
+# Character ceiling for each preserved control field, so the reduced event
+# itself cannot be large (nothing guarantees `node` is short — or
+# even a string).
 TETO_POR_CAMPO = 512
 
-# Teto de caracteres de `error` no primeiro degrau.
+# Character ceiling for `error` in the first step.
 TETO_DO_ERRO = 8 * 1024
 
 _MARCA_DE_CORTE = "…[truncado]"
@@ -69,29 +69,29 @@ def reduzir_node_event(
     *,
     default: Callable[[Any], Any] | None = None,
 ) -> str:
-    """JSON do node_event reduzido a no máximo `teto` bytes.
+    """JSON of the node_event reduced to at most `teto` bytes.
 
-    `payload` é o JSON do evento inteiro, que quem chama já serializou para
-    medir; se ele cabe, volta como está. Senão o evento desce em degraus, cada
-    um medido serializado (nunca estimado), e o primeiro que couber vence:
+    `payload` is the JSON of the whole event, which the caller already serialized
+    to measure; if it fits, it comes back as is. Otherwise the event steps down,
+    each step measured serialized (never estimated), and the first that fits wins:
 
-      1. Sem o peso: sai de `extra` o que está em CHAVES_PESADAS_DO_EXTRA e
-         `error` é encurtado; o resto fica — `extra.output_columns`,
-         `duration_ms`, a categoria do erro.
-      2. Só os CAMPOS_DE_CONTROLE, coagidos a escalares curtos: um valor que
-         não é string nem escalar vira repr cortado — senão o teto seria
-         burlado justamente pelo caminho que o impõe.
-      3. Rede de segurança, se nem os campos coagidos couberem: o indispensável
-         para correlacionar o evento. O teto é garantia, não intenção.
+      1. Without the weight: what is in CHAVES_PESADAS_DO_EXTRA leaves `extra` and
+         `error` is shortened; the rest stays — `extra.output_columns`,
+         `duration_ms`, the error category.
+      2. Only the CAMPOS_DE_CONTROLE, coerced to short scalars: a value that is
+         neither a string nor a scalar becomes a cut repr — otherwise the ceiling
+         would be bypassed precisely through the path that enforces it.
+      3. Safety net, if not even the coerced fields fit: the bare minimum to
+         correlate the event. The ceiling is a guarantee, not an intention.
 
-    Num evento de stdout as linhas SÃO o conteúdo: nos degraus 1 e 2 volta o
-    maior prefixo de `extra['lines']` que ainda cabe, com um marcador do que
-    ficou de fora. Zerar `extra` mostrava a aba de saída do nó vazia, como se o
-    script não tivesse impresso nada.
+    In a stdout event the lines ARE the content: in steps 1 and 2 the
+    longest prefix of `extra['lines']` that still fits comes back, with a marker of
+    what was left out. Emptying `extra` showed the node's output tab empty, as if
+    the script had printed nothing.
 
-    O evento reduzido sai marcado com `__truncated__` e `__original_size__`.
-    `default` é o do `json.dumps`: o executor passa o dele (Timestamp, numpy…);
-    o servidor não precisa, o evento dele veio de JSON.
+    The reduced event comes out marked with `__truncated__` and `__original_size__`.
+    `default` is the one from `json.dumps`: the executor passes its own (Timestamp,
+    numpy…); the server does not need to, its event came from JSON.
     """
     if len(payload) <= teto:
         return payload
@@ -105,8 +105,8 @@ def reduzir_node_event(
     if evento.get("kind") != KIND_STDOUT or not isinstance(linhas, list):
         linhas = []
 
-    # Degrau 1 — só quando há o que cortar: sem corte o candidato teria o
-    # tamanho do original e o dumps seria desperdício.
+    # Step 1 — only when there is something to cut: without a cut the candidate would
+    # have the original's size and the dumps would be wasted.
     reduzido = dict(evento)
     houve_corte = False
     if isinstance(extra, dict) and any(k in extra for k in CHAVES_PESADAS_DO_EXTRA):
@@ -155,16 +155,16 @@ def reduzir_node_event(
 def _com_as_linhas_que_cabem(
     base: dict, linhas: list, teto: int, dumps: Callable[[dict], str],
 ) -> str | None:
-    """`base` com o maior prefixo de `linhas` que cabe no teto.
+    """`base` with the longest prefix of `linhas` that fits in the ceiling.
 
-    None quando não há linhas ou quando nem o marcador do corte cabe.
+    None when there are no lines or when not even the cut marker fits.
 
-    Corta por BUSCA BINÁRIA sobre o resultado já serializado, e não por
-    estimativa de caracteres: `json.dumps` escapa com ensure_ascii, então uma
-    linha de acentos/emoji cresce até 6x e um orçamento contado em `len(str)`
-    estouraria o teto exatamente no caso que este ramo existe para salvar. São
-    ~log2(n) serializações de um payload de 64 KB — irrelevante num caminho que
-    só roda quando o evento já é excepcional.
+    Cuts by BINARY SEARCH over the already serialized result, not by
+    character estimate: `json.dumps` escapes with ensure_ascii, so a
+    line of accents/emoji grows up to 6x and a budget counted in `len(str)`
+    would blow the ceiling exactly in the case this branch exists to save. It is
+    ~log2(n) serializations of a 64 KB payload — irrelevant on a path that
+    only runs when the event is already exceptional.
     """
     if not linhas:
         return None

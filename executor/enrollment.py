@@ -1,17 +1,17 @@
 # executor/enrollment.py
 """
-Modulo de enrollment do executor via Bootstrap OTP + mTLS.
+Executor enrollment module via Bootstrap OTP + mTLS.
 
-Fluxo:
-  1. Operador roda `python -m executor enroll --otp=... --server=https://...`
-  2. Executor gera keypair Ed25519 (cert) + X25519 (envelope encryption de jobs)
-  3. Monta CSR com CN=executor-pending
-  4. POST /executores/enroll com Authorization: Bearer {otp}
-  5. Servidor consome OTP, valida CSR, pede a step-ca para assinar, devolve cert
-  6. Executor valida o bundle e troca cert.pem, chain.pem, ca.pem, key.pem e
-     x25519_key.pem em CERT_DIR (0o600) via .new + os.replace —
-     `_persistir_bundle`, o mesmo caminho do renewal (executor/renewal.py)
-  7. Zera o OTP da memoria
+Flow:
+  1. Operator runs `python -m executor enroll --otp=... --server=https://...`
+  2. Executor generates an Ed25519 keypair (cert) + X25519 (job envelope encryption)
+  3. Builds a CSR with CN=executor-pending
+  4. POST /executores/enroll with Authorization: Bearer {otp}
+  5. Server consumes the OTP, validates the CSR, asks step-ca to sign, returns the cert
+  6. Executor validates the bundle and swaps cert.pem, chain.pem, ca.pem, key.pem and
+     x25519_key.pem in CERT_DIR (0o600) via .new + os.replace —
+     `_persistir_bundle`, the same path as renewal (executor/renewal.py)
+  7. Wipes the OTP from memory
 """
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ from executor.versao import versao_do_executor
 logger = logging.getLogger(__name__)
 
 
-# ── Constantes de filename ────────────────────────────────────────────────────
+# ── Filename constants ────────────────────────────────────────────────────────
 
 CERT_FILE  = "cert.pem"
 CHAIN_FILE = "chain.pem"
@@ -57,13 +57,13 @@ def _ws_to_http(server_url: str) -> str:
 
 
 def _find_internal_root_cert(cert_dir: Path) -> Path | None:
-    """Localiza o root cert da CA interna, na ordem de precedencia real.
+    """Locates the internal CA's root cert, in the actual order of precedence.
 
-    O quickstart/Docker grava o cert FORA do cert_dir (ex: /atlans-root.crt) e
-    aponta SSL_CERT_FILE para la; o _ca_bootstrap respeita esse env e retorna
-    cedo. Procurar apenas em `cert_dir` fazia o enroll ignorar exatamente o
-    cert que o bootstrap tinha acabado de honrar, caindo no bundle publico —
-    que nao contem a CA interna do host dos executores.
+    The quickstart/Docker writes the cert OUTSIDE cert_dir (e.g. /atlans-root.crt)
+    and points SSL_CERT_FILE there; _ca_bootstrap honors that env and returns
+    early. Searching only in `cert_dir` made enroll ignore exactly the cert the
+    bootstrap had just honored, falling back to the public bundle — which does
+    not contain the internal CA of the executors' host.
     """
     candidatos = [cert_dir / "atlans-root.crt"]
     for env in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE"):
@@ -81,30 +81,31 @@ def _find_internal_root_cert(cert_dir: Path) -> Path | None:
 
 
 def _resolve_enroll_verify(cert_dir: Path):
-    """Contexto TLS para o POST /executores/enroll.
+    """TLS context for POST /executores/enroll.
 
-    Combina o trust store padrao (certifi/sistema) COM a CA interna, em vez de
-    escolher um ou outro:
-      - so a CA interna quebraria um servidor com cert publico (ex: o dominio raiz
-        atras do Cloudflare);
-      - so o certifi quebra o host dos executores, cujo cert vem da step-ca.
-    Mesmo padrao de `executor/utils.py::build_mtls_ssl_context`, usado depois
-    do enroll.
+    Combines the default trust store (certifi/system) WITH the internal CA,
+    instead of choosing one or the other:
+      - the internal CA alone would break a server with a public cert (e.g. the
+        root domain behind Cloudflare);
+      - certifi alone breaks the executors' host, whose cert comes from step-ca.
+    Same pattern as `executor/utils.py::build_mtls_ssl_context`, used after
+    enroll.
 
-    Retorna `(verify, descricao_para_log)`. `verify` e um SSLContext quando ha
-    CA interna; senao um path/bool aceito pelo httpx. Passar explicitamente
-    evita o gotcha de bibliotecas que usam truststore e ignoram SSL_CERT_FILE.
+    Returns `(verify, descricao_para_log)`. `verify` is an SSLContext when there
+    is an internal CA; otherwise a path/bool accepted by httpx. Passing it
+    explicitly avoids the gotcha of libraries that use truststore and ignore
+    SSL_CERT_FILE.
     """
     root = _find_internal_root_cert(cert_dir)
     if root is not None:
         import ssl
         ctx = ssl.create_default_context()
         try:
-            # create_default_context() honra SSL_CERT_FILE — que o quickstart
-            # aponta para a CA interna, SUBSTITUINDO o trust store publico em vez
-            # de somar a ele. Recarregamos o bundle publico explicitamente para
-            # que as CAs do sistema sobrevivam (senao um endpoint publico atras
-            # do Cloudflare quebraria no mesmo contexto).
+            # create_default_context() honors SSL_CERT_FILE — which the quickstart
+            # points to the internal CA, REPLACING the public trust store instead
+            # of adding to it. We reload the public bundle explicitly so that
+            # the system CAs survive (otherwise a public endpoint behind
+            # Cloudflare would break in the same context).
             try:
                 import certifi  # type: ignore
                 ctx.load_verify_locations(cafile=certifi.where())
@@ -123,25 +124,26 @@ def _resolve_enroll_verify(cert_dir: Path):
 
 
 def _generate_keypairs() -> tuple[Ed25519PrivateKey, X25519PrivateKey]:
-    """Gera (chave Ed25519 para cert mTLS, chave X25519 para envelope encryption)."""
+    """Generates (Ed25519 key for the mTLS cert, X25519 key for envelope encryption)."""
     return Ed25519PrivateKey.generate(), X25519PrivateKey.generate()
 
 
 def _build_csr(ed_key: Ed25519PrivateKey, cn: str) -> bytes:
     """
-    Monta CSR Ed25519 em PEM. O CN deve ser `executor-{id}` — a step-ca exige
-    que o CN do CSR case com o `sub` do OTT (one-time token) que o backend
-    gera com `sub=executor-{executor_id}`. Sem isso, step-ca rejeita com 403.
+    Builds an Ed25519 CSR in PEM. The CN must be `executor-{id}` — step-ca
+    requires the CSR's CN to match the `sub` of the OTT (one-time token) that the
+    backend generates with `sub=executor-{executor_id}`. Without it, step-ca
+    rejects with 403.
     """
     builder = x509.CertificateSigningRequestBuilder().subject_name(
         x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
     )
-    csr = builder.sign(ed_key, algorithm=None)  # Ed25519 nao usa hash separado
+    csr = builder.sign(ed_key, algorithm=None)  # Ed25519 does not use a separate hash
     return csr.public_bytes(serialization.Encoding.PEM)
 
 
 def _write_pem(path: Path, content: bytes, mode: int = 0o600) -> None:
-    """Escreve PEM com permissoes restritas. Em Windows os.chmod() e no-op mas o NTFS ACL ja restringe."""
+    """Writes a PEM with restricted permissions. On Windows os.chmod() is a no-op but the NTFS ACL already restricts it."""
     path.write_bytes(content)
     try:
         os.chmod(path, mode)
@@ -150,7 +152,7 @@ def _write_pem(path: Path, content: bytes, mode: int = 0o600) -> None:
 
 
 def _pem_privado(chave: Ed25519PrivateKey | X25519PrivateKey) -> bytes:
-    """Chave privada em PEM PKCS8 sem cifra — o formato de key.pem e x25519_key.pem."""
+    """Private key in unencrypted PKCS8 PEM — the format of key.pem and x25519_key.pem."""
     return chave.private_bytes(
         serialization.Encoding.PEM,
         serialization.PrivateFormat.PKCS8,
@@ -160,31 +162,31 @@ def _pem_privado(chave: Ed25519PrivateKey | X25519PrivateKey) -> bytes:
 
 def _validate_bundle(bundle: dict, new_key: Ed25519PrivateKey) -> str | None:
     """
-    Valida o bundle devolvido pelo /enroll ou pelo /renew-cert ANTES de tocar
-    em qualquer arquivo. Retorna None se OK, ou a mensagem do motivo da recusa.
+    Validates the bundle returned by /enroll or /renew-cert BEFORE touching any
+    file. Returns None if OK, or the message with the reason for the refusal.
 
-    POR QUE: o renewal fazia `_write_pem(..., bundle.get("ca_pem", "").encode())`
-    seguido de `os.replace`. Um `ca_pem` vazio (o servidor ja devolveu "" com
-    apenas um WARNING quando o root cert sumia) sobrescrevia o ca.pem BOM por um
-    arquivo vazio. A partir dai TODO connect estourava
-    X509 NO_CERTIFICATE_OR_CRL_FOUND — inclusive o proprio renewal, que precisa
-    do ca.pem para falar com o servidor. O executor ficava offline em backoff
-    eterno, sem conseguir se autocorrigir. Um renewal que falha e recuperavel;
-    um renewal que corrompe as credenciais, nao. O enroll gravava direto e
-    ficou com o mesmo buraco por mais tempo: num RE-enroll, o ca.pem bom virava
-    o vazio do servidor.
+    WHY: renewal did `_write_pem(..., bundle.get("ca_pem", "").encode())`
+    followed by `os.replace`. An empty `ca_pem` (the server has returned "" with
+    only a WARNING when the root cert went missing) overwrote the GOOD ca.pem
+    with an empty file. From then on EVERY connect blew up with
+    X509 NO_CERTIFICATE_OR_CRL_FOUND — including renewal itself, which needs
+    ca.pem to talk to the server. The executor stayed offline in endless
+    backoff, unable to fix itself. A renewal that fails is recoverable; a
+    renewal that corrupts the credentials is not. Enroll wrote directly and
+    kept the same hole for longer: on a RE-enroll, the good ca.pem became the
+    server's empty one.
     """
-    # Obrigatorios: sem cert_pem nao ha identidade, e sem ca_pem nao ha trust
-    # anchor — este ultimo e exatamente o campo cujo vazio causava o dano.
+    # Required: without cert_pem there is no identity, and without ca_pem there is
+    # no trust anchor — the latter is exactly the field whose emptiness caused the damage.
     #
-    # chain_pem NAO entra aqui de proposito. O servidor o preenche com
+    # chain_pem is deliberately NOT included here. The server fills it with
     # `body.get("ca") or ""` (executor_enrollment_service.sign_csr_via_stepca):
-    # vazio e um valor que ele emite legitimamente, e o enroll sempre gravou
-    # esse vazio sem reclamar. Exigi-lo aqui deixaria o validador MAIS RIGIDO
-    # que o emissor, e a consequencia seria pior que o bug original: o renewal
-    # falharia em todo ciclo, silenciosamente, ate o cert expirar e o executor
-    # morrer de vez. Chain ausente nao corrompe nada — quem ancora a confianca
-    # e o ca_pem.
+    # empty is a value it legitimately emits, and enroll has always written
+    # that empty value without complaint. Requiring it here would make the
+    # validator STRICTER than the emitter, and the consequence would be worse
+    # than the original bug: renewal would fail on every cycle, silently, until
+    # the cert expired and the executor died for good. A missing chain corrupts
+    # nothing — what anchors trust is ca_pem.
     for field in ("cert_pem", "ca_pem"):
         value = bundle.get(field)
         if not isinstance(value, str) or not value.strip():
@@ -206,16 +208,16 @@ def _validate_bundle(bundle: dict, new_key: Ed25519PrivateKey) -> str | None:
     if not ca_certs:
         return "'ca_pem' nao contem nenhum certificado"
 
-    # chain_pem so precisa ser PARSEAVEL quando vem preenchido.
+    # chain_pem only needs to be PARSEABLE when it is filled in.
     if chain_pem and chain_pem.strip():
         try:
             x509.load_pem_x509_certificates(chain_pem.encode())
         except Exception as exc:
             return f"'chain_pem' nao e um PEM de certificados valido: {exc}"
 
-    # O cert emitido tem que ser da chave que acabamos de gerar — se o servidor
-    # devolvesse (por bug ou cache) o cert antigo, o par cert/key ficaria
-    # inconsistente e o mTLS quebraria com a mesma cara de "offline eterno".
+    # The issued cert must be for the key we just generated — if the server
+    # returned (through a bug or a cache) the old cert, the cert/key pair would
+    # be inconsistent and mTLS would break with the same "endless offline" look.
     issued_pub = cert.public_key().public_bytes(
         serialization.Encoding.DER,
         serialization.PublicFormat.SubjectPublicKeyInfo,
@@ -237,18 +239,19 @@ def _persistir_bundle(
     chave_x: X25519PrivateKey | None = None,
 ) -> str | None:
     """
-    Valida o bundle e troca os arquivos de identidade — o caminho unico do
-    enroll e do renewal. Retorna None se gravou, ou o motivo da recusa; na
-    recusa NENHUM arquivo foi tocado.
+    Validates the bundle and swaps the identity files — the single path for
+    enroll and renewal. Returns None if it wrote, or the reason for the refusal;
+    on refusal NO file has been touched.
 
-    Tudo vai primeiro para `<nome>.new` e so depois, com todos escritos, cada
-    um substitui o original com os.replace (atomico por arquivo). Uma falha de
-    escrita no meio (disco cheio) apaga os .new e propaga o erro sem ter trocado
-    nada. Os .new que um crash deixar para tras sao limpos no boot
+    Everything first goes to `<nome>.new` and only afterwards, with all of them
+    written, does each one replace the original with os.replace (atomic per
+    file). A write failure midway (disk full) deletes the .new files and
+    propagates the error without having swapped anything. The .new files a crash
+    leaves behind are cleaned up at boot
     (executor/config.py::_cleanup_renewal_orphans).
 
-    `chave_x` (a X25519 do envelope) so vem no enroll: o renewal troca o cert
-    mTLS, e a chave publica X25519 continua a registrada no servidor.
+    `chave_x` (the envelope's X25519 key) only comes on enroll: renewal swaps the
+    mTLS cert, and the X25519 public key remains the one registered on the server.
     """
     problema = _validate_bundle(bundle, chave_ed)
     if problema:
@@ -256,7 +259,7 @@ def _persistir_bundle(
 
     conteudos = [
         (CERT_FILE, bundle["cert_pem"].encode()),
-        # chain_pem e opcional (ver _validate_bundle): ausente ou null vira vazio.
+        # chain_pem is optional (see _validate_bundle): missing or null becomes empty.
         (CHAIN_FILE, (bundle.get("chain_pem") or "").encode()),
         (CA_FILE, bundle["ca_pem"].encode()),
         (KEY_FILE, _pem_privado(chave_ed)),
@@ -281,17 +284,18 @@ def _persistir_bundle(
 
 
 def _pin_server_signing_key(cert_dir: Path, key_b64: str | None) -> str | None:
-    """Fixa a chave de assinatura do servidor entregue no bundle do enroll/renew.
+    """Pins the server's signing key delivered in the enroll/renew bundle.
 
-    Nao desfaz o enrollment em caso de problema: o cert mTLS ja foi emitido e
-    persistido, e reverter isso queimaria o OTP a toa. Mas DIVERGENCIA (a chave
-    fixada e outra) nao pode virar so uma linha de log: `pin_key` grava um
-    marcador de conflito que faz o proximo boot parar, e aqui devolvemos a
-    mensagem para o CLI terminar com falha em vez de imprimir "concluido com
-    sucesso". Antes, o comando saia com 0 e o executor subia rejeitando 100% dos
-    jobs por assinatura invalida, sem nada ligando os dois fatos.
+    Does not undo the enrollment if there is a problem: the mTLS cert has already
+    been issued and persisted, and reverting that would burn the OTP for nothing.
+    But a MISMATCH (the pinned key is a different one) cannot become just a log
+    line: `pin_key` writes a conflict marker that makes the next boot stop, and
+    here we return the message so the CLI ends with a failure instead of printing
+    "concluido com sucesso" (completed successfully). Before, the command exited
+    with 0 and the executor came up rejecting 100% of jobs for an invalid
+    signature, with nothing connecting the two facts.
 
-    Retorna a mensagem de divergencia (fatal para o CLI) ou None.
+    Returns the mismatch message (fatal for the CLI) or None.
     """
     from executor.server_key import ServerKeyError, ServerKeyPersistError, pin_key
 
@@ -305,8 +309,8 @@ def _pin_server_signing_key(cert_dir: Path, key_b64: str | None) -> str | None:
     try:
         pin_key(cert_dir, key_b64, source="bundle do enrollment")
     except ServerKeyPersistError as exc:
-        # Nao e divergencia: o cert_dir e que nao aceitou a escrita. O boot
-        # recorre ao TOFU e segue — nao vale reprovar o enroll por isso.
+        # Not a mismatch: it is the cert_dir that did not accept the write. The boot
+        # falls back to TOFU and carries on — not worth failing the enroll over it.
         logger.error("Nao foi possivel gravar o pin da chave de assinatura: %s", exc)
         return None
     except ServerKeyError as exc:
@@ -321,17 +325,18 @@ def _persist_agent_config_to_env(
     env_path: Path | None = None,
 ) -> None:
     """
-    Semeia o `.env` a partir do `.env.example` (se vazio) e grava EXECUTOR_ID +
-    EXECUTOR_SERVER_URL. Tambem remove envs legados que confundem o executor apos
-    a migracao mTLS.
+    Seeds `.env` from `.env.example` (if empty) and writes EXECUTOR_ID +
+    EXECUTOR_SERVER_URL. Also removes legacy envs that confuse the executor after
+    the mTLS migration.
 
-    O seed garante que variaveis criticas (EXECUTOR_SERVER_URL, LOG_LEVEL, etc.)
-    fiquem populadas desde o primeiro boot — sem isso, o executor caia em
-    fallback hardcoded (`wss://localhost`) e o upload falhava com
+    The seed ensures that critical variables (EXECUTOR_SERVER_URL, LOG_LEVEL, etc.)
+    are populated from the first boot — without it, the executor fell back to a
+    hardcoded fallback (`wss://localhost`) and the upload failed with
     `Connection refused`.
 
-    Erros de IO viram WARNING — o enrollment ja persistiu o cert, e a falta
-    do EXECUTOR_ID em .env nao impede o operador de adicionar manualmente.
+    IO errors become a WARNING — the enrollment has already persisted the cert,
+    and a missing EXECUTOR_ID in .env does not stop the operator from adding it
+    manually.
     """
     from executor._env_utils import (
         normalize_server_url_to_ws,
@@ -341,19 +346,20 @@ def _persist_agent_config_to_env(
         seed_env_from_example,
     )
 
-    # 1. Semeia .env a partir do .env.example (se ainda nao tem config).
+    # 1. Seeds .env from .env.example (if there is no config yet).
     seed_env_from_example(env_path=env_path)
 
-    # 2. Limpa envs legados (idempotente):
-    # - EXECUTOR_API_KEY: nao usado mais apos mTLS, fica residual em .envs antigos.
-    # - EXECUTOR_PRIVATE_KEY_PATH apontando para path legacy: causava o executor gerar
-    #   chave nova em ./agent_key.pem em vez de usar a do enroll em x25519_key.pem.
+    # 2. Cleans up legacy envs (idempotent):
+    # - EXECUTOR_API_KEY: no longer used after mTLS, lingers in old .env files.
+    # - EXECUTOR_PRIVATE_KEY_PATH pointing to a legacy path: made the executor
+    #   generate a new key in ./agent_key.pem instead of using the enroll one in
+    #   x25519_key.pem.
     remove_env_var("EXECUTOR_API_KEY", env_path)
     legacy_key_path = read_env_var("EXECUTOR_PRIVATE_KEY_PATH", env_path)
     if legacy_key_path and legacy_key_path.strip() in ("./agent_key.pem", "/data/agent_key.pem"):
         remove_env_var("EXECUTOR_PRIVATE_KEY_PATH", env_path)
 
-    # 3. Atualiza EXECUTOR_ID com o valor do enrollment.
+    # 3. Updates EXECUTOR_ID with the enrollment value.
     persist_env_var(
         "EXECUTOR_ID",
         executor_id,
@@ -361,10 +367,10 @@ def _persist_agent_config_to_env(
         file_header="# Gerado por `python -m executor enroll`\n",
     )
 
-    # 4. Sobrescreve EXECUTOR_SERVER_URL se o operador passou --server diferente
-    # do default do example. Permite deploys staging/dev sem editar .env manual.
-    # Normaliza para wss:// porque o executor abre WebSocket — gravar https:// no
-    # .env quebra o connect com "scheme isn't ws or wss".
+    # 4. Overwrites EXECUTOR_SERVER_URL if the operator passed a --server different
+    # from the example's default. Allows staging/dev deploys without editing .env
+    # by hand. Normalizes to wss:// because the executor opens a WebSocket — writing
+    # https:// to .env breaks the connect with "scheme isn't ws or wss".
     if server_url:
         persist_env_var(
             "EXECUTOR_SERVER_URL",
@@ -377,11 +383,11 @@ def _persist_agent_config_to_env(
 
 
 def _motivo_da_recusa(resp) -> str:
-    """O motivo que o servidor deu, no formato em que ele responde.
+    """The reason the server gave, in the format it responds with.
 
-    Os handlers do servidor devolvem `message` (e não `detail`, o campo cru do
-    FastAPI), e o 422 de validação lista os campos recusados em `details`. Lia
-    só o `detail`: toda recusa saía com o motivo em branco.
+    The server's handlers return `message` (not `detail`, FastAPI's raw field),
+    and the validation 422 lists the rejected fields in `details`. It used to
+    read only `detail`: every refusal came out with a blank reason.
     """
     try:
         corpo = resp.json()
@@ -407,18 +413,18 @@ def enroll(
     env_path: str | Path | None = None,
 ) -> dict:
     """
-    Executa o enrollment completo: gera keypairs, manda CSR, recebe cert, persiste.
+    Runs the full enrollment: generates keypairs, sends the CSR, receives the cert, persists.
 
-    O `executor_id` deve ser o id_hash do executor (fornecido pelo admin na UI).
-    Ele e usado como CN do CSR — step-ca exige que case com o `sub` do OTT.
+    `executor_id` must be the executor's id_hash (provided by the admin in the UI).
+    It is used as the CSR's CN — step-ca requires it to match the OTT's `sub`.
 
-    `env_path` define onde o EXECUTOR_ID e o EXECUTOR_SERVER_URL sao gravados.
-    Sem ele cai no default de `_env_utils` (o `.env` dentro do pacote), que e o
-    lugar errado quando quem chama e o app desktop — la a config vive em
-    `%APPDATA%\\AtlasExecutor\\config\\.env`.
+    `env_path` defines where EXECUTOR_ID and EXECUTOR_SERVER_URL are written.
+    Without it, it falls back to the `_env_utils` default (the `.env` inside the
+    package), which is the wrong place when the caller is the desktop app — there
+    the config lives in `%APPDATA%\\AtlasExecutor\\config\\.env`.
 
-    Lanca RuntimeError se servidor recusar ou step-ca indisponivel.
-    Retorna dict com metadata do cert emitido (serial, fingerprint, expires_at).
+    Raises RuntimeError if the server refuses or step-ca is unavailable.
+    Returns a dict with the issued cert's metadata (serial, fingerprint, expires_at).
     """
     cert_dir = Path(cert_dir)
     cert_dir.mkdir(parents=True, exist_ok=True)
@@ -443,8 +449,8 @@ def enroll(
         "csr_pem":        csr_pem,
         "public_key_pem": x25519_pub_pem,
         "hostname":       socket.gethostname()[:255],
-        # A mesma do handshake (executor/versao.py): a do build na imagem Docker,
-        # a do app no desktop.
+        # The same as in the handshake (executor/versao.py): the build's version in the
+        # Docker image, the app's version on desktop.
         "executor_version":  versao_do_executor(),
         "os":             f"{platform.system()} {platform.release()}"[:64],
     }
@@ -452,10 +458,10 @@ def enroll(
     http_base = _ws_to_http(server_url).rstrip("/")
     url = f"{http_base}/executores/enroll"
 
-    # `--server=ws://...` vira http:// e o `verify` abaixo passa a ser decorativo:
-    # o OTP viaja em texto claro no header Authorization e qualquer on-path pode
-    # consumi-lo para se enrolar como este executor. Nao bloqueamos (on-prem sem
-    # TLS e uma escolha deliberada do operador), mas nao pode ser silencioso.
+    # `--server=ws://...` becomes http:// and the `verify` below becomes decorative:
+    # the OTP travels in clear text in the Authorization header and anyone on-path
+    # can consume it to enroll as this executor. We do not block it (on-prem
+    # without TLS is a deliberate operator choice), but it cannot be silent.
     if not http_base.lower().startswith("https://"):
         logger.warning(
             "Enroll indo por canal NAO CIFRADO (%s): o OTP trafega em texto claro e "
@@ -477,7 +483,7 @@ def enroll(
     except httpx.HTTPError as exc:
         raise RuntimeError(f"Falha de rede no enrollment: {exc}") from exc
     finally:
-        # Zera o OTP da memoria assim que possivel.
+        # Wipes the OTP from memory as soon as possible.
         otp = None  # noqa: F841
 
     if resp.status_code != 200 and resp.status_code != 201:
@@ -487,10 +493,10 @@ def enroll(
 
     bundle = resp.json()
 
-    # Persiste cert + chain + CA + chaves privadas pelo mesmo caminho do
-    # renewal: valida antes e troca via .new + os.replace. Gravar direto, como
-    # antes, aceitava um ca_pem vazio e — num RE-enroll — sobrescrevia o ca.pem
-    # bom, deixando o executor sem trust anchor.
+    # Persists cert + chain + CA + private keys through the same path as
+    # renewal: validates first and swaps via .new + os.replace. Writing directly,
+    # as before, accepted an empty ca_pem and — on a RE-enroll — overwrote the
+    # good ca.pem, leaving the executor without a trust anchor.
     problema = _persistir_bundle(cert_dir, bundle, ed_key, x_key)
     if problema:
         raise RuntimeError(
@@ -499,17 +505,18 @@ def enroll(
             "corrigir o servidor, gere outro."
         )
 
-    # Fixa a chave de assinatura Ed25519 do servidor que veio no bundle. Este e o
-    # momento certo: o bundle ja foi autenticado pelo OTP, entao nao ha janela de
-    # "confia na primeira resposta". Sem isto o executor cairia no TOFU do boot
-    # (ver executor/server_key.py), que e a brecha que o achado S8 aponta.
+    # Pins the server's Ed25519 signing key that came in the bundle. This is the
+    # right moment: the bundle has already been authenticated by the OTP, so there
+    # is no "trust the first response" window. Without this the executor would
+    # fall back to the boot TOFU (see executor/server_key.py), which is the gap
+    # that finding S8 points out.
     signing_key_conflict = _pin_server_signing_key(
         cert_dir, bundle.get("server_signing_public_key")
     )
 
-    # Semeia executor/.env a partir do .env.example, grava EXECUTOR_ID e atualiza
-    # EXECUTOR_SERVER_URL com o valor que o operador passou no --server. Garante
-    # que variaveis criticas (LOG_LEVEL, EXECUTOR_SYNC_*, etc.) ja venham populadas.
+    # Seeds executor/.env from .env.example, writes EXECUTOR_ID and updates
+    # EXECUTOR_SERVER_URL with the value the operator passed in --server. Ensures
+    # that critical variables (LOG_LEVEL, EXECUTOR_SYNC_*, etc.) come populated.
     _persist_agent_config_to_env(
         executor_id, server_url=server_url,
         env_path=Path(env_path) if env_path else None,
@@ -525,9 +532,9 @@ def enroll(
         "fingerprint": bundle["fingerprint"],
         "issued_at":   bundle["issued_at"],
         "expires_at":  bundle["expires_at"],
-        # Presente (mensagem) quando a chave de assinatura do servidor divergiu da
-        # fixada. O cert e valido, mas o executor NAO vai subir ate o operador
-        # resolver o conflito — o CLI precisa dizer isso em vez de "sucesso".
+        # Present (a message) when the server's signing key diverged from the
+        # pinned one. The cert is valid, but the executor will NOT come up until the
+        # operator resolves the conflict — the CLI needs to say so instead of "success".
         "signing_key_conflict": signing_key_conflict,
     }
 
@@ -537,12 +544,12 @@ def enroll(
 
 def _cli_main(argv: list[str]) -> int:
     """
-    Subcomando `python -m executor enroll`:
+    `python -m executor enroll` subcommand:
       python -m executor enroll --otp=<otp> --server=https://agents.<dominio> \\
           [--executor-id=<id>] [--cert-dir=./certs]
 
-    Se `--executor-id` nao for passado, le de EXECUTOR_ID env (carregado de executor/.env
-    quando rodando via docker compose, ou exportado no shell quando local).
+    If `--executor-id` is not passed, reads it from the EXECUTOR_ID env (loaded from
+    executor/.env when running via docker compose, or exported in the shell when local).
     """
     import argparse
     parser = argparse.ArgumentParser(prog="atlans-executor enroll")
@@ -567,8 +574,8 @@ def _cli_main(argv: list[str]) -> int:
     )
     args = parser.parse_args(argv)
 
-    # Com --json o stdout e do JSON e de mais nada; o log vai para o stderr,
-    # senao a primeira linha INFO do logging quebraria o parse de quem chamou.
+    # With --json stdout belongs to the JSON and nothing else; the log goes to stderr,
+    # otherwise the first INFO logging line would break the caller's parse.
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
         stream=sys.stderr if args.json else sys.stdout,
@@ -589,13 +596,13 @@ def _cli_main(argv: list[str]) -> int:
         if not otp:
             return _falhar("nenhum OTP recebido no stdin.", codigo="otp_ausente")
 
-    # Carrega executor/.env (no-op se env_file ja foi aplicado pelo docker compose).
+    # Loads executor/.env (no-op if env_file was already applied by docker compose).
     try:
         from dotenv import load_dotenv as _load_dotenv
         _env_path = os.getenv("EXECUTOR_ENV_PATH") or str(Path(__file__).parent / ".env")
         _load_dotenv(dotenv_path=_env_path, override=False)
     except ImportError:
-        pass  # python-dotenv ausente: depende do shell ja ter as envs
+        pass  # python-dotenv missing: relies on the shell already having the envs
 
     # Resolve executor_id: flag CLI > env var > erro claro.
     executor_id = (args.executor_id or os.getenv("EXECUTOR_ID") or "").strip()
@@ -612,10 +619,10 @@ def _cli_main(argv: list[str]) -> int:
     except RuntimeError as exc:
         return _falhar(str(exc), codigo="enroll_recusado")
 
-    # Cert emitido, mas a chave de assinatura do servidor nao bate com a fixada:
-    # o executor nao sobe assim (ver executor/server_key.py). Sair com 0 aqui
-    # mandava o operador rodar `docker compose up` e descobrir o problema so pelo
-    # sintoma "online mas nada roda".
+    # Cert issued, but the server's signing key does not match the pinned one:
+    # the executor will not come up like this (see executor/server_key.py). Exiting
+    # with 0 here sent the operator to run `docker compose up` and discover the
+    # problem only through the symptom "online but nothing runs".
     if info.get("signing_key_conflict"):
         if args.json:
             json.dump({

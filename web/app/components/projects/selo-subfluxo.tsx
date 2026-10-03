@@ -5,14 +5,14 @@ import { TbSubtask } from "react-icons/tb"
 import { IWorkflow } from "@/service/types"
 
 /**
- * Selo de workflow que existe para ser CHAMADO por outro.
+ * Badge for a workflow that exists to be CALLED by another.
  *
- * Mesmo ícone e mesma cor do selo de sub-fluxo no painel de execução: quem vê
- * um aprende o outro. Fica colado ao nome porque diz o que o workflow É — as
- * ações ficam do outro lado do card.
+ * Same icon and same color as the sub-workflow badge in the run panel: whoever
+ * sees one learns the other. It sits next to the name because it says what the
+ * workflow IS — the actions are on the other side of the card.
  *
- * O aviso sobre o gatilho não é detalhe: um sub-fluxo em geral não tem um, e o
- * botão de executar da lista dispara um run que não faz o que se espera.
+ * The warning about the trigger is no detail: a sub-workflow usually has none,
+ * and the list's run button fires a run that does not do what is expected.
  */
 export function SeloSubFluxo({ workflow }: { workflow: Pick<IWorkflow, "is_subworkflow"> }) {
   if (!workflow.is_subworkflow) return null

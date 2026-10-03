@@ -1,14 +1,14 @@
 /**
- * Estados de tela (contrato padrao-telas.md §3 e §5), tela a tela.
+ * Screen states (contract screen-patterns.md §3 and §5), screen by screen.
  *
- * O cartão de erro/vazio era recopiado em cada `estados.tsx` (e inline em mais
- * seis telas), e as cópias divergiram: só Planos, Tokens e Admin ›
- * Configurações anunciavam o erro (`role="alert"`, §5); Projetos não pintava a
- * borda destrutiva; Credenciais e Tokens não tinham onde pôr a mensagem
- * do servidor. Aqui cada tela é conferida no estado de erro — anúncio, título,
- * mensagem, moldura destrutiva e "Tentar de novo" — e, no vazio e no
- * sem-resultado, que o texto de cada uma continua o de sempre. (As telas de uma
- * extensão são conferidas na pasta dela, em `__tests__/extensoes/`.)
+ * The error/empty card was re-copied in each `estados.tsx` (and inline in six
+ * more screens), and the copies diverged: only Plans, Tokens and Admin ›
+ * Settings announced the error (`role="alert"`, §5); Projects didn't paint the
+ * destructive border; Credentials and Tokens had nowhere to put the server's
+ * message. Here each screen is checked in the error state — announcement, title,
+ * message, destructive frame and "Tentar de novo" (try again) — and, in the
+ * empty and no-results states, that each one's text is still the usual one.
+ * (An extension's screens are checked in its own folder, in `__tests__/extensoes/`.)
  */
 import type { ReactElement } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -62,11 +62,11 @@ describe("erro de carga: cada tela anuncia a falha, com a mensagem, na moldura d
     const onTentar = vi.fn()
     render(montar(onTentar))
 
-    // §5: `role="alert"` — o leitor de tela anuncia a falha na hora.
+    // §5: `role="alert"` — the screen reader announces the failure right away.
     const alerta = screen.getByRole("alert")
     expect(alerta).toHaveTextContent(titulo)
     expect(alerta).toHaveTextContent(mensagem)
-    // §3.2: a moldura do erro é destrutiva, na borda e no círculo do ícone.
+    // §3.2: the error frame is destructive, on the border and on the icon circle.
     expect(alerta).toHaveClass("border-destructive/20")
 
     fireEvent.click(within(alerta).getByRole("button", { name: "Tentar de novo" }))

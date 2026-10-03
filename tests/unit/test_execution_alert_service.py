@@ -1,7 +1,7 @@
 # tests/unit/test_execution_alert_service.py
 """
-Alerta de agendamento sem executor (spec §7.4): por TRANSIÇÃO, não por tick.
-Um cron de 5 min com o grupo fora por 2 h não pode gerar 24 e-mails.
+Alert for a schedule with no executor (spec §7.4): per TRANSITION, not per tick.
+A 5-min cron with the group down for 2 h must not generate 24 e-mails.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ class TestDecideFailure:
         estado = {"first_failure_at": 1000.0, "last_notified_at": 1000.0, "failures": 5}
         novo, notificar = alert.decide_failure(estado, now=1000.0 + alert.REMINDER_INTERVAL_SECONDS)
         assert notificar is True and novo["last_notified_at"] == 1000.0 + alert.REMINDER_INTERVAL_SECONDS
-        assert novo["first_failure_at"] == 1000.0  # a janela é a mesma
+        assert novo["first_failure_at"] == 1000.0  # the window is the same
 
 
 def _redis_com(estado):
@@ -76,7 +76,7 @@ async def test_record_success_avisa_recuperacao_uma_vez_e_limpa():
         assert await alert.record_success(MagicMock(), schedule_id=7, workflow=_wf()) is True
         rc.delete.assert_awaited_once_with("sched_alert:7")
     enviar.assert_awaited_once()
-    # sem estado, rodar de novo não avisa
+    # no state, running again does not alert
     rc2 = _redis_com(None)
     with patch.object(alert, "_get_redis", MagicMock(return_value=rc2)), \
          patch.object(alert, "_send_to_workspace", AsyncMock()) as enviar2:

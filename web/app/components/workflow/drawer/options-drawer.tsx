@@ -3,10 +3,10 @@ import { descricaoDoTipo, estiloDoTipo, nomeDoTipo } from "@/consts/NodeTypeStyl
 import { cn } from "@/lib/utils"
 import IconDrawer from "./components/icon-drawer"
 
-// Rótulo, descrição e cor saem todos de `consts/NodeTypeStyles`. Este arquivo
-// mantinha uma terceira tabela própria (a segunda dentro do drawer), e ela
-// discordava do canvas nos mesmos quatro tipos — e do drawer de nós em um: aqui
-// "Fontes", lá "Fontes de dados".
+// Label, description and color all come from `consts/NodeTypeStyles`. This file
+// kept a third table of its own (the second inside the drawer), and it disagreed
+// with the canvas on the same four types — and with the node drawer on one: here
+// "Fontes", there "Fontes de dados".
 
 const OptionsDrawer = () => {
   const nodesAPI = useWorkflowCatalogStore(s => s.nodesAPI)
@@ -33,10 +33,10 @@ const OptionsDrawer = () => {
               "hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
             )}
           >
-            {/* A faixa de cor do tipo — a mesma que marca o card no canvas —
-                fica no ladrilho do ícone, e não na borda do cartão: na borda ela
-                competia com o `focus-visible` e sumia no tema escuro, onde o
-                `border` já é quase transparente. */}
+            {/* The type's color strip — the same one that marks the card on the canvas —
+                sits on the icon tile, not on the card border: on the border it
+                competed with `focus-visible` and vanished in the dark theme, where
+                the `border` is already almost transparent. */}
             <div className={cn("p-2 rounded-lg", estilo.bg)}>
               <IconDrawer type={type} fontSize={16} className={estilo.icon} />
             </div>

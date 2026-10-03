@@ -13,9 +13,9 @@ interface PortalShareProps {
 
 const PortalShare = ({ workflow }: PortalShareProps) => {
   const { id } = useParams<{ id: string }>()
-  // Selector booleano: o botão só depende de EXISTIR um PublishMap no canvas.
-  // Assinando `useNodes()` ele re-renderizava a cada pointermove de um arraste
-  // para recalcular a mesma resposta.
+  // Boolean selector: the button only depends on a PublishMap EXISTING on the
+  // canvas. Subscribing to `useNodes()` it re-rendered on every pointermove of a
+  // drag to recompute the same answer.
   const hasPublishMap = useStore(s => {
     for (const no of s.nodeLookup.values()) {
       if ((no.data as { name?: string })?.name === "PublishMap") return true

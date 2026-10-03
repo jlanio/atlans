@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
-"""scripts/avisos_de_terceiros.py — o THIRD-PARTY-NOTICES.md, a partir dos locks.
+"""scripts/avisos_de_terceiros.py — THIRD-PARTY-NOTICES.md, from the locks.
 
-O Atlans é AGPL-3.0-only (LICENSE). O que ele instala de terceiros vem travado
-nos locks: os pacotes do npm do web e do app desktop, e os do PyPI da API e do
-executor. Este script lê os locks e escreve o THIRD-PARTY-NOTICES.md: cada
-pacote, a versão, a licença e quem o usa; os conjuntos de ícones do
-react-icons que os fontes importam; as bibliotecas nativas que algumas wheels
-trazem; e, à parte, toda licença que não está em COMPATIVEIS, para alguém ler
-antes de distribuir.
+Atlans is AGPL-3.0-only (LICENSE). What it installs from third parties is pinned
+in the locks: the npm packages of the web app and the desktop app, and the PyPI
+ones of the API and the executor. This script reads the locks and writes
+THIRD-PARTY-NOTICES.md: each package, its version, its license and who uses it;
+the react-icons icon sets that the sources import; the native libraries some
+wheels bundle; and, separately, every license that is not in COMPATIVEIS, for
+someone to read before distributing.
 
-A licença de um pacote do npm vem no próprio package-lock.json. A de um pacote
-do PyPI não está no lock: o script pergunta ao PyPI, pela versão travada, e
-usa a expressão SPDX que o pacote declara (`License-Expression`). Sem ela, o
-campo de licença curto ou o classificador; quando os dois são vagos («BSD»,
-um texto inteiro), vale o que está em LIDAS_NO_PACOTE, lido no arquivo de
-licença do próprio pacote. O que nada disso resolve sai como «desconhecida»
-e vai para a revisão.
+An npm package's license comes in package-lock.json itself. A PyPI package's
+is not in the lock: the script asks PyPI, for the pinned version, and
+uses the SPDX expression the package declares (`License-Expression`). Without it,
+the short license field or the classifier; when both are vague ("BSD",
+an entire text), what is in LIDAS_NO_PACOTE applies, read from the package's own
+license file. What none of this resolves comes out as "unknown"
+and goes to review.
 
-    python scripts/avisos_de_terceiros.py           # reescreve o THIRD-PARTY-NOTICES.md
-    python scripts/avisos_de_terceiros.py --saida -  # só imprime
+    python scripts/avisos_de_terceiros.py           # rewrites THIRD-PARTY-NOTICES.md
+    python scripts/avisos_de_terceiros.py --saida -  # only prints
 
-Os locks mudam a cada PR do Dependabot, e o arquivo não precisa acompanhar
-cada um: ele é gerado de novo a cada versão publicada. Rodar aqui é para ver o
-resultado, ou depois de somar uma dependência. Precisa de acesso ao PyPI; só
-biblioteca padrão.
+The locks change with every Dependabot PR, and the file doesn't need to follow
+each one: it is regenerated for every published version. Running it here is to see
+the result, or after adding a dependency. Needs access to PyPI; standard
+library only.
 """
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[1]
 SAIDA = RAIZ / "THIRD-PARTY-NOTICES.md"
 
-# (quem usa, lock). O primeiro campo é o que a coluna «Usado por» mostra.
+# (who uses it, lock). The first field is what the "Used by" column shows.
 LOCKS_NPM = [
     ("web", "web/package-lock.json"),
     ("desktop", "desktop/package-lock.json"),
@@ -49,17 +49,18 @@ LOCKS_NPM = [
 LOCKS_PYPI = [
     ("API", "requirements.txt"),
     ("executor", "executor/requirements-full.txt"),
-    ("executor mínimo", "executor/requirements.txt"),
+    ("minimal executor", "executor/requirements.txt"),
 ]
 
-# Pacotes `dev` do npm cujo código vai, mesmo assim, no que a instalação serve:
-# o CSS do web e do app desktop os importa (`@import`), e o build os junta na
-# folha de estilo. O teste confere a lista contra os `@import` dos fontes.
+# npm `dev` packages whose code nevertheless goes into what the installation serves:
+# the CSS of the web app and the desktop app imports them (`@import`), and the
+# build merges them into the stylesheet. The test checks the list against the
+# sources' `@import`s.
 DEV_QUE_VAI_NO_BUILD = frozenset({"tailwindcss", "tw-animate-css"})
 
-# Licenças que podem entrar numa obra AGPL-3.0: as livres que a FSF lista como
-# compatíveis com a GPLv3 (https://www.gnu.org/licenses/license-list.html).
-# Uma expressão com OR precisa de uma alternativa daqui; com AND, de todas.
+# Licenses that may go into an AGPL-3.0 work: the free ones the FSF lists as
+# compatible with GPLv3 (https://www.gnu.org/licenses/license-list.html).
+# An expression with OR needs one alternative from here; with AND, all of them.
 COMPATIVEIS = frozenset({
     "0BSD", "AGPL-3.0-only", "AGPL-3.0-or-later", "Apache-2.0", "BlueOak-1.0.0",
     "BSD-2-Clause", "BSD-3-Clause", "BSL-1.0", "CC-BY-4.0", "CC0-1.0",
@@ -69,31 +70,31 @@ COMPATIVEIS = frozenset({
     "Unlicense", "Zlib",
 })
 
-# Licenças que não entram no programa, mas convivem com ele como arquivo à
-# parte (uma fonte servida ao navegador): valem só para uma obra de
-# NO_REPOSITORIO marcada como agregada, e não para um pacote do npm ou do PyPI,
-# cujo código é compilado junto. A OFL-1.1 é copyleft fraco para fontes; a FSF
-# não a lista como compatível com a GPL, e aqui ela não precisa ser.
+# Licenses that don't go into the program, but coexist with it as a separate
+# file (a font served to the browser): they apply only to a
+# NO_REPOSITORIO work marked as aggregated, not to an npm or PyPI package,
+# whose code is compiled together. OFL-1.1 is weak copyleft for fonts; the FSF
+# doesn't list it as GPL-compatible, and here it doesn't need to be.
 AGREGAVEIS = frozenset({"OFL-1.1"})
 
-# Pacotes do PyPI sem `License-Expression` e com um campo de licença vago (um
-# texto inteiro, ou «BSD» sem dizer qual): a licença lida no arquivo LICENSE
-# do pacote, na versão travada. Só vale enquanto o pacote não declarar a
-# expressão dele — a declarada ganha, e esta linha fica sobrando.
+# PyPI packages without `License-Expression` and with a vague license field (an
+# entire text, or "BSD" without saying which): the license read in the package's
+# LICENSE file, at the pinned version. Only applies while the package doesn't
+# declare its expression — the declared one wins, and this line becomes redundant.
 LIDAS_NO_PACOTE = {
     "cycler": "BSD-3-Clause",
     "jinja2": "BSD-3-Clause",
     "kiwisolver": "BSD-3-Clause",
-    # A da PSF, com o nome do matplotlib no lugar.
+    # The PSF one, with matplotlib's name in its place.
     "matplotlib": "PSF-2.0",
     "pandas": "BSD-3-Clause",
-    # Com uma exceção que permite ligar ao OpenSSL.
+    # With an exception that allows linking to OpenSSL.
     "psycopg2-binary": "LGPL-3.0-or-later",
-    # Apache-2.0 o que entrou a partir de 2017-12; o código anterior, BSD.
+    # Apache-2.0 for what came in from 2017-12 on; the earlier code, BSD.
     "python-dateutil": "Apache-2.0 AND BSD-3-Clause",
 }
 
-# O campo `License` do PyPI, quando é um nome curto, e o SPDX dele.
+# PyPI's `License` field, when it is a short name, and its SPDX.
 _NOMES = {
     "apache 2.0": "Apache-2.0",
     "apache license 2.0": "Apache-2.0",
@@ -105,8 +106,8 @@ _NOMES = {
     "mit license": "MIT",
 }
 
-# O classificador `License :: …` e o SPDX dele; os vagos («BSD License»,
-# «LGPL» sem versão) ficam de fora de propósito.
+# The `License :: …` classifier and its SPDX; the vague ones ("BSD License",
+# "LGPL" without a version) are left out on purpose.
 _CLASSIFICADORES = {
     "Apache Software License": "Apache-2.0",
     "ISC License (ISCL)": "ISC",
@@ -116,32 +117,32 @@ _CLASSIFICADORES = {
     "The Unlicense (Unlicense)": "Unlicense",
 }
 
-# O que mora DENTRO do repositório e é de terceiros: (obra, onde, licença,
-# texto da licença), com os lugares e os textos em tuplas. Um arquivo copiado
-# para cá entra nesta lista, com a licença ao lado dele. A licença é compatível
-# com a AGPL-3.0 (COMPATIVEIS) ou, para um arquivo que só é servido à parte,
-# uma de AGREGAVEIS.
+# What lives INSIDE the repository and is third-party: (work, where, license,
+# license text), with the places and the texts in tuples. A file copied
+# here goes into this list, with the license next to it. The license is compatible
+# with AGPL-3.0 (COMPATIVEIS) or, for a file that is only served separately,
+# one of AGREGAVEIS.
 NO_REPOSITORIO = [
-    ("Inter, a fonte do web (The Inter Project Authors), servida como arquivo à parte", ("web/app/fonts/inter/",), "OFL-1.1", ("web/app/fonts/inter/OFL.txt",)),
+    ("Inter, the web app's font (The Inter Project Authors), served as a separate file", ("web/app/fonts/inter/",), "OFL-1.1", ("web/app/fonts/inter/OFL.txt",)),
     (
-        "shadcn/ui, os componentes de base da interface (shadcn), adaptados",
+        "shadcn/ui, the base UI components (shadcn), adapted",
         ("web/app/components/ui/", "web/hooks/use-mobile.ts", "desktop/src/renderer/components/ui/"),
         "MIT",
         ("web/app/components/ui/LICENSE.shadcn-ui.txt", "desktop/src/renderer/components/ui/LICENSE.shadcn-ui.txt"),
     ),
     (
-        "Monokai, o tema do editor de código, portado do monaco-themes (Brijesh Bittu)",
+        "Monokai, the code editor theme, ported from monaco-themes (Brijesh Bittu)",
         ("web/app/components/workflow/nodes-configuration/fields/monaco-code-editor.tsx",),
         "MIT",
         ("web/app/components/workflow/nodes-configuration/fields/LICENSE.monaco-themes.txt",),
     ),
 ]
 
-# Os conjuntos do react-icons: o pacote é MIT, mas cada conjunto de ícones
-# mantém a licença do projeto de onde veio (o LICENSE do react-icons lista
-# todos). O gerador procura nos fontes do web e do app desktop os conjuntos
-# importados (`react-icons/<conjunto>`); um que não está aqui sai como
-# «desconhecida» e vai para a revisão.
+# The react-icons sets: the package is MIT, but each icon set keeps the
+# license of the project it came from (react-icons' LICENSE lists them
+# all). The generator searches the web app's and the desktop app's sources for the
+# imported sets (`react-icons/<conjunto>`); one that is not here comes out as
+# "unknown" and goes to review.
 CONJUNTOS_DO_REACT_ICONS = {
     "ai": ("Ant Design Icons", "MIT"),
     "bi": ("BoxIcons", "MIT"),
@@ -175,30 +176,30 @@ CONJUNTOS_DO_REACT_ICONS = {
     "vsc": ("VS Code Codicons (Microsoft)", "CC-BY-4.0"),
     "wi": ("Weather Icons", "OFL-1.1"),
 }
-# Onde procurar os imports, e o que pular: dependências, builds e testes.
+# Where to look for the imports, and what to skip: dependencies, builds and tests.
 FONTES_DOS_ICONES = ("web", "desktop/src")
 _PULAR_PASTAS = frozenset({"node_modules", ".next", "dist", "out", "public", "coverage", "__tests__"})
 _FONTE = re.compile(r"\.(?:ts|tsx|js|jsx|mjs|cjs)$")
 _TESTE = re.compile(r"\.(?:test|spec)\.")
 _IMPORT_DE_ICONE = re.compile(r"""['"]react-icons/([a-z0-9]+)['"]""")
 
-# Wheels do PyPI que trazem bibliotecas nativas compiladas, com licença
-# própria, junto do código do pacote: (pacote, o que vai dentro, licenças,
-# onde está o texto). A coluna «Licença» das tabelas é a do pacote Python.
+# PyPI wheels that bundle compiled native libraries, with their own
+# license, along with the package's code: (package, what goes inside, licenses,
+# where the text is). The "License" column of the tables is the Python package's.
 NATIVAS_NAS_WHEELS = [
     ("shapely", "GEOS", "LGPL-2.1", "`shapely-*.dist-info/licenses/LICENSE_GEOS`"),
-    ("pyogrio", "GDAL, com as bibliotecas que ele usa", "MIT, com partes sob outras licenças livres", "https://gdal.org/en/stable/license.html"),
-    ("pyproj", "PROJ, com as bibliotecas que ele usa (SQLite, libcurl, libtiff)", "MIT; as outras, as delas", "`pyproj-*.dist-info/licenses/LICENSE_proj` (o PROJ)"),
-    ("numpy", "OpenBLAS e LAPACK; o runtime do GCC (libgfortran)", "BSD-3-Clause; GPL-3.0-or-later WITH GCC-exception-3.1", "`numpy-*.dist-info/licenses/LICENSE.txt`"),
-    ("pillow", "as bibliotecas de imagem (libjpeg, libpng, libtiff, libwebp, FreeType, HarfBuzz e outras)", "as de cada uma", "`pillow-*.dist-info/licenses/LICENSE`"),
-    ("psycopg2-binary", "libpq e OpenSSL, e o que o libpq usa: krb5, OpenLDAP, Cyrus SASL, PCRE, libselinux, libxcrypt", "PostgreSQL; Apache-2.0; MIT (krb5), OpenLDAP Public License, BSD (SASL, PCRE), domínio público (libselinux), LGPL-2.1 (libxcrypt)", "https://www.postgresql.org/about/licence/ e https://openssl-library.org/source/license/; as demais, nos projetos de cada uma"),
-    ("cryptography", "OpenSSL, ligado estaticamente ao módulo Rust", "Apache-2.0", "https://openssl-library.org/source/license/"),
-    ("uvloop", "libuv, ligado estaticamente", "MIT", "https://github.com/libuv/libuv/blob/v1.x/LICENSE"),
-    ("pyarrow", "Arrow C++ e as bibliotecas que ele embute (zstd, lz4, snappy, brotli, re2, thrift e outras)", "Apache-2.0; as outras, as delas", "`pyarrow-*.dist-info/licenses/LICENSE.txt` e `NOTICE.txt`"),
-    ("lxml", "libxml2 e libxslt", "MIT", "`lxml-*.dist-info/licenses/LICENSES.txt`"),
+    ("pyogrio", "GDAL, with the libraries it uses", "MIT, with parts under other free licenses", "https://gdal.org/en/stable/license.html"),
+    ("pyproj", "PROJ, with the libraries it uses (SQLite, libcurl, libtiff)", "MIT; the others, their own", "`pyproj-*.dist-info/licenses/LICENSE_proj` (PROJ's)"),
+    ("numpy", "OpenBLAS and LAPACK; the GCC runtime (libgfortran)", "BSD-3-Clause; GPL-3.0-or-later WITH GCC-exception-3.1", "`numpy-*.dist-info/licenses/LICENSE.txt`"),
+    ("pillow", "the imaging libraries (libjpeg, libpng, libtiff, libwebp, FreeType, HarfBuzz and others)", "each one's own", "`pillow-*.dist-info/licenses/LICENSE`"),
+    ("psycopg2-binary", "libpq and OpenSSL, and what libpq uses: krb5, OpenLDAP, Cyrus SASL, PCRE, libselinux, libxcrypt", "PostgreSQL; Apache-2.0; MIT (krb5), OpenLDAP Public License, BSD (SASL, PCRE), public domain (libselinux), LGPL-2.1 (libxcrypt)", "https://www.postgresql.org/about/licence/ and https://openssl-library.org/source/license/; the others, in each one's project"),
+    ("cryptography", "OpenSSL, statically linked into the Rust module", "Apache-2.0", "https://openssl-library.org/source/license/"),
+    ("uvloop", "libuv, statically linked", "MIT", "https://github.com/libuv/libuv/blob/v1.x/LICENSE"),
+    ("pyarrow", "Arrow C++ and the libraries it bundles (zstd, lz4, snappy, brotli, re2, thrift and others)", "Apache-2.0; the others, their own", "`pyarrow-*.dist-info/licenses/LICENSE.txt` and `NOTICE.txt`"),
+    ("lxml", "libxml2 and libxslt", "MIT", "`lxml-*.dist-info/licenses/LICENSES.txt`"),
 ]
 
-DESCONHECIDA = "desconhecida"
+DESCONHECIDA = "unknown"
 
 PYPI = "https://pypi.org/pypi"
 
@@ -210,14 +211,14 @@ def normalizar(nome: str) -> str:
     return re.sub(r"[-_.]+", "-", nome).lower()
 
 
-# ── Os locks ─────────────────────────────────────────────────────────────────
+# ── The locks ────────────────────────────────────────────────────────────────
 
 def pacotes_npm(lock: Path) -> dict[tuple[str, str], str]:
-    """`(nome, versão) -> licença` dos pacotes de produção de um package-lock.json.
+    """`(nome, versão) -> licença` of the production packages of a package-lock.json.
 
-    Fica de fora o que é `dev`, menos o que o build junta assim mesmo
-    (DEV_QUE_VAI_NO_BUILD): um `optional` (o binário do sharp de outra
-    plataforma, por exemplo) é instalado onde serve, e vai junto.
+    What is `dev` is left out, except what the build merges in anyway
+    (DEV_QUE_VAI_NO_BUILD): an `optional` (sharp's binary for another
+    platform, for example) is installed where it applies, and goes along.
     """
     pacotes = {}
     for caminho, dados in json.loads(lock.read_text(encoding="utf-8"))["packages"].items():
@@ -231,7 +232,7 @@ def pacotes_npm(lock: Path) -> dict[tuple[str, str], str]:
 
 
 def _licenca_do_npm(declarada) -> str:
-    # Pacotes antigos declaram um objeto ({type, url}) ou uma lista deles.
+    # Old packages declare an object ({type, url}) or a list of them.
     if isinstance(declarada, dict):
         declarada = declarada.get("type")
     if isinstance(declarada, list):
@@ -241,7 +242,7 @@ def _licenca_do_npm(declarada) -> str:
 
 
 def pinos_pypi(lock: Path) -> set[tuple[str, str]]:
-    """`(nome, versão)` de cada pacote de um lock do pip-compile."""
+    """`(nome, versão)` of each package in a pip-compile lock."""
     pinos = set()
     for linha in lock.read_text(encoding="utf-8").splitlines():
         m = _PINO.match(linha)
@@ -250,17 +251,17 @@ def pinos_pypi(lock: Path) -> set[tuple[str, str]]:
     return pinos
 
 
-# ── A licença de um pacote do PyPI ───────────────────────────────────────────
+# ── The license of a PyPI package ─────────────────────────────────────────────
 
 def licenca_do_pypi(nome: str, info: dict) -> str:
-    """A licença SPDX de um pacote, pelo `info` do JSON do PyPI daquela versão."""
+    """A package's SPDX license, from the `info` of PyPI's JSON for that version."""
     expressao = (info.get("license_expression") or "").strip()
     if expressao:
         return expressao
     if nome in LIDAS_NO_PACOTE:
         return LIDAS_NO_PACOTE[nome]
-    # Mais de um classificador é a escolha entre eles; um vago, ou um que não
-    # está no mapa, deixa a licença desconhecida.
+    # More than one classifier is a choice between them; a vague one, or one that is
+    # not in the map, leaves the license unknown.
     classificadores = {
         _CLASSIFICADORES.get(c.split(" :: ")[-1])
         for c in info.get("classifiers") or []
@@ -268,12 +269,12 @@ def licenca_do_pypi(nome: str, info: dict) -> str:
     }
     escolha = " OR ".join(sorted(classificadores)) if classificadores and None not in classificadores else None
     campo = (info.get("license") or "").strip()
-    # Um campo de uma linha só é um nome; o de várias é o texto inteiro.
+    # A one-line field is a name; a multi-line one is the entire text.
     if campo and "\n" not in campo and len(campo) <= 60:
         curta = _NOMES.get(campo.lower()) or (campo if _avaliar(campo) is not None else None)
         if curta:
-            # O campo que diz uma das licenças de um pacote duplo («MIT», com
-            # os classificadores do MIT e do Apache) não apaga a outra.
+            # The field that states one of the licenses of a dual-licensed package ("MIT",
+            # with the MIT and Apache classifiers) doesn't erase the other.
             if escolha and len(classificadores) > 1 and curta in classificadores:
                 return escolha
             return curta
@@ -281,7 +282,7 @@ def licenca_do_pypi(nome: str, info: dict) -> str:
 
 
 def consultar_pypi(pinos: set[tuple[str, str]]) -> dict[tuple[str, str], str]:
-    """`(nome, versão) -> licença`, perguntando ao PyPI em paralelo."""
+    """`(nome, versão) -> licença`, querying PyPI in parallel."""
     def uma(pino):
         nome, versao = pino
         return pino, licenca_do_pypi(nome, _info(nome, versao))
@@ -303,15 +304,15 @@ def _info(nome: str, versao: str) -> dict:
     raise AssertionError("inalcançável")
 
 
-# ── Compatível ou não ────────────────────────────────────────────────────────
+# ── Compatible or not ────────────────────────────────────────────────────────
 
 def compativel(licenca: str) -> bool:
-    """Se a expressão SPDX pode entrar numa obra AGPL-3.0 (ver COMPATIVEIS)."""
+    """Whether the SPDX expression may go into an AGPL-3.0 work (see COMPATIVEIS)."""
     return bool(_avaliar(licenca))
 
 
 def _avaliar(expressao: str) -> bool | None:
-    """True/False pela regra de COMPATIVEIS; None se não é uma expressão SPDX."""
+    """True/False by the COMPATIVEIS rule; None if it is not an SPDX expression."""
     fichas = re.findall(r"\(|\)|[^\s()]+", expressao)
     if not fichas:
         return None
@@ -355,7 +356,7 @@ def _avaliar(expressao: str) -> bool | None:
         if ficha is None or ficha in {")", "AND", "OR", "WITH"} or not _ID_SPDX.match(ficha):
             return None
         posicao += 1
-        # Uma exceção (`X WITH Y`) só dá permissões a mais: vale a licença X.
+        # An exception (`X WITH Y`) only grants extra permissions: license X applies.
         if proxima() == "WITH":
             posicao += 1
             if proxima() is None:
@@ -370,71 +371,73 @@ def _avaliar(expressao: str) -> bool | None:
 # ── O arquivo ────────────────────────────────────────────────────────────────
 
 CABECALHO = """\
-# Avisos de terceiros
+# Third-party notices
 
-O Atlans é software livre, sob a GNU Affero General Public License, versão 3
-(AGPL-3.0-only); o texto está em [LICENSE](LICENSE). Ele usa obras de
-terceiros, cada uma sob a licença que os autores dela escolheram. Esta página
-diz quais são e sob que licença; o texto completo de cada licença vai junto com
-a obra.
+Atlans is free software, under the GNU Affero General Public License, version 3
+(AGPL-3.0-only); the text is in [LICENSE](LICENSE). It uses third-party works,
+each under the license its authors chose. This page says which ones and under
+which license; the full text of each license ships with the work.
 
-<!-- Gerado por scripts/avisos_de_terceiros.py a partir dos locks; não edite à
-     mão, rode o script. -->
+<!-- Generated by scripts/avisos_de_terceiros.py from the locks; do not edit by
+     hand, run the script. -->
 
-## Neste repositório
+## In this repository
 
-| Obra | Onde | Licença | Texto da licença |
+| Work | Where | License | License text |
 |---|---|---|---|
 {no_repositorio}
 
-## Dados de terceiros no repositório
+## Third-party data in the repository
 
-`catalogo/geoservicos/` reúne metadados de serviços WFS públicos de muitas
-instituições (nomes, títulos e esquemas de camadas, colhidos do GetCapabilities
-e do DescribeFeatureType de cada um). Esse conteúdo é de cada instituição e
-segue os termos do serviço de origem; a organização em notas, as finalidades e
-as dicas são do Atlans. Ver `catalogo/README.md`.
+`catalogo/geoservicos/` gathers metadata from the public WFS services of many
+institutions (layer names, titles and schemas, harvested from each service's
+GetCapabilities and DescribeFeatureType). That content belongs to each
+institution and follows the terms of the originating service; the organization
+into notes, the purposes and the tips are Atlans's. See `catalogo/README.md`.
 
-## Nos artefatos montados
+## In the built artifacts
 
-Quem monta e distribui um artefato distribui, junto com o Atlans, o que vai
-dentro dele, e com isso as licenças dessas obras. O que cada um leva:
+Whoever builds and distributes an artifact distributes, along with Atlans, what
+goes inside it, and with that the licenses of those works. What each one
+carries:
 
-- **As imagens da API e do executor** (`Dockerfile.api`, `Dockerfile.executor`)
-  levam a imagem base (o Debian do `python:3.12-slim`, com a licença de cada
-  pacote do sistema em `/usr/share/doc/`), o Python, a [LICENSE](LICENSE) e
-  este arquivo, e os pacotes do PyPI das listas abaixo, inteiros: a licença de
-  cada um fica em `site-packages/<pacote>.dist-info/`.
-- **A imagem do web** (`web/Dockerfile.ui`) leva o Alpine do `node:24-alpine`,
-  o Node.js, a [LICENSE](LICENSE) e este arquivo (em `/app/`), e o que o build
-  do Next junta (a pasta `standalone`): o código dos pacotes do npm, mas não os
-  arquivos de licença deles. Quem distribui essa imagem entrega junto os textos
-  das licenças dos pacotes do npm. O editor de código serve o Monaco da própria
-  origem, com a `LICENSE` e o `ThirdPartyNotices.txt` dele em `/monaco/`; o
-  worker do MapLibre vai com a `LICENSE.txt` dele em `/maplibre/`.
-- **O app desktop** (`desktop/`) leva o Electron, que o instalador acompanha de
-  `LICENSE.electron.txt` e `LICENSES.chromium.html`; o Python do
-  python-build-standalone (PSF-2.0, com as bibliotecas que ele embute e o
-  `LICENSE.txt` dele); os pacotes do executor, com as licenças; e, em
-  `resources/`, a LICENSE e este arquivo. O que o build junta do npm vai sem os
-  arquivos de licença, como no web.
-- **Os serviços que o `docker-compose.yml` sobe** (Valkey, MinIO, step-ca e
-  Traefik) vêm das imagens oficiais de cada projeto, baixadas na instalação,
-  com as licenças delas. O PostgreSQL fica fora do compose.
+- **The API and executor images** (`Dockerfile.api`, `Dockerfile.executor`)
+  carry the base image (the Debian of `python:3.12-slim`, with the license of
+  each system package in `/usr/share/doc/`), Python, the [LICENSE](LICENSE) and
+  this file, and the PyPI packages of the lists below, whole: each one's
+  license stays in `site-packages/<package>.dist-info/`.
+- **The web image** (`web/Dockerfile.ui`) carries the Alpine of
+  `node:24-alpine`, Node.js, the [LICENSE](LICENSE) and this file (in `/app/`),
+  and what the Next build bundles (the `standalone` folder): the code of the
+  npm packages, but not their license files. Whoever distributes this image
+  ships the license texts of the npm packages along with it. The code editor
+  serves Monaco from its own origin, with its `LICENSE` and
+  `ThirdPartyNotices.txt` in `/monaco/`; the MapLibre worker ships with its
+  `LICENSE.txt` in `/maplibre/`.
+- **The desktop app** (`desktop/`) carries Electron, which the installer
+  accompanies with `LICENSE.electron.txt` and `LICENSES.chromium.html`; the
+  Python from python-build-standalone (PSF-2.0, with the libraries it bundles
+  and its `LICENSE.txt`); the executor packages, with their licenses; and, in
+  `resources/`, the LICENSE and this file. What the build bundles from npm goes
+  without the license files, as in the web image.
+- **The services that `docker-compose.yml` starts** (Valkey, MinIO, step-ca and
+  Traefik) come from each project's official images, downloaded at install
+  time, with their licenses. PostgreSQL stays outside the compose file.
 
-## Pacotes
+## Packages
 
-Os pacotes abaixo não moram neste repositório: a instalação os baixa do npm e
-do PyPI, nas versões travadas nos locks. A licença é a que o pacote declara, e
-o texto completo vem com ele, em `node_modules/<pacote>/` ou em
-`site-packages/<pacote>.dist-info/`. Do npm, entra o que vai para a produção,
-e também o que o build junta mesmo sendo de desenvolvimento (`tailwindcss` e
-`tw-animate-css`, no CSS).
+The packages below do not live in this repository: the installation downloads
+them from npm and PyPI, at the versions pinned in the locks. The license is the
+one the package declares, and the full text comes with it, in
+`node_modules/<package>/` or in `site-packages/<package>.dist-info/`. From npm,
+what goes to production is included, and so is what the build bundles even
+though it is a development dependency (`tailwindcss` and `tw-animate-css`, in
+the CSS).
 """
 
 
 def gerar() -> tuple[str, list[tuple[str, str, str, str]]]:
-    """O texto do arquivo e o que vai para a revisão: `(origem, pacote, versão, licença)`."""
+    """The file's text and what goes to review: `(origem, pacote, versão, licença)`."""
     npm: dict[tuple[str, str], dict] = {}
     for quem, lock in LOCKS_NPM:
         for pino, licenca in pacotes_npm(RAIZ / lock).items():
@@ -476,7 +479,7 @@ def gerar() -> tuple[str, list[tuple[str, str, str, str]]]:
 
 
 def conjuntos_de_icones() -> dict[str, tuple[str, str]]:
-    """`conjunto -> (projeto, licença)` de cada conjunto do react-icons que os fontes importam."""
+    """`conjunto -> (projeto, licença)` of each react-icons set that the sources import."""
     usados = set()
     for base in FONTES_DOS_ICONES:
         for pasta, subpastas, arquivos in os.walk(RAIZ / base):
@@ -494,33 +497,33 @@ def _caminhos(caminhos: tuple[str, ...]) -> str:
 
 def _icones(icones: dict[str, tuple[str, str]]) -> str:
     linhas = [
-        "### Os ícones do react-icons",
+        "### The react-icons icon sets",
         "",
-        "O `react-icons` é MIT, mas cada conjunto de ícones mantém a licença do projeto de onde veio. "
-        "Os conjuntos que o web e o app desktop usam:",
+        "`react-icons` is MIT, but each icon set keeps the license of the project it came from. "
+        "The sets that the web app and the desktop app use:",
         "",
-        "| Conjunto | Projeto | Licença |",
+        "| Set | Project | License |",
         "|---|---|---|",
     ]
     linhas += [f"| `react-icons/{c}` | {projeto} | {_celula(licenca)} |" for c, (projeto, licenca) in icones.items()]
     linhas += [
         "",
-        "Os ícones do Font Awesome Free são de Fonticons, Inc. (https://fontawesome.com), sob a "
+        "The Font Awesome Free icons are by Fonticons, Inc. (https://fontawesome.com), under the "
         "Creative Commons Attribution 4.0 (https://creativecommons.org/licenses/by/4.0/). "
-        "Os logos de outros produtos (do Simple Icons, como o do PostgreSQL e o do MySQL) só "
-        "identificam esses produtos: as marcas são dos donos delas.",
+        "The logos of other products (from Simple Icons, such as PostgreSQL's and MySQL's) only "
+        "identify those products: the trademarks belong to their owners.",
     ]
     return "\n".join(linhas) + "\n"
 
 
 def _nativas() -> str:
     linhas = [
-        "### Bibliotecas nativas dentro das wheels",
+        "### Native libraries inside the wheels",
         "",
-        "Algumas wheels do PyPI trazem bibliotecas compiladas, com licença própria, junto do código "
-        "do pacote. A coluna «Licença» acima é a do pacote Python; o que mais vai dentro:",
+        "Some PyPI wheels ship compiled libraries, with their own licenses, alongside the package "
+        "code. The \"License\" column above is the Python package's; what else goes inside:",
         "",
-        "| Pacote | Bibliotecas | Licença | Texto |",
+        "| Package | Libraries | License | Text |",
         "|---|---|---|---|",
     ]
     linhas += [f"| `{pacote}` | {libs} | {_celula(licenca)} | {texto} |" for pacote, libs, licenca, texto in NATIVAS_NAS_WHEELS]
@@ -532,7 +535,7 @@ def _resumo(npm: dict, pypi: dict) -> str:
     for coluna, pacotes in enumerate((npm, pypi)):
         for dados in pacotes.values():
             contagem.setdefault(dados["licenca"], [0, 0])[coluna] += 1
-    linhas = ["### Resumo", "", "| Licença | npm | PyPI |", "|---|--:|--:|"]
+    linhas = ["### Summary", "", "| License | npm | PyPI |", "|---|--:|--:|"]
     for licenca, (n, p) in sorted(contagem.items(), key=lambda item: (-sum(item[1]), item[0].lower())):
         linhas.append(f"| {_celula(licenca)} | {n or '—'} | {p or '—'} |")
     linhas.append(f"| **Total** | **{len(npm)}** | **{len(pypi)}** |")
@@ -540,19 +543,19 @@ def _resumo(npm: dict, pypi: dict) -> str:
 
 
 def _revisao(fora: list[tuple[str, str, str, str]]) -> str:
-    linhas = ["### Para revisar", ""]
+    linhas = ["### To review", ""]
     if not fora:
         linhas.append(
-            "Nada: cada licença acima está entre as compatíveis com a AGPL-3.0 "
-            "(`COMPATIVEIS`, em `scripts/avisos_de_terceiros.py`)."
+            "Nothing: every license above is among those compatible with the AGPL-3.0 "
+            "(`COMPATIVEIS`, in `scripts/avisos_de_terceiros.py`)."
         )
         return "\n".join(linhas) + "\n"
     linhas += [
-        "Licenças fora de `COMPATIVEIS` (em `scripts/avisos_de_terceiros.py`), ou "
-        "que o pacote não declara direito. Cada uma precisa ser lida antes de "
-        "distribuir:",
+        "Licenses outside `COMPATIVEIS` (in `scripts/avisos_de_terceiros.py`), or "
+        "that the package does not declare properly. Each one must be read before "
+        "distributing:",
         "",
-        "| Origem | Pacote | Versão | Licença |",
+        "| Source | Package | Version | License |",
         "|---|---|---|---|",
     ]
     linhas += [f"| {origem} | `{nome}` | {versao} | {_celula(licenca)} |" for origem, nome, versao, licenca in fora]
@@ -560,8 +563,8 @@ def _revisao(fora: list[tuple[str, str, str, str]]) -> str:
 
 
 def _tabela(titulo: str, locks: list[tuple[str, str]], pacotes: dict) -> str:
-    legenda = "Dos locks " + ", ".join(f"`{lock}` ({quem})" for quem, lock in locks) + "."
-    linhas = [f"### {titulo}", "", legenda, "", "| Pacote | Versão | Licença | Usado por |", "|---|---|---|---|"]
+    legenda = "From the locks " + ", ".join(f"`{lock}` ({quem})" for quem, lock in locks) + "."
+    linhas = [f"### {titulo}", "", legenda, "", "| Package | Version | License | Used by |", "|---|---|---|---|"]
     for (nome, versao), dados in sorted(pacotes.items(), key=lambda item: (item[0][0].lower(), item[0][1])):
         linhas.append(f"| `{nome}` | {versao} | {_celula(dados['licenca'])} | {', '.join(dados['quem'])} |")
     return "\n".join(linhas) + "\n"

@@ -1,26 +1,26 @@
 http:
   middlewares:
-    # O middleware de BORDA dos routers dos hosts publicos (PUBLIC_HOST e
-    # S3_HOST) e o que BORDA_MIDDLEWARE no .env escolhe: este, numa instalacao
-    # atras da Cloudflare, ou `borda-aberta` (abaixo), sem CDN.
+    # The EDGE middleware of the public hosts' routers (PUBLIC_HOST and
+    # S3_HOST) is the one BORDA_MIDDLEWARE in .env picks: this one, in an install
+    # behind Cloudflare, or `borda-aberta` (below), without a CDN.
     #
-    # SEG (CRITICO), atras da Cloudflare: so conexao vinda das faixas publicadas
-    # dela entra nos routers dos hosts proxied. O host dos executores e DNS-only
-    # de proposito (o mTLS dos executores nao atravessa a Cloudflare) — e isso
-    # publica o IP do origin. Como e o MESMO Traefik que serve o host publico,
-    # sem esta lista bastava `curl --resolve <host>:443:<ip-do-origin>` para
-    # falar com o Next.js e a API por fora da Cloudflare: sem WAF, sem o rate
-    # limit da borda e com o IP exposto a DDoS.
+    # SEC (CRITICAL), behind Cloudflare: only connections coming from its published
+    # ranges get into the proxied hosts' routers. The executors' host is DNS-only
+    # on purpose (the executors' mTLS does not go through Cloudflare) — and that
+    # publishes the origin IP. Since it is the SAME Traefik that serves the public host,
+    # without this list `curl --resolve <host>:443:<ip-do-origin>` was enough to
+    # talk to Next.js and the API bypassing Cloudflare: no WAF, no edge rate
+    # limit, and with the IP exposed to DDoS.
     #
-    # Sem ipStrategy DE PROPOSITO: o que se checa e o peer TCP (a borda da
-    # Cloudflare), nunca o X-Forwarded-For — que e justamente o que um cliente
-    # batendo direto no origin escreveria. NUNCA encadear nos routers do host
-    # dos executores: eles conectam de qualquer rede.
+    # No ipStrategy ON PURPOSE: what is checked is the TCP peer (the Cloudflare
+    # edge), never X-Forwarded-For — which is exactly what a client
+    # hitting the origin directly would write. NEVER chain this into the routers of the
+    # executors' host: executors connect from any network.
     #
-    # Faixas de https://www.cloudflare.com/ips/ — a mesma lista do exemplo de
-    # BORDA_FAIXAS_CONFIAVEIS (.env.example, o `forwardedHeaders.trustedIPs` do
-    # docker-compose.yml) e de CLOUDFLARE_RANGES (app/core/trusted_proxy.py);
-    # test_traefik_config.py cobra que as tres batam.
+    # Ranges from https://www.cloudflare.com/ips/ — the same list as the example for
+    # BORDA_FAIXAS_CONFIAVEIS (.env.example, the `forwardedHeaders.trustedIPs` in
+    # docker-compose.yml) and CLOUDFLARE_RANGES (app/core/trusted_proxy.py);
+    # test_traefik_config.py enforces that all three match.
     cloudflare-only:
       ipAllowList:
         sourceRange:
@@ -46,43 +46,43 @@ http:
           - 2405:8100::/32
           - 2a06:98c0::/29
           - 2c0f:f248::/32
-    # Borda de uma instalacao SEM CDN na frente: o Traefik e a propria borda, e
-    # qualquer IP entra (o rate limit e os middlewares de cada router seguem
-    # valendo). E o padrao de BORDA_MIDDLEWARE.
+    # Edge for an install with NO CDN in front: Traefik is the edge itself, and
+    # any IP gets in (the rate limit and each router's middlewares still
+    # apply). It is the default for BORDA_MIDDLEWARE.
     borda-aberta:
       ipAllowList:
         sourceRange:
           - 0.0.0.0/0
           - ::/0
 
-    # ── Rate limits, por IP do cliente ────────────────────────────────────
+    # ── Rate limits, per client IP ────────────────────────────────────────
     #
-    # De onde vem "o IP do cliente" depende de haver ou nao um proxy confiavel
-    # na frente do Traefik, e por isso cada limite dos routers publicos existe
-    # em DUAS formas, escolhidas pelo mesmo BORDA_MIDDLEWARE do .env (as
-    # labels do compose referenciam `rate-mcp-${BORDA_MIDDLEWARE}` e
+    # Where "the client IP" comes from depends on whether there is a trusted proxy
+    # in front of Traefik, so each limit of the public routers exists
+    # in TWO forms, chosen by the same BORDA_MIDDLEWARE from .env (the
+    # compose labels reference `rate-mcp-${BORDA_MIDDLEWARE}` and
     # `rate-download-${BORDA_MIDDLEWARE}`):
     #
-    #   -borda-aberta     sem CDN: o Traefik e a borda, e o IP do cliente e o
-    #                     da conexao (sem sourceCriterion = RemoteAddr).
-    #   -cloudflare-only  atras da Cloudflare: o IP do cliente e o ultimo que
-    #                     ELA anexou ao X-Forwarded-For (ipStrategy.depth: 1);
-    #                     o Traefik so preserva esse header de quem esta em
+    #   -borda-aberta     no CDN: Traefik is the edge, and the client IP is the
+    #                     connection's (no sourceCriterion = RemoteAddr).
+    #   -cloudflare-only  behind Cloudflare: the client IP is the last one
+    #                     IT appended to X-Forwarded-For (ipStrategy.depth: 1);
+    #                     Traefik only keeps that header from peers in
     #                     forwardedHeaders.trustedIPs (BORDA_FAIXAS_CONFIAVEIS).
     #
-    # `ipStrategy.depth: 1` numa instalacao SEM CDN nao e "por IP": para um
-    # peer fora de trustedIPs o Traefik APAGA o X-Forwarded-For antes dos
-    # middlewares e so anexa o IP do cliente no proxy, depois deles — a fonte
-    # do limite fica vazia e TODOS os clientes caem num balde so (um cliente
-    # com 300 req/min derrubava /mcp para todo mundo). Quem define outra borda
-    # (um `minha-cdn` proprio) define tambem `rate-mcp-minha-cdn` e
-    # `rate-download-minha-cdn`, com o criterio que vale para ela.
+    # `ipStrategy.depth: 1` in an install with NO CDN is not "per IP": for a
+    # peer outside trustedIPs Traefik DELETES X-Forwarded-For before the
+    # middlewares and only appends the client IP in the proxy, after them — the source
+    # of the limit ends up empty and ALL clients fall into a single bucket (one client
+    # at 300 req/min took /mcp down for everyone). Whoever defines another edge
+    # (their own `minha-cdn`) also defines `rate-mcp-minha-cdn` and
+    # `rate-download-minha-cdn`, with the criterion that holds for it.
     #
-    # /internal (o host dos executores) nao tem variante: os executores
-    # conectam direto em qualquer instalacao (o mTLS nao atravessa CDN), e o IP
-    # e sempre o da conexao.
+    # /internal (the executors' host) has no variant: executors
+    # connect directly in any install (mTLS does not go through a CDN), and the IP
+    # is always the connection's.
 
-    # /internal (send-email) — 10 req/min por executor (IP da conexao)
+    # /internal (send-email) — 10 req/min per executor (connection IP)
     rate-internal:
       rateLimit:
         average: 10
@@ -104,10 +104,10 @@ http:
           ipStrategy:
             depth: 1
 
-    # /mcp — 240 req/min por IP.
-    # Teto de borda grosso de proposito: a cota que importa e a por token
-    # (app/mcp/cotas.py, 120 chamadas/min), e varios agentes atras do mesmo NAT
-    # compartilham um IP. Serve para conter enxurrada, nao para dosar uso.
+    # /mcp — 240 req/min per IP.
+    # Coarse edge ceiling on purpose: the quota that matters is the per-token one
+    # (app/mcp/cotas.py, 120 calls/min), and several agents behind the same NAT
+    # share an IP. It is there to contain a flood, not to meter usage.
     rate-mcp-borda-aberta:
       rateLimit:
         average: 240
@@ -122,24 +122,24 @@ http:
           ipStrategy:
             depth: 1
 
-    # SEG (CRITICO): remove qualquer X-Forwarded-Tls-Client-Cert-Info que o
-    # CLIENTE tenha enviado. O passTLSClientCert do Traefik so faz `Set` quando
-    # existe peer certificate — ele NUNCA faz `Del`. Como clientAuthType e
-    # VerifyClientCertIfGiven (conectar sem cert e permitido), um cliente sem
-    # cert nenhum teria o header forjado repassado intacto ao backend, que
-    # deriva TODA a identidade do executor dele => bypass total do mTLS.
+    # SEC (CRITICAL): removes any X-Forwarded-Tls-Client-Cert-Info the
+    # CLIENT may have sent. Traefik's passTLSClientCert only does `Set` when
+    # there is a peer certificate — it NEVER does `Del`. Since clientAuthType is
+    # VerifyClientCertIfGiven (connecting without a cert is allowed), a client with no
+    # cert at all would have the forged header passed intact to the backend, which
+    # derives the executor's ENTIRE identity from it => full mTLS bypass.
     #
-    # customRequestHeaders com valor vazio remove o header no Traefik v3.
-    # DEVE ser encadeado ANTES de pass-executor-cert em todo router, e tambem
-    # sozinho nos routers que nao usam mTLS (senao o header passa direto).
+    # customRequestHeaders with an empty value removes the header in Traefik v3.
+    # MUST be chained BEFORE pass-executor-cert in every router, and also
+    # on its own in routers that do not use mTLS (otherwise the header passes straight through).
     strip-executor-cert-header:
       headers:
         customRequestHeaders:
           X-Forwarded-Tls-Client-Cert-Info: ""
           X-Forwarded-Tls-Client-Cert: ""
 
-    # Repassa info do cert mTLS validado para o backend via header
-    # X-Forwarded-Tls-Client-Cert-Info. FastAPI parseia CN e Serial.
+    # Passes info from the validated mTLS cert to the backend via the
+    # X-Forwarded-Tls-Client-Cert-Info header. FastAPI parses CN and Serial.
     pass-executor-cert:
       passTLSClientCert:
         info:
@@ -149,14 +149,14 @@ http:
           sans: false
 
 tls:
-  # SNI matching automatico:
-  #   PUBLIC_HOST e S3_HOST -> cert do site (SSL_CERT_DIR: o de origem da
-  #                            Cloudflare, um do Let's Encrypt ou outro)
-  #   AGENTS_HOST           -> cert da CA interna (DNS-only, mTLS de executores),
-  #                            que o scripts/bootstrap-stepca.sh grava como
+  # Automatic SNI matching:
+  #   PUBLIC_HOST and S3_HOST -> site cert (SSL_CERT_DIR: the Cloudflare
+  #                            origin one, a Let's Encrypt one or another)
+  #   AGENTS_HOST           -> internal CA cert (DNS-only, executor mTLS),
+  #                            which scripts/bootstrap-stepca.sh writes as
   #                            agents.crt/agents.key
-  # Um arquivo que nao existe so gera uma linha de erro no log do Traefik; os
-  # outros certificados continuam valendo.
+  # A file that does not exist only produces an error line in the Traefik log; the
+  # other certificates still apply.
   certificates:
     - certFile: /etc/ssl/cloudflare/cert.pem
       keyFile:  /etc/ssl/cloudflare/key.pem
@@ -164,33 +164,33 @@ tls:
       keyFile:  /etc/ssl/atlans-ca/agents.key
 
   options:
-    # mTLS opcional para todos os routers do host dos executores.
+    # Optional mTLS for all routers of the executors' host.
     #
-    # Por que VerifyClientCertIfGiven em vez de RequireAndVerifyClientCert:
-    # Traefik exige TLS options uniformes por host — se um router de executor usa
-    # mTLS-required e outro router (UI, /executores/enroll, etc.) nao usa, ele
-    # detecta conflito e desativa mTLS em TODOS. Solucao: option default
-    # aceita cert opcional + valida quando vier. O backend (get_agent_from_mtls)
-    # bloqueia endpoints de executor que nao recebam X-Forwarded-Tls-Client-Cert-Info.
+    # Why VerifyClientCertIfGiven instead of RequireAndVerifyClientCert:
+    # Traefik requires uniform TLS options per host — if one executor router uses
+    # mTLS-required and another router (UI, /executores/enroll, etc.) does not, it
+    # detects a conflict and disables mTLS on ALL of them. Solution: the default option
+    # accepts an optional cert + validates it when present. The backend (get_agent_from_mtls)
+    # blocks executor endpoints that do not receive X-Forwarded-Tls-Client-Cert-Info.
     #
-    # IMPORTANTE: se o host dos executores estiver atras de um CDN (o proxy da
-    # Cloudflare, por exemplo), o cert do executor NAO chega no Traefik — o CDN
-    # termina TLS na borda.
-    # Para mTLS funcionar, ou o subdominio dos executores fica DNS-only no CF,
-    # ou usa-se Cloudflare Authenticated Origin Pulls + um caminho separado.
+    # IMPORTANT: if the executors' host is behind a CDN (the Cloudflare
+    # proxy, for example), the executor's cert does NOT reach Traefik — the CDN
+    # terminates TLS at the edge.
+    # For mTLS to work, either the executors' subdomain stays DNS-only on CF,
+    # or you use Cloudflare Authenticated Origin Pulls + a separate path.
     mtls-executores:
       clientAuth:
         caFiles:
           - /etc/ssl/atlans-ca/intermediate.crt
         clientAuthType: VerifyClientCertIfGiven
-      # TLS 1.3 mandatorio. Cipher suites legados de TLS 1.2 ficam fora —
-      # CHACHA20-Poly1305 e AES-GCM sao os defaults TLS 1.3 (sem downgrade).
+      # TLS 1.3 mandatory. Legacy TLS 1.2 cipher suites are left out —
+      # CHACHA20-Poly1305 and AES-GCM are the TLS 1.3 defaults (no downgrade).
       minVersion: VersionTLS13
       curvePreferences:
         - X25519
         - CurveP256
 
-  # Fallback padrao (acesso direto por IP ou hostname sem SNI match)
+  # Default fallback (direct access by IP or hostname with no SNI match)
   stores:
     default:
       defaultCertificate:

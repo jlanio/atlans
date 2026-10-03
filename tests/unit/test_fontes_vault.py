@@ -1,11 +1,11 @@
 # tests/unit/test_fontes_vault.py
-"""O parser do Vault: o markdown do Obsidian vira registros do catálogo.
+"""The Vault parser: Obsidian markdown becomes catalog records.
 
-As fixtures em `tests/fixtures/vault/` são cópias REAIS do Vault do dono
-(FUNAI inteira; um recorte do IBGE, que é WFS 1.0.0; um recorte do TIGERweb,
-que é ArcGIS; o placeholder da Dominica) mais uma pasta no formato NOVO —
-frontmatter, tags inline e `_sinonimos.md` — que é o que este parser passa a
-aceitar por cima do formato de hoje.
+The fixtures in `tests/fixtures/vault/` are REAL copies of the owner's Vault
+(all of FUNAI; a slice of IBGE, which is WFS 1.0.0; a slice of TIGERweb,
+which is ArcGIS; the Dominica placeholder) plus a folder in the NEW format —
+frontmatter, inline tags and `_sinonimos.md` — which is what this parser now
+accepts on top of today's format.
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def _da(instituicao, registros):
     return {r.type_name: r for r in registros if r.instituicao == instituicao}
 
 
-# ── O formato de hoje ─────────────────────────────────────────────────────────
+# ── Today's format ────────────────────────────────────────────────────────────
 
 
 def test_funai_inteira_vira_oito_camadas_com_esquema():
@@ -65,7 +65,7 @@ def test_funai_inteira_vira_oito_camadas_com_esquema():
 def test_sort_by_vem_da_primeira_coluna_de_id_que_existe():
     registros, _ = _registros()
     funai = _da("FUNAI", registros)
-    # `tis_poligonais` tem `gid`; `aldeias_pontos` não tem nenhum candidato.
+    # `tis_poligonais` has `gid`; `aldeias_pontos` has no candidate at all.
     assert funai["Funai:tis_poligonais"].propriedades == {
         "url": "https://geoserver.funai.gov.br/geoserver/ows",
         "typeName": "Funai:tis_poligonais",
@@ -95,12 +95,12 @@ def test_arcgis_e_placeholder_sao_ignorados_com_motivo():
     por_pasta = {i.pasta: i.motivo for i in ignoradas}
     assert por_pasta["EUA TIGERweb"] == "sem_endpoint_wfs"
     assert por_pasta["Dominica DomiNode"] == "sem_endpoint_wfs"
-    # E nada da pasta ArcGIS virou registro por engano.
+    # And nothing from the ArcGIS folder became a record by mistake.
     registros, _ = _registros()
     assert not [r for r in registros if r.instituicao == "EUA TIGERweb"]
 
 
-# ── O formato novo (opcional, por cima do de hoje) ────────────────────────────
+# ── The new format (optional, on top of today's) ──────────────────────────────
 
 
 def test_frontmatter_tags_e_prioridade():
@@ -109,12 +109,12 @@ def test_frontmatter_tags_e_prioridade():
 
     focos = exemplo["queimadas:focos_24h"]
     assert focos.url == "https://geoserver.exemplo.gov.br/geoserver/ows"
-    assert focos.titulo == "Focos de calor (24 h)"  # sem as tags
+    assert focos.titulo == "Focos de calor (24 h)"  # without the tags
     assert focos.prioridade == 1  # #preferida
     assert focos.coletada_em == "2026-09-19"
     for tema in ("EXEMPLO", "queimadas", "focos de calor", "BR", "MT"):
         assert tema in focos.temas, tema
-    assert focos.temas.count("queimadas") == 1  # tag == grupo == tema: sem duplicar
+    assert focos.temas.count("queimadas") == 1  # tag == group == theme: no duplication
     assert focos.propriedades["sortBy"] == "id"
     assert focos.dicas and "sortBy: id" in focos.dicas
 
@@ -144,7 +144,7 @@ def test_sinonimos_da_raiz():
     assert fv.sinonimos_de(VAULT / "nao-existe") == {}
 
 
-# ── Casos de borda ────────────────────────────────────────────────────────────
+# ── Edge cases ────────────────────────────────────────────────────────────────
 
 
 def _pasta_minima(raiz: Path, nome: str, endpoint: str, camadas: str | None = "- `a:b` — B\n") -> Path:

@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 /**
- * O modal de entrada da Home: a lógica das antigas páginas /login e /register
- * (POST + signIn sem redirect; POST /auth/register → "Verifique seu e-mail"),
- * fechável — menos com um envio em voo — e no tema da Home.
+ * The Home's sign-in modal: the logic of the old /login and /register pages
+ * (POST + signIn without redirect; POST /auth/register → "Verifique seu e-mail"),
+ * closable — except with a submission in flight — and in the Home's theme.
  */
 const http = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn() }))
 vi.mock("axios", () => {
@@ -70,8 +70,8 @@ describe("ModalDeEntrada — entrar", () => {
     expect(onEntrou).not.toHaveBeenCalled()
     expect(auth.signIn).not.toHaveBeenCalled()
 
-    // O atalho é um BOTÃO: era um <Link href="/verify-email"> e navegar levava
-    // para fora da Home, junto com a mensagem que esperava o login.
+    // The shortcut is a BUTTON: it used to be a <Link href="/verify-email"> and navigating took
+    // you out of the Home, along with the message that was waiting for the login.
     const atalho = screen.getByRole("button", { name: /Reenviar e-mail de verificação/i })
     expect(atalho.closest("a")).toBeNull()
     fireEvent.click(atalho)
@@ -163,7 +163,7 @@ describe("ModalDeEntrada — fechar e o tema", () => {
   })
 
   it("com um envio em voo, Esc não fecha e o X desabilita", async () => {
-    http.post.mockReturnValue(new Promise(() => {}))   // nunca resolve: o envio fica em voo
+    http.post.mockReturnValue(new Promise(() => {}))   // never resolves: the submission stays in flight
     montar()
     preencher(/E-mail ou usuário/i, "fulana")
     submeter(preencher(/^Senha$/i, "x"))
@@ -197,8 +197,8 @@ describe("ModalDeEntrada — fechar e o tema", () => {
 
 describe("ModalDeEntrada — o caminho da senha", () => {
   it("'Esqueceu a senha?' troca de painel, sem navegar", () => {
-    // Era um <Link href="/forgot-password">: levava para fora da Home e, com
-    // ela, ia embora a mensagem que esperava o login.
+    // It used to be a <Link href="/forgot-password">: it took you out of the Home and, with
+    // it, went the message that was waiting for the login.
     montar()
     const gatilho = screen.getByRole("button", { name: /esqueceu a senha/i })
     expect(gatilho.closest("a")).toBeNull()
@@ -219,8 +219,8 @@ describe("ModalDeEntrada — o caminho da senha", () => {
   })
 
   it("recuperar: o e-mail que não existe mostra o MESMO sucesso (anti-enumeração)", async () => {
-    // Dizer "este e-mail não está cadastrado" entrega quem tem conta aqui. O
-    // backend responde igual nos dois casos; a interface não pode desmentir.
+    // Saying "este e-mail não está cadastrado" (this email is not registered) gives away who has an account here. The
+    // backend responds the same in both cases; the interface must not contradict it.
     http.post.mockRejectedValue(new Error("404"))
     montar({ modo: "recuperar" })
     submeter(preencher(/e-mail/i, "ninguem@exemplo.com"))
@@ -287,8 +287,8 @@ describe("ModalDeEntrada — a verificação de e-mail", () => {
   })
 
   it("o token só é gasto UMA vez, mesmo com o painel montando de novo", async () => {
-    // Ele é de uso único: um segundo GET voltaria "inválido" e apagaria o
-    // sucesso do primeiro.
+    // It is single-use: a second GET would come back "inválido" (invalid) and wipe out the
+    // first one's success.
     http.get.mockResolvedValue({ data: {} })
     montar({ modo: "verificar", tokenDoLink: "tok-abc" })
     await waitFor(() =>
@@ -296,8 +296,8 @@ describe("ModalDeEntrada — a verificação de e-mail", () => {
     )
     expect(http.get).toHaveBeenCalledTimes(1)
 
-    // De volta ao painel (o 403 do login leva a ele): a tela é a do reenvio,
-    // sem gastar o link outra vez.
+    // Back to the panel (the login's 403 leads to it): the screen is the resend one,
+    // without spending the link again.
     http.post.mockRejectedValue({ response: { status: 403, headers: { "x-error-code": "email_not_verified" }, data: { message: "Confirme seu e-mail." } } })
     preencher(/E-mail ou usuário/i, "fulana")
     submeter(preencher(/^Senha$/i, "x"))
@@ -312,8 +312,8 @@ describe("ModalDeEntrada — a verificação de e-mail", () => {
     montar({ modo: "verificar", tokenDoLink: "tok-velho" })
 
     expect((await screen.findByRole("alert")).textContent).toContain("Token inválido ou expirado.")
-    // O cabeçalho é do modal, e chega um render depois do painel: o estado sobe
-    // por efeito, que é o que deixa o `DialogTitle` sempre montado.
+    // The header belongs to the modal, and arrives one render after the panel: the state goes up
+    // through an effect, which is what keeps the `DialogTitle` always mounted.
     expect(await screen.findByRole("dialog", { name: "Falha na verificação" })).toBeTruthy()
     expect(screen.getByTestId("modal-de-entrada").getAttribute("data-painel")).toBe("verificar")
 
@@ -338,7 +338,7 @@ describe("ModalDeEntrada — a verificação de e-mail", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Reenviar e-mail de verificação/i }))
     expect((screen.getByLabelText(/Não recebeu\?/i) as HTMLInputElement).value).toBe("ana@exemplo.com")
 
-    // O campo aceita e-mail OU usuário; "fulana" não é um e-mail para reenviar.
+    // The field accepts email OR username; "fulana" is not an email to resend to.
     cleanup()
     montar()
     preencher(/E-mail ou usuário/i, "fulana")
@@ -349,8 +349,8 @@ describe("ModalDeEntrada — a verificação de e-mail", () => {
 })
 
 describe("ModalDeEntrada — o código-fonte da instalação (AGPL §13)", () => {
-  // Quem usa a instalação pela rede acha o código dela antes mesmo de entrar;
-  // sem CODIGO_FONTE_URL não há link, porque o código não traz endereço nenhum.
+  // Whoever uses the install over the network finds its code even before signing in;
+  // without CODIGO_FONTE_URL there is no link, because the code carries no address at all.
   it("com a URL no provider, o cabeçalho tem o link, que abre fora", () => {
     render(
       <CodigoFonteProvider url="https://codigo.example.org/fulana/atlans">

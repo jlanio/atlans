@@ -1,12 +1,12 @@
-"""Taxa de sucesso e percentil: as duas contas que as telas de números repetem.
+"""Success rate and percentile: the two calculations the numbers screens repeat.
 
-Cada uma estava escrita mais de uma vez, e as cópias já tinham divergido. A
-taxa do detalhe do workflow era `(total - falhas) / total` — execução em
-andamento ou cancelada contava como sucesso — enquanto o Histórico e as visões
-por workflow e por executor usavam a da spec. O percentil com interpolação
-linear existia no Histórico e no custo por plano, iguais a menos do caso vazio.
-Aqui fica a versão única; o que cada tela faz com a ausência de dado continua
-sendo decisão dela.
+Each was written more than once, and the copies had already diverged. The
+workflow detail's rate was `(total - falhas) / total` — a running or
+canceled run counted as a success — while History and the per-workflow and
+per-executor views used the spec's. The percentile with linear interpolation
+existed in History and in cost per plan, identical except for the empty case.
+This is the single version; what each screen does with missing data remains
+its own decision.
 """
 from __future__ import annotations
 
@@ -15,23 +15,23 @@ from typing import Optional, Sequence
 
 
 def taxa_de_sucesso(sucesso: int, falha: int) -> float:
-    """Concluídas ÷ (concluídas + falhas), em 4 casas; 0.0 sem denominador.
+    """Completed ÷ (completed + failed), to 4 decimal places; 0.0 with no denominator.
 
-    Em andamento e canceladas ficam FORA do denominador (spec
-    historico-metricas §3): um pico de execuções em curso não pode derrubar a
-    taxa, e cancelar não é falhar.
+    Running and canceled runs stay OUT of the denominator (spec
+    historico-metricas §3): a spike of in-progress runs must not drag the
+    rate down, and canceling is not failing.
     """
     denominador = sucesso + falha
     return round(sucesso / denominador, 4) if denominador else 0.0
 
 
 def percentil_linear(valores: Sequence[float], p: float) -> Optional[float]:
-    """O percentil `p` (0–1) com interpolação linear entre vizinhos — a mesma
-    semântica do `percentile_cont` do PostgreSQL, para que o número calculado em
-    Python bata com o do SQL. `None` sem valores: "sem dado" não é zero.
+    """The `p` percentile (0–1) with linear interpolation between neighbors — the
+    same semantics as PostgreSQL's `percentile_cont`, so the number computed in
+    Python matches the SQL one. `None` with no values: "no data" is not zero.
 
-    Interpola em vez de pegar o vizinho mais próximo porque, com poucas
-    amostras, o vizinho pula degraus grandes de um dia para o outro.
+    Interpolates instead of taking the nearest neighbor because, with few
+    samples, the neighbor jumps in large steps from one day to the next.
     """
     if not valores:
         return None

@@ -1,8 +1,8 @@
 /**
- * A hidratação das portas dinâmicas dos nós SubWorkflow: o laço buscava um
- * contrato por vez (`for...of await`), um waterfall de N requisições. Passa a
- * coletar os hashes não cacheados e resolvê-los em `Promise.all` — o que se
- * testa aqui é que as buscas partem JUNTAS, antes de qualquer uma resolver.
+ * Hydration of the SubWorkflow nodes' dynamic ports: the loop fetched one
+ * contract at a time (`for...of await`), a waterfall of N requests. It now
+ * collects the uncached hashes and resolves them with `Promise.all` — what's
+ * tested here is that the fetches start TOGETHER, before any of them resolves.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderHook, waitFor } from "@testing-library/react"
@@ -12,8 +12,8 @@ const setEdges = vi.fn()
 vi.mock("@xyflow/react", () => ({
   useReactFlow: () => ({ setNodes, setEdges }),
 }))
-// `applyPorts` chama `reancorarArestasDoNo` dentro de `setEdges` (um mock que
-// não executa o updater) — não roda no teste, mas o import precisa resolver.
+// `applyPorts` calls `reancorarArestasDoNo` inside `setEdges` (a mock that
+// doesn't run the updater) — it doesn't run in the test, but the import has to resolve.
 vi.mock("@/app/components/workflow/utils/node-ports", () => ({
   reancorarArestasDoNo: (eds: unknown) => eds,
 }))
@@ -25,7 +25,7 @@ vi.mock("@/service/GisFlowService", () => ({
 import { useSubWorkflowContractSync } from "@/app/hooks/workflow/useSubWorkflowContractSync"
 import type { INodeContext } from "@/context/useFlowContext"
 
-/** Promise segurada na mão, para provar que as buscas partem antes de resolver. */
+/** A promise held by hand, to prove the fetches start before resolving. */
 function pendente<T>() {
   let resolver!: (v: T) => void
   const promise = new Promise<T>((res) => { resolver = res })
@@ -45,8 +45,8 @@ describe("useSubWorkflowContractSync — busca os contratos em paralelo", () => 
 
     renderHook(() => useSubWorkflowContractSync([subwf("n1", "h1"), subwf("n2", "h2")]))
 
-    // O waterfall (`for...of await`) só chamaria a 2a DEPOIS de a 1a resolver;
-    // como nenhuma resolveu, ficaria em 1. O `Promise.all` chama as duas de uma vez.
+    // The waterfall (`for...of await`) would only call the 2nd AFTER the 1st
+    // resolved; since none resolved, it'd stay at 1. `Promise.all` calls both at once.
     await waitFor(() => expect(getContract).toHaveBeenCalledTimes(2))
     expect(getContract.mock.calls.map((c) => c[0])).toEqual(["h1", "h2"])
 

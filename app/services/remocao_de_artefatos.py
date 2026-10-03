@@ -1,30 +1,30 @@
 # app/services/remocao_de_artefatos.py
 """
-Remoção de artefatos: um algoritmo só para os cinco caminhos que apagam.
+Artifact removal: a single algorithm for the five paths that delete.
 
-DELETE /artifacts/{id}, POST /artifacts/batch-delete, a retenção
-(`artifact_cleanup.purge_expired_artifacts`), o reenvio ao executor que
-reconecta (`artifact_cleanup.purgar_pendentes_do_executor`) e a purga do
-workspace (`storage_purge_service.purge_workspace_storage`) tinham cada um a
-sua cópia do laço, e as cópias divergiram: só a purga apagava a camada do
-portal de um artefato LOCAL entregue — nos outros caminhos a linha sumia e a
-PortalLayer ficava no ar. Quem chama escolhe QUAIS artefatos (a query) e
-traduz o desfecho (204/202/502, contadores, log); a regra mora aqui:
+DELETE /artifacts/{id}, POST /artifacts/batch-delete, retention
+(`artifact_cleanup.purge_expired_artifacts`), the resend to a reconnecting
+executor (`artifact_cleanup.purgar_pendentes_do_executor`) and the workspace
+purge (`storage_purge_service.purge_workspace_storage`) each had their
+own copy of the loop, and the copies diverged: only the purge deleted the portal
+layer of a delivered LOCAL artifact — on the other paths the row vanished and the
+PortalLayer stayed up. The caller chooses WHICH artifacts (the query) and
+translates the outcome (204/202/502, counters, log); the rule lives here:
 
-- Conteúdo no disco de um executor (`content_location='executor'`): a ordem de
-  remoção vai para o executor (`_ordenar_remocao_local`, uma por máquina) e a
-  linha só cai quando ela foi ENTREGUE. Apagar antes deixaria o arquivo órfão
-  no disco do usuário e o servidor sem registro nenhum dele — para dado
-  pessoal, pior que não ter apagado. Sem `executor_id`/`local_path` não há a
-  quem mandar: a linha fica, para não perder o rastro do arquivo.
-- Objeto no MinIO: sai PRIMEIRO. Se o S3 falhar por outro motivo que não "not
-  found", a linha fica — o objeto não vira órfão invisível, e a próxima
-  passada (ou a reconciliação) tenta de novo. `s3_key` começando com "/" é o
-  fallback local antigo do executor: não existe no MinIO, só a linha sai.
-- A camada do portal (e as features, em cascata) sai junto com a linha de todo
-  artefato publicado apagado, de qualquer localidade.
+- Content on an executor's disk (`content_location='executor'`): the removal
+  order goes to the executor (`_ordenar_remocao_local`, one per machine) and the
+  row only drops once it has been DELIVERED. Deleting before that would leave the file
+  orphaned on the user's disk and the server with no record of it at all — for personal
+  data, worse than not having deleted. Without `executor_id`/`local_path` there is no one
+  to send it to: the row stays, so as not to lose track of the file.
+- Object in MinIO: goes FIRST. If S3 fails for any reason other than "not
+  found", the row stays — the object does not become an invisible orphan, and the next
+  pass (or the reconciliation) tries again. An `s3_key` starting with "/" is the
+  executor's old local fallback: it does not exist in MinIO, only the row goes.
+- The portal layer (and the features, by cascade) goes along with the row of every
+  deleted published artifact, of any location.
 
-NÃO faz commit: quem chama decide quando persistir.
+Does NOT commit: the caller decides when to persist.
 """
 from __future__ import annotations
 
@@ -43,15 +43,15 @@ logger = get_logger(__name__)
 
 @dataclass
 class Remocao:
-    """O desfecho, artefato por artefato. Só `apagados` saiu do banco."""
+    """The outcome, artifact by artifact. Only `apagados` left the database."""
 
     apagados: list = field(default_factory=list)
-    # Objeto que o MinIO não apagou: a linha fica, e repetir resolve.
+    # Object MinIO did not delete: the row stays, and retrying fixes it.
     falhas_s3: list = field(default_factory=list)
-    # Local cuja ordem não foi entregue (executor offline): a linha fica, e a
-    # ordem é reenviada quando ele reconectar.
+    # Local whose order was not delivered (executor offline): the row stays, and the
+    # order is resent when it reconnects.
     pendentes_local: list = field(default_factory=list)
-    # Local sem executor_id/local_path: não há a quem mandar a ordem.
+    # Local without executor_id/local_path: there is no one to send the order to.
     sem_rastro: list = field(default_factory=list)
 
     @property
@@ -62,17 +62,17 @@ class Remocao:
 async def remover_artefatos(
     db: AsyncSession, artefatos, *, agendar_pendentes: bool,
 ) -> Remocao:
-    """Remove `artefatos` (objetos da sessão `db`) — ver a semântica acima.
+    """Removes `artefatos` (objects from the `db` session) — see the semantics above.
 
-    `agendar_pendentes`: os que ficaram no disco de um executor (ordem não
-    entregue, ou sem rastro) são marcados como vencidos, sem pin, para a
-    retenção concluir sozinha — é o que o usuário pediu nas rotas de exclusão.
-    O pin PRECISA cair junto: a retenção ignora artefato fixado, e um fixado
-    marcado como vencido sumiria da tela como "removendo" e nunca seria
-    removido. Na retenção e na purga eles já estão no alcance da próxima
-    passada, e nada é marcado.
+    `agendar_pendentes`: those left on an executor's disk (order not
+    delivered, or no trace) are marked as expired, unpinned, for
+    retention to finish on its own — that is what the user asked for in the delete routes.
+    The pin MUST drop along with it: retention ignores pinned artifacts, and a pinned one
+    marked as expired would vanish from the screen as "removing" and never be
+    removed. In retention and in the purge they are already within reach of the next
+    pass, and nothing is marked.
     """
-    # Da retenção: é ela que assina, envia e devolve só os ids ENTREGUES.
+    # From retention: it is the one that signs, sends and returns only the DELIVERED ids.
     from app.core.artifact_cleanup import _ordenar_remocao_local
     from app.core import storage as s3
 
@@ -125,7 +125,7 @@ async def remover_artefatos(
 
 
 async def _apagar_camada_do_portal(db: AsyncSession, artefato) -> None:
-    """A camada publicada do artefato (as features caem em cascata)."""
+    """The artifact's published layer (the features drop by cascade)."""
     if artefato.is_published and artefato.workflow_hash:
         await db.execute(
             delete(PortalLayer).where(

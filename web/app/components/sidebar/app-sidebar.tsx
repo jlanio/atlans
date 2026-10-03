@@ -27,23 +27,23 @@ import { useSession } from "next-auth/react";
 import { GisFlowService } from "@/service/GisFlowService";
 import { readCachedHasAgents, writeCachedHasAgents, clearCachedHasAgents } from "@/lib/sidebar-cache";
 
-// Organização: o ambiente em que os workflows vivem.
+// Organization: the environment in which workflows live.
 const organizationSection = [
   { title: "Workspaces",     url: "/workspaces",    icon: TbBuildingFactory2 },
 ]
 
-// Automação: criação e execução de workflows.
-// "Dashboard" é do administrador do sistema por enquanto: inserido só para admin
-// em AppSidebar, o mesmo padrão de "Executores". O middleware barra a rota; aqui
-// só escondemos o caminho para quem não a alcança.
+// Automation: creating and executing workflows.
+// "Dashboard" belongs to the system administrator for now: inserted only for admin
+// in AppSidebar, the same pattern as "Executores". The middleware blocks the route;
+// here we only hide the path from whoever can't reach it.
 const dashboardItem = { title: "Dashboard", url: "/dashboard", icon: TbLayoutDashboard }
 const automationBase = [
   { title: "Projetos",       url: "/projects",      icon: TbFolders },
 ]
 
-// Recursos: infraestrutura que os workflows consomem.
-// "Executores" é inserido condicionalmente em AppSidebar (admin sempre; demais
-// usuários só quando têm ao menos um executor acessível).
+// Resources: infrastructure that workflows consume.
+// "Executores" is inserted conditionally in AppSidebar (admin always; other
+// users only when they have at least one accessible executor).
 const executoresItem = { title: "Executores", url: "/executores", icon: TbServer }
 const resourcesBase = [
   { title: "Credenciais",    url: "/credentials",   icon: TbId },
@@ -56,23 +56,23 @@ const monitoringSection = [
   { title: "Artefatos",       url: "/artifacts",     icon: TbPackage },
 ]
 
-// Admin: configurações globais da plataforma
+// Admin: global platform settings
 const adminSection = [
   { title: "Usuários",       url: "/admin/users",    icon: TbUsers },
   { title: "Configurações",  url: "/admin/settings", icon: TbSettings },
 ]
 
 function NavGroup({ label, items }: { label: string; items: { title: string; url: string; icon: React.ElementType }[] }) {
-  // Detecta rota ativa para destacar o item no menu
+  // Detects the active route to highlight the item in the menu
   const pathname = usePathname()
-  // No telefone a sidebar é uma gaveta sobre a página: sem fechar no clique, o
-  // usuário navega e continua olhando para o menu.
+  // On the phone the sidebar is a drawer over the page: without closing on click,
+  // the user navigates and keeps looking at the menu.
   const { isMobile, setOpenMobile } = useSidebar()
 
   return (
     <SidebarGroup>
-      {/* Rótulo de seção como "eyebrow": mono, versalete e discreto. Dá ritmo à
-          lista sem competir com os itens. */}
+      {/* Section label as an "eyebrow": mono, small caps and discreet. Gives the
+          list rhythm without competing with the items. */}
       <SidebarGroupLabel className="font-mono text-[10px] uppercase tracking-[0.12em] text-sidebar-foreground/55">{label}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
@@ -86,9 +86,9 @@ function NavGroup({ label, items }: { label: string; items: { title: string; url
                   tooltip={item.title}
                   className={cn(
                     "relative h-10",
-                    // Estado ativo refinado: barra indicadora terracota à esquerda
-                    // + ícone tingido com a primária da marca. O rótulo mantém o
-                    // sidebar-accent-foreground que o estado ativo padrão já aplica.
+                    // Refined active state: terracotta indicator bar on the left
+                    // + icon tinted with the brand primary. The label keeps the
+                    // sidebar-accent-foreground the default active state already applies.
                     isActive &&
                       "before:absolute before:left-0 before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-sidebar-primary before:content-[''] [&>svg]:text-sidebar-primary",
                   )}
@@ -113,19 +113,19 @@ const AppSidebar = () => {
   const userId = session?.user?.id_hash
   const quota = session?.user?.agent_quota ?? 0
 
-  // Não-admin: descobre se há algum executor acessível para decidir exibir o menu.
-  // Admin sempre vê — dispensa o fetch.
+  // Non-admin: finds out whether there is any accessible executor to decide
+  // whether to show the menu. Admin always sees it — skips the fetch.
   //
-  // Começa em `false`: é o MESMO valor que o servidor renderiza (lá não há
-  // sessionStorage). Ler o cache no inicializador do useState fazia a primeira
-  // render do cliente divergir do HTML entregue — erro de hidratação e
-  // re-render da raiz. O cache é aplicado logo após a montagem, o que continua
-  // evitando o flicker do F5.
+  // Starts at `false`: it's the SAME value the server renders (there is no
+  // sessionStorage there). Reading the cache in the useState initializer made the
+  // client's first render diverge from the delivered HTML — hydration error and a
+  // re-render of the root. The cache is applied right after mount, which still
+  // avoids the F5 flicker.
   const [hasAgents, setHasAgents] = useState(false)
 
-  // Aplica o cache e detecta troca de usuário na mesma aba (logout + login de
-  // outro user): cache escrito por outro user é descartado, para não mostrar
-  // estado alheio até o novo fetch resolver.
+  // Applies the cache and detects a user switch in the same tab (logout + login
+  // of another user): cache written by another user is discarded, so as not to
+  // show someone else's state until the new fetch resolves.
   useEffect(() => {
     const cached = readCachedHasAgents()
     if (!cached.userId) return
@@ -136,9 +136,9 @@ const AppSidebar = () => {
     if (cached.value) setHasAgents(true)
   }, [userId])
 
-  // Fetch só dispara quando NextAuth confirma status === "authenticated"
-  // (garante que o SessionSync já populou o access_token no axios). O resultado
-  // atualiza o cache para a próxima render/F5.
+  // The fetch only fires when NextAuth confirms status === "authenticated"
+  // (ensures SessionSync has already put the access_token on axios). The result
+  // updates the cache for the next render/F5.
   useEffect(() => {
     if (status !== "authenticated" || isAdmin || !userId) return
     let active = true
@@ -151,8 +151,8 @@ const AppSidebar = () => {
     return () => { active = false }
   }, [status, isAdmin, userId])
 
-  // Mostra o menu também quando o user tem cota pra criar — sem isso, admin
-  // pode conceder cota mas o user não enxerga o caminho pra criar.
+  // Also shows the menu when the user has quota to create — without this, admin
+  // can grant quota but the user doesn't see the path to create.
   const showExecutores = isAdmin || hasAgents || quota > 0
   const resourcesSection = showExecutores ? [executoresItem, ...resourcesBase] : resourcesBase
   const automationSection = isAdmin ? [dashboardItem, ...automationBase] : automationBase
@@ -160,13 +160,13 @@ const AppSidebar = () => {
   return (
     <Sidebar collapsible="icon" className="border-border">
       <SidebarHeader>
-        {/* `app-region-drag`: no app desktop este cabeçalho arrasta a janela
-            (o título é só texto); o gatilho leva `no-drag`. Ver globals.css. */}
+        {/* `app-region-drag`: in the desktop app this header drags the window
+            (the title is just text); the trigger gets `no-drag`. See globals.css. */}
         <div className="app-region-drag flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
-          {/* Marca + wordmark (bloco compartilhado com o HomeSidebar). Some no
-              modo ícone: o gatilho de recolher é o único no desktop (ver
-              app-header.tsx) e precisa centralizar sozinho no trilho de 3rem. No
-              app padrão a marca é só rótulo — sem link. */}
+          {/* Brand + wordmark (block shared with HomeSidebar). Disappears in
+              icon mode: the collapse trigger is the only one on desktop (see
+              app-header.tsx) and needs to center by itself on the 3rem rail. In
+              the standard app the brand is just a label — no link. */}
           <Marca />
           <div className="flex-1 group-data-[collapsible=icon]:hidden" />
           <SidebarTrigger className="app-region-no-drag" size={'sm'} />
@@ -181,9 +181,9 @@ const AppSidebar = () => {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
-          {/* Só aparece dentro do app desktop (feature-detect); no navegador
-              comum não renderiza nada — nem o <li>, pois o próprio componente é
-              dono do SidebarMenuItem. */}
+          {/* Only appears inside the desktop app (feature-detect); in a regular
+              browser it renders nothing — not even the <li>, since the component
+              itself owns the SidebarMenuItem. */}
           <ExecutorLocalBadge />
           <SidebarMenuItem>
             <ActiveRunsIndicator />

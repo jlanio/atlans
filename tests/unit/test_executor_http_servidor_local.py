@@ -1,11 +1,11 @@
 """
-`get_agent_http_config` (flow) decide se desliga TLS/mTLS pelo HOSTNAME exato.
+`get_agent_http_config` (flow) decides whether to disable TLS/mTLS by the exact HOSTNAME.
 
-Antes o flow comparava por substring (`"localhost" in base_url`): um servidor
-`wss://localhost.evil.tld`, ou qualquer URL com "localhost" na query, virava
-"local" e os nos (publish_map, send_email, response_node...) falavam com ele
-com `verify=False`, sem mTLS. O executor ja tinha corrigido a mesma regra em
-`executor.utils.is_local_server`; agora ha uma implementacao so, no flow/.
+Before, flow compared by substring (`"localhost" in base_url`): a server
+`wss://localhost.evil.tld`, or any URL with "localhost" in the query, became
+"local" and the nodes (publish_map, send_email, response_node...) talked to it
+with `verify=False`, without mTLS. The executor had already fixed the same rule
+in `executor.utils.is_local_server`; now there is a single implementation, in flow/.
 """
 from unittest.mock import patch
 

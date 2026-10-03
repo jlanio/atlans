@@ -1,26 +1,26 @@
 # flow/utils/definition_lint.py
-"""Lint estático de uma definition de workflow, ANTES do simulador.
+"""Static lint of a workflow definition, BEFORE the simulator.
 
-O simulador (`WorkflowExecutor.simulate_runner`) exige um executor construído,
-e o construtor estoura com nome de nó inexistente e com ciclo (500 no
-/validate), enquanto outros defeitos passam em silêncio: alias inválido cai no
-`name`, aresta órfã é ignorada, propriedade inventada é descartada, id
-duplicado sobrescreve o nó anterior. Um agente que monta a definição por API
-precisa OUVIR isso tudo de uma vez, com código estável por problema — não uma
-exceção por vez.
+The simulator (`WorkflowExecutor.simulate_runner`) requires a constructed
+executor, and the constructor blows up on a nonexistent node name and on a cycle
+(500 on /validate), while other defects pass silently: an invalid alias falls
+back to `name`, an orphan edge is ignored, an invented property is dropped, a
+duplicate id overwrites the previous node. An agent that builds the definition
+through the API needs to HEAR all of that at once, with a stable code per
+problem — not one exception at a time.
 
-Puro por desenho: só stdlib, flow.core.* e flow.utils.*. Não importa o
-registry nem a factory (o chamador passa os nomes e os descriptors), então
-roda sem geopandas carregado e sem sessão de banco.
+Pure by design: only stdlib, flow.core.* and flow.utils.*. It does not import
+the registry or the factory (the caller passes the names and the descriptors),
+so it runs without geopandas loaded and without a database session.
 
-Os checks são CUMULATIVOS: cada passo continua depois de um erro, para o
-relatório sair inteiro. `RelatorioLint.fatal` diz se vale a pena tentar
-construir o executor depois (o que derrubaria o construtor).
+The checks are CUMULATIVE: each step continues after an error, so the report
+comes out whole. `RelatorioLint.fatal` says whether it is worth trying to
+construct the executor afterwards (which would bring the constructor down).
 
-Tudo aqui roda síncrono no event loop do servidor, sobre texto que o cliente
-controla: toda varredura de string é LINEAR (ver `_partes_jinja`) e as
-heurísticas de referência (alias, `inputs.x`) ignoram strings acima de
-`_TAMANHO_MAX_TEXTO` — a checagem de segredo nunca ignora.
+Everything here runs synchronously on the server's event loop, over text the
+client controls: every string scan is LINEAR (see `_partes_jinja`) and the
+reference heuristics (alias, `inputs.x`) ignore strings above
+`_TAMANHO_MAX_TEXTO` — the secret check never skips.
 """
 from __future__ import annotations
 
@@ -36,66 +36,67 @@ from flow.core.graph import WorkflowGraph
 from flow.utils.parameter_validation import _CHAVES_DE_PLATAFORMA
 from flow.utils.workflow_contract import _parse_ports
 
-# Códigos que derrubariam o construtor do WorkflowExecutor. `construction_error`
-# não nasce aqui: é o código que o chamador usa quando, mesmo com o lint limpo,
-# a construção estourou — o vocabulário fica num lugar só. `unknown_node` só
-# derruba o construtor se o nó entra na ordem de execução (o NodeManager só
-# instancia esses); o passo do grafo rebaixa os demais (ver `Diagnostico.fatal`).
-# `invalid_credential_id` é fatal por contrato, não por construção: um id que
-# não é UUID nunca chega ao banco, e o cliente que só olha o status HTTP (o
-# `validar.py` da skill) precisa continuar reprovando como reprovava com o 403.
+# Codes that would bring down the WorkflowExecutor constructor. `construction_error`
+# does not originate here: it is the code the caller uses when, even with a clean
+# lint, construction blew up — the vocabulary lives in one place. `unknown_node`
+# only brings down the constructor if the node is in the execution order (the
+# NodeManager only instantiates those); the graph step downgrades the rest (see
+# `Diagnostico.fatal`). `invalid_credential_id` is fatal by contract, not by
+# construction: an id that is not a UUID never reaches the database, and a client
+# that only looks at the HTTP status (the skill's `validar.py`) must keep failing
+# as it did with the 403.
 FATAIS = frozenset({
     "unknown_node", "duplicate_node_id", "cycle", "construction_error", "invalid_credential_id",
 })
 
-# Cópia de `_PROPRIEDADES_SECRETAS` (flow/factory.py), em minúsculas: as chaves
-# que só deveriam chegar ao nó por injeção do servidor. Não se importa a factory
-# porque ela puxa o registry inteiro; tests/unit/test_definition_lint.py garante
-# que as duas listas continuam iguais.
+# Copy of `_PROPRIEDADES_SECRETAS` (flow/factory.py), in lowercase: the keys
+# that should only reach the node through server injection. The factory is not
+# imported because it pulls in the whole registry; tests/unit/test_definition_lint.py
+# ensures the two lists stay the same.
 CHAVES_SECRETAS = frozenset({
     "http_auth", "s3_auth", "connectionstring", "token", "password", "senha",
     "secret", "api_key", "apikey", "authorization", "private_key",
     "awssecretaccesskey",
 })
 
-# Cabeçalhos HTTP que carregam credencial quando escritos à mão em `headers`.
-# Superconjunto de `_CABECALHOS_DE_CREDENCIAL` (flow/nodes/action/http_request.py),
-# a lista que o nó derruba ao seguir um 3xx para outra origem — o que o nó
-# considera credencial em trânsito o lint considera credencial gravada.
-# `cookie` e `proxy-authorization` carregam sessão e credencial de proxy tão
-# literalmente quanto `Authorization`; sem eles `headers.Cookie` saía em claro
-# na definition e na redação (que importa esta lista). `x-api-key` só existe
-# aqui: é chave gravada, não cabeçalho a derrubar num redirecionamento.
-# tests/unit/test_definition_lint.py vigia a inclusão.
+# HTTP headers that carry a credential when written by hand in `headers`.
+# Superset of `_CABECALHOS_DE_CREDENCIAL` (flow/nodes/action/http_request.py),
+# the list the node drops when following a 3xx to another origin — what the node
+# considers a credential in transit the lint considers a stored credential.
+# `cookie` and `proxy-authorization` carry a session and a proxy credential as
+# literally as `Authorization`; without them `headers.Cookie` went out in plain
+# text in the definition and in the redaction (which imports this list).
+# `x-api-key` only exists here: it is a stored key, not a header to drop on a
+# redirect. tests/unit/test_definition_lint.py watches over the inclusion.
 _CABECALHOS_SECRETOS = frozenset({
     "authorization", "x-api-key", "cookie", "proxy-authorization",
 })
 
-# O que sobra de um valor depois de tirar as expressões e que NÃO é segredo:
-# só o esquema de autenticação ("Bearer {{ $Cred.token }}" → "Bearer").
+# What remains of a value after removing the expressions and that is NOT a secret:
+# only the authentication scheme ("Bearer {{ $Cred.token }}" → "Bearer").
 _ESQUEMAS_DE_AUTENTICACAO = frozenset({"bearer", "basic", "token", "apikey", "api-key"})
 
-# Referência `$Alias` ou `$Alias.campo.sub` — o mesmo padrão de
-# flow/utils/expression_service.py (`_ALIAS_PATTERN`), repetido aqui para não
-# puxar o jinja2 num módulo puro. `[^\W\d]` é "letra ou _" em Unicode.
+# A `$Alias` or `$Alias.campo.sub` reference — the same pattern as
+# flow/utils/expression_service.py (`_ALIAS_PATTERN`), repeated here so as not
+# to pull jinja2 into a pure module. `[^\W\d]` is "letter or _" in Unicode.
 _ALIAS_REF = re.compile(r"\$[^\W\d]\w*(?:\.[^\W\d]\w*)*")
 
-# `inputs.nome` / `inputs["nome"]` dentro de um bloco Jinja. O lookbehind evita
-# `nodes.inputs.x`; `$` continua permitido antes (`{{ $inputs.x }}` renderiza).
+# `inputs.nome` / `inputs["nome"]` inside a Jinja block. The lookbehind avoids
+# `nodes.inputs.x`; `$` is still allowed before it (`{{ $inputs.x }}` renders).
 _INPUTS_EM_JINJA = re.compile(
     r"(?<![\w.])inputs\s*(?:\.\s*([^\W\d]\w*)|\[\s*(['\"])([^'\"\]]+)\2\s*\])"
 )
 
-# Teto por string para as heurísticas de referência (alias, inputs). Um
-# parâmetro de formulário não chega perto; um payload hostil chega, e o
-# relatório não precisa de nada que esteja dentro de 16 mil caracteres de texto.
+# Per-string ceiling for the reference heuristics (alias, inputs). A form
+# parameter does not come close; a hostile payload does, and the report
+# needs nothing that lies inside 16 thousand characters of text.
 _TAMANHO_MAX_TEXTO = 16_000
 
-# Teto da descida por dict/list — estrutura patológica não vira recursão infinita.
+# Ceiling on the descent through dict/list — a pathological structure does not become infinite recursion.
 _PROFUNDIDADE_MAX = 32
 
-# Teto do total de texto que o índice de referências a alias percorre (soma
-# das strings da definição): ~1 s de CPU no pior caso, e é só para um aviso.
+# Ceiling on the total text the alias reference index goes through (sum of
+# the definition's strings): ~1 s of CPU in the worst case, and it is only for a warning.
 _ORCAMENTO_INDICE = 2_000_000
 
 
@@ -106,13 +107,13 @@ class Diagnostico:
     message: str
     node_id: Optional[str] = None
     edge: Optional[dict] = None
-    # Derrubaria o construtor do executor? Fora do `as_dict()`: é decisão
-    # interna do servidor (422 antes de simular), não parte do contrato.
+    # Would it bring down the executor constructor? Outside `as_dict()`: it is an
+    # internal server decision (422 before simulating), not part of the contract.
     fatal: bool = False
 
     def as_dict(self) -> dict:
-        """Sempre as cinco chaves: quem consome (MCP, script) não precisa
-        tratar campo ausente como caso especial."""
+        """Always the five keys: consumers (MCP, script) do not need to
+        handle a missing field as a special case."""
         return {
             "code": self.code,
             "severity": self.severity,
@@ -131,7 +132,7 @@ class RelatorioLint:
 
     @property
     def fatal(self) -> bool:
-        """Algum erro derrubaria o construtor do executor?"""
+        """Would any error bring down the executor constructor?"""
         return any(d.fatal for d in self.errors)
 
     def erro(self, code: str, message: str, *, node_id: Optional[str] = None,
@@ -150,17 +151,17 @@ class RelatorioLint:
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _partes_jinja(texto: str) -> list:
-    """Alterna texto comum e bloco Jinja: [fora, dentro, fora, ..., fora].
+    """Alternates plain text and Jinja block: [outside, inside, outside, ..., outside].
 
-    Tokenizador LINEAR com `str.find`: acha a próxima abertura (`{{` ou `{%`)
-    e, a partir dela, o fechamento correspondente; sem fechamento, o resto da
-    string é texto comum. Substitui `re.split` com `(\\{\\{.*?\\}\\}|...)`, que
-    era quadrático numa string de `{{` repetidos sem `}}` — 40 KB custavam 6 s
-    de CPU síncrona no event loop, 100 KB custavam 40 s.
+    LINEAR tokenizer with `str.find`: finds the next opening (`{{` or `{%`)
+    and, from there, the matching closing; with no closing, the rest of the
+    string is plain text. Replaces `re.split` with `(\\{\\{.*?\\}\\}|...)`, which
+    was quadratic on a string of repeated `{{` without `}}` — 40 KB cost 6 s
+    of synchronous CPU on the event loop, 100 KB cost 40 s.
 
-    A próxima ocorrência de cada abertura é lembrada e só recalculada quando
-    `pos` a ultrapassa: sem isso, um texto com milhares de `{{` e nenhum `{%`
-    faria o find de `{%` varrer o resto da string a cada bloco.
+    The next occurrence of each opening is remembered and only recomputed when
+    `pos` passes it: without that, a text with thousands of `{{` and no `{%`
+    would make the find for `{%` scan the rest of the string at every block.
     """
     partes: list = []
     pos = 0
@@ -190,39 +191,39 @@ def _blocos_jinja(texto: str) -> list:
 
 
 def _tem_template(texto: str) -> bool:
-    """A string tem algum bloco Jinja ou referência `$Alias`? Então o valor
-    final só existe em runtime, e o lint não pode julgar o texto cru."""
+    """Does the string have any Jinja block or `$Alias` reference? Then the final
+    value only exists at runtime, and the lint cannot judge the raw text."""
     return len(_partes_jinja(texto)) > 1 or _ALIAS_REF.search(texto) is not None
 
 
 def _residuo_literal(texto: str) -> str:
-    """O que resta de uma string sem os blocos Jinja, as referências `$Alias`
-    e os espaços: o que foi gravado LITERALMENTE na definição."""
+    """What remains of a string without the Jinja blocks, the `$Alias` references
+    and the whitespace: what was written LITERALLY in the definition."""
     partes = _partes_jinja(texto)
     fora = "".join(partes[i] for i in range(0, len(partes), 2))
-    # Junta com ESPAÇO, não com nada. Colando os pedaços, duas linhas de um
-    # texto livre viravam uma string só — o corpo de um e-mail que termine numa
-    # URL e comece a linha seguinte com um endereço de e-mail produzia um
-    # "host:usuario@dominio" que nunca foi escrito por ninguém, casava com o
-    # padrão de URL-com-credencial, e fazia a mensagem ser acusada de guardar
-    # senha. A assimetria denunciava o erro: a MESMA URL com caminho no fim
-    # passava, porque a barra quebrava o casamento.
+    # Joins with a SPACE, not with nothing. Gluing the pieces together, two lines of
+    # free text became a single string — the body of an e-mail ending in a
+    # URL and starting the next line with an e-mail address produced a
+    # "host:usuario@dominio" that nobody ever wrote, matched the
+    # URL-with-credential pattern, and got the message accused of storing a
+    # password. The asymmetry gave the bug away: the SAME URL with a path at the
+    # end passed, because the slash broke the match.
     #
-    # O espaço não afeta o que a função existe para medir — se sobrou texto
-    # literal, e se esse texto é só um esquema de autenticação: um DSN de
-    # verdade não tem espaço dentro.
+    # The space does not affect what the function exists to measure — whether
+    # literal text was left, and whether that text is only an authentication
+    # scheme: a real DSN has no space inside.
     return " ".join(_ALIAS_REF.sub("", fora).split())
 
 
 def _params_de(node: Mapping[str, Any]) -> dict:
-    """`parameters` é o formato do corpo da validação; `properties` o da
-    definition salva — mesma tolerância do simulate_runner."""
+    """`parameters` is the format of the validation body; `properties` that of the
+    saved definition — same tolerance as simulate_runner."""
     params = node.get("parameters") or node.get("properties") or {}
     return params if isinstance(params, dict) else {}
 
 
 def _strings(valor: Any, profundidade: int = 0) -> Iterator[str]:
-    """Todos os valores string de uma estrutura, descendo por dict/list."""
+    """All the string values of a structure, descending through dict/list."""
     if profundidade > _PROFUNDIDADE_MAX:
         return
     if isinstance(valor, str):
@@ -236,14 +237,14 @@ def _strings(valor: Any, profundidade: int = 0) -> Iterator[str]:
 
 
 def _preenchido(valor: Any, profundidade: int = 0) -> bool:
-    """Há um segredo LITERAL aqui dentro?
+    """Is there a LITERAL secret in here?
 
-    String: tira blocos Jinja e referências `$Alias`; o que sobra só conta se
-    não for vazio nem apenas um esquema de autenticação — "Bearer {{
-    $Cred.token }}" e "Bearer $Cred.token" não gravam nada, "Bearer abc123"
-    grava. Mapping: conta se ALGUMA folha contar, ignorando a chave `type`
-    (é seletor — `{"type": "http_bearer"}` é um formulário sem token, não um
-    segredo). Sem teto de tamanho: esta é a checagem que nunca se pula.
+    String: strips Jinja blocks and `$Alias` references; what remains only counts
+    if it is not empty nor just an authentication scheme — "Bearer {{
+    $Cred.token }}" and "Bearer $Cred.token" store nothing, "Bearer abc123"
+    does. Mapping: counts if ANY leaf counts, ignoring the `type` key
+    (it is a selector — `{"type": "http_bearer"}` is a form without a token, not
+    a secret). No size ceiling: this is the check that is never skipped.
     """
     if valor is None or profundidade > _PROFUNDIDADE_MAX:
         return False
@@ -262,7 +263,7 @@ def _preenchido(valor: Any, profundidade: int = 0) -> bool:
 
 
 def _como_dict(valor: Any) -> Optional[dict]:
-    """`headers` chega como dict ou como JSON serializado pelo editor."""
+    """`headers` arrives as a dict or as JSON serialized by the editor."""
     if isinstance(valor, str):
         try:
             valor = json.loads(valor)
@@ -272,21 +273,21 @@ def _como_dict(valor: Any) -> Optional[dict]:
 
 
 class _IndiceDeReferencias:
-    """Nomes que a definição usa como alias de nó, coletados UMA vez.
+    """Names the definition uses as node aliases, collected ONCE.
 
-    Fora de bloco Jinja só `$Alias` conta. Dentro, além de `$Alias`, vale
-    `named.Alias`, `named['Alias']` e `Alias` solto como nome (`{{ Alias.x }}`,
-    `{{ Alias }}`, `{{ Alias['x'] }}`, `{{ Alias | tojson }}`, `{% for r in
-    Alias %}`) — o lookbehind exclui `inputs.Alias` e `named.Alias`, que não
-    são o alias em si.
+    Outside a Jinja block only `$Alias` counts. Inside, besides `$Alias`,
+    `named.Alias`, `named['Alias']` and a bare `Alias` as a name also count
+    (`{{ Alias.x }}`, `{{ Alias }}`, `{{ Alias['x'] }}`, `{{ Alias | tojson }}`,
+    `{% for r in Alias %}`) — the lookbehind excludes `inputs.Alias` and
+    `named.Alias`, which are not the alias itself.
 
-    A versão anterior compilava dois regex POR grupo de alias duplicado e
-    re-tokenizava TODAS as strings a cada grupo: N nós com nomes repetidos
-    custavam O(N²) tokenizações (100 nós com 16 KB cada = 24 s de CPU síncrona
-    no event loop). Aqui cada string é tokenizada uma vez, a consulta por
-    alias é uma busca em conjunto, e o total de texto indexado tem teto
-    (`_ORCAMENTO_INDICE`): é heurística de AVISO, e o lint roda síncrono no
-    handler — um corpo de dezenas de MB não pode custar dezenas de segundos.
+    The previous version compiled two regexes PER duplicated alias group and
+    re-tokenized ALL strings for each group: N nodes with repeated names
+    cost O(N²) tokenizations (100 nodes with 16 KB each = 24 s of synchronous
+    CPU on the event loop). Here each string is tokenized once, the lookup by
+    alias is a set lookup, and the total indexed text has a ceiling
+    (`_ORCAMENTO_INDICE`): it is a WARNING heuristic, and the lint runs
+    synchronously in the handler — a body of tens of MB cannot cost tens of seconds.
     """
 
     def __init__(self, textos: Iterable[str]):
@@ -300,16 +301,16 @@ class _IndiceDeReferencias:
                 break
             for m in _REF_EM_QUALQUER_LUGAR.finditer(texto):
                 self.nomes.add(m.group(1) or m.group(3))
-            # Uma chamada por string, não por bloco: a quebra de linha entre os
-            # blocos não é `[\w.$]`, então o lookbehind continua valendo.
+            # One call per string, not per block: the line break between the
+            # blocks is not `[\w.$]`, so the lookbehind still holds.
             self.nomes.update(_NOME_EM_JINJA.findall("\n".join(_blocos_jinja(texto))))
 
     def referencia(self, alias: str) -> bool:
         return alias in self.nomes
 
 
-# `$Alias`, `named.Alias` (grupo 1) e `named['Alias']` (grupo 3) — o mesmo
-# `(?!\w)` de antes: `$Ab` não referencia `A`.
+# `$Alias`, `named.Alias` (group 1) and `named['Alias']` (group 3) — the same
+# `(?!\w)` as before: `$Ab` does not reference `A`.
 _REF_EM_QUALQUER_LUGAR = re.compile(
     r"(?:\$|named\.)([^\W\d]\w*)(?!\w)"
     r"|named\[\s*(['\"])(.*?)\2\s*\]"
@@ -319,12 +320,12 @@ _NOME_EM_JINJA = re.compile(r"(?<![\w.$])([^\W\d]\w*)(?!\w)")
 
 
 def _inputs_referenciados(texto: str) -> list:
-    """Nomes de `inputs.<nome>` que um parâmetro de trigger consome.
+    """Names of `inputs.<nome>` that a trigger parameter consumes.
 
-    Só dentro de bloco Jinja: `$inputs.x` solto no texto NÃO é renderizado
-    pelo executor (`rendering._tem_expressao` só dispara `$X` quando X é alias
-    de nó), então sugerir um parâmetro a partir dele seria prometer o que o
-    run não entrega. `{{ $inputs.x }}` dentro do bloco continua valendo.
+    Only inside a Jinja block: a bare `$inputs.x` in the text is NOT rendered
+    by the executor (`rendering._tem_expressao` only triggers `$X` when X is a
+    node alias), so suggesting a parameter from it would promise what the
+    run does not deliver. `{{ $inputs.x }}` inside the block still counts.
     """
     nomes: list = []
     for bloco in _blocos_jinja(texto):
@@ -342,31 +343,31 @@ def lint_definition(
     reserved_aliases: Collection[str] = RESERVED_ALIASES,
     descriptors: Optional[Mapping[str, dict]] = None,
 ) -> RelatorioLint:
-    """Diagnósticos estáticos de `nodes` + `edges`.
+    """Static diagnostics of `nodes` + `edges`.
 
-    `registry_names`: nomes de nó válidos (chaves do NODE_REGISTRY).
-    `descriptors`: `{name: cls.description()}` — opcional; sem ele os checks de
-    propriedade (não declarada / obrigatória ausente / JSON inválido /
-    fallback vazio) não rodam.
+    `registry_names`: valid node names (keys of NODE_REGISTRY).
+    `descriptors`: `{name: cls.description()}` — optional; without it the property
+    checks (undeclared / missing required / invalid JSON / empty fallback)
+    do not run.
     """
     rel = RelatorioLint()
     nodes = [n for n in (nodes or []) if isinstance(n, Mapping)]
-    # Só arestas com as duas pontas: o Pydantic do router já garante isso, e
-    # uma entrada malformada aqui não é diagnóstico do fluxo, é lixo de payload.
+    # Only edges with both ends: the router's Pydantic already guarantees this, and
+    # a malformed entry here is not a workflow diagnostic, it is payload garbage.
     edges = [
         e for e in (edges or [])
         if isinstance(e, Mapping) and "source" in e and "target" in e
     ]
 
     def alias_efetivo(node: Mapping[str, Any], name: str) -> str:
-        # `resolve_alias` honrando o `reserved_aliases` recebido (e tolerante a
-        # nó sem `name`, que `unknown_node` já acusa).
+        # `resolve_alias` honoring the received `reserved_aliases` (and tolerant of a
+        # node without `name`, which `unknown_node` already reports).
         custom = alias_declarado(node)
         if custom and custom.isidentifier() and custom not in reserved_aliases:
             return custom
         return name
 
-    # 1. Ids duplicados. O executor monta `{id: nó}` e o último vence.
+    # 1. Duplicate ids. The executor builds `{id: nó}` and the last one wins.
     node_defs: dict = {}
     for node in nodes:
         node_defs.setdefault(str(node.get("id") or ""), node)
@@ -378,15 +379,15 @@ def lint_definition(
                 node_id=nid,
             )
 
-    # 2. Por nó: nome, alias, segredos, credential_id e propriedades.
+    # 2. Per node: name, alias, secrets, credential_id and properties.
     for node in nodes:
         nid = str(node.get("id") or "")
         name = str(node.get("name") or "")
         params = _params_de(node)
 
         if name not in registry_names:
-            # O prefixo é a mensagem da factory (flow/factory.py), à letra: é o
-            # texto que o consumidor da validação já procura.
+            # The prefix is the factory's message (flow/factory.py), verbatim: it is the
+            # text the validation's consumer already looks for.
             from flow.nodes.contrato import dica_de_no_desconhecido
             dica = dica_de_no_desconhecido(name)
             rel.erro(
@@ -415,8 +416,8 @@ def lint_definition(
                 node_id=nid,
             )
 
-        # Segredo gravado na definição. Nunca ecoar o valor: o diagnóstico vai
-        # para logs e para o cliente, e o problema é justamente o vazamento.
+        # Secret stored in the definition. Never echo the value: the diagnostic goes
+        # to logs and to the client, and the problem is precisely the leak.
         def acusar_segredo(chave: str) -> None:
             rel.erro(
                 "secret_in_definition",
@@ -455,8 +456,8 @@ def lint_definition(
                 if isinstance(p, dict) and p.get("name")
             ]
             declaradas = {p["name"] for p in props}
-            # Só a PRESENÇA da chave é checada, nunca o tipo do valor: um
-            # parâmetro pode ser expressão Jinja que só vira inteiro no run.
+            # Only the PRESENCE of the key is checked, never the value's type: a
+            # parameter can be a Jinja expression that only becomes an integer in the run.
             nao_declaradas = [
                 k for k in params
                 if k not in declaradas and k not in _CHAVES_DE_PLATAFORMA
@@ -480,12 +481,12 @@ def lint_definition(
                     "ausente(s): a execução falharia antes de rodar o nó.",
                     node_id=nid,
                 )
-            # A exceção à regra "nunca o tipo": propriedade `object` gravada como
-            # texto. O run a decodifica em validate() (`_coerce_structured`) e
-            # falha com esta mesma frase se não for JSON de dict/list — `rules`
-            # ilegível do Switch passava mudo por aqui e `schema_declarado` o
-            # escondia (só o fallback no schema). Texto com template fica de
-            # fora: `{"limite": {{ inputs.n }}}` só vira JSON válido no run.
+            # The exception to the "never the type" rule: an `object` property stored as
+            # text. The run decodes it in validate() (`_coerce_structured`) and
+            # fails with this same sentence if it is not JSON of a dict/list — an
+            # unreadable Switch `rules` passed silently through here and
+            # `schema_declarado` hid it (only the fallback in the schema). Text with
+            # a template is left out: `{"limite": {{ inputs.n }}}` only becomes valid JSON in the run.
             for prop in props:
                 if prop.get("type") != "object":
                     continue
@@ -504,12 +505,12 @@ def lint_definition(
                         "de parâmetros antes de executar o nó.",
                         node_id=nid,
                     )
-            # Switch: `fallback_output` presente e vazio não cai no default — o
-            # run lê `parameters.get("fallback_output", "output_0")` e emite a
-            # porta '' literalmente, que nenhuma aresta consegue nomear.
-            # É erro, não aviso: nenhuma aresta nomeia a porta '' (`from_key`
-            # vazio é "sem chave"), então a fiação a partir dela está morta e o
-            # diagnóstico de aresta não a enxerga — o relatório diria `ok`.
+            # Switch: a present and empty `fallback_output` does not fall to the default —
+            # the run reads `parameters.get("fallback_output", "output_0")` and emits
+            # the port '' literally, which no edge can name.
+            # It is an error, not a warning: no edge names the port '' (an empty
+            # `from_key` means "no key"), so the wiring from it is dead and the
+            # edge diagnostic does not see it — the report would say `ok`.
             if "fallback_output" in declaradas and params.get("fallback_output", None) == "":
                 rel.erro(
                     "empty_fallback_output",
@@ -519,10 +520,11 @@ def lint_definition(
                     node_id=nid,
                 )
 
-    # 3. Alias duplicado. Dois nós sob o mesmo alias: `named[alias]` guarda só o
-    # último que rodou. Com alias explícito é erro (o usuário pediu um nome e ele
-    # não aponta para onde acha). Derivado do `name` (dois "Buffer" sem alias) é
-    # normal e só vira aviso se alguma expressão de fato referencia esse nome.
+    # 3. Duplicate alias. Two nodes under the same alias: `named[alias]` keeps only
+    # the last one that ran. With an explicit alias it is an error (the user asked
+    # for a name and it does not point where they think). Derived from `name` (two
+    # "Buffer" without an alias) it is normal and only becomes a warning if some
+    # expression actually references that name.
     grupos: dict = {}
     for nid, node in node_defs.items():
         grupos.setdefault(alias_efetivo(node, str(node.get("name") or "")), []).append(node)
@@ -554,7 +556,7 @@ def lint_definition(
                 node_id=ids[0],
             )
 
-    # 4. Grafo: aresta órfã, ciclo, nós que ficam de fora do run.
+    # 4. Graph: orphan edge, cycle, nodes left out of the run.
     graph = WorkflowGraph(node_defs, edges, filter_isolated=True)
     for edge in graph.orphan_edges:
         src, tgt = edge.get("source"), edge.get("target")
@@ -579,8 +581,8 @@ def lint_definition(
             if nid in order:
                 continue
             name = str(node.get("name") or "")
-            # `.get`, não `[]`: incoming/outgoing são defaultdict e o acesso
-            # por índice criaria a chave.
+            # `.get`, not `[]`: incoming/outgoing are defaultdicts and index
+            # access would create the key.
             if not graph.incoming.get(nid) and not graph.outgoing.get(nid):
                 msg = f"nó '{name}' (id={nid}) isolado: sem arestas, fica fora da simulação e do run."
             else:
@@ -589,19 +591,19 @@ def lint_definition(
                     "fica fora da simulação e do run."
                 )
             rel.aviso("unreachable_node", msg, node_id=nid)
-        # O NodeManager só instancia os nós da ordem de execução: um nome
-        # inexistente fora dela (isolado, fora do cone do trigger) continua
-        # erro, mas não derruba o construtor. Com ciclo não há ordem — e
-        # `cycle` já é fatal.
+        # The NodeManager only instantiates the nodes in the execution order: a
+        # nonexistent name outside it (isolated, outside the trigger's cone) is still
+        # an error, but does not bring down the constructor. With a cycle there is
+        # no order — and `cycle` is already fatal.
         na_ordem = set(order)
         for d in rel.errors:
             if d.code == "unknown_node" and d.node_id not in na_ordem:
                 d.fatal = False
     rel.execution_order = list(order)
 
-    # 5. Parâmetros de execução que o fluxo espera. `{{ inputs.X }}` só é
-    # parâmetro do usuário em nó trigger (core.py: nos demais, `inputs` são as
-    # arestas). As `ports` do SubWorkflowInput são o contrato de entrada.
+    # 5. Run parameters the workflow expects. `{{ inputs.X }}` is only a user
+    # parameter in a trigger node (core.py: in the others, `inputs` are the
+    # edges). The SubWorkflowInput's `ports` are the input contract.
     sugeridos: dict = {}
     for node in nodes:
         params = _params_de(node)

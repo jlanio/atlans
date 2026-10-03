@@ -1,16 +1,16 @@
 # executor/sync/paths.py
 """
-Resolucao segura de caminhos dentro do diretorio de sync.
+Safe path resolution inside the sync directory.
 
-O nome de arquivo usado como destino de download vem do servidor
-(`WorkspaceFile.original_name`, originalmente digitado por um usuario no upload).
-Tratar esse valor como caminho confiavel permitia escapar do sync_dir com
-`../`, com um caminho absoluto (`/etc/x.geojson`, `C:\\Windows\\x.geojson`) ou
-atraves de um symlink plantado dentro da pasta — virando escrita/remocao
-arbitraria de arquivo no host do executor.
+The file name used as a download destination comes from the server
+(`WorkspaceFile.original_name`, originally typed by a user at upload).
+Treating that value as a trusted path allowed escaping sync_dir with `../`,
+with an absolute path (`/etc/x.geojson`, `C:\\Windows\\x.geojson`) or
+through a symlink planted inside the folder — turning into arbitrary file
+write/removal on the executor host.
 
-O servidor tambem sanitiza na ingestao, mas o executor NAO pode depender disso:
-ele confia no servidor para *o que executar*, nao para *onde escrever*.
+The server also sanitizes at ingestion, but the executor must NOT rely on it:
+it trusts the server for *what to execute*, not for *where to write*.
 """
 import logging
 import re
@@ -24,43 +24,43 @@ from executor.utils import ocultar_no_windows
 
 logger = logging.getLogger("executor.sync")
 
-# Lixeira local do sync. Uma delecao no Drive nao pode virar `unlink()` no disco
-# do tecnico: nao ha lixeira do SO no caminho, nao ha re-download de recuperacao
-# e um shapefile perde .shp/.dbf/.shx de uma vez. Movemos para ca em vez de
-# apagar. Fica DENTRO do sync_dir para o move ser um rename no mesmo volume
-# (atomico e barato), e o scanner/watcher ignoram esse nome explicitamente para
-# a lixeira nao virar um loop de reupload.
+# Local sync trash. A deletion in Drive must not become an `unlink()` on the
+# technician's disk: there is no OS trash on that path, no recovery re-download
+# and a shapefile loses .shp/.dbf/.shx all at once. We move things here instead
+# of deleting them. It lives INSIDE sync_dir so the move is a rename on the
+# same volume (atomic and cheap), and the scanner/watcher explicitly ignore
+# this name so the trash doesn't become a re-upload loop.
 TRASH_DIR_NAME = ".atlans-trash"
 
-# Como a lixeira mora dentro do sync_dir, ela come a mesma cota do notebook de
-# campo e e invisivel para o tecnico (nome com ponto no Linux/macOS e atributo
-# oculto no Windows — ver `move_dataset_to_trash`; ignorada por scanner e
-# watcher). Sem expurgo, uma pasta com rotatividade normal — raster diario
-# substituido no Drive — enche o disco em semanas, e o unico sintoma seria o
-# 'Erro ao salvar manifesto' do manifest.py.
+# Since the trash lives inside sync_dir, it eats the same quota on the field
+# laptop and is invisible to the technician (dot name on Linux/macOS and hidden
+# attribute on Windows — see `move_dataset_to_trash`; ignored by scanner and
+# watcher). Without a purge, a folder with normal turnover — a daily raster
+# replaced in Drive — fills the disk in weeks, and the only symptom would be
+# manifest.py's 'Erro ao salvar manifesto' (error saving manifest).
 TRASH_RETENTION_DAYS = 14
 TRASH_WARN_BYTES = 2 * 1024 * 1024 * 1024  # 2 GB acumulados → avisa o painel
 
-# Rotulo de pasta de descarte: a chave do manifesto vira nome de diretorio, e o
-# manifesto e um arquivo em disco que pode ter sido editado a mao.
+# Discard folder label: the manifest key becomes a directory name, and the
+# manifest is a file on disk that may have been edited by hand.
 _TRASH_LABEL_UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
 class UnsafePathError(ValueError):
-    """Nome de arquivo tentou escapar do diretorio de sync."""
+    """File name tried to escape the sync directory."""
 
 
 def safe_join(base: Path, name: str) -> Path:
     """
-    Devolve `base/name` garantindo que o resultado fique DENTRO de `base`.
+    Returns `base/name` ensuring the result stays INSIDE `base`.
 
-    Levanta UnsafePathError se `name` contiver componentes de diretorio, for
-    absoluto, ou se o caminho resolvido escapar da base (inclusive via symlink).
+    Raises UnsafePathError if `name` contains directory components, is
+    absolute, or if the resolved path escapes the base (including via symlink).
     """
     if not name or name in (".", ".."):
         raise UnsafePathError(f"Nome de arquivo invalido: {name!r}")
 
-    # Qualquer separador de caminho e recusado — o sync e plano por design.
+    # Any path separator is refused — the sync is flat by design.
     normalized = name.replace("\\", "/")
     if "/" in normalized:
         raise UnsafePathError(f"Nome de arquivo contem separador de caminho: {name!r}")
@@ -68,7 +68,7 @@ def safe_join(base: Path, name: str) -> Path:
     candidate = base / normalized
     try:
         base_resolved = base.resolve()
-        # strict=False: o arquivo de destino ainda nao existe no download.
+        # strict=False: the destination file doesn't exist yet on download.
         resolved = candidate.resolve(strict=False)
     except OSError as exc:
         raise UnsafePathError(f"Falha ao resolver caminho para {name!r}: {exc}") from exc
@@ -81,7 +81,7 @@ def safe_join(base: Path, name: str) -> Path:
 
 
 def safe_join_or_none(base: Path, name: str, *, context: str = "") -> Path | None:
-    """Variante que loga e devolve None em vez de levantar — para loops de sync."""
+    """Variant that logs and returns None instead of raising — for sync loops."""
     try:
         return safe_join(base, name)
     except UnsafePathError as exc:
@@ -94,20 +94,20 @@ def safe_join_or_none(base: Path, name: str, *, context: str = "") -> Path | Non
 
 def is_inside(base: Path, path: Path) -> bool:
     """
-    Confirma que `path`, JA RESOLVIDO (symlinks seguidos), fica dentro de `base`.
+    Confirms that `path`, ALREADY RESOLVED (symlinks followed), is inside `base`.
 
-    Usado na contencao do UPLOAD: o download sempre passou por `safe_join`, mas
-    o upload nao tinha contencao nenhuma — um symlink plantado na pasta de sync
-    (`ln -s /opt/atlans/executor/certs/client.key pontos.csv`) publicava um
-    arquivo de fora no Drive do workspace. Exige que o arquivo exista
-    (strict=True): so subimos o que conseguimos resolver de fato.
+    Used for UPLOAD containment: the download always went through `safe_join`,
+    but the upload had no containment at all — a symlink planted in the sync
+    folder (`ln -s /opt/atlans/executor/certs/client.key pontos.csv`) published
+    an outside file to the workspace Drive. Requires the file to exist
+    (strict=True): we only upload what we can actually resolve.
 
-    ESCOPO: isto e contencao de CAMINHO, nao de proveniencia de conteudo. Um
-    hardlink continua passando (`resolve()` nao o desfaz e `is_symlink()` e
-    False), e nao ha contencao possivel contra isso — quem consegue criar o
-    hardlink ja consegue copiar o arquivo para dentro da pasta, o que publicaria
-    exatamente os mesmos bytes. O que garantimos e que o executor so le bytes de
-    dentro do sync_dir.
+    SCOPE: this is PATH containment, not content provenance. A hardlink still
+    gets through (`resolve()` doesn't undo it and `is_symlink()` is False), and
+    no containment is possible against it — whoever can create the hardlink
+    can already copy the file into the folder, which would publish exactly the
+    same bytes. What we guarantee is that the executor only reads bytes from
+    inside sync_dir.
     """
     try:
         resolved = path.resolve(strict=True)
@@ -124,18 +124,18 @@ def _trash_label(ds_name: str) -> str:
 
 def move_dataset_to_trash(sync_dir: Path, ds_name: str, files: Iterable[Path]) -> list[Path]:
     """
-    Move os arquivos de UM dataset para `<sync_dir>/.atlans-trash/<ds>_<stamp>/`,
-    preservando os nomes originais. Devolve a lista dos que NAO puderam ser
-    movidos (vazia = descarte completo).
+    Moves the files of ONE dataset to `<sync_dir>/.atlans-trash/<ds>_<stamp>/`,
+    preserving the original names. Returns the list of those that could NOT be
+    moved (empty = complete discard).
 
-    O descarte e por DATASET, nao por arquivo, porque um shapefile so e
-    utilizavel se .shp/.dbf/.shx compartilham o mesmo stem — e era justamente
-    "um shapefile perde .shp/.dbf/.shx de uma vez" a razao de existir da lixeira.
-    Carimbar cada arquivo individualmente quebrava o bundle de duas formas: o
-    stamp tem granularidade de segundo (um laco sobre componentes de centenas de
-    MB atravessa a virada) e o contador anti-colisao era independente por
-    arquivo. Uma subpasta por descarte resolve stem, colisao e ainda da ao
-    expurgo por idade uma unidade natural.
+    The discard is per DATASET, not per file, because a shapefile is only
+    usable if .shp/.dbf/.shx share the same stem — and "a shapefile loses
+    .shp/.dbf/.shx all at once" was precisely the trash's reason to exist.
+    Stamping each file individually broke the bundle in two ways: the stamp
+    has one-second granularity (a loop over components of hundreds of MB
+    crosses the boundary) and the anti-collision counter was independent per
+    file. One subfolder per discard solves stem, collision, and also gives the
+    age-based purge a natural unit.
     """
     alvos = [p for p in files]
     if not alvos:
@@ -146,10 +146,10 @@ def move_dataset_to_trash(sync_dir: Path, ds_name: str, files: Iterable[Path]) -
     label = _trash_label(ds_name)
     try:
         trash.mkdir(parents=True, exist_ok=True)
-        # No Windows o ponto no nome nao esconde a pasta; sem o atributo oculto
-        # a lixeira apareceria no meio dos dados do usuario. Reaplicado a cada
-        # descarte porque mkdir(exist_ok=True) nao devolve se a pasta ja existia,
-        # e ocultar uma pasta ja oculta e no-op.
+        # On Windows the dot in the name doesn't hide the folder; without the hidden
+        # attribute the trash would show up among the user's data. Reapplied on
+        # every discard because mkdir(exist_ok=True) doesn't report whether the
+        # folder already existed, and hiding an already hidden folder is a no-op.
         ocultar_no_windows(trash)
         dest_dir = trash / f"{label}_{stamp}"
         counter = 1
@@ -189,8 +189,8 @@ def _size_of(path: Path) -> int:
 
 def purge_trash(sync_dir: Path, max_age_days: int = TRASH_RETENTION_DAYS) -> tuple[int, int]:
     """
-    Remove descartes com mais de `max_age_days` dias. Sincrono (I/O de disco):
-    o chamador roda em thread. Devolve (descartes_removidos, bytes_restantes).
+    Removes discards older than `max_age_days` days. Synchronous (disk I/O):
+    the caller runs it in a thread. Returns (descartes_removidos, bytes_restantes).
     """
     trash = sync_dir / TRASH_DIR_NAME
     if not trash.is_dir():

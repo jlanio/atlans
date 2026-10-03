@@ -29,32 +29,33 @@ import { NODE_ICONS } from "@/consts/WorkflowIcons"
 import { TYPE_STYLES, DEFAULT_STYLE } from "@/consts/NodeTypeStyles"
 import { RESERVED_ALIASES, isValidAlias } from "../utils/node-alias"
 
-// Classes compartilhadas pelos paineis laterais (Entrada / Saida) e modal central.
-// Centralizar evita drift visual entre os 3 paineis ao ajustar largura/sombra.
-// Os painéis de Entrada/Saída somam 480px com o modal no meio — não cabem num
-// telefone junto com nada. Somem abaixo de `lg`, onde o conjunto passaria a se
-// espremer mutuamente; o modal central continua dando acesso à configuração, e
-// os dados de entrada/saída continuam no painel de execução.
+// Classes shared by the side panels (Input / Output) and the central modal.
+// Centralizing them avoids visual drift among the 3 panels when adjusting width/shadow.
+// The Input/Output panels add up to 480px with the modal in the middle — they
+// don't fit on a phone alongside anything. They are hidden below `lg`, where the
+// set would start squeezing each other; the central modal still gives access to
+// the configuration, and the input/output data is still in the run panel.
 const SIDE_PANEL = "hidden lg:flex w-[240px] shrink-0 flex-col overflow-y-auto bg-card border border-border/60 shadow-lg pointer-events-auto h-[68vh] z-[1]"
-// `max-w-[60vw]` sozinho dava 216px num telefone de 360px — mais estreito que o
-// próprio card do nó. No telefone o modal ocupa a tela, descontada uma margem.
+// `max-w-[60vw]` alone gave 216px on a 360px phone — narrower than the node
+// card itself. On a phone the modal takes the screen, minus a margin.
 const MODAL_BOX  = "relative pointer-events-auto bg-background rounded-lg border border-border shadow-lg flex flex-col w-full max-w-[calc(100vw-1.5rem)] h-[88vh] lg:w-[600px] lg:max-w-[60vw] lg:h-[80vh] z-[2]"
-// Reservados vêm de utils/node-alias, mesma lista do executor — o autocomplete
-// e esta validação precisam concordar sobre o que é um alias utilizável.
+// Reserved names come from utils/node-alias, the same list as the executor — the
+// autocomplete and this validation must agree on what a usable alias is.
 
 /**
- * Modal de configuração de nó estilo N8N.
- * Renderizado como portal (sem overlay bloqueante) para permitir
- * drag-and-drop dos painéis laterais de Entrada/Saída.
+ * N8N-style node configuration modal.
+ * Rendered as a portal (no blocking overlay) to allow
+ * drag-and-drop from the Input/Output side panels.
  */
 const NodeConfigModal = () => {
   const { id: workflowId } = useParams<{ id?: string }>()
   const { setNodes, getNode } = useReactFlow<INodeContext, Edge>()
   const { configNodeIdParam, removeConfigNodeParam } = useConfigNodeParams()
-  // O modal é um portal SEM overlay bloqueante: o canvas continua arrastável com
-  // ele aberto. Assinar `useNodes()` fazia a reconciliação abaixo (e o formulário
-  // inteiro) rodar a cada pointermove. Estas duas assinaturas só mudam quando o
-  // `data` do nó em edição é substituído ou quando algum nó entra/sai.
+  // The modal is a portal WITHOUT a blocking overlay: the canvas stays draggable
+  // while it is open. Subscribing to `useNodes()` made the reconciliation below
+  // (and the whole form) run on every pointermove. These two subscriptions only
+  // change when the `data` of the node being edited is replaced or when some
+  // node enters/leaves.
   const dadosDoNo = useStore(s => (configNodeIdParam ? s.nodeLookup.get(configNodeIdParam)?.data : undefined))
   const totalDeNos = useStore(s => s.nodeLookup.size)
   const [nodeFound, setNodeFound] = useState<INodeContext>()
@@ -66,7 +67,7 @@ const NodeConfigModal = () => {
   const pinnedNodes = useWorkflowCatalogStore(s => s.pinnedNodes)
   const setPinnedNodes = useWorkflowCatalogStore(s => s.setPinnedNodes)
 
-  // ── Estado do alias editável ──────────────────────────────────────────────
+  // ── Editable alias state ──────────────────────────────────────────────────
   const [aliasTitle, setAliasTitle] = useState<string>("")
   const [aliasError, setAliasError] = useState<string | null>(null)
   const [showGuide, setShowGuide] = useState(false)
@@ -77,8 +78,8 @@ const NodeConfigModal = () => {
   const requiresCredential = !!(nodeFound?.data as { requires_credential?: boolean })?.requires_credential
   const isOpen = !!configNodeIdParam && !!nodeFound
 
-  // Resolve nodeFound a partir do param da URL. Se a lista de nodes ja foi
-  // hidratada e o id nao existe mais (ex: nó deletado), limpa o param.
+  // Resolves nodeFound from the URL param. If the node list has already been
+  // hydrated and the id no longer exists (e.g. deleted node), clears the param.
   useEffect(() => {
     if (!configNodeIdParam) return
     const found = getNode(configNodeIdParam)
@@ -94,9 +95,9 @@ const NodeConfigModal = () => {
     setConfigTab("geral")
   }, [configNodeIdParam, nodeFound])
 
-  // Compat retroativa do nó Response: workflows antigos não têm bodyMode.
-  // Deduzir uma vez ao abrir, espelhando o comportamento que o backend
-  // teria para o legado (literal se customBody preenchido, senão field).
+  // Backward compat for the Response node: old workflows have no bodyMode.
+  // Deduce it once on open, mirroring the behavior the backend would have
+  // for legacy (literal if customBody is filled, otherwise field).
   useEffect(() => {
     if (nodeFound?.data.name !== "Response" || !values) return
     if (values.bodyMode !== undefined) return
@@ -106,7 +107,7 @@ const NodeConfigModal = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeFound?.id])
 
-  // Sincroniza título do alias quando valores mudam
+  // Syncs the alias title when values change
   useEffect(() => {
     setAliasTitle(
       !values || values?.alias === ""
@@ -142,9 +143,9 @@ const NodeConfigModal = () => {
       })
     }
 
-    // A posição vem do canvas, não da fotografia que o modal abriu com: o nó
-    // pode ter sido arrastado enquanto o formulário estava aberto (não há
-    // overlay bloqueante) e gravar a posição antiga o faria pular de volta.
+    // The position comes from the canvas, not from the snapshot the modal opened
+    // with: the node may have been dragged while the form was open (there is no
+    // blocking overlay) and writing the old position would make it jump back.
     const noAtualizado = {
       ...nodeFound,
       position: getNode(nodeFound.id)?.position ?? nodeFound.position,
@@ -155,7 +156,7 @@ const NodeConfigModal = () => {
       },
     } as INodeContext
 
-    // Forma funcional: aplica sobre a lista mais recente da store.
+    // Functional form: applies on top of the store's latest list.
     setNodes(nds => nds.map(node => (node.id === noAtualizado.id ? noAtualizado : node)))
     setNodeFound(noAtualizado)
     removeConfigNodeParam()
@@ -170,7 +171,7 @@ const NodeConfigModal = () => {
     }
   }
 
-  // Fecha ao pressionar Escape
+  // Closes when Escape is pressed
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") handleClosePanel()
   }, [nodeFound, values]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -184,20 +185,20 @@ const NodeConfigModal = () => {
 
   if (!isOpen || !nodeFound) return null
 
-  // Modal renderizado como portal — sem overlay bloqueante
+  // Modal rendered as a portal — no blocking overlay
   const modal = createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-      {/* Backdrop sutil — clicável para fechar, permite drag-through */}
+      {/* Subtle backdrop — clickable to close, allows drag-through */}
       <div
         className="absolute inset-0 bg-black/20 pointer-events-auto"
         onClick={handleClosePanel}
       />
 
-      {/* Wrapper dos 3 painéis. `px-3` no telefone impede o modal de encostar
-          nas bordas, e `px-safe` recua do notch em paisagem. */}
+      {/* Wrapper of the 3 panels. `px-3` on a phone keeps the modal from touching
+          the edges, and `px-safe` backs off from the notch in landscape. */}
       <div className="relative z-10 flex items-center pointer-events-none w-full justify-center px-3 px-safe lg:w-auto lg:px-0">
 
-        {/* Painel esquerdo — Entrada (atrás do modal, menor) */}
+        {/* Left panel — Input (behind the modal, smaller) */}
         <div className={`${SIDE_PANEL} rounded-l-lg -mr-2`}>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 px-4 pt-3 pb-1 shrink-0">
             Entrada
@@ -205,27 +206,27 @@ const NodeConfigModal = () => {
           <InputInspector nodeFound={nodeFound} />
         </div>
 
-        {/* Modal central — na frente, maior, sobrepõe as bordas dos painéis */}
+        {/* Central modal — in front, larger, overlaps the panels' edges */}
         <div className={MODAL_BOX}>
-        {/* Header rico com ícone e cor do tipo */}
+        {/* Rich header with the type's icon and color */}
         {(() => {
           const nodeType = nodeFound?.data.type ?? ""
           const style = TYPE_STYLES[nodeType] ?? DEFAULT_STYLE
           const IconComponent = NODE_ICONS[nodeName] ?? null
           return (
             <div className="shrink-0 border-b flex items-stretch overflow-hidden rounded-t-lg">
-              {/* Stripe colorida à esquerda */}
+              {/* Colored stripe on the left */}
               <div className={`w-[3px] shrink-0 ${style.stripe}`} />
 
               <div className="flex items-center gap-3 px-4 py-3 flex-1 min-w-0">
-                {/* Ícone do nó */}
+                {/* Node icon */}
                 {IconComponent && (
                   <div className={`flex items-center justify-center w-9 h-9 rounded-md shrink-0 ${style.bg}`}>
                     <IconComponent className={`text-lg ${style.icon}`} />
                   </div>
                 )}
 
-                {/* Alias + descrição */}
+                {/* Alias + description */}
                 <div className="flex flex-col flex-1 min-w-0">
                   <div className="group flex items-center gap-1">
                     <input
@@ -254,8 +255,8 @@ const NodeConfigModal = () => {
                     />
                     <MdEdit
                       size={14}
-                      // `coarse:`: o lápis é a única pista de que o alias é
-                      // editável, e sem hover ele nunca aparecia no telefone.
+                      // `coarse:`: the pencil is the only cue that the alias is
+                      // editable, and without hover it never showed up on a phone.
                       className="pointer-events-none group-hover:opacity-100 opacity-0 coarse:opacity-60 transition text-muted-foreground"
                     />
                   </div>
@@ -268,7 +269,7 @@ const NodeConfigModal = () => {
                 </div>
               </div>
 
-              {/* Badge de tipo + botões */}
+              {/* Type badge + buttons */}
               <div className="flex items-center gap-1.5 px-4 shrink-0">
                 <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${style.bg} ${style.label}`}>
                   {nodeType}
@@ -289,10 +290,10 @@ const NodeConfigModal = () => {
           )
         })()}
 
-        {/* Corpo — formulário de configuração */}
+        {/* Body — configuration form */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
 
-          {/* Barra de abas — apenas para nós com helper */}
+          {/* Tab bar — only for nodes with a helper */}
           {hasConfigTabs && (
             <div className="flex gap-1 px-4 pt-3 pb-1 shrink-0 border-b">
               <button
@@ -318,7 +319,7 @@ const NodeConfigModal = () => {
             </div>
           )}
 
-          {/* Aba "Geral" — campos de configuração */}
+          {/* "Geral" (General) tab — configuration fields */}
           {(!hasConfigTabs || configTab === "geral") && (
             <NodeConfigForm
               nodeFound={nodeFound}
@@ -383,7 +384,7 @@ const NodeConfigModal = () => {
             </div>
           )}
 
-          {/* Seção de Pin — sempre visível */}
+          {/* Pin section — always visible */}
           {workflowId && nodeFound && (
             <PinSection nodeId={nodeFound.id} workflowId={workflowId} />
           )}
@@ -414,7 +415,7 @@ const NodeConfigModal = () => {
         </div>
         </div>{/* fim modal central */}
 
-        {/* Painel direito — Saída (atrás do modal, menor) */}
+        {/* Right panel — Output (behind the modal, smaller) */}
         <div className={`${SIDE_PANEL} rounded-r-lg -ml-2`}>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 px-4 pt-3 pb-1 shrink-0">
             Saída
@@ -422,7 +423,7 @@ const NodeConfigModal = () => {
           <OutputPreview nodeFound={nodeFound} />
         </div>
 
-      </div>{/* fim wrapper dos 3 painéis */}
+      </div>{/* end of the 3-panel wrapper */}
     </div>,
     document.body
   )
@@ -431,7 +432,7 @@ const NodeConfigModal = () => {
     <>
       {modal}
 
-      {/* Dialog de confirmação de descarte */}
+      {/* Discard confirmation dialog */}
       <Dialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>
         <DialogContent>
           <DialogHeader>

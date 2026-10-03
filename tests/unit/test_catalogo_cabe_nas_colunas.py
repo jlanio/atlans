@@ -1,24 +1,25 @@
 # tests/unit/test_catalogo_cabe_nas_colunas.py
-"""O catálogo versionado cabe nas colunas do banco — conferido no CI.
+"""The versioned catalog fits in the database columns — checked in CI.
 
-**Este é o teste que faltava, e a razão de ele faltar é instrutiva.** O resto da
-suíte roda em SQLite, e o SQLite **ignora o tamanho declarado de `VARCHAR`**:
-`VARCHAR(255)` aceita 10 mil caracteres sem reclamar. O PostgreSQL não. Então o
-estouro que derrubou a importação em produção era, por construção, invisível
-para todos os testes de importação que existem — eles passavam com o mesmo dado
-que o Postgres recusava.
+**This is the test that was missing, and the reason it was missing is instructive.**
+The rest of the suite runs on SQLite, and SQLite **ignores the declared size of
+`VARCHAR`**: `VARCHAR(255)` accepts 10 thousand characters without complaining.
+PostgreSQL doesn't. So the overflow that brought down the import in production
+was, by construction, invisible to every import test there is — they passed with
+the same data Postgres rejected.
 
-O que aconteceu: 48 dos 25.492 registros de `catalogo/geoservicos` tinham
-`titulo` acima de 255 caracteres (o maior, um indicador do IBGE, com 276). Como
-`importar_pasta` commita de 500 em 500, o lote que continha o primeiro deles
-(posição 6.779) levantava `StringDataRightTruncationError` e abortava o resto:
-6.500 registros no banco, 18.992 perdidos, e nada além de um ERROR no log. O
-assistente ficou sem três quartos das camadas que deveria saber encontrar.
+What happened: 48 of the 25,492 records in `catalogo/geoservicos` had a `titulo`
+over 255 characters (the longest, an IBGE indicator, with 276). Since
+`importar_pasta` commits 500 at a time, the batch containing the first of them
+(position 6,779) raised `StringDataRightTruncationError` and aborted the rest:
+6,500 records in the database, 18,992 lost, and nothing but an ERROR in the log.
+The assistant was left without three quarters of the layers it should know how
+to find.
 
-Este teste não dubla nada e não toca em banco: lê o catálogo REAL do repositório
-e compara cada campo com o limite da COLUNA, tirado do modelo. Ele falha no CI
-no dia em que alguém acrescentar ao catálogo um registro que o Postgres
-recusaria — que é exatamente o dia em que se quer saber.
+This test doubles nothing and doesn't touch a database: it reads the repository's
+REAL catalog and compares each field with the COLUMN's limit, taken from the
+model. It fails in CI on the day someone adds to the catalog a record Postgres
+would reject — which is exactly the day you want to know.
 """
 from __future__ import annotations
 
@@ -32,10 +33,10 @@ from app.services import fontes_vault
 
 CATALOGO = Path(__file__).resolve().parents[2] / "catalogo" / "geoservicos"
 
-# Tudo o que o Vault preenche. Quais deles o banco LIMITA é pergunta para o
-# modelo, não para esta lista: escrever «titulo está fora porque virou TEXT»
-# aqui faria o teste parar de enxergar justamente o campo que causou o estouro,
-# no dia em que alguém revertesse a coluna.
+# Everything the Vault fills in. Which of them the database LIMITS is a question
+# for the model, not for this list: writing "titulo is out because it became TEXT"
+# here would make the test stop seeing precisely the field that caused the
+# overflow, on the day someone reverted the column.
 DO_VAULT = ("instituicao", "grupo", "titulo", "type_name", "url")
 
 
@@ -46,12 +47,12 @@ def _registros():
 
 
 def test_o_catalogo_versionado_cabe_nas_colunas():
-    """Nenhum campo LIMITADO do catálogo real passa do que o Postgres aceita."""
+    """No LIMITED field of the real catalog exceeds what Postgres accepts."""
     registros = _registros()
     assert len(registros) > 1000, "o catálogo veio vazio — o teste não estaria conferindo nada"
 
-    # Só os que a COLUNA limita. `titulo`, `descricao` e `dicas` são TEXT e
-    # devolvem `None` aqui — se um deles voltar a ser VARCHAR, entra sozinho.
+    # Only those the COLUMN limits. `titulo`, `descricao` and `dicas` are TEXT and
+    # return `None` here — if one of them becomes VARCHAR again, it gets in on its own.
     limitados = {c: fs._limite(c) for c in DO_VAULT if fs._limite(c) is not None}
     assert limitados, "nenhum campo limitado — o teste não estaria conferindo nada"
 
@@ -74,12 +75,12 @@ def test_o_catalogo_versionado_cabe_nas_colunas():
 
 
 def test_o_titulo_de_fato_precisa_de_TEXT():
-    """A premissa do `titulo` TEXT (scripts/init_schema.sql; a migração
-    histórica `a3c81d7e2f46` fez a troca), presa contra o dado real.
+    """The premise of `titulo` as TEXT (scripts/init_schema.sql; the historical
+    migration `a3c81d7e2f46` made the change), pinned against the real data.
 
-    Se um dia o catálogo não tiver mais títulos longos, este teste cai — e aí a
-    pergunta «ainda precisamos de TEXT?» merece ser feita de novo, em vez de a
-    resposta continuar valendo por inércia.
+    If one day the catalog no longer has long titles, this test fails — and then
+    the question "do we still need TEXT?" deserves to be asked again, instead of
+    the answer staying valid out of inertia.
     """
     registros = _registros()
     longos = [r for r in registros if r.titulo and len(r.titulo) > 255]

@@ -1,13 +1,13 @@
 # app/api/routers/executor_ws_router.py
 """
-WebSocket para conexão de Executores externos.
+WebSocket for connecting external Executors.
 
 Endpoint: GET /ws/executores/{executor_id}?token=<JWT>
 
-Protocolo de mensagens (JSON). Tipos por direção, versão e chaves reservadas
-moram em flow/utils/protocolo_ws.py, que o executor também importa:
+Message protocol (JSON). Types per direction, version and reserved keys
+live in flow/utils/protocolo_ws.py, which the executor also imports:
 
-  Executor → Servidor:
+  Executor → Server:
     {"type": "handshake",  "protocol_version": str, "executor_version": str, "system_info": dict?}
     {"type": "heartbeat"}
     {"type": "capacity",   "queued": int, "running": int, "max_concurrent": int, "max_queue": int}
@@ -17,12 +17,12 @@ moram em flow/utils/protocolo_ws.py, que o executor também importa:
     {"type": "ack",        "job_id": str, "status": "enqueued"}
     {"type": "inventario", "ativos": [str], "resultados": [str], "truncado": bool}
 
-  Servidor → Executor:
-    {"type": "job",  ...job_message...}   ← build_job_message() do job_crypto.py
-    {"type": "cancel", "job_id": str}         ← assinado (ver control_crypto)
-    {"type": "control", "action": str, "reason": str}   ← assinado (idem)
+  Server → Executor:
+    {"type": "job",  ...job_message...}   ← build_job_message() from job_crypto.py
+    {"type": "cancel", "job_id": str}         ← signed (see control_crypto)
+    {"type": "control", "action": str, "reason": str}   ← signed (ditto)
     {"type": "drive_event", "action": str, "file": dict} ← app/core/drive_events.py
-    {"type": "error", "reason": str, ...}     ← mensagem recusada (`_responder_erro`)
+    {"type": "error", "reason": str, ...}     ← rejected message (`_responder_erro`)
 """
 import asyncio
 import json
@@ -80,8 +80,8 @@ from .executor_ws.protocolo import (
 )
 
 # ── Reexports ────────────────────────────────────────────────────────────────
-# O main importa o watchdog (e o registro de tasks, já importado acima para o
-# teardown) daqui. O resto do pacote é importado direto de
+# main imports the watchdog (and the task registry, already imported above for
+# the teardown) from here. The rest of the package is imported directly from
 # app.api.routers.executor_ws.*.
 from .executor_ws.orfaos import orphan_runs_watchdog  # noqa: F401
 
@@ -89,71 +89,71 @@ logger = get_logger(__name__)
 
 router = APIRouter(tags=["executores-ws"])
 
-# Intervalo máximo sem heartbeat antes de considerar o executor desconectado
+# Maximum interval without a heartbeat before considering the executor disconnected
 _HEARTBEAT_TIMEOUT = 90  # segundos
 
-# Referência forte para a task de purga de retenção disparada na reconexão
-# (asyncio só guarda weakrefs). Perder essa task significa dado pessoal vencido
-# que continua no disco do usuário até o próximo ciclo do loop de limpeza.
+# Strong reference to the retention purge task fired on reconnection (asyncio
+# only keeps weakrefs). Losing that task means expired personal data that stays
+# on the user's disk until the next cycle of the cleanup loop.
 _purge_tasks_pendentes: set[asyncio.Task] = set()
 
 
 def _responder_erro(ws: WebSocket, executor_id: str, reason: str, **detalhe) -> None:
-    """Resposta de erro ao executor: `{"type": "error", "reason": ..., **detalhe}`.
-    Melhor-esforço, pela mesma fila dos outros envios ao socket (ver `_Saida`):
-    escrever por fora disputava o drain de um envio em curso.
+    """Error response to the executor: `{"type": "error", "reason": ..., **detalhe}`.
+    Best-effort, through the same queue as the other sends to the socket (see
+    `_Saida`): writing on the side competed with the drain of a send in progress.
 
-    O tipo é o do protocolo (TIPO_ERRO, em flow/utils/protocolo_ws.py), que o
-    executor reconhece e registra em WARNING com o `reason`.
+    The type is the protocol's (TIPO_ERRO, in flow/utils/protocolo_ws.py), which
+    the executor recognizes and logs at WARNING with the `reason`.
 
-    Só enfileira, sem esperar a vez: quem chama é o loop de recebimento, o único
-    que renova a presença — preso atrás de um frame lento, ele deixava a
-    presença de um executor vivo vencer (e o watchdog fechava os runs dele).
-    Um close logo depois descarta a resposta que ainda estiver na fila; o que
-    conta para o executor nesses casos é o código do close."""
+    Only enqueues, without waiting its turn: the caller is the receive loop, the
+    only one that renews presence — stuck behind a slow frame, it let a live
+    executor's presence expire (and the watchdog closed its runs).
+    A close right after discards the response still in the queue; what matters
+    to the executor in those cases is the close code."""
     corpo = {"type": TIPO_ERRO, "reason": reason, **detalhe}
     try:
         enfileirar_ao_executor(ws, json.dumps(corpo), executor_id)
     except Exception:
-        pass  # socket pode ter fechado
+        pass  # the socket may have closed
 
 
-# Prazo para gravar o fim da sessão no teardown — ver `_gravar_fim_da_sessao`.
+# Deadline for writing the session's end on teardown — see `_gravar_fim_da_sessao`.
 _FIM_DA_SESSAO_TIMEOUT = 5.0
 
 
 async def _gravar_fim_da_sessao(executor_id: str, ultimo_contato) -> None:
-    """Grava o fim da sessão em `last_seen_at`. Sem isto ele parava no
-    handshake, e a tela de executores mostrava um executor que passou três dias
-    no ar e caiu há dez minutos como "visto há 3 dias".
+    """Writes the session's end to `last_seen_at`. Without this it stopped at the
+    handshake, and the executors screen showed an executor that was up for three
+    days and went down ten minutes ago as "visto há 3 dias" (seen 3 days ago).
 
-    Grava o último contato da sessão (a última mensagem recebida), não o
-    instante do teardown: depois de um heartbeat estourado, esse instante vem
-    ~100 s depois do último sinal de vida. E só se for posterior ao que está no
-    banco (ver `registrar_fim_da_sessao`)."""
+    Writes the session's last contact (the last message received), not the
+    moment of the teardown: after a missed heartbeat, that moment comes ~100 s
+    after the last sign of life. And only if it is later than what is in the
+    database (see `registrar_fim_da_sessao`)."""
     if not isinstance(ultimo_contato, datetime):
         ultimo_contato = datetime.now(timezone.utc)
     if ultimo_contato.tzinfo is None:
         ultimo_contato = ultimo_contato.replace(tzinfo=timezone.utc)
-    visto_em = ultimo_contato.astimezone(timezone.utc).replace(tzinfo=None)   # coluna em UTC sem fuso
+    visto_em = ultimo_contato.astimezone(timezone.utc).replace(tzinfo=None)   # column in UTC without time zone
     async with get_session_async() as db:
         await registrar_fim_da_sessao(db, executor_id, visto_em)
 
 
-# Intervalo da conferência de revogação com a sessão aberta — ver `_vigiar_revogacao`.
+# Interval of the revocation check while the session is open — see `_vigiar_revogacao`.
 _REVOGACAO_INTERVALO = 60.0
 
 
 async def _vigiar_revogacao(executor_id: str, ws: WebSocket) -> None:
-    """Fecha com 4403 a sessão de um executor revogado enquanto ela está aberta.
+    """Closes with 4403 the session of an executor revoked while the session is open.
 
-    O mTLS só é conferido ao conectar. As revogações pedem o fechamento pelo
-    relay, mas o aviso se perde com o Redis reiniciando, com o listener da
-    sessão reconectando ou com uma sessão que nasce no meio da revogação — e a
-    sessão revogada seguia viva (recebendo jobs) até reconectar. A cada
-    `_REVOGACAO_INTERVALO` o banco diz se ela ainda vale
-    (`motivo_da_revogacao`). Banco fora fica para a próxima volta: derrubar as
-    sessões vivas da frota por um blip do banco seria pior."""
+    mTLS is only checked on connect. Revocations request the close through the
+    relay, but the notice gets lost when Redis restarts, when the session's
+    listener reconnects or with a session born in the middle of the revocation —
+    and the revoked session stayed alive (receiving jobs) until it reconnected.
+    Every `_REVOGACAO_INTERVALO` the database says whether it still holds
+    (`motivo_da_revogacao`). Database down is left for the next round: dropping
+    the fleet's live sessions over a database blip would be worse."""
     while True:
         await asyncio.sleep(_REVOGACAO_INTERVALO)
         try:
@@ -176,41 +176,42 @@ async def _vigiar_revogacao(executor_id: str, ws: WebSocket) -> None:
 @router.websocket("/ws/executores/{executor_id}")
 async def agent_websocket(executor_id: str, ws: WebSocket):
     """
-    Conexão WebSocket autenticada por cert mTLS.
+    WebSocket connection authenticated by mTLS cert.
 
-    Traefik valida o client cert contra a CA interna no handshake TLS e injeta
-    X-Forwarded-Tls-Client-Cert-Info com CN e serial. Aqui:
-      1. Parse do header → (cn, serial).
-      2. CN deve ser `executor-{executor_id}` (do path da URL).
-      3. Executor existe + status='active' + serial bate com cert_serial no DB.
-      4. Cert serial não está na blacklist Redis.
+    Traefik validates the client cert against the internal CA in the TLS handshake
+    and injects X-Forwarded-Tls-Client-Cert-Info with CN and serial. Here:
+      1. Parse the header → (cn, serial).
+      2. CN must be `executor-{executor_id}` (from the URL path).
+      3. Executor exists + status='active' + serial matches cert_serial in the DB.
+      4. Cert serial is not in the Redis blacklist.
 
-    As fases da sessão moram abaixo, na ordem em que rodam:
-    `_autenticar_ou_recusar` (antes do accept), `_abrir_sessao`,
-    `_tratar_mensagem` a cada mensagem e `_encerrar_sessao` no teardown.
+    The session phases live below, in the order they run:
+    `_autenticar_ou_recusar` (before the accept), `_abrir_sessao`,
+    `_tratar_mensagem` for each message and `_encerrar_sessao` on teardown.
     """
-    # ── 1. Valida cert mTLS antes de accept() ────────────────────────────────
+    # ── 1. Validate the mTLS cert before accept() ────────────────────────────
     tetos = await _autenticar_ou_recusar(ws, executor_id)
     if tetos is None:
         return
 
-    # ── 2. Aceita a conexão ───────────────────────────────────────────────────
+    # ── 2. Accept the connection ──────────────────────────────────────────────
     sessao = await _abrir_sessao(ws, executor_id, tetos)
     try:
-        # Dentro do try DE PROPÓSITO: se o banco estiver fora, a exceção subia
-        # antes do try e o `finally` com o unregister nunca rodava — a conexão
-        # ficava registrada (e renovando presença) sem ninguém lendo o socket.
+        # Inside the try ON PURPOSE: if the database is down, the exception went up
+        # before the try and the `finally` with the unregister never ran — the
+        # connection stayed registered (and renewing presence) with nobody
+        # reading the socket.
         async with get_session_async() as db:
             await update_agent_last_seen(db, executor_id)
 
         logger.info("Executor '%s' conectado via WebSocket.", executor_id)
 
-        # ── 3. Loop de recebimento ────────────────────────────────────────────
+        # ── 3. Receive loop ───────────────────────────────────────────────────
         while True:
             try:
                 raw = await asyncio.wait_for(ws.receive_text(), timeout=_HEARTBEAT_TIMEOUT)
             except asyncio.TimeoutError:
-                # Nenhuma mensagem dentro do timeout — fecha conexão
+                # No message within the timeout — closes the connection
                 logger.warning("Executor '%s' sem heartbeat por %ds — desconectando.", executor_id, _HEARTBEAT_TIMEOUT)
                 await fechar_ws_do_executor(ws, code=4408, reason="Heartbeat timeout.")
                 break
@@ -225,22 +226,23 @@ async def agent_websocket(executor_id: str, ws: WebSocket):
         await _encerrar_sessao(sessao)
 
 
-# ── 1. Autenticação ──────────────────────────────────────────────────────────
+# ── 1. Authentication ────────────────────────────────────────────────────────
 
 
 class _Tetos(NamedTuple):
-    """Tetos do registro — clamp da capacidade auto-declarada (ver S3)."""
+    """The record's ceilings — clamp of the self-declared capacity (see S3)."""
 
     max_concurrent: int | None
     max_queue: int | None
 
 
 async def _autenticar_ou_recusar(ws: WebSocket, executor_id: str) -> _Tetos | None:
-    """Valida o cert mTLS ANTES do accept() — pipeline único: ver
-    dependencies.validate_executor_mtls, compartilhado com o HTTP.
+    """Validates the mTLS cert BEFORE accept() — single pipeline: see
+    dependencies.validate_executor_mtls, shared with HTTP.
 
-    Devolve os tetos do registro do executor, ou None quando recusou: aí a
-    conexão já foi aceita e fechada com o 44xx da razão, e nada mais roda."""
+    Returns the ceilings from the executor's record, or None when it refused: in
+    that case the connection was already accepted and closed with the reason's
+    44xx, and nothing else runs."""
     from app.api.dependencies import (
         validate_executor_mtls, ExecutorMtlsError, _MTLS_WS_CODE,
     )
@@ -254,21 +256,21 @@ async def _autenticar_ou_recusar(ws: WebSocket, executor_id: str) -> _Tetos | No
                 expected_executor_id=executor_id,
                 require_public_key=True,
             )
-            # Extrai antes de fechar a sessão (evita DetachedInstanceError).
-            # A versão NÃO vem daqui: o banco guarda a da sessão anterior, e a
-            # desta chega no handshake.
+            # Extracts before closing the session (avoids DetachedInstanceError).
+            # The version does NOT come from here: the database holds the
+            # previous session's, and this one's arrives in the handshake.
             return _Tetos(max_concurrent=ag.max_concurrent_jobs, max_queue=ag.max_queue_size)
     except ExecutorMtlsError as exc:
-        # DENY AUTORITATIVO: precisa chegar ao executor como CLOSE 44xx, nunca
-        # como status HTTP. Levantar WebSocketException ANTES do accept() faz o
-        # deny virar um status no handshake HTTP, e o cliente classifica status
-        # HTTP como NÃO-terminal DE PROPÓSITO (durante deploy o Traefik responde
-        # 404/502/503). O resultado era um executor revogado/removido
-        # reconectando para sempre, com o ramo terminal do cliente virando
-        # código morto. Aceitamos e fechamos na sequência: nada é processado e o
-        # registry NÃO é populado.
+        # AUTHORITATIVE DENY: it must reach the executor as a CLOSE 44xx, never
+        # as an HTTP status. Raising WebSocketException BEFORE accept() turns
+        # the deny into a status in the HTTP handshake, and the client classifies
+        # HTTP statuses as NON-terminal ON PURPOSE (during a deploy Traefik
+        # answers 404/502/503). The result was a revoked/removed executor
+        # reconnecting forever, with the client's terminal branch becoming dead
+        # code. We accept and close right after: nothing is processed and the
+        # registry is NOT populated.
         close_code = _MTLS_WS_CODE.get(exc.reason, 4401)
-        # `reason` do close cabe em 123 bytes no frame — trunca com folga.
+        # The close `reason` fits in 123 bytes in the frame — truncates with slack.
         close_reason = (exc.detail or "")[:100]
         logger.warning(
             "Executor '%s' recusado na autenticação mTLS (%s) — fechando com code=%d.",
@@ -291,42 +293,45 @@ async def _autenticar_ou_recusar(ws: WebSocket, executor_id: str) -> _Tetos | No
 
 @dataclass(eq=False)
 class _Sessao:
-    """O que uma conexão aceita carrega do accept ao teardown."""
+    """What an accepted connection carries from the accept to the teardown."""
 
     executor_id: str
     ws: WebSocket
-    # A conexão DESTA sessão no registro: no fim, o último contato dela vira o
-    # "visto há". None quando outra sessão registrou por cima antes da
-    # conferência — aí o fim desta não é gravado (ver `_abrir_sessao`).
+    # THIS session's connection in the registry: at the end, its last contact
+    # becomes the "visto há" (seen ... ago). None when another session registered
+    # over it before the check — then this one's end is not written (see
+    # `_abrir_sessao`).
     minha_conexao: Any
-    # Fila + drenadora desta conexão: o loop só valida e enfileira, nunca
-    # espera Redis/Postgres. Ver `_drenar_inbox`.
+    # This connection's queue + drainer: the loop only validates and enqueues,
+    # never waits for Redis/Postgres. See `_drenar_inbox`.
     inbox: _InboxQueue
     drain_task: asyncio.Task
-    # job_results em voo na drenadora. O teardown espera por eles antes de
-    # cancelar: cortar um commit dividido no meio deixa o run terminal no banco
-    # sem nunca publicar o `__workflow_complete__` (painel girando para sempre).
+    # job_results in flight in the drainer. The teardown waits for them before
+    # cancelling: cutting a split commit in the middle leaves the run terminal in
+    # the database without ever publishing `__workflow_complete__` (panel
+    # spinning forever).
     inflight: set[asyncio.Task]
     descartes: dict
-    # A conferência de revogação (`_vigiar_revogacao`). Referência forte (o
-    # asyncio só guarda weakrefs); cancelada no teardown.
+    # The revocation check (`_vigiar_revogacao`). Strong reference (asyncio
+    # only keeps weakrefs); cancelled on teardown.
     vigia: asyncio.Task
-    # Contador de JSON inválido em sequência — evita flapping de executor com
-    # bug que envia payload corrompido repetidamente.
+    # Counter of consecutive invalid JSONs — avoids flapping from a buggy
+    # executor that sends a corrupted payload repeatedly.
     invalid_json_streak: int = 0
-    # A versão e o system_info são da conexão: valem os do PRIMEIRO handshake.
-    # Os seguintes não gravam nada — cada um era um SELECT + UPDATE no banco,
-    # sem limite, e um system_info diferente só na memória deste worker fazia a
-    # tela mudar conforme o worker que respondia.
+    # The version and system_info belong to the connection: those of the FIRST
+    # handshake apply. The following ones write nothing — each was a SELECT +
+    # UPDATE in the database, with no limit, and a different system_info only in
+    # this worker's memory made the screen change depending on which worker
+    # answered.
     identificacao_gravada: bool = False
 
 
 async def _abrir_sessao(ws: WebSocket, executor_id: str, tetos: _Tetos) -> _Sessao:
-    """Aceita a conexão, registra, agenda a purga de retenção e monta a fila,
-    a drenadora e a vigia da sessão.
+    """Accepts the connection, registers it, schedules the retention purge and sets up
+    the session's queue, drainer and watcher.
 
-    Fora do `finally` do handler, como sempre esteve: o teardown só roda para
-    a sessão que chegou a abrir inteira."""
+    Outside the handler's `finally`, as it always was: the teardown only runs for
+    a session that managed to open completely."""
     await ws.accept()
 
     await executor_registry.register(
@@ -335,27 +340,28 @@ async def _abrir_sessao(ws: WebSocket, executor_id: str, tetos: _Tetos) -> _Sess
         max_queue_limit=tetos.max_queue,
     )
 
-    # Em task separada de propósito: o handshake não pode esperar uma consulta
-    # ao banco, e uma falha aqui não deve derrubar a conexão que acabou de subir.
-    # Referência forte obrigatória: o asyncio guarda só weakrefs para tasks, e
-    # sem isto a purga pode ser coletada no meio da consulta ao banco — o mesmo
-    # cuidado de `_orphan_check_tasks` no teardown.
+    # In a separate task on purpose: the handshake cannot wait for a database
+    # query, and a failure here must not drop the connection that just came up.
+    # Strong reference required: asyncio keeps only weakrefs to tasks, and
+    # without this the purge may be garbage-collected in the middle of the
+    # database query — the same care as `_orphan_check_tasks` on teardown.
     _purge_tasks_pendentes.add(
         t := asyncio.create_task(_purgar_pendentes(executor_id), name=f"purge-{executor_id[:8]}")
     )
     t.add_done_callback(_purge_tasks_pendentes.discard)
 
-    # A conexão DESTA sessão: no fim, o último contato dela vira o "visto há".
-    # Guardada agora porque, até o teardown, o registro pode ter outra — e
-    # conferida pelo socket, porque outra sessão pode ter registrado por cima
-    # entre o register e aqui (aí o fim desta não é gravado).
+    # THIS session's connection: at the end, its last contact becomes the "visto
+    # há" (seen ... ago). Stored now because, by the teardown, the registry may
+    # hold another one — and checked by socket, because another session may have
+    # registered over it between the register and here (then this one's end is
+    # not written).
     minha_conexao = executor_registry.get(executor_id)
     if getattr(minha_conexao, "websocket", None) is not ws:
         minha_conexao = None
 
     inbox = _InboxQueue(maxsize=_INBOX_MAXSIZE)
-    # Do próprio websocket, não do registro: um takeover pode tirar esta
-    # conexão de lá antes de a fila esvaziar (ver `_InboxQueue.ip_da_conexao`).
+    # From the websocket itself, not from the registry: a takeover may remove this
+    # connection from there before the queue empties (see `_InboxQueue.ip_da_conexao`).
     inbox.ip_da_conexao = ip_do_websocket(ws)
     inflight: set[asyncio.Task] = set()
     drain_task = asyncio.create_task(
@@ -371,10 +377,10 @@ async def _abrir_sessao(ws: WebSocket, executor_id: str, tetos: _Tetos) -> _Sess
 
 
 async def _purgar_pendentes(executor_id: str) -> None:
-    """Retenção pendente: artefatos locais deste executor que venceram enquanto
-    a máquina estava desligada. O loop periódico só passaria daqui a até uma
-    hora, e nesse intervalo há dado pessoal vencido no disco do usuário —
-    reconectar é o primeiro instante em que a ordem pode ser entregue."""
+    """Pending retention: this executor's local artifacts that expired while the
+    machine was off. The periodic loop would only come by within up to an hour,
+    and in that interval there is expired personal data on the user's disk —
+    reconnecting is the first moment the order can be delivered."""
     from app.core.artifact_cleanup import purgar_pendentes_do_executor
     try:
         n = await purgar_pendentes_do_executor(executor_id)
@@ -390,28 +396,28 @@ async def _purgar_pendentes(executor_id: str) -> None:
         )
 
 
-# ── 3. Cada mensagem ─────────────────────────────────────────────────────────
+# ── 3. Each message ──────────────────────────────────────────────────────────
 
-# JSONs inválidos seguidos que derrubam a sessão (close 1003).
+# Consecutive invalid JSONs that drop the session (close 1003).
 _MAX_INVALID_JSON_STREAK = 5
 
 
 async def _tratar_mensagem(sessao: _Sessao, raw: str) -> bool:
-    """Uma mensagem do executor: parse, schema, portão do handshake e despacho
-    pelo tipo (`_TRATADORES`).
+    """One message from the executor: parse, schema, handshake gate and dispatch
+    by type (`_TRATADORES`).
 
-    False quando a sessão acabou — o close já foi mandado (JSON inválido demais
-    ou versão de protocolo não suportada)."""
+    False when the session is over — the close was already sent (too many invalid
+    JSONs or an unsupported protocol version)."""
     executor_id, ws = sessao.executor_id, sessao.ws
     try:
         msg = json.loads(raw)
-        sessao.invalid_json_streak = 0  # resetou após parse válido
+        sessao.invalid_json_streak = 0  # reset after a valid parse
     except json.JSONDecodeError as exc:
         return await _json_invalido(sessao, raw, exc)
 
     msg_type = msg.get("type")
 
-    # ── Schema validation: campos obrigatórios por tipo ─────────────────────
+    # ── Schema validation: required fields per type ─────────────────────────
     missing = _missing_fields(msg_type, msg) if isinstance(msg_type, str) else []
     if missing:
         logger.warning(
@@ -424,10 +430,10 @@ async def _tratar_mensagem(sessao: _Sessao, raw: str) -> bool:
         )
         return True
 
-    # SEG: handshake deve ser a PRIMEIRA mensagem — bloqueia qualquer
-    # outro tipo até o executor se identificar. Isso vira barreira contra
-    # mensagens espúrias de executores mal-implementados ou adversários
-    # que conseguiram conectar mas não completaram o contrato.
+    # SEC: the handshake must be the FIRST message — blocks any other type
+    # until the executor identifies itself. This becomes a barrier against
+    # spurious messages from badly implemented executors or adversaries
+    # that managed to connect but did not complete the contract.
     conn_state = executor_registry.get(executor_id)
     if conn_state and not getattr(conn_state, "handshake_received", False):
         if msg_type != "handshake":
@@ -441,8 +447,8 @@ async def _tratar_mensagem(sessao: _Sessao, raw: str) -> bool:
             return False
         conn_state.handshake_received = True
 
-    # Só texto é tipo: um `type` lista ou objeto não serve de chave, e cai no
-    # "desconhecido" como qualquer outro.
+    # Only text is a type: a list or object `type` does not work as a key, and
+    # falls into "unknown" like any other.
     tratador = _TRATADORES.get(msg_type) if isinstance(msg_type, str) else None
     if tratador is None:
         logger.debug("Executor '%s' enviou tipo desconhecido: %s", executor_id, msg_type)
@@ -452,14 +458,14 @@ async def _tratar_mensagem(sessao: _Sessao, raw: str) -> bool:
 
 
 async def _json_invalido(sessao: _Sessao, raw: str, exc: json.JSONDecodeError) -> bool:
-    """Responde `invalid_json` e conta a sequência. Na
-    `_MAX_INVALID_JSON_STREAK`-ésima seguida, fecha com 1003 e devolve False."""
+    """Answers `invalid_json` and counts the streak. On the
+    `_MAX_INVALID_JSON_STREAK`-th in a row, closes with 1003 and returns False."""
     sessao.invalid_json_streak += 1
     logger.warning(
         "Executor '%s' enviou JSON inválido (streak=%d): %s | raw=%r",
         sessao.executor_id, sessao.invalid_json_streak, exc, raw[:200],
     )
-    # Feedback ao executor — evita loop onde ele aguarda ACK e re-tenta.
+    # Feedback to the executor — avoids a loop where it waits for an ACK and retries.
     _responder_erro(sessao.ws, sessao.executor_id, "invalid_json", detail=str(exc)[:200])
     if sessao.invalid_json_streak < _MAX_INVALID_JSON_STREAK:
         return True
@@ -472,9 +478,9 @@ async def _json_invalido(sessao: _Sessao, raw: str, exc: json.JSONDecodeError) -
 
 
 async def _protocolo_aceito(sessao: _Sessao, msg: dict) -> bool:
-    """Validação de protocolo do primeiro handshake: rejeita executores com
-    versão incompatível — responde `unsupported_protocol_version`, fecha com
-    4426 e devolve False."""
+    """Protocol validation of the first handshake: rejects executors with an
+    incompatible version — answers `unsupported_protocol_version`, closes with
+    4426 and returns False."""
     claimed = str(msg.get("protocol_version") or "1.0")
     if claimed in SUPPORTED_PROTOCOL_VERSIONS:
         return True
@@ -491,8 +497,8 @@ async def _protocolo_aceito(sessao: _Sessao, msg: dict) -> bool:
     return False
 
 
-# Os tratadores por tipo têm todos a mesma assinatura:
-# (sessão, tipo, mensagem, tamanho do frame em bytes).
+# The per-type handlers all have the same signature:
+# (session, type, message, frame size in bytes).
 
 
 async def _tratar_heartbeat(sessao: _Sessao, _tipo: str, _msg: dict, _frame_bytes: int) -> None:
@@ -507,15 +513,15 @@ async def _tratar_capacity(sessao: _Sessao, _tipo: str, msg: dict, _frame_bytes:
         )
         _responder_erro(sessao.ws, sessao.executor_id, "invalid_capacity", errors=cap_errors)
         return
-    # `update_capacity` já atualiza last_seen_at e renova a
-    # presença — o `update_last_seen` que vinha logo aqui dobrava o
-    # EVAL Lua de renovação a cada 10 segundos, por executor.
+    # `update_capacity` already updates last_seen_at and renews
+    # presence — the `update_last_seen` that used to come right here doubled
+    # the renewal Lua EVAL every 10 seconds, per executor.
     await executor_registry.update_capacity(sessao.executor_id, capacity)
 
 
 async def _tratar_handshake(sessao: _Sessao, _tipo: str, msg: dict, _frame_bytes: int) -> None:
-    """O primeiro handshake grava a identificação da conexão (versão e
-    system_info); os seguintes só renovam a presença."""
+    """The first handshake writes the connection's identification (version and
+    system_info); the following ones only renew presence."""
     executor_id = sessao.executor_id
     if sessao.identificacao_gravada:
         await executor_registry.update_last_seen(executor_id)
@@ -540,11 +546,11 @@ async def _tratar_handshake(sessao: _Sessao, _tipo: str, msg: dict, _frame_bytes
 
 
 async def _persistir_identificacao(executor_id: str, ver: str | None, sys_info: dict | None) -> None:
-    """Persiste versão e system_info no banco (1x por conexão, ver
-    `identificacao_gravada`): a tela de executores lê os dois do
-    banco — a conexão só existe no worker do WebSocket. A versão
-    ficava só na memória, e a coluna "versão" da tela mostrava
-    "—" para todo executor."""
+    """Persists version and system_info to the database (once per connection, see
+    `identificacao_gravada`): the executors screen reads both from the
+    database — the connection only exists on the WebSocket's worker. The
+    version used to stay only in memory, and the screen's "versão" (version)
+    column showed "—" for every executor."""
     async with get_session_async() as db:
         result = await db.execute(
             select(Executor).where(Executor.id_hash == executor_id)
@@ -559,7 +565,7 @@ async def _persistir_identificacao(executor_id: str, ver: str | None, sys_info: 
 
 
 async def _enfileirar(sessao: _Sessao, msg_type: str, msg: dict, frame_bytes: int) -> None:
-    """Para a drenadora da conexão (ver `_drenar_inbox`)."""
+    """Stops the connection's drainer (see `_drenar_inbox`)."""
     await _enfileirar_mensagem(
         sessao.executor_id, sessao.inbox, sessao.descartes, msg_type, msg, frame_bytes,
     )
@@ -575,28 +581,28 @@ async def _tratar_sync_event(sessao: _Sessao, msg_type: str, msg: dict, frame_by
         await _enfileirar(sessao, msg_type, msg, frame_bytes)
 
 
-# O despacho: as chaves são os TIPOS_DO_EXECUTOR do protocolo
-# (flow/utils/protocolo_ws.py). Tipo fora daqui só vai ao debug.
+# The dispatch: the keys are the protocol's TIPOS_DO_EXECUTOR
+# (flow/utils/protocolo_ws.py). A type not in here only goes to debug.
 _TRATADORES: dict[str, Callable[[_Sessao, str, dict, int], Awaitable[None]]] = {
     "handshake": _tratar_handshake,
     "heartbeat": _tratar_heartbeat,
     "capacity": _tratar_capacity,
-    # Os três abaixo custam Redis (e o job_result, Postgres):
-    # validam-se aqui e são processados pela drenadora, para que o
-    # próximo receive_text() não espere por I/O.
+    # The three below cost Redis (and the job_result, Postgres):
+    # they are validated here and processed by the drainer, so that the
+    # next receive_text() does not wait for I/O.
     "job_result": _enfileirar,
     "node_event": _tratar_node_event,
     "sync_event": _tratar_sync_event,
-    # ACK de recebimento de job: limpa o pendente de ACK e promove o
-    # run de 'pending' para 'running' (ver `_record_job_ack`). A
-    # promoção é um UPDATE no Postgres, então vai pela drenadora —
-    # na mesma fila do job_result, que chega depois dele.
+    # Job receipt ACK: clears the pending ACK and promotes the
+    # run from 'pending' to 'running' (see `_record_job_ack`). The
+    # promotion is an UPDATE in Postgres, so it goes through the drainer —
+    # on the same queue as the job_result, which arrives after it.
     "ack": _enfileirar,
-    # Jobs que o executor TEM. A reconciliação fecha os runs que ele
-    # não tem (ver `_reconciliar_inventario`) e vai pela drenadora
-    # DE PROPÓSITO: na mesma fila, um job_result enviado antes do
-    # inventário é gravado antes de o inventário ser conferido — senão
-    # o run recém-terminado pareceria perdido.
+    # Jobs the executor HAS. The reconciliation closes the runs it
+    # does not have (see `_reconciliar_inventario`) and goes through the
+    # drainer ON PURPOSE: on the same queue, a job_result sent before the
+    # inventory is written before the inventory is checked — otherwise
+    # the just-finished run would look lost.
     "inventario": _enfileirar,
 }
 
@@ -605,14 +611,14 @@ _TRATADORES: dict[str, Callable[[_Sessao, str, dict, int], Awaitable[None]]] = {
 
 
 async def _encerrar_sessao(sessao: _Sessao) -> None:
-    """O fim da sessão, nesta ordem: a vigia e os envios param, a fila esvazia
-    (antes do unregister), a presença sai, a verificação de órfãos é agendada
-    e, por último, o fim da sessão é carimbado."""
+    """The end of the session, in this order: the watcher and the sends stop, the
+    queue empties (before the unregister), the presence goes away, the orphan
+    check is scheduled and, last, the session's end is stamped."""
     executor_id, ws = sessao.executor_id, sessao.ws
     sessao.vigia.cancel()
-    # Nada mais sai por este socket: durante o flush abaixo (até 10 s) a
-    # conexão segue registrada e o listener do relay vivo, e um job relayado
-    # agora batia no socket morto sem ninguém fechar o run.
+    # Nothing else goes out through this socket: during the flush below (up to
+    # 10 s) the connection stays registered and the relay listener alive, and a
+    # job relayed now would hit the dead socket with nobody closing the run.
     encerrar_envios(ws)
     await _esvaziar_a_fila(sessao)
     if sessao.descartes["total"]:
@@ -620,19 +626,19 @@ async def _encerrar_sessao(sessao: _Sessao) -> None:
             "Executor '%s': %d mensagem(ns) descartada(s) por fila cheia nesta conexão.",
             executor_id, sessao.descartes["total"],
         )
-    # expected_ws=ws garante que so removemos se o WS registrado ainda
-    # e este — evita matar reconexao rapida que registrou WS_novo.
+    # expected_ws=ws ensures we only remove if the registered WS is still
+    # this one — avoids killing a fast reconnection that registered WS_novo.
     await executor_registry.unregister(executor_id, expected_ws=ws)
     _drop_rate_state(executor_id)
-    # Fim da vida deste socket: a fila de saída dele sai do mapa (ver
-    # `encerrar_saida`) — vale também quando o unregister não o fechou
-    # porque o executor já reconectou noutra sessão.
+    # End of this socket's life: its outgoing queue leaves the map (see
+    # `encerrar_saida`) — this also applies when the unregister did not close it
+    # because the executor already reconnected in another session.
     encerrar_saida(ws)
     _agendar_verificacao_de_orfaos(executor_id)
-    # Por último de propósito: um cancelamento aqui (shutdown) só perde este
-    # carimbo, nunca a verificação de órfãos acima. Melhor-esforço e com
-    # prazo — o teardown não espera um banco fora do ar; o próximo handshake
-    # grava de novo.
+    # Last on purpose: a cancellation here (shutdown) only loses this
+    # stamp, never the orphan check above. Best-effort and with a
+    # deadline — the teardown does not wait for a database that is down; the
+    # next handshake writes it again.
     if sessao.minha_conexao is not None:
         try:
             await asyncio.wait_for(
@@ -644,10 +650,10 @@ async def _encerrar_sessao(sessao: _Sessao) -> None:
 
 
 async def _esvaziar_a_fila(sessao: _Sessao) -> None:
-    """FLUSH ANTES do unregister: o que ainda estiver na fila são os ÚLTIMOS
-    eventos do run (inclusive o job_result e o __workflow_complete__).
-    Cancelar a drenadora aqui deixaria o painel do usuário girando para
-    sempre num run que na verdade terminou."""
+    """FLUSH BEFORE the unregister: whatever is still in the queue are the run's
+    LAST events (including the job_result and the __workflow_complete__).
+    Cancelling the drainer here would leave the user's panel spinning
+    forever on a run that actually finished."""
     executor_id, inbox, drain_task, inflight = (
         sessao.executor_id, sessao.inbox, sessao.drain_task, sessao.inflight,
     )
@@ -661,10 +667,10 @@ async def _esvaziar_a_fila(sessao: _Sessao) -> None:
             "eventos residuais podem ter sido perdidos.",
             executor_id, _INBOX_FLUSH_TIMEOUT, exc,
         )
-        # Parada graciosa antes do cancelamento: o `cancel()` seco podia cair
-        # no meio da gravação de um job_result (banco terminal, canvas sem o
-        # `__workflow_complete__`). A gravação roda blindada numa task
-        # própria; aqui damos a ela a carência para terminar.
+        # Graceful stop before the cancellation: a bare `cancel()` could land
+        # in the middle of writing a job_result (database terminal, canvas
+        # without the `__workflow_complete__`). The write runs shielded in its
+        # own task; here we give it the grace period to finish.
         drain_task.cancel()
         if inflight:
             pendentes = set(inflight)
@@ -677,8 +683,8 @@ async def _esvaziar_a_fila(sessao: _Sessao) -> None:
                     "após %.0fs de carência — run pode ficar sem conclusão.",
                     executor_id, len(faltando), _INBOX_CANCEL_GRACE,
                 )
-        # O que a drenadora cancelada não chegou a consumir: telemetria pode
-        # sumir, job_result não.
+        # What the cancelled drainer did not get to consume: telemetry may
+        # vanish, job_result may not.
         try:
             await asyncio.wait_for(
                 _resgatar_job_results_pendentes(executor_id, inbox),
@@ -692,19 +698,19 @@ async def _esvaziar_a_fila(sessao: _Sessao) -> None:
 
 
 def _agendar_verificacao_de_orfaos(executor_id: str) -> None:
-    """Verificação de órfãos em task separada: ela espera um grace period
-    (ver `_fail_orphan_runs_if_gone`) e não deve segurar o teardown do WS."""
+    """Orphan check in a separate task: it waits for a grace period
+    (see `_fail_orphan_runs_if_gone`) and must not hold up the WS teardown."""
     try:
         check = asyncio.create_task(
             _fail_orphan_runs_if_gone(executor_id),
             name=f"orphan-check-{executor_id[:8]}",
         )
-        # asyncio guarda só weakrefs para tasks — sem esta referência forte
-        # a task pode ser coletada no meio do sleep.
+        # asyncio keeps only weakrefs to tasks — without this strong reference
+        # the task may be garbage-collected in the middle of the sleep.
         _orphan_check_tasks.add(check)
         check.add_done_callback(_orphan_check_tasks.discard)
     except RuntimeError:
-        # Loop já em shutdown: o orphan_runs_watchdog cuida na volta.
+        # Loop already shutting down: the orphan_runs_watchdog takes care of it on the way back.
         logger.debug(
             "Sem loop para agendar verificação de órfãos de '%s' — watchdog assume.",
             executor_id,

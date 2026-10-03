@@ -1,20 +1,20 @@
 # tests/unit/test_exclusao_conteudo_local.py
 """
-Exclusao manual pelo web quando o conteudo vive no disco de um executor.
+Manual deletion from the web app when the content lives on an executor's disk.
 
-A leitura (download 409) e a retencao automatica ja estavam cobertas. O caminho
-de exclusao MANUAL nao estava, e tinha dois defeitos de naturezas opostas:
+Reading (download 409) and automatic retention were already covered. The MANUAL
+deletion path was not, and it had two defects of opposite natures:
 
-  ARTEFATO   `delete_artifact` pulava o MinIO por `s3_key` nula e apagava a
-             linha assim mesmo. O arquivo ficava orfao no disco do usuario e o
-             servidor perdia o unico registro dele — para dado pessoal, pior que
-             nao ter apagado, porque ninguem consegue nem saber que ha o que
-             apagar.
+  ARTIFACT   `delete_artifact` skipped MinIO due to a null `s3_key` and deleted
+             the row anyway. The file was left orphaned on the user's disk and
+             the server lost its only record of it — for personal data, worse
+             than not deleting, because nobody can even know there is something
+             to delete.
 
-  DRIVE      `delete_file` chamava `delete_strict_async(None)`. O boto3 valida
-             `Key=None` no CLIENTE e levanta ParamValidationError, que nao e
-             ClientError, escapa do `except` e virava 500 — o arquivo nao podia
-             ser excluido de jeito nenhum.
+  DRIVE      `delete_file` called `delete_strict_async(None)`. boto3 validates
+             `Key=None` on the CLIENT and raises ParamValidationError, which is
+             not a ClientError, escapes the `except` and became a 500 — the file
+             could not be deleted at all.
 """
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -39,14 +39,14 @@ def test_catalogado_e_recusado_com_saida_explicada():
     with pytest.raises(ConteudoNoExecutorError) as e:
         drive_service._recusar_se_catalogado(_arquivo())
 
-    # A mensagem precisa dizer O QUE FAZER. "Nao permitido" sozinho deixa a
-    # pessoa sem acao no unico lugar onde ela esta olhando.
+    # The message has to say WHAT TO DO. "Nao permitido" (not allowed) alone leaves
+    # the person with no action in the only place they are looking.
     msg = str(e.value).lower()
     assert "pasta sincronizada" in msg or "geosync" in msg
 
 
 def test_recusa_e_409_e_nao_400():
-    """Nao ha nada errado no pedido — o problema e o ESTADO do recurso."""
+    """Nothing is wrong with the request — the problem is the resource's STATE."""
     assert ConteudoNoExecutorError.status_code == 409
 
 
@@ -57,14 +57,15 @@ def test_arquivo_normal_passa():
 
 
 def test_ausencia_do_campo_nao_bloqueia():
-    """Objeto antigo sem `content_location` nao pode virar recusa."""
+    """An old object without `content_location` must not become a rejection."""
     drive_service._recusar_se_catalogado(SimpleNamespace(id_hash="h", s3_key="k"))
 
 
-# ── Artefato: a linha so cai quando a ordem foi entregue ─────────────────────
+# ── Artifact: the row only goes away once the order was delivered ────────────
 #
-# A regra mora em `remocao_de_artefatos.remover_artefatos`, a mesma dos cinco
-# caminhos que apagam; as rotas de exclusao a chamam com `agendar_pendentes`.
+# The rule lives in `remocao_de_artefatos.remover_artefatos`, the same one used
+# by the five deleting paths; the deletion routes call it with
+# `agendar_pendentes`.
 
 def _artefato(id_=1, **kw):
     base = dict(id=id_, id_hash=f"a{id_}", workspace_id="ws1", content_location="executor",
@@ -103,7 +104,7 @@ async def test_entregue_libera_a_linha(entrega):
 
 @pytest.mark.asyncio
 async def test_executor_OFFLINE_marca_para_purga_em_vez_de_apagar(entrega):
-    # O caso do bug: sem entrega, a linha ficava e o arquivo sumia do sistema.
+    # The bug's case: with no delivery, the row stayed and the file vanished from the system.
     entrega([])
     a = _artefato(1)
     remocao = await _remover([a])
@@ -115,9 +116,9 @@ async def test_executor_OFFLINE_marca_para_purga_em_vez_de_apagar(entrega):
 
 @pytest.mark.asyncio
 async def test_artefato_FIXADO_perde_o_pin_ao_ser_agendado(entrega):
-    """`purge_expired_artifacts` ignora `is_pinned` — sem zerar, o artefato
-    ficaria marcado como vencido e nunca purgado: some da UI como "removendo" e
-    permanece no disco para sempre."""
+    """`purge_expired_artifacts` ignores `is_pinned` — without clearing it, the
+    artifact would be marked as expired and never purged: it disappears from the
+    UI as "removing" and stays on disk forever."""
     entrega([])
     a = _artefato(1, is_pinned=True)
     await _remover([a])
@@ -127,8 +128,8 @@ async def test_artefato_FIXADO_perde_o_pin_ao_ser_agendado(entrega):
 
 @pytest.mark.asyncio
 async def test_sem_executor_id_a_linha_e_PRESERVADA(entrega):
-    """Sem destino nao ha para quem mandar. Apagar a linha deixaria o arquivo
-    orfao e invisivel — mesma decisao da retencao e da purga."""
+    """Without a destination there is no one to send to. Deleting the row would
+    leave the file orphaned and invisible — same decision as retention and purge."""
     entrega([])
     a = _artefato(1, executor_id=None)
     remocao = await _remover([a])
@@ -147,13 +148,13 @@ async def test_lote_parcial_separa_entregues_de_pendentes(entrega):
     assert [x.id for x in remocao.pendentes_local] == [2]
 
 
-# ── O lote: commit mesmo sem nada apagado, pendente nao e falha ──────────────
+# ── The batch: commit even with nothing deleted, pending is not failure ──────
 
 async def _excluir_em_lote(monkeypatch, itens):
     from app.api.routers import artifacts_router as R
     from app.core.authorization import workflow_access
 
-    # Onde `exigir_papel_no_workspace` busca o papel (a comparação segue real).
+    # Where `exigir_papel_no_workspace` looks up the role (the comparison stays real).
     monkeypatch.setattr(workflow_access, "get_workspace_member_role", AsyncMock(return_value="owner"))
     selecionados = MagicMock()
     selecionados.scalars.return_value.all.return_value = list(itens)
@@ -167,13 +168,13 @@ async def _excluir_em_lote(monkeypatch, itens):
 
 @pytest.mark.asyncio
 async def test_commit_do_batch_NAO_depende_de_ter_apagado_algo(entrega, monkeypatch):
-    """Regressao: o commit era condicionado ao que foi apagado.
+    """Regression: the commit was conditioned on what was deleted.
 
-    Com TODOS os artefatos locais e o executor offline — o caso comum deste
-    caminho — nada e apagado, e o `expires_at` que acabara de ser posto nos
-    objetos ORM morria no rollback da sessao. A API respondia "remocao
-    pendente" e nada era agendado: os artefatos nunca seriam purgados e o
-    arquivo ficaria no disco para sempre.
+    With ALL artifacts local and the executor offline — the common case of this
+    path — nothing is deleted, and the `expires_at` just set on the ORM objects
+    died in the session rollback. The API answered "remocao pendente" (removal
+    pending) and nothing was scheduled: the artifacts would never be purged and
+    the file would stay on disk forever.
     """
     entrega([])
     a = _artefato(1)
@@ -185,8 +186,8 @@ async def test_commit_do_batch_NAO_depende_de_ter_apagado_algo(entrega, monkeypa
 
 @pytest.mark.asyncio
 async def test_pendente_nao_e_contado_como_falha(entrega, monkeypatch):
-    """`skipped` significa "falhou, tente de novo"; pendente vai acontecer
-    sozinho. Contar nos dois faria a UI somar o mesmo artefato duas vezes."""
+    """`skipped` means "failed, try again"; pending will happen on its own.
+    Counting it in both would make the UI add up the same artifact twice."""
     entrega([])
     resposta, _ = await _excluir_em_lote(monkeypatch, [_artefato(1), _artefato(2, executor_id=None)])
 

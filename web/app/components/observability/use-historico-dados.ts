@@ -8,18 +8,19 @@ import type {
 import type { EstadoDoHistorico, Periodo } from "./historico-url"
 
 /**
- * Dados do topo do Histórico (docs/specs/historico-metricas.md §4.3 "Dados").
+ * Data for the top of History (docs/specs/metrics-history.md §4.3 "Dados").
  *
- * Quatro chamadas em paralelo por (período, filtros): métricas, execuções por
- * dia, executores e workflows. As duas últimas só se recortam por workspace —
- * escolher um workflow não muda a frota nem a lista de workflows, então elas
- * têm chave de cache própria e não voltam à rede quando só o workflow muda.
+ * Four calls in parallel per (period, filters): metrics, runs per day,
+ * executors and workflows. The last two are sliced only by workspace —
+ * picking a workflow changes neither the fleet nor the workflow list, so they
+ * have their own cache key and do not go back to the network when only the
+ * workflow changes.
  *
- * O cache é POR PARTE, e só o que respondeu entra nele. É a mesma lição do
- * `metrics-cache.ts` da página antiga (uma resposta faltando não pode virar
- * lista vazia memorizada), resolvida no grão da parte em vez de tudo-ou-nada:
- * uma falha em `/metrics/executores` não obriga a refazer as outras três na
- * próxima visita ao mesmo período.
+ * The cache is PER PART, and only what responded goes into it. It is the same
+ * lesson as the old page's `metrics-cache.ts` (a missing response must not
+ * become a memorized empty list), solved at the part's grain instead of
+ * all-or-nothing: a failure in `/metrics/executores` does not force redoing the
+ * other three on the next visit to the same period.
  */
 
 export type ParteDosDados = "metrics" | "dias" | "executores" | "workflows"
@@ -31,18 +32,18 @@ export interface HistoricoDados {
   dias: IRunsByDay[]
   executores: IExecutorMetrics[]
   workflows: IWorkflowMetricsRow[]
-  /** Alguma parte está em voo (o poll silencioso da faixa Agora não conta). */
+  /** Some part is in flight (the Now strip's silent poll does not count). */
   carregando: boolean
-  /** Janela a que pertence o que está NA TELA — muda quando o dado chega, não no clique. */
+  /** Window that what is ON SCREEN belongs to — changes when the data arrives, not on click. */
   periodoDosDados: Periodo
-  /** Mensagem por parte que falhou na última carga; o que já havia continua na tela. */
+  /** Message per part that failed in the last load; what was already there stays on screen. */
   falhas: FalhasDosDados
   /** Fura o cache local e manda `force=true` para o backend furar o Redis. */
   recarregar: () => void
 }
 
 export const TTL_DO_CACHE_MS = 60_000
-/** A faixa "Agora" atualiza a cada 30 s com a aba visível (spec §4.3). */
+/** The "Agora" (Now) strip refreshes every 30 s while the tab is visible (spec §4.3). */
 export const INTERVALO_DO_AGORA_MS = 30_000
 
 const MENSAGENS: Record<ParteDosDados, string> = {
@@ -54,7 +55,7 @@ const MENSAGENS: Record<ParteDosDados, string> = {
 
 type Entrada<T> = { valor: T; ts: number }
 
-/** Fuso do navegador para `/runs-by-day` cortar o dia onde a pessoa está. */
+/** Browser time zone so `/runs-by-day` cuts the day where the person is. */
 export function fusoDoNavegador(): string {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
@@ -63,7 +64,7 @@ export function fusoDoNavegador(): string {
   }
 }
 
-/** Chaves de cache: métricas e dias por (período, workspace, workflow); frota e workflows só por (período, workspace). */
+/** Cache keys: metrics and days by (period, workspace, workflow); fleet and workflows only by (period, workspace). */
 export function chavesDeCache(estado: Pick<EstadoDoHistorico, "periodo" | "workspace" | "workflow">, tz: string) {
   const ws = estado.workspace ?? ""
   const wf = estado.workflow ?? ""
@@ -95,13 +96,13 @@ export function useHistoricoDados(
   const [periodoDosDados, setPeriodoDosDados] = useState<Periodo>(estado.periodo)
   const [falhas, setFalhas] = useState<FalhasDosDados>({})
 
-  // Carimbo de sequência: trocar de período duas vezes seguidas dispara duas
-  // cargas, e a mais lenta pode responder por último. Só a última carga
-  // pedida escreve na tela.
+  // Sequence stamp: switching periods twice in a row fires two loads, and the
+  // slower one may respond last. Only the last load requested writes to the
+  // screen.
   const seq = useRef(0)
   const cache = useRef(new Map<string, Entrada<unknown>>())
-  // O estado lido pelo `recarregar` e pelo poll é sempre o corrente, sem que
-  // eles precisem trocar de identidade a cada render (descem para botões).
+  // The state read by `recarregar` and by the poll is always the current one,
+  // without them having to change identity on every render (they go down to buttons).
   const estadoRef = useRef(estado)
   estadoRef.current = estado
   const tz = useMemo(fusoDoNavegador, [])
@@ -123,7 +124,7 @@ export function useHistoricoDados(
       workflows: lerCache<IWorkflowMetricsRow[]>(chaves.workflows, agora),
     }
 
-    // O que o cache tem entra na hora: trocar de período e voltar não pisca.
+    // What the cache has goes in right away: switching periods and back does not flicker.
     if (doCache.metrics) setMetrics(doCache.metrics)
     if (doCache.dias) setDias(doCache.dias)
     if (doCache.executores) setExecutores(doCache.executores)
@@ -172,9 +173,9 @@ export function useHistoricoDados(
       else novasFalhas.workflows = MENSAGENS.workflows
     }
 
-    // O rótulo da janela acompanha o dado que chegou: se só as métricas
-    // vieram, os cards já são do período novo e o gráfico ainda não — o
-    // gráfico se marca pelo aviso de falha, não pelo rótulo.
+    // The window label follows the data that arrived: if only the metrics
+    // came, the cards are already for the new period and the chart is not yet —
+    // the chart is flagged by the failure notice, not by the label.
     if ((rMetrics?.data || rDias?.data?.days) || doCache.metrics || doCache.dias) setPeriodoDosDados(alvo.periodo)
     setFalhas(novasFalhas)
     setCarregando(false)
@@ -183,13 +184,14 @@ export function useHistoricoDados(
   useEffect(() => {
     if (!habilitado) return
     carregar(estadoRef.current, false)
-    // Só (período, workspace, workflow) recortam estas quatro chamadas; os
-    // demais campos do estado (status, busca, visão) são da tabela.
+    // Only (period, workspace, workflow) slice these four calls; the other
+    // state fields (status, search, view) belong to the table.
   }, [habilitado, estado.periodo, estado.workspace, estado.workflow, carregar])
 
-  // Poll silencioso da faixa "Agora": só as métricas (é onde `now` vive), sem
-  // ligar `carregando` — senão os indicadores virariam skeleton a cada 30 s.
-  // Não incrementa a sequência: uma carga completa pedida no meio vence.
+  // Silent poll of the "Agora" strip: only the metrics (that is where `now`
+  // lives), without turning on `carregando` — otherwise the indicators would
+  // become a skeleton every 30 s. It does not bump the sequence: a full load
+  // requested in the middle wins.
   useEffect(() => {
     if (!habilitado || intervaloDoAgoraMs <= 0) return
     let ultimo = Date.now()
@@ -206,8 +208,8 @@ export function useHistoricoDados(
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") atualizarAgora()
     }, intervaloDoAgoraMs)
-    // Voltar para a aba depois de um tempo longe: atualiza na hora em vez de
-    // esperar o próximo tick — mas não a cada alt-tab.
+    // Returning to the tab after a long time away: refreshes right away instead of
+    // waiting for the next tick — but not on every alt-tab.
     const onVisibility = () => {
       if (document.visibilityState === "visible" && Date.now() - ultimo >= intervaloDoAgoraMs) atualizarAgora()
     }

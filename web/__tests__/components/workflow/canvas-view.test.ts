@@ -13,9 +13,9 @@ describe("classifyZoom", () => {
   })
 
   it("segura o degrau na zona de histerese", () => {
-    // Entrou em `far` abaixo de 0.42; precisa passar de 0.50 para sair.
+    // Entered `far` below 0.42; it has to go above 0.50 to leave.
     expect(classifyZoom(0.45, "far")).toBe("far")
-    // Entrou em `near` acima de 0.80; precisa cair abaixo de 0.72 para sair.
+    // Entered `near` above 0.80; it has to drop below 0.72 to leave.
     expect(classifyZoom(0.75, "near")).toBe("near")
   })
 

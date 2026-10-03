@@ -1,11 +1,11 @@
 # tests/unit/test_drive_executor_delete.py
-"""DELETE /drive/executor-file/{id} — a rota mTLS que o GeoSync usa para apagar
-um arquivo do Drive quando ele sai da pasta sincronizada.
+"""DELETE /drive/executor-file/{id} — the mTLS route GeoSync uses to delete a
+Drive file when it leaves the synced folder.
 
-Regressao que estas rotas trancam: o executor mandava `DELETE /drive/{id}` (rota
-de usuario, exige JWT), e no host `agents.atlans.example.org` o Traefik so roteia
-`/drive/executor-*` para a API — o pedido morria com 404 no proprio Traefik e o
-WorkspaceFile ficava listado na UI para sempre, mesmo apos F5.
+Regression these routes lock down: the executor sent `DELETE /drive/{id}` (a
+user route, requires JWT), and on the `agents.atlans.example.org` host Traefik only
+routes `/drive/executor-*` to the API — the request died with a 404 in Traefik
+itself and the WorkspaceFile stayed listed in the UI forever, even after F5.
 """
 import pytest
 from contextlib import contextmanager
@@ -21,11 +21,12 @@ URL = "/drive/executor-file/file-1"
 
 @contextmanager
 def _bypass(svc, *, ws_ids=("ws-1",), executor_id="ag-1"):
-    """Simula auth mTLS bem-sucedida e injeta um DriveService mockado.
+    """Simulates a successful mTLS auth and injects a mocked DriveService.
 
-    Espelha o padrao de test_change_detector_router: o router real autentica o
-    executor por `_auth_agent` (cert mTLS) — aqui basta devolver um executor
-    fake com os workspaces resolvidos, e sobrepor a dependencia do service.
+    Mirrors the pattern of test_change_detector_router: the real router
+    authenticates the executor via `_auth_agent` (mTLS cert) — here it is enough
+    to return a fake executor with the resolved workspaces, and override the
+    service dependency.
     """
     from app.main import app
     from app.api.dependencies import get_db
@@ -77,8 +78,8 @@ async def test_delete_remove_e_devolve_204(client):
     with _bypass(svc):
         resp = await client.delete(URL)
     assert resp.status_code == 204
-    # Delegou ao service com o wf e o id do executor AUTENTICADO (nao um valor
-    # que o cliente escolhe) — a autorizacao por workspace ja passou.
+    # Delegated to the service with the wf and the AUTHENTICATED executor's id (not
+    # a value the client picks) — the per-workspace authorization already passed.
     svc.delete_agent_file.assert_awaited_once()
     args = svc.delete_agent_file.call_args.args
     assert args[0] is wf and args[1] == "ag-1"
@@ -86,7 +87,7 @@ async def test_delete_remove_e_devolve_204(client):
 
 @pytest.mark.asyncio
 async def test_delete_inexistente_e_idempotente_204(client):
-    """Registro ausente = ja esta no estado desejado. 204, sem tocar no service."""
+    """Missing record = already in the desired state. 204, without touching the service."""
     svc = _svc(missing=True)
     with _bypass(svc):
         resp = await client.delete(URL)
@@ -96,7 +97,7 @@ async def test_delete_inexistente_e_idempotente_204(client):
 
 @pytest.mark.asyncio
 async def test_delete_de_outro_workspace_da_403(client):
-    """Arquivo fora dos workspaces do executor: 403, e nada e apagado."""
+    """A file outside the executor's workspaces: 403, and nothing is deleted."""
     svc = _svc(_wf("ws-OUTRO"))
     with _bypass(svc, ws_ids=("ws-1",)):
         resp = await client.delete(URL)
@@ -123,15 +124,15 @@ async def test_service_minio_apaga_s3_primeiro_e_emite():
     s3del.assert_awaited_once()
     db.delete.assert_awaited_once_with(wf)
     db.commit.assert_awaited_once()
-    # exclui o proprio executor do fan-out (ele ja removeu localmente)
+    # excludes the executor itself from the fan-out (it already removed it locally)
     assert emit.await_args.kwargs.get("exclude_agent_id") == "ag-1"
 
 
 @pytest.mark.asyncio
 async def test_service_catalogo_do_proprio_executor_apaga_sem_s3():
-    """Catalogo (content_location='executor', s3_key=None): sem objeto no MinIO,
-    so a ficha. E o caso que `delete_file` (web) recusa e que este caminho existe
-    para atender — o proprio executor dono reportando que o arquivo saiu."""
+    """Catalog entry (content_location='executor', s3_key=None): no object in MinIO,
+    only the record. It is the case that `delete_file` (web) refuses and that this
+    path exists to serve — the owning executor itself reporting the file left."""
     svc, db = _service()
     wf = MagicMock(content_location="executor", s3_key=None, content_executor_id="ag-1",
                    workspace_id="ws-1", id_hash="f2", original_name="b.tif", extension="tif", size=5)
@@ -144,7 +145,7 @@ async def test_service_catalogo_do_proprio_executor_apaga_sem_s3():
 
 @pytest.mark.asyncio
 async def test_service_catalogo_de_outro_executor_e_negado():
-    """Um executor nao apaga a ficha de conteudo que vive em OUTRO."""
+    """An executor does not delete the record of content that lives in ANOTHER one."""
     svc, db = _service()
     wf = MagicMock(content_location="executor", s3_key=None, content_executor_id="ag-OUTRO",
                    workspace_id="ws-1", id_hash="f3", original_name="c.tif", extension="tif", size=5)
@@ -155,10 +156,10 @@ async def test_service_catalogo_de_outro_executor_e_negado():
     emit.assert_not_awaited()
 
 
-# ── Batch delete (web) tambem emite file_deleted ──────────────────────────────
-# Sem isto, a exclusao em lote sumia do Drive mas o executor em download/
-# bidirectional nao removia a copia local — o `delete_file` de um arquivo so
-# avisava, o batch nao.
+# ── Batch delete (web) also emits file_deleted ───────────────────────────────
+# Without this, the batch deletion vanished from the Drive but the executor in
+# download/bidirectional did not remove the local copy — `delete_file` for a
+# single file notified, the batch did not.
 
 def _batch_service(files, *, owned=("ws-1",), roles=()):
     from app.services.drive_service import DriveService
@@ -169,7 +170,7 @@ def _batch_service(files, *, owned=("ws-1",), roles=()):
     owner_res.all.return_value = [(w,) for w in owned]
     member_res = MagicMock()
     member_res.all.return_value = [(w, r) for w, r in roles]
-    # As tres queries de batch_delete_files, na ordem: arquivos, donos, membros.
+    # The three batch_delete_files queries, in order: files, owners, members.
     db.execute = AsyncMock(side_effect=[files_res, owner_res, member_res])
     return DriveService(db), db
 
@@ -202,7 +203,7 @@ async def test_batch_delete_emite_um_evento_por_arquivo():
 
 @pytest.mark.asyncio
 async def test_batch_delete_nao_emite_para_catalogado():
-    """Catalogado e pulado (bytes vivem no executor) — e sem evento."""
+    """A cataloged one is skipped (bytes live on the executor) — and with no event."""
     svc, _ = _batch_service([_bwf("a1", s3_key="drive/ws-1/a1"),
                              _bwf("cat", location="executor")], owned=("ws-1",))
     with patch("app.services.drive_service.s3.delete_strict_async", new_callable=AsyncMock), \
@@ -215,8 +216,8 @@ async def test_batch_delete_nao_emite_para_catalogado():
 
 @pytest.mark.asyncio
 async def test_batch_delete_falha_de_s3_nao_emite_esse_arquivo():
-    """S3 falhou → arquivo pulado (reconcile tenta depois) → nenhum evento para
-    ele; um evento seria mentira, o objeto ainda esta no MinIO."""
+    """S3 failed → file skipped (reconcile retries later) → no event for it; an
+    event would be a lie, the object is still in MinIO."""
     svc, _ = _batch_service([_bwf("ok", s3_key="drive/ws-1/ok"),
                              _bwf("ruim", s3_key="drive/ws-1/ruim")], owned=("ws-1",))
 

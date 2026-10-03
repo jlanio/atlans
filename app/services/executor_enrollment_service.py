@@ -1,15 +1,15 @@
 # app/services/executor_enrollment_service.py
 """
-Servico de enrollment de executores via Bootstrap OTP + mTLS.
+Executor enrollment service via Bootstrap OTP + mTLS.
 
-Responsabilidades:
-  - Geracao e consumo atomico de OTPs single-use (HMAC com pepper).
-  - Validacao de CSR Ed25519 enviado pelo executor.
-  - Assinatura de CSR via step-ca interna (HTTP API JWK provisioner).
-  - Revogacao de cert via Redis blacklist (fail-closed) + CRL step-ca.
+Responsibilities:
+  - Generation and atomic consumption of single-use OTPs (HMAC with pepper).
+  - Validation of the Ed25519 CSR sent by the executor.
+  - CSR signing via the internal step-ca (HTTP API JWK provisioner).
+  - Cert revocation via Redis blacklist (fail-closed) + step-ca CRL.
 
-A revogacao Redis serve como blacklist rapida; CRL/OCSP step-ca e camada
-de defesa em profundidade quando integrarmos com Traefik.
+The Redis revocation serves as a fast blacklist; step-ca CRL/OCSP is a
+defense-in-depth layer for when we integrate with Traefik.
 """
 from __future__ import annotations
 
@@ -72,10 +72,10 @@ def _cert_revoked_key(serial: str) -> str:
 
 
 _REVOCATION_TTL_FLOOR_SECONDS = 7 * 24 * 60 * 60  # 7 dias — piso minimo, mesmo
-# se o cert ja estiver perto de expirar. Idealmente, revoke_cert recebe a data
-# de expiracao do cert e usa max(remaining, floor). Sem isso, cert valido por
-# ate 90 dias (EXECUTOR_CERT_TTL_DAYS) podia continuar aceito pelo Traefik apos o
-# Redis liberar a chave em 7 dias.
+# if the cert is already close to expiring. Ideally, revoke_cert receives the
+# cert's expiration date and uses max(remaining, floor). Without that, a cert valid
+# for up to 90 days (EXECUTOR_CERT_TTL_DAYS) could keep being accepted by Traefik
+# after Redis released the key at 7 days.
 
 
 # ── OTP lifecycle ────────────────────────────────────────────────────────────
@@ -87,16 +87,16 @@ async def create_enrollment_otp(
     created_by: str,
 ) -> tuple[str, datetime]:
     """
-    Gera um OTP de uso unico, persiste o HMAC e retorna o plaintext.
+    Generates a single-use OTP, persists the HMAC and returns the plaintext.
 
-    O plaintext aparece apenas uma vez (no retorno) — admin entrega ao
-    operador via canal seguro. Subsequentemente so o HMAC fica no banco.
+    The plaintext appears only once (in the return value) — the admin hands it
+    to the operator over a secure channel. From then on only the HMAC stays in the database.
     """
-    otp_plaintext = secrets.token_urlsafe(32)  # ~43 chars, 256 bits de entropia
+    otp_plaintext = secrets.token_urlsafe(32)  # ~43 chars, 256 bits of entropy
     expires_at = datetime.now(timezone.utc) + timedelta(hours=EXECUTOR_OTP_TTL_HOURS)
 
-    # Invalida OTPs anteriores ainda não consumidos deste executor — garante que
-    # no máximo um OTP fique válido por vez (evita acúmulo de credenciais vivas).
+    # Invalidates this executor's earlier OTPs not yet consumed — ensures that
+    # at most one OTP is valid at a time (avoids piling up live credentials).
     await db.execute(
         update(ExecutorEnrollmentOTP)
         .where(
@@ -109,7 +109,7 @@ async def create_enrollment_otp(
     record = ExecutorEnrollmentOTP(
         executor_id=executor_id,
         otp_hash=_hash_otp(otp_plaintext),
-        expires_at=expires_at.replace(tzinfo=None),  # tabela usa naive datetime
+        expires_at=expires_at.replace(tzinfo=None),  # table uses naive datetime
         created_by=created_by,
     )
     db.add(record)
@@ -122,13 +122,13 @@ async def create_enrollment_otp(
 
 async def consume_otp(db: AsyncSession, otp_plaintext: str, from_ip: str) -> str:
     """
-    Consome um OTP atomicamente e retorna o executor_id vinculado.
+    Consumes an OTP atomically and returns the linked executor_id.
 
-    Race-safe: UPDATE...WHERE consumed_at IS NULL...RETURNING garante que
-    apenas uma transacao concorrente tera sucesso.
+    Race-safe: UPDATE...WHERE consumed_at IS NULL...RETURNING guarantees that
+    only one concurrent transaction succeeds.
 
-    Lanca ValueError se OTP invalido, expirado ou ja consumido — mensagem
-    generica para nao revelar qual condicao falhou.
+    Raises ValueError if the OTP is invalid, expired or already consumed — a
+    generic message so as not to reveal which condition failed.
     """
     h = _hash_otp(otp_plaintext)
     now = utc_now_naive()
@@ -154,18 +154,18 @@ async def consume_otp(db: AsyncSession, otp_plaintext: str, from_ip: str) -> str
     return row[0]
 
 
-# ── Validacao de CSR ─────────────────────────────────────────────────────────
+# ── CSR validation ───────────────────────────────────────────────────────────
 
 
 def parse_and_validate_csr(csr_pem: str, expected_cn_prefix: str = "executor-") -> x509.CertificateSigningRequest:
     """
-    Carrega o CSR e valida:
-      - PEM bem formado
-      - Assinatura interna OK
-      - CN comeca com `executor-`
-      - Chave publica Ed25519 (rejeita RSA/ECDSA para reduzir matriz de algoritmos)
+    Loads the CSR and validates:
+      - well-formed PEM
+      - internal signature OK
+      - CN starts with `executor-`
+      - Ed25519 public key (rejects RSA/ECDSA to shrink the algorithm matrix)
 
-    Lanca ValueError com mensagem generica em caso de qualquer falha.
+    Raises ValueError with a generic message on any failure.
     """
     try:
         csr = x509.load_pem_x509_csr(csr_pem.encode())
@@ -204,13 +204,13 @@ def _b64u_decode(s: str) -> bytes:
 
 def _decrypt_jwe_pbes2(jwe_compact: str, password: str) -> bytes:
     """
-    Decifra um JWE compacto no formato PBES2-HS256+A128KW + A256GCM (usado
-    pela step-ca para cifrar a chave privada do provisioner JWK no ca.json).
+    Decrypts a compact JWE in the PBES2-HS256+A128KW + A256GCM format (used
+    by step-ca to encrypt the JWK provisioner's private key in ca.json).
 
-    Implementacao manual com `cryptography` porque jwcrypto impoe limite
-    MAX_P2C arbitrario e step-ca usa iterations alto (600k+).
+    Manual implementation with `cryptography` because jwcrypto imposes an
+    arbitrary MAX_P2C limit and step-ca uses a high iteration count (600k+).
 
-    Estrutura do JWE compact: protected_b64.encrypted_key_b64.iv_b64.cipher_b64.tag_b64
+    JWE compact structure: protected_b64.encrypted_key_b64.iv_b64.cipher_b64.tag_b64
     """
     parts = jwe_compact.split(".")
     if len(parts) != 5:
@@ -237,7 +237,7 @@ def _decrypt_jwe_pbes2(jwe_compact: str, password: str) -> bytes:
         iterations=p2c,
     ).derive(password.encode("utf-8"))
 
-    # AES Key Wrap (RFC 3394) → CEK de 256 bits (para A256GCM)
+    # AES Key Wrap (RFC 3394) → 256-bit CEK (for A256GCM)
     cek = aes_key_unwrap(kek, _b64u_decode(enc_key_b64))
 
     # A256GCM decrypt. AAD = ASCII do protected header b64.
@@ -249,8 +249,8 @@ def _decrypt_jwe_pbes2(jwe_compact: str, password: str) -> bytes:
 
 def _jwk_ec_to_pem(jwk: dict) -> bytes:
     """
-    Converte JWK EC (P-256 / ES256) com componente privada `d` para PEM PKCS8
-    sem cifragem. Aceita apenas EC P-256 (kty=EC, crv=P-256).
+    Converts an EC JWK (P-256 / ES256) with private component `d` to unencrypted
+    PKCS8 PEM. Accepts only EC P-256 (kty=EC, crv=P-256).
     """
     if jwk.get("kty") != "EC" or jwk.get("crv") != "P-256":
         raise ValueError(f"JWK nao suportado: kty={jwk.get('kty')} crv={jwk.get('crv')}. Esperado EC P-256.")
@@ -272,15 +272,15 @@ def _jwk_ec_to_pem(jwk: dict) -> bytes:
 
 def _load_provisioner_jwk() -> tuple[dict, bytes]:
     """
-    Le ca.json da step-ca, decifra `encryptedKey` do provisioner com a senha
-    e retorna (JWK privada como dict, chave privada em PEM PKCS8).
-    Cacheia em memoria — PBKDF2 com 600k iterations e caro (~50-200ms).
+    Reads step-ca's ca.json, decrypts the provisioner's `encryptedKey` with the
+    password and returns (private JWK as a dict, private key as PKCS8 PEM).
+    Caches in memory — PBKDF2 with 600k iterations is expensive (~50-200ms).
 
-    Lanca RuntimeError se:
-      - STEPCA_PROVISIONER_PASSWORD vazio.
-      - ca.json nao encontrado (volume step-ca-data:/etc/step-ca:ro nao montado).
-      - Provisioner com nome STEPCA_PROVISIONER_NAME nao existe.
-      - Decifragem falha (senha errada ou JWE mal formado).
+    Raises RuntimeError if:
+      - STEPCA_PROVISIONER_PASSWORD is empty.
+      - ca.json is not found (volume step-ca-data:/etc/step-ca:ro not mounted).
+      - No provisioner named STEPCA_PROVISIONER_NAME exists.
+      - Decryption fails (wrong password or malformed JWE).
     """
     global _provisioner_jwk_cache, _provisioner_pem_cache
     if _provisioner_jwk_cache is not None and _provisioner_pem_cache is not None:
@@ -318,8 +318,8 @@ def _load_provisioner_jwk() -> tuple[dict, bytes]:
     try:
         plaintext = _decrypt_jwe_pbes2(encrypted_key, STEPCA_PROVISIONER_PASSWORD)
         private_jwk = json.loads(plaintext.decode("utf-8"))
-        # Preserva o kid do provisioner (a chave PUBLICA tem kid; a privada
-        # decifrada nao tem, mas precisamos pro header do JWT).
+        # Preserves the provisioner's kid (the PUBLIC key has a kid; the decrypted
+        # private key does not, but we need it for the JWT header).
         if "kid" not in private_jwk and "kid" in provisioner.get("key", {}):
             private_jwk["kid"] = provisioner["key"]["kid"]
         pem = _jwk_ec_to_pem(private_jwk)
@@ -340,17 +340,17 @@ def _load_provisioner_jwk() -> tuple[dict, bytes]:
 
 def _build_stepca_token(executor_id: str, ttl_days: int) -> str:
     """
-    Gera OTT (one-time token) assinado com ES256 usando a chave privada do
-    provisioner JWK da step-ca. Step-ca valida com a chave publica embutida
-    no provisioner e autoriza a assinatura do CSR.
+    Generates an OTT (one-time token) signed with ES256 using the private key of
+    step-ca's JWK provisioner. step-ca validates it with the public key embedded
+    in the provisioner and authorizes the CSR signing.
 
-    Claims exigidos pela step-ca:
-      sub:  identidade do cert (CN/SAN principal)
-      sans: lista de SANs adicionais
-      iss:  nome do provisioner
-      aud:  endpoint /1.0/sign
-      iat/nbf/exp: validade curta (5 min)
-      jti:  ID unico do token (step-ca rastreia para impedir reuso)
+    Claims required by step-ca:
+      sub:  cert identity (primary CN/SAN)
+      sans: list of additional SANs
+      iss:  provisioner name
+      aud:  /1.0/sign endpoint
+      iat/nbf/exp: short validity (5 min)
+      jti:  unique token ID (step-ca tracks it to prevent reuse)
     """
     private_jwk, priv_pem = _load_provisioner_jwk()
 
@@ -372,18 +372,18 @@ def _build_stepca_token(executor_id: str, ttl_days: int) -> str:
 
 async def sign_csr_via_stepca(csr_pem: str, executor_id: str, ttl_days: int | None = None) -> dict:
     """
-    Pede a step-ca para assinar o CSR.
+    Asks step-ca to sign the CSR.
 
-    Retorna dict com:
+    Returns a dict with:
       cert_pem, chain_pem, ca_pem, serial, fingerprint, issued_at, expires_at
 
-    Lanca RuntimeError se step-ca indisponivel ou rejeitar.
+    Raises RuntimeError if step-ca is unavailable or rejects it.
     """
     ttl = ttl_days or EXECUTOR_CERT_TTL_DAYS
-    # _build_stepca_token faz PBKDF2 (600k iter, ~50-200ms) + leituras de arquivo
-    # em _load_provisioner_jwk. O JWK e cacheado em modulo (1x por processo), mas
-    # a assinatura ES256 e o custo do 1o token nao devem prender o event loop que
-    # atende os WebSockets dos executores.
+    # _build_stepca_token does PBKDF2 (600k iter, ~50-200ms) + file reads
+    # in _load_provisioner_jwk. The JWK is cached at module level (once per process),
+    # but the ES256 signature and the cost of the 1st token must not hold the event
+    # loop that serves the executors' WebSockets.
     token = await asyncio.to_thread(_build_stepca_token, executor_id, ttl)
 
     payload = {
@@ -392,14 +392,14 @@ async def sign_csr_via_stepca(csr_pem: str, executor_id: str, ttl_days: int | No
         "notAfter": f"{ttl * 24}h",
     }
 
-    # NAO usar safe_httpx_request aqui: STEPCA_URL vem de ENV var (admin,
-    # nao user-controlled), entao nao ha vetor SSRF. safe_httpx_request faria
-    # pin de IP — desnecessario para um host interno conhecido e configurado.
+    # Do NOT use safe_httpx_request here: STEPCA_URL comes from an ENV var (admin,
+    # not user-controlled), so there is no SSRF vector. safe_httpx_request would
+    # pin the IP — unnecessary for a known, configured internal host.
     #
-    # SEG: este e o canal que EMITE os certs mTLS de todos os executores — e a
-    # raiz de confianca do sistema inteiro. Com verify=False, quem estivesse na
-    # rede interna podia se passar pela step-ca e devolver certs proprios.
-    # Validamos contra o root cert da CA (mesmo volume ja usado por /ca-bundle).
+    # SEC: this is the channel that ISSUES the mTLS certs of every executor — it is
+    # the root of trust of the whole system. With verify=False, anyone on the
+    # internal network could impersonate step-ca and hand back their own certs.
+    # We validate against the CA's root cert (same volume already used by /ca-bundle).
     verify: str | bool = False
     if os.path.exists(STEPCA_ROOT_CERT_PATH):
         verify = STEPCA_ROOT_CERT_PATH
@@ -436,19 +436,20 @@ async def sign_csr_via_stepca(csr_pem: str, executor_id: str, ttl_days: int | No
     fingerprint_bytes = cert_obj.fingerprint(hashes.SHA256())
     serial_hex = format(cert_obj.serial_number, "x")
 
-    # ca_pem do response deve conter o ROOT cert (trust anchor que o executor vai
-    # usar para validar a chain completa). step-ca nao devolve o root no /1.0/sign,
-    # entao lemos diretamente do volume step-ca-data montado em /etc/step-ca/certs.
+    # The response's ca_pem must contain the ROOT cert (the trust anchor the executor
+    # will use to validate the full chain). step-ca does not return the root on
+    # /1.0/sign, so we read it directly from the step-ca-data volume mounted at
+    # /etc/step-ca/certs.
     #
-    # FALHAR AQUI E OBRIGATORIO. Antes esta funcao devolvia ca_pem="" com um mero
-    # WARNING; o executor gravava esse vazio por cima do ca.pem bom e ficava
-    # permanentemente offline — sem trust anchor ele nao consegue nem chamar
-    # /renew-cert para se autocorrigir. Recusar o enroll/renewal deixa o executor
-    # com o bundle antigo (que ainda funciona ate expirar) e da ao operador uma
-    # mensagem acionavel; entregar um bundle mutilado nao tem volta.
+    # FAILING HERE IS MANDATORY. This function used to return ca_pem="" with a mere
+    # WARNING; the executor wrote that empty value over the good ca.pem and went
+    # permanently offline — without a trust anchor it cannot even call
+    # /renew-cert to fix itself. Refusing the enroll/renewal leaves the executor
+    # with the old bundle (which still works until it expires) and gives the operator
+    # an actionable message; handing out a mangled bundle cannot be undone.
     try:
-        # Leitura de arquivo em thread: acontece a CADA enroll/renewal e bloquearia
-        # o event loop no disco. read_text abre/le/fecha; OSError propaga do worker.
+        # File read in a thread: it happens on EVERY enroll/renewal and would block
+        # the event loop on disk. read_text opens/reads/closes; OSError propagates from the worker.
         root_pem = await asyncio.to_thread(Path(STEPCA_ROOT_CERT_PATH).read_text)
     except OSError as exc:
         logger.error(
@@ -460,7 +461,7 @@ async def sign_csr_via_stepca(csr_pem: str, executor_id: str, ttl_days: int | No
             "Root cert da CA interna indisponivel no servidor — bundle nao emitido."
         ) from exc
 
-    # Conteudo vazio/truncado tem o mesmo efeito destrutivo de arquivo ausente.
+    # Empty/truncated content has the same destructive effect as a missing file.
     try:
         x509.load_pem_x509_certificate(root_pem.encode())
     except Exception as exc:
@@ -483,17 +484,17 @@ async def sign_csr_via_stepca(csr_pem: str, executor_id: str, ttl_days: int | No
     }
 
 
-# ── Persistencia do cert no executor ────────────────────────────────────────────
+# ── Persisting the cert on the executor ─────────────────────────────────────────
 
 
 async def attach_cert_to_agent(db: AsyncSession, executor_id: str, cert_data: dict) -> Executor:
     """
-    Enrollment: atualiza o executor com os metadados do novo cert e marca
-    status='active'. A renovacao NAO passa por aqui — ver
+    Enrollment: updates the executor with the new cert's metadata and sets
+    status='active'. Renewal does NOT go through here — see
     `renovar_cert_do_executor`.
 
-    Limpa o flag de revogacao Redis caso houvesse um anterior (reuso de
-    executor_id apos revogacao + re-enrollment).
+    Clears the Redis revocation flag if there was an earlier one (reuse of an
+    executor_id after revocation + re-enrollment).
     """
     result = await db.execute(select(Executor).where(Executor.id_hash == executor_id))
     ag = result.scalar_one_or_none()
@@ -510,7 +511,7 @@ async def attach_cert_to_agent(db: AsyncSession, executor_id: str, cert_data: di
     await db.commit()
     await db.refresh(ag)
 
-    # Limpa revocation flag se existia.
+    # Clears the revocation flag if it existed.
     try:
         from app.core.redis import get_redis_pool
         rc = get_redis_pool()
@@ -525,21 +526,22 @@ async def renovar_cert_do_executor(
     db: AsyncSession, executor_id: str, serial_apresentado: str | None, cert_data: dict,
 ) -> bool:
     """
-    Renovacao: grava o cert novo SO se o executor continua como estava quando
-    apresentou o antigo — ativo e com aquele serial. Condicao e escrita sao um
-    UPDATE so.
+    Renewal: writes the new cert ONLY if the executor is still as it was when it
+    presented the old one — active and with that serial. Condition and write are a
+    single UPDATE.
 
-    A renovacao autentica no inicio do request e espera a assinatura do step-ca
-    antes de gravar. Uma revogacao nessa janela (a do cert zera `cert_serial`,
-    a do executor muda `status`) era desfeita: a gravacao incondicional punha um
-    serial novo e valido no banco, e o executor revogado voltava a conectar.
+    Renewal authenticates at the start of the request and waits for step-ca's
+    signature before writing. A revocation in that window (the cert's zeroes
+    `cert_serial`, the executor's changes `status`) used to be undone: the
+    unconditional write put a new, valid serial in the database, and the revoked
+    executor could connect again.
 
-    Nao mexe em `status` (renovar nao reativa) nem em `last_seen_at` (a
-    renovacao acontece com o executor conectado, e o `last_seen_at` de quem
-    esta online e o inicio da sessao — o "no ar desde" da tela de executores).
+    Does not touch `status` (renewing does not reactivate) nor `last_seen_at` (the
+    renewal happens with the executor connected, and the `last_seen_at` of one
+    that is online is the session start — the "no ar desde" (online since) of the executors screen).
 
-    Devolve False quando o executor mudou no meio: quem chama descarta o cert
-    recem-emitido.
+    Returns False when the executor changed midway: the caller discards the
+    freshly issued cert.
     """
     if not serial_apresentado:
         return False
@@ -563,12 +565,12 @@ async def renovar_cert_do_executor(
 
 
 def validate_x25519_public_key(public_key_pem: str) -> None:
-    """Garante que o PEM enviado no enrollment e mesmo uma chave publica X25519.
+    """Ensures the PEM sent at enrollment really is an X25519 public key.
 
-    Sem esta checagem, um PEM RSA/Ed25519 era persistido como se fosse valido e
-    so estourava no dispatch: `build_job_message` chamava `exchange()` e
-    levantava TypeError, que o `_dispatch_job` nao captura (so trata
-    RuntimeError) — todo despacho para aquele executor virava HTTP 500.
+    Without this check, an RSA/Ed25519 PEM was persisted as if it were valid and
+    only blew up at dispatch: `build_job_message` called `exchange()` and
+    raised TypeError, which `_dispatch_job` does not catch (it only handles
+    RuntimeError) — every dispatch to that executor became an HTTP 500.
     """
     from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey
     from cryptography.hazmat.primitives.serialization import load_pem_public_key
@@ -581,7 +583,7 @@ def validate_x25519_public_key(public_key_pem: str) -> None:
 
 
 async def attach_public_key_to_agent(db: AsyncSession, executor_id: str, public_key_pem: str) -> None:
-    """Persiste a chave publica X25519 do executor (envelope encryption de jobs)."""
+    """Persists the executor's X25519 public key (envelope encryption of jobs)."""
     validate_x25519_public_key(public_key_pem)
     result = await db.execute(select(Executor).where(Executor.id_hash == executor_id))
     ag = result.scalar_one_or_none()
@@ -596,15 +598,15 @@ async def attach_public_key_to_agent(db: AsyncSession, executor_id: str, public_
 
 async def revoke_cert(serial: str, cert_expires_at: datetime | None = None) -> None:
     """
-    Marca o serial como revogado no Redis. TTL = max(remaining_lifetime, 7d).
+    Marks the serial as revoked in Redis. TTL = max(remaining_lifetime, 7d).
 
-    Antes era fixo em 7 dias, mas certs tem ate 90 dias de validade. Apos o
-    Redis liberar a chave, Traefik aceitava o cert revogado pelo restante da
-    validade (potencialmente ~83 dias). Agora o TTL acompanha a validade real.
+    It used to be fixed at 7 days, but certs are valid for up to 90 days. After
+    Redis released the key, Traefik accepted the revoked cert for the rest of its
+    validity (potentially ~83 days). Now the TTL follows the actual validity.
 
-    cert_expires_at: datetime de expiracao do cert (UTC). Se omitido (callers
-    legados), usa o piso de 7 dias — comportamento anterior, mantido por
-    compatibilidade durante migracao.
+    cert_expires_at: the cert's expiration datetime (UTC). If omitted (legacy
+    callers), uses the 7-day floor — the previous behavior, kept for
+    compatibility during the migration.
     """
     from app.core.redis import get_redis_pool
     rc = get_redis_pool()
@@ -612,7 +614,7 @@ async def revoke_cert(serial: str, cert_expires_at: datetime | None = None) -> N
     ttl = _REVOCATION_TTL_FLOOR_SECONDS
     if cert_expires_at is not None:
         now = datetime.now(timezone.utc)
-        # Aceita datetime naive ou aware; normaliza para UTC.
+        # Accepts naive or aware datetime; normalizes to UTC.
         exp = cert_expires_at if cert_expires_at.tzinfo else cert_expires_at.replace(tzinfo=timezone.utc)
         remaining = int((exp - now).total_seconds())
         ttl = max(remaining, _REVOCATION_TTL_FLOOR_SECONDS)
@@ -624,7 +626,7 @@ async def revoke_cert(serial: str, cert_expires_at: datetime | None = None) -> N
 
 
 async def is_cert_revoked(serial: str) -> bool:
-    """Fail-closed: qualquer falha do Redis trata o cert como revogado."""
+    """Fail-closed: any Redis failure treats the cert as revoked."""
     from app.core.redis import get_redis_pool
     try:
         rc = get_redis_pool()

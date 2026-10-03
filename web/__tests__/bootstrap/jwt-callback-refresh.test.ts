@@ -1,18 +1,18 @@
 /**
- * Renovação do access token no callback jwt (web/auth.ts) — o coração da
- * correção do bug de logout espúrio.
+ * Access token renewal in the jwt callback (web/auth.ts) — the heart of the
+ * fix for the spurious logout bug.
  *
- * Antes, QUALQUER resposta não-2xx de /auth/refresh (429 do rate limit, 5xx,
- * timeout de rede) virava `token.error = "RefreshTokenExpired"`, que o
- * middleware e o SessionSync leem para mandar o usuário ao /login — um soluço
- * transitório do backend deslogava. E o erro nunca era limpo num refresh
- * bem-sucedido, então grudava. Estes testes trancam a distinção transitório ×
- * terminal e a limpeza do erro.
+ * Before, ANY non-2xx response from /auth/refresh (rate limit 429, 5xx,
+ * network timeout) became `token.error = "RefreshTokenExpired"`, which the
+ * middleware and SessionSync read to send the user to /login — a transient
+ * backend hiccup logged people out. And the error was never cleared on a successful
+ * refresh, so it stuck. These tests lock the transient ×
+ * terminal distinction and the clearing of the error.
  */
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest"
 
-// auth.ts chama NextAuth() no topo do módulo; aqui só interessa a função pura
-// jwtCallback, então NextAuth e o provider viram stubs.
+// auth.ts calls NextAuth() at the top of the module; here only the pure function
+// jwtCallback matters, so NextAuth and the provider become stubs.
 vi.mock("next-auth", () => ({
   default: () => ({ handlers: {}, signIn: vi.fn(), signOut: vi.fn(), auth: vi.fn() }),
 }))
@@ -24,7 +24,7 @@ import type { JWT } from "next-auth/jwt"
 const AGORA = 1_000_000_000_000
 const now = () => AGORA
 
-/** Token válido, já autenticado, com o access EXPIRADO (força o ramo de refresh). */
+/** Valid token, already authenticated, with the access EXPIRED (forces the refresh branch). */
 function tokenExpirado(over: Partial<JWT> = {}): JWT {
   return {
     id_hash: "u1", username: "ana", role: "user", agent_quota: 0, workspace_id: null,
@@ -39,8 +39,8 @@ function resposta(status: number, body: unknown = {}): Response {
 }
 
 describe("jwtCallback — renovação e distinção transitório × terminal", () => {
-  // Tipado com a assinatura de `fetch`: `jwtCallback` recebe `fetchFn?: typeof
-  // fetch`, e um `vi.fn()` cru (Mock<Procedure>) não é atribuível a ela.
+  // Typed with `fetch`'s signature: `jwtCallback` takes `fetchFn?: typeof
+  // fetch`, and a raw `vi.fn()` (Mock<Procedure>) is not assignable to it.
   let fetchFn: Mock<typeof fetch>
   beforeEach(() => { fetchFn = vi.fn<typeof fetch>() })
 
@@ -70,7 +70,7 @@ describe("jwtCallback — renovação e distinção transitório × terminal", (
     expect(out.access_token).toBe("acc-novo")
     expect(out.refresh_token).toBe("ref-novo")
     expect(out.access_token_expires_at).toBe(AGORA + ACCESS_TTL_MS)
-    expect(out.error).toBeUndefined()  // ← erro grudado foi limpo
+    expect(out.error).toBeUndefined()  // ← stuck error was cleared
   })
 
   it("refresh 200 sem refresh_token novo: preserva o refresh_token atual", async () => {
@@ -84,14 +84,14 @@ describe("jwtCallback — renovação e distinção transitório × terminal", (
     fetchFn.mockResolvedValue(resposta(401, { detail: "Refresh token inválido ou expirado." }))
     const out = await jwtCallback({ token: tokenExpirado() }, { fetchFn, now })
     expect(out.error).toBe("RefreshTokenExpired")
-    // tokens não são trocados; a sessão será encerrada pelo middleware/SessionSync
+    // tokens are not swapped; the session will be ended by the middleware/SessionSync
     expect(out.access_token).toBe("acc-velho")
   })
 
   it("429 (rate limit): TRANSITÓRIO — não desloga, mantém tokens e reagenda", async () => {
     fetchFn.mockResolvedValue(resposta(429, { detail: "Muitas renovações." }))
     const out = await jwtCallback({ token: tokenExpirado() }, { fetchFn, now })
-    expect(out.error).toBeUndefined()          // ← NÃO desloga por rate limit
+    expect(out.error).toBeUndefined()          // ← does NOT log out because of the rate limit
     expect(out.access_token).toBe("acc-velho")
     expect(out.refresh_token).toBe("ref-velho")
     expect(out.access_token_expires_at).toBe(AGORA + REFRESH_BACKOFF_MS)

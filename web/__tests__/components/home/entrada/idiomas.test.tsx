@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 /**
- * O modal de entrada em inglês e em espanhol. Com o `IdiomaProvider`, o que a
- * Home escolhe — títulos, frases de apoio, rótulos, dicas, botões e os erros
- * montados no cliente — segue o idioma; a mensagem que o SERVIDOR devolve
- * aparece como veio. O português (sem provider) é o de modal-de-entrada.test.
+ * The sign-in modal in English and Spanish. With the `IdiomaProvider`, what the
+ * Home chooses — titles, supporting sentences, labels, hints, buttons and the errors
+ * built on the client — follows the language; the message the SERVER returns
+ * shows up as it came. Portuguese (no provider) is covered by modal-de-entrada.test.
  */
 const http = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn() }))
 vi.mock("axios", () => {
@@ -36,8 +36,8 @@ function montar(idioma: Idioma, props: Partial<React.ComponentProps<typeof Modal
   )
 }
 
-// `selector: "input"`: no painel de nova senha o título do diálogo e o rótulo
-// do campo são o mesmo texto.
+// `selector: "input"`: in the new password panel the dialog title and the field
+// label are the same text.
 function campo(rotulo: string) {
   return screen.getByLabelText(rotulo, { selector: "input" }) as HTMLInputElement
 }
@@ -58,7 +58,7 @@ function textos(o: unknown): string[] {
   return []
 }
 
-/** Nenhum texto do português da entrada na tela — menos o que é igual nos dois idiomas ("Enviando…"). */
+/** No Portuguese sign-in text on screen — except what is the same in both languages ("Enviando…"). */
 function semPortugues(idioma: "en" | "es", texto: string) {
   const doIdioma = new Set(textos(entrada[idioma]))
   for (const pt of textos(entrada.pt)) {
@@ -66,13 +66,13 @@ function semPortugues(idioma: "en" | "es", texto: string) {
   }
 }
 
-/** O corpo que o `http_exception_handler` do servidor escreve — o de toda recusa DELE. */
+/** The body the server's `http_exception_handler` writes — the one for every refusal of ITS OWN. */
 function doServidor(status: number, message: string, headers: Record<string, string> = {}) {
   return { response: { status, headers, data: { error: "http_exception", message, status_code: status } } }
 }
 
-// O que NÃO é recusa do servidor: o limitador por IP, o proxy /terra fora do
-// ar, o 500 inesperado e a página de erro de uma CDN.
+// What is NOT a server refusal: the per-IP limiter, the /terra proxy being
+// down, the unexpected 500 and a CDN's error page.
 const LIMITADOR_429 = { response: { status: 429, headers: {}, data: { detail: "Too Many Requests" } } }
 const PROXY_502 = { response: { status: 502, headers: {}, data: { detail: "Serviço indisponível" } } }
 const INESPERADO_500 = {
@@ -221,7 +221,7 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
     submeter(senha)
     expect((await screen.findByRole("alert")).textContent).toContain(txt.semConexao)
 
-    // O servidor recusou sem dizer por quê: a mensagem é a nossa.
+    // The server refused without saying why: the message is ours.
     http.post.mockRejectedValueOnce({ response: { status: 500, headers: {}, data: {} } })
     submeter(senha)
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain(txt.erroAoEntrar))
@@ -234,8 +234,8 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
   })
 
   it("entrar: as recusas fixas do servidor saem no idioma; uma desconhecida, como veio", async () => {
-    // O servidor só fala português. As recusas FIXAS do login têm o texto do
-    // idioma, escolhido pelo status (e pelo X-Error-Code); o resto passa.
+    // The server only speaks Portuguese. The login's FIXED refusals have the text in the
+    // language, chosen by the status (and by X-Error-Code); the rest passes through.
     montar(idioma)
     preencher(txt.identificador, "fulana")
     const senha = preencher(txt.senha, "x")
@@ -252,19 +252,19 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
       doServidor(403, "E-mail não verificado. Verifique sua caixa de entrada.", { "x-error-code": "email_not_verified" }),
       txt.naoVerificado,
     )
-    // Suspensa, excluída ou desativada: o status não diz qual.
+    // Suspended, deleted or deactivated: the status does not say which.
     await recusa(doServidor(403, "Conta suspensa. Entre em contato com o administrador."), txt.contaIndisponivel)
     expect(alerta()).not.toMatch(/Conta suspensa/)
 
-    // Uma recusa do servidor que a tela não conhece passa como veio.
+    // A server refusal the screen does not know passes through as it came.
     http.post.mockRejectedValueOnce(doServidor(400, "Mensagem nova do servidor."))
     submeter(senha)
     await waitFor(() => expect(alerta()).toContain("Mensagem nova do servidor."))
   })
 
   it("entrar: o que não é recusa do servidor não vira recusa da conta", async () => {
-    // O proxy fora do ar, o 500 inesperado e a página de uma CDN: nem o texto
-    // deles (o do proxy é português), nem "esta conta não pode entrar".
+    // The proxy being down, the unexpected 500 and a CDN's page: neither their
+    // text (the proxy's is Portuguese), nor "esta conta não pode entrar" (this account cannot sign in).
     montar(idioma)
     preencher(txt.identificador, "fulana")
     const senha = preencher(txt.senha, "x")
@@ -291,7 +291,7 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
     const alerta = await screen.findByRole("alert")
     expect(alerta.textContent).toContain(txt[chave])
     expect(alerta.textContent).not.toMatch(/Conta bloqueada/)
-    // O bloqueio trava o botão.
+    // The block locks the button.
     expect((screen.getByRole("button", { name: txt.entrar }) as HTMLButtonElement).disabled).toBe(true)
   })
 
@@ -315,8 +315,8 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
     submeter(confirmar)
     expect((await screen.findByRole("alert")).textContent).toContain(txt.jaEmUso)
 
-    // O proxy fora do ar, e o 500 da permissão do banco — que traz `message`,
-    // em português, e não é recusa do cadastro.
+    // The proxy being down, and the 500 from the database permission — which carries `message`,
+    // in Portuguese, and is not a sign-up refusal.
     const permissao = {
       response: {
         status: 500,
@@ -494,9 +494,9 @@ describe.each(["en", "es"] as const)("as peças de components/auth em %s", (idio
 })
 
 describe("em português, a recusa do servidor como veio", () => {
-  // A promessa do português byte a byte: nada de trocar a mensagem do servidor
-  // pelo texto do dicionário. Cada mensagem aqui DIFERE da do dicionário, para
-  // um `traduzir` ligado por engano aparecer.
+  // Portuguese's byte-for-byte promise: no swapping the server's message
+  // for the dictionary text. Each message here DIFFERS from the dictionary's, so
+  // that a `traduzir` wired in by mistake shows up.
   const alerta = () => screen.getByRole("alert").textContent ?? ""
 
   it("entrar: 401, 403 (com e sem código) e o 429 do servidor", async () => {

@@ -17,12 +17,13 @@ import { useTextosDaCasca } from "../home/i18n/da-casca";
 import { useCodigoFonte } from "../share/codigo-fonte";
 
 /**
- * `portalClassName`: o menu e o diálogo de Preferências são portais Radix — vão
- * ao <body>, fora da árvore de quem os abriu. A Home (sempre escura) passa
- * `home-portal`, senão os dois abriam na paleta clara do app por cima dela. É
- * prop, e não uma leitura de rota aqui dentro: a paleta é de quem HOSPEDA o
- * componente, e a casca já decide rota→sidebar uma vez só (ShellSidebar). Sem a
- * prop, o comportamento é o de sempre — o AppSidebar não passa nada.
+ * `portalClassName`: the menu and the Preferences dialog are Radix portals — they
+ * go to <body>, outside the tree of whoever opened them. The Home (always dark)
+ * passes `home-portal`, otherwise both opened in the app's light palette on top
+ * of it. It's a prop, and not a route read in here: the palette belongs to whoever
+ * HOSTS the component, and the shell already decides route→sidebar just once
+ * (ShellSidebar). Without the prop, the behavior is the usual one — AppSidebar
+ * passes nothing.
  */
 const UserSidebar = ({ portalClassName }: { portalClassName?: string } = {}) => {
 
@@ -33,8 +34,8 @@ const UserSidebar = ({ portalClassName }: { portalClassName?: string } = {}) => 
   const [prefsOpen, setPrefsOpen] = useState(false)
   const textosDaCasca = useTextosDaCasca()
   const t = textosDaCasca.casca.conta
-  // AGPL §13: o código-fonte desta instalação (CODIGO_FONTE_URL), quando ela
-  // o declara. Abre fora: não é rota desta aplicação.
+  // AGPL §13: this installation's source code (CODIGO_FONTE_URL), when it
+  // declares it. Opens outside: it isn't a route of this application.
   const codigoFonte = useCodigoFonte()
 
   const username = session?.user?.username ?? t.usuario
@@ -114,15 +115,15 @@ const UserSidebar = ({ portalClassName }: { portalClassName?: string } = {}) => 
         <DropdownMenuSeparator />
 
         <DropdownMenuGroup>
-          {/* "Tokens de acesso" saiu daqui por decisão de produto. A página
-              /settings/tokens, como toda rota fora da Home, só abre para o
-              administrador do sistema (`proxy.ts` devolve `/` aos demais), e
-              ele chega a ela pela paleta Ctrl+K ou pela URL. O token é
-              pessoal (age em nome de quem o cria), então hoje só
-              administradores têm token — é o que dizem as recusas do MCP.
+          {/* "Tokens de acesso" left here by product decision. The
+              /settings/tokens page, like every route outside the Home, only opens
+              for the system administrator (`proxy.ts` sends the others to `/`),
+              and they reach it via the Ctrl+K palette or the URL. The token is
+              personal (it acts on behalf of whoever creates it), so today only
+              administrators have tokens — which is what the MCP refusals say.
 
-              As extensões (`web/extensoes`) somam itens aqui. Cada item recebe
-              a paleta do portal, porque o que ele abre também é um portal. */}
+              The extensions (`web/extensoes`) add items here. Each item gets
+              the portal palette, because what it opens is also a portal. */}
           <DropdownMenuItem onSelect={() => setPrefsOpen(true)}>
             <TbSettings />
             {t.configuracoes}
@@ -146,8 +147,8 @@ const UserSidebar = ({ portalClassName }: { portalClassName?: string } = {}) => 
 
         <DropdownMenuSeparator />
 
-        {/* Sair cai na Home anônima — ela é pública, e abrir o modal de
-            entrada em cima de quem acabou de sair seria insistência. */}
+        {/* Signing out lands on the anonymous Home — it's public, and opening the
+            sign-in modal on top of someone who just left would be pushy. */}
         <DropdownMenuItem onSelect={() => signOut({ callbackUrl: "/" })}>
           <TbLogout />
           {t.sair}

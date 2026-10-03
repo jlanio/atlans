@@ -6,9 +6,9 @@ import { Button } from "@/app/components/ui/button"
 import { cn } from "@/lib/utils"
 
 /**
- * O botão das ações do modal de entrada: o `Button` da Home (terracota, pelos
- * tokens do `home-portal`) com o spinner e o rótulo de carregamento. `submit`
- * por padrão, como convém a um botão de formulário.
+ * The button for the sign-in modal's actions: the Home's `Button` (terracotta,
+ * via the `home-portal` tokens) with the spinner and the loading label. `submit`
+ * by default, as befits a form button.
  */
 export function BotaoDoModal({
   loading = false,
@@ -38,7 +38,7 @@ export function BotaoDoModal({
   )
 }
 
-/** O link de rodapé que troca de painel (Entrar ↔ Criar conta) — um botão, porque não navega. */
+/** The footer link that switches panels (Entrar ↔ Criar conta) — a button, because it does not navigate. */
 export function LinkDoModal({ className, ...props }: React.ComponentProps<"button">) {
   return (
     <button

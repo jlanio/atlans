@@ -1,15 +1,15 @@
 # tests/unit/test_workspace_notifications_router.py
-"""Allowlist de notificacao do workspace: normalizacao e preview de impacto.
+"""Workspace notification allowlist: normalization and impact preview.
 
-`Workspace.notification_url_allowlist` bloqueia webhooks de verdade
-(`run_result_consumer._fire_notification_if_configured`) e ate agora nao tinha
-endpoint nenhum — so dava para mexer por SQL. Do lado do usuario, o webhook
-simplesmente nunca chegava.
+`Workspace.notification_url_allowlist` blocks real webhooks
+(`run_result_consumer._fire_notification_if_configured`) and until now had
+no endpoint at all — it could only be changed through SQL. On the user's side, the webhook
+simply never arrived.
 
-O risco de dar UI a isso e aceitar um padrao que o matcher ignora em silencio:
-`https://exemplo.com/hook` nunca casa com hostname algum, entao gravar isso
-bloquearia TODOS os webhooks do workspace sem nada explicar. `_normalize_allowlist`
-existe para transformar esse erro num 400 legivel.
+The risk of giving this a UI is accepting a pattern the matcher silently ignores:
+`https://exemplo.com/hook` never matches any hostname, so saving it
+would block ALL of the workspace's webhooks without explaining anything. `_normalize_allowlist`
+exists to turn that mistake into a readable 400.
 """
 from unittest.mock import AsyncMock, MagicMock
 
@@ -46,10 +46,10 @@ def test_rejeita_o_que_nao_e_hostname(entrada):
 
 
 @pytest.mark.parametrize("entrada", [
-    "*",             # nao e curinga para o matcher
-    "*exemplo.com",  # sem o ponto, tambem nao
-    "*.com",         # curinga sem dominio
-    "localhost",     # sem ponto: nunca casaria como escrito
+    "*",             # not a wildcard for the matcher
+    "*exemplo.com",  # without the dot, not either
+    "*.com",         # wildcard with no domain
+    "localhost",     # no dot: would never match as written
 ])
 def test_rejeita_curinga_que_o_matcher_ignoraria(entrada):
     with pytest.raises(HTTPException) as exc:
@@ -63,10 +63,10 @@ def test_aceita_as_duas_formas_suportadas():
     ) == ["exemplo.com", "*.exemplo.com"]
 
 
-# ── Preview de impacto ───────────────────────────────────────────────────────
+# ── Impact preview ───────────────────────────────────────────────────────────
 #
-# O `allowed` do preview usa `hostname_matches_allowlist`, a mesma funcao que o
-# consumer chama ao disparar. Estes testes fixam o contrato que a tela promete.
+# The preview's `allowed` uses `hostname_matches_allowlist`, the same function the
+# consumer calls when firing. These tests pin the contract the screen promises.
 
 def _db_com_workflows(linhas):
     db = MagicMock()
@@ -77,11 +77,11 @@ def _db_com_workflows(linhas):
 
 
 async def test_allowlist_vazia_permite_todos_os_workflows():
-    """Semantica invertida da coluna: sem lista, nao ha politica adicional.
+    """Inverted semantics of the column: with no list, there is no additional policy.
 
-    O matcher sozinho devolveria False para tudo (nada casa com lista vazia);
-    quem decide que "vazio = liberado" e o handler, espelhando o `if allowlist:`
-    do consumer. Trocar isso barraria todos os webhooks da plataforma.
+    The matcher alone would return False for everything (nothing matches an empty list);
+    what decides that "empty = allowed" is the handler, mirroring the consumer's
+    `if allowlist:`. Changing that would block every webhook on the platform.
     """
     db = _db_com_workflows([("wf-1", "Diário", "https://qualquer.host/hook")])
 
@@ -112,7 +112,7 @@ async def test_url_sem_host_nao_explode():
 
 
 def test_curinga_nao_cobre_o_dominio_nu():
-    """Regra facil de perder ao portar para outra linguagem."""
+    """A rule that is easy to lose when porting to another language."""
     from app.core.utils.allowlist import hostname_matches_allowlist
 
     assert hostname_matches_allowlist("api.exemplo.com", ["*.exemplo.com"]) is True

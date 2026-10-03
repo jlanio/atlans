@@ -1,12 +1,12 @@
-"""Prazo de cada comando no banco (app/core/db.py).
+"""Timeout for each command in the database (app/core/db.py).
 
-Sem prazo, uma consulta travada — lock esperando outro, plano ruim, rede que
-some sem derrubar a conexão — segurava a conexão sem fim, e poucas presas
-esgotavam o pool do worker (o POOL_TIMEOUT só limita a espera por conexão
-livre). Aqui se confere a fiação; o comportamento contra um Postgres de verdade
-(cancelamento em `QueryCanceledError`, conexão reaproveitável, `SET LOCAL` como
-exceção por transação, espera por lock contando) foi medido fora da suíte, que
-roda sem banco.
+Without a timeout, a stuck query — a lock waiting on another, a bad plan, a
+network that vanishes without dropping the connection — held the connection
+forever, and a few stuck ones exhausted the worker's pool (POOL_TIMEOUT only
+limits the wait for a free connection). Here the wiring is checked; the behavior
+against a real Postgres (cancellation as `QueryCanceledError`, reusable
+connection, `SET LOCAL` as a per-transaction exception, lock waits counting) was
+measured outside the suite, which runs without a database.
 """
 import json
 import logging
@@ -47,7 +47,7 @@ def test_avisa_quando_o_asyncpg_desistiria_antes_do_postgres(caplog):
 
 
 def _em_processo_novo(codigo: str, **env: str) -> dict:
-    """A config é lida na importação: cada cenário num interpretador limpo."""
+    """The config is read at import: each scenario in a clean interpreter."""
     ambiente = {**os.environ, "PYTHONPATH": str(_RAIZ), **env}
     saida = subprocess.run(
         [sys.executable, "-c", codigo], cwd=_RAIZ, env=ambiente,
@@ -57,8 +57,8 @@ def _em_processo_novo(codigo: str, **env: str) -> dict:
 
 
 def test_variavel_vazia_vale_o_padrao():
-    """O compose repassa `${DB_STATEMENT_TIMEOUT:-}`: vazia não pode derrubar a
-    importação com `int('')`."""
+    """Compose passes through `${DB_STATEMENT_TIMEOUT:-}`: empty must not bring down
+    the import with `int('')`."""
     lido = _em_processo_novo(
         "import json; from app.core import config as c;"
         "print(json.dumps([c.DB_STATEMENT_TIMEOUT, c.DB_COMMAND_TIMEOUT]))",
@@ -98,7 +98,7 @@ print(json.dumps({
 
 
 def test_os_prazos_chegam_ao_asyncpg_connect_sem_perder_o_ssl():
-    """O que importa é o que o SQLAlchemy entrega ao asyncpg.connect, não o dict."""
+    """What matters is what SQLAlchemy hands to asyncpg.connect, not the dict."""
     lido = _em_processo_novo(
         _CAPTURA_DO_CONNECT,
         DATABASE_URL="postgresql+asyncpg://u:p@127.0.0.1:1/x",  # pragma: allowlist secret
@@ -108,9 +108,9 @@ def test_os_prazos_chegam_ao_asyncpg_connect_sem_perder_o_ssl():
 
 
 @pytest.mark.parametrize("bruto, esperado", [
-    ("60s", 60), ("5min", 60), ("1.5", 60), ("  ", 60),   # não é inteiro: o padrão, com aviso
+    ("60s", 60), ("5min", 60), ("1.5", 60), ("  ", 60),   # not an integer: the default, with a warning
     ("-5", 0),                                             # negativo: desligado
-    ("99999999", 2_147_483),                               # acima disso o Postgres recusa a conexão
+    ("99999999", 2_147_483),                               # above this Postgres rejects the connection
     ("120", 120),
 ])
 def test_valor_estranho_nao_derruba_a_importacao(bruto, esperado):
@@ -152,9 +152,9 @@ print(json.dumps({"registrado": registrado, **resultado}))
 
 
 def test_conexao_invalidada_por_prazo_ou_cancelamento_e_abortada():
-    """Sem isto, com a rede muda, o fechamento cortês do asyncpg esperava a
-    confirmação do cancelamento sem prazo: nem o command_timeout nem um
-    wait_for em volta da escrita voltavam (medido com um proxy que congela)."""
+    """Without this, with the network silent, asyncpg's polite close waited for the
+    cancellation confirmation with no timeout: neither command_timeout nor a
+    wait_for around the write returned (measured with a proxy that freezes)."""
     lido = _em_processo_novo(_OUVINTE, DATABASE_URL="postgresql+asyncpg://u:p@127.0.0.1:1/x")  # pragma: allowlist secret
     assert lido == {
         "registrado": True,
@@ -164,7 +164,7 @@ def test_conexao_invalidada_por_prazo_ou_cancelamento_e_abortada():
 
 
 def test_a_cli_de_manutencao_roda_sem_prazo():
-    """O migrar-nos varre tabelas inteiras: os 60 s da API o cortariam."""
+    """migrar-nos scans whole tables: the API's 60 s would cut it off."""
     codigo = (
         "import json, app.cli; from app.core import config as c;"
         "print(json.dumps([c.DB_STATEMENT_TIMEOUT, c.DB_COMMAND_TIMEOUT]))"

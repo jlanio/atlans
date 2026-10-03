@@ -1,18 +1,19 @@
 // web/lib/codigo-fonte.ts
 //
-// O link para o código-fonte da versão que roda nesta instalação.
+// The link to the source code of the version running on this installation.
 //
-// A AGPL (seção 13 da LICENSE) pede que quem usa a instalação pela rede possa
-// obter o código-fonte dela — o oficial, ou o fork de quem a modificou. O
-// endereço é da INSTALAÇÃO, não do código: vem de CODIGO_FONTE_URL no
-// ambiente do servidor web, lida pelo layout raiz a cada pedido e passada ao
-// cliente por contexto (`app/components/share/codigo-fonte.tsx`), como os
-// fundos de mapa. NEXT_PUBLIC_* não serviria: gravaria o valor no build, e a
-// imagem do web é a mesma para toda instalação.
+// The AGPL (section 13 of the LICENSE) requires that whoever uses the
+// installation over the network can obtain its source code — the official one,
+// or the fork of whoever modified it. The address belongs to the INSTALLATION,
+// not to the code: it comes from CODIGO_FONTE_URL in the web server's
+// environment, read by the root layout on every request and passed to the
+// client via context (`app/components/share/codigo-fonte.tsx`), like the map
+// basemaps. NEXT_PUBLIC_* would not work: it would bake the value in at build
+// time, and the web image is the same for every installation.
 //
-// Sem a variável, nenhum link aparece: o código não traz endereço nenhum.
+// Without the variable, no link appears: the code ships no address at all.
 
-/** A URL de CODIGO_FONTE_URL, ou null quando vazia ou sem esquema http(s). */
+/** The URL from CODIGO_FONTE_URL, or null when empty or without an http(s) scheme. */
 export function lerCodigoFonteDoAmbiente(env: Record<string, string | undefined>): string | null {
   const url = (env.CODIGO_FONTE_URL ?? "").trim()
   return /^https?:\/\/\S+$/i.test(url) ? url : null

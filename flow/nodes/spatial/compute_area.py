@@ -9,10 +9,10 @@ logger = get_logger(__name__)
 @register_node
 class ComputeArea(BaseNode):
     """
-    Nó que calcula a área de cada feição em um GeoDataFrame e adiciona
-    uma coluna 'area' convertida na unidade escolhida.
-    Suporta unidades: 'm2' (metros quadrados), 'ha' (hectares) e 'km2' (quilômetros quadrados).
-    Apenas geometrias de área (Polygon, MultiPolygon) são consideradas.
+    Node that computes the area of each feature in a GeoDataFrame and adds
+    an 'area' column converted to the chosen unit.
+    Supported units: 'm2' (square meters), 'ha' (hectares) and 'km2' (square kilometers).
+    Only areal geometries (Polygon, MultiPolygon) are considered.
     """
 
     @classmethod
@@ -50,19 +50,19 @@ class ComputeArea(BaseNode):
 
         unit = self.parameters.get('unit', 'm2').strip().lower()
 
-        # Obtém o GeoDataFrame de entrada via helper da classe base
+        # Gets the input GeoDataFrame via the base class helper
         gdf = self.get_first_gdf(inputs)
 
-        # Verifica se CRS está definido
+        # Checks whether the CRS is defined
         require_crs(gdf)
 
-        # Filtra geometrias de área
+        # Keeps areal geometries
         valid_types = ['Polygon', 'MultiPolygon']
         gdf = gdf[gdf.geometry.geom_type.isin(valid_types)]
         if gdf.empty:
             raise ValueError("Nenhuma feição com geometria de área ('Polygon' ou 'MultiPolygon') encontrada.")
 
-        # Reprojeta para UTM se necessário
+        # Reprojects to UTM if needed
         if gdf.crs.is_geographic:
             logger.info("Reprojetando GeoDataFrame geográfico para UTM antes de calcular área.")
             try:
@@ -71,7 +71,7 @@ class ComputeArea(BaseNode):
                 logger.error(f"Falha ao reprojetar para UTM: {e}")
                 raise RuntimeError(f"Erro ao reprojetar para UTM: {e}")
 
-        # Calcula área
+        # Computes the area
         try:
             area_m2 = await asyncio.to_thread(lambda df: df.geometry.area, gdf)
         except Exception as e:

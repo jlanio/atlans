@@ -1,7 +1,7 @@
 // desktop/src/main/python/supervisor.test.ts
 //
-// Politica de reinicio e encerramento. O spawn e injetado, entao nada aqui
-// depende de Python instalado.
+// Restart and shutdown policy. The spawn is injected, so nothing here depends
+// on Python being installed.
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -22,7 +22,7 @@ class ProcFalso extends EventEmitter {
 
   kill(): boolean { this.killed = true; return true }
 
-  /** Simula a saida do processo. */
+  /** Simulates the process exiting. */
   sair(codigo: number | null, sinal: NodeJS.Signals | null = null): void {
     this.emit('exit', codigo, sinal)
   }
@@ -50,7 +50,7 @@ function criar() {
   return { sup, procs, estados, spawnFn }
 }
 
-/** Espera o stdout ser drenado (PassThrough entrega no proximo tick). */
+/** Waits for stdout to be drained (PassThrough delivers on the next tick). */
 const tick = () => new Promise((r) => setImmediate(r))
 
 beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }) })
@@ -69,8 +69,8 @@ describe('start', () => {
   })
 
   it('start duplicado nao cria um segundo processo', () => {
-    // Dois executores com o mesmo EXECUTOR_ID dariam conexoes duplicadas no
-    // servidor.
+    // Two executors with the same EXECUTOR_ID would create duplicate connections
+    // on the server.
     const { sup, spawnFn } = criar()
     sup.start()
     sup.start()
@@ -78,7 +78,7 @@ describe('start', () => {
   })
 
   it('falha de spawn nao entra em loop de retry', async () => {
-    // python.exe ausente ou sem permissao nao se resolve sozinho.
+    // A missing python.exe or one without permission does not fix itself.
     const { sup, procs } = criar()
     sup.start()
     procs[0]!.emit('error', new Error('ENOENT'))
@@ -100,12 +100,13 @@ describe('reinicio', () => {
   })
 
   it('desiste apos um loop de quedas dentro da janela', async () => {
-    // Religar para sempre esconderia a causa e queimaria CPU.
+    // Restarting forever would hide the cause and burn CPU.
     //
-    // O avanco e `advanceTimersToNextTimerAsync`, e nao um valor fixo: cada
-    // tentativa espera o proprio backoff (2s, 4s, 8s… ate 60s, com jitter), e
-    // um numero fixo grande o bastante para a ultima faria a JANELA deslizar,
-    // zerando o contador — o teste passaria a medir outra coisa.
+    // The advance is `advanceTimersToNextTimerAsync`, not a fixed value: each
+    // attempt waits for its own backoff (2s, 4s, 8s… up to 60s, with jitter),
+    // and a fixed number large enough for the last one would make the WINDOW
+    // slide, resetting the counter — the test would end up measuring something
+    // else.
     const { sup, procs } = criar()
     sup.start()
     for (let i = 0; i < 6; i++) {
@@ -118,9 +119,9 @@ describe('reinicio', () => {
   })
 
   it('quedas espacadas NAO consomem a janela', async () => {
-    // Um executor que roda bem por minutos e entao cai nao esta em loop: e uma
-    // falha intermitente, e desistir dela deixaria a maquina do usuario sem
-    // executor ate alguem reparar.
+    // An executor that runs fine for minutes and then crashes is not in a loop:
+    // it is an intermittent failure, and giving up on it would leave the user's
+    // machine without an executor until someone noticed.
     const { sup, procs } = criar()
     sup.start()
     for (let i = 0; i < 6; i++) {
@@ -132,9 +133,9 @@ describe('reinicio', () => {
   })
 
   it('exit 1 apos draining e restart pedido pelo servidor, nao falha', async () => {
-    // `config_changed` faz o executor sair com 1 depois de drenar. Contar isso
-    // como falha derrubaria o executor de vez num servidor que reatribui
-    // workspaces algumas vezes seguidas.
+    // `config_changed` makes the executor exit with 1 after draining. Counting
+    // that as a failure would take the executor down for good on a server that
+    // reassigns workspaces a few times in a row.
     const { sup, procs, estados } = criar()
     sup.start()
     procs[0]!.emitir({ v: 1, t: 'hello', ts: 1, data: {} })
@@ -149,8 +150,8 @@ describe('reinicio', () => {
   })
 
   it('state failed interrompe o retry', async () => {
-    // Cert expirado, chave do servidor indisponivel: causa persistente, o
-    // usuario precisa agir. Tentar de novo so gastaria tempo.
+    // Expired cert, server key unavailable: a persistent cause, the user needs
+    // to act. Trying again would only waste time.
     const { sup, procs, spawnFn } = criar()
     sup.start()
     procs[0]!.emitir({
@@ -169,8 +170,8 @@ describe('reinicio', () => {
 
 describe('stop', () => {
   it('pede shutdown pelo stdin, e nao mata o processo', async () => {
-    // No Windows nao ha SIGTERM: kill() vira TerminateProcess, morte imediata,
-    // com jobs perdidos e resultados nunca confirmados.
+    // On Windows there is no SIGTERM: kill() becomes TerminateProcess, immediate
+    // death, with jobs lost and results never confirmed.
     const { sup, procs } = criar()
     sup.start()
     const proc = procs[0]!
@@ -202,10 +203,10 @@ describe('stop', () => {
   })
 
   it('duplo clique em "Parar" nao deixa um watchdog orfao', async () => {
-    // O segundo clique chegava antes de o estado `draining` pintar a tela e
-    // armava um SEGUNDO teto de graca, sobrescrevendo o handle do primeiro sem
-    // limpa-lo. O orfao sobrevivia a saida do processo e, no fim do prazo,
-    // matava a frio o executor SEGUINTE, no meio de um job.
+    // The second click arrived before the `draining` state painted the screen
+    // and armed a SECOND grace ceiling, overwriting the first one's handle
+    // without clearing it. The orphan outlived the process exit and, at the end
+    // of the deadline, cold-killed the NEXT executor, in the middle of a job.
     const { sup, procs, spawnFn } = criar()
     const linhas: string[] = []
     sup.on('linha', (t) => linhas.push(t))
@@ -215,7 +216,7 @@ describe('stop', () => {
     const p2 = sup.stop(5_000)
     expect(p2).toBe(p1)                       // idempotente: a MESMA parada
     await tick()
-    // Um unico `shutdown` no stdin — o Python ja estava drenando.
+    // A single `shutdown` on stdin — Python was already draining.
     expect(procs[0]!.escrito.join('').trim().split('\n')).toHaveLength(1)
 
     procs[0]!.sair(0)
@@ -229,9 +230,9 @@ describe('stop', () => {
   })
 
   it('um pedido com teto menor encurta a drenagem em curso', async () => {
-    // `refazerEnrollment` para com 10 s porque precisa apagar os PEMs. Herdar
-    // os 150 s de um "Parar" anterior deixaria o usuario esperando por uma
-    // drenagem que ele ja abreviou.
+    // `refazerEnrollment` stops with 10 s because it needs to delete the PEMs.
+    // Inheriting the 150 s of an earlier "Parar" (stop) would leave the user
+    // waiting for a drain they already cut short.
     const { sup, procs } = criar()
     const linhas: string[] = []
     sup.on('linha', (t) => linhas.push(t))
@@ -254,8 +255,9 @@ describe('stop', () => {
     const p = sup.stop(5_000)
     await tick()
     await vi.advanceTimersByTimeAsync(6_000)
-    // No Windows a morte e por taskkill /T (arvore inteira); em outros SOs,
-    // SIGKILL. O teste roda no SO do desenvolvedor, entao so um dos dois vale.
+    // On Windows the kill is via taskkill /T (whole tree); on other OSes,
+    // SIGKILL. The test runs on the developer's OS, so only one of the two
+    // applies.
     if (process.platform !== 'win32') expect(proc.killed).toBe(true)
     proc.sair(null, 'SIGKILL')
     await p
@@ -274,9 +276,10 @@ describe('restart', () => {
   })
 
   it('NAO religa se o app comecou a encerrar durante a drenagem', async () => {
-    // A drenagem leva ate 150 s; nesse intervalo o usuario cansa e clica "Sair"
-    // no tray. Religar ali spawnava um Python que o `app.quit()` seguinte nao
-    // matava — ele ficava orfao segurando o WebSocket com o mesmo EXECUTOR_ID.
+    // Draining takes up to 150 s; in that interval the user gets tired and
+    // clicks "Sair" (quit) in the tray. Restarting at that point spawned a
+    // Python that the following `app.quit()` did not kill — it was left
+    // orphaned, holding the WebSocket with the same EXECUTOR_ID.
     const { sup, procs, spawnFn } = criar()
     sup.start()
     let encerrando = false
@@ -290,8 +293,9 @@ describe('restart', () => {
   })
 
   it('NAO religa se outra parada foi pedida durante a drenagem', async () => {
-    // O "Parar" do tray no meio de um "Salvar e reiniciar" e o pedido mais
-    // recente: religar seria ressuscitar o executor contra ele.
+    // The tray's "Parar" (stop) in the middle of a "Salvar e reiniciar" (save and
+    // restart) is the most recent request: restarting would resurrect the
+    // executor against it.
     const { sup, procs, spawnFn } = criar()
     sup.start()
     const p = sup.restart()

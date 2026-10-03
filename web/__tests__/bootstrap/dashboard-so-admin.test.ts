@@ -1,20 +1,20 @@
 /**
- * Quem não administra o sistema só alcança a Home (`/`) — por enquanto, decisão
- * do dono. O middleware devolve `/` para QUALQUER outra página (o antigo portão
- * de /admin e /dashboard é um caso particular disto); o proxy /terra nunca é
- * redirecionado e os arquivos do public/ não são páginas. Este teste tranca o
- * portão: admin passa em tudo, não-admin só na Home, sessão sem papel falha
- * fechada.
+ * Whoever does not administer the system only reaches the Home (`/`) — for now, the
+ * owner's decision. The middleware returns `/` for ANY other page (the old gate
+ * on /admin and /dashboard is a particular case of this); the /terra proxy is never
+ * redirected and the files in public/ are not pages. This test locks the
+ * gate: admin gets through everything, non-admin only the Home, a session with no role fails
+ * closed.
  *
- * E o portão de SESSÃO: a Home abre sem sessão (a entrada é um modal no
- * primeiro envio) e nunca é redirecionada — nem com a sessão vencida, que o
- * SessionSync limpa no cliente (redirecioná-la para `/?entrar=1`, que está
- * dentro do matcher, seria um laço). Fora dela, quem não tem sessão vai para a
- * Home com o modal aberto e o `callbackUrl` de volta.
+ * And the SESSION gate: the Home opens without a session (sign-in is a modal on the
+ * first submit) and is never redirected — not even with an expired session, which
+ * SessionSync clears on the client (redirecting it to `/?entrar=1`, which is
+ * inside the matcher, would be a loop). Outside it, whoever has no session goes to the
+ * Home with the modal open and the `callbackUrl` to come back.
  *
- * O mock de `next-auth` faz `auth: (fn) => fn`, então o default export do
- * middleware é o handler cru — dá para chamá-lo com uma Request falsa. `@/auth`
- * é stubado nos helpers puros (não queremos gravar SESSION_HEADER aqui).
+ * The `next-auth` mock does `auth: (fn) => fn`, so the middleware's default export
+ * is the raw handler — it can be called with a fake Request. `@/auth`
+ * is stubbed in the pure helpers (we do not want to write SESSION_HEADER here).
  */
 import { describe, it, expect, vi } from "vitest"
 
@@ -25,7 +25,7 @@ vi.mock("next-auth/providers/credentials", () => ({ default: () => ({}) }))
 vi.mock("@/auth", () => ({
   auth: (fn: unknown) => fn,
   SESSION_HEADER: "x-atlans-session",
-  // null => o middleware não seta o cabeçalho de sessão; irrelevante para o portão.
+  // null => the middleware does not set the session header; irrelevant to the gate.
   encodeSessionHeader: () => null,
 }))
 
@@ -68,7 +68,7 @@ describe("portão de papel: quem não é admin só alcança a Home", () => {
   })
 
   it("não-admin em / passa (sem redirect)", async () => {
-    // NextResponse.next() não carrega location; o middleware seguiu adiante.
+    // NextResponse.next() carries no location; the middleware moved on.
     expect(await destino("/", "user")).toBeNull()
   })
 

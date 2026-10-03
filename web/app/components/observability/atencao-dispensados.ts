@@ -4,20 +4,22 @@ import { useCallback, useEffect, useState } from "react"
 import type { ItemDeAtencao } from "./atencao"
 
 /**
- * "Dispensar" itens da lista Precisa de atenção — uma conveniência por
- * navegador (docs/specs/padrao-telas.md §5: localStorage para conveniências do
- * visitante). Os itens são derivados de métricas ao vivo, então guardar um
- * "resolvido" no servidor seria pesado e enganoso; aqui só ESCONDEMOS o que o
- * usuário já viu.
+ * "Dismiss" items from the Needs attention list — a per-browser convenience
+ * (docs/specs/screen-patterns.md §5: localStorage for visitor conveniences).
+ * The items are derived from live metrics, so storing a "resolved" on the
+ * server would be heavy and misleading; here we only HIDE what the user has
+ * already seen.
  *
- * A promessa: dispensar NÃO cega. Guardamos `chave → assinatura` (a assinatura é
- * a gravidade do momento, de `atencao.ts`); o item fica oculto apenas enquanto a
- * assinatura não muda. Se o problema PIORA — nova execução presa, mais uma
- * falha, a fila do executor cresce — a assinatura muda e o alerta volta.
+ * The promise: dismissing does NOT blind. We store `chave → assinatura` (the
+ * signature is the current severity, from `atencao.ts`); the item stays hidden
+ * only while the signature does not change. If the problem GETS WORSE — a new
+ * stuck run, one more failure, the executor's queue grows — the signature
+ * changes and the alert comes back.
  *
- * O mapa é podado para as chaves presentes na leitura atual a cada dispensa:
- * um alerta que se resolveu some da lista e sua dispensa deixa de ocupar espaço
- * (e, se voltar, aparece de novo — não fica preso a uma dispensa antiga).
+ * On every dismissal the map is pruned to the keys present in the current read:
+ * an alert that resolved itself leaves the list and its dismissal stops taking
+ * space (and, if it comes back, it shows again — it is not stuck to an old
+ * dismissal).
  */
 
 const CHAVE_STORAGE = "atlans:atencao-dispensados"
@@ -39,11 +41,11 @@ function gravar(mapa: Mapa): void {
   try {
     localStorage.setItem(CHAVE_STORAGE, JSON.stringify(mapa))
   } catch {
-    /* modo privado / cota / storage bloqueado: dispensa vira só desta sessão */
+    /* private mode / quota / storage blocked: the dismissal lasts only for this session */
   }
 }
 
-/** Poda `mapa` para as chaves presentes em `itens` (alertas ainda vigentes). */
+/** Prunes `mapa` to the keys present in `itens` (alerts still in effect). */
 function podar(mapa: Mapa, itens: ItemDeAtencao[]): Mapa {
   const vigentes = new Set(itens.map(i => i.chave))
   const novo: Mapa = {}
@@ -54,22 +56,23 @@ function podar(mapa: Mapa, itens: ItemDeAtencao[]): Mapa {
 }
 
 export interface Dispensados {
-  /** A lista sem os itens dispensados (assinatura ainda igual à guardada). */
+  /** The list without the dismissed items (signature still equal to the stored one). */
   ocultar: (itens: ItemDeAtencao[]) => ItemDeAtencao[]
-  /** Quantos dos `itens` atuais estão dispensados agora. */
+  /** How many of the current `itens` are dismissed right now. */
   contarOcultos: (itens: ItemDeAtencao[]) => number
   /** Dispensa um item (guarda chave→assinatura, podando os resolvidos). */
   dispensar: (item: ItemDeAtencao, itens: ItemDeAtencao[]) => void
-  /** Dispensa todos os `itens` visíveis de uma vez. */
+  /** Dismisses all visible `itens` at once. */
   dispensarTodos: (itens: ItemDeAtencao[]) => void
-  /** Desfaz todas as dispensas. */
+  /** Undoes all dismissals. */
   restaurar: () => void
 }
 
 export function useAtencaoDispensada(): Dispensados {
-  // Começa vazio (o servidor não sabe de dispensas) e hidrata do localStorage
-  // no cliente — evita divergência de hidratação e o acesso a `localStorage` no
-  // SSR. Um quadro inicial mostra tudo; logo em seguida aplica as dispensas.
+  // Starts empty (the server knows nothing of dismissals) and hydrates from
+  // localStorage on the client — avoids a hydration mismatch and accessing
+  // `localStorage` during SSR. A first frame shows everything; right after, the
+  // dismissals are applied.
   const [mapa, setMapa] = useState<Mapa>({})
   useEffect(() => { setMapa(ler()) }, [])
 

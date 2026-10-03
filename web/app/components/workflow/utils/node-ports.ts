@@ -1,30 +1,30 @@
 // web/app/components/workflow/utils/node-ports.ts
 //
-// Portas de entrada de um nó — declaradas no catálogo ou pelo usuário.
+// A node's input ports — declared in the catalog or by the user.
 //
-// A maioria dos nós declara as entradas no próprio schema (`inputs`), e elas são
-// as mesmas para toda instância. Uns poucos (`dynamic_inputs`) deixam a lista
-// para quem monta o fluxo, na propriedade `ports` — é o caso do Script Python,
-// onde os nomes viram as VARIÁVEIS do script.
+// Most nodes declare their inputs in their own schema (`inputs`), and they are
+// the same for every instance. A few (`dynamic_inputs`) leave the list to
+// whoever builds the workflow, in the `ports` property — that is the case of
+// the Python Script, where the names become the script's VARIABLES.
 //
-// Isso existe porque o nome que chega ao script vem do `to_key` da aresta, e o
-// editor só preenche `to_key` quando o nó de destino declara mais de uma porta.
-// Sem declarar, duas arestas escrevem na mesma chave e a segunda sobrescreve a
-// primeira — o script recebe UMA entrada e reclama de uma variável indefinida,
-// sem nada dizendo que a outra foi perdida.
+// This exists because the name that reaches the script comes from the edge's
+// `to_key`, and the editor only fills `to_key` when the target node declares
+// more than one port. Without declaring, two edges write to the same key and
+// the second overwrites the first — the script receives ONE input and complains
+// about an undefined variable, with nothing saying the other one was lost.
 import { INodePortAPI, INodesAPI } from "@/service/types"
 
 /**
- * Valores aceitos como nome de porta.
+ * Values accepted as a port name.
  *
- * Mesma regra do SubWorkflowPortsHelper: identificador saudável. O nome vira
- * variável dentro do script Python, então espaço ou acento produziriam código
- * inválido — e o erro apareceria como SyntaxError no meio do script do usuário,
- * longe da causa.
+ * Same rule as SubWorkflowPortsHelper: a healthy identifier. The name becomes a
+ * variable inside the Python script, so a space or an accent would produce
+ * invalid code — and the error would show up as a SyntaxError in the middle of
+ * the user's script, far from the cause.
  */
 export const NOME_DE_PORTA = /^[A-Za-z_][A-Za-z0-9_]*$/
 
-/** Lê a propriedade `ports`, tolerando lista, JSON em string, ou ausência. */
+/** Reads the `ports` property, tolerating a list, a JSON string, or absence. */
 export function lerPortas(bruto: unknown): string[] {
   if (Array.isArray(bruto)) {
     return bruto.filter((x): x is string => typeof x === "string" && x.trim() !== "")
@@ -43,11 +43,11 @@ export function lerPortas(bruto: unknown): string[] {
 }
 
 /**
- * Pontos de conexão de entrada de UMA instância de nó.
+ * Input connection points of ONE node instance.
  *
- * Nó comum: as portas do catálogo. Nó de entradas dinâmicas: as que o usuário
- * definiu — e a ausência delas devolve lista vazia, que é o que mantém o nó com
- * um ponto de conexão anônimo, exatamente como antes de `ports` existir.
+ * Regular node: the catalog's ports. Dynamic-input node: the ones the user
+ * defined — and their absence returns an empty list, which is what keeps the
+ * node with an anonymous connection point, exactly as before `ports` existed.
  */
 export function portasDeEntrada(
   def: Pick<INodesAPI, "inputs" | "dynamic_inputs"> | undefined,
@@ -55,23 +55,24 @@ export function portasDeEntrada(
 ): INodePortAPI[] {
   if (!def) return []
   if (!def.dynamic_inputs) return def.inputs ?? []
-  // Sem repetidos: dois pontos de conexão com o mesmo id deixam o React Flow
-  // sem saber em qual a aresta encosta, e a segunda entrada sobrescreveria a
-  // primeira no script — que é exatamente o defeito que as portas existem para
-  // resolver. O campo já marca o nome repetido em vermelho; aqui é a garantia
-  // de que o canvas não entra num estado ambíguo enquanto ele é corrigido.
+  // No duplicates: two connection points with the same id leave React Flow
+  // not knowing which one the edge attaches to, and the second input would
+  // overwrite the first in the script — which is exactly the defect ports exist
+  // to solve. The field already marks the duplicate name in red; this is the
+  // guarantee that the canvas does not enter an ambiguous state while it is
+  // being fixed.
   return [...new Set(lerPortas(properties?.ports))].map(name => ({ name }))
 }
 
 /**
- * Pontos de conexão de SAÍDA de UMA instância de nó.
+ * OUTPUT connection points of ONE node instance.
  *
- * Simétrico a `portasDeEntrada`: um nó `outputs_from_ports` (o SubWorkflowInput)
- * expõe como saídas as portas que o usuário declarou em `ports` — cada porta
- * vira um handle de saída próprio, e a aresta que sai dela leva `from_key` = o
- * nome da porta, então o próximo nó recebe só aquela chave. A ausência de portas
- * devolve lista vazia, que mantém o ponto de saída anônimo (modo espalhar) —
- * exatamente o comportamento legado.
+ * Symmetric to `portasDeEntrada`: an `outputs_from_ports` node (SubWorkflowInput)
+ * exposes as outputs the ports the user declared in `ports` — each port becomes
+ * its own output handle, and the edge leaving it carries `from_key` = the port
+ * name, so the next node receives only that key. The absence of ports returns
+ * an empty list, which keeps the output point anonymous (spread mode) —
+ * exactly the legacy behavior.
  */
 export function portasDeSaida(
   def: Pick<INodesAPI, "outputs" | "outputs_from_ports" | "branches"> | undefined,
@@ -81,31 +82,32 @@ export function portasDeSaida(
   if (def.outputs_from_ports) {
     return [...new Set(lerPortas(properties?.ports))].map(name => ({ name }))
   }
-  // Nó de ramo: os pontos de saída roteiam a execução, não carregam campo.
+  // Branch node: the output points route execution, they do not carry a field.
   if (def.branches) return [{ name: "true" }, { name: "false" }]
-  // Campos com ponto de conexão próprio (`port`). Nenhum marcado ⇒ ponto de
-  // saída anônimo (modo espalhar) — a mesma regra de sempre.
+  // Fields with their own connection point (`port`). None marked ⇒ anonymous
+  // output point (spread mode) — the same rule as always.
   return (def.outputs ?? [])
     .filter(c => c.port)
     .map(c => ({ name: c.name, description: c.description }))
 }
 
 /**
- * Onde a linha de uma aresta encosta no nó de destino, ao recarregar o fluxo.
+ * Where an edge's line attaches to the target node, when reloading the workflow.
  *
- * `to_key` é o NOME DO DADO para o executor; `targetHandle` é ONDE A LINHA
- * ENCOSTA na tela. Só há handle NOMEADO (`id={port.name}`) quando o nó declara
- * 2+ portas — `default-type` desenha um `HandleTarget` por porta apenas nesse
- * caso; com UMA porta só, o handle é ANÔNIMO (sem id). Devolver o nome de uma
- * porta única como `targetHandle` aponta a aresta para um id que não existe na
- * tela: o React Flow não a desenha, ela SOME do canvas continuando a executar
- * (o `to_key` sobrevive em `data`, então o executor ainda roteia pela chave), e
- * sem linha desenhada o botão de excluir é inalcançável — não dá nem para
- * refazer a conexão.
+ * `to_key` is the DATA NAME for the executor; `targetHandle` is WHERE THE LINE
+ * ATTACHES on screen. There is only a NAMED handle (`id={port.name}`) when the
+ * node declares 2+ ports — `default-type` draws one `HandleTarget` per port only
+ * in that case; with just ONE port, the handle is ANONYMOUS (no id). Returning
+ * the name of a single port as `targetHandle` points the edge at an id that does
+ * not exist on screen: React Flow does not draw it, it VANISHES from the canvas
+ * while still executing (`to_key` survives in `data`, so the executor still
+ * routes by the key), and with no line drawn the delete button is unreachable —
+ * you cannot even redo the connection.
  *
- * Por isso o `> 1` espelha o limiar de `resolveSourceHandle` e da renderização:
- * com uma porta, a aresta ancora no handle anônimo (e desenha); com 2+, no
- * handle nomeado que existe. `data.to_key` é preservado nos dois casos.
+ * That is why `> 1` mirrors the threshold of `resolveSourceHandle` and of the
+ * rendering: with one port, the edge anchors on the anonymous handle (and
+ * draws); with 2+, on the named handle that exists. `data.to_key` is preserved
+ * in both cases.
  */
 export function handleDeEntrada(
   edge: { target: string; to_key?: string },
@@ -117,7 +119,7 @@ export function handleDeEntrada(
     : undefined
 }
 
-/** Forma mínima de aresta que a re-ancoragem precisa enxergar. */
+/** Minimal edge shape the re-anchoring needs to see. */
 interface ArestaComHandles {
   source: string
   target: string
@@ -127,19 +129,19 @@ interface ArestaComHandles {
 }
 
 /**
- * Re-ancora, para UM nó, as arestas cujo handle se perdeu no load.
+ * Re-anchors, for ONE node, the edges whose handle was lost on load.
  *
- * `buildEdges` resolve o handle a partir do `to_key`/`from_key` só se o nó já
- * declara aquela porta. O nó SubWorkflow (invoke) recebe as portas de um
- * contrato ASSÍNCRONO (~300 ms depois da hidratação), então na primeira montagem
- * `handleDeEntrada`/`resolveSourceHandle` devolvem `undefined` e o React Flow
- * prende todas as arestas no primeiro handle — o colapso "tudo na primeira
- * entrada" ao dar F5. Quando as portas chegam, esta função devolve cada aresta
- * ao seu ponto: a `data` preservou `to_key` (entrada) e `from_key` (saída), e
- * agora esses nomes casam com uma porta declarada.
+ * `buildEdges` resolves the handle from `to_key`/`from_key` only if the node
+ * already declares that port. The SubWorkflow (invoke) node receives its ports
+ * from an ASYNCHRONOUS contract (~300 ms after hydration), so on the first mount
+ * `handleDeEntrada`/`resolveSourceHandle` return `undefined` and React Flow
+ * pins every edge to the first handle — the "everything on the first input"
+ * collapse on F5. When the ports arrive, this function returns each edge to its
+ * point: `data` preserved `to_key` (input) and `from_key` (output), and now
+ * those names match a declared port.
  *
- * Devolve o MESMO array quando nada muda — proteção anti-laço de quem chama de
- * dentro de um efeito com `setEdges` (mesma regra de `reconciliarPortas`).
+ * Returns the SAME array when nothing changes — an anti-loop protection for
+ * callers inside an effect with `setEdges` (same rule as `reconciliarPortas`).
  */
 export function reancorarArestasDoNo<E extends ArestaComHandles>(
   edges: E[],
@@ -152,9 +154,10 @@ export function reancorarArestasDoNo<E extends ArestaComHandles>(
   let mudou = false
   const proximos = edges.map(e => {
     let ne = e
-    // `> 1` pelo mesmo motivo de `handleDeEntrada`/`resolveSourceHandle`: com uma
-    // porta só, o handle é anônimo (sem id) — ancorar no nome dela apontaria para
-    // um id inexistente e a aresta sumiria. Com 2+, o handle nomeado existe.
+    // `> 1` for the same reason as `handleDeEntrada`/`resolveSourceHandle`: with a
+    // single port, the handle is anonymous (no id) — anchoring on its name would
+    // point at a nonexistent id and the edge would vanish. With 2+, the named
+    // handle exists.
     if (e.target === nodeId && !e.targetHandle && inputs.length > 1 && e.data?.to_key && nomesEntrada.has(e.data.to_key)) {
       ne = { ...ne, targetHandle: e.data.to_key }
     }
@@ -168,14 +171,15 @@ export function reancorarArestasDoNo<E extends ArestaComHandles>(
 }
 
 /**
- * O que o catálogo declara sobre o contrato de um nó, pronto para entrar no
- * `data` da instância no canvas.
+ * What the catalog declares about a node's contract, ready to go into the
+ * instance's `data` on the canvas.
  *
- * Existe porque o `data` é montado em DOIS lugares — ao abrir um fluxo salvo e
- * ao colar/duplicar um nó — cada um campo a campo. Um campo novo esquecido num
- * deles produz um defeito de sintoma bizarro: funciona no nó recém-criado e
- * some ao recarregar a página. Aconteceu com `dynamic_inputs` e de novo com
- * `dynamic_output`; concentrar aqui é o que impede a terceira vez.
+ * Exists because `data` is built in TWO places — when opening a saved workflow
+ * and when pasting/duplicating a node — each one field by field. A new field
+ * forgotten in one of them produces a defect with a bizarre symptom: it works
+ * on the freshly created node and disappears on page reload. It happened with
+ * `dynamic_inputs` and again with `dynamic_output`; centralizing it here is
+ * what prevents a third time.
  */
 export function contratoDoNo(
   def: Pick<INodesAPI, "inputs" | "outputs" | "dynamic_inputs" | "dynamic_output" | "outputs_from_ports" | "branches"> | undefined,
@@ -193,17 +197,17 @@ export function contratoDoNo(
 }
 
 /**
- * Campos de saída de UMA instância de nó.
+ * Output fields of ONE node instance.
  *
- * A maioria declara no catálogo (`saidas`, os `outputs` tipados do nó). O
- * Script Python declara `dynamic_output` e as saídas de verdade estão em
- * `output_vars` — o painel mostrava sempre "result", o nome do catálogo,
- * mesmo depois de a pessoa ter renomeado as variáveis. E o badge da aresta
- * oferecia esse mesmo "result" como chave, que o executor não encontra.
+ * Most declare them in the catalog (`saidas`, the node's typed `outputs`). The
+ * Python Script declares `dynamic_output` and the real outputs are in
+ * `output_vars` — the panel always showed "result", the catalog name, even
+ * after the person had renamed the variables. And the edge badge offered that
+ * same "result" as a key, which the executor does not find.
  *
- * A derivação exige `output_vars`: nós como o ReadGeoJSON também declaram
- * `dynamic_output` — no sentido de que a FORMA do dado varia — mas não têm a
- * propriedade, e para eles vale o catálogo.
+ * The derivation requires `output_vars`: nodes like ReadGeoJSON also declare
+ * `dynamic_output` — in the sense that the data's SHAPE varies — but do not
+ * have the property, and for them the catalog applies.
  */
 export function saidasDoNo(
   data: {
@@ -223,16 +227,16 @@ export function saidasDoNo(
       }))
     }
   }
-  // SubWorkflowInput: as saídas SÃO as portas declaradas pelo usuário — o
-  // catálogo declara [] de propósito. Sem este ramo, o seletor de chave e o
-  // badge da aresta ficavam sem candidatos e a aresta nascia sem from_key.
+  // SubWorkflowInput: the outputs ARE the ports declared by the user — the
+  // catalog declares [] on purpose. Without this branch, the key picker and
+  // the edge badge had no candidates and the edge was born without from_key.
   if (data?.outputs_from_ports) {
     return [...new Set(lerPortas(data?.properties?.ports))].map(name => ({ name }))
   }
   return data?.saidas ?? []
 }
 
-/** Forma mínima de nó que a reconciliação precisa enxergar. */
+/** Minimal node shape the reconciliation needs to see. */
 interface NoComPortas {
   data?: {
     dynamic_inputs?: boolean
@@ -243,21 +247,21 @@ interface NoComPortas {
   }
 }
 
-/** As portas atuais já batem com a lista declarada? (por nome e ordem) */
+/** Do the current ports already match the declared list? (by name and order) */
 function mesmasPortas(atuais: { name: string }[] | undefined, nomes: string[]): boolean {
   const lista = atuais ?? []
   return lista.length === nomes.length && lista.every((p, i) => p.name === nomes[i])
 }
 
 /**
- * Traz `data.inputs`/`data.outputs` de volta ao que a propriedade `ports` diz,
- * nos nós de portas dinâmicas — `dynamic_inputs` popula as entradas (Script
- * Python, SubWorkflowOutput) e `outputs_from_ports` popula as saídas
- * (SubWorkflowInput). Devolve o MESMO array quando nada mudou.
+ * Brings `data.inputs`/`data.outputs` back in line with what the `ports`
+ * property says, on dynamic-port nodes — `dynamic_inputs` populates the inputs
+ * (Python Script, SubWorkflowOutput) and `outputs_from_ports` populates the
+ * outputs (SubWorkflowInput). Returns the SAME array when nothing changed.
  *
- * A identidade referencial é parte do contrato, não detalhe: quem chama é um
- * efeito que depende do estado dos nós, e devolver um array novo a cada
- * passagem o faria se realimentar sem parar.
+ * Referential identity is part of the contract, not a detail: the caller is an
+ * effect that depends on the nodes' state, and returning a new array on every
+ * pass would make it feed itself endlessly.
  */
 export function reconciliarPortas<T extends NoComPortas>(nos: T[]): T[] {
   let mudou = false

@@ -1,12 +1,12 @@
-// Store Zustand para dados "dinâmicos" do editor que antes viviam em FlowContext.
-// Separa estado de UI (drawer, newly-added) e catálogo server-state (nodesAPI,
-// credentials, pinnedNodes) do FlowContext — que agora só guarda refs imutáveis
+// Zustand store for "dynamic" editor data that used to live in FlowContext.
+// Separates UI state (drawer, newly-added) and the server-state catalog (nodesAPI,
+// credentials, pinnedNodes) from FlowContext — which now only holds immutable refs
 // (reactFlowInstance, flowRef, reloadWorkflow).
 //
-// Motivação: cada `setFlowContext(prev => ...)` recriava o value do contexto
-// inteiro, causando re-render em todos os ~40 consumers do hook mesmo quando
-// a mudança afetava só 1 campo. Subscriptions granulares via Zustand eliminam
-// essa cascata.
+// Motivation: each `setFlowContext(prev => ...)` recreated the whole context
+// value, causing a re-render in all ~40 consumers of the hook even when the
+// change affected only 1 field. Granular subscriptions via Zustand eliminate
+// that cascade.
 import { create } from 'zustand'
 
 import { fromBackend } from '@/lib/dayjs'
@@ -17,65 +17,65 @@ import type { IPinNodeMeta } from '@/service/types'
 
 export type NodesDrawerState = 'opened' | 'closed' | (string & {})
 
-/** Validade do catálogo em memória. Nós e credenciais só mudam quando um admin
- *  desabilita um node ou o usuário cadastra uma credencial — não a cada abertura
- *  de canvas. */
+/** Validity of the in-memory catalog. Nodes and credentials only change when an
+ *  admin disables a node or the user registers a credential — not every time a
+ *  canvas opens. */
 const TTL_DO_CATALOGO_MS = 5 * 60 * 1000
 
-// Requisições em voo, para que duas montagens simultâneas (canvas + Ctrl+K)
-// compartilhem o mesmo download em vez de disparar dois.
+// Requests in flight, so that two simultaneous mounts (canvas + Ctrl+K)
+// share the same download instead of firing two.
 let nosEmVoo: Promise<INodesAPI[]> | null = null
 let credenciaisEmVoo: Promise<ICredentials[]> | null = null
 
 const estaFresco = (carimbo: number | null) =>
   carimbo !== null && Date.now() - carimbo < TTL_DO_CATALOGO_MS
 
-/** Compara conteúdo, não referência.
+/** Compares content, not reference.
  *
- *  O canvas assina `nodesAPI` e re-hidrata o grafo quando essa lista troca de
- *  IDENTIDADE. Um refetch de TTL vencido devolve um array novo vindo do JSON
- *  mesmo quando o catálogo é byte a byte o mesmo — e isso bastava para
- *  redesenhar o grafo por cima de tudo que o usuário já tinha editado. */
+ *  The canvas subscribes to `nodesAPI` and re-hydrates the graph when that list
+ *  changes IDENTITY. A refetch after the TTL expires returns a new array from the
+ *  JSON even when the catalog is byte-for-byte the same — and that was enough to
+ *  redraw the graph over everything the user had already edited. */
 const mesmoConteudo = (a: unknown[], b: unknown[]) =>
   a.length === b.length && JSON.stringify(a) === JSON.stringify(b)
 
 interface WorkflowCatalogState {
-  /** Catálogo de tipos de nós — resposta de GET /nodes */
+  /** Catalog of node types — response from GET /nodes */
   nodesAPI: INodesAPI[]
-  /** Credenciais disponíveis ao usuário — resposta de GET /credentials */
+  /** Credentials available to the user — response from GET /credentials */
   credentials: ICredentials[]
-  /** Quando `nodesAPI` foi baixado (epoch ms). null = nunca. */
+  /** When `nodesAPI` was downloaded (epoch ms). null = never. */
   nodesFetchedAt: number | null
-  /** Quando `credentials` foi baixado (epoch ms). null = nunca. */
+  /** When `credentials` was downloaded (epoch ms). null = never. */
   credentialsFetchedAt: number | null
-  /** Nós com output fixado (pin data) no workflow atual */
+  /** Nodes with pinned output (pin data) in the current workflow */
   pinnedNodes: IPinNodeMeta[]
-  /** ID do nó recém-adicionado — usado para animação de destaque */
+  /** ID of the newly added node — used for the highlight animation */
   newlyAddedNodeId: string | undefined
-  /** Estado do drawer lateral de adicionar nós */
+  /** State of the side drawer for adding nodes */
   nodesDrawerState: NodesDrawerState
 }
 
 interface WorkflowCatalogActions {
   setCredentials(v: ICredentials[]): void
-  /** Garante o catálogo em memória: baixa só se estiver vazio ou vencido.
-   *  Uma busca que falha PRESERVA o que já estava em memória e não carimba o
-   *  TTL — a próxima chamada tenta de novo. */
+  /** Ensures the catalog is in memory: downloads only if it is empty or expired.
+   *  A fetch that fails PRESERVES what was already in memory and does not stamp
+   *  the TTL — the next call tries again. */
   ensureNodesAPI(): Promise<INodesAPI[]>
-  /** Idem para as credenciais. */
+  /** Same for the credentials. */
   ensureCredentials(): Promise<ICredentials[]>
-  /** Marca as credenciais como vencidas — o próximo `ensureCredentials` refaz o GET.
-   *  Chamado por quem cria/edita/exclui credencial fora do canvas, senão a
-   *  credencial nova só apareceria no select do nó depois do TTL de 5 min. */
+  /** Marks the credentials as expired — the next `ensureCredentials` redoes the GET.
+   *  Called by whoever creates/edits/deletes a credential outside the canvas, otherwise
+   *  the new credential would only appear in the node's select after the 5-min TTL. */
   invalidarCredenciais(): void
   setPinnedNodes(v: IPinNodeMeta[]): void
   setNewlyAddedNodeId(v: string | undefined): void
   setNodesDrawerState(v: NodesDrawerState): void
-  /** Recalcula `expired` de cada pin com base no `expires_at` carregado e no
-   * relógio atual. No-op quando nada muda — evita re-render dos consumers. */
+  /** Recomputes each pin's `expired` based on the loaded `expires_at` and the
+   * current clock. No-op when nothing changes — avoids re-rendering the consumers. */
   recomputeExpiredPins(): void
-  /** Limpa campos dependentes do workflow (pinnedNodes, newlyAddedNodeId, drawer fechado).
-   * nodesAPI e credentials são mantidos — são globais do usuário. */
+  /** Clears workflow-dependent fields (pinnedNodes, newlyAddedNodeId, drawer closed).
+   * nodesAPI and credentials are kept — they are global to the user. */
   resetWorkflowScoped(): void
 }
 
@@ -96,17 +96,17 @@ export const useWorkflowCatalogStore = create<WorkflowCatalogState & WorkflowCat
     if (nosEmVoo) return nosEmVoo
     nosEmVoo = GisFlowService.getNodes()
       .then(res => {
-        // O service NÃO rejeita em falha: resolve com { data: undefined, error }.
-        // Sem esta guarda, um 502/401/queda de rede gravava `nodesAPI: []` por
-        // cima do catálogo bom e o drawer, a paleta e o "command-add-node"
-        // ficavam vazios sem nenhuma mensagem de erro. Em falha, preserva o que
-        // está em memória e NÃO carimba o TTL — a próxima chamada tenta de novo.
+        // The service does NOT reject on failure: it resolves with { data: undefined, error }.
+        // Without this guard, a 502/401/network drop wrote `nodesAPI: []` over
+        // the good catalog and the drawer, the palette and "command-add-node"
+        // went empty with no error message at all. On failure, preserve what is
+        // in memory and do NOT stamp the TTL — the next call tries again.
         if (res?.error || !Array.isArray(res?.data)) return get().nodesAPI
         const lista = res.data
         const atual = get().nodesAPI
         if (mesmoConteudo(atual, lista)) {
-          // Conteúdo idêntico: renova só a validade e mantém a MESMA referência,
-          // para não acordar os consumers que assinam o array.
+          // Identical content: renew only the validity and keep the SAME reference,
+          // so as not to wake the consumers subscribed to the array.
           set({ nodesFetchedAt: Date.now() })
           return atual
         }
@@ -123,9 +123,9 @@ export const useWorkflowCatalogStore = create<WorkflowCatalogState & WorkflowCat
     if (credenciaisEmVoo) return credenciaisEmVoo
     credenciaisEmVoo = GisFlowService.getCredentials()
       .then(res => {
-        // Mesma regra do catálogo de nós: falha não derruba a lista boa. Aqui o
-        // sintoma seria o select de credencial do nó ficar vazio e o usuário
-        // salvar o nó sem credencial nenhuma.
+        // Same rule as the node catalog: a failure does not take down the good list.
+        // Here the symptom would be the node's credential select going empty and
+        // the user saving the node with no credential at all.
         if (res?.error || !Array.isArray(res?.data)) return get().credentials
         const lista = res.data
         const atual = get().credentials
@@ -151,10 +151,10 @@ export const useWorkflowCatalogStore = create<WorkflowCatalogState & WorkflowCat
     let changed = false
     const updated = state.pinnedNodes.map(p => {
       if (!p.expires_at) return p
-      // expires_at vem UTC naive (sem offset). `new Date()` cru o interpretava
-      // como local, deslocando o epoch pelo offset do fuso → a expiracao do pin
-      // errava por ~horas. fromBackend trata como UTC; valueOf() da o epoch
-      // absoluto correto para comparar com Date.now().
+      // expires_at comes as naive UTC (no offset). A raw `new Date()` interpreted it
+      // as local, shifting the epoch by the time zone offset → the pin expiration
+      // was off by ~hours. fromBackend treats it as UTC; valueOf() gives the correct
+      // absolute epoch to compare with Date.now().
       const expiresAtMs = fromBackend(p.expires_at)?.valueOf() ?? Number.POSITIVE_INFINITY
       const expired = now > expiresAtMs
       if (expired === p.expired) return p

@@ -6,17 +6,18 @@ import { Skeleton } from "@/app/components/ui/skeleton"
 import * as Estado from "@/app/components/shared/estados"
 
 /**
- * Estados da tela de Executores (contrato §3): skeleton da 1ª carga, erro de
- * espinha, vazio de primeiro uso × sem-resultado e o aviso âmbar de falha
- * parcial das métricas. Cada um diz o que aconteceu e o que fazer a seguir;
- * aqui ficam o skeleton e as frases, com a moldura de `shared/estados.tsx`.
+ * States of the Executors screen (contract §3): 1st-load skeleton, spine
+ * error, first-use empty state × no results and the amber warning for a
+ * partial failure of the metrics. Each one says what happened and what to do
+ * next; the skeleton and the sentences live here, with the frame from
+ * `shared/estados.tsx`.
  *
- * Aqui o "conteúdo" é o TRILHO — tabela densa, variante deliberada — então o
- * skeleton desenha justamente ele: cabeçalho de colunas + linhas na altura
- * real (h-11), para a troca para a lista não pular a página.
+ * Here the "content" is the RAIL — a dense table, a deliberate variant — so the
+ * skeleton draws exactly that: column header + rows at the real height
+ * (h-11), so the swap to the list doesn't make the page jump.
  */
 
-/** Primeira carga: o cabeçalho real fica por cima (o `index` sempre o renderiza). */
+/** First load: the real header sits on top (`index` always renders it). */
 export function SkeletonDeExecutores() {
   return (
     <section
@@ -25,7 +26,7 @@ export function SkeletonDeExecutores() {
       aria-label="Carregando os executores"
       className="flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card shadow-xs"
     >
-      {/* Cabeçalho de colunas — some no telefone, onde a linha não tem colunas. */}
+      {/* Column header — hidden on phones, where the row has no columns. */}
       <div className="hidden items-center gap-3 border-b border-border bg-muted/50 px-3 py-1.5 md:flex">
         <Skeleton className="h-3 w-4" />
         <Skeleton className="h-3 w-24" />
@@ -45,19 +46,19 @@ export function SkeletonDeExecutores() {
 }
 
 /**
- * Espinha (a listagem) caiu na 1ª carga: sem ela não há trilho, então o bloco
- * de erro toma o lugar. Só aparece quando `data == null` — uma recarga que
- * falha sobre uma lista já pronta mantém o que havia (ver o `index`).
+ * The spine (the listing) failed on the 1st load: without it there is no rail,
+ * so the error block takes its place. Only appears when `data == null` — a
+ * reload that fails over an already ready list keeps what was there (see `index`).
  */
 export function ErroDosExecutores({ mensagem, onTentar }: { mensagem: string; onTentar: () => void }) {
   return <Estado.ErroDeCarga titulo="Não foi possível carregar os executores" mensagem={mensagem} onTentar={onTentar} />
 }
 
 /**
- * Vazio de primeiro uso (contrato §3.3): distingue "não há executor" de "não há
- * resultado". A mensagem muda conforme o papel — admin registra o primeiro;
- * usuário comum pede acesso. `acao` é o CTA primário (o diálogo de criação),
- * renderizado só quando quem vê pode criar.
+ * First-use empty state (contract §3.3): distinguishes "no executor" from "no
+ * results". The message changes with the role — an admin registers the first
+ * one; a regular user asks for access. `acao` is the primary CTA (the creation
+ * dialog), rendered only when the viewer can create.
  */
 export function VazioDeExecutores({ isAdmin, acao }: { isAdmin: boolean; acao?: ReactNode }) {
   return (
@@ -74,17 +75,18 @@ export function VazioDeExecutores({ isAdmin, acao }: { isAdmin: boolean; acao?: 
 }
 
 /**
- * Recorte ativo sem nenhuma linha (contrato §3.3): a saída óbvia é limpar o
- * filtro, e a tela diz isso — o ícone `TbFilterOff` separa do vazio de fato.
+ * Active slice with no rows (contract §3.3): the obvious way out is to clear the
+ * filter, and the screen says so — the `TbFilterOff` icon sets it apart from a
+ * real empty state.
  */
 export function SemResultado({ onLimpar }: { onLimpar: () => void }) {
   return <Estado.SemResultado texto="Nenhum executor com este filtro" onLimpar={onLimpar} />
 }
 
 /**
- * Falha parcial (contrato §3.4): só as métricas de execução caíram; o trilho
- * continua inteiro, sem os números de histórico. Uma linha âmbar discreta com
- * o "Tentar de novo" que refaz a carga das métricas.
+ * Partial failure (contract §3.4): only the execution metrics failed; the rail
+ * stays whole, without the history numbers. A discreet amber line with the
+ * "Tentar de novo" (try again) that redoes the metrics load.
  */
 export function AvisoDeMetricas({ onTentar }: { onTentar: () => void }) {
   return (

@@ -1,21 +1,21 @@
 # tests/unit/test_mcp_erros.py
 """
-`to_tool_error` — a tabela que traduz o núcleo para o vocabulário do MCP.
+`to_tool_error` — the table that translates the core into MCP's vocabulary.
 
-Cada caso aqui fixa um `code`, e o `code` é contrato: quem integra decide o que
-fazer a seguir lendo esse campo (tentar de novo, pedir outro token, corrigir a
-definição). Trocar um deles silenciosamente quebraria integrações sem quebrar
-teste nenhum — daí um teste por linha da tabela.
+Each case here pins a `code`, and the `code` is a contract: whoever integrates decides
+what to do next by reading that field (retry, ask for another token, fix the
+definition). Silently changing one of them would break integrations without breaking
+any test — hence one test per table row.
 
-Quatro pontos de segurança também ficam fixados: o `ToolError` já formatado
-passa intacto (quem o levantou sabia mais), uma exceção desconhecida NÃO vira
-`str(exc)` no cliente — a mensagem de uma biblioteca pode carregar a URL de
-conexão inteira, com senha —, tudo que sai por `erro()` passa pelo
-`scrub_text`, inclusive o pedaço da mensagem que é eco de um argumento do
-cliente (nome de nó, tópico, nome de workflow), e o relatório do lint — que é
-dict e por isso NÃO cabe no funil de strings — sai higienizado por quem o
-embarca. Essa redação vale também para o log: o SDK imprime o texto do
-`ToolError` por um logger que não tem o filtro de segredos da casa.
+Four security points are also pinned: an already formatted `ToolError`
+passes through intact (whoever raised it knew more), an unknown exception does NOT
+become `str(exc)` on the client — a library's message may carry the whole connection
+URL, with password —, everything that goes out through `erro()` goes through
+`scrub_text`, including the part of the message that echoes a client argument
+(node name, topic, workflow name), and the lint report — which is a
+dict and therefore does NOT fit the string funnel — comes out sanitized by whoever
+embeds it. That redaction also applies to the log: the SDK prints the text of the
+`ToolError` through a logger that does not have the in-house secret filter.
 """
 from __future__ import annotations
 
@@ -62,18 +62,18 @@ def test_erro_omite_hint_e_extras_nulos():
 
 
 def test_erro_preserva_acentuacao_legivel():
-    # `ensure_ascii=False`: a mensagem é lida por uma pessoa no cliente MCP.
+    # `ensure_ascii=False`: the message is read by a person in the MCP client.
     assert "inválida" in str(erro("validation", "Definição inválida."))
 
 
-# O DSN é o formato que o `scrub_text` reconhece e que mais aparece por engano:
-# um `connectionString` copiado para dentro do nome de um nó, de um workflow ou
-# de um tópico volta pela mensagem de erro.
+# The DSN is the format `scrub_text` recognizes and the one that shows up by mistake
+# most often: a `connectionString` copied into the name of a node, a workflow or
+# a topic comes back through the error message.
 _DSN = "postgresql://ana:senha-secreta@db:5432/atlans"  # pragma: allowlist secret
 
 
 def test_erro_redige_segredo_na_mensagem():
-    """A mensagem ecoa argumento do cliente — e o eco passa pelo funil."""
+    """The message echoes a client argument — and the echo goes through the funnel."""
     corpo = _corpo(erro("not_found", f"Nó {_DSN} não existe."))
     assert "senha-secreta" not in json.dumps(corpo)
     assert "<REDACTED>" in corpo["message"]
@@ -94,7 +94,7 @@ def test_erro_redige_segredo_na_dica_e_nos_extras_de_texto():
 
 
 def test_erro_nao_mexe_no_que_nao_e_texto():
-    """O relatório do lint e os números seguem intactos: o cliente os parseia."""
+    """The lint report and the numbers stay intact: the client parses them."""
     relatorio = {"ok": False, "errors": [{"code": "unknown_node", "node_id": "n1"}]}
     corpo = _corpo(erro("validation", "Inválido.", report=relatorio, retry_after_seconds=17))
     assert corpo["report"] == relatorio
@@ -102,7 +102,7 @@ def test_erro_nao_mexe_no_que_nao_e_texto():
 
 
 def test_nome_de_workflow_em_conflito_sai_redigido():
-    """Achado real: o nome escrito por gente ecoava inteiro para o cliente e o log."""
+    """Real finding: the name written by people was echoed whole to the client and the log."""
     corpo = _corpo(
         to_tool_error(
             WorkflowNameConflictError(f"Já existe um workflow chamado '{_DSN}' neste workspace.")
@@ -131,8 +131,8 @@ def test_workflow_inativo_vira_workflow_inactive_com_caminho_de_saida():
 
 
 def test_sem_executor_vira_no_executor_e_nao_o_codigo_antigo_do_banco():
-    # A exceção do núcleo ainda se chama `no_agent_available`; o MCP fala o
-    # vocabulário atual da plataforma.
+    # The core's exception is still called `no_agent_available`; MCP speaks the
+    # platform's current vocabulary.
     assert NoExecutorAvailableError.error_code == "no_agent_available"
     corpo = _corpo(to_tool_error(NoExecutorAvailableError("Ninguém online.")))
     assert corpo["code"] == "no_executor"
@@ -147,15 +147,15 @@ def test_definicao_invalida_carrega_o_relatorio_do_lint():
 
 
 def test_relatorio_de_definicao_invalida_sai_higienizado():
-    """Achado real: o MESMO segredo saía redigido na `message` e em claro no `report`.
+    """Real finding: the SAME secret came out redacted in `message` and in the clear in `report`.
 
-    `erro()` só passa `scrub_text` no que é string no topo do corpo; o relatório
-    é dict e seguia intacto, na premissa de que quem o monta já o higieniza — e
-    `validate_service` não higieniza. A mensagem fatal de `invalid_credential_id`
-    ECOA o `credential_id` recebido, e esse erro só existe quando alguém colou
-    uma string de conexão no lugar do id da credencial: o valor ecoado É um
-    segredo de verdade. Seguia inteiro para o cliente e para o log do SDK, que
-    não tem o filtro de segredos da casa.
+    `erro()` only applies `scrub_text` to what is a string at the top level of the body;
+    the report is a dict and went through intact, on the premise that whoever builds it
+    already sanitizes it — and `validate_service` does not. The fatal message of
+    `invalid_credential_id` ECHOES the received `credential_id`, and that error only
+    exists when someone pasted a connection string in place of the credential's id: the
+    echoed value IS a real secret. It went whole to the client and to the SDK's log,
+    which does not have the in-house secret filter.
     """
     relatorio = {
         "ok": False,
@@ -172,8 +172,8 @@ def test_relatorio_de_definicao_invalida_sai_higienizado():
 
     assert "senha-secreta" not in json.dumps(corpo, ensure_ascii=False)
     assert "<REDACTED>" in corpo["report"]["errors"][0]["message"]
-    # Só o texto muda: o formato que o cliente parseia para achar o campo errado
-    # continua de pé — sem isso a redação teria custado o diagnóstico.
+    # Only the text changes: the format the client parses to find the wrong field
+    # still stands — without that, the redaction would have cost the diagnosis.
     assert corpo["report"]["ok"] is False
     assert corpo["report"]["errors"][0]["code"] == "invalid_credential_id"
     assert corpo["report"]["errors"][0]["node_id"] == "n1"
@@ -268,24 +268,24 @@ def test_excecao_desconhecida_nao_repete_a_mensagem_original():
 
 
 def test_prefixo_do_sdk_e_removido_para_o_cliente_ver_so_o_json():
-    """O SDK re-levanta o erro de dentro de uma tool prefixado com prosa.
+    """The SDK re-raises the error from inside a tool prefixed with prose.
 
-    Sem a limpeza o cliente receberia dois formatos: JSON puro quando a guarda
-    de escopo ou de cota recusa, e JSON precedido de texto quando a própria
-    tool falha — e um `json.loads` direto quebraria só no segundo caso.
+    Without the cleanup the client would get two formats: pure JSON when the scope
+    or quota guard refuses, and JSON preceded by text when the tool itself
+    fails — and a direct `json.loads` would break only in the second case.
     """
     corpo = erro("validation", "Definição inválida.", hint="confira o relatório")
     prefixado = f"Error executing tool validate_workflow: {corpo}"
 
     assert sem_prefixo_do_sdk(prefixado) == str(corpo)
     assert json.loads(sem_prefixo_do_sdk(prefixado))["code"] == "validation"
-    # Mensagem sem prefixo passa intacta, e só o primeiro prefixo é removido.
+    # A message without a prefix passes through intact, and only the first prefix is removed.
     assert sem_prefixo_do_sdk(str(corpo)) == str(corpo)
     assert codigo_do_erro(ToolError(prefixado)) == "validation"
 
 
 def test_arquivo_inexistente_do_drive_vira_not_found():
-    """`drive_service` levanta o FileNotFoundError embutido; é 404, não falha."""
+    """`drive_service` raises the embedded FileNotFoundError; it is a 404, not a failure."""
     convertido = to_tool_error(FileNotFoundError("arquivo sumiu"))
 
     assert json.loads(str(convertido))["code"] == "not_found"

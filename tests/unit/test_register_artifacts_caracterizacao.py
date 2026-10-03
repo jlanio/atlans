@@ -1,19 +1,20 @@
 # tests/unit/test_register_artifacts_caracterizacao.py
-"""Caracterização do `_register_artifacts`: saneia, resolve em lote, persiste.
+"""Characterization of `_register_artifacts`: sanitizes, resolves in batch, persists.
 
-Contra um SQLite de verdade (as linhas gravadas são conferidas campo a campo) e
-com um diário que anota cada consulta, HEAD ao storage, `add`, `commit` e aviso
-do Drive, na ordem em que acontecem. Prende:
+Against a real SQLite (the written rows are checked field by field) and with a
+journal that records each query, HEAD to storage, `add`, `commit` and Drive
+notice, in the order they happen. It pins:
 
-- a ordem das fases: retenção → artefatos já conhecidos do run → guardas do
-  Drive (por id e por key) → HEADs → linhas → UM commit → avisos do Drive;
-- o saneamento: item que não é objeto sai calado, nome inválido sai com aviso,
-  repetido no mesmo lote ou já gravado no run não vira segunda linha;
-- que HEAD só acontece para linha nova que tem objeto no storage (nunca para
-  artefato local nem para arquivo do Drive já registrado);
-- o formato das linhas de Artifact e de WorkspaceFile (minio, local, catálogo);
-- que reentrega não paga commit, e que um aviso do Drive que falha não impede
-  os seguintes.
+- the order of the phases: retention → artifacts already known to the run → Drive
+  guards (by id and by key) → HEADs → rows → ONE commit → Drive notices;
+- the sanitization: an item that is not an object is dropped silently, an invalid
+  name is dropped with a warning, a duplicate in the same batch or one already
+  stored in the run does not become a second row;
+- that HEAD only happens for a new row that has an object in storage (never for a
+  local artifact nor for an already registered Drive file);
+- the shape of the Artifact and WorkspaceFile rows (minio, local, catalog);
+- that a redelivery does not pay for a commit, and that a failing Drive notice
+  does not prevent the following ones.
 """
 import logging
 from datetime import datetime, timedelta, timezone
@@ -72,14 +73,14 @@ async def fabrica():
             Base.metadata.create_all,
             tables=[Artifact.__table__, WorkspaceFile.__table__, SystemConfig.__table__],
         )
-    # O mesmo `expire_on_commit=False` do AsyncSessionLocal de produção.
+    # The same `expire_on_commit=False` as the production AsyncSessionLocal.
     yield async_sessionmaker(eng, expire_on_commit=False)
     await eng.dispose()
 
 
 @pytest.fixture
 def mundo(monkeypatch):
-    """Storage e Drive falsos que anotam no mesmo diário da sessão."""
+    """Fake Storage and Drive that write to the same journal as the session."""
     estado = SimpleNamespace(
         diario=[], tamanhos={}, head_falha=set(), emit_falha=set(),
     )
@@ -209,7 +210,7 @@ async def test_payload_misturado_saneia_e_deduplica_no_proprio_lote(fabrica, mun
                 {"filename": "a.json", "output_key": "repetido"},
                 {"filename": "b.json"},
             ],
-            # Um item solto, fora de lista, também vale.
+            # A loose item, outside a list, also counts.
             "n2": {"filename": "a.json"},
         })
 
@@ -377,8 +378,8 @@ async def test_falha_ao_avisar_um_arquivo_nao_impede_os_demais(fabrica, mundo, c
 
 
 async def test_lote_misturado_percorre_as_tres_fases_na_ordem(fabrica, mundo, caplog):
-    """Artefato no MinIO, artefato local, Drive já enviado, Drive novo e Drive
-    que caiu no fallback local — num payload só."""
+    """Artifact in MinIO, local artifact, Drive already uploaded, new Drive and Drive
+    that fell back to local — in a single payload."""
     await _semear(fabrica, WorkspaceFile(
         id_hash="file-1", workspace_id=WS, s3_key=f"artifacts/{WS}/task-antigo/c.geojson",
         original_name="c.geojson", extension="geojson", size=8,
@@ -395,7 +396,7 @@ async def test_lote_misturado_percorre_as_tres_fases_na_ordem(fabrica, mundo, ca
 
     nomes = _nomes(mundo.diario)
     assert nomes[:4] == ["retencao", "conhecidos", "drive_por_id", "drive_por_key"]
-    # Os HEADs saem em paralelo: a ordem ENTRE eles não é contrato.
+    # The HEADs go out in parallel: the order AMONG them is not a contract.
     assert sorted(c[1] for c in mundo.diario[4:6]) == [_key("a.json"), _key("d.geojson")]
     assert nomes[4:6] == ["head", "head"]
     assert mundo.diario[6:11] == [
@@ -405,7 +406,7 @@ async def test_lote_misturado_percorre_as_tres_fases_na_ordem(fabrica, mundo, ca
         ("add", "WorkspaceFile", "e.geojson"),
         ("commit",),
     ]
-    # O arquivo já existente é avisado primeiro (decidido na fase 2), o novo depois.
+    # The already existing file is notified first (decided in phase 2), the new one after.
     assert [(c[1], c[2]["original_name"]) for c in mundo.diario[11:]] == [
         ("file_created", "c.geojson"), ("file_created", "d.geojson"),
     ]

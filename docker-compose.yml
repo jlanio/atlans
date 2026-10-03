@@ -1,8 +1,9 @@
 name: Atlans App
 
-# Os servidores de tiles da instalação (web/lib/fundos-do-mapa.ts e
-# app/core/config.py). Vazios = só as ruas do OpenStreetMap, sem satélite. Vão
-# para a API (que os injeta nos nós Carta) e para o web (o mapa e o globo).
+# The installation's tile servers (web/lib/fundos-do-mapa.ts and
+# app/core/config.py). Empty = only the OpenStreetMap streets, no satellite.
+# They go to the API (which injects them into the Carta nodes) and to the web
+# (the map and the globe).
 x-mapa-env: &mapa-env
   MAPA_RUAS_URL: ${MAPA_RUAS_URL:-}
   MAPA_RUAS_CREDITO: ${MAPA_RUAS_CREDITO:-}
@@ -16,30 +17,31 @@ x-api-env: &api-env
   TZ: ${TZ}
   DATABASE_URL: ${DATABASE_URL}
   REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
-  # Contadores de rate limit por IP (app/core/rate_limiter.py). Vazio (padrao)
-  # = o REDIS_URL acima, e os limites valem para a API inteira; `memory://`
-  # volta para a memoria de cada worker (ver docs/operations.md).
+  # Per-IP rate limit counters (app/core/rate_limiter.py). Empty (default)
+  # = the REDIS_URL above, and the limits apply to the whole API; `memory://`
+  # goes back to each worker's memory (see docs/operations.md).
   RATE_LIMIT_STORAGE_URI: ${RATE_LIMIT_STORAGE_URI:-}
-  # Prazo de cada comando no banco, em segundos (app/core/config.py). Vazio =
-  # 60 (o Postgres cancela) e 90 (o asyncpg desiste); 0 desliga.
+  # Deadline for each database command, in seconds (app/core/config.py). Empty =
+  # 60 (Postgres cancels) and 90 (asyncpg gives up); 0 turns it off.
   DB_STATEMENT_TIMEOUT: ${DB_STATEMENT_TIMEOUT:-}
   DB_COMMAND_TIMEOUT: ${DB_COMMAND_TIMEOUT:-}
-  # Roteamento por politica de execucao (docs/specs/executor-isolation-routing.md).
-  # `off` (padrao): a API roteia como sempre — executor apontado, depois o pool —
-  # e o editor da politica e uma previa. `on`: niveis, reserva e ultimo recurso
-  # passam a valer. Reversao = voltar para `off` e recriar o container.
+  # Routing by execution policy (docs/specs/executor-isolation-routing.md).
+  # `off` (default): the API routes as always — targeted executor, then the
+  # pool — and the policy editor is a preview. `on`: tiers, fallback and last
+  # resort take effect. Rollback = go back to `off` and recreate the container.
   EXECUTOR_POLICY_ROUTING: ${EXECUTOR_POLICY_ROUTING:-off}
   APP_SECRET: ${APP_SECRET}
   MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
   MINIO_EXTERNAL_ENDPOINT: ${MINIO_EXTERNAL_ENDPOINT:-http://localhost:9000}
-  # Obrigatorias, sem padrao (`:?` para o compose parar sem elas): o MinIO e
-  # publicado em S3_HOST, e um padrao seria uma senha publica.
+  # Required, no default (`:?` so compose stops without them): MinIO is
+  # published on S3_HOST, and a default would be a public password.
   MINIO_ROOT_USER: ${MINIO_ROOT_USER:?defina MINIO_ROOT_USER no .env (make bootstrap)}
   MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?defina MINIO_ROOT_PASSWORD no .env (make bootstrap)}
   MINIO_BUCKET: ${MINIO_BUCKET:-atlans-drive}
   MINIO_PRESIGN_EXPIRY: ${MINIO_PRESIGN_EXPIRY:-3600}
-  # E-mail (app/services/email_transporte.py): resend, smtp ou log. Vazio = o
-  # que estiver configurado — Resend com a chave, SMTP com o host, log sem eles.
+  # Email (app/services/email_transporte.py): resend, smtp or log. Empty =
+  # whatever is configured — Resend with the key, SMTP with the host, log
+  # without them.
   EMAIL_BACKEND: ${EMAIL_BACKEND:-}
   RESEND_API_KEY: ${RESEND_API_KEY:-}
   SMTP_HOST: ${SMTP_HOST:-}
@@ -47,64 +49,65 @@ x-api-env: &api-env
   SMTP_SEGURANCA: ${SMTP_SEGURANCA:-}
   SMTP_USERNAME: ${SMTP_USERNAME:-}
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-  # Vazio = Atlans <noreply@host do FRONTEND_URL> (app/core/config.py).
-  # RESEND_FROM_EMAIL é o nome antigo e continua valendo.
+  # Empty = Atlans <noreply@FRONTEND_URL host> (app/core/config.py).
+  # RESEND_FROM_EMAIL is the old name and still works.
   EMAIL_FROM: ${EMAIL_FROM:-}
   RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
-  # false = o login não exige o e-mail verificado (instalação sem transporte).
+  # false = login does not require a verified email (installation without a transport).
   EXIGIR_EMAIL_VERIFICADO: ${EXIGIR_EMAIL_VERIFICADO:-true}
   FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-  # Endereços desta instalação (ver .env.example). Vazios = as convenções de
-  # app/core/config.py, que partem do FRONTEND_URL.
+  # Addresses of this installation (see .env.example). Empty = the conventions
+  # of app/core/config.py, which derive from FRONTEND_URL.
   AGENTS_URL: ${AGENTS_URL:-}
-  # Uma instalacao pode desligar as extensoes presentes sem apagar a pasta
-  # (app/extensoes/__init__.py). Vazio = as extensoes do disco valem. So a API:
-  # as do web entram no build (web/extensoes/instaladas.ts).
+  # An installation can turn off the extensions present without deleting the
+  # folder (app/extensoes/__init__.py). Empty = the extensions on disk apply.
+  # API only: the web ones go into the build (web/extensoes/instaladas.ts).
   ATLANS_SEM_EXTENSOES: ${ATLANS_SEM_EXTENSOES:-}
-  # CA do Postgres (app/core/db.py, com ?ssl=verify-ca|verify-full no DATABASE_URL):
-  # o caminho DENTRO do container; o arquivo precisa estar la (volume ou imagem).
+  # Postgres CA (app/core/db.py, with ?ssl=verify-ca|verify-full in DATABASE_URL):
+  # the path INSIDE the container; the file needs to be there (volume or image).
   DATABASE_CA_CERT: ${DATABASE_CA_CERT:-}
   EXECUTOR_REPO_URL: ${EXECUTOR_REPO_URL:-}
   DESKTOP_RELEASES_REPO: ${DESKTOP_RELEASES_REPO:-}
-  # Hosts aceitos pelo transporte do servidor MCP (app/mcp). Vazio (padrao) =
-  # o host do FRONTEND_URL (com e sem porta) + localhost:* e 127.0.0.1:*; um
-  # Host fora dela recebe 421. Ver docs/mcp.md.
+  # Hosts accepted by the MCP server transport (app/mcp). Empty (default) =
+  # the FRONTEND_URL host (with and without port) + localhost:* and
+  # 127.0.0.1:*; a Host outside that list gets 421. See docs/mcp.md.
   MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-}
-  # Assistente — superfícies do editor (/assistente/editor) e da Home (/assistente). O modelo vem
-  # de uma API compatível com a da OpenAI: o OpenRouter (padrão), um gateway ou
-  # um servidor local. A chave e da PLATAFORMA (quem paga os tokens e a
-  # instalacao, e o teto por pessoa vive no Redis). Vazia = o assistente nao existe
-  # e o resto do editor continua inteiro. Ver docs/assistente.md.
-  # LLM_* são os nomes genéricos; OPENROUTER_* continuam valendo.
+  # Assistant — editor (/assistente/editor) and Home (/assistente) surfaces. The model comes
+  # from an OpenAI-compatible API: OpenRouter (default), a gateway or a local
+  # server. The key belongs to the PLATFORM (whoever pays for the tokens is the
+  # installation, and the per-person ceiling lives in Redis). Empty = the
+  # assistant does not exist and the rest of the editor remains intact. See
+  # docs/assistant.md.
+  # LLM_* are the generic names; OPENROUTER_* still work.
   LLM_API_KEY: ${LLM_API_KEY:-}
   LLM_BASE_URL: ${LLM_BASE_URL:-}
   OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
   # Vazio = a API publica (https://openrouter.ai/api/v1).
   OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-}
-  # true = o nome e o FRONTEND_URL vão como atribuição do app no OpenRouter.
+  # true = the name and FRONTEND_URL are sent as the app attribution on OpenRouter.
   ASSISTENTE_ATRIBUICAO: ${ASSISTENTE_ATRIBUICAO:-}
   ASSISTENTE_ATIVO: ${ASSISTENTE_ATIVO:-true}
   ASSISTENTE_MODELO: ${ASSISTENTE_MODELO:-}
   ASSISTENTE_IDIOMA: ${ASSISTENTE_IDIOMA:-}
   # Tokens por pessoa em 24 h. Vazio = 1500000.
   ASSISTENTE_TETO_DE_TOKENS_POR_DIA: ${ASSISTENTE_TETO_DE_TOKENS_POR_DIA:-}
-  # Catalogo de fontes (docs/fontes.md). FONTES_CATALOGO_DIR VAZIA desliga a
-  # importacao, e fora do .env vale a pasta do repositorio: sem os dois-pontos
-  # no `-`, de proposito, para o vazio chegar vazio.
+  # Source catalog (docs/sources.md). An EMPTY FONTES_CATALOGO_DIR turns off the
+  # import, and outside .env the repository folder applies: no colon in the
+  # `-`, on purpose, so that empty arrives empty.
   FONTES_CATALOGO_DIR: ${FONTES_CATALOGO_DIR-catalogo/geoservicos}
   FONTES_APRENDER_DAS_EXECUCOES: ${FONTES_APRENDER_DAS_EXECUCOES:-}
   FONTES_VERIFICACAO_INTERVAL: ${FONTES_VERIFICACAO_INTERVAL:-}
-  # O fuso dos agendamentos que nao dizem o seu (flow/utils/fuso.py). Vazio = UTC.
-  # Trocar numa instalacao com agendamentos recria, no proximo save, os que nao
-  # tem fuso explicito (ver app/core/constants.py).
+  # The time zone for schedules that do not state their own (flow/utils/fuso.py).
+  # Empty = UTC. Changing it on an installation with schedules recreates, on the
+  # next save, those without an explicit time zone (see app/core/constants.py).
   AGENDAMENTO_FUSO_PADRAO: ${AGENDAMENTO_FUSO_PADRAO:-}
   EMAIL_VERIFY_TOKEN_TTL: ${EMAIL_VERIFY_TOKEN_TTL:-1440}
   PASSWORD_RESET_TOKEN_TTL: ${PASSWORD_RESET_TOKEN_TTL:-30}
-  # Rede do Traefik: origem confiavel para X-Forwarded-Tls-Client-Cert-Info
-  # (identidade mTLS do executor) e X-Forwarded-For (chave de rate limit).
-  # Nao confundir com EDGE_PROXIES (Cloudflare, que ANEXA o cliente ao XFF):
-  # nao e repassada aqui de proposito — o default da app ja e a lista da
-  # Cloudflare. Ver .env.example e app/core/trusted_proxy.py.
+  # Traefik network: trusted origin for X-Forwarded-Tls-Client-Cert-Info
+  # (executor mTLS identity) and X-Forwarded-For (rate limit key).
+  # Not to be confused with EDGE_PROXIES (Cloudflare, which APPENDS the client
+  # to XFF): it is not passed here on purpose — the app default is already the
+  # Cloudflare list. See .env.example and app/core/trusted_proxy.py.
   TRUSTED_PROXIES: ${TRUSTED_PROXIES:-172.16.0.0/12}
   # ── mTLS + step-ca + OTP de enrollment ───────────────────────────────────
   STEPCA_URL: ${STEPCA_URL:-https://step-ca:9000}
@@ -118,24 +121,25 @@ x-api-env: &api-env
 x-api-volumes: &api-volumes
   - artifacts_data:/data/artifacts
 
-# Driver de log da API e do web: LOG_DRIVER no .env (padrão json-file, que roda
-# em qualquer host). O json-file apaga o log junto com o container, e o deploy
-# recria api-prod e web-prod: em produção num host com systemd, `journald` mantém
-# o log no host depois do deploy, com o teto de disco do próprio journald, e
-# `docker compose logs` continua lendo (consulta direta: `journalctl -t <tag>`).
-# Sem systemd-journald no host (Docker Desktop, por exemplo), journald não sobe.
+# Log driver for the API and the web: LOG_DRIVER in .env (default json-file,
+# which runs on any host). json-file deletes the log along with the container,
+# and the deploy recreates api-prod and web-prod: in production on a host with
+# systemd, `journald` keeps the log on the host after the deploy, with
+# journald's own disk ceiling, and `docker compose logs` keeps reading it
+# (direct query: `journalctl -t <tag>`). Without systemd-journald on the host
+# (Docker Desktop, for example), journald does not start.
 x-log-persistente: &log-persistente
   driver: ${LOG_DRIVER:-json-file}
 
 services:
 
   redis:
-    # REDIS_IMAGE no .env. O padrao e o Valkey (BSD-3, compativel com o
-    # protocolo e os comandos que o Atlans usa): o Redis 7.4+ saiu sob
-    # RSALv2/SSPLv1, que nao sao licencas livres. O Valkey NAO le os dados
-    # gravados pelo Redis 7.4 (RDB versao 12) e nao sobe sobre eles: uma
-    # instalacao que ja roda o Redis fica nele (REDIS_IMAGE=redis:7-alpine) ou
-    # troca comecando de um volume vazio.
+    # REDIS_IMAGE in .env. The default is Valkey (BSD-3, compatible with the
+    # protocol and the commands Atlans uses): Redis 7.4+ was released under
+    # RSALv2/SSPLv1, which are not free licenses. Valkey does NOT read the data
+    # written by Redis 7.4 (RDB version 12) and does not start on top of it: an
+    # installation already running Redis stays on it
+    # (REDIS_IMAGE=redis:7-alpine) or switches starting from an empty volume.
     image: ${REDIS_IMAGE:-valkey/valkey:8-alpine}
     restart: unless-stopped
     environment:
@@ -178,15 +182,15 @@ services:
       # Rotacao (opcional): "<nova>,<antiga>", ver app/core/config.py. Vazio = so a FERNET_KEY.
       FERNET_KEYS: ${FERNET_KEYS:-}
       EXECUTOR_SIGNING_KEY: ${EXECUTOR_SIGNING_KEY:-}
-    # Um Postgres no proprio host e `host.docker.internal` no DATABASE_URL
-    # (`localhost` dentro do container e o container); no Linux o nome so
-    # existe com este extra_hosts, como no api-prod.
+    # A Postgres on the host itself is `host.docker.internal` in DATABASE_URL
+    # (`localhost` inside the container is the container); on Linux the name
+    # only exists with this extra_hosts, as in api-prod.
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      # SEG: bind apenas em loopback. Publicar em 0.0.0.0 expunha a API sem o
-      # Traefik na frente — ou seja, sem o strip do header de cert mTLS, sem
-      # rate limit e sem terminacao TLS.
+      # SEC: bind on loopback only. Publishing on 0.0.0.0 exposed the API without
+      # Traefik in front — that is, without the mTLS cert header strip, without
+      # rate limiting and without TLS termination.
       - "127.0.0.1:8000:8000"
     restart: unless-stopped
     volumes:
@@ -208,8 +212,8 @@ services:
       context: ./web
       dockerfile: Dockerfile.ui
       target: dev
-      # A raiz do repositorio, para a LICENSE e o THIRD-PARTY-NOTICES.md irem na
-      # imagem (BuildKit; Compose 2.17+).
+      # The repository root, so LICENSE and THIRD-PARTY-NOTICES.md go into the
+      # image (BuildKit; Compose 2.17+).
       additional_contexts:
         raiz: .
     depends_on:
@@ -236,11 +240,12 @@ services:
       - dev-net
   # ── PRODUCAO ───────────────────────────────────────────────────────────────
 
-  # CA interna (step-ca) que emite e renova certs mTLS dos executores. Ela cria
-  # a CA sozinha no primeiro boot (os DOCKER_STEPCA_INIT_* abaixo); depois, uma
-  # vez, `make bootstrap-stepca` (docs/mtls-bootstrap.md): o fingerprint no
-  # .env, o intermediate.crt em ./traefik/atlans-ca/ para o Traefik validar os
-  # client certs, o prazo dos certificados e o cert do AGENTS_HOST.
+  # Internal CA (step-ca) that issues and renews the executors' mTLS certs. It
+  # creates the CA on its own on first boot (the DOCKER_STEPCA_INIT_* below);
+  # then, once, `make bootstrap-stepca` (docs/mtls-bootstrap.md): the
+  # fingerprint in .env, the intermediate.crt in ./traefik/atlans-ca/ for
+  # Traefik to validate client certs, the certificate lifetime and the
+  # AGENTS_HOST cert.
   step-ca:
     image: smallstep/step-ca:0.27.0
     profiles: ["prod"]
@@ -270,32 +275,35 @@ services:
       - "80:80"
       - "443:443"
     environment:
-      # Versão da API do Docker que o provider do Traefik usa. Vazio = negocia com
-      # o engine do host (o certo para Docker atual: o 29 recusa clientes abaixo
-      # da 1.44). Um engine antigo que não negocia pede o valor fixo (ex.: 1.41).
+      # Docker API version used by the Traefik provider. Empty = negotiates with
+      # the host engine (the right choice for current Docker: 29 rejects clients
+      # below 1.44). An old engine that does not negotiate needs the fixed value
+      # (e.g. 1.41).
       DOCKER_API_VERSION: ${DOCKER_API_VERSION:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      # Certificado do site (cert.pem/key.pem), de qualquer origem: o de origem da
-      # Cloudflare, um do Let's Encrypt (certbot) ou outro. O caminho no
-      # container mantém o nome antigo; ver traefik-dynamic/dynamic.yml.
+      # Site certificate (cert.pem/key.pem), from any source: Cloudflare's origin
+      # cert, a Let's Encrypt one (certbot) or another. The path in the
+      # container keeps the old name; see traefik-dynamic/dynamic.yml.
       - ${SSL_CERT_DIR:-./certs}:/etc/ssl/cloudflare:ro
-      # DIRETORIO, nunca o arquivo solto. Bind mount de arquivo unico prende o
-      # INODE: quando uma atualizacao apaga o arquivo no host e escreve outro no
-      # lugar, o container segue lendo o inode antigo — ja desvinculado — ate
-      # ser recriado, e um middleware novo (o rate-mcp, por exemplo) fica
-      # invisivel e derruba o router que o usa. Montando o diretorio, o caminho
-      # e resolvido a cada leitura e a troca do arquivo aparece.
+      # The DIRECTORY, never the loose file. A single-file bind mount pins the
+      # INODE: when an update deletes the file on the host and writes another
+      # in its place, the container keeps reading the old inode — already
+      # unlinked — until it is recreated, and a new middleware (rate-mcp, for
+      # example) stays invisible and brings down the router that uses it.
+      # Mounting the directory, the path is resolved on every read and the file
+      # swap shows up.
       #
-      # Na RAIZ do projeto, e nao dentro de ./traefik/: ./traefik/ guarda o que
-      # e da instalacao (a CA interna, fora do git), e ./traefik-dynamic/ vem do
-      # repositorio. Quem atualiza o codigo nao precisa escrever na pasta da CA.
-      # Ver docs/operations.md, "Configuracao dinamica do Traefik".
+      # At the project ROOT, not inside ./traefik/: ./traefik/ holds what
+      # belongs to the installation (the internal CA, outside git), and
+      # ./traefik-dynamic/ comes from the repository. Whoever updates the code
+      # does not need to write to the CA folder.
+      # See docs/operations.md, "Traefik dynamic configuration".
       - ./traefik-dynamic:/etc/traefik/dynamic:ro
-      # Access log do Traefik no host (TRAEFIK_LOG_DIR; padrão ./logs/traefik).
+      # Traefik access log on the host (TRAEFIK_LOG_DIR; default ./logs/traefik).
       - ${TRAEFIK_LOG_DIR:-./logs/traefik}:/var/log/traefik
-      # CA interna que assina certs dos executores — usada para validar client certs no mTLS.
-      # O make bootstrap-stepca copia para ./traefik/atlans-ca/ o intermediate.crt e o cert do AGENTS_HOST.
+      # Internal CA that signs the executors' certs — used to validate client certs in mTLS.
+      # make bootstrap-stepca copies the intermediate.crt and the AGENTS_HOST cert to ./traefik/atlans-ca/.
       - ./traefik/atlans-ca:/etc/ssl/atlans-ca:ro
     command:
       # --- Providers ---
@@ -303,20 +311,20 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=proxy-net"
       - "--providers.docker.endpoint=unix:///var/run/docker.sock"
-      # `directory` casa com o bind mount de diretorio acima; `watch` faz o
-      # Traefik reler sozinho quando o arquivo muda, para que uma mudanca de
-      # configuracao dinamica pare de exigir recriar o container.
+      # `directory` matches the directory bind mount above; `watch` makes
+      # Traefik reload on its own when the file changes, so that a dynamic
+      # configuration change no longer requires recreating the container.
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
 
-      # --- Entrypoint HTTP (:80) — redireciona para HTTPS ---
+      # --- HTTP entrypoint (:80) — redirects to HTTPS ---
       - "--entrypoints.web.address=:80"
       - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
       - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
-      # De quem o Traefik aceita X-Forwarded-*: o CDN na frente do site, se houver
-      # (BORDA_FAIXAS_CONFIAVEIS; com Cloudflare, as faixas dela — ver
-      # .env.example). Sem CDN, só o loopback: o Traefik é a borda e reescreve o
-      # X-Forwarded-For com o IP de quem conectou.
+      # Whom Traefik accepts X-Forwarded-* from: the CDN in front of the site, if
+      # any (BORDA_FAIXAS_CONFIAVEIS; with Cloudflare, its ranges — see
+      # .env.example). Without a CDN, only loopback: Traefik is the edge and
+      # rewrites X-Forwarded-For with the IP of whoever connected.
       - "--entrypoints.web.forwardedHeaders.trustedIPs=${BORDA_FAIXAS_CONFIAVEIS:-127.0.0.1/32}"
 
       # --- Entrypoint HTTPS (:443) ---
@@ -328,7 +336,7 @@ services:
       - "--ping=true"
       - "--ping.entrypoint=traefik-internal"
 
-      # --- Sem telemetria: nem checagem de versão nova, nem uso anônimo ---
+      # --- No telemetry: neither new-version checks nor anonymous usage ---
       - "--global.checkNewVersion=false"
       - "--global.sendAnonymousUsage=false"
 
@@ -348,16 +356,16 @@ services:
       - "--accesslog.fields.headers.names.Referer=keep"
       - "--accesslog.fields.headers.names.X-Forwarded-For=keep"
     healthcheck:
-      # `traefik healthcheck --ping` em v3.6.11 ignora --ping.entrypoint e
-      # tenta porta default 8080, falhando quando o ping esta em outra porta.
-      # wget direto no entrypoint configurado e mais confiavel.
+      # `traefik healthcheck --ping` in v3.6.11 ignores --ping.entrypoint and
+      # tries the default port 8080, failing when ping is on another port.
+      # A direct wget on the configured entrypoint is more reliable.
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/ping"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
-    # Limites conservadores — Traefik é leve, mas sem teto há risco de
-    # noisy-neighbor consumir recursos do host em picos de tráfego.
+    # Conservative limits — Traefik is light, but without a ceiling there is a
+    # risk of a noisy neighbor consuming host resources during traffic spikes.
     deploy:
       resources:
         limits:
@@ -373,22 +381,24 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
-    # A imagem da API: ATLANS_API_IMAGE no .env (padrão `atlans-api:local`, a que
-    # o `build:` acima, ou `docker build -f Dockerfile.api -t atlans-api:local .`,
-    # gera). Um deploy com registry aponta a variável para a imagem de lá, e o
-    # servidor puxa só as camadas que mudaram.
+    # The API image: ATLANS_API_IMAGE in .env (default `atlans-api:local`, the one
+    # that the `build:` above, or `docker build -f Dockerfile.api -t atlans-api:local .`,
+    # produces). A deploy with a registry points the variable at the image
+    # there, and the server pulls only the layers that changed.
     image: ${ATLANS_API_IMAGE:-atlans-api:local}
-    # A conexao com o Postgres e DIRETA — nao ha pgbouncer neste compose (ver a
-    # nota em app/core/db.py). Cada worker abre seu proprio pool, entao o teto de
-    # conexoes e `--workers` x (POOL_SIZE + MAX_OVERFLOW) = 4 x 13 = 52. Ao mexer
-    # em `--workers`, confira `SHOW max_connections` no servidor: estourar o
-    # limite nao deixa lento, devolve "sorry, too many clients already".
+    # The connection to Postgres is DIRECT — there is no pgbouncer in this compose
+    # (see the note in app/core/db.py). Each worker opens its own pool, so the
+    # connection ceiling is `--workers` x (POOL_SIZE + MAX_OVERFLOW) = 4 x 13 =
+    # 52. When changing `--workers`, check `SHOW max_connections` on the
+    # server: exceeding the limit does not slow things down, it returns
+    # "sorry, too many clients already".
     #
-    # `--ws websockets` fixo (e o que o `auto` escolhe hoje): o envio ao executor
-    # conta com esta implementacao escrever o frame INTEIRO antes do drain — ver
-    # `_Saida` em app/core/executor_connections.py. A
-    # `websockets-sansio` e a `wsproto` esperam o socket ANTES de escrever, e um
-    # prazo estourado ali seria um job dado por entregue sem ter saido.
+    # `--ws websockets` pinned (it is what `auto` picks today): sending to the
+    # executor relies on this implementation writing the WHOLE frame before the
+    # drain — see `_Saida` in app/core/executor_connections.py.
+    # `websockets-sansio` and `wsproto` wait for the socket BEFORE writing, and
+    # a deadline exceeded there would be a job considered delivered without
+    # having gone out.
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --ws websockets --ws-ping-interval 60 --ws-ping-timeout 600 --ws-max-size 16777216
     depends_on:
       redis:
@@ -397,9 +407,9 @@ services:
         condition: service_healthy
     environment:
       <<: *api-env
-      # O host dos executores que o Traefik roteia (AGENTS_HOST) e o que a API
-      # anuncia na matricula e no install.sh: uma fonte so. AGENTS_URL no .env
-      # ainda vence, para quem serve os executores por outro endereco.
+      # The executors host that Traefik routes (AGENTS_HOST) is what the API
+      # announces at enrollment and in install.sh: a single source. AGENTS_URL
+      # in .env still wins, for those who serve the executors at another address.
       AGENTS_URL: ${AGENTS_URL:-https://${AGENTS_HOST:-agents.localhost}}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       FERNET_KEY: ${FERNET_KEY}
@@ -408,9 +418,9 @@ services:
       EXECUTOR_SIGNING_KEY: ${EXECUTOR_SIGNING_KEY}
     volumes:
       - artifacts_data:/data/artifacts
-      # Acesso read-only ao ca.json da step-ca para gerar OTTs assinados com a
-      # chave privada do provisioner JWK (decifrada com STEPCA_PROVISIONER_PASSWORD).
-      # Necessario para os endpoints /executores/enroll e /executores/renew-cert.
+      # Read-only access to step-ca's ca.json to generate OTTs signed with the
+      # JWK provisioner's private key (decrypted with STEPCA_PROVISIONER_PASSWORD).
+      # Required for the /executores/enroll and /executores/renew-cert endpoints.
       - step-ca-data:/etc/step-ca:ro
     restart: unless-stopped
     logging:
@@ -426,8 +436,8 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
-    # 4 workers uvicorn + bibliotecas geo (geopandas, shapely) consomem
-    # memória — 2GB cobre uso típico com folga; CPU teto evita stall do host.
+    # 4 uvicorn workers + geo libraries (geopandas, shapely) consume memory —
+    # 2GB covers typical usage with room to spare; a CPU ceiling avoids host stalls.
     deploy:
       resources:
         limits:
@@ -438,17 +448,17 @@ services:
       - "traefik.docker.network=proxy-net"
 
       # ═══════════════════════════════════════════════════════════════════════
-      #  PUBLIC_HOST — tráfego de humanos (UI + webhook + tiles publicos)
-      #  Pode estar atras de um CDN. NUNCA aplicar mTLS aqui — um CDN termina
-      #  TLS na borda e o cert do executor nao chegaria de qualquer forma.
-      #  Cada router deste host leva o middleware de borda na frente
-      #  (BORDA_MIDDLEWARE; ver traefik-dynamic/dynamic.yml). Atras da
-      #  Cloudflare, `cloudflare-only`: sem ele o origin responde por fora dela
-      #  para quem descobrir o IP — e o host dos executores, DNS-only, o publica.
-      #  Sem CDN, `borda-aberta`.
+      #  PUBLIC_HOST — human traffic (UI + webhook + public tiles)
+      #  May be behind a CDN. NEVER apply mTLS here — a CDN terminates TLS at
+      #  the edge and the executor's cert would not arrive anyway.
+      #  Each router on this host has the edge middleware in front
+      #  (BORDA_MIDDLEWARE; see traefik-dynamic/dynamic.yml). Behind
+      #  Cloudflare, `cloudflare-only`: without it the origin answers outside
+      #  Cloudflare to anyone who discovers the IP — and the executors host,
+      #  DNS-only, publishes it. Without a CDN, `borda-aberta`.
       # ═══════════════════════════════════════════════════════════════════════
 
-      # WebSocket de UI (workflow log streaming consumido pelo frontend)
+      # UI WebSocket (workflow log streaming consumed by the frontend)
       - "traefik.http.routers.api-ws-ui.rule=Host(`${PUBLIC_HOST:-localhost}`) && PathPrefix(`/ws/`)"
       - "traefik.http.routers.api-ws-ui.entrypoints=websecure"
       - "traefik.http.routers.api-ws-ui.tls=true"
@@ -456,15 +466,15 @@ services:
       - "traefik.http.routers.api-ws-ui.service=api-svc"
       - "traefik.http.routers.api-ws-ui.middlewares=${BORDA_MIDDLEWARE:-borda-aberta}@file,strip-executor-cert-header@file"
 
-      # REST publico (webhook receiver + tiles do portal + onboarding de executores)
-      # Inclui /executores/ca-bundle e /executores/install no host publico porque o operador
-      # novo (rodando install.sh) ainda nao tem o root cert da CA interna no trust
-      # store — entao o host dos executores (cert step-ca) falha o curl. O host
-      # publico tem cert valido publicamente.
-      # /webhooks/<servico> (plural): os avisos de servicos de fora, como o de
-      # uma extensao de pagamentos. Fica explicito ao lado do PathPrefix(`/webhook`)
-      # do gatilho de workflow, sem depender de o Traefik casar o prefixo por
-      # texto ou por segmento.
+      # Public REST (webhook receiver + portal tiles + executor onboarding)
+      # Includes /executores/ca-bundle and /executores/install on the public host because a
+      # new operator (running install.sh) does not yet have the internal CA root cert in
+      # the trust store — so the executors host (step-ca cert) fails the curl. The
+      # public host has a publicly valid cert.
+      # /webhooks/<servico> (plural): notifications from outside services, such
+      # as a payments extension's. It is explicit next to the workflow
+      # trigger's PathPrefix(`/webhook`), without depending on whether Traefik
+      # matches the prefix by text or by segment.
       - "traefik.http.routers.api-rest-public.rule=Host(`${PUBLIC_HOST:-localhost}`) && (PathPrefix(`/webhook`) || PathPrefix(`/webhooks/`) || PathPrefix(`/artifacts/tiles`) || Path(`/executores/ca-bundle`) || Path(`/executores/install`) || Path(`/executores/server-public-key`))"
       - "traefik.http.routers.api-rest-public.entrypoints=websecure"
       - "traefik.http.routers.api-rest-public.tls=true"
@@ -480,13 +490,14 @@ services:
       - "traefik.http.routers.api-download.service=api-svc"
       - "traefik.http.routers.api-download.middlewares=${BORDA_MIDDLEWARE:-borda-aberta}@file,strip-executor-cert-header@file,rate-download-${BORDA_MIDDLEWARE:-borda-aberta}@file"
 
-      # Servidor MCP (/mcp) — tokens pessoais no header Authorization.
-      # Prioridade 20 porque o catch-all web-prod (Host(`${PUBLIC_HOST:-localhost}`), prioridade 1)
-      # entregaria /mcp ao Next.js. PathPrefix e nao Path porque as DUAS grafias
-      # tem de chegar a API: ela registra /mcp e /mcp/ como rotas exatas para o
-      # mesmo servidor, e com Path(`/mcp`) a variante com barra cairia no Next.js.
-      # NUNCA mtls-executores aqui — o host passa pela Cloudflare, que termina o
-      # TLS e nao repassa cert de cliente.
+      # MCP server (/mcp) — personal tokens in the Authorization header.
+      # Priority 20 because the web-prod catch-all (Host(`${PUBLIC_HOST:-localhost}`), priority 1)
+      # would hand /mcp to Next.js. PathPrefix and not Path because BOTH
+      # spellings have to reach the API: it registers /mcp and /mcp/ as exact
+      # routes for the same server, and with Path(`/mcp`) the trailing-slash
+      # variant would fall to Next.js.
+      # NEVER mtls-executores here — the host goes through Cloudflare, which
+      # terminates TLS and does not forward the client cert.
       - "traefik.http.routers.api-mcp.rule=Host(`${PUBLIC_HOST:-localhost}`) && PathPrefix(`/mcp`)"
       - "traefik.http.routers.api-mcp.entrypoints=websecure"
       - "traefik.http.routers.api-mcp.tls=true"
@@ -495,24 +506,24 @@ services:
       - "traefik.http.routers.api-mcp.middlewares=${BORDA_MIDDLEWARE:-borda-aberta}@file,strip-executor-cert-header@file,rate-mcp-${BORDA_MIDDLEWARE:-borda-aberta}@file"
 
       # ═══════════════════════════════════════════════════════════════════════
-      #  AGENTS_HOST — trafego dos executores (sem CDN: DNS-only, se houver um).
-      #  Cert TLS emitido pela step-ca interna (mesma CA que assina os executores).
-      #  TLS option mtls-executores aplicada uniformemente -> mTLS funciona.
+      #  AGENTS_HOST — executor traffic (no CDN: DNS-only, if there is one).
+      #  TLS cert issued by the internal step-ca (same CA that signs executors).
+      #  TLS option mtls-executores applied uniformly -> mTLS works.
       # ═══════════════════════════════════════════════════════════════════════
 
-      # Enrollment (Bearer OTP — sem cert ainda, mas mtls-executores permite via
-      # VerifyClientCertIfGiven; backend autentica pelo Authorization header).
+      # Enrollment (Bearer OTP — no cert yet, but mtls-executores allows it via
+      # VerifyClientCertIfGiven; the backend authenticates by the Authorization header).
       - "traefik.http.routers.executores-enroll.rule=Host(`${AGENTS_HOST:-agents.localhost}`) && (Path(`/executores/enroll`) || Path(`/executores/server-public-key`))"
       - "traefik.http.routers.executores-enroll.entrypoints=websecure"
       - "traefik.http.routers.executores-enroll.tls=true"
       - "traefik.http.routers.executores-enroll.tls.options=mtls-executores@file"
       - "traefik.http.routers.executores-enroll.priority=50"
       - "traefik.http.routers.executores-enroll.service=api-svc"
-      # Sem pass-executor-cert (nao usa mTLS), mas o strip e obrigatorio: sem ele
-      # o header forjado pelo cliente chegaria intacto ao backend.
+      # No pass-executor-cert (does not use mTLS), but the strip is mandatory:
+      # without it the header forged by the client would reach the backend intact.
       - "traefik.http.routers.executores-enroll.middlewares=strip-executor-cert-header@file"
 
-      # WebSocket de executores (mTLS validado pelo backend)
+      # Executor WebSocket (mTLS validated by the backend)
       - "traefik.http.routers.executores-ws.rule=Host(`${AGENTS_HOST:-agents.localhost}`) && PathPrefix(`/ws/executores/`)"
       - "traefik.http.routers.executores-ws.entrypoints=websecure"
       - "traefik.http.routers.executores-ws.tls=true"
@@ -547,11 +558,11 @@ services:
       context: ./web
       dockerfile: Dockerfile.ui
       target: runner
-      # A raiz do repositorio, para a LICENSE e o THIRD-PARTY-NOTICES.md irem na
-      # imagem (BuildKit; Compose 2.17+).
+      # The repository root, so LICENSE and THIRD-PARTY-NOTICES.md go into the
+      # image (BuildKit; Compose 2.17+).
       additional_contexts:
         raiz: .
-    # A imagem do web: ATLANS_WEB_IMAGE no .env (padrão `atlans-web:local`; ver
+    # The web image: ATLANS_WEB_IMAGE in .env (default `atlans-web:local`; see
     # web/Dockerfile.ui).
     image: ${ATLANS_WEB_IMAGE:-atlans-web:local}
     depends_on:
@@ -565,8 +576,8 @@ services:
       AUTH_URL: ${AUTH_URL}
       AUTH_TRUST_HOST: "true"
       API_INTERNA: http://api-prod:${API_PORT}
-      # O link para o codigo-fonte desta instalacao (AGPL, secao 13), na tela
-      # de entrada e no menu da conta. Vazio = sem o link.
+      # The link to this installation's source code (AGPL, section 13), on the
+      # sign-in screen and in the account menu. Empty = no link.
       CODIGO_FONTE_URL: ${CODIGO_FONTE_URL:-}
       # O nome que a tela mostra (barra lateral, entrada, aba). Vazio = Atlans.
       NOME_NA_TELA: ${NOME_NA_TELA:-}
@@ -575,9 +586,10 @@ services:
       <<: *log-persistente
       options:
         tag: atlans-web
-    # 512M não cobria: em 22/09 o kernel matou o next-server com 519 MB de RSS
-    # (OOM do cgroup) e o site caiu até o Docker reiniciá-lo. 1G dá folga para
-    # o runtime + cache de SSR sem reservar nada — limite não é reserva.
+    # 512M was not enough: on September 22 the kernel killed next-server at
+    # 519 MB of RSS (cgroup OOM) and the site went down until Docker restarted
+    # it. 1G leaves room for the runtime + SSR cache without reserving anything
+    # — a limit is not a reservation.
     deploy:
       resources:
         limits:
@@ -597,18 +609,18 @@ services:
 
   minio:
     profiles: ["prod", "dev"]
-    # Pin de versão estável — `latest` quebra reprodutibilidade e pode trazer
-    # breaking changes silenciosamente em deploys. Atualizar manualmente após
-    # validar release notes.
+    # Stable version pin — `latest` breaks reproducibility and can silently bring
+    # breaking changes into deploys. Update manually after reviewing the
+    # release notes.
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?defina MINIO_ROOT_USER no .env (make bootstrap)}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?defina MINIO_ROOT_PASSWORD no .env (make bootstrap)}
-      # CORS das URLs pre-assinadas: a Home busca (fetch) o GeoJSON de uma
-      # camada direto do S3 pelo navegador. Hoje funciona pelo default `*` do
-      # MinIO; fixar aqui torna explicito de onde o fetch pode vir antes de a
-      # Home depender disso. `*` mantem o comportamento atual.
+      # CORS for the presigned URLs: the Home fetches a layer's GeoJSON directly
+      # from S3 in the browser. Today it works through MinIO's default `*`;
+      # pinning it here makes explicit where the fetch may come from before
+      # the Home depends on it. `*` keeps the current behavior.
       MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_API_CORS_ALLOW_ORIGIN:-*}
     volumes:
       - minio_data:/data
@@ -621,8 +633,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    # Buffers de upload/download de artefatos podem crescer; 2GB cobre uso
-    # típico de workflows com múltiplos arquivos médios em paralelo.
+    # Artifact upload/download buffers can grow; 2GB covers the typical usage
+    # of workflows with multiple medium-sized files in parallel.
     deploy:
       resources:
         limits:
@@ -641,19 +653,20 @@ services:
       - "traefik.http.routers.minio-s3.service=minio-s3-svc"
       - "traefik.http.routers.minio-s3.middlewares=${BORDA_MIDDLEWARE:-borda-aberta}@file"
       - "traefik.http.services.minio-s3-svc.loadbalancer.server.port=9000"
-      # Console (porta 9001) não exposto publicamente — acesso via SSH tunnel:
+      # Console (port 9001) not publicly exposed — access via SSH tunnel:
       # ssh -L 9001:127.0.0.1:9001 servidor && open http://localhost:9001
 
 networks:
   proxy-net:
     driver: bridge
     name: proxy-net   # nome fixo — sem prefixo do projeto (necessário para Traefik)
-    # Subnet fixa: TRUSTED_PROXIES aponta para esta faixa (é dela que saem as
-    # requisições do Traefik para a API, e é ela que autoriza o header de cert
-    # mTLS). Sem fixar, uma recriação da rede pode receber outra faixa do
-    # Docker e todos os executores passam a tomar 401.
-    # Só tem efeito na criação da rede — em rede já existente o Docker ignora.
-    # PROXY_NET_SUBNET troca a faixa (ver .env.example), dentro de TRUSTED_PROXIES.
+    # Fixed subnet: TRUSTED_PROXIES points to this range (it is where Traefik's
+    # requests to the API come from, and it is what authorizes the mTLS cert
+    # header). Without pinning it, a network recreation may get another range
+    # from Docker and all executors start getting 401.
+    # Only takes effect when the network is created — on an existing network
+    # Docker ignores it.
+    # PROXY_NET_SUBNET changes the range (see .env.example), within TRUSTED_PROXIES.
     ipam:
       config:
         - subnet: ${PROXY_NET_SUBNET:-172.18.0.0/16}
@@ -666,11 +679,12 @@ volumes:
   redis_data:
   artifacts_data:
   minio_data:
-  # step-ca-data contem a chave privada da CA interna que assina TODOS os certs
-  # de executores. Marcado como external para sobreviver a `docker compose down -v`
-  # acidental (que destrui volumes compose-managed). Bootstrap manual:
+  # step-ca-data contains the private key of the internal CA that signs ALL the
+  # executors' certs. Marked as external to survive an accidental
+  # `docker compose down -v` (which destroys compose-managed volumes). Manual
+  # bootstrap:
   #   docker volume create step-ca-data
-  # Backup recomendado periodicamente:
+  # Periodic backup recommended:
   #   docker run --rm -v step-ca-data:/data -v $(pwd)/backups:/backup alpine \
   #       tar czf /backup/step-ca-$(date +%F).tar.gz -C /data .
   step-ca-data:

@@ -27,9 +27,9 @@ import type { ICredentials, ICredentialTypeSchema } from "@/service/types"
 
 type SortKey = "name" | "recent" | "used"
 
-// Semente de duplicação: valores para pré-preencher o modal de criar. `_key`
-// só existe para forçar remontagem do CreateCredential (defaultValues são lidos
-// uma vez).
+// Duplication seed: values to prefill the create modal. `_key` only
+// exists to force CreateCredential to remount (defaultValues are read
+// once).
 interface DuplicateSeed {
   _key: string
   name: string
@@ -49,18 +49,19 @@ const CredentialsActions = () => {
   const [configureCredentialId, setConfigureCredentialId] = useState<string>();
   const [createModalState, setCreateModalState] = useState(false);
   const [duplicateSeed, setDuplicateSeed] = useState<DuplicateSeed>();
-  // A carga da lista é o `useFetchData`: `loading` (o `firstLoad` dele) cobre
-  // só a PRIMEIRA carga (skeleton); `refreshing` é o recarregar, com a lista na
-  // tela — antes o recarregar também virava skeleton e o layout saltava. O gate
-  // de sessão e a guarda contra resposta velha também são dele.
+  // Loading the list is `useFetchData`'s job: `loading` (its `firstLoad`) covers
+  // only the FIRST load (skeleton); `refreshing` is the reload, with the list on
+  // screen — before, reloading also turned into a skeleton and the layout
+  // jumped. The session gate and the guard against stale responses are its too.
   //
-  // Sem o ramo de erro, falha de rede caía no estado vazio "Nenhuma credencial
-  // cadastrada" — a tela mentia. O cartão de erro só vale sem carga aceita
-  // (`atualizadoEm == null`); recarga que falha sobre lista pronta mantém o
-  // que havia e avisa por toast (contrato §3.2).
+  // Without the error branch, a network failure fell into the "Nenhuma
+  // credencial cadastrada" (no credentials registered) empty state — the screen
+  // lied. The error card only applies with no accepted load
+  // (`atualizadoEm == null`); a reload that fails over a ready list keeps what
+  // was there and warns via toast (contract §3.2).
   //
-  // A lista mora no contexto, que os diálogos de criar/editar/excluir também
-  // escrevem: cada resposta aceita vai para lá no mesmo tique (`onDados`).
+  // The list lives in the context, which the create/edit/delete dialogs also
+  // write: each accepted response goes there in the same tick (`onDados`).
   const { firstLoad: loading, refreshing, error, atualizadoEm, refetch } = useFetchData(
     () => GisFlowService.getCredentials(),
     "Não foi possível carregar as credenciais.",
@@ -74,14 +75,14 @@ const CredentialsActions = () => {
   const [usageMap, setUsageMap] = useState<Record<string, number>>({})
   const [credentialTypes, setCredentialTypes] = useState<ICredentialTypeSchema[]>([])
 
-  // ── controles de listagem (U1/U7) ──────────────────────────────────────────
+  // ── listing controls (U1/U7) ───────────────────────────────────────────────
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState<string>("__all__")
   const [sortBy, setSortBy] = useState<SortKey>("name")
   const [grouped, setGrouped] = useState(true)
 
-  // Criar é uma ação pessoal (owner-only por natureza); qualquer sessão
-  // autenticada pode. O fallback "peça a um editor" existe por contrato.
+  // Creating is a personal action (owner-only by nature); any authenticated
+  // session can. The "peça a um editor" (ask an editor) fallback exists by contract.
   const canEdit = status !== "unauthenticated"
 
   const handleCloseModal = () => {
@@ -102,9 +103,9 @@ const CredentialsActions = () => {
   }, [status, currentWorkspace?.id_hash])
 
   async function getTypes() {
-    // A listagem precisa do catálogo só para traduzir o slug do tipo
-    // ("http_bearer") no label humano ("HTTP Bearer Token"). Falhar aqui não é
-    // motivo para quebrar a tela: sem catálogo, o slug volta como fallback.
+    // The listing needs the catalog only to translate the type slug
+    // ("http_bearer") into the human label ("HTTP Bearer Token"). Failing here is
+    // no reason to break the screen: without the catalog, the slug comes back as fallback.
     const res = await GisFlowService.getCredentialTypes()
     setCredentialTypes(res.data ?? [])
   }
@@ -115,10 +116,10 @@ const CredentialsActions = () => {
     if (currentWorkspace?.id_hash) computeUsage()
   }
 
-  // Índice tipo→label montado uma vez: getTypeLabel roda no caminho quente do
-  // filtro/ordenação (por credencial, por tecla). Sem o Map cada chamada fazia
-  // um find O(N) sobre o catálogo — O(N×M) por render. `?? []` cobre catálogo
-  // ainda não carregado.
+  // type→label index built once: getTypeLabel runs on the hot path of
+  // filtering/sorting (per credential, per keystroke). Without the Map each call
+  // did an O(N) find over the catalog — O(N×M) per render. `?? []` covers a
+  // catalog not loaded yet.
   const typeLabel = useMemo(
     () => new Map((credentialTypes ?? []).map(t => [t.type, t.label])),
     [credentialTypes],
@@ -138,9 +139,9 @@ const CredentialsActions = () => {
     setUsageMap(map)
   }
 
-  // ── duplicar (U6) ───────────────────────────────────────────────────────────
-  // Só o dono duplica: precisa dos segredos descriptografados (GET /{id}/data é
-  // owner-only). Abre o modal de criar pré-preenchido, sem herdar compartilhamento.
+  // ── duplicate (U6) ──────────────────────────────────────────────────────────
+  // Only the owner duplicates: it needs the decrypted secrets (GET /{id}/data is
+  // owner-only). Opens the create modal prefilled, without inheriting sharing.
   async function handleDuplicate(cred: ICredentials) {
     const res = await GisFlowService.getCredentialData(cred.id)
     if (res?.error || !res.data) {
@@ -168,9 +169,9 @@ const CredentialsActions = () => {
     const exp = fromBackend(expiresAt)
     if (!exp) return null
     const diffDays = Math.ceil((exp.valueOf() - Date.now()) / 86_400_000)
-    // shrink-0 + whitespace-nowrap: sem isso "Expira em 12d" quebrava em duas
-    // linhas em tela estreita e esticava o card. Pares canônicos de status
-    // (contrato §6): vencida = vermelho (falha), a vencer = âmbar (aviso).
+    // shrink-0 + whitespace-nowrap: without it "Expira em 12d" (expires in 12d)
+    // broke into two lines on a narrow screen and stretched the card. Canonical
+    // status pairs (contract §6): expired = red (failure), expiring = amber (warning).
     if (diffDays <= 0) return (
       <span className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium tabular-nums bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400">
         <TbAlertTriangle className="size-3" aria-hidden="true" />
@@ -187,8 +188,8 @@ const CredentialsActions = () => {
   }
 
   function getUsageBadge(credId: string) {
-    // Só rende quando há uso: antes toda linha carregava um "0 nós" cinza, que
-    // numa lista recém-criada era ruído em todas as linhas de uma vez.
+    // Only renders when there is usage: before, every row carried a gray "0 nós",
+    // which in a freshly created list was noise on every row at once.
     const count = usageMap[credId] ?? 0
     if (count === 0) return null
     return (
@@ -218,8 +219,8 @@ const CredentialsActions = () => {
   function getSharedBadge(cred: ICredentials) {
     const { isMine, isShared, sharedWithMe } = ownership(cred)
     if (!isShared) return null
-    // Azul (compartilhamento/em circulação) no lugar do indigo antigo, que não
-    // é um dos tons canônicos de status do contrato §6.
+    // Blue (sharing/in circulation) instead of the old indigo, which is not
+    // one of the canonical status tones of contract §6.
     return (
       <span
         className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400"
@@ -237,16 +238,16 @@ const CredentialsActions = () => {
     [credentials, usageMap],
   )
 
-  // Tipos presentes na lista, para o filtro (só os que existem — não o catálogo inteiro).
+  // Types present in the list, for the filter (only the ones that exist — not the whole catalog).
   const typesPresent = useMemo(() => {
     const set = new Set((credentials ?? []).map(c => c.type))
     return Array.from(set).sort((a, b) => getTypeLabel(a).localeCompare(getTypeLabel(b)))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [credentials, credentialTypes])
 
-  // Filtro + ordenação. `visible` é a lista já peneirada; a separação por
-  // propriedade (minhas × compartilhadas) e o agrupamento por tipo acontecem no
-  // render — ver `renderCredList`.
+  // Filter + sort. `visible` is the already-sifted list; the split by
+  // ownership (mine × shared) and the grouping by type happen at
+  // render — see `renderCredList`.
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
     let list = (credentials ?? []).filter(c => {
@@ -263,7 +264,7 @@ const CredentialsActions = () => {
     list = [...list].sort((a, b) => {
       if (sortBy === "name") return a.name.localeCompare(b.name)
       if (sortBy === "recent") return (b.created_at ?? "").localeCompare(a.created_at ?? "")
-      // "used": mais recentemente usadas primeiro; nunca-usadas ao fim.
+      // "used": most recently used first; never-used at the end.
       const av = a.last_used_at ?? "", bv = b.last_used_at ?? ""
       if (av && bv) return bv.localeCompare(av)
       if (av) return -1
@@ -274,9 +275,9 @@ const CredentialsActions = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [credentials, search, typeFilter, sortBy, credentialTypes])
 
-  // Agrupa uma lista por tipo (usado dentro de cada seção quando "Agrupar por
-  // tipo" está ligado). Deixou de ser um useMemo sobre `visible` inteiro: agora
-  // o agrupamento roda POR seção de propriedade — ver renderCredList.
+  // Groups a list by type (used inside each section when "Agrupar por
+  // tipo" (group by type) is on). It is no longer a useMemo over the whole
+  // `visible`: grouping now runs PER ownership section — see renderCredList.
   function agruparPorTipo(list: ICredentials[]) {
     const map = new Map<string, ICredentials[]>()
     for (const c of list) {
@@ -287,22 +288,22 @@ const CredentialsActions = () => {
     return Array.from(map.entries()).sort((a, b) => getTypeLabel(a[0]).localeCompare(getTypeLabel(b[0])))
   }
 
-  // Separação primária por PROPRIEDADE: as minhas credenciais e as
-  // compartilhadas comigo param de se misturar visualmente (o badge sozinho não
-  // bastava). Só vira duas seções quando há de fato mistura; senão, lista única.
-  // Memoizado: as duas varreduras de `visible` rodavam a cada render; só mudam
-  // quando a lista visível ou a identidade (myId, via ownership) mudam.
+  // Primary split by OWNERSHIP: my credentials and those shared with me
+  // stop mixing visually (the badge alone was not enough). It only becomes
+  // two sections when there is actually a mix; otherwise, a single list.
+  // Memoized: the two sweeps of `visible` ran on every render; they only change
+  // when the visible list or the identity (myId, via ownership) changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const minhas = useMemo(() => visible.filter(c => ownership(c).isMine), [visible, myId])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const compartilhadas = useMemo(() => visible.filter(c => !ownership(c).isMine), [visible, myId])
   const temMistura = useMemo(() => minhas.length > 0 && compartilhadas.length > 0, [minhas, compartilhadas])
 
-  // Pré-agrupa por tipo cada seção uma vez (chaveado por escopo), em vez de
-  // reagrupar dentro de renderCredList a cada render. Só muda quando as listas
-  // ou os labels (typeLabel) mudam; com "Agrupar por tipo" desligado ninguém lê.
-  // `agruparPorTipo` é recriada a cada render (fecha sobre typeLabel, que já
-  // está nas deps); incluí-la anularia o memo.
+  // Pre-groups each section by type once (keyed by scope), instead of
+  // regrouping inside renderCredList on every render. Only changes when the lists
+  // or the labels (typeLabel) change; with "Agrupar por tipo" off nobody reads it.
+  // `agruparPorTipo` is recreated on every render (it closes over typeLabel,
+  // which is already in the deps); including it would void the memo.
   const gruposPorEscopo = useMemo<Record<string, [string, ICredentials[]][]>>(() => ({
     mine: agruparPorTipo(minhas),
     shared: agruparPorTipo(compartilhadas),
@@ -318,8 +319,8 @@ const CredentialsActions = () => {
     setTypeFilter("__all__")
   }
 
-  // Subtítulo do cabeçalho: conta o escopo ("N credenciais · N em uso"). O zero
-  // some (contrato §7) — "0 em uso" numa lista recém-criada não ajuda ninguém.
+  // Header subtitle: counts the scope ("N credenciais · N em uso"). Zero
+  // disappears (contract §7) — "0 em uso" in a freshly created list helps no one.
   function textoDoSubtitulo(): string {
     const partes = [plural(credentials!.length, "credencial", "credenciais")]
     if (usedCount > 0) partes.push(`${formatarInteiro(usedCount)} em uso`)
@@ -350,10 +351,10 @@ const CredentialsActions = () => {
               {getExpiryBadge(credential.expires_at)}
               {getUsageBadge(credential.id)}
               {getLastUsedBadge(credential.last_used_at)}
-              {/* Ações destrutivas/de edição são owner-only: quem só recebeu a
-                  credencial compartilhada não consegue carregar os segredos nem
-                  o backend deixaria editar/excluir. Escondemos em vez de deixar
-                  o clique falhar com 403. */}
+              {/* Destructive/edit actions are owner-only: someone who only received the
+                  shared credential cannot load the secrets, nor would the
+                  backend let them edit/delete. We hide them instead of letting
+                  the click fail with 403. */}
               {isMine && (
                 <DropdownMenu>
                   <DropdownMenuTrigger
@@ -385,21 +386,21 @@ const CredentialsActions = () => {
     )
   }
 
-  // Renderiza um conjunto de credenciais: plano, ou sub-agrupado por tipo quando
-  // "Agrupar por tipo" está ligado. `scope` prefixa as keys para não colidirem
-  // entre as seções "minhas" e "compartilhadas".
+  // Renders a set of credentials: flat, or sub-grouped by type when
+  // "Agrupar por tipo" is on. `scope` prefixes the keys so they don't collide
+  // between the "minhas" (mine) and "compartilhadas" (shared) sections.
   function renderCredList(creds: ICredentials[], scope: string, aninhado: boolean) {
     if (grouped) {
       return (
         <div className="flex flex-col gap-4">
-          {/* Grupos já pré-computados por escopo (ver gruposPorEscopo). */}
+          {/* Groups already precomputed per scope (see gruposPorEscopo). */}
           {gruposPorEscopo[scope].map(([type, cs]) => {
             const style = getCredentialTypeStyle(type)
             const TypeIcon = style.icon
-            // Nível do heading do tipo: h3 quando aninhado sob uma seção de
-            // propriedade (o h2 "Minhas"/"Compartilhadas"); h2 quando a lista é
-            // plana, para a cadeia de headings não pular de h1 direto para h3
-            // (regressão para leitores de tela).
+            // Level of the type heading: h3 when nested under an ownership
+            // section (the "Minhas"/"Compartilhadas" h2); h2 when the list is
+            // flat, so the heading chain doesn't jump from h1 straight to h3
+            // (a regression for screen readers).
             const TituloTipo = aninhado ? "h3" : "h2"
             return (
               <div key={`${scope}-${type}`} className="flex flex-col gap-2">
@@ -428,15 +429,15 @@ const CredentialsActions = () => {
 
   return (
     <PageRoot>
-      {/* Cabeçalho fixo do contrato §1: título + subtítulo de escopo à esquerda,
-          ações à direita (Atualizar em ghost e Criar como única primária). No
-          telefone o secundário vai ao menu ⋯ e o primário ocupa a linha. */}
+      {/* Fixed header of contract §1: title + scope subtitle on the left,
+          actions on the right (Atualizar as ghost and Criar as the only primary).
+          On phones the secondary goes into the ⋯ menu and the primary fills the row. */}
       <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-foreground">Credenciais</h1>
-          {/* Região viva estável: o `aria-live` fica no contêiner (não no <p>),
-              que sobrevive à troca Skeleton↔texto, para o leitor de tela anunciar
-              a contagem quando ela muda (ex.: após Atualizar). */}
+          {/* Stable live region: the `aria-live` sits on the container (not on the <p>),
+              which survives the Skeleton↔text swap, so the screen reader announces
+              the count when it changes (e.g. after Atualizar). */}
           <div aria-live="polite" aria-atomic="true">
             {loading ? (
               <Skeleton className="mt-1 h-4 w-64" />
@@ -470,7 +471,7 @@ const CredentialsActions = () => {
               </Button>
             </div>
 
-            {/* Telefone: menu ⋯ com o secundário que saiu da linha. */}
+            {/* Phone: ⋯ menu with the secondary action that left the row. */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon" aria-label="Mais ações" className="size-10 shrink-0 md:hidden">
@@ -499,7 +500,7 @@ const CredentialsActions = () => {
         </Dialog>
       </div>
 
-      {/* Barra de busca/filtro/ordenação — só quando há o que filtrar (U1/U7). */}
+      {/* Search/filter/sort bar — only when there is something to filter (U1/U7). */}
       {!loading && !loadError && hasCreds && (
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[12rem] flex-1">
@@ -533,8 +534,8 @@ const CredentialsActions = () => {
               <SelectItem value="used">Uso recente</SelectItem>
             </SelectContent>
           </Select>
-          {/* Toggle canônico do contrato §1: grupo com aria-pressed, ativo em
-              bg-accent, inativo em muted. */}
+          {/* Canonical toggle of contract §1: group with aria-pressed, active in
+              bg-accent, inactive in muted. */}
           <div
             role="group"
             aria-label="Agrupamento"
@@ -557,8 +558,8 @@ const CredentialsActions = () => {
         </div>
       )}
 
-      {/* Precedência do contrato §3: carregando → erro (só na 1ª carga) →
-          primeiro uso → conteúdo (com sem-resultado dentro). */}
+      {/* Precedence of contract §3: loading → error (only on the 1st load) →
+          first use → content (with no-results inside). */}
       {loading ? (
         <SkeletonDeCredenciais />
       ) : loadError && atualizadoEm == null ? (
@@ -568,9 +569,9 @@ const CredentialsActions = () => {
       ) : visible.length === 0 ? (
         <SemResultado q={search} comFiltro={comFiltro} onLimpar={clearFilters} />
       ) : (
-        // Lista — separada por PROPRIEDADE (minhas × compartilhadas comigo)
-        // quando há mistura; cada seção respeita o "Agrupar por tipo". Sem
-        // mistura, cai numa lista única (sem cabeçalho redundante).
+        // List — split by OWNERSHIP (mine × shared with me) when there is a
+        // mix; each section honors "Agrupar por tipo". With no mix, it
+        // falls back to a single list (no redundant header).
         <div className={cn("flex flex-col gap-6 transition-opacity", refreshing && "opacity-60")}>
           {temMistura ? (
             <>

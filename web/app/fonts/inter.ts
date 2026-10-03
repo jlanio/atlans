@@ -1,26 +1,26 @@
-// A Inter do web, servida dos arquivos deste repositório (app/fonts/inter/).
+// The web app's Inter, served from files in this repository (app/fonts/inter/).
 //
-// Até aqui ela vinha do `next/font/google`, que baixa o CSS e os arquivos do
-// Google Fonts a cada `next build`. Às vezes o Google devolve o endereço de um
-// arquivo sem extensão, e o carregador do Next 15 (`/\.(woff|woff2|…)$/.exec(url)[1]`
-// no loader.js) quebra com "Cannot read properties of null (reading '1')":
-// caía o job Frontend do CI e, pelo mesmo `next build`, a imagem do CD. Com os
-// arquivos no repositório, o build não depende de rede nenhuma para a fonte.
+// Until now it came from `next/font/google`, which downloads the CSS and the
+// Google Fonts files on every `next build`. Sometimes Google returns the URL of a
+// file with no extension, and the Next 15 loader (`/\.(woff|woff2|…)$/.exec(url)[1]`
+// in loader.js) breaks with "Cannot read properties of null (reading '1')":
+// the CI Frontend job failed and, through the same `next build`, so did the CD
+// image. With the files in the repository, the build needs no network for the font.
 //
-// Os sete arquivos são os mesmos, byte a byte, que o build baixava (Inter v20
-// do Google Fonts, variável, um por faixa de caracteres; origem e SHA-256 em
-// inter/LEIA-ME.md), e o CSS reproduz o que o Google servia: uma @font-face por
-// faixa, todas com a família "Inter" e o `unicode-range` de cada uma. O
-// navegador baixa só as faixas que a página usa, e só a latina é pré-carregada.
-// Peso 400–700, como antes: um peso fora disso cai no mais próximo, e não num
-// peso novo da fonte variável.
+// The seven files are the same, byte for byte, as the ones the build downloaded
+// (Inter v20 from Google Fonts, variable, one per character range; origin and
+// SHA-256 in inter/README.md), and the CSS reproduces what Google served: one
+// @font-face per range, all with the "Inter" family and each one's
+// `unicode-range`. The browser downloads only the ranges the page uses, and only
+// the Latin one is preloaded. Weight 400–700, as before: a weight outside that
+// falls back to the nearest one, not to a new weight of the variable font.
 //
-// Cada chamada precisa de literais escritos por extenso (o next/font lê os
-// argumentos em tempo de compilação), daí a repetição da família.
+// Each call needs literals written out in full (next/font reads the arguments
+// at compile time), hence the repeated family.
 import localFont from "next/font/local"
 
-// A faixa latina define a variável `--font-inter` (ver globals.css) e a
-// "Inter Fallback", a Arial com as métricas ajustadas às da Inter.
+// The Latin range defines the `--font-inter` variable (see globals.css) and
+// "Inter Fallback", Arial with its metrics adjusted to Inter's.
 export const inter = localFont({
   src: "./inter/inter-latin.woff2",
   weight: "400 700",
@@ -31,7 +31,7 @@ export const inter = localFont({
   ],
 })
 
-// As outras faixas só acrescentam @font-face à mesma família.
+// The other ranges only add @font-face rules to the same family.
 export const interLatinExt = localFont({
   src: "./inter/inter-latin-ext.woff2",
   weight: "400 700",

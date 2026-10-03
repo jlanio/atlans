@@ -4,13 +4,13 @@ import path from "node:path"
 import { describe, it, expect, vi } from "vitest"
 
 /**
- * O maplibre-gl 6 roda o worker a partir de uma URL, que com bundler ele não
- * acha sozinho. Sem ela o worker morre em silêncio e os tiles vetoriais nunca
- * carregam, mas o resto do mapa abre normalmente, então só este teste pegaria.
- * O MapLibreMap aponta o `setWorkerUrl` para a cópia que
- * scripts/copiar-maplibre.mjs faz em `public/maplibre` no build e no dev.
- * Este teste confere a cadeia inteira: a URL, o arquivo copiado e o que ele
- * importa.
+ * maplibre-gl 6 runs the worker from a URL, which with a bundler it does not
+ * find on its own. Without it the worker dies silently and the vector tiles never
+ * load, but the rest of the map opens normally, so only this test would catch it.
+ * MapLibreMap points `setWorkerUrl` at the copy that
+ * scripts/copiar-maplibre.mjs makes in `public/maplibre` at build and in dev.
+ * This test checks the whole chain: the URL, the copied file and what it
+ * imports.
  */
 const { setWorkerUrl } = vi.hoisted(() => ({ setWorkerUrl: vi.fn() }))
 vi.mock("maplibre-gl/dist/maplibre-gl.css", () => ({}))

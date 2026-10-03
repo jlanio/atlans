@@ -8,22 +8,23 @@ export interface TestResult {
 }
 
 /**
- * Resultado do "Testar credencial", compartilhado pelos modais de criar e editar.
+ * Result of "Testar credencial" (test credential), shared by the create and
+ * edit modals.
  *
- * Três correções em relação ao parágrafo solto que existia duplicado nos dois:
+ * Three fixes compared with the loose paragraph that used to be duplicated in both:
  *
- * - Ícone junto da cor. Cor sozinha não carrega significado para quem não a
- *   distingue.
- * - Variante `dark:`. `text-green-600` sobre `bg-green-500/10` fica abaixo de
- *   4.5:1 no tema escuro — mesmo problema que a listagem já corrigiu.
- * - Live region. `role="status"` para sucesso e `role="alert"` para falha, senão
- *   o resultado não é anunciado a leitor de tela.
+ * - Icon alongside the color. Color alone carries no meaning for someone who
+ *   cannot tell it apart.
+ * - `dark:` variant. `text-green-600` on `bg-green-500/10` falls below 4.5:1
+ *   in the dark theme — the same problem the listing already fixed.
+ * - Live region. `role="status"` for success and `role="alert"` for failure,
+ *   otherwise the result is not announced to screen readers.
  *
- * A `message` vem do backend e é renderizada literalmente de propósito: para
- * postgresql/mysql/s3 ela reporta conexão real, e para os outros tipos o
- * backend responde "Campos validados com sucesso" — que é a verdade, já que
- * nesses casos ele não toca na rede. Não reescrevemos a mensagem aqui para não
- * prometer mais do que foi feito.
+ * The `message` comes from the backend and is rendered literally on purpose: for
+ * postgresql/mysql/s3 it reports a real connection, and for the other types the
+ * backend answers "Campos validados com sucesso" (fields validated successfully)
+ * — which is the truth, since in those cases it does not touch the network. We
+ * don't rewrite the message here so as not to promise more than was done.
  */
 export function TestResultBanner({ result }: { result: TestResult | null }) {
   if (!result) return null

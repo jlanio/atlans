@@ -1,11 +1,11 @@
-"""Costura HTTP entre o executor e o Drive no upload de artefato.
+"""HTTP seam between the executor and the Drive on artifact upload.
 
-Havia teste do no (propaga `overwrite`) e teste do servico (reaproveita a
-linha), mas nada cobrindo o meio: o corpo do POST que liga os dois. Um campo
-esquecido ali passava despercebido pelas duas pontas verdes.
+There was a node test (propagates `overwrite`) and a service test (reuses the
+row), but nothing covering the middle: the POST body that connects the two. A
+field forgotten there went unnoticed by both green ends.
 
-Cobre tambem o caminho de volta: `reused` diz o que o SERVIDOR fez, e e o que
-permite ao no logar o desfecho em vez da intencao.
+Also covers the way back: `reused` says what the SERVER did, and it is what
+lets the node log the outcome instead of the intent.
 """
 from unittest.mock import MagicMock, patch
 
@@ -22,7 +22,7 @@ def _resposta(payload: dict) -> MagicMock:
 
 
 class _Httpx:
-    """Duble do httpx: guarda o corpo do POST e responde como o servidor."""
+    """httpx double: keeps the POST body and responds like the server."""
 
     def __init__(self, upload_payload: dict):
         self.upload_payload = upload_payload
@@ -64,7 +64,7 @@ RESPOSTA_NOVO = {"upload_url": "https://minio/put", "id_hash": "f-2",
 
 
 def test_overwrite_vai_no_corpo_do_post():
-    """O elo que nenhum teste cobria."""
+    """The link no test covered."""
     _meta, fake = _subir(overwrite=True, resposta_servidor=RESPOSTA_REUSO)
 
     assert fake.corpo_do_upload["overwrite"] is True
@@ -86,7 +86,7 @@ def test_reused_do_servidor_chega_no_meta():
 
 
 def test_pedir_overwrite_sem_encontrar_arquivo_nao_vira_reuso():
-    """O caso que a mensagem antiga do no anunciava como sobrescrita."""
+    """The case the node's old message announced as an overwrite."""
     meta, _fake = _subir(overwrite=True, resposta_servidor=RESPOSTA_NOVO)
 
     assert meta["drive_reused"] is False
@@ -108,7 +108,7 @@ def test_servidor_antigo_sem_o_campo_nao_afirma_reuso():
 
 
 def test_fallback_local_nao_afirma_reuso():
-    """Upload falhou: nada foi ao Drive, entao nada foi sobrescrito."""
+    """Upload failed: nothing went to the Drive, so nothing was overwritten."""
     with patch("httpx.post", side_effect=RuntimeError("sem rede")), \
          patch("flow.utils.executor_http.get_agent_http_config",
                return_value=("https://api", {}, False)), \
@@ -134,11 +134,11 @@ def test_fluxo_sem_drive_nao_afirma_reuso():
         )
 
     assert meta["drive_reused"] is False
-    # Artefato nao passa pelo endpoint que cria WorkspaceFile.
+    # An artifact does not go through the endpoint that creates WorkspaceFile.
     assert all("executor-upload-url" not in url for url, _ in fake.posts)
 
 
-# ── Log do nó: afirma o desfecho, não a intenção ─────────────────────────────
+# ── Node log: asserts the outcome, not the intent ────────────────────────────
 
 async def _logs_do_no(params: dict, meta_extra: dict) -> list[str]:
     from flow.nodes.outputs.data_output import DataOutput
@@ -167,8 +167,8 @@ async def test_log_afirma_sobrescrita_apenas_quando_houve():
 
 @pytest.mark.asyncio
 async def test_log_diz_que_criou_novo_quando_nao_havia_o_que_sobrescrever():
-    """Regressao: a mensagem antiga anunciava sobrescrita sempre que a opcao
-    estava ligada — justamente o caso que se precisava enxergar."""
+    """Regression: the old message announced an overwrite whenever the option
+    was on — precisely the case that needed to be visible."""
     linhas = await _logs_do_no(
         {"label": "r", "context": "drive", "overwrite": True}, {"drive_reused": False},
     )

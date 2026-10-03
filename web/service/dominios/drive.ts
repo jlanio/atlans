@@ -8,12 +8,11 @@ import type {
 // ── Drive ───────────────────────────────────────────────────────────────────
 
 /**
- * Lista arquivos do Drive de um workspace.
+ * Lists the files in a workspace's Drive.
  *
- * `page`/`page_size` são obrigatoriamente enviados: o backend corta em 50 por
- * padrão e os dois consumidores nunca mandavam nada, então tudo além do 50º
- * arquivo era inalcançável pela UI enquanto o cabeçalho anunciava o total
- * real.
+ * `page`/`page_size` are always sent: the backend cuts at 50 by default and
+ * the two consumers never sent anything, so everything past the 50th file was
+ * unreachable from the UI while the header announced the real total.
  */
 export function getDriveFiles(params: import("../types").IDriveListParams) {
   return get<import("../types").IDriveFileList>(
@@ -21,17 +20,18 @@ export function getDriveFiles(params: import("../types").IDriveListParams) {
   )
 }
 
-/** Upload de um arquivo para o Drive do workspace (multipart).
+/** Uploads a file to the workspace's Drive (multipart).
  *
- *  O axios monta o boundary sozinho a partir do FormData — fixar
- *  `Content-Type: multipart/form-data` na mão, como as páginas faziam, gera
- *  um header SEM boundary. Funcionava porque o axios o sobrescrevia. */
+ *  axios builds the boundary on its own from the FormData — hard-coding
+ *  `Content-Type: multipart/form-data`, as the pages did, produces a header
+ *  WITHOUT a boundary. It worked because axios overwrote it. */
 export function uploadDriveFile(workspaceId: string, file: File) {
   const form = new FormData()
   form.append("file", file)
-  // O retorno é o `WorkspaceFileOut` do arquivo criado. Era `unknown`, e a
-  // página /drive de fato só olha o erro — mas os anexos da Home guardam o
-  // `id_hash` do que subiu, e sem o tipo isso seria um cast na mão.
+  // The return value is the created file's `WorkspaceFileOut`. It was `unknown`,
+  // and the /drive page indeed only looks at the error — but the Home's
+  // attachments store the `id_hash` of what was uploaded, and without the type
+  // that would be a manual cast.
   return post<import("../types").IDriveFile>(`/drive/upload${qs({ workspace_id: workspaceId })}`, form)
 }
 

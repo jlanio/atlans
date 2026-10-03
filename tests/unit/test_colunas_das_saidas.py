@@ -1,10 +1,10 @@
 """
-Colunas gravadas por execucao, que viram sugestao no editor.
+Columns recorded per run, which become suggestions in the editor.
 
-A lista alimenta campos que pedem NOME DE COLUNA DE ATRIBUTO (a chave do Join,
-a coluna do filtro, as colunas a trazer). O que entra nela vira botao clicavel
-na interface — entao um item que nao serve como nome de coluna nao e ruido
-inofensivo, e um caminho para configurar o no errado.
+The list feeds fields that ask for an ATTRIBUTE COLUMN NAME (the Join key,
+the filter column, the columns to bring in). Whatever goes into it becomes a
+clickable button in the interface — so an item that does not work as a column
+name is not harmless noise, it is a path to configuring the node wrong.
 """
 import geopandas as gpd
 import pandas as pd
@@ -29,24 +29,25 @@ def test_ignora_saida_que_nao_e_tabela():
 
 
 def test_dict_vazio_devolve_none():
-    # None e nao {}: a chave so existe no node_stats quando ha o que dizer.
+    # None and not {}: the key only exists in node_stats when there is something to say.
     assert _colunas_das_saidas({}) is None
 
 
-# ── A geometria fica de fora ─────────────────────────────────────────────────
+# ── The geometry stays out ───────────────────────────────────────────────────
 
 def test_geometria_nao_e_sugerida():
-    """Sugerir a geometria e sugerir o que sempre falha: no Join, traze-la de B
-    colide com a de A; no filtro, comparar geometria com um valor tambem quebra.
+    """Suggesting the geometry is suggesting what always fails: in the Join,
+    bringing it from B collides with A's; in the filter, comparing geometry to
+    a value breaks too.
     """
     gdf = gpd.GeoDataFrame({"cod": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
     assert _colunas_das_saidas({"output": gdf}) == {"output": ["cod"]}
 
 
 def test_pergunta_ao_geodataframe_em_vez_de_adivinhar_pelo_nome():
-    """Os nos de banco usam 'geom', nao 'geometry'. Excluir por nome fixo
-    deixaria a geometria passar aqui — e sumiria com um ATRIBUTO chamado 'geom'
-    num DataFrame comum."""
+    """The database nodes use 'geom', not 'geometry'. Excluding by a fixed name
+    would let the geometry through here — and would drop an ATTRIBUTE named
+    'geom' in a plain DataFrame."""
     gdf = gpd.GeoDataFrame({"cod": [1], "geom": [Point(0, 0)]}, geometry="geom")
     assert _colunas_das_saidas({"output": gdf}) == {"output": ["cod"]}
 
@@ -64,9 +65,10 @@ def test_corta_no_teto():
 
 
 def test_nao_inventa_item_na_lista_ao_cortar():
-    """REGRESSAO: o marcador de corte ("… (+50)") ia junto das colunas, e a UI
-    renderiza CADA item como sugestao clicavel — dava para inserir o marcador
-    como se fosse nome de coluna. Quem exibe deduz o corte pelo tamanho."""
+    """REGRESSION: the truncation marker ("… (+50)") went along with the columns,
+    and the UI renders EACH item as a clickable suggestion — you could insert the
+    marker as if it were a column name. Whoever displays it infers the
+    truncation from the length."""
     largo = pd.DataFrame({f"c{i}": [1] for i in range(MAX_COLUNAS + 50)})
     nomes = _colunas_das_saidas({"result": largo})["result"]
 

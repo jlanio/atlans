@@ -1,9 +1,9 @@
 /**
- * Estado do Histórico na URL (docs/specs/historico-metricas.md §4.1).
+ * History state in the URL (docs/specs/metrics-history.md §4.1).
  *
- * Tudo o que muda a tela vive na query string: F5, voltar do detalhe e um
- * link colado no chat reabrem exatamente a mesma visão. Os defaults não vão
- * para a URL, para ela ficar limpa quando nada foi tocado.
+ * Everything that changes the screen lives in the query string: F5, going back
+ * from the detail and a link pasted in chat reopen exactly the same view. The
+ * defaults do not go into the URL, so it stays clean when nothing was touched.
  */
 export type Periodo = 7 | 30 | 90
 export const PERIODOS: Periodo[] = [7, 30, 90]
@@ -15,8 +15,8 @@ export type StatusFiltro = "failed" | "running" | "success" | "cancelled"
 const STATUS: StatusFiltro[] = ["failed", "running", "success", "cancelled"]
 
 export type OrigemFiltro = "manual" | "retry" | "webhook" | "schedule" | "mcp"
-/** Origens que a URL aceita. A lista de UI (`filtros.tsx`) tem a mesma
- *  composição em outra ordem — um teste garante que não divergem. */
+/** Origins the URL accepts. The UI list (`filtros.tsx`) has the same
+ *  set in another order — a test guarantees they do not diverge. */
 export const ORIGENS: OrigemFiltro[] = ["manual", "retry", "webhook", "schedule", "mcp"]
 
 export interface EstadoDoHistorico {
@@ -28,13 +28,13 @@ export interface EstadoDoHistorico {
   executor: string | null
   origem: OrigemFiltro | null
   /**
-   * Chip "Assistente": só execuções de fluxos CRIADOS pelo assistente. Não se
-   * chama `origem` porque esse nome já é do disparo (`trigger_source`) — são
-   * dois eixos, e a tela deixa combiná-los.
+   * "Assistente" chip: only runs of workflows CREATED by the assistant. It is
+   * not called `origem` because that name already belongs to the trigger
+   * (`trigger_source`) — they are two axes, and the screen lets you combine them.
    */
   assistente: boolean
   q: string
-  /** run_id da execução aberta no painel lateral. */
+  /** run_id of the run open in the side panel. */
   execucao: string | null
 }
 
@@ -60,7 +60,7 @@ function texto(sp: Leitor, nome: string): string | null {
   return limpo === "" ? null : limpo.slice(0, 200)
 }
 
-/** Lê a query string; qualquer valor inválido cai no default. */
+/** Reads the query string; any invalid value falls back to the default. */
 export function lerEstado(sp: Leitor): EstadoDoHistorico {
   const periodoBruto = Number(sp.get("periodo"))
   const periodo = (PERIODOS as number[]).includes(periodoBruto) ? (periodoBruto as Periodo) : ESTADO_PADRAO.periodo
@@ -84,7 +84,7 @@ export function lerEstado(sp: Leitor): EstadoDoHistorico {
   }
 }
 
-/** Query string (sem "?") só com o que difere do default. */
+/** Query string (without "?") with only what differs from the default. */
 export function escreverEstado(estado: EstadoDoHistorico): string {
   const sp = new URLSearchParams()
   if (estado.periodo !== ESTADO_PADRAO.periodo) sp.set("periodo", String(estado.periodo))
@@ -100,7 +100,7 @@ export function escreverEstado(estado: EstadoDoHistorico): string {
   return sp.toString()
 }
 
-/** Quantos filtros (fora período, visão e execução aberta) estão ativos. */
+/** How many filters (apart from period, view and open run) are active. */
 export function filtrosAtivos(estado: EstadoDoHistorico): number {
   return [
     estado.status, estado.workspace, estado.workflow, estado.executor, estado.origem,
@@ -108,7 +108,7 @@ export function filtrosAtivos(estado: EstadoDoHistorico): number {
   ].filter(Boolean).length
 }
 
-/** Data ISO (UTC) do início da janela, para `date_from` de `/runs`. */
+/** ISO date (UTC) of the window start, for the `date_from` of `/runs`. */
 export function inicioDaJanela(periodo: Periodo, agora: Date = new Date()): string {
   return new Date(agora.getTime() - periodo * 24 * 60 * 60 * 1000).toISOString()
 }

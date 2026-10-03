@@ -42,8 +42,8 @@ class ScheduleCRUD:
         updates: dict
     ) -> Schedule:
         """
-        Busca um agendamento pelo ID e aplica updates.
-        Lança ValueError se não encontrado.
+        Fetches a schedule by ID and applies updates.
+        Raises ValueError if not found.
         """
         sch = await self.get(schedule_id)
         if not sch:
@@ -52,7 +52,7 @@ class ScheduleCRUD:
 
     async def delete(self, job_id: str | Schedule) -> None:
         """
-        Remove um agendamento por ID ou instância.
+        Removes a schedule by ID or instance.
         """
         if isinstance(job_id, Schedule):
             sch = job_id

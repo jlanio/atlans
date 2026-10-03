@@ -1,27 +1,27 @@
 # app/core/config_em_cache.py
-"""Leitura com cache Redis curto — e a configuração global que vive nela.
+"""Reads with a short Redis cache — and the global configuration that lives in it.
 
-O esqueleto que `assistente_config_service` (o modelo) repetia linha a linha
-com os serviços de configuração de uma extensão (a forma da cota, o plano de
-cada pessoa): GET no Redis → no miss, o banco, numa sessão
-própria quando quem chama não tem uma → SET com TTL. Cada serviço fica só com o
-que é dele: validar o valor e dizer como ele vira texto.
+The skeleton that `assistente_config_service` (the model) repeated line by line
+with an extension's configuration services (the shape of the quota, each
+person's plan): GET in Redis → on a miss, the database, in its own
+session when the caller has none → SET with a TTL. Each service keeps only
+what is its own: validating the value and saying how it becomes text.
 
-Três regras valem para todos — e a segunda já divergiu entre as cópias:
+Three rules apply to all of them — and the second had already diverged between the copies:
 
-1. **Degradação aberta.** Redis fora do ar é ler o banco toda vez; banco fora
-   do ar é o padrão. Nunca uma exceção para quem só queria ler.
-2. **O que veio de uma falha do banco não vai para o cache.** Gravá-lo prenderia
-   o padrão por um TTL inteiro DEPOIS de o banco voltar: a escolha do admin
-   sumiria sem nada na tela explicando. Uma das cópias já seguia a regra; as
-   do modelo e da cota gravavam o padrão da falha.
-3. **Quem só lê grava com `NX`; quem salva grava por cima.** Entre o miss e o
-   SET de um leitor, o admin pode ter salvo outro valor e gravado o novo no
-   cache: um SET cego do leitor repintaria o VELHO e o fixaria pelo TTL — a
-   troca «não pegaria», e quem salvou concluiria que o botão está quebrado. Por
-   isso `ConfigEmCache.definir` ESCREVE o valor novo em vez de só apagar a
-   chave: apagando, o leitor atrasado a encontraria livre e o `NX` não o
-   deteria.
+1. **Fail open.** Redis down means reading the database every time; database down
+   means the default. Never an exception for someone who only wanted to read.
+2. **What came from a database failure does not go into the cache.** Writing it would pin
+   the default for an entire TTL AFTER the database came back: the admin's choice
+   would vanish with nothing on screen explaining it. One of the copies already followed the rule; the
+   model's and the quota's wrote the failure default.
+3. **Readers write with `NX`; savers overwrite.** Between a reader's miss and
+   SET, the admin may have saved another value and written the new one to the
+   cache: a reader's blind SET would repaint the OLD one and pin it for the TTL — the
+   change "wouldn't take", and whoever saved would conclude the button is broken. That is
+   why `ConfigEmCache.definir` WRITES the new value instead of just deleting the
+   key: by deleting, the late reader would find it free and `NX` would not
+   stop it.
 """
 from __future__ import annotations
 
@@ -49,9 +49,9 @@ def _o_proprio_texto(texto: str) -> str:
 async def gravar_no_cache(
     redis, chave: str, texto: str, *, ttl_s: int, rotulo: str, so_se_vazio: bool = False,
 ) -> None:
-    """SET com TTL. Falha do Redis vira aviso no log, nunca exceção.
+    """SET with a TTL. A Redis failure becomes a warning in the log, never an exception.
 
-    `so_se_vazio` é o `NX` de quem só leu (regra 3)."""
+    `so_se_vazio` is the `NX` of a reader (rule 3)."""
     if redis is None:
         return
     try:
@@ -59,19 +59,19 @@ async def gravar_no_cache(
             await redis.set(chave, texto, ex=ttl_s, nx=True)
         else:
             await redis.set(chave, texto, ex=ttl_s)
-    except Exception as exc:  # pragma: no cover - depende do Redis
+    except Exception as exc:  # pragma: no cover - depends on Redis
         logger.warning("%s: falha ao gravar o cache (%s).", rotulo, exc.__class__.__name__)
 
 
 async def invalidar_cache(redis, chave: str, *, rotulo: str) -> None:
-    """Apaga a chave. Para quem não tem o valor novo em mãos para gravar (o
-    plano de alguém, mudado por checkout ou webhook) — quem tem, grava por cima
-    (regra 3)."""
+    """Deletes the key. For callers that don't have the new value in hand to write (someone's
+    plan, changed by checkout or webhook) — callers that have it overwrite
+    (rule 3)."""
     if redis is None:
         return
     try:
         await redis.delete(chave)
-    except Exception as exc:  # pragma: no cover - depende do Redis
+    except Exception as exc:  # pragma: no cover - depends on Redis
         logger.warning("%s: falha ao invalidar o cache (%s).", rotulo, exc.__class__.__name__)
 
 
@@ -86,12 +86,12 @@ async def ler_com_cache(
     desserializar: Callable[[str], Optional[T]] = _o_proprio_texto,
     so_se_vazio: bool = False,
 ) -> Optional[T]:
-    """O valor de `chave`: do cache ou, no miss, de `ler_do_banco()` — gravado.
+    """The value of `chave`: from the cache or, on a miss, from `ler_do_banco()` — written.
 
-    `ler_do_banco` devolve `None` quando NÃO deu para ler (o banco falhou). Esse
-    `None` volta a quem chamou, que decide o padrão, e não vai para o cache
-    (regra 2). Um valor no cache que `desserializar` recusa — devolvendo `None`
-    ou levantando — conta como miss.
+    `ler_do_banco` returns `None` when it could NOT read (the database failed). That
+    `None` goes back to the caller, who decides the default, and does not go into the cache
+    (rule 2). A cached value that `desserializar` rejects — by returning `None`
+    or raising — counts as a miss.
     """
     if redis is not None:
         try:
@@ -113,7 +113,7 @@ async def ler_com_cache(
 
 @dataclass(frozen=True)
 class Carimbo(Generic[T]):
-    """O valor salvo que está valendo, e quem e quando o salvou."""
+    """The saved value currently in effect, and who saved it and when."""
 
     valor: T
     por: Optional[str]
@@ -121,21 +121,21 @@ class Carimbo(Generic[T]):
 
 
 class ConfigEmCache(Generic[T]):
-    """Uma configuração global no `SystemConfig`, com um padrão por baixo.
+    """A global configuration in `SystemConfig`, with a default underneath.
 
-    O que se grava é o envelope `{campo: valor, "por": quem, "em": quando}` — ou
-    `None`, que volta ao padrão. É o formato que as instalações já têm salvo. O
-    carimbo fica junto do valor porque a pergunta «desde quando está assim?»
-    aparece exatamente quando a conta do mês surpreende, e aí é tarde para
-    procurar em log.
+    What gets written is the envelope `{campo: valor, "por": quem, "em": quando}` — or
+    `None`, which goes back to the default. It is the format the installations already have saved. The
+    stamp sits next to the value because the question "since when has it been like this?"
+    comes up exactly when the month's bill is a surprise, and by then it is too late to
+    search the logs.
 
-    O que é de cada configuração vem de fora:
+    What is specific to each configuration comes from outside:
 
-    - `ler(valor_cru)`: a linha do `SystemConfig` como está (envelope ou não) →
-      o valor validado, ou `None` quando nada ali serve;
-    - `padrao()`: o piso (env, código) — quem nunca configurou sobe funcionando;
-    - `serializar`/`desserializar`: o valor ↔ o texto do cache. `desserializar`
-      devolve `None` (ou levanta) para o que não reconhece.
+    - `ler(valor_cru)`: the `SystemConfig` row as is (envelope or not) →
+      the validated value, or `None` when nothing there is usable;
+    - `padrao()`: the floor (env, code) — anyone who never configured starts up working;
+    - `serializar`/`desserializar`: the value ↔ the cache text. `desserializar`
+      returns `None` (or raises) for what it doesn't recognize.
     """
 
     def __init__(
@@ -162,11 +162,11 @@ class ConfigEmCache(Generic[T]):
         self.desserializar = desserializar
 
     async def em_uso(self, *, db: AsyncSession | None = None, redis=None) -> T:
-        """O valor que vale agora. Nunca levanta e nunca devolve vazio: qualquer
-        falha — Redis, banco, linha corrompida — cai no padrão.
+        """The value in effect now. Never raises and never returns empty: any
+        failure — Redis, database, corrupted row — falls back to the default.
 
-        `db=None` é o caso do laço do assistente, que roda dentro de um gerador
-        SSE e não tem sessão de request: abre-se uma própria, só no miss."""
+        `db=None` is the case of the assistant loop, which runs inside an SSE
+        generator and has no request session: it opens its own, only on a miss."""
         valor = await ler_com_cache(
             redis, self.chave_cache, lambda: self._do_banco(db),
             ttl_s=self.ttl_s, rotulo=self.rotulo,
@@ -176,15 +176,15 @@ class ConfigEmCache(Generic[T]):
         return valor if valor is not None else self.padrao()
 
     async def _do_banco(self, db: AsyncSession | None) -> Optional[T]:
-        """O salvo ou, se nada salvo serve, o padrão — os dois vão para o cache.
-        `None` só quando o banco falhou (regra 2)."""
+        """The saved value or, if nothing saved is usable, the default — both go into the cache.
+        `None` only when the database failed (rule 2)."""
         try:
             if db is not None:
                 escolhido = self.ler(await get_config(db, self.chave))
             else:
-                # Import tardio: `app.mcp.infra` é o ponto de patch da sessão
-                # nos testes, e importá-lo no topo arrastaria o servidor MCP
-                # inteiro para dentro de `app.core`.
+                # Late import: `app.mcp.infra` is the session patch point
+                # in the tests, and importing it at the top would drag the whole MCP
+                # server into `app.core`.
                 from app.mcp import infra
 
                 async with infra.sessao() as propria:
@@ -200,15 +200,15 @@ class ConfigEmCache(Generic[T]):
     async def definir(
         self, db: AsyncSession, valor: Optional[T], *, por: str | None = None, redis=None,
     ) -> None:
-        """Grava `valor`, já validado por quem chama (`None` volta ao padrão), e
-        o fixa no cache — sem isto a troca demoraria um TTL para valer."""
+        """Writes `valor`, already validated by the caller (`None` goes back to the default), and
+        pins it in the cache — without this the change would take a TTL to apply."""
         from app.core.utils.datetime_utils import utc_now_naive
 
         gravado = None if valor is None else {
             self.campo: valor, "por": por, "em": utc_now_naive().isoformat(),
         }
         await set_config(db, self.chave, gravado)
-        # ESCREVE em vez de só apagar (regra 3).
+        # WRITES instead of just deleting (rule 3).
         await gravar_no_cache(
             redis, self.chave_cache,
             self.serializar(valor if valor is not None else self.padrao()),
@@ -216,11 +216,11 @@ class ConfigEmCache(Generic[T]):
         )
 
     async def carimbo(self, db: AsyncSession) -> Optional[Carimbo[T]]:
-        """O valor salvo que está valendo, com quem e quando — ou `None` quando
-        vale o padrão. É o que a tela de admin mostra.
+        """The saved value in effect, with who and when — or `None` when
+        the default applies. It is what the admin screen shows.
 
-        Lê pelo mesmo `ler` de `em_uso`: a tela não pode dizer «padrão»
-        enquanto a conversa usa um valor salvo."""
+        Reads through the same `ler` as `em_uso`: the screen must not say "default"
+        while the conversation uses a saved value."""
         bruto = await get_config(db, self.chave)
         valor = self.ler(bruto)
         if valor is None:

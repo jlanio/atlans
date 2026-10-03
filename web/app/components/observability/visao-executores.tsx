@@ -15,8 +15,8 @@ interface Props {
   onVerExecucoes: (agentHost: string) => void
 }
 
-/** "2 de 4 em execução · 12 na fila" a partir da capacidade publicada; "—" sem ela. */
-/** "geo-01@3f2a1" → nome "geo-01", sufixo "@3f2a1"; sem "@", tudo é nome. */
+/** "2 de 4 em execução · 12 na fila" from the published capacity; "—" without it. */
+/** "geo-01@3f2a1" → name "geo-01", suffix "@3f2a1"; without "@", it is all name. */
 export function nomeDoExecutor(displayName: string): { nome: string; sufixo: string | null } {
   const i = displayName.indexOf("@")
   if (i <= 0) return { nome: displayName, sufixo: null }
@@ -30,15 +30,15 @@ export function textoDeAgora(cap: IExecutorMetrics["capacity"]): string {
   return partes.join(" · ")
 }
 
-/** Executor no teto: tudo o que chegar agora vai para a fila. */
+/** Executor at the ceiling: everything that arrives now goes to the queue. */
 export function noTeto(cap: IExecutorMetrics["capacity"]): boolean {
   return !!cap && cap.max_concurrent > 0 && cap.running >= cap.max_concurrent
 }
 
 /**
- * Visão "Por executor" (spec §4.3): a frota inteira, com o que cada um está
- * fazendo agora e como foi no período. A linha "Sem executor" agrupa falhas
- * de despacho — não há host para filtrar, então ela não abre.
+ * "Por executor" (by executor) view (spec §4.3): the whole fleet, with what each
+ * one is doing now and how it went in the period. The "Sem executor" row groups
+ * dispatch failures — there is no host to filter by, so it does not open.
  */
 export function VisaoExecutores({ linhas, carregando, onVerExecucoes }: Props) {
   if (carregando && linhas.length === 0) {
@@ -112,9 +112,9 @@ export function VisaoExecutores({ linhas, carregando, onVerExecucoes }: Props) {
                           aria-label={ex.online ? "online" : "offline"}
                         />
                       )}
-                      {/* "geo-01@3f2a1": o sufixo é o que distingue dois executores
-                          com o mesmo nome, não o que a pessoa reconhece — fica
-                          menor e apagado, ao lado do nome. */}
+                      {/* "geo-01@3f2a1": the suffix is what tells apart two executors
+                          with the same name, not what the person recognizes — it
+                          stays smaller and dimmed, next to the name. */}
                       <span className="truncate font-medium" title={ex.agent_host ?? undefined}>
                         {nomeDoExecutor(ex.display_name).nome}
                         {nomeDoExecutor(ex.display_name).sufixo && (
@@ -143,7 +143,7 @@ export function VisaoExecutores({ linhas, carregando, onVerExecucoes }: Props) {
                       : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td data-rotulo="típica" className={cn("px-3 py-2.5 text-right align-middle tabular-nums", CELULA_COM_ROTULO)}>
-                    {/* Só a mediana: a média inclui falhas, zeros e órfãos — o número que o redesenho tirou da tela. */}
+                    {/* Only the median: the mean includes failures, zeros and orphans — the number the redesign took off the screen. */}
                     {formatarDuracao(ex.p50_seconds)}
                   </td>
                   <td data-rotulo="última" className={cn("px-3 py-2.5 align-middle text-xs tabular-nums whitespace-nowrap text-muted-foreground", CELULA_COM_ROTULO)} title={ex.last_run_at ?? undefined}>

@@ -3,16 +3,17 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import type { IAdminUser, IExecutor } from "@/service/types"
 
 /**
- * Os diálogos de ação de Admin › Usuários e de Executores.
+ * The action dialogs of Admin › Users and of Executors.
  *
- * O defeito que a repetição produziu: o campo do diálogo chamava a MESMA função
- * do botão no Enter, e essa função não olhava o "carregando" — só o botão, por
- * estar `disabled`, ficava protegido. Enter duas vezes numa ação lenta (ou
- * Enter e depois o clique) disparava a chamada duas vezes: dois DELETEs, duas
- * revogações, e na revogação em lote a sequência cota→revoke rodando em dobro.
+ * The defect the duplication produced: the dialog's field called the SAME
+ * function as the button on Enter, and that function didn't look at "loading" —
+ * only the button, being `disabled`, was protected. Pressing Enter twice on a
+ * slow action (or Enter and then the click) fired the call twice: two DELETEs,
+ * two revocations, and in the batch revocation the quota→revoke sequence ran
+ * twice.
  *
- * Aqui toda ação é LENTA (a promessa só resolve quando o teste manda): é o
- * intervalo em que o segundo Enter chegava.
+ * Here every action is SLOW (the promise only resolves when the test says so):
+ * that is the window in which the second Enter used to arrive.
  */
 
 const svc = vi.hoisted(() => ({
@@ -30,8 +31,8 @@ vi.mock("@/service/GisFlowService", () => ({ GisFlowService: svc }))
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn(), loading: vi.fn() }))
 vi.mock("@/utils/createToast", () => ({ createToast: toast }))
 
-// Passthrough do menu (mesmo dublê de chats-lista): sem portal/pointer do Radix,
-// o item vira um botão e o `onSelect` dele é o que abre o diálogo.
+// Menu passthrough (same double as chats-lista): without Radix's portal/pointer,
+// the item becomes a button and its `onSelect` is what opens the dialog.
 vi.mock("@/app/components/ui/dropdown-menu", () => ({
   DropdownMenuItem: ({ children, onSelect, className }: { children: React.ReactNode; onSelect?: (e: React.MouseEvent) => void; className?: string }) => (
     <button type="button" onClick={onSelect} className={className}>{children}</button>
@@ -45,7 +46,7 @@ import {
   DeleteAgentDialog, EditAgentDialog, RevokeAgentDialog,
 } from "@/app/components/executores/dialogs"
 
-/** Uma chamada que só termina quando o teste manda. */
+/** A call that only finishes when the test says so. */
 function lenta<T>() {
   let resolver!: (valor: T) => void
   const promessa = new Promise<T>(res => { resolver = res })
@@ -121,7 +122,7 @@ describe("Enter numa ação lenta chama o serviço UMA vez", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Cota de executores/ }))
     const dialogo = await screen.findByRole("dialog")
-    // Reduzir abaixo dos 3 existentes é o que oferece a revogação em lote.
+    // Reducing below the 3 existing ones is what offers the batch revocation.
     await within(dialogo).findByText(/Atualmente possui/)
     fireEvent.change(within(dialogo).getByLabelText("Limite de executores dedicados"), { target: { value: "0" } })
     fireEvent.click(within(dialogo).getByRole("button", { name: /Revogar todos/ }))

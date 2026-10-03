@@ -1,10 +1,10 @@
-"""Regressao da leitura geoespacial segura (auditoria SEG-04/05/14/84).
+"""Regression for safe geospatial reading (audit SEG-04/05/14/84).
 
-O GDAL/pyogrio detecta o driver pelo CONTEUDO. Um documento OGR VRT entregue por
-um servidor WFS malicioso, ou salvo com extensao geoespacial no Drive, faz o GDAL
-ler arquivo local do executor (CSV:/data/certs/key.pem) ou fazer SSRF via
-/vsicurl. `ler_geodataframe` recusa VRT e caminhos virtuais antes de qualquer
-open do GDAL.
+GDAL/pyogrio detects the driver by CONTENT. An OGR VRT document delivered by
+a malicious WFS server, or saved with a geospatial extension in the Drive, makes GDAL
+read a local file of the executor (CSV:/data/certs/key.pem) or perform SSRF via
+/vsicurl. `ler_geodataframe` rejects VRT and virtual paths before any
+GDAL open.
 """
 import io
 import os

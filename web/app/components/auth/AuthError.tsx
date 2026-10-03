@@ -3,13 +3,13 @@
 import { TbAlertCircle, TbLock, TbMailExclamation } from "react-icons/tb";
 import { useTextos } from "@/app/components/home/i18n";
 
-/* Superfície de erro inline das telas de autenticação, extraída do login. É um
-   bloco persistente com `role="alert"` (o cadastro usava toast efêmero, que
-   some antes do usuário ler) e três variantes por status:
-   - `locked`  (429 / conta bloqueada) → laranja + cadeado
-   - `emailNotVerified` (403) → amarelo + malote, com atalho de reenvio
-   - padrão → vermelho + alerta
-   As cores são literais de status (exceção documentada do contrato §6). */
+/* Inline error surface of the authentication screens, extracted from login. It
+   is a persistent block with `role="alert"` (sign-up used an ephemeral toast,
+   which vanished before the user could read it) and three variants by status:
+   - `locked`  (429 / locked account) → orange + padlock
+   - `emailNotVerified` (403) → yellow + mailbag, with a resend shortcut
+   - default → red + alert
+   The colors are status literals (documented exception of contract §6). */
 export interface AuthErrorInfo {
   message: string;
   locked?: boolean;
@@ -21,11 +21,11 @@ export function AuthError({
   onReenviarVerificacao,
 }: {
   error: AuthErrorInfo;
-  /* O atalho do 403: troca para o painel de verificação do mesmo modal. Era um
-     `<Link href="/verify-email">` — navegar leva para fora da Home e joga fora
-     a mensagem que espera o login, o mesmo motivo que tirou o link do "Esqueceu
-     a senha?". Sem a callback o atalho não aparece: quem não tem para onde
-     mandar não deve oferecer o caminho. */
+  /* The 403 shortcut: switches to the verification panel of the same modal. It
+     was a `<Link href="/verify-email">` — navigating leads outside the Home and
+     throws away the message waiting for login, the same reason that removed the
+     link from "Esqueceu a senha?". Without the callback the shortcut does not
+     appear: whoever has nowhere to send it should not offer the path. */
   onReenviarVerificacao?: () => void;
 }) {
   const t = useTextos().entrada.auth;

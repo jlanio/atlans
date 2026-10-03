@@ -1,70 +1,70 @@
-# Armadilhas conhecidas
+# Known pitfalls
 
-Quase todo defeito desta plataforma é silencioso: o fluxo termina verde e o
-dado está errado. A lista abaixo é o que já mordeu, com o motivo.
+Almost every defect on this platform is silent: the workflow finishes green and the
+data is wrong. The list below is what has already bitten, with the reason.
 
-## Execução
+## Execution
 
-- **Pin em nó de saída suprime a escrita.** O modo Pin devolve o resultado
-  salvo em vez de executar o nó. Num nó de saída isso significa que nada é
-  gravado, nenhum e-mail sai — e a execução reporta sucesso, com o
-  `rowsInserted` da execução em que foi fixado. Pin serve para nó CARO a
-  montante, nunca para nó terminal.
-- **4xx e 5xx do `HttpRequest` contam como sucesso.** Não há
-  `raise_for_status`: um 401 vira saída normal e o fluxo segue. Se o fluxo
-  depende da resposta, ponha um `Conditional` sobre `status_code` logo depois.
-- **Resposta binária do `HttpRequest` vira texto.** O corpo passa por
-  `response.json()` e cai para `response.text`. Um ZIP ou um shapefile é
-  decodificado como string irrecuperável.
-- **Não há suporte a raster.** O motor trabalha com vetor. Pedido que envolve
-  imagem de satélite ou modelo de elevação não tem fluxo possível aqui — diga
-  isso em vez de montar um que não roda.
-- **URL de download dura 5 minutos.** As URLs pré-assinadas de artefato e de
-  arquivo do Drive expiram rápido; use-as na hora, não as guarde. Conteúdo
-  que ficou no executor (`content_location: "executor"`) não tem download
-  remoto nenhum.
+- **Pin on an output node suppresses the write.** Pin mode returns the saved
+  result instead of executing the node. On an output node this means nothing is
+  written, no e-mail goes out — and the run reports success, with the
+  `rowsInserted` of the run in which it was pinned. Pin is for an EXPENSIVE node
+  upstream, never for a terminal node.
+- **`HttpRequest` 4xx and 5xx count as success.** There is no
+  `raise_for_status`: a 401 becomes normal output and the workflow moves on. If the workflow
+  depends on the response, put a `Conditional` on `status_code` right after it.
+- **A binary `HttpRequest` response becomes text.** The body goes through
+  `response.json()` and falls back to `response.text`. A ZIP or a shapefile is
+  decoded as an unrecoverable string.
+- **There is no raster support.** The engine works with vector data. A request that involves
+  satellite imagery or an elevation model has no possible workflow here — say
+  so instead of building one that does not run.
+- **A download URL lasts 5 minutes.** The presigned URLs for artifacts and for
+  Drive files expire quickly; use them right away, do not store them. Content
+  that stayed on the executor (`content_location: "executor"`) has no remote
+  download at all.
 
-## Validação
+## Validation
 
-- **Validação e execução não são a mesma coisa.** A validação simula: resolve
-  o schema de cada nó e percorre o grafo sem gravar linha nem enviar e-mail. O
-  único acesso externo é o do `DatabaseSpatialQuery`, que abre conexão para
-  descobrir as colunas. Um nó `WFS` NÃO é sondado: URL errada passa. O que a
-  validação faz é conferir o catálogo — `unknown_source` (fonte que ninguém
-  catalogou) e `failing_source` (fonte que falhou na última verificação) são
-  avisos; ver o tópico `sources`.
-- **O relatório vem inteiro.** Nome de nó inexistente não interrompe a
-  checagem do resto: ele entra como `unknown_node` no `report.errors[]` junto
-  com tudo o mais. Os códigos que derrubam a definição são `unknown_node`,
-  `duplicate_node_id`, `cycle`, `invalid_credential_id` e `construction_error`
-  — nesse caso a tool devolve o erro `validation` com o `report` junto, e nada
-  é gravado. Corrija tudo e revalide uma vez só.
-- **`schema_source` diz de onde saiu o schema de cada nó.** `static` (do
-  catálogo), `simulated` (o nó rodou a simulação), `declared` (deduzido da
-  definição: `output_vars` do `PythonScript`, `rules`/`fallback_output` do
-  `Switch`, `ports` do `SubWorkflowInput`) ou `unknown` (nó de saída dinâmica
-  sem nada declarável — schema vazio, mas o nó continua na resposta). `unknown`
-  não é reprovação; é "só se sabe em execução".
-- **`disabled_nodes` e `subworkflow_errors` podem vir `null`.** Não é lista
-  vazia: é "não foi checado". Sem `workspace_id` a validação não abre sessão
-  de banco, então não há como saber se um nó está desabilitado na instalação
-  nem se o sub-fluxo referenciado existe. Informe `workspace_id` quando o
-  fluxo tiver sub-fluxo ou credencial — `report.hints` pede isso.
-- **Chaves reservadas.** Ao iterar os schemas por `node_id`, pule toda chave
-  que começa com `__` (`__report__`, `__edge_diagnostics__` e o que vier).
+- **Validation and execution are not the same thing.** Validation simulates: it resolves
+  each node's schema and walks the graph without writing a row or sending an e-mail. The
+  only external access is the one by `DatabaseSpatialQuery`, which opens a connection to
+  discover the columns. A `WFS` node is NOT probed: a wrong URL passes. What
+  validation does is check the catalog — `unknown_source` (a source nobody
+  cataloged) and `failing_source` (a source that failed its last check) are
+  warnings; see the `sources` topic.
+- **The report comes back whole.** A nonexistent node name does not stop the
+  check of the rest: it goes in as `unknown_node` in `report.errors[]` along
+  with everything else. The codes that bring the definition down are `unknown_node`,
+  `duplicate_node_id`, `cycle`, `invalid_credential_id` and `construction_error`
+  — in that case the tool returns the `validation` error with the `report` attached, and nothing
+  is saved. Fix everything and revalidate just once.
+- **`schema_source` says where each node's schema came from.** `static` (from the
+  catalog), `simulated` (the node ran the simulation), `declared` (inferred from the
+  definition: `output_vars` of `PythonScript`, `rules`/`fallback_output` of
+  `Switch`, `ports` of `SubWorkflowInput`) or `unknown` (a dynamic-output node
+  with nothing declarable — empty schema, but the node stays in the response). `unknown`
+  is not a failure; it means "only known at execution time".
+- **`disabled_nodes` and `subworkflow_errors` can come back `null`.** That is not an empty
+  list: it means "not checked". Without `workspace_id` validation does not open a database
+  session, so there is no way to know whether a node is disabled on the installation
+  or whether the referenced sub-workflow exists. Provide `workspace_id` when the
+  workflow has a sub-workflow or a credential — `report.hints` asks for it.
+- **Reserved keys.** When iterating the schemas by `node_id`, skip every key
+  that starts with `__` (`__report__`, `__edge_diagnostics__` and whatever comes next).
 
-## Estrutura
+## Structure
 
-- **Propriedade inventada some.** Não vira erro de execução: o nó a descarta e
-  roda com o default. A validação a acusa como aviso `undeclared_property` —
-  leia os avisos.
-- **`from_key` inexistente não derruba a run**, só omite a porta. A checagem é
-  estática: `edge_from_key_unknown`.
-- **Aresta sem chave saindo de nó com várias saídas** espalha tudo e o filho
-  fica dependendo da ordem das chaves do pai: `edge_spread_ambiguous`.
-- **`fallback_output: ""` no `Switch`** emite a porta `''`, que nenhuma aresta
-  consegue nomear — a fiação a partir dela está morta. A chave ausente cai no
-  default; a chave presente e vazia, não.
-- **Propriedade `object` escrita como texto ilegível** (`rules` do `Switch`,
-  `queryParams`, `headers`) falha na validação de parâmetros antes de o nó
-  executar: `invalid_json_property`.
+- **An invented property disappears.** It does not become an execution error: the node discards it and
+  runs with the default. Validation flags it as an `undeclared_property` warning —
+  read the warnings.
+- **A nonexistent `from_key` does not bring down the run**, it only omits the port. The check is
+  static: `edge_from_key_unknown`.
+- **An edge without a key leaving a node with several outputs** spreads everything, and the child
+  ends up depending on the order of the parent's keys: `edge_spread_ambiguous`.
+- **`fallback_output: ""` on `Switch`** emits the `''` port, which no edge
+  can name — the wiring from it is dead. An absent key falls back to the
+  default; a present but empty key does not.
+- **An `object` property written as unreadable text** (`rules` of `Switch`,
+  `queryParams`, `headers`) fails parameter validation before the node
+  executes: `invalid_json_property`.

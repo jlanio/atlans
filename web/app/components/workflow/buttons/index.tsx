@@ -17,16 +17,17 @@ const ActionsButton = ({ workflow }: ActionsButtonProps) => {
 
   const { id } = useParams<{ id: string }>()
   const { canEdit, canExecute } = useWorkspace()
-  // Sobe junto com o dock do painel de execução — sem isso os botões ficam
-  // atrás da barra. O botão de console saiu daqui: o painel agora tem barra
-  // própria, sempre visível, que já serve de gatilho.
+  // Rises together with the run panel dock — without this the buttons sit
+  // behind the bar. The console button left here: the panel now has its own
+  // bar, always visible, which already serves as the trigger.
   const dockHeight = useRunDockHeight()
 
   return (
-    // Esta barra era a única sem camada declarada: um nó por cima cobria os
-    // botões, o clique ia para o nó e o cursor virava o do canvas. O `z-10` que
-    // havia em cada botão era inerte — `z-index` não faz nada em elemento
-    // `position: static`; a camada tem de ser do CONTÊINER. Ver canvas-layers.
+    // This bar was the only one with no declared layer: a node on top covered the
+    // buttons, the click went to the node and the cursor became the canvas's. The
+    // `z-10` that each button had was inert — `z-index` does nothing on a
+    // `position: static` element; the layer has to belong to the CONTAINER. See
+    // canvas-layers.
     <div
       data-canvas-chrome=""
       className={`${CAMADA_SOBRE_O_CANVAS} left-2 sm:left-4 pl-safe flex flex-col gap-2 transition-[bottom] duration-150`}

@@ -17,11 +17,11 @@ class WorkflowGroupUpdate(BaseModel):
 
 
 class WorkflowGroupReorder(BaseModel):
-    """Nova ordem dos grupos, da primeira posicao para a ultima.
+    """New order of the groups, from the first position to the last.
 
-    A posicao vem do INDICE da lista, e nao de um numero enviado pelo cliente:
-    assim nao existe estado intermediario com duas posicoes iguais, nem sobra
-    para o cliente inventar a numeracao.
+    The position comes from the list's INDEX, not from a number sent by the
+    client: that way there is no intermediate state with two equal positions,
+    and nothing is left for the client to make up the numbering.
     """
     group_ids: List[str] = Field(..., min_length=1)
 
@@ -33,11 +33,12 @@ class WorkflowGroupRead(BaseModel):
     description: Optional[str]
     workspace_id: Optional[str]
     position: int = 0
-    # Todos os workflows nao excluidos do grupo (inativos inclusive) — e o que
-    # a tela de Projetos mostra, e um inativo continua na lista. Contar so os
-    # ativos fazia "3 workflows" virar "2" quando um era desativado.
+    # All non-deleted workflows in the group (inactive ones included) — it is
+    # what the Projects screen shows, and an inactive one stays in the list.
+    # Counting only the active ones made "3 workflows" turn into "2" when one
+    # was deactivated.
     workflow_count: int = 0
-    # So os com `flag_ative`; a tela mostra "3 workflows · 2 ativos".
+    # Only those with `flag_ative`; the screen shows "3 workflows · 2 ativos".
     active_count: int = 0
     created_at: datetime
     updated_at: datetime

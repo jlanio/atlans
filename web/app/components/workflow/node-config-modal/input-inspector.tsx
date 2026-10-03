@@ -13,9 +13,9 @@ interface InputInspectorProps {
 }
 
 /**
- * Painel esquerdo — mostra dados de entrada do nó selecionado.
- * Output keys dos nós pais são arrastáveis (drag) para campos do form.
- * Ao soltar num campo de texto, insere a expressão Jinja {{ Alias.key }}.
+ * Left panel — shows the selected node's input data.
+ * Output keys of the parent nodes can be dragged into form fields.
+ * Dropping onto a text field inserts the Jinja expression {{ Alias.key }}.
  */
 type InputTab = "campos" | "schema"
 
@@ -29,13 +29,13 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
 
   const isPythonNode = nodeFound.data?.name === "PythonScript"
 
-  // Portas declaradas por ESTE nó. Num nó de entradas dinâmicas elas são as que
-  // a pessoa configurou, e é por elas que a variável do script se chama.
+  // Ports declared by THIS node. In a node with dynamic inputs they are the ones
+  // the person configured, and they are what the script variable is named after.
   const portasDeclaradas = ((nodeFound.data?.inputs ?? []) as { name: string }[]).map(p => p.name)
 
-  // PERF: memoiza lookup de pais — evita recalcular O(n) a cada drag no canvas
+  // PERF: memoizes the parent lookup — avoids recomputing O(n) on every canvas drag
   const parentInfos = useMemo(() => {
-    // Deduplica: um pai pode ter múltiplas edges conectadas (ex: output + metadata)
+    // Deduplicates: a parent may have multiple connected edges (e.g. output + metadata)
     const seenIds = new Set<string>()
     const parentNodeIds = parentEdges.map(e => e.source).filter(id => {
       if (seenIds.has(id)) return false
@@ -45,12 +45,12 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
     return parentNodeIds.map(id => {
       const node = allNodes.find(n => n.id === id)
       const status = statusWorkflow?.nodes?.find(n => n.id === id)
-      // Mesma regra do executor (flow/executor/core.py::_resolve_alias), em
-      // utils/node-alias — o painel gera expressões que o usuário arrasta para
-      // o campo, então o alias daqui tem de ser o registrado no contexto.
+      // Same rule as the executor (flow/executor/core.py::_resolve_alias), in
+      // utils/node-alias — the panel generates expressions the user drags into
+      // the field, so the alias here must be the one registered in the context.
       const alias = resolveNodeAlias(node?.data ?? {}) || id.slice(0, 8)
       const staticFields: string[] = saidasDoNo(node?.data).map(f => f.name)
-      // Todas as edges deste pai → quais chaves estão de fato conectadas
+      // All edges from this parent → which keys are actually connected
       const connectedEdges = parentEdges.filter(e => e.source === id)
       const connectedKeys = new Set<string>(
         connectedEdges.flatMap(e => {
@@ -69,17 +69,17 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
     navigator.clipboard.writeText(text)
   }, [])
 
-  // Inicia drag com a expressão Jinja como texto
+  // Starts a drag with the Jinja expression as text
   const handleDragStart = useCallback((e: React.DragEvent, expression: string) => {
     e.dataTransfer.setData("text/plain", expression)
     e.dataTransfer.effectAllowed = "copy"
   }, [])
 
-  // Coleta schema do nó pai para a aba Schema. Mescla:
-  //   - os campos declarados no catálogo (nome + tipo + descrição)
-  //   - output_keys observado em runtime (marca como "dinâmico" se não declarado)
-  // Sem o merge, schema do nó sem campos declarados fica vazio mesmo que o
-  // run real tenha entregado keys.
+  // Collects the parent node's schema for the Schema tab. Merges:
+  //   - the fields declared in the catalog (name + type + description)
+  //   - output_keys observed at runtime (marked "dynamic" if not declared)
+  // Without the merge, the schema of a node with no declared fields stays empty
+  // even if the real run delivered keys.
   const parentStaticOutputs = parentInfos.flatMap(({ alias, node, status }) => {
     const declared = saidasDoNo(node?.data).map(f => ({
       alias, name: f.name, type: f.type, description: f.description, dynamic: false,
@@ -99,9 +99,9 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
           <p className="text-xs text-center">Nenhuma entrada conectada a este nó.</p>
         </div>
 
-        {/* As portas que o nó DECLARA, mesmo sem nada ligado. Sem isto, quem
-            acabou de configurá-las não tinha onde conferir os nomes — e são
-            eles que viram as variáveis do script. */}
+        {/* The ports the node DECLARES, even with nothing connected. Without this,
+            whoever had just configured them had nowhere to check the names — and
+            they are what become the script variables. */}
         {portasDeclaradas.length > 0 && (
           <div className="flex flex-col gap-1.5">
             <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
@@ -147,7 +147,7 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
         </button>
       </div>
 
-      {/* Conteúdo da aba Campos */}
+      {/* Content of the Fields tab */}
       {tab === "campos" && (
         <div className="flex flex-col gap-3 p-4">
           {parentInfos.map(({ id, status, alias, staticFields, connectedKeys, connectedEdges }) => {
@@ -159,21 +159,21 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
             if (keys.size === 0) keys.add("output")
             const outputKeys = Array.from(keys)
 
-            // O nome de chegada segue a mesma regra do executor
-            // (`inputs[to_key if to_key else from_key]`). Antes o painel usava
-            // sempre a chave do PAI — certo enquanto não havia portas nomeadas,
-            // e mentira depois: mandava usar `output` quando a variável se
-            // chamava `pontos`.
+            // The arrival name follows the same rule as the executor
+            // (`inputs[to_key if to_key else from_key]`). The panel used to
+            // always use the PARENT's key — right while there were no named
+            // ports, and a lie afterwards: it told you to use `output` when the
+            // variable was called `pontos`.
             //
-            // Uma linha por ARESTA, e não por chave do pai: o mesmo pai pode
-            // alimentar DUAS portas diferentes deste nó, e aí as duas arestas
-            // carregam o mesmo `from_key`. Listando por chave, a segunda porta
-            // ficava invisível — justamente no cenário que as portas criaram.
+            // One row per EDGE, not per parent key: the same parent can feed
+            // TWO different ports of this node, and then both edges carry the
+            // same `from_key`. Listing by key, the second port was invisible —
+            // precisely in the scenario that ports created.
             const linhas = outputKeys.flatMap(key => {
               const daChave = connectedEdges.filter(e => (e.data?.from_key as string | undefined) === key)
-              // Aresta sem `from_key` atende a qualquer chave (o executor espalha
-              // todas as saídas do pai), mas o `to_key` dela, se houver, continua
-              // sendo o nome de chegada.
+              // An edge without `from_key` serves any key (the executor spreads all
+              // of the parent's outputs), but its `to_key`, if any, is still the
+              // arrival name.
               const semChave = connectedEdges.filter(e => !e.data?.from_key)
               const arestas = daChave.length ? daChave : semChave
               if (!arestas.length) return [{ key, variavel: key, linhaId: key }]
@@ -202,8 +202,8 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
                   </span>
                 )}
 
-                {/* Aviso de schema drift: backend detectou divergencia entre
-                    os campos declarados no catálogo e o output real do nó. */}
+                {/* Schema drift warning: the backend detected a divergence between
+                    the fields declared in the catalog and the node's real output. */}
                 {status?.schema_drift && (status.schema_drift.missing.length > 0 || status.schema_drift.extra.length > 0) && (
                   <div className="text-[10px] text-yellow-700 bg-yellow-500/10 border border-yellow-500/30 rounded px-1.5 py-1 mt-1">
                     <span className="font-semibold">Schema divergente:</span>
@@ -220,24 +220,25 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
                 <div className="flex flex-col gap-1 mt-1">
                   <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Saídas</span>
                   {linhas.map(({ key, variavel, linhaId }) => {
-                    // Regra de visibilidade:
-                    // - connectedKeys.size > 0 → edge com from_key explícito: só a chave
-                    //   conectada é marcada como "fiada" (ponto verde + arrastável).
-                    // - connectedKeys.size === 0 → edge sem from_key (auto-connect de nó
-                    //   sem campos declarados): o executor espalha todos os outputs
-                    //   do pai no namespace, portanto todas as chaves são acessíveis —
-                    //   isWired = true para todas evita falsos negativos.
-                    // - Chave observada em runtime via status.output_keys também conta
-                    //   como wired: o executor entregou esse dado mesmo que a edge tenha
-                    //   from_key específico em outra chave (espalhamento dinamico).
+                    // Visibility rule:
+                    // - connectedKeys.size > 0 → edge with an explicit from_key: only
+                    //   the connected key is marked as "wired" (green dot + draggable).
+                    // - connectedKeys.size === 0 → edge without from_key (auto-connect
+                    //   of a node with no declared fields): the executor spreads all
+                    //   of the parent's outputs into the namespace, so every key is
+                    //   accessible — isWired = true for all avoids false negatives.
+                    // - A key observed at runtime via status.output_keys also counts
+                    //   as wired: the executor delivered that data even if the edge
+                    //   has a specific from_key on another key (dynamic spreading).
                     const isWired = (
                       connectedKeys.size === 0 ||
                       connectedKeys.has(key) ||
                       (status?.output_keys?.includes(key) ?? false)
                     )
-                    // Para o Script Python o que se digita é a VARIÁVEL, então
-                    // tem de ser o nome de chegada. Para os demais a expressão
-                    // Jinja navega pela saída do pai, e a chave é a dele.
+                    // For the Python Script what you type is the VARIABLE, so
+                    // it must be the arrival name. For the others the Jinja
+                    // expression navigates the parent's output, and the key is the
+                    // parent's.
                     const expression = isPythonNode ? variavel : `{{ ${alias}.${key} }}`
                     return (
                       <div
@@ -259,8 +260,8 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
                         <code className="flex-1 text-[11px] font-mono text-foreground">
                           {key}
                           {variavel !== key && (
-                            // A porta é o nome que importa para quem escreve o
-                            // script; a chave do pai fica como procedência.
+                            // The port is the name that matters to whoever writes the
+                            // script; the parent's key stays as provenance.
                             <span className="ml-1 text-muted-foreground">
                               &rarr; <span className="text-foreground">{variavel}</span>
                             </span>
@@ -271,8 +272,8 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" title="Conectado" />
                             <button
                               onClick={() => copyToClipboard(expression)}
-                              // `coarse:`: sem hover o botão de copiar a expressão
-                              // simplesmente não existia no telefone.
+                              // `coarse:`: without hover the copy-expression button
+                              // simply didn't exist on a phone.
                               className="opacity-0 coarse:opacity-70 group-hover:opacity-100 transition-opacity ml-1"
                               title={`Copiar: ${expression}`}
                             >
@@ -298,9 +299,9 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
             )
             const pendentes = portasDeclaradas.filter(p => !ligadas.has(p))
             if (!pendentes.length) return null
-            // Com uma porta ligada e outra não, a lista de pais mostra só a
-            // primeira — e a que falta ficava invisível justamente para quem
-            // ainda precisa ligá-la.
+            // With one port connected and another not, the parent list shows only
+            // the first — and the missing one was invisible precisely to whoever
+            // still needs to connect it.
             return (
               <div className="flex flex-col gap-1.5">
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
@@ -325,7 +326,7 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
         </div>
       )}
 
-      {/* Conteúdo da aba Schema — campos estáticos dos nós pais */}
+      {/* Content of the Schema tab — static fields of the parent nodes */}
       {tab === "schema" && (
         <div className="flex flex-col gap-2 p-4">
           {parentStaticOutputs.length === 0 ? (

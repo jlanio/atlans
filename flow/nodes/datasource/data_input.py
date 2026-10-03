@@ -1,15 +1,15 @@
 """
-DataInput — Entrada de Dados a partir do Drive do Workspace ou de Artefatos.
+DataInput — Data Input from the Workspace Drive or from Artifacts.
 
-Le um arquivo armazenado (contexto Drive ou Artefatos), baixa do MinIO para
-temp e carrega os dados. E o espelho de leitura do DataOutput (saida).
+Reads a stored file (Drive or Artifacts context), downloads it from MinIO to
+temp and loads the data. It's the read-side mirror of DataOutput (output).
 
-Formatos suportados:
-  Geoespaciais  -> GeoJSON, Shapefile (.zip ou .shp), KML, GeoPackage (.gpkg)
-                -> saida: GeoDataFrame (geopandas)
-  Tabulares     -> CSV, XLSX, JSON
-                -> saida: DataFrame (pandas) ou list[dict]
-  Outros        -> bytes brutos ou dict com metadados
+Supported formats:
+  Geospatial    -> GeoJSON, Shapefile (.zip or .shp), KML, GeoPackage (.gpkg)
+                -> output: GeoDataFrame (geopandas)
+  Tabular       -> CSV, XLSX, JSON
+                -> output: DataFrame (pandas) or list[dict]
+  Others        -> raw bytes or dict with metadata
 """
 import asyncio
 import os

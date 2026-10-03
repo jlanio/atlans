@@ -1,11 +1,12 @@
 /**
- * A saída de `print()` chega agregada e SEM `message`.
+ * `print()` output arrives aggregated and WITHOUT `message`.
  *
- * O executor fecha o lote de stdout por bytes e escreve o texto uma vez só, em
- * `extra.lines` — antes ele repetia tudo em `extra.message` e o evento passava do
- * teto de 64 KB, chegando ao painel reduzido aos campos de controle: as 200
- * linhas do lote sumiam de uma vez, em silêncio. Quem lê o evento no cliente
- * precisa, portanto, ler `lines`; ler só `message` deixa a linha vazia.
+ * The executor closes the stdout batch by bytes and writes the text only once,
+ * in `extra.lines` — before, it repeated everything in `extra.message` and the
+ * event went over the 64 KB ceiling, reaching the panel stripped down to the
+ * control fields: the batch's 200 lines vanished at once, silently. Whoever reads
+ * the event on the client therefore needs to read `lines`; reading only
+ * `message` leaves the row empty.
  */
 import { describe, it, expect } from "vitest"
 import { RunEvent } from "@/app/stores/workflowExecutionStore"
@@ -22,15 +23,15 @@ describe("textoDoEvento (aba Bruto)", () => {
   })
 
   it("resume o lote agregado dizendo quantas linhas vieram junto", () => {
-    // Uma linha de painel por evento no stream cru; o conteúdo completo aparece
-    // ao expandir e, uma a uma, na aba "Nós".
+    // One panel row per event in the raw stream; the full content appears when
+    // expanded and, one by one, in the "Nós" (nodes) tab.
     expect(textoDoEvento(evento({ lines: ["um", "dois", "três"] })))
       .toBe("um … (+2 linha(s))")
   })
 
   it("não deixa a linha vazia por falta de `message`", () => {
-    // A regressão concreta: stdout sem `message` aparecia como uma linha em
-    // branco na aba "Bruto", como se o script não tivesse impresso nada.
+    // The concrete regression: stdout without `message` showed up as a blank
+    // row in the "Bruto" (raw) tab, as if the script hadn't printed anything.
     expect(textoDoEvento(evento({ lines: ["saída"], message: null }))).not.toBe("")
   })
 

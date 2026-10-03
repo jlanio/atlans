@@ -8,12 +8,12 @@ import { Skeleton } from "@/app/components/ui/skeleton"
 interface Props {
   title: string
   description?: ReactNode
-  /** Ação no canto superior direito da seção (ex.: "Adicionar membro"). */
+  /** Action in the section's top-right corner (e.g. "Adicionar membro"). */
   action?: ReactNode
   /**
-   * Coloca a `action` numa linha ABAIXO do título/descrição, em vez do canto
-   * superior direito. Para ações largas (um link + um botão) que, num painel
-   * estreito, espremem o título a ponto de quebrá-lo em duas linhas.
+   * Puts the `action` on a line BELOW the title/description, instead of the
+   * top-right corner. For wide actions (a link + a button) that, in a narrow
+   * panel, squeeze the title to the point of breaking it into two lines.
    */
   actionBelow?: boolean
   loading?: boolean
@@ -26,16 +26,17 @@ interface Props {
 }
 
 /**
- * Casca de uma seção do painel de configurações.
+ * Shell of a settings panel section.
  *
- * A ordem de decisão — carregando, depois ERRO, depois vazio — é o ponto todo
- * deste componente. Antes, cada seção fazia `catch { toast }` e deixava a lista
- * vazia: uma falha de rede ao carregar membros virava "Nenhum membro convidado
- * ainda", ou seja, a tela afirmava um fato sobre os dados quando na verdade não
- * tinha dado nenhum. O toast some em segundos e o texto errado fica.
+ * The decision order — loading, then ERROR, then empty — is the whole point of
+ * this component. Before, each section did `catch { toast }` and left the list
+ * empty: a network failure while loading members became "Nenhum membro
+ * convidado ainda" (no members invited yet), i.e. the screen asserted a fact
+ * about the data when in fact it had no data at all. The toast disappears in
+ * seconds and the wrong text stays.
  *
- * Erro também precisa de saída: `onRetry` evita que o usuário tenha de recarregar
- * a página inteira para tentar de novo uma seção.
+ * An error also needs a way out: `onRetry` saves the user from having to reload
+ * the whole page to retry a section.
  */
 export function SheetSection({
   title, description, action, actionBelow,

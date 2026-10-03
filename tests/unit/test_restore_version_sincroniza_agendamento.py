@@ -1,13 +1,13 @@
 # tests/unit/test_restore_version_sincroniza_agendamento.py
-"""Restaurar uma versao tem que levar o agendamento junto.
+"""Restoring a version has to bring the schedule along.
 
-`restore_version` trocava a definition inteira com um `crud.update` seco, sem
-passar pelo hook de agendamento. Voltar para uma versao com outro cron — ou sem
-ScheduleTrigger nenhum — deixava o Schedule antigo valendo no banco: o canvas
-mostrava uma coisa e o AsyncScheduler disparava por outra.
+`restore_version` replaced the whole definition with a bare `crud.update`,
+without going through the scheduling hook. Going back to a version with another
+cron — or with no ScheduleTrigger at all — left the old Schedule in force in the
+database: the canvas showed one thing and the AsyncScheduler fired by another.
 
-Mesmo defeito de classe do "schedule orfao" coberto em
-`test_schedule_orfao_workflow_inativo.py`, por outro caminho.
+Same class of defect as the "orphan schedule" covered in
+`test_schedule_orfao_workflow_inativo.py`, through another path.
 """
 from unittest.mock import AsyncMock, MagicMock
 
@@ -39,7 +39,7 @@ def _definition(cron: str) -> dict:
 
 @pytest.fixture
 def crud():
-    """CRUD falso: a versao guardada tem cron diferente do workflow atual."""
+    """Fake CRUD: the stored version has a different cron from the current workflow."""
     c = MagicMock()
     c.db = MagicMock()
     c.get_version = AsyncMock(return_value=MagicMock(definition=_definition(CRON_DA_VERSAO)))
@@ -59,7 +59,7 @@ def crud():
 
 @pytest.fixture
 def schedule_service(monkeypatch):
-    """Intercepta o ScheduleService dentro do hook real — o hook aqui e o de verdade."""
+    """Intercepts ScheduleService inside the real hook — the hook here is the real one."""
     fake = MagicMock()
     fake.schedule_crud = MagicMock(
         get_by_workflow_hash=AsyncMock(return_value=[
@@ -79,7 +79,7 @@ def schedule_service(monkeypatch):
 
 
 async def test_restaurar_versao_com_outro_cron_substitui_o_agendamento(crud, schedule_service):
-    """A regressao: o Schedule ficava no cron antigo, divergente do canvas."""
+    """The regression: the Schedule stayed on the old cron, diverging from the canvas."""
     await restore_version(crud, "wf-1", 3)
 
     schedule_service.schedule_crud.delete.assert_awaited_once_with("job-antigo")
@@ -88,7 +88,7 @@ async def test_restaurar_versao_com_outro_cron_substitui_o_agendamento(crud, sch
 
 
 async def test_restaurar_versao_sem_schedule_trigger_remove_o_agendamento(crud, schedule_service):
-    """Voltar para antes de existir agendamento nao pode deixar o cron rodando."""
+    """Going back to before a schedule existed must not leave the cron running."""
     crud.get_version.return_value = MagicMock(definition={"nodes": [{"id": "n1", "name": "Outro"}]})
 
     await restore_version(crud, "wf-1", 3)
@@ -97,7 +97,7 @@ async def test_restaurar_versao_sem_schedule_trigger_remove_o_agendamento(crud, 
 
 
 async def test_restaurar_versao_com_mesmo_cron_preserva_o_next_run_at(crud, schedule_service):
-    """Recriar o schedule pularia o disparo do dia — o hook ja evita isso."""
+    """Recreating the schedule would skip the day's trigger — the hook already avoids that."""
     crud.get_version.return_value = MagicMock(definition=_definition(CRON_ATUAL))
 
     await restore_version(crud, "wf-1", 3)
@@ -107,7 +107,7 @@ async def test_restaurar_versao_com_mesmo_cron_preserva_o_next_run_at(crud, sche
 
 
 async def test_falha_no_agendamento_nao_desfaz_a_restauracao(crud, schedule_service):
-    """Best-effort: o update da definition ja esta commitado quando o hook roda."""
+    """Best-effort: the definition update is already committed when the hook runs."""
     schedule_service.create_schedule.side_effect = RuntimeError("banco fora")
 
     wf = await restore_version(crud, "wf-1", 3)

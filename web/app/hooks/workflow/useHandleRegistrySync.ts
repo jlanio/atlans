@@ -5,7 +5,7 @@ import { useUpdateNodeInternals } from "@xyflow/react"
 
 import { INodeContext } from "@/context/useFlowContext"
 
-/** Assinatura dos pontos de conexão de um nó: quais existem, e em que ordem. */
+/** Signature of a node's connection points: which ones exist, and in what order. */
 function assinaturaDeHandles(n: INodeContext): string {
   const portas = (lista: unknown) =>
     ((lista ?? []) as { name: string }[]).map(p => p.name).join(",")
@@ -13,38 +13,39 @@ function assinaturaDeHandles(n: INodeContext): string {
 }
 
 /**
- * Avisa o React Flow quando os pontos de conexão de um nó mudam.
+ * Tells React Flow when a node's connection points change.
  *
- * O React Flow MEDE os handles de cada nó uma vez e guarda posições e ids num
- * registro interno. Handles acrescentados a um nó já renderizado são
- * desenhados pelo React, mas não entram nesse registro — e o resultado é o
- * sintoma que não parece um bug de estado: os pontos aparecem na tela e
- * simplesmente não aceitam conexão. `updateNodeInternals` força a remedição.
+ * React Flow MEASURES each node's handles once and keeps positions and ids in
+ * an internal registry. Handles added to an already rendered node are drawn by
+ * React, but do not enter that registry — and the result is the symptom that
+ * does not look like a state bug: the points appear on screen and simply do
+ * not accept connections. `updateNodeInternals` forces a re-measure.
  *
- * Vale para QUALQUER origem de portas dinâmicas, e não só para as do Script
- * Python: o contrato dos sub-fluxos (`useSubWorkflowContractSync`) muda os
- * mesmos campos e tinha o mesmo defeito, só que ninguém tinha esbarrado nele.
- * A regra é uma só — mudou o conjunto de handles, remeça — então mora num
- * lugar só.
+ * It applies to ANY source of dynamic ports, not only Script Python's: the
+ * sub-workflow contract (`useSubWorkflowContractSync`) changes the same fields
+ * and had the same defect, it is just that nobody had run into it. The rule is
+ * a single one — the set of handles changed, re-measure — so it lives in a
+ * single place.
  *
- * Roda DEPOIS de `data.inputs` já ter mudado: a dependência é a assinatura dos
- * handles, não a das portas. Medir antes de o React ter posto os elementos no
- * DOM leria o nó do jeito antigo, e o efeito não voltaria a rodar.
+ * It runs AFTER `data.inputs` has already changed: the dependency is the
+ * handles' signature, not the ports'. Measuring before React has put the
+ * elements in the DOM would read the node the old way, and the effect would
+ * not run again.
  */
 export function useHandleRegistrySync(nodes: INodeContext[]) {
   const updateNodeInternals = useUpdateNodeInternals()
 
-  // No corpo do hook, a varredura acontecia a cada render do canvas — inclusive
-  // por quadro de arraste, e por mudança de tema ou de status de save. O canvas
-  // entrega uma projeção que só troca de identidade quando um nó entra, sai ou
-  // tem o `data` substituído, e é isso que dá valor ao useMemo aqui.
+  // In the hook body, the scan happened on every canvas render — including per
+  // drag frame, and on theme or save-status changes. The canvas hands over a
+  // projection that only changes identity when a node enters, leaves or has its
+  // `data` replaced, and that is what gives the useMemo here its value.
   const assinatura = useMemo(() => nodes.map(assinaturaDeHandles).join("|"), [nodes])
 
   useEffect(() => {
     if (!nodes.length) return
     updateNodeInternals(nodes.map(n => n.id))
-    // Só a assinatura: arrastar um nó muda `nodes` e não muda handle nenhum, e
-    // remedir tudo a cada quadro de um arrasto custaria caro à toa.
+    // Only the signature: dragging a node changes `nodes` and changes no handle,
+    // and re-measuring everything on every frame of a drag would be costly for nothing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assinatura])
 }

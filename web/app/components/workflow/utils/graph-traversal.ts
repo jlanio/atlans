@@ -1,11 +1,11 @@
 import { Edge } from "@xyflow/react"
 
 /**
- * Travessia do grafo para o realce de caminho.
+ * Graph traversal for path highlighting.
  *
- * Dado um nó âncora, devolve tudo que o alimenta (ancestrais) e tudo que ele
- * alimenta (descendentes), incluindo as arestas percorridas — o resto do canvas
- * é esmaecido pela camada CSS.
+ * Given an anchor node, returns everything that feeds it (ancestors) and
+ * everything it feeds (descendants), including the edges traversed — the rest
+ * of the canvas is dimmed by the CSS layer.
  */
 
 export interface FocusGraph {
@@ -36,9 +36,9 @@ export interface FocusPath {
 }
 
 /**
- * BFS para frente e para trás a partir de `nodeId`. Cada direção tem seu
- * próprio `visited`, então um nó alcançável pelos dois lados (diamante) entra
- * uma vez só nos conjuntos, e ciclos não travam a travessia.
+ * Forward and backward BFS from `nodeId`. Each direction has its own
+ * `visited`, so a node reachable from both sides (diamond) enters the sets
+ * only once, and cycles do not stall the traversal.
  */
 export function collectPath(graph: FocusGraph, nodeId: string): FocusPath {
   const nodes = new Set<string>([nodeId])

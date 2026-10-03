@@ -1,23 +1,23 @@
 # app/core/authorization/workflow_access.py
 """
-Autorização de workflows e workspaces — a casa das guardas, sem FastAPI `Depends`.
+Authorization of workflows and workspaces — the home of the guards, without FastAPI `Depends`.
 
-Até aqui as regras de acesso (workspace do recurso, papel mínimo, workflow
-apagado) viviam só nas dependencies e nos routers da REST. Um segundo
-transporte — o servidor MCP (docs/specs/mcp-server.md §1) — precisa das
-MESMAS regras sem passar por uma request FastAPI. Este módulo é a única
-implementação; `app/api/dependencies.py` importa daqui e re-exporta os nomes
-antigos, então nenhum router muda.
+Until now the access rules (the resource's workspace, minimum role, deleted
+workflow) lived only in the REST dependencies and routers. A second
+transport — the MCP server (docs/specs/mcp-server.md §1) — needs the
+SAME rules without going through a FastAPI request. This module is the only
+implementation; `app/api/dependencies.py` imports from here and re-exports the old
+names, so no router changes.
 
-As respostas continuam `HTTPException` com os status e mensagens de sempre —
-o MCP as traduz para o seu erro de ferramenta. Divergências que existem de
-propósito e ficam preservadas:
-- workflow inexistente ou apagado (`deleted_at`) é 404 ANTES de qualquer 403
-  (não revela se o id existe em outro workspace);
-- `verify_workspace_access` dá 403 (não 404) para recurso sem workspace;
-- execução (`WorkflowRun`) se autoriza pelo workspace DO RUN, não pelo atual do
-  workflow — um workflow movido não entrega o histórico antigo ao novo workspace;
-- `owner` está acima de `admin` na hierarquia de workspace.
+The responses are still `HTTPException` with the usual statuses and messages —
+MCP translates them into its tool error. Divergences that exist on
+purpose and are preserved:
+- a nonexistent or deleted (`deleted_at`) workflow is a 404 BEFORE any 403
+  (does not reveal whether the id exists in another workspace);
+- `verify_workspace_access` gives 403 (not 404) for a resource without a workspace;
+- a run (`WorkflowRun`) is authorized by the RUN'S workspace, not the workflow's
+  current one — a moved workflow does not hand the old history to the new workspace;
+- `owner` is above `admin` in the workspace hierarchy.
 """
 from __future__ import annotations
 
@@ -31,13 +31,13 @@ from app.core.exceptions import WorkflowNotFoundError
 from app.core.rbac import ROLE_OWNER
 from app.models.workspace import Workspace
 
-# ── Papéis de workspace ───────────────────────────────────────────────────────
+# ── Workspace roles ───────────────────────────────────────────────────────────
 
 WORKSPACE_ROLE_ORDER: List[str] = ["viewer", "editor", "operator", "admin", ROLE_OWNER]
 
 
 def _has_min_workspace_role(actual: Optional[str], minimum: str) -> bool:
-    """True se `actual` >= `minimum` na hierarquia de papéis do workspace."""
+    """True if `actual` >= `minimum` in the workspace role hierarchy."""
     if actual is None:
         return False
     try:
@@ -50,10 +50,10 @@ tem_papel_minimo = _has_min_workspace_role
 
 
 def exigir_papel(role: Optional[str], minimo: str, mensagem: Optional[str] = None) -> None:
-    """403 se o papel não alcança o mínimo. A mensagem é a da rota, quando ela tem uma própria.
+    """403 if the role does not reach the minimum. The message is the route's, when it has its own.
 
-    A comparação de papel das rotas passa toda por aqui: a REST pela dependência
-    `workflow_com_papel` e por `exigir_papel_no_workspace`, o MCP direto.
+    Every route role comparison goes through here: REST via the
+    `workflow_com_papel` dependency and via `exigir_papel_no_workspace`, MCP directly.
     """
     if not _has_min_workspace_role(role, minimo):
         raise HTTPException(
@@ -67,8 +67,8 @@ def exigir_papel(role: Optional[str], minimo: str, mensagem: Optional[str] = Non
 
 def verify_workspace_access(resource_workspace_id: Optional[str], user_workspace_ids: List[str]) -> None:
     """
-    Lança HTTP 403 se o resource não pertence a nenhum workspace do usuário.
-    Recursos sem workspace_id são bloqueados — devem ser migrados para ter workspace explícito.
+    Raises HTTP 403 if the resource does not belong to any of the user's workspaces.
+    Resources without a workspace_id are blocked — they must be migrated to have an explicit workspace.
     """
     if not resource_workspace_id:
         raise HTTPException(
@@ -80,12 +80,12 @@ def verify_workspace_access(resource_workspace_id: Optional[str], user_workspace
 
 
 async def listar_workspace_ids(db: AsyncSession, user_id: str) -> List[str]:
-    """id_hash dos workspaces acessíveis ao usuário: dono OU membro, nunca da lixeira.
+    """id_hash of the workspaces accessible to the user: owner OR member, never from the trash.
 
-    UMA query em vez de dois round-trips. Membros sobrevivem ao soft delete (a FK
-    CASCADE só dispara no purge), então o filtro de `deleted_at` no Workspace
-    externo vale para os dois casos — senão um workspace na lixeira continuaria
-    dando acesso a artefatos, Drive e logs.
+    ONE query instead of two round-trips. Members survive the soft delete (the FK
+    CASCADE only fires on purge), so the `deleted_at` filter on the outer
+    Workspace covers both cases — otherwise a workspace in the trash would keep
+    granting access to artifacts, Drive and logs.
     """
     from app.models.workspace_member import WorkspaceMember
 
@@ -109,10 +109,10 @@ async def get_workspace_member_role(
     db: AsyncSession, workspace_id: str, user_id: str
 ) -> Optional[str]:
     """
-    Retorna o role efetivo do usuário no workspace:
-    - "owner" se for dono do workspace
-    - o role do WorkspaceMember se for membro
-    - None se não tiver acesso (ou se o workspace está na lixeira)
+    Returns the user's effective role in the workspace:
+    - "owner" if they own the workspace
+    - the WorkspaceMember role if they are a member
+    - None if they have no access (or if the workspace is in the trash)
     """
     from app.models.workspace_member import WorkspaceMember
 
@@ -144,24 +144,24 @@ async def exigir_papel_no_workspace(
     minimo: str,
     mensagem: Optional[str] = None,
 ) -> str:
-    """Papel do usuário no workspace — ou 403 se ele não alcança `minimo`.
+    """The user's role in the workspace — or 403 if it does not reach `minimo`.
 
-    É a dupla "busca o papel + compara" das rotas cujo workspace vem do corpo ou
-    do recurso (grupos, membros, artefatos, Drive, criação de workflow): escrita
-    à mão, ela se repetia rota a rota, e uma cópia esquecida é uma rota sem
-    papel. Quem não é membro (ou workspace inexistente, ou na lixeira) cai no
-    mesmo 403 — `get_workspace_member_role` devolve None nos três, e distinguir
-    permitiria enumerar workspaces alheios pelo id.
+    It is the "fetch the role + compare" pair of the routes whose workspace comes from the body or
+    from the resource (groups, members, artifacts, Drive, workflow creation): written
+    by hand, it was repeated route after route, and a forgotten copy is a route without a
+    role check. A non-member (or a nonexistent workspace, or one in the trash) falls into the
+    same 403 — `get_workspace_member_role` returns None in all three, and distinguishing them
+    would allow enumerating other people's workspaces by id.
 
-    Rotas que carregam um WORKFLOW pelo path usam a dependência
-    `workflow_com_papel` (app/api/dependencies.py), que também dá o 404 antes.
+    Routes that load a WORKFLOW from the path use the
+    `workflow_com_papel` dependency (app/api/dependencies.py), which also gives the 404 first.
     """
     papel = await get_workspace_member_role(db, workspace_id, user_id)
     exigir_papel(papel, minimo, mensagem)
     return papel
 
 
-# ── Workflows e execuções ─────────────────────────────────────────────────────
+# ── Workflows and runs ────────────────────────────────────────────────────────
 
 
 async def carregar_workflow_acessivel(
@@ -173,17 +173,17 @@ async def carregar_workflow_acessivel(
     decifrar: bool = True,
     aceitar_sem_papel: bool = False,
 ) -> Tuple[object, Optional[str]]:
-    """(workflow, papel) — ou 404 se não existe/apagado, 403 se o usuário não está no workspace.
+    """(workflow, role) — or 404 if it does not exist/is deleted, 403 if the user is not in the workspace.
 
-    `service` é um `WorkflowService`. Com `decifrar=True` (a REST) o workflow vem
-    de `get_workflow_by_hash`, que descriptografa as `connectionString` e as
-    atribui em `wf.definition`. Com `decifrar=False` vem cru de `crud.get_by_hash`:
-    é o caminho de quem só vai ler metadados, redigir a definition ou executar —
-    ninguém precisa do segredo em claro na sessão, e uma definition decifrada
-    presa a um ORM dirty é exatamente o que um flush acidental vazaria. As
-    regras de acesso são as mesmas nos dois caminhos.
+    `service` is a `WorkflowService`. With `decifrar=True` (REST) the workflow comes
+    from `get_workflow_by_hash`, which decrypts the `connectionString`s and
+    assigns them into `wf.definition`. With `decifrar=False` it comes raw from `crud.get_by_hash`:
+    it is the path for callers that will only read metadata, redact the definition or execute —
+    nobody needs the secret in clear text in the session, and a decrypted definition
+    attached to a dirty ORM object is exactly what an accidental flush would leak. The
+    access rules are the same on both paths.
 
-    A ordem 404-antes-de-403 é deliberada: não revela se o id existe em outro
+    The 404-before-403 order is deliberate: it does not reveal whether the id exists in another
     workspace.
     """
     if decifrar:
@@ -199,12 +199,12 @@ async def carregar_workflow_acessivel(
         raise HTTPException(status_code=404, detail=f"Workflow '{id_hash}' não encontrado")
     role = await get_workspace_member_role(db, wf.workspace_id, user_id)
     if role is None:
-        # Membro de workspace SEM dono (`owner_id` nulo: dado antigo ou editado
-        # à mão) não tem papel, porque `get_workspace_member_role` sai cedo sem
-        # dono. Mas pertence ao workspace, como diz `listar_workspace_ids`, e a
-        # listagem mostra o fluxo a ele. Com `aceitar_sem_papel` (a REST), ele
-        # recebe (wf, None): a leitura passa, e toda rota com papel mínimo o
-        # recusa, como antes da guarda única.
+        # A member of a workspace WITHOUT an owner (`owner_id` null: old or hand-edited
+        # data) has no role, because `get_workspace_member_role` exits early without
+        # an owner. But they belong to the workspace, as `listar_workspace_ids` says, and the
+        # listing shows them the workflow. With `aceitar_sem_papel` (REST), they
+        # get (wf, None): reading goes through, and every route with a minimum role
+        # refuses them, as before the single guard.
         if aceitar_sem_papel and wf.workspace_id in await listar_workspace_ids(db, user_id):
             return wf, None
         raise HTTPException(status_code=403, detail="Acesso negado a este recurso.")
@@ -212,11 +212,11 @@ async def carregar_workflow_acessivel(
 
 
 async def papel_no_workspace_do_run(db: AsyncSession, run, user_id: str) -> Optional[str]:
-    """Papel do usuário no workspace em que a execução de fato rodou (`run.workspace_id`).
+    """The user's role in the workspace where the run actually ran (`run.workspace_id`).
 
-    É o critério de cancelar/ver uma execução: um workflow pode ter sido movido
-    depois do disparo, e quem controla o workspace novo não manda no histórico
-    do antigo. Sem bypass de admin global — quem quiser esse atalho o faz na
-    rota, explicitamente, como hoje.
+    It is the criterion for canceling/viewing a run: a workflow may have been moved
+    after the trigger, and whoever controls the new workspace has no say over the old
+    one's history. No global admin bypass — anyone who wants that shortcut does it in the
+    route, explicitly, as today.
     """
     return await get_workspace_member_role(db, run.workspace_id, user_id)

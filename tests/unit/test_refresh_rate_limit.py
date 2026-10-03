@@ -1,10 +1,10 @@
-"""Rate limit de /auth/refresh por FAMÍLIA (refresh_rate_exceeded).
+"""Rate limit of /auth/refresh per FAMILY (refresh_rate_exceeded).
 
-O limite por IP transformava o hop interno Next→API num balde único de
-plataforma: estourá-lo devolvia 429, que o front tratava como "refresh
-expirado" e deslogava todo mundo. Agora o limite é por sessão (família) — um
-usuário nunca esgota a cota de outro. Estes testes fixam a contagem, a janela
-e o teto.
+The per-IP limit turned the internal Next→API hop into a single platform-wide
+bucket: exceeding it returned 429, which the front end treated as "refresh
+expired" and logged everyone out. Now the limit is per session (family) — one
+user never exhausts another's quota. These tests pin the counting, the window
+and the ceiling.
 """
 import pytest
 from unittest.mock import patch
@@ -21,7 +21,7 @@ CHAVE = f"{_REFRESH_RATE_PREFIX}fam-1"
 
 
 def _redis(contagem_anterior: int | None = None) -> RedisFalso:
-    """Redis em memória; `contagem_anterior` é o que a família já gastou na janela."""
+    """In-memory Redis; `contagem_anterior` is what the family has already spent in the window."""
     r = RedisFalso()
     if contagem_anterior is not None:
         r.dados[CHAVE] = contagem_anterior
@@ -34,7 +34,7 @@ async def test_dentro_do_teto_nao_excede():
     r = _redis()
     with patch("app.core.redis.get_redis_pool", return_value=r):
         assert await refresh_rate_exceeded("fam-1") is False
-    # a chave é por família, e a primeira contagem arma a janela
+    # the key is per family, and the first count arms the window
     assert r.dados == {CHAVE: 1}
     assert r.ttls[CHAVE] == _REFRESH_RATE_WINDOW
 
@@ -56,10 +56,10 @@ async def test_acima_do_teto_excede():
 
 @pytest.mark.asyncio
 async def test_contagens_seguintes_nao_empurram_a_janela():
-    # 2ª contagem em diante NÃO re-arma o TTL (janela fixa): senão uma sessão
-    # em laço nunca veria a janela fechar.
+    # From the 2nd count on it does NOT re-arm the TTL (fixed window): otherwise a
+    # session in a loop would never see the window close.
     r = _redis(1)
-    r.ttls[CHAVE] = 12  # a janela já está correndo
+    r.ttls[CHAVE] = 12  # the window is already running
     with patch("app.core.redis.get_redis_pool", return_value=r):
         await refresh_rate_exceeded("fam-1")
     assert r.ttls[CHAVE] == 12
@@ -67,7 +67,7 @@ async def test_contagens_seguintes_nao_empurram_a_janela():
 
 @pytest.mark.asyncio
 async def test_familias_distintas_baldes_distintos():
-    # Duas famílias → duas chaves diferentes; uma não consome a cota da outra.
+    # Two families → two different keys; one does not consume the other's quota.
     r = _redis()
     with patch("app.core.redis.get_redis_pool", return_value=r):
         await refresh_rate_exceeded("fam-A")

@@ -9,30 +9,30 @@ import { montarPayloadDoGrafo, useSaveWorkflow } from "@/app/hooks/workflow/useS
 import { rotuloDeSalvo } from "./utils/rotulo-de-salvo"
 import { cn } from "@/lib/utils"
 
-/** Inatividade exigida antes de comparar o grafo com o último snapshot. */
+/** Inactivity required before comparing the graph with the last snapshot. */
 const ATRASO_DA_DETECCAO_MS = 300
 
-/** Cadência com que "Salvo há N min" é recalculado em repouso. */
+/** How often "Salvo há N min" is recomputed while idle. */
 const TIQUE_DO_RELOGIO_MS = 30_000
 
 /**
- * Detecta edições não salvas comparando o grafo com o último snapshot.
+ * Detects unsaved edits by comparing the graph with the last snapshot.
  *
- * Mora aqui, e não em `useSaveWorkflow`, porque aquele hook está montado em
- * vários pontos da árvore do canvas (editor, botão Salvar, botão Executar, este
- * chip) — a detecção rodava uma vez por montagem a cada quadro de arraste, cada
- * passada mapeando todos os nós e serializando o grafo inteiro. Este indicador
- * é o único ponto montado uma vez só, e é ele quem mostra o resultado.
+ * It lives here, not in `useSaveWorkflow`, because that hook is mounted at
+ * several points of the canvas tree (editor, Save button, Run button, this
+ * chip) — detection ran once per mount on every drag frame, each pass mapping
+ * every node and serializing the whole graph. This indicator is the only spot
+ * mounted exactly once, and it is the one that shows the result.
  *
- * A comparação é adiada: durante um arraste `nodes` troca de identidade a cada
- * pointermove, e comparar por quadro fazia fluxos com Script Python ou SQL
- * grandes virarem slideshow. O preço é o rótulo aparecer até 300ms depois da
- * edição.
+ * The comparison is deferred: during a drag `nodes` changes identity on every
+ * pointermove, and comparing per frame turned workflows with large Python
+ * Script or SQL nodes into a slideshow. The price is the label appearing up to
+ * 300ms after the edit.
  */
 function useDeteccaoDeAlteracoes() {
-  // Assinaturas só como GATILHO: quem lê o grafo é o `getState()` lá embaixo,
-  // depois do atraso. Este componente não renderiza nada dependente delas, então
-  // o custo por quadro de arraste é um render vazio e um re-agendamento.
+  // Subscriptions only as a TRIGGER: what reads the graph is the `getState()`
+  // further down, after the delay. This component renders nothing that depends
+  // on them, so the cost per drag frame is an empty render and a reschedule.
   const nodes = useNodes<INodeContext>()
   const edges = useEdges()
   const workflowName = useWorkflowSaveStore(s => s.workflowName)
@@ -51,30 +51,30 @@ function useDeteccaoDeAlteracoes() {
       const store = useWorkflowSaveStore.getState()
 
       if (!store.isDirty(nodesReq, edgesReq, store.workflowName)) {
-        // Voltou ao estado salvo (desfez a edição, apagou o que tinha criado): o
-        // aviso não tem mais razão de existir. Só o 'unsaved' é derrubado — os
-        // outros estados não são deduzidos do grafo.
+        // Back to the saved state (undid the edit, deleted what it had created): the
+        // warning no longer has a reason to exist. Only 'unsaved' is dropped — the
+        // other states are not deduced from the graph.
         if (store.saveStatus === 'unsaved') store.setStatus('idle')
         return
       }
 
-      // Autocorreção APENAS dentro da janela de hidratação (ver
-      // `autocorrigirSnapshot`): o snapshot inicial, tirado logo após
-      // setNodes/setEdges, pode divergir sutilmente do estado atual porque o
-      // ReactFlow ainda estava medindo dimensions/positions.
+      // Self-correction ONLY inside the hydration window (see
+      // `autocorrigirSnapshot`): the initial snapshot, taken right after
+      // setNodes/setEdges, may differ subtly from the current state because
+      // ReactFlow was still measuring dimensions/positions.
       //
-      // A regra é de TEMPO, não "a primeira diferença que aparecer". Como esta
-      // comparação é debounced, a primeira diferença que ela vê já é o resultado
-      // FINAL do arraste (ou do Aplicar no modal): uma flag de uso único engolia
-      // a edição inteira dentro do snapshot de referência — sem "Não salvo",
-      // com Ctrl+S caindo no early-return do isDirty e com o Executar mandando o
-      // executor rodar a definição anterior.
+      // The rule is about TIME, not "the first difference that shows up". Since
+      // this comparison is debounced, the first difference it sees is already
+      // the FINAL result of the drag (or of Apply in the modal): a one-shot flag
+      // swallowed the whole edit into the reference snapshot — no "Não salvo",
+      // with Ctrl+S hitting isDirty's early return and Run telling the executor
+      // to run the previous definition.
       if (store.autocorrigirSnapshot(nodesReq, edgesReq, store.workflowName)) return
 
-      // Um save em voo, uma falha e o pedido de nome não são estados que o grafo
-      // desfaz. A remedição do ReactFlow também troca a identidade de `nodes`,
-      // e rebaixava "Falha ao salvar" a "Não salvo" logo depois da falha —
-      // levando junto o botão de tentar de novo.
+      // An in-flight save, a failure and the name prompt are not states the graph
+      // undoes. ReactFlow's re-measuring also changes the identity of `nodes`,
+      // and downgraded "Falha ao salvar" to "Não salvo" right after the failure —
+      // taking the retry button along with it.
       if (store.saveStatus === 'idle' || store.saveStatus === 'saved') store.setStatus('unsaved')
     }, ATRASO_DA_DETECCAO_MS)
 
@@ -82,7 +82,7 @@ function useDeteccaoDeAlteracoes() {
   }, [nodes, edges, workflowName, lastSavedSnapshot, flowStore])
 }
 
-/** Re-renderiza a cada tique enquanto `ativo`, para "há N min" não envelhecer. */
+/** Re-renders on every tick while `ativo`, so "há N min" doesn't go stale. */
 function useRelogio(ativo: boolean) {
   const [, tique] = useReducer((n: number) => n + 1, 0)
   useEffect(() => {
@@ -99,18 +99,18 @@ interface Rotulo {
 }
 
 /**
- * Estado do salvamento, ao lado do caminho do workflow.
+ * Save state, next to the workflow path.
  *
- * Fica visível SEMPRE que há algo a dizer — inclusive em repouso ("Salvo há 5
- * min"). A versão anterior era uma pílula centrada que sumia 3s depois do save
- * e não mostrava nada no estado normal: entre um "Salvo" que passava rápido e
- * um "Salvando…" que durava o tempo do PUT, a impressão era de que não havia
- * feedback nenhum. O erro ganhou estado próprio, com o retry no lugar em que
- * se lê a falha; antes ele caía em "Não salvo" e a mensagem ia embora com o
- * toast.
+ * Visible WHENEVER there is something to say — including while idle ("Salvo há
+ * 5 min"). The previous version was a centered pill that disappeared 3s after
+ * the save and showed nothing in the normal state: between a "Salvo" that went
+ * by fast and a "Salvando…" that lasted as long as the PUT, the impression was
+ * that there was no feedback at all. The error got its own state, with the
+ * retry where the failure is read; before, it fell into "Não salvo" and the
+ * message went away with the toast.
  *
- * Renderizar como filho de `<WorkflowLocation>`: é ela quem posiciona a fileira
- * sobre o canvas e dá aos filhos diretos o `pointer-events` (o retry precisa).
+ * Render as a child of `<WorkflowLocation>`: it is what positions the row over
+ * the canvas and gives its direct children `pointer-events` (the retry needs it).
  */
 const GlobalSaveIndicator = () => {
   const status = useWorkflowSaveStore(s => s.saveStatus)
@@ -125,7 +125,7 @@ const GlobalSaveIndicator = () => {
   const rotulo: Rotulo | null = (() => {
     switch (status) {
       case 'idle':
-        // Sem save conhecido (workflow novo) não há o que afirmar.
+        // With no known save (new workflow) there is nothing to state.
         return emRepouso
           ? { texto: rotuloDeSalvo(lastSavedAt), icone: <TbCloudCheck size={13} />, classe: "text-muted-foreground" }
           : null
@@ -147,9 +147,9 @@ const GlobalSaveIndicator = () => {
   return (
     <div
       role="status"
-      // Em repouso o texto muda sozinho a cada minuto; anunciar isso num leitor
-      // de tela seria um relógio falante. Os outros estados são resposta a uma
-      // ação do usuário, e aí o anúncio é o feedback.
+      // While idle the text changes by itself every minute; announcing that on a
+      // screen reader would be a talking clock. The other states are responses
+      // to a user action, and there the announcement is the feedback.
       aria-live={emRepouso ? "off" : "polite"}
       title={status === 'error' ? lastError ?? undefined : undefined}
       data-save-status={status}

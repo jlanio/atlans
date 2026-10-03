@@ -1,11 +1,11 @@
 // desktop/scripts/fetch-python.mjs
 //
-// Baixa o CPython standalone descrito em desktop/python-runtime.json, confere o
-// SHA-256 e extrai em desktop/resources/python/.
+// Downloads the standalone CPython described in desktop/python-runtime.json,
+// checks the SHA-256 and extracts it into desktop/resources/python/.
 //
-// Idempotente: se o runtime ja esta la com a versao certa, nao faz nada — e o
-// que torna o cache do CI util. O tarball fica em resources/.cache/ para que um
-// rebuild local nao rebaixe 40 MB.
+// Idempotent: if the runtime is already there with the right version, it does
+// nothing — that is what makes the CI cache useful. The tarball stays in
+// resources/.cache/ so that a local rebuild does not re-download 40 MB.
 //
 //   node scripts/fetch-python.mjs [--force]
 import fs from 'node:fs'
@@ -22,12 +22,12 @@ const cacheDir = path.join(RESOURCES, '.cache')
 const tarball = path.join(cacheDir, spec.asset)
 const stamp = path.join(PY_DIR, '.runtime-spec.json')
 
-// ── Ja instalado? ────────────────────────────────────────────────────────────
+// ── Already installed? ───────────────────────────────────────────────────────
 if (!force && fs.existsSync(PY_EXE) && fs.existsSync(stamp)) {
   const atual = JSON.parse(fs.readFileSync(stamp, 'utf8'))
   if (atual.release === spec.release && atual.asset === spec.asset) {
-    // Confere que o interpretador realmente roda: um cache do CI restaurado pela
-    // metade passaria no teste de existencia do arquivo e falharia so no pip.
+    // Checks that the interpreter actually runs: a half-restored CI cache would
+    // pass the file-existence test and only fail at pip.
     const v = pythonCapture(['-c', 'import sys; print(sys.version.split()[0])']).trim()
     if (v === spec.version) {
       ok(`runtime ${spec.version} (${spec.release}) ja presente — nada a fazer`)
@@ -59,9 +59,9 @@ if (precisaBaixar) {
   ok(`${mb(buf.length)} MB baixados`)
 }
 
-// ── Verificacao ──────────────────────────────────────────────────────────────
-// Antes de extrair, sempre. Uma release re-publicada com outro binario e
-// exatamente o cenario que o pin de hash existe para pegar.
+// ── Verification ─────────────────────────────────────────────────────────────
+// Before extracting, always. A release republished with a different binary is
+// exactly the scenario the hash pin exists to catch.
 const hash = sha256(tarball)
 if (hash !== spec.sha256) {
   fail(
@@ -74,9 +74,9 @@ if (hash !== spec.sha256) {
 }
 ok(`SHA-256 confere (${hash.slice(0, 16)}…)`)
 
-// ── Extracao ─────────────────────────────────────────────────────────────────
-// O install_only extrai como `python/…`, entao extraimos em resources/ e o
-// diretorio nasce com o nome certo.
+// ── Extraction ───────────────────────────────────────────────────────────────
+// install_only extracts as `python/…`, so we extract into resources/ and the
+// directory is born with the right name.
 rmrf(PY_DIR)
 tarExtract(tarball, RESOURCES)
 if (!fs.existsSync(PY_EXE)) fail(`extracao nao produziu ${PY_EXE}`)

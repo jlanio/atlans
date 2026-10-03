@@ -1,9 +1,9 @@
 """
-Bulk de usuarios admin sem N+1.
+Admin user bulk operations without N+1.
 
-Regressao: bulk_suspend/reactivate/delete faziam um get_user (SELECT) + um
-commit + um refresh POR usuario — 3N round-trips. Agora: um get_users_by_ids
-(1 SELECT com IN) + um commit por lote.
+Regression: bulk_suspend/reactivate/delete did a get_user (SELECT) + a
+commit + a refresh PER user — 3N round-trips. Now: one get_users_by_ids
+(1 SELECT with IN) + one commit per batch.
 """
 from unittest.mock import AsyncMock, MagicMock
 
@@ -17,8 +17,8 @@ from unittest.mock import AsyncMock as _AsyncMock_seg16
 
 @_pytest_seg16.fixture(autouse=True)
 def _patch_revoga_executores(monkeypatch):
-    """SEG-16: isola estes testes (token/commit) da revogacao de executores,
-    que faz suas proprias consultas ao banco."""
+    """SEG-16: isolates these tests (token/commit) from executor revocation,
+    which makes its own database queries."""
     monkeypatch.setattr(
         "app.services.executor_service.revogar_executores_do_usuario",
         _AsyncMock_seg16(return_value=[]),
@@ -43,7 +43,7 @@ async def test_get_users_by_ids_uma_query():
     out = await svc.get_users_by_ids(db, ["a", "b", "c"])
 
     assert set(out) == {"a", "b"}
-    db.execute.assert_awaited_once()  # NAO um por id
+    db.execute.assert_awaited_once()  # NOT one per id
     sql = str(db.execute.await_args[0][0]).lower()
     assert "in (" in sql or "in(" in sql, "deve usar IN, nao N selects"
 
@@ -62,8 +62,8 @@ async def test_get_users_by_ids_lista_vazia_nao_consulta():
 async def test_bulk_suspend_um_commit_para_muitos():
     db = MagicMock()
     db.commit = AsyncMock()
-    # A cascata de revogacao dos tokens de acesso roda um UPDATE na mesma
-    # sessao (sem commit proprio) — por isso `execute` precisa ser awaitable.
+    # The access token revocation cascade runs an UPDATE in the same
+    # session (without its own commit) — that is why `execute` must be awaitable.
     db.execute = AsyncMock()
     users = [_user("a"), _user("b"), _user("c")]
 
@@ -71,7 +71,7 @@ async def test_bulk_suspend_um_commit_para_muitos():
 
     assert all(u.status == "suspended" for u in users)
     assert all(u.suspended_at is not None for u in users)
-    db.commit.assert_awaited_once()  # UM commit, nao tres
+    db.commit.assert_awaited_once()  # ONE commit, not three
 
 
 @pytest.mark.asyncio
@@ -92,7 +92,7 @@ async def test_bulk_reactivate_limpa_suspended_at():
 async def test_bulk_soft_delete_marca_deleted():
     db = MagicMock()
     db.commit = AsyncMock()
-    db.execute = AsyncMock()  # cascata de revogacao dos tokens (sem commit proprio)
+    db.execute = AsyncMock()  # token revocation cascade (without its own commit)
     users = [_user("a"), _user("b")]
 
     await svc.bulk_soft_delete(db, users)
@@ -140,7 +140,7 @@ async def test_bulk_suspend_endpoint_carrega_uma_vez(client, mock_current_user):
     async def _bulk_suspend(db, elig, **kwargs):
         calls["suspend"] += 1
         assert [u.id_hash for u in elig] == ["u-ativo"]
-        # `motivo`/`por`: a rota passa o motivo da UI adiante em vez de descarta-lo.
+        # `motivo`/`por`: the route passes the UI's reason along instead of discarding it.
         assert "motivo" in kwargs and "por" in kwargs
 
     import app.api.routers.admin_users_router as mod

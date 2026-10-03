@@ -1,9 +1,10 @@
-"""Politica de espera entre tentativas — flow/utils/backoff.py.
+"""Wait policy between attempts — flow/utils/backoff.py.
 
-O defeito que estes testes travam nao e "a espera cresce errado": e a espera
-crescer IGUAL para todo mundo. Nove dos dez pontos de retry da plataforma
-calculavam potencias de dois sem dispersao, entao a frota de executores que caiu
-junto voltava junto, no mesmo milissegundo, contra um rate limit de balde unico.
+The defect these tests lock down is not "the wait grows wrong": it is the wait
+growing THE SAME for everyone. Nine of the platform's ten retry points computed
+powers of two without dispersion, so the fleet of executors that went down
+together came back together, in the same millisecond, against a single-bucket
+rate limit.
 """
 import httpx
 import pytest
@@ -18,8 +19,8 @@ class TestComJitter:
             assert FATOR_JITTER_MIN * 10.0 <= v <= 10.0
 
     def test_nunca_excede_o_valor_pedido(self):
-        # Jitter PROPORCIONAL, nao aditivo: e o que garante que o teto de quem
-        # chama continua sendo teto. Um `delay + uniform(0, j)` estouraria.
+        # PROPORTIONAL jitter, not additive: it is what guarantees the caller's ceiling
+        # stays a ceiling. A `delay + uniform(0, j)` would overshoot.
         assert all(com_jitter(5.0) <= 5.0 for _ in range(200))
 
     def test_zero_e_negativo_nao_viram_espera(self):
@@ -27,15 +28,15 @@ class TestComJitter:
         assert com_jitter(-3) == 0.0
 
     def test_dispersa_de_fato(self):
-        # O ponto inteiro do modulo. Se isto virar um valor so, dois executores
-        # que falharam no mesmo instante retentam no mesmo instante.
+        # The whole point of the module. If this becomes a single value, two executors
+        # that failed at the same instant retry at the same instant.
         assert len({com_jitter(10.0) for _ in range(50)}) > 40
 
 
 class TestEsperaExponencial:
     def test_cresce_com_a_tentativa(self):
-        # Comparacao entre faixas, e nao entre amostras: com jitter de 50-100%
-        # uma amostra da tentativa 0 pode, sozinha, superar uma da tentativa 1.
+        # Comparison between ranges, not between samples: with 50-100% jitter
+        # a sample from attempt 0 can, by itself, exceed one from attempt 1.
         media = lambda t: sum(espera_exponencial(t, teto=1000) for _ in range(200)) / 200
         assert media(0) < media(1) < media(2) < media(3)
 
@@ -43,7 +44,7 @@ class TestEsperaExponencial:
         assert all(espera_exponencial(40, teto=30) <= 30 for _ in range(100))
 
     def test_inicial_define_a_primeira_espera(self):
-        # Faixa da tentativa 0 com inicial=4: entre 2 e 4.
+        # Range of attempt 0 with inicial=4: between 2 and 4.
         for _ in range(100):
             assert 2.0 <= espera_exponencial(0, inicial=4.0, teto=100) <= 4.0
 
@@ -52,31 +53,31 @@ class TestEsperaExponencial:
 
     @pytest.mark.parametrize("tentativa", [64, 1023, 1024, 5000, 10 ** 6])
     def test_contador_alto_satura_em_vez_de_estourar(self, tentativa):
-        """Regressao: `base ** tentativa` e float e estoura perto de 2**1024.
+        """Regression: `base ** tentativa` is a float and overflows near 2**1024.
 
-        O `2 ** n` INTEIRO que esta funcao substituiu tinha precisao arbitraria
-        e apenas saturava no teto. Com float, `espera_exponencial(1024, teto=300)`
-        levantava OverflowError — e o `consecutive_errors` do ciclo do GeoSync
-        nao tem limite superior: so zera num ciclo bem-sucedido. Pior, a chamada
-        mora DENTRO do `except Exception:` do ciclo, entao o OverflowError
-        escapava do handler e do `while True` (que so protege CancelledError),
-        matando a task de sincronizacao em silencio — exatamente a falha que o
-        isolamento por ciclo existe para impedir.
+        The INTEGER `2 ** n` this function replaced had arbitrary precision
+        and merely saturated at the ceiling. With float, `espera_exponencial(1024, teto=300)`
+        raised OverflowError — and the GeoSync cycle's `consecutive_errors` has no
+        upper bound: it only resets on a successful cycle. Worse, the call lives
+        INSIDE the cycle's `except Exception:`, so the OverflowError escaped the
+        handler and the `while True` (which only protects CancelledError),
+        silently killing the sync task — exactly the failure that per-cycle
+        isolation exists to prevent.
         """
         assert 150.0 <= espera_exponencial(tentativa, teto=300) <= 300.0
 
     def test_base_que_nao_cresce_nao_e_truncada(self):
-        # O corte do expoente vale so para `base > 1`. Com base <= 1 nao ha
-        # estouro possivel, e truncar mudaria o valor em vez de proteger.
+        # The exponent cap only applies for `base > 1`. With base <= 1 no overflow is
+        # possible, and truncating would change the value instead of protecting it.
         assert espera_exponencial(500, inicial=1.0, base=0.5, teto=10) < 1e-9
 
 
 class TestHttpRetryPreservaOContrato:
-    """A troca da formula de espera nao pode mexer em QUEM e retentado.
+    """Changing the wait formula must not touch WHO gets retried.
 
-    `async_request_with_retry` tem tres comportamentos que os callers dependem:
-    status transitorio esgotado devolve o ultimo Response (o caller decide o
-    `raise_for_status`), erro de transporte esgotado PROPAGA, e 4xx nao retenta.
+    `async_request_with_retry` has three behaviors the callers depend on:
+    an exhausted transient status returns the last Response (the caller decides
+    on `raise_for_status`), an exhausted transport error PROPAGATES, and 4xx is not retried.
     """
 
     @pytest.fixture(autouse=True)
@@ -105,7 +106,7 @@ class TestHttpRetryPreservaOContrato:
         )
         assert resp.status_code == 503
         assert len(chamadas) == 3
-        # Duas esperas para tres tentativas, ambas dispersas dentro da faixa.
+        # Two waits for three attempts, both dispersed within the range.
         assert len(self.esperas) == 2
         assert all(0 < e <= 2.0 for e in self.esperas)
 

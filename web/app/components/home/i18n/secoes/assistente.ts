@@ -1,26 +1,26 @@
 // web/app/components/home/i18n/secoes/assistente.ts
 //
-// O assistente da Home: a barra do hero, o painel lateral, a pilha, a linha do
-// tempo das ferramentas, a confirmação por clique, a cota e os anexos. O
-// português é o texto de sempre, byte a byte.
+// The Home assistant: the hero bar, the side panel, the stack, the tools
+// timeline, the click-to-confirm, the quota and the attachments. The Portuguese
+// is the usual text, byte for byte.
 //
-// Os ERROS por código (`erros`) só valem em inglês e espanhol: em português a
-// tela continua mostrando a mensagem exata que o servidor mandou.
+// The ERRORS by code (`erros`) only apply in English and Spanish: in Portuguese
+// the screen keeps showing the exact message the server sent.
 
 import { plural } from "@/lib/formatos"
 
 const pt = {
-  /** O nome que entra nas frases do leitor de tela ("O assistente está respondendo."). */
+  /** The name that goes into the screen reader sentences ("O assistente está respondendo."). */
   nome: "assistente",
   barra: {
-    /** As frases digitadas no campo vazio do hero, uma por vez, em ciclo. */
+    /** The sentences typed into the hero's empty field, one at a time, in a cycle. */
     sugestoes: [
       "Mostre os focos de calor das últimas 24 h em Mato Grosso",
       "Faça um buffer de 500 m nas escolas de municipios.shp e mostre no globo",
       "Quais áreas foram desmatadas em 2025 num raio de 50 km de Sinop?",
       "Cruze os focos de hoje com as terras indígenas e me dê um resumo",
     ],
-    /** Os chips abaixo da barra, só no hero. Clicar preenche o campo. */
+    /** The chips below the bar, only in the hero. Clicking fills the field. */
     chips: [
       "Focos de calor das últimas 24 h em Mato Grosso",
       "Qual o último polígono de embargo registrado no Brasil?",
@@ -41,7 +41,7 @@ const pt = {
   },
   painel: {
     titulo: "Assistente",
-    /** A alça de largura do painel (o `useResizablePanel` a rotula em português). */
+    /** The panel's width handle (`useResizablePanel` labels it in Portuguese). */
     redimensionar: "Redimensionar painel",
     dicaRedimensionar: "Arraste para redimensionar · duplo clique para restaurar",
     novaConversa: "Nova conversa",
@@ -57,7 +57,7 @@ const pt = {
     respondendo: (nome: string) => `O ${nome} está respondendo.`,
     trabalhando: "Trabalhando",
     raciocinio: "Raciocínio",
-    /** Quem perguntou, na legenda de uma linha ("Você · pergunta"). */
+    /** Who asked, in the one-line caption ("Você · pergunta"). */
     voce: "Você",
   },
   pilha: {
@@ -83,7 +83,7 @@ const pt = {
     prazo: "Vale por 15 minutos.",
     sim: "sim",
     nao: "não",
-    /** Os rótulos dos argumentos que descrevem o ALVO da ação, pela chave. */
+    /** The labels of the arguments that describe the action's TARGET, by key. */
     campos: {
       name: "Nome",
       workflow_name: "Fluxo",
@@ -113,7 +113,7 @@ const pt = {
     rotulo: (detalhe: string) => `Cota do dia: ${detalhe}`,
   },
   anexos: {
-    /** Vai NA MENSAGEM (a pessoa a vê na bolha e o assistente a lê). */
+    /** Goes IN THE MESSAGE (the person sees it in the bubble and the assistant reads it). */
     referencia: (nomes: string) => `Arquivos que acabei de enviar ao Drive deste workspace: ${nomes}`,
     analise: (nome: string) => `Analise ${nome}`,
     analiseMais: (nome: string, outros: string) => `Analise ${nome} e mais ${outros}`,
@@ -132,7 +132,7 @@ const pt = {
     lote: (maximo: number) => `Enviando os primeiros ${maximo} arquivos.`,
     loteDica: (soltos: number) => `Você soltou ${soltos} de uma vez. Solte o resto em seguida.`,
     naoEnviou: (nome: string) => `Não foi possível enviar «${nome}».`,
-    /** O painel das recusas (o `ResultadoDoUpload` do Drive). */
+    /** The rejections panel (the Drive's `ResultadoDoUpload`). */
     resultado: {
       enviados: (n: number) => plural(n, "enviado"),
       falhas: (n: number) => plural(n, "falha"),
@@ -162,7 +162,7 @@ const pt = {
   etapa: {
     pensando: "Pensando",
   },
-  /** A linha do tempo diz o que o assistente FAZ, nunca o nome cru da API. */
+  /** The timeline says what the assistant DOES, never the raw API name. */
   ferramentas: {
     list_workspaces: "Listando workspaces",
     list_workflows: "Listando fluxos",
@@ -210,9 +210,9 @@ const pt = {
     delete_drive_file: "Apagar arquivo do Drive",
   } as Record<string, string>,
   /**
-   * Os erros conhecidos, pelo `code` do quadro. Em português a tela mostra a
-   * mensagem do servidor como veio; estes textos só entram em inglês e espanhol
-   * (e ficam aqui, em português, como o molde das chaves).
+   * The known errors, by the frame's `code`. In Portuguese the screen shows the
+   * server message as it came; these texts only come in for English and Spanish
+   * (and stay here, in Portuguese, as the template for the keys).
    */
   erros: {
     loop_limit: {
@@ -231,13 +231,13 @@ const pt = {
     nao_encontrada: { message: () => "Conversa não encontrada.", hint: "" },
     expirada: { message: () => "A confirmação expirou ou já foi decidida.", hint: "" },
     rejeitada: { message: () => "Mensagem recusada.", hint: "" },
-    // `rate_limited` no stream é a cota DIÁRIA do assistente (app/mcp/cotas.py);
-    // o 429 da própria rota é `muitas_requisicoes`, dado pelo cliente.
+    // `rate_limited` in the stream is the assistant's DAILY quota (app/mcp/cotas.py);
+    // the route's own 429 is `muitas_requisicoes`, assigned by the client.
     rate_limited: { message: () => "Você atingiu a cota diária do assistente.", hint: "a cota reabre 24 horas depois da sua primeira conversa" },
     muitas_requisicoes: { message: () => "Muitas mensagens em pouco tempo. Espere um instante.", hint: "" },
     desligado: { message: () => "O assistente não está disponível nesta instalação.", hint: "" },
-    // A trava da conversa (assistente_service.trava_exclusiva): outra aba, ou
-    // um reenvio antes de o servidor soltar o turno anterior.
+    // The conversation lock (assistente_service.trava_exclusiva): another tab, or
+    // a resend before the server releases the previous turn.
     conversa_em_andamento: {
       message: () => "Já há uma resposta em andamento nesta conversa.",
       hint: "espere ela terminar, ou recarregue a outra aba aberta",

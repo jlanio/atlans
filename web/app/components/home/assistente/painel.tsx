@@ -2,10 +2,10 @@
 
 // web/app/components/home/assistente/painel.tsx
 //
-// A conversa FLUTUANTE sobre o globo — fork da gaveta do editor (`assistente/
-// index.tsx`), com o contrato de altura do #111 e sem os `nowheel/nopan/nodrag`
-// (aqui não há React Flow embaixo). O aberto/recolhido vive no `homeStore`; a
-// largura, no `useResizablePanel`.
+// The FLOATING conversation over the globe — a fork of the editor drawer
+// (`assistente/index.tsx`), with the height contract from #111 and without the
+// `nowheel/nopan/nodrag` (there is no React Flow underneath here). Open/collapsed
+// lives in `homeStore`; the width, in `useResizablePanel`.
 
 import { useCallback, useEffect, useRef } from "react"
 import { TbChevronDown, TbPencilPlus, TbPlayerStopFilled, TbSend, TbSparkles } from "react-icons/tb"
@@ -38,16 +38,16 @@ interface Props {
   estado: IAssistenteEstado | null
   turnos: TurnoDoAssistente[]
   correndo: boolean
-  /** O replay da conversa selecionada ainda está vindo. */
+  /** The replay of the selected conversation is still coming in. */
   carregandoReplay?: boolean
-  /** Devolve o foco ao campo quando o painel abriu por atalho/botão. */
+  /** Returns focus to the field when the panel was opened by shortcut/button. */
   autoFoco?: boolean
   enviar: (mensagem: string) => Promise<void> | void
   confirmar: (toolUseId: string, token: string, decisao: "confirmar" | "recusar") => Promise<ResultadoDaDecisao> | void
   parar: () => void
-  /** Anexa arquivos escolhidos no "+" (o mesmo caminho do arraste). */
+  /** Attaches files chosen in the "+" (the same path as dragging). */
   aoAnexar?: (arquivos: File[]) => void
-  /** Aciona o controle de localização do globo (o "Usar minha localização" do "+"). */
+  /** Triggers the globe's location control (the "+"'s "Usar minha localização"). */
   aoPedirLocalizacao?: () => void
 }
 
@@ -57,22 +57,22 @@ export default function Painel({
 }: Props) {
   const recolher = useHomeStore((s) => s.recolherBarra)
   const novaConversa = useHomeStore((s) => s.novaConversa)
-  // Os cartões (confirmação, camada, respostas rápidas) e a regra "clicou,
-  // travou" vivem no hook partilhado com a faixa ao centro: são a MESMA
-  // conversa em duas vistas.
+  // The cards (confirmation, layer, quick replies) and the "clicked, locked"
+  // rule live in the hook shared with the center strip: they are the SAME
+  // conversation in two views.
   const extras = useExtrasDoAssistente({ confirmar, correndo, enviar })
   const isMobile = useIsMobile()
   const idioma = useIdiomaDaTela()
   const t = useTextos().assistente
 
-  // O rascunho também vive na store: Ctrl+I recolhe para a barra e DESMONTA
-  // este painel — num estado local, o atalho apagava o que estava escrito.
-  // Partilhado com a barra, o texto atravessa a troca nos dois sentidos.
+  // The draft also lives in the store: Ctrl+I collapses to the bar and UNMOUNTS
+  // this panel — with local state, the shortcut erased what had been typed.
+  // Shared with the bar, the text survives the swap in both directions.
   const rascunho = useHomeStore((s) => s.rascunho)
   const definirRascunho = useHomeStore((s) => s.definirRascunho)
-  // Os anexos, pelo mesmo motivo: o recurso não pode sumir só porque a pessoa
-  // recolheu a barra em painel (a gaveta do editor foi o achado 4 da revisão 3
-  // — um recurso numa superfície e não na outra).
+  // The attachments, for the same reason: the feature must not vanish just because
+  // the person collapsed the bar into the panel (the editor drawer was finding 4 of
+  // review 3 — a feature on one surface and not the other).
   const anexos = useHomeStore((s) => s.anexos)
   const arrastando = useHomeStore((s) => s.arrastandoArquivo)
   const removerAnexo = useHomeStore((s) => s.removerAnexo)
@@ -80,9 +80,9 @@ export default function Painel({
   const descartarAnexosRecusados = useHomeStore((s) => s.descartarAnexosRecusados)
   const campoRef = useRef<HTMLTextAreaElement>(null)
 
-  // Alternar desmonta o componente focado e o foco cai no <body>: o próximo Tab
-  // recomeça do topo do documento. Só quando a troca foi pedida (atalho/botão) —
-  // roubar o foco na carga da página seria pior.
+  // Toggling unmounts the focused component and focus falls to <body>: the next Tab
+  // starts over from the top of the document. Only when the swap was requested
+  // (shortcut/button) — stealing focus on page load would be worse.
   useEffect(() => {
     if (autoFoco) campoRef.current?.focus()
   }, [autoFoco])
@@ -98,8 +98,9 @@ export default function Painel({
 
   const submeter = useCallback(() => {
     const texto = rascunho.trim()
-    // Com anexo pronto e campo vazio, o envio é a referência sozinha — quem
-    // soltou o arquivo já disse o que quer. Só os PRONTOS entram e só eles saem.
+    // With an attachment ready and the field empty, the submission is the reference
+    // alone — whoever dropped the file already said what they want. Only the READY
+    // ones go in and only they go out.
     if (!texto && anexosProntos(anexos).length === 0) return
     if (correndo) return
     definirRascunho("")
@@ -110,23 +111,23 @@ export default function Painel({
   const cota = estado?.cota ?? null
   const estourou = cota != null && cota.gasto >= cota.teto
 
-  // A pergunta sugerida quando há anexo pronto — a mesma da barra.
+  // The suggested question when there is a ready attachment — the same as the bar's.
   const sugestaoDeAnexo = sugestaoParaAnexos(anexos, idioma)
   const temAnexoPronto = sugestaoDeAnexo !== null
 
   return (
     <aside
-      // A largura vai por CSS var, e o telefone é decidido por MEDIA QUERY e
-      // não por JS: o `useIsMobile` devolve `false` no 1º render de cada
-      // instância, e um painel de 420px ancorado à direita nascia com 84px
-      // fora da tela num telefone de 360px antes de saltar para tela cheia.
+      // The width goes through a CSS var, and the phone is decided by MEDIA QUERY and
+      // not by JS: `useIsMobile` returns `false` on each instance's 1st render,
+      // and a 420px panel anchored to the right started with 84px off screen on
+      // a 360px phone before jumping to full screen.
       //
-      // `absolute` e não `fixed`: a raiz da HomeView já é `relative` e começa
-      // DEPOIS do sidebar. Fixo, o canto de referência era o da viewport, e o
-      // painel/barra pintavam por cima do HomeSidebar.
+      // `absolute` and not `fixed`: the HomeView root is already `relative` and
+      // starts AFTER the sidebar. With fixed, the reference corner was the
+      // viewport's, and the panel/bar painted over the HomeSidebar.
       style={{ "--largura-painel": `${width}px` } as React.CSSProperties}
       className={cn(
-        // Entra da direita, com fade (globals.css); zero sob `prefers-reduced-motion`.
+        // Enters from the right, with a fade (globals.css); zero under `prefers-reduced-motion`.
         "home dark home-painel-entra absolute z-30 flex flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl",
         "max-md:inset-x-3 max-md:bottom-3 max-md:top-16 max-md:pb-safe",
         "md:bottom-6 md:right-6 md:h-[min(640px,calc(100svh-6rem))] md:max-h-[calc(100svh-3rem)] md:w-[var(--largura-painel)]",
@@ -137,8 +138,8 @@ export default function Painel({
       {!isMobile && (
         <div
           {...resizeHandleProps}
-          // Depois do spread: o hook rotula a alça em português (é dele o
-          // resto do app); aqui ela fala o idioma da Home.
+          // After the spread: the hook labels the handle in Portuguese (the rest of the
+          // app is its domain); here it speaks the Home's language.
           aria-label={t.painel.redimensionar}
           title={t.painel.dicaRedimensionar}
           className="group/alca absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize touch-none focus-visible:outline-none"
@@ -180,12 +181,12 @@ export default function Painel({
         correndo={correndo}
         extras={extras}
         nome={t.nome}
-        // A conversa vazia padrão é a do EDITOR: manda descrever um fluxo e
-        // fala em aplicar no canvas, que aqui não existe.
+        // The default empty conversation is the EDITOR's: it asks you to describe a
+        // workflow and talks about applying it on the canvas, which does not exist here.
         vazio={carregandoReplay ? <CarregandoConversa /> : <Primeira />}
-        // O item pendente com a marca do site: aqui quem pensa é o site.
+        // The pending item with the site's logo: here the one thinking is the site.
         indicador={MarcaAnimada}
-        // O cursor terracota no fim do parágrafo que está sendo escrito.
+        // The terracotta cursor at the end of the paragraph being written.
         cursorAoEscrever
       />
 
@@ -202,8 +203,8 @@ export default function Painel({
 
       <form
         className="shrink-0 border-t border-border p-2"
-        // O realce do arraste na gaveta segue o mesmo contrato da barra
-        // (`data-arraste`), só que aqui o alvo é o composer, não uma pílula.
+        // The drag highlight in the drawer follows the same contract as the bar
+        // (`data-arraste`), except that here the target is the composer, not a pill.
         data-arraste={arrastando}
         onSubmit={(e) => { e.preventDefault(); submeter() }}
       >
@@ -249,9 +250,9 @@ export default function Painel({
 }
 
 /**
- * O convite da Home. O da Conversa é o do EDITOR — manda descrever um fluxo e
- * fala em "aplicar no canvas", duas coisas que não existem em `/` e que ainda
- * contradiziam o placeholder logo abaixo ("O que você quer saber?").
+ * The Home's invitation. The Conversa's is the EDITOR's — it asks you to describe
+ * a workflow and talks about "aplicar no canvas", two things that do not exist on
+ * `/` and that also contradicted the placeholder right below ("O que você quer saber?").
  */
 function Primeira() {
   const t = useTextos().assistente.painel
@@ -271,7 +272,7 @@ function Primeira() {
   )
 }
 
-/** O replay da conversa está a caminho — não é uma conversa vazia. */
+/** The conversation replay is on its way — this is not an empty conversation. */
 function CarregandoConversa() {
   const t = useTextos().assistente.painel
   return (

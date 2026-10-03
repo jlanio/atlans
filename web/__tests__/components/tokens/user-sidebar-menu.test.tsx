@@ -4,16 +4,16 @@ import type { ComponentProps } from "react"
 import type { ExtensaoDoWeb } from "@/extensoes"
 
 /**
- * O menu do usuário oferece Tema, Configurações e Log out — e o que as
- * extensões somarem (`itensDaConta`; o item dos planos tem teste na pasta da
- * extensão).
+ * The user menu offers Theme, Settings and Log out — plus whatever the
+ * extensions add (`itensDaConta`; the plans item is tested in the extension's
+ * folder).
  *
- * «Tokens de acesso» continua FORA, por decisão de produto (a página
- * /settings/tokens só abre para o administrador do sistema, que chega a ela
- * pela paleta Ctrl+K ou pela URL; quem não é admin pede o token a ele).
+ * "Tokens de acesso" (access tokens) stays OUT, by product decision (the page
+ * /settings/tokens only opens for the system administrator, who reaches it
+ * through the Ctrl+K palette or the URL; non-admins ask them for the token).
  *
- * Nenhum item daqui navega: o `proxy.ts:66` devolve `/` a quem não é admin,
- * então uma rota seria um beco sem saída.
+ * No item here navigates: `proxy.ts:66` sends non-admins back to `/`, so a
+ * route would be a dead end.
  */
 
 const roteador = vi.hoisted(() => ({ push: vi.fn() }))
@@ -31,19 +31,19 @@ vi.mock("@/context/ThemeContext", () => ({
 const sidebar = vi.hoisted(() => ({ isMobile: false, setOpenMobile: vi.fn() }))
 vi.mock("@/app/components/ui/sidebar", () => ({
   useSidebar: () => sidebar,
-  // Só o botão de verdade importa aqui; `size` é uma variante visual do original.
+  // Only the real button matters here; `size` is a visual variant of the original.
   SidebarMenuButton: ({ children, size: _size, ...props }: ComponentProps<"button"> & { size?: string }) => (
     <button {...props}>{children}</button>
   ),
 }))
 
-// O `className` é capturado: é por ele que o teste de tema vê a paleta que o
-// menu repassa às Preferências.
+// The `className` is captured: it's how the theme test sees the palette the
+// menu passes on to Preferences.
 vi.mock("@/app/components/sidebar/user-preferences-dialog", () => ({
   UserPreferencesDialog: (p: { className?: string }) => <div data-testid="prefs" data-classe={p.className ?? ""} />,
 }))
 
-// O núcleo sozinho; um teste pendura uma extensão de mentira.
+// The core alone; one test hangs a fake extension on it.
 const registro = vi.hoisted(() => ({ EXTENSOES: [] as ExtensaoDoWeb[] }))
 vi.mock("@/extensoes", async (original) => ({ ...(await original<typeof import("@/extensoes")>()), EXTENSOES: registro.EXTENSOES }))
 
@@ -103,15 +103,15 @@ describe("Menu do usuário — o que ele oferece", () => {
   })
 
   it("Log out cai na Home anônima, não no modal de entrada", async () => {
-    // A Home é pública: abrir o modal em cima de quem acabou de sair seria insistência.
+    // Home is public: opening the modal over someone who just logged out would be pushy.
     await abrirMenu()
     fireEvent.click(screen.getByRole("menuitem", { name: /Log out/i }))
     expect(vi.mocked(signOut)).toHaveBeenCalledWith({ callbackUrl: "/" })
   })
 
   it("Configurações abre o diálogo de Preferências em vez de trocar de rota", async () => {
-    // Um clique por abertura: o menu fecha ao selecionar, e clicar em fila
-    // sobre nós já desmontados não mediria nada.
+    // One click per opening: the menu closes on select, and clicking in a row
+    // on already-unmounted nodes wouldn't measure anything.
     await abrirMenu()
     fireEvent.click(screen.getByRole("menuitem", { name: /Configurações/i }))
     expect(roteador.push).not.toHaveBeenCalled()
@@ -125,8 +125,8 @@ describe("Menu do usuário — o que ele oferece", () => {
   })
 
   it("com CODIGO_FONTE_URL, o código-fonte da instalação entra como link que abre fora (AGPL §13)", async () => {
-    // Não é rota desta aplicação: é um <a> para fora, em outra aba. Sem a
-    // variável (os outros testes), o item não existe.
+    // It isn't a route of this application: it's an outbound <a>, in another
+    // tab. Without the variable (the other tests), the item doesn't exist.
     render(
       <CodigoFonteProvider url="https://codigo.example.org/fulana/atlans">
         <UserSidebar />
@@ -146,9 +146,9 @@ describe("Menu do usuário — o que ele oferece", () => {
 })
 
 describe("Menu do usuário — a paleta dos portais", () => {
-  // O menu e as Preferências são portais no <body>, fora da árvore de quem os
-  // abriu: a Home (sempre escura) passa `home-portal`, senão abriam claros por
-  // cima dela. Sem a prop, o comportamento é o de sempre.
+  // The menu and Preferences are portals in <body>, outside the tree of
+  // whoever opened them: Home (always dark) passes `home-portal`, otherwise
+  // they opened light on top of it. Without the prop, the behavior is the usual.
   it("repassa portalClassName ao menu e às Preferências", async () => {
     const menu = await abrirMenu({ portalClassName: "home-portal" })
     expect(menu.className).toContain("home-portal")

@@ -1,22 +1,23 @@
 # tests/unit/test_contributing_reflete_o_repo.py
 """
-A arvore de arquivos do CONTRIBUTING descreve o repositorio de verdade.
+The CONTRIBUTING file tree describes the actual repository.
 
-A renomeacao `worker -> agent -> executor` parou no meio: o codigo virou
-`executor_*`, e o CONTRIBUTING continuou documentando arquivos `agent_*` que nao
-existem mais. Alem disso, a arvore chegou a citar `flow/executor.py` — um arquivo
-que nao existe (o motor virou o pacote `flow/executor/`).
+The `worker -> agent -> executor` rename stopped halfway: the code became
+`executor_*`, and CONTRIBUTING kept documenting `agent_*` files that no longer
+exist. On top of that, the tree once cited `flow/executor.py` — a file that
+does not exist (the engine became the `flow/executor/` package).
 
-Isso nao e cosmetico. O CONTRIBUTING e o primeiro lugar onde alguem novo procura
-"onde fica o dispatch de jobs"; um mapa que aponta para arquivos inexistentes
-custa a essa pessoa a confianca no resto do documento.
+This is not cosmetic. CONTRIBUTING is the first place a newcomer looks for
+"where is the job dispatch"; a map pointing to nonexistent files costs that
+person their trust in the rest of the document.
 
-O teste reconstroi o CAMINHO de cada `.py` a partir da indentacao do desenho
-ASCII e exige que ele exista naquele caminho. A versao anterior so comparava o
-basename com um glob `**/nome.py`, entao `flow/executor.py` (inexistente) passava
-porque `app/models/executor.py` tem o mesmo basename — um falso positivo que
-mascarava justamente o tipo de erro que o teste deveria pegar. Nao valida o
-inverso (arquivo sem mencao): a arvore e um resumo curado, nao um `ls`.
+The test rebuilds the PATH of each `.py` from the indentation of the ASCII
+drawing and requires it to exist at that path. The previous version only
+compared the basename against a `**/nome.py` glob, so `flow/executor.py`
+(nonexistent) passed because `app/models/executor.py` has the same basename — a
+false positive that masked precisely the kind of error the test should catch. It
+does not validate the reverse (a file with no mention): the tree is a curated
+summary, not an `ls`.
 """
 from __future__ import annotations
 
@@ -26,31 +27,32 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[2]
 DOC = RAIZ / "CONTRIBUTING.md"
 
-# Marcadores de galho do desenho de arvore; cada nivel de indentacao antes deles
-# ocupa 4 colunas ("│   " ou "    ").
+# Branch markers of the tree drawing; each indentation level before them
+# takes 4 columns ("│   " or "    ").
 _GALHO = re.compile(r"[├└]── ")
 
 
 def _arquivos_com_caminho() -> list[tuple[int, str]]:
-    """(linha, caminho relativo a raiz) de cada `.py` citado nas arvores.
+    """(line, path relative to the root) of each `.py` cited in the trees.
 
-    Reconstroi o diretorio empilhando os nos-diretorio (que terminam em `/`) por
-    profundidade de indentacao, para que o caminho completo — nao so o basename —
-    seja verificado. O CONTRIBUTING tem mais de uma arvore: a principal (raiz
-    `atlans/`, = raiz do repo) e a de testes (raiz `tests/`). Uma linha `nome/`
-    sem galho e sem indentacao e a raiz de uma arvore e define o prefixo dos
-    caminhos seguintes: uma pasta que existe na raiz do repo (`tests/`) vira o
-    prefixo; outro nome (`atlans/`) e o proprio repo. Nao pelo nome da pasta do
-    clone: o CI clona na pasta com o nome do repositorio, e um repositorio com
-    outro nome (um fork, a copia publica) quebraria o teste.
+    Rebuilds the directory by stacking the directory nodes (which end in `/`)
+    by indentation depth, so that the full path — not just the basename — is
+    checked. CONTRIBUTING has more than one tree: the main one (root
+    `atlans/`, = repo root) and the tests one (root `tests/`). A `nome/` line
+    with no branch and no indentation is the root of a tree and sets the prefix
+    of the following paths: a folder that exists at the repo root (`tests/`)
+    becomes the prefix; any other name (`atlans/`) is the repo itself. Not by
+    the clone folder's name: CI clones into a folder named after the repository,
+    and a repository with another name (a fork, the public copy) would break
+    the test.
     """
     achados: list[tuple[int, str]] = []
     pilha: dict[int, str] = {}  # profundidade -> nome do diretorio naquele nivel
-    base = ""                   # prefixo da (sub)arvore atual
+    base = ""                   # prefix of the current (sub)tree
     for i, linha in enumerate(DOC.read_text(encoding="utf-8").splitlines(), 1):
         m = _GALHO.search(linha)
         if not m:
-            # Raiz de uma (sub)arvore: `nome/` puro, sem galho e sem indentacao.
+            # Root of a (sub)tree: a bare `nome/`, with no branch and no indentation.
             token = re.split(r"\s{2,}|#", linha, maxsplit=1)[0]
             if re.fullmatch(r"[A-Za-z0-9_]+/", token):
                 nome_raiz = token.rstrip("/")
@@ -58,8 +60,8 @@ def _arquivos_com_caminho() -> list[tuple[int, str]]:
                 pilha = {}
             continue
         profundidade = m.start() // 4
-        # nome do item: primeiro token apos o galho, antes de qualquer comentario
-        # (o desenho usa espacos duplos ou `#` para os comentarios de cada linha).
+        # item name: first token after the branch, before any comment
+        # (the drawing uses double spaces or `#` for each line's comments).
         nome = re.split(r"\s{2,}|#", linha[m.end():], maxsplit=1)[0].strip()
         if nome.endswith("/"):
             pilha[profundidade] = nome.rstrip("/")
@@ -88,10 +90,10 @@ def test_todo_arquivo_py_citado_na_arvore_existe():
 
 
 def test_o_vocabulario_agent_nao_voltou_ao_documento():
-    """`agent` foi o nome do meio numa renomeacao ja concluida no codigo.
+    """`agent` was the middle name in a rename already completed in the code.
 
-    Mantê-lo no documento faz o leitor procurar por um vocabulario que o
-    repositorio abandonou.
+    Keeping it in the document makes the reader search for a vocabulary the
+    repository has abandoned.
     """
     problemas = [
         f"CONTRIBUTING.md:{i} — {linha.strip()}"

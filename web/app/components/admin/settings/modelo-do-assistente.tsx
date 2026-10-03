@@ -1,11 +1,11 @@
 "use client"
 
-// Trocar o modelo do assistente.
+// Switching the assistant's model.
 //
-// O núcleo é o seletor: o modelo em uso, o catálogo do provedor e o salvar.
-// Uma extensão (`web/extensoes`) pode envolvê-lo com o que a troca muda nela —
-// uma de planos pagos, por exemplo, soma a cota de cada plano e a conta do
-// custo e da margem com o modelo escolhido. Sem extensão, é só o seletor.
+// The core is the selector: the model in use, the provider's catalog and save.
+// An extension (`web/extensoes`) can wrap it with what the switch changes in it —
+// a paid-plans one, for example, adds each plan's quota and the cost and margin
+// calculation with the chosen model. Without an extension, it is just the selector.
 
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react"
 import { TbAlertTriangle, TbCheck, TbSearch } from "react-icons/tb"
@@ -26,12 +26,12 @@ interface Props {
 export function ModeloDoAssistente({ painel, onTrocado }: Props) {
   const [escolhido, setEscolhido] = useState<string>(painel.atual.modelo)
   const [filtro, setFiltro] = useState("")
-  // Uma gravação em curso — a do modelo, aqui, ou a de uma extensão. Um estado
-  // só, para os botões das duas esperarem juntos.
+  // A save in progress — the model's, here, or an extension's. A single state,
+  // so the buttons of both wait together.
   const [salvando, setSalvando] = useState(false)
 
-  // A carga nova do pai é a verdade: depois de salvar, o modelo escolhido tem
-  // de acompanhar, senão o botão continua oferecendo salvar o que já está lá.
+  // The parent's new load is the truth: after saving, the chosen model has to
+  // follow, otherwise the button keeps offering to save what is already there.
   useEffect(() => { setEscolhido(painel.atual.modelo) }, [painel.atual.modelo])
 
   const catalogo = useMemo(() => {
@@ -101,10 +101,10 @@ export function ModeloDoAssistente({ painel, onTrocado }: Props) {
     </div>
   )
 
-  // Cada extensão envolve o que veio antes dela: a primeira envolve o seletor.
-  // Se um envoltório falha (um defeito dele, ou o pedaço sob demanda que não
-  // chegou), fica o que ele envolvia: o seletor e o «Voltar ao padrão» são a
-  // saída de emergência desta tela, e não podem cair junto.
+  // Each extension wraps what came before it: the first wraps the selector.
+  // If a wrapper fails (a defect of its own, or the on-demand chunk that did not
+  // arrive), what it wrapped remains: the selector and "Voltar ao padrão" are
+  // this screen's emergency exit, and must not go down with it.
   const corpo = EXTENSOES.reduce<ReactNode>((filho, extensao) => {
     const Envoltorio = extensao.painelDoModelo?.Envoltorio
     if (!Envoltorio) return filho
@@ -125,7 +125,7 @@ export function ModeloDoAssistente({ painel, onTrocado }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* ── O que está em uso ───────────────────────────────────────────── */}
+      {/* ── What is in use ──────────────────────────────────────────────── */}
       <p className="flex flex-wrap items-baseline gap-2 text-sm">
         Em uso agora: <b className="font-mono text-[13px]">{painel.atual.modelo}</b>
         <span className="rounded-full border bg-muted px-2 py-px text-[10.5px] text-muted-foreground">
@@ -138,8 +138,8 @@ export function ModeloDoAssistente({ painel, onTrocado }: Props) {
       {painel.catalogo_indisponivel && (
         <p role="status" className="flex items-start gap-2 rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
           <TbAlertTriangle size={14} className="mt-px shrink-0" aria-hidden="true" />
-          {/* Provedor fora do ar não derruba a tela: o admin ainda precisa ver
-              o que está em uso e poder voltar ao padrão. */}
+          {/* A provider being down does not bring down the screen: the admin still
+              needs to see what is in use and be able to go back to the default. */}
           <span>
             Não foi possível ler o catálogo do provedor
             {painel.catalogo_indisponivel === "sem_credencial"
@@ -150,8 +150,8 @@ export function ModeloDoAssistente({ painel, onTrocado }: Props) {
         </p>
       )}
 
-      {/* Um envoltório pode chegar sob demanda (`lazy`): enquanto ele carrega,
-          o seletor aparece sozinho. */}
+      {/* A wrapper may arrive on demand (`lazy`): while it loads, the
+          selector appears alone. */}
       <Suspense fallback={seletor}>{corpo}</Suspense>
 
       {/* ── Salvar ───────────────────────────────────────────────────────── */}

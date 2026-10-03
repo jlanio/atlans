@@ -9,9 +9,10 @@ const TAMANHOS = {
 }
 
 /**
- * Avatar de iniciais com a cor de identidade e, no workspace padrão, o selo de
- * casa. O `WorkspaceBadge` do cabeçalho não carrega o selo; aqui ele importa,
- * porque a tela de workspaces é o único lugar que lista todos lado a lado.
+ * Initials avatar with the identity color and, on the default workspace, the
+ * home badge. The header's `WorkspaceBadge` does not carry the badge; here it
+ * matters, because the workspaces screen is the only place that lists them all
+ * side by side.
  */
 export function WorkspaceAvatar({
   workspace,

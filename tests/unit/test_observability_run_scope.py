@@ -1,15 +1,16 @@
 # tests/unit/test_observability_run_scope.py
-"""Escopo de acesso ao historico de execucoes.
+"""Access scope for the run history.
 
-A observabilidade autorizava runs pelo `Workflow.workspace_id` — o workspace
-ATUAL do workflow. Com a rota de mover workflow entre workspaces isso vira um
-vazamento nos dois sentidos: os membros do workspace de destino passariam a ver
-todo o historico produzido na origem (error_message, node_stats, host do
-executor), e quem so tem acesso a origem perderia a visao dele.
+Observability authorized runs by `Workflow.workspace_id` — the workflow's
+CURRENT workspace. With the route that moves a workflow between workspaces this
+becomes a leak in both directions: the members of the destination workspace
+would start seeing all the history produced at the origin (error_message,
+node_stats, executor host), and those who only have access to the origin would
+lose their view of it.
 
-`WorkflowRun.workspace_id` e gravado no despacho e nunca muda — e o dado
-historico correto. E tambem o criterio que o WebSocket de logs sempre usou e o
-que os artefatos ja usam.
+`WorkflowRun.workspace_id` is written at dispatch and never changes — it is the
+correct historical data. It is also the criterion the logs WebSocket has always
+used and the one artifacts already use.
 """
 from unittest.mock import AsyncMock, MagicMock
 
@@ -32,19 +33,19 @@ def test_filtro_usa_o_workspace_do_run_e_nao_do_workflow():
 
     sql = str(filtros[0])
     assert "workflow_runs.workspace_id" in sql
-    # A subquery antiga sobre workflows nao pode voltar: ela seguia o workflow
-    # para o novo workspace, levando o historico junto.
+    # The old subquery on workflows must not come back: it followed the workflow
+    # to the new workspace, taking the history along.
     assert "workflows" not in sql
 
 
 def test_filtro_nao_tem_escape_por_workspace_nulo():
-    """O `OR workspace_id IS NULL` nao pode voltar.
+    """The `OR workspace_id IS NULL` must not come back.
 
-    Ele existia para preservar historico legado, mas o preco era entregar esse
-    historico — error_message, node_stats, host do executor — a QUALQUER usuario
-    autenticado, de qualquer tenant. A migration 20260828_0001 atribuiu os runs
-    antigos ao workspace certo e tornou a coluna NOT NULL, entao nao ha mais
-    legado a acomodar.
+    It existed to preserve legacy history, but the price was handing that
+    history — error_message, node_stats, executor host — to ANY authenticated
+    user, from any tenant. Migration 20260828_0001 assigned the old runs to
+    the right workspace and made the column NOT NULL, so there is no more
+    legacy to accommodate.
     """
     sql = str(_run_filter(_user(), ["ws-1"])[0])
 
@@ -52,7 +53,7 @@ def test_filtro_nao_tem_escape_por_workspace_nulo():
 
 
 def test_filtro_de_workflow_tambem_nao_tem_escape_por_nulo():
-    """Mesma regressao, do lado da tabela `workflows` (_wf_filter)."""
+    """Same regression, on the `workflows` table side (_wf_filter)."""
     from app.services.observability_service import _wf_filter
 
     sql = str(_wf_filter(_user(), ["ws-1"])[0])
@@ -62,9 +63,9 @@ def test_filtro_de_workflow_tambem_nao_tem_escape_por_nulo():
 
 
 def test_admin_nao_recebe_filtro_quando_o_chamador_pede_a_visao_total():
-    """O bypass de admin deixou de ser deduzido de `user.role` dentro do service:
-    quem chama diz `como_admin=True` (o router REST faz isso para admin global);
-    sem o kwarg, admin recebe o mesmo recorte de membro."""
+    """The admin bypass is no longer inferred from `user.role` inside the service:
+    the caller says `como_admin=True` (the REST router does that for a global
+    admin); without the kwarg, an admin gets the same slice as a member."""
     assert _run_filter(_user("admin"), ["ws-1"], como_admin=True) == []
     assert _run_filter(_user("admin"), ["ws-1"]) != []
 
@@ -95,24 +96,24 @@ def _run(workspace_id):
 
 
 def _where(db, chamada=0):
-    """Só o WHERE da query executada — a lista do SELECT tambem cita
-    `workspace_id`, e olhar o SQL inteiro daria falso-positivo."""
+    """Only the WHERE of the executed query — the SELECT list also mentions
+    `workspace_id`, and looking at the whole SQL would give a false positive."""
     return str(db.execute.await_args_list[chamada].args[0]).split("WHERE", 1)[1]
 
 
 @pytest.mark.asyncio
 async def test_run_de_outro_workspace_nao_e_acessivel():
-    """Cenario do move: o workflow foi para ws-destino, mas este run aconteceu
-    em ws-origem e nao pertence a quem so alcanca o destino.
+    """Move scenario: the workflow went to ws-destino, but this run happened
+    in ws-origem and does not belong to someone who only reaches the destination.
 
-    O recorte vai na propria query, via `_run_filter` — a mesma regra da
-    listagem e das metricas. Por isso o teste verifica o filtro no SQL e nao
-    so o retorno: com o dublê devolvendo qualquer linha, uma checagem em Python
-    passaria mesmo se a query tivesse deixado de filtrar.
+    The slice goes into the query itself, via `_run_filter` — the same rule as
+    the listing and the metrics. That is why the test checks the filter in the
+    SQL and not just the return value: with the double returning any row, a
+    check in Python would pass even if the query had stopped filtering.
     """
     from app.core.exceptions import RunNotFoundError
 
-    db = _db_com_run(None)   # a linha nao volta porque o WHERE a excluiu
+    db = _db_com_run(None)   # the row does not come back because the WHERE excluded it
 
     with pytest.raises(RunNotFoundError):
         await ObservabilityService.get_run_detail(db, "run-1", _user(), ["ws-destino"])
@@ -140,5 +141,5 @@ async def test_admin_acessa_run_de_qualquer_workspace():
     detalhe = await ObservabilityService.get_run_detail(db, "run-1", _user("admin"), [], como_admin=True)
 
     assert detalhe["run_id"] == "run-1"
-    # Com `como_admin=True`, `_run_filter` devolve lista vazia: nenhum recorte por workspace.
+    # With `como_admin=True`, `_run_filter` returns an empty list: no slicing by workspace.
     assert "workspace_id" not in _where(db)

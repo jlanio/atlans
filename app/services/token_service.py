@@ -1,9 +1,9 @@
 # app/services/token_service.py
 """
-Serviço de tokens opacos para verificação de email e reset de senha.
+Opaque token service for email verification and password reset.
 
-Tokens são armazenados em Redis com TTL automático.
-Cada token é de uso único — consumido na primeira validação.
+Tokens are stored in Redis with automatic TTL.
+Each token is single-use — consumed on the first validation.
 """
 import secrets
 
@@ -11,11 +11,11 @@ from app.core.config import EMAIL_VERIFY_TOKEN_TTL, PASSWORD_RESET_TOKEN_TTL
 from app.core.redis import get_redis_pool
 
 
-# ── Verificação de email ───────────────────────────────────────────────────
+# ── Email verification ─────────────────────────────────────────────────────
 
 
 async def create_email_verification_token(user_id_hash: str) -> str:
-    """Gera token de verificação de email e armazena em Redis com TTL."""
+    """Generates an email verification token and stores it in Redis with a TTL."""
     token = secrets.token_urlsafe(32)
     redis = get_redis_pool()
     await redis.setex(
@@ -27,7 +27,7 @@ async def create_email_verification_token(user_id_hash: str) -> str:
 
 
 async def verify_email_token(token: str) -> str | None:
-    """Valida e consome token. Retorna user_id_hash ou None se inválido/expirado."""
+    """Validates and consumes the token. Returns user_id_hash or None if invalid/expired."""
     redis = get_redis_pool()
     user_id = await redis.get(f"email_verify:{token}")
     if user_id:
@@ -35,16 +35,16 @@ async def verify_email_token(token: str) -> str | None:
     return user_id
 
 
-# ── Reset de senha ─────────────────────────────────────────────────────────
+# ── Password reset ─────────────────────────────────────────────────────────
 
 
 async def create_password_reset_token(user_id_hash: str) -> str:
-    """Gera token de reset de senha. Invalida token anterior do mesmo usuário."""
+    """Generates a password reset token. Invalidates the same user's previous token."""
     token = secrets.token_urlsafe(32)
     ttl = PASSWORD_RESET_TOKEN_TTL * 60
     redis = get_redis_pool()
 
-    # Invalida token anterior deste usuário (apenas o último link funciona)
+    # Invalidates this user's previous token (only the latest link works)
     prev = await redis.get(f"pwd_reset_user:{user_id_hash}")
     if prev:
         await redis.delete(f"pwd_reset:{prev}")
@@ -55,7 +55,7 @@ async def create_password_reset_token(user_id_hash: str) -> str:
 
 
 async def verify_password_reset_token(token: str) -> str | None:
-    """Valida e consome token de reset. Retorna user_id_hash ou None."""
+    """Validates and consumes the reset token. Returns user_id_hash or None."""
     redis = get_redis_pool()
     user_id = await redis.get(f"pwd_reset:{token}")
     if user_id:

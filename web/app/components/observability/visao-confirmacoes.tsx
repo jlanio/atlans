@@ -7,9 +7,10 @@ import { GisFlowService } from "@/service/GisFlowService"
 import { cn } from "@/lib/utils"
 import { formatarDuracao, formatarInteiro, plural } from "@/lib/formatos"
 
-// Execuções enviadas a um executor e ainda sem confirmação de recebimento.
-// As atrasadas (além do limiar) merecem destaque: podem ter se perdido entre
-// o servidor e o executor (conexão caiu, executor reiniciou antes de enfileirar).
+// Runs sent to an executor and still without a receipt acknowledgment.
+// The late ones (past the threshold) deserve highlighting: they may have been
+// lost between the server and the executor (connection dropped, executor
+// restarted before enqueuing).
 export type ConfirmacaoPendente = { job_id: string; executor_id: string; elapsed_seconds: number }
 
 export interface ConfirmacoesPendentes {
@@ -21,21 +22,21 @@ export interface ConfirmacoesPendentes {
 }
 
 /**
- * Poll das confirmações pendentes (a cada 10 s, só com a aba visível). Mora
- * fora do card de propósito: a visão "Confirmações" fica fechada quase sempre,
- * e quem alimenta a pílula vermelha na barra de visões é este hook — o alerta
- * precisa aparecer justamente para quem ainda não foi olhar.
+ * Poll of pending acknowledgments (every 10 s, only with the tab visible). It
+ * lives outside the card on purpose: the "Confirmações" view is almost always
+ * closed, and what feeds the red pill in the view bar is this hook — the alert
+ * must show precisely for whoever has not gone to look yet.
  *
- * `enabled` é o gate do admin: `/pending-acks` é admin-only, e para os demais
- * isso era um 403 a cada 10 s com um erro que ninguém podia resolver.
+ * `enabled` is the admin gate: `/pending-acks` is admin-only, and for everyone
+ * else this was a 403 every 10 s with an error nobody could fix.
  */
 export function usePendingAcks({ enabled }: { enabled: boolean }): ConfirmacoesPendentes {
   const [itens, setItens] = useState<ConfirmacaoPendente[]>([])
   const [limiarSegundos, setLimiar] = useState(15)
   const [carregando, setCarregando] = useState(true)
   const [falhou, setFalhou] = useState(false)
-  // Assinatura da última fila aceita: sem ela cada tick trocava a identidade
-  // do array e re-renderizava a página inteira só para manter um contador.
+  // Signature of the last accepted queue: without it every tick changed the
+  // array's identity and re-rendered the whole page just to keep a counter.
   const assinatura = useRef("")
 
   useEffect(() => {
@@ -48,15 +49,15 @@ export function usePendingAcks({ enabled }: { enabled: boolean }): ConfirmacoesP
       const res = await GisFlowService.getPendingAcks()
       if (!vivo) return
       setCarregando(false)
-      // Lista vazia por falha não é fila vazia — sem isto o card afirmava
-      // "tudo confirmado" sem base nenhuma.
+      // An empty list due to failure is not an empty queue — without this the card
+      // claimed "tudo confirmado" (all acknowledged) with no basis at all.
       if (res.error || !res.data) {
         setFalhou(true)
         return
       }
       setFalhou(false)
       const proximos = res.data.items ?? []
-      // `elapsed_seconds` entra de propósito: é a coluna de tempo da lista.
+      // `elapsed_seconds` is included on purpose: it is the list's time column.
       const sig = proximos.map(i => `${i.job_id}:${i.elapsed_seconds}`).join("|")
       if (sig !== assinatura.current) {
         assinatura.current = sig
@@ -89,15 +90,15 @@ export function usePendingAcks({ enabled }: { enabled: boolean }): ConfirmacoesP
 interface Props {
   acks: ConfirmacoesPendentes
   onAbrirExecucao: (runId: string) => void
-  /** executor_id → nome amigável (de /metrics/executores); sem ele, o id curto. */
+  /** executor_id → friendly name (from /metrics/executores); without it, the short id. */
   nomes?: Record<string, string>
 }
 
-/** Visão "Confirmações" (spec §4.3): o card de ACK de antes, em português. */
+/** "Confirmações" (acknowledgments) view (spec §4.3): the former ACK card, in Portuguese. */
 export function VisaoConfirmacoes({ acks, onAbrirExecucao, nomes }: Props) {
   const { itens, limiarSegundos, carregando, atrasadas, falhou } = acks
-  // sort + slice a cada render (o poll de ACKs corre a cada 10 s): memoizado na
-  // lista para só reordenar quando os itens mudam de fato.
+  // sort + slice on every render (the ACK poll runs every 10 s): memoized on the
+  // list so it only re-sorts when the items actually change.
   const topo = useMemo(
     () => [...itens].sort((a, b) => b.elapsed_seconds - a.elapsed_seconds).slice(0, 10),
     [itens],

@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest"
 import { reconciliarExecutores } from "@/app/(dashboard)/executores/reconciliar-executores"
 import type { IExecutor } from "@/service/types"
 
-// Fábrica que simula o que chega do poll: objetos SEMPRE novos, como o
-// JSON.parse de cada resposta produz.
+// Factory that simulates what arrives from the poll: ALWAYS new objects, as
+// JSON.parse of each response produces.
 function executor(id: string, extra: Partial<IExecutor> = {}): IExecutor {
   return {
     id_hash:             id,
@@ -32,10 +32,10 @@ describe("reconciliarExecutores", () => {
     const primeiro = [executor("a"), executor("b")]
     const segundo  = reconciliarExecutores(primeiro, [executor("a"), executor("b")])
 
-    // Sem isto o React.memo do ExecutorCard erra em 100% dos ticks de 15s.
+    // Without this, ExecutorCard's React.memo misses on 100% of the 15s ticks.
     expect(segundo[0]).toBe(primeiro[0])
     expect(segundo[1]).toBe(primeiro[1])
-    // Nada mudou: até o array é o mesmo, para os useMemo derivados pararem ali.
+    // Nothing changed: even the array is the same, so the derived useMemos stop there.
     expect(segundo).toBe(primeiro)
   })
 
@@ -62,8 +62,8 @@ describe("reconciliarExecutores", () => {
     const semB = reconciliarExecutores(comNovo, [executor("a"), executor("c")])
     expect(semB.map(e => e.id_hash)).toEqual(["a", "c"])
 
-    // Mesma dupla em ordem trocada é uma lista NOVA (a ordem é renderizada),
-    // mas os objetos continuam sendo os mesmos.
+    // The same pair in swapped order is a NEW list (the order is rendered),
+    // but the objects are still the same ones.
     const invertida = reconciliarExecutores(semB, [executor("c"), executor("a")])
     expect(invertida).not.toBe(semB)
     expect(invertida[0]).toBe(semB[1])

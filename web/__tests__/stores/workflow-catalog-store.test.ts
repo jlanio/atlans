@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
 
-// O service resolve (não rejeita) em erro: devolve { data: undefined, error }.
-// É exatamente esse formato que a store precisa distinguir de "lista vazia".
+// The service resolves (does not reject) on error: it returns { data: undefined, error }.
+// That is exactly the shape the store needs to tell apart from "empty list".
 const getNodes = vi.fn()
 const getCredentials = vi.fn()
 
@@ -33,21 +33,21 @@ describe("workflowCatalogStore — catálogo em memória com TTL", () => {
   })
 
   it("falha de rede preserva o catálogo bom e não carimba o TTL", async () => {
-    // Cenário: usuário editando há mais de 5 min aperta Ctrl+K e o backend
-    // devolve 502. Antes, `res?.data ?? []` gravava lista vazia e o drawer, a
-    // paleta e o command-add-node ficavam vazios sem nenhuma mensagem.
+    // Scenario: a user editing for more than 5 min presses Ctrl+K and the backend
+    // returns 502. Before, `res?.data ?? []` stored an empty list and the drawer,
+    // the palette and command-add-node went empty without any message.
     getNodes.mockReturnValueOnce(ok([{ name: "Postgres" }]))
     await catalogo().ensureNodesAPI()
     const bom = catalogo().nodesAPI
     expect(bom).toHaveLength(1)
 
-    useWorkflowCatalogStore.setState({ nodesFetchedAt: null }) // força o refetch
+    useWorkflowCatalogStore.setState({ nodesFetchedAt: null }) // forces the refetch
     getNodes.mockReturnValueOnce(falha())
     const devolvido = await catalogo().ensureNodesAPI()
 
     expect(devolvido).toBe(bom)
     expect(catalogo().nodesAPI).toBe(bom)
-    // TTL não carimbado: a próxima chamada tenta de novo em vez de servir o erro.
+    // TTL not stamped: the next call tries again instead of serving the error.
     expect(catalogo().nodesFetchedAt).toBeNull()
 
     getNodes.mockReturnValueOnce(ok([{ name: "Postgres" }, { name: "HTTP" }]))
@@ -56,9 +56,9 @@ describe("workflowCatalogStore — catálogo em memória com TTL", () => {
   })
 
   it("refetch com conteúdo idêntico mantém a MESMA referência do array", async () => {
-    // Invariante que protege o canvas: o efeito de hidratação assina nodesAPI, e
-    // uma referência nova com o mesmo conteúdo redesenhava o grafo por cima das
-    // edições do usuário.
+    // Invariant that protects the canvas: the hydration effect subscribes to
+    // nodesAPI, and a new reference with the same content redrew the graph over
+    // the user's edits.
     getNodes.mockReturnValueOnce(ok([{ name: "Postgres" }]))
     await catalogo().ensureNodesAPI()
     const antes = catalogo().nodesAPI
@@ -92,8 +92,8 @@ describe("workflowCatalogStore — catálogo em memória com TTL", () => {
     await catalogo().ensureCredentials()
     expect(getCredentials).toHaveBeenCalledTimes(1)
 
-    // Criar/editar/excluir credencial em /credentials invalida o carimbo — senão
-    // a credencial nova só apareceria no select do nó depois de 5 min.
+    // Creating/editing/deleting a credential in /credentials invalidates the stamp —
+    // otherwise the new credential would only show up in the node's select after 5 min.
     catalogo().invalidarCredenciais()
     getCredentials.mockReturnValueOnce(ok([
       { id: "1", name: "Postgres Dev", type: "postgresql" },

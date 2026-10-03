@@ -18,18 +18,18 @@ from app.core.exceptions import (  # noqa: F401 — ScheduleNotFoundError re-exp
 
 
 def campos_de_ativacao(ativar: bool) -> dict:
-    """Campos a gravar no Schedule ao ligar/desligar o agendamento.
+    """Fields to write to the Schedule when turning the schedule on/off.
 
-    Religar zera `next_run_at` de propósito. Enquanto o agendamento esteve
-    desligado, o scheduler não o processou e o horário ficou parado no passado —
-    religar sem zerar faria `_process_schedule` ver `now >= next_run_at` e
-    disparar o workflow na hora, como efeito colateral invisível de mexer num
-    switch. Com NULL ele recalcula a próxima ocorrência FUTURA e só então
-    dispara.
+    Turning it back on clears `next_run_at` on purpose. While the schedule was
+    off, the scheduler did not process it and the time stayed stuck in the past —
+    turning it back on without clearing it would make `_process_schedule` see
+    `now >= next_run_at` and fire the workflow right away, as an invisible side effect of
+    flipping a switch. With NULL it recomputes the next FUTURE occurrence and only then
+    fires.
 
-    Fonte canônica dos dois caminhos que ligam/desligam sem passar pela
-    definition: o hook (`core/scheduling/hooks.py`, que importa daqui) e o
-    `update_schedule` abaixo (a rota REST e a tool MCP).
+    Canonical source for the two paths that turn it on/off without going through the
+    definition: the hook (`core/scheduling/hooks.py`, which imports from here) and
+    `update_schedule` below (the REST route and the MCP tool).
     """
     return {"active": True, "next_run_at": None} if ativar else {"active": False}
 
@@ -38,12 +38,12 @@ _CAMPOS_DE_HORARIO = ("strategy", "cron_expression", "interval", "unit", "rrule_
 
 
 def _horario_mudou(updates: dict, sch: Schedule) -> bool:
-    """True se algum campo de temporização PRESENTE em `updates` difere do valor
-    gravado no `sch`.
+    """True if any timing field PRESENT in `updates` differs from the value
+    stored in `sch`.
 
-    Compara só os campos que o caller de fato enviou (o dict vem de
-    `ScheduleUpdate.dict(exclude_unset=True)`), então re-salvar o mesmo horário —
-    ou editar um campo não-temporal — não conta como mudança.
+    Compares only the fields the caller actually sent (the dict comes from
+    `ScheduleUpdate.dict(exclude_unset=True)`), so re-saving the same time —
+    or editing a non-timing field — does not count as a change.
     """
     return any(
         campo in updates and updates[campo] != getattr(sch, campo)
@@ -52,11 +52,11 @@ def _horario_mudou(updates: dict, sch: Schedule) -> bool:
 
 
 def _como_utc(valor: Optional[datetime]) -> Optional[datetime]:
-    """`next_run_at`/`last_run_at` são gravados UTC-NAIVE (ver `_to_utc_naive` no
-    agendador). Sem o tzinfo o Pydantic serializa sem offset e a web lê a hora
-    como local. Mesma normalização de `workflow_service._como_utc` — duplicada de
-    propósito: importá-la de lá fecharia um ciclo (workflow_service já importa
-    deste módulo)."""
+    """`next_run_at`/`last_run_at` are stored as UTC-NAIVE (see `_to_utc_naive` in the
+    scheduler). Without tzinfo, Pydantic serializes with no offset and the web reads the time
+    as local. Same normalization as `workflow_service._como_utc` — duplicated on
+    purpose: importing it from there would close a cycle (workflow_service already imports
+    from this module)."""
     if valor is None or valor.tzinfo is not None:
         return valor
     return valor.replace(tzinfo=timezone.utc)
@@ -65,26 +65,26 @@ def _como_utc(valor: Optional[datetime]) -> Optional[datetime]:
 async def listar_agendamentos_de(
     db: AsyncSession, workspace_ids: List[str], *, limit: int = 200, offset: int = 0
 ) -> List[dict]:
-    """Todos os agendamentos dos workspaces do usuário, um por linha (não um por
-    fluxo, como o resumo de Projetos). Para o painel "Meu → Agendamentos" da Home.
+    """All schedules of the user's workspaces, one per row (not one per
+    workflow, like the Projects summary). For the Home's "Meu → Agendamentos" (My → Schedules) panel.
 
-    NÃO filtra `Workflow.origem`, ao contrário das listagens de Projetos — e a
-    divergência é deliberada. Um fluxo do assistente que está AGENDADO dispara
-    execução sozinho, gasta cota e custa dinheiro; escondê-lo aqui também o
-    deixaria sem nenhuma tela onde possa ser visto ou pausado. Por isso ele
-    aparece com o selo de origem (a web o desenha) em vez de sumir. O lado que
-    falta alinhar é o de Projetos, que tem o parâmetro `assistente` na rota mas
-    ainda não tem o interruptor na tela.
+    Does NOT filter on `Workflow.origem`, unlike the Projects listings — and the
+    divergence is deliberate. An assistant workflow that is SCHEDULED fires
+    runs on its own, spends quota and costs money; hiding it here too would
+    leave it with no screen at all where it can be seen or paused. That is why it
+    shows up with the origin badge (the web draws it) instead of vanishing. The side that
+    still needs aligning is Projects, which has the `assistente` parameter on the route but
+    does not yet have the toggle on the screen.
 
-    SELECT de COLUNAS, nunca do objeto `Schedule`: `Schedule.workflow` é
-    `lazy='raise'`, e trazer o objeto arriscaria um acesso ao relacionamento que
-    levantaria. O JOIN com `Workflow` traz nome e `flag_ative` na mesma query
-    (o `active` do schedule e o `flag_ative` do fluxo são as DUAS causas de
-    "pausado" que a web distingue). Filtra por `Workflow.workspace_id` — nunca
-    por `Schedule.workspace_id`, que o `create` não escreve.
+    SELECT of COLUMNS, never of the `Schedule` object: `Schedule.workflow` is
+    `lazy='raise'`, and fetching the object would risk an access to the relationship that
+    would raise. The JOIN with `Workflow` brings the name and `flag_ative` in the same query
+    (the schedule's `active` and the workflow's `flag_ative` are the TWO causes of
+    "paused" that the web distinguishes). Filters by `Workflow.workspace_id` — never
+    by `Schedule.workspace_id`, which `create` does not write.
 
-    Ordem: ativos primeiro, depois por próxima execução (nulos por último — um
-    agendamento recém-criado sem `next_run_at` ainda não some do topo dos ativos).
+    Order: active first, then by next run (nulls last — a
+    freshly created schedule without `next_run_at` still does not vanish from the top of the active ones).
     """
     if not workspace_ids:
         return []
@@ -106,8 +106,8 @@ async def listar_agendamentos_de(
         .order_by(
             Schedule.active.desc(),
             Schedule.next_run_at.asc().nulls_last(),
-            # Terceiro critério de desempate: sem ele, dois agendamentos com o
-            # mesmo `active`/`next_run_at` podem trocar de página entre requests.
+            # Third tie-breaker: without it, two schedules with the
+            # same `active`/`next_run_at` can switch pages between requests.
             Schedule.id.asc(),
         )
         .limit(limit)
@@ -139,17 +139,17 @@ async def listar_agendamentos_de(
 
 
 def validate_schedule_create(schedule_in: ScheduleCreate) -> None:
-    """Valida uma config de agendamento SEM efeitos colaterais (raise se inválida).
+    """Validates a schedule config WITHOUT side effects (raises if invalid).
 
-    Espelha exatamente as checagens de `create_schedule` (profundidade rasa: só
-    presença dos campos e 5 campos no cron — a validade sintática fina fica com
-    croniter/dateutil no scheduler, que já trata erro sem derrubar o schedule).
+    Mirrors exactly the checks of `create_schedule` (shallow depth: only
+    presence of the fields and 5 fields in the cron — fine syntactic validity is left to
+    croniter/dateutil in the scheduler, which already handles errors without bringing down the schedule).
 
-    Existe separada para que `apply_schedule_if_needed` possa recusar uma config
-    inválida ANTES de apagar o schedule atual. Antes, a validação só acontecia
-    dentro de `create_schedule` — depois do delete dos existentes —, então uma
-    expressão inválida apagava o agendamento e o deixava sem substituto (a
-    exceção é engolida pelo chamador: o usuário via "salvo" e o cron sumia).
+    It exists separately so that `apply_schedule_if_needed` can refuse an invalid
+    config BEFORE deleting the current schedule. Before, validation only happened
+    inside `create_schedule` — after deleting the existing ones —, so an
+    invalid expression deleted the schedule and left it with no replacement (the
+    exception is swallowed by the caller: the user saw "saved" and the cron vanished).
     """
     if schedule_in.strategy not in ("cron", "interval", "rrule"):
         raise InvalidScheduleError(f"Strategy inválida: {schedule_in.strategy}")
@@ -173,11 +173,11 @@ class ScheduleService:
         self.schedule_crud = ScheduleCRUD(db)
 
     async def _buscar_workflow(self, id_hash: str) -> Workflow:
-        """O workflow, exista ele ativo ou não. NÃO autoriza nada.
+        """The workflow, whether active or not. Does NOT authorize anything.
 
-        Quem autoriza é o chamador — as rotas passam por
-        `workflow_com_papel(ROLE_OPERATOR)` antes de chegar aqui. Esta consulta
-        é a segunda leitura, feita só para ter o objeto em mãos.
+        The caller is the one who authorizes — the routes go through
+        `workflow_com_papel(ROLE_OPERATOR)` before getting here. This query
+        is the second read, done only to have the object at hand.
         """
         stmt = select(Workflow).where(Workflow.id_hash == id_hash)
         result = await self.db.execute(stmt)
@@ -187,12 +187,12 @@ class ScheduleService:
         return workflow
 
     async def _exigir_workflow_ativo(self, id_hash: str) -> Workflow:
-        """Idem, mas recusa fluxo desativado — para quem vai ESCREVER.
+        """Likewise, but refuses a deactivated workflow — for whoever is going to WRITE.
 
-        `WorkflowInactiveError` (409), e não `ValueError`: o `ValueError` cru
-        não tem handler (`app/main.py` registra `AtlasBaseError` e um
-        `Exception` genérico), então ele virava **500** com mensagem de erro
-        interno para uma recusa que é de domínio.
+        `WorkflowInactiveError` (409), and not `ValueError`: a bare `ValueError`
+        has no handler (`app/main.py` registers `AtlasBaseError` and a generic
+        `Exception`), so it became a **500** with an internal error message
+        for a refusal that is a domain one.
         """
         workflow = await self._buscar_workflow(id_hash)
         if not workflow.flag_ative:
@@ -204,12 +204,12 @@ class ScheduleService:
     async def create_schedule(self, id_hash: str, schedule_in: ScheduleCreate) -> Schedule:
         workflow = await self._exigir_workflow_ativo(id_hash)
 
-        # Fonte única da validação (também usada por apply_schedule_if_needed
-        # ANTES de apagar o schedule anterior).
+        # Single source of the validation (also used by apply_schedule_if_needed
+        # BEFORE deleting the previous schedule).
         validate_schedule_create(schedule_in)
 
-        # Zera os campos que não pertencem à estratégia escolhida — o nó
-        # ScheduleTrigger envia os defaults de todas elas.
+        # Clears the fields that do not belong to the chosen strategy — the
+        # ScheduleTrigger node sends the defaults of all of them.
         if schedule_in.strategy == "cron":
             schedule_in.interval = None
             schedule_in.unit = None
@@ -235,42 +235,42 @@ class ScheduleService:
             active=schedule_in.active,
             job_id=job_id,
         )
-        # O AsyncScheduler recarrega os schedules do banco no proprio loop —
-        # nao ha registro em processo a fazer aqui.
+        # The AsyncScheduler reloads the schedules from the database in its own loop —
+        # there is no in-process registration to do here.
         return sch
 
     async def update_schedule(
         self, job_id: str, schedule_in: ScheduleCreate, owner_workflow_hash: str,
     ) -> Schedule:
         sch = await self.schedule_crud.get(job_id)
-        # SEG (IDOR): schedules sao resolvidos por job_id global. A rota so
-        # autoriza o workflow do path — sem confirmar que o schedule pertence a
-        # ele, um usuario apontava DELETE/PUT de um workflow proprio para o
-        # job_id de outro tenant. 404 (nao 403) para nao revelar existencia.
+        # SEG (IDOR): schedules are resolved by global job_id. The route only
+        # authorizes the workflow in the path — without confirming that the schedule belongs to
+        # it, a user could point a DELETE/PUT on their own workflow at the
+        # job_id of another tenant. 404 (not 403) so as not to reveal existence.
         #
-        # `owner_workflow_hash` era opcional, e com `None` a confirmacao acima
-        # era PULADA — a defesa descrita neste comentario ficava desligada por
-        # omissao. Ninguem usava o atalho (as duas rotas sempre passaram o dono),
-        # e agora esquece-lo quebra na chamada em vez de abrir o IDOR de volta.
+        # `owner_workflow_hash` used to be optional, and with `None` the confirmation above
+        # was SKIPPED — the defense described in this comment was off by
+        # omission. Nobody used the shortcut (both routes always passed the owner),
+        # and now forgetting it breaks at the call instead of reopening the IDOR.
         if not sch or sch.workflow_hash != owner_workflow_hash:
             raise ScheduleNotFoundError(f"Schedule {job_id} não encontrado.")
 
         updates = schedule_in.dict(exclude_unset=True)
-        # Religar (pausado -> ativo) zera `next_run_at`: sem isto, o horário
-        # parado no passado faria o agendador disparar na hora de virar o
-        # interruptor. Cobre a rota REST (PUT .../schedules/{job}) e a tool MCP
-        # `update_schedule`, que chamam ambas este método. Só quando de fato há
-        # transição para ativo — reeditar um schedule já ativo não deve zerar.
+        # Turning back on (paused -> active) clears `next_run_at`: without this, the time
+        # stuck in the past would make the scheduler fire the moment the
+        # toggle is flipped. Covers the REST route (PUT .../schedules/{job}) and the MCP tool
+        # `update_schedule`, which both call this method. Only when there actually is a
+        # transition to active — re-editing an already active schedule must not clear it.
         if updates.get("active") is True and not sch.active:
             updates.update(campos_de_ativacao(True))
-        # Mudar o HORÁRIO (strategy/cron/interval/unit/rrule/timezone) também zera
-        # `next_run_at`, mesmo num schedule que segue ativo: o valor gravado foi
-        # calculado da expressão ANTIGA, então mantê-lo faria a próxima ocorrência
-        # sair no horário velho uma vez, e uma troca de frequência ficaria atrasada
-        # até o horário antigo passar. `None` NÃO dispara na hora — igual à
-        # ativação, `_process_schedule` recomputa a próxima ocorrência FUTURA e só
-        # então dispara. Editar um campo não-temporal (ou re-salvar o mesmo
-        # horário) não mexe em `next_run_at`.
+        # Changing the TIMING (strategy/cron/interval/unit/rrule/timezone) also clears
+        # `next_run_at`, even on a schedule that stays active: the stored value was
+        # computed from the OLD expression, so keeping it would make the next occurrence
+        # go out at the old time once, and a frequency change would be delayed
+        # until the old time passed. `None` does NOT fire right away — just like
+        # activation, `_process_schedule` recomputes the next FUTURE occurrence and only
+        # then fires. Editing a non-timing field (or re-saving the same
+        # time) does not touch `next_run_at`.
         elif _horario_mudou(updates, sch):
             updates["next_run_at"] = None
         return await self.schedule_crud.update_by_id(job_id, updates)
@@ -285,7 +285,7 @@ class ScheduleService:
 
     async def delete_all_schedules_for_workflow(self, id_hash: str) -> None:
         """
-        Remove todos os agendamentos do workflow com id_hash informado.
+        Removes all schedules of the workflow with the given id_hash.
         """
         schedules = await self.schedule_crud.get_by_workflow_hash(id_hash)
         for sch in schedules:

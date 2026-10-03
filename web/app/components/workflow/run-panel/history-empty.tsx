@@ -11,19 +11,19 @@ import { dadoOuAviso } from "@/lib/respostas"
 import { cn } from "@/lib/utils"
 
 /**
- * Estado vazio útil: em vez de "Nenhum log", lista as execuções recentes e
- * carrega os eventos de uma delas.
+ * A useful empty state: instead of "Nenhum log" (no logs), it lists the recent
+ * runs and loads the events of one of them.
  *
- * Antes, um run concluído deixava o painel permanentemente vazio — a store é
- * volátil e a página de observabilidade só guarda node_stats, sem os eventos.
- * O endpoint /observability/runs/{id}/events expõe o mesmo histórico que o
- * WebSocket reproduz ao conectar.
+ * Before, a finished run left the panel permanently empty — the store is
+ * volatile and the observability page only keeps node_stats, without the events.
+ * The /observability/runs/{id}/events endpoint exposes the same history that the
+ * WebSocket replays on connect.
  */
 const HistoryEmpty = () => {
   const { id } = useParams<{ id: string }>()
   const [runs, setRuns] = useState<IRunSummary[]>([])
   const [loading, setLoading] = useState(false)
-  // A lista não chegou: o lugar do "nenhuma execução" diz isso, e não o vazio.
+  // The list did not arrive: the "no runs" slot says so, not the empty state.
   const [falhou, setFalhou] = useState(false)
   const [loadingRunId, setLoadingRunId] = useState<string | null>(null)
   const loadHistoricalEvents = useWorkflowExecutionStore(s => s.loadHistoricalEvents)
@@ -44,8 +44,8 @@ const HistoryEmpty = () => {
     setLoadingRunId(runId)
     try {
       const dados = dadoOuAviso(await GisFlowService.getRunEvents(runId), "Erro ao carregar o log da execução")
-      // Sem resposta não há veredito sobre o histórico: "expirou" é só para o
-      // log que CHEGOU vazio.
+      // No response means no verdict about the history: "expirou" (expired) is only
+      // for a log that ARRIVED empty.
       if (!dados) return
       const events = (dados.events ?? []).map(toRunEvent)
       if (events.length === 0) {

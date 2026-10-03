@@ -35,7 +35,7 @@ describe("resumirExecutor", () => {
 
   it("alvo que não está na lista está sumido — mas só quando a lista foi lida", () => {
     expect(resumirExecutor({ ...base, alvo: "ex-9" })).toEqual({ estado: "sumido", alvo: "ex-9" })
-    // Com a listagem falhando, todo alvo pareceria removido: vira "não sei".
+    // With the listing failing, every target would look removed: it becomes "don't know".
     expect(resumirExecutor({ ...base, alvo: "ex-9", erroExecutores: "boom" }))
       .toEqual({ estado: "indefinido", mensagem: "boom" })
   })
@@ -54,7 +54,7 @@ describe("resumirExecutor", () => {
 
 describe("textos e ponto", () => {
   it("descreve por extenso o que o status significa para as execuções", () => {
-    // Sem política lida (ou com a flag desligada), o legado transborda para o pool.
+    // With no policy read (or with the flag off), legacy overflows to the pool.
     expect(descreverExecutor({ estado: "ok", executor: executor({}) }))
       .toBe("Online · dedicado a este workspace · se cair, o pool assume")
     expect(descreverExecutor({ estado: "ok", executor: executor({ online: false, executor_type: "default" }) }))
@@ -74,7 +74,7 @@ describe("textos e ponto", () => {
     const dp = isolada({ mode: "dedicated_pool", effective_terminal: "pool" })
     expect(descreverExecutor(r, dp)).toBe("Offline · dedicado a este workspace · se cair, o pool assume")
     expect(emAlerta(r, dp)).toBe(false)
-    // Flag desligada: nada de alerta.
+    // Flag off: no alert.
     expect(emAlerta(r, isolada({ policy_routing_enabled: false }))).toBe(false)
   })
 
@@ -95,7 +95,7 @@ describe("textos e ponto", () => {
   })
 })
 
-// ── Política com grupo ou reserva ───────────────────────────────────────────
+// ── Policy with a group or fallback ─────────────────────────────────────────
 import { isolada, membro } from "../../fixtures/politica"
 
 describe("grupo — política EM VIGOR que não cabe no seletor rápido", () => {
@@ -124,7 +124,7 @@ describe("grupo — política EM VIGOR que não cabe no seletor rápido", () => 
     const r = resumirExecutor({ ...base, executores: [], alvo: "ex-1", politica: isolada({ primary: [membro({ online: null })] }) })
     expect(r.estado).toBe("ok")
     if (r.estado === "ok") expect(r.executor.online).toBeNull()
-    // Sem a política valendo, a lista é a única fonte: continua sumido.
+    // Without the policy in effect, the list is the only source: it stays missing.
     expect(resumirExecutor({ ...base, executores: [], alvo: "ex-1", politica: isolada({ policy_routing_enabled: false }) }).estado)
       .toBe("sumido")
   })

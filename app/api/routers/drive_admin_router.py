@@ -1,6 +1,6 @@
 # app/api/routers/drive_admin_router.py
 """
-Drive — configuração global (admin): tamanho máximo e extensões permitidas.
+Drive — global configuration (admin): maximum size and allowed extensions.
 """
 from typing import List
 

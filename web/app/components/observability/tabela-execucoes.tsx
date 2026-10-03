@@ -20,30 +20,30 @@ interface Props {
   carregando: boolean
   carregandoMais: boolean
   falhou: boolean
-  /** Há filtro ativo: muda o texto do vazio e oferece "Limpar filtros". */
+  /** There is an active filter: changes the empty text and offers "Limpar filtros". */
   filtrado: boolean
   onCarregarMais: () => void
   onAbrir: (runId: string) => void
   onLimparFiltros?: () => void
   onRecarregar?: () => void
-  /** run_id aberto no painel — a linha fica marcada. */
+  /** run_id open in the panel — the row stays highlighted. */
   abertaId?: string | null
 }
 
 const EM_ANDAMENTO = new Set(["running", "pending"])
 
 /**
- * Relógio de grão grosso para o "decorrido" das execuções em andamento. Só
- * corre quando há alguma: uma tabela de concluídas não tem por que re-renderizar
- * a cada meio minuto.
+ * Coarse-grained clock for the "elapsed" of in-progress runs. It only ticks
+ * when there is one: a table of completed runs has no reason to re-render
+ * every half minute.
  */
 function useAgora(ativo: boolean): number {
   const [agora, setAgora] = useState(() => Date.now())
   useEffect(() => {
     if (!ativo) return
     setAgora(Date.now())
-    // Como os demais relógios/pollers da base: não avança com a aba oculta
-    // (ninguém vê o "decorrido") e acerta na hora ao voltar o foco.
+    // Like the other clocks/pollers in the codebase: it does not advance with the
+    // tab hidden (nobody sees the "elapsed") and catches up at once when focus returns.
     const tick = () => { if (document.visibilityState === "visible") setAgora(Date.now()) }
     const t = setInterval(tick, 30_000)
     document.addEventListener("visibilitychange", tick)
@@ -55,7 +55,7 @@ function useAgora(ativo: boolean): number {
   return agora
 }
 
-/** Duração da execução; para as em andamento, o tempo decorrido desde o início. */
+/** Run duration; for in-progress ones, the time elapsed since the start. */
 export function duracaoDaExecucao(run: IRunSummary, agoraMs: number): string {
   if (EM_ANDAMENTO.has(run.status)) {
     const inicio = fromBackend(run.started_at)?.valueOf()
@@ -64,7 +64,7 @@ export function duracaoDaExecucao(run: IRunSummary, agoraMs: number): string {
   return formatarDuracao(run.duration_seconds)
 }
 
-/** "Cadastro · agendado · maria": workspace, origem e quem disparou, o que houver. */
+/** "Cadastro · agendado · maria": workspace, origin and who triggered it, whatever there is. */
 export function sublinhaDoWorkflow(run: IRunSummary): string {
   return [run.workspace_name, rotuloDaOrigem(run.trigger_source), run.triggered_by_username]
     .filter((p): p is string => !!p)
@@ -72,10 +72,10 @@ export function sublinhaDoWorkflow(run: IRunSummary): string {
 }
 
 /**
- * Tabela de execuções (spec §4.3). A linha inteira é o alvo — e é um botão de
- * verdade para o teclado, porque `<tr>` não recebe foco nem responde a Enter
- * por conta própria. Sem o interruptor "Ativo": desligar um workflow é ação
- * de workflow, e vive na visão "Por workflow".
+ * Runs table (spec §4.3). The whole row is the target — and it is a real
+ * button for the keyboard, because a `<tr>` does not take focus or respond to
+ * Enter on its own. No "Ativo" (active) switch: turning a workflow off is a
+ * workflow action, and it lives in the "Por workflow" (by workflow) view.
  */
 export const TabelaExecucoes = memo(function TabelaExecucoes({
   runs, total, hasMore, carregando, carregandoMais, falhou, filtrado,
@@ -127,8 +127,8 @@ export const TabelaExecucoes = memo(function TabelaExecucoes({
   return (
     <div className="flex flex-col rounded-lg border bg-card shadow-xs">
       <div className="overflow-x-auto rounded-t-lg">
-        {/* `min-w` só de `md` para cima: abaixo disso a linha vira ficha
-            (tabela-empilhada.ts) e não há colunas para espremer. */}
+        {/* `min-w` only from `md` up: below that the row becomes a card
+            (tabela-empilhada.ts) and there are no columns to squeeze. */}
         <table className="w-full text-sm max-md:block md:min-w-[860px]">
           <thead className={CABECALHO_DE_COLUNAS}>
             <tr className="border-b bg-muted/40 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
@@ -143,9 +143,9 @@ export const TabelaExecucoes = memo(function TabelaExecucoes({
           </thead>
           <tbody className="max-md:block">
             {runs.map(run => (
-              // Só as em andamento usam `agora` (o decorrido ao vivo); as demais
-              // recebem 0 fixo, para o React.memo da linha segurar e não
-              // reconciliar toda a tabela a cada tique de 30 s.
+              // Only in-progress runs use `agora` (the live elapsed time); the others
+              // get a fixed 0, so the row's React.memo holds and does not
+              // reconcile the whole table on every 30 s tick.
               <LinhaDaExecucao
                 key={run.run_id}
                 run={run}
@@ -188,16 +188,17 @@ const LinhaDaExecucao = memo(function LinhaDaExecucao({ run, agora, aberta, onAb
   const inicioCompleto = formatLocal(run.started_at, "DD/MM/YYYY HH:mm:ss")
 
   return (
-    // A linha inteira responde ao clique (mouse e toque); o alvo de teclado e
-    // de leitor de tela é o botão no nome do workflow. `role="button"` na
-    // própria <tr> apagaria as células (status, erro) para quem ouve a tabela.
+    // The whole row responds to clicks (mouse and touch); the keyboard and
+    // screen-reader target is the button on the workflow name. `role="button"`
+    // on the <tr> itself would erase the cells (status, error) for those who
+    // listen to the table.
     <tr
       onClick={() => onAbrir(run.run_id)}
       className={cn(
         "cursor-pointer border-b transition-colors last:border-0",
         "hover:bg-accent/50 focus-within:bg-accent/50",
         aberta && "bg-primary/5",
-        // Alvo de toque no telefone: a ficha inteira, nunca menos de 40px.
+        // Touch target on the phone: the whole card, never less than 40px.
         "max-md:min-h-10",
         LINHA_EMPILHADA,
       )}
@@ -250,10 +251,10 @@ const LinhaDaExecucao = memo(function LinhaDaExecucao({ run, agora, aberta, onAb
           <span className="text-muted-foreground">—</span>
         )}
       </td>
-      {/* O limite de largura mora no texto, não no <td>: a especificação não
-          define `max-width` em célula de tabela, e um erro com URL longa podia
-          alargar a coluna até a tabela rolar para o lado. No <span> vale a
-          regra de um bloco comum, igual em todo navegador. */}
+      {/* The width limit lives on the text, not on the <td>: the specification does
+          not define `max-width` on a table cell, and an error with a long URL
+          could widen the column until the table scrolled sideways. On the
+          <span> the rule of a regular block applies, the same in every browser. */}
       <td className="px-3 py-2.5 align-middle max-md:order-6 max-md:basis-full max-md:text-xs">
         {erroTexto ? (
           <span

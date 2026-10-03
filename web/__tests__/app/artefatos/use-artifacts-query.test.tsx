@@ -1,6 +1,6 @@
 /**
- * `useArtifactsQuery` — o que o hook garante a quem o recebe, além do que a
- * tela mostra (isso está em tela-de-artefatos.test.tsx).
+ * `useArtifactsQuery` — what the hook guarantees to whoever receives it, beyond what the
+ * screen shows (that is in tela-de-artefatos.test.tsx).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { act, renderHook, waitFor } from "@testing-library/react"
@@ -47,10 +47,10 @@ beforeEach(() => {
 
 describe("useArtifactsQuery", () => {
   it("loadMore e reload mantêm a identidade de uma página para a outra", async () => {
-    // É o que o `useExecucoes` resolve com o offset num ref, para a
-    // `TabelaExecucoes` memoizada não re-renderizar inteira a cada página: um
-    // handler trocando de identidade anula o memo justamente quando a tabela
-    // está maior.
+    // It is what `useExecucoes` solves with the offset in a ref, so the memoized
+    // `TabelaExecucoes` does not re-render entirely on every page: a
+    // handler changing identity defeats the memo exactly when the table
+    // is largest.
     const { result } = renderHook(
       () => useArtifactsQuery({ kind: "execution", search: "", workspaceId: "ws-a", enabled: true }),
       { wrapper: embrulho() },

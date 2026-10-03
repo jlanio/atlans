@@ -1,24 +1,24 @@
 # tests/unit/test_crs_camadas_binarias.py
 """
-Camadas binarias (A, B): busca, validacao e CRS num lugar so.
+Binary layers (A, B): lookup, validation and CRS in a single place.
 
-  UTM         O OverlapPercentage estimava a UTM de A e a de B SEPARADAMENTE.
-              Com os centros em lados opostos de um meridiano de zona, A ia
-              para a 22S e B para a 23S, e o `gpd.overlay` entre CRSs
-              diferentes so AVISA: a intersecao saia vazia e o percentual
-              sumia, sem erro. `para_crs_metrico` escolhe UM CRS para as duas.
+  UTM         OverlapPercentage estimated A's UTM and B's SEPARATELY. With
+              the centers on opposite sides of a zone meridian, A went to
+              22S and B to 23S, and `gpd.overlay` between different CRSs only
+              WARNS: the intersection came out empty and the percentage
+              vanished, with no error. `para_crs_metrico` picks ONE CRS for both.
 
-  POLITICA    Cada no continua com a politica que tinha — quem recusa CRS
-              diferente continua recusando, quem alinha continua alinhando —,
-              agora via `BaseNode.get_pair`. A politica unica e follow-up;
-              aqui ela fica so ANCORADA.
+  POLICY      Each node keeps the policy it had — whoever rejects a different
+              CRS keeps rejecting, whoever aligns keeps aligning —, now via
+              `BaseNode.get_pair`. The single policy is a follow-up; here it
+              is only ANCHORED.
 
-  CLONES      Diferenca e Diferenca Simetrica viram uma base com `how` sem que
-              um workflow salvo perceba: nome, descriptor, parametros e
-              mensagens identicos.
+  CLONES      Difference and Symmetric Difference become one base with `how`
+              without a saved workflow noticing: identical name, descriptor,
+              parameters and messages.
 
-  EVENT LOOP  O SpatialFilter reprojetava a mascara, e o Conditional e o
-              OverlapPercentage estimavam a UTM, no event loop.
+  EVENT LOOP  SpatialFilter reprojected the mask, and Conditional and
+              OverlapPercentage estimated the UTM, on the event loop.
 """
 from __future__ import annotations
 
@@ -42,8 +42,8 @@ from flow.nodes.spatial.symmetric_difference import SymmetricDifferenceNode
 from flow.nodes.spatial.union import UnionNode
 
 
-# Duas camadas geograficas vizinhas: o centro de A cai na zona UTM 22S
-# (-54° a -48°) e o de B na 23S (-48° a -42°). A intersecao e 1/3 de cada uma.
+# Two neighboring geographic layers: A's center falls in UTM zone 22S
+# (-54° to -48°) and B's in 23S (-48° to -42°). The intersection is 1/3 of each.
 def _a(crs: str = "EPSG:4326") -> gpd.GeoDataFrame:
     gdf = gpd.GeoDataFrame({"a": [1]}, geometry=[box(-49.0, -16.0, -48.1, -15.1)], crs="EPSG:4326")
     return gdf.to_crs(crs)
@@ -55,7 +55,7 @@ def _b(crs: str = "EPSG:4326") -> gpd.GeoDataFrame:
 
 
 def _percentuais_de_referencia(A, B) -> tuple[float, float]:
-    """% de A e de B cobertos pela intersecao, numa projecao de AREA IGUAL."""
+    """% of A and of B covered by the intersection, in an EQUAL-AREA projection."""
     area_igual = "EPSG:6933"
     a, b = A.to_crs(area_igual), B.to_crs(area_igual)
     inter = gpd.overlay(a, b, how="intersection").area.sum()
@@ -71,7 +71,7 @@ async def _overlap(A, B) -> gpd.GeoDataFrame:
 
 async def test_overlap_de_camadas_geograficas_em_zonas_utm_diferentes():
     A, B = _a(), _b()
-    assert A.estimate_utm_crs() != B.estimate_utm_crs()  # premissa do cenario
+    assert A.estimate_utm_crs() != B.estimate_utm_crs()  # scenario premise
 
     out = await _overlap(A, B)
 
@@ -82,8 +82,8 @@ async def test_overlap_de_camadas_geograficas_em_zonas_utm_diferentes():
 
 
 async def test_overlap_de_camada_projetada_com_geografica_usa_o_crs_de_a():
-    """A ja projetada (SIRGAS 2000 / UTM 22S), B geografica centrada na 23S:
-    B vai para o CRS de A — e a saida continua no CRS de A, como antes."""
+    """A already projected (SIRGAS 2000 / UTM 22S), B geographic centered in 23S:
+    B goes to A's CRS — and the output stays in A's CRS, as before."""
     A, B = _a("EPSG:31982"), _b()
 
     out = await _overlap(A, B)
@@ -106,10 +106,10 @@ async def test_overlap_no_mesmo_crs_projetado_nao_reprojeta():
 
 
 async def test_overlap_com_a_geografica_e_b_ja_projetada_nao_troca_a_zona_de_a():
-    """Município do leste de SP (A, geográfico) contra uma camada estadual já em
-    SIRGAS 2000 / UTM 23S (B): a extensão CONJUNTA tem o centro na zona 22, e o
-    CRS métrico por ela punha as duas na 22 — mudando o percentual, a área a
-    jusante e o CRS da saída, que antes era o de A."""
+    """A municipality in eastern SP (A, geographic) against a state layer already
+    in SIRGAS 2000 / UTM 23S (B): the COMBINED extent has its center in zone 22,
+    and the metric CRS derived from it put both in 22 — changing the percentage,
+    the downstream area and the output CRS, which used to be A's."""
     A = gpd.GeoDataFrame({"a": [1]}, geometry=[box(-46.6, -23.7, -46.2, -23.4)], crs="EPSG:4674")
     B = gpd.GeoDataFrame({"b": [1]}, geometry=[box(-53.0, -25.0, -44.0, -20.0)], crs="EPSG:4674").to_crs(
         "EPSG:31983"
@@ -134,9 +134,10 @@ async def test_overlap_com_b_sem_geometria_valida_fica_no_crs_de_a():
 
 @pytest.mark.parametrize("geometrias", [[], [None, None]])
 async def test_camada_geografica_sem_geometria_valida_e_erro_de_uso(geometrias):
-    """Sem geometria válida o `estimate_utm_crs` recusa com ValueError (erro do
-    usuário: um filtro que não deixou nada). Pela extensão, `box(nan, ...)`
-    virava GEOSException — "Erro interno inesperado" no painel."""
+    """With no valid geometry `estimate_utm_crs` rejects with ValueError (a user
+    error: a filter that left nothing). Through the extent, `box(nan, ...)`
+    became a GEOSException — "Erro interno inesperado" (unexpected internal
+    error) in the panel."""
     vazio = gpd.GeoDataFrame({"a": [1] * len(geometrias)}, geometry=geometrias, crs="EPSG:4326")
     no = Conditional("c", {"metric": "area", "operator": ">", "compareTo": "0"})
 
@@ -149,13 +150,13 @@ async def test_camada_geografica_sem_geometria_valida_e_erro_de_uso(geometrias):
 # ── O helper ─────────────────────────────────────────────────────────────────
 
 def test_para_crs_metrico_com_uma_camada_geografica_e_a_utm_dela():
-    """O caminho do ComputeArea e do Conditional: a mesma UTM de antes."""
+    """The ComputeArea and Conditional path: the same UTM as before."""
     from flow.utils.geo_helpers import para_crs_metrico
 
     A = _a()
     (metrica,) = para_crs_metrico(A)
     assert metrica.crs == A.estimate_utm_crs()
-    assert A.crs == "EPSG:4326"  # a de entrada nao e tocada
+    assert A.crs == "EPSG:4326"  # the input one is not touched
 
 
 def test_para_crs_metrico_nao_mexe_em_crs_projetado_nem_em_camada_sem_crs():
@@ -192,10 +193,10 @@ async def test_conditional_area_geografica_mede_na_utm_da_camada():
     assert out["branch"] is True
 
 
-# ── Reprojecao fora do event loop ────────────────────────────────────────────
+# ── Reprojection off the event loop ──────────────────────────────────────────
 
 def _registrar_threads(monkeypatch) -> list[bool]:
-    """Anota, a cada to_crs/estimate_utm_crs, se rodou na thread do event loop."""
+    """Records, on each to_crs/estimate_utm_crs, whether it ran on the event loop thread."""
     no_loop: list[bool] = []
     for metodo in ("to_crs", "estimate_utm_crs"):
         original = getattr(GeometryArray, metodo)
@@ -216,7 +217,7 @@ async def test_spatial_filter_reprojeta_a_mascara_fora_do_event_loop(monkeypatch
     no = SpatialFilterNode("n", {"filter_mode": "mask", "predicate": "intersects"})
     out = (await no.execute({"layer": camada, "mask": mascara}))["output"]
 
-    assert set(out["id"]) == {0}  # continua alinhando a mascara ao CRS da camada
+    assert set(out["id"]) == {0}  # still aligns the mask to the layer's CRS
     assert no_loop and not any(no_loop), "to_crs rodou no event loop"
 
 
@@ -225,13 +226,13 @@ async def test_spatial_filter_reprojeta_a_mascara_fora_do_event_loop(monkeypatch
     lambda: OverlapPercentage("n", {}).execute({"layerA": _a(), "layerB": _b()}),
 ], ids=["Conditional", "OverlapPercentage"])
 async def test_utm_e_estimada_fora_do_event_loop(rodar, monkeypatch):
-    coroutine = rodar()  # as camadas sao montadas antes do espiao
+    coroutine = rodar()  # the layers are built before the spy
     no_loop = _registrar_threads(monkeypatch)
     await coroutine
     assert no_loop and not any(no_loop), "estimate_utm_crs/to_crs rodou no event loop"
 
 
-# ── Politica de CRS: cada no mantem a sua ────────────────────────────────────
+# ── CRS policy: each node keeps its own ──────────────────────────────────────
 
 def _par_em_crs_diferentes():
     A = gpd.GeoDataFrame({"a": [1]}, geometry=[box(0, 0, 2, 2)], crs="EPSG:3857")
@@ -299,8 +300,8 @@ async def test_spatial_filter_segue_tolerando_camada_sem_crs():
 
 
 async def test_intersecao_confere_os_tipos_depois_da_higiene():
-    """A camada A so tem geometria vazia: a higiene a esvazia e o resultado e
-    vazio — antes de olhar a GeometryCollection de B, como sempre foi."""
+    """Layer A has only empty geometry: the hygiene step empties it and the result
+    is empty — before looking at B's GeometryCollection, as it always was."""
     from shapely.geometry import Polygon
 
     A = gpd.GeoDataFrame({"a": [1]}, geometry=[Polygon()], crs="EPSG:3857")

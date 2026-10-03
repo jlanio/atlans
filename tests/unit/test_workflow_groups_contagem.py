@@ -1,15 +1,15 @@
 # tests/unit/test_workflow_groups_contagem.py
 """
-Contagem dos grupos de workflows.
+Workflow group counts.
 
-`workflow_count` contava so os ATIVOS: um grupo de tres workflows com um
-desativado dizia "2 workflows" — e o inativo continuava ali na lista. Passa a
-contar todos os nao excluidos, e `active_count` (novo) diz quantos estao
-ativos: "3 workflows · 2 ativos".
+`workflow_count` counted only the ACTIVE ones: a group of three workflows with
+one deactivated said "2 workflows" — and the inactive one was still there in the
+list. It now counts all the non-deleted ones, and `active_count` (new) says how
+many are active: "3 workflows · 2 ativos" (2 active).
 
-Os tres pontos que devolvem um grupo (criar, listar, atualizar) passam pela
-mesma agregacao. Os testes chamam as funcoes de rota diretamente, com uma
-sessao SQLite de memoria — mesmo molde de test_grupos_ordem.py.
+The three places that return a group (create, list, update) go through the
+same aggregation. The tests call the route functions directly, with an
+in-memory SQLite session — same mold as test_grupos_ordem.py.
 """
 from datetime import datetime
 from unittest.mock import AsyncMock, patch
@@ -31,8 +31,8 @@ class _Usuario:
 
 
 def _requisicao() -> Request:
-    """`create_group` tem rate limit, e o slowapi recusa qualquer coisa que
-    nao seja uma Request de verdade."""
+    """`create_group` has a rate limit, and slowapi refuses anything that is not
+    a real Request."""
     return Request({
         "type": "http", "method": "POST", "path": "/workflow-groups",
         "headers": [], "client": ("127.0.0.1", 0), "query_string": b"",
@@ -40,7 +40,7 @@ def _requisicao() -> Request:
 
 
 def _editor():
-    # Onde `exigir_papel_no_workspace` busca o papel (a comparação segue real).
+    # Where `exigir_papel_no_workspace` looks up the role (the comparison stays real).
     return patch(
         "app.core.authorization.workflow_access.get_workspace_member_role",
         new=AsyncMock(return_value="editor"),
@@ -72,12 +72,12 @@ GRUPO = "grp-1"
 
 
 async def _grupo_com_mistura(db) -> str:
-    """Um grupo com dois ativos, um inativo e um na lixeira — o cenario que
-    exercita as duas contagens de uma vez: (3 workflows, 2 ativos).
+    """A group with two active, one inactive and one in the trash — the scenario
+    that exercises both counts at once: (3 workflows, 2 active).
 
-    Devolve o id_hash, e nao a entidade: depois do commit a sessao expira o
-    objeto, e ler um atributo fora de um `await` dispara um refresh sincrono
-    que o driver assincrono recusa.
+    Returns the id_hash, not the entity: after the commit the session expires
+    the object, and reading an attribute outside an `await` triggers a
+    synchronous refresh that the async driver refuses.
     """
     db.add_all([
         WorkflowGroup(id_hash=GRUPO, name="Hidrologia", position=0, workspace_id=WS),
@@ -85,7 +85,7 @@ async def _grupo_com_mistura(db) -> str:
         _workflow("b", group_id=GRUPO, ativo=True),
         _workflow("c", group_id=GRUPO, ativo=False),
         _workflow("lixo", group_id=GRUPO, ativo=False, excluido=True),
-        # Fora do grupo: nao pode contar.
+        # Outside the group: must not be counted.
         _workflow("solto", ativo=True),
     ])
     await db.commit()
@@ -124,8 +124,8 @@ class TestListar:
 
     @pytest.mark.asyncio
     async def test_todos_inativos(self, db):
-        """"2 workflows · 0 ativos" — antes saia "0 workflows", como se o
-        grupo estivesse vazio."""
+        """"2 workflows · 0 ativos" (0 active) — before, it said "0 workflows", as if
+        the group were empty."""
         db.add_all([
             WorkflowGroup(id_hash="grp-1", name="Parados", position=0, workspace_id=WS),
             _workflow("a", group_id="grp-1", ativo=False),
@@ -162,8 +162,8 @@ class TestCriar:
 
     @pytest.mark.asyncio
     async def test_conta_o_inativo_que_acabou_de_entrar(self, db):
-        """Criar o grupo ja com um inativo dentro devolvia "1 workflow" para
-        dois vinculados — a tela recem-criada ja nascia errada."""
+        """Creating the group with an inactive one already inside returned "1 workflow"
+        for two linked ones — the freshly created screen was born wrong."""
         db.add_all([_workflow("ativo", ativo=True), _workflow("inativo", ativo=False)])
         await db.commit()
 
@@ -223,8 +223,9 @@ class TestAtualizar:
 # ── invariante ──────────────────────────────────────────────────────────────
 
 def test_os_tres_pontos_passam_pela_mesma_agregacao():
-    """Se uma das rotas voltar a contar por conta propria, a divergencia
-    reaparece so naquela tela. O helper e o unico lugar que sabe contar."""
+    """If one of the routes goes back to counting on its own, the divergence
+    reappears only on that screen. The helper is the only place that knows how
+    to count."""
     import inspect
 
     for nome in ("create_group", "list_groups", "update_group"):

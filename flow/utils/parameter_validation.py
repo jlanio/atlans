@@ -8,18 +8,18 @@ logger = get_logger(__name__)
 
 
 def _coerce_structured(key: str, value: Any) -> Any:
-    """Normaliza parametros de tipo "object" vindos serializados do canvas.
+    """Normalizes "object" type parameters arriving serialized from the canvas.
 
-    O editor de nodes so consegue gravar primitivos — `setNodeField` tem
-    assinatura (field, value: string | number | boolean) — entao os helpers
-    serializam estruturas com JSON.stringify. Chegavam aqui como str e a
-    checagem `isinstance(value, dict)` rejeitava com
-    "O parametro 'X' deve ser um objeto (dict)", quebrando em runtime algo que
-    a UI tinha gravado corretamente (ex: inputsMapping do SubWorkflow).
+    The node editor can only save primitives — `setNodeField` has the
+    signature (field, value: string | number | boolean) — so the helpers
+    serialize structures with JSON.stringify. They arrived here as str and the
+    `isinstance(value, dict)` check rejected them with
+    "O parametro 'X' deve ser um objeto (dict)", breaking at runtime something
+    the UI had saved correctly (e.g. the SubWorkflow's inputsMapping).
 
-    "object" no vocabulario do catalogo significa "estrutura JSON", nao
-    estritamente dict: `ports` declara type "object" com default [] (lista).
-    Por isso dict e list sao ambos aceitos.
+    "object" in the catalog's vocabulary means "JSON structure", not
+    strictly dict: `ports` declares type "object" with default [] (a list).
+    That is why dict and list are both accepted.
     """
     if isinstance(value, (dict, list)):
         return value
@@ -43,19 +43,19 @@ def _coerce_structured(key: str, value: Any) -> Any:
 
 
 def colunas_pedidas(bruto: Any) -> List[str]:
-    """Lista de colunas de um campo de fichas ("chips"), venha como lista,
-    JSON, ou texto separado por vírgula.
+    """List of columns from a chips field, whether it comes as a list,
+    JSON, or comma-separated text.
 
-    O campo de fichas grava JSON (`ChipsField` faz JSON.stringify), mas as
-    definitions já salvas guardam lista de verdade (editor de objeto) ou o
-    formato antigo — texto com vírgulas —, que continua sendo o jeito natural
-    de COLAR várias colunas de uma vez no campo novo.
+    The chips field saves JSON (`ChipsField` does JSON.stringify), but already
+    saved definitions hold an actual list (object editor) or the old format —
+    comma-separated text —, which is still the natural way to PASTE several
+    columns at once into the new field.
 
-    Um parser tolerante aqui evita uma migration de dados sobre a definition
-    de todo workflow que use um desses nós. Nasceu como `_colunas_pedidas` no
-    AttributeJoin e subiu para cá quando outros nós ganharam o mesmo campo.
+    A tolerant parser here avoids a data migration over the definition of every
+    workflow that uses one of these nodes. It was born as `_colunas_pedidas` in
+    AttributeJoin and moved up here when other nodes gained the same field.
 
-    Devolve list[str] sem vazios e sem espaços nas pontas.
+    Returns list[str] with no empty entries and no leading/trailing spaces.
     """
     if isinstance(bruto, (list, tuple)):
         return [str(c).strip() for c in bruto if str(c).strip()]
@@ -74,15 +74,15 @@ def colunas_pedidas(bruto: Any) -> List[str]:
 
     return [c.strip() for c in texto.split(",") if c.strip()]
 
-# Chaves que vivem em `properties` sem serem parametros do no, e que por isso
-# nao devem gerar aviso de descarte: o rotulo gravado pelo modal de configuracao
-# e os controles de retry que o executor le direto de `parameters` antes do
+# Keys that live in `properties` without being node parameters, and therefore
+# must not trigger a discard warning: the label saved by the configuration modal
+# and the retry controls the executor reads directly from `parameters` before
 # execute (core.py::get_retry_params).
 #
-# Os prefixos legados outputKey*/inputKey* saíram desta lista: auto_map_edges foi
-# aposentado (ver core.py e docs/specs/edge-data-contract.md §5), então esses
-# params não têm mais efeito e DEVEM aparecer como descartados até serem
-# corrigidos à mão.
+# The legacy outputKey*/inputKey* prefixes left this list: auto_map_edges was
+# retired (see core.py and docs/specs/edge-data-contract.md §5), so these
+# params no longer have any effect and MUST show up as discarded until they are
+# fixed by hand.
 _CHAVES_DE_PLATAFORMA = frozenset({"alias", "retry_count", "retry_delay_s"})
 
 
@@ -96,22 +96,22 @@ def validate_node_parameters(
     node_name: str = "",
 ) -> Dict[str, Any]:
     """
-    Nova versão que aceita:
-      params:      O dicionário de parâmetros (por ex. self.parameters)
-      props:       A lista de propriedades (por ex. description().get("properties"))
-      node_name:   Nome do nó, só para identificar o aviso de parâmetro descartado
+    New version that accepts:
+      params:      The parameter dictionary (e.g. self.parameters)
+      props:       The property list (e.g. description().get("properties"))
+      node_name:   Node name, only to identify the discarded-parameter warning
 
-    Retorna os parâmetros validados (com defaults aplicados).
+    Returns the validated parameters (with defaults applied).
 
-    ATENÇÃO: o retorno é montado a partir de `props`, então **toda chave de
-    `params` que não estiver declarada é descartada**. Isso é o que mantém o nó
-    imune a lixo na definition, mas também torna um executor defasado
-    indistinguível de um bug de lógica: o servidor publica o catálogo de nós, a
-    UI mostra o campo novo e grava o valor, e o executor — com um `flow/` mais
-    antigo, cujo descriptor ainda não declara a propriedade — joga o valor fora
-    sem erro nenhum. Foi assim que a opção "Sobrescrever se já existir" do
-    DataOutput não surtiu efeito. O aviso abaixo existe para que isso apareça
-    numa linha de log em vez de virar investigação.
+    WARNING: the return value is built from `props`, so **every key in
+    `params` that is not declared is discarded**. That is what keeps the node
+    immune to garbage in the definition, but it also makes an outdated executor
+    indistinguishable from a logic bug: the server publishes the node catalog, the
+    UI shows the new field and saves the value, and the executor — with an older
+    `flow/`, whose descriptor does not yet declare the property — throws the value
+    away without any error. That is how DataOutput's "Sobrescrever se já existir"
+    (overwrite if it already exists) option had no effect. The warning below exists
+    so that this shows up in a log line instead of becoming an investigation.
     """
     final_params = {}
     for prop in props:
@@ -121,29 +121,29 @@ def validate_node_parameters(
 
         if key in params:
             value = params[key]
-            # Campo numérico/booleano LIMPO na UI chega como "" (o input de
-            # texto grava string vazia, não remove a chave). Para um parâmetro
-            # com default declarado isso é "não preenchido", não um valor:
-            # sem este desvio, limpar um campo opcional derrubava a run com
-            # "deve ser inteiro. Recebido: ''".
+            # A numeric/boolean field CLEARED in the UI arrives as "" (the text
+            # input saves an empty string, it does not remove the key). For a
+            # parameter with a declared default this means "not filled in", not a
+            # value: without this detour, clearing an optional field brought down
+            # the run with "deve ser inteiro. Recebido: ''" (must be an integer).
             if value in ("", None) and expected_type in ("integer", "number", "boolean") \
                     and default_value is not None:
                 value = default_value
         elif default_value is not None:
             value = default_value
-            # opcional: se quiser logar default usado, pode adicionar verbose aqui
+            # optional: to log the default used, add verbose here
         else:
             raise ValueError(f"❌ Parâmetro obrigatório '{key}' ausente.")
 
-        # validação de tipo
+        # type validation
         if expected_type:
             if expected_type == "string" and not isinstance(value, str):
                 raise ValueError(f"O parâmetro '{key}' deve ser uma string.")
             if expected_type == "object":
                 value = _coerce_structured(key, value)
             if expected_type == "number":
-                # Coage strings numéricas (a UI de campo texto gravava "5"); só
-                # rejeita o que não for número de fato.
+                # Coerces numeric strings (the text field UI used to save "5"); only
+                # rejects what is not actually a number.
                 if isinstance(value, str):
                     try:
                         value = float(value)
@@ -173,8 +173,8 @@ def validate_node_parameters(
                 options = prop.get("options", [])
                 valid_values = [o["value"] if isinstance(o, dict) else o for o in options]
                 if valid_values and value not in valid_values:
-                    # Tolera espaços/caixa (como os nós faziam com .strip().lower()/.upper()
-                    # antes de migrarem para select) e canonicaliza para o valor da option.
+                    # Tolerates whitespace/case (as nodes did with .strip().lower()/.upper()
+                    # before migrating to select) and canonicalizes to the option's value.
                     stripped = value.strip()
                     match = next((v for v in valid_values if v.lower() == stripped.lower()), None)
                     if match is None:

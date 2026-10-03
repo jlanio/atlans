@@ -5,13 +5,13 @@ import { computeAutoLayout } from "@/app/components/workflow/utils/auto-layout"
 import { NODE_MIN_HEIGHT, calcNodeHeight } from "@/app/components/workflow/utils/node-metrics"
 
 /**
- * O auto-layout hoje é o dagre (layout em camadas, LR). Estes testes travam as
- * propriedades que o botão "reorganizar nós" precisa garantir: cadeias saem
- * retas, a junção centra entre seus ramos, nós altos (muitas portas) não se
- * sobrepõem, cruzamentos não pioram, e o resultado é estável (mesmo grafo →
- * mesmas posições, para o clique repetido não "dançar"). A ordem dentro de uma
- * camada vem da estrutura do grafo — o dagre reordena para reduzir cruzamentos,
- * não a preserva da disposição do canvas.
+ * Auto-layout today is dagre (layered layout, LR). These tests lock the
+ * properties the "reorganizar nós" (rearrange nodes) button needs to guarantee:
+ * chains come out straight, a join centers between its branches, tall nodes
+ * (many ports) don't overlap, crossings don't get worse, and the result is
+ * stable (same graph → same positions, so a repeated click doesn't "dance").
+ * The order within a layer comes from the graph's structure — dagre reorders to
+ * reduce crossings, it doesn't preserve the order from the canvas layout.
  */
 
 function node(id: string, y = 0, ports = 0): INodeContext {
@@ -26,13 +26,13 @@ function edge(source: string, target: string): Edge {
   return { id: `${source}-${target}`, source, target } as Edge
 }
 
-/** Intervalo vertical ocupado por um nó, já com a altura real. */
+/** Vertical interval occupied by a node, with its real height. */
 function span(pos: { y: number }, n: INodeContext) {
   const outputs = (n.data.outputs as unknown[] | undefined)?.length ?? 0
   return { top: pos.y, bottom: pos.y + calcNodeHeight(outputs) }
 }
 
-/** Inversões entre duas colunas adjacentes — proxy direto do número de cruzamentos. */
+/** Inversions between two adjacent columns — a direct proxy for the number of crossings. */
 function countCrossings(
   orderA: string[],
   orderB: string[],
@@ -59,7 +59,7 @@ function countCrossings(
   return crossings
 }
 
-/** Serializa o mapa de posições numa string estável, para comparar dois runs. */
+/** Serializes the position map into a stable string, to compare two runs. */
 function fingerprint(pos: Map<string, { x: number; y: number }>) {
   return [...pos.entries()]
     .map(([id, p]) => `${id}:${p.x},${p.y}`)
@@ -89,10 +89,10 @@ describe("computeAutoLayout", () => {
     const pos = computeAutoLayout(nodes, edges)
     const center = (id: string) => pos.get(id)!.y + NODE_MIN_HEIGHT / 2
 
-    // D fica no meio de B e C, e A também (o pai de ambos os ramos).
+    // D sits midway between B and C, and so does A (the parent of both branches).
     expect(center("d")).toBeCloseTo((center("b") + center("c")) / 2, 0)
     expect(center("a")).toBeCloseTo((center("b") + center("c")) / 2, 0)
-    // E as três camadas ficam em colunas crescentes.
+    // And the three layers sit in increasing columns.
     expect(pos.get("a")!.x).toBeLessThan(pos.get("b")!.x)
     expect(pos.get("b")!.x).toBeLessThan(pos.get("d")!.x)
   })
@@ -112,8 +112,8 @@ describe("computeAutoLayout", () => {
   })
 
   it("empilha irmãos sem sobreposição, na mesma coluna à frente do pai", () => {
-    // O dagre não preserva a ordem vertical do canvas, mas mantém os irmãos numa
-    // pilha limpa (mesma coluna, sem sobrepor) logo após o pai.
+    // dagre doesn't preserve the canvas's vertical order, but it keeps the
+    // siblings in a clean stack (same column, no overlap) right after the parent.
     const nodes = [node("root"), node("um", 0), node("dois", 200), node("tres", 400)]
     const edges = [edge("root", "um"), edge("root", "dois"), edge("root", "tres")]
 
@@ -121,12 +121,12 @@ describe("computeAutoLayout", () => {
     const byId = new Map(nodes.map(n => [n.id, n]))
     const filhos = ["um", "dois", "tres"]
 
-    // Todos na mesma coluna, à direita do pai.
+    // All in the same column, to the right of the parent.
     const colX = pos.get("um")!.x
     for (const id of filhos) expect(pos.get(id)!.x).toBe(colX)
     expect(colX).toBeGreaterThan(pos.get("root")!.x)
 
-    // Empilhados sem sobreposição vertical.
+    // Stacked with no vertical overlap.
     const spans = filhos
       .map(id => span(pos.get(id)!, byId.get(id)!))
       .sort((a, b) => a.top - b.top)
@@ -142,7 +142,7 @@ describe("computeAutoLayout", () => {
     const pos = computeAutoLayout(nodes, edges)
 
     expect(pos.size).toBe(3)
-    // Cada nó recebe uma coluna própria — nenhum empilhamento na coluna 0.
+    // Each node gets its own column — no stacking in column 0.
     expect(new Set([...pos.values()].map(p => p.x)).size).toBe(3)
   })
 

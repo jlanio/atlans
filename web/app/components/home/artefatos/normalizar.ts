@@ -1,22 +1,22 @@
 // web/app/components/home/artefatos/normalizar.ts
 //
-// O acervo unificado da Home: artefatos de execução e arquivos do Drive na MESMA
-// lista, distinguidos SÓ por ícone (decisão 8). Este módulo é PURO — junta as
-// duas formas do backend (`IArtifactItem`, `IDriveFile`) num só `ItemDoAcervo` e
-// decide o estado do item. Sem React, sem fetch: dá para testar a escada de
-// estados e o "adicionável ao globo" sem montar nada.
+// The Home's unified collection: run artifacts and Drive files in the SAME list,
+// distinguished ONLY by icon (decision 8). This module is PURE — it joins the
+// backend's two shapes (`IArtifactItem`, `IDriveFile`) into a single
+// `ItemDoAcervo` and decides the item's state. No React, no fetch: the state
+// ladder and the "addable to the globe" can be tested without mounting anything.
 //
-// O motivo de um item não ir ao globo é decidido AQUI, como chave (`motivo`); a
-// frase é do dicionário. A lista da Home traduz pela chave na hora de mostrar —
-// o acervo fica guardado no hook, e trocar de idioma nas Preferências não pode
-// deixar a frase no idioma velho.
+// The reason an item doesn't go to the globe is decided HERE, as a key
+// (`motivo`); the sentence belongs to the dictionary. The Home list translates
+// by key at display time — the collection is stored in the hook, and switching
+// language in Preferences must not leave the sentence in the old language.
 
 import type { IArtifactItem, IDriveFile } from "@/service/types"
 import { isLocalDoExecutor } from "@/app/components/local-badge"
 
 export type FonteDoAcervo = "artefato" | "drive"
 
-/** Por que um item NÃO vai ao globo — as chaves de `listas.artefatos.semPrevia`. */
+/** Why an item does NOT go to the globe — the keys of `listas.artefatos.semPrevia`. */
 export type MotivoSemPrevia =
   | "executor"
   | "cartaImagem"
@@ -25,49 +25,49 @@ export type MotivoSemPrevia =
   | "drive"
 
 /**
- * O estado que decide o ícone (decisão 8). Escada, nesta ordem:
- * - `local`: o conteúdo ficou no executor e nunca subiu à nuvem (sem download,
- *   sem prévia) — vale para artefato E arquivo do Drive.
- * - `efemero`: tem `expires_at` (só artefato; o Drive é permanente).
- * - `permanente`: o resto (Drive, ou artefato sem expiração).
+ * The state that decides the icon (decision 8). Ladder, in this order:
+ * - `local`: the content stayed on the executor and never went up to the cloud
+ *   (no download, no preview) — applies to artifacts AND Drive files.
+ * - `efemero`: has `expires_at` (artifacts only; the Drive is permanent).
+ * - `permanente`: the rest (Drive, or an artifact without expiration).
  */
 export type EstadoDoAcervo = "local" | "efemero" | "permanente"
 
 export interface ItemDoAcervo {
-  /** Chave única na lista (a fonte + o id — os dois espaços de id são disjuntos
-   *  na prática, mas o prefixo garante). */
+  /** Unique key in the list (the source + the id — the two id spaces are disjoint
+   *  in practice, but the prefix guarantees it). */
   chave: string
   id: string
   fonte: FonteDoAcervo
   nome: string
-  /** geojson | json | csv | shapefile | ... (minúsculo). */
+  /** geojson | json | csv | shapefile | ... (lowercase). */
   formato: string
   estado: EstadoDoAcervo
-  /** Só quando efêmero (o Drive nunca tem). */
+  /** Only when ephemeral (the Drive never has it). */
   expiresAt: string | null
   executorId: string | null
   /**
-   * A data que ORDENA a lista — no Drive é a última escrita de CONTEÚDO, não a
-   * criação da linha. É o mesmo `coalesce` que o servidor usa para ordenar
-   * /drive: um `.gpkg` de oito meses sobrescrito hoje pelo GeoSync precisa subir
-   * ao topo, e por `created_at` ele afundava entre os arquivos antigos — em duas
-   * telas com ordens diferentes para os mesmos arquivos.
+   * The date that SORTS the list — in the Drive it is the last CONTENT write, not
+   * the row's creation. It is the same `coalesce` the server uses to sort
+   * /drive: an eight-month-old `.gpkg` overwritten today by GeoSync needs to rise
+   * to the top, and by `created_at` it sank among the old files — on two
+   * screens with different orders for the same files.
    */
   ordenadoEm: string | null
   workspaceId: string | null
-  /** Pode ir ao globo: só artefato geojson ou com camada de portal viva, e nunca
-   *  local (o `camadaDoGlobo` é endpoint de ARTEFATO — arquivo do Drive não
-   *  entra na v1). */
+  /** Can go to the globe: only a geojson artifact or one with a live portal layer,
+   *  and never local (`camadaDoGlobo` is an ARTIFACT endpoint — Drive files are
+   *  not included in v1). */
   adicionavel: boolean
-  /** Por que NÃO vai ao globo — `null` quando vai. É pela chave que a lista diz
-   *  a frase no idioma em uso. O motivo é o único texto que a linha inerte tem
-   *  para oferecer, e "sem prévia no globo" sozinho descrevia mal o caso mais
-   *  comum (conteúdo parado no executor). */
+  /** Why it does NOT go to the globe — `null` when it does. It is by key that the
+   *  list says the sentence in the current language. The reason is the only text
+   *  the inert row has to offer, and "sem prévia no globo" alone described the
+   *  most common case poorly (content parked on the executor). */
   motivo: MotivoSemPrevia | null
   driveFile?: IDriveFile
 }
 
-/** A escada de estados, isolada para teste direto. */
+/** The state ladder, isolated for direct testing. */
 export function estadoDoAcervo(
   item: { content_location?: string | null; expires_at?: string | null },
 ): EstadoDoAcervo {
@@ -77,17 +77,18 @@ export function estadoDoAcervo(
 }
 
 /**
- * Um artefato pode ir ao globo quando é geojson OU tem camada de portal viva
- * (vira MVT), e nunca quando é local (sem bytes na nuvem para buscar).
+ * An artifact can go to the globe when it is geojson OR has a live portal layer
+ * (becomes MVT), and never when it is local (no bytes in the cloud to fetch).
  *
- * `is_published` sozinho NÃO basta: o endpoint da camada casa o artefato a uma
- * `PortalLayer` daquela execução e devolve "indisponível" quando não acha
- * (agente_camadas_router). `is_portal_active` é exatamente esse casamento, já
- * feito no servidor (`is_published` E o run tem camada) — oferecer "Exibir no
- * globo" por `is_published` prometia uma prévia que o backend ia recusar.
+ * `is_published` alone is NOT enough: the layer endpoint matches the artifact to
+ * a `PortalLayer` of that run and returns "indisponível" (unavailable) when it
+ * doesn't find one (agente_camadas_router). `is_portal_active` is exactly that
+ * match, already done on the server (`is_published` AND the run has a layer) —
+ * offering "Exibir no globo" based on `is_published` promised a preview the
+ * backend would refuse.
  *
- * Devolve junto a chave do motivo da recusa: a frase dela é o texto que a
- * linha inerte exibe.
+ * Also returns the refusal reason's key: its sentence is the text the inert
+ * row displays.
  */
 const FORMATOS_DE_IMAGEM = new Set(["png", "jpg", "jpeg", "pdf"])
 
@@ -96,9 +97,9 @@ function previaDoArtefato(a: IArtifactItem): { adicionavel: boolean; motivo: Mot
   const formato = (a.format ?? "").toLowerCase()
   if (formato === "geojson") return { adicionavel: true, motivo: null }
   if (FORMATOS_DE_IMAGEM.has(formato)) {
-    // A carta imagem (nó CartaImagem) é um arquivo para baixar: nem publicar
-    // no portal a poria no globo, então a frase genérica ("publique o mapa")
-    // mentiria.
+    // The image map (CartaImagem node) is a file to download: not even publishing
+    // it to the portal would put it on the globe, so the generic sentence
+    // ("publique o mapa") would lie.
     return { adicionavel: false, motivo: "cartaImagem" }
   }
   if (a.is_portal_active) return { adicionavel: true, motivo: null }
@@ -117,7 +118,7 @@ export function normalizarArtefato(a: IArtifactItem): ItemDoAcervo {
     estado: estadoDoAcervo(a),
     expiresAt: a.expires_at,
     executorId: a.executor_id,
-    // Artefato de execução não é sobrescrito: criação e ordenação coincidem.
+    // A run artifact is not overwritten: creation and sort order coincide.
     ordenadoEm: a.created_at,
     workspaceId: a.workspace_id,
     adicionavel: previa.adicionavel,
@@ -132,13 +133,13 @@ export function normalizarArquivoDoDrive(f: IDriveFile): ItemDoAcervo {
     fonte: "drive",
     nome: f.original_name,
     formato: (f.extension ?? "").toLowerCase(),
-    estado: estadoDoAcervo(f), // Drive não tem expires_at → local ou permanente
+    estado: estadoDoAcervo(f), // Drive has no expires_at → local or permanent
     expiresAt: null,
     executorId: f.content_executor_id ?? null,
-    // Ordena pela última escrita de conteúdo, como o servidor ordena /drive.
+    // Sorts by the last content write, as the server sorts /drive.
     ordenadoEm: f.content_written_at ?? f.created_at,
     workspaceId: f.workspace_id,
-    adicionavel: false, // arquivo do Drive nunca vai ao globo na v1
+    adicionavel: false, // a Drive file never goes to the globe in v1
     motivo: "drive",
     driveFile: f,
   }

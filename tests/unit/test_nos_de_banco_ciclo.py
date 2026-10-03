@@ -1,12 +1,12 @@
-"""Ciclo de vida dos nós de consulta em banco.
+"""Lifecycle of the database query nodes.
 
-Os dois nós de leitura não chamavam `self.validate()` — e é só por isso que
-funcionavam. `validate_node_parameters` reconstrói os parâmetros a partir das
-propriedades DECLARADAS e descarta o resto, e nenhum dos dois declarava
-`connectionString`, que é injetada pelo servidor. Bastava alguém seguir a
-instrução da docstring de `BaseNode.validate` — que manda chamá-la no início do
-`execute()`, como os nós de escrita já faziam — para toda consulta de banco da
-plataforma parar de achar a conexão.
+The two read nodes didn't call `self.validate()` — and that is the only reason
+they worked. `validate_node_parameters` rebuilds the parameters from the
+DECLARED properties and discards the rest, and neither of them declared
+`connectionString`, which is injected by the server. All it took was someone
+following the instruction in `BaseNode.validate`'s docstring — which says to
+call it at the start of `execute()`, as the write nodes already did — for every
+database query on the platform to stop finding the connection.
 """
 import pytest
 
@@ -24,7 +24,7 @@ def _nomes(cls):
 
 @pytest.mark.parametrize("cls", TODOS, ids=lambda c: c.__name__)
 def test_connectionstring_e_declarada(cls):
-    """Guarda direta da causa: sem a declaração, o `validate()` a descarta."""
+    """Direct guard on the cause: without the declaration, `validate()` discards it."""
     assert "connectionString" in _nomes(cls)
 
 
@@ -41,15 +41,15 @@ def test_conexao_sobrevive_ao_validate(cls):
 
 @pytest.mark.parametrize("cls", TODOS, ids=lambda c: c.__name__)
 def test_execute_chama_validate(cls):
-    """Contrato da BaseNode. Os nós de leitura eram os dois que não cumpriam."""
+    """BaseNode's contract. The read nodes were the two that didn't comply."""
     import inspect
     assert "self.validate()" in inspect.getsource(cls.execute)
 
 
 def test_timeout_do_espacial_e_declarado():
-    """O `execute` sempre leu `timeout`, mas ele não estava na lista de
-    propriedades: a UI não desenhava campo, e o único jeito de mudá-lo era
-    editar o JSON do workflow na mão."""
+    """`execute` always read `timeout`, but it wasn't in the property list:
+    the UI drew no field, and the only way to change it was editing the
+    workflow's JSON by hand."""
     props = {p["name"]: p for p in DatabaseSpatialQuery.description()["properties"]}
     assert "timeout" in props
     assert props["timeout"]["default"] == 120
@@ -58,7 +58,7 @@ def test_timeout_do_espacial_e_declarado():
         "query": "SELECT 1", "connectionString": "x", "timeout": "600",
     })
     no.validate()
-    # Coagido para inteiro pelo próprio validate — o campo da UI grava texto.
+    # Coerced to an integer by validate itself — the UI field saves text.
     assert no.parameters["timeout"] == 600
 
 
@@ -73,7 +73,7 @@ def test_defaults_declarados_sao_aplicados_no_espacial():
 
 
 def test_queryparams_como_texto_json_e_aceito():
-    """O canvas só grava primitivos, então estrutura chega serializada."""
+    """The canvas only saves primitives, so structures arrive serialized."""
     no = DatabaseQuery(node_id="n1", parameters={
         "query": "SELECT 1", "connectionString": "x",
         "queryParams": '{"bairro": "Centro"}',
@@ -82,12 +82,12 @@ def test_queryparams_como_texto_json_e_aceito():
     assert no.parameters["queryParams"] == {"bairro": "Centro"}
 
 
-# ── queryParams vazio vindo da aresta ───────────────────────────────────────
+# ── Empty queryParams coming from the edge ──────────────────────────────────
 
 @pytest.mark.parametrize("cls", [DatabaseQuery, DatabaseSpatialQuery],
                          ids=lambda c: c.__name__)
 def test_o_no_respeita_o_queryparams_vazio_da_aresta(cls):
-    """Guarda de integração: o `or` que causava isso vivia no `execute()`."""
+    """Integration guard: the `or` that caused this lived in `execute()`."""
     import inspect
     fonte = inspect.getsource(cls.execute)
     assert "resolver_query_params(inputs, self.parameters)" in fonte
@@ -97,9 +97,9 @@ def test_o_no_respeita_o_queryparams_vazio_da_aresta(cls):
 @pytest.mark.parametrize("cls", [DatabaseQuery, DatabaseSpatialQuery],
                          ids=lambda c: c.__name__)
 def test_placeholder_sem_valor_da_erro_acionavel(cls):
-    """Com params vazio, o `if query_params:` pulava o `prepare_query` e mandava
-    o `:bairro` literal para o Postgres, que respondia com erro de sintaxe
-    apontando um caractere. Agora a mensagem diz qual parâmetro falta."""
+    """With empty params, `if query_params:` skipped `prepare_query` and sent the
+    literal `:bairro` to Postgres, which answered with a syntax error pointing
+    at a character. Now the message says which parameter is missing."""
     import asyncio
     no = cls(node_id="n1", parameters={
         "query": "SELECT * FROM t WHERE b = :bairro",

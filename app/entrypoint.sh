@@ -1,11 +1,11 @@
 #!/bin/sh
 # app/entrypoint.sh
-# Aplica migrations Alembic antes de subir o uvicorn.
+# Applies Alembic migrations before starting uvicorn.
 #
-# Idempotente: `alembic upgrade head` e no-op se schema ja esta atualizado.
-# Se DB nao estiver disponivel, Alembic falha rapido e o container reinicia
-# (restart policy do compose). Schema vazio resulta em logs claros, sem
-# requests com 500 mascarando o problema real.
+# Idempotent: `alembic upgrade head` is a no-op if the schema is already up to date.
+# If the DB is not available, Alembic fails fast and the container restarts
+# (the compose restart policy). An empty schema results in clear logs, without
+# requests returning 500 masking the real problem.
 
 set -e
 

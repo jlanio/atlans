@@ -1,9 +1,9 @@
 """
-Padronizacao simetrica Entrada/Saida de Dados:
-- DataOutput: o toggle isPublic mapeia para credential_id (publico = sem
-  credencial; nao-publico = exige credencial), sem tocar o banco.
+Symmetric standardization of Data Input/Output:
+- DataOutput: the isPublic toggle maps to credential_id (public = no
+  credential; non-public = requires a credential), without touching the database.
 
-Resolucao de Drive/Artefatos (entrada) vive em test_drive_resolver.py.
+Drive/Artifacts resolution (input) lives in test_drive_resolver.py.
 """
 from unittest.mock import patch
 
@@ -35,7 +35,7 @@ async def test_dataoutput_publico_ignora_credencial():
     with patch("flow.nodes.outputs.data_output.upload_artifact_to_minio", side_effect=_fake_upload):
         await node.execute({"in": {"a": 1}})
 
-    # Publico → nao propaga credencial, mesmo se preenchida.
+    # Public → does not propagate the credential, even if filled in.
     assert captured["credential_id"] is None
     assert captured["create_drive_entry"] is False
 

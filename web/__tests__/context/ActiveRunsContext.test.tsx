@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, render, screen, waitFor } from "@testing-library/react"
 
-// Só o serviço e os contextos vizinhos são dublados: o provider faz o poll de
-// verdade e o consumidor mostra o que o contexto expõe.
+// Only the service and the neighboring contexts are doubled: the provider
+// polls for real and the consumer shows what the context exposes.
 vi.mock("@/service/GisFlowService", () => ({
   GisFlowService: {
     getWorkflows: vi.fn(),
@@ -15,8 +15,8 @@ vi.mock("@/context/WorkspaceContext", () => ({
   useWorkspace: () => ({ current: { id_hash: "ws1" } }),
 }))
 
-// Estável entre renders: `addNotification` entra nas dependências do efeito
-// do provider, e uma função nova a cada render reiniciaria o poll.
+// Stable across renders: `addNotification` is in the provider effect's
+// dependencies, and a new function on every render would restart the poll.
 const addNotification = vi.hoisted(() => vi.fn())
 vi.mock("@/context/NotificationsContext", () => ({
   useNotifications: () => ({ addNotification }),
@@ -69,7 +69,7 @@ describe("ActiveRunsProvider", () => {
           run_id: "run-1", workflow_hash: "wf-a", status: "running",
           started_at: "2026-09-07T11:56:00", trigger_source: "schedule", executor_name: "geo-01",
         },
-        // Ainda na fila: sem início, sem executor.
+        // Still in the queue: no start, no executor.
         { run_id: "run-2", workflow_hash: "wf-b", status: "pending", started_at: null, trigger_source: "manual", executor_name: null },
       ],
     }))
@@ -86,7 +86,7 @@ describe("ActiveRunsProvider", () => {
       },
       { runId: "run-2", workflowHash: "wf-b", name: "Mapa de risco", startedAt: null, triggerSource: "manual", executorName: null },
     ])
-    // O nome vem da listagem: o endpoint só o dá a admin.
+    // The name comes from the listing: the endpoint only gives it to admins.
     expect(runningRuns.map(r => r.name)).not.toContain("Workflow")
   })
 
@@ -94,7 +94,7 @@ describe("ActiveRunsProvider", () => {
     svc.getObservabilityRuns.mockResolvedValue(ok({ runs: [{ run_id: "run-3", workflow_hash: "wf-a", status: "running" }] }))
     render(<ActiveRunsProvider><Consumidor /></ActiveRunsProvider>)
     await waitFor(() => expect(lerSaida().runningCount).toBe(1))
-    // O JSON preserva `null` e apaga `undefined`: as três chaves têm de existir.
+    // JSON keeps `null` and drops `undefined`: all three keys have to exist.
     expect(lerSaida().runningRuns[0]).toEqual({
       runId: "run-3", workflowHash: "wf-a", name: "Consolidação de outorgas",
       startedAt: null, triggerSource: null, executorName: null,
@@ -111,7 +111,7 @@ describe("ActiveRunsProvider", () => {
     render(<ActiveRunsProvider><Consumidor /></ActiveRunsProvider>)
     await waitFor(() => expect(lerSaida().runningCount).toBe(1))
     expect(lerSaida().hashes).toEqual(["wf-a"])
-    // O hash desconhecido fez a lista de nomes ser recarregada uma vez (workflow recém-criado?), sem loop.
+    // The unknown hash made the names list reload once (newly created workflow?), without looping.
     expect(svc.getWorkflows).toHaveBeenCalledTimes(2)
   })
 
@@ -125,7 +125,7 @@ describe("ActiveRunsProvider", () => {
     await waitFor(() => expect(lerSaida().runningCount).toBe(1))
 
     svc.getObservabilityRuns.mockResolvedValue(ok({ runs: [] }))
-    // Com run vivo a cadência é de 10 s.
+    // With a live run the cadence is 10 s.
     await act(async () => { await vi.advanceTimersByTimeAsync(10_100) })
     await waitFor(() => expect(lerSaida().runningCount).toBe(0))
     expect(lerSaida().runningRuns).toEqual([])

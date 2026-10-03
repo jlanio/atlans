@@ -1,12 +1,13 @@
 # executor/sync/sync_config.py
 """
-SyncConfig — configuracao de sync seletivo.
-Controla quais datasets remotos devem ser baixados no modo bidirecional.
+SyncConfig — selective sync configuration.
+Controls which remote datasets should be downloaded in bidirectional mode.
 
-Este modulo tambem concentra os parametros de RITMO do GeoSync (concorrencia,
-piso entre ciclos, tamanho do pool de threads). Eles moram aqui e nao em
-executor/config.py porque so o subsistema de sync os le — e porque mexer neles
-sem entender o ciclo de varredura e a forma mais rapida de por o disco em 100%.
+This module also concentrates GeoSync's PACING parameters (concurrency, floor
+between cycles, thread pool size). They live here and not in
+executor/config.py because only the sync subsystem reads them — and because
+tweaking them without understanding the scan cycle is the fastest way to
+put the disk at 100%.
 """
 import fnmatch
 import json
@@ -21,62 +22,63 @@ logger = logging.getLogger("executor.sync")
 _CONFIG_FILE = ".atlans-sync-config.json"
 
 
-# Os parametros abaixo passam pela mesma leitura tolerante do resto do
-# executor (executor/_ambiente.py::ler_int): valor fora de faixa e erro de
-# digitacao, nao intencao — `SYNC_CONCURRENCY=0` deixaria a pasta sem nenhum
-# upload e o sintoma ("nada sobe") nao apontaria para o .env.
+# The parameters below go through the same tolerant parsing as the rest of the
+# executor (executor/_ambiente.py::ler_int): an out-of-range value is a typo,
+# not an intent — `SYNC_CONCURRENCY=0` would leave the folder with no uploads
+# at all and the symptom ("nothing uploads") wouldn't point to the .env.
 
-# Transferencias simultaneas por pasta (upload ou download). O teto e baixo de
-# proposito: em link de campo, concorrencia alta piora o tempo total e ainda
-# arrisca estourar o timeout de 300s do PUT/GET.
+# Simultaneous transfers per folder (upload or download). The ceiling is low on
+# purpose: on a field link, high concurrency worsens the total time and also
+# risks blowing the 300s PUT/GET timeout.
 SYNC_CONCURRENCY: int = ler_int("EXECUTOR_SYNC_CONCURRENCY", 3, 1, 16)
 
-# Piso de tempo entre dois ciclos disparados pelo WATCHER. Sem ele, copiar um
-# arquivo grande para a pasta fazia o executor varrer+hashear tudo a cada ~2s,
-# em ciclos encostados, disputando I/O com a propria copia.
+# Time floor between two cycles triggered by the WATCHER. Without it, copying a
+# large file into the folder made the executor scan+hash everything every ~2s,
+# in back-to-back cycles, competing for I/O with the copy itself.
 SYNC_MIN_CYCLE: int = ler_int("EXECUTOR_SYNC_MIN_CYCLE", 5, 0, 3600)
 
-# Debounce de CICLO (nao de caminho): depois de acordar, o ciclo so comeca
-# quando a pasta ficar este tanto de tempo sem nenhum evento novo — e a
-# "estabilizacao" do arquivo que esta sendo copiado.
+# CYCLE debounce (not per path): after waking up, the cycle only starts once
+# the folder has gone this long without any new event — it is the
+# "stabilization" of the file being copied.
 SYNC_QUIET_PERIOD: int = ler_int("EXECUTOR_SYNC_QUIET_PERIOD", 3, 0, 600)
 
-# Teto da espera por estabilizacao: uma copia de horas nao pode adiar o ciclo
-# para sempre.
+# Ceiling on the wait for stabilization: an hours-long copy must not postpone
+# the cycle forever.
 SYNC_MAX_QUIET_WAIT: int = ler_int("EXECUTOR_SYNC_MAX_QUIET_WAIT", 120, 1, 3600)
 
-# Rede de seguranca do atalho (size, mtime) do diff: de tempos em tempos o ciclo
-# rehasheia tudo, para pegar a reescrita rara que preserva o mtime (copia com
-# `-p`, por exemplo).
+# Safety net for the diff's (size, mtime) shortcut: every so often the cycle
+# rehashes everything, to catch the rare rewrite that preserves mtime (a copy
+# with `-p`, for example).
 SYNC_FULL_HASH_INTERVAL: int = ler_int("EXECUTOR_SYNC_FULL_HASH_INTERVAL", 3600, 60, 86400)
 
-# Threads do pool de trabalho PESADO do GeoSync — zip, validate, metadados,
-# MD5, varredura (ver executor/sync/pool.py). Pequeno de proposito: e trabalho
-# CPU-bound e nao pode competir com os nos dos workflows.
+# Threads of GeoSync's HEAVY work pool — zip, validate, metadata, MD5, scan
+# (see executor/sync/pool.py). Small on purpose: it is CPU-bound work and must
+# not compete with the workflows' nodes.
 SYNC_THREADS: int = ler_int("EXECUTOR_SYNC_THREADS", 2, 1, 8)
 
-# Threads do pool de I/O de BYTES das transferencias (chunks do PUT/GET). E
-# separado do de cima porque as duas cargas nao se parecem: cada chamada aqui e
-# curta (1 MB de read/write) mas precisa de vazao continua, e no mesmo pool de 2
-# threads um `_write_zip` de bundle de GB segurava TODAS as transferencias em voo
-# por minutos — socket parado o tempo todo, o que convida o MinIO a derrubar a
-# conexao por ociosidade e joga o upload na fila de retry.
+# Threads of the transfers' BYTE I/O pool (PUT/GET chunks). It is separate
+# from the one above because the two loads are nothing alike: each call here is
+# short (1 MB of read/write) but needs continuous throughput, and in the same
+# 2-thread pool a `_write_zip` of a GB bundle held ALL in-flight transfers for
+# minutes — socket idle the whole time, which invites MinIO to drop the
+# connection for idleness and throws the upload into the retry queue.
 SYNC_IO_THREADS: int = ler_int("EXECUTOR_SYNC_IO_THREADS", 8, 1, 32)
 
-# Intervalo minimo entre gravacoes do manifesto durante um lote de uploads.
+# Minimum interval between manifest writes during a batch of uploads.
 SYNC_FLUSH_INTERVAL: int = ler_int("EXECUTOR_SYNC_FLUSH_INTERVAL", 5, 0, 300)
 
 
 class SyncConfig:
     """
-    Gerencia filtros de sync seletivo, lidos do arquivo local
-    .atlans-sync-config.json da pasta sincronizada.
+    Manages selective sync filters, read from the synced folder's local
+    .atlans-sync-config.json file.
 
-    Havia uma segunda fonte, a config remota (GET /drive/executor-sync-config),
-    mas nada no servidor a escrevia: o GET devolvia sempre o padrão. A rota e a
-    busca saíram; executores antigos que ainda a chamam recebem um erro HTTP
-    (405: o caminho casa com o `DELETE /drive/{id_hash}`) e seguem com a
-    config local, como já faziam quando a busca falhava.
+    There used to be a second source, the remote config
+    (GET /drive/executor-sync-config), but nothing on the server wrote it: the
+    GET always returned the default. The route and the fetch were removed; old
+    executors that still call it get an HTTP error (405: the path matches
+    `DELETE /drive/{id_hash}`) and carry on with the local config, as they
+    already did when the fetch failed.
     """
 
     def __init__(self, sync_dir: str | Path):
@@ -85,7 +87,7 @@ class SyncConfig:
         # Filtros
         self.include_patterns: list[str] = []   # ex: ["*.geojson", "parcelas_*"]
         self.exclude_patterns: list[str] = []   # ex: ["temp_*", "backup_*"]
-        self.enabled_remote_ids: set[str] | None = None  # None = todos
+        self.enabled_remote_ids: set[str] | None = None  # None = all
 
         self._load_local()
 
@@ -94,10 +96,10 @@ class SyncConfig:
         if not config_path.exists():
             return
 
-        # Dotfile de config na pasta do usuario: no Windows o ponto nao esconde,
-        # entao garantimos o atributo oculto sempre que o encontramos. Nao somos
-        # nos que o criamos (vem do usuario ou do push remoto), por isso e aqui,
-        # na leitura, e nao numa gravacao.
+        # Config dotfile in the user's folder: on Windows the dot doesn't hide it,
+        # so we ensure the hidden attribute whenever we find it. We are not the
+        # ones who create it (it comes from the user or from the remote push),
+        # which is why it's here, on read, and not on a write.
         ocultar_no_windows(config_path)
 
         try:
@@ -114,18 +116,18 @@ class SyncConfig:
             logger.warning("Erro ao ler %s: %s", _CONFIG_FILE, exc)
 
     def should_download(self, original_name: str, id_hash: str) -> bool:
-        """Verifica se um arquivo remoto deve ser baixado."""
-        # Se IDs especificos configurados, verificar
+        """Checks whether a remote file should be downloaded."""
+        # If specific IDs are configured, check them
         if self.enabled_remote_ids is not None:
             if id_hash not in self.enabled_remote_ids:
                 return False
 
-        # Se exclude patterns, verificar
+        # If there are exclude patterns, check them
         for pattern in self.exclude_patterns:
             if fnmatch.fnmatch(original_name, pattern):
                 return False
 
-        # Se include patterns, deve casar com pelo menos um
+        # If there are include patterns, it must match at least one
         if self.include_patterns:
             return any(fnmatch.fnmatch(original_name, p) for p in self.include_patterns)
 

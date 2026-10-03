@@ -1,28 +1,28 @@
 # tests/unit/test_mcp_auth.py
 """
-`AutenticacaoPAT` — a única linha entre um token e os dados do usuário.
+`AutenticacaoPAT` — the only line between a token and the user's data.
 
-Os testes daqui são, na maioria, sobre o que NÃO deve acontecer:
+The tests here are, for the most part, about what must NOT happen:
 
-- nada passa sem `Authorization: Bearer atl_pat_…`: nem JWT de sessão (o `/mcp`
-  fica fora das dependencies globais de propósito), nem token na URL (query
-  string vaza em log de proxy, histórico e Referer);
-- token revogado, expirado ou de usuário suspenso recebe a MESMA resposta de um
-  token que nunca existiu — o endpoint não pode virar oráculo de tokens válidos;
-- o alcance do token é `workspaces do usuário ∩ workspace_ids do token`, e
-  `workspace_ids = NULL` significa "todos, inclusive os futuros". Tratar NULL
-  como lista vazia tiraria do token justamente o que o dono escolheu na tela.
+- nothing gets through without `Authorization: Bearer atl_pat_…`: neither a session
+  JWT (`/mcp` stays out of the global dependencies on purpose) nor a token in the URL
+  (the query string leaks into proxy logs, history and Referer);
+- a revoked, expired or suspended-user token gets the SAME response as a
+  token that never existed — the endpoint must not become an oracle of valid tokens;
+- the token's reach is `user's workspaces ∩ token's workspace_ids`, and
+  `workspace_ids = NULL` means "all, including future ones". Treating NULL
+  as an empty list would take from the token exactly what the owner chose on screen.
 
-E sobre o que precisa acontecer: o escopo chega pelos dois canais (o
-`request.state`, que as tools leem, e o `ContextVar`, único caminho até o
-`list_tools`), o `ContextVar` é resetado no fim, e a falta de Redis não derruba
-nada.
+And about what must happen: the scope arrives through both channels (the
+`request.state`, which the tools read, and the `ContextVar`, the only path to
+`list_tools`), the `ContextVar` is reset at the end, and a missing Redis brings
+nothing down.
 
-Dois casos de método e ciclo de vida completam a borda: `GET /mcp` é 405 sem
-ir ao banco (o transporte é stateless, não há stream de servidor para entregar,
-e um GET aceito prenderia uma conexão de worker para sempre) e o evento de
-`lifespan` é respondido AQUI, sem alcançar o app do SDK — quem entra em
-`session_manager.run()` é `app.main`, uma vez só.
+Two method and lifecycle cases complete the edge: `GET /mcp` is a 405 without
+going to the database (the transport is stateless, there is no server stream to deliver,
+and an accepted GET would hold a worker connection forever) and the
+`lifespan` event is answered HERE, without reaching the SDK's app — the one that enters
+`session_manager.run()` is `app.main`, only once.
 """
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ from tests.unit._mcp_harness import (
 
 @pytest.fixture
 async def ambiente(monkeypatch):
-    """Banco em memória com um usuário, um workspace e a infra do MCP redirecionada."""
+    """In-memory database with one user, one workspace and the MCP infrastructure redirected."""
     async with banco_em_memoria() as fabrica:
         async with fabrica() as db:
             await criar_usuario(db, "usr-1", "ana")
@@ -72,7 +72,7 @@ class _Ambiente:
         self.visto: dict = {}
 
     def app(self):
-        """O middleware na frente de um app que só anota o que recebeu."""
+        """The middleware in front of an app that just records what it received."""
         visto = self.visto
 
         async def adiante(scope, receive, send):
@@ -101,13 +101,13 @@ async def _pat(ambiente, *, user_id="usr-1", scopes=("workflows:read",), workspa
         return await criar_pat(db, user_id, scopes, workspace_ids)
 
 
-# ── Método e ciclo de vida ────────────────────────────────────────────────────
+# ── Method and lifecycle ──────────────────────────────────────────────────────
 
 
 async def test_get_no_mcp_e_405_com_allow_post(ambiente):
-    """Com `stateless_http` não há stream de servidor: o GET só prenderia worker.
+    """With `stateless_http` there is no server stream: the GET would only hold a worker.
 
-    E a recusa vem antes do banco — nem o token válido chega a ser resolvido.
+    And the refusal comes before the database — not even a valid token gets resolved.
     """
     segredo = await _pat(ambiente)
     async with ambiente.cliente() as c:
@@ -115,12 +115,12 @@ async def test_get_no_mcp_e_405_com_allow_post(ambiente):
     assert r.status_code == 405
     assert r.headers["allow"] == "POST"
     assert r.json()["error"] == "method_not_allowed"
-    # Não passou adiante: o app interno nunca foi chamado.
+    # It was not passed on: the inner app was never called.
     assert ambiente.visto == {}
 
 
 async def test_get_sem_token_nenhum_tambem_e_405(ambiente):
-    """O método não serve com token nenhum — e a resposta não vira oráculo."""
+    """The method does not work with any token — and the response does not become an oracle."""
     async with ambiente.cliente() as c:
         r = await c.get("/mcp")
     assert r.status_code == 405
@@ -128,15 +128,15 @@ async def test_get_sem_token_nenhum_tambem_e_405(ambiente):
 
 
 async def test_lifespan_e_respondido_sem_alcancar_o_app_interno(ambiente):
-    """Um `run()` a mais no mesmo gerenciador de sessões seria fatal.
+    """One extra `run()` on the same session manager would be fatal.
 
-    O gerenciador é contexto de uso único; se um refactor trocar a rota por um
-    `Mount`, o evento de ciclo de vida passaria a chegar aqui — e este teste diz
-    o que acontece então: respondemos o protocolo e NÃO repassamos.
+    The manager is a single-use context; if a refactor swaps the route for a
+    `Mount`, the lifecycle event would start arriving here — and this test says
+    what happens then: we answer the protocol and do NOT pass it on.
     """
     chegou = []
 
-    async def adiante(scope, receive, send):  # pragma: no cover - não deve rodar
+    async def adiante(scope, receive, send):  # pragma: no cover - must not run
         chegou.append(scope.get("type"))
 
     app = AutenticacaoPAT(adiante)
@@ -168,14 +168,14 @@ async def test_sem_cabecalho_authorization_e_401_com_desafio(ambiente):
 
 
 async def test_jwt_de_sessao_nao_vale_no_mcp(ambiente):
-    # Montado em pedaços de propósito: um JWT inteiro no fonte acusaria no
-    # scanner de segredos do CI, que não distingue exemplo de credencial real.
+    # Assembled in pieces on purpose: a whole JWT in the source would trip the
+    # CI's secret scanner, which does not tell an example from a real credential.
     jwt = ".".join(["eyJhbGciOiJIUzI1NiJ9", "eyJzdWIiOiJ1c3ItMSJ9", "assinatura"])
     async with ambiente.cliente() as c:
         r = await c.post("/mcp", json={}, headers={"Authorization": f"Bearer {jwt}"})
     assert r.status_code == 401
-    # Formato errado nem chega a consultar o banco — e não recebe `invalid_token`,
-    # que diria "o formato estava certo".
+    # The wrong format does not even query the database — and does not get `invalid_token`,
+    # which would say "the format was right".
     assert "invalid_token" not in r.headers["www-authenticate"]
 
 
@@ -254,10 +254,10 @@ async def test_a_mensagem_de_recusa_nunca_diz_o_motivo(ambiente):
 
 
 async def test_a_recusa_diz_onde_se_cria_o_token_e_quem_alcanca_a_pagina(ambiente):
-    """`/settings/tokens`, como toda página fora da Home, devolve `/` a quem não
-    administra o sistema (`web/proxy.ts`), e o token é pessoal: o admin só cria
-    token da PRÓPRIA conta. A recusa diz as duas coisas, sem mandar ninguém
-    pedir o token de outra pessoa."""
+    """`/settings/tokens`, like every page outside the Home, sends to `/` whoever does not
+    administer the system (`web/proxy.ts`), and the token is personal: the admin only
+    creates tokens for their OWN account. The refusal says both things, without telling
+    anyone to ask for someone else's token."""
     async with ambiente.cliente() as c:
         r = await c.post("/mcp", json={})
     mensagem = r.json()["message"]
@@ -310,7 +310,7 @@ async def test_sem_redis_a_autenticacao_continua_funcionando(ambiente, monkeypat
     assert ambiente.visto["escopo"] is not None
 
 
-# ── Alcance por workspace ─────────────────────────────────────────────────────
+# ── Reach per workspace ───────────────────────────────────────────────────────
 
 
 async def test_token_sem_lista_alcanca_workspace_criado_depois_da_emissao(ambiente):
@@ -338,7 +338,7 @@ async def test_lista_explicita_nao_alcanca_workspace_criado_depois(ambiente):
 
 
 async def test_workspace_que_o_usuario_perdeu_sai_do_alcance(ambiente):
-    """A interseção é com os workspaces ATUAIS do usuário, não com a lista do token."""
+    """The intersection is with the user's CURRENT workspaces, not with the token's list."""
     segredo = await _pat(ambiente, workspace_ids=["ws-1", "ws-2"])
     async with ambiente.fabrica() as db:
         from app.models.workspace import Workspace

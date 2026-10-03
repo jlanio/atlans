@@ -8,26 +8,26 @@ import type { ConfirmacaoDoAssistente } from "@/app/components/home/assistente/q
 
 interface Props {
   confirmacao: ConfirmacaoDoAssistente
-  /** Já clicado nesta sessão — os botões travam. */
+  /** Already clicked in this session — the buttons lock. */
   decidido: boolean
   /**
-   * O servidor respondeu 409: a chave já tinha sido consumida (ou venceu). O
-   * cartão continua travado — refazer só renderia outro 409 —, mas no lugar de
-   * "Decidido." vai a microcópia que explica.
+   * The server answered 409: the key had already been consumed (or expired). The
+   * card stays locked — retrying would only render another 409 —, but instead of
+   * "Decidido." (decided) it shows the microcopy that explains.
    */
   expirado?: boolean
-  /** Há um stream em curso — não dá para disparar outra confirmação. */
+  /** A stream is in progress — another confirmation cannot be triggered. */
   ocupado: boolean
   onDecidir: (toolUseId: string, token: string, decisao: "confirmar" | "recusar") => void
 }
 
 /**
- * As chaves dos argumentos que descrevem O ALVO da ação (o rótulo vem do dicionário).
+ * The argument keys that describe THE TARGET of the action (the label comes from the dictionary).
  *
- * A escolha é por chave CONHECIDA, e não "tudo que veio": o resumo do servidor
- * já colapsa o que é grande, mas um argumento novo não pode passar a despejar
- * conteúdo dentro do cartão por acidente. A ordem é a de leitura — o nome antes
- * do id, porque é o nome que diz em que a ação mexe.
+ * The selection is by KNOWN key, not "everything that came": the server summary
+ * already collapses what is large, but a new argument must not start dumping
+ * content into the card by accident. The order is reading order — the name before
+ * the id, because the name is what tells what the action touches.
  */
 const CAMPOS: readonly string[] = [
   "name",
@@ -48,7 +48,7 @@ const CAMPOS: readonly string[] = [
 
 const MAX_LINHAS = 4
 
-/** Os pares legíveis do resumo dos argumentos: `[rótulo, valor]`. */
+/** The readable pairs of the argument summary: `[rótulo, valor]`. */
 export function descreverAlvo(
   argumentos: Record<string, unknown>,
   idioma: Idioma = IDIOMA_PADRAO,
@@ -60,7 +60,7 @@ export function descreverAlvo(
     if (linhas.length >= MAX_LINHAS) break
     const bruto = argumentos[chave]
     if (bruto == null) continue
-    if (typeof bruto === "object") continue // já colapsado pelo servidor
+    if (typeof bruto === "object") continue // already collapsed by the server
     const valor = String(typeof bruto === "boolean" ? (bruto ? t.sim : t.nao) : bruto).trim()
     if (!valor) continue
     linhas.push([rotulo, valor.length > 72 ? `${valor.slice(0, 69)}…` : valor])
@@ -69,19 +69,19 @@ export function descreverAlvo(
 }
 
 /**
- * O cartão de confirmação por clique. Nunca manda os argumentos — só o
- * `tool_use_id`, o `token` e a decisão; o que roda são os args ARMAZENADOS no
- * servidor. Sem token (chave sumida no replay) os botões ficam mortos.
+ * The click-to-confirm card. It never sends the arguments — only the
+ * `tool_use_id`, the `token` and the decision; what runs are the args STORED on
+ * the server. Without a token (key gone on replay) the buttons are dead.
  *
- * Os argumentos são MOSTRADOS (não enviados): o portão é a única barreira contra
- * o destrutivo, e "Apagar arquivo do Drive · a3f9c2e1…" pede um clique às cegas.
+ * The arguments are SHOWN (not sent): the gate is the only barrier against
+ * destructive actions, and "Apagar arquivo do Drive · a3f9c2e1…" asks for a blind click.
  */
 export default function CartaoConfirmacao({ confirmacao, decidido, expirado = false, ocupado, onDecidir }: Props) {
   const { tool_use_id, token, acao } = confirmacao
   const semToken = !token
   const travado = decidido || ocupado || semToken
-  // Duas portas para o mesmo beco: a chave sumiu no replay, ou o servidor
-  // recusou a que foi mandada. A frase é a mesma porque a saída é a mesma.
+  // Two doors into the same dead end: the key vanished on replay, or the server
+  // rejected the one that was sent. The sentence is the same because the way out is the same.
   const semSaida = expirado || (semToken && !decidido)
   const idioma = useIdiomaDaTela()
   const t = textosDe(idioma).assistente.confirmacao
@@ -95,8 +95,8 @@ export default function CartaoConfirmacao({ confirmacao, decidido, expirado = fa
       aria-labelledby={tituloId}
       className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5"
     >
-      {/* O leitor de tela fica MUDO quando o assistente para esperando um
-          clique: o anúncio de "respondendo" some e nada toma o lugar dele. */}
+      {/* The screen reader goes SILENT when the assistant stops to wait for a
+          click: the "respondendo" announcement disappears and nothing takes its place. */}
       {!decidido && !semToken && (
         <p role="status" className="sr-only">{t.pendente(rotulo)}</p>
       )}
@@ -139,8 +139,8 @@ export default function CartaoConfirmacao({ confirmacao, decidido, expirado = fa
       {semSaida && (
         <p className="mt-1.5 text-[11px] text-amber-400/70">{t.semSaida}</p>
       )}
-      {/* O prazo existe no servidor (15 min) e não existia em lugar nenhum da
-          tela: quem voltava do almoço clicava e levava um erro. */}
+      {/* The deadline exists on the server (15 min) and existed nowhere on the
+          screen: someone coming back from lunch clicked and got an error. */}
       {!decidido && !semToken && (
         <p className="mt-1.5 text-[11px] text-amber-400/70">{t.prazo}</p>
       )}

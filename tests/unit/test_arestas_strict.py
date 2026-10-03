@@ -1,11 +1,12 @@
 # tests/unit/test_arestas_strict.py
 """
-Semântica strict das arestas (PR-D): sem "primeiro valor" cego.
+Strict edge semantics (PR-D): no blind "first value".
 
-- Switch emite TODOS os baldes possíveis (fallback + saídas das regras), mesmo
-  vazios, para que uma aresta from_key='output_N' sempre resolva.
-- from_key que não existe no output do pai NÃO cruza dados de outro balde (F5).
-- pai skipado com aresta from_key não injeta None no merge (F14).
+- Switch emits ALL possible buckets (fallback + rule outputs), even empty
+  ones, so that an edge with from_key='output_N' always resolves.
+- A from_key that does not exist in the parent's output does NOT cross data
+  from another bucket (F5).
+- A skipped parent with a from_key edge does not inject None into the merge (F14).
 """
 import asyncio
 
@@ -31,11 +32,11 @@ def _gdf(cats):
     )
 
 
-# ── Switch emite todos os baldes ──────────────────────────────────────────────
+# ── Switch emits all buckets ──────────────────────────────────────────────────
 
 def test_switch_emite_todos_os_baldes_declarados_mesmo_vazios():
-    # Regras mandam para output_1 e output_2; dados só casam output_1. output_0
-    # (fallback) e output_2 devem existir VAZIOS no resultado, não sumir.
+    # Rules send to output_1 and output_2; the data only matches output_1. output_0
+    # (fallback) and output_2 must exist EMPTY in the result, not disappear.
     sw = Switch(node_id="s", parameters={
         "rules": [
             {"field": "cat", "operator": "==", "value": "A", "output": "output_1"},
@@ -43,21 +44,21 @@ def test_switch_emite_todos_os_baldes_declarados_mesmo_vazios():
         ],
         "fallback_output": "output_0",
     })
-    out = asyncio.run(sw.execute({"data": _gdf("AAA")}))  # só 'A' → só output_1
+    out = asyncio.run(sw.execute({"data": _gdf("AAA")}))  # only 'A' → only output_1
     assert set(out) == {"output_0", "output_1", "output_2"}
     assert len(out["output_1"]) == 3
     assert len(out["output_0"]) == 0 and len(out["output_2"]) == 0
 
 
-# ── from_key para balde vazio não cruza dados (F5) ────────────────────────────
+# ── from_key to an empty bucket does not cross data (F5) ──────────────────────
 
 def _node(nid, name="Merge", ntype="control", **props):
     return {"id": nid, "type": ntype, "name": name, "properties": props or {"strategy": "first"}}
 
 
 def test_from_key_para_balde_vazio_do_switch_nao_cruza_dados():
-    # Consumidor ligado a output_2 (vazio) NÃO pode receber os registros de
-    # output_1. Antes: from_key ausente → primeiro valor → dados de output_1.
+    # A consumer wired to output_2 (empty) must NOT receive the records from
+    # output_1. Before: missing from_key → first value → data from output_1.
     definition = {
         "nodes": [
             {"id": "T", "type": "trigger", "name": "Merge", "properties": {"strategy": "first"}},
@@ -78,11 +79,11 @@ def test_from_key_para_balde_vazio_do_switch_nao_cruza_dados():
     ex = WorkflowExecutor(definition, task_id="f5", publisher=_publisher())
     final = asyncio.run(ex.run(initial_inputs={"T": {"output": _gdf("AAA")}}))  # nada casa output_2
     saida_d = final["D"].get("output")
-    # D recebeu o balde vazio (0 feições), NÃO os 3 registros de output_1.
+    # D received the empty bucket (0 features), NOT the 3 records from output_1.
     assert saida_d is not None and len(saida_d) == 0
 
 
-# ── pai skipado com from_key não injeta None (F14) ────────────────────────────
+# ── skipped parent with from_key does not inject None (F14) ───────────────────
 
 def _branch(nid):
     return {"id": nid, "type": "control", "name": "Conditional",
@@ -92,9 +93,9 @@ def _branch(nid):
 def test_pai_skipado_com_from_key_nao_injeta_none_no_merge():
     #   T → A(Conditional, branch=True)
     #        ├true→ V ─(from_key output)→ D
-    #        └false→ C ─(from_key output)→ D   (C skipado)
-    # D roda por causa de V (vivo). A aresta de C (skipada) não pode injetar
-    # {output: None} — antes o from_key-miss sobre {} caía em None.
+    #        └false→ C ─(from_key output)→ D   (C skipped)
+    # D runs because of V (alive). C's edge (skipped) must not inject
+    # {output: None} — before, the from_key miss over {} fell to None.
     definition = {
         "nodes": [
             {"id": "T", "type": "trigger", "name": "Merge", "properties": {"strategy": "first"}},
@@ -112,5 +113,5 @@ def test_pai_skipado_com_from_key_nao_injeta_none_no_merge():
     final = asyncio.run(ex.run(initial_inputs={"T": {"output": _gdf("AAA")}}))
     assert ex.node_stats["C"]["status"] == "skipped"
     assert ex.node_stats["D"]["status"] != "skipped"
-    # D não pode ter recebido None de C: Merge 'first' devolveria o dado de V.
+    # D must not have received None from C: Merge 'first' would return V's data.
     assert final["D"].get("output") is not None

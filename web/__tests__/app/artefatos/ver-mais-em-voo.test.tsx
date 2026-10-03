@@ -1,13 +1,13 @@
 /**
- * Tela de Artefatos — um "Ver mais" em voo não sobrevive à saída da chave.
+ * Artifacts screen — an in-flight "Ver mais" does not survive leaving the key.
  *
- * O `queryFn` não aborta a requisição, e o `gcTime: 0` do cliente só descarta a
- * consulta ociosa. Sem o cancelamento na saída, a consulta da chave deixada
- * seguia viva com o "Ver mais" em voo: voltar à aba (ou remontar a tela, com o
- * provedor do layout de pé) pegava carona nessa busca e mostrava a lista
- * guardada, sem skeleton e sem pedir a 1ª página de novo — e a página velha do
- * "Ver mais" entrava na tela quando respondia. O hook feito à mão de antes
- * começava do zero nos dois casos.
+ * The `queryFn` does not abort the request, and the client's `gcTime: 0` only discards an
+ * idle query. Without the cancellation on leave, the query for the abandoned key
+ * stayed alive with the "Ver mais" in flight: going back to the tab (or remounting the screen, with the
+ * layout's provider still up) piggybacked on that fetch and showed the
+ * stored list, without a skeleton and without requesting the 1st page again — and the old page from the
+ * "Ver mais" came onto the screen when it responded. The hand-rolled hook from before
+ * started from scratch in both cases.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { configure, render, screen, waitFor, fireEvent, within, act } from "@testing-library/react"
@@ -55,8 +55,8 @@ const itens = (prefixo: string, de: number, n: number) =>
 const ok = (items: IArtifactItem[], total: number): Resposta =>
   ({ success: true, status: 200, data: { items, total } }) as Resposta
 
-/** Servidor: 120 de execução e 3 de publicação; `prefixo` é o conteúdo de agora
- *  da aba de execução (muda quando uma execução nova grava artefatos). */
+/** Server: 120 from runs and 3 from publishing; `prefixo` is the current content
+ *  of the runs tab (it changes when a new run writes artifacts). */
 function servidor(prefixo: string) {
   getArtifacts.mockImplementation(async (p = {}) => {
     const kind = p.kind ?? "execution"
@@ -85,7 +85,7 @@ function montar(cliente: QueryClient) {
   return render(<QueryClientProvider client={cliente}><ArtifactsPage /></QueryClientProvider>)
 }
 
-/** Lista com 50 de 120 e um "Ver mais" pendurado, que responde com `velho…`. */
+/** List with 50 of 120 and a pending "Ver mais", which responds with `velho…`. */
 async function comVerMaisEmVoo() {
   await waitFor(() => expect(linhas()).toBe(50))
   const pagina2 = deferido<Resposta>()

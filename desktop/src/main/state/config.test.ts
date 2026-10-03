@@ -1,12 +1,12 @@
 // desktop/src/main/state/config.test.ts
 //
-// A escrita do `.env` e uma reimplementacao de
-// `executor/_env_utils.py::persist_env_var`. Estes casos travam o
-// comportamento que importa: NAO destruir o que o app nao conhece.
+// Writing the `.env` is a reimplementation of
+// `executor/_env_utils.py::persist_env_var`. These cases lock in the behavior
+// that matters: do NOT destroy what the app does not know about.
 //
-// O arquivo carrega EXECUTOR_HOST_ALIASES, MINIO_*, LOG_FILE_AGENT,
-// EXECUTOR_SYNC_* e o que mais o usuario tenha posto la. Reescrever a partir de
-// um dicionario apagaria tudo isso em silencio.
+// The file carries EXECUTOR_HOST_ALIASES, MINIO_*, LOG_FILE_AGENT,
+// EXECUTOR_SYNC_* and whatever else the user has put there. Rewriting it from
+// a dictionary would silently erase all of that.
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -17,8 +17,8 @@ let tmp: string
 let envFile: string
 let certDir: string
 
-// `paths.ts` importa `electron`, que nao existe fora do runtime do Electron.
-// O mock cobre so o que este modulo usa.
+// `paths.ts` imports `electron`, which does not exist outside the Electron
+// runtime. The mock covers only what this module uses.
 vi.mock('../paths.js', () => ({
   get ENV_FILE() { return envFile },
   get CERT_DIR() { return certDir },
@@ -54,8 +54,8 @@ describe('lerEnv', () => {
   })
 
   it('remove aspas do valor', () => {
-    // dotenv aceita as duas formas; sem tirar, a comparacao com o que o Python
-    // enxerga divergiria.
+    // dotenv accepts both forms; without stripping, the comparison with what
+    // Python sees would diverge.
     escrever('A="com espaco"\nB=\'simples\'\n')
     expect(lerEnv()).toEqual({ A: 'com espaco', B: 'simples' })
   })
@@ -102,8 +102,8 @@ describe('gravarEnv', () => {
   })
 
   it('nao acumula linhas em branco a cada escrita', () => {
-    // O split de um arquivo terminado em `\n` deixa um elemento vazio no fim;
-    // empurrar a chave depois dele criava uma linha em branco por escrita.
+    // Splitting a file that ends in `\n` leaves an empty element at the end;
+    // pushing the key after it created one blank line per write.
     escrever('A=1\n')
     gravarEnv({ B: '2' })
     gravarEnv({ C: '3' })
@@ -112,15 +112,16 @@ describe('gravarEnv', () => {
   })
 
   it('preserva linha em branco no meio do arquivo', () => {
-    // Separam secoes no `.env.example`; so as do FIM sao removidas.
+    // They separate sections in `.env.example`; only the ones at the END are
+    // removed.
     escrever('# rede\nA=1\n\n# gis\nB=2\n')
     gravarEnv({ C: '3' })
     expect(fs.readFileSync(envFile, 'utf8')).toBe('# rede\nA=1\n\n# gis\nB=2\nC=3\n')
   })
 
   it('nao trata chave comentada como existente', () => {
-    // Descomentar por engano mudaria o comportamento do executor sem o usuario
-    // ter pedido.
+    // Uncommenting by mistake would change the executor's behavior without the
+    // user having asked for it.
     escrever('# EXECUTOR_ID=antigo\n')
     gravarEnv({ EXECUTOR_ID: 'novo' })
 
@@ -130,7 +131,7 @@ describe('gravarEnv', () => {
   })
 
   it('termina sempre com quebra de linha', () => {
-    // Sem isso a proxima chave gruda na ultima linha: `A=1B=2`.
+    // Without this the next key sticks to the last line: `A=1B=2`.
     escrever('A=1')
     gravarEnv({ B: '2' })
     expect(fs.readFileSync(envFile, 'utf8')).toBe('A=1\nB=2\n')
@@ -156,8 +157,8 @@ describe('lerConfiguracao', () => {
   })
 
   it('com EXECUTOR_ID mas sem cert: falta enrollment', () => {
-    // O caso de quem apagou a pasta de certificados, ou de um enrollment que
-    // falhou depois de gravar o .env.
+    // The case of someone who deleted the certificates folder, or of an
+    // enrollment that failed after writing the .env.
     escrever('EXECUTOR_ID=abc\n')
     const c = lerConfiguracao()
     expect(c.configurado).toBe(false)
@@ -185,8 +186,8 @@ describe('lerConfiguracao', () => {
   })
 
   it('so cert.pem, sem key.pem, nao basta', () => {
-    // `assert_enrolled` do Python exige os dois; divergir aqui faria o app
-    // spawnar um executor que sai na hora.
+    // Python's `assert_enrolled` requires both; diverging here would make the
+    // app spawn an executor that exits immediately.
     escrever('EXECUTOR_ID=abc\n')
     fs.writeFileSync(path.join(certDir, 'cert.pem'), '')
     expect(lerConfiguracao().falta).toBe('enrollment')
@@ -208,10 +209,10 @@ describe('descartarEnrollment', () => {
   })
 
   it('PRESERVA o pin da chave de assinatura do servidor', () => {
-    // O caso de segurança do módulo: `server_signing.pub` é a chave Ed25519 do
-    // servidor, fixada por TOFU. Apagá-la reabriria a janela que o pinning
-    // fecha — o próximo boot aceitaria qualquer chave que respondesse no
-    // endereço configurado, e passaria a executar jobs assinados por ela.
+    // The module's security case: `server_signing.pub` is the server's Ed25519
+    // key, pinned via TOFU. Deleting it would reopen the window that pinning
+    // closes — the next boot would accept any key that answered at the
+    // configured address, and would start running jobs signed by it.
     povoar(['cert.pem', 'key.pem', 'server_signing.pub'])
     descartarEnrollment()
 
@@ -220,8 +221,8 @@ describe('descartarEnrollment', () => {
   })
 
   it('preserva o trust store da CA interna', () => {
-    // Não tem relação com a identidade deste executor; rebaixá-lo só custaria
-    // um download a mais no próximo boot.
+    // It has nothing to do with this executor's identity; downgrading it would
+    // only cost one extra download on the next boot.
     povoar(['cert.pem', 'atlans-root.crt', 'atlans-ca-bundle.crt'])
     descartarEnrollment()
 
@@ -230,8 +231,8 @@ describe('descartarEnrollment', () => {
   })
 
   it('deixa a configuracao em falta=enrollment, e nao em falta=config', () => {
-    // O EXECUTOR_ID sobrevive e vira o valor inicial do formulário: quando o
-    // executor foi apenas revogado (não recriado), ele continua valendo.
+    // The EXECUTOR_ID survives and becomes the form's initial value: when the
+    // executor was only revoked (not recreated), it is still valid.
     escrever('EXECUTOR_ID=abc\n')
     povoar(['cert.pem', 'key.pem'])
     descartarEnrollment()
@@ -267,8 +268,8 @@ describe('configuração de execução', () => {
     const c = ler()
     expect(c.workers).toBe(8)
     expect(c.timeoutS).toBe(120)
-    // O Python compara em maiúsculas; aceitar minúsculo evita divergência com
-    // um .env editado à mão.
+    // Python compares in uppercase; accepting lowercase avoids diverging from a
+    // hand-edited .env.
     expect(c.nivelLog).toBe('DEBUG')
   })
 
@@ -280,9 +281,9 @@ describe('configuração de execução', () => {
     ['EXECUTOR_MAX_QUEUE_SIZE=99999', 'filaMax', 50],
     ['EXECUTOR_JOB_TIMEOUT=0', 'timeoutS', 3600],
   ])('valor fora da faixa (%s) cai no default, como no Python', (linha, campo, esperado) => {
-    // `executor/_ambiente.py::ler_int` descarta em SILÊNCIO e usa o default. Se a
-    // UI aceitasse o valor, ela mostraria 999 workers e o executor rodaria com
-    // 4 — sem nada explicando a diferença.
+    // `executor/_ambiente.py::ler_int` SILENTLY discards it and uses the default.
+    // If the UI accepted the value, it would show 999 workers and the executor
+    // would run with 4 — with nothing explaining the difference.
     escrever(`${linha}\n`)
     expect((ler() as unknown as Record<string, number>)[campo]).toBe(esperado)
   })
@@ -294,15 +295,15 @@ describe('configuração de execução', () => {
     ['EXECUTOR_MAX_CONCURRENT= +8 ', 'workers', 8],
     ['EXECUTOR_MAX_CONCURRENT=8 # oito', 'workers', 8],
   ])('lê o número como o executor o lê (%s)', (linha, campo, esperado) => {
-    // `int()` do Python sobre o que o python-dotenv entrega. O `parseInt` lia
-    // "8x" como 8, e a tela mostrava 8 workers com o executor rodando 4.
+    // Python's `int()` over what python-dotenv delivers. `parseInt` read "8x"
+    // as 8, and the screen showed 8 workers with the executor running 4.
     escrever(`${linha}\n`)
     expect((ler() as unknown as Record<string, number>)[campo]).toBe(esperado)
   })
 
   it('tempo limite acima de 24 h vale: o executor não impõe teto', () => {
-    // A tela tinha teto de 86 400 s que o executor não tem: com 100 000 no
-    // `.env`, ela mostrava 3600 e o executor usava 100 000.
+    // The screen had a ceiling of 86,400 s that the executor does not have: with
+    // 100,000 in the `.env`, it showed 3600 and the executor used 100,000.
     escrever('EXECUTOR_JOB_TIMEOUT=100000\n')
     expect(ler().timeoutS).toBe(100000)
   })
@@ -330,8 +331,8 @@ describe('configuração de execução', () => {
   })
 
   it('o servidor gravado e SEMPRE o do app, nunca o que estava no .env', () => {
-    // O ponto do travamento: um `.env` editado a mao para outro endereco volta
-    // ao servidor correto assim que qualquer ajuste e salvo.
+    // The point of the lock: a `.env` hand-edited to another address goes back
+    // to the correct server as soon as any setting is saved.
     escrever('EXECUTOR_SERVER_URL=wss://outro.servidor\n')
     gravarExecucao({
       workers: 4, filaMax: 50, timeoutS: 60, artifactsDir: 'D:/x', nivelLog: 'INFO',
@@ -363,17 +364,18 @@ describe('configuração de execução', () => {
 
 describe('configuração do GeoSync', () => {
   it('sem EXECUTOR_SYNC_MODE, mostra o modo que o executor usa: upload', () => {
-    // O padrão do executor (executor/config.py) é `upload`; a tela caía em
-    // `bidirectional` e dizia que a pasta recebia o que o Drive publicava.
+    // The executor's default (executor/config.py) is `upload`; the screen fell
+    // back to `bidirectional` and said the folder received what Drive
+    // published.
     escrever('EXECUTOR_SYNC_DIRS=C:/dados\n')
     expect(lerGeoSync()).toMatchObject({ modo: 'upload', conflito: 'remote-wins' })
   })
 
   it('salvar sem mexer não troca o modo que o executor usa', () => {
-    // O bug que a tela mentindo causava: salvar qualquer ajuste do GeoSync
-    // (a pasta, o workspace) gravava o `bidirectional` da tela, e o executor
-    // passava a baixar do Drive e a seguir as exclusões feitas lá — sem
-    // ninguém ter escolhido isso.
+    // The bug the lying screen caused: saving any GeoSync setting (the folder,
+    // the workspace) wrote the screen's `bidirectional`, and the executor
+    // started downloading from Drive and following the deletions made there —
+    // without anyone having chosen that.
     escrever('EXECUTOR_SYNC_DIRS=C:/dados\n')
     gravarGeoSync(lerGeoSync())
     expect(lerEnv().EXECUTOR_SYNC_MODE).toBe('upload')
@@ -385,8 +387,8 @@ describe('configuração do GeoSync', () => {
   })
 
   it('comentário no fim da linha não troca o modo (como o dotenv do executor lê)', () => {
-    // Não reconhecido, o modo caía no padrão, e salvar o GeoSync gravava
-    // `upload` por cima do `bidirectional` que o executor usava.
+    // Not recognized, the mode fell back to the default, and saving GeoSync
+    // wrote `upload` over the `bidirectional` the executor was using.
     escrever('EXECUTOR_SYNC_MODE=bidirectional # editado à mão\nEXECUTOR_SYNC_CONFLICT_STRATEGY="keep-both" # x\n') // pragma: allowlist secret
     expect(lerGeoSync()).toMatchObject({ modo: 'bidirectional', conflito: 'keep-both' })
   })
@@ -398,9 +400,9 @@ describe('artifactsDirEfetivo', () => {
   })
 
   it('o .env vence sobre o padrão', () => {
-    // Sem isto, configurar a pasta em Ajustes gravava o valor e o executor
-    // continuava escrevendo no diretório padrão — o usuário mudaria e nada
-    // aconteceria.
+    // Without this, setting the folder in Settings wrote the value and the
+    // executor kept writing to the default directory — the user would change
+    // it and nothing would happen.
     escrever('EXECUTOR_ARTIFACTS_DIR=D:/meus-dados\n')
     expect(artifactsDirEfetivo('C:/padrao')).toBe('D:/meus-dados')
   })

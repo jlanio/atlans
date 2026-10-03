@@ -1,22 +1,22 @@
 # app/core/storage_reconciliation.py
 """
-Reconciliacao entre o estado do DB e o estado real do MinIO.
+Reconciliation between the DB state and the actual MinIO state.
 
-Endereca a familia de bugs onde o relatorio de uso de disco
-(/admin/storage) drifa silenciosamente em relacao ao disco real:
+Addresses the family of bugs where the disk usage report
+(/admin/storage) silently drifts from the actual disk:
 
-- Bug 1: Artifact.size_bytes = NULL quando s3.head() falhou no run_result_consumer.
-         Job re-tenta o head e preenche o valor.
-- Bug 2: Multipart uploads abandonados e objetos orfaos no MinIO.
-         Job mede o drift e (opcionalmente) limpa.
-- Bug 4: WorkspaceFile com status='pending' que ficou em limbo.
-         Job apaga apos TTL + aborta multipart correspondente.
-- Bug 5: Artifact com workspace_id NULL (legado/orfao). Apenas conta + loga.
-- Bug 8: Artifact pinned cujo workflow_hash sumiu. Apenas conta + loga.
+- Bug 1: Artifact.size_bytes = NULL when s3.head() failed in run_result_consumer.
+         The job retries the head and fills in the value.
+- Bug 2: Abandoned multipart uploads and orphan objects in MinIO.
+         The job measures the drift and (optionally) cleans up.
+- Bug 4: WorkspaceFile with status='pending' left in limbo.
+         The job deletes it after a TTL + aborts the corresponding multipart.
+- Bug 5: Artifact with NULL workspace_id (legacy/orphan). Only counts + logs.
+- Bug 8: Pinned Artifact whose workflow_hash is gone. Only counts + logs.
 
-Roda como background task no lifespan da API (em paralelo com
-artifact_cleanup.run_cleanup_loop). Lock Redis (`laco_periodico`) evita
-duplicacao com varios workers uvicorn.
+Runs as a background task in the API lifespan (in parallel with
+artifact_cleanup.run_cleanup_loop). A Redis lock (`laco_periodico`) avoids
+duplication across multiple uvicorn workers.
 """
 from __future__ import annotations
 
@@ -44,30 +44,30 @@ _PENDING_TTL_HOURS = int(os.getenv("WORKSPACE_FILE_PENDING_TTL_HOURS", "24"))
 _MULTIPART_TTL_HOURS = int(os.getenv("MULTIPART_UPLOAD_TTL_HOURS", "24"))
 
 
-# Janela de retry para size_bytes NULL. Passado esse prazo a causa deixa de ser
-# transitoria (objeto nunca subiu ao MinIO, ou ficou no disco do executor via
-# fallback local) e insistir so gasta chamada e mantem alerta permanente.
+# Retry window for NULL size_bytes. Past this deadline the cause is no longer
+# transient (the object never reached MinIO, or stayed on the executor's disk via
+# local fallback) and insisting only wastes calls and keeps a permanent alert.
 NULL_SIZE_RETRY_WINDOW_DAYS = int(os.getenv("ARTIFACT_NULL_SIZE_RETRY_DAYS", "7"))
 
 
 # ── Bug 1: preencher size_bytes NULL via s3.head() retry ─────────────────────
 
 async def fix_artifact_null_sizes(db: AsyncSession, limit: int = 500) -> dict:
-    """Re-tenta s3.head() em Artifacts RECENTES com size_bytes IS NULL.
+    """Retry s3.head() on RECENT Artifacts with size_bytes IS NULL.
 
-    Quando o run_result_consumer falha em obter o tamanho (MinIO transitorio,
-    race com upload do executor), grava NULL — e o /admin/storage subestima.
-    Este job tenta de novo, preenchendo o que conseguir.
+    When run_result_consumer fails to get the size (transient MinIO issue,
+    race with the executor's upload), it writes NULL — and /admin/storage
+    underestimates. This job tries again, filling in what it can.
 
-    Janela de retry: so artefatos criados nos ultimos NULL_SIZE_RETRY_WINDOW_DAYS
-    dias. Antes o filtro era apenas `size_bytes IS NULL`, entao registros
-    insoluveis eram re-consultados 1x/hora para sempre — gastando chamadas ao
-    MinIO e mantendo um alerta permanente no painel que nenhuma acao resolvia.
-    Passada a janela, a causa nao e mais transitoria: ou o objeto nunca chegou
-    ao MinIO, ou ficou no disco do executor (s3_key local). Esses ficam
-    contabilizados como `unrecoverable_size_artifacts` no /admin/storage.
+    Retry window: only artifacts created in the last NULL_SIZE_RETRY_WINDOW_DAYS
+    days. Previously the filter was just `size_bytes IS NULL`, so unsolvable
+    records were re-queried once an hour forever — spending calls to MinIO
+    and keeping a permanent alert on the panel that no action resolved.
+    Past the window, the cause is no longer transient: either the object never
+    reached MinIO, or it stayed on the executor's disk (local s3_key). Those are
+    counted as `unrecoverable_size_artifacts` in /admin/storage.
 
-    Returns: dict com contadores {checked, fixed, still_null}.
+    Returns: dict with counters {checked, fixed, still_null}.
     """
     from app.core import storage as _s3
 
@@ -85,7 +85,7 @@ async def fix_artifact_null_sizes(db: AsyncSession, limit: int = 500) -> dict:
     fixed = 0
     still_null = 0
     for art in candidates:
-        # s3_key local de fallback do executor (sync to disk) nao tem head() no MinIO
+        # the executor's local fallback s3_key (sync to disk) has no head() in MinIO
         if art.s3_key.startswith("/"):
             still_null += 1
             continue
@@ -113,11 +113,12 @@ async def fix_artifact_null_sizes(db: AsyncSession, limit: int = 500) -> dict:
 # ── Bug 4: TTL para WorkspaceFile pending + abort multipart ──────────────────
 
 async def cleanup_pending_workspace_files(db: AsyncSession) -> dict:
-    """Remove WorkspaceFile com status='pending' mais antigos que TTL.
+    """Remove WorkspaceFiles with status='pending' older than the TTL.
 
-    Pending eterno acumula: cliente pediu presigned PUT, recebeu URL, abandonou.
-    Sem confirm, o registro vive para sempre no DB e bytes podem ter ficado em
-    multipart abandonado no MinIO. Aborta o multipart correspondente se existir.
+    Eternal pending piles up: a client requested a presigned PUT, got the URL,
+    abandoned it. Without a confirm, the record lives forever in the DB and bytes
+    may have been left in an abandoned multipart in MinIO. Aborts the
+    corresponding multipart if there is one.
 
     Returns: dict {deleted_pending, aborted_multipart}.
     """
@@ -135,7 +136,7 @@ async def cleanup_pending_workspace_files(db: AsyncSession) -> dict:
     aborted = 0
     deleted_ids: list[Any] = []
     for wf in stale:
-        # Best-effort: abort multipart se existir para esta key
+        # Best-effort: abort the multipart if one exists for this key
         try:
             for upload in await _s3.list_incomplete_multipart_uploads_async(prefix=wf.s3_key):
                 if upload["key"] == wf.s3_key:
@@ -158,10 +159,10 @@ async def cleanup_pending_workspace_files(db: AsyncSession) -> dict:
 
 
 async def abort_stale_multipart_uploads(prefix: str = "") -> dict:
-    """Aborta multipart uploads com idade > TTL, sem precisar olhar DB.
+    """Abort multipart uploads older than the TTL, without looking at the DB.
 
-    Cobre multipart abandonados que nao tem WorkspaceFile correspondente
-    (ex: presign falhou apos iniciar multipart). Roda em thread (boto3 e sync).
+    Covers abandoned multipart uploads that have no corresponding WorkspaceFile
+    (e.g. presign failed after starting the multipart). Runs in a thread (boto3 is sync).
 
     Returns: dict {scanned, aborted}.
     """
@@ -178,7 +179,7 @@ async def abort_stale_multipart_uploads(prefix: str = "") -> dict:
             initiated = upload.get("initiated")
             if initiated is None:
                 continue
-            # initiated vem com tzinfo do boto3
+            # initiated comes with tzinfo from boto3
             if initiated < cutoff:
                 if _s3.abort_multipart_upload(upload["key"], upload["upload_id"]):
                     a += 1
@@ -200,10 +201,10 @@ async def abort_stale_multipart_uploads(prefix: str = "") -> dict:
 # ── Bug 2: drift report DB vs MinIO ──────────────────────────────────────────
 
 async def compute_storage_drift(db: AsyncSession, sample_prefixes: tuple[str, ...] = ("drive/", "artifacts/")) -> dict:
-    """Compara SUM(size) do DB com soma real de objetos no MinIO por prefixo.
+    """Compare the DB's SUM(size) with the actual sum of objects in MinIO per prefix.
 
-    NAO deleta nada — apenas mede e loga. Operador decide o que fazer com o
-    drift via /admin/storage (que expoe esses numeros).
+    Does NOT delete anything — only measures and logs. The operator decides what
+    to do about the drift via /admin/storage (which exposes these numbers).
 
     Returns: dict {by_prefix: {prefix: {db_bytes, s3_bytes, s3_objects, drift_bytes}}}.
     """
@@ -254,19 +255,19 @@ async def compute_storage_drift(db: AsyncSession, sample_prefixes: tuple[str, ..
 # ── Bug 5 e 8: auditoria de orfaos (so conta + loga) ─────────────────────────
 
 async def count_orphaned_workspace_artifacts(db: AsyncSession) -> int:
-    """Conta Artifact cujo workspace_id nao existe mais em `workspaces`.
+    """Count Artifacts whose workspace_id no longer exists in `workspaces`.
 
-    A versao anterior filtrava `workspace_id IS NULL` numa coluna declarada
-    NOT NULL (ver app/models/artifact.py) — logo, sempre retornava 0 e a
-    auditoria nunca acusava nada, enquanto os orfaos reais apareciam no painel
-    rotulados como "(sem workspace)".
+    The previous version filtered `workspace_id IS NULL` on a column declared
+    NOT NULL (see app/models/artifact.py) — so it always returned 0 and the
+    audit never flagged anything, while the real orphans showed up on the panel
+    labeled "(sem workspace)" (no workspace).
 
-    O orfao real e REFERENCIAL: o artefato aponta para um workspace que nao
-    existe mais (purgado) ou que esta na lixeira. Efeito pratico: ninguem mais
-    consegue acessa-los — verify_workspace_access nunca casa, porque um
-    workspace soft-deletado nao entra em get_user_workspace_ids.
+    The real orphan is REFERENTIAL: the artifact points to a workspace that no
+    longer exists (purged) or that is in the trash. Practical effect: nobody can
+    access them anymore — verify_workspace_access never matches, because a
+    soft-deleted workspace is not included in get_user_workspace_ids.
 
-    Apenas auditoria — nao deleta.
+    Audit only — does not delete.
     """
     from app.models.workspace import Workspace
 
@@ -279,11 +280,11 @@ async def count_orphaned_workspace_artifacts(db: AsyncSession) -> int:
 
 
 async def count_orphaned_pinned_artifacts(db: AsyncSession) -> int:
-    """Conta Artifact pinned cujo workflow_hash nao existe mais.
+    """Count pinned Artifacts whose workflow_hash no longer exists.
 
-    Artifacts pinned escapam do cleanup periodico (Artifact.is_pinned == False
-    no filtro do artifact_cleanup). Se o workflow for deletado, esses pinned
-    ficam orfaos consumindo disco.
+    Pinned Artifacts escape the periodic cleanup (Artifact.is_pinned == False
+    in the artifact_cleanup filter). If the workflow is deleted, those pinned
+    ones become orphans consuming disk.
     """
     valid_hashes = select(Workflow.id_hash)
     result = await db.execute(
@@ -298,7 +299,7 @@ async def count_orphaned_pinned_artifacts(db: AsyncSession) -> int:
 # ── Orquestrador ─────────────────────────────────────────────────────────────
 
 async def run_full_reconciliation() -> dict:
-    """Roda todos os jobs de reconciliacao em sequencia. Returns summary."""
+    """Run all the reconciliation jobs in sequence. Returns a summary."""
     summary: dict[str, Any] = {}
 
     async with AsyncSessionLocal() as db:
@@ -348,7 +349,7 @@ async def run_full_reconciliation() -> dict:
 
 
 async def run_reconciliation_loop() -> None:
-    """Loop infinito. Iniciado no lifespan da API; lock Redis garante 1 worker por ciclo."""
+    """Infinite loop. Started in the API lifespan; a Redis lock ensures 1 worker per cycle."""
     await laco_periodico(
         "Reconciliacao de storage", _RECONCILE_INTERVAL, run_full_reconciliation, lock=_RECONCILE_LOCK_KEY
     )

@@ -9,16 +9,14 @@ import NotFoundIcon from "./custom-nodes/NotFoundIcon"
 import HttpRequestIcon from "./custom-nodes/types/actions/HttpRequestIcon"
 
 /**
- * Mapas de renderização do React Flow — quais componentes desenham cada nó e
- * cada aresta.
+ * React Flow render maps — which components draw each node and each edge.
  *
- * Vivem num módulo próprio, e não no editor, porque dois consumidores precisam
- * deles sem precisar do editor inteiro: `getTypeIcon` (utils), que só consulta
- * as chaves para escolher o ícone, e o visualizador de sub-fluxo, que monta um
- * segundo canvas read-only. Importar do `workflow/index.tsx` puxava o editor
- * completo — com seus hooks de save, histórico e execução — para dentro de
- * ambos, e fechava um ciclo de imports entre o editor e um utilitário que ele
- * mesmo usa.
+ * They live in their own module, not in the editor, because two consumers need
+ * them without needing the whole editor: `getTypeIcon` (utils), which only looks
+ * up the keys to pick the icon, and the sub-workflow viewer, which builds a
+ * second read-only canvas. Importing from `workflow/index.tsx` pulled the full
+ * editor — with its save, history and execution hooks — into both, and closed
+ * an import cycle between the editor and a utility it uses itself.
  */
 export const nodeTypesFlow = {
   //default-trigger

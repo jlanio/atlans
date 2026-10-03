@@ -1,25 +1,25 @@
 # tests/unit/test_ux_diagnostico.py
-"""Informação errada mostrada ao usuário — os três casos do backend.
+"""Wrong information shown to the user — the three backend cases.
 
-1. A validacao (`validate_service`) descartava from_key/to_key no schema
-   Pydantic, entao a simulacao entrava sempre no ramo "sem from_key" e nomeava
-   as entradas com o parent_id: o schema do preview divergia do que o run
-   produzia.
+1. Validation (`validate_service`) dropped from_key/to_key in the Pydantic
+   schema, so the simulation always took the "no from_key" branch and named
+   the inputs with the parent_id: the preview's schema diverged from what the
+   run produced.
 
-2. O catalogo publica os campos de `outputs` (a fonte unica do A13):
-   tipados, filtrando as chaves internas do protocolo. Antes havia duas
-   formas de declarar e a plana era descartada — sem campos no painel,
-   sem autocomplete, sem seletor de porta.
+2. The catalog publishes the fields of `outputs` (the single source from A13):
+   typed, filtering out the protocol's internal keys. Before, there were two
+   ways to declare them and the flat one was dropped — no fields in the panel,
+   no autocomplete, no port selector.
 
-3. `get_first_gdf` escolhia entre varias camadas em silencio, e a escolha
-   depende da ordem das arestas na definition.
+3. `get_first_gdf` silently chose among several layers, and the choice
+   depends on the order of the edges in the definition.
 """
 import pytest
 
 from app.services.validate_service import EdgeDefinition, WorkflowDefinition
 
 
-# ── 1. O preview precisa receber as chaves da aresta ─────────────────────────
+# ── 1. The preview needs to receive the edge's keys ──────────────────────────
 
 def test_edge_definition_preserva_as_chaves():
     edge = EdgeDefinition(source="a", target="b", from_key="bbox_string", to_key="layerA")
@@ -39,7 +39,7 @@ def test_chaves_sao_opcionais():
 
 
 def test_chaves_sobrevivem_ao_dict_que_vai_para_o_executor():
-    """Regressão: era aqui que se perdiam, antes de WorkflowExecutor(payload)."""
+    """Regression: this is where they got lost, before WorkflowExecutor(payload)."""
     d = WorkflowDefinition(
         nodes=[{"id": "n1", "name": "WFS", "type": "datasource"}],
         edges=[{"source": "n1", "target": "n2", "from_key": "output", "to_key": "layer"}],
@@ -50,8 +50,9 @@ def test_chaves_sobrevivem_ao_dict_que_vai_para_o_executor():
 
 
 def test_properties_vira_parameters_e_alias_sobrevive_ao_model_dump():
-    """A definition persistida usa `properties` e guarda `alias` no topo; colar
-    na validação não pode perder nenhum dos dois (o lint de alias depende)."""
+    """The persisted definition uses `properties` and keeps `alias` at the top
+    level; pasting it into validation must not lose either (the alias lint
+    depends on it)."""
     from app.services.validate_service import NodeParameter
 
     d = NodeParameter(id="n1", name="WFS", type="datasource", properties={"a": 1}, alias="Caixa").model_dump()
@@ -72,10 +73,10 @@ def test_parameters_vence_properties_em_conflito():
     assert d["parameters"] == {"a": 9, "b": 2}
 
 
-# ── 2. O catálogo publica os campos de `outputs` ─────────────────────────────
+# ── 2. The catalog publishes the fields of `outputs` ─────────────────────────
 
 async def _catalogo(outputs) -> list[str]:
-    """Exercita o NodeService de verdade, com um nó de descriptor controlado."""
+    """Exercises the real NodeService, with a node whose descriptor is controlled."""
     from unittest.mock import AsyncMock, patch
     from app.services.node_service import NodeService
     from flow.nodes.base import BaseNode
@@ -91,8 +92,8 @@ async def _catalogo(outputs) -> list[str]:
 
     from app.services.node_service import _catalogo_completo
 
-    # O catalogo e cacheado (@lru_cache): limpa ANTES para montar do registry
-    # fingido e DEPOIS para nao vazar esse registry para os proximos testes.
+    # The catalog is cached (@lru_cache): clear it BEFORE, to build from the fake
+    # registry, and AFTER, so that registry does not leak into the next tests.
     with patch("app.services.node_service.NODE_REGISTRY", {"_NoFalso": _NoFalso}), \
          patch("app.services.node_service.disabled_names", new=AsyncMock(return_value=set())):
         _catalogo_completo.cache_clear()
@@ -117,10 +118,10 @@ async def test_catalogo_tolera_lixo():
 
 @pytest.mark.asyncio
 async def test_chaves_internas_do_protocolo_ficam_de_fora():
-    """`__response__` e `__artifact__` sao chaves do protocolo, nao saidas: o
-    executor as remove do que o no entrega (core.py::_actual_keys). Sem o
-    filtro, `__response__` do Response apareceria no painel de schema e no
-    autocomplete como se desse para referenciar."""
+    """`__response__` and `__artifact__` are protocol keys, not outputs: the
+    executor removes them from what the node delivers (core.py::_actual_keys).
+    Without the filter, the Response's `__response__` would show up in the
+    schema panel and in autocomplete as if it could be referenced."""
     assert await _catalogo([{"name": "__response__"}, {"name": "status_code"}]) == ["status_code"]
 
 
@@ -135,7 +136,7 @@ async def test_response_nao_expoe_a_chave_interna():
 
 @pytest.mark.asyncio
 async def test_change_detector_deixa_de_sair_sem_campos():
-    """O nó prometia 4 chaves e o catálogo não entregava nenhuma."""
+    """The node promised 4 keys and the catalog delivered none."""
     from flow.nodes.control.change_detector import ChangeDetector
 
     campos = await _catalogo(ChangeDetector.description().get("outputs"))
@@ -143,10 +144,10 @@ async def test_change_detector_deixa_de_sair_sem_campos():
     assert "output" in campos and "branch" in campos
 
 
-# ── 3. Escolha ambígua de camada precisa aparecer no painel ──────────────────
+# ── 3. An ambiguous layer choice needs to show up in the panel ───────────────
 
 def _no_com_log():
-    """Nó mínimo que grava as mensagens de painel numa lista."""
+    """Minimal node that records the panel messages in a list."""
     from flow.nodes.base import BaseNode
 
     class _No(BaseNode):
@@ -178,7 +179,7 @@ def test_uma_camada_nao_avisa():
 
 
 def test_duas_camadas_avisam_no_painel():
-    """Regressão: processava uma e ignorava a outra sem dizer nada."""
+    """Regression: it processed one and ignored the other without saying anything."""
     no, linhas = _no_com_log()
 
     escolhido = no.get_first_gdf({"cadastro": _gdf(2), "visitas": _gdf(3)})

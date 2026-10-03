@@ -17,9 +17,9 @@ import { useWorkflowSaveStore } from "@/app/stores/workflowSaveStore"
 interface UnsavedDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** Chamado ao confirmar — salva com o nome preenchido */
+  /** Called on confirm — saves with the filled-in name */
   onSave: () => void
-  /** Chamado ao descartar — navega sem salvar */
+  /** Called on discard — navigates without saving */
   onDiscard: () => void
 }
 
@@ -31,7 +31,7 @@ export default function UnsavedDialog({ open, onOpenChange, onSave, onDiscard }:
   function handleSave() {
     if (!localName.trim()) return
     setWorkflowName(localName.trim())
-    // Pequeno delay para o estado propagar antes do save
+    // Small delay for the state to propagate before the save
     requestAnimationFrame(() => onSave())
   }
 

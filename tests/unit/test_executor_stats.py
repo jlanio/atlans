@@ -1,15 +1,15 @@
 # tests/unit/test_executor_stats.py
 """
-Coletor de estatisticas do painel do executor (executor/stats.py).
+Statistics collector for the executor panel (executor/stats.py).
 
-Cobre as armadilhas que um agregador de metricas costuma ter:
-  - divisao por zero antes da primeira execucao
-  - percentil com poucas amostras
-  - janela deslizante que expira sem levar junto os totais acumulados
-  - job cancelado contado duas vezes (chega pelo on_execute E pelo on_cancelled)
-  - reenvio de sync_event inflando os contadores de bytes
+Covers the pitfalls a metrics aggregator usually has:
+  - division by zero before the first run
+  - percentile with few samples
+  - a sliding window that expires without taking the accumulated totals with it
+  - a canceled job counted twice (arrives via on_execute AND via on_cancelled)
+  - sync_event resend inflating the byte counters
 
-O relogio e injetado em todos os casos: nenhum teste dorme.
+The clock is injected in every case: no test sleeps.
 """
 import logging
 
@@ -46,7 +46,7 @@ def test_percentil_vazio_e_unitario():
 
 
 def test_percentil_interpolado():
-    """Mesma convencao do numpy: p95 de 1..5 cai entre o 4 e o 5."""
+    """Same convention as numpy: p95 of 1..5 falls between 4 and 5."""
     assert percentile([1, 2, 3, 4, 5], 0.95) == 4.8
     assert percentile([1, 2, 3, 4, 5], 0.50) == 3.0
 
@@ -57,17 +57,17 @@ def test_percentil_com_cem_amostras():
     assert percentile(list(range(1, 101)), 0.50) == 50.5
 
 
-# ── Taxa de sucesso ──────────────────────────────────────────────────────────
+# ── Success rate ─────────────────────────────────────────────────────────────
 
 def test_taxa_sucesso_sem_execucao_nenhuma():
-    """Executor recem-subido nao pode mostrar '0% de sucesso' — seria alarme falso.
-    E, antes de mais nada, a divisao nao pode estourar."""
+    """A freshly started executor must not show '0% de sucesso' (0% success) — it
+    would be a false alarm. And, first of all, the division must not blow up."""
     st, _ = _stats()
     assert _snap(st).success_rate == 1.0
 
 
 def test_cancelado_conta_no_denominador_mas_nao_como_erro():
-    """Um job cancelado nao entregou resultado: pesa na taxa, mas nao e falha."""
+    """A canceled job delivered no result: it weighs on the rate, but it is not a failure."""
     st, _ = _stats()
     for i in range(3):
         st.on_job_started(f"ok{i}")
@@ -81,8 +81,8 @@ def test_cancelado_conta_no_denominador_mas_nao_como_erro():
 
 
 def test_cancelado_fica_fora_da_media_de_duracao():
-    """Um job morto aos 0.5s nao diz nada sobre quanto um workflow leva —
-    incluir puxaria a media para baixo e esconderia lentidao real."""
+    """A job killed at 0.5s says nothing about how long a workflow takes —
+    including it would pull the average down and hide real slowness."""
     st, _ = _stats()
     st.on_job_started("a")
     st.on_job_finished("a", "ok", 10.0)
@@ -92,16 +92,16 @@ def test_cancelado_fica_fora_da_media_de_duracao():
     assert _snap(st).avg_duration_s == 10.0
 
 
-# ── Contagem dupla de cancelamento ───────────────────────────────────────────
+# ── Double counting of cancellation ──────────────────────────────────────────
 
 def test_cancelamento_de_job_em_execucao_conta_uma_vez_so():
-    """O job interrompido em execucao chega DUAS vezes: pelo `finally` do
-    on_execute (main.py) e pelo on_cancelled da fila. Sem a memoria de ids
-    finalizados, o total dobrava."""
+    """A job interrupted while running arrives TWICE: via the `finally` of
+    on_execute (main.py) and via the queue's on_cancelled. Without the memory of
+    finished ids, the total doubled."""
     st, _ = _stats()
     st.on_job_started("j1")
-    st.on_job_finished("j1", "cancelled", 3.0)   # veio do on_execute
-    st.on_job_cancelled("j1", "cancelado pelo usuario")  # veio do on_cancelled
+    st.on_job_finished("j1", "cancelled", 3.0)   # came from on_execute
+    st.on_job_cancelled("j1", "cancelado pelo usuario")  # came from on_cancelled
 
     s = _snap(st)
     assert s.total_cancelled == 1
@@ -109,8 +109,8 @@ def test_cancelamento_de_job_em_execucao_conta_uma_vez_so():
 
 
 def test_cancelamento_de_job_que_nunca_rodou_e_contado():
-    """Job drenado da fila no shutdown nunca passa pelo on_execute — se o
-    on_cancelled tambem o ignorasse, ele sumiria da contagem."""
+    """A job drained from the queue at shutdown never goes through on_execute — if
+    on_cancelled also ignored it, it would vanish from the count."""
     st, _ = _stats()
     st.on_job_cancelled("na-fila", "Executor encerrando")
     assert _snap(st).total_cancelled == 1
@@ -119,8 +119,8 @@ def test_cancelamento_de_job_que_nunca_rodou_e_contado():
 # ── Janela deslizante ────────────────────────────────────────────────────────
 
 def test_janela_de_uma_hora_expira_mas_o_total_permanece():
-    """'ultima hora' e p95 usam a janela; os totais acumulados e o job mais
-    lento sao desde o boot e nao podem sumir junto."""
+    """'ultima hora' (last hour) and p95 use the window; the accumulated totals and
+    the slowest job are since boot and must not vanish along with it."""
     st, rel = _stats()
     st.on_job_started("velho")
     st.on_job_finished("velho", "ok", 600.0)
@@ -132,13 +132,13 @@ def test_janela_de_uma_hora_expira_mas_o_total_permanece():
 
     s = _snap(st)
     assert s.last_hour_total == 1          # so o novo
-    assert s.total_ok == 2                 # os dois
+    assert s.total_ok == 2                 # both
     assert s.slowest == ("velho", 600.0)   # sobrevive a expiracao
-    assert s.p95_duration_s == 5.0         # calculado so sobre a janela
+    assert s.p95_duration_s == 5.0         # computed only over the window
 
 
 def test_teto_de_amostras_limita_a_memoria():
-    """Executor de alta vazao nao pode crescer a deque sem limite."""
+    """A high-throughput executor must not grow the deque without limit."""
     st, _ = _stats(max_amostras=50)
     for i in range(300):
         st.on_job_started(f"j{i}")
@@ -149,7 +149,7 @@ def test_teto_de_amostras_limita_a_memoria():
     assert s.total_ok == 300
 
 
-# ── Jobs em execucao e nós ───────────────────────────────────────────────────
+# ── Running jobs and nodes ───────────────────────────────────────────────────
 
 def test_job_ativo_reporta_ha_quanto_tempo_roda():
     st, rel = _stats()
@@ -176,10 +176,10 @@ def test_no_atual_e_progresso_vem_dos_node_events():
 
 
 def test_run_id_desconhecido_casa_quando_ha_UM_candidato():
-    """Se o payload trouxer um run_id diferente do job_id, o casamento por
-    eliminacao ainda funciona — desde que nao haja ambiguidade."""
+    """If the payload carries a run_id different from the job_id, matching by
+    elimination still works — as long as there is no ambiguity."""
     st, _ = _stats()
-    st.on_job_started("j")  # sem run_id
+    st.on_job_started("j")  # no run_id
     st.on_event({"run_id": "descoberto", "node": "n1", "status": "started",
                  "extra": {"node_name": "read_file"}})
 
@@ -189,9 +189,9 @@ def test_run_id_desconhecido_casa_quando_ha_UM_candidato():
 
 
 def test_run_id_ambiguo_NAO_e_atribuido_a_ninguem():
-    """Com MAX_CONCURRENT jobs simultaneos sem run_id, escolher 'o primeiro'
-    colava o no de um job no outro. Um painel que mente e pior que um painel
-    incompleto: sem candidato unico, o evento e descartado."""
+    """With MAX_CONCURRENT simultaneous jobs without run_id, picking 'the first'
+    stuck one job's node onto another. A panel that lies is worse than an
+    incomplete panel: with no single candidate, the event is discarded."""
     st, _ = _stats()
     st.on_job_started("jA")
     st.on_job_started("jB")
@@ -203,8 +203,8 @@ def test_run_id_ambiguo_NAO_e_atribuido_a_ninguem():
 
 
 def test_run_id_informado_no_start_resolve_a_ambiguidade():
-    """E por isso que main.on_execute passa run_id=job_id: o servidor despacha
-    com run_id == job_id, entao o casamento e exato mesmo com 4 jobs em voo."""
+    """That is why main.on_execute passes run_id=job_id: the server dispatches
+    with run_id == job_id, so the matching is exact even with 4 jobs in flight."""
     st, _ = _stats()
     st.on_job_started("jA", run_id="jA")
     st.on_job_started("jB", run_id="jB")
@@ -230,7 +230,7 @@ def test_metrics_do_flow_alimentam_os_picos():
 
 
 def test_metrics_malformado_nao_derruba_nada():
-    """Telemetria quebrada nao pode impedir a contagem do job."""
+    """Broken telemetry must not prevent the job from being counted."""
     st, _ = _stats()
     st.on_job_started("j")
     st.on_job_finished("j", "ok", 1.0, metrics={"run": {"nodes_executed": "muitos"}})
@@ -255,8 +255,8 @@ def test_geosync_soma_upload_e_download_separadamente():
 
 
 def test_geosync_ignora_reenvio_do_mesmo_evento():
-    """connection._requeue_event re-enfileira o evento quando o send falha; sem
-    dedupe, o mesmo upload contaria a cada tentativa."""
+    """connection._requeue_event re-enqueues the event when the send fails;
+    without dedupe, the same upload would count on every attempt."""
     st, _ = _stats()
     ev = _sync("file_uploaded", "a", 1.0, total_bytes=1000)
     st.on_event(ev)
@@ -268,8 +268,8 @@ def test_geosync_ignora_reenvio_do_mesmo_evento():
 
 
 def test_geosync_sem_total_bytes_ainda_conta_o_arquivo():
-    """Tolerancia a um manager que ainda nao passe total_bytes: melhor contar o
-    arquivo com 0 byte do que perder o evento inteiro."""
+    """Tolerance for a manager that does not pass total_bytes yet: better to count
+    the file with 0 bytes than to lose the whole event."""
     st, _ = _stats()
     st.on_event(_sync("file_uploaded", "a", 1.0))
     s = _snap(st)
@@ -318,8 +318,8 @@ def test_reconexao_e_contada_e_o_retry_aparece():
 
 
 def test_idade_do_heartbeat_e_zerada_na_desconexao():
-    """Heartbeat velho de uma sessao morta nao pode aparecer como 'ha 4s' na
-    proxima — seria dizer que esta tudo bem enquanto o WS esta fora."""
+    """An old heartbeat from a dead session must not show up as 'ha 4s' (4s ago)
+    in the next one — it would be saying all is well while the WS is down."""
     st, rel = _stats()
     st.on_connected()
     st.on_heartbeat()
@@ -361,9 +361,9 @@ def test_rodape_guarda_as_ultimas_linhas_e_conta_por_nivel():
 # ── NullStats ────────────────────────────────────────────────────────────────
 
 def test_null_stats_cobre_toda_a_superficie_do_coletor():
-    """connection.py e main.py chamam os hooks sem `if` nenhum. Um metodo novo
-    em ExecutorStats sem o no-op correspondente viraria AttributeError em
-    producao, no caminho quente — e so com o painel desligado."""
+    """connection.py and main.py call the hooks without any `if`. A new method in
+    ExecutorStats without the matching no-op would become an AttributeError in
+    production, on the hot path — and only with the panel turned off."""
     metodos = {n for n in dir(ExecutorStats)
                if n.startswith("on_") or n == "snapshot"}
     faltando = metodos - set(dir(NullStats))
@@ -380,7 +380,7 @@ def test_reset_zera_contagens_e_preserva_o_que_esta_vivo():
     st.on_log_record(logging.LogRecord("executor", logging.WARNING, "", 0, "x", (), None),
                      "AGENT ", "WARN ")
     st.on_connected()
-    st.on_job_started("rodando", run_id="rr")   # este NAO pode sumir
+    st.on_job_started("rodando", run_id="rr")   # this one must NOT vanish
     rel.avanca(30)
 
     st.reset()
@@ -390,14 +390,14 @@ def test_reset_zera_contagens_e_preserva_o_que_esta_vivo():
     assert s.sync_files_up == 0 and s.sync_bytes_up == 0
     assert s.slowest is None and s.last_finished is None
     assert s.log_tail == ()
-    # O que continua acontecendo de verdade permanece.
+    # What is actually still happening remains.
     assert [j.job_id for j in s.running] == ["rodando"]
     assert s.conn_state == "connected"
 
 
 def test_reset_nao_zera_o_uptime_do_processo():
-    """O uptime e informacao de sistema — quanto tempo o executor esta no ar.
-    Zera-lo faria parecer que o processo reiniciou."""
+    """Uptime is system information — how long the executor has been up.
+    Resetting it would make it look like the process restarted."""
     st, rel = _stats()
     rel.avanca(600)
     st.reset()
@@ -409,10 +409,10 @@ def test_reset_nao_zera_o_uptime_do_processo():
 
 
 def test_vazao_usa_o_marco_dos_contadores_e_nao_o_uptime():
-    """Sem o marco separado, dividir as execucoes novas por horas de uptime
-    daria ~0 wf/min para sempre depois de um reset."""
+    """Without the separate marker, dividing the new runs by hours of uptime
+    would give ~0 wf/min forever after a reset."""
     st, rel = _stats()
-    rel.avanca(7200)          # 2h de executor no ar
+    rel.avanca(7200)          # executor up for 2h
     st.reset()
     rel.avanca(60)            # 1 min medindo
     for i in range(10):
@@ -423,8 +423,8 @@ def test_vazao_usa_o_marco_dos_contadores_e_nao_o_uptime():
 
 
 def test_reset_preserva_a_memoria_de_deduplicacao():
-    """`_finalizados` e `_sync_vistos` sao memorias de dedupe, nao contadores.
-    Limpa-las faria um evento reenviado logo apos o reset contar de novo."""
+    """`_finalizados` and `_sync_vistos` are dedupe memories, not counters.
+    Clearing them would make an event resent right after the reset count again."""
     st, _ = _stats()
     st.on_event(_sync("file_uploaded", "a", 1.0, total_bytes=500))
     st.reset()
@@ -436,10 +436,10 @@ def test_reset_preserva_a_memoria_de_deduplicacao():
 # ── Concorrencia ─────────────────────────────────────────────────────────────
 
 def test_escrita_de_outra_thread_nao_quebra_o_snapshot():
-    """`on_log_record` chega pela thread que emitiu o registro — o flow engine
-    loga de dentro dos `asyncio.to_thread`. Sem lock, o `append` durante o
-    `snapshot()` levantava 'deque mutated during iteration', e como o runtime
-    desliga o painel apos 3 falhas de render, o executor perdia o painel."""
+    """`on_log_record` arrives on the thread that emitted the record — the flow
+    engine logs from inside `asyncio.to_thread`. Without a lock, the `append`
+    during `snapshot()` raised 'deque mutated during iteration', and since the
+    runtime turns off the panel after 3 render failures, the executor lost the panel."""
     import threading
 
     st = ExecutorStats(max_amostras=200, tail=200)

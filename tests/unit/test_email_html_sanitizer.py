@@ -1,17 +1,17 @@
-"""Sanitizacao do corpo HTML em POST /internal/send-email.
+"""Sanitization of the HTML body in POST /internal/send-email.
 
-O filtro anterior eram quatro `re.sub` de blacklist em PASSADA UNICA. Remover
-uma ocorrencia de um padrao de dentro de um texto RECONSTROI esse padrao a
-partir das bordas — `javjavascript:ascript:` saia como `javascript:` intacto.
-Alem disso a lista nao cobria `<svg>`, `<math>`, `srcdoc` nem `style`.
+The previous filter was four blacklist `re.sub` calls in a SINGLE PASS. Removing
+an occurrence of a pattern from inside a text REBUILDS that pattern from the
+edges — `javjavascript:ascript:` came out as an intact `javascript:`.
+Besides that, the list did not cover `<svg>`, `<math>`, `srcdoc` or `style`.
 
-O que isso valia na pratica: qualquer usuario pode criar e enrolar um executor
-dedicado dentro da sua cota, e este endpoint envia pela conta Resend da
-plataforma, com dominio verificado. HTML arbitrario ali e phishing com SPF e
-DKIM validos.
+What that meant in practice: any user can create and enroll a dedicated executor
+within their quota, and this endpoint sends through the platform's Resend
+account, with a verified domain. Arbitrary HTML there is phishing with valid SPF
+and DKIM.
 
-Estes testes cobrem o comportamento (o HTML que sai), nao a implementacao: se
-um dia o nh3 for trocado por outra allowlist, eles continuam valendo.
+These tests cover the behavior (the HTML that comes out), not the
+implementation: if nh3 is ever swapped for another allowlist, they still hold.
 """
 import pytest
 
@@ -22,10 +22,10 @@ def _limpa(html: str) -> str:
     return SendEmailRequest(to=["a@b.com"], subject="s", html=html).html
 
 
-# Ancora benigna: o nh3 remove a tag proibida INTEIRA, e um corpo que sobra
-# vazio e recusado por `validate_html_not_empty` — o que testaria o validador
-# errado. Com a ancora, o corpo continua valido e da para afirmar sobre o que
-# saiu (e o que ficou).
+# Benign anchor: nh3 removes the forbidden tag ENTIRELY, and a body left empty
+# is rejected by `validate_html_not_empty` — which would test the wrong
+# validator. With the anchor, the body stays valid and we can assert on what
+# came out (and what remained).
 _ANCORA = "<p>relatório pronto</p>"
 
 
@@ -43,7 +43,7 @@ def _limpa_com_ancora(html: str) -> str:
         '<a href="javjavascript:ascript:alert(1)">x</a>',   # reconstroi "javascript:"
         '<a href="javascript:alert(1)">x</a>',              # direto
         '<a href="JaVaScRiPt:alert(1)">x</a>',              # caixa alternada
-        '<a href="java\tscript:alert(1)">x</a>',            # tab no meio do esquema
+        '<a href="java\tscript:alert(1)">x</a>',            # tab in the middle of the scheme
     ],
 )
 def test_protocolo_javascript_nunca_sobrevive(payload):
@@ -57,7 +57,7 @@ def test_protocolo_javascript_nunca_sobrevive(payload):
         "<scr<script>ipt>alert(1)</script>",   # reconstroi "<script>"
         "<script>alert(1)</script>",
         "<SCRIPT>alert(1)</SCRIPT>",
-        "<script>alert(1)",                    # sem fechamento
+        "<script>alert(1)",                    # not closed
     ],
 )
 def test_script_nunca_sobrevive(payload):
@@ -69,7 +69,7 @@ def test_script_nunca_sobrevive(payload):
     [
         "<img src=x onerror=alert(1)>",
         "<img src=x ononerrorerror=alert(1)>",   # reconstroi "onerror="
-        "<img src=x onerror\n=alert(1)>",        # quebra de linha antes do '='
+        "<img src=x onerror\n=alert(1)>",        # line break before the '='
         "<body onload=alert(1)>",
     ],
 )
@@ -79,7 +79,7 @@ def test_manipulador_de_evento_nunca_sobrevive(payload):
     assert "onload" not in saida
 
 
-# ── Tags que a blacklist antiga nem listava ──────────────────────────────────
+# ── Tags the old blacklist did not even list ─────────────────────────────────
 
 @pytest.mark.parametrize(
     "payload,proibido",
@@ -105,11 +105,11 @@ def test_tag_ou_atributo_fora_da_allowlist_e_removido(payload, proibido):
     ],
 )
 def test_data_uri_e_removido(payload):
-    """`data:` em <img>/<a> contrabandeia SVG com script em clientes que renderizam."""
+    """`data:` in <img>/<a> smuggles SVG with script into clients that render it."""
     assert "data:" not in _limpa_com_ancora(payload).lower()
 
 
-# ── O outro lado: o e-mail legitimo tem que continuar funcionando ────────────
+# ── The other side: legitimate e-mail has to keep working ────────────────────
 
 def test_html_legitimo_e_preservado():
     entrada = (
@@ -138,7 +138,7 @@ def test_tabela_e_imagem_https_sao_preservadas():
 
 
 def test_link_externo_recebe_rel_seguro():
-    """`link_rel` fecha o tabnabbing sem depender do autor do workflow."""
+    """`link_rel` closes tabnabbing without depending on the workflow author."""
     saida = _limpa('<a href="https://exemplo.com">x</a>')
 
     assert "noopener" in saida and "noreferrer" in saida
@@ -149,13 +149,14 @@ def test_protocolos_permitidos_passam(esquema):
     assert esquema in _limpa(f'<a href="{esquema}">x</a>')
 
 
-# ── Interacao com o validador de corpo vazio ─────────────────────────────────
+# ── Interaction with the empty-body validator ────────────────────────────────
 
 def test_corpo_que_fica_vazio_apos_sanitizacao_e_recusado():
-    """Ordem dos validadores: sanitize_html roda antes de validate_html_not_empty.
+    """Validator order: sanitize_html runs before validate_html_not_empty.
 
-    Sem isso, um corpo so com tags proibidas ia vazio ao Resend, voltava
-    "Missing html or text field" e o except generico virava um 502 sem pista.
+    Without that, a body with only forbidden tags went empty to Resend, came
+    back with "Missing html or text field" and the generic except turned it into
+    a 502 with no clue.
     """
     from pydantic import ValidationError
 

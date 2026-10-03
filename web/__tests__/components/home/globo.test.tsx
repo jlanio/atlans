@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { cleanup, render, screen } from "@testing-library/react"
 
 /**
- * O Globo é um invólucro fino do MapLibreMap. Mockamos o mapa (jsdom não faz
- * layout do MapLibre) e conferimos o CONTRATO: mapa em projeção globe sobre a
- * imagem híbrida da instalação como basemap ÚNICO — sem alternador, sem chave, sem
- * estado "sem basemap" —, chrome discreta, e um transformRequest que manda o
- * cookie de sessão nos tiles do agente e deixa o resto cru.
+ * The Globo is a thin wrapper around MapLibreMap. We mock the map (jsdom does no
+ * MapLibre layout) and check the CONTRACT: map in globe projection over the
+ * install's hybrid imagery as the ONLY basemap — no switcher, no key, no
+ * "no basemap" state —, discreet chrome, and a transformRequest that sends the
+ * session cookie on the agent's tiles and leaves the rest raw.
  */
 const espiao = vi.hoisted(() => ({ props: null as Record<string, unknown> | null }))
 vi.mock("@/app/components/share/MapLibreMap", async () => {
@@ -19,8 +19,8 @@ vi.mock("@/app/components/share/MapLibreMap", async () => {
   }
 })
 
-// O fuso do navegador é do TESTE, não da máquina que roda: sem isto o centro
-// dependeria de onde o CI (ou quem roda local) está.
+// The browser time zone is the TEST's, not the running machine's: without this the center
+// would depend on where CI (or whoever runs it locally) is.
 const fuso = vi.hoisted(() => ({ valor: null as string | null }))
 vi.mock("@/app/components/home/mapa/regiao", async (original) => ({
   ...(await original<typeof import("@/app/components/home/mapa/regiao")>()),
@@ -34,8 +34,8 @@ beforeEach(() => { espiao.props = null; fuso.valor = null; cleanup() })
 
 describe("Globo", () => {
   it("sempre monta o mapa: não existe mais estado sem basemap", () => {
-    // O Dark Matter exigia chave e, sem ela, a página mostrava um aviso. O
-    // híbrido da instalação não exige nada: a Home sempre tem mapa.
+    // Dark Matter required a key and, without it, the page showed a warning. The
+    // install's hybrid requires nothing: the Home always has a map.
     render(<Globo />)
     expect(screen.getByTestId("maplibre")).toBeTruthy()
     expect(screen.queryByText(/mapa de fundo não está disponível/i)).toBeNull()
@@ -58,8 +58,8 @@ describe("Globo", () => {
   })
 
   it("liga a localização (só a Home): o botão de me-localizar do MapLibre", () => {
-    // O `/share` não passa `geolocalizar`; a Home passa. É o que separa o mapa
-    // que segue a pessoa do mapa público.
+    // `/share` does not pass `geolocalizar`; the Home does. That is what separates the map
+    // that follows the person from the public map.
     render(<Globo />)
     expect(espiao.props!.geolocalizar).toBe(true)
   })
@@ -71,9 +71,9 @@ describe("Globo", () => {
   })
 
   it("a chrome do mapa é discreta, e a atribuição NÃO é passada por nós", () => {
-    // A fonte raster já declara o crédito dela. Passar um texto nosso por cima não
-    // a substituía — o MapLibre concatena os dois com " | " e a tela mostrava
-    // a mesma coisa duas vezes.
+    // The raster source already declares its own credit. Passing our own text on top did not
+    // replace it — MapLibre concatenates the two with " | " and the screen showed
+    // the same thing twice.
     render(<Globo />)
     const p = espiao.props!
     expect(p.controlesDiscretos).toBe(true)
@@ -87,7 +87,7 @@ describe("Globo", () => {
     cleanup()
     render(<Globo />)
     expect(espiao.props!.giroLento).toBe(false)
-    // Sem sinal de região, a volta do giro é para o centro neutro.
+    // With no region signal, the spin returns to the neutral center.
     expect(espiao.props!.center).toEqual([0, 20])
     expect(espiao.props!.zoom).toBe(2.3)
   })
@@ -103,7 +103,7 @@ describe("Globo", () => {
     fuso.valor = "UTC"
     render(<Globo pais="MX" />)
     const [lon, lat] = espiao.props!.center as [number, number]
-    // O centro dos fusos do México — no México, longe do Brasil de antes.
+    // The center of Mexico's time zones — in Mexico, far from the Brazil of before.
     expect(lon).toBeLessThan(-90)
     expect(lat).toBeGreaterThan(14)
   })

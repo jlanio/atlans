@@ -74,7 +74,7 @@ describe("derivarComoAnda", () => {
   it("falhou: leva o erro aparado", () => {
     const r = derivarComoAnda(antigo, metrica({ last_status: "failed", last_error: "  Timeout no WFS  ", last_run_at: haMin(40) }), undefined, false, agora)
     expect(r).toMatchObject({ tipo: "falhou", quando: "há 40 min", erro: "Timeout no WFS", total: 61, falhas: 3 })
-    // `error` (status por nó que o backend também usa) conta como falha; erro vazio vira nulo.
+    // `error` (per-node status the backend also uses) counts as a failure; an empty error becomes null.
     const semTexto = derivarComoAnda(antigo, metrica({ last_status: "error", last_error: "   " }), undefined, false, agora)
     expect(semTexto).toMatchObject({ tipo: "falhou", erro: null })
   })
@@ -98,7 +98,7 @@ describe("derivarComoAnda", () => {
     expect(derivarComoAnda(antigo, undefined, undefined, false, agora)).toEqual({ tipo: "sem-execucoes" })
     expect(derivarComoAnda({ created_at: haDias(JANELA_EM_DIAS) }, undefined, undefined, false, agora)).toEqual({ tipo: "sem-execucoes" })
     expect(derivarComoAnda({}, undefined, undefined, false, agora)).toEqual({ tipo: "sem-execucoes" })
-    // Linha com execuções mas sem `last_run_at` não é "nunca": houve execuções.
+    // A row with runs but no `last_run_at` is not "never": there were runs.
     expect(derivarComoAnda(novo, metrica({ total_runs: 3, last_run_at: null }), undefined, false, agora)).toEqual({ tipo: "sem-execucoes" })
   })
 })

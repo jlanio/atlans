@@ -29,18 +29,18 @@ import { createToast } from "@/utils/createToast"
 import { plural } from "@/lib/formatos"
 
 /*
- * Os seis diálogos de ação da tela Admin › Usuários, extraídos da página para
- * que o `page.tsx` fique só com composição e estado. O ciclo de cada ação —
- * aberto, executando, toast, fechar, `onCompleted` — é o `useAcaoDeDialogo`, e
- * a confirmação por digitação (o nome, REVOGAR) é a do `DeleteDialog`: antes
- * cada diálogo tinha a sua cópia, e o Enter do campo chamava a ação sem olhar
- * se ela já estava em voo. Enquanto a ação roda, o diálogo não fecha
- * (`bloqueado`). As chamadas de serviço, a sequência cota→revoke, os textos e
- * as props são os de antes; cores de status seguem os pares claro/escuro
- * sancionados e os botões usam variant/token.
+ * The six action dialogs of the Admin › Users screen, extracted from the page so
+ * that `page.tsx` keeps only composition and state. Each action's cycle —
+ * open, running, toast, close, `onCompleted` — is `useAcaoDeDialogo`, and the
+ * typed confirmation (the name, REVOGAR) is `DeleteDialog`'s: before, each
+ * dialog had its own copy, and the field's Enter called the action without
+ * checking whether it was already in flight. While the action runs, the dialog
+ * does not close (`bloqueado`). The service calls, the quota→revoke sequence,
+ * the texts and the props are as before; status colors follow the sanctioned
+ * light/dark pairs and the buttons use variant/token.
  */
 
-// ── Diálogo: Suspender ─────────────────────────────────────────────────────────
+// ── Dialog: Suspend ────────────────────────────────────────────────────────────
 
 export function SuspendUserDialog({ user, onCompleted }: { user: IAdminUser; onCompleted: () => void }) {
   const [reason, setReason] = useState("")
@@ -58,7 +58,7 @@ export function SuspendUserDialog({ user, onCompleted }: { user: IAdminUser; onC
   return (
     <Dialog open={acao.aberto} onOpenChange={handleClose}>
       <DialogTrigger asChild>
-        {/* Item em âmbar (cautela) com o par escuro sancionado. */}
+        {/* Item in amber (caution) with the sanctioned dark pair. */}
         <DropdownMenuItem
           className="text-amber-600 focus:text-amber-600 dark:text-amber-400 dark:focus:text-amber-400"
           onSelect={e => { e.preventDefault(); acao.setAberto(true) }}
@@ -86,7 +86,7 @@ export function SuspendUserDialog({ user, onCompleted }: { user: IAdminUser; onC
         </div>
         <DialogFooter>
           <Button variant="outline" className="max-md:h-10" disabled={acao.executando} onClick={() => handleClose(false)}>Cancelar</Button>
-          {/* Âmbar de cautela com par escuro — sancionado pelo contrato (§6). */}
+          {/* Caution amber with dark pair — sanctioned by the contract (§6). */}
           <Button
             className="bg-amber-600 text-white hover:bg-amber-600/90 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-500/90 max-md:h-10"
             disabled={acao.executando}
@@ -100,7 +100,7 @@ export function SuspendUserDialog({ user, onCompleted }: { user: IAdminUser; onC
   )
 }
 
-// ── Diálogo: Reativar ──────────────────────────────────────────────────────────
+// ── Dialog: Reactivate ─────────────────────────────────────────────────────────
 
 export function ReactivateUserDialog({ user, onCompleted }: { user: IAdminUser; onCompleted: () => void }) {
   const acao = useAcaoDeDialogo(() => GisFlowService.reactivateUser(user.id_hash), {
@@ -112,7 +112,7 @@ export function ReactivateUserDialog({ user, onCompleted }: { user: IAdminUser; 
   return (
     <Dialog open={acao.aberto} onOpenChange={acao.setAberto}>
       <DialogTrigger asChild>
-        {/* Verde de sucesso com o par escuro sancionado. */}
+        {/* Success green with the sanctioned dark pair. */}
         <DropdownMenuItem
           className="text-green-600 focus:text-green-600 dark:text-green-400 dark:focus:text-green-400"
           onSelect={e => { e.preventDefault(); acao.setAberto(true) }}
@@ -139,7 +139,7 @@ export function ReactivateUserDialog({ user, onCompleted }: { user: IAdminUser; 
   )
 }
 
-// ── Diálogo: Excluir (soft-delete) ─────────────────────────────────────────────
+// ── Dialog: Delete (soft-delete) ───────────────────────────────────────────────
 
 export function DeleteUserDialog({ user, onCompleted }: { user: IAdminUser; onCompleted: () => void }) {
   const acao = useAcaoDeDialogo(() => GisFlowService.adminDeleteUser(user.id_hash), {
@@ -176,7 +176,7 @@ export function DeleteUserDialog({ user, onCompleted }: { user: IAdminUser; onCo
   )
 }
 
-// ── Diálogo: Alterar role ──────────────────────────────────────────────────────
+// ── Dialog: Change role ────────────────────────────────────────────────────────
 
 export function ChangeRoleDialog({ user, onCompleted }: { user: IAdminUser; onCompleted: () => void }) {
   const [newRole, setNewRole] = useState(user.role === "admin" ? "user" : "admin")
@@ -222,7 +222,7 @@ export function ChangeRoleDialog({ user, onCompleted }: { user: IAdminUser; onCo
   )
 }
 
-// ── Diálogo: Cota de executores ────────────────────────────────────────────────
+// ── Dialog: Executor quota ─────────────────────────────────────────────────────
 
 export function ChangeAgentQuotaDialog({ user, onCompleted }: { user: IAdminUser; onCompleted: () => void }) {
   const [quota, setQuota] = useState(user.agent_quota)
@@ -233,8 +233,8 @@ export function ChangeAgentQuotaDialog({ user, onCompleted }: { user: IAdminUser
   })
   const open = acao.aberto
 
-  // Estatísticas pegas ao abrir o diálogo — usadas para avisar quando reduzir
-  // a cota deixa executores existentes "órfãos" e oferecer revogação em lote.
+  // Stats fetched on opening the dialog — used to warn when lowering the quota
+  // leaves existing executors "orphaned" and to offer a batch revocation.
   const [created, setCreated]           = useState<number | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
   const [revokeOpen, setRevokeOpen]     = useState(false)
@@ -244,7 +244,7 @@ export function ChangeAgentQuotaDialog({ user, onCompleted }: { user: IAdminUser
     acao.setAberto(val)
   }
 
-  // Carrega stats ao abrir
+  // Loads stats on open
   useEffect(() => {
     if (!open) return
     setStatsLoading(true)
@@ -254,10 +254,10 @@ export function ChangeAgentQuotaDialog({ user, onCompleted }: { user: IAdminUser
     })
   }, [open, user.id_hash])
 
-  // O botão e o Enter com a mesma regra: a cota atual não tem o que salvar.
+  // The button and Enter with the same rule: the current quota has nothing to save.
   const podeSalvar = quota !== user.agent_quota
 
-  // Cota baixa demais para acomodar todos os executores existentes.
+  // Quota too low to accommodate all existing executors.
   const reducingBelowExisting = created != null && quota < created
 
   return (
@@ -300,7 +300,7 @@ export function ChangeAgentQuotaDialog({ user, onCompleted }: { user: IAdminUser
             </div>
 
             {reducingBelowExisting && (
-              // Aviso âmbar canônico do contrato (§3.4): par claro/escuro sancionado.
+              // The contract's canonical amber notice (§3.4): sanctioned light/dark pair.
               <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
                 <TbAlertTriangle className="shrink-0 mt-0.5" size={14} aria-hidden="true" />
                 <div className="flex flex-col gap-1.5">
@@ -353,7 +353,7 @@ export function ChangeAgentQuotaDialog({ user, onCompleted }: { user: IAdminUser
   )
 }
 
-// ── Sub-diálogo: Revogar todos os executores do usuário ─────────────────────────
+// ── Sub-dialog: Revoke all of the user's executors ──────────────────────────────
 
 function RevokeAllAgentsDialog({
   open, onOpenChange, user, count, targetQuota, onCompleted,
@@ -366,14 +366,14 @@ function RevokeAllAgentsDialog({
   onCompleted: () => void
 }) {
   const acao = useAcaoDeDialogo(async () => {
-    // Sequência segura: cota PRIMEIRO (fecha a janela de criar executor novo
-    // durante a revogação), depois revoke-all.
+    // Safe sequence: quota FIRST (closes the window for creating a new executor
+    // during the revocation), then revoke-all.
     const quotaRes = await GisFlowService.updateUserAgentQuota(user.id_hash, targetQuota)
     if (quotaRes.error) {
       return { error: { name: "cota", message: "Erro ao atualizar cota — abortando revogação." } }
     }
     const revRes = await GisFlowService.revokeAllUserAgents(user.id_hash)
-    // Sem corpo também é falha: o toast de sucesso é feito das contagens.
+    // No body is also a failure: the success toast is made of the counts.
     return revRes.error || revRes.data ? revRes : { error: { name: "sem-corpo" } }
   }, {
     sucesso: ({ revoked_count, affected_workspaces }) =>
@@ -423,7 +423,7 @@ function RevokeAllAgentsDialog({
   )
 }
 
-// ── Diálogo: Ação em massa ──────────────────────────────────────────────────────
+// ── Dialog: Bulk action ─────────────────────────────────────────────────────────
 
 export function BulkActionDialog({ action, userIds, onCompleted, onClose }: {
   action: "suspend" | "reactivate" | "delete"
@@ -446,7 +446,7 @@ export function BulkActionDialog({ action, userIds, onCompleted, onClose }: {
         : GisFlowService.bulkDeleteUsers
     return fn(userIds)
   }, {
-    // Com falha parcial o toast é de erro (abaixo), não de sucesso.
+    // With a partial failure the toast is an error one (below), not a success one.
     sucesso: d => (d && d.errors.length === 0
       ? `${plural(d.processed, "usuário")} processado${d.processed === 1 ? "" : "s"}.`
       : null),
@@ -466,7 +466,7 @@ export function BulkActionDialog({ action, userIds, onCompleted, onClose }: {
     },
   })
 
-  // Fecha com sucesso ou com falha — como sempre fechou.
+  // Closes on success or on failure — as it always did.
   async function handleBulk() {
     await acao.executar()
     onClose()

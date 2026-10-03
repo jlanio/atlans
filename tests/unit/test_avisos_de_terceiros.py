@@ -1,24 +1,25 @@
 # tests/unit/test_avisos_de_terceiros.py
 """
-O gerador do THIRD-PARTY-NOTICES.md (scripts/avisos_de_terceiros.py).
+The THIRD-PARTY-NOTICES.md generator (scripts/avisos_de_terceiros.py).
 
-O que se protege:
+What is protected:
 
-- **A licença certa de cada pacote do PyPI.** A expressão SPDX declarada ganha
-  de tudo; sem ela, a lida no pacote (LIDAS_NO_PACOTE), o nome curto e o
-  classificador, nesta ordem. Um campo vago (um texto inteiro, «BSD» sem dizer
-  qual) não pode virar uma licença que o pacote não declarou.
-- **Nada incompatível passa calado.** Uma licença fora de COMPATIVEIS, ou uma
-  expressão que não se lê, vai para «Para revisar»; com OR basta uma
-  alternativa compatível, com AND precisa de todas.
-- **Só o que a instalação de produção leva.** Os pacotes `dev` do npm ficam de
-  fora, menos os que o build junta assim mesmo (o CSS importa o tailwindcss);
-  os `optional` (o binário do sharp de cada plataforma) entram.
-- **Os ícones e o código copiado.** Cada conjunto do react-icons que os fontes
-  importam sai com a licença do projeto dele, e uma obra copiada para o
-  repositório vai com o texto da licença ao lado.
+- **The right license for each PyPI package.** The declared SPDX expression
+  beats everything; without it, the one read in the package (LIDAS_NO_PACOTE),
+  the short name and the classifier, in that order. A vague field (a whole text,
+  "BSD" without saying which) must not become a license the package didn't
+  declare.
+- **Nothing incompatible slips through silently.** A license outside COMPATIVEIS,
+  or an expression that can't be parsed, goes to "Para revisar" (to review); with
+  OR one compatible alternative is enough, with AND all of them are needed.
+- **Only what the production install ships.** npm `dev` packages are left out,
+  except the ones the build bundles anyway (the CSS imports tailwindcss); the
+  `optional` ones (sharp's per-platform binary) get in.
+- **The icons and the copied code.** Each react-icons set the sources import
+  goes out with its project's license, and a work copied into the repository
+  goes with the license text next to it.
 
-Sem rede: a consulta ao PyPI é trocada por um dicionário.
+No network: the PyPI query is swapped for a dictionary.
 """
 from __future__ import annotations
 
@@ -40,7 +41,7 @@ def avisos():
     return modulo
 
 
-# ── A licença de um pacote do PyPI ───────────────────────────────────────────
+# ── The license of a PyPI package ────────────────────────────────────────────
 
 def test_a_expressao_declarada_ganha_de_tudo(avisos):
     info = {"license_expression": "Apache-2.0 OR BSD-3-Clause", "license": "MIT", "classifiers": ["License :: OSI Approved :: MIT License"]}
@@ -53,9 +54,9 @@ def test_sem_expressao_vale_a_lida_no_pacote(avisos):
 
 
 def test_a_licenca_composta_lida_no_pacote_vai_para_a_revisao(avisos, monkeypatch):
-    # Um LICENSE que cobre também o que veio de fora (era o caso do passlib:
-    # o md5-crypt em Beerware, o UnixCrypt com aviso próprio) entra inteiro
-    # em LIDAS_NO_PACOTE, e com AND a licença só passa se todas passarem.
+    # A LICENSE that also covers what came from outside (that was passlib's case:
+    # md5-crypt under Beerware, UnixCrypt with its own notice) goes in whole
+    # in LIDAS_NO_PACOTE, and with AND the license only passes if all pass.
     monkeypatch.setitem(avisos.LIDAS_NO_PACOTE, "pacote-composto",
                         "BSD-3-Clause AND Beerware AND LicenseRef-UnixCrypt")
     info = {"license": "BSD", "classifiers": ["License :: OSI Approved :: BSD License"]}
@@ -65,13 +66,13 @@ def test_a_licenca_composta_lida_no_pacote_vai_para_a_revisao(avisos, monkeypatc
 
 
 def test_o_campo_curto_nao_apaga_a_outra_licenca_de_um_pacote_duplo(avisos):
-    # O uvloop: «MIT» no campo, e os classificadores do MIT e do Apache.
+    # uvloop: "MIT" in the field, and the MIT and Apache classifiers.
     info = {"license": "MIT", "classifiers": [
         "License :: OSI Approved :: Apache Software License",
         "License :: OSI Approved :: MIT License",
     ]}
     assert avisos.licenca_do_pypi("uvloop", info) == "Apache-2.0 OR MIT"
-    # O campo que diz outra coisa continua ganhando.
+    # The field that says something else still wins.
     info["license"] = "BSD 3-Clause"
     assert avisos.licenca_do_pypi("pacote", info) == "BSD-3-Clause"
 
@@ -109,7 +110,7 @@ def test_o_vago_fica_desconhecido(avisos, info):
     assert avisos.licenca_do_pypi("pacote", info) == avisos.DESCONHECIDA
 
 
-# ── Compatível ou não ────────────────────────────────────────────────────────
+# ── Compatible or not ────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize(("licenca", "esperado"), [
     ("MIT", True),
@@ -119,7 +120,7 @@ def test_o_vago_fica_desconhecido(avisos, info):
     ("BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0", True),
     ("GPL-2.0-or-later WITH Classpath-exception-2.0", True),
     ("(MIT AND (BSD-3-Clause OR SSPL-1.0))", True),
-    # A GPL-2.0 só ela não convive com a AGPL-3.0, e AND exige todas.
+    # GPL-2.0-only doesn't coexist with AGPL-3.0, and AND requires all.
     ("MIT AND GPL-2.0-only", False),
     ("GPL-2.0-only", False),
     ("SSPL-1.0", False),
@@ -136,7 +137,7 @@ def test_compativel(avisos, licenca, esperado):
     assert avisos.compativel(licenca) is esperado
 
 
-# ── Os locks ─────────────────────────────────────────────────────────────────
+# ── The lockfiles ────────────────────────────────────────────────────────────
 
 def test_do_npm_fica_so_o_que_vai_para_producao(avisos, tmp_path):
     lock = tmp_path / "package-lock.json"
@@ -204,22 +205,22 @@ def test_o_arquivo_junta_quem_usa_conta_e_separa_o_que_revisar(avisos, tmp_path,
 
 
 def test_o_que_mora_no_repositorio_tem_a_licenca_ao_lado(avisos):
-    # Uma obra de terceiros copiada para cá (a fonte Inter, por exemplo) vai
-    # com o texto da licença, e a licença convive com a AGPL-3.0.
+    # A third-party work copied here (the Inter font, for example) goes
+    # with the license text, and the license coexists with AGPL-3.0.
     for obra, onde, licenca, textos in avisos.NO_REPOSITORIO:
         for caminho in onde:
             assert (RAIZ / caminho).exists(), (obra, caminho)
         for texto in textos:
             assert (RAIZ / texto).is_file(), (obra, texto)
-        # Uma fonte servida à parte pode ser OFL (AGREGAVEIS); o que é compilado
-        # junto do programa precisa ser compatível de verdade.
-        agregada = "à parte" in obra
+        # A font served separately may be OFL (AGREGAVEIS); what is compiled
+        # together with the program has to be truly compatible.
+        agregada = "separate file" in obra
         assert avisos.compativel(licenca) or (agregada and licenca in avisos.AGREGAVEIS), obra
 
 
 def test_o_dev_que_vai_no_build_e_o_que_o_css_importa(avisos):
-    # Um `@import "<pacote>"` no CSS leva o pacote para a folha de estilo que a
-    # instalação serve: ou ele é de produção, ou está em DEV_QUE_VAI_NO_BUILD.
+    # An `@import "<pacote>"` in the CSS takes the package into the stylesheet the
+    # installation serves: either it is a production one, or it is in DEV_QUE_VAI_NO_BUILD.
     importados = set()
     for base, lock in (("web", "web/package-lock.json"), ("desktop/src", "desktop/package-lock.json")):
         pacotes = json.loads((RAIZ / lock).read_text(encoding="utf-8"))["packages"]
@@ -233,7 +234,7 @@ def test_o_dev_que_vai_no_build_e_o_que_o_css_importa(avisos):
                 if dados.get("dev"):
                     assert pacote in avisos.DEV_QUE_VAI_NO_BUILD, (css, pacote)
                     importados.add(pacote)
-    # E a lista não guarda o que nenhum CSS importa mais.
+    # And the list doesn't keep what no CSS imports anymore.
     assert importados == avisos.DEV_QUE_VAI_NO_BUILD
 
 

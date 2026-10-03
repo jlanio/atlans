@@ -1,11 +1,11 @@
 # tests/integration/test_carta_no_executor.py
 """
-A carta imagem rodando no EXECUTOR de verdade, e nao o no isolado.
+The image map running on the real EXECUTOR, not the isolated node.
 
-O que so aparece montando o grafo: as duas camadas chegando pelo `to_key` de
-cada aresta (portas nomeadas), a aresta anonima de uma porta so (o dict do pai
-espalhado), e o evento de conclusao sem `schema_drift` — as chaves planas que
-o no devolve casam com os `outputs` declarados.
+What only shows up when assembling the graph: the two layers arriving via each
+edge's `to_key` (named ports), the anonymous edge of a single port (the
+parent's dict spread), and the completion event without `schema_drift` — the
+flat keys the node returns match the declared `outputs`.
 """
 import asyncio
 from unittest.mock import MagicMock, patch
@@ -52,9 +52,9 @@ def _rodar(nodes, edges):
 
 
 def _evento_de_conclusao(publisher, node_id):
-    """O evento de ciclo de vida do no: `publish_event(task_id, node_id, status,
-    ts, duration, error, extra, ...)` — o `extra` leva `output_keys` e, so
-    quando ha drift, `schema_drift`."""
+    """The node lifecycle event: `publish_event(task_id, node_id, status,
+    ts, duration, error, extra, ...)` — `extra` carries `output_keys` and, only
+    when there is drift, `schema_drift`."""
     for chamada in publisher.publish_event.call_args_list:
         args = chamada.args
         if len(args) >= 7 and args[1] == node_id and isinstance(args[6], dict) \
@@ -81,9 +81,9 @@ def test_duas_portas_recebem_uma_camada_cada_pelo_to_key():
 
 
 def test_uma_porta_com_aresta_anonima_desenha_a_camada_espalhada():
-    """Com uma porta o editor nao grava `to_key`: o executor espalha o dict do
-    pai e a camada chega como `r`, nao como `lotes`. A carta a desenha assim
-    mesmo, e a legenda leva o nome da porta."""
+    """With one port the editor does not write `to_key`: the executor spreads the
+    parent's dict and the layer arrives as `r`, not as `lotes`. The image map
+    draws it anyway, and the legend carries the port name."""
     resultado, capturado, _ = _rodar(
         [_script("a", -63.0), _carta("c", ["lotes"])],
         [{"source": "a", "target": "c", "from_key": "r"}],

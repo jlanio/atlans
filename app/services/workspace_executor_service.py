@@ -1,15 +1,16 @@
 # app/services/workspace_executor_service.py
 """
-Política de execução de um workspace (docs/specs/executor-isolation-routing.md).
+Execution policy of a workspace (docs/specs/executor-isolation-routing.md).
 
-    níveis:   [nível 1 = executores dedicados principais]
-              [nível 2 = fallback, opcional: outros dedicados do próprio workspace]
-    terminal: "fail" (Isolado — nunca pool) | "pool" (Dedicado com fallback)
-    piso:     "none" | "no_pool" — só o admin da plataforma; força terminal "fail"
+    tiers:    [tier 1 = main dedicated executors]
+              [tier 2 = fallback, optional: other dedicated ones of the same workspace]
+    terminal: "fail" (Isolated — never pool) | "pool" (Dedicated with fallback)
+    floor:    "none" | "no_pool" — platform admin only; forces terminal "fail"
 
-Modo pool = zero linhas em tier 1: a política nem é lida. Tudo aqui é a ÚNICA
-fonte das regras — o dispatch, os endpoints e as cascatas (revogar/apagar
-executor, promover a default) chamam este módulo em vez de reescrevê-las.
+Pool mode = zero rows in tier 1: the policy is not even read. Everything here is
+the ONLY source of the rules — the dispatch, the endpoints and the cascades
+(revoking/deleting an executor, promoting to default) call this module instead
+of rewriting them.
 """
 from __future__ import annotations
 
@@ -45,15 +46,15 @@ FLOOR_NONE = "none"
 FLOOR_NO_POOL = "no_pool"
 FLOORS = (FLOOR_NONE, FLOOR_NO_POOL)
 
-# Nível em que um job foi ENTREGUE (WorkflowRun.dispatch_tier).
+# Tier at which a job was DELIVERED (WorkflowRun.dispatch_tier).
 DISPATCH_PRIMARY = "primary"
 DISPATCH_FALLBACK = "fallback"
 DISPATCH_POOL = "pool"
 
-# Modo do workspace, derivado — nunca gravado.
-MODE_POOL = "pool"                    # sem nível 1: pool compartilhado
-MODE_ISOLATED = "isolated"            # nível 1 + terminal efetivo fail
-MODE_DEDICATED_POOL = "dedicated_pool"  # nível 1 + terminal efetivo pool
+# Workspace mode, derived — never stored.
+MODE_POOL = "pool"                    # no tier 1: shared pool
+MODE_ISOLATED = "isolated"            # tier 1 + effective terminal fail
+MODE_DEDICATED_POOL = "dedicated_pool"  # tier 1 + effective terminal pool
 
 
 @dataclass
@@ -82,7 +83,7 @@ class WorkspacePolicy:
 
     @property
     def allows_pool(self) -> bool:
-        """O pool pode receber jobs deste workspace? Nunca sob piso `no_pool`."""
+        """May the pool receive jobs from this workspace? Never under the `no_pool` floor."""
         if self.floor_no_pool:
             return False
         return self.mode in (MODE_POOL, MODE_DEDICATED_POOL)
@@ -93,23 +94,23 @@ class WorkspacePolicy:
 
 
 def mode_of(has_primary: bool, floor: str | None, terminal: str | None) -> str:
-    """Modo derivado (nunca gravado) — a MESMA conta para a política carregada
-    e para listagens que só têm as contagens dos níveis (tela de admin).
+    """Derived mode (never stored) — the SAME computation for the loaded policy
+    and for listings that only have the tier counts (admin screen).
 
-    Sem nível 1 o workspace é pool — EXCETO sob piso: o admin da plataforma
-    proibiu o pool, então não há para onde ir (spec §5.3 vence §4.2:
-    "no_pool" é absoluto, não só um default do terminal)."""
+    Without tier 1 the workspace is pool — EXCEPT under a floor: the platform
+    admin forbade the pool, so there is nowhere to go (spec §5.3 beats §4.2:
+    "no_pool" is absolute, not just a terminal default)."""
     if not has_primary:
         return MODE_ISOLATED if (floor or FLOOR_NONE) == FLOOR_NO_POOL else MODE_POOL
     return MODE_ISOLATED if effective_terminal_of(floor, terminal) == TERMINAL_FAIL else MODE_DEDICATED_POOL
 
 
 def effective_terminal_of(floor: str | None, terminal: str | None) -> str:
-    """Terminal que VALE: o piso `no_pool` vence qualquer `fallback_terminal`.
+    """The terminal that COUNTS: the `no_pool` floor beats any `fallback_terminal`.
 
-    Calculado no dispatch e não só na escrita — mesmo que o banco carregue um
-    estado que a API recusa (escrita direta, ordem de migração), o roteamento
-    trata como `fail`.
+    Computed at dispatch and not only on write — even if the database holds a
+    state the API refuses (direct write, migration order), routing treats it
+    as `fail`.
     """
     if (floor or FLOOR_NONE) == FLOOR_NO_POOL:
         return TERMINAL_FAIL
@@ -119,7 +120,7 @@ def effective_terminal_of(floor: str | None, terminal: str | None) -> str:
 # ── Leitura ──────────────────────────────────────────────────────────────────
 
 async def load_policy(db: AsyncSession, ws: Workspace) -> WorkspacePolicy:
-    """Níveis (com os executores vivos) + terminal + piso de um workspace."""
+    """A workspace's tiers (with the live executors) + terminal + floor."""
     result = await db.execute(
         select(WorkspaceExecutor.tier, Executor)
         .join(Executor, Executor.id_hash == WorkspaceExecutor.executor_id)
@@ -150,8 +151,8 @@ async def load_policy_by_id(db: AsyncSession, workspace_id: str) -> WorkspacePol
 
 
 async def allowed_executor_ids(db: AsyncSession, policy: WorkspacePolicy) -> set[str]:
-    """Conjunto PERMITIDO (spec §5.3): níveis ∪ pool, o pool só se a política
-    o admite. É o que a barreira do dispatch confere antes de cifrar."""
+    """ALLOWED set (spec §5.3): tiers ∪ pool, the pool only if the policy
+    admits it. It is what the dispatch barrier checks before encrypting."""
     from app.services.user_executor_service import get_default_agents
 
     allowed = set(policy.tier_ids)
@@ -160,7 +161,7 @@ async def allowed_executor_ids(db: AsyncSession, policy: WorkspacePolicy) -> set
     return allowed
 
 
-# ── Escrita: níveis ──────────────────────────────────────────────────────────
+# ── Write: tiers ─────────────────────────────────────────────────────────────
 
 async def _get_executor(db: AsyncSession, executor_id: str) -> Executor | None:
     result = await db.execute(
@@ -180,8 +181,8 @@ def _validate_member(executor: Executor | None, executor_id: str) -> Executor:
     if executor is None:
         raise WorkspacePolicyError("Executor não encontrado.")
     if executor.is_default:
-        # Q3: um executor do pool dentro de um nível "dedicado" é contradição —
-        # o job iria para uma máquina que também serve o pool aberto.
+        # Q3: a pool executor inside a "dedicated" tier is a contradiction —
+        # the job would go to a machine that also serves the open pool.
         raise WorkspacePolicyError(
             f"'{executor.name}' pertence ao pool compartilhado e não pode entrar num "
             "nível dedicado. O pool participa só como terminal da política."
@@ -202,12 +203,12 @@ async def add_member(
     db: AsyncSession, ws: Workspace, executor_id: str, tier: int, *,
     actor_id: str | None, accessible_ids: set[str] | None = None,
 ) -> WorkspaceExecutor:
-    """Inclui um executor num nível. `accessible_ids` = executores a que quem
-    inclui tem acesso (None = admin da plataforma, sem restrição)."""
+    """Adds an executor to a tier. `accessible_ids` = executors the person
+    adding has access to (None = platform admin, unrestricted)."""
     if tier not in TIERS:
         raise WorkspacePolicyError("Nível inválido: use 1 (principal) ou 2 (fallback).")
-    # Acesso ANTES da validação: quem não tem acesso ao executor não fica
-    # sabendo se ele existe, se é do pool ou se está inativo.
+    # Access BEFORE validation: whoever has no access to the executor does not
+    # get to know whether it exists, whether it is a pool one or inactive.
     if accessible_ids is not None and executor_id not in accessible_ids:
         raise WorkspaceAccessDeniedError("Você não tem acesso a este executor.")
     executor = _validate_member(await _get_executor(db, executor_id), executor_id)
@@ -232,8 +233,8 @@ async def add_member(
     try:
         await db.commit()
     except IntegrityError:
-        # Duas inclusões simultâneas do mesmo executor: a UNIQUE decide, e a
-        # resposta é a mesma 422 do caminho sequencial — não um 500.
+        # Two simultaneous additions of the same executor: the UNIQUE decides, and
+        # the response is the same 422 as the sequential path — not a 500.
         await db.rollback()
         raise WorkspacePolicyError(
             f"'{executor.name}' já está na política deste workspace (um executor "
@@ -254,10 +255,10 @@ async def remove_member(
     await db.execute(
         delete(WorkspaceExecutor).where(WorkspaceExecutor.id == alvo.id)
     )
-    # Nível 2 exige nível 1: esvaziar o principal apaga o fallback junto — e
-    # o terminal volta a `fail`: "pool como último recurso" é uma escolha que
-    # se faz COM um principal na mesa; sem ele, não pode sobreviver escondida
-    # para reaparecer no próximo executor incluído sem confirmação.
+    # Tier 2 requires tier 1: emptying the main one deletes the fallback with it —
+    # and the terminal goes back to `fail`: "pool as a last resort" is a choice
+    # made WITH a main tier on the table; without it, it cannot survive hidden
+    # to reappear on the next executor added without confirmation.
     resto_primario = [r for r in rows if r.tier == TIER_PRIMARY and r.id != alvo.id]
     apagou_fallback = False
     if alvo.tier == TIER_PRIMARY and not resto_primario:
@@ -278,17 +279,17 @@ async def remove_member(
 async def replace_primary(
     db: AsyncSession, ws: Workspace, executor_id: str | None, *, actor_id: str | None,
 ) -> None:
-    """Dual-write do endpoint LEGADO (`PUT /workspaces/{id}/executor`): o nível 1
-    passa a ser {executor}; `None` limpa todos os níveis. Enquanto a flag de
-    roteamento estiver `off`, é `target_executor_id` que vale — esta gravação só
-    mantém os dois lados iguais para a virada não mudar nada."""
+    """Dual-write of the LEGACY endpoint (`PUT /workspaces/{id}/executor`): tier 1
+    becomes {executor}; `None` clears all tiers. While the routing flag is
+    `off`, `target_executor_id` is what counts — this write only keeps both
+    sides equal so the switchover changes nothing."""
     rows = await _rows_of(db, ws.id_hash)
     executor = await _get_executor(db, executor_id) if executor_id else None
     if executor is None or executor.is_default:
-        # `None`, executor apagado ou executor do POOL: nenhum nível faz
-        # sentido. Apontar para um executor do pool é "quero o pool" — deixar
-        # o nível 1 antigo de pé faria o roteamento por política ignorar a
-        # escolha (e a tela mostrar o executor errado).
+        # `None`, deleted executor or POOL executor: no tier makes sense.
+        # Pointing to a pool executor means "I want the pool" — leaving the old
+        # tier 1 standing would make policy routing ignore the choice (and the
+        # screen show the wrong executor).
         if rows:
             await db.execute(
                 delete(WorkspaceExecutor).where(WorkspaceExecutor.workspace_id == ws.id_hash)
@@ -307,7 +308,7 @@ async def replace_primary(
             WorkspaceExecutor.tier == TIER_PRIMARY,
         )
     )
-    # Se o executor novo estava no fallback, sobe para o principal.
+    # If the new executor was in the fallback, it moves up to the main tier.
     await db.execute(
         delete(WorkspaceExecutor).where(
             WorkspaceExecutor.workspace_id == ws.id_hash,
@@ -320,11 +321,11 @@ async def replace_primary(
     terminal_ajustado = False
     if not tinha_primario and (ws.isolation_floor or FLOOR_NONE) != FLOOR_NO_POOL \
             and ws.fallback_terminal != TERMINAL_POOL:
-        # Nível 1 nascendo pelo caminho LEGADO: hoje esse workspace transborda
-        # para o pool quando o dedicado cai, e é isso que a política precisa
-        # reproduzir na virada da flag (o mesmo que o backfill fez). Isolar é
-        # decisão explícita, tomada no editor — não um efeito colateral do
-        # seletor rápido.
+        # Tier 1 born through the LEGACY path: today this workspace overflows to the
+        # pool when the dedicated one goes down, and that is what the policy
+        # needs to reproduce when the flag flips (the same as the backfill did).
+        # Isolating is an explicit decision, made in the editor — not a side
+        # effect of the quick selector.
         ws.fallback_terminal = TERMINAL_POOL
         terminal_ajustado = True
     _audit(db, ws.id_hash, actor_id, "workspace.executor_policy.primary_replaced",
@@ -356,8 +357,8 @@ async def set_terminal(
 async def set_floor(
     db: AsyncSession, ws: Workspace, floor: str, *, actor_id: str | None,
 ) -> bool:
-    """Só o admin da plataforma chama. Devolve True se o terminal foi forçado
-    de 'pool' para 'fail' (o chamador avisa o dono)."""
+    """Only the platform admin calls this. Returns True if the terminal was forced
+    from 'pool' to 'fail' (the caller notifies the owner)."""
     if floor not in FLOORS:
         raise WorkspacePolicyError("Piso inválido: use 'none' ou 'no_pool'.")
     anterior = ws.isolation_floor or FLOOR_NONE
@@ -376,8 +377,8 @@ async def set_floor(
 # ── Cascatas: o executor some ou vira pool ───────────────────────────────────
 
 async def workspaces_depending_on(db: AsyncSession, executor_id: str) -> list[dict]:
-    """Workspaces que têm o executor em algum nível, com o tamanho do nível
-    principal — é o que decide se removê-lo esvazia alguém."""
+    """Workspaces that have the executor in some tier, with the size of the main
+    tier — that is what decides whether removing it empties someone's."""
     result = await db.execute(
         select(WorkspaceExecutor, Workspace)
         .join(Workspace, Workspace.id_hash == WorkspaceExecutor.workspace_id)
@@ -412,17 +413,17 @@ async def workspaces_depending_on(db: AsyncSession, executor_id: str) -> list[di
 async def detach_executor(
     db: AsyncSession, executor_id: str, *, force: bool, actor_id: str | None, reason: str,
 ) -> list[dict]:
-    """Retira o executor de todos os níveis (revogação, remoção, promoção a
-    default). Bloqueia (409) se esvaziaria o nível PRINCIPAL de algum workspace
-    e `force` não foi pedido — um nível que esvazia em silêncio faz toda
-    execução futura falhar ou transbordar sem ninguém saber (spec §4.4).
+    """Removes the executor from all tiers (revocation, removal, promotion to
+    default). Blocks (409) if it would empty some workspace's MAIN tier and
+    `force` was not requested — a tier that empties silently makes every future
+    execution fail or overflow without anyone knowing (spec §4.4).
 
-    NÃO faz commit: o chamador está no meio da própria transação."""
+    Does NOT commit: the caller is in the middle of its own transaction."""
     deps = await workspaces_depending_on(db, executor_id)
     if not deps:
-        # Nenhum workspace VIVO depende dele — mas linhas de workspaces na
-        # lixeira podem existir, e um workspace restaurado depois não pode
-        # voltar com um executor revogado no nível principal.
+        # No LIVE workspace depends on it — but rows from workspaces in the trash
+        # may exist, and a workspace restored later must not come back with a
+        # revoked executor in the main tier.
         await db.execute(delete(WorkspaceExecutor).where(WorkspaceExecutor.executor_id == executor_id))
         return []
     esvaziaria = [d for d in deps if d["would_empty_primary"]]
@@ -434,8 +435,8 @@ async def detach_executor(
             workspaces=esvaziaria,
         )
     await db.execute(delete(WorkspaceExecutor).where(WorkspaceExecutor.executor_id == executor_id))
-    # Esvaziou o principal de alguém: o fallback dele deixa de fazer sentido,
-    # e o terminal volta a `fail` (mesma invariante de `remove_member`).
+    # Emptied someone's main tier: their fallback no longer makes sense, and
+    # the terminal goes back to `fail` (same invariant as `remove_member`).
     for d in esvaziaria:
         await db.execute(
             delete(WorkspaceExecutor).where(
@@ -455,14 +456,14 @@ async def detach_executor(
     return deps
 
 
-# ── Quem depende de quem (ponteiro legado ∪ níveis) ──────────────────────────
+# ── Who depends on whom (legacy pointer ∪ tiers) ─────────────────────────────
 
 async def workspace_ids_for_executor(db: AsyncSession, executor_id: str) -> set[str]:
-    """Workspaces vivos servidos pelo executor: apontado pelo ponteiro legado
-    OU membro de algum nível. É o conjunto que autoriza o executor no Drive,
-    nos artefatos, no portal e no ChangeDetector — o roteamento por política
-    manda jobs para membros de nível, e um job que roda sem essa autorização
-    quebra na primeira leitura do Drive."""
+    """Live workspaces served by the executor: pointed to by the legacy pointer
+    OR member of some tier. It is the set that authorizes the executor on the
+    Drive, the artifacts, the portal and the ChangeDetector — policy routing
+    sends jobs to tier members, and a job that runs without that authorization
+    breaks on the first Drive read."""
     legado = await db.execute(
         select(Workspace.id_hash).where(
             Workspace.target_executor_id == executor_id,
@@ -478,7 +479,7 @@ async def workspace_ids_for_executor(db: AsyncSession, executor_id: str) -> set[
 
 
 async def executor_ids_for_workspaces(db: AsyncSession, workspace_ids: list[str] | set[str]) -> set[str]:
-    """Executores que servem estes workspaces: ponteiros legados ∪ membros de nível."""
+    """Executors serving these workspaces: legacy pointers ∪ tier members."""
     ids = list(workspace_ids)
     if not ids:
         return set()
@@ -496,7 +497,7 @@ async def executor_ids_for_workspaces(db: AsyncSession, workspace_ids: list[str]
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _reset_terminal(ws: Workspace) -> None:
-    """Sem nível principal o terminal não tem o que decidir: volta ao padrão."""
+    """Without a main tier the terminal has nothing to decide: back to the default."""
     if getattr(ws, "fallback_terminal", None) != TERMINAL_FAIL:
         ws.fallback_terminal = TERMINAL_FAIL
 
@@ -515,5 +516,5 @@ async def _notify_executor(executor_id: str, reason: str) -> None:
         await executor_registry.send_json(executor_id, {
             "type": "control", "action": "config_changed", "reason": reason,
         })
-    except Exception as exc:  # pragma: no cover - rede
+    except Exception as exc:  # pragma: no cover - network
         logger.warning("Falha ao notificar executor '%s' (%s): %s", executor_id, reason, exc)

@@ -1,15 +1,15 @@
 // desktop/src/main/ui/windows.test.ts
 //
-// Regressão de "Abrir painel não faz nada".
+// Regression of "Abrir painel" (open panel) "does nothing".
 //
-// O botão vermelho da barra de título ESCONDE a janela em vez de encerrar o app
-// — ele vive na bandeja, e fechá-lo no meio de um job seria destrutivo. Depois
-// disso, o menu da bandeja chamava `focus()` numa janela escondida, e `focus()`
-// não torna nada visível: o item do menu parecia morto, sem erro em lugar
-// nenhum.
+// The red button in the title bar HIDES the window instead of quitting the app
+// — it lives in the tray, and closing it in the middle of a job would be
+// destructive. After that, the tray menu called `focus()` on a hidden window,
+// and `focus()` does not make anything visible: the menu item looked dead,
+// with no error anywhere.
 //
-// O bug é de UMA linha ausente, e é exatamente por isso que ele volta se
-// ninguém o travar.
+// The bug is ONE missing line, and that is exactly why it comes back if
+// nobody locks it down.
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({ BrowserWindow: vi.fn(), shell: {} }))
@@ -49,8 +49,8 @@ describe('trazerParaFrente', () => {
   })
 
   it('minimizada E escondida: restaura e mostra', () => {
-    // Acontece ao minimizar e depois fechar pelo tray, ou ao restaurar uma
-    // sessão do Windows.
+    // Happens when minimizing and then closing via the tray, or when restoring a
+    // Windows session.
     const w = janela({ minimizada: true, visivel: false })
     trazerParaFrente(w)
 
@@ -60,8 +60,9 @@ describe('trazerParaFrente', () => {
   })
 
   it('janela já visível só recebe foco', () => {
-    // `show()` numa janela visível é inofensivo, mas `restore()` numa janela
-    // não-minimizada pode reposicioná-la — melhor não chamar o que não precisa.
+    // `show()` on a visible window is harmless, but `restore()` on a
+    // non-minimized window may reposition it — better not to call what is not
+    // needed.
     const w = janela({ visivel: true })
     trazerParaFrente(w)
 
@@ -71,7 +72,7 @@ describe('trazerParaFrente', () => {
   })
 
   it('foco vem por último, depois de restaurar e mostrar', () => {
-    // Focar antes de a janela existir na tela não tem efeito no Windows.
+    // Focusing before the window exists on screen has no effect on Windows.
     const ordem: string[] = []
     const w = {
       isMinimized: () => true,
@@ -85,9 +86,10 @@ describe('trazerParaFrente', () => {
   })
 })
 
-// ── Link externo e navegação do painel ──────────────────────────────────────
-// `shell.openExternal` entrega o destino ao SO: só http(s) e mailto passam, a
-// mesma allowlist da janela web. E o painel nunca navega para fora.
+// ── External link and panel navigation ──────────────────────────────────────
+// `shell.openExternal` hands the destination to the OS: only http(s) and mailto
+// pass, the same allowlist as the web window. And the panel never navigates
+// away.
 
 describe('protegerNavegacao', () => {
   async function montar() {

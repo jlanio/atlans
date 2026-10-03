@@ -1,10 +1,10 @@
 /**
- * O que o visualizador pinta num nível de sub-fluxo.
+ * What the viewer paints at a sub-workflow level.
  *
- * A fonte é a linha do tempo do painel — e não `statusWorkflow.nodes`, que só
- * conhece os nós do canvas do editor porque é semeado a partir deles e depois só
- * atualizado por id (useExecuteWorkflow). Os ids dos nós do filho chegam
- * prefixados e nunca casam com nenhum.
+ * The source is the panel's timeline — not `statusWorkflow.nodes`, which only
+ * knows the editor canvas's nodes because it's seeded from them and afterwards
+ * only updated by id (useExecuteWorkflow). The child's node ids arrive prefixed
+ * and never match any of them.
  */
 import { describe, it, expect } from "vitest"
 
@@ -82,15 +82,15 @@ describe("recortarNivel", () => {
       ["sA"],
       new Set(["X", "Y"]),
     )
-    // "X" existe no grafo aberto, mas as duas linhas com esse id local são de
-    // OUTROS níveis: pintá-las aqui atribuiria a este nó o estado de outro.
+    // "X" exists in the open graph, but the two rows with that local id are from
+    // OTHER levels: painting them here would assign another node's state to this one.
     expect(estadoPorId.has("X")).toBe(false)
     expect(estadoPorId.has("Y")).toBe(true)
   })
 
   it("conta quem executou e não está mais no grafo", () => {
-    // O grafo vem na versão ATUAL do sub-fluxo; num run histórico o nó pode ter
-    // sido apagado desde então. Silenciar isso faria a tela passar por completa.
+    // The graph comes in the sub-workflow's CURRENT version; in a historical run
+    // the node may have been deleted since. Silencing that would make the screen pass as complete.
     const { estadoPorId, semCorrespondencia } = recortarNivel(
       [linha("sA::X"), linha("sA::sumiu", { name: "Buffer" })],
       ["sA"],

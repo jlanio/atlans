@@ -54,8 +54,8 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left"
   hideCloseButton?: boolean
   /**
-   * Deixa a borda interna do painel arrastável. Só para os lados verticais —
-   * `top`/`bottom` seriam altura, e nenhum painel precisa disso hoje.
+   * Makes the panel's inner edge draggable. Only for the vertical sides —
+   * `top`/`bottom` would be height, and no panel needs that today.
    */
   resizable?: boolean | ResizablePanelOptions
 }) {
@@ -88,9 +88,9 @@ function SheetContent({
           side === "bottom" &&
             "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto border-t",
           className,
-          // Depois de `className` de propósito: o tamanho arrastado tem de
-          // vencer qualquer `w-*`/`max-w-*` que o consumidor tenha passado.
-          // Abaixo de `sm` o painel ocupa a tela e não há o que arrastar.
+          // After `className` on purpose: the dragged size has to
+          // beat any `w-*`/`max-w-*` the consumer may have passed.
+          // Below `sm` the panel takes up the screen and there's nothing to drag.
           canResize && "sm:w-[var(--sheet-width)] sm:max-w-none",
           isResizing && "select-none"
         )}

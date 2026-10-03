@@ -1,11 +1,12 @@
 /**
- * Agendamento — o fuso padrão é o da instalação, e o seletor oferece todos.
+ * Scheduling — the default time zone is the installation's, and the picker offers all of them.
  *
- * Antes, a tela tinha um fuso padrão fixo (UTC-4) e só nove fusos
- * do Brasil mais UTC: um nó sem fuso via a prévia num fuso diferente do que o
- * servidor de outra instalação usaria, e quem estava fora do Brasil não achava o
- * seu. Agora o padrão vem do catálogo de nós (o `default` do campo `timezone`,
- * que o servidor lê de AGENDAMENTO_FUSO_PADRAO), e a lista é a IANA inteira.
+ * Before, the screen had a fixed default time zone (UTC-4) and only nine
+ * Brazilian time zones plus UTC: a node without a time zone saw the preview in a
+ * different zone from the one another installation's server would use, and
+ * people outside Brazil couldn't find theirs. Now the default comes from the node
+ * catalog (the `default` of the `timezone` field, which the server reads from
+ * AGENDAMENTO_FUSO_PADRAO), and the list is the whole IANA database.
  */
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, render, screen } from "@testing-library/react"
@@ -44,7 +45,7 @@ describe("o fuso padrão da instalação", () => {
   it("um nó sem fuso (ou com fuso vazio) lê o padrão da instalação", () => {
     expect(lerEstado(undefined, "Europe/Lisbon").timezone).toBe("Europe/Lisbon")
     expect(lerEstado({ timezone: "" }, "Europe/Lisbon").timezone).toBe("Europe/Lisbon")
-    // Um fuso gravado vence o padrão.
+    // A saved time zone beats the default.
     expect(lerEstado({ timezone: "Asia/Tokyo" }, "Europe/Lisbon").timezone).toBe("Asia/Tokyo")
   })
 
@@ -63,8 +64,8 @@ describe("o fuso padrão da instalação", () => {
 
 describe("o formulário do nó", () => {
   it("entrega ao helper os campos do catálogo, de onde sai o fuso padrão", () => {
-    // Achado da revisão: tirar `campos` do formulário não quebrava nenhum
-    // teste — e o helper cairia em UTC numa instalação de outro fuso.
+    // Review finding: removing `campos` from the form didn't break any test —
+    // and the helper would fall back to UTC on an installation in another time zone.
     const no = {
       id: "agenda-1",
       position: { x: 0, y: 0 },
@@ -110,8 +111,8 @@ describe("a lista de fusos", () => {
     }
     expect(opcoes.length).toBeGreaterThan(300)
     expect(opcoes.find(o => o.value === "America/Sao_Paulo")?.label).toBe("America/Sao Paulo (UTC−3)")
-    // O ICU chama a Índia de `Asia/Calcutta` (o nome canônico dele); versões
-    // novas podem trazer `Asia/Kolkata`. O servidor aceita os dois.
+    // ICU calls India `Asia/Calcutta` (its canonical name); newer versions may
+    // bring `Asia/Kolkata`. The server accepts both.
     const india = opcoes.find(o => o.value === "Asia/Kolkata" || o.value === "Asia/Calcutta")
     expect(india?.label).toMatch(/\(UTC\+5:30\)$/)
   })

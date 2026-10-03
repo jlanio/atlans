@@ -3,9 +3,10 @@ import { cleanup, render, screen } from "@testing-library/react"
 import type { ComponentProps } from "react"
 
 /**
- * "Dashboard" no menu lateral é do administrador do sistema por enquanto: aparece
- * só para admin (o mesmo padrão condicional de "Executores"). "Projetos" continua
- * para todos. O middleware é quem barra a rota; aqui só se esconde o caminho.
+ * "Dashboard" in the side menu belongs to the system administrator for now: it
+ * appears only for admin (the same conditional pattern as "Executores"). "Projetos"
+ * stays for everyone. The middleware is what blocks the route; here only the
+ * path is hidden.
  */
 
 const sessao = vi.hoisted(() => ({ role: "user" as "user" | "admin" }))
@@ -21,7 +22,7 @@ vi.mock("next/link", () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
 }))
 
-// Primitivos do shadcn: passthrough. Só o texto renderizado importa aqui.
+// shadcn primitives: passthrough. Only the rendered text matters here.
 vi.mock("@/app/components/ui/sidebar", () => {
   const P = ({ children }: ComponentProps<"div">) => <div>{children}</div>
   return {
@@ -33,7 +34,7 @@ vi.mock("@/app/components/ui/sidebar", () => {
   }
 })
 
-// Sem executor acessível: o fetch nunca muda o resultado do teste.
+// No accessible executor: the fetch never changes the test result.
 vi.mock("@/service/GisFlowService", () => ({
   GisFlowService: { getMyAgentsCount: vi.fn().mockResolvedValue({ data: { count: 0 } }) },
 }))
@@ -43,7 +44,7 @@ vi.mock("@/lib/sidebar-cache", () => ({
   clearCachedHasAgents: vi.fn(),
 }))
 
-// Filhos do rodapé e da marca — cada um tem suas próprias dependências; stub.
+// Children of the footer and the brand — each has its own dependencies; stub.
 vi.mock("@/app/components/sidebar/user-sidebar", () => ({
   default: (p: { portalClassName?: string }) => <div data-testid="user-sidebar" data-portal={p.portalClassName ?? ""} />,
 }))

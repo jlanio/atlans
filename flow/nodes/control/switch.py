@@ -20,34 +20,34 @@ _OP_FUNCS = {
 
 
 def _cast(value: Any, raw_cmp: str) -> Any:
-    """Tenta converter raw_cmp para o mesmo tipo de value."""
+    """Tries to convert raw_cmp to the same type as value."""
     try:
         if isinstance(value, (int, float)):
             return float(raw_cmp)
     except (TypeError, ValueError):
-        pass  # Conversão de tipo falhou — mantém valor original
+        pass  # Type conversion failed — keeps the original value
     return raw_cmp
 
 
 @register_node
 class Switch(BaseNode):
     """
-    Roteia registros para N saídas diferentes com base em regras de condição.
+    Routes records to N different outputs based on condition rules.
 
-    Cada regra é avaliada em ordem; o registro vai para a primeira saída
-    cuja condição for verdadeira. Registros que não casam com nenhuma regra
-    vão para a saída de fallback (output_0 por padrão).
+    Each rule is evaluated in order; the record goes to the first output
+    whose condition is true. Records that match no rule
+    go to the fallback output (output_0 by default).
 
-    Parâmetros:
-      - rules (list): lista de objetos no formato:
+    Args:
+      - rules (list): list of objects in the format:
             [
               {"field": "status", "operator": "==", "value": "ativo", "output": "output_1"},
               {"field": "area",   "operator": ">",  "value": "1000",  "output": "output_2"}
             ]
-        Operadores suportados: ==, !=, >, <, >=, <=, contains, starts, ends
-      - fallback_output (string): chave de saída para registros sem match (default: "output_0")
+        Supported operators: ==, !=, >, <, >=, <=, contains, starts, ends
+      - fallback_output (string): output key for records with no match (default: "output_0")
 
-    Outputs dinâmicos — cada registro cai em exatamente uma das saídas.
+    Dynamic outputs — each record lands in exactly one of the outputs.
     """
 
     @classmethod
@@ -68,8 +68,8 @@ class Switch(BaseNode):
                         'Lista de regras. Cada regra: {"field":"coluna","operator":"==","value":"x","output":"output_1"}. '
                         "Operadores: ==, !=, >, <, >=, <=, contains, starts, ends."
                     ),
-                    # O editor dedicado (switch-rules-field) oferece os nomes
-                    # vistos na última execução no campo de cada regra.
+                    # The dedicated editor (switch-rules-field) offers the names
+                    # seen in the last run in each rule's field.
                     "suggest_columns": "*",
                 },
                 {
@@ -118,7 +118,7 @@ class Switch(BaseNode):
 
         fallback = self.parameters.get("fallback_output", "output_0")
 
-        # Aceita GeoDataFrame ou lista de dicts
+        # Accepts a GeoDataFrame or a list of dicts
         data = next(iter(inputs.values()), None)
         if data is None:
             raise ValueError("Switch: nenhum dado nos inputs.")
@@ -127,7 +127,7 @@ class Switch(BaseNode):
         geo_col_name = data.geometry.name if is_gdf else "geometry"
         records = data.to_dict(orient="records") if is_gdf else list(data)
 
-        # Cada output_key → lista de registros
+        # Each output_key → list of records
         buckets: Dict[str, list] = {}
 
         for record in records:
@@ -141,11 +141,11 @@ class Switch(BaseNode):
 
             buckets.setdefault(matched_output, []).append(record)
 
-        # Emite TODAS as saídas possíveis (fallback + saídas das regras), mesmo
-        # as que não receberam registro neste lote. Sem isso, uma saída vazia
-        # sumia do dict e uma aresta from_key='output_N' para ela não resolvia —
-        # sob o resolvedor antigo cruzava dados de OUTRO balde (F5). Com o balde
-        # vazio presente, a aresta resolve para um container vazio, correto.
+        # Emits ALL possible outputs (fallback + the rules' outputs), even
+        # those that received no record in this batch. Without this, an empty output
+        # vanished from the dict and an edge from_key='output_N' to it didn't resolve —
+        # under the old resolver it crossed in data from ANOTHER bucket (F5). With the
+        # empty bucket present, the edge resolves to an empty container, which is correct.
         todas_saidas = {fallback}
         for rule in rules:
             saida = rule.get("output")
@@ -157,9 +157,9 @@ class Switch(BaseNode):
             import pandas as pd
 
             def _to_gdf(rows: list):
-                # gpd.GeoDataFrame.from_records é o from_records do pandas (sem
-                # kwarg geometry) e estoura em geopandas >= 1.0. Constrói via
-                # DataFrame + geometria explícita, que funciona em toda versão.
+                # gpd.GeoDataFrame.from_records is pandas' from_records (no
+                # geometry kwarg) and blows up on geopandas >= 1.0. Builds via
+                # DataFrame + explicit geometry, which works on every version.
                 if not rows:
                     return gpd.GeoDataFrame()
                 return gpd.GeoDataFrame(

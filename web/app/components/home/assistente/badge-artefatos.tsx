@@ -6,23 +6,25 @@ import type { TurnoDoAssistente } from "@/app/components/home/assistente/quadros
 import { useTextos } from "../i18n"
 
 /**
- * Os artefatos que ESTA conversa produziu, numa faixa fixa no topo do painel.
- * Clicar põe o artefato no globo — nada aqui navega para fora da Home.
+ * The artifacts THIS conversation produced, in a strip fixed at the top of the
+ * panel. Clicking puts the artifact on the globe — nothing here navigates away
+ * from the Home.
  *
- * Esta faixa mostrava os FLUXOS do assistente e abria `/workflow/{id}` (a antiga
- * decisão 4). O dono a substituiu: a Home é a única página de quem não
- * administra o sistema, e o que vale ser alcançável daqui é o RESULTADO, não a
- * máquina que o produziu. O fluxo continua em Projetos, com o interruptor
- * "mostrar os do assistente" ligado, para quem chegar lá.
+ * This strip used to show the assistant's WORKFLOWS and opened `/workflow/{id}`
+ * (the old decision 4). The owner replaced it: the Home is the only page for
+ * those who don't administer the system, and what is worth reaching from here
+ * is the RESULT, not the machine that produced it. The workflow remains in
+ * Projects, with the "mostrar os do assistente" (show the assistant's) switch
+ * on, for whoever gets there.
  *
- * **Não duplica o que já existe** — são três recortes diferentes:
+ * **It doesn't duplicate what already exists** — they are three different slices:
  *
- * - `CartaoCamada`, inline na conversa: o momento "a camada entrou no globo".
- *   Rola junto com a conversa e sai de vista.
- * - esta faixa: o índice do que a conversa TODA produziu. Fica fixa entre o
- *   cabeçalho e o rolo, então sobrevive à rolagem.
- * - `PainelCamadas`, no canto do globo: o que está no globo AGORA, com olho,
- *   remover e enquadrar.
+ * - `CartaoCamada`, inline in the conversation: the "the layer entered the globe"
+ *   moment. It scrolls along with the conversation and goes out of view.
+ * - this strip: the index of what the WHOLE conversation produced. It stays fixed
+ *   between the header and the scroll, so it survives scrolling.
+ * - `PainelCamadas`, in the globe's corner: what is on the globe NOW, with eye,
+ *   remove and frame.
  */
 export default function BadgeArtefatos({ turnos }: { turnos: TurnoDoAssistente[] }) {
   const pedirCamada = useHomeStore((s) => s.pedirCamada)
@@ -36,10 +38,10 @@ export default function BadgeArtefatos({ turnos }: { turnos: TurnoDoAssistente[]
         const nome = c.nome?.trim() || t.artefato
         const comum = "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] max-md:min-h-10 max-md:px-3 max-md:text-xs"
 
-        // Sem prévia não há o que pôr no globo: fica `<span>`, não `<button>`.
-        // Um botão sem ação promete um clique que não acontece, e o leitor de
-        // tela ainda o anunciaria como acionável — a mesma razão que tirou o
-        // `<button>` da linha de Agendamentos.
+        // Without a preview there is nothing to put on the globe: it stays a `<span>`,
+        // not a `<button>`. A button with no action promises a click that doesn't
+        // happen, and the screen reader would still announce it as actionable —
+        // the same reason that removed the `<button>` from the Schedules row.
         if (!c.available) {
           return (
             <span
@@ -57,9 +59,9 @@ export default function BadgeArtefatos({ turnos }: { turnos: TurnoDoAssistente[]
           <button
             key={c.artifact_id}
             type="button"
-            // A fila do `homeStore` é o mesmo canal que a lista de Artefatos
-            // usa: quem chama `useCamadas.adicionar` é o `HomeView`, que a
-            // drena. `adicionar` já deduplica, então re-clicar é inofensivo.
+            // The `homeStore` queue is the same channel the Artifacts list
+            // uses: the one that calls `useCamadas.adicionar` is `HomeView`,
+            // which drains it. `adicionar` already deduplicates, so re-clicking is harmless.
             onClick={() => pedirCamada(c.artifact_id, c.nome)}
             title={t.mostrarNoGlobo(nome)}
             className={`${comum} border-border bg-muted/40 text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:text-foreground`}

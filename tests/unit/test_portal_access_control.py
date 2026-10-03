@@ -1,11 +1,11 @@
 """
-Controle de acesso do portal em tiles e download.
+Portal access control for tiles and download.
 
-Regressao: get_mvt_tile e download_portal_layer so checavam
-`portal_access == "disabled"`. Um portal PRIVADO tinha as geometrias servidas
-sem auth — bastava saber workflow_hash + layer_key (ou o UUID da camada), ambos
-de baixa entropia. get_portal_data ja aplicava o gate completo; agora ele foi
-extraido para enforce_portal_access e reaplicado nos tres endpoints.
+Regression: get_mvt_tile and download_portal_layer only checked
+`portal_access == "disabled"`. A PRIVATE portal had its geometries served
+without auth — it was enough to know workflow_hash + layer_key (or the layer's
+UUID), both low-entropy. get_portal_data already applied the full gate; now it
+has been extracted into enforce_portal_access and reapplied in the three endpoints.
 """
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -44,7 +44,7 @@ async def test_disabled_404():
 
 @pytest.mark.asyncio
 async def test_public_passa_sem_token():
-    await enforce_portal_access(_wf(access="public"), _req())  # nao levanta
+    await enforce_portal_access(_wf(access="public"), _req())  # does not raise
 
 
 @pytest.mark.asyncio
@@ -73,12 +73,12 @@ async def test_private_usuario_autorizado_passa():
                return_value={"type": "access", "sub": "u-1", "username": "Alice"}), \
             patch("app.core.utils.jwt_utils.is_token_blacklisted",
                   new=AsyncMock(return_value=False)):
-        await enforce_portal_access(wf, _req(auth="Bearer tok"))  # nao levanta (username case-insensitive)
+        await enforce_portal_access(wf, _req(auth="Bearer tok"))  # does not raise (username case-insensitive)
 
 
 @pytest.mark.asyncio
 async def test_private_refresh_token_recusado():
-    """Token que nao e de access (ex: refresh) nao vale no portal."""
+    """A token that is not an access token (e.g. refresh) is not valid on the portal."""
     wf = _wf(access="private", shared=["alice"])
     with patch("app.core.utils.jwt_utils.decode_token",
                return_value={"type": "refresh", "sub": "u-1"}):
@@ -89,7 +89,7 @@ async def test_private_refresh_token_recusado():
 
 @pytest.mark.asyncio
 async def test_private_token_blacklistado_recusado():
-    """Token revogado no logout nao acessa portal privado (defesa em profundidade)."""
+    """A token revoked at logout cannot access a private portal (defense in depth)."""
     wf = _wf(access="private", shared=["u-1"])
     with patch("app.core.utils.jwt_utils.decode_token",
                return_value={"type": "access", "sub": "u-1", "username": "u-1"}), \
@@ -118,7 +118,7 @@ async def test_download_endpoint_bloqueia_portal_privado(client):
                 res.scalar_one_or_none = MagicMock(
                     return_value=MagicMock(id_hash="layer-1", workflow_hash="wf-1",
                                            layer_key="camada", geojson_data={"x": 1}))
-            else:  # workflows — agora projeta as colunas do gate e le por .first()
+            else:  # workflows — now projects the gate's columns and reads via .first()
                 res.first = MagicMock(return_value=_wf(access="private"))
             return res
 
@@ -135,12 +135,12 @@ async def test_download_endpoint_bloqueia_portal_privado(client):
 
 @pytest.mark.asyncio
 async def test_tile_endpoint_bloqueia_portal_privado(client):
-    """O tile resolve gate + camada numa consulta so, e o gate continua valendo.
+    """The tile resolves gate + layer in a single query, and the gate still holds.
 
-    Cada pan/zoom pede dezenas de tiles; antes cada um fazia dois SELECTs de
-    metadados (um deles carregando a `definition` inteira do fluxo) antes do
-    ST_AsMVT. Agora e um outerjoin com as tres colunas que o gate le mais o
-    layer_id — dai o duble responder por `.first()`, e nao por
+    Each pan/zoom requests dozens of tiles; before, each one made two metadata
+    SELECTs (one of them loading the workflow's whole `definition`) before
+    ST_AsMVT. Now it is an outerjoin with the three columns the gate reads plus
+    the layer_id — hence the double answers via `.first()`, and not via
     `.scalar_one_or_none()`.
     """
     from app.main import app

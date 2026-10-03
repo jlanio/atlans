@@ -1,11 +1,11 @@
 """
-SSRF / DNS-rebinding nos nodes de saida HTTP.
+SSRF / DNS rebinding in the HTTP output nodes.
 
-Regressao: http_request e send_webhook chamavam validate_url_ssrf e
-DESCARTAVAM o retorno, deixando o httpx re-resolver o DNS na hora do request
-(TOCTOU). Com DNS TTL=0, o atacante resolvia publico na validacao e interno
-(169.254.169.254 / 10.x) no request. Agora ambos passam por
-safe_httpx_request, que valida E fixa o IP resolvido.
+Regression: http_request and send_webhook called validate_url_ssrf and
+DISCARDED the return value, letting httpx re-resolve DNS at request time
+(TOCTOU). With DNS TTL=0, the attacker resolved to public at validation and to
+internal (169.254.169.254 / 10.x) at request time. Now both go through
+safe_httpx_request, which validates AND pins the resolved IP.
 """
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -18,7 +18,7 @@ from flow.utils.geo_helpers import safe_httpx_request
 
 @pytest.mark.asyncio
 async def test_ip_interno_e_recusado():
-    """Host que resolve para metadata/interno nao pode sair."""
+    """A host that resolves to metadata/internal must not go out."""
     with patch("flow.utils.geo_helpers.socket.getaddrinfo",
                return_value=[(None, None, None, None, ("169.254.169.254", 0))]):
         with pytest.raises(ValueError, match="internos/privados"):
@@ -27,8 +27,8 @@ async def test_ip_interno_e_recusado():
 
 @pytest.mark.asyncio
 async def test_conecta_no_ip_fixado_nao_no_hostname():
-    """A defesa central: a request sai para o IP resolvido na validacao, nao
-    para o hostname (que o DNS poderia re-resolver para um alvo interno)."""
+    """The central defense: the request goes out to the IP resolved at validation,
+    not to the hostname (which DNS could re-resolve to an internal target)."""
     captured = {}
 
     async def _fake_send(self, request, **kwargs):
@@ -43,7 +43,7 @@ async def test_conecta_no_ip_fixado_nao_no_hostname():
             patch("httpx.AsyncClient.send", _fake_send):
         await safe_httpx_request("GET", "http://example.com/path?q=1")
 
-    # URL conecta no IP fixado; hostname vai no Host header para o virtualhost.
+    # URL connects to the pinned IP; hostname goes in the Host header for the virtualhost.
     assert "93.184.216.34" in captured["url"]
     assert "example.com" not in captured["url"]
     assert captured["host_header"] == "example.com"
@@ -52,7 +52,7 @@ async def test_conecta_no_ip_fixado_nao_no_hostname():
 
 @pytest.mark.asyncio
 async def test_params_dict_preservado():
-    """http_request usa params dict — o passthrough novo nao pode perde-lo."""
+    """http_request uses a params dict — the new passthrough must not lose it."""
     captured = {}
 
     async def _fake_send(self, request, **kwargs):
@@ -69,7 +69,7 @@ async def test_params_dict_preservado():
     assert "bbox=1" in captured["url"]
 
 
-# ── Delegacao: os nodes usam o caminho seguro, nao httpx cru ──────────────────
+# ── Delegation: the nodes use the safe path, not raw httpx ───────────────────
 
 @pytest.mark.asyncio
 async def test_http_request_node_delega_para_safe_httpx():

@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { act, renderHook, waitFor } from "@testing-library/react"
 
 /**
- * O estado do hook do assistente: como uma falha de rede é distinguida de
- * "desligado", e o que acontece com o stream quando a Home some.
+ * The assistant hook's state: how a network failure is told apart from
+ * "turned off", and what happens to the stream when the Home goes away.
  */
 const servico = vi.hoisted(() => ({ estadoDoAgente: vi.fn(), lerConversa: vi.fn() }))
 vi.mock("@/service/GisFlowService", () => ({ GisFlowService: servico }))
@@ -75,7 +75,7 @@ describe("useAssistente — estado", () => {
     ;(globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockImplementation(
       async (_url: string, init: RequestInit) => {
         sinal = init.signal ?? undefined
-        // Um stream que nunca termina sozinho — é o abort que o encerra.
+        // A stream that never ends on its own — it is the abort that ends it.
         return { ok: true, body: { getReader: () => ({ read: () => new Promise(() => {}), cancel: async () => {} }) } }
       },
     )
@@ -108,7 +108,7 @@ describe("useAssistente — estado", () => {
 })
 
 describe("useAssistente — o desfecho de uma confirmação", () => {
-  /** Um hook já com conversa carregada — `confirmar` precisa do id no ref. */
+  /** A hook with a conversation already loaded — `confirmar` needs the id in the ref. */
   async function comConversa(onConversa?: (info: { id: string; titulo?: string; nova: boolean }) => void) {
     servico.estadoDoAgente.mockResolvedValue({ success: true, data: ATIVO })
     servico.lerConversa.mockResolvedValue({ success: true, data: { quadros: [] } })
@@ -119,9 +119,9 @@ describe("useAssistente — o desfecho de uma confirmação", () => {
   }
 
   it("'Parar' no meio do stream NÃO destrava o cartão: a chave já foi consumida", async () => {
-    // O servidor aceitou a decisão (a resposta virou stream) e só então o
-    // aborto cortou a leitura. Ler isso como "não valeu" reabria um cartão que
-    // não pode mais ser decidido — o clique seguinte bateria num 409.
+    // The server accepted the decision (the response became a stream) and only then did the
+    // abort cut the read. Reading that as "did not count" reopened a card that
+    // can no longer be decided — the next click would hit a 409.
     ;(globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockImplementation(
       async (_url: string, init: RequestInit) => ({
         ok: true,
@@ -156,13 +156,13 @@ describe("useAssistente — o desfecho de uma confirmação", () => {
     let desfecho: string | undefined
     await act(async () => { desfecho = await result.current.confirmar("tu1", "TOK", "confirmar") })
     expect(desfecho).toBe("expirada")
-    // Sem stream não há carimbo de `updated_at` no servidor: a lista não sobe.
+    // Without a stream there is no `updated_at` stamp on the server: the list does not move up.
     expect(onConversa).not.toHaveBeenCalled()
   })
 
   it("a decisão aceita anuncia a conversa (só o id) — a lista de Chats a sobe", async () => {
-    // O 2º SSE não emite `conversa`, mas o servidor carimba `updated_at` ao
-    // fechá-lo: sem o anúncio a linha só subia na mensagem seguinte.
+    // The 2nd SSE does not emit `conversa`, but the server stamps `updated_at` when
+    // closing it: without the announcement the row only moved up on the next message.
     ;(globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true, status: 200,
       body: { getReader: () => ({ read: async () => ({ done: true, value: undefined }), cancel: async () => {} }) },
@@ -205,7 +205,7 @@ describe("useAssistente — a cota durante o turno", () => {
 
     act(() => { void result.current.enviar("quanto gastei?") })
 
-    // Com o stream ainda aberto, o gasto já é o do quadro — sem GET nenhum.
+    // With the stream still open, the spend is already the frame's — with no GET at all.
     await waitFor(() => expect(result.current.estado?.cota?.gasto).toBe(40))
     expect(result.current.correndo).toBe(true)
     expect(servico.estadoDoAgente).toHaveBeenCalledTimes(1)

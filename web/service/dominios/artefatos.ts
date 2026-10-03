@@ -8,10 +8,10 @@ import type {
 // ── Artefatos ──────────────────────────────────────��───────────────────────
 
 /**
- * Lista artefatos. SEMPRE pagine: a tela baixava a tabela inteira do usuario
- * e filtrava em memoria, o que travava a aba por segundos em workspace com
- * historico. `search`, `workspace_id` e `kind` vao ao servidor pelo mesmo
- * motivo — o cliente nao precisa ver o que nao vai mostrar.
+ * Lists artifacts. ALWAYS paginate: the screen downloaded the user's whole
+ * table and filtered in memory, which froze the tab for seconds in a workspace
+ * with history. `search`, `workspace_id` and `kind` go to the server for the
+ * same reason — the client does not need to see what it will not show.
  */
 export function getArtifacts(params: import("../types").IArtifactListParams = {}) {
   return get<import("../types").IArtifactListResponse>(

@@ -2,33 +2,35 @@
 //
 // Deep link `atlans://enroll?executor_id=…&otp=…&server=…`.
 //
-// Elimina o copiar-colar de dois valores entre o navegador e o app — hoje a
-// maior fricção do vínculo.
+// Eliminates copy-pasting two values between the browser and the app — today
+// the biggest friction in binding.
 //
-// ## Segurança
+// ## Security
 //
-// **Qualquer página web pode disparar um deep link.** Basta um `<a href>` ou um
-// `location.href` para o app abrir com parâmetros escolhidos por quem escreveu
-// a página. Por isso, duas defesas:
+// **Any web page can trigger a deep link.** An `<a href>` or a `location.href`
+// is enough for the app to open with parameters chosen by whoever wrote the
+// page. Hence, two defenses:
 //
-//   1. O app NUNCA enrola automaticamente. Ele preenche o formulário e espera
-//      confirmação humana.
-//   2. O servidor não é escolhido pelo link. Ele é a constante SERVIDOR, e um
-//      `server=` apontando para outro host faz o link inteiro ser descartado.
-//      Um enrollment contra servidor atacante entregaria a esta máquina jobs
-//      assinados por ele — que o executor rodaria com as permissões do usuário.
+//   1. The app NEVER enrolls automatically. It fills in the form and waits for
+//      human confirmation.
+//   2. The server is not chosen by the link. It is the SERVIDOR constant, and a
+//      `server=` pointing to another host makes the whole link be discarded.
+//      An enrollment against an attacker's server would deliver to this machine
+//      jobs signed by it — which the executor would run with the user's
+//      permissions.
 //
-// O OTP na URL não vai para o histórico do navegador (não é navegação), mas
-// aparece na linha de comando do processo. Como é de uso único e dura 24 h,
-// é aceitável — e o mesmo já vale para o `--otp` do CLI.
+// The OTP in the URL does not go into the browser history (it is not a
+// navigation), but it does show up on the process command line. Since it is
+// single-use and lasts 24 h, that is acceptable — and the same already holds for
+// the CLI's `--otp`.
 import { app } from 'electron'
 import { SERVIDOR_HOST } from '../shared/servidor.js'
 
 export const PROTOCOLO = 'atlans'
 
 /**
- * O `servidor` NÃO está aqui: ele é fixo. O que a URL traz é apenas a
- * identidade a vincular.
+ * The `servidor` is NOT here: it is fixed. What the URL brings is only the
+ * identity to bind.
  */
 export interface PedidoDeepLink {
   executorId: string
@@ -36,10 +38,10 @@ export interface PedidoDeepLink {
 }
 
 /**
- * Interpreta uma URL `atlans://`. Devolve `null` para tudo que não seja um
- * pedido de enrollment válido e confiável.
+ * Interprets an `atlans://` URL. Returns `null` for anything that is not a
+ * valid and trustworthy enrollment request.
  *
- * Função pura — a decisão de segurança fica testável sem Electron.
+ * Pure function — the security decision stays testable without Electron.
  */
 export function interpretar(bruta: string): PedidoDeepLink | null {
   let url: URL
@@ -50,7 +52,7 @@ export function interpretar(bruta: string): PedidoDeepLink | null {
   }
 
   if (url.protocol !== `${PROTOCOLO}:`) return null
-  // `atlans://enroll?…` coloca "enroll" no host, não no pathname.
+  // `atlans://enroll?…` puts "enroll" in the host, not in the pathname.
   const acao = (url.host || url.pathname.replace(/^\/+/, '')).toLowerCase()
   if (acao !== 'enroll') return null
 
@@ -58,10 +60,10 @@ export function interpretar(bruta: string): PedidoDeepLink | null {
   const otp = (url.searchParams.get('otp') || '').trim()
   if (!executorId || !otp) return null
 
-  // `server=` é opcional — o app usa o seu de qualquer forma. Quando vem,
-  // precisa CONFERIR: um link apontando para outro host revela intenção de
-  // desviar o vínculo, e o certo aí é recusar, não ignorar o parâmetro e
-  // enrolar contra o servidor certo como se nada tivesse acontecido.
+  // `server=` is optional — the app uses its own either way. When present, it
+  // must MATCH: a link pointing to another host reveals an intent to divert
+  // the binding, and the right thing then is to refuse, not ignore the
+  // parameter and enroll against the right server as if nothing had happened.
   const servidor = (url.searchParams.get('server') || '').trim()
   if (servidor) {
     let alvo: URL
@@ -70,7 +72,7 @@ export function interpretar(bruta: string): PedidoDeepLink | null {
     } catch {
       return null
     }
-    // Só HTTPS/WSS: um `http://` aceito aqui indicaria um link forjado.
+    // HTTPS/WSS only: an `http://` accepted here would indicate a forged link.
     if (alvo.protocol !== 'https:' && alvo.protocol !== 'wss:') return null
     if (alvo.hostname !== SERVIDOR_HOST) return null
   }
@@ -79,13 +81,13 @@ export function interpretar(bruta: string): PedidoDeepLink | null {
 }
 
 /**
- * A URL usa o esquema do deep link (`atlans://`)?
+ * Does the URL use the deep link scheme (`atlans://`)?
  *
- * Só o esquema — a validação de conteúdo é do {@link interpretar}. Serve à
- * janela web (janela-web.ts), que precisa separar um `atlans://` clicado ali
- * dentro (deep link a encaminhar ao main) de um link externo comum (vai ao
- * navegador). Um `atlans://` malformado ainda retorna `true` aqui e é recusado
- * depois por `interpretar` — a mesma recusa silenciosa do fluxo externo.
+ * Only the scheme — content validation is {@link interpretar}'s job. It serves
+ * the web window (janela-web.ts), which needs to tell an `atlans://` clicked
+ * inside it (a deep link to forward to main) from an ordinary external link
+ * (goes to the browser). A malformed `atlans://` still returns `true` here and
+ * is refused later by `interpretar` — the same silent refusal as the external flow.
  */
 export function ehDeepLink(bruta: string): boolean {
   try {
@@ -96,11 +98,11 @@ export function ehDeepLink(bruta: string): boolean {
 }
 
 /**
- * Registra o app como handler do protocolo.
+ * Registers the app as the protocol handler.
  *
- * Em dev o executável é o do Electron, e sem apontar o caminho do projeto o
- * Windows registraria "abrir com electron.exe" — que abriria o app padrão do
- * Electron, não este.
+ * In dev the executable is Electron's, and without pointing at the project
+ * path Windows would register "open with electron.exe" — which would open
+ * Electron's default app, not this one.
  */
 export function registrarProtocolo(): void {
   if (process.defaultApp && process.argv.length >= 2) {
@@ -111,11 +113,11 @@ export function registrarProtocolo(): void {
 }
 
 /**
- * Extrai a URL `atlans://` de uma lista de argumentos.
+ * Extracts the `atlans://` URL from a list of arguments.
  *
- * No Windows o deep link chega em `argv` — na primeira execução, no argv do
- * processo; com o app já aberto, no evento `second-instance`. (O `open-url` do
- * Electron é só macOS.)
+ * On Windows the deep link arrives in `argv` — on first launch, in the
+ * process's argv; with the app already open, in the `second-instance` event.
+ * (Electron's `open-url` is macOS only.)
  */
 export function urlDosArgumentos(argv: string[]): string | null {
   return argv.find((a) => a.startsWith(`${PROTOCOLO}://`)) ?? null

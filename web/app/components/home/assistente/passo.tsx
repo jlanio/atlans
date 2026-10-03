@@ -2,12 +2,12 @@
 
 // web/app/components/home/assistente/passo.tsx
 //
-// Uma linha da ferramenta na conversa.
+// One tool line in the conversation.
 //
-// O passo é discreto de propósito: o que interessa é a EXPLICAÇÃO em volta
-// dele. Mas ele não pode sumir — ver "Consultando o guia · edges" é o que
-// transforma uma pausa de oito segundos em trabalho visível, e é o que permite
-// dizer depois "ele conferiu o nó antes de usar".
+// The step is deliberately discreet: what matters is the EXPLANATION around
+// it. But it cannot disappear — seeing "Consultando o guia · edges" is what
+// turns an eight-second pause into visible work, and it is what lets you say
+// afterwards "it checked the node before using it".
 
 import { TbAlertTriangle, TbCheck, TbLoader2 } from "react-icons/tb"
 
@@ -56,8 +56,8 @@ export default function Passo({ bloco }: { bloco: BlocoDeFerramenta }) {
               </span>
             )}
             <span className="min-w-0 truncate text-[11px] tabular-nums text-muted-foreground">
-              {/* `total` pode ser nulo: o nó devolve progresso sem total quando o
-                  desvio de branch torna o denominador uma mentira. */}
+              {/* `total` may be null: the node reports progress without a total when
+                  the branch detour makes the denominator a lie. */}
               {progresso.total != null
                 ? `${progresso.concluidos}/${progresso.total}`
                 : `${progresso.concluidos}`}

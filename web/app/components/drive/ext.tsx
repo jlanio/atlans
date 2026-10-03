@@ -7,14 +7,15 @@ import {
 import { Badge } from "@/app/components/ui/badge"
 
 /**
- * Selo de extensão do arquivo (ícone + sigla).
+ * File extension badge (icon + abbreviation).
  *
- * As cores saíram dos literais soltos (`text-emerald-500 bg-emerald-500/10`,
- * `text-orange-500`) para os PARES de status sancionados pelo contrato (§6):
- * cada um traz o par claro (`bg-*-100 text-*-700`) e o par escuro
- * (`dark:bg-*-500/15 dark:text-*-400`), então a sigla lê bem nos dois temas.
- * A paleta ficou restrita a green/blue/amber/yellow/purple — o laranja de marca
- * é `primary`, não vira cor de categoria; teal/emerald não estão no conjunto.
+ * The colors moved from loose literals (`text-emerald-500 bg-emerald-500/10`,
+ * `text-orange-500`) to the status PAIRS sanctioned by the contract (§6):
+ * each brings the light pair (`bg-*-100 text-*-700`) and the dark pair
+ * (`dark:bg-*-500/15 dark:text-*-400`), so the abbreviation reads well in both
+ * themes. The palette was restricted to green/blue/amber/yellow/purple — the
+ * brand orange is `primary`, it doesn't become a category color; teal/emerald
+ * are not in the set.
  */
 const EXT_ESTILO: Record<string, string> = {
   geojson: "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400",
@@ -27,7 +28,7 @@ const EXT_ESTILO: Record<string, string> = {
   shp:     "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-400",
 }
 
-/** Ícone da extensão — os formatos espaciais compartilham o mapa. */
+/** Extension icon — the spatial formats share the map. */
 export function ExtIcon({ ext }: { ext: string }) {
   switch (ext) {
     case "csv":  return <TbFileTypeCsv size={14} aria-hidden="true" />
@@ -38,7 +39,7 @@ export function ExtIcon({ ext }: { ext: string }) {
     case "gpkg":
     case "shp":  return <TbMap size={14} aria-hidden="true" />
     case "json": return <TbFileCode size={14} aria-hidden="true" />
-    // A carta imagem (nó CartaImagem) chega como artefato png/jpg/pdf.
+    // The image map (CartaImagem node) arrives as a png/jpg/pdf artifact.
     case "png":
     case "jpg":
     case "jpeg": return <TbPhoto size={14} aria-hidden="true" />

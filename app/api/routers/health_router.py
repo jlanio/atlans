@@ -1,7 +1,7 @@
 # app/api/routers/health_router.py
 """
-Endpoints administrativos: whitelist de webhook e armazenamento (uso e purga).
-Todos requerem role admin.
+Administrative endpoints: webhook whitelist and storage (usage and purge).
+All require the admin role.
 """
 from datetime import timedelta
 from typing import List
@@ -25,27 +25,28 @@ router = APIRouter(prefix="/admin", tags=["admin-health"], dependencies=[Depends
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-# get_config/set_config foram movidos para app/core/system_config.py para reuso
-# por outros modulos admin (disabled_nodes_service etc.). Aliases mantidos como
-# wrappers para manter o resto do arquivo igual.
+# get_config/set_config were moved to app/core/system_config.py for reuse
+# by other admin modules (disabled_nodes_service etc.). Aliases kept as
+# wrappers to keep the rest of the file unchanged.
 
 from app.core.system_config import get_config as _get_config  # noqa: E402
 from app.core.system_config import set_config as _set_config  # noqa: E402
 
 
-# ── Whitelist de webhook (/admin/health) ──────────────────────────────────────
+# ── Webhook whitelist (/admin/health) ─────────────────────────────────────────
 
 @router.get("/health", summary="Whitelist de domínios para webhook")
 async def system_health(db: AsyncSession = Depends(get_db)):
-    """Só a whitelist: é o que a tela de Configurações lê.
+    """Only the whitelist: it is what the Settings screen reads.
 
-    A lista EFETIVA, a mesma que o disparo aplica (`padroes_validos`): uma
-    entrada gravada antes da validação que nunca casaria (`*`, URL com caminho)
-    não aparece como restrição, e a tela avisa "sem restrição" quando é o caso.
+    The EFFECTIVE list, the same one the trigger applies (`padroes_validos`): an
+    entry saved before validation that would never match (`*`, URL with a path)
+    does not appear as a restriction, and the screen shows "sem restrição" (no
+    restriction) when that is the case.
 
-    A rota também calculava Redis INFO, a dead-letter de resultados e as
-    execuções presas (critério antigo, running > 1 h) — nada disso tinha tela.
-    As presas de verdade são as do Dashboard, em /observability/metrics.
+    The route also computed Redis INFO, the results dead-letter and the stuck
+    runs (old criterion, running > 1 h) — none of that had a screen.
+    The truly stuck ones are those on the Dashboard, at /observability/metrics.
     """
     from app.core.utils.allowlist import padroes_validos
 
@@ -59,17 +60,17 @@ async def update_webhook_whitelist(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Define a lista de domínios permitidos para notificação webhook dos workflows.
-    Lista vazia = sem restrição (qualquer URL é aceita). Com itens, o host do
-    webhook precisa estar nela (e na allowlist do workspace, quando houver) —
-    aplicada no disparo, em `run_result_consumer._fire_notification_if_configured`.
+    Sets the list of domains allowed for workflow webhook notifications.
+    Empty list = no restriction (any URL is accepted). With items, the webhook
+    host must be in it (and in the workspace allowlist, when there is one) —
+    applied at trigger time, in `run_result_consumer._fire_notification_if_configured`.
     """
     from app.core.utils.allowlist import normalizar_dominio, separar_dominios, validar_allowlist
 
-    # Uma URL colada vira o HOST (como antes: sem esquema, caminho e porta), e o
-    # que o matcher ignoraria — `*`, `localhost` — é recusado com 400, a mesma
-    # regra da allowlist do workspace. Agora a lista é aplicada no disparo: um
-    # `*` aceito em silêncio bloquearia todos os webhooks da plataforma.
+    # A pasted URL becomes the HOST (as before: no scheme, path or port), and
+    # what the matcher would ignore — `*`, `localhost` — is rejected with 400, the same
+    # rule as the workspace allowlist. Now the list is applied at trigger time: a
+    # silently accepted `*` would block every webhook on the platform.
     try:
         cleaned = validar_allowlist([normalizar_dominio(x) for x in separar_dominios(domains)])
     except ValueError as exc:
@@ -83,15 +84,15 @@ async def update_webhook_whitelist(
 @router.get("/storage", summary="Uso de armazenamento por workspace (Drive + Artefatos)")
 async def storage_usage(db: AsyncSession = Depends(get_db)):
     """
-    Retorna o consumo de armazenamento agregado por workspace,
-    consultando workspace_files.size e artifacts.size_bytes.
+    Returns storage consumption aggregated per workspace,
+    querying workspace_files.size and artifacts.size_bytes.
 
-    Inclui indicadores de saude do tracking — sem essa visibilidade o relatorio
-    drifa silenciosamente quando algo escapa do caminho normal (NULL sizes,
-    pending stale, falha de delete deixando orfao no S3).
+    Includes tracking health indicators — without that visibility the report
+    drifts silently when something escapes the normal path (NULL sizes,
+    stale pending, a failed delete leaving an orphan in S3).
     """
-    # Drive: agrupa por workspace_id (apenas confirmados — pending fica em
-    # bucket separado abaixo).
+    # Drive: groups by workspace_id (confirmed only — pending goes in a
+    # separate bucket below).
     drive_agg = await db.execute(
         select(
             WorkspaceFile.workspace_id,
@@ -105,7 +106,7 @@ async def storage_usage(db: AsyncSession = Depends(get_db)):
     for row in drive_agg.all():
         drive_map[row.workspace_id] = {"bytes": int(row.bytes), "files": row.files}
 
-    # Artefatos: agrupa por workspace_id
+    # Artifacts: groups by workspace_id
     artifact_agg = await db.execute(
         select(
             Artifact.workspace_id,
@@ -119,10 +120,10 @@ async def storage_usage(db: AsyncSession = Depends(get_db)):
         ws_id = row.workspace_id or "__none__"
         artifact_map[ws_id] = {"bytes": int(row.bytes), "files": row.files}
 
-    # ── Indicadores de saude do tracking ─────────────────────────────────────
+    # ── Tracking health indicators ───────────────────────────────────────────
 
-    # Drive pending: presigned PUT criado mas nao confirmado. Bytes ja podem
-    # estar no MinIO sem aparecer em "confirmed".
+    # Drive pending: presigned PUT created but not confirmed. Bytes may already
+    # be in MinIO without showing up in "confirmed".
     pending_drive_row = await db.execute(
         select(
             sa_func.count(WorkspaceFile.id).label("files"),
@@ -131,19 +132,19 @@ async def storage_usage(db: AsyncSession = Depends(get_db)):
     )
     pending_drive = pending_drive_row.one()
 
-    # Artefatos com size_bytes NULL: s3.head() falhou no consumer. Contribui 0
-    # para o total mas o objeto pode existir no MinIO. Job
-    # storage_reconciliation.fix_artifact_null_sizes preenche periodicamente.
+    # Artifacts with NULL size_bytes: s3.head() failed in the consumer. Contributes 0
+    # to the total but the object may exist in MinIO. The
+    # storage_reconciliation.fix_artifact_null_sizes job fills them periodically.
     null_size_row = await db.execute(
         select(sa_func.count(Artifact.id)).where(Artifact.size_bytes.is_(None))
     )
     null_size_artifacts = int(null_size_row.scalar() or 0)
 
-    # Antigos demais para o retry da reconciliação: se o objeto existisse no
-    # MinIO, uma das dezenas de tentativas já teria preenchido o tamanho. Sobram
-    # dois casos, ambos definitivos: o upload nunca chegou ao MinIO, ou o
-    # artefato ficou no disco do executor (s3_key local, via fallback quando o
-    # executor não alcança o MinIO).
+    # Too old for the reconciliation retry: if the object existed in
+    # MinIO, one of the dozens of attempts would already have filled the size. Two
+    # cases remain, both permanent: the upload never reached MinIO, or the
+    # artifact stayed on the executor's disk (local s3_key, via fallback when the
+    # executor cannot reach MinIO).
     from app.core.storage_reconciliation import NULL_SIZE_RETRY_WINDOW_DAYS
     from app.core.utils.datetime_utils import utc_now_naive
     _cutoff = utc_now_naive() - timedelta(days=NULL_SIZE_RETRY_WINDOW_DAYS)
@@ -155,11 +156,11 @@ async def storage_usage(db: AsyncSession = Depends(get_db)):
     )
     unrecoverable_size_artifacts = int(unrecoverable_row.scalar() or 0)
 
-    # Artefatos cujo workspace foi purgado (linha inexistente) ou esta na
-    # lixeira — em ambos os casos ninguem mais os acessa, porque um workspace
-    # soft-deletado nao entra em get_user_workspace_ids. A versao anterior
-    # filtrava `workspace_id IS NULL` numa coluna NOT NULL, entao media sempre 0
-    # e nunca acusava os orfaos que apareciam na tabela como "(sem workspace)".
+    # Artifacts whose workspace was purged (row missing) or is in the
+    # trash — in both cases nobody accesses them anymore, because a soft-deleted
+    # workspace does not enter get_user_workspace_ids. The previous version
+    # filtered `workspace_id IS NULL` on a NOT NULL column, so it always measured 0
+    # and never flagged the orphans that appeared in the table as "(sem workspace)".
     orphan_ws_row = await db.execute(
         select(sa_func.count(Artifact.id))
         .outerjoin(Workspace, Workspace.id_hash == Artifact.workspace_id)
@@ -167,7 +168,7 @@ async def storage_usage(db: AsyncSession = Depends(get_db)):
     )
     orphaned_workspace_artifacts = int(orphan_ws_row.scalar() or 0)
 
-    # Enriquecer com nomes
+    # Enrich with names
     ws_result = await db.execute(select(Workspace))
     ws_by_id = {w.id_hash: w for w in ws_result.scalars().all()}
 
@@ -193,12 +194,12 @@ async def storage_usage(db: AsyncSession = Depends(get_db)):
         total_drive_files += d["files"]
         total_artifact_files += a["files"]
 
-        # Tres estados, nao dois. Com soft delete a linha continua existindo,
-        # entao `ws is None` (o teste antigo) deixava o workspace na lixeira sem
-        # marcacao — enquanto orphaned_workspace_artifacts ja o contava. O
-        # operador lia "N artefatos de workspace deletado" e nao achava a linha.
-        # O rotulo antigo ("sem workspace") tambem sugeria workspace_id NULL,
-        # que a coluna NOT NULL nem permite.
+        # Three states, not two. With soft delete the row still exists,
+        # so `ws is None` (the old test) left the workspace in the trash without
+        # a marker — while orphaned_workspace_artifacts already counted it. The
+        # operator read "N artifacts from a deleted workspace" and could not find the row.
+        # The old label ("sem workspace") also suggested a NULL workspace_id,
+        # which the NOT NULL column does not even allow.
         if ws is None:
             ws_state, ws_name = "purged", "(workspace removido)"
         elif ws.deleted_at is not None:
@@ -230,16 +231,16 @@ async def storage_usage(db: AsyncSession = Depends(get_db)):
             "artifact_files": total_artifact_files,
         },
         "tracking_health": {
-            # Pending drive: bytes possivelmente no MinIO mas nao confirmados.
-            # Reconcile/cleanup_pending_workspace_files limpa apos TTL.
+            # Pending drive: bytes possibly in MinIO but not confirmed.
+            # Reconcile/cleanup_pending_workspace_files cleans up after the TTL.
             "pending_drive_files": int(pending_drive.files or 0),
             "pending_drive_bytes": int(pending_drive.bytes or 0),
             # Artefatos sem tamanho conhecido. Reconcile/fix_artifact_null_sizes
             # tenta preencher enquanto forem recentes.
             "null_size_artifacts": null_size_artifacts,
-            # Subconjunto do anterior: antigos demais para o retry — o objeto
-            # nao existe no MinIO (upload falhou) ou ficou no disco do executor
-            # (fallback local). Nao se resolvem sozinhos.
+            # Subset of the previous one: too old for the retry — the object
+            # does not exist in MinIO (upload failed) or stayed on the executor's disk
+            # (local fallback). They do not resolve on their own.
             "unrecoverable_size_artifacts": unrecoverable_size_artifacts,
             # Artefatos cujo workspace foi deletado: inacessiveis e ocupando disco.
             "orphaned_workspace_artifacts": orphaned_workspace_artifacts,
@@ -248,7 +249,7 @@ async def storage_usage(db: AsyncSession = Depends(get_db)):
     }
 
 
-# ── Purga de armazenamento por workspace ─────────────────────────────────────
+# ── Storage purge per workspace ──────────────────────────────────────────────
 
 class PurgeStorageRequest(BaseModel):
     scope: str = Field(
@@ -270,13 +271,13 @@ async def storage_purge(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Remove objetos do MinIO e as linhas do banco. IRREVERSÍVEL.
+    """Removes objects from MinIO and the database rows. IRREVERSIBLE.
 
-    Também aceita o id de um workspace já deletado — é como se limpam os
-    órfãos que aparecem em /admin/storage como "(workspace deletado)".
+    Also accepts the id of an already deleted workspace — this is how the
+    orphans that appear in /admin/storage as "(workspace deletado)" are cleaned up.
 
-    `confirm` precisa repetir o workspace_id: o botão fica ao lado de cada
-    linha da tabela e um clique errado apagaria os dados do workspace vizinho.
+    `confirm` must repeat the workspace_id: the button sits next to each
+    table row and a misclick would erase the neighboring workspace's data.
     """
     if payload.confirm != workspace_id:
         raise HTTPException(

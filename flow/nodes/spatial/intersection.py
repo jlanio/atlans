@@ -10,25 +10,25 @@ from flow.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# ── Controle de memória do overlay ────────────────────────────────────────────
-# O gpd.overlay materializa o índice de pares candidatos INTEIRO
-# (df2.sindex.query sobre TODA a df1) antes de calcular qualquer interseção. Para
-# camadas grandes/densas isso estoura a RAM — ex.: 747M pares = ~11 GiB só no
-# array de índices (2 × 747M × 8 bytes), antes mesmo do cálculo geométrico.
+# ── Overlay memory control ────────────────────────────────────────────────────
+# gpd.overlay materializes the ENTIRE candidate-pair index
+# (df2.sindex.query over ALL of df1) before computing any intersection. For
+# large/dense layers this blows the RAM — e.g. 747M pairs = ~11 GiB just for the
+# index array (2 × 747M × 8 bytes), before the geometric computation even starts.
 #
-# Estratégia: estimar o fanout médio (candidatos por feição de A) por amostragem
-# barata do sindex de B e fatiar A em blocos dimensionados para manter os pares
-# por bloco perto de _TARGET_PAIRS_PER_CHUNK. O sindex de B é construído uma vez
-# (cached_property) e reusado em todos os blocos. O resultado é idêntico ao
-# overlay direto — particionar linhas de A não altera os pares A∩B.
+# Strategy: estimate the average fanout (candidates per feature of A) by cheap
+# sampling of B's sindex and slice A into chunks sized to keep the pairs per
+# chunk close to _TARGET_PAIRS_PER_CHUNK. B's sindex is built once
+# (cached_property) and reused across all chunks. The result is identical to the
+# direct overlay — partitioning A's rows does not change the A∩B pairs.
 _TARGET_PAIRS_PER_CHUNK = max(1, int(os.getenv("INTERSECTION_TARGET_PAIRS", str(20_000_000))))
 _MAX_CHUNK_ROWS = max(1, int(os.getenv("INTERSECTION_MAX_CHUNK_ROWS", "50000")))
 _FANOUT_SAMPLE = max(1, int(os.getenv("INTERSECTION_FANOUT_SAMPLE", "256")))
 
 
 def _clean_layer(gdf: gpd.GeoDataFrame, name: str) -> gpd.GeoDataFrame:
-    """Remove geometrias nulas/vazias (não intersectam nada e quebram o sindex)
-    e avisa sobre geometrias inválidas (bbox degenerada infla o fanout)."""
+    """Removes null/empty geometries (they intersect nothing and break the sindex)
+    and warns about invalid geometries (a degenerate bbox inflates the fanout)."""
     geom = gdf.geometry
     bad = geom.isna() | geom.is_empty
     n_bad = int(bad.sum())
@@ -49,10 +49,10 @@ def _clean_layer(gdf: gpd.GeoDataFrame, name: str) -> gpd.GeoDataFrame:
 
 
 def _estimate_avg_fanout(srcA: gpd.GeoDataFrame, srcB: gpd.GeoDataFrame) -> float:
-    """Estima candidatos (bbox-overlap) por feição de A amostrando o sindex de B.
+    """Estimates candidates (bbox overlap) per feature of A by sampling B's sindex.
 
-    Barato: O(_FANOUT_SAMPLE) consultas. Também aquece srcB.sindex, reusado pelo
-    overlay. Amostra por passo determinístico (sem aleatoriedade)."""
+    Cheap: O(_FANOUT_SAMPLE) queries. Also warms up srcB.sindex, reused by the
+    overlay. Samples by deterministic step (no randomness)."""
     n = len(srcA)
     step = max(1, n // _FANOUT_SAMPLE)
     geoms = srcA.geometry
@@ -65,8 +65,8 @@ def _estimate_avg_fanout(srcA: gpd.GeoDataFrame, srcB: gpd.GeoDataFrame) -> floa
 
 
 def _overlay_intersection_bounded(srcA: gpd.GeoDataFrame, srcB: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """gpd.overlay(how='intersection') com pico de memória limitado via blocos
-    adaptativos dimensionados pelo fanout estimado."""
+    """gpd.overlay(how='intersection') with bounded peak memory via adaptive
+    chunks sized by the estimated fanout."""
     n = len(srcA)
     avg_fanout = _estimate_avg_fanout(srcA, srcB)
     est_total = int(avg_fanout * n)
@@ -103,7 +103,7 @@ def _overlay_intersection_bounded(srcA: gpd.GeoDataFrame, srcB: gpd.GeoDataFrame
 @register_node
 class IntersectionNode(BaseNode):
     """
-    Executa a interseção entre duas camadas (GeoDataFrames) e retorna as feições resultantes.
+    Computes the intersection between two layers (GeoDataFrames) and returns the resulting features.
     """
 
     @classmethod
@@ -125,19 +125,19 @@ class IntersectionNode(BaseNode):
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, gpd.GeoDataFrame]:
         self.validate()
-        # Obtém as camadas via helper da classe base (handles nomeados) e recusa
-        # CRS diferentes.
+        # Gets the layers via the base class helper (named handles) and rejects
+        # differing CRSs.
         srcA, srcB = self.get_pair(inputs, operacao="operação de interseção")
 
-        # Higiene: remove nulas/vazias e avisa sobre inválidas (podem inflar a memória).
+        # Hygiene: removes null/empty ones and warns about invalid ones (they can inflate memory).
         srcA = _clean_layer(srcA, "A")
         srcB = _clean_layer(srcB, "B")
         if srcA.empty or srcB.empty:
             logger.warning("Interseção: uma das camadas ficou sem geometrias válidas — resultado vazio.")
             return {"output": gpd.GeoDataFrame(columns=['geometry'], geometry='geometry', crs=srcA.crs)}
 
-        # Tipos geométricos suportados — conferidos DEPOIS da higiene, sobre o que
-        # de fato vai para o overlay (por isso não é o `tipos_suportados` do get_pair).
+        # Supported geometry types — checked AFTER hygiene, on what actually
+        # goes to the overlay (that is why it is not get_pair's `tipos_suportados`).
         reject_unsupported_geom_types(srcA, srcB, operation="operação de interseção")
 
         logger.info(f"Camada A: {len(srcA)} feições, Camada B: {len(srcB)} feições")
@@ -145,8 +145,8 @@ class IntersectionNode(BaseNode):
         try:
             result = await asyncio.to_thread(_overlay_intersection_bounded, srcA, srcB)
         except MemoryError as e:
-            # Mesmo com blocos adaptativos, UMA feição de A que cruza um número
-            # enorme de feições de B pode estourar. Mensagem acionável, não crash cru.
+            # Even with adaptive chunks, ONE feature of A that crosses a huge number
+            # of features of B can blow up. Actionable message, not a raw crash.
             logger.error(f"Interseção sem memória: {e}")
             raise RuntimeError(
                 "Interseção excedeu a memória disponível: o cruzamento gera um número enorme de "
@@ -160,7 +160,7 @@ class IntersectionNode(BaseNode):
             logger.error(f"Erro na interseção: {e}")
             raise RuntimeError(f"Erro na operação de interseção: {e}")
 
-        # Consolidação de colunas duplicadas col_1 / col_2
+        # Consolidation of duplicated col_1 / col_2 columns
         to_merge = {}
         for col in result.columns:
             if col.endswith('_1'):

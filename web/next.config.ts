@@ -1,33 +1,34 @@
 import type { NextConfig } from "next";
 
-// CSP do frontend, BLOQUEANTE (`Content-Security-Policy`). Rodou antes em
-// Report-Only, relatando cada violação em POST /api/csp-report (o log do
-// container web); o que ela barraria de legítimo era o Monaco vindo do
-// jsdelivr — o editor de código agora carrega de `public/monaco/vs`, copiado do
-// pacote no build (scripts/copiar-monaco.mjs). Continua relatando: cada bloqueio
-// chega ao mesmo coletor, com `disposicao: "enforce"`.
+// Frontend CSP, BLOCKING (`Content-Security-Policy`). It ran earlier in
+// Report-Only, reporting each violation to POST /api/csp-report (the web
+// container's log); the only legitimate thing it would block was Monaco coming
+// from jsdelivr — the code editor now loads from `public/monaco/vs`, copied from
+// the package at build time (scripts/copiar-monaco.mjs). It keeps reporting:
+// each block reaches the same collector, with `disposicao: "enforce"`.
 //
-// 'unsafe-inline' em script/style é o que o Next.js exige sem nonce (styled-jsx
-// e os chunks do App Router). `https:` e `wss:` em connect-src/img-src porque os
-// tiles (o OSM e o provedor de satélite da instalação) e as URLs pré-assinadas do S3 (MINIO_EXTERNAL_ENDPOINT)
-// são configuração de deploy, e este arquivo é avaliado no BUILD da imagem, sem
-// esse env — por isso também voltar para Report-Only é um build novo, não uma
-// variável.
+// 'unsafe-inline' in script/style is what Next.js requires without a nonce
+// (styled-jsx and the App Router chunks). `https:` and `wss:` in
+// connect-src/img-src because the tiles (OSM and the installation's satellite
+// provider) and the S3 presigned URLs (MINIO_EXTERNAL_ENDPOINT) are deploy
+// configuration, and this file is evaluated at image BUILD time, without that
+// env — which is also why going back to Report-Only is a new build, not a
+// variable.
 //
-// Só no `next dev`: 'unsafe-eval' (HMR) e `http:`/`ws:` fora da origem — lá o
-// WebSocket vai direto à API em outra porta (NEXT_PUBLIC_API_PORT, ver
-// utils/env.ts) e o MinIO é http://localhost:9000. Em produção tudo isso passa
-// pela mesma origem ou por HTTPS, e numa página HTTPS o navegador barraria
-// `http:` como conteúdo misto de qualquer forma.
+// Only in `next dev`: 'unsafe-eval' (HMR) and `http:`/`ws:` outside the origin —
+// there the WebSocket goes straight to the API on another port
+// (NEXT_PUBLIC_API_PORT, see utils/env.ts) and MinIO is http://localhost:9000.
+// In production all of that goes through the same origin or over HTTPS, and on
+// an HTTPS page the browser would block `http:` as mixed content anyway.
 //
-// Scripts de terceiros que a BORDA injeta no HTML, fora do nosso build: o
-// beacon do Cloudflare Web Analytics (`static.cloudflareinsights.com/
-// beacon.min.js/<versão>`), inserido em toda resposta text/html da zona
-// enquanto a injeção automática estiver ligada no painel da Cloudflare. Só o
-// host, sem caminho: a URL real leva a versão depois de `beacon.min.js`, e um
-// caminho sem barra final na CSP casa exato. O POST dele
-// (`cloudflareinsights.com/cdn-cgi/rum`) já cabe no `https:` do connect-src.
-// Sem Cloudflare na frente (instalação fechada) a entrada é inócua.
+// Third-party scripts that the EDGE injects into the HTML, outside our build:
+// the Cloudflare Web Analytics beacon (`static.cloudflareinsights.com/
+// beacon.min.js/<versão>`), inserted into every text/html response of the zone
+// while automatic injection is enabled in the Cloudflare dashboard. Only the
+// host, no path: the real URL carries the version after `beacon.min.js`, and a
+// path without a trailing slash in the CSP matches exactly. Its POST
+// (`cloudflareinsights.com/cdn-cgi/rum`) already fits connect-src's `https:`.
+// Without Cloudflare in front (closed installation) the entry is harmless.
 const scriptsDaBorda = "https://static.cloudflareinsights.com";
 
 const emDev = process.env.NODE_ENV === "development";
@@ -47,25 +48,25 @@ const csp = [
   "base-uri 'self'",
   "form-action 'self'",
   "report-uri /api/csp-report",
-  // Com `report-to` presente o Chrome ignora o `report-uri` — e ele só entrega
-  // pelo Reporting API em HTTPS. No `next dev` (HTTP) nada chegaria ao log;
-  // sem a diretiva, o `report-uri` manda cada relato na hora.
+  // With `report-to` present Chrome ignores `report-uri` — and it only delivers
+  // through the Reporting API over HTTPS. In `next dev` (HTTP) nothing would
+  // reach the log; without the directive, `report-uri` sends each report at once.
   ...(emDev ? [] : ["report-to csp"]),
 ].join("; ");
 
-// Aqui, e não no middleware: o matcher do middleware exclui a superfície
-// pública (/login, /register, /share, /api/auth) e, nas rotas que cobre,
-// devolve o redirect de quem não tem sessão antes de qualquer header — um
-// scan externo via "nenhum header configurado". `headers()` vale para toda
-// resposta do servidor. Sem X-XSS-Protection de propósito: o auditor saiu
-// dos navegadores e o modo `block` criava vazamentos entre origens (XS-Leaks).
+// Here, and not in the middleware: the middleware's matcher excludes the
+// public surface (/login, /register, /share, /api/auth) and, on the routes it
+// covers, returns the redirect for users without a session before any header —
+// an external scan saw "no header configured". `headers()` applies to every
+// server response. No X-XSS-Protection on purpose: the auditor is gone from
+// browsers and the `block` mode created cross-origin leaks (XS-Leaks).
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // `geolocation=(self)`: a Home localiza a pessoa no globo (o GeolocateControl
-  // do MapLibre). Só a própria origem — nenhum terceiro embutido ganha o acesso.
-  // Câmera e microfone seguem negados para todos.
+  // `geolocation=(self)`: the Home locates the person on the globe (MapLibre's
+  // GeolocateControl). Only the origin itself — no embedded third party gets
+  // access. Camera and microphone remain denied for everyone.
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" },
   { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
   { key: "Content-Security-Policy", value: csp },
@@ -73,10 +74,11 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  // `standalone` faz o `next build` gerar `.next/standalone` com o servidor e
-  // só os módulos que ele de fato importa (file tracing). É o que a imagem de
-  // produção copia — em vez do `.next` inteiro, que carrega 1,4 GB de cache de
-  // build, e do `node_modules` completo instalado uma segunda vez no runner.
+  // `standalone` makes `next build` generate `.next/standalone` with the server
+  // and only the modules it actually imports (file tracing). That is what the
+  // production image copies — instead of the whole `.next`, which carries
+  // 1.4 GB of build cache, and the full `node_modules` installed a second time
+  // in the runner.
   output: "standalone",
   transpilePackages: ["@monaco-editor/react"],
   async headers() {

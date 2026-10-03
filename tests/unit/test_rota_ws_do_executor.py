@@ -1,11 +1,11 @@
 # tests/unit/test_rota_ws_do_executor.py
-"""A rota WebSocket do executor chega ao handler de verdade.
+"""The executor's WebSocket route reaches the real handler.
 
-Um helper inserido entre `@router.websocket(...)` e `agent_websocket` roubou a
-rota: o FastAPI passou a validar o handshake contra a assinatura do helper
-(`corpo` obrigatório), fechava toda conexão com 1008 antes do accept e o
-executor — que trata status HTTP como não-terminal de propósito — reconectava
-para sempre. Nenhum teste passava pela rota; este passa.
+A helper inserted between `@router.websocket(...)` and `agent_websocket` stole
+the route: FastAPI started validating the handshake against the helper's
+signature (required `corpo`), closed every connection with 1008 before the accept
+and the executor — which treats HTTP statuses as non-terminal on purpose —
+reconnected forever. No test went through the route; this one does.
 """
 import asyncio
 import time
@@ -31,8 +31,8 @@ def test_a_rota_aponta_para_o_handler_do_executor():
 
 
 def test_handshake_chega_a_autenticacao_do_handler(monkeypatch):
-    """Sem o cert do Traefik o handler aceita e fecha com 44xx (o deny
-    autoritativo). Com a rota roubada, fechava com 1008 antes de chegar aqui."""
+    """Without the Traefik cert the handler accepts and closes with 44xx (the
+    authoritative deny). With the stolen route, it closed with 1008 before getting here."""
     from app.api import dependencies
 
     chamou = []
@@ -60,16 +60,16 @@ def test_handshake_chega_a_autenticacao_do_handler(monkeypatch):
 
     assert chamou == ["ex-1"]
     assert fechou.value.code == 4401
-    fim.assert_not_awaited()                     # recusado não é sessão: nada de "visto há"
-    # O close cria a saída (fechando) do socket; o deny não tem o `finally` do
-    # handler, então a tira do mapa ele mesmo — ela segura o ws, e o
-    # WeakKeyDictionary sozinho nunca a soltaria.
+    fim.assert_not_awaited()                     # rejected is not a session: no "visto há" (seen ago)
+    # The close creates the socket's (closing) outbox; the deny does not have the
+    # handler's `finally`, so it removes it from the map itself — it holds the ws,
+    # and the WeakKeyDictionary alone would never release it.
     assert len(ec._saidas) == saidas_antes
 
 
 def test_nenhuma_rota_do_app_aponta_para_funcao_privada():
-    """A classe inteira do bug: um helper `_x` escrito entre o decorator e o
-    handler vira o endpoint, e nada quebra até alguém chamar a rota."""
+    """The whole class of the bug: a helper `_x` written between the decorator and
+    the handler becomes the endpoint, and nothing breaks until someone calls the route."""
     from app.main import app
 
     privadas = [
@@ -81,7 +81,7 @@ def test_nenhuma_rota_do_app_aponta_para_funcao_privada():
 
 
 class _Registro:
-    """O mínimo do registry que o handler usa — sem Redis."""
+    """The minimum of the registry that the handler uses — without Redis."""
 
     def __init__(self):
         self.conexoes = {}
@@ -112,9 +112,9 @@ class _Registro:
 
 
 def test_sessao_do_executor_passa_ack_e_inventario_pela_drenadora(monkeypatch):
-    """Uma sessão inteira pelo handler de verdade: handshake, ack, inventário e
-    desconexão. O ack e o inventário (novos neste protocolo) chegam aos seus
-    processadores pela drenadora da conexão."""
+    """A whole session through the real handler: handshake, ack, inventory and
+    disconnect. The ack and the inventory (new in this protocol) reach their
+    processors through the connection's drainer."""
     from app.api import dependencies
     from app.api.routers.executor_ws import inbox as IB
 
@@ -124,7 +124,7 @@ def test_sessao_do_executor_passa_ack_e_inventario_pela_drenadora(monkeypatch):
     async def _autentica(**_k):
         return SimpleNamespace(executor_version="1.0", max_concurrent_jobs=4, max_queue_size=10)
 
-    # O handshake grava a versão no banco (ver os testes do fim do arquivo).
+    # The handshake writes the version to the database (see the tests at the end of the file).
     _, banco = _banco_do_executor()
 
     @asynccontextmanager
@@ -145,8 +145,8 @@ def test_sessao_do_executor_passa_ack_e_inventario_pela_drenadora(monkeypatch):
     monkeypatch.setattr("app.core.artifact_cleanup.purgar_pendentes_do_executor", AsyncMock(return_value=0))
     monkeypatch.setattr(IB, "_record_job_ack", _ack)
     monkeypatch.setattr(IB, "_reconciliar_inventario", _inventario)
-    # Enquanto o teardown drena a fila (até 10 s), a conexão segue registrada e
-    # o listener do relay vivo: a saída do socket já tem de estar fechando.
+    # While the teardown drains the queue (up to 10 s), the connection stays
+    # registered and the relay listener alive: the socket outbox must already be closing.
     fechando_na_drenagem = []
     drenagem = R._encerrar_drenagem
 
@@ -166,16 +166,16 @@ def test_sessao_do_executor_passa_ack_e_inventario_pela_drenadora(monkeypatch):
             ws.send_json({"type": "inventario", "ativos": ["j1"], "resultados": [], "truncado": False})
             ws.send_json({"type": "heartbeat"})
             _esperar(lambda: len(processados) == 2)
-            # O executor desconecta. Espera o teardown do handler AQUI dentro: ao
-            # sair do contexto o TestClient cancela a task do app na hora, e o
-            # teardown podia ser cortado no meio (o teste falhava sob carga).
+            # The executor disconnects. Wait for the handler's teardown IN HERE: on
+            # leaving the context the TestClient cancels the app's task right away,
+            # and the teardown could be cut in the middle (the test failed under load).
             ws.close()
             _esperar(lambda: "unregister" in registro.eventos)
 
     assert processados == [("ack", "ex-1", "j1"), ("inventario", "ex-1", ("j1",))]
     assert registro.eventos[0] == "register" and registro.eventos[-1] == "unregister"
     assert fechando_na_drenagem == [True]
-    assert registro.ws not in ec._saidas          # e sai do mapa no fim do handler
+    assert registro.ws not in ec._saidas          # and leaves the map at the end of the handler
 
 
 def _esperar(condicao, prazo_s: float = 5.0) -> None:
@@ -185,14 +185,14 @@ def _esperar(condicao, prazo_s: float = 5.0) -> None:
         time.sleep(0.01)
 
 
-# ── O fim da sessão fica gravado ─────────────────────────────────────────────
-# O `last_seen_at` parava no handshake: a tela mostrava um executor que passou
-# três dias no ar e caiu há dez minutos como "visto há 3 dias".
+# ── The end of the session is recorded ───────────────────────────────────────
+# `last_seen_at` stopped at the handshake: the screen showed an executor that
+# was up for three days and dropped ten minutes ago as "visto há 3 dias" (seen 3 days ago).
 
 def _app_com_sessao(monkeypatch, visto, banco=None, fim=None):
-    """O handler de verdade com registry e banco falsos: `visto` faz o papel de
-    `update_agent_last_seen` (início da sessão), `fim` o de
-    `registrar_fim_da_sessao` e `banco` é o que a sessão entrega."""
+    """The real handler with fake registry and database: `visto` plays the role of
+    `update_agent_last_seen` (session start), `fim` that of
+    `registrar_fim_da_sessao` and `banco` is what the session delivers."""
     from app.api import dependencies
 
     registro = _Registro()
@@ -228,27 +228,27 @@ def test_fim_da_sessao_grava_o_ultimo_contato_depois_do_unregister(monkeypatch):
 
     _, banco = _banco_do_executor()
     app, registro, orfaos = _app_com_sessao(monkeypatch, _visto, banco=banco, fim=_fim)
-    registro.eventos = eventos      # uma linha do tempo só
+    registro.eventos = eventos      # a single timeline
     erros = []
     monkeypatch.setattr(R.logger, "error", lambda msg, *args: erros.append(msg % args))
 
     with TestClient(app) as cliente:
         with cliente.websocket_connect("/ws/executores/ex-1") as ws:
             ws.send_json({"type": "handshake", "executor_version": "2.0", "protocol_version": "1.0"})
-            _esperar(lambda: "vivo" in eventos)       # o handshake foi processado
+            _esperar(lambda: "vivo" in eventos)       # the handshake was processed
             conn = registro.conexoes["ex-1"]
             ultimo_contato = conn.last_seen_at
-            conn.last_seen_at = ultimo_contato - timedelta(minutes=2)   # o sinal de vida é anterior ao teardown
+            conn.last_seen_at = ultimo_contato - timedelta(minutes=2)   # the sign of life precedes the teardown
             ws.close()
             _esperar(lambda: eventos and eventos[-1][0] == "fim")
 
-    # Início da sessão, e o fim depois de a presença sair. A sessão terminou
-    # pelo close do executor, não por um erro no meio.
+    # Session start, and the end after the presence is removed. The session ended
+    # through the executor's close, not through an error midway.
     assert eventos[0] == "register" and eventos[1] == ("inicio", "ex-1")
     assert eventos[-2] == "unregister"
     _, executor_id, visto_em = eventos[-1]
     assert executor_id == "ex-1"
-    # O último contato da sessão, na coluna em UTC sem fuso — não o instante do teardown.
+    # The session's last contact, in the UTC column without time zone — not the teardown instant.
     assert visto_em == (ultimo_contato - timedelta(minutes=2)).replace(tzinfo=None)
     assert erros == []
     orfaos.assert_called_once_with("ex-1")
@@ -256,8 +256,8 @@ def test_fim_da_sessao_grava_o_ultimo_contato_depois_do_unregister(monkeypatch):
 
 @pytest.mark.parametrize("falha", ["erro", "demora"])
 def test_fim_da_sessao_sem_banco_nao_segura_o_teardown(monkeypatch, falha):
-    """Banco fora: o carimbo desiste (com prazo) e a verificação de órfãos já
-    foi agendada antes dele."""
+    """Database down: the stamp gives up (with a deadline) and the orphan check was
+    already scheduled before it."""
     async def _fim(db, executor_id, visto_em):
         if falha == "erro":
             raise RuntimeError("banco fora")
@@ -277,9 +277,10 @@ def test_fim_da_sessao_sem_banco_nao_segura_o_teardown(monkeypatch, falha):
     orfaos.assert_called_once_with("ex-1")
 
 
-# ── Versão e system_info vão para o banco no handshake ───────────────────────
-# A tela lê os dois do banco. A versão ficava só na conexão (memória do worker
-# do WebSocket), e a coluna "versão" mostrava "—" para todo executor.
+# ── Version and system_info go to the database on the handshake ──────────────
+# The screen reads both from the database. The version stayed only in the
+# connection (memory of the WebSocket worker), and the "versão" column showed "—"
+# for every executor.
 
 def _banco_do_executor():
     ag = SimpleNamespace(system_info=None, executor_version=None)
@@ -305,8 +306,8 @@ def test_handshake_grava_versao_e_system_info_no_banco(monkeypatch):
 
 
 def test_versao_invalida_nao_vai_ao_banco_nem_derruba_a_conexao(monkeypatch):
-    """Maior que a coluna, ela estouraria o UPDATE no meio do loop de
-    recebimento — e o erro fechava a conexão."""
+    """Larger than the column, it would blow up the UPDATE in the middle of the
+    receive loop — and the error closed the connection."""
     ag, banco = _banco_do_executor()
     app, registro, _ = _app_com_sessao(monkeypatch, AsyncMock(), banco=banco)
 
@@ -323,8 +324,8 @@ def test_versao_invalida_nao_vai_ao_banco_nem_derruba_a_conexao(monkeypatch):
 
 
 def test_versao_invalida_nao_impede_o_system_info(monkeypatch):
-    """A versão ruim é descartada e o banco fica com a última boa; o resto do
-    handshake grava normalmente."""
+    """The bad version is discarded and the database keeps the last good one; the
+    rest of the handshake is written normally."""
     ag, banco = _banco_do_executor()
     ag.executor_version = "2.3.0"
     app, registro, _ = _app_com_sessao(monkeypatch, AsyncMock(), banco=banco)
@@ -341,9 +342,9 @@ def test_versao_invalida_nao_impede_o_system_info(monkeypatch):
 
 
 def test_register_nao_recebe_a_versao_da_sessao_anterior(monkeypatch):
-    """O banco agora guarda a versão: passada ao register, ela ia para o log de
-    conexão e para o status das conexões até o handshake — a da sessão
-    anterior, que pode ser de antes de uma atualização."""
+    """The database now stores the version: passed to register, it went to the
+    connection log and to the connections status until the handshake — the one
+    from the previous session, which may predate an update."""
     from app.api import dependencies
 
     app, registro, _ = _app_com_sessao(monkeypatch, AsyncMock(), banco=_banco_do_executor()[1])
@@ -365,8 +366,8 @@ def test_register_nao_recebe_a_versao_da_sessao_anterior(monkeypatch):
 
 
 def test_so_o_primeiro_handshake_grava_no_banco(monkeypatch):
-    """Um handshake repetido era um SELECT + UPDATE a cada mensagem, sem limite,
-    e podia trocar o system_info só na memória deste worker."""
+    """A repeated handshake was a SELECT + UPDATE on every message, unbounded,
+    and could change the system_info only in this worker's memory."""
     ag, banco = _banco_do_executor()
     app, registro, _ = _app_com_sessao(monkeypatch, AsyncMock(), banco=banco)
 
@@ -388,12 +389,12 @@ def test_so_o_primeiro_handshake_grava_no_banco(monkeypatch):
     assert (conn.executor_version, conn.system_info) == ("2.3.1", {"hostname": "maq-1"})
 
 
-# ── Revogado com a sessão aberta ─────────────────────────────────────────────
+# ── Revoked with the session open ────────────────────────────────────────────
 
 def test_sessao_de_executor_revogado_cai_com_4403(monkeypatch):
-    """A vigia no handler de verdade: revogado com a sessão aberta — e o aviso
-    do relay perdido —, o executor recebe o close 4403 (terminal para ele) e o
-    teardown roda. Antes a sessão seguia viva até ele reconectar."""
+    """The watcher in the real handler: revoked with the session open — and the
+    relay notice lost —, the executor receives close 4403 (terminal for it) and
+    the teardown runs. Before, the session stayed alive until it reconnected."""
     app, registro, orfaos = _app_com_sessao(monkeypatch, AsyncMock(), banco=_banco_do_executor()[1])
     monkeypatch.setattr(R, "_REVOGACAO_INTERVALO", 0.01)
     conferencia = AsyncMock(side_effect=[None, "Cert revogado."])
@@ -404,10 +405,10 @@ def test_sessao_de_executor_revogado_cai_com_4403(monkeypatch):
             ws.send_json({"type": "handshake", "executor_version": "2.0", "protocol_version": "1.0"})
             with pytest.raises(WebSocketDisconnect) as fechou:
                 ws.receive_text()
-            # O executor responde ao close. No TestClient é isso que entrega a
-            # desconexão ao receive pendente do app (no uvicorn o close do
-            # servidor já o encerra); sair do contexto antes cancelaria a task
-            # do app no meio do teardown.
+            # The executor answers the close. In the TestClient that is what delivers the
+            # disconnect to the app's pending receive (in uvicorn the server's close
+            # already ends it); leaving the context earlier would cancel the app's
+            # task in the middle of the teardown.
             ws.close()
             _esperar(lambda: "unregister" in registro.eventos)
 

@@ -17,34 +17,34 @@ class WorkspaceFile(Base):
                            default=lambda: str(uuid4()))
 
     workspace_id  = Column(String(36), nullable=False, index=True)
-    # NULL quando `content_location='executor'`: nao ha objeto no storage.
-    s3_key        = Column(String(1024), nullable=True)            # key no MinIO
-    original_name = Column(String(512), nullable=False)            # nome original do usuario
+    # NULL when `content_location='executor'`: there is no object in storage.
+    s3_key        = Column(String(1024), nullable=True)            # key in MinIO
+    original_name = Column(String(512), nullable=False)            # user's original name
     extension     = Column(String(20),  nullable=False)
     mime_type     = Column(String(120), nullable=True)
     size          = Column(BigInteger,  nullable=True)             # bytes (preenchido apos confirm)
-    content_md5   = Column(String(32), nullable=True, index=True)  # MD5 do conteudo
+    content_md5   = Column(String(32), nullable=True, index=True)  # MD5 of the content
     uploaded_by   = Column(String(36), nullable=True)              # user.id_hash ou executor_id
     status        = Column(String(16), nullable=False, server_default="confirmed")  # pending | confirmed
 
     created_at    = Column(DateTime, server_default=func.now(), nullable=False, index=True)
     updated_at    = Column(DateTime, nullable=True, onupdate=func.now())
-    # Ultima vez que o CONTEUDO foi escrito. Distinta de `updated_at`, que
-    # qualquer update da linha (renomear, por exemplo) dispara — e que NAO
-    # dispara quando uma sobrescrita nao muda nenhum campo. Gravada
-    # explicitamente no confirm_upload; e por ela que a listagem ordena.
+    # Last time the CONTENT was written. Distinct from `updated_at`, which any
+    # update of the row (renaming, for example) triggers — and which is NOT
+    # triggered when an overwrite changes no field. Written explicitly in
+    # confirm_upload; it is what the listing sorts by.
     content_written_at = Column(DateTime, nullable=True)
 
-    # ── Localidade do conteudo (LGPD) ─────────────────────────────────────────
-    # 'minio'    — objeto no storage; s3_key preenchida (o caso de sempre).
-    # 'executor' — GeoSync em modo catalogo: o arquivo esta na pasta sincronizada
-    #              do executor e NUNCA foi enviado. O servidor guarda apenas o
-    #              catalogo (nome, tipo, tamanho, CRS, bbox, contagem).
+    # ── Content locality (LGPD) ───────────────────────────────────────────────
+    # 'minio'    — object in storage; s3_key filled in (the usual case).
+    # 'executor' — GeoSync in catalog mode: the file is in the executor's synced
+    #              folder and was NEVER uploaded. The server keeps only the
+    #              catalog (name, type, size, CRS, bbox, count).
     #
-    # Nao ha coluna de caminho aqui, diferente de `artifacts.local_path`, e isso e
-    # deliberado: o executor reencontra o arquivo pelo PROPRIO manifesto de sync
-    # (`.atlans-sync.json`, que mapeia remote_id_hash -> dataset). Nenhum caminho
-    # de sistema de arquivos trafega pela rede nem fica guardado no servidor.
+    # There is no path column here, unlike `artifacts.local_path`, and that is
+    # deliberate: the executor finds the file again through its OWN sync manifest
+    # (`.atlans-sync.json`, which maps remote_id_hash -> dataset). No file system
+    # path travels over the network or is stored on the server.
     content_location  = Column(String(16), nullable=False, server_default=text("'minio'"))
-    content_executor_id = Column(String(36), nullable=True)   # qual executor tem os bytes
+    content_executor_id = Column(String(36), nullable=True)   # which executor has the bytes
     spatial_metadata  = Column(JSON, nullable=True)           # CRS, bbox, feature_count, columns

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-// O serviço registra interceptors no import, então o mock do axios precisa
-// tê-los; o resto é o mínimo que os helpers get/post/del usam.
+// The service registers interceptors on import, so the axios mock needs to
+// have them; the rest is the minimum the get/post/del helpers use.
 const { get, post, del } = vi.hoisted(() => ({
   get: vi.fn(), post: vi.fn(), del: vi.fn(),
 }))
@@ -14,7 +14,7 @@ vi.mock("axios", () => ({
 
 import { GisFlowService } from "@/service/GisFlowService"
 
-/** Promise que o teste resolve na mão, para segurar a requisição "em voo". */
+/** A promise the test resolves by hand, to hold the request "in flight". */
 function pendente<T>() {
   let resolver!: (v: T) => void
   const promise = new Promise<T>(res => { resolver = res })
@@ -33,13 +33,13 @@ describe("dedup de GETs em voo", () => {
     p.resolver({ data: [] })
     await Promise.all([a, b])
 
-    // É para isto que a dedup existe: uma requisição só quando dois pontos da
-    // tela pedem a mesma lista no mesmo instante.
+    // This is what dedup exists for: a single request when two spots on the
+    // screen ask for the same list at the same instant.
     expect(get).toHaveBeenCalledTimes(1)
   })
 
   it("não serve a um leitor pós-escrita a resposta que já estava em voo", async () => {
-    // Tick de auto-refresh já em voo quando o admin confirma a exclusão.
+    // An auto-refresh tick already in flight when the admin confirms the deletion.
     const tick = pendente<{ data: unknown[] }>()
     get.mockReturnValueOnce(tick.promise)
     const emVoo = GisFlowService.getAgents()
@@ -47,9 +47,10 @@ describe("dedup de GETs em voo", () => {
     del.mockResolvedValueOnce({ data: {} })
     await GisFlowService.deleteAgent("exec-1")
 
-    // O refetch disparado no sucesso do DELETE precisa ir à rede: reaproveitar
-    // a promise anterior devolvia uma lista calculada ANTES da exclusão, e o
-    // card excluído reaparecia por até 15s depois do toast "Executor excluído".
+    // The refetch fired on the DELETE's success needs to go to the network:
+    // reusing the previous promise returned a list computed BEFORE the deletion,
+    // and the deleted card reappeared for up to 15s after the "Executor excluído"
+    // (executor deleted) toast.
     const depois = pendente<{ data: unknown[] }>()
     get.mockReturnValueOnce(depois.promise)
     const releitura = GisFlowService.getAgents()
@@ -86,11 +87,11 @@ describe("dedup de GETs em voo", () => {
 })
 
 describe("mutações que burlavam a época de escrita", () => {
-  // `unpinNodeOutput` e `removeAgentUser` montavam o `axios.delete` à mão em
-  // vez de passar por `del()`. O efeito era sutil e exatamente o que a época
-  // existe para impedir: como não incrementavam `epocaEscrita`, um GET já em
-  // voo continuava elegível para coalescência, e o refetch do sucesso podia
-  // receber uma resposta calculada ANTES da exclusão.
+  // `unpinNodeOutput` and `removeAgentUser` built `axios.delete` by hand
+  // instead of going through `del()`. The effect was subtle and exactly what
+  // the epoch exists to prevent: since they didn't increment `epocaEscrita`, a
+  // GET already in flight stayed eligible for coalescing, and the success
+  // refetch could receive a response computed BEFORE the deletion.
 
   it("unpinNodeOutput invalida GETs em voo", async () => {
     const tick = pendente<{ data: unknown[] }>()
@@ -109,8 +110,8 @@ describe("mutações que burlavam a época de escrita", () => {
   })
 
   it("unpinNodeOutput continua devolvendo o payload tipado", async () => {
-    // A troca por `del()` cru descartaria o corpo. Nenhum chamador o usa hoje,
-    // mas o tipo é público e mudá-lo em silêncio é uma quebra de contrato.
+    // Swapping for a raw `del()` would discard the body. No caller uses it
+    // today, but the type is public and changing it silently is a contract break.
     del.mockResolvedValueOnce({ data: { unpinned: "n1", total_pinned: 2 } })
     const res = await GisFlowService.unpinNodeOutput("wf-1", "n1")
     expect(res.data).toEqual({ unpinned: "n1", total_pinned: 2 })

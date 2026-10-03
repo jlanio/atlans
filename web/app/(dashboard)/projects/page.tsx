@@ -1,7 +1,7 @@
 import ProjectActions from '../../components/projects';
 
-// Sem provider: a lista vive no hook de dados de Projetos (`use-projetos-dados`),
-// e os diálogos recebem o workflow por prop.
+// No provider: the list lives in the Projects data hook (`use-projetos-dados`),
+// and the dialogs receive the workflow by prop.
 export default function WorkflowsPage() {
   return <ProjectActions />;
 }

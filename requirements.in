@@ -1,16 +1,16 @@
-# requirements.in — as dependencias DIRETAS da API. Edite AQUI.
+# requirements.in — the API's DIRECT dependencies. Edit HERE.
 #
-# O requirements.txt ao lado e GERADO daqui (pip-compile): traz tambem as
-# transitivas, todas travadas, e o hash de cada arquivo. E ele que a imagem, o
-# CI e o pip-audit instalam, com --require-hashes: nada entra no build sem ter
-# passado por um PR, e um arquivo trocado no PyPI nao instala. Depois de mexer
-# numa linha daqui, regere os locks (Linux x86_64, Python 3.12):
+# The requirements.txt next to it is GENERATED from this (pip-compile): it also has
+# the transitive ones, all pinned, and the hash of each file. That is what the image,
+# CI and pip-audit install, with --require-hashes: nothing enters the build without
+# having gone through a PR, and a file swapped on PyPI won't install. After touching
+# a line here, regenerate the locks (Linux x86_64, Python 3.12):
 #     python scripts/travar_python.py
-# O script so aceita, para o que o resolvedor escolhe sozinho, versao publicada
-# ha 14 dias ou mais — a mesma quarentena do Dependabot (.github/dependabot.yml).
+# For what the resolver picks on its own, the script only accepts versions published
+# 14 days ago or more — the same quarantine as Dependabot (.github/dependabot.yml).
 #
-# Estilo: == (exato) ao inves de >= (loose). Builds reproduziveis +
-# updates revisados em PR, em vez de patches transitivos surpresa.
+# Style: == (exact) instead of >= (loose). Reproducible builds +
+# updates reviewed in a PR, instead of surprise transitive patches.
 
 uvicorn[standard]==0.53.0
 fastapi==0.141.1
@@ -24,40 +24,40 @@ python-dotenv==1.2.3
 httpx==0.28.1
 apscheduler==3.11.3
 geopandas==1.1.4
-# numpy, pandas e pyproj chegam pelo geopandas. Pinados na troca para o Python
-# 3.12: no 3.10 o resolvedor parava em numpy 2.2.x, pandas 2.3.x e pyproj 3.7.x,
-# porque as linhas seguintes exigem 3.11+. Soltos, o 3.12 traria numpy 2.5 e
-# pyproj 3.8 aqui, e pandas 3.0 nos dois locks
-# — versao maior, com copy-on-write e o dtype de string novo mudando o
-# comportamento dos nos em silencio. Subir cada um e PR proprio, com a suite
-# verde. Mesmas versoes em executor/requirements-full.in.
+# numpy, pandas and pyproj come in through geopandas. Pinned on the switch to Python
+# 3.12: on 3.10 the resolver stopped at numpy 2.2.x, pandas 2.3.x and pyproj 3.7.x,
+# because the following lines require 3.11+. Unpinned, 3.12 would bring numpy 2.5 and
+# pyproj 3.8 here, and pandas 3.0 in both locks
+# — a major version, with copy-on-write and the new string dtype silently changing
+# the nodes' behavior. Bumping each one is its own PR, with the suite
+# green. Same versions in executor/requirements-full.in.
 numpy==2.5.3
 pandas==2.3.3
 pyproj==3.8.0
-# Usado por flow/executor/spill.py, pin.py e pelos nos de GeoParquet (o
-# to_parquet/read_parquet do pandas e do geopandas). Chegava de carona no
-# streamlit, que saiu; mesma versao em executor/requirements-full.in.
+# Used by flow/executor/spill.py, pin.py and by the GeoParquet nodes (pandas'
+# and geopandas' to_parquet/read_parquet). It used to come along with
+# streamlit, which was removed; same version in executor/requirements-full.in.
 pyarrow==25.0.1
-# Carta imagem (flow/nodes/outputs/carta_imagem.py): renderiza PNG/JPG/PDF no
-# executor. A linha 3.10.x era a ultima que rodava no Python 3.10 (o runtime
-# ate a troca para o 3.12); subir de linha e PR proprio. Traz pillow,
-# contourpy, cycler, fonttools, kiwisolver e pyparsing. Mesma versao em
+# Image map (flow/nodes/outputs/carta_imagem.py): renders PNG/JPG/PDF on the
+# executor. The 3.10.x line was the last one that ran on Python 3.10 (the runtime
+# until the switch to 3.12); moving to a newer line is its own PR. Brings pillow,
+# contourpy, cycler, fonttools, kiwisolver and pyparsing. Same version in
 # executor/requirements-full.in.
 matplotlib==3.11.2
 redis==8.1.0
 croniter==6.2.4
 cachetools==7.2.0
 slowapi==0.1.10
-# Backend de contagem do slowapi. Pinado porque `RATE_LIMIT_STORAGE_URI`
-# (app/core/rate_limiter.py) passa a construir o storage Redis dele.
+# slowapi's counting backend. Pinned because `RATE_LIMIT_STORAGE_URI`
+# (app/core/rate_limiter.py) now builds its Redis storage.
 limits==5.8.0
 psutil==7.2.2
-# Painel ao vivo do executor no terminal (executor/dashboard/).
+# The executor's live dashboard in the terminal (executor/dashboard/).
 rich==15.0.0
 
-# GeoSync do executor. Importados DIRETO por executor/sync/{ignore,watcher}.py e
-# exercitados pela suite, entao precisam estar aqui e nao so no
-# executor/requirements-full.in: o CI instala apenas o lock da API.
+# The executor's GeoSync. Imported DIRECTLY by executor/sync/{ignore,watcher}.py and
+# exercised by the suite, so they must be here and not only in
+# executor/requirements-full.in: CI installs only the API lock.
 pathspec==1.1.1
 watchdog==6.0.0
 cryptography==50.0.1
@@ -67,10 +67,10 @@ geoalchemy2==0.20.0
 
 # Auth JWT
 PyJWT==2.14.0
-# O hash de senha chama o bcrypt direto (app/core/utils/jwt_utils.py, no
-# esquema bcrypt_sha256 que o passlib definia). A pre-chave tem 44 bytes, entao
-# as versoes 4 e 5 do bcrypt (que recusam senha acima de 72 bytes) servem; o
-# tests/unit/test_hash_de_senha.py confere o hash de verdade a cada versao.
+# Password hashing calls bcrypt directly (app/core/utils/jwt_utils.py, in the
+# bcrypt_sha256 scheme passlib used to define). The pre-key is 44 bytes, so
+# bcrypt versions 4 and 5 (which reject passwords over 72 bytes) work; the
+# tests/unit/test_hash_de_senha.py checks the real hash on each version.
 bcrypt==5.0.0
 pydantic[email]==2.13.5
 
@@ -88,28 +88,28 @@ python-dateutil==2.9.0.post0
 boto3==1.43.98
 alembic==1.20.0
 
-# Email — pinar quando instalado na imagem prod (atualmente >=2.0.0 no ambiente local)
+# Email — pin when installed in the prod image (currently >=2.0.0 in the local environment)
 resend==2.47.0
 
-# Sanitizacao de HTML (corpo de e-mail vindo do no SendEmail, via executor).
-# nh3 e o binding do ammonia (Rust): allowlist de verdade, com parser de HTML.
-# Substituiu um filtro de regex de blacklist que era contornavel por
-# reconstrucao — "javjavascript:ascript:" voltava a ser "javascript:" depois
-# da unica passada de remocao. Ver tests/unit/test_email_html_sanitizer.py.
+# HTML sanitization (email body coming from the SendEmail node, via the executor).
+# nh3 is the binding for ammonia (Rust): a real allowlist, with an HTML parser.
+# Replaced a blacklist regex filter that could be bypassed by
+# reconstruction — "javjavascript:ascript:" became "javascript:" again after
+# the single removal pass. See tests/unit/test_email_html_sanitizer.py.
 nh3==0.3.7
 
-# MCP — SDK oficial do servidor (docs/specs/mcp-server.md). O pin e verificado
-# contra o pacote real por tests/unit/test_mcp_sdk_contrato.py (identificadores,
-# Host/Origin do transporte). As transitivas abaixo sao as que o pip resolve
-# (iguais no 3.10 e no 3.12) e nao existiam no arquivo antes.
+# MCP — the official server SDK (docs/specs/mcp-server.md). The pin is checked
+# against the real package by tests/unit/test_mcp_sdk_contrato.py (identifiers,
+# the transport's Host/Origin). The transitive ones below are what pip resolves
+# (the same on 3.10 and 3.12) and did not exist in the file before.
 mcp==2.2.0
 mcp-types==2.2.0
 httpx2==2.12.0
 httpcore2==2.12.0
 sse-starlette==3.4.11
 
-# Copiloto — o cliente do modelo (app/services/openrouter.py) fala com o
-# OpenRouter por HTTP puro sobre o `httpx` ja pinado acima: nenhum SDK de
-# fornecedor de modelo entra na imagem.
+# Copilot — the model client (app/services/openrouter.py) talks to
+# OpenRouter over plain HTTP on the `httpx` already pinned above: no model
+# vendor SDK goes into the image.
 opentelemetry-api==1.44.0
 typing-inspection==0.4.4

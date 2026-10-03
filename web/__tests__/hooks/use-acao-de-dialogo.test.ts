@@ -8,7 +8,7 @@ import { useAcaoDeDialogo, type OpcoesDaAcao } from "@/app/hooks/useAcaoDeDialog
 
 beforeEach(() => vi.clearAllMocks())
 
-/** Uma ação que só termina quando o teste manda. */
+/** An action that only finishes when the test says so. */
 function lenta<T>() {
   let resolver!: (valor: T) => void
   const fn = vi.fn(() => new Promise<T>(res => { resolver = res }))

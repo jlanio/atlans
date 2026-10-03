@@ -1,35 +1,39 @@
 # app/mcp/tools/fontes.py
 """
-Fontes: o catálogo de fontes pré-mapeadas — o que o assistente consulta ANTES
-de prospectar qualquer dado externo.
+Sources: the catalog of pre-mapped sources — what the assistant consults BEFORE
+prospecting any external data.
 
-O problema que este domínio resolve tem número: sem catálogo, o modelo chuta
-`url`/`typeName` de um WFS, a validação passa (ela não toca a rede), e o erro
-só aparece em `run_workflow` — cada chute custa três voltas do laço e até três
-minutos de relógio. Com o catálogo, "terras indígenas" vira `search_sources` →
-`describe_source` → colar o `node_snippet`, sem rede e em menos de um segundo.
+The problem this domain solves has a number: without a catalog, the model
+guesses a WFS's `url`/`typeName`, validation passes (it does not touch the
+network), and the error only shows up in `run_workflow` — each guess costs three
+turns of the loop and up to three minutes of wall clock. With the catalog,
+"terras indígenas" (Indigenous lands) becomes `search_sources` →
+`describe_source` → pasting the `node_snippet`, with no network and in under a
+second.
 
-Quatro decisões moldam o módulo:
+Four decisions shape the module:
 
-- **Catálogo primeiro, rede depois.** `search_sources` e `describe_source` são
-  leitura pura da tabela. Só quando o catálogo não tem a fonte é que
-  `probe_source` sonda a URL — e ela fala com a internet (`open_world=True`
-  na guarda, balde `probe`) e atualiza o estado de uma fonte já catalogada:
-  não é read-only, como `validate_workflow` não é. A ordem está no guia
-  (`sources`) e nos roteiros; a tool não a impõe, mas `probe_source` avisa
-  (`catalog_hint`) quando o endpoint já está catalogado.
-- **Sondagem livre, registro sem clique — por decisão do dono.**
-  `register_source` grava no acervo do workspace (papel `editor`, a mesma
-  régua do Drive) e nasce em `ESCRITAS_SEM_CLIQUE` na Home e em
-  `ESCREVEM_MAS_PASSAM` no editor: registrar é barato e reversível, e pedir
-  clique a cada fonte nova devolveria o custo que o catálogo veio tirar.
-- **O que o modelo cola é o que o nó declara.** `node_snippet` traz só as
-  propriedades que o `WFSNode` conhece hoje (`fontes_service.trecho_do_no`);
-  `version` fica no catálogo até o nó a declarar.
-- **Texto de gente desce em `untrusted_data`.** Título, descrição, dicas e
-  tags são escritos por pessoas (no Vault ou em `register_source`); URL,
-  typeName, colunas e CRS ficam no topo, higienizados, como as colunas do
-  Drive em `list_drive_files` — o modelo precisa copiá-los.
+- **Catalog first, network later.** `search_sources` and `describe_source` are
+  pure reads of the table. Only when the catalog does not have the source does
+  `probe_source` probe the URL — and it talks to the internet
+  (`open_world=True` in the guard, `probe` bucket) and updates the state of an
+  already cataloged source: it is not read-only, just as `validate_workflow`
+  is not. The order is in the guide (`sources`) and in the playbooks; the tool
+  does not enforce it, but `probe_source` warns (`catalog_hint`) when the
+  endpoint is already cataloged.
+- **Free probing, registration without a click — by the owner's decision.**
+  `register_source` writes to the workspace's collection (`editor` role, the
+  same yardstick as Drive) and is born in `ESCRITAS_SEM_CLIQUE` on Home and in
+  `ESCREVEM_MAS_PASSAM` in the editor: registering is cheap and reversible,
+  and asking for a click for every new source would bring back the cost the
+  catalog came to remove.
+- **What the model pastes is what the node declares.** `node_snippet` carries
+  only the properties `WFSNode` knows today (`fontes_service.trecho_do_no`);
+  `version` stays in the catalog until the node declares it.
+- **Human-written text goes down in `untrusted_data`.** Title, description,
+  hints and tags are written by people (in the Vault or in `register_source`);
+  URL, typeName, columns and CRS stay at the top, sanitized, like the Drive
+  columns in `list_drive_files` — the model needs to copy them.
 """
 from __future__ import annotations
 
@@ -53,7 +57,7 @@ from app.mcp.tools.base import anotacoes, ferramenta
 from app.services import fontes_service
 from app.services.fontes_vault import CANDIDATOS_A_SORTBY
 
-# Tetos de orçamento de contexto — os mesmos motivos das outras listagens.
+# Context-budget ceilings — the same reasons as the other listings.
 LIMITE_PADRAO = 20
 LIMITE_MAXIMO = 50
 MAX_COLUNAS = 50
@@ -65,12 +69,12 @@ _MENSAGEM_PAPEL_ESCRITA = (
 
 
 async def _exigir_editor_para_atualizar(db, escopo, ws) -> None:
-    """Exige papel de editor para a sondagem ESCREVER no catálogo.
+    """Requires the editor role for the probe to WRITE to the catalog.
 
-    Fonte de workspace: editor naquele workspace. Fonte de plataforma (ws=None,
-    global, sem um workspace único para checar): editor em ao menos um workspace
-    do alcance da chamada — a mesma régua da escrita, sem deixar um viewer mutar
-    o catálogo por sondagem.
+    Workspace source: editor in that workspace. Platform source (ws=None,
+    global, with no single workspace to check): editor in at least one
+    workspace within the call's reach — the same yardstick as writing, without
+    letting a viewer mutate the catalog by probing.
     """
     if ws is not None:
         papel = await get_workspace_member_role(db, ws, escopo.user_id)
@@ -80,7 +84,7 @@ async def _exigir_editor_para_atualizar(db, escopo, ws) -> None:
         papel = await get_workspace_member_role(db, w, escopo.user_id)
         if _has_min_workspace_role(papel, ROLE_EDITOR):
             return
-    exigir_papel(None, ROLE_EDITOR, _MENSAGEM_PAPEL_ESCRITA)  # nenhum: 403
+    exigir_papel(None, ROLE_EDITOR, _MENSAGEM_PAPEL_ESCRITA)  # none: 403
 
 
 # ── Formas ────────────────────────────────────────────────────────────────────
@@ -91,7 +95,7 @@ def _escopo_de_fonte(fonte) -> str:
 
 
 def _item_leve(fonte) -> dict:
-    """O que basta para escolher: id, estado, prioridade, instituição, camada."""
+    """What is enough to choose: id, state, priority, institution, layer."""
     return envelope(
         {
             "id": fonte.id_hash,
@@ -123,7 +127,7 @@ def _host(url: str | None) -> str | None:
 
 
 def _esquema_resumido(bruto: Any) -> dict | None:
-    """CRS, extensão, geometria, contagem e as primeiras colunas — nunca a lista inteira."""
+    """CRS, extent, geometry, count and the first columns — never the whole list."""
     if not isinstance(bruto, dict):
         return None
     colunas = bruto.get("columns")
@@ -145,7 +149,7 @@ def _esquema_resumido(bruto: Any) -> dict | None:
 
 
 def _ficha(fonte, **extras: Any) -> dict:
-    """A ficha completa: o trecho do nó, o esquema, o estado — e o texto de gente à parte."""
+    """The full record: the node snippet, the schema, the state — and the human-written text set apart."""
     return envelope(
         {
             "id": fonte.id_hash,
@@ -188,8 +192,8 @@ def _erro_de_sondagem(exc: fontes_service.SondagemError):
 
 
 async def _fontes_do_endpoint(db, url: str, workspace_ids) -> int:
-    # Conta direto por URL: `buscar` não filtra por URL (só pagina), então não
-    # vale a pena — cada uso desta função é uma consulta só, não três.
+    # Count directly by URL: `buscar` does not filter by URL (it only pages), so
+    # it is not worth it — each use of this function is a single query, not three.
     from sqlalchemy import func, select
 
     from app.models.fonte_de_dados import FonteDeDados
@@ -212,7 +216,7 @@ def _sort_by(esquema: dict | None) -> str | None:
     return None
 
 
-# ── Leitura (sem rede) ────────────────────────────────────────────────────────
+# ── Reading (no network) ──────────────────────────────────────────────────────
 
 
 @ferramenta
@@ -224,19 +228,19 @@ async def search_sources(
     institution: Optional[str] = None,
     limit: int = LIMITE_PADRAO,
 ) -> dict:
-    """Busca no catálogo de fontes pré-mapeadas — SEM tocar a rede.
+    """Searches the catalog of pre-mapped sources — WITHOUT touching the network.
 
-    Chame ANTES de preencher `url`/`typeName` de um nó de dado externo. Procure
-    pelo TEMA em 2–3 palavras ("terras indígenas", "focos de calor",
-    "hidrografia"), sem lugar nem data: a busca casa cada palavra (e os
-    sinônimos dela) com instituição, título, camada, descrição, temas e nomes
-    de coluna. Sem resultado, tente outra grafia antes de pedir a URL a quem
-    está usando ou sondar com `probe_source`.
+    Call it BEFORE filling in the `url`/`typeName` of an external-data node.
+    Search by TOPIC in 2–3 words ("terras indígenas", "focos de calor",
+    "hidrografia"), with no place or date: the search matches each word (and
+    its synonyms) against institution, title, layer, description, themes and
+    column names. With no result, try another spelling before asking the user
+    for the URL or probing with `probe_source`.
 
-    Os itens vêm leves; a ficha com o trecho pronto para colar vem de
-    `describe_source(id)`. `state` diz se a fonte respondeu na última
-    verificação (`ok`, `falhando`, `nao_verificada`); `priority` 1 é a
-    preferida entre parecidas.
+    Items come back light; the record with the snippet ready to paste comes
+    from `describe_source(id)`. `state` says whether the source responded at
+    the last check (`ok`, `falhando`, `nao_verificada`); `priority` 1 is the
+    preferred one among similar ones.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
@@ -271,13 +275,13 @@ async def search_sources(
 
 @ferramenta
 async def describe_source(ctx: Context, source_id: str) -> dict:
-    """A ficha de uma fonte: o nó pronto para colar (`node_snippet`), o esquema
-    (CRS, extensão, geometria, colunas) e o estado da última verificação.
+    """A source's record: the node ready to paste (`node_snippet`), the schema
+    (CRS, extent, geometry, columns) and the state at the last check.
 
-    Cole `node_snippet.properties` no nó `WFS` da definição como estão — a URL
-    já vem normalizada como o nó a usa, e `sortBy` (quando existe) é o que
-    permite paginar a camada. `schema.columns` são os nomes que um
-    `AttributeFilter` ou uma expressão podem referenciar.
+    Paste `node_snippet.properties` into the definition's `WFS` node as they
+    are — the URL already comes normalized the way the node uses it, and
+    `sortBy` (when present) is what allows paging the layer. `schema.columns`
+    are the names an `AttributeFilter` or an expression can reference.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
@@ -293,25 +297,24 @@ async def describe_source(ctx: Context, source_id: str) -> dict:
         return _ficha(fonte)
 
 
-# ── Sondagem (a única leitura que fala com a internet) ────────────────────────
+# ── Probing (the only read that talks to the internet) ────────────────────────
 
 
 @ferramenta
 async def probe_source(
     ctx: Context, url: str, type_name: Optional[str] = None, version: str = "2.0.0"
 ) -> dict:
-    """Sonda um WFS que NÃO está no catálogo: lista as camadas (GetCapabilities)
-    e, com `type_name`, o esquema da camada (DescribeFeatureType). Nenhuma
-    feição é baixada e nenhuma fonte é criada; se a camada já estiver no
-    catálogo, a sondagem atualiza o estado e o esquema dela.
+    """Probes a WFS that is NOT in the catalog: lists the layers (GetCapabilities)
+    and, with `type_name`, the layer's schema (DescribeFeatureType). No feature
+    is downloaded and no source is created; if the layer is already in the
+    catalog, the probe updates its state and schema.
 
-    Use DEPOIS de `search_sources` voltar vazio. Se o endpoint já estiver
-    catalogado, a resposta traz `catalog_hint` — prefira o catálogo. Para não
-    sondar a mesma fonte duas vezes, guarde-a com `register_source`.
+    Use it AFTER `search_sources` comes back empty. If the endpoint is already
+    cataloged, the response carries `catalog_hint` — prefer the catalog. To
+    avoid probing the same source twice, save it with `register_source`.
 
-    `version` é a do WFS (2.0.0 por padrão; 1.0.0/1.1.0 para servidores
-    antigos). O servidor sondado precisa ser público: endereços privados são
-    recusados.
+    `version` is the WFS one (2.0.0 by default; 1.0.0/1.1.0 for old servers).
+    The probed server must be public: private addresses are refused.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:write")
@@ -328,20 +331,21 @@ async def probe_source(
         ja_catalogadas = await _fontes_do_endpoint(db, endereco, escopo.workspace_ids)
         no_catalogo = None
         if sondagem.camada is not None:
-            # Se esta camada já está no catálogo ao alcance, a sondagem a atualiza:
-            # é o mesmo trabalho que o laço de verificação faria, de graça.
+            # If this layer is already in the catalog within reach, the probe updates
+            # it: it is the same work the check loop would do, for free.
             for ws in (*sorted(escopo.workspace_ids), None):
                 chave = fontes_service.chave_da_fonte(ws, fontes_service.TIPO_WFS, endereco, sondagem.camada.name)
                 fonte = await fontes_service.obter_por_chave(db, chave)
                 if fonte is not None and fonte.deleted_at is None:
-                    # Atualizar estado/esquema/verificada_em e ESCRITA no catalogo:
-                    # exige papel de editor, como register_source. A guarda de
-                    # probe_source declara 'editor', mas a guarda nao aplica papel
-                    # — quem conhece o workspace da chamada e a tool (ver
-                    # app/mcp/guardas.py). O escopo workflows:write sozinho nao
-                    # basta. Fonte de workspace: editor naquele workspace. Fonte
-                    # de plataforma (ws=None, global, sem um workspace unico para
-                    # checar): editor em ao menos um workspace do alcance.
+                    # Updating state/schema/verificada_em IS a WRITE to the catalog:
+                    # it requires the editor role, like register_source. The
+                    # probe_source guard declares 'editor', but the guard does not
+                    # enforce roles — whoever knows the call's workspace and the
+                    # tool does (see app/mcp/guardas.py). The workflows:write scope
+                    # alone is not enough. Workspace source: editor in that
+                    # workspace. Platform source (ws=None, global, with no single
+                    # workspace to check): editor in at least one workspace within
+                    # reach.
                     await _exigir_editor_para_atualizar(db, escopo, ws)
                     fonte.estado, fonte.ultimo_erro = "ok", None
                     fonte.esquema = fontes_service.fundir_esquema(fonte.esquema, sondagem.esquema)
@@ -406,15 +410,15 @@ async def register_source(
     tags: Optional[list[str]] = None,
     hints: Optional[str] = None,
 ) -> dict:
-    """Sonda uma camada WFS e a guarda no catálogo do workspace, para o próximo
-    pedido (seu ou de qualquer membro) encontrá-la por `search_sources`.
+    """Probes a WFS layer and saves it in the workspace's catalog, so the next
+    request (yours or any member's) finds it through `search_sources`.
 
-    Registra o que a sondagem confirmou: a camada precisa existir no
-    GetCapabilities, e o esquema vem do DescribeFeatureType. `title`,
-    `description`, `tags` e `hints` são o que ajuda a busca e o uso — `hints`
-    é a dica que `describe_source` devolve a quem for usar a fonte ("filtre
-    por `estado` em maiúsculas"). Idempotente: a mesma URL+camada atualiza a
-    linha em vez de duplicar.
+    It registers what the probe confirmed: the layer must exist in
+    GetCapabilities, and the schema comes from DescribeFeatureType. `title`,
+    `description`, `tags` and `hints` are what helps search and use — `hints`
+    is the tip that `describe_source` returns to whoever uses the source
+    ("filtre por `estado` em maiúsculas"). Idempotent: the same URL+layer
+    updates the row instead of duplicating it.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:write")
@@ -464,7 +468,7 @@ async def register_source(
 
 
 def registrar(server) -> None:
-    """Registra as tools deste domínio."""
+    """Registers this domain's tools."""
     server.tool(
         name="search_sources",
         title="Buscar fontes catalogadas",

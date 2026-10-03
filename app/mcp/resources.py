@@ -1,40 +1,42 @@
 # app/mcp/resources.py
 """
-Resources do servidor (`atlans://…`) — leitura cacheável, sem efeito colateral.
+Server resources (`atlans://…`) — cacheable reads, no side effects.
 
-Cada resource é **alias de uma tool de leitura**, e alias aqui é literal: o
-handler chama a mesma função que a tool chama, e devolve o que ela devolveu.
-Não há uma segunda consulta, uma segunda redação nem um segundo formato de
-saída para manter em sincronia — a única diferença é a embalagem (texto ou
-JSON) e o fato de o cliente poder anexar um resource ao contexto e reusá-lo,
-em vez de gastar uma chamada.
+Each resource is an **alias of a read tool**, and alias here is literal: the
+handler calls the same function the tool calls, and returns what it returned.
+There is no second query, second redaction or second output format to keep in
+sync — the only difference is the packaging (text or JSON) and the fact that
+the client can attach a resource to the context and reuse it, instead of
+spending a call.
 
-Três regras valem para todo handler daqui:
+Three rules hold for every handler here:
 
-1. **Mesma guarda das tools.** O escopo é conferido dentro da função da tool,
-   que é quem chama `escopo_da_chamada` + `exigir_escopo`. Um resource não é
-   porta dos fundos: sem escopo, sem leitura. O que este módulo acrescenta é a
-   tradução do erro e, nos handlers que leem dados de workspace, a MESMA guarda
-   cronometrada de `call_tool` (`guarda_da_chamada`) — sem ela a leitura por URI
-   seria o único caminho do servidor que não deixa linha de auditoria, e é
-   justamente o caminho que o cliente repete sem pensar.
+1. **Same guard as the tools.** Scope is checked inside the tool's function,
+   which is what calls `escopo_da_chamada` + `exigir_escopo`. A resource is not
+   a back door: no scope, no read. What this module adds is the translation of
+   the error and, in the handlers that read workspace data, the SAME timed
+   guard as `call_tool` (`guarda_da_chamada`) — without it, reading by URI
+   would be the only path in the server that leaves no audit line, and it is
+   precisely the path the client repeats without thinking.
 
-   A cota fica isenta nos resources, e isso é decisão, não esquecimento: um
-   resource é alias de uma tool que já tem balde, cobrar de novo o mesmo
-   trabalho não mede nada. O que segura o laço é o balde geral do token.
+   Quota is waived for resources, and that is a decision, not an oversight: a
+   resource is an alias of a tool that already has a bucket, and charging again
+   for the same work measures nothing. What holds back the loop is the token's
+   general bucket.
 
-   Catálogo e guia não passam pela guarda: são texto fixo da instalação, iguais
-   para todo token, e não há dado de ninguém a registrar — a conferência de
-   escopo deles continua dentro da tool.
+   Catalog and guide do not go through the guard: they are fixed text of the
+   installation, the same for every token, and there is nobody's data to
+   record — their scope check still happens inside the tool.
 
-2. **Erro anticipado vira `ResourceError`.** O SDK só preserva a mensagem de um
-   `ResourceError` (ou `ResourceNotFoundError`); um `ToolError` escapando de um
-   resource conta como crash, e o cliente receberia um texto genérico com a
-   URI. Como o formato de erro do Atlans é o JSON `{code, message, hint}`, a
-   tradução só troca a classe, mantendo o corpo.
+2. **An anticipated error becomes `ResourceError`.** The SDK only preserves the
+   message of a `ResourceError` (or `ResourceNotFoundError`); a `ToolError`
+   escaping from a resource counts as a crash, and the client would receive a
+   generic text with the URI. Since the Atlans error format is the JSON
+   `{code, message, hint}`, the translation only swaps the class, keeping the
+   body.
 
-3. **Nada decifrado.** Vem de graça por (1): as tools carregam o workflow com
-   `decifrar=False` e redigem a definition antes de entregar.
+3. **Nothing decrypted.** Comes for free from (1): the tools load the workflow
+   with `decifrar=False` and redact the definition before handing it over.
 """
 from __future__ import annotations
 
@@ -52,10 +54,10 @@ from app.mcp.tools.catalogo import describe_node, get_authoring_guide, search_no
 from app.mcp.tools.execucao import get_run
 from app.mcp.tools.workflows import get_workflow, get_workflow_contract, list_workflows
 
-# Sem `type`, o catálogo sai só como mapa de grupos. O índice inteiro passa de
-# 10 KB e a ficha completa dos 63 nós, de 70 KB: entregar isso como um blob
-# único num `resources/read` gasta o orçamento de contexto de quem lê antes de
-# a conversa começar. A dica diz como chegar ao que interessa.
+# Without `type`, the catalog comes out only as a map of groups. The whole index
+# exceeds 10 KB and the full sheet of the 63 nodes, 70 KB: delivering that as a
+# single blob in a `resources/read` spends the reader's context budget before
+# the conversation begins. The hint says how to get to what matters.
 DICA_CATALOGO = (
     "Leia atlans://catalog/nodes?type=<tipo> para o índice de um grupo, ou "
     "atlans://catalog/nodes/<Nome> para a ficha completa de um nó."
@@ -63,21 +65,23 @@ DICA_CATALOGO = (
 
 
 def _json(dados: Any) -> str:
-    """JSON legível por humano e por máquina — sem escapar acento."""
+    """JSON readable by humans and machines — without escaping accents."""
     return json.dumps(dados, ensure_ascii=False, default=str)
 
 
 def _como_erro_de_resource(exc: Exception) -> ResourceError:
-    """Traduz uma exceção para o erro de resource, sem perder o `code`.
+    """Translates an exception into the resource error, without losing the `code`.
 
-    `to_tool_error` continua sendo a única tabela de tradução do MCP (um
-    `ToolError` já formatado passa por ela intacto); aqui só se troca a classe,
-    porque o SDK trata as duas famílias por caminhos diferentes.
+    `to_tool_error` remains the MCP's only translation table (an
+    already-formatted `ToolError` passes through it intact); here only the
+    class is swapped, because the SDK handles the two families through
+    different paths.
 
-    Só `Exception`, nunca `BaseException`: um `CancelledError` (o cliente
-    desistiu, o servidor está encerrando) não é erro do recurso, e convertê-lo
-    em `ResourceError` engoliria o cancelamento — a task seguiria viva e a
-    resposta sairia como se o recurso tivesse falhado.
+    Only `Exception`, never `BaseException`: a `CancelledError` (the client
+    gave up, the server is shutting down) is not a resource error, and
+    converting it into `ResourceError` would swallow the cancellation — the
+    task would stay alive and the response would go out as if the resource
+    had failed.
     """
     convertido = to_tool_error(exc)
     corpo = str(convertido)
@@ -87,10 +91,11 @@ def _como_erro_de_resource(exc: Exception) -> ResourceError:
 
 
 def registrar_resources(server) -> None:
-    """Registra os resources na instância recebida.
+    """Registers the resources on the given instance.
 
-    Função, e não decoradores no topo do módulo, porque `create_mcp_server` é
-    uma fábrica: cada instância precisa dos seus próprios registros.
+    A function, and not decorators at module top level, because
+    `create_mcp_server` is a factory: each instance needs its own
+    registrations.
     """
 
     @server.resource(
@@ -105,10 +110,10 @@ def registrar_resources(server) -> None:
         mime_type="text/markdown",
     )
     async def guia_de_autoria(topic: str, ctx: Context) -> str:
-        """Alias de `get_authoring_guide`: um arquivo, dois caminhos de entrega.
+        """Alias of `get_authoring_guide`: one file, two delivery paths.
 
-        Devolve o markdown puro, e não o envelope da tool: o resource declara
-        `text/markdown`, então o corpo é o documento.
+        Returns the plain markdown, not the tool's envelope: the resource
+        declares `text/markdown`, so the body is the document.
         """
         try:
             return (await get_authoring_guide(ctx, topic=topic))["markdown"]
@@ -126,17 +131,17 @@ def registrar_resources(server) -> None:
         mime_type="application/json",
     )
     async def catalogo_de_nos(ctx: Context, type: str | None = None) -> str:
-        """O catálogo em duas camadas — nunca os 63 nós inteiros num blob só.
+        """The catalog in two layers — never all 63 nodes in a single blob.
 
-        O parâmetro se chama `type` porque é o nome da variável na URI, e o SDK
-        casa os dois pelo nome.
+        The parameter is called `type` because that is the variable's name in
+        the URI, and the SDK matches the two by name.
         """
         try:
             resultado = await search_nodes(ctx, type=type)
             if not type:
-                # Sem filtro, só o mapa de grupos: `items` é montado pela tool e
-                # descartado aqui de propósito. Passar por ela mesmo assim é o
-                # que garante que a guarda de escopo roda nos DOIS caminhos.
+                # Without a filter, only the map of groups: `items` is built by the
+                # tool and discarded here on purpose. Going through it anyway
+                # is what guarantees the scope guard runs on BOTH paths.
                 return _json({
                     "types": resultado["types"],
                     "total": resultado["total"],
@@ -158,10 +163,11 @@ def registrar_resources(server) -> None:
         mime_type="application/json",
     )
     async def no_do_catalogo(name: str, ctx: Context) -> str:
-        """Um nó inteiro — o mesmo `describe_node(brief=false)`.
+        """A whole node — the same as `describe_node(brief=false)`.
 
-        Nome desconhecido vira 404, e um nó desabilitado na instalação responde
-        igual a um inexistente: a tool já trata os dois como `not_found`.
+        An unknown name becomes 404, and a node disabled in the installation
+        answers the same as a nonexistent one: the tool already treats both as
+        `not_found`.
         """
         try:
             return _json(await describe_node(ctx, name=name, brief=False))
@@ -176,7 +182,7 @@ def registrar_resources(server) -> None:
         mime_type="application/json",
     )
     async def workflows_do_workspace(id: str, ctx: Context) -> str:
-        """Listagem leve — sem definition, sem params_schema, sem segredo."""
+        """Lightweight listing — no definition, no params_schema, no secret."""
         try:
             escopo = escopo_da_chamada(ctx)
             async with guarda_da_chamada(
@@ -194,10 +200,10 @@ def registrar_resources(server) -> None:
         mime_type="application/json",
     )
     async def workflow(id: str, ctx: Context) -> str:
-        """O fluxo como referência: dá para ler a fiação, nunca a credencial.
+        """The workflow as a reference: you can read the wiring, never the credential.
 
-        `include_definition=True` porque é disso que vive um resource — quem só
-        quer o cabeçalho chama a tool com o default.
+        `include_definition=True` because that is what a resource lives on —
+        whoever only wants the header calls the tool with the default.
         """
         try:
             escopo = escopo_da_chamada(ctx)
@@ -218,7 +224,7 @@ def registrar_resources(server) -> None:
         mime_type="application/json",
     )
     async def contrato_do_workflow(id: str, ctx: Context) -> str:
-        """O que o fluxo aceita e devolve quando é chamado por outro."""
+        """What the workflow accepts and returns when called by another one."""
         try:
             escopo = escopo_da_chamada(ctx)
             async with guarda_da_chamada(
@@ -239,16 +245,16 @@ def registrar_resources(server) -> None:
         mime_type="application/json",
     )
     async def execucao(id: str, ctx: Context) -> str:
-        """A execução inteira — e `full`, não `summary`, de propósito.
+        """The whole run — and `full`, not `summary`, on purpose.
 
-        Quem anexa uma execução ao contexto está investigando uma falha, e é
-        justamente `output_keys`/`output_columns` que mostram onde a cadeia
-        parou de produzir o que o nó seguinte esperava. A tool continua
-        oferecendo o resumo a quem só quer o status.
+        Whoever attaches a run to the context is investigating a failure, and
+        it is precisely `output_keys`/`output_columns` that show where the
+        chain stopped producing what the next node expected. The tool still
+        offers the summary to whoever only wants the status.
 
-        A mensagem de erro do run e a de cada nó descem higienizadas para
-        `untrusted_data` (é o que `resumo_run` faz): são os campos mais
-        prováveis de carregar segredo ou frase de comando de uma execução.
+        The run's error message and each node's go down sanitized into
+        `untrusted_data` (that is what `resumo_run` does): they are the fields
+        most likely to carry a secret or a command sentence from a run.
         """
         try:
             escopo = escopo_da_chamada(ctx)

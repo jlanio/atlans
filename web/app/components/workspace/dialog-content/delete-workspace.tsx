@@ -6,11 +6,11 @@ import { useAcaoDeDialogo } from "@/app/hooks/useAcaoDeDialogo"
 import { useWorkspace, Workspace } from "@/context/WorkspaceContext"
 
 /**
- * Exclusão de workspace, com confirmação por digitação do nome.
+ * Workspace deletion, with confirmation by typing the name.
  *
- * A digitação é reservada a esta ação: ao contrário de remover um membro ou sair
- * (ambos desfazíveis por um novo convite), aqui os arquivos do Drive somem para
- * valer e só um administrador da plataforma pode restaurar o resto.
+ * Typing is reserved for this action: unlike removing a member or leaving
+ * (both undoable with a new invitation), here the Drive files are gone for
+ * good and only a platform administrator can restore the rest.
  */
 export function DeleteWorkspaceDialog({
   workspace, onDeleted,
@@ -38,9 +38,9 @@ export function DeleteWorkspaceDialog({
       loadingLabel="Removendo…"
       onConfirm={acao.executar}
     >
-      {/* O que acontece de fato: sem isto o usuário assume que só o
-          workspace some, e descobre depois que os crons pararam e que os
-          arquivos do Drive não voltam. */}
+      {/* What actually happens: without this the user assumes only the
+          workspace goes away, and finds out later that the crons stopped and
+          that the Drive files do not come back. */}
       <div className="space-y-1.5 rounded-md border border-amber-500/25 bg-amber-500/5 p-3 text-xs">
         <div className="flex items-start gap-2">
           <TbAlertTriangle className="mt-0.5 shrink-0 text-amber-500" aria-hidden="true" />

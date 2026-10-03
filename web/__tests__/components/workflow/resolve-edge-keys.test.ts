@@ -8,9 +8,9 @@ import {
 } from "@/app/components/workflow/utils/resolve-edge-keys"
 
 /**
- * Os campos de saída vêm numa forma só (`saidas`, os `outputs` tipados do
- * catálogo) — e é por eles que o seletor de chave da aresta e o autocomplete
- * navegam.
+ * Output fields come in a single shape (`saidas`, the catalog's typed
+ * `outputs`) — and it's through them that the edge's key picker and the
+ * autocomplete navigate.
  */
 
 const CAMPOS = [
@@ -60,11 +60,11 @@ describe("resolveFromKey", () => {
 })
 
 /**
- * Regressão: a aresta criada pelo botão "+" do handle nascia SEM `to_key`.
- * Num destino multi-input (Join layerA/layerB) isso tem dois efeitos: o
- * executor cai em `inputs[from_key]` e mapeia a porta errada, e a sugestão de
- * colunas POR PORTA (colunas-conhecidas indexa por `to_key || from_key`) fica
- * vazia para sempre — só o "*" do filtro escapava, o que parecia instabilidade.
+ * Regression: the edge created by the handle's "+" button was born WITHOUT
+ * `to_key`. On a multi-input target (Join layerA/layerB) this has two effects:
+ * the executor falls back to `inputs[from_key]` and maps the wrong port, and the
+ * PER-PORT column suggestion (colunas-conhecidas indexes by `to_key || from_key`)
+ * stays empty forever — only the filter's "*" escaped, which looked like flakiness.
  */
 describe("resolveToKey", () => {
   const doisInputs = [{ name: "layerA" }, { name: "layerB" }]
@@ -102,15 +102,15 @@ describe("portaDeEntradaPadrao", () => {
 })
 
 /**
- * Regressão: escolher a chave no badge da aresta a fazia SUMIR. O seletor
- * sincronizava o `sourceHandle` com QUALQUER candidato (getCandidateKeys inclui
- * campos), mas o nó só desenha handle nomeado com 2+ portas reais — campo
- * sem `port` não é handle. Apontar o sourceHandle para um deles
- * deixava a aresta sem âncora e o React Flow parava de desenhá-la.
+ * Regression: choosing the key on the edge badge made it DISAPPEAR. The picker
+ * synced `sourceHandle` with ANY candidate (getCandidateKeys includes fields),
+ * but the node only draws a named handle with 2+ real ports — a field without
+ * `port` isn't a handle. Pointing the sourceHandle at one of them left the edge
+ * without an anchor and React Flow stopped drawing it.
  */
 describe("sourceHandleDaChave", () => {
   it("nó de saída única (0/1 porta) → null, nunca um campo sem porta", () => {
-    // O caso do bug: candidato é um campo sem porta, o handle é o anônimo.
+    // The bug case: the candidate is a field without a port, the handle is the anonymous one.
     expect(sourceHandleDaChave([], "previous_hash")).toBeNull()
     expect(sourceHandleDaChave([{ name: "output" }], "previous_hash")).toBeNull()
     expect(sourceHandleDaChave(undefined, "output")).toBeNull()
@@ -123,7 +123,7 @@ describe("sourceHandleDaChave", () => {
   })
 
   it("nó multi-saída, `nome` não é porta → undefined (não mexe no handle atual)", () => {
-    // Evita reancorar numa porta inexistente; o chamador mantém o sourceHandle.
+    // Avoids re-anchoring on a nonexistent port; the caller keeps the sourceHandle.
     expect(sourceHandleDaChave([{ name: "focos" }, { name: "bbox" }], "data")).toBeUndefined()
   })
 })

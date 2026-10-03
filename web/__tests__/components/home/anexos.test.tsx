@@ -1,15 +1,15 @@
 /**
- * Os anexos soltos sobre a Home, na caixa do assistente.
+ * Attachments dropped onto the Home, in the assistant box.
  *
- * Duas ideias sob proteção aqui:
+ * Two ideas under protection here:
  *
- *  1. **O que viaja com a mensagem é EXATAMENTE o que está à vista.** Só os
- *     PRONTOS entram em `comReferencia` e em `sugestaoParaAnexos`; o que ainda
- *     sobe e o que foi recusado não são citados — mandar o assistente procurar
- *     um arquivo que não chegou ao Drive é uma promessa falsa.
- *  2. **A recusa é a mesma da tela `/drive`.** `recusasDe` alimenta o painel
- *     `ResultadoDoUpload`, com a classificação de `classifyUploadError` — os
- *     dois rótulos nunca divergem porque são a mesma peça.
+ *  1. **What travels with the message is EXACTLY what is in view.** Only the
+ *     READY ones go into `comReferencia` and `sugestaoParaAnexos`; what is still
+ *     uploading and what was refused are not mentioned — telling the assistant to look for
+ *     a file that never reached the Drive is a false promise.
+ *  2. **The refusal is the same as on the `/drive` screen.** `recusasDe` feeds the
+ *     `ResultadoDoUpload` panel, with `classifyUploadError`'s classification — the
+ *     two labels never diverge because they are the same piece.
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { cleanup, render, screen, fireEvent } from "@testing-library/react"
@@ -63,7 +63,7 @@ describe("os chips na caixa", () => {
 
     expect(screen.getByText("chegou.geojson")).toBeTruthy()
     expect(screen.getByText("subindo.csv")).toBeTruthy()
-    // Um só × — o do pronto. O que sobe não pode ser removido no meio do caminho.
+    // A single × — the ready one's. What is uploading cannot be removed midway.
     const remover = screen.getAllByRole("button", { name: /Tirar/i })
     expect(remover).toHaveLength(1)
     fireEvent.click(remover[0])

@@ -1,6 +1,6 @@
 /**
- * O viewport salvo é restaurado ao abrir e gravado no save explícito. Estas
- * regras dizem o que conta como "salvo válido" e o que conta como "mudou".
+ * The saved viewport is restored on open and written on an explicit save. These
+ * rules say what counts as a "valid saved" one and what counts as "changed".
  */
 import { describe, it, expect } from "vitest"
 import { viewportSalvoValido, viewportsIguais } from "@/app/components/workflow/utils/viewport-salvo"

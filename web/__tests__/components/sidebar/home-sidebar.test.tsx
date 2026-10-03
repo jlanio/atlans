@@ -4,15 +4,15 @@ import { CATALOGO, ORGAOS_FEDERAIS } from "@/lib/catalogo"
 import { formatarInteiro } from "@/lib/formatos"
 
 /**
- * A casca da Home: Nova conversa + grupo Meus (Agendamentos, Artefatos, Chats),
- * Chats já aberto, rodapé UserSidebar. As folhas pesadas (UserSidebar, as
- * listas) viram marcadores — o foco é a ESTRUTURA e o comportamento do grupo
- * Meu: o clique no trilho, o aberto/fechado lembrado, a lista que fecha sem
- * desmontar, e a montagem só depois de hidratar.
+ * The Home shell: New conversation + the Mine group (Schedules, Artifacts,
+ * Chats), Chats already open, UserSidebar footer. The heavy leaves (UserSidebar,
+ * the lists) become placeholders — the focus is the STRUCTURE and the behavior
+ * of the Mine group: the click on the rail, the remembered open/closed state,
+ * the list that closes without unmounting, and mounting only after hydration.
  */
 
-// jsdom não tem matchMedia; o SidebarProvider (useIsMobile) precisa dele. Quem
-// decide telefone × desktop é `innerWidth` — o hook lê a largura, não `matches`.
+// jsdom has no matchMedia; SidebarProvider (useIsMobile) needs it. What
+// decides phone × desktop is `innerWidth` — the hook reads the width, not `matches`.
 beforeAll(() => {
   Object.defineProperty(window, "matchMedia", {
     writable: true,
@@ -27,10 +27,10 @@ function largura(px: number) {
   Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: px })
 }
 
-// A sessao e MUTAVEL: o papel decide se a marca e link, e os dois casos precisam
-// do mesmo render. `vi.hoisted` porque a fabrica do `vi.mock` e icada.
-// `status` e `erro` sobrepõem a derivação do papel: é como o teste vira a
-// casca anônima (sem sessão) e a da sessão vencida.
+// The session is MUTABLE: the role decides whether the brand is a link, and both
+// cases need the same render. `vi.hoisted` because the `vi.mock` factory is hoisted.
+// `status` and `erro` override the role derivation: that's how the test turns
+// into the anonymous shell (no session) and the expired-session one.
 const sessao = vi.hoisted(() => ({
   papel: "admin" as string | undefined,
   status: undefined as string | undefined,
@@ -43,9 +43,9 @@ vi.mock("next-auth/react", () => ({
   }),
 }))
 
-// O UserSidebar captura a prop da paleta dos portais; a lista de Chats conta as
-// MONTAGENS (efeito de montagem), não os renders — é o que distingue "escondeu"
-// de "desmontou e remontou".
+// UserSidebar captures the portals' palette prop; the Chats list counts
+// MOUNTS (mount effect), not renders — that's what distinguishes "hid" from
+// "unmounted and remounted".
 const espiao = vi.hoisted(() => ({ chatsMontou: vi.fn() }))
 vi.mock("@/app/components/sidebar/user-sidebar", () => ({
   default: (p: { portalClassName?: string }) => (
@@ -103,14 +103,14 @@ describe("HomeSidebar — sem sessão", () => {
     expect(screen.queryByTestId("chats-lista")).toBeNull()
     expect(espiao.chatsMontou).not.toHaveBeenCalled()
     expect(screen.queryByTestId("user-sidebar")).toBeNull()
-    // A vitrine: números da constante (nunca de um GET — a casca anônima não
-    // faz requisição) e as três fitas rotuladas.
+    // The showcase: numbers from the constant (never from a GET — the anonymous
+    // shell makes no requests) and the three labeled strips.
     expect(screen.getByText("No catálogo")).toBeTruthy()
     expect(screen.getByText(formatarInteiro(CATALOGO.camadas))).toBeTruthy()
     expect(screen.getByText(new RegExp(`de ${CATALOGO.instituicoes} instituições em ${CATALOGO.paises} países`))).toBeTruthy()
     expect(screen.getByText(/Pare de procurar dados/i)).toBeTruthy()
     for (const rotulo of ["Brasil", "Fora do Brasil"]) expect(screen.getByText(rotulo), rotulo).toBeTruthy()
-    // A marca continua, inerte; a landmark também.
+    // The brand stays, inert; so does the landmark.
     expect(screen.getByText("Atlans").closest("a")).toBeNull()
     expect(screen.getByRole("navigation", { name: "Barra lateral da Home" })).toBeTruthy()
 
@@ -121,8 +121,9 @@ describe("HomeSidebar — sem sessão", () => {
   })
 
   it("cada nome da fita sai duas vezes — a segunda é a emenda do laço, e some do leitor de tela", () => {
-    // A animação anda até -50%: sem a cópia, a volta ao início pisca. Mas são
-    // nomes, não enfeite, então quem lê por áudio ouve a lista uma vez só.
+    // The animation runs to -50%: without the copy, the wrap back to the start
+    // flickers. But these are names, not decoration, so someone listening by
+    // audio hears the list only once.
     semSessao()
     montar()
     const copias = screen.getAllByText(ORGAOS_FEDERAIS[0].rotulo)
@@ -132,8 +133,8 @@ describe("HomeSidebar — sem sessão", () => {
   })
 
   it("um grupo Meus lembrado aberto por outra pessoa no mesmo navegador não monta nada sem sessão", () => {
-    // O ItemColapsavel monta a lista em `hidratado && aberto`: sem sessão o
-    // grupo não pode nem existir, senão cada lista sairia com o seu GET.
+    // ItemColapsavel mounts the list on `hidratado && aberto`: without a session
+    // the group can't even exist, otherwise each list would fire its own GET.
     window.localStorage.setItem("atlans:home:meu", JSON.stringify({ agendamentos: true, artefatos: true, chats: true }))
     semSessao()
     montar()
@@ -165,8 +166,8 @@ describe("HomeSidebar — sem sessão", () => {
     expect(entrar.querySelector("svg")).toBeTruthy()
     expect(screen.getByRole("button", { name: "Criar conta" }).querySelector("svg")).toBeTruthy()
     expect(screen.getByText("No catálogo").closest('[data-slot="sidebar-group"]')!.className).toContain("group-data-[collapsible=icon]:hidden")
-    // No telefone o clique fecha a gaveta antes de abrir o modal — coberto
-    // pelo `setOpenMobile` do provider; aqui só o desktop.
+    // On the phone the click closes the drawer before opening the modal —
+    // covered by the provider's `setOpenMobile`; here only desktop.
   })
 })
 
@@ -188,9 +189,9 @@ describe("HomeSidebar", () => {
   })
 
   it("quem NÃO é admin não tem como sair da Home pela marca", () => {
-    // A Home passa a ser a única página de quem não administra o sistema. O
-    // `Marca` sem `href` vira `<span>`: some o destino E a afordância (o realce
-    // de hover que dizia "isto é clicável").
+    // Home becomes the only page for those who don't administer the system.
+    // `Marca` without `href` becomes a `<span>`: both the destination AND the
+    // affordance go away (the hover highlight that said "this is clickable").
     sessao.papel = "user"
     montar()
     expect(screen.getByText("Atlans")).toBeTruthy()
@@ -198,7 +199,7 @@ describe("HomeSidebar", () => {
   })
 
   it("enquanto a sessão carrega a marca fica inerte (falha fechada)", () => {
-    // O contrário piscaria um link para /projects que some no render seguinte.
+    // The opposite would flash a link to /projects that disappears on the next render.
     sessao.papel = undefined
     montar()
     expect(screen.getByText("Atlans").closest("a")).toBeNull()
@@ -225,8 +226,9 @@ describe("HomeSidebar", () => {
     montar()
     const nav = screen.getByRole("navigation", { name: "Barra lateral da Home" })
     expect(nav).toBeTruthy()
-    // Também pinta o fundo: no telefone o painel é o SheetContent, e sem uma
-    // classe de fundo DENTRO do `.home` o fundo vinha do tema do app.
+    // It also paints the background: on the phone the panel is the SheetContent,
+    // and without a background class INSIDE `.home` the background came from
+    // the app's theme.
     expect(nav.className).toContain("bg-sidebar")
     expect(nav.className).toContain("home")
   })
@@ -242,7 +244,7 @@ describe("HomeSidebar", () => {
   it("Agendamentos e Artefatos abrem as listas vivas (sem 'Em breve')", () => {
     montar()
     expect(screen.queryByText("Em breve.")).toBeNull()
-    // Colapsados por padrão; o clique no rótulo abre a sublista.
+    // Collapsed by default; clicking the label opens the sublist.
     fireEvent.click(screen.getByText("Agendamentos"))
     expect(screen.getByTestId("agendamentos-lista")).toBeTruthy()
     fireEvent.click(screen.getByText("Artefatos"))
@@ -252,15 +254,15 @@ describe("HomeSidebar", () => {
 
 describe("HomeSidebar — o grupo Meus", () => {
   it("no trilho, clicar um item EXPANDE a barra e o abre — nunca alterna às cegas", () => {
-    // O defeito: recolhida, a sublista está em display:none e o clique só
-    // virava um estado invisível — ao expandir, o item estava no OPOSTO do que
-    // a pessoa deixou.
+    // The defect: when collapsed, the sublist is display:none and the click
+    // only turned into invisible state — on expanding, the item was in the
+    // OPPOSITE state from what the person left.
     const aoAbrir = vi.fn()
     montar({ open: false, onOpenChange: aoAbrir })
     fireEvent.click(screen.getByText("Agendamentos"))
     expect(aoAbrir).toHaveBeenLastCalledWith(true)
     expect(useHomeStore.getState().meu.agendamentos).toBe(true)
-    // Um item JÁ aberto continua aberto: no trilho não há o que fechar.
+    // An item that is ALREADY open stays open: on the rail there's nothing to close.
     fireEvent.click(screen.getByText("Chats"))
     expect(useHomeStore.getState().meu.chats).toBe(true)
     expect(aoAbrir).toHaveBeenCalledTimes(2)
@@ -283,8 +285,8 @@ describe("HomeSidebar — o grupo Meus", () => {
   })
 
   it("fechar um item ESCONDE a lista sem desmontá-la", () => {
-    // `{aberto && children}` refazia as requisições a cada reabertura e perdia
-    // as páginas do "Ver mais", o erro e a rolagem.
+    // `{aberto && children}` redid the requests on every reopening and lost
+    // the "Ver mais" (see more) pages, the error and the scroll position.
     montar()
     expect(espiao.chatsMontou).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByText("Chats"))
@@ -312,7 +314,7 @@ describe("HomeSidebar — o grupo Meus", () => {
     const { unmount } = montar()
     fireEvent.click(screen.getByText("Artefatos"))
     unmount()
-    // A memória da árvore some; a store volta ao default — só o navegador lembra.
+    // The tree's memory is gone; the store goes back to default — only the browser remembers.
     useHomeStore.setState({ meu: { ...MEU_PADRAO }, hidratado: false })
     montar()
     expect(screen.getByTestId("artefatos-lista")).toBeTruthy()
@@ -324,8 +326,9 @@ describe("HomeSidebar — o grupo Meus", () => {
   })
 
   it("no telefone a lista de Chats NÃO monta antes de a gaveta abrir", () => {
-    // O primeiro render ainda é o ramo desktop (`useIsMobile` começa indefinido):
-    // montar ali disparava um GET que ia para o lixo quando o Sheet assumia.
+    // The first render is still the desktop branch (`useIsMobile` starts
+    // undefined): mounting there fired a GET that was thrown away when the
+    // Sheet took over.
     largura(375)
     montar()
     expect(espiao.chatsMontou).not.toHaveBeenCalled()

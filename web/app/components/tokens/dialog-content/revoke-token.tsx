@@ -7,27 +7,27 @@ import { createToast } from "@/utils/createToast"
 
 interface RevokeTokenProps {
   token: ApiToken
-  /** Recebe o token já marcado como revogado — a lista troca a linha no lugar,
-   *  sem um GET a mais. */
+  /** Receives the token already marked as revoked — the list swaps the row in
+   *  place, without an extra GET. */
   onRevoked: (token: ApiToken) => void
   onClose: () => void
 }
 
 /**
- * Revogar é definitivo e imediato, mas não apaga: o token continua na lista
- * como «Revogado», para o dono saber o que existiu. Daí o `DeleteDialog` com o
- * verbo certo — «Excluir» descreveria a ação errada.
+ * Revoking is final and immediate, but doesn't delete: the token stays in the list
+ * as "Revogado", so the owner knows what existed. Hence the `DeleteDialog` with
+ * the right verb — "Excluir" would describe the wrong action.
  */
 const RevokeToken = ({ token, onRevoked, onClose }: RevokeTokenProps) => {
   async function handleConfirm() {
     const res = await GisFlowService.revokeApiToken(token.id)
-    // Sem isto o item sumia da lista e reaparecia no próximo refresh, sem
-    // mensagem nenhuma.
+    // Without this the item vanished from the list and reappeared on the next
+    // refresh, with no message at all.
     if (res.error) {
       createToast.error("Não foi possível revogar o token", res.error.message)
       return
     }
-    // O backend devolve o token revogado; se o corpo vier vazio, marcamos aqui.
+    // The backend returns the revoked token; if the body comes back empty, we mark it here.
     onRevoked(res.data ?? { ...token, status: "revoked", revoked_at: new Date().toISOString() })
     createToast.success("Token revogado", token.name)
     onClose()

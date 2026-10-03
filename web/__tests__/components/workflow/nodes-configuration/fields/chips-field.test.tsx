@@ -1,9 +1,9 @@
 /**
- * Campo de fichas — a lista de colunas do Join por Atributo.
+ * Chips field — the column list of the Attribute Join.
  *
- * Era um texto separado por vírgula: não mostrava o que já estava lá, e remover
- * um nome do meio significava editar a string. O formato antigo continua nas
- * definitions salvas, então o campo tem de LER os dois.
+ * It used to be comma-separated text: it didn't show what was already there,
+ * and removing a name from the middle meant editing the string. The old format
+ * remains in saved definitions, so the field has to READ both.
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { render, screen, cleanup, fireEvent } from "@testing-library/react"
@@ -44,8 +44,8 @@ describe("lerFichas", () => {
   })
 
   it("lê o formato antigo, separado por vírgula", () => {
-    // É o que está salvo nos workflows criados antes do campo mudar. Sem isto,
-    // abrir um deles mostraria o campo vazio — e salvar apagaria a configuração.
+    // It's what is saved in workflows created before the field changed. Without
+    // this, opening one would show the field empty — and saving would erase the configuration.
     expect(lerFichas("pop, renda_media")).toEqual(["pop", "renda_media"])
   })
 
@@ -88,8 +88,8 @@ describe("ChipsField", () => {
   })
 
   it("Enter adiciona e grava como CSV — o formato que TODO leitor entende", () => {
-    // Inclusive um executor com flow/ anterior à migração para fichas, que
-    // ainda parseia com split(","): JSON-string lá virava coluna fantasma.
+    // Including an executor with a flow/ older than the migration to chips,
+    // which still parses with split(","): a JSON string there became a ghost column.
     const setNodeField = montar('["pop"]')
     fireEvent.change(entrada(), { target: { value: "renda" } })
     fireEvent.keyDown(entrada(), { key: "Enter" })
@@ -111,8 +111,8 @@ describe("ChipsField", () => {
   })
 
   it("sair do campo com algo digitado adiciona", () => {
-    // Perder o que se escreveu por ter clicado fora é o defeito clássico deste
-    // tipo de campo.
+    // Losing what you typed because you clicked outside is the classic defect of
+    // this kind of field.
     const setNodeField = montar("[]")
     fireEvent.change(entrada(), { target: { value: "renda" } })
     fireEvent.blur(entrada())
@@ -178,20 +178,20 @@ describe("sugestões de coluna", () => {
   })
 
   it("não oferece o que já é ficha", () => {
-    // Repetir o que já foi escolhido só vira ruído na lista.
+    // Repeating what has already been chosen just becomes noise in the list.
     comSugestoes('["populacao"]', ["populacao", "renda"])
     expect(screen.queryByRole("button", { name: "populacao" })).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "renda" })).toBeInTheDocument()
   })
 
   it("sem execução anterior, nenhum bloco de sugestão aparece", () => {
-    // O nó nunca rodou: inventar uma lista seria pior que não mostrar nada.
+    // The node has never run: making up a list would be worse than showing nothing.
     comSugestoes("[]", [])
     expect(screen.queryByText(/Vistas na última execução/)).not.toBeInTheDocument()
   })
 
   it("escrever um nome fora da lista continua valendo", () => {
-    // É dica, não validação: o fluxo pode ter mudado desde a última execução.
+    // It's a hint, not validation: the workflow may have changed since the last run.
     const setNodeField = comSugestoes("[]", ["populacao"])
     fireEvent.change(entrada(), { target: { value: "coluna_nova" } })
     fireEvent.keyDown(entrada(), { key: "Enter" })

@@ -1,17 +1,18 @@
 # tests/integration/test_listagem_projetos.py
 """
-A listagem de projetos diz o que cada workflow E: como dispara, se esta
-agendado (e para quando), e quem mexeu por ultimo.
+The project listing says what each workflow IS: how it fires, whether it is
+scheduled (and for when), and who touched it last.
 
-Tres fontes, tres queries por pagina — nunca uma por linha:
-- gatilhos: expressoes SQL sobre `definition`, no mesmo feitio de
-  `is_subworkflow` (ver test_listagem_marca_subfluxo.py);
-- agendamento: `schedules WHERE workflow_hash IN (...)`, mesclado no servico;
-- autoria: `users WHERE id_hash IN (...)`, idem.
+Three sources, three queries per page — never one per row:
+- triggers: SQL expressions over `definition`, in the same style as
+  `is_subworkflow` (see test_listagem_marca_subfluxo.py);
+- scheduling: `schedules WHERE workflow_hash IN (...)`, merged in the service;
+- authorship: `users WHERE id_hash IN (...)`, likewise.
 
-Os testes sobem as tabelas reais num SQLite de memoria e passam pelo servico,
-que e quem mescla — uma asercao sobre o CRUD sozinho nao provaria que o
-`schedule` chega na resposta, nem que chega com fuso.
+The tests bring up the real tables in an in-memory SQLite and go through the
+service, which is what does the merging — an assertion on the CRUD alone would
+not prove that `schedule` reaches the response, nor that it arrives with a
+time zone.
 """
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -49,7 +50,7 @@ async def db():
 
 
 async def _semear(db, *workflows, workspace=WS):
-    """Cada item e (id_hash, definition) ou (id_hash, definition, extras)."""
+    """Each item is (id_hash, definition) or (id_hash, definition, extras)."""
     for i, item in enumerate(workflows):
         hash_, definition, *resto = item
         extras = resto[0] if resto else {}
@@ -100,8 +101,8 @@ class TestGatilhos:
 
     @pytest.mark.asyncio
     async def test_dois_gatilhos_marcam_os_dois(self, db):
-        """Um workflow pode disparar por mais de um caminho — a web mostra
-        "Agendado + webhook"; nenhum booleano pode mascarar o outro."""
+        """A workflow can fire through more than one path — the web shows
+        "Agendado + webhook" (scheduled + webhook); no boolean may mask another."""
         await _semear(db, ("wf", _definition("ScheduleTrigger", "WebhookTrigger", "PythonScript")))
 
         item = (await _por_hash(db))["wf"]
@@ -116,15 +117,15 @@ class TestGatilhos:
 
         item = (await _por_hash(db))["wf"]
         assert not any(getattr(item, nome) for nome in GATILHOS)
-        # As marcas vizinhas continuam lendo a mesma coluna sem se atrapalhar.
+        # The neighboring flags keep reading the same column without getting in each other's way.
         assert item.has_publish_map is True
         assert item.is_subworkflow is False
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("definition", [{}, {"edges": []}], ids=["vazia", "sem_a_chave_nodes"])
     async def test_definition_sem_nodes_nao_derruba_a_resposta(self, db, definition):
-        """Mesma regressao de `is_subworkflow`: sem `nodes` o LIKE propaga
-        NULL e o Pydantic recusa None num `bool` — a lista inteira dava 500."""
+        """Same regression as `is_subworkflow`: without `nodes` LIKE propagates
+        NULL and Pydantic rejects None in a `bool` — the whole list gave 500."""
         await _semear(db, ("torto", definition))
 
         item = (await _por_hash(db))["torto"]
@@ -143,9 +144,9 @@ class TestAgendamento:
 
     @pytest.mark.asyncio
     async def test_ativo_com_proxima_sai_em_utc_aware(self, db):
-        """`next_run_at` e gravado UTC NAIVE pelo agendador. Sem o tzinfo o
-        Pydantic serializa "2026-09-08T09:00:00", e o navegador em Cuiaba le
-        como 09:00 local — tres horas depois da hora real."""
+        """`next_run_at` is stored as NAIVE UTC by the scheduler. Without the tzinfo
+        Pydantic serializes "2026-09-08T09:00:00", and the browser in Cuiabá
+        reads it as 09:00 local — three hours after the real time."""
         await _semear(db, ("wf", _definition("ScheduleTrigger")))
         db.add(_schedule(
             "wf", active=True,
@@ -164,7 +165,7 @@ class TestAgendamento:
         assert item.schedule.cron_expression == "0 6 * * *"
         assert item.schedule.timezone == "America/Cuiaba"
 
-        # O que a web recebe: ISO COM offset.
+        # What the web receives: ISO WITH offset.
         json = item.model_dump(mode="json")["schedule"]
         assert json["next_run_at"].endswith(("Z", "+00:00")), json["next_run_at"]
 
@@ -180,8 +181,9 @@ class TestAgendamento:
 
     @pytest.mark.asyncio
     async def test_ativo_sem_proxima_calculada(self, db):
-        """Recem-criado: o agendador preenche `next_run_at` no proximo tick.
-        A web mostra "proxima: calculando…" — precisa distinguir de pausado."""
+        """Freshly created: the scheduler fills `next_run_at` on the next tick.
+        The web shows "proxima: calculando…" (next: calculating…) — it must be
+        told apart from paused."""
         await _semear(db, ("wf", _definition("ScheduleTrigger")))
         db.add(_schedule("wf", active=True, next_run_at=None))
         await db.commit()
@@ -261,13 +263,14 @@ class TestAutoria:
         item = (await _por_hash(db))["wf"]
         assert item.created_by_username == "joao"
         assert item.updated_by_username == "maria"
-        # Os ids continuam saindo — a web filtra "meus" por eles.
+        # The ids are still returned — the web filters "mine" by them.
         assert (item.created_by_id, item.updated_by_id) == ("u-joao", "u-maria")
 
     @pytest.mark.asyncio
     async def test_id_sem_linha_em_users_vira_none(self, db):
-        """`created_by_id`/`updated_by_id` nao tem FK: um id sem linha em `users`
-        e possivel, e a web mostra so "alterado ha X" sem inventar nome."""
+        """`created_by_id`/`updated_by_id` have no FK: an id with no row in `users`
+        is possible, and the web shows only "alterado ha X" (changed X ago)
+        without making up a name."""
         await _semear(db, ("wf", _definition("PythonScript"),
                            {"created_by_id": "u-sumiu", "updated_by_id": "u-sumiu"}))
 
@@ -277,9 +280,9 @@ class TestAutoria:
 
     @pytest.mark.asyncio
     async def test_usuario_excluido_soft_delete_mantem_o_nome(self, db):
-        """"Excluir usuario" no admin e soft delete (status='deleted', a linha
-        fica). O nome CONTINUA saindo — a mesma atribuicao que o Historico
-        mostra; nao filtramos por status, de proposito."""
+        """"Excluir usuario" (delete user) in the admin is a soft delete
+        (status='deleted', the row stays). The name IS STILL returned — the same
+        attribution the History shows; we do not filter by status, on purpose."""
         db.add(_usuario("u-ex", "maria", status="deleted", deleted_at=datetime(2026, 1, 1)))
         await _semear(db, ("wf", _definition("PythonScript"),
                            {"created_by_id": "u-ex", "updated_by_id": "u-ex"}))
@@ -298,13 +301,13 @@ class TestAutoria:
         assert item.updated_by_username is None
 
 
-# ── forma da resposta ───────────────────────────────────────────────────────
+# ── response shape ──────────────────────────────────────────────────────────
 
 class TestForma:
 
     def test_deleted_at_saiu_do_schema(self):
-        """A listagem filtra `deleted_at IS NULL`: o campo era sempre nulo e
-        so ocupava bytes. Nenhum consumidor da listagem o le."""
+        """The listing filters `deleted_at IS NULL`: the field was always null and
+        only took up bytes. No consumer of the listing reads it."""
         assert "deleted_at" not in WorkflowListItem.model_fields
 
     @pytest.mark.asyncio
@@ -317,8 +320,8 @@ class TestForma:
 
     @pytest.mark.asyncio
     async def test_listagem_por_varios_workspaces_tem_a_mesma_mescla(self, db):
-        """`GET /workflows` sem `workspace_id` passa por `_by_ids`; a mescla
-        tem de ser a mesma, senao a paleta de comandos e a lista divergem."""
+        """`GET /workflows` without `workspace_id` goes through `_by_ids`; the merge
+        must be the same, otherwise the command palette and the list diverge."""
         db.add(_usuario("u-maria", "maria"))
         await _semear(db, ("a", _definition("ScheduleTrigger"), {"updated_by_id": "u-maria"}), workspace="ws-a")
         await _semear(db, ("b", _definition("WebhookTrigger")), workspace="ws-b")
@@ -335,8 +338,9 @@ class TestForma:
 
     @pytest.mark.asyncio
     async def test_lista_vazia_nao_consulta_nada_alem_da_listagem(self, db, monkeypatch):
-        """Sem workflows, a mescla curto-circuita antes de tocar `schedules`
-        e `users` — os dois `IN` a mais so existem quando ha o que enriquecer."""
+        """Without workflows, the merge short-circuits before touching `schedules`
+        and `users` — the two extra `IN`s only exist when there is something to
+        enrich."""
         import app.services.workflow_service as svc
 
         async def _proibido(*a, **k):
@@ -357,8 +361,9 @@ class TestForma:
 # ── origem (usuario | assistente) ─────────────────────────────────────────────
 
 class TestOrigem:
-    """Fluxos do assistente da Home (`origem="assistente"`) saem das listagens por
-    padrao; o interruptor "mostrar os do assistente" os traz de volta."""
+    """Workflows from the Home assistant (`origem="assistente"`) are left out of
+    listings by default; the "mostrar os do assistente" (show the assistant's)
+    toggle brings them back."""
 
     @pytest.mark.asyncio
     async def test_do_assistente_some_por_padrao(self, db):
@@ -390,7 +395,7 @@ class TestOrigem:
 
     @pytest.mark.asyncio
     async def test_filtro_tambem_na_listagem_por_ids(self, db):
-        """O caminho sem `workspace_id` (varios workspaces) esconde do mesmo jeito."""
+        """The path without `workspace_id` (several workspaces) hides them the same way."""
         await _semear(
             db,
             ("meu", _definition("PythonScript")),

@@ -1,18 +1,18 @@
 "use client"
 
 /**
- * SubWorkflowHelper — configuracao do node SubWorkflow.
+ * SubWorkflowHelper — configuration of the SubWorkflow node.
  *
- * Substitui o JsonEditor cru de inputsMapping por:
- *   1. Combo de workflows ativos do workspace (com busca)
- *   2. Preview do contrato do workflow alvo (SubWorkflowInput / SubWorkflowOutput)
- *   3. Tabela de mapeamento: cada entrada esperada pelo filho → escolhe, num
- *      dropdown, uma das chaves que de fato chegam a este node (derivadas das
- *      arestas de entrada). Antes era texto livre: errar o nome não dava erro,
- *      dava ausência silenciosa em runtime.
- *   4. Badge "inativo" se o alvo esta desativado
+ * Replaces the raw inputsMapping JsonEditor with:
+ *   1. A combo of the workspace's active workflows (with search)
+ *   2. A preview of the target workflow's contract (SubWorkflowInput / SubWorkflowOutput)
+ *   3. A mapping table: each input expected by the child → pick, in a
+ *      dropdown, one of the keys that actually arrive at this node (derived from
+ *      the incoming edges). It used to be free text: getting the name wrong gave
+ *      no error, it gave a silent absence at runtime.
+ *   4. An "inativo" (inactive) badge if the target is deactivated
  *
- * Substitui o que antes era 3 campos JSON crus.
+ * Replaces what used to be 3 raw JSON fields.
  */
 import { useEffect, useMemo, useState } from "react"
 import { useReactFlow } from "@xyflow/react"
@@ -38,26 +38,27 @@ interface Props {
   values: Record<string, string | number | boolean> | undefined
   setNodeField: (field: string, value: string | number | boolean) => void
   hasUnsaved: boolean
-  /** Id deste node no canvas — usado para descobrir as chaves que chegam nele. */
+  /** This node's id on the canvas — used to find the keys that arrive at it. */
   nodeId?: string
 }
 
-/** Chave disponível no ponto do grafo onde este SubWorkflow está. */
+/** A key available at the point of the graph where this SubWorkflow sits. */
 interface AvailableKey {
   key: string
   fromLabel: string
 }
 
 /**
- * Deriva as chaves que realmente chegam a este node, a partir das arestas de
- * entrada — a mesma regra do executor (flow/executor/core.py):
+ * Derives the keys that actually arrive at this node, from the incoming
+ * edges — the same rule as the executor (flow/executor/core.py):
  *   from_key + to_key -> to_key
- *   só from_key       -> from_key
- *   só to_key         -> to_key
- *   nenhum dos dois   -> espalha as saídas do node anterior (não enumerável aqui)
+ *   from_key only     -> from_key
+ *   to_key only       -> to_key
+ *   neither           -> spreads the previous node's outputs (not enumerable here)
  *
- * Antes o operador digitava esse nome de cabeça; errar não dava erro, dava
- * ausência silenciosa (o executor só emite um warning e segue sem o dado).
+ * The operator used to type that name from memory; getting it wrong gave no
+ * error, it gave a silent absence (the executor only emits a warning and goes
+ * on without the data).
  */
 function useAvailableInputKeys(nodeId?: string): {
   keys: AvailableKey[]
@@ -85,8 +86,8 @@ function useAvailableInputKeys(nodeId?: string): {
       if (key) {
         if (!found.has(key)) found.set(key, labelOf(edge.source))
       } else {
-        // Aresta sem chave espalha todas as saídas do node anterior: os nomes
-        // dependem do catálogo e não são conhecidos aqui.
+        // An edge without a key spreads all of the previous node's outputs: the names
+        // depend on the catalog and aren't known here.
         unnamed = true
       }
     }
@@ -98,7 +99,7 @@ function useAvailableInputKeys(nodeId?: string): {
   }, [nodeId, getEdges, getNodes])
 }
 
-/** Radix nao aceita SelectItem com value vazio — sentinela para "nao mapear". */
+/** Radix doesn't accept a SelectItem with an empty value — sentinel for "don't map". */
 const _NONE = "__none__"
 
 interface WorkflowListItem {
@@ -106,7 +107,7 @@ interface WorkflowListItem {
   name: string
   workspace_id?: string | null
   flag_ative?: boolean
-  /** "usuario" | "assistente" — quem criou o fluxo (marca a opcao com a faisca). */
+  /** "usuario" | "assistente" — who created the workflow (marks the option with the sparkle). */
   origem?: string | null
 }
 
@@ -137,26 +138,26 @@ export default function SubWorkflowHelper({ values, setNodeField, nodeId }: Prop
   const [contract, setContract] = useState<IWorkflowContract | null>(null)
   const [loadingContract, setLoadingContract] = useState(false)
   const [contractError, setContractError] = useState<string | null>(null)
-  // Nonce incrementado pelo botao "Recarregar contrato" para forcar refetch
-  // mesmo com workflowHash inalterado.
+  // Nonce incremented by the "Recarregar contrato" (reload contract) button to
+  // force a refetch even with an unchanged workflowHash.
   const [reloadNonce, setReloadNonce] = useState(0)
 
-  // ── Carrega lista de workflows ──────────────────────────────────────────
+  // ── Loads the workflow list ─────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false
-    // Com os do assistente: sao fluxos completos e podem ser chamados como
-    // sub-fluxo igual aos demais; escondê-los aqui era arbitrário.
+    // Including the assistant's: they are complete workflows and can be called as
+    // a sub-workflow like any other; hiding them here was arbitrary.
     GisFlowService.getWorkflows(undefined, { incluirDoAssistente: true }).then((res) => {
       if (cancelled || res?.error || !res?.data) return
       const list = (res.data as unknown as WorkflowListItem[])
-        .filter((w) => w.id_hash !== currentWorkflowId) // nao listar self
+        .filter((w) => w.id_hash !== currentWorkflowId) // don't list self
         .sort((a, b) => a.name.localeCompare(b.name))
       setWorkflows(list)
     })
     return () => { cancelled = true }
   }, [currentWorkflowId])
 
-  // ── Carrega contrato do workflow selecionado ────────────────────────────
+  // ── Loads the selected workflow's contract ──────────────────────────────
   useEffect(() => {
     if (!workflowHash) {
       setContract(null)
@@ -195,10 +196,10 @@ export default function SubWorkflowHelper({ values, setNodeField, nodeId }: Prop
 
   const targetWorkflow = workflows.find((w) => w.id_hash === workflowHash)
   const isTargetInactive = contract && contract.is_active === false
-  // Só a saída é obrigatória: SubWorkflowOutput define o valor de retorno.
-  // SubWorkflowInput é opcional — um sub-fluxo pode não receber nada.
+  // Only the output is required: SubWorkflowOutput defines the return value.
+  // SubWorkflowInput is optional — a sub-workflow may receive nothing.
   const missingContract = contract && !contract.has_output_node
-  // Mapear entradas para um filho sem entry point não teria efeito em runtime.
+  // Mapping inputs to a child without an entry point would have no effect at runtime.
   const mappingWithoutEntryPoint =
     contract && contract.has_output_node && !contract.has_input_node &&
     Object.keys(inputsMapping).length > 0
@@ -206,7 +207,7 @@ export default function SubWorkflowHelper({ values, setNodeField, nodeId }: Prop
   // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-5">
-      {/* 1. Seleção do workflow alvo */}
+      {/* 1. Target workflow selection */}
       <div className="flex flex-col gap-1.5">
         <Label className="text-xs">Workflow alvo</Label>
         <Select
@@ -235,7 +236,7 @@ export default function SubWorkflowHelper({ values, setNodeField, nodeId }: Prop
         )}
       </div>
 
-      {/* 2. Status do contrato */}
+      {/* 2. Contract status */}
       {workflowHash && (
         <div className="rounded-md border border-border bg-muted/30 p-3 flex flex-col gap-2">
           <div className="flex items-center justify-between">
@@ -305,11 +306,12 @@ export default function SubWorkflowHelper({ values, setNodeField, nodeId }: Prop
         </div>
       )}
 
-      {/* 3. Sub-fluxo sem portas declaradas: modo passthrough.
-          Com o contrato opt-in, `ports` vazio e valido — o filho recebe todas
-          as chaves que chegam neste node. A tabela abaixo so lista portas
-          declaradas, entao sem esta explicacao o operador via "Inputs (0)" e
-          nenhuma forma de configurar, sem saber que ja estava funcionando. */}
+      {/* 3. Sub-workflow without declared ports: passthrough mode.
+          With the opt-in contract, empty `ports` is valid — the child receives
+          all the keys that arrive at this node. The table below only lists
+          declared ports, so without this explanation the operator saw
+          "Inputs (0)" and no way to configure anything, without knowing it was
+          already working. */}
       {workflowHash && contract && !missingContract && declaredInputs.length === 0 && (
         <div className="flex flex-col gap-2">
           <Label className="text-xs">Mapeamento de entradas</Label>
@@ -334,7 +336,7 @@ export default function SubWorkflowHelper({ values, setNodeField, nodeId }: Prop
         </div>
       )}
 
-      {/* 4. Tabela de mapping (portas declaradas) */}
+      {/* 4. Mapping table (declared ports) */}
       {workflowHash && declaredInputs.length > 0 && (
         <div className="flex flex-col gap-2">
           <Label className="text-xs">Mapeamento de entradas</Label>
@@ -365,9 +367,9 @@ export default function SubWorkflowHelper({ values, setNodeField, nodeId }: Prop
               <tbody>
                 {declaredInputs.map((p) => {
                   const current = inputsMapping[p.name] ?? ""
-                  // Mapeado para chave que não chega neste ponto do grafo.
-                  // Em runtime o node FALHA dizendo quais chaves faltaram —
-                  // antes seguia em silêncio e o filho recebia null.
+                  // Mapped to a key that doesn't arrive at this point of the graph.
+                  // At runtime the node FAILS saying which keys were missing —
+                  // before, it went on silently and the child received null.
                   const isOrphan =
                     current !== "" &&
                     !availableKeys.some((k) => k.key === current) &&
@@ -395,8 +397,8 @@ export default function SubWorkflowHelper({ values, setNodeField, nodeId }: Prop
                                 <span className="text-muted-foreground ml-2">← {k.fromLabel}</span>
                               </SelectItem>
                             ))}
-                            {/* Mantém o valor atual selecionável mesmo que a
-                                aresta que o produzia tenha sido removida. */}
+                            {/* Keeps the current value selectable even if the edge
+                                that produced it has been removed. */}
                             {isOrphan && (
                               <SelectItem value={current} className="text-xs">
                                 <span className="font-mono">{current}</span>
@@ -446,7 +448,7 @@ export default function SubWorkflowHelper({ values, setNodeField, nodeId }: Prop
         </div>
       )}
 
-      {/* Botão refetch contrato */}
+      {/* Contract refetch button */}
       {workflowHash && (
         <Button
           variant="ghost"

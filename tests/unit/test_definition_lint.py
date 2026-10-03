@@ -1,9 +1,9 @@
 # tests/unit/test_definition_lint.py
-"""Lint estático da definition (flow/utils/definition_lint.py).
+"""Static lint of the definition (flow/utils/definition_lint.py).
 
-Puro: registry e descriptors falsos, sem executor. O que se garante aqui é o
-CONTRATO — código por problema, severidade, e o que cada mensagem precisa
-carregar para quem monta o fluxo por API conseguir corrigir sem adivinhar.
+Pure: fake registry and descriptors, no executor. What is guaranteed here is the
+CONTRACT — a code per problem, severity, and what each message needs to carry so
+that whoever builds the workflow via API can fix it without guessing.
 """
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ _DESCRIPTORS = {
     },
 }
 
-# Descriptor no molde do Switch: uma propriedade `object` e o `fallback_output`.
+# Descriptor modeled on Switch: an `object` property and the `fallback_output`.
 _DESC_SWITCH = {"A": {"name": "A", "properties": [
     {"name": "rules", "type": "object", "default": []},
     {"name": "fallback_output", "type": "string", "default": "output_0"},
@@ -62,22 +62,23 @@ def _codes(diags):
     return [d.code for d in diags]
 
 
-# ── Fatais: o que derrubaria o construtor do executor ────────────────────────
+# ── Fatal: what would bring down the executor's constructor ──────────────────
 
 def test_nome_inexistente_e_fatal_com_a_mensagem_da_factory():
     rel = _lint([_n("n1", name="NaoExiste")])
 
     assert _codes(rel.errors) == ["unknown_node"]
     assert rel.fatal
-    # A frase da factory à letra: é o que scripts/validar.py procura.
+    # The factory's sentence verbatim: it is what scripts/validar.py looks for.
     assert "não encontrado para instância" in rel.errors[0].message
     assert "NaoExiste" in rel.errors[0].message and "n1" in rel.errors[0].message
     assert rel.errors[0].node_id == "n1"
 
 
 def test_unknown_node_fora_da_ordem_de_execucao_nao_e_fatal():
-    """O NodeManager só instancia os nós da ordem: um nome inexistente solto
-    (ou fora do cone do trigger) continua ERRO, mas não derruba o construtor."""
+    """NodeManager only instantiates the nodes in the order: a stray nonexistent
+    name (or one outside the trigger's cone) is still an ERROR, but does not
+    bring down the constructor."""
     rel = _lint(
         [_n("t", name="T", ntype="trigger"), _n("m"), _n("x", name="NaoExiste")],
         [{"source": "t", "target": "m"}],
@@ -221,7 +222,7 @@ def test_dois_nos_do_mesmo_tipo_sem_alias_nao_acusam_nada():
     "{% if A.x > 1 %}s{% endif %}",
     "{{ named.A.x }}",
     "{{ named['A'].x }}",
-    # Sem `.` depois: o alias inteiro também é referência.
+    # No `.` after it: the whole alias is also a reference.
     "{{ A }}",
     "{{ A['x'] }}",
     "{{ A | tojson }}",
@@ -237,9 +238,9 @@ def test_alias_derivado_do_name_avisa_so_quando_referenciado(texto):
 
 
 @pytest.mark.parametrize("texto", [
-    "{{ inputs.A.x }} $AB.x",   # `inputs.A` e `$AB` não são o alias `A`
+    "{{ inputs.A.x }} $AB.x",   # `inputs.A` and `$AB` are not the alias `A`
     "{{ named.A2 }}",
-    "A.x fora de bloco",         # sem `$` e fora de Jinja é texto comum
+    "A.x fora de bloco",         # without `$` and outside Jinja it is plain text
 ])
 def test_referencia_a_outro_nome_nao_confunde_com_o_alias(texto):
     rel = _lint([_n("n1"), _n("n2", url=texto)])
@@ -292,14 +293,14 @@ def test_expressao_pura_e_vazio_nao_sao_segredo():
     "bearer",
 ])
 def test_esquema_de_autenticacao_mais_expressao_nao_e_segredo(valor):
-    """Só o esquema ("Bearer") fica gravado; o valor vem de expressão."""
+    """Only the scheme ("Bearer") is stored; the value comes from an expression."""
     rel = _lint([_n("n1", headers={"Authorization": valor}, token=valor)])
 
     assert rel.errors == []
 
 
 def test_http_auth_so_com_type_nao_e_segredo():
-    # `type` é seletor do formulário, não segredo.
+    # `type` is a form selector, not a secret.
     assert _lint([_n("n1", http_auth={"type": "http_bearer"})]).errors == []
 
 
@@ -323,9 +324,10 @@ def test_http_auth_com_token_continua_segredo():
 
 @pytest.mark.parametrize("cabecalho", ["Cookie", "Proxy-Authorization"])
 def test_cookie_e_proxy_authorization_gravados_sao_segredo(cabecalho):
-    """Uma sessão em `Cookie` autentica tão bem quanto um `Authorization`, e
-    `Proxy-Authorization` carrega a credencial do proxy. Sem os dois na lista o
-    lint deixava passar e a definition saía com o valor em claro."""
+    """A session in `Cookie` authenticates just as well as an `Authorization`, and
+    `Proxy-Authorization` carries the proxy's credential. Without both in the
+    list the lint let them through and the definition went out with the value
+    in the clear."""
     rel = _lint([_n("n1", headers={cabecalho: "sessao=abc123"})])  # pragma: allowlist secret
 
     assert _codes(rel.errors) == ["secret_in_definition"]
@@ -341,8 +343,9 @@ def test_headers_como_json_serializado_tambem_e_lido():
 
 
 def test_credential_id_que_nao_e_uuid_e_fatal():
-    """Fatal por contrato: o id nunca chega ao banco, e quem só olha o status
-    HTTP (o `validar.py` da skill) precisa reprovar como reprovava com o 403."""
+    """Fatal by contract: the id never reaches the database, and whoever only looks
+    at the HTTP status (the skill's `validar.py`) needs to fail it as it did
+    with the 403."""
     rel = _lint([_n("n1", credential_id="nao-e-uuid")])
 
     assert _codes(rel.errors) == ["invalid_credential_id"]
@@ -359,7 +362,7 @@ def test_credential_id_uuid_ou_vazio_passa():
     assert rel.errors == []
 
 
-# ── Propriedades (só com descriptors) ────────────────────────────────────────
+# ── Properties (only with descriptors) ───────────────────────────────────────
 
 def test_propriedade_nao_declarada_e_aviso_e_ignora_as_de_plataforma():
     rel = _lint(
@@ -383,7 +386,7 @@ def test_sem_descriptors_nao_ha_check_de_propriedade():
 
 def test_parametro_obrigatorio_ausente_e_aviso():
     descriptors = {"A": {"name": "A", "properties": [
-        {"name": "query", "type": "string"},        # sem default = obrigatório
+        {"name": "query", "type": "string"},        # no default = required
         {"name": "limite", "type": "integer", "default": 10},
     ]}}
 
@@ -404,13 +407,13 @@ def test_obrigatorio_presente_com_expressao_nao_avisa():
 
 @pytest.mark.parametrize("valor", ["{nao e json", '"texto"', "5", "null"])
 def test_propriedade_object_ilegivel_e_erro(valor):
-    """O run decodifica `object` em validate() e falha com esta frase."""
+    """The run decodes `object` in validate() and fails with this sentence."""
     rel = _lint([_n("n1", rules=valor)], descriptors=_DESC_SWITCH)
 
     assert _codes(rel.errors) == ["invalid_json_property"]
     assert "deve ser um objeto (dict) ou JSON válido" in rel.errors[0].message
     assert rel.errors[0].node_id == "n1"
-    assert "nao e json" not in rel.errors[0].message  # valor não é ecoado
+    assert "nao e json" not in rel.errors[0].message  # the value is not echoed
     assert not rel.fatal
 
 
@@ -420,7 +423,7 @@ def test_propriedade_object_ilegivel_e_erro(valor):
     "",
     "   ",
     "{{ inputs.regras }}",
-    '{"limite": {{ inputs.n }}}',   # só vira JSON válido depois de renderizar
+    '{"limite": {{ inputs.n }}}',   # only becomes valid JSON after rendering
     "$Regras.lista",
     [{"field": "x"}],
     {"a": 1},
@@ -432,9 +435,9 @@ def test_propriedade_object_valida_ou_com_template_nao_acusa(valor):
 
 
 def test_fallback_output_vazio_e_erro():
-    """Erro, não aviso: nenhuma aresta nomeia a porta '' (`from_key` vazio é "sem
-    chave"), então a fiação a partir dela está morta e o diagnóstico de aresta
-    não a enxerga — como aviso, o relatório diria `ok: true`."""
+    """An error, not a warning: no edge names the port '' (an empty `from_key` means
+    "no key"), so the wiring out of it is dead and the edge diagnostics do not
+    see it — as a warning, the report would say `ok: true`."""
     rel = _lint([_n("n1", fallback_output="")], descriptors=_DESC_SWITCH)
 
     assert _codes(rel.errors) == ["empty_fallback_output"]
@@ -458,7 +461,7 @@ def test_inputs_em_trigger_viram_parametros_sugeridos():
 
 
 def test_inputs_fora_de_trigger_nao_sao_parametros():
-    # Em nó comum `inputs` são as arestas (core.py), não parâmetros do usuário.
+    # In a regular node `inputs` are the edges (core.py), not user parameters.
     rel = _lint([_n("a", url="{{ inputs.bbox }}")])
 
     assert rel.suggested_params_schema == {}
@@ -470,7 +473,7 @@ def test_formas_de_referencia_a_inputs():
         a="{{ inputs.um }}",
         b="{{ inputs['dois'].x }}",
         c='{% if inputs["tres"] %}s{% endif %}',
-        d="$inputs.quatro/x",          # fora de bloco: o run não renderiza
+        d="$inputs.quatro/x",          # outside a block: the run does not render
         e="{{ $inputs.cinco }}",
         f={"aninhado": ["{{ inputs.seis }}"]},
         g="{{ nodes.inputs.nao }}",
@@ -480,8 +483,8 @@ def test_formas_de_referencia_a_inputs():
 
 
 def test_cifrao_inputs_fora_de_bloco_nao_e_parametro():
-    """`rendering._tem_expressao` só dispara `$X` quando X é alias de nó:
-    `$inputs.x` solto chega cru ao nó, então não é parâmetro do fluxo."""
+    """`rendering._tem_expressao` only triggers on `$X` when X is a node alias:
+    a stray `$inputs.x` reaches the node raw, so it is not a workflow parameter."""
     rel = _lint([_n("t", name="T", ntype="trigger", url="https://api/$inputs.id")])
 
     assert rel.suggested_params_schema == {}
@@ -493,10 +496,10 @@ def test_ports_do_subworkflowinput_viram_parametros_sugeridos():
     assert rel.suggested_params_schema == {"geometry": {"type": "string", "required": True}}
 
 
-# ── Custo linear: texto hostil não pode travar o event loop ──────────────────
+# ── Linear cost: hostile text must not freeze the event loop ─────────────────
 
 def test_texto_patologico_nao_e_quadratico():
-    """`re.split` com `(\\{\\{.*?\\}\\}|...)` levava 40 s em 100 KB de `{{`."""
+    """`re.split` with `(\\{\\{.*?\\}\\}|...)` took 40 s on 100 KB of `{{`."""
     inicio = time.perf_counter()
 
     rel = lint_definition(
@@ -509,9 +512,9 @@ def test_texto_patologico_nao_e_quadratico():
 
 
 def test_muitos_nos_com_nome_repetido_nao_e_quadratico():
-    """A checagem de alias duplicado re-tokenizava TODAS as strings a cada grupo
-    de nomes repetidos: 100 nós de 8 KB custavam segundos de CPU síncrona."""
-    # 50 nomes, cada um em 2 nós sem alias próprio; só N7 é referenciado.
+    """The duplicate-alias check re-tokenized ALL strings for each group of
+    repeated names: 100 nodes of 8 KB cost seconds of synchronous CPU."""
+    # 50 names, each in 2 nodes without their own alias; only N7 is referenced.
     nodes = [_n(f"n{i}", name=f"N{i % 50}", x="{{ a }}" * 1000) for i in range(100)]
     nodes[0]["parameters"]["ref"] = "{{ N7 | tojson }}"
     inicio = time.perf_counter()
@@ -557,7 +560,7 @@ def test_tokenizador_alterna_texto_e_bloco():
     assert _partes_jinja("sem jinja") == ["sem jinja"]
     assert _partes_jinja("") == [""]
     assert _partes_jinja("{{ a }}{{ b }}") == ["", "{{ a }}", "", "{{ b }}", ""]
-    # Abertura sem fechamento: o resto é texto comum.
+    # An opening without a closing: the rest is plain text.
     assert _partes_jinja("{{ sem fim") == ["{{ sem fim"]
     assert _partes_jinja("{% a {{ b }}") == ["{% a {{ b }}"]
     assert _partes_jinja("x {{ a }} {{ sem fim") == ["x ", "{{ a }}", " {{ sem fim"]
@@ -572,12 +575,12 @@ def test_heuristicas_ignoram_strings_acima_do_teto():
     assert "x" in _lint([_n("t", name="T", ntype="trigger", a=abaixo)]).suggested_params_schema
     assert _lint([_n("t", name="T", ntype="trigger", a=acima)]).suggested_params_schema == {}
 
-    # Alias derivado referenciado só dentro de uma string gigante: sem aviso.
+    # Derived alias referenced only inside a giant string: no warning.
     grande = "{{ $A.x }}" + " " * _TAMANHO_MAX_TEXTO
     assert _lint([_n("n1"), _n("n2", url=grande)]).warnings == []
 
 
-# ── Contrato de saída ────────────────────────────────────────────────────────
+# ── Output contract ──────────────────────────────────────────────────────────
 
 def test_as_dict_tem_exatamente_as_cinco_chaves():
     d = Diagnostico("cycle", "error", "msg")
@@ -596,7 +599,7 @@ def test_nos_sem_id_ou_name_nao_estouram():
 
 
 def test_lint_nao_exige_descriptor_de_todo_no():
-    # Descriptor só de "A": "T" fica sem checks de propriedade, sem estourar.
+    # Descriptor only for "A": "T" gets no property checks, without blowing up.
     rel = _lint([_n("t", name="T", ntype="trigger", foo=1), _n("a", foo=1)],
                 [{"source": "t", "target": "a"}], descriptors=_DESCRIPTORS)
 
@@ -604,26 +607,26 @@ def test_lint_nao_exige_descriptor_de_todo_no():
 
 
 def test_cabecalhos_secretos_cobrem_os_de_credencial_do_http_request():
-    """`_CABECALHOS_DE_CREDENCIAL` (flow/nodes/action/http_request.py) é a lista
-    que o nó derruba ao seguir um 3xx para outra origem — a definição de
-    "cabeçalho que carrega credencial" que já existe no repositório. O lint tem
-    de cobri-la inteira: um cabeçalho que não pode atravessar um
-    redirecionamento também não pode ficar GRAVADO na definição, e a redação
-    (app/core/utils/redacao.py) importa esta lista. `cookie` e
-    `proxy-authorization` faltavam, e `headers.Cookie` saía em claro.
+    """`_CABECALHOS_DE_CREDENCIAL` (flow/nodes/action/http_request.py) is the list
+    the node drops when following a 3xx to another origin — the definition of
+    "header that carries a credential" that already exists in the repository.
+    The lint has to cover all of it: a header that cannot cross a redirect
+    cannot stay STORED in the definition either, and the redaction
+    (app/core/utils/redacao.py) imports this list. `cookie` and
+    `proxy-authorization` were missing, and `headers.Cookie` went out in the clear.
     """
     from flow.nodes.action.http_request import _CABECALHOS_DE_CREDENCIAL
 
     assert _CABECALHOS_DE_CREDENCIAL <= _CABECALHOS_SECRETOS
     assert {"cookie", "proxy-authorization"} <= _CABECALHOS_SECRETOS
-    # `x-api-key` só existe no lint: é chave gravada, não cabeçalho a derrubar.
+    # `x-api-key` only exists in the lint: it is a stored key, not a header to drop.
     assert _CABECALHOS_SECRETOS - _CABECALHOS_DE_CREDENCIAL == {"x-api-key"}
 
 
 def test_chaves_secretas_em_sincronia_com_a_factory():
-    """A lista é copiada (importar a factory puxaria o registry inteiro para
-    dentro de um módulo puro). Se alguém acrescentar uma chave lá, tem de
-    acrescentar aqui — senão o lint deixa passar o que o log já redige."""
+    """The list is copied (importing the factory would pull the whole registry
+    into a pure module). If someone adds a key there, they have to add it here
+    too — otherwise the lint lets through what the log already redacts."""
     from flow.factory import _PROPRIEDADES_SECRETAS
 
     assert CHAVES_SECRETAS == _PROPRIEDADES_SECRETAS

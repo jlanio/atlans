@@ -1,14 +1,14 @@
 # tests/unit/test_wfs_authkey_rede.py
-"""O nó WFS com credencial pelo caminho de verdade: owslib → requests → rede.
+"""The WFS node with a credential through the real path: owslib → requests → network.
 
-Só o envio do `requests` é dublado (`HTTPAdapter.send`): a montagem da URL, os
-cabeçalhos, a assinatura do pedido e o seguimento de redirecionamento são os
-das bibliotecas. É onde moravam dois defeitos que o dublê do `openURL` (em
-test_wfs_authkey.py) não tinha como ver:
-- o `requests` segue redirecionamento, e só tira o `Authorization` quando o
-  host muda — a chave num cabeçalho próprio seguia para o outro host;
-- a senha recusada (401) era repetida a cada tentativa, o que bloqueia conta
-  de LDAP/AD por trás do GeoServer.
+Only the `requests` send is stubbed (`HTTPAdapter.send`): URL building, the
+headers, the request signing and redirect following are the libraries' own.
+That is where two defects lived that the `openURL` stub (in
+test_wfs_authkey.py) had no way of seeing:
+- `requests` follows redirects, and only strips `Authorization` when the host
+  changes — the key in a custom header went along to the other host;
+- the refused password (401) was repeated on every attempt, which locks out
+  LDAP/AD accounts behind the GeoServer.
 """
 import io
 
@@ -32,7 +32,7 @@ _MODOS = {
 
 
 class _Rede:
-    """Responde pelo primeiro trecho de URL que casar; guarda cada pedido que saiu."""
+    """Responds by the first URL fragment that matches; records each request sent."""
 
     def __init__(self):
         self.pedidos: list[requests.PreparedRequest] = []
@@ -82,12 +82,12 @@ def _buscar(auth, url=URL, retries=2):
 
 @pytest.mark.parametrize("modo", sorted(_MODOS))
 def test_redirecionamento_para_outro_host_e_recusado_antes_de_seguir(rede, modo):
-    # Inclusive o `return 301 https://novo$request_uri` do nginx, que repete a
-    # query — e com ela a chave da URL — no endereço novo.
+    # Including nginx's `return 301 https://novo$request_uri`, which repeats the
+    # query — and with it the URL key — at the new address.
     rede.responder("x/ows?", 302, cabecalhos={"Location": f"http://outro-host/ows?service=WFS&authkey={CHAVE}"})
     with pytest.raises(ValueError, match="redirecionou o pedido para outro endereço") as ei:
         _buscar(autenticacao_wfs(None, _MODOS[modo]))
-    assert rede.hosts() == ["x"]  # ninguém foi ao outro host, e nada foi repetido
+    assert rede.hosts() == ["x"]  # nobody went to the other host, and nothing was repeated
     assert CHAVE not in str(ei.value)
 
 
@@ -99,18 +99,18 @@ def test_redirecionamento_para_o_mesmo_host_em_outra_porta_e_recusado(rede):
 
 
 def test_a_porta_padrao_explicita_e_a_mesma_origem(rede):
-    # O GetCapabilities enlatado anuncia http://x/geoserver/ows; o nó diz http://x:80/ows.
+    # The canned GetCapabilities advertises http://x/geoserver/ows; the node says http://x:80/ows.
     rede.responder("x:80/ows?", 200, _CAPS)
     cliente = wfs._wfs_client("http://x:80/ows", "2.0.0", 5, auth=autenticacao_wfs(None, _MODOS["url"]))
-    wfs._conferir_destino(cliente, "http://x:80/ows")  # não recusa
+    wfs._conferir_destino(cliente, "http://x:80/ows")  # does not refuse
     (metodo,) = [m for m in cliente.getOperationByName("GetFeature").methods if m["type"].lower() == "get"]
-    assert f"authkey={CHAVE}" in metodo["url"]  # e a chave foi pendurada no endereço anunciado
+    assert f"authkey={CHAVE}" in metodo["url"]  # and the key was attached to the advertised address
 
 
 def test_redirecionamento_na_mesma_origem_que_perde_a_query_repoe_a_chave_da_url(rede):
-    # O `rewrite … ?` do nginx descarta a query — e com ela a chave. Nos modos
-    # cabeçalho e Basic a credencial sobrevive ao salto; na URL, o pedido
-    # seguinte saía ANÔNIMO.
+    # nginx's `rewrite … ?` drops the query — and the key with it. In the header
+    # and Basic modes the credential survives the hop; in the URL, the next
+    # request went out ANONYMOUS.
     rede.responder("x/geoserver/ows?", 200, _CAPS)
     rede.responder("x/ows?", 302, cabecalhos={"Location": "/geoserver/ows?service=WFS&request=GetCapabilities&version=2.0.0"})
     cliente = wfs._wfs_client(URL, "2.0.0", 5, auth=autenticacao_wfs(None, _MODOS["url"]))
@@ -149,7 +149,7 @@ def test_credencial_recusada_nao_e_repetida(rede, modo, status):
     rede.responder("x/ows?", status, b"<html><body>Unauthorized</body></html>")
     with pytest.raises(ValueError, match=f"recusou a credencial \\(HTTP {status}\\)") as ei:
         _buscar(autenticacao_wfs(None, _MODOS[modo]), retries=2)
-    assert len(rede.pedidos) == 1  # nenhuma nova tentativa com a senha errada
+    assert len(rede.pedidos) == 1  # no new attempt with the wrong password
     assert CHAVE not in str(ei.value)
 
 
@@ -157,7 +157,7 @@ def test_o_que_sai_de_verdade_em_cada_modo(rede):
     rede.responder("x/ows?", 200, _CAPS)
     for modo, http_auth in _MODOS.items():
         wfs._wfs_client(URL, "2.0.0", 5, auth=autenticacao_wfs(None, http_auth))
-    url, cabecalho, basic = rede.pedidos  # na ordem de _MODOS
+    url, cabecalho, basic = rede.pedidos  # in the order of _MODOS
     assert f"authkey={CHAVE}" in url.url and "authkey" not in url.headers
     assert cabecalho.headers["authkey"] == CHAVE and CHAVE not in cabecalho.url
     assert basic.headers["Authorization"].startswith("Basic ") and CHAVE not in basic.url

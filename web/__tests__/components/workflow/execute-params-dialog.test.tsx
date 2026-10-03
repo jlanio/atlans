@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest"
 import { cleanup, render, screen } from "@testing-library/react"
 import ExecuteParamsDialog from "@/app/components/workflow/execute-params-dialog"
 
-/** O diálogo é compartilhado e portado ao <body>: quem o abre da Home passa `home-portal`. */
+/** The dialog is shared and portaled to <body>: whoever opens it from Home passes `home-portal`. */
 afterEach(cleanup)
 
 const montar = (className?: string) =>

@@ -3,9 +3,9 @@ import { cleanup, render, screen } from "@testing-library/react"
 import type { ExtensaoDoWeb } from "@/extensoes"
 
 /**
- * As camadas das extensões na casca (`SidebarRoot`): cada uma é montada uma
- * vez, e uma que quebra ao desenhar sai da tela sozinha — a casca e as outras
- * ficam.
+ * The extensions' layers in the shell (`SidebarRoot`): each one is mounted
+ * once, and one that breaks while rendering leaves the screen on its own — the
+ * shell and the others stay.
  */
 
 const registro = vi.hoisted(() => ({ EXTENSOES: [] as ExtensaoDoWeb[] }))

@@ -1,5 +1,5 @@
 # tests/unit/test_storage.py
-"""Testes unitarios para o modulo de storage (MinIO)."""
+"""Unit tests for the storage module (MinIO)."""
 import os
 import pytest
 from unittest.mock import patch, MagicMock
@@ -10,7 +10,7 @@ class TestStorageModule:
     @patch.dict(os.environ, {"MINIO_ROOT_USER": "test-user", "MINIO_ROOT_PASSWORD": "test-pass"})
     @patch("app.core.storage.boto3")
     def test_get_client_creates_singleton(self, mock_boto3):
-        """Deve criar cliente S3 apenas uma vez (singleton)."""
+        """Should create the S3 client only once (singleton)."""
         import app.core.storage as storage
         storage._client = None  # Reset singleton
 
@@ -23,7 +23,7 @@ class TestStorageModule:
 
     @patch("app.core.storage._get_client")
     def test_upload_returns_md5(self, mock_get_client):
-        """Deve retornar MD5 hex do conteudo enviado."""
+        """Should return the MD5 hex of the uploaded content."""
         import app.core.storage as storage
 
         mock_client = MagicMock()
@@ -37,7 +37,7 @@ class TestStorageModule:
 
     @patch("app.core.storage._get_client")
     def test_delete_returns_true_on_success(self, mock_get_client):
-        """Deve retornar True ao deletar com sucesso."""
+        """Should return True when deleting successfully."""
         import app.core.storage as storage
 
         mock_client = MagicMock()
@@ -48,7 +48,7 @@ class TestStorageModule:
 
     @patch("app.core.storage._get_client")
     def test_head_returns_metadata(self, mock_get_client):
-        """Deve retornar size e etag do objeto."""
+        """Should return the object's size and etag."""
         import app.core.storage as storage
 
         mock_client = MagicMock()
@@ -65,7 +65,7 @@ class TestStorageModule:
 
     @patch("app.core.storage._get_client")
     def test_head_returns_none_on_not_found(self, mock_get_client):
-        """Deve retornar None quando objeto nao existe."""
+        """Should return None when the object does not exist."""
         import app.core.storage as storage
         from botocore.exceptions import ClientError
 
@@ -80,7 +80,7 @@ class TestStorageModule:
 
     @patch("app.core.storage._get_external_client")
     def test_presigned_get_generates_url(self, mock_get_ext):
-        """Deve gerar URL pre-assinada para download."""
+        """Should generate a presigned URL for download."""
         import app.core.storage as storage
 
         mock_client = MagicMock()
@@ -93,7 +93,7 @@ class TestStorageModule:
 
     @patch("app.core.storage._get_external_client")
     def test_presigned_put_generates_url(self, mock_get_ext):
-        """Deve gerar URL pre-assinada para upload."""
+        """Should generate a presigned URL for upload."""
         import app.core.storage as storage
 
         mock_client = MagicMock()
@@ -107,15 +107,15 @@ class TestStorageModule:
 # ── delete_strict + list_objects + multipart helpers ─────────────────────────
 
 class TestDeleteStrict:
-    """Atomicidade do delete (Bug 3): falha real do S3 levanta excecao —
-    callers nao apagam o registro do DB, evitando orfaos no MinIO."""
+    """Delete atomicity (Bug 3): a real S3 failure raises an exception —
+    callers do not delete the DB record, avoiding orphans in MinIO."""
 
     @patch("app.core.storage._get_client")
     def test_delete_strict_success(self, mock_get_client):
         import app.core.storage as storage
         mock_get_client.return_value = MagicMock()
 
-        # Nao levanta
+        # Does not raise
         storage.delete_strict("k", allow_missing=True)
 
     @patch("app.core.storage._get_client")
@@ -130,7 +130,7 @@ class TestDeleteStrict:
         )
         mock_get_client.return_value = mock_client
 
-        storage.delete_strict("k", allow_missing=True)  # nao levanta
+        storage.delete_strict("k", allow_missing=True)  # does not raise
 
     @patch("app.core.storage._get_client")
     def test_delete_strict_raises_on_real_error(self, mock_get_client):
@@ -166,7 +166,7 @@ class TestListObjects:
 
     @patch("app.core.storage._get_client")
     def test_list_objects_paginated(self, mock_get_client):
-        """list_objects deve iterar paginas e produzir dicts com key/size."""
+        """list_objects should iterate pages and yield dicts with key/size."""
         import app.core.storage as storage
 
         mock_client = MagicMock()

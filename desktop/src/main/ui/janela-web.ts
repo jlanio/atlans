@@ -1,29 +1,31 @@
 // desktop/src/main/ui/janela-web.ts
 //
-// A janela principal do app: exibe a interface web da instalação, dando ao
-// executor — que já roda em segundo plano — a cara de um software próprio.
+// The app's main window: shows the installation's web interface, giving the
+// executor — which already runs in the background — the face of standalone
+// software.
 //
-// ## Isolamento
+// ## Isolation
 //
-// Esta janela carrega conteúdo REMOTO, e por isso é deliberadamente separada da
-// janela do painel (windows.ts):
+// This window loads REMOTE content, and that is why it is deliberately
+// separate from the panel window (windows.ts):
 //
-//   - preload PRÓPRIO e mínimo (web-preload.cjs): não expõe `window.atlas` nem
-//     o `ipcRenderer`, apenas a ponte READ-ONLY `window.atlansDesktop` (status
-//     público do executor) — ver o cabeçalho de preload/web.ts;
-//   - `partition: 'persist:atlans'`, sessão isolada e persistente: o login (o
-//     cookie de sessão do NextAuth) sobrevive a reinícios, como num app nativo,
-//     e não se mistura com nada local;
+//   - its OWN, minimal preload (web-preload.cjs): it exposes neither
+//     `window.atlas` nor `ipcRenderer`, only the READ-ONLY bridge
+//     `window.atlansDesktop` (public executor status) — see the header of
+//     preload/web.ts;
+//   - `partition: 'persist:atlans'`, an isolated, persistent session: the
+//     login (the NextAuth session cookie) survives restarts, like in a native
+//     app, and does not mix with anything local;
 //   - `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`.
 //
-// Qualquer XSS na UI web fica contido num navegador sem privilégios — não
-// alcança o executor, o filesystem nem o IPC.
+// Any XSS in the web UI stays contained in an unprivileged browser — it does
+// not reach the executor, the filesystem or IPC.
 //
-// ## Navegação
+// ## Navigation
 //
-// A UI web autentica por credencial same-origin (sem OAuth de terceiros),
-// então a regra é estrita: a UI e a sua API navegam dentro; todo o resto vai
-// para o navegador do sistema, onde o usuário vê o endereço.
+// The web UI authenticates with a same-origin credential (no third-party
+// OAuth), so the rule is strict: the UI and its API navigate inside;
+// everything else goes to the system browser, where the user sees the address.
 import { BrowserWindow, shell } from 'electron'
 import { ICONE_APP, arquivoDoApp } from '../paths.js'
 import { UI_URL, ehExternoSeguro, ehOrigemInterna, hostsInternos } from '../../shared/ui.js'
@@ -36,25 +38,27 @@ export function janelaWebPrincipal(): BrowserWindow | null {
   return janela && !janela.isDestroyed() ? janela : null
 }
 
-// Quem processa um `atlans://` clicado DENTRO da janela web. Injetado pelo main
-// (index.ts) porque o despacho do deep link — validar, preencher o formulário,
-// trazer o painel à frente — mora lá. Sem isto, o clique no "Abrir no app" da
-// UI web embutida não teria para onde ir e morreria no `will-navigate`.
+// Who processes an `atlans://` clicked INSIDE the web window. Injected by main
+// (index.ts) because deep link dispatch — validating, filling in the form,
+// bringing the panel to the front — lives there. Without this, a click on
+// "Abrir no app" (open in app) in the embedded web UI would have nowhere to go
+// and would die in `will-navigate`.
 let encaminharDeepLink: ((url: string) => void) | null = null
 
 /**
- * Registra o tratador do deep link clicado na janela web. Chamado uma vez no
- * boot (index.ts) com a MESMA função que trata o deep link vindo de fora, para
- * que "Abrir no app" se comporte igual dentro e fora do app.
+ * Registers the handler for a deep link clicked in the web window. Called once
+ * at boot (index.ts) with the SAME function that handles a deep link coming
+ * from outside, so that "Abrir no app" behaves the same inside and outside the
+ * app.
  */
 export function definirTratadorDeepLink(fn: (url: string) => void): void {
   encaminharDeepLink = fn
 }
 
 /**
- * URL efetiva da UI. Fixa em {@link UI_URL}; `ATLANS_UI_URL` só a redireciona
- * para um staging/local em desenvolvimento. Lido AQUI, no main — nunca no
- * módulo shared, que o renderer em sandbox também importa.
+ * Effective UI URL. Fixed at {@link UI_URL}; `ATLANS_UI_URL` only redirects it
+ * to a staging/local one during development. Read HERE, in main — never in the
+ * shared module, which the sandboxed renderer also imports.
  */
 function urlDaUI(): string {
   const bruta = process.env.ATLANS_UI_URL?.trim()
@@ -63,16 +67,17 @@ function urlDaUI(): string {
     const u = new URL(bruta)
     if (u.protocol === 'https:' || u.protocol === 'http:') return u.toString()
   } catch {
-    /* entrada inválida cai no default */
+    /* invalid input falls back to the default */
   }
   return UI_URL
 }
 
-/** HTML local mostrado quando a UI não carrega (rede fora, servidor fora). */
+/** Local HTML shown when the UI does not load (network down, server down). */
 function paginaOffline(url: string): string {
-  // Página INLINE, sem depender de arquivo empacotado: funciona igual em dev
-  // (sem `vite build`) e no app empacotado. O "Tentar de novo" é um link para a
-  // própria UI — o `will-navigate` reconhece a origem e deixa passar.
+  // INLINE page, without depending on a packaged file: works the same in dev
+  // (no `vite build`) and in the packaged app. "Tentar de novo" (try again) is
+  // a link to the UI itself — `will-navigate` recognizes the origin and lets
+  // it through.
   return `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -116,7 +121,7 @@ export function abrirJanelaWeb(): BrowserWindow {
   const url = urlDaUI()
   const alvo = new URL(url)
   const hosts = hostsInternos(alvo.hostname)
-  // Staging/local por `http:` afrouxa o esquema; produção é HTTPS e ponto.
+  // Staging/local over `http:` loosens the scheme; production is HTTPS, period.
   const protocolos = alvo.protocol === 'http:' ? ['https:', 'http:'] : ['https:']
   const interno = (u: string): boolean => ehOrigemInterna(u, { hosts, protocolos })
 
@@ -126,13 +131,13 @@ export function abrirJanelaWeb(): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     icon: ICONE_APP,
-    // Evita o flash entre a janela aparecer e a UI pintar — mesmo fundo das
-    // outras janelas (ver windows.ts).
+    // Avoids the flash between the window appearing and the UI painting — same
+    // background as the other windows (see windows.ts).
     backgroundColor: '#1d1a17',
     show: false,
     autoHideMenuBar: true,
-    // Os botões da janela são pintados pelo Windows à direita, sobre o
-    // conteúdo; a faixa de arrasto vem do web-preload. Ver preload/web.ts.
+    // The window buttons are painted by Windows on the right, over the content;
+    // the drag strip comes from web-preload. See preload/web.ts.
     titleBarStyle: 'hidden',
     titleBarOverlay: { color: '#1d1a17', symbolColor: '#e7e2da', height: 32 },
     webPreferences: {
@@ -144,12 +149,13 @@ export function abrirJanelaWeb(): BrowserWindow {
     },
   })
 
-  // Conteúdo REMOTO (a UI web) roda nesta sessão. O Electron APROVA pedidos de
-  // permissão por padrão — sem handler, um XSS na página remota poderia obter
-  // câmera, microfone, geolocalização ou notificações do SO sem prompt, furando
-  // a contenção que o resto do isolamento (sandbox, sem nodeIntegration) garante.
-  // Negamos tudo por padrão; a única exceção é a ESCRITA na área de transferência,
-  // que os botões "Copiar" da UI usam (leitura de clipboard e o resto ficam fora).
+  // REMOTE content (the web UI) runs in this session. Electron APPROVES
+  // permission requests by default — without a handler, an XSS in the remote
+  // page could obtain camera, microphone, geolocation or OS notifications
+  // without a prompt, breaking the containment that the rest of the isolation
+  // (sandbox, no nodeIntegration) guarantees. We deny everything by default;
+  // the only exception is clipboard WRITE, which the UI's "Copiar" (copy)
+  // buttons use (clipboard read and the rest stay out).
   const PERMISSOES_WEB = new Set(['clipboard-sanitized-write'])
   const sessaoWeb = janela.webContents.session
   sessaoWeb.setPermissionRequestHandler((_wc, permissao, cb) => cb(PERMISSOES_WEB.has(permissao)))
@@ -157,8 +163,9 @@ export function abrirJanelaWeb(): BrowserWindow {
 
   janela.once('ready-to-show', () => janela?.show())
 
-  // Fechar ESCONDE, não encerra: o app vive na bandeja e o executor segue
-  // rodando — o mesmo contrato da janela do painel. Só a saída explícita fecha.
+  // Closing HIDES, it does not quit: the app lives in the tray and the executor
+  // keeps running — the same contract as the panel window. Only an explicit
+  // quit closes it.
   janela.on('close', (evento) => {
     if (!estaEncerrando()) {
       evento.preventDefault()
@@ -167,39 +174,42 @@ export function abrirJanelaWeb(): BrowserWindow {
   })
   janela.on('closed', () => { janela = null })
 
-  // Destino que NÃO é origem interna. Três saídas:
-  //   - `atlans://` → deep link de enrollment. O "Abrir no app" da UI web é
-  //     um `<a href="atlans://…">`; num navegador o SO o roteia ao app, mas
-  //     clicado AQUI DENTRO é só navegação e, sem este desvio, morreria abaixo
-  //     (não é interno nem esquema externo seguro). Encaminha ao MESMO tratador
-  //     do deep link externo — abre o painel com o formulário preenchido.
-  //   - http(s)/mailto → navegador do sistema, onde o usuário vê o destino.
-  //   - resto → descartado em silêncio.
+  // Destination that is NOT an internal origin. Three ways out:
+  //   - `atlans://` → enrollment deep link. The web UI's "Abrir no app" is an
+  //     `<a href="atlans://…">`; in a browser the OS routes it to the app, but
+  //     clicked IN HERE it is just navigation and, without this detour, would
+  //     die below (it is neither internal nor a safe external scheme). It is
+  //     forwarded to the SAME handler as the external deep link — it opens the
+  //     panel with the form filled in.
+  //   - http(s)/mailto → system browser, where the user sees the destination.
+  //   - anything else → silently discarded.
   //
-  // `shell.openExternal` entrega o destino ao SO, então o esquema precisa passar
-  // por allowlist (ehExternoSeguro): um XSS ou redirect na página remota poderia
-  // disparar `file:`, `smb:` (UNC → vazamento de hash NTLM no Windows) — e o
-  // próprio `atlans://` NÃO vai por aqui, é desviado antes. `interpretar` (no
-  // main) revalida o link e nunca enrola sozinho: exige confirmação humana.
+  // `shell.openExternal` hands the destination to the OS, so the scheme must
+  // go through an allowlist (ehExternoSeguro): an XSS or redirect in the remote
+  // page could trigger `file:`, `smb:` (UNC → NTLM hash leak on Windows) — and
+  // `atlans://` itself does NOT go this way, it is diverted earlier.
+  // `interpretar` (in main) revalidates the link and never enrolls on its own:
+  // it requires human confirmation.
   const tratarExterno = (destino: string): void => {
     if (ehDeepLink(destino)) { encaminharDeepLink?.(destino); return }
     if (ehExternoSeguro(destino)) void shell.openExternal(destino)
   }
 
-  // `target=_blank`/`window.open`: origem interna reaproveita esta janela;
-  // externa (esquema seguro) vai para o navegador. Nunca abre uma BrowserWindow
-  // sem barra de endereço para conteúdo externo — o usuário precisa ver o destino.
+  // `target=_blank`/`window.open`: an internal origin reuses this window; an
+  // external one (safe scheme) goes to the browser. Never opens a
+  // BrowserWindow without an address bar for external content — the user
+  // needs to see the destination.
   janela.webContents.setWindowOpenHandler(({ url: destino }) => {
     if (interno(destino)) void janela?.loadURL(destino)
     else tratarExterno(destino)
     return { action: 'deny' }
   })
 
-  // Navegação do frame de topo: interna segue; externa vai para o navegador.
-  // `will-redirect` recebe o MESMO tratamento — um redirect 30x do servidor não
-  // dispara `will-navigate`, e sem isto uma origem interna redirecionada para
-  // fora terminaria RENDERIZADA nesta janela sem barra de endereço, com o
-  // preload anexado. Os dois eventos têm a mesma assinatura (evento, url).
+  // Top-frame navigation: internal proceeds; external goes to the browser.
+  // `will-redirect` gets the SAME treatment — a server 30x redirect does not
+  // fire `will-navigate`, and without this an internal origin redirected
+  // outside would end up RENDERED in this window without an address bar, with
+  // the preload attached. Both events have the same signature (event, url).
   janela.webContents.on('will-navigate', (evento, destino) => {
     if (interno(destino)) return
     evento.preventDefault()
@@ -211,8 +221,8 @@ export function abrirJanelaWeb(): BrowserWindow {
     tratarExterno(destino)
   })
 
-  // Sem barra de endereço, o DevTools por atalho é a única forma de investigar
-  // a UI embutida na máquina do usuário — igual às outras janelas.
+  // Without an address bar, DevTools via shortcut is the only way to inspect
+  // the embedded UI on the user's machine — same as the other windows.
   janela.webContents.on('before-input-event', (_evento, input) => {
     if (input.type !== 'keyDown') return
     const f12 = input.key === 'F12'
@@ -220,12 +230,13 @@ export function abrirJanelaWeb(): BrowserWindow {
     if (f12 || ctrlShiftI) janela?.webContents.toggleDevTools()
   })
 
-  // Rede/servidor fora: o frame principal falha e a janela ficaria branca.
-  // Troca pela página local com "Tentar de novo".
+  // Network/server down: the main frame fails and the window would stay blank.
+  // Swap in the local page with "Tentar de novo" (try again).
   janela.webContents.on('did-fail-load', (_e, codigo, _desc, urlQueFalhou, ehFramePrincipal) => {
-    // Só o frame de topo, e só carregando a UI remota. `-3` = ABORTED, uma
-    // navegação substituída por outra — trocar aí piscaria à toa; e a própria
-    // página offline (data:) nunca casa com `^https?:`, então não há laço.
+    // Only the top frame, and only while loading the remote UI. `-3` = ABORTED,
+    // a navigation replaced by another — swapping there would flicker for
+    // nothing; and the offline page itself (data:) never matches `^https?:`,
+    // so there is no loop.
     if (!ehFramePrincipal || codigo === -3) return
     if (!/^https?:/i.test(urlQueFalhou)) return
     const html = paginaOffline(url)

@@ -1,7 +1,7 @@
 "use client"
 
-// Navegação lateral das Configurações do admin, o catálogo de seções e o
-// carimbo de frescor do cabeçalho.
+// Side navigation of the admin Settings, the section catalog and the header's
+// freshness stamp.
 
 import { useEffect, useState } from "react"
 import { Badge } from "@/app/components/ui/badge"
@@ -9,7 +9,7 @@ import { TbArchive, TbCategory, TbCpu, TbDatabase, TbDatabaseImport, TbLayoutDas
 import { cn } from "@/lib/utils"
 import { textoDeFrescor } from "@/app/components/observability/cabecalho"
 
-// ── Navegação e visão geral ───────────────────────────────────────────────────
+// ── Navigation and overview ───────────────────────────────────────────────────
 
 export type SectionId = "overview" | "seguranca" | "armazenamento" | "drive" | "nodes" | "assistente" | "execucao" | "lixeira"
 
@@ -21,8 +21,8 @@ export const SECTIONS: { id: SectionId; label: string; icon: React.ElementType }
   { id: "nodes",         label: "Nodes",         icon: TbCategory },
   { id: "assistente",    label: "Assistente",    icon: TbCpu },
   { id: "execucao",      label: "Execução",      icon: TbServer },
-  // TbArchive, não TbTrash: este último já é o botão de purga de armazenamento
-  // logo acima, e são ações diferentes (bytes vs. registro).
+  // TbArchive, not TbTrash: the latter is already the storage purge button
+  // just above, and they are different actions (bytes vs. record).
   { id: "lixeira",       label: "Lixeira",       icon: TbArchive },
 ]
 
@@ -36,7 +36,7 @@ export function SettingsNav({
   return (
     <nav
       aria-label="Seções de configuração"
-      // Rola horizontalmente no mobile e vira coluna fixa a partir de lg.
+      // Scrolls horizontally on mobile and becomes a fixed column from lg up.
       className="flex gap-1 overflow-x-auto pb-1 lg:sticky lg:top-4 lg:w-52 lg:shrink-0 lg:flex-col lg:overflow-visible lg:pb-0"
     >
       {SECTIONS.map(s => {
@@ -69,7 +69,7 @@ export function SettingsNav({
   )
 }
 
-/** "atualizado há 20 s" com relógio próprio: só este span re-renderiza. */
+/** "atualizado há 20 s" (updated 20 s ago) with its own clock: only this span re-renders. */
 export function Frescor({ carimbo }: { carimbo: number }) {
   const [agora, setAgora] = useState(() => Date.now())
   useEffect(() => {

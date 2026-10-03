@@ -19,11 +19,11 @@ export interface INodesItemsDrawer extends INodesAPI<string> {
   icon: IconType
 }
 
-// A cor do tipo NÃO se decide aqui. `TYPE_STYLES` se declara "fonte única de
-// verdade" e é o que pinta o card no canvas e o cabeçalho do modal; este arquivo
-// mantinha duas tabelas próprias que discordavam dela em QUATRO dos seis tipos —
-// trigger era azul aqui e violeta lá, ação âmbar aqui e azul-céu lá. Quem
-// clicava num item âmbar recebia um nó azul no canvas.
+// The type color is NOT decided here. `TYPE_STYLES` declares itself the "single
+// source of truth" and is what paints the card on the canvas and the modal
+// header; this file kept two tables of its own that disagreed with it on FOUR of
+// the six types — trigger was blue here and violet there, action amber here and
+// sky blue there. Clicking an amber item got you a blue node on the canvas.
 
 interface NodesDrawerProps {
   aliasFilter: string
@@ -37,17 +37,17 @@ const NodesDrawer = ({ aliasFilter }: NodesDrawerProps) => {
   const setNewlyAddedNodeId = useWorkflowCatalogStore(s => s.setNewlyAddedNodeId)
   const { addEdges, addNodes, getNode } = useReactFlow<INodeContext, Edge>()
   const { linkHandleIdParam, linkNodeIdParam, removeLinkNodeParam } = useLinkNodeParams()
-  // A lista de nós do canvas só serve para duas perguntas pontuais: "está
-  // vazio?" (aqui) e "onde está o nó de onde saiu o +?" (dentro do addNode, via
-  // getNode). Assinar `useNodes()` refiltrava o catálogo inteiro a cada quadro
-  // de arraste, com o drawer fechado e fora da tela.
+  // The canvas node list only serves two specific questions: "is it empty?"
+  // (here) and "where is the node the + came from?" (inside addNode, via
+  // getNode). Subscribing to `useNodes()` refiltered the whole catalog on every
+  // drag frame, with the drawer closed and off screen.
   const canvasVazio = useStore(s => s.nodeLookup.size === 0)
 
   const drawerType = canvasVazio ? "trigger" : nodesDrawerState
   const hasTypeFilter = drawerType !== "closed" && drawerType !== "opened"
 
-  // Derivado, e não estado + efeito: o cálculo é síncrono e o `setItems` só
-  // servia para guardá-lo, ao custo de um segundo render do drawer inteiro.
+  // Derived, not state + effect: the computation is synchronous and `setItems`
+  // only served to store it, at the cost of a second render of the whole drawer.
   const items = useMemo<INodesItemsDrawer[]>(() => {
     const filtro = aliasFilter.toLowerCase()
     return (nodesAPI ?? [])
@@ -82,8 +82,8 @@ const NodesDrawer = ({ aliasFilter }: NodesDrawerProps) => {
     const newNode: INodeContext = {
       id: uuid(),
       type: getTypeIcon(item),
-      // O contrato vem DEPOIS do spread de `item`: num nó de entradas dinâmicas
-      // a lista do catálogo é vazia e quem manda são as portas do usuário.
+      // The contract comes AFTER the `item` spread: in a node with dynamic inputs
+      // the catalog list is empty and the user's ports are what counts.
       data: { ...data, fields, properties, ...contratoDoNo(item, properties) },
       position,
     }
@@ -94,31 +94,31 @@ const NodesDrawer = ({ aliasFilter }: NodesDrawerProps) => {
     removeLinkNodeParam()
 
     if (nodeFound) {
-      // Sem from_key o executor espalha TODAS as saídas do pai no filho
-      // (inputs.update), ignorando a porta de onde o usuário puxou o "+".
-      // Mesma regra do arrastar-e-soltar do canvas.
+      // Without from_key the executor spreads ALL of the parent's outputs into the
+      // child (inputs.update), ignoring the port the user pulled the "+" from.
+      // Same rule as the canvas drag-and-drop.
       //
-      // `resolveFromKey` devolve undefined quando a escolha é ambígua. O canvas
-      // resolvia isso abrindo um seletor; aqui a aresta nascia SEM chave —
-      // silenciosamente, e justamente no caso que mais precisava de uma. Agora
-      // os dois caminhos usam o primeiro candidato e o badge da aresta permite
-      // trocar depois.
+      // `resolveFromKey` returns undefined when the choice is ambiguous. The
+      // canvas resolved that by opening a picker; here the edge was born WITHOUT
+      // a key — silently, and precisely in the case that needed one most. Now
+      // both paths use the first candidate and the edge badge lets you change
+      // it later.
       const candidatos = getCandidateKeys(nodeFound.data)
       const from_key = resolveFromKey(linkHandleIdParam, candidatos) ?? candidatos[0]?.name
-      // Destino multi-input (Join layerA/layerB): a aresta nasce na PRIMEIRA
-      // porta declarada — sem `to_key`, `colunas-conhecidas` indexa pela chave
-      // errada e a sugestão por porta fica vazia para sempre; e o executor cai
-      // em `inputs[from_key]`. Mesma regra do arrastar-e-soltar
-      // (`resolveToKey`), que aqui não tem handle escolhido para consultar.
+      // Multi-input target (Join layerA/layerB): the edge is born on the FIRST
+      // declared port — without `to_key`, `colunas-conhecidas` indexes by the
+      // wrong key and the per-port suggestion stays empty forever; and the
+      // executor falls back to `inputs[from_key]`. Same rule as drag-and-drop
+      // (`resolveToKey`), which here has no chosen handle to consult.
       const to_key = portaDeEntradaPadrao(newNode.data.inputs)
       const newEdge: Edge = {
         id: uuid(),
         source: nodeFound.id,
         sourceHandle: linkHandleIdParam,
         target: newNode.id,
-        // O handle nomeado existe sempre que há 2+ inputs declarados — ancorar
-        // a linha nele mantém o visual e o dado (`to_key`) contando a mesma
-        // história.
+        // The named handle exists whenever there are 2+ declared inputs — anchoring
+        // the line on it keeps the visual and the data (`to_key`) telling the
+        // same story.
         ...(to_key ? { targetHandle: to_key } : {}),
         type: "custom",
         ...(from_key || to_key
@@ -129,10 +129,10 @@ const NodesDrawer = ({ aliasFilter }: NodesDrawerProps) => {
     }
   }
 
-  // Determina se deve agrupar (sem filtro de tipo específico e com busca ou sem tipo selecionado)
+  // Decides whether to group (no specific type filter, and with a search or no type selected)
   const shouldGroup = !hasTypeFilter && aliasFilter !== ""
 
-  // Agrupa por tipo quando buscando sem categoria
+  // Groups by type when searching without a category
   const grouped = shouldGroup
     ? items.reduce<Record<string, INodesItemsDrawer[]>>((acc, item) => {
         const key = item.type as string
@@ -183,18 +183,18 @@ const NodesDrawer = ({ aliasFilter }: NodesDrawerProps) => {
 }
 
 /**
- * Um nó do catálogo, pronto para entrar no canvas.
+ * A catalog node, ready to go onto the canvas.
  *
- * O ladrilho do ícone repete `bg`/`icon` do tipo — as mesmas classes que o card
- * do canvas usa — para o item da lista PARECER o nó que ele cria. Antes era um
- * `bg-muted` neutro, e a única pista de tipo era a cor do ícone, que discordava
- * da do canvas.
+ * The icon tile repeats the type's `bg`/`icon` — the same classes the canvas
+ * card uses — so the list item LOOKS LIKE the node it creates. It used to be a
+ * neutral `bg-muted`, and the only type cue was the icon color, which disagreed
+ * with the canvas's.
  */
 function NodeCard({ item, onAdd, mostrarTipo }: {
   item: INodesItemsDrawer
   onAdd: (item: INodesItemsDrawer) => void
-  /** O selo de tipo só informa quando a lista mistura tipos. Sob um filtro de
-   *  categoria todos são iguais, e repeti-lo em cada linha é ruído. */
+  /** The type badge only informs when the list mixes types. Under a category
+   *  filter they are all the same, and repeating it on every row is noise. */
   mostrarTipo: boolean
 }) {
   const estilo = estiloDoTipo(item.type as string)
@@ -216,9 +216,9 @@ function NodeCard({ item, onAdd, mostrarTipo }: {
           <h4 className="text-sm font-medium text-foreground truncate leading-tight">
             {item.alias}
           </h4>
-          {/* Presença fixa, e não `hidden group-hover:inline-flex`: aparecer no
-              hover mudava a largura disponível para o título, que é truncado —
-              passar o mouse encolhia o nome do nó. */}
+          {/* Always present, not `hidden group-hover:inline-flex`: appearing on
+              hover changed the width available to the title, which is truncated —
+              hovering shrank the node name. */}
           {mostrarTipo && item.type && (
             <span className={cn(
               "text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0",

@@ -1,21 +1,21 @@
 // desktop/scripts/build-python-runtime.mjs
 //
-// Instala as dependencias do executor (o lock executor/requirements-full.txt,
-// com hash) no runtime baixado por fetch-python.mjs, poda o que nao vai a
-// lugar nenhum e escreve resources/payload.json com as medicoes.
+// Installs the executor's dependencies (the executor/requirements-full.txt
+// lock, with hashes) into the runtime downloaded by fetch-python.mjs, prunes
+// what goes nowhere and writes resources/payload.json with the measurements.
 //
-// Duas decisoes que valem explicacao:
+// Two decisions worth explaining:
 //
-// 1. NAO criamos venv. Instalamos direto no interpretador. Um venv grava
-//    `home = <caminho absoluto do build agent>` em pyvenv.cfg e embute o mesmo
-//    caminho nos .exe de Scripts/ — nada disso existe na maquina do usuario.
-//    Instalar direto torna a arvore relocavel por construcao, sem passo de
-//    "primeira execucao" (era o que o conda-unpack do agent-desktop antigo
-//    fazia, extraindo ~600 MB no primeiro boot).
+// 1. We do NOT create a venv. We install directly into the interpreter. A venv
+//    writes `home = <absolute path of the build agent>` into pyvenv.cfg and
+//    embeds the same path in the .exe files of Scripts/ — none of that exists
+//    on the user's machine. Installing directly makes the tree relocatable by
+//    construction, with no "first run" step (which is what the old
+//    agent-desktop's conda-unpack did, extracting ~600 MB on first boot).
 //
-// 2. `--only-binary=:all:`. Se algum dia uma dependencia perder a wheel
-//    win_amd64, queremos o build VERMELHO no CI, e nao um runner tentando
-//    compilar GDAL e produzindo um bundle que so funciona nele.
+// 2. `--only-binary=:all:`. If some day a dependency loses its win_amd64
+//    wheel, we want the build RED in CI, not a runner trying to compile GDAL
+//    and producing a bundle that only works on it.
 //
 //   node scripts/build-python-runtime.mjs [--no-prune] [--no-compile]
 import fs from 'node:fs'
@@ -44,14 +44,14 @@ function medir(rotulo, fn) {
 assertRuntimeExists()
 const spec = readRuntimeSpec()
 
-// ── Runtime limpo ────────────────────────────────────────────────────────────
-// A poda remove o pip (nada e instalado em runtime), entao rodar este script
-// duas vezes falhava com "No module named pip" — o build so funcionava a partir
-// de um `fetch` novo, e `npm run runtime` quebrava na segunda execucao.
+// ── Clean runtime ────────────────────────────────────────────────────────────
+// Pruning removes pip (nothing is installed at runtime), so running this script
+// twice failed with "No module named pip" — the build only worked from a fresh
+// `fetch`, and `npm run runtime` broke on the second run.
 //
-// Re-extrair e barato (o tarball esta em cache e a verificacao de hash ja
-// aconteceu) e torna o build idempotente, que e o que um script de build
-// precisa ser.
+// Re-extracting is cheap (the tarball is cached and the hash check has already
+// happened) and makes the build idempotent, which is what a build script needs
+// to be.
 if (!fs.existsSync(path.join(SP, 'pip'))) {
   step('Runtime ja podado — re-extraindo do cache')
   const tarball = path.join(RESOURCES, '.cache', spec.asset)
@@ -77,9 +77,9 @@ log(`runtime limpo: ${mb(bruto)} MB`)
 
 python([
   '-m', 'pip', 'install',
-  '--require-hashes',             // todo arquivo conferido com o hash do lock
-  '--only-binary=:all:',          // nunca compilar — ver cabecalho
-  '--no-compile',                 // .pyc vem depois, de uma vez, no compileall
+  '--require-hashes',             // every file checked against the lock's hash
+  '--only-binary=:all:',          // never compile — see header
+  '--no-compile',                 // .pyc comes later, all at once, in compileall
   '--no-warn-script-location',
   '--disable-pip-version-check',
   '--quiet',
@@ -89,9 +89,10 @@ const instalado = dirSize(PY_DIR)
 ok(`instalado: ${mb(instalado)} MB (+${mb(instalado - bruto)} MB)`)
 medicoes.push({ passo: 'pip install', delta_bytes: -(instalado - bruto), total_bytes: instalado })
 
-// ── Poda ─────────────────────────────────────────────────────────────────────
-// Cada passo e medido: sem numero, "podar" vira crenca. Os valores da Fase 0
-// estao em docs — se um passo comecar a render zero, alguem mudou a arvore.
+// ── Pruning ──────────────────────────────────────────────────────────────────
+// Every step is measured: without a number, "pruning" becomes a belief. The
+// Phase 0 values are in docs — if a step starts yielding zero, someone changed
+// the tree.
 if (semPoda) {
   log('poda desativada (--no-prune)')
 } else {
@@ -99,7 +100,7 @@ if (semPoda) {
 
   medir('stdlib GUI/test', () => {
     for (const alvo of ['Lib/test', 'Lib/idlelib', 'Lib/tkinter', 'tcl']) rmrf(path.join(PY_DIR, alvo))
-    // _tkinter.pyd sem tkinter/ e peso morto; idem as DLLs do Tcl/Tk.
+    // _tkinter.pyd without tkinter/ is dead weight; same for the Tcl/Tk DLLs.
     walk(path.join(PY_DIR, 'DLLs'), (p, e) => {
       if (e.isFile() && /^(tcl|tk|_tkinter)/i.test(e.name)) fs.rmSync(p, { force: true })
     })
@@ -116,15 +117,15 @@ if (semPoda) {
     rmrf(path.join(PY_DIR, 'libs'))
     walk(SP, (p, e) => {
       if (e.isDirectory() && e.name === 'include') { rmrf(p); return false }
-      // .pyi/.pxd/.pyx so servem para type-checking e para compilar extensao —
-      // nada disso acontece na maquina do usuario.
+      // .pyi/.pxd/.pyx only serve for type-checking and for compiling extensions —
+      // none of that happens on the user's machine.
       if (e.isFile() && /\.(pyi|c|h|pxd|pyx|lib|exp)$/i.test(e.name)) fs.rmSync(p, { force: true })
     })
   })
 
   medir('pip/setuptools/Scripts', () => {
-    // Nada e instalado em runtime, e o entry point e `python.exe -m executor` —
-    // nenhum console script de Scripts/ e usado.
+    // Nothing is installed at runtime, and the entry point is
+    // `python.exe -m executor` — no console script from Scripts/ is used.
     for (const alvo of ['pip', 'setuptools', 'wheel', 'pkg_resources', '_distutils_hack']) {
       rmrf(path.join(SP, alvo))
     }
@@ -133,23 +134,24 @@ if (semPoda) {
     }
     rmrf(path.join(PY_DIR, 'Scripts'))
 
-    // Os .pth do setuptools sao executados pelo `site` em TODO start do Python,
-    // e o `distutils-precedence.pth` faz `import _distutils_hack` — que acabou
-    // de ser removido acima. O resultado e um traceback de 6 linhas em toda
-    // invocacao do executor, no stderr, antes de qualquer coisa util:
+    // setuptools' .pth files are executed by `site` on EVERY Python start, and
+    // `distutils-precedence.pth` does `import _distutils_hack` — which was just
+    // removed above. The result is a 6-line traceback on every executor
+    // invocation, on stderr, before anything useful:
     //
     //   Error processing line 1 of ...distutils-precedence.pth
     //   ModuleNotFoundError: No module named '_distutils_hack'
     //
-    // Nao quebra nada, mas polui o painel de log do app e assusta quem le.
+    // It breaks nothing, but it pollutes the app's log panel and scares whoever
+    // reads it.
     for (const pth of ['distutils-precedence.pth', '__editable__.pth']) {
       fs.rmSync(path.join(SP, pth), { force: true })
     }
   })
 
   medir('botocore/data (exceto s3 e sts)', () => {
-    // Unico uso de boto3 no projeto e flow/nodes/outputs/save_to_s3.py contra
-    // MinIO. Os outros ~400 servicos da AWS sao ~20 MB de JSON inerte.
+    // The only use of boto3 in the project is flow/nodes/outputs/save_to_s3.py
+    // against MinIO. The other ~400 AWS services are ~20 MB of inert JSON.
     const data = path.join(SP, 'botocore', 'data')
     if (!fs.existsSync(data)) return
     for (const e of fs.readdirSync(data, { withFileTypes: true })) {
@@ -164,20 +166,21 @@ if (semPoda) {
   })
 }
 
-// ── Pre-compilacao ───────────────────────────────────────────────────────────
-// Feita DEPOIS da poda (compilar o que seria apagado e desperdicio) e mantendo
-// os .py: traceback legivel no suporte vale mais que os MB economizados.
+// ── Pre-compilation ──────────────────────────────────────────────────────────
+// Done AFTER pruning (compiling what would be deleted is waste) and keeping
+// the .py files: a readable traceback in support is worth more than the MB saved.
 //
-// Compilar aqui e o que permite NAO passar PYTHONDONTWRITEBYTECODE no spawn:
-// sem .pyc pronto, cada boot recompila pandas/geopandas e o executor demora
-// visivelmente para subir.
+// Compiling here is what makes it possible NOT to pass PYTHONDONTWRITEBYTECODE
+// at spawn: without ready .pyc files, every boot recompiles pandas/geopandas
+// and the executor takes visibly longer to start.
 if (semCompile) {
   log('compileall desativado (--no-compile)')
 } else {
   step('Pre-compilando (.pyc)')
   medir('compileall', () => {
-    // -q silencia; falha de sintaxe em modulo isolado (ha varios em stdlib para
-    // versoes futuras) nao deve derrubar o build — dai o exit code ignorado.
+    // -q silences; a syntax error in an isolated module (there are several in
+    // the stdlib for future versions) must not bring down the build — hence the
+    // ignored exit code.
     python(['-m', 'compileall', '-q', '-j', '0', path.join(PY_DIR, 'Lib')], { stdio: 'ignore' })
   })
 }
@@ -196,9 +199,9 @@ const payload = {
   runtime: { ...spec, _comment: undefined },
   python: pythonCapture(['-c', 'import sys; print(sys.version.split()[0])']).trim(),
   pacotes: versoes,
-  // `final` inclui os .pyc do compileall, entao `instalado - final` NAO e o
-  // quanto a poda cortou — seria a poda menos a pre-compilacao, um numero que
-  // nao significa nada. Os dois sao reportados separados.
+  // `final` includes the .pyc files from compileall, so `instalado - final` is
+  // NOT how much pruning cut — it would be pruning minus pre-compilation, a
+  // number that means nothing. Both are reported separately.
   tamanho: {
     runtime_limpo_mb: +mb(bruto),
     apos_pip_mb: +mb(instalado),

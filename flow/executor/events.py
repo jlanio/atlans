@@ -1,5 +1,5 @@
 # flow/executor/events.py
-"""Publicação de eventos de execução de nós."""
+"""Publishing of node execution events."""
 import time
 from typing import Dict, Any
 from flow.executor.utils import _build_debug_summary
@@ -19,8 +19,8 @@ def publish_started(publisher, task_id: str, node_id: str, node_defs: Dict[str, 
         extra = {
             "node_name": node_def.get("name", node_id),
             "node_type": node_def.get("type", ""),
-            # Denominador do progresso ("nó 7 de 12"). Reafirmado a cada nó, de
-            # modo que um evento perdido no caminho não deixa o painel sem ele.
+            # Progress denominator ("node 7 of 12"). Restated on every node,
+            # so that an event lost along the way does not leave the panel without it.
             "nodes_total": len(node_defs),
         }
         publisher.publish_event(
@@ -55,12 +55,12 @@ def publish_completed(
         }
         if output_keys is not None:
             extra["output_keys"] = output_keys
-        # Colunas de cada saida. Vai junto do evento (e nao so no node_stats
-        # persistido) para o editor ter sugestao de nome de coluna assim que o
-        # run termina, sem uma segunda ida ao servidor. Num evento acima do teto
-        # do protocolo ela sobrevive: a reducao (flow/utils/publisher/reducao.py)
-        # corta antes o traceback e o schema_drift — chave pesada nova neste
-        # `extra` entra em CHAVES_PESADAS_DO_EXTRA de la.
+        # Columns of each output. Goes along with the event (and not only in the
+        # persisted node_stats) so the editor has column name suggestions as soon as
+        # the run finishes, without a second trip to the server. In an event above the
+        # protocol ceiling it survives: the reduction (flow/utils/publisher/reducao.py)
+        # cuts the traceback and schema_drift first — a new heavy key in this
+        # `extra` goes into CHAVES_PESADAS_DO_EXTRA there.
         if output_columns:
             extra["output_columns"] = output_columns
         if branch_result is not None:
@@ -72,9 +72,9 @@ def publish_completed(
         if schema_drift:
             extra["schema_drift"] = schema_drift
 
-        # Categoria de erro POR NÓ. A taxonomia já existia para o job inteiro
-        # (executor → servidor); publicá-la aqui é o que permite o painel dizer
-        # "entrada inválida, repetir não resolve" em vez de só cuspir o stack.
+        # Error category PER NODE. The taxonomy already existed for the whole job
+        # (executor → server); publishing it here is what lets the panel say
+        # "invalid input, retrying will not help" instead of just spitting out the stack.
         if status == "failed" and exception is not None:
             category = classify_error(exception)
             extra["error_category"] = category

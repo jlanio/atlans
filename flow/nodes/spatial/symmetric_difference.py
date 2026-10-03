@@ -6,7 +6,7 @@ from flow.nodes.spatial.sobreposicao_binaria import SobreposicaoBinaria
 @register_node
 class SymmetricDifferenceNode(SobreposicaoBinaria):
     """
-    Executa a diferença simétrica entre duas camadas vetoriais (A △ B).
+    Computes the symmetric difference between two vector layers (A △ B).
     """
 
     HOW = 'symmetric_difference'

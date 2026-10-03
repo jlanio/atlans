@@ -1,5 +1,5 @@
 # flow/nodes/base.py
-# Define a classe abstrata que todos os nós devem estender
+# Defines the abstract class that all nodes must extend
 import asyncio
 from abc import ABC, abstractmethod
 from typing import Any, Dict
@@ -10,42 +10,42 @@ class BaseNode(ABC):
     @abstractmethod
     def description(cls) -> Dict[str, Any]:
         """
-        Metadados para descoberta e geração de interface. O contrato completo
-        (vocabulários fechados e chaves aceitas) mora em flow/nodes/contrato.py
-        e é VALIDADO na importação pelo @register_node — typo aqui morre no CI.
+        Metadata for discovery and interface generation. The complete contract
+        (closed vocabularies and accepted keys) lives in flow/nodes/contrato.py
+        and is VALIDATED at import by @register_node — a typo here dies in CI.
 
         {
-            'name': 'NomeUnico',         # Chave de registro (sem espaços)
-            'alias': 'Nome Legível',     # Nome exibido no editor
-            'description': '...',        # Descrição do nó
-            'type': 'action',            # CATEGORIA: trigger|action|spatial|datasource|output|control
-            'properties': [              # Parâmetros configuráveis (widgets do form)
+            'name': 'NomeUnico',         # Registry key (no spaces)
+            'alias': 'Nome Legível',     # Name shown in the editor
+            'description': '...',        # Node description
+            'type': 'action',            # CATEGORY: trigger|action|spatial|datasource|output|control
+            'properties': [              # Configurable parameters (form widgets)
                 {
-                    'name': 'param1',       # Chave do parâmetro
+                    'name': 'param1',       # Parameter key
                     'type': 'string',       # TIPOS_DE_PROPRIEDADE (contrato.py): string|number|
                                             #   integer|boolean|object|select|chips|credential|
                                             #   keyvalue|code|ports|drive|artifact|sql
-                    'default': '',          # Valor padrão quando não informado
-                    'description': '...',   # Descrição exibida no editor
-                    # select exige 'options'; credential exige 'credential_types';
-                    # opcionais: label, drive_extensions, visibleWhen, suggest_columns.
+                    'default': '',          # Default value when not provided
+                    'description': '...',   # Description shown in the editor
+                    # select requires 'options'; credential requires 'credential_types';
+                    # optional: label, drive_extensions, visibleWhen, suggest_columns.
                 },
             ],
-            'outputs': [                 # Campos de SAÍDA — a fonte única, tipada:
-                {                        #   as chaves do dict que execute() devolve
+            'outputs': [                 # OUTPUT fields — the single, typed source:
+                {                        #   the keys of the dict that execute() returns
                     'name': 'output',
                     'type': 'geodataframe',  # TIPOS_DE_CAMPO: geodataframe|string|number|
                                              #   boolean|object|list|any
                     'description': '...',
-                    # 'port': True em campos com ponto de conexão próprio no
-                    # canvas (2+ deles = handles nomeados; nenhum = saída anônima).
+                    # 'port': True on fields with their own connection point on the
+                    # canvas (2+ of them = named handles; none = anonymous output).
                 },
             ],
-            # 'inputs': [{'name': 'layerA'}, ...]  # portas de entrada nomeadas (nós binários: get_pair)
-            # 'branches': True       # nó de RAMO: handles true/false roteiam a execução
-            # 'dynamic_inputs': True     # entradas vêm da propriedade `ports`
-            # 'dynamic_output': True     # saídas vêm da propriedade `output_vars`
-            # 'outputs_from_ports': True # saídas vêm da propriedade `ports` (SubWorkflowInput)
+            # 'inputs': [{'name': 'layerA'}, ...]  # named input ports (binary nodes: get_pair)
+            # 'branches': True       # BRANCH node: true/false handles route the execution
+            # 'dynamic_inputs': True     # inputs come from the `ports` property
+            # 'dynamic_output': True     # outputs come from the `output_vars` property
+            # 'outputs_from_ports': True # outputs come from the `ports` property (SubWorkflowInput)
             # 'requires_credential': True / 'source_kind': 'wfs'
         }
         """
@@ -53,56 +53,56 @@ class BaseNode(ABC):
 
     def __init__(self, node_id: str, parameters: dict):
         """
-        Construtor comum a todos os nós.
-        :param node_id: identificador único do nó
-        :param parameters: dicionário de parâmetros configurados pelo usuário
+        Constructor common to all nodes.
+        :param node_id: unique identifier of the node
+        :param parameters: dictionary of parameters configured by the user
         """
         self.node_id = node_id
         self.parameters = parameters or {}
-        # Injetados pelo executor — permitem publicação de eventos customizados no terminal
+        # Injected by the executor — allow publishing custom events to the terminal
         self._publisher = None
         self._task_id: str | None = None
         self._debug_mode: bool = False
         self._workspace_id: str | None = None  # Isolamento multi-tenant
         self._workflow_hash: str | None = None  # Identifica o workflow para state cross-run
-        # Context compartilhado com o executor (mesmo dict). Setado pelo
-        # WorkflowExecutor no momento da instanciacao. Hoje carrega
-        # _subflow_ancestors (usado por SubWorkflowNode para loop detection).
+        # Context shared with the executor (same dict). Set by the
+        # WorkflowExecutor at instantiation time. Today it carries
+        # _subflow_ancestors (used by SubWorkflowNode for loop detection).
         self.context: Dict[str, Any] = {}
 
     async def setup(self) -> None:
-        """Hook opcional chamado antes de execute(). Útil para preparar recursos."""
+        """Optional hook called before execute(). Useful for preparing resources."""
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Método principal que contém a lógica do nó.
-        :param inputs: valores de entrada de nós anteriores mapeados por nome
-        :return: valores de saída mapeados por nome
+        Main method that contains the node's logic.
+        :param inputs: input values from previous nodes mapped by name
+        :return: output values mapped by name
 
-        IMPLEMENTE `execute_sync` SEMPRE QUE O NÓ FOR CPU-BOUND (pandas,
-        geopandas, shapely, Jinja linha a linha). Só sobrescreva `execute` quando
-        o nó realmente aguarda I/O assíncrono (asyncpg, httpx) — e, mesmo aí,
-        mande o pós-processamento pesado para `asyncio.to_thread`.
+        IMPLEMENT `execute_sync` WHENEVER THE NODE IS CPU-BOUND (pandas,
+        geopandas, shapely, Jinja row by row). Only override `execute` when
+        the node really awaits asynchronous I/O (asyncpg, httpx) — and, even then,
+        send the heavy post-processing to `asyncio.to_thread`.
 
-        O motivo é arquitetural: no executor externo o engine roda no MESMO event
-        loop que atende o WebSocket. Enquanto um `execute` bloqueia, heartbeat,
-        capacity, node_events, resultados e o `cancel` do usuário deixam de ser
-        agendados — passando de 90s o servidor fecha a sessão com 4408 e o run
-        inteiro morre, junto com o dos OUTROS jobs do mesmo executor. Por isso o
-        default aqui NÃO é "roda no loop": é despachar o corpo síncrono para o
-        pool de threads dedicado (executor/main.py o instala como default).
+        The reason is architectural: in the external executor the engine runs on the
+        SAME event loop that serves the WebSocket. While an `execute` blocks, heartbeat,
+        capacity, node_events, results and the user's `cancel` stop being
+        scheduled — past 90s the server closes the session with 4408 and the whole
+        run dies, along with those of the OTHER jobs on the same executor. That's why
+        the default here is NOT "run on the loop": it's dispatching the synchronous
+        body to the dedicated thread pool (executor/main.py installs it as the default).
         """
         return await asyncio.to_thread(self.execute_sync, inputs)
 
     def execute_sync(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Corpo SÍNCRONO do nó, executado numa thread do pool (ver `execute`).
+        SYNCHRONOUS body of the node, executed in a pool thread (see `execute`).
 
-        Pode bloquear à vontade — é justamente para isso que existe. O que não
-        pode é tocar o event loop: publicação de evento (`self._publisher`) já é
-        thread-safe via `call_soon_threadsafe`, e `self.log` também (logging é
-        thread-safe), mas não crie tasks nem use `asyncio.get_running_loop()`
-        daqui.
+        It may block freely — that's exactly what it exists for. What it must not
+        do is touch the event loop: event publishing (`self._publisher`) is already
+        thread-safe via `call_soon_threadsafe`, and so is `self.log` (logging is
+        thread-safe), but don't create tasks or use `asyncio.get_running_loop()`
+        from here.
         """
         raise NotImplementedError(
             f"'{type(self).__name__}' precisa implementar 'execute_sync' (nó "
@@ -110,16 +110,16 @@ class BaseNode(ABC):
         )
 
     async def teardown(self) -> None:
-        """Hook opcional chamado após execute() (inclusive em caso de erro). Útil para limpar recursos."""
+        """Optional hook called after execute() (including on error). Useful for cleaning up resources."""
 
-    # ── Validação de parâmetros ──────────────────────────────────────────────
+    # ── Parameter validation ─────────────────────────────────────────────────
 
     def validate(self) -> None:
         """
-        Aplica defaults declarados em description()['properties'] aos parâmetros do nó.
-        Chame self.validate() no início de execute() para garantir que todos os
-        parâmetros obrigatórios têm valores e que os defaults são preenchidos.
-        Substitui o padrão: props = self.description()['properties']; self.parameters = validate_node_parameters(...)
+        Applies the defaults declared in description()['properties'] to the node's parameters.
+        Call self.validate() at the start of execute() to ensure that all
+        required parameters have values and that the defaults are filled in.
+        Replaces the pattern: props = self.description()['properties']; self.parameters = validate_node_parameters(...)
         """
         from flow.utils.parameter_validation import validate_node_parameters
         desc = self.description()
@@ -128,36 +128,36 @@ class BaseNode(ABC):
             self.parameters, props, node_name=desc.get("name", type(self).__name__),
         )
 
-    # ── Helpers de parâmetros ────────────────────────────────────────────────
+    # ── Parameter helpers ────────────────────────────────────────────────────
 
     def get_param(self, name: str, default: Any = None) -> Any:
         """
-        Retorna o valor do parâmetro configurado, com fallback para default.
-        Substitui o uso direto de self.parameters.get() para evitar confusão
-        com self.properties (que não existe nesta classe).
+        Returns the configured parameter's value, falling back to the default.
+        Replaces direct use of self.parameters.get() to avoid confusion
+        with self.properties (which doesn't exist in this class).
         """
         return self.parameters.get(name, default)
 
     def get_param_float(self, name: str, default: float = 0.0) -> float:
-        """Retorna parâmetro convertido para float."""
+        """Returns the parameter converted to float."""
         try:
             return float(self.parameters.get(name, default))
         except (TypeError, ValueError):
             raise ValueError(f"Parâmetro '{name}' deve ser numérico. Recebido: {self.parameters.get(name)!r}")
 
     def get_param_int(self, name: str, default: int = 0) -> int:
-        """Retorna parâmetro convertido para int."""
+        """Returns the parameter converted to int."""
         try:
             return int(float(self.parameters.get(name, default)))
         except (TypeError, ValueError):
             raise ValueError(f"Parâmetro '{name}' deve ser inteiro. Recebido: {self.parameters.get(name)!r}")
 
     def get_retry_params(self) -> tuple[int, float]:
-        """Retorna (retry_count, retry_delay_s) configurados no nó (padrão: 0 retries, 5s de espera)."""
+        """Returns (retry_count, retry_delay_s) configured on the node (default: 0 retries, 5s wait)."""
         return self.get_param_int("retry_count", 0), self.get_param_float("retry_delay_s", 5.0)
 
     def get_param_bool(self, name: str, default: bool = False) -> bool:
-        """Retorna parâmetro convertido para bool (aceita True/False/'true'/'false')."""
+        """Returns the parameter converted to bool (accepts True/False/'true'/'false')."""
         value = self.parameters.get(name, default)
         if isinstance(value, bool):
             return value
@@ -165,12 +165,12 @@ class BaseNode(ABC):
             return value.lower() in ("true", "1", "yes", "sim")
         return bool(value)
 
-    # ── Helpers de inputs ────────────────────────────────────────────────────
+    # ── Input helpers ────────────────────────────────────────────────────────
 
     def get_input_gdf(self, inputs: Dict[str, Any], key: str):
         """
-        Busca e valida um GeoDataFrame nos inputs.
-        Lança ValueError com mensagem clara se não encontrado, não for GDF ou estiver vazio.
+        Looks up and validates a GeoDataFrame in the inputs.
+        Raises ValueError with a clear message if not found, not a GDF, or empty.
         """
         import geopandas as gpd
         value = inputs.get(key)
@@ -184,25 +184,25 @@ class BaseNode(ABC):
 
     def get_first_gdf(self, inputs: Dict[str, Any]):
         """
-        Retorna o primeiro GeoDataFrame encontrado nos inputs.
-        Útil quando o nó não exige uma chave específica.
+        Returns the first GeoDataFrame found in the inputs.
+        Useful when the node doesn't require a specific key.
 
-        Havendo mais de um candidato a escolha é AMBÍGUA e depende da ordem das
-        arestas na definition. O nó avisa no painel em vez de processar um e
-        ignorar o outro em silêncio — o sintoma clássico é um filtro espacial
-        que "funciona" com metade dos dados porque dois pais entregaram camadas
-        e só a primeira foi lida.
+        With more than one candidate the choice is AMBIGUOUS and depends on the order
+        of the edges in the definition. The node warns in the panel instead of
+        processing one and silently ignoring the other — the classic symptom is a
+        spatial filter that "works" with half the data because two parents delivered
+        layers and only the first was read.
         """
         import geopandas as gpd
         candidatos = [
             k for k, v in inputs.items()
             if isinstance(v, gpd.GeoDataFrame) and not v.empty
         ]
-        # Duas chaves apontando para o MESMO objeto não são ambiguidade: é o que
-        # os nós de bifurcação produzem, expondo o dado que passou por eles em
-        # `result` além da chave que veio do pai. Comparar por identidade evita
-        # o aviso alarmante sobre uma escolha que não existe — qualquer das duas
-        # chaves devolve exatamente o mesmo GeoDataFrame.
+        # Two keys pointing to the SAME object are not ambiguity: it's what
+        # fork nodes produce, exposing the data that passed through them in
+        # `result` besides the key that came from the parent. Comparing by identity
+        # avoids the alarming warning about a choice that doesn't exist — either
+        # key returns exactly the same GeoDataFrame.
         distintos = {id(inputs[k]) for k in candidatos}
         if len(distintos) > 1:
             self.log(
@@ -212,11 +212,11 @@ class BaseNode(ABC):
         if candidatos:
             return inputs[candidatos[0]]
 
-        # A mensagem precisa dizer O QUE chegou. Nós como SaveToPostGIS aceitam
-        # apenas GeoDataFrame, enquanto DataInput entrega GeoDataFrame, DataFrame,
-        # dict, list ou bytes conforme a extensao do arquivo — sem o diagnostico
-        # abaixo, ligar um CSV no PostGIS falhava com um texto que nao ajudava a
-        # descobrir nem a chave nem o tipo recebido.
+        # The message needs to say WHAT arrived. Nodes like SaveToPostGIS accept
+        # only GeoDataFrame, while DataInput delivers GeoDataFrame, DataFrame,
+        # dict, list or bytes depending on the file extension — without the diagnostic
+        # below, connecting a CSV to PostGIS failed with a text that didn't help
+        # find out either the key or the type received.
         recebido = {k: type(v).__name__ for k, v in inputs.items()}
         vazios = [
             k for k, v in inputs.items()
@@ -239,21 +239,21 @@ class BaseNode(ABC):
         nomes: tuple[str, str] | None = None,
     ):
         """
-        Busca as duas camadas de um nó binário (A, B) e aplica a política de CRS
-        do nó. Devolve `(a, b)`. Antes cada nó reescrevia a busca e a checagem.
+        Fetches the two layers of a binary node (A, B) and applies the node's CRS
+        policy. Returns `(a, b)`. Previously each node rewrote the lookup and the check.
 
         crs:
-          'exigir_igual' → recusa camadas com CRS diferentes; quem monta o fluxo
-                           padroniza antes com um nó de reprojeção.
-          'alinhar'      → exige CRS nas duas camadas. Quem reprojeta B para o CRS
-                           de A é o nó, com `align_crs`, DENTRO da thread de
-                           trabalho: to_crs é O(n) e não roda no event loop.
-          None           → sem checagem: o nó trata o CRS por conta própria
-                           (ex.: `para_crs_metrico`).
-        tipos_suportados: recusa GeometryCollection/geometria nula nas duas.
-        nomes: como cada camada aparece nas mensagens de CRS ausente
-               (padrão: "camada '<chave>'").
-        operacao: como a operação aparece nas mensagens de recusa.
+          'exigir_igual' → refuses layers with different CRSs; whoever builds the workflow
+                           standardizes beforehand with a reprojection node.
+          'alinhar'      → requires a CRS on both layers. Reprojecting B to A's CRS
+                           is the node's job, with `align_crs`, INSIDE the worker
+                           thread: to_crs is O(n) and doesn't run on the event loop.
+          None           → no check: the node handles the CRS on its own
+                           (e.g.: `para_crs_metrico`).
+        tipos_suportados: refuses GeometryCollection/null geometry on both.
+        nomes: how each layer appears in missing-CRS messages
+               (default: "camada '<chave>'").
+        operacao: how the operation appears in refusal messages.
         """
         from flow.utils.geo_helpers import (
             reject_unsupported_geom_types,
@@ -269,19 +269,19 @@ class BaseNode(ABC):
             require_crs(a, name=nome_a)
             require_crs(b, name=nome_b)
         elif crs is not None:
-            # Um typo aqui desligaria a checagem em silêncio.
+            # A typo here would silently turn off the check.
             raise ValueError(f"Política de CRS desconhecida: {crs!r}.")
         if tipos_suportados:
             reject_unsupported_geom_types(a, b, operation=operacao)
         return a, b
 
-    # ── Helpers de contexto de execução ─────────────────────────────────────
+    # ── Execution context helpers ───────────────────────────────────────────
 
     def require_execution_context(self) -> tuple[str, str]:
         """
-        Garante que o executor injetou `_workspace_id` e `_task_id`.
-        Retorna `(workspace_id, task_id)`. Útil para nodes output que
-        precisam isolar artefatos por workspace/run.
+        Ensures the executor injected `_workspace_id` and `_task_id`.
+        Returns `(workspace_id, task_id)`. Useful for output nodes that
+        need to isolate artifacts by workspace/run.
         """
         workspace_id = getattr(self, "_workspace_id", None)
         task_id = getattr(self, "_task_id", None)
@@ -293,11 +293,11 @@ class BaseNode(ABC):
 
     def derive_label(self, label_param: str, output_path_param: str = "") -> str:
         """
-        Resolve o `label` do nó. Prioridade:
-          1. label_param (se preenchido).
-          2. basename do output_path sem extensão.
-          3. ValueError se ambos vazios.
-        Reduz o boilerplate repetido em nodes output (save_geojson, save_to_s3, etc).
+        Resolves the node's `label`. Priority:
+          1. label_param (if filled in).
+          2. basename of output_path without extension.
+          3. ValueError if both are empty.
+        Reduces the boilerplate repeated in output nodes (save_geojson, save_to_s3, etc).
         """
         import os
         label = (label_param or "").strip()
@@ -310,17 +310,17 @@ class BaseNode(ABC):
             "Parametro 'label' e obrigatorio quando 'output_path' nao esta preenchido."
         )
 
-    # ── Helper de log ────────────────────────────────────────────────────────
+    # ── Log helper ───────────────────────────────────────────────────────────
 
     def log(self, message: str) -> None:
         """
-        Loga uma mensagem informativa no contexto do nó.
-        Conveniente para nós que não querem importar get_logger diretamente.
+        Logs an informational message in the node's context.
+        Convenient for nodes that don't want to import get_logger directly.
         """
         from flow.utils.logger import get_logger
         get_logger(f"node.{self.node_id}").info(message)
 
-    # ── Proteção contra typo self.properties ────────────────────────────────
+    # ── Protection against the self.properties typo ─────────────────────────
 
     @property
     def properties(self):

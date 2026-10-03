@@ -10,9 +10,9 @@ logger = get_logger(__name__)
 @register_node
 class DissolveNode(BaseNode):
     """
-    Dissolve feições de um GeoDataFrame agrupando por uma coluna,
-    mesclando as geometrias do grupo (union) e agregando atributos.
-    Se byColumn estiver vazio, dissolve todas as feições em uma só.
+    Dissolves the features of a GeoDataFrame grouping by a column,
+    merging each group's geometries (union) and aggregating attributes.
+    If byColumn is empty, dissolves all features into a single one.
     """
 
     @classmethod
@@ -32,8 +32,8 @@ class DissolveNode(BaseNode):
                     'label': 'Agrupar por',
                     'type': 'string',
                     'default': '',
-                    # O editor oferece os nomes vistos na última execução do nó
-                    # anterior — mesma dica do AttributeFilter.
+                    # The editor offers the names seen in the previous node's last
+                    # run — the same hint as AttributeFilter.
                     'suggest_columns': '*',
                     'description': (
                         'Nome da coluna usada para agrupar as feições. '
@@ -67,13 +67,13 @@ class DissolveNode(BaseNode):
         self.validate()
 
         by_column = self.parameters['byColumn'].strip()
-        # aggFunc já validado contra as options pelo self.validate().
+        # aggFunc already validated against the options by self.validate().
         agg_func = self.parameters['aggFunc'].strip().lower()
 
-        # Obtém o GeoDataFrame de entrada via helper da classe base
+        # Gets the input GeoDataFrame via the base class helper
         gdf = self.get_first_gdf(inputs)
 
-        # Valida se byColumn existe quando não vazio
+        # Validates that byColumn exists when not empty
         if by_column and by_column not in gdf.columns:
             raise ValueError(
                 f"Coluna '{by_column}' não encontrada no GeoDataFrame. "
@@ -82,7 +82,7 @@ class DissolveNode(BaseNode):
 
         dissolve_by = by_column if by_column else None
 
-        # f-string com backslash não é permitido no Python < 3.12; usar variável auxiliar
+        # An f-string with a backslash is not allowed in Python < 3.12; use a helper variable
         col_info = f"por coluna '{by_column}'" if dissolve_by else "(dissolve total)"
         logger.info(
             f"Dissolvendo {len(gdf)} feições {col_info} com aggFunc='{agg_func}'."

@@ -1,21 +1,21 @@
 // web/app/components/home/camadas.ts
 //
-// Derivações puras da conversa do assistente: as camadas/artefatos que ela
-// apontou (para o globo e para a faixa de badges do painel). Puras de propósito
-// — a lógica de "o que a conversa produziu" precisa de teste sem montar o painel
-// inteiro.
+// Pure derivations from the assistant conversation: the layers/artifacts it
+// pointed to (for the globe and for the panel's badges strip). Pure on purpose
+// — the "what the conversation produced" logic needs tests without mounting the
+// whole panel.
 //
-// Havia aqui um `derivarFluxos`, que alimentava a faixa de badges quando ela
-// mostrava os FLUXOS do assistente e abria o editor. A faixa passou a mostrar os
-// artefatos e nada mais lia os fluxos, então ele saiu junto. O quadro `fluxo` e
-// o tipo `FluxoDoAssistente` continuam existindo: o servidor ainda os emite e o
-// decodificador ainda os entende.
+// There used to be a `derivarFluxos` here, which fed the badges strip when it
+// showed the assistant's WORKFLOWS and opened the editor. The strip switched to
+// showing artifacts and nothing else read the workflows, so it went away too.
+// The `fluxo` frame and the `FluxoDoAssistente` type still exist: the server
+// still emits them and the decoder still understands them.
 
 import type {
   TurnoDoAssistente, CamadaDoAssistente,
 } from "@/app/components/home/assistente/quadros"
 
-/** As camadas que a conversa apontou para o globo, sem repetir (a última vence). */
+/** The layers the conversation pointed to for the globe, without repeats (the last one wins). */
 export function derivarCamadas(turnos: TurnoDoAssistente[]): CamadaDoAssistente[] {
   const porId = new Map<string, CamadaDoAssistente>()
   for (const turno of turnos) {
@@ -29,9 +29,9 @@ export function derivarCamadas(turnos: TurnoDoAssistente[]): CamadaDoAssistente[
 }
 
 /**
- * Uma bbox `[oeste, sul, leste, norte]` que cabe em lon/lat — só aí dá para
- * enquadrar. A bbox pode vir no CRS nativo do dado (não reprojetado); enquadrar
- * por ela sem checar mandaria a câmera para o meio do oceano.
+ * A bbox `[oeste, sul, leste, norte]` that fits in lon/lat — only then can it be
+ * framed. The bbox may come in the data's native CRS (not reprojected); framing
+ * by it without checking would send the camera to the middle of the ocean.
  */
 export function pareceLonLat(bbox: number[] | null | undefined): boolean {
   if (!bbox || bbox.length !== 4) return false
@@ -41,7 +41,7 @@ export function pareceLonLat(bbox: number[] | null | undefined): boolean {
     && oeste <= leste && sul <= norte
 }
 
-/** Paleta das camadas — tons distintos e saturados, legíveis sobre a imagem do basemap. */
+/** Layer palette — distinct, saturated hues, readable over the basemap imagery. */
 export const PALETA = ["#f97316", "#22d3ee", "#a78bfa", "#4ade80", "#f43f5e", "#facc15", "#38bdf8", "#fb7185"]
 
 export function corDaCamada(i: number): string {

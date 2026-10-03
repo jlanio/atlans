@@ -1,19 +1,19 @@
 # tests/unit/test_artifact_cleanup_entrega.py
 """
-A linha do banco so cai quando a ordem de remocao FOI ENTREGUE.
+The database row only goes away once the removal order WAS DELIVERED.
 
-Um artefato local vive no disco do executor; o servidor guarda so o catalogo.
-Apagar a linha sem que o executor tenha recebido a ordem deixa o arquivo orfao:
-dado pessoal vencido, retido indefinidamente, e sem NADA no sistema que registre
-que ele existe. Para LGPD esse e o pior desfecho — pior que nao ter apagado,
-porque ninguem consegue nem saber que ha o que apagar.
+A local artifact lives on the executor's disk; the server only keeps the catalog.
+Deleting the row without the executor having received the order leaves the file
+orphaned: expired personal data, retained indefinitely, and with NOTHING in the
+system recording that it exists. For LGPD that is the worst outcome — worse than
+not having deleted it, because nobody can even know there is something to delete.
 
-O bug que estes testes travam era sutil: `_ordenar_remocao_local` envolvia o
-envio num `try/except`, mas `executor_registry.send_json` **devolve False sem
-levantar** quando o executor esta offline (e quando o relay Redis nao tem
-ouvinte, e quando a assinatura Ed25519 falha). O `except` cobria so o caso raro
-e deixava passar o caso comum — executor desligado — tratando a ordem como
-entregue.
+The bug these tests lock down was subtle: `_ordenar_remocao_local` wrapped the
+send in a `try/except`, but `executor_registry.send_json` **returns False without
+raising** when the executor is offline (and when the Redis relay has no listener,
+and when the Ed25519 signature fails). The `except` covered only the rare case
+and let the common case through — executor turned off — treating the order as
+delivered.
 """
 import pytest
 
@@ -30,7 +30,7 @@ def _itens(n=2):
 
 
 class _Registry:
-    """Dubla `executor_registry.send_json` com o retorno que o teste quer."""
+    """Doubles `executor_registry.send_json` with the return value the test wants."""
 
     def __init__(self, retorno):
         self.retorno = retorno
@@ -62,8 +62,8 @@ async def test_entrega_confirmada_libera_a_linha_do_banco(registry):
 
 @pytest.mark.asyncio
 async def test_executor_OFFLINE_nao_libera_a_linha(registry):
-    # O caso do bug: send_json devolve False, sem excecao. Antes, os ids eram
-    # tratados como entregues e a linha era apagada — arquivo orfao no disco.
+    # The bug case: send_json returns False, with no exception. Before, the ids were
+    # treated as delivered and the row was deleted — an orphaned file on disk.
     registry(False)
     entregues = await artifact_cleanup._ordenar_remocao_local(_itens())
     assert entregues == [], (
@@ -80,8 +80,8 @@ async def test_excecao_no_envio_tambem_nao_libera(registry):
 
 @pytest.mark.asyncio
 async def test_um_executor_offline_nao_impede_os_outros(registry, monkeypatch):
-    # Falha por executor, e nao em lote: uma maquina desligada nao pode adiar a
-    # retencao das outras.
+    # Failure per executor, not per batch: one machine that is turned off must not
+    # delay the retention of the others.
     class _Parcial(_Registry):
         async def send_json(self, executor_id, data):
             self.enviados.append((executor_id, data))
@@ -89,9 +89,9 @@ async def test_um_executor_offline_nao_impede_os_outros(registry, monkeypatch):
 
     import app.core.executor_connections as ec
     r = _Parcial(None)
-    # Via monkeypatch, para o dublê sumir ao final: atribuido direto no modulo,
-    # ele sobrevivia ao teste e quebrava quem usa o registro depois (o bloco
-    # "agora" das metricas do Historico chamava `list_pending_acks` nele).
+    # Via monkeypatch, so the double goes away at the end: assigned directly on the
+    # module, it outlived the test and broke whoever used the registry afterwards
+    # (the "now" block of the History metrics called `list_pending_acks` on it).
     monkeypatch.setattr(ec, "executor_registry", r)
 
     entregues = await artifact_cleanup._ordenar_remocao_local({
@@ -103,10 +103,10 @@ async def test_um_executor_offline_nao_impede_os_outros(registry, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_a_ordem_vai_como_control_assinavel(registry):
-    # `purge_artifacts` precisa sair como `type: control` — e o que faz o
-    # servidor assina-la com Ed25519 (sign_if_needed) e o executor exigi-la
-    # assinada. Uma ordem de apagar arquivo sem assinatura seria um canal de
-    # destruicao de dados para quem vencesse a conexao.
+    # `purge_artifacts` must go out as `type: control` — that is what makes the
+    # server sign it with Ed25519 (sign_if_needed) and the executor require it
+    # signed. An unsigned order to delete files would be a data-destruction
+    # channel for whoever won the connection.
     r = registry(True)
     await artifact_cleanup._ordenar_remocao_local(_itens(1))
 

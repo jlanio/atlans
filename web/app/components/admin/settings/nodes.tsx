@@ -1,7 +1,7 @@
 "use client"
 
-// Seção «Nodes da plataforma» das Configurações do admin: habilita/desabilita
-// nodes (desabilitar exige motivo; workflows que os usam falham até reabilitar).
+// "Nodes da plataforma" (platform nodes) section of the admin Settings: enables/
+// disables nodes (disabling requires a reason; workflows that use them fail until re-enabled).
 
 import { memo, useCallback, useMemo, useState } from "react"
 import { GisFlowService } from "@/service/GisFlowService"
@@ -29,10 +29,10 @@ const _NODE_TYPE_LABEL: Record<string, string> = {
 const _NODE_TYPE_ORDER = ["trigger", "action", "datasource", "control", "spatial", "output"]
 
 /**
- * Linha de um node, memoizada: digitar em "Filtrar nodes…" re-renderiza a seção
- * inteira, e sem memo cada uma das ~50 linhas (com Switch Radix) repintava a
- * cada tecla. Com `node`/`onToggle`/`saving` estáveis, só a linha que de fato
- * mudou repinta.
+ * A node row, memoized: typing in "Filtrar nodes…" re-renders the whole section,
+ * and without memo each of the ~50 rows (with a Radix Switch) repainted on every
+ * keystroke. With stable `node`/`onToggle`/`saving`, only the row that actually
+ * changed repaints.
  */
 const NodeAdminRow = memo(function NodeAdminRow({
   node, onToggle, saving,
@@ -89,8 +89,8 @@ export function NodesAdminSection({
     return out
   }, [nodes, search])
 
-  // useCallback: `toggleEnabled` desce como `onToggle` estável para as linhas
-  // memoizadas (NodeAdminRow) — recriá-lo a cada tecla no filtro anularia o memo.
+  // useCallback: `toggleEnabled` goes down as a stable `onToggle` to the memoized
+  // rows (NodeAdminRow) — recreating it on every keystroke in the filter would defeat the memo.
   const toggleEnabled = useCallback(async (node: INodeAdminEntry) => {
     // Desabilitar exige motivo — abre modal. Reabilitar e direto.
     if (node.enabled) {
@@ -159,11 +159,11 @@ export function NodesAdminSection({
         const label = _NODE_TYPE_LABEL[type] ?? type
         const groupEnabled = list.filter(n => n.enabled).length
 
-        // Grupos iniciam FECHADOS: com 50+ nodes, abrir tudo empurrava o resto
-        // da página para longe. Durante a busca eles reabrem — senão o filtro
-        // encontraria resultados sem mostrá-los.
-        // A key alterna com hasSearch para o <details>, que guarda o próprio
-        // estado no DOM, sincronizar ao entrar e sair da busca.
+        // Groups start CLOSED: with 50+ nodes, opening everything pushed the rest
+        // of the page far away. During a search they reopen — otherwise the filter
+        // would find results without showing them.
+        // The key alternates with hasSearch so the <details>, which keeps its own
+        // state in the DOM, syncs on entering and leaving the search.
         return (
           <details
             key={`${type}-${hasSearch}`}

@@ -1,16 +1,18 @@
 # tests/unit/test_assistente_superficie.py
 """
-A superfície Home do assistente — o que pede clique e o que não pede.
+The assistant's Home surface — what asks for a click and what doesn't.
 
-O laço já tem teste (`test_assistente_service.py`); aqui se mede só o PACOTE da
-Home: o portão de confirmação (guarda os args no Redis, emite o quadro, devolve
-"aguardando" sem tocar no servidor), a regra de "fluxo da pessoa × fluxo do
-assistente", os quadros `fluxo`/`camada`, e a entrega `exibir_no_globo`.
+The loop already has tests (`test_assistente_service.py`); here only the Home
+BUNDLE is measured: the confirmation gate (stores the args in Redis, emits the
+frame, returns "waiting" without touching the server), the "person's workflow ×
+assistant's workflow" rule, the `fluxo`/`camada` frames, and the
+`exibir_no_globo` delivery.
 
-As funções são exercitadas DIRETO, sem subir o laço: `_portao_da_home` e
-`_quadros_da_home` recebem um `EstadoDoLaco` montado à mão. `carregar_workflow` e
-`infra.sessao` entram dublados nos dois testes que olham a origem do fluxo — o
-que se mede ali é a decisão do portão, não a consulta ao banco.
+The functions are exercised DIRECTLY, without spinning up the loop:
+`_portao_da_home` and `_quadros_da_home` receive a hand-built `EstadoDoLaco`.
+`carregar_workflow` and `infra.sessao` are doubled in the two tests that look at
+the workflow's origin — what is measured there is the gate's decision, not the
+database query.
 """
 from __future__ import annotations
 
@@ -38,7 +40,7 @@ pytestmark = pytest.mark.asyncio
 
 
 def _estado(*, redis=None, conversa_id="conv-1", user_id="usr-1"):
-    """Um `EstadoDoLaco` da Home, com um `emitir` que captura os quadros."""
+    """A Home `EstadoDoLaco`, with an `emitir` that captures the frames."""
     eventos: list[Evento] = []
 
     async def emitir(ev):
@@ -60,8 +62,8 @@ def _estado(*, redis=None, conversa_id="conv-1", user_id="usr-1"):
 
 
 def _sessao_dublada(monkeypatch):
-    """Dubla `infra.sessao` para ceder uma sessão qualquer — o `carregar_workflow`
-    dos testes ignora o `db`, então o que ela cede não importa."""
+    """Doubles `infra.sessao` to yield any session — the tests' `carregar_workflow`
+    ignores `db`, so what it yields doesn't matter."""
 
     @asynccontextmanager
     async def _sessao():
@@ -70,34 +72,34 @@ def _sessao_dublada(monkeypatch):
     monkeypatch.setattr(ag.infra, "sessao", _sessao)
 
 
-# ── O escopo do assistente ────────────────────────────────────────────────────
+# ── The assistant's scope ─────────────────────────────────────────────────────
 
 
 async def test_o_escopo_do_assistente_tem_alcance_completo_e_marca_a_origem():
-    """Seis escopos (não os quatro do editor), origem carimbada, nunca admin."""
+    """Six scopes (not the editor's four), origin stamped, never admin."""
     escopo = escopo_do_assistente(user_id="u9", username="ana", workspace_ids={"ws-1", "ws-2"})
 
     assert escopo.token_id == "assistente:u9"
     assert escopo.token_prefix == "assistente"
     assert escopo.scopes == frozenset(ESCOPOS_DO_PAT)
-    # As duas que o assistente do editor NÃO carrega entram aqui.
+    # The two the editor's assistant does NOT carry get in here.
     assert "triggers:manage" in escopo.scopes
     assert "drive:write" in escopo.scopes
     assert escopo.origem_dos_fluxos == "assistente"
     assert escopo.todos_os_workspaces is True
-    # E nunca administrador, pelo mesmo motivo do PAT e do assistente.
+    # And never administrator, for the same reason as the PAT and the assistant.
     assert escopo.como_usuario().role == "user"
 
 
-# ── O portão de confirmação ─────────────────────────────────────────────────
+# ── The confirmation gate ───────────────────────────────────────────────────
 
 
 async def test_delete_schedule_pede_clique_sem_tocar_no_servidor():
-    """Confirmável SEMPRE: guarda os args no Redis, emite o quadro, devolve não-erro.
+    """Confirmable ALWAYS: stores the args in Redis, emits the frame, returns a non-error.
 
-    O portão INTERCEPTA — devolve um resultado, e o dispatcher nem chega a chamar
-    o servidor. E o `is_error` é False de propósito: um erro faria o modelo
-    repetir a chamada e duplicar o botão.
+    The gate INTERCEPTS — it returns a result, and the dispatcher never even calls
+    the server. And `is_error` is False on purpose: an error would make the model
+    repeat the call and duplicate the button.
     """
     redis = RedisFalso()
     estado, eventos = _estado(redis=redis)
@@ -117,11 +119,11 @@ async def test_delete_schedule_pede_clique_sem_tocar_no_servidor():
     token = dados["token"]
     assert token
     assert dados["acao"]["tool"] == "delete_schedule"
-    # O resumo, não o conteúdo cru (é o mesmo `_resumo` do editor).
+    # The summary, not the raw content (it is the same `_resumo` as the editor's).
     assert dados["acao"]["alvo"] == "wf-1"
 
-    # A chave guarda os ARGS: é o que o clique executa, nunca o que o cliente
-    # mandar no POST de confirmação.
+    # The key stores the ARGS: it is what the click executes, never what the client
+    # sends in the confirmation POST.
     chave = ag.chave_de_confirmacao("usr-1", "conv-1", "tu-9")
     guardado = json.loads(redis.dados[chave])
     assert guardado["token"] == token
@@ -131,7 +133,7 @@ async def test_delete_schedule_pede_clique_sem_tocar_no_servidor():
 
 
 async def test_confirmacao_sem_redis_recusa_fechado():
-    """Sem Redis não há como validar o clique depois: recusa, não uma confirmação vazia."""
+    """Without Redis there is no way to validate the click later: refuse, not an empty confirmation."""
     estado, eventos = _estado(redis=None)
 
     veredito = await ag._portao_da_home(estado, "delete_schedule", {"job_id": "j"}, "tu-1")
@@ -141,7 +143,7 @@ async def test_confirmacao_sem_redis_recusa_fechado():
 
 
 async def test_rodar_o_proprio_fluxo_do_assistente_nao_pede_clique(monkeypatch):
-    """O assistente cria e roda os PRÓPRIOS fluxos sem clique — é a resposta chegando ao globo."""
+    """The assistant creates and runs its OWN workflows without a click — it is the answer reaching the globe."""
     redis = RedisFalso()
     estado, eventos = _estado(redis=redis)
     _sessao_dublada(monkeypatch)
@@ -159,7 +161,7 @@ async def test_rodar_o_proprio_fluxo_do_assistente_nao_pede_clique(monkeypatch):
 
 
 async def test_rodar_fluxo_da_pessoa_pede_clique(monkeypatch):
-    """Rodar um fluxo que a PESSOA criou é mexer no que já existia: exige clique."""
+    """Running a workflow the PERSON created is touching what already existed: requires a click."""
     redis = RedisFalso()
     estado, eventos = _estado(redis=redis)
     _sessao_dublada(monkeypatch)
@@ -176,7 +178,7 @@ async def test_rodar_fluxo_da_pessoa_pede_clique(monkeypatch):
 
 
 async def test_fluxo_que_nao_carrega_pede_clique_por_seguranca(monkeypatch):
-    """Falha fechada: sem conseguir provar que o fluxo é do assistente, confirma."""
+    """Fail closed: unable to prove the workflow is the assistant's, it confirms."""
     redis = RedisFalso()
     estado, _eventos = _estado(redis=redis)
     _sessao_dublada(monkeypatch)
@@ -192,7 +194,7 @@ async def test_fluxo_que_nao_carrega_pede_clique_por_seguranca(monkeypatch):
 
 
 async def test_leitura_passa_direto_sem_clique():
-    """Uma ferramenta não-confirmável (leitura) segue direto para o servidor."""
+    """A non-confirmable tool (read) goes straight to the server."""
     redis = RedisFalso()
     estado, eventos = _estado(redis=redis)
 
@@ -204,7 +206,7 @@ async def test_leitura_passa_direto_sem_clique():
 
 
 async def test_nome_fora_de_guardas_e_recusado():
-    """Nome que não existe no MCP: recusa uniforme, não vaza o erro do servidor."""
+    """A name that doesn't exist in MCP: uniform refusal, doesn't leak the server's error."""
     estado, _eventos = _estado(redis=RedisFalso())
 
     veredito = await ag._portao_da_home(estado, "ferramenta_inexistente", {}, "tu-1")
@@ -212,7 +214,7 @@ async def test_nome_fora_de_guardas_e_recusado():
     assert veredito is not None and veredito[1] is True
 
 
-# ── Os quadros que a Home emite ──────────────────────────────────────────────
+# ── The frames the Home emits ────────────────────────────────────────────────
 
 
 async def test_create_workflow_vira_quadro_fluxo():
@@ -229,7 +231,7 @@ async def test_create_workflow_vira_quadro_fluxo():
 
 
 async def test_run_workflow_gera_camada_so_de_geojson():
-    """Um `camada` por artefato GeoJSON; shapefile fora; executor-local com hint."""
+    """One `camada` per GeoJSON artifact; shapefile left out; executor-local with a hint."""
     estado, _eventos = _estado()
     resultado = json.dumps(
         {
@@ -272,7 +274,7 @@ async def test_run_workflow_gera_camada_so_de_geojson():
 
 
 async def test_get_run_artifacts_usa_a_lista_items():
-    """`get_run_artifacts` lista em `items` (e não `artifacts`) — os dois valem."""
+    """`get_run_artifacts` lists in `items` (not `artifacts`) — both are valid."""
     estado, _eventos = _estado()
     resultado = json.dumps(
         {
@@ -294,19 +296,20 @@ async def test_resultado_com_erro_nao_vira_quadro():
 
 
 async def test_resultado_ilegivel_nao_derruba():
-    """Um resultado que não parseia não vira quadro nem exceção."""
+    """A result that doesn't parse becomes neither a frame nor an exception."""
     estado, _eventos = _estado()
     assert ag._quadros_da_home(estado, "create_workflow", {}, "isto não é JSON", False) == []
 
 
-# ── A entrega: `exibir_no_globo` ─────────────────────────────────────────────
+# ── The delivery: `exibir_no_globo` ──────────────────────────────────────────
 
 
 async def test_exibir_no_globo_monta_a_camada_pelos_quadros_extras():
-    """O quadro `camada` sai de `quadros_extras`, NAO de um `emitir` local.
+    """The `camada` frame comes out of `quadros_extras`, NOT from a local `emitir`.
 
-    E o que faz o replay reconstruir a camada: ele so reexecuta `quadros_extras`.
-    Um `emitir` dentro do executor local saia no SSE e sumia ao reabrir o chat.
+    It is what makes replay rebuild the layer: it only re-runs `quadros_extras`.
+    An `emitir` inside the local executor went out on the SSE and vanished when
+    the chat was reopened.
     """
     estado, eventos = _estado()
     argumentos = {"artifact_id": "art-9", "nome": "Focos"}
@@ -314,14 +317,14 @@ async def test_exibir_no_globo_monta_a_camada_pelos_quadros_extras():
     texto, is_error = await ag._exibir_no_globo(argumentos, estado)
 
     assert is_error is False
-    assert not eventos  # nada emitido pelo executor local
+    assert not eventos  # nothing emitted by the local executor
 
     quadros = ag._quadros_da_home(estado, ag.NOME_DO_GLOBO, argumentos, texto, False)
     assert [q.tipo for q in quadros] == ["camada"]
     assert quadros[0].dados["artifact_id"] == "art-9"
     assert quadros[0].dados["nome"] == "Focos"
-    # `available` presente: sem ele o front normalizava para False e o cartao
-    # dizia "sem previa no globo" com a camada ja desenhada.
+    # `available` present: without it the front end normalized to False and the card
+    # said "sem previa no globo" (no preview on the globe) with the layer already drawn.
     assert quadros[0].dados["available"] is True
 
 
@@ -332,19 +335,19 @@ async def test_exibir_no_globo_sem_id_e_erro():
 
     assert is_error is True
     assert not eventos
-    # E o quadro tambem nao sai quando a chamada deu erro.
+    # And the frame also doesn't go out when the call errored.
     assert ag._quadros_da_home(estado, ag.NOME_DO_GLOBO, {}, "", True) == []
 
 
-# ── A superfície ─────────────────────────────────────────────────────────────
+# ── The surface ──────────────────────────────────────────────────────────────
 
 
-# ── As respostas rápidas: `sugerir_respostas` ────────────────────────────────
+# ── Quick replies: `sugerir_respostas` ───────────────────────────────────────
 
 
 async def test_sugerir_respostas_monta_o_quadro_pelos_quadros_extras():
-    """Como o globo: o executor não emite nada; o quadro nasce dos argumentos em
-    `quadros_extras` — inclusive com `estado=None`, que é como o replay chama."""
+    """Like the globe: the executor emits nothing; the frame is born from the arguments in
+    `quadros_extras` — including with `estado=None`, which is how replay calls it."""
     estado, eventos = _estado()
     argumentos = {"opcoes": ["Só os últimos 7 dias", "Cruzar com o CAR"]}
 
@@ -352,7 +355,7 @@ async def test_sugerir_respostas_monta_o_quadro_pelos_quadros_extras():
 
     assert is_error is False
     assert "Encerre o turno" in texto
-    assert not eventos  # nada emitido pelo executor local
+    assert not eventos  # nothing emitted by the local executor
 
     for est in (estado, None):
         quadros = ag._quadros_da_home(est, ag.NOME_DAS_RESPOSTAS, argumentos, texto, False)
@@ -361,7 +364,7 @@ async def test_sugerir_respostas_monta_o_quadro_pelos_quadros_extras():
 
 
 async def test_sugerir_respostas_limpa_e_limita_as_opcoes():
-    """Strings só, espaços normalizados, sem vazias nem repetidas, cortadas em 80, três no máximo."""
+    """Strings only, whitespace normalized, no empty or repeated ones, cut at 80, three at most."""
     longa = "x" * 100
     argumentos = {"opcoes": ["  Agendar  ", "", "Agendar", 7, longa, "Ver  por município", "Quinta"]}
 
@@ -383,7 +386,7 @@ async def test_sugerir_respostas_sem_opcao_valida_e_erro(argumentos):
     assert is_error is True
     assert not eventos
     assert ag._quadros_da_home(estado, ag.NOME_DAS_RESPOSTAS, argumentos, "", True) == []
-    # E mesmo sem o erro marcado, argumentos sem opção válida não viram quadro.
+    # And even without the error flagged, arguments with no valid option don't become a frame.
     assert ag._quadros_da_home(None, ag.NOME_DAS_RESPOSTAS, argumentos, "", False) == []
 
 
@@ -394,7 +397,7 @@ async def test_as_instrucoes_da_home_ensinam_as_respostas_rapidas():
 async def test_a_superficie_home_permite_o_catalogo_inteiro_e_a_entrega():
     """Alcance completo (o que o editor bloqueia, a Home permite); a entrega abre a lista."""
     assert ag.HOME.nome == "home"
-    assert ag.HOME.permitida("create_workflow")  # o editor bloqueia; a Home não
+    assert ag.HOME.permitida("create_workflow")  # the editor blocks; the Home doesn't
     assert ag.HOME.permitida("run_workflow")
     assert ag.HOME.permitida("delete_schedule")
     assert not ag.HOME.permitida("ferramenta_inexistente")
@@ -405,24 +408,24 @@ async def test_a_superficie_home_permite_o_catalogo_inteiro_e_a_entrega():
     assert ag.HOME.ferramentas_extras == (ag.FERRAMENTA_DO_GLOBO, ag.FERRAMENTA_DAS_RESPOSTAS)
 
 
-# ── O portão fecha por DEFAULT ───────────────────────────────────────────────
+# ── The gate closes by DEFAULT ───────────────────────────────────────────────
 
 
 async def test_toda_tool_de_escrita_nasce_confirmavel():
-    """Paridade com GUARDAS: nenhuma escrita passa sem clique por esquecimento.
+    """Parity with GUARDAS: no write passes without a click by oversight.
 
-    Este é o teste que faltava quando `cancel_run`, `pin_node_output`,
-    `unpin_node_output`, `duplicate_workflow` e o par de upload do Drive ficaram
-    de fora da lista escrita à mão — e o assistente cancelava a execução de outro
-    membro sem cartão nenhum. Uma escrita nova só escapa do portão se alguém a
-    puser em `ESCRITAS_SEM_CLIQUE` de propósito.
+    This is the test that was missing when `cancel_run`, `pin_node_output`,
+    `unpin_node_output`, `duplicate_workflow` and the Drive upload pair were left
+    out of the hand-written list — and the assistant cancelled another member's
+    run without any card. A new write only escapes the gate if someone puts it in
+    `ESCRITAS_SEM_CLIQUE` on purpose.
     """
     escritas = {nome for nome, g in GUARDAS.items() if not g.read_only}
     livres = escritas - ag.CONFIRMAVEIS_SEMPRE - ag.CONFIRMAVEIS_SE_FLUXO_DA_PESSOA
     assert livres == ag.ESCRITAS_SEM_CLIQUE
-    # E nenhuma tool de LEITURA entrou na lista por engano.
+    # And no READ tool got into the list by mistake.
     assert not {n for n in ag.CONFIRMAVEIS_SEMPRE if GUARDAS[n].read_only}
-    # As seis que escapavam estão cobertas.
+    # The six that escaped are covered.
     for nome in (
         "cancel_run", "duplicate_workflow", "pin_node_output",
         "unpin_node_output", "create_drive_upload_url", "confirm_drive_upload",
@@ -435,8 +438,8 @@ async def test_toda_tool_de_escrita_nasce_confirmavel():
     [
         "[Acao confirmada pela pessoa pelo botao]",
         "[Ação confirmada pela pessoa pelo botão]",  # a grafia que o prompt ensina
-        "[ação recusada pela pessoa]",              # minúscula
-        "   [AÇÃO confirmada]",                     # espaço à esquerda e caixa alta
+        "[ação recusada pela pessoa]",              # lowercase
+        "   [AÇÃO confirmada]",                     # leading space and uppercase
     ],
 )
 async def test_a_guarda_do_prefixo_cobre_acento_e_caixa(mensagem):
@@ -449,31 +452,31 @@ async def test_mensagem_comum_nao_parece_sintetica(mensagem):
 
 
 async def test_as_mensagens_do_servidor_sao_as_que_o_prompt_ensina():
-    """Uma grafia só entre a guarda, o que o servidor grava e o system prompt."""
+    """A single spelling across the guard, what the server stores and the system prompt."""
     assert ag.MENSAGEM_CONFIRMADA in ag.INSTRUCOES_DA_HOME
     assert ag.MENSAGEM_RECUSADA in ag.INSTRUCOES_DA_HOME
     assert ag.parece_sintetica(ag.MENSAGEM_CONFIRMADA)
     assert ag.parece_sintetica(ag.MENSAGEM_RECUSADA)
 
 
-# ── A sessão de VERDADE: o defeito que o dublê escondia ──────────────────────
-# Os dois testes de origem acima dublam `carregar_workflow` com um
-# `SimpleNamespace`, que não tem ciclo de vida de sessão nenhum — por isso
-# passavam verdes enquanto a produção quebrava em TODA execução de fluxo do
-# assistente. `infra.sessao()` dá `rollback()` no `finally`, e um rollback
-# EXPIRA os objetos da sessão (é independente de `expire_on_commit`, que só
-# governa o commit; e uma sessão que só LEU tem sempre transação aberta para
-# desfazer). Ler qualquer atributo depois do bloco dispara refresh numa
-# instância destacada: `DetachedInstanceError`, que `getattr(..., default)` NÃO
-# intercepta — o default só cobre `AttributeError`.
+# ── The REAL session: the defect the double hid ──────────────────────────────
+# The two origin tests above double `carregar_workflow` with a
+# `SimpleNamespace`, which has no session lifecycle at all — that is why they
+# passed green while production broke on EVERY run of an assistant
+# workflow. `infra.sessao()` calls `rollback()` in the `finally`, and a rollback
+# EXPIRES the session's objects (it is independent of `expire_on_commit`, which
+# only governs commit; and a session that only READ always has an open
+# transaction to undo). Reading any attribute after the block triggers a refresh
+# on a detached instance: `DetachedInstanceError`, which `getattr(..., default)`
+# does NOT intercept — the default only covers `AttributeError`.
 #
-# Este teste sobe uma sessão real com o MESMO `finally: rollback()` de
-# `get_session_async`, para que o ciclo de vida seja o de produção.
+# This test spins up a real session with the SAME `finally: rollback()` as
+# `get_session_async`, so that the lifecycle is the production one.
 
 
 @pytest_asyncio.fixture
 async def sessao_com_rollback(monkeypatch):
-    """`infra.sessao` real (sqlite), com o `rollback()` no finally de produção."""
+    """Real `infra.sessao` (sqlite), with the production `rollback()` in the finally."""
     engine = create_async_engine("sqlite+aiosqlite://")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all, tables=[Workflow.__table__])
@@ -509,11 +512,11 @@ async def sessao_com_rollback(monkeypatch):
 
 
 async def test_a_origem_e_lida_com_a_sessao_ainda_aberta(sessao_com_rollback):
-    """REGRESSÃO: ler `origem` fora do `async with` levanta DetachedInstanceError.
+    """REGRESSION: reading `origem` outside the `async with` raises DetachedInstanceError.
 
-    Mutação: mover o `getattr` para depois do bloco derruba SÓ este teste e o
-    seguinte. Em produção o efeito era o assistente não conseguir rodar nenhum
-    fluxo próprio — o caminho inteiro da Home (criar, rodar, camada no globo).
+    Mutation: moving the `getattr` to after the block breaks ONLY this test and
+    the next. In production the effect was the assistant being unable to run any
+    of its own workflows — the whole Home path (create, run, layer on the globe).
     """
     redis = RedisFalso()
     estado, eventos = _estado(redis=redis)
@@ -526,7 +529,7 @@ async def test_a_origem_e_lida_com_a_sessao_ainda_aberta(sessao_com_rollback):
 
 
 async def test_com_sessao_real_o_fluxo_da_pessoa_continua_pedindo_clique(sessao_com_rollback):
-    """O conserto não pode afrouxar o portão: fluxo da pessoa segue exigindo clique."""
+    """The fix must not loosen the gate: the person's workflow still requires a click."""
     redis = RedisFalso()
     estado, eventos = _estado(redis=redis)
 
@@ -537,21 +540,21 @@ async def test_com_sessao_real_o_fluxo_da_pessoa_continua_pedindo_clique(sessao_
 
 
 async def test_o_roteiro_da_home_consulta_o_catalogo_antes_de_prospectar():
-    """"Catálogo primeiro": para dado externo o passo é `search_sources` →
-    `describe_source`, ANTES de `search_nodes` e de `validate_workflow`; sondar e
-    registrar só entram como o caminho para quando o catálogo não tem a fonte."""
+    """"Catalog first": for external data the step is `search_sources` →
+    `describe_source`, BEFORE `search_nodes` and `validate_workflow`; probing and
+    registering only come in as the path for when the catalog lacks the source."""
     texto = ag.INSTRUCOES_DA_HOME
     assert texto.index("search_sources") < texto.index("search_nodes") < texto.index("validate_workflow")
     assert texto.index("describe_source") < texto.index("probe_source") < texto.index("register_source")
-    # E as duas que sondam estão entre as que passam sem clique.
+    # And the two that probe are among the ones that pass without a click.
     assert {"probe_source", "register_source"} <= ag.ESCRITAS_SEM_CLIQUE
 
 
 async def test_duas_confirmacoes_em_paralelo_casam_cada_uma_com_sua_chamada():
-    """A regressão da corrida: com o lote rodando junto, cada confirmação guarda
-    os SEUS args sob o SEU `tool_use_id`. Com um campo compartilhado "chamada
-    atual" (o desenho antigo), as duas casariam com o id que fosse escrito por
-    último — e um clique executaria a ação errada."""
+    """The race regression: with the batch running together, each confirmation stores
+    ITS args under ITS `tool_use_id`. With a shared "current call" field (the old
+    design), both would match the id that was written last — and a click would
+    execute the wrong action."""
     redis = RedisFalso()
     estado, eventos = _estado(redis=redis)
 

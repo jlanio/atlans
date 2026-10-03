@@ -25,16 +25,16 @@ interface Props {
   /** Nulo fecha o painel. */
   runId: string | null
   onFechar: () => void
-  /** "Ver todas deste workflow": filtra a tabela por trás do painel. */
+  /** "Ver todas deste workflow" (see all for this workflow): filters the table behind the panel. */
   onFiltrarWorkflow?: (workflowHash: string) => void
 }
 
 type NoDaExecucao = IRunDetail["node_stats"][string] & { id: string }
 
-/** A linha de selos descreve o painel; antes de o detalhe chegar não há descrição. */
+/** The badge row describes the panel; before the detail arrives there is no description. */
 const ID_DA_DESCRICAO = "painel-execucao-descricao"
 
-/** Nós ordenados como na página da execução: os mais demorados primeiro. */
+/** Nodes sorted as on the run page: the slowest first. */
 export function nosDaExecucao(run: IRunDetail | null): NoDaExecucao[] {
   if (!run?.node_stats) return []
   return Object.entries(run.node_stats)
@@ -44,8 +44,8 @@ export function nosDaExecucao(run: IRunDetail | null): NoDaExecucao[] {
 }
 
 /**
- * Abaixo de 1 s a precisão em ms importa ("123ms"); acima, a mesma escala do
- * resto da página ("1 min 57 s"), em vez de "117.26s".
+ * Below 1 s the ms precision matters ("123ms"); above it, the same scale as the
+ * rest of the page ("1 min 57 s"), instead of "117.26s".
  */
 function duracaoDoNo(ms: number | null | undefined): string {
   if (ms == null) return "—"
@@ -54,8 +54,8 @@ function duracaoDoNo(ms: number | null | undefined): string {
 }
 
 /**
- * Status de EVENTO (o que aconteceu com um nó), que não é o vocabulário de
- * status de execução do `StatusBadge`: "started" é "iniciou", não "Na fila".
+ * EVENT status (what happened to a node), which is not the run-status
+ * vocabulary of `StatusBadge`: "started" is "iniciou", not "Na fila" (queued).
  */
 const ACAO_DO_EVENTO: Record<string, string> = {
   started: "iniciou", running: "em andamento", completed: "concluiu", success: "concluiu",
@@ -63,8 +63,8 @@ const ACAO_DO_EVENTO: Record<string, string> = {
 }
 
 /**
- * Linha do log por extenso: nome do nó (não o id), o que aconteceu em
- * português e o erro. `kind` é lifecycle/stdout/debug; o que importa está em
+ * Log line spelled out: node name (not the id), what happened in Portuguese
+ * and the error. `kind` is lifecycle/stdout/debug; what matters is in
  * `status`.
  */
 export function descreverEvento(ev: IRunEvent, run: IRunDetail | null): string {
@@ -72,11 +72,11 @@ export function descreverEvento(ev: IRunEvent, run: IRunDetail | null): string {
   const acao = ev.kind === "stdout" ? "saída"
     : ev.kind === "debug" ? "depuração"
     : ev.status ? (ACAO_DO_EVENTO[ev.status] ?? null)
-    : null   // um `kind` ou `status` desconhecido não vira texto cru na tela
+    : null   // an unknown `kind` or `status` does not become raw text on screen
   return [nome, acao, ev.error].filter(Boolean).join(" · ")
 }
 
-/** `timestamp` do evento vem em segundos (época); tolera ms por segurança. */
+/** The event `timestamp` comes in seconds (epoch); tolerates ms to be safe. */
 function horaDoEvento(ts: number | undefined): string {
   if (ts == null) return "—"
   const ms = ts > 1e12 ? ts : ts * 1000
@@ -84,23 +84,24 @@ function horaDoEvento(ts: number | undefined): string {
 }
 
 /**
- * Painel lateral de uma execução (spec §4.3): tudo o que a linha da tabela
- * não cabe — erro inteiro, nós, por que rodou onde rodou — sem sair da lista.
- * A página `/observability/run/{id}` continua existindo, como "Abrir em página".
+ * Side panel of a run (spec §4.3): everything that does not fit in the table
+ * row — the whole error, nodes, why it ran where it ran — without leaving the
+ * list. The `/observability/run/{id}` page still exists, as "Abrir em página".
  */
 export function PainelExecucao({ runId, onFechar, onFiltrarWorkflow }: Props) {
   const [run, setRun] = useState<IRunDetail | null>(null)
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
-  // O 403 de "Executar de novo" vale para o workflow inteiro: depois dele o
-  // botão some em vez de prometer de novo o que a API já negou.
+  // The 403 from "Executar de novo" (run again) applies to the whole workflow:
+  // after it the button disappears instead of promising again what the API
+  // already denied.
   const [podeReexecutar, setPodeReexecutar] = useState(true)
   const [confirmandoRetry, setConfirmandoRetry] = useState(false)
   const [reexecutando, setReexecutando] = useState(false)
   const [log, setLog] = useState<{ eventos: IRunEvent[]; expirado: boolean } | null>(null)
   const [carregandoLog, setCarregandoLog] = useState(false)
-  // Abrir outra execução antes de a anterior responder: a resposta lenta não
-  // pode pintar o painel da nova.
+  // Opening another run before the previous one responds: the slow response
+  // must not paint the new one's panel.
   const seq = useRef(0)
 
   useEffect(() => {
@@ -156,8 +157,8 @@ export function PainelExecucao({ runId, onFechar, onFiltrarWorkflow }: Props) {
     }
   }
 
-  // Recalcular a lista de nós a cada render (entries/filter/map/sort) é
-  // desperdício quando `run` não mudou.
+  // Recomputing the node list on every render (entries/filter/map/sort) is
+  // wasteful when `run` has not changed.
   const nos = useMemo(() => nosDaExecucao(run), [run])
   const nivel = rotuloDoNivel(run?.dispatch_tier)
   const origem = rotuloDaOrigem(run?.trigger_source)
@@ -170,8 +171,8 @@ export function PainelExecucao({ runId, onFechar, onFiltrarWorkflow }: Props) {
         side="right"
         resizable={{ storageKey: "atlas_run_sheet_width", defaultWidth: 520, minWidth: 420, maxWidth: 1200 }}
         className="flex w-full flex-col gap-0 p-0"
-        // Sem descrição enquanto carrega: o Radix avisa no console quando o
-        // `aria-describedby` aponta para nada.
+        // No description while loading: Radix warns in the console when
+        // `aria-describedby` points to nothing.
         aria-describedby={run ? ID_DA_DESCRICAO : undefined}
       >
         <SheetHeader className="shrink-0 border-b pr-12">

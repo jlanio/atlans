@@ -7,31 +7,33 @@ import { INodeContext } from "@/context/useFlowContext"
 import { lerPortas, reconciliarPortas } from "@/app/components/workflow/utils/node-ports"
 
 /**
- * Mantém `data.inputs`/`data.outputs` em dia com a propriedade `ports` dos nós
- * de portas dinâmicas — as ENTRADAS do Script Python / SubWorkflowOutput
- * (`dynamic_inputs`) e as SAÍDAS do SubWorkflowInput (`outputs_from_ports`).
+ * Keeps `data.inputs`/`data.outputs` in sync with the `ports` property of
+ * dynamic-port nodes — the INPUTS of Script Python / SubWorkflowOutput
+ * (`dynamic_inputs`) and the OUTPUTS of SubWorkflowInput (`outputs_from_ports`).
  *
- * Sem isto a funcionalidade só valeria depois de recarregar a página: quem monta
- * os pontos de conexão a partir de `ports` é `loadNodes` (ao abrir o fluxo) e o
- * `addNode` (ao criar o nó), mas o "Aplicar" do painel de configuração grava
- * `data.properties` e NÃO recalcula `data.inputs`/`data.outputs`. A pessoa
- * definiria as portas, aplicaria, e o nó continuaria com um ponto anônimo.
+ * Without this the feature would only work after reloading the page: what builds
+ * the connection points from `ports` is `loadNodes` (when opening the workflow)
+ * and `addNode` (when creating the node), but the config panel's "Aplicar"
+ * (apply) writes `data.properties` and does NOT recompute
+ * `data.inputs`/`data.outputs`. The person would define the ports, apply, and the
+ * node would still have one anonymous point.
  *
- * Um efeito, e não um remendo no `saveNodeConfig`, porque `properties` muda por
- * vários caminhos — aplicar, desfazer, refazer, colar um nó. Cobrir só um deles
- * deixaria os outros com o canvas descrevendo um nó que não é mais aquele.
+ * An effect, and not a patch in `saveNodeConfig`, because `properties` changes
+ * through several paths — apply, undo, redo, pasting a node. Covering only one of
+ * them would leave the others with the canvas describing a node that is no
+ * longer that one.
  *
- * Espelha `useSubWorkflowContractSync`, inclusive na proteção contra laço: a
- * reconciliação devolve o mesmo array quando nada mudou, e é isso que impede o
- * efeito de se realimentar a cada render.
+ * Mirrors `useSubWorkflowContractSync`, including the loop protection: the
+ * reconciliation returns the same array when nothing changed, and that is what
+ * keeps the effect from feeding itself on every render.
  */
 export function useDynamicPortsSync(nodes: INodeContext[]) {
   const { setNodes } = useReactFlow<INodeContext, Edge>()
 
-  // Assinatura estável para o dep array: só re-roda quando as portas de algum
-  // nó dinâmico mudam, e não a cada movimento de nó no canvas. Memoizada porque
-  // no corpo do hook a varredura rodava a cada render do canvas — o canvas passa
-  // uma projeção de `nodes` que ignora mudança de posição.
+  // Stable signature for the dep array: it only re-runs when the ports of some
+  // dynamic node change, not on every node move on the canvas. Memoized because
+  // in the hook body the scan ran on every canvas render — the canvas passes a
+  // projection of `nodes` that ignores position changes.
   const assinatura = useMemo(() => nodes
     .filter(n => {
       const d = n.data as { dynamic_inputs?: boolean; outputs_from_ports?: boolean }

@@ -1,23 +1,23 @@
 # app/api/routers/admin_workflows_router.py
 """
-Endpoints administrativos para gerenciamento de workflows.
+Administrative endpoints for workflow management.
 
-Escopo: admin global tem override — pode ler/mutar workflow de qualquer
-workspace mesmo sem membership. Isso permite ao admin:
+Scope: the global admin has an override — can read/mutate a workflow of any
+workspace even without membership. This lets the admin:
 
-  - Desativar workflows mal configurados (schedule quebrado, webhook
-    apontando pra nada, loop infinito), impedindo dispatch, schedule
-    e webhook sem precisar deletar o workflow ou pedir ao dono.
+  - Deactivate misconfigured workflows (broken schedule, webhook
+    pointing to nothing, infinite loop), preventing dispatch, schedule
+    and webhook without having to delete the workflow or ask the owner.
 
-Auditoria: cada alteracao gera `logger.info` estruturado (quem, o
-que, workflow, dono). Nao ha coluna persistida — historia fica no
-stdout/Loki. Se compliance exigir trilha auditavel, extensao futura
-adiciona tabela `audit_events`.
+Auditing: each change produces a structured `logger.info` (who, what,
+workflow, owner). There is no persisted column — the history stays in
+stdout/Loki. If compliance requires an auditable trail, a future extension
+adds an `audit_events` table.
 
-Trade-off consciente: o dono pode reativar via `PUT /workflows/{id}`
-(update do proprio workflow em `/projects`), sobrescrevendo a acao
-do admin. Comportamento aceito — se virar problema real, migrar para
-coluna dedicada `admin_disabled_at` em iteracao futura.
+Conscious trade-off: the owner can reactivate via `PUT /workflows/{id}`
+(update of their own workflow in `/projects`), overriding the admin's
+action. Accepted behavior — if it becomes a real problem, migrate to a
+dedicated `admin_disabled_at` column in a future iteration.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -52,9 +52,9 @@ async def set_workflow_status(
     current_user=Depends(require_admin),
 ):
     """
-    Alterna `Workflow.flag_ative`. Diferente do `PUT /workflows/{id}`
-    do usuario dono, este endpoint NAO checa `_has_min_workspace_role`
-    — admin global tem override em qualquer workspace.
+    Toggles `Workflow.flag_ative`. Unlike the owner user's
+    `PUT /workflows/{id}`, this endpoint does NOT check `_has_min_workspace_role`
+    — the global admin has an override on any workspace.
     """
     wf = await WorkflowCRUD(db).get_by_hash(id_hash)
     if wf is None or wf.deleted_at is not None:
@@ -65,11 +65,11 @@ async def set_workflow_status(
     await db.commit()
 
     if old_value != payload.flag_ative:
-        # Desativar o workflow sem desligar seus agendamentos deixava o
-        # AsyncScheduler disparando em loop contra um workflow que recusa
-        # executar. Best-effort: falhar aqui nao desfaz a decisao do admin, que
-        # ja esta commitada — e o proprio scheduler ignora schedule de workflow
-        # inativo desde o JOIN em `_tick`.
+        # Deactivating the workflow without turning off its schedules left the
+        # AsyncScheduler firing in a loop against a workflow that refuses to
+        # run. Best-effort: failing here does not undo the admin's decision, which
+        # is already committed — and the scheduler itself ignores schedules of
+        # inactive workflows thanks to the JOIN in `_tick`.
         try:
             await sync_schedules_with_workflow_state(wf, db)
         except Exception as exc:

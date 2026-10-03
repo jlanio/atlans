@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest"
 import type { IWorkflow, IWorkflowSchedule } from "@/service/types"
 import { MAXIMO_DE_PROXIMAS, proximas } from "@/app/components/dashboard/proximas"
 
-// Âncora fixa para tornar "futuro/passado" determinístico. O helper `fromBackend`
-// trata a string sem offset como UTC, então usamos horários UTC explícitos.
+// Fixed anchor to make "future/past" deterministic. The `fromBackend` helper
+// treats a string without an offset as UTC, so we use explicit UTC times.
 const AGORA = new Date("2026-09-07T12:00:00Z")
 
 function agendamento(next: string | null, extra: Partial<IWorkflowSchedule> = {}): IWorkflowSchedule {

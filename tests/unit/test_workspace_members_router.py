@@ -1,15 +1,15 @@
 # tests/unit/test_workspace_members_router.py
-"""Lista de membros do workspace: o dono aparece, e nao pode ser editado.
+"""Workspace member list: the owner shows up and cannot be edited.
 
-O dono nunca teve linha em `workspace_members` — `create_workspace` nao cria uma.
-Ate agora isso significava que quem criou o workspace nao aparecia na propria
-lista de membros: um workspace so com o dono exibia "Nenhum membro convidado
-ainda", e um admin convidado nao tinha como descobrir com quem falar.
+The owner never had a row in `workspace_members` — `create_workspace` does not create one.
+Until now that meant whoever created the workspace did not show up in their own
+member list: a workspace with only the owner displayed "Nenhum membro convidado
+ainda" (no members invited yet), and an invited admin had no way to find out who to talk to.
 
-A linha do dono passou a ser sintetica, montada na leitura. Isso abre dois riscos
-que estes testes fecham: ele aparecer DUAS vezes (quando tambem tem linha real,
-possivel em dados antigos) e a UI oferecer editar/remover uma linha que nao
-existe no banco — o que caia num 404 generico.
+The owner's row is now synthetic, built on read. That opens two risks that
+these tests close: the owner showing up TWICE (when they also have a real row,
+possible in old data) and the UI offering to edit/remove a row that does not
+exist in the database — which ended in a generic 404.
 """
 from datetime import datetime
 from types import SimpleNamespace
@@ -44,13 +44,13 @@ def test_owner_vem_primeiro_com_role_owner():
 
     assert [m.user_id for m in resultado] == ["u-dono", "u-1"]
     assert resultado[0].role == "owner"
-    # O dono "entrou" quando criou o workspace — nao ha outro timestamp honesto.
+    # The owner "joined" when they created the workspace — there is no other honest timestamp.
     assert resultado[0].joined_at == CRIADO_EM.isoformat()
     assert resultado[1].role == "editor"
 
 
 def test_owner_com_linha_real_nao_duplica():
-    """Ate agora nada impedia convidar o proprio dono por e-mail."""
+    """Until now nothing prevented inviting the owner themselves by email."""
     dono = _user("u-dono", "dona", "dona@ex.com")
 
     resultado = _build_member_list(
@@ -58,12 +58,12 @@ def test_owner_com_linha_real_nao_duplica():
     )
 
     assert len(resultado) == 1
-    # A linha sintetica vence: "admin" nao pode mascarar quem e o dono.
+    # The synthetic row wins: "admin" cannot mask who the owner is.
     assert resultado[0].role == "owner"
 
 
 def test_sem_owner_id_retorna_so_os_membros():
-    """`Workspace.owner_id` e nullable — nao inventar uma linha vazia."""
+    """`Workspace.owner_id` is nullable — do not make up an empty row."""
     convidado = _user("u-1", "convidado", "c@ex.com")
 
     resultado = _build_member_list(
@@ -74,22 +74,22 @@ def test_sem_owner_id_retorna_so_os_membros():
 
 
 def test_owner_removido_da_plataforma_nao_gera_linha():
-    """owner_id setado mas o User sumiu: sem username/email, nao ha o que exibir."""
+    """owner_id is set but the User is gone: with no username/email, there is nothing to display."""
     resultado = _build_member_list("u-dono", None, CRIADO_EM, [])
     assert resultado == []
 
 
-# ── Guardas de escrita sobre o dono ──────────────────────────────────────────
+# ── Write guards on the owner ────────────────────────────────────────────────
 
 @pytest.fixture
 def ws_client_db(client, mock_current_user, monkeypatch):
-    """client + db mockado, com o usuario autenticado como dono do workspace.
+    """client + mocked db, with the authenticated user as the workspace owner.
 
-    `get_workspace_member_role` e trocado por um stub: com um db mockado, o
-    `select(Workspace.owner_id)` dela devolveria a entidade inteira em vez do
-    id, e a resolucao de role daria 403 antes de a guarda sob teste rodar. O
-    stub vale nos dois lugares que a chamam: o proprio router (leitura) e
-    `workflow_access`, de onde `exigir_papel_no_workspace` a chama (escrita).
+    `get_workspace_member_role` is replaced by a stub: with a mocked db, its
+    `select(Workspace.owner_id)` would return the whole entity instead of the
+    id, and role resolution would give a 403 before the guard under test ran. The
+    stub applies in both places that call it: the router itself (read) and
+    `workflow_access`, from which `exigir_papel_no_workspace` calls it (write).
     """
     from app.api.dependencies import get_db
     from app.api.routers import workspace_router
@@ -126,13 +126,13 @@ def ws_client_db(client, mock_current_user, monkeypatch):
 
 
 async def test_remover_o_dono_e_400_e_nao_404(ws_client_db):
-    """Vale tanto para admin removendo o dono quanto para o dono tentando sair."""
+    """Applies both to an admin removing the owner and to the owner trying to leave."""
     client, ws = ws_client_db
 
     resp = await client.delete(f"/workspaces/ws-1/members/{ws.owner_id}")
 
     assert resp.status_code == 400
-    # `http_exception_handler` remapeia `detail` para `message` na resposta.
+    # `http_exception_handler` remaps `detail` to `message` in the response.
     assert "dono" in resp.json()["message"].lower()
 
 
@@ -144,5 +144,5 @@ async def test_alterar_role_do_dono_e_400(ws_client_db):
     )
 
     assert resp.status_code == 400
-    # `http_exception_handler` remapeia `detail` para `message` na resposta.
+    # `http_exception_handler` remaps `detail` to `message` in the response.
     assert "dono" in resp.json()["message"].lower()

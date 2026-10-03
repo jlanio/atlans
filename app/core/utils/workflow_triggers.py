@@ -1,20 +1,20 @@
-"""Utilitarios para detectar tipos de trigger em definicoes de workflow.
+"""Utilities to detect trigger types in workflow definitions.
 
-A funcao `trigger_workflow_inline` foi removida junto com o node
-TriggerWorkflow — sub-fluxos agora sao executados exclusivamente pelo
-SubWorkflow (categoria control), que tem resolver injetado pelo executor
-e nao depende de `app.*` em runtime.
+The `trigger_workflow_inline` function was removed along with the
+TriggerWorkflow node — sub-workflows are now executed exclusively by
+SubWorkflow (control category), which has a resolver injected by the executor
+and does not depend on `app.*` at runtime.
 """
 
 
 def has_webhook_trigger(definition: dict) -> bool:
-    """True se a definição contém pelo menos um node WebhookTrigger.
+    """True if the definition contains at least one WebhookTrigger node.
 
-    Usado por endpoints que só devem executar workflows configurados para
-    esse tipo de gatilho (ex: POST /webhook/execute/{id_hash}).
+    Used by endpoints that must only execute workflows configured for
+    that trigger type (e.g., POST /webhook/execute/{id_hash}).
 
-    Segue o mesmo padrão de `extract_schedule_node` em app.core.scheduling.hooks
-    (checa type + name).
+    Follows the same pattern as `extract_schedule_node` in app.core.scheduling.hooks
+    (checks type + name).
     """
     for node in definition.get("nodes", []):
         if node.get("type") == "trigger" and node.get("name") == "WebhookTrigger":

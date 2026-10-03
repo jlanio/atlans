@@ -1,18 +1,18 @@
 # tests/unit/test_ocultar_windows.py
-"""Atributo OCULTO do Windows nos arquivos internos do executor.
+"""Windows HIDDEN attribute on the executor's internal files.
 
-Os arquivos que o executor grava na pasta do usuario ja nascem com ponto no
-inicio do nome (`.atlans-sync.json`, `.executor_results.sqlite`,
-`.atlans-trash/`), o que basta para escondê-los no Linux e no macOS. O Explorer
-do Windows ignora essa convencao: la eles apareceriam no meio dos dados do
-usuario, convidando ao apagamento acidental — apagar o manifesto re-sincroniza a
-pasta inteira e apagar o outbox perde resultados de jobs. Dai o
+The files the executor writes into the user's folder are already born with a
+leading dot in the name (`.atlans-sync.json`, `.executor_results.sqlite`,
+`.atlans-trash/`), which is enough to hide them on Linux and macOS. Windows
+Explorer ignores that convention: there they would show up in the middle of the
+user's data, inviting accidental deletion — deleting the manifest re-syncs the
+whole folder and deleting the outbox loses job results. Hence
 `ocultar_no_windows`.
 
-O CI roda em Linux, entao a chamada real ao kernel32 e simulada. O que estes
-testes protegem e a LOGICA (quando e com quais bits chamamos SetFileAttributesW)
-e o contrato de nunca levantar — alem da FIACAO nos dois pontos que o usuario
-citou: o manifesto e os arquivos SQLite.
+CI runs on Linux, so the real call to kernel32 is simulated. What these tests
+protect is the LOGIC (when and with which bits we call SetFileAttributesW) and
+the contract of never raising — plus the WIRING at the two points the user
+mentioned: the manifest and the SQLite files.
 """
 import asyncio
 import types
@@ -26,10 +26,10 @@ FILE_ATTRIBUTE_ARCHIVE = 0x20
 
 
 def _simular_windows(monkeypatch, get_retorno, registro):
-    """Faz `ocultar_no_windows` crer que roda no Windows, com um kernel32 falso.
+    """Makes `ocultar_no_windows` believe it is running on Windows, with a fake kernel32.
 
-    `get_retorno` e o que o GetFileAttributesW simulado devolve; cada
-    SetFileAttributesW vai para `registro` como (caminho, attrs).
+    `get_retorno` is what the simulated GetFileAttributesW returns; each
+    SetFileAttributesW goes into `registro` as (path, attrs).
     """
     import ctypes
 
@@ -45,22 +45,22 @@ def _simular_windows(monkeypatch, get_retorno, registro):
         ctypes, "windll",
         types.SimpleNamespace(kernel32=types.SimpleNamespace(
             GetFileAttributesW=_get, SetFileAttributesW=_set,
-            GetLastError=lambda: 0,  # usado pelo log de diagnostico do helper
+            GetLastError=lambda: 0,  # used by the helper's diagnostic log
         )),
         raising=False,  # `windll` nao existe em Linux; criamos o atributo.
     )
 
 
-# ── No-op fora do Windows ──────────────────────────────────────────────────────
+# ── No-op outside Windows ──────────────────────────────────────────────────────
 
 def test_noop_fora_do_windows_nao_toca_no_kernel32(monkeypatch, tmp_path):
-    """Em Linux/macOS o ponto ja esconde; o guard os.name deve sair ANTES de
-    qualquer chamada ao kernel32.
+    """On Linux/macOS the dot already hides; the os.name guard must exit BEFORE
+    any call to kernel32.
 
-    O teste antigo so checava `is None` — mas o helper engole AttributeError,
-    entao passava mesmo se o guard fosse removido. Aqui injetamos um kernel32
-    falso que REGISTRA qualquer chamada: se o guard sumir, `tocado` fica
-    preenchido e o teste quebra.
+    The old test only checked `is None` — but the helper swallows AttributeError,
+    so it passed even if the guard were removed. Here we inject a fake kernel32
+    that RECORDS any call: if the guard disappears, `tocado` gets filled and the
+    test breaks.
     """
     import ctypes
     tocado = []
@@ -82,7 +82,7 @@ def test_noop_fora_do_windows_nao_toca_no_kernel32(monkeypatch, tmp_path):
     f = tmp_path / ".atlans-sync.json"
     f.write_text("{}")
     assert utils.ocultar_no_windows(f) is None
-    assert tocado == []   # o short-circuit de os.name impediu qualquer syscall
+    assert tocado == []   # the os.name short-circuit prevented any syscall
 
 
 def test_nao_levanta_em_caminho_inexistente(monkeypatch):
@@ -90,7 +90,7 @@ def test_nao_levanta_em_caminho_inexistente(monkeypatch):
     assert utils.ocultar_no_windows("/nao/existe/.atlans-sync.json") is None
 
 
-# ── Logica no Windows (kernel32 simulado) ───────────────────────────────────────
+# ── Logic on Windows (simulated kernel32) ───────────────────────────────────────
 
 def test_seta_oculto_preservando_outros_atributos(monkeypatch, tmp_path):
     registro = []
@@ -103,8 +103,8 @@ def test_seta_oculto_preservando_outros_atributos(monkeypatch, tmp_path):
     assert len(registro) == 1
     caminho, attrs = registro[0]
     assert caminho == str(f)
-    assert attrs & FILE_ATTRIBUTE_HIDDEN      # passou a ser oculto
-    assert attrs & FILE_ATTRIBUTE_ARCHIVE     # sem apagar o que ja estava la
+    assert attrs & FILE_ATTRIBUTE_HIDDEN      # became hidden
+    assert attrs & FILE_ATTRIBUTE_ARCHIVE     # without clearing what was already there
 
 
 def test_nao_reaplica_se_ja_oculto(monkeypatch, tmp_path):
@@ -112,7 +112,7 @@ def test_nao_reaplica_se_ja_oculto(monkeypatch, tmp_path):
     _simular_windows(monkeypatch, FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_ARCHIVE, registro)
 
     utils.ocultar_no_windows(tmp_path / "x")
-    assert registro == []                     # ja oculto → nenhum SetFileAttributes
+    assert registro == []                     # already hidden → no SetFileAttributes
 
 
 @pytest.mark.parametrize("invalido", [-1, 0xFFFFFFFF])
@@ -142,18 +142,18 @@ def test_nunca_levanta_mesmo_com_set_quebrado(monkeypatch, tmp_path):
         raising=False,
     )
 
-    # Best-effort por contrato: jamais propaga para quem acabou de gravar.
+    # Best-effort by contract: never propagates to whoever just wrote the file.
     assert utils.ocultar_no_windows(tmp_path / "x") is None
 
 
 # ── Fiacao: o manifesto e o outbox realmente chamam o helper ────────────────────
 
 def test_manifesto_e_ocultado_apos_cada_gravacao(monkeypatch, tmp_path):
-    """O `.atlans-sync.json` — o exemplo que o usuario citou — e ocultado ao salvar.
+    """`.atlans-sync.json` — the example the user mentioned — is hidden on save.
 
-    Reaplicado a cada gravacao de proposito: no Windows o os.replace faz o
-    manifesto herdar os atributos do `.tmp` visivel, entao um unico hide na
-    criacao nao sobreviveria ao primeiro flush.
+    Reapplied on every write on purpose: on Windows os.replace makes the
+    manifest inherit the attributes of the visible `.tmp`, so a single hide at
+    creation would not survive the first flush.
     """
     from executor.sync import manifest as manifest_mod
 
@@ -164,7 +164,7 @@ def test_manifesto_e_ocultado_apos_cada_gravacao(monkeypatch, tmp_path):
     m.set_dataset("parcelas", {"type": "geojson"})
     asyncio.run(m.flush())
     m.set_dataset("lotes", {"type": "geojson"})
-    asyncio.run(m.flush())  # segunda gravacao tem de reaplicar
+    asyncio.run(m.flush())  # second write has to reapply
 
     alvo = str(tmp_path / ".atlans-sync.json")
     assert (tmp_path / ".atlans-sync.json").exists()
@@ -172,10 +172,10 @@ def test_manifesto_e_ocultado_apos_cada_gravacao(monkeypatch, tmp_path):
 
 
 def test_outbox_sqlite_wal_e_journal_sao_ocultados(monkeypatch, tmp_path):
-    """Os 'arquivos sqlite' (.sqlite, -wal, -shm, -journal) citados pelo usuario.
+    """The 'sqlite files' (.sqlite, -wal, -shm, -journal) mentioned by the user.
 
-    -journal entra porque, quando o WAL nao engata (ex.: share de rede), o SQLite
-    cai silenciosamente para rollback journal e escreve um .sqlite-journal visivel.
+    -journal is included because, when WAL does not kick in (e.g. a network share),
+    SQLite silently falls back to a rollback journal and writes a visible .sqlite-journal.
     """
     from executor import result_store
 
@@ -198,9 +198,9 @@ def test_outbox_sqlite_wal_e_journal_sao_ocultados(monkeypatch, tmp_path):
 
 
 def test_outbox_real_segue_operavel_apos_ocultar(monkeypatch, tmp_path):
-    """Com o helper REAL (no-op em Linux), o db e criado, ocultado e permanece
-    gravavel: valida a premissa de result_store (ocultar depois do CREATE/escrita
-    nao quebra o SQLite), alem do ciclo put/count/mark_sent/load_pending."""
+    """With the REAL helper (no-op on Linux), the db is created, hidden and remains
+    writable: validates result_store's premise (hiding after CREATE/write does
+    not break SQLite), plus the put/count/mark_sent/load_pending cycle."""
     from executor import result_store
 
     db = tmp_path / ".executor_results.sqlite"
@@ -208,7 +208,7 @@ def test_outbox_real_segue_operavel_apos_ocultar(monkeypatch, tmp_path):
     monkeypatch.setattr(result_store, "_conn", None)
     monkeypatch.setattr(result_store, "_disabled", False)
     monkeypatch.setattr(result_store, "_ocultado_pos_escrita", False)
-    # NAO mocka ocultar_no_windows: em Linux ele e no-op, mas exercita o caminho real.
+    # Does NOT mock ocultar_no_windows: on Linux it is a no-op, but it exercises the real path.
 
     try:
         result_store.put({"job_id": "j1", "status": "success"})
@@ -236,7 +236,7 @@ def test_lixeira_e_ocultada_ao_criar(monkeypatch, tmp_path):
 
 
 def test_sync_config_oculta_dotfile_de_config(monkeypatch, tmp_path):
-    """Fiacao do 4o ponto: .atlans-sync-config.json e ocultado ao ser lido."""
+    """Wiring of the 4th point: .atlans-sync-config.json is hidden when read."""
     from executor.sync import sync_config as sc
 
     chamadas = []
@@ -250,7 +250,7 @@ def test_sync_config_oculta_dotfile_de_config(monkeypatch, tmp_path):
 
 
 def test_sync_config_nao_oculta_quando_ausente(monkeypatch, tmp_path):
-    """Sem o arquivo, o early-return impede a chamada (nao oculta caminho inexistente)."""
+    """Without the file, the early return prevents the call (does not hide a nonexistent path)."""
     from executor.sync import sync_config as sc
 
     chamadas = []
@@ -283,13 +283,13 @@ def test_ignore_nao_oculta_quando_ausente(monkeypatch, tmp_path):
 
 
 def test_manifesto_sobrevive_a_os_replace_que_falha(monkeypatch, tmp_path):
-    """Contrato do caminho de erro do os.replace (ex.: destino bloqueado no Windows).
+    """Contract for the os.replace error path (e.g. destination locked on Windows).
 
-    O risco mais grave levantado na revisao: se o os.replace atomico falhasse
-    sobre o manifesto, o executor nao podia corromper nem travar. Como em Linux o
-    replace sempre funciona, simulamos a falha. Esperado: _escrever devolve False,
-    flush() NAO marca como persistido, o manifesto continua 'sujo' para o proximo
-    flush tentar de novo, nada e gravado e o `.tmp` e limpo.
+    The most serious risk raised in the review: if the atomic os.replace failed
+    over the manifest, the executor could neither corrupt nor hang. Since on Linux
+    replace always works, we simulate the failure. Expected: _escrever returns False,
+    flush() does NOT mark it as persisted, the manifest stays 'dirty' for the next
+    flush to try again, nothing is written and the `.tmp` is cleaned up.
     """
     from executor.sync import manifest as manifest_mod
 
@@ -301,7 +301,7 @@ def test_manifesto_sobrevive_a_os_replace_que_falha(monkeypatch, tmp_path):
 
     monkeypatch.setattr(manifest_mod.os, "replace", _replace_bloqueado)
 
-    asyncio.run(m.flush())  # nao deve levantar
+    asyncio.run(m.flush())  # must not raise
 
     assert m._sujo is True                                    # pendente p/ retry
     assert not (tmp_path / ".atlans-sync.json").exists()      # nada persistido

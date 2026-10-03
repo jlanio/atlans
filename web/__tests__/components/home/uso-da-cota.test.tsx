@@ -1,8 +1,8 @@
 /**
- * O donut da cota (o "indicador de contexto" da casa): percentual clampado,
- * faixas de cor, contagem de reabertura quando estourada e o texto completo
- * no aria-label/tooltip: gasto, teto, percentual e prazo — e nada mais (o
- * aviso de cota compartilhada com o editor saiu do texto).
+ * The quota donut (the house "context indicator"): clamped percentage,
+ * color bands, reopening countdown when exceeded and the full text
+ * in the aria-label/tooltip: spent, ceiling, percentage and time — and nothing else (the
+ * warning about the quota shared with the editor left the text).
  */
 import { describe, it, expect, beforeEach } from "vitest"
 import { cleanup, render, screen } from "@testing-library/react"
@@ -23,7 +23,7 @@ describe("percentual e faixa", () => {
   it("arredonda, clampa em 0–100 e nunca divide por zero", () => {
     expect(percentualDaCota(cota(450_000))).toBe(30)
     expect(percentualDaCota(cota(1_230_000))).toBe(82)
-    // O servidor deixa o ÚLTIMO turno passar do teto: o donut não passa de 100.
+    // The server lets the LAST turn go over the ceiling: the donut does not go past 100.
     expect(percentualDaCota(cota(2_000_000))).toBe(100)
     expect(percentualDaCota(cota(-5))).toBe(0)
     expect(percentualDaCota(cota(10, 0))).toBe(0)
@@ -32,7 +32,7 @@ describe("percentual e faixa", () => {
   it("as faixas viram nas fronteiras certas: 80% e o teto", () => {
     expect(faixaDaCota(cota(1_190_000))).toBe("normal")   // 79%
     expect(faixaDaCota(cota(1_200_000))).toBe("alerta")   // 80%
-    expect(faixaDaCota(cota(1_500_000))).toBe("cheia")    // = teto conta como estourada
+    expect(faixaDaCota(cota(1_500_000))).toBe("cheia")    // = ceiling counts as exceeded
     expect(faixaDaCota(cota(2_000_000))).toBe("cheia")
   })
 })
@@ -46,8 +46,8 @@ describe("o donut na tela", () => {
     const rotulo = donut.getAttribute("aria-label") ?? ""
     expect(rotulo).toContain("1.230.000 de 1.500.000 tokens (82%)")
     expect(rotulo).toContain("a janela renova em 3 h")
-    // O texto acaba no prazo: sem o aviso de cota compartilhada e sem espaço
-    // sobrando depois do ponto.
+    // The text ends at the time: without the shared-quota warning and without a space
+    // left over after the period.
     expect(rotulo).not.toContain("compartilhada")
     expect(rotulo).toMatch(/\.$/)
   })

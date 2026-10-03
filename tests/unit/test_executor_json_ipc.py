@@ -1,25 +1,25 @@
 # tests/unit/test_executor_json_ipc.py
 """
-Canal NDJSON entre o executor e um supervisor (o app desktop).
+NDJSON channel between the executor and a supervisor (the desktop app).
 
-Isto e um teste de CONTRATO: o outro lado da ponte e TypeScript, num
-repositorio de build separado, e nao ha type checker que atravesse a fronteira.
-O que garante que os dois lados falam a mesma lingua sao estes casos.
+This is a CONTRACT test: the other side of the bridge is TypeScript, in a
+separate build repository, and no type checker crosses the boundary. What
+guarantees that both sides speak the same language are these cases.
 
-Tres coisas sao travadas aqui:
+Three things are locked down here:
 
-  FRAMING       toda linha comeca por `{"v":1,` e nada mais escreve no stdout.
-                E o que permite ao leitor descartar um `print()` acidental de um
-                no de workflow sem confundi-lo com evento.
+  FRAMING       every line starts with `{"v":1,` and nothing else writes to
+                stdout. That is what lets the reader discard an accidental
+                `print()` from a workflow node without mistaking it for an event.
 
-  COMPLETUDE    todo campo de `Snapshot` aparece no dict serializado. Sem isto,
-                um campo novo nasceria invisivel para a GUI e ninguem notaria.
-                A excecao e deliberada e esta travada em
-                `test_snapshot_emitido_omite_os_campos_so_do_painel`: o evento
-                `snapshot` do NDJSON tira `log_tail` e `system` do dict.
+  COMPLETENESS  every `Snapshot` field appears in the serialized dict. Without
+                this, a new field would be born invisible to the GUI and nobody
+                would notice. The exception is deliberate and locked down in
+                `test_snapshot_emitido_omite_os_campos_so_do_painel`: the NDJSON
+                `snapshot` event drops `log_tail` and `system` from the dict.
 
-  NAO-BLOQUEIO  o observer roda com o lock do stats segurado e e chamado das
-                threads do flow engine. Se ele bloquear, o executor para.
+  NON-BLOCKING  the observer runs with the stats lock held and is called from
+                the flow engine threads. If it blocks, the executor stops.
 """
 import json
 import logging
@@ -43,8 +43,8 @@ def _snapshot(**kw) -> Snapshot:
 
 
 def test_todo_campo_do_snapshot_sai_no_dict():
-    """Completude: quem adiciona um campo ao Snapshot ganha o campo no JSON.
-    Se este teste falhar, alguem trocou o asdict por uma lista manual."""
+    """Completeness: whoever adds a field to Snapshot gets the field in the JSON.
+    If this test fails, someone replaced asdict with a manual list."""
     import dataclasses
     snap = _snapshot()
     d = snapshot_to_dict(snap)
@@ -54,16 +54,16 @@ def test_todo_campo_do_snapshot_sai_no_dict():
 
 @pytest.mark.asyncio
 async def test_snapshot_emitido_omite_os_campos_so_do_painel():
-    """A completude acima vale para `snapshot_to_dict`; o evento `snapshot` do
-    NDJSON tira dois campos de proposito.
+    """The completeness above holds for `snapshot_to_dict`; the NDJSON `snapshot`
+    event drops two fields on purpose.
 
-    `log_tail` sao ate 200 linhas de log REENVIADAS a cada segundo, e o
-    supervisor ja recebe log incremental pelos eventos `log` — o tail so repete
-    o que ele tem. `system` e hardware, que nao muda de um tick para o outro.
-    Nenhum dos dois era lido do outro lado, e os dois atravessavam o pipe, o
-    `JSON.parse` e um structured clone por janela, a 1 Hz, com o executor
-    ocioso. Os contadores `log_warn_count`/`log_error_count` continuam saindo:
-    sao dois inteiros e a GUI os mostra.
+    `log_tail` is up to 200 log lines RESENT every second, and the supervisor
+    already receives the log incrementally through the `log` events — the tail
+    only repeats what it has. `system` is hardware, which does not change from
+    one tick to the next. Neither was read on the other side, and both went
+    through the pipe, `JSON.parse` and a structured clone per window, at 1 Hz,
+    with the executor idle. The `log_warn_count`/`log_error_count` counters are
+    still sent: they are two integers and the GUI shows them.
     """
     st = ExecutorStats(executor_id="e1")
     st.system = {"cpu_cores": 8}
@@ -83,14 +83,14 @@ async def test_snapshot_emitido_omite_os_campos_so_do_painel():
 
 def test_dict_e_serializavel_e_sem_tipos_exoticos():
     d = snapshot_to_dict(_snapshot())
-    texto = json.dumps(d)          # levanta se algo nao for JSON-safe
+    texto = json.dumps(d)          # raises if something is not JSON-safe
     assert json.loads(texto) == d
 
 
 def test_tuplas_heterogeneas_viram_objetos_nomeados():
-    """`slowest` e `last_finished` sao tuplas no dataclass. Em JSON virariam
-    arrays posicionais, e do outro lado `snap.slowest[1]` e um indice sem nome
-    que quebra em silencio se a ordem mudar."""
+    """`slowest` and `last_finished` are tuples in the dataclass. In JSON they
+    would become positional arrays, and on the other side `snap.slowest[1]` is
+    an unnamed index that silently breaks if the order changes."""
     st = ExecutorStats()
     st.on_job_finished("j1", "error", 12.5, run_id="run-7")
     d = snapshot_to_dict(st.snapshot())
@@ -105,9 +105,9 @@ def test_sem_jobs_os_dois_campos_sao_nulos():
 
 
 def test_nan_e_infinito_viram_nulo():
-    """`json.dumps` emite `NaN`/`Infinity` por padrao, que NAO sao JSON valido:
-    `JSON.parse` do outro lado estoura e o canal inteiro morre por causa de uma
-    divisao malfeita numa metrica."""
+    """`json.dumps` emits `NaN`/`Infinity` by default, which are NOT valid JSON:
+    `JSON.parse` on the other side blows up and the whole channel dies because
+    of a botched division in a metric."""
     from executor.stats import _json_safe
     assert _json_safe(float("nan"), 3) is None
     assert _json_safe(float("inf"), 3) is None
@@ -116,8 +116,8 @@ def test_nan_e_infinito_viram_nulo():
 
 
 def test_valor_exotico_degrada_para_texto():
-    """`system` e montado por sysinfo e pode mudar. Um valor inesperado nao pode
-    derrubar a serializacao e, com ela, o canal."""
+    """`system` is assembled by sysinfo and may change. An unexpected value must
+    not bring down the serialization and, with it, the channel."""
     class Esquisito:
         def __str__(self): return "esquisito"
 
@@ -136,8 +136,8 @@ def _coletor():
 
 
 def test_dois_jobs_no_mesmo_tick_geram_dois_eventos():
-    """A razao de o observer existir: `last_finished` guarda UM job, entao com
-    tick de 1s o primeiro de dois desapareceria do historico da GUI."""
+    """The reason the observer exists: `last_finished` keeps ONE job, so with a
+    1s tick the first of two would disappear from the GUI history."""
     eventos, obs = _coletor()
     st = ExecutorStats(observer=obs)
     st.on_job_finished("j1", "ok", 1.0, run_id="r1")
@@ -149,8 +149,8 @@ def test_dois_jobs_no_mesmo_tick_geram_dois_eventos():
 
 
 def test_cancelamento_de_job_em_execucao_emite_uma_vez_so():
-    """`on_job_cancelled` delega para `on_job_finished` quando o job esta
-    rodando. Emitir nos dois faria a GUI contar o cancelamento em dobro."""
+    """`on_job_cancelled` delegates to `on_job_finished` when the job is running.
+    Emitting in both would make the GUI count the cancellation twice."""
     eventos, obs = _coletor()
     st = ExecutorStats(observer=obs)
     st.on_job_started("j1", run_id="r1")
@@ -184,13 +184,13 @@ def test_conexao_emite_transicoes():
 
 
 def test_observer_que_levanta_nao_derruba_o_hook():
-    """Mesma regra dos demais hooks: telemetria quebrada nao pode derrubar a
-    execucao de um workflow."""
+    """Same rule as the other hooks: broken telemetry must not bring down the
+    execution of a workflow."""
     def explode(tipo, dados):
         raise RuntimeError("boom")
 
     st = ExecutorStats(observer=explode)
-    st.on_job_started("j1")              # nao deve levantar
+    st.on_job_started("j1")              # must not raise
     st.on_job_finished("j1", "ok", 1.0)
     assert st.snapshot().total_ok == 1
 
@@ -204,8 +204,8 @@ def test_sem_observer_nada_muda():
 # ── Framing e emissao ────────────────────────────────────────────────────────
 
 class _RuntimeIsolado(json_runtime.JsonRuntime):
-    """JsonRuntime sem thread nem event loop: `emitir` enfileira, e o teste le
-    o buffer direto. Isola o formato do transporte."""
+    """JsonRuntime with no thread or event loop: `emitir` enqueues, and the test
+    reads the buffer directly. Isolates the format from the transport."""
 
     def __init__(self):
         super().__init__(NullStats(), capacity_source=None, result_queue=None,
@@ -233,8 +233,8 @@ def test_toda_linha_tem_o_framing():
 
 
 def test_linha_gigante_vira_aviso_em_vez_de_estourar():
-    """Um `log_tail` patologico nao pode virar uma linha de megabytes que trava
-    o parser do outro lado."""
+    """A pathological `log_tail` must not become a megabytes-long line that
+    freezes the parser on the other side."""
     rt = _RuntimeIsolado()
     rt.emitir("snapshot", {"lixo": "x" * (json_runtime._LINHA_MAX + 10)})
 
@@ -244,9 +244,9 @@ def test_linha_gigante_vira_aviso_em_vez_de_estourar():
 
 
 def test_buffer_cheio_descarta_o_mais_antigo_e_conta():
-    """Ao encher, o mais ANTIGO cai: para snapshots, que se substituem, o
-    consumidor quer o estado atual, nao o de 40s atras. O descarte e contado e
-    reportado no proximo snapshot — perda silenciosa seria pior."""
+    """When full, the OLDEST is dropped: for snapshots, which replace each other,
+    the consumer wants the current state, not the one from 40s ago. The drop is
+    counted and reported in the next snapshot — silent loss would be worse."""
     rt = _RuntimeIsolado()
     for i in range(json_runtime._BUFFER_MAX + 25):
         rt.emitir("snapshot", {"i": i})
@@ -254,19 +254,19 @@ def test_buffer_cheio_descarta_o_mais_antigo_e_conta():
     linhas = rt.linhas()
     assert len(linhas) == json_runtime._BUFFER_MAX
     assert rt._descartados == 25
-    assert json.loads(linhas[0])["data"]["i"] == 25      # os 25 primeiros cairam
+    assert json.loads(linhas[0])["data"]["i"] == 25      # the first 25 were dropped
 
 
 def test_emitir_nunca_levanta_com_dado_impossivel():
     rt = _RuntimeIsolado()
-    rt.emitir("snapshot", {"self": object()})   # nao serializavel
-    assert rt.linhas() == []                    # descartado, sem excecao
+    rt.emitir("snapshot", {"self": object()})   # not serializable
+    assert rt.linhas() == []                    # discarded, without an exception
 
 
 def test_emitir_e_rapido_o_bastante_para_rodar_sob_lock():
-    """O observer segura o `_lock` do stats e e chamado das threads do flow
-    engine. Se `emitir` fizesse I/O aqui, `on_log_record` travaria e o executor
-    inteiro pararia. 2000 eventos precisam custar bem menos que um tick."""
+    """The observer holds the stats `_lock` and is called from the flow engine
+    threads. If `emitir` did I/O here, `on_log_record` would block and the whole
+    executor would stop. 2000 events need to cost much less than a tick."""
     rt = _RuntimeIsolado()
     inicio = time.perf_counter()
     for i in range(2000):
@@ -307,7 +307,7 @@ def test_comando_reconnect_reporta_se_havia_backoff():
 
 
 def test_comando_desconhecido_responde_ack_negativo():
-    """Sem isto, a GUI espera para sempre por uma resposta que nunca vem."""
+    """Without this, the GUI waits forever for a response that never comes."""
     rt = _RuntimeIsolado()
     rt._executar_comando({"cmd": "formatar_disco"})
     ack = json.loads(rt.linhas()[-1])
@@ -323,8 +323,8 @@ def test_comando_que_levanta_vira_ack_negativo():
 
 
 def test_reset_stats_funciona_com_null_stats():
-    """`NullStats` nao tinha `reset` — o comando levantava AttributeError com o
-    coletor desligado."""
+    """`NullStats` had no `reset` — the command raised AttributeError with the
+    collector turned off."""
     rt = _RuntimeIsolado()
     rt._executar_comando({"cmd": "reset_stats"})
     assert json.loads(rt.linhas()[-1])["ok"] is True
@@ -332,8 +332,8 @@ def test_reset_stats_funciona_com_null_stats():
 
 @pytest.mark.parametrize("cmd", json_runtime.COMANDOS)
 def test_todo_comando_anunciado_no_hello_e_aceito(cmd):
-    """O `hello` publica a lista de comandos. Anunciar um que responde
-    'desconhecido' seria mentir para o outro lado da ponte."""
+    """The `hello` publishes the list of commands. Announcing one that answers
+    'desconhecido' (unknown) would be lying to the other side of the bridge."""
     rt = _RuntimeIsolado()
     rt._ao_sair = lambda: None
     rt._ao_reconectar = lambda: True
@@ -343,20 +343,20 @@ def test_todo_comando_anunciado_no_hello_e_aceito(cmd):
     assert ack["ok"] is True, f"{cmd}: {ack.get('detail')}"
 
 
-# ── Handler de log ───────────────────────────────────────────────────────────
+# ── Log handler ──────────────────────────────────────────────────────────────
 
-# ── Ligacao (o que os testes de unidade acima NAO cobriam) ───────────────────
+# ── Wiring (what the unit tests above did NOT cover) ─────────────────────────
 
 @pytest.mark.asyncio
 async def test_dashboard_start_json_liga_o_observer():
-    """Regressao: o mecanismo do observer estava certo e testado, mas ninguem o
-    LIGAVA — `dashboard.start(modo="json")` criava o runtime e nunca chamava
-    `stats.set_observer`.
+    """Regression: the observer mechanism was correct and tested, but nobody
+    WIRED it — `dashboard.start(modo="json")` created the runtime and never
+    called `stats.set_observer`.
 
-    O sintoma nao era um erro: o canal seguia emitindo snapshots normalmente, as
-    metricas do painel ficavam corretas, e so o historico de execucoes ficava
-    permanentemente vazio. `last_finished` do snapshot guarda UM job, entao o
-    consumidor nao tem como reconstruir a lista a partir dele.
+    The symptom was not an error: the channel kept emitting snapshots normally,
+    the panel metrics were correct, and only the run history stayed permanently
+    empty. The snapshot's `last_finished` keeps ONE job, so the consumer has no
+    way to rebuild the list from it.
     """
     from executor import dashboard
 
@@ -379,8 +379,8 @@ async def test_dashboard_start_json_liga_o_observer():
 
 @pytest.mark.asyncio
 async def test_stop_desliga_o_observer():
-    """Observer apontando para um runtime fechado enfileiraria cada job novo num
-    buffer que ninguem drena."""
+    """An observer pointing to a closed runtime would enqueue every new job into a
+    buffer that nobody drains."""
     from executor import dashboard
 
     st = ExecutorStats(executor_id="e1")
@@ -417,11 +417,11 @@ def test_json_log_handler_emite_e_alimenta_o_ring():
 # ── sync_now ─────────────────────────────────────────────────────────────────
 
 def test_sync_now_sem_pasta_configurada_NAO_e_falha():
-    """`ok` diz que o comando era valido e foi executado, nao que algo mudou.
+    """`ok` says the command was valid and was executed, not that anything changed.
 
-    Mesma convencao de `reconnect`, que responde ok mesmo sem backoff para
-    interromper. Tratar "nao ha pasta" como falha faria a UI mostrar erro
-    vermelho para uma configuracao perfeitamente normal.
+    Same convention as `reconnect`, which answers ok even with no backoff to
+    interrupt. Treating "no folder" as a failure would make the UI show a red
+    error for a perfectly normal configuration.
     """
     rt = _RuntimeIsolado()
     rt._ao_sincronizar = lambda: 0
@@ -440,7 +440,7 @@ def test_sync_now_relata_quantas_pastas_acordou():
 
 
 def test_sync_now_sem_handler_e_falha_de_ligacao():
-    """Handler ausente e bug de wiring, nao estado do usuario — e precisa doer."""
+    """A missing handler is a wiring bug, not user state — and it has to hurt."""
     rt = _RuntimeIsolado()
     rt._ao_sincronizar = None
     rt._executar_comando({"cmd": "sync_now"})

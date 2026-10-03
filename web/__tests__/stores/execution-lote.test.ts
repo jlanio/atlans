@@ -1,11 +1,11 @@
 /**
- * O caminho quente do run: lote de eventos, índice por nó e ramos perdedores.
+ * The run's hot path: event batch, per-node index and losing branches.
  *
- * Cada mensagem do WebSocket disparava três trabalhos proporcionais ao tamanho
- * do grafo (mapa de todos os nós, BFS sobre todas as arestas, cópia do array de
- * eventos). O que estes testes protegem é o inverso disso: uma cópia por lote,
- * um índice pronto na store e IDENTIDADE preservada quando nada mudou — é a
- * identidade que corta o re-render de nós e arestas.
+ * Every WebSocket message triggered three jobs proportional to the size of
+ * the graph (a map of all nodes, a BFS over all edges, a copy of the events
+ * array). What these tests protect is the inverse: one copy per batch, a
+ * ready index in the store and IDENTITY preserved when nothing changed — it is
+ * identity that cuts the re-render of nodes and edges.
  */
 import { describe, it, expect, beforeEach } from "vitest"
 import { Edge } from "@xyflow/react"
@@ -41,14 +41,14 @@ describe("workflowExecutionStore — lote de eventos", () => {
     store.appendEvents([evento(0), evento(1), evento(2)])
     expect(useWorkflowExecutionStore.getState().events.map(e => e.seq)).toEqual([0, 1, 2])
 
-    // A rotação descarta stdout do MEIO da lista: as keys das linhas que
-    // sobrevivem não podem mudar por causa disso.
+    // Rotation drops stdout from the MIDDLE of the list: the keys of the lines
+    // that survive must not change because of it.
     const stdout = Array.from({ length: 2_500 }, (_, i) => evento(i + 3, { kind: "stdout", status: "log" }))
     useWorkflowExecutionStore.getState().appendEvents(stdout)
 
     const events = useWorkflowExecutionStore.getState().events
     expect(events.length).toBeLessThanOrEqual(2_000)
-    // Estritamente crescente e sem repetição.
+    // Strictly increasing and without repeats.
     for (let i = 1; i < events.length; i++) {
       expect(events[i].seq).toBeGreaterThan(events[i - 1].seq)
     }
@@ -64,15 +64,15 @@ describe("workflowExecutionStore — lote de eventos", () => {
   })
 
   it("o replay histórico usa o mesmo teto do caminho ao vivo", () => {
-    // O endpoint devolve até 5000 eventos; renderizá-los todos travava a aba.
+    // The endpoint returns up to 5000 events; rendering them all froze the tab.
     const events = Array.from({ length: 5_000 }, (_, i) => evento(i, { kind: "stdout", status: "log" }))
     useWorkflowExecutionStore.getState().loadHistoricalEvents("run-1", events)
     const state = useWorkflowExecutionStore.getState()
     expect(state.events.length).toBeLessThanOrEqual(2_000)
     expect(state.droppedEvents).toBeGreaterThan(0)
     expect(state.events[0].seq).toBe(0)
-    // O início do run continua sendo o do PRIMEIRO evento, não o do sobrevivente
-    // mais antigo — senão todos os offsets "+Xs" do painel se deslocavam.
+    // The run's start is still that of the FIRST event, not of the oldest
+    // survivor — otherwise every "+Xs" offset in the panel would shift.
     expect(state.runStartedTs).toBe(T0)
   })
 
@@ -109,11 +109,11 @@ describe("workflowExecutionStore — índice por nó e ramos perdedores", () => 
     const nodes = useWorkflowExecutionStore.getState().statusWorkflow!.nodes
     const bAntes = useWorkflowExecutionStore.getState().statusById.get("b")
 
-    // Só "a" muda; "b" é devolvido por identidade, como faz o flush do WS.
+    // Only "a" changes; "b" is returned by identity, as the WS flush does.
     const atualizados = nodes.map(n => (n.id === "a" ? { ...n, status: "started" as const } : n))
     useWorkflowExecutionStore.getState().updateNodeStatuses(atualizados, [])
 
-    // É isto que faz o seletor por id do card de "b" não re-renderizar.
+    // This is what keeps the by-id selector of "b"'s card from re-rendering.
     expect(useWorkflowExecutionStore.getState().statusById.get("b")).toBe(bAntes)
     expect(useWorkflowExecutionStore.getState().statusById.get("a")?.status).toBe("started")
   })
@@ -133,12 +133,12 @@ describe("workflowExecutionStore — índice por nó e ramos perdedores", () => 
     ]
     useWorkflowExecutionStore.getState().updateNodeStatuses(decidido, arestas)
     const primeiros = useWorkflowExecutionStore.getState()
-    // O ramo "false" perdeu: a aresta e2 e tudo que ela alcança.
+    // The "false" branch lost: edge e2 and everything it reaches.
     expect([...primeiros.losingEdgeIds!].sort()).toEqual(["e2", "e3"])
     expect([...primeiros.losingNodeIds!].sort()).toEqual(["y", "z"])
 
-    // Um evento qualquer depois disso (um print, o término de outro nó) não
-    // pode recriar os Sets: recriá-los re-renderizava todo nó e toda aresta.
+    // Any event after that (a print, another node finishing) must not
+    // recreate the Sets: recreating them re-rendered every node and every edge.
     useWorkflowExecutionStore.getState().updateNodeStatuses(
       decidido.map(n => (n.id === "x" ? { ...n, status: "completed" as const } : n)),
       arestas,
@@ -155,8 +155,8 @@ describe("workflowExecutionStore — índice por nó e ramos perdedores", () => 
     useWorkflowExecutionStore.getState().updateNodeStatuses(decidido, antes)
     expect([...useWorkflowExecutionStore.getState().losingEdgeIds!]).toEqual(["e1"])
 
-    // Aresta apagada: o curto-circuito por assinatura não pode segurar o
-    // resultado velho só porque nenhum Conditional decidiu de novo.
+    // Deleted edge: the signature short-circuit must not hold on to the
+    // old result just because no Conditional decided again.
     useWorkflowExecutionStore.getState().updateNodeStatuses(decidido, [])
     expect([...useWorkflowExecutionStore.getState().losingEdgeIds!]).toEqual([])
   })

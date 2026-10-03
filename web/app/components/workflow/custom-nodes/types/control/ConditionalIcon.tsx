@@ -11,7 +11,7 @@ const ConditionalIcon = ({ id, ...nodeProps }: NodeProps<INodeContext>) => {
   const Icon = CONTROL_ICONS["Conditional"]
   const edges = useEdges()
 
-  // PERF: Set de sourceHandles conectados para lookup O(1).
+  // PERF: Set of connected sourceHandles for O(1) lookup.
   const connectedSources = useMemo(() => {
     const set = new Set<string>()
     for (const e of edges ?? []) {
@@ -20,8 +20,8 @@ const ConditionalIcon = ({ id, ...nodeProps }: NodeProps<INodeContext>) => {
     return set
   }, [edges, id])
 
-  // A entrada é única e sem id, então basta saber se existe alguma aresta
-  // chegando — é o que decide entre soquete sólido e tracejado.
+  // The input is single and has no id, so it is enough to know whether any edge
+  // is arriving — that is what decides between a solid and a dashed socket.
   const entradaLivre = useMemo(
     () => !(edges ?? []).some(e => e.target === id),
     [edges, id],

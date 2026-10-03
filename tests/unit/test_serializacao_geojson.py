@@ -1,24 +1,24 @@
 # tests/unit/test_serializacao_geojson.py
 """
-GDF -> GeoJSON num lugar so (`geo_helpers.gdf_para_geojson`).
+GDF -> GeoJSON in a single place (`geo_helpers.gdf_para_geojson`).
 
-A serializacao estava repetida em oito pontos, e as copias tinham divergido
-nos dois sentidos:
+The serialization was repeated in eight places, and the copies had diverged
+in both directions:
 
-  MUTACAO   SaveGeoJSON, DataOutput, PublishMap e o anexo automatico do
-            SendEmail passavam o GDF por `stringify_datetime_cols`, que trocava
-            as colunas datetime por TEXTO no proprio objeto. E o objeto era o
-            output do no ANTERIOR: `get_first_gdf` devolve o do pai e
-            `ensure_gdf_crs` devolve o mesmo quando o CRS ja bate. Irmaos do
-            mesmo batch (rodam em paralelo, em threads) e expressoes `$Alias`
-            passavam a ler a coluna como string.
+  MUTATION  SaveGeoJSON, DataOutput, PublishMap and SendEmail's automatic
+            attachment passed the GDF through `stringify_datetime_cols`, which
+            replaced the datetime columns with TEXT in the object itself. And the
+            object was the output of the PREVIOUS node: `get_first_gdf` returns
+            the parent's and `ensure_gdf_crs` returns the same one when the CRS
+            already matches. Siblings in the same batch (they run in parallel, in
+            threads) and `$Alias` expressions started reading the column as a string.
 
-  DATETIME  SaveToS3, SendWebhook, HttpRequest (POST com o GDF no corpo) e o
-            fallback GeoJSON do pin chamavam `to_json` direto, que falha com
+  DATETIME  SaveToS3, SendWebhook, HttpRequest (POST with the GDF in the body) and
+            the pin's GeoJSON fallback called `to_json` directly, which fails with
             "Object of type Timestamp is not JSON serializable".
 
-E o texto que os nos que ja funcionavam produziam nao pode mudar: continua
-sendo `astype(str)` nas colunas datetime, so que numa copia.
+And the text the already working nodes produced must not change: it is still
+`astype(str)` on the datetime columns, only on a copy.
 """
 from __future__ import annotations
 
@@ -48,10 +48,10 @@ def _gdf_com_datas() -> gpd.GeoDataFrame:
     )
 
 
-# O texto que SaveGeoJSON/DataOutput/PublishMap/SendEmail ja produziam para o
-# GDF acima (caminho antigo: ensure_gdf_crs + astype(str) in-place + to_json).
-# NaT vira "NaT" e o fuso fica no texto — e o contrato que quem consome o
-# arquivo ja conhece.
+# The text SaveGeoJSON/DataOutput/PublishMap/SendEmail already produced for the
+# GDF above (old path: ensure_gdf_crs + in-place astype(str) + to_json).
+# NaT becomes "NaT" and the time zone stays in the text — that is the contract
+# whoever consumes the file already knows.
 GEOJSON_ESPERADO = (
     '{"type": "FeatureCollection", "features": ['
     '{"id": "0", "type": "Feature", "properties": {"id": 1, "nome": "S\\u00e9", '
@@ -62,19 +62,19 @@ GEOJSON_ESPERADO = (
     '"geometry": {"type": "Point", "coordinates": [-43.2, -22.9]}}]}'
 )
 
-# Os quatro pontos que serializavam com o `to_json` cru (SaveToS3, SendWebhook,
-# HttpRequest, fallback do pin) entregam a data ausente como `null` — era o que
-# já saía numa coluna de data toda vazia, única que o `to_json` cru aceitava.
+# The four places that serialized with raw `to_json` (SaveToS3, SendWebhook,
+# HttpRequest, pin fallback) deliver the missing date as `null` — that is what
+# already came out for an all-empty date column, the only one raw `to_json` accepted.
 GEOJSON_ESPERADO_NULO = GEOJSON_ESPERADO.replace('"quando": "NaT"', '"quando": null')
 
 
 @pytest.fixture(autouse=True)
 def _servidor_como_localidade(monkeypatch):
-    """Maquina que envia: os nos de saida seguem o caminho normal de upload."""
+    """Sending machine: the output nodes follow the normal upload path."""
     monkeypatch.delenv("EXECUTOR_SYNC_MODE", raising=False)
 
 
-# ── Os quatro nos que convertiam datetime (e mutavam o GDF do pai) ───────────
+# ── The four nodes that converted datetime (and mutated the parent's GDF) ────
 
 async def _save_geojson(gdf) -> str:
     from flow.nodes.outputs.save_geojson import SaveGeoJSON
@@ -144,7 +144,7 @@ NOS_QUE_CONVERTIAM = pytest.mark.parametrize(
 
 @NOS_QUE_CONVERTIAM
 async def test_no_de_saida_nao_altera_o_gdf_do_no_anterior(rodar):
-    """O GDF de entrada e o output do pai, que irmaos e `$Alias` ainda leem."""
+    """The input GDF is the parent's output, which siblings and `$Alias` still read."""
     gdf = _gdf_com_datas()
     intacto = gdf.copy()
 
@@ -161,7 +161,7 @@ async def test_texto_geojson_dos_nos_que_ja_funcionavam_nao_muda(rodar):
     assert await rodar(_gdf_com_datas()) == GEOJSON_ESPERADO
 
 
-# ── Os quatro pontos que nao tratavam datetime ───────────────────────────────
+# ── The four places that did not handle datetime ─────────────────────────────
 
 async def test_save_to_s3_serializa_gdf_com_datetime():
     from flow.nodes.outputs.save_to_s3 import SaveToS3Node
@@ -209,7 +209,7 @@ async def test_http_request_post_serializa_gdf_com_datetime():
 
 
 def test_pin_fallback_geojson_serializa_gdf_com_datetime(monkeypatch):
-    """O GeoJSON do pin e o plano B quando o Parquet falha — e falhava junto."""
+    """The pin's GeoJSON is plan B when Parquet fails — and it failed along with it."""
     from flow.executor import pin
 
     def _parquet_falha(self, *args, **kwargs):
@@ -231,8 +231,8 @@ def test_pin_fallback_geojson_serializa_gdf_com_datetime(monkeypatch):
 
 
 def _gdf_data_toda_vazia() -> gpd.GeoDataFrame:
-    """Um campo DateTime sem valor em nenhuma feição (`dt_cancelamento` só de
-    feições ativas), lido como datetime64 todo NaT."""
+    """A DateTime field with no value in any feature (`dt_cancelamento` with only
+    active features), read as an all-NaT datetime64."""
     return gpd.GeoDataFrame(
         {"id": [1, 2], "dt_cancelamento": pd.to_datetime([None, None]).astype("datetime64[ms]")},
         geometry=[Point(-46.6, -23.5), Point(-43.2, -22.9)],
@@ -241,9 +241,9 @@ def _gdf_data_toda_vazia() -> gpd.GeoDataFrame:
 
 
 def test_coluna_de_data_toda_vazia_segue_null_onde_o_to_json_era_cru():
-    """SaveToS3, SendWebhook, HttpRequest e o pin já serializavam essa coluna
-    (o `to_json` cru aceita NaT) — como `null`. Um fluxo diário que funcionava
-    não pode passar a mandar "NaT"."""
+    """SaveToS3, SendWebhook, HttpRequest and the pin already serialized this column
+    (raw `to_json` accepts NaT) — as `null`. A daily workflow that used to work
+    must not start sending "NaT"."""
     from flow.utils.geo_helpers import gdf_para_geojson
 
     gdf = _gdf_data_toda_vazia()
@@ -307,7 +307,7 @@ def test_helper_reprojeta_numa_copia():
 
 
 def test_helper_atribui_o_crs_a_gdf_sem_crs():
-    """Mesma regra do `ensure_gdf_crs`: sem CRS, o de destino e atribuido."""
+    """Same rule as `ensure_gdf_crs`: without a CRS, the target one is assigned."""
     from flow.utils.geo_helpers import gdf_para_geojson
 
     gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(-46.6, -23.5)])
@@ -316,7 +316,7 @@ def test_helper_atribui_o_crs_a_gdf_sem_crs():
     assert gdf.crs is None
 
 
-# ── Uma copia so ─────────────────────────────────────────────────────────────
+# ── A single copy ────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("arquivo", [
     "flow/nodes/outputs/save_geojson.py",

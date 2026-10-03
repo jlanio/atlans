@@ -8,7 +8,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 
 from app.core.db import engine
-# Importa todos os modelos para que Base.metadata os registre antes do create_all
+# Imports all models so Base.metadata registers them before create_all
 from app.models import models, user, workspace, credential, system_config, workspace_member, artifact, executor, portal_layer, portal_feature, run_metrics  # noqa: F401
 
 from app.core.utils.error_handlers import (
@@ -61,10 +61,10 @@ from app.core.constants import HSTS_MAX_AGE
 logger = logging.getLogger("uvicorn.error")
 
 
-# Espera do banco na subida. O jitter importa mesmo aqui: com mais de uma
-# replica da API subindo junto (deploy, restart do orquestrador), todas
-# reconsultavam o banco no mesmo instante — justo quando ele esta se
-# recuperando.
+# Waiting for the database at startup. Jitter matters even here: with more than
+# one API replica starting together (deploy, orchestrator restart), all of them
+# re-queried the database at the same instant — precisely when it is
+# recovering.
 _DB_TENTATIVAS = 10
 _DB_ESPERA_INICIAL_S = 2.0
 _DB_ESPERA_MAX_S = 30.0
@@ -72,8 +72,8 @@ _DB_ESPERA_MAX_S = 30.0
 
 async def _wait_for_db() -> None:
     """
-    Aguarda o banco ficar acessível (até 10 tentativas com backoff).
-    Não cria tabelas — isso é responsabilidade do Alembic (`alembic upgrade head`).
+    Waits for the database to become reachable (up to 10 attempts with backoff).
+    Does not create tables — that is Alembic's responsibility (`alembic upgrade head`).
     """
     import asyncio
     from flow.utils.backoff import espera_exponencial
@@ -97,13 +97,14 @@ async def _wait_for_db() -> None:
 
 
 def _tarefas_de_fundo() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
-    """As tarefas de fundo do lifespan, na ordem em que sobem: (nome, fábrica).
+    """The lifespan's background tasks, in the order they start: (name, factory).
 
-    Importadas aqui, na subida (como sempre foram), e não no topo do módulo. O
-    lifespan sobe todas depois do Redis e, no shutdown, cancela e AGUARDA todas
-    antes de fechar o banco e o Redis: uma tarefa só cancelada ainda roda o
-    próprio encerramento com o pool já fechado, e o loop acaba com "Task was
-    destroyed but it is pending!".
+    Imported here, at startup (as they always were), and not at the top of the
+    module. The lifespan starts all of them after Redis and, on shutdown,
+    cancels and AWAITS all of them before closing the database and Redis: a
+    task that is only canceled still runs its own teardown with the pool
+    already closed, and the loop ends with "Task was destroyed but it is
+    pending!".
     """
     from app.core.run_result_consumer import run_consumer_loop
     from app.core.artifact_cleanup import run_cleanup_loop
@@ -113,27 +114,27 @@ def _tarefas_de_fundo() -> list[tuple[str, Callable[[], Awaitable[object]]]]:
     from app.api.routers.executor_ws_router import orphan_runs_watchdog
 
     return [
-        # Consumer dos resultados que os executores publicam no Redis.
+        # Consumer of the results the executors publish to Redis.
         ("Consumer de resultados", run_consumer_loop),
         ("Cleanup de artefatos", run_cleanup_loop),
-        # Reconciliacao periodica do storage: preenche size_bytes NULL em Artifact,
-        # apaga WorkspaceFile pending stale, aborta multipart abandonado, mede drift
-        # DB vs MinIO. Lock Redis evita execucao duplicada com varios workers.
+        # Periodic storage reconciliation: fills NULL size_bytes in Artifact,
+        # deletes stale pending WorkspaceFile, aborts abandoned multipart, measures
+        # DB vs MinIO drift. A Redis lock prevents duplicate execution with several workers.
         ("Reconciliação do storage", run_reconciliation_loop),
-        # Catálogo de fontes (WFS): importa a semente versionada (catalogo/geoservicos)
-        # uma vez na subida — idempotente por hash, lock Redis entre workers — e
-        # verifica os endpoints por período (um GetCapabilities por URL distinta).
+        # Source catalog (WFS): imports the versioned seed (catalogo/geoservicos)
+        # once at startup — idempotent by hash, Redis lock across workers — and
+        # checks the endpoints periodically (one GetCapabilities per distinct URL).
         ("Importação do catálogo", importar_catalogo_no_arranque),
         ("Verificação de fontes", run_verificacao_loop),
-        # Monitor de ACKs atrasados — loga quando um job sai do server mas o executor
-        # não confirma enfileiramento. Ajuda a diagnosticar workflows "em voo".
+        # Monitor for late ACKs — logs when a job leaves the server but the executor
+        # does not confirm enqueueing. Helps diagnose "in-flight" workflows.
         ("Monitor de ACKs", overdue_acks_monitor),
-        # Watchdog de runs orfaos — rede de seguranca para quando o worker
-        # uvicorn morre por SIGKILL/OOM e o cleanup do handler WS nunca roda.
-        # Enumera periodicamente runs 'running' cujo executor perdeu presence
-        # no Redis e marca como failed.
+        # Orphan run watchdog — a safety net for when the uvicorn worker
+        # dies from SIGKILL/OOM and the WS handler's cleanup never runs.
+        # Periodically enumerates 'running' runs whose executor lost presence
+        # in Redis and marks them as failed.
         ("Watchdog de runs órfãos", orphan_runs_watchdog),
-        # As das extensões (app/extensoes), com o mesmo encerramento.
+        # The extensions' ones (app/extensoes), with the same teardown.
         *registro_das_extensoes().tarefas_de_fundo,
     ]
 
@@ -144,10 +145,10 @@ async def lifespan(app: FastAPI):
     from app.core.redis import init_redis, close_redis
     from app.core.async_scheduler import scheduler
 
-    # Aguarda o banco ficar disponível (tabelas são criadas/migradas pelo Alembic)
+    # Waits for the database to become available (tables are created/migrated by Alembic)
     await _wait_for_db()
 
-    # Pool Redis centralizado — inicializado uma vez e fechado no shutdown
+    # Centralized Redis pool — initialized once and closed on shutdown
     app.state.redis = await init_redis()
 
     try:
@@ -162,8 +163,8 @@ async def lifespan(app: FastAPI):
         ensure_bucket()
     except Exception as e:
         logger.warning("MinIO indisponivel no startup: %s", e)
-    # Aviso, nunca erro: em dev o endpoint local e o esperado; em producao e o
-    # sintoma de um .env esquecido, e a falha so apareceria como link quebrado.
+    # A warning, never an error: in dev the local endpoint is what is expected; in
+    # production it is the symptom of a forgotten .env, and the failure would only show up as a broken link.
     from app.core import storage as _storage
     if _storage.endpoint_externo_e_local():
         logger.warning(
@@ -173,20 +174,20 @@ async def lifespan(app: FastAPI):
             _storage.endpoint_externo(),
         )
 
-    # Tarefas de fundo (ver `_tarefas_de_fundo`) e o scheduler de agendamentos
+    # Background tasks (see `_tarefas_de_fundo`) and the schedule scheduler
     tarefas = [
         (nome, asyncio.create_task(fabrica(), name=nome)) for nome, fabrica in _tarefas_de_fundo()
     ]
     await scheduler.start()
 
-    # O gerenciador de sessoes do MCP precisa estar ativo enquanto a app atende:
-    # e ele quem mantem o estado do transporte streamable HTTP. Entra depois do
-    # `init_redis` (as cotas e o carimbo de uso do token dependem do pool) e sai
-    # antes do `close_redis`, la embaixo.
+    # The MCP session manager must be active while the app is serving: it is
+    # what keeps the streamable HTTP transport's state. It enters after
+    # `init_redis` (the quotas and the token usage stamp depend on the pool) and
+    # exits before `close_redis`, down below.
     async with mcp_server.session_manager.run():
         yield
 
-    # Shutdown limpo: cancela todas as tarefas de fundo e aguarda cada uma.
+    # Clean shutdown: cancels all background tasks and awaits each one.
     for _, tarefa in tarefas:
         tarefa.cancel()
     resultados = await asyncio.gather(*(tarefa for _, tarefa in tarefas), return_exceptions=True)
@@ -194,13 +195,14 @@ async def lifespan(app: FastAPI):
         if isinstance(resultado, BaseException):
             logger.debug("%s encerrada: %s", nome, resultado.__class__.__name__)
 
-    # Cada desconexão de executor deixa uma task dormindo o grace period antes de
-    # decidir se falha os runs órfãos (ver `_fail_orphan_runs_if_gone`). No
-    # shutdown elas precisam ser canceladas explicitamente: sem isso o loop fecha
-    # com tasks pendentes ("Task was destroyed but it is pending!") e, pior, uma
-    # delas poderia acordar no meio do teardown e tentar falar com um pool de DB
-    # já descartado. Cancelar é o comportamento correto — durante um shutdown do
-    # servidor não se deve falhar run nenhum; o watchdog reavalia na volta.
+    # Each executor disconnection leaves a task sleeping through the grace period
+    # before deciding whether to fail the orphan runs (see
+    # `_fail_orphan_runs_if_gone`). On shutdown they must be canceled explicitly:
+    # without that the loop closes with pending tasks ("Task was destroyed but it
+    # is pending!") and, worse, one of them could wake up in the middle of the
+    # teardown and try to talk to an already-disposed DB pool. Canceling is the
+    # correct behavior — during a server shutdown no run should be failed; the
+    # watchdog re-evaluates on the way back.
     from app.api.routers.executor_ws_router import _orphan_check_tasks
     pendentes = list(_orphan_check_tasks)
     for t in pendentes:
@@ -213,7 +215,7 @@ async def lifespan(app: FastAPI):
     await close_redis()
 
 
-# Instância da aplicação
+# Application instance
 app = FastAPI(
     title="Atlas Studio API",
     lifespan=lifespan,
@@ -234,7 +236,7 @@ app.include_router(observability_router.router)
 app.include_router(auth_router.router)
 app.include_router(api_tokens_router.router)      # Tokens pessoais de acesso (PAT) — /auth/tokens (JWT)
 app.include_router(assistente_editor_router.router)        # Assistente do editor — /assistente/editor (JWT), responde em SSE
-app.include_router(me_router)                     # "Meu" — recortes por pessoa; hoje GET /me/schedules (JWT)
+app.include_router(me_router)                     # "Me" — per-person slices; today GET /me/schedules (JWT)
 app.include_router(assistente_camadas_router)         # Home: camadas do globo — /assistente/camadas, /assistente/tiles (JWT, membro)
 app.include_router(assistente_router)                 # Home: conversas do assistente — /assistente/conversa[s], /estado (JWT, SSE)
 app.include_router(workspace_router.router)
@@ -242,54 +244,55 @@ app.include_router(workflow_groups_router)
 app.include_router(health_router)
 app.include_router(executores_router)
 app.include_router(executor_ws_router)
-app.include_router(portal_router)                # portal: publish, tiles, portal data (público)
-app.include_router(artifacts_public_router)     # download público por id_hash (sem JWT)
-app.include_router(artifacts_router)            # listagem, exclusão e config (JWT)
-app.include_router(executor_drive_router)          # Drive: upload via executor (API key auth) — ANTES do drive_router para evitar captura por /drive/{id_hash}
+app.include_router(portal_router)                # portal: publish, tiles, portal data (public)
+app.include_router(artifacts_public_router)     # public download by id_hash (no JWT)
+app.include_router(artifacts_router)            # listing, deletion and config (JWT)
+app.include_router(executor_drive_router)          # Drive: upload via executor (API key auth) — BEFORE drive_router to avoid capture by /drive/{id_hash}
 app.include_router(drive_router)                # Drive: upload, listagem, download, delete (JWT)
-app.include_router(drive_admin_router)          # Drive: configurações admin (JWT + role=admin)
-app.include_router(admin_users_router)          # Admin: gestão de usuários (JWT + role=admin)
+app.include_router(drive_admin_router)          # Drive: admin settings (JWT + role=admin)
+app.include_router(admin_users_router)          # Admin: user management (JWT + role=admin)
 app.include_router(admin_nodes_router)          # Admin: habilita/desabilita nodes (JWT + role=admin)
 app.include_router(admin_assistente_router)     # Admin: modelo do assistente (JWT + role=admin)
 app.include_router(admin_workflows_router)      # Admin: desativa/ativa workflows (JWT + role=admin)
 app.include_router(admin_workspaces_router)     # Admin: lixeira de workspaces — restore/purge (JWT + role=admin)
 app.include_router(internal_email_router)       # Interno: envio de email via Resend (executor API key auth)
 app.include_router(change_detector_router)      # Interno: hash store do node ChangeDetector (executor API key auth)
-# As rotas das extensões (app/extensoes), depois das do núcleo.
+# The extensions' routes (app/extensoes), after the core's.
 for _rota_da_extensao in registro_das_extensoes().rotas:
     app.include_router(_rota_da_extensao)
 
 
-# ── Servidor MCP (/mcp) ───────────────────────────────────────────────────────
-# `add_route` e nao `app.mount`: a rota EXATA entrega o caminho intacto, e o app
-# do SDK casa o proprio Route("/mcp") sobre o caminho completo da requisicao. Um
-# mount consumiria o prefixo e repassaria "" — nenhuma rota de dentro casaria.
+# ── MCP server (/mcp) ─────────────────────────────────────────────────────────
+# `add_route` and not `app.mount`: the EXACT route delivers the path intact, and
+# the SDK app matches its own Route("/mcp") against the request's full path. A
+# mount would consume the prefix and pass on "" — no inner route would match.
 #
-# As DUAS grafias sao registradas, e as duas apontam para o MESMO app ASGI. Sem
-# a segunda, "/mcp/" nao casa rota nenhuma e o roteador responde 307 para
-# "/mcp": o Location de um redirect e montado com o esquema que a app enxerga, e
-# atras do Traefik o uvicorn roda sem `--proxy-headers`, entao o salto sairia em
-# `http://` — um cliente que o seguisse reenviaria o token fora do TLS. Com as
-# duas rotas nao ha salto a seguir, e o `PathPrefix(/mcp)` do Traefik ja entrega
-# as duas ao mesmo processo. `_CaminhoSemBarraFinal` normaliza "/mcp/" para o
-# "/mcp" que o app do SDK casa, sem duplicar transporte nem session manager.
+# BOTH spellings are registered, and both point to the SAME ASGI app. Without
+# the second, "/mcp/" matches no route and the router answers 307 to "/mcp":
+# a redirect's Location is built with the scheme the app sees, and behind
+# Traefik uvicorn runs without `--proxy-headers`, so the hop would go out as
+# `http://` — a client following it would resend the token outside TLS. With
+# both routes there is no hop to follow, and Traefik's `PathPrefix(/mcp)`
+# already delivers both to the same process. `_CaminhoSemBarraFinal` normalizes
+# "/mcp/" to the "/mcp" the SDK app matches, without duplicating transport or
+# session manager.
 #
-# Fabrica, nunca singleton de modulo: `session_manager.run()` so pode ser
-# entrado uma vez por instancia, e a instancia fica em `app.state` para o
-# lifespan e os testes a alcancarem.
+# Factory, never a module singleton: `session_manager.run()` can only be
+# entered once per instance, and the instance lives in `app.state` so the
+# lifespan and the tests can reach it.
 #
-# A rota nao herda as dependencies globais da app (JWT/HMAC): a autenticacao
-# aqui e o PAT, aplicado pelo middleware que embrulha o app do SDK.
+# The route does not inherit the app's global dependencies (JWT/HMAC): the
+# authentication here is the PAT, applied by the middleware that wraps the SDK app.
 from app.mcp import create_mcp_server, criar_app_mcp
 
 
 class _CaminhoSemBarraFinal:
-    """Delega ao app ASGI de dentro com a barra final do caminho removida.
+    """Delegates to the inner ASGI app with the path's trailing slash removed.
 
-    Objeto, e nao funcao: o `Route` do Starlette trata funcao como endpoint
-    `f(request) -> response` e so chama como ASGI puro o que nao for funcao nem
-    metodo. Corta a barra do fim em vez de escrever "/mcp" na mao para nao
-    perder um eventual `root_path` no prefixo.
+    An object, not a function: Starlette's `Route` treats a function as an
+    endpoint `f(request) -> response` and only calls as pure ASGI what is
+    neither a function nor a method. Strips the trailing slash instead of
+    writing "/mcp" by hand so as not to lose a possible `root_path` in the prefix.
     """
 
     def __init__(self, app_asgi):
@@ -315,7 +318,7 @@ app.add_route("/mcp/", _CaminhoSemBarraFinal(_app_mcp), include_in_schema=False)
 
 @app.get("/ping", include_in_schema=False, tags=["health"])
 async def ping():
-    """Endpoint mínimo para Docker healthcheck — sem auth, sem slowapi overhead."""
+    """Minimal endpoint for the Docker healthcheck — no auth, no slowapi overhead."""
     return {"status": "ok"}
 
 
@@ -337,13 +340,13 @@ from starlette.requests import Request as StarletteRequest
 from starlette.responses import Response as StarletteResponse
 
 
-# Content-Security-Policy: bloqueia XSS ativo (script injection via nome de
-# workflow, label de no, etc). 'unsafe-inline' em script/style e obrigatorio
-# pra Next.js — sem isso, styled-jsx e chunks do App Router quebram. Se um
-# dia migrar pra nonce/hash, remover.
-# connect-src permite HTTPS/WSS pra API + WebSockets do Redis pub/sub.
-# frame-ancestors 'none' bloqueia iframe em qualquer origem (defense-in-
-# depth junto do X-Frame-Options: DENY).
+# Content-Security-Policy: blocks active XSS (script injection via workflow
+# name, node label, etc). 'unsafe-inline' in script/style is mandatory
+# for Next.js — without it, styled-jsx and App Router chunks break. If we
+# ever migrate to nonce/hash, remove it.
+# connect-src allows HTTPS/WSS to the API + Redis pub/sub WebSockets.
+# frame-ancestors 'none' blocks iframes on any origin (defense-in-
+# depth together with X-Frame-Options: DENY).
 _CSP = (
     "default-src 'self'; "
     "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
@@ -359,16 +362,17 @@ _CSP = (
 )
 
 
-# CSP para resposta cujo CORPO e controlado por usuario e renderizavel pelo
-# navegador — hoje so o ResponseNode do webhook devolvendo `text/html`.
+# CSP for a response whose BODY is user-controlled and renderable by the
+# browser — today only the webhook's ResponseNode returning `text/html`.
 #
-# `sandbox` sem tokens poe o documento numa origem opaca e bloqueia script,
-# formulario, popup e plugin. O HTML ainda renderiza (com estilo e imagem), mas
-# um `<script>` vindo do corpo nao executa. Assim `text/html` continua sendo a
-# opcao que o no anuncia, sem virar XSS refletido na origem da API.
+# `sandbox` without tokens puts the document in an opaque origin and blocks
+# scripts, forms, popups and plugins. The HTML still renders (with styles and
+# images), but a `<script>` coming from the body does not run. That way
+# `text/html` remains an option the node advertises, without becoming reflected
+# XSS on the API's origin.
 #
-# Rebaixar o Content-Type seria a alternativa, mas quebraria em silencio todo
-# workflow que hoje escolhe "HTML (text/html)" no canvas.
+# Downgrading the Content-Type would be the alternative, but it would silently
+# break every workflow that today picks "HTML (text/html)" on the canvas.
 _CSP_CORPO_NAO_CONFIAVEL = (
     "sandbox; "
     "default-src 'none'; "
@@ -386,14 +390,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
-        # O handler marca em `request.state` quando o corpo veio do usuario — o
-        # header nao serve como canal porque esta linha sobrescreve a CSP de
-        # qualquer resposta.
+        # The handler marks in `request.state` when the body came from the user — the
+        # header does not work as a channel because this line overwrites the CSP of
+        # any response.
         if getattr(request.state, "corpo_nao_confiavel", False):
             response.headers["Content-Security-Policy"] = _CSP_CORPO_NAO_CONFIAVEL
         else:
             response.headers["Content-Security-Policy"] = _CSP
-        # HSTS — apenas quando origens explícitas configuradas (não em dev local)
+        # HSTS — only when explicit origins are configured (not in local dev)
         if ALLOWED_ORIGINS != ["*"]:
             response.headers["Strict-Transport-Security"] = f"max-age={HSTS_MAX_AGE}; includeSubDomains"
         return response

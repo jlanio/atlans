@@ -34,7 +34,7 @@ describe("SaudeHero", () => {
   it("calmo: check verde, veredito tranquilo e a linha 'agora'", () => {
     render(<SaudeHero {...base} now={now()} tom="calmo" />)
     expect(screen.getByText("Tudo tranquilo — nada pedindo atenção agora.")).toBeInTheDocument()
-    // A linha "agora" (ItensAgora) aparece dentro da faixa calma.
+    // The "agora" (now) line (ItensAgora) shows up inside the calm strip.
     expect(screen.getByText("em andamento")).toBeInTheDocument()
     expect(screen.getByText("na fila")).toBeInTheDocument()
   })
@@ -55,10 +55,10 @@ describe("SaudeHero", () => {
         onAbrirPresa={onAbrirPresa}
       />,
     )
-    // O veredito começa por "Precisa de você:" e traz a contagem específica.
+    // The verdict starts with "Precisa de você:" (needs you) and carries the specific count.
     expect(screen.getByText(/Precisa de você:/)).toBeInTheDocument()
     expect(screen.getByText(/2 workflows falhando/)).toBeInTheDocument()
-    // A presa da linha "agora" abre a execução mais antiga.
+    // The stuck one in the "agora" line opens the oldest run.
     fireEvent.click(screen.getByRole("button", { name: /Abrir a execução presa/ }))
     expect(onAbrirPresa).toHaveBeenCalledWith("run-presa")
   })

@@ -57,22 +57,22 @@ function TabButton({ tab, active, count, icon, label, tone, onClick }: {
 }
 
 /**
- * Painel de execução — dock inferior NÃO-modal.
+ * Run panel — a NON-modal bottom dock.
  *
- * Substitui o antigo "console de execução", que era um Sheet com overlay
- * `bg-black/50` cobrindo a tela: abrir o console escurecia e desabilitava o
- * canvas, justamente onde vive o feedback visual que os logs complementam.
- * Aqui o painel é uma div ancorada dentro do próprio canvas — dá para ler o log
- * e ver a animação ao mesmo tempo, e clicar numa linha centraliza o nó.
+ * Replaces the old "execution console", which was a Sheet with a `bg-black/50`
+ * overlay covering the screen: opening the console dimmed and disabled the
+ * canvas, precisely where the visual feedback that the logs complement lives.
+ * Here the panel is a div anchored inside the canvas itself — you can read the
+ * log and watch the animation at the same time, and clicking a row centers the node.
  */
 const RunPanel = () => {
   const router = useRouter()
   const open = useRunPanelStore(s => s.open)
-  // Snapshot agregado: `events` e `statusWorkflow` mudam a cada mensagem do WS e
-  // assiná-los por selector re-renderizava o painel inteiro nessa frequência.
-  // `open` decide se vale reconstruir a linha do tempo por nó: recolhido, o
-  // painel desenha só a barra de resumo, e reconstruí-la oito vezes por segundo
-  // era CPU que nunca chegava à tela.
+  // Aggregated snapshot: `events` and `statusWorkflow` change on every WS message
+  // and subscribing to them via selector re-rendered the whole panel at that rate.
+  // `open` decides whether rebuilding the per-node timeline is worth it: when
+  // collapsed, the panel draws only the summary bar, and rebuilding it eight
+  // times per second was CPU that never reached the screen.
   const { timeline, events, droppedEvents } = useRunSnapshot(open)
   const isExecuting = useWorkflowExecutionStore(s => s.isExecuting)
   const wsState = useWorkflowExecutionStore(s => s.wsState)
@@ -100,8 +100,8 @@ const RunPanel = () => {
   const runStatus = timeline.workflow.status
   const hasProblems = timeline.problems.length > 0 || runStatus === "failed"
 
-  // Falhou → abre direto em "Problemas". O usuário não deveria ter que procurar
-  // a linha vermelha no meio de dezenas de eventos de ciclo de vida.
+  // Failed → opens directly on "Problemas" (Problems). The user should not have
+  // to hunt for the red line among dozens of lifecycle events.
   const announcedFailureRef = useRef<string | null>(null)
   useEffect(() => {
     if (runStatus !== "failed") return
@@ -111,7 +111,7 @@ const RunPanel = () => {
     openAt("problems")
   }, [runStatus, viewingRunId, openAt])
 
-  // Ctrl+` alterna o painel; Ctrl+F busca quando ele está aberto.
+  // Ctrl+` toggles the panel; Ctrl+F searches when it is open.
   useEffect(() => {
     function isEditing(target: EventTarget | null) {
       const el = target as HTMLElement | null
@@ -120,8 +120,8 @@ const RunPanel = () => {
     }
 
     function onKeyDown(e: KeyboardEvent) {
-      // Não sequestra atalhos enquanto o usuário digita — sem esta guarda o
-      // Ctrl+F dentro da configuração de um nó abria a busca do painel.
+      // Does not hijack shortcuts while the user is typing — without this guard,
+      // Ctrl+F inside a node's configuration opened the panel's search.
       if (isEditing(e.target)) return
       if ((e.ctrlKey || e.metaKey) && e.key === "`") {
         e.preventDefault()
@@ -138,12 +138,12 @@ const RunPanel = () => {
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [setOpen])
 
-  // Eventos de PONTEIRO, não de mouse: com `mousedown`/`mousemove` a alça era
-  // inerte ao toque, e no telefone o painel ficava preso na altura de abertura
-  // — o duplo toque na barra maximizava, mas não havia como escolher um meio
-  // termo. `setPointerCapture` ainda resolve o arraste que sai do elemento,
-  // que com listeners no document dependia de o ponteiro não ser capturado por
-  // outro alvo no meio do caminho.
+  // POINTER events, not mouse events: with `mousedown`/`mousemove` the handle
+  // was inert to touch, and on a phone the panel was stuck at its opening
+  // height — double-tapping the bar maximized it, but there was no way to pick
+  // something in between. `setPointerCapture` also handles a drag that leaves
+  // the element, which with listeners on the document depended on the pointer
+  // not being captured by another target along the way.
   const handleResizePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
     const alca = e.currentTarget
@@ -164,8 +164,8 @@ const RunPanel = () => {
     }
     alca.addEventListener("pointermove", onMove)
     alca.addEventListener("pointerup", onUp)
-    // O navegador cancela o ponteiro quando decide que o gesto virou rolagem;
-    // sem tratar isso, `dragRef` ficava preso e a alça seguia "arrastando".
+    // The browser cancels the pointer when it decides the gesture became a scroll;
+    // without handling that, `dragRef` got stuck and the handle kept "dragging".
     alca.addEventListener("pointercancel", onUp)
   }, [height, setHeight])
 
@@ -188,8 +188,8 @@ const RunPanel = () => {
   const hasRun = events.length > 0 || isExecuting
 
   return (
-    // nowheel/nopan impedem o canvas de capturar scroll e arraste feitos dentro
-    // do painel — sem isso rolar a lista dava zoom no grafo.
+    // nowheel/nopan prevent the canvas from capturing scrolls and drags made
+    // inside the panel — without them, scrolling the list zoomed the graph.
     <div
       className="nowheel nopan nodrag absolute inset-x-0 bottom-0 z-20 flex flex-col border-t border-border bg-background/95 shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.35)] backdrop-blur"
       style={{ height: open ? height : RUN_BAR_HEIGHT }}
@@ -198,21 +198,21 @@ const RunPanel = () => {
       {open && (
         <div
           onPointerDown={handleResizePointerDown}
-          // `touch-none` impede o navegador de tratar o arraste como rolagem
-          // da página e cancelar o ponteiro no primeiro pixel. A faixa é mais
-          // alta no telefone: 8px é um alvo impossível de acertar com o dedo.
+          // `touch-none` prevents the browser from treating the drag as a page
+          // scroll and cancelling the pointer on the first pixel. The strip is
+          // taller on phones: 8px is an impossible target to hit with a finger.
           className="group/resize absolute inset-x-0 -top-3 sm:-top-1 z-10 flex h-6 sm:h-2 touch-none cursor-ns-resize items-center justify-center"
         >
           <div className="h-1 w-10 sm:h-px rounded-full bg-border/50 transition-colors group-hover/resize:bg-primary" />
         </div>
       )}
 
-      {/* ── Barra HUD — sempre visível ─────────────────────────────────────── */}
+      {/* ── HUD bar — always visible ───────────────────────────────────────── */}
       <div
         className="flex h-[34px] shrink-0 cursor-pointer select-none items-center gap-2 px-3 text-xs"
         onClick={() => setOpen(!open)}
-        // Duplo clique expande. Precisa reabrir explicitamente: os dois cliques
-        // que precedem o dblclick já passaram pelo toggle e deixaram fechado.
+        // Double-click expands. It must reopen explicitly: the two clicks that
+        // precede the dblclick already went through the toggle and left it closed.
         onDoubleClick={() => {
           setOpen(true)
           setHeight(Math.round(window.innerHeight * MAX_HEIGHT_RATIO))
@@ -309,7 +309,7 @@ const RunPanel = () => {
             </IconAction>
           </div>
 
-          {/* ── Conteúdo ──────────────────────────────────────────────────── */}
+          {/* ── Content ───────────────────────────────────────────────────── */}
           <div className="min-h-0 flex-1">
             {!hasRun ? (
               <HistoryEmpty />
@@ -349,7 +349,7 @@ function IconAction({ title, onClick, children }: {
   )
 }
 
-/** Resumo da barra — responde "o que está acontecendo" sem abrir o painel. */
+/** Bar summary — answers "what is happening" without opening the panel. */
 function HudSummary({ timeline, isExecuting, wsLive, isHistorical, hasRun }: {
   timeline: RunTimeline
   isExecuting: boolean
@@ -420,10 +420,10 @@ function HudSummary({ timeline, isExecuting, wsLive, isHistorical, hasRun }: {
     )
   }
 
-  // Em andamento
-  // `unknown` conta como resolvido: o nó não está mais em execução, só não se
-  // sabe como terminou. Fora daqui, a barra de um run já encerrado ficaria
-  // eternamente abaixo de 100%.
+  // In progress
+  // `unknown` counts as resolved: the node is no longer running, it is just
+  // not known how it ended. Without this, the bar of an already finished run
+  // would stay below 100% forever.
   const finished = counts.done + counts.failed + counts.unknown
   const progress = counts.total > 0 ? (finished / counts.total) * 100 : 0
   const running = timeline.nodes.find(n => n.status === "running")

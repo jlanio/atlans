@@ -13,16 +13,16 @@ logger = get_logger(__name__)
 
 async def atlas_domain_error_handler(request: Request, exc: Exception) -> JSONResponse:
     """
-    Handler para exceções de domínio (AtlasBaseError e subclasses).
-    Converte automaticamente para a resposta HTTP correta sem que os routers
-    precisem capturar cada tipo de exceção individualmente.
+    Handler for domain exceptions (AtlasBaseError and subclasses).
+    Converts automatically to the correct HTTP response without the routers
+    having to catch each exception type individually.
     """
     content = {
         "error":   exc.error_code,
         "message": exc.detail,
     }
-    # 409 da política de execução: a lista de workspaces que esvaziariam é o
-    # que permite à tela oferecer "remover mesmo assim" com conhecimento.
+    # 409 from the execution policy: the list of workspaces that would be emptied
+    # is what lets the screen offer "remove anyway" knowingly.
     workspaces = getattr(exc, "workspaces", None)
     if workspaces:
         content["workspaces"] = workspaces
@@ -33,8 +33,8 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
     """
     Handle HTTPException uniformly.
     """
-    # Os headers da exceção seguem para o cliente: sem isto, `Retry-After`
-    # (503 do webhook sem executor) e `WWW-Authenticate` morriam aqui.
+    # The exception's headers go on to the client: without this, `Retry-After`
+    # (503 from the webhook with no executor) and `WWW-Authenticate` died here.
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -49,11 +49,12 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     """
     Handle Pydantic validation errors uniformly.
 
-    Remove `input` (e `ctx`) de cada erro: `exc.errors()` inclui o valor cru
-    submetido pelo cliente, que num campo sensível (ex.: senha malformada em
-    /auth/login) volta na resposta e pode ser capturado por proxies, logs ou
-    APM. O cliente não precisa do próprio valor de volta — `loc`, `msg` e `type`
-    bastam. Bônus: `ctx` às vezes carrega objetos de exceção não serializáveis.
+    Removes `input` (and `ctx`) from each error: `exc.errors()` includes the
+    raw value submitted by the client, which for a sensitive field (e.g., a
+    malformed password on /auth/login) comes back in the response and can be
+    captured by proxies, logs or APM. The client does not need its own value
+    back — `loc`, `msg` and `type` are enough. Bonus: `ctx` sometimes carries
+    non-serializable exception objects.
     """
     details = [
         {k: v for k, v in err.items() if k not in ("input", "ctx")}
@@ -69,9 +70,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 def _permissao_negada_no_banco(exc: Exception) -> str | None:
-    """`permission denied for table X` / `must be owner of table X` do
-    PostgreSQL: o usuário da API não é dono (ou não tem GRANT) do objeto.
-    Devolve o trecho legível, ou None se não é esse caso."""
+    """PostgreSQL's `permission denied for table X` / `must be owner of table X`:
+    the API user is not the owner of (or has no GRANT on) the object.
+    Returns the readable excerpt, or None if this is not the case."""
     from sqlalchemy.exc import DBAPIError
 
     if not isinstance(exc, DBAPIError):
@@ -86,8 +87,8 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
     Catch-all for unexpected exceptions.
     """
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    # Permissão no banco não é um bug de código: é configuração do ambiente, e
-    # "Unexpected error occurred" escondia exatamente o que faltava conceder.
+    # A database permission is not a code bug: it is environment configuration,
+    # and "Unexpected error occurred" hid exactly what was missing a grant.
     permissao = _permissao_negada_no_banco(exc)
     if permissao:
         return JSONResponse(

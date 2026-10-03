@@ -1,24 +1,24 @@
 # app/mcp/escopo.py
 """
-`EscopoEfetivo` — quem é o dono da chamada e até onde ele alcança.
+`EscopoEfetivo` — who owns the call and how far it reaches.
 
-O middleware de PAT resolve o token UMA vez por request e destila o resultado
-neste objeto imutável: usuário, token, escopos concedidos e os workspaces que
-ele de fato alcança (já intersectados com os workspaces do usuário). Daí em
-diante nenhuma tool volta ao banco para perguntar "esse token pode?" — a
-resposta viaja junto.
+The PAT middleware resolves the token ONCE per request and distills the result
+into this immutable object: user, token, granted scopes and the workspaces it
+actually reaches (already intersected with the user's workspaces). From then on
+no tool goes back to the database to ask "can this token?" — the answer travels
+along.
 
-Dois canais, porque há dois consumidores:
-- `request.state.escopo`, lido pelas tools a partir do `ctx` (é o caminho
-  normal, e o único que funciona com vários requests concorrentes);
-- `ESCOPO_ATUAL`, um `ContextVar`, porque `list_tools()` não recebe `ctx`
-  nenhum e ainda assim precisa filtrar o catálogo pelo escopo do token.
+Two channels, because there are two consumers:
+- `request.state.escopo`, read by the tools from `ctx` (it is the normal path,
+  and the only one that works with several concurrent requests);
+- `ESCOPO_ATUAL`, a `ContextVar`, because `list_tools()` receives no `ctx` at
+  all and still needs to filter the catalog by the token's scope.
 
-`como_usuario()` existe por uma razão de segurança: os services de
-observabilidade decidem o que mostrar a partir de um objeto `user`, e alguns
-ainda olham `user.role`. Entregar a eles o `User` cru do banco daria ao MCP o
-alcance global de um administrador. O substituto carrega só o que eles leem e
-é sempre `role="user"`.
+`como_usuario()` exists for a security reason: the observability services
+decide what to show based on a `user` object, and some still look at
+`user.role`. Handing them the raw `User` from the database would give MCP an
+administrator's global reach. The substitute carries only what they read and
+is always `role="user"`.
 """
 from __future__ import annotations
 
@@ -32,69 +32,70 @@ from app.mcp.erros import erro
 
 @dataclass(frozen=True)
 class EscopoEfetivo:
-    """O alcance de uma chamada — congelado no momento da autenticação."""
+    """The reach of a call — frozen at authentication time."""
 
     user_id: str
     username: str | None
     token_id: str
     token_prefix: str
     scopes: frozenset[str]
-    # Já é a interseção "workspaces do usuário ∩ alcance do token".
+    # Already the intersection "user's workspaces ∩ token's reach".
     workspace_ids: frozenset[str]
-    # True quando o token foi emitido com `workspace_ids = NULL` ("todos,
-    # inclusive os futuros"). Não amplia nada por si: `workspace_ids` continua
-    # sendo a lista real; serve para explicar o alcance e para a documentação.
+    # True when the token was issued with `workspace_ids = NULL` ("all,
+    # including future ones"). Does not widen anything by itself: `workspace_ids`
+    # remains the real list; it serves to explain the reach and for documentation.
     todos_os_workspaces: bool
 
-    # Proveniência que os fluxos criados por este principal recebem
-    # (`Workflow.origem`). "usuario" para PATs e para o assistente do editor;
-    # "assistente" só para o escopo do assistente da Home. É carimbo de origem,
-    # NÃO privilégio: não amplia alcance nenhum, só marca quem criou o fluxo
-    # para as listagens poderem escondê-lo. Default no fim da classe: os
-    # construtores existentes (PAT, assistente, `escopo_falso`) seguem intactos.
+    # Provenance that the workflows created by this principal receive
+    # (`Workflow.origem`). "usuario" for PATs and for the editor assistant;
+    # "assistente" only for the Home assistant's scope. It is an origin stamp,
+    # NOT a privilege: it widens no reach, it only marks who created the workflow
+    # so the listings can hide it. Default at the end of the class: the
+    # existing constructors (PAT, assistant, `escopo_falso`) remain intact.
     origem_dos_fluxos: str = "usuario"
 
     def tem(self, escopo: str) -> bool:
-        """True se o token carrega este escopo."""
+        """True if the token carries this scope."""
         return escopo in self.scopes
 
     def como_usuario(self) -> SimpleNamespace:
-        """O mínimo que os services pedem como `user` — NUNCA o `User` do banco.
+        """The minimum the services ask for as `user` — NEVER the database `User`.
 
-        Sempre `role="user"`: um PAT não confere privilégio de administrador,
-        mesmo que o dono seja um.
+        Always `role="user"`: a PAT does not confer administrator privilege,
+        even if the owner is one.
         """
         return SimpleNamespace(id_hash=self.user_id, username=self.username, role="user")
 
     def workspace_unico(self) -> str | None:
-        """O workspace quando há exatamente um — o que torna `workspace_id` opcional."""
+        """The workspace when there is exactly one — which makes `workspace_id` optional."""
         if len(self.workspace_ids) == 1:
             return next(iter(self.workspace_ids))
         return None
 
 
-# Preenchido pelo middleware e resetado no fim da request. `list_tools()` é o
-# consumidor que não tem outro canal; o handler roda numa task criada dentro da
-# request, e `create_task` copia o contexto, então o valor chega lá.
+# Filled in by the middleware and reset at the end of the request. `list_tools()`
+# is the consumer that has no other channel; the handler runs in a task created
+# inside the request, and `create_task` copies the context, so the value gets there.
 ESCOPO_ATUAL: ContextVar[EscopoEfetivo | None] = ContextVar("ESCOPO_ATUAL", default=None)
 
 
-# ── Assistente ──────────────────────────────────────────────────────────────────
-# O assistente da web chama as mesmas tools, mas quem o autentica é a sessão JWT,
-# não um PAT. Ele precisa de um `EscopoEfetivo` mesmo assim — é o formato que
-# toda a autorização do MCP consome —, e o `token_id` sintético abaixo tem dois
-# efeitos deliberados: os baldes de cota (`ratelimit:mcp:assistente-editor:…`) nascem
-# separados dos baldes dos PATs, e a linha de auditoria distingue de imediato o
-# que veio da tela do que veio de um cliente externo.
+# ── Assistant ───────────────────────────────────────────────────────────────────
+# The web assistant calls the same tools, but what authenticates it is the JWT
+# session, not a PAT. It still needs an `EscopoEfetivo` — it is the format all of
+# MCP's authorization consumes —, and the synthetic `token_id` below has two
+# deliberate effects: the quota buckets (`ratelimit:mcp:assistente-editor:…`) are
+# born separate from the PATs' buckets, and the audit line immediately
+# distinguishes what came from the screen from what came from an external client.
 
 PREFIXO_DO_EDITOR = "assistente-editor"
 
-# NÃO são os seis escopos do PAT. `triggers:manage` e `drive:write` ficaram de
-# fora da primeira versão por decisão do dono: apagar um agendamento ou um
-# arquivo do Drive destrói dado de outra pessoa do workspace, e a conversa em
-# linguagem natural é justamente onde o mal-entendido é mais barato de cometer
-# ("limpa os agendamentos antigos" é uma frase que alguém digita sem pensar).
-# Ampliar aqui é uma linha — e é uma decisão de produto, não de implementação.
+# These are NOT the PAT's six scopes. `triggers:manage` and `drive:write` were
+# left out of the first version by the owner's decision: deleting a schedule or a
+# Drive file destroys another workspace member's data, and a natural-language
+# conversation is precisely where a misunderstanding is cheapest to commit
+# ("limpa os agendamentos antigos" (clean up the old schedules) is a sentence
+# someone types without thinking). Widening it here is one line — and it is a
+# product decision, not an implementation one.
 ESCOPOS_DO_EDITOR: frozenset[str] = frozenset(
     {
         "workflows:read",
@@ -111,16 +112,16 @@ def escopo_do_editor(
     username: str | None,
     workspace_ids: frozenset[str] | set[str] | list[str],
 ) -> EscopoEfetivo:
-    """O escopo de uma conversa do assistente — o usuário da sessão, sem PAT.
+    """The scope of an assistant conversation — the session's user, no PAT.
 
-    Puro de propósito: `workspace_ids` chega resolvido por quem chamou (com
-    `listar_workspace_ids`), e não por uma consulta daqui. Este módulo é
-    importado por `erros`, pelas tools e pelo middleware; uma dependência de
-    banco nele arrastaria os modelos para dentro de todo esse caminho — e
-    tornaria impossível testar a montagem do escopo sem subir um banco.
+    Pure on purpose: `workspace_ids` arrives resolved by the caller (with
+    `listar_workspace_ids`), and not by a query from here. This module is
+    imported by `erros`, by the tools and by the middleware; a database
+    dependency in it would drag the models into that whole path — and would
+    make it impossible to test building the scope without starting a database.
 
-    `todos_os_workspaces=True` porque não há token restringindo nada: o alcance
-    é exatamente o do usuário, hoje e quando ele entrar num workspace novo.
+    `todos_os_workspaces=True` because there is no token restricting anything:
+    the reach is exactly the user's, today and when they join a new workspace.
     """
     return EscopoEfetivo(
         user_id=user_id,
@@ -133,21 +134,21 @@ def escopo_do_editor(
     )
 
 
-# ── Assistente da Home ────────────────────────────────────────────────────────
-# O assistente da Home é o assistente de OUTRA superfície: mesma sessão JWT, mas
-# alcance COMPLETO. Diferente do assistente do editor, ele cria e roda os PRÓPRIOS
-# fluxos e mexe no que já existia — e o que segura o que ele pode destruir é a
-# CONFIRMAÇÃO POR CLIQUE verificada no servidor (`app/services/assistente_superficie.py`),
-# não a ausência de escopo. A diferença de alcance mora aqui, na IDENTIDADE, e
-# não numa lista espalhada pelo laço.
+# ── Home assistant ────────────────────────────────────────────────────────────
+# The Home assistant is the assistant of ANOTHER surface: same JWT session, but
+# FULL reach. Unlike the editor assistant, it creates and runs its OWN workflows
+# and changes what already existed — and what holds back what it can destroy is
+# the CLICK CONFIRMATION verified on the server (`app/services/assistente_superficie.py`),
+# not the absence of a scope. The difference in reach lives here, in the
+# IDENTITY, and not in a list scattered across the loop.
 
 PREFIXO_DO_ASSISTENTE = "assistente"
 
-# Os SEIS escopos do PAT, `pat.ESCOPOS` — inclusive `triggers:manage` e
-# `drive:write`, que o assistente do editor NÃO carrega. Aqui eles entram porque
-# apagar um agendamento ou um arquivo do Drive é uma ação que o assistente pode
-# fazer, desde que a pessoa clique para confirmar; tirar o escopo tornaria a
-# confirmação inútil (não haveria o que confirmar).
+# The PAT's SIX scopes, `pat.ESCOPOS` — including `triggers:manage` and
+# `drive:write`, which the editor assistant does NOT carry. They come in here
+# because deleting a schedule or a Drive file is an action the assistant can
+# take, as long as the person clicks to confirm; removing the scope would make
+# the confirmation useless (there would be nothing to confirm).
 ESCOPOS_DO_ASSISTENTE: frozenset[str] = frozenset(pat.ESCOPOS)
 
 
@@ -157,22 +158,22 @@ def escopo_do_assistente(
     username: str | None,
     workspace_ids: frozenset[str] | set[str] | list[str],
 ) -> EscopoEfetivo:
-    """O escopo de uma conversa do assistente da Home — o usuário da sessão, alcance completo.
+    """The scope of a Home assistant conversation — the session's user, full reach.
 
-    Molde de `escopo_do_assistente`, com três diferenças deliberadas:
+    Modeled on `escopo_do_assistente`, with three deliberate differences:
 
-    - `token_id`/`token_prefix` "assistente:…": os baldes de cota
-      (`ratelimit:mcp:assistente:{user}`) e a linha de auditoria nascem separados
-      dos do PAT e dos do assistente do editor, de graça — tudo chaveia por
-      `token_id`;
-    - os SEIS escopos (`ESCOPOS_DO_ASSISTENTE`), não os quatro do editor;
-    - `origem_dos_fluxos="assistente"`: todo fluxo que ele criar nasce marcado, e
-      as listagens o escondem por padrão. É carimbo de origem, não privilégio —
-      não amplia alcance nenhum.
+    - `token_id`/`token_prefix` "assistente:…": the quota buckets
+      (`ratelimit:mcp:assistente:{user}`) and the audit line are born separate
+      from the PAT's and the editor assistant's, for free — everything is keyed
+      by `token_id`;
+    - the SIX scopes (`ESCOPOS_DO_ASSISTENTE`), not the editor's four;
+    - `origem_dos_fluxos="assistente"`: every workflow it creates is born
+      marked, and the listings hide it by default. It is an origin stamp, not
+      a privilege — it widens no reach.
 
-    A cota de TOKENS do modelo continua na chave `assistente:tokens:{user}`
-    (`cotas.chave_de_tokens`), COMPARTILHADA com o editor: o modelo é o mesmo e o
-    orçamento por pessoa é um só.
+    The model's TOKEN quota stays on the `assistente:tokens:{user}` key
+    (`cotas.chave_de_tokens`), SHARED with the editor: the model is the same and
+    the per-person budget is a single one.
     """
     return EscopoEfetivo(
         user_id=user_id,
@@ -187,12 +188,12 @@ def escopo_do_assistente(
 
 
 def escopo_da_chamada(ctx) -> EscopoEfetivo:
-    """O escopo desta chamada, pelo `ctx` da tool ou pelo `ContextVar`.
+    """The scope of this call, via the tool's `ctx` or via the `ContextVar`.
 
-    A ordem importa: `request.state` é por request e não se confunde entre
-    chamadas concorrentes; o `ContextVar` é o reserva (e o único caminho em
-    testes que chamam a função da tool direto). Sem nenhum dos dois a chamada
-    não está autenticada — e aí não há o que responder além de "proibido".
+    The order matters: `request.state` is per request and does not get mixed up
+    between concurrent calls; the `ContextVar` is the fallback (and the only path
+    in tests that call the tool function directly). With neither, the call is
+    not authenticated — and then there is nothing to answer but "forbidden".
     """
     requisicao = getattr(getattr(ctx, "request_context", None), "request", None)
     escopo = getattr(getattr(requisicao, "state", None), "escopo", None)
@@ -209,12 +210,12 @@ def escopo_da_chamada(ctx) -> EscopoEfetivo:
 
 
 def exigir_escopo(escopo: EscopoEfetivo, *necessarios: str) -> None:
-    """Recusa a chamada nomeando o escopo que falta.
+    """Refuses the call, naming the missing scope.
 
-    Nomear é deliberado: quem chama não tem como adivinhar qual caixa marcar na
-    tela de tokens, e o nome do escopo não revela nada sobre os dados. O hint
-    diz QUEM marca: a tela de tokens só abre para o administrador do sistema
-    (`web/proxy.ts` devolve `/` a quem não é admin).
+    Naming it is deliberate: the caller has no way to guess which box to tick
+    on the tokens screen, and the scope name reveals nothing about the data.
+    The hint says WHO ticks it: the tokens screen only opens for the system
+    administrator (`web/proxy.ts` sends non-admins to `/`).
     """
     faltando = [e for e in necessarios if not escopo.tem(e)]
     if not faltando:

@@ -1,24 +1,25 @@
 // desktop/src/shared/servidor.ts
 //
-// O servidor do Atlans é FIXO neste app.
+// The Atlans server is FIXED in this app.
 //
-// Não é uma preferência com um bom default: é a única origem à qual este
-// executável se vincula. Deixar o endereço editável dava a qualquer pessoa com
-// acesso à máquina — ou a uma página web disparando um deep link — a chance de
-// apontar o executor para outro servidor, e um executor apontado para servidor
-// alheio roda, com as permissões do usuário, os workflows que aquele servidor
-// mandar.
+// It is not a preference with a good default: it is the only origin this
+// executable links to. Leaving the address editable gave anyone with access to
+// the machine — or a web page firing a deep link — the chance to point the
+// executor at another server, and an executor pointed at someone else's server
+// runs, with the user's permissions, whatever workflows that server sends.
 //
-// Por isso o valor é gravado no executável pelo BUILD (ATLANS_DESKTOP_SERVIDOR,
-// ver scripts/enderecos.mjs), e não vem de `.env`, nem de campo de formulário,
-// nem de parâmetro de IPC vindo do renderer. O `.env` continua recebendo
-// `EXECUTOR_SERVER_URL` porque é o Python que o lê, mas quem o escreve é sempre
-// o main process, sempre com esta constante.
+// That is why the value is written into the executable by the BUILD
+// (ATLANS_DESKTOP_SERVIDOR, see scripts/enderecos.mjs), and does not come from
+// `.env`, nor from a form field, nor from an IPC parameter coming from the
+// renderer. `.env` still receives `EXECUTOR_SERVER_URL` because Python is what
+// reads it, but whoever writes it is always the main process, always with this
+// constant.
 //
-// O código não traz o endereço de instalação nenhuma: cada build grava o seu.
-// Instalação apontada para outro servidor exige outro build. É deliberado.
+// The code carries no installation's address: each build writes its own. An
+// installation pointed at another server requires another build. It is
+// deliberate.
 declare const __ATLANS_SERVIDOR__: string
 export const SERVIDOR: string = __ATLANS_SERVIDOR__
 
-/** Host de {@link SERVIDOR} — o único aceito num deep link de enrollment. */
+/** Host of {@link SERVIDOR} — the only one accepted in an enrollment deep link. */
 export const SERVIDOR_HOST = new URL(SERVIDOR).hostname

@@ -1,13 +1,13 @@
 /**
- * Detecção de `:placeholder` no editor SQL.
+ * Detection of `:placeholder` in the SQL editor.
  *
- * O regex varria o texto cru da query, então `WHERE obs = 'urgente:revisar'`
- * fazia o painel "Parametros detectados" oferecer um `:revisar` que não existe.
- * Quem preenchesse aquele campo mandava um parâmetro fantasma para o backend —
- * que, pelo mesmo motivo, recusava a consulta inteira.
+ * The regex scanned the query's raw text, so `WHERE obs = 'urgente:revisar'`
+ * made the "Parametros detectados" (detected parameters) panel offer a
+ * `:revisar` that doesn't exist. Whoever filled in that field sent a ghost
+ * parameter to the backend — which, for the same reason, rejected the whole query.
  *
- * Mesmas regras do scanner Python (`flow/utils/sql_guard.py`), e os casos aqui
- * espelham os de `tests/unit/test_query_param_formatter.py`.
+ * Same rules as the Python scanner (`flow/utils/sql_guard.py`), and the cases
+ * here mirror those of `tests/unit/test_query_param_formatter.py`.
  */
 import { describe, it, expect } from "vitest"
 import { mascararLiteraisSql, extrairPlaceholders } from "@/lib/sql-literals"

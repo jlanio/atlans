@@ -1,9 +1,9 @@
 """
-O logger redige tokens pessoais de acesso (atl_pat_...) — nus e atrás de Bearer.
+The logger redacts personal access tokens (atl_pat_...) — bare and behind Bearer.
 
-Um `logger.info("token %s", segredo)` esquecido não pode virar segredo em
-arquivo de log. O padrão cobre o formato exato (prefixo + 43 chars url-safe);
-prefixos parecidos mas mais curtos não são tocados, para não redigir texto comum.
+A forgotten `logger.info("token %s", segredo)` must not turn into a secret in a
+log file. The pattern covers the exact format (prefix + 43 url-safe chars);
+similar but shorter prefixes are not touched, so as not to redact ordinary text.
 """
 import logging
 
@@ -20,7 +20,7 @@ def test_scrub_redige_o_token_nu_e_o_bearer():
 
 
 def test_scrub_redige_token_colado_a_outra_palavra():
-    """`id=atl_pat_…`, `_atl_pat_…`: sem fronteira de palavra antes do prefixo."""
+    """`id=atl_pat_…`, `_atl_pat_…`: no word boundary before the prefix."""
     saida = _scrub(f"chave=x{SEGREDO} e _{SEGREDO} e ({SEGREDO})")
     assert SEGREDO not in saida
     assert saida.count("<REDACTED>") == 3

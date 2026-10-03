@@ -1,10 +1,11 @@
 // desktop/src/shared/limites.test.ts
 //
-// O contrato com o executor: as faixas e os padrões que as telas usam são os de
-// `executor/config.py`. O teste lê o fonte Python em vez de confiar num
-// comentário "iguais aos do executor" — foi com esse comentário no lugar que as
-// cópias divergiram (teto de 24 h no tempo limite que o executor não tem;
-// GeoSync mostrando `bidirectional` com o executor em `upload`).
+// The contract with the executor: the ranges and defaults the screens use are
+// those of `executor/config.py`. The test reads the Python source instead of
+// trusting an "same as the executor's" comment — it was with that comment in
+// place that the copies diverged (a 24 h ceiling on the timeout that the
+// executor does not have; GeoSync showing `bidirectional` with the executor on
+// `upload`).
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -28,7 +29,7 @@ function faixaDoExecutor(nome: string): Faixa {
   return { padrao: numero(m[1]!), min: numero(m[2]!), max: m[3] ? numero(m[3]) : null }
 }
 
-/** O padrão de `os.getenv("NOME", "padrão")` em executor/config.py. */
+/** The default of `os.getenv("NOME", "padrão")` in executor/config.py. */
 function textoDoExecutor(nome: string): string {
   const m = new RegExp(`os\\.getenv\\(\\s*"${nome}"\\s*,\\s*"([^"]*)"\\s*\\)`).exec(CONFIG_PY)
   if (!m) throw new Error(`não achei a leitura de ${nome} em executor/config.py`)
@@ -52,7 +53,7 @@ describe('contrato com executor/config.py', () => {
   })
 
   it('o intervalo que o app grava é um que o executor aceita', () => {
-    // Fora da faixa, o executor descartaria o valor e usaria o padrão dele.
+    // Out of range, the executor would discard the value and use its default.
     expect(dentroDaFaixa(INTERVALO_SYNC, faixaDoExecutor('EXECUTOR_SYNC_INTERVAL'))).toBe(true)
   })
 })
@@ -83,8 +84,8 @@ describe('uma cópia só', () => {
   }
 
   it('nenhum outro arquivo do desktop redefine as faixas de execução', () => {
-    // Main e renderer tinham cada um a sua tabela, e as duas já tinham o teto
-    // de 24 h que o executor não tem.
+    // Main and renderer each had their own table, and both already had the 24 h
+    // ceiling the executor does not have.
     const redefinem = fontes(SRC)
       .filter((p) => path.basename(p) !== 'limites.ts')
       .filter((p) => /\b(workers|filaMax|timeoutS):\s*\{\s*(padrao|min|max)\b/.test(fs.readFileSync(p, 'utf8')))

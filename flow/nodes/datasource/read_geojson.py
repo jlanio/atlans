@@ -12,8 +12,8 @@ logger = get_logger(__name__)
 @register_node
 class ReadGeoJSONNode(BaseNode):
     """
-    Le um arquivo GeoJSON do Drive do Workspace e retorna um GeoDataFrame.
-    Opcionalmente reprojeta para o CRS especificado.
+    Reads a GeoJSON file from the Workspace Drive and returns a GeoDataFrame.
+    Optionally reprojects to the specified CRS.
     """
 
     @classmethod

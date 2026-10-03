@@ -1,16 +1,16 @@
 # tests/unit/test_retry_run_valida_o_run.py
 """
-`POST /workflows/{id_hash}/runs/{run_id}/retry` e o run que ele ignorava.
+`POST /workflows/{id_hash}/runs/{run_id}/retry` and the run it ignored.
 
-A rota declarava `{run_id}` no path, recebia o parametro e nunca o lia. Qualquer
-string passava — inclusive o task_id de uma run de OUTRO workflow — e a rota
-disparava a execucao do mesmo jeito. Quem chamasse achando estar reexecutando
-uma run especifica estava disparando outra coisa, sem nenhum sinal disso.
+The route declared `{run_id}` in the path, received the parameter and never read
+it. Any string passed — including the task_id of a run of ANOTHER workflow — and
+the route triggered the execution all the same. Whoever called it thinking they
+were re-running a specific run was triggering something else, with no sign of it.
 
-O que NAO foi feito, de proposito: implementar o replay de verdade.
-`WorkflowRun` nao guarda os parametros de entrada, entao reexecutar exatamente
-aquela run exigiria coluna nova — feature, nao correcao. A rota passou a
-VALIDAR o run e a dizer na docstring o que de fato faz.
+What was NOT done, on purpose: implementing a real replay. `WorkflowRun` does not
+store the input parameters, so re-running exactly that run would require a new
+column — a feature, not a fix. The route now VALIDATES the run and says in its
+docstring what it actually does.
 """
 from __future__ import annotations
 
@@ -28,8 +28,8 @@ class _Wf:
 
 
 def _requisicao() -> Request:
-    """Request minima: a rota tem rate limit, e o slowapi recusa qualquer coisa
-    que nao seja uma Request de verdade (mesmo padrao de
+    """Minimal Request: the route has a rate limit, and slowapi rejects anything
+    that is not a real Request (same pattern as
     tests/integration/test_grupos_ordem.py)."""
     return Request({
         "type": "http", "method": "POST", "path": "/workflows/wf-1/runs/run-1/retry",
@@ -53,7 +53,7 @@ def _service():
 
 @pytest.mark.asyncio
 async def test_run_inexistente_recebe_404_em_vez_de_disparar():
-    """A regressao central: id desconhecido nao pode disparar execucao."""
+    """The central regression: an unknown id must not trigger an execution."""
     svc = _service()
     with pytest.raises(HTTPException) as exc:
         await mod.retry_run(
@@ -75,8 +75,8 @@ async def test_run_de_outro_workflow_nao_dispara():
             service=svc, wf=_Wf(),
         )
     assert exc.value.status_code == 404
-    # A query precisa restringir pelos DOIS campos; so por task_id acharia a run
-    # alheia e disparia a execucao deste workflow.
+    # The query must filter by BOTH fields; by task_id alone it would find the other
+    # workflow's run and trigger the execution of this workflow.
     sql = str(db.execute.await_args.args[0]).lower()
     assert "task_id" in sql and "workflow_hash" in sql
 
@@ -91,16 +91,17 @@ async def test_run_valido_dispara_a_execucao():
     )
     assert resp["task_id"] == "task-novo"
     svc.start_analysis.assert_awaited_once()
-    # Escopo D: o retry também repassa quem disparou.
+    # Scope D: the retry also passes along who triggered it.
     assert svc.start_analysis.await_args.kwargs["triggered_by"] == "user-x"
 
 
 @pytest.mark.asyncio
 async def test_papel_insuficiente_e_barrado_antes_da_consulta(client):
-    """403 continua vindo antes de qualquer I/O.
+    """403 still comes before any I/O.
 
-    Pela app, e não chamando a função: o papel agora é da dependência da rota
-    (`workflow_com_papel`), que roda antes do corpo — é ela que tem de barrar.
+    Through the app, not by calling the function: the role now belongs to the
+    route's dependency (`workflow_com_papel`), which runs before the body — it
+    is the one that has to block.
     """
     from app.api.dependencies import get_accessible_workflow_with_role, get_db
     from app.main import app

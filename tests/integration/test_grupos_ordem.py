@@ -1,13 +1,13 @@
 # tests/integration/test_grupos_ordem.py
 """
-Ordem dos grupos de workflows.
+Order of workflow groups.
 
-O `GET /workflow-groups/` nao tinha `order_by` nenhum: a ordem vinha indefinida
-do banco e podia mudar entre dois carregamentos da mesma pagina. Nao havia nem
-ordem estavel, quanto mais escolhida pelo usuario.
+`GET /workflow-groups/` had no `order_by` at all: the order came undefined
+from the database and could change between two loads of the same page. There
+was not even a stable order, let alone one chosen by the user.
 
-Os testes chamam as funcoes de rota diretamente, com uma sessao SQLite de
-memoria — o que interessa aqui e a consulta e a gravacao, nao a camada HTTP.
+The tests call the route functions directly, with an in-memory SQLite
+session — what matters here is the query and the write, not the HTTP layer.
 """
 from unittest.mock import AsyncMock, patch
 
@@ -29,8 +29,8 @@ class _Usuario:
 
 
 def _requisicao() -> Request:
-    """Request minima: `create_group` tem rate limit, e o slowapi recusa
-    qualquer coisa que nao seja uma Request de verdade."""
+    """Minimal Request: `create_group` has a rate limit, and slowapi rejects
+    anything that is not a real Request."""
     return Request({
         "type": "http", "method": "POST", "path": "/workflow-groups",
         "headers": [], "client": ("127.0.0.1", 0), "query_string": b"",
@@ -67,13 +67,13 @@ async def _nomes_em_ordem(db, workspace_ids=(WS,)):
     return [g.name for g in saida]
 
 
-# Onde `exigir_papel_no_workspace` busca o papel: trocar aqui mantém a
-# comparação de verdade rodando, só sem a tabela de membros.
+# Where `exigir_papel_no_workspace` looks up the role: swapping it here keeps
+# the real comparison running, just without the members table.
 _PAPEL = "app.core.authorization.workflow_access.get_workspace_member_role"
 
 
 def _editor():
-    """Papel de editor no workspace, sem precisar da tabela de membros."""
+    """Editor role in the workspace, without needing the members table."""
     return patch(_PAPEL, new=AsyncMock(return_value="editor"))
 
 
@@ -88,8 +88,8 @@ class TestOrdemDaListagem:
 
     @pytest.mark.asyncio
     async def test_nome_desempata_posicoes_iguais(self, db):
-        # Grupos criados antes da coluna existir, ou uma reordenacao
-        # interrompida: sem o desempate a ordem volta a ser indefinida.
+        # Groups created before the column existed, or an interrupted
+        # reordering: without the tiebreaker the order becomes undefined again.
         await _grupos(db, ("Beta", 0), ("Alfa", 0), ("Gama", 0))
         assert await _nomes_em_ordem(db) == ["Alfa", "Beta", "Gama"]
 
@@ -113,8 +113,9 @@ class TestReordenar:
 
     @pytest.mark.asyncio
     async def test_id_desconhecido_e_recusado(self, db):
-        """Ignorar em silencio deixaria banco e tela com listas diferentes —
-        e a proxima reordenacao gravaria por cima da divergencia."""
+        """Silently ignoring it would leave the database and the screen with
+        different lists — and the next reordering would write over the
+        divergence."""
         criados = await _grupos(db, ("A", 0))
 
         with _editor(), pytest.raises(HTTPException) as exc:
@@ -150,14 +151,15 @@ class TestReordenar:
         assert exc.value.status_code == 403
 
 
-# ── registro das rotas ──────────────────────────────────────────────────────
+# ── route registration ──────────────────────────────────────────────────────
 
 def test_reorder_e_registrada_antes_do_path_variavel():
-    """`PUT /reorder` tem de vir ANTES de `PUT /{group_id}`.
+    """`PUT /reorder` must come BEFORE `PUT /{group_id}`.
 
-    O FastAPI casa as rotas na ordem de registro: com o path variavel primeiro,
-    "reorder" chegaria como se fosse um id de grupo, e a resposta seria um 404
-    de grupo inexistente — um erro que nao sugere em nada a causa real.
+    FastAPI matches routes in registration order: with the variable path
+    first, "reorder" would arrive as if it were a group id, and the response
+    would be a nonexistent-group 404 — an error that in no way hints at the
+    real cause.
     """
     caminhos = [r.path for r in rota.router.routes if "PUT" in (r.methods or set())]
     assert caminhos.index("/workflow-groups/reorder") < caminhos.index(
@@ -171,8 +173,8 @@ class TestGrupoNovoVaiParaOFim:
 
     @pytest.mark.asyncio
     async def test_nao_nasce_empatado_em_zero(self, db):
-        """Com `position=0` fixo, todo grupo novo empata com os existentes e a
-        ordem entre eles volta a depender do desempate por nome."""
+        """With a fixed `position=0`, every new group ties with the existing ones and
+        the order among them goes back to depending on the name tiebreaker."""
         await _grupos(db, ("A", 0), ("B", 1))
 
         with _editor():
@@ -183,7 +185,7 @@ class TestGrupoNovoVaiParaOFim:
             )
 
         assert novo.position == 2
-        # O nome viria primeiro no alfabeto; a posicao e que manda.
+        # The name would come first alphabetically; the position is what decides.
         assert await _nomes_em_ordem(db) == ["A", "B", "Aaa"]
 
     @pytest.mark.asyncio

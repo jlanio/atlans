@@ -21,11 +21,11 @@ import { DangerSection } from "./danger-section"
 
 export type SectionId = "geral" | "membros" | "executor" | "notificacoes" | "perigo"
 
-// "Notificações" (allowlist de webhooks) esteve oculta enquanto o resto da
-// vertical já rodava: a coluna existe, o endpoint existe, e
-// `run_result_consumer` BLOQUEIA webhooks fora da allowlist em produção — só
-// logando um warning no servidor. Sem esta tela, quem configurava um webhook e
-// parava de recebê-lo não tinha como descobrir o motivo nem corrigir.
+// "Notificações" (webhook allowlist) was hidden while the rest of the
+// vertical was already running: the column exists, the endpoint exists, and
+// `run_result_consumer` BLOCKS webhooks outside the allowlist in production —
+// only logging a warning on the server. Without this screen, whoever set up a
+// webhook and stopped receiving it had no way to find out why or to fix it.
 const SECTIONS: { id: SectionId; label: string; icon: IconType }[] = [
   { id: "geral",        label: "Geral",          icon: TbSettings },
   { id: "membros",      label: "Membros",        icon: TbUsers },
@@ -36,15 +36,15 @@ const SECTIONS: { id: SectionId; label: string; icon: IconType }[] = [
 
 interface Props {
   /**
-   * Derivado da lista de workspaces, não guardado em estado: assim o cabeçalho
-   * acompanha uma renomeação feita aqui dentro, e o painel se fecha sozinho se
-   * o workspace deixar de existir.
+   * Derived from the workspace list, not kept in state: this way the header
+   * follows a rename made in here, and the panel closes on its own if the
+   * workspace ceases to exist.
    */
   workspace: Workspace | null
   currentUserId: string | null
   /**
-   * Seção aberta de saída. Só é lida na montagem — a tela remonta o painel a
-   * cada abertura (`key`), então um atalho como "Membros" chega aqui direto.
+   * Section open at start. Only read on mount — the screen remounts the panel
+   * on every opening (`key`), so a shortcut like "Membros" lands here directly.
    */
   initialSection?: SectionId
   onClose: () => void
@@ -59,16 +59,16 @@ export function WorkspaceSettingsSheet({ workspace, currentUserId, initialSectio
 
   const canManage = hasMinRole(workspace?.my_role, "admin")
 
-  // Estáveis: as seções recebem estes callbacks em dependências de efeito, e uma
-  // função nova a cada render as poria em laço de atualização.
+  // Stable: the sections receive these callbacks in effect dependencies, and a
+  // new function on every render would put them in an update loop.
   const handleMemberCount = useCallback((n: number) => setMemberCount(n), [])
   const handleExecutorAlert = useCallback((v: boolean) => setExecutorAlert(v), [])
   const handleNotificacoesAlert = useCallback((v: boolean) => setNotificacoesAlert(v), [])
 
   async function copyId() {
     if (!workspace) return
-    // Sem o await/catch, uma origem não-HTTPS (onde `clipboard` é undefined) ou
-    // permissão negada produzia um "copiado" com a área de transferência vazia.
+    // Without the await/catch, a non-HTTPS origin (where `clipboard` is undefined)
+    // or a denied permission produced a "copiado" (copied) with an empty clipboard.
     try {
       if (!navigator.clipboard) throw new Error("Clipboard indisponível")
       await navigator.clipboard.writeText(workspace.id_hash)
@@ -82,9 +82,9 @@ export function WorkspaceSettingsSheet({ workspace, currentUserId, initialSectio
     <Sheet open={!!workspace} onOpenChange={o => { if (!o) onClose() }}>
       <SheetContent
         side="right"
-        // `SheetContent` é sm:max-w-sm sem overflow; o painel precisa de largura
-        // para a rail + conteúdo, e de um scroller próprio. O mínimo é o ponto
-        // em que a rail de seções ainda cabe ao lado do conteúdo.
+        // `SheetContent` is sm:max-w-sm without overflow; the panel needs width
+        // for the rail + content, and a scroller of its own. The minimum is the
+        // point at which the section rail still fits next to the content.
         resizable={{
           storageKey: "atlas_workspace_settings_width",
           defaultWidth: 640,
@@ -177,11 +177,11 @@ export function WorkspaceSettingsSheet({ workspace, currentUserId, initialSectio
                 })}
               </nav>
 
-              {/* Todas as seções ficam MONTADAS, só ocultas — não é desperdício.
-                  Montar sob demanda faria os avisos da rail ("Executor ⚠",
-                  contagem de membros) só aparecerem depois de visitar a seção, o
-                  que os torna inúteis como aviso. São duas requisições de um
-                  único workspace ao abrir. */}
+              {/* All sections stay MOUNTED, just hidden — it is not waste.
+                  Mounting on demand would make the rail's warnings ("Executor ⚠",
+                  member count) appear only after visiting the section, which
+                  makes them useless as warnings. It is two requests for a
+                  single workspace on open. */}
               <div className="min-w-0 flex-1 overflow-y-auto p-4">
                 <div hidden={section !== "geral"}>
                   <GeneralSection workspace={workspace} />

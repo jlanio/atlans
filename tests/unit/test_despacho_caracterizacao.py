@@ -1,19 +1,20 @@
 # tests/unit/test_despacho_caracterizacao.py
 """
-Caracterização de `_dispatch_job`: a ORDEM dos efeitos e as mensagens.
+Characterization of `_dispatch_job`: the ORDER of the effects and the messages.
 
-O despacho grava no banco, cifra, fala com o executor, fecha o run e emite o
-`dispatch_event` — e a ordem é contrato: o host tem de estar gravado antes do
-envio (é o que autoriza o executor a reportar o run), o fechamento vem antes do
-evento, e a rede de segurança do `except` passa por todo `raise`. Estes testes
-registram cada efeito numa lista só e comparam a sequência inteira, para que
-dividir a função não mude nada do que acontece nem de quando acontece.
+The dispatch writes to the database, encrypts, talks to the executor, closes the
+run and emits the `dispatch_event` — and the order is a contract: the host has
+to be stored before the send (it is what authorizes the executor to report the
+run), the closing comes before the event, and the `except` safety net goes
+through every `raise`. These tests record each effect in a single list and
+compare the whole sequence, so that splitting the function changes nothing about
+what happens nor when it happens.
 
-O que já tinha cobertura (e continua nos arquivos de origem): rótulos no
-INSERT e categorias (test_run_trigger_source.py), cancelamento no meio do
-despacho contra banco real (test_fechamento_de_run.py), barreira e
-`dispatch_tier` (test_policy_routing.py), send_job que estoura
-(test_fix_consumer_services.py), ACK antes do commit (test_na_fila_eterno.py).
+What already had coverage (and stays in the original files): labels in the
+INSERT and categories (test_run_trigger_source.py), cancellation in the middle
+of the dispatch against a real database (test_fechamento_de_run.py), barrier and
+`dispatch_tier` (test_policy_routing.py), send_job blowing up
+(test_fix_consumer_services.py), ACK before the commit (test_na_fila_eterno.py).
 """
 from __future__ import annotations
 
@@ -27,13 +28,13 @@ from app.services import workflow_execution_service as wes
 from app.services.fechamento_de_run import ABERTOS, REPETIVEL
 
 
-# ── Fábricas ──────────────────────────────────────────────────────────────────
+# ── Factories ─────────────────────────────────────────────────────────────────
 
 def _wf(workspace_id="ws-1"):
     wf = MagicMock()
     wf.id_hash = "wf-1"
     wf.workspace_id = workspace_id
-    # Um pin com metadata (passa) e um órfão (fica de fora do envelope).
+    # One pin with metadata (passes) and one orphan (left out of the envelope).
     wf.pinned_outputs = {"n1": {"__pin_s3_key__": "k1"}, "orfao": {"__pin_s3_key__": "k2"}}
     wf.pin_metadata = {"n1": {"expires_at": None}}
     return wf
@@ -49,8 +50,8 @@ _DEFINICAO = {"id": "raiz", "nodes": [{"id": "r", "name": "Response"}], "edges":
 
 
 class _Banco:
-    """Sessão falsa que anota INSERT, commit (com o host gravado naquele
-    instante) e o UPDATE pending→running na mesma lista dos outros efeitos."""
+    """Fake session that records INSERT, commit (with the host stored at that
+    instant) and the pending→running UPDATE in the same list as the other effects."""
 
     def __init__(self, efeitos, *, rowcount=1, falhar_no_commit=None):
         self.efeitos = efeitos
@@ -80,13 +81,13 @@ class _Banco:
 
 @pytest.fixture
 def cenario(monkeypatch):
-    """Tudo o que o despacho toca, anotado em `efeitos` na ordem em que acontece."""
+    """Everything the dispatch touches, recorded in `efeitos` in the order it happens."""
     efeitos: list = []
     estado = {
         "envios": {},          # executor_id -> True | False | Exception
         "falha_cifra": set(),  # executores cuja cifra levanta RuntimeError
         "aviso_falha": False,  # send_json (cancel) levanta
-        "cifras": [],          # kwargs de cada build_job_message
+        "cifras": [],          # kwargs of each build_job_message
     }
 
     async def _credenciais(definicao, *, pre_resolved=None):
@@ -141,14 +142,15 @@ def cenario(monkeypatch):
     return efeitos, estado
 
 
-# ── Caminho feliz com failover ───────────────────────────────────────────────
+# ── Happy path with failover ─────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_sequencia_completa_com_failover(cenario):
-    """ag-1 recusa, a cifra de ag-2 falha, ag-3 aceita: o INSERT leva o host do
-    primeiro; as credenciais (raiz e sub-fluxo) e a serialização vêm depois do
-    commit; só o failover que CHEGA ao envio reescreve o host, e antes de
-    enviar; o UPDATE condicional e o commit vêm depois do envio aceito."""
+    """ag-1 refuses, ag-2's encryption fails, ag-3 accepts: the INSERT carries the
+    first one's host; the credentials (root and sub-workflow) and the
+    serialization come after the commit; only the failover that REACHES the send
+    rewrites the host, and before sending; the conditional UPDATE and the commit
+    come after the accepted send."""
     efeitos, estado = cenario
     estado["envios"] = {"ag-1": False, "ag-3": True}
     estado["falha_cifra"] = {"ag-2"}
@@ -190,8 +192,8 @@ async def test_sequencia_completa_com_failover(cenario):
 
 @pytest.mark.asyncio
 async def test_envelope_e_argumentos_da_cifra(cenario):
-    """O payload é serializado UMA vez (o mesmo `bytes` para cada candidato) e
-    leva o que o executor precisa; `workspace_id` ausente vira string vazia."""
+    """The payload is serialized ONCE (the same `bytes` for each candidate) and
+    carries what the executor needs; an absent `workspace_id` becomes an empty string."""
     efeitos, estado = cenario
     estado["envios"] = {"ag-1": False, "ag-2": True}
     db = _Banco(efeitos)
@@ -231,11 +233,11 @@ async def test_cifra_vai_para_thread_so_acima_do_limiar(cenario, monkeypatch, li
     await wes._dispatch_job(_wf(), _DEFINICAO, [_executor("ag-1"), _executor("ag-2")], {}, False, db=_Banco(efeitos))
 
     threads = [e[1] for e in efeitos if e[0] == "thread"]
-    # A serialização vai sempre para a thread; a cifra, por candidato, só acima do limiar.
+    # Serialization always goes to the thread; encryption, per candidate, only above the threshold.
     assert threads == (["<lambda>", "_cifra", "_cifra"] if cifra_em_thread else ["<lambda>"])
 
 
-# ── Nenhum candidato aceita: fechamento, evento, exceção ────────────────────
+# ── No candidate accepts: closing, event, exception ─────────────────────────
 
 @pytest.mark.asyncio
 async def test_esgotado_com_mensagem_da_politica_e_ultimo_motivo(cenario):
@@ -260,8 +262,8 @@ async def test_esgotado_com_mensagem_da_politica_e_ultimo_motivo(cenario):
             "wf": wf, "mode": "isolated", "candidates_total": 2, "chosen": None,
             "tier": None, "failovers": 2, "category": "no_dedicated_executor", "run_id": db.run.task_id,
         }),
-        # A rede de segurança do `except` passa pelo `raise` do caminho (4); o
-        # run já está fechado, então ela não reescreve nada.
+        # The `except` safety net goes through the `raise` of path (4); the run
+        # is already closed, so it rewrites nothing.
         ("fechar", "failed", "dispatch", f"Falha no despacho: {mensagem}", None, ABERTOS),
     ]
     assert [e for e in efeitos if e[0] == "envio"] == [("envio", "abcdef-12345"), ("envio", "ag-2")]
@@ -328,12 +330,13 @@ async def test_lista_vazia_fecha_sem_host(cenario, candidatos, mensagem, categor
     assert (exc.value.category, exc.value.run_id) == (categoria, db.run.task_id)
 
 
-# ── Barreira do isolamento ───────────────────────────────────────────────────
+# ── Isolation barrier ────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_barreira_depois_de_um_failover(cenario):
-    """O intruso é o SEGUNDO: o primeiro já foi tentado; o intruso não é cifrado,
-    o host não é reescrito para ele, e o evento conta o failover."""
+    """The intruder is the SECOND: the first was already tried; the intruder is not
+    encrypted for, the host is not rewritten for it, and the event counts the
+    failover."""
     efeitos, estado = cenario
     estado["envios"] = {"geo-01": False}
     cadeia = wes.CandidateList(
@@ -362,14 +365,14 @@ async def test_barreira_depois_de_um_failover(cenario):
     assert db.run.host == "executor:geo-01"
 
 
-# ── Cancelamento que vence a corrida com o envio ─────────────────────────────
+# ── Cancellation that wins the race against the send ─────────────────────────
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("aviso_falha", [False, True])
 async def test_cancelado_durante_o_envio_avisa_o_executor_e_devolve(cenario, aviso_falha):
-    """UPDATE sem linha = o usuário cancelou: o executor que já aceitou recebe o
-    'cancel' (falhar ao avisar só vira log), o run não é promovido e não há
-    evento de despacho nem fechamento."""
+    """UPDATE with no row = the user canceled: the executor that already accepted
+    gets the 'cancel' (failing to notify only becomes a log line), the run is not
+    promoted and there is no dispatch event nor closing."""
     efeitos, estado = cenario
     estado["envios"] = {"ag-1": True}
     estado["aviso_falha"] = aviso_falha
@@ -387,11 +390,11 @@ async def test_cancelado_durante_o_envio_avisa_o_executor_e_devolve(cenario, avi
     assert result.id == db.run.task_id and result.has_response_node is True
 
 
-# ── Falhas de infraestrutura ────────────────────────────────────────────────
+# ── Infrastructure failures ─────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_falha_no_insert_sobe_sem_passar_pela_rede_de_seguranca(cenario):
-    """O INSERT está FORA do try: se o commit dele falha não há run para fechar."""
+    """The INSERT is OUTSIDE the try: if its commit fails there is no run to close."""
     efeitos, _ = cenario
     db = _Banco(efeitos, falhar_no_commit=1)
 
@@ -405,7 +408,7 @@ async def test_falha_no_insert_sobe_sem_passar_pela_rede_de_seguranca(cenario):
 async def test_falha_ao_regravar_o_host_no_failover_fecha_como_dispatch(cenario):
     efeitos, estado = cenario
     estado["envios"] = {"ag-1": False, "ag-2": True}
-    db = _Banco(efeitos, falhar_no_commit=2)   # 1 = INSERT; 2 = host do failover
+    db = _Banco(efeitos, falhar_no_commit=2)   # 1 = INSERT; 2 = failover host
 
     with pytest.raises(RuntimeError, match="banco caiu"):
         await wes._dispatch_job(_wf(), _DEFINICAO, [_executor("ag-1"), _executor("ag-2")], {}, False, db=db)

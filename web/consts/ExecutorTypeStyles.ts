@@ -1,14 +1,14 @@
-// Vocabulário visual do TIPO de executor — fonte única de verdade.
+// Visual vocabulary of the executor TYPE — single source of truth.
 //
-// Nome, ícone e cor viviam espalhados: o badge tinha `teal-500`/`purple-500`
-// crus com escada `dark:`, os cabeçalhos de seção da listagem repetiam os
-// mesmos ícones com OUTRAS tonalidades (`teal-600`/`purple-600`) e o rótulo
-// aparecia escrito à mão em três lugares. É o mesmo padrão que fez as cores do
-// drawer de nós divergirem das do canvas — aqui a divergência já tinha começado
-// pelo tom.
+// Name, icon and color lived scattered around: the badge had raw
+// `teal-500`/`purple-500` with a `dark:` ladder, the listing's section headers
+// repeated the same icons in OTHER shades (`teal-600`/`purple-600`) and the
+// label was hand-written in three places. It is the same pattern that made the
+// node drawer's colors drift from the canvas's — here the drift had already
+// started with the shade.
 //
-// Quem precisa da identidade do tipo (badge, aba do filtro, selo da linha,
-// cabeçalho de grupo) lê daqui.
+// Whoever needs the type's identity (badge, filter tab, row badge, group
+// header) reads it from here.
 import { TbCrown, TbUsers } from "react-icons/tb"
 import type { IconType } from "react-icons"
 import type { IExecutor } from "@/service/types"
@@ -16,16 +16,16 @@ import type { IExecutor } from "@/service/types"
 export type ExecutorType = IExecutor["executor_type"]
 
 export interface EstiloDeTipo {
-  /** Rótulo no singular — o plural é montado por quem exibe. */
+  /** Singular label — the plural is built by whoever displays it. */
   nome: string
-  /** Frase curta para o cabeçalho de grupo. */
+  /** Short phrase for the group header. */
   grupo: string
   icone: IconType
-  /** Cor do texto e do ícone. */
+  /** Text and icon color. */
   texto: string
-  /** Fundo tênue, para selo e ladrilho. */
+  /** Faint background, for badge and tile. */
   fundo: string
-  /** Borda do selo. */
+  /** Badge border. */
   borda: string
 }
 
@@ -57,11 +57,11 @@ const NEUTRO: EstiloDeTipo = {
   borda: "border-border",
 }
 
-/** Estilo do tipo, com recuo para o neutro.
+/** The type's style, falling back to neutral.
  *
- *  Leitura pela cadeia de protótipo é o que faz `TIPOS[t] ?? NEUTRO` devolver a
- *  função `Object` — que é truthy — para um `executor_type` inesperado vindo da
- *  API, e aí as classes saem `undefined`. */
+ *  Reading through the prototype chain is what makes `TIPOS[t] ?? NEUTRO` return
+ *  the `Object` function — which is truthy — for an unexpected `executor_type`
+ *  coming from the API, and then the classes come out `undefined`. */
 export function estiloDoTipo(tipo: string): EstiloDeTipo {
   return Object.prototype.hasOwnProperty.call(TIPOS_DE_EXECUTOR, tipo)
     ? TIPOS_DE_EXECUTOR[tipo as ExecutorType]

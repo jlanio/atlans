@@ -10,8 +10,8 @@ interface HeaderDrawerProps {
 
 const HeaderDrawer = ({ title, description }: HeaderDrawerProps) => {
   const drawerAddNodes = useWorkflowCatalogStore(s => s.nodesDrawerState)
-  // Booleano em vez de `useNodes()`: só o "canvas vazio" muda o cabeçalho, e
-  // assinar a lista inteira re-renderizava o drawer por quadro de arraste.
+  // A boolean instead of `useNodes()`: only "empty canvas" changes the header,
+  // and subscribing to the whole list re-rendered the drawer on every drag frame.
   const canvasVazio = useStore(s => s.nodeLookup.size === 0)
 
   return (

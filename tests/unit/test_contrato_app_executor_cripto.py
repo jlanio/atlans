@@ -1,22 +1,23 @@
 # tests/unit/test_contrato_app_executor_cripto.py
 """
-Round-trip REAL da cripto de job entre servidor e executor.
+REAL round trip of the job crypto between server and executor.
 
-`app/core/job_crypto.py` e `executor/crypto.py` sao pares de protocolo: um
-cifra/assina, o outro decifra/verifica. Nao devem ser unificados — `executor/`
-nao importa `app.*` em nenhum arquivo, e essa fronteira e deliberada (o executor
-roda on-premise, na maquina do cliente). O remedio correto para um par assim e
-teste de contrato, nao abstracao compartilhada.
+`app/core/job_crypto.py` and `executor/crypto.py` are protocol pairs: one
+encrypts/signs, the other decrypts/verifies. They must not be unified —
+`executor/` does not import `app.*` in any file, and that boundary is deliberate
+(the executor runs on-premise, on the customer's machine). The right remedy for
+a pair like this is a contract test, not a shared abstraction.
 
-So que o contrato nao era exercido. O unico teste que importava os dois lados
-monkeypatchava justamente `verify_signature` e `decrypt_job_payload`, e a
-`verify_job_signature` que o servidor mantinha so era usada por testes (saiu
-do app) — ou seja, cada lado era testado contra a PROPRIA copia das regras. Uma divergencia nos bytes
-canonicos, no HKDF, no salt ou no separador passaria verde nas duas suites e
-quebraria 100% dos jobs em producao, de uma vez, sem nenhum teste vermelho.
+Except the contract was not exercised. The only test that imported both sides
+monkeypatched precisely `verify_signature` and `decrypt_job_payload`, and the
+`verify_job_signature` the server kept was only used by tests (it left the
+app) — that is, each side was tested against its OWN copy of the rules. A divergence in the
+canonical bytes, in the HKDF, in the salt or in the separator would stay green
+in both suites and break 100% of jobs in production, all at once, with no red
+test.
 
-Aqui nada e monkeypatchado: o servidor monta a mensagem de verdade e o executor
-a abre de verdade.
+Here nothing is monkeypatched: the server builds the message for real and the
+executor opens it for real.
 """
 from __future__ import annotations
 
@@ -33,13 +34,13 @@ from cryptography.hazmat.primitives.serialization import (
 
 @pytest.fixture
 def chaves(monkeypatch):
-    """Par Ed25519 do servidor + par X25519 do executor, como em producao.
+    """Server's Ed25519 pair + executor's X25519 pair, as in production.
 
-    Patcha o ATRIBUTO do modulo, sem `importlib.reload`. `job_crypto` faz
-    `from app.core.config import EXECUTOR_SIGNING_KEY`, entao recarrega-lo
-    reimportaria o valor que `config` leu no proprio import — a chave nova
-    do teste seria ignorada e os testes passariam a assinar com a chave de
-    quem rodou primeiro. E o mesmo padrao de `tests/unit/test_job_crypto.py`.
+    Patches the module ATTRIBUTE, without `importlib.reload`. `job_crypto` does
+    `from app.core.config import EXECUTOR_SIGNING_KEY`, so reloading it would
+    reimport the value that `config` read at its own import — the test's new
+    key would be ignored and the tests would end up signing with the key of
+    whoever ran first. It is the same pattern as `tests/unit/test_job_crypto.py`.
     """
     servidor = Ed25519PrivateKey.generate()
     servidor_priv_b64 = base64.b64encode(
@@ -79,7 +80,7 @@ def _montar(chaves, payload=None, job_type="run_workflow"):
 # ── O round-trip ─────────────────────────────────────────────────────────────
 
 def test_o_executor_verifica_a_assinatura_que_o_servidor_produz(chaves):
-    """Se os bytes canonicos divergirem entre os lados, isto cai."""
+    """If the canonical bytes diverge between the sides, this breaks."""
     from executor import crypto as ec
 
     msg = _montar(chaves)
@@ -87,7 +88,7 @@ def test_o_executor_verifica_a_assinatura_que_o_servidor_produz(chaves):
 
 
 def test_o_executor_decifra_o_payload_que_o_servidor_cifrou(chaves):
-    """Cobre ECDH, HKDF (algoritmo, length, salt e info) e AES-GCM de uma vez."""
+    """Covers ECDH, HKDF (algorithm, length, salt and info) and AES-GCM at once."""
     from executor import crypto as ec
 
     original = {"definition": {"nodes": [{"id": "1", "name": "DataInput"}]}, "n": 42}
@@ -97,7 +98,7 @@ def test_o_executor_decifra_o_payload_que_o_servidor_cifrou(chaves):
 
 
 def test_payload_em_bytes_produz_o_mesmo_resultado_que_o_dict(chaves):
-    """build_job_message aceita JSON ja serializado no caminho de failover."""
+    """build_job_message accepts already-serialized JSON on the failover path."""
     from executor import crypto as ec
 
     original = {"definition": {"nodes": []}, "x": "acentuação"}
@@ -106,7 +107,7 @@ def test_payload_em_bytes_produz_o_mesmo_resultado_que_o_dict(chaves):
     assert ec.decrypt_job_payload(msg, chaves["executor_priv"]) == original
 
 
-# ── O contrato tambem tem de RECUSAR ─────────────────────────────────────────
+# ── The contract also has to REJECT ──────────────────────────────────────────
 
 def test_envelope_adulterado_invalida_a_assinatura(chaves):
     from executor import crypto as ec
@@ -137,7 +138,7 @@ def test_assinatura_de_outro_servidor_e_recusada(chaves):
 
 
 def test_chave_de_executor_errada_nao_decifra(chaves):
-    """Job endereçado a um executor nao pode ser aberto por outro."""
+    """A job addressed to one executor cannot be opened by another."""
     from executor import crypto as ec
 
     msg = _montar(chaves)

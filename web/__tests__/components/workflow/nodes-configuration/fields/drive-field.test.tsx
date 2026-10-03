@@ -3,17 +3,17 @@ import { render, screen, waitFor, cleanup } from "@testing-library/react"
 import DriveField from "@/app/components/workflow/nodes-configuration/fields/drive-field"
 import { INodesPropertyAPI } from "@/service/types"
 
-// O campo passou a consumir a listagem pelo GisFlowService (que envia
-// page/page_size — sem isso o seletor só via os 50 primeiros arquivos do
-// workspace). Mockamos o serviço, e não o axios: o módulo do serviço registra
-// interceptors no import e um axios mockado por baixo não os tem.
+// The field now consumes the listing through GisFlowService (which sends
+// page/page_size — without it the picker only saw the workspace's first 50
+// files). We mock the service, not axios: the service module registers
+// interceptors on import and a mocked axios underneath doesn't have them.
 vi.mock("@/service/GisFlowService", () => ({
   GisFlowService: { getDriveFiles: vi.fn() },
 }))
 import { GisFlowService } from "@/service/GisFlowService"
 const getDriveFiles = vi.mocked(GisFlowService.getDriveFiles)
 
-// Mock do WorkspaceContext
+// WorkspaceContext mock
 const mockWorkspace = { id_hash: "ws-001", name: "Test", description: null, owner_id: null, is_default: true, my_role: "owner" }
 vi.mock("@/context/WorkspaceContext", () => ({
   useWorkspace: () => ({ current: mockWorkspace, canEdit: true }),
@@ -72,7 +72,7 @@ describe("DriveField", () => {
       expect(getDriveFiles).toHaveBeenCalledWith(expect.objectContaining({ ext: ".geojson" }))
     })
 
-    // Simula troca de nó — agora as extensões são .csv
+    // Simulates a node change — now the extensions are .csv
     getDriveFiles.mockReturnValueOnce(resposta(csv))
 
     rerender(
@@ -96,19 +96,19 @@ describe("DriveField", () => {
       expect(getDriveFiles).toHaveBeenCalledTimes(1)
     })
 
-    // Rerender com mesma extensão — não deve fazer novo fetch
+    // Rerender with the same extension — must not make a new fetch
     rerender(
       <DriveField field={makeField({ drive_extensions: [".geojson"] })} setNodeField={vi.fn()} values={{ file_id: "f1" }} />
     )
 
-    // Aguarda para garantir que nenhum novo fetch aconteça
+    // Waits to make sure no new fetch happens
     await new Promise(r => setTimeout(r, 50))
     expect(getDriveFiles).toHaveBeenCalledTimes(1)
   })
 
   it("com várias extensões, filtra no servidor — uma chamada por extensão", async () => {
-    // O `ext` do backend aceita um valor só; filtrar no cliente sobre uma
-    // página cortada era o que escondia arquivos do usuário.
+    // The backend's `ext` accepts a single value; filtering on the client over a
+    // truncated page was what hid the user's files.
     getDriveFiles.mockReturnValueOnce(resposta(geojson)).mockReturnValueOnce(resposta(csv))
 
     render(
@@ -131,10 +131,10 @@ describe("DriveField", () => {
 
     render(<DriveField field={makeField()} setNodeField={vi.fn()} values={{}} />)
 
-    // O texto do estado vazio foi reescrito em 184e492 ("polish empty/loading
-    // states") e este teste ficou para trás — a suíte Vitest não roda na CI,
-    // então ninguém percebeu por ~3 meses. Casa com o trecho estável da frase,
-    // não com a redação inteira.
+    // The empty-state text was rewritten in 184e492 ("polish empty/loading
+    // states") and this test was left behind — the Vitest suite doesn't run in
+    // CI, so nobody noticed for ~3 months. It matches the stable part of the
+    // sentence, not the whole wording.
     await waitFor(() => {
       expect(screen.getByText(/nenhum arquivo no drive/i)).toBeInTheDocument()
     })

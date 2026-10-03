@@ -1,29 +1,31 @@
 # app/mcp/resolucao.py
 """
-Resolver "o que o cliente escreveu" para "o recurso que ele pode alcançar".
+Resolving "what the client wrote" into "the resource it is allowed to reach".
 
-Quem conversa com um servidor MCP escreve o nome que vê na tela ("Produção",
-"Recorte mensal"), não um identificador de 36 caracteres. Aceitar os dois é o
-que torna as tools utilizáveis; fazê-lo sem abrir buraco de autorização é o
-motivo deste módulo existir em vez de um `if` em cada tool.
+Whoever talks to an MCP server writes the name they see on screen ("Produção",
+"Recorte mensal"), not a 36-character identifier. Accepting both is what makes
+the tools usable; doing so without opening an authorization hole is the reason
+this module exists instead of an `if` in every tool.
 
-Três regras que valem para tudo aqui:
+Three rules that hold for everything here:
 
-1. **Ambiguidade é recusa, nunca escolha.** Dois workflows com o mesmo nome em
-   workspaces diferentes viram `ambiguous` com a lista de candidatos; adivinhar
-   "o primeiro" faria a tool agir sobre um recurso que ninguém apontou.
-2. **Não existe e não alcanço respondem igual.** Para um workflow, o id que não
-   existe e o id que existe no workspace de outra conta saem com o mesmo `code`
-   e a mesma frase: a diferença seria um oráculo de existência entre inquilinos,
-   e um cliente MCP tem o laço pronto para varrer identificadores. O núcleo
-   continua devolvendo 404 e 403 separados — é o que a REST usa —; a conversão
-   acontece aqui, na borda. A busca por nome chega ao mesmo lugar por outro
-   caminho: filtra pelo escopo ANTES de contar resultados.
-3. **O escopo do token corta antes do papel do usuário.** Um token emitido para
-   um workspace só não enxerga os outros nem quando o dono é administrador da
-   plataforma. Por isso a checagem de `escopo.workspace_ids` acontece sobre o
-   resultado da autorização de usuário, e não no lugar dela: as duas valem, e a
-   mais restritiva vence.
+1. **Ambiguity is refusal, never choice.** Two workflows with the same name in
+   different workspaces become `ambiguous` with the list of candidates;
+   guessing "the first one" would make the tool act on a resource nobody
+   pointed at.
+2. **Does not exist and cannot reach answer the same.** For a workflow, the id
+   that does not exist and the id that exists in another account's workspace
+   come out with the same `code` and the same sentence: the difference would be
+   an existence oracle between tenants, and an MCP client has the loop ready to
+   sweep identifiers. The core keeps returning separate 404 and 403 — that is
+   what REST uses —; the conversion happens here, at the edge. Lookup by name
+   reaches the same place by another path: it filters by scope BEFORE counting
+   results.
+3. **The token's scope cuts before the user's role.** A token issued for a
+   single workspace does not see the others even when its owner is a platform
+   administrator. That is why the `escopo.workspace_ids` check happens on top of
+   the result of user authorization, not in place of it: both apply, and the
+   more restrictive one wins.
 """
 from __future__ import annotations
 
@@ -47,11 +49,11 @@ from app.services.workflow_service import WorkflowService
 
 
 def e_uuid(valor) -> bool:
-    """True se o texto é um UUID — o formato dos `id_hash` do Atlans.
+    """True if the text is a UUID — the format of Atlans `id_hash` values.
 
-    Serve para decidir "isto é um id ou um nome?". Um nome que por acaso seja um
-    UUID válido é caso de laboratório; se acontecer, o valor é tratado como id,
-    que é a leitura mais previsível.
+    Used to decide "is this an id or a name?". A name that happens to be a
+    valid UUID is a lab case; if it happens, the value is treated as an id,
+    which is the most predictable reading.
     """
     try:
         uuid.UUID(str(valor))
@@ -60,12 +62,13 @@ def e_uuid(valor) -> bool:
     return True
 
 
-# A recusa de "não encontrado" de um workflow é UMA só, em texto e em código,
-# venha ela de um id que não existe, de um id que existe em workspace alheio ou
-# de um nome desconhecido. Dois textos diferentes para o mesmo `not_found`
-# reabririam pelo corpo da mensagem o oráculo que o código fechou: quem variasse
-# o id e lesse a frase saberia quais deles existem do outro lado do muro. A
-# mensagem também não ecoa a referência recebida, pelo mesmo motivo.
+# A workflow's "not found" refusal is a SINGLE one, in text and in code, whether
+# it comes from an id that does not exist, an id that exists in someone else's
+# workspace or an unknown name. Two different texts for the same `not_found`
+# would reopen through the message body the oracle that the code closed:
+# whoever varied the id and read the sentence would learn which ones exist on
+# the other side of the wall. The message also does not echo the reference
+# received, for the same reason.
 MSG_WORKFLOW_NAO_ENCONTRADO = "Nenhum workflow com esta referência está ao alcance do token."
 HINT_WORKFLOW_NAO_ENCONTRADO = "use list_workflows para ver o que este token alcança"
 
@@ -75,16 +78,17 @@ def _workflow_nao_encontrado():
 
 
 def _candidatos(linhas) -> list:
-    """Candidatos de um erro `ambiguous`: id no topo, nome higienizado."""
+    """Candidates for an `ambiguous` error: id at the top level, sanitized name."""
     return [{"id": id_hash, "name": scrub_text(str(nome or ""))} for id_hash, nome in linhas]
 
 
 async def resolver_workspace(db: AsyncSession, escopo: EscopoEfetivo, ref: str | None) -> str:
-    """O `id_hash` do workspace que a chamada indicou — id, nome ou omissão.
+    """The `id_hash` of the workspace the call indicated — id, name or omission.
 
-    Omitir é legítimo quando o token alcança um workspace só: pedir o parâmetro
-    nesse caso é burocracia. Com dois ou mais, a omissão vira `ambiguous` com a
-    lista — o cliente escolhe, o servidor não.
+    Omitting it is legitimate when the token reaches a single workspace: asking
+    for the parameter in that case is red tape. With two or more, the omission
+    becomes `ambiguous` with the list — the client chooses, the server does
+    not.
     """
     alcance = escopo.workspace_ids
     if not alcance:
@@ -128,10 +132,10 @@ async def resolver_workspace(db: AsyncSession, escopo: EscopoEfetivo, ref: str |
             candidates=_candidatos(achados),
         )
 
-    # Nada dentro do alcance. Um id é recusado como "proibido" sem consultar o
-    # banco: dizer "não existe" para um id de outro dono revelaria, pela
-    # diferença, quando ele existe. Um nome é "não encontrado" — nomes não
-    # identificam recurso de terceiro.
+    # Nothing within reach. An id is refused as "forbidden" without querying
+    # the database: saying "does not exist" for an id of another owner would
+    # reveal, by the difference, when it does exist. A name is "not found" —
+    # names do not identify a third party's resource.
     if e_uuid(referencia):
         raise erro(
             "forbidden",
@@ -157,14 +161,15 @@ async def _workspaces_do_escopo(db: AsyncSession, alcance) -> list:
 async def carregar_workflow(
     db: AsyncSession, escopo: EscopoEfetivo, ref: str, *, decifrar: bool = False
 ) -> Tuple[object, str]:
-    """`(workflow, papel)` a partir de um id ou de um nome.
+    """`(workflow, papel)` (workflow, role) from an id or a name.
 
-    `decifrar=False` é o default de propósito: quase toda tool lê metadados ou
-    devolve a definition redigida, e uma definition decifrada presa a uma linha
-    viva da sessão é exatamente o que um flush acidental grava em claro no banco.
+    `decifrar=False` is the default on purpose: almost every tool reads
+    metadata or returns the redacted definition, and a decrypted definition
+    tied to a live session row is exactly what an accidental flush writes in
+    plaintext to the database.
 
-    A checagem do escopo do token vem DEPOIS da autorização do usuário e é
-    independente dela: quem passa por uma pode ser barrado pela outra.
+    The token scope check comes AFTER user authorization and is independent of
+    it: whoever passes one may be stopped by the other.
     """
     referencia = str(ref).strip()
     servico = WorkflowService(db)
@@ -175,14 +180,15 @@ async def carregar_workflow(
                 servico, db, referencia, escopo.user_id, decifrar=decifrar
             )
         except HTTPException as exc:
-            # O núcleo responde em HTTP e separa os dois casos: 404 para o id que
-            # não existe, 403 para o id que existe num workspace de outra conta.
-            # Essa diferença é a resposta a uma pergunta que ninguém deveria
-            # poder fazer aqui — "este identificador existe?" —, e um cliente MCP
-            # tem justamente o laço para varrer ids. A REST mantém o 403 (é o
-            # mesmo módulo do núcleo, usado pelos routers); a conversão vale só
-            # nesta borda, e é para o MESMO `not_found` da busca por nome, texto
-            # incluído: um código igual com frase diferente continuaria contando.
+            # The core answers in HTTP and separates the two cases: 404 for the id
+            # that does not exist, 403 for the id that exists in another
+            # account's workspace. That difference is the answer to a question
+            # nobody should be able to ask here — "does this identifier
+            # exist?" —, and an MCP client has precisely the loop to sweep ids.
+            # REST keeps the 403 (it is the same core module, used by the
+            # routers); the conversion applies only at this edge, and it is to
+            # the SAME `not_found` as the name lookup, text included: an
+            # identical code with a different sentence would still tell.
             if exc.status_code in (403, 404):
                 raise _workflow_nao_encontrado() from exc
             raise to_tool_error(exc) from exc
@@ -198,8 +204,8 @@ async def carregar_workflow(
     )
     achados = list(resultado.scalars().all())
     if not achados:
-        # Inclui o caso "existe, mas fora do alcance": o filtro do escopo entra
-        # na consulta, então a resposta não distingue um do outro.
+        # Includes the "exists, but out of reach" case: the scope filter goes
+        # into the query, so the answer does not tell one from the other.
         raise _workflow_nao_encontrado()
     if len(achados) > 1:
         raise erro(
@@ -225,7 +231,7 @@ async def carregar_workflow(
 
 
 def _exigir_workspace_no_escopo(workspace_id: str | None, escopo: EscopoEfetivo) -> None:
-    """O alcance do TOKEN, conferido antes de qualquer leitura de papel."""
+    """The TOKEN's reach, checked before any role lookup."""
     if workspace_id in escopo.workspace_ids:
         return
     raise erro(

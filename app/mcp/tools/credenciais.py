@@ -1,5 +1,5 @@
 # app/mcp/tools/credenciais.py
-"""Tools de credenciais. As guardas de cada uma estão em app/mcp/guardas.py."""
+"""Credential tools. The guards for each one are in app/mcp/guardas.py."""
 from __future__ import annotations
 
 from mcp.server.mcpserver import Context
@@ -15,28 +15,29 @@ from app.services.credential_service import list_credential_metadata
 
 @ferramenta
 async def list_credentials(ctx: Context, workspace_id: str | None = None) -> dict:
-    """Lista as credenciais que o dono do token pode usar — só os metadados.
+    """Lists the credentials the token's owner can use — metadata only.
 
-    O campo `data` (onde moram senha, token e string de conexão) NUNCA sai daqui,
-    nem cifrado: o que uma definição precisa é o identificador, e é isso que se
-    entrega. Quem monta um fluxo referencia a credencial por `id`; o segredo
-    continua só no servidor, resolvido na hora da execução.
+    The `data` field (where password, token and connection string live) NEVER
+    leaves here, not even encrypted: what a definition needs is the identifier,
+    and that is what gets delivered. Whoever builds a workflow references the
+    credential by `id`; the secret stays only on the server, resolved at run
+    time.
 
-    O que aparece: as credenciais do próprio dono do token e as compartilhadas
-    com os workspaces que o token alcança. Uma credencial compartilhada com um
-    workspace fora do alcance do token não entra, mesmo que o dono a enxergue
-    pela aplicação — o token é a restrição mais estreita, e ela vence.
+    What appears: the token owner's own credentials and those shared with the
+    workspaces the token reaches. A credential shared with a workspace outside
+    the token's reach is not included, even if the owner sees it through the
+    application — the token is the narrower restriction, and it wins.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
 
     alcance = sorted(escopo.workspace_ids)
     if not alcance:
-        # Recusa cedo, com a mesma frase de `resolver_workspace`. Não é zelo
-        # redundante: `list_credential_metadata` entende `workspace_ids=None`
-        # como "sem filtro de workspace" e devolveria as credenciais do dono
-        # inteiras. Um token que não alcança workspace nenhum não pode ser o
-        # único a responder com dados.
+        # Refuse early, with the same sentence as `resolver_workspace`. It is
+        # not redundant zeal: `list_credential_metadata` understands
+        # `workspace_ids=None` as "no workspace filter" and would return all of
+        # the owner's credentials. A token that reaches no workspace cannot be
+        # the only one to answer with data.
         raise erro(
             "forbidden",
             "Este token não alcança nenhum workspace.",
@@ -50,18 +51,18 @@ async def list_credentials(ctx: Context, workspace_id: str | None = None) -> dic
             if workspace_id is not None
             else None
         )
-        # `owner_id` é obrigatório em toda chamada: sem ele o CRUD lista SEM
-        # filtro de escopo — todas as credenciais da instalação.
+        # `owner_id` is required on every call: without it the CRUD lists with
+        # NO scope filter — every credential in the installation.
         credenciais = await list_credential_metadata(
             db, owner_id=escopo.user_id, workspace_ids=alcance
         )
         brutas = [
             {
-                # O `id` que a definição leva em `credential_id` é a chave
-                # primária — a mesma que a tela grava e que o resolver procura
-                # (`Credential.id`). O `id_hash` é outro UUID, independente:
-                # entregá-lo aqui fazia toda credencial escolhida pelo
-                # assistente falhar na resolução.
+                # The `id` the definition carries in `credential_id` is the primary
+                # key — the same one the screen saves and the resolver looks up
+                # (`Credential.id`). The `id_hash` is another, independent
+                # UUID: handing it over here made every credential chosen by
+                # the assistant fail at resolution.
                 "id": str(c.id),
                 "type": c.type,
                 "owner_id": c.owner_id,
@@ -79,9 +80,10 @@ async def list_credentials(ctx: Context, workspace_id: str | None = None) -> dic
         ws = c["workspace_id"]
         if ws is not None and ws not in escopo.workspace_ids:
             continue
-        # Com um workspace pedido, ficam as compartilhadas com ele e as privadas
-        # do dono — estas valem em qualquer workspace, e omiti-las esconderia
-        # justamente a credencial que o fluxo vai usar.
+        # With a workspace requested, what remains are the ones shared with it
+        # and the owner's private ones — the latter apply in any workspace,
+        # and omitting them would hide precisely the credential the workflow
+        # is going to use.
         if alvo is not None and ws is not None and ws != alvo:
             continue
         itens.append(
@@ -105,7 +107,7 @@ async def list_credentials(ctx: Context, workspace_id: str | None = None) -> dic
 
 
 def registrar(server) -> None:
-    """Registra as tools deste domínio."""
+    """Registers this domain's tools."""
     server.tool(
         name="list_credentials",
         title="Listar credenciais",

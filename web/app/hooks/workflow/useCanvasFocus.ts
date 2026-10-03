@@ -4,24 +4,24 @@ import { INodeContext } from "@/context/useFlowContext"
 import { useCanvasViewStore } from "@/app/stores/canvasViewStore"
 import { FocusGraph, buildFocusGraph, collectPath } from "@/app/components/workflow/utils/graph-traversal"
 
-/** Atraso antes de realçar — evita piscar ao arrastar o cursor pelo canvas. */
+/** Delay before highlighting — avoids flicker when dragging the cursor across the canvas. */
 const ENTER_DELAY = 90
-/** Atraso antes de apagar — assimétrico de propósito: sair rápido demais faz o
- *  grafo piscar ao cruzar a borda entre dois cards vizinhos. */
+/** Delay before clearing — asymmetric on purpose: leaving too fast makes the
+ *  graph flicker when crossing the border between two neighboring cards. */
 const LEAVE_DELAY = 140
 
 /**
- * Realce de caminho: passar o mouse sobre um nó destaca tudo que o alimenta e
- * tudo que ele alimenta; clicar fixa o realce até clicar no canvas ou apertar
- * Escape. `F` liga/desliga o modo.
+ * Path highlight: hovering over a node highlights everything that feeds it and
+ * everything it feeds; clicking pins the highlight until a click on the canvas
+ * or pressing Escape. `F` toggles the mode.
  *
- * Chamado uma única vez no componente raiz do canvas — não por nó.
+ * Called only once in the canvas root component — not per node.
  *
- * PERF: os quatro handlers têm identidade estável para sempre. Eles são
- * repassados ao `<ReactFlow>`, e o `NodeRenderer` é `memo` recebendo-os como
- * props — um handler novo a cada render re-renderizaria TODOS os nós do canvas.
- * Por isso as arestas são lidas da store no momento do evento (via `getState()`)
- * em vez de por `useEdges()`: nada aqui entra na lista de dependências.
+ * PERF: the four handlers have a stable identity forever. They are passed to
+ * `<ReactFlow>`, and `NodeRenderer` is `memo` receiving them as props — a new
+ * handler on every render would re-render ALL nodes on the canvas. That is why
+ * edges are read from the store at event time (via `getState()`) instead of
+ * via `useEdges()`: nothing here enters the dependency list.
  */
 export function useCanvasFocus() {
 
@@ -43,8 +43,8 @@ export function useCanvasFocus() {
 
   const focus = useCallback((nodeId: string, origin: "hover" | "pin") => {
     const edges = store.getState().edges
-    // Memo por identidade do array: o grafo só é remontado quando a topologia
-    // muda de fato, não a cada hover.
+    // Memo by array identity: the graph is only rebuilt when the topology actually
+    // changes, not on every hover.
     if (graphCache.current?.source !== edges) {
       graphCache.current = { source: edges, graph: buildFocusGraph(edges) }
     }
@@ -56,9 +56,9 @@ export function useCanvasFocus() {
   const onNodeMouseEnter = useCallback<NodeMouseHandler<INodeContext>>((event, node) => {
     const { focusEnabled, focusOrigin } = useCanvasViewStore.getState()
     if (!focusEnabled) return
-    // O pin é deliberado — passar o mouse por cima não o substitui.
+    // The pin is deliberate — hovering over something does not replace it.
     if (focusOrigin === "pin") return
-    // Arrastando um nó ou puxando uma conexão: esmaecer o grafo atrapalha a mira.
+    // Dragging a node or pulling a connection: dimming the graph gets in the way of aiming.
     if (event.buttons !== 0) return
     if (store.getState().connection.inProgress) return
 
@@ -69,7 +69,7 @@ export function useCanvasFocus() {
     schedule(LEAVE_DELAY, () => useCanvasViewStore.getState().clearFocus("hover"))
   }, [schedule])
 
-  /** Composto com o handler de clique já existente do canvas — só alterna o pin. */
+  /** Composed with the canvas's existing click handler — it only toggles the pin. */
   const onNodeClick = useCallback<NodeMouseHandler<INodeContext>>((_, node) => {
     const { focusEnabled, focusNodeId, focusOrigin, clearFocus } = useCanvasViewStore.getState()
     if (!focusEnabled) return
@@ -85,8 +85,8 @@ export function useCanvasFocus() {
     useCanvasViewStore.getState().clearFocus("pin")
   }, [cancel])
 
-  // Escape solta o pin; F liga/desliga o modo. Mesma guarda de campos de texto
-  // usada pelos atalhos de undo/redo.
+  // Escape releases the pin; F toggles the mode. Same text-field guard used by
+  // the undo/redo shortcuts.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null
@@ -99,9 +99,9 @@ export function useCanvasFocus() {
         return
       }
 
-      // Sem `preventDefault`: uma letra solta fora de campo de texto não tem
-      // ação padrão para cancelar, e cancelá-la quebraria o typeahead de
-      // componentes como o Select do Radix.
+      // No `preventDefault`: a bare letter outside a text field has no default
+      // action to cancel, and canceling it would break the typeahead of
+      // components like Radix's Select.
       if (event.key === "f" || event.key === "F") {
         useCanvasViewStore.getState().toggleFocusEnabled()
       }

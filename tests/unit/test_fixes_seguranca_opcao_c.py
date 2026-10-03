@@ -1,11 +1,11 @@
-"""Regressão dos fixes de segurança aplicados na opção C da auditoria.
+"""Regression tests for the security fixes applied in option C of the audit.
 
-Cada teste falha SEM o fix correspondente:
- - item 10: WS de telemetria só para admin (require_role=ROLE_ADMIN);
- - item 13: cancel_run autoriza pelo workspace DO RUN, não do workflow;
- - item 18: handler 422 não ecoa o valor submetido pelo cliente (input/ctx).
+Each test fails WITHOUT the corresponding fix:
+ - item 10: telemetry WS for admins only (require_role=ROLE_ADMIN);
+ - item 13: cancel_run authorizes by the RUN's workspace, not the workflow's;
+ - item 18: the 422 handler does not echo the value submitted by the client (input/ctx).
 
-(O item 11 — idempotência cobrir 'cancelled' — tem sua regressão em
+(Item 11 — idempotency covering 'cancelled' — has its regression test in
  test_fix_ws_router.py::test_job_result_de_run_cancelado_e_ignorado.)
 """
 import json
@@ -23,7 +23,7 @@ from app.models.workspace import Workspace
 from app.models.workspace_member import WorkspaceMember
 
 
-# ── Item 18: 422 não vaza o input do cliente ────────────────────────────────
+# ── Item 18: 422 does not leak the client's input ───────────────────────────
 
 async def test_422_nao_ecoa_input_nem_ctx_do_cliente():
     from app.core.utils.error_handlers import validation_exception_handler
@@ -42,12 +42,12 @@ async def test_422_nao_ecoa_input_nem_ctx_do_cliente():
     body = json.loads(resp.body)
     detalhes = body["details"]
 
-    # O valor submetido NÃO pode voltar na resposta — nem em 'input', nem solto.
+    # The submitted value must NOT come back in the response — neither in 'input' nor loose.
     assert all("input" not in e for e in detalhes)
     assert all("ctx" not in e for e in detalhes)
     assert "senha-secreta-do-usuario" not in resp.body.decode()
 
-    # Mas o que o cliente precisa para corrigir continua lá.
+    # But what the client needs in order to fix it is still there.
     assert detalhes[0]["loc"] == ["body", "password"]
     assert detalhes[0]["msg"]
     assert detalhes[0]["type"] == "string_too_short"
@@ -62,7 +62,7 @@ async def test_telemetria_ws_exige_admin(monkeypatch):
 
     async def _auth(ws, *, scope=None, require_role=None):
         capturado["require_role"] = require_role
-        return None  # fecha a conexão e faz o handler retornar cedo
+        return None  # closes the connection and makes the handler return early
 
     monkeypatch.setattr(TR, "ws_authenticate", _auth)
 
@@ -74,14 +74,14 @@ async def test_telemetria_ws_exige_admin(monkeypatch):
     assert capturado["require_role"] == TR.ROLE_ADMIN
 
 
-# ── Item 13: cancel_run autoriza pelo workspace do RUN ──────────────────────
+# ── Item 13: cancel_run authorizes by the RUN's workspace ───────────────────
 
 @pytest_asyncio.fixture
 async def banco_do_cancelamento():
-    """Um workflow MOVIDO: o run aconteceu em ws-A, o workflow hoje é de ws-B.
+    """A MOVED workflow: the run happened in ws-A, the workflow now belongs to ws-B.
 
-    É a situação que separa os dois critérios de autorização — e, com banco de
-    verdade em vez de dublê, o teste exercita a query real de papel.
+    It is the situation that separates the two authorization criteria — and, with a
+    real database instead of a double, the test exercises the real role query.
     """
     eng = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
@@ -106,7 +106,7 @@ async def banco_do_cancelamento():
         db.add(WorkflowRun(
             task_id="run-1", workflow_hash="wf-1", workspace_id="ws-A", status="running",
         ))
-        # Operator no workspace ATUAL do workflow, nada no workspace do run.
+        # Operator in the workflow's CURRENT workspace, nothing in the run's workspace.
         db.add(WorkspaceMember(workspace_id="ws-B", user_id="u-1", role="operator"))
         await db.commit()
         yield db
@@ -114,10 +114,10 @@ async def banco_do_cancelamento():
 
 
 async def test_cancel_run_recusa_quem_so_tem_papel_no_workspace_atual(banco_do_cancelamento):
-    """Operator no workspace de HOJE não cancela execução que rodou em OUTRO.
+    """An operator in TODAY's workspace does not cancel a run that executed in ANOTHER.
 
-    Um workflow pode ser movido de A para B depois do disparo. Quem controla B
-    não deve poder cancelar uma execução que rodou — e consumiu recursos — em A.
+    A workflow can be moved from A to B after the trigger. Whoever controls B
+    must not be able to cancel a run that executed — and consumed resources — in A.
     """
     from app.services.workflow_execution_service import cancel_run
 
@@ -128,10 +128,10 @@ async def test_cancel_run_recusa_quem_so_tem_papel_no_workspace_atual(banco_do_c
 
 
 async def test_cancel_run_recusa_papel_insuficiente_no_workspace_do_run(banco_do_cancelamento):
-    """Ser membro do workspace do run não basta: o mínimo é `operator`.
+    """Being a member of the run's workspace is not enough: the minimum is `operator`.
 
-    Sem este caso, o 403 acima poderia vir de "não é membro" e a exigência de
-    PAPEL — que é o outro metade da regra — passaria sem cobertura.
+    Without this case, the 403 above could come from "not a member" and the ROLE
+    requirement — which is the other half of the rule — would go uncovered.
     """
     from app.services.workflow_execution_service import cancel_run
 
@@ -147,14 +147,14 @@ async def test_cancel_run_recusa_papel_insuficiente_no_workspace_do_run(banco_do
 
 
 async def test_cancel_run_aceita_quem_tem_papel_no_workspace_do_run(banco_do_cancelamento, monkeypatch):
-    """O outro lado: com o papel no workspace certo, o cancelamento anda.
+    """The other side: with the role in the right workspace, the cancellation proceeds.
 
-    Sem este par, o teste acima passaria com uma recusa que recusa todo mundo.
+    Without this pair, the test above would pass with a refusal that refuses everyone.
 
-    O run ganha `host` e o registro do executor é dublado de propósito: sem
-    isso o desfecho seria `already_finished` — o ramo "não tem executor
-    associado" —, e a asserção provaria apenas que ninguém levantou 403.
-    Assim ela prova que o cancelamento REALMENTE saiu depois da autorização.
+    The run gets a `host` and the executor registry is doubled on purpose: without
+    that the outcome would be `already_finished` — the "has no associated
+    executor" branch —, and the assertion would only prove that nobody raised 403.
+    This way it proves that the cancellation REALLY went out after authorization.
     """
     from app.services import workflow_execution_service as WES
 
@@ -182,13 +182,13 @@ async def test_cancel_run_aceita_quem_tem_papel_no_workspace_do_run(banco_do_can
 
 
 async def test_cancel_run_exige_user_id(banco_do_cancelamento):
-    """A assinatura é a guarda: esquecer o parâmetro quebra na chamada.
+    """The signature is the guard: forgetting the parameter breaks at the call.
 
-    Era o defeito — `cancel_run(db, run_id)` não tinha autorização nenhuma, e
-    qualquer chamador fora da rota atravessava tenant em silêncio.
+    That was the defect — `cancel_run(db, run_id)` had no authorization at all, and
+    any caller outside the route crossed tenants silently.
 
-    O `match` importa: sem ele, qualquer TypeError de qualquer origem (um dublê
-    mal montado, por exemplo) satisfaria o teste.
+    The `match` matters: without it, any TypeError from any source (a badly
+    built double, for example) would satisfy the test.
     """
     from app.services.workflow_execution_service import cancel_run
 
@@ -196,15 +196,15 @@ async def test_cancel_run_exige_user_id(banco_do_cancelamento):
         await cancel_run(banco_do_cancelamento, "run-1")
 
 
-# ── Item 13b: a rota passa a identidade certa para o serviço ────────────────
+# ── Item 13b: the route passes the right identity to the service ────────────
 
 async def test_rota_de_cancelamento_passa_o_usuario_e_o_atalho_de_admin(monkeypatch):
-    """A regra mora no serviço; a FIAÇÃO mora na rota, e é ela que regride.
+    """The rule lives in the service; the WIRING lives in the route, and that is what regresses.
 
-    Mover a autorização para o serviço deixou a rota sem nenhum teste: trocar
-    `como_admin=...` por `como_admin=True` — isto é, dispensar a autorização de
-    todo mundo — passava a suíte inteira. Este teste é o que torna essa troca
-    visível.
+    Moving authorization into the service left the route with no test at all: swapping
+    `como_admin=...` for `como_admin=True` — that is, waiving authorization for
+    everyone — passed the whole suite. This test is what makes that swap
+    visible.
     """
     from app.api.routers import workflows_router as WR
 
@@ -217,9 +217,9 @@ async def test_rota_de_cancelamento_passa_o_usuario_e_o_atalho_de_admin(monkeypa
     monkeypatch.setattr(
         "app.services.workflow_execution_service.cancel_run", _cancel,
     )
-    # A rota é decorada por @limiter.limit, que exige um Request real antes do
-    # corpo rodar. Desligar o limiter (revertido pelo monkeypatch) deixa chamar
-    # a coroutine direto com request=None, que o corpo não usa.
+    # The route is decorated with @limiter.limit, which requires a real Request before
+    # the body runs. Disabling the limiter (reverted by monkeypatch) lets us call
+    # the coroutine directly with request=None, which the body does not use.
     monkeypatch.setattr(WR.limiter, "enabled", False)
 
     class _Usuario:
@@ -232,7 +232,7 @@ async def test_rota_de_cancelamento_passa_o_usuario_e_o_atalho_de_admin(monkeypa
     )
     assert out == {"run_id": "run-1", "outcome": "requested"}
     assert recebido["user_id"] == "u-1"
-    assert recebido["como_admin"] is False       # não-admin NÃO pula a checagem
+    assert recebido["como_admin"] is False       # non-admin does NOT skip the check
 
     await WR.cancel_run(
         request=None, run_id="run-1", db=None, current_user=_Usuario(WR.ROLE_ADMIN),

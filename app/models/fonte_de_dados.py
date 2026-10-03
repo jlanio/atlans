@@ -1,32 +1,32 @@
 # app/models/fonte_de_dados.py
 """
-O catalogo de fontes pre-mapeadas: o que o assistente consulta ANTES de
-prospectar qualquer dado externo.
+The catalog of pre-mapped sources: what the assistant consults BEFORE
+prospecting any external data.
 
-Uma linha por fonte (hoje: uma camada de um WFS). Ela guarda tres coisas que
-custavam uma execucao inteira para descobrir:
+One row per source (today: one layer of a WFS). It stores three things that
+used to cost a whole run to find out:
 
-- **o que colar no no** (`propriedades`: url, typeName, sortBy...), ja
-  normalizado como o `WFSNode` normaliza;
-- **o que sai dela** (`esquema`: crs, bbox, geometria, colunas, contagem),
-  vindo do Vault, de um DescribeFeatureType ou de uma execucao — a origem fica
-  em `esquema.columns_source`;
-- **se ela responde** (`estado` + `verificada_em` + `ultimo_erro`), atualizado
-  por endpoint pelo laco de verificacao.
+- **what to paste into the node** (`propriedades`: url, typeName, sortBy...),
+  already normalized the way `WFSNode` normalizes it;
+- **what comes out of it** (`esquema`: crs, bbox, geometry, columns, count),
+  coming from the Vault, from a DescribeFeatureType or from a run — the origin
+  is recorded in `esquema.columns_source`;
+- **whether it responds** (`estado` + `verificada_em` + `ultimo_erro`),
+  updated per endpoint by the check loop.
 
-`workspace_id` nulo e fonte da PLATAFORMA (a semente de `catalogo/geoservicos/`
-e as registradas pelo admin), visivel a qualquer membro; preenchido e fonte de
-um workspace. `origem` diz quem a criou — `vault` (a pasta versionada),
-`aprendida` (uma execucao bem-sucedida) ou `manual` (uma pessoa ou o
-assistente por `register_source`) — e nunca e rebaixada: uma fonte do Vault
-que uma execucao usa continua `vault`.
+A null `workspace_id` is a PLATFORM source (the seed from `catalogo/geoservicos/`
+and the ones registered by the admin), visible to any member; filled in, it is
+a workspace source. `origem` says who created it — `vault` (the versioned
+folder), `aprendida` (a successful run) or `manual` (a person or the assistant
+via `register_source`) — and it is never downgraded: a Vault source that a run
+uses stays `vault`.
 
-`chave` e o sha256 de (workspace, tipo, url normalizada, type_name) e e a
-unica identidade da linha: e por ela que o upsert nao duplica e que a
-validacao confere um no em UMA consulta. `busca` e o texto normalizado (sem
-acento, minusculas) que a busca por `LIKE` varre — instituicao, grupo, titulo,
-type_name, host, descricao, temas e nomes de colunas —, recalculado a cada
-escrita pelo service, nunca a mao.
+`chave` is the sha256 of (workspace, type, normalized url, type_name) and is
+the row's only identity: it is what keeps the upsert from duplicating and lets
+validation check a node in ONE query. `busca` is the normalized text (no
+accents, lowercase) that the `LIKE` search scans — institution, group, title,
+type_name, host, description, themes and column names —, recomputed on every
+write by the service, never by hand.
 """
 from uuid import uuid4
 
@@ -51,8 +51,8 @@ class FonteDeDados(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     id_hash = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid4()))
-    # NULL = plataforma. Sem FK de proposito: a semente nasce antes de qualquer
-    # workspace e nao deve cair em cascata com ele.
+    # NULL = platform. No FK on purpose: the seed is born before any workspace
+    # and must not be cascade-deleted with it.
     workspace_id = Column(String(36), nullable=True)
     tipo = Column(String(16), nullable=False, server_default=text("'wfs'"))
     no = Column(String(64), nullable=False, server_default=text("'WFS'"))
@@ -62,12 +62,12 @@ class FonteDeDados(Base):
     propriedades = Column(JSON, nullable=False)
     instituicao = Column(String(120), nullable=True)
     grupo = Column(String(160), nullable=True)
-    # TEXT, e não VARCHAR(255): o título é escrito por gente, e o catálogo real
-    # tem 48 registros acima de 255 (indicadores do IBGE chegam a 276). Quando
-    # ele era limitado, a importação estourava no registro 6.779 e 75 % do
-    # catálogo — 19 mil camadas — nunca entrava. Qualquer limite fixo aqui é
-    # arbitrário; `descricao` e `dicas` já são TEXT pelo mesmo motivo, e não há
-    # índice sobre esta coluna.
+    # TEXT, not VARCHAR(255): the title is written by people, and the real
+    # catalog has 48 records above 255 (IBGE indicators reach 276). When it
+    # was limited, the import blew up at record 6,779 and 75 % of the catalog —
+    # 19 thousand layers — never got in. Any fixed limit here is arbitrary;
+    # `descricao` and `dicas` are already TEXT for the same reason, and there
+    # is no index on this column.
     titulo = Column(Text, nullable=True)
     descricao = Column(Text, nullable=True)
     temas = Column(JSON, nullable=True)
@@ -80,8 +80,8 @@ class FonteDeDados(Base):
     estado = Column(String(16), nullable=False, server_default=text("'nao_verificada'"))
     verificada_em = Column(DateTime, nullable=True)
     ultimo_erro = Column(Text, nullable=True)
-    # sha256 do registro parseado do Vault: reimportar a mesma pasta e uma
-    # consulta e zero escritas.
+    # sha256 of the record parsed from the Vault: reimporting the same folder is
+    # one query and zero writes.
     vault_hash = Column(String(64), nullable=True)
     usos = Column(Integer, nullable=False, server_default=text("0"))
     usada_em = Column(DateTime, nullable=True)

@@ -1,17 +1,17 @@
 // desktop/src/renderer/components/Logs.tsx
 //
-// Painel de log com filtro, busca e exportação.
+// Log panel with filter, search and export.
 //
-// As linhas vêm de duas origens que o store mistura de propósito, porque para
-// quem investiga um problema elas contam a mesma história em ordem:
+// The lines come from two sources that the store mixes on purpose, because for
+// someone investigating a problem they tell the same story in order:
 //
-//   estruturadas — eventos `{"t":"log"}` do canal NDJSON, com nível e alias
-//   brutas       — o stderr do processo (log humano formatado) e qualquer
-//                  `print()` de um nó de workflow
+//   structured — `{"t":"log"}` events from the NDJSON channel, with level and alias
+//   raw        — the process stderr (formatted human log) and any
+//                `print()` from a workflow node
 //
-// O nível só existe nas estruturadas. As brutas ficam marcadas como RAW em vez
-// de terem o nível adivinhado por regex sobre a mensagem — que é exatamente o
-// que apodreceu o app anterior.
+// The level only exists in the structured ones. The raw ones are marked as RAW
+// instead of having their level guessed by a regex over the message — which is
+// exactly what rotted the previous app.
 import {
   memo, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState,
 } from 'react'
@@ -26,14 +26,14 @@ import { cn } from '../lib/utils.js'
 const NIVEIS = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'RAW'] as const
 type Nivel = (typeof NIVEIS)[number]
 
-/** Cor do TEXTO da mensagem. Só onde a cor carrega significado. */
+/** Color of the message TEXT. Only where the color carries meaning. */
 const CORES: Record<string, string> = {
   ERROR: 'text-destructive',
   WARN: 'text-yellow-600 dark:text-yellow-500',
   RAW: 'text-muted-foreground',
 }
 
-/** Marcador do nível na filtragem — bolinha, para o chip não virar um bloco. */
+/** Level marker in the filter — a dot, so the chip does not become a block. */
 const PONTOS: Record<Nivel, string> = {
   ERROR: 'bg-destructive',
   WARN: 'bg-yellow-500',
@@ -42,7 +42,7 @@ const PONTOS: Record<Nivel, string> = {
   RAW: 'bg-muted-foreground/50',
 }
 
-/** Faixa de fundo da linha. Só ERROR e WARN — o resto seria zebra sem sentido. */
+/** Row background strip. Only ERROR and WARN — the rest would be pointless zebra. */
 const FUNDOS: Record<string, string> = {
   ERROR: 'bg-destructive/8',
   WARN: 'bg-yellow-500/8',
@@ -53,10 +53,10 @@ function hora(ts: number): string {
 }
 
 /**
- * Destaca o termo buscado dentro da mensagem.
+ * Highlights the searched term inside the message.
  *
- * Sem isto, buscar num log de mil linhas devolve trinta linhas parecidas e o
- * olho ainda precisa varrer cada uma atrás de onde deu match.
+ * Without this, searching a thousand-line log returns thirty similar lines and
+ * the eye still needs to scan each one for where the match is.
  */
 function Realce({ texto, termo }: { texto: string; termo: string }) {
   if (!termo) return <>{texto}</>
@@ -65,8 +65,8 @@ function Realce({ texto, termo }: { texto: string; termo: string }) {
   const alvo = texto.toLowerCase()
   const busca = termo.toLowerCase()
   let i = 0
-  // Varredura por índice em vez de regex: o termo é digitado pelo usuário e
-  // pode conter `(`, `[`, `\` — construir um regex com ele lançaria.
+  // Index scan instead of regex: the term is typed by the user and may contain
+  // `(`, `[`, `\` — building a regex with it would throw.
   for (;;) {
     const achou = alvo.indexOf(busca, i)
     if (achou === -1) break
@@ -86,28 +86,29 @@ function Realce({ texto, termo }: { texto: string; termo: string }) {
 }
 
 /**
- * Quantas linhas ficam no DOM de saída.
+ * How many lines stay in the output DOM.
  *
- * O buffer chega a 1000, e montar as 1000 custa caro em cada render — pior,
- * cada lote novo re-renderizava todas. Com a janela limitada e o `memo` abaixo,
- * um lote de 5 linhas monta 5 nós e deixa o resto intacto.
+ * The buffer reaches 1000, and mounting all 1000 is expensive on every render —
+ * worse, each new batch re-rendered all of them. With the bounded window and
+ * the `memo` below, a batch of 5 lines mounts 5 nodes and leaves the rest
+ * untouched.
  *
- * O número é generoso o bastante para rolar bastante antes de precisar do
- * botão "mostrar anteriores".
+ * The number is generous enough to scroll a good way before needing the
+ * "mostrar anteriores" (show earlier) button.
  */
 const JANELA = 400
 
 /**
- * Uma linha do log.
+ * One log line.
  *
- * `memo` + chave `seq` é o que faz a lista parar de se reconstruir inteira: o
- * objeto da linha nunca é mutado (o main o cria uma vez e o entrega num lote
- * só), então as props de uma linha antiga são idênticas entre renders e o React
- * pula o trabalho.
+ * `memo` + the `seq` key is what makes the list stop rebuilding itself
+ * entirely: the line object is never mutated (the main process creates it once
+ * and delivers it in a single batch), so the props of an old line are identical
+ * between renders and React skips the work.
  *
- * A chave é `seq`, e NÃO o índice: o buffer é aparado pelo início, e com índice
- * toda linha mudaria de chave a cada descarte — invalidando a memoização
- * exatamente quando ela mais importa, com o log cheio.
+ * The key is `seq`, and NOT the index: the buffer is trimmed from the start,
+ * and with the index every line would change key on each discard —
+ * invalidating the memoization exactly when it matters most, with the log full.
  */
 const LinhaDeLog = memo(function LinhaDeLog({
   linha, termo,
@@ -118,8 +119,8 @@ const LinhaDeLog = memo(function LinhaDeLog({
   return (
     <div className={cn('flex gap-3 px-3 py-0.5 hover:bg-muted/40', FUNDOS[linha.level])}>
       <span className="shrink-0 text-muted-foreground/70 tabular-nums">{hora(linha.ts)}</span>
-      {/* Largura fixa para as mensagens ficarem numa coluna só: com largura
-          automática, cada alias diferente desalinhava tudo. */}
+      {/* Fixed width so the messages stay in a single column: with automatic
+          width, each different alias misaligned everything. */}
       <span className="w-12 shrink-0 truncate text-muted-foreground" title={linha.alias}>
         {linha.alias}
       </span>
@@ -131,28 +132,29 @@ const LinhaDeLog = memo(function LinhaDeLog({
 })
 
 /**
- * Painel de log.
+ * Log panel.
  *
- * Vive SEMPRE em janela própria, aberta pelo botão da barra de rodapé — ler log
- * é quase sempre comparar com outra coisa, e uma aba obriga a escolher entre as
- * duas. Por isso não há mais o modo "embutido" nem o botão de destacar: a tela
- * ocupa a janela inteira, que é a única forma em que ela existe.
+ * ALWAYS lives in its own window, opened by the button in the footer bar —
+ * reading a log is almost always comparing it with something else, and a tab
+ * forces you to choose between the two. That is why there is no longer an
+ * "embedded" mode nor the pop-out button: the screen fills the whole window,
+ * which is the only form in which it exists.
  */
 export function Logs({ linhas, pastaDeLogs }: {
   linhas: LinhaVisivel[]
-  /** Pasta dos arquivos de log — habilita o atalho no rodapé. */
+  /** Folder of the log files — enables the shortcut in the footer. */
   pastaDeLogs?: string
 }) {
   const [busca, setBusca] = useState('')
   const [ocultos, setOcultos] = useState<Set<Nivel>>(new Set())
   const [exportado, setExportado] = useState<string | null>(null)
   const areaRef = useRef<HTMLDivElement>(null)
-  // Rolagem automática só enquanto o usuário está no fim. Rolar sempre
-  // arrancaria a tela de quem subiu para ler uma linha antiga — e linha nova
-  // chega a cada segundo.
+  // Auto-scroll only while the user is at the end. Always scrolling would yank
+  // the screen away from someone who scrolled up to read an old line — and a
+  // new line arrives every second.
   const [seguindo, setSeguindo] = useState(true)
   const [limite, setLimite] = useState(JANELA)
-  // Posição guardada antes de crescer a janela — ver `mostrarAnteriores`.
+  // Position saved before growing the window — see `mostrarAnteriores`.
   const ancora = useRef<{ altura: number; topo: number } | null>(null)
 
   const contagem = useMemo(() => {
@@ -162,38 +164,39 @@ export function Logs({ linhas, pastaDeLogs }: {
   }, [linhas])
 
   /**
-   * O termo que o FILTRO usa — atrasado de propósito.
+   * The term the FILTER uses — deferred on purpose.
    *
-   * `busca` pinta a letra na tela; `termo` só alcança um render depois, e é ele
-   * que refiltra o buffer e remonta a lista. Sem essa separação, cada tecla
-   * fazia as duas coisas na mesma renderização e a letra só aparecia depois do
-   * filtro terminar.
+   * `busca` paints the letter on the screen; `termo` only catches up one render
+   * later, and it is what refilters the buffer and rebuilds the list. Without
+   * this separation, each keystroke did both things in the same render and the
+   * letter only appeared after the filter finished.
    */
   const termo = useDeferredValue(busca.trim().toLowerCase())
 
   const visiveis = useMemo(() => (
-    // `l.busca` já vem em minúsculas (ver useLog.ts): antes eram duas alocações
-    // de string por linha, 2000 por tecla digitada.
+    // `l.busca` already comes lowercased (see useLog.ts): before, it was two string
+    // allocations per line, 2000 per keystroke.
     linhas.filter((l) => {
       if (ocultos.has(l.level as Nivel)) return false
       return !termo || l.busca.includes(termo)
     })
   ), [linhas, termo, ocultos])
 
-  // O recorte que vai ao DOM. Memoizado para o efeito de rolagem ter uma
-  // dependência estável: solto, o `slice` devolvia um array novo a cada render
-  // e o efeito forçava layout mesmo quando a lista não tinha mudado.
+  // The slice that goes to the DOM. Memoized so the scroll effect has a stable
+  // dependency: loose, the `slice` returned a new array on every render and the
+  // effect forced layout even when the list had not changed.
   const recorte = useMemo(
     () => (visiveis.length > limite ? visiveis.slice(-limite) : visiveis),
     [visiveis, limite],
   )
 
   /**
-   * Cresce a janela renderizada, sem mover o que a pessoa está lendo.
+   * Grows the rendered window, without moving what the person is reading.
    *
-   * As linhas entram ACIMA da posição atual, o que empurra todo o conteúdo para
-   * baixo. Sem compensar, clicar em "mostrar anteriores" faz a tela saltar e a
-   * linha que se estava lendo desaparece — o oposto do que o botão promete.
+   * The lines come in ABOVE the current position, which pushes all the content
+   * down. Without compensating, clicking "mostrar anteriores" (show earlier)
+   * makes the screen jump and the line being read disappears — the opposite of
+   * what the button promises.
    */
   function mostrarAnteriores() {
     const el = areaRef.current
@@ -201,19 +204,19 @@ export function Logs({ linhas, pastaDeLogs }: {
     setLimite((n) => n + JANELA)
   }
 
-  // `useLayoutEffect` e não `useEffect`: rolar depois da pintura produz um
-  // salto visível a cada linha nova.
+  // `useLayoutEffect` and not `useEffect`: scrolling after paint produces a
+  // visible jump on every new line.
   //
-  // COM lista de dependências: sem ela o efeito rodava depois de TODA
-  // renderização — inclusive as que só mudaram o texto do campo de busca — e
-  // cada passada lia `scrollHeight`, que força o layout na hora.
+  // WITH a dependency list: without it the effect ran after EVERY render —
+  // including those that only changed the search field text — and each pass
+  // read `scrollHeight`, which forces layout on the spot.
   useLayoutEffect(() => {
     const el = areaRef.current
     if (!el) return
 
     if (ancora.current) {
-      // Restaura pela DIFERENÇA de altura: é exatamente o quanto o conteúdo
-      // desceu ao ganhar linhas no topo.
+      // Restores by the height DIFFERENCE: it is exactly how much the content
+      // moved down when gaining lines at the top.
       el.scrollTop = ancora.current.topo + (el.scrollHeight - ancora.current.altura)
       ancora.current = null
       return
@@ -221,19 +224,19 @@ export function Logs({ linhas, pastaDeLogs }: {
     if (seguindo) el.scrollTop = el.scrollHeight
   }, [recorte, seguindo])
 
-  // Um filtro novo muda o conteúdo inteiro; voltar ao fim é o que o usuário
-  // espera de "aplicar filtro". A janela volta ao tamanho padrão junto: o
-  // recorte anterior era sobre outro conjunto de linhas.
+  // A new filter changes the whole content; going back to the end is what the
+  // user expects from "apply filter". The window goes back to the default size
+  // along with it: the previous slice was over another set of lines.
   //
-  // Depende de `termo`, e não de `busca`: é a filtragem que muda o conteúdo, e
-  // ela chega um render depois da tecla.
+  // Depends on `termo`, not `busca`: it is the filtering that changes the
+  // content, and it arrives one render after the keystroke.
   useEffect(() => { setSeguindo(true); setLimite(JANELA) }, [termo, ocultos])
 
   function aoRolar() {
     const el = areaRef.current
     if (!el) return
-    // 24px de tolerância: exigir o fim exato faz a rolagem por roda, que anda
-    // em passos, desligar o acompanhamento sem o usuário ter pedido.
+    // 24px of tolerance: requiring the exact end makes wheel scrolling, which
+    // moves in steps, turn off follow mode without the user having asked.
     setSeguindo(el.scrollHeight - el.scrollTop - el.clientHeight < 24)
   }
 
@@ -245,8 +248,8 @@ export function Logs({ linhas, pastaDeLogs }: {
   }
 
   async function exportar() {
-    // Exporta o que está VISÍVEL, não tudo: quem filtrou para isolar um
-    // problema quer mandar aquilo, não 1000 linhas de ruído em volta.
+    // Exports what is VISIBLE, not everything: someone who filtered to isolate a
+    // problem wants to send that, not 1000 lines of noise around it.
     const texto = visiveis
       .map((l) => `${hora(l.ts)} ${l.level.padEnd(5)} ${l.alias.padEnd(6)} ${l.msg}`)
       .join('\n')
@@ -258,7 +261,7 @@ export function Logs({ linhas, pastaDeLogs }: {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      {/* ── Barra de ferramentas ────────────────────────────────────── */}
+      {/* ── Toolbar ─────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex h-9 min-w-56 flex-1 items-center">
           <TbSearch size={15} className="pointer-events-none absolute left-3 text-muted-foreground" />
@@ -284,8 +287,8 @@ export function Logs({ linhas, pastaDeLogs }: {
         </Button>
       </div>
 
-      {/* Chips de nível numa linha própria: junto da busca eles quebravam para
-          a linha de baixo em janela estreita e o alinhamento desmontava. */}
+      {/* Level chips on a row of their own: next to the search they wrapped
+          to the line below in a narrow window and the alignment fell apart. */}
       <div className="flex flex-wrap items-center gap-1.5">
         {NIVEIS.map((n) => {
           const escondido = ocultos.has(n)
@@ -334,7 +337,7 @@ export function Logs({ linhas, pastaDeLogs }: {
         </p>
       )}
 
-      {/* ── Área de log ─────────────────────────────────────────────── */}
+      {/* ── Log area ────────────────────────────────────────────────── */}
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card">
         {visiveis.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
@@ -351,7 +354,7 @@ export function Logs({ linhas, pastaDeLogs }: {
           <div
             ref={areaRef}
             onScroll={aoRolar}
-            // `log` traz a tipografia do painel — ver a regra em index.css.
+            // `log` brings the panel typography — see the rule in index.css.
             className="log flex min-h-0 flex-1 flex-col overflow-y-auto py-1.5 font-mono select-text"
           >
             {visiveis.length > limite && (
@@ -370,8 +373,8 @@ export function Logs({ linhas, pastaDeLogs }: {
           </div>
         )}
 
-        {/* Flutua SOBRE a área, e não abaixo dela: o botão só existe quando o
-            usuário rolou para cima, e é ali que o olho dele está. */}
+        {/* Floats OVER the area, not below it: the button only exists when the
+            user has scrolled up, and that is where their eye is. */}
         {!seguindo && visiveis.length > 0 && (
           <button
             type="button"
@@ -383,10 +386,10 @@ export function Logs({ linhas, pastaDeLogs }: {
         )}
       </div>
 
-      {/* Rodapé discreto: quantas linhas há aqui, e onde está o resto.
-          A menção anterior mandava procurar "em Ajustes" — que agora é OUTRA
-          janela. Mandar alguém trocar de janela para achar um caminho, quando
-          o botão cabe aqui, é instrução no lugar de ação. */}
+      {/* Discreet footer: how many lines are here, and where the rest is.
+          The previous mention said to look "em Ajustes" (in Settings) — which
+          is now ANOTHER window. Sending someone to switch windows to find a
+          path, when the button fits here, is instruction in place of action. */}
       <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
         <span>
           {visiveis.length === linhas.length

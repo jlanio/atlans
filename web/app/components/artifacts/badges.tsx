@@ -10,22 +10,22 @@ import { formatLocal, fromBackend, dayjs } from "@/lib/dayjs"
 import { plural } from "@/lib/formatos"
 
 /**
- * Selos e dicas dos artefatos, extraídos da página para caber no contrato de
- * telas. Regra dura de §6: formato NÃO é status, então nada de emerald/blue/
- * orange/purple literais aqui — o ícone distingue os formatos, o token neutro
- * pinta todos igual. Só os estados de portal (§6 permite os pares de status com
- * dark) e a retenção iminente (vermelho/âmbar de aviso) ganham cor.
+ * Artifact badges and hints, extracted from the page to fit the screen
+ * contract. Hard rule from §6: format is NOT status, so no literal emerald/blue/
+ * orange/purple here — the icon tells the formats apart, the neutral token
+ * paints them all the same. Only the portal states (§6 allows the status pairs
+ * with dark) and imminent retention (warning red/amber) get color.
  */
 
-// Só o ÍCONE varia por formato — a cor é sempre neutra. Antes cada formato
-// tinha uma cor própria (emerald/blue/orange/purple), o que fazia o formato
-// competir visualmente com o status de verdade das linhas.
+// Only the ICON varies by format — the color is always neutral. Before, each
+// format had its own color (emerald/blue/orange/purple), which made the format
+// compete visually with the rows' real status.
 const FORMAT_ICONS: Record<string, React.ElementType> = {
   geojson:    TbMapPin,
   json:       TbFileCode,
   shapefile:  TbFileTypeZip,
   geoparquet: TbDatabase,
-  // A carta imagem (nó CartaImagem): um arquivo para baixar, não uma camada.
+  // The image map (CartaImagem node): a file to download, not a layer.
   png:        TbPhoto,
   jpg:        TbPhoto,
   jpeg:       TbPhoto,
@@ -43,7 +43,7 @@ export function FormatBadge({ format }: { format: string | null }) {
   )
 }
 
-/** Portal servindo esta camada agora: sucesso (par verde sancionado + dark). */
+/** Portal serving this layer now: success (sanctioned green pair + dark). */
 export function PortalAtivoBadge() {
   return (
     <span className="flex items-center gap-0.5 rounded-full border border-green-500/20 bg-green-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-green-700 dark:bg-green-500/15 dark:text-green-400">
@@ -52,7 +52,7 @@ export function PortalAtivoBadge() {
   )
 }
 
-/** Publicação superada por outra: neutro, não é falha nem sucesso. */
+/** Publication superseded by another: neutral, neither failure nor success. */
 export function PortalAnteriorBadge() {
   return (
     <span className="flex items-center gap-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">
@@ -61,7 +61,7 @@ export function PortalAnteriorBadge() {
   )
 }
 
-/** Output fixado no cache: aviso âmbar (par sancionado + dark). */
+/** Output pinned in the cache: amber notice (sanctioned pair + dark). */
 export function CachePinBadge() {
   return (
     <span
@@ -74,9 +74,9 @@ export function CachePinBadge() {
 }
 
 /**
- * As frases da dica de retenção. O padrão é o português de sempre; a Home, que
- * fala três idiomas, passa as do idioma dela (a tabela de Artefatos não passa
- * nada e continua igual).
+ * The sentences of the retention hint. The default is the usual Portuguese; the
+ * Home, which speaks three languages, passes those of its language (the Artifacts
+ * table passes nothing and stays the same).
  */
 export interface TextosDaRetencao {
   expirado: string
@@ -90,16 +90,16 @@ export interface TextosDaRetencao {
 export const RETENCAO_EM_PORTUGUES: TextosDaRetencao = {
   expirado: "expirado",
   expiraHoje: "expira hoje",
-  // `plural` cobre o "1 dia"/"2 dias" pt-BR com o mesmo formatador de milhar
-  // das demais telas.
+  // `plural` covers the pt-BR "1 dia"/"2 dias" with the same thousands formatter
+  // as the other screens.
   expiraEm: (dias) => `expira em ${plural(dias, "dia")}`,
   removidoEm: (expiresAt) => `Removido automaticamente em ${formatLocal(expiresAt)}`,
 }
 
-// Retenção: quando o artefato será removido pela limpeza automática
-// (`artifact_cleanup` purga por `expires_at`). `null` = sem expiração — não
-// renderiza nada, a ausência já diz "permanente". Aproxima o vermelho/âmbar do
-// vencimento para o usuário não ser pego de surpresa por um artefato que some.
+// Retention: when the artifact will be removed by the automatic cleanup
+// (`artifact_cleanup` purges by `expires_at`). `null` = no expiration — renders
+// nothing, the absence already says "permanent". Brings the red/amber closer as
+// expiry approaches so the user is not caught off guard by an artifact that vanishes.
 function infoRetencao(
   expiresAt: string | null,
   textos: TextosDaRetencao,

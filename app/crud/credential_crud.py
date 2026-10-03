@@ -1,5 +1,5 @@
 # app/crud/credential_crud.py
-"""Operações de acesso a dados para Credential — sem lógica de negócio."""
+"""Data access operations for Credential — no business logic."""
 from uuid import UUID
 
 from sqlalchemy import or_, select
@@ -22,13 +22,13 @@ class CredentialCRUD:
         type: str | None = None,
         workspace_ids: list[str] | None = None,
     ) -> list[Credential]:
-        """Lista credenciais visíveis: as do dono UNIÃO as compartilhadas com
-        seus workspaces.
+        """Lists visible credentials: the owner's UNION those shared with
+        their workspaces.
 
-        `owner_id` e `workspace_ids` combinam por OR — uma credencial aparece se
-        pertence ao usuário OU tem workspace_id em um workspace dele. Sem nenhum
-        dos dois, mantém o comportamento antigo (sem filtro de escopo); por isso
-        o router SEMPRE passa owner_id, para nunca listar aberto.
+        `owner_id` and `workspace_ids` combine with OR — a credential shows up
+        if it belongs to the user OR has a workspace_id in one of their
+        workspaces. With neither, keeps the old behavior (no scope filter);
+        that is why the router ALWAYS passes owner_id, so it never lists openly.
         """
         stmt = select(Credential)
         escopo = []

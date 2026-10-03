@@ -1,8 +1,8 @@
 # .github/workflows/executor-docker.yml
-# Build da imagem Docker do executor Atlans e upload como asset na Release.
+# Build of the Atlans executor Docker image and upload as a Release asset.
 #
-# Trigger: push de tag executor/v* (ex: executor/v1.0.0)
-# Saída:   GitHub Release com atlans-executor-docker-amd64.tar.gz nos assets.
+# Trigger: push of an executor/v* tag (e.g.: executor/v1.0.0)
+# Output:  GitHub Release with atlans-executor-docker-amd64.tar.gz in the assets.
 
 name: Executor Docker — Build & Release
 
@@ -27,14 +27,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
-      # ── Extrair versão da tag ──────────────────────────────────────────
-      # Antes do build: a imagem declara a versão da tag (+ o commit), a mesma
-      # do nome da release.
+      # ── Extract version from the tag ───────────────────────────────────
+      # Before the build: the image declares the tag's version (+ the commit), the
+      # same as the release name.
       - name: Extract version from tag
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/executor/}" >> $GITHUB_OUTPUT
 
-      # ── Build da imagem ────────────────────────────────────────────────
+      # ── Image build ────────────────────────────────────────────────────
       - name: Build executor image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
@@ -43,21 +43,21 @@ jobs:
           push: false
           load: true
           tags: atlans-executor:latest
-          # Versão que o painel mostra (executor/versao.py): a da tag + o commit.
+          # Version the dashboard shows (executor/versao.py): the tag's + the commit.
           build-args: |
             EXECUTOR_COMMIT=${{ github.sha }}
             EXECUTOR_BASE=${{ steps.version.outputs.VERSION }}
           cache-from: type=gha,scope=executor
           cache-to: type=gha,scope=executor,mode=max
 
-      # ── Exportar como .tar.gz ──────────────────────────────────────────
+      # ── Export as .tar.gz ──────────────────────────────────────────────
       - name: Export image to tar.gz
         run: |
           docker save atlans-executor:latest | gzip > /tmp/atlans-executor-docker-amd64.tar.gz
           echo "SIZE=$(du -h /tmp/atlans-executor-docker-amd64.tar.gz | cut -f1)" >> $GITHUB_ENV
           echo "Imagem exportada: $(du -h /tmp/atlans-executor-docker-amd64.tar.gz | cut -f1)"
 
-      # ── Criar Release com asset ────────────────────────────────────────
+      # ── Create Release with asset ──────────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
@@ -120,7 +120,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── Upload como artifact (backup) ──────────────────────────────────
+      # ── Upload as artifact (backup) ────────────────────────────────────
       - name: Upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

@@ -1,14 +1,15 @@
 /**
- * Aplicar a proposta do painel no canvas.
+ * Applying the panel's proposal to the canvas.
  *
- * O que estes testes protegem é uma coisa só, e é a que estraga o trabalho de
- * alguém: a definição proposta NÃO TEM POSIÇÃO. Sem a preservação, `buildNodes`
- * cai no default `{x: 180 * indice, y: 0}` e o clique em Aplicar enfileira doze
- * cards numa linha horizontal, apagando o desenho que a pessoa arrumou à mão.
+ * What these tests protect is a single thing, and it's the one that ruins
+ * someone's work: the proposed definition HAS NO POSITION. Without preservation,
+ * `buildNodes` falls back to the default `{x: 180 * indice, y: 0}` and clicking
+ * Apply lines up twelve cards in a horizontal row, erasing the layout the person
+ * arranged by hand.
  *
- * Por isso a asserção central não é "aplicou": é que os nós que sobreviveram
- * continuam EXATAMENTE onde estavam, e que o nó novo não pousa em cima de
- * nenhum deles.
+ * That's why the central assertion isn't "it applied": it's that the nodes that
+ * survived stay EXACTLY where they were, and that the new node doesn't land on
+ * top of any of them.
  */
 import { describe, it, expect } from "vitest"
 
@@ -31,8 +32,8 @@ const catalogo = [
     alias: "Buffer",
     description: "Aplica buffer",
     type: "action",
-    // Duas propriedades de propósito: com uma só, inverter a ordem das chaves
-    // não inverte nada e o teste de ordem passaria sem morder.
+    // Two properties on purpose: with only one, reversing the key order
+    // reverses nothing and the order test would pass without biting.
     properties: [
       { name: "distance", label: "Distância", type: "string", default: "" },
       { name: "unit", label: "Unidade", type: "string", default: "m" },
@@ -57,7 +58,7 @@ const catalogo = [
   },
 ] as unknown as INodesAPI[]
 
-/** O canvas de quem já trabalhou no fluxo: três cards arrumados à mão. */
+/** The canvas of someone who has already worked on the workflow: three cards arranged by hand. */
 const ARRUMADO = {
   nodes: [
     { id: "a", name: "DriveFile", properties: { file_id: "mun.shp" }, position: { x: 120, y: 480 }, type: "trigger" },
@@ -70,7 +71,7 @@ const ARRUMADO = {
   ],
 } as unknown as CanvasDefinition
 
-/** A proposta do assistente: sem posição nenhuma, como ela chega de verdade. */
+/** The assistant's proposal: no position at all, as it really arrives. */
 const PROPOSTA = {
   nodes: [
     { id: "a", name: "DriveFile", properties: { file_id: "mun.shp" } },
@@ -98,13 +99,13 @@ describe("aplicarProposta", () => {
     const atuais = noCanvas()
     const { nodes } = aplicarProposta(PROPOSTA, catalogo, atuais)
 
-    // A asserção que importa: os três cards não se mexeram um pixel.
+    // The assertion that matters: the three cards didn't move a pixel.
     expect(acharNo(nodes, "a").position).toEqual({ x: 120, y: 480 })
     expect(acharNo(nodes, "b").position).toEqual({ x: 700, y: 96 })
     expect(acharNo(nodes, "c").position).toEqual({ x: 1240, y: 820 })
 
-    // E o novo NÃO nasceu na fila horizontal do default do `buildNodes`
-    // (`d` é o índice 3 → x = 540, y = 0).
+    // And the new one was NOT born in the horizontal row of `buildNodes`'s
+    // default (`d` is index 3 → x = 540, y = 0).
     const novo = acharNo(nodes, "d").position
     expect(novo).not.toEqual({ x: 540, y: 0 })
     expect(Number.isFinite(novo.x) && Number.isFinite(novo.y)).toBe(true)
@@ -116,23 +117,23 @@ describe("aplicarProposta", () => {
   })
 
   it("nó novo não pousa em cima de um card preservado", () => {
-    // Primeiro descobrimos onde o layout quer pôr o `d`, com os preservados
-    // longe demais para atrapalhar.
+    // First we find out where the layout wants to put `d`, with the preserved
+    // ones too far away to get in the way.
     const longe = noCanvas().map(no => ({ ...no, position: { x: 4000, y: 4000 } }))
     const alvo = acharNo(aplicarProposta(PROPOSTA, catalogo, longe).nodes, "d").position
 
-    // Agora um card preservado está EXATAMENTE nesse ponto.
+    // Now a preserved card is EXACTLY at that point.
     const emCima = noCanvas().map(no => (no.id === "a" ? { ...no, position: { ...alvo } } : no))
     const { nodes } = aplicarProposta(PROPOSTA, catalogo, emCima)
 
-    // O preservado manda: quem desce é o novo.
+    // The preserved one wins: the new one is the one that moves down.
     expect(acharNo(nodes, "a").position).toEqual(alvo)
     expect(acharNo(nodes, "d").position.y).toBeGreaterThan(alvo.y)
   })
 
   it("conta o que vai acontecer: novos, alterados e removidos", () => {
-    // É a contagem que o cartão mostra ANTES do clique. Aplicar com o canvas
-    // cheio é destrutivo por decisão, então o número precisa estar certo.
+    // It's the count the card shows BEFORE the click. Applying with a full
+    // canvas is destructive by decision, so the number has to be right.
     const { resumo } = aplicarProposta(PROPOSTA, catalogo, noCanvas())
     expect(resumo).toEqual({ novos: 1, alterados: 1, removidos: 0 })
   })
@@ -148,9 +149,9 @@ describe("aplicarProposta", () => {
   })
 
   it("ordem das chaves de `properties` não é alteração", () => {
-    // O editor monta `properties` pela ordem do catálogo; o drawer copia o
-    // objeto do catálogo inteiro. Ordem diferente não é mudança nenhuma, e
-    // contar como tal faria o cartão anunciar alteração em nó que ninguém tocou.
+    // The editor builds `properties` in catalog order; the drawer copies the
+    // whole catalog object. A different order is no change at all, and
+    // counting it as one would make the card announce a change on a node nobody touched.
     const atuais = noCanvas().map(no => ({
       ...no,
       data: { ...no.data, properties: Object.fromEntries(Object.entries(no.data.properties).reverse()) },
@@ -175,8 +176,8 @@ describe("aplicarProposta", () => {
   })
 
   it("sem catálogo, avisa em vez de esvaziar o canvas", () => {
-    // `buildNodes` sem catálogo devolve []. Aplicar nesse instante APAGARIA o
-    // fluxo inteiro, em silêncio — o pior desfecho possível deste botão.
+    // `buildNodes` without a catalog returns []. Applying at that moment WOULD
+    // ERASE the whole workflow, silently — the worst possible outcome for this button.
     const semCatalogo = aplicarProposta(PROPOSTA, [], noCanvas())
     expect(semCatalogo.catalogoPronto).toBe(false)
     expect(semCatalogo.nodes).toEqual([])
@@ -192,23 +193,23 @@ describe("aplicarProposta", () => {
   })
 
   it("só quem chegou AGORA entra na animação", () => {
-    // O assistente desenha a cada passo, e cada desenho manda a definição
-    // INTEIRA. Sem a lista de quem é novo, o canvas animaria o fluxo todo a
-    // cada nó acrescentado — um piscar completo doze vezes seguidas, que é o
-    // oposto de acompanhar a montagem.
+    // The assistant draws at every step, and each drawing sends the WHOLE
+    // definition. Without the list of what's new, the canvas would animate the
+    // whole workflow on every added node — a full flicker twelve times in a
+    // row, which is the opposite of following the build.
     const jaNaTela = aplicarProposta(PROPOSTA, catalogo, []).nodes
     const idJaNaTela = jaNaTela[0].id
 
-    // O mesmo fluxo, de novo: nada mudou, então nada é novo.
+    // The same workflow, again: nothing changed, so nothing is new.
     const denovo = aplicarProposta(PROPOSTA, catalogo, jaNaTela)
     expect(denovo.idsNovos.size).toBe(0)
     expect(denovo.idsArestasNovas.size).toBe(0)
 
-    // Agora com um nó a menos no canvas: só ele reaparece como novo.
+    // Now with one node fewer on the canvas: only it reappears as new.
     const semUm = aplicarProposta(PROPOSTA, catalogo, jaNaTela.slice(1))
     expect([...semUm.idsNovos]).toEqual([idJaNaTela])
-    // E as arestas que TOCAM esse nó — uma ligação entre dois nós que já
-    // estavam ali não é novidade e não deve se redesenhar.
+    // And the edges that TOUCH that node — a link between two nodes that were
+    // already there isn't new and shouldn't be redrawn.
     for (const id of semUm.idsArestasNovas) {
       const aresta = semUm.edges.find(e => e.id === id)!
       expect(aresta.source === idJaNaTela || aresta.target === idJaNaTela).toBe(true)
@@ -219,8 +220,8 @@ describe("aplicarProposta", () => {
     const { nodes, resumo } = aplicarProposta(PROPOSTA, catalogo, [])
     expect(resumo).toEqual({ novos: 4, alterados: 0, removidos: 0 })
 
-    // Nenhum par de cards sobreposto — é o que o layout garante e o que a
-    // pessoa vai ver ao pedir um fluxo do zero.
+    // No pair of overlapping cards — that's what the layout guarantees and
+    // what the person will see when asking for a workflow from scratch.
     const caixas = nodes.map(n => ({ ...n.position, w: 158, h: 60 }))
     for (let i = 0; i < caixas.length; i++) {
       for (let j = i + 1; j < caixas.length; j++) {

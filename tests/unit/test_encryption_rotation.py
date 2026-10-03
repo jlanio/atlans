@@ -1,8 +1,9 @@
 # tests/unit/test_encryption_rotation.py
-"""Rotação de chave Fernet (F4).
+"""Fernet key rotation (F4).
 
-O módulo de encryption passou a usar MultiFernet: a primeira chave cifra, todas
-decifram. Isto permite trocar a chave mestra sem invalidar segredos já cifrados.
+The encryption module now uses MultiFernet: the first key encrypts, all of them
+decrypt. This allows changing the master key without invalidating already
+encrypted secrets.
 """
 from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 
@@ -10,7 +11,7 @@ import pytest
 
 
 def test_encryption_module_usa_multifernet():
-    """O objeto de cifra do app é um MultiFernet e o round-trip básico funciona."""
+    """The app's cipher object is a MultiFernet and the basic round-trip works."""
     import app.core.utils.encryption as enc
 
     assert isinstance(enc.fernet, MultiFernet)
@@ -18,14 +19,14 @@ def test_encryption_module_usa_multifernet():
 
 
 def test_multifernet_le_antiga_e_cifra_com_a_nova():
-    """Contrato de rotação que o módulo entrega ao receber [nova, antiga].
+    """Rotation contract the module delivers when given [new, old].
 
-    - Token cifrado com a chave ANTIGA continua legível.
-    - Novo texto é cifrado com a chave NOVA (a antiga não consegue lê-lo).
+    - A token encrypted with the OLD key remains readable.
+    - New text is encrypted with the NEW key (the old one cannot read it).
     """
     antiga = Fernet(Fernet.generate_key())
     nova = Fernet(Fernet.generate_key())
-    mf = MultiFernet([nova, antiga])   # ordem = a que o config produz de "nova,antiga"
+    mf = MultiFernet([nova, antiga])   # order = the one the config produces from "new,old"
 
     token_antigo = antiga.encrypt(b"valor-legado")
     assert mf.decrypt(token_antigo) == b"valor-legado"
@@ -37,27 +38,27 @@ def test_multifernet_le_antiga_e_cifra_com_a_nova():
 
 
 def test_config_parseia_fernet_keys():
-    """FERNET_KEYS vira lista ordenada, e FERNET_KEY é SEMPRE mantida para
-    decifrar — anexada ao fim se o operador esquecer de re-listá-la.
+    """FERNET_KEYS becomes an ordered list, and FERNET_KEY is ALWAYS kept for
+    decryption — appended at the end if the operator forgets to re-list it.
 
-    É a rede de segurança contra o pé-na-jaca de rotação: setar FERNET_KEYS sem a
-    chave atual não pode 'orfanizar' (tornar ilegível) o que já foi cifrado."""
+    It is the safety net against a rotation blunder: setting FERNET_KEYS without
+    the current key must not 'orphan' (make unreadable) what was already encrypted."""
     def build(raw: str, fernet_key: str) -> list[str]:
-        # espelha a lógica de app/core/config.py
+        # mirrors the logic in app/core/config.py
         ks = [k.strip() for k in raw.split(",") if k.strip()]
         if fernet_key not in ks:
             ks.append(fernet_key)
         return ks
 
-    assert build(" nova , antiga ", "antiga") == ["nova", "antiga"]     # já listada: posição preservada
-    assert build("nova", "antiga") == ["nova", "antiga"]                # esqueceu a atual → anexada (ainda lê o legado)
-    assert build("", "FKEY") == ["FKEY"]                                 # sem rotação → só a FERNET_KEY
+    assert build(" nova , antiga ", "antiga") == ["nova", "antiga"]     # already listed: position preserved
+    assert build("nova", "antiga") == ["nova", "antiga"]                # forgot the current one → appended (still reads legacy data)
+    assert build("", "FKEY") == ["FKEY"]                                 # no rotation → only FERNET_KEY
     assert build("  ", "FKEY") == ["FKEY"]
-    assert build("nova,antiga", "atual")[0] == "nova"                    # a primeira é sempre a que cifra
+    assert build("nova,antiga", "atual")[0] == "nova"                    # the first one is always the one that encrypts
 
 
 def test_config_sempre_inclui_fernet_key_no_conjunto_efetivo():
-    """No módulo real (FERNET_KEYS não setado no ambiente de teste), o conjunto
-    efetivo contém a FERNET_KEY."""
+    """In the real module (FERNET_KEYS not set in the test environment), the
+    effective set contains FERNET_KEY."""
     from app.core import config
     assert config.FERNET_KEY in config.FERNET_KEYS

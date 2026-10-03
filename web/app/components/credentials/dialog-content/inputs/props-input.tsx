@@ -23,9 +23,9 @@ const PropsInput = ({ form }: PropsInputProps) => {
   const currentData = form.watch("data")
   const props = Object.entries(currentData ?? {})
   const [createProps, setCreateProp] = useState<{ key: string, value: string }>(initialValue)
-  // Os valores são mascarados (são segredos como quaisquer outros), então precisa
-  // haver como conferi-los — senão editar uma credencial deste tipo fica às
-  // cegas. Mesmo mecanismo do SchemaFieldsInput.
+  // The values are masked (they are secrets like any others), so there has to
+  // be a way to check them — otherwise editing a credential of this type is done
+  // blind. Same mechanism as SchemaFieldsInput.
   const [revealed, setRevealed] = useState<Record<string, boolean>>({})
 
   function updateProp(index: number, newValue: string) {
@@ -72,8 +72,8 @@ const PropsInput = ({ form }: PropsInputProps) => {
           <FormLabel>Props</FormLabel>
 
           <div>
-            {/* Só existe quando a linha TEM duas colunas: no telefone ela
-                empilha (abaixo), e o campo de chave já chega preenchido. */}
+            {/* Only exists when the row HAS two columns: on the phone it
+                stacks (below), and the key field already comes filled in. */}
             <div className="hidden sm:grid grid-cols-2 gap-2 mb-1 mr-6">
               <Label className="text-xs">Chave</Label>
               <Label className="text-xs">Valor</Label>
@@ -81,20 +81,20 @@ const PropsInput = ({ form }: PropsInputProps) => {
 
             <div className="flex flex-col gap-2">
               {props.map(([key, value], index) =>
-                // Chave, valor e dois botões de ícone na mesma linha deixavam
-                // ~90px por campo num telefone de 360px — e sob ponteiro grosso
-                // o input usa 16px de fonte, então cabiam cinco caracteres. O
-                // `sm:contents` do bloco de baixo devolve a linha única do
-                // desktop, sem markup duplicado.
+                // Key, value and two icon buttons on the same row left
+                // ~90px per field on a 360px phone — and under a coarse pointer
+                // the input uses a 16px font, so five characters fit. The
+                // `sm:contents` of the block below restores the desktop's
+                // single row, without duplicated markup.
                 <div key={key} className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Input
                     disabled
                     aria-label={`Chave ${key}`}
                     value={key} />
                   <div className="flex items-center gap-2 sm:contents">
-                    {/* type="password": este editor livre é o fallback usado quando
-                        o tipo não tem schema conhecido, e os valores aqui são
-                        segredos como qualquer outro. Estavam em texto claro na tela. */}
+                    {/* type="password": this free editor is the fallback used when
+                        the type has no known schema, and the values here are
+                        secrets like any other. They were in plain text on screen. */}
                     <Input
                       type={revealed[key] ? "text" : "password"}
                       autoComplete="new-password"
@@ -115,9 +115,9 @@ const PropsInput = ({ form }: PropsInputProps) => {
                         ? <FaEyeSlash className="size-4" aria-hidden="true" />
                         : <FaEye className="size-4" aria-hidden="true" />}
                     </Button>
-                    {/* Era um <FaTrash onClick>: SVG com clique não é focável, não
-                        tem rótulo e não responde a teclado — ação destrutiva
-                        inalcançável sem mouse. */}
+                    {/* It was a <FaTrash onClick>: an SVG with a click is not focusable,
+                        has no label and does not respond to the keyboard — a
+                        destructive action unreachable without a mouse. */}
                     <Button
                       type="button"
                       variant="ghost"
@@ -134,10 +134,10 @@ const PropsInput = ({ form }: PropsInputProps) => {
               )}
             </div>
 
-            {/* Sem teto de 3 pares: o limite antigo impedia representar
-                credenciais de tipo livre com mais campos (o fallback existe
-                justamente para tipos fora do catálogo, que podem ter quantos
-                campos precisarem). */}
+            {/* No ceiling of 3 pairs: the old limit prevented representing
+                free-type credentials with more fields (the fallback exists
+                precisely for types outside the catalog, which may have as many
+                fields as they need). */}
             <div className="flex flex-col gap-2 mt-2 sm:flex-row sm:items-center sm:mr-[20px]">
               <Input
                 placeholder="Insira uma chave"

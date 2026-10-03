@@ -15,13 +15,13 @@ import { createToast } from "@/utils/createToast";
 import { GisFlowService, setAuthToken } from "@/service/GisFlowService";
 import type { IWorkspace } from "@/service/types";
 
-// ----- tipos -----
-// A forma canonica vive em service/types.ts — e o que o GisFlowService devolve.
-// Re-exportada aqui porque este context e o dono do estado do workspace ativo,
-// e e daqui que os componentes importam o tipo.
+// ----- types -----
+// The canonical shape lives in service/types.ts — it is what GisFlowService returns.
+// Re-exported here because this context owns the active workspace's state,
+// and this is where components import the type from.
 export type Workspace = IWorkspace;
 
-// ----- helpers de role -----
+// ----- role helpers -----
 export const ROLE_ORDER = ["viewer", "editor", "operator", "admin", "owner"] as const;
 
 export function hasMinRole(actual: string | null | undefined, minimum: string): boolean {
@@ -33,13 +33,13 @@ export function hasMinRole(actual: string | null | undefined, minimum: string): 
 }
 
 /**
- * Workspaces para onde o workflow atual pode ser movido.
+ * Workspaces the current workflow can be moved to.
  *
- * Espelha `_assert_can_move` do backend: mover exige admin/owner na origem E no
- * destino. Fica aqui, ao lado de `hasMinRole`, porque duas telas precisam da
- * mesma resposta — o menu (para decidir se oferece "Mover") e o diálogo (para
- * listar os destinos). Escrita duas vezes, elas divergiriam em silêncio: o menu
- * apareceria e o select viria vazio.
+ * Mirrors the backend's `_assert_can_move`: moving requires admin/owner in the
+ * source AND in the destination. It lives here, next to `hasMinRole`, because
+ * two screens need the same answer — the menu (to decide whether to offer
+ * "Mover") and the dialog (to list the destinations). Written twice, they would
+ * silently diverge: the menu would show up and the select would come up empty.
  */
 export function moveTargets(workspaces: Workspace[], currentId?: string | null): Workspace[] {
   return workspaces.filter(
@@ -49,18 +49,18 @@ export function moveTargets(workspaces: Workspace[], currentId?: string | null):
 
 interface WorkspaceContextValue {
   workspaces: Workspace[];
-  /** Workspace ativo no momento */
+  /** Currently active workspace */
   current: Workspace | null;
   loading: boolean;
   /**
-   * Falha do último carregamento da lista. Sem isto, um 401/500 chegava na tela
-   * indistinguível de "você não tem workspace nenhum" — quem tinha dez via o
-   * convite para criar o primeiro.
+   * Failure of the last load of the list. Without this, a 401/500 reached the
+   * screen indistinguishable from "you have no workspace at all" — someone who
+   * had ten saw the invitation to create the first one.
    */
   error: string | null;
-  /** Pode criar/editar/deletar workflows, fazer upload e delete no Drive e artifacts */
+  /** Can create/edit/delete workflows, upload and delete in the Drive and artifacts */
   canEdit: boolean;
-  /** Pode executar workflows e retry */
+  /** Can execute workflows and retry */
   canExecute: boolean;
   /** Pode convidar/remover membros, alterar roles, definir executor */
   canManage: boolean;
@@ -69,7 +69,7 @@ interface WorkspaceContextValue {
   createWorkspace: (name: string, description?: string) => Promise<Workspace>;
   updateWorkspace: (id_hash: string, name: string, description?: string | null) => Promise<Workspace>;
   deleteWorkspace: (id_hash: string) => Promise<void>;
-  /** Sai de um workspace do qual se é membro (não funciona para o dono). */
+  /** Leaves a workspace one is a member of (does not work for the owner). */
   leaveWorkspace: (id_hash: string) => Promise<void>;
 }
 
@@ -112,19 +112,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const reload = useCallback(async () => {
     try {
-      // Garante o token no interceptor antes da 1a chamada. O SessionSync já
-      // faz isso no corpo do render (providers.tsx), mas repetir aqui é
-      // idempotente e não deixa o carregamento inicial depender da ordem de
-      // montagem — que é o que o header explícito antigo protegia.
+      // Ensures the token is in the interceptor before the 1st call. SessionSync
+      // already does this in the render body (providers.tsx), but repeating it
+      // here is idempotent and keeps the initial load from depending on mount
+      // order — which is what the old explicit header protected.
       if (accessToken) setAuthToken(accessToken);
 
       const res = await GisFlowService.listWorkspaces();
-      // Os helpers do service NÃO lançam: erro vem como res.error. Sem esta
-      // checagem um 401/500 cairia no caminho feliz com data undefined.
+      // The service helpers do NOT throw: an error comes as res.error. Without
+      // this check a 401/500 would fall into the happy path with data undefined.
       //
-      // A lista anterior NÃO é limpa: um refresh periódico que falha não deve
-      // apagar da tela o que o usuário já estava vendo. O banner de erro conta
-      // o que houve; os dados velhos continuam melhor que nenhum dado.
+      // The previous list is NOT cleared: a periodic refresh that fails should
+      // not wipe from the screen what the user was already looking at. The
+      // error banner tells what happened; stale data is still better than none.
       if (res.error) {
         setError(res.error.message ?? "Não foi possível carregar os workspaces.");
         return;
@@ -134,7 +134,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const data = res.data ?? [];
       setWorkspaces(data);
 
-      // Restaura workspace salvo ou usa o workspace padrão do usuário
+      // Restores the saved workspace or uses the user's default workspace
       const savedId = localStorage.getItem(WS_KEY);
       const preferred =
         data.find((w) => w.id_hash === savedId) ??
@@ -148,7 +148,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [workspaceIdFromSession, accessToken]);
 
-  // Carrega quando a sessão Auth.js é estabelecida
+  // Loads when the Auth.js session is established
   useEffect(() => {
     if (status === "authenticated") {
       reload();
@@ -159,10 +159,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [status, reload]);
 
-  // Rastreia o workspace anterior via ref para decidir se emite toast na
-  // troca. Evita re-criacao do useCallback a cada mudanca (usar `current`
-  // como dep forcaria isso). Tambem evita spurious toast na hidratacao
-  // inicial: prevId comeca null e so vira setado apos a 1a troca.
+  // Tracks the previous workspace via a ref to decide whether to emit a toast
+  // on switching. Avoids re-creating the useCallback on every change (using
+  // `current` as a dep would force that). Also avoids a spurious toast on
+  // initial hydration: prevId starts null and is only set after the 1st switch.
   const prevIdRef = useRef<string | null>(null);
 
   const setCurrent = useCallback((ws: Workspace | null) => {
@@ -172,9 +172,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setCurrentState(ws);
     if (ws) {
       localStorage.setItem(WS_KEY, ws.id_hash);
-      // Toast so quando ha troca real entre dois workspaces (nao no
-      // primeiro set apos boot). Sinaliza mudanca de escopo — util
-      // antes de acoes destrutivas ou de criacao no workspace novo.
+      // Toast only when there is a real switch between two workspaces (not on
+      // the first set after boot). Signals a change of scope — useful before
+      // destructive or creation actions in the new workspace.
       if (prevId && prevId !== ws.id_hash) {
         createToast.info(`Agora trabalhando em ${ws.name}`);
       }
@@ -183,9 +183,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // As três mutações lançam em caso de erro: as telas que as chamam já tratam
-  // com try/catch e toast próprio, e propagar o erro é o que impede um "criado
-  // com sucesso" após uma falha.
+  // The three mutations throw on error: the screens that call them already
+  // handle it with try/catch and their own toast, and propagating the error is
+  // what prevents a "created successfully" after a failure.
   const createWorkspace = useCallback(
     async (name: string, description?: string) => {
       const res = await GisFlowService.createWorkspace(
@@ -221,10 +221,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [current, reload]
   );
 
-  // Sair é o mesmo DELETE de remover membro, com o próprio id. Mora aqui, e não
-  // na tela, porque só o context sabe reconciliar o workspace ativo: sair do
-  // que estava selecionado deixaria a aplicação inteira apontando para um
-  // workspace ao qual o usuário não tem mais acesso.
+  // Leaving is the same DELETE as removing a member, with one's own id. It lives
+  // here, and not in the screen, because only the context knows how to
+  // reconcile the active workspace: leaving the selected one would leave the
+  // whole application pointing at a workspace the user no longer has access to.
   const leaveWorkspace = useCallback(
     async (id_hash: string) => {
       const myId = session?.user?.id_hash;
@@ -240,9 +240,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [session?.user?.id_hash, current, reload]
   );
 
-  // Sem o memo, cada render deste provider entregava um objeto novo e todo
-  // consumidor de useWorkspace() re-renderizava junto — inclusive a sidebar e o
-  // canvas, que não dependiam de nada que tivesse mudado.
+  // Without the memo, every render of this provider handed out a new object and
+  // every useWorkspace() consumer re-rendered along with it — including the
+  // sidebar and the canvas, which depended on nothing that had changed.
   const value = useMemo<WorkspaceContextValue>(
     () => ({ workspaces, current, loading, error, canEdit, canExecute, canManage, setCurrent, reload, createWorkspace, updateWorkspace, deleteWorkspace, leaveWorkspace }),
     [workspaces, current, loading, error, canEdit, canExecute, canManage, setCurrent, reload, createWorkspace, updateWorkspace, deleteWorkspace, leaveWorkspace],

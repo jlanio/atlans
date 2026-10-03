@@ -1,10 +1,11 @@
 # app/mcp/tools/__init__.py
 """
-Registro das tools do servidor — um módulo por domínio.
+Registration of the server's tools — one module per domain.
 
-`registrar_tools` é o único ponto que a fábrica conhece; cada módulo de domínio
-expõe `registrar(server)` e decide sozinho quais tools declara. Assim uma frente
-de trabalho acrescenta um domínio sem tocar na fábrica nem nos outros módulos.
+`registrar_tools` is the only point the factory knows; each domain module
+exposes `registrar(server)` and decides on its own which tools it declares. That
+way a workstream adds a domain without touching the factory or the other
+modules.
 """
 from __future__ import annotations
 
@@ -25,7 +26,7 @@ from app.mcp.tools import (
 
 
 def registrar_tools(server) -> None:
-    """Registra todas as tools na instância recebida."""
+    """Registers all tools on the given instance."""
     workspaces.registrar(server)
     workflows.registrar(server)
     catalogo.registrar(server)

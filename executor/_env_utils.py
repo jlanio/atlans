@@ -1,20 +1,20 @@
 # executor/_env_utils.py
 """
-Manipulacao idempotente do executor/.env.
+Idempotent manipulation of executor/.env.
 
-Compartilhado entre `executor.enrollment` (persist EXECUTOR_ID depois do enroll)
-e pelo app desktop (gravar config sem destruir envs custom).
+Shared between `executor.enrollment` (persists EXECUTOR_ID after enroll)
+and the desktop app (writes config without destroying custom envs).
 
-Algoritmo:
-  - Le linhas com splitlines (preserva comentarios, ordem, linhas vazias).
-  - Encontra a primeira linha com `KEY=...` (ignorando comentarios e indentacao).
-  - Se existe com mesmo valor: no-op.
-  - Se existe com valor diferente: atualiza in-place (mesma posicao).
-  - Se nao existe: adiciona ao final.
-  - Se o arquivo nao existe: cria com header minimal.
+Algorithm:
+  - Reads lines with splitlines (preserves comments, order, blank lines).
+  - Finds the first line with `KEY=...` (ignoring comments and indentation).
+  - If it exists with the same value: no-op.
+  - If it exists with a different value: updates in place (same position).
+  - If it does not exist: appends at the end.
+  - If the file does not exist: creates it with a minimal header.
 
-Erros de IO sao loggados como WARNING — nunca levantados — para nao bloquear
-flows criticos (ex.: enrollment ja persistiu o cert).
+IO errors are logged as WARNING — never raised — so as not to block
+critical flows (e.g.: enrollment has already persisted the cert).
 """
 from __future__ import annotations
 
@@ -26,13 +26,13 @@ logger = logging.getLogger(__name__)
 
 
 def _sem_export(linha: str) -> str:
-    """Remove o prefixo `export ` de uma linha de .env, se houver.
+    """Strips the `export ` prefix from a .env line, if present.
 
-    Ponto unico de proposito: quando so `read_env_var` tolerava `export KEY=`,
-    `remove_env_var` deixava de casar a mesma linha que o read reportava — a
-    migracao de variavel legada (enrollment.py) virava no-op silencioso, e uma
-    linha `export KEY=antigo` convivia com um `KEY=novo` acrescentado depois,
-    com o read devolvendo o antigo (primeira ocorrencia vence).
+    A single place on purpose: when only `read_env_var` tolerated `export KEY=`,
+    `remove_env_var` failed to match the same line that read reported — the
+    migration of a legacy variable (enrollment.py) became a silent no-op, and a
+    line `export KEY=antigo` coexisted with a `KEY=novo` appended later,
+    with read returning the old one (first occurrence wins).
     """
     despido = linha.lstrip()
     if despido.startswith("export "):
@@ -41,11 +41,11 @@ def _sem_export(linha: str) -> str:
 
 
 def default_env_path() -> Path:
-    """Path padrao do executor/.env, respeitando EXECUTOR_ENV_PATH se setado."""
+    """Default path of executor/.env, honoring EXECUTOR_ENV_PATH if set."""
     from_env = os.getenv("EXECUTOR_ENV_PATH")
     if from_env:
         return Path(from_env)
-    # Sobe um nivel a partir deste arquivo (executor/) e usa .env no mesmo dir
+    # Goes up one level from this file (executor/) and uses .env in the same dir
     return Path(__file__).parent / ".env"
 
 
@@ -56,14 +56,14 @@ def persist_env_var(
     file_header: str | None = None,
 ) -> None:
     """
-    Idempotente. Atualiza/adiciona uma variavel de ambiente em `env_path`.
+    Idempotent. Updates/adds an environment variable in `env_path`.
 
     Args:
-        key:        nome da env var (ex.: "EXECUTOR_ID")
-        value:      valor (string; sera escrita como `KEY=value` literalmente)
-        env_path:   caminho do .env. Se None, usa `default_env_path()`.
-        file_header: header opcional para o arquivo se ele for criado do zero
-                    (ex.: "# Gerado por executor enroll\n"). Ignorado se ja existe.
+        key:        name of the env var (e.g.: "EXECUTOR_ID")
+        value:      value (string; will be written as `KEY=value` literally)
+        env_path:   path of the .env. If None, uses `default_env_path()`.
+        file_header: optional header for the file if it is created from scratch
+                    (e.g.: "# Gerado por executor enroll\n"). Ignored if it already exists.
     """
     env_path = Path(env_path) if env_path else default_env_path()
     target_line = f"{key}={value}"
@@ -75,20 +75,20 @@ def persist_env_var(
                 # Ignora linhas comentadas e linhas com chaves diferentes
                 if line.lstrip().startswith("#") or not line.strip():
                     continue
-                # Mesma normalizacao de read/remove: sem ela, um
-                # `export KEY=antigo` nao era reconhecido e o persist ACRESCENTAVA
-                # `KEY=novo`, deixando as duas linhas — com o read devolvendo a
-                # primeira, isto e, a antiga.
+                # Same normalization as read/remove: without it, an
+                # `export KEY=antigo` was not recognized and persist APPENDED
+                # `KEY=novo`, leaving both lines — with read returning the
+                # first one, that is, the old one.
                 stripped = _sem_export(line)
                 if stripped.startswith(f"{key}=") or stripped.startswith(f"{key} ="):
-                    # Preserva o `export ` que estava na linha: num .env que e
-                    # `source`ado — o motivo de alguem escrever `export` —,
-                    # troca-lo pela forma nua faria a variavel deixar de chegar
-                    # aos processos filhos.
+                    # Preserve the `export ` that was on the line: in a .env that is
+                    # `source`d — the reason someone writes `export` —,
+                    # swapping it for the bare form would stop the variable from
+                    # reaching child processes.
                     prefixo = "export " if line.lstrip().startswith("export ") else ""
                     nova = f"{prefixo}{target_line}"
                     if line == nova:
-                        return  # ja igual
+                        return  # already the same
                     lines[i] = nova
                     break
             else:
@@ -108,9 +108,9 @@ def persist_env_var(
 
 def remove_env_var(key: str, env_path: Path | str | None = None) -> bool:
     """
-    Remove a linha `KEY=...` do .env, se existir. Retorna True se removeu algo.
-    Util para limpeza de envs legados (EXECUTOR_API_KEY, EXECUTOR_PRIVATE_KEY_PATH apontando
-    para path antigo, etc.) durante migracao.
+    Removes the `KEY=...` line from the .env, if it exists. Returns True if it removed something.
+    Useful for cleaning up legacy envs (EXECUTOR_API_KEY, EXECUTOR_PRIVATE_KEY_PATH pointing
+    to an old path, etc.) during migration.
     """
     env_path = Path(env_path) if env_path else default_env_path()
     if not env_path.exists():
@@ -137,22 +137,22 @@ def remove_env_var(key: str, env_path: Path | str | None = None) -> bool:
 
 def normalize_server_url_to_ws(server_url: str) -> str:
     """
-    Normaliza a URL do servidor para o scheme WebSocket (`wss://` ou `ws://`).
+    Normalizes the server URL to the WebSocket scheme (`wss://` or `ws://`).
 
-    O executor abre conexao WebSocket — gravar `https://` em EXECUTOR_SERVER_URL
-    quebra o connect com `scheme isn't ws or wss` da lib `websockets`.
-    Aceita https/http/wss/ws na entrada; retorna sempre wss/ws.
+    The executor opens a WebSocket connection — writing `https://` into EXECUTOR_SERVER_URL
+    breaks the connect with `scheme isn't ws or wss` from the `websockets` lib.
+    Accepts https/http/wss/ws as input; always returns wss/ws.
 
-    Funcoes que recebem `--server=URL` do operador devem chamar isso antes
-    de persistir no .env. Os call sites que fazem HTTP (POST /enroll, etc.)
-    devem usar `_ws_to_http` para o caminho inverso.
+    Functions that receive `--server=URL` from the operator must call this before
+    persisting to .env. The call sites that do HTTP (POST /enroll, etc.)
+    must use `_ws_to_http` for the reverse direction.
     """
     s = server_url.strip()
     if s.startswith("https://"):
         return "wss://" + s[len("https://"):]
     if s.startswith("http://"):
         return "ws://" + s[len("http://"):]
-    # Ja em wss/ws, ou outro scheme — devolve sem mudar.
+    # Already wss/ws, or another scheme — return unchanged.
     return s
 
 
@@ -161,28 +161,28 @@ def seed_env_from_example(
     example_path: Path | str | None = None,
 ) -> bool:
     """
-    Semeia `env_path` com o conteudo de `example_path` quando ainda nao foi
-    configurado.
+    Seeds `env_path` with the content of `example_path` when it has not been
+    configured yet.
 
-    Idempotente: se `env_path` ja tem conteudo nao-vazio (linhas com `KEY=valor`
-    fora de comentarios), no-op. Se nao existe ou esta vazio/so com comentarios,
-    copia o example. E o ponto unico do enroll — manual, do quickstart ou do app
-    desktop — para garantir que toda variavel critica (EXECUTOR_SERVER_URL,
-    LOG_LEVEL, etc.) tenha valor desde o primeiro boot.
+    Idempotent: if `env_path` already has non-empty content (lines with `KEY=valor`
+    outside comments), no-op. If it does not exist or is empty/comments only,
+    copies the example. It is the single point of enroll — manual, from the quickstart or
+    from the desktop app — to guarantee that every critical variable (EXECUTOR_SERVER_URL,
+    LOG_LEVEL, etc.) has a value from the first boot.
 
     Returns:
-        True se o arquivo foi semeado nesta chamada, False se ja estava OK.
+        True if the file was seeded in this call, False if it was already OK.
     """
     env_path = Path(env_path) if env_path else default_env_path()
     if example_path is None:
-        # O example vive ao lado do CODIGO, nao ao lado do `.env`.
+        # The example lives next to the CODE, not next to the `.env`.
         #
-        # Antes o default era `env_path.parent / ".env.example"`, o que so
-        # funciona quando o `.env` mora dentro do pacote. Com EXECUTOR_ENV_PATH
-        # apontando para outro lugar — `%APPDATA%\AtlasExecutor\config\.env` no
-        # app desktop — o example nao existia la e o seed virava no-op
-        # silencioso: o `.env` nascia sem EXECUTOR_SYNC_* nem LOG_*,
-        # exatamente o cenario que o docstring acima diz querer evitar.
+        # The default used to be `env_path.parent / ".env.example"`, which only
+        # works when the `.env` lives inside the package. With EXECUTOR_ENV_PATH
+        # pointing elsewhere — `%APPDATA%\AtlasExecutor\config\.env` in the
+        # desktop app — the example did not exist there and the seed became a silent
+        # no-op: the `.env` was born without EXECUTOR_SYNC_* or LOG_*,
+        # exactly the scenario the docstring above says it wants to avoid.
         example_path = Path(__file__).parent / ".env.example"
     else:
         example_path = Path(example_path)
@@ -191,8 +191,8 @@ def seed_env_from_example(
         logger.debug(".env.example nao encontrado em %s — pulando seed.", example_path)
         return False
 
-    # Considera o .env "ja configurado" se tem ao menos uma linha nao-comentada
-    # com `KEY=...`. Evita sobrescrever arquivo customizado pelo operador.
+    # Consider the .env "already configured" if it has at least one non-comment line
+    # with `KEY=...`. Avoids overwriting a file customized by the operator.
     if env_path.exists():
         try:
             for line in env_path.read_text(encoding="utf-8").splitlines():
@@ -200,7 +200,7 @@ def seed_env_from_example(
                 if not stripped or stripped.startswith("#"):
                     continue
                 if "=" in stripped:
-                    return False  # ja tem config — preserva
+                    return False  # already has config — preserve it
         except OSError as exc:
             logger.warning("Falha ao ler %s para verificar seed: %s", env_path, exc)
             return False
@@ -222,7 +222,7 @@ def seed_env_from_example(
 
 
 def read_env_var(key: str, env_path: Path | str | None = None) -> str | None:
-    """Le o valor atual de uma env var do arquivo (sem aplicar no os.environ)."""
+    """Reads the current value of an env var from the file (without applying it to os.environ)."""
     env_path = Path(env_path) if env_path else default_env_path()
     if not env_path.exists():
         return None

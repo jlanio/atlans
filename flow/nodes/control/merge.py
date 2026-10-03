@@ -8,11 +8,11 @@ logger = get_logger(__name__)
 @register_node
 class MergeNode(BaseNode):
     """
-    Nó de controle que mescla entradas de múltiplos branches em uma única saída.
-    Utilizado após Conditional ou JinjaBranch para re-unir os caminhos divergentes.
+    Control node that merges inputs from multiple branches into a single output.
+    Used after Conditional or JinjaBranch to rejoin the diverging paths.
 
-    Propriedades:
-      - strategy: estratégia de mesclagem: 'first', 'last' ou 'all'
+    Properties:
+      - strategy: merge strategy: 'first', 'last' or 'all'
     """
 
     @classmethod
@@ -47,11 +47,11 @@ class MergeNode(BaseNode):
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         # -------------------------------------------------------
-        # 1) Validação e extração de parâmetros
+        # 1) Parameter validation and extraction
         # -------------------------------------------------------
         self.validate()
 
-        # strategy já validado contra as options pelo self.validate().
+        # strategy already validated against the options by self.validate().
         strategy = self.parameters.get('strategy', 'first')
 
         if not inputs:
@@ -64,7 +64,7 @@ class MergeNode(BaseNode):
         )
 
         # -------------------------------------------------------
-        # 2) Aplica a estratégia de mesclagem
+        # 2) Applies the merge strategy
         # -------------------------------------------------------
         merged = None
 

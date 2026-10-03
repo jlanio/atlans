@@ -1,20 +1,21 @@
 # tests/unit/test_sync_bordas.py
 """
-Bordas do GeoSync expostas pela auditoria das otimizacoes de desempenho.
+GeoSync edge cases exposed by the audit of the performance optimizations.
 
-Todas as invariantes aqui tem o mesmo desfecho quando quebradas: ARQUIVO DO
-USUARIO NAO SINCRONIZADO — sem erro nenhum no log.
+Every invariant here has the same outcome when broken: USER FILE NOT
+SYNCED — with no error at all in the log.
 
-  A21 — o marcador da varredura completa (rede de seguranca do atalho de
-        size/mtime) so pode ser carimbado DEPOIS que ela roda, e um arquivo
-        ilegivel nao pode derrubar o ciclo inteiro.
-  A22 — em FS de mtime grosseiro (FAT32/exFAT de pendrive), o par (size, mtime)
-        so testemunha "nao mudou" se tiver sido colhido com o mtime ja fechado.
-  A45 — o backoff tem de alcancar o item que foi executado, e a fila nao pode
-        acumular itens equivalentes.
-  A46 — relogio que anda para tras nao pode congelar um item para sempre.
-  A47 — o I/O de bytes das transferencias nao espera o pool de trabalho pesado.
-  A57 — gravacao de manifesto que falha mantem o manifesto sujo.
+  A21 — the full-scan marker (the safety net for the size/mtime shortcut) may
+        only be stamped AFTER the scan runs, and one unreadable file must not
+        bring down the whole cycle.
+  A22 — on a coarse-mtime FS (a USB stick's FAT32/exFAT), the (size, mtime)
+        pair only attests "unchanged" if it was collected with the mtime
+        already settled.
+  A45 — the backoff has to reach the item that was executed, and the queue
+        must not accumulate equivalent items.
+  A46 — a clock that goes backwards must not freeze an item forever.
+  A47 — the transfers' byte I/O does not wait for the heavy-work pool.
+  A57 — a manifest write that fails keeps the manifest dirty.
 """
 import asyncio
 import os
@@ -30,7 +31,7 @@ LOCAL_URL = "ws://localhost:8000"  # is_local_server → sem exigir cert mTLS
 
 @pytest.fixture(autouse=True)
 def _pools_limpos():
-    """Os pools do GeoSync sao globais do processo: derruba-os entre testes."""
+    """The GeoSync pools are process-global: tear them down between tests."""
     from executor.sync import pool
 
     def _derrubar():
@@ -60,7 +61,7 @@ def _manager(tmp_path: Path):
 
 
 def _manifesto_do_disco(scanner, stat_at=None) -> dict:
-    """Manifesto sintetico que descreve a pasta como ela esta agora."""
+    """Synthetic manifest describing the folder as it is now."""
     manifesto = {}
     for nome, ds in scanner.scan().items():
         arquivos = {}
@@ -73,12 +74,13 @@ def _manifesto_do_disco(scanner, stat_at=None) -> dict:
     return manifesto
 
 
-# ── A21 — a rede de seguranca nao pode ser consumida sem ter rodado ───────────
+# ── A21 — the safety net must not be consumed without having run ──────────────
 
 def test_a21_marcador_da_varredura_completa_so_e_carimbado_se_ela_concluir(tmp_path):
-    """O diff com force_hash abre TODOS os arquivos da pasta. Se ele levantar,
-    o ciclo morre — e marcando antes, a passada completa ficava dada como feita
-    e so voltaria 1h depois, deixando de subir a reescrita que preserva mtime."""
+    """The diff with force_hash opens ALL the files in the folder. If it raises,
+    the cycle dies — and by marking beforehand, the full pass was taken as done
+    and would only come back 1h later, failing to upload the mtime-preserving
+    rewrite."""
     sm = _manager(tmp_path)
     (tmp_path / "parcelas.geojson").write_text('{"a":1}')
 
@@ -92,15 +94,16 @@ def test_a21_marcador_da_varredura_completa_so_e_carimbado_se_ela_concluir(tmp_p
     assert sm._ultimo_hash_completo is None, \
         "a varredura completa foi consumida sem nunca ter acontecido"
 
-    # Ciclo que conclui: agora sim o marcador vale.
+    # A cycle that completes: now the marker does count.
     sm.scanner.diff = lambda *a, **kw: ([], [], [])
     asyncio.run(sm._local_to_remote())
     assert sm._ultimo_hash_completo is not None
 
 
 def test_a21_arquivo_ilegivel_nao_derruba_o_diff_da_pasta(tmp_path, monkeypatch):
-    """Um temporario que some (QGIS/ArcGIS criam e removem o tempo todo) levava
-    OSError para fora do diff e matava a deteccao de mudanca da PASTA inteira."""
+    """A temp file that vanishes (QGIS/ArcGIS create and delete them all the time)
+    carried an OSError out of the diff and killed change detection for the
+    ENTIRE folder."""
     from executor.sync import scanner as scanner_mod
     from executor.sync.scanner import DatasetScanner
 
@@ -109,7 +112,7 @@ def test_a21_arquivo_ilegivel_nao_derruba_o_diff_da_pasta(tmp_path, monkeypatch)
     scanner = DatasetScanner(str(tmp_path))
     manifesto = _manifesto_do_disco(scanner)
 
-    # Os dois mudam de conteudo; so um deles fica ilegivel na hora do hash.
+    # Both change content; only one of them becomes unreadable at hash time.
     for nome in ("some", "fica"):
         alvo = tmp_path / f"{nome}.geojson"
         alvo.write_text('{"a":2,"b":3}')
@@ -126,19 +129,20 @@ def test_a21_arquivo_ilegivel_nao_derruba_o_diff_da_pasta(tmp_path, monkeypatch)
 # ── A22 — testemunho (size, mtime) em FS de mtime grosseiro ──────────────────
 
 def test_a22_edicao_no_mesmo_balde_de_mtime_do_pendrive_e_detectada(tmp_path):
-    """FAT32/exFAT gravam mtime em passos de 2s. Editar um atributo no QGIS
-    reescreve so o .dbf, que tem registro de largura fixa: mesmo tamanho. Se a
-    gravacao cair no mesmo balde do stat que gerou o manifesto, size e mtime
-    ficam identicos e o atalho conclui 'inalterado' — o arquivo nunca sobe."""
+    """FAT32/exFAT record mtime in 2s steps. Editing an attribute in QGIS
+    rewrites only the .dbf, which has fixed-width records: same size. If the
+    write lands in the same bucket as the stat that produced the manifest, size
+    and mtime stay identical and the shortcut concludes 'unchanged' — the file
+    is never uploaded."""
     from executor.sync.scanner import DatasetScanner
 
     alvo = tmp_path / "parcelas.geojson"
     alvo.write_text('{"a":1}')
-    t = float(int(time.time()) - 600)     # mtime INTEIRO, como num FAT32
+    t = float(int(time.time()) - 600)     # INTEGER mtime, as on FAT32
     os.utime(alvo, (t, t))
 
     scanner = DatasetScanner(str(tmp_path))
-    # Testemunho colhido meio segundo depois do mtime: dentro do balde de 2s.
+    # Evidence collected half a second after the mtime: inside the 2s bucket.
     manifesto = _manifesto_do_disco(scanner, stat_at=lambda f: t + 0.5)
 
     alvo.write_text('{"a":2}')            # mesmo tamanho...
@@ -149,8 +153,8 @@ def test_a22_edicao_no_mesmo_balde_de_mtime_do_pendrive_e_detectada(tmp_path):
 
 
 def test_a22_testemunho_maduro_preserva_o_atalho(tmp_path, monkeypatch):
-    """O ganho continua de pe: com o mtime ja fechado quando o stat foi tirado,
-    nenhuma gravacao posterior cabe no mesmo balde — e o ciclo nao abre nada."""
+    """The gain still holds: with the mtime already settled when the stat was
+    taken, no later write fits in the same bucket — and the cycle opens nothing."""
     from executor.sync import scanner as scanner_mod
     from executor.sync.scanner import DatasetScanner
 
@@ -168,9 +172,10 @@ def test_a22_testemunho_maduro_preserva_o_atalho(tmp_path, monkeypatch):
 
 
 def test_a22_testemunho_e_reancorado_apos_o_hash_confirmar(tmp_path, monkeypatch):
-    """Entrada sem `stat_at` (manifesto de versao anterior) ou colhida cedo
-    demais precisa se curar: senao o dataset e rehasheado a cada ciclo para
-    sempre — nada muda, nada sobe, e portanto ninguem regrava o manifesto."""
+    """An entry without `stat_at` (manifest from an earlier version) or collected
+    too early must heal itself: otherwise the dataset is rehashed every cycle
+    forever — nothing changes, nothing is uploaded, and so nobody rewrites the
+    manifest."""
     from executor.sync import scanner as scanner_mod
     from executor.sync.scanner import DatasetScanner
 
@@ -194,7 +199,7 @@ def test_a22_testemunho_e_reancorado_apos_o_hash_confirmar(tmp_path, monkeypatch
     assert leituras["n"] == 1, "o testemunho nao foi reancorado: rehashearia para sempre"
 
 
-# ── A45 — backoff tem de alcancar o item executado ───────────────────────────
+# ── A45 — backoff has to reach the executed item ─────────────────────────────
 
 def _manifesto(tmp_path):
     from executor.sync.manifest import SyncManifest
@@ -202,14 +207,14 @@ def _manifesto(tmp_path):
 
 
 def test_a45_todos_os_itens_executados_recebem_agendamento(tmp_path):
-    """Casando so pelo nome e dando break, o backoff ia sempre para o PRIMEIRO
-    homonimo: os demais retentavam a cada ciclo, cada tentativa pagando
-    validate + metadados + MD5 do dataset inteiro."""
+    """Matching by name only and breaking, the backoff always went to the FIRST
+    namesake: the others retried every cycle, each attempt paying for
+    validate + metadata + MD5 of the entire dataset."""
     from executor.sync.queue import SyncQueue
 
     m = _manifesto(tmp_path)
     m.enqueue("upload", "parcelas")
-    # Fila herdada de antes da deduplicacao — o cenario que a auditoria descreve.
+    # Queue inherited from before deduplication — the scenario the audit describes.
     m._data["pending_queue"].append(dict(m._data["pending_queue"][0]))
 
     async def _falha(item):
@@ -225,8 +230,8 @@ def test_a45_todos_os_itens_executados_recebem_agendamento(tmp_path):
 
 
 def test_a45_enfileirar_de_novo_nao_duplica_nem_zera_o_backoff(tmp_path):
-    """Cada falha de upload deixa a entrada sem 'files', o diff do ciclo
-    seguinte reenfileira, e a fila crescia um item por ciclo."""
+    """Each upload failure leaves the entry without 'files', the next cycle's diff
+    re-enqueues it, and the queue grew by one item per cycle."""
     m = _manifesto(tmp_path)
     m.enqueue("upload", "parcelas")
     m.pending_items()[0]["next_attempt_at"] = 12345.0
@@ -242,13 +247,14 @@ def test_a45_enfileirar_de_novo_nao_duplica_nem_zera_o_backoff(tmp_path):
     assert len(m.pending_items()) == 2, "acoes diferentes sao operacoes diferentes"
 
 
-# ── A46 — relogio de parede nao pode congelar a fila ─────────────────────────
+# ── A46 — the wall clock must not freeze the queue ───────────────────────────
 
 def test_a46_relogio_que_volta_no_tempo_nao_congela_o_descarte(tmp_path):
-    """Notebook de campo que boota adiantado e depois e corrigido pelo NTP: o
-    agendamento gravado no manifesto vira um futuro que nunca chega. Para
-    'discard' nao ha outro motor — o arquivo que o Drive mandou apagar ficaria
-    no disco do tecnico para sempre, sem nenhum erro no log."""
+    """A field laptop that boots with its clock ahead and is later corrected by
+    NTP: the schedule recorded in the manifest becomes a future that never
+    arrives. For 'discard' there is no other engine — the file the Drive said to
+    delete would stay on the technician's disk forever, with no error in the
+    log."""
     from executor.sync.queue import SyncQueue
 
     m = _manifesto(tmp_path)
@@ -266,7 +272,7 @@ def test_a46_relogio_que_volta_no_tempo_nao_congela_o_descarte(tmp_path):
 
 
 def test_a46_agendamento_legitimo_continua_sendo_respeitado(tmp_path):
-    """O saneamento nao pode virar 'ignore o backoff'."""
+    """The sanitizing must not turn into 'ignore the backoff'."""
     from executor.sync.queue import SyncQueue, _MAX_BACKOFF
 
     m = _manifesto(tmp_path)
@@ -279,12 +285,12 @@ def test_a46_agendamento_legitimo_continua_sendo_respeitado(tmp_path):
     asyncio.run(SyncQueue(m, _nunca).process_pending())
 
 
-# ── A47 — transferencias nao esperam o pool de trabalho pesado ───────────────
+# ── A47 — transfers do not wait for the heavy-work pool ──────────────────────
 
 def test_a47_io_de_transferencia_tem_pool_proprio():
-    """Com tudo no mesmo pool de 2 threads, dois `_write_zip`/`extract_metadata`
-    pesados paravam TODAS as transferencias em voo por minutos: o socket do
-    PUT/GET ficava sem dados e o MinIO derrubava a conexao por ociosidade."""
+    """With everything in the same 2-thread pool, two heavy `_write_zip`/
+    `extract_metadata` calls stalled ALL in-flight transfers for minutes: the
+    PUT/GET socket went without data and MinIO dropped the connection as idle."""
     from executor.sync import pool
     from executor.sync.sync_config import SYNC_THREADS
 
@@ -292,7 +298,7 @@ def test_a47_io_de_transferencia_tem_pool_proprio():
         travar = threading.Event()
         pesadas = [asyncio.create_task(pool.em_thread(travar.wait, 10))
                    for _ in range(SYNC_THREADS)]
-        await asyncio.sleep(0.2)  # todas as threads pesadas ocupadas
+        await asyncio.sleep(0.2)  # all heavy threads busy
         try:
             assert await asyncio.wait_for(pool.em_thread_io(lambda: "ok"), timeout=5) == "ok"
         finally:
@@ -305,9 +311,9 @@ def test_a47_io_de_transferencia_tem_pool_proprio():
 # ── A57 — gravacao que falha mantem o manifesto sujo ─────────────────────────
 
 def test_a57_flush_que_falha_nao_da_o_estado_como_salvo(tmp_path):
-    """Disco cheio: o estado de N datasets recem-sincronizados ficava so em
-    memoria com o manifesto marcado como limpo. Um kill nessa janela re-enviava
-    tudo e deixava copias orfas no Drive com o mesmo original_name."""
+    """Disk full: the state of N freshly synced datasets lived only in memory
+    with the manifest marked as clean. A kill in that window re-sent
+    everything and left orphan copies in the Drive with the same original_name."""
     m = _manifesto(tmp_path)
     m.set_dataset("parcelas", {"type": "geojson"})
 
@@ -323,8 +329,8 @@ def test_a57_flush_que_falha_nao_da_o_estado_como_salvo(tmp_path):
 
 
 def test_a57_mutacao_durante_a_gravacao_continua_pendente(tmp_path):
-    """A gravacao roda fora do loop: o que muda no meio dela nao entrou no
-    snapshot e nao pode ser dado como salvo."""
+    """The write runs outside the loop: whatever changes in the middle of it did
+    not make it into the snapshot and cannot be considered saved."""
     m = _manifesto(tmp_path)
     m.set_dataset("a", {"type": "geojson"})
 
@@ -338,7 +344,7 @@ def test_a57_mutacao_durante_a_gravacao_continua_pendente(tmp_path):
 
     async def cenario():
         tarefa = asyncio.create_task(m.flush())
-        await asyncio.sleep(0.2)              # a gravacao ja comecou
+        await asyncio.sleep(0.2)              # the write has already started
         m.set_dataset("b", {"type": "geojson"})
         liberar.set()
         await tarefa

@@ -1,30 +1,31 @@
 # tests/unit/test_mcp_resources.py
 """
-Os resources `atlans://…` — leitura por URI, com a mesma guarda das tools.
+The `atlans://…` resources — reads by URI, with the same guard as the tools.
 
-Um resource é atraente justamente porque é barato: o cliente o anexa ao
-contexto e o relê sem gastar chamada. É por isso que ele é o lugar onde um
-vazamento passaria despercebido — ninguém olha duas vezes para uma URI. Este
-arquivo fixa o que importa:
+A resource is attractive precisely because it is cheap: the client attaches it
+to the context and rereads it without spending a call. That is why it is the
+place where a leak would go unnoticed — nobody looks twice at a URI. This file
+pins down what matters:
 
-- cada URI registrada responde de fato (template errado não falha no registro,
-  falha na leitura);
-- o guia entregue por resource é BYTE A BYTE o mesmo da tool: se um dia
-  divergirem, um cliente aprende uma coisa e o outro aprende outra;
-- `atlans://catalog/nodes` sem `type` nunca devolve o catálogo inteiro num
+- every registered URI actually answers (a wrong template doesn't fail at
+  registration, it fails on read);
+- the guide delivered by resource is BYTE FOR BYTE the same as the tool's: if
+  they ever diverge, one client learns one thing and the other learns another;
+- `atlans://catalog/nodes` without `type` never returns the whole catalog in one
   blob;
-- a execução (`atlans://runs/{id}`) sai com o retrato completo dos nós e com a
-  mensagem de erro redigida e em quarentena — é o segundo caminho por onde uma
-  string de conexão sairia do servidor;
-- escopo insuficiente e workspace fora do alcance do token são recusados —
-  aqui também, não só nas tools;
-- e a leitura de dados de workspace deixa linha de auditoria, como a tool
-  deixaria: sem isso, o resource seria o único caminho do servidor por onde se
-  lê um fluxo sem rastro nenhum.
+- the run (`atlans://runs/{id}`) comes out with the full snapshot of the nodes
+  and with the error message redacted and quarantined — it is the second path
+  through which a connection string would leave the server;
+- insufficient scope and a workspace outside the token's reach are refused —
+  here too, not only in the tools;
+- and reading workspace data leaves an audit row, as the tool would: without
+  it, the resource would be the only path in the server through which one reads
+  a workflow without any trace.
 
-A leitura passa pelo `Client(server)` em processo: é o caminho que exercita o
-casamento do template RFC 6570 do SDK, que é onde um `{?type}` mal escrito
-apareceria. Sem request HTTP, o escopo chega pelo `ContextVar`.
+The read goes through the in-process `Client(server)`: it is the path that
+exercises the SDK's RFC 6570 template matching, which is where a badly written
+`{?type}` would show up. With no HTTP request, the scope arrives via the
+`ContextVar`.
 """
 from __future__ import annotations
 
@@ -49,8 +50,8 @@ from tests.unit._mcp_harness import (
     sessao_de,
 )
 
-# Uma definition com segredo em claro: se algum resource entregar a definition
-# sem redigir, é aqui que aparece.
+# A definition with a cleartext secret: if some resource delivers the definition
+# without redacting, this is where it shows up.
 DEFINITION_COM_SEGREDO = {
     "nodes": [
         {
@@ -72,9 +73,9 @@ DEFINITION_COM_SEGREDO = {
     "edges": [{"source": "n1", "target": "n2", "from_key": "output", "to_key": "camada"}],
 }
 
-# Uma execução que falhou com a string de conexão dentro da mensagem — o caso
-# que prova que `atlans://runs/{id}` não é uma porta lateral para o segredo que
-# a definition já não entrega.
+# A run that failed with the connection string inside the message — the case
+# that proves `atlans://runs/{id}` is not a side door to the secret that the
+# definition no longer hands out.
 DSN = "postgresql://usuario:SenhaLiteral123@db.interno:5432/geo"  # pragma: allowlist secret
 
 NODE_STATS = {
@@ -105,10 +106,10 @@ async def _criar_workflow(db, *, id_hash: str, workspace_id: str, name: str, def
 
 @pytest.fixture
 async def ambiente(monkeypatch):
-    """Dois usuários, dois workspaces, um workflow em cada — e a infra redirecionada.
+    """Two users, two workspaces, one workflow in each — and the infra redirected.
 
-    O segundo workspace existe para provar o que o primeiro não prova: que um id
-    válido de OUTRO workspace não é entregue.
+    The second workspace exists to prove what the first doesn't: that a valid id
+    from ANOTHER workspace is not delivered.
     """
     async with banco_em_memoria() as fabrica:
         async with fabrica() as db:
@@ -148,8 +149,8 @@ async def ambiente(monkeypatch):
             )
         monkeypatch.setattr(infra, "sessao", sessao_de(fabrica))
         monkeypatch.setattr(infra, "redis_ou_none", lambda: RedisFalso())
-        # Nenhum nó desabilitado: a configuração vive numa tabela que o SQLite
-        # do harness não cria, e o que este arquivo investiga não é o overlay.
+        # No disabled node: the configuration lives in a table the harness's SQLite
+        # doesn't create, and what this file investigates is not the overlay.
         monkeypatch.setattr(
             "app.services.node_service.disabled_names",
             _sem_desabilitados,
@@ -168,12 +169,12 @@ RUN_ALHEIO = "run-2222"
 
 
 async def _ler(uri: str, escopo=None) -> str:
-    """Lê uma URI como um cliente leria, com o escopo no `ContextVar`.
+    """Reads a URI as a client would, with the scope in the `ContextVar`.
 
-    A falha é guardada e relançada DEPOIS de fechar o cliente: deixá-la subir
-    por dentro do `async with` a embrulharia num grupo de exceções da sessão, e
-    a mensagem do erro — que é o contrato que estes testes conferem —
-    desapareceria atrás de "unhandled errors" do grupo de exceções.
+    The failure is kept and re-raised AFTER closing the client: letting it
+    propagate from inside the `async with` would wrap it in the session's
+    exception group, and the error message — which is the contract these tests
+    check — would disappear behind the exception group's "unhandled errors".
     """
     escopo = escopo or escopo_falso(scopes={"workflows:read", "drive:read"})
     token = ESCOPO_ATUAL.set(escopo)
@@ -183,7 +184,7 @@ async def _ler(uri: str, escopo=None) -> str:
         async with Client(create_mcp_server()) as cliente:
             try:
                 resultado = await cliente.read_resource(uri)
-            except Exception as exc:  # noqa: BLE001 - relançada abaixo, intacta
+            except Exception as exc:  # noqa: BLE001 - re-raised below, intact
                 falha = exc
     finally:
         ESCOPO_ATUAL.reset(token)
@@ -230,7 +231,7 @@ async def test_cada_uri_responde(ambiente, uri):
     assert conteudo.strip(), f"{uri} devolveu vazio"
 
 
-# ── Guia: o resource é alias da tool ──────────────────────────────────────────
+# ── Guide: the resource is an alias of the tool ───────────────────────────────
 
 
 @pytest.mark.parametrize("topico", guia.TOPICOS)
@@ -247,11 +248,11 @@ async def test_topico_desconhecido_nao_e_entregue(ambiente):
     assert "not_found" in str(exc.value)
 
 
-# ── Catálogo ──────────────────────────────────────────────────────────────────
+# ── Catalog ───────────────────────────────────────────────────────────────────
 
 
 async def test_catalogo_sem_type_nao_entrega_o_catalogo_inteiro(ambiente):
-    """Sem filtro, só o mapa de grupos — o índice inteiro não cabe num blob."""
+    """Without a filter, only the group map — the whole index doesn't fit in one blob."""
     corpo = json.loads(await _ler("atlans://catalog/nodes"))
     assert "items" not in corpo
     assert corpo["hint"]
@@ -259,7 +260,7 @@ async def test_catalogo_sem_type_nao_entrega_o_catalogo_inteiro(ambiente):
     tipos = {t["type"] for t in corpo["types"]}
     assert {"trigger", "spatial", "output"} <= tipos
     assert sum(t["count"] for t in corpo["types"]) == corpo["total"]
-    # E o corpo é pequeno de verdade: o índice compacto sozinho passa de 4 KB.
+    # And the body really is small: the compact index alone exceeds 4 KB.
     assert len(await _ler("atlans://catalog/nodes")) < 2000
 
 
@@ -292,7 +293,7 @@ async def test_listagem_do_workspace_traz_o_fluxo_com_o_nome_em_quarentena(ambie
     item = corpo["items"][0]
     assert item["id"] == ID_DO_MEU
     assert item["workspace_id"] == "ws-1"
-    # Texto escrito por gente nunca sobe ao topo da resposta.
+    # Text written by people never rises to the top of the response.
     assert item["untrusted_data"]["name"] == "Meu fluxo"
     assert "name" not in item
 
@@ -309,21 +310,21 @@ async def test_workflow_sai_com_a_definition_redigida(ambiente):
 
 async def test_contrato_traz_as_portas_declaradas(ambiente):
     corpo = json.loads(await _ler(f"atlans://workflows/{ID_DO_MEU}/contract"))
-    # O que a plataforma deduz da definition fica no topo; o NOME de cada porta
-    # é escrito por quem edita o fluxo e desce para `untrusted_data`.
+    # What the platform derives from the definition stays at the top; the NAME of each
+    # port is written by whoever edits the workflow and goes down into `untrusted_data`.
     assert corpo["has_output_node"] is True
     assert [p["name"] for p in corpo["untrusted_data"]["outputs"]] == ["camada"]
 
 
-# ── Execuções ─────────────────────────────────────────────────────────────────
+# ── Runs ──────────────────────────────────────────────────────────────────────
 
 
 async def test_execucao_traz_o_retrato_completo_dos_nos(ambiente):
-    """`full`, e não `summary`: quem anexa uma execução está investigando.
+    """`full`, not `summary`: whoever attaches a run is investigating.
 
-    As saídas de cada nó (`output_keys`/`output_columns`) são o que mostra onde
-    a cadeia parou de produzir o que o nó seguinte esperava — e são justamente
-    o que o resumo omite.
+    Each node's outputs (`output_keys`/`output_columns`) are what show where the
+    chain stopped producing what the next node expected — and they are precisely
+    what the summary omits.
     """
     corpo = json.loads(await _ler(f"atlans://runs/{RUN_DO_MEU}"))
 
@@ -337,19 +338,19 @@ async def test_execucao_traz_o_retrato_completo_dos_nos(ambiente):
 
 
 async def test_execucao_sai_com_o_erro_redigido_e_fora_do_topo(ambiente):
-    """A mensagem de erro é o campo por onde uma senha sai de uma execução."""
+    """The error message is the field through which a password leaves a run."""
     conteudo = await _ler(f"atlans://runs/{RUN_DO_MEU}")
     corpo = json.loads(conteudo)
 
     assert "error_message" not in corpo
     assert "<REDACTED>" in corpo["untrusted_data"]["error_message"]
-    # Nem no erro do run, nem no erro do nó, nem em lugar nenhum do documento.
+    # Not in the run's error, not in the node's error, nowhere in the document.
     assert "SenhaLiteral123" not in conteudo
     assert "<REDACTED>" in corpo["untrusted_data"]["node_stats"][0]["error"]
 
 
 async def test_execucao_de_outro_workspace_nao_e_entregue(ambiente):
-    """Id válido de uma execução que existe — e a resposta é a do id inexistente."""
+    """A valid id of a run that exists — and the response is the nonexistent id's."""
     with pytest.raises(Exception) as alheia:
         await _ler(f"atlans://runs/{RUN_ALHEIO}")
     with pytest.raises(Exception) as inexistente:
@@ -375,7 +376,7 @@ async def test_execucao_de_outro_workspace_nao_e_entregue(ambiente):
     ],
 )
 async def test_escopo_insuficiente_e_recusado(ambiente, uri):
-    """Um token só de Drive não lê nada de workflow — nem por resource."""
+    """A Drive-only token reads nothing from workflows — not even via resource."""
     sem_leitura = escopo_falso(scopes={"drive:read"})
     with pytest.raises(Exception) as exc:
         await _ler(uri, sem_leitura)
@@ -385,7 +386,7 @@ async def test_escopo_insuficiente_e_recusado(ambiente, uri):
 
 
 async def test_workflow_de_outro_workspace_nao_e_entregue(ambiente):
-    """Id válido, fluxo existente — e mesmo assim nada sai, nem o nome."""
+    """A valid id, an existing workflow — and still nothing comes out, not even the name."""
     for uri in (f"atlans://workflows/{ID_DO_ALHEIO}", f"atlans://workflows/{ID_DO_ALHEIO}/contract"):
         with pytest.raises(Exception) as exc:
             await _ler(uri)
@@ -403,7 +404,7 @@ async def test_workspace_fora_do_alcance_do_token_nao_lista(ambiente):
 
 
 async def test_leitura_sem_identidade_nenhuma_e_recusada(ambiente):
-    """Sem PAT resolvido não há escopo, e um resource não é caminho alternativo."""
+    """Without a resolved PAT there is no scope, and a resource is not an alternative path."""
     token = ESCOPO_ATUAL.set(None)
     try:
         async with Client(create_mcp_server()) as cliente:
@@ -431,14 +432,14 @@ def _linhas_de_auditoria(caplog) -> list[str]:
     ],
 )
 async def test_leitura_de_dados_de_workspace_deixa_linha_de_auditoria(ambiente, caplog, uri, guarda):
-    """O resource é barato de repetir — e por isso não pode ser o caminho sem rastro."""
+    """The resource is cheap to repeat — and that is why it can't be the traceless path."""
     with caplog.at_level("INFO", logger="app.mcp.auditoria"):
         await _ler(uri)
     linhas = _linhas_de_auditoria(caplog)
     assert len(linhas) == 1
     assert f"resource={guarda}" in linhas[0]
     assert "desfecho=ok" in linhas[0]
-    # O id do fluxo é argumento do cliente: não entra na linha.
+    # The workflow id is a client argument: it doesn't go into the row.
     assert ID_DO_MEU not in linhas[0]
 
 
@@ -452,7 +453,7 @@ async def test_recusa_de_resource_tambem_e_auditada(ambiente, caplog):
 
 
 async def test_catalogo_e_guia_nao_gastam_linha_de_auditoria(ambiente, caplog):
-    """Texto fixo da instalação, igual para todo token: não há dado de ninguém."""
+    """Fixed installation text, the same for every token: there is nobody's data in it."""
     with caplog.at_level("INFO", logger="app.mcp.auditoria"):
         await _ler("atlans://catalog/nodes")
         await _ler("atlans://guide/authoring/overview")
@@ -460,7 +461,7 @@ async def test_catalogo_e_guia_nao_gastam_linha_de_auditoria(ambiente, caplog):
 
 
 async def test_resource_nao_consome_o_balde_de_cota(ambiente, monkeypatch):
-    """A isenção é decisão documentada: o resource é alias de uma tool que já conta."""
+    """The exemption is a documented decision: the resource is an alias of a tool that already counts."""
     redis = RedisFalso()
     monkeypatch.setattr(infra, "redis_ou_none", lambda: redis)
     await _ler(f"atlans://workflows/{ID_DO_MEU}")

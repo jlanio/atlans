@@ -1,10 +1,11 @@
 # tests/unit/test_wfs_node.py
-"""Nó WFS: SORTBY para paginar camadas sem chave primária + tradução do erro.
+"""WFS node: SORTBY to paginate layers without a primary key + error translation.
 
-Regressão do erro reportado contra o GeoServer de um geoportal estadual:
-"Cannot do natural order without a primary key ...". O GeoServer exige um SORTBY
-para paginar (startIndex/count) uma camada sem PK; o nó agora aceita 'Ordenar por'
-e, quando o servidor recusa, traduz a mensagem crua para uma instrução acionável.
+Regression of the error reported against a state geoportal's GeoServer:
+"Cannot do natural order without a primary key ...". GeoServer requires a SORTBY
+to paginate (startIndex/count) a layer without a PK; the node now accepts
+'Ordenar por' (Sort by) and, when the server refuses, translates the raw message
+into an actionable instruction.
 """
 import pytest
 
@@ -14,11 +15,11 @@ import flow.nodes.datasource.wfs as wfs
 # ── _parse_sortby ──────────────────────────────────────────────────────────────
 
 def test_parse_sortby_divide_por_virgula_para_lista():
-    # owslib faz `','.join(sortby)`, então o valor precisa chegar como lista.
+    # owslib does `','.join(sortby)`, so the value needs to arrive as a list.
     assert wfs._parse_sortby("gid") == ["gid"]
     assert wfs._parse_sortby("gid, nome") == ["gid", "nome"]
-    assert wfs._parse_sortby("gid DESC") == ["gid DESC"]  # direção acompanha o atributo
-    assert wfs._parse_sortby(" a , , b ") == ["a", "b"]   # vazios entre vírgulas somem
+    assert wfs._parse_sortby("gid DESC") == ["gid DESC"]  # direction goes with the attribute
+    assert wfs._parse_sortby(" a , , b ") == ["a", "b"]   # empty entries between commas are dropped
 
 
 def test_parse_sortby_vazio_vira_none():
@@ -26,7 +27,7 @@ def test_parse_sortby_vazio_vira_none():
     assert wfs._parse_sortby("   ") is None
 
 
-# ── Dublê do owslib ──────────────────────────────────────────────────────────────
+# ── owslib stub ──────────────────────────────────────────────────────────────────
 
 class _FakeResponse:
     def __init__(self, payload: bytes):
@@ -44,7 +45,7 @@ _UMA_FEICAO = (
 
 
 class _FakeWFS:
-    """Registra os kwargs de getfeature e devolve uma resposta configurável."""
+    """Records getfeature's kwargs and returns a configurable response."""
     ultimo_kwargs: dict = {}
     resposta: bytes = _UMA_FEICAO
 
@@ -53,19 +54,19 @@ class _FakeWFS:
 
     @property
     def contents(self):
-        # Contém as camadas usadas nos testes (a validação de existência passa).
+        # Contains the layers used in the tests (the existence check passes).
         return {"camada": object(), "camada_sem_pk": object()}
 
     def getfeature(self, **kwargs):
-        # `type(self)`: a subclasse contada tem os seus próprios `resposta` e
-        # `ultimo_kwargs`, e o que um teste deixa no pai não vaza para ela.
+        # `type(self)`: the counted subclass has its own `resposta` and
+        # `ultimo_kwargs`, and what one test leaves on the parent does not leak into it.
         type(self).ultimo_kwargs = dict(kwargs)
         return _FakeResponse(type(self).resposta)
 
 
 @pytest.fixture(autouse=True)
 def _cache_limpo(monkeypatch):
-    """O cache de capabilities é do processo: cada teste começa sem ele."""
+    """The capabilities cache is process-wide: each test starts without it."""
     monkeypatch.setattr(wfs, "_caps_cache", {})
 
 
@@ -90,7 +91,7 @@ def test_sem_sortby_nao_manda_a_chave(fake_wfs):
     assert "sortby" not in fake_wfs.ultimo_kwargs
 
 
-# ── Tradução do erro (item 3) ────────────────────────────────────────────────────
+# ── Error translation (item 3) ───────────────────────────────────────────────────
 
 _ERRO_ORDEM_NATURAL = (
     b'<?xml version="1.0" encoding="UTF-8"?>'
@@ -108,9 +109,9 @@ def test_erro_de_ordem_natural_vira_mensagem_acionavel(fake_wfs):
         wfs._fetch_wfs_features("http://x/ows", "camada_sem_pk", 1000)
     msg = str(ei.value)
     assert "camada_sem_pk" in msg          # cita a camada
-    assert "Ordenar por" in msg            # aponta o campo que resolve
+    assert "Ordenar por" in msg            # points to the field that solves it
     assert "chave primária" in msg
-    # Preserva o detalhe do servidor para quem quiser o texto cru.
+    # Preserves the server's detail for anyone who wants the raw text.
     assert "natural order" in msg
 
 
@@ -124,13 +125,13 @@ def test_outros_erros_wfs_passam_sem_reescrever(fake_wfs):
         wfs._fetch_wfs_features("http://x/ows", "camada", 1000)
     msg = str(ei.value)
     assert "Feature type nao encontrado" in msg
-    assert "Ordenar por" not in msg  # nao aplica o texto do caso de PK a erro alheio
+    assert "Ordenar por" not in msg  # does not apply the PK case's text to an unrelated error
 
 
-# ── Cache de capabilities ────────────────────────────────────────────────────────
+# ── Capabilities cache ───────────────────────────────────────────────────────────
 
 class _FakeWFSContado(_FakeWFS):
-    """Conta as construções (= GetCapabilities) e deixa as camadas mudarem."""
+    """Counts the constructions (= GetCapabilities) and lets the layers change."""
     construcoes = 0
     camadas = ("camada",)
 
@@ -159,7 +160,7 @@ def test_capabilities_sao_reaproveitadas_entre_chamadas_e_retries(wfs_contado, m
     wfs._fetch_wfs_features("http://x/ows", "camada", 10)
     assert wfs_contado.construcoes == 1
 
-    # Um getfeature que falha duas vezes não refaz o GetCapabilities a cada tentativa.
+    # A getfeature that fails twice does not redo GetCapabilities on every attempt.
     tentativas = {"n": 0}
     original = _FakeWFSContado.getfeature
 
@@ -186,11 +187,11 @@ def test_ttl_vencido_reconstroi(wfs_contado):
 
 def test_camada_ausente_forca_um_refresh_antes_de_falhar(wfs_contado):
     wfs._fetch_wfs_features("http://x/ows", "camada", 10)
-    # A camada nova apareceu no servidor depois de o cache ter sido montado.
+    # The new layer appeared on the server after the cache was built.
     _FakeWFSContado.camadas = ("camada", "nova")
     wfs._fetch_wfs_features("http://x/ows", "nova", 10)
     assert wfs_contado.construcoes == 2
-    # E uma camada que não existe mesmo custa UM refresh, não um por tentativa.
+    # And a layer that really does not exist costs ONE refresh, not one per attempt.
     with pytest.raises(ValueError, match="não encontrada"):
         wfs._fetch_wfs_features("http://x/ows", "fantasma", 10)
     assert wfs_contado.construcoes == 3
@@ -210,10 +211,10 @@ def test_o_cache_tem_teto(wfs_contado, monkeypatch):
     assert len(wfs._caps_cache) == 2 and ("http://a/ows", "2.0.0") not in wfs._caps_cache
 
 
-# ── SSRF: a URL do usuario e validada antes de o owslib busca-la ─────────────
-# Ao contrario de HttpRequest/SendWebhook (safe_httpx_request com IP-pinning), o
-# WFSNode entregava a URL direto ao owslib. Sem validacao, um WFS apontando para
-# 169.254.169.254 (metadata cloud) ou um servico interno seria requisitado.
+# ── SSRF: the user's URL is validated before owslib fetches it ───────────────
+# Unlike HttpRequest/SendWebhook (safe_httpx_request with IP pinning), the
+# WFSNode handed the URL straight to owslib. Without validation, a WFS pointing
+# to 169.254.169.254 (cloud metadata) or an internal service would be requested.
 
 import geopandas as gpd  # noqa: E402
 from unittest.mock import MagicMock  # noqa: E402
@@ -224,10 +225,10 @@ def _no_wfs(url, type_name="camada", **extra):
 
 
 async def test_execute_bloqueia_ssrf_para_endereco_interno(monkeypatch):
-    """Mutacao: remover a chamada a validate_url_ssrf no execute.
+    """Mutation: remove the call to validate_url_ssrf in execute.
 
-    Um endereco link-local (metadata cloud) e recusado ANTES do fetch — o
-    owslib nunca chega a busca-lo.
+    A link-local address (cloud metadata) is refused BEFORE the fetch — owslib
+    never gets to fetch it.
     """
     fetch = MagicMock()
     monkeypatch.setattr(wfs, "_fetch_with_retry", fetch)
@@ -240,9 +241,9 @@ async def test_execute_bloqueia_ssrf_para_endereco_interno(monkeypatch):
 
 
 async def test_execute_valida_ssrf_antes_de_buscar(monkeypatch):
-    """Mutacao: chamar o fetch sem validar a URL.
+    """Mutation: call the fetch without validating the URL.
 
-    A validacao roda e so entao o owslib e chamado (caminho feliz intacto).
+    The validation runs and only then is owslib called (happy path intact).
     """
     import flow.utils.geo_helpers as geo
     vistos = {}

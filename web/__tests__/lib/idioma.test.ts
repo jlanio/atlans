@@ -1,8 +1,9 @@
 /**
- * O idioma da Home por requisição: escolha explícita > navegador > país da
- * conexão > padrão. O navegador vem antes do país de propósito — é o sinal do
- * que a pessoa LÊ (o turista americano no Brasil quer inglês). E o país só
- * conta para quem mandou `Accept-Language`: sem ele é robô, não pessoa.
+ * Home's language per request: explicit choice > browser > the connection's
+ * country > default. The browser comes before the country on purpose — it's
+ * the signal of what the person READS (the American tourist in Brazil wants
+ * English). And the country only counts for those who sent `Accept-Language`:
+ * without it, it's a bot, not a person.
  */
 import { describe, it, expect } from "vitest"
 import { ehIdioma, idiomaDoAcceptLanguage, idiomaDoPais, resolverIdioma } from "@/lib/idioma"
@@ -12,14 +13,14 @@ describe("idiomaDoAcceptLanguage", () => {
     expect(idiomaDoAcceptLanguage("pt-BR,pt;q=0.9,en;q=0.8")).toBe("pt-BR")
     expect(idiomaDoAcceptLanguage("en-US,en;q=0.9")).toBe("en")
     expect(idiomaDoAcceptLanguage("es-MX,es;q=0.9,en;q=0.7")).toBe("es")
-    // Francês não é nosso: vale o próximo que é.
+    // French isn't one of ours: the next one that is wins.
     expect(idiomaDoAcceptLanguage("fr-FR,fr;q=0.9,en;q=0.8,pt;q=0.5")).toBe("en")
   })
 
   it("respeita os pesos q — e q=0 é recusa", () => {
     expect(idiomaDoAcceptLanguage("en;q=0.3,es;q=0.9")).toBe("es")
     expect(idiomaDoAcceptLanguage("pt;q=0,en")).toBe("en")
-    // Recusado sem ninguém com peso maior: continua fora.
+    // Refused with nobody of greater weight: it stays out.
     expect(idiomaDoAcceptLanguage("fr,pt;q=0")).toBeNull()
   })
 
@@ -81,10 +82,10 @@ describe("resolverIdioma", () => {
   })
 
   it("sem Accept-Language (robô de busca, script), o país não decide", () => {
-    // O Googlebot sai dos EUA sem Accept-Language: indexaria a Home em inglês.
+    // Googlebot comes out of the US without Accept-Language: it would index Home in English.
     expect(resolverIdioma({ pais: "US" })).toEqual({ idioma: "pt-BR", detectado: "pt-BR", escolhido: null })
     expect(resolverIdioma({ acceptLanguage: "  ", pais: "AR" }).idioma).toBe("pt-BR")
-    // XX (desconhecido) e T1 (Tor) também não são sinal.
+    // XX (unknown) and T1 (Tor) aren't a signal either.
     expect(resolverIdioma({ pais: "XX" }).idioma).toBe("pt-BR")
     expect(resolverIdioma({ pais: "T1" }).idioma).toBe("pt-BR")
   })

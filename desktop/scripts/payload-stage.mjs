@@ -1,44 +1,44 @@
 // desktop/scripts/payload-stage.mjs
 //
-// Copia executor/ e flow/ para desktop/resources/, que e o layout que o app
-// empacota e o que o smoke test exercita.
+// Copies executor/ and flow/ into desktop/resources/, which is the layout the
+// app packages and the one the smoke test exercises.
 //
-// O layout NAO e arbitrario. executor/job_executor.py faz:
+// The layout is NOT arbitrary. executor/job_executor.py does:
 //
 //     _AGENT_ROOT = dirname(dirname(abspath(__file__)))
 //     sys.path.insert(0, _AGENT_ROOT)
 //     from flow.executor import WorkflowExecutor
 //
-// ou seja, flow/ precisa ser IRMAO de executor/. Dai:
+// that is, flow/ needs to be a SIBLING of executor/. Hence:
 //
 //     resources/{python, executor, flow}
 //
-// e o spawn usa cwd=resources e PYTHONPATH=resources.
+// and the spawn uses cwd=resources and PYTHONPATH=resources.
 //
-// A copia e ordenada de proposito: o .blockmap do electron-updater compara
-// blocos byte a byte entre releases, e ordem de leitura de diretorio variando
-// entre maquinas produziria diffs falsos e updates gordos.
+// The copy is sorted on purpose: electron-updater's .blockmap compares blocks
+// byte by byte between releases, and directory read order varying between
+// machines would produce false diffs and bloated updates.
 //
 //   node scripts/payload-stage.mjs
 import fs from 'node:fs'
 import path from 'node:path'
 import { REPO, RESOURCES, dirSize, fail, log, mb, ok, sortedEntries, rmrf, step } from './lib.mjs'
 
-// Exclusoes por origem. Segredos do desenvolvedor (.env, certs/) NUNCA podem
-// entrar no instalador — o app usa %APPDATA%\AtlansExecutor para isso.
+// Exclusions per source. Developer secrets (.env, certs/) must NEVER end up
+// in the installer — the app uses %APPDATA%\AtlansExecutor for that.
 const ALVOS = [
   {
     nome: 'executor',
     excluir: [
-      /^\.env$/,                    // config local do dev
-      /^certs$/,                    // cert mTLS do dev
+      /^\.env$/,                    // dev's local config
+      /^certs$/,                    // dev's mTLS cert
       /^__pycache__$/,
       /\.pyc$/,
       /\.sqlite(-wal|-shm)?$/,      // outbox local
-      /^requirements(-full)?\.(in|txt)$/, // as dependencias ja vem instaladas no runtime
+      /^requirements(-full)?\.(in|txt)$/, // the dependencies already come installed in the runtime
       /^README\.md$/,
     ],
-    // .env.example FICA: e o que seed_env_from_example copia no primeiro boot.
+    // .env.example STAYS: it is what seed_env_from_example copies on first boot.
   },
   { nome: 'flow', excluir: [/^__pycache__$/, /\.pyc$/] },
 ]
@@ -68,17 +68,17 @@ for (const alvo of ALVOS) {
   log(`  ${alvo.nome.padEnd(9)} ${String(n).padStart(4)} arquivos  ${mb(dirSize(destino)).padStart(3)} MB`)
 }
 
-// Guarda-corpo: se um .env do dev escapar para o instalador, vaza credencial.
-// Barato de checar, caro de descobrir depois.
+// Guardrail: if a dev .env slips into the installer, credentials leak.
+// Cheap to check, expensive to find out later.
 for (const proibido of ['executor/.env', 'executor/certs']) {
   if (fs.existsSync(path.join(RESOURCES, proibido))) {
     fail(`${proibido} entrou no payload — o filtro de exclusao falhou`)
   }
 }
 
-// A licença do Atlans e os avisos de terceiros vão com o instalador
-// (extraResources do electron-builder.yml): quem o distribui distribui junto
-// o que vai dentro dele.
+// The Atlans license and the third-party notices go with the installer
+// (extraResources in electron-builder.yml): whoever distributes it distributes
+// what goes inside it along with it.
 for (const [de, para] of [['LICENSE', 'LICENSE.txt'], ['THIRD-PARTY-NOTICES.md', 'THIRD-PARTY-NOTICES.md']]) {
   const origem = path.join(REPO, de)
   if (!fs.existsSync(origem)) fail(`nao encontrei ${origem}`)

@@ -2,91 +2,92 @@ import { describe, it, expect } from "vitest"
 import { readFileSync, readdirSync, statSync } from "fs"
 import { join, relative } from "path"
 
-// A camada HTTP central não pode ser contornada.
+// The central HTTP layer must not be bypassed.
 //
-// `/drive`, `/admin/settings` e `/artifacts` montavam `axios`/`fetch` na mão,
-// com `Authorization: Bearer` explícito — 10 sítios. O interceptor do
-// GisFlowService já anexa o token, então a duplicação não era só verbosidade:
+// `/drive`, `/admin/settings` and `/artifacts` built `axios`/`fetch` by hand,
+// with an explicit `Authorization: Bearer` — 10 sites. The GisFlowService
+// interceptor already attaches the token, so the duplication wasn't just verbosity:
 //
-//   - as MUTAÇÕES fora do service não passam por `mutar()`, e portanto não
-//     incrementam `epocaEscrita`. Um GET já em voo continuava elegível para
-//     coalescência, e o refetch do sucesso podia receber uma lista calculada
-//     ANTES da escrita — exatamente o bug que a época existe para fechar;
-//   - cada sítio reimplementava o tratamento de erro à sua maneira.
+//   - MUTATIONS outside the service don't go through `mutar()`, and therefore
+//     don't increment `epocaEscrita`. A GET already in flight stayed eligible
+//     for coalescing, and the success refetch could receive a list computed
+//     BEFORE the write — exactly the bug the epoch exists to close;
+//   - each site reimplemented error handling its own way.
 //
-// Este teste varre o código do dashboard em busca de chamadas cruas. As
-// exceções são poucas e cada uma tem um motivo registrado.
+// This test scans the dashboard code for raw calls. The exceptions are few and
+// each one has a recorded reason.
 
 const RAIZ = join(__dirname, "..", "..")
 
-/** Arquivos onde uma chamada HTTP crua é correta. */
+/** Files where a raw HTTP call is correct. */
 const EXCECOES: { arquivo: string; motivo: string }[] = [
   {
-    // Fluxos PRÉ-autenticação: não há token para o interceptor anexar, e não há
-    // lista em cache para invalidar.
+    // PRE-authentication flows: there's no token for the interceptor to attach,
+    // and no cached list to invalidate.
     arquivo: "app/(auth)/",
     motivo: "roda antes da sessão existir",
   },
   {
-    // O modal de entrada da Home: os formulários de login e cadastro (e o
-    // reenvio da verificação) que moraram em app/(auth)/ — o mesmo fluxo
-    // pré-autenticação, agora sobre o globo.
+    // Home's sign-in modal: the login and sign-up forms (and the verification
+    // resend) that used to live in app/(auth)/ — the same pre-authentication
+    // flow, now over the globe.
     arquivo: "app/components/home/entrada/",
     motivo: "roda antes da sessão existir",
   },
   {
-    // Route handler do Next: roda no servidor, é o próprio proxy da API.
+    // Next route handler: runs on the server, it's the API proxy itself.
     arquivo: "app/terra/",
     motivo: "proxy server-side, não é cliente de browser",
   },
   {
-    // Server component que busca um portal público, sem sessão.
+    // Server component that fetches a public portal, with no session.
     arquivo: "app/(portal)/",
     motivo: "server component público, sem token",
   },
   {
-    // Monta SNIPPETS (Python e JS) para o usuário copiar e rodar na máquina
-    // dele. O `fetch`/`Authorization` está dentro de template literal: é texto
-    // exibido, não código executado pela página.
+    // Builds SNIPPETS (Python and JS) for the user to copy and run on their
+    // machine. The `fetch`/`Authorization` is inside a template literal: it's
+    // displayed text, not code executed by the page.
     arquivo: "app/components/workflow/nodes-configuration/webhook-helper.tsx",
     motivo: "gera snippet de exemplo para o usuário, não executa a chamada",
   },
   {
-    // Snippets de conexão MCP (Claude Code, mcp.json, mcp-remote) que o usuário
-    // copia para a máquina dele. O `Authorization: Bearer ${ATLANS_TOKEN}` é
-    // texto exibido — sempre com placeholder, nunca o segredo real — e não
-    // código que a página executa. As chamadas de verdade passam pelo service.
+    // MCP connection snippets (Claude Code, mcp.json, mcp-remote) that the user
+    // copies to their machine. The `Authorization: Bearer ${ATLANS_TOKEN}` is
+    // displayed text — always with a placeholder, never the real secret — and
+    // not code the page executes. The real calls go through the service.
     arquivo: "app/components/tokens/dialog-content/create-token.tsx",
     motivo: "gera snippet de conexão MCP para o usuário, não executa a chamada",
   },
   {
-    // A conversa do assistente é `text/event-stream`, e o axios NÃO entrega
-    // stream no navegador: `onDownloadProgress` devolve a resposta acumulada,
-    // que é a mesma coisa que esperar o fim. `fetch` + `response.body.getReader()`
-    // é o único caminho.
+    // The assistant conversation is `text/event-stream`, and axios does NOT
+    // deliver a stream in the browser: `onDownloadProgress` returns the
+    // accumulated response, which is the same as waiting for the end.
+    // `fetch` + `response.body.getReader()` is the only way.
     //
-    // Nenhum dos dois motivos da época de escrita se aplica: a rota não muta
-    // nada que uma leitura em cache pudesse desencontrar (o transcrito vive no
-    // Redis do servidor, e o painel não o relê por GET), e o tratamento de erro
-    // é próprio de um stream — a resposta já começou quando a falha aparece.
-    // O `GET /assistente/editor/estado` e o `DELETE /assistente/editor/conversa`, que são
-    // requisições normais, passam pelo service.
+    // Neither of the write-epoch reasons applies: the route mutates nothing
+    // that a cached read could get out of sync with (the transcript lives in
+    // the server's Redis, and the panel doesn't re-read it via GET), and error
+    // handling is specific to a stream — the response has already started when
+    // the failure shows up. `GET /assistente/editor/estado` and
+    // `DELETE /assistente/editor/conversa`, which are regular requests, go
+    // through the service.
     arquivo: "app/hooks/workflow/useAssistenteEditor.ts",
     motivo: "SSE: axios não entrega stream no navegador",
   },
   {
-    // O assistente da Home é o mesmo caso do assistente: `POST /assistente/conversa` e
-    // `POST /conversas/{id}/confirmacoes/{tuid}` são `text/event-stream`. As
-    // requisições normais (`GET /assistente/estado`, lista, replay, camadas) passam
-    // pelo service.
+    // The Home assistant is the same case as the assistant: `POST /assistente/conversa`
+    // and `POST /conversas/{id}/confirmacoes/{tuid}` are `text/event-stream`. The
+    // regular requests (`GET /assistente/estado`, list, replay, layers) go
+    // through the service.
     arquivo: "app/hooks/home/useAssistente.ts",
     motivo: "SSE: axios não entrega stream no navegador",
   },
   {
-    // A URL pré-assinada da camada aponta para o MinIO (outra origem). Mandar o
-    // JWT da plataforma para lá seria vazá-lo — o fetch cru, sem Authorization, é
-    // a escolha certa, como em artifacts/tabela.tsx. A camada em si vem por
-    // `GET /assistente/camadas/{id}` pelo service.
+    // The layer's presigned URL points to MinIO (another origin). Sending the
+    // platform JWT there would leak it — the raw fetch, without Authorization,
+    // is the right choice, as in artifacts/tabela.tsx. The layer itself comes
+    // through `GET /assistente/camadas/{id}` via the service.
     arquivo: "app/hooks/home/useCamadas.ts",
     motivo: "fetch cross-origin da URL pré-assinada, sem Authorization",
   },
@@ -112,8 +113,8 @@ describe("camada HTTP central", () => {
 
       const fonte = readFileSync(caminho, "utf8")
       fonte.split("\n").forEach((linha, i) => {
-        // Ignora comentários e strings de exemplo mostradas ao usuário
-        // (webhook-helper monta um snippet com `fetch(` dentro de template).
+        // Ignores comments and example strings shown to the user
+        // (webhook-helper builds a snippet with `fetch(` inside a template).
         const semComentario = linha.replace(/\/\/.*$/, "")
         if (/\baxios\.(get|post|put|patch|delete)\s*\(/.test(semComentario)
             || /\bawait\s+fetch\s*\(/.test(semComentario)) {
@@ -131,8 +132,8 @@ describe("camada HTTP central", () => {
   })
 
   it("as exceções registradas ainda existem", () => {
-    // Uma exceção obsoleta afrouxa o teste em silêncio: o caminho volta a ser
-    // permitido para código novo.
+    // An obsolete exception silently loosens the test: the path becomes
+    // allowed again for new code.
     for (const { arquivo } of EXCECOES) {
       expect(() => statSync(join(RAIZ, arquivo)), `${arquivo} sumiu — remova a exceção`)
         .not.toThrow()

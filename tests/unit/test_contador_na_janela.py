@@ -1,18 +1,18 @@
 # tests/unit/test_contador_na_janela.py
 """
-Contador de janela no Redis e os sítios que contam com ele: o rate limit do
-WebSocket (antes e depois do accept), a cota de e-mail do executor, o refresh
-por família, as cotas do MCP e a cota de tokens do assistente.
+Window counter in Redis and the sites that rely on it: the WebSocket rate
+limit (before and after the accept), the executor's e-mail quota, the
+per-family refresh, the MCP quotas and the assistant's token quota.
 
-O defeito que a repetição produziu: cada sítio fazia `INCR` e, só quando o
-contador voltava a 1, `EXPIRE` — dois comandos. Se o `EXPIRE` se perde (o
-processo cai entre os dois, a conexão quebra, o SSE é cancelado no meio), a
-chave fica SEM PRAZO: o contador nunca zera e, quando cruza o teto, o IP, o
-executor, a família de refresh ou o usuário ficam bloqueados para sempre. Só as
-cotas do MCP tinham uma cura, e só na hora de recusar.
+The defect the repetition produced: each site did `INCR` and, only when the
+counter went back to 1, `EXPIRE` — two commands. If the `EXPIRE` is lost (the
+process dies between the two, the connection breaks, the SSE is canceled
+midway), the key is left WITH NO EXPIRY: the counter never resets and, once it
+crosses the ceiling, the IP, the executor, the refresh family or the user are
+blocked forever. Only the MCP quotas had a cure, and only at refusal time.
 
-O bloqueio de login também conta por aqui, mas numa janela DESLIZANTE (cada
-falha renova o prazo) — e continua assim.
+The login lockout also counts through here, but in a SLIDING window (each
+failure renews the expiry) — and it stays that way.
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from app.core.redis import contar_na_janela
 from tests.unit._mcp_harness import RedisFalso
 
 
-# ── A peça ────────────────────────────────────────────────────────────────────
+# ── The piece ─────────────────────────────────────────────────────────────────
 
 
 async def test_primeira_contagem_arma_a_janela():
@@ -36,8 +36,8 @@ async def test_primeira_contagem_arma_a_janela():
 
 
 async def test_contagem_e_prazo_saem_na_mesma_transacao():
-    """INCRBY e EXPIRE num MULTI/EXEC só: nada de dois comandos soltos, que é
-    onde o EXPIRE se perdia."""
+    """INCRBY and EXPIRE in a single MULTI/EXEC: no two loose commands, which is
+    where the EXPIRE got lost."""
     redis = RedisFalso()
     await contar_na_janela("c", 60, redis=redis)
     assert [c for c in redis.chamadas if c[0] in ("exec", "pipeline")] == [("exec", ["incrby", "expire", "ttl"])]
@@ -71,7 +71,7 @@ async def test_sem_cliente_usa_o_pool_global(monkeypatch):
     assert redis.dados == {"c": 1}
 
 
-# ── Os sítios ─────────────────────────────────────────────────────────────────
+# ── The sites ─────────────────────────────────────────────────────────────────
 
 
 def _ws_falso():
@@ -133,8 +133,8 @@ SITIOS = [
 
 @pytest.mark.parametrize("sitio, chave, janela", SITIOS)
 async def test_chave_que_perdeu_o_expire_volta_a_ter_prazo_na_contagem_seguinte(sitio, chave, janela, monkeypatch):
-    """O `INCR` da primeira contagem chegou; o `EXPIRE`, não. A contagem
-    seguinte tem de armar o prazo — senão o balde nunca reabre."""
+    """The `INCR` of the first count arrived; the `EXPIRE` did not. The next
+    count has to set the expiry — otherwise the bucket never reopens."""
     redis = RedisFalso()
     redis.dados[chave] = 1       # a 1a contagem existiu...
     redis.ttls.pop(chave, None)  # ...e o EXPIRE dela se perdeu
@@ -146,8 +146,8 @@ async def test_chave_que_perdeu_o_expire_volta_a_ter_prazo_na_contagem_seguinte(
 
 
 async def test_bloqueio_de_login_continua_com_janela_deslizante():
-    """Cada falha renova o prazo das tentativas: o contador só zera depois de
-    `_ATTEMPTS_TTL` segundos sem falha nenhuma."""
+    """Each failure renews the attempts' expiry: the counter only resets after
+    `_ATTEMPTS_TTL` seconds with no failure at all."""
     from app.api.routers import auth_router
 
     redis = RedisFalso()

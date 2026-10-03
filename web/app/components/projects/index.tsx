@@ -37,13 +37,13 @@ import { useProjetosDados } from "./use-projetos-dados"
 import { useProjetosUrl } from "./use-projetos-url"
 
 /**
- * Projetos (docs/specs/projetos.md §3.1). Este arquivo só orquestra: o estado
- * de busca/chip/ordem mora na URL, os dados no hook, os runs vivos no
- * `ActiveRunsContext`, as permissões no `WorkspaceContext`; a lógica pura fica
- * nos módulos ao lado e cada bloco decide o próprio texto.
+ * Projects (docs/specs/projects.md §3.1). This file only orchestrates: the
+ * search/chip/order state lives in the URL, the data in the hook, the live runs
+ * in `ActiveRunsContext`, the permissions in `WorkspaceContext`; the pure logic
+ * lives in the neighboring modules and each block decides its own text.
  *
- * O `Suspense` é exigido pelo `useSearchParams` na build estática — mesmo
- * motivo da página do Histórico.
+ * The `Suspense` is required by `useSearchParams` in the static build — same
+ * reason as the History page.
  */
 export default function ProjectActions() {
   return (
@@ -53,7 +53,7 @@ export default function ProjectActions() {
   )
 }
 
-/** O que cada linha precisa e que só muda quando os dados mudam (não a cada tecla da busca). */
+/** What each row needs and that only changes when the data changes (not on every search keystroke). */
 interface Derivados {
   gatilho: Gatilho
   resumo: ResumoDoAgendamento | null
@@ -63,18 +63,18 @@ interface Derivados {
 function Projetos() {
   const router = useViewTransitionRouter()
   const { current: currentWorkspace, canEdit, canExecute, canManage, workspaces } = useWorkspace()
-  // Execuções em andamento (polling global): vencem as métricas por serem
-  // mais frescas, e são o que transforma o Executar em "Ver execução".
+  // Runs in progress (global polling): they beat the metrics for being
+  // fresher, and they are what turns Executar into "Ver execução".
   const { runningRuns, refresh: refreshActiveRuns } = useActiveRuns()
   const { estado, atualizar, limparFiltros } = useProjetosUrl()
   const dados = useProjetosDados()
   const { workflows, grupos, metricas, metricasIndisponiveis, definirWorkflows, definirGrupos, recarregar } = dados
 
-  // ── Grupos recolhidos ──────────────────────────────────────────────────────
-  // O estado de recolhido sobrevive ao recarregamento — sem isso, quem recolhe
-  // os grupos que não usa recolhe tudo de novo a cada visita. A leitura é num
-  // efeito (e não no `useState` inicial) porque `localStorage` não existe no
-  // render do servidor.
+  // ── Collapsed groups ───────────────────────────────────────────────────────
+  // The collapsed state survives a reload — without it, whoever collapses the
+  // groups they do not use collapses everything again on every visit. The read
+  // happens in an effect (and not in the initial `useState`) because
+  // `localStorage` does not exist in the server render.
   const [recolhidos, setRecolhidos] = useState<Set<string>>(new Set())
   const chaveColapso = chaveDosColapsados(currentWorkspace?.id_hash)
   useEffect(() => {
@@ -106,18 +106,18 @@ function Projetos() {
   const todosRecolhidos = grupos.length > 0 && grupos.every(g => recolhidos.has(g.id_hash))
   // ──────────────────────────────────────────────────────────────────────────
 
-  // ── Derivações por workflow ────────────────────────────────────────────────
+  // ── Per-workflow derivations ───────────────────────────────────────────────
   const runPorHash = useMemo(
     () => new Map<string, RunningRun>(runningRuns.map(r => [r.workflowHash, r])),
     [runningRuns],
   )
   const gruposPorId = useMemo(() => new Map(grupos.map(g => [g.id_hash, g])), [grupos])
 
-  // Relógio de minuto para os textos relativos ("há 4 min"). Sem ele, a frescura
-  // dependia de um EFEITO COLATERAL do poll de métricas trocar a identidade de
-  // `metricas` — se o poll não mudasse nada, os tempos congelavam. Só avança com
-  // a aba visível (ninguém lê uma aba oculta) e um retorno ao foco recalcula na
-  // hora, para o "há N min" não voltar defasado.
+  // Minute clock for the relative texts ("há 4 min"). Without it, freshness
+  // depended on a SIDE EFFECT of the metrics poll changing the identity of
+  // `metricas` — if the poll changed nothing, the times froze. It only advances
+  // with the tab visible (nobody reads a hidden tab) and a return to focus
+  // recomputes right away, so "há N min" does not come back stale.
   const [minuto, setMinuto] = useState(0)
   useEffect(() => {
     const bump = () => { if (document.visibilityState === "visible") setMinuto(m => m + 1) }
@@ -126,11 +126,11 @@ function Projetos() {
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", bump) }
   }, [])
 
-  // Gatilho, agendamento e "como anda" de cada linha, recalculados a cada
-  // mudança de DADOS ou do relógio de minuto — e não a cada render: as linhas
-  // são memoizadas e recebem estes objetos por identidade, então uma tecla na
-  // busca não pode recriá-los. `minuto` mantém os tempos relativos frescos por
-  // conta própria, independente da cadência do poll de métricas.
+  // Trigger, schedule and "como anda" of each row, recomputed on every change
+  // of DATA or of the minute clock — and not on every render: the rows are
+  // memoized and receive these objects by identity, so a keystroke in the
+  // search must not recreate them. `minuto` keeps the relative times fresh on
+  // its own, independent of the metrics poll cadence.
   const derivados = useMemo(() => {
     const agora = new Date()
     const mapa = new Map<string, Derivados>()
@@ -155,14 +155,14 @@ function Projetos() {
     return { comoAndaPorHash, resumoDoAgendamentoPorHash }
   }, [derivados])
 
-  // Chips e subtítulo: sempre sobre a lista inteira.
+  // Chips and subtitle: always over the whole list.
   const contagens = useMemo(() => contarPorFiltro(workflows, contexto), [workflows, contexto])
   // ──────────────────────────────────────────────────────────────────────────
 
-  // ── Busca, chip, ordem ─────────────────────────────────────────────────────
-  // PERF: useDeferredValue — o campo responde imediatamente enquanto a
-  // filtragem é deferida para uma transição de baixa prioridade. Evita
-  // travamento do caret ao digitar em listas grandes.
+  // ── Search, chip, order ────────────────────────────────────────────────────
+  // PERF: useDeferredValue — the field responds immediately while the
+  // filtering is deferred to a low-priority transition. Avoids the caret
+  // stalling while typing in large lists.
   const qDiferido = useDeferredValue(estado.q)
   const recorteAtivo = filtrosAtivos({ ...estado, q: qDiferido }) > 0
 
@@ -171,7 +171,7 @@ function Projetos() {
     return workflows.filter(wf => casaBusca(wf, gruposPorId, qDiferido) && casaFiltro(wf))
   }, [workflows, estado.filtro, contexto, gruposPorId, qDiferido])
 
-  // Quantos casariam só com a busca: o "Há N com «q» sem o filtro" do vazio.
+  // How many would match the search alone: the empty state's "Há N com «q» sem o filtro".
   const soComBusca = useMemo(
     () => workflows.filter(wf => casaBusca(wf, gruposPorId, qDiferido)).length,
     [workflows, gruposPorId, qDiferido],
@@ -194,9 +194,9 @@ function Projetos() {
     [visiveis, estado.ordem, contexto],
   )
 
-  // Contagem do cabeçalho de cada seção: do grupo INTEIRO, não do recorte —
-  // contada aqui, e não por `workflow_count`, porque a lista local já reflete
-  // as movimentações otimistas antes de o servidor responder.
+  // Count in each section's header: of the WHOLE group, not the slice —
+  // counted here, and not via `workflow_count`, because the local list already
+  // reflects the optimistic moves before the server responds.
   const totais = useMemo(() => {
     const mapa = new Map<string | null, { total: number; ativos: number }>()
     for (const wf of workflows) {
@@ -210,9 +210,9 @@ function Projetos() {
   }, [workflows])
   const totalSemGrupo = totais.get(null) ?? { total: 0, ativos: 0 }
 
-  // Com busca ou chip ativo, grupos sem nenhuma linha correspondente somem;
-  // sem recorte, todos aparecem (inclusive vazios). Memoizado para não refiltrar
-  // a cada render (ex.: cada tecla da busca).
+  // With an active search or chip, groups with no matching row disappear;
+  // with no slice, all appear (including empty ones). Memoized so it does not
+  // re-filter on every render (e.g. every search keystroke).
   const gruposVisiveis = useMemo(
     () => recorteAtivo
       ? grupos.filter(g => (porGrupo.get(g.id_hash)?.length ?? 0) > 0)
@@ -221,11 +221,11 @@ function Projetos() {
   )
   // ──────────────────────────────────────────────────────────────────────────
 
-  // ── Execução rápida ────────────────────────────────────────────────────────
+  // ── Quick run ──────────────────────────────────────────────────────────────
   const [runningId, setRunningId] = useState<string | null>(null)
   const [preparandoId, setPreparandoId] = useState<string | null>(null)
-  // Alvo do diálogo de parâmetros: o schema vem junto porque a LISTAGEM não o
-  // traz (ver handleRunClick).
+  // Target of the parameters dialog: the schema comes along because the LISTING
+  // does not carry it (see handleRunClick).
   const [executeTarget, setExecuteTarget] =
     useState<{ project: IWorkflow; schema: Record<string, IParamSchema> } | null>(null)
 
@@ -238,30 +238,30 @@ function Projetos() {
       createToast.error("Erro ao executar workflow", res.error.message)
     } else {
       createToast.success(`Workflow "${project.name}" iniciado!`)
-      // Atualiza o indicador global de execuções sem esperar o próximo poll.
+      // Updates the global runs indicator without waiting for the next poll.
       refreshActiveRuns()
     }
   }, [refreshActiveRuns])
 
   /**
-   * `GET /workflows/` responde o schema leve (WorkflowListItem), que não traz
-   * `params_schema` — ler `project.params_schema` aqui dava SEMPRE undefined, e
-   * workflows com inputs obrigatórios eram disparados com `{}` e falhavam no
-   * executor. O schema é buscado no clique, uma requisição só, em vez de
-   * engordar a listagem inteira com um campo que quase nenhuma linha usa.
+   * `GET /workflows/` answers with the light schema (WorkflowListItem), which
+   * does not carry `params_schema` — reading `project.params_schema` here was
+   * ALWAYS undefined, and workflows with required inputs were fired with `{}`
+   * and failed on the executor. The schema is fetched on click, a single
+   * request, instead of fattening the whole listing with a field almost no row uses.
    */
   const handleRunClick = useCallback(async (project: IWorkflow) => {
-    // Estado próprio, e não `runningId`: durante a busca do schema o workflow
-    // ainda NÃO está executando, e o ponto "em execução" da linha leria essa
-    // espera como uma execução em curso.
+    // Its own state, not `runningId`: while the schema is being fetched the
+    // workflow is NOT running yet, and the row's "em execução" dot would read
+    // that wait as a run in progress.
     setPreparandoId(project.id_hash)
     const res = await GisFlowService.getWorkflowById(project.id_hash)
     setPreparandoId(null)
-    // "Não tem schema" e "não consegui saber se tem" são coisas diferentes: sem
-    // este ramo, um 500/timeout aqui caía no else e DISPARAVA o workflow com
-    // inputs vazios — exatamente a falha que buscar o schema veio corrigir, de
-    // volta pelo caminho de erro e agora pior, porque o usuário passou a confiar
-    // que o diálogo de parâmetros aparece quando é necessário.
+    // "Has no schema" and "could not find out whether it has one" are different
+    // things: without this branch, a 500/timeout here fell into the else and
+    // FIRED the workflow with empty inputs — exactly the failure that fetching
+    // the schema came to fix, back through the error path and now worse,
+    // because the user came to trust that the parameters dialog shows up when needed.
     if (res.error || !res.data) {
       createToast.error(
         "Não foi possível preparar a execução.",
@@ -281,15 +281,16 @@ function Projetos() {
   // ── Ativar / Desativar ─────────────────────────────────────────────────────
   const [desativando, setDesativando] = useState<IWorkflow | null>(null)
 
-  // Lê o valor da PRÓPRIA linha em vez de procurar na lista, e atualiza o
-  // estado por função: sem isso o callback fechava sobre `workflows` e trocava
-  // de identidade a cada resposta do servidor — e o memo das linhas não valia.
+  // Reads the value from the row ITSELF instead of looking it up in the list,
+  // and updates the state through a function: without this the callback closed
+  // over `workflows` and changed identity on every server response — and the
+  // rows' memo was worthless.
   const mudarStatus = useCallback(async (workflow: IWorkflow, novo: boolean) => {
     const aplicar = (valor: boolean) => definirWorkflows(prev =>
       prev.map(p => p.id_hash === workflow.id_hash ? { ...p, flag_ative: valor } : p),
     )
-    // Otimista, com reversão: a troca de status é o tipo de mudança em que
-    // esperar o servidor faz a linha "voltar" sob o cursor.
+    // Optimistic, with rollback: a status switch is the kind of change where
+    // waiting for the server makes the row "snap back" under the cursor.
     aplicar(novo)
     const res = await GisFlowService.updateStatusWorkflow(workflow.id_hash, { flag_ative: novo })
     if (res.error) {
@@ -300,8 +301,8 @@ function Projetos() {
     createToast.success(`«${workflow.name}» ${novo ? "ativado" : "desativado"}`)
   }, [definirWorkflows])
 
-  // Ativar é seguro e fica a um clique; Desativar passa pela confirmação que
-  // diz o que pausa (`ConfirmarDesativar`).
+  // Activating is safe and stays one click away; Deactivating goes through the
+  // confirmation that says what it pauses (`ConfirmarDesativar`).
   const ativar = useCallback((workflow: IWorkflow) => { void mudarStatus(workflow, true) }, [mudarStatus])
   const pedirDesativar = useCallback((workflow: IWorkflow) => setDesativando(workflow), [])
   const confirmarDesativar = useCallback((workflow: IWorkflow) => {
@@ -310,7 +311,7 @@ function Projetos() {
   }, [mudarStatus])
   // ──────────────────────────────────────────────────────────────────────────
 
-  // ── Duplicação ─────────────────────────────────────────────────────────────
+  // ── Duplication ────────────────────────────────────────────────────────────
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
 
   const handleDuplicate = useCallback(async (project: IWorkflow) => {
@@ -322,13 +323,14 @@ function Projetos() {
       createToast.error("Erro ao duplicar workflow", res.error.message)
       return
     }
-    // Recarrega em vez de inserir a cópia à mão: quem escolhe o nome é o
-    // backend (desambigua quando "Cópia de X" já existe) e a listagem traz
-    // campos que a resposta da duplicação não tem.
+    // Reloads instead of inserting the copy by hand: the backend picks the name
+    // (it disambiguates when "Cópia de X" already exists) and the listing
+    // carries fields the duplication response does not have.
     //
-    // O aviso é incondicional: a listagem não traz `definition`, então não há
-    // como saber daqui se este workflow tem agendamento — e a regra do endpoint
-    // vale para todos (a cópia nasce com o agendamento desligado).
+    // The notice is unconditional: the listing does not carry `definition`, so
+    // there is no way to know from here whether this workflow has a schedule —
+    // and the endpoint's rule applies to all (the copy is born with the
+    // schedule turned off).
     createToast.success(
       `Cópia criada: "${res.data?.name}"`,
       "Se o original tinha agendamento, a cópia nasce com ele desligado.",
@@ -347,17 +349,17 @@ function Projetos() {
     definirGrupos(prev => [...prev, group])
   }
 
-  // Excluir grupo com workflows dentro era BLOQUEADO, e o operador tinha de
-  // esvaziar o grupo à mão antes. A FK é `ondelete='SET NULL'`: os workflows
-  // apenas voltam a ficar sem grupo, nenhum é apagado. A confirmação diz
-  // quantos serão desagrupados — é o que justifica não bloquear.
+  // Deleting a group with workflows inside used to be BLOCKED, and the operator
+  // had to empty the group by hand first. The FK is `ondelete='SET NULL'`: the
+  // workflows just go back to having no group, none is deleted. The confirmation
+  // says how many will be ungrouped — that is what justifies not blocking.
   async function handleDeleteGroup(groupId: string) {
     const result = await GisFlowService.deleteWorkflowGroup(groupId)
     if (result?.error) { createToast.error("Erro ao excluir grupo"); return }
     createToast.success("Grupo excluído.")
     definirGrupos(prev => prev.filter(g => g.id_hash !== groupId))
-    // Espelha o SET NULL do banco: sem isto as linhas sumiriam da tela até o
-    // próximo carregamento, porque o grupo que as continha deixou de existir.
+    // Mirrors the database's SET NULL: without this the rows would vanish from the
+    // screen until the next load, because the group that held them no longer exists.
     definirWorkflows(prev => prev.map(p => p.group_id === groupId ? { ...p, group_id: null } : p))
   }
 
@@ -367,17 +369,17 @@ function Projetos() {
     definirGrupos(prev => prev.map(g => g.id_hash === groupId ? { ...g, name, description } : g))
   }
 
-  // Os handlers que vão para as linhas são `useCallback` com deps estáveis e
-  // atualização funcional do estado: identidade constante é o que faz o
-  // React.memo da LinhaWorkflow valer alguma coisa.
+  // The handlers that go to the rows are `useCallback` with stable deps and
+  // functional state updates: constant identity is what makes LinhaWorkflow's
+  // React.memo worth anything.
   const handleAddToGroup = useCallback(async (workflowId: string, groupId: string) => {
     const result = await GisFlowService.addWorkflowToGroup(groupId, workflowId)
     if (result?.error) { createToast.error("Erro ao mover workflow para o grupo"); return }
     definirWorkflows(prev => prev.map(p => p.id_hash === workflowId ? { ...p, group_id: groupId } : p))
   }, [definirWorkflows])
 
-  /** Troca de grupo em um passo: o backend sobrescreve `group_id`, então
-   *  chamar só o "adicionar" já tira do anterior. */
+  /** Changes group in one step: the backend overwrites `group_id`, so
+   *  calling just "add" already removes it from the previous one. */
   const handleMoveToGroup = useCallback(async (project: IWorkflow, groupId: string) => {
     if (project.group_id === groupId) return
     await handleAddToGroup(project.id_hash, groupId)
@@ -391,15 +393,15 @@ function Projetos() {
   // ──────────────────────────────────────────────────────────────────────────
 
   // ── Drag and Drop ──────────────────────────────────────────────────────────
-  // Duas coisas arrastam — a linha e o grupo inteiro — e o alvo do drop é o
-  // MESMO retângulo. Sem saber o que está na mão, soltar um grupo sobre outro
-  // seria interpretado como "mover workflow para este grupo".
+  // Two things drag — the row and the whole group — and the drop target is the
+  // SAME rectangle. Without knowing what is in hand, dropping a group on another
+  // would be interpreted as "move workflow to this group".
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [draggingGroupId, setDraggingGroupId] = useState<string | null>(null)
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null)
   const [dragOverUngrouped, setDragOverUngrouped] = useState(false)
 
-  // `useCallback` porque descem como prop para cada linha memoizada.
+  // `useCallback` because they go down as props to each memoized row.
   const handleDragStart = useCallback((workflowId: string) => {
     setDraggingId(workflowId)
   }, [])
@@ -411,7 +413,7 @@ function Projetos() {
     setDragOverUngrouped(false)
   }, [])
 
-  /** Solta um grupo sobre outro: o arrastado assume a posição do alvo. */
+  /** Drops a group on another: the dragged one takes the target's position. */
   async function handleReorderGroups(alvoId: string) {
     const origemId = draggingGroupId
     handleDragEnd()
@@ -419,12 +421,12 @@ function Projetos() {
 
     const atual = grupos.map(g => g.id_hash)
     const ordem = moverGrupo(atual, origemId, alvoId)
-    // Identidade preservada quando não houve movimento — não vale um POST.
+    // Identity preserved when nothing moved — not worth a POST.
     if (ordem === atual) return
 
-    // Otimista, com reversão — mesmo padrão de `mudarStatus`. A ordem é o tipo
-    // de mudança em que esperar o servidor faz o item "voltar" sob o cursor, e
-    // isso lê como falha mesmo quando deu certo.
+    // Optimistic, with rollback — same pattern as `mudarStatus`. Order is the kind
+    // of change where waiting for the server makes the item "snap back" under
+    // the cursor, and that reads as a failure even when it worked.
     const anterior = grupos
     const porId = new Map(grupos.map(g => [g.id_hash, g]))
     definirGrupos(ordem.map(id => porId.get(id)!).filter(Boolean))
@@ -442,9 +444,9 @@ function Projetos() {
     const workflow = workflows.find(p => p.id_hash === draggingId)
     handleDragEnd()
     if (!workflow) return
-    // Uma chamada, não duas: `add_workflow_to_group` sobrescreve o `group_id`.
-    // Tirar do grupo antes abria uma janela em que o workflow ficava sem grupo
-    // nenhum se a segunda chamada falhasse.
+    // One call, not two: `add_workflow_to_group` overwrites the `group_id`.
+    // Removing from the group first opened a window in which the workflow was
+    // left with no group at all if the second call failed.
     await handleMoveToGroup(workflow, groupId)
   }
 
@@ -466,43 +468,43 @@ function Projetos() {
   }
   // ──────────────────────────────────────────────────────────────────────────
 
-  // ── Diálogos por workflow ──────────────────────────────────────────────────
+  // ── Per-workflow dialogs ───────────────────────────────────────────────────
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null)
   const [configureProjectId, setConfigureProjectId] = useState<string | null>(null)
   const [portalDialogProject, setPortalDialogProject] = useState<IWorkflow | null>(null)
   const [moveDialogProject, setMoveDialogProject] = useState<IWorkflow | null>(null)
-  // Por id, e não por objeto: o workflow pode mudar na lista (renomeado,
-  // ativado) enquanto o diálogo está aberto, e ele deve ler a versão atual.
+  // By id, not by object: the workflow may change in the list (renamed,
+  // activated) while the dialog is open, and the dialog must read the current version.
   const workflowParaExcluir = deleteProjectId ? workflows.find(p => p.id_hash === deleteProjectId) ?? null : null
   const workflowParaConfigurar = configureProjectId ? workflows.find(p => p.id_hash === configureProjectId) ?? null : null
   // ──────────────────────────────────────────────────────────────────────────
 
-  // Mesma lista que o diálogo oferece no select — o menu só decide se há alguma.
+  // Same list the dialog offers in the select — the menu only decides whether there is any.
   const podeMover = useMemo(
     () => moveTargets(workspaces, currentWorkspace?.id_hash).length > 0,
     [workspaces, currentWorkspace?.id_hash],
   )
 
-  // ── Callbacks estáveis entregues às linhas ─────────────────────────────────
-  // Tudo o que desce para a LinhaWorkflow tem identidade constante — caso
-  // contrário o React.memo nunca acerta e a lista inteira volta a re-renderizar
-  // a cada tecla da busca.
+  // ── Stable callbacks handed to the rows ────────────────────────────────────
+  // Everything that goes down to LinhaWorkflow has constant identity —
+  // otherwise React.memo never hits and the whole list re-renders again on
+  // every search keystroke.
   const abrirWorkflow = useCallback(
     (id: string) => router.push(`./workflow/${id}`),
     [router],
   )
   /**
-   * Aquece a rota do editor no primeiro hover sobre a linha.
+   * Warms up the editor route on the first hover over the row.
    *
-   * `/workflow/[id]` é a rota mais pesada da aplicação (React Flow + Monaco) e
-   * as linhas navegam por `onClick`, não por <Link>: o App Router não tinha como
-   * pré-carregá-la, então cada abertura pagava payload RSC + chunks do zero e a
-   * listagem ficava segundos parada, sem retorno visual nenhum. Com a rota
-   * quente o comite cabe no teto de espera de `useViewTransitionRouter`, e a
-   * transição de rota passa a acontecer de verdade.
+   * `/workflow/[id]` is the heaviest route in the application (React Flow +
+   * Monaco) and the rows navigate via `onClick`, not via <Link>: the App Router
+   * had no way to prefetch it, so each opening paid for the RSC payload + chunks
+   * from scratch and the listing sat frozen for seconds, with no visual feedback
+   * at all. With the route warm the commit fits within the wait ceiling of
+   * `useViewTransitionRouter`, and the route transition actually happens.
    *
-   * O `Set` evita repetir a chamada a cada entrada do ponteiro na mesma linha —
-   * o cache do Next já deduplica, mas não de graça.
+   * The `Set` avoids repeating the call on every pointer entry into the same
+   * row — Next's cache already deduplicates, but not for free.
    */
   const aquecidos = useRef<Set<string>>(new Set())
   const prefetchWorkflow = useCallback((id: string) => {
@@ -510,8 +512,8 @@ function Projetos() {
     aquecidos.current.add(id)
     router.prefetch(`./workflow/${id}`)
   }, [router])
-  // Histórico já recortado ao workflow (spec §3.9); a execução viva abre
-  // direto no painel dela.
+  // History already sliced to the workflow (spec §3.9); the live run opens
+  // straight in its panel.
   const verExecucoes = useCallback(
     (id: string) => router.push(`/observability?workflow=${encodeURIComponent(id)}`),
     [router],
@@ -531,7 +533,7 @@ function Projetos() {
 
   const hasDnd = grupos.length > 0
 
-  /** A linha de um workflow, com o que já foi derivado para ele. */
+  /** A workflow's row, with what has already been derived for it. */
   function linha(wf: IWorkflow): ReactNode {
     const d = derivados.get(wf.id_hash)
     if (!d) return null
@@ -571,20 +573,20 @@ function Projetos() {
     )
   }
 
-  // ── Estados da tela ────────────────────────────────────────────────────────
+  // ── Screen states ──────────────────────────────────────────────────────────
   const carregando = dados.carregando
-  // O bloco de erro toma a tela apenas quando NUNCA houve uma carga aceita
-  // (`atualizadoEm == null`): quem trocou de workspace não pode ver a estante
-  // do anterior como se fosse a nova. Uma recarga que falha (Atualizar,
-  // Duplicar) sobre uma lista já pronta não a apaga — o hook mantém o que
-  // havia e o toast avisa; bloquear a tela inteira por um erro transitório
-  // seria pior que o problema.
+  // The error block takes over the screen only when there has NEVER been an
+  // accepted load (`atualizadoEm == null`): whoever switched workspaces must not
+  // see the previous shelf as if it were the new one. A reload that fails
+  // (Atualizar, Duplicar) over a list already in place does not erase it — the
+  // hook keeps what was there and the toast warns; blocking the whole screen
+  // over a transient error would be worse than the problem.
   const comErro = !carregando && dados.erro != null && dados.atualizadoEm == null
   const primeiroUso = !carregando && !comErro && workflows.length === 0 && grupos.length === 0
   const semResultado = !carregando && !comErro && !primeiroUso && recorteAtivo && visiveis.length === 0
   const listaPronta = !carregando && !comErro && !primeiroUso
-  // O subtítulo só some enquanto não há nada para contar (primeira carga, ou
-  // erro antes de qualquer resposta).
+  // The subtitle only disappears while there is nothing to count (first load, or
+  // an error before any response).
   const contagensDoCabecalho: ContagensDoCabecalho | null =
     carregando || (comErro && dados.atualizadoEm == null)
       ? null
@@ -627,9 +629,9 @@ function Projetos() {
             <SemResultado q={estado.q} filtro={estado.filtro} semFiltro={soComBusca} onLimpar={limparFiltros} />
           )}
 
-          {/* Sem grupo vem ANTES dos grupos. Seção com título só quando há
-              grupos; sem eles, a lista sai sem título — não há do que se
-              distinguir. */}
+          {/* Ungrouped comes BEFORE the groups. A titled section only when there
+              are groups; without them, the list comes out untitled — there is
+              nothing to tell it apart from. */}
           {!semResultado && semGrupo.length > 0 && (
             grupos.length > 0 ? (
               <section aria-labelledby="sem-grupo-titulo" {...zonaDeRemover} className="flex flex-col gap-1.5">
@@ -659,10 +661,10 @@ function Projetos() {
           {!semResultado && gruposVisiveis.map(grupo => {
             const id = grupo.id_hash
             const total = totais.get(id) ?? { total: 0, ativos: 0 }
-            // Arrastar GRUPO não tinha retorno visual nenhum: a pessoa segurava
-            // a alça e nada na tela dizia onde o grupo cairia. Os dois estados
-            // são distintos de propósito — "receber um workflow" e "trocar de
-            // posição" acontecem sobre o mesmo retângulo.
+            // Dragging a GROUP had no visual feedback at all: the person held
+            // the handle and nothing on screen said where the group would land.
+            // The two states are distinct on purpose — "receive a workflow" and
+            // "change position" happen over the same rectangle.
             const arrastandoEste = draggingGroupId === id
             return (
               <GrupoSecao
@@ -709,10 +711,10 @@ function Projetos() {
             </div>
           )}
 
-          {/* O recurso de grupos não tinha onde se apresentar: sem nenhum grupo
-              criado, nada na lista sugeria que agrupar era possível — nem a alça
-              de arrastar, que só aparece a partir do primeiro grupo. Este
-              convite é o único lugar em que ele pode se mostrar. */}
+          {/* The groups feature had nowhere to introduce itself: with no group
+              created, nothing in the list suggested grouping was possible — not
+              even the drag handle, which only appears from the first group on.
+              This invitation is the only place where it can show itself. */}
           {canEdit && !recorteAtivo && grupos.length === 0 && workflows.length > 2 && (
             <button
               type="button"
@@ -730,8 +732,8 @@ function Projetos() {
             </button>
           )}
 
-          {/* Dica de arrastar, no primeiro grupo criado: a alça só passa a
-              existir a partir daí, e nada explicaria que ela apareceu. */}
+          {/* Drag hint, on the first group created: the handle only exists from
+              then on, and nothing would explain that it appeared. */}
           {canEdit && grupos.length === 1 && totalSemGrupo.total > 0 && (
             <p className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
               <TbGripVertical size={14} className="shrink-0" aria-hidden="true" />
@@ -742,7 +744,7 @@ function Projetos() {
         </>
       )}
 
-      {/* ── Diálogos ──────────────────────────────────────────────────────── */}
+      {/* ── Dialogs ───────────────────────────────────────────────────────── */}
       <Dialog open={modalNovoGrupo} onOpenChange={setModalNovoGrupo}>
         <DialogContent>
           <DialogHeader>
@@ -822,8 +824,8 @@ function Projetos() {
         )}
       </Dialog>
 
-      {/* Diálogo de parâmetros para execução rápida — o schema vem do
-          `getWorkflowById` disparado no clique, porque a listagem não o traz. */}
+      {/* Parameters dialog for a quick run — the schema comes from the
+          `getWorkflowById` fired on click, because the listing does not carry it. */}
       {executeTarget && (
         <ExecuteParamsDialog
           open
@@ -862,8 +864,8 @@ function Projetos() {
           workflowName={moveDialogProject.name}
           portalAccess={moveDialogProject.portal_access}
           onMoved={() => {
-            // O workflow saiu do workspace ativo, então sai da listagem. Update
-            // otimista em vez de refetch: a lista inteira piscaria à toa.
+            // The workflow left the active workspace, so it leaves the listing. Optimistic
+            // update instead of a refetch: the whole list would flicker for nothing.
             definirWorkflows(prev => prev.filter(p => p.id_hash !== moveDialogProject.id_hash))
           }}
         />

@@ -1,11 +1,11 @@
 # app/mcp/instrucoes.py
 """
-`instructions` do servidor — o texto que o cliente MCP recebe no handshake,
-antes da primeira chamada.
+The server's `instructions` — the text the MCP client receives in the handshake,
+before the first call.
 
-É a única chance de estabelecer política antes que alguém crie ou execute um
-fluxo por engano. Curto de propósito: uma lista de regras acionáveis, sem
-tutorial (o tutorial é o guia, em `get_authoring_guide`).
+It is the only chance to establish policy before someone creates or runs a
+workflow by mistake. Short on purpose: a list of actionable rules, no tutorial
+(the tutorial is the guide, in `get_authoring_guide`).
 """
 from __future__ import annotations
 

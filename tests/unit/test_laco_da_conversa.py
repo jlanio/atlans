@@ -1,16 +1,16 @@
 # tests/unit/test_laco_da_conversa.py
 """
-O laço do assistente (`conversar`), quadro a quadro e efeito a efeito.
+The assistant loop (`conversar`), frame by frame and effect by effect.
 
-Caracterização: prende a sequência de quadros que o SSE entrega à Home e ao
-editor (tipos, ordem, conteúdo) e os efeitos que acontecem entre um quadro e o
-seguinte — a chamada ao modelo, o registro de uso, a cobrança da cota, o gancho
-que fecha o turno, as ferramentas —, além do que o laço loga.
+Characterization: pins the sequence of frames the SSE delivers to the Home and the
+editor (types, order, content) and the effects that happen between one frame and
+the next — the model call, the usage record, the quota charge, the hook
+that closes the turn, the tools — plus what the loop logs.
 
-Os quadros são PUXADOS: nada acontece antes de quem consome pedir o quadro
-seguinte. É isso que faz o cancelamento pelo cliente (a aba fechada, que
-cancela a tarefa do SSE) parar o laço exatamente onde ele está — os testes do
-fim do arquivo prendem o que roda e o que não roda nesse caso.
+Frames are PULLED: nothing happens before the consumer asks for the next
+frame. That is what makes cancellation by the client (the closed tab, which
+cancels the SSE task) stop the loop exactly where it is — the tests at the
+end of the file pin what runs and what doesn't in that case.
 """
 from __future__ import annotations
 
@@ -57,8 +57,8 @@ def _chamada(nome, argumentos, ident):
 
 
 class _Modelo:
-    """O modelo, roteirizado: um roteiro por volta — `Delta`s, a `Resposta`, e
-    onde o roteiro trava (`asyncio.Event`) ou quebra (exceção)."""
+    """The model, scripted: one script per round — `Delta`s, the `Resposta`, and
+    where the script blocks (`asyncio.Event`) or breaks (exception)."""
 
     def __init__(self, linha, voltas):
         self.linha = linha
@@ -82,7 +82,7 @@ class _Modelo:
 
 
 class _Servidor:
-    """O servidor MCP em processo, anotando cada chamada na linha do tempo."""
+    """The in-process MCP server, logging each call on the timeline."""
 
     def __init__(self, linha, ferramentas, resultados=None):
         self.linha = linha
@@ -110,7 +110,7 @@ class _Servidor:
 
 @pytest.fixture
 def linha(monkeypatch):
-    """A linha do tempo, com a preparação, o uso, a cota e o log anotados."""
+    """The timeline, with the preparation, the usage, the quota and the log recorded."""
     linha: list = []
 
     async def _teto_de(user_id, *, db=None, redis=None):
@@ -175,7 +175,7 @@ PREPARO = [("teto_de", "usr-1"), ("verificar_tokens", "usr-1", TETO), ("modelo_e
 
 
 def _registro(entrada, saida, superficie="editor"):
-    """O que `uso_service.registrar_volta` recebe numa volta."""
+    """What `uso_service.registrar_volta` receives in a round."""
     return ("registrar_volta", {
         "user_id": "usr-1", "modelo": MODELO, "superficie": superficie, "entrada": entrada,
         "saida": saida, "cache_leitura": 0, "raciocinio": 0, "custo_usd": 0.0,
@@ -203,7 +203,7 @@ async def _esperar(condicao, prazo_s=2.0):
         await asyncio.sleep(0.005)
 
 
-# ── O caminho feliz, nas duas superfícies ─────────────────────────────────────
+# ── The happy path, on both surfaces ──────────────────────────────────────────
 
 
 DEFINICAO = {"nodes": [{"id": "n1"}], "edges": []}
@@ -211,8 +211,8 @@ VALIDOU = '{"ok": true, "error_count": 0, "warning_count": 1}'
 
 
 async def test_editor_quadro_a_quadro(linha):
-    """Quatro voltas: lote paralelo, pista em fila (desenho + execução com
-    progresso), lote com uma ferramenta barrada, e o texto final."""
+    """Four rounds: parallel batch, queued lane (drawing + execution with
+    progress), batch with one tool blocked, and the final text."""
     redis = RedisFalso()
     redis.dados["assistente:tokens:usr-1"] = 100
 
@@ -255,7 +255,7 @@ async def test_editor_quadro_a_quadro(linha):
         {"role": "assistant", "content": [_texto("Pronto.")]},
     ]
     assert linha == PREPARO + [
-        # Volta 1: raciocínio e texto ao vivo; o lote paralelo é anunciado inteiro.
+        # Round 1: live reasoning and text; the parallel batch is announced whole.
         ("modelo", 1),
         ("quadro", "pensando", {"texto": "preciso do catálogo"}),
         ("quadro", "texto", {"texto": "Vou montar"}),
@@ -273,7 +273,7 @@ async def test_editor_quadro_a_quadro(linha):
         ("quadro", "ferramenta_fim", {"id": "tu-1", "nome": "search_nodes", "erro": False}),
         ("quadro", "ferramenta_fim", {"id": "tu-2", "nome": "describe_node", "erro": False}),
         ("gancho", 3, "user"),
-        # Volta 2: com uma ferramenta local no lote, a volta roda em fila.
+        # Round 2: with a local tool in the batch, the round runs queued.
         ("modelo", 3),
         ("stream fechado",),
         _registro(200, 30),
@@ -291,7 +291,7 @@ async def test_editor_quadro_a_quadro(linha):
         ("quadro", "progresso", {"concluidos": 1, "total": 2, "mensagem": "buffer: completed (0.3s)", "id": "tu-4"}),
         ("quadro", "ferramenta_fim", {"id": "tu-4", "nome": "run_workflow", "erro": False}),
         ("gancho", 5, "user"),
-        # Volta 3: a validação vira proposta com veredito; a escrita é barrada.
+        # Round 3: the validation becomes a proposal with a verdict; the write is blocked.
         ("modelo", 5),
         ("stream fechado",),
         _registro(300, 40),
@@ -323,8 +323,8 @@ async def test_editor_quadro_a_quadro(linha):
 
 
 async def test_home_quadro_a_quadro(linha, monkeypatch):
-    """A Home: a confirmação sai pela fila no meio do lote paralelo, o fluxo
-    criado vira `fluxo`, e a ferramenta local (respostas rápidas) roda em fila."""
+    """The Home: the confirmation goes out through the queue in the middle of the parallel
+    batch, the created workflow becomes `fluxo`, and the local tool (quick replies) runs queued."""
     monkeypatch.setattr(agente.secrets, "token_urlsafe", lambda _n: "tok-fixo")
     redis = RedisFalso()
     criado = json.dumps({"id": "wf-9", "untrusted_data": {"name": "Focos"}})
@@ -392,8 +392,8 @@ async def test_home_quadro_a_quadro(linha, monkeypatch):
 
 
 async def test_o_modelo_recebe_a_conversa_viva_e_o_transcrito_do_chamador_fica_intacto(linha):
-    """Cada volta recebe o mesmo sistema, as mesmas ferramentas e a conversa
-    que o laço vai estendendo — uma cópia: a lista de quem chamou não muda."""
+    """Each round receives the same system, the same tools and the conversation
+    that the loop keeps extending — a copy: the caller's list does not change."""
     transcrito = [PEDIDO]
     servidor = _Servidor(linha, ["search_nodes", "create_workflow"])
     modelo = _Modelo(linha, [
@@ -413,11 +413,11 @@ async def test_o_modelo_recebe_a_conversa_viva_e_o_transcrito_do_chamador_fica_i
     assert (primeiro["max_tokens"], primeiro["esforco"]) == (cs.MAX_TOKENS, cs.ESFORCO_DO_RACIOCINIO)
 
 
-# ── As saídas por erro ────────────────────────────────────────────────────────
+# ── The error exits ───────────────────────────────────────────────────────────
 
 
 async def test_teto_de_voltas_fecha_com_loop_limit(linha, monkeypatch):
-    """Sem Redis: nem quadro de cota, nem cobrança — e o teto em memória vale."""
+    """Without Redis: no quota frame, no charge — and the in-memory ceiling applies."""
     monkeypatch.setattr(cs, "TETO_DE_VOLTAS", 2)
     servidor = _Servidor(linha, ["search_nodes"])
     modelo = _Modelo(linha, [
@@ -473,8 +473,8 @@ MODELO_INDISPONIVEL = {
 
 @pytest.mark.parametrize("onde", ["no meio do stream", "sem a resposta final", "na chamada"])
 async def test_falha_do_modelo_vira_erro_e_fecha_a_conversa(linha, onde):
-    """O que o modelo já cedeu continua na tela; o texto da exceção nunca vai
-    ao quadro (carrega URL e cabeçalho), só a classe."""
+    """What the model has already yielded stays on screen; the exception's text never
+    goes into the frame (it carries URL and headers), only the class."""
     servidor = _Servidor(linha, ["search_nodes"])
     if onde == "na chamada":
         modelo = _ModeloQueQuebraNaChamada(linha, [])
@@ -503,8 +503,8 @@ PENDENTE = "A chamada não chegou a acontecer: a conversa foi interrompida."
 
 @pytest.mark.parametrize("parada", ["content_filter", "length"])
 async def test_recusa_ou_corte_do_modelo_fecha_a_conversa_sem_rodar_a_chamada(linha, parada):
-    """A mensagem entra (e o turno fecha) antes do erro; a chamada pedida não
-    roda, e o transcrito devolvido a responde para continuar retomável."""
+    """The message goes in (and the turn closes) before the error; the requested call does
+    not run, and the returned transcript answers it so it stays resumable."""
     blocos = [_texto("vou criar"), _chamada("create_workflow", {"name": "x"}, "tu-1")]
     servidor = _Servidor(linha, ["create_workflow"])
     modelo = _Modelo(linha, [[_resposta(blocos, parada, _uso(50, 5))]])
@@ -600,8 +600,8 @@ async def test_gancho_que_quebra_loga_e_a_conversa_segue(linha):
 
 
 async def test_erros_das_ferramentas_do_lote_viram_resultado_de_erro(linha):
-    """Recusa declarada, quebra, argumento que não é objeto e o portão do
-    editor: todas viram `tool_result` de erro, e a conversa segue."""
+    """Declared refusal, crash, argument that is not an object, and the editor's
+    gate: all become an error `tool_result`, and the conversation goes on."""
     recusa = ToolError(json.dumps({"code": "forbidden", "message": "sem papel"}))
     servidor = _Servidor(linha, ["search_nodes", "describe_node", "get_authoring_guide", "run_workflow"],
                          {"search_nodes": recusa, "describe_node": RuntimeError("quebrou")})
@@ -666,10 +666,10 @@ async def test_cota_estourada_recusa_antes_de_falar_com_o_modelo(linha):
     assert linha == PREPARO[:2]
 
 
-# ── O cancelamento pelo cliente ───────────────────────────────────────────────
-# A aba fechada cancela a tarefa que puxa os quadros (`com_batimento`): o
-# CancelledError cai onde o laço está esperando e sobe. Nenhum efeito seguinte
-# acontece; uma ferramenta que já estava rodando termina sozinha.
+# ── Cancellation by the client ────────────────────────────────────────────────
+# The closed tab cancels the task that pulls the frames (`com_batimento`): the
+# CancelledError lands where the loop is waiting and propagates. No further
+# effect happens; a tool that was already running finishes on its own.
 
 
 async def test_cancelado_no_meio_do_stream_nao_cobra_nem_fecha_turno(linha):
@@ -772,7 +772,7 @@ async def test_cancelado_com_o_lote_paralelo_rodando_todas_terminam_sozinhas(lin
 
 
 async def _puxar_ate(gerador, linha, parar):
-    """Puxa quadros até `parar(evento)` e fecha o gerador ali (`aclose`)."""
+    """Pulls frames until `parar(evento)` and closes the generator there (`aclose`)."""
     async for evento in gerador:
         linha.append(("quadro", evento.tipo, evento.dados))
         if parar(evento):
@@ -782,7 +782,7 @@ async def _puxar_ate(gerador, linha, parar):
 
 
 async def test_fechado_depois_da_cota_a_resposta_nao_entra_na_conversa(linha):
-    """O gancho só roda quando o quadro seguinte à cota é pedido."""
+    """The hook only runs when the frame after the quota one is requested."""
     modelo = _Modelo(linha, [[_resposta([_chamada("search_nodes", {}, "tu-1")], "tool_calls")]])
     gerador = _conversar(linha, servidor=_Servidor(linha, ["search_nodes"]), modelo=modelo, redis=RedisFalso(),
                          ao_fechar_turno=_gancho(linha))
@@ -852,15 +852,15 @@ async def test_fechado_no_meio_do_stream_o_stream_do_modelo_tambem_fecha(linha):
     ]
 
 
-# ── Memória e ordem da preparação ─────────────────────────────────────────────
+# ── Memory and order of the preparation ───────────────────────────────────────
 
 
 async def test_o_laco_sai_da_memoria_com_o_stream_sem_o_coletor_ciclico(linha, monkeypatch):
-    """Terminada a conversa, o laço (a conversa inteira, o catálogo, o cliente)
-    sai da memória por contagem de referência, como as closures do gerador de
-    antes. Com o canal das ferramentas como método ligado do laço, guardado no
-    estado e no contexto de cada ferramenta, o laço ficava num ciclo que só o
-    coletor cíclico desfaz: na geração 2, bem depois do fim."""
+    """Once the conversation ends, the loop (the whole conversation, the catalog, the client)
+    leaves memory through reference counting, like the closures of the earlier
+    generator. With the tools channel as a bound method of the loop, stored in the
+    state and in each tool's context, the loop sat in a cycle that only the
+    cyclic collector breaks: in generation 2, well after the end."""
     vivos = []
 
     class _Espiado(cs.LacoDaConversa):
@@ -885,9 +885,9 @@ async def test_o_laco_sai_da_memoria_com_o_stream_sem_o_coletor_ciclico(linha, m
 
 
 async def test_transcrito_fora_do_formato_com_a_cota_estourada_da_a_recusa_da_cota(linha):
-    """O estado das ferramentas nasce no fim da preparação, como antes: um item
-    do transcrito que não é objeto só é lido depois da cota, e a recusa por
-    cota (a que a rota sabe mostrar) vem primeiro."""
+    """The tools' state is born at the end of the preparation, as before: a transcript
+    item that is not an object is only read after the quota, and the refusal by
+    quota (the one the route knows how to show) comes first."""
     redis = RedisFalso()
     redis.dados["assistente:tokens:usr-1"] = TETO
 

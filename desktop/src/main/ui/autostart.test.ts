@@ -1,25 +1,25 @@
 // desktop/src/main/ui/autostart.test.ts
 //
-// Regressão do "checkbox que liga e volta sozinho".
+// Regression of the "checkbox that turns on and flips back by itself".
 //
-// `app.getLoginItemSettings()` sem opções compara o comando gravado no registro
-// com `process.execPath` e `args: []`. Como a escrita acrescenta `--hidden`, a
-// leitura devolvia `openAtLogin: false` com a entrada gravada e CORRETA — e a
-// UI concluía que a alteração não pegou.
+// `app.getLoginItemSettings()` without options compares the command written in
+// the registry with `process.execPath` and `args: []`. Since the write appends
+// `--hidden`, the read returned `openAtLogin: false` with the entry written and
+// CORRECT — and the UI concluded the change had not taken.
 //
-// Comprovado na máquina, com o mesmo registro nas duas leituras:
+// Proven on the machine, with the same registry entry in both reads:
 //   getLoginItemSettings()                    -> openAtLogin: false
 //   getLoginItemSettings({args:['--hidden']}) -> openAtLogin: true
 //
-// A assimetria entre escrita e leitura é invisível em code review, então o
-// teste é sobre ELA: os argumentos usados nas duas precisam ser os mesmos.
+// The asymmetry between write and read is invisible in code review, so the
+// test is about IT: the arguments used in both must be the same.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 interface Chamada { openAtLogin?: boolean; path?: string; args?: string[] }
 
 let escritas: Chamada[] = []
 let leituras: Chamada[] = []
-/** O que `getLoginItemSettings` devolve — controlado por teste. */
+/** What `getLoginItemSettings` returns — controlled by the test. */
 let resposta = { openAtLogin: false, executableWillLaunchAtLogin: false }
 
 vi.mock('electron', () => ({
@@ -43,8 +43,8 @@ describe('autostart', () => {
 
     expect(escritas).toHaveLength(1)
     expect(leituras).toHaveLength(1)
-    // A igualdade é o ponto: qualquer divergência faz `openAtLogin` voltar
-    // false com o registro correto.
+    // Equality is the point: any divergence makes `openAtLogin` come back false
+    // with the correct registry entry.
     expect(leituras[0]!.args).toEqual(escritas[0]!.args)
     expect(leituras[0]!.path).toEqual(escritas[0]!.path)
   })
@@ -62,16 +62,16 @@ describe('autostart', () => {
   })
 
   it('devolve o estado RELIDO, e nao o pedido', () => {
-    // Escrita bloqueada por politica de grupo: o registro nao muda, e a UI
-    // precisa mostrar "desligado" mesmo tendo pedido "ligado".
+    // Write blocked by group policy: the registry does not change, and the UI
+    // must show "off" even though it asked for "on".
     resposta = { openAtLogin: false, executableWillLaunchAtLogin: false }
     expect(definirAutostart(true).ativo).toBe(false)
   })
 
   it('distingue "entrada existe" de "vai executar de verdade"', () => {
-    // O usuario desativou o item em Gerenciador de Tarefas -> Inicializar: a
-    // entrada continua no registro, mas o app nao sobe. Um checkbox marcado
-    // sem ressalva seria mentira.
+    // The user disabled the item in Task Manager -> Startup: the entry stays in
+    // the registry, but the app does not start. A checked checkbox without a
+    // caveat would be a lie.
     resposta = { openAtLogin: true, executableWillLaunchAtLogin: false }
     const e = lerAutostart()
     expect(e.ativo).toBe(true)
@@ -79,14 +79,14 @@ describe('autostart', () => {
   })
 
   it('expoe o comando que fica no registro', () => {
-    // Exibido na tela: uma entrada de logon que o usuario nao consegue
-    // inspecionar e indistinguivel de malware para quem for conferir.
+    // Shown on screen: a logon entry the user cannot inspect is
+    // indistinguishable from malware to whoever checks.
     expect(lerAutostart().comando).toContain(ARG_OCULTO)
   })
 
   it('um erro do registro vira mensagem, e nao excecao', () => {
-    // Antes o catch devolvia `false` e a UI dizia "desligado" — o usuario
-    // clicava de novo, e de novo, sem nunca saber que foi recusado.
+    // Previously the catch returned `false` and the UI said "off" — the user
+    // clicked again, and again, never knowing it had been refused.
     resposta = null as never
     const e = lerAutostart()
     expect(e.ativo).toBe(false)

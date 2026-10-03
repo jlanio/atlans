@@ -1,12 +1,12 @@
 // desktop/src/shared/ui.test.ts
 //
-// `ehOrigemInterna` é a fronteira que decide o que navega DENTRO da janela web
-// e o que vai para o navegador do sistema. É segurança, não conveniência: um
-// host que passe por "interno" por engano carregaria conteúdo de terceiros com
-// o nosso preload — mínimo, mas próprio — e sob a sessão logada do usuário.
+// `ehOrigemInterna` is the boundary that decides what navigates INSIDE the web
+// window and what goes to the system browser. It is security, not convenience:
+// a host that passed as "internal" by mistake would load third-party content
+// with our preload — minimal, but ours — and under the user's logged-in session.
 //
-// A comparação é por host EXATO e HTTPS por padrão, no mesmo espírito da
-// allowlist de servidor em deeplink.ts.
+// The comparison is by EXACT host and HTTPS by default, in the same spirit as
+// the server allowlist in deeplink.ts.
 import { describe, expect, it } from 'vitest'
 import { UI_HOST, UI_URL, ehExternoSeguro, ehOrigemInterna, hostsInternos } from './ui.js'
 
@@ -44,8 +44,8 @@ describe('ehOrigemInterna', () => {
   })
 
   it('recusa subdomínio fora da lista', () => {
-    // Comparação por host EXATO: um `*.atlans.example.org` deixaria um subdomínio
-    // comprometido servir conteúdo dentro da janela logada.
+    // Comparison by EXACT host: a `*.atlans.example.org` would let a compromised
+    // subdomain serve content inside the logged-in window.
     expect(ehOrigemInterna('https://evil.atlans.example.org/')).toBe(false)
   })
 
@@ -66,12 +66,12 @@ describe('ehOrigemInterna', () => {
     expect(ehOrigemInterna('data:text/html,<h1>x')).toBe(false)
   })
 
-  // ── Override de staging/local ──────────────────────────────────────────────
+  // ── Staging/local override ─────────────────────────────────────────────────
 
   it('afrouxa para http só quando o main pede (staging/local)', () => {
     const opts = { hosts: ['localhost'], protocolos: ['https:', 'http:'] as const }
     expect(ehOrigemInterna('http://localhost:3000/', opts)).toBe(true)
-    // Mesmo host, mas sem o http liberado → recusa.
+    // Same host, but without http allowed → rejected.
     expect(ehOrigemInterna('http://localhost:3000/', { hosts: ['localhost'] })).toBe(false)
   })
 
@@ -93,9 +93,9 @@ describe('ehExternoSeguro', () => {
   })
 
   it('RECUSA esquemas que o SO trataria de forma perigosa', () => {
-    // O ponto do achado: openExternal repassa o destino ao SO. `smb:` no Windows
-    // vaza hash NTLM; `file:` abre recurso local; `atlans:` dispara o deep link
-    // de enrollment do próprio app.
+    // The point of the finding: openExternal hands the target to the OS. `smb:` on
+    // Windows leaks the NTLM hash; `file:` opens a local resource; `atlans:`
+    // fires the app's own enrollment deep link.
     expect(ehExternoSeguro('smb://atacante.example/share')).toBe(false)
     expect(ehExternoSeguro('file:///etc/passwd')).toBe(false)
     expect(ehExternoSeguro('atlans://enroll?executor_id=x&otp=y')).toBe(false)

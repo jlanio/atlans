@@ -1,10 +1,10 @@
 /**
- * Baseline do histórico de undo/redo no load (F10).
+ * Baseline of the undo/redo history on load (F10).
  *
- * Sem um snapshot de baseline após a hidratação, o histórico começa vazio
- * (pointer=-1) e o primeiro saveSnapshot é o estado PÓS-edição; como undo()
- * guarda `pointer <= 0`, a PRIMEIRA edição de aresta ficava presa e nunca era
- * desfeita. captureBaseline() grava o estado carregado como pointer=0.
+ * Without a baseline snapshot after hydration, the history starts empty
+ * (pointer=-1) and the first saveSnapshot is the POST-edit state; since undo()
+ * guards `pointer <= 0`, the FIRST edge edit got stuck and was never undone.
+ * captureBaseline() records the loaded state as pointer=0.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderHook, act } from "@testing-library/react"
@@ -29,10 +29,10 @@ describe("useCanvasHistory — baseline (F10)", () => {
     _nodes = [{ id: "a" }]
     const { result } = renderHook(() => useCanvasHistory())
 
-    _edges = [{ id: "e1" }]                    // primeira edição muda o canvas
-    act(() => result.current.saveSnapshot())    // salva o estado PÓS-edição
+    _edges = [{ id: "e1" }]                    // first edit changes the canvas
+    act(() => result.current.saveSnapshot())    // saves the POST-edit state
 
-    expect(result.current.canUndo).toBe(false)  // pointer=0 → undo é no-op
+    expect(result.current.canUndo).toBe(false)  // pointer=0 → undo is a no-op
   })
 
   it("COM baseline: a primeira edição é desfazível e volta ao estado carregado", () => {
@@ -41,9 +41,9 @@ describe("useCanvasHistory — baseline (F10)", () => {
     const { result } = renderHook(() => useCanvasHistory())
 
     act(() => result.current.captureBaseline())  // baseline = estado carregado
-    expect(result.current.canUndo).toBe(false)   // baseline sozinho não desfaz
+    expect(result.current.canUndo).toBe(false)   // baseline alone doesn't undo
 
-    _edges = [{ id: "e1" }]                       // primeira edição
+    _edges = [{ id: "e1" }]                       // first edit
     act(() => result.current.saveSnapshot())
     expect(result.current.canUndo).toBe(true)
 

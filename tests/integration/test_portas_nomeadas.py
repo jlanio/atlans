@@ -1,18 +1,20 @@
 # tests/integration/test_portas_nomeadas.py
 """
-Duas entradas distintas chegando ao mesmo no.
+Two distinct inputs arriving at the same node.
 
-O nome da variavel que o script recebe vem do `to_key` da aresta. O editor so
-preenche `to_key` quando o no de destino DECLARA mais de uma porta; sem ele o
-executor cai no `from_key` (core.py) — que e "output" em praticamente todo no.
-Duas arestas escrevem na mesma chave e a segunda sobrescreve a primeira.
+The name of the variable the script receives comes from the edge's `to_key`.
+The editor only fills `to_key` when the target node DECLARES more than one
+port; without it the executor falls back to `from_key` (core.py) — which is
+"output" on practically every node. Two edges write to the same key and the
+second overwrites the first.
 
-O sintoma nao denuncia a causa: o script reclama de uma variavel indefinida, sem
-nada dizendo que a outra entrada foi perdida. Foi assim que o `PythonScript`
-passou a existir sem conseguir combinar duas fontes.
+The symptom does not reveal the cause: the script complains about an undefined
+variable, with nothing saying that the other input was lost. That is how
+`PythonScript` came to exist without being able to combine two sources.
 
-Estes testes exercitam o EXECUTOR de verdade, e nao o no isolado: o defeito
-estava na montagem dos inputs entre nos, que so aparece rodando o grafo.
+These tests exercise the real EXECUTOR, not the isolated node: the defect was
+in assembling the inputs between nodes, which only shows up when running the
+graph.
 """
 import asyncio
 from unittest.mock import MagicMock
@@ -39,12 +41,12 @@ def _rodar(nodes, edges):
 # ── O defeito ────────────────────────────────────────────────────────────────
 
 def test_sem_to_key_a_segunda_aresta_SOBRESCREVE_a_primeira():
-    """Documenta o comportamento herdado: sem `to_key`, as duas arestas usam o
-    `from_key` como nome e uma delas se perde.
+    """Documents the inherited behavior: without `to_key`, the two edges use the
+    `from_key` as the name and one of them is lost.
 
-    Nao e um bug a corrigir no executor — e o motivo pelo qual o no precisa
-    DECLARAR portas. Se um dia isto passar a acumular em vez de sobrescrever,
-    este teste avisa que o contrato mudou.
+    It is not a bug to fix in the executor — it is the reason the node needs
+    to DECLARE ports. If this ever starts accumulating instead of overwriting,
+    this test warns that the contract changed.
     """
     with pytest.raises(Exception) as e:
         _rodar(
@@ -71,7 +73,7 @@ def test_com_to_key_as_duas_entradas_chegam_pelo_nome():
 
 
 def test_to_key_nomeia_mesmo_com_from_key_diferente():
-    """`to_key` vence: e o nome de CHEGADA, independente de como o pai chamava."""
+    """`to_key` wins: it is the ARRIVAL name, regardless of what the parent called it."""
     resultado = _rodar(
         [_script("a", "saida_do_a = 'A'", saida="saida_do_a"),
          _script("c", "r = pontos")],
@@ -81,9 +83,9 @@ def test_to_key_nomeia_mesmo_com_from_key_diferente():
 
 
 def test_uma_entrada_sem_to_key_continua_funcionando():
-    """Nao pode quebrar fluxo existente: sem portas declaradas o `ports` fica
-    vazio, o no segue com um ponto de conexao anonimo e a variavel continua
-    vindo pelo `from_key`."""
+    """Must not break existing workflows: without declared ports `ports` stays
+    empty, the node keeps one anonymous connection point and the variable keeps
+    coming through `from_key`."""
     resultado = _rodar(
         [_script("a", "r = 'A'"), _script("c", "r = r + '!'")],
         [{"source": "a", "target": "c", "from_key": "r"}],
@@ -91,11 +93,11 @@ def test_uma_entrada_sem_to_key_continua_funcionando():
     assert resultado["c"]["r"] == "A!"
 
 
-# ── O contrato do no ─────────────────────────────────────────────────────────
+# ── The node contract ────────────────────────────────────────────────────────
 
 def test_pythonscript_declara_entradas_dinamicas():
-    """`dynamic_inputs` e o que faz o editor derivar os pontos de conexao da
-    propriedade `ports` em vez da lista fixa do catalogo."""
+    """`dynamic_inputs` is what makes the editor derive the connection points from
+    the `ports` property instead of the catalog's fixed list."""
     from flow.registry import auto_discover_nodes, NODE_REGISTRY
     auto_discover_nodes()
 

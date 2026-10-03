@@ -2,46 +2,46 @@ import type { IExecutor, IPolicyMember, IWorkspacePolicy } from "@/service/types
 import { descreverPolitica, descreverQueda, disponiveisNaCadeia, politicaEmAlerta, rotuloDoStatus } from "./politica"
 
 /**
- * Leitura do executor de um workspace, reduzida a um estado só.
+ * Reading of a workspace's executor, reduced to a single state.
  *
- * O painel do ativo e a fileira compacta mostram a mesma informação em duas
- * densidades (frase por extenso lá, rótulo curto aqui). As regras que separam
- * "pool", "removido", "inativo" e "não sei" viviam dentro do card e teriam de
- * ser copiadas — e uma cópia divergiria na primeira correção.
+ * The active workspace's panel and the compact row show the same information
+ * at two densities (a full sentence there, a short label here). The rules that
+ * separate "pool", "removed", "inactive" and "don't know" lived inside the card
+ * and would have to be copied — and a copy would diverge on the first fix.
  */
 
-/** O que a tela precisa saber de um executor — serve tanto a lista `/executores/my`
- *  quanto um membro da política, que carrega os mesmos campos. */
+/** What the screen needs to know about an executor — fits both the `/executores/my`
+ *  list and a policy member, which carries the same fields. */
 export type ExecutorResumido = Pick<IExecutor, "id_hash" | "name" | "status" | "executor_type"> & {
   online: boolean | null
 }
 
 export type ResumoDoExecutor =
   | { estado: "carregando" }
-  /** A leitura falhou: NÃO é pool, é "não sei para onde as execuções vão". */
+  /** The read failed: this is NOT pool, it is "don't know where runs go". */
   | { estado: "indefinido"; mensagem: string }
   | { estado: "pool" }
-  /** Apontado para um executor que não está mais na lista (removido ou sem acesso). */
+  /** Pointed at an executor that is no longer in the list (removed or no access). */
   | { estado: "sumido"; alvo: string }
   | { estado: "inativo"; executor: ExecutorResumido }
   | { estado: "ok"; executor: ExecutorResumido }
   /**
-   * Política EM VIGOR com mais de um executor (grupo no principal ou uma
-   * reserva): não é um alvo só, e o seletor rápido não a representa — o
-   * painel mostra o resumo e manda para o editor.
+   * A policy IN EFFECT with more than one executor (a group in the primary
+   * tier or a fallback): it is not a single target, and the quick picker does
+   * not represent it — the panel shows the summary and sends you to the editor.
    */
   | { estado: "grupo"; politica: IWorkspacePolicy }
 
 export interface EntradaDoResumo {
-  /** Executores disponíveis (inclui inativos, para reconhecer um alvo removido). */
+  /** Available executors (includes inactive ones, to recognize a removed target). */
   executores: IExecutor[]
-  /** Alvo atual: `null` = pool da plataforma; `undefined` = ainda não lido. */
+  /** Current target: `null` = platform pool; `undefined` = not read yet. */
   alvo: string | null | undefined
   /** A leitura do executor DESTE workspace falhou. */
   alvoDesconhecido: boolean
-  /** Falha ao listar os executores do usuário (vale para a tela toda). */
+  /** Failure listing the user's executors (applies to the whole screen). */
   erroExecutores: string | null
-  /** Política de execução do workspace, quando lida; ausente = só o alvo. */
+  /** The workspace's execution policy, when read; absent = target only. */
   politica?: IWorkspacePolicy | null
 }
 
@@ -52,14 +52,14 @@ function membroComoExecutor(m: IPolicyMember): ExecutorResumido {
 }
 
 export function resumirExecutor(e: EntradaDoResumo): ResumoDoExecutor {
-  // "Sumido" só faz sentido quando a LISTA de executores foi lida: se a
-  // listagem falhou, todo alvo pareceria removido e a tela pintaria alerta em
-  // todos os workspaces por um problema que não é deles.
+  // "Gone" only makes sense when the executor LIST was read: if listing
+  // failed, every target would look removed and the screen would paint an alert
+  // on every workspace for a problem that is not theirs.
   if (e.erroExecutores) return { estado: "indefinido", mensagem: e.erroExecutores }
   if (e.alvoDesconhecido) return { estado: "indefinido", mensagem: MENSAGEM_ALVO_DESCONHECIDO }
-  // O grupo só toma a tela quando a política VALE. Com a flag desligada é o
-  // ponteiro legado que roteia, e é ele que o seletor mostra — a política
-  // aparece como prévia, ao lado.
+  // The group only takes over the screen when the policy is IN EFFECT. With the
+  // flag off it is the legacy pointer that routes, and that is what the picker
+  // shows — the policy appears as a preview, alongside.
   const emVigor = e.politica?.policy_routing_enabled === true
   if (emVigor && e.politica && (e.politica.primary.length > 1 || e.politica.fallback.length > 0)) {
     return { estado: "grupo", politica: e.politica }
@@ -69,8 +69,8 @@ export function resumirExecutor(e: EntradaDoResumo): ResumoDoExecutor {
   const alvo = e.alvo
   const executor: ExecutorResumido | undefined =
     e.executores.find(x => x.id_hash === alvo)
-    // Membro da política que não está na MINHA lista (incluído por um admin da
-    // plataforma, por exemplo): a política já traz nome, status e presença.
+    // A policy member that is not in MY list (added by a platform admin, for
+    // example): the policy already carries name, status and presence.
     ?? (emVigor ? e.politica?.primary.map(membroComoExecutor).find(m => m.id_hash === alvo) : undefined)
   if (!executor) return { estado: "sumido", alvo }
   if (executor.status !== "active") return { estado: "inativo", executor }
@@ -78,9 +78,9 @@ export function resumirExecutor(e: EntradaDoResumo): ResumoDoExecutor {
 }
 
 /**
- * Merece o triângulo. Um dedicado OFFLINE só é alerta quando a política vale
- * e é Isolado: aí a próxima execução falha. No legado (ou com último recurso
- * pool) o pool assume, e o cinza basta.
+ * Deserves the triangle. An OFFLINE dedicated executor is only an alert when the
+ * policy is in effect and is Isolated: then the next run fails. In legacy mode
+ * (or with pool as last resort) the pool takes over, and gray is enough.
  */
 export function emAlerta(r: ResumoDoExecutor, politica?: IWorkspacePolicy | null): boolean {
   if (r.estado === "grupo") return politicaEmAlerta(r.politica)
@@ -91,13 +91,13 @@ export function emAlerta(r: ResumoDoExecutor, politica?: IWorkspacePolicy | null
   return r.estado === "sumido" || r.estado === "inativo"
 }
 
-/** Frase do painel do ativo: o que o status significa para as execuções. */
+/** Sentence for the active workspace's panel: what the status means for runs. */
 export function descreverExecutor(r: ResumoDoExecutor, politica?: IWorkspacePolicy | null): string {
   switch (r.estado) {
     case "carregando": return ""
     case "indefinido": return r.mensagem
     case "pool": return "Pool compartilhado · qualquer executor compartilhado assume as execuções"
-    // Sem "escolha outro": quem não gerencia lê a mesma frase e não tem como.
+    // No "pick another": someone who does not manage reads the same sentence and cannot.
     case "sumido": return "Indisponível · o executor apontado foi removido ou você perdeu o acesso"
     case "inativo": return `${capitalizar(rotuloDoStatus(r.executor.status))} · não recebe execuções`
     case "grupo": return descreverPolitica(r.politica)
@@ -113,7 +113,7 @@ export function descreverExecutor(r: ResumoDoExecutor, politica?: IWorkspacePoli
   }
 }
 
-/** Rótulo da fileira compacta: cabe ao lado do papel numa linha de 12px. */
+/** Label for the compact row: fits next to the role in a 12px line. */
 export function rotularExecutor(r: ResumoDoExecutor): string {
   switch (r.estado) {
     case "carregando": return ""
@@ -123,8 +123,8 @@ export function rotularExecutor(r: ResumoDoExecutor): string {
     case "inativo": return `${r.executor.name} · ${rotuloDoStatus(r.executor.status)}`
     case "ok": return r.executor.name
     case "grupo": {
-      // Curto de propósito: a fileira tem três colunas e "geo-01 + reserva"
-      // truncava. O detalhe (principais/reserva/online) fica na frase do painel.
+      // Short on purpose: the row has three columns and "geo-01 + reserva" was
+      // truncated. The detail (primary/fallback/online) goes in the panel sentence.
       const total = r.politica.primary.length + r.politica.fallback.length
       return `${total} executores`
     }
@@ -132,9 +132,9 @@ export function rotularExecutor(r: ResumoDoExecutor): string {
 }
 
 /**
- * Classes do ponto de status ao lado do rótulo, ou `null` quando não há o que
- * sinalizar. O ponto acompanha o texto, nunca o substitui: cor sozinha não
- * distingue "offline" de "pool" para quem não vê cor.
+ * Classes for the status dot next to the label, or `null` when there is nothing
+ * to signal. The dot accompanies the text, never replaces it: color alone does
+ * not distinguish "offline" from "pool" for someone who cannot see color.
  */
 export function corDoPonto(r: ResumoDoExecutor, politica?: IWorkspacePolicy | null): string | null {
   switch (r.estado) {

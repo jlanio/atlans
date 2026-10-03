@@ -28,29 +28,31 @@ import { LinhaDoMeu, GatilhoDeAcoes } from "../linha"
 import { useFormatos, useTextosDaCasca } from "../i18n/da-casca"
 import type { ItemDoAcervo } from "./normalizar"
 
-// Acima disto a lista vira virtual — o acervo de um workspace grande passa de
-// centenas de linhas e montar todas trava o scroll da casca.
+// Above this the list becomes virtual — the collection of a large workspace
+// exceeds hundreds of rows and mounting them all freezes the shell's scroll.
 const VIRTUAL_ACIMA = 150
 
-// Ícones do Drive cobrem shp/gpkg; os formatos de artefato usam os mesmos nomes.
+// Drive icons cover shp/gpkg; the artifact formats use the same names.
 const ALIAS_DE_ICONE: Record<string, string> = { shapefile: "shp", geoparquet: "gpkg" }
 
-// O trilho de 3rem só cabe ícone: o `SidebarMenuSub` já some sozinho no modo
-// ícone, mas os blocos que NÃO são sublista (a lista virtual, os avisos) são
-// `<div>` cru e ficavam recortados dentro do trilho.
+// The 3rem rail only fits an icon: `SidebarMenuSub` already hides on its own
+// in icon mode, but the blocks that are NOT a sublist (the virtual list, the
+// warnings) are raw `<div>`s and got clipped inside the rail.
 const SO_EXPANDIDO = "group-data-[collapsible=icon]:hidden"
 
 /**
- * "Meus → Artefatos": o acervo do workspace atual — artefatos de execução e
- * arquivos do Drive na MESMA lista, distinguidos só pelo ícone e pelo estado
- * (permanente / efêmero / local no executor). Clicar num artefato geojson/com
- * camada de portal o põe no globo (pedido pela store, que o HomeView drena);
- * arquivo do Drive não vai ao globo na v1 — abre os metadados.
+ * "Meus → Artefatos" (Mine → Artifacts): the current workspace's collection —
+ * run artifacts and Drive files in the SAME list, distinguished only by icon
+ * and state (permanent / ephemeral / local on the executor). Clicking a
+ * geojson artifact/one with a portal layer puts it on the globe (requested via
+ * the store, which HomeView drains); a Drive file doesn't go to the globe in v1
+ * — it opens the metadata.
  *
- * O painel NÃO troca de workspace: ele segue o `current` do WorkspaceContext (o
- * padrão da pessoa, ou o último usado). O seletor que vivia aqui saiu por
- * decisão do dono — a troca de escopo volta depois, em outro lugar da casca.
- * Por isso este componente só LÊ `current`, e quem o muda é o resto do app.
+ * The panel does NOT switch workspaces: it follows the WorkspaceContext's
+ * `current` (the person's default, or the last one used). The selector that
+ * lived here was removed by the owner's decision — scope switching comes back
+ * later, elsewhere in the shell. That's why this component only READS
+ * `current`, and the rest of the app is what changes it.
  */
 export function ArtefatosLista() {
   const { current, workspaces } = useWorkspace()
@@ -66,8 +68,8 @@ export function ArtefatosLista() {
   const [metaAlvo, setMetaAlvo] = useState<ItemDoAcervo | null>(null)
   const [excluindo, setExcluindo] = useState<ItemDoAcervo | null>(null)
 
-  // As frases da dica de retenção (compartilhada com a tabela de Artefatos,
-  // que segue em português) no idioma da Home.
+  // The sentences of the retention hint (shared with the Artifacts table,
+  // which stays in Portuguese) in the Home's language.
   const retencao = useMemo<TextosDaRetencao>(() => ({
     expirado: t.artefatos.retencao.expirado,
     expiraHoje: t.artefatos.retencao.expiraHoje,
@@ -75,7 +77,7 @@ export function ArtefatosLista() {
     removidoEm: (expiresAt) => t.artefatos.retencao.removidoEm(fmt.dataEHora(expiresAt)),
   }), [t, fmt])
 
-  // O diálogo de metadados do Drive (que segue em português lá) no idioma da Home.
+  // The Drive metadata dialog (which stays in Portuguese there) in the Home's language.
   const metadados = useMemo<TextosDosMetadados>(() => ({
     ...t.artefatos.metadadosDialogo,
     fechar: textos.comum.fechar,
@@ -83,8 +85,8 @@ export function ArtefatosLista() {
     dataEHora: fmt.dataEHora,
   }), [t, textos, fmt])
 
-  // No telefone o sidebar é um Sheet que cobre a tela: pôr uma camada no globo
-  // atrás da gaveta parece "nada aconteceu". Mesmo gesto do "Nova conversa".
+  // On phones the sidebar is a Sheet that covers the screen: putting a layer on
+  // the globe behind the drawer looks like "nothing happened". Same gesture as "Nova conversa".
   const fecharNoTelefone = useCallback(() => {
     if (isMobile) setOpenMobile(false)
   }, [isMobile, setOpenMobile])
@@ -97,11 +99,12 @@ export function ArtefatosLista() {
 
   const baixar = useCallback(async (item: ItemDoAcervo) => {
     if (item.fonte === "artefato") {
-      // ERA `window.open(getArtifactDownloadUrl(...))`, e não baixava nada: esse
-      // endpoint devolve `{download_url, filename}` em JSON, então a aba nova
-      // abria o JSON na cara da pessoa. Pior, navegação de topo não leva o
-      // Bearer, e artefato `protected` virava 401. O caminho certo está em
-      // `lib/baixar-artefato` — o mesmo que a tabela de Artefatos do app usa.
+      // It WAS `window.open(getArtifactDownloadUrl(...))`, and it downloaded
+      // nothing: that endpoint returns `{download_url, filename}` as JSON, so the
+      // new tab opened the JSON in the person's face. Worse, a top-level
+      // navigation doesn't carry the Bearer, and a `protected` artifact became a
+      // 401. The right path is in `lib/baixar-artefato` — the same one the app's
+      // Artifacts table uses.
       const erro = await baixarArtefato(item.id, t.artefatos.download)
       if (erro) createToast.error(t.artefatos.baixarFalhou(item.nome), erro)
       return
@@ -126,8 +129,9 @@ export function ArtefatosLista() {
     const temMenu = item.adicionavel || item.estado !== "local" || item.fonte === "drive" || podeExcluir
     const ext = ALIAS_DE_ICONE[item.formato] ?? item.formato
     const titulo = `${item.nome}${item.formato ? ` · ${item.formato.toUpperCase()}` : ""}`
-    // Pela chave, e não pela frase guardada no item: o acervo mora no hook, e a
-    // frase tem de sair no idioma em uso, não no da carga.
+    // By the key, not by the sentence stored in the item: the collection lives in
+    // the hook, and the sentence must come out in the current language, not the
+    // one at load time.
     const motivo = item.motivo ? t.artefatos.semPrevia[item.motivo] : null
     const primario = (
       <>
@@ -154,8 +158,8 @@ export function ArtefatosLista() {
             className="flex min-w-0 flex-1 items-center gap-1.5 py-1 text-sidebar-foreground/80 max-md:min-h-10"
           >
             {primario}
-            {/* O `title` só existe no hover do mouse: no teclado e no toque o
-                motivo da linha inerte precisa chegar por texto. */}
+            {/* `title` only exists on mouse hover: on keyboard and touch the reason
+                for the inert row has to arrive as text. */}
             {motivo && <span className="sr-only">{motivo}</span>}
           </div>
         )}
@@ -168,11 +172,11 @@ export function ArtefatosLista() {
             <DropdownMenuTrigger asChild>
               <GatilhoDeAcoes rotulo={item.nome} />
             </DropdownMenuTrigger>
-            {/* `home-portal`: o menu é portado para o <body>, FORA da árvore que
-                declara a paleta da Home — sem a classe ele abria claro sobre a
-                Home quase preta quando o app está no tema claro. Os itens ganham
-                40px no telefone: o gatilho já era grande o bastante, o destino
-                do toque é que não era. */}
+            {/* `home-portal`: the menu is portaled to <body>, OUTSIDE the tree that
+                declares the Home's palette — without the class it opened light over
+                the near-black Home when the app is in the light theme. The items get
+                40px on phones: the trigger was already big enough, it was the tap
+                target that wasn't. */}
             <DropdownMenuContent align="end" className="home-portal min-w-40">
               {item.adicionavel && (
                 <DropdownMenuItem onSelect={() => exibirNoGlobo(item)} className="gap-2 max-md:min-h-10">
@@ -204,8 +208,9 @@ export function ArtefatosLista() {
     )
   }, [baixar, exibirNoGlobo, podeGerir, t, retencao])
 
-  // A lista veio cortada no teto do servidor: sem dizer o total, quem rola até o
-  // fim conclui que viu tudo e que o artefato que procura foi apagado.
+  // The list came cut at the server's ceiling: without stating the total, whoever
+  // scrolls to the end concludes they saw everything and that the artifact they
+  // are looking for was deleted.
   const truncado = total != null && total > itens.length
 
   let corpo: React.ReactNode
@@ -220,12 +225,12 @@ export function ArtefatosLista() {
       </SidebarMenuSub>
     )
   } else if (erro && !jaCarregou) {
-    // §3: o bloco de erro só toma a lista quando nunca houve carga aceita.
+    // §3: the error block only takes over the list when there was never an accepted load.
     corpo = <ErroDaLista mensagem={t.artefatos.carregarFalhou} onTentar={recarregar} />
   } else if (!current) {
-    // Sem seletor aqui, "selecione um workspace" mandaria fazer algo que este
-    // painel não oferece mais. O estado é transitório (o contexto ainda não
-    // resolveu o workspace da pessoa), então o texto só descreve.
+    // With no selector here, "selecione um workspace" would tell the person to do
+    // something this panel no longer offers. The state is transient (the context
+    // hasn't resolved the person's workspace yet), so the text only describes.
     corpo = (
       <SidebarMenuSub>
         <li className="px-2 py-1.5 text-xs text-sidebar-foreground/55">
@@ -261,9 +266,9 @@ export function ArtefatosLista() {
     <>
       {corpo}
 
-      {/* Os avisos vivem FORA dos ramos: acima de 150 itens o corpo vira lista
-          virtual e no ramo vazio não há `<ul>` — era justamente no workspace
-          grande que a falha de uma fonte ficava silenciosa. */}
+      {/* The warnings live OUTSIDE the branches: above 150 items the body becomes a
+          virtual list and in the empty branch there is no `<ul>` — it was precisely
+          in the large workspace that a source failure went silent. */}
       {(erro || avisos.drive || avisos.artefatos || truncado) && (
         <div className={`flex flex-col gap-1 px-2 pb-1 ${SO_EXPANDIDO}`}>
           {erro && jaCarregou && (
@@ -298,8 +303,8 @@ export function ArtefatosLista() {
         </div>
       )}
 
-      {/* `home-portal` nos dois diálogos: são portais no <body>, fora da árvore
-          que declara a paleta da Home — abriam claros sobre a Home quase preta. */}
+      {/* `home-portal` on both dialogs: they are portals in <body>, outside the tree
+          that declares the Home's palette — they opened light over the near-black Home. */}
       <MetadataDialog
         className="home-portal"
         file={metaAlvo?.driveFile ?? null}
@@ -333,9 +338,9 @@ export function ArtefatosLista() {
 }
 
 /**
- * O erro de 1ª carga dentro do sidebar: o cartão centralizado do §3.2 não cabe
- * num trilho de 16rem, então fica a forma compacta — mesma semântica
- * (`role="alert"`), mesma microcopy e a mesma saída ("Tentar de novo").
+ * The 1st-load error inside the sidebar: the centered card of §3.2 doesn't fit
+ * in a 16rem rail, so the compact form stays — same semantics
+ * (`role="alert"`), same microcopy and the same way out ("Tentar de novo").
  */
 function ErroDaLista({ mensagem, onTentar }: { mensagem: string; onTentar: () => void }) {
   const { tentarDeNovo } = useTextosDaCasca().comum
@@ -354,11 +359,11 @@ function ErroDaLista({ mensagem, onTentar }: { mensagem: string; onTentar: () =>
 }
 
 /**
- * O caminho virtual (acima de 150 itens): um scroller próprio com altura teto,
- * linhas absolutas. Molde de `run-panel/output-tab.tsx`. Fora do `SidebarMenuSub`
- * (que é `<ul>`) porque as linhas absolutas não são `<li>` — daí os papéis ARIA
- * na mão, e o `aria-setsize`/`aria-posinset` que diz ao leitor de tela o tamanho
- * real da lista (só a janela existe no DOM).
+ * The virtual path (above 150 items): its own scroller with a ceiling height,
+ * absolute rows. Modeled on `run-panel/output-tab.tsx`. Outside `SidebarMenuSub`
+ * (which is a `<ul>`) because absolute rows are not `<li>` — hence the ARIA roles
+ * by hand, and the `aria-setsize`/`aria-posinset` that tells the screen reader
+ * the list's real size (only the window exists in the DOM).
  */
 function ListaVirtual({
   itens,
@@ -368,11 +373,11 @@ function ListaVirtual({
   renderLinha: (item: ItemDoAcervo) => React.ReactNode
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  // A lista fica MONTADA quando o item do grupo Meus fecha (o wrapper vira
-  // `hidden`), e `display:none` pode zerar o `scrollTop` do scroller sem o
-  // virtualizador saber: ao reabrir, a janela calculada era de um offset velho
-  // e as linhas ficavam em branco até rolar. `enabled` amarrado à visibilidade
-  // — desabilitar descarta a assinatura e reabilitar relê o `scrollTop` real.
+  // The list stays MOUNTED when the Mine group item closes (the wrapper becomes
+  // `hidden`), and `display:none` can reset the scroller's `scrollTop` without
+  // the virtualizer knowing: on reopening, the computed window was from a stale
+  // offset and the rows stayed blank until scrolling. `enabled` tied to
+  // visibility — disabling drops the subscription and re-enabling rereads the real `scrollTop`.
   const [visivel, setVisivel] = useState(true)
   useEffect(() => {
     const el = ref.current
@@ -405,9 +410,9 @@ function ListaVirtual({
             aria-setsize={itens.length}
             aria-posinset={vi.index + 1}
             data-index={vi.index}
-            // Mede de verdade em vez de confiar nos 32px estimados: a linha
-            // cresce no telefone (alvo de 40px) e com badge de retenção, e sem
-            // medida as linhas se sobrepunham sem nenhum sinal.
+            // Measures for real instead of trusting the estimated 32px: the row
+            // grows on phones (40px target) and with a retention badge, and
+            // without measuring the rows overlapped with no sign at all.
             ref={virtual.measureElement}
             style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${vi.start}px)` }}
           >

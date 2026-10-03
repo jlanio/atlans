@@ -13,7 +13,7 @@ describe("derivarCamadas", () => {
     ]
     const cs = derivarCamadas(turnos)
     expect(cs.map((c) => c.artifact_id)).toEqual(["a1", "a2"])
-    expect(cs.find((c) => c.artifact_id === "a1")?.available).toBe(true) // a última venceu
+    expect(cs.find((c) => c.artifact_id === "a1")?.available).toBe(true) // the last one won
   })
 })
 
@@ -24,7 +24,7 @@ describe("pareceLonLat", () => {
   it("recusa CRS métrico, ordem invertida e forma errada", () => {
     expect(pareceLonLat([500000, 9000000, 510000, 9100000])).toBe(false) // UTM
     expect(pareceLonLat([-62, -9, -63, -10])).toBe(false)                // invertida
-    expect(pareceLonLat([1, 2, 3])).toBe(false)                          // 3 números
+    expect(pareceLonLat([1, 2, 3])).toBe(false)                          // 3 numbers
     expect(pareceLonLat(null)).toBe(false)
   })
 })

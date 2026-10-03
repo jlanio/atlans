@@ -1,13 +1,13 @@
 import { dayjs } from "@/lib/dayjs"
 
 /**
- * Texto do chip de salvamento em repouso: QUANDO foi o último save, na precisão
- * que responde a pergunta do momento.
+ * Text of the save chip at rest: WHEN the last save was, at the precision that
+ * answers the question of the moment.
  *
- * Nos primeiros minutos a pergunta é "acabei de salvar?" — daí minutos. Depois
- * disso é "foi hoje?" — daí a hora. Antes de hoje, dia e hora, e não "há 3
- * dias": um relativo longo obriga a fazer conta para saber se foi antes ou
- * depois de outra coisa que se lembra.
+ * In the first few minutes the question is "did I just save?" — hence minutes.
+ * After that it is "was it today?" — hence the time. Before today, day and
+ * time, and not "3 days ago": a long relative time forces you to do math to
+ * know whether it was before or after something else you remember.
  */
 export function rotuloDeSalvo(salvoEm: number, agora: number = Date.now()): string {
   const decorrido = Math.max(0, agora - salvoEm)

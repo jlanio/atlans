@@ -2,21 +2,22 @@
 
 // web/app/components/home/assistente/anexos.tsx
 //
-// Os arquivos soltos sobre a Home, mostrados DENTRO da caixa do assistente.
+// The files dropped on the Home, shown INSIDE the assistant's box.
 //
-// Três peças, e as três são montadas pela barra e pelo painel — as duas
-// superfícies onde se escreve. Montar só numa repetiria o bug que o
-// `AvisoDeCotaCheia` existe para não repetir: um recurso que some conforme a
-// tela. Ctrl+I troca uma pela outra, e é por isso que o estado mora na store,
-// não aqui.
+// Three pieces, and all three are mounted by the bar and by the panel — the two
+// surfaces where one writes. Mounting in only one would repeat the bug that
+// `AvisoDeCotaCheia` exists to avoid: a feature that disappears depending on the
+// screen. Ctrl+I swaps one for the other, and that is why the state lives in the
+// store, not here.
 //
-// - `ConviteDeSoltura`: a linha que aparece na caixa enquanto o arquivo está no
-//   ar. É o único realce do arraste — nenhum véu cobre o globo.
-// - `ChipsDeAnexo`: o que está subindo e o que já está no Drive.
-// - `AvisoDeAnexosRecusados`: o que o servidor recusou, com o MESMO painel da
-//   tela `/drive` (`ResultadoDoUpload`) e a mesma classificação do motivo.
-//   Fica fora dos chips de propósito: o recusado não entra na mensagem, e
-//   deixá-lo na fileira faria a pessoa mandar a pergunta achando que ele foi.
+// - `ConviteDeSoltura`: the line that appears in the box while the file is in
+//   the air. It is the drag's only highlight — no veil covers the globe.
+// - `ChipsDeAnexo`: what is uploading and what is already in the Drive.
+// - `AvisoDeAnexosRecusados`: what the server rejected, with the SAME panel as
+//   the `/drive` screen (`ResultadoDoUpload`) and the same reason classification.
+//   It stays out of the chips on purpose: the rejected file doesn't go into the
+//   message, and leaving it in the row would make the person send the question
+//   thinking it went along.
 
 import { TbCheck, TbLoader2, TbPaperclip, TbX } from "react-icons/tb"
 
@@ -28,24 +29,24 @@ import { cn } from "@/lib/utils"
 import type { Anexo } from "@/app/stores/homeStore"
 import { formatBytes } from "@/utils/formatters"
 
-// ── O texto que viaja com a mensagem ─────────────────────────────────────────
+// ── The text that travels with the message ───────────────────────────────────
 
-/** Os que de fato chegaram ao Drive. Só eles podem ser citados. */
+/** The ones that actually reached the Drive. Only they can be cited. */
 export function anexosProntos(anexos: Anexo[]): Anexo[] {
   return anexos.filter((a) => a.estado === "pronto")
 }
 
 /**
- * Acrescenta à mensagem a lista do que acabou de subir.
+ * Appends to the message the list of what was just uploaded.
  *
- * Sem isto, «analise isso» chega ao assistente sem nenhum «isso»: ele tem a
- * ferramenta `list_drive_files` e enxerga o workspace inteiro, mas não tem como
- * saber QUAIS dos arquivos de lá são os desta pergunta. A linha é a tradução
- * literal dos chips que a pessoa está vendo na caixa — nada é anexado sem estar
- * à vista.
+ * Without this, "analise isso" (analyze this) reaches the assistant without any
+ * "this": it has the `list_drive_files` tool and sees the whole workspace, but
+ * has no way to know WHICH of the files there are the ones for this question.
+ * The line is the literal translation of the chips the person sees in the box —
+ * nothing is attached without being in view.
  *
- * Os que ainda estão subindo ficam de fora: citá-los seria mandar o assistente
- * procurar um arquivo que talvez nem exista.
+ * The ones still uploading are left out: citing them would send the assistant
+ * looking for a file that may not even exist.
  */
 export function comReferencia(texto: string, anexos: Anexo[], idioma: Idioma = IDIOMA_PADRAO): string {
   const nomes = anexosProntos(anexos).map((a) => a.nome)
@@ -55,12 +56,12 @@ export function comReferencia(texto: string, anexos: Anexo[], idioma: Idioma = I
 }
 
 /**
- * A pergunta que a caixa passa a oferecer quando há anexo pronto.
+ * The question the box starts offering when there is a ready attachment.
  *
- * Toma o lugar das sugestões digitadas do hero (que falam de focos de calor e
- * desmatamento): oferecer «Mostre os focos de calor» a quem acabou de soltar um
- * shapefile é ignorar o que a pessoa fez. `null` quando não há nada pronto —
- * aí a caixa volta ao placeholder de sempre.
+ * It takes the place of the hero's typed suggestions (which talk about fire
+ * hotspots and deforestation): offering "Mostre os focos de calor" to someone
+ * who just dropped a shapefile is ignoring what the person did. `null` when
+ * nothing is ready — then the box goes back to the usual placeholder.
  */
 export function sugestaoParaAnexos(anexos: Anexo[], idioma: Idioma = IDIOMA_PADRAO): string | null {
   const nomes = anexosProntos(anexos).map((a) => a.nome)
@@ -71,7 +72,7 @@ export function sugestaoParaAnexos(anexos: Anexo[], idioma: Idioma = IDIOMA_PADR
   return t.analiseMais(nomes[0], t.arquivos(outros, FORMATOS[idioma].inteiro(outros)))
 }
 
-/** As recusas, na forma que o painel da tela `/drive` consome. */
+/** The rejections, in the shape the `/drive` screen's panel consumes. */
 export function recusasDe(anexos: Anexo[], idioma: Idioma = IDIOMA_PADRAO): UploadError[] {
   return anexos
     .filter((a) => a.estado === "recusado")
@@ -82,9 +83,9 @@ export function recusasDe(anexos: Anexo[], idioma: Idioma = IDIOMA_PADRAO): Uplo
     }))
 }
 
-// ── As peças ─────────────────────────────────────────────────────────────────
+// ── The pieces ───────────────────────────────────────────────────────────────
 
-/** A linha de convite, enquanto o arquivo está no ar sobre a página. */
+/** The invitation line, while the file is in the air over the page. */
 export function ConviteDeSoltura({ className }: { className?: string }) {
   const t = useTextos().assistente.anexos
   return (
@@ -99,11 +100,11 @@ export function ConviteDeSoltura({ className }: { className?: string }) {
 }
 
 /**
- * A fileira de chips: o que está subindo e o que já está no Drive.
+ * The row of chips: what is uploading and what is already in the Drive.
  *
- * O × só existe depois que o arquivo chegou. Durante o envio ele seria uma
- * promessa falsa — a requisição continuaria correndo e o arquivo apareceria no
- * Drive de qualquer jeito, sem nada na tela dizendo isso.
+ * The × only exists after the file has arrived. During the upload it would be a
+ * false promise — the request would keep running and the file would appear in
+ * the Drive anyway, with nothing on screen saying so.
  */
 export function ChipsDeAnexo({
   anexos, onRemover, className,
@@ -156,11 +157,12 @@ export function ChipsDeAnexo({
 }
 
 /**
- * O que o servidor recusou. É o painel da tela `/drive`, inteiro: mesma
- * classificação, mesmos rótulos, mesmo texto de motivo.
+ * What the server rejected. It is the `/drive` screen's panel, whole: same
+ * classification, same labels, same reason text.
  *
- * Ele some só quando a pessoa fecha — enviar a mensagem não o leva junto,
- * porque a recusa não tem nada a ver com a pergunta e ainda precisa ser lida.
+ * It only goes away when the person closes it — sending the message doesn't take
+ * it along, because the rejection has nothing to do with the question and still
+ * needs to be read.
  */
 export function AvisoDeAnexosRecusados({
   anexos, onFechar, className,

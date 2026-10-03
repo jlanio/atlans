@@ -1,12 +1,12 @@
 """
-Alembic env.py — configuração de ambiente para migrações do Atlas Studio.
+Alembic env.py — environment configuration for Atlas Studio migrations.
 
-Suporta dois modos:
-  - offline: gera SQL sem conectar ao banco
-  - online:  conecta ao banco e aplica migrações diretamente
+Supports two modes:
+  - offline: generates SQL without connecting to the database
+  - online:  connects to the database and applies migrations directly
 
-A DATABASE_URL é lida da variável de ambiente (ou .env via python-dotenv).
-O driver asyncpg é trocado por psycopg2 para compatibilidade com Alembic (síncrono).
+DATABASE_URL is read from the environment variable (or .env via python-dotenv).
+The asyncpg driver is swapped for psycopg2 for compatibility with Alembic (synchronous).
 """
 import os
 import re
@@ -18,12 +18,12 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 from dotenv import load_dotenv
 
-# Garante que o root do projeto está no sys.path para importar app.*
+# Ensure the project root is on sys.path so app.* can be imported
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 load_dotenv()
 
-# Importa Base e todos os models para que metadata esteja populado
+# Import Base and all models so the metadata is populated
 from app.models.base import Base  # noqa: E402
 from app.models import (  # noqa: F401, E402
     models,
@@ -47,7 +47,7 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
-# Tabelas de sistema do PostGIS — não devem ser gerenciadas pelo Alembic
+# PostGIS system tables — must not be managed by Alembic
 _POSTGIS_TABLES = {
     "spatial_ref_sys",
     "layer",
@@ -60,7 +60,7 @@ _POSTGIS_TABLES = {
 
 
 def _include_object(obj, name, type_, reflected, compare_to):
-    """Filtra objetos que o Alembic não deve gerenciar."""
+    """Filters out objects Alembic must not manage."""
     if type_ == "table" and name in _POSTGIS_TABLES:
         return False
     return True
@@ -68,20 +68,20 @@ def _include_object(obj, name, type_, reflected, compare_to):
 
 def _get_sync_url() -> str:
     """
-    Retorna DATABASE_URL convertida para driver síncrono (psycopg2).
-    Remove sslmode da query string e repassa via connect_args se necessário.
+    Returns DATABASE_URL converted to the synchronous driver (psycopg2).
+    Removes sslmode from the query string and passes it via connect_args if needed.
     """
     url = os.environ["DATABASE_URL"]
-    # Troca driver async por sync
+    # Swap the async driver for the sync one
     url = url.replace("+asyncpg", "+psycopg2").replace("postgresql://", "postgresql+psycopg2://")
-    # Remove prefixo asyncpg sem dialeto explícito
+    # Remove the asyncpg prefix without an explicit dialect
     if url.startswith("postgresql+asyncpg"):
         url = url.replace("postgresql+asyncpg", "postgresql+psycopg2", 1)
     return url
 
 
 def run_migrations_offline() -> None:
-    """Gera SQL de migração sem conectar ao banco (útil para revisão/CI)."""
+    """Generates migration SQL without connecting to the database (useful for review/CI)."""
     url = _get_sync_url()
     context.configure(
         url=url,
@@ -97,10 +97,10 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Conecta ao banco e aplica migrações."""
+    """Connects to the database and applies migrations."""
     url = _get_sync_url()
 
-    # Extrai ssl/sslmode da URL e passa via connect_args para psycopg2
+    # Extract ssl/sslmode from the URL and pass it via connect_args to psycopg2
     sslmode = None
     match = re.search(r"[?&](?:ssl|sslmode)=([^&]+)", url)
     if match:
@@ -130,13 +130,13 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             compare_type=True,
             compare_server_default=True,
-            # Uma transacao POR migration, nao uma para o lote inteiro. Sem isto,
-            # o `autocommit_block()` de 20260829_0001 (necessario para o CREATE
-            # INDEX CONCURRENTLY) commita como efeito colateral TODAS as
-            # migrations que rodaram antes dela no mesmo `upgrade head` — se os
-            # indices falharem, o banco fica num estado parcial que o
-            # alembic_version nao descreve. E a recomendacao da propria
-            # documentacao do alembic para quem usa autocommit_block.
+            # One transaction PER migration, not one for the whole batch. Without this,
+            # the `autocommit_block()` of 20260829_0001 (needed for CREATE
+            # INDEX CONCURRENTLY) commits, as a side effect, ALL the
+            # migrations that ran before it in the same `upgrade head` — if the
+            # indexes fail, the database is left in a partial state that
+            # alembic_version does not describe. It is what alembic's own
+            # documentation recommends for those using autocommit_block.
             transaction_per_migration=True,
         )
         with context.begin_transaction():

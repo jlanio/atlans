@@ -2,12 +2,12 @@
 
 // web/app/components/home/assistente/respostas-rapidas.tsx
 //
-// As respostas rápidas: até três continuações curtas que o assistente oferece
-// sob a resposta (`sugerir_respostas`, no servidor) e que a pessoa escolhe com
-// um clique. Mesma linguagem dos chips do hero (`barra.tsx`), com UMA diferença
-// de comportamento: os do hero PREENCHEM o campo; estes ENVIAM. Quem decide se
-// eles aparecem é o `useExtrasDoAssistente` (só no último turno, fora do
-// stream) — aqui é só o desenho e o clique.
+// The quick replies: up to three short continuations the assistant offers below
+// the answer (`sugerir_respostas`, on the server) that the person picks with a
+// click. Same language as the hero chips (`barra.tsx`), with ONE behavioral
+// difference: the hero ones FILL the field; these SEND. What decides whether
+// they appear is `useExtrasDoAssistente` (only on the last turn, outside the
+// stream) — this is only the drawing and the click.
 
 import { useTextos } from "../i18n"
 

@@ -1,5 +1,5 @@
 # tests/unit/test_sync_manager.py
-"""Testes unitarios para o SyncManager e componentes do GeoSync."""
+"""Unit tests for the SyncManager and GeoSync components."""
 import asyncio
 import pytest
 import os
@@ -17,13 +17,13 @@ except ImportError:
 class TestIgnoreFilter:
 
     def test_no_ignore_file(self, tmp_path):
-        """Sem .atlans-ignore, nada deve ser ignorado."""
+        """Without .atlans-ignore, nothing should be ignored."""
         from executor.sync.ignore import IgnoreFilter
         f = IgnoreFilter(str(tmp_path))
         assert f.should_ignore(tmp_path / "test.geojson") is False
 
     def test_ignore_pattern(self, tmp_path):
-        """Deve ignorar arquivos que casam com o padrao."""
+        """Should ignore files that match the pattern."""
         ignore_file = tmp_path / ".atlans-ignore"
         ignore_file.write_text("*.tmp\nbackup_*\n")
 
@@ -35,7 +35,7 @@ class TestIgnoreFilter:
         assert f.should_ignore(tmp_path / "dados.geojson") is False
 
     def test_reload_on_change(self, tmp_path):
-        """Deve recarregar quando .atlans-ignore muda."""
+        """Should reload when .atlans-ignore changes."""
         ignore_file = tmp_path / ".atlans-ignore"
         ignore_file.write_text("*.tmp\n")
 
@@ -45,7 +45,7 @@ class TestIgnoreFilter:
         assert f.should_ignore(tmp_path / "x.tmp") is True
         assert f.should_ignore(tmp_path / "x.bak") is False
 
-        # Muda o arquivo e garante mtime diferente (Windows pode ter resolução de ~10ms)
+        # Change the file and ensure a different mtime (Windows may have ~10ms resolution)
         ignore_file.write_text("*.bak\n")
         future = _time.time() + 1.0
         os.utime(ignore_file, (future, future))
@@ -57,7 +57,7 @@ class TestIgnoreFilter:
 class TestDatasetScanner:
 
     def test_scan_geojson(self, tmp_path):
-        """Deve detectar arquivo GeoJSON como dataset."""
+        """Should detect a GeoJSON file as a dataset."""
         (tmp_path / "test.geojson").write_text('{"type":"FeatureCollection"}')
 
         from executor.sync.scanner import DatasetScanner
@@ -68,7 +68,7 @@ class TestDatasetScanner:
         assert datasets["test"].type == "geojson"
 
     def test_scan_shapefile_bundle(self, tmp_path):
-        """Deve agrupar componentes de Shapefile num unico dataset."""
+        """Should group Shapefile components into a single dataset."""
         for ext in [".shp", ".dbf", ".shx", ".prj"]:
             (tmp_path / f"parcelas{ext}").write_bytes(b"\x00" * 10)
 
@@ -97,7 +97,7 @@ class TestDatasetScanner:
 
     @pytest.mark.skipif(not _pathspec_available, reason="pathspec nao instalado")
     def test_scan_with_ignore_filter(self, tmp_path):
-        """Deve respeitar IgnoreFilter."""
+        """Should respect IgnoreFilter."""
         (tmp_path / "data.geojson").write_text("{}")
         (tmp_path / "temp.geojson").write_text("{}")
         ignore_file = tmp_path / ".atlans-ignore"
@@ -113,7 +113,7 @@ class TestDatasetScanner:
         assert "temp" not in datasets
 
     def test_diff_detects_new(self, tmp_path):
-        """Deve detectar datasets novos."""
+        """Should detect new datasets."""
         (tmp_path / "new.geojson").write_text("{}")
 
         from executor.sync.scanner import DatasetScanner
@@ -126,7 +126,7 @@ class TestDatasetScanner:
         assert len(removed) == 0
 
     def test_diff_detects_removed(self, tmp_path):
-        """Deve detectar datasets removidos."""
+        """Should detect removed datasets."""
         from executor.sync.scanner import DatasetScanner
         scanner = DatasetScanner(str(tmp_path))
         current = scanner.scan()  # vazio
@@ -140,19 +140,19 @@ class TestDatasetScanner:
 class TestSyncManifest:
 
     def test_create_empty_manifest(self, tmp_path):
-        """Deve criar manifesto vazio v2."""
+        """Should create an empty v2 manifest."""
         from executor.sync.manifest import SyncManifest
         m = SyncManifest(str(tmp_path), "ws-1", "ag-1")
 
         assert m.all_datasets() == {}
-        # Manifesto so vai para o disco no flush, depois da primeira mutacao
+        # The manifest only goes to disk on flush, after the first mutation
         assert not (tmp_path / ".atlans-sync.json").exists()
         m.set_dataset("d", {"type": "geojson"})
         asyncio.run(m.flush())
         assert (tmp_path / ".atlans-sync.json").exists()
 
     def test_set_and_get_dataset(self, tmp_path):
-        """Deve salvar e recuperar dataset."""
+        """Should save and retrieve a dataset."""
         from executor.sync.manifest import SyncManifest
         m = SyncManifest(str(tmp_path), "ws-1", "ag-1")
 
@@ -163,7 +163,7 @@ class TestSyncManifest:
         assert ds["type"] == "geojson"
 
     def test_mark_synced(self, tmp_path):
-        """Deve marcar dataset como sincronizado com remote_id."""
+        """Should mark a dataset as synced with remote_id."""
         from executor.sync.manifest import SyncManifest
         m = SyncManifest(str(tmp_path), "ws-1", "ag-1")
 
@@ -176,7 +176,7 @@ class TestSyncManifest:
         assert ds["local_md5"] == "abc"
 
     def test_v1_migration(self, tmp_path):
-        """Deve migrar manifesto v1 para v2."""
+        """Should migrate a v1 manifest to v2."""
         import json
         manifest_path = tmp_path / ".atlans-sync.json"
         manifest_path.write_text(json.dumps({
@@ -191,7 +191,7 @@ class TestSyncManifest:
         from executor.sync.manifest import SyncManifest
         m = SyncManifest(str(tmp_path), "ws-1", "ag-1")
 
-        # Deve ter migrado para v2
+        # Should have migrated to v2
         ds = m.get_dataset("old")
         assert ds is not None
-        assert "remote_md5" in ds  # campo adicionado na migracao
+        assert "remote_md5" in ds  # field added in the migration

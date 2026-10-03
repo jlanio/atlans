@@ -1,10 +1,10 @@
 // desktop/src/main/python/status.test.ts
 //
-// O cache de sessao da consulta de status. O que se testa aqui e a JANELA: a
-// consulta spawna um Python e leva ate 30 s, e nesse intervalo o vinculo pode
-// ser refeito ou o usuario pode pedir "Atualizar". Servir dado do vinculo
-// ANTIGO faz a aba GeoSync oferecer um workspace que este certificado nao
-// alcanca mais — e grava-lo em geosync.json desliga a sincronizacao em silencio.
+// The session cache of the status query. What is tested here is the WINDOW:
+// the query spawns a Python and takes up to 30 s, and in that interval the
+// link may be redone or the user may ask to "Atualizar" (refresh). Serving data
+// from the OLD link makes the GeoSync tab offer a workspace this certificate no
+// longer reaches — and writing it to geosync.json silently turns sync off.
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,8 +13,9 @@ const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }))
 
 vi.mock('node:child_process', () => ({ spawn: spawnMock }))
 
-// `paths.js` importa `electron` no topo (e chama `app.setName`), que nao existe
-// fora do processo principal. Nada aqui depende dos caminhos reais.
+// `paths.js` imports `electron` at the top (and calls `app.setName`), which
+// does not exist outside the main process. Nothing here depends on the real
+// paths.
 vi.mock('../paths.js', () => ({
   ARTIFACTS_DIR_PADRAO: 'C:/artefatos',
   PYTHON_EXE: 'python',
@@ -54,7 +55,7 @@ async function responder(p: ProcFalso, executorId: string): Promise<void> {
 
 beforeEach(() => {
   spawnMock.mockReset()
-  invalidarStatus()   // o cache e estado de modulo: zera entre os testes
+  invalidarStatus()   // the cache is module state: reset it between tests
 })
 
 describe('cache', () => {
@@ -81,15 +82,16 @@ describe('cache', () => {
 
 describe('invalidarStatus', () => {
   it('descarta o resultado da consulta que ficou em voo', async () => {
-    // Enrollment refeito no meio de uma consulta: o certificado que a originou
-    // ja nao vale, e o `.then` dela repovoava o cache com o vinculo antigo.
+    // Enrollment redone in the middle of a query: the certificate that started it
+    // is no longer valid, and its `.then` used to repopulate the cache with the
+    // old link.
     const velho = proximoProcesso()
     const consulta = consultarStatusCacheado()
     invalidarStatus()
     await responder(velho, 'velho')
     await expect(consulta).resolves.toMatchObject({ executor_id: 'velho' })
 
-    // O prefetch do executor NOVO nao pode herdar a consulta invalidada.
+    // The prefetch of the NEW executor must not inherit the invalidated query.
     const novo = proximoProcesso()
     const segunda = consultarStatusCacheado()
     expect(spawnMock).toHaveBeenCalledTimes(2)
@@ -108,7 +110,7 @@ describe('invalidarStatus', () => {
     const novo = proximoProcesso()
     const atual = consultarStatusCacheado()
     await responder(novo, 'novo')
-    await responder(velho, 'velho')          // chega por ultimo, do vinculo antigo
+    await responder(velho, 'velho')          // arrives last, from the old link
     await expect(atual).resolves.toMatchObject({ executor_id: 'novo' })
     await expect(vencida).resolves.toMatchObject({ executor_id: 'velho' })
 
@@ -119,8 +121,8 @@ describe('invalidarStatus', () => {
 
 describe('forcar', () => {
   it('"Atualizar" reconsulta em vez de devolver a consulta em voo', async () => {
-    // A consulta em voo pode ter comecado ANTES da mudanca que motivou o
-    // clique. Devolve-la fazia o spinner girar e a lista velha continuar.
+    // The in-flight query may have started BEFORE the change that prompted the
+    // click. Returning it made the spinner spin and the stale list stay.
     const antigo = proximoProcesso()
     const primeira = consultarStatusCacheado()
     const recente = proximoProcesso()
@@ -132,15 +134,15 @@ describe('forcar', () => {
     await expect(forcada).resolves.toMatchObject({ executor_id: 'novo' })
     await expect(primeira).resolves.toMatchObject({ executor_id: 'velho' })
 
-    // O cache fica com a consulta mais recente, nao com a que respondeu por ultimo.
+    // The cache keeps the most recent query, not the one that answered last.
     await expect(consultarStatusCacheado()).resolves.toMatchObject({ executor_id: 'novo' })
   })
 })
 
 describe('falha do spawn', () => {
   it('erro sincrono vira resultado e libera a consulta em voo', async () => {
-    // Sem o catch, a rejeicao vazava para o `invoke` do renderer e `emVoo`
-    // ficava preso para sempre — a tela congelava em "carregando".
+    // Without the catch, the rejection leaked to the renderer's `invoke` and
+    // `emVoo` stayed stuck forever — the screen froze on "carregando" (loading).
     spawnMock.mockImplementationOnce(() => { throw new Error('ENOENT') })
     await expect(consultarStatusCacheado()).resolves.toMatchObject({
       ok: false, codigo: 'falha',

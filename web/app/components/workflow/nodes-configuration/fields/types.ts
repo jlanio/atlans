@@ -1,6 +1,6 @@
-// Tipos compartilhados pelos componentes de campo da configuração de nó.
-// Antes cada field redeclarava as 3 props base — qualquer mudança em uma
-// (adicionar Date no value, por ex.) exigia tocar 8+ arquivos.
+// Types shared by the node configuration field components.
+// Before, each field redeclared the 3 base props — any change to one
+// (adding Date to value, for example) required touching 8+ files.
 
 import type { INodesPropertyAPI } from "@/service/types"
 
@@ -12,5 +12,5 @@ export interface BaseFieldProps {
   values: Record<string, FieldValue> | undefined
 }
 
-/** Props de field específico, herda os 3 campos base e permite extras. */
+/** Props of a specific field; inherits the 3 base fields and allows extras. */
 export type FieldProps<Extra = object> = BaseFieldProps & Extra

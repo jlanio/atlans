@@ -1,11 +1,12 @@
 # flow/utils/carta.py
 """
-A matematica da carta imagem — pura, sem matplotlib nem Pillow.
+The math of the image map — pure, without matplotlib or Pillow.
 
-Vive fora do no (flow/nodes/outputs/carta_imagem.py) para ser testavel sem
-renderizar nada: o CRS da carta, a extensao, o zoom e os tiles do fundo, a
-escala grafica, os rotulos da grade e os creditos. Nada aqui toca rede, disco
-ou figura. Quem importa matplotlib e o no, e so na hora de desenhar.
+Lives outside the node (flow/nodes/outputs/carta_imagem.py) so it can be tested
+without rendering anything: the map's CRS, the extent, the zoom and the basemap
+tiles, the scale bar, the grid labels and the credits. Nothing here touches the
+network, disk or a figure. The node is what imports matplotlib, and only when it
+is time to draw.
 """
 from __future__ import annotations
 
@@ -15,17 +16,17 @@ import os
 import re
 from typing import Any, Mapping
 
-# ── Constantes do contrato ───────────────────────────────────────────────────
+# ── Contract constants ────────────────────────────────────────────────────────
 
-# Oito cores categoricas legiveis sobre branco E sobre imagem de satelite; a
-# primeira e a terracota da marca.
+# Eight categorical colors readable on white AND on satellite imagery; the
+# first is the brand's terracotta.
 PALETA = (
     "#e7723b", "#2f80ed", "#27ae60", "#f2c94c",
     "#9b51e0", "#eb5757", "#56ccf2", "#8d6e63",
 )
 
-# Polegadas (largura, altura) — ISO 216. A paisagem e o padrao porque uma carta
-# com legenda ao lado do mapa cabe melhor deitada.
+# Inches (width, height) — ISO 216. Landscape is the default because an image
+# map with the legend beside the map fits better lying down.
 TAMANHOS: dict[str, tuple[float, float]] = {
     "a4-paisagem": (11.69, 8.27),
     "a4-retrato":  (8.27, 11.69),
@@ -33,10 +34,10 @@ TAMANHOS: dict[str, tuple[float, float]] = {
     "a3-retrato":  (11.69, 16.54),
 }
 DPI_MIN, DPI_MAX = 72, 300
-# A3 a 300 dpi = 4961 x 3508 = 17,4 Mpx: passa. O teto existe porque o render
-# roda em `asyncio.to_thread`, que nao e cancelavel — um buffer de centenas de
-# megabytes ignoraria o cancel e a memoria do executor e compartilhada entre
-# EXECUTOR_MAX_CONCURRENT runs.
+# A3 at 300 dpi = 4961 x 3508 = 17.4 Mpx: passes. The ceiling exists because the
+# render runs in `asyncio.to_thread`, which is not cancellable — a buffer of
+# hundreds of megabytes would ignore the cancel, and the executor's memory is
+# shared among EXECUTOR_MAX_CONCURRENT runs.
 TETO_DE_PIXELS = 30_000_000
 
 FORMATOS: dict[str, tuple[str, str]] = {
@@ -45,18 +46,19 @@ FORMATOS: dict[str, tuple[str, str]] = {
     "pdf": ("application/pdf", "pdf"),
 }
 
-# Os fundos com nome e as variaveis que os configuram — as mesmas do mapa web
-# (web/lib/fundos-do-mapa.ts). A URL de cada um e da INSTALACAO, e nao do
-# codigo: o servidor a injeta no no ao despachar (`fundo_da_instalacao`, de
-# MAPA_*_URL no ambiente da API) e, sem ela, vale o ambiente do proprio
-# executor. So "ruas" tem padrao: o OpenStreetMap.
+# The named basemaps and the variables that configure them — the same as the web
+# map's (web/lib/fundos-do-mapa.ts). Each one's URL belongs to the INSTALLATION,
+# not the code: the server injects it into the node at dispatch
+# (`fundo_da_instalacao`, from MAPA_*_URL in the API's environment) and, without
+# it, the executor's own environment applies. Only "ruas" has a default:
+# OpenStreetMap.
 FUNDOS_COM_NOME: dict[str, tuple[str, str]] = {
     "hibrido":  ("MAPA_HIBRIDO_URL",  "MAPA_HIBRIDO_CREDITO"),
     "satelite": ("MAPA_SATELITE_URL", "MAPA_SATELITE_CREDITO"),
     "ruas":     ("MAPA_RUAS_URL",     "MAPA_RUAS_CREDITO"),
 }
-# A atribuicao do OpenStreetMap e obrigatoria (ODbL). Entra sozinha nos
-# creditos quando o fundo e usado, como a de qualquer fundo configurado.
+# The OpenStreetMap attribution is mandatory (ODbL). It is added to the credits
+# automatically when the basemap is used, like that of any configured basemap.
 RUAS_PADRAO: tuple[str, str] = (
     "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
     "© OpenStreetMap contributors",
@@ -64,8 +66,8 @@ RUAS_PADRAO: tuple[str, str] = (
 TETO_DE_TILES = 256
 ZOOM_MAXIMO = 19          # o OSM serve ate 19
 TAMANHO_DO_TILE = 256
-RAIO_DA_TERRA = 6378137.0  # esfera do Web Mercator (EPSG:3857)
-LATITUDE_MAXIMA = 85.0511  # limite do Web Mercator
+RAIO_DA_TERRA = 6378137.0  # Web Mercator sphere (EPSG:3857)
+LATITUDE_MAXIMA = 85.0511  # Web Mercator limit
 MERCATOR_MAX = math.pi * RAIO_DA_TERRA
 
 COR_HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -75,18 +77,18 @@ ESCALAS_BONITAS = (1.0, 2.0, 5.0)
 # ── Parametros ───────────────────────────────────────────────────────────────
 
 def cor_valida(cor: Any) -> bool:
-    """`#RRGGBB` e so isso — o matplotlib aceitaria nomes, mas a paleta da carta
-    fala em hex e o campo do editor tambem."""
+    """`#RRGGBB` and nothing else — matplotlib would accept names, but the map's
+    palette speaks hex and so does the editor field."""
     return isinstance(cor, str) and bool(COR_HEX.match(cor.strip()))
 
 
 def parse_mapa(raw: Any) -> dict[str, str]:
-    """Le um campo `keyvalue` (porta → valor).
+    """Reads a `keyvalue` field (port → value).
 
-    O campo do editor grava um objeto, mas um fluxo salvo (ou um executor
-    antigo) pode trazer JSON em string — e `validate_node_parameters` nao toca
-    `keyvalue`. Chaves e valores viram texto sem espacos nas pontas; entradas
-    vazias sao descartadas.
+    The editor field writes an object, but a saved workflow (or an old
+    executor) may bring JSON as a string — and `validate_node_parameters` does
+    not touch `keyvalue`. Keys and values become text with no surrounding
+    whitespace; empty entries are dropped.
     """
     if isinstance(raw, str):
         raw = raw.strip()
@@ -108,13 +110,13 @@ def parse_mapa(raw: Any) -> dict[str, str]:
 
 
 def rotulo_da_porta(porta: str, rotulos: dict[str, str]) -> str:
-    """O rotulo da legenda: o que a pessoa escreveu em `rotulos`, senao o nome
-    da porta com `_` virando espaco (o nome da porta tem de ser identificador)."""
+    """The legend label: what the person wrote in `rotulos`, otherwise the port
+    name with `_` turned into a space (the port name must be an identifier)."""
     return rotulos.get(porta) or porta.replace("_", " ")
 
 
 def escurecer(cor_hex: str, fator: float = 0.6) -> str:
-    """A borda de um poligono: a mesma cor, mais escura."""
+    """A polygon's outline: the same color, darker."""
     cor = cor_hex.lstrip("#")
     r, g, b = (int(cor[i:i + 2], 16) for i in (0, 2, 4))
     return "#{:02x}{:02x}{:02x}".format(
@@ -123,10 +125,10 @@ def escurecer(cor_hex: str, fator: float = 0.6) -> str:
 
 
 def dimensoes_da_pagina(tamanho: str, dpi: int) -> tuple[float, float, int, int]:
-    """(largura_pol, altura_pol, largura_px, altura_px) — ou ValueError.
+    """(largura_pol, altura_pol, largura_px, altura_px) — or ValueError.
 
-    `validate_node_parameters` coage tipos mas nao aplica minimo/maximo; e aqui
-    que o dpi e o tamanho sao conferidos de verdade.
+    `validate_node_parameters` coerces types but does not apply min/max; this is
+    where the dpi and the size are actually checked.
     """
     if tamanho not in TAMANHOS:
         raise ValueError(
@@ -149,14 +151,14 @@ def dimensoes_da_pagina(tamanho: str, dpi: int) -> tuple[float, float, int, int]
 
 def crs_da_carta(caixa_4326: tuple[float, float, float, float],
                  crs_param: str | None, fundo: str | None) -> tuple[str, str | None]:
-    """O CRS em que a carta e desenhada, e um aviso opcional para o log.
+    """The CRS the image map is drawn in, and an optional warning for the log.
 
-    - com fundo de mapa: sempre EPSG:3857 — os tiles sao Web Mercator e
-      reprojetar o raster nao entra nesta versao;
-    - `auto`: o UTM local estimado pelo CENTRO da extensao (`estimate_utm_crs`);
-      extensoes largas ganham aviso (a borda distorce), e onde nao ha zona UTM
-      (regioes polares) cai em 3857 com aviso;
-    - senao, o CRS que a pessoa escreveu (`EPSG:31980`, WKT...) — lixo e ValueError.
+    - with a basemap: always EPSG:3857 — the tiles are Web Mercator and
+      reprojecting the raster is not part of this version;
+    - `auto`: the local UTM estimated from the CENTER of the extent
+      (`estimate_utm_crs`); wide extents get a warning (the edge distorts), and
+      where there is no UTM zone (polar regions) it falls back to 3857 with a warning;
+    - otherwise, the CRS the person wrote (`EPSG:31980`, WKT...) — garbage is a ValueError.
     """
     fundo = (fundo or "nenhum").strip().lower()
     if fundo and fundo != "nenhum":
@@ -200,11 +202,11 @@ def crs_e_projetado(crs_texto: str) -> bool:
 
 def extensao_com_margem(caixa: tuple[float, float, float, float], projetado: bool,
                         fracao: float = 0.05) -> tuple[float, float, float, float]:
-    """(x0, y0, x1, y1) com 5 % de folga em cada lado.
+    """(x0, y0, x1, y1) with 5 % padding on each side.
 
-    Uma extensao degenerada (um ponto so, ou uma linha reta) ganha um tamanho
-    minimo — 500 m em CRS projetado, 0,01 grau em geografico — senao o mapa
-    teria area zero.
+    A degenerate extent (a single point, or a straight line) gets a minimum
+    size — 500 m in a projected CRS, 0.01 degree in a geographic one — otherwise
+    the map would have zero area.
     """
     x0, y0, x1, y1 = caixa
     minimo = 500.0 if projetado else 0.01
@@ -218,32 +220,32 @@ def extensao_com_margem(caixa: tuple[float, float, float, float], projetado: boo
     return x0 - dx, y0 - dy, x1 + dx, y1 + dy
 
 
-# ── O quadro do mapa na pagina ───────────────────────────────────────────────
+# ── The map frame on the page ─────────────────────────────────────────────────
 
 def quadro_do_mapa(legenda: bool) -> tuple[float, float, float, float]:
-    """(esquerda, base, largura, altura) do eixo do mapa, em fracao da figura.
+    """(left, bottom, width, height) of the map axis, as a fraction of the figure.
 
-    A coluna da direita so existe com legenda; sem ela o mapa toma a pagina.
-    O topo fica logo abaixo do subtitulo e a base acima da faixa de creditos.
+    The right column only exists with a legend; without it the map takes the page.
+    The top sits just below the subtitle and the bottom above the credits strip.
     """
     return (0.04, 0.10, 0.70 if legenda else 0.92, 0.785)
 
 
 def extensao_no_quadro(extensao: tuple[float, float, float, float],
                        proporcao: float) -> tuple[float, float, float, float]:
-    """Alarga a extensao (nunca corta) ate ter a proporcao largura/altura do
-    quadro, centrada — assim o mapa PREENCHE o quadro em vez de o eixo
-    encolher e deixar a pagina em branco. E o que uma carta faz: a moldura e
-    fixa, a extensao cresce para caber nela."""
+    """Widens the extent (never cuts) until it has the frame's width/height
+    ratio, centered — so the map FILLS the frame instead of the axis
+    shrinking and leaving the page blank. It is what an image map does: the
+    frame is fixed, the extent grows to fit it."""
     x0, y0, x1, y1 = extensao
     dx, dy = x1 - x0, y1 - y0
     if dx <= 0 or dy <= 0 or proporcao <= 0:
         return extensao
-    if dx / dy < proporcao:      # mais alta que o quadro: alarga
+    if dx / dy < proporcao:      # taller than the frame: widen
         novo_dx = dy * proporcao
         cx = (x0 + x1) / 2
         return cx - novo_dx / 2, y0, cx + novo_dx / 2, y1
-    novo_dy = dx / proporcao     # mais larga que o quadro: cresce para cima e para baixo
+    novo_dy = dx / proporcao     # wider than the frame: grow up and down
     cy = (y0 + y1) / 2
     return x0, cy - novo_dy / 2, x1, cy + novo_dy / 2
 
@@ -251,14 +253,14 @@ def extensao_no_quadro(extensao: tuple[float, float, float, float],
 # ── Escala grafica ───────────────────────────────────────────────────────────
 
 def fator_de_escala_3857(latitude: float) -> float:
-    """Quanto o Web Mercator estica as distancias nesta latitude: 1 m no chao
-    mede 1/cos(lat) unidades de mapa. Corrige a escala grafica em 3857."""
+    """How much Web Mercator stretches distances at this latitude: 1 m on the
+    ground measures 1/cos(lat) map units. Corrects the scale bar in 3857."""
     return math.cos(math.radians(latitude))
 
 
 def comprimento_da_escala(largura_real_m: float) -> float:
-    """A barra da escala: cerca de um quinto da largura do mapa, arredondada
-    para baixo a 1, 2 ou 5 vezes uma potencia de dez (em metros)."""
+    """The scale bar: about one fifth of the map's width, rounded down to
+    1, 2 or 5 times a power of ten (in meters)."""
     alvo = largura_real_m / 5.0
     if alvo <= 0:
         return 0.0
@@ -311,9 +313,9 @@ def _tile_de_lon_lat(lon: float, lat: float, z: int) -> tuple[int, int]:
 
 
 def zoom_para(extensao_3857: tuple[float, float, float, float], largura_px: int) -> int:
-    """O menor zoom em que a largura do mapa, em pixels de tile, alcanca a
-    largura de saida — o fundo nao fica borrado nem e baixado alem do que a
-    pagina consegue mostrar."""
+    """The smallest zoom at which the map's width, in tile pixels, reaches the
+    output width — the basemap is neither blurry nor downloaded beyond what the
+    page can show."""
     x0, _, x1, _ = extensao_3857
     largura_m = max(x1 - x0, 1e-9)
     n_necessario = largura_px * 2 * MERCATOR_MAX / (largura_m * TAMANHO_DO_TILE)
@@ -323,10 +325,10 @@ def zoom_para(extensao_3857: tuple[float, float, float, float], largura_px: int)
 
 def tiles_da_extensao(extensao_3857: tuple[float, float, float, float], z: int,
                       teto: int = TETO_DE_TILES) -> tuple[int, int, int, int, int]:
-    """(z, x_min, x_max, y_min, y_max) dos tiles que cobrem a extensao.
+    """(z, x_min, x_max, y_min, y_max) of the tiles covering the extent.
 
-    Acima do teto o zoom desce ate caber: a carta nunca falha por tamanho de
-    fundo, so perde nitidez.
+    Above the ceiling the zoom steps down until it fits: the image map never
+    fails because of basemap size, it only loses sharpness.
     """
     x0, y0, x1, y1 = extensao_3857
     lon0, lat0 = lon_lat_de_3857(x0, y0)
@@ -343,7 +345,7 @@ def tiles_da_extensao(extensao_3857: tuple[float, float, float, float], z: int,
 
 def extensao_dos_tiles(x_min: int, x_max: int, y_min: int, y_max: int, z: int
                        ) -> tuple[float, float, float, float]:
-    """(xmin, xmax, ymin, ymax) em EPSG:3857 do mosaico — e o `extent` do imshow."""
+    """(xmin, xmax, ymin, ymax) of the mosaic in EPSG:3857 — it is the imshow `extent`."""
     n = 2 ** z
     tamanho = 2 * MERCATOR_MAX / n
     xmin = x_min * tamanho - MERCATOR_MAX
@@ -353,10 +355,10 @@ def extensao_dos_tiles(x_min: int, x_max: int, y_min: int, y_max: int, z: int
     return xmin, xmax, ymin, ymax
 
 
-# ── Grade de coordenadas ─────────────────────────────────────────────────────
+# ── Coordinate grid ───────────────────────────────────────────────────────────
 
 def passo_bonito(vao: float, alvo: int = 5) -> float:
-    """Um passo 1/2/5 x 10^n que divide o vao em cerca de `alvo` partes."""
+    """A 1/2/5 x 10^n step that divides the span into about `alvo` parts."""
     if vao <= 0:
         return 1.0
     bruto = vao / alvo
@@ -369,7 +371,7 @@ def passo_bonito(vao: float, alvo: int = 5) -> float:
 
 
 def marcas(inicio: float, fim: float, passo: float) -> list[float]:
-    """Os multiplos de `passo` dentro de [inicio, fim]."""
+    """The multiples of `passo` within [inicio, fim]."""
     if passo <= 0 or fim <= inicio:
         return []
     primeiro = math.ceil(inicio / passo)
@@ -384,12 +386,12 @@ def _graus(valor: float, positivo: str, negativo: str) -> str:
 
 
 def rotulo_de_coordenada(valor: float, eixo: str, crs_texto: str) -> str:
-    """O texto de uma marca da grade.
+    """The text of a grid tick.
 
-    - EPSG:3857: a marca e convertida para longitude/latitude (em 3857 x so
-      depende de lon e y so de lat, entao a conversao e exata);
-    - outro CRS projetado (UTM): metros, com separador de milhar;
-    - geografico: graus.
+    - EPSG:3857: the tick is converted to longitude/latitude (in 3857 x only
+      depends on lon and y only on lat, so the conversion is exact);
+    - another projected CRS (UTM): meters, with a thousands separator;
+    - geographic: degrees.
     """
     from pyproj import CRS
 
@@ -406,10 +408,10 @@ def rotulo_de_coordenada(valor: float, eixo: str, crs_texto: str) -> str:
 
 def marcas_da_grade(extensao: tuple[float, float, float, float], crs_texto: str
                     ) -> tuple[list[float], list[float]]:
-    """As posicoes das linhas da grade nos dois eixos, em unidades do mapa.
+    """The positions of the grid lines on both axes, in map units.
 
-    Em 3857 as linhas sao de longitude/latitude redondas (convertidas para
-    metros de mapa); nos demais CRS, multiplos redondos da propria unidade.
+    In 3857 the lines are at round longitudes/latitudes (converted to map
+    meters); in the other CRSs, round multiples of the unit itself.
     """
     from pyproj import CRS
 
@@ -433,7 +435,7 @@ def marcas_da_grade(extensao: tuple[float, float, float, float], crs_texto: str
 # ── Creditos ─────────────────────────────────────────────────────────────────
 
 def creditos_com_fundo(creditos: str | None, atribuicao: str | None) -> str:
-    """Os creditos escritos pela pessoa mais a atribuicao do fundo, quando ha."""
+    """The credits written by the person plus the basemap's attribution, when there is one."""
     partes = [(creditos or "").strip(), (atribuicao or "").strip()]
     return " · ".join(p for p in partes if p)
 
@@ -441,11 +443,11 @@ def creditos_com_fundo(creditos: str | None, atribuicao: str | None) -> str:
 def fundo_configurado(
     fundo: str, injetado: Any = None, ambiente: Mapping[str, str] | None = None,
 ) -> tuple[str, str] | None:
-    """(template, atribuicao) de um fundo com nome, ou None se a instalacao nao o tem.
+    """(template, attribution) of a named basemap, or None if the installation does not have it.
 
-    Nesta ordem: o que o servidor injetou no no (`fundo_da_instalacao`), o
-    ambiente do executor (MAPA_*_URL e MAPA_*_CREDITO) e, so para "ruas", o
-    OpenStreetMap. Sem o hibrido, o satelite, como no servidor e no web.
+    In this order: what the server injected into the node (`fundo_da_instalacao`),
+    the executor's environment (MAPA_*_URL and MAPA_*_CREDITO) and, only for
+    "ruas", OpenStreetMap. Without hybrid or satellite, as on the server and the web.
     """
     var_url, var_credito = FUNDOS_COM_NOME[fundo]
     if isinstance(injetado, dict) and str(injetado.get("url") or "").strip():
@@ -465,7 +467,7 @@ def fundo_configurado(
 
 
 def servidor_injetou(injetado: Any) -> bool:
-    """O servidor que despachou mandou o fundo da instalacao? Um servidor
-    desta versao sempre manda a chave `url` (vazia quando nao ha o fundo); sem
-    ela, o despacho veio de um servidor anterior."""
+    """Did the dispatching server send the installation's basemap? A server of
+    this version always sends the `url` key (empty when there is no such
+    basemap); without it, the dispatch came from an earlier server."""
     return isinstance(injetado, dict) and "url" in injetado

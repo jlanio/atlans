@@ -12,7 +12,7 @@ from flow.utils.logger import get_logger
 logger = get_logger(__name__)
 
 # ---------------------------
-# Dicionário de operadores
+# Operator dictionary
 # ---------------------------
 _OP_FUNCS = {
     '==': operator.eq,
@@ -27,18 +27,18 @@ _OP_FUNCS = {
 @register_node
 class Conditional(BaseNode):
     """
-    Nó de controle que avalia uma condição sobre um valor ou GeoDataFrame
-    e sinaliza o branch (True/False) para o fluxo.
+    Control node that evaluates a condition on a value or GeoDataFrame
+    and signals the branch (True/False) to the workflow.
 
-    Métricas disponíveis:
-      - count: tamanho do container (len) ou valor escalar
-      - area:  soma das áreas das geometrias (reprojeta para UTM se CRS geográfico)
-      - field: valor de um campo específico do GeoDataFrame ou dict (requer fieldName)
+    Available metrics:
+      - count: size of the container (len) or scalar value
+      - area:  sum of the geometries' areas (reprojects to UTM if the CRS is geographic)
+      - field: value of a specific field of the GeoDataFrame or dict (requires fieldName)
 
-    Coerção de tipo:
-      Tenta comparação numérica primeiro (float × float).
-      Se falhar, faz fallback para comparação como string.
-      Isso evita falsos negativos quando compareTo="10" e val=10.
+    Type coercion:
+      Tries numeric comparison first (float × float).
+      If that fails, falls back to comparison as strings.
+      This avoids false negatives when compareTo="10" and val=10.
     """
 
     @classmethod
@@ -77,7 +77,7 @@ class Conditional(BaseNode):
                     ],
                 },
                 {
-                    # Definido como string para aparecer no UI; convertido em runtime
+                    # Defined as a string to appear in the UI; converted at runtime
                     'name': 'compareTo',
                     'label': 'Comparar com',
                     'type': 'string',
@@ -90,8 +90,8 @@ class Conditional(BaseNode):
                     'type': 'string',
                     'default': '',
                     'description': "Nome do campo do GeoDataFrame, DataFrame ou chave do dict a avaliar.",
-                    # O editor oferece os nomes vistos na última execução do nó
-                    # anterior — mesma dica do AttributeFilter.
+                    # The editor offers the names seen in the last run of the
+                    # previous node — same hint as AttributeFilter.
                     'suggest_columns': '*',
                     'visibleWhen': {'field': 'metric', 'in': ['field']},
                 },
@@ -102,45 +102,45 @@ class Conditional(BaseNode):
                 {'name': 'value', 'type': 'number', 'description': 'Valor calculado da métrica avaliada'},
             ],
             'branches': True,
-            # A ORDEM importa duas vezes, e nas duas o `result` precisa vir na
-            # frente. Na simulação, uma aresta SEM `from_key` faz o executor tipar
-            # a entrada do nó seguinte pelo PRIMEIRO campo desta lista
-            # (edge_resolver.resolve_edge_schema_inputs): com `branch` na frente, o
-            # editor anunciava `<boolean>` para quem recebia a camada. Hoje a UI
-            # grava `from_key = candidateKeys[0]` (a primeira saída de dado) ao
-            # conectar de um handle de ramo, então arestas novas já não caem nesse
-            # caso — mas manter `result` na frente cobre as arestas legadas. E no
-            # seletor de porta da aresta, o primeiro item é o palpite mais
-            # provável — que é o dado, não a decisão.
+            # The ORDER matters twice, and in both `result` needs to come
+            # first. In the simulation, an edge WITHOUT `from_key` makes the executor
+            # type the next node's input by the FIRST field of this list
+            # (edge_resolver.resolve_edge_schema_inputs): with `branch` first, the
+            # editor announced `<boolean>` to whoever received the layer. Today the UI
+            # writes `from_key = candidateKeys[0]` (the first data output) when
+            # connecting from a branch handle, so new edges no longer fall into this
+            # case — but keeping `result` first covers legacy edges. And in
+            # the edge's port selector, the first item is the most likely
+            # guess — which is the data, not the decision.
         }
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         # ---------------------------------------
-        # 1) Validação de parâmetros (tipos + defaults)
+        # 1) Parameter validation (types + defaults)
         # ---------------------------------------
         self.validate()
 
         # ---------------------------------------
-        # 2) Extrai parâmetros
+        # 2) Extracts parameters
         # ---------------------------------------
-        # metric/operator já validados contra as options pelo self.validate().
+        # metric/operator already validated against the options by self.validate().
         metric       = self.parameters.get('metric', 'count')
         operator_str = self.parameters.get('operator', '==')
         compare_str  = self.parameters.get('compareTo', '').strip()
         field_name   = self.parameters.get('fieldName', '').strip()
 
         # ---------------------------------------
-        # 3) Obtém o dado de entrada (primeiro disponível)
+        # 3) Gets the input data (first available)
         # ---------------------------------------
         if not inputs:
             raise ValueError("Nenhum dado em inputs para avaliar condição.")
         data = next(iter(inputs.values()))
 
         # ---------------------------------------
-        # 4) Calcula a métrica "val" sobre o dado
+        # 4) Computes the metric "val" on the data
         # ---------------------------------------
         if metric == 'count':
-            # Tamanho do container ou valor escalar direto
+            # Size of the container or the scalar value directly
             if hasattr(data, '__len__') and not isinstance(data, (str, bytes)):
                 val = len(data)
             else:
@@ -153,8 +153,8 @@ class Conditional(BaseNode):
             if not isinstance(data, gpd.GeoDataFrame):
                 raise ValueError("Métrica 'area' requer um GeoDataFrame como entrada.")
             gdf: gpd.GeoDataFrame = data
-            # Se CRS for geográfico, reprojeta para UTM antes de calcular área
-            # (a estimativa também vai para a thread: percorre total_bounds)
+            # If the CRS is geographic, reprojects to UTM before computing the area
+            # (the estimate also goes to the thread: it walks total_bounds)
             if gdf.crs and gdf.crs.is_geographic:
                 try:
                     (gdf,) = await asyncio.to_thread(para_crs_metrico, gdf)
@@ -163,7 +163,7 @@ class Conditional(BaseNode):
             val = gdf.geometry.area.sum()
 
         elif metric == 'field':
-            # Avalia o valor de um campo específico do dado
+            # Evaluates the value of a specific field of the data
             if not field_name:
                 raise ValueError(
                     "Bifurcação configurada para avaliar um campo, mas 'Campo' está vazio. "
@@ -176,7 +176,7 @@ class Conditional(BaseNode):
                         f"Campo '{field_name}' não encontrado no GeoDataFrame. "
                         f"Campos disponíveis: {list(data.columns)}"
                     )
-                # Soma numérica do campo; para comparações de valor único, usar count=1
+                # Numeric sum of the field; for single-value comparisons, use count=1
                 val = data[field_name].sum()
             else:
                 # DataFrame puro
@@ -206,16 +206,16 @@ class Conditional(BaseNode):
         op_func = _OP_FUNCS[operator_str]
 
         # ---------------------------------------
-        # 6) Compara com coerção de tipo
+        # 6) Compares with type coercion
         # ---------------------------------------
-        # Tenta comparação numérica (float × float) primeiro.
-        # Se val ou compareTo não forem numéricos, faz fallback para comparação como string.
+        # Tries numeric comparison (float × float) first.
+        # If val or compareTo are not numeric, falls back to comparison as strings.
         try:
             cmp_num = float(compare_str)
             val_num = float(val)
             branch = bool(op_func(val_num, cmp_num))
         except (ValueError, TypeError):
-            # Fallback: comparação como string (suporta "ativo" == "ativo", etc.)
+            # Fallback: comparison as strings (supports "ativo" == "ativo", etc.)
             branch = bool(op_func(str(val), compare_str))
 
         logger.info(
@@ -224,45 +224,45 @@ class Conditional(BaseNode):
         )
 
         # ---------------------------------------
-        # 7) Retorna o resultado para o fluxo
+        # 7) Returns the result to the workflow
         # ---------------------------------------
-        # A ORDEM aqui é o contrato com o executor, e não estética.
+        # The ORDER here is the contract with the executor, not aesthetics.
         #
-        # `**inputs` vinha por ÚLTIMO e sobrescrevia `branch`, `value` e
-        # `result` que este nó acabou de calcular. Encadeando duas
-        # bifurcações, a segunda recebia as chaves da primeira, computava a
-        # própria decisão e a DESCARTAVA na volta: o executor roteia lendo
-        # `outputs["branch"]` (core.py:628), então a segunda bifurcação
-        # repetia a decisão da primeira e o fluxo seguia por um ramo que
-        # ninguém escolheu. Espalhar primeiro e decidir depois faz a decisão
-        # deste nó prevalecer, que é a única leitura correta.
+        # `**inputs` used to come LAST and overwrote the `branch`, `value` and
+        # `result` this node had just computed. Chaining two
+        # forks, the second received the first's keys, computed its
+        # own decision and DISCARDED it on the way back: the executor routes by reading
+        # `outputs["branch"]` (core.py:628), so the second fork
+        # repeated the first's decision and the workflow went down a branch that
+        # nobody chose. Spreading first and deciding afterwards makes this node's
+        # decision prevail, which is the only correct reading.
         #
-        # E `branch` não pode ser a PRIMEIRA chave. Ao conectar de um handle de
-        # ramo, a UI hoje grava `from_key = candidateKeys[0]` — a primeira saída
-        # de dado, nunca o booleano (web/app/components/workflow/index.tsx), então
-        # a aresta nova já resolve para o dado. O espalhamento aqui é a rede de
-        # segurança para arestas legadas sem `from_key` e para quem lê
-        # `next(iter(inputs.values()))` — ComputeBBox, Geocode, HttpRequest no
-        # POST, ResponseNode e os próprios nós de controle — que pegaria o
-        # BOOLEANO em vez do dado. Com o espalhamento na frente, a primeira
-        # chave é o dado que veio do pai.
+        # And `branch` cannot be the FIRST key. When connecting from a branch
+        # handle, the UI today writes `from_key = candidateKeys[0]` — the first data
+        # output, never the boolean (web/app/components/workflow/index.tsx), so
+        # the new edge already resolves to the data. The spread here is the safety
+        # net for legacy edges without `from_key` and for whoever reads
+        # `next(iter(inputs.values()))` — ComputeBBox, Geocode, HttpRequest on
+        # POST, ResponseNode and the control nodes themselves — which would get the
+        # BOOLEAN instead of the data. With the spread first, the first
+        # key is the data that came from the parent.
         #
-        # `result` continua existindo: é uma porta escolhível no seletor da
-        # aresta (custom-edges/index.tsx), e sumir com ela quebraria fluxos
-        # que já a apontam.
-        # `result` fecha o dict, e não é arbitrário: o Merge com estratégia
-        # "último" varre `reversed(inputs.values())` e pegaria o `value` — o
-        # número da métrica — se ele fosse a última chave. Com o dado na
-        # primeira posição (pela chave do pai) E na última (em `result`), tanto
-        # quem lê `next(iter(...))` quanto quem lê de trás para frente recebe a
-        # camada. Os dois apontam para o MESMO objeto, então não há cópia.
-        # As chaves de controle são REMOVIDAS do repasse antes de serem
-        # reescritas, e não apenas sobrescritas. Reatribuir uma chave que já
-        # existe num dict Python mantém a POSIÇÃO original dela: encadeando
-        # JinjaBranch → Bifurcação, o `result` herdado ficava no meio e `value`
-        # terminava como última chave — o Merge com estratégia "último" voltava
-        # a pegar o número da métrica. Reconstruindo, a ordem é sempre a mesma:
-        # dados do pai, decisão, métrica, e o dado de novo no fim.
+        # `result` still exists: it's a selectable port in the edge's
+        # selector (custom-edges/index.tsx), and removing it would break workflows
+        # that already point to it.
+        # `result` closes the dict, and that's not arbitrary: Merge with the
+        # "último" strategy scans `reversed(inputs.values())` and would get `value` —
+        # the metric's number — if it were the last key. With the data in the
+        # first position (under the parent's key) AND in the last (in `result`), both
+        # whoever reads `next(iter(...))` and whoever reads back to front receive the
+        # layer. Both point to the SAME object, so there's no copy.
+        # The control keys are REMOVED from the pass-through before being
+        # rewritten, not just overwritten. Reassigning a key that already
+        # exists in a Python dict keeps its original POSITION: chaining
+        # JinjaBranch → Fork, the inherited `result` stayed in the middle and `value`
+        # ended up as the last key — Merge with the "último" strategy went back
+        # to getting the metric's number. By rebuilding, the order is always the same:
+        # the parent's data, decision, metric, and the data again at the end.
         saida = {k: v for k, v in inputs.items()
                  if k not in ("branch", "value", "result")}
         saida["branch"] = branch

@@ -1,19 +1,19 @@
 # app/services/disabled_nodes_service.py
 """
-Servico de gerenciamento de nodes desabilitados pelo admin.
+Service for managing nodes disabled by the admin.
 
-Persistencia: SystemConfig com key `disabled_nodes` -> dict de
-metadata por nome de node:
+Persistence: SystemConfig with key `disabled_nodes` -> dict of
+metadata per node name:
 
     {
       "SendEmail": {
         "disabled_at": "2026-06-18T14:30:00Z",
         "disabled_by": "<user_id_hash>",
-        "reason": "Auditoria de seguranca em andamento"
+        "reason": "Security audit in progress"
       }
     }
 
-Sem migracao — reusa tabela existente.
+No migration — reuses an existing table.
 """
 from __future__ import annotations
 
@@ -30,28 +30,30 @@ _logger = get_logger(__name__)
 
 _CONFIG_KEY = "disabled_nodes"
 
-# ── Cache em memoria, coordenado entre workers por uma epoca no Redis ────────
+# ── In-memory cache, coordinated across workers by an epoch in Redis ─────────
 #
-# Sintoma que o CACHE resolve: TODO disparo de workflow (POST /execute, webhook
-# e cron) fazia um SELECT em SystemConfig no caminho quente so para descobrir um
-# valor que muda uma vez por mes — um round-trip inteiro ao Postgres somado a
-# latencia entre o clique em "Executar" e o job sair do servidor.
+# Symptom the CACHE fixes: EVERY workflow trigger (POST /execute, webhook and
+# cron) did a SELECT on SystemConfig in the hot path just to find out a value
+# that changes once a month — a whole round trip to Postgres added to the
+# latency between the click on "Executar" (Run) and the job leaving the server.
 #
-# Sintoma que a EPOCA resolve: a producao sobe a API com `uvicorn --workers 4`,
-# entao `_cache` existe em 4 copias independentes e `invalidate_cache()` so
-# alcanca o processo que atendeu o PATCH do admin. Com TTL puro isso dava (a) um
-# node desabilitado por incidente continuando a ser despachado pelos outros 3
-# workers por ate 30 s — e o snapshot `disabled_nodes` que vai no envelope do job
-# sai DESTE mesmo cache, entao o executor revalida contra a lista velha e libera
-# igual (nao ha segunda fonte independente) — e (b) leitura-apos-escrita
-# quebrada na UI: o GET /admin/nodes seguinte caia noutro worker, voltava
-# `enabled: true` e o toggle desfazia-se sozinho na tela.
+# Symptom the EPOCH fixes: production runs the API with `uvicorn --workers 4`,
+# so `_cache` exists in 4 independent copies and `invalidate_cache()` only
+# reaches the process that served the admin's PATCH. With a pure TTL this gave
+# (a) a node disabled because of an incident still being dispatched by the other
+# 3 workers for up to 30 s — and the `disabled_nodes` snapshot that goes in the
+# job envelope comes out of THIS same cache, so the executor revalidates against
+# the stale list and lets it through all the same (there is no second
+# independent source) — and (b) broken read-after-write in the UI: the next
+# GET /admin/nodes landed on another worker, returned `enabled: true` and the
+# toggle undid itself on screen.
 #
-# Como funciona: toda escrita faz INCR na chave de epoca; a leitura confere a
-# epoca (um GET no Redis — que o dispatch ja usa e custa uma fracao do
-# SELECT+desserializacao no Postgres) e so vai ao banco quando ela mudou. O TTL
-# local sobrou como degradacao para Redis indisponivel: nesse caso volta a valer
-# o teto de defasagem de 30 s, e o dispatch nao quebra por causa disso.
+# How it works: every write does an INCR on the epoch key; the read checks the
+# epoch (a GET on Redis — which dispatch already uses and costs a fraction of the
+# SELECT+deserialization on Postgres) and only goes to the database when it has
+# changed. The local TTL was kept as the degradation for Redis being unavailable:
+# in that case the 30 s staleness ceiling applies again, and dispatch does not
+# break because of it.
 _EPOCH_KEY = "disabled_nodes:epoch"
 _CACHE_TTL_S = 30.0
 _cache: dict[str, dict[str, Any]] | None = None
@@ -65,23 +67,23 @@ def _redis():
 
 
 async def _ler_epoca() -> str | None:
-    """Epoca corrente, ou None quando o Redis nao pode ser consultado.
+    """Current epoch, or None when Redis cannot be queried.
 
-    Chave ausente vale "0" (estado inicial, nenhuma escrita ainda) — e diferente
-    de None, que significa "nao deu para saber" e cai no TTL local.
+    A missing key counts as "0" (initial state, no write yet) — and is different
+    from None, which means "could not tell" and falls back to the local TTL.
     """
     try:
         valor = await _redis().get(_EPOCH_KEY)
     except Exception as exc:
-        # Rebaixado a debug de proposito: acontece uma vez por leitura e o
-        # caminho de degradacao (TTL local) e o comportamento documentado acima.
+        # Downgraded to debug on purpose: it happens once per read and the
+        # degradation path (local TTL) is the behavior documented above.
         _logger.debug("Epoca de disabled_nodes indisponivel no Redis: %s", exc)
         return None
     return valor if valor is not None else "0"
 
 
 async def _publicar_invalidacao() -> None:
-    """Avisa os OUTROS workers que o mapa mudou, incrementando a epoca."""
+    """Tells the OTHER workers that the map changed, by incrementing the epoch."""
     try:
         await _redis().incr(_EPOCH_KEY)
     except Exception as exc:
@@ -93,7 +95,7 @@ async def _publicar_invalidacao() -> None:
 
 
 def invalidate_cache() -> None:
-    """Descarta o cache do processo. Toda escrita chama; testes tambem."""
+    """Discards the process cache. Every write calls it; so do tests."""
     global _cache, _cache_epoca, _cache_expira_em
     _cache = None
     _cache_epoca = None
@@ -101,17 +103,17 @@ def invalidate_cache() -> None:
 
 
 async def list_disabled(db: AsyncSession) -> dict[str, dict[str, Any]]:
-    """Retorna o mapa atual de nodes desabilitados {name: metadata}.
+    """Returns the current map of disabled nodes {name: metadata}.
 
-    O dict devolvido e o proprio objeto cacheado — quem precisa alterar copia
-    antes (ver `set_disabled`/`set_enabled`).
+    The returned dict is the cached object itself — whoever needs to change it
+    copies it first (see `set_disabled`/`set_enabled`).
     """
     global _cache, _cache_epoca, _cache_expira_em
 
-    # A epoca e lida ANTES do SELECT de proposito: se uma escrita entrar no meio,
-    # o mapa novo fica gravado sob a epoca antiga e a proxima leitura recarrega
-    # (custo: um SELECT extra). Ler a epoca DEPOIS carimbaria dado velho como
-    # atual e o cache ficaria stale ate o TTL vencer.
+    # The epoch is read BEFORE the SELECT on purpose: if a write comes in between,
+    # the new map is stored under the old epoch and the next read reloads it
+    # (cost: one extra SELECT). Reading the epoch AFTER would stamp old data as
+    # current and the cache would stay stale until the TTL expired.
     epoca = await _ler_epoca()
     agora = monotonic()
 
@@ -123,7 +125,7 @@ async def list_disabled(db: AsyncSession) -> dict[str, dict[str, Any]]:
             return _cache
 
     raw = await get_config(db, _CONFIG_KEY, default={})
-    # Defesa: tipo retornado do JSON pode vir como list em config corrompida
+    # Defense: the type returned from the JSON may come as a list in a corrupted config
     if not isinstance(raw, dict):
         raw = {}
 
@@ -134,7 +136,7 @@ async def list_disabled(db: AsyncSession) -> dict[str, dict[str, Any]]:
 
 
 async def disabled_names(db: AsyncSession) -> set[str]:
-    """Atalho: apenas os nomes (para uso em filtros set-based)."""
+    """Shortcut: just the names (for use in set-based filters)."""
     cfg = await list_disabled(db)
     return set(cfg.keys())
 
@@ -152,14 +154,14 @@ async def set_disabled(
     cfg[name] = entry
     await set_config(db, _CONFIG_KEY, cfg)
     invalidate_cache()
-    # Depois do commit do set_config: quem ler a epoca nova tem de encontrar o
-    # mapa novo no banco, nunca o contrario.
+    # After set_config's commit: whoever reads the new epoch must find the new
+    # map in the database, never the other way around.
     await _publicar_invalidacao()
     return entry
 
 
 async def set_enabled(db: AsyncSession, name: str) -> bool:
-    """Remove o node do mapa. Retorna True se removeu algo."""
+    """Removes the node from the map. Returns True if it removed something."""
     cfg = dict(await list_disabled(db))
     if name not in cfg:
         return False

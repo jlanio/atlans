@@ -1,36 +1,36 @@
 // desktop/src/renderer/components/TitleBar.tsx
 //
-// Barra de título desenhada pelo app (a janela usa `frame: false`).
+// Title bar drawn by the app (the window uses `frame: false`).
 //
-// Híbrido deliberado: a APARÊNCIA é a do macOS (círculos coloridos sólidos),
-// mas a POSIÇÃO e a ORDEM são as do Windows — à direita, minimizar / maximizar
-// / fechar, com o fechar na quina. É onde a mão do usuário de Windows já vai, e
-// deixar o "fechar" em qualquer outro lugar do grupo criaria um híbrido que não
-// corresponde a nenhum dos dois sistemas.
+// A deliberate hybrid: the LOOK is macOS's (solid colored circles), but the
+// POSITION and ORDER are Windows's — on the right, minimize / maximize / close,
+// with close in the corner. That is where a Windows user's hand already goes,
+// and leaving "close" anywhere else in the group would create a hybrid that
+// matches neither system.
 //
-// A única reação ao mouse é o glifo da função aparecendo dentro do círculo sob
-// o cursor — um de cada vez, só o que está sendo apontado.
+// The only reaction to the mouse is the function's glyph appearing inside the
+// circle under the cursor — one at a time, only the one being pointed at.
 //
-// O `-webkit-app-region: drag` faz a barra arrastar a janela; os botões
-// precisam de `no-drag` explícito, senão o clique vira início de arrasto e
-// nunca dispara.
+// `-webkit-app-region: drag` makes the bar drag the window; the buttons need
+// an explicit `no-drag`, otherwise the click becomes the start of a drag and
+// never fires.
 import { useState } from 'react'
 import { cn } from '../lib/utils.js'
 
 type Semaforo = 'fechar' | 'minimizar' | 'maximizar'
 
-// Cores dos semáforos do macOS. São valores fixos de propósito, e não tokens do
-// design system: o usuário reconhece este vermelho/amarelo/verde específicos
-// como "controles de janela", e trocá-los pela paleta terracota do produto
-// tiraria justamente a familiaridade que motiva usá-los.
+// macOS traffic-light colors. They are fixed values on purpose, not design
+// system tokens: the user recognizes this specific red/yellow/green as "window
+// controls", and swapping them for the product's terracotta palette would take
+// away precisely the familiarity that motivates using them.
 const CORES: Record<Semaforo, string> = {
   fechar: 'bg-[#ff5f57]',
   minimizar: 'bg-[#febc2e]',
   maximizar: 'bg-[#28c840]',
 }
 
-// Tom escuro da própria cor do círculo, como no macOS: um glifo preto ou branco
-// brigaria com o fundo colorido em vez de assentar nele.
+// Dark shade of the circle's own color, as on macOS: a black or white glyph
+// would clash with the colored background instead of settling into it.
 const TINTA: Record<Semaforo, string> = {
   fechar: '#7a0a04',
   minimizar: '#8a5a00',
@@ -39,10 +39,11 @@ const TINTA: Record<Semaforo, string> = {
 
 function Glifo({ tipo, maximizada }: { tipo: Semaforo; maximizada: boolean }) {
   const comum = {
-    // `group-hover/semaforo` casa com o `group/semaforo` do PROPRIO botao —
-    // cada circulo e o seu grupo, entao so o que esta sob o cursor revela o
-    // glifo. `pointer-events-none` no svg impede que ele roube o hover do
-    // botao e o icone pisque ao mover o mouse dentro do circulo.
+    // `group-hover/semaforo` matches the `group/semaforo` of the button ITSELF —
+    // each circle is its own group, so only the one under the cursor reveals
+    // the glyph. `pointer-events-none` on the svg keeps it from stealing the
+    // button's hover and making the icon flicker when the mouse moves inside
+    // the circle.
     className:
       'pointer-events-none absolute inset-0 m-auto opacity-0 transition-opacity duration-150 group-hover/semaforo:opacity-100 group-focus-visible/semaforo:opacity-100',
     stroke: TINTA[tipo],
@@ -61,7 +62,7 @@ function Glifo({ tipo, maximizada }: { tipo: Semaforo; maximizada: boolean }) {
   return (
     <svg {...comum} width="7" height="7" viewBox="0 0 7 7">
       {maximizada
-        // Restaurar: setas apontando para dentro.
+        // Restore: arrows pointing inward.
         ? <path d="M3.6 0.9v2.3H1.3M3.4 6.1V3.8h2.3" />
         // Maximizar: cantos opostos, apontando para fora.
         : <path d="M1 3.2V1h2.2M6 3.8V6H3.8" />}
@@ -83,17 +84,17 @@ function Botao({
       onClick={aoClicar}
       aria-label={rotulo}
       title={rotulo}
-      // `app-region: no-drag` é obrigatório: dentro de uma área de arrasto, o
-      // clique seria consumido pelo gesto de mover a janela.
+      // `app-region: no-drag` is mandatory: inside a drag area, the click would be
+      // consumed by the gesture of moving the window.
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-      // O CÍRCULO tem 12px, mas o alvo não precisa ter: `p-1.5 -m-1.5` cresce a
-      // área clicável para 24px sem mover o desenho nem mudar a altura da
-      // barra. Eram três alvos de 12px lado a lado — os primeiros tab stops do
-      // app, e sem anel de foco.
+      // The CIRCLE is 12px, but the target does not have to be: `p-1.5 -m-1.5`
+      // grows the clickable area to 24px without moving the drawing or
+      // changing the bar height. They were three 12px targets side by side —
+      // the app's first tab stops, and with no focus ring.
       //
-      // `focus-visible` (e não `focus`): quem clica não vê anel nenhum; quem
-      // tabula vê. Sem ele, o teclado atravessava os três controles de janela
-      // às cegas.
+      // `focus-visible` (and not `focus`): someone who clicks sees no ring;
+      // someone who tabs does. Without it, the keyboard went through the three
+      // window controls blind.
       className={cn(
         'group/semaforo relative -m-1.5 box-content size-3 rounded-full p-1.5 outline-none',
         'transition-transform active:scale-90',
@@ -108,8 +109,8 @@ function Botao({
 }
 
 export function TitleBar({ titulo }: { titulo?: string }) {
-  // Só rastreia para escolher o rótulo entre "Maximizar" e "Restaurar" — o
-  // botão não muda de aparência.
+  // Only tracked to choose the label between "Maximizar" and "Restaurar" — the
+  // button does not change appearance.
   const [maximizada, setMaximizada] = useState(false)
 
   const alternarMaximizar = () => {
@@ -119,19 +120,19 @@ export function TitleBar({ titulo }: { titulo?: string }) {
   return (
     <header
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-      // Duplo clique na barra alterna maximizar — comportamento esperado nos
-      // dois sistemas.
+      // Double click on the bar toggles maximize — expected behavior on both
+      // systems.
       onDoubleClick={alternarMaximizar}
       className="relative flex h-9 shrink-0 items-center justify-end border-b border-border/60 bg-sidebar px-3 select-none"
     >
-      {/* Título centralizado na JANELA, e não no espaço restante: `absolute`
-          evita que a largura do grupo de botões o desloque para a esquerda. */}
+      {/* Title centered in the WINDOW, not in the remaining space: `absolute`
+          keeps the width of the button group from shifting it to the left. */}
       <span className="pointer-events-none absolute inset-x-0 text-center text-xs font-medium text-muted-foreground">
         {titulo ?? 'Atlans Executor'}
       </span>
 
-      {/* Ordem do Windows: fechar por último, na quina da janela. O hover é de
-          cada botão (`group/semaforo`), não deste contêiner. */}
+      {/* Windows order: close last, in the window corner. The hover belongs to
+          each button (`group/semaforo`), not to this container. */}
       <div className="flex items-center gap-2">
         <Botao tipo="minimizar" rotulo="Minimizar" maximizada={maximizada}
                aoClicar={() => void window.atlas.janela('minimizar')} />

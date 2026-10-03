@@ -1,9 +1,9 @@
 # tests/unit/test_webhook_trigger_validation.py
-"""Testes para a validação de WebhookTrigger no endpoint POST /webhook/execute/{id_hash}.
+"""Tests for the WebhookTrigger validation in the POST /webhook/execute/{id_hash} endpoint.
 
-Cobre:
-  - has_webhook_trigger() em app.core.utils.workflow_triggers
-  - Comportamento do router webhook_router quando o workflow não possui WebhookTrigger
+Covers:
+  - has_webhook_trigger() in app.core.utils.workflow_triggers
+  - Behavior of the webhook_router router when the workflow has no WebhookTrigger
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock
@@ -19,7 +19,7 @@ from app.core.rate_limiter import limiter
 from app.core.utils.workflow_triggers import has_webhook_trigger
 
 
-# ── Testes da função utilitária ───────────────────────────────────────────────
+# ── Tests of the utility function ─────────────────────────────────────────────
 
 class TestHasWebhookTrigger:
     def test_definition_com_webhook_trigger_retorna_true(self):
@@ -64,7 +64,7 @@ class TestHasWebhookTrigger:
         assert has_webhook_trigger({}) is False
 
     def test_definition_com_multiplos_triggers_incluindo_webhook(self):
-        """Workflows híbridos (schedule + webhook) devem passar na validação."""
+        """Hybrid workflows (schedule + webhook) should pass validation."""
         definition = {
             "nodes": [
                 {"id": "n1", "type": "trigger", "name": "ScheduleTrigger", "properties": {}},
@@ -74,8 +74,8 @@ class TestHasWebhookTrigger:
         assert has_webhook_trigger(definition) is True
 
     def test_node_com_name_webhook_mas_type_errado_retorna_false(self):
-        """Defesa anti-spoofing: um node do tipo action chamado 'WebhookTrigger'
-        não deve passar na validação — o type deve ser 'trigger'.
+        """Anti-spoofing defense: a node of type action named 'WebhookTrigger'
+        must not pass validation — the type must be 'trigger'.
         """
         definition = {
             "nodes": [
@@ -85,7 +85,7 @@ class TestHasWebhookTrigger:
         assert has_webhook_trigger(definition) is False
 
 
-# ── Testes de integração com o router via TestClient ─────────────────────────
+# ── Integration tests with the router via TestClient ─────────────────────────
 
 @pytest.fixture
 def mock_service():
@@ -97,10 +97,10 @@ def mock_service():
 
 @pytest.fixture
 def app(mock_service):
-    """FastAPI app mínima para testar o webhook_router.
+    """Minimal FastAPI app to test webhook_router.
 
-    Monta o limiter e registra o handler de RateLimitExceeded como em main.py.
-    Sobrescreve a dependência get_workflow_service via dependency_overrides.
+    Mounts the limiter and registers the RateLimitExceeded handler as in main.py.
+    Overrides the get_workflow_service dependency via dependency_overrides.
     """
     app = FastAPI()
     app.state.limiter = limiter
@@ -116,7 +116,7 @@ def client(app):
 
 
 def test_router_retorna_403_quando_workflow_nao_tem_webhook_trigger(client, mock_service):
-    """POST /webhook/execute/{id_hash} em workflow só com ScheduleTrigger → 403."""
+    """POST /webhook/execute/{id_hash} on a workflow with only a ScheduleTrigger → 403."""
     wf = MagicMock()
     wf.flag_ative = True
     wf.definition = {
@@ -130,7 +130,7 @@ def test_router_retorna_403_quando_workflow_nao_tem_webhook_trigger(client, mock
 
     assert response.status_code == 403
     assert "WebhookTrigger" in response.json()["detail"]
-    # start_analysis NUNCA deve ser chamado nesse cenário
+    # start_analysis must NEVER be called in this scenario
     mock_service.start_analysis.assert_not_called()
 
 

@@ -1,10 +1,10 @@
 // desktop/src/renderer/components/Copiavel.tsx
 //
-// Valor técnico que o usuário eventualmente precisa mandar para alguém — ID do
-// executor, caminho, mensagem de erro.
+// A technical value the user may eventually need to send to someone — executor
+// ID, path, error message.
 //
-// Existe porque o ID aparecia truncado (`7f26ceba…`) sem nenhuma forma de obter
-// o valor inteiro: quem pedisse suporte teria que abrir o `.env` no Explorer.
+// Exists because the ID appeared truncated (`7f26ceba…`) with no way to get the
+// whole value: whoever asked for support would have to open `.env` in Explorer.
 import { useEffect, useState } from 'react'
 import { cn } from '../lib/utils.js'
 
@@ -12,15 +12,15 @@ export function Copiavel({
   valor, rotulo, exibir, className,
 }: {
   valor: string
-  /** Texto do `title`. Sem ele, o próprio valor. */
+  /** `title` text. Without it, the value itself. */
   rotulo?: string
-  /** O que mostrar, se diferente do valor (ex.: truncado). */
+  /** What to show, if different from the value (e.g. truncated). */
   exibir?: string
   className?: string
 }) {
   const [copiado, setCopiado] = useState(false)
 
-  // Some sozinho: um "copiado!" permanente vira ruído na tela.
+  // Disappears on its own: a permanent "copiado!" (copied!) becomes noise.
   useEffect(() => {
     if (!copiado) return
     const t = setTimeout(() => setCopiado(false), 1600)

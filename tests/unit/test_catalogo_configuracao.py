@@ -1,11 +1,12 @@
 # tests/unit/test_catalogo_configuracao.py
 """
-O catálogo de fontes se desliga como a documentação diz, e as variáveis dele
-chegam ao container.
+The source catalog turns off the way the documentation says, and its variables
+reach the container.
 
-O .env.example e docs/fontes.md diziam que FONTES_CATALOGO_DIR vazia desliga a
-importação, mas o `.strip() or` a devolvia ao padrão; e o compose nem repassava
-as três FONTES_* ao container. Na prática, só uma pasta inexistente desligava.
+.env.example and docs/sources.md said an empty FONTES_CATALOGO_DIR turns off the
+import, but the `.strip() or` sent it back to the default; and the compose file
+didn't even pass the three FONTES_* to the container. In practice, only a
+nonexistent folder turned it off.
 """
 from __future__ import annotations
 
@@ -20,7 +21,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 
 
 @pytest.mark.parametrize("valor, esperado", [
-    (None, "catalogo/geoservicos"),   # fora do .env: a pasta do repositório
+    (None, "catalogo/geoservicos"),   # outside .env: the repository folder
     ("", ""),                          # vazia: desliga
     ("  /dados/vault  ", "/dados/vault"),
 ])
@@ -38,7 +39,7 @@ def test_vazia_desliga_e_ausente_vale_o_padrao(valor, esperado):
 
 def test_o_compose_repassa_as_fontes_e_o_vazio_chega_vazio():
     compose = (RAIZ / "docker-compose.yml").read_text(encoding="utf-8")
-    # Sem os dois-pontos: `${X-padrao}` só usa o padrão quando X não existe.
+    # Without the colon: `${X-padrao}` only uses the default when X doesn't exist.
     assert "FONTES_CATALOGO_DIR: ${FONTES_CATALOGO_DIR-catalogo/geoservicos}" in compose
     for var in ("FONTES_APRENDER_DAS_EXECUCOES", "FONTES_VERIFICACAO_INTERVAL"):
         assert f"{var}: ${{{var}:-}}" in compose

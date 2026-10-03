@@ -1,14 +1,14 @@
 # tests/unit/test_fix_consumer_services.py
 """
-Testes das correcoes S2 / B11 / B9 / B13 / B7 no lado servidor.
+Tests for the S2 / B11 / B9 / B13 / B7 fixes on the server side.
 
-Cobre:
-  - S2  : s3_key de artefato/pin derivada pelo servidor (nunca a do executor).
-  - B11 : rollback apos falha de fase — as fases seguintes continuam rodando.
-  - B9  : usage_daily contabilizado SEMPRE (inclusive falhas) e node_stats
-          preservado quando o executor manda stats vazio.
-  - B13 : run nao fica zumbi em 'pending' e cancel_run fecha run sem host.
-  - B7  : sign_csr_via_stepca falha em vez de devolver ca_pem vazio.
+Covers:
+  - S2  : artifact/pin s3_key derived by the server (never the executor's).
+  - B11 : rollback after a phase failure — the following phases keep running.
+  - B9  : usage_daily ALWAYS accounted (failures included) and node_stats
+          preserved when the executor sends empty stats.
+  - B13 : run does not get stuck as a zombie in 'pending' and cancel_run closes a run without a host.
+  - B7  : sign_csr_via_stepca fails instead of returning an empty ca_pem.
 """
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -51,12 +51,12 @@ def _result(value) -> MagicMock:
 
 
 def _scalars(items: list) -> MagicMock:
-    """Resultado de query com `.scalars()`, respondendo `.all()` E `.first()`.
+    """Query result with `.scalars()`, answering both `.all()` AND `.first()`.
 
-    Ligar só o `all()` era uma armadilha silenciosa: um `MagicMock` aceita
-    `.first()` sem reclamar e devolve OUTRO mock, então o código sob teste
-    escrevia num objeto que ninguém inspeciona e a asserção passava a medir
-    nada. Custou um teste verde sobre código que não fazia o que ele dizia.
+    Wiring only `all()` was a silent trap: a `MagicMock` accepts
+    `.first()` without complaint and returns ANOTHER mock, so the code under test
+    wrote to an object nobody inspects and the assertion ended up measuring
+    nothing. It cost us a green test over code that did not do what it claimed.
     """
     r = MagicMock()
     r.scalars.return_value.all.return_value = items
@@ -65,15 +65,15 @@ def _scalars(items: list) -> MagicMock:
 
 
 def _all(rows: list) -> MagicMock:
-    """Resultado de query lida direto por `.all()` (sem `.scalars()`) — a guarda
-    de idempotencia de artefato usa `select(Artifact.node_id, Artifact.filename)`."""
+    """Query result read directly via `.all()` (no `.scalars()`) — the artifact
+    idempotency guard uses `select(Artifact.node_id, Artifact.filename)`."""
     r = MagicMock()
     r.all.return_value = rows
     return r
 
 
 class _AsyncCtx:
-    """Substitui AsyncSessionLocal() nos testes de _consume_one."""
+    """Replaces AsyncSessionLocal() in the _consume_one tests."""
 
     def __init__(self, db):
         self._db = db
@@ -93,12 +93,12 @@ def _rowcount(n: int) -> MagicMock:
 
 
 class _SavepointFalso:
-    """`db.begin_nested()` como gerenciador de contexto assíncrono.
+    """`db.begin_nested()` as an async context manager.
 
-    O `AsyncMock` devolve uma corrotina, e `async with` numa corrotina explode.
-    `_upsert_pin_artifact` usa savepoint para isolar a violação do índice único
-    de pin quando dois runs correm juntos, então o dublê precisa entrar e sair
-    sem fazer nada.
+    `AsyncMock` returns a coroutine, and `async with` on a coroutine blows up.
+    `_upsert_pin_artifact` uses a savepoint to isolate the violation of the pin
+    unique index when two runs race, so the double needs to enter and exit
+    doing nothing.
     """
 
     async def __aenter__(self):
@@ -124,14 +124,14 @@ def _mock_db(execute_results=None) -> AsyncMock:
 
 
 class TestUpsertPinCorrida:
-    """Dois runs do mesmo fluxo terminando juntos, com o indice unico no lugar.
+    """Two runs of the same workflow finishing together, with the unique index in place.
 
-    Antes do indice, os dois inseriam e a base ficava com duas linhas — o
-    defeito que o colapso remedia. Com `uq_artifact_pin_por_no`, o segundo
-    INSERT VIOLA a constraint, e no Postgres um erro assim envenena a transacao
-    inteira: esta e a transacao que persiste o RESULTADO da execucao, no caminho
-    do `job_result`. Sem o SAVEPOINT, trocar a duplicata pela constraint teria
-    piorado o caminho quente em vez de conserta-lo.
+    Before the index, both inserted and the database ended up with two rows — the
+    defect that the collapse remedies. With `uq_artifact_pin_por_no`, the second
+    INSERT VIOLATES the constraint, and in Postgres an error like that poisons the
+    whole transaction: this is the transaction that persists the run's RESULT, on
+    the `job_result` path. Without the SAVEPOINT, swapping the duplicate for the
+    constraint would have made the hot path worse instead of fixing it.
     """
 
     @pytest.mark.asyncio
@@ -147,7 +147,7 @@ class TestUpsertPinCorrida:
 
         db = _mock_db([
             _scalars([]),            # 1a leitura: ninguem tinha inserido ainda
-            _scalars([vencedora]),   # 2a leitura, ja depois da violacao
+            _scalars([vencedora]),   # 2nd read, already after the violation
         ])
         db.flush = AsyncMock(side_effect=IntegrityError("INSERT", {}, Exception("unique")))
 
@@ -157,8 +157,8 @@ class TestUpsertPinCorrida:
             "__pin_filename__": "n1_pin.json",
         })
 
-        # A linha do outro run e a verdade; esta chamada so a reaponta para o
-        # objeto mais novo — exatamente o que o ramo de UPDATE ja fazia.
+        # The other run's row is the truth; this call only repoints it to the
+        # newest object — exactly what the UPDATE branch already did.
         assert vencedora.s3_key == f"pin-cache/ws-alvo/{run.task_id}/n1_pin.json"
         assert vencedora.run_id == run.task_id
         assert vencedora.workspace_id == "ws-alvo"
@@ -200,7 +200,7 @@ class TestUpsertPinCorrida:
         assert db.add.call_args[0][0].node_id == "n1"
 
 
-# ── S2: derivacao de s3_key ───────────────────────────────────────────────────
+# ── S2: s3_key derivation ─────────────────────────────────────────────────────
 
 class TestDeriveS3Key:
 
@@ -209,7 +209,7 @@ class TestDeriveS3Key:
         assert key == "artifacts/ws-1/task-1/saida.geojson"
 
     def test_path_traversal_no_filename_vira_basename(self):
-        # '../../outro-ws/segredo.json' nao pode escapar do prefixo do workspace.
+        # '../../outro-ws/segredo.json' must not escape the workspace prefix.
         key = rrc._derive_s3_key("artifacts", "ws-1", "task-1", "../../outro/segredo.json")
         assert key == "artifacts/ws-1/task-1/segredo.json"
 
@@ -221,17 +221,17 @@ class TestDeriveS3Key:
         assert rrc._derive_s3_key("artifacts", "", "task-1", "a.json") is None
 
     def test_charset_invalido_e_normalizado_nao_descartado(self):
-        # Espaco nao esta no charset S3-safe de _validate_agent_s3_key, mas
-        # descartar o artefato inteiro por causa disso o fazia sumir da UI.
+        # A space is not in the S3-safe charset of _validate_agent_s3_key, but
+        # discarding the whole artifact because of it made it vanish from the UI.
         assert (rrc._derive_s3_key("artifacts", "ws-1", "task-1", "nome com espaco.json")
                 == "artifacts/ws-1/task-1/nome_com_espaco.json")
 
     def test_acento_vira_ascii(self):
-        """Regressao: label pt-BR ('Relatorio 2026') e o caso comum, nao a excecao.
+        """Regression: a pt-BR label ('Relatorio 2026') is the common case, not the exception.
 
-        slugify_label no executor usa str.isalnum(), que PRESERVA acento; o
-        regex S3-safe do servidor e ASCII puro. Rejeitar aqui apagava a linha
-        Artifact e o run terminava 'success' sem nada visivel.
+        slugify_label in the executor uses str.isalnum(), which PRESERVES accents; the
+        server's S3-safe regex is pure ASCII. Rejecting here deleted the Artifact
+        row and the run ended 'success' with nothing visible.
         """
         key = rrc._derive_s3_key("artifacts", "ws-1", "task-1", "Relatório_2026.geojson")
         assert key == "artifacts/ws-1/task-1/Relatorio_2026.geojson"
@@ -248,18 +248,18 @@ class TestRegisterArtifactsIgnoraS3KeyDoExecutor:
 
     @pytest.mark.asyncio
     async def test_s3_key_forjada_e_substituida(self):
-        """Executor manda key de OUTRO workspace — servidor grava a sua propria."""
+        """Executor sends a key from ANOTHER workspace — the server writes its own."""
         run = _make_run(workspace_id="ws-alvo")
         db = _mock_db([
             _result(None),      # _get_retention_days
-            _scalars([]),       # keys ja registradas
+            _scalars([]),       # keys already registered
         ])
         artifacts_meta = {
             "node-a": [{
                 "filename": "resultado.geojson",
                 "output_key": "res",
                 "format": "geojson",
-                # Vetor do ataque: aponta para o workspace da vitima.
+                # Attack vector: points to the victim's workspace.
                 "s3_key": "artifacts/ws-vitima/run-alheio/dados-sigilosos.geojson",
                 "credential_id": None,
             }],
@@ -276,7 +276,7 @@ class TestRegisterArtifactsIgnoraS3KeyDoExecutor:
 
     @pytest.mark.asyncio
     async def test_nome_acentuado_ainda_gera_linha_artifact(self):
-        """Regressao: com acento o artefato sumia da UI (apenas WARNING no log)."""
+        """Regression: with an accent the artifact vanished from the UI (only a WARNING in the log)."""
         run = _make_run(workspace_id="ws-alvo")
         db = _mock_db([_result(None), _scalars([])])
 
@@ -289,8 +289,8 @@ class TestRegisterArtifactsIgnoraS3KeyDoExecutor:
         added = [c.args[0] for c in db.add.call_args_list if isinstance(c.args[0], Artifact)]
         assert len(added) == 1
         assert added[0].s3_key == f"artifacts/ws-alvo/{run.task_id}/Area_Util.geojson"
-        # filename exibido tem de casar com o ultimo segmento da key, senao a UI
-        # promete um download com um nome que nao existe no storage.
+        # the displayed filename must match the last segment of the key, otherwise the UI
+        # promises a download with a name that does not exist in storage.
         assert added[0].filename == "Area_Util.geojson"
 
     @pytest.mark.asyncio
@@ -298,7 +298,7 @@ class TestRegisterArtifactsIgnoraS3KeyDoExecutor:
         run = _make_run(workspace_id="ws-alvo")
         db = _mock_db([
             _result(None),                       # _get_retention_days
-            _all([("n1", "resultado.json")]),    # guarda: (node_id, filename) ja no run
+            _all([("n1", "resultado.json")]),    # guard: (node_id, filename) already in the run
         ])
 
         with patch("app.core.storage.head", return_value=None), \
@@ -337,14 +337,14 @@ class TestSafePinRef:
 
     @pytest.mark.asyncio
     async def test_pinned_outputs_persistido_com_key_do_servidor(self):
-        """Workspace forjado na key e neutralizado — mas a ref precisa ser DESTA
-        run (task_id atual na key): pins gravados agora sao aceitos e re-derivados."""
+        """A workspace forged in the key is neutralized — but the ref must belong to THIS
+        run (current task_id in the key): pins written now are accepted and re-derived."""
         run = _make_run(workspace_id="ws-alvo")
         wf_obj = MagicMock()
         wf_obj.pinned_outputs = None
         wf_obj.workspace_id = "ws-alvo"
         db = _mock_db([
-            _result(wf_obj),   # busca do Workflow
+            _result(wf_obj),   # Workflow lookup
             _result(None),     # _upsert_pin_artifact: artefato de pin anterior
         ])
         stats = {"__updated_pinned_outputs__": {"n1": {
@@ -360,10 +360,10 @@ class TestSafePinRef:
 
     @pytest.mark.asyncio
     async def test_pin_passthrough_de_run_antiga_e_ignorado(self):
-        """Ref que o executor apenas repassou (gravada numa run anterior) NAO pode
-        ser re-persistida: `_safe_pin_ref` derivaria a key com o task_id ATUAL,
-        repontando o pin para um objeto que nunca foi enviado — 404 permanente,
-        que era exatamente o ciclo de corrupcao em producao."""
+        """A ref the executor merely passed along (written in a previous run) must NOT
+        be re-persisted: `_safe_pin_ref` would derive the key with the CURRENT task_id,
+        repointing the pin to an object that was never uploaded — a permanent 404,
+        which was exactly the corruption cycle in production."""
         run = _make_run(workspace_id="ws-alvo")
         wf_obj = MagicMock()
         wf_obj.pinned_outputs = None
@@ -381,10 +381,10 @@ class TestSafePinRef:
 
     @pytest.mark.asyncio
     async def test_pin_descartado_se_o_workflow_mudou_de_workspace(self):
-        """O workflow pode ter sido movido enquanto o run corria. As s3_keys sao
-        derivadas de `run.workspace_id` (a ORIGEM), entao grava-las deixaria o
-        workflow — ja no destino — com pins apontando para o tenant antigo, que o
-        executor default conseguiria ler na proxima execucao."""
+        """The workflow may have been moved while the run was going. The s3_keys are
+        derived from `run.workspace_id` (the ORIGIN), so writing them would leave the
+        workflow — already at the destination — with pins pointing to the old tenant,
+        which the default executor could read on the next execution."""
         run = _make_run(workspace_id="ws-origem")
         wf_obj = MagicMock()
         wf_obj.pinned_outputs = None
@@ -402,10 +402,10 @@ class TestSafePinRef:
 
     @pytest.mark.asyncio
     async def test_upsert_de_pin_realinha_o_workspace_do_artefato(self):
-        """A busca e por (workflow_hash, node_id) e nao filtra tenant: uma linha
-        remanescente de antes de um move seria repontada para um objeto do
-        workspace novo mantendo o `workspace_id` antigo — e o download usa a
-        s3_key literal, servindo dados do destino a quem so alcanca a origem."""
+        """The lookup is by (workflow_hash, node_id) and does not filter by tenant: a row
+        left over from before a move would be repointed to an object of the
+        new workspace while keeping the old `workspace_id` — and the download uses the
+        literal s3_key, serving destination data to someone who only reaches the origin."""
         run = _make_run(workspace_id="ws-destino")
         wf_obj = MagicMock(workspace_id="ws-destino")
         antigo = MagicMock(workspace_id="ws-origem")
@@ -422,16 +422,16 @@ class TestSafePinRef:
 
     @pytest.mark.asyncio
     async def test_upsert_colapsa_linhas_de_pin_duplicadas(self):
-        """`scalar_one_or_none()` aqui levantava `MultipleResultsFound` — e e
-        ESTA funcao que cria a segunda linha.
+        """`scalar_one_or_none()` here raised `MultipleResultsFound` — and it is
+        THIS function that creates the second row.
 
-        `artifacts` nao tem constraint unica em (workflow_hash, node_id,
-        is_pinned): dois runs do mesmo fluxo terminando juntos nao acham linha,
-        cada um insere a sua, e dai em diante toda leitura levantava. Numa rota
-        isso e um 500; aqui e pior — este e o caminho do `job_result`, e a
-        excecao pendura a persistencia do resultado da execucao.
+        `artifacts` has no unique constraint on (workflow_hash, node_id,
+        is_pinned): two runs of the same workflow finishing together find no row,
+        each inserts its own, and from then on every read raised. In a route
+        that is a 500; here it is worse — this is the `job_result` path, and the
+        exception hangs the persistence of the run's result.
 
-        A mais nova vence (a consulta ordena por id desc) e as extras saem.
+        The newest wins (the query orders by id desc) and the extras go.
         """
         run = _make_run(workspace_id="ws-1")
         wf_obj = MagicMock(workspace_id="ws-1")
@@ -445,9 +445,9 @@ class TestSafePinRef:
             "__pin_filename__": "n1_pin.json",
         })
 
-        # A primeira da lista ordenada e a que fica, atualizada.
+        # The first of the ordered list is the one that stays, updated.
         assert nova.s3_key == f"pin-cache/ws-1/{run.task_id}/n1_pin.json"
-        # E a duplicata sai, em vez de derrubar a fase inteira.
+        # And the duplicate goes, instead of bringing down the whole phase.
         db.delete.assert_awaited_once_with(extra)
         db.add.assert_not_called()
 
@@ -466,7 +466,7 @@ class TestRunPhase:
 
         ok = await rrc._run_phase(db, run, run.task_id, "teste", _explode)
 
-        # Sessao recuperada: o pipeline continua, mas a fase conta como perdida.
+        # Session recovered: the pipeline continues, but the phase counts as lost.
         assert ok == rrc.PHASE_FAILED
         db.rollback.assert_awaited_once()
         db.refresh.assert_awaited_once_with(run)
@@ -501,11 +501,11 @@ class TestRunPhase:
 
     @pytest.mark.asyncio
     async def test_falha_em_metricas_nao_impede_artefatos_nem_webhook(self):
-        """Regressao B11: except sem rollback derrubava TODO o resto do payload.
+        """B11 regression: an except without rollback brought down ALL the rest of the payload.
 
-        A fase que falhou continua sendo REPORTADA (PhaseFailure -> dead letter):
-        isolar a falha nao pode significar consumir o item como se tudo tivesse
-        dado certo.
+        The phase that failed is still REPORTED (PhaseFailure -> dead letter):
+        isolating the failure must not mean consuming the item as if everything had
+        gone fine.
         """
         run = _make_run(status="running")
         db = _mock_db([_result(run)])
@@ -567,12 +567,12 @@ class TestRunPhase:
             with pytest.raises(rrc.PhaseFailure) as exc:
                 await rrc._process_result(db, self._payload_de(run))
 
-        # Nada rodou depois da sessao morrer — tudo o que restou e perda.
+        # Nothing ran after the session died — everything left is lost.
         assert exc.value.labels == ["metricas", "artefatos", "pins", "fontes", "notificacao"]
 
 
 class TestConsumeOneDeadLetter:
-    """B11: fase perdida tem de deixar rastro reprocessavel, nao so um log."""
+    """B11: a lost phase must leave a reprocessable trail, not just a log."""
 
     @pytest.mark.asyncio
     async def test_phase_failure_vai_para_dead_letter_anotado(self):
@@ -614,16 +614,16 @@ class TestConsumeOneDeadLetter:
 # ── B9: usage_daily e node_stats ──────────────────────────────────────────────
 
 class TestUsageDaily:
-    # O upsert e atomico: UPDATE `coluna = coluna + delta` no SQL (rowcount decide
-    # se a linha do dia existia) e, quando nao existia (rowcount 0), um INSERT sob
-    # savepoint. A correcao da corrida real (uq_usage_daily) e o incremento sobre
-    # linha existente ficam no teste de sqlite real `test_usage_daily_corrida.py`;
-    # aqui, o mock cobre a logica de ramos e a data UTC.
+    # The upsert is atomic: UPDATE `coluna = coluna + delta` in SQL (rowcount decides
+    # whether the day's row existed) and, when it did not exist (rowcount 0), an INSERT
+    # under a savepoint. The fix for the real race (uq_usage_daily) and the increment
+    # over an existing row live in the real-sqlite test `test_usage_daily_corrida.py`;
+    # here, the mock covers the branch logic and the UTC date.
 
     @pytest.mark.asyncio
     async def test_falha_sem_metricas_conta_como_erro(self):
-        """Regressao B9: sem metricas o upsert nem rodava → taxa de erro 0% eterna.
-        Sem linha do dia (UPDATE atomico com rowcount 0), o INSERT cria a 1a."""
+        """B9 regression: without metrics the upsert did not even run → error rate 0% forever.
+        With no row for the day (atomic UPDATE with rowcount 0), the INSERT creates the 1st."""
         from app.models.run_metrics import UsageDaily
 
         run = _make_run(status="failed")
@@ -666,8 +666,8 @@ class TestUsageDaily:
 
     @pytest.mark.asyncio
     async def test_agregado_existente_atualiza_no_sql_sem_inserir(self):
-        """Linha do dia ja existe: o UPDATE atomico casa (rowcount 1) e NENHUM
-        INSERT roda — o incremento e no SQL, sem ler-modificar-gravar em Python."""
+        """The day's row already exists: the atomic UPDATE matches (rowcount 1) and NO
+        INSERT runs — the increment is in SQL, no read-modify-write in Python."""
         run = _make_run(status="failed")
         db = _mock_db([_rowcount(1)])
 
@@ -675,12 +675,12 @@ class TestUsageDaily:
 
         db.add.assert_not_called()
         db.begin_nested.assert_not_called()
-        assert db.execute.await_count == 1  # um unico UPDATE, sem SELECT nem INSERT
+        assert db.execute.await_count == 1  # a single UPDATE, no SELECT or INSERT
 
     @pytest.mark.asyncio
     async def test_usa_data_utc_e_nao_a_local(self):
-        """Fuso: a linha usa a data UTC (utc_now_naive), nao `date.today()` local —
-        antes a contagem caia no dia errado perto da meia-noite."""
+        """Time zone: the row uses the UTC date (utc_now_naive), not the local `date.today()` —
+        previously the count landed on the wrong day near midnight."""
         from app.models.run_metrics import UsageDaily
 
         run = _make_run(status="failed")
@@ -732,9 +732,9 @@ class TestDispatchNaoDeixaRunPendente:
         wf.workspace_id = "ws-1"
         wf.pinned_outputs = None
         wf.pin_metadata = None
-        # _close_orphan_dispatch fecha o run com UPDATE condicional (venceu:
-        # rowcount 1) e o contabiliza no usage_daily (B9): o UPDATE atomico do
-        # agregado do dia nao casa (rowcount 0) e uma linha nova e criada.
+        # _close_orphan_dispatch closes the run with a conditional UPDATE (won:
+        # rowcount 1) and accounts it in usage_daily (B9): the atomic UPDATE of the
+        # day's aggregate does not match (rowcount 0) and a new row is created.
         db = _mock_db([_rowcount(1), _rowcount(0)])
         ag = MagicMock()
         ag.id_hash = "ag-1"
@@ -753,7 +753,7 @@ class TestDispatchNaoDeixaRunPendente:
 
     @pytest.mark.asyncio
     async def test_falha_de_despacho_entra_no_usage_daily(self):
-        """B9: run fechado FORA da fila run_results tambem tem de ser contado."""
+        """B9: a run closed OUTSIDE the run_results queue must also be counted."""
         from app.models.run_metrics import UsageDaily
         from app.services import workflow_execution_service as wes
 
@@ -761,7 +761,7 @@ class TestDispatchNaoDeixaRunPendente:
         wf.id_hash, wf.workspace_id = "wf-1", "ws-1"
         wf.pinned_outputs = None
         wf.pin_metadata = None
-        db = _mock_db([_rowcount(1), _rowcount(0)])   # fechamento condicional + agregado do dia
+        db = _mock_db([_rowcount(1), _rowcount(0)])   # conditional close + day's aggregate
         ag = MagicMock()
         ag.id_hash, ag.name, ag.public_key = "ag-1", "executor", "PEM"
 
@@ -776,7 +776,7 @@ class TestDispatchNaoDeixaRunPendente:
 
     @pytest.mark.asyncio
     async def test_send_job_que_estoura_faz_failover(self):
-        """TypeError vindo de send_job era fatal — agora conta como recusa."""
+        """A TypeError coming from send_job was fatal — now it counts as a refusal."""
         from app.services import workflow_execution_service as wes
 
         wf = MagicMock()
@@ -815,15 +815,15 @@ class TestCancelRunPendente:
 
         run = _make_run(status="pending", host=None)
         db = _mock_db([
-            _result(run),     # SELECT do run
+            _result(run),     # SELECT of the run
             _rowcount(1),     # UPDATE condicional venceu
-            _result(None),    # usage_daily do dia (B9)
+            _result(None),    # day's usage_daily (B9)
         ])
 
-        # `como_admin=True` não é atalho preguiçoso: estes casos são sobre a MECÂNICA
-        # do cancelamento (pendente × entregue, corrida com o dispatch), e montar
-        # associação de workspace em cada um só afastaria o teste do que ele mede.
-        # A autorização tem cobertura própria em test_fixes_seguranca_opcao_c.py.
+        # `como_admin=True` is not a lazy shortcut: these cases are about the MECHANICS
+        # of cancellation (pending × delivered, race with the dispatch), and setting up
+        # workspace membership in each one would only pull the test away from what it
+        # measures. Authorization has its own coverage in test_fixes_seguranca_opcao_c.py.
         outcome = await wes.cancel_run(db, run.task_id, user_id="irrelevante", como_admin=True)
 
         assert outcome == "cancelled"
@@ -833,11 +833,11 @@ class TestCancelRunPendente:
 
     @pytest.mark.asyncio
     async def test_fechamento_local_e_condicional(self):
-        """O UPDATE tem de trazer o guard, senao volta a corrida com o dispatch.
+        """The UPDATE must carry the guard, otherwise the race with the dispatch comes back.
 
-        O guard e so `status='pending'`: o host passou a entrar ja no INSERT do
-        run (para poupar um commit antes do envio), entao quem distingue "o
-        executor ja tem o job" de "o job nao saiu do servidor" e o status.
+        The guard is just `status='pending'`: the host now goes in already in the run's
+        INSERT (to save a commit before sending), so what distinguishes "the
+        executor already has the job" from "the job has not left the server" is the status.
         """
         from app.services import workflow_execution_service as wes
 
@@ -852,8 +852,8 @@ class TestCancelRunPendente:
 
     @pytest.mark.asyncio
     async def test_corrida_perdida_para_o_dispatch_vira_pedido_ao_executor(self):
-        """Regressao: o cancel local sobrescrevia o run que o dispatch acabara
-        de entregar — usuario via 'cancelled' e o workflow rodava ate o fim."""
+        """Regression: the local cancel overwrote the run that the dispatch had just
+        delivered — the user saw 'cancelled' and the workflow ran to the end."""
         from app.services import workflow_execution_service as wes
 
         run = _make_run(status="pending", host=None)
@@ -871,21 +871,21 @@ class TestCancelRunPendente:
             outcome = await wes.cancel_run(db, run.task_id, user_id="irrelevante", como_admin=True)
 
         assert outcome == "requested"
-        assert run.status == "running"  # nao foi sobrescrito para 'cancelled'
+        assert run.status == "running"  # was not overwritten to 'cancelled'
         reg.send_json.assert_awaited_once_with(
             "ag-9", {"type": "cancel", "job_id": run.task_id}
         )
 
     @pytest.mark.asyncio
     async def test_dispatch_aborta_running_se_run_foi_cancelado(self):
-        """Simetrico: se o cancel venceu, o dispatch nao ressuscita o run."""
+        """Symmetric: if the cancel won, the dispatch does not resurrect the run."""
         from app.services import workflow_execution_service as wes
 
         wf = MagicMock()
         wf.id_hash, wf.workspace_id = "wf-1", "ws-1"
         wf.pinned_outputs = None
         wf.pin_metadata = None
-        db = _mock_db([_rowcount(0)])  # UPDATE pending → running nao casou
+        db = _mock_db([_rowcount(0)])  # UPDATE pending → running did not match
         ag = MagicMock()
         ag.id_hash, ag.name, ag.public_key = "ag-1", "a1", "PEM"
 
@@ -897,7 +897,7 @@ class TestCancelRunPendente:
             result = await wes._dispatch_job(wf, {"nodes": []}, [ag], {}, False, db=db)
 
         runs = [c.args[0] for c in db.add.call_args_list if isinstance(c.args[0], WorkflowRun)]
-        assert runs[0].status == "pending"  # nunca virou 'running'
+        assert runs[0].status == "pending"  # never became 'running'
         reg.send_json.assert_awaited_once_with(
             "ag-1", {"type": "cancel", "job_id": result.id}
         )
@@ -911,7 +911,7 @@ class TestCancelRunPendente:
         assert await wes.cancel_run(db, run.task_id, user_id="irrelevante", como_admin=True) == "already_finished"
 
 
-# ── B7: ca_pem vazio nunca sai do servidor ────────────────────────────────────
+# ── B7: an empty ca_pem never leaves the server ───────────────────────────────
 
 def _self_signed_pem() -> str:
     from cryptography import x509
@@ -1016,13 +1016,13 @@ class TestSignCsrRootCert:
         assert bundle["cert_pem"] == cert_pem
 
     def test_token_e_leitura_do_root_cert_saem_do_event_loop(self):
-        """B-enroll: o PBKDF2 (via _build_stepca_token) e a leitura do root cert
-        rodam em asyncio.to_thread, nao no event loop que atende os WebSockets dos
-        executores. O efeito e de timing (nao observavel num teste; RedisFalso/dubles
-        nao tem relogio), entao a prova e no CODIGO-FONTE — o mesmo padrao do PR do
-        sandbox/timeout. Os tres testes acima ja rodam via to_thread e provam que o
-        comportamento se preserva. Mutacao: tirar qualquer um dos dois wraps derruba
-        exatamente este teste."""
+        """B-enroll: the PBKDF2 (via _build_stepca_token) and the root cert read
+        run in asyncio.to_thread, not on the event loop that serves the executors'
+        WebSockets. The effect is about timing (not observable in a test; RedisFalso/
+        doubles have no clock), so the proof is in the SOURCE CODE — the same pattern
+        as the sandbox/timeout PR. The three tests above already run via to_thread and
+        prove that behavior is preserved. Mutation: removing either of the two wraps
+        breaks exactly this test."""
         import inspect
 
         from app.services import executor_enrollment_service as ees

@@ -3,14 +3,14 @@ import fs from "node:fs"
 import path from "node:path"
 
 /**
- * O layout do dashboard carrega em TODA rota, a administração inclusive. Se
- * algo dele importa o índice dos textos da Home (`home/i18n`), o bloco do
- * layout leva junto os dicionários do assistente e da entrada, nos três
- * idiomas (~20 KB gzip), para telas que nunca os mostram — e a tabela de rotas
- * do `next build` não mostra isso. A casca importa `home/i18n/da-casca`.
+ * The dashboard layout loads on EVERY route, administration included. If
+ * something in it imports the index of the Home's texts (`home/i18n`), the layout's
+ * chunk carries along the assistant and sign-in dictionaries, in all three
+ * languages (~20 KB gzip), to screens that never show them — and the route table
+ * of `next build` does not show that. The shell imports `home/i18n/da-casca`.
  *
- * O teste segue os imports a partir do layout, como o bundler faria (os
- * `import type` somem na compilação e não contam).
+ * The test follows the imports starting from the layout, as the bundler would (the
+ * `import type`s vanish at compile time and do not count).
  */
 const WEB = path.resolve(__dirname, "../../..")
 const EXTENSOES = ["", ".ts", ".tsx", ".js", ".mjs", "/index.ts", "/index.tsx"]
@@ -48,7 +48,7 @@ function alcancaveis(inicio: string): Set<string> {
 describe("o layout do dashboard e os dicionários da Home", () => {
   it("a casca não alcança o índice nem os dicionários do assistente e da entrada", () => {
     const grafo = alcancaveis("app/(dashboard)/layout.tsx")
-    // O teste enxerga o grafo: a barra lateral da Home e os textos dela estão lá.
+    // The test sees the graph: the Home's sidebar and its texts are there.
     expect(grafo).toContain("app/components/sidebar/home-sidebar.tsx")
     expect(grafo).toContain("app/components/home/i18n/da-casca.ts")
 

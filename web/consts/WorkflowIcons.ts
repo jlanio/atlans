@@ -191,7 +191,7 @@ export type ControlsType =
 
 export const CONTROL_ICONS = {
   "Conditional":    TbArrowsSplit2,
-  // Novos nós de controle
+  // New control nodes
   "JinjaBranch":    TbBraces,
   "Merge":          TbGitMerge,
   "Loop":           TbRefresh,
@@ -200,7 +200,7 @@ export const CONTROL_ICONS = {
   "ChangeDetector": TbVersionsFilled,
 } satisfies Record<ControlsType, IconType>
 
-// ── Mapa unificado para o drawer ──────────────────────────────────────────────
+// ── Unified map for the drawer ────────────────────────────────────────────────
 export const NODE_ICONS = {
   ...TRIGGER_ICONS,
   ...ACTION_ICONS,

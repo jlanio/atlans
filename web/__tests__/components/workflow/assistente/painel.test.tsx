@@ -1,29 +1,30 @@
 /**
- * A gaveta do assistente, de ponta a ponta: mensagem → stream → cartão → Aplicar.
+ * The assistant drawer, end to end: message → stream → card → Apply.
  *
- * O teste que dá razão a este arquivo é o do **Aplicar não salva**. O assistente
- * não grava por portão duro no servidor, e o botão é a única ponte entre a
- * conversa e o canvas. Se um dia ele passar a chamar a rota de escrita "por
- * conveniência", o portão inteiro vira decoração — e a decisão do dono era
- * justamente que gravar é da pessoa, pelo botão Salvar.
+ * The test that justifies this file is the **Apply doesn't save** one. The
+ * assistant doesn't save, by a hard gate on the server, and the button is the
+ * only bridge between the conversation and the canvas. If one day it starts
+ * calling the write route "for convenience", the whole gate becomes decoration —
+ * and the owner's decision was precisely that saving belongs to the person,
+ * through the Save button.
  *
- * O `fetch` é de mentira, mas o stream é de verdade: um `ReadableStream` que
- * entrega os quadros do jeito que a rede entrega, em pedaços que não respeitam
- * fronteira de quadro.
+ * The `fetch` is fake, but the stream is real: a `ReadableStream` that
+ * delivers the frames the way the network does, in chunks that don't respect
+ * frame boundaries.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react"
 
-// `vi.mock` é içado para o topo do arquivo, então a fábrica não pode fechar
-// sobre variável de módulo — daí `vi.hoisted`.
+// `vi.mock` is hoisted to the top of the file, so the factory can't close
+// over a module variable — hence `vi.hoisted`.
 const servico = vi.hoisted(() => ({
   estadoDoAssistente: vi.fn(async () => ({ data: { ativo: true, motivo: null as string | null, cota: null }, error: null })),
   esquecerConversaDoAssistente: vi.fn(async () => ({ data: undefined, error: null })),
 }))
 vi.mock("@/service/GisFlowService", () => ({ GisFlowService: servico }))
 
-// Uma extensão de mentira com oferta na cota cheia: a gaveta é uma das três
-// superfícies do aviso, e a oferta tem de chegar aqui também.
+// A fake extension with an offer at full quota: the drawer is one of the three
+// surfaces of the notice, and the offer has to reach here too.
 vi.mock("@/extensoes", async (original) => ({
   ...(await original<typeof import("@/extensoes")>()),
   EXTENSOES: [{
@@ -34,8 +35,8 @@ vi.mock("@/extensoes", async (original) => ({
   }],
 }))
 
-// O cartão assina o canvas por `useNodes`. Aqui o canvas está vazio — é a tela
-// de criar, que é onde a gaveta nasce aberta.
+// The card subscribes to the canvas via `useNodes`. Here the canvas is empty —
+// it's the create screen, which is where the drawer starts out open.
 vi.mock("@xyflow/react", async (original) => ({
   ...(await original<Record<string, unknown>>()),
   useNodes: vi.fn(() => []),
@@ -70,7 +71,7 @@ const DEFINICAO = {
 const quadro = (evento: string, dados: unknown) =>
   `event: ${evento}\ndata: ${JSON.stringify(dados)}\n\n`
 
-/** Os quadros de uma conversa que monta e valida um fluxo. */
+/** The frames of a conversation that builds and validates a workflow. */
 function corpoDaConversa(): string {
   return (
     quadro("pensando", { texto: "preciso do catálogo" }) +
@@ -78,8 +79,9 @@ function corpoDaConversa(): string {
     quadro("texto", { texto: "o fluxo." }) +
     quadro("ferramenta", { id: "t1", nome: "search_nodes", argumentos: { query: "buffer" } }) +
     quadro("ferramenta_fim", { id: "t1", nome: "search_nodes", erro: false }) +
-    // Desenha ANTES de validar: e a ordem do contrato novo, e e o que torna a
-    // montagem incremental. Validar virou conferencia do que ja esta na tela.
+    // Draws BEFORE validating: that's the order of the new contract, and it's
+    // what makes the build incremental. Validating became a check of what's
+    // already on the screen.
     quadro("ferramenta", { id: "t2", nome: "desenhar_no_canvas", argumentos: { definition: { __campos__: 2 } } }) +
     quadro("ferramenta_fim", { id: "t2", nome: "desenhar_no_canvas", erro: false }) +
     quadro("proposta", { definicao: DEFINICAO, nos: 2, arestas: 1, desenhar: true, nota: "montei o buffer" }) +
@@ -90,12 +92,12 @@ function corpoDaConversa(): string {
   )
 }
 
-/** Um corpo SSE entregue em pedaços que CORTAM quadros ao meio, como a rede faz.
+/** An SSE body delivered in chunks that CUT frames in half, as the network does.
  *
- * O `pull` é ASSÍNCRONO de propósito: cede o loop entre um pedaço e outro, que é
- * o que a rede (e um runner de CI carregado) fazem. Com `pull` síncrono o stream
- * inteiro drenava dentro de um `waitFor` e escondia qualquer corrida entre o
- * teste e os quadros — inclusive a que derrubou o CI do #137. */
+ * The `pull` is ASYNCHRONOUS on purpose: it yields the loop between one chunk and
+ * the next, which is what the network (and a loaded CI runner) do. With a
+ * synchronous `pull` the whole stream drained inside one `waitFor` and hid any
+ * race between the test and the frames — including the one that broke CI on #137. */
 function streamPicado(corpo: string, pedacos = 7): ReadableStream<Uint8Array> {
   const bytes = new TextEncoder().encode(corpo)
   const tamanho = Math.ceil(bytes.length / pedacos)
@@ -153,17 +155,17 @@ describe("gaveta do assistente", () => {
 
     expect(screen.getByText("monta um buffer de 500m")).toBeTruthy()
     expect(screen.getByText("Vou montar o fluxo.")).toBeTruthy()
-    // Nome de ferramenta nunca vai cru para a tela — é o padrão de
-    // `status-rotulos.ts`, e "search_nodes" não diz nada a quem monta fluxo.
+    // A tool name never goes raw to the screen — it's the `status-rotulos.ts`
+    // pattern, and "search_nodes" says nothing to someone building a workflow.
     expect(screen.getByText("Procurando nós")).toBeTruthy()
     expect(screen.queryByText(/search_nodes/)).toBeNull()
     expect(screen.getByText("Validando o fluxo")).toBeTruthy()
   })
 
   it("no canvas vazio o fluxo entra sozinho, sem botão", async () => {
-    // A tela de criar: não há trabalho a perder, então desenhar não pede nada.
-    // É isto que torna a construção INCREMENTAL — sem botão a cada passo, o
-    // fluxo cresce enquanto o modelo monta.
+    // The create screen: there's no work to lose, so drawing asks for nothing.
+    // This is what makes the build INCREMENTAL — no button at every step, the
+    // workflow grows while the model builds it.
     await conversar()
 
     expect(aplicou).toHaveBeenCalled()
@@ -173,9 +175,9 @@ describe("gaveta do assistente", () => {
   })
 
   it("o veredito da validação aparece separado, e não redesenha", async () => {
-    // Dois papéis no mesmo quadro: `desenhar_no_canvas` põe na tela,
-    // `validate_workflow` confere. Se o veredito também desenhasse, cada
-    // validação desfaria o que a pessoa mexeu entre um passo e outro.
+    // Two roles in the same frame: `desenhar_no_canvas` puts it on the screen,
+    // `validate_workflow` checks. If the verdict also drew, each validation
+    // would undo what the person changed between one step and the next.
     await conversar()
 
     expect(screen.getByText("Validação limpa")).toBeTruthy()
@@ -185,7 +187,7 @@ describe("gaveta do assistente", () => {
   it("desenhar leva a definição ao canvas — e NÃO chama a rede", async () => {
     await conversar()
 
-    // O que a rede já fez até aqui: o estado na montagem e o POST da conversa.
+    // What the network has done so far: the state on mount and the conversation's POST.
     const antesFetch = fetchFalso.mock.calls.length
     const antesServico =
       servico.estadoDoAssistente.mock.calls.length + servico.esquecerConversaDoAssistente.mock.calls.length
@@ -195,7 +197,7 @@ describe("gaveta do assistente", () => {
     expect(resultado.nodes.map((n: { id: string }) => n.id)).toEqual(["a", "b"])
     expect(resultado.edges).toHaveLength(1)
 
-    // A asserção que importa: aplicar é local. Quem grava é o Salvar.
+    // The assertion that matters: applying is local. Saving is Save's job.
     expect(fetchFalso.mock.calls.length).toBe(antesFetch)
     expect(
       servico.estadoDoAssistente.mock.calls.length + servico.esquecerConversaDoAssistente.mock.calls.length,
@@ -203,9 +205,9 @@ describe("gaveta do assistente", () => {
   })
 
   it("manda só a mensagem nova — o transcrito é do servidor", async () => {
-    // Um cliente que guardasse o transcrito poderia reescrever um `tool_result`,
-    // e um `tool_result` é a palavra do SERVIDOR sobre o que aconteceu. A rota
-    // recusa campo a mais com 422; o painel não pode tentar mandar.
+    // A client that kept the transcript could rewrite a `tool_result`, and a
+    // `tool_result` is the SERVER's word on what happened. The route rejects
+    // an extra field with 422; the panel must not try to send it.
     await conversar()
     const [, init] = fetchFalso.mock.calls[0] as [string, RequestInit]
     expect(JSON.parse(String(init.body))).toEqual({
@@ -215,9 +217,9 @@ describe("gaveta do assistente", () => {
   })
 
   it("validação com erro é dita em voz alta, e não some", async () => {
-    // O fluxo com erro CONTINUA na tela: e onde a pessoa ve o problema. O que
-    // o cartao faz e dizer que a validacao reprovou, para o modelo corrigir e
-    // redesenhar — antes isso desligava um botao; agora e informacao.
+    // The workflow with errors STAYS on the screen: that's where the person sees
+    // the problem. What the card does is say that validation failed, so the
+    // model fixes and redraws — this used to disable a button; now it's information.
     fetchFalso.mockImplementation(async () => new Response(
       streamPicado(
         quadro("proposta", { definicao: DEFINICAO, nos: 2, arestas: 1, ok: false, erros: 2, avisos: 0 }) +
@@ -229,14 +231,14 @@ describe("gaveta do assistente", () => {
     await conversar()
     expect(screen.getByText("Validação com pendências")).toBeTruthy()
     expect(screen.getByText(/A validação apontou 2 erros/)).toBeTruthy()
-    // Veredito nao desenha: nada foi aplicado no canvas por causa dele.
+    // A verdict doesn't draw: nothing was applied to the canvas because of it.
     expect(aplicou).not.toHaveBeenCalled()
   })
 
   it("num canvas com trabalho, o primeiro desenho espera o clique", async () => {
-    // A decisao do dono: avisar UMA VEZ por conversa. Redesenhar sem aviso o
-    // que alguem montou a mao e destrutivo demais para acontecer calado; pedir
-    // a cada no seria o oposto de acompanhar o fluxo crescer.
+    // The owner's decision: warn ONCE per conversation. Redrawing without warning
+    // what someone built by hand is too destructive to happen silently; asking
+    // at every node would be the opposite of following the workflow grow.
     const { useNodes } = await import("@xyflow/react")
     vi.mocked(useNodes).mockReturnValue([
       { id: "ja-existia", position: { x: 0, y: 0 }, data: {} },
@@ -256,9 +258,9 @@ describe("gaveta do assistente", () => {
   })
 
   it("um turno não recebe os quadros do outro", async () => {
-    // A conversa tem vários turnos, e cada quadro pertence a UM deles. Sem o
-    // endereçamento por id, a resposta nova seria escrita também na antiga — e
-    // o painel passaria a mostrar duas vezes o que o modelo disse uma.
+    // The conversation has several turns, and each frame belongs to ONE of them.
+    // Without addressing by id, the new answer would also be written into the
+    // old one — and the panel would show twice what the model said once.
     await conversar()
 
     fetchFalso.mockImplementation(async () => new Response(
@@ -282,8 +284,8 @@ describe("gaveta do assistente", () => {
       data: { ativo: false, motivo: "não configurado", cota: null },
       error: null,
     })
-    // Aberto na store de propósito: nem assim a gaveta pode existir — e nem o
-    // botão que a abre, que é o que sobra quando ela está fechada.
+    // Open in the store on purpose: even so the drawer can't exist — nor can
+    // the button that opens it, which is what remains when it's closed.
     useAssistenteEditorStore.setState({ aberto: true })
 
     const { container } = render(<AssistentePainel onAplicar={aplicou} />)
@@ -308,25 +310,25 @@ describe("gaveta do assistente", () => {
     expect(await screen.findByText(/Já há uma conversa em andamento/)).toBeTruthy()
   })
   it("o raciocínio nasce recolhido — e o texto continua no DOM", async () => {
-    // O resumo do pensamento chega em INGLÊS e não há como pedir outro idioma:
-    // ele é gerado por um passo separado que não lê o system prompt. Recolher é
-    // a resposta; apagar não seria, porque quem quiser auditar o que o modelo
-    // pensou tem de conseguir chegar lá.
+    // The thinking summary arrives in ENGLISH and there's no way to ask for
+    // another language: it's generated by a separate step that doesn't read the
+    // system prompt. Collapsing is the answer; deleting wouldn't be, because
+    // whoever wants to audit what the model thought has to be able to get there.
     await conversar()
 
     const bloco = document.querySelector("details")!
     expect(bloco.open).toBe(false)
-    // O jsdom não esconde nada, então a asserção honesta é sobre VISIBILIDADE e
-    // não sobre presença — e a presença é justamente o contrato que se quer:
-    // Ctrl+F e leitor de tela continuam alcançando o texto.
+    // jsdom hides nothing, so the honest assertion is about VISIBILITY and
+    // not about presence — and presence is exactly the contract we want:
+    // Ctrl+F and screen readers still reach the text.
     expect(screen.getByText("preciso do catálogo")).not.toBeVisible()
     expect(screen.getByText("Raciocínio")).toBeVisible()
   })
 
   it("clicar abre o raciocínio, e ele continua aberto no turno seguinte", async () => {
-    // A segunda metade é o teste de regressão do `key={i}` de `Grupo`: os turnos
-    // são reconstruídos imutavelmente a cada delta, e se o índice de um grupo
-    // deslocasse, o bloco aberto trocaria de dono no meio da leitura.
+    // The second half is the regression test for `Grupo`'s `key={i}`: the turns
+    // are rebuilt immutably on every delta, and if a group's index shifted,
+    // the open block would change owners mid-read.
     await conversar()
 
     fireEvent.click(document.querySelector("summary")!)
@@ -351,30 +353,31 @@ describe("gaveta do assistente", () => {
     const { container } = render(<AssistentePainel workflowId="wf1" abrirPorPadrao onAplicar={aplicou} />)
     await screen.findByLabelText("Mensagem para o assistente")
 
-    // O PAR, e não metade dele. `h-full` sozinho pende de uma cadeia cujo topo
-    // é `min-h-svh` — piso, não teto —, então a conversa cresce a página e a
-    // rolagem vai para o viewport em vez da lista. `max-h-svh` sozinho
-    // colapsaria no dia em que o container do editor deixasse de esticar os
-    // filhos. Tirar qualquer um dos dois derruba este teste.
+    // The PAIR, not half of it. `h-full` alone hangs from a chain whose top is
+    // `min-h-svh` — a floor, not a ceiling —, so the conversation grows the page
+    // and the scroll goes to the viewport instead of the list. `max-h-svh` alone
+    // would collapse the day the editor container stopped stretching its
+    // children. Removing either of the two breaks this test.
     const gaveta = container.querySelector("aside")!
     expect(gaveta.className).toContain("h-full")
     expect(gaveta.className).toContain("max-h-svh")
   })
 
   it("há UM container de rolagem, e ele existe mesmo com a conversa vazia", async () => {
-    // O estado vazio era irmão do formulário e não rolava. Com o teto de altura
-    // isso vira defeito: num viewport curto, ~300px de convite mais cabeçalho e
-    // formulário empurram o campo de enviar para fora da tela e não há nada
-    // para rolar — justamente em `/workflow/create`, onde a gaveta nasce aberta.
+    // The empty state was a sibling of the form and didn't scroll. With the
+    // height ceiling that becomes a defect: on a short viewport, ~300px of
+    // invitation plus header and form push the send field off the screen and
+    // there's nothing to scroll — precisely on `/workflow/create`, where the
+    // drawer starts out open.
     const { container } = render(<AssistentePainel abrirPorPadrao onAplicar={aplicou} />)
     await screen.findByText("Descreva o fluxo que você quer")
 
     const rolagem = container.querySelectorAll("aside [class*='overflow-y-auto']")
     expect(rolagem).toHaveLength(1)
     expect(rolagem[0].className).toContain("min-h-0")
-    // Contrato de classe, e não prova de rolagem: o jsdom não faz layout, então
-    // `scrollHeight` e `clientHeight` são zero aqui. Quem prova é o editor
-    // aberto com a conversa longa.
+    // A class contract, not proof of scrolling: jsdom does no layout, so
+    // `scrollHeight` and `clientHeight` are zero here. The proof is the editor
+    // opened with the long conversation.
   })
 
   it("mostra o donut da cota sob o campo, com o percentual e a faixa", async () => {
@@ -387,7 +390,7 @@ describe("gaveta do assistente", () => {
     const donut = await screen.findByTestId("uso-da-cota")
     expect(donut.textContent).toBe("82%")
     expect(donut.dataset.faixa).toBe("alerta")
-    // O mesmo detalhe da Home no aria-label: gasto, teto e percentual.
+    // The same detail as Home in the aria-label: spent, ceiling and percentage.
     expect(donut.getAttribute("aria-label")).toContain("1.230.000 de 1.500.000 tokens (82%)")
   })
 
@@ -397,15 +400,16 @@ describe("gaveta do assistente", () => {
       error: null,
     } as unknown as Awaited<ReturnType<typeof servico.estadoDoAssistente>>)
     render(<AssistentePainel workflowId="wf1" abrirPorPadrao onAplicar={aplicou} />)
-    // Pelo `data-testid`, e não pelo texto: o aviso virou o componente
-    // compartilhado, e o texto mora num `<span>` DENTRO do parágrafo. Buscar
-    // pelo texto devolveria o filho, cuja classe não é a que segura o layout —
-    // o teste passaria a medir o elemento errado e pararia de proteger nada.
+    // By `data-testid`, not by text: the notice became the shared component,
+    // and the text lives in a `<span>` INSIDE the paragraph. Searching by text
+    // would return the child, whose class isn't the one holding the layout —
+    // the test would measure the wrong element and stop protecting anything.
     const aviso = await screen.findByTestId("aviso-de-cota")
 
-    // O cabeçalho e o formulário já têm `shrink-0`, e a conversa tem fator de
-    // encolhimento escalado ZERO (`flex-basis: 0%`). Sem isto, o algoritmo mira
-    // neste parágrafo quando o espaço fica negativo — e ele não tem o que dar.
+    // The header and the form already have `shrink-0`, and the conversation has
+    // a scaled shrink factor of ZERO (`flex-basis: 0%`). Without this, the
+    // algorithm targets this paragraph when the space goes negative — and it
+    // has nothing to give.
     expect(aviso.className).toContain("shrink-0")
   })
 })
@@ -416,7 +420,7 @@ describe("gaveta do assistente — a cota durante o turno", () => {
       data: { ativo: true, motivo: null, cota: { gasto: 0, teto: 1_000_000, reabre_em_segundos: null } },
       error: null,
     } as unknown as Awaited<ReturnType<typeof servico.estadoDoAssistente>>)
-    // Um stream que manda a cota e fica aberto: o que a tela mostra veio do quadro.
+    // A stream that sends the quota and stays open: what the screen shows came from the frame.
     const aberto = new ReadableStream<Uint8Array>({
       start(c) { c.enqueue(new TextEncoder().encode('event: cota\ndata: {"gasto":300000,"teto":1000000}\n\n')) },
     })
@@ -436,13 +440,14 @@ describe("gaveta do assistente — a cota durante o turno", () => {
   })
 })
 
-// ── A cota cheia ─────────────────────────────────────────────────────────────
+// ── Full quota ───────────────────────────────────────────────────────────────
 //
-// A gaveta do editor é a TERCEIRA superfície do aviso de cota, e ela tinha
-// ficado com a cópia antiga: sem a oferta e dizendo «reabre em algumas horas»
-// com o prazo exato na mão. Uma oferta que existe na Home e não aqui some
-// conforme a tela em que a pessoa bateu no teto — que é exatamente o que o
-// componente compartilhado existe para impedir.
+// The editor drawer is the THIRD surface of the quota notice, and it had
+// been left with the old copy: without the offer and saying "reabre em
+// algumas horas" (reopens in a few hours) with the exact deadline at hand. An
+// offer that exists on Home and not here disappears depending on the screen
+// where the person hit the ceiling — which is exactly what the shared
+// component exists to prevent.
 
 describe("cota cheia na gaveta do editor", () => {
   function comCota(over: Record<string, unknown> = {}) {

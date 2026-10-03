@@ -1,10 +1,10 @@
 # tests/unit/test_consumer_aprende_fontes.py
-"""A fase "fontes" do consumidor de resultados: o catálogo aprende com a execução.
+"""The "sources" phase of the result consumer: the catalog learns from the run.
 
-Só execução `success`, só quando há nó `WFS` nas estatísticas, só com a flag
-ligada — e a definition vem do Workflow ATUAL. A fase é uma entre as demais de
-`_process_result`, isolada por `_run_phase`: falhar aqui não derruba a
-notificação, e é reportada como perda como qualquer outra.
+Only a `success` run, only when there is a `WFS` node in the stats, only with the
+flag on — and the definition comes from the CURRENT Workflow. The phase is one
+among the others in `_process_result`, isolated by `_run_phase`: failing here
+does not take down the notification, and is reported as a loss like any other.
 """
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ async def test_carrega_a_definition_atual_e_delega_ao_catalogo():
     aprender.assert_awaited_once()
     args, kwargs = aprender.await_args
     assert args[0] is db and args[1] is run and args[2] is STATS_COM_WFS and args[3] == DEFINICAO
-    assert kwargs == {"first_close": False}  # reentrega: não conta o uso de novo
+    assert kwargs == {"first_close": False}  # redelivery: does not count the usage again
     db.commit.assert_awaited_once()
 
 
@@ -82,7 +82,7 @@ async def test_workflow_apagado_ou_sem_definition_nao_aprende():
 
 
 async def test_a_fase_esta_no_pipeline_entre_pins_e_notificacao():
-    """A ordem é o contrato: depois das métricas (que trazem o esquema), antes do fim."""
+    """The order is the contract: after the metrics (which bring the schema), before the end."""
     run = _make_run(status="running")
     db = _mock_db([_result(run)])
     ordem: list[str] = []

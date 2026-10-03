@@ -17,18 +17,19 @@ function levelClass(event: RunEvent) {
   return "border-l-transparent"
 }
 
-/** Texto da linha colapsada e da busca.
+/** Text of the collapsed row and of the search.
  *
- *  Um evento de stdout agregado traz N linhas em `lines` e NÃO tem mais
- *  `message` — o executor parou de duplicar o texto para o lote caber no teto de
- *  64 KB do frame. Sem ler `lines` aqui, toda linha de `print()` aparecia vazia
- *  no painel e a busca nunca encontrava nada dentro da saída do script. */
+ *  An aggregated stdout event carries N lines in `lines` and NO longer has
+ *  `message` — the executor stopped duplicating the text so the batch fits the
+ *  frame's 64 KB ceiling. Without reading `lines` here, every `print()` line
+ *  showed up empty in the panel and the search never found anything in the
+ *  script's output. */
 export function textoDoEvento(event: RunEvent): string {
   if (event.message) return event.message
   const linhas = event.lines
   if (!linhas || linhas.length === 0) return ""
-  // Uma linha por evento no stream cru: mostra a primeira e diz quantas vieram
-  // junto (todas ficam visíveis ao expandir, e na aba "Nós" uma a uma).
+  // One row per event in the raw stream: shows the first line and says how many
+  // came with it (all are visible when expanded, and one by one in the "Nós" tab).
   if (linhas.length === 1) return linhas[0]
   return `${linhas[0]} … (+${linhas.length - 1} linha(s))`
 }
@@ -93,7 +94,7 @@ const RawRow = memo(function RawRow({ event, startTs, search, expanded, onToggle
   )
 })
 
-/** Stream cronológico cru — a visão antiga, mantida para depuração avançada. */
+/** Raw chronological stream — the old view, kept for advanced debugging. */
 const RawTab = ({ events, startTs, droppedEvents }: {
   events: RunEvent[]
   startTs: number | null
@@ -101,8 +102,9 @@ const RawTab = ({ events, startTs, droppedEvents }: {
 }) => {
   const search = useRunPanelStore(s => s.search)
 
-  // Estado de expansão FORA da linha: a virtualização desmonta a linha ao sair
-  // da janela, e um useState local perderia a expansão ao rolar de volta.
+  // Expansion state OUTSIDE the row: virtualization unmounts the row when it
+  // leaves the window, and a local useState would lose the expansion on
+  // scrolling back.
   const [expandidos, setExpandidos] = useState<Set<number>>(() => new Set())
   const alternarExpansao = useCallback((seq: number) => {
     setExpandidos(prev => {
@@ -113,8 +115,8 @@ const RawTab = ({ events, startTs, droppedEvents }: {
     })
   }, [])
 
-  // Ref para o virtualizador, para o callback de "grudar no fim" chegar ao
-  // scrollToIndex sem criar dependência circular com o containerRef do hook.
+  // Ref to the virtualizer, so the "stick to the end" callback reaches
+  // scrollToIndex without a circular dependency on the hook's containerRef.
   const virtRef = useRef<Virtualizer<HTMLDivElement, Element> | null>(null)
   const { containerRef, bottomRef, showJump, jumpToBottom } = useStickyScroll(
     [events.length],
@@ -129,19 +131,19 @@ const RawTab = ({ events, startTs, droppedEvents }: {
     if (!term) return events
     return events.filter(e =>
       (e.message ?? "").toLowerCase().includes(term) ||
-      // Busca dentro do lote agregado inteiro, não só da linha de resumo — é
-      // onde mora a saída dos `print()` desde que `message` deixou de duplicá-la.
+      // Searches inside the whole aggregated batch, not just the summary line — that
+      // is where the `print()` output lives since `message` stopped duplicating it.
       (e.lines?.some(linha => linha.toLowerCase().includes(term)) ?? false) ||
       (e.node_name ?? "").toLowerCase().includes(term) ||
       (e.node ?? "").toLowerCase().includes(term) ||
       (e.status ?? "").toLowerCase().includes(term))
   }, [events, search])
 
-  // Virtualização: renderiza só as ~40 linhas visíveis em vez de manter até
-  // MAX_RUN_EVENTS (2000) no DOM. Medição dinâmica (measureElement + ResizeObserver
-  // embutidos) porque a linha expande ao clicar. `getItemKey` usa `seq` pela
-  // mesma razão do map antigo: a rotação remove stdout do MEIO, e o índice
-  // deslocaria as keys de todos os sobreviventes.
+  // Virtualization: renders only the ~40 visible rows instead of keeping up to
+  // MAX_RUN_EVENTS (2000) in the DOM. Dynamic measurement (measureElement +
+  // built-in ResizeObserver) because the row expands on click. `getItemKey` uses
+  // `seq` for the same reason as the old map: rotation removes stdout from the
+  // MIDDLE, and the index would shift the keys of every survivor.
   const rowVirtualizer = useVirtualizer({
     count: visible.length,
     getScrollElement: () => containerRef.current,
@@ -159,9 +161,9 @@ const RawTab = ({ events, startTs, droppedEvents }: {
 
   return (
     <div className="relative flex h-full flex-col">
-      {/* Truncar em silêncio faria o painel parecer completo quando não é. Fica
-          FORA do container de scroll (cabeçalho) para não deslocar o cálculo
-          de offset do virtualizador. */}
+      {/* Silently truncating would make the panel look complete when it is not. It
+          stays OUTSIDE the scroll container (header) so it does not shift the
+          virtualizer's offset calculation. */}
       {droppedEvents > 0 && (
         <div className="shrink-0 border-b bg-amber-500/5 px-3 py-1 font-mono text-[10px] text-amber-600 dark:text-amber-400">
           {droppedEvents} linha(s) de saída mais antiga(s) descartada(s) para limitar o uso de memória

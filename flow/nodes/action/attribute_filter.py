@@ -7,7 +7,7 @@ from flow.nodes.base import BaseNode
 from flow.utils.logger import get_logger
 logger = get_logger(__name__)
 
-# Operadores suportados para filtragem
+# Operators supported for filtering
 _OP_FUNCS = {
     '==': operator.eq,
     '!=': operator.ne,
@@ -20,12 +20,12 @@ _OP_FUNCS = {
 @register_node
 class AttributeFilter(BaseNode):
     """
-    Filtra um GeoDataFrame por uma condição em um atributo e retorna o resultado.
+    Filters a GeoDataFrame by a condition on an attribute and returns the result.
 
-    Propriedades:
-      - attributeName:  coluna a filtrar (string; obrigatório)
-      - operator:       um de ['==','!=','>','<','>=','<='] (string; default '==')
-      - compareTo:      valor para comparação (string no formulário; convertido em número se possível)
+    Properties:
+      - attributeName:  column to filter (string; required)
+      - operator:       one of ['==','!=','>','<','>=','<='] (string; default '==')
+      - compareTo:      value to compare against (string in the form; converted to a number if possible)
     """
 
     @classmethod
@@ -40,7 +40,7 @@ class AttributeFilter(BaseNode):
                     'name': 'attributeName', 'required': True,
                     'label': 'Coluna',
                     'type': 'string',
-                    # Nó de entrada única: '*' e a porta dariam no mesmo.
+                    # Single-input node: '*' and the port would amount to the same thing.
                     'suggest_columns': '*',
                     'default': '',
                     'description': 'Nome da coluna do GeoDataFrame para aplicar o filtro.'
@@ -73,29 +73,29 @@ class AttributeFilter(BaseNode):
             ],
         }
 
-    # Máscara + `.copy()` sobre o GeoDataFrame inteiro são CPU-bound: rodando no
-    # event loop do executor, um filtro sobre centenas de milhares de linhas
-    # segurava heartbeat, node_events e o `cancel` do usuário.
+    # Mask + `.copy()` over the whole GeoDataFrame are CPU-bound: running on the
+    # executor's event loop, a filter over hundreds of thousands of rows
+    # held up the heartbeat, node_events and the user's `cancel`.
     def execute_sync(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         # ---------------------------------------------------
-        # 1) Validação de parâmetros básicos + aplica defaults
+        # 1) Validation of basic parameters + applies defaults
         # ---------------------------------------------------
         self.validate()
 
         # ---------------------------------------------------
-        # 2) Extrai parâmetros (já validados como strings)
+        # 2) Extracts parameters (already validated as strings)
         # ---------------------------------------------------
         attribute    = self.parameters.get('attributeName', '').strip()
         op_str       = self.parameters.get('operator', '==').strip()
         compare_str  = self.parameters.get('compareTo', '').strip()
 
         # ---------------------------------------------------
-        # 3) Obtém o GeoDataFrame via helper da classe base
+        # 3) Gets the GeoDataFrame via the base class helper
         # ---------------------------------------------------
         gdf = self.get_first_gdf(inputs)
 
         # ---------------------------------------------------
-        # 4) Verifica se attributeName foi informado e existe no GeoDataFrame
+        # 4) Checks that attributeName was provided and exists in the GeoDataFrame
         # ---------------------------------------------------
         if not attribute:
             raise ValueError("Parâmetro 'attributeName' é obrigatório.")
@@ -108,13 +108,13 @@ class AttributeFilter(BaseNode):
             )
 
         # ---------------------------------------------------
-        # 5) Verifica se o operador é válido
+        # 5) Checks that the operator is valid
         # ---------------------------------------------------
-        # operator já validado contra as options pelo self.validate().
+        # operator already validated against the options by self.validate().
         op_func = _OP_FUNCS[op_str]
 
         # ---------------------------------------------------
-        # 6) Tenta converter compareTo para número (float), se possível
+        # 6) Tries to convert compareTo to a number (float), if possible
         # ---------------------------------------------------
         if compare_str == "":
             raise ValueError("Parâmetro 'compareTo' é obrigatório e não pode ficar em branco.")
@@ -123,11 +123,11 @@ class AttributeFilter(BaseNode):
         try:
             cmp_val = float(compare_str)
         except Exception:
-            # Permanece como string — usará comparação literal
+            # Stays a string — will use literal comparison
             pass
 
         # ---------------------------------------------------
-        # 7) Aplica o filtro no GeoDataFrame
+        # 7) Applies the filter to the GeoDataFrame
         # ---------------------------------------------------
         try:
             mask = op_func(gdf[attribute], cmp_val)

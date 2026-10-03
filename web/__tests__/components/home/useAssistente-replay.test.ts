@@ -4,7 +4,7 @@ import type { IQuadroDoReplay } from "@/service/types"
 
 const q = (tipo: string, dados: Record<string, unknown> = {}): IQuadroDoReplay => ({ tipo, dados })
 
-/** O replay reconstrói a conversa a partir dos quadros de GET /conversas/{id}. */
+/** The replay rebuilds the conversation from the frames of GET /conversas/{id}. */
 describe("reconstruirTurnos", () => {
   it("usuário → assistente, com o fim no último turno do assistente", () => {
     const turnos = reconstruirTurnos([
@@ -17,7 +17,7 @@ describe("reconstruirTurnos", () => {
     expect(turnos[0]).toMatchObject({ papel: "user", texto: "oi" })
     expect(turnos[1].papel).toBe("assistant")
     expect(turnos[1].blocos.map((b) => b.tipo)).toEqual(["texto", "ferramenta"])
-    // O `fim` chegou ao turno do assistente: a ferramenta que ficou aberta fecha.
+    // The `fim` reached the assistant's turn: the tool that was left open closes.
     expect(turnos[1].blocos[1]).toMatchObject({ estado: "erro" })
   })
 

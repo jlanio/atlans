@@ -1,4 +1,4 @@
-"""Regressão do endurecimento do validate_url_ssrf (auditoria SEG-81)."""
+"""Regression of the validate_url_ssrf hardening (audit SEG-81)."""
 import ipaddress
 import pytest
 
@@ -6,7 +6,7 @@ from flow.utils.geo_helpers import _endereco_perigoso, validate_url_ssrf
 
 
 @pytest.mark.parametrize("ip", [
-    "169.254.169.254",   # metadata de nuvem (link-local)
+    "169.254.169.254",   # cloud metadata (link-local)
     "127.0.0.1", "10.0.0.5", "192.168.1.1", "172.16.0.1",
     "100.64.0.1",         # CGNAT (SEG-81)
     "0.0.0.0",            # unspecified
@@ -23,8 +23,8 @@ def test_enderecos_publicos_ok(ip):
 
 
 def test_ip_literal_interno_e_recusado_nao_engolido():
-    # Antes o raise do bloco de IP literal caía no `except ValueError` e era
-    # engolido; agora recusa direto.
+    # Before, the raise from the literal-IP block fell into the `except ValueError`
+    # and was swallowed; now it refuses directly.
     with pytest.raises(ValueError):
         validate_url_ssrf("http://169.254.169.254/latest/meta-data/")
     with pytest.raises(ValueError):

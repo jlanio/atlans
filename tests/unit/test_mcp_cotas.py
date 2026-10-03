@@ -1,27 +1,27 @@
 # tests/unit/test_mcp_cotas.py
 """
-Cotas por token: contagem por minuto e teto de esperas simultâneas.
+Per-token quotas: per-minute counting and a ceiling on concurrent waits.
 
-O que cada teste protege:
+What each test protects:
 
-- a chave é do TOKEN, nunca do IP — dois clientes atrás do mesmo NAT não podem
-  dividir (nem roubar) o mesmo balde;
-- o prazo nasce na primeira chamada e as seguintes não o empurram, senão a
-  janela nunca fecharia (cada chamada empurraria o prazo à frente e o balde
-  ficaria cheio para sempre);
-- estourar devolve `retry_after_seconds` do TTL real, para o cliente esperar em
-  vez de repetir;
-- a fronteira é onde o teto de verdade está: a chamada de número LIMITE passa e
-  a seguinte recusa (um `<` no lugar de um `<=` passaria despercebido de outra
-  forma);
-- uma chave que ficou sem prazo (o `EXPIRE` se perdeu no tempo em que ele saía
-  separado do `INCR`) ganha prazo na contagem seguinte — senão o token ficaria
-  travado para sempre;
-- uma falha entre os dois `INCR` da reserva não deixa vaga pendurada;
-- sem Redis tudo degrada ABERTO, com aviso no máximo uma vez por minuto — a
-  política já usada pelo WebSocket de logs;
-- a espera devolve a reserva mesmo quando o corpo levanta, e a recusa por teto
-  não deixa contador pendurado.
+- the key is the TOKEN's, never the IP's — two clients behind the same NAT must not
+  share (or steal) the same bucket;
+- the deadline is born on the first call and the following ones do not push it, or the
+  window would never close (each call would push the deadline forward and the bucket
+  would stay full forever);
+- overflowing returns `retry_after_seconds` from the real TTL, so the client waits
+  instead of retrying;
+- the boundary is where the real ceiling is: call number LIMITE passes and
+  the next one is refused (a `<` in place of a `<=` would otherwise go
+  unnoticed);
+- a key left without a deadline (the `EXPIRE` got lost back when it was sent
+  separately from the `INCR`) gets a deadline on the next count — otherwise the token
+  would be locked forever;
+- a failure between the reservation's two `INCR`s does not leave a dangling slot;
+- without Redis everything degrades OPEN, with a warning at most once per minute — the
+  policy already used by the logs WebSocket;
+- the wait returns the reservation even when the body raises, and the refusal by ceiling
+  does not leave a dangling counter.
 """
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ from tests.unit._mcp_harness import RedisFalso
 
 @pytest.fixture(autouse=True)
 def _zera_estado_do_processo():
-    """O aviso e o semáforo local são globais do módulo; cada teste começa limpo."""
+    """The warning and the local semaphore are module globals; each test starts clean."""
     cotas._ultimo_aviso = 0.0
     cotas._esperas_locais.clear()
     cotas._esperas_locais_total = 0
@@ -64,7 +64,7 @@ async def test_chamadas_seguintes_nao_empurram_o_prazo_para_a_janela_poder_fecha
     redis = RedisFalso()
     chave = "ratelimit:mcp:tok-1:geral"
     await cotas.verificar(redis, "tok-1", None)
-    redis.ttls[chave] = 25  # passaram 35 s da janela
+    redis.ttls[chave] = 25  # 35 s of the window have passed
     for _ in range(3):
         await cotas.verificar(redis, "tok-1", None)
     assert redis.dados[chave] == 4
@@ -91,12 +91,12 @@ async def test_estourar_o_geral_levanta_rate_limited_com_o_ttl():
 
 
 async def test_a_fronteira_exata_do_balde_geral():
-    """A chamada de número LIMITE_GERAL passa; a seguinte recusa."""
+    """Call number LIMITE_GERAL passes; the next one is refused."""
     redis = RedisFalso()
     redis.dados["ratelimit:mcp:tok-1:geral"] = cotas.LIMITE_GERAL - 1
     redis.ttls["ratelimit:mcp:tok-1:geral"] = 30
 
-    await cotas.verificar(redis, "tok-1", None)  # a de número LIMITE_GERAL
+    await cotas.verificar(redis, "tok-1", None)  # call number LIMITE_GERAL
     assert redis.dados["ratelimit:mcp:tok-1:geral"] == cotas.LIMITE_GERAL
 
     with pytest.raises(ToolError) as exc:  # a LIMITE_GERAL + 1
@@ -105,18 +105,18 @@ async def test_a_fronteira_exata_do_balde_geral():
 
 
 async def test_chave_estourada_sem_prazo_ganha_o_prazo_na_contagem():
-    """Sem prazo de volta, o token ficaria travado para sempre.
+    """Without the deadline back, the token would be locked forever.
 
-    Quando `INCR` e `EXPIRE` eram dois comandos, perder o segundo (Redis
-    reiniciou, conexão caiu) deixava a chave sem prazo: o contador nunca zerava
-    e todas as chamadas daquele token passavam a ser recusadas — até alguém
-    apagar a chave à mão. A contagem arma o prazo de uma chave sem nenhum, na
-    mesma transação do `INCR`, estourada ou não.
+    When `INCR` and `EXPIRE` were two commands, losing the second (Redis
+    restarted, connection dropped) left the key without a deadline: the counter never
+    reset and every call from that token started being refused — until someone
+    deleted the key by hand. The count arms the deadline of a key without one, in the
+    same transaction as the `INCR`, overflowed or not.
     """
     redis = RedisFalso()
     chave = "ratelimit:mcp:tok-1:geral"
     redis.dados[chave] = cotas.LIMITE_GERAL + 5  # estourado
-    redis.ttls.pop(chave, None)  # e sem prazo nenhum (o EXPIRE se perdeu)
+    redis.ttls.pop(chave, None)  # and with no deadline at all (the EXPIRE got lost)
 
     with pytest.raises(ToolError) as exc:
         await cotas.verificar(redis, "tok-1", None)
@@ -133,8 +133,8 @@ async def test_cota_de_run_tem_teto_proprio_menor_que_o_geral():
     with pytest.raises(ToolError) as exc:
         await cotas.verificar(redis, "tok-1", "run")
     assert _corpo(exc.value)["code"] == "rate_limited"
-    # O balde geral já foi consumido antes de o específico recusar: é uma
-    # chamada, conta uma vez em cada balde.
+    # The general bucket was already consumed before the specific one refused: it is one
+    # call, counted once in each bucket.
     assert redis.dados["ratelimit:mcp:tok-1:geral"] == 1
 
 
@@ -166,7 +166,7 @@ async def test_falha_do_redis_nao_derruba_a_chamada():
         async def incrby(self, chave, quanto):
             raise ConnectionError("sem rede")
 
-    await cotas.verificar(RedisQuebrado(), "tok-1", None)  # não levanta
+    await cotas.verificar(RedisQuebrado(), "tok-1", None)  # does not raise
 
 
 # ── espera() ──────────────────────────────────────────────────────────────────
@@ -221,10 +221,10 @@ async def test_teto_global_recusa_mesmo_token_dentro_do_proprio_limite():
 
 
 async def test_falha_entre_os_dois_incr_nao_deixa_reserva_pendurada():
-    """O primeiro balde já foi incrementado quando o segundo falha.
+    """The first bucket has already been incremented when the second one fails.
 
-    Sem devolver o que foi contado, cada tentativa durante uma queda do Redis
-    comeria uma vaga do token, e o teto travaria assim que a rede voltasse.
+    Without returning what was counted, each attempt during a Redis outage
+    would eat one of the token's slots, and the ceiling would lock as soon as the network came back.
     """
 
     class RedisQueCaiNoGlobal(RedisFalso):
@@ -235,7 +235,7 @@ async def test_falha_entre_os_dois_incr_nao_deixa_reserva_pendurada():
 
     redis = RedisQueCaiNoGlobal()
     async with cotas.espera(redis, "tok-1", ttl_s=60):
-        # Degradou para o semáforo local, como manda a política sem Redis.
+        # It degraded to the local semaphore, as the no-Redis policy dictates.
         assert cotas._esperas_locais["tok-1"] == 1
     assert redis.dados["mcp:wait:token:tok-1"] == 0
 
@@ -250,13 +250,13 @@ async def test_sem_redis_a_espera_usa_semaforo_local_ao_processo():
             async with cotas.espera(None, "tok-1", ttl_s=60):
                 pass
     assert _corpo(exc.value)["code"] == "wait_limit"
-    # Saiu da pilha: o semáforo voltou ao zero e o próximo pedido passa.
+    # Popped off the stack: the semaphore is back at zero and the next request passes.
     async with cotas.espera(None, "tok-1", ttl_s=60):
         pass
 
 
 async def test_semaforo_local_tem_teto_global_e_volta_ao_zero():
-    """Sem Redis o teto global também vale — e o contador desempilha até zero."""
+    """Without Redis the global ceiling also applies — and the counter unwinds down to zero."""
     import contextlib
 
     cotas._esperas_locais_total = cotas.MAX_ESPERAS_GLOBAL
@@ -264,7 +264,7 @@ async def test_semaforo_local_tem_teto_global_e_volta_ao_zero():
         async with cotas.espera(None, "tok-novo", ttl_s=60):
             pass
     assert _corpo(exc.value)["code"] == "wait_limit"
-    # A recusa não consome vaga: o total continua onde estava.
+    # The refusal does not consume a slot: the total stays where it was.
     assert cotas._esperas_locais_total == cotas.MAX_ESPERAS_GLOBAL
     assert "tok-novo" not in cotas._esperas_locais
 
@@ -281,29 +281,29 @@ async def test_semaforo_local_tem_teto_global_e_volta_ao_zero():
 
 
 async def test_o_teto_de_tokens_e_do_CHAMADOR_e_o_default_e_o_da_instalacao():
-    """O teto passou a depender do plano, e quem o resolve é o chamador.
+    """The ceiling now depends on the plan, and the one who resolves it is the caller.
 
-    Este módulo é só Redis: se ele fosse buscar a assinatura, o laço do assistente
-    (que roda dentro de um gerador SSE, sem sessão de request) arrastaria banco
-    para dentro de uma checagem que existe para ser barata.
+    This module is Redis only: if it went fetching the subscription, the assistant loop
+    (which runs inside an SSE generator, without a request session) would drag the database
+    into a check that exists to be cheap.
     """
     redis = RedisFalso()
     redis.dados["assistente:tokens:usr-1"] = cotas.TETO_DE_TOKENS_DO_ASSISTENTE_POR_DIA
 
-    # Sem `teto`, o comportamento de antes dos planos: o teto da instalação.
+    # Without `teto`, the behavior from before plans: the installation's ceiling.
     with pytest.raises(ToolError) as exc:
         await cotas.verificar_tokens_do_assistente(redis, "usr-1")
     assert _corpo(exc.value)["code"] == "rate_limited"
 
-    # Com um teto maior (o de um plano, quando há extensão), o MESMO gasto passa.
+    # With a higher ceiling (a plan's, when there is an extension), the SAME spending passes.
     await cotas.verificar_tokens_do_assistente(
         redis, "usr-1", teto=10 * cotas.TETO_DE_TOKENS_DO_ASSISTENTE_POR_DIA
     )
 
 
 async def test_a_fronteira_do_teto_injetado_e_o_proprio_teto():
-    """Um `<=` no lugar do `<` daria um turno de graça a cada plano — e a
-    fronteira é justamente onde ninguém olha."""
+    """A `<=` in place of the `<` would give a free turn to every plan — and the
+    boundary is precisely where nobody looks."""
     redis = RedisFalso()
     teto = 22_500_000
 
@@ -316,24 +316,24 @@ async def test_a_fronteira_do_teto_injetado_e_o_proprio_teto():
     assert _corpo(exc.value)["code"] == "rate_limited"
 
 
-# ── A chave da cota do assistente nao pode ficar imortal (PR 5, #3) ─────────────
+# ── The assistant quota key must not become immortal (PR 5, #3) ─────────────────
 #
-# Quando a cobranca fazia INCRBY e, so na 1a escrita da janela, EXPIRE — dois
-# comandos —, perder o segundo (Redis reiniciou, conexao caiu, SSE cancelado no
-# meio) deixava a chave sem prazo: ao cruzar o teto, o usuario perdia o
-# assistente PARA SEMPRE. Hoje o prazo sai na mesma transacao do INCRBY
-# (`contar_na_janela`); o que sobra de uma chave antiga sem prazo e armado na
-# cobranca seguinte, na recusa ou na leitura do `/estado` (`gasto_e_prazo`).
+# When the charge did INCRBY and, only on the window's 1st write, EXPIRE — two
+# commands —, losing the second (Redis restarted, connection dropped, SSE cancelled
+# midway) left the key without a deadline: on crossing the ceiling, the user lost
+# the assistant FOREVER. Today the deadline goes out in the same transaction as the
+# INCRBY (`contar_na_janela`); whatever remains of an old key without a deadline is
+# armed on the next charge, on the refusal or on reading `/estado` (`gasto_e_prazo`).
 
 
 async def test_abaixo_do_teto_a_cobranca_arma_o_prazo_de_uma_chave_que_ficou_sem():
-    """Abaixo do teto o turno segue, e a cobranca dele poe o prazo que faltava —
-    senao a chave imortal so seria notada tarde demais, ja travada."""
+    """Below the ceiling the turn goes on, and its charge sets the missing deadline —
+    otherwise the immortal key would only be noticed too late, already locked."""
     redis = RedisFalso()
     chave = cotas.chave_de_tokens("usr-1")
-    redis.dados[chave] = 10  # abaixo do teto, mas SEM prazo (o EXPIRE se perdeu)
+    redis.dados[chave] = 10  # below the ceiling, but WITHOUT a deadline (the EXPIRE got lost)
 
-    await cotas.verificar_tokens_do_assistente(redis, "usr-1", teto=1000)  # nao recusa
+    await cotas.verificar_tokens_do_assistente(redis, "usr-1", teto=1000)  # does not refuse
     assert await cotas.cobrar_tokens_do_assistente(redis, "usr-1", 5) == 15
 
     assert redis.ttls[chave] == cotas.JANELA_DO_ASSISTENTE_SEGUNDOS
@@ -341,12 +341,12 @@ async def test_abaixo_do_teto_a_cobranca_arma_o_prazo_de_uma_chave_que_ficou_sem
 
 
 async def test_a_recusa_arma_o_prazo_de_uma_chave_estourada_que_ficou_sem():
-    """Estourada, o turno e recusado ANTES da cobranca — que e quem arma o
-    prazo. Se a recusa nao o armasse, quem cruzou o teto com uma chave dessas
-    nunca mais teria o assistente; e ela ainda diz quando a janela reabre."""
+    """Once overflowed, the turn is refused BEFORE the charge — which is what arms the
+    deadline. If the refusal did not arm it, whoever crossed the ceiling with such a key
+    would never have the assistant again; and it also says when the window reopens."""
     redis = RedisFalso()
     chave = cotas.chave_de_tokens("usr-1")
-    redis.dados[chave] = 1000  # no teto, e SEM prazo
+    redis.dados[chave] = 1000  # at the ceiling, and WITHOUT a deadline
 
     with pytest.raises(ToolError) as exc:
         await cotas.verificar_tokens_do_assistente(redis, "usr-1", teto=1000)
@@ -356,8 +356,8 @@ async def test_a_recusa_arma_o_prazo_de_uma_chave_estourada_que_ficou_sem():
 
 
 async def test_cobrar_e_recusar_nao_reabrem_uma_janela_com_prazo_vivo():
-    """So a chave SEM prazo ganha um; uma janela viva NAO e reaberta — reabrir
-    estenderia o teto de graca a cada turno."""
+    """Only the key WITHOUT a deadline gets one; a live window is NOT reopened — reopening
+    would extend the ceiling for free on every turn."""
     redis = RedisFalso()
     chave = cotas.chave_de_tokens("usr-1")
     redis.dados[chave] = 10
@@ -373,20 +373,20 @@ async def test_cobrar_e_recusar_nao_reabrem_uma_janela_com_prazo_vivo():
 
 
 async def test_o_estado_arma_o_prazo_de_uma_chave_estourada_que_ficou_sem():
-    """Com a cota cheia, a interface le o `/estado` (que vem daqui) e trava o
-    envio: a recusa, que tambem armaria o prazo, nunca roda. Sem a cura aqui,
-    a chave antiga sem prazo nunca expiraria, e a pessoa perderia o assistente
-    para sempre, com o medidor dizendo "sem prazo"."""
+    """With the quota full, the interface reads `/estado` (which comes from here) and locks
+    sending: the refusal, which would also arm the deadline, never runs. Without the cure
+    here, the old key without a deadline would never expire, and the person would lose the
+    assistant forever, with the meter saying "sem prazo" (no deadline)."""
     redis = RedisFalso()
     chave = cotas.chave_de_tokens("usr-1")
-    redis.dados[chave] = 1_600_000  # acima do teto, e SEM prazo
+    redis.dados[chave] = 1_600_000  # above the ceiling, and WITHOUT a deadline
 
     assert await cotas.gasto_e_prazo(redis, "usr-1") == (1_600_000, cotas.JANELA_DO_ASSISTENTE_SEGUNDOS)
     assert redis.ttls[chave] == cotas.JANELA_DO_ASSISTENTE_SEGUNDOS
 
 
 async def test_o_estado_nao_reabre_uma_janela_com_prazo_vivo():
-    """Ler o medidor nao estende o teto: uma janela viva fica como esta."""
+    """Reading the meter does not extend the ceiling: a live window stays as it is."""
     redis = RedisFalso()
     chave = cotas.chave_de_tokens("usr-1")
     redis.dados[chave] = 10
@@ -397,8 +397,8 @@ async def test_o_estado_nao_reabre_uma_janela_com_prazo_vivo():
 
 
 async def test_gasto_e_prazo_de_chave_ausente_nao_inventa_prazo():
-    """Sem chave (nada gasto), nao ha prazo a mostrar, e a leitura nao cria a
-    chave."""
+    """Without a key (nothing spent), there is no deadline to show, and the read does not
+    create the key."""
     redis = RedisFalso()
     gasto, prazo = await cotas.gasto_e_prazo(redis, "usr-1")
 

@@ -1,13 +1,13 @@
 """
-Contrato dos eventos de execução de nó (flow.executor.events).
+Contract of the node execution events (flow.executor.events).
 
-O painel de execução do frontend depende de `kind` (origem: lifecycle/stdout/
-debug) e `level` (severidade) serem campos PRÓPRIOS, e não deduzidos de `status`.
-Enquanto tudo vivia em `status`, a UI precisava filtrar por negação ("tudo que
-não é erro nem print") e não conseguia distinguir stdout de ciclo de vida.
+The frontend's run panel depends on `kind` (origin: lifecycle/stdout/
+debug) and `level` (severity) being fields of their OWN, not inferred from `status`.
+While everything lived in `status`, the UI had to filter by negation ("everything
+that isn't an error or a print") and couldn't tell stdout from lifecycle.
 
-A categoria de erro por nó é o que permite ao painel dizer "corrija a entrada"
-em vez de apenas despejar o traceback.
+The per-node error category is what lets the panel say "fix the input"
+instead of just dumping the traceback.
 """
 from unittest.mock import MagicMock
 
@@ -54,7 +54,7 @@ def test_completed_sem_drift_e_info():
 
 
 def test_schema_drift_eleva_para_warn():
-    """Drift não é falha, mas também não é rotina — o painel destaca em âmbar."""
+    """Drift is not a failure, but it isn't routine either — the panel highlights it in amber."""
     pub = _publisher()
     node_events.publish_completed(
         pub, "run-1", "n1", NODE_DEFS, "completed", 3.0,
@@ -81,9 +81,9 @@ def test_falha_publica_categoria_e_retryable(exc, category, retryable):
     assert call["level"] == "error"
     assert call["extra"]["error_category"] == category
     assert call["extra"]["retryable"] is retryable
-    # Traceback vai SEMPRE no evento de falha — a UI decide quando mostrar,
-    # e passou a mostrar por padrão (antes exigia o modo debug, que precisa ser
-    # ligado antes de executar e portanto nunca estava ligado quando faltava).
+    # The traceback ALWAYS goes in the failure event — the UI decides when to show it,
+    # and now shows it by default (before, it required debug mode, which has to be
+    # turned on before executing and so was never on when it was needed).
     assert call["extra"]["traceback"] == "Traceback…"
 
 
@@ -97,14 +97,14 @@ def test_debug_tem_kind_proprio():
 
 
 def test_stdout_tem_kind_proprio():
-    """O stdout viaja em LOTE e `lines` é a ÚNICA fonte de verdade.
+    """stdout travels in BATCHES and `lines` is the ONLY source of truth.
 
-    Um evento por linha de print() estourava a fila de 500 slots do executor
-    (compartilhada por todos os jobs e pelo GeoSync) e o rate limit do servidor.
-    Já `extra['message']` não existe mais: publicar o mesmo texto duas vezes
-    dobrava o payload e um lote de 200 linhas longas passava dos 64 KB de
-    `TETO_NODE_EVENT_BYTES`, fazendo o sender reduzir o evento aos campos de
-    controle — sem `extra` — e o painel perder as 200 linhas de uma vez.
+    One event per print() line overflowed the executor's 500-slot queue
+    (shared by all jobs and by GeoSync) and the server's rate limit.
+    And `extra['message']` no longer exists: publishing the same text twice
+    doubled the payload and a batch of 200 long lines exceeded the 64 KB of
+    `TETO_NODE_EVENT_BYTES`, making the sender reduce the event to the control
+    fields — without `extra` — and the panel lose the 200 lines at once.
     """
     pub = _publisher()
     publish_stdout(pub, "run-1", "n1", ["processando 1200 feições", "pronto"])
@@ -116,9 +116,9 @@ def test_stdout_tem_kind_proprio():
 
 
 def test_stdout_nunca_derruba_o_no():
-    """print() do usuário não pode quebrar a execução se o publisher falhar."""
+    """A user's print() must not break the execution if the publisher fails."""
     pub = MagicMock(publish_event=MagicMock(side_effect=RuntimeError("redis fora")))
-    publish_stdout(pub, "run-1", "n1", ["texto"])  # não deve levantar
+    publish_stdout(pub, "run-1", "n1", ["texto"])  # must not raise
     publish_stdout(None, "run-1", "n1", ["texto"])
     publish_stdout(pub, "", "n1", ["texto"])
-    publish_stdout(pub, "run-1", "n1", [])  # lote vazio não vira evento
+    publish_stdout(pub, "run-1", "n1", [])  # an empty batch doesn't become an event

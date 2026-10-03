@@ -1,23 +1,23 @@
 # tests/unit/test_contrato_isolamento_de_pacotes.py
 """
-Isolamento de `flow/` e `executor/` em relacao a `app/`.
+Isolation of `flow/` and `executor/` from `app/`.
 
-O motor (`flow/`) e o executor rodam na maquina do CLIENTE, onde `app/` nao
-existe e as variaveis de ambiente do servidor tambem nao. Dois invariantes
-sustentam isso, e nenhum tinha guarda automatica:
+The engine (`flow/`) and the executor run on the CUSTOMER's machine, where
+`app/` does not exist and neither do the server's environment variables. Two
+invariants hold that up, and neither had an automated guard:
 
-  EXECUTOR   nunca importa `app.*`, em nivel nenhum.
+  EXECUTOR   never imports `app.*`, at any level.
 
-  FLOW       pode importar `app.*`, mas SOMENTE dentro de funcao. Subir um
-             desses imports para o topo do arquivo derruba a frota inteira no
-             boot: `app.core.utils.encryption` importa `app.core.config`, que
-             levanta ValueError quando APP_SECRET nao esta definida — e no
-             executor ela nunca esta.
+  FLOW       may import `app.*`, but ONLY inside a function. Moving one of
+             those imports to the top of the file takes down the whole fleet
+             at boot: `app.core.utils.encryption` imports `app.core.config`,
+             which raises ValueError when APP_SECRET is not set — and on the
+             executor it never is.
 
-Hoje os dois invariantes valem apenas porque alguem lembrou de escrever
-`from app...` indentado. Um "organizar imports" de IDE reverte isso em silencio,
-e o teste que falharia seria nenhum: a suite roda com as variaveis do servidor
-presentes, entao o import funciona aqui e quebra la.
+Today both invariants hold only because someone remembered to write
+`from app...` indented. An IDE "organize imports" silently reverts that, and
+no test would fail: the suite runs with the server's variables present, so the
+import works here and breaks there.
 """
 from __future__ import annotations
 
@@ -33,10 +33,10 @@ def _arquivos(pacote: str) -> list[Path]:
 
 
 def _imports_de_app(caminho: Path) -> list[tuple[int, str, bool]]:
-    """(linha, alvo, e_nivel_de_modulo) para cada import de `app.*` no arquivo."""
+    """(line, target, is_module_level) for each import of `app.*` in the file."""
     arvore = ast.parse(caminho.read_text(encoding="utf-8"), str(caminho))
 
-    # Nos que estao dentro de alguma funcao => import tardio.
+    # Nodes that are inside some function => deferred import.
     dentro_de_funcao: set[int] = set()
     for no in ast.walk(arvore):
         if isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -60,7 +60,7 @@ def _imports_de_app(caminho: Path) -> list[tuple[int, str, bool]]:
 # ── EXECUTOR ─────────────────────────────────────────────────────────────────
 
 def test_executor_nunca_importa_app():
-    """A fronteira de deploy: o executor e distribuido sem o pacote `app`."""
+    """The deploy boundary: the executor is distributed without the `app` package."""
     violacoes = [
         f"{caminho.relative_to(RAIZ)}:{linha} importa {alvo}"
         for caminho in _arquivos("executor")
@@ -75,7 +75,7 @@ def test_executor_nunca_importa_app():
 # ── FLOW ─────────────────────────────────────────────────────────────────────
 
 def test_flow_so_importa_app_dentro_de_funcao():
-    """Import de `app.*` no topo de um modulo de flow/ derruba todo executor."""
+    """An import of `app.*` at the top of a flow/ module takes down every executor."""
     violacoes = [
         f"{caminho.relative_to(RAIZ)}:{linha} importa {alvo} no topo do modulo"
         for caminho in _arquivos("flow")
@@ -90,10 +90,10 @@ def test_flow_so_importa_app_dentro_de_funcao():
 
 
 def test_o_import_tardio_de_flow_ainda_existe_onde_e_esperado():
-    """Ancora a premissa: se os imports tardios sumirem, o teste acima vira vacuo.
+    """Anchors the premise: if the deferred imports disappear, the test above becomes vacuous.
 
-    Sem isto, apagar `workflow_contract.py` inteiro deixaria a suite verde e
-    daria a impressao de que o invariante continua sendo verificado.
+    Without this, deleting `workflow_contract.py` entirely would leave the suite
+    green and give the impression that the invariant is still being checked.
     """
     tardios = [
         (caminho.relative_to(RAIZ), linha, alvo)
@@ -108,10 +108,10 @@ def test_o_import_tardio_de_flow_ainda_existe_onde_e_esperado():
 
 
 def test_importar_flow_nao_exige_variavel_de_ambiente_do_servidor(monkeypatch):
-    """A prova empirica do invariante, e nao so a estrutural.
+    """The empirical proof of the invariant, not just the structural one.
 
-    Simula a maquina do cliente: sem APP_SECRET/FERNET_KEY, importar o motor e
-    o registry de nos tem de funcionar.
+    Simulates the customer's machine: without APP_SECRET/FERNET_KEY, importing
+    the engine and the node registry has to work.
     """
     import subprocess
     import sys
@@ -121,9 +121,9 @@ def test_importar_flow_nao_exige_variavel_de_ambiente_do_servidor(monkeypatch):
         "PYTHONPATH": str(RAIZ),
         "EXECUTOR_ID": "exec-teste",
     }
-    # Importa TODO modulo de flow/, e nao so os pontos de entrada: um import
-    # indevido num arquivo que os entrypoints nao alcancam passaria batido, e
-    # foi exatamente o caso de `flow/utils/workflow_contract.py`.
+    # Imports EVERY module in flow/, not just the entry points: a stray import
+    # in a file the entrypoints do not reach would slip through, and that was
+    # exactly the case of `flow/utils/workflow_contract.py`.
     programa = (
         "import importlib, pkgutil, sys\n"
         "import flow\n"

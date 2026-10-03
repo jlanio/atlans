@@ -1,14 +1,14 @@
 # tests/unit/test_fix_main_queue.py
 """
-Correcoes do entry point do executor (main.py), da fila de jobs (job_queue.py)
-e da validacao de config (config.py).
+Fixes for the executor entry point (main.py), the job queue (job_queue.py)
+and config validation (config.py).
 
-Cobre:
-  D2 — shutdown descartava silenciosamente os jobs que ainda estavam na fila
-  D3 — EXECUTOR_MAX_CONCURRENT=0 subia o executor sem worker nenhum
-  D4 — `cancel()` de job desconhecido vazava no set `_cancelled` e mentia "queued"
-  B8 — uma unica fila de drive_events compartilhada por N SyncManagers
-  D1 — task de background morrendo em silencio
+Covers:
+  D2 — shutdown silently discarded the jobs that were still in the queue
+  D3 — EXECUTOR_MAX_CONCURRENT=0 started the executor with no worker at all
+  D4 — `cancel()` of an unknown job leaked into the `_cancelled` set and lied "queued"
+  B8 — a single drive_events queue shared by N SyncManagers
+  D1 — background task dying silently
 """
 import asyncio
 import logging
@@ -22,12 +22,12 @@ def _job(job_id: str, priority: int = 5) -> dict:
     return {"envelope": {"job_id": job_id, "priority": priority}}
 
 
-# ── D2: shutdown avisa os jobs que nunca chegaram a rodar ────────────────────
+# ── D2: shutdown notifies the jobs that never got to run ─────────────────────
 
 @pytest.mark.asyncio
 async def test_shutdown_avisa_jobs_que_ficaram_na_fila():
-    """Sem isto o servidor fechava como 'desconectou durante a execucao' um job
-    que nem comecou — e nao havia como redespachar com seguranca."""
+    """Without this the server closed as 'desconectou durante a execucao' (disconnected
+    during execution) a job that had not even started — and there was no safe way to redispatch."""
     liberar = asyncio.Event()
     avisados: list[tuple[str, str]] = []
 
@@ -53,16 +53,16 @@ async def test_shutdown_avisa_jobs_que_ficaram_na_fila():
     ids = {job_id for job_id, _ in avisados}
     assert ids == {"na-fila-1", "na-fila-2"}
     assert all(motivo == ExecutorJobQueue.NAO_INICIADO for _, motivo in avisados)
-    # A PriorityQueue de fato esvaziou. (O `get_capacity()["queued"]` NAO serve
-    # mais como prova: depois do shutdown ele anuncia saturacao de proposito —
-    # ver test_capacity_anuncia_saturacao_durante_o_shutdown.)
+    # The PriorityQueue really did empty. (`get_capacity()["queued"]` NO longer
+    # works as proof: after shutdown it advertises saturation on purpose —
+    # see test_capacity_anuncia_saturacao_durante_o_shutdown.)
     assert queue._queue.qsize() == 0
 
 
 @pytest.mark.asyncio
 async def test_shutdown_nao_espera_polling_quando_nao_ha_job():
-    """_wait_for_running virou Event: sem job em execucao o shutdown e imediato
-    (o polling de 0.5s cobrava meio segundo de todo deploy)."""
+    """_wait_for_running became an Event: with no job running, shutdown is immediate
+    (the 0.5s polling charged half a second to every deploy)."""
     async def on_execute(message):
         return None
 
@@ -77,13 +77,13 @@ async def test_shutdown_nao_espera_polling_quando_nao_ha_job():
 
 @pytest.mark.asyncio
 async def test_capacity_anuncia_saturacao_durante_o_shutdown():
-    """Executor drenando nao pode continuar sendo o 'menos carregado' do pool.
+    """A draining executor must not keep being the 'least loaded' in the pool.
 
-    Reproduz a regra do servidor: `ExecutorConnection.is_full()` compara
-    queued+running >= max_concurrent+max_queue, e `_resolve_candidates` põe por
-    último quem essa mesma conta diz cheio. Com a carga real (fila drenada,
-    jobs terminando) o executor em shutdown ficava em PRIMEIRO no ranking e todo
-    job roteado voltava como "Executor em shutdown." sem failover.
+    Reproduces the server's rule: `ExecutorConnection.is_full()` compares
+    queued+running >= max_concurrent+max_queue, and `_resolve_candidates` puts
+    last whoever that same arithmetic says is full. With the real load (queue drained,
+    jobs finishing) the executor in shutdown ended up FIRST in the ranking and every
+    routed job came back as "Executor em shutdown." without failover.
     """
     async def on_execute(message):
         return None
@@ -97,13 +97,13 @@ async def test_capacity_anuncia_saturacao_durante_o_shutdown():
     await queue.shutdown(timeout=2)
 
     cap = queue.get_capacity()
-    # Regra de is_full() do servidor — inclusive se ele clampar max_* para baixo.
+    # The server's is_full() rule — even if it clamps max_* down.
     assert cap["queued"] + cap["running"] >= cap["max_concurrent"] + cap["max_queue"]
-    # E a carga anunciada tem de ser maior que a de qualquer executor saudavel.
+    # And the advertised load must be higher than that of any healthy executor.
     assert cap["queued"] + cap["running"] > antes["queued"] + antes["running"]
 
 
-# ── D4: cancel() de job desconhecido ─────────────────────────────────────────
+# ── D4: cancel() of an unknown job ───────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_cancel_de_job_desconhecido_retorna_unknown_sem_vazar():
@@ -118,7 +118,7 @@ async def test_cancel_de_job_desconhecido_retorna_unknown_sem_vazar():
 
 @pytest.mark.asyncio
 async def test_cancel_de_job_enfileirado_continua_queued():
-    """A resposta 'queued' precisa continuar valendo para job que ESTA na fila."""
+    """The 'queued' answer must stay valid for a job that IS in the queue."""
     liberar = asyncio.Event()
     executados: list[str] = []
 
@@ -143,11 +143,11 @@ async def test_cancel_de_job_enfileirado_continua_queued():
         await queue.shutdown(timeout=2)
 
 
-# ── D3: faixas de config ─────────────────────────────────────────────────────
+# ── D3: config ranges ────────────────────────────────────────────────────────
 
 def test_env_int_rejeita_zero_e_lixo(monkeypatch, caplog):
-    """MAX_CONCURRENT=0 deixava o executor online, com capacity 0 (preferido pelo
-    scheduler least-loaded), aceitando jobs que nunca executariam."""
+    """MAX_CONCURRENT=0 left the executor online, with capacity 0 (preferred by the
+    least-loaded scheduler), accepting jobs that would never execute."""
     from executor._ambiente import ler_int
 
     monkeypatch.setenv("_TESTE_INT", "0")
@@ -176,7 +176,7 @@ def test_config_expoe_valores_saneados():
 
 
 def test_assert_configured_reclama_sem_executor_id(monkeypatch):
-    """A exigencia mora aqui, e nao no import de config.py, que nao aborta mais."""
+    """The requirement lives here, not in the import of config.py, which no longer aborts."""
     from executor import config
 
     monkeypatch.setattr(config, "EXECUTOR_ID", "")
@@ -196,7 +196,7 @@ class _ManagerFake:
 
 
 class _ManagerSemContrato:
-    """Manager que ainda nao implementou claims_event — nao pode quebrar o fan-out."""
+    """A manager that has not implemented claims_event yet — must not break the fan-out."""
     def __init__(self, sync_dir: str):
         self.sync_dir = sync_dir
 
@@ -218,8 +218,8 @@ def _evento(nome: str) -> dict:
 
 @pytest.mark.asyncio
 async def test_fanout_entrega_ao_manager_que_reivindica():
-    """Fila unica compartilhada acordava UM waiter: com 2 pastas cada evento ia
-    para um manager sorteado e o dono nunca via."""
+    """A single shared queue woke ONE waiter: with 2 folders each event went
+    to a random manager and the owner never saw it."""
     entrada: asyncio.Queue = asyncio.Queue()
     managers = [_ManagerFake("/a", {"a.gpkg"}), _ManagerFake("/b", {"b.gpkg"})]
     filas = [asyncio.Queue(maxsize=10), asyncio.Queue(maxsize=10)]
@@ -233,7 +233,7 @@ async def test_fanout_entrega_ao_manager_que_reivindica():
 
 @pytest.mark.asyncio
 async def test_fanout_manda_orfao_para_o_primario():
-    """Arquivo novo nao esta em manifesto nenhum — vai para o primeiro manager."""
+    """A new file is in no manifest at all — it goes to the first manager."""
     entrada: asyncio.Queue = asyncio.Queue()
     managers = [_ManagerFake("/a"), _ManagerFake("/b")]
     filas = [asyncio.Queue(maxsize=10), asyncio.Queue(maxsize=10)]
@@ -253,7 +253,7 @@ async def test_fanout_tolera_manager_sem_claims_event():
     await _rodar_fanout(entrada, managers, filas, [_evento("b.gpkg"), _evento("?.gpkg")])
 
     assert filas[1].qsize() == 1   # reivindicado
-    assert filas[0].qsize() == 1   # orfao cai no primario
+    assert filas[0].qsize() == 1   # orphan falls to the primary
 
 
 @pytest.mark.asyncio
@@ -269,7 +269,7 @@ async def test_fanout_descarta_com_log_quando_fila_do_destino_enche(caplog):
     assert any("cheia" in r.getMessage() for r in caplog.records)
 
 
-# ── P5: espera pelos node_events sem barreira global de 30s ──────────────────
+# ── P5: waiting for node_events without a global 30s barrier ─────────────────
 
 def _fila_eventos(n: int = 0):
     from executor.main import _FilaContada
@@ -281,12 +281,12 @@ def _fila_eventos(n: int = 0):
 
 
 async def _sender_fake(fila, intervalo: float, enviados: list | None = None):
-    """Consumidor com o MESMO contrato do _event_sender_loop.
+    """Consumer with the SAME contract as _event_sender_loop.
 
-    São TRÊS passos, e a distinção importa: `task_done()` é incondicional (fecha
-    o saldo do join mesmo quando o item volta para a fila), enquanto
-    `confirmar_envio()` só acontece quando o `ws.send` retornou — é ele que a
-    barreira de fim de job observa.
+    There are THREE steps, and the distinction matters: `task_done()` is unconditional
+    (it settles the join balance even when the item goes back to the queue), while
+    `confirmar_envio()` only happens when `ws.send` has returned — that is what the
+    end-of-job barrier watches.
     """
     while True:
         ev = await fila.get()
@@ -299,7 +299,7 @@ async def _sender_fake(fila, intervalo: float, enviados: list | None = None):
 
 @pytest.mark.asyncio
 async def test_drenagem_desiste_rapido_quando_ninguem_drena():
-    """Com o WS caido o job pagava os 30s inteiros SEGURANDO o slot do semaforo."""
+    """With the WS down the job paid the full 30s while HOLDING the semaphore slot."""
     from executor.main import _drenar_eventos_pendentes
 
     fila = _fila_eventos(5)
@@ -331,29 +331,29 @@ async def test_drenagem_espera_enquanto_ha_progresso():
 
 @pytest.mark.asyncio
 async def test_drenagem_nao_desiste_com_produtor_mais_rapido_que_o_sender():
-    """O bug que a heuristica de qsize introduziu.
+    """The bug the qsize heuristic introduced.
 
-    Fila compartilhada: o job B continua produzindo node_events mais rapido do
-    que a rede entrega, entao o qsize NUNCA diminui — a versao anterior lia isso
-    como "sem conexao", desistia em 3s e despachava o job_result de A com os
-    eventos finais de A ainda por enviar (UI fechava o run com o grafo
-    congelado). Aqui o sender esta vivo e progredindo: a barreira tem de esperar.
+    Shared queue: job B keeps producing node_events faster than the network
+    delivers them, so qsize NEVER decreases — the previous version read that
+    as "no connection", gave up after 3s and dispatched A's job_result with A's
+    final events still unsent (the UI closed the run with the graph
+    frozen). Here the sender is alive and making progress: the barrier must wait.
     """
     from executor.main import _drenar_eventos_pendentes
 
     fila = _fila_eventos(0)
     enviados: list[dict] = []
-    # Backlog grande o bastante para que, na janela de `estagnado`, o sender nem
-    # chegue perto dos eventos de A — e o corte prematuro doa de verdade.
+    # A backlog big enough that, within the `estagnado` window, the sender does not
+    # even get close to A's events — and the premature cutoff really hurts.
     for i in range(40):
         fila.put_nowait({"node": f"backlog-{i}"})
-    # Os dois ultimos eventos sao do job que acabou de terminar: estao no FIM da
-    # FIFO, exatamente atras do backlog alheio.
+    # The last two events belong to the job that just finished: they are at the END
+    # of the FIFO, right behind the other job's backlog.
     fila.put_nowait({"node": "A-node-final"})
     fila.put_nowait({"node": "A-workflow-complete"})
 
     async def _produtor():
-        # Mais rapido que o sender: o qsize so cresce.
+        # Faster than the sender: qsize only grows.
         while True:
             await asyncio.sleep(0.02)
             fila.put_nowait({"node": "B-ruido"})
@@ -375,10 +375,10 @@ async def test_drenagem_nao_desiste_com_produtor_mais_rapido_que_o_sender():
 
 @pytest.mark.asyncio
 async def test_drenagem_nao_espera_eventos_de_outros_jobs():
-    """A barreira e por marca d'agua: so cobre o que ja estava na fila.
+    """The barrier is by watermark: it only covers what was already in the queue.
 
-    O `join()` global fazia o job A esperar tambem pelos eventos que o job B
-    enfileirasse DEPOIS — com B produzindo sem parar, a espera nunca terminava.
+    The global `join()` made job A also wait for the events that job B
+    enqueued AFTERWARDS — with B producing nonstop, the wait never ended.
     """
     from executor.main import _drenar_eventos_pendentes
 
@@ -404,10 +404,10 @@ async def test_drenagem_nao_espera_eventos_de_outros_jobs():
 
 @pytest.mark.asyncio
 async def test_drenagem_cobre_eventos_publicados_via_call_soon_threadsafe():
-    """ExecutorEventPublisher enfileira por callback do loop, nao na hora.
+    """ExecutorEventPublisher enqueues via a loop callback, not immediately.
 
-    Sem o yield inicial a marca d'agua era tirada antes de os ultimos eventos do
-    job entrarem na fila — a barreira 'passava' sem cobrir nada.
+    Without the initial yield the watermark was taken before the job's last
+    events entered the queue — the barrier 'passed' without covering anything.
     """
     from executor.main import _drenar_eventos_pendentes
 
@@ -427,10 +427,10 @@ async def test_drenagem_cobre_eventos_publicados_via_call_soon_threadsafe():
 
 @pytest.mark.asyncio
 async def test_aguardar_confirmacao_desiste_sem_consumidor_no_shutdown():
-    """Guard do shutdown: `conn_task` vivo em backoff nao e sender vivo.
+    """Shutdown guard: a `conn_task` alive in backoff is not a live sender.
 
-    Antes o shutdown pagava 30s garantidos de `wait_for(join(), 30)` sempre que a
-    conexao estava em backoff de reconexao (task viva, nenhum sender).
+    Before, shutdown paid a guaranteed 30s of `wait_for(join(), 30)` whenever the
+    connection was in reconnection backoff (task alive, no sender).
     """
     from executor.main import _aguardar_confirmacao
 
@@ -442,7 +442,7 @@ async def test_aguardar_confirmacao_desiste_sem_consumidor_no_shutdown():
     assert loop.time() - inicio < 2.0
 
 
-# ── D1: task de background observada ─────────────────────────────────────────
+# ── D1: observed background task ─────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_task_de_background_com_excecao_e_logada(caplog):
@@ -473,29 +473,29 @@ async def test_task_cancelada_nao_vira_erro():
     task.cancel()
     await asyncio.gather(task, return_exceptions=True)
     await asyncio.sleep(0)
-    # Nao levantar nada ja e o contrato: o callback retorna cedo em cancelamento.
+    # Not raising anything is the contract: the callback returns early on cancellation.
 
 
-# ── Aviso imediato de drenagem ───────────────────────────────────────────────
-# `get_capacity()` passa a anunciar saturacao assim que `_shutting_down` vira
-# True, mas quem ENVIA e o `_capacity_loop`, que dorme 10s ANTES de cada envio.
-# Nessa janela o `_resolve_candidates` do servidor ainda elegia este executor
-# pelo least-loaded e o job voltava como "Executor em shutdown." — run FAILED
-# sem failover, o mesmo problema que o anuncio de saturacao existe para evitar.
+# ── Immediate drain notice ───────────────────────────────────────────────────
+# `get_capacity()` starts advertising saturation as soon as `_shutting_down` becomes
+# True, but what SENDS it is `_capacity_loop`, which sleeps 10s BEFORE each send.
+# In that window the server's `_resolve_candidates` still picked this executor
+# as least-loaded and the job came back as "Executor em shutdown." — run FAILED
+# without failover, the very problem the saturation notice exists to avoid.
 
 
 @pytest.mark.asyncio
 async def test_shutdown_avisa_drenagem_antes_de_qualquer_espera():
-    """A ordem e o ponto: avisar DEPOIS de drenar/esperar nao fecharia a janela.
+    """The order is the point: notifying AFTER draining/waiting would not close the window.
 
-    Precisa haver um job ENFILEIRADO para a ordem ser observavel — `_drain_queued`
-    so produz efeito visivel (`on_cancelled`) se tiver o que drenar. Sem isso as
-    duas ordens produzem a mesma lista e o teste passa dos dois jeitos.
+    There must be a QUEUED job for the order to be observable — `_drain_queued`
+    only produces a visible effect (`on_cancelled`) if it has something to drain. Without
+    it both orders produce the same list and the test passes either way.
     """
     ordem: list[str] = []
 
     async def _executa(_msg):
-        await asyncio.sleep(60)  # nunca conclui; o job fica preso na fila
+        await asyncio.sleep(60)  # never completes; the job stays stuck in the queue
 
     async def _cancelado(_msg, reason=None):
         ordem.append("drenou-fila")
@@ -509,7 +509,7 @@ async def test_shutdown_avisa_drenagem_antes_de_qualquer_espera():
         ordem.append("avisou-drenagem")
 
     fila.set_on_draining(_avisa)
-    # Sem start(): nenhum worker consome, entao o job fica na fila ate o drain.
+    # No start(): no worker consumes, so the job stays in the queue until the drain.
     assert await fila.enqueue(_job("preso"))
     await fila.shutdown(timeout=1)
 
@@ -522,8 +522,8 @@ async def test_shutdown_avisa_drenagem_antes_de_qualquer_espera():
 
 @pytest.mark.asyncio
 async def test_aviso_de_drenagem_carrega_capacidade_saturada():
-    """De nada adianta avisar na hora se o numero anunciado nao tira o executor
-    do topo do ranking least-loaded."""
+    """Notifying right away is useless if the advertised number does not take the
+    executor off the top of the least-loaded ranking."""
     capturado: dict = {}
 
     fila = ExecutorJobQueue(on_execute=lambda _m: None, max_concurrent=2, max_queue_size=5)
@@ -544,11 +544,11 @@ async def test_aviso_de_drenagem_carrega_capacidade_saturada():
 
 @pytest.mark.asyncio
 async def test_falha_no_aviso_nao_impede_o_shutdown():
-    """O aviso e best-effort: se o WS ja caiu, encerrar ainda tem que funcionar."""
+    """The notice is best-effort: if the WS has already dropped, shutting down must still work."""
     async def _explode():
         raise RuntimeError("WS ja fechado")
 
     fila = ExecutorJobQueue(on_execute=lambda _m: None, max_concurrent=1, max_queue_size=2)
     fila.set_on_draining(_explode)
     await fila.start()
-    await fila.shutdown(timeout=1)  # nao pode levantar
+    await fila.shutdown(timeout=1)  # must not raise

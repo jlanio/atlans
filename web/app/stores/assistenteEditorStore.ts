@@ -1,18 +1,18 @@
 import { create } from "zustand"
 
 /**
- * Aberto/fechado da gaveta do assistente.
+ * Open/closed state of the assistant drawer.
  *
- * Numa store, e não em estado local do editor, porque três lugares precisam
- * dele: a gaveta, o botão que a abre e o atalho de teclado — que vive num
- * efeito global e não pode depender de a gaveta estar montada.
+ * In a store, and not in the editor's local state, because three places need
+ * it: the drawer, the button that opens it and the keyboard shortcut — which
+ * lives in a global effect and cannot depend on the drawer being mounted.
  *
- * A LARGURA não mora aqui: ela é do `useResizablePanel`, que já resolve
- * arraste, teclado, clamp de viewport e `localStorage`. Duas memórias para a
- * mesma gaveta divergiriam na primeira mudança.
+ * The WIDTH does not live here: it belongs to `useResizablePanel`, which already
+ * handles dragging, keyboard, viewport clamp and `localStorage`. Two memories for
+ * the same drawer would diverge at the first change.
  */
 
-/** Chave do `localStorage`. A largura usa `CHAVE_LARGURA`, no componente. */
+/** `localStorage` key. The width uses `CHAVE_LARGURA`, in the component. */
 const CHAVE_ABERTO = "atlans:assistente:aberto"
 
 function lembrado(): boolean | null {
@@ -20,15 +20,16 @@ function lembrado(): boolean | null {
   try {
     let cru = window.localStorage.getItem(CHAVE_ABERTO)
     if (cru === null) {
-      // A F4 renomeou a chave (era atlans:copiloto:aberto) sem migração — o
-      // painel "esquecia" a preferência de todo mundo. Lê a antiga uma vez e
-      // regrava na nova; a antiga fica, para quem voltar a uma versão anterior.
+      // F4 renamed the key (it was atlans:copiloto:aberto) without a migration — the
+      // panel "forgot" everyone's preference. Reads the old one once and
+      // rewrites it under the new one; the old one stays, for anyone going back to
+      // an earlier version.
       cru = window.localStorage.getItem("atlans:copiloto:aberto")
       if (cru !== null) window.localStorage.setItem(CHAVE_ABERTO, cru)
     }
     return cru === null ? null : cru === "1"
   } catch {
-    // Janela privada ou cota cheia. Preferência é descartável.
+    // Private window or full quota. The preference is disposable.
     return null
   }
 }
@@ -37,7 +38,7 @@ function lembrar(aberto: boolean): void {
   try {
     window.localStorage.setItem(CHAVE_ABERTO, aberto ? "1" : "0")
   } catch {
-    /* preferência descartável */
+    /* disposable preference */
   }
 }
 
@@ -49,10 +50,10 @@ interface AssistenteEditorActions {
   fechar(): void
   alternar(): void
   /**
-   * Lê a preferência do navegador. `padrao` vale quando não há nada guardado:
-   * a tela de criar abre a gaveta (o canvas nasce vazio e ela é o caminho mais
-   * curto), o editor de um fluxo existente não (quem abre um fluxo pronto veio
-   * para o canvas).
+   * Reads the browser preference. `padrao` applies when nothing is stored: the
+   * create screen opens the drawer (the canvas starts empty and it is the
+   * shortest path), the editor of an existing workflow does not (whoever opens
+   * a finished workflow came for the canvas).
    */
   hidratar(padrao: boolean): void
 }
@@ -63,8 +64,8 @@ export const useAssistenteEditorStore = create<AssistenteEditorState & Assistent
   fechar: () => set(() => { lembrar(false); return { aberto: false } }),
   alternar: () => set(state => { lembrar(!state.aberto); return { aberto: !state.aberto } }),
 
-  // Não grava: hidratar é LER a preferência, e escrever aqui transformaria o
-  // default da tela de criar numa escolha que a pessoa nunca fez — e que
-  // passaria a valer no editor também.
+  // Does not write: hydrating is READING the preference, and writing here would
+  // turn the create screen's default into a choice the person never made — and
+  // one that would start applying in the editor too.
   hidratar: (padrao) => set(() => ({ aberto: lembrado() ?? padrao })),
 }))

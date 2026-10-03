@@ -1,9 +1,9 @@
 """
-Schemas de tipos de credencial.
+Credential type schemas.
 
-Cada entrada declara os campos necessários para o tipo, com label, placeholder,
-tipo de input e se é obrigatório. O frontend usa isso para renderizar formulários
-guiados — sem que o usuário precise saber os nomes das chaves.
+Each entry declares the fields the type needs, with label, placeholder,
+input type and whether it is required. The frontend uses this to render guided
+forms — without the user needing to know the key names.
 """
 
 from typing import List, Optional
@@ -26,7 +26,7 @@ class CredentialTypeSchema(BaseModel):
     type: str
     label: str
     description: str
-    # Tipos de nó (categorias) que aceitam esta credencial
+    # Node types (categories) that accept this credential
     node_types: List[str]
     fields: List[CredentialFieldSchema]
 
@@ -150,9 +150,9 @@ CREDENTIAL_TYPE_SCHEMAS: dict[str, CredentialTypeSchema] = {
             CredentialFieldSchema(key="password", label="Senha", type="password"),
         ],
     ),
-    # O módulo authkey do GeoServer: uma chave por usuário, mandada em cada
-    # requisição. `parameter` e `location` têm padrão, mas a tela só EXIBE o
-    # padrão (não o grava em `data`) — quem consome aplica o padrão sozinho.
+    # GeoServer's authkey module: one key per user, sent with every
+    # request. `parameter` and `location` have defaults, but the screen only DISPLAYS the
+    # default (it does not write it to `data`) — the consumer applies the default on its own.
     "geoserver_authkey": CredentialTypeSchema(
         type="geoserver_authkey",
         label="GeoServer (authkey)",

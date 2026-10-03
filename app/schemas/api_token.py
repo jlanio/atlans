@@ -1,9 +1,9 @@
 # app/schemas/api_token.py
 """
-Schemas do token pessoal de acesso (PAT).
+Personal access token (PAT) schemas.
 
-`ApiTokenCreated` é o único lugar em que o segredo aparece — na resposta da
-criação, uma vez. Depois disso a API só devolve `ApiTokenOut` (prefixo + metadados).
+`ApiTokenCreated` is the only place where the secret appears — in the creation
+response, once. After that the API only returns `ApiTokenOut` (prefix + metadata).
 """
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ class ApiTokenCreate(BaseModel):
     def _nome(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            # Mesma frase do service (que revalida): a tela mostra uma só.
+            # Same sentence as the service (which revalidates): the screen shows just one.
             raise ValueError("O nome precisa ter entre 1 e 80 caracteres.")
         return v
 
@@ -67,7 +67,7 @@ class ApiTokenCreate(BaseModel):
 
 
 class ApiTokenOut(BaseModel):
-    """Metadados do token — nunca o segredo."""
+    """Token metadata — never the secret."""
     model_config = ConfigDict(extra="forbid")
 
     id: str
@@ -79,7 +79,7 @@ class ApiTokenOut(BaseModel):
     last_used_at: Optional[datetime]
     revoked_at: Optional[datetime]
     created_at: datetime
-    # "active" | "expired" | "revoked" — calculado no momento da resposta
+    # "active" | "expired" | "revoked" — computed at response time
     status: str
 
     @classmethod
@@ -99,7 +99,7 @@ class ApiTokenOut(BaseModel):
 
 
 class ApiTokenCreated(ApiTokenOut):
-    """Resposta da criação — o segredo aparece UMA ÚNICA VEZ, aqui."""
+    """Creation response — the secret appears ONLY ONCE, here."""
 
     token: str
 

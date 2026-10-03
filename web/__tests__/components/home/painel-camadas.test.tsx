@@ -44,8 +44,8 @@ describe("PainelCamadas", () => {
   })
 
   it("fica ABAIXO do gatilho móvel da barra lateral (z-40, nunca z-50)", () => {
-    // Empatado em z-40 com o gatilho do app-header, este painel o cobria em
-    // tela estreita — e ele é o único jeito de abrir a barra no telefone.
+    // Tied at z-40 with the app-header's trigger, this panel covered it on a
+    // narrow screen — and it is the only way to open the bar on the phone.
     montar({ camadas: [camada()] })
     const painel = screen.getByRole("region", { name: /camadas/i })
     expect(painel.className).toContain("z-40")
@@ -85,29 +85,29 @@ describe("PainelCamadas", () => {
 
 describe("PainelCamadas — baixar", () => {
   it("manda o artifact_id SEM o prefixo `art:`", () => {
-    // O prefixo é do `useCamadas` (dedupe no globo); quem baixa é
-    // `/artifacts/{id}/download`, que não o conhece.
+    // The prefix belongs to `useCamadas` (dedupe on the globe); what downloads is
+    // `/artifacts/{id}/download`, which does not know it.
     const p = montar({ camadas: [camada({ id: "art:a1", label: "Focos", baixavel: true })] })
     fireEvent.click(screen.getByRole("button", { name: /baixar focos/i }))
     expect(p.onBaixar).toHaveBeenCalledWith("a1", "Focos")
   })
 
   it("sem `baixavel`, o botão NEM APARECE", () => {
-    // Uma camada publicada vive no globo com o conteúdo no PostGIS e pode não
-    // ter arquivo no storage; um artefato marcado para ficar no executor idem.
-    // Nos dois o download responderia 409/404 — botão vivo que falha é pior que
-    // botão ausente.
+    // A published layer lives on the globe with its content in PostGIS and may not
+    // have a file in storage; likewise an artifact marked to stay on the executor.
+    // In both cases the download would respond 409/404 — a live button that fails is worse than
+    // an absent button.
     montar({ camadas: [camada({ baixavel: false })] })
     expect(screen.queryByRole("button", { name: /baixar/i })).toBeNull()
 
     cleanup()
-    montar({ camadas: [camada()] })   // sem o campo: o padrão é não oferecer
+    montar({ camadas: [camada()] })   // without the field: the default is not to offer it
     expect(screen.queryByRole("button", { name: /baixar/i })).toBeNull()
   })
 
   it("está na ordem de tabulação mesmo escondido: 'só no hover' não pode virar inalcançável", () => {
-    // Ele é escondido por `opacity`, e só onde HÁ mouse (`@media (hover:hover)`);
-    // no toque é permanente. Some da vista, nunca do teclado.
+    // It is hidden by `opacity`, and only where there IS a mouse (`@media (hover:hover)`);
+    // on touch it is permanent. It disappears from view, never from the keyboard.
     montar({ camadas: [camada({ baixavel: true })] })
     const bt = screen.getByRole("button", { name: /baixar/i })
     expect(bt.hasAttribute("disabled")).toBe(false)

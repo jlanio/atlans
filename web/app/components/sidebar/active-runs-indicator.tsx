@@ -55,9 +55,9 @@ const ActiveRunsIndicator = () => {
                 onClick={() => { setOpen(false); router.push(`/workflow/${r.workflowHash}`) }}
                 className="flex w-full items-center gap-2.5 px-3 py-2.5 border-b border-border last:border-0 hover:bg-accent/50 text-left"
               >
-                {/* `exec-running`, não `blue-500`: o token existe para que o
-                    estado de execução acompanhe o tema e case com a cor usada
-                    nos cards e arestas (globals.css). */}
+                {/* `exec-running`, not `blue-500`: the token exists so that the
+                    execution state follows the theme and matches the color used
+                    on cards and edges (globals.css). */}
                 <span className="relative flex h-2 w-2 shrink-0">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-exec-running opacity-60" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-exec-running" />

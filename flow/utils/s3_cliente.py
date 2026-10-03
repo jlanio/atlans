@@ -1,17 +1,17 @@
 # flow/utils/s3_cliente.py
-"""Cliente boto3 a partir dos campos da credencial `s3` do cofre.
+"""boto3 client built from the fields of the vault's `s3` credential.
 
-Uma implementação para os dois lados: o nó SaveToS3 (no executor, com o
-`s3_auth` que o servidor injeta a partir da credencial escolhida) e o teste de
-conexão da credencial (na API). Antes cada um montava a sessão à sua maneira: o
-nó com chaves digitadas na definition — o segredo em texto puro no banco, no
-histórico de versões e na leitura do MCP — e sem `endpoint_url`, então MinIO e
-S3-compatíveis ficavam de fora; o teste com os campos da credencial.
+One implementation for both sides: the SaveToS3 node (on the executor, with the
+`s3_auth` the server injects from the chosen credential) and the credential's
+connection test (in the API). Before, each one built the session its own way: the
+node with keys typed into the definition — the secret in plain text in the database,
+in the version history and in the MCP read — and without `endpoint_url`, so MinIO
+and S3-compatible services were left out; the test with the credential's fields.
 
-Os nomes dos campos são os do catálogo (`app/core/credentials/schemas.py`):
+The field names are the catalog's (`app/core/credentials/schemas.py`):
 `access_key_id`, `secret_access_key`, `region`, `bucket`, `endpoint_url`.
-Campo vazio não vai ao boto3: sem chaves, vale a cadeia padrão dele (variáveis
-de ambiente, `~/.aws/credentials`, IAM role).
+An empty field is not passed to boto3: without keys, its default chain applies
+(environment variables, `~/.aws/credentials`, IAM role).
 """
 from typing import Any, Mapping
 
@@ -28,11 +28,11 @@ def cliente_s3(
     access_key_id: str | None = None,
     secret_access_key: str | None = None,
 ):
-    """`boto3.client("s3")` com as chaves, a região e o endpoint da credencial.
+    """`boto3.client("s3")` with the credential's keys, region and endpoint.
 
-    `region` explícita vence a da credencial. `access_key_id`/`secret_access_key`
-    explícitos só valem quando a credencial não traz chaves — existem para os
-    campos antigos do nó (ver SaveToS3), nunca para sobrepor o cofre.
+    An explicit `region` wins over the credential's. Explicit
+    `access_key_id`/`secret_access_key` only apply when the credential has no keys —
+    they exist for the node's old fields (see SaveToS3), never to override the vault.
     """
     import boto3
 
@@ -53,6 +53,6 @@ def cliente_s3(
     endpoint = _texto(auth.get("endpoint_url"))
     if endpoint:
         kwargs["endpoint_url"] = endpoint
-    # Uma sessão por chamada, e não a sessão padrão do módulo: ela não é segura
-    # entre threads, e o upload do nó roda em `asyncio.to_thread`.
+    # One session per call, not the module's default session: it is not
+    # thread-safe, and the node's upload runs in `asyncio.to_thread`.
     return boto3.session.Session().client("s3", **kwargs)

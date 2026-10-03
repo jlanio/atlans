@@ -1,10 +1,10 @@
 # tests/unit/test_config_envs_legadas.py
-"""O fallback das envs renomeadas pela F4 (COPILOTO_* -> ASSISTENTE_*).
+"""The fallback for the envs renamed by F4 (COPILOTO_* -> ASSISTENTE_*).
 
-Sem ele, um .env de servidor ainda com os nomes antigos reconfigurava o
-assistente EM SILENCIO (ativo por default, modelo/idioma de fabrica) — achado
-da revisao adversarial de 2026-09-24. O fallback e temporario; os avisos no
-arranque sao o lembrete de migrar o .env.
+Without it, a server .env still using the old names reconfigured the assistant
+SILENTLY (enabled by default, factory model/language) — a finding of the
+2026-09-24 adversarial review. The fallback is temporary; the warnings at
+startup are the reminder to migrate the .env.
 """
 import logging
 
@@ -28,8 +28,8 @@ def test_legada_cai_no_fallback_com_aviso(monkeypatch, caplog):
 
 
 def test_vazia_conta_como_ausente(monkeypatch):
-    # O compose define a variavel como string vazia quando o .env nao a tem —
-    # o mesmo motivo do `.strip() or` que o config ja usava.
+    # Compose defines the variable as an empty string when the .env lacks it —
+    # the same reason for the `.strip() or` that the config already used.
     monkeypatch.setenv("T_NOVA", "   ")
     monkeypatch.setenv("T_LEGADA", "antigo")
     assert config._env_ou_legado("T_NOVA", "T_LEGADA") == "antigo"

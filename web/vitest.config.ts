@@ -2,19 +2,19 @@ import { configDefaults, defineConfig } from "vitest/config"
 import react from "@vitejs/plugin-react"
 import path from "path"
 
-// Fuso FIXO, e fora de UTC, para a suíte inteira. O CI roda em UTC, e ali um
-// erro de fuso — a hora do cron no fuso errado, o "amanhã" do dia errado —
-// passa sem ninguém ver: em UTC o fuso local e o UTC coincidem. La Paz é
-// UTC−4 o ano todo (sem horário de verão): o resultado não muda com a data em
-// que a suíte roda. Aqui, e não num `TZ=` no script do npm, para valer também
-// no Windows.
+// A FIXED time zone, and not UTC, for the whole suite. CI runs in UTC, and there
+// a time zone bug — the cron hour in the wrong zone, the "tomorrow" of the
+// wrong day — slips by unseen: in UTC the local zone and UTC coincide. La Paz
+// is UTC−4 all year round (no daylight saving time): the result does not change
+// with the date the suite runs on. Here, and not in a `TZ=` in the npm script,
+// so it also applies on Windows.
 process.env.TZ = "America/La_Paz"
 
-// `--mode nucleo` (o `npm run test:nucleo`): a suíte do núcleo sem extensão
-// nenhuma, o que a distribuição livre roda. `@/extensoes/instaladas` vira a
-// lista vazia (`extensoes/nenhuma.ts`) e os testes das extensões ficam de fora.
-// Um modo, e não uma variável de ambiente, pelo mesmo motivo do fuso: valer
-// também no Windows.
+// `--mode nucleo` (`npm run test:nucleo`): the core suite with no extension at
+// all, which is what the free distribution runs. `@/extensoes/instaladas`
+// becomes the empty list (`extensoes/nenhuma.ts`) and the extensions' tests are
+// left out. A mode, and not an environment variable, for the same reason as the
+// time zone: so it also applies on Windows.
 export default defineConfig(({ mode }) => {
   const nucleo = mode === "nucleo"
   return {

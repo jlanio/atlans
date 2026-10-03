@@ -13,7 +13,7 @@ def _sanitize_pg_conn_str(conn_str: str) -> str:
 
 
 class _PoolCache(TTLCache):
-    """TTLCache que fecha o asyncpg.Pool ao evicionar entradas."""
+    """TTLCache that closes the asyncpg.Pool when evicting entries."""
 
     def popitem(self):
         key, pool = super().popitem()
@@ -30,26 +30,26 @@ class _PoolCache(TTLCache):
     def _close_pool(pool: asyncpg.Pool) -> None:
         try:
             loop = asyncio.get_running_loop()
-            # Loop está rodando: agenda o fechamento de forma assíncrona
+            # Loop is running: schedule the close asynchronously
             asyncio.ensure_future(pool.close(), loop=loop)
         except RuntimeError:
-            # Nenhum event loop rodando (ex: shutdown após asyncio.run() encerrar)
-            # Não é possível fechar corretamente; o GC do asyncpg cuidará do cleanup.
+            # No event loop running (e.g. shutdown after asyncio.run() finished)
+            # It cannot be closed properly; asyncpg's GC will take care of the cleanup.
             pass
         except Exception as e:
             logger.warning(f"[PoolCache] Erro ao fechar pool asyncpg: {e}")
 
 
-# Chaveado por (loop_id, conn_str) — ver _cache_key. A premissa anterior de
-# "um event loop por processo" nao vale desde que sub-workflows passaram a
-# executar aninhados.
+# Keyed by (loop_id, conn_str) — see _cache_key. The earlier premise of
+# "one event loop per process" no longer holds since sub-workflows started
+# running nested.
 _pool_cache = _PoolCache(maxsize=50, ttl=600)
 
 
 async def close_all_pools() -> None:
     """
-    Fecha explicitamente todos os pools em cache.
-    Deve ser chamado durante o shutdown gracioso do executor, antes do event loop fechar.
+    Explicitly closes all cached pools.
+    Must be called during the executor's graceful shutdown, before the event loop closes.
     """
     keys = list(_pool_cache.keys())
     for key in keys:
@@ -63,16 +63,16 @@ async def close_all_pools() -> None:
 
 
 def _cache_key(conn_str: str) -> tuple:
-    """Chave do cache: (event loop, connection string).
+    """Cache key: (event loop, connection string).
 
-    Um asyncpg.Pool fica atrelado ao event loop que o criou — reusa-lo em outro
-    loop falha com "got Future attached to a different loop". A chave anterior
-    era so a conn_str, apoiada na premissa de "um loop por processo", que
-    qualquer caminho criando loop novo (ex: asyncio.run em thread) quebra de
-    forma intermitente e dificil de diagnosticar.
+    An asyncpg.Pool is tied to the event loop that created it — reusing it in
+    another loop fails with "got Future attached to a different loop". The
+    previous key was only the conn_str, relying on the premise of "one loop per
+    process", which any path creating a new loop (e.g. asyncio.run in a thread)
+    breaks intermittently and in a way that is hard to diagnose.
 
-    Fora de loop (chamada sincrona) cai para None — sem loop nao ha pool a
-    reutilizar de qualquer forma.
+    Outside a loop (synchronous call) it falls back to None — without a loop
+    there is no pool to reuse anyway.
     """
     try:
         loop_id = id(asyncio.get_running_loop())
@@ -83,17 +83,17 @@ def _cache_key(conn_str: str) -> tuple:
 
 async def get_asyncpg_pool(conn_str: str) -> asyncpg.Pool:
     """
-    Retorna ou cria um asyncpg.Pool para a connectionString informada.
-    O pool é reutilizado enquanto estiver no cache (TTL=600s, max=50 entradas)
-    E enquanto o event loop for o mesmo que o criou (ver _cache_key).
-    Ao ser eviccionado, o pool é fechado corretamente para liberar conexões.
+    Returns or creates an asyncpg.Pool for the given connectionString.
+    The pool is reused while it is in the cache (TTL=600s, max=50 entries)
+    AND while the event loop is the same one that created it (see _cache_key).
+    When evicted, the pool is closed properly to release connections.
     """
     key = _cache_key(conn_str)
     if key not in _pool_cache:
         logger.info(f"[get_asyncpg_pool] Criando pool para: {_sanitize_pg_conn_str(conn_str)}")
         try:
-            # application_name aparece em pg_stat_activity — facilita identificar
-            # conexões do Atlas Studio no banco (ex: SELECT * FROM pg_stat_activity)
+            # application_name shows up in pg_stat_activity — makes it easy to identify
+            # Atlas Studio connections in the database (e.g. SELECT * FROM pg_stat_activity)
             executor_id = os.getenv("EXECUTOR_ID", "")
             app_name = f"apolo/{executor_id[-5:]}" if executor_id else "apolo"
             pool = await asyncpg.create_pool(

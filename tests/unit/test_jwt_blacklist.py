@@ -1,5 +1,5 @@
 # tests/unit/test_jwt_blacklist.py
-"""Testes para is_token_blacklisted — comportamento fail-closed quando Redis cai."""
+"""Tests for is_token_blacklisted — fail-closed behavior when Redis goes down."""
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -34,11 +34,11 @@ async def test_token_blacklisted_retorna_true():
 
 @pytest.mark.asyncio
 async def test_redis_indisponivel_levanta_503():
-    """Fail-closed: Redis fora do ar → HTTPException 503.
+    """Fail-closed: Redis down → HTTPException 503.
 
-    Antes do fix, a função retornava False silenciosamente (fail-OPEN), o
-    que aceitava tokens revogados quando o backing store da blacklist
-    estava indisponível — anulando a função de logout.
+    Before the fix, the function silently returned False (fail-OPEN), which
+    accepted revoked tokens when the blacklist's backing store was
+    unavailable — defeating the purpose of logout.
     """
     mock_redis = MagicMock()
     mock_redis.exists = AsyncMock(side_effect=ConnectionError("redis down"))
@@ -53,7 +53,7 @@ async def test_redis_indisponivel_levanta_503():
 
 @pytest.mark.asyncio
 async def test_redis_timeout_tambem_levanta_503():
-    """TimeoutError também deve fail-close (não é caso especial)."""
+    """TimeoutError must also fail closed (it is not a special case)."""
     mock_redis = MagicMock()
     mock_redis.exists = AsyncMock(side_effect=TimeoutError("op timed out"))
 

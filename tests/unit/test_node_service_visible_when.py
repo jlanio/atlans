@@ -1,12 +1,12 @@
 """
-Regressao: as propriedades dos nos declaram `visibleWhen` (visibilidade
-condicional), mas o schema NodeProperty e a montagem em NodeService.list_nodes
-nao repassavam a chave — o Pydantic a descartava e o frontend nunca a recebia,
-deixando TODOS os campos sempre visiveis (os dois pickers do DataInput, o token
-Bearer do DataOutput mesmo quando publico, etc.).
+Regression: the nodes' properties declare `visibleWhen` (conditional
+visibility), but the NodeProperty schema and the assembly in NodeService.list_nodes
+didn't pass the key along — Pydantic dropped it and the frontend never received
+it, leaving ALL fields always visible (DataInput's two pickers, DataOutput's
+Bearer token even when public, etc.).
 
-Este teste percorre o caminho real do servico e garante que `visibleWhen`
-chega serializado para o frontend.
+This test walks the service's real path and ensures `visibleWhen` reaches the
+frontend serialized.
 """
 from unittest.mock import patch
 
@@ -39,7 +39,7 @@ async def test_datainput_pickers_tem_visible_when():
     props = _props(defs, "DataInput")
     assert props["driveFileId"].visibleWhen == {"field": "context", "in": ["drive"]}
     assert props["artifactId"].visibleWhen == {"field": "context", "in": ["artifacts"]}
-    # `context` e `crs` sao sempre visiveis — sem visibleWhen.
+    # `context` and `crs` are always visible — no visibleWhen.
     assert props["context"].visibleWhen is None
     assert props["crs"].visibleWhen is None
 
@@ -48,14 +48,14 @@ async def test_datainput_pickers_tem_visible_when():
 async def test_dataoutput_credencial_e_publico_tem_visible_when():
     defs = await _list()
     props = _props(defs, "DataOutput")
-    # isPublic: contexto Artefatos E conteudo que sai da maquina. Um artefato
-    # mantido no executor nao tem download, entao nao ha acesso a controlar.
+    # isPublic: Artefatos (artifacts) context AND content that leaves the machine. An
+    # artifact kept on the executor has no download, so there is no access to control.
     vw = props["isPublic"].visibleWhen
     assert isinstance(vw, list) and len(vw) == 2
     assert {"field": "context", "in": ["artifacts"]} in vw
     assert {"field": "localidade", "in": ["herdar"]} in vw
 
-    # credential_id: as duas acima MAIS nao-publico.
+    # credential_id: the two above PLUS non-public.
     vw = props["credential_id"].visibleWhen
     assert isinstance(vw, list) and len(vw) == 3
     assert {"field": "context", "in": ["artifacts"]} in vw
@@ -65,27 +65,27 @@ async def test_dataoutput_credencial_e_publico_tem_visible_when():
 
 @pytest.mark.asyncio
 async def test_localidade_esta_em_todos_os_nos_que_gravam_artefato():
-    """O `if` que escolhe local vs nuvem nao pode existir em um no so.
+    """The `if` that chooses local vs cloud must not exist in a single node.
 
-    Foi assim que a politica nasceu — `keepLocal` no DataOutput e mais nada — e
-    o resultado era um executor configurado para reter dados que continuava
-    enviando tudo que os OUTROS nos de saida produziam.
+    That is how the policy was born — `keepLocal` on DataOutput and nothing
+    else — and the result was an executor configured to retain data that kept
+    sending everything the OTHER output nodes produced.
     """
     defs = await _list()
     for nome in ("DataOutput", "SaveGeoJSON", "SaveToGeoParquet", "SaveToShapefile", "SaveToS3", "CartaImagem"):
         prop = _props(defs, nome).get("localidade")
         assert prop is not None, f"no '{nome}' sem o campo de localidade"
         assert prop.default == "herdar", f"no '{nome}': o padrao tem de ser herdar da maquina"
-        # Sem a opcao de enviar: seria a unica capaz de contrariar a politica da
-        # maquina, e o executor a ignoraria em silencio.
+        # Without the option to send: it would be the only one able to override the
+        # machine's policy, and the executor would silently ignore it.
         assert [o.value for o in prop.options] == ["herdar", "executor"], nome
 
 
 @pytest.mark.asyncio
 async def test_keeplocal_nao_existe_mais_em_no_nenhum():
-    """Substituido por `localidade`, sem shim. Se voltasse a aparecer em algum
-    no, `validate_node_parameters` aceitaria os dois e a politica passaria a
-    depender de qual deles o fluxo salvou."""
+    """Replaced by `localidade`, with no shim. If it showed up again in some
+    node, `validate_node_parameters` would accept both and the policy would
+    come to depend on which of them the workflow saved."""
     defs = await _list()
     for d in defs:
         assert all(p.name != "keepLocal" for p in d.properties), f"no '{d.name}'"
@@ -93,20 +93,20 @@ async def test_keeplocal_nao_existe_mais_em_no_nenhum():
 
 @pytest.mark.asyncio
 async def test_registro_do_no_de_saida_tem_serializacao_completa():
-    """Sanidade: model_dump nao perde visibleWhen (o que o FastAPI envia)."""
+    """Sanity: model_dump doesn't lose visibleWhen (what FastAPI sends)."""
     defs = await _list()
     props = _props(defs, "DataInput")
     dumped = props["driveFileId"].model_dump(exclude_none=True)
     assert dumped.get("visibleWhen") == {"field": "context", "in": ["drive"]}
 
 
-# ── Campos de coluna sugerida ────────────────────────────────────────────────
+# ── Suggested column fields ──────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_campos_de_coluna_declaram_de_onde_vem_a_sugestao():
-    """`suggest_columns` diz ao editor QUAL entrada olhar para sugerir nomes de
-    coluna. No Join as duas chaves vem de lados diferentes: sugerir as colunas
-    de A no campo da chave de B seria pior que nao sugerir nada."""
+    """`suggest_columns` tells the editor WHICH input to look at to suggest column
+    names. In Join the two keys come from different sides: suggesting A's
+    columns in B's key field would be worse than suggesting nothing."""
     props = _props(await _list(), "AttributeJoin")
     assert props["keyA"].suggest_columns == "layerA"
     assert props["keyB"].suggest_columns == "layerB"
@@ -121,16 +121,16 @@ async def test_no_de_entrada_unica_sugere_de_todas():
 
 @pytest.mark.asyncio
 async def test_campos_de_lista_de_colunas_viraram_fichas_com_sugestao():
-    """Os campos que recebem VARIAS colunas declaram type 'chips' (o execute
-    aceita lista, JSON-string e o CSV antigo) e `suggest_columns` para o editor
-    oferecer as colunas vistas na ultima execucao. Nenhum desses nos tem portas
-    declaradas, entao a sugestao e '*'.
+    """The fields that take SEVERAL columns declare type 'chips' (execute
+    accepts a list, a JSON string and the old CSV) and `suggest_columns` so the
+    editor offers the columns seen in the last run. None of these nodes has
+    declared ports, so the suggestion is '*'.
 
-    O DEFAULT importa para compat de versao: nos campos que eram type "string",
-    ele continua "" — um executor com flow/ anterior ainda valida esses campos
-    como string, e uma lista no default derrubava a run inteira so por o
-    workflow ter sido salvo na UI nova. RemoveDuplicates ja era object/[] antes,
-    entao [] la e o que o executor antigo espera."""
+    The DEFAULT matters for version compat: in fields that were type "string",
+    it stays "" — an executor with an older flow/ still validates those fields
+    as string, and a list in the default brought down the whole run just
+    because the workflow had been saved in the new UI. RemoveDuplicates was
+    already object/[] before, so [] there is what the old executor expects."""
     defs = await _list()
     for no, campo, default in (
         ("RemoveDuplicates", "fields", []),
@@ -146,9 +146,9 @@ async def test_campos_de_lista_de_colunas_viraram_fichas_com_sugestao():
 
 @pytest.mark.asyncio
 async def test_setfields_sugere_colunas_sem_mudar_o_tipo():
-    """SetFields mantem type 'object' — um helper dedicado da web consome esses
-    campos — mas os tres declaram `suggest_columns` para o bloco de sugestoes
-    aparecer tambem la."""
+    """SetFields keeps type 'object' — a dedicated web helper consumes those
+    fields — but all three declare `suggest_columns` so the suggestions block
+    shows up there too."""
     props = _props(await _list(), "SetFields")
     for campo in ("setFields", "removeFields", "renameFields"):
         assert props[campo].type == "object", campo
@@ -157,10 +157,10 @@ async def test_setfields_sugere_colunas_sem_mudar_o_tipo():
 
 @pytest.mark.asyncio
 async def test_sort_e_switch_sugerem_colunas_sem_mudar_o_tipo():
-    """Sort.sort_by e Switch.rules ganharam editores dedicados na web
-    (linhas campo+direcao / campo+operador+valor+saida) que persistem a MESMA
-    lista que o execute le — o type continua 'object' de proposito: mudar o
-    formato quebraria fluxos salvos e executores antigos."""
+    """Sort.sort_by and Switch.rules got dedicated editors in the web app
+    (field+direction / field+operator+value+output rows) that persist the SAME
+    list execute reads — the type stays 'object' on purpose: changing the
+    format would break saved workflows and old executors."""
     defs = await _list()
     for no, campo in (("Sort", "sort_by"), ("Switch", "rules")):
         prop = _props(defs, no)[campo]
@@ -170,10 +170,10 @@ async def test_sort_e_switch_sugerem_colunas_sem_mudar_o_tipo():
 
 @pytest.mark.asyncio
 async def test_todo_campo_string_que_pede_coluna_declara_sugestao():
-    """O censo dos nos achou campos `string` que pedem NOME DE COLUNA sem o
-    marcador — o operador via a dica no filtro e nada no Dissolve ao lado, o
-    que parecia instabilidade. Fixa os que tem entrada unica (sugerir de todas
-    as portas e correto por construcao)."""
+    """The node census found `string` fields that ask for a COLUMN NAME without
+    the marker — the operator saw the hint in the filter and nothing in the
+    Dissolve next to it, which looked like flakiness. Pins the ones with a
+    single input (suggesting from all ports is correct by construction)."""
     defs = await _list()
     for no, campo in [
         ("Dissolve", "byColumn"),
@@ -185,33 +185,33 @@ async def test_todo_campo_string_que_pede_coluna_declara_sugestao():
 
 @pytest.mark.asyncio
 async def test_campo_sem_relacao_com_coluna_nao_declara_nada():
-    """A ausencia importa: o editor so mostra o bloco de sugestoes onde ele faz
-    sentido, e marcar tudo tornaria a dica ruido."""
+    """The absence matters: the editor only shows the suggestions block where it
+    makes sense, and marking everything would turn the hint into noise."""
     props = _props(await _list(), "AttributeJoin")
     assert props["how"].suggest_columns is None
     assert props["seDuplicado"].suggest_columns is None
 
 
-# ── A classe de defeito, fechada de vez ──────────────────────────────────────
+# ── The defect class, closed for good ────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_nenhuma_chave_declarada_se_perde_no_caminho():
-    """O NodeService copia as propriedades campo a campo (`p.get('x')`), e uma
-    linha esquecida faz o descriptor declarar algo que o frontend nunca recebe.
-    Ja aconteceu com `visibleWhen` (motivo deste arquivo), com `dynamic_inputs`,
-    e de novo com `suggest_columns`.
+    """NodeService copies the properties field by field (`p.get('x')`), and a
+    forgotten line makes the descriptor declare something the frontend never
+    receives. It already happened with `visibleWhen` (the reason for this
+    file), with `dynamic_inputs`, and again with `suggest_columns`.
 
-    Em vez de mais um teste por chave, este percorre TODO o catalogo: para cada
-    propriedade, toda chave que o descriptor declara E que o schema conhece tem
-    de chegar com o mesmo valor.
+    Instead of one more test per key, this one walks the WHOLE catalog: for
+    each property, every key the descriptor declares AND the schema knows has
+    to arrive with the same value.
     """
     from flow.registry import NODE_REGISTRY
     from app.schemas.node import NodeProperty
 
     conhecidas = set(NodeProperty.model_fields)
-    # `model_dump` e o que permite comparar dado com dado: campos aninhados
-    # (as `options` de um select) chegam como modelo Pydantic, e comparar o
-    # modelo com o dict cru do descriptor acusaria os 34 selects do catalogo.
+    # `model_dump` is what allows comparing data with data: nested fields
+    # (a select's `options`) arrive as a Pydantic model, and comparing the
+    # model with the descriptor's raw dict would flag the catalog's 34 selects.
     servidos = {
         d.name: {p.name: p.model_dump() for p in d.properties}
         for d in await _list()
@@ -220,7 +220,7 @@ async def test_nenhuma_chave_declarada_se_perde_no_caminho():
     perdidas: list[str] = []
     for nome, cls in NODE_REGISTRY.items():
         if nome not in servidos:
-            continue  # no desabilitado no ambiente de teste
+            continue  # node disabled in the test environment
         for bruta in (cls.description().get("properties") or []):
             servida = servidos[nome].get(bruta.get("name"))
             if servida is None:
@@ -235,7 +235,7 @@ async def test_nenhuma_chave_declarada_se_perde_no_caminho():
     )
 
 
-# ── Flags de TOPO do NodeDefinition (fora de `properties`) ───────────────────
+# ── TOP-LEVEL flags of NodeDefinition (outside `properties`) ─────────────────
 
 def _def(defs, node_name):
     for d in defs:
@@ -246,22 +246,24 @@ def _def(defs, node_name):
 
 @pytest.mark.asyncio
 async def test_subworkflowinput_expoe_outputs_from_ports():
-    """O trigger do sub-fluxo declara `outputs_from_ports`: e o que faz o editor
-    derivar UMA saida por porta declarada e, com isso, o seletor de chave na
-    aresta ('escolher') aparecer. Sem repassar a flag pelo catalogo, o trigger
-    volta ao handle anonimo/espalhamento e nao ha como escolher o que passar
-    adiante — foi exatamente o defeito relatado."""
+    """The sub-workflow trigger declares `outputs_from_ports`: it is what makes the
+    editor derive ONE output per declared port and, with that, makes the key
+    selector on the edge ('escolher') appear. Without passing the flag through
+    the catalog, the trigger goes back to the anonymous handle/spreading and
+    there is no way to choose what to pass along — that was exactly the
+    reported defect."""
     d = _def(await _list(), "SubWorkflowInput")
     assert d.outputs_from_ports is True
 
 
 @pytest.mark.asyncio
 async def test_flags_de_topo_do_no_nao_se_perdem():
-    """A irma de `test_nenhuma_chave_declarada_se_perde_no_caminho`, para as flags
-    de TOPO do NodeDefinition (nao sao `properties`): uma flag nova na
-    description() que o NodeService esquece de mapear e descartada pelo Pydantic.
-    Ja aconteceu com `dynamic_inputs` e de novo com `outputs_from_ports` (o
-    seletor de chave do trigger sumia). Percorre o catalogo inteiro."""
+    """The sibling of `test_nenhuma_chave_declarada_se_perde_no_caminho`, for
+    NodeDefinition's TOP-LEVEL flags (they are not `properties`): a new flag in
+    description() that NodeService forgets to map is dropped by Pydantic.
+    It already happened with `dynamic_inputs` and again with
+    `outputs_from_ports` (the trigger's key selector vanished). Walks the
+    whole catalog."""
     from flow.registry import NODE_REGISTRY
 
     FLAGS = ("dynamic_inputs", "dynamic_output", "outputs_from_ports", "requires_credential")
@@ -271,7 +273,7 @@ async def test_flags_de_topo_do_no_nao_se_perdem():
     for nome, cls in NODE_REGISTRY.items():
         servido = servidos.get(nome)
         if servido is None:
-            continue  # no desabilitado no ambiente de teste
+            continue  # node disabled in the test environment
         info = cls.description() or {}
         for flag in FLAGS:
             if flag in info and getattr(servido, flag) != bool(info[flag]):

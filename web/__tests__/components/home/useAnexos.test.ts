@@ -1,13 +1,13 @@
 /**
- * O hook que recebe os arquivos soltos sobre a Home e os leva ao Drive.
+ * The hook that receives the files dropped onto the Home and takes them to the Drive.
  *
- * O que ele protege é a fronteira com o backend: os filtros (extensão, teto,
- * vazio, papel) são do servidor e NÃO são reescritos aqui — o hook manda ao
- * `POST /drive/upload` e traduz a recusa com a mesma `classifyUploadError` da
- * tela `/drive`, pelo CÓDIGO (`error` do corpo) e pelo status, nunca pelo
- * texto. As únicas decisões locais são as que já estão no cliente e poupariam
- * uma viagem inútil: sem sessão vai para o login, sem papel de editor nem
- * tenta, e um gesto grande demais é aparado.
+ * What it protects is the boundary with the backend: the filters (extension, ceiling,
+ * empty, role) belong to the server and are NOT rewritten here — the hook sends to
+ * `POST /drive/upload` and translates the refusal with the same `classifyUploadError` as the
+ * `/drive` screen, by the CODE (`error` in the body) and by the status, never by the
+ * text. The only local decisions are those already on the client that would save
+ * a useless round trip: with no session it goes to the login, with no editor role it does not even
+ * try, and a gesture that is too large is trimmed.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { act, renderHook, waitFor } from "@testing-library/react"
@@ -20,7 +20,7 @@ import { useHomeStore } from "@/app/stores/homeStore"
 
 const estado = () => useHomeStore.getState()
 const ok = (idHash: string) => ({ success: true, status: 201, data: { id_hash: idHash } })
-/** A recusa como `resolveAxiosError` a entrega: a frase do servidor em `message` e o `error` do corpo em `code`. */
+/** The refusal as `resolveAxiosError` delivers it: the server's sentence in `message` and the body's `error` in `code`. */
 const erro = (status: number, message: string, code?: string) =>
   ({ success: false, status, error: { name: "AxiosError", message, ...(code ? { code } : {}) }, data: undefined })
 
@@ -62,9 +62,9 @@ describe("useAnexos", () => {
   })
 
   it("uma recusa do servidor vira anexo RECUSADO, com o tipo classificado", async () => {
-    // A recusa como o backend a manda de verdade: 422, o código no `error` e a
-    // frase SEM acento. A classificação por trecho do texto procurava
-    // "extensão"/"não permitida" e mandava este caso para "outra falha".
+    // The refusal as the backend really sends it: 422, the code in `error` and the
+    // sentence WITHOUT accents. The classification by a piece of the text looked for
+    // "extensão"/"não permitida" and sent this case to "outra falha" (other failure).
     servico.uploadDriveFile.mockResolvedValue(erro(422, "Extensao '.pdf' nao permitida.", "extension_not_allowed"))
     const { r } = montar()
 
@@ -81,7 +81,7 @@ describe("useAnexos", () => {
     [422, "dangerous_inner_extension", "extension", "Nome de arquivo com extensao interna perigosa: '.sh'."],
     [422, "empty_file", "empty", "Arquivo vazio."],
     [413, "file_too_large", "size", "Arquivo excede 200MB."],
-    // O teto do router é uma HTTPException, sem código de domínio: vale o status.
+    // The router's ceiling is an HTTPException, with no domain code: the status applies.
     [413, "http_exception", "size", "Arquivo excede 200MB."],
     [403, "http_exception", "permission", "Requer role 'editor' ou superior."],
   ] as const)("%i %s é classificado como %s", async (status, code, tipo, message) => {
@@ -92,8 +92,8 @@ describe("useAnexos", () => {
   })
 
   it("a frase NÃO classifica: sem o código de extensão, é outra falha", async () => {
-    // "extensão" e "não permitida" no texto, mas o código é o genérico de um
-    // servidor antigo — a regra é o código, e a frase pode mudar amanhã.
+    // "extensão" and "não permitida" in the text, but the code is an old server's generic
+    // one — the rule is the code, and the sentence may change tomorrow.
     servico.uploadDriveFile.mockResolvedValue(erro(422, "Extensão '.pdf' não permitida.", "file_validation_error"))
     const { r } = montar()
     act(() => r.result.current.receber([arquivo("relatorio.pdf")]))

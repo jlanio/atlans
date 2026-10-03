@@ -1,14 +1,14 @@
 # app/core/tarefas_periodicas.py
 """
-Laço periódico com lock no Redis: o esqueleto das tarefas de fundo do lifespan.
+Periodic loop with a Redis lock: the skeleton of the lifespan's background tasks.
 
-A limpeza de artefatos, a reconciliação do storage, a verificação das fontes e as
-tarefas das extensões são o mesmo laço — dorme o intervalo, tenta o
-lock daquele intervalo e, se pegou, trabalha. O lock existe porque a API roda com
-`--workers N` e cada worker sobe as mesmas tarefas: sem ele, cada varredura
-rodaria N vezes por intervalo.
+Artifact cleanup, storage reconciliation, source verification and the
+extensions' tasks are the same loop — sleep the interval, try the lock
+for that interval and, if it got it, do the work. The lock exists because the API
+runs with `--workers N` and every worker starts the same tasks: without it, each
+sweep would run N times per interval.
 
-Uso:
+Usage:
     from app.core.tarefas_periodicas import laco_periodico
     await laco_periodico("Cleanup de artefatos", 3600, purge_expired_artifacts,
                          lock="artifact_cleanup:lock")
@@ -22,12 +22,12 @@ logger = get_logger(__name__)
 
 
 async def adquirir_lock(chave: str, ttl_s: float) -> bool:
-    """Lock `SET NX EX` no pool Redis global; True = este worker faz o trabalho.
+    """`SET NX EX` lock on the global Redis pool; True = this worker does the work.
 
-    O TTL é o que segura o lock: ninguém o solta, ele vence (mínimo de 1 s).
-    Redis fora (ou o pool ainda não inicializado): prossegue SEM lock — as
-    rotinas protegidas são idempotentes, então o pior caso é trabalho repetido
-    por mais de um worker, nunca trabalho a menos porque o Redis caiu.
+    The TTL is what holds the lock: nobody releases it, it expires (minimum of 1 s).
+    Redis down (or the pool not yet initialized): proceeds WITHOUT a lock — the
+    protected routines are idempotent, so the worst case is work repeated by
+    more than one worker, never less work because Redis went down.
     """
     try:
         from app.core.redis import get_redis_pool
@@ -39,9 +39,9 @@ async def adquirir_lock(chave: str, ttl_s: float) -> bool:
 
 
 async def soltar_lock(chave: str) -> None:
-    """Devolve o lock antes do TTL — para quem o pegou e FALHOU: sem isto, a
-    próxima subida (a recriação da API logo depois do `alembic upgrade head`,
-    por exemplo) pulava o trabalho por até 10 minutos. Redis fora: nada a soltar."""
+    """Release the lock before the TTL — for whoever took it and FAILED: without this,
+    the next startup (the API recreation right after `alembic upgrade head`,
+    for example) skipped the work for up to 10 minutes. Redis down: nothing to release."""
     try:
         from app.core.redis import get_redis_pool
 
@@ -57,12 +57,12 @@ async def laco_periodico(
     *,
     lock: str | None = None,
 ) -> None:
-    """Chama `trabalho()` a cada `intervalo_s` segundos, até ser cancelado.
+    """Call `trabalho()` every `intervalo_s` seconds, until cancelled.
 
-    Com `lock`, cada volta só trabalha no worker que pegar o lock (TTL = o
-    intervalo); os outros pulam aquela volta. Um erro no trabalho é logado e o
-    laço segue. O cancelamento (shutdown do lifespan) encerra o laço, que
-    termina normalmente.
+    With `lock`, each round only works on the worker that takes the lock (TTL = the
+    interval); the others skip that round. An error in the work is logged and the
+    loop goes on. Cancellation (lifespan shutdown) ends the loop, which
+    finishes normally.
     """
     logger.info("%s: iniciado (intervalo=%ss).", nome, intervalo_s)
     while True:

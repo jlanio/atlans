@@ -1,13 +1,13 @@
 # tests/unit/test_ambiente_do_executor.py
 """
-Leitura de numeros do ambiente do executor — o ponto unico em executor/_ambiente.py.
+Reading numbers from the executor's environment — the single point in executor/_ambiente.py.
 
-Havia duas copias do leitor tolerante (`_env_int` em executor/config.py e em
-executor/sync/sync_config.py, com contratos diferentes) e cinco
-`int(os.getenv(...))` crus em job_validator.py e renewal.py. Os crus derrubavam o
-IMPORT com ValueError por um erro de digitacao no .env: com
-`EXECUTOR_CLOCK_SKEW_SECONDS=abc` o executor nem subia — exatamente o que o
-`_env_int` do config dizia ter corrigido.
+There were two copies of the tolerant reader (`_env_int` in executor/config.py
+and in executor/sync/sync_config.py, with different contracts) and five raw
+`int(os.getenv(...))` calls in job_validator.py and renewal.py. The raw ones
+brought down the IMPORT with ValueError over a typo in .env: with
+`EXECUTOR_CLOCK_SKEW_SECONDS=abc` the executor did not even start — exactly
+what config's `_env_int` claimed to have fixed.
 """
 import json
 import logging
@@ -20,9 +20,9 @@ import pytest
 
 RAIZ = Path(__file__).resolve().parents[2]
 
-# Importa na ordem do executor de verdade (executor/main.py): config primeiro,
-# depois o flush que configure_logging() faz, e so entao o modulo — que o main
-# importa com o logging ja no ar. O coletor fica no root desde o inicio.
+# Imports in the real executor's order (executor/main.py): config first, then
+# the flush that configure_logging() does, and only then the module — which
+# main imports with logging already up. The collector sits on root from the start.
 _IMPORTAR = """
 import importlib, json, logging, sys
 avisos = []
@@ -43,8 +43,8 @@ print(json.dumps({"valor": getattr(modulo, sys.argv[2]), "avisos": avisos}))
     ("executor.job_validator", "EXECUTOR_MAX_CLOCK_SKEW_SECONDS", "_MAX_CLOCK_SKEW_SECONDS", 900, "9.5"),
     ("executor.renewal", "EXECUTOR_CERT_RENEW_BEFORE_DAYS", "RENEW_BEFORE_DAYS", 7, "sete"),
     ("executor.renewal", "EXECUTOR_CERT_RENEW_CHECK_SECONDS", "RENEW_CHECK_INTERVAL_SECONDS", 3600, "1h"),
-    # Numero valido, mas sem sentido: folga negativa recusaria envelope antes
-    # de vencer; intervalo negativo do renewal quebra o asyncio.sleep.
+    # A valid number, but meaningless: a negative slack would reject an envelope
+    # before it expired; a negative renewal interval breaks asyncio.sleep.
     ("executor.job_validator", "EXECUTOR_CLOCK_SKEW_SECONDS", "_CLOCK_SKEW_TOLERANCE_SECONDS", 300, "-60"),
     ("executor.renewal", "EXECUTOR_CERT_RENEW_CHECK_SECONDS", "RENEW_CHECK_INTERVAL_SECONDS", 3600, "-1"),
 ])
@@ -58,13 +58,13 @@ def test_valor_invalido_no_ambiente_nao_derruba_o_import(modulo, variavel, atrib
 
     resultado = json.loads(saida.stdout.strip().splitlines()[-1])
     assert resultado["valor"] == padrao
-    # O aviso diz QUAL variavel e QUAL valor — senao o operador so ve o efeito.
+    # The warning says WHICH variable and WHICH value — otherwise the operator only sees the effect.
     assert any(variavel in a and bruto in a for a in resultado["avisos"]), resultado["avisos"]
 
 
 def test_ler_int_valida_a_faixa(monkeypatch):
-    """MAX_CONCURRENT=0 deixava o executor online, com capacity 0 (preferido pelo
-    scheduler least-loaded), aceitando jobs que nunca executariam."""
+    """MAX_CONCURRENT=0 left the executor online, with capacity 0 (preferred by
+    the least-loaded scheduler), accepting jobs that would never run."""
     from executor._ambiente import ler_int
 
     for bruto, esperado in (
@@ -76,7 +76,7 @@ def test_ler_int_valida_a_faixa(monkeypatch):
     monkeypatch.delenv("_TESTE_INT")
     assert ler_int("_TESTE_INT", 4) == 4
 
-    # O minimo pode ser zero onde zero e escolha legitima (ex.: SYNC_MIN_CYCLE).
+    # The minimum can be zero where zero is a legitimate choice (e.g. SYNC_MIN_CYCLE).
     monkeypatch.setenv("_TESTE_INT", "0")
     assert ler_int("_TESTE_INT", 5, minimo=0, maximo=3600) == 0
 
@@ -90,9 +90,9 @@ def test_ler_float_recusa_o_que_nao_e_numero_finito(monkeypatch):
 
 
 def test_aviso_fica_retido_ate_o_logging_subir_e_sai_direto_depois(monkeypatch, caplog):
-    """config.py e importado antes de existir handler: o aviso espera o flush.
-    Mas job_validator, renewal e sync_config sao importados DEPOIS do flush —
-    se o aviso deles tambem ficasse retido, ninguem mais o entregaria."""
+    """config.py is imported before any handler exists: its warning waits for the
+    flush. But job_validator, renewal and sync_config are imported AFTER the
+    flush — if their warning were also held back, nobody would deliver it."""
     from executor import _ambiente
 
     monkeypatch.setattr(_ambiente, "_AVISOS_ADIADOS", [])
@@ -114,7 +114,7 @@ def test_aviso_fica_retido_ate_o_logging_subir_e_sai_direto_depois(monkeypatch, 
 
 
 def test_nenhuma_copia_do_leitor_sobrou():
-    """As copias divergiram uma vez; a guarda impede que voltem."""
+    """The copies diverged once; the guard keeps them from coming back."""
     for arquivo in ("config.py", "sync/sync_config.py", "job_validator.py", "renewal.py"):
         texto = (RAIZ / "executor" / arquivo).read_text(encoding="utf-8")
         assert "def _env_int" not in texto, arquivo

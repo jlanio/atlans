@@ -1,12 +1,12 @@
 # tests/unit/test_schedule_religar_zera_proxima.py
-"""Religar um agendamento pausado ZERA `next_run_at`.
+"""Turning a paused schedule back on ZEROES `next_run_at`.
 
-O bug: enquanto o agendamento esteve pausado, o `next_run_at` ficou parado num
-horário passado. Ao religar (`active=true`) sem zerar, `_process_schedule` vê
-`now >= next_run_at` e dispara o workflow na hora — efeito colateral invisível
-de virar o interruptor. A correção mora em `ScheduleService.update_schedule`, no
-caminho que a rota REST (`PUT /workflows/{id}/schedules/{job}`) e a tool MCP
-`update_schedule` compartilham.
+The bug: while the schedule was paused, `next_run_at` stayed stuck at a past
+time. On turning it back on (`active=true`) without zeroing, `_process_schedule`
+sees `now >= next_run_at` and fires the workflow right away — an invisible side
+effect of flipping the switch. The fix lives in `ScheduleService.update_schedule`,
+on the path that the REST route (`PUT /workflows/{id}/schedules/{job}`) and the
+MCP tool `update_schedule` share.
 """
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -46,7 +46,7 @@ async def _semear(db, *, active, next_run_at):
     return job_id
 
 
-PASSADO = datetime(2020, 1, 1, 6, 0)  # muito antes de agora, naive (como o banco grava)
+PASSADO = datetime(2020, 1, 1, 6, 0)  # long before now, naive (as the database stores it)
 
 
 @pytest.mark.asyncio
@@ -56,16 +56,16 @@ async def test_religar_pausado_zera_next_run_at(db):
         job, ScheduleUpdate(active=True), owner_workflow_hash=WF,
     )
     assert atualizado.active is True
-    # O ponto: o horário parado no passado NÃO sobrevive à reativação.
+    # The point: the time stuck in the past does NOT survive reactivation.
     assert atualizado.next_run_at is None
 
 
 @pytest.mark.asyncio
 async def test_mudar_o_horario_com_ativo_zera_next_run_at(db):
-    """Já ativo, mas o HORÁRIO mudou: o `next_run_at` gravado foi calculado da
-    cron ANTIGA, então mantê-lo faria a próxima ocorrência sair no horário velho
-    uma vez. Zerar força `_process_schedule` a recalcular a partir da cron nova
-    (e `None` não dispara na hora — recomputa a próxima ocorrência FUTURA)."""
+    """Already active, but the TIME changed: the stored `next_run_at` was computed
+    from the OLD cron, so keeping it would make the next occurrence fire at the old
+    time once. Zeroing forces `_process_schedule` to recompute from the new cron
+    (and `None` does not fire right away — it recomputes the next FUTURE occurrence)."""
     futuro = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=3)
     job = await _semear(db, active=True, next_run_at=futuro)
     atualizado = await ScheduleService(db).update_schedule(
@@ -77,13 +77,13 @@ async def test_mudar_o_horario_com_ativo_zera_next_run_at(db):
 
 @pytest.mark.asyncio
 async def test_reeditar_ativo_sem_mudar_o_horario_nao_zera(db):
-    """Já ativo e o horário NÃO mudou (re-salvar a mesma cron): a próxima
-    ocorrência calculada é preservada — só uma mudança real de temporização, ou a
-    transição pausado→ativo, zera."""
+    """Already active and the time did NOT change (re-saving the same cron): the
+    computed next occurrence is preserved — only a real timing change, or the
+    paused→active transition, zeroes it."""
     futuro = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=3)
     job = await _semear(db, active=True, next_run_at=futuro)
     atualizado = await ScheduleService(db).update_schedule(
-        # Mesma cron que `_semear` grava ("0 6 * * *").
+        # Same cron that `_semear` stores ("0 6 * * *").
         job, ScheduleUpdate(active=True, cron_expression="0 6 * * *"), owner_workflow_hash=WF,
     )
     assert atualizado.active is True
@@ -102,6 +102,6 @@ async def test_pausar_nao_toca_next_run_at(db):
 
 
 def test_campos_de_ativacao_e_a_fonte_canonica():
-    """A semântica que o hook e o update_schedule compartilham, num lugar só."""
+    """The semantics the hook and update_schedule share, in a single place."""
     assert campos_de_ativacao(True) == {"active": True, "next_run_at": None}
     assert campos_de_ativacao(False) == {"active": False}

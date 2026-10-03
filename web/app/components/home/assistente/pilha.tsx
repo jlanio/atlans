@@ -2,17 +2,18 @@
 
 // web/app/components/home/assistente/pilha.tsx
 //
-// A conversa AO CENTRO: uma FAIXA colada à barra, a legenda do globo. Mostra só
-// a última troca — a pergunta numa linha e, da resposta, o que ficou (o último
-// texto cortado em 4 linhas, os erros, os cartões) e o que está vivo (o passo
-// em curso) —, para ocupar pouco da tela e deixar o globo à vista. Nada rola
-// nem desliza: o texto só troca, com um fade de entrada (`.home-pilha` em
-// globals.css). É a MESMA conversa do painel lateral — os mesmos turnos, a
-// mesma `Conversa` (em `compacta`), os mesmos cartões (`useExtrasDoAssistente`)
-// — recortada aos últimos itens. Quem quer ler tudo (raciocínio, passos,
-// textos inteiros) expande para a lateral, pelo botão, pelo chevron da barra
-// ou por Ctrl+I; o painel tem o campo próprio e "Recolher" traz a conversa de
-// volta para cá. Um modelo, duas vistas; nada é duplicado.
+// The conversation in the CENTER: a STRIP attached to the bar, the globe's
+// caption. It shows only the last exchange — the question on one line and, from
+// the answer, what remained (the last text clipped to 4 lines, the errors, the
+// cards) and what is live (the step in progress) —, to take up little of the
+// screen and keep the globe in view. Nothing scrolls or slides: the text just
+// swaps, with a fade-in (`.home-pilha` in globals.css). It is the SAME
+// conversation as the side panel — the same turns, the same `Conversa` (in
+// `compacta`), the same cards (`useExtrasDoAssistente`) — trimmed to the last
+// items. Whoever wants to read everything (reasoning, steps, full texts)
+// expands to the side, via the button, the bar's chevron or Ctrl+I; the panel
+// has its own field and "Recolher" brings the conversation back here. One
+// model, two views; nothing is duplicated.
 
 import { TbArrowsMaximize } from "react-icons/tb"
 
@@ -23,23 +24,23 @@ import { useExtrasDoAssistente, type Confirmar, type Enviar } from "./extras"
 import MarcaAnimada from "./marca-animada"
 import { useTextos } from "../i18n"
 
-/** Quantos turnos ficam ao centro: a última troca (a pergunta e a resposta). */
+/** How many turns stay in the center: the last exchange (the question and the answer). */
 export const ITENS_AO_CENTRO = 2
 
 interface Props {
   turnos: TurnoDoAssistente[]
   correndo: boolean
   confirmar: Confirmar
-  /** As respostas rápidas enviam por aqui — o mesmo `enviar` da barra. */
+  /** Quick replies are sent through here — the same `enviar` as the bar. */
   enviar: Enviar
-  /** O painel abriu e a faixa está saindo: desliza para a direita e apaga, sem cliques. */
+  /** The panel opened and the strip is leaving: slides to the right and fades out, without clicks. */
   saindo?: boolean
-  /** A barra está com o pill de cota estourada acima da caixa: a faixa sobe a
-   *  altura dele, senão o pill (z-30) pinta por cima do rodapé daqui (z-25). */
+  /** The bar has the quota-exceeded pill above the box: the strip moves up by its
+   *  height, otherwise the pill (z-30) paints over this footer (z-25). */
   comAvisoDeCota?: boolean
-  /** A altura, em px, do que a barra empilha acima da caixa (chips de anexo,
-   *  convite, aviso de recusados). Mesma razão do `comAvisoDeCota`, só que
-   *  medida em vez de fixa, porque estes crescem e quebram linha. */
+  /** The height, in px, of what the bar stacks above the box (attachment chips,
+   *  invitation, rejected-files notice). Same reason as `comAvisoDeCota`, except
+   *  measured instead of fixed, because these grow and wrap. */
   folgaExtras?: number
 }
 
@@ -64,9 +65,9 @@ export default function Pilha({
       data-aviso-de-cota={comAvisoDeCota}
       data-testid="pilha"
     >
-      {/* O teto de altura (CSS) é só segurança: com a pergunta numa linha e a
-          resposta em 4, a faixa cabe; a `Conversa` só rola se os cartões
-          passarem dele. */}
+      {/* The height ceiling (CSS) is only a safeguard: with the question on one
+          line and the answer on 4, the strip fits; the `Conversa` only scrolls
+          if the cards exceed it. */}
       <div className="home-pilha-itens flex min-h-0 flex-col">
         <Conversa
           turnos={ultimos}
@@ -78,8 +79,8 @@ export default function Pilha({
           cursorAoEscrever
         />
       </div>
-      {/* O rodapé vem DEPOIS dos itens, colado à barra: o contador à esquerda,
-          a saída para a lateral à direita. */}
+      {/* The footer comes AFTER the items, attached to the bar: the counter on the
+          left, the exit to the side panel on the right. */}
       <div className="flex min-h-[18px] items-center justify-end gap-3 text-[11.5px] text-muted-foreground">
         {ocultos > 0 && (
           <span className="mr-auto">

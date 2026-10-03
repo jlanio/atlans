@@ -3,7 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react"
 import type { IDriveFile } from "@/service/types"
 import { MetadataDialog } from "@/app/components/drive/dialogs"
 
-/** O diálogo é compartilhado e portado ao <body>: quem o abre da Home passa `home-portal`. */
+/** The dialog is shared and portaled to <body>: whoever opens it from the Home passes `home-portal`. */
 afterEach(cleanup)
 
 const arquivo: IDriveFile = {

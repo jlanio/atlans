@@ -1,23 +1,23 @@
 # flow/utils/drive_resolver.py
 """
-Resolve arquivos armazenados (Drive do Workspace ou Artefatos de execucao):
-pede ao servidor uma pre-signed URL, baixa para arquivo temporario e retorna
-o caminho local.
+Resolves stored files (Workspace Drive or run Artifacts): asks the server
+for a pre-signed URL, downloads to a temporary file and returns the local
+path.
 
-Usado pelos nos de leitura de arquivo (ReadGeoJSON, ReadShapefile, etc.),
-e pelo DataInput (contexto Drive ou Artefatos).
+Used by the file-reading nodes (ReadGeoJSON, ReadShapefile, etc.),
+and by DataInput (Drive or Artifacts context).
 
-Contextos:
-  Drive       — WorkspaceFile por id_hash (resolve_drive_file)
-  Artefatos   — Artifact por id_hash (resolve_artifact_file)
+Contexts:
+  Drive       — WorkspaceFile by id_hash (resolve_drive_file)
+  Artifacts   — Artifact by id_hash (resolve_artifact_file)
 
-O motor roda sempre no executor (externo/on-premise), que nao tem acesso ao
-banco nem credenciais do MinIO. Autorizacao e escopo de workspace sao decididos
-pelo servidor, que identifica o executor pelo cert mTLS e responde com uma
-pre-signed URL de TTL curto para aquele objeto:
+The engine always runs on the executor (external/on-premise), which has no
+access to the database nor MinIO credentials. Authorization and workspace scope
+are decided by the server, which identifies the executor by its mTLS cert and
+responds with a short-TTL pre-signed URL for that object:
 
-  GET /drive/executor-download/{id}           → arquivo do Drive
-  GET /drive/executor-download-artifact/{id}  → artefato de execucao
+  GET /drive/executor-download/{id}           → Drive file
+  GET /drive/executor-download-artifact/{id}  → run artifact
 """
 import os
 import tempfile
@@ -26,24 +26,24 @@ from typing import TYPE_CHECKING
 from flow.utils.logger import get_logger
 
 if TYPE_CHECKING:
-    # So para anotacao: `Path` e importado tardiamente dentro das funcoes, como
-    # o resto dos imports pesados deste modulo. As anotacoes sao strings e nunca
-    # sao avaliadas em runtime — este bloco existe para que type checker e lint
-    # enxerguem o nome.
+    # Only for annotations: `Path` is imported lazily inside the functions, like
+    # the rest of this module's heavy imports. The annotations are strings and are
+    # never evaluated at runtime — this block exists so the type checker and lint
+    # can see the name.
     from pathlib import Path
 
 logger = get_logger(__name__)
 
 
 async def read_drive_file_as(drive_file_id, reader, *, label="arquivo", reraise=()):
-    """Resolve o arquivo do Drive, chama `reader(temp_path)` em thread e remove o
-    temp. Converte falha de leitura em RuntimeError com o nome original.
+    """Resolves the Drive file, calls `reader(temp_path)` in a thread and removes the
+    temp file. Converts a read failure into a RuntimeError with the original name.
 
-    Centraliza o padrão resolve→ler→unlink→wrap repetido pelos nós ReadGeoJSON/
-    ReadShapefile/ReadGeoParquet/ReadCSVWithCoords. `reader` é um callable síncrono
-    `(temp_path) -> dados`. `reraise` é uma tupla de exceções a propagar como estão
-    (ex.: ValueError de validação de coluna no CSV), sem virar RuntimeError.
-    Retorna `(dados, original_name)`.
+    Centralizes the resolve→read→unlink→wrap pattern repeated by the ReadGeoJSON/
+    ReadShapefile/ReadGeoParquet/ReadCSVWithCoords nodes. `reader` is a sync callable
+    `(temp_path) -> dados`. `reraise` is a tuple of exceptions to propagate as is
+    (e.g. a column-validation ValueError in the CSV), without becoming RuntimeError.
+    Returns `(dados, original_name)`.
     """
     import asyncio
     temp_path, _ext, original_name = await asyncio.to_thread(
@@ -65,11 +65,11 @@ async def read_drive_file_as(drive_file_id, reader, *, label="arquivo", reraise=
 
 def resolve_drive_file(drive_file_id: str) -> tuple[str, str, str]:
     """
-    Obtem a pre-signed URL + metadados do arquivo do Drive via
-    GET /drive/executor-download/{id_hash}, baixa para temp file e retorna
+    Gets the pre-signed URL + metadata of the Drive file via
+    GET /drive/executor-download/{id_hash}, downloads it to a temp file and returns
     (temp_path, extension, original_name).
 
-    O caller e responsavel por remover o temp file apos o uso.
+    The caller is responsible for removing the temp file after use.
     """
     return _fetch_and_stream(
         f"/drive/executor-download/{drive_file_id}",
@@ -82,11 +82,11 @@ def resolve_drive_file(drive_file_id: str) -> tuple[str, str, str]:
 
 def resolve_artifact_file(artifact_id: str) -> tuple[str, str, str]:
     """
-    Obtem a pre-signed URL + metadados do artefato via
-    GET /drive/executor-download-artifact/{id_hash}, baixa para temp file e
-    retorna (temp_path, extension, original_name).
+    Gets the pre-signed URL + metadata of the artifact via
+    GET /drive/executor-download-artifact/{id_hash}, downloads it to a temp file
+    and returns (temp_path, extension, original_name).
 
-    O caller e responsavel por remover o temp file apos o uso.
+    The caller is responsible for removing the temp file after use.
     """
     return _fetch_and_stream(
         f"/drive/executor-download-artifact/{artifact_id}",
@@ -107,9 +107,9 @@ def _fetch_and_stream(
 
     base_url, headers, verify = get_agent_http_config()
 
-    # GET idempotente: retry_sync retenta apenas transitorios (connect/read).
-    # O tratamento de status (403/404/5xx) fica FORA do retry — esses sao
-    # permanentes e nao devem ser re-tentados.
+    # Idempotent GET: retry_sync retries only transient errors (connect/read).
+    # Status handling (403/404/5xx) stays OUTSIDE the retry — those are
+    # permanent and must not be retried.
     def _fetch_meta() -> "httpx.Response":
         return httpx.get(
             f"{base_url}{path}",
@@ -129,18 +129,18 @@ def _fetch_and_stream(
     original_name: str = body.get("original_name") or fallback_name
     ext: str = (body.get("extension") or "").lower()
 
-    # Conteudo que nunca saiu deste executor (LGPD): o servidor nao tem o objeto
-    # e responde com a localizacao em vez de uma pre-signed URL.
+    # Content that never left this executor (LGPD): the server does not have the
+    # object and responds with the location instead of a pre-signed URL.
     if body.get("content_location") == "executor":
         dono = body.get("executor_id") or ""
         local_path = body.get("local_path")
         if local_path:
-            # Artefato: o servidor DERIVOU o caminho relativo a raiz de
-            # artefatos no registro (run_result_consumer).
+            # Artifact: the server DERIVED the path relative to the artifacts root
+            # from the record (run_result_consumer).
             return _copy_local_to_temp(local_path, dono, ext, original_name)
-        # Arquivo do Drive catalogado pelo GeoSync: o servidor nao guarda
-        # caminho nenhum — quem sabe onde o arquivo esta e o manifesto de sync
-        # desta maquina.
+        # Drive file cataloged by GeoSync: the server stores no path at
+        # all — what knows where the file is is this machine's sync
+        # manifest.
         return _resolve_do_manifesto_de_sync(_id_do_path(path), dono, ext, original_name)
 
     download_url: str = body["download_url"]
@@ -148,22 +148,22 @@ def _fetch_and_stream(
 
 
 def _id_do_path(path: str) -> str:
-    """Extrai o id_hash do final de '/drive/executor-download/{id}'."""
+    """Extracts the id_hash from the end of '/drive/executor-download/{id}'."""
     return path.rstrip("/").rsplit("/", 1)[-1]
 
 
 def _resolve_do_manifesto_de_sync(
     id_hash: str, dono_id: str, ext: str, original_name: str,
 ) -> tuple[str, str, str]:
-    """Acha um dataset catalogado varrendo os manifestos das pastas de sync.
+    """Finds a cataloged dataset by scanning the manifests of the sync folders.
 
-    O servidor guarda que o arquivo e local e de qual executor, mas NAO onde ele
-    esta: um caminho do sistema de arquivos do usuario nao tem por que existir
-    no banco, e nao trafegar caminho nenhum elimina de saida a classe de ataque
-    de path traversal.
+    The server records that the file is local and on which executor, but NOT
+    where it is: a path on the user's file system has no reason to exist in the
+    database, and not transmitting any path rules out the path traversal attack
+    class from the start.
 
-    Quem sabe o caminho e o `.atlans-sync.json` de cada pasta sincronizada, que
-    ja mapeia `remote_id_hash -> dataset -> arquivos`.
+    What knows the path is the `.atlans-sync.json` of each synced folder, which
+    already maps `remote_id_hash -> dataset -> arquivos`.
     """
     import json
     import os as _os
@@ -199,8 +199,8 @@ def _resolve_do_manifesto_de_sync(
             suffix = f".{ext}" if ext else alvo.suffix
             tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
             tmp.close()
-            # Copia pelo mesmo motivo de `_copy_local_to_temp`: o caller apaga
-            # o caminho devolvido, e devolver o arquivo do usuario o destruiria.
+            # Copies for the same reason as `_copy_local_to_temp`: the caller deletes
+            # the returned path, and returning the user's file would destroy it.
             shutil.copyfile(alvo, tmp.name)
             logger.info("Dataset local resolvido pelo manifesto de sync: %s", alvo)
             return tmp.name, ext or alvo.suffix.lstrip("."), original_name
@@ -214,11 +214,12 @@ def _resolve_do_manifesto_de_sync(
 
 
 def _arquivo_principal(pasta: "Path", ds: dict) -> "Path | None":
-    """Arquivo a ser lido de um dataset do manifesto.
+    """File to be read from a manifest dataset.
 
-    Espelha `Dataset.primary_path` de executor/sync/scanner.py: num shapefile o
-    dataset e um bundle (.shp/.dbf/.shx) e quem se le e o `.shp`. Divergir daqui
-    faria o ReadShapefile receber um `.dbf` e falhar de forma incompreensivel.
+    Mirrors `Dataset.primary_path` in executor/sync/scanner.py: for a shapefile
+    the dataset is a bundle (.shp/.dbf/.shx) and the one that is read is the
+    `.shp`. Diverging from it would make ReadShapefile receive a `.dbf` and fail
+    in an incomprehensible way.
     """
     arquivos = list((ds.get("files") or {}).keys())
     if not arquivos:
@@ -234,19 +235,19 @@ def _arquivo_principal(pasta: "Path", ds: dict) -> "Path | None":
 def _copy_local_to_temp(
     local_path: str, dono_id: str, ext: str, original_name: str,
 ) -> tuple[str, str, str]:
-    """Copia um artefato local para um temp file e devolve o mesmo trio.
+    """Copies a local artifact to a temp file and returns the same triple.
 
-    ⚠️ COPIA, e nao devolve o caminho original — de proposito.
+    ⚠️ It COPIES, and does not return the original path — on purpose.
 
-    `read_drive_file_as` faz `os.unlink(temp_path)` num `finally`, porque ate
-    aqui todo caminho devolvido era um temporario baixado. Devolver o arquivo
-    real faria o PRIMEIRO workflow que o lesse APAGAR o dado do usuario, em
-    silencio, e o estrago so apareceria muito depois.
+    `read_drive_file_as` does `os.unlink(temp_path)` in a `finally`, because up
+    to now every returned path was a downloaded temp file. Returning the real
+    file would make the FIRST workflow that read it DELETE the user's data,
+    silently, and the damage would only show up much later.
 
-    A copia e local, entao nao viola a politica de localidade. O custo e I/O
-    duplicado; a alternativa (sinalizar "nao apague" pelo contrato) exige
-    revisar os cinco nos de leitura e todo codigo futuro que use o helper —
-    troca ruim para a primeira versao.
+    The copy is local, so it does not violate the locality policy. The cost is
+    duplicated I/O; the alternative (signaling "do not delete" via the contract)
+    requires revising the five read nodes and all future code that uses the
+    helper — a bad trade for the first version.
     """
     import shutil
     from pathlib import Path
@@ -262,18 +263,18 @@ def _copy_local_to_temp(
     raiz = Path(artifacts_root()).resolve()
     alvo = (raiz / local_path).resolve()
 
-    # Confinamento: `local_path` vem pela rede. O servidor o deriva (nao confia
-    # no executor), mas depender disso seria terceirizar a propria seguranca —
-    # um `../` aqui daria leitura de arquivo arbitrario da maquina.
+    # Confinement: `local_path` comes over the network. The server derives it (it
+    # does not trust the executor), but relying on that would be outsourcing our
+    # own security — a `../` here would give arbitrary file reads on the machine.
     if not alvo.is_relative_to(raiz):
         raise PermissionError(
             f"Caminho de artefato local fora do diretorio permitido: {local_path!r}"
         )
 
     if not alvo.is_file():
-        # Erro nomeado em vez de FileNotFoundError cru: quase sempre significa
-        # que o artefato pertence a OUTRO executor, e o operador precisa saber
-        # disso e nao ficar procurando um arquivo que nunca esteve aqui.
+        # A named error instead of a raw FileNotFoundError: it almost always means
+        # the artifact belongs to ANOTHER executor, and the operator needs to know
+        # that rather than go looking for a file that was never here.
         raise FileNotFoundError(
             f"O artefato '{original_name}' foi mantido no executor "
             f"{dono_id or 'de origem'} e nao esta nesta maquina "
@@ -293,8 +294,8 @@ def _copy_local_to_temp(
 def _stream_presigned_to_temp(
     download_url: str, ext: str, original_name: str, verify,
 ) -> tuple[str, str, str]:
-    """Faz streaming de uma pre-signed URL para um temp file e retorna
-    (temp_path, ext, original_name). O caller remove o temp file."""
+    """Streams a pre-signed URL to a temp file and returns
+    (temp_path, ext, original_name). The caller removes the temp file."""
     import httpx
     from flow.utils.http_retry import retry_sync
 
@@ -303,7 +304,7 @@ def _stream_presigned_to_temp(
     tmp.close()
 
     def _download() -> None:
-        # open("wb") trunca a cada tentativa → re-download idempotente no temp.
+        # open("wb") truncates on each attempt → idempotent re-download into the temp file.
         with httpx.Client(timeout=300, verify=verify, follow_redirects=True) as client:
             with client.stream("GET", download_url) as stream:
                 stream.raise_for_status()

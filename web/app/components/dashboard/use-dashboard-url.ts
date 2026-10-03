@@ -14,17 +14,17 @@ export interface DashboardUrl {
 }
 
 /**
- * Escopo e período do Dashboard lidos e gravados na URL (docs/specs/dashboard.md §3.9).
+ * Dashboard scope and period read from and written to the URL (docs/specs/dashboard.md §3.9).
  *
- * `router.replace` (não `push`): trocar escopo ou período é filtrar a mesma
- * tela, não navegar — não deve empilhar entrada no histórico do navegador,
- * como em `use-projetos-url.ts`.
+ * `router.replace` (not `push`): changing scope or period is filtering the same
+ * screen, not navigating — it must not push an entry onto the browser history,
+ * as in `use-projetos-url.ts`.
  *
- * O `replace` é assíncrono: entre a escrita e o `useSearchParams` refletir a
- * mudança há ao menos um render. Trocar o escopo e o período em sequência
- * partiriam ambos do estado velho e o segundo apagaria o primeiro. Por isso o
- * último estado escrito fica guardado (`pendente`) e serve de base enquanto a
- * URL não o alcança — o mesmo mecanismo de `use-projetos-url.ts`.
+ * `replace` is asynchronous: between the write and `useSearchParams` reflecting
+ * the change there is at least one render. Changing the scope and the period in
+ * a row would both start from the stale state and the second would erase the
+ * first. That is why the last written state is kept (`pendente`) and serves as
+ * the base while the URL hasn't caught up — the same mechanism as `use-projetos-url.ts`.
  */
 export function useDashboardUrl(): DashboardUrl {
   const router = useRouter()
@@ -33,11 +33,11 @@ export function useDashboardUrl(): DashboardUrl {
   const estado = useMemo(() => lerEstado(sp), [sp])
   const pendente = useRef<EstadoDoDashboard | null>(null)
 
-  // Quando a URL alcança QUALQUER estado — o que gravamos ou uma navegação
-  // externa (voltar/avançar, link) —, `pendente` cumpriu seu papel e tem de
-  // zerar. Sem isto ele só era limpo quando `base()` era chamado de novo e batia
-  // com a URL; um `pendente` que sobra depois de um voltar/avançar vira base de
-  // uma escrita futura e ressuscita o estado antigo (perde a navegação externa).
+  // When the URL reaches ANY state — the one we wrote or an external navigation
+  // (back/forward, link) —, `pendente` has done its job and must be reset.
+  // Without this it was only cleared when `base()` was called again and matched
+  // the URL; a `pendente` left over after a back/forward becomes the base of a
+  // future write and resurrects the old state (losing the external navigation).
   useEffect(() => { pendente.current = null }, [estado])
 
   const gravar = useCallback((proximo: EstadoDoDashboard) => {

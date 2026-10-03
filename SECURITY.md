@@ -1,34 +1,34 @@
-# Segurança
+# Security
 
-## Como reportar uma vulnerabilidade
+## How to report a vulnerability
 
-Não abra uma issue pública. Use o reporte privado do GitHub: na aba
-**Security** do repositório oficial, **Report a vulnerability**. Só os
-mantenedores leem.
+Do not open a public issue. Use GitHub's private reporting: in the
+**Security** tab of the official repository, **Report a vulnerability**. Only the
+maintainers read it.
 
-Se o botão não aparecer (o reporte privado está desligado), abra uma issue
-pedindo um contato privado para um problema de segurança, sem nenhum detalhe
-dele. A resposta traz o canal.
+If the button does not appear (private reporting is turned off), open an issue
+asking for a private contact for a security problem, without any details
+of it. The reply provides the channel.
 
-Ajuda muito trazer:
+It helps a great deal to include:
 
-- o que a falha permite (ler dados de outra conta, executar código no
-  servidor ou no executor, derrubar o serviço…);
-- como reproduzir, com a versão ou o commit;
-- se ela depende de alguma configuração (variáveis do `.env`, um executor
-  matriculado, um nó específico).
+- what the flaw allows (reading another account's data, executing code on the
+  server or on the executor, taking the service down…);
+- how to reproduce it, with the version or the commit;
+- whether it depends on some configuration (`.env` variables, an enrolled
+  executor, a specific node).
 
-A resposta chega pelo mesmo canal. Depois da correção publicada, o aviso de
-segurança do repositório conta o que foi e dá o crédito a quem reportou, se a
-pessoa quiser.
+The reply comes through the same channel. Once the fix is published, the repository's security
+advisory describes what it was and credits the person who reported it, if that
+person so wishes.
 
-## Versões cobertas
+## Supported versions
 
-Só a versão mais recente (a última tag `vX.Y.Z` do repositório oficial)
-recebe correção de segurança. Numa versão anterior, a correção é atualizar.
+Only the most recent version (the latest `vX.Y.Z` tag of the official repository)
+receives security fixes. On an earlier version, the fix is to update.
 
-## O que cada instalação cuida
+## What each installation is responsible for
 
-O Atlans é instalado por quem o usa. A correção chega pelo repositório; aplicá-la
-é de cada instalação: atualizar o código e as imagens, e rodar as migrações
-quando houver ([docs/operations.md](docs/operations.md)).
+Atlans is installed by those who use it. The fix arrives through the repository; applying it
+is the responsibility of each installation: updating the code and the images, and running the migrations
+when there are any ([docs/operations.md](docs/operations.md)).

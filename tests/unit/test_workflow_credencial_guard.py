@@ -1,8 +1,9 @@
-"""Regressão do guard de credencial na gravação de workflow (auditoria SEG-12).
+"""Regression of the credential guard when saving a workflow (audit SEG-12).
 
-A guarda mora no `WorkflowService`: a REST checava na borda, mas o MCP gravava
-sem ela com `validate_first=False`, ao duplicar e ao restaurar versão. Aqui se
-prova a função e, pelo MCP, que as quatro escritas a herdam.
+The guard lives in `WorkflowService`: REST checked at the edge, but MCP saved
+without it with `validate_first=False`, when duplicating and when restoring a
+version. Here the function is proven and, through MCP, that the four writes
+inherit it.
 """
 from __future__ import annotations
 
@@ -57,7 +58,7 @@ def _definicao_sem_credencial() -> dict:
     return {"nodes": [{"id": "n1", "name": "SetFields", "type": "transform", "properties": {}}], "edges": []}
 
 
-# ── A função ─────────────────────────────────────────────────────────────────
+# ── The function ─────────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -93,7 +94,7 @@ async def test_sem_credencial_na_definicao_nao_checa_nada():
     chk.assert_not_awaited()
 
 
-# ── As escritas do MCP herdam a guarda ──────────────────────────────────────
+# ── The MCP writes inherit the guard ────────────────────────────────────────
 
 
 def ctx():
@@ -133,7 +134,7 @@ async def banco(monkeypatch):
 
 @pytest.fixture
 def credencial_alheia():
-    """`assert_credentials_accessible` recusando: a credencial é privada de outro membro."""
+    """`assert_credentials_accessible` refusing: the credential is another member's private one."""
     with patch(_ALVO, new=AsyncMock(side_effect=CredentialAccessDeniedError("privada"))) as chk:
         yield chk
 
@@ -151,7 +152,7 @@ async def _inserir(fabrica, definition: dict) -> None:
 
 
 async def test_create_sem_validar_nao_pula_a_guarda(banco, credencial_alheia):
-    """`validate_first=False` pulava a checagem, que só existia na validação."""
+    """`validate_first=False` skipped the check, which existed only in validation."""
     with pytest.raises(ToolError) as exc:
         await create_workflow(
             ctx(), name="Plantado", definition=_definicao_com_credencial(), validate_first=False,
@@ -185,8 +186,9 @@ async def test_update_sem_validar_nao_pula_a_guarda(banco, credencial_alheia):
 
 
 async def test_update_so_de_nome_nao_consulta_credencial(banco, credencial_alheia):
-    """A guarda é da definition: renomear um fluxo que já tem credencial alheia
-    (gravada por quem a alcança) não pode ser barrado por ela."""
+    """The guard is about the definition: renaming a workflow that already has
+    someone else's credential (saved by someone who can reach it) must not be
+    blocked by it."""
     await _inserir(banco, _definicao_com_credencial())
     await update_workflow(ctx(), WF_1, name="Renomeado")
     credencial_alheia.assert_not_awaited()
@@ -219,7 +221,7 @@ async def test_restaurar_nao_reintroduz_credencial_inalcancavel(banco, credencia
     assert wf.definition["nodes"][0]["name"] == "SetFields"
     async with banco() as db:
         versoes = (await db.execute(select(WorkflowVersion))).scalars().all()
-    assert len(versoes) == 1  # nem o auto-snapshot foi gravado
+    assert len(versoes) == 1  # not even the auto-snapshot was saved
 
 
 async def test_restaurar_versao_inexistente_continua_not_found(banco, credencial_alheia):
@@ -229,7 +231,7 @@ async def test_restaurar_versao_inexistente_continua_not_found(banco, credencial
     assert corpo(exc.value)["code"] == "not_found"
 
 
-# ── params_schema: coluna irmã, vai crua para o banco ───────────────────────
+# ── params_schema: sibling column, goes raw to the database ─────────────────
 
 
 _SCHEMA_COM_SEGREDO = {"token": "tok_vivo_nao_pode_entrar_123456"}  # pragma: allowlist secret
@@ -255,12 +257,12 @@ async def test_update_recusa_segredo_no_params_schema(banco):
     assert not wf.params_schema
 
 
-# ── params_schema: só o que ele grava como VALOR ────────────────────────────
+# ── params_schema: only what it stores as a VALUE ───────────────────────────
 
 
 def test_parametro_token_so_declarado_nao_e_segredo():
-    """O próprio lint sugere `{"token": {"type": "string", "required": true}}`:
-    recusá-lo impedia gravar a sugestão da validação."""
+    """The lint itself suggests `{"token": {"type": "string", "required": true}}`:
+    refusing it prevented saving the validation's own suggestion."""
     from app.core.utils.redacao import params_schema_contem_segredo
 
     assert params_schema_contem_segredo({"token": {"type": "string", "required": True}}) == []
@@ -291,10 +293,11 @@ async def test_create_aceita_o_schema_que_a_validacao_sugere(banco):
     assert wf.params_schema == {"token": {"type": "string", "required": True}}
 
 
-# ── REST: a recusa do serviço sai como 403, nunca como 400/500 ─────────────
-# As rotas chamam o serviço dentro de `try`s que traduzem outros erros; se a
-# tradução engolir `CredentialAccessDeniedError`, a guarda vira "Não foi
-# possível atualizar" (400) e o usuário não sabe por quê.
+# ── REST: the service's refusal comes out as 403, never as 400/500 ─────────
+# The routes call the service inside `try`s that translate other errors; if
+# the translation swallows `CredentialAccessDeniedError`, the guard becomes
+# "Não foi possível atualizar" (could not update) (400) and the user does not
+# know why.
 
 
 class _Servico:
@@ -329,8 +332,8 @@ class _Usuario:
 def rota_rest(monkeypatch):
     from app.api.routers import workflows_router as WR
 
-    # O papel é da dependência da rota (`workflow_com_papel`), que a chamada
-    # direta não passa; aqui só o limiter atrapalha.
+    # The role comes from the route's dependency (`workflow_com_papel`), which the
+    # direct call does not go through; here only the limiter gets in the way.
     monkeypatch.setattr(WR.limiter, "enabled", False)
 
     async def _sem_erros(*a, **kw):
@@ -367,9 +370,10 @@ async def test_duplicate_e_restore_rest_deixam_o_403_passar(rota_rest):
 
 
 async def test_restaurar_versao_que_nao_decifra_mais_segue_se_a_credencial_e_acessivel(banco):
-    """A checagem lê a versão crua: `credential_id` não é cifrado, e abrir o blob
-    fazia uma `connectionString` que não decifra mais (chave rotacionada) virar
-    "erro inesperado" — a restauração em si só copia o blob."""
+    """The check reads the raw version: `credential_id` is not encrypted, and
+    opening the blob made a `connectionString` that no longer decrypts (rotated
+    key) turn into an "unexpected error" — the restore itself only copies the
+    blob."""
     await _inserir(banco, _definicao_sem_credencial())
     antiga = {"nodes": [{"id": "n1", "name": "DatabaseQuery", "type": "database", "properties": {
         "credential_id": CRED_ALHEIA, "connectionString": "gAAAAA-cifrado-com-chave-antiga",
@@ -384,11 +388,11 @@ async def test_restaurar_versao_que_nao_decifra_mais_segue_se_a_credencial_e_ace
     assert out["restored_from_version"] == 1
 
 
-# ── Nenhuma escrita grava sem autor ─────────────────────────────────────────
-# A guarda confere a definition contra QUEM grava, e só rodava quando o
-# chamador passava o autor — que era opcional. Todo chamador de produção
-# passava; um chamador novo que o esquecesse pularia a guarda em silêncio.
-# Estes testes reprovam se alguma das quatro escritas voltar a aceitar isso.
+# ── No write saves without an author ────────────────────────────────────────
+# The guard checks the definition against WHO is saving, and only ran when the
+# caller passed the author — which was optional. Every production caller
+# passed it; a new caller that forgot it would silently skip the guard.
+# These tests fail if any of the four writes starts accepting that again.
 
 _ESCRITAS = [
     ("create_workflow", "created_by_id", ("Fluxo", {"nodes": []})),
@@ -400,7 +404,7 @@ _IDS = [escrita[0] for escrita in _ESCRITAS]
 
 
 class _CrudIntocavel:
-    """Qualquer uso reprova: a recusa tem de vir antes de o serviço tocar o banco."""
+    """Any use fails the test: the refusal has to come before the service touches the database."""
 
     def __getattr__(self, nome):
         raise AssertionError(f"escrita sem autor chegou ao CRUD ({nome})")
@@ -433,7 +437,7 @@ def test_escrita_sem_autor_nem_comeca(metodo, _autor, args):
 @pytest.mark.parametrize("vazio", [None, ""])
 @pytest.mark.parametrize("metodo, autor, args", _ESCRITAS, ids=_IDS)
 async def test_autor_vazio_tambem_e_recusado(metodo, autor, args, vazio):
-    """Um `None` explícito — `getattr(user, "id_hash", None)` distraído — pularia
-    a guarda do mesmo jeito que o argumento esquecido."""
+    """An explicit `None` — a careless `getattr(user, "id_hash", None)` — would
+    skip the guard just like the forgotten argument."""
     with pytest.raises(TypeError, match="autor"):
         await getattr(_servico_sem_banco(), metodo)(*args, **{autor: vazio})

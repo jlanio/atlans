@@ -1,30 +1,31 @@
 /**
- * Classes das camadas que flutuam SOBRE o canvas do editor.
+ * Classes for the layers that float ON TOP of the editor canvas.
  *
- * Dois acertos que todo overlay precisa fazer, e que são fáceis de esquecer
- * porque o defeito não parece um defeito de CSS:
+ * Two things every overlay has to get right, and that are easy to forget
+ * because the defect doesn't look like a CSS defect:
  *
- * 1. **Camada.** Nós e arestas vivem no `.react-flow__renderer`, que o React
- *    Flow declara com `z-index: 4`. Um overlay sem z-index próprio fica ABAIXO
- *    dele: o nó cobre o botão, o clique vai para o nó, o cursor vira o do
- *    canvas — e nada disso sugere "faltou z-index".
+ * 1. **Layer.** Nodes and edges live in `.react-flow__renderer`, which React
+ *    Flow declares with `z-index: 4`. An overlay without its own z-index sits
+ *    BELOW it: the node covers the button, the click goes to the node, the cursor
+ *    becomes the canvas's — and none of that suggests "z-index was missing".
  *
- * 2. **Área morta.** O retângulo do contêiner captura o mouse inteiro, não só
- *    onde há botão. Uma coluna de botões com `gap-2` engole faixas de 8px; um
- *    contêiner sem largura definida engole a largura toda da tela. Arrastar o
- *    canvas por ali trava, e o alvo do clique deixa de ser o que se vê.
+ * 2. **Dead area.** The container's rectangle captures the whole mouse area, not
+ *    only where there's a button. A column of buttons with `gap-2` swallows 8px
+ *    strips; a container without a defined width swallows the whole screen width.
+ *    Dragging the canvas through there gets stuck, and the click target stops
+ *    being what you see.
  *
- * Cuidado ao usar: o contêiner precisa ter largura de conteúdo (`w-fit` quando
- * não for `absolute` com posição fixa nos dois lados) — `pointer-events-none`
- * resolve o clique, mas um retângulo gigante ainda atrapalha a depuração.
+ * Careful when using: the container needs content width (`w-fit` when it isn't
+ * `absolute` with a fixed position on both sides) — `pointer-events-none`
+ * solves the click, but a giant rectangle still gets in the way of debugging.
  */
 export const CAMADA_SOBRE_O_CANVAS =
   "pointer-events-none absolute z-10 [&>*]:pointer-events-auto"
 
 /**
- * Overlay que só informa e nunca recebe clique (a animação de carga).
+ * Overlay that only informs and never receives clicks (the loading animation).
  *
- * Sem filhos interativos, o contêiner inteiro sai do caminho do mouse — pode
- * cobrir o canvas todo sem travar arraste nem clique.
+ * With no interactive children, the whole container gets out of the mouse's way —
+ * it can cover the entire canvas without blocking drag or click.
  */
 export const CAMADA_SO_LEITURA = "pointer-events-none absolute z-10"

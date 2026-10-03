@@ -7,16 +7,16 @@ import { formatarInteiro } from "@/lib/formatos"
 import { ESTADO_PADRAO, type Filtro } from "./projetos-url"
 
 /**
- * Estados da tela de Projetos (docs/specs/projetos.md §3.10): carregando,
- * vazio de primeiro uso, sem resultado, erro de carga e métricas
- * indisponíveis. Cada um diz o que aconteceu e o que fazer a seguir. Aqui
- * ficam o skeleton e as frases; a moldura é a de `shared/estados.tsx`.
+ * States of the Projects screen (docs/specs/projects.md §3.10): loading,
+ * first-use empty, no results, load error and metrics unavailable. Each one
+ * says what happened and what to do next. The skeleton and the sentences live
+ * here; the frame is the one from `shared/estados.tsx`.
  */
 
 /**
- * Primeira carga: o cabeçalho real fica por cima (quem compõe a página o
- * renderiza), e aqui vai o desenho da lista — um grupo com três linhas e duas
- * soltas, com a altura da linha de verdade, para a troca não pular.
+ * First load: the real header stays on top (the page composer renders it),
+ * and here goes the shape of the list — a group with three rows and two
+ * loose ones, at the real row height, so the swap does not jump.
  */
 export function SkeletonDeProjetos() {
   return (
@@ -56,7 +56,7 @@ const PASSOS: { titulo: string; detalhe: string }[] = [
   { titulo: "Agende ou exponha", detalhe: "Um horário, um webhook, um arquivo que chega — ou um portal." },
 ]
 
-/** Sem workflow e sem grupo: a tela ensina o que é um workflow e por onde começar. */
+/** No workflow and no group: the screen teaches what a workflow is and where to start. */
 export function VazioPrimeiroUso({ canEdit, onCriar }: { canEdit: boolean; onCriar: () => void }) {
   return (
     <Estado.VazioPrimeiroUso
@@ -82,8 +82,9 @@ export function textoDeSemResultado(q: string, filtro: Filtro): string {
 }
 
 /**
- * Busca ou chip sem nenhuma linha. `semFiltro` é quantos casariam só com a
- * busca: quando há, a saída óbvia é tirar o chip, e a tela diz isso.
+ * Search or chip with no rows at all. `semFiltro` is how many would match the
+ * search alone: when there are some, the obvious way out is removing the chip,
+ * and the screen says so.
  */
 export function SemResultado({ q, filtro, semFiltro, onLimpar }: {
   q: string
@@ -103,12 +104,12 @@ export function SemResultado({ q, filtro, semFiltro, onLimpar }: {
   )
 }
 
-/** Listagem ou grupos falharam: sem eles não há estante. */
+/** Listing or groups failed: without them there is no shelf. */
 export function ErroDeCarga({ mensagem, onTentar }: { mensagem: string; onTentar: () => void }) {
   return <Estado.ErroDeCarga titulo="Não foi possível carregar os projetos" mensagem={mensagem} onTentar={onTentar} />
 }
 
-/** Só as métricas falharam: a lista continua inteira, sem a coluna "como anda". */
+/** Only the metrics failed: the list stays whole, without the "como anda" column. */
 export function MetricasIndisponiveis({ onTentar }: { onTentar: () => void }) {
   return (
     <Estado.AvisoAmbar onTentar={onTentar}>

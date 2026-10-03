@@ -1,16 +1,16 @@
 // desktop/src/renderer/components/ui/input.tsx
 //
-// Portado de web/app/components/ui/input.tsx, sem alteração de classes.
+// Ported from web/app/components/ui/input.tsx, with no class changes.
 //
-// Existe porque as telas montavam `<input>` cru com classes próprias, e cada
-// uma divergia num detalhe: altura 40 em vez de 36, `focus:ring-1` em vez do
-// anel de 3px do sistema, e nenhuma tratava `aria-invalid`. O system.md fixa
-// h-9 / px-3 / rounded-md e o anel de foco — é aqui que isso passa a valer de
-// uma vez.
+// Exists because the screens built a raw `<input>` with their own classes, and
+// each one diverged in a detail: height 40 instead of 36, `focus:ring-1`
+// instead of the system's 3px ring, and none handled `aria-invalid`. system.md
+// fixes h-9 / px-3 / rounded-md and the focus ring — this is where that takes
+// effect once and for all.
 //
-// `md:text-sm` fica: no web ele evita o zoom automático do iOS em campos
-// menores que 16px. Aqui a janela é sempre > 768px, então o efeito é só
-// `text-sm` — mantê-lo custa nada e preserva a paridade literal com o web.
+// `md:text-sm` stays: on the web it prevents iOS auto-zoom on fields smaller
+// than 16px. Here the window is always > 768px, so the effect is just
+// `text-sm` — keeping it costs nothing and preserves literal parity with the web.
 import * as React from 'react'
 
 import { cn } from '../../lib/utils.js'

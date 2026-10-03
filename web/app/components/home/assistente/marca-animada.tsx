@@ -1,16 +1,17 @@
 // web/app/components/home/assistente/marca-animada.tsx
 //
-// A marca do site, animada, sem o fundo laranja: três nós num triângulo e três
-// arestas. Um traço percorre cada aresta (n1 → n2 → n3 → n1) e acende o nó ao
-// chegar, num ciclo de 2,4 s com uma respiração leve do conjunto — o desenho do
-// previewer aprovado. É o indicador do ITEM PENDENTE da conversa na Home (o
-// "Trabalhando…" da faixa e do painel, pelo `indicador` da `Conversa`): ali quem
-// pensa é o site, e a marca é o que diz isso. O editor fica com o `ExecActivity`.
+// The site's logo, animated, without the orange background: three nodes in a
+// triangle and three edges. A stroke travels each edge (n1 → n2 → n3 → n1) and
+// lights the node on arrival, in a 2.4 s cycle with a light breathing of the
+// whole — the approved previewer design. It is the indicator of the conversation's
+// PENDING ITEM on the Home (the "Trabalhando…" of the strip and the panel, through
+// the `Conversa`'s `indicador`): there, the one thinking is the site, and the
+// logo is what says so. The editor keeps the `ExecActivity`.
 //
-// Mesma API do `ExecActivity` (`size`, `className`, `aria-hidden`); a animação
-// mora em `globals.css` (`.home-marca-anim`), inclusive a degradação sob
-// `prefers-reduced-motion`: a marca inteira, parada. As cores vêm de
-// `var(--primary)` — a terracota da Home, não um literal.
+// Same API as `ExecActivity` (`size`, `className`, `aria-hidden`); the animation
+// lives in `globals.css` (`.home-marca-anim`), including the degradation under
+// `prefers-reduced-motion`: the whole logo, still. The colors come from
+// `var(--primary)` — the Home's terracotta, not a literal.
 
 const ARESTAS = ["M12 4.5L19 17", "M19 17L5 17", "M5 17L12 4.5"] as const
 const NOS = [

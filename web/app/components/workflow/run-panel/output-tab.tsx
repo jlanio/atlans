@@ -9,18 +9,18 @@ import { useRunPanelStore } from "@/app/stores/runPanelStore"
 import { useStickyScroll } from "./use-sticky-scroll"
 
 /**
- * Saída de `print()` dos nós, agrupada por nó.
+ * The nodes' `print()` output, grouped by node.
  *
- * O painel antigo renderizava cada print como uma linha de log completa — com
- * ícone, rótulo de status e duração — e, pior, escondia o nome do nó justamente
- * nessas linhas: com dois nós Python imprimindo, não dava para saber quem era
- * quem. Um print não tem status nem duração; aqui ele é tratado como stdout.
+ * The old panel rendered each print as a full log line — with icon, status
+ * label and duration — and, worse, hid the node name precisely on those lines:
+ * with two Python nodes printing, there was no telling which was which. A print
+ * has no status or duration; here it is treated as stdout.
  *
- * Virtualizado: um run verboso pode ter dezenas de milhares de linhas de print
- * (até MAX_RUN_EVENTS eventos × ~200 linhas cada). Grupos e linhas são achatados
- * numa lista única e só as linhas visíveis vão ao DOM. O cabeçalho de cada nó
- * deixou de ser `sticky` — o trade-off por virtualizar a estrutura agrupada com
- * segurança; ele agora rola junto com a saída daquele nó.
+ * Virtualized: a verbose run can have tens of thousands of print lines
+ * (up to MAX_RUN_EVENTS events × ~200 lines each). Groups and lines are flattened
+ * into a single list and only the visible lines go to the DOM. Each node's
+ * header is no longer `sticky` — the trade-off for safely virtualizing the
+ * grouped structure; it now scrolls along with that node's output.
  */
 type ItemSaida =
   | { kind: "header"; node: RunTimeline["nodes"][number]; key: string }
@@ -53,8 +53,8 @@ const OutputTab = ({ timeline, showTimestamps, onToggleTimestamps }: {
       .filter(g => g.prints.length > 0)
   }, [timeline.nodes, search])
 
-  // Achata grupos → [header, print, print, header, print, ...] para a lista
-  // virtual. Keys estáveis por nó+posição, para o `getItemKey` não remontar.
+  // Flattens groups → [header, print, print, header, print, ...] for the virtual
+  // list. Keys are stable per node+position, so `getItemKey` does not remount.
   const flat = useMemo(() => {
     const arr: ItemSaida[] = []
     for (const { node, prints } of groups) {
@@ -120,8 +120,8 @@ const OutputTab = ({ timeline, showTimestamps, onToggleTimestamps }: {
                   >
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60">saída de</span>
                     <span className="font-sans text-[11px] font-medium">{item.node.name}</span>
-                    {/* Um print vindo de dentro do sub-fluxo tinha cabeçalho igual ao
-                        de um nó daqui — e o nome pode ser o mesmo nos dois fluxos. */}
+                    {/* A print coming from inside the sub-workflow had the same header as
+                        one from a node here — and the name can be the same in both workflows. */}
                     {item.node.subFlow && (
                       <span
                         title={`Dentro do sub-fluxo executado por "${item.node.subFlow}"`}

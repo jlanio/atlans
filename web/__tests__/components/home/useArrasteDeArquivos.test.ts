@@ -1,16 +1,16 @@
 /**
- * O arraste de arquivos sobre a Home.
+ * Dragging files over the Home.
  *
- * Três coisas delicadas, e é por elas que existe um hook e não um `onDrop` numa
+ * Three delicate things, and they are why there is a hook and not an `onDrop` on a
  * div:
  *
- *  1. **Só ARQUIVOS acendem a caixa.** Arrastar texto ou um link seleciona
- *     dispara os mesmos eventos; acender para eles seria uma promessa falsa.
- *  2. **O contador de profundidade.** `dragleave` dispara ao cruzar a fronteira
- *     de cada filho; sem o contador, atravessar a barra lateral apagaria o
- *     realce no meio do caminho.
- *  3. **`preventDefault` no dragover/drop.** Sem ele o navegador ABRE o arquivo
- *     solto, trocando a Home por um GeoJSON cru — e perdendo a conversa.
+ *  1. **Only FILES light up the box.** Dragging text or a link selection
+ *     fires the same events; lighting up for them would be a false promise.
+ *  2. **The depth counter.** `dragleave` fires when crossing the boundary
+ *     of each child; without the counter, crossing the sidebar would turn off the
+ *     highlight midway.
+ *  3. **`preventDefault` on dragover/drop.** Without it the browser OPENS the dropped
+ *     file, replacing the Home with raw GeoJSON — and losing the conversation.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderHook } from "@testing-library/react"
@@ -57,13 +57,13 @@ describe("useArrasteDeArquivos", () => {
 
   it("o contador aguenta a fronteira dos filhos: só apaga quando de fato saiu", () => {
     montar()
-    // Entra na página, depois cruza para dentro de um filho (2 enters), e sai
-    // de um (1 leave): ainda está sobre a Home.
+    // Enters the page, then crosses into a child (2 enters), and leaves
+    // one (1 leave): still over the Home.
     window.dispatchEvent(evento("dragenter", COM_ARQUIVO))
     window.dispatchEvent(evento("dragenter", COM_ARQUIVO))
     window.dispatchEvent(evento("dragleave", COM_ARQUIVO))
     expect(aoArrastar).toHaveBeenLastCalledWith(true)
-    // Sai do último: agora apaga.
+    // Leaves the last one: now it turns off.
     window.dispatchEvent(evento("dragleave", COM_ARQUIVO))
     expect(aoArrastar).toHaveBeenLastCalledWith(false)
   })
@@ -103,7 +103,7 @@ describe("useArrasteDeArquivos", () => {
   it("desmontar limpa os listeners e zera o realce", () => {
     const { unmount } = montar()
     unmount()
-    // O cleanup avisa `false` uma vez; e um evento posterior não chama mais nada.
+    // The cleanup reports `false` once; and a later event no longer calls anything.
     expect(aoArrastar).toHaveBeenLastCalledWith(false)
     aoArrastar.mockClear()
     window.dispatchEvent(evento("dragenter", COM_ARQUIVO))

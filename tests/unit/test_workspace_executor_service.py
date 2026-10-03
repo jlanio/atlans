@@ -1,12 +1,12 @@
 # tests/unit/test_workspace_executor_service.py
 """
-Política de execução por workspace (spec docs/specs/executor-isolation-routing.md).
+Per-workspace execution policy (spec docs/specs/executor-isolation-routing.md).
 
-Regras que NÃO podem regredir em silêncio:
-  - o piso `no_pool` vence qualquer `fallback_terminal` (calculado, não gravado);
-  - executor do pool (is_default) nunca entra num nível (Q3);
-  - nível 2 exige nível 1; esvaziar o principal apaga o fallback;
-  - revogar/promover um executor que esvaziaria um nível principal é 409 sem `force`.
+Rules that must NOT regress silently:
+  - the `no_pool` floor beats any `fallback_terminal` (computed, not stored);
+  - a pool executor (is_default) never enters a tier (Q3);
+  - tier 2 requires tier 1; emptying the primary clears the fallback;
+  - revoking/promoting an executor that would empty a primary tier is 409 without `force`.
 """
 from __future__ import annotations
 
@@ -96,7 +96,7 @@ class TestTerminalEfetivo:
         assert p.mode == svc.MODE_ISOLATED and not p.allows_pool
 
 
-# ── inclusão em nível ─────────────────────────────────────────────────────────
+# ── adding to a tier ──────────────────────────────────────────────────────────
 
 class TestModeOf:
     def test_a_mesma_conta_da_dataclass(self):
@@ -128,7 +128,7 @@ class TestReplacePrimaryLegado:
         rows = [_row("ex-1", 1), _row("ex-2", 2)]
         db = _db_returning(rows, _executor("pool-a", is_default=True), None)
         await svc.replace_primary(db, ws, "pool-a", actor_id="u")
-        # rows + executor + DELETE de todos os níveis
+        # rows + executor + DELETE of all tiers
         assert db.execute.await_count == 3
         assert ws.fallback_terminal == "fail"
         assert any(c.args[0].action == "workspace.executor_policy.cleared" for c in db.add.call_args_list)
@@ -142,8 +142,8 @@ class TestReplacePrimaryLegado:
 
     @pytest.mark.asyncio
     async def test_nivel_1_nascendo_do_vazio_reproduz_o_legado_com_terminal_pool(self):
-        # Hoje esse workspace transborda para o pool quando o dedicado cai; a
-        # política precisa nascer igual para a virada da flag não mudar nada.
+        # Today this workspace overflows to the pool when the dedicated one goes down;
+        # the policy needs to start out the same so that flipping the flag changes nothing.
         ws = _workspace(terminal="fail")
         db = _db_returning([], _executor("ex-1"), None, None)
         await svc.replace_primary(db, ws, "ex-1", actor_id="u")
@@ -173,7 +173,7 @@ class TestRemoveMember:
         rows = [_row("ex-1", 1), _row("ex-2", 2)]
         db = _db_returning(rows, None, None)
         await svc.remove_member(db, ws, "ex-1", actor_id="u")
-        assert db.execute.await_count == 3  # rows + delete do alvo + delete da reserva
+        assert db.execute.await_count == 3  # rows + delete of the target + delete of the fallback
         assert ws.fallback_terminal == "fail"
 
     @pytest.mark.asyncio
@@ -216,7 +216,7 @@ class TestAddMember:
 
     @pytest.mark.asyncio
     async def test_nivel_2_exige_nivel_1(self):
-        db = _db_returning(_executor(), [])  # executor ok; nenhuma linha ainda
+        db = _db_returning(_executor(), [])  # executor ok; no row yet
         with pytest.raises(WorkspacePolicyError, match="nível principal"):
             await svc.add_member(db, _workspace(), "ex-1", 2, actor_id="u-1")
 
@@ -297,16 +297,16 @@ class TestDetach:
         db = _db_returning(None, None, ws)
         out = await svc.detach_executor(db, "ex-1", force=True, actor_id="a", reason="revoked")
         assert out == deps
-        # delete do executor + delete do fallback de ws-1 + leitura de ws-1 (terminal)
+        # delete of the executor + delete of ws-1's fallback + read of ws-1 (terminal)
         assert db.execute.await_count == 3
-        # Sem principal, "pool como último recurso" não sobrevive escondido.
+        # Without a primary, "pool as a last resort" does not survive hidden.
         assert ws.fallback_terminal == "fail"
         assert any(type(c.args[0]).__name__ == "AuditEvent" for c in db.add.call_args_list)
 
     @pytest.mark.asyncio
     async def test_sem_dependente_vivo_ainda_apaga_linhas_de_lixeira(self, monkeypatch):
-        # Workspace na lixeira com o executor no nível 1: restaurado depois, não
-        # pode voltar com um executor revogado no principal.
+        # Workspace in the trash with the executor in tier 1: restored later, it must
+        # not come back with a revoked executor in the primary.
         monkeypatch.setattr(svc, "workspaces_depending_on", AsyncMock(return_value=[]))
         db = _db_returning(None)
         out = await svc.detach_executor(db, "ex-1", force=False, actor_id="a", reason="revoked")
