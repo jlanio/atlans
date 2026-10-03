@@ -8,7 +8,7 @@
 import { describe, it, expect } from "vitest"
 
 import {
-  MENSAGEM_DE_RECUSA,
+  REJECTION_MESSAGE,
   tipoAceito,
   tipoEmitido,
   validarConexao,
@@ -40,13 +40,13 @@ const DATA_INPUT = { id: "din", data: { name: "DataInput", saidas: [
   { name: "output", type: "object", port: true },
   { name: "metadata", type: "object", port: true },
 ] } }
-const CONDICIONAL = { id: "cond", data: { name: "Conditional", branches: true, saidas: [
+const CONDITIONAL = { id: "cond", data: { name: "Conditional", branches: true, saidas: [
   { name: "result", type: "any" },
   { name: "branch", type: "boolean" },
 ] } }
-const SAIDA_UNICA = { id: "sw-out", data: { name: "SubWorkflowOutput", inputs: [] } }
+const SINGLE_OUTPUT = { id: "sw-out", data: { name: "SubWorkflowOutput", inputs: [] } }
 
-const NODES = [WFS, BUFFER, CLIP, DATA_INPUT, CONDICIONAL, SAIDA_UNICA]
+const NODES = [WFS, BUFFER, CLIP, DATA_INPUT, CONDITIONAL, SINGLE_OUTPUT]
 
 const con = (source: string, target: string, sourceHandle?: string | null, targetHandle?: string | null) =>
   ({ source, target, sourceHandle: sourceHandle ?? null, targetHandle: targetHandle ?? null })
@@ -97,7 +97,7 @@ describe("validarConexao", () => {
 
   it("toda recusa tem mensagem para o toast", () => {
     for (const motivo of ["auto-conexao", "duplicada", "destino-de-uma-aresta", "tipo-incompativel"] as const) {
-      expect(MENSAGEM_DE_RECUSA[motivo]).toBeTruthy()
+      expect(REJECTION_MESSAGE[motivo]).toBeTruthy()
     }
   })
 })

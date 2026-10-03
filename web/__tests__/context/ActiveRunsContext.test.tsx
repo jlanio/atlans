@@ -42,7 +42,7 @@ function Consumidor() {
   )
 }
 
-function lerSaida() {
+function readOutput() {
   return JSON.parse(screen.getByTestId("saida").textContent ?? "{}") as {
     runningRuns: { runId: string; workflowHash: string; name: string; startedAt: string | null; triggerSource: string | null; executorName: string | null }[]
     hashes: string[]
@@ -75,8 +75,8 @@ describe("ActiveRunsProvider", () => {
     }))
     render(<ActiveRunsProvider><Consumidor /></ActiveRunsProvider>)
 
-    await waitFor(() => expect(lerSaida().runningCount).toBe(2))
-    const { runningRuns, hashes } = lerSaida()
+    await waitFor(() => expect(readOutput().runningCount).toBe(2))
+    const { runningRuns, hashes } = readOutput()
     expect(svc.getObservabilityRuns).toHaveBeenCalledWith({ status: "running", limit: 200 })
     expect(hashes).toEqual(["wf-a", "wf-b"])
     expect(runningRuns).toEqual([
@@ -93,9 +93,9 @@ describe("ActiveRunsProvider", () => {
   it("campos ausentes na resposta viram nulo, e não `undefined` — o contrato do RunningRun é `string | null`", async () => {
     svc.getObservabilityRuns.mockResolvedValue(ok({ runs: [{ run_id: "run-3", workflow_hash: "wf-a", status: "running" }] }))
     render(<ActiveRunsProvider><Consumidor /></ActiveRunsProvider>)
-    await waitFor(() => expect(lerSaida().runningCount).toBe(1))
+    await waitFor(() => expect(readOutput().runningCount).toBe(1))
     // JSON keeps `null` and drops `undefined`: all three keys have to exist.
-    expect(lerSaida().runningRuns[0]).toEqual({
+    expect(readOutput().runningRuns[0]).toEqual({
       runId: "run-3", workflowHash: "wf-a", name: "Consolidação de outorgas",
       startedAt: null, triggerSource: null, executorName: null,
     })
@@ -109,8 +109,8 @@ describe("ActiveRunsProvider", () => {
       ],
     }))
     render(<ActiveRunsProvider><Consumidor /></ActiveRunsProvider>)
-    await waitFor(() => expect(lerSaida().runningCount).toBe(1))
-    expect(lerSaida().hashes).toEqual(["wf-a"])
+    await waitFor(() => expect(readOutput().runningCount).toBe(1))
+    expect(readOutput().hashes).toEqual(["wf-a"])
     // The unknown hash made the names list reload once (newly created workflow?), without looping.
     expect(svc.getWorkflows).toHaveBeenCalledTimes(2)
   })
@@ -122,13 +122,13 @@ describe("ActiveRunsProvider", () => {
     }))
     svc.getRunDetail.mockResolvedValue(ok({ run_id: "run-1", status: "failed" }))
     render(<ActiveRunsProvider><Consumidor /></ActiveRunsProvider>)
-    await waitFor(() => expect(lerSaida().runningCount).toBe(1))
+    await waitFor(() => expect(readOutput().runningCount).toBe(1))
 
     svc.getObservabilityRuns.mockResolvedValue(ok({ runs: [] }))
     // With a live run the cadence is 10 s.
     await act(async () => { await vi.advanceTimersByTimeAsync(10_100) })
-    await waitFor(() => expect(lerSaida().runningCount).toBe(0))
-    expect(lerSaida().runningRuns).toEqual([])
+    await waitFor(() => expect(readOutput().runningCount).toBe(0))
+    expect(readOutput().runningRuns).toEqual([])
     await waitFor(() => expect(addNotification).toHaveBeenCalledWith({
       type: "error", title: "Workflow falhou", message: "Consolidação de outorgas",
     }))

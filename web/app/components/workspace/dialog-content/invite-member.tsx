@@ -21,7 +21,7 @@ import { ROLE_DESCRIPTIONS, ROLE_LABELS, ROLE_OPTIONS } from "../role-labels"
 // part of the email — avoids harvesting the whole user base, audit SEG-06).
 // It only fires when the text looks like a complete email.
 const _RE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-function pareceEmail(v: string): boolean {
+function looksLikeEmail(v: string): boolean {
   return _RE_EMAIL.test(v)
 }
 
@@ -49,7 +49,7 @@ export function InviteMemberDialog({ workspaceId, onClose, onInvited }: Props) {
 
   useEffect(() => {
     if (selected) return
-    if (!pareceEmail(termo)) {
+    if (!looksLikeEmail(termo)) {
       setResults([])
       setStatus("idle")
       return
@@ -118,7 +118,7 @@ export function InviteMemberDialog({ workspaceId, onClose, onInvited }: Props) {
                 />
               )}
             </div>
-            {termo.length > 0 && !pareceEmail(termo) && !selected && (
+            {termo.length > 0 && !looksLikeEmail(termo) && !selected && (
               <p className="text-xs text-muted-foreground">
                 Digite o e-mail completo do usuário.
               </p>

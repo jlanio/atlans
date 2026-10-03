@@ -55,7 +55,7 @@ def _node_with_scope(**scope):
 # ── 1. Scope propagation ─────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_filho_herda_task_id_e_workspace_id():
+async def test_child_inherits_task_id_and_workspace_id():
     """Without this, any output node inside the sub-workflow breaks."""
     node = _node_with_scope(task_id="run-abc", workspace_id="ws-1")
 
@@ -73,7 +73,7 @@ async def test_filho_herda_task_id_e_workspace_id():
 
 
 @pytest.mark.asyncio
-async def test_workflow_hash_do_filho_e_do_filho_nao_do_pai():
+async def test_child_workflow_hash_is_the_childs_not_the_parents():
     """The sub-workflow's artifacts and metrics belong to it, not to the caller."""
     node = _node_with_scope(workflow_hash="PARENT")
 
@@ -89,7 +89,7 @@ async def test_workflow_hash_do_filho_e_do_filho_nao_do_pai():
 
 
 @pytest.mark.asyncio
-async def test_sem_publisher_no_pai_nao_cria_wrapper():
+async def test_without_publisher_in_parent_creates_no_wrapper():
     node = _node_with_scope(publisher=None)
 
     with patch("flow.executor.WorkflowExecutor") as cls:
@@ -105,7 +105,7 @@ async def test_sem_publisher_no_pai_nao_cria_wrapper():
 
 # ── 2. Event namespacing ─────────────────────────────────────────────────────
 
-def test_evento_do_filho_recebe_prefixo_do_node_pai():
+def test_child_event_gets_the_parent_node_prefix():
     """The child's node_ids do not exist on the parent's canvas — without a prefix
     the frontend receives events from unknown nodes."""
     parent = MagicMock()
@@ -118,7 +118,7 @@ def test_evento_do_filho_recebe_prefixo_do_node_pai():
     assert kwargs["extra"]["subworkflow_parent_node"] == "sub-1"
 
 
-def test_workflow_complete_do_filho_nao_e_repassado():
+def test_child_workflow_complete_is_not_forwarded():
     """It would end the parent's run in the frontend."""
     parent = MagicMock()
     pub = _SubWorkflowEventPublisher(parent, "sub-1")
@@ -128,7 +128,7 @@ def test_workflow_complete_do_filho_nao_e_repassado():
     parent.publish_event.assert_not_called()
 
 
-def test_falha_ao_publicar_nao_derruba_execucao():
+def test_publish_failure_does_not_break_the_run():
     parent = MagicMock()
     parent.publish_event.side_effect = Exception("redis down")
     pub = _SubWorkflowEventPublisher(parent, "sub-1")
@@ -139,7 +139,7 @@ def test_falha_ao_publicar_nao_derruba_execucao():
 # ── 3. Symmetric contract (ports on input) ───────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_input_filtra_chaves_fora_do_contrato():
+async def test_input_filters_keys_outside_the_contract():
     from flow.nodes.trigger.sub_workflow_input import SubWorkflowInput
 
     node = SubWorkflowInput("in", {"ports": ["geometry"]})
@@ -149,7 +149,7 @@ async def test_input_filtra_chaves_fora_do_contrato():
 
 
 @pytest.mark.asyncio
-async def test_input_com_ports_vazio_e_passthrough():
+async def test_input_with_empty_ports_is_passthrough():
     """Modo 'aceita tudo' — contrato opt-in."""
     from flow.nodes.trigger.sub_workflow_input import SubWorkflowInput
 
@@ -160,7 +160,7 @@ async def test_input_com_ports_vazio_e_passthrough():
 
 
 @pytest.mark.asyncio
-async def test_input_aceita_ports_serializado_em_json():
+async def test_input_accepts_json_serialized_ports():
     """O helper da UI grava via JSON.stringify."""
     from flow.nodes.trigger.sub_workflow_input import SubWorkflowInput
 
@@ -171,7 +171,7 @@ async def test_input_aceita_ports_serializado_em_json():
 
 
 @pytest.mark.asyncio
-async def test_output_continua_filtrando():
+async def test_output_keeps_filtering():
     from flow.nodes.outputs.sub_workflow_output import SubWorkflowOutput
 
     node = SubWorkflowOutput("out", {"ports": ["mapa"]})
@@ -181,7 +181,7 @@ async def test_output_continua_filtrando():
 
 
 @pytest.mark.asyncio
-async def test_metadados_internos_nunca_atravessam():
+async def test_internal_metadata_never_crosses_over():
     from flow.nodes.outputs.sub_workflow_output import SubWorkflowOutput
 
     node = SubWorkflowOutput("out", {"ports": []})
@@ -197,7 +197,7 @@ async def _async_cache_key(dsn):
     return _cache_key(dsn)
 
 
-def test_mesmo_dsn_em_loops_distintos_gera_chaves_distintas():
+def test_same_dsn_in_distinct_loops_yields_distinct_keys():
     """A pool is bound to the loop that created it; reusing it in another one breaks
     with 'attached to a different loop'.
 
@@ -222,7 +222,7 @@ def test_mesmo_dsn_em_loops_distintos_gera_chaves_distintas():
     assert key_a != key_b
 
 
-def test_chave_fora_de_loop_nao_quebra():
+def test_key_outside_loop_does_not_break():
     from flow.utils.get_asyncpg_pool import _cache_key
 
     assert _cache_key("postgresql://x")[0] is None

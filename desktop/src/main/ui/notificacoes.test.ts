@@ -8,7 +8,7 @@
 // That is why the tests are about the decision, not the text: when to notify,
 // when to stay quiet, and when to speak up again.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EstadoApp } from '../state/store.js'
+import type { AppState } from '../state/store.js'
 
 vi.mock('electron', () => ({ Notification: { isSupported: () => false } }))
 vi.mock('../paths.js', () => ({ ICONE_APP: 'icon.ico' }))
@@ -17,7 +17,7 @@ const {
   DISCO_BAIXO_GB, DISCO_CRITICO_GB, avaliarNotificacao, notificarSeMudou, _resetarMemoria,
 } = await import('./notificacoes.js')
 
-function estado(p: Partial<EstadoApp> & { livre?: number | null } = {}): EstadoApp {
+function estado(p: Partial<AppState> & { livre?: number | null } = {}): AppState {
   const { livre, ...resto } = p
   return {
     supervisor: 'running',
@@ -30,7 +30,7 @@ function estado(p: Partial<EstadoApp> & { livre?: number | null } = {}): EstadoA
     log: [],
     snapshot: livre === undefined ? null : ({ artifacts_disk_free_gb: livre } as never),
     ...resto,
-  } as EstadoApp
+  } as AppState
 }
 
 beforeEach(_resetarMemoria)

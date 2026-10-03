@@ -15,7 +15,7 @@ vi.mock("@/service/GisFlowService", () => ({
 }))
 vi.mock("@/lib/desktop", () => ({ ponteDesktop: () => null }))
 
-import { EnrollConnect, SERVIDOR_A_PREENCHER } from "@/app/components/executores/enroll"
+import { EnrollConnect, SERVER_PLACEHOLDER } from "@/app/components/executores/enroll"
 
 function otp(extra: Partial<IExecutorEnrollmentOtpResponse> = {}): IExecutorEnrollmentOtpResponse {
   return {
@@ -55,12 +55,12 @@ describe("EnrollConnect — endereços da instalação", () => {
     render(<EnrollConnect otp={otp({ server_url: "" })} />)
     const aviso = screen.getByRole("alert")
     expect(aviso).toHaveTextContent("AGENTS_URL")
-    expect(within(aviso).getByText(SERVIDOR_A_PREENCHER)).toBeInTheDocument()
+    expect(within(aviso).getByText(SERVER_PLACEHOLDER)).toBeInTheDocument()
     metodo("Python local")
-    expect(comando()).toContain(`--server=${SERVIDOR_A_PREENCHER}`)
+    expect(comando()).toContain(`--server=${SERVER_PLACEHOLDER}`)
     // The served install.sh also goes out without the host: the quickstart carries the flag.
     metodo("Quickstart")
-    expect(comando()).toContain(`--server=${SERVIDOR_A_PREENCHER}`)
+    expect(comando()).toContain(`--server=${SERVER_PLACEHOLDER}`)
   })
 
   it("com o host dos executores, o quickstart não repete a flag (o install.sh servido já o traz)", () => {

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from "vitest"
 import { FORMATOS } from "@/app/components/home/i18n/formatos"
-import { formatarInteiro, formatarQuando } from "@/lib/formatos"
+import { formatInteger, formatarQuando } from "@/lib/formatos"
 import { textosDe } from "@/app/components/home/i18n"
 
 // Local noon on a Wednesday: far from midnight, "today" and "yesterday" are stable.
@@ -14,7 +14,7 @@ const menos = (min: number) => iso(new Date(AGORA.getTime() - min * 60_000))
 
 describe("FORMATOS pt-BR", () => {
   it("é exatamente o de lib/formatos", () => {
-    expect(FORMATOS["pt-BR"].inteiro).toBe(formatarInteiro)
+    expect(FORMATOS["pt-BR"].inteiro).toBe(formatInteger)
     expect(FORMATOS["pt-BR"].quando).toBe(formatarQuando)
   })
 })
@@ -48,8 +48,8 @@ describe("FORMATOS en/es — quando", () => {
     const setembro = iso(new Date(2026, 8, 1, 8, 4))
     expect(FORMATOS.en.quando(setembro, AGORA)).toMatch(/^Sep 1, 8:04\sAM$/)
     expect(FORMATOS.es.quando(setembro, AGORA)).toMatch(/^1 sept?, 8:04$/)
-    const anoPassado = iso(new Date(2025, 8, 1, 8, 4))
-    expect(FORMATOS.en.quando(anoPassado, AGORA)).toContain("2025")
+    const lastYear = iso(new Date(2025, 8, 1, 8, 4))
+    expect(FORMATOS.en.quando(lastYear, AGORA)).toContain("2025")
   })
 
   it("vazio é —", () => {
@@ -66,9 +66,9 @@ describe("FORMATOS en/es — quando", () => {
 
 describe("FORMATOS en/es — dataEHora", () => {
   it("inglês com o mês por extenso: 09/01 seria setembro nos EUA e janeiro no Reino Unido", () => {
-    const primeiroDeSetembro = iso(new Date(2026, 8, 1, 12, 0))
-    expect(FORMATOS.en.dataEHora(primeiroDeSetembro)).toMatch(/^Sep 1, 2026, 12:00\sPM$/)
-    expect(FORMATOS.es.dataEHora(primeiroDeSetembro)).toBe("01/09/2026, 12:00")
+    const firstOfSeptember = iso(new Date(2026, 8, 1, 12, 0))
+    expect(FORMATOS.en.dataEHora(firstOfSeptember)).toMatch(/^Sep 1, 2026, 12:00\sPM$/)
+    expect(FORMATOS.es.dataEHora(firstOfSeptember)).toBe("01/09/2026, 12:00")
   })
 })
 

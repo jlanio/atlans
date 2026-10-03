@@ -18,16 +18,16 @@ import { cn } from "@/lib/utils"
 import { formatarInicio } from "@/lib/formatos"
 import { SeloAssistente } from "../shared/selo-assistente"
 import { ComoAndaCelula } from "./como-anda-celula"
-import type { ComoAnda } from "./como-anda"
-import { temPortal } from "./filtros"
-import type { Gatilho, ResumoDoAgendamento, TipoDeGatilho } from "./gatilho"
+import type { HowItsGoing } from "./como-anda"
+import { hasPortal } from "./filtros"
+import type { Gatilho, ScheduleSummary, TriggerKind } from "./gatilho"
 import { SeloSubFluxo } from "./selo-subfluxo"
 
-export interface LinhaWorkflowProps {
+export interface WorkflowRowProps {
   workflow: IWorkflow
   gatilho: Gatilho
-  resumoDoAgendamento: ResumoDoAgendamento | null
-  comoAnda: ComoAnda
+  resumoDoAgendamento: ScheduleSummary | null
+  comoAnda: HowItsGoing
   grupos: IWorkflowGroup[]
   canEdit: boolean
   canExecute: boolean
@@ -61,7 +61,7 @@ export interface LinhaWorkflowProps {
   onDragEnd: () => void
 }
 
-const ICONE_DO_GATILHO: Record<TipoDeGatilho, IconType> = {
+const TRIGGER_ICON: Record<TriggerKind, IconType> = {
   agendado: TbClock,
   webhook: TbBolt,
   arquivo: TbFile,
@@ -70,13 +70,13 @@ const ICONE_DO_GATILHO: Record<TipoDeGatilho, IconType> = {
   subfluxo: TbSubtask,
 }
 
-const TITULO_DO_SUBFLUXO = "Sub-fluxo: executar sozinho normalmente não faz o esperado"
-const VINTE_E_QUATRO_HORAS = 24
+const SUBFLOW_TITLE = "Sub-fluxo: executar sozinho normalmente não faz o esperado"
+const TWENTY_FOUR_HOURS = 24
 
 /** Created less than 24 h ago: gets the "Novo" badge. Without `created_at` there is no way to tell. */
 export function ehNovo(wf: Pick<IWorkflow, "created_at">, agora: Date = new Date()): boolean {
   const criado = fromBackend(wf.created_at)
-  return criado != null && dayjs(agora).diff(criado, "hour") < VINTE_E_QUATRO_HORAS
+  return criado != null && dayjs(agora).diff(criado, "hour") < TWENTY_FOUR_HOURS
 }
 
 /**
@@ -99,24 +99,24 @@ export function formatarHa(iso: string | null | undefined, agora: Date = new Dat
   return `em ${formatarInicio(iso, agora)}`
 }
 
-type CamposDeAutoria = Pick<IWorkflow, "created_at" | "updated_at" | "created_by_username" | "updated_by_username">
+type AuthorshipFields = Pick<IWorkflow, "created_at" | "updated_at" | "created_by_username" | "updated_by_username">
 
 /**
  * "alterado há 2 d por maria" — or "criado há 3 h por joão" when it was never
  * changed after creation; with no name (deleted user) only the when remains.
  * Null when the listing brought no date at all.
  */
-export function textoDeAutoria(wf: CamposDeAutoria, agora: Date = new Date()): string | null {
+export function textoDeAutoria(wf: AuthorshipFields, agora: Date = new Date()): string | null {
   const criado = fromBackend(wf.created_at)
   const alterado = fromBackend(wf.updated_at)
   const referencia = alterado ?? criado
   if (!referencia) return null
   // Compared by instant, not by string: the backend may serialize the two
   // dates with different precisions.
-  const ehCriacao = !alterado || !criado || alterado.valueOf() === criado.valueOf()
-  const verbo = ehCriacao ? "criado" : "alterado"
-  const quem = ehCriacao ? wf.created_by_username : wf.updated_by_username
-  const quando = formatarHa(ehCriacao ? wf.created_at ?? wf.updated_at : wf.updated_at, agora)
+  const isCreation = !alterado || !criado || alterado.valueOf() === criado.valueOf()
+  const verbo = isCreation ? "criado" : "alterado"
+  const quem = isCreation ? wf.created_by_username : wf.updated_by_username
+  const quando = formatarHa(isCreation ? wf.created_at ?? wf.updated_at : wf.updated_at, agora)
   return quem ? `${verbo} ${quando} por ${quem}` : `${verbo} ${quando}`
 }
 
@@ -136,7 +136,7 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
   canEdit, canExecute, canManage, podeMover, hasDnd, isDragging, executando, duplicando, runIdVivo,
   onOpen, onPrefetch, onRun, onVerExecucao, onAtivar, onDesativar, onConfigure, onPortal, onMove,
   onDuplicate, onDelete, onViewRuns, onAddToGroup, onRemoveFromGroup, onDragStart, onDragEnd,
-}: LinhaWorkflowProps) {
+}: WorkflowRowProps) {
   const id = workflow.id_hash
   const nome = workflow.name
   const inativo = !workflow.flag_ative
@@ -144,9 +144,9 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
   // A viewer sees everything without a handle (spec §3.10): `hasDnd` says there
   // are groups, `canEdit` says the person can move.
   const arrastavel = hasDnd && canEdit
-  const Icone = ICONE_DO_GATILHO[gatilho.tipo]
+  const Icone = TRIGGER_ICON[gatilho.tipo]
   const subfluxo = gatilho.tipo === "subfluxo"
-  const portal = temPortal(workflow)
+  const portal = hasPortal(workflow)
   const novo = ehNovo(workflow)
   const autoria = textoDeAutoria(workflow)
   // A single path for "Mover para grupo": all groups except the current one.
@@ -155,10 +155,10 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
   const metadados: ReactNode[] = [
     <span key="gatilho" className="font-medium text-foreground">{gatilho.rotulo}</span>,
   ]
-  if (resumoDoAgendamento) metadados.push(...partesDoAgendamento(resumoDoAgendamento))
+  if (resumoDoAgendamento) metadados.push(...scheduleParts(resumoDoAgendamento))
   if (autoria) metadados.push(autoria)
 
-  const temMovimentacao = (canEdit && destinos.length > 0) || (canEdit && !!workflow.group_id)
+  const hasMoveActions = (canEdit && destinos.length > 0) || (canEdit && !!workflow.group_id)
     || (canManage && podeMover && !!workflow.workspace_id)
 
   return (
@@ -214,7 +214,7 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
       >
         <Icone size={17} aria-hidden="true" />
         <span className="sr-only">{gatilho.rotulo}</span>
-        <PontoDeEstado inativo={inativo} emExecucao={emExecucao} />
+        <StateDot inativo={inativo} emExecucao={emExecucao} />
       </span>
 
       <div className={cn("flex min-w-0 flex-col gap-0.5", inativo && "opacity-60")}>
@@ -231,14 +231,14 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
           <SeloSubFluxo workflow={workflow} />
           <SeloAssistente origem={workflow.origem} />
           {portal && (
-            <Selo className="bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-400">
+            <Badge className="bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-400">
               {workflow.portal_access === "public"
                 ? <><TbWorld size={11} aria-hidden="true" /> Portal público</>
                 : <><TbLock size={11} aria-hidden="true" /> Portal privado</>}
-            </Selo>
+            </Badge>
           )}
-          {inativo && <Selo className="bg-muted text-muted-foreground">Inativo</Selo>}
-          {novo && <Selo className="bg-primary/10 text-primary">Novo</Selo>}
+          {inativo && <Badge className="bg-muted text-muted-foreground">Inativo</Badge>}
+          {novo && <Badge className="bg-primary/10 text-primary">Novo</Badge>}
         </div>
         {workflow.description && (
           <p className="truncate text-xs text-muted-foreground max-md:hidden" title={workflow.description}>
@@ -267,7 +267,7 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
         className="flex shrink-0 items-center gap-1 self-center max-md:col-start-3 max-md:row-start-1"
         onClick={e => e.stopPropagation()}
       >
-        <AcaoPrincipal
+        <PrimaryAction
           nome={nome}
           inativo={inativo}
           subfluxo={subfluxo}
@@ -318,7 +318,7 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
                 <TbWorld aria-hidden="true" /> Configurar portal
               </DropdownMenuItem>
             )}
-            {temMovimentacao && <DropdownMenuSeparator />}
+            {hasMoveActions && <DropdownMenuSeparator />}
             {canEdit && destinos.length > 0 && (
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger className="gap-2 [&_svg]:size-4 [&_svg]:text-muted-foreground">
@@ -370,7 +370,7 @@ export const LinhaWorkflow = React.memo(function LinhaWorkflow({
 })
 
 /** Schedule description and what comes after it: the next run, the pause (amber) or "calculando…". */
-function partesDoAgendamento(resumo: ResumoDoAgendamento): ReactNode[] {
+function scheduleParts(resumo: ScheduleSummary): ReactNode[] {
   const partes: ReactNode[] = [
     resumo.descricaoCrua
       ? <code key="descricao" className="rounded bg-muted px-1 font-mono text-[11px]">{resumo.descricao}</code>
@@ -396,7 +396,7 @@ function partesDoAgendamento(resumo: ResumoDoAgendamento): ReactNode[] {
  * the inactive one (the switch left the card and the safe action stays one
  * click away), "Executar" on the rest.
  */
-function AcaoPrincipal({
+function PrimaryAction({
   nome, inativo, subfluxo, canEdit, canExecute, executando, runIdVivo, onRun, onVerExecucao, onAtivar,
 }: {
   nome: string
@@ -447,7 +447,7 @@ function AcaoPrincipal({
         aria-label={`Executar ${nome} agora`}
         // The sub-workflow stays clickable (some people test it on its own), but
         // dimmed and with the warning: the run it fires does not do what is expected.
-        title={subfluxo ? TITULO_DO_SUBFLUXO : "Executar agora"}
+        title={subfluxo ? SUBFLOW_TITLE : "Executar agora"}
         onClick={onRun}
         disabled={executando}
         className={cn(classe, subfluxo && "opacity-45")}
@@ -461,7 +461,7 @@ function AcaoPrincipal({
   return <span aria-hidden="true" className={classe} />
 }
 
-function PontoDeEstado({ inativo, emExecucao }: { inativo: boolean; emExecucao: boolean }) {
+function StateDot({ inativo, emExecucao }: { inativo: boolean; emExecucao: boolean }) {
   const posicao = "absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2 border-card"
   if (emExecucao) {
     return (
@@ -478,7 +478,7 @@ function PontoDeEstado({ inativo, emExecucao }: { inativo: boolean; emExecucao: 
   )
 }
 
-function Selo({ className, children }: { className: string; children: ReactNode }) {
+function Badge({ className, children }: { className: string; children: ReactNode }) {
   return (
     <span className={cn("inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-px text-[10px] font-medium", className)}>
       {children}

@@ -57,15 +57,15 @@ _MAX_CYCLE_BACKOFF = 300
 # It is keyed by event loop because a module-level `asyncio.Semaphore` binds to
 # the first loop that awaits it — which would break any process (or test) that
 # runs more than one loop in its lifetime.
-_semaforos_de_transferencia: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
+_transfer_semaphores: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 
 
-def _semaforo_de_transferencia() -> asyncio.Semaphore:
+def _transfer_semaphore() -> asyncio.Semaphore:
     loop = asyncio.get_running_loop()
-    semaforo = _semaforos_de_transferencia.get(loop)
+    semaforo = _transfer_semaphores.get(loop)
     if semaforo is None:
         semaforo = asyncio.Semaphore(SYNC_CONCURRENCY)
-        _semaforos_de_transferencia[loop] = semaforo
+        _transfer_semaphores[loop] = semaforo
     return semaforo
 
 # Interval between trash purges. The cycle runs every `interval` (30s by
@@ -96,7 +96,7 @@ class SyncManager:
         # Creates the folder if it doesn't exist
         self.sync_dir.mkdir(parents=True, exist_ok=True)
 
-        # Componentes — autenticacao via mTLS (cert + chave do EXECUTOR_CERT_DIR).
+        # Componentes — auth_headers via mTLS (cert + chave do EXECUTOR_CERT_DIR).
         self.ignore = IgnoreFilter(sync_dir)
         self.events = SyncEventEmitter(event_queue)
         self.manifest = SyncManifest(sync_dir, workspace_id, executor_id)
@@ -114,48 +114,48 @@ class SyncManager:
         self._drive_task: asyncio.Task | None = None
         self._syncing = False  # Flag to ignore watcher events during sync
         self._last_trash_purge = 0.0
-        # Cycle pacing: `_ultimo_ciclo` sustains the floor between sweeps
-        # triggered by the watcher and `_forcar_ciclo` is the UI command's bypass.
-        self._ultimo_ciclo = 0.0
-        self._forcar_ciclo = False
+        # Cycle pacing: `_last_cycle` sustains the floor between sweeps
+        # triggered by the watcher and `_force_cycle` is the UI command's bypass.
+        self._last_cycle = 0.0
+        self._force_cycle = False
         # None = there has been no hashed sweep yet in this execution. 0.0 doesn't
         # work as "never": `time.monotonic()` is the machine's uptime, and on a
         # laptop switched on 5 minutes ago the math would say "a short while ago".
-        self._ultimo_hash_completo: float | None = None
+        self._last_full_hash: float | None = None
         # Scan shared by the items of ONE pass over the retry queue.
         self._scan_da_fila: dict[str, Dataset] | None = None
         try:
             self._loop: asyncio.AbstractEventLoop | None = asyncio.get_running_loop()
         except RuntimeError:
-            self._loop = None  # construido fora do loop — run() preenche
+            self._loop = None  # built fora do loop — run() preenche
 
-    def sincronizar_agora(self) -> bool:
+    def sync_now(self) -> bool:
         """Wakes the cycle without waiting for the interval. Returns whether it succeeded.
 
         The loop sleeps on `_change_flag` with an `interval` timeout — the same
         mechanism the watcher uses to signal a local change. A command coming
         from the UI is just another way of knocking on that door.
 
-        Difference: `_forcar_ciclo` bypasses the interval floor and the wait
+        Difference: `_force_cycle` bypasses the interval floor and the wait
         for stabilization. The floor exists to contain the watchdog burst during
         a copy; a user click is an explicit intent and cannot wait.
         """
         loop = self._loop
         if loop is None:
-            self._forcar_ciclo = True
+            self._force_cycle = True
             self._change_flag.set()
             return True
         try:
-            loop.call_soon_threadsafe(self._acordar_forcado)
+            loop.call_soon_threadsafe(self._force_wake)
             return True
         except RuntimeError:
             return False  # loop already closed
 
-    def _acordar_forcado(self):
-        self._forcar_ciclo = True
+    def _force_wake(self):
+        self._force_cycle = True
         self._change_flag.set()
 
-    def _emitir_inventario(self) -> None:
+    def _emit_inventory(self) -> None:
         """Publishes how many datasets there are, how many are up to date and how many are queued.
 
         Goes out as a sync event, and not as a direct read of the manifest by
@@ -169,14 +169,14 @@ class SyncManager:
         try:
             datasets = self.manifest.all_datasets()
             pendentes = len(self.manifest.pending_items())
-            sincronizados = sum(
+            synced_count = sum(
                 1 for d in datasets.values() if d.get("status") == "synced"
             )
             self.events.emit(
                 "sync_inventory",
                 dataset="",
                 total=len(datasets),
-                synced=sincronizados,
+                synced=synced_count,
                 pending=pendentes,
             )
         except Exception:
@@ -289,20 +289,20 @@ class SyncManager:
 
                     # Before sleeping: the manifest state is now what the UI
                     # should show until the next cycle.
-                    self._emitir_inventario()
+                    self._emit_inventory()
 
                     # Waits for a local change or timeout
-                    acordou_por_evento = False
+                    woke_by_event = False
                     try:
                         await asyncio.wait_for(self._change_flag.wait(), timeout=self.interval)
                         self._change_flag.clear()
-                        acordou_por_evento = True
+                        woke_by_event = True
                     except asyncio.TimeoutError:
                         pass
 
-                    if acordou_por_evento:
-                        await self._esperar_pasta_estabilizar()
-                    self._forcar_ciclo = False
+                    if woke_by_event:
+                        await self._wait_for_folder_to_settle()
+                    self._force_cycle = False
 
                     # Sync local → remoto
                     if self.sync_mode in ("upload", "bidirectional", "catalog"):
@@ -326,9 +326,9 @@ class SyncManager:
             if self._drive_task:
                 self._drive_task.cancel()
             self.watcher.stop()
-            await self._fechar_clientes()
+            await self._close_clients()
 
-    async def _fechar_clientes(self):
+    async def _close_clients(self):
         """Closes the long-lived httpx clients.
 
         They live as long as the manager lives (keep-alive is the point).
@@ -346,7 +346,7 @@ class SyncManager:
                 logger.debug("Falha ao fechar cliente HTTP de %s.", type(componente).__name__,
                              exc_info=True)
 
-    async def _esperar_pasta_estabilizar(self):
+    async def _wait_for_folder_to_settle(self):
         """
         Holds the cycle until the folder stops changing.
 
@@ -362,13 +362,13 @@ class SyncManager:
             `SYNC_MAX_QUIET_WAIT` so an hours-long copy doesn't postpone the
             sync forever.
 
-        `sincronizar_agora()` bypasses both — it is a user command.
+        `sync_now()` bypasses both — it is a user command.
         """
         loop = asyncio.get_running_loop()
         limite = loop.time() + SYNC_MAX_QUIET_WAIT
-        piso = self._ultimo_ciclo + SYNC_MIN_CYCLE
+        piso = self._last_cycle + SYNC_MIN_CYCLE
 
-        while not self._forcar_ciclo:
+        while not self._force_cycle:
             agora = loop.time()
             if agora >= limite:
                 return
@@ -510,10 +510,10 @@ class SyncManager:
 
                     # size/mtime of the file ON DISK: those are what the `diff`
                     # shortcut compares on the next cycle.
-                    from executor.sync.scanner import entrada_de_manifesto
+                    from executor.sync.scanner import manifest_entry
                     self.manifest.set_dataset(ds_key, {
                         "type": ext,
-                        "files": {original_name: entrada_de_manifesto(dest, downloaded_md5)},
+                        "files": {original_name: manifest_entry(dest, downloaded_md5)},
                         "status": "synced",
                         "remote_id_hash": id_hash,
                         "remote_name": original_name,
@@ -687,7 +687,7 @@ class SyncManager:
             self._syncing = False
             # Marks the end of the cycle AFTER the work: the floor counts from
             # here, otherwise a 2-minute sweep would already be born expired.
-            self._ultimo_ciclo = asyncio.get_running_loop().time()
+            self._last_cycle = asyncio.get_running_loop().time()
 
     async def _full_sync(self):
         """Executa scan completo e sincroniza diferencas."""
@@ -714,7 +714,7 @@ class SyncManager:
             self._change_flag.clear()
             self._syncing = False
 
-    async def _em_paralelo(self, corrotinas: list, contexto: str):
+    async def _in_parallel(self, corrotinas: list, contexto: str):
         """Runs the transfers with a concurrency ceiling, without killing the batch.
 
         The ceiling is low (SYNC_CONCURRENCY) on purpose: on a field link, high
@@ -725,16 +725,16 @@ class SyncManager:
         """
         if not corrotinas:
             return
-        # PROCESS semaphore (see `_semaforo_de_transferencia`): the ceiling applies
+        # PROCESS semaphore (see `_transfer_semaphore`): the ceiling applies
         # to the link, which all folders share. Obtained here, and not in
         # __init__, because the manager is built before the event loop exists.
-        semaforo = _semaforo_de_transferencia()
+        semaforo = _transfer_semaphore()
 
-        async def _limitada(coro):
+        async def _throttled(coro):
             async with semaforo:
                 return await coro
 
-        resultados = await asyncio.gather(*(_limitada(c) for c in corrotinas),
+        resultados = await asyncio.gather(*(_throttled(c) for c in corrotinas),
                                           return_exceptions=True)
         for resultado in resultados:
             if isinstance(resultado, asyncio.CancelledError):
@@ -755,13 +755,13 @@ class SyncManager:
         # Safety net for the (size, mtime) shortcut: every so often the diff
         # rehashes everything, to catch the rare rewrite that preserves mtime.
         agora = time.monotonic()
-        hash_completo = (self._ultimo_hash_completo is None
-                         or (agora - self._ultimo_hash_completo) >= SYNC_FULL_HASH_INTERVAL)
+        full_hash = (self._last_full_hash is None
+                         or (agora - self._last_full_hash) >= SYNC_FULL_HASH_INTERVAL)
 
         # diff() also goes to the thread: it is what triggers `file_hashes()` and,
         # with it, the MD5 of the candidate files (the scan only does stat).
         new_ds, modified_ds, removed_ds = await em_thread(
-            self.scanner.diff, current_datasets, manifest_datasets, hash_completo
+            self.scanner.diff, current_datasets, manifest_datasets, full_hash
         )
 
         # The marker is only stamped AFTER the diff completes. Stamped before, it
@@ -770,19 +770,19 @@ class SyncManager:
         # whole cycle into `run()`'s backoff — but the safety net was already
         # recorded as done and would only come back 1h later (at boot, never).
         # A file rewritten with (size, mtime) preserved went hours without upload.
-        if hash_completo:
-            self._ultimo_hash_completo = agora
+        if full_hash:
+            self._last_full_hash = agora
 
         # New datasets — only uploads if it didn't come from remote.
         # The list holds (name, dataset) and not coroutines: there is still an
         # `await` before the gather, and a coroutine created and never awaited
         # becomes a warning.
-        a_enviar: list[tuple[str, Dataset]] = []
+        to_upload: list[tuple[str, Dataset]] = []
         for name in new_ds:
             old = manifest_datasets.get(name, {})
             if old.get("sync_direction") == "remote":
                 continue  # Was just downloaded from Drive, don't re-upload
-            a_enviar.append((name, current_datasets[name]))
+            to_upload.append((name, current_datasets[name]))
 
         # Modified — ignores it if it came from remote and wasn't edited locally
         for name in modified_ds:
@@ -806,13 +806,13 @@ class SyncManager:
 
             # The DELETE of the old copy happens INSIDE _upload_dataset: it is the
             # only point both the direct upload and the queue retry go through.
-            a_enviar.append((name, ds))
+            to_upload.append((name, ds))
 
         # Uploads are mutually independent I/O: serially, the first sync of
         # 200 small files spent the whole time waiting on round-trips with
         # the link idle.
-        await self._em_paralelo(
-            [self._upload_dataset(nome, dataset) for nome, dataset in a_enviar], "upload")
+        await self._in_parallel(
+            [self._upload_dataset(nome, dataset) for nome, dataset in to_upload], "upload")
 
         # Removidos localmente
         for name in removed_ds:
@@ -905,11 +905,11 @@ class SyncManager:
             if not self.sync_config.should_download(rf.original_name, rf.id_hash):
                 continue
 
-            pendentes.append(self._sincronizar_remoto(rf, manifest_datasets, local_datasets))
+            pendentes.append(self._sync_remote(rf, manifest_datasets, local_datasets))
 
         # Downloads are also independent I/O: serially, entering a new workspace
         # showed one `file_downloading` at a time with the link idle.
-        await self._em_paralelo(pendentes, "download")
+        await self._in_parallel(pendentes, "download")
 
         # ── Detects remote deletions ─────────────────────────────────────────
         # If the manifest's remote_id_hash no longer exists in Drive, removes it locally.
@@ -922,7 +922,7 @@ class SyncManager:
             if rid not in all_remote_ids:
                 self._discard_dataset(ds_name, "deletado no Drive")
 
-    async def _sincronizar_remoto(self, rf, manifest_datasets: dict,
+    async def _sync_remote(self, rf, manifest_datasets: dict,
                                   local_datasets: dict[str, Dataset]):
         """Decides and does what to do with ONE Drive object.
 
@@ -996,10 +996,10 @@ class SyncManager:
         # size/mtime come from the file that is ON DISK, not from what the server
         # declared: those are what the `diff` shortcut compares on the next
         # cycle, and a diverging size would make the file be rehashed forever.
-        from executor.sync.scanner import entrada_de_manifesto
+        from executor.sync.scanner import manifest_entry
         self.manifest.set_dataset(ds_key, {
             "type": rf.extension,
-            "files": {rf.original_name: entrada_de_manifesto(dest, downloaded_md5)},
+            "files": {rf.original_name: manifest_entry(dest, downloaded_md5)},
             "status": "synced",
             "remote_id_hash": rf.id_hash,
             "remote_name": rf.original_name,
@@ -1077,7 +1077,7 @@ class SyncManager:
             # account. The order documented above still holds: what sits in
             # the window is the OLD state, which only causes a re-upload, never
             # a new MD5 taken as confirmed.
-            await self.manifest.flush(min_intervalo=SYNC_FLUSH_INTERVAL)
+            await self.manifest.flush(min_interval=SYNC_FLUSH_INTERVAL)
 
             # UPLOAD FIRST, delete the old copy afterwards — and HERE, not in the
             # caller. Deleting before the PUT opened a window of TOTAL loss (a

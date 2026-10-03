@@ -19,7 +19,7 @@ import { ARTIFACTS_DIR_PADRAO, CERT_DIR } from '../paths.js'
 import { SERVIDOR } from '../../shared/servidor.js'
 
 /** Mirrors the `codigo` values emitted by executor/enrollment.py::_cli_main. */
-export type CodigoEnroll =
+export type EnrollCode =
   | 'otp_ausente'
   | 'executor_id_ausente'
   | 'enroll_recusado'
@@ -27,7 +27,7 @@ export type CodigoEnroll =
   | 'saida_invalida'
   | 'timeout'
 
-export type ResultadoEnroll =
+export type EnrollResult =
   | {
       ok: true
       executor_id: string
@@ -37,7 +37,7 @@ export type ResultadoEnroll =
       cert_dir: string
       env_path: string
     }
-  | { ok: false; codigo: CodigoEnroll; erro: string; cert_dir?: string }
+  | { ok: false; codigo: EnrollCode; erro: string; cert_dir?: string }
 
 /**
  * The server is NOT part of the request: it is the constant {@link SERVIDOR}.
@@ -46,7 +46,7 @@ export type ResultadoEnroll =
  * and the deep link are untrusted input, and a `servidor` coming from them
  * would decide whom this machine binds to.
  */
-export interface PedidoEnroll {
+export interface EnrollRequest {
   executorId: string
   otp: string
 }
@@ -54,7 +54,7 @@ export interface PedidoEnroll {
 /** Enrollment should not take longer than this; beyond it, the server is hung. */
 const TIMEOUT_MS = 120_000
 
-export function enrolar(pedido: PedidoEnroll): Promise<ResultadoEnroll> {
+export function enrolar(pedido: EnrollRequest): Promise<EnrollResult> {
   return new Promise((resolve) => {
     const proc = spawn(PYTHON_EXE, [
       '-X', 'utf8', '-m', 'executor', 'enroll',
@@ -74,7 +74,7 @@ export function enrolar(pedido: PedidoEnroll): Promise<ResultadoEnroll> {
     let erro = ''
     let terminou = false
 
-    const finalizar = (r: ResultadoEnroll) => {
+    const finish = (r: EnrollResult) => {
       if (terminou) return
       terminou = true
       clearTimeout(timer)
@@ -83,7 +83,7 @@ export function enrolar(pedido: PedidoEnroll): Promise<ResultadoEnroll> {
 
     const timer = setTimeout(() => {
       proc.kill()
-      finalizar({
+      finish({
         ok: false, codigo: 'timeout',
         erro: `O enrollment não respondeu em ${TIMEOUT_MS / 1000}s. Verifique o endereço do servidor e a conexão.`,
       })
@@ -94,7 +94,7 @@ export function enrolar(pedido: PedidoEnroll): Promise<ResultadoEnroll> {
     proc.stderr.setEncoding('utf8')
     proc.stderr.on('data', (c: string) => { erro += c })
 
-    proc.on('error', (e) => finalizar({
+    proc.on('error', (e) => finish({
       ok: false, codigo: 'enroll_recusado',
       erro: `Não foi possível executar o enrollment: ${e.message}`,
     }))
@@ -104,16 +104,16 @@ export function enrolar(pedido: PedidoEnroll): Promise<ResultadoEnroll> {
       // tolerates a native-library warning written to fd 1 before it.
       const linha = saida.split('\n').map((l) => l.trim()).filter(Boolean).pop()
       if (!linha) {
-        finalizar({
+        finish({
           ok: false, codigo: 'saida_invalida',
           erro: erro.trim() || 'O enrollment terminou sem produzir resultado.',
         })
         return
       }
       try {
-        finalizar(JSON.parse(linha) as ResultadoEnroll)
+        finish(JSON.parse(linha) as EnrollResult)
       } catch {
-        finalizar({
+        finish({
           ok: false, codigo: 'saida_invalida',
           erro: erro.trim() || `Resposta não reconhecida do enrollment: ${linha.slice(0, 200)}`,
         })

@@ -146,7 +146,7 @@ describe('gravarEnv', () => {
 })
 
 describe('lerConfiguracao', () => {
-  const certificar = () => {
+  const writeCerts = () => {
     for (const f of ['cert.pem', 'key.pem']) fs.writeFileSync(path.join(certDir, f), '')
   }
 
@@ -167,13 +167,13 @@ describe('lerConfiguracao', () => {
   })
 
   it('com cert mas sem EXECUTOR_ID: falta config', () => {
-    certificar()
+    writeCerts()
     expect(lerConfiguracao().falta).toBe('config')
   })
 
   it('com os dois: configurado', () => {
     escrever('EXECUTOR_ID=abc\n')
-    certificar()
+    writeCerts()
     const c = lerConfiguracao()
     expect(c.configurado).toBe(true)
     expect(c.falta).toBeNull()
@@ -181,7 +181,7 @@ describe('lerConfiguracao', () => {
 
   it('EXECUTOR_ID em branco nao conta', () => {
     escrever('EXECUTOR_ID=   \n')
-    certificar()
+    writeCerts()
     expect(lerConfiguracao().falta).toBe('config')
   })
 
@@ -195,13 +195,13 @@ describe('lerConfiguracao', () => {
 })
 
 describe('descartarEnrollment', () => {
-  const povoar = (nomes: string[]) => {
+  const populate = (nomes: string[]) => {
     for (const n of nomes) fs.writeFileSync(path.join(certDir, n), 'conteudo')
   }
   const existe = (n: string) => fs.existsSync(path.join(certDir, n))
 
   it('remove o material de identidade do executor', () => {
-    povoar(['cert.pem', 'chain.pem', 'ca.pem', 'key.pem', 'x25519_key.pem'])
+    populate(['cert.pem', 'chain.pem', 'ca.pem', 'key.pem', 'x25519_key.pem'])
     const { removidos } = descartarEnrollment()
 
     expect(removidos).toHaveLength(5)
@@ -213,7 +213,7 @@ describe('descartarEnrollment', () => {
     // key, pinned via TOFU. Deleting it would reopen the window that pinning
     // closes — the next boot would accept any key that answered at the
     // configured address, and would start running jobs signed by it.
-    povoar(['cert.pem', 'key.pem', 'server_signing.pub'])
+    populate(['cert.pem', 'key.pem', 'server_signing.pub'])
     descartarEnrollment()
 
     expect(existe('server_signing.pub')).toBe(true)
@@ -223,7 +223,7 @@ describe('descartarEnrollment', () => {
   it('preserva o trust store da CA interna', () => {
     // It has nothing to do with this executor's identity; downgrading it would
     // only cost one extra download on the next boot.
-    povoar(['cert.pem', 'atlans-root.crt', 'atlans-ca-bundle.crt'])
+    populate(['cert.pem', 'atlans-root.crt', 'atlans-ca-bundle.crt'])
     descartarEnrollment()
 
     expect(existe('atlans-root.crt')).toBe(true)
@@ -234,7 +234,7 @@ describe('descartarEnrollment', () => {
     // The EXECUTOR_ID survives and becomes the form's initial value: when the
     // executor was only revoked (not recreated), it is still valid.
     escrever('EXECUTOR_ID=abc\n')
-    povoar(['cert.pem', 'key.pem'])
+    populate(['cert.pem', 'key.pem'])
     descartarEnrollment()
 
     const c = lerConfiguracao()
@@ -245,21 +245,21 @@ describe('descartarEnrollment', () => {
 
   it('e idempotente e nao falha com a pasta vazia', () => {
     expect(descartarEnrollment().removidos).toEqual([])
-    povoar(['cert.pem'])
+    populate(['cert.pem'])
     expect(descartarEnrollment().removidos).toEqual(['cert.pem'])
     expect(descartarEnrollment().removidos).toEqual([])
   })
 })
 
 describe('configuração de execução', () => {
-  const PADRAO_ART = 'C:/padrao/artifacts'
-  const ler = () => lerExecucao(PADRAO_ART)
+  const DEFAULT_ART = 'C:/padrao/artifacts'
+  const ler = () => lerExecucao(DEFAULT_ART)
 
   it('usa os defaults quando o .env está vazio', () => {
     const c = ler()
     expect(c).toMatchObject({
       workers: 4, filaMax: 50, timeoutS: 3600,
-      artifactsDir: PADRAO_ART, nivelLog: 'INFO',
+      artifactsDir: DEFAULT_ART, nivelLog: 'INFO',
     })
   })
 

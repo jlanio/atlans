@@ -39,7 +39,7 @@ async def _eventually(pred, timeout: float = 2.0):
 
 
 @pytest.mark.asyncio
-async def test_cancela_job_em_execucao_e_avisa():
+async def test_cancels_running_job_and_notifies():
     started = asyncio.Event()
     cancelled: list[str] = []
 
@@ -67,7 +67,7 @@ async def test_cancela_job_em_execucao_e_avisa():
 
 
 @pytest.mark.asyncio
-async def test_worker_continua_vivo_apos_cancelamento():
+async def test_worker_stays_alive_after_cancellation():
     """Cancelling a job must not bring down the worker that was executing it."""
     started = asyncio.Event()
     executados: list[str] = []
@@ -96,7 +96,7 @@ async def test_worker_continua_vivo_apos_cancelamento():
 
 
 @pytest.mark.asyncio
-async def test_cancela_job_ainda_na_fila():
+async def test_cancels_job_still_in_queue():
     """You cannot remove from the middle of a PriorityQueue: the worker discards it."""
     liberar = asyncio.Event()
     executados: list[str] = []
@@ -129,7 +129,7 @@ async def test_cancela_job_ainda_na_fila():
 
 
 @pytest.mark.asyncio
-async def test_cancelamento_durante_espera_pelo_semaforo_nao_se_perde():
+async def test_cancellation_while_waiting_for_semaphore_is_not_lost():
     """Saturated executor: the job has already left the queue but is still waiting for a slot.
 
     In that window `cancel()` finds no active task and marks it for discard; without the
@@ -173,7 +173,7 @@ async def test_cancelamento_durante_espera_pelo_semaforo_nao_se_perde():
 
 
 @pytest.mark.asyncio
-async def test_shutdown_nao_deixa_job_orfao_rodando():
+async def test_shutdown_does_not_leave_orphan_job_running():
     """Cancelling `await task` does not cancel the task — the job would leak after shutdown."""
     started = asyncio.Event()
     concluiu = False
@@ -202,7 +202,7 @@ async def test_shutdown_nao_deixa_job_orfao_rodando():
 
 
 @pytest.mark.asyncio
-async def test_falha_no_aviso_nao_derruba_o_worker():
+async def test_notification_failure_does_not_bring_down_the_worker():
     started = asyncio.Event()
 
     async def on_execute(message):

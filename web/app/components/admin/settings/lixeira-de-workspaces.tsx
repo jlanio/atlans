@@ -12,8 +12,8 @@ import { DeleteDialog } from "@/app/components/shared/DeleteDialog"
 import { useAcaoDeDialogo } from "@/app/hooks/useAcaoDeDialogo"
 import { TbAlertTriangle, TbArchive, TbRestore, TbTrashX } from "react-icons/tb"
 import { formatLocal } from "@/lib/dayjs"
-import { CABECALHO_DE_COLUNAS, CELULA_COM_ROTULO, DESTAQUE_DA_FICHA, LINHA_EMPILHADA } from "@/app/components/shared/tabela-empilhada"
-import { formatarInteiro, formatarQuando, plural } from "@/lib/formatos"
+import { COLUMN_HEADER, LABELED_CELL, CARD_HIGHLIGHT, STACKED_ROW } from "@/app/components/shared/tabela-empilhada"
+import { formatInteger, formatarQuando, plural } from "@/lib/formatos"
 import { VazioEmCirculo } from "./estados"
 
 // ── Workspace trash ────────────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ export function WorkspaceTrashSection({ items, onChanged }: {
     <div className="flex flex-col gap-4">
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-xs md:min-w-[560px]">
-          <thead className={CABECALHO_DE_COLUNAS}>
+          <thead className={COLUMN_HEADER}>
             <tr className="border-b border-border bg-muted/50">
               <th className="px-3 py-2 text-left font-medium text-muted-foreground">Workspace</th>
               <th className="px-3 py-2 text-left font-medium text-muted-foreground">Removido em</th>
@@ -153,19 +153,19 @@ export function WorkspaceTrashSection({ items, onChanged }: {
           </thead>
           <tbody>
             {items.map(ws => (
-              <tr key={ws.id_hash} className={`border-b border-border last:border-b-0 ${LINHA_EMPILHADA}`}>
-                <td className={`px-3 py-2 ${DESTAQUE_DA_FICHA}`}>
+              <tr key={ws.id_hash} className={`border-b border-border last:border-b-0 ${STACKED_ROW}`}>
+                <td className={`px-3 py-2 ${CARD_HIGHLIGHT}`}>
                   <div className="font-medium text-foreground">{ws.name}</div>
                   <div className="text-muted-foreground">
                     {ws.owner_username ?? "(sem dono)"}
                     {ws.owner_email && <span className="ml-1 opacity-60">· {ws.owner_email}</span>}
                   </div>
                 </td>
-                <td data-rotulo="removido" className={`px-3 py-2 text-muted-foreground ${CELULA_COM_ROTULO}`}>
+                <td data-rotulo="removido" className={`px-3 py-2 text-muted-foreground ${LABELED_CELL}`}>
                   <div className="tabular-nums">{formatLocal(ws.deleted_at)}</div>
                   <div className="text-[11px] opacity-70 tabular-nums">{formatarQuando(ws.deleted_at)}</div>
                 </td>
-                <td data-rotulo="workflows" className={`px-3 py-2 text-right tabular-nums text-foreground ${CELULA_COM_ROTULO}`}>{formatarInteiro(ws.workflows)}</td>
+                <td data-rotulo="workflows" className={`px-3 py-2 text-right tabular-nums text-foreground ${LABELED_CELL}`}>{formatInteger(ws.workflows)}</td>
                 <td className="px-3 py-2">
                   <div className="flex justify-end gap-1">
                     <Button

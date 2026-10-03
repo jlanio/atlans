@@ -22,7 +22,7 @@ import { useStickyScroll } from "./use-sticky-scroll"
  * header is no longer `sticky` — the trade-off for safely virtualizing the
  * grouped structure; it now scrolls along with that node's output.
  */
-type ItemSaida =
+type OutputItem =
   | { kind: "header"; node: RunTimeline["nodes"][number]; key: string }
   | { kind: "print"; node: RunTimeline["nodes"][number]; print: RunTimeline["nodes"][number]["prints"][number]; key: string }
 
@@ -56,7 +56,7 @@ const OutputTab = ({ timeline, showTimestamps, onToggleTimestamps }: {
   // Flattens groups → [header, print, print, header, print, ...] for the virtual
   // list. Keys are stable per node+position, so `getItemKey` does not remount.
   const flat = useMemo(() => {
-    const arr: ItemSaida[] = []
+    const arr: OutputItem[] = []
     for (const { node, prints } of groups) {
       arr.push({ kind: "header", node, key: `h:${node.nodeId}` })
       prints.forEach((print, j) => arr.push({ kind: "print", node, print, key: `p:${node.nodeId}:${j}` }))

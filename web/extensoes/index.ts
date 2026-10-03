@@ -6,9 +6,9 @@
 // See `tipos.ts`.
 
 import { INSTALADAS } from "@/extensoes/instaladas"
-import type { ExtensaoDoWeb, PropsDoEnvoltorioDoPainel } from "./tipos"
+import type { ExtensaoDoWeb, PanelWrapperProps } from "./tipos"
 
-export type { ExtensaoDoWeb, PropsDoEnvoltorioDoPainel }
+export type { ExtensaoDoWeb, PanelWrapperProps }
 /** What every extension piece on the screen passes through: if it fails, it drops out on its own. */
 export { LimiteDaExtensao } from "./limite"
 

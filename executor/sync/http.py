@@ -13,13 +13,13 @@ import httpx
 
 # Timeout for CONTROL requests (request URL, confirm, list). Kept short on
 # purpose: they are small calls and a failure needs to surface fast.
-TIMEOUT_CONTROLE = 30.0
+CONTROL_TIMEOUT = 30.0
 
 # READ/WRITE timeout for transfers (PUT/GET of bytes to/from MinIO).
-TIMEOUT_TRANSFERENCIA = 300.0
+TRANSFER_TIMEOUT = 300.0
 
 
-class ClienteHTTP:
+class HTTPClient:
     """Holds a reusable `httpx.AsyncClient`, created on demand.
 
     Lazy because the sync components are built OUTSIDE the event loop
@@ -27,30 +27,30 @@ class ClienteHTTP:
     created there would be born bound to the wrong loop.
 
     The default timeout already covers the transfer; the control calls pass
-    `timeout=TIMEOUT_CONTROLE` per request.
+    `timeout=CONTROL_TIMEOUT` per request.
     """
 
     def __init__(self, httpx_kwargs: dict):
         self._kwargs = httpx_kwargs
-        self._cliente: httpx.AsyncClient | None = None
+        self._client: httpx.AsyncClient | None = None
 
     def __call__(self) -> httpx.AsyncClient:
-        if self._cliente is None or self._cliente.is_closed:
-            self._cliente = httpx.AsyncClient(
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
                 timeout=httpx.Timeout(
-                    TIMEOUT_CONTROLE,
-                    read=TIMEOUT_TRANSFERENCIA,
-                    write=TIMEOUT_TRANSFERENCIA,
+                    CONTROL_TIMEOUT,
+                    read=TRANSFER_TIMEOUT,
+                    write=TRANSFER_TIMEOUT,
                 ),
                 follow_redirects=True,
                 limits=httpx.Limits(max_keepalive_connections=8, max_connections=16),
                 **self._kwargs,
             )
-        return self._cliente
+        return self._client
 
     async def aclose(self) -> None:
         """Closes the client. A shared pool needs an explicit close at
         shutdown, otherwise the sockets leak until the process dies."""
-        if self._cliente is not None and not self._cliente.is_closed:
-            await self._cliente.aclose()
-        self._cliente = None
+        if self._client is not None and not self._client.is_closed:
+            await self._client.aclose()
+        self._client = None

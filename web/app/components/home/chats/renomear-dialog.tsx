@@ -8,19 +8,19 @@ import {
   Dialog, DialogClose, DialogContent, DialogDescription,
   DialogFooter, DialogHeader, DialogTitle,
 } from "@/app/components/ui/dialog"
-import type { IConversaResumo } from "@/service/types"
-import type { ResultadoDaEscrita } from "@/app/hooks/home/useConversas"
-import { useTextosDaCasca } from "../i18n/da-casca"
+import type { IConversationSummary } from "@/service/types"
+import type { WriteResult } from "@/app/hooks/home/useConversas"
+import { useShellTexts } from "../i18n/da-casca"
 
-interface RenomearDialogProps {
+interface RenameDialogProps {
   /** The conversation being edited; `null` keeps the dialog closed. */
-  conversa: IConversaResumo | null
+  conversa: IConversationSummary | null
   onClose: () => void
   /** May be async; the dialog waits and locks while saving. The result's `erro`
    *  becomes the message in the box — a boolean alone left the dialog open and
    *  identical, and the person clicked Salvar again thinking the click had not
    *  registered. */
-  onRenomear: (id: string, titulo: string) => Promise<ResultadoDaEscrita> | ResultadoDaEscrita
+  onRenomear: (id: string, titulo: string) => Promise<WriteResult> | WriteResult
 }
 
 /**
@@ -28,28 +28,28 @@ interface RenomearDialogProps {
  * requires 1..120). Controlled by the presence of `conversa` — that way Radix
  * animates entry and exit, and an effect resets the field for each new conversation.
  */
-export function RenomearDialog({ conversa, onClose, onRenomear }: RenomearDialogProps) {
-  const textos = useTextosDaCasca()
+export function RenameDialog({ conversa, onClose, onRenomear }: RenameDialogProps) {
+  const textos = useShellTexts()
   const t = textos.listas.renomear
-  const [titulo, setTitulo] = useState("")
-  const [salvando, setSalvando] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
+  const [titulo, setTitle] = useState("")
+  const [salvando, setSaving] = useState(false)
+  const [erro, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (conversa) { setTitulo(conversa.titulo ?? ""); setErro(null) }
+    if (conversa) { setTitle(conversa.titulo ?? ""); setError(null) }
   }, [conversa])
 
   async function salvar() {
     const limpo = titulo.trim()
     if (!limpo || salvando || !conversa) return
-    setSalvando(true)
-    setErro(null)
+    setSaving(true)
+    setError(null)
     try {
       const r = await onRenomear(conversa.id, limpo)
       if (r.ok) onClose()
-      else setErro(r.erro ?? t.falhou)
+      else setError(r.erro ?? t.falhou)
     } finally {
-      setSalvando(false)
+      setSaving(false)
     }
   }
 
@@ -71,7 +71,7 @@ export function RenomearDialog({ conversa, onClose, onRenomear }: RenomearDialog
             maxLength={120}
             autoFocus
             disabled={salvando}
-            onChange={(e) => setTitulo(e.target.value)}
+            onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); salvar() } }}
           />
           {erro && (

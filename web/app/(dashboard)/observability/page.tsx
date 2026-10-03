@@ -9,12 +9,12 @@ import { useWorkspace } from "@/context/WorkspaceContext"
 import { GisFlowService } from "@/service/GisFlowService"
 import { createToast } from "@/utils/createToast"
 import { AgoraFaixa } from "@/app/components/observability/agora-faixa"
-import { montarAtencao, textoDeVazio, type AcaoDeAtencao } from "@/app/components/observability/atencao"
+import { montarAtencao, textoDeVazio, type AttentionAction } from "@/app/components/observability/atencao"
 import { AtencaoLista } from "@/app/components/observability/atencao-lista"
 import { CabecalhoDoHistorico } from "@/app/components/observability/cabecalho"
 import { Filtros } from "@/app/components/observability/filtros"
 import { GraficoPorDia } from "@/app/components/observability/grafico-por-dia"
-import { filtrosAtivos, type Visao } from "@/app/components/observability/historico-url"
+import { filtrosAtivos, type ViewKind } from "@/app/components/observability/historico-url"
 import { Indicadores } from "@/app/components/observability/indicadores"
 import { PainelExecucao } from "@/app/components/observability/painel-execucao"
 import { TabelaExecucoes } from "@/app/components/observability/tabela-execucoes"
@@ -24,26 +24,26 @@ import { useHistoricoUrl } from "@/app/components/observability/use-historico-ur
 import { usePendingAcks, VisaoConfirmacoes } from "@/app/components/observability/visao-confirmacoes"
 import { VisaoExecutores } from "@/app/components/observability/visao-executores"
 import { VisaoWorkflows } from "@/app/components/observability/visao-workflows"
-import { VisoesAbas, type ContagensDasVisoes } from "@/app/components/observability/visoes-abas"
+import { VisoesAbas, type ViewCounts } from "@/app/components/observability/visoes-abas"
 
 /**
  * History (docs/specs/metrics-history.md §4.3). The page only composes: the
  * state lives in the URL, the data in the two hooks, and each block decides its
  * own text. The `Suspense` is required by `useSearchParams` in the static build.
  */
-export default function HistoricoPage() {
+export default function HistoryPage() {
   return (
-    <Suspense fallback={<PageRoot><EsqueletoDaPagina /></PageRoot>}>
-      <Historico />
+    <Suspense fallback={<PageRoot><PageSkeleton /></PageRoot>}>
+      <HistoryView />
     </Suspense>
   )
 }
 
-function Historico() {
+function HistoryView() {
   const { data: session, status } = useSession()
   const isAdmin = session?.user?.role === "admin"
   const habilitado = status === "authenticated"
-  const { workspaces: meusWorkspaces } = useWorkspace()
+  const { workspaces: myWorkspaces } = useWorkspace()
 
   const { estado, atualizar, abrirExecucao, fecharExecucao } = useHistoricoUrl()
   const dados = useHistoricoDados(estado, { habilitado })
@@ -52,11 +52,11 @@ function Historico() {
 
   // "Confirmações" is admin-only; the session resolves after the first render and
   // a URL pasted by an admin must not leave someone else on an empty tab.
-  const visao: Visao = estado.visao === "confirmacoes" && !isAdmin ? "execucoes" : estado.visao
+  const visao: ViewKind = estado.visao === "confirmacoes" && !isAdmin ? "execucoes" : estado.visao
 
   // Workflow origin by hash: the alert metrics do not carry it, the per-workflow
   // inventory does — it is what gives the assistant badge in the attention list.
-  const origemPorWorkflow = useMemo(() => {
+  const originByWorkflow = useMemo(() => {
     const m = new Map<string, string | null | undefined>()
     for (const wf of dados.workflows) m.set(wf.workflow_hash, wf.origem)
     return m
@@ -66,42 +66,42 @@ function Historico() {
     () => montarAtencao({
       metrics: dados.metrics,
       executores: dados.executores,
-      origemDoWorkflow: hash => origemPorWorkflow.get(hash),
+      origemDoWorkflow: hash => originByWorkflow.get(hash),
     }),
-    [dados.metrics, dados.executores, origemPorWorkflow],
+    [dados.metrics, dados.executores, originByWorkflow],
   )
 
   // The "Assistente" chip also slices the "Por workflow" view. Here it is local:
   // the inventory comes whole in a single call, with no pagination to redo.
-  const workflowsVisiveis = useMemo(
+  const visibleWorkflows = useMemo(
     () => estado.assistente ? dados.workflows.filter(w => w.origem === "assistente") : dados.workflows,
     [dados.workflows, estado.assistente],
   )
-  const vazioDaAtencao = useMemo(() => textoDeVazio(dados.metrics), [dados.metrics])
+  const attentionEmptyText = useMemo(() => textoDeVazio(dados.metrics), [dados.metrics])
 
   // Workspaces for the filter: the person's own, plus those that appear in the
   // workflow rows — for an admin, that is how other people's workspaces get into
   // the list. The options only grow: with a workspace chosen, `dados.workflows`
   // comes sliced by it, and without the memory the admin's select would lose the others.
-  const workspacesVistos = useRef(new Map<string, string>())
-  const workspacesDoFiltro = useMemo(() => {
-    const porId = workspacesVistos.current
-    for (const w of meusWorkspaces) porId.set(w.id_hash, w.name)
+  const seenWorkspaces = useRef(new Map<string, string>())
+  const filterWorkspaces = useMemo(() => {
+    const byId = seenWorkspaces.current
+    for (const w of myWorkspaces) byId.set(w.id_hash, w.name)
     for (const wf of dados.workflows) {
-      if (wf.workspace_id && !porId.has(wf.workspace_id)) porId.set(wf.workspace_id, wf.workspace_name ?? wf.workspace_id)
+      if (wf.workspace_id && !byId.has(wf.workspace_id)) byId.set(wf.workspace_id, wf.workspace_name ?? wf.workspace_id)
     }
-    return [...porId].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
-  }, [meusWorkspaces, dados.workflows])
-  const mostrarWorkspace = isAdmin || workspacesDoFiltro.length > 1
+    return [...byId].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+  }, [myWorkspaces, dados.workflows])
+  const mostrarWorkspace = isAdmin || filterWorkspaces.length > 1
 
   // Friendly executor names for the Confirmações view, which only receives ids.
-  const nomesDosExecutores = useMemo(() => {
+  const executorNames = useMemo(() => {
     const m: Record<string, string> = {}
     for (const e of dados.executores) if (e.executor_id) m[e.executor_id] = e.display_name
     return m
   }, [dados.executores])
 
-  const contagens: ContagensDasVisoes = useMemo(() => ({
+  const contagens: ViewCounts = useMemo(() => ({
     execucoes: execucoes.total,
     workflows: dados.workflows.length || null,
     executores: dados.executores.length || null,
@@ -110,12 +110,12 @@ function Historico() {
     confirmacoes: isAdmin && acks.atrasadas.length > 0 ? acks.atrasadas.length : null,
   }), [execucoes.total, dados.workflows.length, dados.executores.length, isAdmin, acks.atrasadas.length])
 
-  const atualizarTudo = useCallback(() => {
+  const refreshAll = useCallback(() => {
     dados.recarregar()
     execucoes.recarregar()
   }, [dados, execucoes])
 
-  const aoAcaoDeAtencao = useCallback((acao: AcaoDeAtencao) => {
+  const onAttentionAction = useCallback((acao: AttentionAction) => {
     switch (acao.tipo) {
       case "abrir-execucao":
         abrirExecucao(acao.runId)
@@ -154,7 +154,7 @@ function Historico() {
         periodo={estado.periodo}
         onPeriodo={p => atualizar({ periodo: p })}
         carregando={dados.carregando}
-        onAtualizar={atualizarTudo}
+        onAtualizar={refreshAll}
         comparandoCom={estado.periodo}
       />
 
@@ -186,8 +186,8 @@ function Historico() {
         <AtencaoLista
           itens={atencao}
           carregando={dados.carregando}
-          vazio={vazioDaAtencao}
-          onAcao={aoAcaoDeAtencao}
+          vazio={attentionEmptyText}
+          onAcao={onAttentionAction}
           falha={dados.falhas.executores}
         />
       </div>
@@ -211,7 +211,7 @@ function Historico() {
                 // workspace and workflow: with executor, origin or search active
                 // the chip's number would belong to another list — better none.
                 contagens={estado.executor || estado.origem || estado.q.trim() ? undefined : dados.metrics?.by_status}
-                workspaces={workspacesDoFiltro}
+                workspaces={filterWorkspaces}
                 workflows={dados.workflows}
                 executores={dados.executores}
                 mostrarWorkspace={mostrarWorkspace}
@@ -241,7 +241,7 @@ function Historico() {
             <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               Filtrado por
               {estado.workspace && (
-                <span>workspace <span className="font-medium text-foreground">«{workspacesDoFiltro.find(w => w.id === estado.workspace)?.name ?? estado.workspace}»</span></span>
+                <span>workspace <span className="font-medium text-foreground">«{filterWorkspaces.find(w => w.id === estado.workspace)?.name ?? estado.workspace}»</span></span>
               )}
               {estado.workflow && (
                 <span>workflow <span className="font-medium text-foreground">«{dados.workflows.find(w => w.workflow_hash === estado.workflow)?.workflow_name ?? estado.workflow}»</span></span>
@@ -256,7 +256,7 @@ function Historico() {
             <>
               {dados.falhas.workflows && <Aviso>{dados.falhas.workflows}{dados.workflows.length > 0 && " Mostrando a última leitura."}</Aviso>}
               <VisaoWorkflows
-                linhas={workflowsVisiveis}
+                linhas={visibleWorkflows}
                 carregando={dados.carregando}
                 isAdmin={isAdmin}
                 onVerExecucoes={hash => atualizar({ workflow: hash, visao: "execucoes" })}
@@ -277,7 +277,7 @@ function Historico() {
           )}
 
           {visao === "confirmacoes" && (
-            <VisaoConfirmacoes acks={acks} onAbrirExecucao={abrirExecucao} nomes={nomesDosExecutores} />
+            <VisaoConfirmacoes acks={acks} onAbrirExecucao={abrirExecucao} nomes={executorNames} />
           )}
         </div>
       </div>
@@ -300,7 +300,7 @@ function Aviso({ children }: { children: React.ReactNode }) {
   )
 }
 
-function EsqueletoDaPagina() {
+function PageSkeleton() {
   return (
     <div className="flex flex-col gap-4" role="status" aria-busy="true" aria-label="Carregando o Histórico">
       <div className="flex flex-col gap-2">

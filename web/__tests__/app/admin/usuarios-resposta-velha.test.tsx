@@ -35,7 +35,7 @@ const pagina = (...items: IAdminUser[]): { success: true; status: 200; data: IAd
 
 /** Each fetch stays pending until the test resolves it — in whatever order it wants. */
 let pendentes: { params: IAdminUserListParams; resolver: (r: unknown) => void }[] = []
-function resolverDoFiltro(status: string | undefined, resposta: unknown) {
+function resolveForFilter(status: string | undefined, resposta: unknown) {
   const i = pendentes.findIndex(p => p.params.status === status)
   if (i < 0) throw new Error(`nenhuma busca pendente para status=${status}`)
   const [p] = pendentes.splice(i, 1)
@@ -54,7 +54,7 @@ describe("Admin › Usuários — resposta de filtro antigo", () => {
   it("duas respostas fora de ordem: a tela fica com a do filtro ATUAL", async () => {
     render(<AdminUsersPage />)
     await waitFor(() => expect(svc.getAdminUsers).toHaveBeenCalledTimes(1))
-    await resolverDoFiltro("active", pagina(usuario("ana", "active")))
+    await resolveForFilter("active", pagina(usuario("ana", "active")))
     expect(await screen.findByText("ana")).toBeInTheDocument()
 
     // Two filter changes in a row: both fetches are in flight together.
@@ -63,8 +63,8 @@ describe("Admin › Usuários — resposta de filtro antigo", () => {
     await waitFor(() => expect(pendentes.map(p => p.params.status)).toEqual(["suspended", "deleted"]))
 
     // The current filter's arrives first; the old filter's, afterward.
-    await resolverDoFiltro("deleted", pagina(usuario("carla", "deleted")))
-    await resolverDoFiltro("suspended", pagina(usuario("bruno", "suspended")))
+    await resolveForFilter("deleted", pagina(usuario("carla", "deleted")))
+    await resolveForFilter("suspended", pagina(usuario("bruno", "suspended")))
 
     expect(screen.getByRole("button", { name: "Excluídos" })).toHaveAttribute("aria-pressed", "true")
     expect(screen.getByText("carla")).toBeInTheDocument()
@@ -74,12 +74,12 @@ describe("Admin › Usuários — resposta de filtro antigo", () => {
   it("recarga que falha sobre a lista pronta mantém a lista e avisa por toast", async () => {
     render(<AdminUsersPage />)
     await waitFor(() => expect(svc.getAdminUsers).toHaveBeenCalledTimes(1))
-    await resolverDoFiltro("active", pagina(usuario("ana", "active")))
+    await resolveForFilter("active", pagina(usuario("ana", "active")))
     await screen.findByText("ana")
 
     fireEvent.click(screen.getByRole("button", { name: "Atualizar a lista de usuários" }))
     await waitFor(() => expect(pendentes).toHaveLength(1))
-    await resolverDoFiltro("active", { success: false, status: 500, error: { name: "AxiosError", message: "boom" } })
+    await resolveForFilter("active", { success: false, status: 500, error: { name: "AxiosError", message: "boom" } })
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Não foi possível atualizar os usuários."))
     expect(screen.getByText("ana")).toBeInTheDocument()
@@ -89,7 +89,7 @@ describe("Admin › Usuários — resposta de filtro antigo", () => {
   it("erro na 1ª carga: o cartão de erro, e sem toast", async () => {
     render(<AdminUsersPage />)
     await waitFor(() => expect(svc.getAdminUsers).toHaveBeenCalledTimes(1))
-    await resolverDoFiltro("active", { success: false, status: 500, error: { name: "AxiosError", message: "boom" } })
+    await resolveForFilter("active", { success: false, status: 500, error: { name: "AxiosError", message: "boom" } })
 
     expect(await screen.findByText(/A listagem de contas não respondeu/)).toBeInTheDocument()
     expect(toast.error).not.toHaveBeenCalled()

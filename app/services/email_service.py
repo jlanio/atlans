@@ -33,13 +33,13 @@ def _ambiente() -> Environment:
     return _template_env
 
 
-_CHAVE_SENSIVEL = re.compile(r"token|url|link|senha|password|otp", re.IGNORECASE)
+_SENSITIVE_KEY = re.compile(r"token|url|link|senha|password|otp", re.IGNORECASE)
 
 
-def _contexto_sem_segredos(context: dict) -> dict:
+def _context_without_secrets(context: dict) -> dict:
     """The email context as it can go to the log: links, tokens and passwords
     become "***" (the field name stays, so one knows what the email carried)."""
-    return {chave: ("***" if _CHAVE_SENSIVEL.search(str(chave)) else valor) for chave, valor in context.items()}
+    return {chave: ("***" if _SENSITIVE_KEY.search(str(chave)) else valor) for chave, valor in context.items()}
 
 
 async def send_email(to: str, subject: str, template: str, context: dict) -> None:
@@ -56,7 +56,7 @@ async def send_email(to: str, subject: str, template: str, context: dict) -> Non
         logger.warning(
             "[EMAIL-DEV] Nenhum transporte de e-mail configurado. Email NÃO enviado.\n"
             "  Para: %s\n  Assunto: %s\n  Contexto: %s",
-            to, subject, _contexto_sem_segredos(context),
+            to, subject, _context_without_secrets(context),
         )
         logger.debug("[EMAIL-DEV] Contexto completo: %s", context)
         return

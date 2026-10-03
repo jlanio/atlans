@@ -35,9 +35,9 @@ from typing import Callable, Mapping, Sequence
 
 logger = logging.getLogger("executor.stats")
 
-_JANELA_PADRAO_S = 3600.0     # "ultima hora"
-_MAX_AMOSTRAS = 5000          # memory ceiling on a high-throughput executor
-_TAIL_PADRAO = 200            # log lines kept for the footer
+_DEFAULT_WINDOW_S = 3600.0     # "ultima hora"
+_MAX_SAMPLES = 5000          # memory ceiling on a high-throughput executor
+_DEFAULT_TAIL = 200            # log lines kept for the footer
 _DEDUPE_SYNC = 256            # recent sync events, to ignore resends
 
 
@@ -228,7 +228,7 @@ def _fmt_ts(epoch: float) -> str:
     return time.strftime("%H:%M:%S", time.localtime(epoch))
 
 
-def _travado(metodo):
+def _locked(metodo):
     """Serializes access to the collector's state — see the note on `_lock`."""
     @functools.wraps(metodo)
     def wrapper(self, *args, **kwargs):
@@ -260,9 +260,9 @@ class ExecutorStats:
         version: str = "",
         server_url: str = "",
         clock: Callable[[], float] = time.monotonic,
-        janela_s: float = _JANELA_PADRAO_S,
-        max_amostras: int = _MAX_AMOSTRAS,
-        tail: int = _TAIL_PADRAO,
+        window_s: float = _DEFAULT_WINDOW_S,
+        max_samples: int = _MAX_SAMPLES,
+        tail: int = _DEFAULT_TAIL,
         observer: Callable[[str, dict], None] | None = None,
     ) -> None:
         self.executor_id = executor_id
@@ -281,7 +281,7 @@ class ExecutorStats:
         # the whole executor stalls.
         self._observer = observer
         self._clock = clock
-        self._janela = janela_s
+        self._window = window_s
         self._t0 = clock()
 
         # Most hooks run on the event loop, but `on_log_record` doesn't: the
@@ -302,15 +302,15 @@ class ExecutorStats:
         # (system information), while the counts restart from zero. Without
         # the separation, throughput right after a reset would divide 0 runs by
         # hours of uptime and show ~0 wf/min forever.
-        self._contadores_desde = self._t0
+        self._counters_since = self._t0
 
         # workflows — cumulative counters live OUTSIDE the sliding window,
         # otherwise "total since boot" would become "total in the last hour".
         self._ok = 0
-        self._erro = 0
+        self._error = 0
         self._cancelado = 0
-        self._soma_duracoes = 0.0
-        self._n_duracoes = 0
+        self._durations_sum = 0.0
+        self._n_durations = 0
         self._slowest: tuple[str, float] | None = None
         self._last_finished: tuple[str, str, float] | None = None
         self._nodes_executed = 0
@@ -318,8 +318,8 @@ class ExecutorStats:
         self._wf_cpu_peak: float | None = None
         self._wf_mem_peak: float | None = None
 
-        # janela deslizante: (ts, duracao_s, status)
-        self._janela_jobs: deque[tuple[float, float, str]] = deque(maxlen=max_amostras)
+        # janela sliding: (ts, duration_s, status)
+        self._jobs_window: deque[tuple[float, float, str]] = deque(maxlen=max_samples)
 
         # jobs em execucao
         self._running: dict[str, _RunState] = {}
@@ -327,38 +327,38 @@ class ExecutorStats:
         # Ids already counted. A job cancelled while running arrives TWICE:
         # through on_execute's `finally` and through the queue's on_cancelled.
         # Without this short memory it would appear twice in the total.
-        self._finalizados: deque[str] = deque(maxlen=256)
-        self._finalizados_set: set[str] = set()
+        self._finished: deque[str] = deque(maxlen=256)
+        self._finished_set: set[str] = set()
 
         # conexao
         self._conn_state = "offline"
-        self._conn_desde: float | None = None
+        self._conn_since: float | None = None
         self._reconnects = 0
-        self._ultimo_heartbeat: float | None = None
-        self._proximo_retry: float | None = None
+        self._last_heartbeat: float | None = None
+        self._next_retry: float | None = None
 
         # geosync
         self._sync_up_arq = 0
         self._sync_up_bytes = 0
         self._sync_down_arq = 0
         self._sync_down_bytes = 0
-        self._sync_erros = 0
-        self._sync_conflitos = 0
-        self._sync_atual: str | None = None
+        self._sync_errors = 0
+        self._sync_conflicts = 0
+        self._sync_current: str | None = None
         self._sync_total = 0
         self._sync_synced = 0
         self._sync_pending = 0
         # Resending an event via the connection's _requeue_event would make the SAME
         # upload count twice. The timestamp is fixed at emit and survives the
         # requeue, so it serves as an identity key.
-        self._sync_vistos: deque[tuple] = deque(maxlen=_DEDUPE_SYNC)
-        self._sync_vistos_set: set[tuple] = set()
+        self._sync_seen: deque[tuple] = deque(maxlen=_DEDUPE_SYNC)
+        self._sync_seen_set: set[tuple] = set()
 
         # log
         self._tail: deque[LogLine] = deque(maxlen=tail)
-        self._janela_logs: deque[tuple[float, int]] = deque(maxlen=max_amostras)
+        self._logs_window: deque[tuple[float, int]] = deque(maxlen=max_samples)
 
-    @_travado
+    @_locked
     def reset(self) -> None:
         """Resets the session counts without touching the live state.
 
@@ -367,26 +367,26 @@ class ExecutorStats:
         running), the connection state and the process uptime.
         """
         agora = self._clock()
-        self._contadores_desde = agora
+        self._counters_since = agora
 
-        self._ok = self._erro = self._cancelado = 0
-        self._soma_duracoes = 0.0
-        self._n_duracoes = 0
+        self._ok = self._error = self._cancelado = 0
+        self._durations_sum = 0.0
+        self._n_durations = 0
         self._slowest = None
         self._last_finished = None
         self._nodes_executed = self._nodes_failed = 0
         self._wf_cpu_peak = self._wf_mem_peak = None
-        self._janela_jobs.clear()
+        self._jobs_window.clear()
 
         self._sync_up_arq = self._sync_up_bytes = 0
         self._sync_down_arq = self._sync_down_bytes = 0
-        self._sync_erros = self._sync_conflitos = 0
+        self._sync_errors = self._sync_conflicts = 0
 
         self._reconnects = 0
         self._tail.clear()
-        self._janela_logs.clear()
+        self._logs_window.clear()
 
-        # `_finalizados` and `_sync_vistos` are NOT reset: they are deduplication
+        # `_finished` and `_sync_seen` are NOT reset: they are deduplication
         # memories, not counters. Clearing them would make an event resent
         # right after the reset count again.
 
@@ -404,7 +404,7 @@ class ExecutorStats:
         """
         self._observer = observer
 
-    def _emitir(self, tipo: str, dados: dict) -> None:
+    def _emit(self, tipo: str, dados: dict) -> None:
         """Delivers to the observer, best-effort. Same rule as the `on_*` hooks:
         broken telemetry never brings down a workflow execution."""
         obs = self._observer
@@ -417,20 +417,20 @@ class ExecutorStats:
 
     # ── Escrita: jobs ────────────────────────────────────────────────────────
 
-    @_travado
+    @_locked
     def on_job_started(self, job_id: str, run_id: str | None = None) -> None:
         st = _RunState(job_id=job_id, run_id=run_id, started_at=self._clock())
         self._running[job_id] = st
         if run_id:
             self._run_para_job[run_id] = job_id
-        self._emitir("job", {"event": "started", "job_id": job_id, "run_id": run_id})
+        self._emit("job", {"event": "started", "job_id": job_id, "run_id": run_id})
 
-    @_travado
+    @_locked
     def on_job_finished(
         self,
         job_id: str,
         status: str,
-        duracao_s: float,
+        duration_s: float,
         *,
         run_id: str | None = None,
         metrics: Mapping | None = None,
@@ -440,7 +440,7 @@ class ExecutorStats:
         if st and st.run_id:
             self._run_para_job.pop(st.run_id, None)
 
-        self._marcar_finalizado(job_id)
+        self._mark_finished(job_id)
         agora = self._clock()
         if status == "ok":
             self._ok += 1
@@ -448,30 +448,30 @@ class ExecutorStats:
             self._cancelado += 1
         else:
             status = "error"
-            self._erro += 1
+            self._error += 1
 
-        self._janela_jobs.append((agora, duracao_s, status))
-        self._last_finished = (rid, status, duracao_s)
+        self._jobs_window.append((agora, duration_s, status))
+        self._last_finished = (rid, status, duration_s)
 
         # Cancelled doesn't count toward the average: a job killed at 2s says
         # nothing about how long a workflow takes, and would drag the average down.
         if status != "cancelled":
-            self._soma_duracoes += duracao_s
-            self._n_duracoes += 1
-            if self._slowest is None or duracao_s > self._slowest[1]:
-                self._slowest = (rid, duracao_s)
+            self._durations_sum += duration_s
+            self._n_durations += 1
+            if self._slowest is None or duration_s > self._slowest[1]:
+                self._slowest = (rid, duration_s)
 
-        self._absorver_metrics(metrics)
+        self._absorb_metrics(metrics)
         run = (metrics or {}).get("run") or {}
-        self._emitir("job", {
+        self._emit("job", {
             "event": "cancelled" if status == "cancelled" else "finished",
             "job_id": job_id, "run_id": rid, "status": status,
-            "duration_s": duracao_s,
+            "duration_s": duration_s,
             "nodes_executed": run.get("nodes_executed"),
             "nodes_failed": run.get("nodes_failed"),
         })
 
-    @_travado
+    @_locked
     def on_job_cancelled(self, job_id: str, motivo: str | None = None) -> None:
         """Cancellation reported by the queue.
 
@@ -480,30 +480,30 @@ class ExecutorStats:
         running (not counted anywhere). We tell them apart by the memory of
         finished ids: without it, the first case would be added twice.
         """
-        if job_id in self._finalizados_set:
+        if job_id in self._finished_set:
             return
         if job_id in self._running:
             # Delegates — on_job_finished is the one that emits, otherwise the event
             # would go out twice for the same cancellation.
             self.on_job_finished(job_id, "cancelled", 0.0)
             return
-        self._marcar_finalizado(job_id)
+        self._mark_finished(job_id)
         self._cancelado += 1
-        self._janela_jobs.append((self._clock(), 0.0, "cancelled"))
-        self._emitir("job", {
+        self._jobs_window.append((self._clock(), 0.0, "cancelled"))
+        self._emit("job", {
             "event": "cancelled", "job_id": job_id, "run_id": None,
             "status": "cancelled", "duration_s": 0.0, "motivo": motivo,
         })
 
-    def _marcar_finalizado(self, job_id: str) -> None:
-        if job_id in self._finalizados_set:
+    def _mark_finished(self, job_id: str) -> None:
+        if job_id in self._finished_set:
             return
-        if len(self._finalizados) == self._finalizados.maxlen:
-            self._finalizados_set.discard(self._finalizados[0])
-        self._finalizados.append(job_id)
-        self._finalizados_set.add(job_id)
+        if len(self._finished) == self._finished.maxlen:
+            self._finished_set.discard(self._finished[0])
+        self._finished.append(job_id)
+        self._finished_set.add(job_id)
 
-    def _absorver_metrics(self, metrics: Mapping | None) -> None:
+    def _absorb_metrics(self, metrics: Mapping | None) -> None:
         """Extrai o bloco `run` de stats['__metrics__'] (flow/metrics/collector)."""
         if not metrics:
             return
@@ -522,7 +522,7 @@ class ExecutorStats:
 
     # ── Escrita: eventos da fila (node events + sync events) ─────────────────
 
-    @_travado
+    @_locked
     def on_event(self, event: Mapping) -> None:
         try:
             if event.get("type") == "sync_event":
@@ -570,12 +570,12 @@ class ExecutorStats:
 
     def _on_sync_event(self, event: Mapping) -> None:
         chave = (event.get("event"), event.get("dataset"), event.get("timestamp"))
-        if chave in self._sync_vistos_set:
+        if chave in self._sync_seen_set:
             return  # resend via _requeue_event — already counted
-        if len(self._sync_vistos) == self._sync_vistos.maxlen:
-            self._sync_vistos_set.discard(self._sync_vistos[0])
-        self._sync_vistos.append(chave)
-        self._sync_vistos_set.add(chave)
+        if len(self._sync_seen) == self._sync_seen.maxlen:
+            self._sync_seen_set.discard(self._sync_seen[0])
+        self._sync_seen.append(chave)
+        self._sync_seen_set.add(chave)
 
         nome = event.get("event")
         dataset = event.get("dataset") or ""
@@ -587,22 +587,22 @@ class ExecutorStats:
         if nome == "file_uploaded":
             self._sync_up_arq += max(int(event.get("file_count") or 1), 1)
             self._sync_up_bytes += total_bytes
-            self._sync_atual = None
+            self._sync_current = None
         elif nome == "file_downloaded":
             self._sync_down_arq += 1
             self._sync_down_bytes += total_bytes
-            self._sync_atual = None
+            self._sync_current = None
         elif nome == "file_uploading":
-            self._sync_atual = f"↑ {dataset}"
+            self._sync_current = f"↑ {dataset}"
         elif nome == "file_downloading":
-            self._sync_atual = f"↓ {dataset}"
+            self._sync_current = f"↓ {dataset}"
         elif nome == "sync_error":
-            self._sync_erros += 1
-            self._sync_atual = None
+            self._sync_errors += 1
+            self._sync_current = None
         elif nome == "conflict_detected":
-            self._sync_conflitos += 1
+            self._sync_conflicts += 1
         elif nome in ("sync_complete", "sync_started"):
-            self._sync_atual = None
+            self._sync_current = None
         elif nome == "sync_inventory":
             # Replaces, doesn't accumulate: it is a snapshot of the manifest, not an
             # event counter.
@@ -613,43 +613,43 @@ class ExecutorStats:
             except (TypeError, ValueError):
                 pass
 
-        self._emitir("sync", {
+        self._emit("sync", {
             "event": nome, "dataset": dataset, "total_bytes": total_bytes,
         })
 
     # ── Escrita: conexao ─────────────────────────────────────────────────────
 
-    @_travado
+    @_locked
     def on_connecting(self) -> None:
-        self._conn_state = "reconnecting" if self._reconnects or self._conn_desde else "connecting"
-        self._emitir("conn", {"state": self._conn_state, "reconnects": self._reconnects})
+        self._conn_state = "reconnecting" if self._reconnects or self._conn_since else "connecting"
+        self._emit("conn", {"state": self._conn_state, "reconnects": self._reconnects})
 
-    @_travado
+    @_locked
     def on_connected(self) -> None:
-        if self._conn_desde is not None:
+        if self._conn_since is not None:
             self._reconnects += 1
         self._conn_state = "connected"
-        self._conn_desde = self._clock()
-        self._proximo_retry = None
-        self._emitir("conn", {"state": "connected", "reconnects": self._reconnects})
+        self._conn_since = self._clock()
+        self._next_retry = None
+        self._emit("conn", {"state": "connected", "reconnects": self._reconnects})
 
-    @_travado
-    def on_disconnected(self, *, proximo_retry_s: float | None = None, terminal: bool = False) -> None:
+    @_locked
+    def on_disconnected(self, *, next_retry_s: float | None = None, terminal: bool = False) -> None:
         self._conn_state = "terminal" if terminal else "reconnecting"
-        self._proximo_retry = None if terminal else proximo_retry_s
-        self._ultimo_heartbeat = None
-        self._emitir("conn", {
+        self._next_retry = None if terminal else next_retry_s
+        self._last_heartbeat = None
+        self._emit("conn", {
             "state": self._conn_state, "reconnects": self._reconnects,
-            "next_retry_in_s": self._proximo_retry,
+            "next_retry_in_s": self._next_retry,
         })
 
-    @_travado
+    @_locked
     def on_heartbeat(self) -> None:
-        self._ultimo_heartbeat = self._clock()
+        self._last_heartbeat = self._clock()
 
     # ── Escrita: log ─────────────────────────────────────────────────────────
 
-    @_travado
+    @_locked
     def on_log_record(self, record: logging.LogRecord, alias: str, level: str) -> None:
         try:
             self._tail.append(LogLine(
@@ -658,20 +658,20 @@ class ExecutorStats:
                 alias=alias.strip(),
                 msg=record.getMessage(),
             ))
-            self._janela_logs.append((self._clock(), record.levelno))
+            self._logs_window.append((self._clock(), record.levelno))
         except Exception:
             pass
 
     # ── Leitura ──────────────────────────────────────────────────────────────
 
-    def _podar(self) -> None:
-        limite = self._clock() - self._janela
-        while self._janela_jobs and self._janela_jobs[0][0] < limite:
-            self._janela_jobs.popleft()
-        while self._janela_logs and self._janela_logs[0][0] < limite:
-            self._janela_logs.popleft()
+    def _prune(self) -> None:
+        limite = self._clock() - self._window
+        while self._jobs_window and self._jobs_window[0][0] < limite:
+            self._jobs_window.popleft()
+        while self._logs_window and self._logs_window[0][0] < limite:
+            self._logs_window.popleft()
 
-    @_travado
+    @_locked
     def snapshot(
         self,
         *,
@@ -681,26 +681,26 @@ class ExecutorStats:
         outbox_pending: int = 0,
         result_queue_size: int = 0,
     ) -> Snapshot:
-        self._podar()
+        self._prune()
         agora = self._clock()
         cap = capacity or {}
         rec = recursos or {}
         proc = processo or {}
 
-        duracoes = sorted(d for _, d, s in self._janela_jobs if s != "cancelled")
-        hora_total = len(self._janela_jobs)
-        hora_erro = sum(1 for _, _, s in self._janela_jobs if s == "error")
+        duracoes = sorted(d for _, d, s in self._jobs_window if s != "cancelled")
+        hour_total = len(self._jobs_window)
+        hour_errors = sum(1 for _, _, s in self._jobs_window if s == "error")
 
-        finalizados = self._ok + self._erro + self._cancelado
+        finished = self._ok + self._error + self._cancelado
         # 1.0 on a freshly started executor: showing "0% de sucesso" (0% success)
         # before the first run would be a false alarm.
-        taxa = (self._ok / finalizados) if finalizados else 1.0
+        taxa = (self._ok / finished) if finished else 1.0
 
         uptime = agora - self._t0
         # Throughput measures from the COUNTERS baseline, not the process's: after
         # a reset, dividing the new runs by hours of uptime would give ~0.
-        medindo_ha = agora - self._contadores_desde
-        vazao = (hora_total / (min(medindo_ha, self._janela) / 60.0)) if medindo_ha > 1 else 0.0
+        measuring_for = agora - self._counters_since
+        throughput = (hour_total / (min(measuring_for, self._window) / 60.0)) if measuring_for > 1 else 0.0
 
         running = tuple(
             RunningJob(
@@ -720,15 +720,15 @@ class ExecutorStats:
             server_url=self.server_url,
             system=dict(self.system),
             uptime_s=uptime,
-            contando_ha_s=medindo_ha,
+            contando_ha_s=measuring_for,
             total_ok=self._ok,
-            total_error=self._erro,
+            total_error=self._error,
             total_cancelled=self._cancelado,
             success_rate=taxa,
-            last_hour_total=hora_total,
-            last_hour_error=hora_erro,
-            throughput_per_min=round(vazao, 2),
-            avg_duration_s=(self._soma_duracoes / self._n_duracoes) if self._n_duracoes else None,
+            last_hour_total=hour_total,
+            last_hour_error=hour_errors,
+            throughput_per_min=round(throughput, 2),
+            avg_duration_s=(self._durations_sum / self._n_durations) if self._n_durations else None,
             p50_duration_s=percentile(duracoes, 0.50),
             p95_duration_s=percentile(duracoes, 0.95),
             slowest=self._slowest,
@@ -756,10 +756,10 @@ class ExecutorStats:
             result_queue_size=result_queue_size,
             outbox_pending=outbox_pending,
             conn_state=self._conn_state,
-            conn_since_s=(agora - self._conn_desde) if self._conn_desde is not None else None,
+            conn_since_s=(agora - self._conn_since) if self._conn_since is not None else None,
             reconnects=self._reconnects,
-            heartbeat_age_s=(agora - self._ultimo_heartbeat) if self._ultimo_heartbeat else None,
-            next_retry_in_s=self._proximo_retry,
+            heartbeat_age_s=(agora - self._last_heartbeat) if self._last_heartbeat else None,
+            next_retry_in_s=self._next_retry,
             sync_dirs=self.sync_dirs,
             sync_total=self._sync_total,
             sync_synced=self._sync_synced,
@@ -768,12 +768,12 @@ class ExecutorStats:
             sync_bytes_up=self._sync_up_bytes,
             sync_files_down=self._sync_down_arq,
             sync_bytes_down=self._sync_down_bytes,
-            sync_errors=self._sync_erros,
-            sync_conflicts=self._sync_conflitos,
-            sync_current=self._sync_atual,
+            sync_errors=self._sync_errors,
+            sync_conflicts=self._sync_conflicts,
+            sync_current=self._sync_current,
             log_tail=tuple(self._tail),
-            log_warn_count=sum(1 for _, lv in self._janela_logs if lv == logging.WARNING),
-            log_error_count=sum(1 for _, lv in self._janela_logs if lv >= logging.ERROR),
+            log_warn_count=sum(1 for _, lv in self._logs_window if lv == logging.WARNING),
+            log_error_count=sum(1 for _, lv in self._logs_window if lv >= logging.ERROR),
         )
 
 

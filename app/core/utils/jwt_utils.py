@@ -63,7 +63,7 @@ _HASH = re.compile(
 )
 
 
-def _pre_chave(plain: str, salt: str, versao: int) -> bytes:
+def _pre_key(plain: str, salt: str, versao: int) -> bytes:
     """The password as bcrypt receives it: HMAC-SHA256 with the salt (v2) or plain
     SHA-256 (v1), in base64 — 44 bytes, within bcrypt's 72-byte limit."""
     senha = plain.encode("utf-8")
@@ -78,7 +78,7 @@ def hash_password(plain: str) -> str:
     """A new `bcrypt_sha256` v2 hash, with its own salt."""
     config = bcrypt.gensalt(rounds=_ROUNDS, prefix=b"2b")          # b"$2b$12$<salt>"
     salt = config[-22:].decode("ascii")
-    completo = bcrypt.hashpw(_pre_chave(plain, salt, 2), config).decode("ascii")
+    completo = bcrypt.hashpw(_pre_key(plain, salt, 2), config).decode("ascii")
     return f"$bcrypt-sha256$v=2,t=2b,r={_ROUNDS}${salt}${completo[-31:]}"
 
 
@@ -93,7 +93,7 @@ def verify_password(plain: str, hashed: str) -> bool:
     rounds = int(partes["rounds"] or partes["rounds1"])
     config = f"${tipo}${rounds:02d}${partes['salt']}".encode("ascii")
     try:
-        calculado = bcrypt.hashpw(_pre_chave(plain, partes["salt"], versao), config)
+        calculado = bcrypt.hashpw(_pre_key(plain, partes["salt"], versao), config)
     except ValueError:
         return False
     return hmac.compare_digest(calculado[-31:], partes["digest"].encode("ascii"))
@@ -286,11 +286,11 @@ _REFRESH_RATE_WINDOW = 60
 async def refresh_rate_exceeded(family: str) -> bool:
     """True if this family has already exceeded the refresh ceiling in the window.
 
-    Fixed-window Redis counter (`contar_na_janela`: the deadline starts at the
+    Fixed-window Redis counter (`count_in_window`: the deadline starts at the
     first count and does not move). Keyed by family — immune to the single-IP
     problem of the internal hop.
     """
-    from app.core.redis import contar_na_janela
+    from app.core.redis import count_in_window
 
-    count, _ = await contar_na_janela(f"{_REFRESH_RATE_PREFIX}{family}", _REFRESH_RATE_WINDOW)
+    count, _ = await count_in_window(f"{_REFRESH_RATE_PREFIX}{family}", _REFRESH_RATE_WINDOW)
     return count > _REFRESH_RATE_LIMIT

@@ -10,7 +10,7 @@ from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 import pytest
 
 
-def test_encryption_module_usa_multifernet():
+def test_encryption_module_uses_multifernet():
     """The app's cipher object is a MultiFernet and the basic round-trip works."""
     import app.core.utils.encryption as enc
 
@@ -18,7 +18,7 @@ def test_encryption_module_usa_multifernet():
     assert enc.decrypt_string(enc.encrypt_string("segredo")) == "segredo"
 
 
-def test_multifernet_le_antiga_e_cifra_com_a_nova():
+def test_multifernet_reads_old_and_encrypts_with_new():
     """Rotation contract the module delivers when given [new, old].
 
     - A token encrypted with the OLD key remains readable.
@@ -28,13 +28,13 @@ def test_multifernet_le_antiga_e_cifra_com_a_nova():
     nova = Fernet(Fernet.generate_key())
     mf = MultiFernet([nova, antiga])   # order = the one the config produces from "new,old"
 
-    token_antigo = antiga.encrypt(b"valor-legado")
-    assert mf.decrypt(token_antigo) == b"valor-legado"
+    old_token = antiga.encrypt(b"valor-legado")
+    assert mf.decrypt(old_token) == b"valor-legado"
 
-    token_novo = mf.encrypt(b"valor-novo")
-    assert nova.decrypt(token_novo) == b"valor-novo"
+    new_token = mf.encrypt(b"valor-novo")
+    assert nova.decrypt(new_token) == b"valor-novo"
     with pytest.raises(InvalidToken):
-        antiga.decrypt(token_novo)
+        antiga.decrypt(new_token)
 
 
 def test_config_parseia_fernet_keys():
@@ -57,7 +57,7 @@ def test_config_parseia_fernet_keys():
     assert build("nova,antiga", "atual")[0] == "nova"                    # the first one is always the one that encrypts
 
 
-def test_config_sempre_inclui_fernet_key_no_conjunto_efetivo():
+def test_config_always_includes_fernet_key_in_the_effective_set():
     """In the real module (FERNET_KEYS not set in the test environment), the
     effective set contains FERNET_KEY."""
     from app.core import config

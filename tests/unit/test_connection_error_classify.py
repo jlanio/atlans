@@ -34,7 +34,7 @@ def _conn_closed(code: int):
 
 
 @pytest.mark.parametrize("status", [401, 403, 404, 502, 503])
-def test_http_status_no_handshake_nunca_e_terminal(status):
+def test_http_status_in_handshake_is_never_terminal(status):
     """The bug: a 404 from Traefik during a deploy must not bring the executor down."""
     _msg, _tb, terminal = _classify_connection_error(_invalid_status(status))
     assert terminal is False, f"HTTP {status} no handshake NAO deve ser terminal"
@@ -48,12 +48,12 @@ def test_close_code_4xxx_do_app_e_terminal(code):
 
 
 @pytest.mark.parametrize("code", [1006, 1001, 1011, 4408])
-def test_close_code_transitorio_nao_e_terminal(code):
+def test_transient_close_code_is_not_terminal(code):
     """Queda abrupta / going-away / heartbeat timeout → reconectar."""
     _msg, _tb, terminal = _classify_connection_error(_conn_closed(code))
     assert terminal is False, f"close code {code} nao deve ser terminal"
 
 
-def test_oserror_de_rede_nao_e_terminal():
+def test_network_oserror_is_not_terminal():
     _msg, _tb, terminal = _classify_connection_error(ConnectionRefusedError("recusado"))
     assert terminal is False

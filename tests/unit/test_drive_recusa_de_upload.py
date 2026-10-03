@@ -60,7 +60,7 @@ async def servico():
     await eng.dispose()
 
 
-async def _corpo(exc) -> tuple[int, dict]:
+async def _response_body(exc) -> tuple[int, dict]:
     """What the global handler returns to the client for this exception."""
     resp = await atlas_domain_error_handler(MagicMock(), exc)
     return resp.status_code, json.loads(resp.body)
@@ -76,34 +76,34 @@ async def _corpo(exc) -> tuple[int, dict]:
         ("instalador.exe.geojson", "dangerous_inner_extension"),
     ],
 )
-async def test_recusa_por_nome_tem_codigo_proprio_e_continua_422(servico, nome, codigo):
+async def test_name_rejection_has_its_own_code_and_stays_422(servico, nome, codigo):
     with pytest.raises(FileValidationError) as exc:
         await servico.validate_upload(nome, 10)
 
-    status, corpo = await _corpo(exc.value)
+    status, corpo = await _response_body(exc.value)
     assert corpo["error"] == codigo
     assert status == 422
     # The sentence stays the same — it is what the person reads in the panel.
     assert corpo["message"] == exc.value.detail
 
 
-async def test_arquivo_vazio_tem_codigo_proprio_e_continua_422(servico):
+async def test_empty_file_has_its_own_code_and_stays_422(servico):
     with pytest.raises(FileValidationError) as exc:
         await servico.upload_file("ws-1", "dados.csv", b"", uploaded_by="u-1")
 
-    status, corpo = await _corpo(exc.value)
+    status, corpo = await _response_body(exc.value)
     assert corpo == {"error": "empty_file", "message": "Arquivo vazio."}
     assert status == 422
 
 
-async def test_arquivo_acima_do_teto_continua_413_file_too_large(servico):
+async def test_file_above_the_ceiling_stays_413_file_too_large(servico):
     with pytest.raises(FileTooLargeError) as exc:
         await servico.validate_upload("grande.csv", 2 * UM_MB)
 
-    status, corpo = await _corpo(exc.value)
+    status, corpo = await _response_body(exc.value)
     assert corpo["error"] == "file_too_large"
     assert status == 413
 
 
-async def test_extensao_permitida_passa(servico):
+async def test_allowed_extension_passes(servico):
     assert await servico.validate_upload("mapa.GeoJSON", 10) == "geojson"

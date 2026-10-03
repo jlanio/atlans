@@ -109,18 +109,18 @@ export function portasDeSaida(
  * draws); with 2+, on the named handle that exists. `data.to_key` is preserved
  * in both cases.
  */
-export function handleDeEntrada(
+export function inputHandle(
   edge: { target: string; to_key?: string },
-  portasPorNo: Map<string, string[]>,
+  portsByNode: Map<string, string[]>,
 ): string | undefined {
-  const portas = portasPorNo.get(edge.target)
+  const portas = portsByNode.get(edge.target)
   return edge.to_key && portas && portas.length > 1 && portas.includes(edge.to_key)
     ? edge.to_key
     : undefined
 }
 
 /** Minimal edge shape the re-anchoring needs to see. */
-interface ArestaComHandles {
+interface EdgeWithHandles {
   source: string
   target: string
   sourceHandle?: string | null
@@ -134,7 +134,7 @@ interface ArestaComHandles {
  * `buildEdges` resolves the handle from `to_key`/`from_key` only if the node
  * already declares that port. The SubWorkflow (invoke) node receives its ports
  * from an ASYNCHRONOUS contract (~300 ms after hydration), so on the first mount
- * `handleDeEntrada`/`resolveSourceHandle` return `undefined` and React Flow
+ * `inputHandle`/`resolveSourceHandle` return `undefined` and React Flow
  * pins every edge to the first handle — the "everything on the first input"
  * collapse on F5. When the ports arrive, this function returns each edge to its
  * point: `data` preserved `to_key` (input) and `from_key` (output), and now
@@ -143,31 +143,31 @@ interface ArestaComHandles {
  * Returns the SAME array when nothing changes — an anti-loop protection for
  * callers inside an effect with `setEdges` (same rule as `reconciliarPortas`).
  */
-export function reancorarArestasDoNo<E extends ArestaComHandles>(
+export function reancorarArestasDoNo<E extends EdgeWithHandles>(
   edges: E[],
   nodeId: string,
   inputs: string[],
   outputs: string[],
 ): E[] {
-  const nomesEntrada = new Set(inputs)
-  const nomesSaida = new Set(outputs)
+  const inputNames = new Set(inputs)
+  const outputNames = new Set(outputs)
   let mudou = false
-  const proximos = edges.map(e => {
+  const nextItems = edges.map(e => {
     let ne = e
-    // `> 1` for the same reason as `handleDeEntrada`/`resolveSourceHandle`: with a
+    // `> 1` for the same reason as `inputHandle`/`resolveSourceHandle`: with a
     // single port, the handle is anonymous (no id) — anchoring on its name would
     // point at a nonexistent id and the edge would vanish. With 2+, the named
     // handle exists.
-    if (e.target === nodeId && !e.targetHandle && inputs.length > 1 && e.data?.to_key && nomesEntrada.has(e.data.to_key)) {
+    if (e.target === nodeId && !e.targetHandle && inputs.length > 1 && e.data?.to_key && inputNames.has(e.data.to_key)) {
       ne = { ...ne, targetHandle: e.data.to_key }
     }
-    if (e.source === nodeId && !e.sourceHandle && outputs.length > 1 && e.data?.from_key && nomesSaida.has(e.data.from_key)) {
+    if (e.source === nodeId && !e.sourceHandle && outputs.length > 1 && e.data?.from_key && outputNames.has(e.data.from_key)) {
       ne = { ...ne, sourceHandle: e.data.from_key }
     }
     if (ne !== e) mudou = true
     return ne
   })
-  return mudou ? proximos : edges
+  return mudou ? nextItems : edges
 }
 
 /**
@@ -237,7 +237,7 @@ export function saidasDoNo(
 }
 
 /** Minimal node shape the reconciliation needs to see. */
-interface NoComPortas {
+interface NodeWithPorts {
   data?: {
     dynamic_inputs?: boolean
     outputs_from_ports?: boolean
@@ -248,7 +248,7 @@ interface NoComPortas {
 }
 
 /** Do the current ports already match the declared list? (by name and order) */
-function mesmasPortas(atuais: { name: string }[] | undefined, nomes: string[]): boolean {
+function samePorts(atuais: { name: string }[] | undefined, nomes: string[]): boolean {
   const lista = atuais ?? []
   return lista.length === nomes.length && lista.every((p, i) => p.name === nomes[i])
 }
@@ -263,24 +263,24 @@ function mesmasPortas(atuais: { name: string }[] | undefined, nomes: string[]): 
  * effect that depends on the nodes' state, and returning a new array on every
  * pass would make it feed itself endlessly.
  */
-export function reconciliarPortas<T extends NoComPortas>(nos: T[]): T[] {
+export function reconciliarPortas<T extends NodeWithPorts>(nos: T[]): T[] {
   let mudou = false
-  const proximos = nos.map(n => {
+  const nextItems = nos.map(n => {
     const d = n.data
     if (!d?.dynamic_inputs && !d?.outputs_from_ports) return n
 
     const portas = [...new Set(lerPortas(d.properties?.ports))]
     let proximo = n
 
-    if (d.dynamic_inputs && !mesmasPortas(d.inputs, portas)) {
+    if (d.dynamic_inputs && !samePorts(d.inputs, portas)) {
       proximo = { ...proximo, data: { ...proximo.data, inputs: portas.map(name => ({ name })) } }
     }
-    if (d.outputs_from_ports && !mesmasPortas(proximo.data?.outputs, portas)) {
+    if (d.outputs_from_ports && !samePorts(proximo.data?.outputs, portas)) {
       proximo = { ...proximo, data: { ...proximo.data, outputs: portas.map(name => ({ name })) } }
     }
 
     if (proximo !== n) mudou = true
     return proximo
   })
-  return mudou ? proximos : nos
+  return mudou ? nextItems : nos
 }

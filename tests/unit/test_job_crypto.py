@@ -80,7 +80,7 @@ def without_signing_key(monkeypatch):
 
 class TestBuildJobMessage:
 
-    def test_sem_signing_key_lanca_runtime_error(self, without_signing_key, x25519_agent_pub_pem):
+    def test_without_signing_key_raises_runtime_error(self, without_signing_key, x25519_agent_pub_pem):
         """Without EXECUTOR_SIGNING_KEY configured it must raise RuntimeError."""
         from app.core.job_crypto import build_job_message
 
@@ -93,7 +93,7 @@ class TestBuildJobMessage:
                 payload={"test": True},
             )
 
-    def test_estrutura_resultado_completa(self, with_signing_key, x25519_agent_pub_pem):
+    def test_complete_result_structure(self, with_signing_key, x25519_agent_pub_pem):
         """The result must contain exactly the keys: envelope, ephemeral_public, ciphertext, signature."""
         from app.core.job_crypto import build_job_message
 
@@ -107,7 +107,7 @@ class TestBuildJobMessage:
 
         assert set(msg.keys()) == {"envelope", "ephemeral_public", "ciphertext", "signature"}
 
-    def test_campos_envelope(self, with_signing_key, x25519_agent_pub_pem):
+    def test_envelope_fields(self, with_signing_key, x25519_agent_pub_pem):
         """The envelope must contain all required fields with correct values."""
         from app.core.job_crypto import build_job_message
 
@@ -131,7 +131,7 @@ class TestBuildJobMessage:
         assert len(env["nonce"]) == 64
         assert all(c in "0123456789abcdef" for c in env["nonce"])
 
-    def test_job_id_gerado_automaticamente_se_none(self, with_signing_key, x25519_agent_pub_pem):
+    def test_job_id_generated_automatically_if_none(self, with_signing_key, x25519_agent_pub_pem):
         """Without an explicit job_id, it must generate a UUID4."""
         from app.core.job_crypto import build_job_message
         import re
@@ -150,7 +150,7 @@ class TestBuildJobMessage:
         )
         assert uuid4_pattern.match(job_id), f"job_id não é UUID4: {job_id}"
 
-    def test_job_id_customizado_preservado(self, with_signing_key, x25519_agent_pub_pem):
+    def test_custom_job_id_preserved(self, with_signing_key, x25519_agent_pub_pem):
         """A provided job_id must be preserved in the envelope."""
         from app.core.job_crypto import build_job_message
 
@@ -165,7 +165,7 @@ class TestBuildJobMessage:
 
         assert msg["envelope"]["job_id"] == "my-deterministic-id"
 
-    def test_ephemeral_public_e_ciphertext_sao_base64_valido(self, with_signing_key, x25519_agent_pub_pem):
+    def test_ephemeral_public_and_ciphertext_are_valid_base64(self, with_signing_key, x25519_agent_pub_pem):
         """ephemeral_public and ciphertext must be decodable base64 strings."""
         from app.core.job_crypto import build_job_message
 
@@ -186,7 +186,7 @@ class TestBuildJobMessage:
         # ciphertext inclui GCM nonce (12B) + dados cifrados + tag (16B)
         assert len(ciphertext_raw) >= 12 + 16
 
-    def test_dois_jobs_geram_ephemeral_keys_diferentes(self, with_signing_key, x25519_agent_pub_pem):
+    def test_two_jobs_generate_different_ephemeral_keys(self, with_signing_key, x25519_agent_pub_pem):
         """Each call must generate a distinct ephemeral X25519 pair (forward secrecy)."""
         from app.core.job_crypto import build_job_message
 
@@ -198,7 +198,7 @@ class TestBuildJobMessage:
 
 class TestVerifyJobSignature:
 
-    def test_assinatura_valida_retorna_true(
+    def test_valid_signature_returns_true(
         self, with_signing_key, x25519_agent_pub_pem, ed25519_signing_key_b64
     ):
         """An untampered message must have a valid signature."""
@@ -209,7 +209,7 @@ class TestVerifyJobSignature:
 
         assert _verify_job_signature(msg, pub_b64) is True
 
-    def test_envelope_adulterado_retorna_false(
+    def test_tampered_envelope_returns_false(
         self, with_signing_key, x25519_agent_pub_pem
     ):
         """Modifying the envelope after signing must invalidate the signature."""
@@ -224,7 +224,7 @@ class TestVerifyJobSignature:
 
         assert _verify_job_signature(tampered, pub_b64) is False
 
-    def test_ciphertext_adulterado_retorna_false(
+    def test_tampered_ciphertext_returns_false(
         self, with_signing_key, x25519_agent_pub_pem
     ):
         """Modificar o ciphertext deve invalidar a assinatura."""
@@ -241,7 +241,7 @@ class TestVerifyJobSignature:
 
         assert _verify_job_signature(tampered, pub_b64) is False
 
-    def test_chave_ed25519_incorreta_retorna_false(
+    def test_wrong_ed25519_key_returns_false(
         self, with_signing_key, x25519_agent_pub_pem
     ):
         """Verifying with the wrong public key must return False."""
@@ -256,7 +256,7 @@ class TestVerifyJobSignature:
 
         assert _verify_job_signature(msg, wrong_pub_b64) is False
 
-    def test_ephemeral_public_adulterado_retorna_false(
+    def test_tampered_ephemeral_public_returns_false(
         self, with_signing_key, x25519_agent_pub_pem
     ):
         """Modificar ephemeral_public deve invalidar a assinatura."""
@@ -276,7 +276,7 @@ class TestVerifyJobSignature:
 
 class TestRoundTrip:
 
-    def test_build_e_verify_retorna_true(self, with_signing_key, x25519_agent_pub_pem):
+    def test_build_and_verify_returns_true(self, with_signing_key, x25519_agent_pub_pem):
         """Round-trip completo: build + verify deve retornar True."""
         from app.core.job_crypto import (
             build_job_message,
@@ -304,7 +304,7 @@ class TestRoundTrip:
 
 class TestGetServerSigningPublicKeyB64:
 
-    def test_sem_chave_retorna_none(self, without_signing_key):
+    def test_without_key_returns_none(self, without_signing_key):
         """Without EXECUTOR_SIGNING_KEY, it must return None."""
         from app.core.job_crypto import get_server_signing_public_key_b64
 
@@ -312,7 +312,7 @@ class TestGetServerSigningPublicKeyB64:
 
         assert result is None
 
-    def test_com_chave_retorna_base64_valido(self, with_signing_key):
+    def test_with_key_returns_valid_base64(self, with_signing_key):
         """With a valid EXECUTOR_SIGNING_KEY, it must return base64 of 32 bytes (raw Ed25519 pub)."""
         from app.core.job_crypto import get_server_signing_public_key_b64
 

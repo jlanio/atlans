@@ -4,7 +4,7 @@
 The chips field stores a JSON string (JSON.stringify); the definitions already
 saved hold a real list (object editor) or comma-separated text. The tolerant
 parser that was born in AttributeJoin moved up to
-`flow.utils.parameter_validation.colunas_pedidas`, and every migrated node must
+`flow.utils.parameter_validation.requested_columns`, and every migrated node must
 behave THE SAME with any of the three formats — no data migration.
 
 ChangeDetector is tested in test_change_detector.py (which already has the fake
@@ -18,30 +18,30 @@ from shapely.geometry import Point  # noqa: E402
 
 from flow.nodes.action.remove_duplicates import RemoveDuplicates  # noqa: E402
 from flow.nodes.outputs.publish_map import PublishMap  # noqa: E402
-from flow.utils.parameter_validation import colunas_pedidas  # noqa: E402
+from flow.utils.parameter_validation import requested_columns  # noqa: E402
 
 
 # ── O parser compartilhado ───────────────────────────────────────────────────
 
-def test_join_delegou_para_o_utilitario_sem_mudar_de_nome():
-    """`_colunas_pedidas` is still importable from the join (execute and tests
+def test_join_delegated_to_the_utility_without_renaming():
+    """`_requested_columns` is still importable from the join (execute and tests
     reference it), but it is the SAME object as the utility: a single parser
     for every chips field."""
-    from flow.nodes.action.attribute_join import _colunas_pedidas
-    assert _colunas_pedidas is colunas_pedidas
+    from flow.nodes.action.attribute_join import _requested_columns
+    assert _requested_columns is requested_columns
 
 
-def test_parser_aceita_lista_json_csv_e_none():
-    assert colunas_pedidas(["a", " b ", ""]) == ["a", "b"]
-    assert colunas_pedidas('["a","b"]') == ["a", "b"]
-    assert colunas_pedidas("a, b,, ") == ["a", "b"]
-    assert colunas_pedidas("") == []
-    assert colunas_pedidas(None) == []
+def test_parser_accepts_list_json_csv_and_none():
+    assert requested_columns(["a", " b ", ""]) == ["a", "b"]
+    assert requested_columns('["a","b"]') == ["a", "b"]
+    assert requested_columns("a, b,, ") == ["a", "b"]
+    assert requested_columns("") == []
+    assert requested_columns(None) == []
 
 
 # ── RemoveDuplicates: `fields` em fichas ─────────────────────────────────────
 
-def _gdf_com_duplicatas():
+def _gdf_with_duplicates():
     # ("a", 1) appears twice; ("a", 2) differs only in the value. So the subset
     # ["cod"] and the subset ["cod", "valor"] give DIFFERENT results — proof
     # that the parser read both columns, not just the first.
@@ -57,9 +57,9 @@ def _gdf_com_duplicatas():
     '["cod"]',       # JSON string — what the chips field stores
     "cod",           # text — old format, already saved
 ])
-async def test_remove_duplicates_mesmo_resultado_nos_tres_formatos(guardado):
+async def test_remove_duplicates_same_result_in_the_three_formats(guardado):
     saida = await RemoveDuplicates("n", {"fields": guardado}).execute(
-        {"input": _gdf_com_duplicatas()}
+        {"input": _gdf_with_duplicates()}
     )
     assert len(saida["output"]) == 2          # um "a", um "b"
     assert saida["removed_count"] == 2
@@ -70,27 +70,27 @@ async def test_remove_duplicates_mesmo_resultado_nos_tres_formatos(guardado):
     '["cod","valor"]',
     "cod, valor",
 ])
-async def test_remove_duplicates_duas_colunas_nos_tres_formatos(guardado):
+async def test_remove_duplicates_two_columns_in_the_three_formats(guardado):
     saida = await RemoveDuplicates("n", {"fields": guardado}).execute(
-        {"input": _gdf_com_duplicatas()}
+        {"input": _gdf_with_duplicates()}
     )
     # So a linha ("a", 1) repetida sai; ("a", 2) e ("b", 9) ficam.
     assert len(saida["output"]) == 3
     assert saida["removed_count"] == 1
 
 
-async def test_remove_duplicates_vazio_continua_usando_todas_as_colunas():
+async def test_remove_duplicates_empty_still_uses_all_columns():
     """An empty field keeps the usual behavior: uniqueness over all the
     non-geometry columns."""
     saida = await RemoveDuplicates("n", {"fields": ""}).execute(
-        {"input": _gdf_com_duplicatas()}
+        {"input": _gdf_with_duplicates()}
     )
     assert saida["removed_count"] == 1
 
 
 # ── PublishMap: `visible_fields` em fichas ───────────────────────────────────
 
-async def _publicar(monkeypatch, guardado):
+async def _publish(monkeypatch, guardado):
     """Runs the node with the portal mocked and returns the visible_fields sent."""
     capturado: dict = {}
 
@@ -118,9 +118,9 @@ async def _publicar(monkeypatch, guardado):
     '["nome","area"]',
     "nome, area",        # old format, already saved in the definitions
 ])
-async def test_publish_map_mesmos_campos_nos_tres_formatos(monkeypatch, guardado):
-    assert await _publicar(monkeypatch, guardado) == ["nome", "area"]
+async def test_publish_map_same_fields_in_the_three_formats(monkeypatch, guardado):
+    assert await _publish(monkeypatch, guardado) == ["nome", "area"]
 
 
-async def test_publish_map_vazio_continua_exibindo_todos(monkeypatch):
-    assert await _publicar(monkeypatch, "") == []
+async def test_publish_map_empty_still_shows_all(monkeypatch):
+    assert await _publish(monkeypatch, "") == []

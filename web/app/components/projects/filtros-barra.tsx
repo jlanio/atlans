@@ -6,14 +6,14 @@ import { Button } from "@/app/components/ui/button"
 import { Input } from "@/app/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select"
 import { cn } from "@/lib/utils"
-import { formatarInteiro } from "@/lib/formatos"
-import { FILTROS_DOS_CHIPS, ROTULO_DA_ORDEM, ROTULO_DO_FILTRO } from "./filtros"
-import { ESTADO_PADRAO, ORDENS, filtrosAtivos, type EstadoDeProjetos, type Filtro, type Ordem } from "./projetos-url"
+import { formatInteger } from "@/lib/formatos"
+import { CHIP_FILTERS, SORT_LABEL, FILTER_LABEL } from "./filtros"
+import { DEFAULT_STATE, SORT_ORDERS, filtrosAtivos, type ProjectsState, type Filtro, type Ordem } from "./projetos-url"
 
-export interface BarraDeFiltrosProps {
-  estado: EstadoDeProjetos
+export interface FilterBarProps {
+  estado: ProjectsState
   /** Receives only what changed; the page composer merges it with the rest and writes it to the URL. */
-  onEstado: (mudanca: Partial<EstadoDeProjetos>) => void
+  onEstado: (mudanca: Partial<ProjectsState>) => void
   onLimpar: () => void
   /** Count of each chip over the whole list (`contarPorFiltro`). */
   contagens: Record<Filtro, number>
@@ -27,14 +27,14 @@ export interface BarraDeFiltrosProps {
 // The search is local (the list is already in memory), but each keystroke
 // written to the URL is a `router.replace`; a short pause gathers the keystrokes
 // of a word without the person noticing the wait.
-const ATRASO_DA_BUSCA_MS = 200
+const SEARCH_DELAY_MS = 200
 
 /**
  * Where the bar changes subject: after "Inativos" (from state to nature
  * and situation) and after "Com portal" (the slice by WHO created the workflow,
  * which is not a property of the workflow like the others).
  */
-const SEPARADOR_DEPOIS_DE: Filtro[] = ["inativos", "portal"]
+const SEPARATOR_AFTER: Filtro[] = ["inativos", "portal"]
 
 /**
  * Search, sort, collapse and chips bar (docs/specs/projects.md §3.6).
@@ -48,13 +48,13 @@ const SEPARADOR_DEPOIS_DE: Filtro[] = ["inativos", "portal"]
  */
 export function BarraDeFiltros({
   estado, onEstado, onLimpar, contagens, temGrupos, todosRecolhidos, onRecolherTodos, onExpandirTodos,
-}: BarraDeFiltrosProps) {
+}: FilterBarProps) {
   const ativos = filtrosAtivos(estado)
   // `pausado` and `nunca` arrive through the attention strip and have no fixed
   // chip: a provisional chip, already checked, shows the slice in effect —
   // otherwise the strip disappears (when the number hits zero) and the list
   // stays filtered with nothing saying why.
-  const filtroSemChip = FILTROS_DOS_CHIPS.includes(estado.filtro) ? null : estado.filtro
+  const filterWithoutChip = CHIP_FILTERS.includes(estado.filtro) ? null : estado.filtro
 
   return (
     <div className="flex flex-col gap-2">
@@ -66,8 +66,8 @@ export function BarraDeFiltros({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {ORDENS.map(o => (
-              <SelectItem key={o} value={o}>{ROTULO_DA_ORDEM[o]}</SelectItem>
+            {SORT_ORDERS.map(o => (
+              <SelectItem key={o} value={o}>{SORT_LABEL[o]}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -91,19 +91,19 @@ export function BarraDeFiltros({
           aria-label="Filtros"
           className="flex min-w-0 items-center gap-1.5 max-md:overflow-x-auto max-md:pb-1 md:flex-wrap"
         >
-          {FILTROS_DOS_CHIPS.map(f => (
+          {CHIP_FILTERS.map(f => (
             <span key={f} className="contents">
               <Chip
                 filtro={f}
                 ativo={estado.filtro === f}
                 n={contagens[f]}
-                onClick={() => onEstado({ filtro: estado.filtro === f && f !== ESTADO_PADRAO.filtro ? ESTADO_PADRAO.filtro : f })}
+                onClick={() => onEstado({ filtro: estado.filtro === f && f !== DEFAULT_STATE.filtro ? DEFAULT_STATE.filtro : f })}
               />
-              {SEPARADOR_DEPOIS_DE.includes(f) && <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-border" />}
+              {SEPARATOR_AFTER.includes(f) && <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-border" />}
             </span>
           ))}
-          {filtroSemChip && (
-            <Chip filtro={filtroSemChip} ativo n={contagens[filtroSemChip]} onClick={() => onEstado({ filtro: ESTADO_PADRAO.filtro })} />
+          {filterWithoutChip && (
+            <Chip filtro={filterWithoutChip} ativo n={contagens[filterWithoutChip]} onClick={() => onEstado({ filtro: DEFAULT_STATE.filtro })} />
           )}
         </div>
         {ativos > 0 && (
@@ -137,14 +137,14 @@ function Chip({ filtro, ativo, n, onClick }: { filtro: Filtro; ativo: boolean; n
       {/* The chip's sparkle is the same as the row badge's: whoever sees one
           recognizes the other without reading the label. */}
       {filtro === "assistente" && <TbSparkles size={13} aria-hidden="true" className="text-primary" />}
-      {ROTULO_DO_FILTRO[filtro]}
-      {n != null && <b className="font-semibold text-foreground tabular-nums">{formatarInteiro(n)}</b>}
+      {FILTER_LABEL[filtro]}
+      {n != null && <b className="font-semibold text-foreground tabular-nums">{formatInteger(n)}</b>}
     </button>
   )
 }
 
 function Busca({ valor, onValor }: { valor: string; onValor: (q: string) => void }) {
-  const [texto, setTexto] = useState(valor)
+  const [texto, setText] = useState(valor)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // What this field has already emitted: when the URL changes from outside
   // (Clear filters, new link), the field follows; when the URL only echoes what
@@ -158,19 +158,19 @@ function Busca({ valor, onValor }: { valor: string; onValor: (q: string) => void
     // URL echo from erasing the space the person just typed.
     if (valor !== emitido.current.trim()) {
       emitido.current = valor
-      setTexto(valor)
+      setText(valor)
     }
   }, [valor])
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
 
-  function aoDigitar(q: string) {
-    setTexto(q)
+  function onType(q: string) {
+    setText(q)
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => {
       emitido.current = q
       onValor(q)
-    }, ATRASO_DA_BUSCA_MS)
+    }, SEARCH_DELAY_MS)
   }
 
   return (
@@ -182,7 +182,7 @@ function Busca({ valor, onValor }: { valor: string; onValor: (q: string) => void
         aria-label="Buscar workflow ou grupo"
         placeholder="Buscar workflow ou grupo…"
         value={texto}
-        onChange={e => aoDigitar(e.target.value)}
+        onChange={e => onType(e.target.value)}
         // 16px on the phone: below that iOS zooms in when the field gets focus.
         className="h-8 pl-8 text-base max-md:h-10 md:text-xs"
       />

@@ -83,7 +83,7 @@ PARES = [
 # header). What matters to it is that the lock keeps a hash on every line.
 # `--no-emit-index-url`/`--no-emit-trusted-host`: an index configured on the
 # machine (proxy, mirror) must not leak into the versioned file.
-OPCOES_PIP_COMPILE = [
+PIP_COMPILE_OPTIONS = [
     "--generate-hashes",
     "--allow-unsafe",
     "--strip-extras",
@@ -91,7 +91,7 @@ OPCOES_PIP_COMPILE = [
     "--no-emit-trusted-host",
 ]
 
-_PINO = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]*\])?\s*==\s*([^\s;\\#]+)")
+_PIN = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]*\])?\s*==\s*([^\s;\\#]+)")
 _HASH = re.compile(r"--hash=sha256:([0-9a-f]{64})")
 # pip-tools 7.6.1 with click 8.5 (what the API lock pins) writes `--no-index`
 # into the header command without anyone having passed it: for a flag without
@@ -100,7 +100,7 @@ _HASH = re.compile(r"--hash=sha256:([0-9a-f]{64})")
 # resolution used PyPI normally (the real flag is False); only the header
 # lies. And whoever re-ran that command would resolve with NO index at all.
 # pip-tools 7.5 does not even run with click 8.5.
-_NO_INDEX_ESPURIO = re.compile(r"^(#\s+pip-compile\b.*?) --no-index\b", re.M)
+_SPURIOUS_NO_INDEX = re.compile(r"^(#\s+pip-compile\b.*?) --no-index\b", re.M)
 
 
 class Falha(Exception):
@@ -111,27 +111,27 @@ def normalizar(nome: str) -> str:
     return re.sub(r"[-_.]+", "-", nome).lower()
 
 
-def pinos(caminho: Path) -> dict[str, str]:
+def pins(caminho: Path) -> dict[str, str]:
     """`nome -> versão` for each `nome==versão` line (hash continuations and
     comments are left out)."""
     if not caminho.exists():
         return {}
     achados = {}
     for linha in caminho.read_text(encoding="utf-8").splitlines():
-        m = _PINO.match(linha)
+        m = _PIN.match(linha)
         if m:
             achados[normalizar(m.group(1))] = m.group(2)
     return achados
 
 
-def hashes_por_pino(caminho: Path) -> dict[str, set[str]]:
+def hashes_by_pin(caminho: Path) -> dict[str, set[str]]:
     """`nome -> hashes sha256` from a hashed lock."""
     blocos: dict[str, set[str]] = {}
     atual = None
     if not caminho.exists():
         return blocos
     for linha in caminho.read_text(encoding="utf-8").splitlines():
-        m = _PINO.match(linha)
+        m = _PIN.match(linha)
         if m:
             atual = normalizar(m.group(1))
             blocos[atual] = set()
@@ -140,7 +140,7 @@ def hashes_por_pino(caminho: Path) -> dict[str, set[str]]:
     return blocos
 
 
-def conferir_plataforma() -> None:
+def check_platform() -> None:
     if (sys.platform, platform.machine(), sys.version_info[:2]) != ("linux", "x86_64", (3, 12)):
         sys.exit(
             f"travar_python: o lock é da plataforma da imagem e do CI (Linux x86_64, Python 3.12);\n"
@@ -157,11 +157,11 @@ def conferir_plataforma() -> None:
             )
 
 
-def _instante(momento: dt.datetime) -> str:
+def _instant(momento: dt.datetime) -> str:
     return momento.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def isencoes(
+def exemptions(
     atual: dict[str, str], hashes: dict[str, set[str]], fixos: set[str], corte: dt.datetime,
 ) -> dict[str, str]:
     """`nome -> instante` for uv's `--exclude-newer-package`.
@@ -175,7 +175,7 @@ def isencoes(
       all uv would not see the locked version and would silently downgrade it —
       even a security fix.
     """
-    amanha = _instante(dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=1))
+    amanha = _instant(dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=1))
     livres = {nome: amanha for nome in fixos}
     pendentes = {(n, v): hashes.get(n) or None for n, v in atual.items() if n not in fixos}
     for (nome, versao), resposta in consultar_varios(pendentes).items():
@@ -186,12 +186,12 @@ def isencoes(
             print(f"  aviso: sem a data de {nome}=={versao} no PyPI ({resposta}); vale o corte comum")
             continue
         if resposta.publicado > corte:
-            livres[nome] = _instante(resposta.publicado + dt.timedelta(seconds=1))
+            livres[nome] = _instant(resposta.publicado + dt.timedelta(seconds=1))
     return livres
 
 
-def resolver_em_quarentena(
-    entrada_rel: str, restricoes_rel: list[str], atual: dict[str, str], livres: dict[str, str],
+def resolve_in_quarantine(
+    input_rel: str, constraints_rel: list[str], atual: dict[str, str], livres: dict[str, str],
     renovar: bool, corte: dt.datetime,
 ) -> dict[str, str]:
     """Step 1: the uv resolution with the cutoff date."""
@@ -201,23 +201,23 @@ def resolver_em_quarentena(
             # uv reads the existing output file as a preference.
             saida.write_text("".join(f"{n}=={v}\n" for n, v in sorted(atual.items())))
         cmd = [
-            sys.executable, "-m", "uv", "pip", "compile", entrada_rel,
+            sys.executable, "-m", "uv", "pip", "compile", input_rel,
             "--output-file", str(saida),
             "--python", sys.executable,
-            "--exclude-newer", _instante(corte),
+            "--exclude-newer", _instant(corte),
             "--no-header", "--no-annotate", "--quiet",
         ]
-        for restricao in restricoes_rel:
-            cmd += ["--constraint", restricao]
+        for constraint in constraints_rel:
+            cmd += ["--constraint", constraint]
         for nome, instante in sorted(livres.items()):
             cmd += ["--exclude-newer-package", f"{nome}={instante}"]
         feito = subprocess.run(cmd, cwd=RAIZ, capture_output=True, text=True)
         if feito.returncode != 0:
-            raise Falha(f"o uv não resolveu {entrada_rel} com a quarentena:\n{feito.stderr}")
-        return pinos(saida)
+            raise Falha(f"o uv não resolveu {input_rel} com a quarentena:\n{feito.stderr}")
+        return pins(saida)
 
 
-def _rebaixou(antes: str | None, depois: str) -> bool:
+def _downgraded(antes: str | None, depois: str) -> bool:
     if not antes:
         return False
     try:
@@ -227,75 +227,75 @@ def _rebaixou(antes: str | None, depois: str) -> bool:
         return False
 
 
-def travar(entrada_rel: str, saida_rel: str, restricoes_rel: list[str], renovar: bool, corte: dt.datetime) -> None:
-    entrada, saida = RAIZ / entrada_rel, RAIZ / saida_rel
-    atual = pinos(saida)
-    no_in = pinos(entrada)
+def travar(input_rel: str, output_rel: str, constraints_rel: list[str], renovar: bool, corte: dt.datetime) -> None:
+    entrada, saida = RAIZ / input_rel, RAIZ / output_rel
+    atual = pins(saida)
+    no_in = pins(entrada)
     # What comes from a constraint lock was already checked when that lock
     # was generated.
-    das_restricoes: dict[str, str] = {}
-    for restricao in restricoes_rel:
-        das_restricoes.update(pinos(RAIZ / restricao))
-    fixos = set(no_in) | set(das_restricoes)
+    from_constraints: dict[str, str] = {}
+    for constraint in constraints_rel:
+        from_constraints.update(pins(RAIZ / constraint))
+    fixos = set(no_in) | set(from_constraints)
 
-    livres = isencoes(atual, hashes_por_pino(saida), fixos, corte)
-    semente = resolver_em_quarentena(entrada_rel, restricoes_rel, atual, livres, renovar, corte)
+    livres = exemptions(atual, hashes_by_pin(saida), fixos, corte)
+    semente = resolve_in_quarantine(input_rel, constraints_rel, atual, livres, renovar, corte)
 
     # Step 2: the seed in place of the lock. Step 3: pip-compile respects it.
     # (If anything fails from here on, main restores the original lock.)
     saida.write_text("".join(f"{n}=={v}\n" for n, v in sorted(semente.items())), encoding="utf-8")
-    cmd = [sys.executable, "-m", "piptools", "compile", *OPCOES_PIP_COMPILE, "--quiet"]
-    for restricao in restricoes_rel:
-        cmd.append(f"--constraint={restricao}")
-    cmd += [f"--output-file={saida_rel}", entrada_rel]
+    cmd = [sys.executable, "-m", "piptools", "compile", *PIP_COMPILE_OPTIONS, "--quiet"]
+    for constraint in constraints_rel:
+        cmd.append(f"--constraint={constraint}")
+    cmd += [f"--output-file={output_rel}", input_rel]
     feito = subprocess.run(cmd, cwd=RAIZ, capture_output=True, text=True)
     if feito.returncode != 0:
-        raise Falha(f"o pip-compile falhou em {entrada_rel}:\n{feito.stderr}")
+        raise Falha(f"o pip-compile falhou em {input_rel}:\n{feito.stderr}")
     texto = saida.read_text(encoding="utf-8")
-    saida.write_text(_NO_INDEX_ESPURIO.sub(r"\1", texto, count=1), encoding="utf-8")
+    saida.write_text(_SPURIOUS_NO_INDEX.sub(r"\1", texto, count=1), encoding="utf-8")
 
-    final = pinos(saida)
+    final = pins(saida)
     mudou = {n: (atual.get(n), v) for n, v in final.items() if atual.get(n) != v}
 
     # Step 4: whatever changed without being pinned in the `.in` must have passed
     # the cutoff — including what pip-compile chose differently from uv.
-    hashes = hashes_por_pino(saida)
+    hashes = hashes_by_pin(saida)
     conferir = {
         (n, v): hashes.get(n) or None
         for n, (_, v) in mudou.items()
-        if n not in no_in and das_restricoes.get(n) != v
+        if n not in no_in and from_constraints.get(n) != v
     }
-    furos = []
+    gaps = []
     for (nome, versao), resposta in sorted(consultar_varios(conferir).items()):
         if isinstance(resposta, Exception):
-            furos.append(f"{nome}=={versao}: não consegui a data no PyPI ({resposta})")
+            gaps.append(f"{nome}=={versao}: não consegui a data no PyPI ({resposta})")
         elif resposta.publicado > corte:
-            furos.append(f"{nome}=={versao}: publicado em {_instante(resposta.publicado)}, depois do corte")
+            gaps.append(f"{nome}=={versao}: publicado em {_instant(resposta.publicado)}, depois do corte")
         elif resposta.retirada is not None:
-            furos.append(f"{nome}=={versao}: retirado do PyPI (yanked): {resposta.retirada or 'sem motivo'}")
-    if furos:
+            gaps.append(f"{nome}=={versao}: retirado do PyPI (yanked): {resposta.retirada or 'sem motivo'}")
+    if gaps:
         raise Falha(
-            f"{saida_rel}: versões fora da quarentena de {QUARENTENA_DIAS} dias:\n"
-            + "\n".join(f"    {f}" for f in furos)
+            f"{output_rel}: versões fora da quarentena de {QUARENTENA_DIAS} dias:\n"
+            + "\n".join(f"    {f}" for f in gaps)
             + "\n  Se uma delas é mesmo necessária (correção de segurança), pine-a com `==` no "
-            f"{entrada_rel} — é uma decisão, e fica registrada."
+            f"{input_rel} — é uma decisão, e fica registrada."
         )
 
     saiu = sorted(set(atual) - set(final))
-    fora_da_semente = sorted(n for n, v in final.items() if semente.get(n) != v)
-    print(f"{saida_rel}: {len(final)} pacotes travados com hash")
+    diverged_from_seed = sorted(n for n, v in final.items() if semente.get(n) != v)
+    print(f"{output_rel}: {len(final)} pacotes travados com hash")
     for nome, (antes, depois) in sorted(mudou.items()):
-        marca = "  (REBAIXOU — confira por quê)" if _rebaixou(antes, depois) else ""
+        marca = "  (REBAIXOU — confira por quê)" if _downgraded(antes, depois) else ""
         print(f"    {nome}: {antes or '(novo)'} -> {depois}{marca}")
     for nome in saiu:
         print(f"    {nome}: {atual[nome]} -> (saiu)")
-    if fora_da_semente:
+    if diverged_from_seed:
         # pip-compile chose differently from uv. The date was already checked above;
         # this records that the two resolutions diverged.
-        print(f"  nota: o pip-compile divergiu da resolução do uv em: {', '.join(fora_da_semente)}")
+        print(f"  nota: o pip-compile divergiu da resolução do uv em: {', '.join(diverged_from_seed)}")
 
 
-def _interromper(sinal: int, _quadro) -> None:
+def _interrupt(sinal: int, _frame) -> None:
     # SIGTERM and SIGHUP kill the process without going through the `finally`: the
     # lock would be left with the hashless seed, and the orphaned pip-compile
     # would still rewrite it afterwards. As an exception, `subprocess.run`
@@ -310,33 +310,33 @@ def main() -> None:
         help="re-resolve as transitivas em vez de manter as travadas (ainda com a quarentena)",
     )
     args = parser.parse_args()
-    conferir_plataforma()
+    check_platform()
     for sinal in (signal.SIGTERM, signal.SIGHUP):
-        signal.signal(sinal, _interromper)
+        signal.signal(sinal, _interrupt)
 
     # An exact instant, not a date: with only the date, uv accepts the whole
     # cutoff day, and something published on it would get in at under 14 days.
     corte = dt.datetime.now(dt.timezone.utc).replace(microsecond=0) - dt.timedelta(days=QUARENTENA_DIAS)
-    print(f"quarentena: só entra o que foi publicado até {_instante(corte)} ({QUARENTENA_DIAS} dias)")
+    print(f"quarentena: só entra o que foi publicado até {_instant(corte)} ({QUARENTENA_DIAS} dias)")
 
     originais = {
-        saida_rel: (RAIZ / saida_rel).read_text(encoding="utf-8") if (RAIZ / saida_rel).exists() else None
-        for _, saida_rel, _ in PARES
+        output_rel: (RAIZ / output_rel).read_text(encoding="utf-8") if (RAIZ / output_rel).exists() else None
+        for _, output_rel, _ in PARES
     }
     try:
-        for entrada_rel, saida_rel, restricoes_rel in PARES:
-            travar(entrada_rel, saida_rel, restricoes_rel, args.renovar, corte)
+        for input_rel, output_rel, constraints_rel in PARES:
+            travar(input_rel, output_rel, constraints_rel, args.renovar, corte)
     except BaseException as erro:
         # A half-done pair, or only the first ones regenerated, would leave locks
         # that do not match each other: roll everything back — without letting a
         # second Ctrl-C cut the rollback midway.
         for sinal in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             signal.signal(sinal, signal.SIG_IGN)
-        for saida_rel, texto in originais.items():
+        for output_rel, texto in originais.items():
             if texto is None:
-                (RAIZ / saida_rel).unlink(missing_ok=True)
+                (RAIZ / output_rel).unlink(missing_ok=True)
             else:
-                (RAIZ / saida_rel).write_text(texto, encoding="utf-8")
+                (RAIZ / output_rel).write_text(texto, encoding="utf-8")
         if isinstance(erro, Falha):
             sys.exit(f"travar_python: {erro}\n  Os locks voltaram ao que eram.")
         if isinstance(erro, KeyboardInterrupt):

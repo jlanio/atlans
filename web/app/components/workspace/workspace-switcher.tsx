@@ -28,7 +28,7 @@ export default function WorkspaceSwitcher() {
   // Same rule as WorkspaceBadge: `my_role` distinguishes the five roles, and the
   // `owner_id` comparison remains as a fallback. Without it, an admin of a
   // shared workspace showed up as "Convidado" (Guest) on every row.
-  function papelDe(ws: { my_role: string | null; owner_id: string | null }) {
+  function roleOf(ws: { my_role: string | null; owner_id: string | null }) {
     const dono =
       ws.my_role === "owner" || !!(ws.owner_id && userId && ws.owner_id === userId);
     return {
@@ -122,7 +122,7 @@ export default function WorkspaceSwitcher() {
 
         {workspaces.map((ws) => {
           const isActive = current?.id_hash === ws.id_hash;
-          const papel = papelDe(ws);
+          const papel = roleOf(ws);
           return (
             <DropdownMenuItem
               key={ws.id_hash}

@@ -39,10 +39,10 @@ class _Client:
 
     def __init__(self, status):
         self._status = status
-        self.ultimo_url: str | None = None
+        self.last_url: str | None = None
 
     async def delete(self, url, headers=None, timeout=None):
-        self.ultimo_url = url
+        self.last_url = url
         return _Resp(self._status)
 
 
@@ -66,7 +66,7 @@ def uploader():
 
 
 @pytest.mark.asyncio
-async def test_delete_usa_a_rota_mtls_de_executor(uploader):
+async def test_delete_uses_the_executor_mtls_route(uploader):
     """The deletion MUST go to /drive/executor-* — the only prefix that Traefik
     routes to the API on the executors' host. A bare /drive/{id} dies at
     Traefik with a 404, and 404-as-success made the executor give up with the
@@ -74,19 +74,19 @@ async def test_delete_usa_a_rota_mtls_de_executor(uploader):
     that would send it back to the broken path."""
     up = uploader(204)
     await up.delete("f4ee8c0b")
-    url = up._http().ultimo_url
+    url = up._http().last_url
     assert url == "https://servidor/drive/executor-file/f4ee8c0b"
     assert "/drive/executor-" in url
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("status", [200, 204])
-async def test_remocao_bem_sucedida(uploader, status):
+async def test_successful_removal(uploader, status):
     assert await uploader(status).delete("abc") is True
 
 
 @pytest.mark.asyncio
-async def test_404_conta_como_REMOVIDO(uploader):
+async def test_404_counts_as_REMOVED(uploader):
     """The bug's case. No longer being there is the same as having been deleted —
     the same policy as the `allow_missing=True` the server uses in
     `delete_strict`."""
@@ -95,7 +95,7 @@ async def test_404_conta_como_REMOVIDO(uploader):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("status", [403, 409, 500, 502])
-async def test_outros_erros_continuam_sendo_falha(uploader, status):
+async def test_other_errors_are_still_a_failure(uploader, status):
     """Idempotency applies only to "does not exist". A 500 is transient and
     deserves a retry; a 403 is a permission problem that needs to surface."""
     assert await uploader(status).delete("abc") is False
@@ -105,12 +105,12 @@ async def test_outros_erros_continuam_sendo_falha(uploader, status):
 
 class _Manifesto:
     def __init__(self, itens):
-        self._itens = itens
+        self._items = itens
         self.removidos: list[str] = []
         self.desenfileirados: list[str] = []
 
     def pending_items(self):
-        return self._itens
+        return self._items
 
     def dequeue(self, nome):
         self.desenfileirados.append(nome)
@@ -123,7 +123,7 @@ class _Manifesto:
 
 
 @pytest.mark.asyncio
-async def test_delete_esgotado_sai_do_MANIFESTO_tambem():
+async def test_exhausted_delete_leaves_the_MANIFEST_too():
     """Leaving only the queue left the dataset in the manifest. Since it is also
     no longer on disk, the next `diff` classified it again as removed locally
     and re-enqueued it — the cycle started over from scratch, indefinitely."""
@@ -133,17 +133,17 @@ async def test_delete_esgotado_sai_do_MANIFESTO_tambem():
         {"action": "delete", "dataset": "ds1", "retries": _MAX_RETRIES},
     ])
 
-    async def _nunca_chamado(item):
+    async def _never_called(item):
         raise AssertionError("nao deveria tentar de novo apos esgotar")
 
-    await SyncQueue(manifesto, _nunca_chamado).process_pending()
+    await SyncQueue(manifesto, _never_called).process_pending()
 
     assert manifesto.desenfileirados == ["ds1"]
     assert manifesto.removidos == ["ds1"], "sem isto o dataset volta na proxima varredura"
 
 
 @pytest.mark.asyncio
-async def test_upload_esgotado_NAO_some_do_manifesto():
+async def test_exhausted_upload_does_NOT_leave_the_manifest():
     """Only the delete cleans the manifest. An upload that ran out of attempts
     refers to a file that EXISTS on disk — removing it from the manifest would
     bring it back as "new" and restart the same upload that already failed ten
@@ -154,10 +154,10 @@ async def test_upload_esgotado_NAO_some_do_manifesto():
         {"action": "upload", "dataset": "ds2", "retries": _MAX_RETRIES},
     ])
 
-    async def _nunca_chamado(item):
+    async def _never_called(item):
         raise AssertionError("nao deveria tentar de novo apos esgotar")
 
-    await SyncQueue(manifesto, _nunca_chamado).process_pending()
+    await SyncQueue(manifesto, _never_called).process_pending()
 
     assert manifesto.desenfileirados == ["ds2"]
     assert manifesto.removidos == []

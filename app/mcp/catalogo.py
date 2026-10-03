@@ -7,7 +7,7 @@ Delivering that in one call consumes the context budget of whoever is on the
 other side before the conversation starts — and nine tenths of it is property
 detail that only matters once the node has been chosen. Hence the split:
 
-- `indice_compacto` answers "which nodes exist, and what for" in ~10 KB: name,
+- `compact_index` answers "which nodes exist, and what for" in ~10 KB: name,
   type, the first sentence of the description and whether the node needs a
   credential;
 - `descrever(brief=True)` answers "how do I configure this node" with the
@@ -45,10 +45,10 @@ _MIN_ONE_LINE = 8
 # the period). A short, explicit list on purpose: whatever is not here simply
 # cuts as it always did — erring on the side of a shorter line is preferable to
 # guessing grammar.
-_ABREVIACOES = frozenset({"ex", "etc", "p", "pag", "obs", "cf", "fig", "aprox", "vs", "ref"})
+_ABBREVIATIONS = frozenset({"ex", "etc", "p", "pag", "obs", "cf", "fig", "aprox", "vs", "ref"})
 
 
-def _texto_de_descricao(desc: Any) -> str:
+def _description_text(desc: Any) -> str:
     """The description, whether it comes as text, a dict or a `NodeDefinition`."""
     if isinstance(desc, str):
         return desc
@@ -72,14 +72,14 @@ def one_line(desc: Any) -> str:
     next one, instead of cutting the description in the middle and leaving the
     index line without saying what the node is for.
     """
-    paragrafo = _texto_de_descricao(desc).split("\n\n")[0]
-    texto = " ".join(paragrafo.split())
+    paragraph = _description_text(desc).split("\n\n")[0]
+    texto = " ".join(paragraph.split())
     if not texto:
         return ""
     partes = texto.split(". ")
     frase = partes[0]
     for seguinte in partes[1:]:
-        if not _fim_de_frase(frase):
+        if not _is_sentence_end(frase):
             frase = f"{frase}. {seguinte}"
             continue
         break
@@ -89,39 +89,39 @@ def one_line(desc: Any) -> str:
     return frase
 
 
-def _fim_de_frase(trecho: str) -> bool:
+def _is_sentence_end(trecho: str) -> bool:
     """Does the period after this excerpt really end a sentence?
 
     Two refusals: the excerpt is too short to be a sentence (it is a whole
     abbreviation, "Ex.") or it ends in a known abbreviation ("…, etc.").
     """
-    sem_ponto = trecho.rstrip(".")
-    if len(sem_ponto) < _MIN_ONE_LINE:
+    without_period = trecho.rstrip(".")
+    if len(without_period) < _MIN_ONE_LINE:
         return False
-    palavras = sem_ponto.split()
-    ultima = _normalizar(palavras[-1]).strip(",;:()[]") if palavras else ""
-    return ultima not in _ABREVIACOES
+    palavras = without_period.split()
+    ultima = _normalize(palavras[-1]).strip(",;:()[]") if palavras else ""
+    return ultima not in _ABBREVIATIONS
 
 
-def _normalizar(texto: str) -> str:
+def _normalize(texto: str) -> str:
     """Lowercase and without accents — searching for "área" finds "area" and vice versa."""
-    sem_acento = unicodedata.normalize("NFKD", texto)
-    return "".join(c for c in sem_acento if not unicodedata.combining(c)).casefold()
+    unaccented = unicodedata.normalize("NFKD", texto)
+    return "".join(c for c in unaccented if not unicodedata.combining(c)).casefold()
 
 
-def _campos_de_busca(d: Any) -> str:
+def _search_fields(d: Any) -> str:
     return " ".join(
         str(valor or "")
         for valor in (
             getattr(d, "name", None),
             getattr(d, "alias", None),
             getattr(d, "type", None),
-            _texto_de_descricao(d),
+            _description_text(d),
         )
     )
 
 
-def indice_compacto(
+def compact_index(
     defs: Iterable[Any], *, query: str | None = None, tipo: str | None = None
 ) -> list[dict]:
     """The filtered index, sorted by name.
@@ -129,12 +129,12 @@ def indice_compacto(
     The `query` filter runs over name, nickname, type and description: whoever
     searches for "postgres" does not know the node is called `DatabaseQuery`.
     """
-    alvo = _normalizar(query) if query else None
+    alvo = _normalize(query) if query else None
     itens: list[dict] = []
     for d in defs:
         if tipo and str(getattr(d, "type", "") or "") != tipo:
             continue
-        if alvo and alvo not in _normalizar(_campos_de_busca(d)):
+        if alvo and alvo not in _normalize(_search_fields(d)):
             continue
         itens.append(
             {
@@ -147,7 +147,7 @@ def indice_compacto(
     return sorted(itens, key=lambda i: str(i["name"] or ""))
 
 
-def tipos_do_catalogo(defs: Iterable[Any]) -> list[dict]:
+def catalog_types(defs: Iterable[Any]) -> list[dict]:
     """`[{type, count}]` — the map that tells where to filter before listing everything."""
     contagem: dict[str, int] = {}
     for d in defs:
@@ -156,7 +156,7 @@ def tipos_do_catalogo(defs: Iterable[Any]) -> list[dict]:
     return [{"type": tipo, "count": n} for tipo, n in sorted(contagem.items())]
 
 
-def _propriedade_essencial(p: Any) -> dict:
+def _essential_property(p: Any) -> dict:
     """The minimum to configure the property — no label, help or visibility."""
     item: dict[str, Any] = {"name": getattr(p, "name", None), "type": getattr(p, "type", None)}
     # `required` does not exist in today's catalog; it is read via getattr so that
@@ -172,13 +172,13 @@ def _propriedade_essencial(p: Any) -> dict:
             {"value": getattr(o, "value", None), "label": getattr(o, "label", None)}
             for o in opcoes
         ]
-    tipos_de_credencial = getattr(p, "credential_types", None)
-    if tipos_de_credencial:
-        item["credential_types"] = list(tipos_de_credencial)
+    credential_types = getattr(p, "credential_types", None)
+    if credential_types:
+        item["credential_types"] = list(credential_types)
     return item
 
 
-def _dicas(d: Any) -> list[str]:
+def _hints(d: Any) -> list[str]:
     """What the sheet does not say per field and makes a difference when building the node."""
     dicas: list[str] = []
     if getattr(d, "dynamic_inputs", False):
@@ -209,11 +209,11 @@ def _dicas(d: Any) -> list[str]:
             "Este nó exige credencial: passe o identificador de `list_credentials`, "
             "nunca a string de conexão ou o token em si."
         )
-    tipo_de_fonte = getattr(d, "source_kind", None)
-    if tipo_de_fonte:
+    source_kind = getattr(d, "source_kind", None)
+    if source_kind:
         dicas.append(
-            f"Este nó lê uma FONTE EXTERNA ({tipo_de_fonte}): não invente `url`/`typeName`. "
-            f"Consulte `search_sources(kind=\"{tipo_de_fonte}\")` e cole o `node_snippet` de "
+            f"Este nó lê uma FONTE EXTERNA ({source_kind}): não invente `url`/`typeName`. "
+            f"Consulte `search_sources(kind=\"{source_kind}\")` e cole o `node_snippet` de "
             "`describe_source`; fonte fora do catálogo → `probe_source` e `register_source`."
         )
     return dicas
@@ -226,14 +226,14 @@ def descrever(d: Any, *, brief: bool) -> dict:
         # editor consumes, and copying it field by field here would create a second
         # definition of what a node is, doomed to fall behind.
         ficha = d.model_dump(exclude_none=True) if hasattr(d, "model_dump") else dict(d)
-        ficha["hints"] = _dicas(d)
+        ficha["hints"] = _hints(d)
         return ficha
 
     return {
         "name": getattr(d, "name", None),
         "type": getattr(d, "type", None),
-        "description": _texto_de_descricao(d) or None,
-        "properties": [_propriedade_essencial(p) for p in getattr(d, "properties", None) or []],
+        "description": _description_text(d) or None,
+        "properties": [_essential_property(p) for p in getattr(d, "properties", None) or []],
         "inputs": [
             {"name": getattr(p, "name", None), "description": getattr(p, "description", None)}
             for p in getattr(d, "inputs", None) or []
@@ -247,5 +247,5 @@ def descrever(d: Any, *, brief: bool) -> dict:
             for c in getattr(d, "outputs", None) or []
         ],
         "requires_credential": bool(getattr(d, "requires_credential", False)),
-        "hints": _dicas(d),
+        "hints": _hints(d),
     }

@@ -6,19 +6,19 @@ These are the five tools that WRITE to the collection — and, for that reason,
 the ones that carry three precautions the read tools do not need:
 
 1. **Secrets do not get in.** Every definition received goes through
-   `definition_contem_segredo` BEFORE anything else. A password in
+   `definition_contains_secret` BEFORE anything else. A password in
    `connectionString` or an `Authorization` in `headers` saved in the definition
    would be encrypted in the database, but would still be a secret that
    traveled through a transport, a client history and a log — and that the
    output redaction would later erase, giving the false impression that it is
    not there. The refusal cites the field's PATH and never the value
-   (`erros.erro_de_segredo`).
+   (`erros.secret_error`).
 2. **Validating before saving is the default.** `validate_first=True` runs the
    validation core (`validate_service.validar_definicao`) and refuses the save
    when the report contains errors. `force=True` overrides ordinary errors —
    but never the FATAL ones (nonexistent node, duplicate id, cycle,
    `credential_id` that is not a UUID): `validar_definicao` raises those as
-   `DefinicaoInvalidaError` before building any report, and saving a
+   `InvalidDefinitionError` before building any report, and saving a
    definition that the executor cannot even build would be creating a workflow
    that can only fail.
 3. **Authorship comes from the identity, never from the body.** `created_by_id`
@@ -44,12 +44,12 @@ from sqlalchemy import func, select
 
 from app.core.authorization.workflow_access import exigir_papel, get_workspace_member_role
 from app.core.rbac import ROLE_EDITOR
-from app.core.utils.redacao import definition_contem_segredo, params_schema_contem_segredo
+from app.core.utils.redacao import definition_contains_secret, params_schema_contains_secret
 from app.mcp import infra
-from app.mcp.erros import erro, erro_de_segredo
+from app.mcp.erros import erro, secret_error
 from app.mcp.escopo import escopo_da_chamada, exigir_escopo
-from app.mcp.resolucao import carregar_workflow, resolver_workspace
-from app.mcp.saida import envelope, higienizar
+from app.mcp.resolucao import carregar_workflow, resolve_workspace
+from app.mcp.saida import envelope, sanitize
 from app.mcp.tools.base import anotacoes, ferramenta
 # `_share_url` belongs to the same family of tools and is the ONLY definition of
 # the portal's absolute URL. Copying it here because of the underscore would
@@ -61,19 +61,19 @@ from app.schemas.workflow import WorkflowUpdate
 from app.services import validate_service
 from app.services.workflow_service import WorkflowService
 
-_MENSAGEM_PAPEL = "Requer papel 'editor' ou superior neste workspace."
+_ROLE_MESSAGE = "Requer papel 'editor' ou superior neste workspace."
 
 # The three portal states, in the same order the screen offers them. It is the
 # same list as the `pattern` of `PortalSettingsSchema` in REST.
-ACESSOS_DO_PORTAL = ("disabled", "public", "private")
+PORTAL_ACCESS_MODES = ("disabled", "public", "private")
 
 # Ceiling of shape-error items passed on to the client: a very wrong body
 # yields dozens of items, and the whole list only drowns the first line, which
 # is the one that matters.
-_MAX_ERROS_DE_FORMA = 20
+_MAX_SHAPE_ERRORS = 20
 
 
-def _erros_de_forma(exc: ValidationError) -> list:
+def _shape_errors(exc: ValidationError) -> list:
     """`[{path, message}]` from a Pydantic error — without the value received.
 
     Pydantic's `str(exc)` echoes the INPUT of each failed field, and the input
@@ -82,7 +82,7 @@ def _erros_de_forma(exc: ValidationError) -> list:
     and the SDK log. Path and reason are enough to fix it.
     """
     itens = []
-    for detalhe in exc.errors()[:_MAX_ERROS_DE_FORMA]:
+    for detalhe in exc.errors()[:_MAX_SHAPE_ERRORS]:
         caminho = ".".join(str(parte) for parte in detalhe.get("loc", ()))
         itens.append({"path": caminho, "message": str(detalhe.get("msg", ""))})
     return itens
@@ -98,27 +98,27 @@ def _recusar_segredo(definition: Any) -> None:
     """
     if not isinstance(definition, dict):
         return
-    caminhos = definition_contem_segredo(definition)
+    caminhos = definition_contains_secret(definition)
     if caminhos:
-        raise erro_de_segredo(caminhos)
+        raise secret_error(caminhos)
 
 
-def _recusar_segredo_no_schema(params_schema: Any) -> None:
+def _refuse_secret_in_schema(params_schema: Any) -> None:
     """Refuses a `params_schema` that stores a secret as the VALUE of a parameter
     (`params_schema.token.default`). Declaring a `token` parameter with no
     value, as the lint itself suggests, passes."""
-    caminhos = params_schema_contem_segredo(params_schema)
+    caminhos = params_schema_contains_secret(params_schema)
     if caminhos:
-        raise erro_de_segredo(caminhos)
+        raise secret_error(caminhos)
 
 
-def _relatorio(saida: Any) -> dict:
+def _report(saida: Any) -> dict:
     """The validation's `__report__` — an empty dict when the output lacks it."""
     relatorio = saida.get("__report__") if isinstance(saida, dict) else None
     return relatorio if isinstance(relatorio, dict) else {}
 
 
-def _resumo_da_validacao(relatorio: dict) -> dict:
+def _validation_summary(relatorio: dict) -> dict:
     """What fits at the top level of the response: the verdict and the counts.
 
     The report's MESSAGES are left out on purpose — they cite node names and
@@ -132,7 +132,7 @@ def _resumo_da_validacao(relatorio: dict) -> dict:
     }
 
 
-def _avisos_de_agendamento(wf) -> list:
+def _schedule_warnings(wf) -> list:
     """`schedule_notices` (a transient attribute of the service) as dicts.
 
     They are Pydantic objects: without this, the response does not serialize
@@ -149,7 +149,7 @@ def _avisos_de_agendamento(wf) -> list:
     return avisos
 
 
-async def _contar_versoes(db, workflow_hash: str) -> int:
+async def _count_versions(db, workflow_hash: str) -> int:
     """How many snapshots the workflow has. A count, and not `list_versions`: the
     listing brings each version's definition, and here only the number is
     wanted."""
@@ -161,7 +161,7 @@ async def _contar_versoes(db, workflow_hash: str) -> int:
     return int(resultado.scalar() or 0)
 
 
-async def _validar(definition: Any, *, user_id: str, workspace_id: str) -> dict:
+async def _validate(definition: Any, *, user_id: str, workspace_id: str) -> dict:
     """`validar_definicao` with a malformed body translated.
 
     A `pydantic.ValidationError` — a node without `id`, an edge without
@@ -178,23 +178,23 @@ async def _validar(definition: Any, *, user_id: str, workspace_id: str) -> dict:
             "validation",
             "O corpo de definition não tem a forma esperada.",
             "cada nó precisa de id, name e type; cada aresta, de source e target",
-            errors=_erros_de_forma(exc),
+            errors=_shape_errors(exc),
         ) from exc
 
 
-async def _validar_antes_de_gravar(
+async def _validate_before_saving(
     definition: Any, *, user_id: str, workspace_id: str, force: bool
 ) -> dict:
     """Validates and refuses the save when there are errors — unless `force`.
 
     The FATAL case does not get here even with `force=True`:
-    `validar_definicao` raises it as `DefinicaoInvalidaError`, which the
+    `validar_definicao` raises it as `InvalidDefinitionError`, which the
     decorator translates into `validation` with the same report. That is the
     asymmetry we want — `force` exists for judgment errors (a node the
     simulation cannot exercise without real data), not for saving a graph the
     executor cannot even build.
     """
-    relatorio = _relatorio(await _validar(definition, user_id=user_id, workspace_id=workspace_id))
+    relatorio = _report(await _validate(definition, user_id=user_id, workspace_id=workspace_id))
     erros = relatorio.get("errors") or []
     if erros and not force:
         raise erro(
@@ -205,16 +205,16 @@ async def _validar_antes_de_gravar(
             # receives at the top level, but does not descend into a nested
             # structure, and a `simulate_error` message repeats what the node
             # tried to do — including a URL the simulation built.
-            report=higienizar(relatorio),
+            report=sanitize(relatorio),
         )
     return relatorio
 
 
-async def _workspace_editavel(db, escopo, workspace_id: str | None) -> str:
+async def _editable_workspace(db, escopo, workspace_id: str | None) -> str:
     """The call's workspace, with the minimum editor role already checked."""
-    alvo = await resolver_workspace(db, escopo, workspace_id)
+    alvo = await resolve_workspace(db, escopo, workspace_id)
     papel = await get_workspace_member_role(db, alvo, escopo.user_id)
-    exigir_papel(papel, ROLE_EDITOR, _MENSAGEM_PAPEL)
+    exigir_papel(papel, ROLE_EDITOR, _ROLE_MESSAGE)
     return alvo
 
 
@@ -252,23 +252,23 @@ async def validate_workflow(
     _recusar_segredo(definition)
 
     async with infra.sessao() as db:
-        alvo = await _workspace_editavel(db, escopo, workspace_id)
+        alvo = await _editable_workspace(db, escopo, workspace_id)
 
-    saida = await _validar(definition, user_id=escopo.user_id, workspace_id=alvo)
-    relatorio = _relatorio(saida)
+    saida = await _validate(definition, user_id=escopo.user_id, workspace_id=alvo)
+    relatorio = _report(saida)
     # The validate body is `{node_id: {...}}` plus the reserved `__*` keys.
     # Here it comes out separated into two parts, and both are text from
     # whoever writes the definition: the nodes' id and label, the lint
     # messages, the `suggested_params_schema`.
-    por_no = {
+    by_node = {
         chave: valor for chave, valor in saida.items() if not str(chave).startswith("__")
     }
     dados = {"workspace_id": alvo}
-    dados.update(_resumo_da_validacao(relatorio))
+    dados.update(_validation_summary(relatorio))
     return envelope(
         dados,
         report=relatorio,
-        nodes=por_no,
+        nodes=by_node,
         edge_diagnostics=saida.get("__edge_diagnostics__"),
     )
 
@@ -298,14 +298,14 @@ async def create_workflow(
     # does not go through `encrypt_workflow_connections`): the same refusal as
     # REST — only on what the schema stores as a value, and not on
     # `required: true` of a `token`.
-    _recusar_segredo_no_schema(params_schema)
+    _refuse_secret_in_schema(params_schema)
 
     async with infra.sessao() as db:
-        alvo = await _workspace_editavel(db, escopo, workspace_id)
+        alvo = await _editable_workspace(db, escopo, workspace_id)
 
     relatorio: dict = {}
     if validate_first:
-        relatorio = await _validar_antes_de_gravar(
+        relatorio = await _validate_before_saving(
             definition, user_id=escopo.user_id, workspace_id=alvo, force=force
         )
 
@@ -343,7 +343,7 @@ async def create_workflow(
         nome = wf.name
 
     if validate_first:
-        dados["validation"] = _resumo_da_validacao(relatorio)
+        dados["validation"] = _validation_summary(relatorio)
     return envelope(dados, name=nome, validation_report=relatorio or None)
 
 
@@ -375,7 +375,7 @@ async def update_workflow(
     if definition is not None:
         _recusar_segredo(definition)
     if params_schema is not None:
-        _recusar_segredo_no_schema(params_schema)
+        _refuse_secret_in_schema(params_schema)
 
     campos: dict = {}
     for chave, valor in (
@@ -395,14 +395,14 @@ async def update_workflow(
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_EDITOR, _MENSAGEM_PAPEL)
+        exigir_papel(papel, ROLE_EDITOR, _ROLE_MESSAGE)
         id_hash = wf.id_hash
         workspace_id = wf.workspace_id
-        versoes_antes = await _contar_versoes(db, id_hash)
+        versions_before = await _count_versions(db, id_hash)
 
     relatorio: dict = {}
     if definition is not None and validate_first:
-        relatorio = await _validar_antes_de_gravar(
+        relatorio = await _validate_before_saving(
             definition, user_id=escopo.user_id, workspace_id=workspace_id, force=force
         )
 
@@ -416,7 +416,7 @@ async def update_workflow(
             "validation",
             "Campos inválidos para a atualização.",
             "confira os tipos em errors[] e repita",
-            errors=_erros_de_forma(exc),
+            errors=_shape_errors(exc),
         ) from exc
 
     async with infra.sessao() as db:
@@ -424,15 +424,15 @@ async def update_workflow(
             id_hash, workflow_in, change_note=change_note, updated_by_id=escopo.user_id
         )
         await db.commit()
-        avisos = _avisos_de_agendamento(atualizado)
-        versoes_depois = await _contar_versoes(db, id_hash)
+        avisos = _schedule_warnings(atualizado)
+        versions_after = await _count_versions(db, id_hash)
         dados = {
             "id": atualizado.id_hash,
             "workspace_id": atualizado.workspace_id,
             "is_active": bool(atualizado.flag_ative),
             "updated_fields": sorted(campos),
-            "version_snapshot": versoes_depois > versoes_antes,
-            "versions_count": versoes_depois,
+            "version_snapshot": versions_after > versions_before,
+            "versions_count": versions_after,
             # The notice code is closed and generated by the platform; the
             # message, which cites the schedule expression written by people,
             # goes in the untrusted block.
@@ -441,7 +441,7 @@ async def update_workflow(
         nome = atualizado.name
 
     if definition is not None and validate_first:
-        dados["validation"] = _resumo_da_validacao(relatorio)
+        dados["validation"] = _validation_summary(relatorio)
     return envelope(
         dados,
         name=nome,
@@ -463,14 +463,14 @@ async def set_workflow_active(ctx: Context, workflow_id: str, active: bool) -> d
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_EDITOR, _MENSAGEM_PAPEL)
+        exigir_papel(papel, ROLE_EDITOR, _ROLE_MESSAGE)
         atualizado = await WorkflowService(db).update_workflow(
             wf.id_hash,
             WorkflowUpdate(flag_ative=bool(active)),
             updated_by_id=escopo.user_id,
         )
         await db.commit()
-        avisos = _avisos_de_agendamento(atualizado)
+        avisos = _schedule_warnings(atualizado)
         dados = {
             "id": atualizado.id_hash,
             "workspace_id": atualizado.workspace_id,
@@ -482,7 +482,7 @@ async def set_workflow_active(ctx: Context, workflow_id: str, active: bool) -> d
     return envelope(dados, name=nome, schedule_notices=avisos or None)
 
 
-def _lista_de_compartilhamento(shared_with: Any) -> list | None:
+def _share_list(shared_with: Any) -> list | None:
     """The list of who sees the private portal, sanitized.
 
     `None` stays `None` ("with nobody yet"), which is what REST saves when the
@@ -520,18 +520,18 @@ async def set_portal_access(
     exigir_escopo(escopo, "workflows:write")
 
     alvo = str(access or "").strip().lower()
-    if alvo not in ACESSOS_DO_PORTAL:
+    if alvo not in PORTAL_ACCESS_MODES:
         raise erro(
             "validation",
             "access precisa ser disabled, public ou private.",
             "use private com shared_with para restringir a pessoas",
-            allowed=list(ACESSOS_DO_PORTAL),
+            allowed=list(PORTAL_ACCESS_MODES),
         )
-    lista = _lista_de_compartilhamento(shared_with) if alvo == "private" else None
+    lista = _share_list(shared_with) if alvo == "private" else None
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_EDITOR, _MENSAGEM_PAPEL)
+        exigir_papel(papel, ROLE_EDITOR, _ROLE_MESSAGE)
         # Direct write in the ORM, like `PATCH /workflows/{id}/portal`:
         # `WorkflowUpdate` has no `portal_access` (and must not have it —
         # changing the publication state through the generic PUT would hide
@@ -544,12 +544,12 @@ async def set_portal_access(
             "portal_access": alvo,
             "share_url": _share_url(wf),
         }
-        com_quem = list(lista or [])
+        shared_with_list = list(lista or [])
         nome = wf.name
         await db.commit()
 
     # An empty list still shows up: "shared with nobody" is an answer.
-    return envelope(dados, name=nome, shared_with=com_quem)
+    return envelope(dados, name=nome, shared_with=shared_with_list)
 
 
 def registrar(server) -> None:

@@ -26,7 +26,7 @@ from app.models.base import Base
 from app.models.system_config import SystemConfig
 from app.services import assistente_config_service as svc
 
-from ._mcp_harness import RedisFalso
+from ._mcp_harness import FakeRedis
 
 pytestmark = pytest.mark.asyncio
 
@@ -43,48 +43,48 @@ async def db():
 
 # ── Precedence ───────────────────────────────────────────────────────────────
 
-async def test_sem_escolha_salva_vale_o_padrao_do_ambiente(db):
+async def test_without_saved_choice_the_environment_default_applies(db):
     assert await svc.modelo_em_uso(db=db) == ASSISTENTE_MODELO
-    situacao = await svc.situacao(db=db)
-    assert situacao["origem"] == "ambiente"
-    assert situacao["definido_em"] is None
+    get_status = await svc.get_status(db=db)
+    assert get_status["origem"] == "ambiente"
+    assert get_status["definido_em"] is None
 
 
-async def test_a_escolha_do_admin_vence_o_ambiente(db):
-    await svc.definir_modelo(db, "outro/modelo", por="jose")
+async def test_admin_choice_beats_the_environment(db):
+    await svc.set_model(db, "outro/modelo", por="jose")
 
     assert await svc.modelo_em_uso(db=db) == "outro/modelo"
-    situacao = await svc.situacao(db=db)
-    assert (situacao["origem"], situacao["definido_por"]) == ("banco", "jose")
+    get_status = await svc.get_status(db=db)
+    assert (get_status["origem"], get_status["definido_por"]) == ("banco", "jose")
     # The default stays visible: it is what the screen offers as "back to default".
-    assert situacao["padrao_do_ambiente"] == ASSISTENTE_MODELO
+    assert get_status["padrao_do_ambiente"] == ASSISTENTE_MODELO
 
 
-async def test_voltar_ao_padrao_apaga_a_escolha(db):
-    await svc.definir_modelo(db, "outro/modelo", por="jose")
-    await svc.definir_modelo(db, None, por="jose")
+async def test_reverting_to_default_erases_the_choice(db):
+    await svc.set_model(db, "outro/modelo", por="jose")
+    await svc.set_model(db, None, por="jose")
 
     assert await svc.modelo_em_uso(db=db) == ASSISTENTE_MODELO
-    assert (await svc.situacao(db=db))["origem"] == "ambiente"
+    assert (await svc.get_status(db=db))["origem"] == "ambiente"
 
 
 # ── O cache ──────────────────────────────────────────────────────────────────
 
-async def test_salvar_grava_o_valor_novo_no_cache(db):
+async def test_save_writes_the_new_value_to_cache(db):
     """Without this the change takes up to five minutes to take effect, and the admin
     concludes the button didn't work — and clicks again."""
-    redis = RedisFalso()
+    redis = FakeRedis()
     await svc.modelo_em_uso(db=db, redis=redis)          # popula
     assert redis.dados[svc._CACHE] == ASSISTENTE_MODELO
 
-    await svc.definir_modelo(db, "outro/modelo", por="jose", redis=redis)
+    await svc.set_model(db, "outro/modelo", por="jose", redis=redis)
 
     # WRITES, does not delete — see the race test right below.
     assert redis.dados[svc._CACHE] == "outro/modelo"
     assert await svc.modelo_em_uso(db=db, redis=redis) == "outro/modelo"
 
 
-async def test_leitor_atrasado_nao_repinta_o_modelo_VELHO_por_cima(db):
+async def test_late_reader_does_not_repaint_the_OLD_model_on_top(db):
     """The race the adversarial review found, staged step by step.
 
     A reader misses the cache and goes to the database. WHILE it reads, the admin
@@ -92,11 +92,11 @@ async def test_leitor_atrasado_nao_repinta_o_modelo_VELHO_por_cima(db):
     the old value over the new one and pin it for the five minutes of the TTL: the
     change "wouldn't take", and whoever saved would conclude the button is broken.
     """
-    redis = RedisFalso()
+    redis = FakeRedis()
 
     # The reader has already read the database (old model) and only needs to write
     # to the cache. In between, the change happens:
-    await svc.definir_modelo(db, "novo/modelo", por="jose", redis=redis)
+    await svc.set_model(db, "novo/modelo", por="jose", redis=redis)
 
     # Now the late reader tries to write what it read. `nx` makes it give up.
     await redis.set(svc._CACHE, "velho/modelo", ex=svc._TTL_S, nx=True)
@@ -105,16 +105,16 @@ async def test_leitor_atrasado_nao_repinta_o_modelo_VELHO_por_cima(db):
     assert await svc.modelo_em_uso(db=db, redis=redis) == "novo/modelo"
 
 
-async def test_redis_fora_do_ar_nao_deixa_ninguem_sem_modelo(db):
-    class RedisQuebrado:
+async def test_redis_down_leaves_nobody_without_a_model(db):
+    class BrokenRedis:
         async def get(self, *a, **k): raise RuntimeError("fora do ar")
         async def set(self, *a, **k): raise RuntimeError("fora do ar")
 
-    await svc.definir_modelo(db, "outro/modelo")
-    assert await svc.modelo_em_uso(db=db, redis=RedisQuebrado()) == "outro/modelo"
+    await svc.set_model(db, "outro/modelo")
+    assert await svc.modelo_em_uso(db=db, redis=BrokenRedis()) == "outro/modelo"
 
 
-async def test_falha_do_banco_nao_prende_o_padrao_no_cache(db):
+async def test_database_failure_does_not_pin_the_default_in_cache(db):
     """The default from a database ERROR does not go into the cache.
 
     Writing it would lock the installation into the environment's model for five
@@ -122,21 +122,21 @@ async def test_falha_do_banco_nao_prende_o_padrao_no_cache(db):
     nothing on the screen explaining it. It is the rule another copy of the
     "SystemConfig + cache" skeleton already followed — and that this one didn't take.
     """
-    await svc.definir_modelo(db, "outro/modelo", por="jose")
-    redis = RedisFalso()
+    await svc.set_model(db, "outro/modelo", por="jose")
+    redis = FakeRedis()
 
-    class SessaoQuebrada:
+    class BrokenSession:
         async def execute(self, *a, **kw):
             raise RuntimeError("banco fora do ar")
 
-    assert await svc.modelo_em_uso(db=SessaoQuebrada(), redis=redis) == ASSISTENTE_MODELO
+    assert await svc.modelo_em_uso(db=BrokenSession(), redis=redis) == ASSISTENTE_MODELO
     assert svc._CACHE not in redis.dados
 
     # Once the database is back, the first read already sees the admin's choice.
     assert await svc.modelo_em_uso(db=db, redis=redis) == "outro/modelo"
 
 
-async def test_banco_fora_do_ar_cai_no_padrao_em_vez_de_levantar():
+async def test_database_down_falls_back_to_default_instead_of_raising():
     """The whole assistant down because of a setting would be a bad trade: the
     environment default is always better than nothing."""
     class Explode:
@@ -157,15 +157,15 @@ async def test_id_invalido_e_recusado_ao_salvar(db, ruim):
     """Rejecting here is rejecting once; letting it through is failing on the next
     conversation of EVERY user, without the screen saying why."""
     with pytest.raises(ValueError):
-        await svc.definir_modelo(db, ruim)
+        await svc.set_model(db, ruim)
     assert await svc.modelo_em_uso(db=db) == ASSISTENTE_MODELO
 
 
-async def test_linha_corrompida_no_banco_nao_derruba_a_leitura(db):
+async def test_corrupted_db_row_does_not_break_the_read(db):
     """Someone editing `system_config` by hand, a botched migration: the read
     ignores what doesn't look like an id and falls back to the default."""
     from app.core.system_config import set_config
 
     await set_config(db, svc.CHAVE, {"modelo": "isto não é um id"})
     assert await svc.modelo_em_uso(db=db) == ASSISTENTE_MODELO
-    assert (await svc.situacao(db=db))["origem"] == "ambiente"
+    assert (await svc.get_status(db=db))["origem"] == "ambiente"

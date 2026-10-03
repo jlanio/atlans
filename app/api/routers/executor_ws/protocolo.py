@@ -13,12 +13,12 @@ from app.core.utils.logger import get_logger
 
 from app.core.executor_connections import _DEFAULT_CAPACITY, executor_registry
 from flow.utils.protocolo_ws import (
-    STATS_CONTROLE_DESCARTADO,
-    STATS_TRUNCADO,
-    SYSTEM_INFO_BOOLEANOS,
-    SYSTEM_INFO_NUMEROS,
-    SYSTEM_INFO_TEXTOS,
-    reduzir_stats,
+    STATS_CONTROL_DROPPED,
+    STATS_TRUNCATED,
+    SYSTEM_INFO_BOOLEANS,
+    SYSTEM_INFO_NUMBERS,
+    SYSTEM_INFO_TEXTS,
+    shrink_stats,
 )
 
 logger = get_logger(__name__)
@@ -32,7 +32,7 @@ logger = get_logger(__name__)
 # TWO node_event STRIPS on purpose. A single 200/s ceiling treated a node's
 # `completed` as if it were a log line and DROPPED lifecycle events — a total
 # and permanent drop, with no re-enqueuing. The executor drains the event queue
-# in a burst (main.py → _drenar_eventos_pendentes), so a workflow of ~300
+# in a burst (main.py → _drain_pending_events), so a workflow of ~300
 # trivial nodes emits 600+ events in 2-3s and goes over the ceiling: the
 # frontend loses the `completed` of several nodes and, since `completeExecution`
 # only demotes a stuck node when the run is 'cancelled', the user sees a run
@@ -101,7 +101,7 @@ _MAX_JOB_ERROR_CHARS = 8 * 1024
 # frame ceiling.
 _MAX_JOB_STATS_BYTES = 4 * 1024 * 1024
 
-def _e_ciclo_de_vida(msg: dict) -> bool:
+def _is_lifecycle(msg: dict) -> bool:
     """True for a node_event that carries GRAPH STATE (started/completed/failed).
 
     A missing `kind` counts as lifecycle: it is the producer's default
@@ -112,7 +112,7 @@ def _e_ciclo_de_vida(msg: dict) -> bool:
     kind = msg.get("kind")
     return kind is None or kind == "lifecycle"
 
-def _e_telemetria(msg_type: str, msg: dict) -> bool:
+def _is_telemetry(msg_type: str, msg: dict) -> bool:
     """True for what can be lost without lying about the system's state.
 
     These are the `sync_event`s (GeoSync progress, which the executor emits per
@@ -125,7 +125,7 @@ def _e_telemetria(msg_type: str, msg: dict) -> bool:
         # forever — the same reason it is already exempt from the rate limit
         # (see `_SYNC_TERMINAL_EVENTS`). The two policies must agree.
         return msg.get("event") not in _SYNC_TERMINAL_EVENTS
-    return msg_type == "node_event" and not _e_ciclo_de_vida(msg)
+    return msg_type == "node_event" and not _is_lifecycle(msg)
 
 # Required fields per message type. Missing ones → explicit error to the
 # executor instead of the old silent drop.
@@ -210,7 +210,7 @@ def _sanitize_capacity(executor_id: str, msg: dict) -> tuple[dict | None, list[s
     and would hurt whoever, after a limit is lowered in the database, still has
     jobs in flight above the new ceiling. In dispatch ORDERING, lying downward
     does not pay off: the load used is the one counted by the server — the
-    host's `pending`/`running` runs in the database (`_situacoes` in
+    host's `pending`/`running` runs in the database (`_executor_states` in
     workflow_execution_service) —, and the declared one only serves to say
     "full". Announcing zero does not put the executor ahead of anyone. The
     `is_full` in `send_job` still looks only at the declared one: whoever lies
@@ -276,18 +276,18 @@ def _sanitize_system_info(executor_id: str, raw) -> dict | None:
         return None
 
     clean: dict = {}
-    for key in SYSTEM_INFO_TEXTOS:
+    for key in SYSTEM_INFO_TEXTS:
         value = raw.get(key)
         if isinstance(value, str) and value.strip():
             clean[key] = value.strip()[:_SYSTEM_INFO_STR_MAX]
-    for key in SYSTEM_INFO_NUMEROS:
+    for key in SYSTEM_INFO_NUMBERS:
         value = raw.get(key)
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             continue
         if value != value or value in (float("inf"), float("-inf")) or value < 0:
             continue
         clean[key] = round(float(value), 2)
-    for key in SYSTEM_INFO_BOOLEANOS:
+    for key in SYSTEM_INFO_BOOLEANS:
         value = raw.get(key)
         if isinstance(value, bool):
             clean[key] = value
@@ -342,7 +342,7 @@ def _sanitize_executor_version(executor_id: str, raw) -> str | None:
 _rate_state: dict[tuple[str, str], dict] = {}
 
 def _rate_allowed(executor_id: str, bucket: str, limit: int) -> bool:
-    """Janela deslizante por (executor, bucket). False = descartar a mensagem."""
+    """Janela sliding por (executor, bucket). False = descartar a mensagem."""
     now = time.monotonic()
     key = (executor_id, bucket)
     state = _rate_state.get(key)
@@ -373,7 +373,7 @@ def _node_event_allowed(executor_id: str, msg: dict) -> bool:
     falls into the high strip, which is accepted on purpose — the per-event byte
     ceiling still applies and 2000 events/s of 64 KB is already a hard limit.
     """
-    if _e_ciclo_de_vida(msg):
+    if _is_lifecycle(msg):
         return _rate_allowed(executor_id, "node_event:lifecycle", _NODE_EVENT_LIFECYCLE_RATE_LIMIT)
     return _rate_allowed(executor_id, "node_event:log", _NODE_EVENT_RATE_LIMIT)
 
@@ -403,7 +403,7 @@ def _cap_job_result(executor_id: str, msg: dict) -> tuple[dict, str]:
     destinations (ephemeral Redis, the `run_results` queue, `workflow:{run}:history`,
     webhook_response and, via the consumer, the `error_message`/`node_stats`
     columns) use the same contained payload. The truncation of `stats` is the
-    protocol's (`reduzir_stats` in flow/utils/protocolo_ws.py), the same one the
+    protocol's (`shrink_stats` in flow/utils/protocolo_ws.py), the same one the
     executor applies before sending: first it drops the per-node stats while
     preserving the control keys; if even those don't fit, it drops everything
     and marks `__control_dropped__`, which the webhook handler already knows how
@@ -453,13 +453,13 @@ def _cap_job_result(executor_id: str, msg: dict) -> tuple[dict, str]:
             "Executor '%s': 'stats' do job_result não é serializável — descartado.",
             executor_id,
         )
-        capped["stats"] = {STATS_TRUNCADO: True, STATS_CONTROLE_DESCARTADO: True}
+        capped["stats"] = {STATS_TRUNCATED: True, STATS_CONTROL_DROPPED: True}
         return capped, json.dumps(capped["stats"])
 
     size = len(stats_json)
     if size > _MAX_JOB_STATS_BYTES:
         # The yardstick here is only `stats`, against the ceiling of what the server stores.
-        reduced, stats_json, preservou = reduzir_stats(
+        reduced, stats_json, preservou = shrink_stats(
             stats, size, _MAX_JOB_STATS_BYTES, lambda s: json.dumps(s, default=str),
         )
         if preservou:

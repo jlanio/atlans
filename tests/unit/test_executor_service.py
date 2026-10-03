@@ -4,7 +4,7 @@ Unit tests for app/services/executor_service.py after the migration to mTLS.
 
 Coverage:
   - create_executor (status=pending; credential comes via enrollment OTP + mTLS cert)
-  - delete_agent, revogar_executor + concluir_revogacoes (revocation marks
+  - delete_agent, revogar_executor + complete_revocations (revocation marks
     cert_serial in the Redis blacklist after the commit)
 
 Flows covered in another file:
@@ -68,7 +68,7 @@ def mock_db():
 class TestCreateAgent:
 
     @pytest.mark.asyncio
-    async def test_sucesso_dedicated_retorna_agent_pending(self, mock_db):
+    async def test_dedicated_success_returns_agent_pending(self, mock_db):
         """Apos migracao mTLS, create_executor retorna apenas Executor (sem api_key)."""
         from app.services.executor_service import create_executor
 
@@ -84,7 +84,7 @@ class TestCreateAgent:
         mock_db.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_sucesso_default(self, mock_db):
+    async def test_default_success(self, mock_db):
         from app.services.executor_service import create_executor
 
         ag = await create_executor(
@@ -94,7 +94,7 @@ class TestCreateAgent:
         assert ag.executor_type == "default"
 
     @pytest.mark.asyncio
-    async def test_agent_type_invalido_lanca_value_error(self, mock_db):
+    async def test_invalid_agent_type_raises_value_error(self, mock_db):
         from app.services.executor_service import create_executor
 
         with pytest.raises(ValueError, match="executor_type"):
@@ -113,7 +113,7 @@ class TestCreateDedicatedForUser:
         return u
 
     @pytest.mark.asyncio
-    async def test_sem_cota_lanca_403(self, mock_db):
+    async def test_without_quota_raises_403(self, mock_db):
         from app.services.executor_service import create_dedicated_for_user, ExecutorQuotaError
 
         with pytest.raises(ExecutorQuotaError) as exc:
@@ -121,7 +121,7 @@ class TestCreateDedicatedForUser:
         assert exc.value.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_limite_atingido_lanca_409(self, mock_db):
+    async def test_limit_reached_raises_409(self, mock_db):
         from app.services import executor_service
 
         with patch("app.services.executor_service.count_user_created_executors", AsyncMock(return_value=1)):
@@ -130,7 +130,7 @@ class TestCreateDedicatedForUser:
         assert exc.value.status_code == 409
 
     @pytest.mark.asyncio
-    async def test_sucesso_forca_dedicated_e_cria_assignment(self, mock_db):
+    async def test_success_forces_dedicated_and_creates_assignment(self, mock_db):
         from app.services import executor_service
         from app.models.user_executor_assignment import UserExecutorAssignment
 
@@ -156,7 +156,7 @@ class TestCountUserCreatedAgents:
     admin restores the quota after a round of revocations."""
 
     @pytest.mark.asyncio
-    async def test_retorna_scalar_do_execute(self, mock_db):
+    async def test_returns_scalar_from_execute(self, mock_db):
         from app.services.executor_service import count_user_created_executors
 
         result_mock = MagicMock()
@@ -168,7 +168,7 @@ class TestCountUserCreatedAgents:
         mock_db.execute.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_select_filtra_revoked_e_deleted(self, mock_db):
+    async def test_select_filters_revoked_and_deleted(self, mock_db):
         """Compiles the statement and checks that the correct filters are present."""
         from app.services.executor_service import count_user_created_executors
 
@@ -197,7 +197,7 @@ class TestCountUserCreatedAgents:
 class TestDeleteAgent:
 
     @pytest.mark.asyncio
-    async def test_sucesso_preenche_deleted_at(self, mock_db):
+    async def test_success_fills_deleted_at(self, mock_db):
         from app.services.executor_service import delete_agent
 
         ag = _make_agent(status="revoked")
@@ -211,7 +211,7 @@ class TestDeleteAgent:
         mock_db.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_nao_revogado_lanca_value_error(self, mock_db):
+    async def test_not_revoked_raises_value_error(self, mock_db):
         from app.services.executor_service import delete_agent
 
         ag = _make_agent(status="active")
@@ -223,7 +223,7 @@ class TestDeleteAgent:
                 await delete_agent(mock_db, ag.id_hash)
 
     @pytest.mark.asyncio
-    async def test_nao_encontrado_lanca_value_error(self, mock_db):
+    async def test_not_found_raises_value_error(self, mock_db):
         from app.services.executor_service import delete_agent
 
         with patch("app.services.executor_service.ExecutorCRUD") as crud_cls:
@@ -234,9 +234,9 @@ class TestDeleteAgent:
                 await delete_agent(mock_db, "missing")
 
 
-# ── Revocation: revogar_executor + concluir_revogacoes ───────────────────────
+# ── Revocation: revogar_executor + complete_revocations ───────────────────────
 
-def _revogar(ag, **kw):
+def _revoke(ag, **kw):
     from app.services.executor_service import revogar_executor
 
     return revogar_executor(
@@ -245,14 +245,14 @@ def _revogar(ag, **kw):
     )
 
 
-class TestRevogarExecutor:
+class TestRevokeExecutor:
 
     @pytest.mark.asyncio
-    async def test_muda_status_e_anula_o_cert_sem_commit_proprio(self, mock_db):
+    async def test_changes_status_and_clears_the_cert_without_own_commit(self, mock_db):
         ag = _make_agent(status="active", cert_serial="abc123")
         with patch("app.services.workspace_executor_service.detach_executor",
                    AsyncMock(return_value=[])) as detach:
-            revogacao = await _revogar(ag, db=mock_db)
+            revogacao = await _revoke(ag, db=mock_db)
 
         assert (ag.status, ag.cert_serial) == ("revoked", None)
         assert revogacao.serial == "abc123"            # what the blacklist receives afterwards
@@ -262,7 +262,7 @@ class TestRevogarExecutor:
         mock_db.commit.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_nivel_principal_que_esvaziaria_barra_a_revogacao(self, mock_db):
+    async def test_primary_tier_that_would_be_emptied_blocks_revocation(self, mock_db):
         """Without `force`, the policy's 409 comes BEFORE touching the executor."""
         from app.core.exceptions import WorkspacePolicyConflictError
 
@@ -271,7 +271,7 @@ class TestRevogarExecutor:
         with patch("app.services.workspace_executor_service.detach_executor",
                    AsyncMock(side_effect=recusa)):
             with pytest.raises(WorkspacePolicyConflictError):
-                await _revogar(ag, db=mock_db)
+                await _revoke(ag, db=mock_db)
 
         assert (ag.status, ag.cert_serial) == ("active", "abc123")
 
@@ -283,20 +283,20 @@ def _registro():
     return reg
 
 
-class TestConcluirRevogacoes:
+class TestCompleteRevocations:
 
     @pytest.mark.asyncio
-    async def test_blacklist_aviso_e_fechamento(self):
+    async def test_blacklist_notice_and_close(self):
         from app.services import executor_service as svc
 
-        revogacao = svc.Revogacao(
+        revogacao = svc.Revocation(
             executor_id="ex-1", nome="maquina", serial="abc123", serial_expira_em=None,
             aviso="Executor revogado pelo administrador.", fechamento="Executor revogado.",
         )
         reg = _registro()
         with patch.object(svc, "executor_registry", reg), \
              patch("app.services.executor_enrollment_service.revoke_cert", AsyncMock()) as blacklist:
-            await svc.concluir_revogacoes([revogacao])
+            await svc.complete_revocations([revogacao])
 
         # V07: revoke_cert recebe cert_expires_at para alinhar o TTL.
         blacklist.assert_awaited_once_with("abc123", cert_expires_at=None)
@@ -306,13 +306,13 @@ class TestConcluirRevogacoes:
         reg.disconnect_executor.assert_awaited_once_with("ex-1", code=4403, reason="Executor revogado.")
 
     @pytest.mark.asyncio
-    async def test_falha_de_um_passo_nao_impede_os_outros(self):
+    async def test_one_step_failure_does_not_block_the_others(self):
         """Everything after the commit is best-effort: the blacklist being down must
         not leave the executor connected, nor must one executor's stop prevent another's."""
         from app.services import executor_service as svc
 
-        revogacoes = [
-            svc.Revogacao(executor_id=e, nome=e, serial=f"serial-{e}", serial_expira_em=None,
+        revocations = [
+            svc.Revocation(executor_id=e, nome=e, serial=f"serial-{e}", serial_expira_em=None,
                           aviso="a", fechamento="Operador revogado.")
             for e in ("exec-a", "exec-b")
         ]
@@ -325,16 +325,16 @@ class TestConcluirRevogacoes:
         reg.send_json = AsyncMock(side_effect=[RuntimeError("relay fora"), True])
         with patch.object(svc, "executor_registry", reg), \
              patch("app.services.executor_enrollment_service.revoke_cert", new=_revoke_cert):
-            await svc.concluir_revogacoes(revogacoes)
+            await svc.complete_revocations(revocations)
 
         assert [c.args[0] for c in reg.disconnect_executor.await_args_list] == ["exec-a", "exec-b"]
 
 
-class TestRevogarExecutoresDoUsuario:
+class TestRevokeUserExecutors:
     """Auditoria SEG-16: suspender/excluir a conta revoga os executores dela."""
 
     @staticmethod
-    def _db_com(executores):
+    def _db_with(executores):
         sel = MagicMock()
         sel.scalars.return_value.all.return_value = list(executores)
         db = MagicMock()
@@ -343,25 +343,25 @@ class TestRevogarExecutoresDoUsuario:
         return db
 
     @pytest.mark.asyncio
-    async def test_revoga_todos_os_executores_da_conta(self):
+    async def test_revokes_all_executors_of_the_account(self):
         from app.services import executor_service as svc
 
         a, b = _make_agent(cert_serial="serial-a"), _make_agent(status="pending", cert_serial=None)
-        db = self._db_com([a, b])
+        db = self._db_with([a, b])
         usuario = MagicMock(id_hash="user-001", username="ana")
         with patch("app.services.workspace_executor_service.detach_executor",
                    AsyncMock(return_value=[])) as detach:
-            revogacoes = await svc.revogar_executores_do_usuario(
+            revocations = await svc.revogar_executores_do_usuario(
                 db, usuario, motivo="operator_revoked", desanexar=True,
             )
 
-        assert [r.executor_id for r in revogacoes] == [a.id_hash, b.id_hash]
+        assert [r.executor_id for r in revocations] == [a.id_hash, b.id_hash]
         assert {a.status, b.status} == {"revoked"}
         # "Revogar todos" (revoke all): policy tiers with force, because it is the whole account.
         assert [c.kwargs["force"] for c in detach.await_args_list] == [True, True]
         assert {c.kwargs["reason"] for c in detach.await_args_list} == {"operator_revoked"}
-        assert revogacoes[0].fechamento == "Operador revogado."
-        assert "ana" in revogacoes[0].aviso
+        assert revocations[0].fechamento == "Operador revogado."
+        assert "ana" in revocations[0].aviso
         # A single SELECT (apart from each one's detach) and no commit of its own.
         db.execute.assert_awaited_once()
         db.commit.assert_not_awaited()
@@ -369,29 +369,29 @@ class TestRevogarExecutoresDoUsuario:
         assert "executors.created_by" in sql and "executors.status !=" in sql
 
     @pytest.mark.asyncio
-    async def test_suspensao_nao_tira_dos_niveis(self):
+    async def test_suspension_does_not_remove_from_tiers(self):
         """Suspending/deleting the account (`desanexar=False`) revokes without detach:
         the executor stays in the workspaces' tiers (spec §4.4)."""
         from app.services import executor_service as svc
 
         a = _make_agent(cert_serial="serial-a")
-        db = self._db_com([a])
+        db = self._db_with([a])
         with patch("app.services.workspace_executor_service.detach_executor", AsyncMock()) as detach:
-            revogacoes = await svc.revogar_executores_do_usuario(
+            revocations = await svc.revogar_executores_do_usuario(
                 db, MagicMock(id_hash="user-001", username="ana"), motivo="user_suspended", desanexar=False,
             )
 
         detach.assert_not_awaited()
         assert a.status == "revoked" and a.cert_serial is None
-        assert revogacoes[0].afetados == []
+        assert revocations[0].afetados == []
 
     @pytest.mark.asyncio
-    async def test_sem_executores_nao_revoga_nada(self):
+    async def test_without_executors_revokes_nothing(self):
         from app.services import executor_service as svc
 
-        db = self._db_com([])
-        revogacoes = await svc.revogar_executores_do_usuario(
+        db = self._db_with([])
+        revocations = await svc.revogar_executores_do_usuario(
             db, MagicMock(id_hash="user-001", username="ana"), motivo="user_deleted", desanexar=False,
         )
-        assert revogacoes == []
+        assert revocations == []
         db.execute.assert_awaited_once()

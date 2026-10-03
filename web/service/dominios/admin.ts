@@ -5,7 +5,7 @@ import axios, { AxiosError } from "axios"
 import { resolveAxiosError } from "../resolveResponse"
 import { API_URL } from "@/utils/env"
 import type {
-  IAdminBulkActionResponse, IAdminUser, IAdminUserListParams, IAdminUserListResponse, IArtifactSettings, IAssistenteEstado, ICamadaDoGlobo, IConversaDetalhe, IConversaLista, IConversaResumo, INodeAdminEntry, IPainelDoModelo, IStoragePurgeResult, IStorageUsage, IStorageUsageAdmin, ISystemHealth, IWorkflowContract, IWorkspaceRestoreResult, IWorkspaceTrash,
+  IAdminBulkActionResponse, IAdminUser, IAdminUserListParams, IAdminUserListResponse, IArtifactSettings, IAssistantState, IGlobeLayer, IConversationDetail, IConversationList, IConversationSummary, INodeAdminEntry, IModelPanel, IStoragePurgeResult, IStorageUsage, IStorageUsageAdmin, ISystemHealth, IWorkflowContract, IWorkspaceRestoreResult, IWorkspaceTrash,
 } from "../types"
 
 // ── Assistant model (admin) ────────────────────────────────────────────────
@@ -15,7 +15,7 @@ import type {
  *  saving anything** — it is the preview. Saving on simulate would mean
  *  switching the production model by hovering over a list. */
 export function painelDoModelo(simular?: string | null) {
-  return get<IPainelDoModelo>(`/admin/assistente/modelo${qs({ simular })}`)
+  return get<IModelPanel>(`/admin/assistente/modelo${qs({ simular })}`)
 }
 
 /** Switches the model. `null` goes back to the environment default.
@@ -23,7 +23,7 @@ export function painelDoModelo(simular?: string | null) {
  *  Applies from the NEXT conversation on: those already in progress finish on
  *  the model they started with. */
 export function trocarModelo(modelo: string | null) {
-  return put<IPainelDoModelo>("/admin/assistente/modelo", { modelo })
+  return put<IModelPanel>("/admin/assistente/modelo", { modelo })
 }
 
 // ── System Health ──────────────────────────────────────────────────────────
@@ -188,7 +188,7 @@ export function purgeWorkspaceStorage(workspaceId: string, scope: "all" | "artif
  * `useAssistenteEditor`, with `fetch` + a body reader.
  */
 export function estadoDoAssistente() {
-  return get<import("../types").IAssistenteEstado>("/assistente/editor/estado")
+  return get<import("../types").IAssistantState>("/assistente/editor/estado")
 }
 
 /** Restarts the conversation for that workflow. Deletes no workflow — only the history. */
@@ -205,22 +205,22 @@ export function esquecerConversaDoAssistente(workflowId?: string) {
 
 /** Is the assistant available? The quota is the SAME as the editor's (`assistente:tokens`). */
 export function estadoDoAgente() {
-  return get<import("../types").IAssistenteEstado>("/assistente/estado")
+  return get<import("../types").IAssistantState>("/assistente/estado")
 }
 
 /** My non-deleted conversations, most recently active on top. */
 export function listarConversas(limit = 50, offset = 0) {
-  return get<import("../types").IConversaLista>(`/assistente/conversas${qs({ limit, offset })}`)
+  return get<import("../types").IConversationList>(`/assistente/conversas${qs({ limit, offset })}`)
 }
 
 /** The replay of a conversation, in frames (for the panel to reapply). */
 export function lerConversa(id: string) {
-  return get<import("../types").IConversaDetalhe>(`/assistente/conversas/${encodeURIComponent(id)}`)
+  return get<import("../types").IConversationDetail>(`/assistente/conversas/${encodeURIComponent(id)}`)
 }
 
 /** Renames a conversation. */
 export function renomearConversa(id: string, titulo: string) {
-  return patch<import("../types").IConversaResumo>(`/assistente/conversas/${encodeURIComponent(id)}`, { titulo })
+  return patch<import("../types").IConversationSummary>(`/assistente/conversas/${encodeURIComponent(id)}`, { titulo })
 }
 
 /** (Soft-)deletes a conversation: it disappears from the list, the history stays. */
@@ -230,7 +230,7 @@ export function apagarConversa(id: string) {
 
 /** A globe layer (member gate): how to load a run output. */
 export function camadaDoGlobo(artifactId: string) {
-  return get<import("../types").ICamadaDoGlobo>(`/assistente/camadas/${encodeURIComponent(artifactId)}`)
+  return get<import("../types").IGlobeLayer>(`/assistente/camadas/${encodeURIComponent(artifactId)}`)
 }
 
 // ── Workflow contract (SubWorkflow caller le contrato do alvo) ─────────

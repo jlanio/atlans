@@ -26,7 +26,7 @@ const RecentRuns = () => {
   const [runs, setRuns]       = useState<IRunSummary[]>([])
   const [loading, setLoading] = useState(false)
   // The list didn't arrive: the "nenhuma execução" slot says so, not the empty state.
-  const [falhou, setFalhou] = useState(false)
+  const [falhou, setFailed] = useState(false)
   const [runningId, setRunningId] = useState<string | null>(null)
 
   const fetchRuns = useCallback(async () => {
@@ -34,7 +34,7 @@ const RecentRuns = () => {
     setLoading(true)
     const dados = dadoOuAviso(await GisFlowService.getWorkflowMetrics(id, 5), "Erro ao carregar execuções recentes")
     if (dados?.last_runs) setRuns(dados.last_runs)
-    setFalhou(dados === null)
+    setFailed(dados === null)
     setLoading(false)
   }, [id])
 

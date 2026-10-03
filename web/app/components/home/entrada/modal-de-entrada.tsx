@@ -26,20 +26,20 @@ import { useCallback, useEffect, useState } from "react"
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/app/components/ui/dialog"
-import { GlifoDaMarca } from "@/app/components/sidebar/marca"
-import { useCodigoFonte } from "@/app/components/share/codigo-fonte"
-import { useNomeNaTela } from "@/app/components/share/nome-na-tela"
-import { useTextos } from "@/app/components/home/i18n"
-import type { ModoDeEntrada } from "@/lib/entrada"
-import { FormularioDeEntrada } from "./formulario-de-entrada"
-import { FormularioDeCadastro } from "./formulario-de-cadastro"
-import { PainelVerificar, type EstadoDaVerificacao } from "./painel-verificar"
-import { PainelRecuperar } from "./painel-recuperar"
-import { PainelRedefinir } from "./painel-redefinir"
+import { BrandGlyph } from "@/app/components/sidebar/marca"
+import { useSourceCode } from "@/app/components/share/codigo-fonte"
+import { useDisplayName } from "@/app/components/share/nome-na-tela"
+import { useTexts } from "@/app/components/home/i18n"
+import type { EntryMode } from "@/lib/entrada"
+import { SignInForm } from "./formulario-de-entrada"
+import { SignUpForm } from "./formulario-de-cadastro"
+import { VerifyPanel, type VerificationState } from "./painel-verificar"
+import { RecoverPanel } from "./painel-recuperar"
+import { ResetPanel } from "./painel-redefinir"
 
 interface Props {
   /** O modal pedido; `null` = fechado. */
-  modo: ModoDeEntrada | null
+  modo: EntryMode | null
   /**
    * The token from the link that brought the person — the password reset one
    * (`?redefinir=1&token=…`) or the verification one (`?verificar=1&token=…`).
@@ -58,53 +58,53 @@ interface Props {
 export default function ModalDeEntrada({
   modo, tokenDoLink, comEnvioPendente = false, onFechar, onEntrou,
 }: Props) {
-  const textos = useTextos()
-  const codigoFonte = useCodigoFonte()
-  const nomeNaTela = useNomeNaTela()
+  const textos = useTexts()
+  const codigoFonte = useSourceCode()
+  const displayName = useDisplayName()
   const t = textos.entrada.modal
-  const [painel, setPainel] = useState<ModoDeEntrada>(modo ?? "entrar")
-  const [enviando, setEnviando] = useState(false)
-  const [emailCadastrado, setEmailCadastrado] = useState("")
+  const [painel, setPanel] = useState<EntryMode>(modo ?? "entrar")
+  const [enviando, setSending] = useState(false)
+  const [registeredEmail, setRegisteredEmail] = useState("")
   // The link request went out: the same panel changes its face, and the header with it.
-  const [linkEnviado, setLinkEnviado] = useState(false)
+  const [linkEnviado, setLinkSent] = useState(false)
   // The password was just changed: the login gets a notice instead of a toast,
   // which would disappear behind the modal.
-  const [senhaTrocada, setSenhaTrocada] = useState(false)
+  const [senhaTrocada, setPasswordChanged] = useState(false)
   // The account was just activated via the e-mail link — same notice, same
   // reason.
-  const [emailVerificado, setEmailVerificado] = useState(false)
+  const [emailVerificado, setEmailVerified] = useState(false)
   // Which of the three states the verification panel is in (the token GET
   // starts on its own): the dialog's title and supporting sentence come from here.
-  const [estadoDaVerificacao, setEstadoDaVerificacao] = useState<EstadoDaVerificacao>("sem-token")
+  const [verificationState, setVerificationState] = useState<VerificationState>("sem-token")
   // The link token is valid ONCE per modal, not once per panel mount: it
   // stays in the URL after being spent, and without this mark going back to the
   // panel (via the login's 403, or via a failure's "Reenviar") would repeat the
   // GET with a token that is no longer valid.
-  const [tokenGasto, setTokenGasto] = useState(false)
+  const [tokenSpent, setTokenSpent] = useState(false)
   // Reopening in another mode (Criar conta from the sidebar after an Entrar)
   // switches the panel; closed (`null`) nothing changes.
   useEffect(() => {
-    if (modo) setPainel(modo)
+    if (modo) setPanel(modo)
   }, [modo])
 
   // Stable on purpose: the panel has it in the dependencies of the effect that
   // spends the token, and a new identity on every render would make it run again.
-  const marcarTokenGasto = useCallback(() => setTokenGasto(true), [])
+  const markTokenSpent = useCallback(() => setTokenSpent(true), [])
 
-  function irPara(destino: ModoDeEntrada) {
+  function irPara(destino: EntryMode) {
     // Leaving a panel resets what was its own: going back to "Esqueceu a senha?"
     // has to ask for the e-mail again, and the login cannot keep forever the
     // notice of a changed password (or a verified e-mail) three panels ago.
-    if (destino !== "recuperar") setLinkEnviado(false)
-    if (destino !== "entrar") { setSenhaTrocada(false); setEmailVerificado(false) }
-    if (destino !== "verificar") setEstadoDaVerificacao("sem-token")
-    setPainel(destino)
+    if (destino !== "recuperar") setLinkSent(false)
+    if (destino !== "entrar") { setPasswordChanged(false); setEmailVerified(false) }
+    if (destino !== "verificar") setVerificationState("sem-token")
+    setPanel(destino)
   }
 
   const titulo =
-    painel === "verificar" && estadoDaVerificacao === "verificando"
+    painel === "verificar" && verificationState === "verificando"
       ? t.tituloVerificando
-      : painel === "verificar" && estadoDaVerificacao === "falhou"
+      : painel === "verificar" && verificationState === "falhou"
         ? t.tituloFalhou
         : t.titulos[painel]
 
@@ -125,9 +125,9 @@ export default function ModalDeEntrada({
             : t.descricoes.recuperar
           : painel === "redefinir"
             ? t.descricoes.redefinir
-            : estadoDaVerificacao === "verificando"
+            : verificationState === "verificando"
               ? t.descricoes.verificando
-              : estadoDaVerificacao === "falhou"
+              : verificationState === "falhou"
                 ? t.descricoes.verificacaoFalhou
                 : t.descricoes.verificar
 
@@ -144,7 +144,7 @@ export default function ModalDeEntrada({
       >
         <DialogHeader className="gap-3 text-left">
           <p className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-            <GlifoDaMarca /> {nomeNaTela}
+            <BrandGlyph /> {displayName}
             {/* AGPL §13: whoever uses the installation over the network finds its
                 source code from here, even before signing in. Only when the installation declares it. */}
             {codigoFonte && (
@@ -163,44 +163,44 @@ export default function ModalDeEntrada({
         </DialogHeader>
 
         {painel === "entrar" && (
-          <FormularioDeEntrada
-            onEnviando={setEnviando}
+          <SignInForm
+            onEnviando={setSending}
             onEntrou={onEntrou}
             onCriarConta={() => irPara("cadastro")}
             onRecuperar={() => irPara("recuperar")}
-            onVerificar={(email) => { if (email) setEmailCadastrado(email); irPara("verificar") }}
+            onVerificar={(email) => { if (email) setRegisteredEmail(email); irPara("verificar") }}
           />
         )}
         {painel === "cadastro" && (
-          <FormularioDeCadastro
-            onEnviando={setEnviando}
-            onCadastrou={(email) => { setEmailCadastrado(email); irPara("verificar") }}
+          <SignUpForm
+            onEnviando={setSending}
+            onCadastrou={(email) => { setRegisteredEmail(email); irPara("verificar") }}
             onEntrar={() => irPara("entrar")}
           />
         )}
         {painel === "verificar" && (
-          <PainelVerificar
-            email={emailCadastrado}
-            token={tokenGasto ? undefined : tokenDoLink}
-            onEnviando={setEnviando}
+          <VerifyPanel
+            email={registeredEmail}
+            token={tokenSpent ? undefined : tokenDoLink}
+            onEnviando={setSending}
             onEntrar={() => irPara("entrar")}
-            onVerificou={() => { setPainel("entrar"); setEmailVerificado(true) }}
-            onEstado={setEstadoDaVerificacao}
-            onGastouToken={marcarTokenGasto}
+            onVerificou={() => { setPanel("entrar"); setEmailVerified(true) }}
+            onEstado={setVerificationState}
+            onGastouToken={markTokenSpent}
           />
         )}
         {painel === "recuperar" && (
-          <PainelRecuperar
-            onEnviando={setEnviando}
+          <RecoverPanel
+            onEnviando={setSending}
             onEntrar={() => irPara("entrar")}
-            onEnviado={setLinkEnviado}
+            onEnviado={setLinkSent}
           />
         )}
         {painel === "redefinir" && (
-          <PainelRedefinir
+          <ResetPanel
             token={tokenDoLink}
-            onEnviando={setEnviando}
-            onRedefiniu={() => { setPainel("entrar"); setSenhaTrocada(true) }}
+            onEnviando={setSending}
+            onRedefiniu={() => { setPanel("entrar"); setPasswordChanged(true) }}
             onRecuperar={() => irPara("recuperar")}
           />
         )}

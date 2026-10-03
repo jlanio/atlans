@@ -33,7 +33,7 @@ export interface MapLayer {
   mvt?: { workflowHash: string; layerKey: string };
   /**
    * The source file can be downloaded (`GET /artifacts/{id}/download`). It comes
-   * from the server (`CamadaDoGlobo.baixavel`), and it is NOT the same as "is on
+   * from the server (`GlobeLayer.baixavel`), and it is NOT the same as "is on
    * the globe": a published layer appears with its content in PostGIS and may
    * have no file in storage. Whoever offers the action hides it when false.
    */
@@ -45,24 +45,24 @@ export interface MapLayer {
 // westward (the Earth seen from space), in linear one-second steps chained on
 // `moveend`; pause after a gesture; the return to `center`/`zoom` lasts the
 // same as the bar transition (globals.css, `--home-dur`).
-export const VELOCIDADE_DO_GIRO_GRAUS_POR_S = 0.5;
-export const PASSO_DO_GIRO_MS = 1000;
-export const PAUSA_APOS_GESTO_MS = 2500;
-export const DURACAO_DA_VOLTA_MS = 900;
-const INTERVALO_DE_RETOMADA_MS = 300;
+export const SPIN_SPEED_DEGREES_PER_S = 0.5;
+export const SPIN_STEP_MS = 1000;
+export const PAUSE_AFTER_GESTURE_MS = 2500;
+export const REVOLUTION_DURATION_MS = 900;
+const RESUME_INTERVAL_MS = 300;
 // The framing before there is data (`fitBounds` replaces it when the layers
 // arrive): the world, with no preferred region.
-const CENTRO_PADRAO: [number, number] = [0, 20];
-const ZOOM_PADRAO = 1.5;
+const DEFAULT_CENTER: [number, number] = [0, 20];
+const DEFAULT_ZOOM = 1.5;
 /** The gestures that pause the spin. `Map` event names: since maplibre-gl 6, `on`/`off` do not accept just any `string`. */
-const GESTOS: readonly (keyof maplibregl.MapEventType)[] = ["mousedown", "touchstart", "wheel", "dragstart", "mouseup", "touchend", "dragend"];
+const GESTURES: readonly (keyof maplibregl.MapEventType)[] = ["mousedown", "touchstart", "wheel", "dragstart", "mouseup", "touchend", "dragend"];
 
 function _easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
 /** Read on the spot, not in a hook: here the value changes no markup at all. */
-function _prefereMenosMovimento(): boolean {
+function _prefersReducedMotion(): boolean {
   return typeof window !== "undefined"
     && typeof window.matchMedia === "function"
     && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -75,7 +75,7 @@ function _prefereMenosMovimento(): boolean {
  * those of its language. The controls are read in the constructor: the ones
  * at mount time apply.
  */
-export interface TextosDoMapa {
+export interface MapTexts {
   controles: Readonly<Record<string, string>>;
   semAtributos: string;
   campos: (n: number) => string;
@@ -85,7 +85,7 @@ export interface TextosDoMapa {
   data: { comHora: string; semHora: string };
 }
 
-export const TEXTOS_DO_MAPA_PT: TextosDoMapa = {
+export const TEXTOS_DO_MAPA_PT: MapTexts = {
   // The document is lang="pt-BR": without this the canvas announces "Map" and
   // the buttons come out in English on the screen reader.
   controles: {
@@ -117,7 +117,7 @@ export interface MapLibreMapHandle {
 }
 
 /** The position the globe returns to the parent on the `geolocate` event. */
-export interface PosicaoDoUsuario {
+export interface UserPosition {
   lat: number;
   lon: number;
   /** Accuracy radius in meters (the browser's `accuracy`); `null` if absent. */
@@ -191,7 +191,7 @@ interface Props {
    * `geolocate` event), with the coordinate and the accuracy. The Home uses it
    * to attach the location to the assistant turn. Fires only with `geolocalizar`.
    */
-  aoLocalizar?: (pos: PosicaoDoUsuario) => void;
+  aoLocalizar?: (pos: UserPosition) => void;
   /**
    * Called when location FAILS (the control's `error` event), with the
    * browser's code (1 = permission denied). It is the only visible feedback from
@@ -200,7 +200,7 @@ interface Props {
    */
   aoErroDeLocalizacao?: (codigo: number) => void;
   /** The texts of the controls and the popup. Default: `TEXTOS_DO_MAPA_PT`. */
-  textos?: TextosDoMapa;
+  textos?: MapTexts;
 }
 
 const FALLBACK_COLORS = ["#3b82f6", "#e74c3c", "#2ecc71", "#f39c12", "#9b59b6"];
@@ -212,7 +212,7 @@ const FALLBACK_COLORS = ["#3b82f6", "#e74c3c", "#2ecc71", "#f39c12", "#9b59b6"];
 // satellite, and without satellite there is no toggle.
 
 /** The minimal v8 style of a raster basemap — what the constructor builds. */
-function _estiloRaster(ts: { tiles: string[]; attribution: string }): maplibregl.StyleSpecification {
+function _rasterStyle(ts: { tiles: string[]; attribution: string }): maplibregl.StyleSpecification {
   return {
     version: 8,
     sources: { basemap: { type: "raster", tiles: ts.tiles, tileSize: 256, attribution: ts.attribution } },
@@ -256,7 +256,7 @@ export function _cssDoMapa(scope: string, isDark: boolean, controlesDiscretos: b
   // MapLibre's icons are SVG embedded in `background-image`, with the color
   // BAKED into the data URI (a dark gray). They cannot be recolored via `color`;
   // over the dark glass they would vanish. `invert` is what there is.
-  const iconeEscuro = isDark ? `${scope} .maplibregl-ctrl-icon { filter: invert(1); }` : "";
+  const darkIconCss = isDark ? `${scope} .maplibregl-ctrl-icon { filter: invert(1); }` : "";
 
   return `${popup}
         ${scope} .maplibregl-ctrl-group {
@@ -273,7 +273,7 @@ export function _cssDoMapa(scope: string, isDark: boolean, controlesDiscretos: b
         ${scope} .maplibregl-ctrl-group button:not(:disabled):hover {
           background-color: color-mix(in oklab, var(--accent) 55%, transparent) !important;
         }
-        ${iconeEscuro}
+        ${darkIconCss}
         ${scope} .maplibregl-ctrl-icon { opacity: 0.65; transition: opacity 150ms ease; }
         ${scope} .maplibregl-ctrl-group button:hover .maplibregl-ctrl-icon,
         ${scope} .maplibregl-ctrl-group button:focus-visible .maplibregl-ctrl-icon { opacity: 1; }
@@ -340,27 +340,27 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
   /** The location control, kept so the handle's `localizar()` can trigger it. */
   const geoControlRef = useRef<maplibregl.GeolocateControl | null>(null);
   /** `aoLocalizar` in a ref: the event is bound at mount and the callback changes per render. */
-  const aoLocalizarRef = useRef(aoLocalizar);
-  aoLocalizarRef.current = aoLocalizar;
-  const aoErroDeLocalizacaoRef = useRef(aoErroDeLocalizacao);
-  aoErroDeLocalizacaoRef.current = aoErroDeLocalizacao;
+  const onLocateRef = useRef(aoLocalizar);
+  onLocateRef.current = aoLocalizar;
+  const onLocationErrorRef = useRef(aoErroDeLocalizacao);
+  onLocationErrorRef.current = aoErroDeLocalizacao;
   /**
    * One of OUR movements (spin step or return to the region) is in flight. It
    * is what the start of following may cut with `stop()` — cutting ANY
    * movement, as before, also killed the location control's own framing on
    * re-click from background mode (the fitBounds runs before the start event).
    */
-  const giroEmVooRef = useRef(false);
+  const spinInFlightRef = useRef(false);
   /**
    * Style loaded (`style.load` has already passed). It is what enables
    * `addSource`/`addLayer` — unlike `isStyleLoaded()`, which also requires
    * all sources to be up to date and is therefore false whenever a tile is in flight.
    */
-  const estiloProntoRef = useRef(false);
+  const styleReadyRef = useRef(false);
   /** Current layers for the pointer handlers, bound to the mount closure. */
-  const camadasRef = useRef<MapLayer[]>(layers);
+  const layersRef = useRef<MapLayer[]>(layers);
   /** Ids from the last sync: the delta avoids scanning the whole style. */
-  const idsAnterioresRef = useRef<string[]>([]);
+  const previousIdsRef = useRef<string[]>([]);
   /**
    * The CURRENT layer sync, so `style.load` can call it.
    * A `setStyle` that falls into a full load erases sources and layers, and the
@@ -369,20 +369,20 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
    * whole style when the diff does not apply. Without this pointer, that reload
    * would erase the map's data layers.
    */
-  const sincronizarRef = useRef<() => void>(() => {});
+  const syncRef = useRef<() => void>(() => {});
   /**
    * The basemap ALREADY applied to the map. Without it the switch effect would
    * fire on mount and do a redundant `setStyle` right after the constructor.
    */
-  const basemapAplicadoRef = useRef<Basemap>(basemapInicial);
+  const appliedBasemapRef = useRef<Basemap>(basemapInicial);
   const [basemap, setBasemap] = useState<Basemap>(basemapInicial);
   // The installation's tile servers. Read via ref in the effects: the map is
   // built once, and the context does not change during the page's life.
   const fundos = useFundosDoMapa();
-  const fundosRef = useRef(fundos);
-  fundosRef.current = fundos;
+  const basemapsRef = useRef(fundos);
+  basemapsRef.current = fundos;
   // With no satellite configured, both sides of the toggle would be the same map.
-  const comAlternador = basemapToggle && Boolean(fundos.satelite);
+  const withToggle = basemapToggle && Boolean(fundos.satelite);
 
   // ── Exposes fitToLayer / localizar to the parent ───────────────────────────
   useImperativeHandle(ref, () => ({
@@ -410,7 +410,7 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
       if (interno._watchState === "ACTIVE_LOCK" || interno._watchState === "WAITING_ACTIVE") {
         const c = interno._lastKnownPosition?.coords;
         if (c) {
-          aoLocalizarRef.current?.({
+          onLocateRef.current?.({
             lat: c.latitude,
             lon: c.longitude,
             precisao_m: Number.isFinite(c.accuracy) ? c.accuracy : null,
@@ -448,8 +448,8 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
       // string) and is interpolated inside a `style="…"` that goes to Popup.setHTML.
       // Only a valid hex is accepted; anything else falls back to the default,
       // closing HTML/attribute injection through the color value.
-      const COR_HEX_OK = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
-      const color = layerColor && COR_HEX_OK.test(layerColor) ? layerColor : "#FF6A00";
+      const VALID_HEX_COLOR = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+      const color = layerColor && VALID_HEX_COLOR.test(layerColor) ? layerColor : "#FF6A00";
       const text = isDark ? "#e5e5e5" : "#1a1a1a";
       const muted = isDark ? "#888" : "#666";
       const codeBg = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)";
@@ -578,9 +578,9 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
       container: containerRef.current,
       // The usual raster; `basemapInicial` picks WHICH one. The portal is born in
       // "streets" and toggles; the Home is born in "hybrid" and stays.
-      style: _estiloRaster(conjuntoDoFundo(fundosRef.current, basemapInicial)),
-      center: center ?? CENTRO_PADRAO,
-      zoom: zoom ?? ZOOM_PADRAO,
+      style: _rasterStyle(conjuntoDoFundo(basemapsRef.current, basemapInicial)),
+      center: center ?? DEFAULT_CENTER,
+      zoom: zoom ?? DEFAULT_ZOOM,
       locale: { ...textos.controles },
       // `transformRequest`/`attributionControl` only exist for the Home; without them
       // the constructor stays identical to what it was.
@@ -605,8 +605,8 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
       // `true` from the SECOND load on. It only exists if a `setStyle` fell into
       // a full load: the portal's basemap switch asks for `diff: true`, but
       // MapLibre reloads everything when the diff does not apply.
-      const recarga = estiloProntoRef.current;
-      estiloProntoRef.current = true;
+      const recarga = styleReadyRef.current;
+      styleReadyRef.current = true;
       if (projection === "globe") map.setProjection({ type: "globe" });
       // The full load erases sources and layers, and the `[layers]` effect does
       // NOT run again — the layers did not change. Without this call, it would
@@ -616,7 +616,7 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
       // `idsAnterioresRef` is left as is on purpose: it only feeds the
       // computation of what to REMOVE, and `_syncLayers` recreates what is
       // missing by looking at the map (`if (!map.getSource(src))`), not the list.
-      if (recarga) sincronizarRef.current();
+      if (recarga) syncRef.current();
     });
 
     map.addControl(new maplibregl.NavigationControl(), controlsPosition);
@@ -639,7 +639,7 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
         // Cuts only the in-flight spin/return step — stopping ANY movement
         // killed the control's own framing on re-click from
         // background mode (its fitBounds runs BEFORE this event).
-        if (giroEmVooRef.current) map.stop();
+        if (spinInFlightRef.current) map.stop();
       });
       geo.on("trackuserlocationend", () => {
         // This event also fires when dropping to BACKGROUND (the person dragged
@@ -657,7 +657,7 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
       geo.on("geolocate", (e) => {
         const c = (e as unknown as GeolocationPosition).coords;
         if (!c) return;
-        aoLocalizarRef.current?.({
+        onLocateRef.current?.({
           lat: c.latitude,
           lon: c.longitude,
           precisao_m: Number.isFinite(c.accuracy) ? c.accuracy : null,
@@ -670,7 +670,7 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
       geo.on("error", (e) => {
         const codigo = (e as unknown as GeolocationPositionError | undefined)?.code ?? 0;
         if (codigo === 1) geolocalizandoRef.current = false;
-        aoErroDeLocalizacaoRef.current?.(codigo);
+        onLocationErrorRef.current?.(codigo);
       });
       geoControlRef.current = geo;
       map.addControl(geo, controlsPosition);
@@ -680,17 +680,17 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
 
     // Any movement that ends (including a `stop()`) closes "our" flight — the
     // flag only turns back on when the spin/return fire the next easeTo.
-    map.on("moveend", () => { giroEmVooRef.current = false; });
+    map.on("moveend", () => { spinInFlightRef.current = false; });
 
     map.on("mousemove", (e) => {
-      const ids = _idsInterativos(map, camadasRef.current);
+      const ids = _idsInterativos(map, layersRef.current);
       if (!ids.length) return;
       const feats = map.queryRenderedFeatures(e.point, { layers: ids });
       map.getCanvas().style.cursor = feats.length ? "pointer" : "";
     });
 
     map.on("click", (e) => {
-      const ids = _idsInterativos(map, camadasRef.current);
+      const ids = _idsInterativos(map, layersRef.current);
       if (!ids.length) return;
       const feats = map.queryRenderedFeatures(e.point, { layers: ids });
       if (!feats.length) {
@@ -699,7 +699,7 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
       }
       const f = feats[0];
       const lid = f.layer.id.replace(/^(fill|line|circle)-/, "");
-      const meta = camadasRef.current.find((l) => l.id === lid);
+      const meta = layersRef.current.find((l) => l.id === lid);
       popupRef.current?.remove();
       popupRef.current = new maplibregl.Popup({ maxWidth: "380px", closeButton: true, closeOnClick: false })
         .setLngLat(e.lngLat)
@@ -713,9 +713,9 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
       mapRef.current = null;
       initializedRef.current = false;
       fittedRef.current = false;
-      estiloProntoRef.current = false;
-      idsAnterioresRef.current = [];
-      basemapAplicadoRef.current = basemapInicial;
+      styleReadyRef.current = false;
+      previousIdsRef.current = [];
+      appliedBasemapRef.current = basemapInicial;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -725,60 +725,60 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
   // map needs to exist when this effect runs. `center`/`zoom` come in via ref,
   // not through the dependencies: the Globo passes them as literals, and a new
   // array on every render would restart the spin (with a `stop()`) on every render.
-  const alvoDaVoltaRef = useRef({ center, zoom });
-  alvoDaVoltaRef.current = { center, zoom };
-  const girouRef = useRef(false);
+  const returnTargetRef = useRef({ center, zoom });
+  returnTargetRef.current = { center, zoom };
+  const spunRef = useRef(false);
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const reduzMovimento = _prefereMenosMovimento();
+    const reduceMotion = _prefersReducedMotion();
 
     if (!giroLento) {
       // Only what spun returns: in the portal, which never spins, this does nothing.
-      if (!girouRef.current) return;
-      girouRef.current = false;
+      if (!spunRef.current) return;
+      spunRef.current = false;
       // Following the person: do NOT return to the region — that would pull the map
       // away the instant we find them (the owner's decision).
       if (geolocalizandoRef.current) return;
-      const { center: c, zoom: z } = alvoDaVoltaRef.current;
-      const destino = { center: c ?? CENTRO_PADRAO, zoom: z ?? ZOOM_PADRAO };
-      if (reduzMovimento) map.jumpTo(destino);
+      const { center: c, zoom: z } = returnTargetRef.current;
+      const destino = { center: c ?? DEFAULT_CENTER, zoom: z ?? DEFAULT_ZOOM };
+      if (reduceMotion) map.jumpTo(destino);
       else {
-        giroEmVooRef.current = true; // locating during the return may cut it
-        map.easeTo({ ...destino, duration: DURACAO_DA_VOLTA_MS, easing: _easeInOutCubic, essential: true });
+        spinInFlightRef.current = true; // locating during the return may cut it
+        map.easeTo({ ...destino, duration: REVOLUTION_DURATION_MS, easing: _easeInOutCubic, essential: true });
       }
       return;
     }
 
-    girouRef.current = true;
+    spunRef.current = true;
     // Without motion the globe stays still — and the return, above, is a jump.
-    if (reduzMovimento) return;
+    if (reduceMotion) return;
 
-    let ultimoGesto = -Infinity;
-    const gesto = () => { ultimoGesto = Date.now(); };
+    let lastGesture = -Infinity;
+    const gesto = () => { lastGesture = Date.now(); };
     const passo = () => {
       // Localizando/seguindo a pessoa: o giro fica suspenso.
       if (geolocalizandoRef.current) return;
       if (map.isMoving()) return;
-      if (Date.now() - ultimoGesto < PAUSA_APOS_GESTO_MS) return;
+      if (Date.now() - lastGesture < PAUSE_AFTER_GESTURE_MS) return;
       const atual = map.getCenter();
-      giroEmVooRef.current = true; // it is the step that the start of following may cut
+      spinInFlightRef.current = true; // it is the step that the start of following may cut
       map.easeTo({
-        center: [atual.lng - VELOCIDADE_DO_GIRO_GRAUS_POR_S * (PASSO_DO_GIRO_MS / 1000), atual.lat],
-        duration: PASSO_DO_GIRO_MS,
+        center: [atual.lng - SPIN_SPEED_DEGREES_PER_S * (SPIN_STEP_MS / 1000), atual.lat],
+        duration: SPIN_STEP_MS,
         easing: (n: number) => n,
         essential: true,
       });
     };
-    for (const g of GESTOS) map.on(g, gesto);
+    for (const g of GESTURES) map.on(g, gesto);
     // Chains at the end of each step; the interval resumes after a gesture's pause.
     map.on("moveend", passo);
-    const retomada = setInterval(passo, INTERVALO_DE_RETOMADA_MS);
+    const retomada = setInterval(passo, RESUME_INTERVAL_MS);
     passo();
     return () => {
       clearInterval(retomada);
       map.off("moveend", passo);
-      for (const g of GESTOS) map.off(g, gesto);
+      for (const g of GESTURES) map.off(g, gesto);
       // Interrupts the in-flight step: the return (the next effect) starts from where
       // the globe is. On unmount the map may already have been removed — hence the try.
       try { map.stop(); } catch { /* mapa removido */ }
@@ -796,9 +796,9 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
     // Covers the mount: the state is born as `basemapInicial` and the map was
     // already built that way. Without the guard, the first render would do a
     // redundant `setStyle`.
-    if (!map || basemapAplicadoRef.current === basemap) return;
-    basemapAplicadoRef.current = basemap;
-    const ts = conjuntoDoFundo(fundosRef.current, basemap);
+    if (!map || appliedBasemapRef.current === basemap) return;
+    appliedBasemapRef.current = basemap;
+    const ts = conjuntoDoFundo(basemapsRef.current, basemap);
     const style = map.getStyle();
     if (style?.sources?.basemap) {
       (style.sources.basemap as Record<string, unknown>).tiles = ts.tiles;
@@ -809,7 +809,7 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
 
   // ── Sincronizar layers ─────────────────────────────────────────────────────
   useEffect(() => {
-    camadasRef.current = layers;
+    layersRef.current = layers;
     const map = mapRef.current;
     if (!map) return;
     const sync = () => {
@@ -821,21 +821,21 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
         tileLayerKeys,
         tileLayerVersions,
         tilesBaseUrl,
-        idsAnterioresRef.current,
+        previousIdsRef.current,
       );
-      idsAnterioresRef.current = layers.map((l) => l.id);
+      previousIdsRef.current = layers.map((l) => l.id);
       if (didFit) fittedRef.current = true;
     };
     // `style.load` calls THIS sync after a `setStyle`. Keeping the current
     // closure is what keeps the conversation's layers on the globe when the
     // basemap changes — the `[layers]` effect does not run at that moment.
-    sincronizarRef.current = sync;
+    syncRef.current = sync;
     // Waiting for `load`/`isStyleLoaded()` silently lost syncs: `load` fires
     // ONCE in the map's life (a `once` registered later never runs) and
     // `isStyleLoaded()` is false while any tile is in flight — on the vector
     // globe, the rule. What is enough to create layers is the style having
     // loaded, signaled once per style on `style.load`.
-    return _quandoEstiloPronto(map, estiloProntoRef.current, sync);
+    return _quandoEstiloPronto(map, styleReadyRef.current, sync);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layers]);
 
@@ -846,7 +846,7 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
       {/* Basemap toggle. Two buttons and not a switch: the label of the
           ACTIVE side must stay visible — "Mapa"/"Satélite" say what you are
           seeing, and a switch would only say where you are going. */}
-      {comAlternador && (
+      {withToggle && (
       <div className="absolute bottom-6 left-3 z-10 flex rounded-xl overflow-hidden border border-border/50 shadow-lg bg-background/80 backdrop-blur-md">
         <button
           type="button"
@@ -912,10 +912,10 @@ export function _idsInterativos(map: maplibregl.Map, layers: MapLayer[]): string
  */
 export function _quandoEstiloPronto(
   map: maplibregl.Map,
-  estiloPronto: boolean,
+  styleReady: boolean,
   sync: () => void,
 ): (() => void) | undefined {
-  if (estiloPronto) {
+  if (styleReady) {
     sync();
     return undefined;
   }
@@ -937,7 +937,7 @@ export function _filtroGeom(...tipos: Array<"Point" | "LineString" | "Polygon">)
  * `line-`/`circle-` whose source is `src-*`, plus orphan `src-*` sources).
  * Compatibility path for callers of `_syncLayers` without the previous list.
  */
-function _nossasCamadasDoEstilo(map: maplibregl.Map): string[] {
+function _ownStyleLayers(map: maplibregl.Map): string[] {
   const estilo = map.getStyle();
   const ids = new Set<string>();
   for (const l of estilo.layers || []) {
@@ -955,17 +955,17 @@ function _nossasCamadasDoEstilo(map: maplibregl.Map): string[] {
 // maplibre-gl 6 types the name and value of each paint property. The type that
 // lists them comes from style-spec, which is not a direct dependency: hence
 // reading them from the `setPaintProperty` signature.
-type PropriedadeDePintura = Parameters<maplibregl.Map["setPaintProperty"]>[1];
-type ValorDePintura = Parameters<maplibregl.Map["setPaintProperty"]>[2];
+type PaintProperty = Parameters<maplibregl.Map["setPaintProperty"]>[1];
+type PaintValue = Parameters<maplibregl.Map["setPaintProperty"]>[2];
 
 /** Only writes the property when it actually changed (avoids repainting the style). */
-function _definirPaint(map: maplibregl.Map, id: string, prop: PropriedadeDePintura, valor: ValorDePintura): void {
+function _setPaint(map: maplibregl.Map, id: string, prop: PaintProperty, valor: PaintValue): void {
   if (map.getPaintProperty(id, prop) !== valor) {
     map.setPaintProperty(id, prop, valor);
   }
 }
 
-function _definirVisibilidade(map: maplibregl.Map, id: string, visivel: boolean): void {
+function _setVisibility(map: maplibregl.Map, id: string, visivel: boolean): void {
   const alvo = visivel ? "visible" : "none";
   // A missing `visibility` is equivalent to "visible" — do not rewrite for nothing.
   const atual = map.getLayoutProperty(id, "visibility") ?? "visible";
@@ -981,7 +981,7 @@ export function _syncLayers(
   tileLayerKeys?: Record<string, string>,
   tileLayerVersions?: Record<string, string>,
   tilesBaseUrl?: string,
-  idsAnteriores?: string[],
+  previousIds?: string[],
 ): boolean {
   // ── Removes the layers that left the list ──────────────────────────────────
   // The Home removes layers from the globe (the portal has a stable list, so
@@ -990,10 +990,10 @@ export function _syncLayers(
   // sources: a source still in use cannot be removed.
   // Whoever passes `idsAnteriores` (the component, via ref) closes the delta
   // without `getStyle()`, which serializes all of the basemap's sources and layers.
-  const desejadas = new Set(layers.map((l) => l.id));
-  const removidas = idsAnteriores
-    ? idsAnteriores.filter((id) => !desejadas.has(id))
-    : _nossasCamadasDoEstilo(map).filter((id) => !desejadas.has(id));
+  const wantedIds = new Set(layers.map((l) => l.id));
+  const removidas = previousIds
+    ? previousIds.filter((id) => !wantedIds.has(id))
+    : _ownStyleLayers(map).filter((id) => !wantedIds.has(id));
   for (const id of removidas) {
     for (const prefixo of ["fill-", "line-", "circle-"]) {
       if (map.getLayer(`${prefixo}${id}`)) map.removeLayer(`${prefixo}${id}`);
@@ -1045,52 +1045,52 @@ export function _syncLayers(
     // a polygon, and a `fill` layer triangulates even a LineString — without it
     // a field plot becomes a cloud of dots on the public portal.
     const gt = layer.geomType || _sniffGeomType(layer.geojson);
-    const semTipo = useMvt && !gt;
+    const withoutType = useMvt && !gt;
     const isPoly = gt.includes("Polygon");
     const isLine = gt.includes("LineString");
     const isPoint = gt.includes("Point");
     const sourceLayer = mvtInfo ? mvtInfo.layerKey : undefined;
 
-    if (isPoly || semTipo) {
+    if (isPoly || withoutType) {
       if (!map.getLayer(fillId)) {
         map.addLayer({
           id: fillId, type: "fill", source: src, ...(sourceLayer ? { "source-layer": sourceLayer } : {}),
-          ...(semTipo ? { filter: _filtroGeom("Polygon") } : {}),
+          ...(withoutType ? { filter: _filtroGeom("Polygon") } : {}),
           paint: { "fill-color": color, "fill-opacity": layer.opacity },
         });
       } else {
-        _definirPaint(map, fillId, "fill-color", color);
-        _definirPaint(map, fillId, "fill-opacity", layer.opacity);
+        _setPaint(map, fillId, "fill-color", color);
+        _setPaint(map, fillId, "fill-opacity", layer.opacity);
       }
-      _definirVisibilidade(map, fillId, layer.visible);
+      _setVisibility(map, fillId, layer.visible);
     }
 
-    if (isPoly || isLine || semTipo) {
+    if (isPoly || isLine || withoutType) {
       if (!map.getLayer(lineId)) {
         map.addLayer({
           id: lineId, type: "line", source: src, ...(sourceLayer ? { "source-layer": sourceLayer } : {}),
           // With no declared type, the outline covers polygon AND line: both have an outline.
-          ...(semTipo ? { filter: _filtroGeom("Polygon", "LineString") } : {}),
+          ...(withoutType ? { filter: _filtroGeom("Polygon", "LineString") } : {}),
           paint: { "line-color": color, "line-width": isPoly ? 1.5 : 2.5, "line-opacity": 0.9 },
         });
       } else {
-        _definirPaint(map, lineId, "line-color", color);
+        _setPaint(map, lineId, "line-color", color);
       }
-      _definirVisibilidade(map, lineId, layer.visible);
+      _setVisibility(map, lineId, layer.visible);
     }
 
-    if (isPoint || semTipo) {
+    if (isPoint || withoutType) {
       if (!map.getLayer(circleId)) {
         map.addLayer({
           id: circleId, type: "circle", source: src, ...(sourceLayer ? { "source-layer": sourceLayer } : {}),
-          ...(semTipo ? { filter: _filtroGeom("Point") } : {}),
+          ...(withoutType ? { filter: _filtroGeom("Point") } : {}),
           paint: { "circle-color": color, "circle-radius": 6, "circle-opacity": layer.opacity, "circle-stroke-color": "#fff", "circle-stroke-width": 1.5 },
         });
       } else {
-        _definirPaint(map, circleId, "circle-color", color);
-        _definirPaint(map, circleId, "circle-opacity", layer.opacity);
+        _setPaint(map, circleId, "circle-color", color);
+        _setPaint(map, circleId, "circle-opacity", layer.opacity);
       }
-      _definirVisibilidade(map, circleId, layer.visible);
+      _setVisibility(map, circleId, layer.visible);
     }
 
     if (layer.visible && _estenderBounds(bounds, layer)) hasBounds = true;

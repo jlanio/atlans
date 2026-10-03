@@ -25,12 +25,12 @@ import {
   log, mb, ok, python, pythonCapture, readRuntimeSpec, rmrf, step, tarExtract, walk,
 } from './lib.mjs'
 
-const semPoda    = process.argv.includes('--no-prune')
-const semCompile = process.argv.includes('--no-compile')
+const noPrune    = process.argv.includes('--no-prune')
+const noCompile = process.argv.includes('--no-compile')
 const SP = path.join(PY_DIR, 'Lib', 'site-packages')
 const medicoes = []
 
-function medir(rotulo, fn) {
+function measure(rotulo, fn) {
   const antes = dirSize(PY_DIR)
   fn()
   const depois = dirSize(PY_DIR)
@@ -93,12 +93,12 @@ medicoes.push({ passo: 'pip install', delta_bytes: -(instalado - bruto), total_b
 // Every step is measured: without a number, "pruning" becomes a belief. The
 // Phase 0 values are in docs — if a step starts yielding zero, someone changed
 // the tree.
-if (semPoda) {
+if (noPrune) {
   log('poda desativada (--no-prune)')
 } else {
   step('Podando')
 
-  medir('stdlib GUI/test', () => {
+  measure('stdlib GUI/test', () => {
     for (const alvo of ['Lib/test', 'Lib/idlelib', 'Lib/tkinter', 'tcl']) rmrf(path.join(PY_DIR, alvo))
     // _tkinter.pyd without tkinter/ is dead weight; same for the Tcl/Tk DLLs.
     walk(path.join(PY_DIR, 'DLLs'), (p, e) => {
@@ -106,13 +106,13 @@ if (semPoda) {
     })
   })
 
-  medir('suites de teste dos pacotes', () => {
+  measure('suites de teste dos pacotes', () => {
     walk(SP, (p, e) => {
       if (e.isDirectory() && /^(tests?|testing)$/.test(e.name)) { rmrf(p); return false }
     })
   })
 
-  medir('headers e fontes', () => {
+  measure('headers e fontes', () => {
     rmrf(path.join(PY_DIR, 'include'))
     rmrf(path.join(PY_DIR, 'libs'))
     walk(SP, (p, e) => {
@@ -123,7 +123,7 @@ if (semPoda) {
     })
   })
 
-  medir('pip/setuptools/Scripts', () => {
+  measure('pip/setuptools/Scripts', () => {
     // Nothing is installed at runtime, and the entry point is
     // `python.exe -m executor` — no console script from Scripts/ is used.
     for (const alvo of ['pip', 'setuptools', 'wheel', 'pkg_resources', '_distutils_hack']) {
@@ -149,7 +149,7 @@ if (semPoda) {
     }
   })
 
-  medir('botocore/data (exceto s3 e sts)', () => {
+  measure('botocore/data (exceto s3 e sts)', () => {
     // The only use of boto3 in the project is flow/nodes/outputs/save_to_s3.py
     // against MinIO. The other ~400 AWS services are ~20 MB of inert JSON.
     const data = path.join(SP, 'botocore', 'data')
@@ -159,7 +159,7 @@ if (semPoda) {
     }
   })
 
-  medir('__pycache__', () => {
+  measure('__pycache__', () => {
     walk(PY_DIR, (p, e) => {
       if (e.isDirectory() && e.name === '__pycache__') { rmrf(p); return false }
     })
@@ -173,11 +173,11 @@ if (semPoda) {
 // Compiling here is what makes it possible NOT to pass PYTHONDONTWRITEBYTECODE
 // at spawn: without ready .pyc files, every boot recompiles pandas/geopandas
 // and the executor takes visibly longer to start.
-if (semCompile) {
+if (noCompile) {
   log('compileall desativado (--no-compile)')
 } else {
   step('Pre-compilando (.pyc)')
-  medir('compileall', () => {
+  measure('compileall', () => {
     // -q silences; a syntax error in an isolated module (there are several in
     // the stdlib for future versions) must not bring down the build — hence the
     // ignored exit code.

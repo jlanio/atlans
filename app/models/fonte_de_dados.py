@@ -46,7 +46,7 @@ from sqlalchemy import (
 from app.models.base import Base
 
 
-class FonteDeDados(Base):
+class DataSource(Base):
     __tablename__ = "fontes_de_dados"
 
     id = Column(Integer, primary_key=True, index=True)

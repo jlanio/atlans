@@ -36,7 +36,7 @@ describe("useRunSnapshot — identidade e custo", () => {
 
     const { result, unmount } = renderHook(() => useRunSnapshot(true))
     await waitFor(() => expect(result.current.timeline.nodes).toHaveLength(2))
-    const linhaB = result.current.timeline.nodes.find(n => n.nodeId === "b")!
+    const rowB = result.current.timeline.nodes.find(n => n.nodeId === "b")!
 
     act(() => {
       useWorkflowExecutionStore.getState().appendEvents([evento("a", "completed", 500)])
@@ -47,7 +47,7 @@ describe("useRunSnapshot — identidade e custo", () => {
 
     // "b" wasn't touched by any event: its row has to be the SAME object,
     // otherwise NodeRow's `memo` holds nothing back.
-    expect(result.current.timeline.nodes.find(n => n.nodeId === "b")).toBe(linhaB)
+    expect(result.current.timeline.nodes.find(n => n.nodeId === "b")).toBe(rowB)
     unmount()
   })
 

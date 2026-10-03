@@ -19,14 +19,14 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.core.exceptions import FonteInvalidaError
+from app.core.exceptions import InvalidSourceError
 from app.models.base import Base
-from app.models.fonte_de_dados import FonteDeDados
+from app.models.fonte_de_dados import DataSource
 from app.services import fontes_service as fs
 
 VAULT = Path(__file__).resolve().parents[1] / "fixtures" / "vault"
 WS = "11111111-1111-4111-8111-111111111111"
-WS_OUTRO = "22222222-2222-4222-8222-222222222222"
+WS_OTHER = "22222222-2222-4222-8222-222222222222"
 FUNAI = "https://geoserver.funai.gov.br/geoserver/ows"
 
 CAPS_2 = """<?xml version="1.0" encoding="UTF-8"?>
@@ -74,7 +74,7 @@ XSD = """<?xml version="1.0" encoding="UTF-8"?>
 async def fabrica():
     engine = create_async_engine("sqlite+aiosqlite://")
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all, tables=[FonteDeDados.__table__])
+        await conn.run_sync(Base.metadata.create_all, tables=[DataSource.__table__])
     try:
         yield async_sessionmaker(engine, expire_on_commit=False)
     finally:
@@ -82,26 +82,26 @@ async def fabrica():
 
 
 @pytest.fixture
-def sem_rede(monkeypatch):
+def without_network(monkeypatch):
     """No test here goes out to the internet — whoever probes without a double breaks."""
-    async def _proibido(*a, **k):
+    async def _forbidden(*a, **k):
         raise AssertionError("sondagem sem dublê")
-    monkeypatch.setattr(fs, "safe_httpx_request", _proibido)
+    monkeypatch.setattr(fs, "safe_httpx_request", _forbidden)
     monkeypatch.setattr(fs, "validate_url_ssrf", lambda url: ("1.2.3.4", "host"))
 
 
-def _rede(monkeypatch, respostas: dict[str, str | Exception]):
+def _network(monkeypatch, respostas: dict[str, str | Exception]):
     """`safe_httpx_request` doubled: picks the response by a piece of the URL."""
     monkeypatch.setattr(fs, "validate_url_ssrf", lambda url: ("1.2.3.4", "host"))
 
-    async def _falso(method, url, **kw):
+    async def _fake(method, url, **kw):
         for trecho, resposta in respostas.items():
             if trecho in url:
                 if isinstance(resposta, Exception):
                     raise resposta
                 return httpx.Response(200, text=resposta, request=httpx.Request(method, url))
         return httpx.Response(404, request=httpx.Request(method, url))
-    monkeypatch.setattr(fs, "safe_httpx_request", _falso)
+    monkeypatch.setattr(fs, "safe_httpx_request", _fake)
 
 
 async def _upsert(db, **kw):
@@ -113,7 +113,7 @@ async def _upsert(db, **kw):
         esquema={"columns": [{"name": "gid"}, {"name": "uf_sigla"}], "columns_source": "vault"},
     )
     campos.update(kw)
-    fonte, desfecho = await fs.upsert_fonte(db, **campos)
+    fonte, desfecho = await fs.upsert_source(db, **campos)
     await db.commit()
     return fonte, desfecho
 
@@ -121,23 +121,23 @@ async def _upsert(db, **kw):
 # ── Shape: URL, key, search text, synonyms ───────────────────────────────────
 
 
-def test_normalizar_url_normaliza_como_o_no_e_recusa_o_que_nunca_e_fonte():
-    assert fs.normalizar_url("<https://h/geoserver/ows?service=WFS&request=GetCapabilities>") == "https://h/geoserver/ows"
-    assert fs.normalizar_url("https://h/geoserver/wfs/") == "https://h/geoserver/wfs"
+def test_normalize_url_normalizes_like_the_node_and_refuses_what_is_never_a_source():
+    assert fs.normalize_url("<https://h/geoserver/ows?service=WFS&request=GetCapabilities>") == "https://h/geoserver/ows"
+    assert fs.normalize_url("https://h/geoserver/wfs/") == "https://h/geoserver/wfs"
     for ruim in ("", "ftp://h/x", "naourl", "https://user:senha@h/ows", "https://" + "a" * 2050):  # pragma: allowlist secret
-        with pytest.raises(FonteInvalidaError):
-            fs.normalizar_url(ruim)
+        with pytest.raises(InvalidSourceError):
+            fs.normalize_url(ruim)
 
 
-def test_chave_distingue_plataforma_de_workspace_e_ignora_query_string():
-    plataforma = fs.chave_da_fonte(None, "wfs", fs.normalizar_url(FUNAI + "?x=1"), "Funai:tis")
-    assert plataforma == fs.chave_da_fonte(None, "wfs", FUNAI, "Funai:tis")
-    assert plataforma != fs.chave_da_fonte(WS, "wfs", FUNAI, "Funai:tis")
+def test_key_distinguishes_platform_from_workspace_and_ignores_query_string():
+    plataforma = fs.source_key(None, "wfs", fs.normalize_url(FUNAI + "?x=1"), "Funai:tis")
+    assert plataforma == fs.source_key(None, "wfs", FUNAI, "Funai:tis")
+    assert plataforma != fs.source_key(WS, "wfs", FUNAI, "Funai:tis")
     assert len(plataforma) == 64
 
 
-def test_texto_de_busca_junta_tudo_sem_acento():
-    texto = fs.texto_de_busca(
+def test_search_text_joins_everything_without_accents():
+    texto = fs.search_text(
         instituicao="Ministério da Saúde", grupo="IDE-MS", titulo="Estabelecimentos", type_name="ms:cnes_estab",
         url=FUNAI, descricao="Saúde pública.", temas=["saúde"],
         esquema={"columns": [{"name": "nome_fantasia"}, "cnes"]},
@@ -147,19 +147,19 @@ def test_texto_de_busca_junta_tudo_sem_acento():
         assert pedaco in texto, pedaco
 
 
-def test_termos_expandem_por_sinonimos_padrao_e_do_vault():
-    fs.definir_sinonimos({"Cadastro Ambiental Rural": ["CAR", "imóveis rurais"]})
+def test_terms_expand_by_default_and_vault_synonyms():
+    fs.set_synonyms({"Cadastro Ambiental Rural": ["CAR", "imóveis rurais"]})
     try:
-        termos = fs.termos_da_consulta("focos de calor")
+        termos = fs.query_terms("focos de calor")
         assert len(termos) == 2  # "focos" and "calor"; "de" is a connective
         assert {"focos de calor", "queimadas", "hotspot"} <= termos[0]
         assert "calor" in termos[1] and "focos de calor" in termos[1]
         # From the Vault, in both directions.
-        assert "car" in fs.sinonimos_de("cadastro ambiental rural")
-        assert "cadastro ambiental rural" in fs.sinonimos_de("CAR")
-        assert fs.termos_da_consulta("  ") == []
+        assert "car" in fs.synonyms_of("cadastro ambiental rural")
+        assert "cadastro ambiental rural" in fs.synonyms_of("CAR")
+        assert fs.query_terms("  ") == []
     finally:
-        fs.definir_sinonimos({})
+        fs.set_synonyms({})
 
 
 # ── Parsers ───────────────────────────────────────────────────────────────────
@@ -168,13 +168,13 @@ def test_termos_expandem_por_sinonimos_padrao_e_do_vault():
 def test_parsear_capabilities_2_0_0_e_1_0_0():
     caps = fs.parsear_capabilities(CAPS_2)
     assert caps.version == "2.0.0"
-    tis = caps.por_nome()["Funai:tis_poligonais"]
+    tis = caps.by_name()["Funai:tis_poligonais"]
     assert tis.title == "Terras indígenas (poligonais)"
     assert tis.abstract == "Limites das terras indígenas."
     assert tis.keywords == ("terras", "indígenas")
     assert tis.crs == "EPSG:4674"
     assert tis.bbox == (-73.99, -33.75, -28.84, 5.27)
-    assert caps.por_nome()["Funai:aldeias_pontos"].crs == "EPSG:4326"
+    assert caps.by_name()["Funai:aldeias_pontos"].crs == "EPSG:4326"
 
     antiga = fs.parsear_capabilities(CAPS_1)
     assert antiga.version == "1.0.0"
@@ -182,18 +182,18 @@ def test_parsear_capabilities_2_0_0_e_1_0_0():
     assert ibge.name == "APONDS:aponds_ibge" and ibge.crs == "EPSG:4674" and ibge.bbox == (-73.0, -33.0, -28.0, 5.0)
 
 
-def test_parsear_capabilities_recusa_dtd_e_exception_report():
-    with pytest.raises(fs.SondagemError) as exc:
+def test_parse_capabilities_refuses_dtd_and_exception_report():
+    with pytest.raises(fs.ProbeError) as exc:
         fs.parsear_capabilities('<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "b">]><x/>')
     assert exc.value.codigo == "xml"
-    with pytest.raises(fs.SondagemError) as exc:
+    with pytest.raises(fs.ProbeError) as exc:
         fs.parsear_capabilities('<ows:ExceptionReport xmlns:ows="http://www.opengis.net/ows/1.1"><ows:Exception><ows:ExceptionText>Service unavailable</ows:ExceptionText></ows:Exception></ows:ExceptionReport>')
     assert exc.value.codigo == "http_status" and "Service unavailable" in exc.value.mensagem
-    with pytest.raises(fs.SondagemError):
+    with pytest.raises(fs.ProbeError):
         fs.parsear_capabilities("isto não é xml <")
 
 
-def test_parsear_describe_feature_type_le_a_sequence_e_acha_a_geometria():
+def test_parse_describe_feature_type_reads_the_sequence_and_finds_the_geometry():
     esquema = fs.parsear_describe_feature_type(XSD)
     assert esquema["columns_source"] == "describe_feature_type"
     assert [c["name"] for c in esquema["columns"]] == ["gid", "terrai_nome", "the_geom"]
@@ -213,35 +213,35 @@ def test_parsear_describe_feature_type_le_a_sequence_e_acha_a_geometria():
         (ConnectionError("recusada"), "rede", 502),
     ],
 )
-async def test_falhas_de_rede_viram_sondagem_error(monkeypatch, falha, codigo, status_http):
-    _rede(monkeypatch, {"GetCapabilities": falha})
-    with pytest.raises(fs.SondagemError) as exc:
+async def test_network_failures_become_probe_error(monkeypatch, falha, codigo, status_http):
+    _network(monkeypatch, {"GetCapabilities": falha})
+    with pytest.raises(fs.ProbeError) as exc:
         await fs.listar_camadas_wfs(FUNAI)
     assert exc.value.codigo == codigo
-    assert exc.value.como_http()[0] == status_http
+    assert exc.value.as_http()[0] == status_http
 
 
 async def test_status_http_e_ssrf(monkeypatch):
-    _rede(monkeypatch, {"GetCapabilities": httpx.Response(500, request=httpx.Request("GET", FUNAI))})
+    _network(monkeypatch, {"GetCapabilities": httpx.Response(500, request=httpx.Request("GET", FUNAI))})
 
     async def _500(method, url, **kw):
         return httpx.Response(500, request=httpx.Request(method, url))
     monkeypatch.setattr(fs, "safe_httpx_request", _500)
-    with pytest.raises(fs.SondagemError) as exc:
+    with pytest.raises(fs.ProbeError) as exc:
         await fs.listar_camadas_wfs(FUNAI)
     assert exc.value.codigo == "http_status" and exc.value.status == 500
-    assert exc.value.como_http() == (502, "Servidor WFS retornou HTTP 500.")
+    assert exc.value.as_http() == (502, "Servidor WFS retornou HTTP 500.")
 
-    def _bloqueia(url):
+    def _block_message(url):
         raise ValueError("IP privado")
-    monkeypatch.setattr(fs, "validate_url_ssrf", _bloqueia)
-    with pytest.raises(fs.SondagemError) as exc:
+    monkeypatch.setattr(fs, "validate_url_ssrf", _block_message)
+    with pytest.raises(fs.ProbeError) as exc:
         await fs.listar_camadas_wfs("https://10.0.0.1/ows")
-    assert exc.value.codigo == "ssrf" and exc.value.como_http()[0] == 403
+    assert exc.value.codigo == "ssrf" and exc.value.as_http()[0] == 403
 
 
-async def test_listar_camadas_e_sondar_com_camada(monkeypatch):
-    _rede(monkeypatch, {"GetCapabilities": CAPS_2, "DescribeFeatureType": XSD})
+async def test_list_layers_and_probe_with_layer(monkeypatch):
+    _network(monkeypatch, {"GetCapabilities": CAPS_2, "DescribeFeatureType": XSD})
     camadas = await fs.listar_camadas_wfs(FUNAI)
     assert camadas == [
         {"name": "Funai:aldeias_pontos", "title": "Aldeias"},
@@ -252,17 +252,17 @@ async def test_listar_camadas_e_sondar_com_camada(monkeypatch):
     assert sondagem.esquema["crs"] == "EPSG:4674" and sondagem.esquema["bbox"] == [-73.99, -33.75, -28.84, 5.27]
     assert sondagem.esquema["geometry_type"] == "MultiPolygon"
 
-    with pytest.raises(fs.SondagemError) as exc:
+    with pytest.raises(fs.ProbeError) as exc:
         await fs.sondar_wfs(FUNAI, "Funai:nao_existe")
     assert exc.value.codigo == "camada_inexistente"
-    assert exc.value.candidatas == ["Funai:tis_poligonais", "Funai:aldeias_pontos"]
+    assert exc.value.candidates == ["Funai:tis_poligonais", "Funai:aldeias_pontos"]
 
 
-async def test_servidor_sem_camadas(monkeypatch):
-    _rede(monkeypatch, {"GetCapabilities": '<wfs:WFS_Capabilities version="2.0.0" xmlns:wfs="http://www.opengis.net/wfs/2.0"/>'})
-    with pytest.raises(fs.SondagemError) as exc:
+async def test_server_without_layers(monkeypatch):
+    _network(monkeypatch, {"GetCapabilities": '<wfs:WFS_Capabilities version="2.0.0" xmlns:wfs="http://www.opengis.net/wfs/2.0"/>'})
+    with pytest.raises(fs.ProbeError) as exc:
         await fs.listar_camadas_wfs(FUNAI)
-    assert exc.value.codigo == "sem_camadas" and exc.value.como_http()[0] == 404
+    assert exc.value.codigo == "sem_camadas" and exc.value.as_http()[0] == 404
 
 
 # ── Listing with the node's credential (the editor's layer picker) ────────────
@@ -297,10 +297,10 @@ def _query(pedido: httpx.Request) -> dict:
     return dict(parse_qsl(pedido.url.query.decode()))
 
 
-async def test_authkey_na_url_vai_junto_da_query_do_getcapabilities(fio, caplog):
+async def test_authkey_in_url_goes_with_the_getcapabilities_query(fio, caplog):
     import logging
-    from flow.utils.credencial_wfs import autenticacao_wfs
-    auth = autenticacao_wfs(None, {"type": "geoserver_authkey", "token": "a+b/c=d&e"})
+    from flow.utils.credencial_wfs import wfs_authentication
+    auth = wfs_authentication(None, {"type": "geoserver_authkey", "token": "a+b/c=d&e"})
     with caplog.at_level(logging.INFO, logger="httpx"):
         camadas = await fs.listar_camadas_wfs(FUNAI, auth=auth)
     assert "authkey=***" in caplog.text and "a%2Bb%2Fc%3Dd%26e" not in caplog.text  # httpx's log
@@ -311,26 +311,26 @@ async def test_authkey_na_url_vai_junto_da_query_do_getcapabilities(fio, caplog)
     assert pedido.headers["host"] == "geoserver.funai.gov.br"
 
 
-async def test_authkey_no_cabecalho_nao_vai_na_url(fio):
-    from flow.utils.credencial_wfs import autenticacao_wfs
-    auth = autenticacao_wfs(None, {"type": "geoserver_authkey", "token": "K-123456", "parameter": "X-Chave", "location": "header"})
+async def test_authkey_in_header_does_not_go_in_url(fio):
+    from flow.utils.credencial_wfs import wfs_authentication
+    auth = wfs_authentication(None, {"type": "geoserver_authkey", "token": "K-123456", "parameter": "X-Chave", "location": "header"})
     await fs.listar_camadas_wfs(FUNAI, auth=auth)
     (pedido,) = fio
     assert pedido.headers["x-chave"] == "K-123456" and "K-123456" not in str(pedido.url)
     assert _query(pedido) == {"service": "WFS", "request": "GetCapabilities", "version": "2.0.0"}
 
 
-async def test_usuario_e_senha_vao_por_basic(fio):
+async def test_user_and_password_go_via_basic(fio):
     import base64
-    from flow.utils.credencial_wfs import autenticacao_wfs
-    auth = autenticacao_wfs(None, {"type": "wfs", "username": "leitor", "password": "s3nh@:x"})
+    from flow.utils.credencial_wfs import wfs_authentication
+    auth = wfs_authentication(None, {"type": "wfs", "username": "leitor", "password": "s3nh@:x"})
     await fs.listar_camadas_wfs(FUNAI, auth=auth)
     (pedido,) = fio
     assert pedido.headers["authorization"] == "Basic " + base64.b64encode(b"leitor:s3nh@:x").decode()
     assert "s3nh" not in str(pedido.url)
 
 
-async def test_sem_credencial_o_pedido_sai_anonimo(fio):
+async def test_without_credential_the_request_goes_anonymous(fio):
     await fs.listar_camadas_wfs(FUNAI)
     (pedido,) = fio
     assert "authorization" not in pedido.headers
@@ -340,7 +340,7 @@ async def test_sem_credencial_o_pedido_sai_anonimo(fio):
 # ── Upsert and merge ──────────────────────────────────────────────────────────
 
 
-async def test_upsert_cria_e_depois_atualiza_pela_chave(fabrica, sem_rede):
+async def test_upsert_creates_then_updates_by_key(fabrica, without_network):
     async with fabrica() as db:
         fonte, desfecho = await _upsert(db)
         assert desfecho == "created" and fonte.busca and "terras indigenas" in fonte.busca
@@ -348,16 +348,16 @@ async def test_upsert_cria_e_depois_atualiza_pela_chave(fabrica, sem_rede):
         mesma, desfecho = await _upsert(db, url=FUNAI + "?service=WFS", titulo="Outro título")
         assert desfecho == "updated" and mesma.id == fonte.id
         assert mesma.titulo == "Terras indígenas (poligonais)"  # the empty one is filled in; the written one is not
-        assert (await db.execute(select(FonteDeDados))).scalars().all().__len__() == 1
+        assert (await db.execute(select(DataSource))).scalars().all().__len__() == 1
 
 
-async def test_aprendida_nao_rebaixa_nem_ressuscita_e_conta_uso_so_no_primeiro_fechamento(fabrica, sem_rede):
+async def test_learned_neither_downgrades_nor_resurrects_and_counts_use_only_on_first_close(fabrica, without_network):
     async with fabrica() as db:
         fonte, _ = await _upsert(db)
-        _, desfecho = await _upsert(db, origem="aprendida", estado="ok", contar_uso=True, propriedades={})
+        _, desfecho = await _upsert(db, origem="aprendida", estado="ok", count_usage=True, propriedades={})
         assert desfecho == "updated" and fonte.origem == "vault" and fonte.usos == 1
         assert fonte.propriedades["sortBy"] == "gid"  # the run does not bring sortBy; the Vault did, so it stays
-        await _upsert(db, origem="aprendida", contar_uso=False)
+        await _upsert(db, origem="aprendida", count_usage=False)
         assert fonte.usos == 1
 
         fonte.deleted_at = datetime(2026, 9, 19)
@@ -368,25 +368,25 @@ async def test_aprendida_nao_rebaixa_nem_ressuscita_e_conta_uso_so_no_primeiro_f
         assert desfecho == "updated" and fonte.deleted_at is None
 
 
-def test_fundir_esquema_respeita_a_forca_e_preserva_crs_e_bbox():
+def test_merge_schema_respects_strength_and_preserves_crs_and_bbox():
     vault = {"columns": [{"name": "gid"}], "columns_source": "vault", "geometry_type": "MultiPolygon"}
     run = {"columns": [{"name": "gid"}, {"name": "x"}], "columns_source": "run", "crs": "EPSG:4674", "bbox": [1, 2, 3, 4], "feature_count": 84}
-    fundido = fs.fundir_esquema(vault, run)
-    assert fundido["columns_source"] == "vault" and len(fundido["columns"]) == 1
-    assert fundido["crs"] == "EPSG:4674" and fundido["bbox"] == [1, 2, 3, 4] and fundido["feature_count"] == 84
-    assert fundido["geometry_type"] == "MultiPolygon"
+    merged = fs.merge_schema(vault, run)
+    assert merged["columns_source"] == "vault" and len(merged["columns"]) == 1
+    assert merged["crs"] == "EPSG:4674" and merged["bbox"] == [1, 2, 3, 4] and merged["feature_count"] == 84
+    assert merged["geometry_type"] == "MultiPolygon"
 
     describe = {"columns": [{"name": "gid", "type": "int"}], "columns_source": "describe_feature_type"}
-    assert fs.fundir_esquema(fundido, describe)["columns_source"] == "describe_feature_type"
-    assert fs.fundir_esquema(fundido, describe)["crs"] == "EPSG:4674"
-    assert fs.fundir_esquema(None, None) is None
-    assert fs.fundir_esquema(None, {"crs": "EPSG:4326"}) == {"crs": "EPSG:4326"}
+    assert fs.merge_schema(merged, describe)["columns_source"] == "describe_feature_type"
+    assert fs.merge_schema(merged, describe)["crs"] == "EPSG:4674"
+    assert fs.merge_schema(None, None) is None
+    assert fs.merge_schema(None, {"crs": "EPSG:4326"}) == {"crs": "EPSG:4326"}
 
 
 # ── Busca e leitura ───────────────────────────────────────────────────────────
 
 
-async def _semear(db):
+async def _seed(db):
     await _upsert(db)  # FUNAI tis_poligonais, plataforma, ok
     await _upsert(db, type_name="Funai:aldeias_pontos", titulo="Aldeias Indígenas (pontos)", estado="falhando",
                   ultimo_erro="camada não consta no GetCapabilities", prioridade=1,
@@ -395,14 +395,14 @@ async def _semear(db):
                   titulo="Focos de calor (24 h)", descricao="Exemplo.", temas=["queimadas"], instituicao="Exemplo",
                   grupo="queimadas", origem="manual", estado="ok",
                   esquema={"columns": [{"name": "id"}, {"name": "estado"}], "columns_source": "vault"})
-    await _upsert(db, workspace_id=WS_OUTRO, url="https://geoserver.exemplo.gov.br/ows", type_name="privada:x",
+    await _upsert(db, workspace_id=WS_OTHER, url="https://geoserver.exemplo.gov.br/ows", type_name="privada:x",
                   titulo="Só do outro", descricao="", temas=[], instituicao="Outro", origem="manual", estado="ok",
                   esquema=None)
 
 
-async def test_buscar_respeita_o_escopo_e_expande_sinonimos(fabrica, sem_rede):
+async def test_search_respects_the_scope_and_expands_synonyms(fabrica, without_network):
     async with fabrica() as db:
-        await _semear(db)
+        await _seed(db)
         itens, total = await fs.buscar(db, [WS], query="queimadas")
         assert total == 1 and itens[0].type_name == "queimadas:focos_24h"
         # Synonym: "focos de calor" finds the "queimadas" source.
@@ -424,9 +424,9 @@ async def test_buscar_respeita_o_escopo_e_expande_sinonimos(fabrica, sem_rede):
         assert (await fs.buscar(db, [WS], query="focos indígenas"))[1] == 0
 
 
-async def test_buscar_ordena_ok_antes_de_falhando_e_por_prioridade(fabrica, sem_rede):
+async def test_search_orders_ok_before_failing_and_by_priority(fabrica, without_network):
     async with fabrica() as db:
-        await _semear(db)
+        await _seed(db)
         itens, _ = await fs.buscar(db, [WS], query="FUNAI")
         # aldeias has priority 1 but is failing: `ok` comes first.
         assert [i.type_name for i in itens] == ["Funai:tis_poligonais", "Funai:aldeias_pontos"]
@@ -438,14 +438,14 @@ async def test_buscar_ordena_ok_antes_de_falhando_e_por_prioridade(fabrica, sem_
         assert itens == []
 
 
-async def test_obter_e_trecho_do_no(fabrica, sem_rede):
+async def test_get_and_node_snippet_of_source(fabrica, without_network):
     async with fabrica() as db:
-        await _semear(db)
+        await _seed(db)
         fonte = (await fs.buscar(db, [WS], query="tis_poligonais"))[0][0]
         assert (await fs.obter(db, fonte.id_hash, [WS])).id == fonte.id
-        privada = (await fs.buscar(db, [WS_OUTRO], query="privada"))[0][0]
+        privada = (await fs.buscar(db, [WS_OTHER], query="privada"))[0][0]
         assert await fs.obter(db, privada.id_hash, [WS]) is None  # out of scope
-        trecho = fs.trecho_do_no(fonte)
+        trecho = fs.node_snippet(fonte)
         assert trecho == {
             "name": "WFS", "type": "datasource",
             "properties": {"url": FUNAI, "typeName": "Funai:tis_poligonais", "sortBy": "gid"},
@@ -454,16 +454,16 @@ async def test_obter_e_trecho_do_no(fabrica, sem_rede):
 
 # ── Validation without network ────────────────────────────────────────────────
 
-DESCRITORES = {"WFS": {"source_kind": "wfs"}, "Buffer": {}}
+DESCRIPTORS = {"WFS": {"source_kind": "wfs"}, "Buffer": {}}
 
 
 def _no(id_, url, type_name):
     return {"id": id_, "name": "WFS", "type": "datasource", "parameters": {"url": url, "typeName": type_name}}
 
 
-async def test_conferir_fontes_avisa_desconhecida_e_falhando_e_cala_a_catalogada(fabrica, sem_rede):
+async def test_check_sources_warns_unknown_and_failing_and_silences_cataloged(fabrica, without_network):
     async with fabrica() as db:
-        await _semear(db)
+        await _seed(db)
         nos = [
             _no("ok", FUNAI + "?service=WFS", "Funai:tis_poligonais"),
             _no("falha", FUNAI, "Funai:aldeias_pontos"),
@@ -472,28 +472,28 @@ async def test_conferir_fontes_avisa_desconhecida_e_falhando_e_cala_a_catalogada
             {"id": "b", "name": "Buffer", "type": "spatial", "parameters": {"url": "https://ignorada/ows", "typeName": "z"}},
             _no("sem_url", "", "x:y"),
         ]
-        avisos = await fs.conferir_fontes_da_definicao(db, nos, DESCRITORES, WS)
-        por_no = {a["node_id"]: a for a in avisos}
-        assert set(por_no) == {"falha", "nova"}
-        assert por_no["nova"]["code"] == "unknown_source" and "search_sources" in por_no["nova"]["message"]
-        assert por_no["falha"]["code"] == "failing_source" and "não consta" in por_no["falha"]["message"]
+        avisos = await fs.conferir_fontes_da_definicao(db, nos, DESCRIPTORS, WS)
+        by_node = {a["node_id"]: a for a in avisos}
+        assert set(by_node) == {"falha", "nova"}
+        assert by_node["nova"]["code"] == "unknown_source" and "search_sources" in by_node["nova"]["message"]
+        assert by_node["falha"]["code"] == "failing_source" and "não consta" in by_node["falha"]["message"]
         assert all(a["severity"] == "warning" and a["edge"] is None for a in avisos)
         # From the other workspace the private source does NOT count.
-        avisos = await fs.conferir_fontes_da_definicao(db, [_no("x", "https://geoserver.exemplo.gov.br/ows", "queimadas:focos_24h")], DESCRITORES, WS_OUTRO)
+        avisos = await fs.conferir_fontes_da_definicao(db, [_no("x", "https://geoserver.exemplo.gov.br/ows", "queimadas:focos_24h")], DESCRIPTORS, WS_OTHER)
         assert [a["code"] for a in avisos] == ["unknown_source"]
 
 
-async def test_conferir_fontes_falha_aberta(sem_rede):
-    class _DbQuebrado:
+async def test_check_sources_fails_open(without_network):
+    class _BrokenDb:
         async def execute(self, *a, **k):
             raise RuntimeError("banco fora")
-    assert await fs.conferir_fontes_da_definicao(_DbQuebrado(), [_no("a", FUNAI, "x")], DESCRITORES, WS) == []
+    assert await fs.conferir_fontes_da_definicao(_BrokenDb(), [_no("a", FUNAI, "x")], DESCRIPTORS, WS) == []
 
 
 # ── Aprendizado ───────────────────────────────────────────────────────────────
 
 
-async def test_aprender_de_execucao_registra_so_os_completos_com_o_esquema_do_run(fabrica, sem_rede):
+async def test_learn_from_run_records_only_complete_ones_with_the_run_schema(fabrica, without_network):
     definition = {"nodes": [
         {"id": "f1", "name": "WFS", "properties": {"url": FUNAI + "?x=1", "typeName": "Funai:tis_poligonais", "maxFeatures": 5000, "version": "2.0.0"}},
         {"id": "f2", "name": "WFS", "data": {"properties": {"url": FUNAI, "typeName": "Funai:aldeias_pontos"}}},
@@ -508,7 +508,7 @@ async def test_aprender_de_execucao_registra_so_os_completos_com_o_esquema_do_ru
     async with fabrica() as db:
         assert await fs.aprender_de_execucao(db, run, stats, definition, first_close=True) == 1
         await db.commit()
-        fonte = await fs.obter_por_chave(db, fs.chave_da_fonte(WS, "wfs", FUNAI, "Funai:tis_poligonais"))
+        fonte = await fs.get_by_key(db, fs.source_key(WS, "wfs", FUNAI, "Funai:tis_poligonais"))
         assert fonte.origem == "aprendida" and fonte.estado == "ok" and fonte.usos == 1
         assert fonte.verificada_em == datetime(2026, 9, 19, 12, 0)
         assert fonte.propriedades == {"url": FUNAI, "typeName": "Funai:tis_poligonais", "maxFeatures": 5000}
@@ -522,7 +522,7 @@ async def test_aprender_de_execucao_registra_so_os_completos_com_o_esquema_do_ru
         assert fonte.usos == 1
 
 
-async def test_camada_lida_com_credencial_nao_entra_no_catalogo(fabrica, sem_rede):
+async def test_layer_read_with_credential_does_not_enter_the_catalog(fabrica, without_network):
     """Protected: the daily verification would probe it without the key, and the ready-made
     snippet would offer it to someone who has no access."""
     definition = {"nodes": [
@@ -534,10 +534,10 @@ async def test_camada_lida_com_credencial_nao_entra_no_catalogo(fabrica, sem_red
     async with fabrica() as db:
         assert await fs.aprender_de_execucao(db, run, stats, definition, first_close=True) == 0
         await db.commit()
-        assert await fs.obter_por_chave(db, fs.chave_da_fonte(WS, "wfs", FUNAI, "Funai:restrita")) is None
+        assert await fs.get_by_key(db, fs.source_key(WS, "wfs", FUNAI, "Funai:restrita")) is None
 
 
-async def test_credencial_so_em_data_properties_tambem_nao_ensina(fabrica, sem_rede):
+async def test_credential_only_in_data_properties_also_does_not_teach(fabrica, without_network):
     """The resolver and the executor read `data.properties` first; the catalog read
     `properties` first. With the credential in only one of them, the run went out
     authenticated and the protected layer entered the catalog."""
@@ -553,7 +553,7 @@ async def test_credencial_so_em_data_properties_tambem_nao_ensina(fabrica, sem_r
         assert await fs.aprender_de_execucao(db, run, stats, definition, first_close=True) == 0
 
 
-async def test_execucao_com_filtro_ou_bbox_nao_ensina_extensao_nem_contagem(fabrica, sem_rede):
+async def test_run_with_filter_or_bbox_teaches_neither_extent_nor_count(fabrica, without_network):
     """A question's slice (uf = 'MT', a bbox) is not the layer: its extent and
     count do not overwrite the source's. The columns still apply."""
     definition = {"nodes": [
@@ -572,17 +572,17 @@ async def test_execucao_com_filtro_ou_bbox_nao_ensina_extensao_nem_contagem(fabr
     async with fabrica() as db:
         assert await fs.aprender_de_execucao(db, run, stats, definition, first_close=True) == 2
         await db.commit()
-        tis = await fs.obter_por_chave(db, fs.chave_da_fonte(WS, "wfs", FUNAI, "Funai:tis_poligonais"))
+        tis = await fs.get_by_key(db, fs.source_key(WS, "wfs", FUNAI, "Funai:tis_poligonais"))
         assert tis.esquema == {
             "columns": [{"name": "gid", "type": None, "xsd": None, "nullable": True}, {"name": "uf_sigla", "type": None, "xsd": None, "nullable": True}],
             "columns_source": "run", "crs": "EPSG:4674",
         }
         assert "cqlFilter" not in tis.propriedades  # the filter belongs to the question, not to the source
-        aldeias = await fs.obter_por_chave(db, fs.chave_da_fonte(WS, "wfs", FUNAI, "Funai:aldeias_pontos"))
+        aldeias = await fs.get_by_key(db, fs.source_key(WS, "wfs", FUNAI, "Funai:aldeias_pontos"))
         assert aldeias.esquema == {"crs": "EPSG:4674"}
 
 
-async def test_bbox_que_chega_por_aresta_tambem_e_recorte(fabrica, sem_rede):
+async def test_bbox_arriving_via_edge_is_also_a_clip(fabrica, without_network):
     """ComputeBoundingBox → WFS: the node reads `inputs["bbox_string"]` with the
     `bbox` field empty, and the run is a slice just like one with the field filled in."""
     import flow.nodes.spatial.compute_bbox  # noqa: F401 — registers the node (the edge without keys needs the descriptor)
@@ -613,23 +613,23 @@ async def test_bbox_que_chega_por_aresta_tambem_e_recorte(fabrica, sem_rede):
         assert await fs.aprender_de_execucao(db, run, stats, definition, first_close=True) == 3
         await db.commit()
         for camada in ("Funai:tis_poligonais", "Funai:aldeias_pontos"):
-            fonte = await fs.obter_por_chave(db, fs.chave_da_fonte(WS, "wfs", FUNAI, camada))
+            fonte = await fs.get_by_key(db, fs.source_key(WS, "wfs", FUNAI, camada))
             assert fonte.esquema == {"crs": "EPSG:4674"}, camada
-        outra = await fs.obter_por_chave(db, fs.chave_da_fonte(WS, "wfs", FUNAI, "Funai:outra"))
+        outra = await fs.get_by_key(db, fs.source_key(WS, "wfs", FUNAI, "Funai:outra"))
         assert outra.esquema == {"crs": "EPSG:4674", "bbox": [-61.6, -18.0, -50.2, -7.3], "feature_count": 84}
 
 
 # ── Per-endpoint verification ─────────────────────────────────────────────────
 
 
-async def test_verificar_endpoint_marca_todas_as_linhas_da_url_com_um_pedido(fabrica, monkeypatch):
-    _rede(monkeypatch, {"GetCapabilities": CAPS_2})
+async def test_check_endpoint_marks_all_url_rows_with_one_request(fabrica, monkeypatch):
+    _network(monkeypatch, {"GetCapabilities": CAPS_2})
     async with fabrica() as db:
-        await _semear(db)
+        await _seed(db)
         await _upsert(db, type_name="Funai:sumida", titulo="Sumida", estado="nao_verificada")
-        resumo = await fs.verificar_endpoint(db, FUNAI, "2.0.0")
+        resumo = await fs.verify_endpoint(db, FUNAI, "2.0.0")
         assert (resumo.ok, resumo.falhando, resumo.erro) == (2, 1, None)
-        linhas = {f.type_name: f for f in (await db.execute(select(FonteDeDados).where(FonteDeDados.url == FUNAI))).scalars()}
+        linhas = {f.type_name: f for f in (await db.execute(select(DataSource).where(DataSource.url == FUNAI))).scalars()}
         assert linhas["Funai:tis_poligonais"].estado == "ok"
         assert linhas["Funai:tis_poligonais"].esquema["crs"] == "EPSG:4674"
         assert linhas["Funai:tis_poligonais"].esquema["bbox"] == [-73.99, -33.75, -28.84, 5.27]
@@ -640,23 +640,23 @@ async def test_verificar_endpoint_marca_todas_as_linhas_da_url_com_um_pedido(fab
         # Another URL was not touched.
         outra = (await fs.buscar(db, [WS], query="queimadas"))[0][0]
         assert outra.verificada_em is None
-        assert sorted(u for u, _ in await fs.endpoints_para_verificar(db)) == sorted([FUNAI, "https://geoserver.exemplo.gov.br/ows"])
+        assert sorted(u for u, _ in await fs.endpoints_to_verify(db)) == sorted([FUNAI, "https://geoserver.exemplo.gov.br/ows"])
 
 
-async def test_endpoint_fora_do_ar_marca_tudo_falhando(fabrica, monkeypatch):
-    _rede(monkeypatch, {"GetCapabilities": httpx.ReadTimeout("t")})
+async def test_endpoint_down_marks_everything_failing(fabrica, monkeypatch):
+    _network(monkeypatch, {"GetCapabilities": httpx.ReadTimeout("t")})
     async with fabrica() as db:
-        await _semear(db)
-        resumo = await fs.verificar_endpoint(db, FUNAI)
+        await _seed(db)
+        resumo = await fs.verify_endpoint(db, FUNAI)
         assert resumo.falhando == 2 and resumo.erro == "Timeout ao conectar ao servidor WFS."
-        for f in (await db.execute(select(FonteDeDados).where(FonteDeDados.url == FUNAI))).scalars():
+        for f in (await db.execute(select(DataSource).where(DataSource.url == FUNAI))).scalars():
             assert f.estado == "falhando" and "Timeout" in f.ultimo_erro
 
 
 # ── Vault import ──────────────────────────────────────────────────────────────
 
 
-async def test_importar_pasta_cria_reimporta_sem_escrever_atualiza_e_remove(fabrica, sem_rede, tmp_path):
+async def test_import_folder_creates_reimports_without_writing_updates_and_removes(fabrica, without_network, tmp_path):
     pasta = tmp_path / "vault"
     shutil.copytree(VAULT, pasta)
     async with fabrica() as db:
@@ -664,15 +664,15 @@ async def test_importar_pasta_cria_reimporta_sem_escrever_atualiza_e_remove(fabr
         assert (resumo.criadas, resumo.atualizadas, resumo.iguais, resumo.removidas) == (12, 0, 0, 0)
         assert resumo.ignoradas == {"sem_endpoint_wfs": 2} and resumo.erros == []
         # The Vault synonyms made it into the search.
-        assert "hotspot" in fs.sinonimos_de("focos de calor")
-        fonte = await fs.obter_por_chave(db, fs.chave_da_fonte(None, "wfs", FUNAI, "Funai:tis_poligonais"))
+        assert "hotspot" in fs.synonyms_of("focos de calor")
+        fonte = await fs.get_by_key(db, fs.source_key(None, "wfs", FUNAI, "Funai:tis_poligonais"))
         assert fonte.origem == "vault" and fonte.estado == "nao_verificada" and fonte.workspace_id is None
         assert fonte.propriedades["sortBy"] == "gid" and fonte.esquema["columns_source"] == "vault"
         assert fonte.vault_hash and fonte.busca
 
         # Reimporting the same folder: read-only.
-        de_novo = await fs.importar_pasta(db, pasta)
-        assert (de_novo.criadas, de_novo.atualizadas, de_novo.iguais) == (0, 0, 12)
+        again = await fs.importar_pasta(db, pasta)
+        assert (again.criadas, again.atualizadas, again.iguais) == (0, 0, 12)
 
         # The state the catalog learned survives an update to the note.
         fonte.estado, fonte.usos = "ok", 3
@@ -696,7 +696,7 @@ async def test_importar_pasta_cria_reimporta_sem_escrever_atualiza_e_remove(fabr
         assert (await fs.buscar(db, None, query="aponds"))[1] == 0
 
 
-async def test_importar_pasta_inexistente_e_por_workspace(fabrica, sem_rede):
+async def test_import_missing_folder_and_per_workspace(fabrica, without_network):
     async with fabrica() as db:
         resumo = await fs.importar_pasta(db, "/nao/existe")
         assert resumo.erros and resumo.criadas == 0
@@ -719,7 +719,7 @@ async def test_importar_pasta_inexistente_e_por_workspace(fabrica, sem_rede):
 # The fix has two layers, and these tests pin down both.
 
 
-async def test_titulo_longo_nao_derruba_a_importacao(fabrica, sem_rede, tmp_path):
+async def test_long_title_does_not_break_the_import(fabrica, without_network, tmp_path):
     """Layer 1: `titulo` became TEXT, so the text goes in whole.
 
     The case is the real one — 276 characters, the length of the longest title in the
@@ -729,14 +729,14 @@ async def test_titulo_longo_nao_derruba_a_importacao(fabrica, sem_rede, tmp_path
     shutil.copytree(VAULT, pasta)
     # `.strip()` because the Vault parser trims the ends — without it the test
     # would compare against a trailing space that never reaches the database.
-    comprido = ("Indicador 17.19.2 — " + "proporção de países " * 13).strip()
-    assert len(comprido) > 255, "a premissa do teste caiu"
+    long_label = ("Indicador 17.19.2 — " + "proporção de países " * 13).strip()
+    assert len(long_label) > 255, "a premissa do teste caiu"
 
     camadas = pasta / "FUNAI" / "Camadas.md"
     camadas.write_text(
         camadas.read_text(encoding="utf-8").replace(
             "- `Funai:tis_poligonais` — Terras indígenas (poligonais)\n",
-            f"- `Funai:tis_poligonais` — {comprido}\n",
+            f"- `Funai:tis_poligonais` — {long_label}\n",
         ),
         encoding="utf-8",
     )
@@ -745,18 +745,18 @@ async def test_titulo_longo_nao_derruba_a_importacao(fabrica, sem_rede, tmp_path
         resumo = await fs.importar_pasta(db, pasta)
         # All 12 go in: none was taken down by the long record.
         assert (resumo.criadas, resumo.erros) == (12, [])
-        fonte = await fs.obter_por_chave(db, fs.chave_da_fonte(None, "wfs", FUNAI, "Funai:tis_poligonais"))
-        assert fonte.titulo == comprido, "o título tem de entrar INTEIRO, sem corte"
+        fonte = await fs.get_by_key(db, fs.source_key(None, "wfs", FUNAI, "Funai:tis_poligonais"))
+        assert fonte.titulo == long_label, "o título tem de entrar INTEIRO, sem corte"
 
 
-async def test_rotulo_longo_e_cortado_em_vez_de_derrubar_o_lote(fabrica, sem_rede, tmp_path):
+async def test_long_label_is_cut_instead_of_breaking_the_batch(fabrica, without_network, tmp_path):
     """Layer 2, for the DISPLAY fields.
 
     `instituicao` and `grupo` are still limited in the database. Cutting them loses the
     tail of a label — the source keeps working and keeps being found.
     Letting them overflow would lose the whole catalog, which is what used to happen.
     """
-    limite = fs._limite("instituicao")
+    limite = fs._column_limit("instituicao")
     assert limite is not None
 
     class _Registro:
@@ -773,14 +773,14 @@ async def test_rotulo_longo_e_cortado_em_vez_de_derrubar_o_lote(fabrica, sem_red
 
     from app.core.utils.datetime_utils import utc_now_naive
 
-    fonte = FonteDeDados(url=FUNAI, type_name="a:b", chave="k", propriedades={})
-    fs._aplicar_registro(fonte, _Registro(), utc_now_naive())
+    fonte = DataSource(url=FUNAI, type_name="a:b", chave="k", propriedades={})
+    fs._apply_record(fonte, _Registro(), utc_now_naive())
 
     assert len(fonte.instituicao) == limite
     assert fonte.instituicao.endswith("…"), "o corte precisa ser visível"
 
 
-async def test_type_name_longo_PULA_o_registro_em_vez_de_cortar(fabrica, sem_rede, tmp_path):
+async def test_long_type_name_SKIPS_the_record_instead_of_cutting(fabrica, without_network, tmp_path):
     """Layer 2, for the FUNCTIONAL fields — and this is where cutting would be worse.
 
     `type_name` goes literally into the WFS query, and `chave` derives from it.
@@ -790,14 +790,14 @@ async def test_type_name_longo_PULA_o_registro_em_vez_de_cortar(fabrica, sem_red
     """
     pasta = tmp_path / "vault"
     shutil.copytree(VAULT, pasta)
-    limite = fs._limite("type_name")
-    comprido = "Funai:" + ("x" * limite)
+    limite = fs._column_limit("type_name")
+    long_label = "Funai:" + ("x" * limite)
 
     camadas = pasta / "FUNAI" / "Camadas.md"
     camadas.write_text(
         camadas.read_text(encoding="utf-8").replace(
             "- `Funai:tis_poligonais` — Terras indígenas (poligonais)\n",
-            f"- `{comprido}` — Camada de nome absurdo\n",
+            f"- `{long_label}` — Camada de nome absurdo\n",
         ),
         encoding="utf-8",
     )
@@ -809,13 +809,13 @@ async def test_type_name_longo_PULA_o_registro_em_vez_de_cortar(fabrica, sem_red
         assert len(resumo.erros) == 1
         assert "type_name" in resumo.erros[0] and "pulado" in resumo.erros[0]
         # And it did NOT go in truncated.
-        achadas, _ = await fs.buscar(db, None, query="absurdo")
-        assert achadas == []
+        found, _ = await fs.buscar(db, None, query="absurdo")
+        assert found == []
 
 
-async def test_o_limite_vem_da_COLUNA_e_nao_de_uma_constante():
+async def test_the_limit_comes_from_the_COLUMN_not_a_constant():
     """A constant copied here would diverge the day the column changed — and
     the divergence would show up as the same overflow the guard prevents."""
-    assert fs._limite("instituicao") == FonteDeDados.__table__.c["instituicao"].type.length
+    assert fs._column_limit("instituicao") == DataSource.__table__.c["instituicao"].type.length
     # `titulo` is TEXT: no limit, and therefore outside the truncation guard.
-    assert fs._limite("titulo") is None
+    assert fs._column_limit("titulo") is None

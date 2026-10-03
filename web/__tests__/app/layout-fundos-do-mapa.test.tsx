@@ -18,14 +18,14 @@ vi.mock("@/app/fonts/inter", () => ({ inter: { variable: "font-inter" } }))
 vi.mock("@/app/globals.css", () => ({}))
 
 import RootLayout from "@/app/layout"
-import { FundosDoMapaProvider } from "@/app/components/share/fundos-do-mapa"
+import { MapBasemapsProvider } from "@/app/components/share/fundos-do-mapa"
 
-function acharProvider(no: ReactNode): ReactElement<{ fundos: unknown }> | null {
+function findProvider(no: ReactNode): ReactElement<{ fundos: unknown }> | null {
   if (!isValidElement(no)) return null
-  if (no.type === FundosDoMapaProvider) return no as ReactElement<{ fundos: unknown }>
+  if (no.type === MapBasemapsProvider) return no as ReactElement<{ fundos: unknown }>
   const filhos = (no.props as { children?: ReactNode }).children
   for (const filho of Array.isArray(filhos) ? filhos : [filhos]) {
-    const achado = acharProvider(filho)
+    const achado = findProvider(filho)
     if (achado) return achado
   }
   return null
@@ -41,7 +41,7 @@ describe("o layout raiz e os fundos de mapa", () => {
     vi.stubEnv("MAPA_SATELITE_CREDITO", "© Satélite de Exemplo")
 
     const arvore = await RootLayout({ children: <main /> })
-    const provider = acharProvider(arvore)
+    const provider = findProvider(arvore)
 
     expect(provider).not.toBeNull()
     expect(provider!.props.fundos).toEqual({
@@ -54,7 +54,7 @@ describe("o layout raiz e os fundos de mapa", () => {
     vi.stubEnv("MAPA_SATELITE_URL", "")
     vi.stubEnv("MAPA_HIBRIDO_URL", "")
 
-    const provider = acharProvider(await RootLayout({ children: <main /> }))
+    const provider = findProvider(await RootLayout({ children: <main /> }))
 
     expect(provider!.props.fundos).toEqual({
       ruas: { url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", credito: "© OpenStreetMap contributors" },

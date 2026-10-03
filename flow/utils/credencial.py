@@ -15,7 +15,7 @@
 from typing import Any, Dict
 
 
-def obter_conexao(parameters: Dict[str, Any]) -> str:
+def get_connection(parameters: Dict[str, Any]) -> str:
     """The node's connection DSN, or an error saying which of the two things was missing."""
     conn = str(parameters.get("connectionString") or "").strip()
     if conn:

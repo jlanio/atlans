@@ -24,7 +24,7 @@ def _payload(end_time: str) -> dict:
     }
 
 
-async def test_end_time_com_offset_e_preservado():
+async def test_end_time_with_offset_is_preserved():
     run, db = MagicMock(), MagicMock(commit=AsyncMock())
 
     await _update_run_status(db, run, _payload("2026-08-04T17:01:34+00:00"))
@@ -32,7 +32,7 @@ async def test_end_time_com_offset_e_preservado():
     assert run.end_time == datetime(2026, 8, 4, 17, 1, 34, tzinfo=timezone.utc)
 
 
-async def test_end_time_naive_e_assumido_como_utc():
+async def test_naive_end_time_is_assumed_utc():
     """An old payload in the queue must not turn into a 4h offset in the database."""
     run, db = MagicMock(), MagicMock(commit=AsyncMock())
 
@@ -42,7 +42,7 @@ async def test_end_time_naive_e_assumido_como_utc():
     assert run.end_time == datetime(2026, 8, 4, 17, 1, 34, tzinfo=timezone.utc)
 
 
-async def test_end_time_em_outro_offset_e_convertido_corretamente():
+async def test_end_time_in_another_offset_is_converted_correctly():
     run, db = MagicMock(), MagicMock(commit=AsyncMock())
 
     await _update_run_status(db, run, _payload("2026-08-04T13:01:34-04:00"))

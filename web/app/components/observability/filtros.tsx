@@ -7,17 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils"
 import type { IExecutorMetrics, IObservabilityMetrics, IWorkflowMetricsRow } from "@/service/types"
 import { SeloAssistente } from "../shared/selo-assistente"
-import { formatarInteiro, rotuloDaOrigem } from "@/lib/formatos"
-import { filtrosAtivos, type EstadoDoHistorico, type OrigemFiltro, type StatusFiltro } from "./historico-url"
+import { formatInteger, originLabel } from "@/lib/formatos"
+import { filtrosAtivos, type HistoryState, type SourceFilter, type StatusFilter } from "./historico-url"
 
-export type ContagensPorStatus = Partial<IObservabilityMetrics["by_status"]>
+export type CountsByStatus = Partial<IObservabilityMetrics["by_status"]>
 
 interface Props {
-  estado: EstadoDoHistorico
+  estado: HistoryState
   /** Receives only what changed; the page composer merges it with the rest and writes it to the URL. */
-  onEstado: (mudanca: Partial<EstadoDoHistorico>) => void
+  onEstado: (mudanca: Partial<HistoryState>) => void
   /** The metrics' `by_status`; without it the chips come without a number. */
-  contagens?: ContagensPorStatus | null
+  contagens?: CountsByStatus | null
   workspaces?: { id: string; name: string }[]
   workflows?: IWorkflowMetricsRow[]
   /** The "Sem executor" row (`unassigned`) is excluded: it is not a filterable host. */
@@ -28,9 +28,9 @@ interface Props {
 
 /** Sentinel for the selects: Radix does not accept `""` as an item value. */
 const TODOS = "__todos__"
-const ATRASO_DA_BUSCA_MS = 300
+const SEARCH_DELAY_MS = 300
 
-const CHIPS: { status: StatusFiltro | null; rotulo: string; contar: (c: ContagensPorStatus) => number | null }[] = [
+const CHIPS: { status: StatusFilter | null; rotulo: string; contar: (c: CountsByStatus) => number | null }[] = [
   { status: null, rotulo: "Todas", contar: c => somaTotal(c) },
   { status: "failed", rotulo: "Falhas", contar: c => c.failed ?? null },
   // The backend's `status=running` filter returns only `running`; `pending` stays
@@ -40,14 +40,14 @@ const CHIPS: { status: StatusFiltro | null; rotulo: string; contar: (c: Contagen
   { status: "cancelled", rotulo: "Canceladas", contar: c => c.cancelled ?? null },
 ]
 
-function somaTotal(c: ContagensPorStatus): number | null {
+function somaTotal(c: CountsByStatus): number | null {
   const partes = [c.success, c.failed, c.running, c.pending, c.cancelled, c.other].filter((n): n is number => typeof n === "number")
   return partes.length === 0 ? null : partes.reduce((a, b) => a + b, 0)
 }
 
 /** Display order of the selector; the set must match `ORIGENS` in
  *  `historico-url.ts` (the URL discards an unknown origin — a test guarantees it). */
-export const ORIGENS_DA_UI: OrigemFiltro[] = ["manual", "schedule", "webhook", "retry", "mcp"]
+export const UI_ORIGINS: SourceFilter[] = ["manual", "schedule", "webhook", "retry", "mcp"]
 
 /**
  * Table filters (spec §4.3). Nothing here holds filter state: everything goes
@@ -62,10 +62,10 @@ export function Filtros({
   const ativos = filtrosAtivos(estado)
   const c = contagens ?? {}
 
-  const workflowsVisiveis = estado.workspace
+  const visibleWorkflows = estado.workspace
     ? workflows.filter(w => w.workspace_id === estado.workspace)
     : workflows
-  const executoresVisiveis = executores.filter(e => !e.unassigned && e.agent_host)
+  const visibleExecutors = executores.filter(e => !e.unassigned && e.agent_host)
 
   function limpar() {
     onEstado({ status: null, workspace: null, workflow: null, executor: null, origem: null, assistente: false, q: "" })
@@ -102,31 +102,31 @@ export function Filtros({
 
         <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
           {mostrarWorkspace && (
-            <Seletor
+            <Selector
               rotulo="Workspace"
               valor={estado.workspace}
               onValor={v => onEstado({ workspace: v, workflow: null })}
               opcoes={workspaces.map(w => ({ valor: w.id, rotulo: w.name }))}
             />
           )}
-          <Seletor
+          <Selector
             rotulo="Workflow"
             valor={estado.workflow}
             onValor={v => onEstado({ workflow: v })}
-            opcoes={workflowsVisiveis.map(w => ({ valor: w.workflow_hash, rotulo: w.workflow_name, origem: w.origem }))}
+            opcoes={visibleWorkflows.map(w => ({ valor: w.workflow_hash, rotulo: w.workflow_name, origem: w.origem }))}
           />
-          <Seletor
+          <Selector
             rotulo="Executor"
             valor={estado.executor}
             onValor={v => onEstado({ executor: v })}
-            opcoes={executoresVisiveis.map(e => ({ valor: e.agent_host as string, rotulo: e.display_name }))}
+            opcoes={visibleExecutors.map(e => ({ valor: e.agent_host as string, rotulo: e.display_name }))}
           />
-          <Seletor
+          <Selector
             rotulo="Origem"
             todosRotulo="todas"
             valor={estado.origem}
-            onValor={v => onEstado({ origem: (v as OrigemFiltro | null) })}
-            opcoes={ORIGENS_DA_UI.map(o => ({ valor: o, rotulo: rotuloDaOrigem(o) ?? o }))}
+            onValor={v => onEstado({ origem: (v as SourceFilter | null) })}
+            opcoes={UI_ORIGINS.map(o => ({ valor: o, rotulo: originLabel(o) ?? o }))}
           />
           <Busca valor={estado.q} onValor={q => onEstado({ q })} />
         </div>
@@ -171,12 +171,12 @@ function Chip({ rotulo, ativo, n, icone = false, onClick }: {
     >
       {icone && <TbSparkles size={13} aria-hidden="true" className="text-primary" />}
       {rotulo}
-      {n != null && <b className="font-semibold text-foreground tabular-nums">{formatarInteiro(n)}</b>}
+      {n != null && <b className="font-semibold text-foreground tabular-nums">{formatInteger(n)}</b>}
     </button>
   )
 }
 
-function Seletor({ rotulo, todosRotulo = "todos", valor, onValor, opcoes }: {
+function Selector({ rotulo, todosRotulo = "todos", valor, onValor, opcoes }: {
   rotulo: string
   todosRotulo?: string
   valor: string | null
@@ -212,7 +212,7 @@ function Seletor({ rotulo, todosRotulo = "todos", valor, onValor, opcoes }: {
 }
 
 function Busca({ valor, onValor }: { valor: string; onValor: (q: string) => void }) {
-  const [texto, setTexto] = useState(valor)
+  const [texto, setText] = useState(valor)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // What this field has already emitted: when the URL changes from outside
   // (Clear filters, new link), the field follows; when the URL only echoes what
@@ -226,19 +226,19 @@ function Busca({ valor, onValor }: { valor: string; onValor: (q: string) => void
     // keeps the URL echo from erasing the space the person just typed.
     if (valor !== emitido.current.trim()) {
       emitido.current = valor
-      setTexto(valor)
+      setText(valor)
     }
   }, [valor])
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
 
-  function aoDigitar(q: string) {
-    setTexto(q)
+  function onType(q: string) {
+    setText(q)
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => {
       emitido.current = q
       onValor(q)
-    }, ATRASO_DA_BUSCA_MS)
+    }, SEARCH_DELAY_MS)
   }
 
   return (
@@ -250,7 +250,7 @@ function Busca({ valor, onValor }: { valor: string; onValor: (q: string) => void
         aria-label="Buscar execuções"
         placeholder="Buscar por erro, workflow ou ID"
         value={texto}
-        onChange={e => aoDigitar(e.target.value)}
+        onChange={e => onType(e.target.value)}
         className="h-8 pl-8 text-xs max-md:h-10 md:text-xs"
       />
     </div>

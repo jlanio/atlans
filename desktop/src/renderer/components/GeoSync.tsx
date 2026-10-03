@@ -21,10 +21,10 @@ import {
   TbCopy, TbDeviceDesktop, TbDownloadOff, TbFolder, TbFolderFilled, TbFolderOff,
   TbFolderOpen, TbRefresh, TbShieldLock, TbX,
 } from 'react-icons/tb'
-import { INTERVALO_SYNC, PADRAO_SYNC } from '../../shared/geosync.js'
-import type { EstrategiaConflito, ModoSync } from '../../shared/geosync.js'
-import type { ConfigGeoSync, PastaInvalida } from '../../main/state/config.js'
-import type { ResultadoStatus, Workspace } from '../../main/python/status.js'
+import { SYNC_INTERVAL, SYNC_DEFAULTS } from '../../shared/geosync.js'
+import type { ConflictStrategy, SyncMode } from '../../shared/geosync.js'
+import type { ConfigGeoSync, InvalidFolder } from '../../main/state/config.js'
+import type { StatusResult, Workspace } from '../../main/python/status.js'
 import { useSnapshot } from '../lib/snapshot.js'
 import { BarraSalvar } from './BarraSalvar.js'
 import { Alerta } from './Alerta.js'
@@ -40,7 +40,7 @@ import { cn } from '../lib/utils.js'
  * drawn at different sizes by the full list (18px) and by the segmented control
  * (14px), and an element with a built-in `size` would serve only one of them.
  */
-interface Opcao<T extends string> {
+interface Choice<T extends string> {
   v: T
   r: string
   d: ReactNode
@@ -63,7 +63,7 @@ interface Opcao<T extends string> {
  */
 type Localidade = 'sincronizar' | 'local'
 
-const LOCALIDADES: Array<Opcao<Localidade>> = [
+const LOCALITIES: Array<Choice<Localidade>> = [
   {
     v: 'sincronizar',
     r: 'Sincronizar os arquivos',
@@ -104,11 +104,11 @@ const LOCALIDADES: Array<Opcao<Localidade>> = [
  * download does not exist); the sync one is neutral because it describes the
  * expected behavior.
  */
-function QuadroDoModo({
+function ModePanel({
   local, direcao, pasta,
 }: {
   local: boolean
-  direcao: Exclude<ModoSync, 'catalog'>
+  direcao: Exclude<SyncMode, 'catalog'>
   pasta: string | null
 }) {
   const conteudo = local
@@ -210,17 +210,17 @@ function QuadroDoModo({
 /**
  * COMPACT exclusive choice — a strip instead of a stack of cards.
  *
- * Direction and conflict used the same `Opcoes` as locality and took up six
+ * Direction and conflict used the same `Choices` as locality and took up six
  * tall blocks, competing in weight with the decision that governs them. Here
  * each group fits on one line, and the explanation appears only for the CHOSEN
  * option — which is the only one that describes what will actually happen. The
  * others remain reachable through the label and the icon.
  */
-function Segmentado<T extends string>({
+function Segmented<T extends string>({
   valor, opcoes, aoMudar,
 }: {
   valor: T
-  opcoes: Array<Opcao<T>>
+  opcoes: Array<Choice<T>>
   aoMudar: (v: T) => void
 }) {
   const escolhida = opcoes.find((o) => o.v === valor)
@@ -308,7 +308,7 @@ function Coluna({
 }
 
 /** Transfer directions. Only apply when the content may leave. */
-const MODOS: Array<Opcao<Exclude<ModoSync, 'catalog'>>> = [
+const MODES: Array<Choice<Exclude<SyncMode, 'catalog'>>> = [
   {
     v: 'upload',
     r: 'Só enviar',
@@ -332,7 +332,7 @@ const MODOS: Array<Opcao<Exclude<ModoSync, 'catalog'>>> = [
   },
 ]
 
-const CONFLITOS: Array<Opcao<EstrategiaConflito>> = [
+const CONFLICTS: Array<Choice<ConflictStrategy>> = [
   {
     v: 'remote-wins',
     r: 'O Drive vence',
@@ -363,7 +363,7 @@ const CONFLITOS: Array<Opcao<EstrategiaConflito>> = [
  * hand-edited `.env` may have forward slashes, and in that case the "name"
  * would be the whole path.
  */
-function nomeDaPasta(caminho: string): string {
+function folderName(caminho: string): string {
   const partes = caminho.split(/[\/]/).filter(Boolean)
   return partes[partes.length - 1] ?? caminho
 }
@@ -386,21 +386,21 @@ function nomeDaPasta(caminho: string): string {
  * prop: that way the tick re-renders this card, and not the ten of the whole
  * screen. See lib/snapshot.ts.
  */
-function Situacao() {
+function SyncStatusCard() {
   const snapshot = useSnapshot()
-  const [pedindo, setPedindo] = useState(false)
-  const [retorno, setRetorno] = useState<string | null>(null)
+  const [pedindo, setRequesting] = useState(false)
+  const [retorno, setFeedback] = useState<string | null>(null)
 
-  async function sincronizarAgora() {
-    setPedindo(true)
-    setRetorno(null)
+  async function syncNow() {
+    setRequesting(true)
+    setFeedback(null)
     try {
       const ok = await window.atlas.comando('sync_now')
-      setRetorno(ok ? 'Varredura solicitada.' : 'O executor não aceitou o comando.')
+      setFeedback(ok ? 'Varredura solicitada.' : 'O executor não aceitou o comando.')
     } finally {
-      setPedindo(false)
+      setRequesting(false)
       // The message disappears on its own: it confirms a click, it is not state.
-      setTimeout(() => setRetorno(null), 4000)
+      setTimeout(() => setFeedback(null), 4000)
     }
   }
 
@@ -408,7 +408,7 @@ function Situacao() {
   if (!snapshot) return null
 
   const pendentes = snapshot.sync_pending
-  const emTransito = snapshot.sync_current
+  const inTransit = snapshot.sync_current
 
   return (
     <Card>
@@ -418,11 +418,11 @@ function Situacao() {
       <CardHeader className="px-6">
         <CardTitle className="text-base font-medium">Situação</CardTitle>
         <CardDescription className="text-xs">
-          A varredura roda a cada {INTERVALO_SYNC}s, e também quando um arquivo muda.
+          A varredura roda a cada {SYNC_INTERVAL}s, e também quando um arquivo muda.
         </CardDescription>
         <CardAction>
         <Button size="sm" variant="secondary" className="shrink-0"
-                disabled={pedindo} onClick={sincronizarAgora}
+                disabled={pedindo} onClick={syncNow}
                 title="Acorda o ciclo agora, sem esperar o intervalo">
           <TbRefresh size={14} className={cn(pedindo && 'animate-spin')} />
           Sincronizar agora
@@ -443,10 +443,10 @@ function Situacao() {
         {/* The file in transit. The sync is sequential — it is one at a time,
             not a list, and showing "N downloading" would invent parallelism
             that does not exist. */}
-        {emTransito && (
+        {inTransit && (
           <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs">
             <TbRefresh size={13} className="shrink-0 animate-spin text-primary" />
-            <span className="truncate font-mono select-text">{emTransito}</span>
+            <span className="truncate font-mono select-text">{inTransit}</span>
           </div>
         )}
 
@@ -499,11 +499,11 @@ function bytes(n: number): string {
  * icon — because a highlight in background color only, on a dark theme,
  * vanishes on a low-brightness monitor.
  */
-function Opcoes<T extends string>({
+function Choices<T extends string>({
   valor, opcoes, aoMudar,
 }: {
   valor: T
-  opcoes: Array<Opcao<T>>
+  opcoes: Array<Choice<T>>
   aoMudar: (v: T) => void
 }) {
   return (
@@ -583,10 +583,10 @@ export const GeoSync = memo(function GeoSync({
 }) {
   const [cfg, setCfg] = useState<ConfigGeoSync | null>(null)
   const [original, setOriginal] = useState<string>('')
-  const [status, setStatus] = useState<ResultadoStatus | null>(null)
-  const [carregandoWs, setCarregandoWs] = useState(false)
-  const [invalidas, setInvalidas] = useState<PastaInvalida[]>([])
-  const [salvo, setSalvo] = useState(false)
+  const [status, setStatus] = useState<StatusResult | null>(null)
+  const [loadingWs, setLoadingWs] = useState(false)
+  const [invalidas, setInvalidFolders] = useState<InvalidFolder[]>([])
+  const [salvo, setSaved] = useState(false)
   /**
    * Direction chosen before switching to "manter apenas no executor" (keep
    * only on the executor).
@@ -597,13 +597,13 @@ export const GeoSync = memo(function GeoSync({
    * reversible. Without a previous direction (the `.env` already came with
    * `catalog`), the executor's applies.
    */
-  const [direcaoLembrada, setDirecaoLembrada] = useState<Exclude<ModoSync, 'catalog'>>(PADRAO_SYNC.modo)
+  const [rememberedDirection, setRememberedDirection] = useState<Exclude<SyncMode, 'catalog'>>(SYNC_DEFAULTS.modo)
 
   useEffect(() => {
     void window.atlas.geosync().then((c) => {
       setCfg(c)
       setOriginal(JSON.stringify(c))
-      if (c.modo !== 'catalog') setDirecaoLembrada(c.modo)
+      if (c.modo !== 'catalog') setRememberedDirection(c.modo)
       aoMudarPasta?.(c.pasta)
     })
     // An outside `aoMudarPasta` must not re-run the load; the effect is mount-only.
@@ -619,21 +619,21 @@ export const GeoSync = memo(function GeoSync({
    * repeating that every time the tab opened meant the skeleton pulsing for
    * seconds. See python/status.ts.
    */
-  const buscarWorkspaces = useCallback((atualizar = false) => {
-    setCarregandoWs(true)
+  const fetchWorkspaces = useCallback((atualizar = false) => {
+    setLoadingWs(true)
     void window.atlas.workspaces(atualizar)
       .then(setStatus)
-      .finally(() => setCarregandoWs(false))
+      .finally(() => setLoadingWs(false))
   }, [])
 
-  // Only once, the first time the tab appears. `buscarWorkspaces` remains
+  // Only once, the first time the tab appears. `fetchWorkspaces` remains
   // available through the "Atualizar" button for anyone who wants to re-query.
-  const [jaConsultou, setJaConsultou] = useState(false)
+  const [alreadyQueried, setAlreadyQueried] = useState(false)
   useEffect(() => {
-    if (!visivel || jaConsultou) return
-    setJaConsultou(true)
-    buscarWorkspaces()
-  }, [visivel, jaConsultou, buscarWorkspaces])
+    if (!visivel || alreadyQueried) return
+    setAlreadyQueried(true)
+    fetchWorkspaces()
+  }, [visivel, alreadyQueried, fetchWorkspaces])
 
   // Reported through an effect, not inside `patch`: it is derived from the
   // comparison with the original, and there are paths that reset it without
@@ -649,15 +649,15 @@ export const GeoSync = memo(function GeoSync({
     return <p className="text-sm text-muted-foreground">Carregando…</p>
   }
 
-  const patch = (p: Partial<ConfigGeoSync>) => { setCfg({ ...cfg, ...p }); setSalvo(false) }
+  const patch = (p: Partial<ConfigGeoSync>) => { setCfg({ ...cfg, ...p }); setSaved(false) }
 
-  const soCatalogo = cfg.modo === 'catalog'
+  const catalogOnly = cfg.modo === 'catalog'
 
   // The direction the UI shows. In local mode the `modo` field holds 'catalog',
   // so the effective direction is the remembered one. The `if` is also what
   // narrows the type for the direction card, which does not know 'catalog'.
-  const direcaoAtual: Exclude<ModoSync, 'catalog'> =
-    cfg.modo === 'catalog' ? direcaoLembrada : cfg.modo
+  const currentDirection: Exclude<SyncMode, 'catalog'> =
+    cfg.modo === 'catalog' ? rememberedDirection : cfg.modo
 
   /**
    * Toggles the locality while preserving the chosen direction.
@@ -667,19 +667,19 @@ export const GeoSync = memo(function GeoSync({
    * who chose "só enviar" (upload only) and tried the local mode should not
    * return to "nos dois sentidos" (both ways) without having asked.
    */
-  function trocarLocalidade(v: Localidade) {
+  function changeLocality(v: Localidade) {
     if (v === 'local') {
-      if (cfg!.modo !== 'catalog') setDirecaoLembrada(cfg!.modo)
+      if (cfg!.modo !== 'catalog') setRememberedDirection(cfg!.modo)
       patch({ modo: 'catalog' })
     } else {
-      patch({ modo: direcaoLembrada })
+      patch({ modo: rememberedDirection })
     }
   }
 
   const workspaces: Workspace[] = status?.ok ? status.workspaces : []
   // The executor's rule: with >1 workspace and none chosen, GeoSync is silently
   // disabled. It is the most important alert on this screen.
-  const precisaEscolherWorkspace = workspaces.length > 1 && !cfg.workspaceId
+  const mustPickWorkspace = workspaces.length > 1 && !cfg.workspaceId
   const semWorkspace = status?.ok === true && workspaces.length === 0
 
   async function escolherPasta() {
@@ -689,12 +689,12 @@ export const GeoSync = memo(function GeoSync({
 
   async function salvar() {
     const r = await window.atlas.salvarGeosync(cfg!)
-    setInvalidas(r.invalidas)
+    setInvalidFolders(r.invalidas)
     if (r.salvo) {
       const atual = await window.atlas.geosync()
       setCfg(atual)
       setOriginal(JSON.stringify(atual))
-      setSalvo(true)
+      setSaved(true)
       aoMudarPasta?.(atual.pasta)
     }
   }
@@ -718,7 +718,7 @@ export const GeoSync = memo(function GeoSync({
         />
       )}
 
-      {precisaEscolherWorkspace && cfg.pasta && (
+      {mustPickWorkspace && cfg.pasta && (
         <Alerta
           tom="aviso"
           titulo="Escolha o workspace de destino."
@@ -751,12 +751,12 @@ export const GeoSync = memo(function GeoSync({
           </span>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 px-6">
-          <Opcoes
-            valor={soCatalogo ? 'local' : 'sincronizar'}
-            opcoes={LOCALIDADES}
-            aoMudar={trocarLocalidade}
+          <Choices
+            valor={catalogOnly ? 'local' : 'sincronizar'}
+            opcoes={LOCALITIES}
+            aoMudar={changeLocality}
           />
-          <QuadroDoModo local={soCatalogo} direcao={direcaoAtual} pasta={cfg.pasta} />
+          <ModePanel local={catalogOnly} direcao={currentDirection} pasta={cfg.pasta} />
 
           {/* ── Direction and conflict ──────────────────────────────────
               INSIDE this card, not next to it: both only exist when the
@@ -767,19 +767,19 @@ export const GeoSync = memo(function GeoSync({
               They still disappear in local mode: the panel above already says
               nothing is transferred, and two dimmed blocks repeating that in
               gray would cost half a window to explain their own uselessness. */}
-          {!soCatalogo && (
+          {!catalogOnly && (
             <>
               <Subsecao titulo="Direção">
-                <Segmentado
-                  valor={direcaoAtual}
-                  opcoes={MODOS}
-                  aoMudar={(modo) => { setDirecaoLembrada(modo); patch({ modo }) }}
+                <Segmented
+                  valor={currentDirection}
+                  opcoes={MODES}
+                  aoMudar={(modo) => { setRememberedDirection(modo); patch({ modo }) }}
                 />
               </Subsecao>
 
               <Subsecao titulo="Em caso de conflito">
-                <Segmentado
-                  valor={cfg.conflito} opcoes={CONFLITOS}
+                <Segmented
+                  valor={cfg.conflito} opcoes={CONFLICTS}
                   aoMudar={(conflito) => patch({ conflito })}
                 />
               </Subsecao>
@@ -803,16 +803,16 @@ export const GeoSync = memo(function GeoSync({
           <CardTitle className="flex min-w-0 items-center gap-2 text-base font-medium">
             <span className={cn(
               'shrink-0 transition-colors',
-              soCatalogo ? 'text-primary' : 'text-muted-foreground',
+              catalogOnly ? 'text-primary' : 'text-muted-foreground',
             )}>
-              {soCatalogo ? <TbShieldLock size={18} /> : <TbCloud size={18} />}
+              {catalogOnly ? <TbShieldLock size={18} /> : <TbCloud size={18} />}
             </span>
             <span className="min-w-0 truncate">
-              {soCatalogo ? 'Pasta catalogada' : 'Pasta sincronizada'}
+              {catalogOnly ? 'Pasta catalogada' : 'Pasta sincronizada'}
             </span>
           </CardTitle>
           <CardDescription className="text-xs">
-            {soCatalogo
+            {catalogOnly
               ? 'Onde moram os arquivos que o executor vai catalogar.'
               : 'Onde moram os arquivos espelhados com o Drive.'}
           </CardDescription>
@@ -835,7 +835,7 @@ export const GeoSync = memo(function GeoSync({
                       cut-off line. */}
                   <div className="flex min-w-0 flex-col">
                     <span className="truncate text-sm font-medium select-text">
-                      {nomeDaPasta(cfg.pasta)}
+                      {folderName(cfg.pasta)}
                     </span>
                     <span className="truncate font-mono text-xs text-muted-foreground select-text"
                           title={cfg.pasta}>
@@ -907,16 +907,16 @@ export const GeoSync = memo(function GeoSync({
             spins. */}
         <Button size="sm" variant="ghost"
                 className="absolute top-2.5 right-2.5 h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
-                disabled={carregandoWs} onClick={() => buscarWorkspaces(true)}
+                disabled={loadingWs} onClick={() => fetchWorkspaces(true)}
                 title="Consultar o servidor de novo">
-          <TbRefresh size={14} className={cn(carregandoWs && 'animate-spin')} />
+          <TbRefresh size={14} className={cn(loadingWs && 'animate-spin')} />
           Atualizar
         </Button>
 
         <CardHeader className="px-6">
           <CardTitle className="text-base font-medium">Workspace de destino</CardTitle>
           <span className="text-xs text-muted-foreground">
-            {carregandoWs
+            {loadingWs
               ? 'Consultando o servidor…'
               : workspaces.length > 0
                 ? `${workspaces.length} workspace(s) ao alcance deste executor.`
@@ -931,8 +931,8 @@ export const GeoSync = memo(function GeoSync({
                 ajustes, mas impede escolher o destino. {status.erro}
               </p>
               <Button size="sm" variant="secondary" className="h-7 shrink-0 text-xs"
-                      disabled={carregandoWs} onClick={() => buscarWorkspaces(true)}>
-                <TbRefresh size={13} className={cn(carregandoWs && 'animate-spin')} />
+                      disabled={loadingWs} onClick={() => fetchWorkspaces(true)}>
+                <TbRefresh size={13} className={cn(loadingWs && 'animate-spin')} />
                 Tentar de novo
               </Button>
             </div>
@@ -940,7 +940,7 @@ export const GeoSync = memo(function GeoSync({
 
           {/* First query still in progress: without this the card stays empty and
               looks broken during the seconds Python takes to start. */}
-          {carregandoWs && workspaces.length === 0 && !status && (
+          {loadingWs && workspaces.length === 0 && !status && (
             <div className="flex flex-col gap-2" aria-hidden>
               {[0, 1].map((i) => (
                 <div key={i} className="h-[52px] animate-pulse rounded-md border border-input bg-muted/40" />
@@ -986,11 +986,11 @@ export const GeoSync = memo(function GeoSync({
 
       {/* ── Interval ──────────────────────────────────────────────────
           Fixed, and shown only to explain the behavior. See
-          INTERVALO_SYNC in shared/geosync.ts. */}
+          SYNC_INTERVAL in shared/geosync.ts. */}
       <Card>
         <CardHeader className="px-6"><CardTitle className="text-base font-medium">Intervalo de verificação</CardTitle></CardHeader>
         <CardContent className="flex items-baseline gap-3 px-6">
-          <span className="font-mono text-sm tabular-nums">{INTERVALO_SYNC}s</span>
+          <span className="font-mono text-sm tabular-nums">{SYNC_INTERVAL}s</span>
           <span className="text-sm text-muted-foreground">
             O que muda na pasta é detectado na hora, por evento do sistema de
             arquivos. Esta varredura periódica só recolhe o que escapou — pastas
@@ -1000,13 +1000,13 @@ export const GeoSync = memo(function GeoSync({
       </Card>
 
       {/* ── Status ──────────────────────────────────────────────────── */}
-      {rodando && <Situacao />}
+      {rodando && <SyncStatusCard />}
 
       <BarraSalvar
         mudou={sujo} salvo={salvo}
         rodando={rodando}
         aoSalvar={salvar}
-        aoDescartar={() => { setCfg(JSON.parse(original)); setSalvo(false) }}
+        aoDescartar={() => { setCfg(JSON.parse(original)); setSaved(false) }}
       />
     </div>
   )

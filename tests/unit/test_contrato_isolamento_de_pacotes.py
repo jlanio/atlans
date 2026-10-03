@@ -28,7 +28,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[2]
 
 
-def _arquivos(pacote: str) -> list[Path]:
+def _files(pacote: str) -> list[Path]:
     return sorted((RAIZ / pacote).rglob("*.py"))
 
 
@@ -37,11 +37,11 @@ def _imports_de_app(caminho: Path) -> list[tuple[int, str, bool]]:
     arvore = ast.parse(caminho.read_text(encoding="utf-8"), str(caminho))
 
     # Nodes that are inside some function => deferred import.
-    dentro_de_funcao: set[int] = set()
+    inside_function: set[int] = set()
     for no in ast.walk(arvore):
         if isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef)):
             for filho in ast.walk(no):
-                dentro_de_funcao.add(id(filho))
+                inside_function.add(id(filho))
 
     achados = []
     for no in ast.walk(arvore):
@@ -53,17 +53,17 @@ def _imports_de_app(caminho: Path) -> list[tuple[int, str, bool]]:
                 if nome.name.startswith("app.") or nome.name == "app":
                     alvo = nome.name
         if alvo:
-            achados.append((no.lineno, alvo, id(no) not in dentro_de_funcao))
+            achados.append((no.lineno, alvo, id(no) not in inside_function))
     return achados
 
 
 # ── EXECUTOR ─────────────────────────────────────────────────────────────────
 
-def test_executor_nunca_importa_app():
+def test_executor_never_imports_app():
     """The deploy boundary: the executor is distributed without the `app` package."""
     violacoes = [
         f"{caminho.relative_to(RAIZ)}:{linha} importa {alvo}"
-        for caminho in _arquivos("executor")
+        for caminho in _files("executor")
         for linha, alvo, _ in _imports_de_app(caminho)
     ]
     assert not violacoes, (
@@ -74,13 +74,13 @@ def test_executor_nunca_importa_app():
 
 # ── FLOW ─────────────────────────────────────────────────────────────────────
 
-def test_flow_so_importa_app_dentro_de_funcao():
+def test_flow_only_imports_app_inside_functions():
     """An import of `app.*` at the top of a flow/ module takes down every executor."""
     violacoes = [
         f"{caminho.relative_to(RAIZ)}:{linha} importa {alvo} no topo do modulo"
-        for caminho in _arquivos("flow")
-        for linha, alvo, nivel_modulo in _imports_de_app(caminho)
-        if nivel_modulo
+        for caminho in _files("flow")
+        for linha, alvo, module_level in _imports_de_app(caminho)
+        if module_level
     ]
     assert not violacoes, (
         "import de app/ no nivel de modulo em flow/ — o executor quebra no boot "
@@ -89,25 +89,25 @@ def test_flow_so_importa_app_dentro_de_funcao():
     )
 
 
-def test_o_import_tardio_de_flow_ainda_existe_onde_e_esperado():
+def test_the_late_flow_import_still_exists_where_expected():
     """Anchors the premise: if the deferred imports disappear, the test above becomes vacuous.
 
     Without this, deleting `workflow_contract.py` entirely would leave the suite
     green and give the impression that the invariant is still being checked.
     """
-    tardios = [
+    late_imports = [
         (caminho.relative_to(RAIZ), linha, alvo)
-        for caminho in _arquivos("flow")
-        for linha, alvo, nivel_modulo in _imports_de_app(caminho)
-        if not nivel_modulo
+        for caminho in _files("flow")
+        for linha, alvo, module_level in _imports_de_app(caminho)
+        if not module_level
     ]
-    assert tardios, (
+    assert late_imports, (
         "nenhum import tardio de app/ em flow/ — ou o acoplamento acabou (otimo, "
         "remova este teste) ou os arquivos que o tinham sumiram"
     )
 
 
-def test_importar_flow_nao_exige_variavel_de_ambiente_do_servidor(monkeypatch):
+def test_importing_flow_does_not_require_server_env_vars(monkeypatch):
     """The empirical proof of the invariant, not just the structural one.
 
     Simulates the customer's machine: without APP_SECRET/FERNET_KEY, importing

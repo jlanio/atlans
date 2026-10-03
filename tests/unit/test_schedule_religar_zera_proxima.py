@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.models.models import Schedule, Workflow
 from app.schemas.schedule import ScheduleUpdate
-from app.services.schedule_service import ScheduleService, campos_de_ativacao
+from app.services.schedule_service import ScheduleService, activation_fields
 
 WF = "wf-1"
 
@@ -35,7 +35,7 @@ async def db():
     await engine.dispose()
 
 
-async def _semear(db, *, active, next_run_at):
+async def _seed(db, *, active, next_run_at):
     job_id = f"job-{uuid4()}"
     db.add(Schedule(
         workflow_hash=WF, strategy="cron", cron_expression="0 6 * * *",
@@ -46,12 +46,12 @@ async def _semear(db, *, active, next_run_at):
     return job_id
 
 
-PASSADO = datetime(2020, 1, 1, 6, 0)  # long before now, naive (as the database stores it)
+PAST = datetime(2020, 1, 1, 6, 0)  # long before now, naive (as the database stores it)
 
 
 @pytest.mark.asyncio
-async def test_religar_pausado_zera_next_run_at(db):
-    job = await _semear(db, active=False, next_run_at=PASSADO)
+async def test_resuming_paused_resets_next_run_at(db):
+    job = await _seed(db, active=False, next_run_at=PAST)
     atualizado = await ScheduleService(db).update_schedule(
         job, ScheduleUpdate(active=True), owner_workflow_hash=WF,
     )
@@ -61,13 +61,13 @@ async def test_religar_pausado_zera_next_run_at(db):
 
 
 @pytest.mark.asyncio
-async def test_mudar_o_horario_com_ativo_zera_next_run_at(db):
+async def test_changing_the_time_while_active_resets_next_run_at(db):
     """Already active, but the TIME changed: the stored `next_run_at` was computed
     from the OLD cron, so keeping it would make the next occurrence fire at the old
     time once. Zeroing forces `_process_schedule` to recompute from the new cron
     (and `None` does not fire right away — it recomputes the next FUTURE occurrence)."""
     futuro = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=3)
-    job = await _semear(db, active=True, next_run_at=futuro)
+    job = await _seed(db, active=True, next_run_at=futuro)
     atualizado = await ScheduleService(db).update_schedule(
         job, ScheduleUpdate(active=True, cron_expression="30 7 * * *"), owner_workflow_hash=WF,
     )
@@ -76,14 +76,14 @@ async def test_mudar_o_horario_com_ativo_zera_next_run_at(db):
 
 
 @pytest.mark.asyncio
-async def test_reeditar_ativo_sem_mudar_o_horario_nao_zera(db):
+async def test_reediting_active_without_changing_the_time_does_not_reset(db):
     """Already active and the time did NOT change (re-saving the same cron): the
     computed next occurrence is preserved — only a real timing change, or the
     paused→active transition, zeroes it."""
     futuro = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=3)
-    job = await _semear(db, active=True, next_run_at=futuro)
+    job = await _seed(db, active=True, next_run_at=futuro)
     atualizado = await ScheduleService(db).update_schedule(
-        # Same cron that `_semear` stores ("0 6 * * *").
+        # Same cron that `_seed` stores ("0 6 * * *").
         job, ScheduleUpdate(active=True, cron_expression="0 6 * * *"), owner_workflow_hash=WF,
     )
     assert atualizado.active is True
@@ -91,17 +91,17 @@ async def test_reeditar_ativo_sem_mudar_o_horario_nao_zera(db):
 
 
 @pytest.mark.asyncio
-async def test_pausar_nao_toca_next_run_at(db):
+async def test_pausing_does_not_touch_next_run_at(db):
     """Desligar preserva o `next_run_at` (nada a recalcular ao pausar)."""
-    job = await _semear(db, active=True, next_run_at=PASSADO)
+    job = await _seed(db, active=True, next_run_at=PAST)
     atualizado = await ScheduleService(db).update_schedule(
         job, ScheduleUpdate(active=False), owner_workflow_hash=WF,
     )
     assert atualizado.active is False
-    assert atualizado.next_run_at == PASSADO
+    assert atualizado.next_run_at == PAST
 
 
-def test_campos_de_ativacao_e_a_fonte_canonica():
+def test_activation_fields_are_the_canonical_source():
     """The semantics the hook and update_schedule share, in a single place."""
-    assert campos_de_ativacao(True) == {"active": True, "next_run_at": None}
-    assert campos_de_ativacao(False) == {"active": False}
+    assert activation_fields(True) == {"active": True, "next_run_at": None}
+    assert activation_fields(False) == {"active": False}

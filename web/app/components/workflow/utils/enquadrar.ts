@@ -25,13 +25,13 @@ export interface Caixa {
  * every draw, which is the jump we are trying to remove. Smaller than a node, so
  * that a real node coming in always counts.
  */
-export const FOLGA_DO_ENQUADRAMENTO = 40
+export const FIT_PADDING = 40
 
 /** How long the camera movement lasts, in ms. */
-export const DURACAO_DO_ENQUADRAMENTO = 700
+export const FIT_DURATION = 700
 
 /** Zoom ceiling when framing the whole workflow. */
-export const ZOOM_MAXIMO_DO_ENQUADRAMENTO = 1
+export const FIT_MAX_ZOOM = 1
 
 /**
  * Does the new drawing fit within what was already framed?
@@ -47,7 +47,7 @@ export const ZOOM_MAXIMO_DO_ENQUADRAMENTO = 1
 export function cabeNoEnquadrado(
   nova: Caixa,
   anterior: Caixa | null,
-  folga: number = FOLGA_DO_ENQUADRAMENTO,
+  folga: number = FIT_PADDING,
 ): boolean {
   if (!anterior) return false
   return (

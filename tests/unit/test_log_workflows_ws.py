@@ -36,18 +36,18 @@ from app.services import run_events_service as svc
 
 
 class FakeWS:
-    def __init__(self, *, fechar_apos_frames: int | None = None):
+    def __init__(self, *, close_after_frames: int | None = None):
         self.sent: list[str] = []
         self.closes: list[tuple[int, str]] = []
         self.client_state = WebSocketState.CONNECTED
         self.application_state = WebSocketState.CONNECTED
         self._disconnect = asyncio.Event()
         # Simulates the tab closing after N frames received.
-        self._fechar_apos_frames = fechar_apos_frames
+        self._close_after_frames = close_after_frames
 
     async def send_text(self, text: str) -> None:
         self.sent.append(text)
-        if self._fechar_apos_frames is not None and len(self.sent) >= self._fechar_apos_frames:
+        if self._close_after_frames is not None and len(self.sent) >= self._close_after_frames:
             self._disconnect.set()
 
     async def receive(self) -> dict:
@@ -70,17 +70,17 @@ class FakePubSub:
     """`segurar=True` simulates a run still alive: `listen()` never ends."""
 
     def __init__(self, mensagens: list[str], *, segurar: bool = False):
-        self._mensagens = mensagens
-        self._segurar = segurar
-        self.canais: list[str] = []
+        self._messages = mensagens
+        self._hold = segurar
+        self.channels: list[str] = []
 
     async def subscribe(self, canal: str) -> None:
-        self.canais.append(canal)
+        self.channels.append(canal)
 
     async def listen(self):
-        for raw in self._mensagens:
+        for raw in self._messages:
             yield {"type": "message", "data": raw}
-        if self._segurar:
+        if self._hold:
             await asyncio.Event().wait()
 
 
@@ -126,7 +126,7 @@ class _FakeDB:
         self.eventos.append("rollback")
 
 
-def _patches_de_handshake(stack, autorizado=(True, True), db=None):
+def _patches_de_handshake(stack, authorized=(True, True), db=None):
     import app.core.db as core_db
 
     usuario = MagicMock()
@@ -144,7 +144,7 @@ def _patches_de_handshake(stack, autorizado=(True, True), db=None):
     stack.enter_context(patch.object(mod, "check_ws_rate_limit", AsyncMock(return_value=True)))
     stack.enter_context(patch.object(core_db, "get_session_async", lambda: _SessCtx()))
     stack.enter_context(
-        patch.object(mod, "_authorize_run", AsyncMock(return_value=autorizado))
+        patch.object(mod, "_authorize_run", AsyncMock(return_value=authorized))
     )
     return sessao
 
@@ -162,7 +162,7 @@ def _patches_de_redis(stack, historico, pubsub: FakePubSub) -> tuple[MagicMock, 
     return rc, sub_client
 
 
-async def _rodar(ws: FakeWS, run_id: str = "run-1", timeout: float = 3.0) -> None:
+async def _run(ws: FakeWS, run_id: str = "run-1", timeout: float = 3.0) -> None:
     """The handler has to end on its own; a test that hangs is a regression."""
     await asyncio.wait_for(mod.websocket_workflow(ws, run_id), timeout=timeout)
 
@@ -170,7 +170,7 @@ async def _rodar(ws: FakeWS, run_id: str = "run-1", timeout: float = 3.0) -> Non
 # ── A11: single envelope ──────────────────────────────────────────────────────
 
 
-def test_batch_frame_usa_envelope_events_com_dropped_sempre():
+def test_batch_frame_uses_events_envelope_always_with_dropped():
     frame = json.loads(mod._batch_frame([evento("n1")]))
     assert frame["type"] == "events"
     assert frame["dropped"] == 0
@@ -185,7 +185,7 @@ def test_batch_frame_usa_envelope_events_com_dropped_sempre():
 
 
 @pytest.mark.asyncio
-async def test_replay_le_o_historico_em_uma_unica_chamada():
+async def test_replay_reads_history_in_a_single_call():
     """A single read: paginating by absolute index loses events under LTRIM."""
     historico = [evento(f"n{i}") for i in range(1200)]
     ws = FakeWS()
@@ -193,10 +193,10 @@ async def test_replay_le_o_historico_em_uma_unica_chamada():
     with ExitStack() as stack:
         _patches_de_handshake(stack)
         rc, sub_client = _patches_de_redis(stack, historico, FakePubSub([COMPLETE]))
-        await _rodar(ws)
+        await _run(ws)
 
     rc.lrange.assert_awaited_once_with("workflow:run-1:history", 0, -1)
-    assert sub_client._pubsub.canais == ["workflow:run-1:events"]
+    assert sub_client._pubsub.channels == ["workflow:run-1:events"]
     # SENDING is still paginated — the gain of fewer WS frames still stands:
     # 500 + 500 + 200 from the replay and the live complete.
     assert [len(frame["events"]) for frame in ws.frames()] == [500, 500, 200, 1]
@@ -208,7 +208,7 @@ async def test_replay_le_o_historico_em_uma_unica_chamada():
 
 
 @pytest.mark.asyncio
-async def test_replay_nao_perde_eventos_quando_a_lista_desliza():
+async def test_replay_does_not_lose_events_when_list_slides():
     """Simulates the publisher's LTRIM on each read: nothing may be skipped."""
     historico = [evento(f"n{i}") for i in range(1500)]
     estado = {"lista": list(historico)}
@@ -225,22 +225,22 @@ async def test_replay_nao_perde_eventos_quando_a_lista_desliza():
     with ExitStack() as stack:
         _patches_de_handshake(stack)
         _patches_de_redis(stack, lrange, FakePubSub([COMPLETE]))
-        await _rodar(ws)
+        await _run(ws)
 
     nodes = [ev["node"] for ev in ws.eventos()]
     assert nodes == [f"n{i}" for i in range(1500)] + [WORKFLOW_COMPLETE_NODE]
 
 
 @pytest.mark.asyncio
-async def test_replay_corta_no_marcador_de_conclusao_e_nao_vai_ao_vivo():
+async def test_replay_stops_at_completion_marker_and_does_not_go_live():
     ws = FakeWS()
-    # If the handler went live it would get stuck here and `_rodar` would time out.
+    # If the handler went live it would get stuck here and `_run` would time out.
     pubsub = FakePubSub([evento("n-fantasma")], segurar=True)
 
     with ExitStack() as stack:
         _patches_de_handshake(stack)
         _, sub_client = _patches_de_redis(stack, [evento("n1"), COMPLETE, evento("n2")], pubsub)
-        await _rodar(ws)
+        await _run(ws)
 
     assert [ev["node"] for ev in ws.eventos()] == ["n1", WORKFLOW_COMPLETE_NODE]
     assert sub_client.fechado is True
@@ -251,7 +251,7 @@ async def test_replay_corta_no_marcador_de_conclusao_e_nao_vai_ao_vivo():
 
 
 @pytest.mark.asyncio
-async def test_stream_live_descarta_eventos_ja_enviados_no_replay():
+async def test_live_stream_discards_events_already_sent_in_replay():
     duplicados = [evento("n8", "linha"), evento("n8", "linha"), evento("n9")]
     novos = [evento("n10"), evento("n8", "linha")]
     ws = FakeWS()
@@ -259,11 +259,11 @@ async def test_stream_live_descarta_eventos_ja_enviados_no_replay():
     with ExitStack() as stack:
         _patches_de_handshake(stack)
         _patches_de_redis(stack, duplicados, FakePubSub([*duplicados, *novos, COMPLETE]))
-        await _rodar(ws)
+        await _run(ws)
 
-    replay, ao_vivo = ws.frames()[0], ws.frames()[1:]
+    replay, live = ws.frames()[0], ws.frames()[1:]
     assert [ev["node"] for ev in replay["events"]] == ["n8", "n8", "n9"]
-    recebidos = [ev for frame in ao_vivo for ev in frame["events"]]
+    recebidos = [ev for frame in live for ev in frame["events"]]
     assert [ev["node"] for ev in recebidos] == [
         "n10", "n8", WORKFLOW_COMPLETE_NODE,
     ]
@@ -272,13 +272,13 @@ async def test_stream_live_descarta_eventos_ja_enviados_no_replay():
 
 
 @pytest.mark.asyncio
-async def test_stream_live_sem_dedup_entrega_tudo():
+async def test_live_stream_without_dedup_delivers_everything():
     ws = FakeWS()
 
     with ExitStack() as stack:
         _patches_de_handshake(stack)
         _patches_de_redis(stack, [], FakePubSub([evento("n1"), evento("n2"), COMPLETE]))
-        await _rodar(ws)
+        await _run(ws)
 
     assert [ev["node"] for ev in ws.eventos()] == [
         "n1", "n2", WORKFLOW_COMPLETE_NODE,
@@ -292,7 +292,7 @@ async def test_stream_live_sem_dedup_entrega_tudo():
 
 
 @pytest.mark.asyncio
-async def test_frames_coalescidos_carregam_o_dropped_do_buffer():
+async def test_coalesced_frames_carry_buffer_dropped():
     """Browser lento: stdout cai primeiro, o ciclo de vida chega e `dropped` conta."""
     lifecycle = lambda n: json.dumps({"node": n, "kind": "lifecycle", "status": "completed"})
     mensagens = [evento("s1"), evento("s2"), lifecycle("n1"), lifecycle("n2"), COMPLETE]
@@ -304,7 +304,7 @@ async def test_frames_coalescidos_carregam_o_dropped_do_buffer():
         _patches_de_handshake(stack)
         _patches_de_redis(stack, [], FakePubSub(mensagens))
         stack.enter_context(patch.object(svc, "_QUEUE_MAXSIZE", 3))
-        await _rodar(ws)
+        await _run(ws)
 
     assert len(ws.frames()) == 1
     assert ws.frames()[0]["dropped"] == 2
@@ -312,19 +312,19 @@ async def test_frames_coalescidos_carregam_o_dropped_do_buffer():
 
 
 @pytest.mark.asyncio
-async def test_canal_quieto_manda_lote_vazio_de_heartbeat():
+async def test_quiet_channel_sends_empty_heartbeat_batch():
     # Closes the tab after two heartbeats — it is `watch_close` that ends it.
-    ws = FakeWS(fechar_apos_frames=2)
+    ws = FakeWS(close_after_frames=2)
     real = svc.iter_run_events
 
-    def com_heartbeat_curto(run_id, **kw):
+    def with_short_heartbeat(run_id, **kw):
         return real(run_id, heartbeat_s=0.01, **kw)
 
     with ExitStack() as stack:
         _patches_de_handshake(stack)
         _, sub_client = _patches_de_redis(stack, [], FakePubSub([], segurar=True))
-        stack.enter_context(patch.object(mod, "iter_run_events", com_heartbeat_curto))
-        await _rodar(ws)
+        stack.enter_context(patch.object(mod, "iter_run_events", with_short_heartbeat))
+        await _run(ws)
 
     assert len(ws.frames()) >= 2
     assert all(frame == {"type": "events", "dropped": 0, "events": []} for frame in ws.frames())
@@ -332,19 +332,19 @@ async def test_canal_quieto_manda_lote_vazio_de_heartbeat():
 
 
 @pytest.mark.asyncio
-async def test_watch_close_encerra_o_laco_quando_a_aba_fecha():
+async def test_watch_close_ends_loop_when_tab_closes():
     """Live and silent run: without the socket reader the handler would be stuck until the end."""
     ws = FakeWS()
 
-    async def fechar_aba():
+    async def close_tab():
         await asyncio.sleep(0.02)
         ws._disconnect.set()
 
     with ExitStack() as stack:
         _patches_de_handshake(stack)
         _, sub_client = _patches_de_redis(stack, [evento("n1")], FakePubSub([], segurar=True))
-        fechamento = asyncio.create_task(fechar_aba())
-        await _rodar(ws)
+        fechamento = asyncio.create_task(close_tab())
+        await _run(ws)
         await fechamento
 
     assert [ev["node"] for ev in ws.eventos()] == ["n1"]
@@ -356,22 +356,22 @@ async def test_watch_close_encerra_o_laco_quando_a_aba_fecha():
 
 
 @pytest.mark.asyncio
-async def test_handshake_libera_a_conexao_do_pool_antes_de_dormir():
+async def test_handshake_releases_pool_connection_before_sleeping():
     """A56: without the rollback the session stays `idle in transaction` during the sleep."""
     db = _FakeDB()
     ws = FakeWS()
-    dormidas: list[float] = []
+    sleeps: list[float] = []
 
     async def fake_sleep(segundos):
-        dormidas.append(segundos)
+        sleeps.append(segundos)
         db.eventos.append("sleep")
 
     with ExitStack() as stack:
-        _patches_de_handshake(stack, autorizado=(False, False), db=db)
+        _patches_de_handshake(stack, authorized=(False, False), db=db)
         stack.enter_context(patch.object(asyncio, "sleep", fake_sleep))
         await mod.websocket_workflow(ws, "run-1")
 
-    assert len(dormidas) == mod._WS_POLL_ATTEMPTS - 1
+    assert len(sleeps) == mod._WS_POLL_ATTEMPTS - 1
     # Every sleep is immediately preceded by a rollback.
     for indice, marca in enumerate(db.eventos):
         if marca == "sleep":
@@ -380,12 +380,12 @@ async def test_handshake_libera_a_conexao_do_pool_antes_de_dormir():
 
 
 @pytest.mark.asyncio
-async def test_run_de_outro_workspace_fecha_com_4403():
+async def test_run_from_another_workspace_closes_with_4403():
     ws = FakeWS()
     with ExitStack() as stack:
-        _patches_de_handshake(stack, autorizado=(True, False))
+        _patches_de_handshake(stack, authorized=(True, False))
         chamado = stack.enter_context(patch.object(mod, "iter_run_events"))
-        await _rodar(ws)
+        await _run(ws)
 
     assert ws.closes[-1][0] == 4403
     assert ws.sent == []
@@ -393,20 +393,20 @@ async def test_run_de_outro_workspace_fecha_com_4403():
 
 
 @pytest.mark.asyncio
-async def test_erro_na_verificacao_de_acesso_fecha_com_4500():
+async def test_access_check_error_closes_with_4500():
     ws = FakeWS()
     with ExitStack() as stack:
         _patches_de_handshake(stack)
         stack.enter_context(
             patch.object(mod, "_authorize_run", AsyncMock(side_effect=RuntimeError("db fora")))
         )
-        await _rodar(ws)
+        await _run(ws)
 
     assert ws.closes[-1] == (4500, "Erro interno na verificação de acesso.")
 
 
 @pytest.mark.asyncio
-async def test_falha_de_redis_nao_e_confundida_com_aba_fechada(caplog):
+async def test_redis_failure_is_not_mistaken_for_closed_tab(caplog):
     """A37: a missing pool with a live socket is a server error, not a close."""
     ws = FakeWS()
     sub_client = FakeSubClient(FakePubSub([]))
@@ -421,7 +421,7 @@ async def test_falha_de_redis_nao_e_confundida_com_aba_fechada(caplog):
             )
         )
         with caplog.at_level("ERROR"):
-            await _rodar(ws)
+            await _run(ws)
 
     assert sub_client.fechado is True
     # 1000 is ignored by the client: the panel would stay "Executando" (running) forever.
@@ -430,13 +430,13 @@ async def test_falha_de_redis_nao_e_confundida_com_aba_fechada(caplog):
 
 
 @pytest.mark.asyncio
-async def test_aba_fechada_durante_o_envio_e_encerramento_normal(caplog):
+async def test_tab_closed_during_send_is_normal_shutdown(caplog):
     """Starlette's RuntimeError with an already-dead socket does NOT become 4500."""
     from starlette.websockets import WebSocketDisconnect
 
     ws = FakeWS()
 
-    async def send_text(_texto):
+    async def send_text(_as_text):
         ws.client_state = WebSocketState.DISCONNECTED
         raise WebSocketDisconnect(1001)
 
@@ -445,7 +445,7 @@ async def test_aba_fechada_durante_o_envio_e_encerramento_normal(caplog):
         _patches_de_handshake(stack)
         _, sub_client = _patches_de_redis(stack, [evento("n1")], FakePubSub([], segurar=True))
         with caplog.at_level("ERROR"):
-            await _rodar(ws)
+            await _run(ws)
 
     assert sub_client.fechado is True
     assert ws.closes == []
@@ -453,14 +453,14 @@ async def test_aba_fechada_durante_o_envio_e_encerramento_normal(caplog):
 
 
 @pytest.mark.asyncio
-async def test_endpoint_nao_emite_mais_o_marcador_live():
+async def test_endpoint_no_longer_emits_live_marker():
     """A11: o marcador `{"type":"live"}` deixou de existir."""
     ws = FakeWS()
 
     with ExitStack() as stack:
         _patches_de_handshake(stack)
         _patches_de_redis(stack, [evento("n1"), COMPLETE], FakePubSub([]))
-        await _rodar(ws)
+        await _run(ws)
 
     assert all(frame["type"] == "events" for frame in ws.frames())
     assert '"live"' not in "".join(ws.sent)
@@ -468,7 +468,7 @@ async def test_endpoint_nao_emite_mais_o_marcador_live():
 
 
 @pytest.mark.asyncio
-async def test_teto_de_vida_do_socket_fecha_normal_e_sem_frames_extras():
+async def test_socket_lifetime_ceiling_closes_normally_without_extra_frames():
     """`_WS_MAX_S`: orphaned subscriber of a run that never publishes the marker.
 
     The old loop had no ceiling — the socket lived until `__workflow_complete__`
@@ -483,7 +483,7 @@ async def test_teto_de_vida_do_socket_fecha_normal_e_sem_frames_extras():
         _patches_de_handshake(stack)
         _, sub_client = _patches_de_redis(stack, [], FakePubSub([], segurar=True))
         stack.enter_context(patch.object(mod, "_WS_MAX_S", 0.05))
-        await _rodar(ws)
+        await _run(ws)
 
     assert ws.sent == []
     assert ws.closes[-1] == (1000, "")

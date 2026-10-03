@@ -15,7 +15,7 @@ import pytest
 
 
 @pytest.fixture
-def listagem_mockada(client):
+def mocked_listing(client):
     from app.api.dependencies import get_db
     from app.api.routers import observability_router as R
     from app.main import app
@@ -31,23 +31,23 @@ def listagem_mockada(client):
     app.dependency_overrides.pop(get_db, None)
 
 
-async def test_filtro_de_origem_aceita_mcp(listagem_mockada):
-    client, listar = listagem_mockada
+async def test_source_filter_accepts_mcp(mocked_listing):
+    client, listar = mocked_listing
     resp = await client.get("/observability/runs", params={"trigger_source": "mcp"})
     assert resp.status_code == 200, resp.text
     assert listar.await_args.kwargs["trigger_source"] == "mcp"
 
 
 @pytest.mark.parametrize("origem", ["manual", "retry", "webhook", "schedule"])
-async def test_filtro_de_origem_continua_aceitando_as_antigas(listagem_mockada, origem):
-    client, listar = listagem_mockada
+async def test_source_filter_still_accepts_the_old_ones(mocked_listing, origem):
+    client, listar = mocked_listing
     resp = await client.get("/observability/runs", params={"trigger_source": origem})
     assert resp.status_code == 200, resp.text
     assert listar.await_args.kwargs["trigger_source"] == origem
 
 
-async def test_filtro_de_origem_fora_do_vocabulario_e_422(listagem_mockada):
-    client, listar = listagem_mockada
+async def test_source_filter_outside_the_vocabulary_is_422(mocked_listing):
+    client, listar = mocked_listing
     resp = await client.get("/observability/runs", params={"trigger_source": "cron"})
     assert resp.status_code == 422
     listar.assert_not_awaited()

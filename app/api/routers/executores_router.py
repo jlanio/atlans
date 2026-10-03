@@ -117,7 +117,7 @@ def _assert_executor_owner_or_admin(current_user, ag) -> None:
         raise HTTPException(status_code=403, detail="Acesso negado a este executor.")
 
 
-def _assert_pode_gerenciar_executor(current_user, ag) -> None:
+def _assert_can_manage_executor(current_user, ag) -> None:
     """Like `_assert_executor_owner_or_admin`, but for MANAGEMENT operations
     (generating an enrollment OTP, revoking): audit SEG-94.
 
@@ -166,11 +166,11 @@ def _assert_pode_ler_executor(quem: "ExecutorOuUsuario", ag) -> None:
 # the database — including in the WebSocket worker: its memory has values a few
 # seconds newer, and mixing them made the response change depending on the worker.
 
-_CONTADORES_DA_CAPACIDADE = ("queued", "running", "max_concurrent", "max_queue")
-_MEDIDAS_DA_CAPACIDADE = ("disk_free_gb", "ram_available_gb")
+_CAPACITY_COUNTERS = ("queued", "running", "max_concurrent", "max_queue")
+_CAPACITY_MEASURES = ("disk_free_gb", "ram_available_gb")
 
 
-def _capacidade_para_a_tela(cap) -> dict | None:
+def _capacity_for_screen(cap) -> dict | None:
     """The Redis copy, revalidated against the format the WebSocket worker writes
     (`_sanitize_capacity`): only the contract fields, with the right type. This
     module does not trust what it reads from Redis (the relay is signed for the
@@ -179,22 +179,22 @@ def _capacidade_para_a_tela(cap) -> dict | None:
     if not isinstance(cap, dict):
         return None
     erros: list[str] = []
-    saida = {campo: _coerce_count(cap.get(campo), campo, erros) for campo in _CONTADORES_DA_CAPACIDADE}
+    saida = {campo: _coerce_count(cap.get(campo), campo, erros) for campo in _CAPACITY_COUNTERS}
     if erros:
         return None
-    saida.update({campo: _coerce_gauge(cap.get(campo)) for campo in _MEDIDAS_DA_CAPACIDADE})
+    saida.update({campo: _coerce_gauge(cap.get(campo)) for campo in _CAPACITY_MEASURES})
     return saida
 
 
-async def _estado_ao_vivo(ids: list[str]) -> tuple[dict[str, bool], dict[str, dict | None]]:
+async def _live_state(ids: list[str]) -> tuple[dict[str, bool], dict[str, dict | None]]:
     """(online per executor, capacity of the online ones), from the same Redis
     snapshot in any worker (see `read_presence_and_capacities`), with the capacity
-    revalidated (`_capacidade_para_a_tela`)."""
+    revalidated (`_capacity_for_screen`)."""
     online, publicadas = await executor_registry.read_presence_and_capacities(ids)
-    return online, {i: _capacidade_para_a_tela(cap) for i, cap in publicadas.items()}
+    return online, {i: _capacity_for_screen(cap) for i, cap in publicadas.items()}
 
 
-def _conectado_desde(online: bool, last_seen_at) -> str | None:
+def _connected_since(online: bool, last_seen_at) -> str | None:
     """Start of the current WebSocket session, in ISO with time zone. Offline has no session.
 
     It is the database's `last_seen_at`: written on each session's handshake and, at
@@ -214,13 +214,13 @@ def _conectado_desde(online: bool, last_seen_at) -> str | None:
 def _serialize_agent(ag, *, online: bool, capacidade: dict | None) -> dict:
     """Serializes an executor with online status, live capacity and system_info.
 
-    `online` and `capacidade` come from `_estado_ao_vivo`, which reads from where
+    `online` and `capacidade` come from `_live_state`, which reads from where
     all workers can see (see above)."""
     data = {
         **ExecutorOut.from_model(ag).model_dump(),
         "online":       online,
         "capacity":     capacidade,
-        "connected_at": _conectado_desde(online, ag.last_seen_at),
+        "connected_at": _connected_since(online, ag.last_seen_at),
     }
     # Merges the static system_info (from the database, written on the connection's
     # first handshake) with the dynamic capacity metrics.
@@ -365,13 +365,13 @@ async def ca_bundle(request: Request):
     )
 
 
-_LINHA_PIN_CA = 'CA_SHA256_PIN="${ATLANS_CA_SHA256:-}"'
+_CA_PIN_LINE = 'CA_SHA256_PIN="${ATLANS_CA_SHA256:-}"'
 
 
 _RE_FINGERPRINT = "0123456789abcdef"
 
 
-def _normalizar_fingerprint(bruto: str) -> str:
+def _normalize_fingerprint(bruto: str) -> str:
     """Lowercase hex, without ':' or spaces — the format install.sh compares.
 
     `step certificate fingerprint` returns plain hex and `openssl x509 -fingerprint`
@@ -379,7 +379,7 @@ def _normalizar_fingerprint(bruto: str) -> str:
 
     Accepts SEVERAL comma-separated fingerprints and returns the normalized
     list, also comma-separated. Without this, the rotation value the
-    documentation prescribes (`<fp_antigo>,<fp_novo>`) was rejected by the
+    documentation prescribes (`<fp_antigo>,<new_fp>`) was rejected by the
     length validation and install.sh ran WITHOUT pinning — pure TOFU exactly
     in the window when the CA is being swapped.
     """
@@ -390,7 +390,7 @@ def _normalizar_fingerprint(bruto: str) -> str:
     return ",".join(p for p in partes if p)
 
 
-def _injetar_fingerprint_da_ca(script: str) -> str:
+def _inject_ca_fingerprint(script: str) -> str:
     """Publishes STEPCA_ROOT_FINGERPRINT as the default in the served install.sh.
 
     Without this, `STEPCA_ROOT_FINGERPRINT` was read from config and never used: the
@@ -405,7 +405,7 @@ def _injetar_fingerprint_da_ca(script: str) -> str:
     """
     from app.core.config import STEPCA_ROOT_FINGERPRINT
 
-    fp = _normalizar_fingerprint(STEPCA_ROOT_FINGERPRINT or "")
+    fp = _normalize_fingerprint(STEPCA_ROOT_FINGERPRINT or "")
     if not fp:
         return script
 
@@ -423,23 +423,23 @@ def _injetar_fingerprint_da_ca(script: str) -> str:
         )
         return script
 
-    if _LINHA_PIN_CA not in script:
+    if _CA_PIN_LINE not in script:
         logger.error(
             "install.sh nao contem a linha de pinning esperada — servido sem "
             "fingerprint. Verifique static/install.sh.",
         )
         return script
 
-    return script.replace(_LINHA_PIN_CA, f'CA_SHA256_PIN="${{ATLANS_CA_SHA256:-{fp}}}"', 1)
+    return script.replace(_CA_PIN_LINE, f'CA_SHA256_PIN="${{ATLANS_CA_SHA256:-{fp}}}"', 1)
 
 
 # The addresses the served install.sh carries as defaults. One line for each
 # (`SERVER=""` etc., at the start of the line) is replaced by this
 # installation's value; the file in the repository points to none.
-_ENDERECO_SEGURO = re.compile(r"(?:https?|wss?)://[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~/-]*)?")
+_SAFE_ADDRESS = re.compile(r"(?:https?|wss?)://[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~/-]*)?")
 
 
-def _injetar_enderecos(script: str) -> str:
+def _inject_addresses(script: str) -> str:
     """Fills SERVER, PUBLIC_SERVER and REPO_URL with this server's config.
 
     Only a value that is a plain URL gets in (scheme, host, port and path, no
@@ -462,7 +462,7 @@ def _injetar_enderecos(script: str) -> str:
     ):
         if not valor:
             continue
-        if not _ENDERECO_SEGURO.fullmatch(valor):
+        if not _SAFE_ADDRESS.fullmatch(valor):
             logger.error("install.sh: %s com valor fora do formato de URL — servido sem padrao.", var)
             continue
         script, n = re.subn(rf'^{var}=""$', f'{var}="{valor}"', script, count=1, flags=re.MULTILINE)
@@ -500,8 +500,8 @@ async def install_script(request: Request):
     except FileNotFoundError:
         raise HTTPException(status_code=503, detail="install.sh indisponivel no servidor.")
 
-    content = _injetar_fingerprint_da_ca(content)
-    content = _injetar_enderecos(content)
+    content = _inject_ca_fingerprint(content)
+    content = _inject_addresses(content)
 
     return Response(
         content=content,
@@ -530,7 +530,7 @@ _DESKTOP_CACHE_TTL = 300  # segundos
 _desktop_cache: dict = {"em": 0.0, "dados": None}
 
 
-async def _ultima_release_desktop() -> dict | None:
+async def _latest_desktop_release() -> dict | None:
     """Metadata of the latest Windows installer, or None if there is none.
 
     Never raises: the absence of a release is a normal state (none published
@@ -586,7 +586,7 @@ async def _ultima_release_desktop() -> dict | None:
 @limiter.limit("60/minute")
 async def desktop_latest(request: Request):
     """Installer version, size and URL — for the UI to show before the click."""
-    dados = await _ultima_release_desktop()
+    dados = await _latest_desktop_release()
     if not dados:
         raise HTTPException(
             status_code=404,
@@ -601,7 +601,7 @@ async def desktop_install(request: Request):
     """Redirects to the `.exe` installer of the latest `desktop/v*` release."""
     from fastapi.responses import RedirectResponse
 
-    dados = await _ultima_release_desktop()
+    dados = await _latest_desktop_release()
     if not dados or not dados.get("url"):
         raise HTTPException(
             status_code=404,
@@ -619,11 +619,11 @@ async def my_agents(
 ):
     """Returns default + dedicated executors assigned via the user's workspaces."""
     executores = await user_executor_service.get_user_accessible_agents(db, current_user.id_hash)
-    online, capacidades = await _estado_ao_vivo([ag["id_hash"] for ag in executores])
+    online, capacities = await _live_state([ag["id_hash"] for ag in executores])
     for ag in executores:
         ag["online"] = online[ag["id_hash"]]
-        ag["capacity"] = capacidades.get(ag["id_hash"])
-        ag["connected_at"] = _conectado_desde(ag["online"], ag.get("last_seen_at"))
+        ag["capacity"] = capacities.get(ag["id_hash"])
+        ag["connected_at"] = _connected_since(ag["online"], ag.get("last_seen_at"))
     return executores
 
 
@@ -647,9 +647,9 @@ async def list_agents(
     """Lists all executors."""
     executores = await executor_service.list_agents(db)
     filtered = [ag for ag in executores if not executor_type or ag.executor_type == executor_type]
-    online, capacidades = await _estado_ao_vivo([ag.id_hash for ag in filtered])
+    online, capacities = await _live_state([ag.id_hash for ag in filtered])
     return [
-        _serialize_agent(ag, online=online[ag.id_hash], capacidade=capacidades.get(ag.id_hash))
+        _serialize_agent(ag, online=online[ag.id_hash], capacidade=capacities.get(ag.id_hash))
         for ag in filtered
     ]
 
@@ -821,7 +821,7 @@ async def revoke_executor(
     current_user=Depends(get_current_user),
     ag=Depends(get_agent_or_404),
 ):
-    _assert_pode_gerenciar_executor(current_user, ag)
+    _assert_can_manage_executor(current_user, ag)
     # Execution policy (spec §4.4): a revoked executor drops out of the tiers; if
     # that would empty someone's main tier, 409 — unless `force`. The
     # steps (tiers, status, cert, notice to owners, session dropped) are those of
@@ -831,7 +831,7 @@ async def revoke_executor(
         aviso="Executor revogado pelo administrador.", fechamento="Executor revogado.",
     )
     await db.commit()
-    await executor_service.concluir_revogacoes([revogacao])
+    await executor_service.complete_revocations([revogacao])
 
     logger.info("Usuário '%s' revogou executor '%s'.", current_user.username, executor_id)
 
@@ -850,7 +850,7 @@ async def delete_agent(
     Fills deleted_at and hides the executor from listings.
     Only executors with status='revoked' can be removed.
     """
-    _assert_pode_gerenciar_executor(current_user, ag)
+    _assert_can_manage_executor(current_user, ag)
     from app.services import workspace_executor_service as politica
     afetados = await politica.detach_executor(
         db, executor_id, force=force, actor_id=current_user.id_hash, reason="deleted",
@@ -859,7 +859,7 @@ async def delete_agent(
         await executor_service.delete_agent(db, executor_id)
     except ValueError:
         raise HTTPException(status_code=409, detail="Executor precisa estar revogado para ser removido.")
-    executor_service.avisar_donos_de_niveis_esvaziados(afetados, executor_name=getattr(ag, "name", "?"))
+    executor_service.notify_owners_of_emptied_tiers(afetados, executor_name=getattr(ag, "name", "?"))
 
     logger.info("Usuário '%s' removeu executor '%s' (soft-delete).", current_user.username, executor_id)
 
@@ -882,7 +882,7 @@ async def set_default(
         )
     except ValueError:
         raise HTTPException(status_code=422, detail="Não foi possível definir o executor padrão.")
-    executor_service.avisar_donos_de_niveis_esvaziados(afetados, executor_name=getattr(ag, "name", "?"))
+    executor_service.notify_owners_of_emptied_tiers(afetados, executor_name=getattr(ag, "name", "?"))
     logger.info("Admin '%s' adicionou executor '%s' ao pool padrão.", current_user.username, payload.executor_id)
     return ExecutorOut.from_model(ag).model_dump()
 
@@ -901,7 +901,7 @@ async def unset_default(
     return ExecutorOut.from_model(ag).model_dump()
 
 
-# ── Enrollment + Renewal + Revogacao (mTLS) ──────────────────────────────────
+# ── Enrollment + Renewal + Revocation (mTLS) ──────────────────────────────────
 
 @router.post("/{executor_id}/enroll-otp",
              response_model=EnrollmentOTPResponse,
@@ -924,7 +924,7 @@ async def admin_create_enrollment_otp(
     The plaintext appears ONLY ONCE — store it in a secure channel
     (1Password, Signal). Afterwards only the HMAC stays in the DB.
     """
-    _assert_pode_gerenciar_executor(current_user, ag)
+    _assert_can_manage_executor(current_user, ag)
     otp, expires_at = await executor_enrollment_service.create_enrollment_otp(
         db, executor_id, created_by=current_user.id_hash,
     )
@@ -1016,7 +1016,7 @@ async def agent_enroll(
     )
 
 
-def _chave_do_executor_no_mtls(request: Request) -> str:
+def _executor_key_from_mtls(request: Request) -> str:
     """Rate-limit bucket per executor (the cert CN that Traefik forwards),
     not per IP: a fleet behind the same NAT, enrolled on the same day, renews
     on the same day. The limit is only checked after the route's dependencies, so
@@ -1031,7 +1031,7 @@ def _chave_do_executor_no_mtls(request: Request) -> str:
 # A legitimate executor renews every ~83 days and tries at most once per hour.
 # Without a limit, an authenticated executor made step-ca sign nonstop, and each
 # renewal leaves the previous serial in the Redis blacklist for up to 90 days.
-@limiter.limit("6/hour;30/day", key_func=_chave_do_executor_no_mtls)
+@limiter.limit("6/hour;30/day", key_func=_executor_key_from_mtls)
 async def agent_renew_cert(
     request: Request,
     payload: RenewRequest,
@@ -1114,19 +1114,19 @@ async def admin_revoke_cert(
         raise HTTPException(status_code=404, detail="Executor sem cert ativo.")
 
     # Only the cert: status and policy tiers stay. The rest is that of every
-    # revocation (`executor_service.concluir_revogacoes`), after the commit:
+    # revocation (`executor_service.complete_revocations`), after the commit:
     # blacklist, `control: revoked` and the 4403 close — which relays through Redis
     # when the WS is in another worker, and is what makes the executor stop. Without
     # the session's listener subscribed (Redis restarting), the session watchdog
     # drops it when it sees the cert voided in the database.
-    revogacao = executor_service.Revogacao(
+    revogacao = executor_service.Revocation(
         executor_id=executor_id, nome=ag.name, serial=ag.cert_serial,
         serial_expira_em=ag.cert_expires_at,
         aviso="Cert revogado pelo administrador.", fechamento="Cert revogado.",
     )
     ag.cert_serial = None
     await db.commit()
-    await executor_service.concluir_revogacoes([revogacao])
+    await executor_service.complete_revocations([revogacao])
 
     logger.info(
         "Admin '%s' revogou cert serial '%s' do executor '%s'.",

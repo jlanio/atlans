@@ -16,8 +16,8 @@ import type { ExtensaoDoWeb } from "@/extensoes"
  * route would be a dead end.
  */
 
-const roteador = vi.hoisted(() => ({ push: vi.fn() }))
-vi.mock("next/navigation", () => ({ useRouter: () => roteador }))
+const router = vi.hoisted(() => ({ push: vi.fn() }))
+vi.mock("next/navigation", () => ({ useRouter: () => router }))
 
 vi.mock("next-auth/react", () => ({
   useSession: () => ({ data: { user: { username: "fulana", email: "fulana@exemplo.com" } }, status: "authenticated" }),
@@ -48,7 +48,7 @@ const registro = vi.hoisted(() => ({ EXTENSOES: [] as ExtensaoDoWeb[] }))
 vi.mock("@/extensoes", async (original) => ({ ...(await original<typeof import("@/extensoes")>()), EXTENSOES: registro.EXTENSOES }))
 
 import UserSidebar from "@/app/components/sidebar/user-sidebar"
-import { CodigoFonteProvider } from "@/app/components/share/codigo-fonte"
+import { SourceCodeProvider } from "@/app/components/share/codigo-fonte"
 import { DropdownMenuItem } from "@/app/components/ui/dropdown-menu"
 import { signOut } from "next-auth/react"
 
@@ -114,23 +114,23 @@ describe("Menu do usuário — o que ele oferece", () => {
     // on already-unmounted nodes wouldn't measure anything.
     await abrirMenu()
     fireEvent.click(screen.getByRole("menuitem", { name: /Configurações/i }))
-    expect(roteador.push).not.toHaveBeenCalled()
+    expect(router.push).not.toHaveBeenCalled()
     expect(sidebar.setOpenMobile).not.toHaveBeenCalled()
   })
 
   it("NENHUM item do menu navega", async () => {
     await abrirMenu()
     fireEvent.click(screen.getByRole("menuitem", { name: /Tema/i }))
-    expect(roteador.push).not.toHaveBeenCalled()
+    expect(router.push).not.toHaveBeenCalled()
   })
 
   it("com CODIGO_FONTE_URL, o código-fonte da instalação entra como link que abre fora (AGPL §13)", async () => {
     // It isn't a route of this application: it's an outbound <a>, in another
     // tab. Without the variable (the other tests), the item doesn't exist.
     render(
-      <CodigoFonteProvider url="https://codigo.example.org/fulana/atlans">
+      <SourceCodeProvider url="https://codigo.example.org/fulana/atlans">
         <UserSidebar />
-      </CodigoFonteProvider>,
+      </SourceCodeProvider>,
     )
     fireEvent.keyDown(screen.getByRole("button"), { key: "Enter" })
     await screen.findByRole("menu")
@@ -141,7 +141,7 @@ describe("Menu do usuário — o que ele oferece", () => {
     expect(link.tagName).toBe("A")
     expect(link.getAttribute("href")).toBe("https://codigo.example.org/fulana/atlans")
     expect(link.getAttribute("target")).toBe("_blank")
-    expect(roteador.push).not.toHaveBeenCalled()
+    expect(router.push).not.toHaveBeenCalled()
   })
 })
 

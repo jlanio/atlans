@@ -14,9 +14,9 @@ describe("CabecalhoDoHistorico", () => {
     expect(screen.getByText("Execuções dos seus workflows · comparado com os 30 dias anteriores")).toBeInTheDocument()
 
     const grupo = screen.getByRole("group", { name: "Período" })
-    const botoes = Array.from(grupo.querySelectorAll("button"))
-    expect(botoes.map(b => b.textContent)).toEqual(["7 dias", "30 dias", "90 dias"])
-    expect(botoes.map(b => b.getAttribute("aria-pressed"))).toEqual(["false", "true", "false"])
+    const buttons = Array.from(grupo.querySelectorAll("button"))
+    expect(buttons.map(b => b.textContent)).toEqual(["7 dias", "30 dias", "90 dias"])
+    expect(buttons.map(b => b.getAttribute("aria-pressed"))).toEqual(["false", "true", "false"])
 
     fireEvent.click(screen.getByRole("button", { name: "Últimos 7 dias" }))
     expect(onPeriodo).toHaveBeenCalledWith(7)

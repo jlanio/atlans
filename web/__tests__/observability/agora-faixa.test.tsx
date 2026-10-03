@@ -66,10 +66,10 @@ describe("AgoraFaixa", () => {
   })
 
   it("'Ver em andamento' aciona o filtro", () => {
-    const onVer = vi.fn()
-    render(<AgoraFaixa now={now()} carregando={false} onVerEmAndamento={onVer} onAbrirPresa={() => {}} />)
+    const onView = vi.fn()
+    render(<AgoraFaixa now={now()} carregando={false} onVerEmAndamento={onView} onAbrirPresa={() => {}} />)
     fireEvent.click(screen.getByRole("button", { name: "Ver execuções em andamento" }))
-    expect(onVer).toHaveBeenCalledTimes(1)
+    expect(onView).toHaveBeenCalledTimes(1)
   })
 
   it("skeleton enquanto carrega sem dado; sem dado e sem carga, diz que não há leitura", () => {

@@ -32,11 +32,11 @@ import { app } from 'electron'
 /** Makes the app start without a window: only tray + executor spawn. */
 export const ARG_OCULTO = '--hidden'
 
-export function iniciadoOculto(): boolean {
+export function startedHidden(): boolean {
   return process.argv.includes(ARG_OCULTO)
 }
 
-export interface EstadoAutostart {
+export interface AutostartState {
   /** A entrada existe e o comando bate exatamente com o deste app. */
   ativo: boolean
   /**
@@ -60,7 +60,7 @@ export interface EstadoAutostart {
  * In dev the executable is `electron.exe` from node_modules, and without the
  * project path Windows would launch Electron's DEFAULT app on every logon — a
  * gray window that has nothing to do with Atlans, and that would outlive the
- * end of `npm run dev`. Same treatment as `registrarProtocolo` in deeplink.ts.
+ * end of `npm run dev`. Same treatment as `registerProtocol` in deeplink.ts.
  */
 function alvo(): { path: string; args: string[] } {
   if (process.defaultApp && process.argv.length >= 2) {
@@ -69,7 +69,7 @@ function alvo(): { path: string; args: string[] } {
   return { path: process.execPath, args: [ARG_OCULTO] }
 }
 
-function comandoDe({ path, args }: { path: string; args: string[] }): string {
+function commandOf({ path, args }: { path: string; args: string[] }): string {
   return [path.includes(' ') ? `"${path}"` : path, ...args].join(' ')
 }
 
@@ -83,12 +83,12 @@ function comandoDe({ path, args }: { path: string; args: string[] }): string {
  * serves windows, tray and IPC, for a value that only changes when the user
  * themselves clicks the tray menu or the checkbox in Settings.
  */
-let cache: EstadoAutostart | null = null
+let cache: AutostartState | null = null
 
 /** Actually reads from the registry and repopulates the cache. */
-export function lerAutostart(): EstadoAutostart {
+export function lerAutostart(): AutostartState {
   const a = alvo()
-  const base = { comando: comandoDe(a), dev: Boolean(process.defaultApp) }
+  const base = { comando: commandOf(a), dev: Boolean(process.defaultApp) }
   try {
     // The SAME path/args as the write — see pitfall 1 in the header.
     const s = app.getLoginItemSettings(a)
@@ -119,7 +119,7 @@ export function autostartAtivo(): boolean {
  * The re-read is also what repopulates the cache with the RE-READ value — this
  * is the only path through which autostart changes with the app open.
  */
-export function definirAutostart(ativar: boolean): EstadoAutostart {
+export function definirAutostart(ativar: boolean): AutostartState {
   const a = alvo()
   try {
     app.setLoginItemSettings({ openAtLogin: ativar, path: a.path, args: a.args })

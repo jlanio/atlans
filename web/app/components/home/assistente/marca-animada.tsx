@@ -13,8 +13,8 @@
 // `prefers-reduced-motion`: the whole logo, still. The colors come from
 // `var(--primary)` — the Home's terracotta, not a literal.
 
-const ARESTAS = ["M12 4.5L19 17", "M19 17L5 17", "M5 17L12 4.5"] as const
-const NOS = [
+const EDGES = ["M12 4.5L19 17", "M19 17L5 17", "M5 17L12 4.5"] as const
+const NODES = [
   { cx: 12, cy: 4.5 },
   { cx: 19, cy: 17 },
   { cx: 5, cy: 17 },
@@ -31,9 +31,9 @@ export default function MarcaAnimada({ size = 14, className }: { size?: number; 
       focusable="false"
     >
       <g className="respira">
-        {ARESTAS.map((d) => <path key={`trilho-${d}`} className="trilho" d={d} />)}
-        {ARESTAS.map((d, i) => <path key={`traco-${d}`} className={`traco a${i + 1}`} d={d} />)}
-        {NOS.map((no, i) => <circle key={`no-${i}`} className={`no n${i + 1}`} cx={no.cx} cy={no.cy} r={2.3} />)}
+        {EDGES.map((d) => <path key={`trilho-${d}`} className="trilho" d={d} />)}
+        {EDGES.map((d, i) => <path key={`traco-${d}`} className={`traco a${i + 1}`} d={d} />)}
+        {NODES.map((no, i) => <circle key={`no-${i}`} className={`no n${i + 1}`} cx={no.cx} cy={no.cy} r={2.3} />)}
       </g>
     </svg>
   )

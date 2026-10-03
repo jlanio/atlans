@@ -34,28 +34,28 @@ BACKENDS = ("resend", "smtp", "log")
 # 30 s for the whole response (`flow/nodes/outputs/send_email.py`): with 30 s
 # per operation, a slow server blew the node's deadline with the email still
 # going out, and the node failed with the email sent.
-TEMPO_LIMITE_SMTP_S = 10
+SMTP_TIMEOUT_S = 10
 
 # What, in a recipient, would make it more than one: the comma separates
 # addresses, `:` and `;` open and close a group, and a line break would inject a header.
-_SEPARADORES = frozenset(",;:\r\n")
+_SEPARATORS = frozenset(",;:\r\n")
 
 
-def endereco(destinatario: str) -> str:
+def endereco(recipient: str) -> str:
     """The address of ONE recipient (`ana@x.org` or `Ana <ana@x.org>`).
 
     Raises ValueError if the item is not exactly one address. This is what
     enforces the SendEmail node's recipient ceiling: without it, an item with
     commas became several `RCPT TO` in SMTP, and the list of 50 counted as one.
     """
-    item = destinatario.strip()
-    if not item or any(c in _SEPARADORES for c in item):
-        raise ValueError(f"Destinatário inválido: {destinatario!r} (um endereço por item).")
+    item = recipient.strip()
+    if not item or any(c in _SEPARATORS for c in item):
+        raise ValueError(f"Destinatário inválido: {recipient!r} (um endereço por item).")
     pares = getaddresses([item])
     _, puro = pares[0] if len(pares) == 1 else ("", "")
     local, arroba, dominio = puro.rpartition("@")
     if not (arroba and local and dominio) or any(c.isspace() for c in puro):
-        raise ValueError(f"Destinatário inválido: {destinatario!r} (um endereço por item).")
+        raise ValueError(f"Destinatário inválido: {recipient!r} (um endereço por item).")
     return puro
 
 
@@ -79,42 +79,42 @@ def ativo() -> bool:
     return backend() != "log"
 
 
-def enviar(para: list[str], assunto: str, html: str) -> str | None:
+def enviar(para: list[str], subject: str, html: str) -> str | None:
     """Sends the email through the transport in use and returns the message id.
 
     Raises on any transport failure, and also in `log`: the caller decides
     what to do when there is no transport (`ativo()`).
     """
     qual = backend()
-    for destinatario in para:
-        endereco(destinatario)
+    for recipient in para:
+        endereco(recipient)
     if qual == "resend":
-        return _enviar_resend(para, assunto, html)
+        return _send_resend(para, subject, html)
     if qual == "smtp":
-        return _enviar_smtp(para, assunto, html)
+        return _send_smtp(para, subject, html)
     raise RuntimeError("Nenhum transporte de e-mail configurado (EMAIL_BACKEND, RESEND_API_KEY ou SMTP_HOST).")
 
 
-def _enviar_resend(para: list[str], assunto: str, html: str) -> str | None:
+def _send_resend(para: list[str], subject: str, html: str) -> str | None:
     import resend
 
     resend.api_key = config.RESEND_API_KEY
     resultado = resend.Emails.send({
         "from": config.EMAIL_FROM,
         "to": para,
-        "subject": assunto,
+        "subject": subject,
         "html": html,
     })
     return resultado.get("id") if isinstance(resultado, dict) else None
 
 
-def _enviar_smtp(para: list[str], assunto: str, html: str) -> str | None:
+def _send_smtp(para: list[str], subject: str, html: str) -> str | None:
     # EmailMessage rejects line breaks in headers (ValueError): a subject coming
     # from a workflow injects no header at all.
     mensagem = EmailMessage()
     mensagem["From"] = config.EMAIL_FROM
     mensagem["To"] = ", ".join(para)
-    mensagem["Subject"] = assunto
+    mensagem["Subject"] = subject
     mensagem["Date"] = formatdate(localtime=False)
     dominio = parseaddr(config.EMAIL_FROM)[1].rpartition("@")[2] or None
     mensagem["Message-ID"] = make_msgid(domain=dominio)
@@ -123,10 +123,10 @@ def _enviar_smtp(para: list[str], assunto: str, html: str) -> str | None:
     contexto = ssl.create_default_context()
     if config.SMTP_SEGURANCA == "ssl":
         conexao = smtplib.SMTP_SSL(
-            config.SMTP_HOST, config.SMTP_PORT, context=contexto, timeout=TEMPO_LIMITE_SMTP_S,
+            config.SMTP_HOST, config.SMTP_PORT, context=contexto, timeout=SMTP_TIMEOUT_S,
         )
     else:
-        conexao = smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=TEMPO_LIMITE_SMTP_S)
+        conexao = smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=SMTP_TIMEOUT_S)
     with conexao as smtp:
         if config.SMTP_SEGURANCA == "starttls":
             smtp.starttls(context=contexto)

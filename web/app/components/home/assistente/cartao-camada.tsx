@@ -1,7 +1,7 @@
 "use client"
 import { TbAlertTriangle, TbMap2 } from "react-icons/tb"
-import type { CamadaDoAssistente } from "@/app/components/home/assistente/quadros"
-import { useTextos } from "../i18n"
+import type { AssistantLayer } from "@/app/components/home/assistente/quadros"
+import { useTexts } from "../i18n"
 
 /**
  * The inline mention of a layer the conversation put (or tried to put) on the
@@ -10,8 +10,8 @@ import { useTextos } from "../i18n"
  * Pops in on arrival (`home-pop`, globals.css) — on replay they all arrive
  * together, and it is brief.
  */
-export default function CartaoCamada({ camada }: { camada: CamadaDoAssistente }) {
-  const t = useTextos().assistente.camada
+export default function CartaoCamada({ camada }: { camada: AssistantLayer }) {
+  const t = useTexts().assistente.camada
   const nome = camada.nome?.trim() || t.camada
 
   if (!camada.available) {

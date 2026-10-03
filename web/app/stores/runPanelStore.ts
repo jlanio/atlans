@@ -8,7 +8,7 @@ const DEFAULT_HEIGHT = 320
 const MIN_HEIGHT = 160
 
 /** Fraction of the window the panel may take when it OPENS, without the user asking. */
-const FRACAO_INICIAL = 0.45
+const INITIAL_RATIO = 0.45
 
 /**
  * Opening height, limited by the window.
@@ -23,9 +23,9 @@ const FRACAO_INICIAL = 0.45
  * import, which also runs on the server, and reading `window` there would break
  * SSR (besides freezing the height of the first render).
  */
-function alturaDeAbertura(atual: number): number {
+function openingHeight(atual: number): number {
   if (typeof window === "undefined") return atual
-  return Math.max(MIN_HEIGHT, Math.min(atual, Math.round(window.innerHeight * FRACAO_INICIAL)))
+  return Math.max(MIN_HEIGHT, Math.min(atual, Math.round(window.innerHeight * INITIAL_RATIO)))
 }
 
 /** UI state of the execution panel.
@@ -67,8 +67,8 @@ export const useRunPanelStore = create<RunPanelState & RunPanelActions>((set) =>
 
   // The clamp goes on OPEN, not on `setHeight`: whoever dragged the handle chose
   // that height and may exceed the fraction as they please.
-  setOpen: (v) => set(state => v ? { open: true, height: alturaDeAbertura(state.height) } : { open: false }),
-  openAt: (tab) => set(state => ({ open: true, tab, height: alturaDeAbertura(state.height) })),
+  setOpen: (v) => set(state => v ? { open: true, height: openingHeight(state.height) } : { open: false }),
+  openAt: (tab) => set(state => ({ open: true, tab, height: openingHeight(state.height) })),
   setHeight: (h) => set({ height: Math.max(MIN_HEIGHT, h) }),
   setTab: (tab) => set({ tab }),
   setSearch: (search) => set({ search }),

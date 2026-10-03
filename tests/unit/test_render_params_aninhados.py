@@ -14,7 +14,7 @@ import pytest
 from flow.executor.rendering import render_node_parameters
 
 
-class NoFalso:
+class FakeNode:
     def __init__(self, parameters):
         self.parameters = parameters
 
@@ -27,12 +27,12 @@ def _render(parameters, named=None):
     }
     context = {"inputs": {}, "nodes": {}, "named": named,
                "now": None, "uuid": None, "env": {}}
-    return render_node_parameters(NoFalso(parameters), "n1", named, context)
+    return render_node_parameters(FakeNode(parameters), "n1", named, context)
 
 
 # ── The case from the request: queryParams ──────────────────────────────────
 
-def test_expressao_no_valor_do_queryparams_e_resolvida():
+def test_expression_in_queryparams_value_is_resolved():
     saida = _render({
         "query": "SELECT * FROM imoveis WHERE bairro = :bairro",
         "queryParams": {"bairro": "{{ $Filtro.bairro }}"},
@@ -40,12 +40,12 @@ def test_expressao_no_valor_do_queryparams_e_resolvida():
     assert saida["queryParams"] == {"bairro": "Centro"}
 
 
-def test_alias_sem_chaves_tambem_vale_no_queryparams():
+def test_alias_without_braces_also_works_in_queryparams():
     saida = _render({"queryParams": {"b": "$Filtro.bairro"}})
     assert saida["queryParams"] == {"b": "Centro"}
 
 
-def test_string_de_topo_continua_funcionando():
+def test_top_level_string_still_works():
     """The regression I would fear most: the old path had to stay the same."""
     saida = _render({"query": "SELECT * FROM t LIMIT {{ $Filtro.limite }}"})
     assert saida["query"] == "SELECT * FROM t LIMIT 50"
@@ -64,19 +64,19 @@ def test_string_de_topo_continua_funcionando():
     ("{{ $Filtro.nada }}",   None,     type(None)),
     ("{{ $Filtro.bairro }}", "Centro", str),
 ])
-def test_tipo_e_preservado_quando_o_valor_e_a_expressao_inteira(expressao, esperado, tipo):
+def test_type_is_preserved_when_the_value_is_the_whole_expression(expressao, esperado, tipo):
     saida = _render({"queryParams": {"v": expressao}})
     assert saida["queryParams"]["v"] == esperado
     assert isinstance(saida["queryParams"]["v"], tipo)
 
 
-def test_template_misto_continua_texto():
+def test_mixed_template_stays_text():
     """`ano-{{ x }}` asks for concatenation — text is the right result."""
     saida = _render({"queryParams": {"v": "ano-{{ $Filtro.limite }}"}})
     assert saida["queryParams"]["v"] == "ano-50"
 
 
-def test_topo_nao_muda_de_tipo():
+def test_top_level_does_not_change_type():
     """At the top level the old behavior is preserved on purpose: some nodes
     call `.strip()` on the parameter, and changing the type there would mix a fix
     with breakage."""
@@ -86,23 +86,23 @@ def test_topo_nao_muda_de_tipo():
 
 # ── Estrutura ───────────────────────────────────────────────────────────────
 
-def test_desce_por_lista_e_dicionario_aninhados():
+def test_descends_into_nested_list_and_dictionary():
     saida = _render({"conf": {"filtros": [{"campo": "{{ $Filtro.bairro }}"}]}})
     assert saida["conf"]["filtros"][0]["campo"] == "Centro"
 
 
-def test_chave_do_dicionario_nao_e_renderizada():
+def test_dictionary_key_is_not_rendered():
     """The key is the name of the `:placeholder` and must match the SQL."""
     saida = _render({"queryParams": {"{{ $Filtro.bairro }}": "x"}})
     assert list(saida["queryParams"]) == ["{{ $Filtro.bairro }}"]
 
 
-def test_valor_sem_expressao_passa_intacto():
+def test_value_without_expression_passes_intact():
     saida = _render({"queryParams": {"a": "texto", "b": 7, "c": None}})
     assert saida["queryParams"] == {"a": "texto", "b": 7, "c": None}
 
 
-def test_erro_aponta_o_caminho_dentro_da_estrutura():
+def test_error_points_to_the_path_inside_the_structure():
     with pytest.raises(ValueError) as exc:
         _render({"queryParams": {"bairro": "{{ $Filtro.inexistente }}"}})
     # Without the path, the message would say only "queryParams" and the user would
@@ -113,7 +113,7 @@ def test_erro_aponta_o_caminho_dentro_da_estrutura():
 # ── What the server injects from the credential is not a template ────────────
 
 @pytest.mark.parametrize("senha", ["p@ss{{w0rd}}", "abc{%x%}def", "x$Filtro.bairro"])
-def test_a_credencial_injetada_passa_intacta_e_sem_erro(senha):
+def test_the_injected_credential_passes_intact_and_without_error(senha):
     # Rendered, the password would change silently — or the rendering failure would
     # repeat it in the error message, which goes to the screen, the database and the log.
     parametros = {

@@ -6,11 +6,11 @@
 // that the Painel no longer showed.
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import type { JobHistorico } from '../../main/state/store.js'
+import type { HistoryJob } from '../../main/state/store.js'
 import type { Snapshot } from '../../shared/events.js'
 import { Execucoes } from './Execucoes.js'
 
-function concluido(duration_s: number, i: number): JobHistorico {
+function concluido(duration_s: number, i: number): HistoryJob {
   return { job_id: `job-${i}`, run_id: null, status: 'ok', duration_s, ts: 1_700_000_000 + i }
 }
 

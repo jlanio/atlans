@@ -18,8 +18,8 @@ import { ExecutorTypeBadge } from "@/app/components/executor-type-badge"
 import { useFetchData } from "@/app/hooks/useFetchData"
 import { SheetSection } from "./section-shell"
 import {
-  capacidadeCheia, classeDoModo, contarOnline, descreverCapacidade, descreverPolitica, politicaEmAlerta,
-  rotuloDoModo, rotuloDoStatus, saudeDoPool, semSinal, type Capacidade,
+  capacityFull, modeClass, countOnline, describeCapacity, describePolicy, politicaEmAlerta,
+  modeLabel, rotuloDoStatus, poolHealth, noSignal, type Capacidade,
 } from "../politica"
 
 interface Props {
@@ -72,10 +72,10 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
   const politica = data?.politica ?? null
   const executores = useMemo<IExecutor[]>(() => data?.executores ?? [], [data])
   /** The policy a write returned (or the re-read): replaces only that. */
-  const setPolitica = (nova: IWorkspacePolicy) => setData(atual => atual && { ...atual, politica: nova })
-  const [operacao, setOperacao] = useState<Operacao | null>(null)
-  const [confirmarPool, setConfirmarPool] = useState(false)
-  const [confirmarRemocao, setConfirmarRemocao] = useState<IPolicyMember | null>(null)
+  const setPolicy = (nova: IWorkspacePolicy) => setData(atual => atual && { ...atual, politica: nova })
+  const [operacao, setOperation] = useState<Operacao | null>(null)
+  const [confirmPool, setConfirmPool] = useState(false)
+  const [confirmRemoval, setConfirmRemoval] = useState<IPolicyMember | null>(null)
 
   const alerta = politica ? politicaEmAlerta(politica) : false
   useEffect(() => {
@@ -83,10 +83,10 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
   }, [alerta, loading, error, onAlertChange])
 
   const emVigor = politica?.policy_routing_enabled === true
-  const sufixoPrevia = emVigor ? "" : " (vale quando o roteamento por política for ativado)"
+  const previewSuffix = emVigor ? "" : " (vale quando o roteamento por política for ativado)"
 
   /** Re-reads only the policy — DELETE answers 204, without the recomputed policy. */
-  async function relerPolitica(): Promise<IWorkspacePolicy | null> {
+  async function reloadPolicy(): Promise<IWorkspacePolicy | null> {
     const res = await GisFlowService.getWorkspacePolicy(workspaceId)
     if (res.error || !res.data) {
       // The removal succeeded; only the re-read failed. The success toast already
@@ -94,20 +94,20 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
       createToast.error("Não foi possível reler a política", "Clique em Atualizar.")
       return null
     }
-    setPolitica(res.data)
+    setPolicy(res.data)
     return res.data
   }
 
   async function incluir(executor: IExecutor, tier: 1 | 2) {
     if (operacao) return
-    setOperacao(`incluir:${executor.id_hash}`)
+    setOperation(`incluir:${executor.id_hash}`)
     const res = await GisFlowService.addWorkspacePolicyMember(workspaceId, executor.id_hash, tier)
-    setOperacao(null)
+    setOperation(null)
     if (res.error || !res.data) {
       createToast.error("Erro ao incluir o executor", res.error?.message)
       return
     }
-    setPolitica(res.data)
+    setPolicy(res.data)
     createToast.success(
       tier === 1
         ? `${executor.name} incluído entre os principais.`
@@ -115,87 +115,87 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
     )
   }
 
-  function pedirRemocao(membro: IPolicyMember) {
+  function requestRemoval(membro: IPolicyMember) {
     if (!politica) return
-    const ultimoPrincipal = membro.tier === 1 && politica.primary.length === 1
+    const lastPrimary = membro.tier === 1 && politica.primary.length === 1
     // The last primary takes down the fallback and returns the workspace to the
     // pool: it is the sensitive direction (nothing → everything on shared machines).
-    if (ultimoPrincipal) { setConfirmarRemocao(membro); return }
+    if (lastPrimary) { setConfirmRemoval(membro); return }
     remover(membro)
   }
 
   async function remover(membro: IPolicyMember) {
     if (operacao || !politica) return
-    setConfirmarRemocao(null)
-    const eraUltimoPrincipal = membro.tier === 1 && politica.primary.length === 1
-    const tinhaReserva = politica.fallback.length > 0
-    setOperacao(`remover:${membro.id_hash}`)
+    setConfirmRemoval(null)
+    const wasLastPrimary = membro.tier === 1 && politica.primary.length === 1
+    const hadFallback = politica.fallback.length > 0
+    setOperation(`remover:${membro.id_hash}`)
     const res = await GisFlowService.removeWorkspacePolicyMember(workspaceId, membro.id_hash)
     if (res.error) {
-      setOperacao(null)
+      setOperation(null)
       createToast.error("Erro ao remover o executor", res.error.message)
       return
     }
     // Emptying the primary takes the fallback down with it (spec §4.3): only the
     // re-read shows what is left.
-    await relerPolitica()
-    setOperacao(null)
-    if (eraUltimoPrincipal) {
+    await reloadPolicy()
+    setOperation(null)
+    if (wasLastPrimary) {
       createToast.success(
         `${membro.name} removido. O workspace voltou a usar o pool compartilhado.`
-        + (tinhaReserva ? " Os executores de reserva também saíram." : ""),
+        + (hadFallback ? " Os executores de reserva também saíram." : ""),
       )
     } else {
       createToast.success(`${membro.name} removido da política.`)
     }
   }
 
-  async function definirTerminal(terminal: PolicyTerminal, confirmado = false) {
+  async function applyTerminal(terminal: PolicyTerminal, confirmado = false) {
     if (!politica || operacao) return
     if (terminal === politica.effective_terminal) return
-    if (terminal === "pool" && !confirmado) { setConfirmarPool(true); return }
-    setConfirmarPool(false)
-    setOperacao("terminal")
+    if (terminal === "pool" && !confirmado) { setConfirmPool(true); return }
+    setConfirmPool(false)
+    setOperation("terminal")
     const res = await GisFlowService.setWorkspaceFallback(workspaceId, terminal)
-    setOperacao(null)
+    setOperation(null)
     if (res.error || !res.data) {
       createToast.error("Erro ao alterar o último recurso", res.error?.message)
       return
     }
-    setPolitica(res.data)
+    setPolicy(res.data)
     createToast.success(
       (terminal === "pool"
         ? "O pool compartilhado passa a ser o último recurso."
         : "Sem último recurso: a execução falha quando nenhum executor da política estiver disponível.")
-      + sufixoPrevia,
+      + previewSuffix,
     )
   }
 
-  const naPolitica = new Set(
+  const inPolicy = new Set(
     [...(politica?.primary ?? []), ...(politica?.fallback ?? [])].map(m => m.id_hash),
   )
   // Candidates: MY active dedicated executors that are not in any tier yet.
   // The pool is not a tier (spec Q3): `is_default` is left out.
   const dedicados = executores.filter(e => !e.is_default)
-  const candidatos = dedicados.filter(e => e.status === "active" && !naPolitica.has(e.id_hash))
-  const temPrincipal = (politica?.primary.length ?? 0) > 0
-  const sobPiso = politica?.isolation_floor === "no_pool"
+  const candidatos = dedicados.filter(e => e.status === "active" && !inPolicy.has(e.id_hash))
+  const hasPrimary = (politica?.primary.length ?? 0) > 0
+  const underFloor = politica?.isolation_floor === "no_pool"
   const ocupado = operacao !== null
 
   // Name of the legacy pointer, so the preview says what holds TODAY. In quotes:
   // an executor named "executor" left the sentence meaningless.
-  const nomeLegado = politica?.target_executor_id
+  const legacyName = politica?.target_executor_id
     ? executores.find(e => e.id_hash === politica.target_executor_id)?.name
     : undefined
   const legado = politica?.target_executor_id
-    ? (nomeLegado
-      ? `o executor «${nomeLegado}»`
+    ? (legacyName
+      ? `o executor «${legacyName}»`
       : "um executor que não está mais na sua lista (removido ou sem acesso)")
     : "o pool compartilhado"
 
   // Shared with no candidate: a single message, instead of five disabled
   // blocks. The whole editor screen presupposes a dedicated executor.
-  const semNadaParaEditar = politica?.mode === "pool" && candidatos.length === 0 && !sobPiso
+  const nothingToEdit = politica?.mode === "pool" && candidatos.length === 0 && !underFloor
 
   return (
     <>
@@ -280,17 +280,17 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                 <Badge
                   variant="outline"
-                  className={cn("gap-1 px-1.5 py-0 text-[10px]", classeDoModo(politica.mode), !emVigor && "border-dashed")}
+                  className={cn("gap-1 px-1.5 py-0 text-[10px]", modeClass(politica.mode), !emVigor && "border-dashed")}
                 >
-                  {sobPiso && <TbLock size={10} aria-hidden="true" />}
-                  {rotuloDoModo(politica.mode)}{!emVigor && " · prévia"}
+                  {underFloor && <TbLock size={10} aria-hidden="true" />}
+                  {modeLabel(politica.mode)}{!emVigor && " · prévia"}
                 </Badge>
                 <span className="text-xs text-muted-foreground">
                   {politica.mode === "pool"
-                    ? (saudeDoPool(politica) ?? "Pool compartilhado")
-                    : sobPiso && !temPrincipal
+                    ? (poolHealth(politica) ?? "Pool compartilhado")
+                    : underFloor && !hasPrimary
                       ? "Sem executor principal: nada roda até você incluir um"
-                      : descreverPolitica(politica)}
+                      : describePolicy(politica)}
                 </span>
               </div>
               {ocupado && (
@@ -298,7 +298,7 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
               )}
             </div>
 
-            {sobPiso && (
+            {underFloor && (
               <p className="flex items-start gap-2 text-xs text-muted-foreground">
                 <TbLock className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
                 <span>
@@ -309,7 +309,7 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
               </p>
             )}
 
-            {semNadaParaEditar ? (
+            {nothingToEdit ? (
               <div className="space-y-3 rounded-md border border-dashed px-4 py-4 text-sm">
                 <p>
                   Este workspace usa o pool compartilhado: qualquer executor compartilhado assume as
@@ -346,9 +346,9 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
                   canManage={canManage}
                   ocupado={ocupado}
                   operacao={operacao}
-                  onRemover={pedirRemocao}
+                  onRemover={requestRemoval}
                 />
-                {temPrincipal ? (
+                {hasPrimary ? (
                   <Nivel
                     titulo="Executores de reserva"
                     rotulo="reserva"
@@ -358,7 +358,7 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
                     canManage={canManage}
                     ocupado={ocupado}
                     operacao={operacao}
-                    onRemover={pedirRemocao}
+                    onRemover={requestRemoval}
                   />
                 ) : (
                   <p className="text-xs text-muted-foreground">
@@ -367,7 +367,7 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
                 )}
 
                 {/* ── Last resort ────────────────────────────────────────── */}
-                {temPrincipal && (
+                {hasPrimary && (
                   <div className="space-y-1.5">
                     <div className="flex items-baseline justify-between gap-2">
                       <h4
@@ -378,15 +378,15 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
                       </h4>
                       <span className="text-xs text-muted-foreground">Quando nenhum deles estiver disponível</span>
                     </div>
-                    <GrupoDeTerminal
+                    <TerminalGroup
                       labelledBy={`terminal-${workspaceId}`}
                       selecionado={politica.effective_terminal}
                       disabled={!canManage || ocupado}
-                      poolBloqueado={sobPiso}
-                      detalhePool={saudeDoPool(politica) ?? undefined}
-                      onEscolher={definirTerminal}
+                      poolBloqueado={underFloor}
+                      detalhePool={poolHealth(politica) ?? undefined}
+                      onEscolher={applyTerminal}
                     />
-                    {sobPiso && (
+                    {underFloor && (
                       <p className="text-xs text-amber-700 dark:text-amber-400">
                         Bloqueado pelo administrador da plataforma.
                       </p>
@@ -412,7 +412,7 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
                       <ul className="divide-y rounded-md border">
                         {candidatos.map(e => (
                           <li key={e.id_hash} className="flex items-center gap-2 px-3 py-1.5 text-sm">
-                            <PontoDePresenca online={e.online} />
+                            <PresenceDot online={e.online} />
                             <span className="min-w-0 flex-1 truncate">{e.name}</span>
                             <Carga capacidade={e.capacity} />
                             <Button
@@ -432,8 +432,8 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
                               variant="outline"
                               size="sm"
                               className="h-7 gap-1 text-xs"
-                              disabled={ocupado || !temPrincipal}
-                              title={!temPrincipal ? "Defina um executor principal antes." : undefined}
+                              disabled={ocupado || !hasPrimary}
+                              title={!hasPrimary ? "Defina um executor principal antes." : undefined}
                               onClick={() => incluir(e, 2)}
                               aria-label={`Incluir ${e.name} como reserva`}
                             >
@@ -453,7 +453,7 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
       </SheetSection>
 
       {/* Confirmation: "pool" changes where this workspace's DATA can run. */}
-      <Dialog open={confirmarPool} onOpenChange={setConfirmarPool}>
+      <Dialog open={confirmPool} onOpenChange={setConfirmPool}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Usar o pool como último recurso?</DialogTitle>
@@ -464,15 +464,15 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmarPool(false)}>Cancelar</Button>
-            <Button onClick={() => definirTerminal("pool", true)}>Permitir o pool</Button>
+            <Button variant="outline" onClick={() => setConfirmPool(false)}>Cancelar</Button>
+            <Button onClick={() => applyTerminal("pool", true)}>Permitir o pool</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Confirmation: the last primary takes the fallback with it and returns
           the workspace to the pool. */}
-      <Dialog open={confirmarRemocao !== null} onOpenChange={o => { if (!o) setConfirmarRemocao(null) }}>
+      <Dialog open={confirmRemoval !== null} onOpenChange={o => { if (!o) setConfirmRemoval(null) }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Remover o último executor principal?</DialogTitle>
@@ -486,8 +486,8 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmarRemocao(null)}>Cancelar</Button>
-            <Button variant="destructive" onClick={() => confirmarRemocao && remover(confirmarRemocao)}>
+            <Button variant="outline" onClick={() => setConfirmRemoval(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => confirmRemoval && remover(confirmRemoval)}>
               Remover
             </Button>
           </DialogFooter>
@@ -524,7 +524,7 @@ function Nivel({
             "text-xs tabular-nums",
             disponiveis === 0 ? "font-medium text-amber-700 dark:text-amber-400" : "text-muted-foreground",
           )}>
-            {contarOnline(disponiveis, membros.length, semSinal(membros))}
+            {countOnline(disponiveis, membros.length, noSignal(membros))}
           </span>
         )}
       </div>
@@ -539,7 +539,7 @@ function Nivel({
                 key={m.id_hash}
                 className={cn("flex items-center gap-2 px-3 py-1.5 text-sm", inativo && "bg-amber-500/5")}
               >
-                <PontoDePresenca online={m.online} />
+                <PresenceDot online={m.online} />
                 <span className="min-w-0 flex-1 truncate font-medium">{m.name}</span>
                 <Carga capacidade={m.capacity} />
                 <ExecutorTypeBadge type={m.executor_type} size="sm" />
@@ -580,7 +580,7 @@ function Nivel({
  * reconnecting). The third exists so as not to paint "offline" an executor
  * that simply could not be queried.
  */
-function PontoDePresenca({ online }: { online: boolean | null }) {
+function PresenceDot({ online }: { online: boolean | null }) {
   const texto = online === true ? "online" : online === false ? "offline" : "sem sinal"
   return (
     <span
@@ -603,9 +603,9 @@ function PontoDePresenca({ online }: { online: boolean | null }) {
  * when no capacity is published (offline, no signal, old version).
  */
 function Carga({ capacidade }: { capacidade: Capacidade }) {
-  const texto = descreverCapacidade(capacidade)
+  const texto = describeCapacity(capacidade)
   if (!texto) return null
-  const cheio = capacidadeCheia(capacidade)
+  const cheio = capacityFull(capacidade)
   return (
     <span
       className={cn(
@@ -619,7 +619,7 @@ function Carga({ capacidade }: { capacidade: Capacidade }) {
   )
 }
 
-const OPCOES: { valor: PolicyTerminal; titulo: string; descricao: string }[] = [
+const OPTIONS: { valor: PolicyTerminal; titulo: string; descricao: string }[] = [
   {
     valor: "fail",
     titulo: "Falhar a execução",
@@ -637,7 +637,7 @@ const OPCOES: { valor: PolicyTerminal; titulo: string; descricao: string }[] = [
  * Cards instead of dots because each option needs a sentence about its
  * consequence — but the keyboard has to work as in a radio.
  */
-function GrupoDeTerminal({
+function TerminalGroup({
   labelledBy, selecionado, disabled, poolBloqueado, detalhePool, onEscolher,
 }: {
   labelledBy: string
@@ -647,7 +647,7 @@ function GrupoDeTerminal({
   detalhePool?: string
   onEscolher: (t: PolicyTerminal) => void
 }) {
-  function habilitada(valor: PolicyTerminal) {
+  function isEnabled(valor: PolicyTerminal) {
     return !disabled && !(valor === "pool" && poolBloqueado)
   }
 
@@ -655,7 +655,7 @@ function GrupoDeTerminal({
     if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return
     e.preventDefault()
     const outra: PolicyTerminal = selecionado === "fail" ? "pool" : "fail"
-    if (habilitada(outra)) onEscolher(outra)
+    if (isEnabled(outra)) onEscolher(outra)
   }
 
   return (
@@ -665,7 +665,7 @@ function GrupoDeTerminal({
       onKeyDown={aoTeclar}
       className="grid gap-2 sm:grid-cols-2"
     >
-      {OPCOES.map(o => {
+      {OPTIONS.map(o => {
         const ativa = selecionado === o.valor
         const bloqueada = o.valor === "pool" && poolBloqueado
         return (
@@ -674,10 +674,10 @@ function GrupoDeTerminal({
             type="button"
             role="radio"
             aria-checked={ativa}
-            aria-disabled={!habilitada(o.valor) || undefined}
+            aria-disabled={!isEnabled(o.valor) || undefined}
             disabled={disabled}
             tabIndex={ativa ? 0 : -1}
-            onClick={() => habilitada(o.valor) && onEscolher(o.valor)}
+            onClick={() => isEnabled(o.valor) && onEscolher(o.valor)}
             className={cn(
               "flex flex-col items-start gap-0.5 rounded-md border px-3 py-2 text-left text-sm transition-colors",
               ativa ? "border-primary bg-primary/5" : "hover:bg-muted/60",

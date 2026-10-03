@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
-  ESCOPO_PADRAO, PERIODO_PADRAO, escreverEstado, lerEscopo, type EstadoDoEscopo,
+  DEFAULT_SCOPE, DEFAULT_PERIOD, escreverEstado, lerEscopo, type ScopeState,
 } from "@/app/components/dashboard/dashboard-url"
 
 const sp = (s: string) => new URLSearchParams(s)
@@ -8,7 +8,7 @@ const sp = (s: string) => new URLSearchParams(s)
 describe("lerEscopo", () => {
   it("sem query string é o padrão: workspace ativo", () => {
     expect(lerEscopo(sp(""))).toBe("ativo")
-    expect(ESCOPO_PADRAO).toBe("ativo")
+    expect(DEFAULT_SCOPE).toBe("ativo")
   })
 
   it("só `escopo=todos` vira 'todos'", () => {
@@ -25,16 +25,16 @@ describe("lerEscopo", () => {
 
 describe("escreverEstado", () => {
   it("omite o escopo padrão para deixar a URL limpa", () => {
-    expect(escreverEstado({ escopo: "ativo", periodo: PERIODO_PADRAO })).toBe("")
+    expect(escreverEstado({ escopo: "ativo", periodo: DEFAULT_PERIOD })).toBe("")
   })
 
   it("escreve 'todos'", () => {
-    expect(escreverEstado({ escopo: "todos", periodo: PERIODO_PADRAO })).toBe("escopo=todos")
+    expect(escreverEstado({ escopo: "todos", periodo: DEFAULT_PERIOD })).toBe("escopo=todos")
   })
 
   it("ida e volta preserva o escopo", () => {
-    for (const e of ["ativo", "todos"] as EstadoDoEscopo[]) {
-      expect(lerEscopo(sp(escreverEstado({ escopo: e, periodo: PERIODO_PADRAO })))).toBe(e)
+    for (const e of ["ativo", "todos"] as ScopeState[]) {
+      expect(lerEscopo(sp(escreverEstado({ escopo: e, periodo: DEFAULT_PERIOD })))).toBe(e)
     }
   })
 })

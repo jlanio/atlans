@@ -43,7 +43,7 @@ def _gdf():
     )
 
 
-class _NoComBranchIncidental(BaseNode):
+class _NodeWithIncidentalBranch(BaseNode):
     """Ordinary (non-control) node whose output CONTAINS a boolean 'branch' key.
     It is not a routing node — it just emits the data and, by chance, a 'branch'."""
 
@@ -58,7 +58,7 @@ class _NoComBranchIncidental(BaseNode):
 @pytest.fixture
 def _registra_no():
     from flow.registry import NODE_REGISTRY
-    NODE_REGISTRY["TesteBranchIncidental"] = _NoComBranchIncidental
+    NODE_REGISTRY["TesteBranchIncidental"] = _NodeWithIncidentalBranch
     try:
         yield
     finally:
@@ -78,7 +78,7 @@ def _branch(nid):
             "properties": {"metric": "count", "operator": ">", "compareTo": "1"}}
 
 
-def test_f7_no_comum_com_branch_incidental_nao_sequestra_roteamento(_registra_no):
+def test_f7_plain_node_with_incidental_branch_does_not_hijack_routing(_registra_no):
     # N emits branch=True but only has a DATA edge (no condition). The child D
     # must run — before it was skipped because no edge matched condition==True.
     definition = {
@@ -96,7 +96,7 @@ def test_f7_no_comum_com_branch_incidental_nao_sequestra_roteamento(_registra_no
     assert "D" in final and final["D"]
 
 
-def test_f8_aresta_de_dado_saindo_de_no_de_ramo_permanece_ativa():
+def test_f8_data_edge_leaving_a_branch_node_stays_active():
     # A (Conditional, branch=True) with a BRANCH edge (true→B) and a DATA edge
     # (→E, no condition). E must run; before it was skipped (None != True).
     definition = {
@@ -114,7 +114,7 @@ def test_f8_aresta_de_dado_saindo_de_no_de_ramo_permanece_ativa():
     assert "B" in final and "E" in final
 
 
-def test_roteamento_normal_continua_funcionando():
+def test_normal_routing_keeps_working():
     # Guarda: com true/false wired, branch=True → ramo true roda, false skipado.
     definition = {
         "nodes": [_trigger("T"), _branch("A"), _merge("V"), _merge("F")],

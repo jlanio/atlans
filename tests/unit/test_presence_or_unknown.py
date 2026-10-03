@@ -16,7 +16,7 @@ import app.core.executor_connections as ec
 
 
 @pytest.mark.asyncio
-async def test_conexao_local_e_prova_de_vida():
+async def test_local_connection_is_proof_of_life():
     reg = ec.ExecutorConnectionRegistry()
     reg._connections["ex-1"] = MagicMock()
     with patch.object(ec, "_redis_presence_or_unknown", AsyncMock(return_value=False)) as rp:
@@ -25,14 +25,14 @@ async def test_conexao_local_e_prova_de_vida():
 
 
 @pytest.mark.asyncio
-async def test_redis_fora_vira_nao_sei():
+async def test_redis_down_becomes_unknown():
     reg = ec.ExecutorConnectionRegistry()
     with patch.object(ec, "_redis_presence_or_unknown", AsyncMock(return_value=None)):
         assert await reg.presence_or_unknown("ex-1") is None
 
 
 @pytest.mark.asyncio
-async def test_desconexao_recente_vira_nao_sei_dentro_da_carencia():
+async def test_recent_disconnect_becomes_unknown_within_grace_period():
     reg = ec.ExecutorConnectionRegistry()
     reg._recent_disconnects["ex-1"] = time.monotonic()
     with patch.object(ec, "_redis_presence_or_unknown", AsyncMock(return_value=False)):
@@ -40,7 +40,7 @@ async def test_desconexao_recente_vira_nao_sei_dentro_da_carencia():
 
 
 @pytest.mark.asyncio
-async def test_fora_da_carencia_e_offline_de_verdade():
+async def test_outside_grace_period_is_really_offline():
     reg = ec.ExecutorConnectionRegistry()
     reg._recent_disconnects["ex-1"] = time.monotonic() - ec._DISPATCH_GRACE_SECONDS - 1
     with patch.object(ec, "_redis_presence_or_unknown", AsyncMock(return_value=False)):
@@ -49,7 +49,7 @@ async def test_fora_da_carencia_e_offline_de_verdade():
 
 
 @pytest.mark.asyncio
-async def test_presenca_confirmada_limpa_a_carencia_e_cacheia():
+async def test_confirmed_presence_clears_the_grace_period_and_caches():
     reg = ec.ExecutorConnectionRegistry()
     reg._recent_disconnects["ex-1"] = time.monotonic()
     with patch.object(ec, "_redis_presence_or_unknown", AsyncMock(return_value=True)):
@@ -59,7 +59,7 @@ async def test_presenca_confirmada_limpa_a_carencia_e_cacheia():
 
 
 @pytest.mark.asyncio
-async def test_is_online_continua_fail_closed():
+async def test_is_online_stays_fail_closed():
     reg = ec.ExecutorConnectionRegistry()
     with patch.object(ec, "_redis_presence_or_unknown", AsyncMock(return_value=None)):
         assert await reg.is_online("ex-1") is False

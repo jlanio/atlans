@@ -26,11 +26,11 @@ from app.services.openrouter import (
 
 pytestmark = pytest.mark.asyncio
 
-SISTEMA = [
+SYSTEM = [
     {"type": "text", "text": "politica"},
     {"type": "text", "text": "guia", "cache_control": {"type": "ephemeral", "ttl": "1h"}},
 ]
-FERRAMENTAS = [openrouter.ferramenta("search_nodes", "procura", {"type": "object", "properties": {}})]
+TOOLS = [openrouter.ferramenta("search_nodes", "procura", {"type": "object", "properties": {}})]
 
 
 # ── Test doubles ──────────────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ def _sse(*eventos, done: bool = True, comentarios: bool = False) -> bytes:
     return "".join(partes).encode("utf-8")
 
 
-def _quadro(delta: dict, *, parada=None, usage=None, **extras) -> dict:
+def _frame(delta: dict, *, parada=None, usage=None, **extras) -> dict:
     corpo = {
         "id": "gen-1",
         "object": "chat.completion.chunk",
@@ -72,14 +72,14 @@ class Roteiro:
     """The fake server: one response (or exception) per request, in order."""
 
     def __init__(self, respostas):
-        self._respostas = list(respostas)
+        self._responses = list(respostas)
         self.pedidos: list[httpx.Request] = []
 
     async def __call__(self, pedido: httpx.Request) -> httpx.Response:
         self.pedidos.append(pedido)
-        if not self._respostas:
+        if not self._responses:
             raise AssertionError("o cliente pediu mais do que o roteiro previa")
-        proxima = self._respostas.pop(0)
+        proxima = self._responses.pop(0)
         if isinstance(proxima, Exception):
             raise proxima
         return proxima
@@ -88,23 +88,23 @@ class Roteiro:
         return json.loads(self.pedidos[indice].content)
 
 
-def _cliente(roteiro: Roteiro, **kw) -> tuple[ClienteOpenRouter, list[float]]:
-    esperas: list[float] = []
+def _client(roteiro: Roteiro, **kw) -> tuple[ClienteOpenRouter, list[float]]:
+    waits: list[float] = []
 
     async def dormir(segundos: float) -> None:
-        esperas.append(segundos)
+        waits.append(segundos)
 
     http = httpx.AsyncClient(transport=httpx.MockTransport(roteiro))
     cliente = ClienteOpenRouter("sk-or-v1-teste", http=http, dormir=dormir, **kw)
-    return cliente, esperas
+    return cliente, waits
 
 
-async def _colher(cliente: ClienteOpenRouter, conversa=None, **kw):
+async def _collect(cliente: ClienteOpenRouter, conversa=None, **kw):
     base = dict(
         modelo="anthropic/claude-opus-5",
-        sistema=SISTEMA,
+        sistema=SYSTEM,
         conversa=conversa or [{"role": "user", "content": "monta um fluxo"}],
-        ferramentas=FERRAMENTAS,
+        ferramentas=TOOLS,
         max_tokens=1000,
         esforco="high",
     )
@@ -115,12 +115,12 @@ async def _colher(cliente: ClienteOpenRouter, conversa=None, **kw):
 # ── A ida: o pedido ───────────────────────────────────────────────────────────
 
 
-def test_o_pedido_leva_modelo_stream_uso_raciocinio_e_ferramentas():
+def test_the_request_carries_model_stream_usage_reasoning_and_tools():
     corpo = montar_pedido(
         modelo="openai/gpt-5",
-        sistema=SISTEMA,
+        sistema=SYSTEM,
         conversa=[{"role": "user", "content": "oi"}],
-        ferramentas=FERRAMENTAS,
+        ferramentas=TOOLS,
         max_tokens=4321,
         esforco="high",
     )
@@ -131,14 +131,14 @@ def test_o_pedido_leva_modelo_stream_uso_raciocinio_e_ferramentas():
     # The count (and the cost) comes in the stream's last frame: it is the quota's source.
     assert corpo["usage"] == {"include": True}
     assert corpo["reasoning"] == {"effort": "high"}
-    assert corpo["tools"] == FERRAMENTAS
+    assert corpo["tools"] == TOOLS
     assert corpo["tools"][0] == {
         "type": "function",
         "function": {"name": "search_nodes", "description": "procura", "parameters": {"type": "object", "properties": {}}},
     }
 
 
-def test_sem_esforco_nem_ferramentas_o_pedido_nao_leva_os_campos():
+def test_without_effort_or_tools_the_request_omits_the_fields():
     corpo = montar_pedido(
         modelo="m", sistema=[], conversa=[{"role": "user", "content": "oi"}],
         ferramentas=[], max_tokens=10, esforco=None,
@@ -151,10 +151,10 @@ def test_sem_esforco_nem_ferramentas_o_pedido_nao_leva_os_campos():
     ]}]
 
 
-def test_o_sistema_vai_em_partes_e_o_corte_de_cache_perde_o_ttl():
+def test_the_system_goes_in_parts_and_the_cache_cut_loses_the_ttl():
     """Only the type: the cache duration belongs to the provider behind the router,
     and a field it does not recognize would be a rejection on every conversation."""
-    mensagens = montar_mensagens(SISTEMA, [])
+    mensagens = montar_mensagens(SYSTEM, [])
 
     assert mensagens == [
         {
@@ -167,7 +167,7 @@ def test_o_sistema_vai_em_partes_e_o_corte_de_cache_perde_o_ttl():
     ]
 
 
-def test_a_ultima_mensagem_humana_leva_o_segundo_corte_e_os_resultados_viram_tool():
+def test_the_last_human_message_gets_the_second_cut_and_results_become_tool():
     """The prefix that is the same across all rounds of a turn ends at the person's
     question. Tool results become `tool` messages, with the raw text."""
     conversa = [
@@ -205,7 +205,7 @@ def test_a_ultima_mensagem_humana_leva_o_segundo_corte_e_os_resultados_viram_too
     assert mensagens[4] == {"role": "tool", "tool_call_id": "call_1", "content": "achei 3"}
 
 
-def test_o_assistente_leva_texto_chamadas_e_o_raciocinio_verbatim():
+def test_the_assistant_carries_text_calls_and_reasoning_verbatim():
     detalhes = [
         {"type": "reasoning.text", "text": "preciso do catálogo", "signature": "assin-1", "format": "anthropic-claude-v1", "index": 0},
         {"type": "reasoning.encrypted", "data": "xyz==", "id": "rs_1", "format": "openai-responses-v1", "index": 1},
@@ -233,7 +233,7 @@ def test_o_assistente_leva_texto_chamadas_e_o_raciocinio_verbatim():
     assert [c["function"]["arguments"] for c in assistente["tool_calls"]] == ['{"q": "x"}', "{}"]
 
 
-def test_mensagem_do_assistente_sem_texto_e_sem_chamada_e_omitida_na_ida():
+def test_assistant_message_without_text_or_call_is_omitted_outbound():
     """Reasoning only (cut off by `length` while still thinking), an empty list
     (refusal with no output) or an empty string: sending `content: ""` is a
     certain rejection by the provider, and one the 400 plan B does not fix."""
@@ -257,7 +257,7 @@ def test_mensagem_do_assistente_sem_texto_e_sem_chamada_e_omitida_na_ida():
     assert all(isinstance(m["content"], str) for m in mensagens[:-1])
 
 
-def test_o_raciocinio_antigo_com_assinatura_e_omitido_na_ida():
+def test_old_signed_reasoning_is_omitted_outbound():
     """A `thinking` block from another API (with `signature`, without
     `reasoning_details`) stays in the transcript for replay and does not go to
     the provider."""
@@ -278,7 +278,7 @@ def test_o_raciocinio_antigo_com_assinatura_e_omitido_na_ida():
     assert "reasoning_details" not in assistente
 
 
-def test_resultado_com_erro_ganha_o_prefixo_e_lista_de_blocos_e_juntada():
+def test_error_result_gets_the_prefix_and_block_list_is_joined():
     """The wire format has no `is_error`; without the prefix, a scope refusal
     would reach the model just like a normal result."""
     conversa = [
@@ -305,25 +305,25 @@ def test_resultado_com_erro_ganha_o_prefixo_e_lista_de_blocos_e_juntada():
 # ── A volta: o stream ─────────────────────────────────────────────────────────
 
 
-async def test_o_stream_remonta_texto_raciocinio_e_chamadas_por_indice():
+async def test_the_stream_reassembles_text_reasoning_and_calls_by_index():
     """Calls arrive by `index` — `id`/`name` in the first chunk, arguments drop
     by drop, TWO interleaved; `reasoning_details` also comes by index, and the
     `signature` only at the end. What comes out is the project's format, whole."""
     corpo = _sse(
-        _quadro({"role": "assistant", "reasoning": "preciso ", "reasoning_details": [
+        _frame({"role": "assistant", "reasoning": "preciso ", "reasoning_details": [
             {"type": "reasoning.text", "text": "preciso ", "format": "anthropic-claude-v1", "index": 0}]}),
-        _quadro({"reasoning": "do catálogo", "reasoning_details": [
+        _frame({"reasoning": "do catálogo", "reasoning_details": [
             {"type": "reasoning.text", "text": "do catálogo", "format": "anthropic-claude-v1", "index": 0}]}),
-        _quadro({"reasoning_details": [
+        _frame({"reasoning_details": [
             {"type": "reasoning.text", "text": "", "signature": "assin-9", "format": "anthropic-claude-v1", "index": 0}]}),
-        _quadro({"content": "Vou "}),
-        _quadro({"content": "procurar."}),
-        _quadro({"tool_calls": [{"index": 0, "id": "call_a", "type": "function", "function": {"name": "search_nodes", "arguments": ""}}]}),
-        _quadro({"tool_calls": [{"index": 1, "id": "call_b", "type": "function", "function": {"name": "describe_node", "arguments": '{"name":'}}]}),
-        _quadro({"tool_calls": [{"index": 0, "function": {"arguments": '{"q": "buf'}}]}),
-        _quadro({"tool_calls": [{"index": 1, "function": {"arguments": ' "Buffer"}'}}]}),
-        _quadro({"tool_calls": [{"index": 0, "function": {"arguments": 'fer"}'}}]}),
-        _quadro({}, parada="tool_calls", usage={
+        _frame({"content": "Vou "}),
+        _frame({"content": "procurar."}),
+        _frame({"tool_calls": [{"index": 0, "id": "call_a", "type": "function", "function": {"name": "search_nodes", "arguments": ""}}]}),
+        _frame({"tool_calls": [{"index": 1, "id": "call_b", "type": "function", "function": {"name": "describe_node", "arguments": '{"name":'}}]}),
+        _frame({"tool_calls": [{"index": 0, "function": {"arguments": '{"q": "buf'}}]}),
+        _frame({"tool_calls": [{"index": 1, "function": {"arguments": ' "Buffer"}'}}]}),
+        _frame({"tool_calls": [{"index": 0, "function": {"arguments": 'fer"}'}}]}),
+        _frame({}, parada="tool_calls", usage={
             "prompt_tokens": 1500, "completion_tokens": 80, "total_tokens": 1580, "cost": 0.0123,
             "prompt_tokens_details": {"cached_tokens": 1200},
             "completion_tokens_details": {"reasoning_tokens": 30},
@@ -331,9 +331,9 @@ async def test_o_stream_remonta_texto_raciocinio_e_chamadas_por_indice():
         comentarios=True,
     )
     roteiro = Roteiro([_stream(corpo)])
-    cliente, esperas = _cliente(roteiro)
+    cliente, waits = _client(roteiro)
 
-    pedacos = await _colher(cliente)
+    pedacos = await _collect(cliente)
 
     deltas = [p for p in pedacos if isinstance(p, Delta)]
     assert deltas == [
@@ -365,7 +365,7 @@ async def test_o_stream_remonta_texto_raciocinio_e_chamadas_por_indice():
         "entrada": 1500, "saida": 80, "cache_leitura": 1200, "cache_escrita": 0,
         "raciocinio": 30, "custo": 0.0123,
     }
-    assert esperas == [], "sucesso de primeira não espera nada"
+    assert waits == [], "sucesso de primeira não espera nada"
     # And the request that went out is the translated one: the auth header, and no
     # attribution header — no title or referer, nothing identifies the installation.
     pedido = roteiro.pedidos[0]
@@ -375,32 +375,32 @@ async def test_o_stream_remonta_texto_raciocinio_e_chamadas_por_indice():
     assert str(pedido.url) == "https://openrouter.ai/api/v1/chat/completions"
 
 
-async def test_argumento_que_nao_fecha_vira_texto_cru_e_nao_objeto():
+async def test_unclosed_argument_becomes_raw_text_not_object():
     """Half a definition cannot reach the tool as if it were whole.
     The loop treats anything that is not an object as a call error."""
     corpo = _sse(
-        _quadro({"tool_calls": [{"index": 0, "id": "call_a", "type": "function",
+        _frame({"tool_calls": [{"index": 0, "id": "call_a", "type": "function",
                                  "function": {"name": "validate_workflow", "arguments": '{"definition": {"nodes": ['}}]}),
-        _quadro({}, parada="length"),
+        _frame({}, parada="length"),
     )
-    cliente, _ = _cliente(Roteiro([_stream(corpo)]))
+    cliente, _ = _client(Roteiro([_stream(corpo)]))
 
-    resposta = (await _colher(cliente))[-1]
+    resposta = (await _collect(cliente))[-1]
 
     assert resposta.parada == "length"
     assert resposta.blocos[0]["input"] == '{"definition": {"nodes": ['
 
 
-async def test_argumento_vazio_vira_objeto_e_chamada_sem_indice_e_aceita():
+async def test_empty_argument_becomes_object_and_call_without_index_is_accepted():
     corpo = _sse(
-        _quadro({"content": "pronto"}),
-        _quadro({"tool_calls": [{"id": "call_x", "type": "function", "function": {"name": "list_workflows", "arguments": ""}}]},
+        _frame({"content": "pronto"}),
+        _frame({"tool_calls": [{"id": "call_x", "type": "function", "function": {"name": "list_workflows", "arguments": ""}}]},
                 parada="tool_calls"),
         done=False,
     )
-    cliente, _ = _cliente(Roteiro([_stream(corpo)]))
+    cliente, _ = _client(Roteiro([_stream(corpo)]))
 
-    resposta = (await _colher(cliente))[-1]
+    resposta = (await _collect(cliente))[-1]
 
     assert resposta.parada == "tool_calls"
     assert resposta.blocos == [
@@ -409,82 +409,82 @@ async def test_argumento_vazio_vira_objeto_e_chamada_sem_indice_e_aceita():
     ]
 
 
-async def test_stream_sem_finish_reason_e_erro_e_nao_resposta_vazia():
+async def test_stream_without_finish_reason_is_error_not_empty_response():
     """OpenRouter always sends `finish_reason` before `[DONE]`. Without it, what
     arrived is not a response — and inferring `stop` would record an empty
     assistant message and emit an ok `fim`."""
-    corpo = _sse(_quadro({"content": "pronto"}))
-    cliente, _ = _cliente(Roteiro([_stream(corpo)]))
+    corpo = _sse(_frame({"content": "pronto"}))
+    cliente, _ = _client(Roteiro([_stream(corpo)]))
 
     with pytest.raises(ErroDoOpenRouter) as exc:
-        await _colher(cliente)
+        await _collect(cliente)
 
     assert "finish_reason" in str(exc.value)
 
 
-async def test_200_de_gateway_com_html_e_erro_e_nao_resposta_vazia():
+async def test_gateway_200_with_html_is_error_not_empty_response():
     """A proxy that responds 200 with HTML has no SSE frame at all."""
     roteiro = Roteiro([httpx.Response(200, content=b"<html>gateway</html>", headers={"content-type": "text/html"})])
-    cliente, _ = _cliente(roteiro)
+    cliente, _ = _client(roteiro)
 
     with pytest.raises(ErroDoOpenRouter):
-        await _colher(cliente)
+        await _collect(cliente)
 
 
-async def test_separador_de_linha_unicode_dentro_do_JSON_nao_corta_o_quadro():
+async def test_unicode_line_separator_inside_the_JSON_does_not_cut_the_frame():
     """U+2028, U+2029 and U+0085 are valid WITHOUT escaping in a JSON string, and
     httpx's `aiter_lines()` broke the line on them (`str.splitlines()`). The
     custom reader breaks only on `\\n`, `\\r\\n` and `\\r`."""
     texto = "antes\u2028meio\u2029fim\u0085ponto"
-    corpo = _sse(_quadro({"content": texto}), _quadro({}, parada="stop"))
-    cliente, _ = _cliente(Roteiro([_stream(corpo)]))
+    corpo = _sse(_frame({"content": texto}), _frame({}, parada="stop"))
+    cliente, _ = _client(Roteiro([_stream(corpo)]))
 
-    pedacos = await _colher(cliente)
+    pedacos = await _collect(cliente)
 
     assert pedacos[0] == Delta("texto", texto)
     assert pedacos[-1].blocos == [{"type": "text", "text": texto}]
 
 
-async def test_terminadores_CRLF_e_pedacos_partidos_no_meio_sao_remontados():
+async def test_CRLF_terminators_and_chunks_split_midway_are_reassembled():
     """`\\r\\n` as terminator, a `\\r\\n` split between two network chunks and a
     multibyte character split between two chunks: everything reassembles the same."""
-    quadro_a = json.dumps(_quadro({"content": "olá ção"}), ensure_ascii=False).encode("utf-8")
-    quadro_b = json.dumps(_quadro({}, parada="stop")).encode("utf-8")
-    corpo = b"data: " + quadro_a + b"\r\n\r\ndata: " + quadro_b + b"\r\n\r\ndata: [DONE]\r\n\r\n"
+    frame_a = json.dumps(_frame({"content": "olá ção"}), ensure_ascii=False).encode("utf-8")
+    frame_b = json.dumps(_frame({}, parada="stop")).encode("utf-8")
+    corpo = b"data: " + frame_a + b"\r\n\r\ndata: " + frame_b + b"\r\n\r\ndata: [DONE]\r\n\r\n"
     # Splits the body into small chunks: one of them lands in the middle of `ção`
     # and another between the `\r` and the `\n`.
-    corte_no_multibyte = corpo.index("ção".encode("utf-8")) + 1
-    corte_no_crlf = corpo.index(b"\r\n") + 1
-    cortes = sorted({corte_no_multibyte, corte_no_crlf, len(corpo) - 7})
-    pedacos_bytes = [corpo[a:b] for a, b in zip([0, *cortes], [*cortes, len(corpo)])]
+    cut_at_multibyte = corpo.index("ção".encode("utf-8")) + 1
+    cut_at_crlf = corpo.index(b"\r\n") + 1
+    cortes = sorted({cut_at_multibyte, cut_at_crlf, len(corpo) - 7})
+    byte_chunks = [corpo[a:b] for a, b in zip([0, *cortes], [*cortes, len(corpo)])]
 
-    async def corpo_em_pedacos():
-        for pedaco in pedacos_bytes:
+    async def body_in_chunks():
+        for pedaco in byte_chunks:
             yield pedaco
 
-    roteiro = Roteiro([httpx.Response(200, content=corpo_em_pedacos(), headers={"content-type": "text/event-stream"})])
-    cliente, _ = _cliente(roteiro)
+    roteiro = Roteiro([httpx.Response(200, content=body_in_chunks(), headers={"content-type": "text/event-stream"})])
+    cliente, _ = _client(roteiro)
 
-    pedacos = await _colher(cliente)
+    pedacos = await _collect(cliente)
 
     assert pedacos[0] == Delta("texto", "olá ção")
     assert pedacos[-1].parada == "stop"
 
 
-async def test_reasoning_details_sem_indice_mas_com_id_nao_se_fundem():
+async def test_reasoning_details_without_index_but_with_id_do_not_merge():
     """Distinct items without `index` (the encrypted reasoning of some
     providers) stay distinct, keyed by `id`; chunks with neither `index` nor
     `id` keep belonging to the same block."""
     corpo = _sse(
-        _quadro({"reasoning_details": [{"type": "reasoning.encrypted", "data": "AAA", "id": "rs_1"}]}),
-        _quadro({"reasoning_details": [{"type": "reasoning.encrypted", "data": "BBB", "id": "rs_2"}]}),
-        _quadro({"reasoning_details": [{"type": "reasoning.text", "text": "pen"}]}),
-        _quadro({"reasoning_details": [{"type": "reasoning.text", "text": "sei"}]}),
-        _quadro({"content": "ok"}, parada="stop"),
+        _frame({"reasoning_details": [{"type": "reasoning.encrypted", "data": "AAA", "id": "rs_1"}]}),
+        _frame({"reasoning_details": [{"type": "reasoning.encrypted", "data": "BBB", "id": "rs_2"}]}),
+        _frame({"reasoning_details": [{"type": "reasoning.text", "text": "pen"}]}),
+        _frame({"reasoning_details": [{"type": "reasoning.text", "text": "sei"}]}),
+        _frame({"content": "ok"}, parada="stop"),
     )
-    cliente, _ = _cliente(Roteiro([_stream(corpo)]))
+    cliente, _ = _client(Roteiro([_stream(corpo)]))
 
-    resposta = (await _colher(cliente))[-1]
+    resposta = (await _collect(cliente))[-1]
 
     assert resposta.blocos[0]["reasoning_details"] == [
         {"type": "reasoning.encrypted", "data": "AAA", "id": "rs_1"},
@@ -494,11 +494,11 @@ async def test_reasoning_details_sem_indice_mas_com_id_nao_se_fundem():
     assert resposta.blocos[0]["thinking"] == "pensei"
 
 
-async def test_stream_so_de_texto_termina_em_stop_e_sem_bloco_de_raciocinio():
-    corpo = _sse(_quadro({"content": "olá"}), _quadro({}, parada="stop", usage={"prompt_tokens": 5, "completion_tokens": 1}))
-    cliente, _ = _cliente(Roteiro([_stream(corpo)]))
+async def test_text_only_stream_ends_in_stop_without_reasoning_block():
+    corpo = _sse(_frame({"content": "olá"}), _frame({}, parada="stop", usage={"prompt_tokens": 5, "completion_tokens": 1}))
+    cliente, _ = _client(Roteiro([_stream(corpo)]))
 
-    pedacos = await _colher(cliente)
+    pedacos = await _collect(cliente)
 
     assert pedacos == [Delta("texto", "olá"), pedacos[-1]]
     assert pedacos[-1].parada == "stop"
@@ -506,115 +506,115 @@ async def test_stream_so_de_texto_termina_em_stop_e_sem_bloco_de_raciocinio():
     assert pedacos[-1].uso["entrada"] == 5 and pedacos[-1].uso["custo"] == 0.0
 
 
-async def test_erro_no_meio_do_stream_vira_excecao_e_nao_resposta():
+async def test_mid_stream_error_becomes_exception_not_response():
     """An `error` frame after text was already emitted: what went out, went out; but
     there is no `Resposta` — the loop does not record a half-finished message."""
     corpo = _sse(
-        _quadro({"content": "Vou "}),
+        _frame({"content": "Vou "}),
         {"id": "gen-1", "error": {"code": 502, "message": "Provider returned error"},
          "choices": [{"index": 0, "delta": {}, "finish_reason": "error"}]},
     )
-    cliente, _ = _cliente(Roteiro([_stream(corpo)]))
+    cliente, _ = _client(Roteiro([_stream(corpo)]))
 
     with pytest.raises(ErroDoOpenRouter) as exc:
-        await _colher(cliente)
+        await _collect(cliente)
 
     assert exc.value.codigo == 502
     assert "Provider returned error" in str(exc.value)
 
 
-async def test_quadro_ilegivel_vira_excecao():
+async def test_unreadable_frame_becomes_exception():
     corpo = b"data: {isto nao e json\n\n"
-    cliente, _ = _cliente(Roteiro([_stream(corpo)]))
+    cliente, _ = _client(Roteiro([_stream(corpo)]))
 
     with pytest.raises(ErroDoOpenRouter):
-        await _colher(cliente)
+        await _collect(cliente)
 
 
 # ── Failures before the body: retry; after the body: never ────────────────────
 
 
-async def test_429_e_5xx_sao_retentados_com_espera_e_o_retry_after_manda():
-    corpo_ok = _sse(_quadro({"content": "ok"}), _quadro({}, parada="stop"))
+async def test_429_and_5xx_are_retried_with_backoff_and_retry_after_rules():
+    ok_body = _sse(_frame({"content": "ok"}), _frame({}, parada="stop"))
     roteiro = Roteiro([
         httpx.Response(429, json={"error": {"code": 429, "message": "slow down"}}, headers={"retry-after": "2"}),
         httpx.Response(503, json={"error": {"code": 503, "message": "provider down"}}),
-        _stream(corpo_ok),
+        _stream(ok_body),
     ])
-    cliente, esperas = _cliente(roteiro)
+    cliente, waits = _client(roteiro)
 
-    pedacos = await _colher(cliente)
+    pedacos = await _collect(cliente)
 
     assert pedacos[-1].blocos == [{"type": "text", "text": "ok"}]
     assert len(roteiro.pedidos) == 3
     # The 429's `Retry-After` rules; the 503 falls to exponential backoff (2nd attempt).
-    assert esperas == [2.0, 1.0]
+    assert waits == [2.0, 1.0]
 
 
-async def test_depois_da_ultima_tentativa_o_erro_sobe_com_o_status():
+async def test_after_the_last_attempt_the_error_propagates_with_the_status():
     roteiro = Roteiro([
         httpx.Response(502, json={"error": {"code": 502, "message": "bad gateway"}}),
         httpx.Response(502, json={"error": {"code": 502, "message": "bad gateway"}}),
     ])
-    cliente, esperas = _cliente(roteiro, tentativas=2)
+    cliente, waits = _client(roteiro, tentativas=2)
 
     with pytest.raises(ErroDoOpenRouter) as exc:
-        await _colher(cliente)
+        await _collect(cliente)
 
     assert exc.value.status == 502
     assert exc.value.codigo == 502
     assert len(roteiro.pedidos) == 2
-    assert esperas == [0.5]
+    assert waits == [0.5]
 
 
-async def test_401_e_402_nao_sao_retentados():
+async def test_401_and_402_are_not_retried():
     """A wrong key and zero credit do not get better by waiting."""
     for status in (401, 402):
         roteiro = Roteiro([httpx.Response(status, json={"error": {"code": status, "message": "nope"}})])
-        cliente, esperas = _cliente(roteiro)
+        cliente, waits = _client(roteiro)
 
         with pytest.raises(ErroDoOpenRouter) as exc:
-            await _colher(cliente)
+            await _collect(cliente)
 
         assert exc.value.status == status
         assert len(roteiro.pedidos) == 1
-        assert esperas == []
+        assert waits == []
 
 
-async def test_falha_de_rede_antes_do_corpo_e_retentada():
-    corpo_ok = _sse(_quadro({"content": "ok"}), _quadro({}, parada="stop"))
-    roteiro = Roteiro([httpx.ConnectError("sem rota"), _stream(corpo_ok)])
-    cliente, esperas = _cliente(roteiro)
+async def test_network_failure_before_the_body_is_retried():
+    ok_body = _sse(_frame({"content": "ok"}), _frame({}, parada="stop"))
+    roteiro = Roteiro([httpx.ConnectError("sem rota"), _stream(ok_body)])
+    cliente, waits = _client(roteiro)
 
-    pedacos = await _colher(cliente)
+    pedacos = await _collect(cliente)
 
     assert pedacos[-1].parada == "stop"
-    assert esperas == [0.5]
+    assert waits == [0.5]
 
 
-async def test_falha_de_rede_persistente_vira_erro_do_openrouter():
+async def test_persistent_network_failure_becomes_openrouter_error():
     roteiro = Roteiro([httpx.ConnectError("sem rota")] * 3)
-    cliente, _ = _cliente(roteiro)
+    cliente, _ = _client(roteiro)
 
     with pytest.raises(ErroDoOpenRouter) as exc:
-        await _colher(cliente)
+        await _collect(cliente)
 
     assert "ConnectError" in str(exc.value)
     assert len(roteiro.pedidos) == 3
 
 
-async def test_erro_de_corpo_nao_json_e_encurtado_na_mensagem():
+async def test_non_json_body_error_is_shortened_in_the_message():
     roteiro = Roteiro([httpx.Response(500, content=b"<html>" + b"x" * 1000)])
-    cliente, _ = _cliente(roteiro, tentativas=1)
+    cliente, _ = _client(roteiro, tentativas=1)
 
     with pytest.raises(ErroDoOpenRouter) as exc:
-        await _colher(cliente)
+        await _collect(cliente)
 
     assert exc.value.status == 500
     assert len(str(exc.value)) < 400
 
 
-async def test_400_com_raciocinio_guardado_e_refeito_uma_vez_sem_ele():
+async def test_400_with_stored_reasoning_is_retried_once_without_it():
     """If the provider rejects the stored reasoning, the conversation loses the old
     reasoning — not the conversation."""
     conversa = [
@@ -625,17 +625,17 @@ async def test_400_com_raciocinio_guardado_e_refeito_uma_vez_sem_ele():
         ]},
         {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "c1", "content": "ok", "is_error": False}]},
     ]
-    corpo_ok = _sse(_quadro({"content": "seguindo"}), _quadro({}, parada="stop"))
+    ok_body = _sse(_frame({"content": "seguindo"}), _frame({}, parada="stop"))
     roteiro = Roteiro([
         httpx.Response(400, json={"error": {"code": 400, "message": "invalid reasoning signature"}}),
-        _stream(corpo_ok),
+        _stream(ok_body),
     ])
-    cliente, esperas = _cliente(roteiro)
+    cliente, waits = _client(roteiro)
 
-    pedacos = await _colher(cliente, conversa=conversa)
+    pedacos = await _collect(cliente, conversa=conversa)
 
     assert pedacos[-1].blocos == [{"type": "text", "text": "seguindo"}]
-    assert esperas == [], "o 400 não é espera: é outro pedido"
+    assert waits == [], "o 400 não é espera: é outro pedido"
     primeiro, segundo = roteiro.corpo(0), roteiro.corpo(1)
     assert "reasoning_details" in primeiro["messages"][2]
     assert "reasoning_details" not in segundo["messages"][2]
@@ -644,18 +644,18 @@ async def test_400_com_raciocinio_guardado_e_refeito_uma_vez_sem_ele():
     assert segundo["tools"] == primeiro["tools"]
 
 
-async def test_400_sem_raciocinio_guardado_nao_e_refeito():
+async def test_400_without_stored_reasoning_is_not_retried():
     roteiro = Roteiro([httpx.Response(400, json={"error": {"code": 400, "message": "bad model"}})])
-    cliente, _ = _cliente(roteiro)
+    cliente, _ = _client(roteiro)
 
     with pytest.raises(ErroDoOpenRouter) as exc:
-        await _colher(cliente)
+        await _collect(cliente)
 
     assert exc.value.status == 400
     assert len(roteiro.pedidos) == 1
 
 
-async def test_o_400_refeito_e_recusado_de_novo_sobe_sem_terceiro_pedido():
+async def test_the_retried_400_refused_again_propagates_without_third_request():
     conversa = [
         {"role": "user", "content": "oi"},
         {"role": "assistant", "content": [
@@ -668,10 +668,10 @@ async def test_o_400_refeito_e_recusado_de_novo_sobe_sem_terceiro_pedido():
         httpx.Response(400, json={"error": {"code": 400, "message": "a"}}),
         httpx.Response(400, json={"error": {"code": 400, "message": "b"}}),
     ])
-    cliente, _ = _cliente(roteiro)
+    cliente, _ = _client(roteiro)
 
     with pytest.raises(ErroDoOpenRouter) as exc:
-        await _colher(cliente, conversa=conversa)
+        await _collect(cliente, conversa=conversa)
 
     assert "b" in str(exc.value)
     assert len(roteiro.pedidos) == 2
@@ -680,19 +680,19 @@ async def test_o_400_refeito_e_recusado_de_novo_sobe_sem_terceiro_pedido():
 # ── Construction and lifecycle ────────────────────────────────────────────────
 
 
-def test_chave_vazia_e_recusada_na_construcao():
+def test_empty_key_is_refused_on_construction():
     with pytest.raises(ValueError):
         ClienteOpenRouter("")
 
 
-def test_a_base_url_e_o_referer_sao_respeitados():
+def test_the_base_url_and_the_referer_are_respected():
     cliente = ClienteOpenRouter("sk-or-v1-x", base_url="https://gateway.interno/api/v1/", referer="https://atlans.example.org")
 
     assert cliente._url == "https://gateway.interno/api/v1/chat/completions"
-    assert cliente._cabecalhos()["HTTP-Referer"] == "https://atlans.example.org"
+    assert cliente._headers()["HTTP-Referer"] == "https://atlans.example.org"
 
 
-def test_a_url_completa_do_endpoint_na_configuracao_nao_duplica_o_caminho():
+def test_the_full_endpoint_url_in_config_does_not_duplicate_the_path():
     """`OPENROUTER_BASE_URL` is the base, but whoever pastes the whole endpoint URL
     must not get `/chat/completions/chat/completions` on every request."""
     cliente = ClienteOpenRouter("sk-or-v1-x", base_url="https://openrouter.ai/api/v1/chat/completions")
@@ -700,27 +700,27 @@ def test_a_url_completa_do_endpoint_na_configuracao_nao_duplica_o_caminho():
     assert cliente._url == "https://openrouter.ai/api/v1/chat/completions"
 
 
-async def test_sem_http_injetado_as_conversas_compartilham_um_pool(monkeypatch):
+async def test_without_injected_http_the_chats_share_a_pool(monkeypatch):
     """One `AsyncClient` per process, created on the first conversation and reused:
     opening one per call cost a TCP+TLS handshake on every tool round."""
-    corpo_ok = _sse(_quadro({"content": "ok"}), _quadro({}, parada="stop"))
-    roteiro = Roteiro([_stream(corpo_ok), _stream(corpo_ok)])
+    ok_body = _sse(_frame({"content": "ok"}), _frame({}, parada="stop"))
+    roteiro = Roteiro([_stream(ok_body), _stream(ok_body)])
     criados: list[httpx.AsyncClient] = []
     # `openrouter.httpx` IS the `httpx` module: keep the real class before
     # swapping, or the factory calls itself.
-    ClienteReal = httpx.AsyncClient
+    RealClient = httpx.AsyncClient
 
     def fabrica(**kw):
-        assert kw.get("timeout") is openrouter.TEMPO_LIMITE
-        http = ClienteReal(transport=httpx.MockTransport(roteiro))
+        assert kw.get("timeout") is openrouter.TIMEOUT
+        http = RealClient(transport=httpx.MockTransport(roteiro))
         criados.append(http)
         return http
 
     monkeypatch.setattr(openrouter.httpx, "AsyncClient", fabrica)
     monkeypatch.setattr(openrouter, "_http_compartilhado", None)
 
-    primeira = await _colher(ClienteOpenRouter("sk-or-v1-x"))
-    segunda = await _colher(ClienteOpenRouter("sk-or-v1-x"))
+    primeira = await _collect(ClienteOpenRouter("sk-or-v1-x"))
+    segunda = await _collect(ClienteOpenRouter("sk-or-v1-x"))
 
     assert primeira[-1].parada == "stop" and segunda[-1].parada == "stop"
     assert len(roteiro.pedidos) == 2
@@ -729,22 +729,22 @@ async def test_sem_http_injetado_as_conversas_compartilham_um_pool(monkeypatch):
     await criados[0].aclose()
 
 
-def test_o_uso_do_projeto_le_o_usage_do_openrouter_com_tolerancia():
-    uso = openrouter._uso_do_projeto({
+def test_the_project_usage_reads_openrouter_usage_tolerantly():
+    uso = openrouter._project_usage({
         "prompt_tokens": "12", "completion_tokens": None, "cost": "0.5",
         "prompt_tokens_details": {"cached_tokens": 4, "cache_write_tokens": 2},
         "completion_tokens_details": {"reasoning_tokens": "x"},
     })
 
     assert uso == {"entrada": 12, "saida": 0, "cache_leitura": 4, "cache_escrita": 2, "raciocinio": 0, "custo": 0.5}
-    assert openrouter._uso_do_projeto(None)["entrada"] == 0
+    assert openrouter._project_usage(None)["entrada"] == 0
 
 
 # ── The model catalog ────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_listar_modelos_converte_o_preco_de_TOKEN_para_MILHAO():
+async def test_list_models_converts_the_price_from_TOKEN_to_MILLION():
     """The provider returns the price per token, as a string (`"0.000003"`). Whoever
     reads a cost table thinks in millions, and leaving the conversion to each
     caller is waiting for one of them to get the factor of a million wrong —
@@ -768,7 +768,7 @@ async def test_listar_modelos_converte_o_preco_de_TOKEN_para_MILHAO():
 
 
 @pytest.mark.asyncio
-async def test_preco_ausente_vira_None_e_NUNCA_zero():
+async def test_missing_price_becomes_None_and_NEVER_zero():
     """Zero in a cost table looks like "free" — and that is exactly the reading
     that would make someone pick the wrong model."""
     def handler(pedido: httpx.Request) -> httpx.Response:
@@ -792,7 +792,7 @@ async def test_preco_ausente_vira_None_e_NUNCA_zero():
 
 
 @pytest.mark.asyncio
-async def test_a_url_do_catalogo_nao_herda_o_caminho_de_conversa():
+async def test_the_catalog_url_does_not_inherit_the_chat_path():
     """Whoever configured `OPENROUTER_BASE_URL` with the FULL URL of the chat
     endpoint must not end up requesting `/chat/completions/models`."""
     visto = {}
@@ -813,7 +813,7 @@ async def test_a_url_do_catalogo_nao_herda_o_caminho_de_conversa():
     httpx.Response(503, text="fora do ar"),
     httpx.Response(200, json={"modelos": []}),        # formato inesperado
 ])
-async def test_catalogo_que_falha_vira_erro_tipado(resposta):
+async def test_failing_catalog_becomes_typed_error(resposta):
     """The caller is an admin screen, and it knows how to degrade — but only if the
     error arrives as an error, and not as an empty list that looks like "no models"."""
     with pytest.raises(openrouter.ErroDoOpenRouter):

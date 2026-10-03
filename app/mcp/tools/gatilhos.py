@@ -21,7 +21,7 @@ Four decisions shape the module:
 - **`list_schedules` lists inactive workflows.** "Why did this workflow stop
   running?" is exactly the question asked about an inactive workflow, so
   reading does not go through the execution guard that writes use
-  (`ScheduleService._exigir_workflow_ativo`). The query goes directly to
+  (`ScheduleService._require_active_workflow`). The query goes directly to
   `ScheduleCRUD`: the tool already has the workflow in hand from
   `carregar_workflow`.
 - **`delete_schedule` requires `confirm`.** Deleting a schedule cannot be
@@ -52,8 +52,8 @@ from app.services.schedule_service import (
     ScheduleService, validate_schedule_create,
 )
 
-_MENSAGEM_PAPEL_LEITURA = "Requer papel 'viewer' ou superior neste workspace."
-_MENSAGEM_PAPEL_ESCRITA = (
+_READ_ROLE_MESSAGE = "Requer papel 'viewer' ou superior neste workspace."
+_WRITE_ROLE_MESSAGE = (
     "Requer papel 'operator' ou superior neste workspace — agendar é executar."
 )
 
@@ -61,7 +61,7 @@ ESTRATEGIAS = ("cron", "interval", "rrule")
 UNIDADES = ("seconds", "minutes", "hours", "days")
 
 
-def _resumo(sch) -> dict:
+def _summarize(sch) -> dict:
     """What identifies and describes a schedule.
 
     Nothing here is free human text: strategy and unit are enums, the timezone
@@ -88,7 +88,7 @@ def _resumo(sch) -> dict:
     }
 
 
-def _erro_de_config(exc: Exception):
+def _config_error(exc: Exception):
     return erro(
         "validation",
         str(exc),
@@ -122,16 +122,16 @@ async def list_schedules(ctx: Context, workflow_id: str) -> dict:
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_VIEWER, _MENSAGEM_PAPEL_LEITURA)
-        id_do_fluxo, ativo = wf.id_hash, bool(wf.flag_ative)
+        exigir_papel(papel, ROLE_VIEWER, _READ_ROLE_MESSAGE)
+        workflow_id_hash, ativo = wf.id_hash, bool(wf.flag_ative)
 
         # Directly on the CRUD, without the writes' execution guard: the workflow
         # already came from `carregar_workflow` above, and an inactive workflow
         # is listable.
-        itens = [_resumo(s) for s in await ScheduleCRUD(db).get_by_workflow_hash(id_do_fluxo)]
+        itens = [_summarize(s) for s in await ScheduleCRUD(db).get_by_workflow_hash(workflow_id_hash)]
 
     return envelope({
-        "workflow_id": id_do_fluxo,
+        "workflow_id": workflow_id_hash,
         "workflow_active": ativo,
         "items": itens,
         "total": len(itens),
@@ -191,10 +191,10 @@ async def create_schedule(
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_OPERATOR, _MENSAGEM_PAPEL_ESCRITA)
-        id_do_fluxo = wf.id_hash
+        exigir_papel(papel, ROLE_OPERATOR, _WRITE_ROLE_MESSAGE)
+        workflow_id_hash = wf.id_hash
 
-        # The refusal also belongs to the core (`_exigir_workflow_ativo` raises
+        # The refusal also belongs to the core (`_require_active_workflow` raises
         # `WorkflowInactiveError`). Anticipating it here gives the code and the
         # way out before building and validating the whole configuration — and
         # the message here explains the WHY, which the core's has no room to say.
@@ -224,17 +224,17 @@ async def create_schedule(
             # The same validation the route uses, called BEFORE saving.
             validate_schedule_create(config)
         except AtlasBaseError as exc:
-            raise _erro_de_config(exc)
+            raise _config_error(exc)
         except ValueError as exc:
             # Pydantic and `InvalidScheduleError` land here.
-            raise _erro_de_config(exc)
+            raise _config_error(exc)
 
-        criado = await ScheduleService(db).create_schedule(id_do_fluxo, config)
+        criado = await ScheduleService(db).create_schedule(workflow_id_hash, config)
         # `create_schedule` does not commit; the MCP session rolls back in the finally.
         await db.commit()
-        item = _resumo(criado)
+        item = _summarize(criado)
 
-    return envelope({"workflow_id": id_do_fluxo, **item})
+    return envelope({"workflow_id": workflow_id_hash, **item})
 
 
 @ferramenta
@@ -273,8 +273,8 @@ async def update_schedule(
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_OPERATOR, _MENSAGEM_PAPEL_ESCRITA)
-        id_do_fluxo = wf.id_hash
+        exigir_papel(papel, ROLE_OPERATOR, _WRITE_ROLE_MESSAGE)
+        workflow_id_hash = wf.id_hash
 
         campos: dict[str, Any] = {}
         for nome, valor in (
@@ -295,11 +295,11 @@ async def update_schedule(
         try:
             mudancas = ScheduleUpdate(**campos)
         except ValueError as exc:
-            raise _erro_de_config(exc)
+            raise _config_error(exc)
 
         try:
             atualizado = await ScheduleService(db).update_schedule(
-                job_id, mudancas, owner_workflow_hash=id_do_fluxo,
+                job_id, mudancas, owner_workflow_hash=workflow_id_hash,
             )
         except AtlasBaseError as exc:
             # `ScheduleNotFoundError` covers both "does not exist" and "belongs to
@@ -309,9 +309,9 @@ async def update_schedule(
                 "use list_schedules(workflow_id) para ver os job_id deste fluxo",
             )
         await db.commit()
-        item = _resumo(atualizado)
+        item = _summarize(atualizado)
 
-    return envelope({"workflow_id": id_do_fluxo, **item})
+    return envelope({"workflow_id": workflow_id_hash, **item})
 
 
 @ferramenta
@@ -334,23 +334,23 @@ async def delete_schedule(
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_OPERATOR, _MENSAGEM_PAPEL_ESCRITA)
-        id_do_fluxo = wf.id_hash
+        exigir_papel(papel, ROLE_OPERATOR, _WRITE_ROLE_MESSAGE)
+        workflow_id_hash = wf.id_hash
 
         crud = ScheduleCRUD(db)
         alvo = await crud.get(job_id)
         # The same rule as the service: ownership confirmed through the path's
         # workflow, and `not_found` for both cases.
-        if alvo is None or alvo.workflow_hash != id_do_fluxo:
+        if alvo is None or alvo.workflow_hash != workflow_id_hash:
             raise erro(
                 "not_found", f"Agendamento {job_id} não encontrado neste workflow.",
                 "use list_schedules(workflow_id) para ver os job_id deste fluxo",
             )
-        item = _resumo(alvo)
+        item = _summarize(alvo)
 
         if not confirm:
             return envelope({
-                "workflow_id": id_do_fluxo,
+                "workflow_id": workflow_id_hash,
                 "outcome": "not_confirmed",
                 "would_delete": item,
                 "hint": (
@@ -359,11 +359,11 @@ async def delete_schedule(
                 ),
             })
 
-        await ScheduleService(db).delete_schedule(job_id, owner_workflow_hash=id_do_fluxo)
+        await ScheduleService(db).delete_schedule(job_id, owner_workflow_hash=workflow_id_hash)
         await db.commit()
 
     return envelope({
-        "workflow_id": id_do_fluxo,
+        "workflow_id": workflow_id_hash,
         "outcome": "deleted",
         "deleted": item,
     })

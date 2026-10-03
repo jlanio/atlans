@@ -25,13 +25,13 @@ import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
 from app.mcp import guia, infra
-from app.mcp.catalogo import descrever, indice_compacto, one_line, tipos_do_catalogo
+from app.mcp.catalogo import descrever, compact_index, one_line, catalog_types
 from app.mcp.tools.catalogo import describe_node, get_authoring_guide, search_nodes
 from app.services import node_service
 from app.services.node_service import NodeService
-from tests.unit._mcp_harness import ctx_falso, escopo_falso
+from tests.unit._mcp_harness import fake_ctx, fake_scope
 
-TETO_DO_INDICE = 16 * 1024
+INDEX_CEILING = 16 * 1024
 
 
 def corpo(exc: ToolError) -> dict:
@@ -43,49 +43,49 @@ def catalogo(monkeypatch):
     """Real catalog, no database: the list of disabled nodes is the only I/O point."""
     desabilitados: set = set()
 
-    async def _desabilitados(db):
+    async def _disabled_names(db):
         return set(desabilitados)
 
     @asynccontextmanager
-    async def _sessao():
+    async def _session():
         yield None
 
-    monkeypatch.setattr(node_service, "disabled_names", _desabilitados)
-    monkeypatch.setattr(infra, "sessao", _sessao)
+    monkeypatch.setattr(node_service, "disabled_names", _disabled_names)
+    monkeypatch.setattr(infra, "sessao", _session)
     return desabilitados
 
 
-async def definicoes_reais() -> list:
+async def real_definitions() -> list:
     """The registry's `NodeDefinition`s, with the `catalogo` fixture already applied."""
     return await NodeService().list_nodes(None)
 
 
 def ctx():
-    return ctx_falso(escopo_falso(scopes={"workflows:read"}))
+    return fake_ctx(fake_scope(scopes={"workflows:read"}))
 
 
 # ── Helpers puros ─────────────────────────────────────────────────────────────
 
 
-def test_one_line_pega_a_primeira_frase():
+def test_one_line_takes_the_first_sentence():
     assert one_line({"description": "Recorta camadas. Aceita GeoJSON e SHP."}) == "Recorta camadas"
     assert one_line({"description": "Sem ponto final"}) == "Sem ponto final"
     assert one_line({"description": ""}) == ""
     assert one_line("Texto direto. Resto.") == "Texto direto"
 
 
-def test_one_line_nao_devolve_paragrafo():
+def test_one_line_does_not_return_a_paragraph():
     """A multi-line description becomes ONE line — the index is read whole."""
     linha = one_line({"description": "Primeira frase\n\nParágrafo longo com detalhes."})
     assert linha == "Primeira frase"
 
 
-def test_one_line_corta_frase_quilometrica():
+def test_one_line_cuts_a_huge_sentence():
     linha = one_line({"description": "a" * 400})
     assert len(linha) <= 160
 
 
-def test_one_line_nao_corta_na_abreviacao():
+def test_one_line_does_not_cut_at_the_abbreviation():
     """"Ex." and "etc." end in a period without ending the sentence.
 
     Cutting there would deliver an index of "Ex" and "etc" lines: the client would have
@@ -106,7 +106,7 @@ def test_one_line_nao_corta_na_abreviacao():
     assert one_line({"description": "Ex."}) == "Ex"
 
 
-def test_one_line_nao_quebra_um_decimal():
+def test_one_line_does_not_break_a_decimal():
     """The period in "0.5" is not the end of a sentence — the cut requires the space after it."""
     assert one_line({"description": "Aplica um buffer de 0.5 m. Aceita metros."}) == (
         "Aplica um buffer de 0.5 m"
@@ -114,7 +114,7 @@ def test_one_line_nao_quebra_um_decimal():
     assert one_line({"description": "Tolerância 0.5 m"}) == "Tolerância 0.5 m"
 
 
-def test_one_line_ainda_corta_na_primeira_frase_de_verdade():
+def test_one_line_still_cuts_at_the_real_first_sentence():
     """The joining only applies to the short segment: a real sentence stays a single one."""
     assert one_line({"description": "Recorta camadas. Aceita GeoJSON e SHP."}) == "Recorta camadas"
 
@@ -122,27 +122,27 @@ def test_one_line_ainda_corta_na_primeira_frase_de_verdade():
 # ── search_nodes ──────────────────────────────────────────────────────────────
 
 
-async def test_o_indice_compacto_cabe_no_contexto(catalogo):
+async def test_the_compact_index_fits_in_the_context(catalogo):
     resposta = await search_nodes(ctx())
     tamanho = len(json.dumps(resposta, ensure_ascii=False).encode("utf-8"))
-    assert tamanho < TETO_DO_INDICE, f"índice com {tamanho} bytes"
+    assert tamanho < INDEX_CEILING, f"índice com {tamanho} bytes"
     assert resposta["total"] == len(resposta["items"]) > 10
 
 
-async def test_cada_item_do_indice_tem_so_o_que_serve_para_escolher(catalogo):
+async def test_each_index_item_has_only_what_helps_to_choose(catalogo):
     resposta = await search_nodes(ctx())
     for item in resposta["items"]:
         assert set(item) == {"name", "type", "one_line", "requires_credential"}
 
 
-async def test_o_indice_traz_o_mapa_de_tipos(catalogo):
+async def test_the_index_carries_the_type_map(catalogo):
     resposta = await search_nodes(ctx())
     tipos = {t["type"] for t in resposta["types"]}
     assert "trigger" in tipos
     assert all(t["count"] >= 1 for t in resposta["types"])
 
 
-async def test_filtro_por_tipo_e_por_texto(catalogo):
+async def test_filter_by_type_and_by_text(catalogo):
     todos = await search_nodes(ctx())
     gatilhos = await search_nodes(ctx(), type="trigger")
     assert 0 < gatilhos["total"] < todos["total"]
@@ -153,7 +153,7 @@ async def test_filtro_por_tipo_e_por_texto(catalogo):
     assert algum in {i["name"] for i in achado["items"]}
 
 
-async def test_no_desabilitado_some_do_indice_e_do_detalhe(catalogo):
+async def test_disabled_node_disappears_from_index_and_detail(catalogo):
     todos = await search_nodes(ctx())
     alvo = todos["items"][0]["name"]
 
@@ -171,7 +171,7 @@ async def test_no_desabilitado_some_do_indice_e_do_detalhe(catalogo):
 # ── describe_node ─────────────────────────────────────────────────────────────
 
 
-async def test_nome_desconhecido_e_not_found(catalogo):
+async def test_unknown_name_is_not_found(catalogo):
     with pytest.raises(ToolError) as exc:
         await describe_node(ctx(), name="NoQueNuncaExistiu")
     detalhe = corpo(exc.value)
@@ -179,7 +179,7 @@ async def test_nome_desconhecido_e_not_found(catalogo):
     assert "search_nodes" in detalhe["hint"]
 
 
-async def test_brief_traz_o_essencial_da_propriedade(catalogo):
+async def test_brief_carries_the_property_essentials(catalogo):
     ficha = await describe_node(ctx(), name="DatabaseQuery", brief=True)
     assert ficha["name"] == "DatabaseQuery"
     assert ficha["requires_credential"] is True
@@ -195,22 +195,22 @@ async def test_brief_traz_o_essencial_da_propriedade(catalogo):
         }
 
 
-async def test_completo_traz_mais_que_o_brief(catalogo):
+async def test_full_carries_more_than_the_brief(catalogo):
     breve = await describe_node(ctx(), name="DatabaseQuery", brief=True)
     inteiro = await describe_node(ctx(), name="DatabaseQuery", brief=False)
     assert set(breve) - {"hints"} <= set(inteiro) | {"inputs", "outputs"}
     # The full sheet carries the fields the summary cuts.
-    chaves_de_propriedade = {chave for p in inteiro["properties"] for chave in p}
-    assert "label" in chaves_de_propriedade
+    property_keys = {chave for p in inteiro["properties"] for chave in p}
+    assert "label" in property_keys
     assert len(json.dumps(inteiro)) > len(json.dumps(breve))
 
 
-async def test_no_que_exige_credencial_diz_como_referencia_la(catalogo):
+async def test_node_requiring_credential_says_how_to_reference_it(catalogo):
     ficha = await describe_node(ctx(), name="DatabaseQuery", brief=True)
     assert any("list_credentials" in dica for dica in ficha["hints"])
 
 
-def test_dicas_explicam_o_que_nenhum_campo_diz():
+def test_hints_explain_what_no_field_says():
     """Dynamic output and suggested column have no field of their own in the sheet."""
     from types import SimpleNamespace
 
@@ -232,18 +232,18 @@ def test_dicas_explicam_o_que_nenhum_campo_diz():
     assert any("NOME DE UMA COLUNA" in d for d in dicas)
 
 
-def test_indice_compacto_ordena_por_nome():
+def test_compact_index_sorts_by_name():
     from types import SimpleNamespace
 
     defs = [
         SimpleNamespace(name="Zebra", type="t", description="Z.", requires_credential=False, alias=None),
         SimpleNamespace(name="Abelha", type="t", description="A.", requires_credential=True, alias=None),
     ]
-    assert [i["name"] for i in indice_compacto(defs)] == ["Abelha", "Zebra"]
-    assert tipos_do_catalogo(defs) == [{"type": "t", "count": 2}]
+    assert [i["name"] for i in compact_index(defs)] == ["Abelha", "Zebra"]
+    assert catalog_types(defs) == [{"type": "t", "count": 2}]
 
 
-def test_busca_ignora_acento_e_caixa():
+def test_search_ignores_accents_and_case():
     from types import SimpleNamespace
 
     defs = [
@@ -252,15 +252,15 @@ def test_busca_ignora_acento_e_caixa():
             requires_credential=False, alias=None,
         ),
     ]
-    assert indice_compacto(defs, query="AREA") != []
-    assert indice_compacto(defs, query="área") != []
-    assert indice_compacto(defs, query="volume") == []
+    assert compact_index(defs, query="AREA") != []
+    assert compact_index(defs, query="área") != []
+    assert compact_index(defs, query="volume") == []
 
 
 # ── get_authoring_guide ───────────────────────────────────────────────────────
 
 
-async def test_guia_devolve_markdown_e_o_uri_do_resource(monkeypatch):
+async def test_guide_returns_markdown_and_the_resource_uri(monkeypatch):
     monkeypatch.setattr(guia, "ler_topico", lambda topic: f"# {topic}\n\ntexto")
     resposta = await get_authoring_guide(ctx(), topic="overview")
     assert resposta["topic"] == "overview"
@@ -271,22 +271,22 @@ async def test_guia_devolve_markdown_e_o_uri_do_resource(monkeypatch):
     assert len(resposta["topics"]) == 9 and "sources" in resposta["topics"]
 
 
-async def test_topico_desconhecido_e_not_found_com_a_lista(monkeypatch):
+async def test_unknown_topic_is_not_found_with_the_list(monkeypatch):
     with pytest.raises(ToolError) as exc:
         await get_authoring_guide(ctx(), topic="../../etc/passwd")
     detalhe = corpo(exc.value)
     assert detalhe["code"] == "not_found"
     # The refusal lists the valid topics — and never echoes a file path.
-    assert detalhe["topics"] == list(guia.TOPICOS)
+    assert detalhe["topics"] == list(guia.TOPICS)
 
 
-async def test_guia_sem_o_arquivo_instalado_nao_vira_erro_interno(monkeypatch):
+async def test_guide_without_the_installed_file_does_not_become_internal_error(monkeypatch):
     """A missing file is unavailability, and the message does not expose the path."""
 
-    def _sem_arquivo(topic):
+    def _missing_file(topic):
         raise FileNotFoundError("/caminho/interno/guia/overview.md")
 
-    monkeypatch.setattr(guia, "ler_topico", _sem_arquivo)
+    monkeypatch.setattr(guia, "ler_topico", _missing_file)
     with pytest.raises(ToolError) as exc:
         await get_authoring_guide(ctx(), topic="overview")
     detalhe = corpo(exc.value)
@@ -294,14 +294,14 @@ async def test_guia_sem_o_arquivo_instalado_nao_vira_erro_interno(monkeypatch):
     assert "/caminho/interno" not in json.dumps(detalhe)
 
 
-async def test_guia_le_o_arquivo_de_verdade_do_topico():
+async def test_guide_reads_the_real_topic_file():
     """No substitute at all: the tool delivers the markdown that is on disk."""
     resposta = await get_authoring_guide(ctx(), topic="overview")
     assert resposta["markdown"].strip() == guia.ler_topico("overview").strip()
     assert resposta["markdown"].strip() != ""
 
 
-def test_no_que_le_fonte_externa_manda_consultar_o_catalogo():
+def test_node_reading_external_source_says_to_check_the_catalog():
     """`source_kind` is what links the node to the source catalog — the hint is what
     makes the model call `search_sources` instead of inventing url/typeName."""
     from types import SimpleNamespace
@@ -317,7 +317,7 @@ def test_no_que_le_fonte_externa_manda_consultar_o_catalogo():
     assert not any("search_sources" in dica for dica in descrever(sem, brief=True)["hints"])
 
 
-async def test_o_catalogo_expoe_o_source_kind_do_wfs(catalogo):
+async def test_the_catalog_exposes_the_wfs_source_kind(catalogo):
     """O flag atravessa `NodeService.list_nodes`, que monta a ficha campo a campo."""
     from app.mcp.tools.catalogo import describe_node
 
@@ -331,8 +331,8 @@ async def test_o_catalogo_expoe_o_source_kind_do_wfs(catalogo):
 # single call, instead of one model round per node.
 
 
-async def test_lista_devolve_as_fichas_na_ordem_e_deduplicada(catalogo):
-    defs = await definicoes_reais()
+async def test_list_returns_the_cards_in_order_and_deduplicated(catalogo):
+    defs = await real_definitions()
     a, b = defs[0].name, defs[1].name
 
     saida = await describe_node(ctx(), name=[a, b, a])
@@ -343,9 +343,9 @@ async def test_lista_devolve_as_fichas_na_ordem_e_deduplicada(catalogo):
     assert "skipped" not in saida
 
 
-async def test_lista_com_desconhecido_nao_derruba_o_lote(catalogo):
+async def test_list_with_unknown_does_not_break_the_batch(catalogo):
     """The model fixes only the name it got wrong, without paying another round for the right ones."""
-    defs = await definicoes_reais()
+    defs = await real_definitions()
     a = defs[0].name
 
     saida = await describe_node(ctx(), name=[a, "NoQueNuncaExistiu"])
@@ -355,8 +355,8 @@ async def test_lista_com_desconhecido_nao_derruba_o_lote(catalogo):
     assert "search_nodes" in saida["hint"]
 
 
-async def test_no_desabilitado_responde_igual_a_inexistente_tambem_no_lote(catalogo):
-    defs = await definicoes_reais()
+async def test_disabled_node_answers_like_nonexistent_also_in_the_batch(catalogo):
+    defs = await real_definitions()
     a, b = defs[0].name, defs[1].name
     catalogo.add(a)
 
@@ -366,8 +366,8 @@ async def test_no_desabilitado_responde_igual_a_inexistente_tambem_no_lote(catal
     assert [f["name"] for f in saida["nodes"]] == [b]
 
 
-async def test_lista_respeita_o_teto_e_anuncia_o_corte(catalogo):
-    defs = await definicoes_reais()
+async def test_list_respects_the_ceiling_and_announces_the_cut(catalogo):
+    defs = await real_definitions()
     nomes = [d.name for d in defs[:9]]
     assert len(nomes) == 9, "o registro encolheu a menos de 9 nós?"
 
@@ -379,13 +379,13 @@ async def test_lista_respeita_o_teto_e_anuncia_o_corte(catalogo):
     assert "8" in saida["hint"]
 
 
-async def test_lista_vazia_e_validation(catalogo):
+async def test_empty_list_is_validation(catalogo):
     with pytest.raises(ToolError) as exc:
         await describe_node(ctx(), name=["", "  "])
     assert corpo(exc.value)["code"] == "validation"
 
 
-async def test_nome_unico_segue_devolvendo_a_ficha_crua(catalogo):
+async def test_single_name_still_returns_the_raw_card(catalogo):
     """Contract regression: a string returns the sheet directly, without a batch envelope
     — it is the form the external MCP clients already consume."""
     ficha = await describe_node(ctx(), name="DatabaseQuery")
@@ -393,17 +393,17 @@ async def test_nome_unico_segue_devolvendo_a_ficha_crua(catalogo):
     assert "nodes" not in ficha
 
 
-async def test_nome_e_apelido_do_mesmo_no_viram_uma_ficha_so(catalogo):
+async def test_name_and_alias_of_the_same_node_become_a_single_card(catalogo):
     """Dedupe by RESOLUTION, not just by spelling: asking for the node by name AND by
     alias returns one sheet — two identical ones would only burn the context that the
     ceiling exists to protect."""
-    defs = await definicoes_reais()
-    com_alias = next((d for d in defs if d.alias), None)
-    if com_alias is None:
+    defs = await real_definitions()
+    with_alias = next((d for d in defs if d.alias), None)
+    if with_alias is None:
         pytest.skip("nenhum nó com apelido no registro")
 
-    saida = await describe_node(ctx(), name=[com_alias.name, com_alias.alias])
+    saida = await describe_node(ctx(), name=[with_alias.name, with_alias.alias])
 
-    assert [f["name"] for f in saida["nodes"]] == [com_alias.name]
+    assert [f["name"] for f in saida["nodes"]] == [with_alias.name]
     assert saida["total"] == 1
     assert "not_found" not in saida

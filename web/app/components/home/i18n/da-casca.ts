@@ -12,24 +12,24 @@ import type { Idioma } from "@/lib/idioma"
 import * as casca from "./secoes/casca"
 import * as comum from "./secoes/comum"
 import * as listas from "./secoes/listas"
-import { useIdiomaDaTela } from "./tela"
+import { useScreenLanguage } from "./tela"
 
-export const TEXTOS_DA_CASCA = {
+export const SHELL_TEXTS = {
   "pt-BR": { comum: comum.pt, casca: casca.pt, listas: listas.pt },
   en: { comum: comum.en, casca: casca.en, listas: listas.en },
   es: { comum: comum.es, casca: casca.es, listas: listas.es },
 } satisfies Record<Idioma, unknown>
 
-export type TextosDaCasca = (typeof TEXTOS_DA_CASCA)["pt-BR"]
+export type ShellTexts = (typeof SHELL_TEXTS)["pt-BR"]
 
 /** Outside React (a pure function that receives the language). */
-export function textosDaCascaDe(idioma: Idioma): TextosDaCasca {
-  return TEXTOS_DA_CASCA[idioma]
+export function shellTextsFor(idioma: Idioma): ShellTexts {
+  return SHELL_TEXTS[idioma]
 }
 
 /** The shell texts in the screen's language. A stable object per language — usable as a dependency. */
-export function useTextosDaCasca(): TextosDaCasca {
-  return TEXTOS_DA_CASCA[useIdiomaDaTela()]
+export function useShellTexts(): ShellTexts {
+  return SHELL_TEXTS[useScreenLanguage()]
 }
 
-export { useFormatos, useIdiomaDaTela } from "./tela"
+export { useFormats, useScreenLanguage } from "./tela"

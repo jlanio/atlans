@@ -2,7 +2,7 @@
 
 import { Dialog } from "@/app/components/ui/dialog"
 import { DeleteDialog } from "@/app/components/shared/DeleteDialog"
-import { formatarInteiro, plural } from "@/lib/formatos"
+import { formatInteger, plural } from "@/lib/formatos"
 
 /**
  * Confirmation of the batch deletion of artifacts. Wraps `shared/DeleteDialog`
@@ -14,7 +14,7 @@ import { formatarInteiro, plural } from "@/lib/formatos"
  * quotes, in the tone of the other screens. In a batch the names are not
  * listed — the number is what matters.
  */
-export function ExcluirArtefatosDialog({
+export function DeleteArtifactsDialog({
   aberto, quantidade, nomeUnico, onConfirmar, onFechar,
 }: {
   aberto: boolean
@@ -27,7 +27,7 @@ export function ExcluirArtefatosDialog({
   const titulo = umSo ? "Excluir artefato" : `Excluir ${plural(quantidade, "artefato")}`
   const descricao = umSo
     ? `O artefato${nomeUnico ? ` «${nomeUnico}»` : ""} será removido permanentemente e não poderá ser recuperado.`
-    : `${formatarInteiro(quantidade)} artefatos serão removidos permanentemente e não poderão ser recuperados.`
+    : `${formatInteger(quantidade)} artefatos serão removidos permanentemente e não poderão ser recuperados.`
 
   return (
     <Dialog open={aberto} onOpenChange={v => { if (!v) onFechar() }}>

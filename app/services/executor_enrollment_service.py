@@ -523,7 +523,7 @@ async def attach_cert_to_agent(db: AsyncSession, executor_id: str, cert_data: di
 
 
 async def renovar_cert_do_executor(
-    db: AsyncSession, executor_id: str, serial_apresentado: str | None, cert_data: dict,
+    db: AsyncSession, executor_id: str, presented_serial: str | None, cert_data: dict,
 ) -> bool:
     """
     Renewal: writes the new cert ONLY if the executor is still as it was when it
@@ -543,13 +543,13 @@ async def renovar_cert_do_executor(
     Returns False when the executor changed midway: the caller discards the
     freshly issued cert.
     """
-    if not serial_apresentado:
+    if not presented_serial:
         return False
     resultado = await db.execute(
         update(Executor)
         .where(
             Executor.id_hash == executor_id,
-            Executor.cert_serial == serial_apresentado,
+            Executor.cert_serial == presented_serial,
             Executor.status == "active",
         )
         .values(
@@ -593,7 +593,7 @@ async def attach_public_key_to_agent(db: AsyncSession, executor_id: str, public_
     await db.commit()
 
 
-# ── Revogacao ────────────────────────────────────────────────────────────────
+# ── Revocation ────────────────────────────────────────────────────────────────
 
 
 async def revoke_cert(serial: str, cert_expires_at: datetime | None = None) -> None:

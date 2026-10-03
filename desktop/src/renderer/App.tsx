@@ -12,8 +12,8 @@ import {
   TbActivity, TbBolt, TbChartBar, TbCircleOff, TbCpu, TbHandStop, TbKey, TbLoader,
   TbPlayerPlayFilled, TbPlugConnected, TbServer, TbTrendingUp,
 } from 'react-icons/tb'
-import type { EstadoApp } from '../main/state/store.js'
-import type { EstadoConfiguracao } from '../main/state/config.js'
+import type { AppState } from '../main/state/store.js'
+import type { ConfigState } from '../main/state/config.js'
 import type { InfoApp } from '../shared/ipc.js'
 import { Ajustes } from './components/Ajustes.js'
 import { Alerta } from './components/Alerta.js'
@@ -23,7 +23,7 @@ import { GeoSync } from './components/GeoSync.js'
 import { Logs } from './components/Logs.js'
 import { MetricCard } from './components/MetricCard.js'
 import { Onboarding } from './components/Onboarding.js'
-import { Sidebar, type Aba } from './components/Sidebar.js'
+import { Sidebar, type Tab } from './components/Sidebar.js'
 import { StatusBadge } from './components/StatusBadge.js'
 import { StatusBar } from './components/StatusBar.js'
 import { TitleBar } from './components/TitleBar.js'
@@ -32,10 +32,10 @@ import { Card, CardContent } from './components/ui/card.js'
 import { Skeleton } from './components/ui/skeleton.js'
 import { SERVIDOR } from '../shared/servidor.js'
 import { duracao } from './lib/formato.js'
-import { ContextoSnapshot } from './lib/snapshot.js'
+import { SnapshotContext } from './lib/snapshot.js'
 import { useLog } from './lib/useLog.js'
 
-const CONEXAO: Record<string, string> = {
+const CONNECTION: Record<string, string> = {
   offline: 'Offline',
   connecting: 'Conectando',
   connected: 'Conectado',
@@ -44,7 +44,7 @@ const CONEXAO: Record<string, string> = {
 }
 
 /** Actionable message per failure step — it is what `state: failed` carries. */
-const REMEDIO: Record<string, string> = {
+const REMEDY: Record<string, string> = {
   config: 'Este computador ainda não foi vinculado a um executor. Gere um OTP no painel web, em Executores, e conclua o enrollment.',
   enrollment: 'O certificado mTLS não foi encontrado. Refaça o enrollment com um OTP novo.',
   server_key: 'Não foi possível obter a chave de assinatura do servidor. Verifique a conexão de rede e o endereço configurado.',
@@ -57,9 +57,9 @@ const REMEDIO: Record<string, string> = {
 }
 
 /** Steps whose fix is redoing the link, not trying again. */
-const PEDE_NOVO_ENROLLMENT = new Set(['revoked', 'enrollment', 'private_key'])
+const NEEDS_NEW_ENROLLMENT = new Set(['revoked', 'enrollment', 'private_key'])
 
-const TITULOS: Record<Aba, string> = {
+const TITLES: Record<Tab, string> = {
   painel: 'Painel',
   execucoes: 'Execuções',
   geosync: 'GeoSync',
@@ -67,18 +67,18 @@ const TITULOS: Record<Aba, string> = {
 }
 
 /**
- * Window dedicated to the log — opened by `abrirJanelaDeLog` in main.
+ * Window dedicated to the log — opened by `openLogWindow` in main.
  *
  * The route is the URL hash, not a router: there are TWO screens, and pulling
  * in a whole router for that would cost more in dependencies than it saves in
  * code.
  */
-function ehJanelaDeLog(): boolean {
+function isLogWindow(): boolean {
   return window.location.hash === '#log'
 }
 
 /** Only the log, full screen, with the app's title bar on top. */
-function JanelaDeLog() {
+function LogWindow() {
   // It does not even subscribe to the state: this window only shows the log,
   // and the log channel is independent of the state channel. `info` comes in
   // because it is static — only the logs folder path, for the footer
@@ -101,13 +101,13 @@ export function App() {
   // Before any hook: the two screens have different lifecycles, and mounting
   // one of them conditionally inside a single component would break the hook
   // order.
-  return ehJanelaDeLog() ? <JanelaDeLog /> : <JanelaPrincipal />
+  return isLogWindow() ? <LogWindow /> : <MainWindow />
 }
 
-function JanelaPrincipal() {
-  const [estado, setEstado] = useState<EstadoApp | null>(null)
+function MainWindow() {
+  const [estado, setAppState] = useState<AppState | null>(null)
   const [info, setInfo] = useState<InfoApp | null>(null)
-  const [config, setConfig] = useState<EstadoConfiguracao | null>(null)
+  const [config, setConfig] = useState<ConfigState | null>(null)
   /**
    * Redoing the link — the only action in the window that is REALLY blocking.
    *
@@ -117,8 +117,8 @@ function JanelaPrincipal() {
    * the `parar` promise left the whole window gray during the drain,
    * including the "Forçar" (force) buttons, which are the way out of it.
    */
-  const [refazendo, setRefazendo] = useState(false)
-  const [aba, setAba] = useState<Aba>('painel')
+  const [refazendo, setRedoing] = useState(false)
+  const [aba, setTab] = useState<Tab>('painel')
   /**
    * Screens with unsaved changes.
    *
@@ -129,13 +129,13 @@ function JanelaPrincipal() {
    * A confirmation dialog on every switch would be worse: it always interrupts
    * to protect against a loss that no longer happens.
    */
-  const [pendencias, setPendencias] = useState<Partial<Record<Aba, boolean>>>({})
+  const [pendencias, setPending] = useState<Partial<Record<Tab, boolean>>>({})
   // The SAVED GeoSync folder, for the footer shortcut. It comes from the screen
   // itself, which is what knows when the `.env` changed.
   const [pastaGeosync, setPastaGeosync] = useState<string | null>(null)
 
-  const marcarPendencia = useCallback((tela: Aba, pendente: boolean) => {
-    setPendencias((atual) => (
+  const markPending = useCallback((tela: Tab, pendente: boolean) => {
+    setPending((atual) => (
       Boolean(atual[tela]) === pendente ? atual : { ...atual, [tela]: pendente }
     ))
   }, [])
@@ -144,25 +144,25 @@ function JanelaPrincipal() {
   // every render (that is, every second) would get through `memo` and also
   // make the `useEffect([sujo, aoMudarPendencia])` of both re-run with
   // nothing having changed.
-  const pendenciaGeosync = useCallback(
-    (p: boolean) => marcarPendencia('geosync', p), [marcarPendencia],
+  const geosyncPending = useCallback(
+    (p: boolean) => markPending('geosync', p), [markPending],
   )
-  const pendenciaAjustes = useCallback(
-    (p: boolean) => marcarPendencia('ajustes', p), [marcarPendencia],
+  const settingsPending = useCallback(
+    (p: boolean) => markPending('ajustes', p), [markPending],
   )
 
-  const recarregarConfig = useCallback(() => {
+  const reloadConfig = useCallback(() => {
     void window.atlas.configuracao().then(setConfig)
   }, [])
 
   useEffect(() => {
-    void window.atlas.estado().then(setEstado)
+    void window.atlas.estado().then(setAppState)
     void window.atlas.info().then(setInfo)
-    recarregarConfig()
+    reloadConfig()
     // The unsubscribe returned by the preload must run in the cleanup, otherwise
     // each remount accumulates an IPC listener.
-    return window.atlas.aoAtualizarEstado(setEstado)
-  }, [recarregarConfig])
+    return window.atlas.aoAtualizarEstado(setAppState)
+  }, [reloadConfig])
 
   // A failure in `config`/`enrollment` means the `.env` or the certificates
   // changed from outside (folder deleted, cert expired and removed). Re-reading
@@ -170,14 +170,14 @@ function JanelaPrincipal() {
   // does not work.
   useEffect(() => {
     if (estado?.passoFase === 'config' || estado?.passoFase === 'enrollment') {
-      recarregarConfig()
+      reloadConfig()
     }
-  }, [estado?.passoFase, recarregarConfig])
+  }, [estado?.passoFase, reloadConfig])
 
   const refazerEnrollment = useCallback(async () => {
-    setRefazendo(true)
+    setRedoing(true)
     try { setConfig(await window.atlas.refazerEnrollment()) }
-    finally { setRefazendo(false) }
+    finally { setRedoing(false) }
   }, [])
 
   // The title bar belongs to the app (the window uses `frame: false`), so it
@@ -185,7 +185,7 @@ function JanelaPrincipal() {
   // opens with no way to close it.
   if (!estado || !config) {
     return (
-      <Moldura>
+      <Frame>
         {/* Skeleton shaped like what is coming: the sidebar and the four cards
             of the Painel. A centered sentence says neither where the content
             will appear nor how much of it is coming — and it vanishes
@@ -204,7 +204,7 @@ function JanelaPrincipal() {
             </div>
           </div>
         </div>
-      </Moldura>
+      </Frame>
     )
   }
 
@@ -213,9 +213,9 @@ function JanelaPrincipal() {
   // window.
   if (!config.configurado) {
     return (
-      <Moldura>
-        <Onboarding config={config} aoConcluir={recarregarConfig} />
-      </Moldura>
+      <Frame>
+        <Onboarding config={config} aoConcluir={reloadConfig} />
+      </Frame>
     )
   }
 
@@ -224,14 +224,14 @@ function JanelaPrincipal() {
   return (
     // The snapshot goes down through context: as a prop, it re-rendered GeoSync
     // and Ajustes entirely every second. See lib/snapshot.ts.
-    <ContextoSnapshot.Provider value={snap}>
-      <Moldura barra={<StatusBar estado={estado} info={info}
+    <SnapshotContext.Provider value={snap}>
+      <Frame barra={<StatusBar estado={estado} info={info}
                             pastaGeosync={pastaGeosync}
-                            aoAbrirAjustes={() => setAba('ajustes')} />}>
+                            aoAbrirAjustes={() => setTab('ajustes')} />}>
         <div className="flex min-h-0 flex-1">
           <Sidebar
             aba={aba}
-            aoTrocar={setAba}
+            aoTrocar={setTab}
             pendencias={pendencias}
             estado={estado}
             aoIniciar={() => void window.atlas.iniciar()}
@@ -253,7 +253,7 @@ function JanelaPrincipal() {
                   lifecycle actions now live in the sidebar, and repeating
                   them here would cost height without saying anything new. */}
               <header className="flex min-h-8 items-center justify-between gap-4">
-                <h1 className="text-lg font-semibold">{TITULOS[aba]}</h1>
+                <h1 className="text-lg font-semibold">{TITLES[aba]}</h1>
                 {aba === 'painel' && estado.hello && (
                   <div className="flex items-center gap-3">
                     <Copiavel
@@ -295,10 +295,10 @@ function JanelaPrincipal() {
                 <Alerta
                   tom="erro"
                   titulo="O executor não está rodando."
-                  remedio={estado.passoFase ? REMEDIO[estado.passoFase] : undefined}
+                  remedio={estado.passoFase ? REMEDY[estado.passoFase] : undefined}
                   bruto={estado.detalheFase ?? estado.detalheSupervisor}
                 >
-                  {estado.passoFase && PEDE_NOVO_ENROLLMENT.has(estado.passoFase) && (
+                  {estado.passoFase && NEEDS_NEW_ENROLLMENT.has(estado.passoFase) && (
                     <Button size="sm" disabled={refazendo}
                             title="Descarta o certificado desta máquina. A configuração e os artefatos são mantidos."
                             onClick={() => void refazerEnrollment()}>
@@ -347,7 +347,7 @@ function JanelaPrincipal() {
                 <GeoSync
                   rodando={estado.supervisor === 'running'}
                   visivel={aba === 'geosync'}
-                  aoMudarPendencia={pendenciaGeosync}
+                  aoMudarPendencia={geosyncPending}
                   aoMudarPasta={setPastaGeosync}
                 />
               </div>
@@ -355,7 +355,7 @@ function JanelaPrincipal() {
                    className={aba === 'ajustes' ? 'animate-in fade-in-0 slide-in-from-bottom-1 duration-200' : undefined}>
                 <Ajustes
                   info={info} rodando={estado.supervisor === 'running'}
-                  aoMudarPendencia={pendenciaAjustes}
+                  aoMudarPendencia={settingsPending}
                 />
               </div>
 
@@ -375,8 +375,8 @@ function JanelaPrincipal() {
             </div>
           </main>
         </div>
-      </Moldura>
-    </ContextoSnapshot.Provider>
+      </Frame>
+    </SnapshotContext.Provider>
   )
 }
 
@@ -385,7 +385,7 @@ function JanelaPrincipal() {
 function Painel({
   estado, info, aoIniciar,
 }: {
-  estado: EstadoApp
+  estado: AppState
   info: InfoApp | null
   aoIniciar: () => void
 }) {
@@ -508,7 +508,7 @@ function Painel({
                   needs to see something is still happening. */}
               <StatusBadge
                 status={snap.conn_state}
-                rotulo={CONEXAO[snap.conn_state] ?? snap.conn_state}
+                rotulo={CONNECTION[snap.conn_state] ?? snap.conn_state}
                 pulsando={snap.conn_state === 'connecting' || snap.conn_state === 'reconnecting'}
               />
             </Linha>
@@ -585,7 +585,7 @@ function Linha({ rotulo, children }: { rotulo: string; children: React.ReactNode
  * The status bar is optional because on the loading and link screens there is
  * no executor to report anything about.
  */
-function Moldura({ children, barra }: { children: React.ReactNode; barra?: React.ReactNode }) {
+function Frame({ children, barra }: { children: React.ReactNode; barra?: React.ReactNode }) {
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <TitleBar />

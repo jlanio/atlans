@@ -18,11 +18,11 @@ import os
 from collections.abc import Mapping
 from urllib.parse import urlsplit
 
-PRODUTO = "Atlans"
-_PREFIXO_DO_HOST_DOS_EXECUTORES = "agents."
+PRODUCT = "Atlans"
+_EXECUTOR_HOST_PREFIX = "agents."
 
 
-def site_da_instalacao(ambiente: Mapping[str, str] | None = None) -> str:
+def installation_site(ambiente: Mapping[str, str] | None = None) -> str:
     """The site of this executor's installation; empty if there is none.
 
     EXECUTOR_PUBLIC_SERVER_URL, when defined; otherwise the executors' host
@@ -45,8 +45,8 @@ def site_da_instalacao(ambiente: Mapping[str, str] | None = None) -> str:
         return ""
     if partes.scheme not in ("http", "https") or not host:
         return ""
-    if not publico and host.startswith(_PREFIXO_DO_HOST_DOS_EXECUTORES):
-        host = host[len(_PREFIXO_DO_HOST_DOS_EXECUTORES):]
+    if not publico and host.startswith(_EXECUTOR_HOST_PREFIX):
+        host = host[len(_EXECUTOR_HOST_PREFIX):]
     if _interno(host):
         return ""
     if ":" in host:  # IPv6 goes in brackets in the URL
@@ -67,5 +67,5 @@ def _interno(host: str) -> bool:
 
 def user_agent(componente: str, ambiente: Mapping[str, str] | None = None) -> str:
     """`Atlans/<componente> (+<site da instalação>)` (component, installation site), or without the site if there is none."""
-    site = site_da_instalacao(ambiente)
-    return f"{PRODUTO}/{componente} (+{site})" if site else f"{PRODUTO}/{componente}"
+    site = installation_site(ambiente)
+    return f"{PRODUCT}/{componente} (+{site})" if site else f"{PRODUCT}/{componente}"

@@ -27,7 +27,7 @@ def _script(node_id, code, saida="r"):
             "properties": {"code": code, "output_vars": saida, "timeout": 20}}
 
 
-def _rodar(nodes, edges):
+def _run(nodes, edges):
     from flow.executor import WorkflowExecutor
 
     publisher = MagicMock()
@@ -40,7 +40,7 @@ def _rodar(nodes, edges):
 
 # ── O defeito ────────────────────────────────────────────────────────────────
 
-def test_sem_to_key_a_segunda_aresta_SOBRESCREVE_a_primeira():
+def test_without_to_key_the_second_edge_OVERWRITES_the_first():
     """Documents the inherited behavior: without `to_key`, the two edges use the
     `from_key` as the name and one of them is lost.
 
@@ -49,7 +49,7 @@ def test_sem_to_key_a_segunda_aresta_SOBRESCREVE_a_primeira():
     this test warns that the contract changed.
     """
     with pytest.raises(Exception) as e:
-        _rodar(
+        _run(
             [_script("a", "r = 'A'"), _script("b", "r = 'B'"),
              _script("c", "r = f'{A}+{B}'")],
             [{"source": "a", "target": "c", "from_key": "r"},
@@ -62,8 +62,8 @@ def test_sem_to_key_a_segunda_aresta_SOBRESCREVE_a_primeira():
 
 # ── O conserto ───────────────────────────────────────────────────────────────
 
-def test_com_to_key_as_duas_entradas_chegam_pelo_nome():
-    resultado = _rodar(
+def test_with_to_key_both_inputs_arrive_by_name():
+    resultado = _run(
         [_script("a", "r = 'A'"), _script("b", "r = 'B'"),
          _script("c", "r = f'{entrada_1}+{entrada_2}'")],
         [{"source": "a", "target": "c", "from_key": "r", "to_key": "entrada_1"},
@@ -72,9 +72,9 @@ def test_com_to_key_as_duas_entradas_chegam_pelo_nome():
     assert resultado["c"]["r"] == "A+B"
 
 
-def test_to_key_nomeia_mesmo_com_from_key_diferente():
+def test_to_key_names_even_with_different_from_key():
     """`to_key` wins: it is the ARRIVAL name, regardless of what the parent called it."""
-    resultado = _rodar(
+    resultado = _run(
         [_script("a", "saida_do_a = 'A'", saida="saida_do_a"),
          _script("c", "r = pontos")],
         [{"source": "a", "target": "c", "from_key": "saida_do_a", "to_key": "pontos"}],
@@ -82,11 +82,11 @@ def test_to_key_nomeia_mesmo_com_from_key_diferente():
     assert resultado["c"]["r"] == "A"
 
 
-def test_uma_entrada_sem_to_key_continua_funcionando():
+def test_single_input_without_to_key_still_works():
     """Must not break existing workflows: without declared ports `ports` stays
     empty, the node keeps one anonymous connection point and the variable keeps
     coming through `from_key`."""
-    resultado = _rodar(
+    resultado = _run(
         [_script("a", "r = 'A'"), _script("c", "r = r + '!'")],
         [{"source": "a", "target": "c", "from_key": "r"}],
     )
@@ -95,7 +95,7 @@ def test_uma_entrada_sem_to_key_continua_funcionando():
 
 # ── The node contract ────────────────────────────────────────────────────────
 
-def test_pythonscript_declara_entradas_dinamicas():
+def test_pythonscript_declares_dynamic_inputs():
     """`dynamic_inputs` is what makes the editor derive the connection points from
     the `ports` property instead of the catalog's fixed list."""
     from flow.registry import auto_discover_nodes, NODE_REGISTRY

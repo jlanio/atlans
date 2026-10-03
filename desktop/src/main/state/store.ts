@@ -35,7 +35,7 @@
 import type {
   ExecutorEvent, HelloEvent, JobEvent, Phase, Snapshot,
 } from '../../shared/events.js'
-import type { EstadoSupervisor } from '../python/supervisor.js'
+import type { SupervisorState } from '../python/supervisor.js'
 
 const MAX_JOBS = 200
 const MAX_LOG = 1000
@@ -47,9 +47,9 @@ const MAX_LOG = 1000
  * to become an event) and long enough to collapse the burst of events that
  * arrives when a workflow starts.
  */
-const JANELA_MS = 80
+const WINDOW_MS = 80
 
-export interface LinhaLog {
+export interface LogLine {
   /** Monotonic and global. Stable key of the line and cursor of the incremental channel. */
   seq: number
   ts: number
@@ -61,8 +61,8 @@ export interface LinhaLog {
 }
 
 /** Batch delivered by the log channel. */
-export interface LoteLog {
-  linhas: LinhaLog[]
+export interface LogBatch {
+  linhas: LogLine[]
   /**
    * `seq` of the oldest line still in main's buffer.
    *
@@ -73,7 +73,7 @@ export interface LoteLog {
   primeiroSeq: number
 }
 
-export interface JobHistorico {
+export interface HistoryJob {
   job_id: string
   run_id: string | null
   status: string
@@ -83,15 +83,15 @@ export interface JobHistorico {
   nodes_failed?: number | null
 }
 
-export interface EstadoApp {
-  supervisor: EstadoSupervisor
+export interface AppState {
+  supervisor: SupervisorState
   detalheSupervisor: string | null
   fase: Phase | null
   passoFase: string | null
   detalheFase: string | null
   hello: HelloEvent['data'] | null
   snapshot: Snapshot | null
-  jobs: JobHistorico[]
+  jobs: HistoryJob[]
   /**
    * How many ERRORs are in the log buffer.
    *
@@ -104,7 +104,7 @@ export interface EstadoApp {
 }
 
 export class AppStore {
-  private estado: EstadoApp = {
+  private estado: AppState = {
     supervisor: 'stopped',
     detalheSupervisor: null,
     fase: null,
@@ -116,35 +116,35 @@ export class AppStore {
     errosNoLog: 0,
   }
 
-  private log: LinhaLog[] = []
+  private log: LogLine[] = []
   private proximoSeq = 1
 
-  private ouvintes = new Set<(e: EstadoApp) => void>()
-  private ouvintesLog = new Set<(lote: LoteLog) => void>()
+  private ouvintes = new Set<(e: AppState) => void>()
+  private ouvintesLog = new Set<(lote: LogBatch) => void>()
 
   /** Linhas acumuladas desde o ultimo flush. */
-  private pendentes: LinhaLog[] = []
+  private pendentes: LogLine[] = []
   private timer: ReturnType<typeof setTimeout> | null = null
   private estadoSujo = false
 
   // ── Leitura ────────────────────────────────────────────────────────────────
 
-  instantaneo(): EstadoApp { return this.estado }
+  instantaneo(): AppState { return this.estado }
 
   /** Full buffer. Used by a window that has just opened. */
-  logCompleto(): LoteLog {
+  logCompleto(): LogBatch {
     // A copy: IPC serializes this object in a later microtask, and returning the
     // live array would bet that nothing mutated it in that interval. It costs
     // a slice of 1000 elements once per opened window.
     return { linhas: this.log.slice(), primeiroSeq: this.log[0]?.seq ?? this.proximoSeq }
   }
 
-  assinar(fn: (e: EstadoApp) => void): () => void {
+  assinar(fn: (e: AppState) => void): () => void {
     this.ouvintes.add(fn)
     return () => this.ouvintes.delete(fn)
   }
 
-  assinarLog(fn: (lote: LoteLog) => void): () => void {
+  assinarLog(fn: (lote: LogBatch) => void): () => void {
     this.ouvintesLog.add(fn)
     return () => this.ouvintesLog.delete(fn)
   }
@@ -164,7 +164,7 @@ export class AppStore {
     this.timer = setTimeout(() => {
       this.timer = null
       this.entregar()
-    }, JANELA_MS)
+    }, WINDOW_MS)
   }
 
   private entregar(): void {
@@ -175,7 +175,7 @@ export class AppStore {
       }
     }
     if (this.pendentes.length > 0) {
-      const lote: LoteLog = {
+      const lote: LogBatch = {
         linhas: this.pendentes,
         primeiroSeq: this.log[0]?.seq ?? this.proximoSeq,
       }
@@ -202,7 +202,7 @@ export class AppStore {
 
   // ── Escrita ────────────────────────────────────────────────────────────────
 
-  aplicarEstadoSupervisor(estado: EstadoSupervisor, detalhe?: string): void {
+  aplicarEstadoSupervisor(estado: SupervisorState, detalhe?: string): void {
     this.estado = { ...this.estado, supervisor: estado, detalheSupervisor: detalhe ?? null }
     // A stopped executor has no valid snapshot; keeping the last one would make
     // the UI show "connected" with the process dead.
@@ -284,7 +284,7 @@ export class AppStore {
     this.estado = { ...this.estado, jobs }
   }
 
-  private registrarLog(linha: LinhaLog): void {
+  private registrarLog(linha: LogLine): void {
     linha.seq = this.proximoSeq++
 
     // `push` and `shift`, not `[...log, linha]`: copying the whole array on

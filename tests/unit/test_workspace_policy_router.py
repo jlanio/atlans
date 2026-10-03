@@ -35,7 +35,7 @@ def _ws():
     return ws
 
 
-def _saida():
+def _output():
     from app.api.routers.workspace_router import WorkspacePolicyOut
     return WorkspacePolicyOut(
         workspace_id="ws-test-001", mode="pool", primary=[], fallback=[],
@@ -46,7 +46,7 @@ def _saida():
 
 # ── member inclusion ──────────────────────────────────────────────────────────
 
-async def test_viewer_nao_inclui_membro(db_override):
+async def test_viewer_does_not_add_member(db_override):
     client, _ = db_override
     negado = AsyncMock(side_effect=HTTPException(status_code=403, detail="Requer role 'admin'."))
     with patch("app.api.routers.workspace_router._get_admin_managed_workspace", negado):
@@ -54,12 +54,12 @@ async def test_viewer_nao_inclui_membro(db_override):
     assert resp.status_code == 403
 
 
-async def test_admin_do_workspace_inclui_no_nivel_pedido(db_override):
+async def test_workspace_admin_adds_to_the_requested_tier(db_override):
     client, db = db_override
     add = AsyncMock()
     with patch("app.api.routers.workspace_router._get_admin_managed_workspace", AsyncMock(return_value=_ws())), \
          patch("app.api.routers.workspace_router._accessible_ids_for", AsyncMock(return_value={"ex-1"})), \
-         patch("app.api.routers.workspace_router._policy_out", AsyncMock(return_value=_saida())), \
+         patch("app.api.routers.workspace_router._policy_out", AsyncMock(return_value=_output())), \
          patch("app.services.workspace_executor_service.add_member", add):
         resp = await client.post("/workspaces/ws-test-001/executors/ex-1?tier=2")
     assert resp.status_code == 200, resp.text
@@ -67,14 +67,14 @@ async def test_admin_do_workspace_inclui_no_nivel_pedido(db_override):
     assert add.await_args.kwargs["accessible_ids"] == {"ex-1"}
 
 
-async def test_tier_fora_do_intervalo_e_422(db_override):
+async def test_tier_out_of_range_is_422(db_override):
     client, _ = db_override
     with patch("app.api.routers.workspace_router._get_admin_managed_workspace", AsyncMock(return_value=_ws())):
         resp = await client.post("/workspaces/ws-test-001/executors/ex-1?tier=3")
     assert resp.status_code == 422
 
 
-async def test_erro_de_politica_vira_422_com_mensagem(db_override):
+async def test_policy_error_becomes_422_with_message(db_override):
     from app.core.exceptions import WorkspacePolicyError
     client, _ = db_override
     with patch("app.api.routers.workspace_router._get_admin_managed_workspace", AsyncMock(return_value=_ws())), \
@@ -91,7 +91,7 @@ async def test_erro_de_politica_vira_422_com_mensagem(db_override):
 
 # ── terminal ──────────────────────────────────────────────────────────────────
 
-async def test_terminal_pool_sob_piso_e_403(db_override):
+async def test_terminal_pool_under_floor_is_403(db_override):
     from app.core.exceptions import WorkspacePolicyFloorError
     client, _ = db_override
     with patch("app.api.routers.workspace_router._get_admin_managed_workspace", AsyncMock(return_value=_ws())), \
@@ -101,7 +101,7 @@ async def test_terminal_pool_sob_piso_e_403(db_override):
     assert resp.status_code == 403
 
 
-async def test_terminal_invalido_e_422_antes_de_tocar_no_servico(db_override):
+async def test_invalid_terminal_is_422_before_touching_the_service(db_override):
     client, _ = db_override
     with patch("app.api.routers.workspace_router._get_admin_managed_workspace", AsyncMock(return_value=_ws())), \
          patch("app.services.workspace_executor_service.set_terminal", AsyncMock()) as st:
@@ -112,7 +112,7 @@ async def test_terminal_invalido_e_422_antes_de_tocar_no_servico(db_override):
 
 # ── leitura ───────────────────────────────────────────────────────────────────
 
-async def test_leitura_exige_ser_membro(db_override):
+async def test_read_requires_membership(db_override):
     client, _ = db_override
     negado = AsyncMock(side_effect=HTTPException(status_code=403, detail="não é membro"))
     with patch("app.api.routers.workspace_router._get_visible_workspace", negado):
@@ -120,10 +120,10 @@ async def test_leitura_exige_ser_membro(db_override):
     assert resp.status_code == 403
 
 
-async def test_leitura_devolve_a_politica_com_a_flag(db_override):
+async def test_read_returns_the_policy_with_the_flag(db_override):
     client, _ = db_override
     with patch("app.api.routers.workspace_router._get_visible_workspace", AsyncMock(return_value=(_ws(), "viewer"))), \
-         patch("app.api.routers.workspace_router._policy_out", AsyncMock(return_value=_saida())):
+         patch("app.api.routers.workspace_router._policy_out", AsyncMock(return_value=_output())):
         resp = await client.get("/workspaces/ws-test-001/executors")
     assert resp.status_code == 200
     corpo = resp.json()
@@ -132,21 +132,21 @@ async def test_leitura_devolve_a_politica_com_a_flag(db_override):
 
 # ── platform admin floor ─────────────────────────────────────────────────────
 
-async def test_piso_negado_para_usuario_comum(client):
+async def test_floor_denied_for_regular_user(client):
     resp = await client.put("/admin/workspaces/ws-test-001/isolation-floor", json={"floor": "no_pool"})
     assert resp.status_code == 403
 
 
-async def test_piso_pelo_admin_forca_terminal_e_avisa(db_override, mock_current_user):
+async def test_floor_by_admin_forces_terminal_and_warns(db_override, mock_current_user):
     client, db = db_override
     mock_current_user.role = "admin"; mock_current_user.username = "admin-test"
     ws = _ws(); ws.fallback_terminal = "pool"
     res = MagicMock(); res.scalar_one_or_none = MagicMock(return_value=ws)
     db.execute = AsyncMock(return_value=res)
     from app.services import workspace_executor_service as svc
-    com_principal = svc.WorkspacePolicy(workspace_id="ws-test-001", primary=[MagicMock()])
+    with_primary = svc.WorkspacePolicy(workspace_id="ws-test-001", primary=[MagicMock()])
     with patch("app.services.execution_alert_service.notify_floor_forced", AsyncMock()) as avisar, \
-         patch("app.services.workspace_executor_service.load_policy", AsyncMock(return_value=com_principal)):
+         patch("app.services.workspace_executor_service.load_policy", AsyncMock(return_value=with_primary)):
         resp = await client.put("/admin/workspaces/ws-test-001/isolation-floor", json={"floor": "no_pool"})
     assert resp.status_code == 200, resp.text
     corpo = resp.json()
@@ -155,7 +155,7 @@ async def test_piso_pelo_admin_forca_terminal_e_avisa(db_override, mock_current_
     avisar.assert_awaited_once()
 
 
-async def test_piso_sem_principal_nao_avisa(db_override, mock_current_user):
+async def test_floor_without_primary_does_not_warn(db_override, mock_current_user):
     # "Became isolated" only makes sense for someone with a dedicated executor.
     client, db = db_override
     mock_current_user.role = "admin"; mock_current_user.username = "admin-test"
@@ -163,16 +163,16 @@ async def test_piso_sem_principal_nao_avisa(db_override, mock_current_user):
     res = MagicMock(); res.scalar_one_or_none = MagicMock(return_value=ws)
     db.execute = AsyncMock(return_value=res)
     from app.services import workspace_executor_service as svc
-    sem_principal = svc.WorkspacePolicy(workspace_id="ws-test-001")
+    without_primary = svc.WorkspacePolicy(workspace_id="ws-test-001")
     with patch("app.services.execution_alert_service.notify_floor_forced", AsyncMock()) as avisar, \
-         patch("app.services.workspace_executor_service.load_policy", AsyncMock(return_value=sem_principal)):
+         patch("app.services.workspace_executor_service.load_policy", AsyncMock(return_value=without_primary)):
         resp = await client.put("/admin/workspaces/ws-test-001/isolation-floor", json={"floor": "no_pool"})
     assert resp.status_code == 200, resp.text
     avisar.assert_not_awaited()
 
 
 
-async def test_admin_lista_a_politica_de_todos_os_workspaces(db_override, mock_current_user):
+async def test_admin_lists_the_policy_of_all_workspaces(db_override, mock_current_user):
     """Admin screen "Piso de isolamento" (isolation floor): one row per live workspace, with the
     mode derived from the tier COUNTS — without loading executors."""
     client, db = db_override
@@ -202,7 +202,7 @@ async def test_admin_lista_a_politica_de_todos_os_workspaces(db_override, mock_c
     assert linhas["ws-2"]["owner_username"] is None
 
 
-async def test_lista_de_politicas_exige_admin(db_override, mock_current_user):
+async def test_policy_list_requires_admin(db_override, mock_current_user):
     client, _ = db_override
     mock_current_user.role = "user"
     resp = await client.get("/admin/workspaces/policies")

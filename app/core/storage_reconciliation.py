@@ -15,7 +15,7 @@ Addresses the family of bugs where the disk usage report
 - Bug 8: Pinned Artifact whose workflow_hash is gone. Only counts + logs.
 
 Runs as a background task in the API lifespan (in parallel with
-artifact_cleanup.run_cleanup_loop). A Redis lock (`laco_periodico`) avoids
+artifact_cleanup.run_cleanup_loop). A Redis lock (`periodic_loop`) avoids
 duplication across multiple uvicorn workers.
 """
 from __future__ import annotations
@@ -29,7 +29,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import AsyncSessionLocal
-from app.core.tarefas_periodicas import laco_periodico
+from app.core.tarefas_periodicas import periodic_loop
 from app.core.utils.datetime_utils import utc_now_naive
 from app.core.utils.logger import get_logger
 from app.models.artifact import Artifact
@@ -350,6 +350,6 @@ async def run_full_reconciliation() -> dict:
 
 async def run_reconciliation_loop() -> None:
     """Infinite loop. Started in the API lifespan; a Redis lock ensures 1 worker per cycle."""
-    await laco_periodico(
+    await periodic_loop(
         "Reconciliacao de storage", _RECONCILE_INTERVAL, run_full_reconciliation, lock=_RECONCILE_LOCK_KEY
     )

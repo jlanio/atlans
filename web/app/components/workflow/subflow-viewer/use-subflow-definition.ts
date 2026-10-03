@@ -18,8 +18,8 @@ const MAX_EM_CACHE = 12
 
 function guardar(hash: string, workflow: IWorkflow) {
   if (cache.size >= MAX_EM_CACHE) {
-    const maisAntigo = cache.keys().next().value
-    if (maisAntigo !== undefined) cache.delete(maisAntigo)
+    const oldest = cache.keys().next().value
+    if (oldest !== undefined) cache.delete(oldest)
   }
   cache.set(hash, workflow)
 }
@@ -49,28 +49,28 @@ export interface SubflowDefinition {
 export function useSubflowDefinition(workflowHash: string | null): SubflowDefinition {
   // Only to repaint when the fetch populates the cache — the data itself comes from the Map.
   const [, repintar] = useReducer((n: number) => n + 1, 0)
-  const [versao, setVersao] = useState(0)
-  const [carregando, setCarregando] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
+  const [versao, setVersion] = useState(0)
+  const [carregando, setLoading] = useState(false)
+  const [erro, setError] = useState<string | null>(null)
 
   const workflow = workflowHash ? cache.get(workflowHash) ?? null : null
 
   useEffect(() => {
     if (!workflowHash || cache.has(workflowHash)) {
-      setCarregando(false)
-      setErro(null)
+      setLoading(false)
+      setError(null)
       return
     }
 
     let cancelado = false
-    setCarregando(true)
-    setErro(null)
+    setLoading(true)
+    setError(null)
 
     GisFlowService.getWorkflowById(workflowHash).then(res => {
       if (cancelado) return
-      setCarregando(false)
+      setLoading(false)
       if (res?.error || !res?.data) {
-        setErro(res?.error?.message ?? "Não foi possível carregar o sub-fluxo.")
+        setError(res?.error?.message ?? "Não foi possível carregar o sub-fluxo.")
         return
       }
       guardar(workflowHash, res.data)
@@ -86,7 +86,7 @@ export function useSubflowDefinition(workflowHash: string | null): SubflowDefini
     erro,
     recarregar: () => {
       if (workflowHash) cache.delete(workflowHash)
-      setVersao(v => v + 1)
+      setVersion(v => v + 1)
     },
   }
 }

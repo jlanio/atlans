@@ -7,7 +7,7 @@ from app.core.constants import FUSO_PADRAO_DO_AGENDAMENTO
 from app.core.exceptions import InvalidScheduleError
 from app.core.utils.logger import get_logger
 from app.models.models import Schedule, Workflow
-from app.services.schedule_service import ScheduleService, validate_schedule_create, campos_de_ativacao
+from app.services.schedule_service import ScheduleService, validate_schedule_create, activation_fields
 from app.schemas.schedule import ScheduleCreate, ScheduleNotice
 
 logger = get_logger(__name__)
@@ -40,13 +40,13 @@ def disable_schedule_node(definition: dict) -> bool:
 def _update_de_active(ativar: bool) -> dict:
     """Fields to write to the Schedule when turning scheduling on/off.
 
-    Thin alias of `campos_de_ativacao` (the canonical source lives in
+    Thin alias of `activation_fields` (the canonical source lives in
     `schedule_service`, next to the `update_schedule` that the REST route and the
     MCP tool use). Kept under the old name so the callers of this module are not
     touched. Turning it back on resets `next_run_at` on purpose — see the
     canonical function's docstring.
     """
-    return campos_de_ativacao(ativar)
+    return activation_fields(ativar)
 
 
 async def sync_schedules_with_workflow_state(workflow: Workflow, db_session) -> None:
@@ -89,7 +89,7 @@ async def sync_schedules_with_workflow_state(workflow: Workflow, db_session) -> 
             await crud.update(sch, _update_de_active(desejado))
 
 
-def _campo_cron_norm(campo: str) -> str:
+def _normalized_cron_field(campo: str) -> str:
     """Normalize a cron field for comparison: "09" -> "9", "4,2" -> "2,4".
 
     Only touches fields that are lists of plain integers — wildcards, ranges and
@@ -101,17 +101,17 @@ def _campo_cron_norm(campo: str) -> str:
     return campo
 
 
-def _cron_normalizado(expr: str | None) -> str | None:
+def _normalized_cron(expr: str | None) -> str | None:
     """Canonical form of a cron for the configuration comparator."""
     if not expr:
         return None
     campos = expr.strip().split()
     if len(campos) != 5:
         return expr.strip()   # not a 5-field cron: compare literally
-    return " ".join(_campo_cron_norm(c) for c in campos)
+    return " ".join(_normalized_cron_field(c) for c in campos)
 
 
-def _mesma_configuracao(atual: Schedule, desejado: ScheduleCreate) -> bool:
+def _same_configuration(atual: Schedule, desejado: ScheduleCreate) -> bool:
     """Compare only what defines WHEN the schedule fires.
 
     `active` is left out on purpose — changing from active to inactive must not
@@ -132,7 +132,7 @@ def _mesma_configuracao(atual: Schedule, desejado: ScheduleCreate) -> bool:
         return False
 
     if desejado.strategy == "cron":
-        return _cron_normalizado(atual.cron_expression) == _cron_normalizado(desejado.cron_expression)
+        return _normalized_cron(atual.cron_expression) == _normalized_cron(desejado.cron_expression)
     if desejado.strategy == "interval":
         return atual.interval == desejado.interval and (atual.unit or None) == (desejado.unit or None)
     if desejado.strategy == "rrule":
@@ -182,7 +182,7 @@ async def apply_schedule_if_needed(
 
     existentes = await scheduler.schedule_crud.get_by_workflow_hash(workflow.id_hash)
 
-    if len(existentes) == 1 and _mesma_configuracao(existentes[0], desejado):
+    if len(existentes) == 1 and _same_configuration(existentes[0], desejado):
         atual = existentes[0]
         if bool(atual.active) != bool(desejado.active):
             await scheduler.schedule_crud.update(atual, _update_de_active(bool(desejado.active)))

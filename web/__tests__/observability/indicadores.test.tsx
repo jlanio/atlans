@@ -54,14 +54,14 @@ describe("Indicadores", () => {
       <Indicadores metrics={metricas({ failed_runs: 20 })} dias={dias} carregando={false} periodo={30} />,
     )
     const selos = () => Array.from(container.querySelectorAll("span[aria-hidden='true'].rounded-full"))
-    const seloFalhas = selos().find(s => s.textContent?.includes("−9"))
-    expect(seloFalhas?.className).toContain("text-green-700")
+    const failuresBadge = selos().find(s => s.textContent?.includes("−9"))
+    expect(failuresBadge?.className).toContain("text-green-700")
 
     rerender(<Indicadores metrics={metricas({ failed_runs: 46 })} dias={dias} carregando={false} periodo={30} />)
-    const seloMais = selos().find(s => s.textContent?.includes("+17"))
-    expect(seloMais?.className).toContain("text-red-700")
-    const seloExec = selos().find(s => s.textContent?.includes("12%"))
-    expect(seloExec?.className).toContain("text-green-700")
+    const moreFailuresBadge = selos().find(s => s.textContent?.includes("+17"))
+    expect(moreFailuresBadge?.className).toContain("text-red-700")
+    const runsBadge = selos().find(s => s.textContent?.includes("12%"))
+    expect(runsBadge?.className).toContain("text-green-700")
   })
 
   it("sem período anterior nem duração, descreve a janela e cala a tendência", () => {

@@ -31,7 +31,7 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
 
   // Ports declared by THIS node. In a node with dynamic inputs they are the ones
   // the person configured, and they are what the script variable is named after.
-  const portasDeclaradas = ((nodeFound.data?.inputs ?? []) as { name: string }[]).map(p => p.name)
+  const declaredPorts = ((nodeFound.data?.inputs ?? []) as { name: string }[]).map(p => p.name)
 
   // PERF: memoizes the parent lookup — avoids recomputing O(n) on every canvas drag
   const parentInfos = useMemo(() => {
@@ -102,12 +102,12 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
         {/* The ports the node DECLARES, even with nothing connected. Without this,
             whoever had just configured them had nowhere to check the names — and
             they are what become the script variables. */}
-        {portasDeclaradas.length > 0 && (
+        {declaredPorts.length > 0 && (
           <div className="flex flex-col gap-1.5">
             <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
               Entradas deste nó
             </span>
-            {portasDeclaradas.map(porta => (
+            {declaredPorts.map(porta => (
               <div key={porta} className="flex items-center gap-1.5 rounded-md border border-dashed px-2 py-1.5">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/40"
                       title="Ainda sem conexão" />
@@ -170,12 +170,12 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
             // same `from_key`. Listing by key, the second port was invisible —
             // precisely in the scenario that ports created.
             const linhas = outputKeys.flatMap(key => {
-              const daChave = connectedEdges.filter(e => (e.data?.from_key as string | undefined) === key)
+              const fromKey = connectedEdges.filter(e => (e.data?.from_key as string | undefined) === key)
               // An edge without `from_key` serves any key (the executor spreads all
               // of the parent's outputs), but its `to_key`, if any, is still the
               // arrival name.
-              const semChave = connectedEdges.filter(e => !e.data?.from_key)
-              const arestas = daChave.length ? daChave : semChave
+              const withoutKey = connectedEdges.filter(e => !e.data?.from_key)
+              const arestas = fromKey.length ? fromKey : withoutKey
               if (!arestas.length) return [{ key, variavel: key, linhaId: key }]
               return arestas.map(e => ({
                 key,
@@ -297,7 +297,7 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
             const ligadas = new Set(
               parentEdges.map(e => (e.data?.to_key as string | undefined)).filter(Boolean) as string[],
             )
-            const pendentes = portasDeclaradas.filter(p => !ligadas.has(p))
+            const pendentes = declaredPorts.filter(p => !ligadas.has(p))
             if (!pendentes.length) return null
             // With one port connected and another not, the parent list shows only
             // the first — and the missing one was invisible precisely to whoever

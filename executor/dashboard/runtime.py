@@ -22,31 +22,31 @@ from rich.console import Console
 from rich.live import Live
 
 from executor.dashboard import render, tick
-from executor.dashboard.keys import LeitorDeTeclas
+from executor.dashboard.keys import KeyReader
 
 logger = logging.getLogger("executor.dashboard")
 
 # Consecutive render failures before the dashboard gives up and hands back the console.
-_MAX_FALHAS = 3
+_MAX_FAILURES = 3
 
-MODO_PAINEL = "painel"
-MODO_LOG = "log"
+MODE_DASHBOARD = "painel"
+MODE_LOG = "log"
 
 
 class DashboardRuntime:
     def __init__(self, stats, *, capacity_source, result_queue, intervalo: float,
                  log_path: str, tail_handler: logging.Handler | None = None,
-                 ao_sair=None, ao_reconectar=None, ao_sincronizar=None):
+                 on_exit=None, ao_reconectar=None, on_sync=None):
         self._stats = stats
         self._capacity_source = capacity_source
         self._result_queue = result_queue
-        self._intervalo = intervalo
+        self._interval = intervalo
         self._log_path = log_path
         self._tail_handler = tail_handler
         # Accepted so the terminal dashboard follows the same contract as the JSON one.
         # Without this, `_start_rich` broke with TypeError when passing the handler on.
-        self._ao_sincronizar = ao_sincronizar
-        self._ao_sair = ao_sair
+        self._on_sync = on_sync
+        self._on_exit = on_exit
         self._ao_reconectar = ao_reconectar
 
         self._console = Console(stderr=False)
@@ -63,25 +63,25 @@ class DashboardRuntime:
                           transient=False, screen=False,
                           vertical_overflow="crop")
         self._task: asyncio.Task | None = None
-        self._parar = asyncio.Event()
-        self._vivo = False
+        self._stop_event = asyncio.Event()
+        self._alive = False
         self._cache_outbox = tick.CacheOutbox()
 
-        self._modo = MODO_PAINEL
-        self._pausado = False
+        self._mode = MODE_DASHBOARD
+        self._paused = False
         self._overlay: str | None = None   # None | "ajuda" | "alertas"
-        self._teclas = LeitorDeTeclas(self._tecla)
-        self._com_teclado = False
+        self._key_reader = KeyReader(self._on_key)
+        self._with_keyboard = False
 
     # ── Lifecycle ────────────────────────────────────────────────────────────
 
     async def start(self) -> None:
-        self._com_teclado = self._teclas.start()
+        self._with_keyboard = self._key_reader.start()
 
         atalho = (
             "[dim]Atalhos:[/dim] [bold]l[/bold][dim] alterna painel/log · [/dim]"
             "[bold]?[/bold][dim] lista todos · [/dim][bold]q[/bold][dim] encerra[/dim]"
-            if self._com_teclado else
+            if self._with_keyboard else
             "[dim]Atalhos indisponiveis (stdin nao e um terminal). "
             "Desative o painel com EXECUTOR_DASHBOARD=off.[/dim]"
         )
@@ -89,13 +89,13 @@ class DashboardRuntime:
             f"[dim]Painel ao vivo ativo. Log completo em[/dim] [cyan]{self._log_path}[/cyan]\n"
             f"{atalho}\n"
         )
-        self._entrar_no_painel()
+        self._enter_dashboard()
         self._task = asyncio.create_task(self._loop(), name="dashboard")
 
     async def stop(self) -> None:
         """Encerra o painel e devolve o console. Idempotente."""
-        self._parar.set()
-        self._teclas.stop()
+        self._stop_event.set()
+        self._key_reader.stop()
         if self._task is not None:
             self._task.cancel()
             try:
@@ -108,8 +108,8 @@ class DashboardRuntime:
     def close_live(self) -> None:
         """Stops the `Live` and reattaches the console. Synchronous — also used by
         `emergency_stop`, which runs outside the event loop (atexit, os.execve)."""
-        self._teclas.stop()
-        self._sair_do_painel()
+        self._key_reader.stop()
+        self._leave_dashboard()
         if self._tail_handler is not None:
             try:
                 logging.getLogger().removeHandler(self._tail_handler)
@@ -121,22 +121,22 @@ class DashboardRuntime:
 
     @property
     def modo(self) -> str:
-        return self._modo
+        return self._mode
 
-    def _entrar_no_painel(self) -> None:
+    def _enter_dashboard(self) -> None:
         """Takes the log off the console and hands the screen back to the `Live`."""
-        if self._vivo:
+        if self._alive:
             return
         from executor import logging_setup
         logging_setup.switch_to_dashboard_mode()
         self._live.start(refresh=False)
-        self._vivo = True
-        self._modo = MODO_PAINEL
+        self._alive = True
+        self._mode = MODE_DASHBOARD
 
-    def _sair_do_painel(self) -> None:
+    def _leave_dashboard(self) -> None:
         """Fecha o `Live` e devolve o console. O arquivo continua gravando."""
-        if self._vivo:
-            self._vivo = False
+        if self._alive:
+            self._alive = False
             try:
                 self._live.stop()
                 # The last frame stays on screen as a summary, but it does not end in
@@ -146,21 +146,21 @@ class DashboardRuntime:
                 pass
         from executor import logging_setup
         logging_setup.restore_console_mode()
-        self._modo = MODO_LOG
+        self._mode = MODE_LOG
 
     def alternar(self) -> None:
-        if self._modo == MODO_PAINEL:
-            self._sair_do_painel()
+        if self._mode == MODE_DASHBOARD:
+            self._leave_dashboard()
             self._console.print(
                 "[dim]Modo log — o passo a passo volta para o terminal.[/dim] "
                 "[bold]l[/bold][dim] devolve o painel · [/dim][bold]q[/bold][dim] encerra.[/dim]"
             )
         else:
-            self._entrar_no_painel()
+            self._enter_dashboard()
 
     # ── Teclas ───────────────────────────────────────────────────────────────
 
-    def _tecla(self, tecla: str) -> None:
+    def _on_key(self, tecla: str) -> None:
         """Runs ON the event loop (the reader delivers via call_soon_threadsafe)."""
         try:
             k = tecla.lower()
@@ -170,34 +170,34 @@ class DashboardRuntime:
                 self.alternar()
                 repintar = False        # switching already takes care of the screen
             elif k == "p":
-                self._pausado = not self._pausado
+                self._paused = not self._paused
             elif k in ("?", "h"):
                 self._overlay = None if self._overlay == "ajuda" else "ajuda"
             elif k == "a":
                 self._overlay = None if self._overlay == "alertas" else "alertas"
             elif k == "d":
-                self._alternar_debug()
+                self._toggle_debug()
             elif k == "r":
                 self._reconectar()
             elif k == "z":
                 self._zerar()
             elif k == "q":
-                self._sair()
+                self._quit()
                 repintar = False
             else:
                 repintar = False        # tecla desconhecida: ignora em silencio
 
             # Repaints right away instead of waiting for the next tick — without this,
             # a key seems not to have worked for up to a whole second.
-            if repintar and self._modo == MODO_PAINEL and self._vivo:
-                self._pintar()
+            if repintar and self._mode == MODE_DASHBOARD and self._alive:
+                self._paint()
         except Exception as exc:
             # A key press must never bring down the executor.
             logger.debug("Falha ao tratar a tecla %r: %s", tecla, exc)
 
-    def _alternar_debug(self) -> None:
+    def _toggle_debug(self) -> None:
         from executor import logging_setup
-        ligado = logging_setup.alternar_debug()
+        ligado = logging_setup.toggle_debug()
         # Goes to the log (and to the alerts footer) because it changes the file's
         # volume drastically: whoever later finds the log huge needs to find the
         # moment it was turned on.
@@ -224,14 +224,14 @@ class DashboardRuntime:
         except Exception as exc:
             logger.debug("Falha ao zerar os contadores: %s", exc)
 
-    def _sair(self) -> None:
-        if self._ao_sair is None:
+    def _quit(self) -> None:
+        if self._on_exit is None:
             logger.info("Tecla 'q' — encerrando o executor...")
             return
-        self._sair_do_painel()
+        self._leave_dashboard()
         logger.info("Tecla 'q' — encerrando o executor...")
         try:
-            self._ao_sair()
+            self._on_exit()
         except Exception as exc:
             logger.error("Falha ao solicitar o encerramento pela tecla 'q': %s", exc)
 
@@ -239,17 +239,17 @@ class DashboardRuntime:
 
     async def _loop(self) -> None:
         falhas = 0
-        while not self._parar.is_set():
+        while not self._stop_event.is_set():
             try:
-                if self._modo == MODO_PAINEL and not self._pausado:
-                    self._pintar()
+                if self._mode == MODE_DASHBOARD and not self._paused:
+                    self._paint()
                 falhas = 0
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
                 falhas += 1
-                logger.debug("Falha ao desenhar o painel (%d/%d): %s", falhas, _MAX_FALHAS, exc)
-                if falhas >= _MAX_FALHAS:
+                logger.debug("Falha ao desenhar o painel (%d/%d): %s", falhas, _MAX_FAILURES, exc)
+                if falhas >= _MAX_FAILURES:
                     # The dashboard must never bring down or blind the executor: after
                     # N consecutive failures it resigns and the log goes back to the console.
                     logger.error(
@@ -260,17 +260,17 @@ class DashboardRuntime:
                     self.close_live()
                     return
             try:
-                await asyncio.wait_for(self._parar.wait(), timeout=self._intervalo)
+                await asyncio.wait_for(self._stop_event.wait(), timeout=self._interval)
             except asyncio.TimeoutError:
                 pass
 
-    def _pintar(self) -> None:
-        if not self._vivo:
+    def _paint(self) -> None:
+        if not self._alive:
             return
         loop = asyncio.get_running_loop()
         # Collection shared with the JSON mode (dashboard/tick.py): both
         # runtimes need to read exactly the same numbers.
-        snap = tick.coletar_snapshot(
+        snap = tick.collect_snapshot(
             self._stats,
             capacity_source=self._capacity_source,
             result_queue=self._result_queue,
@@ -291,8 +291,8 @@ class DashboardRuntime:
                 # the legacy Windows conhost cannot handle the unicode blocks and
                 # repaints slowly — falls back to ASCII for the bars.
                 ascii_only=bool(getattr(self._console, "legacy_windows", False)),
-                atalhos=self._com_teclado,
-                pausado=self._pausado,
+                atalhos=self._with_keyboard,
+                pausado=self._paused,
                 overlay=self._overlay,
             ),
             refresh=True,

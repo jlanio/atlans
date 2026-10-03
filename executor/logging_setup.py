@@ -47,7 +47,7 @@ _BACKUP_COUNT = 5
 _log_color = "auto"
 
 
-def _nivel() -> int:
+def _log_level() -> int:
     return getattr(logging, os.getenv("LOG_LEVEL", "INFO").strip().upper(), logging.INFO)
 
 
@@ -165,7 +165,7 @@ class _ColoredFormatter(logging.Formatter):
 
 # ── Module state ─────────────────────────────────────────────────────────────
 
-_configurado = False
+_configured = False
 _console: logging.Handler | None = None
 _detached_console: logging.Handler | None = None
 _catch_all: logging.Handler | None = None
@@ -181,24 +181,24 @@ def configure_logging() -> None:
     Reads the variables HERE, not at import: the executor's `.env` only enters
     the environment when `executor.config` runs `load_dotenv()`.
     """
-    global _configurado, _console, _agent_file, _agent_file_path, _log_color
-    if _configurado:
+    global _configured, _console, _agent_file, _agent_file_path, _log_color
+    if _configured:
         return
-    _configurado = True
+    _configured = True
 
     # Secret redaction by default (DSN with password, Bearer, Basic, PAT...) on
     # EVERY record of the process, before any handler — the console, the
     # files and the dashboard. The executor decrypts DSNs and builds
     # authentication headers, and logged all of that unmasked; the list is the
     # same as the API's.
-    from flow.utils.redacao_log import instalar_no_processo
-    instalar_no_processo()
+    from flow.utils.redacao_log import install_in_process
+    install_in_process()
 
     _log_color = os.getenv("LOG_COLOR", "auto")
 
     plain = logging.Formatter(_LOG_FORMAT)
     root = logging.getLogger()
-    root.setLevel(_nivel())
+    root.setLevel(_log_level())
 
     # Console: all logs, unfiltered, with the colored formatter.
     _console = logging.StreamHandler()
@@ -331,14 +331,14 @@ def restore_console_mode() -> None:
 
 # ── Runtime log level ────────────────────────────────────────────────────────
 # Keeps the level configured at boot so the toggle knows what to go back to.
-_nivel_base: int | None = None
+_base_level: int | None = None
 
 
 def em_debug() -> bool:
     return logging.getLogger().level <= logging.DEBUG
 
 
-def alternar_debug() -> bool:
+def toggle_debug() -> bool:
     """Turns DEBUG on/off without restarting the executor. Returns the new state.
 
     Diagnosing an error required stopping the process, editing LOG_LEVEL in .env
@@ -346,13 +346,13 @@ def alternar_debug() -> bool:
     Since no handler has its own level (only LogTailHandler, fixed at WARNING),
     changing the root is enough for the file to start receiving DEBUG right away.
     """
-    global _nivel_base
+    global _base_level
     root = logging.getLogger()
-    if _nivel_base is None:
-        _nivel_base = root.level or logging.INFO
+    if _base_level is None:
+        _base_level = root.level or logging.INFO
 
     if em_debug():
-        root.setLevel(_nivel_base)
+        root.setLevel(_base_level)
         logging.getLogger("httpx").setLevel(logging.WARNING)
         logging.getLogger("httpcore").setLevel(logging.WARNING)
         return False

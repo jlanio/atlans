@@ -15,8 +15,8 @@ import pytest
 
 from app.services.workflow_version_service import restore_version
 
-CRON_ATUAL = "0 13 * * *"
-CRON_DA_VERSAO = "0 7 * * *"
+CURRENT_CRON = "0 13 * * *"
+VERSION_CRON = "0 7 * * *"
 
 
 def _definition(cron: str) -> dict:
@@ -42,9 +42,9 @@ def crud():
     """Fake CRUD: the stored version has a different cron from the current workflow."""
     c = MagicMock()
     c.db = MagicMock()
-    c.get_version = AsyncMock(return_value=MagicMock(definition=_definition(CRON_DA_VERSAO)))
+    c.get_version = AsyncMock(return_value=MagicMock(definition=_definition(VERSION_CRON)))
     c.get_by_hash = AsyncMock(
-        return_value=MagicMock(id_hash="wf-1", flag_ative=True, definition=_definition(CRON_ATUAL))
+        return_value=MagicMock(id_hash="wf-1", flag_ative=True, definition=_definition(CURRENT_CRON))
     )
     c.create_version = AsyncMock()
 
@@ -64,7 +64,7 @@ def schedule_service(monkeypatch):
     fake.schedule_crud = MagicMock(
         get_by_workflow_hash=AsyncMock(return_value=[
             MagicMock(
-                job_id="job-antigo", strategy="cron", cron_expression=CRON_ATUAL,
+                job_id="job-antigo", strategy="cron", cron_expression=CURRENT_CRON,
                 interval=None, unit=None, rrule_expression=None,
                 timezone="America/Cuiaba", active=True,
             )
@@ -78,16 +78,16 @@ def schedule_service(monkeypatch):
     return fake
 
 
-async def test_restaurar_versao_com_outro_cron_substitui_o_agendamento(crud, schedule_service):
+async def test_restore_version_with_another_cron_replaces_the_schedule(crud, schedule_service):
     """The regression: the Schedule stayed on the old cron, diverging from the canvas."""
     await restore_version(crud, "wf-1", 3)
 
     schedule_service.schedule_crud.delete.assert_awaited_once_with("job-antigo")
     schedule_service.create_schedule.assert_awaited_once()
-    assert schedule_service.create_schedule.await_args.args[1].cron_expression == CRON_DA_VERSAO
+    assert schedule_service.create_schedule.await_args.args[1].cron_expression == VERSION_CRON
 
 
-async def test_restaurar_versao_sem_schedule_trigger_remove_o_agendamento(crud, schedule_service):
+async def test_restore_version_without_schedule_trigger_removes_the_schedule(crud, schedule_service):
     """Going back to before a schedule existed must not leave the cron running."""
     crud.get_version.return_value = MagicMock(definition={"nodes": [{"id": "n1", "name": "Outro"}]})
 
@@ -96,9 +96,9 @@ async def test_restaurar_versao_sem_schedule_trigger_remove_o_agendamento(crud, 
     schedule_service.delete_all_schedules_for_workflow.assert_awaited_once_with("wf-1")
 
 
-async def test_restaurar_versao_com_mesmo_cron_preserva_o_next_run_at(crud, schedule_service):
+async def test_restore_version_with_same_cron_preserves_next_run_at(crud, schedule_service):
     """Recreating the schedule would skip the day's trigger — the hook already avoids that."""
-    crud.get_version.return_value = MagicMock(definition=_definition(CRON_ATUAL))
+    crud.get_version.return_value = MagicMock(definition=_definition(CURRENT_CRON))
 
     await restore_version(crud, "wf-1", 3)
 
@@ -106,16 +106,16 @@ async def test_restaurar_versao_com_mesmo_cron_preserva_o_next_run_at(crud, sche
     schedule_service.create_schedule.assert_not_awaited()
 
 
-async def test_falha_no_agendamento_nao_desfaz_a_restauracao(crud, schedule_service):
+async def test_schedule_failure_does_not_undo_the_restore(crud, schedule_service):
     """Best-effort: the definition update is already committed when the hook runs."""
     schedule_service.create_schedule.side_effect = RuntimeError("banco fora")
 
     wf = await restore_version(crud, "wf-1", 3)
 
-    assert wf.definition == _definition(CRON_DA_VERSAO)
+    assert wf.definition == _definition(VERSION_CRON)
 
 
-async def test_definition_da_versao_chega_ao_workflow(crud, schedule_service):
+async def test_version_definition_reaches_the_workflow(crud, schedule_service):
     await restore_version(crud, "wf-1", 3)
 
-    assert crud.update.await_args.args[1]["definition"] == _definition(CRON_DA_VERSAO)
+    assert crud.update.await_args.args[1]["definition"] == _definition(VERSION_CRON)

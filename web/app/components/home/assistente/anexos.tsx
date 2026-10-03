@@ -21,9 +21,9 @@
 
 import { TbCheck, TbLoader2, TbPaperclip, TbX } from "react-icons/tb"
 
-import { ResultadoDoUpload, type UploadError } from "@/app/components/drive/resultado-upload"
-import { IDIOMA_PADRAO, type Idioma } from "@/lib/idioma"
-import { textosDe, useIdiomaDaTela, useTextos } from "../i18n"
+import { UploadResult, type UploadError } from "@/app/components/drive/resultado-upload"
+import { DEFAULT_LANGUAGE, type Idioma } from "@/lib/idioma"
+import { textosDe, useScreenLanguage, useTexts } from "../i18n"
 import { FORMATOS } from "../i18n/formatos"
 import { cn } from "@/lib/utils"
 import type { Anexo } from "@/app/stores/homeStore"
@@ -48,7 +48,7 @@ export function anexosProntos(anexos: Anexo[]): Anexo[] {
  * The ones still uploading are left out: citing them would send the assistant
  * looking for a file that may not even exist.
  */
-export function comReferencia(texto: string, anexos: Anexo[], idioma: Idioma = IDIOMA_PADRAO): string {
+export function comReferencia(texto: string, anexos: Anexo[], idioma: Idioma = DEFAULT_LANGUAGE): string {
   const nomes = anexosProntos(anexos).map((a) => a.nome)
   if (nomes.length === 0) return texto
   const lista = textosDe(idioma).assistente.anexos.referencia(nomes.join(", "))
@@ -63,7 +63,7 @@ export function comReferencia(texto: string, anexos: Anexo[], idioma: Idioma = I
  * who just dropped a shapefile is ignoring what the person did. `null` when
  * nothing is ready — then the box goes back to the usual placeholder.
  */
-export function sugestaoParaAnexos(anexos: Anexo[], idioma: Idioma = IDIOMA_PADRAO): string | null {
+export function suggestionForAttachments(anexos: Anexo[], idioma: Idioma = DEFAULT_LANGUAGE): string | null {
   const nomes = anexosProntos(anexos).map((a) => a.nome)
   if (nomes.length === 0) return null
   const t = textosDe(idioma).assistente.anexos
@@ -73,7 +73,7 @@ export function sugestaoParaAnexos(anexos: Anexo[], idioma: Idioma = IDIOMA_PADR
 }
 
 /** The rejections, in the shape the `/drive` screen's panel consumes. */
-export function recusasDe(anexos: Anexo[], idioma: Idioma = IDIOMA_PADRAO): UploadError[] {
+export function recusasDe(anexos: Anexo[], idioma: Idioma = DEFAULT_LANGUAGE): UploadError[] {
   return anexos
     .filter((a) => a.estado === "recusado")
     .map((a) => ({
@@ -86,8 +86,8 @@ export function recusasDe(anexos: Anexo[], idioma: Idioma = IDIOMA_PADRAO): Uplo
 // ── The pieces ───────────────────────────────────────────────────────────────
 
 /** The invitation line, while the file is in the air over the page. */
-export function ConviteDeSoltura({ className }: { className?: string }) {
-  const t = useTextos().assistente.anexos
+export function DropPrompt({ className }: { className?: string }) {
+  const t = useTexts().assistente.anexos
   return (
     <p
       data-testid="convite-de-soltura"
@@ -106,14 +106,14 @@ export function ConviteDeSoltura({ className }: { className?: string }) {
  * false promise — the request would keep running and the file would appear in
  * the Drive anyway, with nothing on screen saying so.
  */
-export function ChipsDeAnexo({
+export function AttachmentChips({
   anexos, onRemover, className,
 }: {
   anexos: Anexo[]
   onRemover: (id: string) => void
   className?: string
 }) {
-  const t = useTextos().assistente.anexos
+  const t = useTexts().assistente.anexos
   const visiveis = anexos.filter((a) => a.estado !== "recusado")
   if (visiveis.length === 0) return null
 
@@ -164,20 +164,20 @@ export function ChipsDeAnexo({
  * it along, because the rejection has nothing to do with the question and still
  * needs to be read.
  */
-export function AvisoDeAnexosRecusados({
+export function RejectedAttachmentsNotice({
   anexos, onFechar, className,
 }: {
   anexos: Anexo[]
   onFechar: () => void
   className?: string
 }) {
-  const idioma = useIdiomaDaTela()
-  const t = useTextos().assistente.anexos
+  const idioma = useScreenLanguage()
+  const t = useTexts().assistente.anexos
   const recusas = recusasDe(anexos, idioma)
   if (recusas.length === 0) return null
   return (
     <div data-testid="anexos-recusados" className={cn("text-left", className)}>
-      <ResultadoDoUpload sucessos={0} erros={recusas} onFechar={onFechar} textos={t.resultado} />
+      <UploadResult sucessos={0} erros={recusas} onFechar={onFechar} textos={t.resultado} />
     </div>
   )
 }

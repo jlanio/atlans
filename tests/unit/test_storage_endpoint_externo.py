@@ -26,7 +26,7 @@ from app.core import storage
     "",                           # without an endpoint there is no usable URL
     "   ",
 ])
-def test_hosts_locais_ou_vazio_contam_como_local(monkeypatch, endpoint):
+def test_local_or_empty_hosts_count_as_local(monkeypatch, endpoint):
     monkeypatch.setattr(storage, "_EXTERNAL_ENDPOINT", endpoint)
     assert storage.endpoint_externo_e_local() is True
 
@@ -38,12 +38,12 @@ def test_hosts_locais_ou_vazio_contam_como_local(monkeypatch, endpoint):
     "http://minio.interno.exemplo:9000",
     "http://localhost.exemplo.com",  # only the whole host counts, not the prefix
 ])
-def test_hosts_externos_nao_sao_locais(monkeypatch, endpoint):
+def test_external_hosts_are_not_local(monkeypatch, endpoint):
     monkeypatch.setattr(storage, "_EXTERNAL_ENDPOINT", endpoint)
     assert storage.endpoint_externo_e_local() is False
 
 
-def test_le_o_valor_no_momento_da_chamada(monkeypatch):
+def test_reads_the_value_at_call_time(monkeypatch):
     """The module resolves the endpoint at import; the function has to look at the
     current value, otherwise the warning reflects the environment from when the process imported."""
     monkeypatch.setattr(storage, "_EXTERNAL_ENDPOINT", "http://localhost:9000")

@@ -68,7 +68,7 @@ POOL_PRE_PING  = os.getenv("POOL_PRE_PING", "true").lower() == "true"
 # 0 disables each one. A task that needs more time makes an exception only in
 # its own transaction, `SET LOCAL statement_timeout = '80s'` — up to
 # DB_COMMAND_TIMEOUT, which is client-side and cannot be raised per transaction.
-def _segundos_do_env(nome: str, padrao: int) -> int:
+def _seconds_from_env(nome: str, padrao: int) -> int:
     """Whole seconds of `nome`; empty means the default (compose passes both
     through with `${VAR:-}`). A value that is not an integer ("60s", "5min", "1.5")
     means the default with a warning, instead of breaking the import — and with it the API.
@@ -87,8 +87,8 @@ def _segundos_do_env(nome: str, padrao: int) -> int:
     return max(0, min(valor, 2_147_483))
 
 
-DB_STATEMENT_TIMEOUT = _segundos_do_env("DB_STATEMENT_TIMEOUT", 60)
-DB_COMMAND_TIMEOUT   = _segundos_do_env("DB_COMMAND_TIMEOUT", 90)
+DB_STATEMENT_TIMEOUT = _seconds_from_env("DB_STATEMENT_TIMEOUT", 60)
+DB_COMMAND_TIMEOUT   = _seconds_from_env("DB_COMMAND_TIMEOUT", 90)
 
 
 APP_SECRET = os.getenv("APP_SECRET")
@@ -212,7 +212,7 @@ def _host_de(url: str) -> str:
         return ""
 
 
-def _site_normalizado(url: str) -> str:
+def _normalized_site(url: str) -> str:
     """The site URL without spaces or a trailing `/`, with the host in ASCII.
 
     A space stuck to the secret's value silently became an invalid host
@@ -227,15 +227,15 @@ def _site_normalizado(url: str) -> str:
         return url
     if not host or host.isascii():
         return url
-    em_ascii = _host_de(url)
-    if not em_ascii:
+    as_ascii = _host_de(url)
+    if not as_ascii:
         return url
-    return urlunsplit(partes._replace(netloc=em_ascii + (f":{porta}" if porta else "")))
+    return urlunsplit(partes._replace(netloc=as_ascii + (f":{porta}" if porta else "")))
 
 
 # Public URL of the site, the one the browser opens. It goes in the email links and is the
 # origin of the conventions below.
-FRONTEND_URL: str = _site_normalizado(os.getenv("FRONTEND_URL", "")) or "http://localhost:3000"
+FRONTEND_URL: str = _normalized_site(os.getenv("FRONTEND_URL", "")) or "http://localhost:3000"
 # Without a scheme (`atlans.example.org`) the URL passed every gate and
 # silently disabled the conventions: sender `noreply@localhost`, MCP without the
 # site's host, enrollment screen without the executors host — three symptoms
@@ -244,7 +244,7 @@ if not re.match(r"^https?://", FRONTEND_URL, re.IGNORECASE):
     raise ValueError(f"FRONTEND_URL={FRONTEND_URL!r} precisa começar com http:// ou https://")
 
 
-def _host_com_dominio(url: str) -> str:
+def _host_with_domain(url: str) -> str:
     """The URL's host when it has a domain; empty for localhost, `*.localhost`
     and IPs, which serve as the basis for no convention at all."""
     host = _host_de(url)
@@ -257,10 +257,10 @@ def _host_com_dominio(url: str) -> str:
     return ""
 
 
-def agents_por_convencao(frontend_url: str) -> str:
+def agents_by_convention(frontend_url: str) -> str:
     """`https://agents.<host do site>` (site host), the convention the executor uses in the reverse
     direction (executor/_ca_bootstrap.py). Without a domain or without https, none."""
-    host = _host_com_dominio(frontend_url)
+    host = _host_with_domain(frontend_url)
     if host and frontend_url.strip().lower().startswith("https://"):
         return f"https://agents.{host}"
     return ""
@@ -276,25 +276,25 @@ def _ip_do_site(url: str) -> str:
     return host
 
 
-def hosts_mcp_padrao(frontend_url: str) -> list[str]:
+def default_mcp_hosts(frontend_url: str) -> list[str]:
     """The site's host (with and without port) plus local dev. A site served by IP goes in
     with the IP: the DNS rebinding protection is for names, and a Host that is already an
     IP is not subject to rebinding — without it, `/mcp` answered 421 until someone set
     MCP_ALLOWED_HOSTS."""
-    host = _host_com_dominio(frontend_url) or _ip_do_site(frontend_url)
+    host = _host_with_domain(frontend_url) or _ip_do_site(frontend_url)
     return ([host, f"{host}:*"] if host else []) + ["localhost:*", "127.0.0.1:*"]
 
 
-def remetente_padrao(frontend_url: str) -> str:
+def default_sender(frontend_url: str) -> str:
     """`noreply@` at the site's host; without a domain, `localhost`."""
-    return f"Atlans <noreply@{_host_com_dominio(frontend_url) or 'localhost'}>"
+    return f"Atlans <noreply@{_host_with_domain(frontend_url) or 'localhost'}>"
 
 
 # URL of the executors host (the mTLS one), in https: the `--server` of the
 # enrollment commands and the default of the served install.sh. Empty = the convention above; on a host
 # without a domain it also stays empty, and the enrollment screen asks for the address.
 AGENTS_URL: str = (
-    os.getenv("AGENTS_URL", "").strip().rstrip("/") or agents_por_convencao(FRONTEND_URL)
+    os.getenv("AGENTS_URL", "").strip().rstrip("/") or agents_by_convention(FRONTEND_URL)
 )
 
 # Git repository that install.sh clones on the executor's machine. Empty: the served
@@ -321,7 +321,7 @@ DESKTOP_RELEASES_REPO: str = _raw_desktop_repo
 _raw_mcp_hosts = os.getenv("MCP_ALLOWED_HOSTS", "")
 MCP_ALLOWED_HOSTS: list[str] = (
     [h.strip() for h in _raw_mcp_hosts.split(",") if h.strip()]
-    or hosts_mcp_padrao(FRONTEND_URL)
+    or default_mcp_hosts(FRONTEND_URL)
 )
 
 # ── Assistant (building workflows from natural language) ─────────────────────
@@ -352,10 +352,10 @@ ASSISTENTE_ATRIBUICAO: bool = (
 )
 
 
-def _env_ou_legado(nova: str, legada: str) -> str:
+def _env_or_legacy(nova: str, legada: str) -> str:
     """Reads the NEW env var; if absent/empty, falls back to the LEGACY one — with a warning.
 
-    F4 renamed COPILOTO_{ATIVO,MODELO,IDIOMA} -> ASSISTENTE_{...} with no
+    F4 renamed COPILOTO_{ATIVO,MODEL,IDIOMA} -> ASSISTENTE_{...} with no
     coexistence period: a server .env still using the old names reconfigured
     the assistant SILENTLY (enabled by default, factory model/language). The
     fallback is temporary — remove it once the production .env files have migrated; the
@@ -380,7 +380,7 @@ def _env_ou_legado(nova: str, legada: str) -> str:
 
 
 ASSISTENTE_ATIVO: bool = bool(OPENROUTER_API_KEY) and (
-    _env_ou_legado("ASSISTENTE_ATIVO", "COPILOTO_ATIVO") or "true"
+    _env_or_legacy("ASSISTENTE_ATIVO", "COPILOTO_ATIVO") or "true"
 ).lower() not in ("false", "0", "off", "no")
 
 # The model is an environment variable, and not a constant in the code, so that changing it
@@ -399,18 +399,18 @@ ASSISTENTE_ATIVO: bool = bool(OPENROUTER_API_KEY) and (
 # set", so without this the default installation would start up requesting a model with an
 # empty name — and the error would only show up in the first conversation. Same care as
 # `MCP_ALLOWED_HOSTS` above.
-ASSISTENTE_MODELO: str = _env_ou_legado("ASSISTENTE_MODELO", "COPILOTO_MODELO") or "anthropic/claude-opus-5"
+ASSISTENTE_MODELO: str = _env_or_legacy("ASSISTENTE_MODELO", "COPILOTO_MODELO") or "anthropic/claude-opus-5"
 
-# The response language. `INSTRUCOES` is in Portuguese, but it never TOLD the model to
+# The response language. `INSTRUCTIONS` is in Portuguese, but it never TOLD the model to
 # answer in it — and a model mirrors the language of whoever writes, so a
 # question in English came back in English in the middle of a pt-BR interface.
-ASSISTENTE_IDIOMA: str = _env_ou_legado("ASSISTENTE_IDIOMA", "COPILOTO_IDIOMA") or "português do Brasil"
+ASSISTENTE_IDIOMA: str = _env_or_legacy("ASSISTENTE_IDIOMA", "COPILOTO_IDIOMA") or "português do Brasil"
 
 # How many assistant tokens each person spends in a 24 h window (the quota in
 # `app/mcp/cotas.py`, which explains the default). It is the ceiling for everyone; a plans
 # extension derives each plan's ceiling from it. Zero or negative would block every
 # conversation after the first turn: such a value prevents the API from starting.
-def _teto_do_assistente() -> int:
+def _assistant_ceiling() -> int:
     bruto = os.getenv("ASSISTENTE_TETO_DE_TOKENS_POR_DIA", "").strip()
     if not bruto:
         return 1_500_000
@@ -425,7 +425,7 @@ def _teto_do_assistente() -> int:
     return teto
 
 
-ASSISTENTE_TETO_DE_TOKENS_POR_DIA: int = _teto_do_assistente()
+ASSISTENTE_TETO_DE_TOKENS_POR_DIA: int = _assistant_ceiling()
 
 # ── Map basemaps ──────────────────────────────────────────────────────────
 # The installation's tile servers. The code ships none besides
@@ -435,7 +435,7 @@ ASSISTENTE_TETO_DE_TOKENS_POR_DIA: int = _teto_do_assistente()
 # here, to the Carta nodes: the server injects the chosen basemap into the dispatch
 # (`app/services/fundos_do_mapa.py`), and the executor needs no configuration.
 # Template with {z}, {x} and {y}; the credit goes in the map's and the image map's attribution.
-def _fundo_do_ambiente(prefixo: str) -> dict[str, str] | None:
+def _env_fallback(prefixo: str) -> dict[str, str] | None:
     url = os.getenv(f"MAPA_{prefixo}_URL", "").strip()
     if not url:
         return None
@@ -451,7 +451,7 @@ def _fundo_do_ambiente(prefixo: str) -> dict[str, str] | None:
 MAPA_FUNDOS: dict[str, dict[str, str]] = {
     nome: fundo
     for nome, prefixo in (("ruas", "RUAS"), ("satelite", "SATELITE"), ("hibrido", "HIBRIDO"))
-    if (fundo := _fundo_do_ambiente(prefixo)) is not None
+    if (fundo := _env_fallback(prefixo)) is not None
 }
 # Without the hybrid, the satellite — as on the web (web/lib/fundos-do-mapa.ts) and in the
 # executor (flow/utils/carta.py), so the Carta and the Home say the same thing.
@@ -465,8 +465,8 @@ if "hibrido" not in MAPA_FUNDOS and "satelite" in MAPA_FUNDOS:
 # empty value that .env.example and docs/sources.md teach went back to the default, and there
 # was no way to turn it off. Compose passes `${FONTES_CATALOGO_DIR-…}` (without the
 # colon) so that the .env's empty value arrives empty.
-_catalogo_dir = os.getenv("FONTES_CATALOGO_DIR")
-FONTES_CATALOGO_DIR: str = "catalogo/geoservicos" if _catalogo_dir is None else _catalogo_dir.strip()
+_catalog_dir = os.getenv("FONTES_CATALOGO_DIR")
+FONTES_CATALOGO_DIR: str = "catalogo/geoservicos" if _catalog_dir is None else _catalog_dir.strip()
 # Every successful run with a WFS node registers the source in the workspace's catalog.
 FONTES_APRENDER_DAS_EXECUCOES: bool = os.getenv(
     "FONTES_APRENDER_DAS_EXECUCOES", "true"
@@ -481,8 +481,8 @@ FONTES_VERIFICACAO_INTERVAL: int = int(os.getenv("FONTES_VERIFICACAO_INTERVAL", 
 # S3_HOST, and Redis, with a password that sits in a public repository. Stopping the
 # API says so; the short APP_SECRET already stopped it.
 for _nome in ("MINIO_ROOT_PASSWORD", "REDIS_PASSWORD", "REDIS_URL", "RATE_LIMIT_STORAGE_URI"):
-    _valor = os.getenv(_nome, "")
-    if "change-me" in _valor.lower() or "troque-me" in _valor.lower():
+    _value = os.getenv(_nome, "")
+    if "change-me" in _value.lower() or "troque-me" in _value.lower():
         raise ValueError(
             f"{_nome} ainda leva o valor de exemplo do .env.example: gere uma senha "
             "(openssl rand -base64 32) ou rode `make bootstrap`."
@@ -530,7 +530,7 @@ if SMTP_HOST and SMTP_SEGURANCA == "nenhuma" and SMTP_USERNAME:
 # name and still works. Empty = `noreply@` at the FRONTEND_URL host (the
 # domain must be verified with the provider). `.strip() or` because compose
 # passes it empty.
-EMAIL_FROM: str = _env_ou_legado("EMAIL_FROM", "RESEND_FROM_EMAIL") or remetente_padrao(FRONTEND_URL)
+EMAIL_FROM: str = _env_or_legacy("EMAIL_FROM", "RESEND_FROM_EMAIL") or default_sender(FRONTEND_URL)
 RESEND_FROM_EMAIL: str = EMAIL_FROM
 # Login requires a verified email (default). On an installation without an email
 # transport, the verification link never arrives: `false` lets people in without it — and

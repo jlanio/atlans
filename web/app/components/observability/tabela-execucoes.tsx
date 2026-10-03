@@ -7,11 +7,11 @@ import { Skeleton } from "@/app/components/ui/skeleton"
 import { CartaoDeEstado, ErroDeCarga, SemResultado } from "@/app/components/shared/estados"
 import { SeloAssistente } from "@/app/components/shared/selo-assistente"
 import { StatusBadge } from "@/app/components/shared/StatusBadge"
-import { CABECALHO_DE_COLUNAS, CELULA_COM_ROTULO, DESTAQUE_DA_FICHA, LINHA_EMPILHADA } from "@/app/components/shared/tabela-empilhada"
+import { COLUMN_HEADER, LABELED_CELL, CARD_HIGHLIGHT, STACKED_ROW } from "@/app/components/shared/tabela-empilhada"
 import { fromBackend, formatLocal } from "@/lib/dayjs"
 import { cn } from "@/lib/utils"
 import type { IRunSummary } from "@/service/types"
-import { formatarDuracao, formatarInicio, formatarInteiro, rotuloDaCategoria, rotuloDaOrigem, rotuloDoNivel } from "@/lib/formatos"
+import { formatarDuracao, formatarInicio, formatInteger, categoryLabel, originLabel, tierLabel } from "@/lib/formatos"
 
 interface Props {
   runs: IRunSummary[]
@@ -30,21 +30,21 @@ interface Props {
   abertaId?: string | null
 }
 
-const EM_ANDAMENTO = new Set(["running", "pending"])
+const IN_PROGRESS = new Set(["running", "pending"])
 
 /**
  * Coarse-grained clock for the "elapsed" of in-progress runs. It only ticks
  * when there is one: a table of completed runs has no reason to re-render
  * every half minute.
  */
-function useAgora(ativo: boolean): number {
-  const [agora, setAgora] = useState(() => Date.now())
+function useNow(ativo: boolean): number {
+  const [agora, setNow] = useState(() => Date.now())
   useEffect(() => {
     if (!ativo) return
-    setAgora(Date.now())
+    setNow(Date.now())
     // Like the other clocks/pollers in the codebase: it does not advance with the
     // tab hidden (nobody sees the "elapsed") and catches up at once when focus returns.
-    const tick = () => { if (document.visibilityState === "visible") setAgora(Date.now()) }
+    const tick = () => { if (document.visibilityState === "visible") setNow(Date.now()) }
     const t = setInterval(tick, 30_000)
     document.addEventListener("visibilitychange", tick)
     return () => {
@@ -56,17 +56,17 @@ function useAgora(ativo: boolean): number {
 }
 
 /** Run duration; for in-progress ones, the time elapsed since the start. */
-export function duracaoDaExecucao(run: IRunSummary, agoraMs: number): string {
-  if (EM_ANDAMENTO.has(run.status)) {
+export function runDuration(run: IRunSummary, nowMs: number): string {
+  if (IN_PROGRESS.has(run.status)) {
     const inicio = fromBackend(run.started_at)?.valueOf()
-    return inicio ? formatarDuracao((agoraMs - inicio) / 1000) : "—"
+    return inicio ? formatarDuracao((nowMs - inicio) / 1000) : "—"
   }
   return formatarDuracao(run.duration_seconds)
 }
 
 /** "Cadastro · agendado · maria": workspace, origin and who triggered it, whatever there is. */
-export function sublinhaDoWorkflow(run: IRunSummary): string {
-  return [run.workspace_name, rotuloDaOrigem(run.trigger_source), run.triggered_by_username]
+export function workflowSubline(run: IRunSummary): string {
+  return [run.workspace_name, originLabel(run.trigger_source), run.triggered_by_username]
     .filter((p): p is string => !!p)
     .join(" · ")
 }
@@ -81,7 +81,7 @@ export const TabelaExecucoes = memo(function TabelaExecucoes({
   runs, total, hasMore, carregando, carregandoMais, falhou, filtrado,
   onCarregarMais, onAbrir, onLimparFiltros, onRecarregar, abertaId = null,
 }: Props) {
-  const agora = useAgora(runs.some(r => EM_ANDAMENTO.has(r.status)))
+  const agora = useNow(runs.some(r => IN_PROGRESS.has(r.status)))
 
   if (carregando && runs.length === 0) {
     return (
@@ -130,7 +130,7 @@ export const TabelaExecucoes = memo(function TabelaExecucoes({
         {/* `min-w` only from `md` up: below that the row becomes a card
             (tabela-empilhada.ts) and there are no columns to squeeze. */}
         <table className="w-full text-sm max-md:block md:min-w-[860px]">
-          <thead className={CABECALHO_DE_COLUNAS}>
+          <thead className={COLUMN_HEADER}>
             <tr className="border-b bg-muted/40 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
               <th scope="col" className="px-3 py-2 text-left">Status</th>
               <th scope="col" className="px-3 py-2 text-left">Workflow</th>
@@ -146,10 +146,10 @@ export const TabelaExecucoes = memo(function TabelaExecucoes({
               // Only in-progress runs use `agora` (the live elapsed time); the others
               // get a fixed 0, so the row's React.memo holds and does not
               // reconcile the whole table on every 30 s tick.
-              <LinhaDaExecucao
+              <RunRow
                 key={run.run_id}
                 run={run}
-                agora={EM_ANDAMENTO.has(run.status) ? agora : 0}
+                agora={IN_PROGRESS.has(run.status) ? agora : 0}
                 aberta={run.run_id === abertaId}
                 onAbrir={onAbrir}
               />
@@ -160,8 +160,8 @@ export const TabelaExecucoes = memo(function TabelaExecucoes({
       <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2.5 text-xs text-muted-foreground">
         <span aria-live="polite">
           {total != null
-            ? `Mostrando ${formatarInteiro(runs.length)} de ${formatarInteiro(total)}`
-            : `Mostrando ${formatarInteiro(runs.length)}`}
+            ? `Mostrando ${formatInteger(runs.length)} de ${formatInteger(total)}`
+            : `Mostrando ${formatInteger(runs.length)}`}
         </span>
         {hasMore && (
           <Button variant="outline" size="sm" onClick={onCarregarMais} disabled={carregandoMais} className="max-md:h-10">
@@ -173,7 +173,7 @@ export const TabelaExecucoes = memo(function TabelaExecucoes({
   )
 })
 
-const LinhaDaExecucao = memo(function LinhaDaExecucao({ run, agora, aberta, onAbrir }: {
+const RunRow = memo(function RunRow({ run, agora, aberta, onAbrir }: {
   run: IRunSummary
   agora: number
   aberta: boolean
@@ -181,11 +181,11 @@ const LinhaDaExecucao = memo(function LinhaDaExecucao({ run, agora, aberta, onAb
 }) {
   const nome = run.workflow_name ?? "Workflow sem nome"
   const falhou = run.status === "failed" || run.status === "error"
-  const categoria = rotuloDaCategoria(run.error_category)
+  const categoria = categoryLabel(run.error_category)
   const erro = run.error_message?.trim() || null
-  const erroTexto = erro ? (categoria ? `${categoria} · ${erro}` : erro) : null
-  const nivel = rotuloDoNivel(run.dispatch_tier)
-  const inicioCompleto = formatLocal(run.started_at, "DD/MM/YYYY HH:mm:ss")
+  const errorText = erro ? (categoria ? `${categoria} · ${erro}` : erro) : null
+  const nivel = tierLabel(run.dispatch_tier)
+  const fullStart = formatLocal(run.started_at, "DD/MM/YYYY HH:mm:ss")
 
   return (
     // The whole row responds to clicks (mouse and touch); the keyboard and
@@ -200,11 +200,11 @@ const LinhaDaExecucao = memo(function LinhaDaExecucao({ run, agora, aberta, onAb
         aberta && "bg-primary/5",
         // Touch target on the phone: the whole card, never less than 40px.
         "max-md:min-h-10",
-        LINHA_EMPILHADA,
+        STACKED_ROW,
       )}
     >
       <td className="px-3 py-2.5 align-middle max-md:order-2"><StatusBadge status={run.status} /></td>
-      <td className={cn("px-3 py-2.5 align-middle max-md:order-1", DESTAQUE_DA_FICHA)}>
+      <td className={cn("px-3 py-2.5 align-middle max-md:order-1", CARD_HIGHLIGHT)}>
         <div className="flex min-w-0 flex-col">
           <div className="flex min-w-0 items-center gap-1.5">
             <button
@@ -219,16 +219,16 @@ const LinhaDaExecucao = memo(function LinhaDaExecucao({ run, agora, aberta, onAb
             </button>
             <SeloAssistente origem={run.workflow_origem} />
           </div>
-          <span className="truncate text-[11.5px] text-muted-foreground">{sublinhaDoWorkflow(run) || "—"}</span>
+          <span className="truncate text-[11.5px] text-muted-foreground">{workflowSubline(run) || "—"}</span>
         </div>
       </td>
-      <td className="px-3 py-2.5 align-middle whitespace-nowrap tabular-nums max-md:order-3 max-md:ml-auto max-md:text-xs max-md:text-muted-foreground" title={inicioCompleto}>
+      <td className="px-3 py-2.5 align-middle whitespace-nowrap tabular-nums max-md:order-3 max-md:ml-auto max-md:text-xs max-md:text-muted-foreground" title={fullStart}>
         {formatarInicio(run.started_at)}
       </td>
-      <td data-rotulo="duração" className={cn("px-3 py-2.5 align-middle whitespace-nowrap tabular-nums max-md:order-4 max-md:text-xs", CELULA_COM_ROTULO)}>
-        {duracaoDaExecucao(run, agora)}
+      <td data-rotulo="duração" className={cn("px-3 py-2.5 align-middle whitespace-nowrap tabular-nums max-md:order-4 max-md:text-xs", LABELED_CELL)}>
+        {runDuration(run, agora)}
       </td>
-      <td data-rotulo="executor" className={cn("px-3 py-2.5 align-middle whitespace-nowrap max-md:order-5 max-md:text-xs", CELULA_COM_ROTULO)}>
+      <td data-rotulo="executor" className={cn("px-3 py-2.5 align-middle whitespace-nowrap max-md:order-5 max-md:text-xs", LABELED_CELL)}>
         {run.executor_name || run.agent_host ? (
           <span className="inline-flex items-center gap-1.5">
             <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-muted-foreground/50" />
@@ -256,12 +256,12 @@ const LinhaDaExecucao = memo(function LinhaDaExecucao({ run, agora, aberta, onAb
           could widen the column until the table scrolled sideways. On the
           <span> the rule of a regular block applies, the same in every browser. */}
       <td className="px-3 py-2.5 align-middle max-md:order-6 max-md:basis-full max-md:text-xs">
-        {erroTexto ? (
+        {errorText ? (
           <span
             className={cn("block max-w-[220px] truncate text-[12.5px] max-md:max-w-full", falhou ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}
-            title={erroTexto}
+            title={errorText}
           >
-            {erroTexto}
+            {errorText}
           </span>
         ) : (
           <span className="sr-only">Sem erro</span>

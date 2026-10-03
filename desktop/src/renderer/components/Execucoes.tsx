@@ -10,7 +10,7 @@ import { useMemo, useState } from 'react'
 import {
   TbBan, TbCircleCheck, TbCircleX, TbHistory, TbPlayerPlay,
 } from 'react-icons/tb'
-import type { JobHistorico } from '../../main/state/store.js'
+import type { HistoryJob } from '../../main/state/store.js'
 import type { Snapshot } from '../../shared/events.js'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { duracao } from '../lib/formato.js'
@@ -27,13 +27,13 @@ function quando(ts: number): string {
  * those who cannot see it — and in a thirty-row history the icon is also
  * quicker to scan than reading "Concluída" (completed) thirty times.
  */
-const DESFECHO: Record<string, { icone: React.ReactNode; rotulo: string; cor: string }> = {
+const OUTCOME: Record<string, { icone: React.ReactNode; rotulo: string; cor: string }> = {
   ok: { icone: <TbCircleCheck size={16} />, rotulo: 'Concluída', cor: 'text-green-500' },
   error: { icone: <TbCircleX size={16} />, rotulo: 'Com erro', cor: 'text-destructive' },
   cancelled: { icone: <TbBan size={16} />, rotulo: 'Cancelada', cor: 'text-warning' },
 }
 
-const FILTROS = [
+const FILTERS = [
   { v: 'todos', r: 'Todas' },
   { v: 'ok', r: 'Concluídas' },
   { v: 'error', r: 'Com erro' },
@@ -44,9 +44,9 @@ export function Execucoes({
   snapshot, jobs,
 }: {
   snapshot: Snapshot | null
-  jobs: JobHistorico[]
+  jobs: HistoryJob[]
 }) {
-  const [filtro, setFiltro] = useState<(typeof FILTROS)[number]['v']>('todos')
+  const [filtro, setFilter] = useState<(typeof FILTERS)[number]['v']>('todos')
 
   const contagem = useMemo(() => {
     const c: Record<string, number> = { todos: jobs.length }
@@ -59,7 +59,7 @@ export function Execucoes({
     [jobs, filtro],
   )
 
-  const emAndamento = snapshot?.running ?? []
+  const inProgress = snapshot?.running ?? []
 
   return (
     <div className="flex flex-col gap-4">
@@ -72,20 +72,20 @@ export function Execucoes({
         <CardHeader className="px-6">
           <CardTitle className="flex items-center gap-2 text-base font-medium">
             Em andamento
-            {emAndamento.length > 0 && (
+            {inProgress.length > 0 && (
               <span className="flex items-center gap-1.5 rounded-full bg-blue-500/15 px-2 py-0.5 text-xs font-semibold text-blue-400 animate-in fade-in-0 zoom-in-95 duration-200">
                 {/* Breathing, not `animate-ping`: the ring that expands every
                     second, on the only screen that stays open in the
                     background, pulls the eye without having anything new to
                     say. */}
                 <span className="size-1.5 rounded-full bg-blue-400 animate-pulso-vivo" />
-                {emAndamento.length}
+                {inProgress.length}
               </span>
             )}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2 px-6">
-          {emAndamento.length === 0 ? (
+          {inProgress.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-6 text-center">
               <TbPlayerPlay size={24} className="text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">
@@ -93,7 +93,7 @@ export function Execucoes({
                 esta máquina, ele aparece aqui com o progresso nó a nó.
               </p>
             </div>
-          ) : emAndamento.map((j) => {
+          ) : inProgress.map((j) => {
             const pct = j.nodes_total ? Math.min(100, (j.nodes_done / j.nodes_total) * 100) : null
             return (
               <div
@@ -136,7 +136,7 @@ export function Execucoes({
         <CardHeader className="items-center px-6">
           <CardTitle className="text-base font-medium">Histórico da sessão</CardTitle>
           <CardAction className="flex flex-wrap justify-end gap-1">
-            {FILTROS.map((f) => {
+            {FILTERS.map((f) => {
               const n = contagem[f.v] ?? 0
               return (
                 <button
@@ -146,7 +146,7 @@ export function Execucoes({
                   // A filter with nothing to show leads to an empty screen for no
                   // apparent reason; better not to allow the click.
                   disabled={n === 0 && f.v !== 'todos'}
-                  onClick={() => setFiltro(f.v)}
+                  onClick={() => setFilter(f.v)}
                   className={cn(
                     'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
                     'disabled:pointer-events-none disabled:opacity-40',
@@ -175,7 +175,7 @@ export function Execucoes({
           ) : (
             <div className="-mx-2 flex max-h-[52vh] flex-col overflow-y-auto">
               {visiveis.map((j, i) => {
-                const d = DESFECHO[j.status]
+                const d = OUTCOME[j.status]
                 return (
                   <div
                     key={`${j.job_id}-${i}`}

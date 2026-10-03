@@ -26,7 +26,7 @@ vi.mock('../paths.js', () => ({
 
 const { consultarStatusCacheado, invalidarStatus } = await import('./status.js')
 
-class ProcFalso extends EventEmitter {
+class FakeProc extends EventEmitter {
   stdout = new PassThrough()
   stderr = new PassThrough()
   killed = false
@@ -36,14 +36,14 @@ class ProcFalso extends EventEmitter {
 const tick = () => new Promise((r) => setImmediate(r))
 
 /** Enfileira o proximo `spawn` e devolve o processo falso. */
-function proximoProcesso(): ProcFalso {
-  const p = new ProcFalso()
+function nextProcess(): FakeProc {
+  const p = new FakeProc()
   spawnMock.mockReturnValueOnce(p)
   return p
 }
 
 /** Escreve a resposta JSON e encerra o processo, como o Python faria. */
-async function responder(p: ProcFalso, executorId: string): Promise<void> {
+async function responder(p: FakeProc, executorId: string): Promise<void> {
   p.stdout.write(JSON.stringify({
     ok: true, executor_id: executorId, server_url: 'https://x', status: 'active',
     workspaces: [{ id_hash: executorId }],
@@ -60,7 +60,7 @@ beforeEach(() => {
 
 describe('cache', () => {
   it('guarda o sucesso e nao spawna de novo', async () => {
-    const p1 = proximoProcesso()
+    const p1 = nextProcess()
     const consulta = consultarStatusCacheado()
     await responder(p1, 'a')
     await expect(consulta).resolves.toMatchObject({ executor_id: 'a' })
@@ -70,7 +70,7 @@ describe('cache', () => {
   })
 
   it('dois pedidos simultaneos compartilham um unico spawn', async () => {
-    const p1 = proximoProcesso()
+    const p1 = nextProcess()
     const a = consultarStatusCacheado()
     const b = consultarStatusCacheado()
     expect(spawnMock).toHaveBeenCalledTimes(1)
@@ -85,14 +85,14 @@ describe('invalidarStatus', () => {
     // Enrollment redone in the middle of a query: the certificate that started it
     // is no longer valid, and its `.then` used to repopulate the cache with the
     // old link.
-    const velho = proximoProcesso()
+    const velho = nextProcess()
     const consulta = consultarStatusCacheado()
     invalidarStatus()
     await responder(velho, 'velho')
     await expect(consulta).resolves.toMatchObject({ executor_id: 'velho' })
 
     // The prefetch of the NEW executor must not inherit the invalidated query.
-    const novo = proximoProcesso()
+    const novo = nextProcess()
     const segunda = consultarStatusCacheado()
     expect(spawnMock).toHaveBeenCalledTimes(2)
     await responder(novo, 'novo')
@@ -103,11 +103,11 @@ describe('invalidarStatus', () => {
   })
 
   it('consulta vencida que responde depois nao sobrescreve o cache novo', async () => {
-    const velho = proximoProcesso()
+    const velho = nextProcess()
     const vencida = consultarStatusCacheado()
     invalidarStatus()
 
-    const novo = proximoProcesso()
+    const novo = nextProcess()
     const atual = consultarStatusCacheado()
     await responder(novo, 'novo')
     await responder(velho, 'velho')          // arrives last, from the old link
@@ -123,15 +123,15 @@ describe('forcar', () => {
   it('"Atualizar" reconsulta em vez de devolver a consulta em voo', async () => {
     // The in-flight query may have started BEFORE the change that prompted the
     // click. Returning it made the spinner spin and the stale list stay.
-    const antigo = proximoProcesso()
+    const antigo = nextProcess()
     const primeira = consultarStatusCacheado()
-    const recente = proximoProcesso()
-    const forcada = consultarStatusCacheado(true)
+    const recente = nextProcess()
+    const forced = consultarStatusCacheado(true)
     expect(spawnMock).toHaveBeenCalledTimes(2)
 
     await responder(recente, 'novo')
     await responder(antigo, 'velho')
-    await expect(forcada).resolves.toMatchObject({ executor_id: 'novo' })
+    await expect(forced).resolves.toMatchObject({ executor_id: 'novo' })
     await expect(primeira).resolves.toMatchObject({ executor_id: 'velho' })
 
     // The cache keeps the most recent query, not the one that answered last.
@@ -148,7 +148,7 @@ describe('falha do spawn', () => {
       ok: false, codigo: 'falha',
     })
 
-    const p = proximoProcesso()
+    const p = nextProcess()
     const segunda = consultarStatusCacheado()
     expect(spawnMock).toHaveBeenCalledTimes(2)
     await responder(p, 'a')

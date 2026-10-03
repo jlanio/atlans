@@ -36,7 +36,7 @@ def _definition(credential_id: str) -> dict:
 
 
 @pytest.fixture
-def db_sem_credenciais_do_usuario():
+def db_without_user_credentials():
     """None of the requested credentials belongs to the user.
 
     The session is opened by the service itself (get_session_async), only when
@@ -58,7 +58,7 @@ def db_sem_credenciais_do_usuario():
         yield
 
 
-async def test_credencial_alheia_e_recusada_sem_simular(db_sem_credenciais_do_usuario):
+async def test_someone_elses_credential_is_refused_without_simulating(db_without_user_credentials):
     alheia = str(uuid4())
 
     with patch("flow.executor.core.WorkflowExecutor.simulate_runner", new=AsyncMock()) as sim:
@@ -70,7 +70,7 @@ async def test_credencial_alheia_e_recusada_sem_simular(db_sem_credenciais_do_us
     sim.assert_not_awaited()
 
 
-async def test_definition_sem_credencial_segue_simulando():
+async def test_definition_without_credential_keeps_simulating():
     """The common case must not be affected by the guard — it does not even open a database session."""
     from flow.executor.core import WorkflowExecutor
 

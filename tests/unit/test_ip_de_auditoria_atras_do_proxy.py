@@ -46,24 +46,24 @@ def proxy_confiavel(monkeypatch):
 
 # ── RESOLVE / NAO FORJA (no forging) ─────────────────────────────────────────
 
-def test_atras_de_proxy_confiavel_usa_o_forwarded_for(proxy_confiavel):
+def test_behind_trusted_proxy_uses_forwarded_for(proxy_confiavel):
     ip = proxy_confiavel.get_client_ip("172.18.0.5", "203.0.113.9, 172.18.0.5")
     assert ip == "203.0.113.9"
 
 
-def test_peer_nao_confiavel_nao_pode_forjar_o_header(proxy_confiavel):
+def test_untrusted_peer_cannot_forge_the_header(proxy_confiavel):
     """Without this guard, the audited party would choose what the audit records."""
     ip = proxy_confiavel.get_client_ip("198.51.100.7", "203.0.113.9")
     assert ip == "198.51.100.7"
 
 
-def test_sem_forwarded_for_cai_no_peer(proxy_confiavel):
+def test_without_forwarded_for_falls_back_to_peer(proxy_confiavel):
     assert proxy_confiavel.get_client_ip("172.18.0.5", None) == "172.18.0.5"
 
 
 # ── Both call sites actually use the helper ──────────────────────────────────
 
-def test_enrollment_resolve_o_ip_pelo_helper():
+def test_enrollment_resolves_ip_via_helper():
     """`consumed_from_ip` must not go back to being Traefik's IP."""
     import inspect
     from app.api.routers import executores_router as mod
@@ -75,7 +75,7 @@ def test_enrollment_resolve_o_ip_pelo_helper():
     )
 
 
-def test_registro_de_executor_resolve_o_ip_pelo_helper():
+def test_executor_registration_resolves_ip_via_helper():
     import inspect
     from app.core import executor_connections as mod
 
@@ -86,7 +86,7 @@ def test_registro_de_executor_resolve_o_ip_pelo_helper():
 
 # ── NULL ─────────────────────────────────────────────────────────────────────
 
-def test_executor_ip_continua_NULL_quando_nao_ha_peer(proxy_confiavel):
+def test_executor_ip_stays_NULL_when_there_is_no_peer(proxy_confiavel):
     """The column is nullable on purpose: 'unknown' looks like a value and isn't."""
     import inspect
     from app.core import executor_connections as mod
@@ -97,12 +97,12 @@ def test_executor_ip_continua_NULL_quando_nao_ha_peer(proxy_confiavel):
     )
 
 
-def test_helper_devolve_unknown_apenas_sem_host(proxy_confiavel):
+def test_helper_returns_unknown_only_without_host(proxy_confiavel):
     """Documents why the outer `if ws.client` is necessary."""
     assert proxy_confiavel.get_client_ip(None, None) == "unknown"
 
 
-def test_ipv6_com_zona_no_forwarded_for_e_pulado(proxy_confiavel):
+def test_ipv6_with_zone_in_forwarded_for_is_skipped(proxy_confiavel):
     """The zone (`%eth0`) is free text, with no size limit: it overflowed the
     VARCHAR(45) of the IP columns. It is not a client address on the internet."""
     ip = proxy_confiavel.get_client_ip("172.18.0.5", "203.0.113.9, fe80::1%" + "A" * 200)

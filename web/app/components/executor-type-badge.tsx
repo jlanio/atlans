@@ -2,7 +2,7 @@
 
 import { Badge } from "@/app/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { estiloDoTipo } from "@/consts/ExecutorTypeStyles"
+import { typeStyle } from "@/consts/ExecutorTypeStyles"
 import type { IExecutor } from "@/service/types"
 
 /**
@@ -19,7 +19,7 @@ export function ExecutorTypeBadge({
   type: IExecutor["executor_type"]
   size?: "sm" | "md"
 }) {
-  const estilo = estiloDoTipo(type)
+  const estilo = typeStyle(type)
   const Icone = estilo.icone
 
   return (

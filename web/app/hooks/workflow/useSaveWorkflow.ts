@@ -9,7 +9,7 @@ import { useWorkflowSaveStore } from "@/app/stores/workflowSaveStore"
 import { serializeEdge } from "@/app/components/workflow/utils/edge-persistence"
 import { viewportsIguais } from "@/app/components/workflow/utils/viewport-salvo"
 
-export interface OpcoesDeSave {
+export interface SaveOptions {
   /** Save triggered by another action (Executar saves before dispatching): no
    *  error toast — the caller answers with its own — and no "Salvo" (saved) flash
    *  when there is nothing to save. The chip keeps reflecting the state. */
@@ -39,7 +39,7 @@ function normalizeProperties(properties: unknown): Record<string, string> {
  * payload the save writes. Any asymmetry between the two becomes a "Não salvo"
  * (unsaved) that never goes away.
  */
-export function montarPayloadDoGrafo(nodes: INodeContext[], edges: Edge[]) {
+export function buildGraphPayload(nodes: INodeContext[], edges: Edge[]) {
   const nodesReq = nodes.map(node => {
     const { data: { name, alias, properties, type }, position } = node
     // Normalizes position to { x, y } — discards extra fields that ReactFlow
@@ -81,13 +81,13 @@ export const useSaveWorkflow = () => {
 
   function buildPayload() {
     const { nodes, edges } = flowStore.getState()
-    const { nodesReq, edgesReq } = montarPayloadDoGrafo(nodes as unknown as INodeContext[], edges)
+    const { nodesReq, edgesReq } = buildGraphPayload(nodes as unknown as INodeContext[], edges)
     const viewportReq = reactFlowInstance.getViewport()
     return { nodesReq, edgesReq, viewportReq }
   }
 
 
-  function handleSaveWorkflow(opcoes: OpcoesDeSave = {}) {
+  function handleSaveWorkflow(opcoes: SaveOptions = {}) {
     // Single guard — the decision to start lives in saveWorkflow. Before the
     // Zustand refactor, handleSaveWorkflow set isSaving=true here; but
     // Zustand is synchronous, so the next guard in saveWorkflow blocked
@@ -96,7 +96,7 @@ export const useSaveWorkflow = () => {
     return saveWorkflow(opcoes)
   }
 
-  async function saveWorkflow({ silent = false }: OpcoesDeSave = {}) {
+  async function saveWorkflow({ silent = false }: SaveOptions = {}) {
 
     const store = useWorkflowSaveStore.getState()
     if (store.isSaving)
@@ -142,8 +142,8 @@ export const useSaveWorkflow = () => {
       // does not chase it. It goes along when the USER asks for the save; the
       // backend does not open a version for it (`_has_substantial_changes`
       // ignores position and viewport).
-      const viewportMudou = !viewportsIguais(viewportReq, store.lastSavedViewport)
-      if (silent || !viewportMudou) {
+      const viewportChanged = !viewportsIguais(viewportReq, store.lastSavedViewport)
+      if (silent || !viewportChanged) {
         // Nothing to write — no PUT. But a Ctrl+S that answers nothing is
         // indistinguishable from a broken shortcut: flash "Salvo" to confirm that
         // everything is saved. No status reset is needed, since
@@ -229,8 +229,8 @@ export const useSaveWorkflow = () => {
       // you were editing) and Ctrl+S stayed on /workflow/create with no id —
       // the next Ctrl+S created a copy. `replace`, not `push`: going back to
       // /create in the history would mean going back to "create another".
-      const novoId = data.data?.id_hash
-      if (novoId) router.replace(`/workflow/${novoId}`)
+      const newId = data.data?.id_hash
+      if (newId) router.replace(`/workflow/${newId}`)
 
       return data
     } catch (err) {

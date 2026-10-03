@@ -15,7 +15,7 @@ import { create } from 'zustand'
 // are UUIDs, but a duplicated workflow inherits the original's ids — without the
 // per-workflow cut, A's columns would show up as suggestions in B.
 
-export interface ColunasDoNo {
+export interface NodeColumns {
   /** Columns per output port — the same `output_columns` shape that the
    *  executor publishes in the event and writes to `node_stats`. `{}` is a
    *  TOMBSTONE: the node completed live WITHOUT publishing columns, and the
@@ -37,7 +37,7 @@ export interface ColunasDoNo {
 interface KnownColumnsState {
   /** Workflow that owns the `porNo` entries. */
   workflowId: string | null
-  porNo: Map<string, ColunasDoNo>
+  porNo: Map<string, NodeColumns>
 }
 
 interface KnownColumnsActions {
@@ -67,15 +67,15 @@ interface KnownColumnsActions {
   semearDoHistorico(
     workflowId: string,
     runId: string,
-    colunasPorNo: Record<string, { porPorta: Record<string, string[]>; parciais?: boolean }>,
+    columnsByNode: Record<string, { porPorta: Record<string, string[]>; parciais?: boolean }>,
   ): void
 }
 
-const VAZIO: Map<string, ColunasDoNo> = new Map()
+const EMPTY: Map<string, NodeColumns> = new Map()
 
 export const useKnownColumnsStore = create<KnownColumnsState & KnownColumnsActions>((set) => ({
   workflowId: null,
-  porNo: VAZIO,
+  porNo: EMPTY,
 
   prepararParaWorkflow: (workflowId) => {
     set(state => (state.workflowId === workflowId
@@ -89,7 +89,7 @@ export const useKnownColumnsStore = create<KnownColumnsState & KnownColumnsActio
       // A write from another workflow (late rAF after the switch): starts over with
       // only what arrived — the per-run filter in `drenarLote` already blocks
       // almost everything, this is the seat belt.
-      const base = state.workflowId === workflowId ? state.porNo : VAZIO
+      const base = state.workflowId === workflowId ? state.porNo : EMPTY
       const porNo = new Map(base)
       for (const [nodeId, porPorta] of mudancas) {
         porNo.set(nodeId, { porPorta: porPorta ?? {}, runId, fresh: true })
@@ -98,7 +98,7 @@ export const useKnownColumnsStore = create<KnownColumnsState & KnownColumnsActio
     })
   },
 
-  semearDoHistorico: (workflowId, runId, colunasPorNo) => {
+  semearDoHistorico: (workflowId, runId, columnsByNode) => {
     set(state => {
       // A LATE response from another workflow: ignore. A live write may adopt the
       // workflow (the event proves that it is the one running); an old API
@@ -106,7 +106,7 @@ export const useKnownColumnsStore = create<KnownColumnsState & KnownColumnsActio
       // columns on B's screen.
       if (state.workflowId !== null && state.workflowId !== workflowId) return state
       const porNo = new Map(state.porNo)
-      for (const [nodeId, { porPorta, parciais }] of Object.entries(colunasPorNo)) {
+      for (const [nodeId, { porPorta, parciais }] of Object.entries(columnsByNode)) {
         // A live run has already written to this node (tombstone included): the API
         // response is older.
         if (porNo.get(nodeId)?.fresh) continue

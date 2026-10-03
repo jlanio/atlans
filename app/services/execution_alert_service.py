@@ -160,22 +160,22 @@ async def workspace_recipients(db: AsyncSession, workspace_id: str | None) -> li
 
 async def _send_to_workspace(db: AsyncSession, workspace_id: str | None, template: str, *, subject: str, context: dict) -> None:
     try:
-        destinatarios = await workspace_recipients(db, workspace_id)
+        recipients = await workspace_recipients(db, workspace_id)
     except Exception as exc:
         logger.warning("Alerta de agendamento: falha ao resolver destinatários de %s: %s", workspace_id, exc)
         return
-    if not destinatarios:
+    if not recipients:
         logger.info("Alerta de agendamento: workspace %s sem destinatários com e-mail.", workspace_id)
         return
-    for user in destinatarios:
+    for user in recipients:
         send_email_background(user.email, subject, template, {**context, "username": user.username})
 
 
-async def notify_primary_emptied(db: AsyncSession, esvaziados: list[dict], *, executor_name: str) -> None:
+async def notify_primary_emptied(db: AsyncSession, emptied: list[dict], *, executor_name: str) -> None:
     """A forced removal of an executor emptied the primary tier of these
     workspaces (spec §4.4): every future execution will fail (terminal `fail`)
     or overflow (terminal `pool`). The owner has to know now."""
-    for d in esvaziados:
+    for d in emptied:
         await _send_to_workspace(
             db, d.get("workspace_id"), "policy_primary_emptied.html",
             subject=f"[Atlans] O workspace \"{d.get('workspace_name')}\" ficou sem executor dedicado",
@@ -183,13 +183,13 @@ async def notify_primary_emptied(db: AsyncSession, esvaziados: list[dict], *, ex
         )
 
 
-def notify_primary_emptied_background(esvaziados: list[dict], *, executor_name: str) -> None:
+def notify_primary_emptied_background(emptied: list[dict], *, executor_name: str) -> None:
     """Fire-and-forget version of `notify_primary_emptied` with its OWN session.
 
     The request session is closed as soon as the handler responds; a task
     that kept using it would race against the teardown's `rollback()`/`close()`
     (and the email would never go out)."""
-    if not esvaziados:
+    if not emptied:
         return
     import asyncio
 
@@ -198,7 +198,7 @@ def notify_primary_emptied_background(esvaziados: list[dict], *, executor_name: 
     async def _task():
         try:
             async with AsyncSessionLocal() as db:
-                await notify_primary_emptied(db, esvaziados, executor_name=executor_name)
+                await notify_primary_emptied(db, emptied, executor_name=executor_name)
         except Exception as exc:  # best-effort
             logger.warning("Falha ao avisar donos sobre nível esvaziado: %s", exc)
 

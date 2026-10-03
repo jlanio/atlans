@@ -48,7 +48,7 @@ async def criar_token(
         workspace_ids=payload.workspace_ids,
         expires_in_days=payload.expires_in_days,
     )
-    return ApiTokenCreated.com_segredo(token, segredo, utc_now_naive())
+    return ApiTokenCreated.with_secret(token, segredo, utc_now_naive())
 
 
 @router.get("", response_model=List[ApiTokenOut], summary="Listar tokens de acesso")
@@ -57,7 +57,7 @@ async def listar_tokens(
     current_user=Depends(get_current_user),
 ):
     agora = utc_now_naive()
-    return [ApiTokenOut.de_modelo(t, agora) for t in await svc.listar(db, current_user.id_hash)]
+    return [ApiTokenOut.from_model(t, agora) for t in await svc.listar(db, current_user.id_hash)]
 
 
 @router.delete("/{id_hash}", response_model=ApiTokenOut, summary="Revogar token de acesso")
@@ -68,4 +68,4 @@ async def revogar_token(
 ):
     """Revokes (does not delete) one of the user's own tokens. Idempotent."""
     token = await svc.revogar(db, current_user.id_hash, id_hash)
-    return ApiTokenOut.de_modelo(token, utc_now_naive())
+    return ApiTokenOut.from_model(token, utc_now_naive())

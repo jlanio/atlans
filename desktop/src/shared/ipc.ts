@@ -4,14 +4,14 @@
 // channel names: the preload, main and renderer import FROM HERE, so renaming a
 // channel breaks the compilation instead of becoming a handler that never fires.
 import type { CommandName } from './events.js'
-import type { EstadoApp, LoteLog } from '../main/state/store.js'
-import type { ConfigExecucao, ConfigGeoSync, EstadoConfiguracao, PastaInvalida } from '../main/state/config.js'
-import type { PedidoDeepLink } from '../main/deeplink.js'
-import type { ResultadoStatus } from '../main/python/status.js'
-import type { PedidoEnroll, ResultadoEnroll } from '../main/python/enroll.js'
-import type { EstadoAutostart } from '../main/ui/autostart.js'
+import type { AppState, LogBatch } from '../main/state/store.js'
+import type { RunConfig, ConfigGeoSync, ConfigState, InvalidFolder } from '../main/state/config.js'
+import type { DeepLinkRequest } from '../main/deeplink.js'
+import type { StatusResult } from '../main/python/status.js'
+import type { EnrollRequest, EnrollResult } from '../main/python/enroll.js'
+import type { AutostartState } from '../main/ui/autostart.js'
 
-export const CANAIS = {
+export const CHANNELS = {
   /** renderer -> main, with a response. */
   estado: 'atlas:estado',
   iniciar: 'atlas:iniciar',
@@ -43,8 +43,8 @@ export const CANAIS = {
   aoReceberLog: 'atlas:log-lote',
 } as const
 
-export const ACOES_JANELA = ['minimizar', 'alternar-maximizar', 'fechar', 'esta-maximizada'] as const
-export type AcaoJanela = (typeof ACOES_JANELA)[number]
+export const WINDOW_ACTIONS = ['minimizar', 'alternar-maximizar', 'fechar', 'esta-maximizada'] as const
+export type WindowAction = (typeof WINDOW_ACTIONS)[number]
 
 export interface InfoApp {
   versao: string
@@ -58,17 +58,17 @@ export interface InfoApp {
 
 /** Surface exposed to the renderer by the preload, via contextBridge. */
 export interface AtlasApi {
-  estado(): Promise<EstadoApp>
+  estado(): Promise<AppState>
   info(): Promise<InfoApp>
-  configuracao(): Promise<EstadoConfiguracao>
+  configuracao(): Promise<ConfigState>
   /** Runs the enrollment. On success the executor is started right after. */
-  enrolar(pedido: PedidoEnroll): Promise<ResultadoEnroll>
+  enrolar(pedido: EnrollRequest): Promise<EnrollResult>
   /**
    * Stops the executor and discards the current certificate, returning the app
    * to the linking form. Used when the server revoked or removed the executor —
    * the certificate on disk remains valid locally, but useless.
    */
-  refazerEnrollment(): Promise<EstadoConfiguracao>
+  refazerEnrollment(): Promise<ConfigState>
   iniciar(): Promise<void>
   /**
    * Requests the orderly shutdown and RETURNS right away.
@@ -100,16 +100,16 @@ export interface AtlasApi {
    * write may be blocked by group policy, and the item may be disabled in Task
    * Manager even with the entry present.
    */
-  autostart(ativar?: boolean): Promise<EstadoAutostart>
+  autostart(ativar?: boolean): Promise<AutostartState>
   /**
    * Controls of the frameless window. `fechar` hides instead of quitting — the
    * app lives in the tray and the executor keeps running.
    */
-  janela(acao: AcaoJanela): Promise<boolean>
+  janela(acao: WindowAction): Promise<boolean>
 
   geosync(): Promise<ConfigGeoSync>
   /** Saves and returns the rejected folders — empty means everything was saved. */
-  salvarGeosync(cfg: ConfigGeoSync): Promise<{ salvo: boolean; invalidas: PastaInvalida[] }>
+  salvarGeosync(cfg: ConfigGeoSync): Promise<{ salvo: boolean; invalidas: InvalidFolder[] }>
   /**
    * Workspaces accessible to this executor.
    *
@@ -118,12 +118,12 @@ export interface AtlasApi {
    * is kept in the main process for the session: `atualizar: true` (the screen's
    * "Atualizar" button) is what forces the query again.
    */
-  workspaces(atualizar?: boolean): Promise<ResultadoStatus>
+  workspaces(atualizar?: boolean): Promise<StatusResult>
   /** Linking request that arrived before the renderer mounted. Consumed once. */
-  deepLinkPendente(): Promise<PedidoDeepLink | null>
+  deepLinkPendente(): Promise<DeepLinkRequest | null>
 
-  execucao(): Promise<ConfigExecucao>
-  salvarExecucao(cfg: ConfigExecucao): Promise<ConfigExecucao>
+  execucao(): Promise<RunConfig>
+  salvarExecucao(cfg: RunConfig): Promise<RunConfig>
   /** Saves the visible log to a file chosen by the user. Returns the path. */
   exportarLog(texto: string): Promise<string | null>
   /**
@@ -142,15 +142,15 @@ export interface AtlasApi {
    * sending it whole on every change cost ~150-200 KB per window per broadcast.
    * See the header of `main/state/store.ts`.
    */
-  log(): Promise<LoteLog>
+  log(): Promise<LogBatch>
 
   /** Return the unsubscribe function — the renderer needs it in the cleanup. */
-  aoAtualizarEstado(fn: (e: EstadoApp) => void): () => void
+  aoAtualizarEstado(fn: (e: AppState) => void): () => void
   /** Only the NEW lines since the last batch. */
-  aoReceberLog(fn: (lote: LoteLog) => void): () => void
+  aoReceberLog(fn: (lote: LogBatch) => void): () => void
   /** Linking requested by `atlans://enroll?…`. The app NEVER enrolls on its own:
    *  the form is filled in and the confirmation is the user's. */
-  aoReceberDeepLink(fn: (p: PedidoDeepLink) => void): () => void
+  aoReceberDeepLink(fn: (p: DeepLinkRequest) => void): () => void
 }
 
 declare global {

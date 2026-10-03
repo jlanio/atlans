@@ -24,7 +24,7 @@ SERVIDOR = "servidor"
 EXECUTOR = "executor"
 
 
-class EnvioBloqueadoError(RuntimeError):
+class SendBlockedError(RuntimeError):
     """The executor retains the data and the node only works by sending.
 
     Its own exception, and not a `ValueError`, because it is not a node
@@ -34,7 +34,7 @@ class EnvioBloqueadoError(RuntimeError):
     """
 
 
-def localidade_padrao() -> str:
+def default_locality() -> str:
     """THIS machine's policy: `servidor` or `executor`.
 
     Read from `EXECUTOR_SYNC_MODE == "catalog"`, which is the SAME variable the
@@ -54,7 +54,7 @@ def localidade_padrao() -> str:
     return EXECUTOR if modo == "catalog" else SERVIDOR
 
 
-def resolver_localidade(escolha: str | None) -> tuple[str, str]:
+def resolve_locality(escolha: str | None) -> tuple[str, str]:
     """Translates the node's choice into (effective locality, who decided).
 
     The machine's policy is a PROHIBITION, not a default: the workflow can
@@ -62,15 +62,15 @@ def resolver_localidade(escolha: str | None) -> tuple[str, str]:
     for one of the two to ask for the content to stay.
 
     `quem` is 'executor' or 'nó', so the log tells the truth instead of
-    "herdado" (inherited) when the two coincided.
+    "inherited" (inherited) when the two coincided.
     """
-    pediu_local = (escolha or HERDAR).strip().lower() == EXECUTOR
-    if localidade_padrao() == EXECUTOR:
+    wants_local = (escolha or HERDAR).strip().lower() == EXECUTOR
+    if default_locality() == EXECUTOR:
         return EXECUTOR, "executor"
-    return (EXECUTOR, "nó") if pediu_local else (SERVIDOR, "executor")
+    return (EXECUTOR, "nó") if wants_local else (SERVIDOR, "executor")
 
 
-def descrever_localidade(efetiva: str, quem: str) -> str:
+def describe_locality(efetiva: str, quem: str) -> str:
     """Sentence for the run log. It is the ONLY place where whoever built the
     workflow sees what "Herdar do executor" (inherit from the executor) became —
     the editor does not know the destination machine."""
@@ -78,7 +78,7 @@ def descrever_localidade(efetiva: str, quem: str) -> str:
     return f"Localidade dos dados: o conteúdo {onde} (definido pelo {quem})."
 
 
-def exigir_envio_permitido(no: str, o_que_exige: str) -> None:
+def exigir_envio_permitido(no: str, requirement: str) -> None:
     """Blocks a node that ONLY works by sending, when the machine retains the data.
 
     Single point of refusal: the message lives here, and a new node that depends
@@ -89,23 +89,23 @@ def exigir_envio_permitido(no: str, o_que_exige: str) -> None:
     went out without an attachment — it is the worst of outcomes, because it
     produces no signal at all.
     """
-    if localidade_padrao() != EXECUTOR:
+    if default_locality() != EXECUTOR:
         return
     # No arrow (U+2192) nor any character outside latin-1: this message
     # travels through the executor's log, which may end up on a cp1252 console —
     # and a UnicodeEncodeError while EXPLAINING a refusal would replace the
     # explanation with a traceback.
-    raise EnvioBloqueadoError(
+    raise SendBlockedError(
         f"{no} não foi executado.\n\n"
         "Este executor está configurado para manter os dados apenas nele "
         '(app do executor: GeoSync > Localidade dos dados > "Manter apenas no '
-        f'executor"), e {o_que_exige}.\n\n'
+        f'executor"), e {requirement}.\n\n'
         f"O que fazer: remova o nó {no} deste workflow, ou execute-o num "
         "executor que possa enviar dados ao servidor."
     )
 
 
-def propriedade_localidade(visible_when=None) -> dict:
+def locality_property(visible_when=None) -> dict:
     """Schema fragment for the `localidade` field, identical in every output node.
 
     Copying the dict into each node would make the labels diverge over time.
@@ -350,7 +350,7 @@ def persistir_artefato(
     and return values precisely for this.
 
     Receives the already resolved locality, and not the raw choice, because the
-    caller needs it anyway for logging (see `descrever_localidade`) —
+    caller needs it anyway for logging (see `describe_locality`) —
     resolving twice would leave room for the two to diverge.
     """
     if localidade == EXECUTOR:
@@ -376,7 +376,7 @@ def pasta_do_geosync() -> str | None:
     return pastas[0] if pastas else None
 
 
-def _publicar_com_retry(temporario: str, destino: str, tentativas: int = 4) -> None:
+def _publish_with_retry(temporario: str, destino: str, tentativas: int = 4) -> None:
     """`os.replace` with a short retry, because of Windows.
 
     The GeoSync scanner runs in a THREAD of this same process and opens the
@@ -407,7 +407,7 @@ def _publicar_com_retry(temporario: str, destino: str, tentativas: int = 4) -> N
             time.sleep(0.25 * (tentativa + 1))
 
 
-def salvar_na_pasta_do_geosync(
+def save_to_geosync_folder(
     content: bytes, filename: str, workspace_id: str, overwrite: bool = False,
 ) -> str:
     """Writes a Drive file into the synced folder. Returns the path.
@@ -433,7 +433,7 @@ def salvar_na_pasta_do_geosync(
     # only calls `register` when the mode is `catalog`). Writing here on such a
     # machine would publish to MinIO, within seconds, the file someone had just
     # marked not to leave — and with no sign at all that it happened.
-    if localidade_padrao() != EXECUTOR:
+    if default_locality() != EXECUTOR:
         raise ValueError(
             "Não é possível manter um arquivo do Drive apenas neste executor "
             "enquanto ele estiver sincronizando a pasta com o servidor: o "
@@ -479,7 +479,7 @@ def salvar_na_pasta_do_geosync(
     try:
         with open(temporario, "wb") as fh:
             fh.write(content)
-        _publicar_com_retry(temporario, destino)
+        _publish_with_retry(temporario, destino)
     except BaseException:
         # An orphaned temp file would be invisible to the user (starts with a dot) and
         # to the scanner, and would take up disk space forever.

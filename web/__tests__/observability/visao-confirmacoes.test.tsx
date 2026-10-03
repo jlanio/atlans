@@ -6,7 +6,7 @@ vi.mock("@/service/GisFlowService", () => ({
 }))
 
 import { GisFlowService } from "@/service/GisFlowService"
-import { VisaoConfirmacoes, usePendingAcks, type ConfirmacoesPendentes } from "@/app/components/observability/visao-confirmacoes"
+import { VisaoConfirmacoes, usePendingAcks, type PendingAcks } from "@/app/components/observability/visao-confirmacoes"
 
 const svc = GisFlowService as unknown as { getPendingAcks: ReturnType<typeof vi.fn> }
 const ok = <T,>(data: T) => ({ success: true, status: 200, data })
@@ -14,7 +14,7 @@ const ok = <T,>(data: T) => ({ success: true, status: 200, data })
 beforeEach(() => { vi.resetAllMocks() })
 afterEach(cleanup)
 
-function acks(extra: Partial<ConfirmacoesPendentes> = {}): ConfirmacoesPendentes {
+function acks(extra: Partial<PendingAcks> = {}): PendingAcks {
   const itens = [
     { job_id: "job-a", executor_id: "exec-0001-xyz", elapsed_seconds: 22 },
     { job_id: "job-b", executor_id: "exec-0002-xyz", elapsed_seconds: 3 },

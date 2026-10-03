@@ -4,7 +4,7 @@ The tools' shared base: the error-translation decorator, the timed guard
 (scope + quota + audit) and the annotations derived from the table.
 
 The module lives here, and not in `servidor.py`, because the THREE consumers of
-the guard — `ServidorAtlans.call_tool`, the resource handlers and the tools
+the guard — `AtlansServer.call_tool`, the resource handlers and the tools
 themselves — already depend on this file and none of them can import
 `servidor.py` without a cycle (`servidor` imports `tools` and `resources` to
 register them).
@@ -19,7 +19,7 @@ Whoever wants to turn a `WorkflowInactiveError` into a readable `{"code":
 and the client receives "unexpected error".
 
 What goes up intact, and why:
-- `ToolError` passes through: whoever raised it (a guard, `resolver_workspace`,
+- `ToolError` passes through: whoever raised it (a guard, `resolve_workspace`,
   the tool itself) knew more about the case than the generic table;
 - `AtlasBaseError` and `HTTPException` become `to_tool_error(exc)` — they are
   the exceptions Atlans services use to say "404", "403", "422";
@@ -58,13 +58,13 @@ from app.core.exceptions import AtlasBaseError
 from app.core.utils.logger import get_logger
 from app.mcp import cotas, infra
 from app.mcp.erros import codigo_do_erro, to_tool_error
-from app.mcp.escopo import EscopoEfetivo, exigir_escopo
+from app.mcp.escopo import EffectiveScope, exigir_escopo
 from app.mcp.guardas import GUARDAS
 
 auditoria = get_logger("app.mcp.auditoria")
 
 
-def _anotacoes_resolvidas(fn: Callable[..., Any]) -> dict:
+def _resolved_annotations(fn: Callable[..., Any]) -> dict:
     """The annotations of `fn` already evaluated (objects, not strings).
 
     Failing here must not bring down the tool's registration: without the
@@ -81,7 +81,7 @@ def ferramenta(fn: Callable[..., Any]) -> Callable[..., Any]:
     """Wraps a tool's coroutine, translating the core's exceptions."""
 
     @functools.wraps(fn)
-    async def _embrulho(*args: Any, **kwargs: Any):
+    async def _wrapper(*args: Any, **kwargs: Any):
         try:
             return await fn(*args, **kwargs)
         except ToolError:
@@ -89,16 +89,16 @@ def ferramenta(fn: Callable[..., Any]) -> Callable[..., Any]:
         except (AtlasBaseError, HTTPException) as exc:
             raise to_tool_error(exc) from exc
 
-    _embrulho.__annotations__ = _anotacoes_resolvidas(fn)
-    return _embrulho
+    _wrapper.__annotations__ = _resolved_annotations(fn)
+    return _wrapper
 
 
 @asynccontextmanager
-async def guarda_da_chamada(
+async def call_guard(
     nome: str,
-    escopo: EscopoEfetivo,
+    escopo: EffectiveScope,
     *,
-    cobrar_cota: bool = True,
+    charge_quota: bool = True,
     origem: str = "tool",
 ) -> AsyncIterator[None]:
     """Scope → quota → body → audit line, with the real outcome.
@@ -115,7 +115,7 @@ async def guarda_da_chamada(
     OUTSIDE of here — when it fails there is no identity to name in the audit
     line.
 
-    `cobrar_cota=False` is the case of resources, which are read aliases of a
+    `charge_quota=False` is the case of resources, which are read aliases of a
     tool and have no bucket of their own: charging twice for the same work
     measures nothing, and the tool's general bucket already holds back the
     loop. Auditing still applies.
@@ -130,7 +130,7 @@ async def guarda_da_chamada(
         try:
             if guarda is not None and guarda.escopo:
                 exigir_escopo(escopo, guarda.escopo)
-            if cobrar_cota:
+            if charge_quota:
                 await cotas.verificar(
                     infra.redis_ou_none(), escopo.token_id, guarda.cota if guarda else None
                 )

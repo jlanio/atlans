@@ -6,11 +6,11 @@ vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: () => false }))
 import PainelCamadas from "@/app/components/home/painel-camadas"
 import type { MapLayer } from "@/app/components/share/MapLibreMap"
 
-const VAZIO: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] }
+const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] }
 
 const camada = (over: Partial<MapLayer> = {}): MapLayer => ({
   id: "art:a1", label: "Focos", color: "#f97316", opacity: 0.6,
-  geojson: VAZIO, visible: true, geomType: "Point", ...over,
+  geojson: EMPTY, visible: true, geomType: "Point", ...over,
 })
 
 type Props = React.ComponentProps<typeof PainelCamadas>

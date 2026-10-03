@@ -64,10 +64,10 @@ def executar(definition, task_id, publisher):
 
 # ── Node chaining ─────────────────────────────────────────────────────────────
 
-class TestEncadeamento:
+class TestChaining:
     """Execution of a workflow with linearly chained nodes."""
 
-    def test_tres_nos_em_cadeia_todos_executam(self):
+    def test_three_chained_nodes_all_run(self):
         """Workflow A→B→C must execute all 3 nodes with status 'completed'."""
         definition = make_workflow(
             nodes=[
@@ -92,7 +92,7 @@ class TestEncadeamento:
             assert node_id in stats, f"{node_id} não está em node_stats"
             assert stats[node_id]["status"] == "completed"
 
-    def test_cadeia_respeita_ordem_topologica(self):
+    def test_chain_respects_topological_order(self):
         """In the chain A→B, the topological order must put A before B."""
         from flow.executor import WorkflowExecutor
 
@@ -110,7 +110,7 @@ class TestEncadeamento:
             "node-a deve preceder node-b na ordem topológica"
         )
 
-    def test_output_de_no_intermediario_flui_para_filho(self):
+    def test_middle_node_output_flows_to_child(self):
         """A's output must arrive as B's input via the edge."""
         from flow.executor import WorkflowExecutor
 
@@ -138,10 +138,10 @@ class TestEncadeamento:
 
 # ── Jinja2 rendering ──────────────────────────────────────────────────────────
 
-class TestJinja2Renderizacao:
+class TestJinja2Rendering:
     """Parameter rendering via Jinja2 during a real execution."""
 
-    def test_expressao_jinja2_renderizada_no_parametro(self):
+    def test_jinja2_expression_rendered_in_parameter(self):
         """A parameter with a Jinja2 expression must be resolved before the node executes."""
         # strategy renders to 'last' via Jinja2
         # If rendering does NOT happen, the node receives "{{ 'la' + 'st' }}"
@@ -185,7 +185,7 @@ class TestJinja2Renderizacao:
         )
         assert stats["node-b"]["status"] == "completed"
 
-    def test_m5_libera_named_antes_da_renderizacao(self):
+    def test_m5_releases_named_before_rendering(self):
         """
         M5 releases outputs (and removes them from 'named') while preparing
         inputs, BEFORE asyncio.gather starts the coroutines. Therefore
@@ -221,18 +221,18 @@ class TestJinja2Renderizacao:
 
 # ── Event publishing ─────────────────────────────────────────────────────────
 
-class TestPublicacaoDeEventos:
+class TestEventPublishing:
     """Checks that the correct events are published during execution."""
 
-    def test_started_e_completed_publicados_por_no(self):
+    def test_started_and_completed_published_per_node(self):
         """Each node must generate at least one 'started' and one 'completed' event."""
         publisher = make_publisher()
         eventos = []
 
-        def captura(run_id, node, status, *args, **kwargs):
+        def capture(run_id, node, status, *args, **kwargs):
             eventos.append({"node": node, "status": status})
 
-        publisher.publish_event.side_effect = captura
+        publisher.publish_event.side_effect = capture
 
         status, _, _ = executar(
             definition=make_workflow(
@@ -249,15 +249,15 @@ class TestPublicacaoDeEventos:
             assert "started" in statuses, f"Evento 'started' ausente para {node_id}"
             assert "completed" in statuses, f"Evento 'completed' ausente para {node_id}"
 
-    def test_started_antecede_completed_para_cada_no(self):
+    def test_started_precedes_completed_for_each_node(self):
         """For each node, 'started' must be published before 'completed'."""
         publisher = make_publisher()
         eventos = []
 
-        def captura(run_id, node, status, *args, **kwargs):
+        def capture(run_id, node, status, *args, **kwargs):
             eventos.append({"node": node, "status": status})
 
-        publisher.publish_event.side_effect = captura
+        publisher.publish_event.side_effect = capture
 
         executar(
             definition=make_workflow(nodes=[make_node("no-seq")], edges=[]),
@@ -265,39 +265,39 @@ class TestPublicacaoDeEventos:
             publisher=publisher,
         )
 
-        eventos_no = [e for e in eventos if e["node"] == "no-seq"]
-        statuses = [e["status"] for e in eventos_no]
+        node_events = [e for e in eventos if e["node"] == "no-seq"]
+        statuses = [e["status"] for e in node_events]
 
         assert "started" in statuses and "completed" in statuses
         assert statuses.index("started") < statuses.index("completed"), (
             "'started' deve anteceder 'completed'"
         )
 
-    def test_publisher_chamado_pelo_menos_uma_vez_por_no(self):
+    def test_publisher_called_at_least_once_per_node(self):
         """The number of calls to the publisher must be >= the number of nodes."""
         publisher = make_publisher()
-        n_nos = 3
+        n_nodes = 3
 
         executar(
             definition=make_workflow(
-                nodes=[make_node(f"no-{i}") for i in range(n_nos)],
+                nodes=[make_node(f"no-{i}") for i in range(n_nodes)],
                 edges=[],
             ),
             task_id="test-calls-001",
             publisher=publisher,
         )
 
-        assert publisher.publish_event.call_count >= n_nos, (
+        assert publisher.publish_event.call_count >= n_nodes, (
             "Publisher deve ser chamado ao menos uma vez por nó"
         )
 
 
 # ── Parallel execution ───────────────────────────────────────────────────────
 
-class TestParalelismo:
+class TestParallelism:
     """Nodes with no dependencies between them must be able to execute in parallel."""
 
-    def test_diamante_todos_nos_executam(self):
+    def test_diamond_all_nodes_run(self):
         """Workflow A→[B,C]→D must execute all 4 nodes successfully."""
         definition = make_workflow(
             nodes=[
@@ -325,7 +325,7 @@ class TestParalelismo:
             assert node_id in stats, f"{node_id} não foi executado"
             assert stats[node_id]["status"] == "completed"
 
-    def test_diamante_ordem_topologica_correta(self):
+    def test_diamond_correct_topological_order(self):
         """D must appear after B and C in the diamond's topological order."""
         from flow.executor import WorkflowExecutor
 
@@ -352,10 +352,10 @@ class TestParalelismo:
 
 # ── Error handling ────────────────────────────────────────────────────────────
 
-class TestTratamentoDeErros:
+class TestErrorHandling:
     """Executor behavior when a node fails."""
 
-    def test_no_invalido_retorna_status_failed(self):
+    def test_invalid_node_returns_status_failed(self):
         """A node with an invalid strategy must fail and return status 'failed'."""
         definition = make_workflow(
             nodes=[make_node("node-ruim", strategy="invalida")],
@@ -373,7 +373,7 @@ class TestTratamentoDeErros:
         assert stats["node-ruim"]["status"] == "failed"
         assert stats["node-ruim"]["error"] is not None
 
-    def test_erro_em_no_intermediario_stats_do_antecessor_preservados(self):
+    def test_error_in_middle_node_keeps_predecessor_stats(self):
         """When B fails (A→B), the stats of A (which completed) must be present."""
         definition = make_workflow(
             nodes=[
@@ -396,15 +396,15 @@ class TestTratamentoDeErros:
         )
         assert stats["node-fail"]["status"] == "failed"
 
-    def test_erro_publica_evento_completed_com_status_failed(self):
+    def test_error_publishes_completed_event_with_status_failed(self):
         """When a node fails, a 'completed' event with the failure must be published."""
         publisher = make_publisher()
         eventos = []
 
-        def captura(run_id, node, status, *args, **kwargs):
+        def capture(run_id, node, status, *args, **kwargs):
             eventos.append({"node": node, "status": status})
 
-        publisher.publish_event.side_effect = captura
+        publisher.publish_event.side_effect = capture
 
         executar(
             definition=make_workflow(
@@ -415,18 +415,18 @@ class TestTratamentoDeErros:
             publisher=publisher,
         )
 
-        eventos_no = [e for e in eventos if e["node"] == "node-ruim"]
-        statuses = [e["status"] for e in eventos_no]
+        node_events = [e for e in eventos if e["node"] == "node-ruim"]
+        statuses = [e["status"] for e in node_events]
         assert "started" in statuses, "Evento 'started' ausente mesmo em nó que falha"
         assert "failed" in statuses, "Evento 'failed'/'completed' ausente para nó que falha"
 
 
 # ── Memory release (M5) ──────────────────────────────────────────────────────
 
-class TestLiberacaoDeMemoria:
+class TestMemoryRelease:
     """M5 optimization: node outputs are released after the children consume them."""
 
-    def test_outputs_intermediarios_liberados_de_all_node_outputs(self):
+    def test_intermediate_outputs_released_from_all_node_outputs(self):
         """
         After executing A→B, A's all_node_outputs must be released
         (B consumed A's data, triggering _free_node_outputs).
@@ -447,7 +447,7 @@ class TestLiberacaoDeMemoria:
             "M5: outputs de node-a devem ser liberados após node-b consumir"
         )
 
-    def test_final_outputs_preservados_apos_liberacao_m5(self):
+    def test_final_outputs_preserved_after_m5_release(self):
         """
         final_outputs must contain the original values even after
         all_node_outputs is cleared by M5.
@@ -472,7 +472,7 @@ class TestLiberacaoDeMemoria:
             "final_outputs deve preservar output de node-b mesmo após M5"
         )
 
-    def test_no_folha_sem_filhos_tambem_e_liberado(self):
+    def test_leaf_node_without_children_is_also_released(self):
         """
         A leaf node (no children) must also have its outputs released after execution
         (remaining_consumers == 0 → _free_node_outputs called).

@@ -11,7 +11,7 @@ beforeEach(() => {
 })
 
 /** Controllable fetcher: each call returns a promise the test resolves. */
-function fetcherControlado<T>() {
+function controlledFetcher<T>() {
   const resolvers: ((valor: { data: T }) => void)[] = []
   const fetcher = vi.fn(() => new Promise<{ data: T }>(res => { resolvers.push(res) }))
   return { fetcher, resolverProxima: (valor: T) => act(async () => { resolvers.shift()!({ data: valor }) }) }
@@ -19,7 +19,7 @@ function fetcherControlado<T>() {
 
 describe("useFetchData — sinais de carga", () => {
   it("firstLoad só na primeira carga; loading em TODA requisição", async () => {
-    const { fetcher, resolverProxima } = fetcherControlado<string[]>()
+    const { fetcher, resolverProxima } = controlledFetcher<string[]>()
     const { result } = renderHook(() => useFetchData(fetcher, "erro"))
 
     // First load: nothing on screen, both signals on (skeleton + spinner).
@@ -48,19 +48,19 @@ describe("useFetchData — sinais de carga", () => {
   })
 
   it("loading é a união de firstLoad e refreshing, nunca menos", async () => {
-    const { fetcher, resolverProxima } = fetcherControlado<number[]>()
+    const { fetcher, resolverProxima } = controlledFetcher<number[]>()
     const { result } = renderHook(() => useFetchData(fetcher, "erro"))
 
-    const uniao = () => result.current.firstLoad || result.current.refreshing
-    expect(result.current.loading).toBe(uniao())
+    const union = () => result.current.firstLoad || result.current.refreshing
+    expect(result.current.loading).toBe(union())
 
     await resolverProxima([1])
     await waitFor(() => expect(result.current.loading).toBe(false))
-    expect(result.current.loading).toBe(uniao())
+    expect(result.current.loading).toBe(union())
 
     act(() => { result.current.refetch() })
     await waitFor(() => expect(result.current.refreshing).toBe(true))
-    expect(result.current.loading).toBe(uniao())
+    expect(result.current.loading).toBe(union())
   })
 })
 
@@ -180,7 +180,7 @@ describe("useFetchData — recarga de fundo", () => {
   })
 
   it("com dado na tela, é a recarga de sempre (gira o Atualizar, a lista fica)", async () => {
-    const { fetcher, resolverProxima } = fetcherControlado<string[]>()
+    const { fetcher, resolverProxima } = controlledFetcher<string[]>()
     const { result } = renderHook(() => useFetchData(fetcher, "erro"))
     await resolverProxima(["a"])
     await waitFor(() => expect(result.current.data).toEqual(["a"]))
@@ -237,7 +237,7 @@ describe("useFetchData — sessão, ativo e setData", () => {
   })
 
   it("ativo=false não busca; ligar carrega; desligar descarta o que estava em voo e zera a tela", async () => {
-    const { fetcher, resolverProxima } = fetcherControlado<string>()
+    const { fetcher, resolverProxima } = controlledFetcher<string>()
     const { result, rerender } = renderHook(
       ({ ativo }: { ativo: boolean }) => useFetchData(fetcher, "erro", [], 0, { ativo }),
       { initialProps: { ativo: false } },
@@ -259,7 +259,7 @@ describe("useFetchData — sessão, ativo e setData", () => {
   })
 
   it("setData troca o dado sem buscar e sem virar 'resposta aceita'", async () => {
-    const { fetcher, resolverProxima } = fetcherControlado<string[]>()
+    const { fetcher, resolverProxima } = controlledFetcher<string[]>()
     const { result } = renderHook(() => useFetchData(fetcher, "erro"))
     await resolverProxima(["a"])
     await waitFor(() => expect(result.current.data).toEqual(["a"]))

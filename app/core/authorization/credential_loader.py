@@ -50,7 +50,7 @@ class CredentialScopeMissing(RuntimeError):
 
 
 @dataclass(frozen=True)
-class EscopoDeCredenciais:
+class CredentialScope:
     """What a `credential_scope` delimits: authorized owners and, optionally,
     the workspace whose shared credentials also count.
 
@@ -66,7 +66,7 @@ class EscopoDeCredenciais:
 
 # Implicit scope for code that takes no parameters — today only the nodes'
 # `simulate()`, invoked generically by `simulate_runner`.
-_scope: ContextVar[EscopoDeCredenciais | None] = ContextVar("credential_scope", default=None)
+_scope: ContextVar[CredentialScope | None] = ContextVar("credential_scope", default=None)
 
 
 @contextmanager
@@ -78,7 +78,7 @@ def credential_scope(owner_ids: Iterable[str], shared_workspace_id: str | None =
     when the caller has already verified that the user belongs to the workspace — the
     resolver trusts what it receives here.
     """
-    token = _scope.set(EscopoDeCredenciais(frozenset(owner_ids), shared_workspace_id))
+    token = _scope.set(CredentialScope(frozenset(owner_ids), shared_workspace_id))
     try:
         yield
     finally:
@@ -133,7 +133,7 @@ async def assert_credentials_accessible(
     another user's infrastructure. Blocking here gives a clear 403 before
     any connection. The `WorkflowService` writes use the same guard.
 
-    The clause is the SAME as the dispatch's (`_resolver_na_sessao`): (requested id) AND
+    The clause is the SAME as the dispatch's (`_resolve_in_session`): (requested id) AND
     (owner_id IS NOT NULL) AND (owner_id == user OR workspace_id ==
     shared_workspace_id). Keeping the two identical ensures validate accepts
     exactly what Run would resolve — no more (it would connect to a
@@ -186,12 +186,12 @@ async def assert_credentials_accessible(
         )
 
 
-def validade_da_credencial(expires_at_raw) -> str:
+def credential_validity(expires_at_raw) -> str:
     """What the `expires_at` stored in the credential's `data` says about it:
     `"valida"` (still valid, or has no expiry), `"expirada"` (expired) or
     `"invalida"` (not a date — ignored for safety during resolution).
 
-    It is the resolution rule (`_resolver_na_sessao`); validation uses it to
+    It is the resolution rule (`_resolve_in_session`); validation uses it to
     warn BEFORE Run that the node's credential will not be resolved.
     """
     if not expires_at_raw:
@@ -227,7 +227,7 @@ async def tipos_e_validades(db, credential_ids: Iterable[str]) -> dict:
     saida = {}
     for cid, tipo, data in rows:
         expires_at_raw = (data or {}).get("expires_at") if isinstance(data, dict) else None
-        saida[str(cid)] = (tipo, validade_da_credencial(expires_at_raw), expires_at_raw)
+        saida[str(cid)] = (tipo, credential_validity(expires_at_raw), expires_at_raw)
     return saida
 
 
@@ -296,7 +296,7 @@ async def resolve_credentials_from_ids(
 
     The two kwargs are the ENTIRE scope as soon as either of them is passed.
     Only in the absence of BOTH does the active `credential_scope` apply — which carries the
-    same two dimensions (`EscopoDeCredenciais`). There is no mixing: an explicit
+    same two dimensions (`CredentialScope`). There is no mixing: an explicit
     kwarg is never completed by the ContextVar, so that a call
     site's scope is always what is written in it.
 
@@ -351,19 +351,19 @@ async def resolve_credentials_from_ids(
     if db is not None:
         # Request session: the caller is the one who commits. We don't commit here so we
         # don't accidentally write its pending work.
-        return await _resolver_na_sessao(
+        return await _resolve_in_session(
             db, uuid_ids, allowed, shared_workspace_id=shared_workspace_id, own_session=False
         )
 
     async with get_session_async() as session:
         # Own session (simulate): get_session_async rolls back on exit,
         # so the last_used_at stamp only persists if we commit here.
-        return await _resolver_na_sessao(
+        return await _resolve_in_session(
             session, uuid_ids, allowed, shared_workspace_id=shared_workspace_id, own_session=True
         )
 
 
-async def _marcar_last_used(session, usados: List[UUID], now, *, own_session: bool) -> None:
+async def _mark_last_used(session, usados: List[UUID], now, *, own_session: bool) -> None:
     """Stamps last_used_at on the credentials actually resolved — best-effort.
 
     Runs on the HOTTEST path (POST /execute). Safety rules:
@@ -401,7 +401,7 @@ async def _marcar_last_used(session, usados: List[UUID], now, *, own_session: bo
                 pass
 
 
-async def _resolver_na_sessao(
+async def _resolve_in_session(
     session, uuid_ids: List[UUID], allowed: list,
     *, shared_workspace_id: str | None = None, own_session: bool = False,
 ) -> dict:
@@ -444,7 +444,7 @@ async def _resolver_na_sessao(
     for cred in credentials:
         # Ignores expired credentials (expires_at is inside the JSONB data, not a column)
         expires_at_raw = (cred.data or {}).get("expires_at")
-        validade = validade_da_credencial(expires_at_raw)
+        validade = credential_validity(expires_at_raw)
         if validade == "expirada":
             logger.warning("Credencial %s expirada em %s — ignorada.", cred.id, expires_at_raw)
             continue
@@ -463,6 +463,6 @@ async def _resolver_na_sessao(
         usados.append(cred.id)
 
     await _explain_missing(session, uuid_ids, set(auth), allowed, shared_workspace_id)
-    await _marcar_last_used(session, usados, now, own_session=own_session)
+    await _mark_last_used(session, usados, now, own_session=own_session)
 
     return auth

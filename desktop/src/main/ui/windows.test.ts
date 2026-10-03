@@ -98,11 +98,11 @@ describe('protegerNavegacao', () => {
     ;(electron.shell as { openExternal?: unknown }).openExternal = abrir
     const { protegerNavegacao } = await import('./windows.js')
     let aoAbrir: ((d: { url: string }) => { action: string }) | undefined
-    type Ouvinte = (e: { preventDefault: () => void }, url: string) => void
-    const ouvintes: Record<string, Ouvinte> = {}
+    type Listener = (e: { preventDefault: () => void }, url: string) => void
+    const ouvintes: Record<string, Listener> = {}
     const conteudo = {
       setWindowOpenHandler: vi.fn((f) => { aoAbrir = f }),
-      on: vi.fn((evento: string, f: Ouvinte) => { ouvintes[evento] = f }),
+      on: vi.fn((evento: string, f: Listener) => { ouvintes[evento] = f }),
       getURL: vi.fn(() => 'http://localhost:5173/#log'),
     }
     protegerNavegacao(conteudo as never)

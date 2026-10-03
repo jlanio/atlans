@@ -15,13 +15,13 @@
 import {
   TbAlertTriangle, TbCircleX, TbFolder, TbFolderSymlink, TbList,
 } from 'react-icons/tb'
-import type { EstadoApp } from '../../main/state/store.js'
+import type { AppState } from '../../main/state/store.js'
 import type { InfoApp } from '../../shared/ipc.js'
-import { gb, nivelDoDisco } from '../../shared/disco.js'
+import { gb, diskLevel } from '../../shared/disco.js'
 import { cn } from '../lib/utils.js'
 
 /** Colored status dot. The color is the same language as the tray icon. */
-export function Ponto({ estado }: { estado: EstadoApp }) {
+export function StatusDot({ estado }: { estado: AppState }) {
   const snap = estado.snapshot
   const conectado = estado.supervisor === 'running' && snap?.conn_state === 'connected'
   const ocupado = conectado && snap.running_count > 0
@@ -38,7 +38,7 @@ export function Ponto({ estado }: { estado: EstadoApp }) {
       // The color is the only clue to the connection state in this strip; without an
       // accessible label, the LED does not exist for screen reader users.
       role="img"
-      aria-label={`Estado: ${rotuloStatus(estado)}`}
+      aria-label={`Estado: ${statusLabel(estado)}`}
     >
       {/* Breathing, not `animate-ping`.
           The ring that expands every second lives in the window's ONLY
@@ -56,7 +56,7 @@ export function Ponto({ estado }: { estado: EstadoApp }) {
   )
 }
 
-export function rotuloStatus(estado: EstadoApp): string {
+export function statusLabel(estado: AppState): string {
   const snap = estado.snapshot
   switch (estado.supervisor) {
     case 'stopped': return 'Parado'
@@ -74,7 +74,7 @@ export function rotuloStatus(estado: EstadoApp): string {
 }
 
 /** Detail that only makes sense in some states — empty in the others. */
-function detalhe(estado: EstadoApp): string | null {
+function detalhe(estado: AppState): string | null {
   const snap = estado.snapshot
   if (!snap) return null
   // Without this, the user keeps clicking Reconectar without knowing there is
@@ -97,7 +97,7 @@ function detalhe(estado: EstadoApp): string | null {
  * text — `px-1.5 py-0.5` gives click area without changing the height of the
  * strip, which is fixed.
  */
-const ATALHO = [
+const LINK_BUTTON = [
   'flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 outline-none',
   'transition-colors underline-offset-4 hover:underline',
   'focus-visible:ring-ring/50 focus-visible:ring-2',
@@ -106,7 +106,7 @@ const ATALHO = [
 export function StatusBar({
   estado, info, pastaGeosync, aoAbrirAjustes,
 }: {
-  estado: EstadoApp
+  estado: AppState
   info: InfoApp | null
   /** GeoSync folder, when one is configured. */
   pastaGeosync: string | null
@@ -119,7 +119,7 @@ export function StatusBar({
   const extra = detalhe(estado)
   // Only with the executor running: the metric comes from its snapshot.
   const disco = estado.supervisor === 'running'
-    ? nivelDoDisco(estado.snapshot?.artifacts_disk_free_gb)
+    ? diskLevel(estado.snapshot?.artifacts_disk_free_gb)
     : null
 
   return (
@@ -135,14 +135,14 @@ export function StatusBar({
           drift from reality as soon as the person closed it. */}
       <button type="button" onClick={() => window.atlas.abrirJanelaLog()}
               title="Abrir o log em uma janela separada"
-              className={cn(ATALHO, 'hover:text-foreground')}>
+              className={cn(LINK_BUTTON, 'hover:text-foreground')}>
         <TbList size={13} /> Log
       </button>
 
       {info && (
         <button type="button" onClick={() => window.atlas.abrirCaminho(info.artifactsDir)}
                 title={`Abrir no Explorer: ${info.artifactsDir}`}
-                className={cn(ATALHO, 'hover:text-foreground')}>
+                className={cn(LINK_BUTTON, 'hover:text-foreground')}>
           <TbFolder size={13} /> Artefatos
         </button>
       )}
@@ -154,7 +154,7 @@ export function StatusBar({
       {pastaGeosync && (
         <button type="button" onClick={() => window.atlas.abrirCaminho(pastaGeosync)}
                 title={`Abrir no Explorer: ${pastaGeosync}`}
-                className={cn(ATALHO, 'hover:text-foreground')}>
+                className={cn(LINK_BUTTON, 'hover:text-foreground')}>
           <TbFolderSymlink size={13} /> GeoSync
         </button>
       )}
@@ -169,7 +169,7 @@ export function StatusBar({
         <button type="button" onClick={aoAbrirAjustes}
                 title="Ver detalhes em Ajustes"
                 className={cn(
-                  ATALHO,
+                  LINK_BUTTON,
                   'animate-in fade-in-0 slide-in-from-right-2 duration-300',
                   disco === 'critico' ? 'text-destructive' : 'text-warning',
                 )}>
@@ -183,7 +183,7 @@ export function StatusBar({
       {erros > 0 && (
         <button type="button" onClick={() => window.atlas.abrirJanelaLog()}
                 title="Abrir o log para ver os erros"
-                className={cn(ATALHO, 'text-destructive animate-in fade-in-0 slide-in-from-right-2 duration-300')}>
+                className={cn(LINK_BUTTON, 'text-destructive animate-in fade-in-0 slide-in-from-right-2 duration-300')}>
           <TbCircleX size={13} />
           {/* "1 erro(s)" was the only parenthesized plural in the file. */}
           {erros > 99 ? '99+ erros' : `${erros} ${erros === 1 ? 'erro' : 'erros'}`}
@@ -191,8 +191,8 @@ export function StatusBar({
       )}
       {extra && <span className="truncate">{extra}</span>}
       <span className="flex items-center gap-2 border-l border-sidebar-border pl-3">
-        <Ponto estado={estado} />
-        <span className="text-foreground">{rotuloStatus(estado)}</span>
+        <StatusDot estado={estado} />
+        <span className="text-foreground">{statusLabel(estado)}</span>
       </span>
     </footer>
   )

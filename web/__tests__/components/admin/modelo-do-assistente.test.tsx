@@ -1,8 +1,8 @@
 import { lazy } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
-import type { ExtensaoDoWeb, PropsDoEnvoltorioDoPainel } from "@/extensoes"
-import type { IPainelDoModelo } from "@/service/types"
+import type { ExtensaoDoWeb, PanelWrapperProps } from "@/extensoes"
+import type { IModelPanel } from "@/service/types"
 
 /**
  * The section that switches the assistant's model, in the core: the model in use, the
@@ -30,7 +30,7 @@ vi.mock("@/utils/createToast", () => ({
 const registro = vi.hoisted(() => ({ EXTENSOES: [] as ExtensaoDoWeb[] }))
 vi.mock("@/extensoes", async (original) => ({ ...(await original<typeof import("@/extensoes")>()), EXTENSOES: registro.EXTENSOES }))
 
-import { ModeloDoAssistente } from "@/app/components/admin/settings/modelo-do-assistente"
+import { AssistantModel } from "@/app/components/admin/settings/modelo-do-assistente"
 
 const ok = <T,>(data: T) => ({ success: true, status: 200, data })
 
@@ -41,7 +41,7 @@ const CATALOGO = [
 ]
 
 /** The panel as the server sends it with no extension at all. */
-function painel(over: Partial<IPainelDoModelo> = {}): IPainelDoModelo {
+function painel(over: Partial<IModelPanel> = {}): IModelPanel {
   return {
     atual: {
       modelo: "a/barato", origem: "ambiente",
@@ -57,7 +57,7 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); registro.EXTENSOES.length = 0 }
 
 describe("o seletor do núcleo", () => {
   it("lista o catálogo e mostra «preço não informado», nunca zero", () => {
-    render(<ModeloDoAssistente painel={painel()} onTrocado={vi.fn()} />)
+    render(<AssistantModel painel={painel()} onTrocado={vi.fn()} />)
 
     expect(screen.getAllByRole("option")).toHaveLength(3)
     expect(screen.getByText("preço não informado")).toBeTruthy()
@@ -65,14 +65,14 @@ describe("o seletor do núcleo", () => {
   })
 
   it("filtra por nome ou fornecedor", () => {
-    render(<ModeloDoAssistente painel={painel()} onTrocado={vi.fn()} />)
+    render(<AssistantModel painel={painel()} onTrocado={vi.fn()} />)
 
     fireEvent.change(screen.getByPlaceholderText(/filtrar/), { target: { value: "caro" } })
     expect(screen.getAllByRole("option").map(o => o.textContent)).toEqual([expect.stringContaining("a/caro")])
   })
 
   it("escolher não salva", () => {
-    render(<ModeloDoAssistente painel={painel()} onTrocado={vi.fn()} />)
+    render(<AssistantModel painel={painel()} onTrocado={vi.fn()} />)
 
     fireEvent.click(screen.getByRole("option", { name: /a\/caro/ }))
 
@@ -83,7 +83,7 @@ describe("o seletor do núcleo", () => {
   it("salvar troca o modelo e avisa o pai", async () => {
     svc.trocarModelo.mockResolvedValue(ok(painel()))
     const aoTrocar = vi.fn()
-    render(<ModeloDoAssistente painel={painel()} onTrocado={aoTrocar} />)
+    render(<AssistantModel painel={painel()} onTrocado={aoTrocar} />)
 
     fireEvent.click(screen.getByRole("option", { name: /a\/caro/ }))
     fireEvent.click(screen.getByRole("button", { name: /Salvar modelo/ }))
@@ -93,17 +93,17 @@ describe("o seletor do núcleo", () => {
   })
 
   it("sem mudança, salvar fica desabilitado", () => {
-    render(<ModeloDoAssistente painel={painel()} onTrocado={vi.fn()} />)
+    render(<AssistantModel painel={painel()} onTrocado={vi.fn()} />)
     const botao = screen.getByRole("button", { name: /Salvar modelo/ }) as HTMLButtonElement
     expect(botao.disabled).toBe(true)
     expect(screen.getByText(/já é o modelo em uso/)).toBeTruthy()
   })
 
   it("«voltar ao padrão» só existe quando alguém já definiu um modelo aqui", () => {
-    const { rerender } = render(<ModeloDoAssistente painel={painel()} onTrocado={vi.fn()} />)
+    const { rerender } = render(<AssistantModel painel={painel()} onTrocado={vi.fn()} />)
     expect(screen.queryByRole("button", { name: /Voltar ao padrão/ })).toBeNull()
 
-    rerender(<ModeloDoAssistente painel={painel({
+    rerender(<AssistantModel painel={painel({
       atual: { modelo: "a/caro", origem: "banco", definido_por: "jose",
                definido_em: "2026-09-21T12:00:00", padrao_do_ambiente: "a/barato" },
     })} onTrocado={vi.fn()} />)
@@ -115,7 +115,7 @@ describe("o seletor do núcleo", () => {
   it("provedor fora do ar não derruba a tela", () => {
     // Without a catalog the admin still needs to see what is in use and be able to go back
     // to the default — hiding everything would lock the only way out.
-    render(<ModeloDoAssistente painel={painel({
+    render(<AssistantModel painel={painel({
       catalogo: [], catalogo_indisponivel: "ErroDoOpenRouter",
       atual: { modelo: "a/caro", origem: "banco", definido_por: "jose",
                definido_em: "2026-09-21T12:00:00", padrao_do_ambiente: "a/barato" },
@@ -131,8 +131,8 @@ describe("o seletor do núcleo", () => {
 
 describe("o encaixe das extensões", () => {
   /** A fake wrapper that exposes what it received. */
-  const recebido: { atual: PropsDoEnvoltorioDoPainel | null } = { atual: null }
-  function Envoltorio(props: PropsDoEnvoltorioDoPainel) {
+  const recebido: { atual: PanelWrapperProps | null } = { atual: null }
+  function Envoltorio(props: PanelWrapperProps) {
     recebido.atual = props
     return (
       <section data-testid="envoltorio" data-escolhido={props.escolhido}>
@@ -146,7 +146,7 @@ describe("o encaixe das extensões", () => {
   it("cerca o seletor, sabe o que foi escolhido e recebe o painel", () => {
     registro.EXTENSOES.push({ nome: "teste", painelDoModelo: { Envoltorio } })
     const p = painel()
-    render(<ModeloDoAssistente painel={p} onTrocado={vi.fn()} />)
+    render(<AssistantModel painel={p} onTrocado={vi.fn()} />)
 
     const envoltorio = screen.getByTestId("envoltorio")
     expect(within(envoltorio).getByRole("listbox")).toBeTruthy()
@@ -159,7 +159,7 @@ describe("o encaixe das extensões", () => {
 
   it("uma gravação da extensão trava os botões do núcleo", () => {
     registro.EXTENSOES.push({ nome: "teste", painelDoModelo: { Envoltorio } })
-    render(<ModeloDoAssistente painel={painel()} onTrocado={vi.fn()} />)
+    render(<AssistantModel painel={painel()} onTrocado={vi.fn()} />)
     fireEvent.click(screen.getByRole("option", { name: /a\/caro/ }))
     expect((screen.getByRole("button", { name: /Salvar modelo/ }) as HTMLButtonElement).disabled).toBe(false)
 
@@ -176,7 +176,7 @@ describe("o encaixe das extensões", () => {
     const erro = vi.spyOn(console, "error").mockImplementation(() => {})
     const Quebrado = lazy<typeof Envoltorio>(() => Promise.reject(new Error("ChunkLoadError: Loading chunk 123 failed.")))
     registro.EXTENSOES.push({ nome: "teste", painelDoModelo: { Envoltorio: Quebrado } })
-    render(<ModeloDoAssistente painel={painel({
+    render(<AssistantModel painel={painel({
       atual: { modelo: "a/caro", origem: "banco", definido_por: "jose",
                definido_em: "2026-09-21T12:00:00", padrao_do_ambiente: "a/barato" },
     })} onTrocado={vi.fn()} />)
@@ -191,7 +191,7 @@ describe("o encaixe das extensões", () => {
   it("o `aoTrocar` da extensão é o recarregar da página", () => {
     registro.EXTENSOES.push({ nome: "teste", painelDoModelo: { Envoltorio } })
     const onTrocado = vi.fn()
-    render(<ModeloDoAssistente painel={painel()} onTrocado={onTrocado} />)
+    render(<AssistantModel painel={painel()} onTrocado={onTrocado} />)
 
     act(() => recebido.atual?.aoTrocar())
     expect(onTrocado).toHaveBeenCalledTimes(1)

@@ -10,7 +10,7 @@
  *      keeping the old value would assert columns the last run didn't produce.
  *
  * Uses the same socket/frame harness as the stream recovery: the live path
- * goes through the per-frame batch (`drenarLote`), not through a direct call.
+ * goes through the per-frame batch (`drainBatch`), not through a direct call.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { renderHook, act, waitFor } from "@testing-library/react"
@@ -19,28 +19,28 @@ import { useKnownColumnsStore } from "@/app/stores/knownColumnsStore"
 
 const RUN = "run-x"
 
-let workflowAtual = "wf-a"
-const runsPorWorkflow: Record<string, { run_id: string; status: string }[]> = {}
+let currentWorkflow = "wf-a"
+const runsByWorkflow: Record<string, { run_id: string; status: string }[]> = {}
 /** What `getRunDetail` returns — the detail with `node_stats` for hydration. */
-let detalheNaApi: Record<string, unknown> = {}
+let apiDetail: Record<string, unknown> = {}
 
-const nosDoCanvas = [
+const canvasNodes = [
   { id: "n1", position: { x: 0, y: 0 }, data: {} },
   { id: "n2", position: { x: 0, y: 0 }, data: {} },
 ]
 
-vi.mock("next/navigation", () => ({ useParams: () => ({ id: workflowAtual }) }))
+vi.mock("next/navigation", () => ({ useParams: () => ({ id: currentWorkflow }) }))
 vi.mock("next-auth/react", () => ({ useSession: () => ({ data: null }) }))
 vi.mock("@/app/hooks/workflow/useSaveWorkflow", () => ({
   useSaveWorkflow: () => ({ saveWorkflow: vi.fn(async () => ({ error: null })) }),
 }))
 
-const getRunDetail = vi.fn(async () => ({ data: detalheNaApi }))
+const getRunDetail = vi.fn(async () => ({ data: apiDetail }))
 
 vi.mock("@/service/GisFlowService", () => ({
   GisFlowService: {
     getObservabilityRuns: vi.fn(async ({ workflow_id }: { workflow_id: string }) => ({
-      data: { runs: runsPorWorkflow[workflow_id] ?? [] },
+      data: { runs: runsByWorkflow[workflow_id] ?? [] },
     })),
     getRunDetail: (...args: unknown[]) => getRunDetail(...(args as [])),
     executeWorkflow: vi.fn(),
@@ -53,19 +53,19 @@ vi.mock("@/utils/createToast", () => ({
 vi.mock("@/utils/env", () => ({ getWsUrl: () => "ws://teste" }))
 vi.mock("@xyflow/react", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useNodes: () => nosDoCanvas,
+  useNodes: () => canvasNodes,
   useEdges: () => [],
-  useReactFlow: () => ({ getNodes: () => nosDoCanvas }),
+  useReactFlow: () => ({ getNodes: () => canvasNodes }),
 }))
 
-class SocketFalso {
-  static abertos: SocketFalso[] = []
+class FakeSocket {
+  static abertos: FakeSocket[] = []
   onopen: (() => void) | null = null
   onmessage: ((ev: { data: string }) => void) | null = null
   onerror: ((err: unknown) => void) | null = null
   onclose: ((ev: { code: number }) => void) | null = null
   constructor(public url: string) {
-    SocketFalso.abertos.push(this)
+    FakeSocket.abertos.push(this)
   }
   send() {}
   close() {
@@ -74,10 +74,10 @@ class SocketFalso {
 }
 
 const quadros = new Map<number, FrameRequestCallback>()
-let proximoQuadro = 1
+let nextFrame = 1
 
 /** Runs the pending frames — it's what applies the batch to the store. */
-function rodarQuadros() {
+function runFrames() {
   const cbs = [...quadros.values()]
   quadros.clear()
   for (const cb of cbs) cb(0)
@@ -90,16 +90,16 @@ async function montar() {
 
 describe("colunas do run → knownColumnsStore", () => {
   beforeEach(() => {
-    workflowAtual = "wf-a"
-    runsPorWorkflow["wf-a"] = []
-    detalheNaApi = {}
-    SocketFalso.abertos = []
+    currentWorkflow = "wf-a"
+    runsByWorkflow["wf-a"] = []
+    apiDetail = {}
+    FakeSocket.abertos = []
     quadros.clear()
-    proximoQuadro = 1
+    nextFrame = 1
     getRunDetail.mockClear()
-    vi.stubGlobal("WebSocket", SocketFalso)
+    vi.stubGlobal("WebSocket", FakeSocket)
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-      const id = proximoQuadro++
+      const id = nextFrame++
       quadros.set(id, cb)
       return id
     })
@@ -116,8 +116,8 @@ describe("colunas do run → knownColumnsStore", () => {
   // ── 1. Re-hydration of the last persisted run ───────────────────────────
 
   it("último run concluído semeia as colunas do node_stats, sem abrir socket", async () => {
-    runsPorWorkflow["wf-a"] = [{ run_id: RUN, status: "success" }]
-    detalheNaApi = {
+    runsByWorkflow["wf-a"] = [{ run_id: RUN, status: "success" }]
+    apiDetail = {
       status: "success",
       node_stats: {
         n1: { node_name: "Ler camada", output_columns: { output: ["cod", "nome"] } },
@@ -135,7 +135,7 @@ describe("colunas do run → knownColumnsStore", () => {
     expect(useKnownColumnsStore.getState().workflowId).toBe("wf-a")
     expect(useKnownColumnsStore.getState().porNo.has("n2")).toBe(false)
     // A dead run has nothing to re-attach.
-    expect(SocketFalso.abertos).toHaveLength(0)
+    expect(FakeSocket.abertos).toHaveLength(0)
     // And hydration doesn't touch the execution state (clean canvas).
     expect(useWorkflowExecutionStore.getState().statusWorkflow).toBeNull()
 
@@ -143,8 +143,8 @@ describe("colunas do run → knownColumnsStore", () => {
   })
 
   it("stats sem coluna nenhuma não chama a store à toa", async () => {
-    runsPorWorkflow["wf-a"] = [{ run_id: RUN, status: "failed" }]
-    detalheNaApi = { status: "failed", node_stats: { n1: { node_name: "x" } } }
+    runsByWorkflow["wf-a"] = [{ run_id: RUN, status: "failed" }]
+    apiDetail = { status: "failed", node_stats: { n1: { node_name: "x" } } }
 
     const view = await montar()
     await waitFor(() => expect(getRunDetail).toHaveBeenCalled())
@@ -156,11 +156,11 @@ describe("colunas do run → knownColumnsStore", () => {
   // ── 2. Live write, through the per-frame batch ──────────────────────────
 
   it("completed com colunas grava fresh=true; sem colunas, remove a entrada", async () => {
-    runsPorWorkflow["wf-a"] = [{ run_id: RUN, status: "running" }]
+    runsByWorkflow["wf-a"] = [{ run_id: RUN, status: "running" }]
 
     const view = await montar()
-    await waitFor(() => expect(SocketFalso.abertos.length).toBeGreaterThan(0))
-    const ws = SocketFalso.abertos[0]
+    await waitFor(() => expect(FakeSocket.abertos.length).toBeGreaterThan(0))
+    const ws = FakeSocket.abertos[0]
 
     const frame = (eventos: object[]) =>
       JSON.stringify({ type: "events", events: eventos })
@@ -172,7 +172,7 @@ describe("colunas do run → knownColumnsStore", () => {
           extra: { output_columns: { output: ["x", "y"] } },
         }]),
       })
-      rodarQuadros()
+      runFrames()
     })
     expect(useKnownColumnsStore.getState().porNo.get("n1")).toEqual({
       porPorta: { output: ["x", "y"] }, runId: RUN, fresh: true,
@@ -185,7 +185,7 @@ describe("colunas do run → knownColumnsStore", () => {
       ws.onmessage?.({
         data: frame([{ node: "n1", status: "completed", kind: "lifecycle", timestamp: 2, extra: {} }]),
       })
-      rodarQuadros()
+      runFrames()
     })
     expect(useKnownColumnsStore.getState().porNo.get("n1")).toEqual({
       porPorta: {}, runId: RUN, fresh: true,
@@ -195,14 +195,14 @@ describe("colunas do run → knownColumnsStore", () => {
   })
 
   it("evento que não é completed não mexe na memória de colunas", async () => {
-    runsPorWorkflow["wf-a"] = [{ run_id: RUN, status: "running" }]
+    runsByWorkflow["wf-a"] = [{ run_id: RUN, status: "running" }]
     useKnownColumnsStore.getState().semearDoHistorico("wf-a", "run-antigo", {
       n1: { porPorta: { output: ["antiga"] } },
     })
 
     const view = await montar()
-    await waitFor(() => expect(SocketFalso.abertos.length).toBeGreaterThan(0))
-    const ws = SocketFalso.abertos[0]
+    await waitFor(() => expect(FakeSocket.abertos.length).toBeGreaterThan(0))
+    const ws = FakeSocket.abertos[0]
 
     await act(async () => {
       ws.onmessage?.({
@@ -211,7 +211,7 @@ describe("colunas do run → knownColumnsStore", () => {
           events: [{ node: "n1", status: "started", kind: "lifecycle", timestamp: 1 }],
         }),
       })
-      rodarQuadros()
+      runFrames()
     })
     // `started` (and stdout, debug…) assert nothing about columns.
     expect(useKnownColumnsStore.getState().porNo.get("n1")).toMatchObject({

@@ -26,61 +26,61 @@ import ts from "typescript"
 import { describe, expect, it } from "vitest"
 
 const WEB = path.resolve(__dirname, "..")
-const PASTAS_FORA = new Set(["node_modules", ".next", "public", "out", "build", "coverage"])
-const CODIGO = /\.(ts|tsx|js|jsx|mjs|cjs)$/
-const METODOS_DO_VI = new Set(["mock", "doMock", "unmock", "importActual", "importMock"])
+const EXCLUDED_DIRS = new Set(["node_modules", ".next", "public", "out", "build", "coverage"])
+const CODE_FILE = /\.(ts|tsx|js|jsx|mjs|cjs)$/
+const VI_METHODS = new Set(["mock", "doMock", "unmock", "importActual", "importMock"])
 
 /** `extensoes/<nome>/…` and `__tests__/extensoes/…` belong to the extensions. */
-function daExtensao(relativo: string): boolean {
+function isFromExtension(relativo: string): boolean {
   const partes = relativo.split("/")
   return (partes[0] === "extensoes" && partes.length > 2) || (partes[0] === "__tests__" && partes[1] === "extensoes")
 }
 
 // This file mentions fake extensions on purpose, in the detector's examples.
-const ESTE = path.relative(WEB, __filename).split(path.sep).join("/")
+const THIS_FILE = path.relative(WEB, __filename).split(path.sep).join("/")
 
-function arquivosDoNucleo(pasta = WEB): string[] {
+function coreFiles(pasta = WEB): string[] {
   const achados: string[] = []
   for (const entrada of fs.readdirSync(pasta, { withFileTypes: true })) {
-    if (PASTAS_FORA.has(entrada.name)) continue
+    if (EXCLUDED_DIRS.has(entrada.name)) continue
     const caminho = path.join(pasta, entrada.name)
     const relativo = path.relative(WEB, caminho).split(path.sep).join("/")
-    if (daExtensao(relativo) || relativo === "extensoes/instaladas.ts" || relativo === ESTE) continue
-    if (entrada.isDirectory()) achados.push(...arquivosDoNucleo(caminho))
-    else if (CODIGO.test(entrada.name)) achados.push(relativo)
+    if (isFromExtension(relativo) || relativo === "extensoes/instaladas.ts" || relativo === THIS_FILE) continue
+    if (entrada.isDirectory()) achados.push(...coreFiles(caminho))
+    else if (CODE_FILE.test(entrada.name)) achados.push(relativo)
   }
   return achados
 }
 
 /** The modules a file references: imports and exports (type-only too), `import()`,
  *  `import("…")` in types, `require` and `vi.mock` and its relatives. */
-export function especificadores(texto: string, arquivo: string): string[] {
+export function specifiers(texto: string, arquivo: string): string[] {
   const tipo = /\.[jt]sx$/.test(arquivo) ? ts.ScriptKind.TSX : ts.ScriptKind.TS
   const fonte = ts.createSourceFile(arquivo, texto, ts.ScriptTarget.Latest, false, tipo)
   const achados: string[] = []
   const literal = (no: ts.Node | undefined) =>
     no && (ts.isStringLiteral(no) || ts.isNoSubstitutionTemplateLiteral(no)) ? no.text : undefined
-  const anotar = (no: ts.Node | undefined) => {
+  const collect = (no: ts.Node | undefined) => {
     const texto = literal(no)
     if (texto !== undefined) achados.push(texto)
   }
-  const visitar = (no: ts.Node): void => {
+  const visit = (no: ts.Node): void => {
     if (ts.isImportDeclaration(no) || ts.isExportDeclaration(no)) {
-      anotar(no.moduleSpecifier)
+      collect(no.moduleSpecifier)
     } else if (ts.isImportEqualsDeclaration(no) && ts.isExternalModuleReference(no.moduleReference)) {
-      anotar(no.moduleReference.expression)
+      collect(no.moduleReference.expression)
     } else if (ts.isImportTypeNode(no) && ts.isLiteralTypeNode(no.argument)) {
-      anotar(no.argument.literal)
+      collect(no.argument.literal)
     } else if (ts.isCallExpression(no)) {
       const alvo = no.expression
       const doVi = ts.isPropertyAccessExpression(alvo) && ts.isIdentifier(alvo.expression)
-        && alvo.expression.text === "vi" && METODOS_DO_VI.has(alvo.name.text)
+        && alvo.expression.text === "vi" && VI_METHODS.has(alvo.name.text)
       const require = ts.isIdentifier(alvo) && alvo.text === "require"
-      if (alvo.kind === ts.SyntaxKind.ImportKeyword || doVi || require) anotar(no.arguments[0])
+      if (alvo.kind === ts.SyntaxKind.ImportKeyword || doVi || require) collect(no.arguments[0])
     }
-    ts.forEachChild(no, visitar)
+    ts.forEachChild(no, visit)
   }
-  visitar(fonte)
+  visit(fonte)
   return achados
 }
 
@@ -91,33 +91,33 @@ export function especificadores(texto: string, arquivo: string): string[] {
 const DO_REGISTRO = new Set([
   "extensoes",
   ...fs.readdirSync(path.join(WEB, "extensoes"), { withFileTypes: true })
-    .filter(e => e.isFile() && CODIGO.test(e.name))
-    .map(e => `extensoes/${e.name.replace(CODIGO, "")}`)
+    .filter(e => e.isFile() && CODE_FILE.test(e.name))
+    .map(e => `extensoes/${e.name.replace(CODE_FILE, "")}`)
     .filter(alvo => alvo !== "extensoes/instaladas"),
 ])
 
 /** The `extensoes/` targets that a core file references without being allowed to. */
-export function citacoesProibidas(texto: string, arquivo: string): string[] {
-  const proibidas: string[] = []
-  for (const especificador of especificadores(texto, arquivo)) {
+export function forbiddenImports(texto: string, arquivo: string): string[] {
+  const forbidden: string[] = []
+  for (const specifier of specifiers(texto, arquivo)) {
     let alvo: string
-    if (especificador.startsWith("@/")) alvo = especificador.slice(2)
-    else if (especificador.startsWith(".")) alvo = path.posix.join(path.posix.dirname(arquivo), especificador)
+    if (specifier.startsWith("@/")) alvo = specifier.slice(2)
+    else if (specifier.startsWith(".")) alvo = path.posix.join(path.posix.dirname(arquivo), specifier)
     else continue
     alvo = alvo.replace(/\.(tsx?|jsx?|mjs)$/, "").replace(/\/index$/, "")
     if (alvo !== "extensoes" && !alvo.startsWith("extensoes/")) continue
     if (DO_REGISTRO.has(alvo)) continue
     // The registry, and only it, reads the list of installed ones.
     if (arquivo === "extensoes/index.ts" && alvo === "extensoes/instaladas") continue
-    proibidas.push(especificador)
+    forbidden.push(specifier)
   }
-  return proibidas
+  return forbidden
 }
 
 describe("a fronteira entre o núcleo e as extensões", () => {
   it("o detector enxerga os jeitos de citar uma extensão", () => {
     const ouro = "ouro" // a fake extension
-    const ve = (codigo: string, arquivo = "app/a.tsx") => citacoesProibidas(codigo, arquivo)
+    const ve = (codigo: string, arquivo = "app/a.tsx") => forbiddenImports(codigo, arquivo)
 
     expect(ve(`import x from "@/extensoes/${ouro}/store"`)).toHaveLength(1)
     expect(ve(`vi.mock("@/extensoes/${ouro}/servico", () => ({}))`, "__tests__/a.test.ts")).toHaveLength(1)
@@ -138,16 +138,16 @@ describe("a fronteira entre o núcleo e as extensões", () => {
   })
 
   it("nenhum arquivo do núcleo cita uma extensão pelo nome", () => {
-    const arquivos = arquivosDoNucleo()
+    const arquivos = coreFiles()
     // The test sees the core: the shell and the registry are in the list.
     expect(arquivos).toContain("app/components/sidebar/user-sidebar.tsx")
     expect(arquivos).toContain("extensoes/index.ts")
-    expect(arquivos).not.toContain(ESTE)
+    expect(arquivos).not.toContain(THIS_FILE)
 
     const erros = Object.fromEntries(
       arquivos
-        .map(a => [a, citacoesProibidas(fs.readFileSync(path.join(WEB, a), "utf8"), a)] as const)
-        .filter(([, citadas]) => citadas.length > 0),
+        .map(a => [a, forbiddenImports(fs.readFileSync(path.join(WEB, a), "utf8"), a)] as const)
+        .filter(([, cited]) => cited.length > 0),
     )
     expect(erros, "o núcleo fala com as extensões só por `@/extensoes`; os testes delas vão em __tests__/extensoes/").toEqual({})
   })

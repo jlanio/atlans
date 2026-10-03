@@ -109,7 +109,7 @@ async def export_users_csv(
         db, search=search, status=status, role=role, limit=10_000, offset=0,
     )
 
-    def _neutralizar(valor):
+    def _neutralize(valor):
         """Neutralizes formula injection in the CSV (audit SEG-121).
 
         A username/e-mail starting with `=`, `+`, `-`, `@` (or TAB/CR) is
@@ -128,7 +128,7 @@ async def export_users_csv(
         buf.seek(0)
         buf.truncate(0)
         for u in users:
-            writer.writerow([_neutralizar(c) for c in (
+            writer.writerow([_neutralize(c) for c in (
                 u.id_hash, u.username, u.email, u.status, u.role,
                 str(u.last_login_at) if u.last_login_at else "",
                 str(u.created_at),
@@ -153,7 +153,7 @@ async def _triar(
     user_ids: list[str],
     *,
     elegivel: Callable[[object], str | None],
-    erro_auto: str | None,
+    self_error: str | None,
 ) -> tuple[list, list[dict]]:
     """Common triage for `bulk/suspend`, `bulk/reactivate` and `bulk/delete`.
 
@@ -166,7 +166,7 @@ async def _triar(
     would use the bulk route with a single id.
 
     `elegivel(user)` returns None when the action can be applied, or the error
-    message. `erro_auto` is the message when the admin is the target itself; None
+    message. `self_error` is the message when the admin is the target itself; None
     allows self-action (that is the case for `reactivate`).
 
     Returns (eligible, errors).
@@ -176,8 +176,8 @@ async def _triar(
     users_by_id = await svc.get_users_by_ids(db, user_ids)
 
     for uid in user_ids:
-        if erro_auto and uid == current_user.id_hash:
-            errors.append({"user_id": uid, "error": erro_auto})
+        if self_error and uid == current_user.id_hash:
+            errors.append({"user_id": uid, "error": self_error})
             continue
 
         user = users_by_id.get(uid)
@@ -216,7 +216,7 @@ async def bulk_suspend(
             None if u.status == "active"
             else f"Usuário com status '{u.status}' não pode ser suspenso."
         ),
-        erro_auto="Não é possível suspender a si mesmo.",
+        self_error="Não é possível suspender a si mesmo.",
     )
     await svc.bulk_suspend(
         db, eligible,
@@ -240,7 +240,7 @@ async def bulk_reactivate(
         ),
         # Reactivating yourself is harmless: a suspended admin cannot
         # authenticate to get here.
-        erro_auto=None,
+        self_error=None,
     )
     await svc.bulk_reactivate(db, eligible)
     return UserBulkActionResponse(processed=len(eligible), errors=errors)
@@ -255,7 +255,7 @@ async def bulk_delete(
     eligible, errors = await _triar(
         db, current_user, payload.user_ids,
         elegivel=lambda u: None if u.status != "deleted" else "Usuário já está excluído.",
-        erro_auto="Não é possível excluir a si mesmo.",
+        self_error="Não é possível excluir a si mesmo.",
     )
     await svc.bulk_soft_delete(db, eligible)
     return UserBulkActionResponse(processed=len(eligible), errors=errors)
@@ -409,19 +409,19 @@ async def revoke_all_user_agents(
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
 
-    revogacoes = await executor_service.revogar_executores_do_usuario(
+    revocations = await executor_service.revogar_executores_do_usuario(
         db, user, motivo="operator_revoked", desanexar=True, actor_id=current_user.id_hash,
     )
     # Affected workspaces (for the toast/log): those of the tiers each
     # executor just left ∪ those pointing to it through the legacy pointer.
-    impactados: set[str] = set()
-    for r in revogacoes:
-        impactados |= {d["workspace_id"] for d in r.afetados}
-        impactados |= await politica.workspace_ids_for_executor(db, r.executor_id)
-    affected_workspaces = len(impactados)
+    impacted: set[str] = set()
+    for r in revocations:
+        impacted |= {d["workspace_id"] for d in r.afetados}
+        impacted |= await politica.workspace_ids_for_executor(db, r.executor_id)
+    affected_workspaces = len(impacted)
     await db.commit()
-    await executor_service.concluir_revogacoes(revogacoes)
-    revoked = [r.executor_id for r in revogacoes]
+    await executor_service.complete_revocations(revocations)
+    revoked = [r.executor_id for r in revocations]
 
     logger.info(
         "Admin '%s' executou revoke-all-executores para '%s': %d revogados, %d workspaces afetados.",

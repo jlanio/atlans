@@ -1,6 +1,6 @@
 import { fromBackend, dayjs } from "@/lib/dayjs"
 import type { IExecutorMetrics, IObservabilityMetrics } from "@/service/types"
-import { formatarDuracao, plural, rotuloDaCategoria } from "@/lib/formatos"
+import { formatarDuracao, plural, categoryLabel } from "@/lib/formatos"
 
 /**
  * "Needs attention" (docs/specs/metrics-history.md §4.3): what would change a
@@ -9,12 +9,12 @@ import { formatarDuracao, plural, rotuloDaCategoria } from "@/lib/formatos"
  * has and returns text and action; rendering and navigation stay out of here.
  */
 
-export type AcaoDeAtencao =
+export type AttentionAction =
   | { tipo: "abrir-execucao"; runId: string }
   | { tipo: "filtrar-workflow"; workflowHash: string; status: "failed" }
   | { tipo: "abrir-executor"; agentHost: string }
 
-export interface ItemDeAtencao {
+export interface AttentionItem {
   chave: string
   tipo: "presa" | "falhas" | "saturado"
   /** Who the subject is (workflow, executor): the list highlights it at the start of the title. */
@@ -22,7 +22,7 @@ export interface ItemDeAtencao {
   /** Full sentence, starting with `nome`. */
   titulo: string
   detalhe: string
-  acao: AcaoDeAtencao
+  acao: AttentionAction
   /** Button verb: "Abrir", "Ver falhas", "Ver executor" (open, see failures, see executor). */
   rotuloDaAcao: string
   /**
@@ -41,10 +41,10 @@ export interface ItemDeAtencao {
   assinatura: string
 }
 
-export const MAXIMO_DE_ITENS = 5
+export const MAX_ITEMS = 5
 /** Falhas repetidas: `failure_count ≥ 3` ou `failure_rate ≥ 0.2` (spec §4.3). */
-export const MINIMO_DE_FALHAS = 3
-export const MINIMO_DE_TAXA_DE_FALHA = 0.2
+export const MIN_FAILURES = 3
+export const MIN_FAILURE_RATE = 0.2
 
 function nomeDoWorkflow(nome: string | null | undefined, hash: string): string {
   return nome?.trim() || `workflow ${hash.slice(0, 8)}`
@@ -60,9 +60,9 @@ export function montarAtencao(entrada: {
    * Absent → no badge.
    */
   origemDoWorkflow?: (hash: string) => string | null | undefined
-}): ItemDeAtencao[] {
+}): AttentionItem[] {
   const { metrics, executores, origemDoWorkflow } = entrada
-  const itens: ItemDeAtencao[] = []
+  const itens: AttentionItem[] = []
   const periodo = metrics?.period_days ?? 30
 
   // 1. Stuck: `now.stuck` already comes sorted from oldest to newest.
@@ -89,15 +89,15 @@ export function montarAtencao(entrada: {
 
   // 2. Repeated failures. The backend already sorts by `failure_count` desc.
   for (const w of metrics?.top_failing_workflows ?? []) {
-    const repetida = w.failure_count >= MINIMO_DE_FALHAS || (w.failure_rate ?? 0) >= MINIMO_DE_TAXA_DE_FALHA
+    const repetida = w.failure_count >= MIN_FAILURES || (w.failure_rate ?? 0) >= MIN_FAILURE_RATE
     if (!repetida || w.failure_count <= 0) continue
     const nome = nomeDoWorkflow(w.workflow_name, w.workflow_hash)
     // A high count speaks for itself; a high rate with few runs needs the
     // denominator so it does not look like little ("2 vezes" × "2 de 3").
-    const quanto = w.failure_count >= MINIMO_DE_FALHAS
+    const quanto = w.failure_count >= MIN_FAILURES
       ? `falhou ${plural(w.failure_count, "vez", "vezes")} em ${periodo} dias`
       : `falhou em ${w.failure_count} de ${plural(w.total_runs, "execução", "execuções")} em ${periodo} dias`
-    const categoria = rotuloDaCategoria(w.last_error_category)
+    const categoria = categoryLabel(w.last_error_category)
     const erro = w.last_error?.trim()
     const detalhe = erro
       ? `Último erro: ${categoria ? `${categoria} · ` : ""}${erro}`
@@ -147,7 +147,7 @@ export function montarAtencao(entrada: {
     })
   }
 
-  return itens.slice(0, MAXIMO_DE_ITENS)
+  return itens.slice(0, MAX_ITEMS)
 }
 
 /** "há 12 min", "há 3 h", "há 3 dias" (ago) — coarse grain, for an empty-state sentence. */
@@ -160,8 +160,8 @@ export function haQuantoTempo(iso: string | null | undefined, agora: Date = new 
   if (minutos < 60) return `há ${minutos} min`
   const horas = Math.floor(minutos / 60)
   if (horas < 24) return `há ${horas} h`
-  const diasInteiros = Math.floor(horas / 24)
-  return `há ${plural(diasInteiros, "dia")}`
+  const wholeDays = Math.floor(horas / 24)
+  return `há ${plural(wholeDays, "dia")}`
 }
 
 /** Empty-list sentence: when the last failure was, or that there was none. */

@@ -63,7 +63,7 @@ _HKDF_INFO = b"atlas-executor-job-v1"
 # ── Server Ed25519 signing key ────────────────────────────────────────────────
 
 # Already reconstructed keys, indexed by the raw value of the environment variable.
-_chaves_assinatura: dict[str, Ed25519PrivateKey | None] = {}
+_signing_keys: dict[str, Ed25519PrivateKey | None] = {}
 
 
 def _load_signing_key() -> Ed25519PrivateKey | None:
@@ -76,15 +76,15 @@ def _load_signing_key() -> Ed25519PrivateKey | None:
     """
     if not EXECUTOR_SIGNING_KEY:
         return None
-    if EXECUTOR_SIGNING_KEY in _chaves_assinatura:
-        return _chaves_assinatura[EXECUTOR_SIGNING_KEY]
+    if EXECUTOR_SIGNING_KEY in _signing_keys:
+        return _signing_keys[EXECUTOR_SIGNING_KEY]
     try:
         raw = base64.b64decode(EXECUTOR_SIGNING_KEY)
         key = Ed25519PrivateKey.from_private_bytes(raw)
     except Exception as exc:
         logger.error("Falha ao carregar EXECUTOR_SIGNING_KEY: %s", exc)
         key = None
-    _chaves_assinatura[EXECUTOR_SIGNING_KEY] = key
+    _signing_keys[EXECUTOR_SIGNING_KEY] = key
     return key
 
 

@@ -52,7 +52,7 @@ FORMATOS: dict[str, tuple[str, str]] = {
 # (`fundo_da_instalacao`, from MAPA_*_URL in the API's environment) and, without
 # it, the executor's own environment applies. Only "ruas" has a default:
 # OpenStreetMap.
-FUNDOS_COM_NOME: dict[str, tuple[str, str]] = {
+NAMED_BASEMAPS: dict[str, tuple[str, str]] = {
     "hibrido":  ("MAPA_HIBRIDO_URL",  "MAPA_HIBRIDO_CREDITO"),
     "satelite": ("MAPA_SATELITE_URL", "MAPA_SATELITE_CREDITO"),
     "ruas":     ("MAPA_RUAS_URL",     "MAPA_RUAS_CREDITO"),
@@ -63,26 +63,26 @@ RUAS_PADRAO: tuple[str, str] = (
     "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
     "© OpenStreetMap contributors",
 )
-TETO_DE_TILES = 256
-ZOOM_MAXIMO = 19          # o OSM serve ate 19
-TAMANHO_DO_TILE = 256
-RAIO_DA_TERRA = 6378137.0  # Web Mercator sphere (EPSG:3857)
+TILE_CEILING = 256
+MAX_ZOOM = 19          # o OSM serve ate 19
+TILE_SIZE = 256
+EARTH_RADIUS = 6378137.0  # Web Mercator sphere (EPSG:3857)
 LATITUDE_MAXIMA = 85.0511  # Web Mercator limit
-MERCATOR_MAX = math.pi * RAIO_DA_TERRA
+MERCATOR_MAX = math.pi * EARTH_RADIUS
 
-COR_HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
-ESCALAS_BONITAS = (1.0, 2.0, 5.0)
+HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
+NICE_SCALES = (1.0, 2.0, 5.0)
 
 
 # ── Parametros ───────────────────────────────────────────────────────────────
 
-def cor_valida(cor: Any) -> bool:
+def valid_color(cor: Any) -> bool:
     """`#RRGGBB` and nothing else — matplotlib would accept names, but the map's
     palette speaks hex and so does the editor field."""
-    return isinstance(cor, str) and bool(COR_HEX.match(cor.strip()))
+    return isinstance(cor, str) and bool(HEX_COLOR.match(cor.strip()))
 
 
-def parse_mapa(raw: Any) -> dict[str, str]:
+def parse_map(raw: Any) -> dict[str, str]:
     """Reads a `keyvalue` field (port → value).
 
     The editor field writes an object, but a saved workflow (or an old
@@ -109,22 +109,22 @@ def parse_mapa(raw: Any) -> dict[str, str]:
     return saida
 
 
-def rotulo_da_porta(porta: str, rotulos: dict[str, str]) -> str:
+def port_label(porta: str, rotulos: dict[str, str]) -> str:
     """The legend label: what the person wrote in `rotulos`, otherwise the port
     name with `_` turned into a space (the port name must be an identifier)."""
     return rotulos.get(porta) or porta.replace("_", " ")
 
 
-def escurecer(cor_hex: str, fator: float = 0.6) -> str:
+def darken(hex_color: str, factor: float = 0.6) -> str:
     """A polygon's outline: the same color, darker."""
-    cor = cor_hex.lstrip("#")
+    cor = hex_color.lstrip("#")
     r, g, b = (int(cor[i:i + 2], 16) for i in (0, 2, 4))
     return "#{:02x}{:02x}{:02x}".format(
-        int(r * fator), int(g * fator), int(b * fator),
+        int(r * factor), int(g * factor), int(b * factor),
     )
 
 
-def dimensoes_da_pagina(tamanho: str, dpi: int) -> tuple[float, float, int, int]:
+def page_dimensions(tamanho: str, dpi: int) -> tuple[float, float, int, int]:
     """(largura_pol, altura_pol, largura_px, altura_px) — or ValueError.
 
     `validate_node_parameters` coerces types but does not apply min/max; this is
@@ -149,7 +149,7 @@ def dimensoes_da_pagina(tamanho: str, dpi: int) -> tuple[float, float, int, int]
 
 # ── CRS e extensao ───────────────────────────────────────────────────────────
 
-def crs_da_carta(caixa_4326: tuple[float, float, float, float],
+def image_map_crs(bbox_4326: tuple[float, float, float, float],
                  crs_param: str | None, fundo: str | None) -> tuple[str, str | None]:
     """The CRS the image map is drawn in, and an optional warning for the log.
 
@@ -169,7 +169,7 @@ def crs_da_carta(caixa_4326: tuple[float, float, float, float],
         import geopandas as gpd
         from shapely.geometry import box
 
-        x0, y0, x1, y1 = caixa_4326
+        x0, y0, x1, y1 = bbox_4326
         aviso = None
         if (x1 - x0) > 6:
             aviso = (
@@ -195,12 +195,12 @@ def crs_da_carta(caixa_4326: tuple[float, float, float, float],
     return crs.to_string(), None
 
 
-def crs_e_projetado(crs_texto: str) -> bool:
+def crs_is_projected(crs_texto: str) -> bool:
     from pyproj import CRS
     return bool(CRS.from_user_input(crs_texto).is_projected)
 
 
-def extensao_com_margem(caixa: tuple[float, float, float, float], projetado: bool,
+def extent_with_margin(caixa: tuple[float, float, float, float], projetado: bool,
                         fracao: float = 0.05) -> tuple[float, float, float, float]:
     """(x0, y0, x1, y1) with 5 % padding on each side.
 
@@ -222,7 +222,7 @@ def extensao_com_margem(caixa: tuple[float, float, float, float], projetado: boo
 
 # ── The map frame on the page ─────────────────────────────────────────────────
 
-def quadro_do_mapa(legenda: bool) -> tuple[float, float, float, float]:
+def map_frame(legenda: bool) -> tuple[float, float, float, float]:
     """(left, bottom, width, height) of the map axis, as a fraction of the figure.
 
     The right column only exists with a legend; without it the map takes the page.
@@ -231,49 +231,49 @@ def quadro_do_mapa(legenda: bool) -> tuple[float, float, float, float]:
     return (0.04, 0.10, 0.70 if legenda else 0.92, 0.785)
 
 
-def extensao_no_quadro(extensao: tuple[float, float, float, float],
-                       proporcao: float) -> tuple[float, float, float, float]:
+def extent_in_frame(extensao: tuple[float, float, float, float],
+                       aspect_ratio: float) -> tuple[float, float, float, float]:
     """Widens the extent (never cuts) until it has the frame's width/height
     ratio, centered — so the map FILLS the frame instead of the axis
     shrinking and leaving the page blank. It is what an image map does: the
     frame is fixed, the extent grows to fit it."""
     x0, y0, x1, y1 = extensao
     dx, dy = x1 - x0, y1 - y0
-    if dx <= 0 or dy <= 0 or proporcao <= 0:
+    if dx <= 0 or dy <= 0 or aspect_ratio <= 0:
         return extensao
-    if dx / dy < proporcao:      # taller than the frame: widen
-        novo_dx = dy * proporcao
+    if dx / dy < aspect_ratio:      # taller than the frame: widen
+        new_dx = dy * aspect_ratio
         cx = (x0 + x1) / 2
-        return cx - novo_dx / 2, y0, cx + novo_dx / 2, y1
-    novo_dy = dx / proporcao     # wider than the frame: grow up and down
+        return cx - new_dx / 2, y0, cx + new_dx / 2, y1
+    new_dy = dx / aspect_ratio     # wider than the frame: grow up and down
     cy = (y0 + y1) / 2
-    return x0, cy - novo_dy / 2, x1, cy + novo_dy / 2
+    return x0, cy - new_dy / 2, x1, cy + new_dy / 2
 
 
 # ── Escala grafica ───────────────────────────────────────────────────────────
 
-def fator_de_escala_3857(latitude: float) -> float:
+def scale_factor_3857(latitude: float) -> float:
     """How much Web Mercator stretches distances at this latitude: 1 m on the
     ground measures 1/cos(lat) map units. Corrects the scale bar in 3857."""
     return math.cos(math.radians(latitude))
 
 
-def comprimento_da_escala(largura_real_m: float) -> float:
+def scale_length(real_width_m: float) -> float:
     """The scale bar: about one fifth of the map's width, rounded down to
     1, 2 or 5 times a power of ten (in meters)."""
-    alvo = largura_real_m / 5.0
+    alvo = real_width_m / 5.0
     if alvo <= 0:
         return 0.0
-    expoente = math.floor(math.log10(alvo))
-    base = 10.0 ** expoente
+    exponent = math.floor(math.log10(alvo))
+    base = 10.0 ** exponent
     melhor = base
-    for m in ESCALAS_BONITAS:
+    for m in NICE_SCALES:
         if m * base <= alvo:
             melhor = m * base
     return melhor
 
 
-def rotulo_da_escala(metros: float) -> str:
+def scale_label(metros: float) -> str:
     if metros >= 1000:
         km = metros / 1000
         return f"{km:g} km".replace(".", ",")
@@ -282,7 +282,7 @@ def rotulo_da_escala(metros: float) -> str:
 
 # ── Tiles (Web Mercator) ─────────────────────────────────────────────────────
 
-def validar_template(template: str) -> str:
+def validate_template(template: str) -> str:
     t = (template or "").strip()
     for marcador in ("{z}", "{x}", "{y}"):
         if marcador not in t:
@@ -298,8 +298,8 @@ def url_do_tile(template: str, z: int, x: int, y: int) -> str:
 
 
 def lon_lat_de_3857(x: float, y: float) -> tuple[float, float]:
-    lon = math.degrees(x / RAIO_DA_TERRA)
-    lat = math.degrees(math.atan(math.sinh(y / RAIO_DA_TERRA)))
+    lon = math.degrees(x / EARTH_RADIUS)
+    lat = math.degrees(math.atan(math.sinh(y / EARTH_RADIUS)))
     return lon, lat
 
 
@@ -312,28 +312,28 @@ def _tile_de_lon_lat(lon: float, lat: float, z: int) -> tuple[int, int]:
     return max(0, min(n - 1, x)), max(0, min(n - 1, y))
 
 
-def zoom_para(extensao_3857: tuple[float, float, float, float], largura_px: int) -> int:
+def zoom_para(extent_3857: tuple[float, float, float, float], largura_px: int) -> int:
     """The smallest zoom at which the map's width, in tile pixels, reaches the
     output width — the basemap is neither blurry nor downloaded beyond what the
     page can show."""
-    x0, _, x1, _ = extensao_3857
+    x0, _, x1, _ = extent_3857
     largura_m = max(x1 - x0, 1e-9)
-    n_necessario = largura_px * 2 * MERCATOR_MAX / (largura_m * TAMANHO_DO_TILE)
-    z = math.ceil(math.log2(max(n_necessario, 1.0)))
-    return max(0, min(ZOOM_MAXIMO, z))
+    n_needed = largura_px * 2 * MERCATOR_MAX / (largura_m * TILE_SIZE)
+    z = math.ceil(math.log2(max(n_needed, 1.0)))
+    return max(0, min(MAX_ZOOM, z))
 
 
-def tiles_da_extensao(extensao_3857: tuple[float, float, float, float], z: int,
-                      teto: int = TETO_DE_TILES) -> tuple[int, int, int, int, int]:
+def tiles_for_extent(extent_3857: tuple[float, float, float, float], z: int,
+                      teto: int = TILE_CEILING) -> tuple[int, int, int, int, int]:
     """(z, x_min, x_max, y_min, y_max) of the tiles covering the extent.
 
     Above the ceiling the zoom steps down until it fits: the image map never
     fails because of basemap size, it only loses sharpness.
     """
-    x0, y0, x1, y1 = extensao_3857
+    x0, y0, x1, y1 = extent_3857
     lon0, lat0 = lon_lat_de_3857(x0, y0)
     lon1, lat1 = lon_lat_de_3857(x1, y1)
-    z = max(0, min(ZOOM_MAXIMO, int(z)))
+    z = max(0, min(MAX_ZOOM, int(z)))
     while True:
         tx0, ty1 = _tile_de_lon_lat(lon0, lat0, z)  # canto inferior esquerdo -> y maior
         tx1, ty0 = _tile_de_lon_lat(lon1, lat1, z)  # canto superior direito  -> y menor
@@ -343,7 +343,7 @@ def tiles_da_extensao(extensao_3857: tuple[float, float, float, float], z: int,
         z -= 1
 
 
-def extensao_dos_tiles(x_min: int, x_max: int, y_min: int, y_max: int, z: int
+def tiles_extent(x_min: int, x_max: int, y_min: int, y_max: int, z: int
                        ) -> tuple[float, float, float, float]:
     """(xmin, xmax, ymin, ymax) of the mosaic in EPSG:3857 — it is the imshow `extent`."""
     n = 2 ** z
@@ -357,20 +357,20 @@ def extensao_dos_tiles(x_min: int, x_max: int, y_min: int, y_max: int, z: int
 
 # ── Coordinate grid ───────────────────────────────────────────────────────────
 
-def passo_bonito(vao: float, alvo: int = 5) -> float:
+def nice_step(vao: float, alvo: int = 5) -> float:
     """A 1/2/5 x 10^n step that divides the span into about `alvo` parts."""
     if vao <= 0:
         return 1.0
     bruto = vao / alvo
-    expoente = math.floor(math.log10(bruto))
-    base = 10.0 ** expoente
-    for m in ESCALAS_BONITAS:
+    exponent = math.floor(math.log10(bruto))
+    base = 10.0 ** exponent
+    for m in NICE_SCALES:
         if m * base >= bruto:
             return m * base
     return 10.0 * base
 
 
-def marcas(inicio: float, fim: float, passo: float) -> list[float]:
+def badges(inicio: float, fim: float, passo: float) -> list[float]:
     """The multiples of `passo` within [inicio, fim]."""
     if passo <= 0 or fim <= inicio:
         return []
@@ -379,13 +379,13 @@ def marcas(inicio: float, fim: float, passo: float) -> list[float]:
     return [round(k * passo, 10) for k in range(primeiro, ultimo + 1)]
 
 
-def _graus(valor: float, positivo: str, negativo: str) -> str:
+def _degrees(valor: float, positivo: str, negativo: str) -> str:
     lado = positivo if valor >= 0 else negativo
     texto = f"{abs(valor):.2f}".rstrip("0").rstrip(".").replace(".", ",")
     return f"{texto}°{lado}"
 
 
-def rotulo_de_coordenada(valor: float, eixo: str, crs_texto: str) -> str:
+def coordinate_label(valor: float, eixo: str, crs_texto: str) -> str:
     """The text of a grid tick.
 
     - EPSG:3857: the tick is converted to longitude/latitude (in 3857 x only
@@ -398,15 +398,15 @@ def rotulo_de_coordenada(valor: float, eixo: str, crs_texto: str) -> str:
     crs = CRS.from_user_input(crs_texto)
     if crs.to_epsg() == 3857:
         if eixo == "x":
-            return _graus(math.degrees(valor / RAIO_DA_TERRA), "L", "O")
-        return _graus(math.degrees(math.atan(math.sinh(valor / RAIO_DA_TERRA))), "N", "S")
+            return _degrees(math.degrees(valor / EARTH_RADIUS), "L", "O")
+        return _degrees(math.degrees(math.atan(math.sinh(valor / EARTH_RADIUS))), "N", "S")
     if crs.is_projected:
         inteiro = int(round(valor))
         return f"{inteiro:,}".replace(",", " ") + " m"
-    return _graus(valor, "L", "O") if eixo == "x" else _graus(valor, "N", "S")
+    return _degrees(valor, "L", "O") if eixo == "x" else _degrees(valor, "N", "S")
 
 
-def marcas_da_grade(extensao: tuple[float, float, float, float], crs_texto: str
+def grid_ticks(extensao: tuple[float, float, float, float], crs_texto: str
                     ) -> tuple[list[float], list[float]]:
     """The positions of the grid lines on both axes, in map units.
 
@@ -420,27 +420,27 @@ def marcas_da_grade(extensao: tuple[float, float, float, float], crs_texto: str
     if crs.to_epsg() == 3857:
         lon0, lat0 = lon_lat_de_3857(x0, y0)
         lon1, lat1 = lon_lat_de_3857(x1, y1)
-        p_lon = passo_bonito(lon1 - lon0)
-        p_lat = passo_bonito(lat1 - lat0)
-        xs = [math.radians(lon) * RAIO_DA_TERRA for lon in marcas(lon0, lon1, p_lon)]
+        p_lon = nice_step(lon1 - lon0)
+        p_lat = nice_step(lat1 - lat0)
+        xs = [math.radians(lon) * EARTH_RADIUS for lon in badges(lon0, lon1, p_lon)]
         ys = [
-            RAIO_DA_TERRA * math.log(math.tan(math.pi / 4 + math.radians(lat) / 2))
-            for lat in marcas(lat0, lat1, p_lat)
+            EARTH_RADIUS * math.log(math.tan(math.pi / 4 + math.radians(lat) / 2))
+            for lat in badges(lat0, lat1, p_lat)
             if -LATITUDE_MAXIMA < lat < LATITUDE_MAXIMA
         ]
         return xs, ys
-    return marcas(x0, x1, passo_bonito(x1 - x0)), marcas(y0, y1, passo_bonito(y1 - y0))
+    return badges(x0, x1, nice_step(x1 - x0)), badges(y0, y1, nice_step(y1 - y0))
 
 
 # ── Creditos ─────────────────────────────────────────────────────────────────
 
-def creditos_com_fundo(creditos: str | None, atribuicao: str | None) -> str:
+def credits_with_basemap(creditos: str | None, atribuicao: str | None) -> str:
     """The credits written by the person plus the basemap's attribution, when there is one."""
     partes = [(creditos or "").strip(), (atribuicao or "").strip()]
     return " · ".join(p for p in partes if p)
 
 
-def fundo_configurado(
+def configured_basemap(
     fundo: str, injetado: Any = None, ambiente: Mapping[str, str] | None = None,
 ) -> tuple[str, str] | None:
     """(template, attribution) of a named basemap, or None if the installation does not have it.
@@ -449,24 +449,24 @@ def fundo_configurado(
     the executor's environment (MAPA_*_URL and MAPA_*_CREDITO) and, only for
     "ruas", OpenStreetMap. Without hybrid or satellite, as on the server and the web.
     """
-    var_url, var_credito = FUNDOS_COM_NOME[fundo]
+    var_url, var_credit = NAMED_BASEMAPS[fundo]
     if isinstance(injetado, dict) and str(injetado.get("url") or "").strip():
         url, credito = str(injetado["url"]), str(injetado.get("credito") or "")
     else:
         ambiente = os.environ if ambiente is None else ambiente
-        url, credito = ambiente.get(var_url) or "", ambiente.get(var_credito) or ""
+        url, credito = ambiente.get(var_url) or "", ambiente.get(var_credit) or ""
         if fundo == "hibrido" and not url.strip():
-            var_url, var_credito = FUNDOS_COM_NOME["satelite"]
-            url, credito = ambiente.get(var_url) or "", ambiente.get(var_credito) or ""
+            var_url, var_credit = NAMED_BASEMAPS["satelite"]
+            url, credito = ambiente.get(var_url) or "", ambiente.get(var_credit) or ""
     if url.strip():
         try:
-            return validar_template(url), credito.strip()
+            return validate_template(url), credito.strip()
         except ValueError as exc:
             raise ValueError(f"O fundo '{fundo}' da instalacao ({var_url}) nao e um template de tiles: {exc}") from exc
     return RUAS_PADRAO if fundo == "ruas" else None
 
 
-def servidor_injetou(injetado: Any) -> bool:
+def server_injected(injetado: Any) -> bool:
     """Did the dispatching server send the installation's basemap? A server of
     this version always sends the `url` key (empty when there is no such
     basemap); without it, the dispatch came from an earlier server."""

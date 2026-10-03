@@ -14,7 +14,7 @@ import pytest
 # ── disabled_nodes_service ──────────────────────────────────────────────────
 
 @pytest.fixture(autouse=True)
-def _sem_cache_entre_testes():
+def _no_cache_between_tests():
     """The map of disabled nodes is cached in memory with a TTL.
 
     Without this reset, the {} read by the first test would still hold in the
@@ -27,10 +27,10 @@ def _sem_cache_entre_testes():
     from app.services import node_service as ns
 
     svc.invalidate_cache()
-    ns._catalogo_completo.cache_clear()
+    ns._full_catalog.cache_clear()
     yield
     svc.invalidate_cache()
-    ns._catalogo_completo.cache_clear()
+    ns._full_catalog.cache_clear()
 
 
 class TestDisabledNodesService:
@@ -152,7 +152,7 @@ class TestNodeServiceFilter:
         assert catalog_names == registry_names
 
     @pytest.mark.asyncio
-    async def test_catalogo_montado_uma_vez_e_reusado(self):
+    async def test_catalog_built_once_and_reused(self):
         """The base catalog is cached (@lru_cache): a repeated GET /nodes does NOT
         rebuild the NodeDefinitions nor re-call cls.description() (the cost the
         audit pointed out). Spies on a node's description() and asserts it is
@@ -199,7 +199,7 @@ class TestValidateNoDisabledNodes:
         # Status code so it becomes a 422 in the global handler
         assert exc_info.value.status_code == 422
 
-    def test_offenders_sao_unicos_e_ordenados(self):
+    def test_offenders_are_unique_and_sorted(self):
         """The same node appearing twice in the workflow does not duplicate the message."""
         from app.services.workflow_execution_service import _validate_no_disabled_nodes
         from app.core.exceptions import DisabledNodesInWorkflowError

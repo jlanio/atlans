@@ -13,7 +13,7 @@ import sqlalchemy as sa
 import flow.nodes.outputs.save_to_postgres as mod_pg
 from flow.nodes.outputs.save_to_postgres import SaveToPostgres
 from flow.nodes.outputs.save_to_postgis import SaveToPostGIS
-from flow.utils.sql_engine import lote_seguro, _MAX_PARAMETROS_POR_INSTRUCAO
+from flow.utils.sql_engine import safe_batch_size, _MAX_PARAMS_PER_STATEMENT
 
 
 # ── Safe batch ──────────────────────────────────────────────────────────────
@@ -29,41 +29,41 @@ from flow.utils.sql_engine import lote_seguro, _MAX_PARAMETROS_POR_INSTRUCAO
     (500, 200),       # 100.000
     (10, 2),          # fit, and has to keep fitting
 ])
-def test_o_lote_nunca_estoura_o_limite_do_protocolo(linhas, colunas):
-    lote = lote_seguro(colunas, 0)
-    assert lote * colunas <= _MAX_PARAMETROS_POR_INSTRUCAO
+def test_the_batch_never_exceeds_the_protocol_limit(linhas, colunas):
+    lote = safe_batch_size(colunas, 0)
+    assert lote * colunas <= _MAX_PARAMS_PER_STATEMENT
     assert lote >= 1
 
 
-def test_lote_escolhido_pelo_usuario_e_respeitado():
-    assert lote_seguro(10, 1_000) == 1_000
+def test_batch_chosen_by_the_user_is_respected():
+    assert safe_batch_size(10, 1_000) == 1_000
 
 
-def test_lote_escolhido_grande_demais_e_cortado():
+def test_chosen_batch_too_large_is_cut():
     """How many rows go per statement is performance tuning; no performance
     value justifies building a statement the database refuses."""
-    lote = lote_seguro(10, 50_000)
-    assert lote * 10 <= _MAX_PARAMETROS_POR_INSTRUCAO
+    lote = safe_batch_size(10, 50_000)
+    assert lote * 10 <= _MAX_PARAMS_PER_STATEMENT
 
 
-def test_tabela_com_muitas_colunas_ainda_grava_uma_linha_por_vez():
-    assert lote_seguro(100_000, 0) == 1
+def test_table_with_many_columns_still_writes_one_row_at_a_time():
+    assert safe_batch_size(100_000, 0) == 1
 
 
-def test_o_no_deriva_o_lote_do_numero_de_colunas(monkeypatch):
+def test_the_node_derives_the_batch_from_the_column_count(monkeypatch):
     """Integration: the value that reaches `to_sql` has to fit in the protocol."""
     recebido = {}
     df = pd.DataFrame({f"c{i}": range(10) for i in range(10)})
 
-    def espia(**kw):
+    def spy(**kw):
         recebido.update(kw)
 
-    monkeypatch.setattr(pd.DataFrame, "to_sql", lambda self, *a, **kw: espia(**kw))
+    monkeypatch.setattr(pd.DataFrame, "to_sql", lambda self, *a, **kw: spy(**kw))
     engine = sa.create_engine("sqlite://")
     no = SaveToPostgres(node_id="n1", parameters={})
     no._save_to_postgres(df, "t", None, "append", False, 0, engine)
 
-    assert recebido["chunksize"] * 10 <= _MAX_PARAMETROS_POR_INSTRUCAO
+    assert recebido["chunksize"] * 10 <= _MAX_PARAMS_PER_STATEMENT
     assert recebido["method"] == "multi"
 
 
@@ -85,7 +85,7 @@ def banco(tmp_path):
     return engine
 
 
-def _conta(engine, tabela="destino"):
+def _count(engine, tabela="destino"):
     with engine.connect() as c:
         return c.exec_driver_sql(f"SELECT count(*) FROM {tabela}").scalar()
 
@@ -100,7 +100,7 @@ def truncate_sqlite(monkeypatch):
     monkeypatch.setattr(mod_pg, "ensure_schema", lambda conn, schema: None)
 
 
-def test_gravacao_que_falha_nao_deixa_a_tabela_vazia(banco, truncate_sqlite, monkeypatch):
+def test_failing_write_does_not_leave_the_table_empty(banco, truncate_sqlite, monkeypatch):
     df = pd.DataFrame({"a": [9, 9]})
 
     def explode(self, *a, **kw):
@@ -112,14 +112,14 @@ def test_gravacao_que_falha_nao_deixa_a_tabela_vazia(banco, truncate_sqlite, mon
         no._save_to_postgres(df, "destino", None, "truncate", False, 0, banco)
 
     # Before: 0 — TRUNCATE had already committed on its own.
-    assert _conta(banco) == 3
+    assert _count(banco) == 3
 
 
-def test_limpar_e_gravar_com_sucesso_substitui_o_conteudo(banco, truncate_sqlite):
+def test_successful_clear_and_write_replaces_the_content(banco, truncate_sqlite):
     no = SaveToPostgres(node_id="n1", parameters={})
     no._save_to_postgres(pd.DataFrame({"a": [7]}), "destino", None, "truncate", False, 0, banco)
 
-    assert _conta(banco) == 1
+    assert _count(banco) == 1
     with banco.connect() as c:
         assert c.exec_driver_sql("SELECT a FROM destino").scalar() == 7
 
@@ -130,7 +130,7 @@ def test_limpar_e_gravar_com_sucesso_substitui_o_conteudo(banco, truncate_sqlite
     (SaveToPostgres, "_save_to_postgres"),
     (SaveToPostGIS, "_save_to_postgis"),
 ])
-def test_o_no_grava_dentro_de_uma_transacao(cls, metodo):
+def test_the_node_writes_inside_a_transaction(cls, metodo):
     """Direct guard on the cause: passing the ENGINE to `to_sql`/`to_postgis`
     opens a new connection, outside the TRUNCATE's transaction."""
     import inspect
@@ -142,7 +142,7 @@ def test_o_no_grava_dentro_de_uma_transacao(cls, metodo):
 
 # ── CRS ausente ─────────────────────────────────────────────────────────────
 
-def test_camada_sem_crs_avisa_no_painel_da_run(caplog):
+def test_layer_without_crs_warns_in_the_run_panel(caplog):
     """geopandas writes SRID 0 and warns via `warnings.warn`, which doesn't show
     up for whoever triggered the workflow. The layer sits in the database with
     no coordinate system and the problem only shows when it aligns with nothing."""
@@ -158,21 +158,21 @@ def test_camada_sem_crs_avisa_no_painel_da_run(caplog):
     import flow.nodes.outputs.save_to_postgis as mod_gis
     from unittest.mock import patch
 
-    async def falso_thread(fn, *a):
+    async def fake_thread(fn, *a):
         return None
 
     # The warning goes out BEFORE any contact with the database — that order is
     # what matters, and it is what the test pins down. `_get_engine` and the write
     # become no-ops (the test environment has no psycopg2, and doesn't need it).
     with patch.object(mod_gis, "_get_engine", return_value=object()), \
-         patch.object(mod_gis.asyncio, "to_thread", falso_thread), \
+         patch.object(mod_gis.asyncio, "to_thread", fake_thread), \
          caplog.at_level(logging.INFO):
         asyncio.run(no.execute({"camada": gdf}))
 
     assert "SRID 0" in caplog.text
 
 
-def test_camada_com_crs_nao_gera_aviso(caplog):
+def test_layer_with_crs_does_not_warn(caplog):
     import geopandas as gpd
     from shapely.geometry import Point
     import flow.nodes.outputs.save_to_postgis as mod_gis
@@ -184,11 +184,11 @@ def test_camada_com_crs_nao_gera_aviso(caplog):
         "tableName": "destino",
     })
 
-    async def falso_thread(fn, *a):
+    async def fake_thread(fn, *a):
         return None
 
     with patch.object(mod_gis, "_get_engine", return_value=object()), \
-         patch.object(mod_gis.asyncio, "to_thread", falso_thread), \
+         patch.object(mod_gis.asyncio, "to_thread", fake_thread), \
          caplog.at_level(logging.INFO):
         asyncio.run(no.execute({"camada": gdf}))
 
@@ -200,14 +200,14 @@ def test_camada_com_crs_nao_gera_aviso(caplog):
 # geopandas reuses the transaction when it receives an already open Connection
 # (`_get_conn`), so the write goes into the SAME transaction as the TRUNCATE.
 
-def test_postgis_gravacao_que_falha_nao_deixa_a_tabela_vazia(banco, monkeypatch):
+def test_postgis_failing_write_does_not_leave_the_table_empty(banco, monkeypatch):
     import flow.nodes.outputs.save_to_postgis as mod_gis
 
     monkeypatch.setattr(mod_gis, "ensure_schema", lambda conn, schema: None)
-    def falso_truncate(conn, schema, table):
+    def fake_truncate(conn, schema, table):
         conn.exec_driver_sql(f"DELETE FROM {table}")
         return True
-    monkeypatch.setattr(mod_gis, "truncate_table", falso_truncate)
+    monkeypatch.setattr(mod_gis, "truncate_table", fake_truncate)
 
     import geopandas as gpd
     from shapely.geometry import Point
@@ -221,10 +221,10 @@ def test_postgis_gravacao_que_falha_nao_deixa_a_tabela_vazia(banco, monkeypatch)
     with pytest.raises(RuntimeError, match="SRID divergente"):
         no._save_to_postgis(gdf, "destino", None, "truncate", False, banco, "geom", 50_000)
 
-    assert _conta(banco) == 3
+    assert _count(banco) == 3
 
 
-def test_postgis_passa_o_lote_adiante(banco, monkeypatch):
+def test_postgis_passes_the_batch_along(banco, monkeypatch):
     """Without batching, geopandas serializes the WHOLE layer into an in-memory
     CSV before sending the first row."""
     import flow.nodes.outputs.save_to_postgis as mod_gis
@@ -243,7 +243,7 @@ def test_postgis_passa_o_lote_adiante(banco, monkeypatch):
     assert recebido["chunksize"] == 12_345
 
 
-def test_postgis_renomeia_a_geometria_para_a_coluna_configurada(banco, monkeypatch):
+def test_postgis_renames_the_geometry_to_the_configured_column(banco, monkeypatch):
     """A GDF coming from other nodes arrives with geometry.name == 'geometry'; the
     PostGIS table convention is 'geom'."""
     import flow.nodes.outputs.save_to_postgis as mod_gis
@@ -255,9 +255,9 @@ def test_postgis_renomeia_a_geometria_para_a_coluna_configurada(banco, monkeypat
     assert gdf.geometry.name == "geometry"
 
     visto = {}
-    def espia(self, *a, **kw):
+    def spy(self, *a, **kw):
         visto["nome"] = self.geometry.name
-    monkeypatch.setattr(gpd.GeoDataFrame, "to_postgis", espia)
+    monkeypatch.setattr(gpd.GeoDataFrame, "to_postgis", spy)
 
     no = SaveToPostGIS(node_id="n1", parameters={})
     no._save_to_postgis(gdf, "destino", None, "append", False, banco, "geom", 0)

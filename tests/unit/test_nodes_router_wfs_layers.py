@@ -24,20 +24,20 @@ ROTA = "/nodes/wfs/layers"
 
 
 @pytest.fixture
-def sem_dns(monkeypatch):
+def no_dns(monkeypatch):
     """SSRF validation resolves DNS; here it just lets things through."""
     monkeypatch.setattr(geo, "validate_url_ssrf", lambda url: None)
 
 
-async def test_devolve_as_camadas_do_servico_com_a_url_normalizada(client, monkeypatch, sem_dns):
+async def test_returns_the_service_layers_with_the_normalized_url(client, monkeypatch, no_dns):
     chamadas: list[str] = []
 
-    async def _listar(url, version="2.0.0", *, auth=None):
+    async def _list_schedules(url, version="2.0.0", *, auth=None):
         chamadas.append(url)
         assert auth is None  # with no credential on the node, the listing is anonymous
         return [{"name": "Funai:tis_poligonais", "title": "Terras indígenas"}]
 
-    monkeypatch.setattr(fs, "listar_camadas_wfs", _listar)
+    monkeypatch.setattr(fs, "listar_camadas_wfs", _list_schedules)
     r = await client.get(ROTA, params={"url": "https://geoserver.funai.gov.br/geoserver/ows?service=WFS&request=GetCapabilities"})
     assert r.status_code == 200
     assert r.json() == {"layers": [{"name": "Funai:tis_poligonais", "title": "Terras indígenas"}]}
@@ -49,9 +49,9 @@ async def test_devolve_as_camadas_do_servico_com_a_url_normalizada(client, monke
     "codigo,status",
     [("timeout", 504), ("http_status", 502), ("sem_camadas", 404), ("ssrf", 403), ("xml", 502), ("rede", 502)],
 )
-async def test_traduz_os_erros_da_sondagem_nos_status_de_sempre(client, monkeypatch, sem_dns, codigo, status):
+async def test_translates_probe_errors_to_the_usual_statuses(client, monkeypatch, no_dns, codigo, status):
     async def _falha(url, version="2.0.0", *, auth=None):
-        raise fs.SondagemError(codigo, "deu errado", status=503 if codigo == "http_status" else None)
+        raise fs.ProbeError(codigo, "deu errado", status=503 if codigo == "http_status" else None)
 
     monkeypatch.setattr(fs, "listar_camadas_wfs", _falha)
     r = await client.get(ROTA, params={"url": "https://x.gov.br/ows"})
@@ -59,11 +59,11 @@ async def test_traduz_os_erros_da_sondagem_nos_status_de_sempre(client, monkeypa
     assert r.json()["message"]
 
 
-async def test_url_sem_http_e_400_sem_sondar(client, monkeypatch, sem_dns):
-    async def _nao_chama(url, version="2.0.0", *, auth=None):
+async def test_url_without_http_is_400_without_probing(client, monkeypatch, no_dns):
+    async def _never_called(url, version="2.0.0", *, auth=None):
         raise AssertionError("não devia sondar")
 
-    monkeypatch.setattr(fs, "listar_camadas_wfs", _nao_chama)
+    monkeypatch.setattr(fs, "listar_camadas_wfs", _never_called)
     r = await client.get(ROTA, params={"url": "ftp://x.gov.br/ows"})
     assert r.status_code == 400
 
@@ -87,7 +87,7 @@ def banco(monkeypatch):
         papel="operator", credenciais={}, escopos=[], commits=0, fluxos={"wf1": "ws1"}, consultas=[],
     )
 
-    class _Sessao:
+    class _Session:
         async def commit(self):
             estado.commits += 1
 
@@ -99,36 +99,36 @@ def banco(monkeypatch):
             return SimpleNamespace(scalar_one_or_none=lambda: achado)
 
     @asynccontextmanager
-    async def _sessao():
-        yield _Sessao()
+    async def _session():
+        yield _Session()
 
-    async def _papel(db, workspace_id, user_id):
+    async def _role(db, workspace_id, user_id):
         return estado.papel
 
     async def _resolver(ids, *, allowed_owner_ids=None, shared_workspace_id=None, db=None):
         estado.escopos.append((list(ids), set(allowed_owner_ids or ()), shared_workspace_id))
         return {cid: estado.credenciais[cid] for cid in ids if cid in estado.credenciais}
 
-    monkeypatch.setattr(db, "get_session_async", _sessao)
-    monkeypatch.setattr(acesso, "get_workspace_member_role", _papel)
+    monkeypatch.setattr(db, "get_session_async", _session)
+    monkeypatch.setattr(acesso, "get_workspace_member_role", _role)
     monkeypatch.setattr(loader, "resolve_credentials_from_ids", _resolver)
     return estado
 
 
 @pytest.fixture
-def listagem(monkeypatch, sem_dns):
+def listagem(monkeypatch, no_dns):
     """The credentials the route listed with (one per request that reached the network)."""
     usadas: list = []
 
-    async def _listar(url, version="2.0.0", *, auth=None):
+    async def _list_schedules(url, version="2.0.0", *, auth=None):
         usadas.append(auth)
         return [{"name": "ns:protegida", "title": "Protegida"}]
 
-    monkeypatch.setattr(fs, "listar_camadas_wfs", _listar)
+    monkeypatch.setattr(fs, "listar_camadas_wfs", _list_schedules)
     return usadas
 
 
-async def test_lista_com_a_credencial_propria(client, banco, listagem):
+async def test_lists_with_own_credential(client, banco, listagem):
     banco.credenciais = {CID: {"type": "geoserver_authkey", "token": CHAVE, "expires_at": "2099-01-01T00:00:00Z"}}
     r = await client.get(ROTA, params={"url": "https://geo.x.gov.br/ows", "credential_id": CID})
     assert r.status_code == 200 and r.json()["layers"][0]["name"] == "ns:protegida"
@@ -142,7 +142,7 @@ async def test_lista_com_a_credencial_propria(client, banco, listagem):
 @pytest.mark.parametrize("papel, compartilhado", [
     ("owner", "ws1"), ("admin", "ws1"), ("operator", "ws1"), ("editor", None), ("viewer", None),
 ])
-async def test_compartilhadas_do_workspace_do_fluxo_so_para_quem_executa(client, banco, listagem, papel, compartilhado):
+async def test_workflow_workspace_shared_ones_only_for_who_runs(client, banco, listagem, papel, compartilhado):
     banco.papel = papel
     banco.credenciais = {CID: {"type": "wfs", "username": "leitor", "password": CHAVE}}
     r = await client.get(ROTA, params={"url": "https://geo.x.gov.br/ows", "credential_id": CID, "workflow_id": "wf1"})
@@ -152,14 +152,14 @@ async def test_compartilhadas_do_workspace_do_fluxo_so_para_quem_executa(client,
     assert "deleted_at IS NULL" in consulta  # a workflow in the trash grants no scope
 
 
-async def test_quem_nao_e_do_workspace_do_fluxo_nao_resolve_nada(client, banco, listagem):
+async def test_non_member_of_the_workflow_workspace_resolves_nothing(client, banco, listagem):
     banco.papel = None
     r = await client.get(ROTA, params={"url": "https://geo.x.gov.br/ows", "credential_id": CID, "workflow_id": "wf1"})
     assert r.status_code == 403
     assert banco.escopos == [] and listagem == []
 
 
-async def test_fluxo_inexistente_e_404_e_o_cliente_nao_escolhe_o_workspace(client, banco, listagem):
+async def test_nonexistent_workflow_is_404_and_the_client_does_not_choose_the_workspace(client, banco, listagem):
     banco.credenciais = {CID: {"type": "geoserver_authkey", "token": CHAVE}}
     r = await client.get(ROTA, params={"url": "https://geo.x.gov.br/ows", "credential_id": CID, "workflow_id": "wf-sumido"})
     assert r.status_code == 404
@@ -170,7 +170,7 @@ async def test_fluxo_inexistente_e_404_e_o_cliente_nao_escolhe_o_workspace(clien
     assert r.status_code == 200 and banco.escopos == [([CID], {USUARIO}, None)]
 
 
-async def test_credencial_fora_do_alcance_e_403_e_nao_lista_anonimo(client, banco, listagem):
+async def test_credential_out_of_reach_is_403_and_does_not_list_anonymously(client, banco, listagem):
     r = await client.get(ROTA, params={"url": "https://geo.x.gov.br/ows", "credential_id": CID})
     assert r.status_code == 403 and "não está ao seu alcance" in r.json()["message"]
     assert listagem == []
@@ -180,14 +180,14 @@ async def test_credencial_fora_do_alcance_e_403_e_nao_lista_anonimo(client, banc
     {"type": "postgresql", "connectionString": "postgresql://h/db"},
     {"type": "http_bearer", "token": CHAVE},
 ])
-async def test_credencial_que_nao_serve_ao_wfs_e_400(client, banco, listagem, cred):
+async def test_credential_not_suited_to_wfs_is_400(client, banco, listagem, cred):
     banco.credenciais = {CID: cred}
     r = await client.get(ROTA, params={"url": "https://geo.x.gov.br/ows", "credential_id": CID})
     assert r.status_code == 400 and "não serve para o nó WFS" in r.json()["message"]
     assert CHAVE not in r.text and listagem == []
 
 
-async def test_id_malformado_e_400_e_maiusculas_valem(client, banco, listagem):
+async def test_malformed_id_is_400_and_uppercase_is_valid(client, banco, listagem):
     r = await client.get(ROTA, params={"url": "https://geo.x.gov.br/ows", "credential_id": "nao-e-uuid"})
     assert r.status_code == 400 and banco.escopos == []
 
@@ -196,11 +196,11 @@ async def test_id_malformado_e_400_e_maiusculas_valem(client, banco, listagem):
     assert r.status_code == 200 and banco.escopos[-1][0] == [CID]
 
 
-async def test_o_erro_da_sondagem_nao_devolve_a_chave(client, banco, monkeypatch, sem_dns):
+async def test_the_probe_error_does_not_return_the_key(client, banco, monkeypatch, no_dns):
     banco.credenciais = {CID: {"type": "geoserver_authkey", "token": CHAVE}}
 
     async def _falha(url, version="2.0.0", *, auth=None):
-        raise fs.SondagemError("ssrf", f"bloqueado: https://geo.x.gov.br/ows?authkey={CHAVE}")
+        raise fs.ProbeError("ssrf", f"bloqueado: https://geo.x.gov.br/ows?authkey={CHAVE}")
 
     monkeypatch.setattr(fs, "listar_camadas_wfs", _falha)
     r = await client.get(ROTA, params={"url": "https://geo.x.gov.br/ows", "credential_id": CID})

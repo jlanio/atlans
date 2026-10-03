@@ -3,15 +3,15 @@
 // by the sidebar brand and the sign-in screen. See lib/nome-na-tela.ts.
 
 import { createContext, useContext, type ReactNode } from "react"
-import { NOME_PADRAO } from "@/lib/nome-na-tela"
+import { DEFAULT_NAME } from "@/lib/nome-na-tela"
 
-const NomeNaTelaContexto = createContext<string>(NOME_PADRAO)
+const DisplayNameContext = createContext<string>(DEFAULT_NAME)
 
-export function NomeNaTelaProvider({ nome, children }: { nome: string; children: ReactNode }) {
-  return <NomeNaTelaContexto.Provider value={nome}>{children}</NomeNaTelaContexto.Provider>
+export function DisplayNameProvider({ nome, children }: { nome: string; children: ReactNode }) {
+  return <DisplayNameContext.Provider value={nome}>{children}</DisplayNameContext.Provider>
 }
 
 /** This installation's on-screen name; "Atlans" when it doesn't declare one. */
-export function useNomeNaTela(): string {
-  return useContext(NomeNaTelaContexto)
+export function useDisplayName(): string {
+  return useContext(DisplayNameContext)
 }

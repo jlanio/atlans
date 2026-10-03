@@ -24,7 +24,7 @@
 // single-use and lasts 24 h, that is acceptable — and the same already holds for
 // the CLI's `--otp`.
 import { app } from 'electron'
-import { SERVIDOR_HOST } from '../shared/servidor.js'
+import { SERVER_HOST } from '../shared/servidor.js'
 
 export const PROTOCOLO = 'atlans'
 
@@ -32,7 +32,7 @@ export const PROTOCOLO = 'atlans'
  * The `servidor` is NOT here: it is fixed. What the URL brings is only the
  * identity to bind.
  */
-export interface PedidoDeepLink {
+export interface DeepLinkRequest {
   executorId: string
   otp: string
 }
@@ -43,7 +43,7 @@ export interface PedidoDeepLink {
  *
  * Pure function — the security decision stays testable without Electron.
  */
-export function interpretar(bruta: string): PedidoDeepLink | null {
+export function interpretar(bruta: string): DeepLinkRequest | null {
   let url: URL
   try {
     url = new URL(bruta)
@@ -74,7 +74,7 @@ export function interpretar(bruta: string): PedidoDeepLink | null {
     }
     // HTTPS/WSS only: an `http://` accepted here would indicate a forged link.
     if (alvo.protocol !== 'https:' && alvo.protocol !== 'wss:') return null
-    if (alvo.hostname !== SERVIDOR_HOST) return null
+    if (alvo.hostname !== SERVER_HOST) return null
   }
 
   return { executorId, otp }
@@ -104,7 +104,7 @@ export function ehDeepLink(bruta: string): boolean {
  * path Windows would register "open with electron.exe" — which would open
  * Electron's default app, not this one.
  */
-export function registrarProtocolo(): void {
+export function registerProtocol(): void {
   if (process.defaultApp && process.argv.length >= 2) {
     app.setAsDefaultProtocolClient(PROTOCOLO, process.execPath, [process.argv[1]!])
   } else {

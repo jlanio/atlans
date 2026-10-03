@@ -359,13 +359,13 @@ function SidebarTrigger({
  * do it, and they are the two advertised ways.
  */
 /** The rail's labels. The default is the admin area's Portuguese; the Home passes its language's. */
-export interface TextosDoTrilho {
+export interface RailTexts {
   expandir: string
   redimensionar: string
   dica: string
 }
 
-export const TEXTOS_DO_TRILHO_PT: TextosDoTrilho = {
+export const TEXTOS_DO_TRILHO_PT: RailTexts = {
   expandir: "Expandir barra lateral",
   redimensionar: "Redimensionar a barra lateral",
   dica: "Arraste para redimensionar · duplo clique volta ao padrão",
@@ -375,16 +375,16 @@ function SidebarRail({
   className,
   textos = TEXTOS_DO_TRILHO_PT,
   ...props
-}: React.ComponentProps<"button"> & { textos?: TextosDoTrilho }) {
+}: React.ComponentProps<"button"> & { textos?: RailTexts }) {
   const { toggleSidebar, state, width, setWidth } = useSidebar()
   const recolhida = state === "collapsed"
   const ref = React.useRef<HTMLButtonElement>(null)
-  const [arrastando, setArrastando] = React.useState(false)
+  const [arrastando, setDragging] = React.useState(false)
 
   // The side matters for the math: on the left the bar starts at x=0, on the right
   // it ends at the window edge. Read from the DOM (the group's `data-side`) instead
   // of becoming a prop — the component doesn't receive `side`, the <Sidebar> does.
-  const larguraDoPonteiro = React.useCallback((clientX: number) => {
+  const pointerWidth = React.useCallback((clientX: number) => {
     const grupo = ref.current?.closest<HTMLElement>('[data-slot="sidebar"]')
     const direita = grupo?.dataset.side === "right"
     return direita ? window.innerWidth - clientX : clientX
@@ -397,7 +397,7 @@ function SidebarRail({
   // second of dragging cost 60 renders of EACH `useSidebar` consumer
   // (there are nine, the virtualized Artifacts list among them) and 60 synchronous
   // writes to `document.cookie`. Now it's one render and one cookie per gesture.
-  const larguraViva = React.useRef(width)
+  const liveWidth = React.useRef(width)
   const envoltorio = React.useCallback(
     () => ref.current?.closest<HTMLElement>('[data-slot="sidebar-wrapper"]'),
     [],
@@ -408,28 +408,28 @@ function SidebarRail({
     // The pointer stays captured by the separator: moving off it (or passing over an
     // iframe, like the globe's) doesn't interrupt the drag midway.
     ref.current?.setPointerCapture(e.pointerId)
-    larguraViva.current = width
-    setArrastando(true)
+    liveWidth.current = width
+    setDragging(true)
   }
   function aoMover(e: React.PointerEvent<HTMLButtonElement>) {
     if (!arrastando) return
     e.preventDefault()
-    larguraViva.current = limitarLargura(larguraDoPonteiro(e.clientX))
-    envoltorio()?.style.setProperty("--sidebar-width", `${larguraViva.current}px`)
+    liveWidth.current = limitarLargura(pointerWidth(e.clientX))
+    envoltorio()?.style.setProperty("--sidebar-width", `${liveWidth.current}px`)
   }
   function aoSoltar(e: React.PointerEvent<HTMLButtonElement>) {
     if (!arrastando) return
     ref.current?.releasePointerCapture(e.pointerId)
-    setArrastando(false)
+    setDragging(false)
     // Here, and only here: the state (and with it `aria-valuenow`) and the cookie.
-    setWidth(larguraViva.current)
+    setWidth(liveWidth.current)
   }
   function aoTeclar(e: React.KeyboardEvent<HTMLButtonElement>) {
     if (recolhida) return
     // A bar on the right grows the other way: ← and → swap roles, otherwise
     // the "outward" arrow would shrink it.
-    const paraDireita = ref.current?.closest<HTMLElement>('[data-slot="sidebar"]')?.dataset.side !== "right"
-    const passo = (e.shiftKey ? 48 : 16) * (paraDireita ? 1 : -1)
+    const toRight = ref.current?.closest<HTMLElement>('[data-slot="sidebar"]')?.dataset.side !== "right"
+    const passo = (e.shiftKey ? 48 : 16) * (toRight ? 1 : -1)
     if (e.key === "ArrowRight") { e.preventDefault(); setWidth(width + passo) }
     else if (e.key === "ArrowLeft") { e.preventDefault(); setWidth(width - passo) }
     else if (e.key === "Home") { e.preventDefault(); setWidth(SIDEBAR_WIDTH_MIN) }

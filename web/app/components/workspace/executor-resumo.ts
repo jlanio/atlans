@@ -1,5 +1,5 @@
 import type { IExecutor, IPolicyMember, IWorkspacePolicy } from "@/service/types"
-import { descreverPolitica, descreverQueda, disponiveisNaCadeia, politicaEmAlerta, rotuloDoStatus } from "./politica"
+import { describePolicy, describeOutage, availableInChain, politicaEmAlerta, rotuloDoStatus } from "./politica"
 
 /**
  * Reading of a workspace's executor, reduced to a single state.
@@ -12,19 +12,19 @@ import { descreverPolitica, descreverQueda, disponiveisNaCadeia, politicaEmAlert
 
 /** What the screen needs to know about an executor — fits both the `/executores/my`
  *  list and a policy member, which carries the same fields. */
-export type ExecutorResumido = Pick<IExecutor, "id_hash" | "name" | "status" | "executor_type"> & {
+export type BriefExecutor = Pick<IExecutor, "id_hash" | "name" | "status" | "executor_type"> & {
   online: boolean | null
 }
 
-export type ResumoDoExecutor =
+export type ExecutorSummary =
   | { estado: "carregando" }
   /** The read failed: this is NOT pool, it is "don't know where runs go". */
   | { estado: "indefinido"; mensagem: string }
   | { estado: "pool" }
   /** Pointed at an executor that is no longer in the list (removed or no access). */
   | { estado: "sumido"; alvo: string }
-  | { estado: "inativo"; executor: ExecutorResumido }
-  | { estado: "ok"; executor: ExecutorResumido }
+  | { estado: "inativo"; executor: BriefExecutor }
+  | { estado: "ok"; executor: BriefExecutor }
   /**
    * A policy IN EFFECT with more than one executor (a group in the primary
    * tier or a fallback): it is not a single target, and the quick picker does
@@ -32,7 +32,7 @@ export type ResumoDoExecutor =
    */
   | { estado: "grupo"; politica: IWorkspacePolicy }
 
-export interface EntradaDoResumo {
+export interface SummaryEntry {
   /** Available executors (includes inactive ones, to recognize a removed target). */
   executores: IExecutor[]
   /** Current target: `null` = platform pool; `undefined` = not read yet. */
@@ -45,18 +45,18 @@ export interface EntradaDoResumo {
   politica?: IWorkspacePolicy | null
 }
 
-export const MENSAGEM_ALVO_DESCONHECIDO = "Não foi possível ler o executor deste workspace."
+export const UNKNOWN_TARGET_MESSAGE = "Não foi possível ler o executor deste workspace."
 
-function membroComoExecutor(m: IPolicyMember): ExecutorResumido {
+function memberAsExecutor(m: IPolicyMember): BriefExecutor {
   return { id_hash: m.id_hash, name: m.name, status: m.status as IExecutor["status"], executor_type: m.executor_type, online: m.online }
 }
 
-export function resumirExecutor(e: EntradaDoResumo): ResumoDoExecutor {
+export function resumirExecutor(e: SummaryEntry): ExecutorSummary {
   // "Gone" only makes sense when the executor LIST was read: if listing
   // failed, every target would look removed and the screen would paint an alert
   // on every workspace for a problem that is not theirs.
   if (e.erroExecutores) return { estado: "indefinido", mensagem: e.erroExecutores }
-  if (e.alvoDesconhecido) return { estado: "indefinido", mensagem: MENSAGEM_ALVO_DESCONHECIDO }
+  if (e.alvoDesconhecido) return { estado: "indefinido", mensagem: UNKNOWN_TARGET_MESSAGE }
   // The group only takes over the screen when the policy is IN EFFECT. With the
   // flag off it is the legacy pointer that routes, and that is what the picker
   // shows — the policy appears as a preview, alongside.
@@ -67,11 +67,11 @@ export function resumirExecutor(e: EntradaDoResumo): ResumoDoExecutor {
   if (e.alvo === undefined) return { estado: "carregando" }
   if (e.alvo === null) return { estado: "pool" }
   const alvo = e.alvo
-  const executor: ExecutorResumido | undefined =
+  const executor: BriefExecutor | undefined =
     e.executores.find(x => x.id_hash === alvo)
     // A policy member that is not in MY list (added by a platform admin, for
     // example): the policy already carries name, status and presence.
-    ?? (emVigor ? e.politica?.primary.map(membroComoExecutor).find(m => m.id_hash === alvo) : undefined)
+    ?? (emVigor ? e.politica?.primary.map(memberAsExecutor).find(m => m.id_hash === alvo) : undefined)
   if (!executor) return { estado: "sumido", alvo }
   if (executor.status !== "active") return { estado: "inativo", executor }
   return { estado: "ok", executor }
@@ -82,7 +82,7 @@ export function resumirExecutor(e: EntradaDoResumo): ResumoDoExecutor {
  * policy is in effect and is Isolated: then the next run fails. In legacy mode
  * (or with pool as last resort) the pool takes over, and gray is enough.
  */
-export function emAlerta(r: ResumoDoExecutor, politica?: IWorkspacePolicy | null): boolean {
+export function inAlert(r: ExecutorSummary, politica?: IWorkspacePolicy | null): boolean {
   if (r.estado === "grupo") return politicaEmAlerta(r.politica)
   if (r.estado === "ok") {
     return r.executor.online === false && r.executor.executor_type === "dedicated"
@@ -92,19 +92,19 @@ export function emAlerta(r: ResumoDoExecutor, politica?: IWorkspacePolicy | null
 }
 
 /** Sentence for the active workspace's panel: what the status means for runs. */
-export function descreverExecutor(r: ResumoDoExecutor, politica?: IWorkspacePolicy | null): string {
+export function describeExecutor(r: ExecutorSummary, politica?: IWorkspacePolicy | null): string {
   switch (r.estado) {
     case "carregando": return ""
     case "indefinido": return r.mensagem
     case "pool": return "Pool compartilhado · qualquer executor compartilhado assume as execuções"
     // No "pick another": someone who does not manage reads the same sentence and cannot.
     case "sumido": return "Indisponível · o executor apontado foi removido ou você perdeu o acesso"
-    case "inativo": return `${capitalizar(rotuloDoStatus(r.executor.status))} · não recebe execuções`
-    case "grupo": return descreverPolitica(r.politica)
+    case "inativo": return `${capitalize(rotuloDoStatus(r.executor.status))} · não recebe execuções`
+    case "grupo": return describePolicy(r.politica)
     case "ok": {
       const conexao = r.executor.online === true ? "Online" : r.executor.online === false ? "Offline" : "Sem sinal"
       if (r.executor.executor_type !== "dedicated") return `${conexao} · executor compartilhado, fixado para este workspace`
-      const queda = descreverQueda(politica)
+      const queda = describeOutage(politica)
       if (r.executor.online === false && politica?.policy_routing_enabled && politica.mode === "isolated") {
         return "Offline · novas execuções vão falhar"
       }
@@ -114,7 +114,7 @@ export function descreverExecutor(r: ResumoDoExecutor, politica?: IWorkspacePoli
 }
 
 /** Label for the compact row: fits next to the role in a 12px line. */
-export function rotularExecutor(r: ResumoDoExecutor): string {
+export function labelExecutor(r: ExecutorSummary): string {
   switch (r.estado) {
     case "carregando": return ""
     case "indefinido": return "Executor não lido"
@@ -136,10 +136,10 @@ export function rotularExecutor(r: ResumoDoExecutor): string {
  * to signal. The dot accompanies the text, never replaces it: color alone does
  * not distinguish "offline" from "pool" for someone who cannot see color.
  */
-export function corDoPonto(r: ResumoDoExecutor, politica?: IWorkspacePolicy | null): string | null {
+export function dotColor(r: ExecutorSummary, politica?: IWorkspacePolicy | null): string | null {
   switch (r.estado) {
     case "ok":
-      if (emAlerta(r, politica)) return "bg-amber-500"
+      if (inAlert(r, politica)) return "bg-amber-500"
       if (r.executor.online === null) return "border border-dashed border-muted-foreground/70"
       return r.executor.online ? "bg-green-500" : "bg-muted-foreground/40"
     case "pool": return "border border-muted-foreground/60"
@@ -147,11 +147,11 @@ export function corDoPonto(r: ResumoDoExecutor, politica?: IWorkspacePolicy | nu
     case "inativo": return "bg-amber-500"
     case "grupo":
       if (politicaEmAlerta(r.politica)) return "bg-amber-500"
-      return disponiveisNaCadeia(r.politica) > 0 ? "bg-green-500" : "bg-muted-foreground/40"
+      return availableInChain(r.politica) > 0 ? "bg-green-500" : "bg-muted-foreground/40"
     default: return null
   }
 }
 
-function capitalizar(s: string): string {
+function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }

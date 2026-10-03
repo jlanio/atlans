@@ -5,9 +5,9 @@ import type { IWorkflowMetricsRow } from "@/service/types"
 
 // ── Doubles ──────────────────────────────────────────────────────────────────
 const url = vi.hoisted(() => ({ sp: new URLSearchParams(""), pathname: "/projects" }))
-const roteador = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), prefetch: vi.fn() }))
+const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), prefetch: vi.fn() }))
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ ...roteador, back: vi.fn(), forward: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ ...router, back: vi.fn(), forward: vi.fn(), refresh: vi.fn() }),
   usePathname: () => url.pathname,
   useSearchParams: () => url.sp,
 }))
@@ -67,13 +67,13 @@ const falha = (message = "boom") => ({ success: false, status: 500, error: { nam
 // ── Massa ────────────────────────────────────────────────────────────────────
 const agora = new Date()
 const haHoras = (h: number) => new Date(agora.getTime() - h * 3_600_000).toISOString()
-const haDias = (d: number) => new Date(agora.getTime() - d * 86_400_000).toISOString()
+const daysAgo = (d: number) => new Date(agora.getTime() - d * 86_400_000).toISOString()
 
 function wf(id: string, name: string, extra: Partial<IWorkflow> = {}): IWorkflow {
   return {
     id_hash: id, flag_ative: true, name, description: "", version: "1", priority: 0,
     definition: { nodes: [], edges: [] }, created_by_id: "u1", updated_by_id: "u1",
-    workspace_id: "ws-1", group_id: null, created_at: haDias(40), updated_at: haDias(2),
+    workspace_id: "ws-1", group_id: null, created_at: daysAgo(40), updated_at: daysAgo(2),
     updated_by_username: "maria", ...extra,
   }
 }
@@ -105,7 +105,7 @@ const metricas = () => [
   metrica("d", { last_status: "failed", last_error: "Timeout ao consultar o WFS", last_run_at: haHoras(1) }),
 ]
 
-function respostasBoas() {
+function goodResponses() {
   svc.getWorkflows.mockResolvedValue(ok(workflows()))
   svc.getWorkflowGroups.mockResolvedValue(ok(grupos()))
   svc.getWorkflowMetricsList.mockResolvedValue(ok({ period_days: 30, workflows: metricas() }))
@@ -114,7 +114,7 @@ function respostasBoas() {
 
 beforeEach(() => {
   vi.resetAllMocks()
-  respostasBoas()
+  goodResponses()
   url.sp = new URLSearchParams("")
   runs.lista = []
   workspace.canEdit = true
@@ -123,7 +123,7 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-const ultimaUrl = () => roteador.replace.mock.calls.at(-1)![0] as string
+const lastUrl = () => router.replace.mock.calls.at(-1)![0] as string
 
 /** A workflow's row, by the name button. */
 async function linha(nome: string, opcoes: { hidden?: boolean } = {}) {
@@ -147,17 +147,17 @@ describe("Projetos — página", () => {
     expect(within(hidrologia).getByRole("button", { name: "Abrir Consolidação de outorgas no editor" })).toBeInTheDocument()
     expect(within(hidrologia).getByRole("button", { name: "Abrir Cheias no editor" })).toBeInTheDocument()
 
-    const rascunhos = screen.getByRole("region", { name: "Rascunhos" })
-    expect(rascunhos).toHaveTextContent("vazio")
-    expect(rascunhos).toHaveTextContent("Nenhum workflow aqui.")
+    const drafts = screen.getByRole("region", { name: "Rascunhos" })
+    expect(drafts).toHaveTextContent("vazio")
+    expect(drafts).toHaveTextContent("Nenhum workflow aqui.")
 
-    const semGrupo = screen.getByRole("region", { name: "Sem grupo" })
-    expect(semGrupo).toHaveTextContent("2 workflows · 2 ativos")
-    expect(within(semGrupo).getByRole("button", { name: "Abrir Recorte por município no editor" })).toBeInTheDocument()
-    expect(within(semGrupo).getByRole("button", { name: "Abrir Mapa de risco no editor" })).toBeInTheDocument()
+    const ungrouped = screen.getByRole("region", { name: "Sem grupo" })
+    expect(ungrouped).toHaveTextContent("2 workflows · 2 ativos")
+    expect(within(ungrouped).getByRole("button", { name: "Abrir Recorte por município no editor" })).toBeInTheDocument()
+    expect(within(ungrouped).getByRole("button", { name: "Abrir Mapa de risco no editor" })).toBeInTheDocument()
 
     // "Sem grupo" (no group) comes BEFORE the groups.
-    expect(semGrupo.compareDocumentPosition(hidrologia) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(ungrouped.compareDocumentPosition(hidrologia) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 
     // Subtitle about the whole list; "como anda" (how it is going) came from the metrics.
     expect(screen.getByText("4 workflows em 2 grupos · 3 ativos · 1 agendado")).toBeInTheDocument()
@@ -178,7 +178,7 @@ describe("Projetos — página", () => {
     const inativos = within(chips).getByRole("button", { name: /^Inativos/ })
     expect(inativos).toHaveTextContent("1")
     fireEvent.click(inativos)
-    expect(roteador.replace).toHaveBeenCalledWith("/projects?filtro=inativos", { scroll: false })
+    expect(router.replace).toHaveBeenCalledWith("/projects?filtro=inativos", { scroll: false })
     unmount()
 
     url.sp = new URLSearchParams("filtro=inativos")
@@ -210,7 +210,7 @@ describe("Projetos — página", () => {
     expect(await screen.findByText("Nenhum workflow com «inexistente»")).toBeInTheDocument()
     expect(screen.queryByRole("region", { name: "Hidrologia" })).toBeNull()
     fireEvent.click(screen.getAllByRole("button", { name: "Limpar filtros" })[0])
-    expect(ultimaUrl()).toBe("/projects")
+    expect(lastUrl()).toBe("/projects")
   })
 
   it("Desativar… pede confirmação, troca otimista e reverte quando a API falha", async () => {
@@ -259,7 +259,7 @@ describe("Projetos — página", () => {
     expect(screen.getByText("Nenhum workflow ainda")).toBeInTheDocument()
     expect(screen.queryByRole("searchbox")).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: "Criar o primeiro workflow" }))
-    expect(roteador.push).toHaveBeenCalledWith("./workflow/create")
+    expect(router.push).toHaveBeenCalledWith("./workflow/create")
   })
 
   it("métricas indisponíveis: aviso discreto e a lista completa, sem dados de execução", async () => {
@@ -282,7 +282,7 @@ describe("Projetos — página", () => {
     const l = await linha("Consolidação de outorgas")
     expect(l).toHaveTextContent("Em execução há 6 min")
     fireEvent.click(within(l).getByRole("button", { name: "Ver execução de Consolidação de outorgas" }))
-    expect(roteador.push).toHaveBeenCalledWith("/observability?execucao=run-9")
+    expect(router.push).toHaveBeenCalledWith("/observability?execucao=run-9")
     expect(within(screen.getByRole("group", { name: "Filtros" })).getByRole("button", { name: /^Em execução/ })).toHaveTextContent("1")
   })
 

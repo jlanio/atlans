@@ -88,7 +88,7 @@ exports.acharSigntool = acharSigntool
 function acharSigntool() {
   if (process.env.ATLANS_SIGNTOOL) return process.env.ATLANS_SIGNTOOL
 
-  for (const p of candidatosDoCacheDoBuilder()) {
+  for (const p of builderCacheCandidates()) {
     if (fs.existsSync(p)) return p
   }
 
@@ -111,7 +111,7 @@ function acharSigntool() {
 }
 
 /** `%LOCALAPPDATA%\electron-builder\Cache\winCodeSign\<algo>\windows-10\x64`. */
-function candidatosDoCacheDoBuilder() {
+function builderCacheCandidates() {
   const base = process.env.LOCALAPPDATA
   if (!base) return []
   const raiz = path.join(base, 'electron-builder', 'Cache', 'winCodeSign')
@@ -137,7 +137,7 @@ function candidatosDoCacheDoBuilder() {
 }
 
 /** Accepts a file path OR the whole .pfx in base64 (what fits in a secret). */
-function materializarPfx(valor) {
+function materializePfx(valor) {
   if (fs.existsSync(valor)) return { arquivo: valor, temporario: false }
 
   const destino = path.join(os.tmpdir(), `atlans-sign-${process.pid}.pfx`)
@@ -151,10 +151,10 @@ function exigir(nome) {
   return v
 }
 
-function argumentosDo(provedor, temporarios) {
+function argumentsFor(provedor, tempFiles) {
   if (provedor === 'pfx') {
-    const { arquivo, temporario } = materializarPfx(exigir('ATLANS_SIGN_PFX'))
-    if (temporario) temporarios.push(arquivo)
+    const { arquivo, temporario } = materializePfx(exigir('ATLANS_SIGN_PFX'))
+    if (temporario) tempFiles.push(arquivo)
     const args = ['/f', arquivo]
     const senha = process.env.ATLANS_SIGN_PFX_PASSWORD
     if (senha) args.push('/p', senha)
@@ -185,7 +185,7 @@ exports.default = async function sign(configuration) {
     return
   }
 
-  const temporarios = []
+  const tempFiles = []
   try {
     const args = [
       'sign',
@@ -194,7 +194,7 @@ exports.default = async function sign(configuration) {
       '/fd', 'sha256',
       '/td', 'sha256',
       '/tr', TIMESTAMP_URL,
-      ...argumentosDo(provedor, temporarios),
+      ...argumentsFor(provedor, tempFiles),
       // `isNest` = the file already has a signature and this one is additional.
       // Without `/as`, the second one silently REPLACES the first.
       ...(configuration.isNest ? ['/as'] : []),
@@ -202,13 +202,13 @@ exports.default = async function sign(configuration) {
     ]
 
     const signtool = acharSigntool()
-    let ultimoErro
+    let lastError
     for (let i = 1; i <= TENTATIVAS; i++) {
       try {
         execFileSync(signtool, args, { stdio: 'inherit' })
         return
       } catch (erro) {
-        ultimoErro = erro
+        lastError = erro
         if (i < TENTATIVAS) {
           console.warn(`[sign] tentativa ${i}/${TENTATIVAS} falhou; repetindo…`)
           // Short, increasing wait: almost every failure here is the timestamp
@@ -222,10 +222,10 @@ exports.default = async function sign(configuration) {
       `Falha ao assinar ${configuration.path} com signtool (${TENTATIVAS} tentativas). ` +
       `Um build que DEVERIA ser assinado e sai sem assinatura é pior que um build ` +
       `que não termina: ele chega ao usuário com o aviso do SmartScreen e ninguém ` +
-      `percebe até o primeiro chamado de suporte. Causa: ${ultimoErro && ultimoErro.message}`,
+      `percebe até o primeiro chamado de suporte. Causa: ${lastError && lastError.message}`,
     )
   } finally {
-    for (const t of temporarios) {
+    for (const t of tempFiles) {
       try { fs.unlinkSync(t) } catch { /* already removed */ }
     }
   }

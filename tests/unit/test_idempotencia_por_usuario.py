@@ -23,7 +23,7 @@ from app.models.workflow import Workflow
 from app.services.workflow_service import DispatchResult, WorkflowService
 
 
-class _RedisFalso:
+class _FakeRedis:
     def __init__(self):
         self.dados: dict[str, str] = {}
         self.gravacoes: list[tuple[str, str, int | None]] = []
@@ -42,13 +42,13 @@ class _RedisFalso:
 
 @pytest.fixture
 def redis():
-    r = _RedisFalso()
+    r = _FakeRedis()
     with patch("app.core.redis._pool", r):
         yield r
 
 
 @pytest.fixture(autouse=True)
-def _sem_banco():
+def _without_db():
     with patch("app.services.disabled_nodes_service.disabled_names", new=AsyncMock(return_value=set())), \
          patch("flow.utils.workflow_contract.collect_subworkflow_definitions_recursive", new=AsyncMock(return_value={})):
         yield
@@ -83,7 +83,7 @@ async def _disparar(service, wf: str, usuario: str | None, chave: str) -> str:
 
 
 @pytest.mark.asyncio
-async def test_formato_da_chave_usuario_workflow_e_chave(service, redis):
+async def test_key_format_is_user_workflow_and_key(service, redis):
     await _disparar(service, "wf-1", "usr-a", "k1")
     assert [g[0] for g in redis.gravacoes] == ["idempotency:wf_execute:usr-a:wf-1:k1"]
     (_, valor, ttl), = redis.gravacoes
@@ -92,7 +92,7 @@ async def test_formato_da_chave_usuario_workflow_e_chave(service, redis):
 
 
 @pytest.mark.asyncio
-async def test_mesma_chave_dois_usuarios_sao_duas_execucoes(service, redis):
+async def test_same_key_two_users_are_two_runs(service, redis):
     a = await _disparar(service, "wf-1", "usr-a", "1")
     b = await _disparar(service, "wf-1", "usr-b", "1")
     assert a != b
@@ -100,7 +100,7 @@ async def test_mesma_chave_dois_usuarios_sao_duas_execucoes(service, redis):
 
 
 @pytest.mark.asyncio
-async def test_mesmo_usuario_mesma_chave_devolve_a_mesma_execucao_sem_despachar(service, redis):
+async def test_same_user_same_key_returns_same_run_without_dispatching(service, redis):
     a = await _disparar(service, "wf-1", "usr-a", "1")
     b = await _disparar(service, "wf-1", "usr-a", "1")
     assert a == b == "task-1"
@@ -109,7 +109,7 @@ async def test_mesmo_usuario_mesma_chave_devolve_a_mesma_execucao_sem_despachar(
 
 
 @pytest.mark.asyncio
-async def test_mesmo_usuario_mesma_chave_workflows_diferentes_sao_duas_execucoes(service, redis):
+async def test_same_user_same_key_different_workflows_are_two_runs(service, redis):
     a = await _disparar(service, "wf-1", "usr-a", "1")
     b = await _disparar(service, "wf-2", "usr-a", "1")
     assert a != b
@@ -117,7 +117,7 @@ async def test_mesmo_usuario_mesma_chave_workflows_diferentes_sao_duas_execucoes
 
 
 @pytest.mark.asyncio
-async def test_sem_usuario_a_chave_leva_um_traco(service, redis):
+async def test_without_user_the_key_carries_a_dash(service, redis):
     """Cron and webhook do not pass a key today; if they do, they must not fall into
     any user's slice."""
     await _disparar(service, "wf-1", None, "k1")
@@ -125,6 +125,6 @@ async def test_sem_usuario_a_chave_leva_um_traco(service, redis):
 
 
 @pytest.mark.asyncio
-async def test_sem_chave_nada_e_gravado(service, redis):
+async def test_without_key_nothing_is_stored(service, redis):
     await service.start_analysis("wf-1", triggered_by="usr-a")
     assert redis.gravacoes == []

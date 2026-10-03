@@ -12,10 +12,10 @@
 // the `ferramenta` frame is emitted BEFORE dispatch: a name the gate rejects
 // still shows up here once, followed by the step in error.
 
-import { IDIOMA_PADRAO, type Idioma } from "@/lib/idioma"
+import { DEFAULT_LANGUAGE, type Idioma } from "@/lib/idioma"
 import { textosDe } from "../i18n"
 
-export function rotuloDaFerramenta(nome: string, idioma: Idioma = IDIOMA_PADRAO): string {
+export function toolLabel(nome: string, idioma: Idioma = DEFAULT_LANGUAGE): string {
   const tabela = textosDe(idioma).assistente.ferramentas
   return Object.hasOwn(tabela, nome) ? tabela[nome] : nome
 }
@@ -28,10 +28,10 @@ export function rotuloDaFerramenta(nome: string, idioma: Idioma = IDIOMA_PADRAO)
  * selection is by known key, not "the first value that fits": a new argument
  * must not start dumping content onto the screen by accident.
  */
-const DETALHE = ["query", "topic", "name", "search", "node_name", "workflow_id", "run_id", "file_id"]
+const DETAIL_KEYS = ["query", "topic", "name", "search", "node_name", "workflow_id", "run_id", "file_id"]
 
-export function detalheDaChamada(argumentos: Record<string, unknown>): string | null {
-  for (const chave of DETALHE) {
+export function callDetail(argumentos: Record<string, unknown>): string | null {
+  for (const chave of DETAIL_KEYS) {
     const valor = argumentos[chave]
     if (typeof valor === "string" && valor.trim()) return valor.length > 48 ? `${valor.slice(0, 45)}…` : valor
   }

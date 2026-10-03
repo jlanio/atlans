@@ -34,7 +34,7 @@ describe("SaudeHero", () => {
   it("calmo: check verde, veredito tranquilo e a linha 'agora'", () => {
     render(<SaudeHero {...base} now={now()} tom="calmo" />)
     expect(screen.getByText("Tudo tranquilo — nada pedindo atenção agora.")).toBeInTheDocument()
-    // The "agora" (now) line (ItensAgora) shows up inside the calm strip.
+    // The "agora" (now) line (NowItems) shows up inside the calm strip.
     expect(screen.getByText("em andamento")).toBeInTheDocument()
     expect(screen.getByText("na fila")).toBeInTheDocument()
   })

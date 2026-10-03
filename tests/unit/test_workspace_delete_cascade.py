@@ -30,7 +30,7 @@ def _update_result(rowcount: int = 0) -> MagicMock:
     return result
 
 
-async def test_workspace_sem_workflows_nao_dispara_updates():
+async def test_workspace_without_workflows_fires_no_updates():
     db = AsyncMock()
     db.execute = AsyncMock(return_value=_rows_result([]))
 
@@ -40,13 +40,13 @@ async def test_workspace_sem_workflows_nao_dispara_updates():
     assert db.execute.await_count == 1  # apenas o SELECT
 
 
-async def test_soft_deleta_pendentes_e_desativa_schedules():
-    ativo_a, ativo_b, ja_deletado = str(uuid4()), str(uuid4()), str(uuid4())
+async def test_soft_deletes_pending_and_deactivates_schedules():
+    active_a, active_b, ja_deletado = str(uuid4()), str(uuid4()), str(uuid4())
     db = AsyncMock()
     db.execute = AsyncMock(side_effect=[
         _rows_result([
-            (ativo_a, None),
-            (ativo_b, None),
+            (active_a, None),
+            (active_b, None),
             (ja_deletado, datetime(2026, 7, 27, 14, 20)),
         ]),
         _update_result(),   # UPDATE workflows
@@ -74,10 +74,10 @@ async def test_soft_deleta_pendentes_e_desativa_schedules():
     assert sched_update.compile().params["active"] is False
 
     # ChangeDetector is only cleared for those soft-deleted just now
-    assert {c.args[0] for c in cleanup.await_args_list} == {ativo_a, ativo_b}
+    assert {c.args[0] for c in cleanup.await_args_list} == {active_a, active_b}
 
 
-async def test_desativa_schedule_de_workflow_ja_soft_deletado():
+async def test_deactivates_schedule_of_already_soft_deleted_workflow():
     """An active schedule of an already-deleted workflow also goes down — the cascade covers them all."""
     wf_id = str(uuid4())
     db = AsyncMock()
@@ -97,13 +97,13 @@ async def test_desativa_schedule_de_workflow_ja_soft_deletado():
     cleanup.assert_not_awaited()
 
 
-async def test_nao_commita_por_conta_propria():
+async def test_does_not_commit_on_its_own():
     """The one that commits is delete_workspace.
 
     No end-to-end atomicity guarantee, though: the router calls
     `schedule_workspace_data_expiry` right afterwards, and it commits
     internally. That is why the router marks Workspace.deleted_at BEFORE this
-    function — see test_delete_marca_workspace_antes_do_helper_que_commita.
+    function — see test_delete_marks_workspace_before_the_committing_helper.
     """
     db = AsyncMock()
     db.execute = AsyncMock(side_effect=[
@@ -121,7 +121,7 @@ async def test_nao_commita_por_conta_propria():
     db.commit.assert_not_awaited()
 
 
-async def test_delete_marca_workspace_antes_do_helper_que_commita(client, mock_current_user):
+async def test_delete_marks_workspace_before_the_committing_helper(client, mock_current_user):
     """The order in the router is what guarantees atomicity — not the absence of a commit.
 
     `schedule_workspace_data_expiry` commits internally (via
@@ -179,7 +179,7 @@ async def test_delete_marca_workspace_antes_do_helper_que_commita(client, mock_c
 
 # ── Restore ───────────────────────────────────────────────────────────────────
 
-async def test_restore_devolve_apenas_workflows_do_mesmo_delete():
+async def test_restore_returns_only_workflows_from_the_same_delete():
     """A workflow deleted individually earlier does not come back with the workspace."""
     ws_id = str(uuid4())
     db = AsyncMock()
@@ -200,7 +200,7 @@ async def test_restore_devolve_apenas_workflows_do_mesmo_delete():
     db.commit.assert_not_awaited()
 
 
-async def test_restore_nao_reativa_workflow():
+async def test_restore_does_not_reactivate_workflow():
     """Regression: bulk reactivation resurrected what the owner had turned off.
 
     The cascade clears `flag_ative` on all of them, so on restore there is no
@@ -217,7 +217,7 @@ async def test_restore_nao_reativa_workflow():
     assert "flag_ative" not in params
 
 
-async def test_restore_nao_reativa_schedules():
+async def test_restore_does_not_reactivate_schedules():
     """Religar cron sozinho e o lado perigoso — restore mexe so em workflows."""
     db = AsyncMock()
     db.execute = AsyncMock(return_value=_update_result(1))
@@ -228,12 +228,12 @@ async def test_restore_nao_reativa_schedules():
     # back, to steer clear of names re-taken while the workspace was in the
     # trash (the name index is partial on `deleted_at IS NULL`). Reading is not
     # reactivating — what must not happen is a write to `schedules`.
-    emitidas = [str(c.args[0]) for c in db.execute.await_args_list]
-    assert not any("schedules" in sql for sql in emitidas), emitidas
+    issued = [str(c.args[0]) for c in db.execute.await_args_list]
+    assert not any("schedules" in sql for sql in issued), issued
     assert db.execute.await_args.args[0].table.name == "workflows"
 
 
-async def test_restore_desvia_de_nome_reocupado():
+async def test_restore_avoids_a_reoccupied_name():
     """The name of something in the trash may have been taken in the meantime.
 
     The name index is PARTIAL (`deleted_at IS NULL`), so soft-deleting frees
@@ -257,7 +257,7 @@ async def test_restore_desvia_de_nome_reocupado():
     assert rename.compile().params["name"] == "Edificações (2)"
 
 
-async def test_restore_preserva_o_nome_quando_ninguem_o_tomou():
+async def test_restore_keeps_the_name_when_nobody_took_it():
     """Normal case: no collision, the workflow comes back with the name it had."""
     db = AsyncMock()
     db.execute = AsyncMock(side_effect=[

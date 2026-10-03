@@ -3,7 +3,7 @@ import { createContext, PropsWithChildren, useContext, useMemo } from "react"
 import { INodeStatusWorkFlow } from "@/context/useFlowContext"
 
 /** What a node's card needs to know about its execution. */
-export type EstadoDeNo = Pick<
+export type NodeState = Pick<
   INodeStatusWorkFlow,
   "status" | "error" | "duration" | "cache_hit"
 >
@@ -20,7 +20,7 @@ export type EstadoDeNo = Pick<
 const SubflowReadOnlyContext = createContext(false)
 
 /** State of each node of the open sub-workflow, indexed by LOCAL id. */
-const SubflowStatusContext = createContext<Map<string, EstadoDeNo> | null>(null)
+const SubflowStatusContext = createContext<Map<string, NodeState> | null>(null)
 
 /** true when drawn inside the viewer. Stable for as long as it lasts. */
 export function useSubflowReadOnly(): boolean {
@@ -41,14 +41,14 @@ export function useSubflowReadOnly(): boolean {
  * to apply: that way the card has ONE read point, and the rule of which source
  * applies in which context lives in a single place.
  */
-export function useSubflowStatus(): Map<string, EstadoDeNo> | null {
+export function useSubflowStatus(): Map<string, NodeState> | null {
   return useContext(SubflowStatusContext)
 }
 
 export function SubflowScope({
   estadoPorId,
   children,
-}: PropsWithChildren<{ estadoPorId: Map<string, EstadoDeNo> }>) {
+}: PropsWithChildren<{ estadoPorId: Map<string, NodeState> }>) {
   // The boolean's provider sits outside, with a literal value: its context is
   // never invalidated, so its consumers do not follow the state.
   const status = useMemo(() => estadoPorId, [estadoPorId])

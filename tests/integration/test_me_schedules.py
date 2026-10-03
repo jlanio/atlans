@@ -1,6 +1,6 @@
 # tests/integration/test_me_schedules.py
 """`GET /me/schedules` — the person's schedules, across all their
-workspaces, one per row. The logic lives in `listar_agendamentos_de`, tested
+workspaces, one per row. The logic lives in `list_schedules_for`, tested
 here against real tables in an in-memory SQLite (the endpoint is just a
 `Depends(get_user_workspace_ids)` wrapper + the call).
 
@@ -14,8 +14,8 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.models.models import Schedule, Workflow
-from app.schemas.me import AgendamentoMeu
-from app.services.schedule_service import listar_agendamentos_de
+from app.schemas.me import MySchedule
+from app.services.schedule_service import list_schedules_for
 
 WS_1 = "ws-1"
 WS_2 = "ws-2"
@@ -54,38 +54,38 @@ async def _schedule(db, workflow_hash, *, active=True, next_run_at=None):
     return job
 
 
-async def _listar(db, workspace_ids):
-    itens = await listar_agendamentos_de(db, workspace_ids)
+async def _list_schedules(db, workspace_ids):
+    itens = await list_schedules_for(db, workspace_ids)
     # Validates the output contract along the way.
     for i in itens:
-        AgendamentoMeu.model_validate(i)
+        MySchedule.model_validate(i)
     return itens
 
 
 @pytest.mark.asyncio
-async def test_so_os_meus_workspaces(db):
+async def test_only_my_workspaces(db):
     await _workflow(db, "meu", workspace=WS_1)
     await _workflow(db, "alheio", workspace=WS_2)
     await _schedule(db, "meu")
     await _schedule(db, "alheio")
 
-    itens = await _listar(db, [WS_1])
+    itens = await _list_schedules(db, [WS_1])
     assert [i["workflow_id"] for i in itens] == ["meu"]
 
 
 @pytest.mark.asyncio
-async def test_soft_deletado_fica_de_fora(db):
+async def test_soft_deleted_is_left_out(db):
     await _workflow(db, "vivo", workspace=WS_1)
     await _workflow(db, "lixeira", workspace=WS_1, deleted_at=datetime(2026, 1, 1))
     await _schedule(db, "vivo")
     await _schedule(db, "lixeira")
 
-    itens = await _listar(db, [WS_1])
+    itens = await _list_schedules(db, [WS_1])
     assert [i["workflow_id"] for i in itens] == ["vivo"]
 
 
 @pytest.mark.asyncio
-async def test_ordem_ativos_primeiro_depois_proxima_nulls_por_ultimo(db):
+async def test_order_active_first_then_next_nulls_last(db):
     await _workflow(db, "wf", workspace=WS_1)
     cedo = datetime(2030, 1, 1, 6, 0)
     tarde = datetime(2030, 1, 1, 18, 0)
@@ -94,7 +94,7 @@ async def test_ordem_ativos_primeiro_depois_proxima_nulls_por_ultimo(db):
     await _schedule(db, "wf", active=True, next_run_at=tarde)
     await _schedule(db, "wf", active=True, next_run_at=cedo)
 
-    itens = await _listar(db, [WS_1])
+    itens = await _list_schedules(db, [WS_1])
     ativos = [i for i in itens if i["active"]]
     # Active ones first; among them, by ascending next run, null last.
     assert [i["next_run_at"] for i in ativos[:2]] == [
@@ -106,22 +106,22 @@ async def test_ordem_ativos_primeiro_depois_proxima_nulls_por_ultimo(db):
 
 
 @pytest.mark.asyncio
-async def test_datas_saem_tz_aware(db):
+async def test_dates_come_out_tz_aware(db):
     """Naive in the database (UTC) → with offset in the response, otherwise the web reads it as local."""
     await _workflow(db, "wf", workspace=WS_1)
     await _schedule(db, "wf", next_run_at=datetime(2030, 5, 1, 9, 0))
 
-    item = (await _listar(db, [WS_1]))[0]
+    item = (await _list_schedules(db, [WS_1]))[0]
     assert item["next_run_at"].tzinfo is not None
     assert item["next_run_at"] == datetime(2030, 5, 1, 9, 0, tzinfo=timezone.utc)
 
 
 @pytest.mark.asyncio
-async def test_traz_nome_e_flag_ative_do_workflow(db):
+async def test_brings_workflow_name_and_flag_ative(db):
     await _workflow(db, "wf-desligado", workspace=WS_1, flag_ative=False)
     await _schedule(db, "wf-desligado", active=True)
 
-    item = (await _listar(db, [WS_1]))[0]
+    item = (await _list_schedules(db, [WS_1]))[0]
     assert item["workflow_name"] == "wf-desligado"
     # "Paused" has two causes: the schedule is active, but the workflow is not.
     assert item["active"] is True
@@ -129,7 +129,7 @@ async def test_traz_nome_e_flag_ative_do_workflow(db):
 
 
 @pytest.mark.asyncio
-async def test_traz_origem_do_workflow(db):
+async def test_brings_workflow_origin(db):
     """The origin comes from the JOIN with Workflow, for the "assistente" badge on
     Home. Defaults to "usuario" when the workflow did not come from the assistant."""
     await _workflow(db, "do-usuario", workspace=WS_1, origem="usuario")
@@ -137,28 +137,28 @@ async def test_traz_origem_do_workflow(db):
     await _schedule(db, "do-usuario")
     await _schedule(db, "do-assistente")
 
-    itens = await _listar(db, [WS_1])
-    origem_por_fluxo = {i["workflow_id"]: i["origem"] for i in itens}
-    assert origem_por_fluxo == {"do-usuario": "usuario", "do-assistente": "assistente"}
+    itens = await _list_schedules(db, [WS_1])
+    origin_by_workflow = {i["workflow_id"]: i["origem"] for i in itens}
+    assert origin_by_workflow == {"do-usuario": "usuario", "do-assistente": "assistente"}
 
 
 @pytest.mark.asyncio
-async def test_sem_workspaces_lista_vazia(db):
+async def test_without_workspaces_empty_list(db):
     await _workflow(db, "wf", workspace=WS_1)
     await _schedule(db, "wf")
-    assert await _listar(db, []) == []
+    assert await _list_schedules(db, []) == []
 
 
 @pytest.mark.asyncio
-async def test_pagina_com_limit_e_offset(db):
+async def test_page_with_limit_and_offset(db):
     """It was the only new listing without a ceiling — Chats cuts at 50, Collection at 200."""
     for i in range(5):
         await _workflow(db, f"wf-{i}")
         await _schedule(db, f"wf-{i}", next_run_at=datetime(2026, 1, 1 + i, tzinfo=timezone.utc))
 
-    primeira = await listar_agendamentos_de(db, [WS_1], limit=2, offset=0)
-    segunda = await listar_agendamentos_de(db, [WS_1], limit=2, offset=2)
-    inteira = await listar_agendamentos_de(db, [WS_1], limit=100, offset=0)
+    primeira = await list_schedules_for(db, [WS_1], limit=2, offset=0)
+    segunda = await list_schedules_for(db, [WS_1], limit=2, offset=2)
+    inteira = await list_schedules_for(db, [WS_1], limit=100, offset=0)
 
     assert len(primeira) == 2 and len(segunda) == 2 and len(inteira) == 5
     # Disjoint pages, in the same order as the full list.
@@ -166,7 +166,7 @@ async def test_pagina_com_limit_e_offset(db):
 
 
 @pytest.mark.asyncio
-async def test_a_ordem_desempata_de_forma_estavel(db):
+async def test_order_breaks_ties_stably(db):
     """Same `active` and same `next_run_at`: without the third criterion, two
     rows could swap pages between requests."""
     quando = datetime(2026, 3, 1, tzinfo=timezone.utc)
@@ -174,13 +174,13 @@ async def test_a_ordem_desempata_de_forma_estavel(db):
         await _workflow(db, f"igual-{i}")
         await _schedule(db, f"igual-{i}", next_run_at=quando)
 
-    uma = [i["job_id"] for i in await listar_agendamentos_de(db, [WS_1])]
-    outra = [i["job_id"] for i in await listar_agendamentos_de(db, [WS_1])]
+    uma = [i["job_id"] for i in await list_schedules_for(db, [WS_1])]
+    outra = [i["job_id"] for i in await list_schedules_for(db, [WS_1])]
     assert uma == outra
 
 
 @pytest.mark.asyncio
-async def test_a_rota_responde_e_repassa_limit_offset(client, db, monkeypatch):
+async def test_route_responds_and_passes_limit_offset(client, db, monkeypatch):
     """Closes the loop: the limiter decorator, the query params and the ENVELOPE.
 
     The response is `{itens, total}` — the same format as `GET /assistente/conversas`.
@@ -218,7 +218,7 @@ async def test_a_rota_responde_e_repassa_limit_offset(client, db, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_o_total_usa_o_mesmo_recorte_da_pagina(client, db, monkeypatch):
+async def test_total_uses_the_same_slice_as_the_page(client, db, monkeypatch):
     """The total counts what the list lists: neither other people's workflows nor
     workflows in the trash.
 

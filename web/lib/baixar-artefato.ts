@@ -23,12 +23,12 @@
 import { GisFlowService } from "@/service/GisFlowService"
 
 /** The error phrases. Default: the Portuguese of the Artifacts table; the translated Home passes its own. */
-export interface TextosDoDownload {
+export interface DownloadTexts {
   noExecutor: string
   tenteDeNovo: string
 }
 
-export const TEXTOS_DO_DOWNLOAD_PT: TextosDoDownload = {
+export const DOWNLOAD_TEXTS_PT: DownloadTexts = {
   noExecutor: "Este arquivo permanece no executor e não pode ser baixado daqui.",
   tenteDeNovo: "Tente de novo.",
 }
@@ -41,7 +41,7 @@ export const TEXTOS_DO_DOWNLOAD_PT: TextosDoDownload = {
  */
 export async function baixarArtefato(
   idHash: string,
-  textos: TextosDoDownload = TEXTOS_DO_DOWNLOAD_PT,
+  textos: DownloadTexts = DOWNLOAD_TEXTS_PT,
 ): Promise<string | null> {
   const res = await GisFlowService.getArtifactDownload(idHash)
   if (!res.success || !res.data?.download_url) {

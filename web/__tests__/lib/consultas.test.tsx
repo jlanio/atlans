@@ -12,7 +12,7 @@ import type { ReactNode } from "react"
 import { criarClienteDeConsultas } from "@/lib/consultas"
 
 function embrulho(cliente: QueryClient) {
-  return function Embrulho({ children }: { children: ReactNode }) {
+  return function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={cliente}>{children}</QueryClientProvider>
   }
 }

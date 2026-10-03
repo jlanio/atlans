@@ -24,7 +24,7 @@ class TestFixArtifactNullSizes:
 
     @pytest.mark.asyncio
     @patch("app.core.storage_reconciliation._s3" if False else "app.core.storage.head")
-    async def test_preenche_quando_head_retorna_size(self, mock_head):
+    async def test_fills_when_head_returns_size(self, mock_head):
         from app.core import storage_reconciliation as mod
 
         # 2 artifacts with NULL size_bytes, head() returns 1234 for both
@@ -69,7 +69,7 @@ class TestFixArtifactNullSizes:
 
     @pytest.mark.asyncio
     @patch("app.core.storage.head")
-    async def test_continua_null_quando_head_retorna_none(self, mock_head):
+    async def test_stays_null_when_head_returns_none(self, mock_head):
         """MinIO does not have the object yet — leaves NULL and tries again next cycle."""
         from app.core import storage_reconciliation as mod
 
@@ -89,7 +89,7 @@ class TestFixArtifactNullSizes:
 
     @pytest.mark.asyncio
     @patch("app.core.storage.head")
-    async def test_exception_no_head_e_tratada_como_still_null(self, mock_head):
+    async def test_exception_in_head_is_treated_as_still_null(self, mock_head):
         """An exception in head() does not break the loop — it stays still_null."""
         from app.core import storage_reconciliation as mod
 
@@ -141,7 +141,7 @@ class TestCleanupPendingWorkspaceFiles:
         db.commit.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_nao_apaga_quando_nao_ha_stale(self):
+    async def test_does_not_delete_when_there_is_no_stale(self):
         from app.core import storage_reconciliation as mod
 
         db = MagicMock()
@@ -161,7 +161,7 @@ class TestCleanupPendingWorkspaceFiles:
 class TestAbortStaleMultipart:
 
     @pytest.mark.asyncio
-    async def test_aborta_apenas_uploads_antigos(self):
+    async def test_aborts_only_old_uploads(self):
         from app.core import storage_reconciliation as mod
 
         now = datetime.now(timezone.utc)
@@ -187,7 +187,7 @@ class TestAbortStaleMultipart:
 class TestComputeStorageDrift:
 
     @pytest.mark.asyncio
-    async def test_drift_positivo_quando_minio_tem_mais_que_db(self):
+    async def test_positive_drift_when_minio_has_more_than_db(self):
         from app.core import storage_reconciliation as mod
 
         # DB: 1000 bytes total (drive + artifacts)
@@ -260,7 +260,7 @@ class TestAudit:
 class TestRunFullReconciliation:
 
     @pytest.mark.asyncio
-    async def test_continua_quando_um_job_falha(self):
+    async def test_continues_when_a_job_fails(self):
         """A failure of one sub-job does not prevent the others."""
         from app.core import storage_reconciliation as mod
 

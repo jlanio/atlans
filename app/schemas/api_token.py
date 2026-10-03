@@ -14,9 +14,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.authorization.pat import (
     ESCOPOS,
-    VALIDADE_MAX_DIAS,
-    VALIDADE_PADRAO_DIAS,
-    escopos_invalidos,
+    MAX_VALIDITY_DAYS,
+    DEFAULT_VALIDITY_DAYS,
+    invalid_scopes,
     status_de,
 )
 
@@ -31,8 +31,8 @@ class ApiTokenCreate(BaseModel):
         description="Workspaces que o token alcança. null = todos os workspaces do usuário, inclusive os futuros",
     )
     expires_in_days: int = Field(
-        default=VALIDADE_PADRAO_DIAS, ge=1, le=VALIDADE_MAX_DIAS,
-        description=f"Validade em dias (1 a {VALIDADE_MAX_DIAS})",
+        default=DEFAULT_VALIDITY_DAYS, ge=1, le=MAX_VALIDITY_DAYS,
+        description=f"Validade em dias (1 a {MAX_VALIDITY_DAYS})",
     )
 
     @field_validator("name")
@@ -46,11 +46,11 @@ class ApiTokenCreate(BaseModel):
 
     @field_validator("scopes")
     @classmethod
-    def _escopos(cls, v: List[str]) -> List[str]:
+    def _scopes(cls, v: List[str]) -> List[str]:
         unicos = list(dict.fromkeys(s.strip() for s in v if s and s.strip()))
         if not unicos:
             raise ValueError("Informe ao menos um escopo.")
-        invalidos = escopos_invalidos(unicos)
+        invalidos = invalid_scopes(unicos)
         if invalidos:
             raise ValueError(f"Escopo desconhecido: {', '.join(invalidos)}.")
         return unicos
@@ -83,7 +83,7 @@ class ApiTokenOut(BaseModel):
     status: str
 
     @classmethod
-    def de_modelo(cls, token, agora: datetime) -> "ApiTokenOut":
+    def from_model(cls, token, agora: datetime) -> "ApiTokenOut":
         return cls(
             id=token.id_hash,
             name=token.name,
@@ -104,6 +104,6 @@ class ApiTokenCreated(ApiTokenOut):
     token: str
 
     @classmethod
-    def com_segredo(cls, token, segredo: str, agora: datetime) -> "ApiTokenCreated":
-        base = ApiTokenOut.de_modelo(token, agora)
+    def with_secret(cls, token, segredo: str, agora: datetime) -> "ApiTokenCreated":
+        base = ApiTokenOut.from_model(token, agora)
         return cls(**base.model_dump(), token=segredo)

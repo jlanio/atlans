@@ -18,12 +18,12 @@ export function Copiavel({
   exibir?: string
   className?: string
 }) {
-  const [copiado, setCopiado] = useState(false)
+  const [copiado, setCopied] = useState(false)
 
   // Disappears on its own: a permanent "copiado!" (copied!) becomes noise.
   useEffect(() => {
     if (!copiado) return
-    const t = setTimeout(() => setCopiado(false), 1600)
+    const t = setTimeout(() => setCopied(false), 1600)
     return () => clearTimeout(t)
   }, [copiado])
 
@@ -32,7 +32,7 @@ export function Copiavel({
       type="button"
       title={copiado ? 'Copiado' : `${rotulo ?? valor} — clique para copiar`}
       onClick={() => {
-        void navigator.clipboard.writeText(valor).then(() => setCopiado(true))
+        void navigator.clipboard.writeText(valor).then(() => setCopied(true))
       }}
       className={cn(
         'group inline-flex items-center gap-1.5 rounded font-mono text-xs text-muted-foreground',

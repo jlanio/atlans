@@ -14,9 +14,9 @@ import { Input } from "@/app/components/ui/input"
 import { Label } from "@/app/components/ui/label"
 import { AuthError, type AuthErrorInfo } from "@/app/components/auth/AuthError"
 import { AuthPasswordField } from "@/app/components/auth/AuthPasswordField"
-import { useIdiomaDaTela, useTextos } from "@/app/components/home/i18n"
-import { BotaoDoModal, LinkDoModal } from "./botao-do-modal"
-import { ehRecusaDoServidor } from "./recusas"
+import { useScreenLanguage, useTexts } from "@/app/components/home/i18n"
+import { ModalButton, LinkDoModal } from "./botao-do-modal"
+import { isServerRejection } from "./recusas"
 
 interface Props {
   /** Um envio em voo: o modal trava o fechamento enquanto durar. */
@@ -36,12 +36,12 @@ interface Props {
   onVerificar: (email: string) => void
 }
 
-export function FormularioDeEntrada({ onEnviando, onEntrou, onCriarConta, onRecuperar, onVerificar }: Props) {
-  const t = useTextos().entrada.formularioDeEntrada
+export function SignInForm({ onEnviando, onEntrou, onCriarConta, onRecuperar, onVerificar }: Props) {
+  const t = useTexts().entrada.formularioDeEntrada
   // In Portuguese, the server's rejection AS IT CAME (as always); in English and
   // Spanish, the same rejection via the language's text — the server only speaks
   // Portuguese (see ./recusas).
-  const traduzir = useIdiomaDaTela() !== "pt-BR"
+  const traduzir = useScreenLanguage() !== "pt-BR"
   const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -70,7 +70,7 @@ export function FormularioDeEntrada({ onEnviando, onEntrou, onCriarConta, onRecu
       const errCode = axiosErr.response?.headers?.["x-error-code"]
       const data = axiosErr.response?.data
       const message = data?.message ?? data?.detail ?? t.erroAoEntrar
-      const doServidor = ehRecusaDoServidor(data)
+      const fromServer = isServerRejection(data)
       if (!axiosErr.response) {
         setError({ message: t.semConexao })
       } else if (status === 403 && errCode === "email_not_verified") {
@@ -79,10 +79,10 @@ export function FormularioDeEntrada({ onEnviando, onEntrou, onCriarConta, onRecu
         // Two different 429s: the ACCOUNT lockout (from the server, with
         // Retry-After) and the per-connection limit (5 per minute, from the
         // limiter — no account locked, and the window passes in a minute).
-        const minutos = minutosDoRetryAfter(axiosErr.response.headers?.["retry-after"])
-        const texto = doServidor ? t.contaBloqueada(minutos) : t.muitasTentativas
+        const minutos = retryAfterMinutes(axiosErr.response.headers?.["retry-after"])
+        const texto = fromServer ? t.contaBloqueada(minutos) : t.muitasTentativas
         setError({ message: traduzir ? texto : message, locked: true })
-      } else if (traduzir && !doServidor) {
+      } else if (traduzir && !fromServer) {
         // The proxy down, an unexpected 500, a CDN's error page.
         setError({ message: t.erroAoEntrar })
       } else if (traduzir && status === 401) {
@@ -145,9 +145,9 @@ export function FormularioDeEntrada({ onEnviando, onEntrou, onCriarConta, onRecu
           />
         )}
 
-        <BotaoDoModal loading={loading} loadingLabel={t.entrando} disabled={!!error?.locked} className="mt-1">
+        <ModalButton loading={loading} loadingLabel={t.entrando} disabled={!!error?.locked} className="mt-1">
           {t.entrar}
-        </BotaoDoModal>
+        </ModalButton>
       </form>
 
       <p className="text-center text-[12.5px] text-muted-foreground">
@@ -158,7 +158,7 @@ export function FormularioDeEntrada({ onEnviando, onEntrou, onCriarConta, onRecu
 }
 
 /** `Retry-After` in seconds → whole minutes for the sentence (null when absent). */
-function minutosDoRetryAfter(valor: unknown): number | null {
+function retryAfterMinutes(valor: unknown): number | null {
   const segundos = Number(valor)
   return Number.isFinite(segundos) && segundos > 0 ? Math.ceil(segundos / 60) : null
 }

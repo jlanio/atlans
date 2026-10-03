@@ -28,17 +28,17 @@ import json
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
-from app.mcp.parametros import HINT_SEM_CONTRATO, validar_inputs
+from app.mcp.parametros import HINT_NO_CONTRACT, validate_inputs
 
 
-def _corpo(exc: ToolError) -> dict:
+def _response_body(exc: ToolError) -> dict:
     return json.loads(str(exc))
 
 
-def _erro(params_schema, inputs) -> dict:
+def _error(params_schema, inputs) -> dict:
     with pytest.raises(ToolError) as capturado:
-        validar_inputs(params_schema, inputs)
-    return _corpo(capturado.value)
+        validate_inputs(params_schema, inputs)
+    return _response_body(capturado.value)
 
 
 # ── No contract: doesn't validate, but warns ──────────────────────────────────
@@ -56,23 +56,23 @@ def _erro(params_schema, inputs) -> dict:
         {"x": {"type": "string"}, "y": {}},    # one of the fields has no type
     ],
 )
-def test_schema_sem_contrato_deixa_os_inputs_passarem_com_hint(schema):
+def test_schema_without_contract_lets_the_inputs_through_with_hint(schema):
     """An old workflow keeps running: what's missing is checking, not permission."""
-    inputs, hints = validar_inputs(schema, {"x": "3", "y": True})
+    inputs, hints = validate_inputs(schema, {"x": "3", "y": True})
 
     assert inputs == {"x": "3", "y": True}
-    assert HINT_SEM_CONTRATO in hints
+    assert HINT_NO_CONTRACT in hints
 
 
-def test_sem_schema_e_sem_inputs_devolve_dicionario_vazio():
-    inputs, hints = validar_inputs(None, None)
+def test_without_schema_and_inputs_returns_empty_dict():
+    inputs, hints = validate_inputs(None, None)
 
     assert inputs == {}
-    assert hints == [HINT_SEM_CONTRATO]
+    assert hints == [HINT_NO_CONTRACT]
 
 
-def test_inputs_que_nao_e_objeto_e_recusado():
-    corpo = _erro({"x": {"type": "string"}}, ["x"])
+def test_inputs_that_is_not_an_object_is_refused():
+    corpo = _error({"x": {"type": "string"}}, ["x"])
 
     assert corpo["code"] == "validation"
     assert corpo["errors"] == [{"path": "inputs", "message": "esperado object"}]
@@ -81,15 +81,15 @@ def test_inputs_que_nao_e_objeto_e_recusado():
 # ── Required, default, absence ────────────────────────────────────────────────
 
 
-def test_obrigatorio_ausente_e_erro():
-    corpo = _erro({"cidade": {"type": "string", "required": True}}, {})
+def test_missing_required_is_error():
+    corpo = _error({"cidade": {"type": "string", "required": True}}, {})
 
     assert corpo["code"] == "validation"
     assert corpo["errors"] == [{"path": "inputs.cidade", "message": "obrigatório e sem default"}]
 
 
-def test_obrigatorio_com_default_e_preenchido_sem_erro():
-    inputs, hints = validar_inputs(
+def test_required_with_default_is_filled_without_error():
+    inputs, hints = validate_inputs(
         {"limite": {"type": "number", "required": True, "default": 10}}, {}
     )
 
@@ -97,35 +97,35 @@ def test_obrigatorio_com_default_e_preenchido_sem_erro():
     assert hints == []
 
 
-def test_default_em_texto_chega_coagido():
+def test_text_default_arrives_coerced():
     """`"5"` written in the schema must become 5, otherwise omitting differs from typing."""
-    inputs, _ = validar_inputs({"limite": {"type": "number", "default": "5"}}, {})
+    inputs, _ = validate_inputs({"limite": {"type": "number", "default": "5"}}, {})
 
     assert inputs == {"limite": 5}
 
 
-def test_default_invalido_e_denunciado_pelo_caminho():
-    corpo = _erro({"limite": {"type": "number", "default": "dez"}}, {})
+def test_invalid_default_is_reported_by_path():
+    corpo = _error({"limite": {"type": "number", "default": "dez"}}, {})
 
     assert corpo["errors"][0]["path"] == "inputs.limite"
     assert "default do params_schema" in corpo["errors"][0]["message"]
 
 
-def test_opcional_ausente_nao_entra_como_nulo():
+def test_missing_optional_does_not_enter_as_null():
     """No `{"cidade": None}`: the node would see the key and treat the null as a value."""
-    inputs, hints = validar_inputs({"cidade": {"type": "string"}}, {})
+    inputs, hints = validate_inputs({"cidade": {"type": "string"}}, {})
 
     assert inputs == {}
     assert hints == []
 
 
-def test_nulo_explicito_conta_como_ausencia():
-    corpo = _erro({"cidade": {"type": "string", "required": True}}, {"cidade": None})
+def test_explicit_null_counts_as_absence():
+    corpo = _error({"cidade": {"type": "string", "required": True}}, {"cidade": None})
 
     assert corpo["errors"][0]["message"] == "obrigatório e sem default"
 
 
-def test_default_nulo_em_opcional_conta_como_ausencia_e_o_campo_nao_sai():
+def test_null_default_on_optional_counts_as_absence_and_the_field_is_omitted():
     """`default: null` must not make the workflow unexecutable via MCP.
 
     It is the same rule as the null input, applied on the other side of the
@@ -135,15 +135,15 @@ def test_default_nulo_em_opcional_conta_como_ausencia_e_o_campo_nao_sai():
     with any input. And `null` for a blank optional field is exactly what an
     ordinary JSON serializer emits.
     """
-    inputs, hints = validar_inputs({"bairro": {"type": "string", "default": None}}, {})
+    inputs, hints = validate_inputs({"bairro": {"type": "string", "default": None}}, {})
 
     assert inputs == {}
     assert hints == []
 
 
-def test_default_nulo_em_obrigatorio_acusa_o_obrigatorio_e_nao_o_default():
+def test_null_default_on_required_reports_the_required_not_the_default():
     """No value and no default is a missing input — that is the useful diagnosis."""
-    corpo = _erro({"bairro": {"type": "string", "default": None, "required": True}}, {})
+    corpo = _error({"bairro": {"type": "string", "default": None, "required": True}}, {})
 
     assert corpo["errors"] == [{"path": "inputs.bairro", "message": "obrigatório e sem default"}]
 
@@ -164,37 +164,37 @@ def test_default_nulo_em_obrigatorio_acusa_o_obrigatorio_e_nao_o_default():
         (3.5, 3.5),
     ],
 )
-def test_number_aceita_numero_e_texto_numerico(enviado, esperado):
-    inputs, _ = validar_inputs({"n": {"type": "number"}}, {"n": enviado})
+def test_number_accepts_number_and_numeric_text(enviado, esperado):
+    inputs, _ = validate_inputs({"n": {"type": "number"}}, {"n": enviado})
 
     assert inputs == {"n": esperado}
     assert type(inputs["n"]) is type(esperado)
 
 
-def test_number_com_string_vazia_e_erro_e_nunca_zero():
+def test_number_with_empty_string_is_error_never_zero():
     """O defeito original da tela: campo em branco virava `0` e o fluxo rodava."""
-    corpo = _erro({"n": {"type": "number"}}, {"n": ""})
+    corpo = _error({"n": {"type": "number"}}, {"n": ""})
 
     assert corpo["errors"] == [{"path": "inputs.n", "message": "esperado number; string vazia não é zero"}]
 
 
 @pytest.mark.parametrize("enviado", ["  ", "dez", "1,5", "12abc", True, False, [], {}])
-def test_number_recusa_o_que_nao_e_numero(enviado):
-    corpo = _erro({"n": {"type": "number"}}, {"n": enviado})
+def test_number_refuses_what_is_not_a_number(enviado):
+    corpo = _error({"n": {"type": "number"}}, {"n": enviado})
 
     assert corpo["errors"][0]["path"] == "inputs.n"
     assert corpo["errors"][0]["message"].startswith("esperado number")
 
 
 @pytest.mark.parametrize("enviado", ["inf", "-inf", "nan", float("inf")])
-def test_number_recusa_infinito_e_nan(enviado):
+def test_number_refuses_infinity_and_nan(enviado):
     """`json.dumps(float("inf"))` produces `Infinity`, which is not valid JSON."""
-    corpo = _erro({"n": {"type": "number"}}, {"n": enviado})
+    corpo = _error({"n": {"type": "number"}}, {"n": enviado})
 
     assert corpo["errors"][0]["message"] == "esperado number finito"
 
 
-def test_number_com_inteiro_de_digitos_demais_e_recusado_sem_derrubar_a_chamada():
+def test_number_with_too_many_digit_integer_is_refused_without_breaking_the_call():
     """The interpreter has a 4300-digit ceiling for converting text to int.
 
     Above it `int()` raises `ValueError` — which is not `ToolError`,
@@ -204,16 +204,16 @@ def test_number_com_inteiro_de_digitos_demais_e_recusado_sem_derrubar_a_chamada(
     STRING; a raw JSON number with 5000 digits would already die in the SDK's
     parser.
     """
-    corpo = _erro({"n": {"type": "number", "required": True}}, {"n": "1" * 5000})
+    corpo = _error({"n": {"type": "number", "required": True}}, {"n": "1" * 5000})
 
     assert corpo["code"] == "validation"
     assert corpo["errors"][0]["path"] == "inputs.n"
     assert corpo["errors"][0]["message"].startswith("esperado number")
 
 
-def test_default_com_inteiro_de_digitos_demais_e_denunciado_como_default():
+def test_default_with_too_many_digit_integer_is_reported_as_default():
     """The default goes through the SAME coercion — and fell through the same raw exception."""
-    corpo = _erro({"n": {"type": "number", "default": "1" * 5000}}, {})
+    corpo = _error({"n": {"type": "number", "default": "1" * 5000}}, {})
 
     assert corpo["code"] == "validation"
     assert corpo["errors"][0]["path"] == "inputs.n"
@@ -233,16 +233,16 @@ def test_default_com_inteiro_de_digitos_demais_e_denunciado_como_default():
         (True, True), (False, False),
     ],
 )
-def test_boolean_entende_as_grafias_de_texto(enviado, esperado):
-    inputs, _ = validar_inputs({"b": {"type": "boolean"}}, {"b": enviado})
+def test_boolean_understands_the_text_spellings(enviado, esperado):
+    inputs, _ = validate_inputs({"b": {"type": "boolean"}}, {"b": enviado})
 
     assert inputs == {"b": esperado}
 
 
 @pytest.mark.parametrize("enviado", [1, 0, 2, "talvez", "", [], {}])
-def test_boolean_recusa_numero_e_texto_desconhecido(enviado):
+def test_boolean_refuses_number_and_unknown_text(enviado):
     """In JSON, a number is a number: whoever wants a boolean writes `true` or `"1"`."""
-    corpo = _erro({"b": {"type": "boolean"}}, {"b": enviado})
+    corpo = _error({"b": {"type": "boolean"}}, {"b": enviado})
 
     assert corpo["errors"][0]["path"] == "inputs.b"
     assert corpo["errors"][0]["message"].startswith("esperado boolean")
@@ -255,15 +255,15 @@ def test_boolean_recusa_numero_e_texto_desconhecido(enviado):
     "enviado,esperado",
     [("oi", "oi"), ("", ""), (42, "42"), (3.5, "3.5"), (True, "true"), (False, "false")],
 )
-def test_string_aceita_texto_e_converte_escalares(enviado, esperado):
-    inputs, _ = validar_inputs({"s": {"type": "string"}}, {"s": enviado})
+def test_string_accepts_text_and_converts_scalars(enviado, esperado):
+    inputs, _ = validate_inputs({"s": {"type": "string"}}, {"s": enviado})
 
     assert inputs == {"s": esperado}
 
 
 @pytest.mark.parametrize("enviado", [{"a": 1}, [1, 2]])
-def test_string_recusa_estrutura(enviado):
-    corpo = _erro({"s": {"type": "string"}}, {"s": enviado})
+def test_string_refuses_structure(enviado):
+    corpo = _error({"s": {"type": "string"}}, {"s": enviado})
 
     assert corpo["errors"] == [{"path": "inputs.s", "message": "esperado string"}]
 
@@ -271,8 +271,8 @@ def test_string_recusa_estrutura(enviado):
 # ── object ────────────────────────────────────────────────────────────────────
 
 
-def test_object_aceita_dicionario_e_lista():
-    inputs, _ = validar_inputs(
+def test_object_accepts_dict_and_list():
+    inputs, _ = validate_inputs(
         {"o": {"type": "object"}, "l": {"type": "object"}},
         {"o": {"a": 1}, "l": [1, 2]},
     )
@@ -280,14 +280,14 @@ def test_object_aceita_dicionario_e_lista():
     assert inputs == {"o": {"a": 1}, "l": [1, 2]}
 
 
-def test_object_decodifica_json_em_texto():
-    inputs, _ = validar_inputs({"o": {"type": "object"}}, {"o": '{"a": 1}'})
+def test_object_decodes_json_in_text():
+    inputs, _ = validate_inputs({"o": {"type": "object"}}, {"o": '{"a": 1}'})
 
     assert inputs == {"o": {"a": 1}}
 
 
-def test_object_aceita_json_que_da_lista():
-    inputs, _ = validar_inputs({"o": {"type": "object"}}, {"o": "[1, 2]"})
+def test_object_accepts_json_that_yields_a_list():
+    inputs, _ = validate_inputs({"o": {"type": "object"}}, {"o": "[1, 2]"})
 
     assert inputs == {"o": [1, 2]}
 
@@ -303,13 +303,13 @@ def test_object_aceita_json_que_da_lista():
         (42, "esperado object"),
     ],
 )
-def test_object_recusa_json_invalido_ou_escalar(enviado, trecho):
-    corpo = _erro({"o": {"type": "object"}}, {"o": enviado})
+def test_object_refuses_invalid_or_scalar_json(enviado, trecho):
+    corpo = _error({"o": {"type": "object"}}, {"o": enviado})
 
     assert trecho in corpo["errors"][0]["message"]
 
 
-def test_object_com_json_aninhado_demais_vira_erro_de_validacao():
+def test_object_with_too_deeply_nested_json_becomes_validation_error():
     """Deep nesting blew the stack instead of becoming an input error.
 
     CPython's decoder is recursive and raises `RecursionError` BEFORE deciding
@@ -319,7 +319,7 @@ def test_object_com_json_aninhado_demais_vira_erro_de_validacao():
     stack at its limit inside the request handler. 100 thousand levels blow up
     on any version.
     """
-    corpo = _erro({"cfg": {"type": "object"}}, {"cfg": "[" * 100_000 + "]" * 100_000})
+    corpo = _error({"cfg": {"type": "object"}}, {"cfg": "[" * 100_000 + "]" * 100_000})
 
     assert corpo["code"] == "validation"
     assert corpo["errors"] == [
@@ -327,24 +327,24 @@ def test_object_com_json_aninhado_demais_vira_erro_de_validacao():
     ]
 
 
-def _aninhado(niveis: int) -> list:
-    """A list with `niveis` levels, built without recursion."""
+def _nested(tiers: int) -> list:
+    """A list with `tiers` levels, built without recursion."""
     valor: list = []
-    for _ in range(niveis - 1):
+    for _ in range(tiers - 1):
         valor = [valor]
     return valor
 
 
 @pytest.mark.parametrize("como", ["texto", "nativo"])
-def test_object_fundo_demais_e_recusado_mesmo_quando_o_json_decodifica(como):
+def test_object_too_deep_is_refused_even_when_the_json_decodes(como):
     """From 3.12 onward `json.loads` accepts 2000 levels (the decoder counts
     against the C recursion limit): without the explicit ceiling, the object
     got past here and blew the stack of whoever traversed it later. Native too —
     the call body arrives already decoded. 150 levels decode on any version,
     and the result is the same on all of them."""
-    fundo = _aninhado(150)
+    fundo = _nested(150)
     enviado = json.dumps(fundo) if como == "texto" else fundo
-    corpo = _erro({"cfg": {"type": "object"}}, {"cfg": enviado})
+    corpo = _error({"cfg": {"type": "object"}}, {"cfg": enviado})
 
     assert corpo["code"] == "validation"
     assert corpo["errors"] == [
@@ -352,21 +352,21 @@ def test_object_fundo_demais_e_recusado_mesmo_quando_o_json_decodifica(como):
     ]
 
 
-def test_object_no_teto_de_aninhamento_passa():
-    no_teto = _aninhado(100)
-    inputs, _ = validar_inputs({"cfg": {"type": "object"}}, {"cfg": json.dumps(no_teto)})
-    assert inputs == {"cfg": no_teto}
+def test_object_at_the_nesting_ceiling_passes():
+    at_ceiling = _nested(100)
+    inputs, _ = validate_inputs({"cfg": {"type": "object"}}, {"cfg": json.dumps(at_ceiling)})
+    assert inputs == {"cfg": at_ceiling}
 
-    corpo = _erro({"cfg": {"type": "object"}}, {"cfg": json.dumps(_aninhado(101))})
+    corpo = _error({"cfg": {"type": "object"}}, {"cfg": json.dumps(_nested(101))})
     assert corpo["errors"][0]["message"] == "esperado object; aninhamento acima de 100 níveis"
 
 
 # ── Undeclared keys ───────────────────────────────────────────────────────────
 
 
-def test_chave_nao_declarada_passa_intacta_e_vira_hint():
+def test_undeclared_key_passes_intact_and_becomes_hint():
     """The webhook trigger has its own `payload_schema`, checked later."""
-    inputs, hints = validar_inputs(
+    inputs, hints = validate_inputs(
         {"cidade": {"type": "string"}},
         {"cidade": "Recife", "payload": {"id": 9}, "extra": "1"},
     )
@@ -379,9 +379,9 @@ def test_chave_nao_declarada_passa_intacta_e_vira_hint():
 # ── Aggregation and message safety ────────────────────────────────────────────
 
 
-def test_os_erros_saem_todos_de_uma_vez():
+def test_the_errors_come_out_all_at_once():
     """One problem per attempt would make the caller discover the schema by trial and error."""
-    corpo = _erro(
+    corpo = _error(
         {
             "n": {"type": "number"},
             "b": {"type": "boolean"},
@@ -396,9 +396,9 @@ def test_os_erros_saem_todos_de_uma_vez():
     assert corpo["hint"]
 
 
-def test_a_mensagem_de_erro_nao_ecoa_o_valor_enviado():
+def test_the_error_message_does_not_echo_the_sent_value():
     """A parameter may carry a password; the error is the easiest route into the log."""
-    corpo = _erro(
+    corpo = _error(
         {"dsn": {"type": "number"}},
         {"dsn": "postgresql://ana:sup3rs3cr3t@db.local:5432/geo"},  # pragma: allowlist secret
     )
@@ -408,10 +408,10 @@ def test_a_mensagem_de_erro_nao_ecoa_o_valor_enviado():
     assert "db.local" not in texto
 
 
-def test_o_dicionario_de_entrada_nao_e_alterado():
+def test_the_input_dict_is_not_modified():
     """The caller still needs what it sent (audit, retry)."""
     originais = {"n": "42", "extra": 1}
-    inputs, _ = validar_inputs({"n": {"type": "number"}}, originais)
+    inputs, _ = validate_inputs({"n": {"type": "number"}}, originais)
 
     assert originais == {"n": "42", "extra": 1}
     assert inputs == {"n": 42, "extra": 1}

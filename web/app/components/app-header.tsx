@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation"
 import { useWorkspace } from "@/context/WorkspaceContext"
-import { useIdiomaDaTela, useTextosDaCasca } from "./home/i18n/da-casca"
+import { useScreenLanguage, useShellTexts } from "./home/i18n/da-casca"
 import { SidebarTrigger } from "./ui/sidebar"
 import WorkspaceSwitcher from "./workspace/workspace-switcher"
 import { Skeleton } from "./ui/skeleton"
@@ -52,8 +52,8 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
   const pathname = usePathname()
   const { loading } = useWorkspace()
   // Only the `/` route uses it: outside the Home the language scope already returns Portuguese.
-  const textosDaBarra = useTextosDaCasca().casca.barraLateral
-  const idioma = useIdiomaDaTela()
+  const sidebarTexts = useShellTexts().casca.barraLateral
+  const idioma = useScreenLanguage()
 
   // The Home (`/`) is full-bleed like the canvas: no bar. But the header is the only
   // place in the app that mounts a sidebar trigger visible on the phone — below
@@ -81,8 +81,8 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
         className="home dark app-region-no-drag fixed right-3 top-3 z-50 size-10 rounded-full border border-border bg-background/85 text-foreground shadow-lg backdrop-blur md:hidden"
         // Outside the HomeView tree: its `lang` does not reach here.
         lang={idioma}
-        aria-label={textosDaBarra.abrirMenu}
-        label={textosDaBarra.alternar}
+        aria-label={sidebarTexts.abrirMenu}
+        label={sidebarTexts.alternar}
       />
     )
   }

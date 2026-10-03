@@ -29,10 +29,10 @@ DOC = RAIZ / "CONTRIBUTING.md"
 
 # Branch markers of the tree drawing; each indentation level before them
 # takes 4 columns ("│   " or "    ").
-_GALHO = re.compile(r"[├└]── ")
+_BRANCH = re.compile(r"[├└]── ")
 
 
-def _arquivos_com_caminho() -> list[tuple[int, str]]:
+def _files_with_path() -> list[tuple[int, str]]:
     """(line, path relative to the root) of each `.py` cited in the trees.
 
     Rebuilds the directory by stacking the directory nodes (which end in `/`)
@@ -50,13 +50,13 @@ def _arquivos_com_caminho() -> list[tuple[int, str]]:
     pilha: dict[int, str] = {}  # profundidade -> nome do diretorio naquele nivel
     base = ""                   # prefix of the current (sub)tree
     for i, linha in enumerate(DOC.read_text(encoding="utf-8").splitlines(), 1):
-        m = _GALHO.search(linha)
+        m = _BRANCH.search(linha)
         if not m:
             # Root of a (sub)tree: a bare `nome/`, with no branch and no indentation.
             token = re.split(r"\s{2,}|#", linha, maxsplit=1)[0]
             if re.fullmatch(r"[A-Za-z0-9_]+/", token):
-                nome_raiz = token.rstrip("/")
-                base = nome_raiz if (RAIZ / nome_raiz).is_dir() else ""
+                root_name = token.rstrip("/")
+                base = root_name if (RAIZ / root_name).is_dir() else ""
                 pilha = {}
             continue
         profundidade = m.start() // 4
@@ -73,8 +73,8 @@ def _arquivos_com_caminho() -> list[tuple[int, str]]:
     return achados
 
 
-def test_todo_arquivo_py_citado_na_arvore_existe():
-    arquivos = _arquivos_com_caminho()
+def test_every_py_file_cited_in_the_tree_exists():
+    arquivos = _files_with_path()
     assert arquivos, "a arvore de diretorios do CONTRIBUTING sumiu — ajuste este teste"
 
     faltando = [
@@ -89,7 +89,7 @@ def test_todo_arquivo_py_citado_na_arvore_existe():
     )
 
 
-def test_o_vocabulario_agent_nao_voltou_ao_documento():
+def test_the_agent_vocabulary_did_not_return_to_the_document():
     """`agent` was the middle name in a rename already completed in the code.
 
     Keeping it in the document makes the reader search for a vocabulary the

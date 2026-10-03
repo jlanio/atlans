@@ -8,11 +8,11 @@ the route (`assistente_router`) stitches the two together. The responsibilities 
 
 - **Conversation CRUD** — create, load (with an owner gate), list, rename,
   delete (soft), and the `tocar` that stamps `updated_at`/`tokens_total`.
-- **Transcript and incremental persistence** — `transcrito_de` builds what the
-  model receives (`[{"role", "content"}]`), and `anexar_mensagens` writes the new
+- **Transcript and incremental persistence** — `transcript_of` builds what the
+  model receives (`[{"role", "content"}]`), and `append_messages` writes the new
   messages with a contiguous `ordem`. The route persists turn by turn through the
   `ao_fechar_turno` hook, and not as a blob at the end.
-- **Replay** — `quadros_do_replay` rebuilds the conversation in the SAME SSE
+- **Replay** — `replay_frames` rebuilds the conversation in the SAME SSE
   frames, so the panel reapplies them along the same path as a live frame. Two
   security rules: a `tool_result` NEVER goes out (it is the server's word, not
   screen content), and a `confirmacao` only reappears with its token if its key
@@ -41,13 +41,13 @@ from app.services import assistente_service as cs
 
 logger = get_logger("app.agente.service")
 
-TAMANHO_DO_TITULO = 60
+TITLE_LENGTH = 60
 
 
 # ── CRUD ─────────────────────────────────────────────────────────────────────
 
 
-async def carregar_conversa_da_pessoa(db: AsyncSession, user_id: str, conversa_id: str) -> Conversa:
+async def load_user_conversation(db: AsyncSession, user_id: str, conversa_id: str) -> Conversa:
     """The conversation, if it belongs to the person and was not deleted. Uniform 404 otherwise.
 
     404 and not 403 on purpose: distinguishing "does not exist" from "exists but is
@@ -69,7 +69,7 @@ async def carregar_conversa_da_pessoa(db: AsyncSession, user_id: str, conversa_i
     return conv
 
 
-async def criar_conversa(
+async def create_conversation(
     db: AsyncSession,
     *,
     user_id: str,
@@ -90,14 +90,14 @@ async def criar_conversa(
     return conv
 
 
-def titulo_automatico(mensagem: str) -> str:
+def automatic_title(mensagem: str) -> str:
     """The first words of the 1st message, up to 60 chars. A model-generated title
     is left for later — this is the cheap one that already says what the conversation is about."""
     limpo = " ".join((mensagem or "").split())
-    return limpo[:TAMANHO_DO_TITULO] if limpo else "Nova conversa"
+    return limpo[:TITLE_LENGTH] if limpo else "Nova conversa"
 
 
-async def listar_conversas(
+async def list_conversations(
     db: AsyncSession, user_id: str, *, limit: int = 50, offset: int = 0
 ) -> tuple[list[Conversa], int]:
     """My non-deleted conversations, most recently active on top."""
@@ -117,8 +117,8 @@ async def listar_conversas(
     return list(linhas), int(total)
 
 
-async def renomear_conversa(db: AsyncSession, user_id: str, conversa_id: str, titulo: str) -> Conversa:
-    conv = await carregar_conversa_da_pessoa(db, user_id, conversa_id)
+async def rename_conversation(db: AsyncSession, user_id: str, conversa_id: str, titulo: str) -> Conversa:
+    conv = await load_user_conversation(db, user_id, conversa_id)
     conv.titulo = titulo
     conv.updated_at = utc_now_naive()
     await db.commit()
@@ -126,9 +126,9 @@ async def renomear_conversa(db: AsyncSession, user_id: str, conversa_id: str, ti
     return conv
 
 
-async def apagar_conversa(db: AsyncSession, user_id: str, conversa_id: str) -> None:
+async def delete_conversation(db: AsyncSession, user_id: str, conversa_id: str) -> None:
     """Soft delete: it disappears from the list, the history stays."""
-    conv = await carregar_conversa_da_pessoa(db, user_id, conversa_id)
+    conv = await load_user_conversation(db, user_id, conversa_id)
     conv.deleted_at = utc_now_naive()
     await db.commit()
 
@@ -136,8 +136,8 @@ async def apagar_conversa(db: AsyncSession, user_id: str, conversa_id: str) -> N
 # ── Transcrito e persistencia incremental ────────────────────────────────────
 
 
-async def transcrito_de(
-    db: AsyncSession, conversa_id: str, *, persistir_fecho: bool = False
+async def transcript_of(
+    db: AsyncSession, conversa_id: str, *, persist_closing: bool = False
 ) -> list[dict[str, Any]]:
     """What the model receives: `[{"role", "content"}]` in order, VERBATIM.
 
@@ -145,11 +145,11 @@ async def transcrito_de(
     model client translates on the way out — `app/services/openrouter.py`), so
     there is no conversion here — only the read in order.
 
-    `persistir_fecho=True` also writes to the database the closing `tool_result`
-    that `_fechar_pendencias` appended. Whoever is going to RESUME the conversation
+    `persist_closing=True` also writes to the database the closing `tool_result`
+    that `_close_pending` appended. Whoever is going to RESUME the conversation
     (append a new message afterwards) needs this: closing only in memory would
     leave the orphan in the database and, with the new message written after it,
-    the closing on the next read would no longer happen (`_fechar_pendencias`
+    the closing on the next read would no longer happen (`_close_pending`
     only looks at the LAST message).
     """
     linhas = (
@@ -159,7 +159,7 @@ async def transcrito_de(
             .order_by(Mensagem.ordem)
         )
     ).all()
-    # `_fechar_pendencias` ON READ, and not only on write: the loop only closes
+    # `_close_pending` ON READ, and not only on write: the loop only closes
     # pending items on the `fim` event, which never happens when the generator is
     # CANCELLED (the person switched chats and the fetch aborted in the middle of
     # a tool). The orphan `tool_use` stayed recorded and the API rejected the
@@ -167,15 +167,15 @@ async def transcrito_de(
     # blocks"), forever. Closing here, what comes out of the database is always
     # well formed, whatever the cause of the interruption.
     cru = [{"role": papel, "content": blocos} for papel, blocos in linhas]
-    fechado = cs._fechar_pendencias(cru)
-    if persistir_fecho and len(fechado) > len(cru):
-        await anexar_mensagens(
-            db, conversa_id, fechado[len(cru):], ordem_inicial=await proxima_ordem(db, conversa_id)
+    fechado = cs._close_pending(cru)
+    if persist_closing and len(fechado) > len(cru):
+        await append_messages(
+            db, conversa_id, fechado[len(cru):], initial_order=await next_order(db, conversa_id)
         )
     return fechado
 
 
-async def proxima_ordem(db: AsyncSession, conversa_id: str) -> int:
+async def next_order(db: AsyncSession, conversa_id: str) -> int:
     """The next free `ordem` — `MAX(ordem)+1`, never the COUNT of rows.
 
     The count only matches the next order while nothing writes in parallel.
@@ -191,22 +191,22 @@ async def proxima_ordem(db: AsyncSession, conversa_id: str) -> int:
     return 0 if maior is None else int(maior) + 1
 
 
-async def anexar_mensagens(
+async def append_messages(
     db: AsyncSession,
     conversa_id: str,
     entradas: list[dict[str, Any]],
     *,
-    ordem_inicial: int,
+    initial_order: int,
     metas: Optional[dict[int, dict[str, Any]]] = None,
 ) -> int:
     """Writes messages in the loop's format (`[{"role", "content"}]`), with a
-    contiguous `ordem` starting at `ordem_inicial`. Returns the next free order.
+    contiguous `ordem` starting at `initial_order`. Returns the next free order.
 
     `metas` (optional) marks a message by the ABSOLUTE index of the order — used
     only by the synthetic confirmation message, which carries `meta={"tipo":...}`.
     """
     metas = metas or {}
-    ordem = ordem_inicial
+    ordem = initial_order
     for entrada in entradas:
         db.add(
             Mensagem(
@@ -223,7 +223,7 @@ async def anexar_mensagens(
     return ordem
 
 
-async def tocar_conversa(
+async def touch_conversation(
     db: AsyncSession, conversa_id: str, *, tokens_total: Optional[int] = None
 ) -> None:
     """Stamps `updated_at` (and `tokens_total`, when given). Never raises: it is
@@ -236,7 +236,7 @@ async def tocar_conversa(
     conv.updated_at = utc_now_naive()
     if tokens_total is not None:
         # ADDS, does not assign: the field name, the model's docstring and
-        # `ConversaResumo` promise the CONVERSATION total. When assigning, it kept
+        # `ConversationSummary` promise the CONVERSATION total. When assigning, it kept
         # the cost of the last turn — and any abnormal exit before `fim` (lock
         # taken by another tab, quota exceeded) wrote 0 over the accumulated
         # value. Whoever did not observe `fim` passes `None` and stamps nothing.
@@ -247,7 +247,7 @@ async def tocar_conversa(
 # ── Confirmation (the key is already written by the Home gate) ────────────────
 
 
-async def ler_confirmacao(
+async def read_confirmation(
     redis, user_id: str, conversa_id: str, tool_use_id: str
 ) -> Optional[dict[str, Any]]:
     """The stored `{token, tool, args, criado_em}`, or None if it expired/does not exist."""
@@ -267,7 +267,7 @@ async def ler_confirmacao(
     return corpo if isinstance(corpo, dict) else None
 
 
-async def consumir_confirmacao(
+async def consume_confirmation(
     redis, user_id: str, conversa_id: str, tool_use_id: str
 ) -> bool:
     """Deletes the key exactly once. True if THIS call deleted it (won the race),
@@ -285,7 +285,7 @@ async def consumir_confirmacao(
 # ── Auditable trail of what the assistant WRITES ─────────────────────────────
 
 
-async def _workspace_do_alvo(
+async def _target_workspace(
     db: AsyncSession, args: Any, workspace_ids: Any = None
 ) -> Optional[str]:
     """The target workflow's workspace, when the arguments carry a `workflow_id`.
@@ -314,7 +314,7 @@ async def _workspace_do_alvo(
     ).scalar_one_or_none()
 
 
-async def registrar_acao_confirmada(
+async def record_confirmed_action(
     db: AsyncSession,
     *,
     user_id: str,
@@ -324,7 +324,7 @@ async def registrar_acao_confirmada(
     tool_use_id: str,
     decisao: str,
     erro: bool,
-    workspace_padrao: Optional[str] = None,
+    default_workspace: Optional[str] = None,
     workspace_ids: Any = None,
 ) -> None:
     """Writes one `AuditEvent` per action decided on the confirmation card.
@@ -337,14 +337,14 @@ async def registrar_acao_confirmada(
 
     The row's workspace is the target workflow's, but only when it is within the
     actor's reach (`workspace_ids`); otherwise, the conversation's. See
-    `_workspace_do_alvo`.
+    `_target_workspace`.
 
     Never raises: auditing must not bring down an action that has already
     happened — the `logger.exception` is the signal that the trail failed.
     """
     try:
         workspace_id = (
-            await _workspace_do_alvo(db, args, workspace_ids) or workspace_padrao or "desconhecido"
+            await _target_workspace(db, args, workspace_ids) or default_workspace or "desconhecido"
         )
         db.add(
             AuditEvent(
@@ -352,10 +352,10 @@ async def registrar_acao_confirmada(
                 user_id=user_id,
                 action=f"assistente.{decisao}",
                 resource_type="assistente_tool",
-                resource_id=(ag._alvo(args) or tool or "")[:255],
+                resource_id=(ag._target(args) or tool or "")[:255],
                 details={
                     "tool": tool,
-                    "argumentos": cs._resumo(args),
+                    "argumentos": cs._summarize(args),
                     "conversa_id": conversa_id,
                     "tool_use_id": tool_use_id,
                     "erro": bool(erro),
@@ -375,7 +375,7 @@ async def registrar_acao_confirmada(
 # ── Replay ───────────────────────────────────────────────────────────────────
 
 
-def _texto_do_tool_result(bloco: dict[str, Any]) -> tuple[str, bool]:
+def _tool_result_text(bloco: dict[str, Any]) -> tuple[str, bool]:
     conteudo = bloco.get("content")
     if isinstance(conteudo, str):
         texto = conteudo
@@ -388,12 +388,12 @@ def _texto_do_tool_result(bloco: dict[str, Any]) -> tuple[str, bool]:
     return texto, bool(bloco.get("is_error"))
 
 
-async def _confirmacao_reaberta(
+async def _reopened_confirmation(
     redis, user_id: str, conversa_id: str, tool_use_id: str
 ) -> Optional[dict[str, Any]]:
     """The `confirmacao` frame of a call STILL PENDING — only when the Redis key
     exists. A vanished key (decided or expired) does not become a dead button."""
-    guardado = await ler_confirmacao(redis, user_id, conversa_id, tool_use_id)
+    guardado = await read_confirmation(redis, user_id, conversa_id, tool_use_id)
     if not guardado:
         return None
     args = guardado.get("args")
@@ -402,13 +402,13 @@ async def _confirmacao_reaberta(
         "token": guardado.get("token"),
         "acao": {
             "tool": guardado.get("tool"),
-            "argumentos": cs._resumo(args),
-            "alvo": ag._alvo(args),
+            "argumentos": cs._summarize(args),
+            "alvo": ag._target(args),
         },
     }
 
 
-async def quadros_do_replay(
+async def replay_frames(
     db: AsyncSession, conversa_id: str, *, redis, user_id: str, tokens_total: int
 ) -> list[dict[str, Any]]:
     """The conversation rebuilt in the SAME SSE frames.
@@ -431,11 +431,11 @@ async def quadros_do_replay(
 
     # Map tool_use_id -> (text, error), gathered from the tool_results (which do not go out).
     resultados: dict[str, tuple[str, bool]] = {}
-    for _papel, blocos, _meta in rows:
+    for _role, blocos, _meta in rows:
         if isinstance(blocos, list):
             for b in blocos:
                 if isinstance(b, dict) and b.get("type") == "tool_result":
-                    resultados[b.get("tool_use_id")] = _texto_do_tool_result(b)
+                    resultados[b.get("tool_use_id")] = _tool_result_text(b)
 
     quadros: list[dict[str, Any]] = []
     for papel, blocos, meta in rows:
@@ -463,18 +463,18 @@ async def quadros_do_replay(
                 args = b.get("input")
                 tuid = b.get("id")
                 quadros.append(
-                    {"tipo": "ferramenta", "dados": {"id": tuid, "nome": nome, "argumentos": cs._resumo(args)}}
+                    {"tipo": "ferramenta", "dados": {"id": tuid, "nome": nome, "argumentos": cs._summarize(args)}}
                 )
                 resultado = resultados.get(tuid)
                 if resultado is not None:
-                    texto_res, deu_erro = resultado
+                    result_text, had_error = resultado
                     quadros.append(
-                        {"tipo": "ferramenta_fim", "dados": {"id": tuid, "nome": nome, "erro": deu_erro}}
+                        {"tipo": "ferramenta_fim", "dados": {"id": tuid, "nome": nome, "erro": had_error}}
                     )
-                    for evento in ag.HOME.quadros_extras(None, nome, args, texto_res, deu_erro):
+                    for evento in ag.HOME.quadros_extras(None, nome, args, result_text, had_error):
                         quadros.append({"tipo": evento.tipo, "dados": evento.dados})
                 else:
-                    reaberta = await _confirmacao_reaberta(redis, user_id, conversa_id, tuid)
+                    reaberta = await _reopened_confirmation(redis, user_id, conversa_id, tuid)
                     if reaberta is not None:
                         quadros.append({"tipo": "confirmacao", "dados": reaberta})
 

@@ -13,10 +13,10 @@ import re
 # (comma, space, semicolon, leading dot, two dots in a row) would never match
 # any hostname at firing time — and, in an applied list, would block every
 # webhook without explanation.
-_ROTULO = r"(?:[^\W_](?:[^\W_]|-){0,61}[^\W_]|[^\W_])"
-_HOSTNAME = re.compile(rf"(?:\*\.)?{_ROTULO}(?:\.{_ROTULO})+")
+_LABEL = r"(?:[^\W_](?:[^\W_]|-){0,61}[^\W_]|[^\W_])"
+_HOSTNAME = re.compile(rf"(?:\*\.)?{_LABEL}(?:\.{_LABEL})+")
 # A pasted line with several domains: "a.com, b.com" is two.
-_SEPARADORES = re.compile(r"[,;\s]+")
+_SEPARATORS = re.compile(r"[,;\s]+")
 
 
 def hostname_matches_allowlist(hostname: str, allowlist: list[str]) -> bool:
@@ -45,7 +45,7 @@ def hostname_matches_allowlist(hostname: str, allowlist: list[str]) -> bool:
     return False
 
 
-def normalizar_dominio(entrada: str) -> str:
+def normalize_domain(entrada: str) -> str:
     """The HOST of an allowlist entry, as `hostname_matches_allowlist` compares
     it: `https://Hooks.Slack.com/services/x` → `hooks.slack.com`.
 
@@ -64,7 +64,7 @@ def normalizar_dominio(entrada: str) -> str:
     return d
 
 
-def validar_allowlist(raw: list[str]) -> list[str]:
+def validate_allowlist(raw: list[str]) -> list[str]:
     """Normalize and validate hostname patterns; `ValueError` for what the matcher
     would ignore.
 
@@ -111,7 +111,7 @@ def validar_allowlist(raw: list[str]) -> list[str]:
     return normalized
 
 
-def padroes_validos(raw: list[str]) -> list[str]:
+def valid_patterns(raw: list[str]) -> list[str]:
     """The patterns in `raw` that the matcher can match, each one normalized
     to the host — the others silently dropped.
 
@@ -120,20 +120,20 @@ def padroes_validos(raw: list[str]) -> list[str]:
     any host; applied as they came, a `*` saved to "allow everything" would
     block every webhook.
     """
-    validos: list[str] = []
-    for entrada in separar_dominios(raw):
+    valid_items: list[str] = []
+    for entrada in split_domains(raw):
         try:
-            validos.extend(p for p in validar_allowlist([normalizar_dominio(entrada)]) if p not in validos)
+            valid_items.extend(p for p in validate_allowlist([normalize_domain(entrada)]) if p not in valid_items)
         except ValueError:
             continue
-    return validos
+    return valid_items
 
 
-def separar_dominios(entradas) -> list[str]:
+def split_domains(entradas) -> list[str]:
     """Each item, split where a pasted line joins several domains:
     `["a.com, b.com"]` → `["a.com", "b.com"]`."""
     partes: list[str] = []
     for entrada in entradas or []:
-        partes.extend(p for p in _SEPARADORES.split(str(entrada or "")) if p)
+        partes.extend(p for p in _SEPARATORS.split(str(entrada or "")) if p)
     return partes
 

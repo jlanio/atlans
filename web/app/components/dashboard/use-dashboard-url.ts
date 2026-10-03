@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
-  escreverEstado, lerEstado, type EstadoDoDashboard, type EstadoDoEscopo, type Periodo,
+  escreverEstado, lerEstado, type DashboardState, type ScopeState, type Period,
 } from "./dashboard-url"
 
 export interface DashboardUrl {
-  escopo: EstadoDoEscopo
-  setEscopo: (escopo: EstadoDoEscopo) => void
-  periodo: Periodo
-  setPeriodo: (periodo: Periodo) => void
+  escopo: ScopeState
+  setEscopo: (escopo: ScopeState) => void
+  periodo: Period
+  setPeriodo: (periodo: Period) => void
 }
 
 /**
@@ -31,7 +31,7 @@ export function useDashboardUrl(): DashboardUrl {
   const pathname = usePathname()
   const sp = useSearchParams()
   const estado = useMemo(() => lerEstado(sp), [sp])
-  const pendente = useRef<EstadoDoDashboard | null>(null)
+  const pendente = useRef<DashboardState | null>(null)
 
   // When the URL reaches ANY state — the one we wrote or an external navigation
   // (back/forward, link) —, `pendente` has done its job and must be reset.
@@ -40,21 +40,21 @@ export function useDashboardUrl(): DashboardUrl {
   // future write and resurrects the old state (losing the external navigation).
   useEffect(() => { pendente.current = null }, [estado])
 
-  const gravar = useCallback((proximo: EstadoDoDashboard) => {
+  const gravar = useCallback((proximo: DashboardState) => {
     pendente.current = proximo
     const qs = escreverEstado(proximo)
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
   }, [router, pathname])
 
-  const base = useCallback((): EstadoDoDashboard => {
+  const base = useCallback((): DashboardState => {
     const p = pendente.current
     if (p && escreverEstado(p) !== escreverEstado(estado)) return p
     pendente.current = null
     return estado
   }, [estado])
 
-  const setEscopo = useCallback((escopo: EstadoDoEscopo) => gravar({ ...base(), escopo }), [base, gravar])
-  const setPeriodo = useCallback((periodo: Periodo) => gravar({ ...base(), periodo }), [base, gravar])
+  const setEscopo = useCallback((escopo: ScopeState) => gravar({ ...base(), escopo }), [base, gravar])
+  const setPeriodo = useCallback((periodo: Period) => gravar({ ...base(), periodo }), [base, gravar])
 
   return useMemo(
     () => ({ escopo: estado.escopo, setEscopo, periodo: estado.periodo, setPeriodo }),

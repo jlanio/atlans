@@ -28,7 +28,7 @@ def _gate(env=None, *, stdout=True, stderr=True, rich=True, w=120, h=40):
     failed on Linux (the CI runs Ubuntu) and — worse — the "should not enable"
     cases passed for the wrong reason, disabling due to a missing TERM instead
     of the rule under test. The TERM rule itself is covered in
-    test_term_ausente_ou_dumb_nao_liga.
+    test_missing_or_dumb_term_does_not_enable.
     """
     return dashboard.should_enable(
         env={"TERM": "xterm-256color", **(env or {})},
@@ -37,64 +37,64 @@ def _gate(env=None, *, stdout=True, stderr=True, rich=True, w=120, h=40):
     )
 
 
-def test_off_vence_tudo():
+def test_off_beats_everything():
     """Neither a perfect TTY nor rich installed turn the panel on against the operator."""
     modo, _ = _gate({"EXECUTOR_DASHBOARD": "off"})
-    assert modo == dashboard.MODO_OFF
+    assert modo == dashboard.MODE_OFF
 
 
 @pytest.mark.parametrize("valor", ["off", "never", "0", "false", "no", "OFF"])
-def test_off_aceita_sinonimos(valor):
-    assert _gate({"EXECUTOR_DASHBOARD": valor})[0] == dashboard.MODO_OFF
+def test_off_accepts_synonyms(valor):
+    assert _gate({"EXECUTOR_DASHBOARD": valor})[0] == dashboard.MODE_OFF
 
 
-def test_sem_rich_nao_liga_nem_forcado():
+def test_without_rich_does_not_enable_even_when_forced():
     """The library is the only requirement that `on` cannot bypass."""
-    assert _gate(rich=False)[0] == dashboard.MODO_OFF
-    assert _gate({"EXECUTOR_DASHBOARD": "on"}, rich=False)[0] == dashboard.MODO_OFF
+    assert _gate(rich=False)[0] == dashboard.MODE_OFF
+    assert _gate({"EXECUTOR_DASHBOARD": "on"}, rich=False)[0] == dashboard.MODE_OFF
 
 
-def test_on_ignora_a_falta_de_tty():
+def test_on_ignores_the_missing_tty():
     """Deliberate escape hatch: whoever passes `on` knows what they are doing."""
     modo, _ = _gate({"EXECUTOR_DASHBOARD": "on"}, stdout=False, stderr=False)
-    assert modo == dashboard.MODO_RICH
+    assert modo == dashboard.MODE_RICH
 
 
-def test_stdout_tty_mas_stderr_redirecionado_nao_liga():
+def test_stdout_tty_but_redirected_stderr_does_not_enable():
     """It is enough for one of the two not to be a terminal — that is the case of
     `2> arquivo`, and of whoever captures only one of the channels."""
-    assert _gate(stdout=True, stderr=False)[0] == dashboard.MODO_OFF
-    assert _gate(stdout=False, stderr=True)[0] == dashboard.MODO_OFF
+    assert _gate(stdout=True, stderr=False)[0] == dashboard.MODE_OFF
+    assert _gate(stdout=False, stderr=True)[0] == dashboard.MODE_OFF
 
 
-def test_sem_tty_nenhum_nao_liga():
+def test_without_any_tty_does_not_enable():
     """Covers Docker without -it, systemd/journald, `| tee` and Electron, which
     captures the process output through a pipe."""
-    assert _gate(stdout=False, stderr=False)[0] == dashboard.MODO_OFF
+    assert _gate(stdout=False, stderr=False)[0] == dashboard.MODE_OFF
 
 
-def test_log_color_never_desliga():
+def test_log_color_never_turns_off():
     """docker-compose.executor.yml uses LOG_COLOR=never — the operator already
     asked for unadorned output."""
-    assert _gate({"LOG_COLOR": "never"})[0] == dashboard.MODO_OFF
+    assert _gate({"LOG_COLOR": "never"})[0] == dashboard.MODE_OFF
 
 
-def test_no_color_e_ci_desligam():
-    assert _gate({"NO_COLOR": "1"})[0] == dashboard.MODO_OFF
-    assert _gate({"CI": "true"})[0] == dashboard.MODO_OFF
+def test_no_color_and_ci_turn_off():
+    assert _gate({"NO_COLOR": "1"})[0] == dashboard.MODE_OFF
+    assert _gate({"CI": "true"})[0] == dashboard.MODE_OFF
 
 
-def test_terminal_pequeno_demais_nao_liga():
+def test_too_small_terminal_does_not_enable():
     """A clipped panel is worse than no panel."""
-    assert _gate(w=40)[0] == dashboard.MODO_OFF
-    assert _gate(h=8)[0] == dashboard.MODO_OFF
+    assert _gate(w=40)[0] == dashboard.MODE_OFF
+    assert _gate(h=8)[0] == dashboard.MODE_OFF
 
 
-def test_terminal_interativo_liga():
-    assert _gate()[0] == dashboard.MODO_RICH
+def test_interactive_terminal_enables():
+    assert _gate()[0] == dashboard.MODE_RICH
 
 
-def test_term_ausente_ou_dumb_nao_liga(monkeypatch):
+def test_missing_or_dumb_term_does_not_enable(monkeypatch):
     """Cron, systemd without a tty and minimal images end up here. The rule only
     applies outside Windows, where TERM is not the sign of a usable terminal —
     that is why `os.name` is forced, instead of skipping the test in the
@@ -102,9 +102,9 @@ def test_term_ausente_ou_dumb_nao_liga(monkeypatch):
     monkeypatch.setattr(dashboard.os, "name", "posix")
     base = dict(stdout_tty=True, stderr_tty=True, rich_ok=True, largura=120, altura=40)
 
-    assert dashboard.should_enable(env={}, **base)[0] == dashboard.MODO_OFF
-    assert dashboard.should_enable(env={"TERM": "dumb"}, **base)[0] == dashboard.MODO_OFF
-    assert dashboard.should_enable(env={"TERM": "xterm"}, **base)[0] == dashboard.MODO_RICH
+    assert dashboard.should_enable(env={}, **base)[0] == dashboard.MODE_OFF
+    assert dashboard.should_enable(env={"TERM": "dumb"}, **base)[0] == dashboard.MODE_OFF
+    assert dashboard.should_enable(env={"TERM": "xterm"}, **base)[0] == dashboard.MODE_RICH
 
 
 @pytest.mark.parametrize("caso", [
@@ -114,17 +114,17 @@ def test_term_ausente_ou_dumb_nao_liga(monkeypatch):
     {"env": {"LOG_COLOR": "never"}},
     {"w": 30},
 ])
-def test_motivo_sempre_preenchido_quando_nao_liga(caso):
+def test_reason_always_filled_when_not_enabled(caso):
     """The reason goes to the boot log: a panel that does not show up without
     explanation becomes a support ticket."""
     modo, motivo = _gate(**caso)
-    assert modo == dashboard.MODO_OFF
+    assert modo == dashboard.MODE_OFF
     assert motivo and isinstance(motivo, str)
 
 
-def test_gate_do_processo_devolve_modo_e_motivo():
+def test_process_gate_returns_mode_and_reason():
     modo, motivo = dashboard.should_enable_from_process()
-    assert modo in (dashboard.MODO_RICH, dashboard.MODO_JSON, dashboard.MODO_OFF)
+    assert modo in (dashboard.MODE_RICH, dashboard.MODE_JSON, dashboard.MODE_OFF)
     assert motivo
 
 
@@ -134,8 +134,8 @@ def test_gate_do_processo_devolve_modo_e_motivo():
 # protect the screen — and that is why it is never inferred.
 
 @pytest.mark.parametrize("valor", ["json", "ndjson", "ipc", "JSON", " json "])
-def test_json_aceita_sinonimos(valor):
-    assert _gate({"EXECUTOR_DASHBOARD": valor})[0] == dashboard.MODO_JSON
+def test_json_accepts_synonyms(valor):
+    assert _gate({"EXECUTOR_DASHBOARD": valor})[0] == dashboard.MODE_JSON
 
 
 @pytest.mark.parametrize("caso", [
@@ -144,33 +144,33 @@ def test_json_aceita_sinonimos(valor):
     {"w": 20, "h": 5},                    # there is no screen to fit
     {"env": {"LOG_COLOR": "never", "NO_COLOR": "1", "CI": "true"}},
 ])
-def test_json_ignora_as_condicoes_de_tela(caso):
+def test_json_ignores_the_screen_conditions(caso):
     """All these rules exist so as not to mess up a terminal. With a program on
     the other side of the pipe, none of them applies — and JSON mode is exactly
     the scenario in which stdout is NOT a TTY."""
     env = {"EXECUTOR_DASHBOARD": "json", **caso.pop("env", {})}
-    assert _gate(env, **caso)[0] == dashboard.MODO_JSON
+    assert _gate(env, **caso)[0] == dashboard.MODE_JSON
 
 
-def test_json_nunca_e_inferido():
+def test_json_is_never_inferred():
     """A perfect terminal still yields `rich`, and an environment without a TTY
     still yields `off`. Emitting NDJSON on the stdout of someone expecting a
     human log would silently break the consumer — whoever wants the channel
     asks for it."""
-    assert _gate()[0] == dashboard.MODO_RICH
-    assert _gate(stdout=False, stderr=False)[0] == dashboard.MODO_OFF
+    assert _gate()[0] == dashboard.MODE_RICH
+    assert _gate(stdout=False, stderr=False)[0] == dashboard.MODE_OFF
 
 
-def test_off_vence_json_apenas_se_pedido_explicitamente():
+def test_off_beats_json_only_if_explicitly_requested():
     """`off` and `json` are different values of the SAME variable; whoever wrote
     `off` turned everything off, including the channel."""
-    assert _gate({"EXECUTOR_DASHBOARD": "off"})[0] == dashboard.MODO_OFF
+    assert _gate({"EXECUTOR_DASHBOARD": "off"})[0] == dashboard.MODE_OFF
 
 
 # ── Logging switching ────────────────────────────────────────────────────────
 
 @pytest.fixture
-def logging_limpo():
+def clean_logging():
     """Isolates the root logger — the tests touch global handlers. And the
     LogRecord factory: `configure_logging()` installs secret redaction in it,
     which would apply to the rest of the test session."""
@@ -179,21 +179,21 @@ def logging_limpo():
     root = logging.getLogger()
     originais = list(root.handlers)
     nivel = root.level
-    fabrica, instalada = logging.getLogRecordFactory(), redacao_log._instalada
+    fabrica, instalada = logging.getLogRecordFactory(), redacao_log._installed
     estado = (logging_setup._console, logging_setup._detached_console,
               logging_setup._catch_all, logging_setup._agent_file,
-              logging_setup._agent_file_path, logging_setup._configurado)
+              logging_setup._agent_file_path, logging_setup._configured)
     yield root
     root.handlers[:] = originais
     root.setLevel(nivel)
     logging.setLogRecordFactory(fabrica)
-    redacao_log._instalada = instalada
+    redacao_log._installed = instalada
     (logging_setup._console, logging_setup._detached_console,
      logging_setup._catch_all, logging_setup._agent_file,
-     logging_setup._agent_file_path, logging_setup._configurado) = estado
+     logging_setup._agent_file_path, logging_setup._configured) = estado
 
 
-def _preparar(root, tmp_path, monkeypatch, *, log_file_agent=None):
+def _prepare(root, tmp_path, monkeypatch, *, log_file_agent=None):
     """Simula o estado pos-configure_logging() com um console e um arquivo."""
     root.handlers[:] = []
     console = logging.StreamHandler(io.StringIO())
@@ -211,7 +211,7 @@ def _preparar(root, tmp_path, monkeypatch, *, log_file_agent=None):
     return console, destino
 
 
-def test_modo_painel_captura_logger_de_terceiro(logging_limpo, tmp_path, monkeypatch):
+def test_panel_mode_captures_third_party_logger(clean_logging, tmp_path, monkeypatch):
     """The central test: the handler replacing the console must have no filter.
 
     The existing file handlers only accept `executor`/`httpx` and
@@ -219,12 +219,12 @@ def test_modo_painel_captura_logger_de_terceiro(logging_limpo, tmp_path, monkeyp
     the terminal today. With a filtered handler in place of the console, that
     log would vanish.
     """
-    _, destino = _preparar(logging_limpo, tmp_path, monkeypatch)
+    _, destino = _prepare(clean_logging, tmp_path, monkeypatch)
 
     logging_setup.switch_to_dashboard_mode()
     logging.getLogger("websockets.client").warning("conexao caiu")
     logging.getLogger("executor.job_queue").info("job enfileirado")
-    for h in logging_limpo.handlers:
+    for h in clean_logging.handlers:
         h.flush()
 
     conteudo = open(destino, encoding="utf-8").read()
@@ -232,66 +232,66 @@ def test_modo_painel_captura_logger_de_terceiro(logging_limpo, tmp_path, monkeyp
     assert "job enfileirado" in conteudo
 
 
-def test_modo_painel_tira_o_console_do_root(logging_limpo, tmp_path, monkeypatch):
-    console, _ = _preparar(logging_limpo, tmp_path, monkeypatch)
+def test_panel_mode_removes_the_console_from_root(clean_logging, tmp_path, monkeypatch):
+    console, _ = _prepare(clean_logging, tmp_path, monkeypatch)
     logging_setup.switch_to_dashboard_mode()
-    assert console not in logging_limpo.handlers
+    assert console not in clean_logging.handlers
 
 
-def test_restore_devolve_o_mesmo_handler(logging_limpo, tmp_path, monkeypatch):
-    console, _ = _preparar(logging_limpo, tmp_path, monkeypatch)
+def test_restore_returns_the_same_handler(clean_logging, tmp_path, monkeypatch):
+    console, _ = _prepare(clean_logging, tmp_path, monkeypatch)
     logging_setup.switch_to_dashboard_mode()
     logging_setup.restore_console_mode()
-    assert console in logging_limpo.handlers
+    assert console in clean_logging.handlers
 
 
-def test_restore_e_idempotente(logging_limpo, tmp_path, monkeypatch):
+def test_restore_is_idempotent(clean_logging, tmp_path, monkeypatch):
     """emergency_stop can be called by several exit paths (atexit,
     KeyboardInterrupt, execve) — duplicating the console would double every line."""
-    console, _ = _preparar(logging_limpo, tmp_path, monkeypatch)
+    console, _ = _prepare(clean_logging, tmp_path, monkeypatch)
     logging_setup.switch_to_dashboard_mode()
     logging_setup.restore_console_mode()
     logging_setup.restore_console_mode()
     logging_setup.restore_console_mode()
-    assert logging_limpo.handlers.count(console) == 1
+    assert clean_logging.handlers.count(console) == 1
 
 
-def test_arquivo_continua_gravando_depois_do_restore(logging_limpo, tmp_path, monkeypatch):
+def test_file_keeps_writing_after_restore(clean_logging, tmp_path, monkeypatch):
     """Closing the panel must not stop the file log: the process stays alive."""
-    _, destino = _preparar(logging_limpo, tmp_path, monkeypatch)
+    _, destino = _prepare(clean_logging, tmp_path, monkeypatch)
     logging_setup.switch_to_dashboard_mode()
     logging_setup.restore_console_mode()
 
     logging.getLogger("executor").info("depois do painel")
-    for h in logging_limpo.handlers:
+    for h in clean_logging.handlers:
         h.flush()
     assert "depois do painel" in open(destino, encoding="utf-8").read()
 
 
-def test_handler_filtrado_do_mesmo_arquivo_e_removido(logging_limpo, tmp_path, monkeypatch):
+def test_filtered_handler_for_the_same_file_is_removed(clean_logging, tmp_path, monkeypatch):
     """If LOG_FILE_AGENT already pointed to this file, keeping both handlers
     would duplicate every `executor.*` line inside it."""
-    _, destino = _preparar(logging_limpo, tmp_path, monkeypatch)
+    _, destino = _prepare(clean_logging, tmp_path, monkeypatch)
 
     antigo = logging_setup._rotating(destino)
     antigo.addFilter(logging_setup._PrefixFilter("executor"))
-    logging_limpo.addHandler(antigo)
+    clean_logging.addHandler(antigo)
     logging_setup._agent_file = antigo
     logging_setup._agent_file_path = destino
 
     logging_setup.switch_to_dashboard_mode()
-    assert antigo not in logging_limpo.handlers
+    assert antigo not in clean_logging.handlers
 
     logging.getLogger("executor").info("linha unica")
-    for h in logging_limpo.handlers:
+    for h in clean_logging.handlers:
         h.flush()
     assert open(destino, encoding="utf-8").read().count("linha unica") == 1
 
 
-def test_diretorio_invalido_levanta_e_preserva_o_console(logging_limpo, tmp_path, monkeypatch):
+def test_invalid_directory_raises_and_preserves_the_console(clean_logging, tmp_path, monkeypatch):
     """The rule: the panel only turns on if the file opens. Swapping the console
     log for a file that does not exist would be deleting the log, not moving it."""
-    console, _ = _preparar(logging_limpo, tmp_path, monkeypatch)
+    console, _ = _prepare(clean_logging, tmp_path, monkeypatch)
 
     def _explode(_path):
         raise OSError("permissao negada")
@@ -300,16 +300,16 @@ def test_diretorio_invalido_levanta_e_preserva_o_console(logging_limpo, tmp_path
 
     with pytest.raises(logging_setup.LoggingSetupError):
         logging_setup.switch_to_dashboard_mode()
-    assert console in logging_limpo.handlers
+    assert console in clean_logging.handlers
 
 
-def test_log_level_do_env_e_lido_no_configure_e_nao_no_import(logging_limpo, monkeypatch):
+def test_env_log_level_is_read_on_configure_not_on_import(clean_logging, monkeypatch):
     """`logging_setup` must not read the variables at import: what puts the
     contents of `.env` into the environment is `load_dotenv()` in `config.py`,
     which runs later. Reading at import, `LOG_LEVEL=DEBUG` in the .env was
     silently ignored whenever the import order changed."""
-    logging_limpo.handlers[:] = []
-    logging_setup._configurado = False
+    clean_logging.handlers[:] = []
+    logging_setup._configured = False
     logging_setup._console = None
     logging_setup._detached_console = None
 
@@ -318,12 +318,12 @@ def test_log_level_do_env_e_lido_no_configure_e_nao_no_import(logging_limpo, mon
     monkeypatch.setenv("LOG_COLOR", "never")
     logging_setup.configure_logging()
 
-    assert logging_limpo.level == logging.DEBUG
+    assert clean_logging.level == logging.DEBUG
     formatter = logging_setup._console.formatter
     assert formatter._color is False, "LOG_COLOR=never do .env foi ignorado"
 
 
-def test_alias_reusa_a_taxonomia_do_console():
+def test_alias_reuses_the_console_taxonomy():
     """The panel footer shows the same subsystem column as the log."""
     assert logging_setup.alias_for("executor.connection").strip() == "CONN"
     assert logging_setup.alias_for("executor.sync.uploader").strip() == "SYNC"
@@ -333,7 +333,7 @@ def test_alias_reusa_a_taxonomia_do_console():
 
 # ── Config warnings before the handlers ──────────────────────────────────────
 
-def test_avisos_do_import_de_config_sao_emitidos_no_flush(caplog, monkeypatch):
+def test_config_import_warnings_are_emitted_on_flush(caplog, monkeypatch):
     """config.py is imported before any handler exists. Before, these warnings
     fell into logging.lastResort (raw stderr) — with the panel up, they would
     become garbage on top of the drawing. The queue lives in
@@ -355,7 +355,7 @@ def test_avisos_do_import_de_config_sao_emitidos_no_flush(caplog, monkeypatch):
 
 # ── Render ───────────────────────────────────────────────────────────────────
 
-def _snapshot_sintetico():
+def _synthetic_snapshot():
     from executor.stats import ExecutorStats
 
     relogio = [1000.0]
@@ -389,7 +389,7 @@ def _snapshot_sintetico():
 
 
 @pytest.mark.parametrize("largura,ascii_only", [(120, False), (80, False), (100, True)])
-def test_render_nao_estoura_e_mostra_o_essencial(largura, ascii_only):
+def test_render_does_not_overflow_and_shows_the_essentials(largura, ascii_only):
     pytest.importorskip("rich")
     from rich.console import Console
     from executor.dashboard import render
@@ -397,7 +397,7 @@ def test_render_nao_estoura_e_mostra_o_essencial(largura, ascii_only):
     buf = io.StringIO()
     Console(file=buf, width=largura, height=44, force_terminal=False,
             legacy_windows=False).print(
-        render.build(_snapshot_sintetico(), largura=largura, altura=44,
+        render.build(_synthetic_snapshot(), largura=largura, altura=44,
                      log_path="/tmp/executor.log", ascii_only=ascii_only)
     )
     saida = buf.getvalue()
@@ -432,7 +432,7 @@ def _render(snap, largura, altura, ascii_only=False):
     (120, 24), (120, 20), (120, 16), (110, 26), (100, 24), (90, 34),
     (80, 40), (80, 24), (80, 16), (72, 20), (64, 14), (60, 12),
 ])
-def test_painel_nunca_estoura_o_terminal(largura, altura):
+def test_panel_never_overflows_the_terminal(largura, altura):
     """`Live` repaints by rewriting N lines upward. If the renderable is taller
     than the terminal, it scrolls nonstop and the panel becomes continuous garbage.
 
@@ -441,7 +441,7 @@ def test_painel_nunca_estoura_o_terminal(largura, altura):
     44 lines.
     """
     pytest.importorskip("rich")
-    saida = _render(_snapshot_sintetico(), largura, altura)
+    saida = _render(_synthetic_snapshot(), largura, altura)
     linhas = saida.rstrip("\n").splitlines()
     assert len(linhas) <= altura, (
         f"painel com {len(linhas)} linhas num terminal de {altura}"
@@ -449,16 +449,16 @@ def test_painel_nunca_estoura_o_terminal(largura, altura):
     assert max((len(linha) for linha in linhas), default=0) <= largura
 
 
-def test_painel_apertado_mantem_os_alertas():
+def test_cramped_panel_keeps_the_alerts():
     """When space runs out, what goes away is 'em execucao' (running) and geosync
     — never the alerts. Without them the panel hides precisely what needs to be seen."""
     pytest.importorskip("rich")
-    saida = _render(_snapshot_sintetico(), 120, 18)
+    saida = _render(_synthetic_snapshot(), 120, 18)
     assert "alertas" in saida
     assert "Falha de rede" in saida
 
 
-def test_painel_avisa_quando_corta_jobs_da_lista():
+def test_panel_warns_when_it_cuts_jobs_from_the_list():
     """Truncar em silencio faria o painel mentir sobre quantos jobs rodam."""
     pytest.importorskip("rich")
     from executor.stats import ExecutorStats
@@ -474,21 +474,21 @@ def test_painel_avisa_quando_corta_jobs_da_lista():
                                  "queued": 0, "max_queue": 50},
                        recursos={}, processo={})
     # At 120x30, 4 of the 12 jobs fit — the title must say that 8 were left out.
-    apertado = _render(snap, 120, 30)
-    assert "em execução (12)" in apertado
-    assert "sem espaço" in apertado
+    cramped = _render(snap, 120, 30)
+    assert "em execução (12)" in cramped
+    assert "sem espaço" in cramped
 
     # With height to spare, all 12 show up and the notice goes away.
-    folgado = _render(snap, 120, 44)
-    assert "em execução (12)" in folgado
-    assert "sem espaço" not in folgado
+    roomy = _render(snap, 120, 44)
+    assert "em execução (12)" in roomy
+    assert "sem espaço" not in roomy
 
 
 # ── Keyboard shortcuts ───────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("largura", [60, 72, 80, 100, 120, 160, 200])
 @pytest.mark.parametrize("pausado", [False, True])
-def test_rodape_com_atalhos_cabe_numa_linha(largura, pausado):
+def test_footer_with_shortcuts_fits_on_one_line(largura, pausado):
     """The panel height counts 1 line for the footer. If the shortcut bar made it
     wrap into two, `Live` would start scrolling again."""
     pytest.importorskip("rich")
@@ -497,13 +497,13 @@ def test_rodape_com_atalhos_cabe_numa_linha(largura, pausado):
 
     buf = io.StringIO()
     Console(file=buf, width=largura, force_terminal=False, legacy_windows=False).print(
-        render._rodape("/home/usuario/com/caminho/bem/longo/AtlansExecutor/logs/executor.log",
+        render._footer("/home/usuario/com/caminho/bem/longo/AtlansExecutor/logs/executor.log",
                        largura, atalhos=True, pausado=pausado, debug=False)
     )
     assert len(buf.getvalue().rstrip("\n").splitlines()) == 1
 
 
-def test_rodape_sacrifica_o_caminho_antes_dos_atalhos():
+def test_footer_sacrifices_the_path_before_the_shortcuts():
     """Knowing which key to press matters more than reading the whole path —
     which also appears in the line printed when the panel turns on."""
     pytest.importorskip("rich")
@@ -512,28 +512,28 @@ def test_rodape_sacrifica_o_caminho_antes_dos_atalhos():
 
     buf = io.StringIO()
     Console(file=buf, width=70, force_terminal=False, legacy_windows=False).print(
-        render._rodape("/um/caminho/absurdamente/longo/AtlansExecutor/logs/executor.log",
+        render._footer("/um/caminho/absurdamente/longo/AtlansExecutor/logs/executor.log",
                        70, atalhos=True, pausado=False, debug=False)
     )
     saida = buf.getvalue()
     assert "log/painel" in saida and "q encerra" in saida
 
 
-def test_rodape_sem_teclado_explica_como_desligar():
+def test_footer_without_keyboard_explains_how_to_turn_off():
     pytest.importorskip("rich")
     from rich.console import Console
     from executor.dashboard import render
 
     buf = io.StringIO()
     Console(file=buf, width=120, force_terminal=False, legacy_windows=False).print(
-        render._rodape("/tmp/x.log", 120, atalhos=False, pausado=False, debug=False)
+        render._footer("/tmp/x.log", 120, atalhos=False, pausado=False, debug=False)
     )
     assert "EXECUTOR_DASHBOARD=off" in buf.getvalue()
 
 
-def test_ajuda_substitui_o_corpo_e_mantem_cabecalho_e_rodape():
+def test_help_replaces_the_body_and_keeps_header_and_footer():
     pytest.importorskip("rich")
-    saida = _render_kw(_snapshot_sintetico(), 110, 34, atalhos=True, overlay="ajuda")
+    saida = _render_kw(_synthetic_snapshot(), 110, 34, atalhos=True, overlay="ajuda")
     assert "atalhos" in saida
     assert "alterna entre o painel e o log" in saida
     assert "Atlans Executor" in saida       # header stays
@@ -541,7 +541,7 @@ def test_ajuda_substitui_o_corpo_e_mantem_cabecalho_e_rodape():
     assert "workflows" not in saida         # corpo deu lugar a ajuda
 
 
-def test_teclado_indisponivel_sem_tty(monkeypatch):
+def test_keyboard_unavailable_without_tty(monkeypatch):
     """stdin redirecionado (`< /dev/null`, pipe, supervisor) — o painel continua
     funcionando, so sem atalhos."""
     from executor.dashboard import keys
@@ -555,15 +555,15 @@ def test_teclado_indisponivel_sem_tty(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_leitor_de_teclas_nao_sobe_sem_terminal(monkeypatch):
+async def test_key_reader_does_not_start_without_terminal(monkeypatch):
     from executor.dashboard import keys
 
     monkeypatch.setattr(keys, "teclado_disponivel", lambda: False)
-    assert keys.LeitorDeTeclas(lambda t: None).start() is False
+    assert keys.KeyReader(lambda t: None).start() is False
 
 
 @pytest.mark.asyncio
-async def test_leitor_entrega_as_teclas_no_event_loop(monkeypatch):
+async def test_reader_delivers_the_keys_on_the_event_loop(monkeypatch):
     """The thread reads blocking and delivers via `call_soon_threadsafe`. If the
     delivery did not go through the loop, the callback would touch the panel
     state from another thread, in the middle of a render."""
@@ -584,7 +584,7 @@ async def test_leitor_entrega_as_teclas_no_event_loop(monkeypatch):
         if len(recebidas) == 3:
             tudo.set()
 
-    leitor = keys.LeitorDeTeclas(registrar)
+    leitor = keys.KeyReader(registrar)
     monkeypatch.setattr(keys, "teclado_disponivel", lambda: True)
     monkeypatch.setattr(leitor, "_preparar_terminal", lambda: None)
     monkeypatch.setattr(leitor, "_ler_uma", lambda: pendentes.get())
@@ -600,17 +600,17 @@ async def test_leitor_entrega_as_teclas_no_event_loop(monkeypatch):
         "callback rodou fora do event loop"
 
 
-def test_restaurar_terminal_e_idempotente():
+def test_restore_terminal_is_idempotent():
     """The restoration is called from three places (stop, the thread's finally,
     atexit). A terminal left in cbreak stops echoing what the user types —
     the shell looks frozen."""
     from executor.dashboard import keys
 
-    keys._restaurar_terminal()
-    keys._restaurar_terminal()  # with no saved state, must not raise
+    keys._restore_terminal()
+    keys._restore_terminal()  # with no saved state, must not raise
 
 
-def _runtime_de_teste(tmp_path, ao_sair=None):
+def _test_runtime(tmp_path, on_exit=None):
     from executor.dashboard.runtime import DashboardRuntime
     from executor.stats import ExecutorStats
 
@@ -626,187 +626,187 @@ def _runtime_de_teste(tmp_path, ao_sair=None):
         capacity_source=lambda: {"queued": 0, "running": 0,
                                  "max_concurrent": 4, "max_queue": 50},
         result_queue=_Fila(), intervalo=0.05,
-        log_path=str(tmp_path / "executor.log"), ao_sair=ao_sair,
+        log_path=str(tmp_path / "executor.log"), on_exit=on_exit,
     )
 
 
 @pytest.mark.asyncio
-async def test_tecla_l_alterna_painel_e_log(logging_limpo, tmp_path, monkeypatch):
+async def test_key_l_toggles_panel_and_log(clean_logging, tmp_path, monkeypatch):
     """What the user asked for: go back to the usual log without restarting the executor.
 
     In log mode the console receives again; in panel mode, it does not. The
     file writes in both — toggling must never cost a record.
     """
     pytest.importorskip("rich")
-    from executor.dashboard.runtime import MODO_LOG, MODO_PAINEL
+    from executor.dashboard.runtime import MODE_LOG, MODE_DASHBOARD
 
-    console, destino = _preparar(logging_limpo, tmp_path, monkeypatch)
+    console, destino = _prepare(clean_logging, tmp_path, monkeypatch)
     logging_setup.ensure_file_mirror()
 
-    dash = _runtime_de_teste(tmp_path)
-    monkeypatch.setattr(dash._teclas, "start", lambda: False)  # no real thread
+    dash = _test_runtime(tmp_path)
+    monkeypatch.setattr(dash._key_reader, "start", lambda: False)  # no real thread
     await dash.start()
     try:
-        assert dash.modo == MODO_PAINEL
-        assert console not in logging_limpo.handlers
+        assert dash.modo == MODE_DASHBOARD
+        assert console not in clean_logging.handlers
         logging.getLogger("executor").info("no painel")
 
-        dash._tecla("l")
-        assert dash.modo == MODO_LOG
-        assert console in logging_limpo.handlers
+        dash._on_key("l")
+        assert dash.modo == MODE_LOG
+        assert console in clean_logging.handlers
         logging.getLogger("executor").info("no log")
 
-        dash._tecla("l")
-        assert dash.modo == MODO_PAINEL
-        assert console not in logging_limpo.handlers
+        dash._on_key("l")
+        assert dash.modo == MODE_DASHBOARD
+        assert console not in clean_logging.handlers
         logging.getLogger("executor").info("no painel de novo")
     finally:
         await dash.stop()
 
-    for h in logging_limpo.handlers:
+    for h in clean_logging.handlers:
         h.flush()
     arquivo = open(destino, encoding="utf-8").read()
     assert all(m in arquivo for m in ("no painel", "no log", "no painel de novo"))
-    assert console in logging_limpo.handlers, "console tem de voltar no stop"
+    assert console in clean_logging.handlers, "console tem de voltar no stop"
 
 
 @pytest.mark.asyncio
-async def test_tecla_q_dispara_o_shutdown(logging_limpo, tmp_path, monkeypatch):
+async def test_key_q_triggers_the_shutdown(clean_logging, tmp_path, monkeypatch):
     """'q' goes through the same path as a SIGTERM. It matters even more on
     Windows, where `add_signal_handler` registers nothing and Ctrl+C can kill
     the process before any `finally`."""
     pytest.importorskip("rich")
-    _preparar(logging_limpo, tmp_path, monkeypatch)
+    _prepare(clean_logging, tmp_path, monkeypatch)
     logging_setup.ensure_file_mirror()
 
     chamou: list[bool] = []
-    dash = _runtime_de_teste(tmp_path, ao_sair=lambda: chamou.append(True))
-    monkeypatch.setattr(dash._teclas, "start", lambda: False)
+    dash = _test_runtime(tmp_path, on_exit=lambda: chamou.append(True))
+    monkeypatch.setattr(dash._key_reader, "start", lambda: False)
     await dash.start()
     try:
-        dash._tecla("q")
+        dash._on_key("q")
         assert chamou == [True]
     finally:
         await dash.stop()
 
 
 @pytest.mark.asyncio
-async def test_tecla_d_alterna_o_nivel_de_log(logging_limpo, tmp_path, monkeypatch):
+async def test_key_d_toggles_the_log_level(clean_logging, tmp_path, monkeypatch):
     """Diagnosing an error required stopping the executor, editing LOG_LEVEL in
     the .env and starting it again — losing the state one wanted to investigate."""
     pytest.importorskip("rich")
-    _preparar(logging_limpo, tmp_path, monkeypatch)
+    _prepare(clean_logging, tmp_path, monkeypatch)
     logging_setup.ensure_file_mirror()
-    logging_limpo.setLevel(logging.INFO)
-    logging_setup._nivel_base = None
+    clean_logging.setLevel(logging.INFO)
+    logging_setup._base_level = None
 
-    dash = _runtime_de_teste(tmp_path)
-    monkeypatch.setattr(dash._teclas, "start", lambda: False)
+    dash = _test_runtime(tmp_path)
+    monkeypatch.setattr(dash._key_reader, "start", lambda: False)
     await dash.start()
     try:
-        dash._tecla("d")
-        assert logging_limpo.level == logging.DEBUG
+        dash._on_key("d")
+        assert clean_logging.level == logging.DEBUG
         # httpx em DEBUG despeja cada frame HTTP e afoga o resto.
         assert logging.getLogger("httpx").level == logging.INFO
 
-        dash._tecla("d")
-        assert logging_limpo.level == logging.INFO
+        dash._on_key("d")
+        assert clean_logging.level == logging.INFO
         assert logging.getLogger("httpx").level == logging.WARNING
     finally:
         await dash.stop()
 
 
 @pytest.mark.asyncio
-async def test_tecla_r_interrompe_o_backoff(logging_limpo, tmp_path, monkeypatch):
+async def test_key_r_interrupts_the_backoff(clean_logging, tmp_path, monkeypatch):
     """When the network comes back, the executor may be in a backoff of up to 60s."""
     pytest.importorskip("rich")
-    _preparar(logging_limpo, tmp_path, monkeypatch)
+    _prepare(clean_logging, tmp_path, monkeypatch)
     logging_setup.ensure_file_mirror()
 
     pedidos: list[bool] = []
-    dash = _runtime_de_teste(tmp_path)
+    dash = _test_runtime(tmp_path)
     dash._ao_reconectar = lambda: (pedidos.append(True), True)[1]
-    monkeypatch.setattr(dash._teclas, "start", lambda: False)
+    monkeypatch.setattr(dash._key_reader, "start", lambda: False)
     await dash.start()
     try:
-        dash._tecla("r")
+        dash._on_key("r")
         assert pedidos == [True]
     finally:
         await dash.stop()
 
 
 @pytest.mark.asyncio
-async def test_tecla_z_zera_os_contadores(logging_limpo, tmp_path, monkeypatch):
+async def test_key_z_resets_the_counters(clean_logging, tmp_path, monkeypatch):
     pytest.importorskip("rich")
-    _preparar(logging_limpo, tmp_path, monkeypatch)
+    _prepare(clean_logging, tmp_path, monkeypatch)
     logging_setup.ensure_file_mirror()
 
-    dash = _runtime_de_teste(tmp_path)
-    monkeypatch.setattr(dash._teclas, "start", lambda: False)
+    dash = _test_runtime(tmp_path)
+    monkeypatch.setattr(dash._key_reader, "start", lambda: False)
     await dash.start()
     try:
         dash._stats.on_job_started("j", run_id="j")
         dash._stats.on_job_finished("j", "ok", 5.0)
         assert dash._stats.snapshot(capacity={}, recursos={}, processo={}).total_ok == 1
 
-        dash._tecla("z")
+        dash._on_key("z")
         assert dash._stats.snapshot(capacity={}, recursos={}, processo={}).total_ok == 0
     finally:
         await dash.stop()
 
 
 @pytest.mark.asyncio
-async def test_tecla_a_abre_o_historico_de_alertas(logging_limpo, tmp_path, monkeypatch):
+async def test_key_a_opens_the_alert_history(clean_logging, tmp_path, monkeypatch):
     """The buffer keeps 200 lines but the footer shows 6 — 194 stay invisible."""
     pytest.importorskip("rich")
-    _preparar(logging_limpo, tmp_path, monkeypatch)
+    _prepare(clean_logging, tmp_path, monkeypatch)
     logging_setup.ensure_file_mirror()
 
-    dash = _runtime_de_teste(tmp_path)
-    monkeypatch.setattr(dash._teclas, "start", lambda: False)
+    dash = _test_runtime(tmp_path)
+    monkeypatch.setattr(dash._key_reader, "start", lambda: False)
     await dash.start()
     try:
-        dash._tecla("a")
+        dash._on_key("a")
         assert dash._overlay == "alertas"
-        dash._tecla("a")
+        dash._on_key("a")
         assert dash._overlay is None
 
         # One overlay replaces the other, instead of stacking.
-        dash._tecla("a")
-        dash._tecla("?")
+        dash._on_key("a")
+        dash._on_key("?")
         assert dash._overlay == "ajuda"
     finally:
         await dash.stop()
 
 
 @pytest.mark.asyncio
-async def test_teclas_p_e_interrogacao(logging_limpo, tmp_path, monkeypatch):
+async def test_keys_p_and_question_mark(clean_logging, tmp_path, monkeypatch):
     pytest.importorskip("rich")
-    _preparar(logging_limpo, tmp_path, monkeypatch)
+    _prepare(clean_logging, tmp_path, monkeypatch)
     logging_setup.ensure_file_mirror()
 
-    dash = _runtime_de_teste(tmp_path)
-    monkeypatch.setattr(dash._teclas, "start", lambda: False)
+    dash = _test_runtime(tmp_path)
+    monkeypatch.setattr(dash._key_reader, "start", lambda: False)
     await dash.start()
     try:
-        dash._tecla("p")
-        assert dash._pausado is True
-        dash._tecla("p")
-        assert dash._pausado is False
+        dash._on_key("p")
+        assert dash._paused is True
+        dash._on_key("p")
+        assert dash._paused is False
 
-        dash._tecla("?")
+        dash._on_key("?")
         assert dash._overlay == "ajuda"
-        dash._tecla("h")
+        dash._on_key("h")
         assert dash._overlay is None
 
         # An unknown key must not change anything or raise.
-        dash._tecla("")
-        assert dash._pausado is False and dash._overlay is None
+        dash._on_key("")
+        assert dash._paused is False and dash._overlay is None
     finally:
         await dash.stop()
 
 
-def test_render_omite_o_total_quando_a_ram_livre_e_maior():
+def test_render_omits_the_total_when_free_ram_is_larger():
     """It really happens in a container: if memory.max exists but memory.current
     does not, the total comes from the cgroup and the available amount falls
     back to the HOST's psutil. Showing '34 / 16 GB' would be worse than omitting
@@ -816,7 +816,7 @@ def test_render_omite_o_total_quando_a_ram_livre_e_maior():
     from executor.dashboard import render
     from dataclasses import replace
 
-    snap = replace(_snapshot_sintetico(), ram_available_gb=34.0, ram_total_gb=16.0)
+    snap = replace(_synthetic_snapshot(), ram_available_gb=34.0, ram_total_gb=16.0)
     buf = io.StringIO()
     Console(file=buf, width=120, height=44, force_terminal=False,
             legacy_windows=False).print(
@@ -827,7 +827,7 @@ def test_render_omite_o_total_quando_a_ram_livre_e_maior():
     assert "34.0 / 16.0" not in saida
 
 
-def test_render_ascii_nao_usa_caractere_fora_do_cp1252():
+def test_ascii_render_uses_no_character_outside_cp1252():
     """The legacy Windows conhost uses the ANSI code page and raises
     UnicodeEncodeError on the first '●' — the panel would die on the 1st frame."""
     pytest.importorskip("rich")
@@ -837,7 +837,7 @@ def test_render_ascii_nao_usa_caractere_fora_do_cp1252():
     buf = io.StringIO()
     Console(file=buf, width=100, height=44, force_terminal=False,
             legacy_windows=False).print(
-        render.build(_snapshot_sintetico(), largura=100, altura=44,
+        render.build(_synthetic_snapshot(), largura=100, altura=44,
                      log_path="/tmp/executor.log", ascii_only=True)
     )
     # errors='strict': any glyph outside the code page raises here.

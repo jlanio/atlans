@@ -7,7 +7,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-class AgendamentoMeu(BaseModel):
+class MySchedule(BaseModel):
     """A schedule in the person's list. One per row (not one per workflow, as in
     the Projects summary): the same routine may have more than one.
 

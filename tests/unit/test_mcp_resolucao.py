@@ -29,14 +29,14 @@ import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
 from app.core.utils.datetime_utils import utc_now_naive
-from app.mcp.resolucao import carregar_workflow, e_uuid, resolver_workspace
+from app.mcp.resolucao import carregar_workflow, e_uuid, resolve_workspace
 from app.models.workflow import Workflow
 from app.models.workspace_member import WorkspaceMember
 from tests.unit._mcp_harness import (
-    banco_em_memoria,
-    criar_usuario,
-    criar_workspace,
-    escopo_falso,
+    in_memory_db,
+    create_user,
+    create_workspace,
+    fake_scope,
 )
 
 ID_A = "11111111-1111-4111-8111-111111111111"
@@ -48,7 +48,7 @@ def corpo(exc: ToolError) -> dict:
     return json.loads(str(exc))
 
 
-async def criar_workflow(db, *, id_hash: str, nome: str, workspace_id: str, apagado=False) -> Workflow:
+async def create_workflow_row(db, *, id_hash: str, nome: str, workspace_id: str, apagado=False) -> Workflow:
     wf = Workflow(
         id_hash=id_hash,
         name=nome,
@@ -61,7 +61,7 @@ async def criar_workflow(db, *, id_hash: str, nome: str, workspace_id: str, apag
     return wf
 
 
-async def tornar_membro(db, workspace_id: str, user_id: str, papel: str = "viewer") -> None:
+async def make_member(db, workspace_id: str, user_id: str, papel: str = "viewer") -> None:
     db.add(WorkspaceMember(workspace_id=workspace_id, user_id=user_id, role=papel))
     await db.commit()
 
@@ -69,62 +69,62 @@ async def tornar_membro(db, workspace_id: str, user_id: str, papel: str = "viewe
 @pytest.fixture
 async def banco():
     """Two workspaces of the same owner, for the ambiguity and reach cases."""
-    async with banco_em_memoria() as fabrica:
+    async with in_memory_db() as fabrica:
         async with fabrica() as db:
-            await criar_usuario(db, "usr-1", "ana")
-            await criar_workspace(db, "ws-1", "usr-1", "Principal")
-            await criar_workspace(db, "ws-2", "usr-1", "Secundário")
+            await create_user(db, "usr-1", "ana")
+            await create_workspace(db, "ws-1", "usr-1", "Principal")
+            await create_workspace(db, "ws-2", "usr-1", "Secundário")
         yield fabrica
 
 
 # ── e_uuid ────────────────────────────────────────────────────────────────────
 
 
-def test_e_uuid_separa_identificador_de_nome():
+def test_is_uuid_separates_identifier_from_name():
     assert e_uuid(ID_A) is True
     assert e_uuid("Recorte mensal") is False
     assert e_uuid("") is False
     assert e_uuid(None) is False
 
 
-# ── resolver_workspace ────────────────────────────────────────────────────────
+# ── resolve_workspace ────────────────────────────────────────────────────────
 
 
-async def test_workspace_unico_dispensa_o_parametro(banco):
+async def test_single_workspace_makes_the_parameter_optional(banco):
     async with banco() as db:
-        assert await resolver_workspace(db, escopo_falso(workspace_ids={"ws-1"}), None) == "ws-1"
+        assert await resolve_workspace(db, fake_scope(workspace_ids={"ws-1"}), None) == "ws-1"
 
 
-async def test_com_dois_workspaces_a_omissao_vira_ambiguous_com_os_candidatos(banco):
-    escopo = escopo_falso(workspace_ids={"ws-1", "ws-2"})
+async def test_with_two_workspaces_omission_becomes_ambiguous_with_the_candidates(banco):
+    escopo = fake_scope(workspace_ids={"ws-1", "ws-2"})
     async with banco() as db:
         with pytest.raises(ToolError) as exc:
-            await resolver_workspace(db, escopo, None)
+            await resolve_workspace(db, escopo, None)
     detalhe = corpo(exc.value)
     assert detalhe["code"] == "ambiguous"
     assert {c["id"] for c in detalhe["candidates"]} == {"ws-1", "ws-2"}
     assert {c["name"] for c in detalhe["candidates"]} == {"Principal", "Secundário"}
 
 
-async def test_workspace_por_nome_dentro_do_escopo(banco):
-    escopo = escopo_falso(workspace_ids={"ws-1", "ws-2"})
+async def test_workspace_by_name_within_scope(banco):
+    escopo = fake_scope(workspace_ids={"ws-1", "ws-2"})
     async with banco() as db:
-        assert await resolver_workspace(db, escopo, "Secundário") == "ws-2"
+        assert await resolve_workspace(db, escopo, "Secundário") == "ws-2"
 
 
-async def test_nome_repetido_em_dois_workspaces_vira_ambiguous(banco):
+async def test_name_repeated_in_two_workspaces_becomes_ambiguous(banco):
     async with banco() as db:
-        await criar_workspace(db, "ws-3", "usr-1", "Principal")
-    escopo = escopo_falso(workspace_ids={"ws-1", "ws-3"})
+        await create_workspace(db, "ws-3", "usr-1", "Principal")
+    escopo = fake_scope(workspace_ids={"ws-1", "ws-3"})
     async with banco() as db:
         with pytest.raises(ToolError) as exc:
-            await resolver_workspace(db, escopo, "Principal")
+            await resolve_workspace(db, escopo, "Principal")
     detalhe = corpo(exc.value)
     assert detalhe["code"] == "ambiguous"
     assert {c["id"] for c in detalhe["candidates"]} == {"ws-1", "ws-3"}
 
 
-async def test_id_de_workspace_fora_do_escopo_e_proibido(banco):
+async def test_workspace_id_out_of_scope_is_forbidden(banco):
     """It exists, the user is the owner — but the token can't reach it.
 
     The reference is id-shaped (it is a UUID, like every `id_hash` in Atlans),
@@ -132,37 +132,37 @@ async def test_id_de_workspace_fora_do_escopo_e_proibido(banco):
     means no chance of the response revealing whether that id exists.
     """
     async with banco() as db:
-        await criar_workspace(db, ID_B, "usr-1", "Terceiro")
-    escopo = escopo_falso(workspace_ids={"ws-1"})
+        await create_workspace(db, ID_B, "usr-1", "Terceiro")
+    escopo = fake_scope(workspace_ids={"ws-1"})
     async with banco() as db:
         with pytest.raises(ToolError) as exc:
-            await resolver_workspace(db, escopo, ID_B)
+            await resolve_workspace(db, escopo, ID_B)
     assert corpo(exc.value)["code"] == "forbidden"
 
 
-async def test_nome_de_workspace_desconhecido_e_not_found(banco):
-    escopo = escopo_falso(workspace_ids={"ws-1"})
+async def test_unknown_workspace_name_is_not_found(banco):
+    escopo = fake_scope(workspace_ids={"ws-1"})
     async with banco() as db:
         with pytest.raises(ToolError) as exc:
-            await resolver_workspace(db, escopo, "Inexistente")
+            await resolve_workspace(db, escopo, "Inexistente")
     assert corpo(exc.value)["code"] == "not_found"
 
 
-async def test_token_sem_workspace_nenhum_e_proibido(banco):
-    escopo = escopo_falso(workspace_ids=set())
+async def test_token_without_any_workspace_is_forbidden(banco):
+    escopo = fake_scope(workspace_ids=set())
     async with banco() as db:
         with pytest.raises(ToolError) as exc:
-            await resolver_workspace(db, escopo, None)
+            await resolve_workspace(db, escopo, None)
     assert corpo(exc.value)["code"] == "forbidden"
 
 
 # ── carregar_workflow ─────────────────────────────────────────────────────────
 
 
-async def test_carrega_por_id_e_devolve_o_papel(banco):
+async def test_loads_by_id_and_returns_the_role(banco):
     async with banco() as db:
-        await criar_workflow(db, id_hash=ID_A, nome="Recorte", workspace_id="ws-1")
-    escopo = escopo_falso(workspace_ids={"ws-1"})
+        await create_workflow_row(db, id_hash=ID_A, nome="Recorte", workspace_id="ws-1")
+    escopo = fake_scope(workspace_ids={"ws-1"})
     async with banco() as db:
         wf, papel = await carregar_workflow(db, escopo, ID_A)
     assert wf.id_hash == ID_A
@@ -170,20 +170,20 @@ async def test_carrega_por_id_e_devolve_o_papel(banco):
     assert papel == "owner"
 
 
-async def test_carrega_por_nome(banco):
+async def test_loads_by_name(banco):
     async with banco() as db:
-        await criar_workflow(db, id_hash=ID_A, nome="Recorte mensal", workspace_id="ws-1")
-    escopo = escopo_falso(workspace_ids={"ws-1"})
+        await create_workflow_row(db, id_hash=ID_A, nome="Recorte mensal", workspace_id="ws-1")
+    escopo = fake_scope(workspace_ids={"ws-1"})
     async with banco() as db:
         wf, _ = await carregar_workflow(db, escopo, "Recorte mensal")
     assert wf.id_hash == ID_A
 
 
-async def test_nome_repetido_em_dois_workspaces_lista_os_ids(banco):
+async def test_name_repeated_in_two_workspaces_lists_the_ids(banco):
     async with banco() as db:
-        await criar_workflow(db, id_hash=ID_A, nome="Recorte", workspace_id="ws-1")
-        await criar_workflow(db, id_hash=ID_B, nome="Recorte", workspace_id="ws-2")
-    escopo = escopo_falso(workspace_ids={"ws-1", "ws-2"})
+        await create_workflow_row(db, id_hash=ID_A, nome="Recorte", workspace_id="ws-1")
+        await create_workflow_row(db, id_hash=ID_B, nome="Recorte", workspace_id="ws-2")
+    escopo = fake_scope(workspace_ids={"ws-1", "ws-2"})
     async with banco() as db:
         with pytest.raises(ToolError) as exc:
             await carregar_workflow(db, escopo, "Recorte")
@@ -193,11 +193,11 @@ async def test_nome_repetido_em_dois_workspaces_lista_os_ids(banco):
     assert {c["workspace_id"] for c in detalhe["candidates"]} == {"ws-1", "ws-2"}
 
 
-async def test_workflow_apagado_responde_not_found(banco):
+async def test_deleted_workflow_answers_not_found(banco):
     """The trash is not a 403: for the caller, the workflow no longer exists."""
     async with banco() as db:
-        await criar_workflow(db, id_hash=ID_A, nome="Antigo", workspace_id="ws-1", apagado=True)
-    escopo = escopo_falso(workspace_ids={"ws-1"})
+        await create_workflow_row(db, id_hash=ID_A, nome="Antigo", workspace_id="ws-1", apagado=True)
+    escopo = fake_scope(workspace_ids={"ws-1"})
     async with banco() as db:
         with pytest.raises(ToolError) as exc:
             await carregar_workflow(db, escopo, ID_A)
@@ -209,15 +209,15 @@ async def test_workflow_apagado_responde_not_found(banco):
     assert corpo(exc.value)["code"] == "not_found"
 
 
-async def test_id_inexistente_e_not_found_antes_de_qualquer_403(banco):
-    escopo = escopo_falso(workspace_ids={"ws-1"})
+async def test_nonexistent_id_is_not_found_before_any_403(banco):
+    escopo = fake_scope(workspace_ids={"ws-1"})
     async with banco() as db:
         with pytest.raises(ToolError) as exc:
             await carregar_workflow(db, escopo, "33333333-3333-4333-8333-333333333333")
     assert corpo(exc.value)["code"] == "not_found"
 
 
-async def test_id_de_outra_conta_responde_byte_a_byte_como_id_inexistente(banco):
+async def test_id_of_another_account_answers_byte_for_byte_like_nonexistent_id(banco):
     """The cross-account existence oracle, closed in the text and in the code.
 
     The workflow exists, in a workspace of another account, and the user is not
@@ -228,10 +228,10 @@ async def test_id_de_outra_conta_responde_byte_a_byte_como_id_inexistente(banco)
     which ones exist on the other side of the wall.
     """
     async with banco() as db:
-        await criar_usuario(db, "usr-2", "bruno")
-        await criar_workspace(db, "ws-9", "usr-2", "De outro")
-        await criar_workflow(db, id_hash=ID_B, nome="Alheio", workspace_id="ws-9")
-    escopo = escopo_falso(workspace_ids={"ws-1"})
+        await create_user(db, "usr-2", "bruno")
+        await create_workspace(db, "ws-9", "usr-2", "De outro")
+        await create_workflow_row(db, id_hash=ID_B, nome="Alheio", workspace_id="ws-9")
+    escopo = fake_scope(workspace_ids={"ws-1"})
 
     async with banco() as db:
         with pytest.raises(ToolError) as alheio:
@@ -248,20 +248,20 @@ async def test_id_de_outra_conta_responde_byte_a_byte_como_id_inexistente(banco)
     assert ID_B not in str(alheio.value)
 
 
-async def test_nome_de_workflow_fora_do_escopo_nao_revela_existencia(banco):
+async def test_workflow_name_out_of_scope_does_not_reveal_existence(banco):
     """By name the answer is `not_found`: the scope filter goes into the query."""
     async with banco() as db:
-        await criar_usuario(db, "usr-2", "bruno")
-        await criar_workspace(db, "ws-9", "usr-2", "De outro")
-        await criar_workflow(db, id_hash=ID_B, nome="Alheio", workspace_id="ws-9")
-    escopo = escopo_falso(workspace_ids={"ws-1"})
+        await create_user(db, "usr-2", "bruno")
+        await create_workspace(db, "ws-9", "usr-2", "De outro")
+        await create_workflow_row(db, id_hash=ID_B, nome="Alheio", workspace_id="ws-9")
+    escopo = fake_scope(workspace_ids={"ws-1"})
     async with banco() as db:
         with pytest.raises(ToolError) as exc:
             await carregar_workflow(db, escopo, "Alheio")
     assert corpo(exc.value)["code"] == "not_found"
 
 
-async def test_token_restrito_nao_ve_workspace_do_proprio_dono(banco):
+async def test_restricted_token_does_not_see_its_own_owners_workspace(banco):
     """The owner reaches both workspaces; the token, only one. The token wins.
 
     It is the case that separates "what the user can do" from "what this token
@@ -276,8 +276,8 @@ async def test_token_restrito_nao_ve_workspace_do_proprio_dono(banco):
     half an hour looking for a workflow that didn't vanish.
     """
     async with banco() as db:
-        await criar_workflow(db, id_hash=ID_B, nome="Do outro projeto", workspace_id="ws-2")
-    escopo = escopo_falso(workspace_ids={"ws-1"})
+        await create_workflow_row(db, id_hash=ID_B, nome="Do outro projeto", workspace_id="ws-2")
+    escopo = fake_scope(workspace_ids={"ws-1"})
     async with banco() as db:
         with pytest.raises(ToolError) as exc:
             await carregar_workflow(db, escopo, ID_B)
@@ -289,30 +289,30 @@ async def test_token_restrito_nao_ve_workspace_do_proprio_dono(banco):
     assert corpo(exc.value)["code"] == "not_found"
 
 
-async def test_membro_comum_carrega_com_o_papel_de_membro(banco):
+async def test_regular_member_loads_with_the_member_role(banco):
     async with banco() as db:
-        await criar_usuario(db, "usr-2", "bruno")
-        await tornar_membro(db, "ws-1", "usr-2", "editor")
-        await criar_workflow(db, id_hash=ID_A, nome="Recorte", workspace_id="ws-1")
-    escopo = escopo_falso(user_id="usr-2", workspace_ids={"ws-1"})
+        await create_user(db, "usr-2", "bruno")
+        await make_member(db, "ws-1", "usr-2", "editor")
+        await create_workflow_row(db, id_hash=ID_A, nome="Recorte", workspace_id="ws-1")
+    escopo = fake_scope(user_id="usr-2", workspace_ids={"ws-1"})
     async with banco() as db:
         wf, papel = await carregar_workflow(db, escopo, ID_A)
     assert (wf.id_hash, papel) == (ID_A, "editor")
 
 
-async def test_carregar_por_id_nao_decifra_por_padrao(banco, monkeypatch):
+async def test_load_by_id_does_not_decrypt_by_default(banco, monkeypatch):
     """`decifrar=False` is the default: no cleartext definition in the session."""
     from app.services import workflow_service
 
-    async def _nao_deveria(*args, **kwargs):  # pragma: no cover - the test fails first
+    async def _should_not_be_called(*args, **kwargs):  # pragma: no cover - the test fails first
         raise AssertionError("o caminho que decifra não pode ser usado pelo MCP")
 
     monkeypatch.setattr(
-        workflow_service.WorkflowService, "get_workflow_by_hash", _nao_deveria, raising=True
+        workflow_service.WorkflowService, "get_workflow_by_hash", _should_not_be_called, raising=True
     )
     async with banco() as db:
-        await criar_workflow(db, id_hash=ID_A, nome="Recorte", workspace_id="ws-1")
-    escopo = escopo_falso(workspace_ids={"ws-1"})
+        await create_workflow_row(db, id_hash=ID_A, nome="Recorte", workspace_id="ws-1")
+    escopo = fake_scope(workspace_ids={"ws-1"})
     async with banco() as db:
         wf, _ = await carregar_workflow(db, escopo, ID_A)
     assert wf.id_hash == ID_A

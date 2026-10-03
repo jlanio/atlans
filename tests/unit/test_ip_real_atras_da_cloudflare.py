@@ -14,12 +14,12 @@ by a hop we trust. `get_client_ip` walks from right to left skipping
 `TRUSTED_PROXIES` (Traefik's network) and `EDGE_PROXIES` (Cloudflare) and
 returns the first IP left over.
 
-  FORJADO     (forged) junk on the left is ignored; the IP appended by Cloudflare wins.
+  FORGED     (forged) junk on the left is ignored; the IP appended by Cloudflare wins.
   DIRETO      (direct) peer outside TRUSTED_PROXIES: the whole header is ignored.
   IPV6        Cloudflare's IPv6 ranges are skipped too.
   SO PROXIES  (only proxies) if every element is a known proxy, the leftmost wins.
   DESLIGADO   (off) EDGE_PROXIES="" (explicitly empty) differs from ABSENT (Cloudflare).
-  INVALIDO    (invalid) a mistyped range is ignored with a log; it does not break the import.
+  INVALID    (invalid) a mistyped range is ignored with a log; it does not break the import.
   ANTIGOS     (old) the previous contracts of get_client_ip still hold.
 """
 from __future__ import annotations
@@ -61,9 +61,9 @@ def recarrega(monkeypatch):
     importlib.reload(tp)  # ...and the module reloaded with it
 
 
-# ── FORJADO ──────────────────────────────────────────────────────────────────
+# ── FORGED ──────────────────────────────────────────────────────────────────
 
-def test_lixo_a_esquerda_e_ignorado_vale_o_ip_anexado_pela_cloudflare(recarrega):
+def test_garbage_on_the_left_is_ignored_cloudflare_appended_ip_counts(recarrega):
     """The bug scenario: the client sends its own XFF, Cloudflare appends the
     real IP and Traefik appends the edge. Before, the 1st element was the key."""
     tp = recarrega()
@@ -73,7 +73,7 @@ def test_lixo_a_esquerda_e_ignorado_vale_o_ip_anexado_pela_cloudflare(recarrega)
 
 # ── DIRETO ───────────────────────────────────────────────────────────────────
 
-def test_direto_ao_origin_o_header_inteiro_e_ignorado(recarrega):
+def test_direct_to_origin_whole_header_is_ignored(recarrega):
     """Peer outside TRUSTED_PROXIES: not even the right side of the header counts."""
     tp = recarrega()
     assert tp.get_client_ip("198.51.100.7", "forjado") == "198.51.100.7"
@@ -82,28 +82,28 @@ def test_direto_ao_origin_o_header_inteiro_e_ignorado(recarrega):
 
 # ── IPV6 ─────────────────────────────────────────────────────────────────────
 
-def test_edge_ipv6_da_cloudflare_tambem_e_pulado(recarrega):
+def test_cloudflare_ipv6_edge_is_also_skipped(recarrega):
     tp = recarrega()
     assert tp.get_client_ip(TRAEFIK, f"2001:db8::9, {CF_EDGE_V6}") == "2001:db8::9"
 
 
 # ── SO PROXIES ───────────────────────────────────────────────────────────────
 
-def test_todos_proxies_conhecidos_vale_o_mais_a_esquerda(recarrega):
+def test_all_known_proxies_leftmost_counts(recarrega):
     tp = recarrega()
     assert tp.get_client_ip(TRAEFIK, f"{TRAEFIK}, {CF_EDGE_V4}") == TRAEFIK
 
 
 # ── DESLIGADO / AUSENTE ──────────────────────────────────────────────────────
 
-def test_edge_proxies_vazio_desliga_o_default(recarrega):
+def test_empty_edge_proxies_disables_the_default(recarrega):
     """Without Cloudflare in front, the last IP of the header IS the client."""
     tp = recarrega(edge="")
     assert tp.EDGE_PROXIES == []
     assert tp.get_client_ip(TRAEFIK, f"{CLIENTE}, {CF_EDGE_V4}") == CF_EDGE_V4
 
 
-def test_edge_proxies_ausente_e_a_lista_da_cloudflare(recarrega):
+def test_edge_proxies_absent_is_the_cloudflare_list(recarrega):
     tp = recarrega(edge=None)
     esperadas = [p.strip() for p in tp.CLOUDFLARE_RANGES.split(",") if p.strip()]
     # no entry of the constant was discarded as invalid
@@ -112,7 +112,7 @@ def test_edge_proxies_ausente_e_a_lista_da_cloudflare(recarrega):
     assert ipaddress.ip_network("2606:4700::/32") in tp.EDGE_PROXIES
 
 
-def test_edge_proxies_customizado_substitui_o_default(recarrega):
+def test_custom_edge_proxies_replaces_the_default(recarrega):
     tp = recarrega(edge="198.51.100.0/24")
     assert tp.EDGE_PROXIES == [ipaddress.ip_network("198.51.100.0/24")]
     # Cloudflare is no longer skipped...
@@ -121,9 +121,9 @@ def test_edge_proxies_customizado_substitui_o_default(recarrega):
     assert tp.get_client_ip(TRAEFIK, f"{CLIENTE}, 198.51.100.7") == CLIENTE
 
 
-# ── INVALIDO ─────────────────────────────────────────────────────────────────
+# ── INVALID ─────────────────────────────────────────────────────────────────
 
-def test_edge_proxies_invalido_e_ignorado_com_log_sem_derrubar_o_import(
+def test_invalid_edge_proxies_is_ignored_with_log_without_breaking_import(
     recarrega, monkeypatch, caplog,
 ):
     # The app's logger may have propagate=False (its own handlers) depending
@@ -142,28 +142,28 @@ def test_edge_proxies_invalido_e_ignorado_com_log_sem_derrubar_o_import(
 
 # ── ANTIGOS ──────────────────────────────────────────────────────────────────
 
-def test_proxy_interno_a_direita_continua_sendo_pulado(recarrega):
+def test_internal_proxy_on_the_right_is_still_skipped(recarrega):
     tp = recarrega()
     assert tp.get_client_ip(TRAEFIK, f"{CLIENTE}, {TRAEFIK}") == CLIENTE
 
 
-def test_peer_nao_confiavel_continua_nao_podendo_forjar(recarrega):
+def test_untrusted_peer_still_cannot_forge(recarrega):
     tp = recarrega()
     assert tp.get_client_ip("198.51.100.7", CLIENTE) == "198.51.100.7"
 
 
-def test_sem_forwarded_for_continua_caindo_no_peer(recarrega):
+def test_without_forwarded_for_still_falls_back_to_peer(recarrega):
     tp = recarrega()
     assert tp.get_client_ip(TRAEFIK, None) == TRAEFIK
     assert tp.get_client_ip(TRAEFIK, "") == TRAEFIK
 
 
-def test_sem_peer_continua_unknown(recarrega):
+def test_without_peer_stays_unknown(recarrega):
     tp = recarrega()
     assert tp.get_client_ip(None, None) == "unknown"
 
 
-def test_trusted_proxies_vazio_continua_ignorando_o_header(recarrega):
+def test_empty_trusted_proxies_still_ignores_the_header(recarrega):
     """Asymmetry preserved: is_trusted_proxy() is True (check disabled),
     but the XFF is not read — in dev without a proxy, the peer IS the client."""
     tp = recarrega(trusted="")
@@ -173,7 +173,7 @@ def test_trusted_proxies_vazio_continua_ignorando_o_header(recarrega):
 
 # ── Decisions documented in get_client_ip's docstring ───────────────────────
 
-def test_elementos_que_nao_sao_ip_sao_pulados_e_sem_nenhum_valido_vale_o_peer(recarrega):
+def test_non_ip_elements_are_skipped_and_with_none_valid_peer_counts(recarrega):
     tp = recarrega()
     # `unknown` e `ip:porta` nao contam; o IP valido seguinte a esquerda vale
     assert tp.get_client_ip(TRAEFIK, f"{CLIENTE}, unknown, 10.0.0.1:8080, {CF_EDGE_V4}") == CLIENTE
@@ -181,13 +181,13 @@ def test_elementos_que_nao_sao_ip_sao_pulados_e_sem_nenhum_valido_vale_o_peer(re
     assert tp.get_client_ip(TRAEFIK, "unknown, , lixo") == TRAEFIK
 
 
-def test_ip_devolvido_na_forma_canonica(recarrega):
+def test_ip_returned_in_canonical_form(recarrega):
     """Same client, same bucket — regardless of how the IPv6 was written."""
     tp = recarrega()
     assert tp.get_client_ip(TRAEFIK, f"2001:DB8:0000::0009, {CF_EDGE_V6}") == "2001:db8::9"
 
 
-def test_is_trusted_proxy_nao_avaliza_a_cloudflare(recarrega):
+def test_is_trusted_proxy_does_not_vouch_for_cloudflare(recarrega):
     """EDGE_PROXIES does not authorize the mTLS cert header: only TRUSTED_PROXIES."""
     tp = recarrega()
     assert tp.is_trusted_proxy(CF_EDGE_V4) is False
@@ -204,19 +204,19 @@ WORKER_EGRESS = "2a06:98c0:3600::103"
 CF_EDGE_2 = "172.70.1.2"  # within 172.64.0.0/13
 
 
-def test_worker_da_cloudflare_nao_escolhe_a_propria_identidade(recarrega):
+def test_cloudflare_worker_does_not_choose_its_own_identity(recarrega):
     tp = recarrega()
     for forjado in ("6.6.6.6", "7.7.7.7", "203.0.113.9"):
         assert tp.get_client_ip(TRAEFIK, f"{forjado}, {WORKER_EGRESS}, {CF_EDGE_2}") == WORKER_EGRESS
 
 
-def test_so_um_salto_de_borda_e_pulado(recarrega):
+def test_only_one_edge_hop_is_skipped(recarrega):
     """Two edges in a row: the second (from right to left) is the one that
     connected to Cloudflare, and it is the client — even though it is within its ranges."""
     tp = recarrega()
     assert tp.get_client_ip(TRAEFIK, f"{CLIENTE}, {CF_EDGE_V4}, {CF_EDGE_2}") == CF_EDGE_V4
 
 
-def test_infra_interna_a_direita_e_pulada_antes_do_edge(recarrega):
+def test_internal_infra_on_the_right_is_skipped_before_edge(recarrega):
     tp = recarrega()
     assert tp.get_client_ip(TRAEFIK, f"forjado, {CLIENTE}, {CF_EDGE_V4}, {TRAEFIK}") == CLIENTE

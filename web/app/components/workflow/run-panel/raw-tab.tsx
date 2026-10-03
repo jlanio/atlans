@@ -105,9 +105,9 @@ const RawTab = ({ events, startTs, droppedEvents }: {
   // Expansion state OUTSIDE the row: virtualization unmounts the row when it
   // leaves the window, and a local useState would lose the expansion on
   // scrolling back.
-  const [expandidos, setExpandidos] = useState<Set<number>>(() => new Set())
-  const alternarExpansao = useCallback((seq: number) => {
-    setExpandidos(prev => {
+  const [expandidos, setExpanded] = useState<Set<number>>(() => new Set())
+  const toggleExpansion = useCallback((seq: number) => {
+    setExpanded(prev => {
       const next = new Set(prev)
       if (next.has(seq)) next.delete(seq)
       else next.add(seq)
@@ -183,7 +183,7 @@ const RawTab = ({ events, startTs, droppedEvents }: {
                 startTs={startTs}
                 search={search}
                 expanded={expandidos.has(visible[vi.index].seq)}
-                onToggle={alternarExpansao}
+                onToggle={toggleExpansion}
               />
             </div>
           ))}

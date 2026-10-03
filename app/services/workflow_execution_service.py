@@ -17,7 +17,7 @@ from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.authorization.workflow_access import (
     exigir_papel,
-    papel_no_workspace_do_run,
+    role_in_run_workspace,
 )
 from app.core.config import policy_routing_enabled
 from app.core.rbac import ROLE_OPERATOR
@@ -29,7 +29,7 @@ from app.core.exceptions import (
     WorkflowNotFoundError,
 )
 from app.core.job_crypto import build_job_message
-from app.services.fundos_do_mapa import injetar_fundos_de_mapa
+from app.services.fundos_do_mapa import inject_basemaps
 from app.services.fuso_do_agendamento import injetar_fuso_do_agendamento
 from app.core.utils.encryption import decrypt_workflow_connections
 from app.core.utils.workflow_nodes import node_props
@@ -39,7 +39,7 @@ from app.models.models import Workflow, WorkflowRun
 from app.models.workspace import Workspace
 from app.services import workspace_executor_service as politica
 from app.services.credential_resolver import inject_credentials
-from app.services.fechamento_de_run import ABERTOS, REPETIVEL, fechar_runs
+from app.services.fechamento_de_run import OPEN_STATUSES, REPETIVEL, fechar_runs
 from app.services.user_executor_service import get_default_agents
 
 _logger = get_logger(__name__)
@@ -313,7 +313,7 @@ async def _load_workflow(
     return wf, definition
 
 
-async def _disponivel(executor_id: str) -> bool:
+async def _is_available(executor_id: str) -> bool:
     """Candidate to be TRIED: presence True or "don't know" (spec §5.1).
 
     Only a confirmed absent presence excludes. A Redis blip or a
@@ -325,31 +325,31 @@ async def _disponivel(executor_id: str) -> bool:
 
 # Runs that occupy an executor in the server's eyes: dispatched and still without
 # an outcome. `pending` is included because the INSERT already writes the host before sending.
-_STATUS_EM_VOO = ("pending", "running")
+_IN_FLIGHT_STATUSES = ("pending", "running")
 
 # Executor defaults (EXECUTOR_MAX_CONCURRENT / EXECUTOR_MAX_QUEUE_SIZE), for
 # those that have not declared their own and have no readable database ceiling.
-_VAGAS_PADRAO = 4
-_FILA_PADRAO = 50
+_DEFAULT_SLOTS = 4
+_DEFAULT_QUEUE = 50
 
 # Random draw for the order (uniform in [0, 1)). A module function so the tests
 # can fix the order; it is not security, just spreading.
 _desempate = random.random
 
 
-def _contagem(valor) -> int:
+def _count(valor) -> int:
     """Non-negative integer, or 0 — the capacity comes from outside (executor/Redis)."""
     if isinstance(valor, bool) or not isinstance(valor, int):
         return 0
     return max(valor, 0)
 
 
-def _menor_positivo(*valores: int) -> int:
+def _smallest_positive(*valores: int) -> int:
     """The smallest of the positive values; 0 if none is."""
     return min((v for v in valores if v > 0), default=0)
 
 
-def _cheio_pela_declarada(cap: dict) -> bool:
+def _full_by_declared(cap: dict) -> bool:
     """The SAME computation as `send_job`'s `is_full`: if it says full, the send will
     be refused. Unreadable capacity is not "full" — the send is what decides."""
     if not cap:
@@ -361,8 +361,8 @@ def _cheio_pela_declarada(cap: dict) -> bool:
 
 
 @dataclass(frozen=True)
-class _Situacao:
-    """How an executor is doing, for the dispatch order (`_situacoes`)."""
+class _ExecutorState:
+    """How an executor is doing, for the dispatch order (`_executor_states`)."""
     carga: int              # jobs it has (running + in the local queue)
     vagas: int              # concurrent runs it can hold
     fila: int               # jobs its local queue can hold beyond the slots
@@ -380,12 +380,12 @@ class _Situacao:
         return self.cheio_declarado or self.carga >= self.vagas + self.fila
 
     @property
-    def ocupacao(self) -> float:
+    def occupancy(self) -> float:
         """Occupancy with this one more job: (load + 1) / slots."""
         return (self.carga + 1) / self.vagas
 
 
-async def _contadas_pelo_servidor(db: AsyncSession, ids: list[str]) -> dict[str, int] | None:
+async def _counted_by_server(db: AsyncSession, ids: list[str]) -> dict[str, int] | None:
     """`pending`/`running` runs of each executor, counted in the database; None if the
     count did not come through.
 
@@ -410,7 +410,7 @@ async def _contadas_pelo_servidor(db: AsyncSession, ids: list[str]) -> dict[str,
     consulta = (
         sa_select(WorkflowRun.host, func.count())
         .where(
-            WorkflowRun.status.in_(_STATUS_EM_VOO),
+            WorkflowRun.status.in_(_IN_FLIGHT_STATUSES),
             WorkflowRun.host.in_(list(hosts)),
         )
         .group_by(WorkflowRun.host)
@@ -429,7 +429,7 @@ async def _contadas_pelo_servidor(db: AsyncSession, ids: list[str]) -> dict[str,
     return {hosts[host]: int(n) for host, n in linhas if host in hosts}
 
 
-async def _situacoes(db: AsyncSession, executores: list[Executor]) -> dict[str, _Situacao]:
+async def _executor_states(db: AsyncSession, executores: list[Executor]) -> dict[str, _ExecutorState]:
     """Load, slots, queue and "full" for each candidate.
 
     - load = the one counted by the server. It is fresh and the same on all workers;
@@ -448,36 +448,36 @@ async def _situacoes(db: AsyncSession, executores: list[Executor]) -> dict[str, 
     # still in flight — the query would use the session while the caller is already using it
     # again. After both finish, a count error propagates; an error reading the
     # capacity counts as nothing declared.
-    contadas, declaradas = await asyncio.gather(
-        _contadas_pelo_servidor(db, ids),
+    counted, declaradas = await asyncio.gather(
+        _counted_by_server(db, ids),
         executor_registry.read_capacities(ids),
         return_exceptions=True,
     )
-    if isinstance(contadas, BaseException):
-        raise contadas
+    if isinstance(counted, BaseException):
+        raise counted
     if isinstance(declaradas, BaseException) or not isinstance(declaradas, dict):
         declaradas = {}
-    situacoes: dict[str, _Situacao] = {}
+    executor_states: dict[str, _ExecutorState] = {}
     for ag in executores:
         cap = declaradas.get(ag.id_hash)
         cap = cap if isinstance(cap, dict) else {}
-        declarada = _contagem(cap.get("running")) + _contagem(cap.get("queued"))
-        situacoes[ag.id_hash] = _Situacao(
-            carga=contadas.get(ag.id_hash, 0) if contadas is not None else declarada,
-            vagas=_menor_positivo(
-                _contagem(cap.get("max_concurrent")),
-                _contagem(getattr(ag, "max_concurrent_jobs", None)),
-            ) or _VAGAS_PADRAO,
-            fila=_menor_positivo(
-                _contagem(cap.get("max_queue")),
-                _contagem(getattr(ag, "max_queue_size", None)),
-            ) or _FILA_PADRAO,
-            cheio_declarado=_cheio_pela_declarada(cap),
+        declarada = _count(cap.get("running")) + _count(cap.get("queued"))
+        executor_states[ag.id_hash] = _ExecutorState(
+            carga=counted.get(ag.id_hash, 0) if counted is not None else declarada,
+            vagas=_smallest_positive(
+                _count(cap.get("max_concurrent")),
+                _count(getattr(ag, "max_concurrent_jobs", None)),
+            ) or _DEFAULT_SLOTS,
+            fila=_smallest_positive(
+                _count(cap.get("max_queue")),
+                _count(getattr(ag, "max_queue_size", None)),
+            ) or _DEFAULT_QUEUE,
+            cheio_declarado=_full_by_declared(cap),
         )
-    return situacoes
+    return executor_states
 
 
-def _chave_de_ordem(s: _Situacao) -> tuple:
+def _sort_key(s: _ExecutorState) -> tuple:
     """Three groups, in this order:
 
     1. With a free slot — the job starts right away. Draw WEIGHTED by the free
@@ -493,29 +493,29 @@ def _chave_de_ordem(s: _Situacao) -> tuple:
        other. This is where the draining executor lands.
     """
     if s.cheio:
-        return (2, s.ocupacao, _desempate())
+        return (2, s.occupancy, _desempate())
     if s.livres > 0:
         return (0, -(_desempate() ** (1 / s.livres)))
-    return (1, s.ocupacao, _desempate())
+    return (1, s.occupancy, _desempate())
 
 
-async def _elegiveis_ordenados(
+async def _sorted_eligible(
     db: AsyncSession, executores: list[Executor], *, excluir: set[str] = frozenset(),
 ) -> list[Executor]:
     """Filters by `active` + `public_key` + availability (in parallel) and
-    sorts by `_chave_de_ordem` over `_situacoes`."""
+    sorts by `_sort_key` over `_executor_states`."""
     base = [
         ag for ag in executores
         if ag.id_hash not in excluir and ag.status == "active" and ag.public_key
     ]
     if not base:
         return []
-    flags = await asyncio.gather(*[_disponivel(ag.id_hash) for ag in base])
+    flags = await asyncio.gather(*[_is_available(ag.id_hash) for ag in base])
     vivos = [ag for ag, ok in zip(base, flags) if ok]
     if len(vivos) < 2:
         return vivos
-    situacoes = await _situacoes(db, vivos)
-    vivos.sort(key=lambda ag: _chave_de_ordem(situacoes[ag.id_hash]))
+    executor_states = await _executor_states(db, vivos)
+    vivos.sort(key=lambda ag: _sort_key(executor_states[ag.id_hash]))
     return vivos
 
 
@@ -527,7 +527,7 @@ async def _resolve_candidates(db: AsyncSession, wf: Workflow) -> CandidateList:
     then the entire pool). After the backfill of migration 20260907_0002 both
     produce the same chain for every existing workspace — the same
     executors in the same tiers; within a tier the order involves a random draw
-    (`_chave_de_ordem`), so it is only identical with the draw fixed, as in the
+    (`_sort_key`), so it is only identical with the draw fixed, as in the
     golden test.
     """
     if policy_routing_enabled() and wf.workspace_id:
@@ -537,7 +537,7 @@ async def _resolve_candidates(db: AsyncSession, wf: Workflow) -> CandidateList:
 
 async def _resolve_candidates_legacy(db: AsyncSession, wf: Workflow) -> CandidateList:
     """Legacy priority order: 1. the workspace's dedicated executor (if available);
-    2. the default executor pool, in `_chave_de_ordem` order. Raises 503 if
+    2. the default executor pool, in `_sort_key` order. Raises 503 if
     the list ends up empty."""
     candidates: list[Executor] = []
     tiers: dict[str, str] = {}
@@ -553,12 +553,12 @@ async def _resolve_candidates_legacy(db: AsyncSession, wf: Workflow) -> Candidat
             )
         )
         ag = result.scalar_one_or_none()
-        if ag and ag.status == "active" and ag.public_key and await _disponivel(ag.id_hash):
+        if ag and ag.status == "active" and ag.public_key and await _is_available(ag.id_hash):
             candidates.append(ag)
             tiers[ag.id_hash] = politica.DISPATCH_PRIMARY
 
     defaults = await get_default_agents(db)
-    for ag in await _elegiveis_ordenados(db, defaults, excluir={c.id_hash for c in candidates}):
+    for ag in await _sorted_eligible(db, defaults, excluir={c.id_hash for c in candidates}):
         candidates.append(ag)
         tiers[ag.id_hash] = politica.DISPATCH_POOL
 
@@ -570,7 +570,7 @@ async def _resolve_candidates_legacy(db: AsyncSession, wf: Workflow) -> Candidat
     return CandidateList(candidates, tiers=tiers, mode=None)
 
 
-def _mensagens_da_politica(p: "politica.WorkspacePolicy") -> tuple[str, str]:
+def _policy_messages(p: "politica.WorkspacePolicy") -> tuple[str, str]:
     """(detailed message for the owner, error_category) when the chain is exhausted."""
     n = len(p.primary) + len(p.fallback)
     if p.mode == politica.MODE_ISOLATED:
@@ -590,7 +590,7 @@ def _mensagens_da_politica(p: "politica.WorkspacePolicy") -> tuple[str, str]:
 async def _resolve_candidates_by_policy(db: AsyncSession, wf: Workflow) -> CandidateList:
     """Policy chain: tier 1 → tier 2 → terminal (spec §5).
 
-    Within a tier, the `_chave_de_ordem` order; between tiers, strict
+    Within a tier, the `_sort_key` order; between tiers, strict
     order. The pool only comes in if the EFFECTIVE terminal is `pool` (the admin's floor
     wins). Pool mode (no tier 1) is the usual one."""
     p = await politica.load_policy_by_id(db, wf.workspace_id)
@@ -602,17 +602,17 @@ async def _resolve_candidates_by_policy(db: AsyncSession, wf: Workflow) -> Candi
     tiers: dict[str, str] = {}
 
     if p.has_primary:
-        for ag in await _elegiveis_ordenados(db, p.primary):
+        for ag in await _sorted_eligible(db, p.primary):
             cadeia.append(ag); tiers[ag.id_hash] = politica.DISPATCH_PRIMARY
-        for ag in await _elegiveis_ordenados(db, p.fallback, excluir=set(tiers)):
+        for ag in await _sorted_eligible(db, p.fallback, excluir=set(tiers)):
             cadeia.append(ag); tiers[ag.id_hash] = politica.DISPATCH_FALLBACK
 
     if p.allows_pool:
         defaults = await get_default_agents(db)
-        for ag in await _elegiveis_ordenados(db, defaults, excluir=set(tiers)):
+        for ag in await _sorted_eligible(db, defaults, excluir=set(tiers)):
             cadeia.append(ag); tiers[ag.id_hash] = politica.DISPATCH_POOL
 
-    mensagem, categoria = _mensagens_da_politica(p)
+    mensagem, categoria = _policy_messages(p)
     if not cadeia:
         _log_dispatch_event(
             wf=wf, mode=p.mode, candidates_total=0, chosen=None, tier=None,
@@ -651,7 +651,7 @@ def _log_dispatch_event(*, wf, mode, candidates_total, chosen, tier, failovers,
 
 
 @dataclass
-class _Despacho:
+class _Dispatch:
     """What the phases of `_dispatch_job` share: the already written run, the
     chain with the policy annotations and the decision clock (spec §11).
     `ultimo_erro` accumulates the reason for the last refusal, which goes into the
@@ -702,9 +702,9 @@ async def _dispatch_job(
       4. No candidate accepts: UPDATE status='failed' + error_message.
          Re-raise NoExecutorAvailableError to the caller (POST returns 5xx).
 
-    Each step is a function: `_criar_run` (1), `_serializar_payload` (the
-    envelope, once), `_tentar_candidatos` (2 and 3, with the isolation
-    barrier and `_confirmar_entrega`) and `_fechar_sem_executor` (4). This
+    Each step is a function: `_create_run` (1), `_serializar_payload` (the
+    envelope, once), `_try_candidates` (2 and 3, with the isolation
+    barrier and `_confirm_delivery`) and `_close_without_executor` (4). This
     function only chains them and holds the safety net.
 
     Before, this creation was asynchronous via the Redis queue 'run_creates' (a consumer
@@ -732,11 +732,11 @@ async def _dispatch_job(
     allowed = getattr(candidates, "allowed", None)
     mode = getattr(candidates, "mode", None)
 
-    run = await _criar_run(
+    run = await _create_run(
         db, wf, candidates, tiers, job_id,
         trigger_source=trigger_source, triggered_by=triggered_by, schedule_id=schedule_id,
     )
-    despacho = _Despacho(
+    despacho = _Dispatch(
         db=db, wf=wf, run=run, job_id=job_id, candidatos=candidates, tiers=tiers,
         allowed=allowed, mode=mode, inicio=inicio, has_response_node=has_response_node,
     )
@@ -747,10 +747,10 @@ async def _dispatch_job(
             pre_resolved=pre_resolved, disabled_nodes=disabled_nodes,
             subworkflow_definitions=subworkflow_definitions,
         )
-        entregue = await _tentar_candidatos(despacho, plaintext)
+        entregue = await _try_candidates(despacho, plaintext)
         if entregue is not None:
             return entregue
-        raise await _fechar_sem_executor(despacho)
+        raise await _close_without_executor(despacho)
 
     except Exception as exc:
         # Safety net: closes the run before propagating. Idempotent — path
@@ -759,7 +759,7 @@ async def _dispatch_job(
         raise
 
 
-async def _criar_run(
+async def _create_run(
     db: AsyncSession,
     wf: Workflow,
     candidates: list[Executor],
@@ -821,8 +821,8 @@ async def _serializar_payload(
     }
     # And the installation's base map in the Carta nodes, for the same reason: the
     # executor does not have the configuration (see app/services/fundos_do_mapa.py).
-    enriched = injetar_fundos_de_mapa(enriched)
-    enriched_subs = {hash_: injetar_fundos_de_mapa(sub) for hash_, sub in enriched_subs.items()}
+    enriched = inject_basemaps(enriched)
+    enriched_subs = {hash_: inject_basemaps(sub) for hash_, sub in enriched_subs.items()}
     # And the default schedule timezone in a ScheduleTrigger without a timezone: the node's
     # default is that of the environment of whoever imports it, and the executor does not have the
     # installation's (see app/services/fuso_do_agendamento.py).
@@ -860,14 +860,14 @@ async def _serializar_payload(
     )
 
 
-async def _tentar_candidatos(d: _Despacho, plaintext: bytes) -> DispatchResult | None:
+async def _try_candidates(d: _Dispatch, plaintext: bytes) -> DispatchResult | None:
     """2) Tries to dispatch to each candidate in priority order.
 
     Returns the result of the first one that accepts (3), or None if none accepted
     — with the reason for the last refusal in `d.ultimo_erro`. A candidate outside the
-    policy raises, with the run already closed (`_barrar_fora_da_politica`).
+    policy raises, with the run already closed (`_block_outside_policy`).
     """
-    cifrar_em_thread = len(plaintext) >= _LIMIAR_CIFRA_EM_THREAD
+    encrypt_in_thread = len(plaintext) >= _LIMIAR_CIFRA_EM_THREAD
     for indice, ag in enumerate(d.candidatos):
         label = f"{ag.name}@{ag.id_hash[-5:]}" if ag.name else ag.id_hash
 
@@ -876,10 +876,10 @@ async def _tentar_candidatos(d: _Despacho, plaintext: bytes) -> DispatchResult |
         # allows. A refactor that reintroduces the pool into the chain is caught
         # here, not in production by the customer — and the job never goes out.
         if d.allowed is not None and ag.id_hash not in d.allowed:
-            raise await _barrar_fora_da_politica(d, ag, indice, label)
+            raise await _block_outside_policy(d, ag, indice, label)
 
         try:
-            job_msg = await _cifrar_para(d, ag, plaintext, cifrar_em_thread)
+            job_msg = await _encrypt_for(d, ag, plaintext, encrypt_in_thread)
         except RuntimeError as exc:
             _logger.warning("Falha ao cifrar job para executor '%s': %s", label, exc)
             d.ultimo_erro = f"Falha ao cifrar job para '{label}': {exc}"
@@ -911,12 +911,12 @@ async def _tentar_candidatos(d: _Despacho, plaintext: bytes) -> DispatchResult |
             d.ultimo_erro = f"Executor '{label}' não aceitou o job (fila cheia ou desconectado)."
             continue
 
-        return await _confirmar_entrega(d, ag, indice, label)
+        return await _confirm_delivery(d, ag, indice, label)
     return None
 
 
-async def _barrar_fora_da_politica(
-    d: _Despacho, ag: Executor, indice: int, label: str,
+async def _block_outside_policy(
+    d: _Dispatch, ag: Executor, indice: int, label: str,
 ) -> NoExecutorAvailableError:
     """Closes the run and records the isolation violation; returns the exception that
     the caller raises. The job does NOT go out: nothing was encrypted for this executor."""
@@ -930,7 +930,7 @@ async def _barrar_fora_da_politica(
     )
     # Conditional, like every server-side close: a
     # cancellation that arrived in this window wins.
-    await fechar_runs(d.db, [d.run], de=ABERTOS, para="failed", mensagem=mensagem, categoria="isolation")
+    await fechar_runs(d.db, [d.run], de=OPEN_STATUSES, para="failed", mensagem=mensagem, categoria="isolation")
     _log_dispatch_event(
         wf=d.wf, mode=d.mode, candidates_total=len(d.candidatos), chosen=ag.id_hash,
         tier=d.tiers.get(ag.id_hash), failovers=indice,
@@ -942,7 +942,7 @@ async def _barrar_fora_da_politica(
     )
 
 
-async def _cifrar_para(d: _Despacho, ag: Executor, plaintext: bytes, cifrar_em_thread: bool) -> dict:
+async def _encrypt_for(d: _Dispatch, ag: Executor, plaintext: bytes, encrypt_in_thread: bool) -> dict:
     """The envelope encrypted for this executor's key. RuntimeError means an invalid
     key, and the candidate is skipped."""
     argumentos = dict(
@@ -959,12 +959,12 @@ async def _cifrar_para(d: _Despacho, ag: Executor, plaintext: bytes, cifrar_em_t
     # encrypting a megabyte envelope inline froze the whole process
     # for tens of milliseconds on every trigger. Below the
     # threshold the thread hop would cost more than it saves.
-    if cifrar_em_thread:
+    if encrypt_in_thread:
         return await asyncio.to_thread(build_job_message, **argumentos)
     return build_job_message(**argumentos)
 
 
-async def _confirmar_entrega(d: _Despacho, ag: Executor, indice: int, label: str) -> DispatchResult:
+async def _confirm_delivery(d: _Dispatch, ag: Executor, indice: int, label: str) -> DispatchResult:
     """3) Success — transitions pending → running, but ONLY if the run has not
     yet reached a terminal state. Between the INSERT of step (1) and this
     point seconds go by (inject_credentials resolves/decrypts
@@ -1022,7 +1022,7 @@ async def _confirmar_entrega(d: _Despacho, ag: Executor, indice: int, label: str
     return d.resultado()
 
 
-async def _fechar_sem_executor(d: _Despacho) -> NoExecutorAvailableError:
+async def _close_without_executor(d: _Dispatch) -> NoExecutorAvailableError:
     """4) No candidate accepted — marks as failed to avoid a zombie run
     in 'pending' forever. Conditional (see `fechar_runs`): the
     user may have cancelled the run while the candidates were answering, and
@@ -1042,7 +1042,7 @@ async def _fechar_sem_executor(d: _Despacho) -> NoExecutorAvailableError:
     # fit the column's taxonomy, which sums all of that up as "no executor".
     # Retrying is safe: nothing ran, and the executor may come back.
     await fechar_runs(
-        d.db, [d.run], de=ABERTOS, para="failed", mensagem=mensagem,
+        d.db, [d.run], de=OPEN_STATUSES, para="failed", mensagem=mensagem,
         categoria="no_executor", extra=REPETIVEL,
     )
     _log_dispatch_event(
@@ -1065,7 +1065,7 @@ async def _close_orphan_dispatch(db: AsyncSession, run: WorkflowRun, exc: Except
     """
     try:
         await fechar_runs(
-            db, [run], de=ABERTOS, para="failed",
+            db, [run], de=OPEN_STATUSES, para="failed",
             mensagem=f"Falha no despacho: {exc}"[:1000], categoria="dispatch",
         )
     except Exception as commit_exc:
@@ -1096,7 +1096,7 @@ async def _close_unassigned_run(db: AsyncSession, run: WorkflowRun) -> bool:
 
     Careful: 'pending' separates the two cases only while the process that dispatched
     is alive. That is why whoever closes here must notify the host anyway — see
-    `_avisar_host_do_cancelamento`.
+    `_notify_host_of_cancellation`.
     """
     return bool(await fechar_runs(
         db, [run], de=("pending",), para="cancelled",
@@ -1104,7 +1104,7 @@ async def _close_unassigned_run(db: AsyncSession, run: WorkflowRun) -> bool:
     ))
 
 
-async def _avisar_host_do_cancelamento(run: WorkflowRun) -> None:
+async def _notify_host_of_cancellation(run: WorkflowRun) -> None:
     """Asks the executor recorded in `run.host` to interrupt the job. Best-effort.
 
     Called ALSO when the run was closed locally while still 'pending'.
@@ -1158,7 +1158,7 @@ async def cancel_run(
     a workflow may have been moved from A to B after it was triggered, and whoever
     controls B must not be able to cancel a run that ran (and consumed
     resources) in A. `como_admin` reproduces the global administrator shortcut that the
-    route already had — a personal token never gets it, because `como_usuario()`
+    route already had — a personal token never gets it, because `as_user()`
     always returns `role="user"`.
 
     Returns the "outcome": "requested" when the message reached the executor,
@@ -1184,7 +1184,7 @@ async def cancel_run(
     close the user would have no way at all to clean up the run (the watchdog only
     reconciles 'running'). The local close does NOT waive notifying the host: a
     'pending' may be an already delivered job whose dispatcher died before the
-    commit — see `_avisar_host_do_cancelamento`.
+    commit — see `_notify_host_of_cancellation`.
 
     With the executor holding it down, the run is also closed here
     ("cancelled"): without this there was no way to clean up a lost run from the screen.
@@ -1199,7 +1199,7 @@ async def cancel_run(
         raise WorkflowNotFoundError(f"Execução '{run_id}' não encontrada.")
 
     if not como_admin:
-        papel = await papel_no_workspace_do_run(db, run, user_id)
+        papel = await role_in_run_workspace(db, run, user_id)
         exigir_papel(
             papel,
             ROLE_OPERATOR,
@@ -1218,8 +1218,8 @@ async def cancel_run(
             _logger.info("Run '%s' cancelado localmente (ainda em 'pending').", run_id)
             # And notifies the host anyway: 'pending' may be a job that HAS ALREADY gone out
             # and whose dispatcher died before the commit — see
-            # `_avisar_host_do_cancelamento`.
-            await _avisar_host_do_cancelamento(run)
+            # `_notify_host_of_cancellation`.
+            await _notify_host_of_cancellation(run)
             return "cancelled"
 
         # The dispatch got there first: re-reads the real state before deciding.
@@ -1263,7 +1263,7 @@ async def cancel_run(
         # precisely the lost run the user was trying to get out of the way. Closes
         # here, conditionally (a job_result that arrives midway wins). If the
         # executor comes back still running the job, its inventory tells it to stop
-        # (see `_parar_zumbis`) and the late result is refused by idempotency.
+        # (see `_stop_zombies`) and the late result is refused by idempotency.
         if await _close_offline_run(db, run):
             _logger.info(
                 "Run '%s' cancelado no servidor: executor '%s' fora do ar.", run_id, executor_id,
@@ -1285,7 +1285,7 @@ async def _close_offline_run(db: AsyncSession, run: WorkflowRun) -> bool:
     UPDATE has already closed the run with the real outcome, and it cannot be overwritten.
     """
     return bool(await fechar_runs(
-        db, [run], de=ABERTOS, para="cancelled",
+        db, [run], de=OPEN_STATUSES, para="cancelled",
         mensagem="Cancelada com o executor fora do ar — a execução foi encerrada no servidor.",
         categoria=None,
     ))

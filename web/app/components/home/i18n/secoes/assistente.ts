@@ -132,7 +132,7 @@ const pt = {
     lote: (maximo: number) => `Enviando os primeiros ${maximo} arquivos.`,
     loteDica: (soltos: number) => `Você soltou ${soltos} de uma vez. Solte o resto em seguida.`,
     naoEnviou: (nome: string) => `Não foi possível enviar «${nome}».`,
-    /** The rejections panel (the Drive's `ResultadoDoUpload`). */
+    /** The rejections panel (the Drive's `UploadResult`). */
     resultado: {
       enviados: (n: number) => plural(n, "enviado"),
       falhas: (n: number) => plural(n, "falha"),

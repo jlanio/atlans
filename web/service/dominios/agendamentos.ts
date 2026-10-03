@@ -2,7 +2,7 @@
 
 import { qs, get, post, put, del } from "../http"
 import type {
-  IAgendamentoMeu, IAgendamentosMeus, IWorkflowGroup,
+  IMySchedule, IMySchedules, IWorkflowGroup,
 } from "../types"
 
 // ── Meu → Agendamentos ───────────────────────────────────────────────────
@@ -12,7 +12,7 @@ import type {
  *  `listarConversas`: the route has a ceiling and without the total it
  *  truncated silently. The server clamps `limit` to 500. */
 export function getMySchedules(limit = 200, offset = 0) {
-  return get<import("../types").IAgendamentosMeus>(`/me/schedules${qs({ limit, offset })}`)
+  return get<import("../types").IMySchedules>(`/me/schedules${qs({ limit, offset })}`)
 }
 
 /** Pauses/activates a schedule. Goes via `put` (mutation) so the write epoch

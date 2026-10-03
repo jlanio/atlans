@@ -17,15 +17,15 @@ BEARER = "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.assinaturaassinatura"  # p
 
 
 @pytest.fixture
-def fabrica_isolada():
-    fabrica, instalada = logging.getLogRecordFactory(), redacao_log._instalada
-    redacao_log._instalada = False
+def isolated_factory():
+    fabrica, instalada = logging.getLogRecordFactory(), redacao_log._installed
+    redacao_log._installed = False
     yield
     logging.setLogRecordFactory(fabrica)
-    redacao_log._instalada = instalada
+    redacao_log._installed = instalada
 
 
-def _capturar(nome: str):
+def _capture(nome: str):
     fluxo = io.StringIO()
     handler = logging.StreamHandler(fluxo)
     handler.setFormatter(logging.Formatter("%(message)s"))
@@ -36,34 +36,34 @@ def _capturar(nome: str):
     return logger, fluxo
 
 
-def test_app_reexporta_a_mesma_lista():
+def test_app_reexports_the_same_list():
     from app.core.utils import logger as app_logger
 
     assert app_logger.scrub_text is redacao_log.scrub_text
     assert app_logger._SCRUB_PATTERNS is redacao_log._SCRUB_PATTERNS
 
 
-def test_fabrica_redige_logger_de_terceiro_sem_filtro(fabrica_isolada):
+def test_factory_redacts_third_party_logger_without_filter(isolated_factory):
     """The third-party handler/logger has no filter at all: the factory is what catches it."""
-    redacao_log.instalar_no_processo()
-    logger, fluxo = _capturar("asyncpg.terceiro")
+    redacao_log.install_in_process()
+    logger, fluxo = _capture("asyncpg.terceiro")
     logger.error("falhou em %s com %s", DSN, BEARER)
     saida = fluxo.getvalue()
     assert "SenhaForte123" not in saida and "assinaturaassinatura" not in saida
     assert "db.interno" in saida  # the diagnostic is still useful
 
 
-def test_argumento_que_nao_e_string_tambem_e_redigido(fabrica_isolada):
+def test_non_string_argument_is_also_redacted(isolated_factory):
     """The driver exception carries the DSN in its `str()` — `%s` of an object."""
-    redacao_log.instalar_no_processo()
-    logger, fluxo = _capturar("executor.teste_objeto")
+    redacao_log.install_in_process()
+    logger, fluxo = _capture("executor.teste_objeto")
     logger.error("conexão recusada: %s", ConnectionError(f"não conectou em {DSN}"))
     assert "SenhaForte123" not in fluxo.getvalue()
 
 
-def test_traceback_e_redigido(fabrica_isolada):
-    redacao_log.instalar_no_processo()
-    logger, fluxo = _capturar("executor.teste_traceback")
+def test_traceback_is_redacted(isolated_factory):
+    redacao_log.install_in_process()
+    logger, fluxo = _capture("executor.teste_traceback")
     try:
         raise RuntimeError(f"erro com {DSN}")
     except RuntimeError:
@@ -72,37 +72,37 @@ def test_traceback_e_redigido(fabrica_isolada):
     assert "RuntimeError" in fluxo.getvalue()
 
 
-def test_registro_sem_segredo_mantem_a_forma(fabrica_isolada):
+def test_record_without_secret_keeps_its_shape(isolated_factory):
     """Some formatters read `record.args` (uvicorn's access one)."""
-    redacao_log.instalar_no_processo()
+    redacao_log.install_in_process()
     registro = logging.getLogger("x").makeRecord("x", logging.INFO, __file__, 1, "%s %s", ("a", "b"), None)
     assert registro.args == ("a", "b")
 
 
-def test_instalar_e_idempotente(fabrica_isolada):
-    redacao_log.instalar_no_processo()
+def test_install_is_idempotent(isolated_factory):
+    redacao_log.install_in_process()
     primeira = logging.getLogRecordFactory()
-    redacao_log.instalar_no_processo()
+    redacao_log.install_in_process()
     assert logging.getLogRecordFactory() is primeira
 
 
-def test_configure_logging_do_executor_liga_a_redacao(fabrica_isolada, monkeypatch):
+def test_executor_configure_logging_enables_redaction(isolated_factory, monkeypatch):
     from executor import logging_setup
 
     root = logging.getLogger()
     originais, nivel = list(root.handlers), root.level
-    estado = (logging_setup._console, logging_setup._configurado)
-    logging_setup._configurado = False
+    estado = (logging_setup._console, logging_setup._configured)
+    logging_setup._configured = False
     try:
         logging_setup.configure_logging()
-        assert redacao_log._instalada
+        assert redacao_log._installed
     finally:
         root.handlers[:] = originais
         root.setLevel(nivel)
-        logging_setup._console, logging_setup._configurado = estado
+        logging_setup._console, logging_setup._configured = estado
 
 
-def test_logger_do_flow_leva_o_filtro_mesmo_fora_do_executor():
+def test_flow_logger_carries_the_filter_even_outside_the_executor():
     from flow.utils.logger import get_logger
 
     logger = get_logger("flow.teste_filtro")
@@ -116,15 +116,15 @@ def test_logger_do_flow_leva_o_filtro_mesmo_fora_do_executor():
     assert "SenhaForte123" not in fluxo.getvalue()
 
 
-def test_segredo_em_uso_e_trocado_antes_dos_padroes(fabrica_isolada):
+def test_secret_in_use_is_replaced_before_the_patterns(isolated_factory):
     """The patterns stop at the first `%` of the value: running before the exact
     `segredos_vivos` replacement, they cut the needle and the key's tail leaked to the log."""
     from flow.utils import segredos_vivos
 
-    redacao_log.instalar_no_processo()
+    redacao_log.install_in_process()
     chave = "Kq7vT9zR%2BaB3%2FxY5wL%3D%3D"  # pragma: allowlist secret
-    logger, fluxo = _capturar("urllib3.teste_ordem")
-    with segredos_vivos.em_uso(chave):
+    logger, fluxo = _capture("urllib3.teste_ordem")
+    with segredos_vivos.in_use(chave):
         # How urllib3 logs: the whole URL is ONE argument.
         logger.warning('"%s %s HTTP/1.1" %s', "GET", f"/ows?service=WFS&token={chave}", 200)
         # And the already-formatted message, with no arguments.
@@ -134,8 +134,8 @@ def test_segredo_em_uso_e_trocado_antes_dos_padroes(fabrica_isolada):
     assert saida.count("token=***") == 2
 
 
-def test_argumentos_simples_mantem_a_forma_e_nao_reescaneiam(fabrica_isolada, monkeypatch):
-    redacao_log.instalar_no_processo()
+def test_simple_arguments_keep_their_shape_and_are_not_rescanned(isolated_factory, monkeypatch):
+    redacao_log.install_in_process()
     chamadas = []
     original = redacao_log._scrub
     monkeypatch.setattr(redacao_log, "_scrub", lambda t: chamadas.append(t) or original(t))
@@ -144,8 +144,8 @@ def test_argumentos_simples_mantem_a_forma_e_nao_reescaneiam(fabrica_isolada, mo
     assert "a de 3" not in chamadas  # the interpolated message was not rescanned
 
 
-def test_traceback_formatado_uma_vez_fica_em_exc_text(fabrica_isolada):
-    redacao_log.instalar_no_processo()
+def test_traceback_formatted_once_stays_in_exc_text(isolated_factory):
+    redacao_log.install_in_process()
     try:
         raise RuntimeError("sem segredo")
     except RuntimeError:

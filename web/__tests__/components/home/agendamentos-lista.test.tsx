@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
-import type { IAgendamentoMeu } from "@/service/types"
+import type { IMySchedule } from "@/service/types"
 
 /**
  * The "Meu → Agendamentos" panel: list (with paused ones + reason), pause/activate and
@@ -69,9 +69,9 @@ import { AgendamentosLista } from "@/app/components/home/agendamentos/lista"
 const ok = <T,>(data: T) => ({ success: true, status: 200, data })
 
 /** The envelope of `GET /me/schedules`: page + TOTAL (the same as Chats). */
-const pagina = (itens: IAgendamentoMeu[], total = itens.length) => ok({ itens, total })
+const pagina = (itens: IMySchedule[], total = itens.length) => ok({ itens, total })
 
-function ag(extra: Partial<IAgendamentoMeu> = {}): IAgendamentoMeu {
+function ag(extra: Partial<IMySchedule> = {}): IMySchedule {
   return {
     job_id: "job-1", id_hash: "sch-1", active: true, strategy: "interval", interval: 6, unit: "hours",
     next_run_at: new Date(Date.now() + 3_600_000).toISOString(), last_run_at: null,
@@ -176,39 +176,39 @@ describe("AgendamentosLista", () => {
   const comHora = { strategy: "cron" as const, cron_expression: "0 6 * * *", interval: null, unit: null }
   // The schedule WITHOUT A TIME: a cadence is the same in any time zone.
   const semHora = { strategy: "cron" as const, cron_expression: "*/30 * * * *", interval: null, unit: null }
-  const FUSO_LOCAL = Intl.DateTimeFormat().resolvedOptions().timeZone
-  const OUTRO_FUSO = FUSO_LOCAL === "America/La_Paz" ? "Europe/Lisbon" : "America/La_Paz"
+  const LOCAL_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const OTHER_TIMEZONE = LOCAL_TIMEZONE === "America/La_Paz" ? "Europe/Lisbon" : "America/La_Paz"
 
   it("mostra o fuso do agendamento quando ele difere do do navegador", async () => {
-    H.getMySchedules.mockResolvedValue(pagina([ag({ ...comHora, timezone: OUTRO_FUSO })]))
+    H.getMySchedules.mockResolvedValue(pagina([ag({ ...comHora, timezone: OTHER_TIMEZONE })]))
     montar()
     await screen.findByText("Fluxo A")
-    expect(screen.getByText(new RegExp(`todo dia às 06:00 \\(${OUTRO_FUSO}\\)`))).toBeTruthy()
+    expect(screen.getByText(new RegExp(`todo dia às 06:00 \\(${OTHER_TIMEZONE}\\)`))).toBeTruthy()
   })
 
   it("não nomeia o fuso quando é o mesmo do navegador", async () => {
-    H.getMySchedules.mockResolvedValue(pagina([ag({ ...comHora, timezone: FUSO_LOCAL })]))
+    H.getMySchedules.mockResolvedValue(pagina([ag({ ...comHora, timezone: LOCAL_TIMEZONE })]))
     montar()
     await screen.findByText("Fluxo A")
-    expect(screen.queryByText(new RegExp(`\\(${FUSO_LOCAL}\\)`))).toBeNull()
+    expect(screen.queryByText(new RegExp(`\\(${LOCAL_TIMEZONE}\\)`))).toBeNull()
   })
 
   it("não gruda o fuso numa descrição SEM hora (cadência)", async () => {
     // "a cada 30 min (America/La_Paz)" means nothing: the time zone only
     // qualifies a time of day, not a cadence.
-    H.getMySchedules.mockResolvedValue(pagina([ag({ ...semHora, timezone: OUTRO_FUSO })]))
+    H.getMySchedules.mockResolvedValue(pagina([ag({ ...semHora, timezone: OTHER_TIMEZONE })]))
     montar()
     expect(await screen.findByText(/a cada 30 min/)).toBeTruthy()
-    expect(screen.queryByText(new RegExp(`\\(${OUTRO_FUSO}\\)`))).toBeNull()
+    expect(screen.queryByText(new RegExp(`\\(${OTHER_TIMEZONE}\\)`))).toBeNull()
   })
 
   it("não gruda o fuso num cron que a tela não soube traduzir", async () => {
     H.getMySchedules.mockResolvedValue(pagina([
-      ag({ strategy: "cron", cron_expression: "7 3 */2 * 1", interval: null, unit: null, timezone: OUTRO_FUSO }),
+      ag({ strategy: "cron", cron_expression: "7 3 */2 * 1", interval: null, unit: null, timezone: OTHER_TIMEZONE }),
     ]))
     montar()
     await screen.findByText("Fluxo A")
-    expect(screen.queryByText(new RegExp(`\\(${OUTRO_FUSO}\\)`))).toBeNull()
+    expect(screen.queryByText(new RegExp(`\\(${OTHER_TIMEZONE}\\)`))).toBeNull()
   })
 
   it("diz quantos agendamentos o servidor tem e o 'Ver mais' traz a página seguinte", async () => {

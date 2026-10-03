@@ -86,18 +86,18 @@ export function DeleteDialog({ onConfirm, className, closeLabel, ...resto }: Del
   const [isDeleting, setIsDeleting] = useState(false)
   // A ref and not just state: the field's Enter and the click can arrive in the
   // same tick, before "deleting" is drawn.
-  const emVoo = useRef(false)
+  const inFlight = useRef(false)
 
   async function handleConfirm() {
-    if (emVoo.current) return
-    emVoo.current = true
+    if (inFlight.current) return
+    inFlight.current = true
     setIsDeleting(true)
     try {
       await onConfirm()
     } finally {
       // If onConfirm closed the dialog, this setState lands on an unmounted
       // component and React ignores it; if it failed, the button works again.
-      emVoo.current = false
+      inFlight.current = false
       setIsDeleting(false)
     }
   }
@@ -127,8 +127,8 @@ function Confirmacao({
   isDeleting: boolean
   onConfirmar: () => void
 }) {
-  const [digitado, setDigitado] = useState("")
-  const campoId = useId()
+  const [digitado, setTyped] = useState("")
+  const fieldId = useId()
   const liberado = confirmarDigitando === undefined || digitado === confirmarDigitando
 
   function confirmar() {
@@ -147,11 +147,11 @@ function Confirmacao({
       {children}
       {confirmarDigitando !== undefined && (
         <div className="grid gap-1.5">
-          {rotuloDigitando && <Label htmlFor={campoId}>{rotuloDigitando}</Label>}
+          {rotuloDigitando && <Label htmlFor={fieldId}>{rotuloDigitando}</Label>}
           <Input
-            id={campoId}
+            id={fieldId}
             value={digitado}
-            onChange={e => setDigitado(e.target.value)}
+            onChange={e => setTyped(e.target.value)}
             // `repeat`: holding Enter must not turn into a second confirmation
             // when the first one comes back with the 409 of the "mesmo assim".
             onKeyDown={e => { if (e.key === "Enter" && !e.repeat) confirmar() }}

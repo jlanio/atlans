@@ -19,7 +19,7 @@ import { createToast } from "@/utils/createToast"
 import { formatDuration } from "@/utils/formatters"
 import { formatLocal } from "@/lib/dayjs"
 import { cn } from "@/lib/utils"
-import { formatarDuracao, rotuloDaCategoria, rotuloDaOrigem, rotuloDoNivel } from "@/lib/formatos"
+import { formatarDuracao, categoryLabel, originLabel, tierLabel } from "@/lib/formatos"
 
 interface Props {
   /** Nulo fecha o painel. */
@@ -29,13 +29,13 @@ interface Props {
   onFiltrarWorkflow?: (workflowHash: string) => void
 }
 
-type NoDaExecucao = IRunDetail["node_stats"][string] & { id: string }
+type RunNode = IRunDetail["node_stats"][string] & { id: string }
 
 /** The badge row describes the panel; before the detail arrives there is no description. */
-const ID_DA_DESCRICAO = "painel-execucao-descricao"
+const DESCRIPTION_ID = "painel-execucao-descricao"
 
 /** Nodes sorted as on the run page: the slowest first. */
-export function nosDaExecucao(run: IRunDetail | null): NoDaExecucao[] {
+export function nosDaExecucao(run: IRunDetail | null): RunNode[] {
   if (!run?.node_stats) return []
   return Object.entries(run.node_stats)
     .filter(([k]) => !k.startsWith("__"))
@@ -47,7 +47,7 @@ export function nosDaExecucao(run: IRunDetail | null): NoDaExecucao[] {
  * Below 1 s the ms precision matters ("123ms"); above it, the same scale as the
  * rest of the page ("1 min 57 s"), instead of "117.26s".
  */
-function duracaoDoNo(ms: number | null | undefined): string {
+function nodeDuration(ms: number | null | undefined): string {
   if (ms == null) return "—"
   if (ms < 1000) return formatDuration(ms) ?? "—"
   return formatarDuracao(ms / 1000)
@@ -57,7 +57,7 @@ function duracaoDoNo(ms: number | null | undefined): string {
  * EVENT status (what happened to a node), which is not the run-status
  * vocabulary of `StatusBadge`: "started" is "iniciou", not "Na fila" (queued).
  */
-const ACAO_DO_EVENTO: Record<string, string> = {
+const EVENT_ACTION: Record<string, string> = {
   started: "iniciou", running: "em andamento", completed: "concluiu", success: "concluiu",
   failed: "falhou", error: "falhou", cancelled: "cancelado", skipped: "pulado", cached: "cache",
 }
@@ -67,17 +67,17 @@ const ACAO_DO_EVENTO: Record<string, string> = {
  * and the error. `kind` is lifecycle/stdout/debug; what matters is in
  * `status`.
  */
-export function descreverEvento(ev: IRunEvent, run: IRunDetail | null): string {
+export function describeEvent(ev: IRunEvent, run: IRunDetail | null): string {
   const nome = (ev.node && run?.node_stats?.[ev.node]?.node_name) || ev.node || null
   const acao = ev.kind === "stdout" ? "saída"
     : ev.kind === "debug" ? "depuração"
-    : ev.status ? (ACAO_DO_EVENTO[ev.status] ?? null)
+    : ev.status ? (EVENT_ACTION[ev.status] ?? null)
     : null   // an unknown `kind` or `status` does not become raw text on screen
   return [nome, acao, ev.error].filter(Boolean).join(" · ")
 }
 
 /** The event `timestamp` comes in seconds (epoch); tolerates ms to be safe. */
-function horaDoEvento(ts: number | undefined): string {
+function eventTime(ts: number | undefined): string {
   if (ts == null) return "—"
   const ms = ts > 1e12 ? ts : ts * 1000
   return formatLocal(new Date(ms).toISOString(), "HH:mm:ss")
@@ -90,34 +90,34 @@ function horaDoEvento(ts: number | undefined): string {
  */
 export function PainelExecucao({ runId, onFechar, onFiltrarWorkflow }: Props) {
   const [run, setRun] = useState<IRunDetail | null>(null)
-  const [carregando, setCarregando] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
+  const [carregando, setLoading] = useState(false)
+  const [erro, setError] = useState<string | null>(null)
   // The 403 from "Executar de novo" (run again) applies to the whole workflow:
   // after it the button disappears instead of promising again what the API
   // already denied.
-  const [podeReexecutar, setPodeReexecutar] = useState(true)
-  const [confirmandoRetry, setConfirmandoRetry] = useState(false)
+  const [canRerun, setCanRerun] = useState(true)
+  const [confirmingRetry, setConfirmingRetry] = useState(false)
   const [reexecutando, setReexecutando] = useState(false)
   const [log, setLog] = useState<{ eventos: IRunEvent[]; expirado: boolean } | null>(null)
-  const [carregandoLog, setCarregandoLog] = useState(false)
+  const [loadingLog, setLoadingLog] = useState(false)
   // Opening another run before the previous one responds: the slow response
   // must not paint the new one's panel.
   const seq = useRef(0)
 
   useEffect(() => {
     setRun(null)
-    setErro(null)
+    setError(null)
     setLog(null)
-    setPodeReexecutar(true)
-    setConfirmandoRetry(false)
+    setCanRerun(true)
+    setConfirmingRetry(false)
     if (!runId) return
     const meu = ++seq.current
-    setCarregando(true)
+    setLoading(true)
     GisFlowService.getRunDetail(runId).then(res => {
       if (meu !== seq.current) return
-      setCarregando(false)
+      setLoading(false)
       if (res?.data) setRun(res.data)
-      else setErro(res?.error?.message ?? "Não foi possível carregar esta execução.")
+      else setError(res?.error?.message ?? "Não foi possível carregar esta execução.")
     })
   }, [runId])
 
@@ -126,20 +126,20 @@ export function PainelExecucao({ runId, onFechar, onFiltrarWorkflow }: Props) {
     setReexecutando(true)
     const res = await GisFlowService.retryRun(run.workflow_hash, run.run_id)
     setReexecutando(false)
-    setConfirmandoRetry(false)
+    setConfirmingRetry(false)
     if (res?.data) {
       createToast.success("Execução enviada", "Uma nova execução do workflow entrou na fila.")
       return
     }
-    if (res?.status === 403) setPodeReexecutar(false)
+    if (res?.status === 403) setCanRerun(false)
     createToast.error("Não foi possível executar de novo", res?.error?.message)
   }
 
-  async function verLog() {
+  async function viewLog() {
     if (!run) return
-    setCarregandoLog(true)
+    setLoadingLog(true)
     const res = await GisFlowService.getRunEvents(run.run_id)
-    setCarregandoLog(false)
+    setLoadingLog(false)
     if (!res?.data) {
       createToast.error("Não foi possível carregar o log", res?.error?.message)
       return
@@ -147,7 +147,7 @@ export function PainelExecucao({ runId, onFechar, onFiltrarWorkflow }: Props) {
     setLog({ eventos: res.data.events ?? [], expirado: !!res.data.expired })
   }
 
-  async function copiarId() {
+  async function copyId() {
     if (!run) return
     try {
       await navigator.clipboard.writeText(run.run_id)
@@ -160,9 +160,9 @@ export function PainelExecucao({ runId, onFechar, onFiltrarWorkflow }: Props) {
   // Recomputing the node list on every render (entries/filter/map/sort) is
   // wasteful when `run` has not changed.
   const nos = useMemo(() => nosDaExecucao(run), [run])
-  const nivel = rotuloDoNivel(run?.dispatch_tier)
-  const origem = rotuloDaOrigem(run?.trigger_source)
-  const categoria = rotuloDaCategoria(run?.error_category)
+  const nivel = tierLabel(run?.dispatch_tier)
+  const origem = originLabel(run?.trigger_source)
+  const categoria = categoryLabel(run?.error_category)
   const nome = run?.workflow_name ?? "Execução"
 
   return (
@@ -173,7 +173,7 @@ export function PainelExecucao({ runId, onFechar, onFiltrarWorkflow }: Props) {
         className="flex w-full flex-col gap-0 p-0"
         // No description while loading: Radix warns in the console when
         // `aria-describedby` points to nothing.
-        aria-describedby={run ? ID_DA_DESCRICAO : undefined}
+        aria-describedby={run ? DESCRIPTION_ID : undefined}
       >
         <SheetHeader className="shrink-0 border-b pr-12">
           <p className="font-mono text-[10.5px] font-semibold tracking-[0.1em] text-muted-foreground uppercase">
@@ -181,13 +181,13 @@ export function PainelExecucao({ runId, onFechar, onFiltrarWorkflow }: Props) {
           </p>
           <SheetTitle className="text-lg leading-tight">{carregando && !run ? "Carregando…" : nome}</SheetTitle>
           {run && (
-            <SheetDescription asChild id={ID_DA_DESCRICAO}>
+            <SheetDescription asChild id={DESCRIPTION_ID}>
               <div className="flex flex-wrap items-center gap-1.5 text-xs">
                 <StatusBadge status={run.status} />
-                {run.retry_count > 0 && <Selo>{run.retry_count + 1}ª tentativa</Selo>}
-                {nivel && <Selo tom={nivel === "reserva" ? "roxo" : "teal"} title={nivel === "reserva" ? "Rodou num executor de reserva da política" : "Rodou no pool compartilhado"}>rodou na {nivel === "reserva" ? "reserva" : "pool"}</Selo>}
-                {origem && <Selo>{origem}</Selo>}
-                {run.triggered_by_username && <Selo>disparada por {run.triggered_by_username}</Selo>}
+                {run.retry_count > 0 && <Badge>{run.retry_count + 1}ª tentativa</Badge>}
+                {nivel && <Badge tom={nivel === "reserva" ? "roxo" : "teal"} title={nivel === "reserva" ? "Rodou num executor de reserva da política" : "Rodou no pool compartilhado"}>rodou na {nivel === "reserva" ? "reserva" : "pool"}</Badge>}
+                {origem && <Badge>{origem}</Badge>}
+                {run.triggered_by_username && <Badge>disparada por {run.triggered_by_username}</Badge>}
                 {onFiltrarWorkflow && (
                   <button
                     type="button"
@@ -220,20 +220,20 @@ export function PainelExecucao({ runId, onFechar, onFiltrarWorkflow }: Props) {
           {run && (
             <>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[12.5px]">
-                <Fato rotulo="Início">{formatLocal(run.started_at, "DD/MM/YYYY HH:mm:ss")}</Fato>
-                <Fato rotulo="Duração">
+                <Fact rotulo="Início">{formatLocal(run.started_at, "DD/MM/YYYY HH:mm:ss")}</Fact>
+                <Fact rotulo="Duração">
                   {formatarDuracao(run.duration_seconds)}
                   {run.typical_seconds != null && (
                     <span className="text-muted-foreground"> · típica {formatarDuracao(run.typical_seconds)}</span>
                   )}
-                </Fato>
-                <Fato rotulo="Executor">
+                </Fact>
+                <Fact rotulo="Executor">
                   {run.executor_name ?? run.agent_host ?? <span className="text-muted-foreground">—</span>}
                   {nivel && <span className="text-muted-foreground"> · {nivel}</span>}
-                </Fato>
-                <Fato rotulo="Workspace">{run.workspace_name ?? <span className="text-muted-foreground">—</span>}</Fato>
-                {categoria && <Fato rotulo="Categoria do erro">{categoria}</Fato>}
-                {run.owner_username && <Fato rotulo="Dono do workflow">{run.owner_username}</Fato>}
+                </Fact>
+                <Fact rotulo="Workspace">{run.workspace_name ?? <span className="text-muted-foreground">—</span>}</Fact>
+                {categoria && <Fact rotulo="Categoria do erro">{categoria}</Fact>}
+                {run.owner_username && <Fact rotulo="Dono do workflow">{run.owner_username}</Fact>}
               </dl>
 
               {run.error_message && (
@@ -271,7 +271,7 @@ export function PainelExecucao({ runId, onFechar, onFiltrarWorkflow }: Props) {
                             )}
                           </div>
                           <span className={cn("text-xs tabular-nums", falhou ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
-                            {duracaoDoNo(no.duration_ms)}
+                            {nodeDuration(no.duration_ms)}
                             {falhou ? " · falhou" : !ok && no.status ? ` · ${rotuloDoStatus(no.status).toLowerCase()}` : ""}
                             {no.cache_hit && <span className="text-purple-600 dark:text-purple-400"> · cache</span>}
                           </span>
@@ -295,9 +295,9 @@ export function PainelExecucao({ runId, onFechar, onFiltrarWorkflow }: Props) {
                     <ol className="max-h-72 overflow-auto rounded-md border font-mono text-[11px] leading-relaxed">
                       {log.eventos.map((ev, i) => (
                         <li key={i} className={cn("flex gap-2 border-t px-2.5 py-1 first:border-t-0", (ev.level === "error" || ev.status === "failed") && "text-red-600 dark:text-red-400")}>
-                          <span className="shrink-0 text-muted-foreground">{horaDoEvento(ev.timestamp)}</span>
+                          <span className="shrink-0 text-muted-foreground">{eventTime(ev.timestamp)}</span>
                           <span className="min-w-0 flex-1 break-words">
-                            {descreverEvento(ev, run)}
+                            {describeEvent(ev, run)}
                             {ev.duration_ms != null && <span className="text-muted-foreground"> ({formatDuration(ev.duration_ms)})</span>}
                           </span>
                         </li>
@@ -312,8 +312,8 @@ export function PainelExecucao({ runId, onFechar, onFiltrarWorkflow }: Props) {
 
         {run && (
           <div className="flex shrink-0 flex-wrap gap-2 border-t p-4">
-            {podeReexecutar && (
-              <Button size="sm" onClick={() => setConfirmandoRetry(true)} className="max-md:h-10">
+            {canRerun && (
+              <Button size="sm" onClick={() => setConfirmingRetry(true)} className="max-md:h-10">
                 <TbPlayerPlay size={14} aria-hidden="true" /> Executar de novo
               </Button>
             )}
@@ -321,20 +321,20 @@ export function PainelExecucao({ runId, onFechar, onFiltrarWorkflow }: Props) {
               <Link href={`/workflow/${run.workflow_hash}`}>Abrir workflow</Link>
             </Button>
             {!log && (
-              <Button size="sm" variant="outline" onClick={verLog} disabled={carregandoLog} className="max-md:h-10">
-                <TbFileText size={14} aria-hidden="true" /> {carregandoLog ? "Carregando…" : "Ver log"}
+              <Button size="sm" variant="outline" onClick={viewLog} disabled={loadingLog} className="max-md:h-10">
+                <TbFileText size={14} aria-hidden="true" /> {loadingLog ? "Carregando…" : "Ver log"}
               </Button>
             )}
             <Button size="sm" variant="ghost" asChild className="max-md:h-10">
               <Link href={`/observability/run/${run.run_id}`}><TbExternalLink size={14} aria-hidden="true" /> Abrir em página</Link>
             </Button>
-            <Button size="sm" variant="ghost" onClick={copiarId} className="max-md:h-10">
+            <Button size="sm" variant="ghost" onClick={copyId} className="max-md:h-10">
               <TbCopy size={14} aria-hidden="true" /> Copiar ID
             </Button>
           </div>
         )}
 
-        <Dialog open={confirmandoRetry} onOpenChange={aberto => { if (!aberto && !reexecutando) setConfirmandoRetry(false) }}>
+        <Dialog open={confirmingRetry} onOpenChange={aberto => { if (!aberto && !reexecutando) setConfirmingRetry(false) }}>
           <DialogContent closeDisabled={reexecutando}>
             <DialogHeader>
               <DialogTitle>Executar «{nome}» de novo?</DialogTitle>
@@ -343,7 +343,7 @@ export function PainelExecucao({ runId, onFechar, onFiltrarWorkflow }: Props) {
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setConfirmandoRetry(false)} disabled={reexecutando}>Cancelar</Button>
+              <Button variant="outline" onClick={() => setConfirmingRetry(false)} disabled={reexecutando}>Cancelar</Button>
               <Button onClick={reexecutar} disabled={reexecutando}>{reexecutando ? "Enviando…" : "Executar"}</Button>
             </DialogFooter>
           </DialogContent>
@@ -353,7 +353,7 @@ export function PainelExecucao({ runId, onFechar, onFiltrarWorkflow }: Props) {
   )
 }
 
-function Fato({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+function Fact({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <dt className="text-[10.5px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">{rotulo}</dt>
@@ -362,7 +362,7 @@ function Fato({ rotulo, children }: { rotulo: string; children: React.ReactNode 
   )
 }
 
-function Selo({ children, tom, title }: { children: React.ReactNode; tom?: "roxo" | "teal"; title?: string }) {
+function Badge({ children, tom, title }: { children: React.ReactNode; tom?: "roxo" | "teal"; title?: string }) {
   return (
     <span
       title={title}

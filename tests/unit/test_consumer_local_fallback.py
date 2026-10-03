@@ -27,16 +27,16 @@ def _run():
                      host="executor:ag-1")
 
 
-def _db(conhecidos=(), s3_conhecidas=()):
+def _db(conhecidos=(), known_s3=()):
     """Session double. `conhecidos` = (node_id, filename) pairs already in the
     database for the idempotency guard (`select(Artifact.node_id, Artifact.filename)`,
-    read via `.all()`); `s3_conhecidas` = what the OLD guard (by s3_key) would read."""
+    read via `.all()`); `known_s3` = what the OLD guard (by s3_key) would read."""
     db = MagicMock(commit=AsyncMock(), add=MagicMock())
 
     async def _execute(stmt):
         res = MagicMock()
         res.all.return_value = list(conhecidos)
-        res.scalars.return_value.all.return_value = list(s3_conhecidas)
+        res.scalars.return_value.all.return_value = list(known_s3)
         res.scalar_one_or_none.return_value = None
         return res
 
@@ -49,7 +49,7 @@ def _artefatos(db):
 
 
 @pytest.fixture(autouse=True)
-def _sem_io():
+def _no_io():
     with patch("app.core.run_result_consumer._get_retention_days",
                new=AsyncMock(return_value=None)), \
          patch("app.core.run_result_consumer._head_sizes",
@@ -67,7 +67,7 @@ def _meta(**extra):
 
 
 @pytest.mark.asyncio
-async def test_fallback_vira_executor_local_sem_s3_key():
+async def test_fallback_becomes_executor_local_without_s3_key():
     db = _db()
     await _register_artifacts(db, _run(), _meta(
         content_location="minio", local_fallback=True, size_bytes=123,
@@ -83,7 +83,7 @@ async def test_fallback_vira_executor_local_sem_s3_key():
 
 
 @pytest.mark.asyncio
-async def test_upload_bem_sucedido_continua_minio():
+async def test_successful_upload_stays_minio():
     """Without `local_fallback`, the normal artifact keeps pointing to MinIO."""
     db = _db()
     await _register_artifacts(db, _run(), _meta(
@@ -98,7 +98,7 @@ async def test_upload_bem_sucedido_continua_minio():
 
 
 @pytest.mark.asyncio
-async def test_fallback_no_drive_vira_catalogo_sem_download():
+async def test_fallback_in_drive_becomes_catalog_without_download():
     """context='drive' that fell into the fallback: the object never reached MinIO,
     so a 'confirmed' WorkspaceFile with an s3_key would give a 404 download. It
     becomes a catalog entry (content_location='executor', no s3_key), without
@@ -128,7 +128,7 @@ async def test_fallback_no_drive_vira_catalogo_sem_download():
 
 
 @pytest.mark.asyncio
-async def test_drive_bem_sucedido_continua_minio_e_emite():
+async def test_successful_drive_stays_minio_and_emits():
     """Without a fallback, the normal Drive keeps its s3_key and notifies the executors."""
     from app.models.workspace_file import WorkspaceFile
 
@@ -149,7 +149,7 @@ async def test_drive_bem_sucedido_continua_minio_e_emite():
 
 
 @pytest.mark.asyncio
-async def test_keeplocal_continua_executor_local():
+async def test_keeplocal_stays_executor_local():
     """The keepLocal path (content_location='executor') does not regress."""
     db = _db()
     await _register_artifacts(db, _run(), _meta(
@@ -164,14 +164,14 @@ async def test_keeplocal_continua_executor_local():
 
 
 @pytest.mark.asyncio
-async def test_reentrega_de_artefato_local_nao_duplica():
+async def test_redelivery_of_local_artifact_does_not_duplicate():
     """Idempotency: reprocessing the payload (dead letter / replay) with the local
     row ALREADY in the database does NOT create a second one. The guard dedups by
     stable identity (node_id, filename) within the run, not by s3_key — which for
     a local artifact is None and never matched the derived key. Mutation: going
     back to dedup by the derived s3_key makes the 2nd delivery recreate the row
     (the known s3_key is None, it never matches)."""
-    db = _db(conhecidos=[("node-1", "buffer.geojson")], s3_conhecidas=[None])
+    db = _db(conhecidos=[("node-1", "buffer.geojson")], known_s3=[None])
     await _register_artifacts(db, _run(), _meta(
         content_location="minio", local_fallback=True, size_bytes=123,
     ))

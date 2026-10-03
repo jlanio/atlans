@@ -44,7 +44,7 @@ def _http_config():
     (drive_resolver.resolve_drive_file, "file-1", "/drive/executor-download/file-1"),
     (drive_resolver.resolve_artifact_file, "art-1", "/drive/executor-download-artifact/art-1"),
 ])
-def test_resolve_usa_endpoint_do_executor(resolve, file_id, endpoint):
+def test_resolve_uses_executor_endpoint(resolve, file_id, endpoint):
     with patch("httpx.get", return_value=_Resp(200, _META)) as get, \
             patch.object(drive_resolver, "_stream_presigned_to_temp",
                          return_value=("/tmp/x.geojson", "geojson", "x.geojson")) as stream:
@@ -60,7 +60,7 @@ def test_resolve_usa_endpoint_do_executor(resolve, file_id, endpoint):
     drive_resolver.resolve_drive_file,
     drive_resolver.resolve_artifact_file,
 ])
-def test_404_vira_file_not_found(resolve):
+def test_404_becomes_file_not_found(resolve):
     with patch("httpx.get", return_value=_Resp(404)):
         with pytest.raises(FileNotFoundError):
             resolve("inexistente")
@@ -70,14 +70,14 @@ def test_404_vira_file_not_found(resolve):
     drive_resolver.resolve_drive_file,
     drive_resolver.resolve_artifact_file,
 ])
-def test_403_vira_permission_error(resolve):
+def test_403_becomes_permission_error(resolve):
     """Authorization is decided by the server — a 403 must not become 'missing file'."""
     with patch("httpx.get", return_value=_Resp(403)):
         with pytest.raises(PermissionError):
             resolve("de-outro-workspace")
 
 
-def test_sem_original_name_usa_o_id_como_fallback():
+def test_without_original_name_uses_the_id_as_fallback():
     with patch("httpx.get", return_value=_Resp(200, {"download_url": "https://minio/o"})), \
             patch.object(drive_resolver, "_stream_presigned_to_temp",
                          return_value=("/tmp/o", "", "file-9")) as stream:
@@ -88,18 +88,18 @@ def test_sem_original_name_usa_o_id_como_fallback():
 
 
 @pytest.mark.asyncio
-async def test_read_drive_file_as_remove_o_temp_e_envolve_erro(tmp_path):
+async def test_read_drive_file_as_removes_the_temp_and_wraps_error(tmp_path):
     temp = tmp_path / "dados.geojson"
     temp.write_text("{}")
 
-    def _reader_quebrado(_path):
+    def _broken_reader(_path):
         raise RuntimeError("driver falhou")
 
     with patch.object(drive_resolver, "resolve_drive_file",
                       return_value=(str(temp), "geojson", "dados.geojson")):
         with pytest.raises(RuntimeError, match="dados.geojson"):
             await drive_resolver.read_drive_file_as(
-                "file-1", _reader_quebrado, label="GeoJSON"
+                "file-1", _broken_reader, label="GeoJSON"
             )
 
     assert not temp.exists(), "temp file deve ser removido mesmo em falha de leitura"

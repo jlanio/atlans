@@ -56,20 +56,20 @@ _DB_PATH = _default_db_path()
 # SILENTLY falls back to rollback journal and writes
 # .executor_results.sqlite-journal during each transaction. We hide all four
 # so none of them shows up in Explorer.
-_DB_SUFIXOS = ("", "-wal", "-shm", "-journal")
+_DB_SUFFIXES = ("", "-wal", "-shm", "-journal")
 
-# Whether we have already reapplied the hide after the first write (see _ocultar_arquivos_db).
+# Whether we have already reapplied the hide after the first write (see _hide_db_files).
 _ocultado_pos_escrita: bool = False
 
 
-def _ocultar_arquivos_db() -> None:
+def _hide_db_files() -> None:
     """Applies the hidden attribute (Windows) to the database and its satellite files.
 
     No-op outside Windows. The -wal/-shm/-journal files are born at different
     moments (WAL open, first write, rollback fallback): hiding one that does
     not exist yet is harmless — GetFileAttributesW fails and the helper gives up.
     """
-    for sufixo in _DB_SUFIXOS:
+    for sufixo in _DB_SUFFIXES:
         ocultar_no_windows(_DB_PATH + sufixo)
 
 
@@ -148,7 +148,7 @@ def _get_conn() -> sqlite3.Connection | None:
                 # into CreateFile's hidden-file restriction). The first put()
                 # reapplies it to catch the -wal/-journal that only appears on the
                 # 1st write.
-                _ocultar_arquivos_db()
+                _hide_db_files()
                 _conn = c
             except Exception as exc:
                 _disabled = True
@@ -226,7 +226,7 @@ def put(result: dict[str, Any]) -> None:
                 # already exists — may not have created in _get_conn. We reapply
                 # ONCE to catch these newborn files; subsequent writes don't pay
                 # for the syscall.
-                _ocultar_arquivos_db()
+                _hide_db_files()
                 _ocultado_pos_escrita = True
     except Exception as exc:
         # Non-fatal: the store is a robustness upgrade, not a requirement.
@@ -347,8 +347,8 @@ def job_ids_pendentes() -> list[str] | None:
 # executor killed by the cgroup OOM came back 6 s later and nobody closed the
 # run it was executing.
 
-ESTADO_NA_FILA = "fila"
-ESTADO_EXECUTANDO = "executando"
+STATE_QUEUED = "fila"
+STATE_RUNNING = "executando"
 
 
 def registrar_em_voo(job_id: str) -> None:
@@ -362,7 +362,7 @@ def registrar_em_voo(job_id: str) -> None:
                 return
             conn.execute(
                 "INSERT OR REPLACE INTO jobs_em_voo (job_id, estado, desde) VALUES (?, ?, ?)",
-                (str(job_id), ESTADO_NA_FILA, time.time()),
+                (str(job_id), STATE_QUEUED, time.time()),
             )
     except Exception as exc:
         logger.debug("result_store.registrar_em_voo: %s", exc)
@@ -379,7 +379,7 @@ def marcar_executando(job_id: str) -> None:
                 return
             conn.execute(
                 "UPDATE jobs_em_voo SET estado = ?, desde = ? WHERE job_id = ?",
-                (ESTADO_EXECUTANDO, time.time(), str(job_id)),
+                (STATE_RUNNING, time.time(), str(job_id)),
             )
     except Exception as exc:
         logger.debug("result_store.marcar_executando: %s", exc)
@@ -414,14 +414,14 @@ def carregar_em_voo() -> list[dict]:
 
 # ── Journal ownership ─────────────────────────────────────────────────────────
 # File next to the outbox, locked for the lifetime of the process — see
-# `tomar_posse_do_diario`.
+# `take_journal_ownership`.
 _trava_do_diario = None
 _esperando_posse = False
 _lock_da_posse = threading.Lock()
 _INTERVALO_DE_POSSE_S = 5.0
 
 
-def _tentar_travar() -> str:
+def _try_lock() -> str:
     """'travou' (locked), 'ocupada' (another live process holds it) or 'sem_suporte' (unsupported)."""
     global _trava_do_diario
     with _lock_da_posse:
@@ -454,10 +454,10 @@ def _tentar_travar() -> str:
     return "travou"
 
 
-def _esperar_posse() -> None:
+def _wait_for_ownership() -> None:
     global _esperando_posse
     try:
-        while (resultado := _tentar_travar()) == "ocupada":
+        while (resultado := _try_lock()) == "ocupada":
             time.sleep(_INTERVALO_DE_POSSE_S)
         if resultado == "travou":
             logger.info("Diário de jobs: posse assumida (o processo anterior saiu).")
@@ -465,7 +465,7 @@ def _esperar_posse() -> None:
         _esperando_posse = False
 
 
-def tomar_posse_do_diario() -> bool:
+def take_journal_ownership() -> bool:
     """Exclusive lock on the journal for this process. False if ANOTHER live
     process holds it.
 
@@ -483,12 +483,12 @@ def tomar_posse_do_diario() -> bool:
     the previous behavior.
     """
     global _esperando_posse
-    if _tentar_travar() != "ocupada":
+    if _try_lock() != "ocupada":
         return True
     with _lock_da_posse:
         if not _esperando_posse:
             _esperando_posse = True
-            threading.Thread(target=_esperar_posse, name="posse-do-diario", daemon=True).start()
+            threading.Thread(target=_wait_for_ownership, name="posse-do-diario", daemon=True).start()
     return False
 
 

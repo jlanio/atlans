@@ -24,7 +24,7 @@ def _db():
     return MagicMock(execute=AsyncMock(side_effect=[contagem, itens]))
 
 
-async def _listar(**kwargs):
+async def _list_schedules(**kwargs):
     """Calls the route directly. Defaults declared as `Query(...)` are not
     resolved outside FastAPI, so they have to be passed explicitly."""
     db = _db()
@@ -35,38 +35,38 @@ async def _listar(**kwargs):
 
 
 @pytest.mark.asyncio
-async def test_busca_cobre_nome_do_workflow_alem_de_filename_e_output_key():
-    _, (sql_count, sql_itens) = await _listar(search="Cadastro")
+async def test_search_covers_workflow_name_besides_filename_and_output_key():
+    _, (sql_count, sql_items) = await _list_schedules(search="Cadastro")
 
-    for sql in (sql_count, sql_itens):
+    for sql in (sql_count, sql_items):
         assert "workflows.name" in sql
         assert "artifacts.filename" in sql
         assert "artifacts.output_key" in sql
 
 
 @pytest.mark.asyncio
-async def test_contagem_faz_o_mesmo_join_da_pagina():
+async def test_count_does_the_same_join_as_the_page():
     """Without the join in the count, `total` would be computed over a filter that
     references `workflows.name` without the table in the query — an SQL error — or,
     worse, a total inconsistent with the page shown."""
-    _, (sql_count, _) = await _listar(search="Cadastro")
+    _, (sql_count, _) = await _list_schedules(search="Cadastro")
 
     assert "JOIN workflows" in sql_count
 
 
 @pytest.mark.asyncio
-async def test_sem_busca_a_contagem_nao_paga_o_join():
+async def test_without_search_the_count_does_not_pay_for_the_join():
     """The join exists for the search; the count in the common case (no `search`)
     must not drag `workflows` along."""
-    _, (sql_count, _) = await _listar(search=None)
+    _, (sql_count, _) = await _list_schedules(search=None)
 
     assert "workflows" not in sql_count
 
 
 @pytest.mark.asyncio
-async def test_curingas_do_usuario_continuam_escapados():
+async def test_user_wildcards_stay_escaped():
     """`%` and `_` are literals: without escaping, searching for '_' would match everything."""
-    _, (sql_count, _) = await _listar(search="a_b%c")
+    _, (sql_count, _) = await _list_schedules(search="a_b%c")
 
     parametros = sql_count  # the term goes as a bind; the ESCAPE stays in the SQL
     assert "ESCAPE" in parametros.upper()

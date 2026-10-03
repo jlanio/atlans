@@ -43,7 +43,7 @@ interface FetchState<T> {
   setData: (valor: T | null | ((anterior: T | null) => T | null)) => void
 }
 
-export interface OpcoesDaCarga<T> {
+export interface FetchOptions<T> {
   /** Each ACCEPTED response (it already passed the generation guard), in the same
    *  tick in which the hook stores it. For whoever mirrors the data outside the
    *  hook — the credentials context, the allowlist draft — without a frame of lag. */
@@ -73,7 +73,7 @@ export function useFetchData<T>(
   errorMsg = "Erro ao carregar dados.",
   deps: unknown[] = [],
   debounceMs = 0,
-  opcoes: OpcoesDaCarga<T> = {},
+  opcoes: FetchOptions<T> = {},
 ): FetchState<T> {
   const { status } = useSession()
   const ativo = opcoes.ativo ?? true
@@ -81,7 +81,7 @@ export function useFetchData<T>(
   const [firstLoad, setFirstLoad]       = useState(true)
   const [refreshing, setRefreshing]     = useState(false)
   const [error, setError]               = useState<string | null>(null)
-  const [atualizadoEm, setAtualizadoEm] = useState<number | null>(null)
+  const [atualizadoEm, setUpdatedAt] = useState<number | null>(null)
   const timerRef                        = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // The caller recreates `fetcher` (and `errorMsg`) on every render; reading them
@@ -93,18 +93,18 @@ export function useFetchData<T>(
   const fetcherRef  = useRef(fetcher)
   const errorMsgRef = useRef(errorMsg)
   const debounceRef = useRef(debounceMs)
-  const opcoesRef   = useRef(opcoes)
+  const optionsRef   = useRef(opcoes)
   fetcherRef.current  = fetcher
   errorMsgRef.current = errorMsg
   debounceRef.current = debounceMs
-  opcoesRef.current   = opcoes
+  optionsRef.current   = opcoes
 
   // `data` in a ref too: `executar` needs to know whether something is already on
   // screen to choose between skeleton and refresh, and reading it from state would
   // pin the callback. Same for the timestamp, which decides between the error card
   // and `onErroComDados`.
   const dataRef         = useRef<T | null>(null)
-  const atualizadoEmRef = useRef<number | null>(null)
+  const updatedAtRef = useRef<number | null>(null)
 
   // Generation counter: two overlapping executions (the URL/deps change while the
   // previous one is still resolving) must not let the OLD response overwrite the
@@ -113,11 +113,11 @@ export function useFetchData<T>(
   // the result is stale and is ignored.
   const geracao = useRef(0)
 
-  const executar = useCallback(async (deFundo: boolean): Promise<T | null> => {
+  const executar = useCallback(async (inBackground: boolean): Promise<T | null> => {
     const gen = ++geracao.current
     // In the background and with no data on screen, nothing changes while the
     // fetch is in flight: no skeleton and no cleared error (see `recarregarEmFundo`).
-    if (!deFundo || dataRef.current !== null) {
+    if (!inBackground || dataRef.current !== null) {
       if (dataRef.current === null) setFirstLoad(true)
       else setRefreshing(true)
       setError(null)
@@ -125,7 +125,7 @@ export function useFetchData<T>(
 
     function falhou(mensagem: string) {
       setError(mensagem)
-      if (atualizadoEmRef.current != null) opcoesRef.current.onErroComDados?.(mensagem)
+      if (updatedAtRef.current != null) optionsRef.current.onErroComDados?.(mensagem)
     }
 
     try {
@@ -135,12 +135,12 @@ export function useFetchData<T>(
         const dados = result.data
         const agora = Date.now()
         dataRef.current = dados
-        atualizadoEmRef.current = agora
+        updatedAtRef.current = agora
         setDataState(dados)
-        setAtualizadoEm(agora)
+        setUpdatedAt(agora)
         // The background reload does not clear the error on its way out: the response does.
         setError(null)
-        opcoesRef.current.onDados?.(dados)
+        optionsRef.current.onDados?.(dados)
         return dados
       }
       falhou(result?.error?.message ?? errorMsgRef.current)
@@ -178,9 +178,9 @@ export function useFetchData<T>(
       // the start — the next time it is turned on is a 1st load, with skeleton.
       geracao.current++
       dataRef.current = null
-      atualizadoEmRef.current = null
+      updatedAtRef.current = null
       setDataState(null)
-      setAtualizadoEm(null)
+      setUpdatedAt(null)
       setError(null)
       setRefreshing(false)
       setFirstLoad(true)

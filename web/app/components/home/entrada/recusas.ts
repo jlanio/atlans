@@ -18,11 +18,11 @@ import type { AxiosError } from "axios"
 type Corpo = { error?: string; message?: string; detail?: string }
 
 /** The rejection came from the server itself (and not from the limiter, the proxy or a CDN). */
-export function ehRecusaDoServidor(data: unknown): boolean {
+export function isServerRejection(data: unknown): boolean {
   return !!data && typeof data === "object" && (data as Corpo).error === "http_exception"
 }
 
-export interface TextosDaRecusaDoLink {
+export interface LinkRejectionTexts {
   tokenInvalido: string
   muitasTentativas: string
   servidorIndisponivel: string
@@ -34,7 +34,7 @@ export interface TextosDaRecusaDoLink {
  * other languages, by status: the token rejections (400 and 404) become the
  * language's "token inválido".
  */
-export function textoDaRecusaDoLink(erro: unknown, traduzir: boolean, t: TextosDaRecusaDoLink): string {
+export function linkRejectionText(erro: unknown, traduzir: boolean, t: LinkRejectionTexts): string {
   const resposta = (erro as AxiosError<Corpo> | null)?.response
   if (!traduzir) return resposta?.data?.message ?? t.tokenInvalido
   if (!resposta || resposta.status >= 500) return t.servidorIndisponivel

@@ -129,14 +129,14 @@ function nome(n: string): HTMLElement {
   if (!el) throw new Error(`Nenhum nome de arquivo "${n}" na tela`)
   return el
 }
-const acharNome = (n: string) => waitFor(() => nome(n))
+const findName = (n: string) => waitFor(() => nome(n))
 
 describe("ArtefatosLista", () => {
   it("junta artefatos e arquivos do Drive na mesma lista", async () => {
     H.getArtifacts.mockResolvedValue(ok({ items: [artefato()], total: 1 }))
     H.getDriveFiles.mockResolvedValue(ok({ items: [arquivo()], total: 1 }))
     montar()
-    expect(await acharNome("saida.geojson")).toBeTruthy()
+    expect(await findName("saida.geojson")).toBeTruthy()
     expect(nome("dados.csv")).toBeTruthy()
   })
 
@@ -148,7 +148,7 @@ describe("ArtefatosLista", () => {
     H.getArtifacts.mockResolvedValue(ok({ items: [artefato()], total: 1 }))
     H.getDriveFiles.mockResolvedValue(ok({ items: [], total: 0 }))
     montar()
-    await acharNome("saida.geojson")
+    await findName("saida.geojson")
 
     expect(screen.queryByTestId("ws-switcher")).toBeNull()
     expect(screen.queryByText("Escopo")).toBeNull()
@@ -158,7 +158,7 @@ describe("ArtefatosLista", () => {
     H.getArtifacts.mockResolvedValue(ok({ items: [artefato()], total: 1 }))
     H.getDriveFiles.mockRejectedValue(new Error("drive fora do ar"))
     montar()
-    expect(await acharNome("saida.geojson")).toBeTruthy()
+    expect(await findName("saida.geojson")).toBeTruthy()
     expect(screen.getByText(/Não foi possível listar o Drive/)).toBeTruthy()
   })
 
@@ -178,7 +178,7 @@ describe("ArtefatosLista", () => {
     H.getArtifacts.mockRejectedValue(new Error("artifacts 500"))
     H.getDriveFiles.mockResolvedValue(ok({ items: [arquivo()], total: 1 }))
     montar()
-    expect(await acharNome("dados.csv")).toBeTruthy()
+    expect(await findName("dados.csv")).toBeTruthy()
     expect(screen.getByText(/Não foi possível listar os artefatos/)).toBeTruthy()
   })
 
@@ -188,7 +188,7 @@ describe("ArtefatosLista", () => {
     H.getArtifacts.mockResolvedValue(ok({ items: [artefato()], total: 1 }))
     H.getDriveFiles.mockRejectedValue(new Error("drive fora do ar"))
     montar()
-    await acharNome("saida.geojson")
+    await findName("saida.geojson")
 
     // Now BOTH sources go down: the list has to stay on screen (§3).
     H.getArtifacts.mockRejectedValue(new Error("caiu"))
@@ -209,7 +209,7 @@ describe("ArtefatosLista", () => {
     H.getArtifacts.mockResolvedValue(ok({ items: [artefato()], total: 700 }))
     H.getDriveFiles.mockResolvedValue(ok({ items: [arquivo()], total: 200 }))
     montar()
-    await acharNome("saida.geojson")
+    await findName("saida.geojson")
     expect(screen.getByText(/mostrando 2 de 900/)).toBeTruthy()
   })
 
@@ -217,7 +217,7 @@ describe("ArtefatosLista", () => {
     H.getArtifacts.mockResolvedValue(ok({ items: [artefato()], total: 1 }))
     H.getDriveFiles.mockResolvedValue(ok({ items: [], total: 0 }))
     montar()
-    await acharNome("saida.geojson")
+    await findName("saida.geojson")
     // Portaled to <body>, the menu sits OUTSIDE the `.home dark` tree: without
     // `home-portal` it opens light over the near-black Home.
     expect(screen.getByTestId("menu").className).toContain("home-portal")
@@ -231,7 +231,7 @@ describe("ArtefatosLista", () => {
     H.getArtifacts.mockResolvedValue(ok({ items: [artefato()], total: 1 }))
     H.getDriveFiles.mockResolvedValue(ok({ items: [], total: 0 }))
     montar()
-    const botao = (await acharNome("saida.geojson")).closest("button")!
+    const botao = (await findName("saida.geojson")).closest("button")!
     for (const c of ["min-w-0", "flex-1"]) expect(botao.className).toContain(c)
     const gatilho = screen.getByRole("button", { name: 'Ações de "saida.geojson"' })
     expect(gatilho.closest('[data-slot="linha-do-meu"]')).toBe(botao.closest('[data-slot="linha-do-meu"]'))
@@ -244,7 +244,7 @@ describe("ArtefatosLista", () => {
     H.getArtifacts.mockResolvedValue(ok({ items: [artefato()], total: 1 }))
     H.getDriveFiles.mockResolvedValue(ok({ items: [arquivo()], total: 1 }))
     montar()
-    fireEvent.click(await acharNome("dados.csv"))
+    fireEvent.click(await findName("dados.csv"))
     expect((await screen.findByTestId("meta-dialog")).className).toContain("home-portal")
 
     fireEvent.click(screen.getAllByText("Excluir")[0])
@@ -259,7 +259,7 @@ describe("ArtefatosLista", () => {
     }))
     H.getDriveFiles.mockResolvedValue(ok({ items: [], total: 0 }))
     montar()
-    await acharNome("saida.geojson")
+    await findName("saida.geojson")
 
     // Only the geojson offers "Exibir no globo" (show on globe; the shapefile cannot be added).
     expect(screen.getAllByText("Exibir no globo")).toHaveLength(1)

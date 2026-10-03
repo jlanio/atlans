@@ -1,7 +1,7 @@
 "use client"
 import { TbDots } from "react-icons/tb"
 import { cn } from "@/lib/utils"
-import { useTextosDaCasca } from "./i18n/da-casca"
+import { useShellTexts } from "./i18n/da-casca"
 
 /**
  * The row of the three lists in the Mine group (Chats, Schedules, Artifacts) —
@@ -51,7 +51,7 @@ export function GatilhoDeAcoes({
   className,
   ...props
 }: React.ComponentProps<"button"> & { rotulo: string }) {
-  const t = useTextosDaCasca().casca.linha
+  const t = useShellTexts().casca.linha
   return (
     <button
       type="button"

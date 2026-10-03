@@ -21,10 +21,10 @@ VAULT = Path(__file__).resolve().parents[1] / "fixtures" / "vault"
 
 
 def _registros(pasta=VAULT):
-    itens = list(fv.ler_pasta(pasta))
+    itens = list(fv.read_folder(pasta))
     return (
         [r for r in itens if isinstance(r, fv.RegistroDoVault)],
-        [i for i in itens if isinstance(i, fv.Ignorada)],
+        [i for i in itens if isinstance(i, fv.Skipped)],
     )
 
 
@@ -35,7 +35,7 @@ def _da(instituicao, registros):
 # ── Today's format ────────────────────────────────────────────────────────────
 
 
-def test_funai_inteira_vira_oito_camadas_com_esquema():
+def test_whole_funai_becomes_eight_layers_with_schema():
     registros, _ = _registros()
     funai = _da("FUNAI", registros)
 
@@ -62,7 +62,7 @@ def test_funai_inteira_vira_oito_camadas_com_esquema():
     assert nomes["the_geom"]["type"] == "MultiPolygon"
 
 
-def test_sort_by_vem_da_primeira_coluna_de_id_que_existe():
+def test_sort_by_comes_from_the_first_existing_id_column():
     registros, _ = _registros()
     funai = _da("FUNAI", registros)
     # `tis_poligonais` has `gid`; `aldeias_pontos` has no candidate at all.
@@ -76,7 +76,7 @@ def test_sort_by_vem_da_primeira_coluna_de_id_que_existe():
     assert funai["Funai:aldeias_pontos"].esquema["geometry_type"] == "Point"
 
 
-def test_ibge_e_wfs_1_0_0_e_o_recorte_tem_duas_camadas():
+def test_ibge_is_wfs_1_0_0_and_the_slice_has_two_layers():
     registros, _ = _registros()
     ibge = _da("IBGE", registros)
 
@@ -90,11 +90,11 @@ def test_ibge_e_wfs_1_0_0_e_o_recorte_tem_duas_camadas():
     assert fonte.grupo == "APONDS"
 
 
-def test_arcgis_e_placeholder_sao_ignorados_com_motivo():
+def test_arcgis_and_placeholder_are_ignored_with_reason():
     _, ignoradas = _registros()
-    por_pasta = {i.pasta: i.motivo for i in ignoradas}
-    assert por_pasta["EUA TIGERweb"] == "sem_endpoint_wfs"
-    assert por_pasta["Dominica DomiNode"] == "sem_endpoint_wfs"
+    by_folder = {i.pasta: i.motivo for i in ignoradas}
+    assert by_folder["EUA TIGERweb"] == "sem_endpoint_wfs"
+    assert by_folder["Dominica DomiNode"] == "sem_endpoint_wfs"
     # And nothing from the ArcGIS folder became a record by mistake.
     registros, _ = _registros()
     assert not [r for r in registros if r.instituicao == "EUA TIGERweb"]
@@ -103,7 +103,7 @@ def test_arcgis_e_placeholder_sao_ignorados_com_motivo():
 # ── The new format (optional, on top of today's) ──────────────────────────────
 
 
-def test_frontmatter_tags_e_prioridade():
+def test_frontmatter_tags_and_priority():
     registros, _ = _registros()
     exemplo = _da("Exemplo Novo", registros)
 
@@ -124,30 +124,30 @@ def test_frontmatter_tags_e_prioridade():
     assert risco.esquema["geometry_type"] == "MultiPolygon"
 
 
-def test_ler_frontmatter_aceita_lista_em_bloco_e_valor_entre_aspas():
+def test_read_frontmatter_accepts_block_list_and_quoted_value():
     texto = '---\nsigla: "X Y"\ntemas:\n  - um\n  - "dois"\nprioridade: 1\n---\n# Título\n'
-    campos, resto = fv.ler_frontmatter(texto)
+    campos, resto = fv.read_frontmatter(texto)
     assert campos == {"sigla": "X Y", "temas": ["um", "dois"], "prioridade": "1"}
     assert resto.startswith("# Título")
 
 
-def test_sem_frontmatter_devolve_o_texto_inteiro():
-    campos, resto = fv.ler_frontmatter("# Só um título\n")
+def test_without_frontmatter_returns_the_whole_text():
+    campos, resto = fv.read_frontmatter("# Só um título\n")
     assert campos == {} and resto == "# Só um título\n"
 
 
-def test_sinonimos_da_raiz():
-    sinonimos = fv.sinonimos_de(VAULT)
-    assert sinonimos["focos de calor"] == {"queimadas", "incêndio", "hotspot", "fogo"}
-    assert sinonimos["terra indígena"] == {"TI", "indígena", "aldeia"}
-    assert sinonimos["unidade de conservação"] == {"UC", "parque", "reserva"}
-    assert fv.sinonimos_de(VAULT / "nao-existe") == {}
+def test_root_synonyms():
+    synonyms = fv.synonyms_of(VAULT)
+    assert synonyms["focos de calor"] == {"queimadas", "incêndio", "hotspot", "fogo"}
+    assert synonyms["terra indígena"] == {"TI", "indígena", "aldeia"}
+    assert synonyms["unidade de conservação"] == {"UC", "parque", "reserva"}
+    assert fv.synonyms_of(VAULT / "nao-existe") == {}
 
 
 # ── Edge cases ────────────────────────────────────────────────────────────────
 
 
-def _pasta_minima(raiz: Path, nome: str, endpoint: str, camadas: str | None = "- `a:b` — B\n") -> Path:
+def _minimal_folder(raiz: Path, nome: str, endpoint: str, camadas: str | None = "- `a:b` — B\n") -> Path:
     pasta = raiz / nome
     pasta.mkdir(parents=True)
     (pasta / "Nota — SIGLA.md").write_text(
@@ -158,38 +158,38 @@ def _pasta_minima(raiz: Path, nome: str, endpoint: str, camadas: str | None = "-
     return pasta
 
 
-def test_nome_de_pasta_em_nfd_vira_nfc(tmp_path):
+def test_nfd_folder_name_becomes_nfc(tmp_path):
     nfd = unicodedata.normalize("NFD", "Instituição")
-    _pasta_minima(tmp_path, nfd, "https://h/ows")
+    _minimal_folder(tmp_path, nfd, "https://h/ows")
     registros, _ = _registros(tmp_path)
     assert registros[0].instituicao == "Instituição"
     assert unicodedata.is_normalized("NFC", registros[0].instituicao)
 
 
-def test_url_com_credencial_e_recusada(tmp_path):
-    _pasta_minima(tmp_path, "Segredo", "https://user:senha@h/ows")  # pragma: allowlist secret
+def test_url_with_credential_is_refused(tmp_path):
+    _minimal_folder(tmp_path, "Segredo", "https://user:senha@h/ows")  # pragma: allowlist secret
     registros, ignoradas = _registros(tmp_path)
     assert registros == []
     assert [(i.pasta, i.motivo) for i in ignoradas] == [("Segredo", "url_com_credencial")]
 
 
-def test_endpoint_sem_camadas_e_ignorado(tmp_path):
-    _pasta_minima(tmp_path, "Vazia", "https://h/ows", camadas=None)
-    _pasta_minima(tmp_path, "SoTitulo", "https://h/ows", camadas="nenhum bullet aqui\n")
+def test_endpoint_without_layers_is_ignored(tmp_path):
+    _minimal_folder(tmp_path, "Vazia", "https://h/ows", camadas=None)
+    _minimal_folder(tmp_path, "SoTitulo", "https://h/ows", camadas="nenhum bullet aqui\n")
     _, ignoradas = _registros(tmp_path)
     assert {(i.pasta, i.motivo) for i in ignoradas} == {("Vazia", "sem_camadas"), ("SoTitulo", "sem_camadas")}
 
 
-def test_nota_ilegivel_nao_derruba_a_leitura(tmp_path):
-    pasta = _pasta_minima(tmp_path, "Quebrada", "https://h/ows")
+def test_unreadable_note_does_not_break_the_read(tmp_path):
+    pasta = _minimal_folder(tmp_path, "Quebrada", "https://h/ows")
     (pasta / "Camadas.md").write_bytes(b"\xff\xfe nao e utf-8")
-    _pasta_minima(tmp_path, "Boa", "https://h/ows")
+    _minimal_folder(tmp_path, "Boa", "https://h/ows")
     registros, ignoradas = _registros(tmp_path)
     assert [r.instituicao for r in registros] == ["Boa"]
     assert [(i.pasta, i.motivo) for i in ignoradas] == [("Quebrada", "nota_ilegivel")]
 
 
-def test_nota_base_so_vale_quando_a_nota_nomeada_nao_tem_endpoint(tmp_path):
+def test_base_note_applies_only_when_named_note_has_no_endpoint(tmp_path):
     pasta = tmp_path / "Duas"
     pasta.mkdir()
     (pasta / "nota-base.md").write_text("# Duas\n\n**Endpoint WFS:** <https://base/ows>\n", encoding="utf-8")
@@ -199,18 +199,18 @@ def test_nota_base_so_vale_quando_a_nota_nomeada_nao_tem_endpoint(tmp_path):
     assert registros[0].url == "https://base/ows"
 
 
-def test_pasta_inexistente_nao_gera_nada():
-    assert list(fv.ler_pasta(VAULT / "nao-existe")) == []
+def test_missing_folder_yields_nothing():
+    assert list(fv.read_folder(VAULT / "nao-existe")) == []
 
 
-def test_arquivos_soltos_na_raiz_sao_pulados(tmp_path):
+def test_loose_files_at_root_are_skipped(tmp_path):
     shutil.copytree(VAULT / "FUNAI", tmp_path / "FUNAI")
     (tmp_path / "Índice.md").write_text("# Índice\n- **Endpoint WFS:** <https://x/ows>\n", encoding="utf-8")
     registros, ignoradas = _registros(tmp_path)
     assert len(registros) == 8 and ignoradas == []
 
 
-def test_vault_hash_e_estavel_e_sensivel_ao_conteudo(tmp_path):
+def test_vault_hash_is_stable_and_content_sensitive(tmp_path):
     shutil.copytree(VAULT / "FUNAI", tmp_path / "FUNAI")
     antes = {r.type_name: r.vault_hash for r in _registros(tmp_path)[0]}
     assert antes == {r.type_name: r.vault_hash for r in _registros(tmp_path)[0]}
@@ -231,14 +231,14 @@ def test_vault_hash_e_estavel_e_sensivel_ao_conteudo(tmp_path):
      ("gml:MultiCurvePropertyType", "MultiLineString"), ("gml:GeometryPropertyType", "Geometry"),
      ("gml:CoisaNova", "Geometry")],
 )
-def test_tipos_de_geometria(xsd, esperado):
-    esquema = fv.ler_atributos(f"### `a:b`\n\n| Campo | Tipo XSD | Nulo | Ocorrência |\n|---|---|---:|---|\n| `g` | `{xsd}` | true | 0..1 |\n")
+def test_geometry_types(xsd, esperado):
+    esquema = fv.read_attributes(f"### `a:b`\n\n| Campo | Tipo XSD | Nulo | Ocorrência |\n|---|---|---:|---|\n| `g` | `{xsd}` | true | 0..1 |\n")
     assert esquema["a:b"].geometry_type == esperado
     assert esquema["a:b"].geometry_column == "g"
 
 
-def test_versao_tolera_formas():
-    assert fv._versao("WFS 1.1.0") == "1.1.0"
-    assert fv._versao("2.0") == "2.0.0"
-    assert fv._versao(None) == "2.0.0"
-    assert fv._versao("sem número") == "2.0.0"
+def test_version_tolerates_forms():
+    assert fv._version("WFS 1.1.0") == "1.1.0"
+    assert fv._version("2.0") == "2.0.0"
+    assert fv._version(None) == "2.0.0"
+    assert fv._version("sem número") == "2.0.0"

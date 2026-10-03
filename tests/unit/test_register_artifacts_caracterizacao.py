@@ -47,7 +47,7 @@ def _run(**campos):
     return SimpleNamespace(**base)
 
 
-def _consulta(stmt) -> str:
+def _query(stmt) -> str:
     sql = str(stmt)
     onde = sql.split("WHERE")[-1]
     if "system_config" in sql:
@@ -102,11 +102,11 @@ def mundo(monkeypatch):
     return estado
 
 
-def _espionar(db, diario: list) -> None:
+def _spy_on(db, diario: list) -> None:
     execute, add, commit = db.execute, db.add, db.commit
 
     async def _execute(stmt, *a, **kw):
-        diario.append(("execute", _consulta(stmt)))
+        diario.append(("execute", _query(stmt)))
         return await execute(stmt, *a, **kw)
 
     def _add(obj, *a, **kw):
@@ -123,29 +123,29 @@ def _espionar(db, diario: list) -> None:
 
 async def _registrar(fabrica, mundo, meta, run=None) -> None:
     async with fabrica() as db:
-        _espionar(db, mundo.diario)
+        _spy_on(db, mundo.diario)
         await rrc._register_artifacts(db, run or _run(), meta)
 
 
-async def _linhas(fabrica, modelo):
+async def _lines(fabrica, modelo):
     async with fabrica() as db:
         return list((await db.execute(select(modelo).order_by(modelo.id))).scalars().all())
 
 
-async def _semear(fabrica, *objs) -> None:
+async def _seed(fabrica, *objs) -> None:
     async with fabrica() as db:
         db.add_all(objs)
         await db.commit()
 
 
-def _nomes(diario) -> list:
+def _names(diario) -> list:
     return [c[0] if c[0] != "execute" else c[1] for c in diario]
 
 
 # ── Fases e formato ───────────────────────────────────────────────────────────
 
 
-async def test_run_sem_workspace_nao_consulta_nada(fabrica, mundo, caplog):
+async def test_run_without_workspace_queries_nothing(fabrica, mundo, caplog):
     with caplog.at_level("WARNING"):
         await _registrar(fabrica, mundo, {"n1": [{"filename": "a.json"}]}, _run(workspace_id=None))
     assert mundo.diario == []
@@ -155,8 +155,8 @@ async def test_run_sem_workspace_nao_consulta_nada(fabrica, mundo, caplog):
     )
 
 
-async def test_artefato_no_minio_segue_as_fases_e_grava_a_linha_completa(fabrica, mundo):
-    await _semear(fabrica, SystemConfig(key="artifact_retention_days", value=7))
+async def test_minio_artifact_follows_the_phases_and_writes_the_full_row(fabrica, mundo):
+    await _seed(fabrica, SystemConfig(key="artifact_retention_days", value=7))
     mundo.tamanhos[_key("Saida_Final.geojson")] = 4321
 
     await _registrar(fabrica, mundo, {"n1": [{
@@ -173,7 +173,7 @@ async def test_artefato_no_minio_segue_as_fases_e_grava_a_linha_completa(fabrica
         ("add", "Artifact", "Saida_Final.geojson"),
         ("commit",),
     ]
-    [a] = await _linhas(fabrica, Artifact)
+    [a] = await _lines(fabrica, Artifact)
     assert (a.workspace_id, a.workflow_hash, a.run_id, a.node_id) == (WS, "wf-1", TASK, "n1")
     assert (a.output_key, a.filename, a.format) == ("saida", "Saida_Final.geojson", "geojson")
     assert (a.size_bytes, a.features) == (4321, 12)
@@ -184,22 +184,22 @@ async def test_artefato_no_minio_segue_as_fases_e_grava_a_linha_completa(fabrica
     assert abs((a.expires_at - esperado).total_seconds()) < 60
 
 
-async def test_sem_retencao_nao_expira_e_campos_opcionais_tem_default(fabrica, mundo):
+async def test_without_retention_does_not_expire_and_optional_fields_have_defaults(fabrica, mundo):
     await _registrar(fabrica, mundo, {"n1": [{"filename": "a.json"}]})
-    [a] = await _linhas(fabrica, Artifact)
+    [a] = await _lines(fabrica, Artifact)
     assert a.expires_at is None
     assert (a.output_key, a.format, a.features, a.credential_id) == ("", None, None, None)
     assert (a.is_published, a.publish_config) == (False, None)
 
 
 @pytest.mark.parametrize(("host", "esperado"), [("local", None), (None, None), ("executor:", "")])
-async def test_executor_id_so_sai_de_host_de_executor(fabrica, mundo, host, esperado):
+async def test_executor_id_only_comes_from_executor_host(fabrica, mundo, host, esperado):
     await _registrar(fabrica, mundo, {"n1": [{"filename": "a.json"}]}, _run(host=host))
-    [a] = await _linhas(fabrica, Artifact)
+    [a] = await _lines(fabrica, Artifact)
     assert a.executor_id == esperado
 
 
-async def test_payload_misturado_saneia_e_deduplica_no_proprio_lote(fabrica, mundo, caplog):
+async def test_mixed_payload_sanitizes_and_deduplicates_within_the_batch(fabrica, mundo, caplog):
     with caplog.at_level("WARNING"):
         await _registrar(fabrica, mundo, {
             "n1": [
@@ -214,7 +214,7 @@ async def test_payload_misturado_saneia_e_deduplica_no_proprio_lote(fabrica, mun
             "n2": {"filename": "a.json"},
         })
 
-    linhas = await _linhas(fabrica, Artifact)
+    linhas = await _lines(fabrica, Artifact)
     assert [(a.node_id, a.filename, a.output_key) for a in linhas] == [
         ("n1", "a.json", ""), ("n1", "b.json", ""), ("n2", "a.json", ""),
     ]
@@ -223,7 +223,7 @@ async def test_payload_misturado_saneia_e_deduplica_no_proprio_lote(fabrica, mun
     assert [c for c in mundo.diario if c[0] == "commit"] == [("commit",)]
 
 
-async def test_reentrega_nao_duplica_nem_paga_commit_nem_head(fabrica, mundo):
+async def test_redelivery_neither_duplicates_nor_pays_commit_or_head(fabrica, mundo):
     meta = {"n1": [{"filename": "a.json"}, {"filename": "b.json", "content_location": "executor"}]}
     await _registrar(fabrica, mundo, meta)
     mundo.diario.clear()
@@ -231,15 +231,15 @@ async def test_reentrega_nao_duplica_nem_paga_commit_nem_head(fabrica, mundo):
     await _registrar(fabrica, mundo, meta)
 
     assert mundo.diario == [("execute", "retencao"), ("execute", "conhecidos")]
-    assert len(await _linhas(fabrica, Artifact)) == 2
+    assert len(await _lines(fabrica, Artifact)) == 2
 
 
-async def test_nada_aproveitavel_para_antes_das_guardas_do_drive(fabrica, mundo):
+async def test_nothing_usable_stops_before_the_drive_guards(fabrica, mundo):
     await _registrar(fabrica, mundo, {"n1": [{"filename": "..", "context": "drive"}, 7]})
     assert mundo.diario == [("execute", "retencao"), ("execute", "conhecidos")]
 
 
-async def test_local_nao_consulta_o_storage_e_so_aceita_tamanho_inteiro(fabrica, mundo):
+async def test_local_does_not_query_storage_and_only_accepts_integer_size(fabrica, mundo):
     await _registrar(fabrica, mundo, {"n1": [
         {"filename": "a.geojson", "content_location": "executor", "size_bytes": 77},
         {"filename": "b.geojson", "content_location": "executor", "size_bytes": -1},
@@ -247,8 +247,8 @@ async def test_local_nao_consulta_o_storage_e_so_aceita_tamanho_inteiro(fabrica,
         {"filename": "d.geojson", "content_location": "minio", "local_fallback": True, "size_bytes": 5},
     ]})
 
-    assert "head" not in _nomes(mundo.diario)
-    linhas = await _linhas(fabrica, Artifact)
+    assert "head" not in _names(mundo.diario)
+    linhas = await _lines(fabrica, Artifact)
     assert [(a.filename, a.size_bytes) for a in linhas] == [
         ("a.geojson", 77), ("b.geojson", None), ("c.geojson", None), ("d.geojson", 5),
     ]
@@ -257,14 +257,14 @@ async def test_local_nao_consulta_o_storage_e_so_aceita_tamanho_inteiro(fabrica,
         assert a.local_path == f"{WS}/{TASK}/{a.filename}"
 
 
-async def test_head_que_falha_deixa_so_aquele_sem_tamanho(fabrica, mundo, caplog):
+async def test_failing_head_leaves_only_that_one_without_size(fabrica, mundo, caplog):
     mundo.head_falha.add(_key("a.json"))
     mundo.tamanhos[_key("b.json")] = 9
 
     with caplog.at_level("WARNING"):
         await _registrar(fabrica, mundo, {"n1": [{"filename": "a.json"}, {"filename": "b.json"}]})
 
-    assert [(a.filename, a.size_bytes) for a in await _linhas(fabrica, Artifact)] == [
+    assert [(a.filename, a.size_bytes) for a in await _lines(fabrica, Artifact)] == [
         ("a.json", None), ("b.json", 9),
     ]
     assert any(
@@ -284,17 +284,17 @@ async def test_head_que_falha_deixa_so_aquele_sem_tamanho(fabrica, mundo, caplog
         ("LEIAME", "", "application/json"),
     ],
 )
-async def test_drive_novo_no_minio_cria_linha_e_avisa_depois_do_commit(fabrica, mundo, nome, extensao, mime):
+async def test_new_drive_in_minio_creates_row_and_notifies_after_commit(fabrica, mundo, nome, extensao, mime):
     mundo.tamanhos[_key(nome)] = 321
 
     await _registrar(fabrica, mundo, {"n1": [{"filename": nome, "context": "drive"}]})
 
-    [wf] = await _linhas(fabrica, WorkspaceFile)
+    [wf] = await _lines(fabrica, WorkspaceFile)
     assert (wf.workspace_id, wf.s3_key, wf.original_name) == (WS, _key(nome), nome)
     assert (wf.extension, wf.mime_type, wf.size) == (extensao, mime, 321)
     assert (wf.uploaded_by, wf.status, wf.content_location) == (EXECUTOR, "confirmed", "minio")
     assert wf.content_executor_id is None
-    assert not await _linhas(fabrica, Artifact)
+    assert not await _lines(fabrica, Artifact)
     assert mundo.diario == [
         ("execute", "retencao"),
         ("execute", "conhecidos"),
@@ -310,8 +310,8 @@ async def test_drive_novo_no_minio_cria_linha_e_avisa_depois_do_commit(fabrica, 
 
 
 @pytest.mark.parametrize(("reusado", "acao"), [(True, "file_updated"), (False, "file_created")])
-async def test_drive_com_linha_do_upload_so_avisa(fabrica, mundo, reusado, acao):
-    await _semear(fabrica, WorkspaceFile(
+async def test_drive_with_upload_row_only_notifies(fabrica, mundo, reusado, acao):
+    await _seed(fabrica, WorkspaceFile(
         id_hash="file-1", workspace_id=WS, s3_key=f"artifacts/{WS}/task-antigo/imovel.geojson",
         original_name="imovel.geojson", extension="geojson", size=None, content_md5="abc",
     ))
@@ -331,11 +331,11 @@ async def test_drive_com_linha_do_upload_so_avisa(fabrica, mundo, reusado, acao)
             "size": 0, "content_md5": "abc",
         }),
     ]
-    assert len(await _linhas(fabrica, WorkspaceFile)) == 1
+    assert len(await _lines(fabrica, WorkspaceFile)) == 1
 
 
-async def test_id_do_drive_de_outro_workspace_nao_serve_de_guarda(fabrica, mundo):
-    await _semear(fabrica, WorkspaceFile(
+async def test_drive_id_from_another_workspace_does_not_act_as_guard(fabrica, mundo):
+    await _seed(fabrica, WorkspaceFile(
         id_hash="file-1", workspace_id="ws-2", s3_key="artifacts/ws-2/t/x.geojson",
         original_name="x.geojson", extension="geojson",
     ))
@@ -344,13 +344,13 @@ async def test_id_do_drive_de_outro_workspace_nao_serve_de_guarda(fabrica, mundo
         "filename": "x.geojson", "context": "drive", "drive_file_id": "file-1",
     }]})
 
-    novas = [wf for wf in await _linhas(fabrica, WorkspaceFile) if wf.workspace_id == WS]
+    novas = [wf for wf in await _lines(fabrica, WorkspaceFile) if wf.workspace_id == WS]
     assert [wf.s3_key for wf in novas] == [_key("x.geojson")]
     assert [c[1] for c in mundo.diario if c[0] == "emit"] == ["file_created"]
 
 
-async def test_drive_ja_registrado_pela_key_derivada_e_ignorado(fabrica, mundo):
-    await _semear(fabrica, WorkspaceFile(
+async def test_drive_already_registered_by_derived_key_is_ignored(fabrica, mundo):
+    await _seed(fabrica, WorkspaceFile(
         workspace_id=WS, s3_key=_key("x.geojson"), original_name="x.geojson", extension="geojson",
     ))
 
@@ -361,7 +361,7 @@ async def test_drive_ja_registrado_pela_key_derivada_e_ignorado(fabrica, mundo):
     ]
 
 
-async def test_falha_ao_avisar_um_arquivo_nao_impede_os_demais(fabrica, mundo, caplog):
+async def test_failure_notifying_one_file_does_not_stop_the_others(fabrica, mundo, caplog):
     mundo.emit_falha.add("a.geojson")
 
     with caplog.at_level("WARNING"):
@@ -371,16 +371,16 @@ async def test_falha_ao_avisar_um_arquivo_nao_impede_os_demais(fabrica, mundo, c
         ]})
 
     assert [c[2]["original_name"] for c in mundo.diario if c[0] == "emit"] == ["a.geojson", "b.geojson"]
-    assert len(await _linhas(fabrica, WorkspaceFile)) == 2
+    assert len(await _lines(fabrica, WorkspaceFile)) == 2
     assert any(
         r.getMessage() == "Falha ao notificar Drive para 'a.geojson': ws caiu" for r in caplog.records
     )
 
 
-async def test_lote_misturado_percorre_as_tres_fases_na_ordem(fabrica, mundo, caplog):
+async def test_mixed_batch_goes_through_the_three_phases_in_order(fabrica, mundo, caplog):
     """Artifact in MinIO, local artifact, Drive already uploaded, new Drive and Drive
     that fell back to local — in a single payload."""
-    await _semear(fabrica, WorkspaceFile(
+    await _seed(fabrica, WorkspaceFile(
         id_hash="file-1", workspace_id=WS, s3_key=f"artifacts/{WS}/task-antigo/c.geojson",
         original_name="c.geojson", extension="geojson", size=8,
     ))
@@ -394,7 +394,7 @@ async def test_lote_misturado_percorre_as_tres_fases_na_ordem(fabrica, mundo, ca
             "n5": [{"filename": "e.geojson", "context": "drive", "local_fallback": True, "size_bytes": 4}],
         })
 
-    nomes = _nomes(mundo.diario)
+    nomes = _names(mundo.diario)
     assert nomes[:4] == ["retencao", "conhecidos", "drive_por_id", "drive_por_key"]
     # The HEADs go out in parallel: the order AMONG them is not a contract.
     assert sorted(c[1] for c in mundo.diario[4:6]) == [_key("a.json"), _key("d.geojson")]
@@ -410,7 +410,7 @@ async def test_lote_misturado_percorre_as_tres_fases_na_ordem(fabrica, mundo, ca
     assert [(c[1], c[2]["original_name"]) for c in mundo.diario[11:]] == [
         ("file_created", "c.geojson"), ("file_created", "d.geojson"),
     ]
-    catalogo = next(wf for wf in await _linhas(fabrica, WorkspaceFile) if wf.original_name == "e.geojson")
+    catalogo = next(wf for wf in await _lines(fabrica, WorkspaceFile) if wf.original_name == "e.geojson")
     assert (catalogo.s3_key, catalogo.content_location, catalogo.content_executor_id) == (None, "executor", EXECUTOR)
     assert catalogo.size == 4
     assert "run task-1: 4 artefato(s) registrado(s) (2 no Drive)." in [

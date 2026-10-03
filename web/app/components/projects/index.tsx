@@ -21,15 +21,15 @@ import CreateGroup from "./dialog-content/create-group"
 import DeleteProject from "./dialog-content/delete-project"
 import MoveWorkflowDialog from "./dialog-content/move-workflow"
 import RenameGroup from "./dialog-content/rename-group"
-import { CabecalhoDeProjetos, type ContagensDoCabecalho } from "./cabecalho"
-import { derivarComoAnda, type ComoAnda } from "./como-anda"
+import { CabecalhoDeProjetos, type HeaderCounts } from "./cabecalho"
+import { derivarComoAnda, type HowItsGoing } from "./como-anda"
 import { ConfirmarDesativar } from "./confirmar-desativar"
 import { ErroDeCarga, MetricasIndisponiveis, SemResultado, SkeletonDeProjetos, VazioPrimeiroUso } from "./estados"
 import { BarraDeFiltros } from "./filtros-barra"
-import { casaBusca, contarPorFiltro, ordenar, predicadoDoFiltro, type ContextoDeFiltro } from "./filtros"
-import { derivarGatilho, resumirAgendamento, type Gatilho, type ResumoDoAgendamento } from "./gatilho"
+import { matchesSearch, contarPorFiltro, ordenar, predicadoDoFiltro, type FilterContext } from "./filtros"
+import { derivarGatilho, resumirAgendamento, type Gatilho, type ScheduleSummary } from "./gatilho"
 import { GrupoSecao, textoDaContagemDoGrupo } from "./grupo-secao"
-import { chaveDosColapsados, gravarColapsados, lerColapsados } from "./grupos-colapsados"
+import { chaveDosColapsados, saveCollapsed, readCollapsed } from "./grupos-colapsados"
 import { LinhaWorkflow } from "./linha-workflow"
 import { moverGrupo } from "./ordem-dos-grupos"
 import { filtrosAtivos } from "./projetos-url"
@@ -54,10 +54,10 @@ export default function ProjectActions() {
 }
 
 /** What each row needs and that only changes when the data changes (not on every search keystroke). */
-interface Derivados {
+interface Derived {
   gatilho: Gatilho
-  resumo: ResumoDoAgendamento | null
-  comoAnda: ComoAnda
+  resumo: ScheduleSummary | null
+  comoAnda: HowItsGoing
 }
 
 function Projetos() {
@@ -75,52 +75,52 @@ function Projetos() {
   // groups they do not use collapses everything again on every visit. The read
   // happens in an effect (and not in the initial `useState`) because
   // `localStorage` does not exist in the server render.
-  const [recolhidos, setRecolhidos] = useState<Set<string>>(new Set())
-  const chaveColapso = chaveDosColapsados(currentWorkspace?.id_hash)
+  const [recolhidos, setCollapsed] = useState<Set<string>>(new Set())
+  const collapseKey = chaveDosColapsados(currentWorkspace?.id_hash)
   useEffect(() => {
-    setRecolhidos(lerColapsados(chaveColapso))
-  }, [chaveColapso])
+    setCollapsed(readCollapsed(collapseKey))
+  }, [collapseKey])
 
-  const alternarGrupo = useCallback((groupId: string) => {
-    setRecolhidos(prev => {
+  const toggleGroup = useCallback((groupId: string) => {
+    setCollapsed(prev => {
       const next = new Set(prev)
       if (next.has(groupId)) next.delete(groupId)
       else next.add(groupId)
-      gravarColapsados(chaveColapso, next)
+      saveCollapsed(collapseKey, next)
       return next
     })
-  }, [chaveColapso])
+  }, [collapseKey])
 
-  function recolherTodos() {
+  function collapseAll() {
     const next = new Set(grupos.map(g => g.id_hash))
-    gravarColapsados(chaveColapso, next)
-    setRecolhidos(next)
+    saveCollapsed(collapseKey, next)
+    setCollapsed(next)
   }
 
-  function expandirTodos() {
+  function expandAll() {
     const next = new Set<string>()
-    gravarColapsados(chaveColapso, next)
-    setRecolhidos(next)
+    saveCollapsed(collapseKey, next)
+    setCollapsed(next)
   }
 
   const todosRecolhidos = grupos.length > 0 && grupos.every(g => recolhidos.has(g.id_hash))
   // ──────────────────────────────────────────────────────────────────────────
 
   // ── Per-workflow derivations ───────────────────────────────────────────────
-  const runPorHash = useMemo(
+  const runByHash = useMemo(
     () => new Map<string, RunningRun>(runningRuns.map(r => [r.workflowHash, r])),
     [runningRuns],
   )
-  const gruposPorId = useMemo(() => new Map(grupos.map(g => [g.id_hash, g])), [grupos])
+  const groupsById = useMemo(() => new Map(grupos.map(g => [g.id_hash, g])), [grupos])
 
   // Minute clock for the relative texts ("há 4 min"). Without it, freshness
   // depended on a SIDE EFFECT of the metrics poll changing the identity of
   // `metricas` — if the poll changed nothing, the times froze. It only advances
   // with the tab visible (nobody reads a hidden tab) and a return to focus
   // recomputes right away, so "há N min" does not come back stale.
-  const [minuto, setMinuto] = useState(0)
+  const [minuto, setMinute] = useState(0)
   useEffect(() => {
-    const bump = () => { if (document.visibilityState === "visible") setMinuto(m => m + 1) }
+    const bump = () => { if (document.visibilityState === "visible") setMinute(m => m + 1) }
     const timer = setInterval(bump, 60_000)
     document.addEventListener("visibilitychange", bump)
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", bump) }
@@ -133,21 +133,21 @@ function Projetos() {
   // its own, independent of the metrics poll cadence.
   const derivados = useMemo(() => {
     const agora = new Date()
-    const mapa = new Map<string, Derivados>()
+    const mapa = new Map<string, Derived>()
     for (const wf of workflows) {
       mapa.set(wf.id_hash, {
         gatilho: derivarGatilho(wf),
         resumo: resumirAgendamento(wf.schedule, wf.flag_ative, agora),
-        comoAnda: derivarComoAnda(wf, metricas?.get(wf.id_hash), runPorHash.get(wf.id_hash), metricasIndisponiveis, agora),
+        comoAnda: derivarComoAnda(wf, metricas?.get(wf.id_hash), runByHash.get(wf.id_hash), metricasIndisponiveis, agora),
       })
     }
     return mapa
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workflows, metricas, runPorHash, metricasIndisponiveis, minuto])
+  }, [workflows, metricas, runByHash, metricasIndisponiveis, minuto])
 
-  const contexto = useMemo<ContextoDeFiltro>(() => {
-    const comoAndaPorHash = new Map<string, ComoAnda>()
-    const resumoDoAgendamentoPorHash = new Map<string, ResumoDoAgendamento | null>()
+  const contexto = useMemo<FilterContext>(() => {
+    const comoAndaPorHash = new Map<string, HowItsGoing>()
+    const resumoDoAgendamentoPorHash = new Map<string, ScheduleSummary | null>()
     for (const [hash, d] of derivados) {
       comoAndaPorHash.set(hash, d.comoAnda)
       resumoDoAgendamentoPorHash.set(hash, d.resumo)
@@ -163,21 +163,21 @@ function Projetos() {
   // PERF: useDeferredValue — the field responds immediately while the
   // filtering is deferred to a low-priority transition. Avoids the caret
   // stalling while typing in large lists.
-  const qDiferido = useDeferredValue(estado.q)
-  const recorteAtivo = filtrosAtivos({ ...estado, q: qDiferido }) > 0
+  const deferredQuery = useDeferredValue(estado.q)
+  const sliceActive = filtrosAtivos({ ...estado, q: deferredQuery }) > 0
 
   const visiveis = useMemo(() => {
-    const casaFiltro = predicadoDoFiltro(estado.filtro, contexto)
-    return workflows.filter(wf => casaBusca(wf, gruposPorId, qDiferido) && casaFiltro(wf))
-  }, [workflows, estado.filtro, contexto, gruposPorId, qDiferido])
+    const matchesFilter = predicadoDoFiltro(estado.filtro, contexto)
+    return workflows.filter(wf => matchesSearch(wf, groupsById, deferredQuery) && matchesFilter(wf))
+  }, [workflows, estado.filtro, contexto, groupsById, deferredQuery])
 
   // How many would match the search alone: the empty state's "Há N com «q» sem o filtro".
-  const soComBusca = useMemo(
-    () => workflows.filter(wf => casaBusca(wf, gruposPorId, qDiferido)).length,
-    [workflows, gruposPorId, qDiferido],
+  const searchOnly = useMemo(
+    () => workflows.filter(wf => matchesSearch(wf, groupsById, deferredQuery)).length,
+    [workflows, groupsById, deferredQuery],
   )
 
-  const porGrupo = useMemo(() => {
+  const byGroup = useMemo(() => {
     const mapa = new Map<string, IWorkflow[]>()
     for (const wf of visiveis) {
       if (!wf.group_id) continue
@@ -189,7 +189,7 @@ function Projetos() {
     return mapa
   }, [visiveis, estado.ordem, contexto])
 
-  const semGrupo = useMemo(
+  const ungrouped = useMemo(
     () => ordenar(visiveis.filter(wf => !wf.group_id), estado.ordem, contexto),
     [visiveis, estado.ordem, contexto],
   )
@@ -208,22 +208,22 @@ function Projetos() {
     }
     return mapa
   }, [workflows])
-  const totalSemGrupo = totais.get(null) ?? { total: 0, ativos: 0 }
+  const ungroupedTotal = totais.get(null) ?? { total: 0, ativos: 0 }
 
   // With an active search or chip, groups with no matching row disappear;
   // with no slice, all appear (including empty ones). Memoized so it does not
   // re-filter on every render (e.g. every search keystroke).
-  const gruposVisiveis = useMemo(
-    () => recorteAtivo
-      ? grupos.filter(g => (porGrupo.get(g.id_hash)?.length ?? 0) > 0)
+  const visibleGroups = useMemo(
+    () => sliceActive
+      ? grupos.filter(g => (byGroup.get(g.id_hash)?.length ?? 0) > 0)
       : grupos,
-    [recorteAtivo, grupos, porGrupo],
+    [sliceActive, grupos, byGroup],
   )
   // ──────────────────────────────────────────────────────────────────────────
 
   // ── Quick run ──────────────────────────────────────────────────────────────
   const [runningId, setRunningId] = useState<string | null>(null)
-  const [preparandoId, setPreparandoId] = useState<string | null>(null)
+  const [preparingId, setPreparingId] = useState<string | null>(null)
   // Target of the parameters dialog: the schema comes along because the LISTING
   // does not carry it (see handleRunClick).
   const [executeTarget, setExecuteTarget] =
@@ -254,9 +254,9 @@ function Projetos() {
     // Its own state, not `runningId`: while the schema is being fetched the
     // workflow is NOT running yet, and the row's "em execução" dot would read
     // that wait as a run in progress.
-    setPreparandoId(project.id_hash)
+    setPreparingId(project.id_hash)
     const res = await GisFlowService.getWorkflowById(project.id_hash)
-    setPreparandoId(null)
+    setPreparingId(null)
     // "Has no schema" and "could not find out whether it has one" are different
     // things: without this branch, a 500/timeout here fell into the else and
     // FIRED the workflow with empty inputs — exactly the failure that fetching
@@ -279,13 +279,13 @@ function Projetos() {
   // ──────────────────────────────────────────────────────────────────────────
 
   // ── Ativar / Desativar ─────────────────────────────────────────────────────
-  const [desativando, setDesativando] = useState<IWorkflow | null>(null)
+  const [deactivating, setDeactivating] = useState<IWorkflow | null>(null)
 
   // Reads the value from the row ITSELF instead of looking it up in the list,
   // and updates the state through a function: without this the callback closed
   // over `workflows` and changed identity on every server response — and the
   // rows' memo was worthless.
-  const mudarStatus = useCallback(async (workflow: IWorkflow, novo: boolean) => {
+  const changeStatus = useCallback(async (workflow: IWorkflow, novo: boolean) => {
     const aplicar = (valor: boolean) => definirWorkflows(prev =>
       prev.map(p => p.id_hash === workflow.id_hash ? { ...p, flag_ative: valor } : p),
     )
@@ -303,12 +303,12 @@ function Projetos() {
 
   // Activating is safe and stays one click away; Deactivating goes through the
   // confirmation that says what it pauses (`ConfirmarDesativar`).
-  const ativar = useCallback((workflow: IWorkflow) => { void mudarStatus(workflow, true) }, [mudarStatus])
-  const pedirDesativar = useCallback((workflow: IWorkflow) => setDesativando(workflow), [])
-  const confirmarDesativar = useCallback((workflow: IWorkflow) => {
-    setDesativando(null)
-    void mudarStatus(workflow, false)
-  }, [mudarStatus])
+  const ativar = useCallback((workflow: IWorkflow) => { void changeStatus(workflow, true) }, [changeStatus])
+  const requestDeactivate = useCallback((workflow: IWorkflow) => setDeactivating(workflow), [])
+  const confirmDeactivate = useCallback((workflow: IWorkflow) => {
+    setDeactivating(null)
+    void changeStatus(workflow, false)
+  }, [changeStatus])
   // ──────────────────────────────────────────────────────────────────────────
 
   // ── Duplication ────────────────────────────────────────────────────────────
@@ -340,12 +340,12 @@ function Projetos() {
   // ──────────────────────────────────────────────────────────────────────────
 
   // ── Grupos: criar, renomear, excluir, mover para dentro/fora ───────────────
-  const [modalNovoGrupo, setModalNovoGrupo] = useState(false)
+  const [newGroupModal, setNewGroupModal] = useState(false)
   const [editGroup, setEditGroup] = useState<IWorkflowGroup | null>(null)
   const [deleteGroupConfirm, setDeleteGroupConfirm] = useState<IWorkflowGroup | null>(null)
 
   function handleGroupCreated(group: IWorkflowGroup) {
-    setModalNovoGrupo(false)
+    setNewGroupModal(false)
     definirGrupos(prev => [...prev, group])
   }
 
@@ -414,22 +414,22 @@ function Projetos() {
   }, [])
 
   /** Drops a group on another: the dragged one takes the target's position. */
-  async function handleReorderGroups(alvoId: string) {
-    const origemId = draggingGroupId
+  async function handleReorderGroups(targetId: string) {
+    const sourceId = draggingGroupId
     handleDragEnd()
-    if (!origemId || origemId === alvoId) return
+    if (!sourceId || sourceId === targetId) return
 
     const atual = grupos.map(g => g.id_hash)
-    const ordem = moverGrupo(atual, origemId, alvoId)
+    const ordem = moverGrupo(atual, sourceId, targetId)
     // Identity preserved when nothing moved — not worth a POST.
     if (ordem === atual) return
 
-    // Optimistic, with rollback — same pattern as `mudarStatus`. Order is the kind
+    // Optimistic, with rollback — same pattern as `changeStatus`. Order is the kind
     // of change where waiting for the server makes the item "snap back" under
     // the cursor, and that reads as a failure even when it worked.
     const anterior = grupos
-    const porId = new Map(grupos.map(g => [g.id_hash, g]))
-    definirGrupos(ordem.map(id => porId.get(id)!).filter(Boolean))
+    const byId = new Map(grupos.map(g => [g.id_hash, g]))
+    definirGrupos(ordem.map(id => byId.get(id)!).filter(Boolean))
 
     const result = await GisFlowService.reorderWorkflowGroups(ordem)
     if (result?.error) {
@@ -459,7 +459,7 @@ function Projetos() {
   }
 
   const arrastando = draggingId ? workflows.find(p => p.id_hash === draggingId) ?? null : null
-  const zonaDeRemover = {
+  const removeZone = {
     onDragOver: (e: DragEvent<HTMLElement>) => { e.preventDefault(); setDragOverUngrouped(true) },
     onDragLeave: (e: DragEvent<HTMLElement>) => {
       if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverUngrouped(false)
@@ -475,8 +475,8 @@ function Projetos() {
   const [moveDialogProject, setMoveDialogProject] = useState<IWorkflow | null>(null)
   // By id, not by object: the workflow may change in the list (renamed,
   // activated) while the dialog is open, and the dialog must read the current version.
-  const workflowParaExcluir = deleteProjectId ? workflows.find(p => p.id_hash === deleteProjectId) ?? null : null
-  const workflowParaConfigurar = configureProjectId ? workflows.find(p => p.id_hash === configureProjectId) ?? null : null
+  const workflowToDelete = deleteProjectId ? workflows.find(p => p.id_hash === deleteProjectId) ?? null : null
+  const workflowToConfigure = configureProjectId ? workflows.find(p => p.id_hash === configureProjectId) ?? null : null
   // ──────────────────────────────────────────────────────────────────────────
 
   // Same list the dialog offers in the select — the menu only decides whether there is any.
@@ -489,7 +489,7 @@ function Projetos() {
   // Everything that goes down to LinhaWorkflow has constant identity —
   // otherwise React.memo never hits and the whole list re-renders again on
   // every search keystroke.
-  const abrirWorkflow = useCallback(
+  const openWorkflow = useCallback(
     (id: string) => router.push(`./workflow/${id}`),
     [router],
   )
@@ -506,28 +506,28 @@ function Projetos() {
    * The `Set` avoids repeating the call on every pointer entry into the same
    * row — Next's cache already deduplicates, but not for free.
    */
-  const aquecidos = useRef<Set<string>>(new Set())
+  const prefetched = useRef<Set<string>>(new Set())
   const prefetchWorkflow = useCallback((id: string) => {
-    if (aquecidos.current.has(id)) return
-    aquecidos.current.add(id)
+    if (prefetched.current.has(id)) return
+    prefetched.current.add(id)
     router.prefetch(`./workflow/${id}`)
   }, [router])
   // History already sliced to the workflow (spec §3.9); the live run opens
   // straight in its panel.
-  const verExecucoes = useCallback(
+  const viewRuns = useCallback(
     (id: string) => router.push(`/observability?workflow=${encodeURIComponent(id)}`),
     [router],
   )
-  const verExecucao = useCallback(
+  const viewRun = useCallback(
     (runId: string) => router.push(`/observability?execucao=${encodeURIComponent(runId)}`),
     [router],
   )
-  const abrirPortal = useCallback((project: IWorkflow) => setPortalDialogProject(project), [])
-  const abrirMover = useCallback((project: IWorkflow) => setMoveDialogProject(project), [])
-  const abrirConfigurar = useCallback((id: string) => setConfigureProjectId(id), [])
-  const abrirExcluir = useCallback((id: string) => setDeleteProjectId(id), [])
-  const criarWorkflow = useCallback(() => router.push("./workflow/create"), [router])
-  const atualizarLista = useCallback(() => recarregar({ force: true }), [recarregar])
+  const openPortal = useCallback((project: IWorkflow) => setPortalDialogProject(project), [])
+  const openMove = useCallback((project: IWorkflow) => setMoveDialogProject(project), [])
+  const openConfigure = useCallback((id: string) => setConfigureProjectId(id), [])
+  const openDelete = useCallback((id: string) => setDeleteProjectId(id), [])
+  const createWorkflow = useCallback(() => router.push("./workflow/create"), [router])
+  const refreshList = useCallback(() => recarregar({ force: true }), [recarregar])
   const tentarDeNovo = useCallback(() => recarregar(), [recarregar])
   // ──────────────────────────────────────────────────────────────────────────
 
@@ -550,21 +550,21 @@ function Projetos() {
         podeMover={podeMover}
         hasDnd={hasDnd}
         isDragging={draggingId === wf.id_hash}
-        executando={runningId === wf.id_hash || preparandoId === wf.id_hash}
+        executando={runningId === wf.id_hash || preparingId === wf.id_hash}
         duplicando={duplicatingId === wf.id_hash}
-        runIdVivo={runPorHash.get(wf.id_hash)?.runId ?? null}
-        onOpen={abrirWorkflow}
+        runIdVivo={runByHash.get(wf.id_hash)?.runId ?? null}
+        onOpen={openWorkflow}
         onPrefetch={prefetchWorkflow}
         onRun={handleRunClick}
-        onVerExecucao={verExecucao}
+        onVerExecucao={viewRun}
         onAtivar={ativar}
-        onDesativar={pedirDesativar}
-        onConfigure={abrirConfigurar}
-        onPortal={abrirPortal}
-        onMove={abrirMover}
+        onDesativar={requestDeactivate}
+        onConfigure={openConfigure}
+        onPortal={openPortal}
+        onMove={openMove}
         onDuplicate={handleDuplicate}
-        onDelete={abrirExcluir}
-        onViewRuns={verExecucoes}
+        onDelete={openDelete}
+        onViewRuns={viewRuns}
         onAddToGroup={handleAddToGroup}
         onRemoveFromGroup={handleRemoveFromGroup}
         onDragStart={handleDragStart}
@@ -581,14 +581,14 @@ function Projetos() {
   // (Atualizar, Duplicar) over a list already in place does not erase it — the
   // hook keeps what was there and the toast warns; blocking the whole screen
   // over a transient error would be worse than the problem.
-  const comErro = !carregando && dados.erro != null && dados.atualizadoEm == null
-  const primeiroUso = !carregando && !comErro && workflows.length === 0 && grupos.length === 0
-  const semResultado = !carregando && !comErro && !primeiroUso && recorteAtivo && visiveis.length === 0
-  const listaPronta = !carregando && !comErro && !primeiroUso
+  const hasError = !carregando && dados.erro != null && dados.atualizadoEm == null
+  const firstUse = !carregando && !hasError && workflows.length === 0 && grupos.length === 0
+  const noResults = !carregando && !hasError && !firstUse && sliceActive && visiveis.length === 0
+  const listReady = !carregando && !hasError && !firstUse
   // The subtitle only disappears while there is nothing to count (first load, or
   // an error before any response).
-  const contagensDoCabecalho: ContagensDoCabecalho | null =
-    carregando || (comErro && dados.atualizadoEm == null)
+  const headerCounts: HeaderCounts | null =
+    carregando || (hasError && dados.atualizadoEm == null)
       ? null
       : { workflows: workflows.length, grupos: grupos.length, ativos: contagens.ativos, agendados: contagens.agendados, portal: contagens.portal }
   // ──────────────────────────────────────────────────────────────────────────
@@ -596,23 +596,23 @@ function Projetos() {
   return (
     <PageRoot>
       <CabecalhoDeProjetos
-        contagens={contagensDoCabecalho}
+        contagens={headerCounts}
         atualizando={dados.atualizando}
         canEdit={canEdit}
-        onAtualizar={atualizarLista}
-        onNovoGrupo={() => setModalNovoGrupo(true)}
-        onCriarWorkflow={criarWorkflow}
+        onAtualizar={refreshList}
+        onNovoGrupo={() => setNewGroupModal(true)}
+        onCriarWorkflow={createWorkflow}
       />
 
       {carregando && <SkeletonDeProjetos />}
 
-      {comErro && <ErroDeCarga mensagem={dados.erro!} onTentar={tentarDeNovo} />}
+      {hasError && <ErroDeCarga mensagem={dados.erro!} onTentar={tentarDeNovo} />}
 
-      {primeiroUso && <VazioPrimeiroUso canEdit={canEdit} onCriar={criarWorkflow} />}
+      {firstUse && <VazioPrimeiroUso canEdit={canEdit} onCriar={createWorkflow} />}
 
-      {listaPronta && (
+      {listReady && (
         <>
-          {metricasIndisponiveis && <MetricasIndisponiveis onTentar={atualizarLista} />}
+          {metricasIndisponiveis && <MetricasIndisponiveis onTentar={refreshList} />}
 
           <BarraDeFiltros
             estado={estado}
@@ -621,44 +621,44 @@ function Projetos() {
             contagens={contagens}
             temGrupos={grupos.length > 0}
             todosRecolhidos={todosRecolhidos}
-            onRecolherTodos={recolherTodos}
-            onExpandirTodos={expandirTodos}
+            onRecolherTodos={collapseAll}
+            onExpandirTodos={expandAll}
           />
 
-          {semResultado && (
-            <SemResultado q={estado.q} filtro={estado.filtro} semFiltro={soComBusca} onLimpar={limparFiltros} />
+          {noResults && (
+            <SemResultado q={estado.q} filtro={estado.filtro} semFiltro={searchOnly} onLimpar={limparFiltros} />
           )}
 
           {/* Ungrouped comes BEFORE the groups. A titled section only when there
               are groups; without them, the list comes out untitled — there is
               nothing to tell it apart from. */}
-          {!semResultado && semGrupo.length > 0 && (
+          {!noResults && ungrouped.length > 0 && (
             grupos.length > 0 ? (
-              <section aria-labelledby="sem-grupo-titulo" {...zonaDeRemover} className="flex flex-col gap-1.5">
+              <section aria-labelledby="sem-grupo-titulo" {...removeZone} className="flex flex-col gap-1.5">
                 <h2 className="flex flex-wrap items-baseline gap-x-2 px-1">
                   <span id="sem-grupo-titulo" className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                     Sem grupo
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {textoDaContagemDoGrupo(
-                      totalSemGrupo.total,
-                      totalSemGrupo.ativos,
-                      semGrupo.length < totalSemGrupo.total ? semGrupo.length : null,
+                      ungroupedTotal.total,
+                      ungroupedTotal.ativos,
+                      ungrouped.length < ungroupedTotal.total ? ungrouped.length : null,
                     )}
                   </span>
                 </h2>
                 <ul className="flex flex-col gap-1.5">
-                  {semGrupo.map(wf => <li key={wf.id_hash}>{linha(wf)}</li>)}
+                  {ungrouped.map(wf => <li key={wf.id_hash}>{linha(wf)}</li>)}
                 </ul>
               </section>
             ) : (
               <ul className="flex flex-col gap-1.5">
-                {semGrupo.map(wf => <li key={wf.id_hash}>{linha(wf)}</li>)}
+                {ungrouped.map(wf => <li key={wf.id_hash}>{linha(wf)}</li>)}
               </ul>
             )
           )}
 
-          {!semResultado && gruposVisiveis.map(grupo => {
+          {!noResults && visibleGroups.map(grupo => {
             const id = grupo.id_hash
             const total = totais.get(id) ?? { total: 0, ativos: 0 }
             // Dragging a GROUP had no visual feedback at all: the person held
@@ -670,11 +670,11 @@ function Projetos() {
               <GrupoSecao
                 key={id}
                 grupo={grupo}
-                workflows={porGrupo.get(id) ?? []}
+                workflows={byGroup.get(id) ?? []}
                 totalNoGrupo={total.total}
                 ativosNoGrupo={total.ativos}
                 recolhido={recolhidos.has(id)}
-                onToggle={alternarGrupo}
+                onToggle={toggleGroup}
                 canEdit={canEdit}
                 podeArrastar={canEdit && grupos.length > 1}
                 arrastandoEste={arrastandoEste}
@@ -695,10 +695,10 @@ function Projetos() {
             )
           })}
 
-          {/* Zona fixa — aparece ao arrastar um workflow agrupado. */}
+          {/* Zona fixa — aparece ao arrastar um workflow grouped. */}
           {arrastando?.group_id && (
             <div
-              {...zonaDeRemover}
+              {...removeZone}
               className={cn(
                 "flex items-center justify-center gap-2 rounded-lg border-2 border-dashed py-4 text-sm transition-colors select-none",
                 dragOverUngrouped
@@ -715,10 +715,10 @@ function Projetos() {
               created, nothing in the list suggested grouping was possible — not
               even the drag handle, which only appears from the first group on.
               This invitation is the only place where it can show itself. */}
-          {canEdit && !recorteAtivo && grupos.length === 0 && workflows.length > 2 && (
+          {canEdit && !sliceActive && grupos.length === 0 && workflows.length > 2 && (
             <button
               type="button"
-              onClick={() => setModalNovoGrupo(true)}
+              onClick={() => setNewGroupModal(true)}
               className="flex items-center gap-3 rounded-lg border border-dashed border-border px-4 py-3 text-left transition-colors outline-none hover:border-primary/50 hover:bg-accent/40 focus-visible:ring-[3px] focus-visible:ring-ring/50"
             >
               <TbFolderPlus className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -734,7 +734,7 @@ function Projetos() {
 
           {/* Drag hint, on the first group created: the handle only exists from
               then on, and nothing would explain that it appeared. */}
-          {canEdit && grupos.length === 1 && totalSemGrupo.total > 0 && (
+          {canEdit && grupos.length === 1 && ungroupedTotal.total > 0 && (
             <p className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
               <TbGripVertical size={14} className="shrink-0" aria-hidden="true" />
               Arraste um workflow pela alça para colocá-lo no grupo — ou use
@@ -745,7 +745,7 @@ function Projetos() {
       )}
 
       {/* ── Dialogs ───────────────────────────────────────────────────────── */}
-      <Dialog open={modalNovoGrupo} onOpenChange={setModalNovoGrupo}>
+      <Dialog open={newGroupModal} onOpenChange={setNewGroupModal}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Novo grupo</DialogTitle>
@@ -801,10 +801,10 @@ function Projetos() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!workflowParaExcluir} onOpenChange={open => { if (!open) setDeleteProjectId(null) }}>
-        {workflowParaExcluir && (
+      <Dialog open={!!workflowToDelete} onOpenChange={open => { if (!open) setDeleteProjectId(null) }}>
+        {workflowToDelete && (
           <DeleteProject
-            workflow={workflowParaExcluir}
+            workflow={workflowToDelete}
             onDeleted={id => {
               definirWorkflows(prev => prev.filter(p => p.id_hash !== id))
               setDeleteProjectId(null)
@@ -813,11 +813,11 @@ function Projetos() {
         )}
       </Dialog>
 
-      <Dialog open={!!workflowParaConfigurar} onOpenChange={open => { if (!open) setConfigureProjectId(null) }}>
-        {workflowParaConfigurar && (
+      <Dialog open={!!workflowToConfigure} onOpenChange={open => { if (!open) setConfigureProjectId(null) }}>
+        {workflowToConfigure && (
           <ConfigureProject
-            key={workflowParaConfigurar.id_hash}
-            workflow={workflowParaConfigurar}
+            key={workflowToConfigure.id_hash}
+            workflow={workflowToConfigure}
             onSaved={atualizado => definirWorkflows(prev => prev.map(p => p.id_hash === atualizado.id_hash ? atualizado : p))}
             onDone={() => setConfigureProjectId(null)}
           />
@@ -835,7 +835,7 @@ function Projetos() {
         />
       )}
 
-      <ConfirmarDesativar workflow={desativando} onConfirm={confirmarDesativar} onCancel={() => setDesativando(null)} />
+      <ConfirmarDesativar workflow={deactivating} onConfirm={confirmDeactivate} onCancel={() => setDeactivating(null)} />
 
       {portalDialogProject && (
         <PortalSettingsDialog

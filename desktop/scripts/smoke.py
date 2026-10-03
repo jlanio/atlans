@@ -19,15 +19,15 @@ import sys
 import tempfile
 import traceback
 
-MIN_NOS = 60          # there were 64 in Phase 0; margin for the occasional node removal
-MIN_CAMPOS_SNAPSHOT = 50  # there were 55; the IPC contract lives here
+MIN_NODES = 60          # there were 64 in Phase 0; margin for the occasional node removal
+MIN_SNAPSHOT_FIELDS = 50  # there were 55; the IPC contract lives here
 
-_passos = []
+_steps = []
 
 
 def passo(nome):
     def deco(fn):
-        _passos.append((nome, fn))
+        _steps.append((nome, fn))
         return fn
     return deco
 
@@ -56,7 +56,7 @@ def _():
     from flow.registry import NODE_REGISTRY, auto_discover_nodes
     auto_discover_nodes()
     n = len(NODE_REGISTRY)
-    assert n >= MIN_NOS, f"apenas {n} nos registrados (minimo {MIN_NOS})"
+    assert n >= MIN_NODES, f"apenas {n} nos registrados (minimo {MIN_NODES})"
     return f"{n} nos"
 
 
@@ -147,7 +147,7 @@ def _():
     import dataclasses
     from executor.stats import Snapshot
     campos = [f.name for f in dataclasses.fields(Snapshot)]
-    assert len(campos) >= MIN_CAMPOS_SNAPSHOT, f"Snapshot com {len(campos)} campos"
+    assert len(campos) >= MIN_SNAPSHOT_FIELDS, f"Snapshot com {len(campos)} campos"
     json.dumps(campos)
     return f"{len(campos)} campos"
 
@@ -160,8 +160,8 @@ def _gdf():
 
 
 def main() -> int:
-    total = len(_passos)
-    for i, (nome, fn) in enumerate(_passos, 1):
+    total = len(_steps)
+    for i, (nome, fn) in enumerate(_steps, 1):
         try:
             print(f"  [{i:2}/{total}] OK    {nome}  ->  {fn()}", flush=True)
         except Exception:

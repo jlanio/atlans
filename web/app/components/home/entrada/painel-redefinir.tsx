@@ -16,9 +16,9 @@ import { API_URL } from "@/utils/env"
 import { AuthError } from "@/app/components/auth/AuthError"
 import { AuthPasswordField } from "@/app/components/auth/AuthPasswordField"
 import { AuthPasswordStrength } from "@/app/components/auth/AuthPasswordStrength"
-import { useIdiomaDaTela, useTextos } from "@/app/components/home/i18n"
-import { BotaoDoModal, LinkDoModal } from "./botao-do-modal"
-import { textoDaRecusaDoLink } from "./recusas"
+import { useScreenLanguage, useTexts } from "@/app/components/home/i18n"
+import { ModalButton, LinkDoModal } from "./botao-do-modal"
+import { linkRejectionText } from "./recusas"
 
 interface Props {
   /** The token from the e-mail link. Empty = invalid or truncated link. */
@@ -30,11 +30,11 @@ interface Props {
   onRecuperar: () => void
 }
 
-export function PainelRedefinir({ token, onEnviando, onRedefiniu, onRecuperar }: Props) {
-  const t = useTextos().entrada.painelRedefinir
+export function ResetPanel({ token, onEnviando, onRedefiniu, onRecuperar }: Props) {
+  const t = useTexts().entrada.painelRedefinir
   // The server only speaks Portuguese: in the other languages, the rejection via
   // the language's text (see ./recusas).
-  const traduzir = useIdiomaDaTela() !== "pt-BR"
+  const traduzir = useScreenLanguage() !== "pt-BR"
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -59,7 +59,7 @@ export function PainelRedefinir({ token, onEnviando, onRedefiniu, onRecuperar }:
       })
       onRedefiniu()
     } catch (err) {
-      setError(textoDaRecusaDoLink(err, traduzir, t))
+      setError(linkRejectionText(err, traduzir, t))
     } finally {
       setLoading(false)
       onEnviando(false)
@@ -73,9 +73,9 @@ export function PainelRedefinir({ token, onEnviando, onRedefiniu, onRecuperar }:
     return (
       <>
         <AuthError error={{ message: t.linkInvalido }} />
-        <BotaoDoModal type="button" onClick={onRecuperar}>
+        <ModalButton type="button" onClick={onRecuperar}>
           {t.pedirLinkNovo}
-        </BotaoDoModal>
+        </ModalButton>
       </>
     )
   }
@@ -110,9 +110,9 @@ export function PainelRedefinir({ token, onEnviando, onRedefiniu, onRecuperar }:
 
       {error && <AuthError error={{ message: error }} />}
 
-      <BotaoDoModal loading={loading} loadingLabel={t.redefinindo} disabled={passwordMismatch} className="mt-1">
+      <ModalButton loading={loading} loadingLabel={t.redefinindo} disabled={passwordMismatch} className="mt-1">
         {t.redefinirSenha}
-      </BotaoDoModal>
+      </ModalButton>
 
       <p className="text-center text-[12.5px] text-muted-foreground">
         {t.linkExpirou} <LinkDoModal onClick={onRecuperar}>{t.pedirOutro}</LinkDoModal>

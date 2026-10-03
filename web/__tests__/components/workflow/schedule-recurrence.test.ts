@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {
   lerEstado, gerarCampos, descrever, resumoSalvo, proximasExecucoes, validarAvancado,
-  type EstadoAgenda,
+  type ScheduleState,
 } from "@/app/components/workflow/nodes-configuration/schedule-recurrence"
 
 // Reads the "wall clock" components of a date in a time zone (to check the
@@ -22,7 +22,7 @@ function parts(d: Date, tz: string) {
 const SP = "America/Sao_Paulo"
 const AGORA = new Date("2026-03-10T15:00:00Z") // 12:00 in São Paulo (−3)
 
-function base(over: Partial<EstadoAgenda> = {}): EstadoAgenda {
+function base(over: Partial<ScheduleState> = {}): ScheduleState {
   return {
     freq: "diario", intervalo: 15, unidade: "minutes", hora: 9, minuto: 0,
     everyDays: 1, weekdays: [1, 2, 3, 4, 5], monthDay: 1, monthLast: false,
@@ -63,7 +63,7 @@ describe("gerarCampos — estado → campos gravados", () => {
 })
 
 describe("lerEstado — campos gravados → estado (round-trip)", () => {
-  const casos: [string, Partial<EstadoAgenda>][] = [
+  const casos: [string, Partial<ScheduleState>][] = [
     ["intervalo", { freq: "intervalo", intervalo: 2, unidade: "hours" }],
     ["diário", { freq: "diario", hora: 14, minuto: 30, everyDays: 1 }],
     ["a cada 3 dias", { freq: "diario", hora: 9, minuto: 0, everyDays: 3 }],

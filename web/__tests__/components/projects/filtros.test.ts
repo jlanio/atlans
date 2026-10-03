@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest"
 import {
-  FILTROS_DOS_CHIPS, ROTULO_DA_ORDEM, ROTULO_DO_FILTRO, casaBusca, contarPorFiltro, normalizarBusca, ordenar,
-  predicadoDoFiltro, temPortal, type ContextoDeFiltro,
+  CHIP_FILTERS, SORT_LABEL, FILTER_LABEL, matchesSearch, contarPorFiltro, normalizeSearch, ordenar,
+  predicadoDoFiltro, hasPortal, type FilterContext,
 } from "@/app/components/projects/filtros"
-import { FILTROS } from "@/app/components/projects/projetos-url"
-import type { ComoAnda } from "@/app/components/projects/como-anda"
+import { FILTERS } from "@/app/components/projects/projetos-url"
+import type { HowItsGoing } from "@/app/components/projects/como-anda"
 import { resumirAgendamento } from "@/app/components/projects/gatilho"
 import type { IWorkflow, IWorkflowGroup, IWorkflowSchedule } from "@/service/types"
 
@@ -19,9 +19,9 @@ const schedule = (active: boolean): IWorkflowSchedule => ({
   active, next_run_at: active ? "2026-09-08T09:00:00Z" : null, last_run_at: null, strategy: "cron", cron_expression: "0 6 * * *",
 })
 
-const concluida: ComoAnda = { tipo: "concluida", quando: "há 3 h", instante: 3_000, erro: null, total: 10, falhas: 0, mediana: null }
-const falhou: ComoAnda = { tipo: "falhou", quando: "há 40 min", instante: 5_000, erro: "boom", total: 10, falhas: 1, mediana: null }
-const executando: ComoAnda = { tipo: "executando", desde: "há 4 min", instante: 9_000, origem: null, executor: null, tipica: null }
+const concluida: HowItsGoing = { tipo: "concluida", quando: "há 3 h", instante: 3_000, erro: null, total: 10, falhas: 0, mediana: null }
+const falhou: HowItsGoing = { tipo: "falhou", quando: "há 40 min", instante: 5_000, erro: "boom", total: 10, falhas: 1, mediana: null }
+const executando: HowItsGoing = { tipo: "executando", desde: "há 4 min", instante: 9_000, origem: null, executor: null, tipica: null }
 
 // A small shelf that goes through every predicate.
 const a = wf({ id_hash: "a", name: "Consolidação de outorgas", has_schedule_trigger: true, schedule: schedule(true), group_id: "g1" })
@@ -35,9 +35,9 @@ const f = wf({ id_hash: "f", name: "Zoneamento", has_publish_map: true, portal_a
 const g = wf({ id_hash: "g", name: "Embargos no Brasil", origem: "assistente" })
 const todos = [a, b, c, d, e, f, g]
 
-function contexto(): ContextoDeFiltro {
+function contexto(): FilterContext {
   return {
-    comoAndaPorHash: new Map<string, ComoAnda>([
+    comoAndaPorHash: new Map<string, HowItsGoing>([
       ["a", concluida], ["c", executando], ["d", falhou], ["e", { tipo: "nunca" }],
     ]),
     resumoDoAgendamentoPorHash: new Map(todos.map(w => [w.id_hash, resumirAgendamento(w.schedule, w.flag_ative)])),
@@ -63,17 +63,17 @@ describe("predicadoDoFiltro", () => {
   })
 
   it("portal desligado não conta como 'com portal'", () => {
-    expect(temPortal(e)).toBe(true)
-    expect(temPortal(f)).toBe(false)
-    expect(temPortal(wf({ has_publish_map: false, portal_access: "public" }))).toBe(false)
+    expect(hasPortal(e)).toBe(true)
+    expect(hasPortal(f)).toBe(false)
+    expect(hasPortal(wf({ has_publish_map: false, portal_access: "public" }))).toBe(false)
   })
 
   it("'executando' lê o «como anda», não runningHashes: conta métricas-running sem run vivo", () => {
     // "a" is running according to the metrics (45 s cache window) without being
     // in runningHashes. The row shows "Em execução"; the chip/filter have to
     // agree, otherwise the count says 0 with a blue row on screen.
-    const ctx: ContextoDeFiltro = {
-      comoAndaPorHash: new Map<string, ComoAnda>([["a", executando]]),
+    const ctx: FilterContext = {
+      comoAndaPorHash: new Map<string, HowItsGoing>([["a", executando]]),
       resumoDoAgendamentoPorHash: new Map(),
     }
     expect(todos.filter(predicadoDoFiltro("executando", ctx)).map(w => w.id_hash)).toEqual(["a"])
@@ -81,7 +81,7 @@ describe("predicadoDoFiltro", () => {
   })
 
   it("pausado sem resumo no contexto deriva do próprio item", () => {
-    const vazio: ContextoDeFiltro = { comoAndaPorHash: new Map(), resumoDoAgendamentoPorHash: new Map() }
+    const vazio: FilterContext = { comoAndaPorHash: new Map(), resumoDoAgendamentoPorHash: new Map() }
     expect(predicadoDoFiltro("pausado", vazio)(b)).toBe(true)
     expect(predicadoDoFiltro("pausado", vazio)(a)).toBe(false)
     expect(predicadoDoFiltro("pausado", vazio)(c)).toBe(false)
@@ -97,13 +97,13 @@ describe("contarPorFiltro", () => {
   })
   it("lista vazia é zero em tudo", () => {
     const zeros = contarPorFiltro([], contexto())
-    for (const f of FILTROS) expect(zeros[f]).toBe(0)
+    for (const f of FILTERS) expect(zeros[f]).toBe(0)
   })
   it("os chips da barra são os dez da tela, com rótulo, e toda ordem tem rótulo", () => {
-    expect(FILTROS_DOS_CHIPS).toEqual(["todos", "ativos", "inativos", "executando", "falha", "agendados", "webhook", "subfluxos", "portal", "assistente"])
-    expect(FILTROS_DOS_CHIPS.map(f => ROTULO_DO_FILTRO[f]))
+    expect(CHIP_FILTERS).toEqual(["todos", "ativos", "inativos", "executando", "falha", "agendados", "webhook", "subfluxos", "portal", "assistente"])
+    expect(CHIP_FILTERS.map(f => FILTER_LABEL[f]))
       .toEqual(["Todos", "Ativos", "Inativos", "Em execução", "Com falha", "Agendados", "Webhook", "Sub-fluxos", "Com portal", "Assistente"])
-    expect(ROTULO_DA_ORDEM).toEqual({ nome: "Nome", execucao: "Última execução", alterado: "Alterado" })
+    expect(SORT_LABEL).toEqual({ nome: "Nome", execucao: "Última execução", alterado: "Alterado" })
   })
 })
 
@@ -113,31 +113,31 @@ describe("busca", () => {
   ])
 
   it("normaliza: sem acento, sem caixa, sem espaço nas pontas", () => {
-    expect(normalizarBusca("  Consolidação de Outorgas ")).toBe("consolidacao de outorgas")
-    expect(normalizarBusca("Município")).toBe("municipio")
-    expect(normalizarBusca(null)).toBe("")
+    expect(normalizeSearch("  Consolidação de Outorgas ")).toBe("consolidacao de outorgas")
+    expect(normalizeSearch("Município")).toBe("municipio")
+    expect(normalizeSearch(null)).toBe("")
   })
 
   it("acha pelo nome sem acento e sem caixa", () => {
-    expect(casaBusca(a, grupos, "CONSOLIDACAO")).toBe(true)
-    expect(casaBusca(d, grupos, "municipio")).toBe(true)
-    expect(casaBusca(a, grupos, "cheia")).toBe(false)
+    expect(matchesSearch(a, grupos, "CONSOLIDACAO")).toBe(true)
+    expect(matchesSearch(d, grupos, "municipio")).toBe(true)
+    expect(matchesSearch(a, grupos, "cheia")).toBe(false)
   })
 
   it("acha pela descrição", () => {
-    expect(casaBusca(c, grupos, "webhook da ana")).toBe(true)
+    expect(matchesSearch(c, grupos, "webhook da ana")).toBe(true)
   })
 
   it("acha pelo nome do grupo: o grupo que bate mostra os seus workflows", () => {
-    expect(casaBusca(a, grupos, "hidro")).toBe(true)
-    expect(casaBusca(b, grupos, "hidro")).toBe(false)
+    expect(matchesSearch(a, grupos, "hidro")).toBe(true)
+    expect(matchesSearch(b, grupos, "hidro")).toBe(false)
     // A group the list does not know does not break the search.
-    expect(casaBusca(wf({ group_id: "g-fantasma" }), grupos, "hidro")).toBe(false)
+    expect(matchesSearch(wf({ group_id: "g-fantasma" }), grupos, "hidro")).toBe(false)
   })
 
   it("busca vazia casa tudo", () => {
-    expect(casaBusca(b, grupos, "")).toBe(true)
-    expect(casaBusca(b, grupos, "   ")).toBe(true)
+    expect(matchesSearch(b, grupos, "")).toBe(true)
+    expect(matchesSearch(b, grupos, "   ")).toBe(true)
   })
 })
 

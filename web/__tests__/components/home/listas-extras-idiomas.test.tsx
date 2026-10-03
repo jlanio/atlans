@@ -16,7 +16,7 @@ vi.mock("@/service/GisFlowService", () => ({
 
 import { LocalBadge, TEXTOS_DO_LOCAL_PT } from "@/app/components/local-badge"
 import { MetadataDialog, TEXTOS_DOS_METADADOS_PT } from "@/app/components/drive/dialogs"
-import { baixarArtefato, TEXTOS_DO_DOWNLOAD_PT } from "@/lib/baixar-artefato"
+import { baixarArtefato, DOWNLOAD_TEXTS_PT } from "@/lib/baixar-artefato"
 import { RETENCAO_EM_PORTUGUES } from "@/app/components/artifacts/badges"
 import { TEXTOS_DO_RESULTADO_PT } from "@/app/components/drive/resultado-upload"
 import { textosDe } from "@/app/components/home/i18n"
@@ -49,13 +49,13 @@ describe("o português do dicionário é o dos componentes", () => {
   it("o diálogo de metadados e o download", () => {
     const { fechar, inteiro, dataEHora, ...frases } = TEXTOS_DOS_METADADOS_PT
     const { executor, ...resto } = frases
-    const { executor: executorDoDicionario, ...restoDoDicionario } = pt.metadadosDialogo
+    const { executor: dictionaryExecutor, ...restoDoDicionario } = pt.metadadosDialogo
     expect(restoDoDicionario).toEqual(resto)
-    expect(executorDoDicionario("x")).toBe(executor("x"))
+    expect(dictionaryExecutor("x")).toBe(executor("x"))
     expect(fechar).toBe(textosDe("pt-BR").comum.fechar)
     expect(inteiro(5570)).toBe(FORMATOS["pt-BR"].inteiro(5570))
     expect(dataEHora(arquivo.created_at)).toBe(FORMATOS["pt-BR"].dataEHora(arquivo.created_at))
-    expect(pt.download).toEqual(TEXTOS_DO_DOWNLOAD_PT)
+    expect(pt.download).toEqual(DOWNLOAD_TEXTS_PT)
   })
 
   it("a dica de retenção, montada como a lista de Artefatos da Home a monta", () => {
@@ -71,11 +71,11 @@ describe("o português do dicionário é o dos componentes", () => {
 
   it("o resultado do envio (o painel das recusas do Drive)", () => {
     const { enviados, falhas, ...resto } = textosDe("pt-BR").assistente.anexos.resultado
-    const { enviados: enviadosPt, falhas: falhasPt, ...restoPt } = TEXTOS_DO_RESULTADO_PT
+    const { enviados: sentPt, falhas: failuresPt, ...restoPt } = TEXTOS_DO_RESULTADO_PT
     expect(resto).toEqual(restoPt)
     for (const n of [0, 1, 2, 1500]) {
-      expect(enviados(n)).toBe(enviadosPt(n))
-      expect(falhas(n)).toBe(falhasPt(n))
+      expect(enviados(n)).toBe(sentPt(n))
+      expect(falhas(n)).toBe(failuresPt(n))
     }
   })
 

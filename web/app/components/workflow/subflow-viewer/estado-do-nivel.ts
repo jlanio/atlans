@@ -4,7 +4,7 @@
 import { NodeRun, NodeRunStatus } from "../run-panel/timeline"
 import { StatusNodeStatusWorkFlow } from "@/context/useFlowContext"
 import { idLocal, pertenceAoNivel } from "../utils/subflow-path"
-import { EstadoDeNo } from "./scope"
+import { NodeState } from "./scope"
 
 /**
  * The timeline speaks in four execution states; the node card speaks in the
@@ -12,7 +12,7 @@ import { EstadoDeNo } from "./scope"
  * "aguardando" (waiting) in the panel is "idle" on the canvas — a node drawn
  * without a ring, which is what you want for a node the run never reached.
  */
-const ESTADO_NO_CANVAS: Record<NodeRunStatus, StatusNodeStatusWorkFlow> = {
+const NODE_CANVAS_STATUS: Record<NodeRunStatus, StatusNodeStatusWorkFlow> = {
   pending: "idle",
   running: "started",
   completed: "completed",
@@ -22,9 +22,9 @@ const ESTADO_NO_CANVAS: Record<NodeRunStatus, StatusNodeStatusWorkFlow> = {
   unknown: "unknown",
 }
 
-export interface RecorteDoNivel {
+export interface LevelSlice {
   /** State of each node of that level, by local id — ready for the scope. */
-  estadoPorId: Map<string, EstadoDeNo>
+  estadoPorId: Map<string, NodeState>
   /**
    * Nodes that ran at this level but do not exist in the loaded graph.
    *
@@ -39,22 +39,22 @@ export interface RecorteDoNivel {
 export function recortarNivel(
   nodes: NodeRun[],
   caminho: string[],
-  idsDoGrafo: Set<string>,
-): RecorteDoNivel {
-  const estadoPorId = new Map<string, EstadoDeNo>()
+  graphIds: Set<string>,
+): LevelSlice {
+  const estadoPorId = new Map<string, NodeState>()
   const semCorrespondencia: string[] = []
 
   for (const node of nodes) {
     if (!pertenceAoNivel(node.nodeId, caminho)) continue
 
     const id = idLocal(node.nodeId)
-    if (!idsDoGrafo.has(id)) {
+    if (!graphIds.has(id)) {
       semCorrespondencia.push(node.name || id)
       continue
     }
 
     estadoPorId.set(id, {
-      status: ESTADO_NO_CANVAS[node.status],
+      status: NODE_CANVAS_STATUS[node.status],
       error: node.problem?.message,
       duration: node.durationMs ?? undefined,
       cache_hit: node.cacheHit,

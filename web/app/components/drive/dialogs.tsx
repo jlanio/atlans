@@ -8,7 +8,7 @@ import {
 } from "@/app/components/ui/dialog"
 import { isLocalDoExecutor } from "@/app/components/local-badge"
 import { formatBytes } from "@/utils/formatters"
-import { formatarInteiro } from "@/lib/formatos"
+import { formatInteger } from "@/lib/formatos"
 import { ExtIcon } from "./ext"
 import { cn } from "@/lib/utils"
 
@@ -20,13 +20,13 @@ export function lastWrite(file: DriveFile): string {
 }
 
 /** Was there a rewrite after the original upload? (keeps both dates). */
-export function foiReescrito(file: DriveFile): boolean {
+export function wasRewritten(file: DriveFile): boolean {
   const escrita = file.content_written_at
   return Boolean(escrita && formatLocal(escrita) !== formatLocal(file.created_at))
 }
 
 /** The dialog's texts. Default: the Drive's Portuguese; the translated Home passes its own. */
-export interface TextosDosMetadados {
+export interface MetadataTexts {
   descricao: string
   rotulos: {
     extensao: string
@@ -51,7 +51,7 @@ export interface TextosDosMetadados {
   dataEHora: (iso: string | null | undefined) => string
 }
 
-export const TEXTOS_DOS_METADADOS_PT: TextosDosMetadados = {
+export const TEXTOS_DOS_METADADOS_PT: MetadataTexts = {
   descricao: "Metadados do arquivo",
   rotulos: {
     extensao: "Extensão",
@@ -73,7 +73,7 @@ export const TEXTOS_DOS_METADADOS_PT: TextosDosMetadados = {
     "Workflows que rodem nesse executor conseguem lê-lo normalmente.",
   executor: (id) => `executor ${id}`,
   fechar: "Fechar",
-  inteiro: formatarInteiro,
+  inteiro: formatInteger,
   dataEHora: (iso) => formatLocal(iso),
 }
 
@@ -83,7 +83,7 @@ export const TEXTOS_DOS_METADADOS_PT: TextosDosMetadados = {
  * showing "—" for five empty fields on every file would make the dialog worse in
  * the normal case.
  */
-function metadadosEspaciais(file: DriveFile, textos: TextosDosMetadados): Array<[string, string]> {
+function spatialMetadata(file: DriveFile, textos: MetadataTexts): Array<[string, string]> {
   const m = file.spatial_metadata
   if (!m) return []
 
@@ -115,7 +115,7 @@ export function MetadataDialog({
   onClose: () => void
   /** The Home passes `home-portal`: the content is portaled to <body>, outside its palette. */
   className?: string
-  textos?: TextosDosMetadados
+  textos?: MetadataTexts
 }) {
   if (!file) return null
   const r = textos.rotulos
@@ -138,11 +138,11 @@ export function MetadataDialog({
             // and time, not the summary's relative "há 3 min".
             [r.enviadoEm, textos.dataEHora(file.created_at)],
             // Only appears when the content was actually rewritten after the upload.
-            ...(foiReescrito(file) ? [[r.atualizadoEm, textos.dataEHora(lastWrite(file))]] : []),
+            ...(wasRewritten(file) ? [[r.atualizadoEm, textos.dataEHora(lastWrite(file))]] : []),
             [r.id, file.id_hash],
             // In catalog mode these are the ONLY data the platform has about
             // the content — without them the file would be just a name.
-            ...metadadosEspaciais(file, textos),
+            ...spatialMetadata(file, textos),
             // The key is the position: in Portuguese the file's extension and the
             // bbox's extent have the same label.
           ] as Array<[string, string]>).map(([label, value], i) => (

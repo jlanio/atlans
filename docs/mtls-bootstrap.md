@@ -115,7 +115,7 @@ makes rotation possible without turning pinning off: during the overlap the bund
 legitimately carries both the old and the new root, and both need to be on the list.
 
 ```
-ATLANS_CA_SHA256=<fp_antigo>,<fp_novo>
+ATLANS_CA_SHA256=<fp_antigo>,<new_fp>
 ```
 
 Once every executor is on the new root, remove the old one from the list.

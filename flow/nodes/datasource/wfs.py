@@ -17,8 +17,8 @@ from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit, urlunsp
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
 from flow.utils import segredos_vivos
-from flow.utils.credencial_wfs import AutenticacaoWFS, autenticacao_wfs, formas_do_segredo, sem_segredo
-from flow.utils.leitura_geo import ler_geodataframe
+from flow.utils.credencial_wfs import AutenticacaoWFS, wfs_authentication, secret_forms, without_secret
+from flow.utils.leitura_geo import read_geodataframe
 from flow.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -50,7 +50,7 @@ _caps_lock = threading.Lock()
 
 # ── Authentication (saved credential) ────────────────────────────────────────
 # The credential arrives resolved by the server in `http_auth` (see
-# app/services/credential_resolver.py) and is read by `autenticacao_wfs` — the
+# app/services/credential_resolver.py) and is read by `wfs_authentication` — the
 # same rules as the editor's layer listing (see flow/utils/credencial_wfs.py).
 # Here, the rules for whoever talks to the server through owslib:
 #
@@ -60,7 +60,7 @@ _caps_lock = threading.Lock()
 # - The secret never leaves in a message: in a URL with `?authkey=`, requests
 #   repeats it in the error text, and the error (with the traceback) goes to the
 #   screen and to the database. Every message that leaves `_fetch_with_retry` goes
-#   through `sem_segredo`, without the exception chain.
+#   through `without_secret`, without the exception chain.
 # - The capabilities cache is PER CREDENTIAL: the key decides what the server
 #   shows, and an authenticated client must not serve another workflow on the executor.
 # - With a credential, no redirect outside the node's origin: `requests` only
@@ -70,10 +70,10 @@ _caps_lock = threading.Lock()
 #   wrong password can lock an LDAP/AD account behind GeoServer.
 
 
-_PORTA_PADRAO = {"http": 80, "https": 443}
+_DEFAULT_PORT = {"http": 80, "https": 443}
 
 
-def _origem(url: str) -> tuple[str, str, int | None]:
+def _origin(url: str) -> tuple[str, str, int | None]:
     """Normalized (scheme, host, port) — what decides "same address".
 
     The raw `netloc` distinguishes what every HTTP client treats as equal: the
@@ -92,10 +92,10 @@ def _origem(url: str) -> tuple[str, str, int | None]:
         porta = partes.port
     except ValueError:
         return esquema, host, -1  # a port that isn't a number: an origin of its own, and fail closed
-    return esquema, host, porta or _PORTA_PADRAO.get(esquema)
+    return esquema, host, porta or _DEFAULT_PORT.get(esquema)
 
 
-class _AssinaturaDoNo(AuthBase):
+class _NodeSignature(AuthBase):
     """The credential on every request of the node — owslib's and ours —, and what
     is checked on each response.
 
@@ -112,16 +112,16 @@ class _AssinaturaDoNo(AuthBase):
     def __init__(self, auth: "AutenticacaoWFS", url: str):
         # Key in the URL: it's already in the address (see `_wfs_client`); here it's
         # only put back on a redirect that drops it.
-        self._cabecalhos = auth.cabecalhos()
+        self._headers = auth.cabecalhos()
         self._na_url = auth.parametros()
-        self._origem = _origem(url)
+        self._origin = _origin(url)
 
     def __call__(self, pedido):
-        pedido.headers.update(self._cabecalhos)
-        pedido.register_hook("response", self._conferir_resposta)
+        pedido.headers.update(self._headers)
+        pedido.register_hook("response", self._check_response)
         return pedido
 
-    def _conferir_resposta(self, resposta, *args, **kwargs):
+    def _check_response(self, resposta, *args, **kwargs):
         # `ValueError`: the retry doesn't repeat it (see `_tentar_com_retry`).
         if resposta.status_code in (401, 403):
             raise ValueError(
@@ -132,7 +132,7 @@ class _AssinaturaDoNo(AuthBase):
         if not resposta.is_redirect:
             return resposta
         destino = urljoin(resposta.url, resposta.headers.get("location", ""))
-        if _origem(destino) != self._origem:
+        if _origin(destino) != self._origin:
             onde = urlsplit(destino)
             raise ValueError(
                 f"O servidor WFS redirecionou o pedido para outro endereço "
@@ -145,27 +145,27 @@ class _AssinaturaDoNo(AuthBase):
             # would send the next request ANONYMOUS — in header and Basic modes the
             # credential survives the hop on the same origin. The origin has already been
             # checked: the key goes back on the destination before `requests` follows it.
-            resposta.headers["Location"] = _com_parametros(destino, self._na_url)
+            resposta.headers["Location"] = _with_params(destino, self._na_url)
         return resposta
 
 
-def _pendurar_a_chave(wfs, url: str, auth: "AutenticacaoWFS") -> None:
+def _attach_key(wfs, url: str, auth: "AutenticacaoWFS") -> None:
     """The key on the addresses the server announces — only those of the node's origin.
 
     owslib builds each GetFeature from these addresses, preserving their
     query; hanging the key there carries it to every page. An address of another
-    origin stays without it (and `_conferir_destino` refuses before using it).
+    origin stays without it (and `_check_destination` refuses before using it).
     """
     for operacao in getattr(wfs, "operations", None) or []:
         for metodo in getattr(operacao, "methods", None) or []:
             destino = metodo.get("url")
-            if not destino or _origem(destino) != _origem(url):
+            if not destino or _origin(destino) != _origin(url):
                 continue
             if auth.nome not in dict(parse_qsl(urlsplit(destino).query)):
-                metodo["url"] = _com_parametros(destino, {auth.nome: auth.segredo})
+                metodo["url"] = _with_params(destino, {auth.nome: auth.segredo})
 
 
-def _conferir_destino(wfs, url: str) -> None:
+def _check_destination(wfs, url: str) -> None:
     """With a credential, the GetFeature has to go to the same origin as the node."""
     try:
         anunciado = next(
@@ -174,7 +174,7 @@ def _conferir_destino(wfs, url: str) -> None:
         )
     except Exception:
         return  # without a GetFeature announcement owslib fails on its own, without requesting anything
-    if anunciado and _origem(anunciado) != _origem(url):
+    if anunciado and _origin(anunciado) != _origin(url):
         onde = urlsplit(anunciado)
         raise ValueError(
             f"O servidor anuncia outro endereço para buscar as feições "
@@ -197,7 +197,7 @@ def _wfs_client(
     from owslib.util import Authentication
     from owslib.wfs import WebFeatureService
 
-    chave = (url, version) if auth is None else (url, version, auth.impressao)
+    chave = (url, version) if auth is None else (url, version, auth.fingerprint)
     agora = time.monotonic()
     if _CAPS_TTL_S > 0 and not refresh:
         with _caps_lock:
@@ -211,20 +211,20 @@ def _wfs_client(
         # Basic and the key in the header go through the signature; the key in the URL,
         # in the address. The signature goes along regardless: it's what blocks
         # the redirect outside the origin.
-        extras["auth"] = Authentication(auth_delegate=_AssinaturaDoNo(auth, url))
-        endereco = _com_parametros(url, auth.parametros()) if auth.parametros() else url
+        extras["auth"] = Authentication(auth_delegate=_NodeSignature(auth, url))
+        endereco = _with_params(url, auth.parametros()) if auth.parametros() else url
 
     inicio = time.perf_counter()
     wfs = WebFeatureService(endereco, version=version, timeout=timeout, **extras)
     if auth is not None and auth.tipo == "authkey" and not auth.no_cabecalho:
-        _pendurar_a_chave(wfs, url, auth)
+        _attach_key(wfs, url, auth)
     logger.info("WFS capabilities: rede em %d ms (%s)", (time.perf_counter() - inicio) * 1000, url)
     if _CAPS_TTL_S > 0:
         with _caps_lock:
             if len(_caps_cache) >= _CAPS_MAX and chave not in _caps_cache:
                 # Teto: sai a entrada que expira primeiro.
-                mais_velha = min(_caps_cache, key=lambda k: _caps_cache[k][1])
-                _caps_cache.pop(mais_velha, None)
+                oldest = min(_caps_cache, key=lambda k: _caps_cache[k][1])
+                _caps_cache.pop(oldest, None)
             _caps_cache[chave] = (wfs, agora + _CAPS_TTL_S)
     return wfs
 
@@ -233,26 +233,26 @@ def _wfs_client(
 _WFS_ERROR_RE = re.compile(r"<ows:ExceptionText>(.*?)</ows:ExceptionText>", re.DOTALL)
 
 
-def _sem_redigir(texto: str) -> str:
+def _no_redaction(texto: str) -> str:
     return texto
 
 
-def _parse_wfs_error(raw: str, redigir=_sem_redigir) -> str:
+def _parse_wfs_error(raw: str, redact=_no_redaction) -> str:
     """Extracts a readable message from a WFS error XML.
 
-    `redigir` (the credential's `sem_segredo`) runs AFTER `html.unescape`
+    `redact` (the credential's `without_secret`) runs AFTER `html.unescape`
     and BEFORE any truncation: the key echoed with HTML entities (`&amp;`,
     `&#x27;`) only becomes the key again when unescaped, and a cut in the middle of it
     would leave a piece that no later redaction recognizes.
     """
     match = _WFS_ERROR_RE.search(raw)
     if match:
-        return redigir(html.unescape(match.group(1).strip()))
+        return redact(html.unescape(match.group(1).strip()))
     if re.search(r"<html|<!doctype html", raw[:500], re.IGNORECASE):
         # A firewall, login or maintenance page in place of the WFS: the text, without the tags.
-        texto = redigir(re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", raw))).strip())
+        texto = redact(re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", raw))).strip())
         return f"o servidor respondeu uma página HTML em vez do WFS: {texto[:200]}"
-    return redigir(html.unescape(raw))[:500]
+    return redact(html.unescape(raw))[:500]
 
 
 # GeoServer refuses pagination (startIndex/count) on a layer without a primary key:
@@ -263,10 +263,10 @@ _NATURAL_ORDER_RE = re.compile(
 )
 
 
-def _wfs_error_message(raw: str, type_name: str, redigir=_sem_redigir) -> str:
+def _wfs_error_message(raw: str, type_name: str, redact=_no_redaction) -> str:
     """Readable message from the ExceptionReport; the 'no primary key' case becomes
     an instruction on how to fix it (set the SORTBY)."""
-    msg = _parse_wfs_error(raw, redigir)
+    msg = _parse_wfs_error(raw, redact)
     if _NATURAL_ORDER_RE.search(msg):
         return (
             f"A camada '{type_name}' não tem chave primária no servidor, então a "
@@ -280,33 +280,33 @@ def _wfs_error_message(raw: str, type_name: str, redigir=_sem_redigir) -> str:
 # The OWS codes that say "the request is wrong": retrying gives the same
 # refusal. `NoApplicableCode`/`OperationProcessingFailed` (slow database, exhausted
 # pool) remain retryable, as they always were.
-_CODIGOS_DE_REQUISICAO_ERRADA = frozenset({
+_BAD_REQUEST_CODES = frozenset({
     "InvalidParameterValue", "MissingParameterValue", "OperationParsingFailed",
     "OperationNotSupported", "OptionNotSupported", "VersionNegotiationFailed",
 })
 _EXCEPTION_CODE_RE = re.compile(r'exceptionCode="([^"]+)"')
 _LOCATOR_RE = re.compile(r'locator="([^"]+)"')
-_MENCIONA_FILTRO_RE = re.compile(r"cql|filter", re.IGNORECASE)
+_MENTIONS_FILTER_RE = re.compile(r"cql|filter", re.IGNORECASE)
 # Without an exceptionCode (owslib delivers only the ExceptionText when the
 # Content-Type is exactly text/xml), the GeoServer CQL parser's sentence is the only
 # sign of a wrong request. PARSE sentences, and not the word "filter": GeoTools
 # writes "Error occured filtering features" when the database goes down — transient,
 # and retryable.
-_ERRO_DE_PARSE_DO_CQL_RE = re.compile(
+_CQL_PARSE_ERROR_RE = re.compile(
     r"could not parse|illegal filter|unable to parse|illegal property name|parsing failed|"
     r"encountered \"|\bcql\b",
     re.IGNORECASE,
 )
 # The web server in front of the WFS (Tomcat, Jetty, nginx) refusing the request
 # line: HTML, no exceptionCode, and retrying doesn't help.
-_URL_LONGA_RE = re.compile(
+_LONG_URL_RE = re.compile(
     r"request header is too large|request-uri too long|uri too long|header too large|http status 414",
     re.IGNORECASE,
 )
 
 
-def _erro_do_servidor(
-    raw: str, type_name: str, com_cql: bool, auth: "AutenticacaoWFS | None" = None,
+def _server_error(
+    raw: str, type_name: str, with_cql: bool, auth: "AutenticacaoWFS | None" = None,
 ) -> Exception:
     """The server's refusal as an exception: `ValueError` (not retried) when the
     request is wrong; `RuntimeError` (retried) for the rest. The message is the
@@ -326,18 +326,18 @@ def _erro_do_servidor(
     URL, cut in the middle of the key, would leave its beginning behind — and
     no later redaction would recognize the piece.
     """
-    raw = sem_segredo(raw, auth)
-    msg = _wfs_error_message(raw, type_name, lambda texto: sem_segredo(texto, auth))
+    raw = without_secret(raw, auth)
+    msg = _wfs_error_message(raw, type_name, lambda texto: without_secret(texto, auth))
     achado = _EXCEPTION_CODE_RE.search(raw)
     codigo = achado.group(1) if achado else None
     achado = _LOCATOR_RE.search(raw)
     locator = achado.group(1) if achado else None
-    if com_cql and _URL_LONGA_RE.search(msg):
-        return _erro_de_url_longa(None)
-    if codigo in _CODIGOS_DE_REQUISICAO_ERRADA:
+    if with_cql and _LONG_URL_RE.search(msg):
+        return _long_url_error(None)
+    if codigo in _BAD_REQUEST_CODES:
         errada = True
     elif codigo in (None, "NoApplicableCode"):
-        errada = bool(com_cql and _ERRO_DE_PARSE_DO_CQL_RE.search(msg))
+        errada = bool(with_cql and _CQL_PARSE_ERROR_RE.search(msg))
     else:
         errada = False
     if not errada:
@@ -345,12 +345,12 @@ def _erro_do_servidor(
     dica = ""
     if locator and locator.lower() == "outputformat":
         dica = " O servidor não serve GeoJSON (outputFormat=application/json), que o nó exige."
-    elif com_cql and (not locator or _MENCIONA_FILTRO_RE.search(locator) or _MENCIONA_FILTRO_RE.search(msg)):
+    elif with_cql and (not locator or _MENTIONS_FILTER_RE.search(locator) or _MENTIONS_FILTER_RE.search(msg)):
         dica = " Confira o filtro CQL (a sintaxe e os nomes de atributo)."
     return ValueError(f"O servidor WFS recusou a consulta: {msg.rstrip('.')}.{dica}")
 
 
-def _excecoes_do_servico() -> tuple[type[BaseException], ...]:
+def _service_exceptions() -> tuple[type[BaseException], ...]:
     """The exceptions through which owslib delivers the server's voice.
 
     There are two classes: the one in `owslib.util` (`openURL`, for HTTP 400/401/403 and
@@ -395,10 +395,10 @@ def _parse_sortby(raw: str) -> list[str] | None:
 # Jetty stop at 8 KB counting the request line AND the headers — and the
 # credential adds one (Basic, or the key in the header). The response is
 # an HTML page that is neither GeoJSON nor an ExceptionReport.
-_MAX_URL_COM_CQL = 7500
+_MAX_URL_WITH_CQL = 7500
 # Headroom for what the URL gains after the initial check: the clip's
 # `BBOX(...)` and the `startindex` of the following pages.
-_FOLGA_DA_URL = 250
+_URL_MARGIN = 250
 
 # Servers that have already shown they apply CQL_FILTER: url -> expires at.
 _cql_verificado: dict[str, float] = {}
@@ -414,13 +414,13 @@ def _parse_cql(raw: Any) -> str | None:
     return texto or None
 
 
-def _numero_cql(valor: float) -> str:
+def _cql_number(valor: float) -> str:
     """Number in decimal notation (no exponent, which not every CQL parser accepts)."""
     texto = f"{valor:.12f}".rstrip("0").rstrip(".")
     return "0" if texto in ("", "-0") else texto
 
 
-def _cql_com_bbox(cql: str, bbox: tuple, geometria: str, crs: str | None) -> str:
+def _cql_with_bbox(cql: str, bbox: tuple, geometria: str, crs: str | None) -> str:
     """`BBOX("geom", minx, miny, maxx, maxy[, 'EPSG:x']) AND (<filtro>)`.
 
     The parentheses around the author's filter keep an `OR` of theirs from
@@ -430,12 +430,12 @@ def _cql_com_bbox(cql: str, bbox: tuple, geometria: str, crs: str | None) -> str
     GeoTools may not decode, and without it the layer's default CRS applies.
     """
     nome = '"' + geometria.replace('"', "") + '"'
-    coords = ", ".join(_numero_cql(v) for v in bbox)
+    coords = ", ".join(_cql_number(v) for v in bbox)
     crs_arg = f", '{crs}'" if crs and _CRS_EPSG_RE.fullmatch(crs) else ""
     return f"BBOX({nome}, {coords}{crs_arg}) AND ({cql})"
 
 
-def _com_parametros(url: str, params: dict[str, str]) -> str:
+def _with_params(url: str, params: dict[str, str]) -> str:
     """Appends parameters to a URL's QUERY (a space becomes %20) — before the
     fragment, if there is one: glued to the end of `…/ows#x`, they would fall into the
     fragment and the request would go out without the key."""
@@ -446,7 +446,7 @@ def _com_parametros(url: str, params: dict[str, str]) -> str:
     return urlunsplit(partes._replace(query=query + urlencode(params, quote_via=quote)))
 
 
-def _crs_padrao(wfs, type_name: str) -> str | None:
+def _default_crs(wfs, type_name: str) -> str | None:
     """The layer's default CRS (`EPSG:4674`) — the one of the bbox sent in the request."""
     try:
         opcoes = wfs.contents[type_name].crsOptions
@@ -460,18 +460,18 @@ def _local(tag: Any) -> str:
 
 
 # The GML geometric property types (`<nome>PropertyType`): those of the
-# source catalog (`fontes_vault.GEOMETRIAS`) plus the 3D, composite and
+# source catalog (`fontes_vault.GEOMETRIES`) plus the 3D, composite and
 # generic ones of an app-schema/INSPIRE schema.
-_GEOMETRIAS_GML = frozenset({
+_GML_GEOMETRIES = frozenset({
     "Point", "MultiPoint", "Curve", "MultiCurve", "LineString", "MultiLineString",
     "Surface", "MultiSurface", "Polygon", "MultiPolygon", "Geometry", "MultiGeometry",
     "Solid", "MultiSolid", "CompositeCurve", "CompositeSurface", "CompositeSolid",
     "GeometricPrimitive", "GeometricAggregate", "GeometricComplex",
 })
-_ESPACO_GML = "http://www.opengis.net/gml"
+_GML_NAMESPACE = "http://www.opengis.net/gml"
 
 
-def _geometria_do_xsd(raiz) -> str | None:
+def _xsd_geometry(raiz) -> str | None:
     """The first geometric attribute of a DescribeFeatureType.
 
     A geometry is an `element` of a `sequence` whose type is a GML geometric
@@ -494,16 +494,16 @@ def _geometria_do_xsd(raiz) -> str | None:
             if not nome or not tipo:
                 continue
             prefixo, _, local = tipo.rpartition(":")
-            if not local.endswith("PropertyType") or local[: -len("PropertyType")] not in _GEOMETRIAS_GML:
+            if not local.endswith("PropertyType") or local[: -len("PropertyType")] not in _GML_GEOMETRIES:
                 continue
             espaco = nsmap.get(prefixo or None)
-            if espaco is not None and not espaco.startswith(_ESPACO_GML):
+            if espaco is not None and not espaco.startswith(_GML_NAMESPACE):
                 continue  # a `ns:PointPropertyType` from the schema itself is not GML
             return nome
     return None
 
 
-def _coluna_de_geometria(wfs, type_name: str) -> str:
+def _geometry_column(wfs, type_name: str) -> str:
     """The name of the layer's geometry, via DescribeFeatureType.
 
     Network, timeout and 5xx propagate as they came (the query is retried); only a
@@ -512,7 +512,7 @@ def _coluna_de_geometria(wfs, type_name: str) -> str:
     from owslib.etree import etree
     from owslib.util import openURL
 
-    url = _com_parametros(wfs.url, {
+    url = _with_params(wfs.url, {
         "service": "WFS", "version": wfs.version,
         "request": "DescribeFeatureType", "typeNames": type_name,
     })
@@ -523,7 +523,7 @@ def _coluna_de_geometria(wfs, type_name: str) -> str:
         raise RuntimeError(
             f"O DescribeFeatureType de '{type_name}' não veio em XML legível."
         ) from exc
-    coluna = _geometria_do_xsd(raiz)
+    coluna = _xsd_geometry(raiz)
     if not coluna:
         raise ValueError(
             f"Para usar o bbox junto com o filtro CQL, o nó precisa da coluna de geometria "
@@ -534,20 +534,20 @@ def _coluna_de_geometria(wfs, type_name: str) -> str:
     return coluna
 
 
-def _pedir(wfs, type_name: str, extras: dict[str, str], **montagem) -> bytes:
+def _request(wfs, type_name: str, extras: dict[str, str], **montagem) -> bytes:
     """A GetFeature built by owslib, with extra parameters."""
     from owslib.util import openURL
 
     base = wfs.getGETGetFeatureRequest(typename=[type_name], **montagem)
-    url = _com_parametros(base, extras)
+    url = _with_params(base, extras)
     return openURL(url, None, "Get", timeout=wfs.timeout, headers=wfs.headers, auth=wfs.auth).read()
 
 
-def _texto(corpo: Any) -> str:
+def _as_text(corpo: Any) -> str:
     return corpo.decode("utf-8", errors="replace") if isinstance(corpo, bytes) else str(corpo)
 
 
-def _quantas_casam(wfs, type_name: str, cql: str | None, auth: "AutenticacaoWFS | None" = None) -> int:
+def _count_matches(wfs, type_name: str, cql: str | None, auth: "AutenticacaoWFS | None" = None) -> int:
     """How many features match (with the filter, if any).
 
     First `resultType=hits` (with `count=1`, so that a server that ignores
@@ -558,15 +558,15 @@ def _quantas_casam(wfs, type_name: str, cql: str | None, auth: "AutenticacaoWFS 
     it were the clip — and GDAL would read it without complaining.
     """
     extras = {"CQL_FILTER": cql} if cql else {}
-    corpo = _pedir(wfs, type_name, {"resultType": "hits", **extras}, maxfeatures=1)
-    achado = _NUMBER_MATCHED_RE.search(_texto(corpo[:4096]))
+    corpo = _request(wfs, type_name, {"resultType": "hits", **extras}, maxfeatures=1)
+    achado = _NUMBER_MATCHED_RE.search(_as_text(corpo[:4096]))
     if achado:
         return int(achado.group(1))
-    corpo = _texto(_pedir(wfs, type_name, extras, maxfeatures=1, outputFormat="application/json"))
+    corpo = _as_text(_request(wfs, type_name, extras, maxfeatures=1, outputFormat="application/json"))
     if "<ows:ExceptionReport" in corpo or "<ServiceException" in corpo:
         # The server refused the sample (it doesn't serve GeoJSON, for example): its
         # voice, classified as on any page.
-        raise _erro_do_servidor(corpo, type_name, bool(cql), auth)
+        raise _server_error(corpo, type_name, bool(cql), auth)
     try:
         return len(json.loads(corpo).get("features") or [])
     except (ValueError, AttributeError, TypeError):
@@ -577,7 +577,7 @@ def _quantas_casam(wfs, type_name: str, cql: str | None, auth: "AutenticacaoWFS 
         ) from None
 
 
-def _garantir_que_aplica_cql(wfs, url: str, type_name: str, auth: "AutenticacaoWFS | None" = None) -> bool:
+def _ensure_cql_applied(wfs, url: str, type_name: str, auth: "AutenticacaoWFS | None" = None) -> bool:
     """Refuses a server that ignores CQL_FILTER (it would return the whole layer).
 
     `CQL_FILTER=EXCLUDE` matches zero features on servers that apply it: a positive
@@ -585,7 +585,7 @@ def _garantir_que_aplica_cql(wfs, url: str, type_name: str, auth: "AutenticacaoW
     layer gives on any server — the proof that the server applies the
     CQL is only complete when the layer shows a feature: the first filtered
     page that comes with something (see `_fetch_wfs_features`, which then calls
-    `_registrar_cql_verificado`). Returns whether that confirmation is pending.
+    `_record_verified_cql`). Returns whether that confirmation is pending.
 
     No second count, of the whole layer, for this: a `count(*)`
     on a table with millions of rows (the case CQL exists for) blew
@@ -596,7 +596,7 @@ def _garantir_que_aplica_cql(wfs, url: str, type_name: str, auth: "AutenticacaoW
         expira = _cql_verificado.get(url)
     if expira is not None and expira > agora:
         return False
-    if _quantas_casam(wfs, type_name, "EXCLUDE", auth) > 0:
+    if _count_matches(wfs, type_name, "EXCLUDE", auth) > 0:
         raise ValueError(
             "Este servidor WFS não aplica o filtro CQL: ele ignorou o parâmetro "
             "CQL_FILTER e devolveria a camada inteira. O filtro CQL é uma extensão do "
@@ -606,7 +606,7 @@ def _garantir_que_aplica_cql(wfs, url: str, type_name: str, auth: "AutenticacaoW
     return _CAPS_TTL_S > 0
 
 
-def _registrar_cql_verificado(url: str) -> None:
+def _record_verified_cql(url: str) -> None:
     """The server at `url` applies CQL: valid for the cache TTL, per server."""
     agora = time.monotonic()
     with _caps_lock:
@@ -617,7 +617,7 @@ def _registrar_cql_verificado(url: str) -> None:
         _cql_verificado[url] = agora + _CAPS_TTL_S
 
 
-def _url_da_pagina(wfs, kwargs: dict, cql: str) -> str:
+def _page_url(wfs, kwargs: dict, cql: str) -> str:
     """The URL of a GetFeature page, with CQL_FILTER at the end."""
     base = wfs.getGETGetFeatureRequest(
         typename=[kwargs["typename"]],
@@ -627,26 +627,26 @@ def _url_da_pagina(wfs, kwargs: dict, cql: str) -> str:
         startindex=kwargs.get("startindex"),
         sortby=kwargs.get("sortby"),
     )
-    return _com_parametros(base, {"CQL_FILTER": cql})
+    return _with_params(base, {"CQL_FILTER": cql})
 
 
-def _erro_de_url_longa(tamanho: int | None) -> ValueError:
+def _long_url_error(tamanho: int | None) -> ValueError:
     """`tamanho` is what the node measured; `None` when it was the web server that refused."""
     medida = f"{tamanho} caracteres na URL; " if tamanho else ""
     return ValueError(
         f"O filtro CQL é longo demais para a requisição ({medida}o limite prático é "
-        f"{_MAX_URL_COM_CQL}). Encurte o filtro — troque listas longas de valores por um "
+        f"{_MAX_URL_WITH_CQL}). Encurte o filtro — troque listas longas de valores por um "
         f"intervalo ou por um recorte espacial."
     )
 
 
-def _getfeature_com_cql(wfs, kwargs: dict, cql: str):
+def _getfeature_with_cql(wfs, kwargs: dict, cql: str):
     """owslib's `getfeature`, with the CQL_FILTER it doesn't know how to send."""
     from owslib.util import openURL
 
-    url = _url_da_pagina(wfs, kwargs, cql)
-    if len(url) > _MAX_URL_COM_CQL:
-        raise _erro_de_url_longa(len(url))
+    url = _page_url(wfs, kwargs, cql)
+    if len(url) > _MAX_URL_WITH_CQL:
+        raise _long_url_error(len(url))
     return openURL(url, None, "Get", timeout=wfs.timeout, headers=wfs.headers, auth=wfs.auth)
 
 
@@ -678,24 +678,24 @@ def _fetch_wfs_features(
             f"{'...' if len(available) > 20 else ''}"
         )
     if auth is not None:
-        _conferir_destino(wfs, url)
+        _check_destination(wfs, url)
 
     # With a CQL filter: the server needs to apply it, and the bbox (if any) goes
     # into the filter itself — see the "CQL filter" block above.
     cql = cql_filter
-    confirmar_o_cql = False
+    confirm_cql = False
     if cql:
         # Before any request: a filter that doesn't fit in the URL fails right away, and
         # not in the middle of pagination.
-        primeira = _url_da_pagina(wfs, {
+        primeira = _page_url(wfs, {
             "typename": type_name, "maxfeatures": min(max_features, _TAMANHO_DA_PAGINA),
             "srsname": srs_name, "outputFormat": "application/json", "sortby": sort_by,
         }, cql)
-        if len(primeira) + (_FOLGA_DA_URL if bbox else 30) > _MAX_URL_COM_CQL:
-            raise _erro_de_url_longa(len(primeira))
-        confirmar_o_cql = _garantir_que_aplica_cql(wfs, url, type_name, auth)
+        if len(primeira) + (_URL_MARGIN if bbox else 30) > _MAX_URL_WITH_CQL:
+            raise _long_url_error(len(primeira))
+        confirm_cql = _ensure_cql_applied(wfs, url, type_name, auth)
         if bbox:
-            cql = _cql_com_bbox(cql, bbox, _coluna_de_geometria(wfs, type_name), _crs_padrao(wfs, type_name))
+            cql = _cql_with_bbox(cql, bbox, _geometry_column(wfs, type_name), _default_crs(wfs, type_name))
             bbox = None
 
     # Automatic pagination: fetches in blocks until reaching maxFeatures
@@ -724,24 +724,24 @@ def _fetch_wfs_features(
         if sort_by:
             kwargs["sortby"] = sort_by
 
-        response = _getfeature_com_cql(wfs, kwargs, cql) if cql else wfs.getfeature(**kwargs)
+        response = _getfeature_with_cql(wfs, kwargs, cql) if cql else wfs.getfeature(**kwargs)
         raw = response.read()
 
         # Detecta erro XML do servidor WFS
         raw_str = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else raw
         if "<ows:ExceptionReport" in raw_str or "<ServiceException" in raw_str:
-            raise _erro_do_servidor(raw_str, type_name, bool(cql), auth)
+            raise _server_error(raw_str, type_name, bool(cql), auth)
 
-        # `ler_geodataframe` refuses a response that is an OGR VRT document
+        # `read_geodataframe` refuses a response that is an OGR VRT document
         # (malicious WFS server) before GDAL opens it — see leitura_geo.py.
-        chunk = ler_geodataframe(io.BytesIO(raw if isinstance(raw, bytes) else raw.encode()))
+        chunk = read_geodataframe(io.BytesIO(raw if isinstance(raw, bytes) else raw.encode()))
 
         if chunk.empty:
             break
-        if confirmar_o_cql:
+        if confirm_cql:
             # The layer has a feature and EXCLUDE matched zero: the server applies CQL.
-            _registrar_cql_verificado(url)
-            confirmar_o_cql = False
+            _record_verified_cql(url)
+            confirm_cql = False
 
         all_chunks.append(chunk)
         total_fetched += len(chunk)
@@ -776,7 +776,7 @@ def _fetch_with_retry(
 ) -> gpd.GeoDataFrame:
     """Wrapper with retry and exponential backoff.
 
-    With a credential, every message that leaves here goes through `sem_segredo` and
+    With a credential, every message that leaves here goes through `without_secret` and
     without the exception chain: the original error (the one from requests, with the URL
     and the key) would go whole into the traceback, which reaches the screen and the
     database. And, while the fetch runs, no log in the process carries the key — not
@@ -784,7 +784,7 @@ def _fetch_with_retry(
     `segredos_vivos`).
     """
     try:
-        with segredos_vivos.em_uso(*formas_do_segredo(auth)):
+        with segredos_vivos.in_use(*secret_forms(auth)):
             return _tentar_com_retry(
                 url, type_name, max_features, bbox, srs_name, sort_by, timeout,
                 retries, retry_delay, cql_filter, auth,
@@ -793,7 +793,7 @@ def _fetch_with_retry(
         if auth is None:
             raise
         base = ValueError if isinstance(exc, ValueError) else ImportError if isinstance(exc, ImportError) else RuntimeError
-        raise base(sem_segredo(str(exc), auth)) from None
+        raise base(without_secret(str(exc), auth)) from None
 
 
 def _tentar_com_retry(
@@ -813,7 +813,7 @@ def _tentar_com_retry(
     from flow.utils.backoff import espera_exponencial
     from flow.utils.geo_helpers import is_tls_verify_error, tls_verify_error_message
 
-    excecoes_do_servico = _excecoes_do_servico()
+    service_exceptions = _service_exceptions()
     last_exc: Exception | None = None
     for attempt in range(retries + 1):
         try:
@@ -822,11 +822,11 @@ def _tentar_com_retry(
             )
         except (ImportError, ValueError):
             raise  # Configuration errors — retries make no sense
-        except excecoes_do_servico as exc:
+        except service_exceptions as exc:
             # The server's voice (the raw message is the whole XML): a wrong
             # request — invalid filter, rejected parameter — is not retried;
             # the rest (slow database, exhausted pool) follows the usual retry.
-            erro = _erro_do_servidor(str(exc), type_name, bool(cql_filter), auth)
+            erro = _server_error(str(exc), type_name, bool(cql_filter), auth)
             if isinstance(erro, ValueError):
                 raise erro from exc
             last_exc = erro
@@ -834,7 +834,7 @@ def _tentar_com_retry(
                 delay = espera_exponencial(attempt, inicial=retry_delay, teto=_RETRY_MAX_DELAY)
                 logger.warning(
                     "WFS tentativa %d/%d falhou: %s. Retentando em %.1fs...",
-                    attempt + 1, retries + 1, sem_segredo(str(erro), auth), delay,
+                    attempt + 1, retries + 1, without_secret(str(erro), auth), delay,
                 )
                 time.sleep(delay)
         except Exception as exc:
@@ -848,7 +848,7 @@ def _tentar_com_retry(
                 delay = espera_exponencial(attempt, inicial=retry_delay, teto=_RETRY_MAX_DELAY)
                 logger.warning(
                     "WFS tentativa %d/%d falhou: %s. Retentando em %.1fs...",
-                    attempt + 1, retries + 1, sem_segredo(str(exc), auth), delay,
+                    attempt + 1, retries + 1, without_secret(str(exc), auth), delay,
                 )
                 time.sleep(delay)
     raise RuntimeError(f"WFS falhou após {retries + 1} tentativa(s): {last_exc}") from last_exc
@@ -998,7 +998,7 @@ class WFSNode(BaseNode):
         srs_name = self.get_param("crs", "").strip() or None
         sort_by = _parse_sortby(self.get_param("sortBy", ""))
         cql_filter = _parse_cql(self.get_param("cqlFilter", ""))
-        auth = autenticacao_wfs(self.get_param("credential_id"), self.get_param("http_auth"))
+        auth = wfs_authentication(self.get_param("credential_id"), self.get_param("http_auth"))
 
         if not url:
             raise ValueError("Parâmetro 'url' é obrigatório.")
@@ -1052,7 +1052,7 @@ class WFSNode(BaseNode):
         except ValueError:
             raise
         except Exception as e:
-            raise RuntimeError(f"Erro ao consultar WFS: {sem_segredo(str(e), auth)}") from e
+            raise RuntimeError(f"Erro ao consultar WFS: {without_secret(str(e), auth)}") from e
 
         if gdf.empty:
             logger.warning("Nenhuma feição retornada do WFS para a camada '%s'.", type_name)

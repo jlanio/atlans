@@ -22,27 +22,27 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[2]
 
 # The core: everything the free distribution ships.
-_PASTAS_DO_NUCLEO = ("app", "flow", "executor", "scripts", "alembic", "tests")
+_CORE_FOLDERS = ("app", "flow", "executor", "scripts", "alembic", "tests")
 # The registry API, which the core may use.
 _API_DO_REGISTRO = {"registro", "importar_modelos", "desligadas", "esquemas", "Registro"}
 # A name after the registry, in a string: `app.extensoes.planos` cites an
 # extension; `app.extensoes.registro` is the API. The prefix alone
 # (`app.extensoes.`) is generic and allowed.
-_NOME_NO_TEXTO = re.compile(r"app\.extensoes\.([A-Za-z_]\w*)")
+_NAME_IN_TEXT = re.compile(r"app\.extensoes\.([A-Za-z_]\w*)")
 _REGISTRO = "app.extensoes"
 
 
-def _da_extensao(caminho: Path) -> bool:
+def _is_extension_file(caminho: Path) -> bool:
     relativo = caminho.relative_to(RAIZ).parts
     return (
         relativo[:2] == ("app", "extensoes") and len(relativo) > 3
     ) or relativo[:2] == ("tests", "extensoes")
 
 
-def _arquivos_do_nucleo():
-    for pasta in _PASTAS_DO_NUCLEO:
+def _core_files():
+    for pasta in _CORE_FOLDERS:
         for caminho in (RAIZ / pasta).rglob("*.py"):
-            if "__pycache__" in caminho.parts or _da_extensao(caminho):
+            if "__pycache__" in caminho.parts or _is_extension_file(caminho):
                 continue
             yield caminho
 
@@ -56,14 +56,14 @@ def _docstrings(arvore: ast.AST) -> set[int]:
     return ids
 
 
-def _pacote(relativo: str) -> str:
+def _package(relativo: str) -> str:
     """A file's package, to resolve its relative imports:
     `app/services/x.py` is in `app.services`, and `app/extensoes/__init__.py`
     is `app.extensoes` itself."""
     return ".".join(Path(relativo).with_suffix("").parts[:-1])
 
 
-def _pontuado(no: ast.AST) -> str | None:
+def _dotted(no: ast.AST) -> str | None:
     """`app.extensoes.planos.config` from an attribute chain, or None."""
     partes = []
     while isinstance(no, ast.Attribute):
@@ -75,13 +75,13 @@ def _pontuado(no: ast.AST) -> str | None:
     return ".".join(reversed(partes))
 
 
-def _fora_da_api(resto: str) -> bool:
+def _outside_the_api(resto: str) -> bool:
     """Does `planos.config` (what comes after the registry) cite an extension?"""
     primeiro = resto.split(".")[0]
     return not (primeiro in _API_DO_REGISTRO or primeiro.startswith("__"))
 
 
-def citacoes(arvore: ast.AST, relativo: str) -> list[str]:
+def citations(arvore: ast.AST, relativo: str) -> list[str]:
     """The citations of an extension by name in a core module.
 
     Three paths: an import (absolute or relative, resolved against the file's
@@ -89,16 +89,16 @@ def citacoes(arvore: ast.AST, relativo: str) -> list[str]:
     (`app.extensoes.planos...`, or an alias of it, `extensoes.planos...`) and a
     string that names the extension (a patch target, an `import_module`)."""
     docstrings = _docstrings(arvore)
-    pacote = _pacote(relativo)
-    apelidos = {_REGISTRO}  # names that point to the registry package
-    achadas: list[str] = []
+    pacote = _package(relativo)
+    aliases = {_REGISTRO}  # names that point to the registry package
+    found: list[str] = []
     for no in ast.walk(arvore):
         if isinstance(no, ast.Import):
             for a in no.names:
-                if a.name.startswith(_REGISTRO + ".") and _fora_da_api(a.name[len(_REGISTRO) + 1:]):
-                    achadas.append(f"import {a.name}")
+                if a.name.startswith(_REGISTRO + ".") and _outside_the_api(a.name[len(_REGISTRO) + 1:]):
+                    found.append(f"import {a.name}")
                 elif a.name == _REGISTRO and a.asname:
-                    apelidos.add(a.asname)
+                    aliases.add(a.asname)
         elif isinstance(no, ast.ImportFrom):
             modulo = no.module or ""
             if no.level:
@@ -106,34 +106,34 @@ def citacoes(arvore: ast.AST, relativo: str) -> list[str]:
                     modulo = importlib.util.resolve_name("." * no.level + modulo, pacote)
                 except (ImportError, ValueError):
                     continue
-            if modulo.startswith(_REGISTRO + ".") and _fora_da_api(modulo[len(_REGISTRO) + 1:]):
-                achadas.append(f"from {modulo} import …")
+            if modulo.startswith(_REGISTRO + ".") and _outside_the_api(modulo[len(_REGISTRO) + 1:]):
+                found.append(f"from {modulo} import …")
             elif modulo == _REGISTRO:
-                achadas += [f"from {_REGISTRO} import {a.name}" for a in no.names if _fora_da_api(a.name)]
+                found += [f"from {_REGISTRO} import {a.name}" for a in no.names if _outside_the_api(a.name)]
             elif modulo == "app":
-                apelidos.update(a.asname or a.name for a in no.names if a.name == "extensoes")
+                aliases.update(a.asname or a.name for a in no.names if a.name == "extensoes")
         elif (
             isinstance(no, ast.Constant) and isinstance(no.value, str) and id(no) not in docstrings
-            and any(_fora_da_api(nome) for nome in _NOME_NO_TEXTO.findall(no.value))
+            and any(_outside_the_api(nome) for nome in _NAME_IN_TEXT.findall(no.value))
         ):
-            achadas.append(f"texto {no.value[:60]!r}")
+            found.append(f"texto {no.value[:60]!r}")
     # Aliases apply to the whole file, so the chains come in a second pass.
     # Each chain is recorded up to the extension name (`app.extensoes.ouro`), only
     # once: `ast.walk` goes through every piece of `a.b.c.d`.
-    cadeias = set()
+    chains = set()
     for no in ast.walk(arvore):
-        if isinstance(no, ast.Attribute) and (nome := _pontuado(no)):
-            for apelido in apelidos:
-                if nome.startswith(apelido + ".") and _fora_da_api(resto := nome[len(apelido) + 1:]):
-                    cadeias.add(f"{apelido}.{resto.split('.')[0]}")
-    achadas += sorted(f"atributo {c}" for c in cadeias)
-    return achadas
+        if isinstance(no, ast.Attribute) and (nome := _dotted(no)):
+            for apelido in aliases:
+                if nome.startswith(apelido + ".") and _outside_the_api(resto := nome[len(apelido) + 1:]):
+                    chains.add(f"{apelido}.{resto.split('.')[0]}")
+    found += sorted(f"atributo {c}" for c in chains)
+    return found
 
 
-def test_o_detector_ve_os_jeitos_de_citar_uma_extensao():
+def test_the_detector_sees_the_ways_to_cite_an_extension():
     """The ways the detector must see — and the ones the core may use."""
     def ve(codigo: str, arquivo: str = "app/services/x.py") -> list[str]:
-        return citacoes(ast.parse(codigo), arquivo)
+        return citations(ast.parse(codigo), arquivo)
 
     ouro = "ouro"  # a fake extension; the real name must not be here
     assert ve(f"from ..extensoes.{ouro} import config")
@@ -152,20 +152,20 @@ def test_o_detector_ve_os_jeitos_de_citar_uma_extensao():
     assert ve("from .x import y", "tests/unit/test_y.py") == []
 
 
-def test_o_nucleo_nao_importa_extensao_pelo_nome():
+def test_the_core_does_not_import_extension_by_name():
     erros = {}
-    for caminho in _arquivos_do_nucleo():
+    for caminho in _core_files():
         relativo = caminho.relative_to(RAIZ).as_posix()
         arvore = ast.parse(caminho.read_text(encoding="utf-8"), filename=str(caminho))
-        if achadas := citacoes(arvore, relativo):
-            erros[relativo] = achadas
+        if found := citations(arvore, relativo):
+            erros[relativo] = found
     assert not erros, (
         "O núcleo não pode citar uma extensão pelo nome (use o registro de app/extensoes, "
         f"e ponha os testes dela em tests/extensoes/): {erros}"
     )
 
 
-_SONDA = """
+_PROBE = """
 import json, sys
 import app.main
 from app.extensoes import registro
@@ -186,9 +186,9 @@ print(json.dumps({
 """
 
 
-def test_a_api_sobe_sem_extensoes():
+def test_the_api_starts_without_extensions():
     env = dict(os.environ, ATLANS_SEM_EXTENSOES="1")
-    r = subprocess.run([sys.executable, "-c", _SONDA], cwd=RAIZ, env=env, capture_output=True, text=True)
+    r = subprocess.run([sys.executable, "-c", _PROBE], cwd=RAIZ, env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stderr[-3000:]
     estado = json.loads(r.stdout.strip().splitlines()[-1])
 

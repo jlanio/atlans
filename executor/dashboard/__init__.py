@@ -22,25 +22,25 @@ from typing import Mapping
 
 logger = logging.getLogger("executor.dashboard")
 
-_LIGADO = {"off", "never", "0", "false", "no"}
-_FORCADO = {"on", "always", "1", "true", "yes"}
+_FORCED_OFF = {"off", "never", "0", "false", "no"}
+_FORCED_ON = {"on", "always", "1", "true", "yes"}
 _JSON = {"json", "ndjson", "ipc"}
 
 # Possible modes. The gate returns one of these, and not a boolean: with the arrival of
 # the desktop app there came to be TWO consumers of the statistics collector —
 # the terminal and a supervisor — and "on/off" does not distinguish the two.
-MODO_RICH = "rich"
-MODO_JSON = "json"
-MODO_OFF = "off"
+MODE_RICH = "rich"
+MODE_JSON = "json"
+MODE_OFF = "off"
 
 # Below this the panel comes out clipped, which is worse than not existing.
-_MIN_LARGURA = 60
-_MIN_ALTURA = 12
+_MIN_WIDTH = 60
+_MIN_HEIGHT = 12
 
 _runtime = None
 
 
-def rich_disponivel() -> bool:
+def rich_available() -> bool:
     """`find_spec` instead of `import`: does not pay the cost of loading rich
     when the panel is off."""
     try:
@@ -74,41 +74,41 @@ def should_enable(
     # Before anything else: does not depend on rich, on a TTY or on the terminal size.
     # The consumer is a program.
     if modo in _JSON:
-        return MODO_JSON, "canal NDJSON por EXECUTOR_DASHBOARD"
+        return MODE_JSON, "canal NDJSON por EXECUTOR_DASHBOARD"
 
-    if modo in _LIGADO:
-        return MODO_OFF, "desativado por EXECUTOR_DASHBOARD"
+    if modo in _FORCED_OFF:
+        return MODE_OFF, "desativado por EXECUTOR_DASHBOARD"
 
     if not rich_ok:
-        return MODO_OFF, "biblioteca 'rich' nao instalada (pip install rich)"
+        return MODE_OFF, "biblioteca 'rich' nao instalada (pip install rich)"
 
     # Deliberate escape hatch: whoever passes `on` knows what they are doing.
-    if modo in _FORCADO:
-        return MODO_RICH, "forcado por EXECUTOR_DASHBOARD"
+    if modo in _FORCED_ON:
+        return MODE_RICH, "forcado por EXECUTOR_DASHBOARD"
 
     # A partir daqui, modo == auto.
     if not stdout_tty or not stderr_tty:
         # Covers Docker without -it, systemd/journald, `| tee` and the desktop app, which
         # captures the process output through a pipe.
-        return MODO_OFF, "stdout/stderr nao e um terminal interativo"
+        return MODE_OFF, "stdout/stderr nao e um terminal interativo"
 
     if (env.get("LOG_COLOR") or "").strip().lower() == "never":
         # The operator already asked for unadorned output; it is what the executor's compose uses.
-        return MODO_OFF, "LOG_COLOR=never"
+        return MODE_OFF, "LOG_COLOR=never"
 
     if env.get("NO_COLOR"):
-        return MODO_OFF, "NO_COLOR definido"
+        return MODE_OFF, "NO_COLOR definido"
 
     if os.name != "nt" and (env.get("TERM") or "").strip().lower() in ("", "dumb"):
-        return MODO_OFF, "TERM ausente ou 'dumb'"
+        return MODE_OFF, "TERM ausente ou 'dumb'"
 
     if env.get("CI"):
-        return MODO_OFF, "ambiente de CI"
+        return MODE_OFF, "ambiente de CI"
 
-    if largura < _MIN_LARGURA or altura < _MIN_ALTURA:
-        return MODO_OFF, f"terminal pequeno demais ({largura}x{altura})"
+    if largura < _MIN_WIDTH or altura < _MIN_HEIGHT:
+        return MODE_OFF, f"terminal pequeno demais ({largura}x{altura})"
 
-    return MODO_RICH, "terminal interativo"
+    return MODE_RICH, "terminal interativo"
 
 
 def should_enable_from_process() -> tuple[str, str]:
@@ -121,36 +121,36 @@ def should_enable_from_process() -> tuple[str, str]:
         env=os.environ,
         stdout_tty=bool(getattr(sys.stdout, "isatty", lambda: False)()),
         stderr_tty=bool(getattr(sys.stderr, "isatty", lambda: False)()),
-        rich_ok=rich_disponivel(),
+        rich_ok=rich_available(),
         largura=tamanho.columns,
         altura=tamanho.lines,
     )
 
 
-async def start(stats, *, modo: str = MODO_RICH, capacity_source, result_queue,
-                intervalo: float = 1.0, ao_sair=None, ao_reconectar=None, ao_sincronizar=None):
+async def start(stats, *, modo: str = MODE_RICH, capacity_source, result_queue,
+                intervalo: float = 1.0, on_exit=None, ao_reconectar=None, on_sync=None):
     """Starts the runtime for the requested `modo` and returns the object (with `stop()`).
 
-    `ao_sair` is called by the 'q' key or by the `shutdown` command — it must
+    `on_exit` is called by the 'q' key or by the `shutdown` command — it must
     trigger the same orderly shutdown as a SIGTERM. `ao_reconectar` responds
     to 'r' / `reconnect` and must interrupt the connection backoff.
 
     Returns `None` if it could not be turned on. Does not raise: any failure here
     leaves the executor in normal log mode, working.
     """
-    if modo == MODO_JSON:
+    if modo == MODE_JSON:
         return await _start_json(stats, capacity_source=capacity_source,
                                  result_queue=result_queue, intervalo=intervalo,
-                                 ao_sair=ao_sair, ao_reconectar=ao_reconectar,
-                             ao_sincronizar=ao_sincronizar)
+                                 on_exit=on_exit, ao_reconectar=ao_reconectar,
+                             on_sync=on_sync)
     return await _start_rich(stats, capacity_source=capacity_source,
                              result_queue=result_queue, intervalo=intervalo,
-                             ao_sair=ao_sair, ao_reconectar=ao_reconectar,
-                                 ao_sincronizar=ao_sincronizar)
+                             on_exit=on_exit, ao_reconectar=ao_reconectar,
+                                 on_sync=on_sync)
 
 
 async def _start_rich(stats, *, capacity_source, result_queue, intervalo,
-                      ao_sair, ao_reconectar, ao_sincronizar):
+                      on_exit, ao_reconectar, on_sync):
     """`rich` panel: swaps the console for the file and starts the refresh loop."""
     global _runtime
 
@@ -179,9 +179,9 @@ async def _start_rich(stats, *, capacity_source, result_queue, intervalo,
             intervalo=intervalo,
             log_path=caminho,
             tail_handler=tail,
-            ao_sair=ao_sair,
+            on_exit=on_exit,
             ao_reconectar=ao_reconectar,
-            ao_sincronizar=ao_sincronizar,
+            on_sync=on_sync,
         )
         await _runtime.start()
         atexit.register(emergency_stop)
@@ -198,7 +198,7 @@ async def _start_rich(stats, *, capacity_source, result_queue, intervalo,
 
 
 async def _start_json(stats, *, capacity_source, result_queue, intervalo,
-                      ao_sair, ao_reconectar, ao_sincronizar):
+                      on_exit, ao_reconectar, on_sync):
     """NDJSON channel on stdout.
 
     Does not touch console logging: it writes to stderr, which is still the
@@ -225,9 +225,9 @@ async def _start_json(stats, *, capacity_source, result_queue, intervalo,
             capacity_source=capacity_source,
             result_queue=result_queue,
             intervalo=intervalo,
-            ao_sair=ao_sair,
+            on_exit=on_exit,
             ao_reconectar=ao_reconectar,
-            ao_sincronizar=ao_sincronizar,
+            on_sync=on_sync,
         )
         tail = JsonLogHandler(stats, _runtime)
         logging.getLogger().addHandler(tail)

@@ -14,10 +14,10 @@
 import type { IArtifactItem, IDriveFile } from "@/service/types"
 import { isLocalDoExecutor } from "@/app/components/local-badge"
 
-export type FonteDoAcervo = "artefato" | "drive"
+export type CollectionSource = "artefato" | "drive"
 
 /** Why an item does NOT go to the globe — the keys of `listas.artefatos.semPrevia`. */
-export type MotivoSemPrevia =
+export type NoPreviewReason =
   | "executor"
   | "cartaImagem"
   | "semCamadaNoPortal"
@@ -31,18 +31,18 @@ export type MotivoSemPrevia =
  * - `efemero`: has `expires_at` (artifacts only; the Drive is permanent).
  * - `permanente`: the rest (Drive, or an artifact without expiration).
  */
-export type EstadoDoAcervo = "local" | "efemero" | "permanente"
+export type CollectionState = "local" | "efemero" | "permanente"
 
-export interface ItemDoAcervo {
+export interface CollectionItem {
   /** Unique key in the list (the source + the id — the two id spaces are disjoint
    *  in practice, but the prefix guarantees it). */
   chave: string
   id: string
-  fonte: FonteDoAcervo
+  fonte: CollectionSource
   nome: string
   /** geojson | json | csv | shapefile | ... (lowercase). */
   formato: string
-  estado: EstadoDoAcervo
+  estado: CollectionState
   /** Only when ephemeral (the Drive never has it). */
   expiresAt: string | null
   executorId: string | null
@@ -63,14 +63,14 @@ export interface ItemDoAcervo {
    *  list says the sentence in the current language. The reason is the only text
    *  the inert row has to offer, and "sem prévia no globo" alone described the
    *  most common case poorly (content parked on the executor). */
-  motivo: MotivoSemPrevia | null
+  motivo: NoPreviewReason | null
   driveFile?: IDriveFile
 }
 
 /** The state ladder, isolated for direct testing. */
 export function estadoDoAcervo(
   item: { content_location?: string | null; expires_at?: string | null },
-): EstadoDoAcervo {
+): CollectionState {
   if (isLocalDoExecutor(item)) return "local"
   if (item.expires_at) return "efemero"
   return "permanente"
@@ -90,13 +90,13 @@ export function estadoDoAcervo(
  * Also returns the refusal reason's key: its sentence is the text the inert
  * row displays.
  */
-const FORMATOS_DE_IMAGEM = new Set(["png", "jpg", "jpeg", "pdf"])
+const IMAGE_FORMATS = new Set(["png", "jpg", "jpeg", "pdf"])
 
-function previaDoArtefato(a: IArtifactItem): { adicionavel: boolean; motivo: MotivoSemPrevia | null } {
+function artifactPreview(a: IArtifactItem): { adicionavel: boolean; motivo: NoPreviewReason | null } {
   if (isLocalDoExecutor(a)) return { adicionavel: false, motivo: "executor" }
   const formato = (a.format ?? "").toLowerCase()
   if (formato === "geojson") return { adicionavel: true, motivo: null }
-  if (FORMATOS_DE_IMAGEM.has(formato)) {
+  if (IMAGE_FORMATS.has(formato)) {
     // The image map (CartaImagem node) is a file to download: not even publishing
     // it to the portal would put it on the globe, so the generic sentence
     // ("publique o mapa") would lie.
@@ -107,8 +107,8 @@ function previaDoArtefato(a: IArtifactItem): { adicionavel: boolean; motivo: Mot
   return { adicionavel: false, motivo: "formatoSemPrevia" }
 }
 
-export function normalizarArtefato(a: IArtifactItem): ItemDoAcervo {
-  const previa = previaDoArtefato(a)
+export function normalizarArtefato(a: IArtifactItem): CollectionItem {
+  const previa = artifactPreview(a)
   return {
     chave: `art:${a.id_hash}`,
     id: a.id_hash,
@@ -126,7 +126,7 @@ export function normalizarArtefato(a: IArtifactItem): ItemDoAcervo {
   }
 }
 
-export function normalizarArquivoDoDrive(f: IDriveFile): ItemDoAcervo {
+export function normalizarArquivoDoDrive(f: IDriveFile): CollectionItem {
   return {
     chave: `drv:${f.id_hash}`,
     id: f.id_hash,

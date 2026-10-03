@@ -5,7 +5,7 @@ import { TbArrowRight } from "react-icons/tb"
 import { Skeleton } from "@/app/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import type { INowBlock } from "@/service/types"
-import { formatarDuracao, formatarInteiro } from "@/lib/formatos"
+import { formatarDuracao, formatInteger } from "@/lib/formatos"
 
 interface Props {
   now: INowBlock | null | undefined
@@ -36,7 +36,7 @@ export function AgoraFaixa({ now, carregando, onVerEmAndamento, onAbrirPresa }: 
           ? <Skeleton className="h-4 w-56" />
           : <span className="text-muted-foreground">Sem leitura do instante.</span>
       ) : (
-        <ItensAgora now={now} onAbrirPresa={onAbrirPresa} />
+        <NowItems now={now} onAbrirPresa={onAbrirPresa} />
       )}
       <button
         type="button"
@@ -56,55 +56,55 @@ export function AgoraFaixa({ now, carregando, onVerEmAndamento, onAbrirPresa }: 
  * export so the Dashboard reuses the SAME line inside the Health strip
  * (docs/specs/dashboard.md §3.4), without duplicating the "hide what is zero" logic.
  */
-export function ItensAgora({ now, onAbrirPresa }: { now: INowBlock; onAbrirPresa: (runId: string) => void }) {
+export function NowItems({ now, onAbrirPresa }: { now: INowBlock; onAbrirPresa: (runId: string) => void }) {
   const presas = now.stuck_count ?? 0
-  const maisAntiga = now.stuck?.[0]
+  const oldest = now.stuck?.[0]
   const { online, total } = now.executors ?? { online: 0, total: 0 }
   const confirmacoes = now.overdue_acks
 
   return (
     <>
       <Item>
-        <Ponto className={cn("bg-blue-500", now.running > 0 && "motion-safe:animate-pulse")} />
-        <N>{formatarInteiro(now.running)}</N> em andamento
+        <StatusDot className={cn("bg-blue-500", now.running > 0 && "motion-safe:animate-pulse")} />
+        <N>{formatInteger(now.running)}</N> em andamento
       </Item>
       {now.pending > 0 && (
-        <Item className="text-muted-foreground"><N>{formatarInteiro(now.pending)}</N> na fila</Item>
+        <Item className="text-muted-foreground"><N>{formatInteger(now.pending)}</N> na fila</Item>
       )}
       {presas > 0 && (
         <>
-          <Separador />
+          <Separator />
           <button
             type="button"
-            onClick={maisAntiga ? () => onAbrirPresa(maisAntiga.run_id) : undefined}
-            disabled={!maisAntiga}
+            onClick={oldest ? () => onAbrirPresa(oldest.run_id) : undefined}
+            disabled={!oldest}
             aria-label={presas === 1
-              ? `Abrir a execução presa há ${formatarDuracao(maisAntiga?.elapsed_seconds)}`
+              ? `Abrir a execução presa há ${formatarDuracao(oldest?.elapsed_seconds)}`
               : `Abrir a mais antiga das ${presas} execuções presas`}
             className="inline-flex items-center gap-1.5 rounded-sm text-amber-700 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:no-underline dark:text-amber-400"
           >
-            <Ponto className="bg-amber-500" />
+            <StatusDot className="bg-amber-500" />
             <span>
-              <N>{formatarInteiro(presas)}</N> {presas === 1 ? "presa" : "presas"}
-              {maisAntiga && ` há ${formatarDuracao(maisAntiga.elapsed_seconds)}`}
+              <N>{formatInteger(presas)}</N> {presas === 1 ? "presa" : "presas"}
+              {oldest && ` há ${formatarDuracao(oldest.elapsed_seconds)}`}
             </span>
           </button>
         </>
       )}
       {total > 0 && (
         <>
-          <Separador />
+          <Separator />
           <Item>
-            <Ponto className={online === 0 ? "bg-red-500" : online < total ? "bg-amber-500" : "bg-green-500"} />
+            <StatusDot className={online === 0 ? "bg-red-500" : online < total ? "bg-amber-500" : "bg-green-500"} />
             Executores <N>{online} de {total}</N> online
           </Item>
         </>
       )}
       {confirmacoes != null && confirmacoes > 0 && (
         <>
-          <Separador />
+          <Separator />
           <Item className="text-amber-700 dark:text-amber-400">
-            <N>{formatarInteiro(confirmacoes)}</N> {confirmacoes === 1 ? "confirmação atrasada" : "confirmações atrasadas"}
+            <N>{formatInteger(confirmacoes)}</N> {confirmacoes === 1 ? "confirmação atrasada" : "confirmações atrasadas"}
           </Item>
         </>
       )}
@@ -118,9 +118,9 @@ function Item({ children, className }: { children: ReactNode; className?: string
 function N({ children }: { children: ReactNode }) {
   return <span className="font-semibold tabular-nums">{children}</span>
 }
-function Ponto({ className }: { className?: string }) {
+function StatusDot({ className }: { className?: string }) {
   return <span aria-hidden="true" className={cn("inline-block size-2 shrink-0 rounded-full", className)} />
 }
-function Separador() {
+function Separator() {
   return <span aria-hidden="true" className="hidden h-4 w-px bg-border sm:inline-block" />
 }

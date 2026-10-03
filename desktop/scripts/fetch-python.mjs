@@ -43,14 +43,14 @@ if (!force && fs.existsSync(PY_EXE) && fs.existsSync(stamp)) {
 step(`CPython ${spec.version} (${spec.release})`)
 fs.mkdirSync(cacheDir, { recursive: true })
 
-let precisaBaixar = true
+let needsDownload = true
 if (fs.existsSync(tarball)) {
   log('tarball em cache — conferindo hash')
-  if (sha256(tarball) === spec.sha256) { ok('hash confere, download dispensado'); precisaBaixar = false }
+  if (sha256(tarball) === spec.sha256) { ok('hash confere, download dispensado'); needsDownload = false }
   else { log('hash do cache diverge — rebaixando'); fs.rmSync(tarball) }
 }
 
-if (precisaBaixar) {
+if (needsDownload) {
   log(`baixando ${url}`)
   const resp = await fetch(url, { redirect: 'follow' })
   if (!resp.ok) fail(`download falhou: HTTP ${resp.status} ${resp.statusText}`)

@@ -13,12 +13,12 @@
 // stay in Portuguese by default — the Home passes them the texts from here.
 
 /** 0 = Sunday … 6 = Saturday, as in cron (7 arrives here already as 0). */
-const DIAS_PT = ["aos domingos", "às segundas", "às terças", "às quartas", "às quintas", "às sextas", "aos sábados"]
-const DIAS_EN = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"]
-const DIAS_ES = ["los domingos", "los lunes", "los martes", "los miércoles", "los jueves", "los viernes", "los sábados"]
+const DAYS_PT = ["aos domingos", "às segundas", "às terças", "às quartas", "às quintas", "às sextas", "aos sábados"]
+const DAYS_EN = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"]
+const DAYS_ES = ["los domingos", "los lunes", "los martes", "los miércoles", "los jueves", "los viernes", "los sábados"]
 
 /** "a las 6:00", but "a la 1:00": in Spanish the article agrees with the hour. */
-const aLas = (hora: string) => (/^0?1:/.test(hora) ? `a la ${hora}` : `a las ${hora}`)
+const atHourEs = (hora: string) => (/^0?1:/.test(hora) ? `a la ${hora}` : `a las ${hora}`)
 
 export const pt = {
   /** What the three lists repeat: the cut-off footer and the failure fallback. */
@@ -84,7 +84,7 @@ export const pt = {
       intervalo: "intervalo",
       todoDia: (hora: string) => `todo dia às ${hora}`,
       segASex: (hora: string) => `seg–sex às ${hora}`,
-      naSemana: (dia: number, hora: string) => `${DIAS_PT[dia]} às ${hora}`,
+      naSemana: (dia: number, hora: string) => `${DAYS_PT[dia]} às ${hora}`,
       noDia: (dia: number, hora: string) => `dia ${dia} às ${hora}`,
       recorrencia: "recorrência (RRULE)",
       agendamento: "agendamento",
@@ -228,7 +228,7 @@ export const en: typeof pt = {
       intervalo: "interval",
       todoDia: (hora) => `every day at ${hora}`,
       segASex: (hora) => `Mon–Fri at ${hora}`,
-      naSemana: (dia, hora) => `${DIAS_EN[dia]} at ${hora}`,
+      naSemana: (dia, hora) => `${DAYS_EN[dia]} at ${hora}`,
       noDia: (dia, hora) => `monthly on day ${dia} at ${hora}`,
       recorrencia: "recurrence (RRULE)",
       agendamento: "schedule",
@@ -364,10 +364,10 @@ export const es: typeof pt = {
       aCadaUnidade: (n, unidade) => `cada ${n} ${unidade}`,
       aCada: (n) => `cada ${n}`,
       intervalo: "intervalo",
-      todoDia: (hora) => `todos los días ${aLas(hora)}`,
-      segASex: (hora) => `lun–vie ${aLas(hora)}`,
-      naSemana: (dia, hora) => `${DIAS_ES[dia]} ${aLas(hora)}`,
-      noDia: (dia, hora) => `el día ${dia} de cada mes ${aLas(hora)}`,
+      todoDia: (hora) => `todos los días ${atHourEs(hora)}`,
+      segASex: (hora) => `lun–vie ${atHourEs(hora)}`,
+      naSemana: (dia, hora) => `${DAYS_ES[dia]} ${atHourEs(hora)}`,
+      noDia: (dia, hora) => `el día ${dia} de cada mes ${atHourEs(hora)}`,
       recorrencia: "recurrencia (RRULE)",
       agendamento: "programación",
       amanha: "mañana",

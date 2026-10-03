@@ -5,7 +5,7 @@ import { GisFlowService } from "@/service/GisFlowService"
 import type {
   IExecutorMetrics, IObservabilityMetrics, IRunsByDay, IWorkflowMetricsRow,
 } from "@/service/types"
-import type { EstadoDoHistorico, Periodo } from "./historico-url"
+import type { HistoryState, Period } from "./historico-url"
 
 /**
  * Data for the top of History (docs/specs/metrics-history.md §4.3 "Dados").
@@ -23,11 +23,11 @@ import type { EstadoDoHistorico, Periodo } from "./historico-url"
  * other three on the next visit to the same period.
  */
 
-export type ParteDosDados = "metrics" | "dias" | "executores" | "workflows"
+export type DataPart = "metrics" | "dias" | "executores" | "workflows"
 
-export type FalhasDosDados = Partial<Record<ParteDosDados, string>>
+export type DataFailures = Partial<Record<DataPart, string>>
 
-export interface HistoricoDados {
+export interface HistoryData {
   metrics: IObservabilityMetrics | null
   dias: IRunsByDay[]
   executores: IExecutorMetrics[]
@@ -35,9 +35,9 @@ export interface HistoricoDados {
   /** Some part is in flight (the Now strip's silent poll does not count). */
   carregando: boolean
   /** Window that what is ON SCREEN belongs to — changes when the data arrives, not on click. */
-  periodoDosDados: Periodo
+  periodoDosDados: Period
   /** Message per part that failed in the last load; what was already there stays on screen. */
-  falhas: FalhasDosDados
+  falhas: DataFailures
   /** Fura o cache local e manda `force=true` para o backend furar o Redis. */
   recarregar: () => void
 }
@@ -46,7 +46,7 @@ export const TTL_DO_CACHE_MS = 60_000
 /** The "Agora" (Now) strip refreshes every 30 s while the tab is visible (spec §4.3). */
 export const INTERVALO_DO_AGORA_MS = 30_000
 
-const MENSAGENS: Record<ParteDosDados, string> = {
+const MESSAGES: Record<DataPart, string> = {
   metrics: "Não foi possível carregar os indicadores.",
   dias: "Não foi possível carregar as execuções por dia.",
   executores: "Não foi possível carregar os executores.",
@@ -65,7 +65,7 @@ export function fusoDoNavegador(): string {
 }
 
 /** Cache keys: metrics and days by (period, workspace, workflow); fleet and workflows only by (period, workspace). */
-export function chavesDeCache(estado: Pick<EstadoDoHistorico, "periodo" | "workspace" | "workflow">, tz: string) {
+export function cacheKeys(estado: Pick<HistoryState, "periodo" | "workspace" | "workflow">, tz: string) {
   const ws = estado.workspace ?? ""
   const wf = estado.workflow ?? ""
   return {
@@ -76,7 +76,7 @@ export function chavesDeCache(estado: Pick<EstadoDoHistorico, "periodo" | "works
   }
 }
 
-function filtrosDeJanela(estado: Pick<EstadoDoHistorico, "workspace" | "workflow">) {
+function windowFilters(estado: Pick<HistoryState, "workspace" | "workflow">) {
   return {
     workspace_id: estado.workspace ?? undefined,
     workflow_id: estado.workflow ?? undefined,
@@ -84,17 +84,17 @@ function filtrosDeJanela(estado: Pick<EstadoDoHistorico, "workspace" | "workflow
 }
 
 export function useHistoricoDados(
-  estado: EstadoDoHistorico,
+  estado: HistoryState,
   opts: { habilitado: boolean; intervaloDoAgoraMs?: number },
-): HistoricoDados {
+): HistoryData {
   const { habilitado, intervaloDoAgoraMs = INTERVALO_DO_AGORA_MS } = opts
   const [metrics, setMetrics] = useState<IObservabilityMetrics | null>(null)
-  const [dias, setDias] = useState<IRunsByDay[]>([])
-  const [executores, setExecutores] = useState<IExecutorMetrics[]>([])
+  const [dias, setDays] = useState<IRunsByDay[]>([])
+  const [executores, setExecutors] = useState<IExecutorMetrics[]>([])
   const [workflows, setWorkflows] = useState<IWorkflowMetricsRow[]>([])
-  const [carregando, setCarregando] = useState(true)
-  const [periodoDosDados, setPeriodoDosDados] = useState<Periodo>(estado.periodo)
-  const [falhas, setFalhas] = useState<FalhasDosDados>({})
+  const [carregando, setLoading] = useState(true)
+  const [periodoDosDados, setDataPeriod] = useState<Period>(estado.periodo)
+  const [falhas, setFailures] = useState<DataFailures>({})
 
   // Sequence stamp: switching periods twice in a row fires two loads, and the
   // slower one may respond last. Only the last load requested writes to the
@@ -103,46 +103,46 @@ export function useHistoricoDados(
   const cache = useRef(new Map<string, Entrada<unknown>>())
   // The state read by `recarregar` and by the poll is always the current one,
   // without them having to change identity on every render (they go down to buttons).
-  const estadoRef = useRef(estado)
-  estadoRef.current = estado
+  const stateRef = useRef(estado)
+  stateRef.current = estado
   const tz = useMemo(fusoDoNavegador, [])
 
-  const lerCache = useCallback(<T,>(chave: string, agora: number): T | undefined => {
+  const readCache = useCallback(<T,>(chave: string, agora: number): T | undefined => {
     const e = cache.current.get(chave)
     if (!e || agora - e.ts >= TTL_DO_CACHE_MS) return undefined
     return e.valor as T
   }, [])
 
-  const carregar = useCallback(async (alvo: EstadoDoHistorico, force: boolean) => {
+  const carregar = useCallback(async (alvo: HistoryState, force: boolean) => {
     const mine = ++seq.current
     const agora = Date.now()
-    const chaves = chavesDeCache(alvo, tz)
+    const chaves = cacheKeys(alvo, tz)
     const doCache = force ? {} : {
-      metrics: lerCache<IObservabilityMetrics>(chaves.metrics, agora),
-      dias: lerCache<IRunsByDay[]>(chaves.dias, agora),
-      executores: lerCache<IExecutorMetrics[]>(chaves.executores, agora),
-      workflows: lerCache<IWorkflowMetricsRow[]>(chaves.workflows, agora),
+      metrics: readCache<IObservabilityMetrics>(chaves.metrics, agora),
+      dias: readCache<IRunsByDay[]>(chaves.dias, agora),
+      executores: readCache<IExecutorMetrics[]>(chaves.executores, agora),
+      workflows: readCache<IWorkflowMetricsRow[]>(chaves.workflows, agora),
     }
 
     // What the cache has goes in right away: switching periods and back does not flicker.
     if (doCache.metrics) setMetrics(doCache.metrics)
-    if (doCache.dias) setDias(doCache.dias)
-    if (doCache.executores) setExecutores(doCache.executores)
+    if (doCache.dias) setDays(doCache.dias)
+    if (doCache.executores) setExecutors(doCache.executores)
     if (doCache.workflows) setWorkflows(doCache.workflows)
-    if (doCache.metrics || doCache.dias) setPeriodoDosDados(alvo.periodo)
+    if (doCache.metrics || doCache.dias) setDataPeriod(alvo.periodo)
 
-    const faltam = (["metrics", "dias", "executores", "workflows"] as ParteDosDados[])
+    const faltam = (["metrics", "dias", "executores", "workflows"] as DataPart[])
       .filter(p => !doCache[p])
     if (faltam.length === 0) {
-      setFalhas({})
-      setCarregando(false)
+      setFailures({})
+      setLoading(false)
       return
     }
 
-    setCarregando(true)
-    const janela = filtrosDeJanela(alvo)
+    setLoading(true)
+    const janela = windowFilters(alvo)
     const soWorkspace = { workspace_id: janela.workspace_id }
-    const [rMetrics, rDias, rExecutores, rWorkflows] = await Promise.all([
+    const [rMetrics, rDays, rExecutors, rWorkflows] = await Promise.all([
       faltam.includes("metrics") ? GisFlowService.getObservabilityMetrics(alvo.periodo, force, janela) : null,
       faltam.includes("dias") ? GisFlowService.getRunsByDay(alvo.periodo, { ...janela, tz }) : null,
       faltam.includes("executores") ? GisFlowService.getExecutorMetrics(alvo.periodo, force, soWorkspace) : null,
@@ -151,39 +151,39 @@ export function useHistoricoDados(
     if (mine !== seq.current) return
 
     const ts = Date.now()
-    const novasFalhas: FalhasDosDados = {}
+    const newFailures: DataFailures = {}
     const guardar = (chave: string, valor: unknown) => {
       cache.current.set(chave, { valor, ts })
     }
 
     if (rMetrics) {
       if (rMetrics.data) { setMetrics(rMetrics.data); guardar(chaves.metrics, rMetrics.data) }
-      else novasFalhas.metrics = MENSAGENS.metrics
+      else newFailures.metrics = MESSAGES.metrics
     }
-    if (rDias) {
-      if (rDias.data?.days) { setDias(rDias.data.days); guardar(chaves.dias, rDias.data.days) }
-      else novasFalhas.dias = MENSAGENS.dias
+    if (rDays) {
+      if (rDays.data?.days) { setDays(rDays.data.days); guardar(chaves.dias, rDays.data.days) }
+      else newFailures.dias = MESSAGES.dias
     }
-    if (rExecutores) {
-      if (rExecutores.data?.executores) { setExecutores(rExecutores.data.executores); guardar(chaves.executores, rExecutores.data.executores) }
-      else novasFalhas.executores = MENSAGENS.executores
+    if (rExecutors) {
+      if (rExecutors.data?.executores) { setExecutors(rExecutors.data.executores); guardar(chaves.executores, rExecutors.data.executores) }
+      else newFailures.executores = MESSAGES.executores
     }
     if (rWorkflows) {
       if (rWorkflows.data?.workflows) { setWorkflows(rWorkflows.data.workflows); guardar(chaves.workflows, rWorkflows.data.workflows) }
-      else novasFalhas.workflows = MENSAGENS.workflows
+      else newFailures.workflows = MESSAGES.workflows
     }
 
     // The window label follows the data that arrived: if only the metrics
     // came, the cards are already for the new period and the chart is not yet —
     // the chart is flagged by the failure notice, not by the label.
-    if ((rMetrics?.data || rDias?.data?.days) || doCache.metrics || doCache.dias) setPeriodoDosDados(alvo.periodo)
-    setFalhas(novasFalhas)
-    setCarregando(false)
-  }, [tz, lerCache])
+    if ((rMetrics?.data || rDays?.data?.days) || doCache.metrics || doCache.dias) setDataPeriod(alvo.periodo)
+    setFailures(newFailures)
+    setLoading(false)
+  }, [tz, readCache])
 
   useEffect(() => {
     if (!habilitado) return
-    carregar(estadoRef.current, false)
+    carregar(stateRef.current, false)
     // Only (period, workspace, workflow) slice these four calls; the other
     // state fields (status, search, view) belong to the table.
   }, [habilitado, estado.periodo, estado.workspace, estado.workflow, carregar])
@@ -195,23 +195,23 @@ export function useHistoricoDados(
   useEffect(() => {
     if (!habilitado || intervaloDoAgoraMs <= 0) return
     let ultimo = Date.now()
-    async function atualizarAgora() {
-      const alvo = estadoRef.current
+    async function refreshNow() {
+      const alvo = stateRef.current
       const mine = seq.current
       ultimo = Date.now()
-      const res = await GisFlowService.getObservabilityMetrics(alvo.periodo, false, filtrosDeJanela(alvo))
+      const res = await GisFlowService.getObservabilityMetrics(alvo.periodo, false, windowFilters(alvo))
       if (mine !== seq.current || !res.data) return
       const ts = Date.now()
-      cache.current.set(chavesDeCache(alvo, tz).metrics, { valor: res.data, ts })
+      cache.current.set(cacheKeys(alvo, tz).metrics, { valor: res.data, ts })
       setMetrics(res.data)
     }
     const timer = setInterval(() => {
-      if (document.visibilityState === "visible") atualizarAgora()
+      if (document.visibilityState === "visible") refreshNow()
     }, intervaloDoAgoraMs)
     // Returning to the tab after a long time away: refreshes right away instead of
     // waiting for the next tick — but not on every alt-tab.
     const onVisibility = () => {
-      if (document.visibilityState === "visible" && Date.now() - ultimo >= intervaloDoAgoraMs) atualizarAgora()
+      if (document.visibilityState === "visible" && Date.now() - ultimo >= intervaloDoAgoraMs) refreshNow()
     }
     document.addEventListener("visibilitychange", onVisibility)
     return () => {
@@ -220,7 +220,7 @@ export function useHistoricoDados(
     }
   }, [habilitado, intervaloDoAgoraMs, tz])
 
-  const recarregar = useCallback(() => { carregar(estadoRef.current, true) }, [carregar])
+  const recarregar = useCallback(() => { carregar(stateRef.current, true) }, [carregar])
 
   return useMemo(() => ({
     metrics, dias, executores, workflows, carregando, periodoDosDados, falhas, recarregar,

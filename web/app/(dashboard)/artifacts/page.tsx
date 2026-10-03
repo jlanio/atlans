@@ -6,16 +6,16 @@ import PageRoot from "@/app/components/page-root"
 import { Button } from "@/app/components/ui/button"
 import { useWorkspace } from "@/context/WorkspaceContext"
 import { createToast } from "@/utils/createToast"
-import { formatarInteiro, plural } from "@/lib/formatos"
-import { CabecalhoDeArtefatos } from "@/app/components/artifacts/cabecalho"
-import { AbasDeArtefatos, BuscaDeArtefatos, FiltroDeFormato } from "@/app/components/artifacts/controles"
+import { formatInteger, plural } from "@/lib/formatos"
+import { ArtifactsHeader } from "@/app/components/artifacts/cabecalho"
+import { AbasDeArtefatos, ArtifactsSearch, FormatFilter } from "@/app/components/artifacts/controles"
 import { ArtifactTable } from "@/app/components/artifacts/tabela"
-import { ExcluirArtefatosDialog } from "@/app/components/artifacts/excluir-dialog"
+import { DeleteArtifactsDialog } from "@/app/components/artifacts/excluir-dialog"
 import {
   SkeletonDeArtefatos, ErroDeCarga, VazioPrimeiroUso, SemResultado, AvisoDeRecarga,
 } from "@/app/components/artifacts/estados"
 import {
-  useArtifactsQuery, idsSelecionadosVisiveis, type ArtifactTab,
+  useArtifactsQuery, visibleSelectedIds, type ArtifactTab,
 } from "./use-artifacts-query"
 
 type Tab = ArtifactTab
@@ -27,9 +27,9 @@ type Tab = ArtifactTab
  * has artifacts, none match), so we use a filter sentence. With a count,
  * "N … de execução".
  */
-function textoDoSubtitulo(tab: Tab, total: number, temRecorte: boolean): string {
+function textoDoSubtitulo(tab: Tab, total: number, isFiltered: boolean): string {
   if (total === 0) {
-    if (temRecorte) return "Nenhum resultado para o filtro"
+    if (isFiltered) return "Nenhum resultado para o filtro"
     return tab === "execution" ? "Nenhum artefato ainda" : "Nenhuma publicação ainda"
   }
   return tab === "execution"
@@ -87,16 +87,16 @@ export default function ArtifactsPage() {
    *  the selection with what is LOADED. That way the label never talks about
    *  artifacts the user is not seeing, and the deletion never reaches what
    *  left the screen through a scope change. */
-  const idsParaExcluir = useMemo(
-    () => idsSelecionadosVisiveis(items, selected),
+  const idsToDelete = useMemo(
+    () => visibleSelectedIds(items, selected),
     [items, selected],
   )
 
   // Name of the single target, so the dialog shows it in angle quotes.
   const nomeUnico = useMemo(() => {
-    if (idsParaExcluir.length !== 1) return null
-    return items.find(i => i.id_hash === idsParaExcluir[0])?.filename ?? null
-  }, [idsParaExcluir, items])
+    if (idsToDelete.length !== 1) return null
+    return items.find(i => i.id_hash === idsToDelete[0])?.filename ?? null
+  }, [idsToDelete, items])
 
   const toggleSelect = useCallback((id: string) => {
     setSelected(prev => {
@@ -111,11 +111,11 @@ export default function ArtifactsPage() {
    *  "all" that fits on screen. The delete button counts the whole Set. */
   const toggleAll = useCallback(() => {
     setSelected(prev => {
-      const idsNaTela = itemsRef.current.map(i => i.id_hash)
-      const todosMarcados = idsNaTela.length > 0 && idsNaTela.every(id => prev.has(id))
+      const visibleIds = itemsRef.current.map(i => i.id_hash)
+      const allChecked = visibleIds.length > 0 && visibleIds.every(id => prev.has(id))
       const next = new Set(prev)
-      for (const id of idsNaTela) {
-        if (todosMarcados) next.delete(id)
+      for (const id of visibleIds) {
+        if (allChecked) next.delete(id)
         else next.add(id)
       }
       return next
@@ -141,7 +141,7 @@ export default function ArtifactsPage() {
   // is async, it awaits, and the page only closes the dialog on success
   // (on error the dialog stays open to try again).
   async function handleBatchDelete() {
-    const alvos = idsParaExcluir
+    const alvos = idsToDelete
     if (alvos.length === 0) return
     try {
       // `deleteArtifact`/`batchDeleteArtifacts` do NOT throw: like every
@@ -187,20 +187,20 @@ export default function ArtifactsPage() {
   // ── State precedence (contract §3) ──────────────────────────────────────────
   // loading → error (only if there was never a load) → content. `atualizadoEm`
   // is the gate: while null, no load has succeeded.
-  const primeiraCarga = loading && atualizadoEm == null
-  const erroDeEspinha = !!erro && atualizadoEm == null
-  const temRecorte = debouncedSearch.length > 0 || formatFilter !== "all"
+  const initialLoad = loading && atualizadoEm == null
+  const initialLoadError = !!erro && atualizadoEm == null
+  const isFiltered = debouncedSearch.length > 0 || formatFilter !== "all"
 
   return (
     <PageRoot>
-      <CabecalhoDeArtefatos
+      <ArtifactsHeader
         // During ANY load (`loading`) the subtitle becomes a skeleton instead of
         // a stale/zeroed number — switching filter/tab zeroes `total` before the
         // response arrives, and showing "Nenhum artefato ainda" in that interval
         // was misleading (contract §3: loading takes precedence).
-        subtitulo={(atualizadoEm == null || loading) ? null : textoDoSubtitulo(tab, total, temRecorte)}
+        subtitulo={(atualizadoEm == null || loading) ? null : textoDoSubtitulo(tab, total, isFiltered)}
         atualizando={loading}
-        aExcluir={idsParaExcluir.length}
+        aExcluir={idsToDelete.length}
         podeExcluir={podeEditar}
         onAtualizar={reload}
         onExcluir={() => setDeleteOpen(true)}
@@ -210,13 +210,13 @@ export default function ArtifactsPage() {
           count only once there is a list to filter. */}
       <div className="flex flex-col gap-3">
         <AbasDeArtefatos tab={tab} total={total} onTab={switchTab} />
-        {!primeiraCarga && !erroDeEspinha && (
+        {!initialLoad && !initialLoadError && (
           <div className="flex flex-wrap items-center gap-3">
-            <BuscaDeArtefatos valor={search} onChange={setSearch} />
-            <FiltroDeFormato formatos={availableFormats} atual={formatFilter} onFormato={setFormatFilter} />
+            <ArtifactsSearch valor={search} onChange={setSearch} />
+            <FormatFilter formatos={availableFormats} atual={formatFilter} onFormato={setFormatFilter} />
             {!erro && total > 0 && (
               <span className="ml-auto text-xs tabular-nums text-muted-foreground">
-                {formatarInteiro(items.length)} de {tab === "execution" ? plural(total, "artefato") : plural(total, "publicação", "publicações")}
+                {formatInteger(items.length)} de {tab === "execution" ? plural(total, "artefato") : plural(total, "publicação", "publicações")}
               </span>
             )}
           </div>
@@ -232,14 +232,14 @@ export default function ArtifactsPage() {
           erasing the table. */}
       {loading ? (
         <SkeletonDeArtefatos />
-      ) : erroDeEspinha ? (
+      ) : initialLoadError ? (
         <ErroDeCarga mensagem={erro!} onTentar={reload} />
       ) : (
         <>
           {erro && <AvisoDeRecarga mensagem={erro} onTentar={reload} />}
 
           {items.length === 0 ? (
-            temRecorte ? (
+            isFiltered ? (
               <SemResultado q={debouncedSearch} formato={formatFilter} tab={tab} onLimpar={limparFiltros} />
             ) : (
               <VazioPrimeiroUso tab={tab} />
@@ -259,16 +259,16 @@ export default function ArtifactsPage() {
           {hasMore && (
             <div className="flex justify-center">
               <Button variant="outline" size="sm" onClick={loadMore} disabled={loadingMore} className="max-md:h-10">
-                {loadingMore ? "Carregando…" : `Ver mais (${formatarInteiro(total - items.length)} ${total - items.length === 1 ? "restante" : "restantes"})`}
+                {loadingMore ? "Carregando…" : `Ver mais (${formatInteger(total - items.length)} ${total - items.length === 1 ? "restante" : "restantes"})`}
               </Button>
             </div>
           )}
         </>
       )}
 
-      <ExcluirArtefatosDialog
+      <DeleteArtifactsDialog
         aberto={deleteOpen}
-        quantidade={idsParaExcluir.length}
+        quantidade={idsToDelete.length}
         nomeUnico={nomeUnico}
         onConfirmar={handleBatchDelete}
         onFechar={() => setDeleteOpen(false)}

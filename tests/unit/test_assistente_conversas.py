@@ -26,7 +26,7 @@ from app.models.user import User
 from app.services import assistente_conversas as svc
 from app.services import assistente_superficie as ag
 
-from ._mcp_harness import RedisFalso
+from ._mcp_harness import FakeRedis
 
 pytestmark = pytest.mark.asyncio
 
@@ -56,18 +56,18 @@ async def sessao():
 # ── Titulo ────────────────────────────────────────────────────────────────────
 
 
-async def test_titulo_automatico_corta_em_60_e_normaliza_espacos():
-    assert svc.titulo_automatico("  monta   um fluxo  ") == "monta um fluxo"
+async def test_automatic_title_cuts_at_60_and_normalizes_spaces():
+    assert svc.automatic_title("  monta   um fluxo  ") == "monta um fluxo"
     longa = "x" * 200
-    assert len(svc.titulo_automatico(longa)) == 60
-    assert svc.titulo_automatico("") == "Nova conversa"
+    assert len(svc.automatic_title(longa)) == 60
+    assert svc.automatic_title("") == "Nova conversa"
 
 
 # ── Round-trip with the project's blocks ─────────────────────────────────────
 
 
-async def test_transcrito_round_trip_preserva_os_blocos_e_o_raciocinio(sessao):
-    conv = await svc.criar_conversa(sessao, user_id=USUARIO, titulo="t")
+async def test_transcript_round_trip_preserves_the_blocks_and_the_reasoning(sessao):
+    conv = await svc.create_conversation(sessao, user_id=USUARIO, titulo="t")
     # The blocks as the model client reassembles them and the loop writes them.
     blocos = [
         {
@@ -80,37 +80,37 @@ async def test_transcrito_round_trip_preserva_os_blocos_e_o_raciocinio(sessao):
         {"type": "text", "text": "vou montar"},
         {"type": "tool_use", "id": "tu-1", "name": "search_nodes", "input": {"query": "buffer"}},
     ]
-    await svc.anexar_mensagens(
+    await svc.append_messages(
         sessao,
         conv.id_hash,
         [
             {"role": "user", "content": "monta um fluxo"},
             {"role": "assistant", "content": blocos},
         ],
-        ordem_inicial=0,
+        initial_order=0,
     )
 
-    transcrito = await svc.transcrito_de(sessao, conv.id_hash)
+    transcrito = await svc.transcript_of(sessao, conv.id_hash)
 
     # Serializable (Redis/JSON require it), and the format the client translates on the way out.
     json.dumps(transcrito)
     assert transcrito[0] == {"role": "user", "content": "monta um fluxo"}
-    saidos = transcrito[1]["content"]
-    pensamento = next(b for b in saidos if b["type"] == "thinking")
+    outgoing = transcrito[1]["content"]
+    thinking = next(b for b in outgoing if b["type"] == "thinking")
     # The reasoning SURVIVED the database, verbatim — it is what goes back to the provider.
-    assert pensamento["reasoning_details"][0]["signature"] == "assin-123"
-    assert pensamento["thinking"] == "preciso do catalogo"
+    assert thinking["reasoning_details"][0]["signature"] == "assin-123"
+    assert thinking["thinking"] == "preciso do catalogo"
 
 
-async def test_replay_com_blocos_reais_tem_vocabulario_e_nao_vaza_tool_result(sessao):
-    conv = await svc.criar_conversa(sessao, user_id=USUARIO, titulo="t")
+async def test_replay_with_real_blocks_has_vocabulary_and_does_not_leak_tool_result(sessao):
+    conv = await svc.create_conversation(sessao, user_id=USUARIO, titulo="t")
     conv.tokens_total = 99
     await sessao.commit()
     assistente = [
         {"type": "text", "text": "pronto"},
         {"type": "tool_use", "id": "tu-1", "name": "run_workflow", "input": {"workflow_id": "wf-1"}},
     ]
-    await svc.anexar_mensagens(
+    await svc.append_messages(
         sessao,
         conv.id_hash,
         [
@@ -118,11 +118,11 @@ async def test_replay_com_blocos_reais_tem_vocabulario_e_nao_vaza_tool_result(se
             {"role": "assistant", "content": assistente},
             {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "tu-1", "content": "{}", "is_error": False}]},
         ],
-        ordem_inicial=0,
+        initial_order=0,
     )
 
-    quadros = await svc.quadros_do_replay(
-        sessao, conv.id_hash, redis=RedisFalso(), user_id=USUARIO, tokens_total=conv.tokens_total
+    quadros = await svc.replay_frames(
+        sessao, conv.id_hash, redis=FakeRedis(), user_id=USUARIO, tokens_total=conv.tokens_total
     )
 
     tipos = [q["tipo"] for q in quadros]
@@ -134,52 +134,52 @@ async def test_replay_com_blocos_reais_tem_vocabulario_e_nao_vaza_tool_result(se
 # ── Confirmacao ───────────────────────────────────────────────────────────────
 
 
-async def test_consumir_confirmacao_e_one_shot():
-    redis = RedisFalso()
+async def test_consuming_confirmation_is_one_shot():
+    redis = FakeRedis()
     chave = ag.chave_de_confirmacao(USUARIO, "conv-1", "tu-1")
     redis.dados[chave] = json.dumps({"token": "t", "tool": "delete_schedule", "args": {}})
 
-    ler = await svc.ler_confirmacao(redis, USUARIO, "conv-1", "tu-1")
+    ler = await svc.read_confirmation(redis, USUARIO, "conv-1", "tu-1")
     assert ler["token"] == "t"
     # O primeiro consumo vence; o segundo perde a corrida.
-    assert await svc.consumir_confirmacao(redis, USUARIO, "conv-1", "tu-1") is True
-    assert await svc.consumir_confirmacao(redis, USUARIO, "conv-1", "tu-1") is False
+    assert await svc.consume_confirmation(redis, USUARIO, "conv-1", "tu-1") is True
+    assert await svc.consume_confirmation(redis, USUARIO, "conv-1", "tu-1") is False
     assert chave not in redis.dados
 
 
-async def test_carregar_conversa_alheia_ou_apagada_e_404(sessao):
-    minha = await svc.criar_conversa(sessao, user_id=USUARIO, titulo="minha")
-    alheia = await svc.criar_conversa(sessao, user_id="outro", titulo="alheia")
+async def test_loading_foreign_or_deleted_conversation_is_404(sessao):
+    minha = await svc.create_conversation(sessao, user_id=USUARIO, titulo="minha")
+    alheia = await svc.create_conversation(sessao, user_id="outro", titulo="alheia")
 
     # A minha carrega.
-    assert (await svc.carregar_conversa_da_pessoa(sessao, USUARIO, minha.id_hash)).id_hash == minha.id_hash
+    assert (await svc.load_user_conversation(sessao, USUARIO, minha.id_hash)).id_hash == minha.id_hash
     # Someone else's is 404 (not 403: it doesn't reveal that the id exists).
     with pytest.raises(HTTPException) as exc:
-        await svc.carregar_conversa_da_pessoa(sessao, USUARIO, alheia.id_hash)
+        await svc.load_user_conversation(sessao, USUARIO, alheia.id_hash)
     assert exc.value.status_code == 404
     # A deleted one disappears.
-    await svc.apagar_conversa(sessao, USUARIO, minha.id_hash)
+    await svc.delete_conversation(sessao, USUARIO, minha.id_hash)
     with pytest.raises(HTTPException) as exc2:
-        await svc.carregar_conversa_da_pessoa(sessao, USUARIO, minha.id_hash)
+        await svc.load_user_conversation(sessao, USUARIO, minha.id_hash)
     assert exc2.value.status_code == 404
 
 
 # ── Replay rebuilds the `exibir_no_globo` layer ───────────────────────────────
 
 
-async def test_replay_reconstroi_a_camada_de_exibir_no_globo(sessao):
+async def test_replay_rebuilds_the_show_on_globe_layer(sessao):
     """Reopening the chat has to bring the layer back to the globe.
 
     The `camada` frame was emitted inline by the local executor: it showed up in
     the SSE and vanished on replay, which only re-runs `quadros_extras`. Now it is
     born from the arguments, and a single path serves both.
     """
-    conv = await svc.criar_conversa(sessao, user_id=USUARIO, titulo="t")
+    conv = await svc.create_conversation(sessao, user_id=USUARIO, titulo="t")
     chamada = {
         "type": "tool_use", "id": "tu-globo", "name": ag.NOME_DO_GLOBO,
         "input": {"artifact_id": "art-9", "nome": "Focos"},
     }
-    await svc.anexar_mensagens(
+    await svc.append_messages(
         sessao,
         conv.id_hash,
         [
@@ -187,11 +187,11 @@ async def test_replay_reconstroi_a_camada_de_exibir_no_globo(sessao):
             {"role": "assistant", "content": [chamada]},
             {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "tu-globo", "content": "ok", "is_error": False}]},
         ],
-        ordem_inicial=0,
+        initial_order=0,
     )
 
-    quadros = await svc.quadros_do_replay(
-        sessao, conv.id_hash, redis=RedisFalso(), user_id=USUARIO, tokens_total=0
+    quadros = await svc.replay_frames(
+        sessao, conv.id_hash, redis=FakeRedis(), user_id=USUARIO, tokens_total=0
     )
 
     camadas = [q for q in quadros if q["tipo"] == "camada"]
@@ -202,22 +202,22 @@ async def test_replay_reconstroi_a_camada_de_exibir_no_globo(sessao):
 # ── Transcript order and closing ─────────────────────────────────────────────
 
 
-async def test_proxima_ordem_e_max_mais_um(sessao):
-    conv = await svc.criar_conversa(sessao, user_id=USUARIO, titulo="t")
-    assert await svc.proxima_ordem(sessao, conv.id_hash) == 0
+async def test_next_order_is_max_plus_one(sessao):
+    conv = await svc.create_conversation(sessao, user_id=USUARIO, titulo="t")
+    assert await svc.next_order(sessao, conv.id_hash) == 0
 
     sessao.add(Mensagem(conversa_id=conv.id_hash, ordem=0, papel="user", blocos="a"))
     sessao.add(Mensagem(conversa_id=conv.id_hash, ordem=9, papel="user", blocos="b"))
     await sessao.commit()
 
     # The count would be 2 — and would collide with order 0, already used.
-    assert await svc.proxima_ordem(sessao, conv.id_hash) == 10
+    assert await svc.next_order(sessao, conv.id_hash) == 10
 
 
-async def test_transcrito_fecha_tool_use_orfao_e_pode_persistir_o_fecho(sessao):
+async def test_transcript_closes_orphan_tool_use_and_can_persist_the_closing(sessao):
     """An unpaired `tool_use` makes the API reject the whole conversation. Closed on READ."""
-    conv = await svc.criar_conversa(sessao, user_id=USUARIO, titulo="t")
-    await svc.anexar_mensagens(
+    conv = await svc.create_conversation(sessao, user_id=USUARIO, titulo="t")
+    await svc.append_messages(
         sessao,
         conv.id_hash,
         [
@@ -226,27 +226,27 @@ async def test_transcrito_fecha_tool_use_orfao_e_pode_persistir_o_fecho(sessao):
                 {"type": "tool_use", "id": "tu-orfa", "name": "run_workflow", "input": {}}
             ]},
         ],
-        ordem_inicial=0,
+        initial_order=0,
     )
 
     # Leitura pura: fecha em memoria e NAO grava nada.
-    somente_leitura = await svc.transcrito_de(sessao, conv.id_hash)
+    somente_leitura = await svc.transcript_of(sessao, conv.id_hash)
     assert somente_leitura[-1]["content"][0]["tool_use_id"] == "tu-orfa"
-    assert await svc.proxima_ordem(sessao, conv.id_hash) == 2
+    assert await svc.next_order(sessao, conv.id_hash) == 2
 
     # To RESUME, the closing has to go to the database: otherwise the new message would
     # land after the orphan and the next read would no longer close anything.
-    await svc.transcrito_de(sessao, conv.id_hash, persistir_fecho=True)
-    assert await svc.proxima_ordem(sessao, conv.id_hash) == 3
+    await svc.transcript_of(sessao, conv.id_hash, persist_closing=True)
+    assert await svc.next_order(sessao, conv.id_hash) == 3
     # Idempotent: already closed, does not write again.
-    await svc.transcrito_de(sessao, conv.id_hash, persistir_fecho=True)
-    assert await svc.proxima_ordem(sessao, conv.id_hash) == 3
+    await svc.transcript_of(sessao, conv.id_hash, persist_closing=True)
+    assert await svc.next_order(sessao, conv.id_hash) == 3
 
 
 # ── Rastro auditavel: o workspace da linha ────────────────────────────────────
 
 
-async def _fluxo(sessao, hash_, workspace, *, deleted_at=None):
+async def _workflow(sessao, hash_, workspace, *, deleted_at=None):
     sessao.add(Workflow(
         id_hash=hash_, name=hash_, workspace_id=workspace, deleted_at=deleted_at,
         definition={"nodes": [], "edges": []}, flag_ative=True,
@@ -254,8 +254,8 @@ async def _fluxo(sessao, hash_, workspace, *, deleted_at=None):
     await sessao.commit()
 
 
-async def _auditar(sessao, *, workflow_id, workspace_ids, padrao="ws-da-conversa"):
-    await svc.registrar_acao_confirmada(
+async def _audit(sessao, *, workflow_id, workspace_ids, padrao="ws-da-conversa"):
+    await svc.record_confirmed_action(
         sessao,
         user_id=USUARIO,
         conversa_id="conv-1",
@@ -264,29 +264,29 @@ async def _auditar(sessao, *, workflow_id, workspace_ids, padrao="ws-da-conversa
         tool_use_id=f"tu-{workflow_id}",
         decisao="confirmar",
         erro=False,
-        workspace_padrao=padrao,
+        default_workspace=padrao,
         workspace_ids=workspace_ids,
     )
 
 
-async def test_alvo_fora_do_alcance_nao_escreve_na_trilha_alheia(sessao):
+async def test_target_out_of_reach_does_not_write_to_another_trail(sessao):
     """The `workflow_id` comes from the stored args: resolving its workspace without
     scoping put the `AuditEvent` in the trail of a workspace the person isn't even
     a member of — and hid the record from whoever should see it."""
-    await _fluxo(sessao, "wf-alheio", "ws-alheio")
-    await _fluxo(sessao, "wf-meu", "ws-b")
-    await _fluxo(sessao, "wf-lixeira", "ws-b", deleted_at=svc.utc_now_naive())
+    await _workflow(sessao, "wf-alheio", "ws-alheio")
+    await _workflow(sessao, "wf-meu", "ws-b")
+    await _workflow(sessao, "wf-lixeira", "ws-b", deleted_at=svc.utc_now_naive())
 
     alcance = ["ws-da-conversa", "ws-b"]
-    await _auditar(sessao, workflow_id="wf-alheio", workspace_ids=alcance)
-    await _auditar(sessao, workflow_id="wf-meu", workspace_ids=alcance)
-    await _auditar(sessao, workflow_id="wf-lixeira", workspace_ids=alcance)
+    await _audit(sessao, workflow_id="wf-alheio", workspace_ids=alcance)
+    await _audit(sessao, workflow_id="wf-meu", workspace_ids=alcance)
+    await _audit(sessao, workflow_id="wf-lixeira", workspace_ids=alcance)
 
-    trilhas = {
+    trails = {
         e.details["argumentos"]["workflow_id"]: e.workspace_id
         for e in (await sessao.execute(select(AuditEvent))).scalars().all()
     }
-    assert trilhas == {
+    assert trails == {
         # Out of reach: falls back to the CONVERSATION's workspace, never the target's.
         "wf-alheio": "ws-da-conversa",
         # Within reach: the workflow's own trail.
@@ -296,12 +296,12 @@ async def test_alvo_fora_do_alcance_nao_escreve_na_trilha_alheia(sessao):
     }
 
 
-async def test_tokens_total_soma_e_ignora_none(sessao):
-    conv = await svc.criar_conversa(sessao, user_id=USUARIO, titulo="t")
+async def test_tokens_total_sums_and_ignores_none(sessao):
+    conv = await svc.create_conversation(sessao, user_id=USUARIO, titulo="t")
 
-    await svc.tocar_conversa(sessao, conv.id_hash, tokens_total=1_000)
-    await svc.tocar_conversa(sessao, conv.id_hash, tokens_total=500)
-    await svc.tocar_conversa(sessao, conv.id_hash, tokens_total=None)
+    await svc.touch_conversation(sessao, conv.id_hash, tokens_total=1_000)
+    await svc.touch_conversation(sessao, conv.id_hash, tokens_total=500)
+    await svc.touch_conversation(sessao, conv.id_hash, tokens_total=None)
 
     await sessao.refresh(conv)
     assert conv.tokens_total == 1_500
@@ -310,15 +310,15 @@ async def test_tokens_total_soma_e_ignora_none(sessao):
 # ── Replay rebuilds the `sugerir_respostas` chips ─────────────────────────────
 
 
-async def test_replay_reconstroi_as_respostas_rapidas_de_sugerir_respostas(sessao):
+async def test_replay_rebuilds_the_quick_replies_from_suggest_replies(sessao):
     """Reopening the chat brings back the chips of the last turn — through the SAME
     `quadros_extras` of the loop, from the stored (cleaned) arguments."""
-    conv = await svc.criar_conversa(sessao, user_id=USUARIO, titulo="t")
+    conv = await svc.create_conversation(sessao, user_id=USUARIO, titulo="t")
     chamada = {
         "type": "tool_use", "id": "tu-chips", "name": ag.NOME_DAS_RESPOSTAS,
         "input": {"opcoes": ["  Só os últimos 7 dias ", "Cruzar com o CAR", "Cruzar com o CAR"]},
     }
-    await svc.anexar_mensagens(
+    await svc.append_messages(
         sessao,
         conv.id_hash,
         [
@@ -326,11 +326,11 @@ async def test_replay_reconstroi_as_respostas_rapidas_de_sugerir_respostas(sessa
             {"role": "assistant", "content": [{"type": "text", "text": "Achei 128 focos."}, chamada]},
             {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "tu-chips", "content": "ok", "is_error": False}]},
         ],
-        ordem_inicial=0,
+        initial_order=0,
     )
 
-    quadros = await svc.quadros_do_replay(
-        sessao, conv.id_hash, redis=RedisFalso(), user_id=USUARIO, tokens_total=0
+    quadros = await svc.replay_frames(
+        sessao, conv.id_hash, redis=FakeRedis(), user_id=USUARIO, tokens_total=0
     )
 
     tipos = [q["tipo"] for q in quadros]

@@ -17,38 +17,38 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import get_db, get_user_workspace_ids
 from app.core.rate_limiter import limiter
 from app.models.models import Schedule, Workflow
-from app.schemas.me import AgendamentoMeu
-from app.services.schedule_service import listar_agendamentos_de
+from app.schemas.me import MySchedule
+from app.services.schedule_service import list_schedules_for
 
 router = APIRouter(prefix="/me", tags=["me"])
 
 # The same ceiling as the Home collection (`useAcervo`): the sidebar panel does not
 # virtualize, and a large installation would return hundreds of rows per response.
-LIMITE_PADRAO = 200
-LIMITE_MAXIMO = 500
+DEFAULT_LIMIT = 200
+MAX_LIMIT = 500
 
 
-class AgendamentosMeus(BaseModel):
-    """Page + TOTAL, the same envelope as `ConversaLista` (`GET /assistente/conversas`).
+class MySchedules(BaseModel):
+    """Page + TOTAL, the same envelope as `ConversationList` (`GET /assistente/conversas`).
 
     The ceiling alone truncated silently: the web received 200 rows and had no way
     to know there were more. With the total it draws the "Ver mais" (See more)
     footer — and the response pattern of the Home lists (Chats, Collection) becomes one.
     """
 
-    itens: List[AgendamentoMeu]
+    itens: List[MySchedule]
     total: int
 
 
 @router.get(
     "/schedules",
-    response_model=AgendamentosMeus,
+    response_model=MySchedules,
     summary="Agendamentos da pessoa, entre todos os seus workspaces",
 )
 @limiter.limit("60/minute")
 async def meus_agendamentos(
     request: Request,
-    limit: int = LIMITE_PADRAO,
+    limit: int = DEFAULT_LIMIT,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
     workspace_ids: List[str] = Depends(get_user_workspace_ids),
@@ -60,19 +60,19 @@ async def meus_agendamentos(
     Paginated and with a limiter because it was the only new listing without a ceiling:
     Chats cuts at 50, Collection at 200, and this one returned the workspaces' entire
     table. The `total` comes along with the page so the ceiling stops being an
-    invisible truncation — see `AgendamentosMeus`."""
-    itens = await listar_agendamentos_de(
+    invisible truncation — see `MySchedules`."""
+    itens = await list_schedules_for(
         db,
         workspace_ids,
-        limit=max(1, min(int(limit), LIMITE_MAXIMO)),
+        limit=max(1, min(int(limit), MAX_LIMIT)),
         offset=max(0, int(offset)),
     )
-    return AgendamentosMeus(itens=itens, total=await _contar_agendamentos(db, workspace_ids))
+    return MySchedules(itens=itens, total=await _count_schedules(db, workspace_ids))
 
 
-async def _contar_agendamentos(db: AsyncSession, workspace_ids: List[str]) -> int:
+async def _count_schedules(db: AsyncSession, workspace_ids: List[str]) -> int:
     """How many schedules the page slices — the SAME filter as
-    `listar_agendamentos_de` (JOIN with Workflow, not deleted, the actor's workspace).
+    `list_schedules_for` (JOIN with Workflow, not deleted, the actor's workspace).
 
     The count lives here, and not in the service, because it is the ROUTE's
     envelope that asks for it; the filter is short enough to be repeated without

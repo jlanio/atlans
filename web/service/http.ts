@@ -59,7 +59,7 @@ export function qs(params: Record<string, string | number | boolean | undefined 
  * The window is strictly "while the request is in flight": nothing is
  * memoized after it responds, so the next read is always fresh.
  */
-const getsEmVoo = new Map<string, Promise<unknown>>()
+const getsInFlight = new Map<string, Promise<unknown>>()
 
 /**
  * Write epoch: incremented BEFORE and AFTER every mutation, and used as the
@@ -85,16 +85,16 @@ let epocaEscrita = 0
 // lib/respostas.ts).
 export function get<T>(url: string): Promise<IResponse<T>> {
   const chave = `${epocaEscrita}|${url}`
-  const emAndamento = getsEmVoo.get(chave)
-  if (emAndamento) return emAndamento as Promise<IResponse<T>>
+  const inProgress = getsInFlight.get(chave)
+  if (inProgress) return inProgress as Promise<IResponse<T>>
 
   const requisicao = (async () => {
     try { return resolveResponse((await axios.get(`${API_URL}${url}`)).data) as IResponse<T> }
     catch (e) { return resolveAxiosError(e as AxiosError) as IResponse<T> }
-    finally { getsEmVoo.delete(chave) }
+    finally { getsInFlight.delete(chave) }
   })()
 
-  getsEmVoo.set(chave, requisicao)
+  getsInFlight.set(chave, requisicao)
   return requisicao
 }
 
@@ -134,7 +134,7 @@ export function del(url: string): Promise<IResponse<undefined>> {
 /** DELETE that preserves the response body. Same as `del`, and likewise
  *  wrapped by `mutar` — it exists because some DELETEs return a payload and
  *  reimplementing them by hand left them outside the write epoch. */
-export function delComRetorno<T>(url: string): Promise<IResponse<T>> {
+export function delWithResponse<T>(url: string): Promise<IResponse<T>> {
   return mutar(async () => {
     try { return resolveResponse((await axios.delete(`${API_URL}${url}`)).data) as IResponse<T> }
     catch (e) { return resolveAxiosError(e as AxiosError) as IResponse<T> }

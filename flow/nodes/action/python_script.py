@@ -42,7 +42,7 @@ _SCRIPT_POOL = ThreadPoolExecutor(
 )
 
 
-class _ScriptInterrompido(BaseException):
+class _ScriptInterrupted(BaseException):
     """Injected into the script's thread when the time limit expires.
 
     Subclass of BaseException — not of Exception — to survive an
@@ -52,7 +52,7 @@ class _ScriptInterrompido(BaseException):
 
 
 def _interromper_thread(future: "Future", ident: Optional[int]) -> bool:
-    """Best-effort: injects _ScriptInterrompido into the script's thread on timeout.
+    """Best-effort: injects _ScriptInterrupted into the script's thread on timeout.
 
     `asyncio.wait_for` only cancels the WAIT; the exec() thread keeps running.
     For the common case of a pure-Python loop (`while True: x = 1`) this injection
@@ -72,21 +72,21 @@ def _interromper_thread(future: "Future", ident: Optional[int]) -> bool:
     """
     if ident is None or future.done():
         return False
-    armadas = ctypes.pythonapi.PyThreadState_SetAsyncExc(
-        ctypes.c_long(ident), ctypes.py_object(_ScriptInterrompido)
+    armed = ctypes.pythonapi.PyThreadState_SetAsyncExc(
+        ctypes.c_long(ident), ctypes.py_object(_ScriptInterrupted)
     )
-    if armadas > 1:
+    if armed > 1:
         # Should never happen (the ident is unique); if it does, undo it so as
         # not to leave the exception pending in the wrong thread.
         ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(ident), None)
         return False
-    return armadas == 1
+    return armed == 1
 
 
-def _descartar_future(f: "Future") -> None:
+def _discard_future(f: "Future") -> None:
     """Consumes the result/exception of an orphaned future (after the timeout).
 
-    Without this, the _ScriptInterrompido that the injection puts in the future
+    Without this, the _ScriptInterrupted that the injection puts in the future
     would become "Future exception was never retrieved" in the executor's log.
     """
     try:
@@ -106,7 +106,7 @@ _STDOUT_FLUSH_SECONDS = 0.2
 _STDOUT_FLUSH_LINES = 200
 # The batch's BYTE budget — and it closes BEFORE the line ceiling.
 # Counting only lines was not enough: a node_event above 64 KB
-# (TETO_NODE_EVENT_BYTES in flow/utils/publisher/reducao.py, the single rule for
+# (NODE_EVENT_BYTES_CEILING in flow/utils/publisher/reducao.py, the single rule for
 # the executor and the server) is reduced, and of the lines only the prefix that
 # fits remains — the panel lost the ENTIRE batch, silently, whenever lines were
 # long (`for r in gdf.itertuples(): print(r)`, `print(json.dumps(feature))`).
@@ -152,15 +152,15 @@ class _LoggingStream(io.TextIOBase):
         self._lock = threading.Lock()
         self._buffer: List[str] = []
         # Bytes of text already accumulated in the current batch (see _STDOUT_FLUSH_BYTES).
-        self._bytes_lote = 0
+        self._batch_bytes = 0
         self._timer: threading.Timer | None = None
-        self._publicadas = 0
-        self._truncado = False
+        self._published = 0
+        self._truncated = False
 
     # ── Buffer ───────────────────────────────────────────────────────────────
 
     @staticmethod
-    def _cortar_linha(line: str) -> str:
+    def _truncate_line(line: str) -> str:
         """Truncates a single line too large to fit in a frame.
 
         Without this, a single `print()` of a GeoJSON takes the whole batch with it:
@@ -180,23 +180,23 @@ class _LoggingStream(io.TextIOBase):
             return
         # The local log (above) receives the ENTIRE line; only what goes to the panel
         # is cut.
-        linha = self._cortar_linha(line)
+        linha = self._truncate_line(line)
         with self._lock:
             self._buffer.append(linha)
-            self._bytes_lote += len(linha)
+            self._batch_bytes += len(linha)
             # Bytes first: it's the criterion that prevents the total loss of the batch.
             cheio = (
-                self._bytes_lote >= _STDOUT_FLUSH_BYTES
+                self._batch_bytes >= _STDOUT_FLUSH_BYTES
                 or len(self._buffer) >= _STDOUT_FLUSH_LINES
             )
             if not cheio and self._timer is None:
-                self._timer = threading.Timer(_STDOUT_FLUSH_SECONDS, self._flush_lote)
+                self._timer = threading.Timer(_STDOUT_FLUSH_SECONDS, self._flush_batch)
                 self._timer.daemon = True
                 self._timer.start()
         if cheio:
-            self._flush_lote()
+            self._flush_batch()
 
-    def _flush_lote(self) -> None:
+    def _flush_batch(self) -> None:
         """Closes the current batch and publishes it. Called by the script's thread or by the timer.
 
         Publishes INSIDE the lock: two threads produce batches (the script's,
@@ -212,23 +212,23 @@ class _LoggingStream(io.TextIOBase):
                 return
             lote = self._buffer
             self._buffer = []
-            self._bytes_lote = 0
-            restante = _STDOUT_MAX_LINES - self._publicadas
+            self._batch_bytes = 0
+            restante = _STDOUT_MAX_LINES - self._published
             if restante <= 0:
-                if self._truncado:
+                if self._truncated:
                     return
-                self._truncado = True
-                lote = [self._aviso_de_truncagem()]
+                self._truncated = True
+                lote = [self._truncation_notice()]
             elif len(lote) > restante:
-                self._truncado = True
-                lote = lote[:restante] + [self._aviso_de_truncagem()]
-                self._publicadas = _STDOUT_MAX_LINES
+                self._truncated = True
+                lote = lote[:restante] + [self._truncation_notice()]
+                self._published = _STDOUT_MAX_LINES
             else:
-                self._publicadas += len(lote)
+                self._published += len(lote)
             self._publish_fn(lote)  # type: ignore[misc]
 
     @staticmethod
-    def _aviso_de_truncagem() -> str:
+    def _truncation_notice() -> str:
         return (
             f"[saída truncada: o nó passou de {_STDOUT_MAX_LINES} linhas impressas; "
             "o restante continua apenas no log do executor]"
@@ -249,7 +249,7 @@ class _LoggingStream(io.TextIOBase):
         if self._partial.strip():
             self._emit(self._partial)
         self._partial = ""
-        self._flush_lote()
+        self._flush_batch()
 
 
 def _run_script(
@@ -270,7 +270,7 @@ def _run_script(
         exec(compile(code, "<PythonScript>", "exec"), namespace)  # noqa: S102
     finally:
         # Restores stdout BEFORE the flush: if the timeout's asynchronous
-        # interruption (_ScriptInterrompido) lands in this finally, the global
+        # interruption (_ScriptInterrupted) lands in this finally, the global
         # stdout is already back to normal — it never stays stuck on the node's
         # dead stream. The flush operates on `stream` itself, not on sys.stdout,
         # so the order doesn't change what is published; at most the last batch
@@ -418,23 +418,23 @@ class PythonScript(BaseNode):
         # The script's thread is NOT cancelable: on timeout there's no way to stop it.
         # That's why (a) we run on _SCRIPT_POOL, which isolates the damage of a stuck
         # loop from the other nodes, and (b) we capture the thread's ident to inject
-        # _ScriptInterrompido and try to return the worker to the pool.
+        # _ScriptInterrupted and try to return the worker to the pool.
         loop = asyncio.get_running_loop()
-        estado_thread: Dict[str, int] = {}
+        thread_state: Dict[str, int] = {}
 
         def _executar_script() -> None:
-            estado_thread["ident"] = threading.get_ident()
-            stdout_antes = sys.stdout
+            thread_state["ident"] = threading.get_ident()
+            stdout_before = sys.stdout
             try:
                 _run_script(code, namespace, self.log, _publish_print)
             finally:
-                # Safety net: if _ScriptInterrompido lands in _run_script's finally
+                # Safety net: if _ScriptInterrupted lands in _run_script's finally
                 # before stdout is restored, it is restored here. At this
                 # point the asynchronous exception has already been consumed (it fires
                 # only once), so this finally runs in full, with no risk of another
                 # interruption — the global stdout never stays stuck on the node's stream.
-                if sys.stdout is not stdout_antes:
-                    sys.stdout = stdout_antes
+                if sys.stdout is not stdout_before:
+                    sys.stdout = stdout_before
 
         future = loop.run_in_executor(_SCRIPT_POOL, _executar_script)
         # Do NOT use asyncio.wait_for: on timeout it tries to CANCEL the future and,
@@ -447,13 +447,13 @@ class PythonScript(BaseNode):
             # add_done_callback only here: only the orphan path (thread still
             # alive) needs to discard the exception — on the normal path the
             # future.exception() below already consumes it.
-            future.add_done_callback(_descartar_future)
-            liberou = _interromper_thread(future, estado_thread.get("ident"))
+            future.add_done_callback(_discard_future)
+            released = _interromper_thread(future, thread_state.get("ident"))
             self.log(
                 "Tempo limite excedido. "
                 + (
                     "Thread do script interrompida; worker devolvido ao pool."
-                    if liberou
+                    if released
                     else "A thread pode seguir presa (codigo em extensao C ou I/O); "
                     "o worker so volta ao reiniciar o executor."
                 )

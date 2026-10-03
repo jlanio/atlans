@@ -34,7 +34,7 @@ def _gdf(cats):
 
 # ── Switch emits all buckets ──────────────────────────────────────────────────
 
-def test_switch_emite_todos_os_baldes_declarados_mesmo_vazios():
+def test_switch_emits_all_declared_buckets_even_empty():
     # Rules send to output_1 and output_2; the data only matches output_1. output_0
     # (fallback) and output_2 must exist EMPTY in the result, not disappear.
     sw = Switch(node_id="s", parameters={
@@ -56,7 +56,7 @@ def _node(nid, name="Merge", ntype="control", **props):
     return {"id": nid, "type": ntype, "name": name, "properties": props or {"strategy": "first"}}
 
 
-def test_from_key_para_balde_vazio_do_switch_nao_cruza_dados():
+def test_from_key_to_empty_switch_bucket_does_not_cross_data():
     # A consumer wired to output_2 (empty) must NOT receive the records from
     # output_1. Before: missing from_key → first value → data from output_1.
     definition = {
@@ -78,9 +78,9 @@ def test_from_key_para_balde_vazio_do_switch_nao_cruza_dados():
     }
     ex = WorkflowExecutor(definition, task_id="f5", publisher=_publisher())
     final = asyncio.run(ex.run(initial_inputs={"T": {"output": _gdf("AAA")}}))  # nada casa output_2
-    saida_d = final["D"].get("output")
+    output_d = final["D"].get("output")
     # D received the empty bucket (0 features), NOT the 3 records from output_1.
-    assert saida_d is not None and len(saida_d) == 0
+    assert output_d is not None and len(output_d) == 0
 
 
 # ── skipped parent with from_key does not inject None (F14) ───────────────────
@@ -90,7 +90,7 @@ def _branch(nid):
             "properties": {"metric": "count", "operator": ">", "compareTo": "1"}}
 
 
-def test_pai_skipado_com_from_key_nao_injeta_none_no_merge():
+def test_skipped_parent_with_from_key_does_not_inject_none_into_merge():
     #   T → A(Conditional, branch=True)
     #        ├true→ V ─(from_key output)→ D
     #        └false→ C ─(from_key output)→ D   (C skipped)

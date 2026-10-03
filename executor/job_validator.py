@@ -179,7 +179,7 @@ class JobValidationError(Exception):
 # WARNING line per job and drown the log precisely when the operator needs to
 # read it.
 _SKEW_WARN_INTERVAL_SECONDS = 300.0
-# None = never warned. Anchoring at 0.0 made `agora_mono - 0.0 < 300` swallow the
+# None = never warned. Anchoring at 0.0 made `now_mono - 0.0 < 300` swallow the
 # FIRST warning while the host had less than 5 min of uptime — on Linux
 # `time.monotonic()` is the machine's uptime. In other words, the warning vanished
 # precisely in the scenario where it matters: a container starting on a freshly
@@ -213,13 +213,13 @@ def _warn_on_clock_skew(now_utc: datetime, issued_at: datetime) -> None:
     skew = (now_utc - issued_at).total_seconds()
     if abs(skew) <= _CLOCK_SKEW_TOLERANCE_SECONDS:
         return
-    agora_mono = time.monotonic()
+    now_mono = time.monotonic()
     if (
         _last_skew_warn_monotonic is not None
-        and agora_mono - _last_skew_warn_monotonic < _SKEW_WARN_INTERVAL_SECONDS
+        and now_mono - _last_skew_warn_monotonic < _SKEW_WARN_INTERVAL_SECONDS
     ):
         return
-    _last_skew_warn_monotonic = agora_mono
+    _last_skew_warn_monotonic = now_mono
     logger.warning(
         "Relógio local diverge do servidor em %.0fs (%s) — tolerância %ds, "
         "teto rígido %ds. Ainda estamos aceitando envelopes, mas corrija o NTP "

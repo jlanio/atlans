@@ -153,7 +153,7 @@ def _id_do_path(path: str) -> str:
 
 
 def _resolve_do_manifesto_de_sync(
-    id_hash: str, dono_id: str, ext: str, original_name: str,
+    id_hash: str, owner_id: str, ext: str, original_name: str,
 ) -> tuple[str, str, str]:
     """Finds a cataloged dataset by scanning the manifests of the sync folders.
 
@@ -174,7 +174,7 @@ def _resolve_do_manifesto_de_sync(
     if not pastas:
         raise FileNotFoundError(
             f"O arquivo '{original_name}' esta catalogado no executor "
-            f"{dono_id or 'de origem'}, mas esta maquina nao tem nenhuma pasta "
+            f"{owner_id or 'de origem'}, mas esta maquina nao tem nenhuma pasta "
             "de GeoSync configurada (EXECUTOR_SYNC_DIRS vazio)."
         )
 
@@ -185,14 +185,14 @@ def _resolve_do_manifesto_de_sync(
         except (OSError, ValueError):
             continue
 
-        for ds_nome, ds in (dados.get("datasets") or {}).items():
+        for ds_name, ds in (dados.get("datasets") or {}).items():
             if not isinstance(ds, dict) or ds.get("remote_id_hash") != id_hash:
                 continue
 
-            alvo = _arquivo_principal(Path(pasta), ds)
+            alvo = _primary_file(Path(pasta), ds)
             if alvo is None or not alvo.is_file():
                 raise FileNotFoundError(
-                    f"O dataset '{ds_nome}' esta no manifesto de '{pasta}', mas o "
+                    f"O dataset '{ds_name}' esta no manifesto de '{pasta}', mas o "
                     "arquivo nao esta mais no disco. Ele foi movido ou apagado."
                 )
 
@@ -207,13 +207,13 @@ def _resolve_do_manifesto_de_sync(
 
     raise FileNotFoundError(
         f"O arquivo '{original_name}' foi catalogado pelo executor "
-        f"{dono_id or 'de origem'} e nao esta nas pastas de GeoSync desta "
+        f"{owner_id or 'de origem'} e nao esta nas pastas de GeoSync desta "
         "maquina. Arquivos em modo catalogo so podem ser lidos por workflows "
         "que rodem naquele mesmo executor."
     )
 
 
-def _arquivo_principal(pasta: "Path", ds: dict) -> "Path | None":
+def _primary_file(pasta: "Path", ds: dict) -> "Path | None":
     """File to be read from a manifest dataset.
 
     Mirrors `Dataset.primary_path` in executor/sync/scanner.py: for a shapefile
@@ -233,7 +233,7 @@ def _arquivo_principal(pasta: "Path", ds: dict) -> "Path | None":
 
 
 def _copy_local_to_temp(
-    local_path: str, dono_id: str, ext: str, original_name: str,
+    local_path: str, owner_id: str, ext: str, original_name: str,
 ) -> tuple[str, str, str]:
     """Copies a local artifact to a temp file and returns the same triple.
 
@@ -277,7 +277,7 @@ def _copy_local_to_temp(
         # that rather than go looking for a file that was never here.
         raise FileNotFoundError(
             f"O artefato '{original_name}' foi mantido no executor "
-            f"{dono_id or 'de origem'} e nao esta nesta maquina "
+            f"{owner_id or 'de origem'} e nao esta nesta maquina "
             f"({alvo}). Arquivos marcados para permanecer no executor so podem "
             "ser lidos por workflows que rodem naquele mesmo executor."
         )

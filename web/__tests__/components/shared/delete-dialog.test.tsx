@@ -117,7 +117,7 @@ describe("DeleteDialog — confirmação por digitação", () => {
   it("o que foi digitado não sobrevive a fechar e reabrir", async () => {
     // The dialog opened by a menu item stays mounted inside the closed
     // `Dialog`: it's the field that has to start out empty again.
-    function Tela() {
+    function Screen() {
       const [aberto, setAberto] = useState(true)
       return (
         <>
@@ -128,7 +128,7 @@ describe("DeleteDialog — confirmação por digitação", () => {
         </>
       )
     }
-    render(<Tela />)
+    render(<Screen />)
     fireEvent.change(screen.getByPlaceholderText("nome"), { target: { value: "nome" } })
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancelar" }))
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())

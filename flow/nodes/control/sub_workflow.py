@@ -3,7 +3,7 @@ from typing import Any, Dict
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
 from flow.nodes.outputs.sub_workflow_output import _parse_ports
-from flow.utils.workflow_contract import MAX_PROFUNDIDADE
+from flow.utils.workflow_contract import MAX_DEPTH
 from flow.utils.logger import get_logger
 from flow.utils.publisher.events import KIND_LIFECYCLE, LEVEL_INFO
 
@@ -15,24 +15,24 @@ _CTX_DEFINITIONS_KEY = "_subworkflow_definitions"
 
 # Name of the wrapper returned to the parent. Reserved: an output port with this
 # name would survive the return's `**public` and erase the whole dict.
-RESULTADO = "subWorkflowResult"
+RESULT_KEY = "subWorkflowResult"
 
 
-def _onde_falhou(child: Any) -> str:
+def _where_failed(child: Any) -> str:
     """Suffix with the sub-workflow node that failed, when it can be known.
 
     `node_stats` is filled in each node's `finally`, so it's available
     even after the exception propagates.
     """
     stats = getattr(child, "node_stats", None) or {}
-    quebrados = [
+    failed_nodes = [
         (nid, info.get("node_name") or nid)
         for nid, info in stats.items()
         if isinstance(info, dict) and info.get("status") == "failed"
     ]
-    if not quebrados:
+    if not failed_nodes:
         return ""
-    nid, nome = quebrados[0]
+    nid, nome = failed_nodes[0]
     return f", no nó '{nome}' ({nid})"
 
 
@@ -205,12 +205,12 @@ class SubWorkflowNode(BaseNode):
         # would receive a raw value, with nothing explaining it.
         conflitantes = [
             p for p in _parse_ports((outputs[0].get("properties") or {}).get("ports"))
-            if p == RESULTADO
+            if p == RESULT_KEY
         ] if outputs else []
         if conflitantes:
             raise ValueError(
                 f"Sub-workflow '{workflow_hash}' declara uma saida chamada "
-                f"'{RESULTADO}', que e o nome reservado do resultado devolvido ao "
+                f"'{RESULT_KEY}', que e o nome reservado do resultado devolvido ao "
                 "workflow chamador. Renomeie essa porta no node SubWorkflowOutput."
             )
 
@@ -316,15 +316,15 @@ class SubWorkflowNode(BaseNode):
         # 2) Loop detection — before any of the child's I/O.
         child_ancestors = self._check_loop(workflow_hash)
 
-        # 2b) Depth. The server stops pre-resolving at MAX_PROFUNDIDADE
+        # 2b) Depth. The server stops pre-resolving at MAX_DEPTH
         # levels, and without this check the overflow reached the operator as
         # "workflow not found — doesn't exist, is deactivated, or belongs to another
         # workspace". None of the three was true, and the advice (re-save) didn't
         # help: they would go check three things that were correct.
-        if len(child_ancestors) > MAX_PROFUNDIDADE:
+        if len(child_ancestors) > MAX_DEPTH:
             cadeia = " > ".join(list(child_ancestors)[:4]) + " > ..."
             raise ValueError(
-                f"A cadeia de sub-fluxos passou de {MAX_PROFUNDIDADE} níveis ao "
+                f"A cadeia de sub-fluxos passou de {MAX_DEPTH} níveis ao "
                 f"chamar '{workflow_hash}' ({cadeia}). O servidor só pré-resolve "
                 f"até esse limite. Achate a cadeia — um sub-fluxo intermediário "
                 "geralmente pode ser absorvido pelo chamador."
@@ -423,7 +423,7 @@ class SubWorkflowNode(BaseNode):
         child.context[_CTX_DISABLED_NODES_KEY] = set(inherited_disabled)
         child.context[_CTX_DEFINITIONS_KEY] = dict(inherited_defs)
 
-        def _erro_do_filho(e: BaseException) -> RuntimeError:
+        def _child_error(e: BaseException) -> RuntimeError:
             logger.error(
                 "SubWorkflowNode: erro durante execucao do sub-workflow '%s': %s",
                 workflow_hash, e,
@@ -433,7 +433,7 @@ class SubWorkflowNode(BaseNode):
             # nothing, and the child's interior doesn't appear in the execution panel.
             return RuntimeError(
                 f"Erro ao executar o sub-workflow '{workflow_hash}'"
-                f"{_onde_falhou(child)}: {e}"
+                f"{_where_failed(child)}: {e}"
             )
 
         # `asyncio.timeout` and not `wait_for`: from 3.11 onward
@@ -451,7 +451,7 @@ class SubWorkflowNode(BaseNode):
             raise
         except TimeoutError as exc:
             if not prazo.expired():
-                raise _erro_do_filho(exc) from exc
+                raise _child_error(exc) from exc
             raise RuntimeError(
                 f"Sub-workflow '{workflow_hash}' excedeu o timeout de {timeout}s. "
                 "Aumente 'timeoutSeconds' ou investigue por que o sub-fluxo trava."
@@ -461,7 +461,7 @@ class SubWorkflowNode(BaseNode):
             # must propagate without rewrapping.
             raise
         except Exception as e:
-            raise _erro_do_filho(e) from e
+            raise _child_error(e) from e
 
         logger.info(
             "SubWorkflowNode: sub-workflow '%s' concluido. Chaves de resultado: %s",
@@ -487,4 +487,4 @@ class SubWorkflowNode(BaseNode):
             "SubWorkflowOutput: %s",
             workflow_hash, len(public), list(public.keys()),
         )
-        return {RESULTADO: public, **public}
+        return {RESULT_KEY: public, **public}

@@ -39,7 +39,7 @@ _pool: ThreadPoolExecutor | None = None
 _pool_io: ThreadPoolExecutor | None = None
 
 
-def _obter_pool() -> ThreadPoolExecutor:
+def _get_pool() -> ThreadPoolExecutor:
     """Creates the heavy-work pool on first use.
 
     Lazy because the SyncManagers are built before the event loop starts (and
@@ -53,7 +53,7 @@ def _obter_pool() -> ThreadPoolExecutor:
     return _pool
 
 
-def _obter_pool_io() -> ThreadPoolExecutor:
+def _get_io_pool() -> ThreadPoolExecutor:
     """Creates the transfers' I/O pool on first use."""
     global _pool_io
     if _pool_io is None:
@@ -63,7 +63,7 @@ def _obter_pool_io() -> ThreadPoolExecutor:
     return _pool_io
 
 
-async def _executar(pool: ThreadPoolExecutor, func, *args, **kwargs):
+async def _execute(pool: ThreadPoolExecutor, func, *args, **kwargs):
     """`run_in_executor` doesn't accept kwargs — hence the `partial`."""
     loop = asyncio.get_running_loop()
     if kwargs:
@@ -73,7 +73,7 @@ async def _executar(pool: ThreadPoolExecutor, func, *args, **kwargs):
 
 async def em_thread(func, *args, **kwargs):
     """Trabalho pesado do sync (varredura, MD5, validacao, zip, manifesto)."""
-    return await _executar(_obter_pool(), func, *args, **kwargs)
+    return await _execute(_get_pool(), func, *args, **kwargs)
 
 
 async def em_thread_io(func, *args, **kwargs):
@@ -83,4 +83,4 @@ async def em_thread_io(func, *args, **kwargs):
     the duration of whatever zip/validate was occupying the heavy pool's 2
     threads.
     """
-    return await _executar(_obter_pool_io(), func, *args, **kwargs)
+    return await _execute(_get_io_pool(), func, *args, **kwargs)

@@ -725,7 +725,7 @@ after a deploy — a new tool bumps the minor version.
   another and a null column fell back to **UTC** inside the scheduler —
   four hours of difference, silently, between the screen and the trigger. Now it is a
   single constant. No migration and no recreating schedules: the value is what the node already
-  sent, so `_mesma_configuracao` keeps agreeing.
+  sent, so `_same_configuration` keeps agreeing.
 
 ### 1.3.0
 

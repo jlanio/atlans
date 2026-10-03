@@ -24,7 +24,7 @@ import type { FieldProps } from "./types"
 type KeyValueFieldProps = FieldProps
 
 /** Accepts an object or a JSON string — the saved value may come in either form. */
-function paraObjeto(bruto: unknown): Record<string, string> {
+function toObject(bruto: unknown): Record<string, string> {
   if (bruto && typeof bruto === "object") return bruto as Record<string, string>
   if (typeof bruto === "string" && bruto.trim()) {
     try {
@@ -36,13 +36,13 @@ function paraObjeto(bruto: unknown): Record<string, string> {
 }
 
 /** Pairs in the order they appear in the saved object, with the value always a string. */
-function paraPares(objeto: Record<string, string>): [string, string][] {
+function toPairs(objeto: Record<string, string>): [string, string][] {
   return Object.entries(objeto).map(([k, v]) => [k, String(v ?? "")])
 }
 
 const KeyValueField = ({ field, values, setNodeField }: KeyValueFieldProps) => {
 
-  const objeto = paraObjeto(values?.[field.name])
+  const objeto = toObject(values?.[field.name])
   const assinatura = JSON.stringify(objeto)
 
   // The rows live in LOCAL STATE, not derived from the saved object.
@@ -54,7 +54,7 @@ const KeyValueField = ({ field, values, setNodeField }: KeyValueFieldProps) => {
   // button simply did nothing, and the HttpRequest `headers` and `params` could
   // not be filled from the interface. For the same reason, clearing the name to
   // rename a header deleted the whole row mid-edit.
-  const [pares, setPares] = useState<[string, string][]>(() => paraPares(objeto))
+  const [pares, setPairs] = useState<[string, string][]>(() => toPairs(objeto))
 
   // Seed: the last shape of the object THIS component knows. The path is
   // controlled (the modal hands back what we wrote, with no state of its own), so
@@ -62,22 +62,22 @@ const KeyValueField = ({ field, values, setNodeField }: KeyValueFieldProps) => {
   // outside" and drop the unnamed row the user is filling in. When the
   // difference is real — another node selected, value reset from outside — the
   // rows are reseeded.
-  const [semente, setSemente] = useState(assinatura)
+  const [semente, setSeed] = useState(assinatura)
   if (assinatura !== semente) {
-    setSemente(assinatura)
-    setPares(paraPares(objeto))
+    setSeed(assinatura)
+    setPairs(toPairs(objeto))
   }
 
-  function gravar(novosPares: [string, string][]) {
-    setPares(novosPares)
+  function gravar(newPairs: [string, string][]) {
+    setPairs(newPairs)
     const saida: Record<string, string> = {}
-    for (const [chave, valor] of novosPares) {
+    for (const [chave, valor] of newPairs) {
       const limpa = chave.trim()
       // An unnamed row stays on screen, but doesn't become a header: the value that
       // leaves the component is still only what can be sent.
       if (limpa) saida[limpa] = valor
     }
-    setSemente(JSON.stringify(saida))
+    setSeed(JSON.stringify(saida))
     setNodeField(field.name, saida as unknown as string)
   }
 

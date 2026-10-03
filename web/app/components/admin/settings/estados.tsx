@@ -22,7 +22,7 @@ import * as Estado from "@/app/components/shared/estados"
  * Overview: the four indicators (real height `h-24`) and the pending-items
  * block. `aria-busy` on the wrapper so the screen reader announces the wait.
  */
-export function SkeletonVisaoGeral() {
+export function OverviewSkeleton() {
   return (
     <div role="status" aria-busy="true" aria-label="Carregando a visão geral" className="flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -40,7 +40,7 @@ export function SkeletonVisaoGeral() {
  * Stackable table (Storage, Trash, Isolation): a header strip and a few rows
  * with the real height, so the swap to the content does not make the page jump.
  */
-export function SkeletonDeTabela({ linhas = 4, rotulo }: { linhas?: number; rotulo: string }) {
+export function TableSkeleton({ linhas = 4, rotulo }: { linhas?: number; rotulo: string }) {
   return (
     <div role="status" aria-busy="true" aria-label={rotulo} className="flex flex-col gap-2.5">
       <Skeleton className="h-8 w-full rounded-md" />
@@ -55,7 +55,7 @@ export function SkeletonDeTabela({ linhas = 4, rotulo }: { linhas?: number; rotu
  * Short form (Whitelist, Retention, Drive): the label, the field + button
  * row and the help note.
  */
-export function SkeletonDeFormulario({ rotulo }: { rotulo: string }) {
+export function FormSkeleton({ rotulo }: { rotulo: string }) {
   return (
     <div role="status" aria-busy="true" aria-label={rotulo} className="flex flex-col gap-3">
       <Skeleton className="h-3 w-40" />

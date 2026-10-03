@@ -4,7 +4,7 @@ from typing import Any, List, Optional
 
 class NodePort(BaseModel):
     """A node's named input port. `type` is the data type it accepts
-    (TIPOS_DE_CAMPO from the contract) — connection validation in the canvas
+    (FIELD_TYPES from the contract) — connection validation in the canvas
     gesture compares it with the type emitted by the source."""
     name: str
     type: Optional[str] = None

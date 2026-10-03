@@ -20,15 +20,15 @@ export type NodesDrawerState = 'opened' | 'closed' | (string & {})
 /** Validity of the in-memory catalog. Nodes and credentials only change when an
  *  admin disables a node or the user registers a credential — not every time a
  *  canvas opens. */
-const TTL_DO_CATALOGO_MS = 5 * 60 * 1000
+const CATALOG_TTL_MS = 5 * 60 * 1000
 
 // Requests in flight, so that two simultaneous mounts (canvas + Ctrl+K)
 // share the same download instead of firing two.
-let nosEmVoo: Promise<INodesAPI[]> | null = null
-let credenciaisEmVoo: Promise<ICredentials[]> | null = null
+let nodesInFlight: Promise<INodesAPI[]> | null = null
+let credentialsInFlight: Promise<ICredentials[]> | null = null
 
-const estaFresco = (carimbo: number | null) =>
-  carimbo !== null && Date.now() - carimbo < TTL_DO_CATALOGO_MS
+const isFresh = (carimbo: number | null) =>
+  carimbo !== null && Date.now() - carimbo < CATALOG_TTL_MS
 
 /** Compares content, not reference.
  *
@@ -36,7 +36,7 @@ const estaFresco = (carimbo: number | null) =>
  *  changes IDENTITY. A refetch after the TTL expires returns a new array from the
  *  JSON even when the catalog is byte-for-byte the same — and that was enough to
  *  redraw the graph over everything the user had already edited. */
-const mesmoConteudo = (a: unknown[], b: unknown[]) =>
+const sameContent = (a: unknown[], b: unknown[]) =>
   a.length === b.length && JSON.stringify(a) === JSON.stringify(b)
 
 interface WorkflowCatalogState {
@@ -92,9 +92,9 @@ export const useWorkflowCatalogStore = create<WorkflowCatalogState & WorkflowCat
 
   ensureNodesAPI: () => {
     const { nodesAPI, nodesFetchedAt } = get()
-    if (nodesAPI.length > 0 && estaFresco(nodesFetchedAt)) return Promise.resolve(nodesAPI)
-    if (nosEmVoo) return nosEmVoo
-    nosEmVoo = GisFlowService.getNodes()
+    if (nodesAPI.length > 0 && isFresh(nodesFetchedAt)) return Promise.resolve(nodesAPI)
+    if (nodesInFlight) return nodesInFlight
+    nodesInFlight = GisFlowService.getNodes()
       .then(res => {
         // The service does NOT reject on failure: it resolves with { data: undefined, error }.
         // Without this guard, a 502/401/network drop wrote `nodesAPI: []` over
@@ -104,7 +104,7 @@ export const useWorkflowCatalogStore = create<WorkflowCatalogState & WorkflowCat
         if (res?.error || !Array.isArray(res?.data)) return get().nodesAPI
         const lista = res.data
         const atual = get().nodesAPI
-        if (mesmoConteudo(atual, lista)) {
+        if (sameContent(atual, lista)) {
           // Identical content: renew only the validity and keep the SAME reference,
           // so as not to wake the consumers subscribed to the array.
           set({ nodesFetchedAt: Date.now() })
@@ -113,15 +113,15 @@ export const useWorkflowCatalogStore = create<WorkflowCatalogState & WorkflowCat
         set({ nodesAPI: lista, nodesFetchedAt: Date.now() })
         return lista
       })
-      .finally(() => { nosEmVoo = null })
-    return nosEmVoo
+      .finally(() => { nodesInFlight = null })
+    return nodesInFlight
   },
 
   ensureCredentials: () => {
     const { credentials, credentialsFetchedAt } = get()
-    if (credentials.length > 0 && estaFresco(credentialsFetchedAt)) return Promise.resolve(credentials)
-    if (credenciaisEmVoo) return credenciaisEmVoo
-    credenciaisEmVoo = GisFlowService.getCredentials()
+    if (credentials.length > 0 && isFresh(credentialsFetchedAt)) return Promise.resolve(credentials)
+    if (credentialsInFlight) return credentialsInFlight
+    credentialsInFlight = GisFlowService.getCredentials()
       .then(res => {
         // Same rule as the node catalog: a failure does not take down the good list.
         // Here the symptom would be the node's credential select going empty and
@@ -129,15 +129,15 @@ export const useWorkflowCatalogStore = create<WorkflowCatalogState & WorkflowCat
         if (res?.error || !Array.isArray(res?.data)) return get().credentials
         const lista = res.data
         const atual = get().credentials
-        if (mesmoConteudo(atual, lista)) {
+        if (sameContent(atual, lista)) {
           set({ credentialsFetchedAt: Date.now() })
           return atual
         }
         set({ credentials: lista, credentialsFetchedAt: Date.now() })
         return lista
       })
-      .finally(() => { credenciaisEmVoo = null })
-    return credenciaisEmVoo
+      .finally(() => { credentialsInFlight = null })
+    return credentialsInFlight
   },
 
   invalidarCredenciais: () => set({ credentialsFetchedAt: null }),

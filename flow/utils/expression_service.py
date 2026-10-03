@@ -5,7 +5,7 @@ import threading
 from uuid import uuid4
 from jinja2 import StrictUndefined
 from flow.utils.datetime_utils import utc_now_naive
-from flow.utils.jinja_seguro import criar_ambiente_sandbox
+from flow.utils.jinja_seguro import create_sandbox_environment
 from flow.utils.safe_env import safe_env
 
 # Captures $Alias or $Alias.key.subkey (with an optional dotted path).
@@ -24,7 +24,7 @@ _ALIAS_PATTERN = re.compile(r'\$(?P<alias>[^\W\d]\w*(?:\.[^\W\d]\w*)*)')
 
 # Jinja blocks: expression, statement and comment. Used to separate what already
 # IS Jinja from plain text, because `$Alias` is treated differently in each.
-_BLOCO_JINJA = re.compile(r"(\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\})", re.DOTALL)
+_JINJA_BLOCK = re.compile(r"(\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\})", re.DOTALL)
 
 
 def _preprocessar_aliases(template: str) -> str:
@@ -61,7 +61,7 @@ def _preprocessar_aliases(template: str) -> str:
                                                `$Alias` became literal text —
                                                also silently.
     """
-    partes = _BLOCO_JINJA.split(template)
+    partes = _JINJA_BLOCK.split(template)
     saida = []
     for i, parte in enumerate(partes):
         if i % 2:  # captured separator: already a Jinja block
@@ -83,7 +83,7 @@ class ExpressionService:
     Exposes utilities such as now(), uuid() and environment variables.
     """
     def __init__(self):
-        self.env = criar_ambiente_sandbox(undefined=StrictUndefined)
+        self.env = create_sandbox_environment(undefined=StrictUndefined)
         self.env.globals.update({
             "now":      lambda fmt=None: utc_now_naive().strftime(fmt or "%Y-%m-%dT%H:%M:%SZ"),
             "uuid":     lambda: str(uuid4()),

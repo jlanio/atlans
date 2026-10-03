@@ -4,7 +4,7 @@
 Workflow delete is soft (workflow_crud.soft_delete_by_hash writes deleted_at
 and keeps the row). While the name constraint was total, the name of everything
 that got deleted stayed taken forever — and invisibly, since no listing shows
-soft-deleted ones. The pre-check (workflow_move_service.nomes_no_workspace)
+soft-deleted ones. The pre-check (workflow_move_service.names_in_workspace)
 always filtered `deleted_at IS NULL`, so it and the database disagreed about
 what a taken name is.
 
@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from app.models.workflow import Workflow
 
 
-_EXCLUIDO_EM = datetime(2026, 8, 7, 22, 26, 32)
+_DELETED_AT = datetime(2026, 8, 7, 22, 26, 32)
 
 
 @pytest_asyncio.fixture
@@ -46,7 +46,7 @@ def _wf(id_hash: str, nome: str, workspace: str = "ws-1", **kw) -> Workflow:
                     definition={}, **kw)
 
 
-async def _inserir(db, wf) -> bool:
+async def _insert(db, wf) -> bool:
     """True if the database accepted; False if it refused on uniqueness."""
     db.add(wf)
     try:
@@ -58,7 +58,7 @@ async def _inserir(db, wf) -> bool:
 
 
 @pytest.mark.asyncio
-async def test_o_predicado_chega_ao_ddl(db):
+async def test_the_predicate_reaches_the_ddl(db):
     """Without the WHERE, the index becomes TOTALLY unique and the rule reverts to the old one.
 
     Checking the DDL is worth it: the predicate is a per-dialect option
@@ -75,59 +75,59 @@ async def test_o_predicado_chega_ao_ddl(db):
 
 
 @pytest.mark.asyncio
-async def test_dois_vivos_com_o_mesmo_nome_sao_recusados(db):
+async def test_two_live_with_the_same_name_are_refused(db):
     """The rule that must not loosen."""
-    assert await _inserir(db, _wf("a", "Edificações"))
+    assert await _insert(db, _wf("a", "Edificações"))
 
-    assert not await _inserir(db, _wf("b", "Edificações"))
+    assert not await _insert(db, _wf("b", "Edificações"))
 
 
 @pytest.mark.asyncio
-async def test_excluir_libera_o_nome(db):
+async def test_deleting_frees_the_name(db):
     """The 'Cópia de get-CAR' case: deleting gives the name back to the workspace."""
-    assert await _inserir(db, _wf("a", "get-CAR"))
-    assert not await _inserir(db, _wf("b", "get-CAR"))
+    assert await _insert(db, _wf("a", "get-CAR"))
+    assert not await _insert(db, _wf("b", "get-CAR"))
 
     alvo = (await db.execute(
         sa.select(Workflow).where(Workflow.id_hash == "a")
     )).scalars().first()
-    alvo.deleted_at = _EXCLUIDO_EM
+    alvo.deleted_at = _DELETED_AT
     alvo.flag_ative = False
     await db.commit()
 
-    assert await _inserir(db, _wf("c", "get-CAR"))
+    assert await _insert(db, _wf("c", "get-CAR"))
 
 
 @pytest.mark.asyncio
-async def test_dois_excluidos_podem_repetir_o_nome(db):
+async def test_two_deleted_can_repeat_the_name(db):
     """Follows from the predicate — and it is what the migration's downgrade breaks ties on."""
-    assert await _inserir(db, _wf("a", "X", deleted_at=_EXCLUIDO_EM))
+    assert await _insert(db, _wf("a", "X", deleted_at=_DELETED_AT))
 
-    assert await _inserir(db, _wf("b", "X", deleted_at=_EXCLUIDO_EM))
+    assert await _insert(db, _wf("b", "X", deleted_at=_DELETED_AT))
 
 
 @pytest.mark.asyncio
-async def test_escopo_por_workspace_continua_valendo(db):
+async def test_per_workspace_scope_still_applies(db):
     """Loosening by `deleted_at` must not loosen by workspace."""
-    assert await _inserir(db, _wf("a", "Edificações", workspace="ws-1"))
+    assert await _insert(db, _wf("a", "Edificações", workspace="ws-1"))
 
-    assert await _inserir(db, _wf("b", "Edificações", workspace="ws-2"))
+    assert await _insert(db, _wf("b", "Edificações", workspace="ws-2"))
 
 
 @pytest.mark.asyncio
-async def test_nome_liberado_volta_a_ser_exclusivo(db):
+async def test_freed_name_becomes_unique_again(db):
     """Reusing a deleted workflow's name does not leave the door open.
 
     A second live one with that name has to be refused like any other.
     """
-    assert await _inserir(db, _wf("a", "X", deleted_at=_EXCLUIDO_EM))
-    assert await _inserir(db, _wf("b", "X"))
+    assert await _insert(db, _wf("a", "X", deleted_at=_DELETED_AT))
+    assert await _insert(db, _wf("b", "X"))
 
-    assert not await _inserir(db, _wf("c", "X"))
+    assert not await _insert(db, _wf("c", "X"))
 
 
 @pytest.mark.asyncio
-async def test_ler_atributo_apos_rollback_e_erro_de_sessao(db):
+async def test_reading_attribute_after_rollback_is_a_session_error(db):
     """Pins down WHY the conflict messages cannot read from the ORM object.
 
     `crud.update` does setattr and commits; the `except IntegrityError` calls
@@ -138,10 +138,10 @@ async def test_ler_atributo_apos_rollback_e_erro_de_sessao(db):
     error path.
 
     That is why `create_workflow` cites the `name` parameter and
-    `update_workflow` captures the name BEFORE the commit (`nome_tentado`).
+    `update_workflow` captures the name BEFORE the commit (`attempted_name`).
     """
-    assert await _inserir(db, _wf("a", "Edificações"))
-    assert await _inserir(db, _wf("b", "Outro"))
+    assert await _insert(db, _wf("a", "Edificações"))
+    assert await _insert(db, _wf("b", "Outro"))
 
     alvo = (await db.execute(
         sa.select(Workflow).where(Workflow.id_hash == "b")

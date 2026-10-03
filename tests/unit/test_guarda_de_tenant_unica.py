@@ -48,7 +48,7 @@ ARQUIVOS = [
 ]
 
 
-def _funcao_que_contem(arvore, linha: int) -> str:
+def _enclosing_function(arvore, linha: int) -> str:
     melhor = "<modulo>"
     for no in ast.walk(arvore):
         if isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -57,7 +57,7 @@ def _funcao_que_contem(arvore, linha: int) -> str:
     return melhor
 
 
-def test_a_guarda_de_tenant_nao_e_reimplementada_a_mao():
+def test_the_tenant_guard_is_not_reimplemented_by_hand():
     violacoes = []
     for rel in ARQUIVOS:
         caminho = RAIZ / rel
@@ -68,7 +68,7 @@ def test_a_guarda_de_tenant_nao_e_reimplementada_a_mao():
         for i, linha in enumerate(fonte.splitlines(), 1):
             if "not in workspace_ids" not in linha:
                 continue
-            funcao = _funcao_que_contem(arvore, i)
+            funcao = _enclosing_function(arvore, i)
             if (rel, funcao) in EXCECOES:
                 continue
             violacoes.append(f"{rel}:{i} em {funcao}() — {linha.strip()}")
@@ -81,7 +81,7 @@ def test_a_guarda_de_tenant_nao_e_reimplementada_a_mao():
     )
 
 
-def test_as_excecoes_registradas_ainda_existem():
+def test_the_registered_exceptions_still_exist():
     """If an exception disappears, it must leave the list — otherwise the test loosens
     silently and starts allowing a new copy in the same place."""
     for rel, funcao in EXCECOES:
@@ -94,11 +94,11 @@ def test_as_excecoes_registradas_ainda_existem():
         assert funcao in nomes, f"{rel}: {funcao}() sumiu — remova a excecao"
 
 
-def test_nenhum_depends_de_workspace_ids_fica_sem_uso():
+def test_no_workspace_ids_depends_is_left_unused():
     """The parameter costs one SQL query per request.
 
     Five workflow_groups routes declared it and never read it. It was not a hole —
-    all of them check the role (today via `exigir_papel_no_workspace`), which is a
+    all of them check the role (today via `require_workspace_role`), which is a
     strict superset of the check — but it was one query per request for nothing,
     and an unused authorization `Depends` gives the impression that the route is
     protected by it.

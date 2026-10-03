@@ -15,18 +15,18 @@ import pytest
 
 # ── Denied for a regular user ────────────────────────────────────────────────
 
-async def test_trash_negado_para_usuario_comum(client):
+async def test_trash_denied_for_regular_user(client):
     """client authenticates with role='user' (see conftest)."""
     resp = await client.get("/admin/workspaces/trash")
     assert resp.status_code == 403
 
 
-async def test_restore_negado_para_usuario_comum(client):
+async def test_restore_denied_for_regular_user(client):
     resp = await client.post("/admin/workspaces/ws-test-001/restore")
     assert resp.status_code == 403
 
 
-async def test_purge_negado_para_usuario_comum(client):
+async def test_purge_denied_for_regular_user(client):
     resp = await client.post(
         "/admin/workspaces/ws-test-001/purge",
         json={"confirm": "ws-test-001"},
@@ -57,7 +57,7 @@ def admin_client_db(client, mock_current_user):
     app.dependency_overrides.pop(get_db, None)
 
 
-async def test_purge_exige_confirm_igual_ao_id(admin_client_db):
+async def test_purge_requires_confirm_equal_to_id(admin_client_db):
     """Guard against a click on the wrong row of the table — checked on the server."""
     ac, _ = admin_client_db
     resp = await ac.post(
@@ -67,7 +67,7 @@ async def test_purge_exige_confirm_igual_ao_id(admin_client_db):
     assert resp.status_code == 400
 
 
-async def test_purge_404_para_workspace_fora_da_lixeira(admin_client_db):
+async def test_purge_404_for_workspace_not_in_trash(admin_client_db):
     """Only a workspace with deleted_at set can be purged."""
     ac, db = admin_client_db
     result = MagicMock()
@@ -82,7 +82,7 @@ async def test_purge_404_para_workspace_fora_da_lixeira(admin_client_db):
     db.delete.assert_not_awaited()
 
 
-async def test_restore_404_para_workspace_fora_da_lixeira(admin_client_db):
+async def test_restore_404_for_workspace_not_in_trash(admin_client_db):
     ac, db = admin_client_db
     result = MagicMock()
     result.scalar_one_or_none.return_value = None

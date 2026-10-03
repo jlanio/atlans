@@ -47,7 +47,7 @@ function grupo(id: string): IWorkflowGroup {
 
 const metrica = (hash: string, total = 1) => ({ workflow_hash: hash, total_runs: total, last_status: "success" })
 
-function respostasBoas(sufixo = "") {
+function goodResponses(sufixo = "") {
   svc.getWorkflows.mockResolvedValue(ok([wf(`a${sufixo}`), wf(`b${sufixo}`)]))
   svc.getWorkflowGroups.mockResolvedValue(ok([grupo(`g${sufixo}`)]))
   svc.getWorkflowMetricsList.mockResolvedValue(ok({ period_days: 30, workflows: [metrica(`a${sufixo}`)] }))
@@ -64,7 +64,7 @@ afterEach(() => {
 
 describe("useProjetosDados", () => {
   it("três chamadas em paralelo, por workspace, com janela de 30 dias e sem force", async () => {
-    respostasBoas()
+    goodResponses()
     const { result } = renderHook(() => useProjetosDados({ intervaloDasMetricasMs: 0 }))
     expect(result.current.carregando).toBe(true)
     await waitFor(() => expect(result.current.carregando).toBe(false))
@@ -89,7 +89,7 @@ describe("useProjetosDados", () => {
   })
 
   it("espera o context resolver o workspace antes de buscar", async () => {
-    respostasBoas()
+    goodResponses()
     ws.loading = true
     const { result, rerender } = renderHook(() => useProjetosDados({ intervaloDasMetricasMs: 0 }))
     expect(svc.getWorkflows).not.toHaveBeenCalled()
@@ -102,7 +102,7 @@ describe("useProjetosDados", () => {
   })
 
   it("só as métricas falharam: a lista sai completa, sem erro, com o aviso discreto", async () => {
-    respostasBoas()
+    goodResponses()
     svc.getWorkflowMetricsList.mockResolvedValue(falhou())
     const { result } = renderHook(() => useProjetosDados({ intervaloDasMetricasMs: 0 }))
     await waitFor(() => expect(result.current.carregando).toBe(false))
@@ -117,7 +117,7 @@ describe("useProjetosDados", () => {
   })
 
   it("um `throw` inesperado nas métricas não derruba a tela (allSettled)", async () => {
-    respostasBoas()
+    goodResponses()
     svc.getWorkflowMetricsList.mockRejectedValue(new Error("rede"))
     const { result } = renderHook(() => useProjetosDados({ intervaloDasMetricasMs: 0 }))
     await waitFor(() => expect(result.current.carregando).toBe(false))
@@ -127,7 +127,7 @@ describe("useProjetosDados", () => {
   })
 
   it("a listagem falhou na 1ª carga: estado de erro com a mensagem e o carregando desliga, sem toast", async () => {
-    respostasBoas()
+    goodResponses()
     svc.getWorkflows.mockResolvedValue(falhou("Sem permissão"))
     const { result } = renderHook(() => useProjetosDados({ intervaloDasMetricasMs: 0 }))
     await waitFor(() => expect(result.current.carregando).toBe(false))
@@ -141,7 +141,7 @@ describe("useProjetosDados", () => {
   })
 
   it("recarga que falha com a lista na tela: a lista fica e o toast avisa", async () => {
-    respostasBoas()
+    goodResponses()
     const { result } = renderHook(() => useProjetosDados({ intervaloDasMetricasMs: 0 }))
     await waitFor(() => expect(result.current.carregando).toBe(false))
     const carimbo = result.current.atualizadoEm
@@ -157,7 +157,7 @@ describe("useProjetosDados", () => {
 
   it("1ª carga falhou: o tick das métricas não carimba a tela (o cartão de erro fica)", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    respostasBoas()
+    goodResponses()
     svc.getWorkflows.mockResolvedValue(falhou("boom"))
     const { result } = renderHook(() => useProjetosDados({ intervaloDasMetricasMs: 1_000 }))
     await waitFor(() => expect(result.current.carregando).toBe(false))
@@ -172,7 +172,7 @@ describe("useProjetosDados", () => {
   })
 
   it("os grupos falharam: também é erro (são obrigatórios), com a mensagem padrão quando não há texto", async () => {
-    respostasBoas()
+    goodResponses()
     svc.getWorkflowGroups.mockResolvedValue({ success: false, status: 500, error: { name: "AxiosError" } })
     const { result } = renderHook(() => useProjetosDados({ intervaloDasMetricasMs: 0 }))
     await waitFor(() => expect(result.current.carregando).toBe(false))
@@ -180,10 +180,10 @@ describe("useProjetosDados", () => {
   })
 
   it("recarregar: fura o cache das métricas com force, gira o botão e não mostra skeleton", async () => {
-    respostasBoas()
+    goodResponses()
     const { result } = renderHook(() => useProjetosDados({ intervaloDasMetricasMs: 0 }))
     await waitFor(() => expect(result.current.carregando).toBe(false))
-    const carimboAnterior = result.current.atualizadoEm
+    const previousStamp = result.current.atualizadoEm
 
     // The reload stays pending to observe `atualizando` on with the list still on screen.
     let soltar: (v: unknown) => void = () => {}
@@ -197,7 +197,7 @@ describe("useProjetosDados", () => {
     await act(async () => { soltar(ok({ period_days: 30, workflows: [metrica("a", 9)] })) })
     await waitFor(() => expect(result.current.atualizando).toBe(false))
     expect(result.current.metricas?.get("a")?.total_runs).toBe(9)
-    expect(result.current.atualizadoEm).toBeGreaterThanOrEqual(carimboAnterior!)
+    expect(result.current.atualizadoEm).toBeGreaterThanOrEqual(previousStamp!)
     // Without `force`, the call goes out without bypassing the cache.
     act(() => result.current.recarregar())
     await waitFor(() => expect(svc.getWorkflowMetricsList).toHaveBeenLastCalledWith(30, false, { workspace_id: "ws1" }))
@@ -205,9 +205,9 @@ describe("useProjetosDados", () => {
 
   it("resposta atrasada do workspace anterior é descartada (carimbo de sequência)", async () => {
     // ws1 responds AFTER ws2: the screen has to stay with ws2.
-    let soltarWs1: (v: unknown) => void = () => {}
+    let releaseWs1: (v: unknown) => void = () => {}
     svc.getWorkflows.mockImplementation((id: string) =>
-      id === "ws1" ? new Promise(r => { soltarWs1 = r }) : Promise.resolve(ok([wf("z")])),
+      id === "ws1" ? new Promise(r => { releaseWs1 = r }) : Promise.resolve(ok([wf("z")])),
     )
     svc.getWorkflowGroups.mockResolvedValue(ok([]))
     svc.getWorkflowMetricsList.mockResolvedValue(ok({ period_days: 30, workflows: [] }))
@@ -218,13 +218,13 @@ describe("useProjetosDados", () => {
     await waitFor(() => expect(result.current.workflows.map(w => w.id_hash)).toEqual(["z"]))
     expect(result.current.carregando).toBe(false)
 
-    await act(async () => { soltarWs1(ok([wf("velho")])) })
+    await act(async () => { releaseWs1(ok([wf("velho")])) })
     expect(result.current.workflows.map(w => w.id_hash)).toEqual(["z"])
     expect(result.current.erro).toBeNull()
   })
 
   it("trocar de workspace mostra skeleton de novo (é outra estante), e recarregar o mesmo não", async () => {
-    respostasBoas()
+    goodResponses()
     const { result, rerender } = renderHook(() => useProjetosDados({ intervaloDasMetricasMs: 0 }))
     await waitFor(() => expect(result.current.carregando).toBe(false))
 
@@ -253,7 +253,7 @@ describe("useProjetosDados", () => {
 
   it("métricas se atualizam sozinhas no intervalo, só elas, com a aba visível; falha no tick mantém o que havia", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    respostasBoas()
+    goodResponses()
     const { result } = renderHook(() => useProjetosDados({ intervaloDasMetricasMs: 1_000 }))
     await waitFor(() => expect(result.current.carregando).toBe(false))
     expect(svc.getWorkflowMetricsList).toHaveBeenCalledTimes(1)
@@ -287,7 +287,7 @@ describe("useProjetosDados", () => {
   })
 
   it("definirWorkflows/definirGrupos aceitam função para a atualização otimista do index", async () => {
-    respostasBoas()
+    goodResponses()
     const { result } = renderHook(() => useProjetosDados({ intervaloDasMetricasMs: 0 }))
     await waitFor(() => expect(result.current.carregando).toBe(false))
 
@@ -300,7 +300,7 @@ describe("useProjetosDados", () => {
   })
 
   it("`recarregar` é estável entre renders (desce para o botão Atualizar)", async () => {
-    respostasBoas()
+    goodResponses()
     const { result, rerender } = renderHook(() => useProjetosDados({ intervaloDasMetricasMs: 0 }))
     await waitFor(() => expect(result.current.carregando).toBe(false))
     const antes = result.current.recarregar

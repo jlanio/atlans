@@ -47,7 +47,7 @@ def _cond(**props):
 
 # ── The data reaches the next node ──────────────────────────────────────────
 
-def test_o_primeiro_valor_e_o_dado_e_nao_o_booleano(camada):
+def test_the_first_value_is_the_data_not_the_boolean(camada):
     """The reported symptom: the next node received True instead of the layer."""
     saida = asyncio.run(_cond().execute({"output": camada}))
     primeiro = next(iter(saida.values()))
@@ -55,27 +55,27 @@ def test_o_primeiro_valor_e_o_dado_e_nao_o_booleano(camada):
     assert len(primeiro) == 3
 
 
-def test_a_chave_original_do_pai_sobrevive(camada):
+def test_the_parent_original_key_survives(camada):
     saida = asyncio.run(_cond().execute({"focos": camada}))
     assert "focos" in saida
     assert saida["focos"] is camada
 
 
-def test_todas_as_chaves_do_pai_sobrevivem(camada):
+def test_all_parent_keys_survive(camada):
     """The node passes along the whole package, not just the first value."""
     saida = asyncio.run(_cond().execute({"camada": camada, "meta": {"fonte": "IBGE"}}))
     assert saida["camada"] is camada
     assert saida["meta"] == {"fonte": "IBGE"}
 
 
-def test_result_continua_existindo(camada):
+def test_result_still_exists(camada):
     """It is a selectable port in the edge selector (custom-edges); removing it
     would break workflows that already point to it in `from_key`."""
     saida = asyncio.run(_cond().execute({"output": camada}))
     assert saida["result"] is camada
 
 
-def test_o_branch_continua_sendo_booleano(camada):
+def test_the_branch_is_still_boolean(camada):
     """The executor routes with `isinstance(outputs['branch'], bool)`
     (core.py:628) — without this the branch stops branching."""
     saida = asyncio.run(_cond().execute({"output": camada}))
@@ -86,7 +86,7 @@ def test_o_branch_continua_sendo_booleano(camada):
 
 # ── The node's decision is not overwritten ──────────────────────────────────
 
-def test_a_decisao_do_no_vence_a_do_pai(camada):
+def test_the_node_decision_beats_the_parent_one(camada):
     """A `branch` key coming from the parent must not erase this node's decision."""
     entrada = {"output": camada, "branch": True, "value": 999}
     # 3 features > 5 is false.
@@ -95,7 +95,7 @@ def test_a_decisao_do_no_vence_a_do_pai(camada):
     assert saida["value"] == 3
 
 
-def test_duas_bifurcacoes_decidem_de_forma_independente(camada):
+def test_two_forks_decide_independently(camada):
     """O defeito mais grave, e silencioso: a segunda repetia a primeira."""
     s1 = asyncio.run(_cond(operator=">", compareTo="1").execute({"output": camada}))
     assert s1["branch"] is True
@@ -106,7 +106,7 @@ def test_duas_bifurcacoes_decidem_de_forma_independente(camada):
     assert s2["value"] == 3, "a 2a avaliou o booleano da 1a em vez da camada"
 
 
-def test_a_segunda_bifurcacao_avalia_a_camada_e_nao_o_booleano(camada):
+def test_the_second_fork_evaluates_the_layer_not_the_boolean(camada):
     """Before: `float(True)` = 1.0 became the second evaluation's `count`."""
     s1 = asyncio.run(_cond().execute({"output": camada}))
     s2 = asyncio.run(_cond().execute(dict(s1)))
@@ -119,13 +119,13 @@ def _jinja(expr):
     return JinjaBranchNode(node_id="j", parameters={"expression": expr})
 
 
-def test_jinja_branch_repassa_o_dado_primeiro(camada):
+def test_jinja_branch_passes_the_data_first(camada):
     saida = asyncio.run(_jinja("{{ value | length > 1 }}").execute({"output": camada}))
     assert isinstance(next(iter(saida.values())), gpd.GeoDataFrame)
     assert saida["branch"] is True
 
 
-def test_jinja_branch_nao_e_sobrescrito_pelo_pai(camada):
+def test_jinja_branch_is_not_overwritten_by_the_parent(camada):
     entrada = {"output": camada, "branch": True}
     saida = asyncio.run(_jinja("{{ false }}").execute(entrada))
     assert saida["branch"] is False
@@ -133,15 +133,15 @@ def test_jinja_branch_nao_e_sobrescrito_pelo_pai(camada):
 
 # ── ChangeDetector: `output` comes before `branch` ──────────────────────────
 
-def test_change_detector_devolve_o_dado_antes_do_branch():
+def test_change_detector_returns_the_data_before_the_branch():
     """Without executing the node (it needs Redis): the dict's shape is the contract."""
     import inspect
     from flow.nodes.control.change_detector import ChangeDetector
 
     fonte = inspect.getsource(ChangeDetector.execute)
-    pos_output = fonte.index('"output":')
-    pos_branch = fonte.index('"branch":', fonte.index("def _resultado"))
-    assert pos_output < pos_branch, "branch como primeira chave volta a mascarar o dado"
+    output_pos = fonte.index('"output":')
+    branch_pos = fonte.index('"branch":', fonte.index("def _resultado"))
+    assert output_pos < branch_pos, "branch como primeira chave volta a mascarar o dado"
 
 
 # ── get_first_gdf doesn't warn about a choice that doesn't exist ────────────
@@ -155,20 +155,20 @@ class _NoFalso(BaseNode):
         return {}
 
 
-def test_mesma_camada_em_duas_chaves_nao_gera_aviso(camada, caplog):
+def test_same_layer_in_two_keys_does_not_warn(camada, caplog):
     """It is exactly what the branch produces: `result` and the parent's key
     pointing to the SAME object. There is no ambiguity to warn about."""
     import logging
 
     no = _NoFalso(node_id="n1", parameters={})
     with caplog.at_level(logging.INFO):
-        achada = no.get_first_gdf({"output": camada, "result": camada})
+        found = no.get_first_gdf({"output": camada, "result": camada})
 
-    assert achada is camada
+    assert found is camada
     assert "Mais de uma camada" not in caplog.text
 
 
-def test_camadas_distintas_continuam_avisando(camada, caplog):
+def test_distinct_layers_still_warn(camada, caplog):
     """The original guard has to survive: two DIFFERENT layers are real
     ambiguity, and silence there was the bug it came to fix."""
     import logging
@@ -190,7 +190,7 @@ def test_camadas_distintas_continuam_avisando(camada, caplog):
 
 @pytest.mark.parametrize("cls", [Conditional, JinjaBranchNode],
                          ids=lambda c: c.__name__)
-def test_o_primeiro_campo_do_schema_e_o_dado(cls):
+def test_the_first_schema_field_is_the_data(cls):
     campos = cls.description()["outputs"]
     assert campos[0]["name"] == "result", (
         f"{cls.__name__}: com '{campos[0]['name']}' na frente, a simulação "
@@ -198,13 +198,13 @@ def test_o_primeiro_campo_do_schema_e_o_dado(cls):
     )
 
 
-def test_change_detector_ja_anuncia_o_dado_primeiro():
+def test_change_detector_already_announces_the_data_first():
     from flow.nodes.control.change_detector import ChangeDetector
     campos = ChangeDetector.description()["outputs"]
     assert campos[0]["name"] == "output"
 
 
-def test_todo_operador_do_select_tem_funcao():
+def test_every_select_operator_has_a_function():
     """Conditional indexes `_OP_FUNCS` directly by the operator, without checking:
     what guarantees it is one of the options is `validate()`. So every
     option needs its own function."""
@@ -221,7 +221,7 @@ def test_todo_operador_do_select_tem_funcao():
 # Merge started picking `value` — the metric's number — instead of the layer.
 
 @pytest.mark.parametrize("estrategia,esperado", [("first", 0), ("last", -1)])
-def test_o_dado_esta_nas_duas_pontas_do_dict(camada, estrategia, esperado):
+def test_the_data_is_at_both_ends_of_the_dict(camada, estrategia, esperado):
     saida = asyncio.run(_cond().execute({"output": camada}))
     valores = list(saida.values())
     assert isinstance(valores[esperado], gpd.GeoDataFrame), (
@@ -229,29 +229,29 @@ def test_o_dado_esta_nas_duas_pontas_do_dict(camada, estrategia, esperado):
     )
 
 
-def test_merge_com_estrategia_ultimo_recebe_a_camada(camada):
+def test_merge_with_last_strategy_receives_the_layer(camada):
     """Real integration with the node that reads back to front."""
     from flow.nodes.control.merge import MergeNode
 
-    saida_cond = asyncio.run(_cond().execute({"output": camada}))
+    cond_output = asyncio.run(_cond().execute({"output": camada}))
     merge = MergeNode(node_id="m", parameters={"strategy": "last"})
-    saida_merge = asyncio.run(merge.execute(dict(saida_cond)))
+    merge_output = asyncio.run(merge.execute(dict(cond_output)))
 
-    assert isinstance(saida_merge["output"], gpd.GeoDataFrame)
-    assert len(saida_merge["output"]) == 3
+    assert isinstance(merge_output["output"], gpd.GeoDataFrame)
+    assert len(merge_output["output"]) == 3
 
 
-def test_merge_com_estrategia_primeiro_recebe_a_camada(camada):
+def test_merge_with_first_strategy_receives_the_layer(camada):
     from flow.nodes.control.merge import MergeNode
 
-    saida_cond = asyncio.run(_cond().execute({"output": camada}))
+    cond_output = asyncio.run(_cond().execute({"output": camada}))
     merge = MergeNode(node_id="m", parameters={"strategy": "first"})
-    saida_merge = asyncio.run(merge.execute(dict(saida_cond)))
+    merge_output = asyncio.run(merge.execute(dict(cond_output)))
 
-    assert isinstance(saida_merge["output"], gpd.GeoDataFrame)
+    assert isinstance(merge_output["output"], gpd.GeoDataFrame)
 
 
-def test_a_ordem_e_estavel_encadeando_nos_diferentes(camada):
+def test_the_order_is_stable_chaining_different_nodes(camada):
     """Reassigning an existing key keeps its POSITION in a Python dict. Without
     removing the control keys before rewriting them, the `result` inherited
     from JinjaBranch stayed in the middle and `value` ended up as the last key."""
@@ -264,7 +264,7 @@ def test_a_ordem_e_estavel_encadeando_nos_diferentes(camada):
     assert isinstance(list(saida.values())[-1], gpd.GeoDataFrame)
 
 
-def test_chave_de_controle_do_pai_nao_e_repassada_em_duplicidade(camada):
+def test_parent_control_key_is_not_passed_on_twice(camada):
     """The parent's `branch`/`value`/`result` are superseded, not accumulated."""
     entrada = {"output": camada, "branch": True, "value": 99, "result": "velho"}
     saida = asyncio.run(_cond(operator=">", compareTo="5").execute(entrada))

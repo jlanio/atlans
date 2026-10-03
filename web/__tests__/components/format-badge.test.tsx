@@ -15,8 +15,8 @@ function svgDe(format: string): string {
 
 describe("FormatBadge", () => {
   it("png e jpg usam o ícone de imagem, diferente do genérico", () => {
-    const generico = svgDe("xyz")
-    expect(svgDe("png")).not.toBe(generico)
+    const generic = svgDe("xyz")
+    expect(svgDe("png")).not.toBe(generic)
     expect(svgDe("jpg")).toBe(svgDe("png"))
     expect(svgDe("jpeg")).toBe(svgDe("png"))
   })

@@ -11,71 +11,71 @@ import pandas as pd
 import pytest
 from shapely.geometry import Point
 
-from flow.executor.utils import MAX_COLUNAS, _colunas_das_saidas
+from flow.executor.utils import MAX_COLUMNS, _output_columns
 
 
-def test_lista_as_colunas_de_um_dataframe():
+def test_lists_the_columns_of_a_dataframe():
     df = pd.DataFrame({"cod": [1], "populacao": [2]})
-    assert _colunas_das_saidas({"result": df}) == {"result": ["cod", "populacao"]}
+    assert _output_columns({"result": df}) == {"result": ["cod", "populacao"]}
 
 
-def test_uma_entrada_por_saida():
+def test_one_entry_per_output():
     saidas = {"a": pd.DataFrame({"x": [1]}), "b": pd.DataFrame({"y": [1]})}
-    assert _colunas_das_saidas(saidas) == {"a": ["x"], "b": ["y"]}
+    assert _output_columns(saidas) == {"a": ["x"], "b": ["y"]}
 
 
-def test_ignora_saida_que_nao_e_tabela():
-    assert _colunas_das_saidas({"texto": "abc", "n": 42}) is None
+def test_ignores_output_that_is_not_a_table():
+    assert _output_columns({"texto": "abc", "n": 42}) is None
 
 
-def test_dict_vazio_devolve_none():
+def test_empty_dict_returns_none():
     # None and not {}: the key only exists in node_stats when there is something to say.
-    assert _colunas_das_saidas({}) is None
+    assert _output_columns({}) is None
 
 
 # ── The geometry stays out ───────────────────────────────────────────────────
 
-def test_geometria_nao_e_sugerida():
+def test_geometry_is_not_suggested():
     """Suggesting the geometry is suggesting what always fails: in the Join,
     bringing it from B collides with A's; in the filter, comparing geometry to
     a value breaks too.
     """
     gdf = gpd.GeoDataFrame({"cod": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
-    assert _colunas_das_saidas({"output": gdf}) == {"output": ["cod"]}
+    assert _output_columns({"output": gdf}) == {"output": ["cod"]}
 
 
-def test_pergunta_ao_geodataframe_em_vez_de_adivinhar_pelo_nome():
+def test_asks_the_geodataframe_instead_of_guessing_by_name():
     """The database nodes use 'geom', not 'geometry'. Excluding by a fixed name
     would let the geometry through here — and would drop an ATTRIBUTE named
     'geom' in a plain DataFrame."""
     gdf = gpd.GeoDataFrame({"cod": [1], "geom": [Point(0, 0)]}, geometry="geom")
-    assert _colunas_das_saidas({"output": gdf}) == {"output": ["cod"]}
+    assert _output_columns({"output": gdf}) == {"output": ["cod"]}
 
 
-def test_atributo_chamado_geom_em_tabela_comum_continua_valendo():
+def test_attribute_named_geom_in_plain_table_still_counts():
     df = pd.DataFrame({"cod": [1], "geom": ["texto qualquer"]})
-    assert _colunas_das_saidas({"result": df}) == {"result": ["cod", "geom"]}
+    assert _output_columns({"result": df}) == {"result": ["cod", "geom"]}
 
 
 # ── Truncamento ──────────────────────────────────────────────────────────────
 
-def test_corta_no_teto():
-    largo = pd.DataFrame({f"c{i}": [1] for i in range(MAX_COLUNAS + 50)})
-    assert len(_colunas_das_saidas({"result": largo})["result"]) == MAX_COLUNAS
+def test_truncates_at_the_ceiling():
+    wide = pd.DataFrame({f"c{i}": [1] for i in range(MAX_COLUMNS + 50)})
+    assert len(_output_columns({"result": wide})["result"]) == MAX_COLUMNS
 
 
-def test_nao_inventa_item_na_lista_ao_cortar():
+def test_does_not_invent_list_item_when_truncating():
     """REGRESSION: the truncation marker ("… (+50)") went along with the columns,
     and the UI renders EACH item as a clickable suggestion — you could insert the
     marker as if it were a column name. Whoever displays it infers the
     truncation from the length."""
-    largo = pd.DataFrame({f"c{i}": [1] for i in range(MAX_COLUNAS + 50)})
-    nomes = _colunas_das_saidas({"result": largo})["result"]
+    wide = pd.DataFrame({f"c{i}": [1] for i in range(MAX_COLUMNS + 50)})
+    nomes = _output_columns({"result": wide})["result"]
 
     assert all(n.startswith("c") for n in nomes), [n for n in nomes if not n.startswith("c")]
-    assert nomes[-1] == f"c{MAX_COLUNAS - 1}"
+    assert nomes[-1] == f"c{MAX_COLUMNS - 1}"
 
 
 @pytest.mark.parametrize("entrada", [None, {"x": None}])
-def test_nao_quebra_com_entrada_estranha(entrada):
-    _colunas_das_saidas(entrada)
+def test_does_not_break_on_odd_input(entrada):
+    _output_columns(entrada)

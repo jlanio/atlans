@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
-  ESCOPOS, ESCOPOS_SOMENTE_LEITURA, ESCOPO_DESCRICOES, ESCOPO_ROTULOS,
-  ordenarEscopos, rotuloDeEscopo, rotuloDeStatus,
+  ESCOPOS, READ_ONLY_SCOPES, SCOPE_DESCRIPTIONS, SCOPE_LABELS,
+  ordenarEscopos, scopeLabel, statusLabel,
 } from "@/app/components/tokens/escopo-rotulos"
 
 describe("escopo-rotulos", () => {
@@ -10,22 +10,22 @@ describe("escopo-rotulos", () => {
       "workflows:read", "workflows:write", "runs:execute", "triggers:manage", "drive:read", "drive:write",
     ])
     for (const escopo of ESCOPOS) {
-      expect(ESCOPO_ROTULOS[escopo]).toBeTruthy()
-      expect(ESCOPO_DESCRICOES[escopo]).toBeTruthy()
+      expect(SCOPE_LABELS[escopo]).toBeTruthy()
+      expect(SCOPE_DESCRIPTIONS[escopo]).toBeTruthy()
     }
   })
 
   it("rótulos curtos em pt-BR", () => {
-    expect(rotuloDeEscopo("workflows:read")).toBe("Ler fluxos")
-    expect(rotuloDeEscopo("workflows:write")).toBe("Criar e editar fluxos")
-    expect(rotuloDeEscopo("runs:execute")).toBe("Executar fluxos")
-    expect(rotuloDeEscopo("triggers:manage")).toBe("Gerenciar agendamentos e webhooks")
-    expect(rotuloDeEscopo("drive:read")).toBe("Ler o Drive")
-    expect(rotuloDeEscopo("drive:write")).toBe("Enviar arquivos ao Drive")
+    expect(scopeLabel("workflows:read")).toBe("Ler fluxos")
+    expect(scopeLabel("workflows:write")).toBe("Criar e editar fluxos")
+    expect(scopeLabel("runs:execute")).toBe("Executar fluxos")
+    expect(scopeLabel("triggers:manage")).toBe("Gerenciar agendamentos e webhooks")
+    expect(scopeLabel("drive:read")).toBe("Ler o Drive")
+    expect(scopeLabel("drive:write")).toBe("Enviar arquivos ao Drive")
   })
 
   it("escopo desconhecido volta cru no rótulo, sem quebrar", () => {
-    expect(rotuloDeEscopo("admin:everything")).toBe("admin:everything")
+    expect(scopeLabel("admin:everything")).toBe("admin:everything")
   })
 
   it("ordenarEscopos devolve a ordem canônica e ignora o que não conhece", () => {
@@ -34,14 +34,14 @@ describe("escopo-rotulos", () => {
   })
 
   it("«Somente leitura» é ler fluxos + ler o Drive", () => {
-    expect(ESCOPOS_SOMENTE_LEITURA).toEqual(["workflows:read", "drive:read"])
+    expect(READ_ONLY_SCOPES).toEqual(["workflows:read", "drive:read"])
   })
 
   it("status sempre traduzido, com fallback", () => {
-    expect(rotuloDeStatus("active")).toBe("Ativo")
-    expect(rotuloDeStatus("expired")).toBe("Expirado")
-    expect(rotuloDeStatus("revoked")).toBe("Revogado")
-    expect(rotuloDeStatus(null)).toBe("—")
-    expect(rotuloDeStatus("weird")).toBe("weird")
+    expect(statusLabel("active")).toBe("Ativo")
+    expect(statusLabel("expired")).toBe("Expirado")
+    expect(statusLabel("revoked")).toBe("Revogado")
+    expect(statusLabel(null)).toBe("—")
+    expect(statusLabel("weird")).toBe("weird")
   })
 })

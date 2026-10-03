@@ -10,20 +10,20 @@ from mcp_types import ToolAnnotations
 from app.core import config
 from app.core.authorization.workflow_access import exigir_papel
 from app.core.rbac import ROLE_VIEWER
-from app.core.utils.redacao import compactar_definition, redigir_definition
+from app.core.utils.redacao import compact_definition, redact_definition
 from app.mcp import infra
 from app.mcp.escopo import escopo_da_chamada, exigir_escopo
-from app.mcp.resolucao import carregar_workflow, resolver_workspace
-from app.mcp.saida import envelope, iso, resumo_definition
+from app.mcp.resolucao import carregar_workflow, resolve_workspace
+from app.mcp.saida import envelope, iso, definition_summary
 from app.mcp.tools.base import ferramenta
 from app.services.workflow_service import WorkflowService
 from flow.utils.workflow_contract import extract_contract
 
 # Listing ceiling. It is not about saving the database: it is the context budget
 # of whoever reads on the other side — 200 items are already ~40 KB of response.
-LIMITE_MAXIMO = 200
+MAX_LIMIT = 200
 
-_MENSAGEM_PAPEL = "Requer papel 'viewer' ou superior neste workspace."
+_ROLE_MESSAGE = "Requer papel 'viewer' ou superior neste workspace."
 
 
 def _share_url(wf) -> str | None:
@@ -38,7 +38,7 @@ def _share_url(wf) -> str | None:
     return f"{str(config.FRONTEND_URL).rstrip('/')}/share/{wf.id_hash}"
 
 
-def _resumo_de_agendamento(bruto: Any) -> dict | None:
+def _schedule_summary(bruto: Any) -> dict | None:
     """The schedule in closed fields — no raw dates and no extra keys."""
     if not isinstance(bruto, Mapping):
         return None
@@ -54,7 +54,7 @@ def _resumo_de_agendamento(bruto: Any) -> dict | None:
     }
 
 
-def _casa_com_a_busca(item: Mapping[str, Any], termo: str) -> bool:
+def _matches_search(item: Mapping[str, Any], termo: str) -> bool:
     alvo = termo.casefold()
     return alvo in str(item.get("name") or "").casefold() or alvo in str(
         item.get("description") or ""
@@ -68,7 +68,7 @@ async def list_workflows(
     search: str | None = None,
     only_active: bool = False,
     limit: int = 100,
-    incluir_do_assistente: bool | None = None,
+    include_from_assistant: bool | None = None,
 ) -> dict:
     """Lists the workflows of the workspaces within the token's reach.
 
@@ -78,7 +78,7 @@ async def list_workflows(
     cost is acceptable because the query is already per workspace and does not
     load definitions.
 
-    `incluir_do_assistente` mirrors REST's `?assistente=1`. Left as `None`, it
+    `include_from_assistant` mirrors REST's `?assistente=1`. Left as `None`, it
     is resolved by the scope: the Home assistant stamps `origem="assistente"`
     on everything it creates, and with the `False` default it could not see
     its OWN workflows — in a new chat, "roda de novo aquele do desmatamento"
@@ -88,31 +88,31 @@ async def list_workflows(
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
-    teto = max(1, min(int(limit), LIMITE_MAXIMO))
-    se_assistente = (
-        bool(incluir_do_assistente)
-        if incluir_do_assistente is not None
+    teto = max(1, min(int(limit), MAX_LIMIT))
+    assistant_only = (
+        bool(include_from_assistant)
+        if include_from_assistant is not None
         else getattr(escopo, "origem_dos_fluxos", None) == "assistente"
     )
 
     async with infra.sessao() as db:
         if workspace_id is not None:
-            alcance = [await resolver_workspace(db, escopo, workspace_id)]
+            alcance = [await resolve_workspace(db, escopo, workspace_id)]
         else:
             alcance = sorted(escopo.workspace_ids)
         if not alcance:
             return {"items": [], "total": 0, "limit": teto}
         brutos = await WorkflowService(db).list_workflows_metadata_by_ids(
-            alcance, incluir_do_assistente=se_assistente
+            alcance, include_from_assistant=assistant_only
         )
 
-    filtrados = [
+    filtered = [
         item
         for item in brutos
         if (not only_active or bool(item.get("flag_ative")))
-        and (not search or _casa_com_a_busca(item, search))
+        and (not search or _matches_search(item, search))
     ]
-    pagina = sorted(filtrados, key=lambda i: str(i.get("updated_at") or ""), reverse=True)[:teto]
+    pagina = sorted(filtered, key=lambda i: str(i.get("updated_at") or ""), reverse=True)[:teto]
 
     itens = [
         envelope(
@@ -131,7 +131,7 @@ async def list_workflows(
                 "has_geofence_trigger": bool(item.get("has_geofence_trigger")),
                 "has_publish_map": bool(item.get("has_publish_map")),
                 "portal_access": item.get("portal_access"),
-                "schedule": _resumo_de_agendamento(item.get("schedule")),
+                "schedule": _schedule_summary(item.get("schedule")),
                 "updated_at": iso(item.get("updated_at")),
             },
             name=item.get("name"),
@@ -139,7 +139,7 @@ async def list_workflows(
         )
         for item in pagina
     ]
-    return {"items": itens, "total": len(filtrados), "limit": teto}
+    return {"items": itens, "total": len(filtered), "limit": teto}
 
 
 @ferramenta
@@ -150,8 +150,8 @@ async def get_workflow(
 
     The definition only goes out on request (`include_definition=true`) and is
     always REDACTED: the workflow is loaded without decrypting and what is
-    handed over goes through `redigir_definition` (secrets become
-    `<REDACTED>`) and `compactar_definition` (position and viewport, which
+    handed over goes through `redact_definition` (secrets become
+    `<REDACTED>`) and `compact_definition` (position and viewport, which
     only serve the canvas, do not travel).
     """
     escopo = escopo_da_chamada(ctx)
@@ -159,9 +159,9 @@ async def get_workflow(
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_VIEWER, _MENSAGEM_PAPEL)
+        exigir_papel(papel, ROLE_VIEWER, _ROLE_MESSAGE)
         versoes = await WorkflowService(db).list_versions(wf.id_hash)
-        segura = compactar_definition(redigir_definition(wf.definition or {}))
+        segura = compact_definition(redact_definition(wf.definition or {}))
         dados = {
             "id": wf.id_hash,
             "workspace_id": wf.workspace_id,
@@ -172,7 +172,7 @@ async def get_workflow(
             "created_at": iso(wf.created_at),
             "updated_at": iso(wf.updated_at),
         }
-        resumo = resumo_definition(segura, pin_metadata=wf.pin_metadata)
+        resumo = definition_summary(segura, pin_metadata=wf.pin_metadata)
         nome, descricao = wf.name, wf.description
         # Raw: sanitizing is the `envelope`'s job, once, on output.
         esquema = wf.params_schema if wf.params_schema else None
@@ -215,7 +215,7 @@ async def get_workflow_contract(ctx: Context, workflow_id: str) -> dict:
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_VIEWER, _MENSAGEM_PAPEL)
+        exigir_papel(papel, ROLE_VIEWER, _ROLE_MESSAGE)
         contrato = extract_contract(wf.definition or {})
         dados = {
             "id": wf.id_hash,
@@ -247,7 +247,7 @@ async def get_portal_info(ctx: Context, workflow_id: str) -> dict:
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_VIEWER, _MENSAGEM_PAPEL)
+        exigir_papel(papel, ROLE_VIEWER, _ROLE_MESSAGE)
         compartilhado = wf.portal_shared_with or []
         dados = {
             "id": wf.id_hash,
@@ -255,17 +255,17 @@ async def get_portal_info(ctx: Context, workflow_id: str) -> dict:
             "portal_access": wf.portal_access,
             "share_url": _share_url(wf),
         }
-        com_quem = list(compartilhado) if isinstance(compartilhado, list) else []
+        shared_with_list = list(compartilhado) if isinstance(compartilhado, list) else []
 
     # `portal_shared_with` is a free-text column that ANY editor of the
     # workflow fills in — the shortest channel between a person and the client
     # reading this response. A command sentence written there goes out as data,
     # inside `untrusted_data`, never alongside the fields the platform generates.
     # An empty list still appears: "shared with no one" is an answer.
-    return envelope(dados, shared_with=com_quem)
+    return envelope(dados, shared_with=shared_with_list)
 
 
-_SOMENTE_LEITURA = ToolAnnotations(
+_READ_ONLY = ToolAnnotations(
     read_only_hint=True,
     destructive_hint=False,
     idempotent_hint=True,
@@ -283,7 +283,7 @@ def registrar(server) -> None:
             "agendamento e estado do portal. Filtre por `workspace_id`, por texto "
             "(`search`, sobre nome e descrição) e por `only_active`."
         ),
-        annotations=_SOMENTE_LEITURA,
+        annotations=_READ_ONLY,
     )(list_workflows)
 
     server.tool(
@@ -295,7 +295,7 @@ def registrar(server) -> None:
             "`include_definition=true` devolve também a definição completa, sempre "
             "redigida — segredos saem como <REDACTED>."
         ),
-        annotations=_SOMENTE_LEITURA,
+        annotations=_READ_ONLY,
     )(get_workflow)
 
     server.tool(
@@ -305,7 +305,7 @@ def registrar(server) -> None:
             "Entradas e saídas declaradas do workflow como sub-fluxo, para encadear um "
             "fluxo dentro de outro."
         ),
-        annotations=_SOMENTE_LEITURA,
+        annotations=_READ_ONLY,
     )(get_workflow_contract)
 
     server.tool(
@@ -315,5 +315,5 @@ def registrar(server) -> None:
             "Estado de publicação do workflow no portal: acesso (disabled/public/private), "
             "endereço absoluto de compartilhamento e com quem foi compartilhado."
         ),
-        annotations=_SOMENTE_LEITURA,
+        annotations=_READ_ONLY,
     )(get_portal_info)

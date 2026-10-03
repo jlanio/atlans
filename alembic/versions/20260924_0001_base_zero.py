@@ -37,10 +37,10 @@ down_revision = None
 branch_labels = None
 depends_on = None
 
-_RAIZ = Path(__file__).resolve().parents[2]
+_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _sql_sem_alembic_version(sql: str) -> str:
+def _sql_without_alembic_version(sql: str) -> str:
     """The script ready for `op.execute`.
 
     Two cuts, neither of them changing the effect on an empty database:
@@ -57,8 +57,8 @@ def _sql_sem_alembic_version(sql: str) -> str:
     sql = re.sub(r"^\s*--[^\n]*$", "", sql, flags=re.M)
     # No executable command targeting the alembic table may remain, and
     # no fake psql bind may reach text().
-    sobras = re.search(r"^\s*(DROP|CREATE|INSERT)[^\n]*alembic_version", sql, flags=re.M | re.I)
-    assert not sobras, f"filtro deixou passar: {sobras.group(0)!r}"
+    leftovers = re.search(r"^\s*(DROP|CREATE|INSERT)[^\n]*alembic_version", sql, flags=re.M | re.I)
+    assert not leftovers, f"filtro deixou passar: {leftovers.group(0)!r}"
     assert ":app_user" not in sql
     return sql
 
@@ -104,10 +104,10 @@ def upgrade() -> None:
     if context.is_offline_mode():
         op.execute(_GUARDA_OFFLINE)
     else:
-        tem_users = op.get_bind().execute(
+        has_users = op.get_bind().execute(
             sa.text("SELECT to_regclass('public.users') IS NOT NULL")
         ).scalar()
-        if tem_users:
+        if has_users:
             raise RuntimeError(
                 "Este banco ja tem tabelas da aplicacao, mas nenhum carimbo do "
                 "alembic — executar a base zero aqui APAGARIA os dados (o corpo "
@@ -116,15 +116,15 @@ def upgrade() -> None:
                 "psql -f scripts/init_schema.sql."
             )
 
-    caminho = _RAIZ / "scripts" / "init_schema.sql"
-    op.execute(_sql_sem_alembic_version(caminho.read_text(encoding="utf-8")))
+    caminho = _ROOT / "scripts" / "init_schema.sql"
+    op.execute(_sql_without_alembic_version(caminho.read_text(encoding="utf-8")))
 
     # The tables of each extension present, after the core ones and with the same
     # filter. Without extensions (the free distribution), nothing.
     from app.extensoes import esquemas
 
     for esquema in esquemas():
-        op.execute(_sql_sem_alembic_version(esquema.read_text(encoding="utf-8")))
+        op.execute(_sql_without_alembic_version(esquema.read_text(encoding="utf-8")))
 
 
 def downgrade() -> None:

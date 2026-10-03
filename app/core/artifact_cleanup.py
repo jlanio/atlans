@@ -5,7 +5,7 @@ Periodic cleanup loop for expired artifacts.
 Runs as a background task in the API lifespan.
 Interval: ARTIFACT_CLEANUP_INTERVAL seconds (default: 3600 = 1h).
 
-Distributed Redis lock (`laco_periodico`, with TTL = the interval) — ensures that
+Distributed Redis lock (`periodic_loop`, with TTL = the interval) — ensures that
 only one uvicorn worker runs the cleanup per interval, avoiding redundant
 queries with --workers N.
 """
@@ -15,10 +15,10 @@ import os
 from sqlalchemy import select
 
 from app.core.db import AsyncSessionLocal
-from app.core.tarefas_periodicas import laco_periodico
+from app.core.tarefas_periodicas import periodic_loop
 from app.core.utils.datetime_utils import utc_now_naive
 from app.models.artifact import Artifact
-from app.services.remocao_de_artefatos import remover_artefatos
+from app.services.remocao_de_artefatos import remove_artifacts
 
 logger = get_logger(__name__)
 
@@ -26,7 +26,7 @@ _CLEANUP_INTERVAL = int(os.getenv("ARTIFACT_CLEANUP_INTERVAL", "3600"))
 _CLEANUP_LOCK_KEY = "artifact_cleanup:lock"
 
 
-async def _ordenar_remocao_local(por_executor: dict[str, list[dict]]) -> list:
+async def _ordenar_remocao_local(by_executor: dict[str, list[dict]]) -> list:
     """Tells each executor to delete the expired local artifacts it holds.
 
     Returns the database ids whose order was DELIVERED — only those can have their
@@ -42,7 +42,7 @@ async def _ordenar_remocao_local(por_executor: dict[str, list[dict]]) -> list:
     from app.core.executor_connections import executor_registry
 
     entregues: list = []
-    for executor_id, itens in por_executor.items():
+    for executor_id, itens in by_executor.items():
         try:
             # ⚠️ The RETURN VALUE matters. `send_json` returns False — without raising —
             # when the executor is offline, when the Redis relay has no
@@ -116,7 +116,7 @@ async def purgar_pendentes_do_executor(executor_id: str) -> int:
         if not pendentes:
             return 0
 
-        remocao = await remover_artefatos(db, pendentes, agendar_pendentes=False)
+        remocao = await remove_artifacts(db, pendentes, schedule_pending=False)
         if remocao.apagados:
             await db.commit()
         return len(remocao.apagados)
@@ -148,7 +148,7 @@ async def purge_expired_artifacts() -> int:
         # local content only goes once the order is DELIVERED to the executor — with it
         # offline, deleting the row would leave the file forever on the user's
         # disk, with nothing to record it: retention that does not happen.
-        remocao = await remover_artefatos(db, expired, agendar_pendentes=False)
+        remocao = await remove_artifacts(db, expired, schedule_pending=False)
         if remocao.apagados:
             await db.commit()
         if remocao.falhas_s3:
@@ -166,6 +166,6 @@ async def run_cleanup_loop() -> None:
 
     A Redis lock ensures that only one uvicorn worker runs the cleanup per interval.
     """
-    await laco_periodico(
+    await periodic_loop(
         "Cleanup de artefatos", _CLEANUP_INTERVAL, purge_expired_artifacts, lock=_CLEANUP_LOCK_KEY
     )

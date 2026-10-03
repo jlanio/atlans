@@ -5,17 +5,17 @@ import "./globals.css";
 import { cookies } from 'next/headers';
 import { cn } from '@/lib/utils';
 import { lerFundosDoAmbiente } from '@/lib/fundos-do-mapa';
-import { FundosDoMapaProvider } from '@/app/components/share/fundos-do-mapa';
-import { lerCodigoFonteDoAmbiente } from '@/lib/codigo-fonte';
-import { CodigoFonteProvider } from '@/app/components/share/codigo-fonte';
-import { lerNomeNaTelaDoAmbiente } from '@/lib/nome-na-tela';
-import { NomeNaTelaProvider } from '@/app/components/share/nome-na-tela';
+import { MapBasemapsProvider } from '@/app/components/share/fundos-do-mapa';
+import { readSourceCodeFromEnv } from '@/lib/codigo-fonte';
+import { SourceCodeProvider } from '@/app/components/share/codigo-fonte';
+import { readDisplayNameFromEnv } from '@/lib/nome-na-tela';
+import { DisplayNameProvider } from '@/app/components/share/nome-na-tela';
 
 // The tab title is this installation's name (NOME_NA_TELA; "Atlans" without it),
 // read on every request like the rest of the layout configuration.
 export async function generateMetadata() {
   return {
-    title: lerNomeNaTelaDoAmbiente(process.env),
+    title: readDisplayNameFromEnv(process.env),
     description: 'Spatial data factory by flow',
   };
 }
@@ -49,26 +49,26 @@ export default async function RootLayout(props: { children: ReactNode }) {
   const mode = cookieStore.get("theme")?.value ?? "dark";
   // This installation's tile servers (MAPA_*), read on every request: the
   // layout is already dynamic (cookies), and the web image is the same for all.
-  const fundosDoMapa = lerFundosDoAmbiente(process.env);
+  const mapBasemaps = lerFundosDoAmbiente(process.env);
   // The link to this installation's source code (CODIGO_FONTE_URL, AGPL §13),
   // read the same way: the sign-in screen and the account menu show it.
-  const codigoFonte = lerCodigoFonteDoAmbiente(process.env);
+  const codigoFonte = readSourceCodeFromEnv(process.env);
   // The name the screen shows (NOME_NA_TELA): the sidebar wordmark and the
   // sign-in screen header. The code shows "Atlans"; the form with the
   // domain belongs to the trademark holder's installation (TRADEMARKS.md).
-  const nomeNaTela = lerNomeNaTelaDoAmbiente(process.env);
+  const displayName = readDisplayNameFromEnv(process.env);
 
   return (
     <html lang="pt-BR" suppressHydrationWarning className={cn(mode === "dark" && "dark", inter.variable)}>
       <body suppressHydrationWarning>
         <Suspense>
-          <FundosDoMapaProvider fundos={fundosDoMapa}>
-            <CodigoFonteProvider url={codigoFonte}>
-              <NomeNaTelaProvider nome={nomeNaTela}>
+          <MapBasemapsProvider fundos={mapBasemaps}>
+            <SourceCodeProvider url={codigoFonte}>
+              <DisplayNameProvider nome={displayName}>
                 {props.children}
-              </NomeNaTelaProvider>
-            </CodigoFonteProvider>
-          </FundosDoMapaProvider>
+              </DisplayNameProvider>
+            </SourceCodeProvider>
+          </MapBasemapsProvider>
           <Toaster />
         </Suspense>
       </body>

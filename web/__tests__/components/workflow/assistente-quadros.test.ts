@@ -13,8 +13,8 @@ import {
   aplicarQuadro,
   cotaDoQuadro,
   criarDecodificador,
-  turnoVazio,
-  type TurnoDoAssistente,
+  emptyTurn,
+  type AssistantTurn,
 } from "@/app/components/home/assistente/quadros"
 
 const quadro = (evento: string, dados: unknown) =>
@@ -22,8 +22,8 @@ const quadro = (evento: string, dados: unknown) =>
 
 describe("criarDecodificador", () => {
   it("lê um quadro inteiro", () => {
-    const alimentar = criarDecodificador()
-    expect(alimentar(quadro("texto", { texto: "oi" }))).toEqual([
+    const feed = criarDecodificador()
+    expect(feed(quadro("texto", { texto: "oi" }))).toEqual([
       { evento: "texto", dados: { texto: "oi" } },
     ])
   })
@@ -31,36 +31,36 @@ describe("criarDecodificador", () => {
   it("quadro partido no meio do JSON entre dois read() sai inteiro", () => {
     // The classic defect. Without remembering the remainder, the first chunk
     // would become a `JSON.parse` of `{"texto": "mun` and the conversation would die here.
-    const alimentar = criarDecodificador()
+    const feed = criarDecodificador()
     const inteiro = quadro("texto", { texto: "municípios" })
     const corte = inteiro.indexOf("munic") + 3
 
-    expect(alimentar(inteiro.slice(0, corte))).toEqual([])
-    expect(alimentar(inteiro.slice(corte))).toEqual([
+    expect(feed(inteiro.slice(0, corte))).toEqual([])
+    expect(feed(inteiro.slice(corte))).toEqual([
       { evento: "texto", dados: { texto: "municípios" } },
     ])
   })
 
   it("corte exatamente entre o `\\n` e o `\\n` que fecham o quadro", () => {
     // The worst place to cut: the frame is complete but the terminator isn't.
-    const alimentar = criarDecodificador()
+    const feed = criarDecodificador()
     const inteiro = quadro("fim", { ok: true })
 
-    expect(alimentar(inteiro.slice(0, inteiro.length - 1))).toEqual([])
-    expect(alimentar(inteiro.slice(inteiro.length - 1))).toEqual([
+    expect(feed(inteiro.slice(0, inteiro.length - 1))).toEqual([])
+    expect(feed(inteiro.slice(inteiro.length - 1))).toEqual([
       { evento: "fim", dados: { ok: true } },
     ])
   })
 
   it("`\\r\\n` partido entre dois pedaços ainda termina a linha", () => {
-    const alimentar = criarDecodificador()
-    expect(alimentar('event: texto\r\ndata: {"texto":"a"}\r')).toEqual([])
-    expect(alimentar("\n\r\n")).toEqual([{ evento: "texto", dados: { texto: "a" } }])
+    const feed = criarDecodificador()
+    expect(feed('event: texto\r\ndata: {"texto":"a"}\r')).toEqual([])
+    expect(feed("\n\r\n")).toEqual([{ evento: "texto", dados: { texto: "a" } }])
   })
 
   it("vários quadros num pedaço só saem na ordem", () => {
-    const alimentar = criarDecodificador()
-    const saida = alimentar(
+    const feed = criarDecodificador()
+    const saida = feed(
       quadro("pensando", { texto: "hm" }) +
         quadro("ferramenta", { id: "t1", nome: "search_nodes", argumentos: {} }) +
         quadro("ferramenta_fim", { id: "t1", nome: "search_nodes", erro: false }),
@@ -69,30 +69,30 @@ describe("criarDecodificador", () => {
   })
 
   it("quadro ilegível é descartado sem derrubar os seguintes", () => {
-    const alimentar = criarDecodificador()
-    const saida = alimentar(`event: texto\ndata: {não é json}\n\n${quadro("fim", { ok: true })}`)
+    const feed = criarDecodificador()
+    const saida = feed(`event: texto\ndata: {não é json}\n\n${quadro("fim", { ok: true })}`)
     expect(saida).toEqual([{ evento: "fim", dados: { ok: true } }])
   })
 
   it("comentário de keep-alive não vira quadro", () => {
-    const alimentar = criarDecodificador()
-    expect(alimentar(":\n\n")).toEqual([])
-    expect(alimentar(": ping\n\n")).toEqual([])
+    const feed = criarDecodificador()
+    expect(feed(":\n\n")).toEqual([])
+    expect(feed(": ping\n\n")).toEqual([])
   })
 })
 
 // ── A conversa ───────────────────────────────────────────────────────────────
 
-const aplicarTodos = (eventos: [string, unknown][]): TurnoDoAssistente =>
+const applyAll = (eventos: [string, unknown][]): AssistantTurn =>
   eventos.reduce(
     (turno, [evento, dados]) =>
       aplicarQuadro(turno, { evento, dados: dados as Record<string, unknown> }),
-    turnoVazio("t"),
+    emptyTurn("t"),
   )
 
 describe("aplicarQuadro", () => {
   it("texto em pedaços vira UM bloco, e não um bloco por delta", () => {
-    const turno = aplicarTodos([
+    const turno = applyAll([
       ["texto", { texto: "Vou " }],
       ["texto", { texto: "montar " }],
       ["texto", { texto: "o fluxo." }],
@@ -103,7 +103,7 @@ describe("aplicarQuadro", () => {
   it("a linha do tempo preserva o que veio antes e depois de cada ferramenta", () => {
     // It's what keeps someone from applying a workflow without understanding
     // it: the explanation lives between the steps, not in a single field at the end.
-    const turno = aplicarTodos([
+    const turno = applyAll([
       ["pensando", { texto: "preciso do catálogo" }],
       ["texto", { texto: "Procurando nós…" }],
       ["ferramenta", { id: "t1", nome: "search_nodes", argumentos: { query: "buffer" } }],
@@ -121,7 +121,7 @@ describe("aplicarQuadro", () => {
   })
 
   it("ferramenta corre, recebe progresso e fecha em ok", () => {
-    const turno = aplicarTodos([
+    const turno = applyAll([
       ["ferramenta", { id: "t1", nome: "run_workflow", argumentos: { workflow_id: "abc" } }],
       ["progresso", { concluidos: 2, total: 5, mensagem: "Buffer: completed (1.2s)" }],
       ["ferramenta_fim", { id: "t1", nome: "run_workflow", erro: false }],
@@ -140,7 +140,7 @@ describe("aplicarQuadro", () => {
   it("progresso com `id` pinta a dona certa, mesmo com duas correndo", () => {
     // The tools of one round run in parallel on the backend: two are "running"
     // at the same time, and the `progresso` frame carries its owner's id.
-    const turno = aplicarTodos([
+    const turno = applyAll([
       ["ferramenta", { id: "t1", nome: "run_workflow", argumentos: {} }],
       ["ferramenta", { id: "t2", nome: "describe_node", argumentos: {} }],
       ["progresso", { id: "t1", concluidos: 3, total: 5, mensagem: "nó 3/5" }],
@@ -155,7 +155,7 @@ describe("aplicarQuadro", () => {
   })
 
   it("progresso sem `id` segue no critério antigo (replay de conversa gravada)", () => {
-    const turno = aplicarTodos([
+    const turno = applyAll([
       ["ferramenta", { id: "t1", nome: "run_workflow", argumentos: {} }],
       ["progresso", { concluidos: 1, total: 4, mensagem: null }],
     ])
@@ -165,7 +165,7 @@ describe("aplicarQuadro", () => {
   })
 
   it("`erro: true` no fim da ferramenta marca o passo, não a conversa", () => {
-    const turno = aplicarTodos([
+    const turno = applyAll([
       ["ferramenta", { id: "t1", nome: "validate_workflow", argumentos: {} }],
       ["ferramenta_fim", { id: "t1", nome: "validate_workflow", erro: true }],
       ["fim", { ok: true, uso: { total: 10 }, voltas: 1 }],
@@ -177,7 +177,7 @@ describe("aplicarQuadro", () => {
 
   it("a proposta chega inteira, com a contagem e o veredito", () => {
     const definicao = { nodes: [{ id: "a", name: "Buffer", properties: {} }], edges: [] }
-    const turno = aplicarTodos([
+    const turno = applyAll([
       ["proposta", { definicao, nos: 1, arestas: 0, ok: true, erros: 0, avisos: 1 }],
     ])
 
@@ -204,7 +204,7 @@ describe("aplicarQuadro", () => {
     // the screen now" from "here's what validation found" — and would redraw
     // on every verdict, undoing what the person changed in between.
     const definicao = { nodes: [{ id: "a", name: "Buffer", properties: {} }], edges: [] }
-    const turno = aplicarTodos([
+    const turno = applyAll([
       ["proposta", { definicao, nos: 1, arestas: 0, desenhar: true, nota: "liguei o buffer" }],
     ])
 
@@ -222,7 +222,7 @@ describe("aplicarQuadro", () => {
   it("relatório ilegível vira veredito desconhecido, e não 'passou'", () => {
     // `null` is "don't know", and the card disables Apply because of it. Treating
     // it as `ok` would offer to apply a workflow nobody confirmed validates.
-    const turno = aplicarTodos([
+    const turno = applyAll([
       ["proposta", { definicao: {}, nos: 0, arestas: 0, ok: null, erros: null, avisos: null }],
     ])
     expect(turno.blocos[0]).toMatchObject({ tipo: "proposta", proposta: { ok: null, erros: null, avisos: null } })
@@ -231,7 +231,7 @@ describe("aplicarQuadro", () => {
   it("o `fim` fecha ferramenta que ficou girando", () => {
     // Round ceiling, model down, tab closed: the turn can end in the middle of
     // a call. A step spinning forever would lie about what happened.
-    const turno = aplicarTodos([
+    const turno = applyAll([
       ["ferramenta", { id: "t1", nome: "run_workflow", argumentos: {} }],
       ["erro", { code: "loop_limit", message: "passou das rodadas", hint: "em partes menores" }],
       ["fim", { ok: false, uso: { entrada: 1, saida: 2, cache_leitura: 3, cache_escrita: 4, total: 10 }, voltas: 12 }],
@@ -248,17 +248,17 @@ describe("aplicarQuadro", () => {
     // In English and Spanish the sentence comes from the dictionary and cites
     // the ceiling ("went past 28 tool rounds"); if the frame lost it, the
     // sentence would fall back to the text without a number.
-    const turno = aplicarTodos([["erro", { code: "loop_limit", message: "passou de 28 rodadas", teto: 28 }]])
+    const turno = applyAll([["erro", { code: "loop_limit", message: "passou de 28 rodadas", teto: 28 }]])
     expect(turno.blocos[0]).toEqual({ tipo: "erro", erro: { code: "loop_limit", message: "passou de 28 rodadas", teto: 28 } })
     // A ceiling that isn't a number doesn't get in (the server sends an integer).
-    const semTeto = aplicarTodos([["erro", { code: "loop_limit", message: "…", teto: "28" }]])
-    expect(semTeto.blocos[0]).toEqual({ tipo: "erro", erro: { code: "loop_limit", message: "…" } })
+    const withoutCeiling = applyAll([["erro", { code: "loop_limit", message: "…", teto: "28" }]])
+    expect(withoutCeiling.blocos[0]).toEqual({ tipo: "erro", erro: { code: "loop_limit", message: "…" } })
   })
 
   it("quadro desconhecido não quebra o painel", () => {
     // Server newer than the panel: ignoring keeps the conversation working
     // instead of bringing it down on an update.
-    const turno = aplicarTodos([
+    const turno = applyAll([
       ["texto", { texto: "oi" }],
       ["quadro_do_futuro", { seja_o_que_for: 1 }],
     ])
@@ -268,7 +268,7 @@ describe("aplicarQuadro", () => {
   it("não muta o turno que recebe", () => {
     // The panel re-renders by identity: mutating in place would make React see
     // no change at all over an entire stream.
-    const antes = turnoVazio("t")
+    const antes = emptyTurn("t")
     const depois = aplicarQuadro(antes, { evento: "texto", dados: { texto: "oi" } })
     expect(antes.blocos).toEqual([])
     expect(depois).not.toBe(antes)
@@ -290,7 +290,7 @@ describe("cotaDoQuadro", () => {
   })
 
   it("o quadro `cota` nunca vira bloco da conversa", () => {
-    const turno = turnoVazio("t1")
+    const turno = emptyTurn("t1")
     expect(aplicarQuadro(turno, { evento: "cota", dados: { gasto: 620, teto: 1_500_000 } })).toEqual(turno)
   })
 })

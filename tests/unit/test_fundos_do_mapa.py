@@ -20,8 +20,8 @@ from pathlib import Path
 
 import pytest
 
-from app.services.fundos_do_mapa import SEM_FUNDO, injetar_fundos_de_mapa
-from flow.utils.carta import RUAS_PADRAO, fundo_configurado, servidor_injetou
+from app.services.fundos_do_mapa import NO_BASEMAP, inject_basemaps
+from flow.utils.carta import RUAS_PADRAO, configured_basemap, server_injected
 
 RAIZ = Path(__file__).resolve().parents[2]
 SAT = {"url": "https://sat.example.org/{z}/{x}/{y}.jpg", "credito": "© Sat"}
@@ -29,7 +29,7 @@ SAT = {"url": "https://sat.example.org/{z}/{x}/{y}.jpg", "credito": "© Sat"}
 
 # ── CONFIG ───────────────────────────────────────────────────────────────────
 
-def _mapa_fundos(ambiente: dict[str, str]) -> str:
+def _basemaps_for_env(ambiente: dict[str, str]) -> str:
     env = {k: v for k, v in os.environ.items() if not k.startswith("MAPA_")}
     env.update(ambiente)
     r = subprocess.run(
@@ -40,12 +40,12 @@ def _mapa_fundos(ambiente: dict[str, str]) -> str:
     return r.stdout.strip()
 
 
-def test_sem_configuracao_o_servidor_nao_tem_fundo_nenhum():
-    assert _mapa_fundos({}) == "[]"
+def test_without_config_the_server_has_no_basemap():
+    assert _basemaps_for_env({}) == "[]"
 
 
-def test_o_servidor_le_os_fundos_e_ignora_o_que_nao_e_template():
-    saida = _mapa_fundos({
+def test_server_reads_basemaps_and_ignores_non_templates():
+    saida = _basemaps_for_env({
         "MAPA_SATELITE_URL": " https://sat.example.org/{z}/{x}/{y}.jpg ", "MAPA_SATELITE_CREDITO": "© Sat",
         "MAPA_HIBRIDO_URL": "https://hib.example.org/tiles",  # without {z}/{x}/{y}
         "MAPA_RUAS_URL": "file:///etc/{z}/{x}/{y}",
@@ -55,8 +55,8 @@ def test_o_servidor_le_os_fundos_e_ignora_o_que_nao_e_template():
     assert saida == f"[('hibrido', {sat}), ('satelite', {sat})]"
 
 
-def test_o_hibrido_proprio_vence_o_satelite():
-    saida = _mapa_fundos({
+def test_own_hybrid_beats_the_satellite():
+    saida = _basemaps_for_env({
         "MAPA_SATELITE_URL": "https://sat.example.org/{z}/{x}/{y}.jpg",
         "MAPA_HIBRIDO_URL": "https://hib.example.org/{z}/{x}/{y}.jpg",
     })
@@ -65,52 +65,52 @@ def test_o_hibrido_proprio_vence_o_satelite():
 
 # ── INJECTION ────────────────────────────────────────────────────────────────
 
-def _definicao(*nos):
+def _definition(*nos):
     return {"nodes": list(nos), "edges": []}
 
 
-def test_o_despacho_poe_o_fundo_da_instalacao_no_no_carta():
-    original = _definicao(
+def test_dispatch_puts_the_installation_basemap_in_the_map_node():
+    original = _definition(
         {"id": "c1", "name": "CartaImagem", "properties": {"fundo": "satelite"}},
         {"id": "c2", "name": "CartaImagem", "data": {"properties": {"fundo": "hibrido"}}},
         {"id": "w1", "name": "WFS", "properties": {"fundo": "satelite"}},
     )
 
-    enriquecida = injetar_fundos_de_mapa(original, {"satelite": SAT})
+    enriched = inject_basemaps(original, {"satelite": SAT})
 
-    assert enriquecida["nodes"][0]["properties"]["fundo_da_instalacao"] == SAT
+    assert enriched["nodes"][0]["properties"]["fundo_da_instalacao"] == SAT
     # Basemap without configuration: the URL goes empty — the executor knows the server
     # answered, and decides.
-    assert enriquecida["nodes"][1]["data"]["properties"]["fundo_da_instalacao"] == SEM_FUNDO
+    assert enriched["nodes"][1]["data"]["properties"]["fundo_da_instalacao"] == NO_BASEMAP
     # Only the Carta node; and the original definition stays intact (it is the one stored in the database).
-    assert "fundo_da_instalacao" not in enriquecida["nodes"][2]["properties"]
+    assert "fundo_da_instalacao" not in enriched["nodes"][2]["properties"]
     assert "fundo_da_instalacao" not in original["nodes"][0]["properties"]
 
 
-FORJADO = {"url": "https://outro.example.org/{z}/{x}/{y}.png"}
+FORGED = {"url": "https://outro.example.org/{z}/{x}/{y}.png"}
 
 
-def test_um_fundo_escrito_a_mao_no_workflow_nao_passa_por_fundo_da_instalacao():
-    original = _definicao({"id": "c1", "name": "CartaImagem", "properties": {
-        "fundo": "satelite", "fundo_da_instalacao": FORJADO,
+def test_handwritten_workflow_basemap_does_not_pass_as_installation_basemap():
+    original = _definition({"id": "c1", "name": "CartaImagem", "properties": {
+        "fundo": "satelite", "fundo_da_instalacao": FORGED,
     }})
-    assert injetar_fundos_de_mapa(original, {})["nodes"][0]["properties"]["fundo_da_instalacao"] == SEM_FUNDO
+    assert inject_basemaps(original, {})["nodes"][0]["properties"]["fundo_da_instalacao"] == NO_BASEMAP
 
 
-def test_o_forjado_some_das_duas_formas_de_propriedades():
+def test_forged_disappears_from_both_property_forms():
     """Review finding: with `properties` AND `data.properties` on the same node, the
     injection wrote only to the second — and the executor reads the first."""
-    original = _definicao({
+    original = _definition({
         "id": "c1", "name": "CartaImagem",
-        "properties": {"fundo": "satelite", "fundo_da_instalacao": FORJADO},
-        "data": {"properties": {"fundo": "satelite", "fundo_da_instalacao": FORJADO}},
+        "properties": {"fundo": "satelite", "fundo_da_instalacao": FORGED},
+        "data": {"properties": {"fundo": "satelite", "fundo_da_instalacao": FORGED}},
     })
-    no = injetar_fundos_de_mapa(original, {"satelite": SAT})["nodes"][0]
+    no = inject_basemaps(original, {"satelite": SAT})["nodes"][0]
     assert no["properties"]["fundo_da_instalacao"] == SAT
     assert no["data"]["properties"]["fundo_da_instalacao"] == SAT
 
 
-async def test_o_despacho_injeta_na_raiz_e_nos_sub_fluxos(monkeypatch):
+async def test_dispatch_injects_at_root_and_in_sub_workflows(monkeypatch):
     """The envelope that goes out to the executor, not just the function: removing the injection
     from `_serializar_payload` must break this test."""
     import json
@@ -120,71 +120,71 @@ async def test_o_despacho_injeta_na_raiz_e_nos_sub_fluxos(monkeypatch):
     from app.services import workflow_execution_service as servico
 
     monkeypatch.setattr(config, "MAPA_FUNDOS", {"satelite": SAT})
-    carta = {"id": "c1", "name": "CartaImagem", "properties": {"fundo": "satelite", "fundo_da_instalacao": FORJADO}}
+    carta = {"id": "c1", "name": "CartaImagem", "properties": {"fundo": "satelite", "fundo_da_instalacao": FORGED}}
     wf = SimpleNamespace(id_hash="wf-1", workspace_id="ws-1", pinned_outputs=None, pin_metadata=None)
 
     corpo = await servico._serializar_payload(
-        wf, _definicao(dict(carta)), "job-1", None, False,
+        wf, _definition(dict(carta)), "job-1", None, False,
         pre_resolved={}, disabled_nodes=None,
-        subworkflow_definitions={"sub-1": _definicao({**carta, "id": "c2", "properties": {"fundo": "hibrido"}})},
+        subworkflow_definitions={"sub-1": _definition({**carta, "id": "c2", "properties": {"fundo": "hibrido"}})},
     )
     envelope = json.loads(corpo)
     raiz = envelope["workflow_definition"]["nodes"][0]["properties"]
     sub = envelope["subworkflow_definitions"]["sub-1"]["nodes"][0]["properties"]
     assert raiz["fundo_da_instalacao"] == SAT
-    assert sub["fundo_da_instalacao"] == SEM_FUNDO
+    assert sub["fundo_da_instalacao"] == NO_BASEMAP
 
 
-def test_sem_no_carta_a_definicao_volta_a_mesma():
-    original = _definicao({"id": "w1", "name": "WFS", "properties": {}})
-    assert injetar_fundos_de_mapa(original, {"satelite": SAT}) is original
+def test_without_map_node_the_definition_comes_back_unchanged():
+    original = _definition({"id": "w1", "name": "WFS", "properties": {}})
+    assert inject_basemaps(original, {"satelite": SAT}) is original
 
 
 # ── CARTA ────────────────────────────────────────────────────────────────────
 
-def test_a_carta_usa_o_fundo_injetado():
-    assert fundo_configurado("satelite", SAT, ambiente={}) == (SAT["url"], "© Sat")
+def test_map_uses_the_injected_basemap():
+    assert configured_basemap("satelite", SAT, ambiente={}) == (SAT["url"], "© Sat")
 
 
-def test_sem_injecao_vale_o_ambiente_do_executor():
+def test_without_injection_the_executor_environment_applies():
     ambiente = {"MAPA_SATELITE_URL": "https://exec.example.org/{z}/{x}/{y}.png", "MAPA_SATELITE_CREDITO": "© Exec"}
-    assert fundo_configurado("satelite", {}, ambiente=ambiente) == ("https://exec.example.org/{z}/{x}/{y}.png", "© Exec")
+    assert configured_basemap("satelite", {}, ambiente=ambiente) == ("https://exec.example.org/{z}/{x}/{y}.png", "© Exec")
 
 
-def test_as_ruas_caem_no_openstreetmap_e_o_satelite_em_nada():
-    assert fundo_configurado("ruas", {}, ambiente={}) == RUAS_PADRAO
-    assert fundo_configurado("satelite", {}, ambiente={}) is None
-    assert fundo_configurado("hibrido", None, ambiente={}) is None
+def test_streets_fall_back_to_openstreetmap_and_satellite_to_nothing():
+    assert configured_basemap("ruas", {}, ambiente={}) == RUAS_PADRAO
+    assert configured_basemap("satelite", {}, ambiente={}) is None
+    assert configured_basemap("hibrido", None, ambiente={}) is None
 
 
-def test_no_executor_o_hibrido_tambem_cai_no_satelite():
+def test_on_executor_hybrid_also_falls_back_to_satellite():
     ambiente = {"MAPA_SATELITE_URL": "https://exec.example.org/{z}/{x}/{y}.png", "MAPA_SATELITE_CREDITO": "© Exec"}
-    assert fundo_configurado("hibrido", {}, ambiente=ambiente) == ("https://exec.example.org/{z}/{x}/{y}.png", "© Exec")
+    assert configured_basemap("hibrido", {}, ambiente=ambiente) == ("https://exec.example.org/{z}/{x}/{y}.png", "© Exec")
 
 
-def test_o_executor_sabe_se_o_servidor_mandou_o_fundo():
-    assert servidor_injetou(SEM_FUNDO)
-    assert servidor_injetou(SAT)
+def test_executor_knows_whether_the_server_sent_the_basemap():
+    assert server_injected(NO_BASEMAP)
+    assert server_injected(SAT)
     # The field's default: a server older than this version sends nothing.
-    assert not servidor_injetou({})
-    assert not servidor_injetou(None)
+    assert not server_injected({})
+    assert not server_injected(None)
 
 
-def test_um_template_invalido_diz_qual_variavel_conferir():
+def test_invalid_template_says_which_variable_to_check():
     with pytest.raises(ValueError, match="MAPA_SATELITE_URL"):
-        fundo_configurado("satelite", {}, ambiente={"MAPA_SATELITE_URL": "https://sat.example.org/tiles"})
+        configured_basemap("satelite", {}, ambiente={"MAPA_SATELITE_URL": "https://sat.example.org/tiles"})
 
 
-async def test_a_carta_sem_satelite_configurado_explica_o_que_fazer(monkeypatch):
+async def test_map_without_configured_satellite_explains_what_to_do(monkeypatch):
     from flow.nodes.outputs.carta_imagem import CartaImagem
 
     monkeypatch.delenv("MAPA_SATELITE_URL", raising=False)
-    no = CartaImagem(node_id="c1", parameters={"fundo": "satelite", "fundo_da_instalacao": SEM_FUNDO})
+    no = CartaImagem(node_id="c1", parameters={"fundo": "satelite", "fundo_da_instalacao": NO_BASEMAP})
     with pytest.raises(ValueError, match="nao esta configurado nesta instalacao .MAPA_SATELITE_URL no servidor."):
         await no.execute({"output": None})
 
 
-async def test_executor_novo_com_servidor_antigo_diz_o_que_houve(monkeypatch):
+async def test_new_executor_with_old_server_says_what_happened(monkeypatch):
     """Review finding: the executors pick up `main` before the server
     deploy. Without the injection (old server) and without MAPA_* on the executor, the
     message says so, and not that the installation does not have the basemap."""

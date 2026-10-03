@@ -194,7 +194,7 @@ class WorkflowListItem(BaseModel):
     # Declares a sub-workflow contract: it can be called by another workflow.
     is_subworkflow: bool = False
     # Triggers — same mechanism as `has_publish_map`/`is_subworkflow` (see
-    # `_tem_node` in the CRUD). "Manual only" is none of the four and not
+    # `_has_node` in the CRUD). "Manual only" is none of the four and not
     # being a sub-workflow; the web app derives it, to avoid a fifth redundant
     # boolean.
     has_webhook_trigger: bool = False

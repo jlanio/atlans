@@ -43,7 +43,7 @@ def test_started_e_lifecycle_info():
     assert call["extra"]["node_name"] == "Ler CSV"
 
 
-def test_completed_sem_drift_e_info():
+def test_completed_without_drift_is_info():
     pub = _publisher()
     node_events.publish_completed(pub, "run-1", "n1", NODE_DEFS, "completed", 12.5, output_keys=["out"])
     call = _kwargs(pub)
@@ -53,7 +53,7 @@ def test_completed_sem_drift_e_info():
     assert "error_category" not in call["extra"]
 
 
-def test_schema_drift_eleva_para_warn():
+def test_schema_drift_raises_to_warn():
     """Drift is not a failure, but it isn't routine either — the panel highlights it in amber."""
     pub = _publisher()
     node_events.publish_completed(
@@ -71,7 +71,7 @@ def test_schema_drift_eleva_para_warn():
     (ConnectionError(), "transient", True),
     (MemoryError(), "resource", False),
 ])
-def test_falha_publica_categoria_e_retryable(exc, category, retryable):
+def test_failure_publishes_category_and_retryable(exc, category, retryable):
     pub = _publisher()
     node_events.publish_completed(
         pub, "run-1", "n1", NODE_DEFS, "failed", 8.0,
@@ -87,7 +87,7 @@ def test_falha_publica_categoria_e_retryable(exc, category, retryable):
     assert call["extra"]["traceback"] == "Traceback…"
 
 
-def test_debug_tem_kind_proprio():
+def test_debug_has_its_own_kind():
     pub = _publisher()
     node_events.publish_debug(pub, "run-1", "n1", NODE_DEFS, {"a": 1}, {"b": 2})
     call = _kwargs(pub)
@@ -96,14 +96,14 @@ def test_debug_tem_kind_proprio():
     assert "debug_output" in call["extra"]
 
 
-def test_stdout_tem_kind_proprio():
+def test_stdout_has_its_own_kind():
     """stdout travels in BATCHES and `lines` is the ONLY source of truth.
 
     One event per print() line overflowed the executor's 500-slot queue
     (shared by all jobs and by GeoSync) and the server's rate limit.
     And `extra['message']` no longer exists: publishing the same text twice
     doubled the payload and a batch of 200 long lines exceeded the 64 KB of
-    `TETO_NODE_EVENT_BYTES`, making the sender reduce the event to the control
+    `NODE_EVENT_BYTES_CEILING`, making the sender reduce the event to the control
     fields — without `extra` — and the panel lose the 200 lines at once.
     """
     pub = _publisher()
@@ -115,7 +115,7 @@ def test_stdout_tem_kind_proprio():
     assert "message" not in call["extra"], "texto duplicado estoura o teto de 64 KB"
 
 
-def test_stdout_nunca_derruba_o_no():
+def test_stdout_never_brings_down_the_node():
     """A user's print() must not break the execution if the publisher fails."""
     pub = MagicMock(publish_event=MagicMock(side_effect=RuntimeError("redis fora")))
     publish_stdout(pub, "run-1", "n1", ["texto"])  # must not raise

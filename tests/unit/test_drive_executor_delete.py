@@ -86,7 +86,7 @@ async def test_delete_remove_e_devolve_204(client):
 
 
 @pytest.mark.asyncio
-async def test_delete_inexistente_e_idempotente_204(client):
+async def test_delete_nonexistent_is_idempotent_204(client):
     """Missing record = already in the desired state. 204, without touching the service."""
     svc = _svc(missing=True)
     with _bypass(svc):
@@ -96,7 +96,7 @@ async def test_delete_inexistente_e_idempotente_204(client):
 
 
 @pytest.mark.asyncio
-async def test_delete_de_outro_workspace_da_403(client):
+async def test_delete_from_another_workspace_gives_403(client):
     """A file outside the executor's workspaces: 403, and nothing is deleted."""
     svc = _svc(_wf("ws-OUTRO"))
     with _bypass(svc, ws_ids=("ws-1",)):
@@ -114,7 +114,7 @@ def _service():
 
 
 @pytest.mark.asyncio
-async def test_service_minio_apaga_s3_primeiro_e_emite():
+async def test_service_minio_deletes_s3_first_and_emits():
     svc, db = _service()
     wf = MagicMock(content_location="minio", s3_key="drive/ws-1/f_1", content_executor_id=None,
                    workspace_id="ws-1", id_hash="f1", original_name="a.geojson", extension="geojson", size=10)
@@ -129,7 +129,7 @@ async def test_service_minio_apaga_s3_primeiro_e_emite():
 
 
 @pytest.mark.asyncio
-async def test_service_catalogo_do_proprio_executor_apaga_sem_s3():
+async def test_service_catalog_of_own_executor_deletes_without_s3():
     """Catalog entry (content_location='executor', s3_key=None): no object in MinIO,
     only the record. It is the case that `delete_file` (web) refuses and that this
     path exists to serve — the owning executor itself reporting the file left."""
@@ -144,7 +144,7 @@ async def test_service_catalogo_do_proprio_executor_apaga_sem_s3():
 
 
 @pytest.mark.asyncio
-async def test_service_catalogo_de_outro_executor_e_negado():
+async def test_service_catalog_of_another_executor_is_denied():
     """An executor does not delete the record of content that lives in ANOTHER one."""
     svc, db = _service()
     wf = MagicMock(content_location="executor", s3_key=None, content_executor_id="ag-OUTRO",
@@ -188,7 +188,7 @@ def _bwf(id_hash, ws="ws-1", *, location="minio", s3_key="drive/ws-1/x"):
 
 
 @pytest.mark.asyncio
-async def test_batch_delete_emite_um_evento_por_arquivo():
+async def test_batch_delete_emits_one_event_per_file():
     svc, _ = _batch_service([_bwf("a1", s3_key="drive/ws-1/a1"),
                              _bwf("a2", s3_key="drive/ws-1/a2")], owned=("ws-1",))
     with patch("app.services.drive_service.s3.delete_strict_async", new_callable=AsyncMock), \
@@ -202,7 +202,7 @@ async def test_batch_delete_emite_um_evento_por_arquivo():
 
 
 @pytest.mark.asyncio
-async def test_batch_delete_nao_emite_para_catalogado():
+async def test_batch_delete_does_not_emit_for_cataloged():
     """A cataloged one is skipped (bytes live on the executor) — and with no event."""
     svc, _ = _batch_service([_bwf("a1", s3_key="drive/ws-1/a1"),
                              _bwf("cat", location="executor")], owned=("ws-1",))
@@ -215,7 +215,7 @@ async def test_batch_delete_nao_emite_para_catalogado():
 
 
 @pytest.mark.asyncio
-async def test_batch_delete_falha_de_s3_nao_emite_esse_arquivo():
+async def test_batch_delete_s3_failure_does_not_emit_that_file():
     """S3 failed → file skipped (reconcile retries later) → no event for it; an
     event would be a lie, the object is still in MinIO."""
     svc, _ = _batch_service([_bwf("ok", s3_key="drive/ws-1/ok"),

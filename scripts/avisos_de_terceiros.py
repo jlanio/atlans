@@ -13,7 +13,7 @@ An npm package's license comes in package-lock.json itself. A PyPI package's
 is not in the lock: the script asks PyPI, for the pinned version, and
 uses the SPDX expression the package declares (`License-Expression`). Without it,
 the short license field or the classifier; when both are vague ("BSD",
-an entire text), what is in LIDAS_NO_PACOTE applies, read from the package's own
+an entire text), what is in READ_FROM_PACKAGE applies, read from the package's own
 license file. What none of this resolves comes out as "unknown"
 and goes to review.
 
@@ -56,7 +56,7 @@ LOCKS_PYPI = [
 # the CSS of the web app and the desktop app imports them (`@import`), and the
 # build merges them into the stylesheet. The test checks the list against the
 # sources' `@import`s.
-DEV_QUE_VAI_NO_BUILD = frozenset({"tailwindcss", "tw-animate-css"})
+DEV_SHIPPED_IN_BUILD = frozenset({"tailwindcss", "tw-animate-css"})
 
 # Licenses that may go into an AGPL-3.0 work: the free ones the FSF lists as
 # compatible with GPLv3 (https://www.gnu.org/licenses/license-list.html).
@@ -72,16 +72,16 @@ COMPATIVEIS = frozenset({
 
 # Licenses that don't go into the program, but coexist with it as a separate
 # file (a font served to the browser): they apply only to a
-# NO_REPOSITORIO work marked as aggregated, not to an npm or PyPI package,
+# IN_REPOSITORY work marked as aggregated, not to an npm or PyPI package,
 # whose code is compiled together. OFL-1.1 is weak copyleft for fonts; the FSF
 # doesn't list it as GPL-compatible, and here it doesn't need to be.
-AGREGAVEIS = frozenset({"OFL-1.1"})
+AGGREGABLE = frozenset({"OFL-1.1"})
 
 # PyPI packages without `License-Expression` and with a vague license field (an
 # entire text, or "BSD" without saying which): the license read in the package's
 # LICENSE file, at the pinned version. Only applies while the package doesn't
 # declare its expression — the declared one wins, and this line becomes redundant.
-LIDAS_NO_PACOTE = {
+READ_FROM_PACKAGE = {
     "cycler": "BSD-3-Clause",
     "jinja2": "BSD-3-Clause",
     "kiwisolver": "BSD-3-Clause",
@@ -95,7 +95,7 @@ LIDAS_NO_PACOTE = {
 }
 
 # PyPI's `License` field, when it is a short name, and its SPDX.
-_NOMES = {
+_NAMES = {
     "apache 2.0": "Apache-2.0",
     "apache license 2.0": "Apache-2.0",
     "apache license, version 2.0": "Apache-2.0",
@@ -108,7 +108,7 @@ _NOMES = {
 
 # The `License :: …` classifier and its SPDX; the vague ones ("BSD License",
 # "LGPL" without a version) are left out on purpose.
-_CLASSIFICADORES = {
+_CLASSIFIERS = {
     "Apache Software License": "Apache-2.0",
     "ISC License (ISCL)": "ISC",
     "MIT License": "MIT",
@@ -121,8 +121,8 @@ _CLASSIFICADORES = {
 # license text), with the places and the texts in tuples. A file copied
 # here goes into this list, with the license next to it. The license is compatible
 # with AGPL-3.0 (COMPATIVEIS) or, for a file that is only served separately,
-# one of AGREGAVEIS.
-NO_REPOSITORIO = [
+# one of AGGREGABLE.
+IN_REPOSITORY = [
     ("Inter, the web app's font (The Inter Project Authors), served as a separate file", ("web/app/fonts/inter/",), "OFL-1.1", ("web/app/fonts/inter/OFL.txt",)),
     (
         "shadcn/ui, the base UI components (shadcn), adapted",
@@ -143,7 +143,7 @@ NO_REPOSITORIO = [
 # all). The generator searches the web app's and the desktop app's sources for the
 # imported sets (`react-icons/<conjunto>`); one that is not here comes out as
 # "unknown" and goes to review.
-CONJUNTOS_DO_REACT_ICONS = {
+REACT_ICONS_SETS = {
     "ai": ("Ant Design Icons", "MIT"),
     "bi": ("BoxIcons", "MIT"),
     "bs": ("Bootstrap Icons", "MIT"),
@@ -177,16 +177,16 @@ CONJUNTOS_DO_REACT_ICONS = {
     "wi": ("Weather Icons", "OFL-1.1"),
 }
 # Where to look for the imports, and what to skip: dependencies, builds and tests.
-FONTES_DOS_ICONES = ("web", "desktop/src")
-_PULAR_PASTAS = frozenset({"node_modules", ".next", "dist", "out", "public", "coverage", "__tests__"})
-_FONTE = re.compile(r"\.(?:ts|tsx|js|jsx|mjs|cjs)$")
-_TESTE = re.compile(r"\.(?:test|spec)\.")
-_IMPORT_DE_ICONE = re.compile(r"""['"]react-icons/([a-z0-9]+)['"]""")
+ICON_SOURCES = ("web", "desktop/src")
+_SKIP_DIRS = frozenset({"node_modules", ".next", "dist", "out", "public", "coverage", "__tests__"})
+_SOURCE_FILE = re.compile(r"\.(?:ts|tsx|js|jsx|mjs|cjs)$")
+_TEST_FILE = re.compile(r"\.(?:test|spec)\.")
+_ICON_IMPORT = re.compile(r"""['"]react-icons/([a-z0-9]+)['"]""")
 
 # PyPI wheels that bundle compiled native libraries, with their own
 # license, along with the package's code: (package, what goes inside, licenses,
 # where the text is). The "License" column of the tables is the Python package's.
-NATIVAS_NAS_WHEELS = [
+NATIVE_IN_WHEELS = [
     ("shapely", "GEOS", "LGPL-2.1", "`shapely-*.dist-info/licenses/LICENSE_GEOS`"),
     ("pyogrio", "GDAL, with the libraries it uses", "MIT, with parts under other free licenses", "https://gdal.org/en/stable/license.html"),
     ("pyproj", "PROJ, with the libraries it uses (SQLite, libcurl, libtiff)", "MIT; the others, their own", "`pyproj-*.dist-info/licenses/LICENSE_proj` (PROJ's)"),
@@ -199,11 +199,11 @@ NATIVAS_NAS_WHEELS = [
     ("lxml", "libxml2 and libxslt", "MIT", "`lxml-*.dist-info/licenses/LICENSES.txt`"),
 ]
 
-DESCONHECIDA = "unknown"
+UNKNOWN = "unknown"
 
 PYPI = "https://pypi.org/pypi"
 
-_PINO = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]*\])?==([^\s\\;#]+)")
+_PIN = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]*\])?==([^\s\\;#]+)")
 _ID_SPDX = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.+-]*$")
 
 
@@ -213,11 +213,11 @@ def normalizar(nome: str) -> str:
 
 # ── The locks ────────────────────────────────────────────────────────────────
 
-def pacotes_npm(lock: Path) -> dict[tuple[str, str], str]:
+def npm_packages(lock: Path) -> dict[tuple[str, str], str]:
     """`(nome, versão) -> licença` of the production packages of a package-lock.json.
 
     What is `dev` is left out, except what the build merges in anyway
-    (DEV_QUE_VAI_NO_BUILD): an `optional` (sharp's binary for another
+    (DEV_SHIPPED_IN_BUILD): an `optional` (sharp's binary for another
     platform, for example) is installed where it applies, and goes along.
     """
     pacotes = {}
@@ -225,70 +225,70 @@ def pacotes_npm(lock: Path) -> dict[tuple[str, str], str]:
         if not caminho or dados.get("link"):
             continue
         nome = dados.get("name") or caminho.rsplit("node_modules/", 1)[-1]
-        if dados.get("dev") and nome not in DEV_QUE_VAI_NO_BUILD:
+        if dados.get("dev") and nome not in DEV_SHIPPED_IN_BUILD:
             continue
-        pacotes[(nome, dados["version"])] = _licenca_do_npm(dados.get("license"))
+        pacotes[(nome, dados["version"])] = _npm_license(dados.get("license"))
     return pacotes
 
 
-def _licenca_do_npm(declarada) -> str:
+def _npm_license(declarada) -> str:
     # Old packages declare an object ({type, url}) or a list of them.
     if isinstance(declarada, dict):
         declarada = declarada.get("type")
     if isinstance(declarada, list):
-        tipos = [_licenca_do_npm(d) for d in declarada]
+        tipos = [_npm_license(d) for d in declarada]
         declarada = " OR ".join(tipos) if tipos else None
-    return declarada.strip() if isinstance(declarada, str) and declarada.strip() else DESCONHECIDA
+    return declarada.strip() if isinstance(declarada, str) and declarada.strip() else UNKNOWN
 
 
-def pinos_pypi(lock: Path) -> set[tuple[str, str]]:
+def pypi_pins(lock: Path) -> set[tuple[str, str]]:
     """`(nome, versão)` of each package in a pip-compile lock."""
-    pinos = set()
+    pins = set()
     for linha in lock.read_text(encoding="utf-8").splitlines():
-        m = _PINO.match(linha)
+        m = _PIN.match(linha)
         if m:
-            pinos.add((normalizar(m.group(1)), m.group(2)))
-    return pinos
+            pins.add((normalizar(m.group(1)), m.group(2)))
+    return pins
 
 
 # ── The license of a PyPI package ─────────────────────────────────────────────
 
-def licenca_do_pypi(nome: str, info: dict) -> str:
+def pypi_license(nome: str, info: dict) -> str:
     """A package's SPDX license, from the `info` of PyPI's JSON for that version."""
     expressao = (info.get("license_expression") or "").strip()
     if expressao:
         return expressao
-    if nome in LIDAS_NO_PACOTE:
-        return LIDAS_NO_PACOTE[nome]
+    if nome in READ_FROM_PACKAGE:
+        return READ_FROM_PACKAGE[nome]
     # More than one classifier is a choice between them; a vague one, or one that is
     # not in the map, leaves the license unknown.
-    classificadores = {
-        _CLASSIFICADORES.get(c.split(" :: ")[-1])
+    classifiers = {
+        _CLASSIFIERS.get(c.split(" :: ")[-1])
         for c in info.get("classifiers") or []
         if c.startswith("License :: ") and c != "License :: OSI Approved"
     }
-    escolha = " OR ".join(sorted(classificadores)) if classificadores and None not in classificadores else None
+    escolha = " OR ".join(sorted(classifiers)) if classifiers and None not in classifiers else None
     campo = (info.get("license") or "").strip()
     # A one-line field is a name; a multi-line one is the entire text.
     if campo and "\n" not in campo and len(campo) <= 60:
-        curta = _NOMES.get(campo.lower()) or (campo if _avaliar(campo) is not None else None)
+        curta = _NAMES.get(campo.lower()) or (campo if _evaluate(campo) is not None else None)
         if curta:
             # The field that states one of the licenses of a dual-licensed package ("MIT",
             # with the MIT and Apache classifiers) doesn't erase the other.
-            if escolha and len(classificadores) > 1 and curta in classificadores:
+            if escolha and len(classifiers) > 1 and curta in classifiers:
                 return escolha
             return curta
-    return escolha or DESCONHECIDA
+    return escolha or UNKNOWN
 
 
-def consultar_pypi(pinos: set[tuple[str, str]]) -> dict[tuple[str, str], str]:
+def consultar_pypi(pins: set[tuple[str, str]]) -> dict[tuple[str, str], str]:
     """`(nome, versão) -> licença`, querying PyPI in parallel."""
-    def uma(pino):
-        nome, versao = pino
-        return pino, licenca_do_pypi(nome, _info(nome, versao))
+    def uma(pin):
+        nome, versao = pin
+        return pin, pypi_license(nome, _info(nome, versao))
 
     with ThreadPoolExecutor(max_workers=8) as executor:
-        return dict(executor.map(uma, sorted(pinos)))
+        return dict(executor.map(uma, sorted(pins)))
 
 
 def _info(nome: str, versao: str) -> dict:
@@ -308,10 +308,10 @@ def _info(nome: str, versao: str) -> dict:
 
 def compativel(licenca: str) -> bool:
     """Whether the SPDX expression may go into an AGPL-3.0 work (see COMPATIVEIS)."""
-    return bool(_avaliar(licenca))
+    return bool(_evaluate(licenca))
 
 
-def _avaliar(expressao: str) -> bool | None:
+def _evaluate(expressao: str) -> bool | None:
     """True/False by the COMPATIVEIS rule; None if it is not an SPDX expression."""
     fichas = re.findall(r"\(|\)|[^\s()]+", expressao)
     if not fichas:
@@ -370,7 +370,7 @@ def _avaliar(expressao: str) -> bool | None:
 
 # ── O arquivo ────────────────────────────────────────────────────────────────
 
-CABECALHO = """\
+HEADER = """\
 # Third-party notices
 
 Atlans is free software, under the GNU Affero General Public License, version 3
@@ -440,15 +440,15 @@ def gerar() -> tuple[str, list[tuple[str, str, str, str]]]:
     """The file's text and what goes to review: `(origem, pacote, versão, licença)`."""
     npm: dict[tuple[str, str], dict] = {}
     for quem, lock in LOCKS_NPM:
-        for pino, licenca in pacotes_npm(RAIZ / lock).items():
-            npm.setdefault(pino, {"licenca": licenca, "quem": []})["quem"].append(quem)
+        for pin, licenca in npm_packages(RAIZ / lock).items():
+            npm.setdefault(pin, {"licenca": licenca, "quem": []})["quem"].append(quem)
 
-    usos_pypi: dict[tuple[str, str], list[str]] = {}
+    pypi_uses: dict[tuple[str, str], list[str]] = {}
     for quem, lock in LOCKS_PYPI:
-        for pino in pinos_pypi(RAIZ / lock):
-            usos_pypi.setdefault(pino, []).append(quem)
-    licencas_pypi = consultar_pypi(set(usos_pypi))
-    pypi = {pino: {"licenca": licencas_pypi[pino], "quem": quem} for pino, quem in usos_pypi.items()}
+        for pin in pypi_pins(RAIZ / lock):
+            pypi_uses.setdefault(pin, []).append(quem)
+    pypi_licenses = consultar_pypi(set(pypi_uses))
+    pypi = {pin: {"licenca": pypi_licenses[pin], "quem": quem} for pin, quem in pypi_uses.items()}
 
     fora = [
         (origem, nome, versao, dados["licenca"])
@@ -456,46 +456,46 @@ def gerar() -> tuple[str, list[tuple[str, str, str, str]]]:
         for (nome, versao), dados in sorted(pacotes.items())
         if not compativel(dados["licenca"])
     ]
-    icones = conjuntos_de_icones()
+    icons = icon_sets()
     fora += [
         ("react-icons", f"react-icons/{conjunto}", "—", licenca)
-        for conjunto, (_projeto, licenca) in sorted(icones.items())
+        for conjunto, (_project, licenca) in sorted(icons.items())
         if not compativel(licenca)
     ]
     no_repositorio = "\n".join(
-        f"| {obra} | {_caminhos(onde)} | {licenca} | {_caminhos(texto)} |"
-        for obra, onde, licenca, texto in NO_REPOSITORIO
+        f"| {work} | {_format_paths(onde)} | {licenca} | {_format_paths(texto)} |"
+        for work, onde, licenca, texto in IN_REPOSITORY
     )
     partes = [
-        CABECALHO.format(no_repositorio=no_repositorio),
-        _resumo(npm, pypi),
-        _revisao(fora),
-        _tabela("npm", LOCKS_NPM, npm),
-        _icones(icones),
-        _tabela("PyPI", LOCKS_PYPI, pypi),
-        _nativas(),
+        HEADER.format(no_repositorio=no_repositorio),
+        _summarize(npm, pypi),
+        _review_table(fora),
+        _table("npm", LOCKS_NPM, npm),
+        _icons_table(icons),
+        _table("PyPI", LOCKS_PYPI, pypi),
+        _native_table(),
     ]
     return "\n".join(partes), fora
 
 
-def conjuntos_de_icones() -> dict[str, tuple[str, str]]:
+def icon_sets() -> dict[str, tuple[str, str]]:
     """`conjunto -> (projeto, licença)` of each react-icons set that the sources import."""
     usados = set()
-    for base in FONTES_DOS_ICONES:
+    for base in ICON_SOURCES:
         for pasta, subpastas, arquivos in os.walk(RAIZ / base):
-            subpastas[:] = sorted(s for s in subpastas if s not in _PULAR_PASTAS)
+            subpastas[:] = sorted(s for s in subpastas if s not in _SKIP_DIRS)
             for nome in arquivos:
-                if _FONTE.search(nome) and not _TESTE.search(nome):
+                if _SOURCE_FILE.search(nome) and not _TEST_FILE.search(nome):
                     texto = (Path(pasta) / nome).read_text(encoding="utf-8", errors="replace")
-                    usados.update(_IMPORT_DE_ICONE.findall(texto))
-    return {c: CONJUNTOS_DO_REACT_ICONS.get(c, (f"react-icons/{c}", DESCONHECIDA)) for c in sorted(usados)}
+                    usados.update(_ICON_IMPORT.findall(texto))
+    return {c: REACT_ICONS_SETS.get(c, (f"react-icons/{c}", UNKNOWN)) for c in sorted(usados)}
 
 
-def _caminhos(caminhos: tuple[str, ...]) -> str:
+def _format_paths(caminhos: tuple[str, ...]) -> str:
     return ", ".join(f"`{c}`" for c in caminhos)
 
 
-def _icones(icones: dict[str, tuple[str, str]]) -> str:
+def _icons_table(icons: dict[str, tuple[str, str]]) -> str:
     linhas = [
         "### The react-icons icon sets",
         "",
@@ -505,7 +505,7 @@ def _icones(icones: dict[str, tuple[str, str]]) -> str:
         "| Set | Project | License |",
         "|---|---|---|",
     ]
-    linhas += [f"| `react-icons/{c}` | {projeto} | {_celula(licenca)} |" for c, (projeto, licenca) in icones.items()]
+    linhas += [f"| `react-icons/{c}` | {projeto} | {_cell(licenca)} |" for c, (projeto, licenca) in icons.items()]
     linhas += [
         "",
         "The Font Awesome Free icons are by Fonticons, Inc. (https://fontawesome.com), under the "
@@ -516,7 +516,7 @@ def _icones(icones: dict[str, tuple[str, str]]) -> str:
     return "\n".join(linhas) + "\n"
 
 
-def _nativas() -> str:
+def _native_table() -> str:
     linhas = [
         "### Native libraries inside the wheels",
         "",
@@ -526,23 +526,23 @@ def _nativas() -> str:
         "| Package | Libraries | License | Text |",
         "|---|---|---|---|",
     ]
-    linhas += [f"| `{pacote}` | {libs} | {_celula(licenca)} | {texto} |" for pacote, libs, licenca, texto in NATIVAS_NAS_WHEELS]
+    linhas += [f"| `{pacote}` | {libs} | {_cell(licenca)} | {texto} |" for pacote, libs, licenca, texto in NATIVE_IN_WHEELS]
     return "\n".join(linhas) + "\n"
 
 
-def _resumo(npm: dict, pypi: dict) -> str:
+def _summarize(npm: dict, pypi: dict) -> str:
     contagem: dict[str, list[int]] = {}
     for coluna, pacotes in enumerate((npm, pypi)):
         for dados in pacotes.values():
             contagem.setdefault(dados["licenca"], [0, 0])[coluna] += 1
     linhas = ["### Summary", "", "| License | npm | PyPI |", "|---|--:|--:|"]
     for licenca, (n, p) in sorted(contagem.items(), key=lambda item: (-sum(item[1]), item[0].lower())):
-        linhas.append(f"| {_celula(licenca)} | {n or '—'} | {p or '—'} |")
+        linhas.append(f"| {_cell(licenca)} | {n or '—'} | {p or '—'} |")
     linhas.append(f"| **Total** | **{len(npm)}** | **{len(pypi)}** |")
     return "\n".join(linhas) + "\n"
 
 
-def _revisao(fora: list[tuple[str, str, str, str]]) -> str:
+def _review_table(fora: list[tuple[str, str, str, str]]) -> str:
     linhas = ["### To review", ""]
     if not fora:
         linhas.append(
@@ -558,19 +558,19 @@ def _revisao(fora: list[tuple[str, str, str, str]]) -> str:
         "| Source | Package | Version | License |",
         "|---|---|---|---|",
     ]
-    linhas += [f"| {origem} | `{nome}` | {versao} | {_celula(licenca)} |" for origem, nome, versao, licenca in fora]
+    linhas += [f"| {origem} | `{nome}` | {versao} | {_cell(licenca)} |" for origem, nome, versao, licenca in fora]
     return "\n".join(linhas) + "\n"
 
 
-def _tabela(titulo: str, locks: list[tuple[str, str]], pacotes: dict) -> str:
+def _table(titulo: str, locks: list[tuple[str, str]], pacotes: dict) -> str:
     legenda = "From the locks " + ", ".join(f"`{lock}` ({quem})" for quem, lock in locks) + "."
     linhas = [f"### {titulo}", "", legenda, "", "| Package | Version | License | Used by |", "|---|---|---|---|"]
     for (nome, versao), dados in sorted(pacotes.items(), key=lambda item: (item[0][0].lower(), item[0][1])):
-        linhas.append(f"| `{nome}` | {versao} | {_celula(dados['licenca'])} | {', '.join(dados['quem'])} |")
+        linhas.append(f"| `{nome}` | {versao} | {_cell(dados['licenca'])} | {', '.join(dados['quem'])} |")
     return "\n".join(linhas) + "\n"
 
 
-def _celula(texto: str) -> str:
+def _cell(texto: str) -> str:
     return texto.replace("|", "\\|")
 
 

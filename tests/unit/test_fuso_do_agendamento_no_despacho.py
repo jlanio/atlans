@@ -15,7 +15,7 @@ from app.services import workflow_execution_service
 from app.services.fuso_do_agendamento import injetar_fuso_do_agendamento
 
 
-def _definicao(**props):
+def _definition(**props):
     return {
         "nodes": [
             {"id": "t", "name": "ScheduleTrigger", "properties": dict(props), "data": {"properties": dict(props)}},
@@ -25,8 +25,8 @@ def _definicao(**props):
     }
 
 
-def test_sem_fuso_o_despacho_poe_o_da_instalacao_nas_duas_formas():
-    original = _definicao(cron="0 9 * * *")
+def test_without_timezone_dispatch_sets_the_installation_one_in_both_forms():
+    original = _definition(cron="0 9 * * *")
     enriched = injetar_fuso_do_agendamento(original)
     gatilho = enriched["nodes"][0]
     assert gatilho["properties"]["timezone"] == FUSO_PADRAO_DO_AGENDAMENTO
@@ -36,21 +36,21 @@ def test_sem_fuso_o_despacho_poe_o_da_instalacao_nas_duas_formas():
     assert enriched["nodes"][1] == original["nodes"][1]
 
 
-def test_fuso_vazio_conta_como_ausente_e_explicito_fica():
-    enriched = injetar_fuso_do_agendamento(_definicao(cron="0 9 * * *", timezone="  "))
+def test_empty_timezone_counts_as_missing_and_explicit_stays():
+    enriched = injetar_fuso_do_agendamento(_definition(cron="0 9 * * *", timezone="  "))
     assert enriched["nodes"][0]["properties"]["timezone"] == FUSO_PADRAO_DO_AGENDAMENTO
-    enriched = injetar_fuso_do_agendamento(_definicao(cron="0 9 * * *", timezone="Europe/Lisbon"))
+    enriched = injetar_fuso_do_agendamento(_definition(cron="0 9 * * *", timezone="Europe/Lisbon"))
     assert enriched["nodes"][0]["properties"]["timezone"] == "Europe/Lisbon"
-    assert injetar_fuso_do_agendamento(_definicao(cron="0 9 * * *"), fuso="Pacific/Auckland")["nodes"][0]["properties"]["timezone"] == "Pacific/Auckland"
+    assert injetar_fuso_do_agendamento(_definition(cron="0 9 * * *"), fuso="Pacific/Auckland")["nodes"][0]["properties"]["timezone"] == "Pacific/Auckland"
 
 
-def test_sem_gatilho_a_definicao_volta_igual_e_e_o_mesmo_objeto():
+def test_without_trigger_the_definition_comes_back_equal_and_same_object():
     definicao = {"nodes": [{"id": "h", "name": "HttpRequest", "properties": {}}], "edges": []}
     assert injetar_fuso_do_agendamento(definicao) is definicao
     assert injetar_fuso_do_agendamento({}) == {}
 
 
-def test_o_despacho_passa_pela_injecao():
+def test_dispatch_goes_through_injection():
     # The same place the basemaps go in: the envelope that goes to the executor.
     fonte = open(workflow_execution_service.__file__, encoding="utf-8").read()
     assert "injetar_fuso_do_agendamento(enriched)" in fonte

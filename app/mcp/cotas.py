@@ -31,21 +31,21 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from app.core.config import ASSISTENTE_TETO_DE_TOKENS_POR_DIA
-from app.core.redis import contar_na_janela
+from app.core.redis import count_in_window
 from app.core.utils.logger import get_logger
 from app.mcp.erros import erro
 
 logger = get_logger("app.mcp.cotas")
 
-JANELA_SEGUNDOS = 60
+WINDOW_SECONDS = 60
 
-LIMITE_GERAL = 120
+OVERALL_LIMIT = 120
 # `probe` is I/O against third-party servers (GetCapabilities/DescribeFeatureType
 # of a WFS): half of the validation bucket, which is already the tightest.
-LIMITES_POR_COTA: dict[str, int] = {"validate": 20, "run": 20, "probe": 10}
+LIMITS_PER_QUOTA: dict[str, int] = {"validate": 20, "run": 20, "probe": 10}
 
-MAX_ESPERAS_POR_TOKEN = 3
-MAX_ESPERAS_GLOBAL = 40
+MAX_WAITS_PER_TOKEN = 3
+MAX_GLOBAL_WAITS = 40
 
 # The web assistant's quota. Here the ceiling is not about load: it is about MONEY
 # — the platform pays for the model's tokens. That is why the unit is tokens
@@ -62,54 +62,54 @@ MAX_ESPERAS_GLOBAL = 40
 # Revise with the real number: `docs/editor-assistant.md` records the measured
 # cost, and this value should come from there, not from an estimate. Each
 # installation can change it via ASSISTENTE_TETO_DE_TOKENS_POR_DIA (`app/core/config.py`).
-JANELA_DO_ASSISTENTE_SEGUNDOS = 24 * 60 * 60
+ASSISTANT_WINDOW_SECONDS = 24 * 60 * 60
 TETO_DE_TOKENS_DO_ASSISTENTE_POR_DIA = ASSISTENTE_TETO_DE_TOKENS_POR_DIA
 
 # One warning per minute per process — see the module note.
-_INTERVALO_AVISO = 60.0
-_ultimo_aviso = 0.0
+_WARNING_INTERVAL = 60.0
+_last_warning = 0.0
 
 # Without Redis there is no counter shared across workers; the wait ceiling falls
 # back to this semaphore, which only holds within the process. It is less than the
 # design asks for and more than nothing: it holds back a single client's loop.
-_esperas_locais: dict[str, int] = {}
-_esperas_locais_total = 0
+_local_waits: dict[str, int] = {}
+_local_waits_total = 0
 
 
-def _avisar_sem_redis(motivo: str) -> None:
-    global _ultimo_aviso
+def _warn_without_redis(motivo: str) -> None:
+    global _last_warning
     agora = time.monotonic()
-    if agora - _ultimo_aviso < _INTERVALO_AVISO:
+    if agora - _last_warning < _WARNING_INTERVAL:
         return
-    _ultimo_aviso = agora
+    _last_warning = agora
     logger.warning("Cotas do MCP degradando abertas (%s).", motivo)
 
 
-def _limite_da_cota(cota: str) -> int:
-    return LIMITES_POR_COTA.get(cota, LIMITE_GERAL)
+def _quota_limit(cota: str) -> int:
+    return LIMITS_PER_QUOTA.get(cota, OVERALL_LIMIT)
 
 
 async def verificar(redis, token_id: str, cota: str | None = None) -> None:
     """Consumes one unit from the general bucket and, if there is one, from the quota's bucket.
 
-    Fixed one-minute window (`contar_na_janela`), the same counter as the
+    Fixed one-minute window (`count_in_window`), the same counter as the
     WebSocket rate limit: the deadline starts at the first call and does not
     move. Exceeded: raises `ToolError rate_limited` with `retry_after_seconds`
     read from the TTL, so the client knows to wait instead of retrying.
     """
     if redis is None:
-        _avisar_sem_redis("pool Redis indisponível")
+        _warn_without_redis("pool Redis indisponível")
         return
 
-    baldes: list[tuple[str, int]] = [(f"ratelimit:mcp:{token_id}:geral", LIMITE_GERAL)]
+    buckets: list[tuple[str, int]] = [(f"ratelimit:mcp:{token_id}:geral", OVERALL_LIMIT)]
     if cota:
-        baldes.append((f"ratelimit:mcp:{token_id}:{cota}", _limite_da_cota(cota)))
+        buckets.append((f"ratelimit:mcp:{token_id}:{cota}", _quota_limit(cota)))
 
-    for chave, limite in baldes:
+    for chave, limite in buckets:
         try:
-            contador, ttl = await contar_na_janela(chave, JANELA_SEGUNDOS, redis=redis)
+            contador, ttl = await count_in_window(chave, WINDOW_SECONDS, redis=redis)
         except Exception as exc:  # pragma: no cover - depends on Redis
-            _avisar_sem_redis(f"falha ao contar: {exc.__class__.__name__}")
+            _warn_without_redis(f"falha ao contar: {exc.__class__.__name__}")
             return
         if contador <= limite:
             continue
@@ -117,7 +117,7 @@ async def verificar(redis, token_id: str, cota: str | None = None) -> None:
             "rate_limited",
             f"Limite de {limite} chamadas por minuto atingido para este token.",
             "aguarde a janela reabrir antes de tentar de novo",
-            retry_after_seconds=ttl if ttl > 0 else JANELA_SEGUNDOS,
+            retry_after_seconds=ttl if ttl > 0 else WINDOW_SECONDS,
         )
 
 
@@ -144,12 +144,12 @@ async def verificar_tokens_do_assistente(
     accumulated spending, not against the last cent.
     """
     if redis is None:
-        _avisar_sem_redis("pool Redis indisponível")
+        _warn_without_redis("pool Redis indisponível")
         return
     try:
-        gasto = await redis.get(chave_de_tokens(user_id))
+        gasto = await redis.get(tokens_key(user_id))
     except Exception as exc:  # pragma: no cover - depends on Redis
-        _avisar_sem_redis(f"falha ao ler a cota do assistente: {exc.__class__.__name__}")
+        _warn_without_redis(f"falha ao ler a cota do assistente: {exc.__class__.__name__}")
         return
     if gasto is None:
         return
@@ -173,7 +173,7 @@ async def verificar_tokens_do_assistente(
         "rate_limited",
         "Você atingiu a cota diária do assistente.",
         "a cota reabre 24 horas depois da sua primeira conversa",
-        retry_after_seconds=await _quanto_falta(redis, chave_de_tokens(user_id)),
+        retry_after_seconds=await _time_remaining(redis, tokens_key(user_id)),
     )
 
 
@@ -186,7 +186,7 @@ async def cobrar_tokens_do_assistente(redis, user_id: str, tokens: int) -> int |
     when there was no charge — no Redis, nothing to charge, or Redis failed.
 
     The 24 h window starts at the first charge and does not move
-    (`contar_na_janela`, which sets the deadline in the same transaction as the
+    (`count_in_window`, which sets the deadline in the same transaction as the
     INCRBY — the key does not become immortal).
 
     If Redis fails here, the spending drops out of the count and the day's
@@ -197,12 +197,12 @@ async def cobrar_tokens_do_assistente(redis, user_id: str, tokens: int) -> int |
     if redis is None or tokens <= 0:
         return None
     try:
-        acumulado, _ = await contar_na_janela(
-            chave_de_tokens(user_id), JANELA_DO_ASSISTENTE_SEGUNDOS, incremento=int(tokens), redis=redis
+        acumulado, _ = await count_in_window(
+            tokens_key(user_id), ASSISTANT_WINDOW_SECONDS, increment=int(tokens), redis=redis
         )
         return acumulado
     except Exception as exc:  # pragma: no cover - depends on Redis
-        _avisar_sem_redis(f"falha ao cobrar a cota do assistente: {exc.__class__.__name__}")
+        _warn_without_redis(f"falha ao cobrar a cota do assistente: {exc.__class__.__name__}")
         return None
 
 
@@ -221,11 +221,11 @@ async def cobrar_tokens_do_assistente(redis, user_id: str, tokens: int) -> int |
 # shows only spending, ceiling and deadline: saying there that the budget is
 # shared was tried and removed — it is noise for someone reading a meter. The
 # fact is recorded in docs/assistant.md, "Known limits".
-def chave_de_tokens(user_id: str) -> str:
+def tokens_key(user_id: str) -> str:
     return f"assistente:tokens:{user_id}"
 
 
-async def gasto_e_prazo(redis, user_id: str) -> tuple[int, int | None]:
+async def spent_and_reset(redis, user_id: str) -> tuple[int, int | None]:
     """How much has been spent in the window and in how many seconds it reopens. Never raises.
 
     It is what `GET /assistente/editor/estado` shows without refusing anything
@@ -235,17 +235,17 @@ async def gasto_e_prazo(redis, user_id: str) -> tuple[int, int | None]:
     """
     if redis is None:
         return (0, None)
-    chave = chave_de_tokens(user_id)
+    chave = tokens_key(user_id)
     try:
         cru = await redis.get(chave)
-        # An old key with no deadline (the charge from before `contar_na_janela`
+        # An old key with no deadline (the charge from before `count_in_window`
         # did INCRBY and EXPIRE in two commands, and the second could get lost):
         # NX gives it the window and does not touch a key that has a deadline.
         # It has to be here, and not only in the refusal: with the quota full,
         # the interface reads this state and locks sending, the refusal never
         # runs, and the key would never expire.
         if cru is not None:
-            await redis.expire(chave, JANELA_DO_ASSISTENTE_SEGUNDOS, nx=True)
+            await redis.expire(chave, ASSISTANT_WINDOW_SECONDS, nx=True)
         ttl = await redis.ttl(chave)
     except Exception as exc:  # pragma: no cover - depends on Redis
         logger.warning("Falha ao ler a cota do assistente: %s", exc.__class__.__name__)
@@ -257,22 +257,22 @@ async def gasto_e_prazo(redis, user_id: str) -> tuple[int, int | None]:
     return (gasto, int(ttl) if isinstance(ttl, int) and ttl > 0 else None)
 
 
-async def _quanto_falta(redis, chave: str) -> int:
+async def _time_remaining(redis, chave: str) -> int:
     """The window's TTL, so the refusal can say when it reopens. Never raises.
 
     The `EXPIRE ... NX` before reading only acts on a key WITHOUT a deadline —
-    one that the charge from before `contar_na_janela` (INCRBY and EXPIRE in two
+    one that the charge from before `count_in_window` (INCRBY and EXPIRE in two
     commands) left immortal. It is in the refusal that this matters: once
     refused, the turn never reaches the charge, which is what sets the
     deadline, and whoever crossed the ceiling with such a key would never have
     the assistant again. On a key with a deadline, NX touches nothing.
     """
     try:
-        await redis.expire(chave, JANELA_DO_ASSISTENTE_SEGUNDOS, nx=True)
+        await redis.expire(chave, ASSISTANT_WINDOW_SECONDS, nx=True)
         ttl = await redis.ttl(chave)
     except Exception:  # pragma: no cover - depends on Redis
-        return JANELA_DO_ASSISTENTE_SEGUNDOS
-    return int(ttl) if isinstance(ttl, int) and ttl > 0 else JANELA_DO_ASSISTENTE_SEGUNDOS
+        return ASSISTANT_WINDOW_SECONDS
+    return int(ttl) if isinstance(ttl, int) and ttl > 0 else ASSISTANT_WINDOW_SECONDS
 
 
 @asynccontextmanager
@@ -290,38 +290,38 @@ async def espera(redis, token_id: str, ttl_s: int) -> AsyncIterator[None]:
     token's slots on every attempt until the TTL expired.
     """
     if redis is None:
-        _avisar_sem_redis("pool Redis indisponível")
-        async with _espera_local(token_id):
+        _warn_without_redis("pool Redis indisponível")
+        async with _local_wait(token_id):
             yield
         return
 
-    chave_token = f"mcp:wait:token:{token_id}"
-    chave_global = "mcp:wait:global"
-    expiracao = max(int(ttl_s), 0) + 60
-    incrementadas: list[str] = []
+    token_key = f"mcp:wait:token:{token_id}"
+    global_key = "mcp:wait:global"
+    expiration = max(int(ttl_s), 0) + 60
+    incremented: list[str] = []
     try:
-        do_token = await redis.incr(chave_token)
-        incrementadas.append(chave_token)
-        await redis.expire(chave_token, expiracao)
-        do_global = await redis.incr(chave_global)
-        incrementadas.append(chave_global)
-        await redis.expire(chave_global, expiracao)
+        do_token = await redis.incr(token_key)
+        incremented.append(token_key)
+        await redis.expire(token_key, expiration)
+        do_global = await redis.incr(global_key)
+        incremented.append(global_key)
+        await redis.expire(global_key, expiration)
     except Exception as exc:  # pragma: no cover - depends on Redis
-        _avisar_sem_redis(f"falha ao reservar espera: {exc.__class__.__name__}")
-        await _devolver(redis, *incrementadas)
-        async with _espera_local(token_id):
+        _warn_without_redis(f"falha ao reservar espera: {exc.__class__.__name__}")
+        await _release(redis, *incremented)
+        async with _local_wait(token_id):
             yield
         return
 
-    if do_token > MAX_ESPERAS_POR_TOKEN or do_global > MAX_ESPERAS_GLOBAL:
-        await _devolver(redis, chave_token, chave_global)
-        excedido_no_token = do_token > MAX_ESPERAS_POR_TOKEN
+    if do_token > MAX_WAITS_PER_TOKEN or do_global > MAX_GLOBAL_WAITS:
+        await _release(redis, token_key, global_key)
+        exceeded_for_token = do_token > MAX_WAITS_PER_TOKEN
         raise erro(
             "wait_limit",
             (
-                f"Limite de {MAX_ESPERAS_POR_TOKEN} execuções aguardando em paralelo "
+                f"Limite de {MAX_WAITS_PER_TOKEN} execuções aguardando em paralelo "
                 "atingido para este token."
-                if excedido_no_token
+                if exceeded_for_token
                 else "A plataforma está no limite de execuções aguardando em paralelo."
             ),
             "execute com wait=false e acompanhe por get_run(run_id)",
@@ -330,10 +330,10 @@ async def espera(redis, token_id: str, ttl_s: int) -> AsyncIterator[None]:
     try:
         yield
     finally:
-        await _devolver(redis, chave_token, chave_global)
+        await _release(redis, token_key, global_key)
 
 
-async def _devolver(redis, *chaves: str) -> None:
+async def _release(redis, *chaves: str) -> None:
     """Releases the reservation. Never raises: failing here would only lose the result."""
     for chave in chaves:
         try:
@@ -343,24 +343,24 @@ async def _devolver(redis, *chaves: str) -> None:
 
 
 @asynccontextmanager
-async def _espera_local(token_id: str) -> AsyncIterator[None]:
+async def _local_wait(token_id: str) -> AsyncIterator[None]:
     """Per-process ceiling, used only when there is no Redis."""
-    global _esperas_locais_total
-    do_token = _esperas_locais.get(token_id, 0) + 1
-    if do_token > MAX_ESPERAS_POR_TOKEN or _esperas_locais_total + 1 > MAX_ESPERAS_GLOBAL:
+    global _local_waits_total
+    do_token = _local_waits.get(token_id, 0) + 1
+    if do_token > MAX_WAITS_PER_TOKEN or _local_waits_total + 1 > MAX_GLOBAL_WAITS:
         raise erro(
             "wait_limit",
-            f"Limite de {MAX_ESPERAS_POR_TOKEN} execuções aguardando em paralelo atingido.",
+            f"Limite de {MAX_WAITS_PER_TOKEN} execuções aguardando em paralelo atingido.",
             "execute com wait=false e acompanhe por get_run(run_id)",
         )
-    _esperas_locais[token_id] = do_token
-    _esperas_locais_total += 1
+    _local_waits[token_id] = do_token
+    _local_waits_total += 1
     try:
         yield
     finally:
-        restante = _esperas_locais.get(token_id, 1) - 1
+        restante = _local_waits.get(token_id, 1) - 1
         if restante > 0:
-            _esperas_locais[token_id] = restante
+            _local_waits[token_id] = restante
         else:
-            _esperas_locais.pop(token_id, None)
-        _esperas_locais_total -= 1
+            _local_waits.pop(token_id, None)
+        _local_waits_total -= 1

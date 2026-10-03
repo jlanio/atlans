@@ -82,7 +82,7 @@ class DisabledNodesInWorkflowError(WorkflowError):
     error_code  = "workflow_has_disabled_nodes"
 
 
-class DefinicaoInvalidaError(WorkflowError):
+class InvalidDefinitionError(WorkflowError):
     """A definition the executor cannot even build (nonexistent node, duplicate
     id, cycle). `report` is the lint report, which the MCP error translator
     (`app/mcp/erros.py`) returns sanitized — before, these cases
@@ -98,7 +98,7 @@ class DefinicaoInvalidaError(WorkflowError):
 
 # ── Source catalog ────────────────────────────────────────────────────────────
 
-class FonteInvalidaError(AtlasBaseError):
+class InvalidSourceError(AtlasBaseError):
     """A source's URL (or layer) does not pass the shape check: scheme, length,
     embedded credential. 422 like every malformed input."""
     status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
@@ -219,7 +219,7 @@ class InvalidFileOperationError(FileError):
     error_code  = "invalid_file_operation"
 
 
-class ConteudoNoExecutorError(FileError):
+class ContentOnExecutorError(FileError):
     """Operation that would require the CONTENT of a file that only exists on the executor.
 
     Applies to the record of a cataloged file (LGPD): the platform knows the

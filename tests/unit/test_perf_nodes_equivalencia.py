@@ -14,7 +14,7 @@ from flow.nodes.spatial.spatial_filter import SpatialFilterNode  # noqa: E402
 from flow.nodes.action.field_transformer import SetFields  # noqa: E402
 
 
-async def test_partition_indexado_mantem_todas_as_feicoes():
+async def test_indexed_partition_keeps_all_features():
     """2x2 grid over 4 points, one per quadrant: 4 non-empty tiles, 1 feature
     each, no feature lost or duplicated. Proves the spatial index returns the
     same set as the old elementwise scan (intersects predicate)."""
@@ -32,7 +32,7 @@ async def test_partition_indexado_mantem_todas_as_feicoes():
     assert ids == [1, 2, 3, 4]                  # none lost, none duplicated
 
 
-async def test_partition_tile_vazio_e_omitido():
+async def test_partition_empty_tile_is_omitted():
     """A single point in a 2x2 grid: only the tile that contains it enters the result."""
     pts = gpd.GeoDataFrame(
         {"id": [1]}, geometry=[Point(0, 0)], crs="EPSG:3857",
@@ -43,7 +43,7 @@ async def test_partition_tile_vazio_e_omitido():
     assert len(tiles[0]) == 1
 
 
-async def test_setfields_compila_uma_vez_rende_por_linha():
+async def test_setfields_compiles_once_renders_per_row():
     """Per-row expression, fixed value and numeric coercion: the per-row result
     is the same with the single template compilation."""
     gdf = gpd.GeoDataFrame(
@@ -63,7 +63,7 @@ async def test_setfields_compila_uma_vez_rende_por_linha():
     assert list(out["status"]) == ["ativo", "ativo", "ativo"]
 
 
-async def test_setfields_sem_expressao_usa_caminho_vetorial():
+async def test_setfields_without_expression_uses_vectorized_path():
     """Fixed values only: direct assignment, unchanged result."""
     gdf = gpd.GeoDataFrame(
         {"a": [1, 2]}, geometry=[Point(0, 0), Point(1, 1)], crs="EPSG:3857",
@@ -72,7 +72,7 @@ async def test_setfields_sem_expressao_usa_caminho_vetorial():
     assert list(out["flag"]) == ["x", "x"]
 
 
-async def test_setfields_valor_fixo_lista_e_replicado_por_linha():
+async def test_setfields_fixed_list_value_is_replicated_per_row():
     """Regression: a NON-scalar fixed value (list) in a field mixed with an expression.
     Without care, `gdf[col] = ["x","y"]` would assign element by element; the
     expected result (like the old behavior) is the SAME list in every cell."""
@@ -88,7 +88,7 @@ async def test_setfields_valor_fixo_lista_e_replicado_por_linha():
     assert list(out["e"]) == [1, 2]
 
 
-async def test_spatial_filter_intersects_indice_nao_unico():
+async def test_spatial_filter_intersects_non_unique_index():
     """Regression: a duplicate index must not over-select. b(0) is OUTSIDE the
     mask and must not get in just because it shares label 0 with a(0)."""
     layer = gpd.GeoDataFrame(
@@ -103,7 +103,7 @@ async def test_spatial_filter_intersects_indice_nao_unico():
     assert sorted(out["id"]) == ["a", "c"]
 
 
-async def test_spatial_filter_intersects_com_coluna_index_right():
+async def test_spatial_filter_intersects_with_index_right_column():
     """Regression: a pre-existing 'index_right' column (e.g. output of an earlier
     SpatialJoin) must not make sjoin raise ValueError."""
     layer = gpd.GeoDataFrame(

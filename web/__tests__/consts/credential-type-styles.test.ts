@@ -12,7 +12,7 @@ import {
  * out — the UI doesn't break (it falls back to DEFAULT), but the credential would
  * show up with the generic icon without anyone noticing.
  */
-const TIPOS_DO_BACKEND = [
+const BACKEND_TYPES = [
   "postgresql",
   "mysql",
   "s3",
@@ -25,12 +25,12 @@ const TIPOS_DO_BACKEND = [
 ]
 
 describe("CredentialTypeStyles", () => {
-  it.each(TIPOS_DO_BACKEND)("tem entrada para o tipo '%s'", tipo => {
+  it.each(BACKEND_TYPES)("tem entrada para o tipo '%s'", tipo => {
     expect(CREDENTIAL_TYPE_STYLES[tipo]).toBeDefined()
   })
 
   it("nao tem entrada sobrando que o backend nao conheca", () => {
-    expect(Object.keys(CREDENTIAL_TYPE_STYLES).sort()).toEqual([...TIPOS_DO_BACKEND].sort())
+    expect(Object.keys(CREDENTIAL_TYPE_STYLES).sort()).toEqual([...BACKEND_TYPES].sort())
   })
 
   it.each(Object.entries(CREDENTIAL_TYPE_STYLES))(

@@ -98,7 +98,7 @@ class SendWebhookNode(BaseNode):
 
         if gdf is not None and not gdf.empty:
             try:
-                geojson_str = await asyncio.to_thread(gdf_para_geojson, gdf, nat_como_nulo=True)
+                geojson_str = await asyncio.to_thread(gdf_para_geojson, gdf, nat_as_null=True)
                 payload['data'] = json.loads(geojson_str)
             except Exception as e:
                 raise RuntimeError(f"Erro ao serializar GeoDataFrame para GeoJSON: {e}") from e

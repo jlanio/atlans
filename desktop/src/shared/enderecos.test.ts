@@ -1,7 +1,7 @@
 // The server and UI the app writes into the executable come from the build, never from the code.
 import { afterEach, describe, expect, it } from 'vitest'
 import {
-  DEV, TESTE, conferirMarcaDoBuild, defineDosEnderecos, enderecosDoBuild, marcaDoBuild,
+  DEV, TEST, conferirMarcaDoBuild, addressDefines, buildAddresses, buildBrand,
 } from '../../scripts/enderecos.mjs'
 import { SERVIDOR } from './servidor.js'
 import { UI_URL } from './ui.js'
@@ -20,21 +20,21 @@ function ambiente(servidor?: string, ui?: string) {
 
 describe('endereços do build', () => {
   it('os testes rodam com o domínio de exemplo, não com o de uma instalação', () => {
-    expect(SERVIDOR).toBe(TESTE.servidor)
-    expect(UI_URL).toBe(TESTE.ui)
+    expect(SERVIDOR).toBe(TEST.servidor)
+    expect(UI_URL).toBe(TEST.ui)
   })
 
   it('um build de verdade sem os endereços falha, em vez de sair com um vazio', () => {
     ambiente()
-    expect(() => enderecosDoBuild()).toThrow(/ATLANS_DESKTOP_SERVIDOR e ATLANS_DESKTOP_UI_URL/)
+    expect(() => buildAddresses()).toThrow(/ATLANS_DESKTOP_SERVIDOR e ATLANS_DESKTOP_UI_URL/)
     ambiente('wss://agents.x.org')
-    expect(() => enderecosDoBuild()).toThrow(/ATLANS_DESKTOP_UI_URL/)
+    expect(() => buildAddresses()).toThrow(/ATLANS_DESKTOP_UI_URL/)
   })
 
   it('o build grava os do ambiente, só com esquema e host', () => {
     ambiente(' wss://agents.x.org ', 'https://x.org/')
-    expect(enderecosDoBuild()).toEqual({ servidor: 'wss://agents.x.org', ui: 'https://x.org' })
-    expect(defineDosEnderecos(enderecosDoBuild())).toEqual({
+    expect(buildAddresses()).toEqual({ servidor: 'wss://agents.x.org', ui: 'https://x.org' })
+    expect(addressDefines(buildAddresses())).toEqual({
       __ATLANS_SERVIDOR__: '"wss://agents.x.org"',
       __ATLANS_UI_URL__: '"https://x.org"',
     })
@@ -42,35 +42,35 @@ describe('endereços do build', () => {
 
   it('fora do desenvolvimento, só wss e https', () => {
     ambiente('ws://agents.x.org', 'https://x.org')
-    expect(() => enderecosDoBuild()).toThrow(/wss:/)
+    expect(() => buildAddresses()).toThrow(/wss:/)
     ambiente('wss://agents.x.org', 'http://x.org')
-    expect(() => enderecosDoBuild()).toThrow(/https:/)
+    expect(() => buildAddresses()).toThrow(/https:/)
   })
 
   it('caminho, query ou credencial na URL são recusados', () => {
     for (const ui of ['https://x.org/app', 'https://x.org/?a=1', 'https://u:p@x.org', 'nao-e-url']) {
       ambiente('wss://agents.x.org', ui)
-      expect(() => enderecosDoBuild(), ui).toThrow()
+      expect(() => buildAddresses(), ui).toThrow()
     }
   })
 
   it('o desenvolvimento local cai nos endereços locais e aceita ws/http', () => {
     ambiente()
-    expect(enderecosDoBuild({ dev: true })).toEqual(DEV)
+    expect(buildAddresses({ dev: true })).toEqual(DEV)
     ambiente('ws://localhost:9000', 'http://localhost:4000')
-    expect(enderecosDoBuild({ dev: true })).toEqual({ servidor: 'ws://localhost:9000', ui: 'http://localhost:4000' })
+    expect(buildAddresses({ dev: true })).toEqual({ servidor: 'ws://localhost:9000', ui: 'http://localhost:4000' })
   })
 })
 
 describe('marca do build', () => {
   it('o bundle de produção vira instalador', () => {
-    const marca = marcaDoBuild({ dev: false, ...TESTE })
+    const marca = buildBrand({ dev: false, ...TEST })
     expect(marca.modo).toBe('producao')
     expect(() => conferirMarcaDoBuild(marca)).not.toThrow()
   })
 
   it('o bundle do npm run dev não vira instalador', () => {
-    const marca = marcaDoBuild({ dev: true, ...DEV })
+    const marca = buildBrand({ dev: true, ...DEV })
     expect(() => conferirMarcaDoBuild(marca)).toThrow(/npm run dev.*ws:\/\/localhost:8000.*npm run build/)
   })
 

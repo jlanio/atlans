@@ -12,9 +12,9 @@ import {
 } from "@/app/components/ui/select"
 import { cn } from "@/lib/utils"
 import {
-  type EstadoAgenda, type Frequencia, type UnidadeIntervalo,
-  descrever, fusoPadraoDosCampos, gerarCampos, lerEstado, NOME_DIA_CURTO, NOME_DIA_LONGO,
-  opcoesDeFuso, proximasExecucoes, resumoSalvo, validarAvancado,
+  type ScheduleState, type Frequency, type IntervalUnit,
+  descrever, fieldsDefaultTimezone, gerarCampos, lerEstado, SHORT_DAY_NAME, LONG_DAY_NAME,
+  timezoneOptions, proximasExecucoes, resumoSalvo, validarAvancado,
 } from "./schedule-recurrence"
 import type { INodesPropertyAPI } from "@/service/types"
 
@@ -32,14 +32,14 @@ interface Props {
   campos?: INodesPropertyAPI[]
 }
 
-const UNIDADES: { value: UnidadeIntervalo; label: string }[] = [
+const UNIDADES: { value: IntervalUnit; label: string }[] = [
   { value: "seconds", label: "segundos" },
   { value: "minutes", label: "minutos" },
   { value: "hours",   label: "horas" },
   { value: "days",    label: "dias" },
 ]
 
-const FREQS: { value: Frequencia; label: string; icon: typeof TbClock }[] = [
+const FREQS: { value: Frequency; label: string; icon: typeof TbClock }[] = [
   { value: "intervalo", label: "Intervalo",    icon: TbRepeat },
   { value: "diario",    label: "Diariamente",  icon: TbClock },
   { value: "semanal",   label: "Semanalmente", icon: TbCalendarWeek },
@@ -50,8 +50,8 @@ const FREQS: { value: Frequencia; label: string; icon: typeof TbClock }[] = [
 const pad = (n: number) => String(n).padStart(2, "0")
 
 export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved, nodeId, campos }: Props) {
-  const fusoPadrao = fusoPadraoDosCampos(campos)
-  const [e, setE] = useState<EstadoAgenda>(() => lerEstado(values, fusoPadrao))
+  const defaultTimeZone = fieldsDefaultTimezone(campos)
+  const [e, setE] = useState<ScheduleState>(() => lerEstado(values, defaultTimeZone))
   const eRef = useRef(e)
   eRef.current = e
 
@@ -63,11 +63,11 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
   // (via gerarCampos) so as NOT to re-initialize on the echo of its own writes
   // nor for an equivalent cron.
   useEffect(() => {
-    const alvo = lerEstado(values, fusoPadrao)
+    const alvo = lerEstado(values, defaultTimeZone)
     if (JSON.stringify(gerarCampos(alvo)) !== JSON.stringify(gerarCampos(eRef.current))) {
       setE(alvo)
     }
-  }, [values, nodeId, fusoPadrao])
+  }, [values, nodeId, defaultTimeZone])
 
   /** Writes only the fields that actually CHANGED. Avoids canonicalizing an
    * equivalent cron ('00 09' -> '0 9') and making the backend (which compares by
@@ -81,7 +81,7 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
   }
 
   /** Changes a field that DEFINES the recurrence and rewrites the expression (diff-only). */
-  function atualizar(patch: Partial<EstadoAgenda>) {
+  function atualizar(patch: Partial<ScheduleState>) {
     const ne = { ...e, ...patch }
     setE(ne)
     const campos: Record<string, string | number | boolean> = { ...gerarCampos(ne) }
@@ -100,32 +100,32 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
 
   /** Time zone and "active" don't touch the expression — they write only their
    * own field, so as not to rewrite (and churn) the cron/rrule. */
-  function setFuso(v: string) {
+  function setTimeZone(v: string) {
     setE(p => ({ ...p, timezone: v }))
     if (String(v) !== String(values?.timezone ?? "")) setNodeField("timezone", v)
   }
-  function setAtivo(v: boolean) {
+  function setActive(v: boolean) {
     setE(p => ({ ...p, active: v }))
     if (String(v) !== String(values?.active ?? "")) setNodeField("active", v)
   }
 
-  const horaStr = `${pad(e.hora)}:${pad(e.minuto)}`
-  function setHora(hhmm: string) {
+  const timeStr = `${pad(e.hora)}:${pad(e.minuto)}`
+  function setTime(hhmm: string) {
     const [h, m] = hhmm.split(":").map(Number)
     if (Number.isFinite(h) && Number.isFinite(m)) atualizar({ hora: h, minuto: m })
   }
-  function toggleDia(d: number) {
+  function toggleDay(d: number) {
     const tem = e.weekdays.includes(d)
     if (tem && e.weekdays.length === 1) return // never leaves it with no day at all
     atualizar({ weekdays: tem ? e.weekdays.filter(x => x !== d) : [...e.weekdays, d] })
   }
 
   const frase = descrever(e)
-  const erroAvancado = validarAvancado(e)
+  const advancedError = validarAvancado(e)
   const runs = useMemo(() => proximasExecucoes(e, 5), [e])
   // All IANA time zones (plus the current one, if it is an old name). The list
   // only changes with the chosen zone: building it costs ~400 offset formattings.
-  const fusos = useMemo(() => opcoesDeFuso(e.timezone), [e.timezone])
+  const fusos = useMemo(() => timezoneOptions(e.timezone), [e.timezone])
   const tzLabel = (fusos.find(t => t.value === e.timezone) || { label: e.timezone }).label
   const fmt = useMemo(() => {
     try {
@@ -136,7 +136,7 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
   }, [e.timezone])
 
   // Honest guards, derived from what the scheduler actually does.
-  const aviso = avisoDe(e)
+  const aviso = warningFor(e)
 
   return (
     <div className="flex flex-col gap-4 mt-1 px-1 pb-4">
@@ -179,7 +179,7 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
           </div>
           <div className="flex flex-col gap-1.5 flex-1">
             <Label>Unidade</Label>
-            <Select value={e.unidade} onValueChange={v => atualizar({ unidade: v as UnidadeIntervalo })}>
+            <Select value={e.unidade} onValueChange={v => atualizar({ unidade: v as IntervalUnit })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {UNIDADES.map(u => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}
@@ -194,7 +194,7 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
         <div className="flex items-end gap-2">
           <div className="flex flex-col gap-1.5 flex-1">
             <Label htmlFor="hora-d">Horário</Label>
-            <Input id="hora-d" type="time" value={horaStr} onChange={ev => setHora(ev.target.value)} />
+            <Input id="hora-d" type="time" value={timeStr} onChange={ev => setTime(ev.target.value)} />
           </div>
           <div className="flex flex-col gap-1.5 w-36">
             <Label htmlFor="everydays">Repetir a cada</Label>
@@ -216,12 +216,12 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
           <div className="flex flex-col gap-1.5">
             <Label>Dias da semana</Label>
             <div className="flex flex-wrap gap-1.5">
-              {NOME_DIA_CURTO.map((nome, i) => {
+              {SHORT_DAY_NAME.map((nome, i) => {
                 const ativo = e.weekdays.includes(i)
                 return (
                   <button
-                    key={i} type="button" aria-pressed={ativo} aria-label={NOME_DIA_LONGO[i]}
-                    onClick={() => toggleDia(i)}
+                    key={i} type="button" aria-pressed={ativo} aria-label={LONG_DAY_NAME[i]}
+                    onClick={() => toggleDay(i)}
                     className={cn(
                       "grid size-9 place-items-center rounded-full border text-xs font-semibold transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
                       ativo
@@ -251,7 +251,7 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="hora-s">Horário</Label>
-            <Input id="hora-s" type="time" value={horaStr} onChange={ev => setHora(ev.target.value)} />
+            <Input id="hora-s" type="time" value={timeStr} onChange={ev => setTime(ev.target.value)} />
           </div>
         </div>
       )}
@@ -277,7 +277,7 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
             </div>
             <div className="flex flex-col gap-1.5 w-36">
               <Label htmlFor="hora-m">Horário</Label>
-              <Input id="hora-m" type="time" value={horaStr} onChange={ev => setHora(ev.target.value)} />
+              <Input id="hora-m" type="time" value={timeStr} onChange={ev => setTime(ev.target.value)} />
             </div>
           </div>
         </div>
@@ -322,10 +322,10 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
               <p className="text-[11px] text-muted-foreground">RRule (RFC 5545) — para recorrências que o cron não expressa.</p>
             </div>
           )}
-          {erroAvancado && (
+          {advancedError && (
             <p className="flex items-start gap-1.5 text-xs text-destructive">
               <TbAlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-              {erroAvancado} Enquanto estiver assim, o agendamento anterior é mantido.
+              {advancedError} Enquanto estiver assim, o agendamento anterior é mantido.
             </p>
           )}
         </div>
@@ -334,7 +334,7 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
       {/* Time zone */}
       <div className="flex flex-col gap-1.5">
         <Label>Fuso horário</Label>
-        <Select value={e.timezone} onValueChange={setFuso}>
+        <Select value={e.timezone} onValueChange={setTimeZone}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             {fusos.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
@@ -348,7 +348,7 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
           <Label className="text-sm font-medium">Agendamento ativo</Label>
           <p className="text-xs text-muted-foreground mt-0.5">Inativo, o workflow não roda sozinho.</p>
         </div>
-        <Switch checked={e.active} onCheckedChange={setAtivo} aria-label="Agendamento ativo" />
+        <Switch checked={e.active} onCheckedChange={setActive} aria-label="Agendamento ativo" />
       </div>
 
       {/* Aviso */}
@@ -379,7 +379,7 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
             runs.map((d, i) => (
               <li key={i} className={cn("flex items-center gap-2 rounded-md px-2 py-1.5 text-xs", i === 0 && "bg-primary/5")}>
                 <span className={cn("size-1.5 rounded-full bg-primary", i !== 0 && "opacity-40")} aria-hidden="true" />
-                <span className="tabular-nums">{capitalizar(fmt.format(d))}</span>
+                <span className="tabular-nums">{capitalize(fmt.format(d))}</span>
                 <span className="ml-auto tabular-nums text-muted-foreground">{relativo(d)}</span>
               </li>
             ))
@@ -402,7 +402,7 @@ export default function ScheduleTriggerHelper({ values, setNodeField, hasUnsaved
   )
 }
 
-function avisoDe(e: EstadoAgenda): string | null {
+function warningFor(e: ScheduleState): string | null {
   if (e.freq === "intervalo") {
     const seg = e.intervalo * ({ seconds: 1, minutes: 60, hours: 3600, days: 86400 }[e.unidade])
     if (seg < 30) return "O agendador verifica a cada ~30 s; intervalos menores rodam no máximo a cada ~30 s."
@@ -413,7 +413,7 @@ function avisoDe(e: EstadoAgenda): string | null {
   return null
 }
 
-function capitalizar(s: string): string {
+function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 

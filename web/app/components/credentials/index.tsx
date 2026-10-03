@@ -20,9 +20,9 @@ import { Skeleton } from "../ui/skeleton"
 import { getCredentialTypeStyle } from "@/consts/CredentialTypeStyles"
 import { createToast } from "@/utils/createToast"
 import { cn } from "@/lib/utils"
-import { formatarInteiro, plural } from "@/lib/formatos"
+import { formatInteger, plural } from "@/lib/formatos"
 import { useFetchData } from "@/app/hooks/useFetchData"
-import { ErroDeCarga, SemResultado, SkeletonDeCredenciais, VazioPrimeiroUso } from "./estados"
+import { ErroDeCarga, SemResultado, CredentialsSkeleton, VazioPrimeiroUso } from "./estados"
 import type { ICredentials, ICredentialTypeSchema } from "@/service/types"
 
 type SortKey = "name" | "recent" | "used"
@@ -278,7 +278,7 @@ const CredentialsActions = () => {
   // Groups a list by type (used inside each section when "Agrupar por
   // tipo" (group by type) is on). It is no longer a useMemo over the whole
   // `visible`: grouping now runs PER ownership section — see renderCredList.
-  function agruparPorTipo(list: ICredentials[]) {
+  function groupByType(list: ICredentials[]) {
     const map = new Map<string, ICredentials[]>()
     for (const c of list) {
       const arr = map.get(c.type) ?? []
@@ -297,17 +297,17 @@ const CredentialsActions = () => {
   const minhas = useMemo(() => visible.filter(c => ownership(c).isMine), [visible, myId])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const compartilhadas = useMemo(() => visible.filter(c => !ownership(c).isMine), [visible, myId])
-  const temMistura = useMemo(() => minhas.length > 0 && compartilhadas.length > 0, [minhas, compartilhadas])
+  const isMixed = useMemo(() => minhas.length > 0 && compartilhadas.length > 0, [minhas, compartilhadas])
 
   // Pre-groups each section by type once (keyed by scope), instead of
   // regrouping inside renderCredList on every render. Only changes when the lists
   // or the labels (typeLabel) change; with "Agrupar por tipo" off nobody reads it.
   // `agruparPorTipo` is recreated on every render (it closes over typeLabel,
   // which is already in the deps); including it would void the memo.
-  const gruposPorEscopo = useMemo<Record<string, [string, ICredentials[]][]>>(() => ({
-    mine: agruparPorTipo(minhas),
-    shared: agruparPorTipo(compartilhadas),
-    all: agruparPorTipo(visible),
+  const groupsByScope = useMemo<Record<string, [string, ICredentials[]][]>>(() => ({
+    mine: groupByType(minhas),
+    shared: groupByType(compartilhadas),
+    all: groupByType(visible),
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [minhas, compartilhadas, visible, typeLabel])
 
@@ -323,7 +323,7 @@ const CredentialsActions = () => {
   // disappears (contract §7) — "0 em uso" in a freshly created list helps no one.
   function textoDoSubtitulo(): string {
     const partes = [plural(credentials!.length, "credencial", "credenciais")]
-    if (usedCount > 0) partes.push(`${formatarInteiro(usedCount)} em uso`)
+    if (usedCount > 0) partes.push(`${formatInteger(usedCount)} em uso`)
     return partes.join(" · ")
   }
 
@@ -393,23 +393,23 @@ const CredentialsActions = () => {
     if (grouped) {
       return (
         <div className="flex flex-col gap-4">
-          {/* Groups already precomputed per scope (see gruposPorEscopo). */}
-          {gruposPorEscopo[scope].map(([type, cs]) => {
+          {/* Groups already precomputed per scope (see groupsByScope). */}
+          {groupsByScope[scope].map(([type, cs]) => {
             const style = getCredentialTypeStyle(type)
             const TypeIcon = style.icon
             // Level of the type heading: h3 when nested under an ownership
             // section (the "Minhas"/"Compartilhadas" h2); h2 when the list is
             // flat, so the heading chain doesn't jump from h1 straight to h3
             // (a regression for screen readers).
-            const TituloTipo = aninhado ? "h3" : "h2"
+            const TypeHeading = aninhado ? "h3" : "h2"
             return (
               <div key={`${scope}-${type}`} className="flex flex-col gap-2">
                 <div className="flex items-center gap-2 px-1">
                   <TypeIcon className={`size-3.5 ${style.fg}`} aria-hidden="true" />
-                  <TituloTipo className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <TypeHeading className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     {getTypeLabel(type)}
-                  </TituloTipo>
-                  <span className="text-[11px] tabular-nums text-muted-foreground/60">{formatarInteiro(cs.length)}</span>
+                  </TypeHeading>
+                  <span className="text-[11px] tabular-nums text-muted-foreground/60">{formatInteger(cs.length)}</span>
                 </div>
                 <ul className="flex flex-col gap-3 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
                   {cs.map(renderCard)}
@@ -561,7 +561,7 @@ const CredentialsActions = () => {
       {/* Precedence of contract §3: loading → error (only on the 1st load) →
           first use → content (with no-results inside). */}
       {loading ? (
-        <SkeletonDeCredenciais />
+        <CredentialsSkeleton />
       ) : loadError && atualizadoEm == null ? (
         <ErroDeCarga onTentar={handleRefresh} />
       ) : !hasCreds ? (
@@ -573,13 +573,13 @@ const CredentialsActions = () => {
         // mix; each section honors "Agrupar por tipo". With no mix, it
         // falls back to a single list (no redundant header).
         <div className={cn("flex flex-col gap-6 transition-opacity", refreshing && "opacity-60")}>
-          {temMistura ? (
+          {isMixed ? (
             <>
               <section aria-labelledby="cred-minhas-titulo" className="flex flex-col gap-2.5">
                 <div className="flex items-center gap-2 border-b border-border/60 pb-1.5">
                   <TbUser className="size-4 text-muted-foreground" aria-hidden="true" />
                   <h2 id="cred-minhas-titulo" className="text-sm font-semibold text-foreground">Minhas credenciais</h2>
-                  <span className="text-xs tabular-nums text-muted-foreground/70">{formatarInteiro(minhas.length)}</span>
+                  <span className="text-xs tabular-nums text-muted-foreground/70">{formatInteger(minhas.length)}</span>
                 </div>
                 {renderCredList(minhas, "mine", true)}
               </section>
@@ -587,7 +587,7 @@ const CredentialsActions = () => {
                 <div className="flex items-center gap-2 border-b border-border/60 pb-1.5">
                   <TbUsers className="size-4 text-muted-foreground" aria-hidden="true" />
                   <h2 id="cred-compartilhadas-titulo" className="text-sm font-semibold text-foreground">Compartilhadas comigo</h2>
-                  <span className="text-xs tabular-nums text-muted-foreground/70">{formatarInteiro(compartilhadas.length)}</span>
+                  <span className="text-xs tabular-nums text-muted-foreground/70">{formatInteger(compartilhadas.length)}</span>
                 </div>
                 {renderCredList(compartilhadas, "shared", true)}
               </section>

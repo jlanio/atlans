@@ -77,11 +77,11 @@ describe("formatDuration", () => {
 
 // ── Guards against the duplication coming back ───────────────────────────────
 
-function arquivosTs(dir: string, acc: string[] = []): string[] {
+function tsFiles(dir: string, acc: string[] = []): string[] {
   for (const nome of readdirSync(dir)) {
     if (nome === "node_modules" || nome === ".next") continue
     const caminho = join(dir, nome)
-    if (statSync(caminho).isDirectory()) arquivosTs(caminho, acc)
+    if (statSync(caminho).isDirectory()) tsFiles(caminho, acc)
     else if (/\.tsx?$/.test(nome)) acc.push(caminho)
   }
   return acc
@@ -89,7 +89,7 @@ function arquivosTs(dir: string, acc: string[] = []): string[] {
 
 describe("sem cópias locais", () => {
   it("nenhuma página redefine formatBytes", () => {
-    const violacoes = arquivosTs(join(RAIZ, "app"))
+    const violacoes = tsFiles(join(RAIZ, "app"))
       .filter(c => /^\s*(function|const)\s+formatBytes\b/m.test(readFileSync(c, "utf8")))
       .map(c => relative(RAIZ, c))
     expect(violacoes, "use formatBytes de @/utils/formatters").toEqual([])
@@ -98,7 +98,7 @@ describe("sem cópias locais", () => {
   it("nenhuma página redefine formatDate", () => {
     // The four copies were wrappers of `formatLocal`'s DEFAULT — they called
     // `formatLocal(iso, "DD/MM/YYYY HH:mm")`, which is literally the default.
-    const violacoes = arquivosTs(join(RAIZ, "app"))
+    const violacoes = tsFiles(join(RAIZ, "app"))
       .filter(c => /^\s*(function|const)\s+formatDate\s*[(:=]/m.test(readFileSync(c, "utf8")))
       .map(c => relative(RAIZ, c))
     expect(violacoes, "chame formatLocal de @/lib/dayjs direto").toEqual([])
@@ -106,7 +106,7 @@ describe("sem cópias locais", () => {
 
   it("nenhuma página compara success_rate com limiar literal", () => {
     const violacoes: string[] = []
-    for (const caminho of arquivosTs(join(RAIZ, "app"))) {
+    for (const caminho of tsFiles(join(RAIZ, "app"))) {
       const fonte = readFileSync(caminho, "utf8")
       fonte.split("\n").forEach((linha, i) => {
         if (/success_rate\s*[<>]=?\s*0\./.test(linha)) {

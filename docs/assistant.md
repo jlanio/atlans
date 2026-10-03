@@ -81,7 +81,7 @@ Two notes on the last two:
   bar AND opens it — it never toggles an invisible state; the brand stays as a glyph
   (for the admin, still the link to Projects, with a tooltip) and only the wordmark goes away.
 - **Portals in the Home palette.** Every Radix `*Content` opened from the
-  Home (the "⋯" menus, tooltips, `RenomearDialog`, `DeleteDialog`,
+  Home (the "⋯" menus, tooltips, `RenameDialog`, `DeleteDialog`,
   `MetadataDialog`, `ExecuteParamsDialog`, the account menu and the Preferences)
   goes to the `<body>`, outside the `.home dark` tree, and that is why it carries `home-portal`
   (globals.css). The shared components gained optional `className` /
@@ -193,7 +193,7 @@ Two notes on the last two:
 - **Downloading from the layers panel itself**, without going to look for the same file in the
   Artefatos list. The icon appears on hovering the row (where there IS a mouse:
   on touch it is permanent, and keyboard focus always reveals it), and **only when the
-  server said there is a file** — `CamadaDoGlobo.baixavel`, which is different from
+  server said there is a file** — `GlobeLayer.baixavel`, which is different from
   `available`: a published layer appears on the globe with its content in PostGIS and
   may not have a file in storage, and an artifact marked `keepLocal` never leaves the
   executor. In both cases the download would respond 409/404, and a live button that fails is
@@ -232,11 +232,11 @@ Meu group; the `WorkspaceContext` and the `ActiveRunsContext` were already idle 
 session). The anonymous sidebar shows the brand, the collapse trigger, the **catalog
 showcase** and, in the footer, **Entrar** (Sign in) and **Criar conta** (Create account).
 
-- **The showcase** (`VitrineDoCatalogo`, in `home-sidebar.tsx`) takes up the body that
+- **The showcase** (`CatalogShowcase`, in `home-sidebar.tsx`) takes up the body that
   used to be the invitation "Entre para ver seus chats, artefatos e agendamentos." (Sign in to see your
   chats, artifacts and schedules.): the size of the catalog (25,492 layers, 76 institutions, 11
   countries) and three sliding ribbons of acronyms — two from Brazil and one of the countries, under the labels
-  BRASIL and FORA DO BRASIL (BRAZIL and OUTSIDE BRAZIL). The change is one of argument: verifiable proof in place of
+  BRASIL and OUTSIDER DO BRASIL (BRAZIL and OUTSIDE BRAZIL). The change is one of argument: verifiable proof in place of
   a feature promise, and the vocabulary of someone who has already hunted for a WFS by hand in
   place of three words that a newcomer does not know.
   The numbers and the names are CONSTANTS in `web/lib/catalogo.ts` — the anonymous
@@ -318,7 +318,7 @@ showcase** and, in the footer, **Entrar** (Sign in) and **Criar conta** (Create 
   answer, in the strip and in the panel; the click sends the sentence as the next
   message, and the new turn takes the chips off the screen.
 - **Full reach, with click confirmation.** It has the six
-  PAT scopes (`escopo_do_assistente`). What holds back destructive actions is not the absence of a
+  PAT scopes (`assistant_scope`). What holds back destructive actions is not the absence of a
   scope: it is the **confirmation gate verified on the server**. Editing/running a
   workflow the person created, touching a schedule, deleting a Drive file,
   publishing, restoring, turning on/off — all of this asks for a click.
@@ -361,7 +361,7 @@ dangerous inner extension (`notas.sh.csv`), MB ceiling and empty file all live
 in `drive_service.py`/`drive_router.py`, apply to any upload
 path, and this path sends to the same `POST /drive/upload`. The refusal is translated
 with the SAME `classifyUploadError` as the `/drive` screen and shown in the SAME panel
-(`ResultadoDoUpload`), in a notice separate from the chips — the refused file does not enter the
+(`UploadResult`), in a notice separate from the chips — the refused file does not enter the
 message, and leaving it in the row would make the person send the question thinking it
 went. The only check done BEFORE uploading is the role in the workspace
 (`useWorkspace().canEdit`, the mirror of the `editor` role that the Drive requires): uploading a

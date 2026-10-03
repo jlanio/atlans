@@ -21,28 +21,28 @@ import pytest_asyncio
 
 from app.core.config import ASSISTENTE_MODELO
 from app.services import openrouter
-from tests.unit._painel_do_modelo import CATALOGO, api_com_banco, com_catalogo
+from tests.unit._painel_do_modelo import CATALOGO, api_with_db, with_catalog
 
 pytestmark = pytest.mark.asyncio
 
 
 @pytest_asyncio.fixture
 async def api(client, mock_current_user):
-    async with api_com_banco(client, mock_current_user) as par:
+    async with api_with_db(client, mock_current_user) as par:
         yield par
 
 
-async def test_usuario_comum_nao_entra(client, mock_current_user):
+async def test_regular_user_cannot_enter(client, mock_current_user):
     mock_current_user.role = "user"
     r = await client.get("/admin/assistente/modelo")
     assert r.status_code in (401, 403)
 
 
-async def test_provedor_fora_do_ar_nao_derruba_a_tela(api):
+async def test_provider_down_does_not_break_the_screen(api):
     """Without a catalog the admin still needs to see what is in use and be able
     to go back to the default — answering 500 here would lock the only exit."""
     client, _ = api
-    with com_catalogo(erro=openrouter.ErroDoOpenRouter("fora do ar", status=503)):
+    with with_catalog(erro=openrouter.ErroDoOpenRouter("fora do ar", status=503)):
         r = await client.get("/admin/assistente/modelo")
 
     assert r.status_code == 200
@@ -52,18 +52,18 @@ async def test_provedor_fora_do_ar_nao_derruba_a_tela(api):
     assert corpo["atual"]["modelo"] == ASSISTENTE_MODELO
 
 
-async def test_o_catalogo_vem_da_base_configurada_com_a_chave(api):
+async def test_catalog_comes_from_the_configured_base_with_the_key(api):
     """Outside OpenRouter (a gateway, a vLLM with a key), the catalog is the
     configured server's, and it requires the same key as the conversation."""
     client, _ = api
     visto: dict = {}
 
-    async def _listar(**kw):
+    async def _list_schedules(**kw):
         visto.update(kw)
         return [dict(m) for m in CATALOGO]
 
-    with com_catalogo(), \
-            patch("app.services.openrouter.listar_modelos", _listar), \
+    with with_catalog(), \
+            patch("app.services.openrouter.listar_modelos", _list_schedules), \
             patch("app.api.routers.admin_assistente_router.OPENROUTER_BASE_URL", "http://vllm:8000/v1"):
         r = await client.get("/admin/assistente/modelo")
 
@@ -71,9 +71,9 @@ async def test_o_catalogo_vem_da_base_configurada_com_a_chave(api):
     assert visto == {"base_url": "http://vllm:8000/v1", "chave": "k"}
 
 
-async def test_trocar_salva_e_a_resposta_ja_reflete(api):
+async def test_switching_saves_and_the_response_already_reflects_it(api):
     client, _ = api
-    with com_catalogo():
+    with with_catalog():
         r = await client.put("/admin/assistente/modelo", json={"modelo": "a/caro"})
 
     assert r.status_code == 200
@@ -84,9 +84,9 @@ async def test_trocar_salva_e_a_resposta_ja_reflete(api):
     assert atual["definido_em"]
 
 
-async def test_voltar_ao_padrao_do_ambiente(api):
+async def test_revert_to_environment_default(api):
     client, _ = api
-    with com_catalogo():
+    with with_catalog():
         await client.put("/admin/assistente/modelo", json={"modelo": "a/caro"})
         r = await client.put("/admin/assistente/modelo", json={"modelo": None})
 
@@ -97,9 +97,9 @@ async def test_voltar_ao_padrao_do_ambiente(api):
     }
 
 
-async def test_id_invalido_e_400_e_nao_erro_na_proxima_conversa(api):
+async def test_invalid_id_is_400_and_not_an_error_in_the_next_conversation(api):
     client, _ = api
-    with com_catalogo():
+    with with_catalog():
         r = await client.put("/admin/assistente/modelo", json={"modelo": "antropic claude"})
         depois = await client.get("/admin/assistente/modelo")
 
@@ -107,11 +107,11 @@ async def test_id_invalido_e_400_e_nao_erro_na_proxima_conversa(api):
     assert depois.json()["atual"]["modelo"] == ASSISTENTE_MODELO
 
 
-async def test_campo_desconhecido_e_recusado(api):
+async def test_unknown_field_is_rejected(api):
     """`extra=forbid`: price and ceiling belong to the server. Silently accepting
     an extra field is the first step toward someone trying to send one of them."""
     client, _ = api
-    with com_catalogo():
+    with with_catalog():
         r = await client.put("/admin/assistente/modelo",
                              json={"modelo": "a/caro", "preco_centavos": 1})
     assert r.status_code == 422
@@ -119,27 +119,27 @@ async def test_campo_desconhecido_e_recusado(api):
 
 # ── The panel without extensions, and with one ──────────────────────────────
 
-async def test_sem_extensoes_o_painel_e_o_modelo_e_o_catalogo(api, registro_de_teste):
+async def test_without_extensions_the_panel_is_model_and_catalog(api, empty_registry):
     """The free distribution: no quota or per-plan cost."""
     client, _ = api
-    with com_catalogo():
+    with with_catalog():
         r = await client.get("/admin/assistente/modelo")
 
     assert r.status_code == 200
     assert set(r.json()) == {"atual", "catalogo", "catalogo_indisponivel"}
 
 
-async def test_uma_extensao_soma_campos_e_recebe_os_parametros_da_url(api, registro_de_teste):
+async def test_an_extension_adds_fields_and_receives_the_url_parameters(api, empty_registry):
     client, _ = api
     vistos: list[dict] = []
 
-    async def contribuicao(db, *, atual, catalogo, simular, consulta):
+    async def contribution(db, *, atual, catalogo, simular, consulta):
         vistos.append({"modelo": atual["modelo"], "catalogo": [m["id"] for m in catalogo],
                        "simular": simular, "consulta": dict(consulta)})
         return {"economia": {"teto": 42}}
 
-    registro_de_teste.painel_do_modelo.append(contribuicao)
-    with com_catalogo():
+    empty_registry.painel_do_modelo.append(contribution)
+    with with_catalog():
         r = await client.get("/admin/assistente/modelo", params={"simular": "a/caro", "faixa": "7"})
         trocado = await client.put("/admin/assistente/modelo", json={"modelo": "a/barato"})
 
@@ -162,18 +162,18 @@ async def test_uma_extensao_soma_campos_e_recebe_os_parametros_da_url(api, regis
 # The screen offered a choice that could not work. The probe is what moves the
 # provider's refusal to the moment of the click, in its own words.
 
-_RECUSA_DO_BATCH = (
+_BATCH_REFUSAL = (
     "OpenRouter respondeu 404: deepseek/deepseek-v4-flash-vision-exp:batch cannot be "
     "used with the chat/completions endpoint (adapter FireworksBatchAdapter)."
 )
 
 
-async def test_modelo_que_o_provedor_recusa_nao_e_salvo(api):
+async def test_model_the_provider_refuses_is_not_saved(api):
     """400 on the click, with the provider's message — and nothing changes."""
     client, _ = api
     from app.services.openrouter import ErroDoOpenRouter
 
-    with com_catalogo(sonda=ErroDoOpenRouter(_RECUSA_DO_BATCH, status=404)):
+    with with_catalog(sonda=ErroDoOpenRouter(_BATCH_REFUSAL, status=404)):
         r = await client.put("/admin/assistente/modelo", json={"modelo": "a/caro"})
         assert r.status_code == 400
         # The PROVIDER's message arrives in full: it is what says what to do.
@@ -185,7 +185,7 @@ async def test_modelo_que_o_provedor_recusa_nao_e_salvo(api):
     assert depois.json()["atual"]["origem"] == "ambiente"
 
 
-async def test_sonda_que_nao_responde_tambem_bloqueia(api):
+async def test_probe_that_does_not_respond_also_blocks(api):
     """The costly error is the other one.
 
     Letting an unverified model through breaks the product for everyone;
@@ -194,34 +194,34 @@ async def test_sonda_que_nao_responde_tambem_bloqueia(api):
     for different actions from whoever is on the screen.
     """
     client, _ = api
-    with com_catalogo(sonda=TimeoutError("estourou")):
+    with with_catalog(sonda=TimeoutError("estourou")):
         r = await client.put("/admin/assistente/modelo", json={"modelo": "a/caro"})
     assert r.status_code == 400
     assert "Não deu para conferir" in r.json()["message"]
     assert "TimeoutError" in r.json()["message"]
 
 
-async def test_voltar_ao_padrao_NUNCA_e_sondado(api):
+async def test_reverting_to_default_is_NEVER_probed(api):
     """The emergency exit cannot depend on the provider.
 
     If it is down with a bad model saved, probing "back to default" would lock
     the door precisely when it is needed.
     """
     client, _ = api
-    with com_catalogo():
+    with with_catalog():
         await client.put("/admin/assistente/modelo", json={"modelo": "a/caro"})
 
     # Now the provider refuses EVERYTHING — and even so the default comes back.
     from app.services.openrouter import ErroDoOpenRouter
 
-    with com_catalogo(sonda=ErroDoOpenRouter("provedor fora do ar", status=503)):
+    with with_catalog(sonda=ErroDoOpenRouter("provedor fora do ar", status=503)):
         r = await client.put("/admin/assistente/modelo", json={"modelo": None})
 
     assert r.status_code == 200
     assert r.json()["atual"]["origem"] == "ambiente"
 
 
-async def test_a_sonda_manda_a_MESMA_forma_da_conversa():
+async def test_probe_sends_the_SAME_shape_as_the_conversation():
     """Probing with a shape different from the real one would prove nothing.
 
     It is the shape that the provider refuses: it is the tools that a model
@@ -236,7 +236,7 @@ async def test_a_sonda_manda_a_MESMA_forma_da_conversa():
 
     visto = {}
 
-    def _responder(pedido: httpx.Request) -> httpx.Response:
+    def _respond(pedido: httpx.Request) -> httpx.Response:
         import json as _json
 
         visto.update(_json.loads(pedido.content))
@@ -251,7 +251,7 @@ async def test_a_sonda_manda_a_MESMA_forma_da_conversa():
             ),
         )
 
-    async with httpx.AsyncClient(transport=httpx.MockTransport(_responder)) as http:
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_respond)) as http:
         await openrouter.sondar_modelo(
             "a/qualquer", chave="k", max_tokens=MAX_TOKENS,
             esforco=ESFORCO_DO_RACIOCINIO, http=http,
@@ -264,7 +264,7 @@ async def test_a_sonda_manda_a_MESMA_forma_da_conversa():
     assert visto["stream"] is True
 
 
-async def test_stream_esquisito_NAO_bloqueia_a_troca():
+async def test_odd_stream_does_NOT_block_the_switch():
     """The provider accepted — that is all the probe asks.
 
     A stream that opens with 200 and ends without a useful frame is a
@@ -275,26 +275,26 @@ async def test_stream_esquisito_NAO_bloqueia_a_troca():
 
     from app.services import openrouter
 
-    def _vazio(pedido: httpx.Request) -> httpx.Response:
+    def _empty(pedido: httpx.Request) -> httpx.Response:
         return httpx.Response(200, headers={"Content-Type": "text/event-stream"},
                               content=b"data: [DONE]\n\n")
 
-    async with httpx.AsyncClient(transport=httpx.MockTransport(_vazio)) as http:
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_empty)) as http:
         await openrouter.sondar_modelo(
             "a/qualquer", chave="k", max_tokens=1000, esforco=None, http=http,
         )
 
 
-async def test_a_sonda_levanta_o_que_o_provedor_respondeu():
+async def test_probe_raises_what_the_provider_answered():
     """No translation in between: the provider's message is what helps decide."""
     import httpx
 
     from app.services import openrouter
 
-    def _recusar(pedido: httpx.Request) -> httpx.Response:
-        return httpx.Response(404, json={"error": {"message": _RECUSA_DO_BATCH}})
+    def _refuse(pedido: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"error": {"message": _BATCH_REFUSAL}})
 
-    async with httpx.AsyncClient(transport=httpx.MockTransport(_recusar)) as http:
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_refuse)) as http:
         with pytest.raises(openrouter.ErroDoOpenRouter) as erro:
             await openrouter.sondar_modelo(
                 "d/v:batch", chave="k", max_tokens=1000, esforco=None, http=http,

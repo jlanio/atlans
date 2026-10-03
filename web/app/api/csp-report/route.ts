@@ -11,14 +11,14 @@ import { extrairViolacoes } from "@/lib/csp-report";
 // With 16 KB, a page with more than ~18 blocks in a minute lost the whole batch
 // to a 413 — precisely the case where the log matters most. The volume in the
 // log stays limited by `extrairViolacoes` (20 lines per POST).
-const TETO_BYTES = 256 * 1024;
+const MAX_BYTES = 256 * 1024;
 
 /** The body as text, or `null` if it exceeds the ceiling.
  *
  *  Read as a stream, counting bytes: without `Content-Length` (chunked body),
  *  the earlier `req.text()` kept the WHOLE body in memory before any check —
  *  100 MB in an anonymous POST added ~330 MB to the process. */
-async function lerComTeto(req: Request): Promise<string | null> {
+async function readWithCeiling(req: Request): Promise<string | null> {
   if (!req.body) return "";
   const leitor = req.body.getReader();
   const pedacos: Uint8Array[] = [];
@@ -27,7 +27,7 @@ async function lerComTeto(req: Request): Promise<string | null> {
     const { done, value } = await leitor.read();
     if (done) break;
     total += value.byteLength;
-    if (total > TETO_BYTES) {
+    if (total > MAX_BYTES) {
       await leitor.cancel();
       return null;
     }
@@ -37,10 +37,10 @@ async function lerComTeto(req: Request): Promise<string | null> {
 }
 
 export async function POST(req: Request) {
-  if (Number(req.headers.get("content-length") ?? 0) > TETO_BYTES) {
+  if (Number(req.headers.get("content-length") ?? 0) > MAX_BYTES) {
     return new NextResponse(null, { status: 413 });
   }
-  const bruto = await lerComTeto(req);
+  const bruto = await readWithCeiling(req);
   if (bruto === null) return new NextResponse(null, { status: 413 });
 
   let corpo: unknown;
@@ -49,8 +49,8 @@ export async function POST(req: Request) {
   } catch {
     return new NextResponse(null, { status: 400 });
   }
-  for (const violacao of extrairViolacoes(corpo)) {
-    console.warn("[csp-report]", JSON.stringify(violacao));
+  for (const violation of extrairViolacoes(corpo)) {
+    console.warn("[csp-report]", JSON.stringify(violation));
   }
   return new NextResponse(null, { status: 204 });
 }

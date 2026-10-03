@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils"
  * status), which used `bg-muted` pills with `shadow-sm` — outside the pattern
  * of the sibling screens. The component is generic over the value type to serve both.
  */
-export function GrupoDeToggle<T extends string>({ rotulo, valor, onChange, opcoes }: {
+export function ToggleGroup<T extends string>({ rotulo, valor, onChange, opcoes }: {
   rotulo: string
   valor: T
   onChange: (v: T) => void
@@ -25,16 +25,16 @@ export function GrupoDeToggle<T extends string>({ rotulo, valor, onChange, opcoe
       aria-label={rotulo}
       className="inline-flex h-8 overflow-hidden rounded-md border bg-card max-md:h-10"
     >
-      {opcoes.map(opcao => {
-        const ativo = opcao.valor === valor
-        const Icone = opcao.icone
+      {opcoes.map(option => {
+        const ativo = option.valor === valor
+        const Icone = option.icone
         return (
           <button
-            key={opcao.valor}
+            key={option.valor}
             type="button"
             aria-pressed={ativo}
-            aria-label={opcao.aria}
-            onClick={() => onChange(opcao.valor)}
+            aria-label={option.aria}
+            onClick={() => onChange(option.valor)}
             className={cn(
               "inline-flex items-center gap-1.5 px-3 text-xs font-medium outline-none transition-colors",
               "border-l first:border-l-0 focus-visible:z-10 focus-visible:ring-[3px] focus-visible:ring-ring/50",
@@ -42,7 +42,7 @@ export function GrupoDeToggle<T extends string>({ rotulo, valor, onChange, opcoe
             )}
           >
             {Icone && <Icone size={13} className="shrink-0" aria-hidden="true" />}
-            {opcao.rotulo}
+            {option.rotulo}
           </button>
         )
       })}

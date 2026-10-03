@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { AtencaoLista } from "@/app/components/observability/atencao-lista"
-import type { ItemDeAtencao } from "@/app/components/observability/atencao"
+import type { AttentionItem } from "@/app/components/observability/atencao"
 
 // Dismissals live in localStorage (a per-browser convenience). Cleared between
 // cases so one doesn't inherit the other's dismissals.
@@ -10,7 +10,7 @@ afterEach(() => {
   try { localStorage.clear() } catch { /* jsdom sem storage: nada a limpar */ }
 })
 
-const itens: ItemDeAtencao[] = [
+const itens: AttentionItem[] = [
   {
     chave: "presa:run-1", tipo: "presa", nome: "Cadastro rural · lote 7",
     titulo: "Cadastro rural · lote 7 está em andamento há 2 h 14 min",
@@ -32,7 +32,7 @@ const itens: ItemDeAtencao[] = [
 ]
 
 /** An item's main action button (by the title in the aria-label), not the dismiss ×. */
-const acaoDe = (regex: RegExp) => screen.getByRole("button", { name: regex })
+const actionButton = (regex: RegExp) => screen.getByRole("button", { name: regex })
 
 describe("AtencaoLista", () => {
   it("lista os itens com o nome em destaque e a ação de cada um", () => {
@@ -41,13 +41,13 @@ describe("AtencaoLista", () => {
     expect(screen.getByRole("heading", { name: "Precisa de atenção" })).toBeInTheDocument()
     expect(screen.getByText("3 itens · o que mudaria uma decisão hoje")).toBeInTheDocument()
 
-    const presa = acaoDe(/Cadastro rural · lote 7 está em andamento/)
+    const presa = actionButton(/Cadastro rural · lote 7 está em andamento/)
     expect(presa).toHaveTextContent("Abrir")
     expect(presa.querySelector(".font-semibold")?.textContent).toBe("Cadastro rural · lote 7")
 
-    fireEvent.click(acaoDe(/Integração SICAR falhou/))
+    fireEvent.click(actionButton(/Integração SICAR falhou/))
     expect(onAcao).toHaveBeenCalledWith({ tipo: "filtrar-workflow", workflowHash: "wf-sicar", status: "failed" })
-    fireEvent.click(acaoDe(/geo-02 está no teto/))
+    fireEvent.click(actionButton(/geo-02 está no teto/))
     expect(onAcao).toHaveBeenLastCalledWith({ tipo: "abrir-executor", agentHost: "executor:geo-02" })
   })
 
@@ -83,8 +83,8 @@ describe("AtencaoLista", () => {
     expect(screen.queryByRole("button", { name: /Integração SICAR falhou/ })).toBeNull()
 
     // Uma nova falha muda a assinatura (28 → 29): o alerta reaparece.
-    const piorado = itens.map(i => i.chave === "falhas:wf-sicar" ? { ...i, assinatura: "29" } : i)
-    rerender(<AtencaoLista itens={piorado} carregando={false} vazio="x" onAcao={() => {}} />)
+    const worsened = itens.map(i => i.chave === "falhas:wf-sicar" ? { ...i, assinatura: "29" } : i)
+    rerender(<AtencaoLista itens={worsened} carregando={false} vazio="x" onAcao={() => {}} />)
     expect(screen.getByRole("button", { name: /Integração SICAR falhou/ })).toBeInTheDocument()
   })
 

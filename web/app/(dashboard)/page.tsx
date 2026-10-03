@@ -1,6 +1,6 @@
 import { headers } from "next/headers"
 import HomeView from "../components/home"
-import { caminhoInterno, type ModoDeEntrada } from "@/lib/entrada"
+import { caminhoInterno, type EntryMode } from "@/lib/entrada"
 
 // The Home (`/`). It lives in the (dashboard) group — the group contributes no
 // segment, so the route is `/`. The root `app/page.tsx` was DELETED (two files for
@@ -28,7 +28,7 @@ export default async function HomePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const sp = await searchParams
-  const entrada: ModoDeEntrada | undefined =
+  const entrada: EntryMode | undefined =
     "redefinir" in sp ? "redefinir"
       : "recuperar" in sp ? "recuperar"
         : "verificar" in sp ? "verificar"

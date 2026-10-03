@@ -28,7 +28,7 @@ vi.mock("@/app/components/home/mapa/regiao", async (original) => ({
 }))
 
 import Globo from "@/app/components/home/globo"
-import { IdiomaProvider } from "@/context/IdiomaContext"
+import { LanguageProvider } from "@/context/IdiomaContext"
 
 beforeEach(() => { espiao.props = null; fuso.valor = null; cleanup() })
 
@@ -124,9 +124,9 @@ describe("Globo", () => {
     cleanup()
 
     render(
-      <IdiomaProvider inicial={{ idioma: "en", detectado: "en", escolhido: null }}>
+      <LanguageProvider inicial={{ idioma: "en", detectado: "en", escolhido: null }}>
         <Globo />
-      </IdiomaProvider>,
+      </LanguageProvider>,
     )
     const en = espiao.props!.textos as { controles: Record<string, string>; campos: (n: number) => string }
     expect(en.controles["GeolocateControl.FindMyLocation"]).toBe("Show my location")

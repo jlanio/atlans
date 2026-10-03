@@ -31,7 +31,7 @@ from app.models.workflow_run import WorkflowRun
 
 # ═══ Servidor ════════════════════════════════════════════════════════════════
 
-class _RedisFalso:
+class _FakeRedis:
     def __init__(self, chegou=()):
         self.chegou = set(chegou)
 
@@ -47,12 +47,12 @@ async def banco(monkeypatch):
     fabrica = async_sessionmaker(engine, expire_on_commit=False)
 
     @asynccontextmanager
-    async def _sessao():
+    async def _session():
         async with fabrica() as s:
             yield s
 
-    monkeypatch.setattr(RES, "get_session_async", _sessao)
-    monkeypatch.setattr(ORF, "get_session_async", _sessao)
+    monkeypatch.setattr(RES, "get_session_async", _session)
+    monkeypatch.setattr(ORF, "get_session_async", _session)
     # No registered connection: the minimum interval between reconciliations does not apply.
     monkeypatch.setattr(ORF.executor_registry, "get", lambda _eid: None)
     try:
@@ -62,13 +62,13 @@ async def banco(monkeypatch):
 
 
 @pytest.fixture
-def efeitos(monkeypatch):
-    feito = {"contabilizados": [], "publicados": [], "cancelados": [], "redis": _RedisFalso()}
+def effects(monkeypatch):
+    feito = {"contabilizados": [], "publicados": [], "cancelados": [], "redis": _FakeRedis()}
 
-    async def _contabiliza(db, run, *a, **k):
+    async def _account(db, run, *a, **k):
         feito["contabilizados"].append(run.task_id)
 
-    async def _publica(run_ids, *, status, mensagem, extra=None):
+    async def _publish(run_ids, *, status, mensagem, extra=None):
         # None of these runs failed because of its content: retrying is safe.
         assert (status, extra) == ("failed", {"error_category": "transient", "retryable": True})
         feito["publicados"].extend(run_ids)
@@ -77,18 +77,18 @@ def efeitos(monkeypatch):
         feito["cancelados"].append((executor_id, data["job_id"]))
         return True
 
-    monkeypatch.setattr("app.core.run_result_consumer.account_terminal_run", _contabiliza)
-    monkeypatch.setattr("app.services.run_events_service.publicar_conclusao", _publica)
+    monkeypatch.setattr("app.core.run_result_consumer.account_terminal_run", _account)
+    monkeypatch.setattr("app.services.run_events_service.publicar_conclusao", _publish)
     monkeypatch.setattr(ORF.executor_registry, "send_json", _cancel)
     monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: feito["redis"])
     return feito
 
 
-async def _run(fabrica, *, status="running", host="executor:ex-1", idade_min=5.0):
+async def _run(fabrica, *, status="running", host="executor:ex-1", age_min=5.0):
     run = WorkflowRun(
         id_hash=str(uuid4()), task_id=str(uuid4()), workflow_hash="wf-1",
         workspace_id="ws-1", status=status, host=host, node_stats={},
-        start_time=datetime.now(timezone.utc) - timedelta(minutes=idade_min),
+        start_time=datetime.now(timezone.utc) - timedelta(minutes=age_min),
     )
     async with fabrica() as s:
         s.add(run)
@@ -96,209 +96,209 @@ async def _run(fabrica, *, status="running", host="executor:ex-1", idade_min=5.0
     return run.task_id
 
 
-async def _linha(fabrica, task_id):
+async def _row(fabrica, task_id):
     async with fabrica() as s:
         return (await s.execute(select(WorkflowRun).where(WorkflowRun.task_id == task_id))).scalar_one()
 
 
-def _inventario(ativos=(), resultados=(), truncado=False):
+def _inventory(ativos=(), resultados=(), truncado=False):
     return {"type": "inventario", "ativos": list(ativos), "resultados": list(resultados), "truncado": truncado}
 
 
-async def test_run_que_o_executor_nao_tem_e_fechado_como_perdido(banco, efeitos):
+async def test_run_the_executor_lacks_is_closed_as_lost(banco, effects):
     """The titan case: connected, without the job, and the run "Em andamento"."""
     perdido = await _run(banco)
 
-    feito = await ORF._reconciliar_inventario("ex-1", _inventario())
+    feito = await ORF._reconciliar_inventario("ex-1", _inventory())
 
     assert feito["fechados"] == 1
-    linha = await _linha(banco, perdido)
+    linha = await _row(banco, perdido)
     assert (linha.status, linha.error_category) == ("failed", "executor_lost")
     assert "não tinha mais esta execução" in linha.error_message
-    assert efeitos["contabilizados"] == [perdido]
-    assert efeitos["publicados"] == [perdido]
+    assert effects["contabilizados"] == [perdido]
+    assert effects["publicados"] == [perdido]
 
 
-async def test_job_ainda_a_caminho_nao_e_fechado_como_perdido(banco, efeitos):
+async def test_job_still_in_transit_is_not_closed_as_lost(banco, effects):
     """A send that timed out keeps draining through the socket for an indefinite
     time: with the pending ACK alive, the run is not lost — closing it would
     let the executor run, with side effects, a job of an already closed run."""
-    a_caminho = await _run(banco)
-    efeitos["redis"].chegou.add(f"executor:pending_ack:{a_caminho}")
+    in_transit = await _run(banco)
+    effects["redis"].chegou.add(f"executor:pending_ack:{in_transit}")
 
-    feito = await ORF._reconciliar_inventario("ex-1", _inventario())
+    feito = await ORF._reconciliar_inventario("ex-1", _inventory())
 
     assert feito["fechados"] == 0
-    assert (await _linha(banco, a_caminho)).status == "running"
+    assert (await _row(banco, in_transit)).status == "running"
 
 
-async def test_run_fechado_como_perdido_recebe_cancel(banco, efeitos):
+async def test_run_closed_as_lost_receives_cancel(banco, effects):
     """If the job still arrives, the cancel arrives after it on the same socket and
     interrupts it — or becomes a tombstone."""
     perdido = await _run(banco)
 
-    await ORF._reconciliar_inventario("ex-1", _inventario())
-    await asyncio.gather(*ORF._cancels_em_curso)   # saem em segundo plano
+    await ORF._reconciliar_inventario("ex-1", _inventory())
+    await asyncio.gather(*ORF._cancels_in_flight)   # saem em segundo plano
 
-    assert ("ex-1", perdido) in efeitos["cancelados"]
+    assert ("ex-1", perdido) in effects["cancelados"]
 
 
-async def test_run_de_job_descartado_no_relay_fecha_como_nao_entregue(banco, efeitos, monkeypatch):
-    limpos = []
+async def test_run_of_job_dropped_in_the_relay_closes_as_undelivered(banco, effects, monkeypatch):
+    cleaned = []
 
-    async def _limpa(job_id, expected_executor_id=None):
-        limpos.append((job_id, expected_executor_id))
+    async def _clean(job_id, expected_executor_id=None):
+        cleaned.append((job_id, expected_executor_id))
 
-    monkeypatch.setattr(ORF.executor_registry, "clear_pending_ack", _limpa)
+    monkeypatch.setattr(ORF.executor_registry, "clear_pending_ack", _clean)
     tid = await _run(banco, status="running")
     alheio = await _run(banco, status="running", host="executor:ex-2")
     terminou = await _run(banco, status="success")
-    no_fechamento = await _run(banco, status="running")
+    at_close = await _run(banco, status="running")
 
     assert await ORF.fechar_run_nao_entregue("ex-1", tid) is True
     assert await ORF.fechar_run_nao_entregue("ex-1", alheio) is False     # someone else's host
     assert await ORF.fechar_run_nao_entregue("ex-1", terminou) is False   # already terminal
-    assert await ORF.fechar_run_nao_entregue("ex-1", no_fechamento, conexao_fechando=True) is True
+    assert await ORF.fechar_run_nao_entregue("ex-1", at_close, connection_closing=True) is True
 
-    linha = await _linha(banco, tid)
+    linha = await _row(banco, tid)
     assert (linha.status, linha.error_category) == ("failed", "dispatch")
     assert "envio anterior" in linha.error_message
     # The right reason for the reader: the connection was closing, there was no queue.
-    assert "sendo encerrada" in (await _linha(banco, no_fechamento)).error_message
-    assert efeitos["contabilizados"] == [tid, no_fechamento]
-    assert efeitos["publicados"] == [tid, no_fechamento]
-    assert limpos == [(tid, "ex-1"), (no_fechamento, "ex-1")]
+    assert "sendo encerrada" in (await _row(banco, at_close)).error_message
+    assert effects["contabilizados"] == [tid, at_close]
+    assert effects["publicados"] == [tid, at_close]
+    assert cleaned == [(tid, "ex-1"), (at_close, "ex-1")]
 
 
-async def test_cancels_da_reconciliacao_nao_prendem_a_drenadora(banco, efeitos, monkeypatch):
+async def test_reconciliation_cancels_do_not_block_the_drainer(banco, effects, monkeypatch):
     """Reconciliation runs in the connection's drainer: with the socket congested,
     each inline cancel could wait its turn for the whole timeout, delaying that
     connection's job_results."""
     liberar = asyncio.Event()
 
-    async def _cancel_lento(executor_id, data):
+    async def _slow_cancel(executor_id, data):
         await liberar.wait()
-        efeitos["cancelados"].append((executor_id, data["job_id"]))
+        effects["cancelados"].append((executor_id, data["job_id"]))
         return True
 
-    monkeypatch.setattr(ORF.executor_registry, "send_json", _cancel_lento)
+    monkeypatch.setattr(ORF.executor_registry, "send_json", _slow_cancel)
     perdido = await _run(banco)
 
-    feito = await asyncio.wait_for(ORF._reconciliar_inventario("ex-1", _inventario()), timeout=2)
+    feito = await asyncio.wait_for(ORF._reconciliar_inventario("ex-1", _inventory()), timeout=2)
 
-    assert feito["fechados"] == 1 and efeitos["cancelados"] == []
+    assert feito["fechados"] == 1 and effects["cancelados"] == []
     liberar.set()
-    await asyncio.gather(*ORF._cancels_em_curso)
-    assert efeitos["cancelados"] == [("ex-1", perdido)]
+    await asyncio.gather(*ORF._cancels_in_flight)
+    assert effects["cancelados"] == [("ex-1", perdido)]
 
 
-async def test_o_que_o_executor_tem_fica_como_esta(banco, efeitos):
+async def test_what_the_executor_has_stays_as_is(banco, effects):
     rodando = await _run(banco)
     terminou = await _run(banco)   # result in the executor's outbox, on its way
 
-    await ORF._reconciliar_inventario("ex-1", _inventario(ativos=[rodando], resultados=[terminou]))
+    await ORF._reconciliar_inventario("ex-1", _inventory(ativos=[rodando], resultados=[terminou]))
 
-    assert (await _linha(banco, rodando)).status == "running"
-    assert (await _linha(banco, terminou)).status == "running"
-    assert efeitos["contabilizados"] == []
+    assert (await _row(banco, rodando)).status == "running"
+    assert (await _row(banco, terminou)).status == "running"
+    assert effects["contabilizados"] == []
 
 
-async def test_run_recente_nao_e_julgado(banco, efeitos):
+async def test_recent_run_is_not_judged(banco, effects):
     """A job still in transit when the executor built the inventory is not a loss."""
-    novo = await _run(banco, idade_min=1)
+    novo = await _run(banco, age_min=1)
 
-    await ORF._reconciliar_inventario("ex-1", _inventario())
+    await ORF._reconciliar_inventario("ex-1", _inventory())
 
-    assert (await _linha(banco, novo)).status == "running"
+    assert (await _row(banco, novo)).status == "running"
 
 
-async def test_resultado_recem_chegado_ao_servidor_protege_o_run(banco, efeitos):
+async def test_result_just_arrived_at_the_server_protects_the_run(banco, effects):
     """The job_result has already passed through the WS (key with a 300 s TTL) and the
     consumer is still going to close the run: closing it here would erase the real outcome."""
     tid = await _run(banco)
-    efeitos["redis"].chegou.add(f"executor:ex-1:results:{tid}")
+    effects["redis"].chegou.add(f"executor:ex-1:results:{tid}")
 
-    await ORF._reconciliar_inventario("ex-1", _inventario())
+    await ORF._reconciliar_inventario("ex-1", _inventory())
 
-    assert (await _linha(banco, tid)).status == "running"
+    assert (await _row(banco, tid)).status == "running"
 
 
-async def test_redis_fora_do_ar_adia_sem_fechar(banco, efeitos, monkeypatch):
+async def test_redis_down_defers_without_closing(banco, effects, monkeypatch):
     tid = await _run(banco)
 
-    class _RedisQuebrado:
-        async def mget(self, _chaves):
+    class _BrokenRedis:
+        async def mget(self, _keys):
             raise ConnectionError("redis fora")
 
-    monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: _RedisQuebrado())
+    monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: _BrokenRedis())
 
-    await ORF._reconciliar_inventario("ex-1", _inventario())
+    await ORF._reconciliar_inventario("ex-1", _inventory())
 
-    assert (await _linha(banco, tid)).status == "running"
+    assert (await _row(banco, tid)).status == "running"
 
 
-async def test_pending_que_o_executor_nao_tem_vira_nao_entregue(banco, efeitos):
+async def test_pending_the_executor_lacks_becomes_undelivered(banco, effects):
     tid = await _run(banco, status="pending")
 
-    await ORF._reconciliar_inventario("ex-1", _inventario())
+    await ORF._reconciliar_inventario("ex-1", _inventory())
 
-    linha = await _linha(banco, tid)
+    linha = await _row(banco, tid)
     assert (linha.status, linha.error_category) == ("failed", "dispatch")
     assert "não chegou a rodar" in linha.error_message
 
 
-async def test_pending_que_o_executor_tem_e_promovido(banco, efeitos):
+async def test_pending_the_executor_has_is_promoted(banco, effects):
     """Lost ACK: the inventory is the second proof of delivery."""
-    tid = await _run(banco, status="pending", idade_min=0.5)
+    tid = await _run(banco, status="pending", age_min=0.5)
 
-    feito = await ORF._reconciliar_inventario("ex-1", _inventario(ativos=[tid]))
+    feito = await ORF._reconciliar_inventario("ex-1", _inventory(ativos=[tid]))
 
     assert feito["promovidos"] == 1
-    assert (await _linha(banco, tid)).status == "running"
+    assert (await _row(banco, tid)).status == "running"
 
 
-async def test_zumbi_que_o_servidor_ja_fechou_recebe_cancel(banco, efeitos):
+async def test_zombie_already_closed_by_the_server_receives_cancel(banco, effects):
     """Cancelled while the executor was down: it comes back still running the job."""
     tid = await _run(banco, status="cancelled")
 
-    feito = await ORF._reconciliar_inventario("ex-1", _inventario(ativos=[tid]))
-    await asyncio.gather(*ORF._cancels_em_curso)   # saem em segundo plano
+    feito = await ORF._reconciliar_inventario("ex-1", _inventory(ativos=[tid]))
+    await asyncio.gather(*ORF._cancels_in_flight)   # saem em segundo plano
 
     assert feito["parados"] == 1
-    assert efeitos["cancelados"] == [("ex-1", tid)]
+    assert effects["cancelados"] == [("ex-1", tid)]
 
 
-async def test_inventario_truncado_nao_fecha_por_ausencia(banco, efeitos):
+async def test_truncated_inventory_does_not_close_for_absence(banco, effects):
     perdido = await _run(banco)
-    pendente = await _run(banco, status="pending", idade_min=0.5)
+    pendente = await _run(banco, status="pending", age_min=0.5)
 
     feito = await ORF._reconciliar_inventario(
-        "ex-1", _inventario(ativos=[pendente], truncado=True),
+        "ex-1", _inventory(ativos=[pendente], truncado=True),
     )
 
     assert feito["fechados"] == 0
-    assert (await _linha(banco, perdido)).status == "running"
-    assert (await _linha(banco, pendente)).status == "running"   # promover continua valendo
+    assert (await _row(banco, perdido)).status == "running"
+    assert (await _row(banco, pendente)).status == "running"   # promover continua valendo
 
 
-async def test_runs_de_outro_executor_nao_sao_tocados(banco, efeitos):
+async def test_runs_of_another_executor_are_not_touched(banco, effects):
     alheio = await _run(banco, host="executor:ex-2")
-    alheio_pendente = await _run(banco, host="executor:ex-2", status="pending", idade_min=0.5)
+    foreign_pending = await _run(banco, host="executor:ex-2", status="pending", age_min=0.5)
 
-    await ORF._reconciliar_inventario("ex-1", _inventario(ativos=[alheio_pendente]))
+    await ORF._reconciliar_inventario("ex-1", _inventory(ativos=[foreign_pending]))
 
-    assert (await _linha(banco, alheio)).status == "running"
-    assert (await _linha(banco, alheio_pendente)).status == "pending"
+    assert (await _row(banco, alheio)).status == "running"
+    assert (await _row(banco, foreign_pending)).status == "pending"
 
 
-async def test_inventario_malformado_e_ignorado(banco, efeitos):
+async def test_malformed_inventory_is_ignored(banco, effects):
     tid = await _run(banco)
 
     assert await ORF._reconciliar_inventario("ex-1", {"type": "inventario", "ativos": "tudo"}) == {}
-    assert (await _linha(banco, tid)).status == "running"
+    assert (await _row(banco, tid)).status == "running"
 
 
-async def test_intervalo_minimo_entre_reconciliacoes(banco, efeitos, monkeypatch):
+async def test_minimum_interval_between_reconciliations(banco, effects, monkeypatch):
     """A buggy executor does not turn the inventory into one SELECT per message."""
     conn = SimpleNamespace(
         ultima_reconciliacao=0.0, connected_at=datetime.now(timezone.utc) - timedelta(minutes=10),
@@ -306,31 +306,31 @@ async def test_intervalo_minimo_entre_reconciliacoes(banco, efeitos, monkeypatch
     monkeypatch.setattr(ORF.executor_registry, "get", lambda _eid: conn)
     await _run(banco)
 
-    primeira = await ORF._reconciliar_inventario("ex-1", _inventario())
-    segunda = await ORF._reconciliar_inventario("ex-1", _inventario())
+    primeira = await ORF._reconciliar_inventario("ex-1", _inventory())
+    segunda = await ORF._reconciliar_inventario("ex-1", _inventory())
 
     assert primeira["fechados"] == 1
     assert segunda == {}
 
 
-async def test_conexao_recem_aberta_nao_fecha_por_ausencia(banco, efeitos, monkeypatch):
+async def test_freshly_opened_connection_does_not_close_for_absence(banco, effects, monkeypatch):
     """Reconnection: the PREVIOUS connection's inbox may still be draining the
     job_result of a run that finished before the drop. The new session's first
     inventory does not list it — closing now would make the true result be
     rejected right after. Promoting and stopping zombies do not wait."""
     conn = SimpleNamespace(ultima_reconciliacao=0.0, connected_at=datetime.now(timezone.utc))
     monkeypatch.setattr(ORF.executor_registry, "get", lambda _eid: conn)
-    terminou_antes_da_queda = await _run(banco)
+    finished_before_the_crash = await _run(banco)
     na_fila = await _run(banco, status="pending")
 
-    feito = await ORF._reconciliar_inventario("ex-1", _inventario(ativos=[na_fila]))
+    feito = await ORF._reconciliar_inventario("ex-1", _inventory(ativos=[na_fila]))
 
     assert feito == {"promovidos": 1, "parados": 0, "fechados": 0}
-    assert (await _linha(banco, terminou_antes_da_queda)).status == "running"
-    assert (await _linha(banco, na_fila)).status == "running"
+    assert (await _row(banco, finished_before_the_crash)).status == "running"
+    assert (await _row(banco, na_fila)).status == "running"
 
 
-async def test_inventario_vai_pela_drenadora_depois_do_job_result(monkeypatch):
+async def test_inventory_goes_through_the_drainer_after_job_result(monkeypatch):
     """On the same queue: the job_result sent before the inventory is written before
     the inventory is checked — otherwise the just-finished run would look lost."""
     ordem = []
@@ -338,30 +338,30 @@ async def test_inventario_vai_pela_drenadora_depois_do_job_result(monkeypatch):
     async def _resultado(executor_id, msg, frame_bytes=0, **_kw):
         ordem.append(("job_result", msg["job_id"]))
 
-    async def _reconcilia(executor_id, msg):
+    async def _reconcile(executor_id, msg):
         ordem.append(("inventario", tuple(msg["ativos"])))
 
     monkeypatch.setattr(IB, "_handle_job_result", _resultado)
-    monkeypatch.setattr(IB, "_reconciliar_inventario", _reconcilia)
+    monkeypatch.setattr(IB, "_reconciliar_inventario", _reconcile)
     inbox = IB._InboxQueue(maxsize=10)
     inbox.put_nowait(("job_result", {"job_id": "j1"}, 10))
-    inbox.put_nowait(("inventario", _inventario(), 10))
+    inbox.put_nowait(("inventario", _inventory(), 10))
     inbox.put_nowait(IB._INBOX_STOP)
 
-    await IB._drenar_inbox("ex-1", inbox)
+    await IB._drain_inbox("ex-1", inbox)
 
     assert ordem == [("job_result", "j1"), ("inventario", ())]
 
 
-async def test_inventario_com_a_fila_cheia_e_descartado(monkeypatch):
+async def test_inventory_with_full_queue_is_discarded(monkeypatch):
     """Periodic: the next one arrives in a minute; back-pressure is not worth it."""
     chamado = []
     monkeypatch.setattr(IB, "_reconciliar_inventario", lambda *a: chamado.append(a))
     inbox = IB._InboxQueue(maxsize=1)
     inbox.put_nowait(("job_result", {"job_id": "x"}, 10))
-    descartes = IB._novo_contador_de_descartes()
+    descartes = IB._new_drop_counter()
 
-    await IB._enfileirar_mensagem("ex-1", inbox, descartes, "inventario", _inventario(), 10)
+    await IB._enfileirar_mensagem("ex-1", inbox, descartes, "inventario", _inventory(), 10)
 
     assert descartes["total"] == 1 and chamado == []
 
@@ -381,7 +381,7 @@ def _payload(status):
             "end_time": datetime.now(timezone.utc).isoformat()}
 
 
-async def test_desfecho_tardio_diferente_nao_sobrescreve_o_primeiro(monkeypatch):
+async def test_different_late_outcome_does_not_overwrite_the_first(monkeypatch):
     """The true result (success) and a late one (a 'cancelled' coming from a cancel
     that crossed paths with the end of the job) both passed the WS check before
     the first was written. The consumer wrote both, and the last one won: a
@@ -408,7 +408,7 @@ async def test_desfecho_tardio_diferente_nao_sobrescreve_o_primeiro(monkeypatch)
     assert "FOR UPDATE" in str(select_do_run.compile(dialect=postgresql.dialect()))
 
 
-async def test_resultado_verdadeiro_corrige_o_desfecho_que_o_servidor_deduziu(monkeypatch):
+async def test_real_result_corrects_the_outcome_the_server_inferred(monkeypatch):
     """The server closed the run as lost (executor went down, reconciliation) with the
     true result already in the queue: the result corrects the guess, as it always
     has. Only a REAL outcome (or the user's cancellation) is final."""
@@ -425,7 +425,7 @@ async def test_resultado_verdadeiro_corrige_o_desfecho_que_o_servidor_deduziu(mo
     grava.assert_awaited_once()
 
 
-async def test_cancelamento_do_usuario_nao_e_desfeito_por_resultado_tardio(monkeypatch):
+async def test_user_cancellation_is_not_undone_by_late_result(monkeypatch):
     from app.core import run_result_consumer as rrc
 
     run = WorkflowRun(task_id="run-1", workflow_hash="wf", workspace_id="ws",
@@ -438,7 +438,7 @@ async def test_cancelamento_do_usuario_nao_e_desfeito_por_resultado_tardio(monke
     grava.assert_not_awaited()
 
 
-async def test_orfao_nao_sobrescreve_resultado_gravado_no_meio(banco, efeitos, monkeypatch):
+async def test_orphan_does_not_overwrite_result_written_in_between(banco, effects, monkeypatch):
     """Between the SELECT of the orphans and the commit, the consumer wrote the true
     result. The ORM's UPDATE by PK overwrote it with 'failed' — and usage was
     counted twice."""
@@ -448,7 +448,7 @@ async def test_orfao_nao_sobrescreve_resultado_gravado_no_meio(banco, efeitos, m
     real = ORF.get_session_async
 
     @asynccontextmanager
-    async def _com_corrida():
+    async def _with_race():
         async with real() as sessao:
             original = sessao.execute
             feito = {"n": 0}
@@ -468,26 +468,26 @@ async def test_orfao_nao_sobrescreve_resultado_gravado_no_meio(banco, efeitos, m
             sessao.execute = _execute
             yield sessao
 
-    monkeypatch.setattr(ORF, "get_session_async", _com_corrida)
+    monkeypatch.setattr(ORF, "get_session_async", _with_race)
 
     await ORF._fail_orphan_runs("ex-1")
 
-    assert (await _linha(banco, run_id)).status == "success"
-    assert efeitos["contabilizados"] == [] and efeitos["publicados"] == []
+    assert (await _row(banco, run_id)).status == "success"
+    assert effects["contabilizados"] == [] and effects["publicados"] == []
 
 
-async def test_orfao_fecha_o_run_que_ficou_rodando(banco, efeitos):
+async def test_orphan_closes_the_run_left_running(banco, effects):
     run_id = await _run(banco)
 
     await ORF._fail_orphan_runs("ex-1")
 
-    linha = await _linha(banco, run_id)
+    linha = await _row(banco, run_id)
     assert (linha.status, linha.error_category) == ("failed", "executor_lost")
     assert linha.duration_seconds and linha.duration_seconds > 0
-    assert efeitos["contabilizados"] == [run_id] and efeitos["publicados"] == [run_id]
+    assert effects["contabilizados"] == [run_id] and effects["publicados"] == [run_id]
 
 
-async def test_reentrega_do_mesmo_desfecho_segue_como_antes(monkeypatch):
+async def test_redelivery_of_the_same_outcome_works_as_before(monkeypatch):
     """Reprocessed dead letter: the phases run again, without recounting usage."""
     from app.core import run_result_consumer as rrc
 
@@ -496,12 +496,12 @@ async def test_reentrega_do_mesmo_desfecho_segue_como_antes(monkeypatch):
     grava = AsyncMock()
     chamadas = []
 
-    async def _fase(db, run, task_id, label, fn, *args):
+    async def _phase(db, run, task_id, label, fn, *args):
         chamadas.append((label, args[-1] if label == "uso diario" else None))
         return rrc.PHASE_OK
 
     monkeypatch.setattr(rrc, "_update_run_status", grava)
-    monkeypatch.setattr(rrc, "_run_phase", _fase)
+    monkeypatch.setattr(rrc, "_run_phase", _phase)
 
     assert await rrc._process_result(_db_do_consumer(run), _payload("success")) is True
 
@@ -524,7 +524,7 @@ def _select(run):
     return r
 
 
-async def test_cancelar_com_o_executor_fora_do_ar_fecha_no_servidor():
+async def test_cancel_with_the_executor_offline_closes_on_the_server():
     """It used to be a 503 and the lost run had no way to be cleaned up from the screen."""
     from app.services import workflow_execution_service as wes
 
@@ -533,7 +533,7 @@ async def test_cancelar_com_o_executor_fora_do_ar_fecha_no_servidor():
     db = _mock_db(_select(run), MagicMock(rowcount=1))
 
     with patch.object(wes, "executor_registry") as reg, \
-         patch("app.core.run_result_consumer.account_terminal_run", new=AsyncMock()) as contabiliza:
+         patch("app.core.run_result_consumer.account_terminal_run", new=AsyncMock()) as account_terminal:
         reg.send_json = AsyncMock(return_value=False)
         reg.presence_or_unknown = AsyncMock(return_value=False)
         outcome = await wes.cancel_run(db, "run-1", user_id="u", como_admin=True)
@@ -541,13 +541,13 @@ async def test_cancelar_com_o_executor_fora_do_ar_fecha_no_servidor():
     assert outcome == "cancelled"
     assert run.status == "cancelled"
     assert "fora do ar" in run.error_message
-    contabiliza.assert_awaited_once()
+    account_terminal.assert_awaited_once()
     # Conditional: a job_result that arrives in the middle wins.
     sql = str(db.execute.await_args_list[-1].args[0].compile(compile_kwargs={"literal_binds": True}))
     assert "status IN ('pending', 'running')" in sql
 
 
-async def test_cancelar_offline_perde_para_o_resultado_que_chegou():
+async def test_offline_cancel_loses_to_the_result_that_arrived():
     from app.services import workflow_execution_service as wes
 
     run = WorkflowRun(task_id="run-1", workflow_hash="wf", workspace_id="ws", status="running",
@@ -590,7 +590,7 @@ def store(tmp_path, monkeypatch):
         result_store._trava_do_diario.close()
 
 
-def test_job_aceito_fica_no_diario_ate_o_resultado(store):
+def test_accepted_job_stays_in_the_journal_until_the_result(store):
     store.registrar_em_voo("j1")
     store.registrar_em_voo("j2")
     store.marcar_executando("j2")
@@ -603,16 +603,16 @@ def test_job_aceito_fica_no_diario_ate_o_resultado(store):
     assert [r[0] for r in linhas] == ["j2"]
     # j1 finished (result in the outbox); j2 died in the middle.
     assert [o["job_id"] for o in store.carregar_em_voo()] == ["j2"]
-    assert store.carregar_em_voo()[0]["estado"] == store.ESTADO_EXECUTANDO
+    assert store.carregar_em_voo()[0]["estado"] == store.STATE_RUNNING
     assert store.job_ids_pendentes() == ["j1"]
 
 
-def test_outbox_guarda_a_categoria_para_o_replay(store):
+def test_outbox_keeps_the_category_for_replay(store):
     store.put({"job_id": "j1", "status": "error", "error": "x", "error_category": "executor_lost"})
     assert store.load_pending()[0]["error_category"] == "executor_lost"
 
 
-def test_orfao_do_boot_vira_falha_com_a_causa(store, monkeypatch):
+def test_boot_orphan_becomes_failure_with_the_cause(store, monkeypatch):
     """The OOM case: killed midway, the executor comes back and reports what it lost."""
     from executor import main as M
 
@@ -621,7 +621,7 @@ def test_orfao_do_boot_vira_falha_com_a_causa(store, monkeypatch):
     store.marcar_executando("rodando")
     store.registrar_em_voo("na-fila")
 
-    assert M._fechar_orfaos_do_boot_anterior() == 2
+    assert M._close_previous_boot_orphans() == 2
 
     resultados = {r["job_id"]: r for r in store.load_pending()}
     assert resultados["rodando"]["status"] == "error"
@@ -633,7 +633,7 @@ def test_orfao_do_boot_vira_falha_com_a_causa(store, monkeypatch):
     assert store.carregar_em_voo() == []
 
 
-def test_orfaos_de_outro_processo_vivo_nao_viram_falha(store):
+def test_orphans_of_another_live_process_do_not_become_failures(store):
     """Desktop: the force-killed app leaves the old Python draining and reopening
     starts another process with the same outbox. The jobs in the journal belong to
     the old one, which still finishes them — converting them would make the true
@@ -643,16 +643,16 @@ def test_orfaos_de_outro_processo_vivo_nao_viram_falha(store):
 
     store.registrar_em_voo("do-processo-antigo")
     store.marcar_executando("do-processo-antigo")
-    with open(store._DB_PATH + ".dono", "a+b") as dono_vivo:
-        fcntl.flock(dono_vivo.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    with open(store._DB_PATH + ".dono", "a+b") as live_owner:
+        fcntl.flock(live_owner.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
-        assert M._fechar_orfaos_do_boot_anterior() == 0
+        assert M._close_previous_boot_orphans() == 0
 
     assert store.load_pending() == []
     assert [o["job_id"] for o in store.carregar_em_voo()] == ["do-processo-antigo"]
 
 
-def test_quem_subiu_sem_a_trava_assume_quando_o_outro_sai(store):
+def test_whoever_started_without_the_lock_takes_over_when_the_other_exits(store):
     """A holds the lock; B starts and cannot get it; A exits. If B did not try
     again, a third one (C) would grab the free lock and convert B's LIVE jobs
     into failures — the case the lock exists to prevent."""
@@ -660,7 +660,7 @@ def test_quem_subiu_sem_a_trava_assume_quando_o_outro_sai(store):
     a = open(store._DB_PATH + ".dono", "a+b")
     fcntl.flock(a.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
-    assert store.tomar_posse_do_diario() is False    # B starts with A alive
+    assert store.take_journal_ownership() is False    # B starts with A alive
     a.close()                                         # A sai
     for _ in range(300):
         if store._trava_do_diario is not None:
@@ -673,22 +673,22 @@ def test_quem_subiu_sem_a_trava_assume_quando_o_outro_sai(store):
             fcntl.flock(c.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
 
-def test_posse_do_diario_fica_com_o_processo(store):
+def test_journal_ownership_stays_with_the_process(store):
     fcntl = pytest.importorskip("fcntl")
 
-    assert store.tomar_posse_do_diario() is True
-    assert store.tomar_posse_do_diario() is True   # idempotent within the same process
+    assert store.take_journal_ownership() is True
+    assert store.take_journal_ownership() is True   # idempotent within the same process
     with open(store._DB_PATH + ".dono", "a+b") as outro:
         with pytest.raises(BlockingIOError):
             fcntl.flock(outro.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
 
-def test_causa_sem_limite_de_container():
+def test_cause_without_container_limit():
     from executor import main as M
-    assert M._causa_da_interrupcao("executando", None).endswith("falta de memória na máquina.")
+    assert M._interruption_cause("executando", None).endswith("falta de memória na máquina.")
 
 
-async def test_fila_lista_os_ativos_e_guarda_lapide():
+async def test_queue_lists_the_active_and_keeps_tombstone():
     from executor.job_queue import ExecutorJobQueue
 
     cancelados = []
@@ -699,107 +699,107 @@ async def test_fila_lista_os_ativos_e_guarda_lapide():
     fila = ExecutorJobQueue(on_execute=AsyncMock(), on_cancelled=_on_cancelled)
     await fila.enqueue({"envelope": {"job_id": "j1"}})
 
-    assert fila.job_ids_ativos() == ["j1"]
+    assert fila.active_job_ids() == ["j1"]
 
-    await fila.encerrar_desconhecido("j9", "motivo")
+    await fila.close_unknown("j9", "motivo")
 
     assert cancelados == [("j9", "motivo")]
-    assert fila.cancelado_antes_de_chegar("j9") is True
-    assert fila.cancelado_antes_de_chegar("j9") is False   # the tombstone is consumed
+    assert fila.cancelled_before_arrival("j9") is True
+    assert fila.cancelled_before_arrival("j9") is False   # the tombstone is consumed
 
 
-def _conexao_nova(result_queue=None):
+def _new_connection(result_queue=None):
     from executor.job_queue import ExecutorJobQueue
 
-    return _conexao(ExecutorJobQueue(on_execute=AsyncMock(), on_cancelled=AsyncMock()), result_queue)
+    return _connection(ExecutorJobQueue(on_execute=AsyncMock(), on_cancelled=AsyncMock()), result_queue)
 
 
-def test_resultado_enviado_ha_pouco_segue_no_inventario(store, monkeypatch):
+def test_recently_sent_result_stays_in_the_inventory(store, monkeypatch):
     """`mark_sent` deletes the outbox as soon as send returns, but the server may
     not even have processed the result yet (the connection dropped right after).
     Without this memory the new session's inventory said "I don't have it" and
     the server closed the run as lost — rejecting the true result right after."""
     from executor import connection as C
 
-    conn = _conexao_nova()
+    conn = _new_connection()
     store.put({"job_id": "j1", "status": "ok"})
-    conn._lembrar_enviado("j1")
+    conn._remember_sent("j1")
     store.mark_sent("j1")
 
-    assert conn._montar_inventario()["resultados"] == ["j1"]
+    assert conn._build_inventory()["resultados"] == ["j1"]
 
     agora = time.monotonic()
-    monkeypatch.setattr(C.time, "monotonic", lambda: agora + C._ENVIADOS_TTL_S + 1)
-    assert conn._montar_inventario()["resultados"] == []   # past the deadline: lost
+    monkeypatch.setattr(C.time, "monotonic", lambda: agora + C._SENT_TTL_S + 1)
+    assert conn._build_inventory()["resultados"] == []   # past the deadline: lost
 
 
-async def test_cancel_de_job_que_acabou_de_terminar_nao_vira_cancelado(store):
+async def test_cancel_of_job_that_just_finished_does_not_become_cancelled(store):
     """The true result went out; a synthetic 'cancelled' on top of it could
     win in the server's consumer and erase a success."""
-    conn = _conexao_nova()
-    conn._lembrar_enviado("j1")
+    conn = _new_connection()
+    conn._remember_sent("j1")
 
-    assert await conn._encerrar_cancelamento_desconhecido("j1") == "resultado_pendente"
-    assert conn._queue.cancelado_antes_de_chegar("j1") is False   # no tombstone
+    assert await conn._close_unknown_cancellation("j1") == "resultado_pendente"
+    assert conn._queue.cancelled_before_arrival("j1") is False   # no tombstone
 
 
-async def test_cancel_com_resultado_na_fila_em_memoria_nao_vira_cancelado(store):
+async def test_cancel_with_result_in_the_in_memory_queue_does_not_become_cancelled(store):
     fila = asyncio.Queue()
     fila.put_nowait({"job_id": "j1", "status": "ok"})
-    conn = _conexao_nova(fila)
+    conn = _new_connection(fila)
 
-    assert await conn._encerrar_cancelamento_desconhecido("j1") == "resultado_pendente"
+    assert await conn._close_unknown_cancellation("j1") == "resultado_pendente"
 
 
-async def test_outbox_ilegivel_nao_afirma_ausencia(store, monkeypatch):
+async def test_unreadable_outbox_does_not_assert_absence(store, monkeypatch):
     """Reading [] from a locked outbox would say "nothing pending": the server would
     close as lost runs whose result is on disk. The inventory skips the round
     and the cancel does not make up an outcome."""
-    conn = _conexao_nova()
+    conn = _new_connection()
     monkeypatch.setattr(store, "_get_conn", MagicMock(side_effect=RuntimeError("database is locked")))
 
     assert store.job_ids_pendentes() is None
     # The inventory goes out, marked `truncado`: the server promotes and stops
     # zombies but does not close by absence — and the "speaks inventory" mark
     # does not expire (otherwise the 'pending' sweep would treat the executor as old).
-    assert conn._montar_inventario()["truncado"] is True
-    assert await conn._encerrar_cancelamento_desconhecido("j1") == "outbox_ilegivel"
+    assert conn._build_inventory()["truncado"] is True
+    assert await conn._close_unknown_cancellation("j1") == "outbox_ilegivel"
 
 
-def test_executor_movimentado_nao_desliga_a_propria_reconciliacao(store):
+def test_busy_executor_does_not_disable_its_own_reconciliation(store):
     """The recently sent ones only take up the space left over and do not mark
     `truncado` — at ~3 jobs/s they would fill the inventory and the server would
     never again close a lost run of this executor."""
     from executor import connection as C
 
-    conn = _conexao_nova()
+    conn = _new_connection()
     for i in range(C._INVENTARIO_MAX + 500):
-        conn._lembrar_enviado(f"j{i}")
+        conn._remember_sent(f"j{i}")
 
-    inventario = conn._montar_inventario()
+    inventario = conn._build_inventory()
 
     assert inventario["truncado"] is False
     assert len(inventario["resultados"]) == C._INVENTARIO_MAX
     assert inventario["resultados"][0] == f"j{C._INVENTARIO_MAX + 499}"   # most recent first
 
 
-def test_lapide_vence(monkeypatch):
+def test_tombstone_expires(monkeypatch):
     from executor import job_queue as JQ
 
     fila = JQ.ExecutorJobQueue(on_execute=AsyncMock())
-    fila.lapidar("j1")
+    fila.add_tombstone("j1")
     agora = time.monotonic()
-    monkeypatch.setattr(JQ.time, "monotonic", lambda: agora + JQ._LAPIDE_TTL_S + 1)
+    monkeypatch.setattr(JQ.time, "monotonic", lambda: agora + JQ._TOMBSTONE_TTL_S + 1)
 
-    assert fila.cancelado_antes_de_chegar("j1") is False
+    assert fila.cancelled_before_arrival("j1") is False
 
 
-def _conexao(fila, resultados=None):
+def _connection(fila, resultados=None):
     from executor.connection import ExecutorConnection
     return ExecutorConnection(job_queue=fila, result_queue=resultados or asyncio.Queue())
 
 
-async def test_cancel_de_job_desconhecido_fecha_e_descarta_o_atrasado(store):
+async def test_cancel_of_unknown_job_closes_and_discards_the_late_one(store):
     from executor.job_queue import ExecutorJobQueue
 
     cancelados = []
@@ -808,9 +808,9 @@ async def test_cancel_de_job_desconhecido_fecha_e_descarta_o_atrasado(store):
         cancelados.append(message["envelope"]["job_id"])
 
     fila = ExecutorJobQueue(on_execute=AsyncMock(), on_cancelled=_on_cancelled)
-    conn = _conexao(fila)
+    conn = _connection(fila)
 
-    assert await conn._encerrar_cancelamento_desconhecido("j1") == "encerrado"
+    assert await conn._close_unknown_cancellation("j1") == "encerrado"
     assert cancelados == ["j1"]
 
     # The job arrives after the cancellation: it is discarded without running and without an ACK.
@@ -818,11 +818,11 @@ async def test_cancel_de_job_desconhecido_fecha_e_descarta_o_atrasado(store):
     ws.send = AsyncMock()
     await conn._handle_job(ws, {"envelope": {"job_id": "j1"}})
 
-    assert fila.job_ids_ativos() == []
+    assert fila.active_job_ids() == []
     ws.send.assert_not_awaited()
 
 
-async def test_cancel_de_job_que_ja_terminou_nao_mente(store):
+async def test_cancel_of_job_already_finished_does_not_lie(store):
     """Result in the outbox: the true one is on its way; no 'cancelled' on top of it."""
     from executor.job_queue import ExecutorJobQueue
 
@@ -830,23 +830,23 @@ async def test_cancel_de_job_que_ja_terminou_nao_mente(store):
     fila = ExecutorJobQueue(on_execute=AsyncMock(), on_cancelled=on_cancelled)
     store.put({"job_id": "j1", "run_id": "j1", "status": "ok"})
 
-    assert await _conexao(fila)._encerrar_cancelamento_desconhecido("j1") == "resultado_pendente"
+    assert await _connection(fila)._close_unknown_cancellation("j1") == "resultado_pendente"
     on_cancelled.assert_not_awaited()
 
 
-async def test_job_aceito_entra_no_diario(store):
+async def test_accepted_job_enters_the_journal(store):
     from executor.job_queue import ExecutorJobQueue
 
     fila = ExecutorJobQueue(on_execute=AsyncMock())
     ws = MagicMock()
     ws.send = AsyncMock()
 
-    await _conexao(fila)._handle_job(ws, {"envelope": {"job_id": "j1"}})
+    await _connection(fila)._handle_job(ws, {"envelope": {"job_id": "j1"}})
 
     assert [o["job_id"] for o in store.carregar_em_voo()] == ["j1"]
 
 
-async def test_inventario_junta_ativos_outbox_e_fila_em_memoria(store):
+async def test_inventory_merges_active_outbox_and_in_memory_queue(store):
     from executor.job_queue import ExecutorJobQueue
 
     fila = ExecutorJobQueue(on_execute=AsyncMock())
@@ -855,7 +855,7 @@ async def test_inventario_junta_ativos_outbox_e_fila_em_memoria(store):
     memoria = asyncio.Queue()
     memoria.put_nowait({"job_id": "so-na-memoria", "status": "ok"})
 
-    inv = _conexao(fila, memoria)._montar_inventario()
+    inv = _connection(fila, memoria)._build_inventory()
 
     assert inv["type"] == "inventario"
     assert inv["ativos"] == ["ativo"]
@@ -863,7 +863,7 @@ async def test_inventario_junta_ativos_outbox_e_fila_em_memoria(store):
     assert inv["truncado"] is False
 
 
-async def test_inventario_grande_vai_marcado_truncado(store, monkeypatch):
+async def test_large_inventory_is_marked_truncated(store, monkeypatch):
     from executor import connection as CX
     from executor.job_queue import ExecutorJobQueue
 
@@ -872,20 +872,20 @@ async def test_inventario_grande_vai_marcado_truncado(store, monkeypatch):
     for i in range(3):
         await fila.enqueue({"envelope": {"job_id": f"j{i}"}})
 
-    inv = _conexao(fila)._montar_inventario()
+    inv = _connection(fila)._build_inventory()
 
     assert len(inv["ativos"]) == 2 and inv["truncado"] is True
 
 
-async def test_contrato_o_inventario_do_executor_passa_no_schema_do_servidor(store):
+async def test_contract_the_executor_inventory_passes_the_server_schema(store):
     """Both sides of the protocol, with no mock in between: what the executor sends is
     what the server requires."""
     from app.api.routers.executor_ws.protocolo import _missing_fields
     from executor.job_queue import ExecutorJobQueue
 
     fila = ExecutorJobQueue(on_execute=AsyncMock())
-    inv = _conexao(fila)._montar_inventario()
+    inv = _connection(fila)._build_inventory()
 
     assert _missing_fields(inv["type"], inv) == []
-    assert ORF._ids_do_inventario(inv["ativos"]) == set()
-    assert ORF._ids_do_inventario(inv["resultados"]) == set()
+    assert ORF._inventory_ids(inv["ativos"]) == set()
+    assert ORF._inventory_ids(inv["resultados"]) == set()

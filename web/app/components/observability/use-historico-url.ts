@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { escreverEstado, lerEstado, type EstadoDoHistorico } from "./historico-url"
+import { escreverEstado, lerEstado, type HistoryState } from "./historico-url"
 
-export interface HistoricoUrl {
-  estado: EstadoDoHistorico
+export interface HistoryUrl {
+  estado: HistoryState
   /** Merges what changed with the current state and writes it to the URL. Switching views closes the panel. */
-  atualizar: (parcial: Partial<EstadoDoHistorico>) => void
+  atualizar: (parcial: Partial<HistoryState>) => void
   abrirExecucao: (runId: string) => void
   fecharExecucao: () => void
 }
@@ -23,12 +23,12 @@ export interface HistoricoUrl {
  * start from the old state and the second would erase the first. That is why
  * the last written state is kept and serves as the base until the URL catches up.
  */
-export function useHistoricoUrl(): HistoricoUrl {
+export function useHistoricoUrl(): HistoryUrl {
   const router = useRouter()
   const pathname = usePathname()
   const sp = useSearchParams()
   const estado = useMemo(() => lerEstado(sp), [sp])
-  const pendente = useRef<EstadoDoHistorico | null>(null)
+  const pendente = useRef<HistoryState | null>(null)
 
   // When the URL reaches ANY state — the one we wrote or an external
   // navigation (back/forward, link) —, `pendente` has done its job and must
@@ -37,22 +37,22 @@ export function useHistoricoUrl(): HistoricoUrl {
   // of a future write and resurrects the old state (losing the external navigation).
   useEffect(() => { pendente.current = null }, [estado])
 
-  const gravar = useCallback((proximo: EstadoDoHistorico) => {
+  const gravar = useCallback((proximo: HistoryState) => {
     pendente.current = proximo
     const qs = escreverEstado(proximo)
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
   }, [router, pathname])
 
-  const base = useCallback((): EstadoDoHistorico => {
+  const base = useCallback((): HistoryState => {
     const p = pendente.current
     if (p && escreverEstado(p) !== escreverEstado(estado)) return p
     pendente.current = null
     return estado
   }, [estado])
 
-  const atualizar = useCallback((parcial: Partial<EstadoDoHistorico>) => {
+  const atualizar = useCallback((parcial: Partial<HistoryState>) => {
     const atual = base()
-    const proximo: EstadoDoHistorico = { ...atual, ...parcial }
+    const proximo: HistoryState = { ...atual, ...parcial }
     // Changing views changes the screen's subject; the open panel belonged to
     // the previous view. Period and filters do not touch the open run — the
     // person may be reading an error while adjusting the list behind the panel.

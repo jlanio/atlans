@@ -9,7 +9,7 @@ import { Input } from "@/app/components/ui/input"
 import { TbSearch, TbX } from "react-icons/tb"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
-import { nomeDoTipo } from "@/consts/NodeTypeStyles"
+import { typeName } from "@/consts/NodeTypeStyles"
 
 const WorkflowDrawer = () => {
   const drawerAddNodes = useWorkflowCatalogStore(s => s.nodesDrawerState)
@@ -17,7 +17,7 @@ const WorkflowDrawer = () => {
   // All that matters is whether the canvas is empty. Subscribing to `useNodes()`
   // re-rendered the whole drawer on every pointermove of a drag — and it is
   // always mounted, just translated off screen, so the cost was invisible.
-  const canvasVazio = useStore(s => s.nodeLookup.size === 0)
+  const canvasEmpty = useStore(s => s.nodeLookup.size === 0)
   const isOpen = drawerAddNodes !== "closed"
 
   return (
@@ -28,7 +28,7 @@ const WorkflowDrawer = () => {
       <DrawerRoot>
 
         {drawerAddNodes === "opened" || drawerAddNodes === "closed" ? (
-          canvasVazio ? (
+          canvasEmpty ? (
             <HeaderDrawer
               title="Qual será o trigger?"
               description="O trigger é o ponto de início do workflow" />
@@ -36,7 +36,7 @@ const WorkflowDrawer = () => {
             <HeaderDrawer title="Adicionar nó" />
           )
         ) : (
-          <HeaderDrawer title={nomeDoTipo(drawerAddNodes)} />
+          <HeaderDrawer title={typeName(drawerAddNodes)} />
         )}
 
         <Separator />
@@ -65,11 +65,11 @@ const WorkflowDrawer = () => {
 
         <div className="flex-1 overflow-y-auto">
 
-          {(!canvasVazio && drawerAddNodes === "opened" && filter === "") &&
+          {(!canvasEmpty && drawerAddNodes === "opened" && filter === "") &&
             <OptionsDrawer />
           }
 
-          {(canvasVazio || (drawerAddNodes !== "opened" && drawerAddNodes !== "closed") || filter !== "") &&
+          {(canvasEmpty || (drawerAddNodes !== "opened" && drawerAddNodes !== "closed") || filter !== "") &&
             <NodesDrawer aliasFilter={filter} />
           }
 

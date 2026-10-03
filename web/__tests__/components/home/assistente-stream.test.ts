@@ -5,11 +5,11 @@
  */
 import { describe, it, expect, vi } from "vitest"
 
-import { erroDaResposta, lerQuadrosSSE, type ErrosDaRota } from "@/app/components/home/assistente/stream"
-import type { QuadroSSE } from "@/app/components/home/assistente/quadros"
+import { erroDaResposta, lerQuadrosSSE, type RouteErrors } from "@/app/components/home/assistente/stream"
+import type { SSEFrame } from "@/app/components/home/assistente/quadros"
 
 /** A body that delivers exactly the given chunks, and records whether it was canceled. */
-function corpoEmPedacos(pedacos: Uint8Array[]) {
+function chunkedBody(pedacos: Uint8Array[]) {
   const estado = { cancelado: false }
   let i = 0
   const corpo = new ReadableStream<Uint8Array>({
@@ -27,9 +27,9 @@ describe("lerQuadrosSSE", () => {
     const bytes = new TextEncoder().encode('event: texto\ndata: {"texto":"atenção"}\n\n')
     // Cuts in the middle of the "ç" (two bytes in UTF-8).
     const corte = bytes.indexOf(0xc3) + 1
-    const { corpo } = corpoEmPedacos([bytes.slice(0, corte), bytes.slice(corte)])
+    const { corpo } = chunkedBody([bytes.slice(0, corte), bytes.slice(corte)])
 
-    const quadros: QuadroSSE[] = []
+    const quadros: SSEFrame[] = []
     await lerQuadrosSSE(corpo, (q) => quadros.push(q))
 
     expect(quadros).toEqual([{ evento: "texto", dados: { texto: "atenção" } }])
@@ -37,7 +37,7 @@ describe("lerQuadrosSSE", () => {
 
   it("um quadro que o tratar não digere solta o leitor — e o erro chega a quem chamou", async () => {
     const bytes = new TextEncoder().encode('event: texto\ndata: {"texto":"a"}\n\nevent: texto\ndata: {"texto":"b"}\n\n')
-    const { corpo, estado } = corpoEmPedacos([bytes, new Uint8Array([0x3a])])
+    const { corpo, estado } = chunkedBody([bytes, new Uint8Array([0x3a])])
 
     const tratar = vi.fn(() => { throw new Error("quadro indigesto") })
     await expect(lerQuadrosSSE(corpo, tratar)).rejects.toThrow("quadro indigesto")
@@ -48,8 +48,8 @@ describe("lerQuadrosSSE", () => {
 describe("erroDaResposta", () => {
   // Two fake tables, like those of the two routes: the same status says different
   // things in each one, and that is why the table comes in as a parameter.
-  const HOME: ErrosDaRota = { 409: { code: "expirada", message: "A confirmação expirou." } }
-  const EDITOR: ErrosDaRota = { 409: { code: "conversa_em_andamento", message: "Já há uma conversa." } }
+  const HOME: RouteErrors = { 409: { code: "expirada", message: "A confirmação expirou." } }
+  const EDITOR: RouteErrors = { 409: { code: "conversa_em_andamento", message: "Já há uma conversa." } }
   const resposta = (status: number, corpo?: unknown) =>
     ({ status, json: async () => { if (corpo === undefined) throw new SyntaxError("sem corpo"); return corpo } }) as Response
 

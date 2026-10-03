@@ -5,7 +5,7 @@
  * `error`/`cached`). The `StatusBadge` showed the raw text in an interface
  * entirely in Portuguese; this is the only place that translates, for every screen.
  */
-const ROTULOS: Record<string, string> = {
+const LABELS: Record<string, string> = {
   success: "Concluída",
   failed: "Falhou",
   error: "Falhou",
@@ -17,5 +17,5 @@ const ROTULOS: Record<string, string> = {
 
 export function rotuloDoStatus(status: string | null | undefined): string {
   if (!status) return "—"
-  return ROTULOS[status] ?? status
+  return LABELS[status] ?? status
 }

@@ -2,18 +2,18 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { GisFlowService } from "@/service/GisFlowService"
 import {
-  normalizarArtefato, normalizarArquivoDoDrive, type ItemDoAcervo,
+  normalizarArtefato, normalizarArquivoDoDrive, type CollectionItem,
 } from "@/app/components/home/artefatos/normalizar"
 
 /** Which of the two sources went down while the other stayed up — degradation
  *  is per source, and each half needs its own notice (before, only Drive had one). */
-export interface AvisosDoAcervo {
+export interface CollectionWarnings {
   artefatos: boolean
   drive: boolean
 }
 
-export interface UseAcervo {
-  itens: ItemDoAcervo[]
+export interface UseCollection {
+  itens: CollectionItem[]
   /** Only the FIRST load (the skeleton). A reload does not turn it back on. */
   carregando: boolean
   /** Reload in flight over the list already on screen — becomes `aria-busy`, not a skeleton. */
@@ -22,18 +22,18 @@ export interface UseAcervo {
   jaCarregou: boolean
   /** Only when BOTH sources fail. */
   erro: string | null
-  avisos: AvisosDoAcervo
+  avisos: CollectionWarnings
   /** How many items the server says exist across both sources combined; `null`
    *  when one of them failed and they cannot be added up. */
   total: number | null
   recarregar: () => void
   /** Removes (optimistically) the item from the list after the backend confirms. */
-  remover: (item: ItemDoAcervo) => Promise<boolean>
+  remover: (item: CollectionItem) => Promise<boolean>
 }
 
-const LIMITE = 200
+const LIMIT = 200
 
-const SEM_AVISOS: AvisosDoAcervo = { artefatos: false, drive: false }
+const NO_WARNINGS: CollectionWarnings = { artefatos: false, drive: false }
 
 /**
  * The current workspace's collection: run artifacts + Drive files in the same
@@ -49,35 +49,35 @@ const SEM_AVISOS: AvisosDoAcervo = { artefatos: false, drive: false }
  * shows as an amber notice when there was already content and as a block only
  * on the first load.
  */
-export function useAcervo(workspaceId: string | null | undefined): UseAcervo {
-  const [itens, setItens] = useState<ItemDoAcervo[]>([])
-  const [carregando, setCarregando] = useState(true)
-  const [atualizando, setAtualizando] = useState(false)
-  const [jaCarregou, setJaCarregou] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
-  const [avisos, setAvisos] = useState<AvisosDoAcervo>(SEM_AVISOS)
+export function useAcervo(workspaceId: string | null | undefined): UseCollection {
+  const [itens, setItems] = useState<CollectionItem[]>([])
+  const [carregando, setLoading] = useState(true)
+  const [atualizando, setRefreshing] = useState(false)
+  const [jaCarregou, setAlreadyLoaded] = useState(false)
+  const [erro, setError] = useState<string | null>(null)
+  const [avisos, setWarnings] = useState<CollectionWarnings>(NO_WARNINGS)
   const [total, setTotal] = useState<number | null>(null)
   const geracao = useRef(0)
   // Mirrors `jaCarregou` so the callback can decide skeleton × `aria-busy`
   // without entering the dependencies (`recarregar` must be stable so the
   // effect does not re-fire on every load).
-  const jaCarregouRef = useRef(false)
+  const alreadyLoadedRef = useRef(false)
 
   const recarregar = useCallback(() => {
     if (!workspaceId) {
-      setItens([]); setErro(null); setAvisos(SEM_AVISOS); setTotal(null)
-      setCarregando(false); setAtualizando(false)
+      setItems([]); setError(null); setWarnings(NO_WARNINGS); setTotal(null)
+      setLoading(false); setRefreshing(false)
       return
     }
     const minha = ++geracao.current
-    if (jaCarregouRef.current) setAtualizando(true)
-    else setCarregando(true)
+    if (alreadyLoadedRef.current) setRefreshing(true)
+    else setLoading(true)
     Promise.allSettled([
-      GisFlowService.getArtifacts({ workspace_id: workspaceId, limit: LIMITE }),
-      GisFlowService.getDriveFiles({ workspace_id: workspaceId, page_size: LIMITE }),
+      GisFlowService.getArtifacts({ workspace_id: workspaceId, limit: LIMIT }),
+      GisFlowService.getDriveFiles({ workspace_id: workspaceId, page_size: LIMIT }),
     ]).then(([resArt, resDrive]) => {
       if (minha !== geracao.current) return
-      const acervo: ItemDoAcervo[] = []
+      const acervo: CollectionItem[] = []
       let artOk = false
       let driveOk = false
       let totalArt = 0
@@ -96,18 +96,18 @@ export function useAcervo(workspaceId: string | null | undefined): UseAcervo {
         // Most recent first; undated last. `ordenadoEm` is the last content
         // write in Drive — the same order /drive shows.
         acervo.sort((x, y) => (y.ordenadoEm ?? "").localeCompare(x.ordenadoEm ?? ""))
-        setItens(acervo)
-        setErro(null)
+        setItems(acervo)
+        setError(null)
         setTotal(artOk && driveOk ? totalArt + totalDrive : null)
-        jaCarregouRef.current = true
-        setJaCarregou(true)
+        alreadyLoadedRef.current = true
+        setAlreadyLoaded(true)
       } else {
         // Total failure: keep the previous list (§3) and only signal the failure.
-        setErro("Não foi possível carregar o acervo.")
+        setError("Não foi possível carregar o acervo.")
       }
-      setAvisos({ artefatos: !artOk && driveOk, drive: artOk && !driveOk })
-      setCarregando(false)
-      setAtualizando(false)
+      setWarnings({ artefatos: !artOk && driveOk, drive: artOk && !driveOk })
+      setLoading(false)
+      setRefreshing(false)
     })
   }, [workspaceId])
 
@@ -116,19 +116,19 @@ export function useAcervo(workspaceId: string | null | undefined): UseAcervo {
   // so this effect does not fire on a manual reload (the "Tentar de novo" (try
   // again) button).
   useEffect(() => {
-    jaCarregouRef.current = false
-    setJaCarregou(false)
-    setItens([])
+    alreadyLoadedRef.current = false
+    setAlreadyLoaded(false)
+    setItems([])
     setTotal(null)
     recarregar()
   }, [recarregar])
 
-  const remover = useCallback(async (item: ItemDoAcervo) => {
+  const remover = useCallback(async (item: CollectionItem) => {
     const res = item.fonte === "artefato"
       ? await GisFlowService.deleteArtifact(item.id)
       : await GisFlowService.deleteDriveFile(item.id)
     if (res.success) {
-      setItens((atual) => atual.filter((i) => i.chave !== item.chave))
+      setItems((atual) => atual.filter((i) => i.chave !== item.chave))
       // The total comes from the server and feeds the "showing N of M": without
       // subtracting, the cutoff line would start lying right after a deletion.
       setTotal((t) => (t == null ? t : Math.max(0, t - 1)))

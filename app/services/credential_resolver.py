@@ -25,43 +25,43 @@ from app.core.authorization.credential_loader import resolve_credentials_from_id
 # extract" is needed for HTTP types, the mitigation belongs in the node/egress
 # (destination allowlist when there is a credential), not here. The same goes
 # for the WFS ones: the node's URL is also the author's.
-_TIPOS_AUTH_HTTP = ("http_bearer", "http_basic", "wfs", "geoserver_authkey")
+_HTTP_AUTH_TYPES = ("http_bearer", "http_basic", "wfs", "geoserver_authkey")
 
 # Fields that can make up the authentication. A closed list on purpose: the
 # decrypted credential carries other keys (`expires_at`, `type`) that have no
 # reason to travel all the way to the executor. Per TYPE, only the ones the
-# credential catalog declares for it count (`_campos_de_autenticacao`): a
+# credential catalog declares for it count (`_auth_fields`): a
 # credential that used to be of another type carries extra fields in `data`,
 # and the `password` from when it was Basic must not travel along with the
 # authkey key.
-_CAMPOS_AUTH_HTTP = ("token", "username", "password", "parameter", "location")
+_HTTP_AUTH_FIELDS = ("token", "username", "password", "parameter", "location")
 
 
 # The `s3` credential goes into the node in `s3_auth`, with the catalog's fields
-# and nothing else (closed list for the same reason as `_CAMPOS_AUTH_HTTP`). The
-# node builds the client with `flow.utils.s3_cliente.cliente_s3` — the same one
+# and nothing else (closed list for the same reason as `_HTTP_AUTH_FIELDS`). The
+# node builds the client with `flow.utils.s3_cliente.s3_client` — the same one
 # as the connection test.
-_CAMPOS_S3 = ("access_key_id", "secret_access_key", "region", "bucket", "endpoint_url")
+_S3_FIELDS = ("access_key_id", "secret_access_key", "region", "bucket", "endpoint_url")
 
 
-def s3_auth_da_credencial(cred: dict) -> dict | None:
+def s3_auth_from_credential(cred: dict) -> dict | None:
     """The `s3_auth` the node receives from a resolved credential — or None, if it
     is not of type `s3`."""
     if cred.get("type") != "s3":
         return None
-    return {campo: cred[campo] for campo in _CAMPOS_S3 if cred.get(campo) not in (None, "")}
+    return {campo: cred[campo] for campo in _S3_FIELDS if cred.get(campo) not in (None, "")}
 
 
-def _campos_de_autenticacao(tipo: str) -> tuple[str, ...]:
+def _auth_fields(tipo: str) -> tuple[str, ...]:
     from app.core.credentials.schemas import CREDENTIAL_TYPE_SCHEMAS
 
     esquema = CREDENTIAL_TYPE_SCHEMAS.get(tipo)
     if esquema is None:
-        return _CAMPOS_AUTH_HTTP
-    return tuple(f.key for f in esquema.fields if f.key in _CAMPOS_AUTH_HTTP)
+        return _HTTP_AUTH_FIELDS
+    return tuple(f.key for f in esquema.fields if f.key in _HTTP_AUTH_FIELDS)
 
 
-def http_auth_da_credencial(cred: dict) -> dict | None:
+def http_auth_from_credential(cred: dict) -> dict | None:
     """The `http_auth` the node receives from a resolved credential — or None, if
     it does not sign HTTP requests (database ones become `connectionString`).
 
@@ -69,15 +69,15 @@ def http_auth_da_credencial(cred: dict) -> dict | None:
     SAME authentication the execution will use.
     """
     tipo = cred.get("type")
-    if tipo not in _TIPOS_AUTH_HTTP:
+    if tipo not in _HTTP_AUTH_TYPES:
         return None
     return {
         "type": tipo,
-        **{campo: cred[campo] for campo in _campos_de_autenticacao(tipo) if campo in cred},
+        **{campo: cred[campo] for campo in _auth_fields(tipo) if campo in cred},
     }
 
 
-def _id_canonico(cid) -> str:
+def _canonical_id(cid) -> str:
     """The id as the resolver returns it (lowercase UUID). Written in
     uppercase on the node, it matched nothing and the credential vanished
     without warning — while the guard (`assert_credentials_accessible`), which
@@ -88,12 +88,12 @@ def _id_canonico(cid) -> str:
         return str(cid)
 
 
-def propriedade_que_recebe(tipo: str) -> str | None:
+def receiving_property(tipo: str) -> str | None:
     """Where a credential of this type goes into the node: `http_auth` (the ones
     that sign HTTP requests), `s3_auth` (the S3 one), `connectionString` (the
     database ones) — or None (the ones the node uses by their own id, like
     `webhook_token`, and the free-form types)."""
-    if tipo in _TIPOS_AUTH_HTTP:
+    if tipo in _HTTP_AUTH_TYPES:
         return "http_auth"
     if tipo == "s3":
         return "s3_auth"
@@ -102,7 +102,7 @@ def propriedade_que_recebe(tipo: str) -> str | None:
     return None
 
 
-def tipos_aceitos_do_descriptor(descriptor: dict) -> frozenset | None:
+def accepted_types_from_descriptor(descriptor: dict) -> frozenset | None:
     """The credential types the descriptor's `credential_id` accepts — or
     None when the field does not exist or does not carry the list."""
     for prop in descriptor.get("properties") or []:
@@ -111,7 +111,7 @@ def tipos_aceitos_do_descriptor(descriptor: dict) -> frozenset | None:
     return None
 
 
-def _contrato_do_no(node: dict) -> tuple[frozenset | None, frozenset | None]:
+def _node_contract(node: dict) -> tuple[frozenset | None, frozenset | None]:
     """(credential types the node accepts, properties it declares) —
     each one None when it cannot be known (node outside the registry, broken
     descriptor, field without the list): then the usual applies, no filter.
@@ -135,7 +135,7 @@ def _contrato_do_no(node: dict) -> tuple[frozenset | None, frozenset | None]:
     declaradas = frozenset(
         p.get("name") for p in descriptor.get("properties") or [] if isinstance(p, dict) and p.get("name")
     )
-    return tipos_aceitos_do_descriptor(descriptor), declaradas
+    return accepted_types_from_descriptor(descriptor), declaradas
 
 
 async def inject_credentials(
@@ -172,7 +172,7 @@ async def inject_credentials(
     nodes = definition.get("nodes", [])
 
     cred_ids = list({
-        _id_canonico(props.get("credential_id"))
+        _canonical_id(props.get("credential_id"))
         for node in nodes
         for props in [(node.get("data", {}).get("properties") or node.get("properties") or {})]
         if props.get("credential_id")
@@ -190,16 +190,16 @@ async def inject_credentials(
     )
     for node in enriched.get("nodes", []):
         props = node.get("data", {}).get("properties") or node.get("properties") or {}
-        cid = _id_canonico(props.get("credential_id")) if props.get("credential_id") else None
+        cid = _canonical_id(props.get("credential_id")) if props.get("credential_id") else None
         if not cid or cid not in resolved:
             continue
         cred = resolved[cid]
-        aceitos, declaradas = _contrato_do_no(node)
+        aceitos, declaradas = _node_contract(node)
         if aceitos is not None and cred.get("type") not in aceitos:
             # Nothing travels: neither a database's DSN to a WFS node, nor a
             # GeoServer's key to a database node.
             continue
-        if (http_auth := http_auth_da_credencial(cred)) is not None:
+        if (http_auth := http_auth_from_credential(cred)) is not None:
             # Without this clause, an HTTP credential was resolved, had its
             # `credential_id` removed right below and vanished without a trace:
             # the node received the definition already without the id and with
@@ -215,7 +215,7 @@ async def inject_credentials(
             if declaradas is not None and "http_auth" not in declaradas:
                 continue  # nowhere to receive it: the id stays, and the node refuses for not having the secret
             props["http_auth"] = http_auth
-        elif (s3_auth := s3_auth_da_credencial(cred)) is not None:
+        elif (s3_auth := s3_auth_from_credential(cred)) is not None:
             # The `s3` type existed in the vault (with a connection test) with no
             # consumer: SaveToS3 asked for the secret key typed into the node, in plain text.
             if declaradas is not None and "s3_auth" not in declaradas:

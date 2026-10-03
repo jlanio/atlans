@@ -30,7 +30,7 @@ import pytest
 from flow.utils import protocolo_ws as PW
 
 
-def test_tipos_de_mensagem_assinada_batem_nos_dois_lados():
+def test_signed_message_types_match_on_both_sides():
     """Diverging here turns into a silently discarded command.
 
     A type that the executor requires signed but the server sends unsigned is
@@ -48,7 +48,7 @@ def test_tipos_de_mensagem_assinada_batem_nos_dois_lados():
     )
 
 
-def test_reducao_de_node_event_e_a_mesma_nos_dois_lados():
+def test_node_event_reduction_is_the_same_on_both_sides():
     """node_event ceiling and reduction: a single rule, in flow/utils/publisher.
 
     There were two copies. With the executor's ceiling HIGHER than the server's,
@@ -61,17 +61,17 @@ def test_reducao_de_node_event_e_a_mesma_nos_dois_lados():
     from executor import connection
     from flow.utils.publisher import reducao
 
-    assert connection.reduzir_node_event is reducao.reduzir_node_event, (
+    assert connection.shrink_node_event is reducao.shrink_node_event, (
         "o executor voltou a ter a sua propria reducao de node_event"
     )
-    assert resultados.reduzir_node_event is reducao.reduzir_node_event, (
+    assert resultados.shrink_node_event is reducao.shrink_node_event, (
         "o servidor voltou a ter a sua propria reducao de node_event"
     )
-    assert connection.TETO_NODE_EVENT_BYTES is reducao.TETO_NODE_EVENT_BYTES
-    assert resultados.TETO_NODE_EVENT_BYTES is reducao.TETO_NODE_EVENT_BYTES
+    assert connection.NODE_EVENT_BYTES_CEILING is reducao.NODE_EVENT_BYTES_CEILING
+    assert resultados.NODE_EVENT_BYTES_CEILING is reducao.NODE_EVENT_BYTES_CEILING
 
 
-def test_a_acao_de_purga_que_o_servidor_envia_e_aceita_pelo_executor():
+def test_the_purge_action_the_server_sends_is_accepted_by_the_executor():
     """The personal-data removal channel has to exist on both sides.
 
     `_ordenar_remocao_local` sends `action: purge_artifacts` in a `control`. If
@@ -95,7 +95,7 @@ def test_a_acao_de_purga_que_o_servidor_envia_e_aceita_pelo_executor():
 
 # ── Vocabulario do protocolo WS (flow/utils/protocolo_ws.py) ─────────────────
 
-def test_vocabulario_do_protocolo_vem_do_modulo_unico():
+def test_protocol_vocabulary_comes_from_the_single_module():
     """Version, types, stats keys and system_info fields: a single copy.
 
     Each side declared its own: a literal "1.0" in the executor's handshake
@@ -113,20 +113,20 @@ def test_vocabulario_do_protocolo_vem_do_modulo_unico():
     assert rota.SUPPORTED_PROTOCOL_VERSIONS is PW.SUPPORTED_PROTOCOL_VERSIONS
     assert PW.PROTOCOL_VERSION in PW.SUPPORTED_PROTOCOL_VERSIONS
 
-    assert connection.TIPOS_DO_SERVIDOR is PW.TIPOS_DO_SERVIDOR
-    assert connection.TIPO_ERRO is PW.TIPO_ERRO
-    assert rota.TIPO_ERRO is PW.TIPO_ERRO
-    assert PW.TIPO_ERRO in PW.TIPOS_DO_SERVIDOR
+    assert connection.SERVER_TYPES is PW.SERVER_TYPES
+    assert connection.ERROR_TYPE is PW.ERROR_TYPE
+    assert rota.ERROR_TYPE is PW.ERROR_TYPE
+    assert PW.ERROR_TYPE in PW.SERVER_TYPES
 
-    assert connection.reduzir_stats is PW.reduzir_stats
-    assert protocolo.reduzir_stats is PW.reduzir_stats
+    assert connection.shrink_stats is PW.shrink_stats
+    assert protocolo.shrink_stats is PW.shrink_stats
 
-    assert protocolo.SYSTEM_INFO_TEXTOS is PW.SYSTEM_INFO_TEXTOS
-    assert protocolo.SYSTEM_INFO_NUMEROS is PW.SYSTEM_INFO_NUMEROS
-    assert protocolo.SYSTEM_INFO_BOOLEANOS is PW.SYSTEM_INFO_BOOLEANOS
+    assert protocolo.SYSTEM_INFO_TEXTS is PW.SYSTEM_INFO_TEXTS
+    assert protocolo.SYSTEM_INFO_NUMBERS is PW.SYSTEM_INFO_NUMBERS
+    assert protocolo.SYSTEM_INFO_BOOLEANS is PW.SYSTEM_INFO_BOOLEANS
 
 
-async def test_erro_que_o_servidor_responde_chega_ao_operador_do_executor(monkeypatch, caplog):
+async def test_error_the_server_replies_reaches_the_executor_operator(monkeypatch, caplog):
     """The server's REAL error response goes through the executor's REAL receive path.
 
     The server replies `error` to every message it rejects ("evita loop onde
@@ -142,8 +142,8 @@ async def test_erro_que_o_servidor_responde_chega_ao_operador_do_executor(monkey
     monkeypatch.setattr(
         rota, "enfileirar_ao_executor", lambda _ws, texto, _eid: respostas.append(texto),
     )
-    rota._responder_erro(object(), "ex-1", "invalid_capacity", errors=["queued: negativo (-1)"])
-    assert json.loads(respostas[0])["type"] in PW.TIPOS_DO_SERVIDOR
+    rota._reply_error(object(), "ex-1", "invalid_capacity", errors=["queued: negativo (-1)"])
+    assert json.loads(respostas[0])["type"] in PW.SERVER_TYPES
 
     class _WS:
         def __aiter__(self):
@@ -168,7 +168,7 @@ async def test_erro_que_o_servidor_responde_chega_ao_operador_do_executor(monkey
     )
 
 
-async def test_handshake_do_executor_e_aceito_inteiro_pelo_servidor(monkeypatch):
+async def test_executor_handshake_is_fully_accepted_by_the_server(monkeypatch):
     """The executor's REAL handshake goes through the server's REAL validation.
 
     A version outside SUPPORTED_PROTOCOL_VERSIONS closes the session with 4426.
@@ -215,13 +215,13 @@ async def test_handshake_do_executor_e_aceito_inteiro_pelo_servidor(monkeypatch)
     assert handshake["protocol_version"] in rota.SUPPORTED_PROTOCOL_VERSIONS
     enviado = handshake["system_info"]
     assert set(enviado) == set(
-        PW.SYSTEM_INFO_TEXTOS + PW.SYSTEM_INFO_NUMEROS + PW.SYSTEM_INFO_BOOLEANOS
+        PW.SYSTEM_INFO_TEXTS + PW.SYSTEM_INFO_NUMBERS + PW.SYSTEM_INFO_BOOLEANS
     )
     guardado = protocolo._sanitize_system_info("ex-1", enviado) or {}
     assert set(guardado) == set(enviado), "o servidor descartou campo que o executor manda"
 
 
-def test_tipos_que_o_executor_envia_sao_os_que_o_servidor_trata():
+def test_types_the_executor_sends_are_the_ones_the_server_handles():
     """A type that one side sends and the other does not handle vanishes silently.
 
     That is what happened with `error` in the server → executor direction. In
@@ -230,23 +230,23 @@ def test_tipos_que_o_executor_envia_sao_os_que_o_servidor_trata():
     from app.api.routers import executor_ws_router as rota
     from app.api.routers.executor_ws import protocolo
     from executor import connection
-    from executor.sync import events as eventos_de_sync
+    from executor.sync import events as sync_events
 
-    # The dispatch is the `{tipo: tratador}` table of the receive loop.
-    tratados = set(rota._TRATADORES)
-    assert tratados == PW.TIPOS_DO_EXECUTOR
+    # The dispatch is the `{tipo: handler}` table of the receive loop.
+    handled = set(rota._HANDLERS)
+    assert handled == PW.EXECUTOR_TYPES
 
     enviados: set[str] = set()
-    for modulo in (connection, eventos_de_sync):
+    for modulo in (connection, sync_events):
         enviados |= set(re.findall(r'"type":\s*"(\w+)"', inspect.getsource(modulo)))
-    assert enviados and enviados <= PW.TIPOS_DO_EXECUTOR, (
-        f"o executor manda tipo que o servidor nao trata: {enviados - PW.TIPOS_DO_EXECUTOR}"
+    assert enviados and enviados <= PW.EXECUTOR_TYPES, (
+        f"o executor manda tipo que o servidor nao trata: {enviados - PW.EXECUTOR_TYPES}"
     )
-    assert set(protocolo._REQUIRED_FIELDS) <= PW.TIPOS_DO_EXECUTOR
+    assert set(protocolo._REQUIRED_FIELDS) <= PW.EXECUTOR_TYPES
 
 
-@pytest.mark.parametrize("chave", PW.CHAVES_DE_CONTROLE_STATS)
-def test_chave_de_controle_de_stats_sobrevive_a_truncagem_nos_dois_lados(chave, monkeypatch):
+@pytest.mark.parametrize("chave", PW.STATS_CONTROL_KEYS)
+def test_stats_control_key_survives_truncation_on_both_sides(chave, monkeypatch):
     """Without `__response__` the synchronous webhook's BRPOP hangs until the timeout.
 
     The `stats` truncation was written twice, each side with its own list of
@@ -268,4 +268,4 @@ def test_chave_de_controle_de_stats_sobrevive_a_truncagem_nos_dois_lados(chave, 
     for lado in (enviado, recebido["stats"]):
         assert lado[chave] == controle
         assert "no-1" not in lado
-        assert lado[PW.STATS_TRUNCADO] is True
+        assert lado[PW.STATS_TRUNCATED] is True

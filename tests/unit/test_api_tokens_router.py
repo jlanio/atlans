@@ -24,7 +24,7 @@ from app.models.user import User
 from app.models.workspace import Workspace
 from app.models.workspace_member import WorkspaceMember
 
-TABELAS = [User.__table__, Workspace.__table__, WorkspaceMember.__table__, ApiToken.__table__]
+TABLES = [User.__table__, Workspace.__table__, WorkspaceMember.__table__, ApiToken.__table__]
 USUARIO = "usr-test-001"  # the id_hash of the conftest's mock_current_user
 
 
@@ -32,7 +32,7 @@ USUARIO = "usr-test-001"  # the id_hash of the conftest's mock_current_user
 async def sessao():
     engine = create_async_engine("sqlite+aiosqlite://")
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all, tables=TABELAS)
+        await conn.run_sync(Base.metadata.create_all, tables=TABLES)
     fabrica = async_sessionmaker(engine, expire_on_commit=False)
     async with fabrica() as s:
         s.add_all([
@@ -74,12 +74,12 @@ def _payload(**extra):
 
 
 @pytest.mark.asyncio
-async def test_post_cria_e_mostra_o_segredo_uma_unica_vez(api, sessao):
+async def test_post_creates_and_shows_the_secret_only_once(api, sessao):
     resp = await api.post("/auth/tokens", json=_payload(workspace_ids=["ws-test-001"]))
 
     assert resp.status_code == 201, resp.text
     corpo = resp.json()
-    assert pat.e_segredo_pat(corpo["token"])
+    assert pat.is_pat_secret(corpo["token"])
     assert corpo["token_prefix"] == corpo["token"][:12]
     assert corpo["status"] == "active" and corpo["revoked_at"] is None and corpo["last_used_at"] is None
     assert corpo["scopes"] == ["workflows:read", "runs:execute"]
@@ -91,14 +91,14 @@ async def test_post_cria_e_mostra_o_segredo_uma_unica_vez(api, sessao):
 
     # Only the hash in the database; the listing never returns the secret.
     linha = (await sessao.execute(select(ApiToken).where(ApiToken.id_hash == corpo["id"]))).scalar_one()
-    assert linha.token_hash == pat.hash_segredo(corpo["token"])
+    assert linha.token_hash == pat.hash_secret(corpo["token"])
     lista = (await api.get("/auth/tokens")).json()
     assert [t["id"] for t in lista] == [corpo["id"]]
     assert "token" not in lista[0]
 
 
 @pytest.mark.asyncio
-async def test_post_valida_o_corpo_no_formato_do_repo(api):
+async def test_post_validates_the_body_in_the_repo_format(api):
     r = await api.post("/auth/tokens", json=_payload(scopes=["admin"]))
     assert r.status_code == 422
     assert "Escopo desconhecido" in r.text
@@ -117,21 +117,21 @@ async def test_post_valida_o_corpo_no_formato_do_repo(api):
 
 
 @pytest.mark.asyncio
-async def test_post_recusa_workspace_de_que_o_usuario_nao_participa(api):
+async def test_post_rejects_workspace_the_user_is_not_a_member_of(api):
     r = await api.post("/auth/tokens", json=_payload(workspace_ids=["ws-test-001", "ws-outro"]))
     assert r.status_code == 422
     assert r.json()["error"] == "api_token_invalid"
 
 
 @pytest.mark.asyncio
-async def test_teto_de_tokens_ativos_da_409(api, sessao):
+async def test_active_tokens_ceiling_gives_409(api, sessao):
     sessao.add_all([
         ApiToken(
             user_id=USUARIO, name=f"t{i}", token_prefix="atl_pat_xxxx",
-            token_hash=pat.hash_segredo(f"seed-{i}"), scopes=["workflows:read"],
+            token_hash=pat.hash_secret(f"seed-{i}"), scopes=["workflows:read"],
             expires_at=utc_now_naive() + timedelta(days=5),
         )
-        for i in range(pat.MAX_TOKENS_ATIVOS_POR_USUARIO)
+        for i in range(pat.MAX_ACTIVE_TOKENS_PER_USER)
     ])
     await sessao.commit()
 
@@ -141,7 +141,7 @@ async def test_teto_de_tokens_ativos_da_409(api, sessao):
 
 
 @pytest.mark.asyncio
-async def test_delete_revoga_sem_apagar_e_e_idempotente(api):
+async def test_delete_revokes_without_erasing_and_is_idempotent(api):
     criado = (await api.post("/auth/tokens", json=_payload())).json()
 
     r1 = await api.delete(f"/auth/tokens/{criado['id']}")
@@ -158,10 +158,10 @@ async def test_delete_revoga_sem_apagar_e_e_idempotente(api):
 
 
 @pytest.mark.asyncio
-async def test_delete_de_token_alheio_ou_inexistente_da_404(api, sessao):
+async def test_delete_of_foreign_or_missing_token_gives_404(api, sessao):
     sessao.add(ApiToken(
         id_hash="tok-da-outra", user_id="u-outro", name="dela", token_prefix="atl_pat_xxxx",
-        token_hash=pat.hash_segredo("seed-outra"), scopes=["workflows:read"],
+        token_hash=pat.hash_secret("seed-outra"), scopes=["workflows:read"],
         expires_at=utc_now_naive() + timedelta(days=5),
     ))
     await sessao.commit()
@@ -173,7 +173,7 @@ async def test_delete_de_token_alheio_ou_inexistente_da_404(api, sessao):
 
 
 @pytest.mark.asyncio
-async def test_sem_sessao_e_401(api):
+async def test_without_session_is_401(api):
     from app.api.dependencies import get_current_user
     from app.main import app
 
@@ -182,7 +182,7 @@ async def test_sem_sessao_e_401(api):
     assert (await api.post("/auth/tokens", json=_payload())).status_code == 401
 
 
-def test_criacao_tem_rate_limit_de_10_por_hora():
+def test_creation_has_rate_limit_of_10_per_hour():
     """Through the slowapi registry, not the source text: it is what the request uses."""
     from app.api.routers import api_tokens_router  # noqa: F401 — importar registra a rota no limiter
 
@@ -194,7 +194,7 @@ def test_criacao_tem_rate_limit_de_10_por_hora():
 
 
 @pytest.mark.asyncio
-async def test_reset_de_senha_revoga_os_tokens_do_usuario(api, sessao):
+async def test_password_reset_revokes_the_user_tokens(api, sessao):
     criado = (await api.post("/auth/tokens", json=_payload())).json()
 
     with patch("app.api.routers.auth_router.verify_password_reset_token", AsyncMock(return_value=USUARIO)), \

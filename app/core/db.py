@@ -81,7 +81,7 @@ def _parse_url(url: str) -> tuple[str, dict]:
     return clean, {"ssl": _ssl_ctx}
 
 
-def _prazos(statement_timeout_s: int, command_timeout_s: int) -> dict:
+def _timeouts(statement_timeout_s: int, command_timeout_s: int) -> dict:
     """
     asyncpg connect_args with the per-command deadlines (see config.py).
 
@@ -107,7 +107,7 @@ def _prazos(statement_timeout_s: int, command_timeout_s: int) -> dict:
 
 
 _async_url, _connect_args = _parse_url(DATABASE_URL) if DATABASE_URL else (None, {})
-_connect_args = {**_connect_args, **_prazos(DB_STATEMENT_TIMEOUT, DB_COMMAND_TIMEOUT)}
+_connect_args = {**_connect_args, **_timeouts(DB_STATEMENT_TIMEOUT, DB_COMMAND_TIMEOUT)}
 
 # --- Async Engine & Session ---
 #
@@ -130,7 +130,7 @@ _connect_args = {**_connect_args, **_prazos(DB_STATEMENT_TIMEOUT, DB_COMMAND_TIM
 # `connect_args` MUST also carry `statement_cache_size=0` and
 # `prepared_statement_cache_size=0`: asyncpg with prepared statements under
 # transaction pooling produces intermittent "prepared statement already exists",
-# which only shows up under concurrency. And the `statement_timeout` from `_prazos` goes as a
+# which only shows up under concurrency. And the `statement_timeout` from `_timeouts` goes as a
 # session startup parameter, which pgbouncer refuses: either it goes into
 # `ignore_startup_parameters`, or the deadline moves to `ALTER ROLE ... SET`.
 #

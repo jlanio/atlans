@@ -5,16 +5,16 @@ import { cn } from "@/lib/utils"
  * one artifact from another in practice — `_v3.geojson`, `_2023.gpkg`,
  * `_final.shp` — without eating the width the beginning needs.
  */
-const CAUDA = 12
+const TAIL = 12
 
 /** Where a file name changes subject. */
-const SEPARADORES = "_-."
+const SEPARATORS = "_-."
 /**
  * How far the cut may MOVE FORWARD to land on a separator. It only moves
  * forward — moving back would lengthen the tail and eat the beginning, which is
  * what the narrow width has none of to spare.
  */
-const JANELA = 5
+const WINDOW_SIZE = 5
 
 /**
  * Where the tail starts. The raw count splits the word in the middle
@@ -22,12 +22,12 @@ const JANELA = 5
  * name changes subject (`…consolidado` + `_v3.geojson`). With no separator
  * nearby, the raw count applies — better an ugly cut than a giant tail.
  */
-function inicioDaCauda(letras: string[]): number {
-  const bruto = Math.max(0, letras.length - CAUDA)
+function tailStart(letras: string[]): number {
+  const bruto = Math.max(0, letras.length - TAIL)
   if (bruto === 0) return 0
-  const teto = Math.min(letras.length - 1, bruto + JANELA)
+  const teto = Math.min(letras.length - 1, bruto + WINDOW_SIZE)
   for (let i = bruto; i <= teto; i++) {
-    if (SEPARADORES.includes(letras[i])) return i
+    if (SEPARATORS.includes(letras[i])) return i
   }
   return bruto
 }
@@ -62,7 +62,7 @@ export function NomeDeArquivo({ nome, className }: { nome: string; className?: s
   // separated from its variation selector (🗺️ is two code points), and then a
   // different glyph comes out — ugly, but legible, and no `Intl.Segmenter`.
   const letras = Array.from(nome)
-  const corte = inicioDaCauda(letras)
+  const corte = tailStart(letras)
   return (
     // `overflow-hidden` on the wrapper: at a width smaller than the tail itself
     // it would spill over what comes next instead of being clipped.

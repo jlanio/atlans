@@ -6,7 +6,7 @@
 // that `--primary` does not.
 import { cn } from '../lib/utils.js'
 
-const CORES: Record<string, string> = {
+const COLORS: Record<string, string> = {
   ok: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400',
   success: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400',
   error: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
@@ -32,7 +32,7 @@ export function StatusBadge({
     <span
       className={cn(
         'inline-flex items-center gap-1.5 rounded-full border border-transparent px-2.5 py-0.5 text-xs font-semibold',
-        CORES[status] ?? 'bg-muted text-muted-foreground',
+        COLORS[status] ?? 'bg-muted text-muted-foreground',
         className,
       )}
     >

@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest"
 import { derivarCamadas, pareceLonLat, corDaCamada, PALETA } from "@/app/components/home/camadas"
-import type { TurnoDoAssistente, BlocoDoAssistente } from "@/app/components/home/assistente/quadros"
+import type { AssistantTurn, AssistantBlock } from "@/app/components/home/assistente/quadros"
 
-const turno = (blocos: BlocoDoAssistente[]): TurnoDoAssistente => ({ id: "t", papel: "assistant", blocos })
+const turno = (blocos: AssistantBlock[]): AssistantTurn => ({ id: "t", papel: "assistant", blocos })
 
 describe("derivarCamadas", () => {
   it("última menção do mesmo artefato vence", () => {

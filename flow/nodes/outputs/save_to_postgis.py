@@ -4,14 +4,14 @@ from flow.registry import register_node
 from flow.nodes.base import BaseNode
 from flow.utils.logger import get_logger
 from flow.utils.sql_engine import make_engine_cache, get_engine, ensure_schema, truncate_table
-from flow.utils.credencial import obter_conexao
+from flow.utils.credencial import get_connection
 
 logger = get_logger(__name__)
 
 # Features per COPY when the user leaves the batch size on automatic. COPY has
 # no parameter limit like INSERT, so what this number controls is
 # MEMORY: geopandas serializes each batch into an in-RAM CSV before sending.
-_LOTE_PADRAO = 50_000
+_DEFAULT_BATCH = 50_000
 
 # Own cache (separate from SaveToPostgres) so as not to compete for slots.
 _engine_cache = make_engine_cache("SaveToPostGIS")
@@ -83,7 +83,7 @@ class SaveToPostGIS(BaseNode):
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         self.validate()
-        conn_str = obter_conexao(self.parameters)
+        conn_str = get_connection(self.parameters)
 
         # Gets the GeoDataFrame via the base class helper
         gdf = self.get_first_gdf(inputs)
@@ -102,9 +102,9 @@ class SaveToPostGIS(BaseNode):
         geom_col = (self.parameters.get('geometryColumn') or 'geom').strip()
         chunksize_raw = self.parameters.get('chunksize', 0) or 0
         try:
-            chunksize = int(chunksize_raw) or _LOTE_PADRAO
+            chunksize = int(chunksize_raw) or _DEFAULT_BATCH
         except (TypeError, ValueError):
-            chunksize = _LOTE_PADRAO
+            chunksize = _DEFAULT_BATCH
 
         # Without a CRS, geopandas writes SRID 0 and warns via `warnings.warn` — which
         # shows up nowhere for whoever triggered the workflow. The layer ends up

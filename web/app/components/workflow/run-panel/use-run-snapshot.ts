@@ -29,19 +29,19 @@ export interface RunSnapshot {
  * nodes, eight times per second, on the same thread that animates the canvas.
  * Here the rebuild happens once and both read the same object.
  */
-const inscritos = new Set<() => void>()
+const subscribers = new Set<() => void>()
 /** Subset that needs the FULL timeline (panel open, sub-workflow viewer).
  *  Empty ⇒ only the bar summary is built. */
-const querTimeline = new Set<() => void>()
+const timelineSubscribers = new Set<() => void>()
 let timer: ReturnType<typeof setTimeout> | null = null
-let cancelarStore: (() => void) | null = null
+let cancelStore: (() => void) | null = null
 
 function readSnapshot(anterior: RunSnapshot | null): RunSnapshot {
   const state = useWorkflowExecutionStore.getState()
-  const nosDoCanvas = state.statusWorkflow?.nodes ?? []
-  const timeline = querTimeline.size > 0
-    ? buildTimeline(state.events, nosDoCanvas, state.runStartedTs)
-    : buildHudTimeline(nosDoCanvas, state.runStartedTs, state.runOutcome, state.events.length > 0)
+  const canvasNodes = state.statusWorkflow?.nodes ?? []
+  const timeline = timelineSubscribers.size > 0
+    ? buildTimeline(state.events, canvasNodes, state.runStartedTs)
+    : buildHudTimeline(canvasNodes, state.runStartedTs, state.runOutcome, state.events.length > 0)
   return {
     timeline: anterior ? reaproveitar(anterior.timeline, timeline) : timeline,
     events: state.events,
@@ -56,7 +56,7 @@ function readSnapshot(anterior: RunSnapshot | null): RunSnapshot {
  * change. Within the same run prints only grow, and equal length implies equal
  * content.
  */
-function mesmoNo(a: NodeRun, b: NodeRun): boolean {
+function sameNode(a: NodeRun, b: NodeRun): boolean {
   return a.nodeId === b.nodeId
     && a.status === b.status
     && a.durationMs === b.durationMs
@@ -89,20 +89,20 @@ function reaproveitar(anterior: RunTimeline, nova: RunTimeline): RunTimeline {
   for (const node of anterior.nodes) antes.set(node.nodeId, node)
 
   const reusados = new Map<string, NodeRun>()
-  let todosIguais = anterior.nodes.length === nova.nodes.length
+  let allEqual = anterior.nodes.length === nova.nodes.length
   const nodes = nova.nodes.map((node, i) => {
     const velho = antes.get(node.nodeId)
-    if (velho && mesmoNo(velho, node)) {
+    if (velho && sameNode(velho, node)) {
       reusados.set(node.nodeId, velho)
-      if (anterior.nodes[i] !== velho) todosIguais = false
+      if (anterior.nodes[i] !== velho) allEqual = false
       return velho
     }
-    todosIguais = false
+    allEqual = false
     return node
   })
 
   if (
-    todosIguais
+    allEqual
     && anterior.totalPrints === nova.totalPrints
     && anterior.startTs === nova.startTs
     && anterior.workflow.status === nova.workflow.status
@@ -124,38 +124,38 @@ function reaproveitar(anterior: RunTimeline, nova: RunTimeline): RunTimeline {
 
 let snapshot: RunSnapshot = readSnapshot(null)
 
-function agendarFlush() {
+function scheduleFlush() {
   if (timer) return // a flush is already scheduled in this window
   timer = setTimeout(() => {
     timer = null
     snapshot = readSnapshot(snapshot)
-    for (const notificar of inscritos) notificar()
+    for (const notificar of subscribers) notificar()
   }, REFRESH_MS)
 }
 
-function inscrever(notificar: () => void, precisaTimeline: boolean) {
-  const primeiroCompleto = precisaTimeline && querTimeline.size === 0
-  inscritos.add(notificar)
-  if (precisaTimeline) querTimeline.add(notificar)
+function inscrever(notificar: () => void, needsTimeline: boolean) {
+  const firstFull = needsTimeline && timelineSubscribers.size === 0
+  subscribers.add(notificar)
+  if (needsTimeline) timelineSubscribers.add(notificar)
   // Subscribes to the store only once, while there is any consumer. The first
   // to arrive collects what already exists right away — waiting for the window
   // would leave the panel empty for an instant when opening an already loaded
   // run. React re-reads the snapshot right after subscribing, so this does not
   // need to notify anyone.
-  if (!cancelarStore) {
-    cancelarStore = useWorkflowExecutionStore.subscribe(agendarFlush)
+  if (!cancelStore) {
+    cancelStore = useWorkflowExecutionStore.subscribe(scheduleFlush)
     snapshot = readSnapshot(null)
-  } else if (primeiroCompleto) {
+  } else if (firstFull) {
     // The panel just opened and the current snapshot only has the bar summary.
-    agendarFlush()
+    scheduleFlush()
   }
 
   return () => {
-    inscritos.delete(notificar)
-    querTimeline.delete(notificar)
-    if (inscritos.size > 0) return
-    cancelarStore?.()
-    cancelarStore = null
+    subscribers.delete(notificar)
+    timelineSubscribers.delete(notificar)
+    if (subscribers.size > 0) return
+    cancelStore?.()
+    cancelStore = null
     if (timer) {
       clearTimeout(timer)
       timer = null
@@ -170,14 +170,14 @@ function inscrever(notificar: () => void, precisaTimeline: boolean) {
  * a high write frequency does not turn into a high render frequency: the
  * components only update when the timer fires.
  *
- * `precisaTimeline` says whether this consumer shows the per-node timeline. The
+ * `needsTimeline` says whether this consumer shows the per-node timeline. The
  * panel passes `open`: when collapsed it only draws the summary bar, and the
  * full rebuild stops happening.
  */
-export function useRunSnapshot(precisaTimeline = true): RunSnapshot {
+export function useRunSnapshot(needsTimeline = true): RunSnapshot {
   const subscribe = useCallback(
-    (notificar: () => void) => inscrever(notificar, precisaTimeline),
-    [precisaTimeline],
+    (notificar: () => void) => inscrever(notificar, needsTimeline),
+    [needsTimeline],
   )
   return useSyncExternalStore(subscribe, () => snapshot, () => snapshot)
 }

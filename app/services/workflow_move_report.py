@@ -223,14 +223,14 @@ async def _avisar_dependentes(db, id_hash: str, origin_ws: str | None) -> List[D
     )).all()
 
     avisos: List[Dict[str, Any]] = []
-    for dep_hash, dep_nome, dep_def in candidatos:
+    for dep_hash, dep_name, dep_def in candidatos:
         nodes = _collect_subworkflow_refs(dep_def or {}).get(id_hash)
         if nodes:
             avisos.append(warn(
                 "reverse_dependents",
-                f"O workflow '{dep_nome}' chama este como sub-fluxo e vai parar "
+                f"O workflow '{dep_name}' chama este como sub-fluxo e vai parar "
                 "de funcionar, pois ficará em outro workspace.",
-                workflow_hash=dep_hash, workflow_name=dep_nome, node_ids=nodes,
+                workflow_hash=dep_hash, workflow_name=dep_name, node_ids=nodes,
             ))
     return avisos
 
@@ -287,22 +287,22 @@ async def _avisar_workspace(db, wf, origin_ws: str | None, target_ws: str) -> Li
             Workspace.target_executor_id, Workspace.notification_url_allowlist,
         ).where(Workspace.id_hash.in_([w for w in (origin_ws, target_ws) if w]))
     )).all()
-    por_id = {h: (nome, executor, allowlist) for h, nome, executor, allowlist in linhas}
+    by_task_id = {h: (nome, executor, allowlist) for h, nome, executor, allowlist in linhas}
 
     avisos: List[Dict[str, Any]] = []
-    _, exec_origem, _ = por_id.get(origin_ws, (None, None, None))
-    nome_destino, exec_destino, allowlist = por_id.get(target_ws, (None, None, None))
+    _, origin_exec, _ = by_task_id.get(origin_ws, (None, None, None))
+    target_name, target_exec, allowlist = by_task_id.get(target_ws, (None, None, None))
 
-    if exec_origem != exec_destino:
-        destino_txt = (
-            "o pool de executores padrão" if not exec_destino
+    if origin_exec != target_exec:
+        target_txt = (
+            "o pool de executores padrão" if not target_exec
             else "outro executor dedicado"
         )
         avisos.append(warn(
             "executor_changed",
-            f"As execuções passarão a rodar em {destino_txt}, que pode não ter o "
+            f"As execuções passarão a rodar em {target_txt}, que pode não ter o "
             "mesmo acesso de rede e a bancos internos.",
-            from_executor_id=exec_origem, to_executor_id=exec_destino,
+            from_executor_id=origin_exec, to_executor_id=target_exec,
         ))
 
     url = getattr(wf, "notification_url", None)
@@ -316,7 +316,7 @@ async def _avisar_workspace(db, wf, origin_ws: str | None, target_ws: str) -> Li
             avisos.append(warn(
                 "notification_url_blocked",
                 f"A URL de notificação não é permitida no workspace "
-                f"'{nome_destino}' e passará a ser bloqueada após cada execução.",
+                f"'{target_name}' e passará a ser bloqueada após cada execução.",
                 notification_url=url, host=host, allowlist=allowlist,
             ))
     return avisos
@@ -397,16 +397,16 @@ async def _avisar_estado(db, wf, definition: dict) -> List[Dict[str, Any]]:
             portal_access=wf.portal_access,
         ))
 
-    tem_camadas = (await db.execute(
+    has_layers = (await db.execute(
         select(func.count()).select_from(PortalLayer)
         .where(PortalLayer.workflow_hash == id_hash)
     )).scalar_one_or_none() or 0
-    if tem_camadas:
+    if has_layers:
         avisos.append(warn(
             "portal_layers_retained",
-            f"As {tem_camadas} camada(s) já publicadas acompanham o workflow. Se o "
+            f"As {has_layers} camada(s) já publicadas acompanham o workflow. Se o "
             "portal for reativado no destino, elas voltam a ficar visíveis lá.",
-            severity="info", layers=tem_camadas,
+            severity="info", layers=has_layers,
         ))
 
     from app.core.scheduling.hooks import extract_schedule_node

@@ -29,8 +29,8 @@ def _load_file(path: str, ext: str, crs: str) -> Any:
     """Carrega o arquivo de forma sincrona."""
     try:
         if ext in _GEO_EXTENSIONS:
-            from flow.utils.leitura_geo import ler_geodataframe
-            gdf = ler_geodataframe(path)
+            from flow.utils.leitura_geo import read_geodataframe
+            gdf = read_geodataframe(path)
             if crs and gdf.crs is not None and str(gdf.crs) != crs:
                 gdf = gdf.to_crs(crs)
             elif gdf.crs is None and crs:

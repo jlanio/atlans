@@ -41,14 +41,14 @@ function linhas(arquivo) {
 }
 
 const fusos = new Map()
-const porPais = new Map()
+const byCountry = new Map()
 
 // zone.tab first: one line per (country, time zone), with the zone's own coordinates.
 for (const [pais, iso, fuso] of linhas("zone.tab")) {
   const c = coordenadas(iso)
   if (!fusos.has(fuso)) fusos.set(fuso, c)
-  if (!porPais.has(pais)) porPais.set(pais, [])
-  porPais.get(pais).push(c)
+  if (!byCountry.has(pais)) byCountry.set(pais, [])
+  byCountry.get(pais).push(c)
 }
 // zone1970.tab completa o que faltar.
 for (const [, iso, fuso] of linhas("zone1970.tab")) {
@@ -90,11 +90,11 @@ const par = ([lon, lat]) => `[${lon}, ${lat}]`
 // and the generated file changed order depending on who ran it (in Czech,
 // Anchorage and Chicago swap places).
 const ordem = (a, b) => a.localeCompare(b, "en")
-const corpoFusos = [...fusos.entries()]
+const timeZonesBody = [...fusos.entries()]
   .sort(([a], [b]) => ordem(a, b))
   .map(([nome, c]) => `  "${nome}": ${par(arredonda(c))},`)
   .join("\n")
-const corpoPaises = [...porPais.entries()]
+const countriesBody = [...byCountry.entries()]
   .sort(([a], [b]) => ordem(a, b))
   .map(([pais, pontos]) => `  ${pais}: ${par(arredonda(centro(pontos)))},`)
   .join("\n")
@@ -111,13 +111,13 @@ const ts = `// web/app/components/home/mapa/fusos.gerado.ts
 
 /** Fuso → [lon, lat] da cidade de referência do fuso. */
 export const FUSOS: Readonly<Record<string, readonly [number, number]>> = {
-${corpoFusos}
+${timeZonesBody}
 }
 
 /** País (ISO 3166 alfa-2) → [lon, lat] do centro dos fusos daquele país. */
 export const PAISES: Readonly<Record<string, readonly [number, number]>> = {
-${corpoPaises}
+${countriesBody}
 }
 `
 writeFileSync(SAIDA, ts)
-console.log(`fusos: ${fusos.size} · países: ${porPais.size} · ${Math.round(ts.length / 1024)} KB → ${SAIDA}`)
+console.log(`fusos: ${fusos.size} · países: ${byCountry.size} · ${Math.round(ts.length / 1024)} KB → ${SAIDA}`)

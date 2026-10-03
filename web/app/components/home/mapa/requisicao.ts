@@ -11,16 +11,16 @@
  * is no key to attach. CARTO, which required `?key=` on its CDN, left the Home.
  */
 
-const PREFIXO_TILES_AGENTE = "/terra/assistente/tiles/";
+const AGENT_TILES_PREFIX = "/terra/assistente/tiles/";
 
-export interface RequisicaoTransformada {
+export interface TransformedRequest {
   url: string;
   // Restricted to what MapLibre accepts (never "omit").
   credentials?: "same-origin" | "include";
 }
 
 /** MapLibre's `transformRequest`, ready to go into the constructor. */
-export function transformarRequisicao(url: string): RequisicaoTransformada | undefined {
+export function transformarRequisicao(url: string): TransformedRequest | undefined {
   // Assistant tiles (same-origin proxy): send the session cookie.
   if (ehTileDoAgente(url)) {
     return { url, credentials: "same-origin" };
@@ -31,10 +31,10 @@ export function transformarRequisicao(url: string): RequisicaoTransformada | und
 /** `true` if the URL is an assistant tile through the `/terra` proxy. */
 export function ehTileDoAgente(url: string): boolean {
   try {
-    return new URL(url, base()).pathname.startsWith(PREFIXO_TILES_AGENTE);
+    return new URL(url, base()).pathname.startsWith(AGENT_TILES_PREFIX);
   } catch {
     // Relative URL with no resolvable base (e.g. in a test): check the raw prefix.
-    return url.startsWith(PREFIXO_TILES_AGENTE);
+    return url.startsWith(AGENT_TILES_PREFIX);
   }
 }
 

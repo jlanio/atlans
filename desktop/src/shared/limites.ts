@@ -38,7 +38,7 @@ export const LIMITES = {
   timeoutS: { padrao: 3600, min: 1, max: null },
 } as const satisfies Record<string, Faixa>
 
-export function dentroDaFaixa(n: number, faixa: Faixa): boolean {
+export function withinRange(n: number, faixa: Faixa): boolean {
   return Number.isSafeInteger(n) && n >= faixa.min && (faixa.max === null || n <= faixa.max)
 }
 
@@ -54,5 +54,5 @@ export function dentroDaFaixa(n: number, faixa: Faixa): boolean {
 export function inteiroDoEnv(bruto: string | undefined, faixa: Faixa): number {
   const m = /^\s*([+-]?\d+(?:_\d+)*)(?:\s+#.*)?\s*$/.exec(bruto ?? '')
   const n = m ? Number(m[1]!.replace(/_/g, '')) : Number.NaN
-  return dentroDaFaixa(n, faixa) ? n : faixa.padrao
+  return withinRange(n, faixa) ? n : faixa.padrao
 }

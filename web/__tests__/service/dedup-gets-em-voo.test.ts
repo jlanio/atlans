@@ -42,7 +42,7 @@ describe("dedup de GETs em voo", () => {
     // An auto-refresh tick already in flight when the admin confirms the deletion.
     const tick = pendente<{ data: unknown[] }>()
     get.mockReturnValueOnce(tick.promise)
-    const emVoo = GisFlowService.getAgents()
+    const inFlight = GisFlowService.getAgents()
 
     del.mockResolvedValueOnce({ data: {} })
     await GisFlowService.deleteAgent("exec-1")
@@ -59,7 +59,7 @@ describe("dedup de GETs em voo", () => {
 
     tick.resolver({ data: [{ id_hash: "exec-1" }] })
     depois.resolver({ data: [] })
-    const [antes, agora] = await Promise.all([emVoo, releitura])
+    const [antes, agora] = await Promise.all([inFlight, releitura])
     expect(antes.data).toHaveLength(1)
     expect(agora.data).toHaveLength(0)
   })

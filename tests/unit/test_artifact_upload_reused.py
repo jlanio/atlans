@@ -14,7 +14,7 @@ import pytest
 from flow.utils.artifact_helpers import upload_artifact_to_minio
 
 
-def _resposta(payload: dict) -> MagicMock:
+def _response(payload: dict) -> MagicMock:
     resp = MagicMock()
     resp.json.return_value = payload
     resp.raise_for_status.return_value = None
@@ -31,19 +31,19 @@ class _Httpx:
     def post(self, url, json=None, **kwargs):
         self.posts.append((url, json or {}))
         if "executor-upload-url" in url:
-            return _resposta(self.upload_payload)
-        return _resposta({})
+            return _response(self.upload_payload)
+        return _response({})
 
     def put(self, *args, **kwargs):
-        return _resposta({})
+        return _response({})
 
     @property
-    def corpo_do_upload(self) -> dict:
+    def upload_body(self) -> dict:
         return next(corpo for url, corpo in self.posts if "executor-upload-url" in url)
 
 
-def _subir(overwrite: bool, resposta_servidor: dict) -> tuple[dict, _Httpx]:
-    fake = _Httpx(resposta_servidor)
+def _upload(overwrite: bool, server_response: dict) -> tuple[dict, _Httpx]:
+    fake = _Httpx(server_response)
     with patch("httpx.post", side_effect=fake.post), \
          patch("httpx.put", side_effect=fake.put), \
          patch("flow.utils.executor_http.get_agent_http_config",
@@ -57,57 +57,57 @@ def _subir(overwrite: bool, resposta_servidor: dict) -> tuple[dict, _Httpx]:
     return meta, fake
 
 
-RESPOSTA_REUSO = {"upload_url": "https://minio/put", "id_hash": "f-1",
+REUSE_RESPONSE = {"upload_url": "https://minio/put", "id_hash": "f-1",
                   "s3_key": "drive/ws-1/antigo.geojson", "reused": True}
-RESPOSTA_NOVO = {"upload_url": "https://minio/put", "id_hash": "f-2",
+NEW_RESPONSE = {"upload_url": "https://minio/put", "id_hash": "f-2",
                  "s3_key": "artifacts/ws-1/task-1/resultado.geojson", "reused": False}
 
 
-def test_overwrite_vai_no_corpo_do_post():
+def test_overwrite_goes_in_the_post_body():
     """The link no test covered."""
-    _meta, fake = _subir(overwrite=True, resposta_servidor=RESPOSTA_REUSO)
+    _meta, fake = _upload(overwrite=True, server_response=REUSE_RESPONSE)
 
-    assert fake.corpo_do_upload["overwrite"] is True
-    assert fake.corpo_do_upload["filename"] == "resultado.geojson"
-    assert fake.corpo_do_upload["workspace_id"] == "ws-1"
-
-
-def test_overwrite_desligado_tambem_e_enviado():
-    _meta, fake = _subir(overwrite=False, resposta_servidor=RESPOSTA_NOVO)
-
-    assert fake.corpo_do_upload["overwrite"] is False
+    assert fake.upload_body["overwrite"] is True
+    assert fake.upload_body["filename"] == "resultado.geojson"
+    assert fake.upload_body["workspace_id"] == "ws-1"
 
 
-def test_reused_do_servidor_chega_no_meta():
-    meta, _fake = _subir(overwrite=True, resposta_servidor=RESPOSTA_REUSO)
+def test_overwrite_off_is_also_sent():
+    _meta, fake = _upload(overwrite=False, server_response=NEW_RESPONSE)
+
+    assert fake.upload_body["overwrite"] is False
+
+
+def test_reused_from_server_reaches_meta():
+    meta, _fake = _upload(overwrite=True, server_response=REUSE_RESPONSE)
 
     assert meta["drive_reused"] is True
     assert meta["drive_file_id"] == "f-1"
 
 
-def test_pedir_overwrite_sem_encontrar_arquivo_nao_vira_reuso():
+def test_requesting_overwrite_without_finding_file_does_not_become_reuse():
     """The case the node's old message announced as an overwrite."""
-    meta, _fake = _subir(overwrite=True, resposta_servidor=RESPOSTA_NOVO)
+    meta, _fake = _upload(overwrite=True, server_response=NEW_RESPONSE)
 
     assert meta["drive_reused"] is False
 
 
-def test_s3_key_do_servidor_prevalece():
+def test_server_s3_key_prevails():
     """No reuso o servidor devolve a s3_key ORIGINAL — o PUT substitui o objeto."""
-    meta, _fake = _subir(overwrite=True, resposta_servidor=RESPOSTA_REUSO)
+    meta, _fake = _upload(overwrite=True, server_response=REUSE_RESPONSE)
 
     assert meta["s3_key"] == "drive/ws-1/antigo.geojson"
 
 
-def test_servidor_antigo_sem_o_campo_nao_afirma_reuso():
-    sem_campo = {"upload_url": "https://minio/put", "id_hash": "f-3", "s3_key": "k"}
+def test_old_server_without_the_field_does_not_claim_reuse():
+    without_field = {"upload_url": "https://minio/put", "id_hash": "f-3", "s3_key": "k"}
 
-    meta, _fake = _subir(overwrite=True, resposta_servidor=sem_campo)
+    meta, _fake = _upload(overwrite=True, server_response=without_field)
 
     assert meta["drive_reused"] is False
 
 
-def test_fallback_local_nao_afirma_reuso():
+def test_local_fallback_does_not_claim_reuse():
     """Upload failed: nothing went to the Drive, so nothing was overwritten."""
     with patch("httpx.post", side_effect=RuntimeError("sem rede")), \
          patch("flow.utils.executor_http.get_agent_http_config",
@@ -122,7 +122,7 @@ def test_fallback_local_nao_afirma_reuso():
     assert meta["drive_reused"] is False
 
 
-def test_fluxo_sem_drive_nao_afirma_reuso():
+def test_workflow_without_drive_does_not_claim_reuse():
     fake = _Httpx({"upload_url": "https://minio/put"})
     with patch("httpx.post", side_effect=fake.post), \
          patch("httpx.put", side_effect=fake.put), \
@@ -140,7 +140,7 @@ def test_fluxo_sem_drive_nao_afirma_reuso():
 
 # ── Node log: asserts the outcome, not the intent ────────────────────────────
 
-async def _logs_do_no(params: dict, meta_extra: dict) -> list[str]:
+async def _logs_do_no(params: dict, extra_meta: dict) -> list[str]:
     from flow.nodes.outputs.data_output import DataOutput
 
     node = DataOutput("n1", params)
@@ -148,7 +148,7 @@ async def _logs_do_no(params: dict, meta_extra: dict) -> list[str]:
     linhas: list[str] = []
 
     def _fake_upload(**_kwargs):
-        return "artifacts/ws-1/task-1/r.json", {"local_fallback": False, **meta_extra}
+        return "artifacts/ws-1/task-1/r.json", {"local_fallback": False, **extra_meta}
 
     with patch("flow.nodes.outputs.data_output.upload_artifact_to_minio", side_effect=_fake_upload), \
          patch.object(DataOutput, "log", lambda self, m: linhas.append(m)):
@@ -157,7 +157,7 @@ async def _logs_do_no(params: dict, meta_extra: dict) -> list[str]:
 
 
 @pytest.mark.asyncio
-async def test_log_afirma_sobrescrita_apenas_quando_houve():
+async def test_log_claims_overwrite_only_when_it_happened():
     linhas = await _logs_do_no(
         {"label": "r", "context": "drive", "overwrite": True}, {"drive_reused": True},
     )
@@ -166,7 +166,7 @@ async def test_log_afirma_sobrescrita_apenas_quando_houve():
 
 
 @pytest.mark.asyncio
-async def test_log_diz_que_criou_novo_quando_nao_havia_o_que_sobrescrever():
+async def test_log_says_it_created_new_when_there_was_nothing_to_overwrite():
     """Regression: the old message announced an overwrite whenever the option
     was on — precisely the case that needed to be visible."""
     linhas = await _logs_do_no(

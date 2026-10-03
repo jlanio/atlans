@@ -5,15 +5,15 @@ import { useEdges, useNodes, useStoreApi } from "@xyflow/react"
 import { TbAlertTriangle, TbCheck, TbCloudCheck, TbCloudOff, TbLoader, TbPencil } from "react-icons/tb"
 import { INodeContext } from "@/context/useFlowContext"
 import { useWorkflowSaveStore } from "@/app/stores/workflowSaveStore"
-import { montarPayloadDoGrafo, useSaveWorkflow } from "@/app/hooks/workflow/useSaveWorkflow"
+import { buildGraphPayload, useSaveWorkflow } from "@/app/hooks/workflow/useSaveWorkflow"
 import { rotuloDeSalvo } from "./utils/rotulo-de-salvo"
 import { cn } from "@/lib/utils"
 
 /** Inactivity required before comparing the graph with the last snapshot. */
-const ATRASO_DA_DETECCAO_MS = 300
+const DETECTION_DELAY_MS = 300
 
 /** How often "Salvo há N min" is recomputed while idle. */
-const TIQUE_DO_RELOGIO_MS = 30_000
+const CLOCK_TICK_MS = 30_000
 
 /**
  * Detects unsaved edits by comparing the graph with the last snapshot.
@@ -29,7 +29,7 @@ const TIQUE_DO_RELOGIO_MS = 30_000
  * Script or SQL nodes into a slideshow. The price is the label appearing up to
  * 300ms after the edit.
  */
-function useDeteccaoDeAlteracoes() {
+function useChangeDetection() {
   // Subscriptions only as a TRIGGER: what reads the graph is the `getState()`
   // further down, after the delay. This component renders nothing that depends
   // on them, so the cost per drag frame is an empty render and a reschedule.
@@ -43,10 +43,10 @@ function useDeteccaoDeAlteracoes() {
     if (!lastSavedSnapshot) return
 
     const timer = setTimeout(() => {
-      const { nodes: nosAtuais, edges: arestasAtuais } = flowStore.getState()
-      const { nodesReq, edgesReq } = montarPayloadDoGrafo(
-        nosAtuais as unknown as INodeContext[],
-        arestasAtuais,
+      const { nodes: currentNodes, edges: currentEdges } = flowStore.getState()
+      const { nodesReq, edgesReq } = buildGraphPayload(
+        currentNodes as unknown as INodeContext[],
+        currentEdges,
       )
       const store = useWorkflowSaveStore.getState()
 
@@ -76,23 +76,23 @@ function useDeteccaoDeAlteracoes() {
       // and downgraded "Falha ao salvar" to "Não salvo" right after the failure —
       // taking the retry button along with it.
       if (store.saveStatus === 'idle' || store.saveStatus === 'saved') store.setStatus('unsaved')
-    }, ATRASO_DA_DETECCAO_MS)
+    }, DETECTION_DELAY_MS)
 
     return () => clearTimeout(timer)
   }, [nodes, edges, workflowName, lastSavedSnapshot, flowStore])
 }
 
 /** Re-renders on every tick while `ativo`, so "há N min" doesn't go stale. */
-function useRelogio(ativo: boolean) {
-  const [, tique] = useReducer((n: number) => n + 1, 0)
+function useClock(ativo: boolean) {
+  const [, tick] = useReducer((n: number) => n + 1, 0)
   useEffect(() => {
     if (!ativo) return
-    const intervalo = setInterval(tique, TIQUE_DO_RELOGIO_MS)
+    const intervalo = setInterval(tick, CLOCK_TICK_MS)
     return () => clearInterval(intervalo)
   }, [ativo])
 }
 
-interface Rotulo {
+interface Label {
   texto: string
   icone: ReactNode
   classe: string
@@ -117,16 +117,16 @@ const GlobalSaveIndicator = () => {
   const lastSavedAt = useWorkflowSaveStore(s => s.lastSavedAt)
   const lastError = useWorkflowSaveStore(s => s.lastError)
   const { saveWorkflow } = useSaveWorkflow()
-  useDeteccaoDeAlteracoes()
+  useChangeDetection()
 
-  const emRepouso = status === 'idle' && lastSavedAt !== null
-  useRelogio(emRepouso)
+  const atRest = status === 'idle' && lastSavedAt !== null
+  useClock(atRest)
 
-  const rotulo: Rotulo | null = (() => {
+  const rotulo: Label | null = (() => {
     switch (status) {
       case 'idle':
         // With no known save (new workflow) there is nothing to state.
-        return emRepouso
+        return atRest
           ? { texto: rotuloDeSalvo(lastSavedAt), icone: <TbCloudCheck size={13} />, classe: "text-muted-foreground" }
           : null
       case 'unsaved':
@@ -150,7 +150,7 @@ const GlobalSaveIndicator = () => {
       // While idle the text changes by itself every minute; announcing that on a
       // screen reader would be a talking clock. The other states are responses
       // to a user action, and there the announcement is the feedback.
-      aria-live={emRepouso ? "off" : "polite"}
+      aria-live={atRest ? "off" : "polite"}
       title={status === 'error' ? lastError ?? undefined : undefined}
       data-save-status={status}
       className={cn(

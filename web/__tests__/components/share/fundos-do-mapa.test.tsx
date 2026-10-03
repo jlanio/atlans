@@ -9,17 +9,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, render, screen } from "@testing-library/react"
 import {
-  conjuntoDoFundo, FUNDOS_PADRAO, lerFundosDoAmbiente, RUAS_PADRAO,
+  conjuntoDoFundo, DEFAULT_BASEMAPS, lerFundosDoAmbiente, RUAS_PADRAO,
 } from "@/lib/fundos-do-mapa"
-import { FundosDoMapaProvider } from "@/app/components/share/fundos-do-mapa"
+import { MapBasemapsProvider } from "@/app/components/share/fundos-do-mapa"
 
 vi.mock("maplibre-gl/dist/maplibre-gl.css", () => ({}))
-const construido = vi.hoisted(() => ({ estilo: null as unknown }))
+const built = vi.hoisted(() => ({ estilo: null as unknown }))
 vi.mock("maplibre-gl", () => {
   class Mapa {
-    constructor(opcoes: { style: unknown }) { construido.estilo = opcoes.style }
+    constructor(opcoes: { style: unknown }) { built.estilo = opcoes.style }
     on() {} once() {} off() {} addControl() {} removeControl() {} remove() {}
-    getStyle() { return construido.estilo }
+    getStyle() { return built.estilo }
     isStyleLoaded() { return false }
     getCanvas() { return { style: {} } }
     setProjection() {}
@@ -41,8 +41,8 @@ type Estilo = { sources: { basemap: { tiles: string[]; attribution: string } } }
 
 describe("lerFundosDoAmbiente", () => {
   it("sem variável nenhuma, só as ruas do OpenStreetMap", () => {
-    expect(lerFundosDoAmbiente({})).toEqual(FUNDOS_PADRAO)
-    expect(FUNDOS_PADRAO.ruas).toBe(RUAS_PADRAO)
+    expect(lerFundosDoAmbiente({})).toEqual(DEFAULT_BASEMAPS)
+    expect(DEFAULT_BASEMAPS.ruas).toBe(RUAS_PADRAO)
     expect(RUAS_PADRAO.url).toContain("tile.openstreetmap.org")
   })
 
@@ -62,7 +62,7 @@ describe("lerFundosDoAmbiente", () => {
   it("uma URL que não é template de tiles é ignorada (e as ruas voltam ao padrão)", () => {
     const erro = vi.spyOn(console, "error").mockImplementation(() => {})
     expect(lerFundosDoAmbiente({ MAPA_RUAS_URL: "https://ruas.example.org/tiles", MAPA_SATELITE_URL: "javascript:alert(1)//{z}{x}{y}" }))
-      .toEqual(FUNDOS_PADRAO)
+      .toEqual(DEFAULT_BASEMAPS)
     expect(erro).toHaveBeenCalledTimes(2)
     erro.mockRestore()
   })
@@ -71,13 +71,13 @@ describe("lerFundosDoAmbiente", () => {
 describe("conjuntoDoFundo", () => {
   const sat = { url: "https://sat.example.org/{z}/{x}/{y}.jpg", credito: "© Sat <b>" }
   it("o híbrido cai no satélite, e o satélite nas ruas, sem configuração", () => {
-    expect(conjuntoDoFundo(FUNDOS_PADRAO, "hybrid").tiles).toEqual([RUAS_PADRAO.url])
-    expect(conjuntoDoFundo(FUNDOS_PADRAO, "satellite").tiles).toEqual([RUAS_PADRAO.url])
-    expect(conjuntoDoFundo({ ...FUNDOS_PADRAO, satelite: sat }, "hybrid").tiles).toEqual([sat.url])
+    expect(conjuntoDoFundo(DEFAULT_BASEMAPS, "hybrid").tiles).toEqual([RUAS_PADRAO.url])
+    expect(conjuntoDoFundo(DEFAULT_BASEMAPS, "satellite").tiles).toEqual([RUAS_PADRAO.url])
+    expect(conjuntoDoFundo({ ...DEFAULT_BASEMAPS, satelite: sat }, "hybrid").tiles).toEqual([sat.url])
   })
 
   it("o crédito vai escapado: o MapLibre o desenha como HTML", () => {
-    expect(conjuntoDoFundo({ ...FUNDOS_PADRAO, satelite: sat }, "satellite").attribution).toBe("© Sat &lt;b&gt;")
+    expect(conjuntoDoFundo({ ...DEFAULT_BASEMAPS, satelite: sat }, "satellite").attribution).toBe("© Sat &lt;b&gt;")
   })
 })
 
@@ -85,19 +85,19 @@ describe("o mapa sem satélite configurado", () => {
   it("o portal não oferece o alternador: os dois lados seriam o mesmo mapa", () => {
     render(<MapLibreMap layers={[]} />)
     expect(screen.queryByRole("button", { name: "Satélite" })).toBeNull()
-    expect((construido.estilo as Estilo).sources.basemap.tiles[0]).toContain("tile.openstreetmap.org")
+    expect((built.estilo as Estilo).sources.basemap.tiles[0]).toContain("tile.openstreetmap.org")
   })
 
   it("a Home (híbrido) nasce nas ruas", () => {
     render(<MapLibreMap layers={[]} basemapInicial="hybrid" basemapToggle={false} />)
-    expect((construido.estilo as Estilo).sources.basemap.tiles[0]).toContain("tile.openstreetmap.org")
+    expect((built.estilo as Estilo).sources.basemap.tiles[0]).toContain("tile.openstreetmap.org")
   })
 
   it("com o satélite da instalação no contexto, o alternador volta", () => {
     render(
-      <FundosDoMapaProvider fundos={{ ...FUNDOS_PADRAO, satelite: { url: "https://sat.example.org/{z}/{x}/{y}.jpg", credito: "© Sat" } }}>
+      <MapBasemapsProvider fundos={{ ...DEFAULT_BASEMAPS, satelite: { url: "https://sat.example.org/{z}/{x}/{y}.jpg", credito: "© Sat" } }}>
         <MapLibreMap layers={[]} />
-      </FundosDoMapaProvider>,
+      </MapBasemapsProvider>,
     )
     expect(screen.getByRole("button", { name: "Satélite" })).toBeTruthy()
   })

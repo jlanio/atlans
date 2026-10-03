@@ -95,11 +95,11 @@ async def get_users_by_ids(db: AsyncSession, ids: list[str]) -> dict[str, User]:
     return {u.id_hash: u for u in result.scalars().all()}
 
 
-async def _revogar_executores(db: AsyncSession, users: list[User], *, motivo: str) -> list:
+async def _revoke_executors(db: AsyncSession, users: list[User], *, motivo: str) -> list:
     """Audit (SEG-16): each account's executors go down with it, in the caller's
     transaction — otherwise they stayed connected, receiving jobs with code and
     credentials and renewing their own cert. Status revoked, cert voided and,
-    after the commit (`executor_service.concluir_revogacoes`), blacklist,
+    after the commit (`executor_service.complete_revocations`), blacklist,
     `control: revoked` and the session dropped.
 
     The policy tiers stay (`desanexar=False`): the executor may be in the
@@ -126,12 +126,12 @@ async def bulk_suspend(
         user.suspended_at = now
     # Cascade: a suspended account must not keep acting through an agent. Same
     # transaction (the service does NOT commit — the commit below closes both).
-    from app.services.api_token_service import revogar_todos_do_usuario
+    from app.services.api_token_service import revoke_all_for_user
 
-    await revogar_todos_do_usuario(db, [u.id_hash for u in users], motivo="user_suspended")
-    revogados = await _revogar_executores(db, users, motivo="user_suspended")
+    await revoke_all_for_user(db, [u.id_hash for u in users], motivo="user_suspended")
+    revogados = await _revoke_executors(db, users, motivo="user_suspended")
     await db.commit()
-    await executor_service.concluir_revogacoes(revogados)
+    await executor_service.complete_revocations(revogados)
     logger.info(
         "%d usuario(s) suspenso(s) em lote por '%s'. Motivo: %s | alvos: %s",
         len(users), por or "?", motivo or "(nao informado)",
@@ -156,12 +156,12 @@ async def bulk_soft_delete(db: AsyncSession, users: list[User]) -> None:
     for user in users:
         user.status = "deleted"
         user.deleted_at = now
-    from app.services.api_token_service import revogar_todos_do_usuario
+    from app.services.api_token_service import revoke_all_for_user
 
-    await revogar_todos_do_usuario(db, [u.id_hash for u in users], motivo="user_deleted")
-    revogados = await _revogar_executores(db, users, motivo="user_deleted")
+    await revoke_all_for_user(db, [u.id_hash for u in users], motivo="user_deleted")
+    revogados = await _revoke_executors(db, users, motivo="user_deleted")
     await db.commit()
-    await executor_service.concluir_revogacoes(revogados)
+    await executor_service.complete_revocations(revogados)
     logger.info("%d usuario(s) deletado(s) em lote.", len(users))
 
 
@@ -185,12 +185,12 @@ async def suspend_user(
     """
     user.status = "suspended"
     user.suspended_at = utc_now_naive()
-    from app.services.api_token_service import revogar_todos_do_usuario
+    from app.services.api_token_service import revoke_all_for_user
 
-    await revogar_todos_do_usuario(db, [user.id_hash], motivo="user_suspended")
-    revogados = await _revogar_executores(db, [user], motivo="user_suspended")
+    await revoke_all_for_user(db, [user.id_hash], motivo="user_suspended")
+    revogados = await _revoke_executors(db, [user], motivo="user_suspended")
     await db.commit()
-    await executor_service.concluir_revogacoes(revogados)
+    await executor_service.complete_revocations(revogados)
     await db.refresh(user)
     logger.info(
         "Usuário '%s' suspenso por '%s' (executores revogados: %d). Motivo: %s",
@@ -213,12 +213,12 @@ async def soft_delete_user(db: AsyncSession, user: User) -> User:
     """Marks a user as deleted (soft delete)."""
     user.status = "deleted"
     user.deleted_at = utc_now_naive()
-    from app.services.api_token_service import revogar_todos_do_usuario
+    from app.services.api_token_service import revoke_all_for_user
 
-    await revogar_todos_do_usuario(db, [user.id_hash], motivo="user_deleted")
-    revogados = await _revogar_executores(db, [user], motivo="user_deleted")
+    await revoke_all_for_user(db, [user.id_hash], motivo="user_deleted")
+    revogados = await _revoke_executors(db, [user], motivo="user_deleted")
     await db.commit()
-    await executor_service.concluir_revogacoes(revogados)
+    await executor_service.complete_revocations(revogados)
     await db.refresh(user)
     logger.info(
         "Usuário '%s' marcado como deletado (executores revogados: %d).",
