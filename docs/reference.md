@@ -86,7 +86,7 @@ The `docker-compose.yml` does **not** include PostgreSQL — the database is ext
 | `redis` | `valkey/valkey:8-alpine` (`REDIS_IMAGE`) | — (internal) | Cache and pub/sub |
 | `api` | `Dockerfile.api` | `8000` | FastAPI with hot reload |
 | `web-dev` | `web/Dockerfile.ui` | `3000` | Next.js in dev mode |
-| `minio` | `minio/minio` | `9000` / `9001` | S3 object storage + console |
+| `minio` | `pgsty/minio` | `9000` / `9001` | S3 object storage + console |
 
 ### Production (`--profile prod`)
 
@@ -97,7 +97,7 @@ The `docker-compose.yml` does **not** include PostgreSQL — the database is ext
 | `web-prod` | `web/Dockerfile.ui` | — (via Traefik) | Optimized Next.js build |
 | `step-ca` | `smallstep/step-ca:0.27.0` | `9000` (internal) | Internal CA that issues the executors' mTLS certs |
 | `traefik` | `traefik:v3.6` | `80` / `443` | Reverse proxy + TLS + mTLS termination |
-| `minio` | `minio/minio` | — (via Traefik) | S3 object storage |
+| `minio` | `pgsty/minio` | — (via Traefik) | S3 object storage |
 
 ### Docker Networks
 
