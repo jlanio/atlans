@@ -1,6 +1,6 @@
 .PHONY: bootstrap bootstrap-stepca smoke seed-admin backup-stepca \
         up-dev up-dev-no-executor up-prod down logs logs-dev logs-prod restart restart-prod \
-        build-dev build-prod
+        build-dev build-prod check-db
 
 # Dev comes with the local executor (profile executor-local): it enrolls and
 # connects on its own, so workflows run without creating one by hand. See
@@ -23,6 +23,14 @@ bootstrap-stepca:
 
 smoke:
 	./scripts/smoke.sh
+
+# Checks DATABASE_URL with the API's own code (driver, TLS): the connection, the
+# login, the postgis/uuid-ossp extensions and the schema. Read-only, and it does
+# not need the API up: a throwaway container from its image. In production,
+# `make check-db SERVICE=api-prod`.
+SERVICE ?= api
+check-db:
+	docker compose $(TODOS_OS_PERFIS) run --rm --no-deps $(SERVICE) python -m app.cli check-db
 
 seed-admin:
 	docker compose exec api-prod python -m app.cli create-admin

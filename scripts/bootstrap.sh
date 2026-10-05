@@ -215,6 +215,59 @@ urlencode() {
     printf '%s' "$saida"
 }
 
+# Tests the database answers before writing them, from a throwaway container:
+# the same network path the API takes (host.docker.internal is the host, via
+# host-gateway). psql speaks libpq and the API asyncpg, so sslmode is passed
+# explicitly to behave like the API: no TLS is `disable`, as in app/core/db.py.
+# The password goes in the environment, never on the command line.
+# Returns 0 (ok), 1 (the database refused) or 2 (could not test from here).
+IMAGEM_PSQL="postgres:16-alpine"
+CONSULTA_BANCO="SELECT current_user || '|' || (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) || '|' || coalesce((SELECT string_agg(extname, ',') FROM pg_extension WHERE extname IN ('postgis', 'uuid-ossp')), '') || '|' || (SELECT count(*) FROM pg_available_extensions WHERE name = 'postgis')"
+testar_banco() {  # <host> <porta> <banco> <usuario> <senha> <tls>
+    local ssl saida usuario super instaladas disponivel
+    case "$6" in
+        require) ssl="sslmode=require" ;;
+        verify-full) ssl="sslmode=verify-full&sslrootcert=system" ;;
+        *) ssl="sslmode=disable" ;;
+    esac
+    if ! docker image inspect "$IMAGEM_PSQL" >/dev/null 2>&1 \
+        && ! docker pull -q "$IMAGEM_PSQL" >/dev/null 2>&1; then
+        warn "Nao consegui baixar a imagem $IMAGEM_PSQL para testar o banco daqui. Depois do make up-dev, rode: make check-db"
+        return 2
+    fi
+    if ! saida="$(PGPASSWORD="$5" docker run --rm -e PGPASSWORD -e PGCONNECT_TIMEOUT=10 \
+            --add-host host.docker.internal:host-gateway "$IMAGEM_PSQL" \
+            psql "postgresql://$(urlencode "$4")@$1:$2/$(urlencode "$3")?${ssl}" \
+            -XtAq -v ON_ERROR_STOP=1 -c "$CONSULTA_BANCO" 2>&1)"; then
+        # psql's first error line says what failed; the last one is a generic hint.
+        err "O banco recusou: $(printf '%s' "$saida" | grep -m 1 -E 'error:|FATAL' || printf '%s' "$saida" | tail -n 1)"
+        case "$saida" in
+            *pg_hba.conf*) warn "Libere a rede do Docker (dentro de 172.16.0.0/12) no pg_hba.conf do Postgres e recarregue-o." ;;
+            *LDAP*) warn "Autenticacao por LDAP: confira a senha e se a conta nao esta bloqueada ou expirada no diretorio." ;;
+            *"password authentication failed"*) warn "Usuario ou senha errados." ;;
+            *"does not exist"*) warn "O banco (ou o usuario) nao existe: crie-o ou corrija o nome." ;;
+            *"could not translate host name"*) warn "O host nao resolve. Postgres nesta maquina e host.docker.internal, nao localhost." ;;
+            *"Connection refused"*) warn "Nada escuta nesse host e porta: o Postgres esta de pe e ouvindo na interface do Docker (listen_addresses)? Postgres nesta maquina e host.docker.internal, nao localhost." ;;
+            *timeout*|*"timed out"*) warn "Sem resposta: um firewall, ou o host errado." ;;
+        esac
+        return 1
+    fi
+    IFS='|' read -r usuario super instaladas disponivel <<< "$(printf '%s' "$saida" | tail -n 1)"
+    ok "Conexao com o banco OK, como ${usuario}."
+    case ",$instaladas," in
+        *,postgis,*) case ",$instaladas," in *,uuid-ossp,*) ok "Extensoes postgis e uuid-ossp ja instaladas."; return 0 ;; esac ;;
+    esac
+    if [ "$disponivel" = "0" ]; then
+        warn "O servidor nao tem o PostGIS instalado no sistema: instale o pacote (Debian/Ubuntu: postgresql-<versao>-postgis-3) no servidor do banco."
+    elif [ "$super" = "true" ]; then
+        log "Faltam extensoes, mas ${usuario} e superusuario: a primeira migracao as cria."
+    else
+        warn "Faltam extensoes, e ${usuario} nao e superusuario: a migracao vai parar em 'permission denied to create extension'. Uma vez, como superusuario:"
+        warn "  psql -d $3 -c 'CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";'"
+    fi
+    return 0
+}
+
 if [ "$PERGUNTAR" = "1" ] && env_get DATABASE_URL | grep -q '<usuario>'; then
     echo
     log "Configuracao inicial. Enter aceita o valor entre colchetes; --no-prompt pula esta etapa."
@@ -222,16 +275,33 @@ if [ "$PERGUNTAR" = "1" ] && env_get DATABASE_URL | grep -q '<usuario>'; then
 
     echo
     log "Banco PostgreSQL (com PostGIS). Na mesma maquina, use host.docker.internal: dentro do container, localhost e o proprio container."
-    DB_HOST="$(perguntar_host "Host" "host.docker.internal")"
+    DB_HOST="host.docker.internal"; DB_PORTA="5432"; DB_NOME="atlans"; DB_USUARIO="atlans"; DB_TLS="nao"
     while :; do
-        DB_PORTA="$(perguntar "Porta" "5432")"
-        printf '%s' "$DB_PORTA" | grep -qE '^[0-9]{1,5}$' && break
-        printf '  Um numero de porta.\n' >&2
+        # The answers of a failed try are the defaults of the next one.
+        DB_HOST="$(perguntar_host "Host" "$DB_HOST")"
+        while :; do
+            DB_PORTA="$(perguntar "Porta" "$DB_PORTA")"
+            printf '%s' "$DB_PORTA" | grep -qE '^[0-9]{1,5}$' && break
+            printf '  Um numero de porta.\n' >&2
+        done
+        DB_NOME="$(perguntar "Nome do banco" "$DB_NOME")"
+        DB_USUARIO="$(perguntar "Usuario" "$DB_USUARIO")"
+        DB_SENHA="$(perguntar_segredo "Senha")"
+        DB_TLS="$(perguntar_opcao "TLS na conexao" "$DB_TLS" nao require verify-full)"
+        while :; do
+            log "Testando a conexao com o banco..."
+            set +e
+            testar_banco "$DB_HOST" "$DB_PORTA" "$DB_NOME" "$DB_USUARIO" "$DB_SENHA" "$DB_TLS"
+            RESULTADO=$?
+            set -e
+            [ "$RESULTADO" != "1" ] && break 2
+            case "$(perguntar_opcao "E agora" "corrigir" corrigir tentar gravar)" in
+                corrigir) break ;;
+                tentar) ;;
+                gravar) break 2 ;;
+            esac
+        done
     done
-    DB_NOME="$(perguntar "Nome do banco" "atlans")"
-    DB_USUARIO="$(perguntar "Usuario" "atlans")"
-    DB_SENHA="$(perguntar_segredo "Senha")"
-    DB_TLS="$(perguntar_opcao "TLS na conexao" "nao" nao require verify-full)"
     DATABASE_URL="postgresql+asyncpg://$(urlencode "$DB_USUARIO"):$(urlencode "$DB_SENHA")@${DB_HOST}:${DB_PORTA}/$(urlencode "$DB_NOME")"
     [ "$DB_TLS" != "nao" ] && DATABASE_URL="${DATABASE_URL}?ssl=${DB_TLS}"
     upsert_env .env DATABASE_URL "$DATABASE_URL"
@@ -461,6 +531,7 @@ cat <<'EOF'
   5. Suba:
        make up-dev     # dev, ja com um executor local (cadastro automatico)
        make up-prod    # prod
+       make check-db   # o banco, conferido com o codigo da API (prod: SERVICE=api-prod)
        docker compose exec api alembic upgrade head        # dev (prod: api-prod)
        ./scripts/bootstrap-stepca.sh   # apenas prod, apos step-ca healthy
        make smoke

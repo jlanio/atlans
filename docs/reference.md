@@ -475,6 +475,7 @@ The API exposes aggregated run metrics (general, per workflow, per executor and 
 | `make bootstrap-stepca` | Captures fingerprint + intermediate, raises step-ca's certificate lifetime and issues the `AGENTS_HOST` cert |
 | `make up-dev` / `make up-prod` | Starts the stack in dev (hot reload, with the [local executor](#local-executor-development)) / prod (Traefik + TLS) |
 | `make up-dev-no-executor` | Starts dev without the local executor |
+| `make check-db` | Checks `DATABASE_URL` with the API's own code: connection, login, the postgis/uuid-ossp extensions and the schema (read-only; `SERVICE=api-prod` in production) |
 | `make down` | Stops and removes the containers of every profile (the volumes stay) |
 | `make logs` / `logs-dev` / `logs-prod` | Real-time logs (last 100 lines) |
 | `make restart` / `restart-prod` | Restarts the dev / prod stack |

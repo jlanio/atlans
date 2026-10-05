@@ -46,7 +46,7 @@ You need **Docker** (with Compose v2.17 or newer), **make**, **openssl** and a *
 git clone https://github.com/jlanio/atlans-studio.git atlans
 cd atlans
 
-make bootstrap      # asks for your Postgres and creates .env with strong secrets
+make bootstrap      # asks for your Postgres, tests the connection, and creates .env with strong secrets
 # Postgres on this same machine is host.docker.internal (the suggested default), not localhost.
 # To fill .env by hand instead: make bootstrap ARGS=--no-prompt
 # Create the postgis and uuid-ossp extensions once, as a superuser (the Atlans user does not need to be one):
@@ -58,6 +58,17 @@ docker compose exec api python -m app.cli create-admin       # creates your firs
 ```
 
 Then open **http://localhost:3000** and sign in. 🎉
+
+**Something wrong with the database?** `make check-db` checks it the way the API uses it and says what to fix: whether it connects, the login (password, LDAP, `pg_hba.conf`), the postgis and uuid-ossp extensions, and whether the schema was created. It changes nothing, and it works even with the API down. `make bootstrap` runs the same kind of test right after you answer, and lets you correct the answers before it writes them.
+
+| Command | What it does |
+|---|---|
+| `make bootstrap` | Creates `.env` and the secrets, asks for the database (and, for production, the domain and the e-mail) and tests it |
+| `make bootstrap ARGS=--no-prompt` | The same, without questions: you edit `.env` by hand |
+| `make up-dev` | Starts Atlans for development, with the local executor |
+| `make up-dev-no-executor` | Starts it without the local executor |
+| `make check-db` | Checks the database connection, the extensions and the schema |
+| `make down` | Stops everything (the data stays) |
 
 Going to a real server, with HTTPS and your own domain? Follow the step-by-step guide in [docs/self-hosting.md](docs/self-hosting.md).
 

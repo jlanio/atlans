@@ -671,7 +671,14 @@ docker compose --profile prod logs api-prod --tail 100 | grep -iE 'mtls|cert'
 
 ```bash
 docker compose --profile prod logs api-prod --tail 50
+make check-db SERVICE=api-prod   # the database, checked with the API's own code
 ```
+
+`make check-db` runs in a throwaway container of the API image, so it works
+with the API down: it says whether the connection and the login work (wrong
+password, LDAP refusing the account, `pg_hba.conf` without the Docker range,
+nothing listening, TLS), whether postgis and uuid-ossp are installed or this
+user can create them, and whether the schema was migrated. It only reads.
 
 Common causes:
 - **Schema not migrated** — startup does **not** run migrations (see

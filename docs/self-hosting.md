@@ -75,8 +75,12 @@ On a terminal it also asks what only you know, and writes it to the `.env`:
 choose `prod`, then the database (its URL is assembled with the password
 encoded), the three host names (it derives `FRONTEND_URL`, `AUTH_URL`,
 `ALLOWED_ORIGINS`, `MINIO_EXTERNAL_ENDPOINT` and `MINIO_API_CORS_ALLOW_ORIGIN`
-from them) and the e-mail transport (Resend or SMTP). It asks only while
-`DATABASE_URL` is still the example: a second run asks nothing.
+from them) and the e-mail transport (Resend or SMTP). It tests the database
+right after the answers, from a throwaway container on the same network path as
+the API (connection, login, and whether the extensions are there or can be
+created), and lets you correct them before writing. It asks only while
+`DATABASE_URL` is still the example: a second run asks nothing. Later,
+`make check-db SERVICE=api-prod` repeats the database check with the API's own code.
 `make bootstrap ARGS=--no-prompt`, or running it without a terminal, skips the
 questions, and the next section is then all by hand.
 
