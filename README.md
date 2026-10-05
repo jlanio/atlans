@@ -10,6 +10,10 @@
   <img src="https://img.shields.io/badge/built%20with-PostGIS-4169E1?logo=postgresql&logoColor=white" alt="Built with PostGIS"/>
 </p>
 
+<p align="center">
+  <img src="docs/media/atlans-hero.webp" width="100%" alt="A workflow running in the Atlans editor: a Python script, Buffer, Dissolve, Compute Area and a map output, each block lighting up as it runs"/>
+</p>
+
 ---
 
 ## What is Atlans?
