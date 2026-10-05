@@ -5,8 +5,15 @@
 #   - creates the directories secrets/, traefik/atlans-ca/, certs/, backups/
 #   - generates secrets/stepca_password.txt
 #   - copies .env.example -> .env and replaces the dev placeholders with strong secrets
+#   - asks for what only you know (the database; in production, the domain and
+#     the e-mail transport) and writes it to .env
 #
-# Idempotent: running it twice does not destroy anything created before.
+# Usage: ./scripts/bootstrap.sh [--no-prompt]   (make bootstrap ARGS=--no-prompt)
+#   --no-prompt  asks nothing: .env keeps the example values, to edit by hand.
+#                Without a terminal (CI, a pipe) it never asks either.
+#
+# Idempotent: running it twice does not destroy anything created before, and it
+# only asks for what is still the example value.
 
 set -euo pipefail
 
@@ -17,6 +24,23 @@ log()  { printf '\033[1;36m[bootstrap]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[bootstrap]\033[0m %s\n' "$*"; }
 err()  { printf '\033[1;31m[bootstrap]\033[0m %s\n' "$*" >&2; }
 ok()   { printf '\033[1;32m[bootstrap]\033[0m %s\n' "$*"; }
+
+PERGUNTAR=1
+for arg in "$@"; do
+    case "$arg" in
+        --no-prompt) PERGUNTAR=0 ;;
+        -h|--help)
+            sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0 ;;
+        *)
+            err "Opcao desconhecida: $arg (use --help)."
+            exit 2 ;;
+    esac
+done
+# No terminal (CI, a pipe): never ask.
+if [ ! -t 0 ] || [ ! -t 1 ]; then
+    PERGUNTAR=0
+fi
 
 # ── 1. Verificar pre-requisitos ──────────────────────────────────────────────
 if ! command -v docker >/dev/null 2>&1; then
@@ -89,6 +113,20 @@ upsert_env() {
     fi
 }
 
+# Literal value, in single quotes: neither compose nor python-dotenv expands a
+# `$` there. For what the person types (an SMTP password), not for generated values.
+upsert_env_literal() {
+    local file="$1" key="$2" value="$3"
+    grep -vE "^${key}=" "$file" > "$file.tmp" || true
+    [ -s "$file.tmp" ] && [ -n "$(tail -c 1 "$file.tmp")" ] && printf '\n' >> "$file.tmp"
+    printf "%s='%s'\n" "$key" "$value" >> "$file.tmp"
+    cat "$file.tmp" > "$file" && rm -f "$file.tmp"
+}
+
+env_get() {
+    grep -E "^$1=" .env 2>/dev/null | tail -n 1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' || true
+}
+
 gen_secret() { openssl rand -base64 32 | tr -d '\n'; }
 
 if [ -f .env ]; then
@@ -105,9 +143,230 @@ else
     upsert_env .env AUTH_SECRET                 "$(gen_secret)"
     upsert_env .env REDIS_PASSWORD              "$(openssl rand -hex 32)"
     upsert_env .env MINIO_ROOT_PASSWORD         "$(gen_secret)"
+    # The user too: `change-me` is public (it is in .env.example), and nobody
+    # types it, since the API and MinIO read it from the same .env. Only on a
+    # new .env: on a MinIO that already has data, changing it is not harmless.
+    upsert_env .env MINIO_ROOT_USER             "atlans-$(openssl rand -hex 6)"
     upsert_env .env STEPCA_PROVISIONER_PASSWORD "$STEPCA_PASS"
 
     ok ".env gerado com secrets novos. NUNCA commite este arquivo."
+fi
+
+# ── 5b. What only you know ───────────────────────────────────────────────────
+# Asked only on a terminal, and only while DATABASE_URL is still the example:
+# a second run asks nothing. Enter takes the value in brackets.
+perguntar() {  # <texto> [padrao]: the answer, never empty
+    local resposta
+    while :; do
+        if [ -n "${2:-}" ]; then
+            read -r -p "  $1 [$2]: " resposta </dev/tty
+            resposta="${resposta:-$2}"
+        else
+            read -r -p "  $1: " resposta </dev/tty
+        fi
+        [ -n "$resposta" ] && break
+    done
+    printf '%s' "$resposta"
+}
+perguntar_opcional() {  # <texto>: the answer, maybe empty
+    local resposta
+    read -r -p "  $1 (Enter para deixar vazio): " resposta </dev/tty
+    printf '%s' "$resposta"
+}
+perguntar_segredo() {  # <texto>: not echoed, never empty
+    local resposta
+    while :; do
+        read -r -s -p "  $1: " resposta </dev/tty
+        printf '\n' >&2
+        [ -n "$resposta" ] && break
+    done
+    printf '%s' "$resposta"
+}
+perguntar_opcao() {  # <texto> <padrao> <opcao>...: one of the options
+    local texto="$1" padrao="$2" resposta opcao
+    shift 2
+    while :; do
+        resposta="$(perguntar "$texto ($(IFS=/; echo "$*"))" "$padrao")"
+        for opcao in "$@"; do
+            [ "$resposta" = "$opcao" ] && { printf '%s' "$resposta"; return; }
+        done
+        printf '  Responda %s.\n' "$(IFS=,; echo "$*")" >&2
+    done
+}
+perguntar_host() {  # <texto> [padrao]: a host name, without scheme or path
+    local resposta
+    while :; do
+        resposta="$(perguntar "$1" "${2:-}")"
+        printf '%s' "$resposta" | grep -qE '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$' && break
+        printf '  So o nome do host (ex.: atlans.exemplo.org), sem https:// nem barra.\n' >&2
+    done
+    printf '%s' "$resposta"
+}
+# Percent-encodes a URL component: a password with @ : / # % ? breaks the URL.
+urlencode() {
+    local LC_ALL=C texto="$1" i c saida=""
+    for (( i = 0; i < ${#texto}; i++ )); do
+        c="${texto:i:1}"
+        case "$c" in
+            [A-Za-z0-9.~_-]) saida+="$c" ;;
+            *) saida+="$(printf '%%%02X' "'$c")" ;;
+        esac
+    done
+    printf '%s' "$saida"
+}
+
+# Tests the database answers before writing them, from a throwaway container:
+# the same network path the API takes (host.docker.internal is the host, via
+# host-gateway). psql speaks libpq and the API asyncpg, so sslmode is passed
+# explicitly to behave like the API: no TLS is `disable`, as in app/core/db.py.
+# The password goes in the environment, never on the command line.
+# Returns 0 (ok), 1 (the database refused) or 2 (could not test from here).
+IMAGEM_PSQL="postgres:16-alpine"
+CONSULTA_BANCO="SELECT current_user || '|' || (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) || '|' || coalesce((SELECT string_agg(extname, ',') FROM pg_extension WHERE extname IN ('postgis', 'uuid-ossp')), '') || '|' || (SELECT count(*) FROM pg_available_extensions WHERE name = 'postgis')"
+testar_banco() {  # <host> <porta> <banco> <usuario> <senha> <tls>
+    local ssl saida usuario super instaladas disponivel
+    case "$6" in
+        require) ssl="sslmode=require" ;;
+        verify-full) ssl="sslmode=verify-full&sslrootcert=system" ;;
+        *) ssl="sslmode=disable" ;;
+    esac
+    if ! docker image inspect "$IMAGEM_PSQL" >/dev/null 2>&1 \
+        && ! docker pull -q "$IMAGEM_PSQL" >/dev/null 2>&1; then
+        warn "Nao consegui baixar a imagem $IMAGEM_PSQL para testar o banco daqui. Depois do make up-dev, rode: make check-db"
+        return 2
+    fi
+    if ! saida="$(PGPASSWORD="$5" docker run --rm -e PGPASSWORD -e PGCONNECT_TIMEOUT=10 \
+            --add-host host.docker.internal:host-gateway "$IMAGEM_PSQL" \
+            psql "postgresql://$(urlencode "$4")@$1:$2/$(urlencode "$3")?${ssl}" \
+            -XtAq -v ON_ERROR_STOP=1 -c "$CONSULTA_BANCO" 2>&1)"; then
+        # psql's first error line says what failed; the last one is a generic hint.
+        err "O banco recusou: $(printf '%s' "$saida" | grep -m 1 -E 'error:|FATAL' || printf '%s' "$saida" | tail -n 1)"
+        case "$saida" in
+            *pg_hba.conf*) warn "Libere a rede do Docker (dentro de 172.16.0.0/12) no pg_hba.conf do Postgres e recarregue-o." ;;
+            *LDAP*) warn "Autenticacao por LDAP: confira a senha e se a conta nao esta bloqueada ou expirada no diretorio." ;;
+            *"password authentication failed"*) warn "Usuario ou senha errados." ;;
+            *"does not exist"*) warn "O banco (ou o usuario) nao existe: crie-o ou corrija o nome." ;;
+            *"could not translate host name"*) warn "O host nao resolve. Postgres nesta maquina e host.docker.internal, nao localhost." ;;
+            *"Connection refused"*) warn "Nada escuta nesse host e porta: o Postgres esta de pe e ouvindo na interface do Docker (listen_addresses)? Postgres nesta maquina e host.docker.internal, nao localhost." ;;
+            *timeout*|*"timed out"*) warn "Sem resposta: um firewall, ou o host errado." ;;
+        esac
+        return 1
+    fi
+    IFS='|' read -r usuario super instaladas disponivel <<< "$(printf '%s' "$saida" | tail -n 1)"
+    ok "Conexao com o banco OK, como ${usuario}."
+    case ",$instaladas," in
+        *,postgis,*) case ",$instaladas," in *,uuid-ossp,*) ok "Extensoes postgis e uuid-ossp ja instaladas."; return 0 ;; esac ;;
+    esac
+    if [ "$disponivel" = "0" ]; then
+        warn "O servidor nao tem o PostGIS instalado no sistema: instale o pacote (Debian/Ubuntu: postgresql-<versao>-postgis-3) no servidor do banco."
+    elif [ "$super" = "true" ]; then
+        log "Faltam extensoes, mas ${usuario} e superusuario: a primeira migracao as cria."
+    else
+        warn "Faltam extensoes, e ${usuario} nao e superusuario: a migracao vai parar em 'permission denied to create extension'. Uma vez, como superusuario:"
+        warn "  psql -d $3 -c 'CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";'"
+    fi
+    return 0
+}
+
+if [ "$PERGUNTAR" = "1" ] && env_get DATABASE_URL | grep -q '<usuario>'; then
+    echo
+    log "Configuracao inicial. Enter aceita o valor entre colchetes; --no-prompt pula esta etapa."
+    MODO="$(perguntar_opcao "Instalacao" "dev" dev prod)"
+
+    echo
+    log "Banco PostgreSQL (com PostGIS). Na mesma maquina, use host.docker.internal: dentro do container, localhost e o proprio container."
+    DB_HOST="host.docker.internal"; DB_PORTA="5432"; DB_NOME="atlans"; DB_USUARIO="atlans"; DB_TLS="nao"
+    while :; do
+        # The answers of a failed try are the defaults of the next one.
+        DB_HOST="$(perguntar_host "Host" "$DB_HOST")"
+        while :; do
+            DB_PORTA="$(perguntar "Porta" "$DB_PORTA")"
+            printf '%s' "$DB_PORTA" | grep -qE '^[0-9]{1,5}$' && break
+            printf '  Um numero de porta.\n' >&2
+        done
+        DB_NOME="$(perguntar "Nome do banco" "$DB_NOME")"
+        DB_USUARIO="$(perguntar "Usuario" "$DB_USUARIO")"
+        DB_SENHA="$(perguntar_segredo "Senha")"
+        DB_TLS="$(perguntar_opcao "TLS na conexao" "$DB_TLS" nao require verify-full)"
+        while :; do
+            log "Testando a conexao com o banco..."
+            set +e
+            testar_banco "$DB_HOST" "$DB_PORTA" "$DB_NOME" "$DB_USUARIO" "$DB_SENHA" "$DB_TLS"
+            RESULTADO=$?
+            set -e
+            [ "$RESULTADO" != "1" ] && break 2
+            case "$(perguntar_opcao "E agora" "corrigir" corrigir tentar gravar)" in
+                corrigir) break ;;
+                tentar) ;;
+                gravar) break 2 ;;
+            esac
+        done
+    done
+    DATABASE_URL="postgresql+asyncpg://$(urlencode "$DB_USUARIO"):$(urlencode "$DB_SENHA")@${DB_HOST}:${DB_PORTA}/$(urlencode "$DB_NOME")"
+    [ "$DB_TLS" != "nao" ] && DATABASE_URL="${DATABASE_URL}?ssl=${DB_TLS}"
+    upsert_env .env DATABASE_URL "$DATABASE_URL"
+    unset DB_SENHA DATABASE_URL
+    ok "DATABASE_URL gravado (a senha vai codificada na URL)."
+
+    if [ "$MODO" = "prod" ]; then
+        echo
+        log "Os tres nomes do dominio, cada um com DNS para este servidor (docs/self-hosting.md)."
+        PUBLIC="$(perguntar_host "Site (PUBLIC_HOST)")"
+        AGENTS="$(perguntar_host "Executores (AGENTS_HOST, nunca atras de CDN)" "agents.${PUBLIC}")"
+        S3="$(perguntar_host "Arquivos (S3_HOST)" "s3.${PUBLIC}")"
+        upsert_env .env PUBLIC_HOST "$PUBLIC"
+        upsert_env .env AGENTS_HOST "$AGENTS"
+        upsert_env .env S3_HOST "$S3"
+        # The addresses that derive from them (the minimum of docs/self-hosting.md).
+        upsert_env .env FRONTEND_URL "https://${PUBLIC}"
+        upsert_env .env AUTH_URL "https://${PUBLIC}"
+        upsert_env .env ALLOWED_ORIGINS "https://${PUBLIC}"
+        upsert_env .env MINIO_EXTERNAL_ENDPOINT "https://${S3}"
+        upsert_env .env MINIO_API_CORS_ALLOW_ORIGIN "https://${PUBLIC}"
+        ok "Hosts e enderecos gravados (FRONTEND_URL, AUTH_URL, ALLOWED_ORIGINS, MINIO_EXTERNAL_ENDPOINT)."
+
+        echo
+        log "Envio de e-mail (verificacao de conta, senha, alertas)."
+        TRANSPORTE="$(perguntar_opcao "Transporte" "resend" resend smtp nenhum)"
+        case "$TRANSPORTE" in
+            resend)
+                upsert_env .env RESEND_API_KEY "$(perguntar_segredo "Chave da API do Resend")"
+                ;;
+            smtp)
+                upsert_env .env SMTP_HOST "$(perguntar_host "Servidor SMTP")"
+                # The security first: each mode has its usual port.
+                SMTP_MODO="$(perguntar_opcao "Seguranca" "starttls" starttls ssl nenhuma)"
+                case "$SMTP_MODO" in ssl) SMTP_PADRAO=465 ;; nenhuma) SMTP_PADRAO=25 ;; *) SMTP_PADRAO=587 ;; esac
+                while :; do
+                    SMTP_PORTA="$(perguntar "Porta" "$SMTP_PADRAO")"
+                    printf '%s' "$SMTP_PORTA" | grep -qE '^[0-9]{1,5}$' && break
+                    printf '  Um numero de porta.\n' >&2
+                done
+                upsert_env .env SMTP_SEGURANCA "$SMTP_MODO"
+                upsert_env .env SMTP_PORT "$SMTP_PORTA"
+                SMTP_USUARIO="$(perguntar_opcional "Usuario")"
+                if [ -n "$SMTP_USUARIO" ]; then
+                    upsert_env .env SMTP_USERNAME "$SMTP_USUARIO"
+                    while :; do
+                        SMTP_SENHA="$(perguntar_segredo "Senha")"
+                        case "$SMTP_SENHA" in
+                            *"'"*) printf "  A senha tem aspas simples ('): grave-a a mao no .env depois.\n" >&2 ;;
+                            *) upsert_env_literal .env SMTP_PASSWORD "$SMTP_SENHA"; break ;;
+                        esac
+                    done
+                    unset SMTP_SENHA
+                fi
+                ;;
+            nenhum)
+                warn "Sem transporte, os e-mails vao para o log da API. Quem se cadastrar nao recebe a verificacao: veja EXIGIR_EMAIL_VERIFICADO no .env.example."
+                ;;
+        esac
+        if [ "$TRANSPORTE" != "nenhum" ]; then
+            upsert_env .env EMAIL_FROM "$(perguntar "Remetente" "Atlans <noreply@${PUBLIC}>")"
+        fi
+        ok "E-mail configurado."
+    fi
+    echo
 fi
 
 # ── 6. Range of the proxy-net network ────────────────────────────────────────
@@ -118,9 +377,6 @@ fi
 # address space". So the range is pinned in .env here, after checking it is free.
 # The compose default stays 172.18: compose recreates a network whose range
 # changed, and a new default would move proxy-net on servers already running.
-env_get() {
-    grep -E "^$1=" .env 2>/dev/null | tail -n 1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' || true
-}
 ip2int() {
     local IFS=.
     # shellcheck disable=SC2086
@@ -239,18 +495,30 @@ cat <<'EOF'
 │  Bootstrap concluido. Proximos passos manuais:                   │
 ╰──────────────────────────────────────────────────────────────────╯
 
-  1. Edite .env:
-       - DATABASE_URL ........ aponte para seu Postgres + extensions postgis/uuid-ossp
-       - ALLOWED_ORIGINS ..... dominios reais em prod (NUNCA '*' em prod)
-       - FRONTEND_URL ........ URL publica do frontend
-       - PUBLIC_HOST, AGENTS_HOST, S3_HOST ... os hosts do site, dos executores
-         e do S3 (as regras do Traefik)
+EOF
+
+# Item 1 lists only what is still the example value: what the questions above
+# filled in does not need editing again.
+echo "  1. Revise o .env. Ainda falta:"
+if env_get DATABASE_URL | grep -q '<usuario>'; then
+    echo "       - DATABASE_URL ........ aponte para seu Postgres + extensions postgis/uuid-ossp"
+fi
+if [ "$(env_get MINIO_ROOT_USER)" = "change-me" ]; then
+    echo "       - MINIO_ROOT_USER ..... troque o change-me"
+fi
+if [ "$(env_get PUBLIC_HOST)" = "localhost" ]; then
+    cat <<'EOF'
+       - (apenas prod) PUBLIC_HOST, AGENTS_HOST, S3_HOST ... os hosts do site,
+         dos executores e do S3, e as URLs que derivam deles: FRONTEND_URL,
+         AUTH_URL, ALLOWED_ORIGINS (NUNCA '*' em prod), MINIO_EXTERNAL_ENDPOINT
+EOF
+fi
+if [ -z "$(env_get RESEND_API_KEY)" ] && [ -z "$(env_get SMTP_HOST)" ]; then
+    echo "       - (apenas prod) RESEND_API_KEY ou SMTP_* ... o envio de e-mail, e EMAIL_FROM"
+fi
+cat <<'EOF'
        - BORDA_MIDDLEWARE e BORDA_FAIXAS_CONFIAVEIS ... com ou sem CDN na
          frente (ver .env.example)
-       - RESEND_API_KEY ou SMTP_HOST/SMTP_* ... o transporte de e-mail, e
-         EMAIL_FROM, o remetente
-       - MINIO_ROOT_USER ..... troque o change-me
-       - AUTH_URL e MINIO_EXTERNAL_ENDPOINT ... as URLs publicas do site e do S3
 
   2. Crie as extensoes no banco do DATABASE_URL, uma vez, como SUPERUSUARIO
      (o usuario do Atlans nao precisa ser; sem isso o 'alembic upgrade head'
@@ -271,6 +539,7 @@ cat <<'EOF'
   5. Suba:
        make up-dev     # dev, ja com um executor local (cadastro automatico)
        make up-prod    # prod
+       make check-db   # o banco, conferido com o codigo da API (prod: SERVICE=api-prod)
        docker compose exec api alembic upgrade head        # dev (prod: api-prod)
        ./scripts/bootstrap-stepca.sh   # apenas prod, apos step-ca healthy
        make smoke

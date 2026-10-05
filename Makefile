@@ -1,10 +1,10 @@
 .PHONY: bootstrap bootstrap-stepca smoke seed-admin backup-stepca \
-        up-dev up-dev-sem-executor up-prod down logs logs-dev logs-prod restart restart-prod \
-        build-dev build-prod
+        up-dev up-dev-no-executor up-prod down logs logs-dev logs-prod restart restart-prod \
+        build-dev build-prod check-db
 
 # Dev comes with the local executor (profile executor-local): it enrolls and
 # connects on its own, so workflows run without creating one by hand. See
-# docs/reference.md, "Local executor". `make up-dev-sem-executor` leaves it out.
+# docs/reference.md, "Local executor". `make up-dev-no-executor` leaves it out.
 PERFIS_DEV = --profile dev --profile executor-local
 # `down` without profiles only sees the services that have none (redis): the
 # API, the web, MinIO and the rest stayed up. With every profile it takes down
@@ -13,14 +13,24 @@ TODOS_OS_PERFIS = --profile dev --profile executor-local --profile prod
 
 # ── Bootstrap & ops ──────────────────────────────────────────────────────────
 
+# Asks for the database (and, for production, the domain and the e-mail).
+# `make bootstrap ARGS=--no-prompt` asks nothing.
 bootstrap:
-	./scripts/bootstrap.sh
+	./scripts/bootstrap.sh $(ARGS)
 
 bootstrap-stepca:
 	./scripts/bootstrap-stepca.sh
 
 smoke:
 	./scripts/smoke.sh
+
+# Checks DATABASE_URL with the API's own code (driver, TLS): the connection, the
+# login, the postgis/uuid-ossp extensions and the schema. Read-only, and it does
+# not need the API up: a throwaway container from its image. In production,
+# `make check-db SERVICE=api-prod`.
+SERVICE ?= api
+check-db:
+	docker compose $(TODOS_OS_PERFIS) run --rm --no-deps $(SERVICE) python -m app.cli check-db
 
 seed-admin:
 	docker compose exec api-prod python -m app.cli create-admin
@@ -33,7 +43,7 @@ backup-stepca:
 up-dev:
 	docker compose $(PERFIS_DEV) up -d --build
 
-up-dev-sem-executor:
+up-dev-no-executor:
 	docker compose --profile dev up -d --build
 
 up-prod:

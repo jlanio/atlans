@@ -403,7 +403,7 @@ def test_the_plain_http_dev_router_only_serves_the_ca_root():
     # traefik-dev publishes only the TLS entrypoint, on the loopback.
     portas = re.search(r"\n    ports:\n((?:      .*\n)+)", _service_block("traefik-dev")).group(1)
     assert [p.strip() for p in portas.splitlines() if p.strip().startswith("- ")] == [
-        '- "127.0.0.1:${EXECUTOR_LOCAL_PORTA:-8443}:443"'
+        '- "127.0.0.1:${EXECUTOR_LOCAL_PORT:-8443}:443"'
     ]
 
 

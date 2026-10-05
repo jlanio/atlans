@@ -44,7 +44,7 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import urlsplit
 
-PASTA = Path(os.environ.get("EXECUTOR_LOCAL_PASTA", "/data/matricula"))
+PASTA = Path(os.environ.get("EXECUTOR_LOCAL_DIR", "/data/matricula"))
 CERTS = Path(os.environ.get("EXECUTOR_CERT_DIR", "/data/certs"))
 ENV_PATH = Path(os.environ.get("EXECUTOR_ENV_PATH", "/data/executor.env"))
 SERVIDOR = os.environ.get("EXECUTOR_SERVER_URL", "wss://agents.localhost")

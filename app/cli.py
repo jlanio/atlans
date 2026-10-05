@@ -5,6 +5,8 @@ Atlans administrative CLI. Invocation:
 
 Available commands:
     create-admin   Creates the first admin user (idempotent).
+    check-db       Checks DATABASE_URL as the API uses it: connection, login,
+                   the postgis/uuid-ossp extensions and the schema (read-only).
     executor-local Creates the dev executor and leaves its enrollment request in
                    a folder (development only; see app/services/executor_local_service.py).
     migrar-nos     Rewrites saved workflows with old node names (dry run
@@ -147,14 +149,23 @@ def _cmd_migrate_nodes(args: argparse.Namespace) -> int:
     return asyncio.run(_migrate_nodes(aplicar=args.aplicar))
 
 
+def _cmd_check_db(args: argparse.Namespace) -> int:
+    from app.services.diagnostico_banco import diagnosticar
+
+    relatorio = asyncio.run(diagnosticar())
+    for linha in relatorio.linhas:
+        print(linha)
+    return 0 if relatorio.ok else 1
+
+
 def _cmd_executor_local(args: argparse.Namespace) -> int:
     from pathlib import Path
     from app.services import executor_local_service as local
 
-    pasta = Path(args.pasta)
-    if args.vigiar:
+    pasta = Path(args.dir)
+    if args.watch:
         try:
-            asyncio.run(local.vigiar(pasta, intervalo=args.intervalo))
+            asyncio.run(local.vigiar(pasta, intervalo=args.interval))
         except KeyboardInterrupt:
             pass
         return 0
@@ -177,16 +188,22 @@ def main(argv: list[str] | None = None) -> int:
     p_admin.add_argument("--username", help="Username opcional. Default: parte antes do @ do email.")
     p_admin.set_defaults(func=_cmd_create_admin)
 
+    p_check = sub.add_parser(
+        "check-db",
+        help="Confere o DATABASE_URL como a API o usa: conexao, login, extensoes e schema.",
+    )
+    p_check.set_defaults(func=_cmd_check_db)
+
     p_local = sub.add_parser(
         "executor-local",
         help="[Dev] Cria o executor local e grava o pedido de cadastro dele na pasta.",
     )
-    p_local.add_argument("--pasta", required=True, help="Pasta compartilhada com o container do executor.")
+    p_local.add_argument("--dir", required=True, help="Pasta compartilhada com o container do executor.")
     p_local.add_argument(
-        "--vigiar", action="store_true",
+        "--watch", action="store_true",
         help="Repete a verificacao para sempre (o container executor-local-init do compose).",
     )
-    p_local.add_argument("--intervalo", type=float, default=15.0, help="Segundos entre verificacoes (com --vigiar).")
+    p_local.add_argument("--interval", type=float, default=15.0, help="Segundos entre verificacoes (com --watch).")
     p_local.set_defaults(func=_cmd_executor_local)
 
     p_nodes = sub.add_parser(

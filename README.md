@@ -46,10 +46,10 @@ You need **Docker** (with Compose v2.17 or newer), **make**, **openssl** and a *
 git clone https://github.com/jlanio/atlans-studio.git atlans
 cd atlans
 
-make bootstrap      # creates .env and strong secrets for you
-# Open .env and set DATABASE_URL to your Postgres (with the postgis and uuid-ossp extensions).
-# If Postgres runs on this same machine, use host.docker.internal instead of localhost.
-# Create the extensions once, as a superuser (the Atlans user does not need to be one):
+make bootstrap      # asks for your Postgres, tests the connection, and creates .env with strong secrets
+# Postgres on this same machine is host.docker.internal (the suggested default), not localhost.
+# To fill .env by hand instead: make bootstrap ARGS=--no-prompt
+# Create the postgis and uuid-ossp extensions once, as a superuser (the Atlans user does not need to be one):
 #   sudo -u postgres psql -d <banco> -c 'CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
 
 make up-dev         # starts Atlans, with an executor to run your workflows
@@ -59,9 +59,42 @@ docker compose exec api python -m app.cli create-admin       # creates your firs
 
 Then open **http://localhost:3000** and sign in. 🎉
 
-Workflows run on executors, and `make up-dev` brings one up on its own: it enrolls and connects as soon as the database is migrated, with nothing to create by hand ([how it works](docs/reference.md#local-executor-development)). The first `make up-dev` takes a while longer because it builds the executor image.
+**Something wrong with the database?** `make check-db` checks it the way the API uses it and says what to fix: whether it connects, the login (password, LDAP, `pg_hba.conf`), the postgis and uuid-ossp extensions, and whether the schema was created. It changes nothing, and it works even with the API down. `make bootstrap` runs the same kind of test right after you answer, and lets you correct the answers before it writes them.
+
+| Command | What it does |
+|---|---|
+| `make bootstrap` | Creates `.env` and the secrets, asks for the database (and, for production, the domain and the e-mail) and tests it |
+| `make bootstrap ARGS=--no-prompt` | The same, without questions: you edit `.env` by hand |
+| `make up-dev` | Starts Atlans for development, with the local executor |
+| `make up-dev-no-executor` | Starts it without the local executor |
+| `make check-db` | Checks the database connection, the extensions and the schema (production: `make check-db SERVICE=api-prod`) |
+| `make down` | Stops everything (the data stays) |
 
 Going to a real server, with HTTPS and your own domain? Follow the step-by-step guide in [docs/self-hosting.md](docs/self-hosting.md).
+
+## Where your workflows run: executors
+
+Atlans does not run workflows on the server: an **executor** does, a separate program that connects to Atlans and receives the work. There are three ways to have one.
+
+**1. On your computer, to try Atlans (nothing to do).** `make up-dev` brings up **Executor local (dev)**, which enrolls and connects on its own as soon as the database is migrated. It is in the default pool, so every workspace uses it. The first `make up-dev` takes a while longer because it builds the executor image.
+
+```bash
+docker compose logs -f executor-local executor-local-init   # follow the enrollment
+make up-dev-no-executor                                    # dev without it
+```
+
+**2. Another executor on the same computer**, outside Docker: to use files or databases on your machine, or to test the desktop app. Under **Executores** in the dashboard, create the executor and generate its enrollment code, then, in the repository folder, with Python 3.12 and the [executor's dependencies](executor/README.md):
+
+```bash
+grep -q agents.localhost /etc/hosts || echo "127.0.0.1 agents.localhost" | sudo tee -a /etc/hosts
+mkdir -p certs && curl -s http://localhost:8000/executores/ca-bundle -o certs/atlans-root.crt
+python -m executor enroll --executor-id=<id> --otp=<código> --server=https://agents.localhost:8443
+python -m executor
+```
+
+**3. On a server, in production:** each executor on its own machine, with the installer, Docker or the desktop app. See step 4 of [docs/self-hosting.md](docs/self-hosting.md#4-the-executors).
+
+How the local executor works, and how to start it over: [docs/reference.md](docs/reference.md#local-executor-development).
 
 ## Learn more
 
