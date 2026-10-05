@@ -17,7 +17,8 @@ vi.mock("next-auth/react", () => ({
   }),
 }))
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/" }))
+// `useRouter`: the Chat / Workspace switcher at the top of the bar navigates with it.
+vi.mock("next/navigation", () => ({ usePathname: () => "/", useRouter: () => ({ push: vi.fn(), prefetch: vi.fn() }) }))
 vi.mock("next/link", () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
 }))

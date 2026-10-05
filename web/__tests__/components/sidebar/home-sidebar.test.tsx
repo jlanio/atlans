@@ -43,6 +43,10 @@ vi.mock("next-auth/react", () => ({
   }),
 }))
 
+// The Chat / Workspace switcher (admin) navigates through the App Router, which
+// is not mounted here.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), prefetch: vi.fn() }), usePathname: () => "/" }))
+
 // UserSidebar captures the portals' palette prop; the Chats list counts
 // MOUNTS (mount effect), not renders — that's what distinguishes "hid" from
 // "unmounted and remounted".

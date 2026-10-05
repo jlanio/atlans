@@ -9,6 +9,7 @@ import { TbCalendarClock, TbPackage, TbMessages, TbPencilPlus, TbChevronRight, T
 import { useSession } from "next-auth/react"
 import { cn } from "@/lib/utils"
 import Marca from "./marca"
+import SeletorDeModo from "./seletor-de-modo"
 import UserSidebar from "./user-sidebar"
 import { ChatsLista } from "../home/chats/lista"
 import { AgendamentosLista } from "../home/agendamentos/lista"
@@ -121,6 +122,8 @@ export default function HomeSidebar() {
                 screen patterns) — the trigger's size-7 gives 28px. */}
             <SidebarTrigger className="app-region-no-drag max-md:size-10" size="sm" label={t.alternar} />
           </div>
+          {/* Chat / Workspace: renders only for the admin (the way out of the Home). */}
+          {!anonimo && <SeletorDeModo modo="chat" portalClassName="home-portal" />}
           {!anonimo && (
             <SidebarMenu>
               <SidebarMenuItem>
