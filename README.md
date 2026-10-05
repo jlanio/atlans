@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/media/atlans-hero.webp" width="100%" alt="A workflow running in the Atlans editor: a Python script, Buffer, Dissolve, Compute Area and a map output, each block lighting up as it runs"/>
+  <img src="docs/media/atlans-promo.webp" width="100%" alt="Atlans in 27 seconds: a block is added and connected in the editor, the workflow runs with each block lighting up, the resulting map comes out, and the dashboard shows every run"/>
 </p>
 
 ---

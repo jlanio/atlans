@@ -82,7 +82,8 @@ repos:
         stages: [pre-commit, pre-push, manual]
         args: ['--maxkb=1024']  # >1MB bloqueia (usar Git LFS se preciso)
         # catalogo/: IBGE's Atributos.md has 4 MB of tables (9,759 layers).
-        exclude: ^catalogo/
+        # docs/media/: the README's animated preview (a 27 s WebP, ~4 MB).
+        exclude: ^(catalogo|docs/media)/
       - id: check-merge-conflict
         name: check for merge conflicts
         entry: check-merge-conflict
