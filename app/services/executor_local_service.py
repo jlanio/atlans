@@ -107,24 +107,34 @@ async def provisionar(pasta: Path) -> Situacao:
     pedido = _ler_json(pasta / PEDIDO)
 
     async with get_session_async() as db:
+        # Only a usable executor counts. Revoked (or any other final state): a
+        # new one, instead of fighting whoever revoked it. Enrolling a revoked
+        # executor again would also work, but it would bring back the
+        # certificate history of the old one.
+        utilizaveis = ("pending", "active")
         executor = None
         # The id the executor holds a certificate for comes first: the name can
         # be edited in the UI, the id cannot.
         if cadastrado.get("executor_id"):
             executor = await executor_service.get_agent(db, cadastrado["executor_id"])
+            if executor is not None and executor.status not in utilizaveis:
+                executor = None
+        # Then by name, among the usable ones. This is also what finds the
+        # replacement a previous pass created while `cadastrado.json` still names
+        # the revoked one: without it, every pass created another executor until
+        # the container enrolled again.
         if executor is None:
             executor = (
                 await db.execute(
                     select(Executor)
-                    .where(Executor.name == NOME, Executor.deleted_at.is_(None))
+                    .where(
+                        Executor.name == NOME,
+                        Executor.deleted_at.is_(None),
+                        Executor.status.in_(utilizaveis),
+                    )
                     .order_by(Executor.created_at.desc())
                 )
             ).scalars().first()
-        # Revoked (or any other final state): a new one, instead of fighting
-        # whoever revoked it. Enrolling a revoked executor again would also work,
-        # but it would bring back the certificate history of the old one.
-        if executor is not None and executor.status not in ("pending", "active"):
-            executor = None
         if executor is None:
             executor = await executor_service.create_executor(
                 db,

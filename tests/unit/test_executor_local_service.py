@@ -138,6 +138,30 @@ async def test_revogado_vira_um_executor_novo(fabrica, tmp_path):
     assert [e.status for e in await _executores(fabrica)] == ["revoked", "pending"]
 
 
+async def test_revogado_cria_um_so_substituto_enquanto_o_container_nao_volta(fabrica, tmp_path):
+    """`cadastrado.json` keeps naming the revoked executor until the container
+    enrolls again, which can take minutes (restart backoff, enrollment backoff,
+    traefik-dev down). The passes in between must reuse the replacement."""
+    await local.provisionar(tmp_path)
+    antigo = _pedido(tmp_path)["executor_id"]
+    (tmp_path / local.CADASTRADO).write_text(json.dumps({"executor_id": antigo}))
+    await _marcar(fabrica, antigo, status="revoked")
+
+    assert await local.provisionar(tmp_path) == "pedido"
+    novo = _pedido(tmp_path)["executor_id"]
+    for _ in range(3):
+        assert await local.provisionar(tmp_path) == "aguardando"
+    assert _pedido(tmp_path)["executor_id"] == novo
+    assert [e.status for e in await _executores(fabrica)] == ["revoked", "pending"]
+
+    # The executor's request was used up and failed (the container deletes it):
+    # a new OTP, still for the same replacement.
+    (tmp_path / local.PEDIDO).unlink()
+    assert await local.provisionar(tmp_path) == "pedido"
+    assert _pedido(tmp_path)["executor_id"] == novo
+    assert len(await _executores(fabrica)) == 2
+
+
 async def test_removido_na_tela_volta_sozinho(fabrica, tmp_path):
     await local.provisionar(tmp_path)
     antigo = _pedido(tmp_path)["executor_id"]
