@@ -13,8 +13,10 @@ TODOS_OS_PERFIS = --profile dev --profile executor-local --profile prod
 
 # ── Bootstrap & ops ──────────────────────────────────────────────────────────
 
+# Asks for the database (and, for production, the domain and the e-mail).
+# `make bootstrap ARGS=--no-prompt` asks nothing.
 bootstrap:
-	./scripts/bootstrap.sh
+	./scripts/bootstrap.sh $(ARGS)
 
 bootstrap-stepca:
 	./scripts/bootstrap-stepca.sh

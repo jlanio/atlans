@@ -46,10 +46,10 @@ You need **Docker** (with Compose v2.17 or newer), **make**, **openssl** and a *
 git clone https://github.com/jlanio/atlans-studio.git atlans
 cd atlans
 
-make bootstrap      # creates .env and strong secrets for you
-# Open .env and set DATABASE_URL to your Postgres (with the postgis and uuid-ossp extensions).
-# If Postgres runs on this same machine, use host.docker.internal instead of localhost.
-# Create the extensions once, as a superuser (the Atlans user does not need to be one):
+make bootstrap      # asks for your Postgres and creates .env with strong secrets
+# Postgres on this same machine is host.docker.internal (the suggested default), not localhost.
+# To fill .env by hand instead: make bootstrap ARGS=--no-prompt
+# Create the postgis and uuid-ossp extensions once, as a superuser (the Atlans user does not need to be one):
 #   sudo -u postgres psql -d <banco> -c 'CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
 
 make up-dev         # starts Atlans, with an executor to run your workflows

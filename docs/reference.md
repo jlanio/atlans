@@ -471,7 +471,7 @@ The API exposes aggregated run metrics (general, per workflow, per executor and 
 
 | Command | Description |
 |---|---|
-| `make bootstrap` | Creates the `step-ca-data` volume, `secrets/` and `.env` with strong secrets |
+| `make bootstrap` | Creates the `step-ca-data` volume, `secrets/` and `.env` with strong secrets, and asks for the database (and, for production, the hosts and the e-mail). `ARGS=--no-prompt` asks nothing |
 | `make bootstrap-stepca` | Captures fingerprint + intermediate, raises step-ca's certificate lifetime and issues the `AGENTS_HOST` cert |
 | `make up-dev` / `make up-prod` | Starts the stack in dev (hot reload, with the [local executor](#local-executor-development)) / prod (Traefik + TLS) |
 | `make up-dev-no-executor` | Starts dev without the local executor |
