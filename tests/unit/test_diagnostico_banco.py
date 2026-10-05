@@ -10,7 +10,7 @@ import asyncpg
 import pytest
 from sqlalchemy.exc import DBAPIError
 
-from app.services.diagnostico_banco import Relatorio, explicar_falha
+from app.services.diagnostico_banco import Relatorio, avaliar_extensoes, explicar_falha
 
 ONDE = "host.docker.internal:5432/atlans"
 
@@ -71,6 +71,52 @@ async def test_url_de_exemplo_nao_tenta_conectar(monkeypatch):
     from app.services import diagnostico_banco
 
     monkeypatch.setattr("app.core.config.DATABASE_URL", "postgresql+asyncpg://<usuario>:<senha>@<host>:5432/<banco>")
+    # With or without an engine built at import (it depends on the environment's .env).
+    for motor in (None, object()):
+        monkeypatch.setattr("app.core.db.async_engine", motor)
+        rel = await diagnostico_banco.diagnosticar()
+        assert rel.ok is False
+        assert "exemplo" in rel.linhas[0]
+
+
+async def test_sem_url_diz_que_falta(monkeypatch):
+    from app.services import diagnostico_banco
+
+    monkeypatch.setattr("app.core.config.DATABASE_URL", None)
+    monkeypatch.setattr("app.core.db.async_engine", None)
     rel = await diagnostico_banco.diagnosticar()
     assert rel.ok is False
-    assert "exemplo" in rel.linhas[0]
+    assert "nao esta definida" in rel.linhas[0]
+
+
+TODAS = {"postgis", "uuid-ossp"}
+
+
+def _avaliar(instaladas, disponiveis, superusuario):
+    rel = Relatorio()
+    avaliar_extensoes(rel, set(instaladas), set(disponiveis), superusuario=superusuario,
+                      usuario="atlans", banco="atlans")
+    return rel
+
+
+def test_extensoes_instaladas():
+    rel = _avaliar(TODAS, TODAS, superusuario=False)
+    assert rel.ok and rel.linhas[0].startswith("[ok]")
+
+
+def test_faltam_e_o_usuario_comum_recebe_o_comando_de_superusuario():
+    rel = _avaliar(set(), TODAS, superusuario=False)
+    assert not rel.ok
+    assert "CREATE EXTENSION IF NOT EXISTS postgis" in rel.linhas[0]
+
+
+def test_faltam_e_o_superusuario_deixa_para_a_migracao():
+    rel = _avaliar(set(), TODAS, superusuario=True)
+    assert rel.ok and rel.linhas[0].startswith("[aviso]")
+
+
+def test_sem_o_pacote_nem_o_superusuario_cria():
+    """The package missing on the server: one failure, and no promise that the migration will create it."""
+    rel = _avaliar({"uuid-ossp"}, {"uuid-ossp"}, superusuario=True)
+    assert not rel.ok
+    assert len(rel.linhas) == 1 and "pacote" in rel.linhas[0]

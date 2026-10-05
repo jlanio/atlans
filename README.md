@@ -67,7 +67,7 @@ Then open **http://localhost:3000** and sign in. 🎉
 | `make bootstrap ARGS=--no-prompt` | The same, without questions: you edit `.env` by hand |
 | `make up-dev` | Starts Atlans for development, with the local executor |
 | `make up-dev-no-executor` | Starts it without the local executor |
-| `make check-db` | Checks the database connection, the extensions and the schema |
+| `make check-db` | Checks the database connection, the extensions and the schema (production: `make check-db SERVICE=api-prod`) |
 | `make down` | Stops everything (the data stays) |
 
 Going to a real server, with HTTPS and your own domain? Follow the step-by-step guide in [docs/self-hosting.md](docs/self-hosting.md).

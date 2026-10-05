@@ -334,8 +334,16 @@ if [ "$PERGUNTAR" = "1" ] && env_get DATABASE_URL | grep -q '<usuario>'; then
                 ;;
             smtp)
                 upsert_env .env SMTP_HOST "$(perguntar_host "Servidor SMTP")"
-                upsert_env .env SMTP_PORT "$(perguntar "Porta" "587")"
-                upsert_env .env SMTP_SEGURANCA "$(perguntar_opcao "Seguranca" "starttls" starttls ssl nenhuma)"
+                # The security first: each mode has its usual port.
+                SMTP_MODO="$(perguntar_opcao "Seguranca" "starttls" starttls ssl nenhuma)"
+                case "$SMTP_MODO" in ssl) SMTP_PADRAO=465 ;; nenhuma) SMTP_PADRAO=25 ;; *) SMTP_PADRAO=587 ;; esac
+                while :; do
+                    SMTP_PORTA="$(perguntar "Porta" "$SMTP_PADRAO")"
+                    printf '%s' "$SMTP_PORTA" | grep -qE '^[0-9]{1,5}$' && break
+                    printf '  Um numero de porta.\n' >&2
+                done
+                upsert_env .env SMTP_SEGURANCA "$SMTP_MODO"
+                upsert_env .env SMTP_PORT "$SMTP_PORTA"
                 SMTP_USUARIO="$(perguntar_opcional "Usuario")"
                 if [ -n "$SMTP_USUARIO" ]; then
                     upsert_env .env SMTP_USERNAME "$SMTP_USUARIO"
