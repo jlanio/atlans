@@ -1541,6 +1541,90 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Chat / Workspace switch (components/sidebar/seletor-de-modo.tsx) ─────────
+   While the switch animates, <html> carries `data-troca-de-modo` with the side
+   being entered. Only then do the stage (<main>, `vt-palco`) and the switcher's
+   thumb get a `view-transition-name`: every other navigation keeps the plain
+   cross-fade above.
+
+   Going to Workspace, the new stage slides in from the right like a sheet, over
+   the globe, which darkens and recedes a little. Going back to Chat, the
+   Workspace slides out to the right (on top, hence the z-index) and the globe
+   comes back. The thumb is the same element in both bars, so the browser slides
+   it from one half to the other. The bar itself (root) only cross-fades,
+   without the 4px of `vt-fade-in`, which would make its text jump.
+
+   `mix-blend-mode: normal`: the browser's default (`plus-lighter`) adds the two
+   snapshots where they overlap, and these two stay opaque the whole time.
+   `overflow: clip` on the group keeps the receding globe off the bar.
+
+   `none`, not `auto`, in the @supports: `auto` came after the API, and Chrome
+   141 has the API without it, so testing for it switched the block off there. */
+@supports (view-transition-name: none) {
+  html[data-troca-de-modo] .vt-palco { view-transition-name: palco; }
+  html[data-troca-de-modo] .vt-seletor-indicador { view-transition-name: seletor-de-modo; }
+
+  html[data-troca-de-modo]::view-transition-old(root),
+  html[data-troca-de-modo]::view-transition-new(root) {
+    animation-duration: 200ms;
+    animation-timing-function: ease;
+  }
+  html[data-troca-de-modo]::view-transition-new(root) { animation-name: vt-fade-in-plano; }
+
+  ::view-transition-group(palco) {
+    overflow: clip;
+    animation-duration: 380ms;
+  }
+  ::view-transition-old(palco),
+  ::view-transition-new(palco) {
+    animation-duration: 380ms;
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+    animation-fill-mode: both;
+    mix-blend-mode: normal;
+  }
+  html[data-troca-de-modo="workspace"]::view-transition-old(palco) { animation-name: palco-recua; }
+  html[data-troca-de-modo="workspace"]::view-transition-new(palco) {
+    animation-name: palco-entra;
+    box-shadow: -24px 0 48px rgb(0 0 0 / 0.45);
+  }
+  html[data-troca-de-modo="chat"]::view-transition-old(palco) {
+    animation-name: palco-sai;
+    z-index: 1;
+    box-shadow: -24px 0 48px rgb(0 0 0 / 0.45);
+  }
+  html[data-troca-de-modo="chat"]::view-transition-new(palco) { animation-name: palco-volta; }
+
+  ::view-transition-group(seletor-de-modo) {
+    animation-duration: 280ms;
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+
+  /* Reduced motion: a short cross-fade, nothing moves. */
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-group(palco),
+    ::view-transition-group(seletor-de-modo) { animation-duration: 150ms; }
+    html[data-troca-de-modo]::view-transition-old(palco) { animation: vt-fade-out 150ms ease both; z-index: auto; box-shadow: none; }
+    html[data-troca-de-modo]::view-transition-new(palco) { animation: vt-fade-in-plano 150ms ease both; box-shadow: none; }
+  }
+}
+
+@keyframes vt-fade-in-plano {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes palco-entra {
+  from { transform: translateX(100%); }
+}
+@keyframes palco-sai {
+  to { transform: translateX(100%); }
+}
+@keyframes palco-recua {
+  to { transform: translateX(-12%) scale(0.96); filter: brightness(0.4); }
+}
+@keyframes palco-volta {
+  from { transform: translateX(-12%) scale(0.96); filter: brightness(0.4); }
+}
+
 /* ── Scrollbar global — estilo uniforme em toda a plataforma ────────────────── */
 
 /* Webkit (Chrome, Edge, Safari) */

@@ -13,7 +13,9 @@ see [operations.md](operations.md).
 - **A Linux host** with Docker 24+, Docker Compose v2.17 or newer (the
   compose file uses `additional_contexts`), `openssl`, `make` and `git`.
 - **A PostgreSQL 15+ with PostGIS 3** and the `uuid-ossp` extension, outside the
-  compose: on the same host, on another one or managed. On the same host, the API (in a
+  compose: on the same host, on another one or managed. A superuser creates the two
+  extensions once ([The database extensions](#the-database-extensions)); the
+  application user does not need to be one. On the same host, the API (in a
   container) does not reach it through `localhost`, which there is the container itself: use
   `host.docker.internal` in `DATABASE_URL` (`api-prod` already points that name
   at the host), and make Postgres listen on the Docker interface
@@ -126,6 +128,31 @@ The secrets (`APP_SECRET`, `FERNET_KEY`, `AUTH_SECRET`, `OTP_PEPPER`,
 bootstrap. Keep a copy of the `.env` off the host: without the
 `FERNET_KEY`, the credentials saved in the database can no longer be opened.
 
+### The database extensions
+
+The first migration runs `CREATE EXTENSION IF NOT EXISTS` for `postgis` and
+`uuid-ossp`, and PostGIS is not a *trusted* extension: only a superuser
+creates it. With the application user in `DATABASE_URL` (which does not need
+to be, and should not be, a superuser), `alembic upgrade head` stops at
+`permission denied to create extension "postgis"`. Create both once, as a
+superuser, in the database `DATABASE_URL` points to:
+
+```bash
+# Postgres on this host
+sudo -u postgres psql -d <banco> -c 'CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+# Postgres on another host
+psql -h <host> -U postgres -d <banco> -c 'CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+```
+
+From then on the migration's `IF NOT EXISTS` finds them and moves on.
+
+- `could not open extension control file ".../postgis.control"`: PostGIS is not
+  installed on the database server. On Debian/Ubuntu,
+  `apt install postgresql-<versão>-postgis-3` (the version from `psql -V`).
+- **Managed Postgres** (RDS, Azure, Cloud SQL): there is no real superuser; the
+  provider's admin user is allowed to create PostGIS.
+- **No admin access**: ask the DBA to run the two `CREATE EXTENSION` on that database.
+
 ## 3. Bring it up
 
 ```bash
@@ -147,9 +174,11 @@ The source catalog (`catalogo/geoservicos`, [sources.md](sources.md)) is
 imported by the API at startup, as soon as the tables exist: with the schema
 created before recreating it, the recreation above already imports it.
 
-If `make up-prod` stops at "Pool overlaps with other one on this address
-space", another Docker network already uses the range of the Traefik network: see
-`PROXY_NET_SUBNET` in `.env.example`.
+`make bootstrap` pins the range of the Traefik network (`PROXY_NET_SUBNET` in
+`.env`) to one no other Docker network or host route uses. If `make up-prod`
+still stops at "Pool overlaps with other one on this address space", a network
+created after the bootstrap took the range: run `make bootstrap` again, or pick
+a free one by hand (see `PROXY_NET_SUBNET` in `.env.example`).
 
 Migrations never run on their own: the `alembic upgrade head` comes back with every
 version that changes the schema. The manual step-by-step procedure for the CA is in

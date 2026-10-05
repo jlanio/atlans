@@ -24,7 +24,8 @@ const SidebarRoot = ({ children, sidebar, defaultOpen = true, defaultWidth }: Si
   return (
     <SidebarProvider defaultOpen={defaultOpen} defaultWidth={defaultWidth}>
       {sidebar ?? <ShellSidebar />}
-      <main className="flex-1 overflow-auto bg-card flex flex-col">
+      {/* `vt-palco`: the stage of the Chat / Workspace switch (globals.css). */}
+      <main className="vt-palco flex-1 overflow-auto bg-card flex flex-col">
         {/* AppHeader returns null on the Home and on the canvas (full-bleed). */}
         <AppHeader />
         <div className="flex-1">

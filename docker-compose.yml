@@ -182,6 +182,10 @@ services:
       # Rotacao (opcional): "<nova>,<antiga>", ver app/core/config.py. Vazio = so a FERNET_KEY.
       FERNET_KEYS: ${FERNET_KEYS:-}
       EXECUTOR_SIGNING_KEY: ${EXECUTOR_SIGNING_KEY:-}
+      # What the API announces as the executors host (the OTP screen, install.sh):
+      # traefik-dev, published on the loopback (profile executor-local, below).
+      # AGENTS_URL in .env still wins.
+      AGENTS_URL: ${AGENTS_URL:-https://${EXECUTOR_LOCAL_HOST:-agents.localhost}:${EXECUTOR_LOCAL_PORTA:-8443}}
     # A Postgres on the host itself is `host.docker.internal` in DATABASE_URL
     # (`localhost` inside the container is the container); on Linux the name
     # only exists with this extra_hosts, as in api-prod.
@@ -196,15 +200,67 @@ services:
     volumes:
       - .:/app
       - artifacts_data:/data/artifacts
+      # The CA's ca.json and root, read-only, as in api-prod: enrolling an
+      # executor signs its CSR through step-ca (profile executor-local, below).
+      - step-ca-data:/etc/step-ca:ro
     networks:
       - backend
       - dev-net
+      # step-ca-dev and traefik-dev live here (profile executor-local). The
+      # range is inside TRUSTED_PROXIES, which is what lets the API accept the
+      # mTLS header from traefik-dev.
+      - proxy-net
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ping')"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 20s
+    # The executors host in dev, read only by traefik-dev (its docker provider
+    # takes only containers with `atlans.borda=dev`). The same routes and
+    # middlewares as api-prod's AGENTS_HOST, under `dev-` names. The site and
+    # the API are still reached directly, on localhost:3000 and localhost:8000.
+    labels:
+      - "traefik.enable=true"
+      - "atlans.borda=dev"
+      - "traefik.docker.network=proxy-net"
+      - "traefik.http.routers.dev-executores-enroll.rule=Host(`${EXECUTOR_LOCAL_HOST:-agents.localhost}`) && (Path(`/executores/enroll`) || Path(`/executores/server-public-key`))"
+      - "traefik.http.routers.dev-executores-enroll.entrypoints=websecure"
+      - "traefik.http.routers.dev-executores-enroll.tls=true"
+      - "traefik.http.routers.dev-executores-enroll.tls.options=mtls-executores@file"
+      - "traefik.http.routers.dev-executores-enroll.priority=50"
+      - "traefik.http.routers.dev-executores-enroll.service=dev-api-svc"
+      - "traefik.http.routers.dev-executores-enroll.middlewares=strip-executor-cert-header@file"
+      - "traefik.http.routers.dev-executores-ws.rule=Host(`${EXECUTOR_LOCAL_HOST:-agents.localhost}`) && PathPrefix(`/ws/executores/`)"
+      - "traefik.http.routers.dev-executores-ws.entrypoints=websecure"
+      - "traefik.http.routers.dev-executores-ws.tls=true"
+      - "traefik.http.routers.dev-executores-ws.tls.options=mtls-executores@file"
+      - "traefik.http.routers.dev-executores-ws.priority=40"
+      - "traefik.http.routers.dev-executores-ws.service=dev-api-svc"
+      - "traefik.http.routers.dev-executores-ws.middlewares=strip-executor-cert-header@file,pass-executor-cert@file"
+      - "traefik.http.routers.dev-executores-rest.rule=Host(`${EXECUTOR_LOCAL_HOST:-agents.localhost}`) && (PathPrefix(`/executores`) || PathPrefix(`/drive/executor-`) || PathPrefix(`/artifacts/portal`))"
+      - "traefik.http.routers.dev-executores-rest.entrypoints=websecure"
+      - "traefik.http.routers.dev-executores-rest.tls=true"
+      - "traefik.http.routers.dev-executores-rest.tls.options=mtls-executores@file"
+      - "traefik.http.routers.dev-executores-rest.priority=10"
+      - "traefik.http.routers.dev-executores-rest.service=dev-api-svc"
+      - "traefik.http.routers.dev-executores-rest.middlewares=strip-executor-cert-header@file,pass-executor-cert@file"
+      - "traefik.http.routers.dev-executores-internal.rule=Host(`${EXECUTOR_LOCAL_HOST:-agents.localhost}`) && PathPrefix(`/internal`)"
+      - "traefik.http.routers.dev-executores-internal.entrypoints=websecure"
+      - "traefik.http.routers.dev-executores-internal.tls=true"
+      - "traefik.http.routers.dev-executores-internal.tls.options=mtls-executores@file"
+      - "traefik.http.routers.dev-executores-internal.priority=30"
+      - "traefik.http.routers.dev-executores-internal.service=dev-api-svc"
+      - "traefik.http.routers.dev-executores-internal.middlewares=strip-executor-cert-header@file,rate-internal@file,pass-executor-cert@file"
+      # The CA root, over plain HTTP on traefik-dev's internal entrypoint (never
+      # published): what the local executor downloads before it can verify the
+      # executors host's TLS. It is the same public file /executores/ca-bundle
+      # serves in production.
+      - "traefik.http.routers.dev-executores-ca.rule=Host(`${EXECUTOR_LOCAL_HOST:-agents.localhost}`) && Path(`/executores/ca-bundle`)"
+      - "traefik.http.routers.dev-executores-ca.entrypoints=interno"
+      - "traefik.http.routers.dev-executores-ca.service=dev-api-svc"
+      - "traefik.http.routers.dev-executores-ca.middlewares=strip-executor-cert-header@file"
+      - "traefik.http.services.dev-api-svc.loadbalancer.server.port=8000"
 
   web-dev:
     profiles: ["dev"]
@@ -238,6 +294,193 @@ services:
     networks:
       - backend
       - dev-net
+
+  # ── EXECUTOR LOCAL (dev) ───────────────────────────────────────────────────
+  #
+  # Profile `executor-local`, which `make up-dev` turns on with `dev`: one
+  # executor that enrolls and connects on its own, so workflows run locally
+  # without creating anything by hand. The real path, end to end: the internal
+  # CA issues its certificate, Traefik validates it (mTLS) and the API reads the
+  # identity from the header, as in production. `make up-dev-sem-executor`
+  # brings up only `dev`, as before.
+  #
+  #   step-ca-dev          the internal CA (the same step-ca-data as production)
+  #   traefik-dev          only the executors host (EXECUTOR_LOCAL_HOST)
+  #   executor-local-init  creates the executor and its enrollment OTP, and
+  #                        keeps doing it (fresh database, revocation, `down -v`)
+  #   executor-local       enrolls with the OTP and starts the executor
+  #
+  # The executor is alone on `executor-local-net` with traefik-dev: it reaches
+  # the API only through Traefik, like an installed executor. On proxy-net it
+  # could call the API directly from inside the TRUSTED_PROXIES range and
+  # forge the mTLS header, and the executor runs workflow code.
+  #
+  # Development only. See docs/reference.md, "Local executor".
+
+  step-ca-dev:
+    image: smallstep/step-ca:0.27.0
+    profiles: ["executor-local"]
+    restart: unless-stopped
+    environment:
+      DOCKER_STEPCA_INIT_NAME: "Atlans Internal CA"
+      DOCKER_STEPCA_INIT_DNS_NAMES: "step-ca,localhost"
+      DOCKER_STEPCA_INIT_PROVISIONER_NAME: ${STEPCA_PROVISIONER_NAME:-atlans-app}
+      DOCKER_STEPCA_INIT_PASSWORD_FILE: /run/secrets/stepca_password
+      STEPCA_PROVISIONER_NAME: ${STEPCA_PROVISIONER_NAME:-atlans-app}
+      EXECUTOR_LOCAL_HOST: ${EXECUTOR_LOCAL_HOST:-agents.localhost}
+    # After the image's entrypoint (which creates the CA on the first boot):
+    # the certificate lifetime and the executors host certificate, then the CA.
+    command: ["sh", "/opt/executor-local/step-ca.sh"]
+    volumes:
+      - step-ca-data:/home/step
+      - ./scripts/executor-local:/opt/executor-local:ro
+    secrets:
+      - stepca_password
+    networks:
+      proxy-net:
+        # The name the API calls (STEPCA_URL) and the one in the CA's certificate.
+        aliases: ["step-ca"]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+
+  traefik-dev:
+    image: traefik:v3.6
+    profiles: ["executor-local"]
+    restart: unless-stopped
+    depends_on:
+      # The host certificate is issued before the CA starts: healthy means it exists.
+      step-ca-dev:
+        condition: service_healthy
+    ports:
+      # Loopback only: for an executor on this machine outside Docker (the
+      # desktop app, `python -m executor`), at https://agents.localhost:8443.
+      # The local executor talks to it over executor-local-net.
+      - "127.0.0.1:${EXECUTOR_LOCAL_PORTA:-8443}:443"
+    environment:
+      DOCKER_API_VERSION: ${DOCKER_API_VERSION:-}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik-dev:/etc/traefik/dynamic:ro
+      # The host certificate (dev/) and the intermediate that validates the
+      # executors' certificates (certs/), read-only.
+      - step-ca-data:/etc/step-ca:ro
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=proxy-net"
+      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      # Only the dev API's routes: api-prod's, if it is ever up on the same
+      # Docker, belong to the production Traefik.
+      - "--providers.docker.constraints=Label(`atlans.borda`,`dev`)"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      - "--entrypoints.websecure.address=:443"
+      # Only on the compose networks, never published: the CA root (HTTP) and
+      # MinIO (TCP, traefik-dev/dynamic.yml) for the local executor.
+      - "--entrypoints.interno.address=:80"
+      - "--entrypoints.minio.address=:9000"
+      - "--entrypoints.traefik-internal.address=:8082"
+      - "--ping=true"
+      - "--ping.entrypoint=traefik-internal"
+      - "--global.checkNewVersion=false"
+      - "--global.sendAnonymousUsage=false"
+      - "--log.level=INFO"
+      - "--api=false"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      # Where the dev API, step-ca-dev and MinIO are.
+      proxy-net: {}
+      executor-local-net:
+        # The executors host, as the local executor resolves it.
+        aliases: ["${EXECUTOR_LOCAL_HOST:-agents.localhost}"]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  executor-local:
+    profiles: ["executor-local"]
+    build:
+      context: .
+      dockerfile: Dockerfile.executor
+    restart: unless-stopped
+    depends_on:
+      traefik-dev:
+        condition: service_started
+    # Downloads the CA root through traefik-dev, enrolls with the OTP from
+    # executor-local-init and starts the executor (scripts/executor-local/iniciar.py).
+    entrypoint: ["python", "/opt/executor-local/iniciar.py"]
+    environment:
+      EXECUTOR_SERVER_URL: wss://${EXECUTOR_LOCAL_HOST:-agents.localhost}
+      EXECUTOR_LOCAL_PASTA: /data/matricula
+      EXECUTOR_LOCAL_CA_URL: http://${EXECUTOR_LOCAL_HOST:-agents.localhost}/executores/ca-bundle
+      # MinIO through traefik-dev's TCP entrypoint (the executor is not on proxy-net).
+      EXECUTOR_LOCAL_MINIO: traefik-dev:9000
+      # The address the API signs MinIO URLs with; iniciar.py forwards it to MinIO.
+      MINIO_EXTERNAL_ENDPOINT: ${MINIO_EXTERNAL_ENDPOINT:-http://localhost:9000}
+      EXECUTOR_CERT_DIR: /data/certs
+      # Where enroll writes EXECUTOR_ID: in the volume, so it survives a rebuild.
+      EXECUTOR_ENV_PATH: /data/executor.env
+      EXECUTOR_ARTIFACTS_DIR: /data/artifacts
+      LOG_COLOR: never
+      EXECUTOR_DASHBOARD: "off"
+    volumes:
+      - executor_local_data:/data
+      - ./scripts/executor-local:/opt/executor-local:ro
+    # A Postgres or a service on this machine, from inside a workflow.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    security_opt:
+      - seccomp:security/seccomp-executor.json
+    networks:
+      # Only traefik-dev is here (see the top of this section).
+      - executor-local-net
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: ${EXECUTOR_LOCAL_MEMORIA:-2G}
+
+  executor-local-init:
+    profiles: ["executor-local"]
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      # Started first, the executor's image creates the shared volume with its
+      # own user, the same uid as this one: otherwise it would be born root's.
+      executor-local:
+        condition: service_started
+    command: ["python", "-m", "app.cli", "executor-local", "--pasta", "/data/matricula", "--vigiar"]
+    environment:
+      <<: *api-env
+      FERNET_KEY: ${FERNET_KEY}
+      # The repository's app.log belongs to the dev API (it rotates it).
+      LOG_FILE: /tmp/executor-local-init.log
+    volumes:
+      - .:/app
+      # The executor's volume: the request and the record live in /data/matricula.
+      - executor_local_data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+
   # ── PRODUCAO ───────────────────────────────────────────────────────────────
 
   # Internal CA (step-ca) that issues and renews the executors' mTLS certs. It
@@ -612,7 +855,11 @@ services:
     # Stable version pin — `latest` breaks reproducibility and can silently bring
     # breaking changes into deploys. Update manually after reviewing the
     # release notes.
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # MinIO, Inc. deleted minio/minio from Docker Hub (Sep 2026) after archiving
+    # the community edition. pgsty/minio (Silo) is a maintained fork with the
+    # same command and bundled `mc`, a drop-in replacement that reads existing
+    # data. MINIO_IMAGE in .env overrides it.
+    image: ${MINIO_IMAGE:-pgsty/minio:RELEASE.2026-08-04T00-00-00Z}
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?defina MINIO_ROOT_USER no .env (make bootstrap)}
@@ -674,11 +921,19 @@ networks:
     driver: bridge
   dev-net:
     driver: bridge
+  # The local executor and traefik-dev, nothing else (profile executor-local).
+  executor-local-net:
+    driver: bridge
 
 volumes:
   redis_data:
   artifacts_data:
   minio_data:
+  # The local executor's certificate, keys, .env and enrollment folder
+  # (profile executor-local). `docker compose rm -sf executor-local executor-local-init`
+  # and then `docker volume rm atlansapp_executor_local_data`
+  # starts it over: executor-local-init enrolls it again.
+  executor_local_data:
   # step-ca-data contains the private key of the internal CA that signs ALL the
   # executors' certs. Marked as external to survive an accidental
   # `docker compose down -v` (which destroys compose-managed volumes). Manual

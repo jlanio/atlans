@@ -86,7 +86,18 @@ The `docker-compose.yml` does **not** include PostgreSQL — the database is ext
 | `redis` | `valkey/valkey:8-alpine` (`REDIS_IMAGE`) | — (internal) | Cache and pub/sub |
 | `api` | `Dockerfile.api` | `8000` | FastAPI with hot reload |
 | `web-dev` | `web/Dockerfile.ui` | `3000` | Next.js in dev mode |
-| `minio` | `minio/minio` | `9000` / `9001` | S3 object storage + console |
+| `minio` | `pgsty/minio` | `9000` / `9001` | S3 object storage + console |
+
+### Local executor (`--profile executor-local`)
+
+`make up-dev` turns this profile on together with `dev`: one executor that enrolls and connects on its own (see [Local executor](#local-executor-development)). `make up-dev-sem-executor` leaves it out.
+
+| Service | Image | Port | Description |
+|---|---|---|---|
+| `step-ca-dev` | `smallstep/step-ca:0.27.0` | — (internal) | The internal CA (same `step-ca-data` volume as production) |
+| `traefik-dev` | `traefik:v3.6` | `127.0.0.1:8443` | Only the executors host (`EXECUTOR_LOCAL_HOST`), with mTLS |
+| `executor-local` | `Dockerfile.executor` | — | The executor: enrolls with the OTP and connects |
+| `executor-local-init` | `Dockerfile.api` | — | Creates the executor and its OTP, and keeps checking |
 
 ### Production (`--profile prod`)
 
@@ -97,7 +108,7 @@ The `docker-compose.yml` does **not** include PostgreSQL — the database is ext
 | `web-prod` | `web/Dockerfile.ui` | — (via Traefik) | Optimized Next.js build |
 | `step-ca` | `smallstep/step-ca:0.27.0` | `9000` (internal) | Internal CA that issues the executors' mTLS certs |
 | `traefik` | `traefik:v3.6` | `80` / `443` | Reverse proxy + TLS + mTLS termination |
-| `minio` | `minio/minio` | — (via Traefik) | S3 object storage |
+| `minio` | `pgsty/minio` | — (via Traefik) | S3 object storage |
 
 ### Docker Networks
 
@@ -105,7 +116,7 @@ The `docker-compose.yml` does **not** include PostgreSQL — the database is ext
 |---|---|
 | `backend` | Internal communication between API, Redis, MinIO and step-ca |
 | `dev-net` | Communication between `api` and `web-dev` (development) |
-| `proxy-net` | Services exposed via Traefik (production) |
+| `proxy-net` | Services exposed via Traefik (production); in dev, `step-ca-dev`, `traefik-dev` and the local executor |
 
 ---
 
@@ -140,6 +151,35 @@ The executor uses neither an API key nor a JWT. It enrolls with a one-time passw
 ```
 
 The installation script (`GET /executores/install`) pins the CA certificate by SHA-256 to block a CA swap. Details in [docs/mtls-bootstrap.md](mtls-bootstrap.md).
+
+### Local executor (development)
+
+`make up-dev` brings up one executor that needs nothing by hand: workflows run as soon as the database is migrated. It goes through the real path, the same as production: the internal CA issues its certificate, Traefik validates it (mTLS) and the API reads the identity from the header Traefik sets.
+
+How it gets there:
+
+1. `step-ca-dev` creates the CA on the first boot (in the `step-ca-data` volume that `make bootstrap` creates), raises the certificate lifetime and issues the certificate of the executors host, before the CA starts. In production `make bootstrap-stepca` does the same by hand.
+2. `executor-local-init` (`python -m app.cli executor-local --vigiar`) creates the executor **Executor local (dev)** in the default pool, so every workspace can use it, and writes an enrollment OTP to a folder it shares with the executor. On a database without the schema it waits, and says to run `alembic upgrade head`.
+3. `executor-local` (`scripts/executor-local/iniciar.py`) downloads the CA root from the API, runs `python -m executor enroll` with the OTP through `traefik-dev` and starts the executor.
+
+`executor-local-init` keeps checking every 15 seconds, so the executor also comes back by itself after a revocation on the Executores screen, a recreated database or a removed volume: a new OTP, or a new executor when the old one was revoked.
+
+| What | Command |
+|---|---|
+| See what it is doing | `docker compose logs -f executor-local executor-local-init` |
+| Start the executor over (new keys and certificate) | `docker compose rm -sf executor-local executor-local-init && docker volume rm atlansapp_executor_local_data && make up-dev` |
+| Bring up dev without it | `make up-dev-sem-executor` |
+
+Another executor on the same machine, outside Docker (the desktop app or `python -m executor enroll`), connects to `https://agents.localhost:8443`: `traefik-dev` publishes the executors host on the loopback. The OTP screen already announces that address in dev.
+
+Optional `.env` variables: `EXECUTOR_LOCAL_HOST` (the executors host name, default `agents.localhost`), `EXECUTOR_LOCAL_PORTA` (the loopback port, default `8443`) and `EXECUTOR_LOCAL_MEMORIA` (the executor's memory ceiling, default `2G`).
+
+Two things specific to dev:
+
+- **The executor reaches the API only through Traefik.** It runs workflow code, and it shares a network (`executor-local-net`) with `traefik-dev` alone: on a network with the API, that code could call it directly from inside `TRUSTED_PROXIES` and forge the mTLS header. For the same reason it never mounts `step-ca-data`, which holds the CA's keys: it downloads only the root, from the public `/executores/ca-bundle`, on an internal Traefik entrypoint that is never published.
+- **MinIO.** The API signs upload and download URLs with `MINIO_EXTERNAL_ENDPOINT` (`http://localhost:9000` in dev), which inside the executor's container is the container itself. `iniciar.py` forwards that address to MinIO, through a TCP entrypoint of `traefik-dev`, and the signature stays valid because the client still sends `Host: localhost:9000`.
+
+Development only: the profile is never turned on in production.
 
 ### WebSocket Protocol
 
@@ -424,8 +464,9 @@ The API exposes aggregated run metrics (general, per workflow, per executor and 
 |---|---|
 | `make bootstrap` | Creates the `step-ca-data` volume, `secrets/` and `.env` with strong secrets |
 | `make bootstrap-stepca` | Captures fingerprint + intermediate, raises step-ca's certificate lifetime and issues the `AGENTS_HOST` cert |
-| `make up-dev` / `make up-prod` | Starts the stack in dev (hot reload) / prod (Traefik + TLS) |
-| `make down` | Stops and removes the containers |
+| `make up-dev` / `make up-prod` | Starts the stack in dev (hot reload, with the [local executor](#local-executor-development)) / prod (Traefik + TLS) |
+| `make up-dev-sem-executor` | Starts dev without the local executor |
+| `make down` | Stops and removes the containers of every profile (the volumes stay) |
 | `make logs` / `logs-dev` / `logs-prod` | Real-time logs (last 100 lines) |
 | `make restart` / `restart-prod` | Restarts the dev / prod stack |
 | `make build-dev` / `build-prod` | Builds the containers |

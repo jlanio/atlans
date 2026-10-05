@@ -83,6 +83,8 @@ upsert_env() {
     if grep -qE "^${key}=" "$file"; then
         sed -i.bak -E "s|^${key}=.*|${key}=\"${escaped}\"|" "$file" && rm -f "$file.bak"
     else
+        # A file with no final newline would glue the new key onto its last line.
+        [ -s "$file" ] && [ -n "$(tail -c 1 "$file")" ] && printf '\n' >> "$file"
         printf '%s="%s"\n' "$key" "$value" >> "$file"
     fi
 }
@@ -108,7 +110,129 @@ else
     ok ".env gerado com secrets novos. NUNCA commite este arquivo."
 fi
 
-# ── 6. Checklist final ───────────────────────────────────────────────────────
+# ── 6. Range of the proxy-net network ────────────────────────────────────────
+# proxy-net has a fixed range (PROXY_NET_SUBNET, default 172.18.0.0/16 in the
+# compose file), and 172.18 is the first range Docker hands out on its own: any
+# other network (another project's, or this project's backend/dev-net created
+# first) takes it and `up` fails with "Pool overlaps with other one on this
+# address space". So the range is pinned in .env here, after checking it is free.
+# The compose default stays 172.18: compose recreates a network whose range
+# changed, and a new default would move proxy-net on servers already running.
+env_get() {
+    grep -E "^$1=" .env 2>/dev/null | tail -n 1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' || true
+}
+ip2int() {
+    local IFS=.
+    # shellcheck disable=SC2086
+    set -- $1
+    echo $(( ($1 << 24) | ($2 << 16) | ($3 << 8) | $4 ))
+}
+# cidr_overlap A B: true when the IPv4 ranges A and B share any address.
+cidr_overlap() {
+    local n1="${1%/*}" l1="${1#*/}" n2="${2%/*}" l2="${2#*/}" l mask
+    [ "$l1" = "$1" ] && l1=32
+    [ "$l2" = "$2" ] && l2=32
+    l=$(( l1 < l2 ? l1 : l2 ))
+    mask=$(( l == 0 ? 0 : (0xFFFFFFFF << (32 - l)) & 0xFFFFFFFF ))
+    [ $(( $(ip2int "$n1") & mask )) -eq $(( $(ip2int "$n2") & mask )) ]
+}
+# cidr_contains OUTER INNER: true when INNER lies entirely inside OUTER.
+cidr_contains() {
+    local lo="${1#*/}" li="${2#*/}"
+    [ "$lo" = "$1" ] && lo=32
+    [ "$li" = "$2" ] && li=32
+    [ "$lo" -le "$li" ] && cidr_overlap "$1" "$2"
+}
+# IPv4 ranges already in use: Docker networks (except proxy-net itself) and,
+# on Linux, the host routes (VPN, the WSL network, the LAN).
+used_ranges() {
+    local net
+    for net in $(docker network ls -q 2>/dev/null); do
+        docker network inspect "$net" \
+            --format '{{if ne .Name "proxy-net"}}{{range .IPAM.Config}}{{.Subnet}} {{end}}{{end}}' 2>/dev/null || true
+    done | tr ' ' '\n'
+    if command -v ip >/dev/null 2>&1; then
+        ip -4 route show 2>/dev/null | awk '$1 != "default" {print $1}'
+    fi
+}
+is_ipv4_cidr() { printf '%s' "$1" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(/[0-9]+)?$'; }
+range_free() {
+    local r
+    while read -r r; do
+        is_ipv4_cidr "$r" || continue
+        cidr_overlap "$1" "$r" && return 1
+    done <<< "$USED_RANGES"
+    return 0
+}
+
+PROXY_SUBNET_ATUAL="$(docker network inspect proxy-net \
+    --format '{{range .IPAM.Config}}{{.Subnet}} {{end}}' 2>/dev/null | awk '{print $1}' || true)"
+PROXY_SUBNET_ENV="$(env_get PROXY_NET_SUBNET)"
+
+if [ -n "$PROXY_SUBNET_ATUAL" ]; then
+    # The network already exists: keep its range (changing it moves Traefik
+    # to another range and can break TRUSTED_PROXIES).
+    if [ -z "$PROXY_SUBNET_ENV" ]; then
+        upsert_env .env PROXY_NET_SUBNET "$PROXY_SUBNET_ATUAL"
+        ok "proxy-net ja existe em $PROXY_SUBNET_ATUAL: fixado em PROXY_NET_SUBNET no .env."
+    elif [ "$PROXY_SUBNET_ENV" != "$PROXY_SUBNET_ATUAL" ]; then
+        warn "proxy-net existe em $PROXY_SUBNET_ATUAL, mas o .env pede PROXY_NET_SUBNET=$PROXY_SUBNET_ENV:"
+        warn "  o proximo 'up' recria a rede na faixa do .env. Se nao era a intencao,"
+        warn "  ajuste PROXY_NET_SUBNET=$PROXY_SUBNET_ATUAL no .env."
+    else
+        log "proxy-net em $PROXY_SUBNET_ATUAL (igual ao .env)."
+    fi
+    PROXY_SUBNET_FINAL="$PROXY_SUBNET_ENV"
+    [ -z "$PROXY_SUBNET_FINAL" ] && PROXY_SUBNET_FINAL="$PROXY_SUBNET_ATUAL"
+else
+    USED_RANGES="$(used_ranges)"
+    if [ -n "$PROXY_SUBNET_ENV" ]; then
+        if range_free "$PROXY_SUBNET_ENV"; then
+            log "PROXY_NET_SUBNET=$PROXY_SUBNET_ENV esta livre."
+        else
+            err "PROXY_NET_SUBNET=$PROXY_SUBNET_ENV (no .env) ja esta em uso por outra rede:"
+            err "  o 'up' vai falhar com 'Pool overlaps'. Escolha outra faixa livre no .env"
+            err "  (veja 'docker network ls' e 'ip -4 route')."
+            exit 1
+        fi
+        PROXY_SUBNET_FINAL="$PROXY_SUBNET_ENV"
+    else
+        # /16 ranges inside 172.16.0.0/12 (the compose default of TRUSTED_PROXIES),
+        # starting with the ones Docker reaches last when it picks on its own.
+        PROXY_SUBNET_FINAL=""
+        for oct in 29 30 31 28 27 26 25 24 23 22 21 20 19 18 16; do
+            if range_free "172.$oct.0.0/16"; then
+                PROXY_SUBNET_FINAL="172.$oct.0.0/16"
+                break
+            fi
+        done
+        if [ -z "$PROXY_SUBNET_FINAL" ]; then
+            err "Nenhuma faixa /16 livre em 172.16.0.0/12 para a proxy-net."
+            err "  Defina PROXY_NET_SUBNET no .env (e TRUSTED_PROXIES cobrindo-a)."
+            exit 1
+        fi
+        upsert_env .env PROXY_NET_SUBNET "$PROXY_SUBNET_FINAL"
+        ok "PROXY_NET_SUBNET=$PROXY_SUBNET_FINAL (faixa livre) gravado no .env."
+    fi
+fi
+
+# The API only accepts the mTLS cert header from TRUSTED_PROXIES: proxy-net must be inside it.
+TRUSTED_ENV="$(env_get TRUSTED_PROXIES)"
+if [ -n "$TRUSTED_ENV" ] && is_ipv4_cidr "$PROXY_SUBNET_FINAL"; then
+    COBERTO=false
+    for faixa in $(printf '%s' "$TRUSTED_ENV" | tr ',' ' '); do
+        if is_ipv4_cidr "$faixa" && cidr_contains "$faixa" "$PROXY_SUBNET_FINAL"; then
+            COBERTO=true
+            break
+        fi
+    done
+    if [ "$COBERTO" = false ]; then
+        warn "TRUSTED_PROXIES=$TRUSTED_ENV nao cobre a proxy-net ($PROXY_SUBNET_FINAL):"
+        warn "  os executores vao receber 401. Inclua a faixa em TRUSTED_PROXIES no .env."
+    fi
+fi
+
+# ── 7. Checklist final ───────────────────────────────────────────────────────
 cat <<'EOF'
 
 ╭──────────────────────────────────────────────────────────────────╮
@@ -128,18 +252,26 @@ cat <<'EOF'
        - MINIO_ROOT_USER ..... troque o change-me
        - AUTH_URL e MINIO_EXTERNAL_ENDPOINT ... as URLs publicas do site e do S3
 
-  2. (Apenas prod) coloque o certificado do site em ./certs/
+  2. Crie as extensoes no banco do DATABASE_URL, uma vez, como SUPERUSUARIO
+     (o usuario do Atlans nao precisa ser; sem isso o 'alembic upgrade head'
+     para em "permission denied to create extension postgis"):
+       sudo -u postgres psql -d <banco> -c 'CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+     Postgres em outro host: psql -h <host> -U postgres -d <banco> -c '...'
+     Gerenciado (RDS, Azure, Cloud SQL): use o usuario admin do provedor.
+
+  3. (Apenas prod) coloque o certificado do site em ./certs/
        cert.pem  e  key.pem (o de origem da Cloudflare, um do Let's Encrypt
        ou outro; ou aponte SSL_CERT_DIR para onde eles estao)
 
-  3. Configure o DNS:
+  4. Configure o DNS:
        <PUBLIC_HOST>   A  -> IP   (atras do CDN, se usar um)
        <AGENTS_HOST>   A  -> IP   (direto, NUNCA atras de CDN)  *obrigatorio*
        <S3_HOST>       A  -> IP   (atras do CDN, se usar um)
 
-  4. Suba:
-       make up-dev     # dev
+  5. Suba:
+       make up-dev     # dev, ja com um executor local (cadastro automatico)
        make up-prod    # prod
+       docker compose exec api alembic upgrade head        # dev (prod: api-prod)
        ./scripts/bootstrap-stepca.sh   # apenas prod, apos step-ca healthy
        make smoke
        make seed-admin

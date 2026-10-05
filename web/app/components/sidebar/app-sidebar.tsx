@@ -19,6 +19,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import Marca from "./marca";
+import SeletorDeModo from "./seletor-de-modo";
 import UserSidebar from "./user-sidebar";
 import NotificationBell from "./notification-bell";
 import ActiveRunsIndicator from "./active-runs-indicator";
@@ -171,6 +172,8 @@ const AppSidebar = () => {
           <div className="flex-1 group-data-[collapsible=icon]:hidden" />
           <SidebarTrigger className="app-region-no-drag" size={'sm'} />
         </div>
+        {/* Chat / Workspace: the way back to the Home (admin only, as is every page here). */}
+        <SeletorDeModo modo="workspace" />
       </SidebarHeader>
       <SidebarContent>
         <NavGroup label="Organização"  items={organizationSection} />

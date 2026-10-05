@@ -3,9 +3,21 @@
 import { useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 
-type ViewTransitionLike = {
+export type ViewTransitionLike = {
   skipTransition: () => void
   ready?: Promise<void>
+  /** Settles when the animation ends, skipped or not. */
+  finished?: Promise<void>
+}
+
+export type TransitionOptions = {
+  /**
+   * Ceiling on the wait for the route commit, in ms (default `MAX_WAIT_MS`).
+   * The mode switcher (Chat / Workspace) raises it: the two sides of the switch
+   * are prefetched, but the Home's globe and the dashboard's first render take
+   * longer than a cached listing, and its animation is the point of the click.
+   */
+  maxWaitMs?: number
 }
 
 type DocumentWithTransition = Document & {
@@ -44,11 +56,15 @@ function documentWithTransition(): DocumentWithTransition | null {
  * the animation: with no DOM change there is nothing to animate, and animating
  * anyway is the bug.
  */
-function navigateWithTransition(navegar: () => void, href: string) {
+function navigateWithTransition(
+  navegar: () => void,
+  href: string,
+  { maxWaitMs = MAX_WAIT_MS }: TransitionOptions = {},
+): ViewTransitionLike | null {
   const doc = documentWithTransition()
   if (!doc) {
     navegar()
-    return
+    return null
   }
 
   // `location.pathname` is the commit signal observable from outside Next: the App
@@ -80,7 +96,7 @@ function navigateWithTransition(navegar: () => void, href: string) {
 
         const verificar = () => {
           if (window.location.pathname === destino) return encerrar(true)
-          if (Date.now() - inicio >= MAX_WAIT_MS) return encerrar(false)
+          if (Date.now() - inicio >= maxWaitMs) return encerrar(false)
           sonda = setTimeout(verificar, PROBE_INTERVAL_MS)
         }
 
@@ -91,6 +107,9 @@ function navigateWithTransition(navegar: () => void, href: string) {
   // `ready` rejects with AbortError when the transition is skipped — without this
   // `catch` the deliberate discard shows up in the console as an unhandled error.
   transicao.atual?.ready?.catch(() => {})
+  // Same for `finished`, which callers chain cleanup on.
+  transicao.atual?.finished?.catch(() => {})
+  return transicao.atual ?? null
 }
 
 // Wrapper around Next.js's `useRouter`. In browsers without View Transitions
@@ -99,11 +118,13 @@ function navigateWithTransition(navegar: () => void, href: string) {
 // Usage:
 //   const router = useViewTransitionRouter()
 //   router.push("/projects")
+//   router.push("/dashboard", { maxWaitMs: 600 })  // returns the transition, or null
 export function useViewTransitionRouter() {
   const router = useRouter()
 
   const push = useCallback(
-    (href: string) => navigateWithTransition(() => router.push(href), href),
+    (href: string, opcoes?: TransitionOptions) =>
+      navigateWithTransition(() => router.push(href), href, opcoes),
     [router],
   )
 
