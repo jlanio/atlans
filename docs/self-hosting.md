@@ -147,9 +147,11 @@ The source catalog (`catalogo/geoservicos`, [sources.md](sources.md)) is
 imported by the API at startup, as soon as the tables exist: with the schema
 created before recreating it, the recreation above already imports it.
 
-If `make up-prod` stops at "Pool overlaps with other one on this address
-space", another Docker network already uses the range of the Traefik network: see
-`PROXY_NET_SUBNET` in `.env.example`.
+`make bootstrap` pins the range of the Traefik network (`PROXY_NET_SUBNET` in
+`.env`) to one no other Docker network or host route uses. If `make up-prod`
+still stops at "Pool overlaps with other one on this address space", a network
+created after the bootstrap took the range: run `make bootstrap` again, or pick
+a free one by hand (see `PROXY_NET_SUBNET` in `.env.example`).
 
 Migrations never run on their own: the `alembic upgrade head` comes back with every
 version that changes the schema. The manual step-by-step procedure for the CA is in
