@@ -1,5 +1,15 @@
 .PHONY: bootstrap bootstrap-stepca smoke seed-admin backup-stepca \
-        up-dev up-prod down logs logs-dev logs-prod restart restart-prod build-dev build-prod
+        up-dev up-dev-sem-executor up-prod down logs logs-dev logs-prod restart restart-prod \
+        build-dev build-prod
+
+# Dev comes with the local executor (profile executor-local): it enrolls and
+# connects on its own, so workflows run without creating one by hand. See
+# docs/reference.md, "Local executor". `make up-dev-sem-executor` leaves it out.
+PERFIS_DEV = --profile dev --profile executor-local
+# `down` without profiles only sees the services that have none (redis): the
+# API, the web, MinIO and the rest stayed up. With every profile it takes down
+# whatever of the project is running, dev or prod.
+TODOS_OS_PERFIS = --profile dev --profile executor-local --profile prod
 
 # ── Bootstrap & ops ──────────────────────────────────────────────────────────
 
@@ -21,31 +31,34 @@ backup-stepca:
 # ── Compose ──────────────────────────────────────────────────────────────────
 
 up-dev:
+	docker compose $(PERFIS_DEV) up -d --build
+
+up-dev-sem-executor:
 	docker compose --profile dev up -d --build
 
 up-prod:
 	docker compose --profile prod up -d --build
 
 down:
-	docker compose down
+	docker compose $(TODOS_OS_PERFIS) down
 
 logs:
 	docker compose logs -f --tail=100
 
 logs-dev:
-	docker compose --profile dev logs -f --tail=100
+	docker compose $(PERFIS_DEV) logs -f --tail=100
 
 logs-prod:
 	docker compose --profile prod logs -f --tail=100
 
 restart:
-	docker compose down && docker compose --profile dev up -d --build
+	docker compose $(TODOS_OS_PERFIS) down && docker compose $(PERFIS_DEV) up -d --build
 
 restart-prod:
-	docker compose down && docker compose --profile prod up -d --build
+	docker compose $(TODOS_OS_PERFIS) down && docker compose --profile prod up -d --build
 
 build-dev:
-	docker compose --profile dev build
+	docker compose $(PERFIS_DEV) build
 
 build-prod:
 	docker compose --profile prod build

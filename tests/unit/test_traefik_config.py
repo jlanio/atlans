@@ -38,6 +38,9 @@ import yaml
 RAIZ = Path(__file__).resolve().parents[2]
 COMPOSE = RAIZ / "docker-compose.yml"
 DINAMICO = RAIZ / "traefik-dynamic" / "dynamic.yml"
+# The file provider of traefik-dev (profile executor-local), which serves only the
+# dev executors host. Its routers are the `dev-` ones, on the dev API's labels.
+DINAMICO_DEV = RAIZ / "traefik-dev" / "dynamic.yml"
 
 # `traefik.http.routers.<router>.middlewares=a@file,b@file`
 _MIDDLEWARES_DA_LABEL = re.compile(
@@ -59,9 +62,9 @@ _MIDDLEWARE_NAME = re.compile(r"^    ([A-Za-z][\w-]*):\s*$", re.M)
 _BLOCK_END = re.compile(r"^(?:\S|  [A-Za-z])", re.M)
 
 
-def _defined_middlewares() -> set[str]:
+def _defined_middlewares(arquivo: Path = DINAMICO) -> set[str]:
     """The names the file provider publishes as `<nome>@file`."""
-    texto = _as_text(DINAMICO)
+    texto = _as_text(arquivo)
     inicio = _MIDDLEWARES_START.search(texto)
     assert inicio, "bloco `http.middlewares` nao encontrado em dynamic.yml"
     resto = texto[inicio.end() :]
@@ -144,14 +147,17 @@ def test_every_referenced_middleware_exists_in_the_dynamic_file(borda):
     wrong page.
     """
     definidos = _defined_middlewares()
+    # The `dev-` routers are read by traefik-dev, whose file provider is another file.
+    definidos_dev = _defined_middlewares(DINAMICO_DEV)
     faltando: list[str] = []
     for router, nomes in sorted(_references_by_router(_EDGES[borda]).items()):
+        do_router = definidos_dev if router.startswith("dev-") else definidos
         for nome in nomes:
             # Only the file provider is checked here: a middleware without a
             # suffix, or with `@docker`, comes from another source and has another rule.
             if not nome.endswith("@file"):
                 continue
-            if nome[: -len("@file")] not in definidos:
+            if nome[: -len("@file")] not in do_router:
                 faltando.append(f"{router} -> {nome}")
     assert not faltando, (
         "middleware referenciado que o provider de arquivo nao define: "
@@ -212,6 +218,7 @@ _LABEL_RULE = re.compile(
 )
 _HOSTS_PROXIED = ("Host(`${PUBLIC_HOST:-localhost}`)", "Host(`${S3_HOST:-s3.localhost}`)")
 _EXECUTORS_HOST = "Host(`${AGENTS_HOST:-agents.localhost}`)"
+_DEV_EXECUTORS_HOST = "Host(`${EXECUTOR_LOCAL_HOST:-agents.localhost}`)"
 _EDGE_LIST_REF = "${BORDA_MIDDLEWARE:-borda-aberta}@file"
 
 
@@ -262,19 +269,21 @@ def test_the_executor_routers_do_not_carry_the_cloudflare_list():
     references = _raw_references()
     with_list = [
         r for r, g in sorted(regras.items())
-        if _EXECUTORS_HOST in g
+        if (_EXECUTORS_HOST in g or _DEV_EXECUTORS_HOST in g)
         and ({_EDGE_LIST_REF, "cloudflare-only@file"} & set(references.get(r, [])))
     ]
     assert not with_list, "router de executor com a borda: " + ", ".join(with_list)
 
 
 def test_every_host_rule_comes_from_the_env():
-    """No installation host hard-coded in the rules: only the three from the .env."""
+    """No installation host hard-coded in the rules: only the three from the .env,
+    and the dev executors host for the `dev-` routers."""
     for router, regra in sorted(_rules_by_router().items()):
         hosts = re.findall(r"Host\(`([^`]*)`\)", regra)
         assert hosts, f"{router} sem Host() na regra"
+        variaveis = "EXECUTOR_LOCAL_HOST" if router.startswith("dev-") else "PUBLIC_HOST|AGENTS_HOST|S3_HOST"
         for host in hosts:
-            assert re.fullmatch(r"\$\{(PUBLIC_HOST|AGENTS_HOST|S3_HOST):-[a-z0-9.-]+\}", host), (
+            assert re.fullmatch(rf"\$\{{({variaveis}):-[a-z0-9.-]+\}}", host), (
                 f"{router}: host fixo na regra ({host})"
             )
 
@@ -346,3 +355,88 @@ def test_the_executors_cert_has_a_fixed_name_and_the_legacy_one_stays_until_the_
     bootstrap = _as_text(RAIZ / "scripts" / "bootstrap-stepca.sh")
     assert 'CRT_PATH="traefik/atlans-ca/agents.crt"' in bootstrap
     assert 'KEY_PATH="traefik/atlans-ca/agents.key"' in bootstrap
+
+
+# ── The executors host in dev (profile executor-local) ──────────────────────
+#
+# traefik-dev serves only the dev executors host, with the same mTLS contract
+# as production: the API derives the executor's ENTIRE identity from the cert
+# header, so a router that lets a client-sent copy through is a full bypass.
+
+
+def _dev_routers() -> dict[str, str]:
+    return {r: g for r, g in _rules_by_router().items() if r.startswith("dev-")}
+
+
+# The one dev router without TLS: the CA root, which the local executor needs
+# before it can verify the executors host. On the internal entrypoint only.
+_DEV_CA_ROUTER = "dev-executores-ca"
+
+
+def test_the_dev_executor_routers_exist_and_use_the_dev_host():
+    regras = _dev_routers()
+    assert {"dev-executores-enroll", "dev-executores-ws", "dev-executores-rest",
+            "dev-executores-internal", _DEV_CA_ROUTER} <= set(regras)
+    assert all(_DEV_EXECUTORS_HOST in g for g in regras.values()), regras
+
+
+def test_every_dev_router_strips_the_client_cert_header_first():
+    references = _raw_references()
+    for router in sorted(_dev_routers()):
+        assert references.get(router, [""])[0] == "strip-executor-cert-header@file", router
+
+
+def test_every_dev_router_requires_the_mtls_options():
+    compose = _as_text(COMPOSE)
+    for router in sorted(set(_dev_routers()) - {_DEV_CA_ROUTER}):
+        assert f"traefik.http.routers.{router}.entrypoints=websecure" in compose, router
+        assert f"traefik.http.routers.{router}.tls.options=mtls-executores@file" in compose, router
+
+
+def test_the_plain_http_dev_router_only_serves_the_ca_root():
+    """Without TLS there is no client certificate: that router may serve the
+    public root and nothing else, and only on the entrypoint that is never published."""
+    compose = _as_text(COMPOSE)
+    assert _dev_routers()[_DEV_CA_ROUTER].endswith("&& Path(`/executores/ca-bundle`)")
+    assert f"traefik.http.routers.{_DEV_CA_ROUTER}.entrypoints=interno" in compose
+    assert '"--entrypoints.interno.address=:80"' in compose
+    # traefik-dev publishes only the TLS entrypoint, on the loopback.
+    portas = re.search(r"\n    ports:\n((?:      .*\n)+)", _service_block("traefik-dev")).group(1)
+    assert [p.strip() for p in portas.splitlines() if p.strip().startswith("- ")] == [
+        '- "127.0.0.1:${EXECUTOR_LOCAL_PORTA:-8443}:443"'
+    ]
+
+
+def test_the_dev_mtls_validates_against_the_internal_ca_and_keeps_tls13():
+    dinamico = _as_text(DINAMICO_DEV)
+    assert "/etc/step-ca/certs/intermediate_ca.crt" in dinamico
+    assert "clientAuthType: VerifyClientCertIfGiven" in dinamico
+    assert "minVersion: VersionTLS13" in dinamico
+
+
+def test_traefik_dev_only_reads_the_dev_labels():
+    """Without the constraint, traefik-dev would also serve api-prod's routers if
+    both were ever up on the same Docker."""
+    compose = _as_text(COMPOSE)
+    assert '"--providers.docker.constraints=Label(`atlans.borda`,`dev`)"' in compose
+    assert '"atlans.borda=dev"' in compose
+    assert "./traefik-dev:/etc/traefik/dynamic:ro" in compose
+
+
+def _service_block(nome: str) -> str:
+    """The text of one service in the compose file, up to the next service."""
+    texto = _as_text(COMPOSE)
+    inicio = texto.index(f"\n  {nome}:\n")
+    fim = re.search(r"\n  [a-z][\w-]*:\n", texto[inicio + 1:])
+    return texto[inicio: inicio + 1 + fim.start()] if fim else texto[inicio:]
+
+
+def test_the_local_executor_reaches_the_api_only_through_traefik():
+    """The executor runs workflow code. On proxy-net (or any network the API is
+    on) that code could call the API directly from inside TRUSTED_PROXIES and
+    forge the mTLS header: it must share a network with traefik-dev only."""
+    bloco = _service_block("executor-local")
+    redes = re.search(r"\n    networks:\n((?:      .*\n)+)", bloco + "\n").group(1)
+    assert [linha.strip() for linha in redes.splitlines() if linha.strip().startswith("- ")] == ["- executor-local-net"]
+    assert "executor-local-net" not in _service_block("api")
+    assert "executor-local-net" in _service_block("traefik-dev")

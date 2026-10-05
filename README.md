@@ -52,12 +52,14 @@ make bootstrap      # creates .env and strong secrets for you
 # Create the extensions once, as a superuser (the Atlans user does not need to be one):
 #   sudo -u postgres psql -d <banco> -c 'CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
 
-make up-dev         # starts Atlans
+make up-dev         # starts Atlans, with an executor to run your workflows
 docker compose exec api alembic upgrade head                 # prepares the database
 docker compose exec api python -m app.cli create-admin       # creates your first user
 ```
 
 Then open **http://localhost:3000** and sign in. 🎉
+
+Workflows run on executors, and `make up-dev` brings one up on its own: it enrolls and connects as soon as the database is migrated, with nothing to create by hand ([how it works](docs/reference.md#local-executor-development)). The first `make up-dev` takes a while longer because it builds the executor image.
 
 Going to a real server, with HTTPS and your own domain? Follow the step-by-step guide in [docs/self-hosting.md](docs/self-hosting.md).
 

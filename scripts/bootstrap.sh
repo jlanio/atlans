@@ -269,7 +269,7 @@ cat <<'EOF'
        <S3_HOST>       A  -> IP   (atras do CDN, se usar um)
 
   5. Suba:
-       make up-dev     # dev
+       make up-dev     # dev, ja com um executor local (cadastro automatico)
        make up-prod    # prod
        docker compose exec api alembic upgrade head        # dev (prod: api-prod)
        ./scripts/bootstrap-stepca.sh   # apenas prod, apos step-ca healthy

@@ -8,6 +8,10 @@ It applies to a clean production host, or when recreating the CA from scratch. *
 run it against a cluster with executors already in production** — it wipes the old CA and
 invalidates every issued cert.
 
+In development none of this is by hand: `make up-dev` brings up the CA, a
+Traefik for the executors host and one executor that enrolls on its own. See
+[Local executor](reference.md#local-executor-development).
+
 ## Fast path (recommended)
 
 Steps 1 to 8 of this document fit into these commands, with 1, 2 and 4 to 6

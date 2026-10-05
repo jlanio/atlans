@@ -1,0 +1,78 @@
+# traefik-dev/dynamic.yml
+#
+# File provider of traefik-dev (docker-compose.yml, profile executor-local): the
+# Traefik that serves ONLY the executors host in development. The site and the
+# API are still reached directly (localhost:3000 and localhost:8000), as in
+# plain `--profile dev`.
+#
+# The same mTLS contract as production (traefik-dynamic/dynamic.yml): the cert
+# header is stripped from every request and only set from a client certificate
+# that Traefik validated against the internal CA. The difference is where the
+# files come from: straight from the step-ca volume, mounted read-only at
+# /etc/step-ca. step-ca-dev writes the host certificate to /etc/step-ca/dev/
+# (scripts/executor-local/step-ca.sh), and the intermediate is the CA's own.
+
+http:
+  middlewares:
+    # Removes any client-sent copy of the header the API derives the executor's
+    # identity from (see the production file for the full reasoning).
+    strip-executor-cert-header:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Tls-Client-Cert-Info: ""
+          X-Forwarded-Tls-Client-Cert: ""
+
+    pass-executor-cert:
+      passTLSClientCert:
+        info:
+          subject:
+            commonName: true
+          serialNumber: true
+          sans: false
+
+    rate-internal:
+      rateLimit:
+        average: 10
+        burst: 5
+        period: 1m
+
+# MinIO for the local executor, which is alone with traefik-dev on its network:
+# the API signs MinIO URLs for localhost:9000, the executor's entrypoint
+# forwards that to this entrypoint, and this to MinIO. Plain TCP, so the
+# request (and its Host header, which the signature covers) arrives untouched.
+tcp:
+  routers:
+    minio-local:
+      entryPoints: ["minio"]
+      rule: "HostSNI(`*`)"
+      service: minio-local
+  services:
+    minio-local:
+      loadBalancer:
+        servers:
+          - address: "minio:9000"
+
+tls:
+  certificates:
+    - certFile: /etc/step-ca/dev/agents.crt
+      keyFile:  /etc/step-ca/dev/agents.key
+
+  options:
+    # Optional client certificate, validated when present: the enrollment comes
+    # without one (it authenticates with the OTP), every other executor route
+    # requires it in the API. Same reasoning as production.
+    mtls-executores:
+      clientAuth:
+        caFiles:
+          - /etc/step-ca/certs/intermediate_ca.crt
+        clientAuthType: VerifyClientCertIfGiven
+      minVersion: VersionTLS13
+      curvePreferences:
+        - X25519
+        - CurveP256
+
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /etc/step-ca/dev/agents.crt
+        keyFile:  /etc/step-ca/dev/agents.key
