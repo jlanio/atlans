@@ -90,7 +90,7 @@ The `docker-compose.yml` does **not** include PostgreSQL — the database is ext
 
 ### Local executor (`--profile executor-local`)
 
-`make up-dev` turns this profile on together with `dev`: one executor that enrolls and connects on its own (see [Local executor](#local-executor-development)). `make up-dev-sem-executor` leaves it out.
+`make up-dev` turns this profile on together with `dev`: one executor that enrolls and connects on its own (see [Local executor](#local-executor-development)). `make up-dev-no-executor` leaves it out.
 
 | Service | Image | Port | Description |
 |---|---|---|---|
@@ -159,7 +159,7 @@ The installation script (`GET /executores/install`) pins the CA certificate by S
 How it gets there:
 
 1. `step-ca-dev` creates the CA on the first boot (in the `step-ca-data` volume that `make bootstrap` creates), raises the certificate lifetime and issues the certificate of the executors host, before the CA starts. In production `make bootstrap-stepca` does the same by hand.
-2. `executor-local-init` (`python -m app.cli executor-local --vigiar`) creates the executor **Executor local (dev)** in the default pool, so every workspace can use it, and writes an enrollment OTP to a folder it shares with the executor. On a database without the schema it waits, and says to run `alembic upgrade head`.
+2. `executor-local-init` (`python -m app.cli executor-local --watch`) creates the executor **Executor local (dev)** in the default pool, so every workspace can use it, and writes an enrollment OTP to a folder it shares with the executor. On a database without the schema it waits, and says to run `alembic upgrade head`.
 3. `executor-local` (`scripts/executor-local/iniciar.py`) downloads the CA root from the API, runs `python -m executor enroll` with the OTP through `traefik-dev` and starts the executor.
 
 `executor-local-init` keeps checking every 15 seconds, so the executor also comes back by itself after a revocation on the Executores screen, a recreated database or a removed volume: a new OTP, or a new executor when the old one was revoked.
@@ -168,7 +168,7 @@ How it gets there:
 |---|---|
 | See what it is doing | `docker compose logs -f executor-local executor-local-init` |
 | Start the executor over (new keys and certificate) | `docker compose rm -sf executor-local executor-local-init && docker volume rm atlansapp_executor_local_data && make up-dev` |
-| Bring up dev without it | `make up-dev-sem-executor` |
+| Bring up dev without it | `make up-dev-no-executor` |
 
 Another executor on the same machine, outside Docker (the desktop app or `python -m executor enroll`), connects to `https://agents.localhost:8443`: `traefik-dev` publishes the executors host on the loopback. The OTP screen already announces that address in dev. Two things it needs first: the name has to resolve (many Linux and WSL setups do not resolve `*.localhost`), and the executor has to trust the internal CA, whose root the API serves on `localhost:8000`:
 
@@ -181,7 +181,7 @@ python -m executor
 
 `enroll` and the executor look for the root as `certs/atlans-root.crt` (the default `--cert-dir`).
 
-Optional `.env` variables: `EXECUTOR_LOCAL_HOST` (the executors host name, default `agents.localhost`), `EXECUTOR_LOCAL_PORTA` (the loopback port, default `8443`) and `EXECUTOR_LOCAL_MEMORIA` (the executor's memory ceiling, default `2G`).
+Optional `.env` variables: `EXECUTOR_LOCAL_HOST` (the executors host name, default `agents.localhost`), `EXECUTOR_LOCAL_PORT` (the loopback port, default `8443`) and `EXECUTOR_LOCAL_MEMORY` (the executor's memory ceiling, default `2G`).
 
 Two things specific to dev:
 
@@ -474,7 +474,7 @@ The API exposes aggregated run metrics (general, per workflow, per executor and 
 | `make bootstrap` | Creates the `step-ca-data` volume, `secrets/` and `.env` with strong secrets |
 | `make bootstrap-stepca` | Captures fingerprint + intermediate, raises step-ca's certificate lifetime and issues the `AGENTS_HOST` cert |
 | `make up-dev` / `make up-prod` | Starts the stack in dev (hot reload, with the [local executor](#local-executor-development)) / prod (Traefik + TLS) |
-| `make up-dev-sem-executor` | Starts dev without the local executor |
+| `make up-dev-no-executor` | Starts dev without the local executor |
 | `make down` | Stops and removes the containers of every profile (the volumes stay) |
 | `make logs` / `logs-dev` / `logs-prod` | Real-time logs (last 100 lines) |
 | `make restart` / `restart-prod` | Restarts the dev / prod stack |

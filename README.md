@@ -69,7 +69,7 @@ Atlans does not run workflows on the server: an **executor** does, a separate pr
 
 ```bash
 docker compose logs -f executor-local executor-local-init   # follow the enrollment
-make up-dev-sem-executor                                    # dev without it
+make up-dev-no-executor                                    # dev without it
 ```
 
 **2. Another executor on the same computer**, outside Docker: to use files or databases on your machine, or to test the desktop app. Under **Executores** in the dashboard, create the executor and generate its enrollment code, then, in the repository folder, with Python 3.12 and the [executor's dependencies](executor/README.md):

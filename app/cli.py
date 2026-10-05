@@ -151,10 +151,10 @@ def _cmd_executor_local(args: argparse.Namespace) -> int:
     from pathlib import Path
     from app.services import executor_local_service as local
 
-    pasta = Path(args.pasta)
-    if args.vigiar:
+    pasta = Path(args.dir)
+    if args.watch:
         try:
-            asyncio.run(local.vigiar(pasta, intervalo=args.intervalo))
+            asyncio.run(local.vigiar(pasta, intervalo=args.interval))
         except KeyboardInterrupt:
             pass
         return 0
@@ -181,12 +181,12 @@ def main(argv: list[str] | None = None) -> int:
         "executor-local",
         help="[Dev] Cria o executor local e grava o pedido de cadastro dele na pasta.",
     )
-    p_local.add_argument("--pasta", required=True, help="Pasta compartilhada com o container do executor.")
+    p_local.add_argument("--dir", required=True, help="Pasta compartilhada com o container do executor.")
     p_local.add_argument(
-        "--vigiar", action="store_true",
+        "--watch", action="store_true",
         help="Repete a verificacao para sempre (o container executor-local-init do compose).",
     )
-    p_local.add_argument("--intervalo", type=float, default=15.0, help="Segundos entre verificacoes (com --vigiar).")
+    p_local.add_argument("--interval", type=float, default=15.0, help="Segundos entre verificacoes (com --watch).")
     p_local.set_defaults(func=_cmd_executor_local)
 
     p_nodes = sub.add_parser(

@@ -185,7 +185,7 @@ services:
       # What the API announces as the executors host (the OTP screen, install.sh):
       # traefik-dev, published on the loopback (profile executor-local, below).
       # AGENTS_URL in .env still wins.
-      AGENTS_URL: ${AGENTS_URL:-https://${EXECUTOR_LOCAL_HOST:-agents.localhost}:${EXECUTOR_LOCAL_PORTA:-8443}}
+      AGENTS_URL: ${AGENTS_URL:-https://${EXECUTOR_LOCAL_HOST:-agents.localhost}:${EXECUTOR_LOCAL_PORT:-8443}}
     # A Postgres on the host itself is `host.docker.internal` in DATABASE_URL
     # (`localhost` inside the container is the container); on Linux the name
     # only exists with this extra_hosts, as in api-prod.
@@ -301,7 +301,7 @@ services:
   # executor that enrolls and connects on its own, so workflows run locally
   # without creating anything by hand. The real path, end to end: the internal
   # CA issues its certificate, Traefik validates it (mTLS) and the API reads the
-  # identity from the header, as in production. `make up-dev-sem-executor`
+  # identity from the header, as in production. `make up-dev-no-executor`
   # brings up only `dev`, as before.
   #
   #   step-ca-dev          the internal CA (the same step-ca-data as production)
@@ -358,7 +358,7 @@ services:
       # Loopback only: for an executor on this machine outside Docker (the
       # desktop app, `python -m executor`), at https://agents.localhost:8443.
       # The local executor talks to it over executor-local-net.
-      - "127.0.0.1:${EXECUTOR_LOCAL_PORTA:-8443}:443"
+      - "127.0.0.1:${EXECUTOR_LOCAL_PORT:-8443}:443"
     environment:
       DOCKER_API_VERSION: ${DOCKER_API_VERSION:-}
     volumes:
@@ -421,7 +421,7 @@ services:
     entrypoint: ["python", "/opt/executor-local/iniciar.py"]
     environment:
       EXECUTOR_SERVER_URL: wss://${EXECUTOR_LOCAL_HOST:-agents.localhost}
-      EXECUTOR_LOCAL_PASTA: /data/matricula
+      EXECUTOR_LOCAL_DIR: /data/matricula
       EXECUTOR_LOCAL_CA_URL: http://${EXECUTOR_LOCAL_HOST:-agents.localhost}/executores/ca-bundle
       # MinIO through traefik-dev's TCP entrypoint (the executor is not on proxy-net).
       EXECUTOR_LOCAL_MINIO: traefik-dev:9000
@@ -448,7 +448,7 @@ services:
       resources:
         limits:
           cpus: "2.0"
-          memory: ${EXECUTOR_LOCAL_MEMORIA:-2G}
+          memory: ${EXECUTOR_LOCAL_MEMORY:-2G}
 
   executor-local-init:
     profiles: ["executor-local"]
@@ -461,7 +461,7 @@ services:
       # own user, the same uid as this one: otherwise it would be born root's.
       executor-local:
         condition: service_started
-    command: ["python", "-m", "app.cli", "executor-local", "--pasta", "/data/matricula", "--vigiar"]
+    command: ["python", "-m", "app.cli", "executor-local", "--dir", "/data/matricula", "--watch"]
     environment:
       <<: *api-env
       FERNET_KEY: ${FERNET_KEY}
