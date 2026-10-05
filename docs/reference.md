@@ -170,7 +170,16 @@ How it gets there:
 | Start the executor over (new keys and certificate) | `docker compose rm -sf executor-local executor-local-init && docker volume rm atlansapp_executor_local_data && make up-dev` |
 | Bring up dev without it | `make up-dev-sem-executor` |
 
-Another executor on the same machine, outside Docker (the desktop app or `python -m executor enroll`), connects to `https://agents.localhost:8443`: `traefik-dev` publishes the executors host on the loopback. The OTP screen already announces that address in dev.
+Another executor on the same machine, outside Docker (the desktop app or `python -m executor enroll`), connects to `https://agents.localhost:8443`: `traefik-dev` publishes the executors host on the loopback. The OTP screen already announces that address in dev. Two things it needs first: the name has to resolve (many Linux and WSL setups do not resolve `*.localhost`), and the executor has to trust the internal CA, whose root the API serves on `localhost:8000`:
+
+```bash
+grep -q agents.localhost /etc/hosts || echo "127.0.0.1 agents.localhost" | sudo tee -a /etc/hosts
+mkdir -p certs && curl -s http://localhost:8000/executores/ca-bundle -o certs/atlans-root.crt
+python -m executor enroll --executor-id=<id> --otp=<código> --server=https://agents.localhost:8443
+python -m executor
+```
+
+`enroll` and the executor look for the root as `certs/atlans-root.crt` (the default `--cert-dir`).
 
 Optional `.env` variables: `EXECUTOR_LOCAL_HOST` (the executors host name, default `agents.localhost`), `EXECUTOR_LOCAL_PORTA` (the loopback port, default `8443`) and `EXECUTOR_LOCAL_MEMORIA` (the executor's memory ceiling, default `2G`).
 
