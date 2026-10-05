@@ -155,7 +155,7 @@ async def diagnosticar() -> Relatorio:
         url = make_url(DATABASE_URL)
         onde = _onde(url)
     except Exception:  # noqa: BLE001 — a malformed URL is the finding itself
-        rel.falha("DATABASE_URL nao e uma URL valida (postgresql+asyncpg://usuario:senha@host:5432/banco).")
+        rel.falha("DATABASE_URL nao e uma URL valida (postgresql+asyncpg://usuario:senha@host:5432/banco).")  # pragma: allowlist secret
         return rel
 
     try:
