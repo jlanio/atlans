@@ -49,6 +49,8 @@ cd atlans
 make bootstrap      # creates .env and strong secrets for you
 # Open .env and set DATABASE_URL to your Postgres (with the postgis and uuid-ossp extensions).
 # If Postgres runs on this same machine, use host.docker.internal instead of localhost.
+# Create the extensions once, as a superuser (the Atlans user does not need to be one):
+#   sudo -u postgres psql -d <banco> -c 'CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
 
 make up-dev         # starts Atlans
 docker compose exec api alembic upgrade head                 # prepares the database

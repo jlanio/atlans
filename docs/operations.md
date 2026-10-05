@@ -679,8 +679,11 @@ Common causes:
   fails on queries (`relation "..." does not exist`), run
   `docker compose exec api-prod alembic upgrade head`. If
   `alembic upgrade head` itself fails, check `DATABASE_URL` and the Postgres logs.
-- `psycopg2.errors.UndefinedObject: extension "postgis" does not exist` —
-  run `CREATE EXTENSION postgis;` and `uuid-ossp` on the database.
+- `psycopg2.errors.UndefinedObject: extension "postgis" does not exist` or
+  `InsufficientPrivilege: permission denied to create extension "postgis"` —
+  as a superuser, run `CREATE EXTENSION postgis;` and `uuid-ossp` on the database
+  ([self-hosting.md](self-hosting.md#the-database-extensions)), then
+  `alembic upgrade head` again: the migration is one transaction, nothing was half applied.
 - Wrong `STEPCA_PROVISIONER_PASSWORD` — the value is written by
   [bootstrap.sh](../scripts/bootstrap.sh) and must match
   `secrets/stepca_password.txt`;

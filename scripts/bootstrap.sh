@@ -252,18 +252,26 @@ cat <<'EOF'
        - MINIO_ROOT_USER ..... troque o change-me
        - AUTH_URL e MINIO_EXTERNAL_ENDPOINT ... as URLs publicas do site e do S3
 
-  2. (Apenas prod) coloque o certificado do site em ./certs/
+  2. Crie as extensoes no banco do DATABASE_URL, uma vez, como SUPERUSUARIO
+     (o usuario do Atlans nao precisa ser; sem isso o 'alembic upgrade head'
+     para em "permission denied to create extension postgis"):
+       sudo -u postgres psql -d <banco> -c 'CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+     Postgres em outro host: psql -h <host> -U postgres -d <banco> -c '...'
+     Gerenciado (RDS, Azure, Cloud SQL): use o usuario admin do provedor.
+
+  3. (Apenas prod) coloque o certificado do site em ./certs/
        cert.pem  e  key.pem (o de origem da Cloudflare, um do Let's Encrypt
        ou outro; ou aponte SSL_CERT_DIR para onde eles estao)
 
-  3. Configure o DNS:
+  4. Configure o DNS:
        <PUBLIC_HOST>   A  -> IP   (atras do CDN, se usar um)
        <AGENTS_HOST>   A  -> IP   (direto, NUNCA atras de CDN)  *obrigatorio*
        <S3_HOST>       A  -> IP   (atras do CDN, se usar um)
 
-  4. Suba:
+  5. Suba:
        make up-dev     # dev
        make up-prod    # prod
+       docker compose exec api alembic upgrade head        # dev (prod: api-prod)
        ./scripts/bootstrap-stepca.sh   # apenas prod, apos step-ca healthy
        make smoke
        make seed-admin
