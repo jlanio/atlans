@@ -10,8 +10,15 @@ import { cn } from "@/lib/utils"
 
 export type Modo = "chat" | "workspace"
 
-/** Where each side of the switch lands. Workspace opens on the Dashboard. */
-export const DESTINO_DO_MODO: Record<Modo, string> = { chat: "/", workspace: "/dashboard" }
+/**
+ * Where each side of the switch lands. Workspace opens on the Dashboard for the
+ * admin and on Projetos for everyone else: the Dashboard is admin-only
+ * (`proxy.ts`), so a user sent there would bounce back to the Home.
+ */
+export function destinoDoModo(modo: Modo, isAdmin: boolean): string {
+  if (modo === "chat") return "/"
+  return isAdmin ? "/dashboard" : "/projects"
+}
 
 /**
  * The attribute on `<html>` that names the switch while it animates
@@ -35,9 +42,9 @@ const ESPERA_MAXIMA_MS = 600
  * Without it neither side had a visible way to the other: the Home only had the
  * brand (to /projects, admin only) and the app's brand is just a label.
  *
- * **Admin only**, like every route outside the Home (`proxy.ts` sends the others
- * back to `/`): offering Workspace to someone who cannot open it would be a
- * button that does nothing. Fails closed while the session loads.
+ * **Every signed-in person**, admin or not: both sides open for any role
+ * (`proxy.ts` keeps only /admin and /dashboard for the admin). A session with
+ * no role does not see it, and neither does a session still loading.
  *
  * **Links, not buttons**: it is navigation, so middle-click and Ctrl+click open
  * the other side in a new tab, and `next/link` prefetches it. A plain click
@@ -64,7 +71,9 @@ export default function SeletorDeModo({
   const { isMobile, setOpenMobile } = useSidebar()
   const router = useViewTransitionRouter()
 
-  if (session?.user?.role !== "admin") return null
+  const role = session?.user?.role
+  if (!role) return null
+  const isAdmin = role === "admin"
 
   function trocar(destino: Modo, evento: MouseEvent<HTMLAnchorElement>) {
     if (destino === modo) {
@@ -80,7 +89,7 @@ export default function SeletorDeModo({
     evento.preventDefault()
     const html = document.documentElement
     html.setAttribute(ATRIBUTO_DA_TROCA, destino)
-    const transicao = router.push(DESTINO_DO_MODO[destino], { maxWaitMs: ESPERA_MAXIMA_MS })
+    const transicao = router.push(destinoDoModo(destino, isAdmin), { maxWaitMs: ESPERA_MAXIMA_MS })
     const limpar = () => html.removeAttribute(ATRIBUTO_DA_TROCA)
     if (transicao?.finished) transicao.finished.then(limpar, limpar)
     else limpar()
@@ -108,7 +117,7 @@ export default function SeletorDeModo({
         {lados.map(({ modo: lado, rotulo, Icone }) => (
           <Link
             key={lado}
-            href={DESTINO_DO_MODO[lado]}
+            href={destinoDoModo(lado, isAdmin)}
             onClick={(e) => trocar(lado, e)}
             aria-current={lado === modo ? "page" : undefined}
             className={cn(
@@ -133,7 +142,7 @@ export default function SeletorDeModo({
               tooltip={{ children: rotulo, className: portalClassName }}
             >
               <Link
-                href={DESTINO_DO_MODO[lado]}
+                href={destinoDoModo(lado, isAdmin)}
                 onClick={(e) => trocar(lado, e)}
                 aria-current={lado === modo ? "page" : undefined}
               >

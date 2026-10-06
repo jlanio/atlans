@@ -172,7 +172,7 @@ const AppSidebar = () => {
           <div className="flex-1 group-data-[collapsible=icon]:hidden" />
           <SidebarTrigger className="app-region-no-drag" size={'sm'} />
         </div>
-        {/* Chat / Workspace: the way back to the Home (admin only, as is every page here). */}
+        {/* Chat / Workspace: the way back to the Home. */}
         <SeletorDeModo modo="workspace" />
       </SidebarHeader>
       <SidebarContent>

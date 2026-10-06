@@ -7,6 +7,17 @@ import { auth, SESSION_HEADER, encodeSessionHeader } from "@/auth";
 import { destinoDaEntrada } from "@/lib/entrada";
 import { NextResponse } from "next/server";
 
+/**
+ * Pages only the system administrator opens: the platform's settings and users,
+ * and the Dashboard (the fleet-wide overview). The match is by segment, so
+ * `/administrative` would not be caught by `/admin`.
+ */
+const ROTAS_SO_ADMIN = ["/admin", "/dashboard"] as const
+
+function rotaSoAdmin(pathname: string): boolean {
+  return ROTAS_SO_ADMIN.some((rota) => pathname === rota || pathname.startsWith(rota + "/"))
+}
+
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const { pathname } = req.nextUrl;
@@ -54,18 +65,16 @@ export default auth((req) => {
       return NextResponse.redirect(new URL("/", req.url));
     }
 
-    // Whoever does not administer the system only reaches the Home — FOR NOW.
-    // It is the owner's direction: the Home (`/`) is the only page for non-admins,
-    // and the rest of the app (/projects, /workflow, /drive, /settings/tokens,
-    // /admin, /dashboard…) migrates into it gradually. It is not just an offer:
-    // the route returns `/` — an old link, a typed URL or the login callbackUrl
-    // land on the globe. Outside the gate: the /terra proxy (the Home lives on
-    // it; handled above) and the files in `public/`, which are not pages. A
-    // session without a role fails closed (the anonymous Home passes because it
-    // is `/`, not because it has a role). "For now" lives only in this
-    // condition — to reopen a route to non-admins, it gets an exception here.
+    // Whoever does not administer the system reaches the Home and the Workspace
+    // (the rest of the app: /projects, /workflow, /drive, /settings/tokens…), the
+    // two sides of the Chat / Workspace switcher. What stays admin-only are the
+    // routes in `ROTAS_SO_ADMIN`: an old link or a typed URL to one of them lands
+    // on the Home. The API still checks every call on its own; this gate decides
+    // which pages open. Outside it: the /terra proxy (handled above) and the
+    // files in `public/`, which are not pages. A session without a role fails
+    // closed, like a non-admin.
     const role = (req.auth as { user?: { role?: string } })?.user?.role;
-    if (role !== "admin" && pathname !== "/" && !looksLikeFile) {
+    if (role !== "admin" && !looksLikeFile && rotaSoAdmin(pathname)) {
       return NextResponse.redirect(new URL("/", req.url));
     }
   }

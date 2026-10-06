@@ -50,7 +50,7 @@ export const pt = {
       dica: "Arraste para redimensionar · duplo clique volta ao padrão",
     },
     projetos: "Projetos",
-    /** The Chat / Workspace switcher at the top of both bars (admin only). */
+    /** The Chat / Workspace switcher at the top of both bars (every signed-in person). */
     modo: { rotulo: "Modo", chat: "Chat", workspace: "Workspace" },
     novaConversa: "Nova conversa",
     noCatalogo: "No catálogo",

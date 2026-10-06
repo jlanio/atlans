@@ -36,7 +36,8 @@ import type { EntryMode } from "@/lib/entrada"
  *
  * **The brand is only a LINK for the system admin.** It was the Home's only
  * explicit navigation to the rest of the app (`/projects`); by the owner's
- * decision, whoever isn't admin stays on the Home, and the brand becomes a label —
+ * decision, for whoever isn't admin the brand is a label (their way to the rest
+ * of the app is the Chat / Workspace switcher right below) —
  * `Marca` without `href` already renders an inert `<span>`, with no hover
  * highlight, so the AFFORDANCE goes away too, not just the destination. And it
  * STAYS on the 3rem rail (`glifoNoTrilho`): collapsed, the bar hid the whole
@@ -122,7 +123,7 @@ export default function HomeSidebar() {
                 screen patterns) — the trigger's size-7 gives 28px. */}
             <SidebarTrigger className="app-region-no-drag max-md:size-10" size="sm" label={t.alternar} />
           </div>
-          {/* Chat / Workspace: renders only for the admin (the way out of the Home). */}
+          {/* Chat / Workspace: the way out of the Home, for every signed-in person. */}
           {!anonimo && <SeletorDeModo modo="chat" portalClassName="home-portal" />}
           {!anonimo && (
             <SidebarMenu>

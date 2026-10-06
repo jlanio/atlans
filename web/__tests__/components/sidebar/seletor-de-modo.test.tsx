@@ -71,8 +71,28 @@ afterEach(() => {
 })
 
 describe("SeletorDeModo", () => {
-  it("só existe para o admin — quem não é admin não sai da Home", () => {
+  it("o usuário comum também alterna: o Workspace dele abre em Projetos", () => {
     sessao.papel = "user"
+    montar("chat")
+    expect(lado("/")).toHaveTextContent("Chat")
+    expect(lado("/projects")).toHaveTextContent("Workspace")
+    expect(lado("/dashboard")).toBeNull()
+
+    fireEvent.click(lado("/projects"))
+    expect(roteador.push).toHaveBeenCalledWith("/projects", { maxWaitMs: 600 })
+    expect(document.documentElement.getAttribute(ATRIBUTO_DA_TROCA)).toBe("workspace")
+  })
+
+  it("no Workspace, o usuário comum volta para a Home", () => {
+    sessao.papel = "user"
+    montar("workspace")
+    expect(lado("/projects")).toHaveAttribute("aria-current", "page")
+    fireEvent.click(lado("/"))
+    expect(roteador.push).toHaveBeenCalledWith("/", { maxWaitMs: 600 })
+  })
+
+  it("sessão sem papel não vê o seletor (falha fechada)", () => {
+    sessao.papel = ""
     montar("chat")
     expect(screen.queryByRole("navigation")).toBeNull()
     expect(screen.queryAllByRole("link")).toHaveLength(0)
@@ -85,7 +105,7 @@ describe("SeletorDeModo", () => {
     expect(screen.queryAllByRole("link")).toHaveLength(0)
   })
 
-  it("Chat leva à Home e Workspace ao Dashboard, com o lado atual marcado", () => {
+  it("admin: Chat leva à Home e Workspace ao Dashboard, com o lado atual marcado", () => {
     montar("chat")
     expect(lado("/")).toHaveTextContent("Chat")
     expect(lado("/")).toHaveAttribute("aria-current", "page")
