@@ -119,6 +119,6 @@ def test_create_admin_le_a_senha_da_entrada(monkeypatch):
         visto.update(email=email, password=password)
         return 0
     monkeypatch.setattr(cli, "_create_admin", falso)
-    monkeypatch.setattr("sys.stdin", __import__("io").StringIO("senha-forte-12345\n"))
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO("senha-forte-12345\n"))  # pragma: allowlist secret
     assert cli.main(["create-admin", "--email", "a@x.org", "--password-stdin"]) == 0
-    assert visto == {"email": "a@x.org", "password": "senha-forte-12345"}
+    assert visto == {"email": "a@x.org", "password": "senha-forte-12345"}  # pragma: allowlist secret
