@@ -3,10 +3,9 @@ import { cleanup, render, screen } from "@testing-library/react"
 import type { ComponentProps } from "react"
 
 /**
- * "Dashboard" in the side menu belongs to the system administrator for now: it
- * appears only for admin (the same conditional pattern as "Executores"). "Projetos"
- * stays for everyone. The middleware is what blocks the route; here only the
- * path is hidden.
+ * "Dashboard" and "Projetos" in the side menu are for everyone: the API filters
+ * the Dashboard's numbers (the admin sees the whole fleet, everyone else only
+ * their own workspaces). The "Admin" group stays for the admin.
  */
 
 const sessao = vi.hoisted(() => ({ role: "user" as "user" | "admin" }))
@@ -58,19 +57,22 @@ import AppSidebar from "@/app/components/sidebar/app-sidebar"
 
 afterEach(cleanup)
 
-describe("AppSidebar — Dashboard só para admin", () => {
-  it("não-admin não vê Dashboard, mas vê Projetos", () => {
+describe("AppSidebar — Dashboard para todos, Admin só para admin", () => {
+  it("não-admin vê Dashboard e Projetos, sem o grupo Admin", () => {
     sessao.role = "user"
     render(<AppSidebar />)
-    expect(screen.queryByText("Dashboard")).toBeNull()
+    expect(screen.getByText("Dashboard")).toBeTruthy()
     expect(screen.getByText("Projetos")).toBeTruthy()
+    expect(screen.queryByText("Usuários")).toBeNull()
+    expect(screen.queryByText("Configurações")).toBeNull()
   })
 
-  it("admin vê Dashboard e Projetos", () => {
+  it("admin vê Dashboard, Projetos e o grupo Admin", () => {
     sessao.role = "admin"
     render(<AppSidebar />)
     expect(screen.getByText("Dashboard")).toBeTruthy()
     expect(screen.getByText("Projetos")).toBeTruthy()
+    expect(screen.getByText("Usuários")).toBeTruthy()
   })
 
   it("o menu de conta segue no tema do app — a paleta da Home é só da Home", () => {

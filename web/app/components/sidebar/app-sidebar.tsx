@@ -34,11 +34,10 @@ const organizationSection = [
 ]
 
 // Automation: creating and executing workflows.
-// "Dashboard" belongs to the system administrator for now: inserted only for admin
-// in AppSidebar, the same pattern as "Executores". The middleware blocks the route;
-// here we only hide the path from whoever can't reach it.
-const dashboardItem = { title: "Dashboard", url: "/dashboard", icon: TbLayoutDashboard }
-const automationBase = [
+// "Dashboard" is for everyone: the API filters its numbers (the admin sees the
+// whole fleet, everyone else only their own workspaces).
+const automationSection = [
+  { title: "Dashboard",      url: "/dashboard",     icon: TbLayoutDashboard },
   { title: "Projetos",       url: "/projects",      icon: TbFolders },
 ]
 
@@ -156,7 +155,6 @@ const AppSidebar = () => {
   // can grant quota but the user doesn't see the path to create.
   const showExecutors = isAdmin || hasAgents || quota > 0
   const resourcesSection = showExecutors ? [executorsItem, ...resourcesBase] : resourcesBase
-  const automationSection = isAdmin ? [dashboardItem, ...automationBase] : automationBase
 
   return (
     <Sidebar collapsible="icon" className="border-border">
@@ -172,7 +170,7 @@ const AppSidebar = () => {
           <div className="flex-1 group-data-[collapsible=icon]:hidden" />
           <SidebarTrigger className="app-region-no-drag" size={'sm'} />
         </div>
-        {/* Chat / Workspace: the way back to the Home (admin only, as is every page here). */}
+        {/* Chat / Workspace: the way back to the Home. */}
         <SeletorDeModo modo="workspace" />
       </SidebarHeader>
       <SidebarContent>

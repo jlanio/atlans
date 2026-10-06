@@ -20,20 +20,15 @@ interface CommandItem {
   icon: React.ElementType
   action: () => void
   group: string
-  // Items for the system administrator only. Dashboard, Users and Settings
-  // are admin routes: without this mark the palette offered them to everyone and
-  // only the gate blocked — a path that ended in a redirect.
-  //
-  // TODAY the mark changes nothing: a non-admin only reaches the Home (`proxy.ts`
-  // returns `/` on every other page), and on the Home the palette does not open
-  // for them (`paletaDisponivel`) — they never see it. It stays for the day a
-  // route is reopened to non-admins (the exception goes into `proxy.ts`): then
-  // the palette opens for them again, and these three stay admin-only.
+  // Items for the system administrator only. Users and Settings are admin
+  // routes (`proxy.ts` keeps /admin for the admin): without this mark the
+  // palette offered them to everyone and only the gate blocked — a path that
+  // ended in a redirect.
   admin?: boolean
 }
 
 export const STATIC_ITEMS = (router: ReturnType<typeof useRouter>): CommandItem[] => [
-  { id: "dashboard",      label: "Dashboard",       icon: TbLayoutDashboard, group: "Navegar",    action: () => router.push("/dashboard"),      description: "Visão geral", admin: true },
+  { id: "dashboard",      label: "Dashboard",       icon: TbLayoutDashboard, group: "Navegar",    action: () => router.push("/dashboard"),      description: "Visão geral" },
   { id: "projects",       label: "Projetos",         icon: TbFolders,         group: "Navegar",    action: () => router.push("/projects"),       description: "Workflows" },
   { id: "observability",  label: "Histórico",         icon: TbActivity,        group: "Navegar",    action: () => router.push("/observability"),  description: "Execuções e métricas" },
   { id: "artifacts",      label: "Artefatos",        icon: TbPackage,         group: "Navegar",    action: () => router.push("/artifacts"),      description: "Outputs" },
@@ -47,8 +42,7 @@ export const STATIC_ITEMS = (router: ReturnType<typeof useRouter>): CommandItem[
 ]
 
 // Hides admin items from non-admins. Pure and exported for testing — the
-// visibility rule depends on neither render nor session. No-op as long as
-// non-admins have no palette (see the `admin` mark above).
+// visibility rule depends on neither render nor session.
 export function itensVisiveis(itens: CommandItem[], isAdmin: boolean): CommandItem[] {
   return itens.filter(item => !item.admin || isAdmin)
 }
@@ -66,11 +60,10 @@ export function itensVisiveis(itens: CommandItem[], isAdmin: boolean): CommandIt
  * `loadItems` does not run: gone is the `getWorkflows()` that fired on every
  * Ctrl+K on the Home.
  *
- * This is NOT access control: what blocks is `proxy.ts`, which today returns
- * `/` to non-admins on EVERY page outside the Home. So, for now, a non-admin
- * never sees the palette — here it does not open, and outside here they do not
- * get. What this function decides is the OFFER, and it matters again when a
- * route is reopened to non-admins.
+ * This is NOT access control: what blocks is `proxy.ts`, which keeps /admin for
+ * the admin. A non-admin goes to the Workspace through the
+ * Chat / Workspace switcher, and the palette opens for them there. What this
+ * function decides is only the OFFER on the Home.
  *
  * EXACT equality with `"/"`, never `startsWith` — the precedent is
  * `shell-sidebar.tsx`, where a prefix would match every app route.
