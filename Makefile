@@ -13,8 +13,9 @@ TODOS_OS_PERFIS = --profile dev --profile executor-local --profile prod
 
 # ── Bootstrap & ops ──────────────────────────────────────────────────────────
 
-# Asks for the database (and, for production, the domain and the e-mail).
-# `make bootstrap ARGS=--no-prompt` asks nothing.
+# Asks for the language, the database (and, for production, the domain and the
+# e-mail), and checks the internal CA. `make bootstrap ARGS=--no-prompt` asks
+# nothing; ARGS="--lang en" picks the language (pt, en, es).
 bootstrap:
 	./scripts/bootstrap.sh $(ARGS)
 
@@ -40,14 +41,17 @@ backup-stepca:
 
 # ── Compose ──────────────────────────────────────────────────────────────────
 
+# up-dev / up-prod go through scripts/up.sh: they bring the stack up and leave
+# it ready (migrations, first admin, local executor online), in the language of
+# ATLANS_LANG. ARGS passes options (--yes, --no-prompt; see scripts/up.sh).
 up-dev:
-	docker compose $(PERFIS_DEV) up -d --build
+	./scripts/up.sh dev $(ARGS)
 
 up-dev-no-executor:
-	docker compose --profile dev up -d --build
+	./scripts/up.sh dev --no-executor $(ARGS)
 
 up-prod:
-	docker compose --profile prod up -d --build
+	./scripts/up.sh prod $(ARGS)
 
 down:
 	docker compose $(TODOS_OS_PERFIS) down
@@ -62,10 +66,10 @@ logs-prod:
 	docker compose --profile prod logs -f --tail=100
 
 restart:
-	docker compose $(TODOS_OS_PERFIS) down && docker compose $(PERFIS_DEV) up -d --build
+	docker compose $(TODOS_OS_PERFIS) down && ./scripts/up.sh dev $(ARGS)
 
 restart-prod:
-	docker compose $(TODOS_OS_PERFIS) down && docker compose --profile prod up -d --build
+	docker compose $(TODOS_OS_PERFIS) down && ./scripts/up.sh prod $(ARGS)
 
 build-dev:
 	docker compose $(PERFIS_DEV) build

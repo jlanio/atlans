@@ -471,9 +471,9 @@ The API exposes aggregated run metrics (general, per workflow, per executor and 
 
 | Command | Description |
 |---|---|
-| `make bootstrap` | Creates the `step-ca-data` volume, `secrets/` and `.env` with strong secrets, and asks for the database (and, for production, the hosts and the e-mail). `ARGS=--no-prompt` asks nothing |
+| `make bootstrap` | Guided setup in stages (`scripts/bootstrap.sh`): the language of the scripts (pt, en, es; `ATLANS_LANG` in `.env`), the `step-ca-data` volume, `secrets/` and `.env` with strong secrets, the internal CA password (it realigns `.env` and `secrets/` with a CA left by an earlier install), the database (tested before it is saved) and, for production, the hosts and the e-mail. `ARGS=--no-prompt` asks nothing; `ARGS="--lang en"` picks the language |
 | `make bootstrap-stepca` | Captures fingerprint + intermediate, raises step-ca's certificate lifetime and issues the `AGENTS_HOST` cert |
-| `make up-dev` / `make up-prod` | Starts the stack in dev (hot reload, with the [local executor](#local-executor-development)) / prod (Traefik + TLS) |
+| `make up-dev` / `make up-prod` | Starts the stack in dev (hot reload, with the [local executor](#local-executor-development)) / prod, through `scripts/up.sh`: checks, start, health, migrations (prod asks first), the CA second phase (prod), the first admin and, in dev, the local executor online. `ARGS=--yes` / `--no-prompt` for scripts |
 | `make up-dev-no-executor` | Starts dev without the local executor |
 | `make check-db` | Checks `DATABASE_URL` with the API's own code: connection, login, the postgis/uuid-ossp extensions and the schema (read-only; `SERVICE=api-prod` in production) |
 | `make down` | Stops and removes the containers of every profile (the volumes stay) |

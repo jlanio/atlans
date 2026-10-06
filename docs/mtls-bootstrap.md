@@ -19,9 +19,10 @@ inside the scripts. On a clean host:
 
 ```bash
 make bootstrap            # creates the volume, secrets/, .env
-make up-prod              # brings up step-ca + the other services
-docker compose exec api-prod alembic upgrade head  # the schema, before recreating the API
-make bootstrap-stepca     # fingerprint, intermediate, cert lifetime and the AGENTS_HOST cert
+make up-prod              # brings up step-ca + the other services, migrates, and on the first run
+                          # runs bootstrap-stepca (fingerprint, intermediate, cert lifetime and the
+                          # AGENTS_HOST cert), recreates the API and restarts Traefik
+# By hand, the same steps: docker compose exec api-prod alembic upgrade head; make bootstrap-stepca
 docker compose --profile prod up -d api-prod      # recreates the API: only then does it read the new .env
 docker compose --profile prod restart traefik     # loads the certificates
 make backup-stepca        # immediate backup (do it before something goes wrong)
