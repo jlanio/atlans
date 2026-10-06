@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/media/atlans-promo.webp" width="100%" alt="Atlans in 27 seconds: a block is added and connected in the editor, the workflow runs with each block lighting up, the resulting map comes out, and the dashboard shows every run"/>
+  <img src="docs/media/atlans-promo.webp" width="100%" alt="Atlans in 28 seconds: a block is added and connected in the editor, a hotspot analysis runs with each block lighting up, its statistics per region come out in the run panel, and the dashboard shows every run"/>
 </p>
 
 ---
