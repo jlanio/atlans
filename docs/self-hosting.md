@@ -171,16 +171,30 @@ From then on the migration's `IF NOT EXISTS` finds them and moves on.
 ## 3. Bring it up
 
 ```bash
-make up-prod                # constrói as imagens e sobe a stack; a step-ca cria a CA no 1º boot
-docker compose exec api-prod alembic upgrade head        # cria o schema (a API já está de pé, esperando por ele)
-make bootstrap-stepca       # fingerprint da CA no .env, prazo dos certificados e o cert do AGENTS_HOST
-docker compose --profile prod up -d api-prod      # recria a API: só assim ela lê o .env novo
-docker compose --profile prod restart traefik     # carrega os certificados
-
+make up-prod                # sobe a stack, aplica as migrações, emite os certificados internos e cria o admin
 make backup-stepca          # o primeiro backup da CA, antes de qualquer outra coisa
 make smoke                  # confere API, schema, Redis, MinIO, step-ca, web, o instalador dos executores e o AGENTS_HOST
-make seed-admin             # cria o admin (pede e-mail e senha)
 ```
+
+`make up-prod` (`scripts/up.sh prod`) goes in stages and stops at the first one
+that fails, saying what to do:
+
+1. checks that the bootstrap ran, that Docker answers and that the internal CA
+   opens with the password in `.env`;
+2. `docker compose --profile prod up -d --build` (the step-ca creates the CA on
+   the first boot);
+3. waits for `api-prod` to answer;
+4. `alembic upgrade head`: on the first run it creates the schema; on a database
+   that already has one it **asks before migrating** (`ARGS=--yes` answers yes);
+5. on the first run, `scripts/bootstrap-stepca.sh` (the CA fingerprint in
+   `.env`, the certificate lifetime and the `AGENTS_HOST` certificate), then it
+   recreates `api-prod` and restarts Traefik so they read them;
+6. creates the first admin when there is none (it asks for the e-mail and the
+   password, which never goes on a command line);
+7. the addresses and the everyday commands.
+
+Without a terminal (CI, a deploy script) it asks nothing: what would need an
+answer is only reported, with the command to run.
 
 A container reads the `.env` only when it is created: after changing the `.env`, it is
 `docker compose --profile prod up -d <serviço>`, not `restart`.
@@ -195,9 +209,9 @@ still stops at "Pool overlaps with other one on this address space", a network
 created after the bootstrap took the range: run `make bootstrap` again, or pick
 a free one by hand (see `PROXY_NET_SUBNET` in `.env.example`).
 
-Migrations never run on their own: the `alembic upgrade head` comes back with every
-version that changes the schema. The manual step-by-step procedure for the CA is in
-[mtls-bootstrap.md](mtls-bootstrap.md).
+The API never migrates on its own: `make up-prod` applies the migrations after
+asking, and by hand it is `docker compose --profile prod exec api-prod alembic upgrade head`.
+The manual step-by-step procedure for the CA is in [mtls-bootstrap.md](mtls-bootstrap.md).
 
 Open `https://<PUBLIC_HOST>` and sign in with the admin.
 

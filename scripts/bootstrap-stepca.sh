@@ -130,6 +130,9 @@ else
     ok "Cert $AGENTS_DOMAIN emitido para traefik/atlans-ca/."
 fi
 
+# Called from scripts/up.sh (make up-prod), which does these steps itself.
+[ -n "${ATLANS_UP:-}" ] && exit 0
+
 cat <<EOF
 
 ╭──────────────────────────────────────────────────────────────────╮

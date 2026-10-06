@@ -9,6 +9,8 @@ Available commands:
                    the postgis/uuid-ossp extensions and the schema (read-only).
     executor-local Creates the dev executor and leaves its enrollment request in
                    a folder (development only; see app/services/executor_local_service.py).
+    status         The installation in one JSON line: schema, admins and
+                   executors online (read by scripts/up.sh).
     migrar-nos     Rewrites saved workflows with old node names (dry run
                    by default; writes with --aplicar). See app/services/nos_renomeados.py.
 """
@@ -95,6 +97,9 @@ async def _create_admin(email: str, password: str, username: str | None) -> int:
 def _cmd_create_admin(args: argparse.Namespace) -> int:
     email = args.email or input("Email do admin: ").strip()
     password = args.password
+    if args.password_stdin:
+        # From a script (scripts/up.sh): the password never goes on a command line.
+        password = sys.stdin.readline().rstrip("\n")
     if not password:
         password = getpass.getpass("Senha (>=12 chars): ")
         confirm = getpass.getpass("Confirme a senha: ")
@@ -158,6 +163,19 @@ def _cmd_check_db(args: argparse.Namespace) -> int:
     return 0 if relatorio.ok else 1
 
 
+def _cmd_status(args: argparse.Namespace) -> int:
+    import json
+    from app.services.diagnostico_banco import explicar_falha
+    from app.services.situacao_instalacao import situacao
+
+    try:
+        print(json.dumps(asyncio.run(situacao()), ensure_ascii=False))
+    except Exception as exc:  # noqa: BLE001 — one line instead of a traceback
+        print(explicar_falha(exc, "DATABASE_URL"), file=sys.stderr)
+        return 1
+    return 0
+
+
 def _cmd_executor_local(args: argparse.Namespace) -> int:
     from pathlib import Path
     from app.services import executor_local_service as local
@@ -186,6 +204,10 @@ def main(argv: list[str] | None = None) -> int:
     p_admin.add_argument("--email", help="Email do admin. Se omitido, pergunta interativamente.")
     p_admin.add_argument("--password", help="Senha do admin. Se omitido, pergunta interativamente.")
     p_admin.add_argument("--username", help="Username opcional. Default: parte antes do @ do email.")
+    p_admin.add_argument(
+        "--password-stdin", action="store_true",
+        help="Le a senha da primeira linha da entrada padrao (para scripts).",
+    )
     p_admin.set_defaults(func=_cmd_create_admin)
 
     p_check = sub.add_parser(
@@ -193,6 +215,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Confere o DATABASE_URL como a API o usa: conexao, login, extensoes e schema.",
     )
     p_check.set_defaults(func=_cmd_check_db)
+
+    p_status = sub.add_parser(
+        "status", help="A instalacao numa linha JSON: schema, admins e executores online.",
+    )
+    p_status.set_defaults(func=_cmd_status)
 
     p_local = sub.add_parser(
         "executor-local",

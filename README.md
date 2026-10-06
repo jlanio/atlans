@@ -50,28 +50,30 @@ You need **Docker** (with Compose v2.17 or newer), **make**, **openssl** and a *
 git clone https://github.com/jlanio/atlans-studio.git atlans
 cd atlans
 
-make bootstrap      # asks for your Postgres, tests the connection, and creates .env with strong secrets
-# Postgres on this same machine is host.docker.internal (the suggested default), not localhost.
-# To fill .env by hand instead: make bootstrap ARGS=--no-prompt
-# Create the postgis and uuid-ossp extensions once, as a superuser (the Atlans user does not need to be one):
-#   sudo -u postgres psql -d <banco> -c 'CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+make bootstrap      # guided setup: language, your Postgres (tested before it is saved), secrets
+make up-dev         # starts Atlans, prepares the database, creates your first user and connects an executor
+```
 
-make up-dev         # starts Atlans, with an executor to run your workflows
-docker compose exec api alembic upgrade head                 # prepares the database
-docker compose exec api python -m app.cli create-admin       # creates your first user
+Both go step by step, in Portuguese, English or Spanish (chosen at the start, `ARGS="--lang en"` to change it), and say what to do when something is wrong. Postgres on this same machine is `host.docker.internal` (the suggested default), not `localhost`. If the Atlans user is not a superuser, create the postgis and uuid-ossp extensions once, as one (the bootstrap tells you when, with the exact command):
+
+```bash
+sudo -u postgres psql -d <banco> -c 'CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
 ```
 
 Then open **http://localhost:3000** and sign in. 🎉
 
 **Something wrong with the database?** `make check-db` checks it the way the API uses it and says what to fix: whether it connects, the login (password, LDAP, `pg_hba.conf`), the postgis and uuid-ossp extensions, and whether the schema was created. It changes nothing, and it works even with the API down. `make bootstrap` runs the same kind of test right after you answer, and lets you correct the answers before it writes them.
 
+**The executor does not connect?** `make bootstrap` again: it checks that the internal CA opens with the password in `.env` and `secrets/` (a CA left by an earlier install keeps its own password) and realigns them without losing anything.
+
 | Command | What it does |
 |---|---|
-| `make bootstrap` | Creates `.env` and the secrets, asks for the database (and, for production, the domain and the e-mail) and tests it |
+| `make bootstrap` | Guided setup: the language, the secrets, the internal CA, the database (tested before it is saved) and, for production, the domain and the e-mail. Running it again checks everything and fixes what drifted |
 | `make bootstrap ARGS=--no-prompt` | The same, without questions: you edit `.env` by hand |
-| `make up-dev` | Starts Atlans for development, with the local executor |
+| `make up-dev` | Starts Atlans for development: applies the migrations, creates the first admin if there is none and waits for the local executor to connect |
 | `make up-dev-no-executor` | Starts it without the local executor |
 | `make check-db` | Checks the database connection, the extensions and the schema (production: `make check-db SERVICE=api-prod`) |
+| `make up-prod` | The same for production: asks before migrating a database that already has a schema and issues the executors' certificates on the first run |
 | `make down` | Stops everything (the data stays) |
 
 Going to a real server, with HTTPS and your own domain? Follow the step-by-step guide in [docs/self-hosting.md](docs/self-hosting.md).
