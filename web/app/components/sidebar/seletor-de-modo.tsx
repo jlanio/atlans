@@ -12,8 +12,8 @@ export type Modo = "chat" | "workspace"
 
 /**
  * Where each side of the switch lands. Workspace opens on the Dashboard for the
- * admin and on Projetos for everyone else: the Dashboard is admin-only
- * (`proxy.ts`), so a user sent there would bounce back to the Home.
+ * admin and on Projetos for everyone else (the owner's choice: the Dashboard is
+ * open to them too, one click away in the bar).
  */
 export function destinoDoModo(modo: Modo, isAdmin: boolean): string {
   if (modo === "chat") return "/"
@@ -43,7 +43,7 @@ const ESPERA_MAXIMA_MS = 600
  * brand (to /projects, admin only) and the app's brand is just a label.
  *
  * **Every signed-in person**, admin or not: both sides open for any role
- * (`proxy.ts` keeps only /admin and /dashboard for the admin). A session with
+ * (`proxy.ts` keeps only /admin for the admin). A session with
  * no role does not see it, and neither does a session still loading.
  *
  * **Links, not buttons**: it is navigation, so middle-click and Ctrl+click open

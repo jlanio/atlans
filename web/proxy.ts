@@ -8,11 +8,12 @@ import { destinoDaEntrada } from "@/lib/entrada";
 import { NextResponse } from "next/server";
 
 /**
- * Pages only the system administrator opens: the platform's settings and users,
- * and the Dashboard (the fleet-wide overview). The match is by segment, so
- * `/administrative` would not be caught by `/admin`.
+ * Pages only the system administrator opens: the platform's settings and users.
+ * The match is by segment, so `/administrative` would not be caught by `/admin`.
+ * The Dashboard is NOT here: its numbers come filtered by the API (the admin sees
+ * the whole fleet, everyone else only their own workspaces).
  */
-const ROTAS_SO_ADMIN = ["/admin", "/dashboard"] as const
+const ROTAS_SO_ADMIN = ["/admin"] as const
 
 function rotaSoAdmin(pathname: string): boolean {
   return ROTAS_SO_ADMIN.some((rota) => pathname === rota || pathname.startsWith(rota + "/"))
@@ -66,7 +67,7 @@ export default auth((req) => {
     }
 
     // Whoever does not administer the system reaches the Home and the Workspace
-    // (the rest of the app: /projects, /workflow, /drive, /settings/tokens…), the
+    // (the rest of the app: /dashboard, /projects, /workflow, /drive…), the
     // two sides of the Chat / Workspace switcher. What stays admin-only are the
     // routes in `ROTAS_SO_ADMIN`: an old link or a typed URL to one of them lands
     // on the Home. The API still checks every call on its own; this gate decides

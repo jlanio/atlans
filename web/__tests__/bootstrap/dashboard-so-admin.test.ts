@@ -1,10 +1,10 @@
 /**
  * Whoever does not administer the system reaches the Home (`/`) and the Workspace
- * (the rest of the app, the other side of the Chat / Workspace switcher); only
- * /admin and /dashboard stay for the admin, and the middleware returns `/` for
- * them. The /terra proxy is never redirected and the files in public/ are not
+ * (the rest of the app, the other side of the Chat / Workspace switcher, the
+ * Dashboard included); only /admin stays for the admin, and the middleware
+ * returns `/` for it. The /terra proxy is never redirected and the files in public/ are not
  * pages. This test locks the gate: admin gets through everything, non-admin
- * everything but /admin and /dashboard, a session with no role fails closed.
+ * everything but /admin, a session with no role fails closed.
  *
  * And the SESSION gate: the Home opens without a session (sign-in is a modal on the
  * first submit) and is never redirected — not even with an expired session, which
@@ -53,24 +53,23 @@ async function destino(pathname: string, role: Papel | null, auth?: unknown): Pr
 const caminho = (loc: string | null) => new URL(loc as string).pathname
 
 describe("portão de papel: quem não é admin alcança a Home e o Workspace", () => {
-  it("não-admin entra no Workspace: as páginas fora de /admin e /dashboard passam", async () => {
+  it("não-admin entra no Workspace: as páginas fora de /admin passam, o Dashboard também", async () => {
     for (const p of [
-      "/projects", "/workflow/abc", "/drive", "/settings/tokens", "/workspaces",
+      "/dashboard", "/dashboard/qualquer", "/projects", "/workflow/abc", "/drive", "/settings/tokens", "/workspaces",
       "/credentials", "/executores", "/observability", "/artifacts",
     ]) {
       expect(await destino(p, "user"), p).toBeNull()
     }
   })
 
-  it("/dashboard e /admin continuam só do admin: não-admin volta para a Home", async () => {
-    for (const p of ["/dashboard", "/dashboard/qualquer", "/admin", "/admin/users", "/admin/settings"]) {
+  it("/admin continua só do admin: não-admin volta para a Home", async () => {
+    for (const p of ["/admin", "/admin/users", "/admin/settings"]) {
       expect(caminho(await destino(p, "user")), p).toBe("/")
     }
   })
 
   it("o casamento é por segmento: /administrativo não é /admin", async () => {
     expect(await destino("/administrativo", "user")).toBeNull()
-    expect(await destino("/dashboards-publicos", "user")).toBeNull()
   })
 
   it("não-admin em / passa (sem redirect)", async () => {
@@ -88,9 +87,8 @@ describe("portão de papel: quem não é admin alcança a Home e o Workspace", (
     expect(await destino("/icons/marca.png", "user")).toBeNull()
   })
 
-  it("sessão sem papel falha fechada: /admin e /dashboard voltam para a Home", async () => {
+  it("sessão sem papel falha fechada: /admin volta para a Home", async () => {
     expect(caminho(await destino("/admin/users", null, { user: {} }))).toBe("/")
-    expect(caminho(await destino("/dashboard", null, { user: {} }))).toBe("/")
   })
 
   it("admin passa em tudo: /projects, /dashboard, /admin", async () => {

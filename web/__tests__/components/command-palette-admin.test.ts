@@ -1,12 +1,9 @@
 /**
- * Admin items of the command palette. Dashboard, Usuários and Configurações are
- * system administrator routes — before, the palette offered them to everyone and only the
- * middleware blocked them, ending in a redirect. Now they carry the `admin` mark and
- * `itensVisiveis` hides them from non-admins.
- *
- * Today the mark does not change what anyone sees: a non-admin only reaches the Home
- * (`proxy.ts`), where the palette does not open for them. It protects the day a
- * route is reopened to non-admins — and that is why it is still tested.
+ * Admin items of the command palette. Usuários and Configurações are system
+ * administrator routes (`proxy.ts` keeps /admin for the admin) — before, the
+ * palette offered them to everyone and only the middleware blocked them, ending
+ * in a redirect. They carry the `admin` mark and `itensVisiveis` hides them from
+ * non-admins. The Dashboard is open to everyone (the API filters its numbers).
  *
  * Tested at the pure level (the function and the list, no render): the visibility rule
  * depends on neither the session nor the DOM.
@@ -18,13 +15,14 @@ import { STATIC_ITEMS, itensVisiveis, paletaDisponivel } from "@/app/components/
 const router = { push: vi.fn() } as any
 const ids = (itens: { id: string }[]) => itens.map(i => i.id)
 
-const SO_ADMIN = ["dashboard", "users", "settings"]
+const SO_ADMIN = ["users", "settings"]
 
 describe("itensVisiveis", () => {
   it("esconde os itens de admin de quem não é admin", () => {
     const visiveis = ids(itensVisiveis(STATIC_ITEMS(router), false))
     for (const id of SO_ADMIN) expect(visiveis).not.toContain(id)
     // The rest stays visible.
+    expect(visiveis).toContain("dashboard")
     expect(visiveis).toContain("projects")
     expect(visiveis).toContain("drive")
     expect(visiveis).toContain("new-workflow")
@@ -40,7 +38,7 @@ describe("itensVisiveis", () => {
     for (const id of SO_ADMIN) expect(visiveis).toContain(id)
   })
 
-  it("exatamente Dashboard, Usuários e Configurações são marcados admin", () => {
+  it("exatamente Usuários e Configurações são marcados admin", () => {
     // Guards the mark: if someone marks (or unmarks) an item by mistake, this fails.
     const marcados = STATIC_ITEMS(router).filter(i => i.admin).map(i => i.id).sort()
     expect(marcados).toEqual([...SO_ADMIN].sort())
@@ -49,8 +47,7 @@ describe("itensVisiveis", () => {
 
 describe("paletaDisponivel", () => {
   // The Home does not OFFER a way out to someone who does not administer the system. It is not access
-  // control: what blocks is `proxy.ts`, which today returns `/` to non-admins
-  // on every page outside the Home.
+  // control: what blocks is `proxy.ts`, which keeps /admin for the admin.
   it("na Home, só o admin tem paleta", () => {
     expect(paletaDisponivel("/", false)).toBe(false)
     expect(paletaDisponivel("/", true)).toBe(true)

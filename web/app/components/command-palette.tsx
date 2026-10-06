@@ -20,18 +20,15 @@ interface CommandItem {
   icon: React.ElementType
   action: () => void
   group: string
-  // Items for the system administrator only. Dashboard, Users and Settings
-  // are admin routes: without this mark the palette offered them to everyone and
-  // only the gate blocked — a path that ended in a redirect.
-  //
-  // A non-admin reaches the Workspace (`proxy.ts` keeps only /admin and
-  // /dashboard for the admin), and there the palette opens for them: these
-  // three are the ones that stay out of it.
+  // Items for the system administrator only. Users and Settings are admin
+  // routes (`proxy.ts` keeps /admin for the admin): without this mark the
+  // palette offered them to everyone and only the gate blocked — a path that
+  // ended in a redirect.
   admin?: boolean
 }
 
 export const STATIC_ITEMS = (router: ReturnType<typeof useRouter>): CommandItem[] => [
-  { id: "dashboard",      label: "Dashboard",       icon: TbLayoutDashboard, group: "Navegar",    action: () => router.push("/dashboard"),      description: "Visão geral", admin: true },
+  { id: "dashboard",      label: "Dashboard",       icon: TbLayoutDashboard, group: "Navegar",    action: () => router.push("/dashboard"),      description: "Visão geral" },
   { id: "projects",       label: "Projetos",         icon: TbFolders,         group: "Navegar",    action: () => router.push("/projects"),       description: "Workflows" },
   { id: "observability",  label: "Histórico",         icon: TbActivity,        group: "Navegar",    action: () => router.push("/observability"),  description: "Execuções e métricas" },
   { id: "artifacts",      label: "Artefatos",        icon: TbPackage,         group: "Navegar",    action: () => router.push("/artifacts"),      description: "Outputs" },
@@ -63,8 +60,8 @@ export function itensVisiveis(itens: CommandItem[], isAdmin: boolean): CommandIt
  * `loadItems` does not run: gone is the `getWorkflows()` that fired on every
  * Ctrl+K on the Home.
  *
- * This is NOT access control: what blocks is `proxy.ts`, which keeps /admin and
- * /dashboard for the admin. A non-admin goes to the Workspace through the
+ * This is NOT access control: what blocks is `proxy.ts`, which keeps /admin for
+ * the admin. A non-admin goes to the Workspace through the
  * Chat / Workspace switcher, and the palette opens for them there. What this
  * function decides is only the OFFER on the Home.
  *
