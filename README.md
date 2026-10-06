@@ -10,6 +10,10 @@
   <img src="https://img.shields.io/badge/built%20with-PostGIS-4169E1?logo=postgresql&logoColor=white" alt="Built with PostGIS"/>
 </p>
 
+<p align="center">
+  <img src="docs/media/atlans-promo.webp" width="100%" alt="Atlans in 31 seconds: a block is added and connected in the editor, a hotspot analysis that also reads protected areas from a WFS runs block by block, its statistics per region come out in the run panel along with a map, and the dashboard shows every run"/>
+</p>
+
 ---
 
 ## What is Atlans?
