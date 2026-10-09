@@ -119,6 +119,13 @@ if env_get DATABASE_URL | grep -q '<usuario>'; then
     ui_cmd "make bootstrap"
     exit 1
 fi
+# Unreadable, the comparison below would take an empty password for a
+# mismatch and send the person to make bootstrap for nothing.
+if [ ! -r secrets/stepca_password.txt ]; then
+    ui_err "$(t secrets_stepca_unreadable "$(id -u)")"
+    ui_cmd "$(ca_password_file_fix_cmd secrets/stepca_password.txt)"
+    exit 1
+fi
 ui_run "$(t ca_checking)" ca_state secrets/stepca_password.txt || true
 ESTADO_CA="$(tail -n 1 "$UI_LOG")"
 if [ "$ESTADO_CA" = "wrong" ] || { [ "$ESTADO_CA" != "unknown" ] && [ "$(env_get STEPCA_PROVISIONER_PASSWORD)" != "$(cat secrets/stepca_password.txt)" ]; }; then

@@ -57,14 +57,17 @@ JWK provisioner. Generate a strong one and persist it:
 ```bash
 mkdir -p secrets
 openssl rand -base64 48 > secrets/stepca_password.txt
-chmod 600 secrets/stepca_password.txt
-sudo chown 1000:1000 secrets/stepca_password.txt   # the container's step user
+sudo chown 1000:"$(id -g)" secrets/stepca_password.txt   # owner: the container's step user; group: yours
+sudo chmod 640 secrets/stepca_password.txt
 ```
 
 step-ca runs as the `step` user (UID 1000), and compose mounts the file
 with the host's owner and mode: with another owner and mode 600, it cannot read it and never
-becomes healthy. `make bootstrap` does the `chown` when it runs as root, and warns
-when it cannot.
+becomes healthy. `make bootstrap` and `make up-dev`/`make up-prod` read it too, as your
+user, to check it against the CA: hence your group and mode 640 (with `chown 1000:1000`
+and mode 600, a user with another UID could not read it, and `up.sh` reported a password
+mismatch that did not exist). `make bootstrap` does the `chown` when it runs as root, and
+prints the command when it cannot.
 
 The password must also go into `.env` as `STEPCA_PROVISIONER_PASSWORD` so that
 the backend can decrypt the provisioner key when generating OTTs.
