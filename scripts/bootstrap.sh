@@ -33,6 +33,8 @@ cd "$ROOT_DIR"
 . scripts/lib/ui.sh
 # shellcheck source=lib/ca.sh
 . scripts/lib/ca.sh
+# shellcheck source=lib/cert.sh
+. scripts/lib/cert.sh
 
 # ── Options ──────────────────────────────────────────────────────────────────
 PERGUNTAR=1
@@ -463,6 +465,19 @@ elif [ "$PERGUNTAR" = "1" ]; then
 else
     ui_warn "$(t domain_still_example)"
 fi
+# Without a site certificate Traefik answers nothing on PUBLIC_HOST and
+# S3_HOST (scripts/lib/cert.sh): a provisional one until the real one arrives.
+if [ "$MODO" = "prod" ]; then
+    DIR_CERT="$(env_get SSL_CERT_DIR)"; DIR_CERT="${DIR_CERT:-./certs}"
+    if cert_site_absent "$DIR_CERT"; then
+        if cert_site_provisional "$DIR_CERT" "$(env_get PUBLIC_HOST)" "$(env_get S3_HOST)"; then
+            ui_warn "$(t cert_provisional_created "$(env_get PUBLIC_HOST)" "$(env_get S3_HOST)")"
+            ui_hint "$(t cert_provisional_hint "$DIR_CERT")"
+        else
+            ui_warn "$(t cert_provisional_failed "$DIR_CERT")"
+        fi
+    fi
+fi
 
 # ── 8. E-mail (prod) ─────────────────────────────────────────────────────────
 ui_stage email
@@ -641,7 +656,11 @@ esac
 if [ "$MODO" = "prod" ]; then
     { [ "$(env_get PUBLIC_HOST)" = "localhost" ] || [ -z "$(env_get PUBLIC_HOST)" ]; } && PENDENCIAS+=("$(t pending_domain)")
     [ -z "$(env_get RESEND_API_KEY)" ] && [ -z "$(env_get SMTP_HOST)" ] && PENDENCIAS+=("$(t pending_email)")
-    { [ ! -s certs/cert.pem ] || [ ! -s certs/key.pem ]; } && PENDENCIAS+=("$(t pending_cert)")
+    if cert_site_missing "$DIR_CERT"; then
+        PENDENCIAS+=("$(t pending_cert)")
+    elif cert_site_self_signed "$DIR_CERT"; then
+        PENDENCIAS+=("$(t pending_cert_provisional "$DIR_CERT")")
+    fi
     PENDENCIAS+=("$(t pending_edge)")
 fi
 [ "$ESTADO_CA" = "wrong" ] && [ "$(ca_state secrets/stepca_password.txt)" = "wrong" ] && PENDENCIAS+=("$(t pending_ca)")

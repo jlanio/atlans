@@ -162,6 +162,7 @@ M_pending_extensions='as extensões postgis e uuid-ossp no banco (comando acima)
 M_pending_domain='o domínio (PUBLIC_HOST, AGENTS_HOST, S3_HOST) no .env'
 M_pending_email='o envio de e-mail (RESEND_API_KEY ou SMTP_*) no .env'
 M_pending_cert='o certificado do site em certs/cert.pem e certs/key.pem'
+M_pending_cert_provisional='o certificado definitivo do site: o de %s é autoassinado'
 M_pending_edge='BORDA_MIDDLEWARE e BORDA_FAIXAS_CONFIAVEIS: com ou sem CDN na frente (veja o .env.example)'
 M_pending_ca='a senha da CA (veja a etapa da autoridade certificadora acima)'
 M_summary_nothing_pending='Nada pendente na configuração.'
@@ -177,6 +178,13 @@ M_summary_prod_dns_direct='(direto, nunca atrás de CDN)'
 M_summary_prod_cert='2. O certificado do site em certs/ (cert.pem e key.pem).'
 M_summary_prod_up='3. Suba: a subida aplica as migrações, emite os certificados internos e cria o admin.'
 M_summary_docs='Documentação: README.md · docs/self-hosting.md · docs/operations.md'
+
+# Site certificate (bootstrap.sh and up.sh, production)
+M_cert_provisional_created='Sem certificado do site: gerei um provisório, autoassinado, para %s e %s (vale 90 dias).'
+M_cert_provisional_hint='Os navegadores vão avisar e os executores não confiam nele. Ponha o definitivo em %s (cert.pem e key.pem) e reinicie o Traefik: docker compose --profile prod restart traefik'
+M_cert_provisional_failed='Sem certificado do site, e não consegui gerar um provisório (é preciso o openssl 1.1.1 ou mais novo). Sem cert.pem e key.pem em %s, o Traefik não atende o site.'
+M_cert_key_without_cert='%s tem o key.pem, mas falta o cert.pem: até ele chegar, o Traefik não atende o site.'
+M_cert_provisional_in_use='O certificado do site ainda é autoassinado: os navegadores avisam e os executores não confiam nele.'
 
 # up.sh
 M_banner_up_dev='subindo em modo dev'

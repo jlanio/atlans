@@ -28,6 +28,8 @@ cd "$ROOT_DIR"
 . scripts/lib/ui.sh
 # shellcheck source=lib/ca.sh
 . scripts/lib/ca.sh
+# shellcheck source=lib/cert.sh
+. scripts/lib/cert.sh
 
 env_get() {
     grep -E "^$1=" .env 2>/dev/null | tail -n 1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" || true
@@ -139,6 +141,23 @@ case "$ESTADO_CA" in
     ok) ui_ok "$(t ca_ok)" ;;
     *) ui_warn "$(t ca_unknown)" ;;
 esac
+# The site certificate (scripts/lib/cert.sh): without one, Traefik answers
+# nothing on PUBLIC_HOST and S3_HOST and the browser shows no page at all.
+if [ "$MODO" = "prod" ]; then
+    DIR_CERT="$(env_get SSL_CERT_DIR)"; DIR_CERT="${DIR_CERT:-./certs}"
+    if cert_site_absent "$DIR_CERT"; then
+        if cert_site_provisional "$DIR_CERT" "$(env_get PUBLIC_HOST)" "$(env_get S3_HOST)"; then
+            ui_warn "$(t cert_provisional_created "$(env_get PUBLIC_HOST)" "$(env_get S3_HOST)")"
+            ui_hint "$(t cert_provisional_hint "$DIR_CERT")"
+        else
+            ui_warn "$(t cert_provisional_failed "$DIR_CERT")"
+        fi
+    elif cert_site_missing "$DIR_CERT"; then
+        ui_warn "$(t cert_key_without_cert "$DIR_CERT")"
+    elif cert_site_self_signed "$DIR_CERT"; then
+        ui_warn "$(t cert_provisional_in_use)"
+    fi
+fi
 
 # ── 2. Start ─────────────────────────────────────────────────────────────────
 ui_stage start
