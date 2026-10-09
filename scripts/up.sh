@@ -222,6 +222,31 @@ if ! ui_run "$(t up_waiting_api)" esperar_api; then
 fi
 ui_ok "$(t up_api_ok)"
 
+# The image's entrypoint creates the CA on the first start and prints "Your CA
+# administrative password is: ..." in the step-ca log: the password of the CA
+# keys and of the provisioner, readable by anyone who runs `docker compose
+# logs`. A container's log goes away with it, so recreating it once removes
+# the line and leaves the CA (in the volume) as it was. With a log driver that
+# keeps the logs elsewhere (journald, syslog), the line stays there too.
+SVC_CA=""
+if [ "$MODO" = "prod" ]; then
+    SVC_CA="step-ca"
+elif [ "$EXECUTOR_LOCAL" = "1" ]; then
+    SVC_CA="step-ca-dev"
+fi
+if [ -n "$SVC_CA" ]; then
+    case "$(dc logs --no-log-prefix "$SVC_CA" 2>/dev/null)" in
+        *"administrative password"*)
+            if ui_run "$(t up_ca_log_purging)" dc up -d --force-recreate --no-deps --wait "$SVC_CA"; then
+                ui_ok "$(t up_ca_log_purged)"
+            else
+                ui_warn "$(t up_ca_log_purge_failed)"
+                ui_cmd "docker compose ${PERFIS[*]} up -d --force-recreate --no-deps $SVC_CA"
+            fi
+            ;;
+    esac
+fi
+
 # ── 4. Database ──────────────────────────────────────────────────────────────
 ui_stage database
 ler_status
