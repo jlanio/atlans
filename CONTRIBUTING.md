@@ -63,7 +63,7 @@ has to be compatible with the AGPL-3.0:
 ### 2. Clone and configure
 
 ```bash
-git clone https://github.com/seu-usuario/atlans-studio.git atlans
+git clone https://github.com/seu-usuario/atlans.git atlans
 cd atlans
 cp .env.example .env
 ```
