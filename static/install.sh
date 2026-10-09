@@ -334,10 +334,22 @@ chmod 660 executor/.env
 if [[ "$(id -u)" == "0" ]]; then
     chown 1000:1000 executor/.env
     ok "executor/.env: 0660 (owner UID 1000 do container)"
+elif chgrp 1000 executor/.env 2>/dev/null; then
+    ok "executor/.env: 0660 (grupo 1000, o do container)"
 else
-    chgrp 1000 executor/.env 2>/dev/null || \
-        warn "Nao foi possivel ajustar group do executor/.env (rode como root para chown). Permissao mundo-r removida mesmo assim."
-    ok "executor/.env: 0660"
+    # Without root, a user with another UID can give the file neither to UID
+    # 1000 nor to group 1000. The container reaches it through this user's
+    # group instead, which docker-compose.executor.yml adds to it (group_add,
+    # EXECUTOR_HOST_GID in the .env next to it). Without this, the enroll died
+    # with PermissionError on /app/executor/.env.
+    _gid_do_host="$(id -g)"
+    if grep -qE '^EXECUTOR_HOST_GID=' .env 2>/dev/null; then
+        sed -i.bak -E "s|^EXECUTOR_HOST_GID=.*|EXECUTOR_HOST_GID=${_gid_do_host}|" .env
+        rm -f .env.bak
+    else
+        printf 'EXECUTOR_HOST_GID=%s\n' "$_gid_do_host" >> .env
+    fi
+    ok "executor/.env: 0660 (grupo ${_gid_do_host}, acrescentado ao container)"
 fi
 
 # ── 5b. Container memory limit ───────────────────────────────────────────────
