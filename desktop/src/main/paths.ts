@@ -12,6 +12,7 @@ import { app } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import { SERVIDOR } from '../shared/servidor.js'
+import { UI_URL } from '../shared/ui.js'
 
 /**
  * The name is set HERE, at the top of the module that reads
@@ -145,6 +146,19 @@ export function ensureDirectories(): void {
 }
 
 /**
+ * The installation's site, for the executor: where it downloads the internal
+ * CA's root on the first start (executor/_ca_bootstrap.py), and the contact
+ * it announces (flow/utils/identidade.py). Without it the executor derives the
+ * site by stripping `agents.` from SERVIDOR, and a host named otherwise
+ * (`workers.<domain>`) left it downloading from the executors' host itself,
+ * whose certificate (from that very CA) it does not trust yet: the enrollment
+ * never went through. Only over https; a dev build (http) keeps the old path.
+ */
+function siteDaInstalacao(): Record<string, string> {
+  return UI_URL.startsWith('https://') ? { EXECUTOR_PUBLIC_SERVER_URL: UI_URL } : {}
+}
+
+/**
  * Variables the executor understands, pointed at the user profile.
  * See the header of executor/config.py for each one.
  */
@@ -160,6 +174,7 @@ export function envDoExecutor(artifactsDir: string): Record<string, string> {
     // even a hand-edited `.env` cannot point this installation at another
     // server.
     EXECUTOR_SERVER_URL: SERVIDOR,
+    ...siteDaInstalacao(),
     // Version of the INSTALLER, which is what actually defines the code running
     // here.
     //

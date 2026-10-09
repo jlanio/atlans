@@ -28,6 +28,8 @@ cd "$ROOT_DIR"
 . scripts/lib/ui.sh
 # shellcheck source=lib/ca.sh
 . scripts/lib/ca.sh
+# shellcheck source=lib/cert.sh
+. scripts/lib/cert.sh
 
 env_get() {
     grep -E "^$1=" .env 2>/dev/null | tail -n 1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" || true
@@ -119,6 +121,13 @@ if env_get DATABASE_URL | grep -q '<usuario>'; then
     ui_cmd "make bootstrap"
     exit 1
 fi
+# Unreadable, the comparison below would take an empty password for a
+# mismatch and send the person to make bootstrap for nothing.
+if [ ! -r secrets/stepca_password.txt ]; then
+    ui_err "$(t secrets_stepca_unreadable "$(id -u)")"
+    ui_cmd "$(ca_password_file_fix_cmd secrets/stepca_password.txt)"
+    exit 1
+fi
 ui_run "$(t ca_checking)" ca_state secrets/stepca_password.txt || true
 ESTADO_CA="$(tail -n 1 "$UI_LOG")"
 if [ "$ESTADO_CA" = "wrong" ] || { [ "$ESTADO_CA" != "unknown" ] && [ "$(env_get STEPCA_PROVISIONER_PASSWORD)" != "$(cat secrets/stepca_password.txt)" ]; }; then
@@ -132,6 +141,23 @@ case "$ESTADO_CA" in
     ok) ui_ok "$(t ca_ok)" ;;
     *) ui_warn "$(t ca_unknown)" ;;
 esac
+# The site certificate (scripts/lib/cert.sh): without one, Traefik answers
+# nothing on PUBLIC_HOST and S3_HOST and the browser shows no page at all.
+if [ "$MODO" = "prod" ]; then
+    DIR_CERT="$(env_get SSL_CERT_DIR)"; DIR_CERT="${DIR_CERT:-./certs}"
+    if cert_site_absent "$DIR_CERT"; then
+        if cert_site_provisional "$DIR_CERT" "$(env_get PUBLIC_HOST)" "$(env_get S3_HOST)"; then
+            ui_warn "$(t cert_provisional_created "$(env_get PUBLIC_HOST)" "$(env_get S3_HOST)")"
+            ui_hint "$(t cert_provisional_hint "$DIR_CERT")"
+        else
+            ui_warn "$(t cert_provisional_failed "$DIR_CERT")"
+        fi
+    elif cert_site_missing "$DIR_CERT"; then
+        ui_warn "$(t cert_key_without_cert "$DIR_CERT")"
+    elif cert_site_self_signed "$DIR_CERT"; then
+        ui_warn "$(t cert_provisional_in_use)"
+    fi
+fi
 
 # ── 2. Start ─────────────────────────────────────────────────────────────────
 ui_stage start
@@ -154,6 +180,20 @@ ui_ok "$(t up_running "$SERVICOS")"
 
 # ── 3. Health ────────────────────────────────────────────────────────────────
 ui_stage health
+# An API that crashes while starting does not always take its container down:
+# uvicorn --reload (dev) and the --workers supervisor (prod) stay alive, and
+# the health only turns `unhealthy` minutes later. The crash is in the log
+# (a worker process that died, or the lifespan that failed) and /ping does not
+# answer: both together end the wait, with the log below.
+api_quebrou() {  # <container id>
+    # Captured, not piped into grep -q: with pipefail, grep leaving early
+    # would turn a match into a failure.
+    case "$(docker logs --tail 300 "$1" 2>&1)" in
+        *"Process SpawnProcess-"*|*"Application startup failed"*) ;;
+        *) return 1 ;;
+    esac
+    ! docker exec "$1" python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/ping', timeout=3)" >/dev/null 2>&1
+}
 esperar_api() {
     local id estado i=0
     id="$(dc ps -q "$API")"
@@ -161,8 +201,12 @@ esperar_api() {
         estado="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$id" 2>/dev/null || echo gone)"
         case "$estado" in
             healthy|running) return 0 ;;
-            exited|dead|gone) return 1 ;;
+            exited|dead|gone|unhealthy) return 1 ;;
         esac
+        # Every 10 s: reading the log is not free.
+        if [ $((i % 5)) -eq 4 ] && api_quebrou "$id"; then
+            return 1
+        fi
         sleep 2
         i=$((i + 1))
     done
@@ -177,6 +221,31 @@ if ! ui_run "$(t up_waiting_api)" esperar_api; then
     exit 1
 fi
 ui_ok "$(t up_api_ok)"
+
+# The image's entrypoint creates the CA on the first start and prints "Your CA
+# administrative password is: ..." in the step-ca log: the password of the CA
+# keys and of the provisioner, readable by anyone who runs `docker compose
+# logs`. A container's log goes away with it, so recreating it once removes
+# the line and leaves the CA (in the volume) as it was. With a log driver that
+# keeps the logs elsewhere (journald, syslog), the line stays there too.
+SVC_CA=""
+if [ "$MODO" = "prod" ]; then
+    SVC_CA="step-ca"
+elif [ "$EXECUTOR_LOCAL" = "1" ]; then
+    SVC_CA="step-ca-dev"
+fi
+if [ -n "$SVC_CA" ]; then
+    case "$(dc logs --no-log-prefix "$SVC_CA" 2>/dev/null)" in
+        *"administrative password"*)
+            if ui_run "$(t up_ca_log_purging)" dc up -d --force-recreate --no-deps --wait "$SVC_CA"; then
+                ui_ok "$(t up_ca_log_purged)"
+            else
+                ui_warn "$(t up_ca_log_purge_failed)"
+                ui_cmd "docker compose ${PERFIS[*]} up -d --force-recreate --no-deps $SVC_CA"
+            fi
+            ;;
+    esac
+fi
 
 # ── 4. Database ──────────────────────────────────────────────────────────────
 ui_stage database

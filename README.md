@@ -47,7 +47,7 @@ Want the full picture? [docs/architecture.md](docs/architecture.md) explains eve
 You need **Docker** (with Compose v2.17 or newer), **make**, **openssl** and a **PostgreSQL database with PostGIS** that Atlans can reach. Atlans does not start a database of its own, so point it at one you already have.
 
 ```bash
-git clone https://github.com/jlanio/atlans-studio.git atlans
+git clone https://github.com/jlanio/atlans.git atlans
 cd atlans
 
 make bootstrap      # guided setup: language, your Postgres (tested before it is saved), secrets

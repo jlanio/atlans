@@ -7,7 +7,18 @@ from urllib.parse import urlsplit, urlunsplit
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# In development the compose file mounts the repository at /app, its .env
+# included, and the API runs as UID 1000. When the host user has another UID,
+# that .env (mode 600, from make bootstrap) cannot be read in there, and the
+# PermissionError at import kept the API from starting. The compose file
+# already passes the environment, so an unreadable .env is not fatal.
+try:
+    load_dotenv()
+except PermissionError as exc:
+    logging.getLogger(__name__).warning(
+        "%s ilegível (%s): usando só as variáveis de ambiente.",
+        exc.filename, exc.strerror,
+    )
 
 DATABASE_URL   = os.getenv("DATABASE_URL")
 

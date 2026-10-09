@@ -203,10 +203,11 @@ make backup-stepca
 # 1. Stop step-ca
 docker compose --profile prod stop step-ca
 
-# 2. Generate a new password (owned by the container's step user, UID 1000)
+# 2. Generate a new password (owned by the container's step user, UID 1000,
+#    and readable by your group, for step 3 and for up.sh's CA check)
 openssl rand -base64 48 > secrets/stepca_password.txt
-chmod 600 secrets/stepca_password.txt
-sudo chown 1000:1000 secrets/stepca_password.txt
+sudo chown 1000:"$(id -g)" secrets/stepca_password.txt
+sudo chmod 640 secrets/stepca_password.txt
 
 # 3. Update the .env (and whatever copy of it your deploy keeps)
 sed -i.bak -E "s|^STEPCA_PROVISIONER_PASSWORD=.*|STEPCA_PROVISIONER_PASSWORD=\"$(cat secrets/stepca_password.txt)\"|" .env && rm .env.bak

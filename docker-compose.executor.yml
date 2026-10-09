@@ -102,6 +102,14 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+    # The group of the host user who installed without root: the container
+    # (UID 1000) reaches executor/.env through it when the installer could
+    # give the file neither to UID 1000 nor to group 1000. static/install.sh
+    # writes EXECUTOR_HOST_GID to the .env next to this file; without it,
+    # 1000, the container's own group.
+    group_add:
+      - "${EXECUTOR_HOST_GID:-1000}"
+
     # Perfil seccomp — bloqueia syscalls perigosas (mount, ptrace, reboot, etc.)
     security_opt:
       - seccomp:security/seccomp-executor.json

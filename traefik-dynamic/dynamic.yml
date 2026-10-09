@@ -155,8 +155,13 @@ tls:
   #   AGENTS_HOST           -> internal CA cert (DNS-only, executor mTLS),
   #                            which scripts/bootstrap-stepca.sh writes as
   #                            agents.crt/agents.key
-  # A file that does not exist only produces an error line in the Traefik log; the
-  # other certificates still apply.
+  # A missing agents.crt only produces an error line in the Traefik log; the
+  # other certificates still apply. The site cert is different: it is also the
+  # default store's certificate (below), and without it that store does not
+  # load and Traefik serves no certificate at all on PUBLIC_HOST and S3_HOST
+  # (the browser shows nothing, not even a warning). make bootstrap and
+  # make up-prod write a provisional self-signed one when both files are
+  # missing (scripts/lib/cert.sh).
   certificates:
     - certFile: /etc/ssl/cloudflare/cert.pem
       keyFile:  /etc/ssl/cloudflare/key.pem

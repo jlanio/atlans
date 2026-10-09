@@ -33,6 +33,8 @@ cd "$ROOT_DIR"
 . scripts/lib/ui.sh
 # shellcheck source=lib/ca.sh
 . scripts/lib/ca.sh
+# shellcheck source=lib/cert.sh
+. scripts/lib/cert.sh
 
 # ── Options ──────────────────────────────────────────────────────────────────
 PERGUNTAR=1
@@ -193,19 +195,33 @@ fi
 # step-ca runs as the step user (UID 1000) and reads this file through the
 # compose secret, which mounts it with the host's owner and mode: with another
 # owner and mode 600, it cannot read it and never becomes healthy (and the API,
-# which depends on it, does not come up).
+# which depends on it, does not come up). These scripts read it too, as the
+# user who runs them, to check it against the CA (below and in up.sh). So the
+# owner is 1000 and the group is that user's, with mode 640: chown 1000:1000
+# and mode 600 left a user with another UID unable to read it, and up.sh
+# reported a password mismatch that did not exist.
 # Linux only: on Docker Desktop (Mac, Windows) the host's owner does not reach the container.
 conferir_dono_do_segredo() {  # [quieto]
-    local dono
-    dono="$(ls -n secrets/stepca_password.txt | awk '{print $3}')"
-    if [ "$(uname -s)" = "Linux" ] && [ "$dono" != "1000" ]; then
-        if [ "$(id -u)" = "0" ]; then
-            chown 1000:1000 secrets/stepca_password.txt
-            [ -n "${1:-}" ] || ui_ok "$(t secrets_stepca_chown)"
-        else
-            ui_warn "$(t secrets_stepca_owner "$dono")"
-            ui_cmd "sudo chown 1000:1000 secrets/stepca_password.txt"
-        fi
+    local arquivo=secrets/stepca_password.txt dono grupo
+    [ "$(uname -s)" = "Linux" ] || return 0
+    dono="$(ls -n "$arquivo" | awk '{print $3}')"
+    if [ "$dono" = "1000" ] && [ -r "$arquivo" ]; then
+        return 0
+    fi
+    if [ "$(id -u)" = "0" ]; then
+        # Through sudo, the group is the one of the user who called it.
+        grupo="${SUDO_GID:-1000}"
+        chown "1000:$grupo" "$arquivo"
+        if [ "$grupo" = "1000" ]; then chmod 600 "$arquivo"; else chmod 640 "$arquivo"; fi
+        [ -n "${1:-}" ] || ui_ok "$(t secrets_stepca_chown)"
+    elif [ -r "$arquivo" ]; then
+        ui_warn "$(t secrets_stepca_owner "$dono")"
+        ui_cmd "$(ca_password_file_fix_cmd "$arquivo")"
+    else
+        # Out of this user's reach: the CA check below would read nothing.
+        ui_err "$(t secrets_stepca_unreadable "$(id -u)")"
+        ui_cmd "$(ca_password_file_fix_cmd "$arquivo")"
+        exit 1
     fi
 }
 conferir_dono_do_segredo
@@ -449,6 +465,19 @@ elif [ "$PERGUNTAR" = "1" ]; then
 else
     ui_warn "$(t domain_still_example)"
 fi
+# Without a site certificate Traefik answers nothing on PUBLIC_HOST and
+# S3_HOST (scripts/lib/cert.sh): a provisional one until the real one arrives.
+if [ "$MODO" = "prod" ]; then
+    DIR_CERT="$(env_get SSL_CERT_DIR)"; DIR_CERT="${DIR_CERT:-./certs}"
+    if cert_site_absent "$DIR_CERT"; then
+        if cert_site_provisional "$DIR_CERT" "$(env_get PUBLIC_HOST)" "$(env_get S3_HOST)"; then
+            ui_warn "$(t cert_provisional_created "$(env_get PUBLIC_HOST)" "$(env_get S3_HOST)")"
+            ui_hint "$(t cert_provisional_hint "$DIR_CERT")"
+        else
+            ui_warn "$(t cert_provisional_failed "$DIR_CERT")"
+        fi
+    fi
+fi
 
 # ── 8. E-mail (prod) ─────────────────────────────────────────────────────────
 ui_stage email
@@ -627,7 +656,11 @@ esac
 if [ "$MODO" = "prod" ]; then
     { [ "$(env_get PUBLIC_HOST)" = "localhost" ] || [ -z "$(env_get PUBLIC_HOST)" ]; } && PENDENCIAS+=("$(t pending_domain)")
     [ -z "$(env_get RESEND_API_KEY)" ] && [ -z "$(env_get SMTP_HOST)" ] && PENDENCIAS+=("$(t pending_email)")
-    { [ ! -s certs/cert.pem ] || [ ! -s certs/key.pem ]; } && PENDENCIAS+=("$(t pending_cert)")
+    if cert_site_missing "$DIR_CERT"; then
+        PENDENCIAS+=("$(t pending_cert)")
+    elif cert_site_self_signed "$DIR_CERT"; then
+        PENDENCIAS+=("$(t pending_cert_provisional "$DIR_CERT")")
+    fi
     PENDENCIAS+=("$(t pending_edge)")
 fi
 [ "$ESTADO_CA" = "wrong" ] && [ "$(ca_state secrets/stepca_password.txt)" = "wrong" ] && PENDENCIAS+=("$(t pending_ca)")

@@ -1,6 +1,7 @@
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+import sys
 
 # ── Secret scrubbing ─────────────────────────────────────────────────────────
 # The patterns and the filter live in `flow/utils/redacao_log.py` — flow is in
@@ -31,6 +32,28 @@ BACKUP_COUNT = 5
 LOG_FORMAT = "%(asctime)s — %(levelname)s — %(name)s — %(message)s"
 # A more detailed format that includes the traceback for error and critical levels
 LOG_FORMAT_DETAILED = "%(asctime)s — %(levelname)s — %(name)s — %(message)s%(exc_info)s"
+
+# Set when LOG_FILE fails to open: the loggers created afterwards skip the
+# attempt, and the warning is printed only once.
+_arquivo_de_log_falhou = False
+
+
+def _abrir_arquivo_de_log() -> RotatingFileHandler | None:
+    """The handler for LOG_FILE, or None (with one warning) if it cannot be opened."""
+    global _arquivo_de_log_falhou
+    try:
+        # Creates the directory for the log file if it does not exist
+        log_dir = os.path.dirname(LOG_FILE)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        return RotatingFileHandler(LOG_FILE, maxBytes=MAX_LOG_BYTES, backupCount=BACKUP_COUNT)
+    except OSError as exc:
+        _arquivo_de_log_falhou = True
+        sys.stderr.write(
+            f"Arquivo de log {LOG_FILE} indisponível ({exc.strerror}): "
+            "o log segue só no console.\n"
+        )
+        return None
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -80,17 +103,17 @@ def get_logger(name: str) -> logging.Logger:
     logger.addHandler(ch)
 
     # --- Rotating File Handler setup (to save logs to a file) ---
-    # Creates the directory for the log file if it does not exist
-    log_dir = os.path.dirname(LOG_FILE)
-    if log_dir and not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-
-    fh = RotatingFileHandler(LOG_FILE, maxBytes=MAX_LOG_BYTES, backupCount=BACKUP_COUNT)
-    # The file handler's level also follows the logger's level
-    fh.setLevel(LOG_LEVEL)
-    # Sets the format for the file. We use the detailed format to include exceptions in the file.
-    fh.setFormatter(logging.Formatter(LOG_FORMAT_DETAILED))
-    logger.addHandler(fh)
+    # The file is an extra copy of the console: when it cannot be opened, the
+    # logger keeps the console only. In development the API (UID 1000) writes
+    # app.log into the mounted repository, which a host user with another UID
+    # owns; the PermissionError used to stop the API at import.
+    fh = None if _arquivo_de_log_falhou else _abrir_arquivo_de_log()
+    if fh is not None:
+        # The file handler's level also follows the logger's level
+        fh.setLevel(LOG_LEVEL)
+        # Sets the format for the file. We use the detailed format to include exceptions in the file.
+        fh.setFormatter(logging.Formatter(LOG_FORMAT_DETAILED))
+        logger.addHandler(fh)
 
     # Initial setup message
     if logger.level <= logging.DEBUG:

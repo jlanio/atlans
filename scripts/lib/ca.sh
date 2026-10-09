@@ -63,3 +63,10 @@ ca_own_password_opens() {
 ca_copy_own_password() {
     ( umask 077 && _ca_sh 'cat /home/step/secrets/password' > "$1" )
 }
+
+# ca_password_file_fix_cmd <password file>: the command that leaves it readable
+# by step-ca (UID 1000, the owner) and by the user who runs these scripts (the
+# group, mode 640), who checks it against the CA.
+ca_password_file_fix_cmd() {
+    printf 'sudo chown 1000:%s %s && sudo chmod 640 %s' "$(id -g)" "$1" "$1"
+}

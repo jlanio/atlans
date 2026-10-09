@@ -60,7 +60,7 @@ Ollama); the map's satellite view needs a tile provider of your choice
 ## 1. Prepare the host
 
 ```bash
-git clone https://github.com/jlanio/atlans-studio.git atlans
+git clone https://github.com/jlanio/atlans.git atlans
 cd atlans
 make bootstrap
 ```
