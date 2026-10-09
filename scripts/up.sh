@@ -161,6 +161,20 @@ ui_ok "$(t up_running "$SERVICOS")"
 
 # ── 3. Health ────────────────────────────────────────────────────────────────
 ui_stage health
+# An API that crashes while starting does not always take its container down:
+# uvicorn --reload (dev) and the --workers supervisor (prod) stay alive, and
+# the health only turns `unhealthy` minutes later. The crash is in the log
+# (a worker process that died, or the lifespan that failed) and /ping does not
+# answer: both together end the wait, with the log below.
+api_quebrou() {  # <container id>
+    # Captured, not piped into grep -q: with pipefail, grep leaving early
+    # would turn a match into a failure.
+    case "$(docker logs --tail 300 "$1" 2>&1)" in
+        *"Process SpawnProcess-"*|*"Application startup failed"*) ;;
+        *) return 1 ;;
+    esac
+    ! docker exec "$1" python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/ping', timeout=3)" >/dev/null 2>&1
+}
 esperar_api() {
     local id estado i=0
     id="$(dc ps -q "$API")"
@@ -168,8 +182,12 @@ esperar_api() {
         estado="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$id" 2>/dev/null || echo gone)"
         case "$estado" in
             healthy|running) return 0 ;;
-            exited|dead|gone) return 1 ;;
+            exited|dead|gone|unhealthy) return 1 ;;
         esac
+        # Every 10 s: reading the log is not free.
+        if [ $((i % 5)) -eq 4 ] && api_quebrou "$id"; then
+            return 1
+        fi
         sleep 2
         i=$((i + 1))
     done
