@@ -86,8 +86,11 @@ if [ "$PROFILE" = "prod" ]; then
     fi
 fi
 
-# 6. Web frontend (the image's Alpine wget)
-if docker compose exec -T "$WEB_SVC" wget -q -O /dev/null "http://localhost:3000/" 2>/dev/null; then
+# 6. Web frontend (the image's Alpine wget). 127.0.0.1, not localhost: in
+# Alpine localhost resolves to ::1 first, and the production server listens on
+# IPv4 only (HOSTNAME=0.0.0.0 in Dockerfile.ui) — the check failed with the
+# site up.
+if docker compose exec -T "$WEB_SVC" wget -q -O /dev/null "http://127.0.0.1:3000/" 2>/dev/null; then
     pass "Web frontend responde em :3000"
 else
     fail "Web frontend nao responde em :3000 (docker compose logs $WEB_SVC)"
