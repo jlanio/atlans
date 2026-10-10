@@ -1241,7 +1241,7 @@ MinIO is used as the S3-compatible storage backend for three functions:
 
 | Function | S3 Prefix | Description |
 |--------|-----------|-----------|
-| **Artifacts** | `artifacts/{workspace_id}/{run_id}/` | Artifacts produced by runs (GeoJSON, Shapefile, GeoParquet; PNG/JPG/PDF from the image map) |
+| **Artifacts** | `artifacts/{workspace_id}/{run_id}/` | Artifacts produced by runs (GeoJSON, Shapefile, GeoParquet; GeoPackage, KMZ/KML, Excel and CSV from "Salvar arquivo"; PNG/JPG/PDF from the image map) |
 | **Drive** | `drive/{workspace_id}/` | Workspace files (manual upload or synchronized with executors) |
 | **Portal** | `portal/{workspace_id}/` | Layers published for public viewing |
 
