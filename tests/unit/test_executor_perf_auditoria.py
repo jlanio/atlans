@@ -184,6 +184,7 @@ def test_end_node_metrics_go_to_thread():
     ("flow/nodes/outputs/save_geojson.py", "persistir_artefato"),
     ("flow/nodes/outputs/save_to_shapefile.py", "persistir_artefato"),
     ("flow/nodes/outputs/save_to_geoparquet.py", "persistir_artefato"),
+    ("flow/nodes/outputs/save_file.py", "persistir_artefato"),
     ("flow/nodes/outputs/save_to_s3.py", "persistir_artefato"),
     ("flow/nodes/outputs/data_output.py", "persistir_artefato"),
     ("flow/nodes/outputs/data_output.py", "upload_artifact_to_minio"),

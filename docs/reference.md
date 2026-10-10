@@ -368,7 +368,7 @@ In the frontend (NextAuth), the access token lives in `session.user.access_token
 
 The executor processes DAG graphs in **topological order**, respecting the dependencies between nodes. Execution is restricted to the nodes **reachable from the triggers** (and their ancestors); isolated nodes and orphan edges are discarded before the run.
 
-### Node Categories (63 in total)
+### Node Categories (64 in total)
 
 | Category | Count | Examples (real registry names) |
 |---|---|---|
@@ -377,7 +377,7 @@ The executor processes DAG graphs in **topological order**, respecting the depen
 | 🗺️ **spatial** | 21 | `Buffer`, `Clip`, `Dissolve`, `SpatialJoin`, `TransformCRS`, `ComputeArea`, `Simplify`, `ValidateGeometry`, `IntersectionNode`, `UnionNode`, `Heatmap`, … |
 | ⚡ **action** | 9 | `HttpRequest`, `SetFields`, `AttributeFilter`, `AttributeJoin`, `OverlapPercentage`, `GeocodeNode`, `PythonScript`, `Sort`, `RemoveDuplicates` |
 | 🔀 **control** | 7 | `Conditional`, `Switch`, `JinjaBranch`, `Merge`, `Loop`, `SubWorkflow`, `ChangeDetector` |
-| 📤 **output** | 13 | `SaveGeoJSON`, `SaveToPostGIS`, `SaveToShapefile`, `SaveToGeoParquet`, `SaveToS3`, `SendEmail`, `SendWebhook`, `PublishMap`, `CartaImagem`, `Response`, `DataOutput`, `SubWorkflowOutput`, `SaveToPostgres` |
+| 📤 **output** | 14 | `SaveGeoJSON`, `SaveToPostGIS`, `SaveToShapefile`, `SaveToGeoParquet`, `SaveFile`, `SaveToS3`, `SendEmail`, `SendWebhook`, `PublishMap`, `CartaImagem`, `Response`, `DataOutput`, `SubWorkflowOutput`, `SaveToPostgres` |
 
 To create a node, see [docs/creating-nodes.md](creating-nodes.md).
 

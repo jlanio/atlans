@@ -28,7 +28,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 OUTPUTS_DIR = RAIZ / "flow" / "nodes" / "outputs"
 
 # Nodes that resolve workspace_id/task_id (the ones that save an artifact).
-WITH_CONTEXT = ["save_to_shapefile", "save_to_geoparquet", "save_to_s3", "data_output", "carta_imagem"]
+WITH_CONTEXT = ["save_to_shapefile", "save_to_geoparquet", "save_to_s3", "data_output", "carta_imagem", "save_file"]
 
 
 def _source(modulo: str) -> str:
@@ -88,7 +88,7 @@ def test_save_to_s3_does_NOT_use_derive_label_on_purpose():
 
 # ── The no-op branch ─────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("modulo", ["save_to_shapefile", "save_to_geoparquet"])
+@pytest.mark.parametrize("modulo", ["save_to_shapefile", "save_to_geoparquet", "save_file"])
 def test_the_10mb_branch_did_not_come_back(modulo):
     fonte = _source(modulo)
     assert "10 * 1024 * 1024" not in fonte, (
@@ -97,7 +97,7 @@ def test_the_10mb_branch_did_not_come_back(modulo):
     )
 
 
-@pytest.mark.parametrize("modulo", ["save_to_shapefile", "save_to_geoparquet"])
+@pytest.mark.parametrize("modulo", ["save_to_shapefile", "save_to_geoparquet", "save_file"])
 def test_persist_artifact_is_called_ONCE(modulo):
     """Two calls with the same arguments and the duplicated branch back.
 

@@ -349,7 +349,7 @@ gesture's `isValidConnection` **from the same catalog** (`GET /nodes`).
 
 The examples below are **module** (file) names. The registered `name` is PascalCase —
 e.g.: `webhook_trigger` → `WebhookTrigger`, `field_transformer` → `SetFields`, `data_output`
-→ `DataOutput`. There are 63 nodes in total.
+→ `DataOutput`. There are 64 nodes in total.
 
 | Category | Directory | Examples |
 |-----------|-----------|----------|
@@ -358,7 +358,7 @@ e.g.: `webhook_trigger` → `WebhookTrigger`, `field_transformer` → `SetFields
 | **Spatial** | `flow/nodes/spatial/` | `buffer`, `centroid`, `clip`, `union`, `intersection`, `difference`, `symmetric_difference`, `dissolve`, `spatial_join`, `transform_crs`, `compute_area`, `compute_bbox`, `simplify`, `validate_geometry`, `voronoi`, `convex_hull`, `heatmap`, `partition`, `aggregate`, `spatial_filter`, `filter_by_geometry_type` |
 | **Action** | `flow/nodes/action/` | `http_request`, `field_transformer` (→`SetFields`), `attribute_filter`, `attribute_join`, `overlap_percentage`, `geocode`, `python_script`, `sort`, `remove_duplicates` |
 | **Control** | `flow/nodes/control/` | `conditional`, `merge`, `loop`, `sub_workflow`, `jinja_branch`, `switch`, `change_detector` |
-| **Output** | `flow/nodes/outputs/` | `save_geojson`, `save_to_postgis`, `save_to_postgres`, `save_to_shapefile`, `save_to_geoparquet`, `save_to_s3`, `send_email`, `send_webhook`, `publish_map`, `data_output`, `response_node`, `sub_workflow_output` |
+| **Output** | `flow/nodes/outputs/` | `save_geojson`, `save_to_postgis`, `save_to_postgres`, `save_to_shapefile`, `save_to_geoparquet`, `save_file`, `save_to_s3`, `send_email`, `send_webhook`, `publish_map`, `data_output`, `response_node`, `sub_workflow_output` |
 
 ### Executor Execution Flow
 
