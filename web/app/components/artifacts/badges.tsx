@@ -3,7 +3,7 @@
 import type React from "react"
 import {
   TbMapPin, TbFileCode, TbFileTypeZip, TbDatabase, TbClock, TbCloudUp, TbPinFilled,
-  TbPhoto, TbFileTypePdf,
+  TbPhoto, TbFileTypePdf, TbWorld, TbFileSpreadsheet, TbFileTypeCsv,
 } from "react-icons/tb"
 import { Badge } from "@/app/components/ui/badge"
 import { formatLocal, fromBackend, dayjs } from "@/lib/dayjs"
@@ -25,6 +25,13 @@ const FORMAT_ICONS: Record<string, React.ElementType> = {
   json:       TbFileCode,
   shapefile:  TbFileTypeZip,
   geoparquet: TbDatabase,
+  // The SaveFile node: a GeoPackage is a database (SQLite), KML/KMZ open in
+  // Google Earth, and the spreadsheets get the same icons as on the Drive.
+  gpkg:       TbDatabase,
+  kml:        TbWorld,
+  kmz:        TbWorld,
+  xlsx:       TbFileSpreadsheet,
+  csv:        TbFileTypeCsv,
   // The image map (CartaImagem node): a file to download, not a layer.
   png:        TbPhoto,
   jpg:        TbPhoto,
