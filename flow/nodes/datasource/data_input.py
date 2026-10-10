@@ -5,8 +5,9 @@ Reads a stored file (Drive or Artifacts context), downloads it from MinIO to
 temp and loads the data. It's the read-side mirror of DataOutput (output).
 
 Supported formats:
-  Geospatial    -> GeoJSON, Shapefile (.zip or .shp), KML, GeoPackage (.gpkg)
-                -> output: GeoDataFrame (geopandas)
+  Geospatial    -> GeoJSON, Shapefile (.zip or .shp), KML/KMZ, GeoPackage (.gpkg)
+                -> output: GeoDataFrame (geopandas); a GeoPackage table
+                   without geometry comes out as a DataFrame
   Tabular       -> CSV, XLSX, JSON
                 -> output: DataFrame (pandas) or list[dict]
   Others        -> raw bytes or dict with metadata
@@ -22,15 +23,35 @@ from flow.utils.drive_resolver import resolve_drive_file, resolve_artifact_file
 
 logger = get_logger(__name__)
 
-_GEO_EXTENSIONS = {"geojson", "shp", "zip", "kml", "gpkg", "gml", "fgb"}
+_GEO_EXTENSIONS = {"geojson", "shp", "zip", "kml", "kmz", "gpkg", "gml", "fgb"}
+
+
+def _ler_kmz(path: str) -> Any:
+    """A KMZ holding a single KML (Google Earth's, and Salvar arquivo's) is
+    read through that KML: GDAL's LIBKML, opening the .kmz itself, drops the
+    attributes (SchemaData) it reads from the same doc.kml outside the zip. A
+    KMZ made of several KML (LIBKML's own, with layers/) is read as it is."""
+    import zipfile
+    from flow.utils.leitura_geo import read_geodataframe
+
+    with zipfile.ZipFile(path) as kmz:
+        kmls = [nome for nome in kmz.namelist() if nome.lower().endswith(".kml")]
+        if len(kmls) == 1:
+            return read_geodataframe(kmz.read(kmls[0]))
+    return read_geodataframe(path)
 
 
 def _load_file(path: str, ext: str, crs: str) -> Any:
     """Carrega o arquivo de forma sincrona."""
     try:
         if ext in _GEO_EXTENSIONS:
+            import geopandas as gpd
             from flow.utils.leitura_geo import read_geodataframe
-            gdf = read_geodataframe(path)
+            gdf = _ler_kmz(path) if ext == "kmz" else read_geodataframe(path)
+            # A GeoPackage can hold a table without geometry (Salvar arquivo
+            # writes one): it comes back as a DataFrame, with no CRS to touch.
+            if not isinstance(gdf, gpd.GeoDataFrame):
+                return gdf
             if crs and gdf.crs is not None and str(gdf.crs) != crs:
                 gdf = gdf.to_crs(crs)
             elif gdf.crs is None and crs:
@@ -38,10 +59,18 @@ def _load_file(path: str, ext: str, crs: str) -> Any:
             return gdf
 
         if ext == "csv":
-            import pandas as pd
-            return pd.read_csv(path)
+            from flow.utils.leitura_csv import ler_csv
+            return ler_csv(path)
 
-        if ext in ("xlsx", "xls"):
+        if ext == "xlsx":
+            # Through GDAL, which the executor ships: pandas.read_excel needs
+            # openpyxl, which it does not, and failed on every .xlsx. FORCE: the
+            # first row is the header, as pandas reads it (GDAL only guesses so
+            # when a row below it has a number).
+            from flow.utils.leitura_geo import read_geodataframe
+            return read_geodataframe(path, read_geometry=False, HEADERS="FORCE")
+
+        if ext == "xls":
             import pandas as pd
             return pd.read_excel(path)
 
@@ -70,7 +99,7 @@ class DataInput(BaseNode):
             "description": (
                 "Carrega um arquivo armazenado no Drive do Workspace ou um "
                 "Artefato de execucao anterior e o expoe como dado de entrada. "
-                "Suporta GeoJSON, Shapefile, KML, GeoPackage, CSV, XLSX e JSON."
+                "Suporta GeoJSON, Shapefile, KML, KMZ, GeoPackage, CSV, XLSX e JSON."
             ),
             "type": "datasource",
             "dynamic_output": True,

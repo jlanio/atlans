@@ -1,16 +1,16 @@
-import pandas as pd
 import geopandas as gpd
 from typing import Any, Dict
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
 from flow.utils.drive_resolver import read_drive_file_as
+from flow.utils.leitura_csv import ler_csv
 from flow.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
 def _read_csv_as_geodataframe(file_path: str, lat_col: str, lon_col: str, crs: str) -> gpd.GeoDataFrame:
     """Helper bloqueante: le CSV e converte colunas lat/lon em geometria de pontos."""
-    df = pd.read_csv(file_path)
+    df = ler_csv(file_path)
 
     if lat_col not in df.columns:
         raise ValueError(f"Coluna de latitude '{lat_col}' nao encontrada no CSV. Colunas disponiveis: {list(df.columns)}")
