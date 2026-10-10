@@ -227,7 +227,7 @@ developers of their own agents.
   properties[{name,label,type,default,description,credential_types,drive_extensions,
   suggest_columns,options,visibleWhen}], inputs, outputs, dynamic_inputs, dynamic_output,
   outputs_from_ports, requires_credential, outputs (campos tipados; `__*` removidos)}`.
-  63 nodes: trigger 5, action 9, control 7, datasource 8, output 12, spatial 22. **Size**: the
+  64 nodes: trigger 5, action 9, control 7, datasource 8, output 14, spatial 21. **Size**: the
   `description()` add up to ~145 KB of source; the largest (`http_request.py`) ≈ 7.6 KB (~2k tokens);
   the whole catalog ≈ 100-150 KB (~30k tokens) — it does not fit as a single resource. Special ones:
   `PythonScript` (`ports` + `output_vars`, AST sandbox, `timeout` 30), `SubWorkflowInput/

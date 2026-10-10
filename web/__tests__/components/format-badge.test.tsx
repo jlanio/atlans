@@ -26,6 +26,15 @@ describe("FormatBadge", () => {
     expect(svgDe("pdf")).not.toBe(svgDe("xyz"))
   })
 
+  it("os formatos do Salvar arquivo têm ícone próprio, não o genérico", () => {
+    const generic = svgDe("xyz")
+    for (const format of ["gpkg", "kml", "kmz", "xlsx", "csv"]) {
+      expect(svgDe(format), format).not.toBe(generic)
+    }
+    expect(svgDe("kmz")).toBe(svgDe("kml"))
+    expect(svgDe("xlsx")).not.toBe(svgDe("csv"))
+  })
+
   it("mostra o formato em maiúsculas", () => {
     const { getByText } = render(<FormatBadge format="png" />)
     expect(getByText("PNG")).toBeTruthy()

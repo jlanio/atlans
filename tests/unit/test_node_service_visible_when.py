@@ -72,7 +72,7 @@ async def test_locality_is_in_every_node_that_writes_an_artifact():
     sending everything the OTHER output nodes produced.
     """
     defs = await _list()
-    for nome in ("DataOutput", "SaveGeoJSON", "SaveToGeoParquet", "SaveToShapefile", "SaveToS3", "CartaImagem"):
+    for nome in ("DataOutput", "SaveGeoJSON", "SaveToGeoParquet", "SaveToShapefile", "SaveToS3", "CartaImagem", "SaveFile"):
         prop = _props(defs, nome).get("localidade")
         assert prop is not None, f"no '{nome}' sem o campo de localidade"
         assert prop.default == "herdar", f"no '{nome}': o padrao tem de ser herdar da maquina"

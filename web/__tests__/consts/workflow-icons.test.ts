@@ -14,6 +14,7 @@ const BACKEND_OUTPUTS = [
   "SaveGeoJSON",
   "SaveToShapefile",
   "SaveToGeoParquet",
+  "SaveFile",
   "SaveToS3",
   "SendEmail",
   "SendWebhook",
