@@ -30,15 +30,25 @@ def _ler_kmz(path: str) -> Any:
     """A KMZ holding a single KML (Google Earth's, and Salvar arquivo's) is
     read through that KML: GDAL's LIBKML, opening the .kmz itself, drops the
     attributes (SchemaData) it reads from the same doc.kml outside the zip. A
-    KMZ made of several KML (LIBKML's own, with layers/) is read as it is."""
+    KMZ made of several KML (LIBKML's own, with layers/) is read as it is.
+
+    The KML goes to a file, not to memory: as bytes it was held twice (here
+    and in GDAL's /vsimem), half again the RAM for a large KMZ.
+    """
+    import shutil
+    import tempfile
     import zipfile
     from flow.utils.leitura_geo import read_geodataframe
 
     with zipfile.ZipFile(path) as kmz:
         kmls = [nome for nome in kmz.namelist() if nome.lower().endswith(".kml")]
-        if len(kmls) == 1:
-            return read_geodataframe(kmz.read(kmls[0]))
-    return read_geodataframe(path)
+        if len(kmls) != 1:
+            return read_geodataframe(path)
+        with tempfile.TemporaryDirectory() as pasta:
+            doc = os.path.join(pasta, "doc.kml")
+            with kmz.open(kmls[0]) as origem, open(doc, "wb") as destino:
+                shutil.copyfileobj(origem, destino)
+            return read_geodataframe(doc)
 
 
 def _load_file(path: str, ext: str, crs: str) -> Any:

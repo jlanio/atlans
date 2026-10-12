@@ -100,3 +100,42 @@ def test_reads_a_kmz_made_of_several_kml(tmp_path):
     lido = _load_file(caminho, "kmz", "")
 
     assert lido["nome"].tolist() == ["Escola Ji-Paraná", "Posto"]
+
+
+def test_a_semicolon_csv_with_decimal_points(tmp_path):
+    """QGIS (ogr2ogr SEPARATOR=SEMICOLON) and pandas write ';' with '.' decimals:
+    every number came back as text."""
+    caminho = tmp_path / "x.csv"
+    caminho.write_text("nome;lat;lon;valor\nA;-8.7608;-63.9004;1500.5\n", encoding="utf-8")
+
+    lido = _load_file(str(caminho), "csv", "")
+
+    assert lido.iloc[0].tolist() == ["A", -8.7608, -63.9004, 1500.5]
+
+
+def test_a_semicolon_csv_mixing_integers_and_decimal_commas(tmp_path):
+    caminho = tmp_path / "x.csv"
+    caminho.write_text("valor;codigo\n12;A1\n1.500,5;B2\n", encoding="utf-8")
+
+    lido = _load_file(str(caminho), "csv", "")
+
+    assert lido["valor"].tolist() == [12.0, 1500.5]
+    assert lido["codigo"].tolist() == ["A1", "B2"]
+
+
+def test_the_csv_excel_in_portuguese_saves(tmp_path):
+    """'CSV (separado por vírgulas)' in Excel in Portuguese is Windows-1252."""
+    caminho = tmp_path / "x.csv"
+    caminho.write_bytes("Município;Valor\nJi-Paraná;1500,5\n".encode("cp1252"))
+
+    assert _load_file(str(caminho), "csv", "").to_dict("records") == [{"Município": "Ji-Paraná", "Valor": 1500.5}]
+
+
+def test_a_semicolon_csv_keeps_dotted_codes_as_text(tmp_path):
+    caminho = tmp_path / "x.csv"
+    caminho.write_text("processo;valor\n12.345.678;1,5\n98.765.432;2,5\n", encoding="utf-8")
+
+    lido = _load_file(str(caminho), "csv", "")
+
+    assert lido["processo"].tolist() == ["12.345.678", "98.765.432"]
+    assert lido["valor"].tolist() == [1.5, 2.5]
