@@ -13,6 +13,7 @@ Geodatabase refuse a layer with mixed geometry types, and DXF drops the
 attributes.
 """
 import asyncio
+import datetime
 import json
 import math
 import numbers
@@ -27,6 +28,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 from geopandas.array import GeometryDtype
+from pandas.api.types import infer_dtype
 from pyproj import CRS
 
 from flow.registry import register_node
@@ -66,6 +68,16 @@ CARACTERES_POR_CELULA = 32_767
 # would go past the 90 s after which the server drops the executor. This budget
 # keeps the freeze around 20 s.
 CELULAS_DO_EXCEL = 5_000_000
+
+# The same for the KML writer, which costs about 3.3 µs per vertex and 2.2 µs
+# per attribute value (30 thousand 65-vertex polygons froze the loop for 6 s):
+# a state's rural properties (CAR) would go past the 90 s. Around 20 s here,
+# and a KML that big is already slow to open in Google Earth.
+ELEMENTOS_DO_KML = 6_000_000
+
+# Longitude/latitude, with room for rounding; longitudes up to 360 are the
+# 0–360 convention of some datasets. A UTM coordinate goes far past both.
+_LONGITUDES, _LATITUDES = (-180.000001, 360.000001), (-90.000001, 90.000001)
 
 # Excel keeps 15 significant digits: a longer number (an NF-e access key, a
 # process number) loses its last digits, so it goes as text.
@@ -112,7 +124,12 @@ def _para_json(valor: Any) -> Any:
         return {str(k): _para_json(v) for k, v in valor.items()}
     if isinstance(valor, np.ndarray):
         valor = valor.tolist()
-    if isinstance(valor, (list, tuple, set)):
+    if isinstance(valor, set):
+        # Sorted: a set's order changes from one process to another
+        # (PYTHONHASHSEED), and the same data would come out as another file.
+        itens = [_para_json(v) for v in valor]
+        return sorted(itens, key=lambda v: json.dumps(v, sort_keys=True, default=str))
+    if isinstance(valor, (list, tuple)):
         return [_para_json(v) for v in valor]
     if isinstance(valor, np.generic):
         valor = valor.item()
@@ -195,63 +212,90 @@ def _coluna_gravavel(serie: pd.Series, crs: Any) -> pd.Series:
         maior = serie.max()
         if not pd.isna(maior) and int(maior) > _MAIOR_INT64:
             return serie.astype(object).map(_como_texto)
+    if isinstance(serie.dtype, pd.StringDtype):
+        return _sem_nul(serie)
     if serie.dtype != object:
         return serie
 
     # pd.NA and NaT went out as the texts "<NA>" and "NaT".
     serie = serie.where(serie.notna(), None)
-    presentes = serie.dropna()
-    if presentes.empty:
+    # One pass in C says what the column holds; the per-value work below only
+    # runs for the kind that needs it.
+    tipo = infer_dtype(serie, skipna=True)
+    if tipo == "empty":
         return serie
-    if all(isinstance(v, str) for v in presentes):
-        if presentes.str.contains("\x00", regex=False).any():
-            return serie.map(lambda v: v.replace("\x00", "") if isinstance(v, str) else v)
-        return serie
-    if all(isinstance(v, (bool, np.bool_)) for v in presentes):
+    if tipo == "string":
+        return _sem_nul(serie)
+    if tipo == "boolean":
         # A Postgres boolean with NULL comes as an object column: without this
         # it became the text "True", while the same column without NULL is a boolean.
         return serie.astype("boolean")
+    if tipo == "date" and all(type(v) is datetime.date for v in serie.dropna()):
+        # A Postgres `date` comes as datetime.date objects, and was written as
+        # text: no date filter or sort in QGIS and Excel. In seconds, because
+        # 9999-12-31, the "no end date" of many public databases, does not fit
+        # in nanoseconds.
+        return serie.astype("datetime64[s]")
     numeros = _como_numero(serie)
     return numeros if numeros is not None else serie.map(_como_texto)
 
 
-def _nomes_unicos(df: pd.DataFrame, avisos: List[str]) -> List[Any]:
+def _sem_nul(serie: pd.Series) -> pd.Series:
+    """Text without NUL: GDAL cuts the text there, and the CSV carried the byte."""
+    if serie.map(lambda v: isinstance(v, str) and "\x00" in v).any():
+        # What is not text here is a missing value: None, not the pd.NA of a
+        # `string` column, which GDAL writes as the text "<NA>".
+        return serie.map(lambda v: v.replace("\x00", "") if isinstance(v, str) else None)
+    return serie
+
+
+def _nomes_unicos(df: pd.DataFrame, avisos: List[str], renomeadas: Dict[str, str]) -> List[Any]:
     """The column names as distinct text, compared without case.
 
     GDAL compares field names without case: `NM_MUN` and `nm_mun` (the join of
     an IBGE layer with a Postgres table) made the GeoPackage refuse the layer,
     and the KML wrote the second column's values under the first one's name, in
     silence. A pivot's columns (tuples) are joined with '_'. A repeated name
-    takes a suffix, and the log says so.
+    takes a suffix that no other column has (for `a`, `A`, `a_1` the `A`
+    becomes `A_2`, and `a_1` stays), the log says so, and `renomeadas` keeps
+    the change for whoever chose a column by its old name.
     """
     geometria = df.active_geometry_name if isinstance(df, gpd.GeoDataFrame) else None
+    originais = [
+        coluna if geometria is not None and coluna == geometria
+        else "_".join(str(p) for p in coluna if str(p) != "") if isinstance(coluna, tuple)
+        else str(coluna)
+        for coluna in df.columns
+    ]
+    reservados = {str(nome).lower() for nome in originais}
     nomes: List[Any] = []
     usados: set = set()
-    for coluna in df.columns:
+    for coluna, nome in zip(df.columns, originais):
         if geometria is not None and coluna == geometria:
             nomes.append(coluna)
             continue
-        if isinstance(coluna, tuple):
-            nome = "_".join(str(parte) for parte in coluna if str(parte) != "")
-        else:
-            nome = str(coluna)
         if nome.lower() in usados:
-            novo = _nome_livre(usados, nome)
+            novo = _nome_livre(usados | reservados, nome)
             avisos.append(
                 f"A coluna '{nome}' foi gravada como '{novo}': outra coluna já tem esse "
                 "nome, sem contar maiúsculas e minúsculas."
             )
+            renomeadas.setdefault(nome, novo)
             nome = novo
         usados.add(nome.lower())
         nomes.append(nome)
     return nomes
 
 
-def atributos_gravaveis(df: pd.DataFrame, avisos: Optional[List[str]] = None) -> pd.DataFrame:
+def atributos_gravaveis(
+    df: pd.DataFrame, avisos: Optional[List[str]] = None,
+    renomeadas: Optional[Dict[str, str]] = None,
+) -> pd.DataFrame:
     """The columns the same way in every format. Never changes `df`.
 
     What GDAL writes each its own way, or refuses: a Postgres query brings
-    `numeric` as Decimal and booleans with NULL as objects, an API brings dicts
+    `numeric` as Decimal, `date` as datetime.date and booleans with NULL as
+    objects, an API brings dicts
     and lists, a spreadsheet mixes 1 and "a" in the same column, a pivot names
     columns with numbers or tuples, a join brings two names that differ only in
     case, a groupby keeps the keys in the index, and a node that swaps the
@@ -260,9 +304,10 @@ def atributos_gravaveis(df: pd.DataFrame, avisos: Optional[List[str]] = None) ->
     (as text when they would lose digits), any other mixed column becomes text
     (containers as JSON), a second geometry becomes WKT, the names become
     distinct text and a named index becomes columns. What changes a name goes
-    into `avisos`.
+    into `avisos`, and into `renomeadas` (old name -> new one).
     """
     avisos = [] if avisos is None else avisos
+    renomeadas = {} if renomeadas is None else renomeadas
     if any(nome is not None for nome in df.index.names):
         # A named index is data (the keys of a groupby): every format dropped it.
         nomes_do_indice: List[str] = []
@@ -272,7 +317,7 @@ def atributos_gravaveis(df: pd.DataFrame, avisos: Optional[List[str]] = None) ->
         df = df.reset_index(names=nomes_do_indice)
     else:
         df = df.copy()
-    df.columns = _nomes_unicos(df, avisos)
+    df.columns = _nomes_unicos(df, avisos, renomeadas)
 
     geometria = df.active_geometry_name if isinstance(df, gpd.GeoDataFrame) else None
     crs = df.crs if geometria is not None else None
@@ -285,28 +330,49 @@ def atributos_gravaveis(df: pd.DataFrame, avisos: Optional[List[str]] = None) ->
 def no_crs_de_destino(gdf: gpd.GeoDataFrame, destino: str, formato: str) -> gpd.GeoDataFrame:
     """`ensure_gdf_crs`, refusing to call longitude/latitude what is not.
 
-    Without a CRS, `ensure_gdf_crs` takes the destination one as the layer's.
-    For a UTM shapefile whose .prj got lost, that wrote a KML at 40,9030000
-    (GDAL only complained on stderr) and a CSV with longitude 400000.
+    A UTM shapefile whose .prj got lost passes for longitude/latitude in two
+    ways: without a CRS, `ensure_gdf_crs` takes the destination one (EPSG:4326
+    by default); or the reader already stamped its own default on it (Entrada
+    de Dados: EPSG:4326). Either way that wrote a KML at 40,9030000 (GDAL only
+    complained on stderr) and a CSV with longitude 400000.
     """
-    if gdf.crs is None and destino and CRS.from_user_input(destino).is_geographic:
-        minx, miny, maxx, maxy = gdf.total_bounds
-        if not np.isnan(minx) and (minx < -180 or maxx > 180 or miny < -90 or maxy > 90):
-            if formato in ("kml", "kmz"):
-                dica = (
-                    "O KML precisa saber o CRS de origem para converter: informe-o no nó "
-                    "que lê a camada (campo CRS)."
-                )
-            else:
-                dica = (
-                    "Informe no campo 'CRS de destino' o CRS em que ela está (ex.: "
-                    "EPSG:31980) para gravar sem reprojetar."
-                )
-            raise ValueError(
-                f"A camada não tem CRS, e as coordenadas (x de {minx:.0f} a {maxx:.0f}, "
-                f"y de {miny:.0f} a {maxy:.0f}) não são longitude/latitude. {dica}"
-            )
-    return ensure_gdf_crs(gdf, destino)
+    if gdf.crs is not None:
+        geografico = gdf.crs.is_geographic
+    else:
+        geografico = bool(destino) and CRS.from_user_input(destino).is_geographic
+    if not geografico:
+        return ensure_gdf_crs(gdf, destino)
+
+    minx, miny, maxx, maxy = gdf.total_bounds
+    dentro = np.isnan(minx) or (
+        _LONGITUDES[0] <= minx and maxx <= _LONGITUDES[1]
+        and _LATITUDES[0] <= miny and maxy <= _LATITUDES[1]
+    )
+    if dentro:
+        return ensure_gdf_crs(gdf, destino)
+
+    coordenadas = f"(x de {minx:.0f} a {maxx:.0f}, y de {miny:.0f} a {maxy:.0f})"
+    if gdf.crs is not None:
+        raise ValueError(
+            f"A camada está marcada como {gdf.crs.to_string()}, longitude/latitude, mas as "
+            f"coordenadas {coordenadas} não são: o CRS dela está errado, como num "
+            "shapefile sem o .prj lido com o CRS padrão. Informe o CRS certo no nó que lê "
+            "a camada (campo CRS)."
+        )
+    if formato in ("kml", "kmz"):
+        dica = (
+            "O KML precisa saber o CRS de origem para converter: informe-o no nó que lê "
+            "a camada (campo CRS)."
+        )
+    else:
+        dica = (
+            "Informe no campo 'CRS de destino' o CRS em que ela está (ex.: EPSG:31980) "
+            "para gravar sem reprojetar."
+        )
+    raise ValueError(
+        f"A camada não tem CRS, e as coordenadas {coordenadas} não são "
+        f"longitude/latitude. {dica}"
+    )
 
 
 def geometria_em_colunas(df: pd.DataFrame, modo: str) -> tuple[pd.DataFrame, Optional[str]]:
@@ -477,36 +543,56 @@ def _para_gpkg(dado: pd.DataFrame) -> pd.DataFrame:
     return dado
 
 
-def _para_kml(dado: gpd.GeoDataFrame, avisos: List[str]) -> tuple[gpd.GeoDataFrame, Dict[str, str]]:
-    """What the KML driver writes wrong. Returns the layer and the renamed fields.
+def conferir_tamanho_do_kml(dado: gpd.GeoDataFrame) -> None:
+    """Refuses a KML that would hold the executor too long (ELEMENTOS_DO_KML)."""
+    vertices = int(dado.geometry.count_coordinates().sum())
+    valores = len(dado) * (len(dado.columns) - 1)
+    if vertices + valores > ELEMENTOS_DO_KML:
+        raise ValueError(
+            f"O KML teria {_milhar(vertices)} vértices e {_milhar(valores)} valores de "
+            f"atributos, acima dos {_milhar(ELEMENTOS_DO_KML)} que o executor grava sem "
+            "ficar parado tempo demais (e pesado para o Google Earth abrir). Simplifique "
+            "a geometria (nó Simplify), leve menos colunas ou grave em GeoPackage."
+        )
+
+
+def _para_kml(dado: gpd.GeoDataFrame, campo: str, avisos: List[str]) -> tuple[gpd.GeoDataFrame, str]:
+    """What the KML driver writes wrong. Returns the layer and the name field,
+    renamed along with its column.
 
     - A field name with & < > or ": see _FORA_DO_XML. The character becomes '_'.
+    - With a name field chosen, GDAL declares it as `Name`, and the values of
+      another column called name (any case) went out under `Name` too. That
+      column takes a suffix.
     - An empty geometry (POINT EMPTY, what intersecting a point with a polygon
       it is not in returns) became <coordinates>nan,nan</coordinates>, read back
       as POINT (0 0). It goes without geometry.
     """
     geometria = dado.geometry.name
+    reservados = ["name"] if campo else []
     nomes: List[str] = []
     renomeados: Dict[str, str] = {}
     for coluna in dado.columns:
-        nome = coluna
+        nome, motivo = coluna, None
         if coluna != geometria and _FORA_DO_XML.search(coluna):
-            outros = [c for c in dado.columns if c != coluna] + nomes
-            nome = _nome_livre(outros, _FORA_DO_XML.sub("_", coluna))
+            nome, motivo = _FORA_DO_XML.sub("_", coluna), "o KML não aceita & < > \" no nome de um campo"
+        elif coluna != geometria and campo and coluna != campo and coluna.lower() == "name":
+            motivo = f"o KML chama de Name o campo do nome ('{campo}')"
+        if motivo:
+            outros = [c for c in dado.columns if c != coluna] + nomes + reservados
+            nome = _nome_livre(outros, nome)
             renomeados[coluna] = nome
-            avisos.append(
-                f"A coluna '{coluna}' foi gravada como '{nome}': o KML não aceita & < > \" "
-                "no nome de um campo."
-            )
+            avisos.append(f"A coluna '{coluna}' foi gravada como '{nome}': {motivo}.")
         nomes.append(nome)
+    campo = renomeados.get(campo, campo)
     vazias = dado.geometry.is_empty
     if not renomeados and not vazias.any():
-        return dado, renomeados
+        return dado, campo
     dado = dado.copy()
     dado.columns = nomes
     if vazias.any():
         dado[geometria] = dado.geometry.where(~vazias, None)
-    return dado, renomeados
+    return dado, campo
 
 
 def gravar(
@@ -533,9 +619,8 @@ def gravar(
         return caminho
 
     if formato in ("kml", "kmz"):
-        dado, renomeados = _para_kml(dado, avisos)
-        campo = opcoes.get("campo_nome") or ""
-        campo = renomeados.get(campo, campo)
+        conferir_tamanho_do_kml(dado)
+        dado, campo = _para_kml(dado, opcoes.get("campo_nome") or "", avisos)
         destino_kml = caminho if formato == "kml" else os.path.join(pasta, "doc.kml")
         # The layer is the folder Google Earth shows, and its name is also an
         # XML id: GDAL turns the slug's '-' into '_', warning on every run.
@@ -702,12 +787,20 @@ class SaveFileNode(BaseNode):
                 valor = como_tabela.setdefault(id(valor), pd.DataFrame(valor))
             entradas[chave] = valor
 
-        if any(isinstance(v, gpd.GeoDataFrame) and not v.empty for v in entradas.values()):
+        camadas = [k for k, v in entradas.items() if isinstance(v, gpd.GeoDataFrame)]
+        if any(not entradas[k].empty for k in camadas):
             return self.get_first_gdf(entradas)
         tabelas = [
             k for k, v in entradas.items()
             if isinstance(v, pd.DataFrame) and not isinstance(v, gpd.GeoDataFrame) and not v.empty
         ]
+        if camadas and tabelas:
+            # The layer is what was wired to be saved: writing the table that came
+            # along under its name would hand over other data, with no error.
+            raise ValueError(
+                f"A camada chegou vazia ({camadas}), e a tabela que veio junto ({tabelas}) "
+                "não é gravada no lugar dela."
+            )
         if tabelas:
             if len({id(entradas[k]) for k in tabelas}) > 1:
                 self.log(
@@ -751,9 +844,13 @@ class SaveFileNode(BaseNode):
         if tem_geometria:
             destino = CRS_DO_KML if formato in ("kml", "kmz") else self.get_param("crs", "EPSG:4326").strip()
             dado = await asyncio.to_thread(no_crs_de_destino, dado, destino, formato)
-        dado = await asyncio.to_thread(atributos_gravaveis, dado, avisos)
+        renomeadas: Dict[str, str] = {}
+        dado = await asyncio.to_thread(atributos_gravaveis, dado, avisos, renomeadas)
 
         campo_nome = self.get_param("campoNome", "").strip()
+        if campo_nome not in dado.columns:
+            # The editor offers the names as they arrive; a repeated one took a suffix.
+            campo_nome = renomeadas.get(campo_nome, campo_nome)
         if formato in ("kml", "kmz") and campo_nome and campo_nome not in dado.columns:
             colunas = [c for c in dado.columns if c != dado.geometry.name]
             raise ValueError(f"O campo '{campo_nome}' não existe na camada. Campos: {colunas}.")
@@ -800,12 +897,13 @@ class SaveFileNode(BaseNode):
         onde = "neste executor" if localidade == EXECUTOR else "no MinIO"
         self.log(f"Arquivo salvo {onde}: {s3_key} ({formato}, {features} linhas)")
 
+        # The declared outputs at the top, as the executor compares them: nested
+        # under "output" they showed as schema drift on every run, and an edge
+        # taking `artifact_s3_key` delivered nothing to the next node.
         return {
-            "output": {
-                "artifact_filename": filename,
-                "artifact_s3_key": s3_key,
-                "artifact_format": formato,
-                "features": features,
-            },
+            "artifact_filename": filename,
+            "artifact_s3_key": s3_key,
+            "artifact_format": formato,
+            "features": features,
             "__artifact__": artifact_meta,
         }

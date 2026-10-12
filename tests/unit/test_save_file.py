@@ -103,12 +103,10 @@ async def test_gpkg_comes_back_with_the_columns_rows_and_crs(tmp_path):
     assert recebido["content_type"] == "application/geopackage+sqlite3"
     assert recebido["fmt"] == "gpkg"
     assert recebido["features"] == 2
-    assert resultado["output"] == {
-        "artifact_filename": "Obras.gpkg",
-        "artifact_s3_key": "artifacts/ws-1/task-1/Obras.gpkg",
-        "artifact_format": "gpkg",
-        "features": 2,
-    }
+    assert resultado["artifact_filename"] == "Obras.gpkg"
+    assert resultado["artifact_s3_key"] == "artifacts/ws-1/task-1/Obras.gpkg"
+    assert resultado["artifact_format"] == "gpkg"
+    assert resultado["features"] == 2
     assert resultado["__artifact__"] == {"filename": "Obras.gpkg"}
 
 
@@ -890,3 +888,138 @@ def test_importing_the_node_does_not_load_gdal():
         capture_output=True, text=True, check=True,
     )
     assert saida.stdout.strip() == "False"
+
+
+# ── Findings of the second review ────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_returns_the_declared_outputs_at_the_top():
+    """The executor compares the returned keys with the declared outputs:
+    nested under "output" they showed as schema drift on every run, and an
+    edge taking `artifact_s3_key` delivered nothing to the next node."""
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as pasta:
+        resultado, _, _ = await _salvar(Path(pasta), {"label": "t"}, {"in": _obras()})
+
+    declaradas = {o["name"] for o in SaveFileNode.description()["outputs"]}
+    assert set(resultado) - {"__artifact__", "_logs"} == declaradas
+
+
+@pytest.mark.asyncio
+async def test_kml_refuses_more_than_the_executor_writes_in_time(tmp_path, monkeypatch):
+    """GDAL's KML writer holds the GIL too, about 3.3 µs per vertex: a state's
+    rural properties would freeze the executor past the 90 s."""
+    monkeypatch.setattr(save_file, "ELEMENTOS_DO_KML", 5)
+
+    with pytest.raises(ValueError, match=r"O KML teria 10 vértices e 2 valores de atributos, acima dos 5"):
+        await _salvar(tmp_path, {"label": "t", "formato": "kmz", "crs": ""}, {"in": _lotes()})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("formato", ["kml", "csv"])
+async def test_a_layer_marked_wgs84_with_utm_coordinates_is_refused(tmp_path, formato):
+    """Entrada de Dados stamps its default EPSG:4326 on a shapefile without .prj:
+    the layer arrives with a CRS, and the check for a missing one let it pass."""
+    marcada = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(400000, 9030000)], crs="EPSG:4326")
+
+    with pytest.raises(ValueError, match="marcada como EPSG:4326, longitude/latitude, mas as coordenadas"):
+        await _salvar(tmp_path, {"label": "u", "formato": formato}, {"in": marcada})
+
+
+@pytest.mark.asyncio
+async def test_the_name_field_follows_a_renamed_column(tmp_path):
+    camada = _obras()
+    camada["NM_MUN"] = ["Porto Velho", "Ji-Paraná"]
+    camada["nm_mun"] = ["PVH (sede)", "JPR (sede)"]
+
+    _, _, kmz = await _salvar(tmp_path, {"label": "j", "formato": "kmz", "campoNome": "nm_mun"}, {"in": camada})
+
+    assert "<name>PVH (sede)</name>" in _kml_de(kmz)
+
+
+@pytest.mark.asyncio
+async def test_kml_keeps_a_column_called_name_apart_from_the_name_field(tmp_path):
+    """GDAL declares the chosen name field as `Name`: an OSM layer's own `name`
+    column went out under `Name` too."""
+    camada = _obras()
+    camada["name"] = ["n1", "n2"]
+
+    resultado, _, arquivo = await _salvar(
+        tmp_path, {"label": "t", "formato": "kml", "campoNome": "nome"}, {"in": camada}
+    )
+
+    kml = arquivo.read_text(encoding="utf-8")
+    assert "<name>Escola Ji-Paraná</name>" in kml
+    assert '<SimpleData name="name_1">n1</SimpleData>' in kml
+    assert '<SimpleData name="Name">' not in kml
+    assert any("'name' foi gravada como 'name_1'" in linha for linha in resultado["_logs"])
+
+
+@pytest.mark.asyncio
+async def test_an_empty_layer_is_not_replaced_by_a_table(tmp_path):
+    with pytest.raises(ValueError, match=r"A camada chegou vazia \(\['camada'\]\), e a tabela"):
+        await _salvar(
+            tmp_path, {"label": "obras_filtradas", "formato": "csv"},
+            {"camada": _obras().iloc[0:0], "resumo": pd.DataFrame({"municipio": ["PVH"], "total": [3]})},
+        )
+
+
+@pytest.mark.asyncio
+async def test_nul_is_removed_from_pandas_string_columns(tmp_path):
+    camada = _obras()
+    camada["obs"] = pd.array(["antes\x00depois", None], dtype="string")
+
+    _, _, arquivo = await _salvar(tmp_path, {"label": "t", "formato": "gpkg"}, {"in": camada})
+
+    assert pyogrio.read_dataframe(arquivo)["obs"].tolist() == ["antesdepois", None]
+
+
+def test_a_renamed_column_does_not_take_another_columns_name():
+    tabela = pd.DataFrame([[1, 2, 3]], columns=["a", "A", "a_1"])
+    renomeadas: dict = {}
+
+    pronta = atributos_gravaveis(tabela, renomeadas=renomeadas)
+
+    assert list(pronta.columns) == ["a", "A_2", "a_1"]
+    assert renomeadas == {"A": "A_2"}
+
+
+@pytest.mark.asyncio
+async def test_postgres_dates_stay_dates(tmp_path):
+    """A `date` column comes as datetime.date objects, and was written as text.
+    9999-12-31 is the "no end date" of many public databases."""
+    import datetime
+
+    camada = _obras()
+    camada["vistoria"] = pd.Series([datetime.date(2024, 3, 11), datetime.date(9999, 12, 31)], dtype=object)
+
+    _, _, gpkg = await _salvar(tmp_path, {"label": "t", "formato": "gpkg"}, {"in": camada})
+    info = pyogrio.read_info(gpkg)
+    assert dict(zip(info["fields"], info["dtypes"]))["vistoria"].startswith("datetime64")
+
+    _, _, csv = await _salvar(tmp_path, {"label": "t", "formato": "csv", "geometria": "nenhuma"}, {"in": camada})
+    assert csv.read_text(encoding="utf-8-sig").splitlines()[1:] == [
+        "Escola Ji-Paraná;1500,5;2024-03-11", "Posto de saúde;20,25;9999-12-31",
+    ]
+
+
+def test_a_set_is_written_in_the_same_order_in_every_process():
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    codigo = (
+        "import pandas as pd; from flow.nodes.outputs.save_file import atributos_gravaveis; "
+        "s = pd.Series([{'escola', 'saude', 'creche', 'praca'}, 'x'], dtype=object); "
+        "print(atributos_gravaveis(pd.DataFrame({'c': s}))['c'].iloc[0])"
+    )
+    saidas = {
+        subprocess.run(
+            [sys.executable, "-c", codigo], cwd=Path(__file__).resolve().parents[2],
+            capture_output=True, text=True, check=True, env={**__import__("os").environ, "PYTHONHASHSEED": semente},
+        ).stdout.strip()
+        for semente in ("1", "2", "3")
+    }
+    assert saidas == {'["creche", "escola", "praca", "saude"]'}
