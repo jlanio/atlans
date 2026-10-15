@@ -209,6 +209,15 @@ class TestReferenciasDeDefinicaoMalformada:
         assert collect_subworkflow_references({"nodes": "nada"}) == []
         assert collect_subworkflow_references(None) == []
 
+    def test_put_com_id_de_no_que_nao_e_texto_nao_quebra(self):
+        from app.api.routers.workflows_router import _referencias_alteradas
+
+        nova = {"nodes": [
+            {"id": ["x"], "name": "Buffer", "properties": {}},
+            {"id": {"a": 1}, "name": "SubWorkflow", "properties": {"workflowHash": "filho-1"}},
+        ]}
+        assert [n["name"] for n in _referencias_alteradas(nova, {})["nodes"]] == ["SubWorkflow"]
+
     def test_put_com_definicao_salva_malformada_nao_quebra(self):
         from app.api.routers.workflows_router import _referencias_alteradas
 

@@ -406,12 +406,14 @@ def _referencias_alteradas(nova: Dict[str, Any], salva: Optional[Dict[str, Any]]
     `inputsMapping`) is not in the saved one — what a save has to validate."""
     from flow.utils.workflow_contract import collect_subworkflow_references
 
+    # Ids compared as text: a hand-written id that is a list or an object is not
+    # hashable, and the set lookups turned every such save into a 500.
     def chave(ref: dict) -> tuple:
-        return (ref["node_id"], ref["workflow_hash"], json.dumps(ref["inputs_mapping"], sort_keys=True, default=str))
+        return (str(ref["node_id"]), ref["workflow_hash"], json.dumps(ref["inputs_mapping"], sort_keys=True, default=str))
 
     ja_salvas = {chave(r) for r in collect_subworkflow_references(salva or {})}
-    ids = {r["node_id"] for r in collect_subworkflow_references(nova) if chave(r) not in ja_salvas}
-    return {"nodes": [n for n in (nova.get("nodes") or []) if isinstance(n, dict) and n.get("id") in ids]}
+    ids = {str(r["node_id"]) for r in collect_subworkflow_references(nova) if chave(r) not in ja_salvas}
+    return {"nodes": [n for n in (nova.get("nodes") or []) if isinstance(n, dict) and str(n.get("id")) in ids]}
 
 
 @router.put("/{id_hash}", response_model=WorkflowRead, summary="Atualiza um workflow existente")
