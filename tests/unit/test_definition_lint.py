@@ -121,7 +121,9 @@ def test_cycle_is_fatal():
 
 
 def test_report_without_fatal_is_not_fatal():
-    rel = _lint([_n("a"), _n("b")], [{"source": "a", "target": "ghost"}])
+    # The a -> b edge keeps the run from being empty (with only the orphan edge,
+    # nothing would run — `empty_run`, an error, though not a fatal one).
+    rel = _lint([_n("a"), _n("b")], [{"source": "a", "target": "b"}, {"source": "a", "target": "ghost"}])
 
     assert rel.errors == []
     assert not rel.fatal
@@ -166,6 +168,21 @@ def test_isolated_node_and_node_outside_trigger_cone_are_distinct_warnings():
     assert "sem caminho a partir de um trigger" in fora["z"]
     assert fora["x"] != fora["y"]
     assert rel.execution_order == ["t", "a"]
+
+
+def test_nenhuma_aresta_ligando_nos_e_execucao_vazia():
+    # Edges pointing at ids that are not in the definition: every node leaves
+    # the run, and nothing would execute.
+    rel = _lint([_n("t2", name="T", ntype="trigger"), _n("a2")],
+                [{"source": "t", "target": "a"}])
+    assert "empty_run" in _codes(rel.errors)
+    assert rel.execution_order == []
+
+
+def test_execucao_com_algum_no_nao_e_vazia():
+    rel = _lint([_n("t", name="T", ntype="trigger"), _n("a"), _n("x")],
+                [{"source": "t", "target": "a"}, {"source": "x", "target": "ghost"}])
+    assert "empty_run" not in _codes(rel.errors)
 
 
 def test_without_edges_no_node_is_unreachable():

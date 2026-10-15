@@ -117,6 +117,10 @@ class EdgeDefinition(BaseModel):
     from_key: Optional[str] = None
     to_key: Optional[str] = None
     condition: Optional[bool] = None
+    # The branch handle: with no usable `condition`, the run routes the edge by
+    # it (edge_resolver.Edge.from_dict). Dropped here, the validation read as a
+    # data edge what the run treats as a branch.
+    source_handle: Optional[str] = None
 
 
 class WorkflowDefinition(BaseModel):
@@ -128,6 +132,33 @@ class WorkflowDefinition(BaseModel):
 
 
 # --- HELPERS ---
+# React Flow's names for what the definition calls `source_handle`, `from_key` and
+# `to_key`. The model above drops them before the lint, and the executor never
+# reads them: an edge written with them runs as "spread every output", which
+# is not what whoever wrote `fromKey` meant — and nothing said so.
+_CHAVES_DO_REACT_FLOW = {
+    "sourceHandle": "source_handle",
+    "targetHandle": "to_key",
+    "fromKey": "from_key",
+    "toKey": "to_key",
+    "data": "from_key/to_key no nível da aresta",
+}
+
+
+def _chaves_de_aresta_ignoradas(definition: Any) -> List[tuple]:
+    """`(edge, key, what to use)` for each React Flow key in the RAW edges."""
+    if not isinstance(definition, dict):
+        return []
+    achados = []
+    for edge in definition.get("edges") or []:
+        if not isinstance(edge, dict):
+            continue
+        for chave, certo in _CHAVES_DO_REACT_FLOW.items():
+            if chave in edge:
+                achados.append(({"source": edge.get("source"), "target": edge.get("target")}, chave, certo))
+    return achados
+
+
 def _payload_para_o_executor(definition: WorkflowDefinition) -> dict:
     """Definition in the format the executor and the server helpers read.
 
@@ -359,6 +390,7 @@ async def validar_definicao(
     from flow.executor import WorkflowExecutor
     from flow.registry import NODE_REGISTRY
 
+    ignoradas = _chaves_de_aresta_ignoradas(definition)
     if not isinstance(definition, WorkflowDefinition):
         definition = WorkflowDefinition.model_validate(definition)
     if workspace_id is None:
@@ -385,6 +417,14 @@ async def validar_definicao(
             continue
 
     lint = lint_definition(nodes, payload["edges"], registry_names=NODE_REGISTRY.keys(), descriptors=descriptors)
+    for edge, chave, certo in ignoradas:
+        lint.aviso(
+            "edge_unknown_key",
+            f"aresta '{edge['source']}' -> '{edge['target']}' usa '{chave}' (nome do "
+            f"React Flow), que o executor ignora: use {certo}. Sem isso a aresta "
+            "repassa todas as saídas da origem.",
+            edge=edge,
+        )
     if lint.fatal:
         raise InvalidDefinitionError(_fatal_message(lint), report=_build_report(
             lint, nodes, disabled_nodes=None, subworkflow_errors=None,
