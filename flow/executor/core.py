@@ -985,20 +985,23 @@ class WorkflowExecutor:
             for edge in self.incoming.get(node_id, []):
                 parent_id = edge["source"]
                 parent_output = self.simulated_outputs.get(parent_id)
-                if not parent_output or parent_output.get("status") != "ok":
-                    continue
-                schema_list = parent_output.get("schema") or []
-                fields = schema_list[0].get("fields", []) if schema_list else []
-                names = {f.get("name") for f in fields if f.get("name")}
-                if not names:
-                    continue
+                names: set = set()
+                if parent_output and parent_output.get("status") == "ok":
+                    schema_list = parent_output.get("schema") or []
+                    fields = schema_list[0].get("fields", []) if schema_list else []
+                    names = {f.get("name") for f in fields if f.get("name")}
 
                 aresta = Edge.from_dict(edge)
                 from_key = aresta.from_key
                 to_key = edge.get("to_key")
                 is_branch = aresta.is_branch
 
-                if from_key:
+                # The source side needs the source's outputs: without them a
+                # typo cannot be told from a dynamic output. The target side
+                # (below) only needs the target, and runs either way.
+                if not names:
+                    pass
+                elif from_key:
                     # The SubWorkflow node returns `{subWorkflowResult, **child
                     # ports}` (sub_workflow.py): the child's ports are outputs
                     # too, but they come from ANOTHER workflow's contract, which
@@ -1008,10 +1011,8 @@ class WorkflowExecutor:
                     # instead of the port's value.
                     if (
                         from_key not in names
-                        and self.node_mgr.node_defs.get(parent_id, {}).get("name") == "SubWorkflow"
+                        and self.node_mgr.node_defs.get(parent_id, {}).get("name") != "SubWorkflow"
                     ):
-                        continue
-                    if from_key not in names:
                         diagnostics.append({
                             "severity": "error",
                             "source": parent_id,
@@ -1086,25 +1087,32 @@ class WorkflowExecutor:
         return diagnostics
 
     def _entradas_declaradas(self, node_id: str) -> "set[str] | None":
-        """Input names a node reads, or None when they are not known statically.
+        """Input names a node reads BY NAME, or None when any key will do or
+        they are not known statically.
 
-        Catalog `inputs` for most nodes; the `ports` property for a
-        SubWorkflowOutput, whose ports are its inputs, and for a Merge. Other
-        dynamic-input nodes (the Python Script) and nodes that declare no input
-        are left out.
+        The `ports` property for a SubWorkflowOutput (its allowlist drops any
+        other key, even with a single port), a Merge and a CartaImagem (they
+        tell keys apart from two ports on, as the editor does — with one, what
+        arrives is the input). Catalog `inputs` from two on (`get_pair`): a node
+        with one declared input takes whatever arrives (`get_first_gdf`, the
+        Aggregate's scan), so a `to_key` with another name works there. The
+        Python Script reads every key as a variable and is left out.
         """
         node_def = self.node_mgr.node_defs.get(node_id) or {}
-        cls = self.node_mgr.factory.get(node_def.get("name"))
+        nome = node_def.get("name")
+        cls = self.node_mgr.factory.get(nome)
         try:
             desc = cls.description() if cls else {}
         except Exception:
             return None
         if desc.get("dynamic_inputs"):
-            if node_def.get("name") not in ("SubWorkflowOutput", "Merge"):
+            if nome not in ("SubWorkflowOutput", "Merge", "CartaImagem"):
                 return None
             from flow.utils.workflow_contract import _parse_ports
             props = node_def.get("properties") or node_def.get("parameters") or {}
             portas = set(_parse_ports(props.get("ports")))
+            if nome != "SubWorkflowOutput" and len(portas) < 2:
+                return None
             return portas or None
         nomes = {i["name"] for i in (desc.get("inputs") or []) if isinstance(i, dict) and i.get("name")}
-        return nomes or None
+        return nomes if len(nomes) > 1 else None

@@ -187,3 +187,48 @@ def test_empty_parent_schema_does_not_cascade_error(_register_nodes):
     )
     asyncio.run(ex.simulate_runner())
     assert ex.simulated_outputs["c"]["status"] == "ok", ex.simulated_outputs["c"]
+
+
+# ── Target-side checks run whatever the source ────────────────────────────────
+
+def _merge_com_portas(nid="m", portas=("a", "b")):
+    return {"id": nid, "type": "control", "name": "Merge", "properties": {"strategy": "all", "ports": list(portas)}}
+
+
+def test_aresta_de_subworkflow_sem_to_key_num_merge_com_portas_avisa():
+    # The child port is not in the simulated schema: the source check skips it,
+    # but the target check (no port on the Merge) used to be skipped along.
+    ex = _executor([_n("s", name="SubWorkflow", ntype="control"), _merge_com_portas()],
+                   [{"source": "s", "target": "m", "from_key": "porta_do_filho"}])
+    ex.simulated_outputs = {"s": {"status": "ok", "schema": _schema("subWorkflowResult")}}
+    assert [d.get("code") for d in ex.validate_edges()] == ["edge_to_key_missing"]
+
+
+def test_origem_sem_esquema_conhecido_ainda_tem_o_destino_conferido():
+    ex = _executor([_n("a", ntype="action"), _merge_com_portas()],
+                   [{"source": "a", "target": "m", "from_key": "qualquer"}])
+    ex.simulated_outputs = {"a": {"status": "ok", "schema": []}}
+    assert [d.get("code") for d in ex.validate_edges()] == ["edge_to_key_missing"]
+    ex.simulated_outputs = {"a": {"status": "error", "error": "falhou"}}
+    assert [d.get("code") for d in ex.validate_edges()] == ["edge_to_key_missing"]
+
+
+def test_to_key_fora_das_camadas_da_carta_vira_aviso():
+    carta = {"id": "c", "type": "output", "name": "CartaImagem", "properties": {"ports": ["lotes", "quadras"]}}
+    ex = _executor([_n("a", ntype="action"), carta],
+                   [{"source": "a", "target": "c", "from_key": "output", "to_key": "lote"}])
+    ex.simulated_outputs = {"a": {"status": "ok", "schema": _schema("output")}}
+    assert [d.get("code") for d in ex.validate_edges()] == ["edge_to_key_unknown"]
+
+
+@pytest.mark.parametrize("alvo", [
+    # One declared input: the node takes whatever arrives (get_first_gdf).
+    {"id": "h", "type": "spatial", "name": "ConvexHullNode", "properties": {}},
+    # A Carta with a single layer takes the layer that arrives.
+    {"id": "h", "type": "output", "name": "CartaImagem", "properties": {"ports": ["lotes"]}},
+])
+def test_to_key_com_outro_nome_onde_qualquer_chave_serve_nao_avisa(alvo):
+    ex = _executor([_n("a", ntype="action"), alvo],
+                   [{"source": "a", "target": "h", "from_key": "output", "to_key": "pontos"}])
+    ex.simulated_outputs = {"a": {"status": "ok", "schema": _schema("output")}}
+    assert ex.validate_edges() == []
