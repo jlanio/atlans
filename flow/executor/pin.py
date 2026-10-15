@@ -7,6 +7,7 @@ import re
 import unicodedata
 from typing import Dict, Any, Optional
 from flow.utils.geo_helpers import gdf_para_geojson
+from flow.utils.json_saida import json_default
 from flow.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -121,48 +122,6 @@ def _serialize_frame(df: Any) -> "tuple[bytes | str, str, str]":
         return geojson_str.encode("utf-8"), "geojson", "application/geo+json"
 
 
-def _pin_json_default(obj: Any, as_text: set) -> Any:
-    """`default` for the values of `__pin_extra__`: the conversions of
-    `executor/connection.py::_json_default`, the serializer that carries the ref
-    to the server. The types that could only become text go into `as_text`.
-
-    Repeated rather than imported because `flow/` also runs on the server and
-    does not import `executor/`. Diverging from it would make a pinned run
-    deliver, for a date or a numpy number, something other than what the pins
-    written before this change hold.
-    """
-    from datetime import date, datetime
-
-    if isinstance(obj, (datetime, date)):
-        return obj.isoformat()
-    try:
-        import numpy as np
-        if isinstance(obj, np.integer):
-            return int(obj)
-        if isinstance(obj, np.floating):
-            return float(obj)
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-    except ImportError:
-        pass
-    try:
-        import pandas as pd
-        if isinstance(obj, pd.NA.__class__):
-            return None
-    except ImportError:
-        pd = None
-    # From here on there is no JSON form: the pinned run will see text.
-    as_text.add(type(obj).__name__)
-    if pd is not None and isinstance(obj, pd.DataFrame):
-        # Only a DataFrame NESTED in a list or dict gets here — a top-level one is a
-        # layer of its own.
-        return f"<DataFrame {obj.shape[0]}x{obj.shape[1]}>"
-    texto = str(obj)
-    if len(texto) > 500:
-        return texto[:500] + "...[truncated]"
-    return texto
-
-
 def _json_value(key: Any, value: Any) -> Any:
     """A non-DataFrame output already in the form the server will store.
 
@@ -181,7 +140,7 @@ def _json_value(key: Any, value: Any) -> Any:
         pass
     as_text: set = set()
     try:
-        convertido = json.loads(json.dumps(value, default=lambda obj: _pin_json_default(obj, as_text)))
+        convertido = json.loads(json.dumps(value, default=lambda obj: json_default(obj, como_texto=as_text)))
     except (TypeError, ValueError):
         # A structure that contains itself: not even the default gets out of it.
         as_text.add(type(value).__name__)
