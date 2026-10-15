@@ -107,8 +107,10 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
   // None of the three syncs reacts to position — they all read `id` and `data`.
   const structuralNodes = useStructuralNodes(nodes);
   // Syncs the dynamic ports of SubWorkflow nodes with the target workflow's
-  // contract (SubWorkflowInput/SubWorkflowOutput).
-  useSubWorkflowContractSync(structuralNodes);
+  // contract (SubWorkflowInput/SubWorkflowOutput). Through the state setters,
+  // not React Flow's: the ports come from the child and must not become undo
+  // steps (see the hook).
+  useSubWorkflowContractSync(structuralNodes, setNodes, setEdges);
   // Python Script ports: `data.inputs` follows the `ports` property.
   // Without this, defining the ports would only take effect on page reload.
   useDynamicPortsSync(structuralNodes);
