@@ -12,7 +12,7 @@ import { describe, it, expect } from "vitest"
 
 import { buildEdges, buildNodes } from "@/app/components/workflow/utils/build-canvas"
 import { serializeEdge } from "@/app/components/workflow/utils/edge-persistence"
-import { INodesAPI } from "@/service/types"
+import { CanvasDefinition, INodesAPI } from "@/service/types"
 
 const catalogo = [
   {
@@ -312,5 +312,17 @@ describe("buildEdges", () => {
   it("definition sem arestas devolve lista vazia", () => {
     expect(buildEdges(undefined, [])).toEqual([])
     expect(buildEdges({}, [])).toEqual([])
+  })
+
+  it("aresta sem as duas pontas fica de fora, para não voltar no próximo salvar", () => {
+    // Saved by hand or by another client. It cannot be drawn and the executor
+    // skips it; kept, it went back in every save, which the server refuses (422).
+    const salvas = [
+      { source: "a", target: "b" }, { source: "a" }, { target: "b" }, { source: "", target: "b" }, null,
+    ] as unknown as CanvasDefinition["edges"]
+    const arestas = buildEdges({ edges: salvas }, [])
+    expect(arestas.map(e => [e.source, e.target])).toEqual([["a", "b"]])
+    expect(buildNodes({ nodes: [{ id: "x", name: "Sumiu", type: "action", properties: {}, position: { x: 0, y: 0 } }], edges: salvas }, [{ name: "Outro" } as INodesAPI]))
+      .toHaveLength(1)
   })
 })

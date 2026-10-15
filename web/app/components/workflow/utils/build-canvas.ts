@@ -16,7 +16,7 @@
 import { Edge } from "@xyflow/react"
 import { v4 as uuid } from "uuid"
 import { INodeContext } from "@/context/useFlowContext"
-import { CanvasDefinition, INodePortAPI, INodesAPI } from "@/service/types"
+import { CanvasDefinition, IEdgeDefinition, INodePortAPI, INodesAPI } from "@/service/types"
 import { getTypeIcon } from "@/utils/getTypeIconsUtils"
 import { contratoDoNo, inputHandle } from "./node-ports"
 import { chaveEfetiva, ramoDaCondicao, resolveSourceHandle } from "./edge-persistence"
@@ -40,7 +40,7 @@ function saidasDasArestasSalvas(
   const nomes = new Set<string>()
   let ramo = false
   for (const e of edges ?? []) {
-    if (e.source !== nodeId) continue
+    if (e?.source !== nodeId) continue
     if (e.source_handle === "true" || e.source_handle === "false" || ramoDaCondicao(e.condition) !== undefined) {
       ramo = true
     } else if (e.source_handle) {
@@ -129,6 +129,16 @@ export function buildNodes(
 }
 
 /**
+ * An edge with both ends. One saved without `source` or `target` (by hand, by
+ * another client) cannot be drawn and the executor skips it; kept on the
+ * canvas it went back in every save, which the server now refuses (422), and
+ * the workflow could no longer be saved at all.
+ */
+function ligaDoisNos(edge: IEdgeDefinition | null | undefined): edge is IEdgeDefinition {
+  return Boolean(edge && edge.source != null && edge.source !== "" && edge.target != null && edge.target !== "")
+}
+
+/**
  * Canvas edges. Depends on the nodes already built: the source and target
  * handles can only be resolved knowing which ports each node declares.
  */
@@ -145,7 +155,7 @@ export function buildEdges(
     nodes.map(n => [n.id, ((n.data?.inputs ?? []) as INodePortAPI[]).map(p => p.name)]),
   )
 
-  return definition.edges.map(salva => {
+  return definition.edges.filter(ligaDoisNos).map(salva => {
     // The key the edge really means (see `chaveEfetiva`): from here on the
     // canvas, the anchoring and the next save all use it.
     const edge = { ...salva, from_key: chaveEfetiva(salva) }

@@ -1,9 +1,25 @@
 import logging
 from collections import defaultdict, deque
+from collections.abc import Mapping
 from graphlib import TopologicalSorter, CycleError
-from typing import Dict, List
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
+
+
+def ponta(edge: Any, papel: str) -> "str | int | None":
+    """`source`/`target` of an edge, or None when the edge has no usable one.
+
+    A definition saved by hand or by another client could carry an edge with no
+    `target`, or `null` in the list: indexing it raised a bare KeyError (or
+    TypeError) that took down the whole run before any node, with a message
+    that named nothing. Read through here, such an edge is an orphan like one
+    whose end does not exist: skipped, logged and flagged by the lint.
+    """
+    valor = edge.get(papel) if isinstance(edge, Mapping) else None
+    if isinstance(valor, str):
+        return valor or None
+    return valor if isinstance(valor, int) and not isinstance(valor, bool) else None
 
 
 class WorkflowGraph:
@@ -43,8 +59,8 @@ class WorkflowGraph:
         """
         self.orphan_edges: List[dict] = []
         for edge in self.edges:
-            src = edge['source']
-            tgt = edge['target']
+            src = ponta(edge, 'source')
+            tgt = ponta(edge, 'target')
             if src not in self.node_defs or tgt not in self.node_defs:
                 self.orphan_edges.append(edge)
                 continue
@@ -54,7 +70,7 @@ class WorkflowGraph:
             logger.warning(
                 "Ignorando %d aresta(s) órfã(s) (endpoint fora de node_defs): %s",
                 len(self.orphan_edges),
-                [f"{e.get('source')}->{e.get('target')}" for e in self.orphan_edges],
+                [f"{ponta(e, 'source')}->{ponta(e, 'target')}" for e in self.orphan_edges],
             )
 
     def compute_order(self) -> List[str]:
@@ -65,8 +81,8 @@ class WorkflowGraph:
         # Builds the predecessor map
         predecessors = {nid: set() for nid in self.node_defs}
         for edge in self.edges:
-            src = edge['source']
-            tgt = edge['target']
+            src = ponta(edge, 'source')
+            tgt = ponta(edge, 'target')
             # Guard against orphan edges (the same cruft handled in _index_edges):
             #  - target outside node_defs → predecessors[tgt] would raise a raw KeyError
             #    (plain dict), aborting the WHOLE run before any filter;

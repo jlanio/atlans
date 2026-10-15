@@ -23,6 +23,7 @@ from app.core.rate_limiter import limiter
 from app.core.rbac import ROLE_ADMIN, ROLE_EDITOR, ROLE_OPERATOR, ROLE_VIEWER
 from app.core.utils.logger import get_logger
 from app.core.utils.redacao import definition_contains_secret, params_schema_contains_secret
+from flow.core.graph import ponta
 from app.services import pin_service
 from app.services.pin_service import MAX_TTL_HOURS
 
@@ -69,6 +70,33 @@ def _recusar_segredo(definition: Any, *, schema: bool = False) -> None:
         )
 
 
+def _recusar_arestas_malformadas(definition: Any) -> None:
+    """Rejects an edge that does not connect two nodes.
+
+    The definition is a free dict, so an edge with no `source` or `target` (or
+    a `null` in the list) was saved as written: the canvas cannot draw it and
+    the executor skips it as an orphan (flow/core/graph.py) — a connection
+    someone meant to make vanished with nothing said. The MCP validation
+    already refused it (`EdgeDefinition`); REST, where the editor and other
+    clients save, did not. The editor drops such edges when it opens a
+    workflow, so an old one in the database does not block its next save.
+    """
+    if not isinstance(definition, dict) or definition.get("edges") is None:
+        return
+    arestas = definition["edges"]
+    if not isinstance(arestas, list):
+        raise HTTPException(status_code=422, detail="`edges` da definição deve ser uma lista.")
+    ruins = [i for i, e in enumerate(arestas) if ponta(e, "source") is None or ponta(e, "target") is None]
+    if ruins:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Aresta sem `source` ou `target` na definição (posição "
+                f"{', '.join(str(i) for i in ruins[:10])}): cada aresta liga dois nós pelos ids."
+            ),
+        )
+
+
 @router.post("", status_code=201, summary="Create a new workflow definition")
 @limiter.limit("30/minute")
 async def create_workflow(
@@ -86,6 +114,7 @@ async def create_workflow(
     )
 
     _recusar_segredo(payload.definition)
+    _recusar_arestas_malformadas(payload.definition)
     # `params_schema` is a sibling column, writable in the same body, and — unlike the
     # definition — it does NOT go through `encrypt_workflow_connections`: it goes raw to
     # the database. MCP output already redacts `params_schema.token`, so leaving it out
@@ -423,6 +452,7 @@ async def update_workflow(
     new_def = getattr(workflow_in, "definition", None)
     if new_def is not None:
         _recusar_segredo(new_def)
+        _recusar_arestas_malformadas(new_def)
         # The credentials (SEG-12) are checked by the service in `update_workflow`.
 
         from flow.utils.workflow_contract import validate_subworkflow_references_against_db

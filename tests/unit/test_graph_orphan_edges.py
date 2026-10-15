@@ -93,3 +93,17 @@ def test_orphan_logged_once(caplog):
     avisos = [r for r in caplog.records if "órfã" in r.getMessage()]
     assert len(avisos) == 1
     assert "a->ghost" in avisos[0].getMessage()
+
+
+def test_edge_without_an_end_is_an_orphan_not_a_crash():
+    # A definition saved by hand or by another client: no `target`, a `null` in
+    # the list, a non-dict entry. Before: bare KeyError/TypeError on indexing,
+    # which took down the whole run before any node.
+    g = WorkflowGraph(
+        _nd("a", "b"),
+        [{"source": "a", "target": "b"}, {"source": "a"}, None, "a->b", {"source": True, "target": "b"}],
+        filter_trigger_reachable=False,
+    )
+    assert len(g.orphan_edges) == 4
+    assert set(g.compute_order()) == {"a", "b"}
+    assert [e["target"] for e in g.outgoing["a"]] == ["b"]

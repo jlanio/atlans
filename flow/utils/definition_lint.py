@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 from typing import Any, Collection, Iterable, Iterator, Mapping, Optional
 
 from flow.core.aliases import RESERVED_ALIASES, declared_alias
-from flow.core.graph import WorkflowGraph
+from flow.core.graph import WorkflowGraph, ponta
 from flow.utils.parameter_validation import _PLATFORM_KEYS
 from flow.utils.workflow_contract import _parse_ports
 
@@ -559,11 +559,11 @@ def lint_definition(
     # 4. Graph: orphan edge, cycle, nodes left out of the run.
     graph = WorkflowGraph(node_defs, edges, filter_isolated=True)
     for edge in graph.orphan_edges:
-        src, tgt = edge.get("source"), edge.get("target")
+        src, tgt = ponta(edge, "source"), ponta(edge, "target")
         pontas = [
-            f"{papel} '{ponta}'"
-            for papel, ponta in (("source", src), ("target", tgt))
-            if ponta not in node_defs
+            f"{papel} '{valor}'"
+            for papel, valor in (("source", src), ("target", tgt))
+            if valor not in node_defs
         ]
         rel.aviso(
             "orphan_edge",
