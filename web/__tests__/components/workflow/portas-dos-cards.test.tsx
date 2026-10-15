@@ -149,6 +149,14 @@ describe("cada card desenha as portas que a ancoragem usa", () => {
     expect(desenhar(no("http")).source).toEqual(["status_code", "headers", "body"])
   })
 
+  it("nó de saída com uma aresta já saindo dele desenha a saída", () => {
+    // Written through the MCP or by hand, and the executor runs it: without a
+    // handle the edge could be neither seen nor deleted.
+    expect(desenhar(no("salvar")).source).toEqual([])
+    estado.edges = [{ source: "salvar", target: "script" }]
+    expect(desenhar(no("salvar")).source).toEqual([""])
+  })
+
   it("um card de nó desconhecido do catálogo desenha a porta anônima", () => {
     const desconhecido = { ...no("http"), type: "NotFound", data: { ...no("http").data, outputs: [], inputs: [] } }
     expect(desenhar(desconhecido)).toEqual({ source: [""], target: [""] })

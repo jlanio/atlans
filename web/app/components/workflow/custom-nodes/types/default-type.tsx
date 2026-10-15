@@ -43,9 +43,14 @@ const DefaultTypeIcon = ({ id, data, selected }: NodeProps<INodeContext>) => {
   const isOutputNode = data.type === "output"
   const outputs = (data.outputs ?? []) as INodePortAPI[]
   const inputs  = (data.inputs  ?? []) as INodePortAPI[]
+  // Output-type nodes are terminal: no output to start a connection from. But an
+  // edge can already leave one — written through the MCP or by hand, and the
+  // executor runs it — and without a handle React Flow does not draw it: it
+  // could be neither seen nor deleted. Those nodes draw their outputs.
+  const drawOutputs = !isOutputNode || connectedSources.size > 0
 
   const title = (data.properties?.["alias"] as string | undefined) || (data.alias as string)
-  const nodeHeight = calcNodeHeight(Math.max(isOutputNode ? 0 : outputs.length, inputs.length))
+  const nodeHeight = calcNodeHeight(Math.max(drawOutputs ? outputs.length : 0, inputs.length))
   // Stable object: recreating it per render invalidated the card's props
   // comparison on every frame.
   const cardStyle = useMemo(() => ({ height: nodeHeight }), [nodeHeight])
@@ -65,7 +70,7 @@ const DefaultTypeIcon = ({ id, data, selected }: NodeProps<INodeContext>) => {
       <Icon className="text-xl" />
 
       {/* ── Outputs (right) — output-type nodes are terminal, with no output ── */}
-      {!isOutputNode && (
+      {drawOutputs && (
         <PortasDeSaida nodeId={id} outputs={outputs} nodeHeight={nodeHeight} emUso={connectedSources} />
       )}
 
