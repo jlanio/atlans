@@ -200,3 +200,66 @@ describe("salvar por cima de outra edição", () => {
     expect(toasts.erros).toHaveLength(1)
   })
 })
+
+/**
+ * A save still in flight when the person opens another workflow answers about
+ * the workflow it was sent for. Its answer used to land in the save state of
+ * the canvas now on screen: the next save there carried the previous
+ * workflow's tag and was refused as a conflict nobody caused, and the change
+ * detector compared against the previous graph.
+ */
+describe("save que volta depois de trocar de workflow", () => {
+  const comEtiquetaEm = (id: string, nos: string[], etiqueta: string) => ({ ...workflow(id, nos), definition_etag: etiqueta })
+
+  it("não deixa a etiqueta nem o snapshot do workflow anterior no novo", async () => {
+    let responder: (r: unknown) => void = () => {}
+    servico.updateWorkflowById.mockImplementationOnce(() => new Promise(r => { responder = r }))
+    const tela = montar(comEtiquetaEm("wf-1", ["A", "B"], "e1"))
+    await esperar()
+    adicionarNo("C")
+    await esperar()
+    ctrlS()
+    await esperar()
+
+    rota.params = { id: "wf-2" }
+    tela.trocarWorkflow(comEtiquetaEm("wf-2", ["X"], "e2"))
+    await esperar()
+    await act(async () => { responder({ data: { id_hash: "wf-1", definition_etag: "e1-novo" }, error: null }) })
+    await esperar()
+
+    const estado = useWorkflowSaveStore.getState()
+    expect(estado.definitionEtag).toBe("e2")
+    expect(JSON.parse(estado.lastSavedSnapshot!).nodes.map((n: { id: string }) => n.id)).toEqual(["X"])
+
+    adicionarNo("Y")
+    await esperar()
+    ctrlS()
+    await esperar()
+    expect(servico.updateWorkflowById.mock.calls[1][0]).toBe("wf-2")
+    expect(etiquetaDoPut(1)).toBe("e2")
+  })
+
+  it("o 'Salvar mesmo assim' de um conflito anterior não grava o canvas novo por cima", async () => {
+    toasts.erros = []
+    servico.updateWorkflowById.mockResolvedValueOnce({
+      data: undefined, status: 409,
+      error: { name: "AxiosError", code: "definition_conflict", message: "Alterado em outro lugar." },
+    })
+    const tela = montar(comEtiquetaEm("wf-1", ["A", "B"], "e1"))
+    await esperar()
+    adicionarNo("C")
+    await esperar()
+    ctrlS()
+    await esperar()
+    expect(toasts.erros.map(t => t.titulo)).toEqual(["Workflow alterado em outro lugar"])
+
+    // The toast outlives the switch: clicked on the other workflow, it built
+    // the payload from the canvas on screen and sent it to the first one.
+    rota.params = { id: "wf-2" }
+    tela.trocarWorkflow(comEtiquetaEm("wf-2", ["X"], "e2"))
+    await esperar()
+    await act(async () => { toasts.erros[0].acao!.onClick() })
+    await esperar()
+    expect(servico.updateWorkflowById).toHaveBeenCalledTimes(1)
+  })
+})

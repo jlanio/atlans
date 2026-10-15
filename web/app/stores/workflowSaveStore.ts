@@ -37,6 +37,12 @@ interface WorkflowSaveState {
    *  refuses (409) if someone else saved in between. `null` = not known (new
    *  workflow, older server): the save goes without the check. */
   definitionEtag: string | null
+  /** Which canvas this state belongs to: incremented on every workflow switch.
+   *  A save takes it when it starts; an answer that comes back after a switch
+   *  is about another workflow and must not touch this state — it wrote the
+   *  previous workflow's tag (the next save here then failed with a false
+   *  conflict) and its snapshot (the change detector compared against it). */
+  geracao: number
 }
 
 interface WorkflowSaveActions {
@@ -116,6 +122,7 @@ export const useWorkflowSaveStore = create<WorkflowSaveState & WorkflowSaveActio
     // screen opens) — the safe side for a flag that holds back saves.
     canvasHidratado: false,
     definitionEtag: null,
+    geracao: 0,
 
     setWorkflowName: (name) => {
       set({ workflowName: name })

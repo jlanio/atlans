@@ -426,7 +426,10 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
     // every save until its graph is on the canvas (initSnapshot releases it) —
     // until then the canvas is empty, or still A's; the creation screen has
     // nothing to wait for.
-    useWorkflowSaveStore.setState({
+    //
+    // `geracao` moves on: a save of the previous workflow still in flight
+    // answers about that one, and must not land in this canvas's state.
+    useWorkflowSaveStore.setState(s => ({
       lastSavedSnapshot: idDaRota ? null : JSON.stringify({ name: "", nodes: [], edges: [] }),
       lastSavedAt: null,
       lastError: null,
@@ -435,7 +438,8 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
       snapshotIniciadoEm: null,
       canvasHidratado: !idDaRota,
       definitionEtag: null,
-    })
+      geracao: s.geracao + 1,
+    }))
     // Lets the snapshot hydration effect run again for the new workflow.
     snapshotInitializedFor.current = null
     // And the viewport one: B's is B's, not the framing done for A.

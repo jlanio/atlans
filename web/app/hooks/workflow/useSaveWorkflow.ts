@@ -218,6 +218,11 @@ export const useSaveWorkflow = () => {
     // isSaving. (Before, the start was in handleSaveWorkflow and the early
     // returns above left isSaving=true stuck).
     store.startSaving()
+    // The canvas this save belongs to. Switching workflows while the request is
+    // in flight resets the store for the other one; the answer then says
+    // nothing about the canvas on screen (see `geracao`).
+    const geracao = useWorkflowSaveStore.getState().geracao
+    const deOutroCanvas = () => useWorkflowSaveStore.getState().geracao !== geracao
 
     try {
       if (id) {
@@ -240,15 +245,28 @@ export const useSaveWorkflow = () => {
           // did (their edges included) with nothing said, which is what the tag
           // exists to stop. Said even on a silent save: Executar stops here, and
           // the person has to know why.
+          if (deOutroCanvas()) {
+            // Already on another workflow: no chip to mark, and no "save
+            // anyway" — it builds the payload from the canvas ON SCREEN and
+            // would write the other workflow's graph over this one.
+            createToast.error("Workflow não salvo", data.error.message)
+            return data
+          }
           store.failSave(data.error.message ?? "Workflow alterado em outro lugar.")
           createToast.error("Workflow alterado em outro lugar", data.error.message, {
             label: "Salvar mesmo assim",
-            onClick: () => { void saveWorkflow({ force: true }) },
+            // Same guard when clicked later: the toast outlives a switch.
+            onClick: () => { if (!deOutroCanvas()) void saveWorkflow({ force: true }) },
           })
           return data
         }
 
         if (data.error) {
+          if (deOutroCanvas()) {
+            // The person left believing it was saved: say so even if silent.
+            createToast.error(`Workflow não salvo`, data.error.message)
+            return data
+          }
           store.failSave(data.error.message)
           // On a silent save (triggered by Execute before dispatch), the chip
           // already shows "Falha ao salvar" (save failed) — a toast here would
@@ -257,13 +275,15 @@ export const useSaveWorkflow = () => {
           return data
         }
 
-        // The saved definition is the new base for the next save's check.
-        useWorkflowSaveStore.setState({ definitionEtag: data.data?.definition_etag ?? null })
-        const snapshot = JSON.stringify({ name: currentName, nodes: nodesReq, edges: edgesReq })
-        // No success toast: the chip next to the workflow path says "Salvo"
-        // and keeps saying "Salvo há N min" (saved N min ago). A toast on every
-        // Ctrl+S was noise about the same information.
-        store.completeSave(snapshot, viewportReq)
+        if (!deOutroCanvas()) {
+          // The saved definition is the new base for the next save's check.
+          useWorkflowSaveStore.setState({ definitionEtag: data.data?.definition_etag ?? null })
+          const snapshot = JSON.stringify({ name: currentName, nodes: nodesReq, edges: edgesReq })
+          // No success toast: the chip next to the workflow path says "Salvo"
+          // and keeps saying "Salvo há N min" (saved N min ago). A toast on every
+          // Ctrl+S was noise about the same information.
+          store.completeSave(snapshot, viewportReq)
+        }
         // Saved, but the schedule may not have been applied (inactive workflow,
         // invalid expression): the backend returns the reason in
         // `schedule_notices`. In that case the "Salvo" on the chip would hide an
@@ -303,10 +323,13 @@ export const useSaveWorkflow = () => {
       })
 
       if (data.error) {
-        store.failSave(data.error.message)
+        if (!deOutroCanvas()) store.failSave(data.error.message)
         createToast.error(`Workflow não criado`, data.error.message)
         return data
       }
+      // Created, but the person already opened another workflow: neither its
+      // state nor its URL are this one's to change.
+      if (deOutroCanvas()) return data
 
       store.completeSave(JSON.stringify({ name: currentName, nodes: nodesReq, edges: edgesReq }), viewportReq)
 
@@ -320,7 +343,7 @@ export const useSaveWorkflow = () => {
 
       return data
     } catch (err) {
-      store.failSave(String(err))
+      if (!deOutroCanvas()) store.failSave(String(err))
       createToast.error("Erro ao salvar workflow", String(err))
     }
 
