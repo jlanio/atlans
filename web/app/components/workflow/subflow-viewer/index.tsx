@@ -120,9 +120,14 @@ function Conteudo({ path, rootLabel }: Props & { path: SubflowLevel[] }) {
     })
   }
 
+  // `nokey`: the EDITOR's React Flow, under this overlay, listens for its delete
+  // key on the whole document and skips only text fields and `.nokey`
+  // elements. The descent starts from the SubWorkflow's toolbar, a click that
+  // selects that node, so Backspace here — the reflex for "go back" — deleted it
+  // from the editor. This canvas deletes nothing itself (`deleteKeyCode` null).
   return (
     <div
-      className="absolute inset-x-0 top-0 z-30 flex flex-col border-b border-border bg-background/95 backdrop-blur"
+      className="nokey absolute inset-x-0 top-0 z-30 flex flex-col border-b border-border bg-background/95 backdrop-blur"
       style={{ bottom: dockHeight }}
     >
       {/* ── Trilha ────────────────────────────────────────────────────────── */}

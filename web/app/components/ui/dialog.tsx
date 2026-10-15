@@ -105,6 +105,13 @@ function DialogContent({
           // 100dvh (not vh) because of the mobile address bar, which changes the
           // visible height while scrolling.
           "max-h-[calc(100dvh-2rem)] overflow-y-auto",
+          // The workflow canvas (React Flow) listens for its delete key on the
+          // whole document and skips only text fields and `.nokey` elements.
+          // This content is portaled to the end of the body, outside any marked
+          // root: a dialog opened over the canvas — run parameters, discarding a
+          // node's changes — let Backspace on one of its buttons delete the
+          // selected node. Inert where there is no canvas.
+          "nokey",
           className
         )}
         {...props}

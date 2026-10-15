@@ -185,9 +185,16 @@ const NodeConfigModal = () => {
 
   if (!isOpen || !nodeFound) return null
 
-  // Modal rendered as a portal — no blocking overlay
+  // Modal rendered as a portal — no blocking overlay.
+  //
+  // `nokey` keeps React Flow's keyboard out of it. Its delete key listens on
+  // the whole document and only skips text fields and `.nokey` elements; the
+  // double-click that opens this modal leaves the node selected, so Backspace
+  // on any button, select or switch in here deleted the very node being
+  // configured, edges and all. Text inputs were already safe — which is why it
+  // went unnoticed while typing.
   const modal = createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+    <div className="nokey fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
       {/* Subtle backdrop — clickable to close, allows drag-through */}
       <div
         className="absolute inset-0 bg-black/20 pointer-events-auto"

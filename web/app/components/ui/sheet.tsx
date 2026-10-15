@@ -87,6 +87,11 @@ function SheetContent({
             "data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top inset-x-0 top-0 h-auto border-b",
           side === "bottom" &&
             "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto border-t",
+          // Out of reach of the workflow canvas's delete key — same reason as
+          // `DialogContent`: portaled outside any `.nokey` root, a sheet opened
+          // over the canvas (the expressions guide, the version history) let
+          // Backspace on one of its buttons delete the selected node.
+          "nokey",
           className,
           // After `className` on purpose: the dragged size has to
           // beat any `w-*`/`max-w-*` the consumer may have passed.

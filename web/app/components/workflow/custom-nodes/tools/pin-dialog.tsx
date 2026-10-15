@@ -62,9 +62,13 @@ export default function PinDialog({ nodeId, workflowId, onClose }: PinDialogProp
     }
   }
 
+  // `nokey`: React Flow's delete key listens on the whole document and skips
+  // only text fields and `.nokey` elements. This dialog opens from the node's
+  // toolbar or its configuration modal, with the node selected either way, and
+  // Backspace on one of the expiry buttons deleted it.
   return createPortal(
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 backdrop-blur-sm"
+      className="nokey fixed inset-0 z-[200] flex items-center justify-center bg-black/30 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div className="bg-background border border-border rounded-lg shadow-lg p-5 w-[320px]" onClick={e => e.stopPropagation()}>
