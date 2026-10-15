@@ -250,10 +250,12 @@ export function buildTimeline(
       if (ev.schema_drift) run.schemaDrift = ev.schema_drift
       if (ev.unresolved_edges?.length || ev.overwritten_inputs?.length) {
         // Inside a sub-workflow the source is the child's LOCAL id; its row
-        // was registered prefixed with the parent's.
+        // was registered prefixed with the parent's. Only there: looked up
+        // bare first, a parent node with the same id (`fonte`, `n1` — readable
+        // ids repeat across workflows) won, and the panel named the parent's.
         const pai = ev.subworkflow_parent ?? null
         const nomeDe = (id: string) =>
-          (byId.get(id) ?? (pai ? byId.get(`${pai}::${id}`) : undefined))?.name ?? id
+          (pai ? byId.get(`${pai}::${id}`) : byId.get(id))?.name ?? id
         if (ev.unresolved_edges?.length) {
           run.unresolvedEdges = ev.unresolved_edges.map(a => ({ ...a, sourceName: nomeDe(a.source) }))
         }

@@ -61,6 +61,23 @@ describe("conexão que não entregou dado", () => {
     expect(linha.unresolvedEdges?.[0].sourceName).toBe("Origem no filho")
   })
 
+  it("dentro de um subfluxo, um nó do pai com o mesmo id não toma o nome", () => {
+    // Readable ids repeat across workflows: the parent also has a `fonte`.
+    const comFonteNoPai = [
+      { id: "fonte", status: "completed", position: { x: 0, y: 0 }, data: { alias: "Fonte do PAI" } },
+    ] as unknown as INodeStatusWorkFlow[]
+    const inicio = toRunEvent({
+      node: "pai::fonte", status: "completed", timestamp: 1_700_000_000,
+      extra: { subworkflow_parent_node: "pai", node_name: "Origem no FILHO" },
+    })
+    const filho = toRunEvent({
+      node: "pai::destino", status: "completed", kind: "lifecycle", level: "warn", timestamp: 1_700_000_001,
+      extra: { subworkflow_parent_node: "pai", unresolved_edges: [{ source: "fonte", from_key: "x", keys: [] }] },
+    })
+    const linha = buildTimeline([inicio, filho], comFonteNoPai).nodes.find(n => n.nodeId === "pai::destino")!
+    expect(linha.unresolvedEdges?.[0].sourceName).toBe("Origem no FILHO")
+  })
+
   it("sem o campo, nada muda", () => {
     const linha = buildTimeline([falhou({})], canvas).nodes.find(n => n.nodeId === "destino")!
     expect(linha.unresolvedEdges).toBeNull()
