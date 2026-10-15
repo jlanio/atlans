@@ -2,6 +2,8 @@
 # Workflow version management.
 
 import copy
+import json
+from collections import Counter
 
 from sqlalchemy.orm.attributes import set_committed_value
 
@@ -32,12 +34,20 @@ def _has_substantial_changes(old_def: dict, new_def: dict) -> bool:
     if set(old_nodes.keys()) != set(new_nodes.keys()):
         return True
 
-    # Connections (edges) changed
-    def _edge_key(e: dict) -> tuple:
-        return (e.get("source"), e.get("target"), e.get("sourceHandle"), e.get("targetHandle"))
+    # Connections (edges) changed. The whole edge counts, compared as a
+    # multiset. The persisted edge is snake_case — `{source, target,
+    # source_handle?, condition?, from_key?, to_key?}`, written by
+    # `serializeEdge` in the web app — and this used to key on React Flow's
+    # `sourceHandle`/`targetHandle`, which never reach the definition: every edge
+    # read as `(source, target, None, None)`, in a set. Switching an edge's
+    # output, its input key or its branch, or adding a second edge between the
+    # same two nodes, never became a version, and the previous wiring was gone
+    # from the history.
+    def _edge_key(e) -> str:
+        return json.dumps(e, sort_keys=True, default=str)
 
-    old_edges = {_edge_key(e) for e in old_def.get("edges", [])}
-    new_edges = {_edge_key(e) for e in new_def.get("edges", [])}
+    old_edges = Counter(_edge_key(e) for e in old_def.get("edges") or [])
+    new_edges = Counter(_edge_key(e) for e in new_def.get("edges") or [])
     if old_edges != new_edges:
         return True
 
