@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Any, Dict, List, Literal, Optional
 from datetime import datetime
 from uuid import uuid4
@@ -134,6 +134,14 @@ class WorkflowRead(BaseModel):
     # as `expected_etag` on its next save, which is refused with 409 if someone
     # else saved in between. Filled on GET and PUT; not a database column.
     definition_etag: Optional[str] = None
+
+    @field_validator("definition_etag", mode="before")
+    @classmethod
+    def _etiqueta_so_texto(cls, valor):
+        # Read from the ORM object, which only has it when a route set it (a
+        # transient attribute, like `schedule_notices`). Anything that is not
+        # text is "no tag" — a save without the check — never a 500.
+        return valor if isinstance(valor, str) else None
 
     class Config:
         from_attributes = True

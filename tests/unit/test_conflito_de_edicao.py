@@ -165,3 +165,18 @@ async def test_leitura_devolve_a_etiqueta():
 
     dados = await WR.read_workflow(wf=_Lido())
     assert dados.definition_etag == definition_etag(DEF)
+
+
+def test_etiqueta_que_nao_e_texto_vira_sem_etiqueta():
+    # The tag is read from the object the route returns; an attribute that is
+    # not text (anything other than what a route set) means "no tag", not a 500.
+    from unittest.mock import MagicMock
+    from app.schemas.workflow import WorkflowRead
+
+    campos = dict(
+        id=1, id_hash="wf-1", name="x", flag_ative=True, description=None, version=None,
+        priority=0, definition={"nodes": [], "edges": []},
+        created_at="2026-01-01T00:00:00", updated_at="2026-01-01T00:00:00",
+    )
+    assert WorkflowRead.model_validate({**campos, "definition_etag": MagicMock()}).definition_etag is None
+    assert WorkflowRead.model_validate({**campos, "definition_etag": "abc"}).definition_etag == "abc"
