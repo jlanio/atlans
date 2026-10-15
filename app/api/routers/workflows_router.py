@@ -1,3 +1,4 @@
+import json
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, HTTPException, Depends, Request, Header
 from fastapi.responses import JSONResponse
@@ -366,6 +367,19 @@ async def preview_move_workflow(
     return await _move(payload, service, wf, db, current_user, dry_run=True)
 
 
+def _referencias_alteradas(nova: Dict[str, Any], salva: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """The new definition's SubWorkflow nodes whose reference (node, workflow,
+    `inputsMapping`) is not in the saved one — what a save has to validate."""
+    from flow.utils.workflow_contract import collect_subworkflow_references
+
+    def chave(ref: dict) -> tuple:
+        return (ref["node_id"], ref["workflow_hash"], json.dumps(ref["inputs_mapping"], sort_keys=True, default=str))
+
+    ja_salvas = {chave(r) for r in collect_subworkflow_references(salva or {})}
+    ids = {r["node_id"] for r in collect_subworkflow_references(nova) if chave(r) not in ja_salvas}
+    return {"nodes": [n for n in (nova.get("nodes") or []) if isinstance(n, dict) and n.get("id") in ids]}
+
+
 @router.put("/{id_hash}", response_model=WorkflowRead, summary="Atualiza um workflow existente")
 @limiter.limit("30/minute")
 async def update_workflow(
@@ -412,9 +426,16 @@ async def update_workflow(
         # The credentials (SEG-12) are checked by the service in `update_workflow`.
 
         from flow.utils.workflow_contract import validate_subworkflow_references_against_db
+        # Only the references this save creates or changes. One that was already
+        # saved and broke because the CHILD changed — deactivated, moved, a port
+        # renamed — made every save of the parent fail with 422, including saves
+        # that do not touch it and the silent save before Executar: the person
+        # could neither keep nor run any edit. The run still refuses a broken
+        # reference, saying why.
+        alteradas = _referencias_alteradas(new_def, wf.definition)
         cross_errors = await validate_subworkflow_references_against_db(
-            new_def, db, workspace_id=wf.workspace_id,
-        )
+            alteradas, db, workspace_id=wf.workspace_id,
+        ) if alteradas["nodes"] else []
         if cross_errors:
             raise HTTPException(
                 status_code=422,
