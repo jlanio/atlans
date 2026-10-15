@@ -281,4 +281,27 @@ describe("restaurar uma versão", () => {
     await esperar(50)
     expect(nos()).toEqual(["A", "E"])
   })
+
+  it("a falha ao salvar de antes da restauração não fica no chip", async () => {
+    const { trocarWorkflow } = montar(workflow(["A", "B"]))
+    await esperar(50)
+    act(() => { useWorkflowSaveStore.setState({ snapshotIniciadoEm: null }) })
+
+    servico.updateWorkflowById.mockResolvedValue({ data: null, error: { message: "Servidor indisponível" } })
+    adicionarNo("C")
+    await esperar(PASSO)
+    teclar("s")
+    await esperar(50)
+    expect(useWorkflowSaveStore.getState().saveStatus).toBe("error")
+    expect(screen.getByText("Falha ao salvar")).toBeInTheDocument()
+
+    // The edit that failed to save is gone with the restore: what is on the
+    // canvas now is the restored definition, saved by the restore itself.
+    trocarWorkflow(workflow(["A", "E"]))
+    await esperar(PASSO)
+    expect(nos()).toEqual(["A", "E"])
+    expect(useWorkflowSaveStore.getState().saveStatus).toBe("idle")
+    expect(useWorkflowSaveStore.getState().lastError).toBeNull()
+    expect(screen.queryByText("Falha ao salvar")).not.toBeInTheDocument()
+  })
 })

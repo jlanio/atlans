@@ -530,7 +530,16 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
     )
     // The canvas is now based on THIS definition: the next save sends its tag
     // back, and is refused if someone else saved in between.
-    useWorkflowSaveStore.setState({ definitionEtag: workflow.definition_etag ?? null })
+    //
+    // And what the chip said was about the graph this one replaced. After a
+    // restore, a "Falha ao salvar" — message included — about edits no longer on
+    // the canvas stayed up, and kept the page asking for confirmation on close.
+    // On a first hydration this is the state the workflow switch already left.
+    useWorkflowSaveStore.setState({
+      definitionEtag: workflow.definition_etag ?? null,
+      saveStatus: 'idle',
+      lastError: null,
+    })
     // F10: undo/redo history baseline with the freshly hydrated state. Without
     // this the history starts empty and the FIRST edge edit was not undoable
     // (undo guards pointer <= 0). Mirrors the save's initSnapshot.
