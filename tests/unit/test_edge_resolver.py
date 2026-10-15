@@ -70,6 +70,33 @@ def test_from_dict_handle_de_dado_nao_vira_ramo():
     assert e.is_branch is False
 
 
+# ── An edge the editor saved from a SubWorkflow port with the envelope as key ──
+
+def test_porta_do_subfluxo_com_o_envelope_entrega_a_porta():
+    # Dragged from port `r2`, the editor used to save `from_key:
+    # "subWorkflowResult"` (its candidates did not know the child's ports): the
+    # run delivered the dict of ALL the ports instead of r2.
+    saida = {"subWorkflowResult": {"r1": 1, "r2": 2}, "r1": 1, "r2": 2}
+    aresta = {"source": "sub", "target": "b", "source_handle": "r2", "from_key": "subWorkflowResult"}
+    assert Edge.from_dict(aresta).from_key == "r2"
+    assert resolve_edge_inputs(aresta, saida) == {"r2": 2}
+    assert resolve_edge_inputs({**aresta, "to_key": "data"}, saida) == {"data": 2}
+
+
+@pytest.mark.parametrize("aresta, chave", [
+    # The envelope chosen on purpose is saved without a handle.
+    ({"from_key": "subWorkflowResult"}, "subWorkflowResult"),
+    ({"source_handle": "", "from_key": "subWorkflowResult"}, "subWorkflowResult"),
+    ({"source_handle": "subWorkflowResult", "from_key": "subWorkflowResult"}, "subWorkflowResult"),
+    # A port with a key of its own, a branch handle, a handle with no key.
+    ({"source_handle": "r2", "from_key": "r1"}, "r1"),
+    ({"source_handle": "true", "from_key": "subWorkflowResult"}, "subWorkflowResult"),
+    ({"source_handle": "r2"}, None),
+])
+def test_so_o_par_porta_e_envelope_muda_de_chave(aresta, chave):
+    assert Edge.from_dict({"source": "a", "target": "b", **aresta}).from_key == chave
+
+
 # ── resolve_edge_inputs (run) ─────────────────────────────────────────────────
 
 def test_from_key_found():

@@ -61,6 +61,32 @@ export function serializeEdge(edge: Edge): IEdgeDefinition {
   }
 }
 
+/** The SubWorkflow's envelope output: a dict with ALL of the child's ports. */
+export const ENVELOPE_DO_SUBFLUXO = "subWorkflowResult"
+
+/**
+ * The `from_key` a persisted edge really means.
+ *
+ * An edge dragged from a SubWorkflow's port `r2` used to be saved with the port
+ * as handle and the envelope as key — the candidate list did not know the
+ * child's ports — so it delivered the dict of ALL the ports instead of r2, and
+ * after a reload it jumped to the first port. The handle is what the person
+ * pulled: that pair reads as the port, here and in the run (`Edge.from_dict`
+ * in flow/executor/edge_resolver.py), so those edges get their line and their
+ * key back without migrating the database. Choosing the envelope on purpose
+ * saves it without a handle (`sourceHandleDaChave`), which this leaves alone.
+ */
+export function chaveEfetiva(edge: Pick<IEdgeDefinition, "from_key" | "source_handle">): string | undefined {
+  const handle = edge.source_handle
+  if (
+    edge.from_key === ENVELOPE_DO_SUBFLUXO
+    && handle && handle !== ENVELOPE_DO_SUBFLUXO && handle !== "true" && handle !== "false"
+  ) {
+    return handle
+  }
+  return edge.from_key
+}
+
 /**
  * Source handle of a persisted edge.
  *

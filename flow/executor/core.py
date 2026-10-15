@@ -991,9 +991,10 @@ class WorkflowExecutor:
                 if not names:
                     continue
 
-                from_key = edge.get("from_key")
+                aresta = Edge.from_dict(edge)
+                from_key = aresta.from_key
                 to_key = edge.get("to_key")
-                is_branch = Edge.from_dict(edge).is_branch
+                is_branch = aresta.is_branch
 
                 if from_key:
                     # The SubWorkflow node returns `{subWorkflowResult, **child

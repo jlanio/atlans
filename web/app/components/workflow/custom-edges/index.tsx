@@ -120,9 +120,9 @@ const CustomEdge = ({
     // sourceHandle with a field without a connection point (which the selector
     // offers via getCandidateKeys) pointed the line at a nonexistent handle and
     // React Flow stopped drawing it: the edge VANISHED on choosing the key.
-    // `sourceHandleDaChave` returns `undefined` when there's nothing to change;
-    // otherwise the named handle or `null` (anonymous, which still clears a ghost
-    // handle already stored).
+    // `sourceHandleDaChave` returns the named handle when the key is a real port,
+    // otherwise `null` (anonymous, which also clears a ghost handle already
+    // stored, and takes a SubWorkflow envelope off the port it sat on).
     const saidas = (store.getState().nodeLookup.get(source)?.data as { outputs?: Array<{ name?: string }> } | undefined)?.outputs
     const newHandle = sourceHandleDaChave(saidas, nome)
     // Emits as an EdgeChange instead of a direct setEdges: that's what makes the
@@ -134,7 +134,7 @@ const CustomEdge = ({
       type: "replace",
       item: {
         ...atual,
-        sourceHandle: newHandle === undefined ? atual.sourceHandle : newHandle,
+        sourceHandle: newHandle,
         data: { ...atual.data, from_key: nome },
       },
     }])

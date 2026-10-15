@@ -19,7 +19,7 @@ import { INodeContext } from "@/context/useFlowContext"
 import { CanvasDefinition, INodePortAPI, INodesAPI } from "@/service/types"
 import { getTypeIcon } from "@/utils/getTypeIconsUtils"
 import { contratoDoNo, inputHandle } from "./node-ports"
-import { ramoDaCondicao, resolveSourceHandle } from "./edge-persistence"
+import { chaveEfetiva, ramoDaCondicao, resolveSourceHandle } from "./edge-persistence"
 
 /**
  * Output handles a node missing from the catalog had in use, read from its
@@ -145,18 +145,23 @@ export function buildEdges(
     nodes.map(n => [n.id, ((n.data?.inputs ?? []) as INodePortAPI[]).map(p => p.name)]),
   )
 
-  return definition.edges.map(edge => ({
-    id: uuid(),
-    source: edge.source,
-    target: edge.target,
-    sourceHandle: resolveSourceHandle(edge, outputsByNodeId),
-    targetHandle: inputHandle(edge, inputsByNodeId),
-    type: "custom",
-    data: {
-      ...(edge.from_key ? { from_key: edge.from_key } : {}),
-      ...(edge.to_key ? { to_key: edge.to_key } : {}),
-    },
-  } satisfies Edge))
+  return definition.edges.map(salva => {
+    // The key the edge really means (see `chaveEfetiva`): from here on the
+    // canvas, the anchoring and the next save all use it.
+    const edge = { ...salva, from_key: chaveEfetiva(salva) }
+    return {
+      id: uuid(),
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: resolveSourceHandle(edge, outputsByNodeId),
+      targetHandle: inputHandle(edge, inputsByNodeId),
+      type: "custom",
+      data: {
+        ...(edge.from_key ? { from_key: edge.from_key } : {}),
+        ...(edge.to_key ? { to_key: edge.to_key } : {}),
+      },
+    } satisfies Edge
+  })
 }
 
 export type { CanvasDefinition } from "@/service/types"

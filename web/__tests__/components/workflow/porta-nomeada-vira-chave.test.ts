@@ -11,6 +11,10 @@
  * line jumped to the first port, because `from_key` was not a port name for
  * `reancorarArestasDoNo` to put it back on.
  *
+ * The ports come BEFORE the envelope, whatever their count: a port is what a
+ * connection usually wants, and listed last a single-port SubWorkflow (drawn
+ * with the anonymous handle) gave every new edge the envelope as its key.
+ *
  * Every other shape must keep its list: catalog ports are already catalog
  * fields, SubWorkflowInput's ports are its outputs, the Python Script's outputs
  * are its `output_vars`, and a branch node's true/false handles route the
@@ -19,9 +23,9 @@
 import { describe, it, expect } from "vitest"
 
 import { buildEdges, buildNodes } from "@/app/components/workflow/utils/build-canvas"
-import { serializeEdge } from "@/app/components/workflow/utils/edge-persistence"
+import { chaveEfetiva, serializeEdge } from "@/app/components/workflow/utils/edge-persistence"
 import { reancorarArestasDoNo } from "@/app/components/workflow/utils/node-ports"
-import { getCandidateKeys, resolveFromKey } from "@/app/components/workflow/utils/resolve-edge-keys"
+import { getCandidateKeys, resolveFromKey, sourceHandleDaChave } from "@/app/components/workflow/utils/resolve-edge-keys"
 import { INodeContext } from "@/context/useFlowContext"
 import { CanvasDefinition, INodeOutputField, INodesAPI } from "@/service/types"
 
@@ -131,10 +135,19 @@ describe("candidatas a from_key — cada forma de nó mantém a sua lista", () =
       .toEqual(["subWorkflowResult"])
   })
 
-  it("SubWorkflow com o contrato do filho: as portas também são chaves (o badge da aresta as oferece)", () => {
-    // The envelope stays: the node still returns it, and from the anonymous
-    // handle it is what an edge carries.
-    expect(candidatas("sub")).toEqual(["subWorkflowResult", "r1", "r2"])
+  it("SubWorkflow com o contrato do filho: as portas são chaves, antes do envelope", () => {
+    // The envelope stays on the list: the node still returns it and the badge
+    // still offers it, for whoever wants the dict of all the ports.
+    expect(candidatas("sub")).toEqual(["r1", "r2", "subWorkflowResult"])
+  })
+
+  it("SubWorkflow de uma porta só: a aresta nasce com a porta, não com o envelope", () => {
+    // One port: the card draws the anonymous handle, so a drag carries no
+    // handle and takes the first candidate. Listed after the envelope, the
+    // port never won and the next node got the dict instead of the layer.
+    const umaPorta = { ...dataDe("sub"), outputs: [{ name: "focos" }] }
+    expect(getCandidateKeys(umaPorta).map(c => c.name)).toEqual(["focos", "subWorkflowResult"])
+    expect(getCandidateKeys(umaPorta)[0].name).toBe("focos")
   })
 })
 
@@ -175,5 +188,62 @@ describe("SubWorkflow — a aresta puxada da porta r2 leva r2", () => {
     expect(chaveDoArraste("filtro", "polygons")).toBe("polygons")
     expect(chaveDoMais("dedup", "removed")).toBe("removed")
     expect(chaveDoMais("entrada", "zonas")).toBe("zonas")
+  })
+})
+
+/**
+ * Edges saved by the old drag defect: the port `r2` as handle, the envelope as
+ * key. They delivered the dict of all the ports and, on reload, sat on the
+ * first port. The handle is what the person pulled, so that pair now reads as
+ * the port — on the canvas and in the run (`Edge.from_dict`) — and the next
+ * save writes `from_key: r2`. No database migration.
+ */
+describe("SubWorkflow — arestas salvas com o defeito antigo (porta r2 + envelope)", () => {
+  const ANTIGA = { source: "sub", target: "geojson", source_handle: "r2", from_key: "subWorkflowResult" }
+
+  it("a chave efetiva é a porta puxada", () => {
+    expect(chaveEfetiva(ANTIGA)).toBe("r2")
+  })
+
+  it("ao abrir, a aresta já leva r2 e volta para a porta r2 quando o contrato chega", () => {
+    const [carregada] = buildEdges({ edges: [ANTIGA] } as CanvasDefinition, AO_ABRIR)
+    expect(carregada.data).toEqual({ from_key: "r2" })
+
+    const [reancorada] = reancorarArestasDoNo([carregada], "sub", ["geom", "raio"], ["r1", "r2"])
+    expect(reancorada.sourceHandle).toBe("r2")
+    expect(serializeEdge(reancorada)).toMatchObject({ source_handle: "r2", from_key: "r2" })
+  })
+
+  it("com o contrato já conhecido, ancora direto na porta r2", () => {
+    const [carregada] = buildEdges({ edges: [ANTIGA] } as CanvasDefinition, NOS)
+    expect(carregada.sourceHandle).toBe("r2")
+    expect(carregada.data).toEqual({ from_key: "r2" })
+  })
+
+  it("escolher o envelope de propósito sobrevive ao F5", () => {
+    // The badge of the r2 edge, choosing `subWorkflowResult`: the edge leaves
+    // the port, so it is not saved as the old defect's pair.
+    const outputs = (NOS.find(n => n.id === "sub")!.data.outputs ?? []) as { name: string }[]
+    expect(sourceHandleDaChave(outputs, "subWorkflowResult")).toBeNull()
+
+    const escolhida = {
+      id: "e1", source: "sub", sourceHandle: null, target: "geojson", targetHandle: null,
+      type: "custom", data: { from_key: "subWorkflowResult" },
+    }
+    const salva = serializeEdge(escolhida)
+    expect(salva.source_handle).toBeUndefined()
+
+    const [recarregada] = buildEdges({ edges: [salva] } as CanvasDefinition, NOS)
+    expect(recarregada.data).toEqual({ from_key: "subWorkflowResult" })
+    expect(recarregada.sourceHandle).toBeUndefined()
+  })
+
+  it("só o par porta + envelope é reescrito", () => {
+    // Its own key on its own port; a branch handle; an envelope with no handle.
+    expect(chaveEfetiva({ source_handle: "r2", from_key: "r1" })).toBe("r1")
+    expect(chaveEfetiva({ source_handle: "true", from_key: "subWorkflowResult" })).toBe("subWorkflowResult")
+    expect(chaveEfetiva({ from_key: "subWorkflowResult" })).toBe("subWorkflowResult")
+    expect(chaveEfetiva({ source_handle: "subWorkflowResult", from_key: "subWorkflowResult" })).toBe("subWorkflowResult")
+    expect(chaveEfetiva({ source_handle: "r2" })).toBeUndefined()
   })
 })

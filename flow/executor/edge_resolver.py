@@ -46,6 +46,34 @@ def condicao_do_ramo(cond: Any) -> bool | None:
     return None
 
 
+# The SubWorkflow node's envelope output: the dict of ALL the child's ports
+# (`RESULT_KEY` in flow/nodes/control/sub_workflow.py).
+_ENVELOPE_DO_SUBFLUXO = "subWorkflowResult"
+
+
+def from_key_efetiva(d: Mapping[str, Any]) -> str | None:
+    """The `from_key` an edge really means.
+
+    The editor used to save an edge dragged from a SubWorkflow's port `r2` with
+    the port as `source_handle` and the envelope as `from_key` — its candidate
+    list did not know the child's ports — and the run delivered the dict of ALL
+    the ports instead of r2. The handle is what the person pulled, so that pair
+    reads as the port: the same reading as the editor's `chaveEfetiva`
+    (web/app/components/workflow/utils/edge-persistence.ts), which writes
+    `from_key: r2` on the next save. The envelope chosen on purpose is saved
+    without a handle and is left alone, as are the branch handles.
+    """
+    from_key = d.get("from_key") or None
+    handle = d.get("source_handle")
+    if (
+        from_key == _ENVELOPE_DO_SUBFLUXO
+        and isinstance(handle, str) and handle
+        and handle not in (_ENVELOPE_DO_SUBFLUXO, "true", "false")
+    ):
+        return handle
+    return from_key
+
+
 @dataclass(frozen=True)
 class Edge:
     """Typed view of an edge. `condition` is the branch routing of control
@@ -74,7 +102,7 @@ class Edge:
         return cls(
             source=d["source"],
             target=d["target"],
-            from_key=d.get("from_key") or None,
+            from_key=from_key_efetiva(d),
             to_key=d.get("to_key") or None,
             condition=cond,
         )
