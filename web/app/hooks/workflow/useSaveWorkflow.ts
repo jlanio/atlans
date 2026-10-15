@@ -14,6 +14,9 @@ export interface SaveOptions {
    *  error toast — the caller answers with its own — and no "Salvo" (saved) flash
    *  when there is nothing to save. The chip keeps reflecting the state. */
   silent?: boolean
+  /** Save even if the definition changed elsewhere since it was loaded — what
+   *  the conflict toast's "Salvar mesmo assim" asks for. */
+  force?: boolean
 }
 
 // Normalizes properties by sorting keys — JSON.stringify preserves insertion
@@ -114,7 +117,7 @@ export const useSaveWorkflow = () => {
     return saveWorkflow(opcoes)
   }
 
-  async function saveWorkflow({ silent = false }: SaveOptions = {}) {
+  async function saveWorkflow({ silent = false, force = false }: SaveOptions = {}) {
 
     const store = useWorkflowSaveStore.getState()
     if (store.isSaving)
@@ -194,7 +197,21 @@ export const useSaveWorkflow = () => {
             edges: edgesReq,
             viewport: viewportReq,
           },
-        })
+        }, { expectedEtag: force ? null : store.definitionEtag })
+
+        if (data.error?.code === "definition_conflict") {
+          // Someone else saved this workflow after it was opened here — another
+          // tab, another person, the assistant. Saving on would erase what they
+          // did (their edges included) with nothing said, which is what the tag
+          // exists to stop. Said even on a silent save: Executar stops here, and
+          // the person has to know why.
+          store.failSave(data.error.message ?? "Workflow alterado em outro lugar.")
+          createToast.error("Workflow alterado em outro lugar", data.error.message, {
+            label: "Salvar mesmo assim",
+            onClick: () => { void saveWorkflow({ force: true }) },
+          })
+          return data
+        }
 
         if (data.error) {
           store.failSave(data.error.message)
@@ -205,6 +222,8 @@ export const useSaveWorkflow = () => {
           return data
         }
 
+        // The saved definition is the new base for the next save's check.
+        useWorkflowSaveStore.setState({ definitionEtag: data.data?.definition_etag ?? null })
         const snapshot = JSON.stringify({ name: currentName, nodes: nodesReq, edges: edgesReq })
         // No success toast: the chip next to the workflow path says "Salvo"
         // and keeps saying "Salvo há N min" (saved N min ago). A toast on every

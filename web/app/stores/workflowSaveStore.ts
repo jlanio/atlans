@@ -32,6 +32,11 @@ interface WorkflowSaveState {
    *  previous workflow — and a save would write that over the server's
    *  definition. The creation screen is born `true`: there is nothing to load. */
   canvasHidratado: boolean
+  /** `definition_etag` of the definition the canvas is based on — the loaded
+   *  one, then each save's. Sent back on the next save, which the server
+   *  refuses (409) if someone else saved in between. `null` = not known (new
+   *  workflow, older server): the save goes without the check. */
+  definitionEtag: string | null
 }
 
 interface WorkflowSaveActions {
@@ -110,6 +115,7 @@ export const useWorkflowSaveStore = create<WorkflowSaveState & WorkflowSaveActio
     // Nothing is on the canvas until a workflow hydrates it (or the creation
     // screen opens) — the safe side for a flag that holds back saves.
     canvasHidratado: false,
+    definitionEtag: null,
 
     setWorkflowName: (name) => {
       set({ workflowName: name })

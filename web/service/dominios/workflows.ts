@@ -38,12 +38,19 @@ export function createWorkflow(newWorkflow: Omit<IWorkflow, "id_hash" | "created
   return post<IWorkflow>("/workflows", newWorkflow)
 }
 
-export function updateWorkflowById(id: string, updatedWorkflow: Partial<Omit<IWorkflow, "id_hash">>) {
+export function updateWorkflowById(
+  id: string,
+  updatedWorkflow: Partial<Omit<IWorkflow, "id_hash">>,
+  opcoes: { expectedEtag?: string | null } = {},
+) {
   // Partial payload — send ONLY the fields that actually changed.
   // The backend (WorkflowUpdate in app/schemas/workflow.py) uses
   // `dict(exclude_unset=True)` and only persists what arrives, preserving
   // the rest. Sending a field with a hardcoded value OVERWRITES the real value.
-  return put<IWorkflow>(`/workflows/${id}`, updatedWorkflow)
+  //
+  // `expectedEtag`: the `definition_etag` the editor loaded — the save is
+  // refused (409) if the stored definition changed since.
+  return put<IWorkflow>(`/workflows/${id}${qs({ expected_etag: opcoes.expectedEtag })}`, updatedWorkflow)
 }
 
 export function deleteWorkflowById(id: string) { return del(`/workflows/${id}`) }

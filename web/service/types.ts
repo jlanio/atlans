@@ -1319,6 +1319,10 @@ export interface IWorkflow {
   deleted_at?: string | null
   /** Schedule notices from this save (empty in the normal case). */
   schedule_notices?: IScheduleNotice[]
+  /** Tag of the stored definition (GET/PUT). The editor sends it back as
+   *  `expected_etag` on its next save: a save over a definition someone else
+   *  changed in between is refused with 409 `definition_conflict`. */
+  definition_etag?: string | null
 }
 
 export interface IWorkflowGroup {

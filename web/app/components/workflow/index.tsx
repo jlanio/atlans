@@ -432,6 +432,7 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
       saveStatus: 'idle',
       snapshotIniciadoEm: null,
       canvasHidratado: !idDaRota,
+      definitionEtag: null,
     })
     // Lets the snapshot hydration effect run again for the new workflow.
     snapshotInitializedFor.current = null
@@ -525,6 +526,9 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
       fromBackend(workflow.updated_at)?.valueOf() ?? null,
       viewportSalvoValido(workflow.definition?.viewport) ? workflow.definition.viewport : null,
     )
+    // The canvas is now based on THIS definition: the next save sends its tag
+    // back, and is refused if someone else saved in between.
+    useWorkflowSaveStore.setState({ definitionEtag: workflow.definition_etag ?? null })
     // F10: undo/redo history baseline with the freshly hydrated state. Without
     // this the history starts empty and the FIRST edge edit was not undoable
     // (undo guards pointer <= 0). Mirrors the save's initSnapshot.
