@@ -63,3 +63,12 @@ def test_validacao_aponta_a_aresta_como_orfa():
         registry_names={"Merge"},
     )
     assert [d.code for d in relatorio.warnings if d.code == "orphan_edge"] == ["orphan_edge"]
+
+
+@pytest.mark.parametrize("arestas", [5, True, 1.5, "x"])
+def test_validacao_com_edges_que_nao_e_lista_nao_escapa_como_typeerror(arestas):
+    # Read raw before the Pydantic model: a number escaped as a TypeError the
+    # MCP tools do not translate, instead of the model's validation error.
+    from app.services.validate_service import _chaves_de_aresta_ignoradas
+
+    assert _chaves_de_aresta_ignoradas({"nodes": [], "edges": arestas}) == []

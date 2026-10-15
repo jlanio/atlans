@@ -151,8 +151,12 @@ def _chaves_de_aresta_ignoradas(definition: Any) -> List[tuple]:
     """`(edge, key, what to use)` for each React Flow key in the RAW edges."""
     if not isinstance(definition, dict):
         return []
+    # Raw, before the Pydantic model: an `edges` that is not a list (a number,
+    # a boolean) escaped as a TypeError the MCP tools do not translate, instead
+    # of the model's validation error right after.
+    arestas = definition.get("edges")
     achados = []
-    for edge in definition.get("edges") or []:
+    for edge in arestas if isinstance(arestas, list) else []:
         if not isinstance(edge, dict):
             continue
         for chave, certo in _CHAVES_DO_REACT_FLOW.items():
