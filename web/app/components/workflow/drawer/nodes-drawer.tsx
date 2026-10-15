@@ -12,11 +12,29 @@ import { getTypeIcon } from "@/utils/getTypeIconsUtils"
 import IconDrawer from "./components/icon-drawer"
 import { getCandidateKeys, resolveFromKey, portaDeEntradaPadrao } from "../utils/resolve-edge-keys"
 import { contratoDoNo } from "../utils/node-ports"
+import { REJECTION_MESSAGE, validarConexao } from "../utils/valida-conexao"
 import { typeStyle, typeName } from "@/consts/NodeTypeStyles"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 
 export interface INodesItemsDrawer extends INodesAPI<string> {
   icon: IconType
+}
+
+/**
+ * Whether the drawer was opened by the "+" next to a port of a node still on
+ * the canvas — exactly when `addNode` links that node to the new one.
+ *
+ * Then the new node is the TARGET of an edge, and a trigger has no input
+ * handle: React Flow never draws that edge, but it is saved and runs, with no
+ * line to select or delete. So triggers leave the list (and their category
+ * leaves the options). An `ndid` left behind by a node that is gone links
+ * nothing, and must not hide them — on an empty canvas they are the only list
+ * there is.
+ */
+export function useLigandoDeUmNo(): boolean {
+  const { linkNodeIdParam } = useLinkNodeParams()
+  return useStore(s => !!linkNodeIdParam && s.nodeLookup.has(linkNodeIdParam))
 }
 
 // The type color is NOT decided here. `TYPE_STYLES` declares itself the "single
@@ -35,13 +53,14 @@ const NodesDrawer = ({ aliasFilter }: NodesDrawerProps) => {
   const nodesDrawerState = useWorkflowCatalogStore(s => s.nodesDrawerState)
   const setNodesDrawerState = useWorkflowCatalogStore(s => s.setNodesDrawerState)
   const setNewlyAddedNodeId = useWorkflowCatalogStore(s => s.setNewlyAddedNodeId)
-  const { addEdges, addNodes, getNode } = useReactFlow<INodeContext, Edge>()
+  const { addEdges, addNodes, getNode, getEdges } = useReactFlow<INodeContext, Edge>()
   const { linkHandleIdParam, linkNodeIdParam, removeLinkNodeParam } = useLinkNodeParams()
-  // The canvas node list only serves two specific questions: "is it empty?"
-  // (here) and "where is the node the + came from?" (inside addNode, via
-  // getNode). Subscribing to `useNodes()` refiltered the whole catalog on every
-  // drag frame, with the drawer closed and off screen.
+  // The canvas node list only serves specific questions: "is it empty?" and
+  // "is the node the + came from there?" (here), and "where is it?" (inside
+  // addNode, via getNode). Subscribing to `useNodes()` refiltered the whole
+  // catalog on every drag frame, with the drawer closed and off screen.
   const canvasEmpty = useStore(s => s.nodeLookup.size === 0)
+  const ligando = useLigandoDeUmNo()
 
   const drawerType = canvasEmpty ? "trigger" : nodesDrawerState
   const hasTypeFilter = drawerType !== "closed" && drawerType !== "opened"
@@ -53,8 +72,9 @@ const NodesDrawer = ({ aliasFilter }: NodesDrawerProps) => {
     return (nodesAPI ?? [])
       .filter(item => item.alias.toLowerCase().includes(filtro))
       .filter(item => hasTypeFilter ? item.type === drawerType : true)
+      .filter(item => !(ligando && item.type === "trigger"))
       .map(item => ({ ...item, icon: NODE_ICONS[item.name as string] ?? TbError404 })) as INodesItemsDrawer[]
-  }, [nodesAPI, aliasFilter, hasTypeFilter, drawerType])
+  }, [nodesAPI, aliasFilter, hasTypeFilter, drawerType, ligando])
 
   function addNode(item: INodesItemsDrawer) {
     const viewPort = reactFlowInstance.getViewport()
@@ -124,6 +144,26 @@ const NodesDrawer = ({ aliasFilter }: NodesDrawerProps) => {
         ...(from_key || to_key
           ? { data: { ...(from_key ? { from_key } : {}), ...(to_key ? { to_key } : {}) } }
           : {}),
+      }
+      // The canvas gate (`isValidConnection` + `onConnect`), which this path
+      // skipped: a number into a node that expects a layer was refused when
+      // dragged and accepted here. The node stays — it is what the person
+      // picked, and placing it is valid on its own; only the link is not, just
+      // as a refused line on the canvas leaves both nodes where they are.
+      // Dropping the node too would make the click look ignored.
+      const recusa = validarConexao(
+        {
+          source: newEdge.source,
+          target: newEdge.target,
+          sourceHandle: newEdge.sourceHandle ?? null,
+          targetHandle: newEdge.targetHandle ?? null,
+        },
+        [nodeFound, newNode],
+        getEdges(),
+      )
+      if (recusa) {
+        toast.warning(REJECTION_MESSAGE[recusa], { description: "O nó foi adicionado sem a conexão." })
+        return
       }
       addEdges(newEdge)
     }

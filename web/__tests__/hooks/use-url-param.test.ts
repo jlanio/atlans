@@ -56,6 +56,18 @@ describe("useLinkNodeParams — o drawer de conexão usa replace, não push", ()
     expect(push).not.toHaveBeenCalled()
   })
 
+  it("setLinkNodeParam sem handle apaga o ndhid de um '+' anterior", () => {
+    // "+" on a named port, then "+" on an anonymous output: keeping the old
+    // `ndhid` made the new edge leave from a handle the source does not have,
+    // and React Flow does not draw it.
+    url.sp = new URLSearchParams("ndid=no-1&ndhid=points")
+    const { result } = renderHook(() => useLinkNodeParams())
+    act(() => result.current.setLinkNodeParam("no-2"))
+    const u = replace.mock.calls[0][0] as string
+    expect(u).toContain("ndid=no-2")
+    expect(u).not.toContain("ndhid=")
+  })
+
   it("removeLinkNodeParam tira ndid/ndhid com replace", () => {
     url.sp = new URLSearchParams("ndid=no-1&ndhid=h-2")
     const { result } = renderHook(() => useLinkNodeParams())
