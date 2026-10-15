@@ -701,6 +701,12 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
           </Button>
         )}
 
+        {/* Around <ReactFlow>, not inside it: React Flow renders its children
+            NEXT TO the nodes and edges, not around them, so from inside the
+            cards and edges read "editable" on a phone too — the node toolbar
+            kept its trash can and the edge its delete button, and Save/Run
+            persisted what was deleted on a "read-only" canvas. */}
+        <CanvasInteractionProvider>
         <ReactFlow nodes={nodes}
           colorMode={theme}
           ref={domNode}
@@ -729,7 +735,6 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
           deleteKeyCode={canvasReadOnly ? null : undefined}
         >
 
-          <CanvasInteractionProvider>
           <CanvasViewLayer />
           <CanvasLoading carregando={carregando} />
 
@@ -754,8 +759,8 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
             onSaveSnapshot={saveSnapshot}
           />
 
-          </CanvasInteractionProvider>
         </ReactFlow>
+        </CanvasInteractionProvider>
 
         </div>
 
