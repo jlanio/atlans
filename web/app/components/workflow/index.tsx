@@ -155,6 +155,14 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
         ? { ...aresta, className: "assistente-aresta-entrando" }
         : aresta
     )))
+    // The applied proposal is a step of its own. With only the snapshot above,
+    // the history ended at the canvas BEFORE the proposal: Ctrl+Z went one step
+    // further back than that, and Ctrl+Y never brought the proposal back. The
+    // setters reach the canvas only after React commits, so the state is handed
+    // over as it is — and without the entrance classes, which are not part of
+    // the workflow: a redo that brought them back would pin the "just arrived"
+    // look on nodes for good.
+    saveSnapshot({ nodes: resultado.nodes, edges: resultado.edges })
 
     // After React draws: measuring before that would measure the old canvas.
     requestAnimationFrame(() => {
@@ -192,10 +200,13 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
   // /workflow/[id] before the fetch responds; only the route tells which is which.
   const { id: idDaRota } = useParams<{ id?: string }>()
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
-  // The graph has already been put on the canvas (loadNodes/loadEdges). It is
-  // state, not the `hidratadoPara` ref, because it needs to re-render: it is what
-  // removes the loading animation and enables the add-node button.
-  const [hidratado, setHydrated] = useState(false)
+  // The workflow object whose graph has already been put on the canvas
+  // (loadNodes/loadEdges); null while there is none. It is state, not the
+  // `hydratedFor` ref, because it needs to re-render: it is what removes the
+  // loading animation and enables the add-node button — and what tells the
+  // snapshot effect that the canvas now holds THIS object's graph.
+  const [hidratadoCom, setHidratadoCom] = useState<IWorkflow | null>(null)
+  const hidratado = hidratadoCom !== null
   // Only the route with an id waits for anything; the creation screen is born ready.
   const carregando = Boolean(idDaRota) && !hidratado
   usePinExpirationTimer()
@@ -405,6 +416,11 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
     // is already an edit. snapshotIniciadoEm is reset in both cases: the
     // self-correction window belongs to the new workflow's hydration, and what
     // opens it is that initSnapshot.
+    //
+    // `canvasHidratado` follows the same split: an existing workflow holds back
+    // every save until its graph is on the canvas (initSnapshot releases it) —
+    // until then the canvas is empty, or still A's; the creation screen has
+    // nothing to wait for.
     useWorkflowSaveStore.setState({
       lastSavedSnapshot: idDaRota ? null : JSON.stringify({ name: "", nodes: [], edges: [] }),
       lastSavedAt: null,
@@ -412,13 +428,14 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
       isSaving: false,
       saveStatus: 'idle',
       snapshotIniciadoEm: null,
+      canvasHidratado: !idDaRota,
     })
     // Lets the snapshot hydration effect run again for the new workflow.
     snapshotInitializedFor.current = null
     // And the viewport one: B's is B's, not the framing done for A.
     initialFitDone.current = false
     // The canvas goes back to waiting until B's graph comes in.
-    setHydrated(false)
+    setHidratadoCom(null)
   }, [workflow?.id_hash, idDaRota])
 
   // Loads the workflow's pins
@@ -471,7 +488,7 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
     // handle — which is why it consumes loadNodes' return value.
     const loadedNodes = loadNodes()
     loadEdges(loadedNodes)
-    setHydrated(true)
+    setHidratadoCom(workflow)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workflow, nodeCatalogReady])
 
@@ -481,13 +498,22 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
   // it, detect-dirty flagged "Não salvo" even with no edits, because the
   // initial snapshot (loadedNodes directly) differed subtly from the current
   // snapshot (nodes via useNodes(), already processed by ReactFlow).
-  const snapshotInitializedFor = useRef<string | null>(null)
+  //
+  // Once per workflow OBJECT, in the render where the canvas holds its graph
+  // (`hidratadoCom` changes in the same render as the nodes, and ReactFlow takes
+  // them in a layout effect, before this one). Per object, not per id, because
+  // restoring a version swaps the object under the same id: the restored graph
+  // has to become the reference — "Alterações não salvas" showed right after a
+  // restore — and the history has to restart from it, or Ctrl+Z brought back the
+  // graph the restore replaced. And not on "some node appeared": a workflow that
+  // opens empty is hydrated too, and without this the save never learns that its
+  // canvas is ready.
+  const snapshotInitializedFor = useRef<IWorkflow | null>(null)
   useEffect(() => {
-    if (!workflow?.id_hash) return
-    if (snapshotInitializedFor.current === workflow.id_hash) return
-    if (!nodesAPI?.length || nodes.length === 0) return
+    if (!workflow?.id_hash || hidratadoCom !== workflow) return
+    if (snapshotInitializedFor.current === workflow) return
 
-    snapshotInitializedFor.current = workflow.id_hash
+    snapshotInitializedFor.current = workflow
     const { nodesReq, edgesReq } = buildPayload()
     // The server's `updated_at` is the "saved at" the chip shows before the
     // first save of this session. `fromBackend` because the date has no offset.
@@ -501,7 +527,7 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
     // (undo guards pointer <= 0). Mirrors the save's initSnapshot.
     captureBaseline()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges, workflow?.id_hash, workflow?.name, nodesAPI?.length])
+  }, [hidratadoCom, workflow])
 
   // Restores the saved viewport, or frames the nodes, after loading.
   //
@@ -559,18 +585,20 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
   }
 
   function addEdgeWithKey(connection: Connection, from_key?: string, to_key?: string) {
-    setEdges(prev => [
-      ...prev,
-      {
-        ...connection,
-        id: uuid(),
-        type: 'custom',
-        data: {
-          ...(from_key ? { from_key } : {}),
-          ...(to_key   ? { to_key   } : {}),
-        },
-      }
-    ])
+    // Through React Flow's `addEdges`, not the `useEdgesState` setter: it is what
+    // turns the new edge into an `add` change, and only changes schedule a
+    // history snapshot (`handleEdgesChange`). With the setter the connection never
+    // got a step of its own — Ctrl+Z took it away together with the step before
+    // it, and Ctrl+Y never brought it back. Same path as the handle's "+" (drawer).
+    reactFlowInstance.addEdges({
+      ...connection,
+      id: uuid(),
+      type: 'custom',
+      data: {
+        ...(from_key ? { from_key } : {}),
+        ...(to_key   ? { to_key   } : {}),
+      },
+    })
   }
 
   function handleConnectNodes(connections: Connection) {

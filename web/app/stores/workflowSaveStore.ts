@@ -26,6 +26,12 @@ interface WorkflowSaveState {
   /** Moment (epoch ms) at which the reference snapshot was taken on hydration.
    *  `null` = no self-correction window is open. See `autocorrigirSnapshot`. */
   snapshotIniciadoEm: number | null
+  /** The canvas holds the graph of the workflow being edited. `false` from the
+   *  moment an existing workflow starts loading until its hydration
+   *  (`initSnapshot`): in between, the canvas is empty — or still shows the
+   *  previous workflow — and a save would write that over the server's
+   *  definition. The creation screen is born `true`: there is nothing to load. */
+  canvasHidratado: boolean
 }
 
 interface WorkflowSaveActions {
@@ -44,7 +50,8 @@ interface WorkflowSaveActions {
   setStatus(status: SaveStatus): void
   /** `savedAt` is the server's `updated_at` on hydration and `viewport` is what
    *  came in the `definition`; when omitted, they keep the current value (the
-   *  reset on workflow switch is what clears them). */
+   *  reset on workflow switch is what clears them). Also marks the canvas as
+   *  hydrated: from here on there is a graph to save. */
   initSnapshot(nodes: INodesDefinition[], edges: IEdgeDefinition[], name: string, savedAt?: number | null, viewport?: Viewport | null): void
   isDirty(nodes: INodesDefinition[], edges: IEdgeDefinition[], name: string): boolean
   /**
@@ -100,6 +107,9 @@ export const useWorkflowSaveStore = create<WorkflowSaveState & WorkflowSaveActio
     workflowName: '',
     flagActive: true,
     snapshotIniciadoEm: null,
+    // Nothing is on the canvas until a workflow hydrates it (or the creation
+    // screen opens) — the safe side for a flag that holds back saves.
+    canvasHidratado: false,
 
     setWorkflowName: (name) => {
       set({ workflowName: name })
@@ -149,6 +159,7 @@ export const useWorkflowSaveStore = create<WorkflowSaveState & WorkflowSaveActio
       set({
         lastSavedSnapshot: snapshot,
         snapshotIniciadoEm: Date.now(),
+        canvasHidratado: true,
         ...(savedAt !== undefined ? { lastSavedAt: savedAt } : {}),
         ...(viewport !== undefined ? { lastSavedViewport: viewport } : {}),
       })

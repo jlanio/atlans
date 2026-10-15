@@ -32,6 +32,24 @@ function normalizeProperties(properties: unknown): Record<string, string> {
 }
 
 /**
+ * Whether the last saved graph may have nodes — what the "never save an empty
+ * graph" rail asks. With no snapshot the saved state is UNKNOWN, not empty: the
+ * canvas has not been hydrated, which is exactly when an empty canvas means "not
+ * loaded" rather than "cleared". Before, a missing snapshot switched the rail
+ * off, and the snapshot only exists after the very load it was meant to cover.
+ */
+function savedGraphMayHaveNodes(snapshot: string | null): boolean {
+  if (!snapshot) return true
+  try {
+    const prev = JSON.parse(snapshot) as { nodes?: unknown[] }
+    return !!prev.nodes && prev.nodes.length > 0
+  } catch {
+    // corrupted snapshot — does not block
+    return false
+  }
+}
+
+/**
  * Persistable projection of the graph — what goes into `definition` in the backend.
  *
  * Pure and exported on purpose: the "unsaved" detector lives in another
@@ -102,6 +120,17 @@ export const useSaveWorkflow = () => {
     if (store.isSaving)
       return
 
+    // An existing workflow whose graph has not reached the canvas yet (node
+    // catalog still loading, or the previous workflow still on screen while this
+    // one loads) has nothing of the user's to save — and the payload would be
+    // built from an empty canvas, or from another workflow's graph. It lives here
+    // and not in the callers because every one of them comes through: Ctrl+S has
+    // no "loaded yet?" of its own (only the buttons fade out while loading) and
+    // Executar saves silently before dispatching. Before the name check too: until
+    // the workflow request returns the name is still empty, and a save there asked
+    // for a name the workflow already has.
+    if (id && !store.canvasHidratado) return { data: null, error: null }
+
     // Captures the latest value from the store
     const currentName = store.workflowName
     if (!currentName || currentName.trim() === "") {
@@ -119,20 +148,13 @@ export const useSaveWorkflow = () => {
     // need to delete the nodes on the canvas (which brings isDirty with an
     // explicit nodes=[] as the last rendered state). Protects against stale
     // closures that called saveWorkflow before the canvas hydrated.
-    if (id && nodesReq.length === 0 && store.lastSavedSnapshot) {
-      try {
-        const prev = JSON.parse(store.lastSavedSnapshot) as { nodes?: unknown[] }
-        if (prev.nodes && prev.nodes.length > 0) {
-          // The workflow had nodes — we refuse to overwrite it with an empty one.
-          console.warn(
-            "[useSaveWorkflow] Tentativa de salvar workflow existente com 0 nós bloqueada "
-            + "(provável closure stale pré-hidratação).",
-          )
-          return { data: null, error: null }
-        }
-      } catch {
-        // corrupted snapshot — does not block
-      }
+    if (id && nodesReq.length === 0 && savedGraphMayHaveNodes(store.lastSavedSnapshot)) {
+      // The workflow had nodes — or may have — and we refuse to overwrite it with an empty one.
+      console.warn(
+        "[useSaveWorkflow] Tentativa de salvar workflow existente com 0 nós bloqueada "
+        + "(provável closure stale pré-hidratação).",
+      )
+      return { data: null, error: null }
     }
 
     if (id && !store.isDirty(nodesReq, edgesReq, currentName)) {
