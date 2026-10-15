@@ -1,15 +1,14 @@
 import { NodeProps, useEdges } from "@xyflow/react";
 import IconRoot from "../../icon-root";
-import AddConnectionHandle from "../../add-connection-handle";
 import { INodeContext } from "@/context/useFlowContext";
-import { HandleSource } from "../../handle";
+import { PortasDeSaida } from "../../portas";
 import ToolsIcon from "../../tools";
 import { useTools } from "@/app/hooks/workflow/useTools";
 import { TRIGGER_ICONS, TriggersType } from "@/consts/WorkflowIcons";
 import { TbError404 } from "react-icons/tb";
 import { INodePortAPI } from "@/service/types";
 import { memo, useCallback, useMemo } from "react";
-import { calcNodeHeight, portTopStyle } from "../../../utils/node-metrics";
+import { calcNodeHeight } from "../../../utils/node-metrics";
 
 // `selected` comes from the React Flow prop — see the comment in default-type.tsx.
 const DefaultTriggerIcon = ({ id, data, selected }: NodeProps<INodeContext>) => {
@@ -49,27 +48,7 @@ const DefaultTriggerIcon = ({ id, data, selected }: NodeProps<INodeContext>) => 
 
       <Icon className="text-xl" />
 
-      {outputs.length > 1 ? (
-        outputs.map((port, i) => {
-          const ts = portTopStyle(i, outputs.length, nodeHeight)
-          return (
-            <AddConnectionHandle
-              key={port.name}
-              nodeId={id}
-              label={port.name}
-              handleId={port.name}
-              connectionVisible={!connectedSources.has(port.name)}
-              style={ts}
-            >
-              <HandleSource id={port.name} className="port-top" livre={!connectedSources.has(port.name)} style={ts} />
-            </AddConnectionHandle>
-          )
-        })
-      ) : (
-        <AddConnectionHandle nodeId={id} connectionVisible={!connectedSources.has("__default__")}>
-          <HandleSource livre={!connectedSources.has("__default__")} />
-        </AddConnectionHandle>
-      )}
+      <PortasDeSaida nodeId={id} outputs={outputs} nodeHeight={nodeHeight} emUso={connectedSources} />
 
     </IconRoot>
   )
