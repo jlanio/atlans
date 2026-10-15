@@ -159,7 +159,15 @@ export const useSaveWorkflow = () => {
     // Executar saves silently before dispatching. Before the name check too: until
     // the workflow request returns the name is still empty, and a save there asked
     // for a name the workflow already has.
-    if (id && !store.canvasHidratado) return { data: null, error: null }
+    //
+    // An explicit save says why it did nothing: refused in silence, Ctrl+S on a
+    // slow load looked like a broken shortcut — or like a save that happened.
+    // The silent one stays silent, as everywhere here: its caller answers with
+    // its own message.
+    if (id && !store.canvasHidratado) {
+      if (!silent) createToast.info("Aguarde o workflow carregar para salvar")
+      return { data: null, error: null }
+    }
 
     // Captures the latest value from the store
     const currentName = store.workflowName

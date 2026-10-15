@@ -13,7 +13,9 @@
  *
  * The refusal lives in the save itself, not in the shortcut: Ctrl+S, the Save
  * button, the retry on the state chip and the silent save before Executar all
- * go through `saveWorkflow`.
+ * go through `saveWorkflow`. A refused Ctrl+S used to answer nothing at all —
+ * no PUT, no chip, no toast, the same as a shortcut that does not work — so an
+ * explicit save now says why; the silent one stays silent.
  */
 import React, { useEffect } from "react"
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest"
@@ -26,6 +28,13 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => "/workflow",
+}))
+const toasts = vi.hoisted(() => ({ avisos: [] as string[] }))
+vi.mock("@/utils/createToast", () => ({
+  createToast: {
+    info: (titulo: string) => { toasts.avisos.push(titulo) },
+    error: () => {}, warning: () => {}, success: () => {}, loading: () => {},
+  },
 }))
 vi.mock("next-auth/react", () => ({ useSession: () => ({ status: "authenticated", data: null }) }))
 // The node configuration modal is the only `next/dynamic` in the editor.
@@ -135,9 +144,27 @@ beforeEach(() => {
   servico.updateWorkflowById.mockImplementation(async (id: string) => ({ data: { id_hash: id }, error: null }))
   servico.createWorkflow.mockResolvedValue({ data: { id_hash: "wf-novo" }, error: null })
   useWorkflowCatalogStore.setState({ nodesAPI: CATALOGO, nodesFetchedAt: Date.now() })
+  toasts.avisos = []
 })
 
 describe("Ctrl+S no editor enquanto o workflow carrega", () => {
+  it("o Ctrl+S recusado diz que é preciso esperar o workflow carregar", async () => {
+    useWorkflowCatalogStore.setState({ nodesAPI: [], nodesFetchedAt: null })
+    const catalogo = adiado<{ data: INodesAPI[]; error: null }>()
+    servico.getNodes.mockReturnValue(catalogo.promise)
+
+    montar(workflow("wf-1", ["A", "B"]))
+    await esperar()
+    ctrlS()
+    await esperar()
+    // The catalog request is shared by the whole module: left pending — by a
+    // failed assertion too — it would hold back the next test's catalog.
+    await act(async () => { catalogo.resolve({ data: CATALOGO, error: null }) })
+
+    expect(servico.updateWorkflowById).not.toHaveBeenCalled()
+    expect(toasts.avisos).toEqual(["Aguarde o workflow carregar para salvar"])
+  })
+
   it("antes de o catálogo chegar não grava nada — e depois grava o grafo de verdade", async () => {
     // GET /nodes still in flight: the workflow came, its graph cannot be drawn yet.
     useWorkflowCatalogStore.setState({ nodesAPI: [], nodesFetchedAt: null })
@@ -245,6 +272,9 @@ describe("o save de qualquer chamador", () => {
 
     expect(servico.updateWorkflowById).not.toHaveBeenCalled()
     expect(useWorkflowSaveStore.getState().saveStatus).toBe("idle")
+    // Executar answers for itself; a "wait for it to load" here would be noise
+    // on top of its own message.
+    expect(toasts.avisos).toEqual([])
   })
 
   it("sem snapshot de referência, um grafo vazio não sobrescreve um workflow existente", async () => {
