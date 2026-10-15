@@ -20,7 +20,7 @@
 // editor's Save still belongs to whoever is using it.
 
 import { useEffect, useMemo, useRef } from "react"
-import { useNodes } from "@xyflow/react"
+import { useEdges, useNodes } from "@xyflow/react"
 import { TbAlertTriangle, TbCheck, TbWand } from "react-icons/tb"
 
 import { Button } from "@/app/components/ui/button"
@@ -45,20 +45,23 @@ export default function ProposalCard({ proposta, onAplicar, liberado, onLiberar 
   // to what is drawn, and subscribing up there would re-render the whole
   // conversation on every frame of a drag.
   const nos = useNodes<INodeContext>()
+  const arestas = useEdges()
 
   const resultado = useMemo(
-    () => aplicarProposta(proposta.definicao, nodesAPI, nos),
-    [proposta.definicao, nodesAPI, nos],
+    () => aplicarProposta(proposta.definicao, nodesAPI, nos, arestas),
+    [proposta.definicao, nodesAPI, nos, arestas],
   )
 
-  const { novos, alterados, removidos } = resultado.resumo
+  const { novos, alterados, removidos, arestasRemovidas = 0 } = resultado.resumo
 
   // Empty canvas: nothing to lose, always draws. Canvas with work: only after
-  // the conversation's first acceptance.
+  // the conversation's first acceptance — and never over connections drawn
+  // since: the assistant builds on the SAVED workflow, so an edge made by hand
+  // in the meantime would vanish with no one asked.
   const canvasEmpty = nos.length === 0
   const drawsAutomatically = proposta.desenhar === true
     && resultado.catalogoPronto
-    && (canvasEmpty || liberado)
+    && (canvasEmpty || (liberado && arestasRemovidas === 0))
 
   // Once per card. Without the lock, any canvas re-render (a drag,
   // a zoom) would reapply the same proposal and undo what the person just
@@ -114,14 +117,17 @@ export default function ProposalCard({ proposta, onAplicar, liberado, onLiberar 
 
       {/* The count of what CHANGES on the canvas. Only appears when there is a canvas:
           on an empty workflow "4 novos" tells nothing the 4 nodes don't already say. */}
-      {(alterados > 0 || removidos > 0) && (
+      {(alterados > 0 || removidos > 0 || arestasRemovidas > 0) && (
         <p className="mt-2 text-xs tabular-nums text-muted-foreground">
           {[
             novos > 0 ? `${novos} ${novos === 1 ? "novo" : "novos"}` : null,
             alterados > 0 ? `${alterados} ${alterados === 1 ? "alterado" : "alterados"}` : null,
             removidos > 0 ? `${removidos} ${removidos === 1 ? "removido" : "removidos"}` : null,
+            arestasRemovidas > 0
+              ? `${plural(arestasRemovidas, "ligação removida", "ligações removidas")}`
+              : null,
           ].filter(Boolean).join(" · ")}
-          {removidos > 0 && (
+          {(removidos > 0 || arestasRemovidas > 0) && (
             <span className="block text-destructive">
               Aplicar substitui o canvas. O que não estiver no fluxo proposto some.
             </span>

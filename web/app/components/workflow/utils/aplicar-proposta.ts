@@ -41,6 +41,10 @@ export interface ProposalSummary {
   alterados: number
   /** Canvas nodes the proposal does not have — they disappear on apply. */
   removidos: number
+  /** Canvas edges between two nodes that stay, which the proposal does not
+   *  have — they disappear on apply. Only counted when the canvas edges are
+   *  given (see `ligacoesPerdidas`). */
+  arestasRemovidas?: number
 }
 
 export interface ProposalResult {
@@ -72,11 +76,13 @@ interface Caixa {
  * @param definicao  the validated definition that came in the `proposta` frame
  * @param nodesAPI   the node catalog (`useWorkflowCatalogStore`)
  * @param atuais     the nodes currently on the canvas
+ * @param arestasAtuais the edges currently on the canvas (for `arestasRemovidas`)
  */
 export function aplicarProposta(
   definicao: CanvasDefinition | undefined,
   nodesAPI: INodesAPI[] | undefined,
   atuais: INodeContext[],
+  arestasAtuais?: Edge[],
 ): ProposalResult {
   const proposed = buildNodes(definicao, nodesAPI)
   const edges = buildEdges(definicao, proposed)
@@ -106,7 +112,10 @@ export function aplicarProposta(
     // Definition order, so the canvas does not shuffle on every apply.
     nodes: proposed.map(p => finalNodes.get(p.id) ?? p),
     edges,
-    resumo: contar(proposed, preservados, atuais, onScreen),
+    resumo: {
+      ...contar(proposed, preservados, atuais, onScreen),
+      ...(arestasAtuais ? { arestasRemovidas: ligacoesPerdidas(arestasAtuais, edges, proposed) } : {}),
+    },
     catalogoPronto: pedidos === 0 || proposed.length > 0,
     // What arrived NOW. Feeds the entry animation: without the list, the canvas
     // would have to animate everything on every draw — and a workflow that
@@ -180,6 +189,31 @@ function colide(a: Caixa, b: Caixa): boolean {
     a.y < b.y + b.h + MARGIN &&
     a.y + a.h + MARGIN > b.y
   )
+}
+
+/**
+ * Canvas edges between two nodes that stay, which the proposal does not have.
+ *
+ * The assistant builds on the SAVED workflow and never sees the canvas's
+ * unsaved edits: an edge drawn by hand since then disappears on apply — and
+ * after the conversation's first acceptance, apply happens on its own. Edges
+ * touching a removed node already go with it (`removidos`). Compared by
+ * source and target only: the proposal may leave out a key the editor wrote,
+ * and the same connection must not count as lost.
+ */
+function ligacoesPerdidas(atuais: Edge[], propostas: Edge[], proposed: INodeContext[]): number {
+  const ficam = new Set(proposed.map(n => n.id))
+  const par = (e: Edge) => `${e.source}\u0000${e.target}`
+  const restantes = new Map<string, number>()
+  for (const e of propostas) restantes.set(par(e), (restantes.get(par(e)) ?? 0) + 1)
+  let perdidas = 0
+  for (const e of atuais) {
+    if (!ficam.has(e.source) || !ficam.has(e.target)) continue
+    const n = restantes.get(par(e)) ?? 0
+    if (n > 0) restantes.set(par(e), n - 1)
+    else perdidas++
+  }
+  return perdidas
 }
 
 function contar(
