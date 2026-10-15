@@ -2,11 +2,11 @@
 import { useState } from "react"
 import {
   TbAlertTriangle, TbCheck, TbChevronRight, TbCopy, TbRefreshAlert,
-  TbSettings, TbSubtask, TbTarget, TbCircleX,
+  TbSettings, TbSubtask, TbTarget, TbCircleX, TbPlugConnectedX,
 } from "react-icons/tb"
 import { cn } from "@/lib/utils"
 import { NodeRun, RunTimeline } from "./timeline"
-import { ERROR_CATEGORY_LABEL, EmptyHint, formatOffset, useOpenSubworkflow, useNodeFocus } from "./shared"
+import { ERROR_CATEGORY_LABEL, EmptyHint, descreverArestasSemDado, formatOffset, useOpenSubworkflow, useNodeFocus } from "./shared"
 import { useConfigNodeParams } from "@/app/hooks/workflow/useConfigNodeParams"
 
 function ProblemCard({ node }: { node: NodeRun }) {
@@ -23,6 +23,7 @@ function ProblemCard({ node }: { node: NodeRun }) {
       node.subFlow ? `dentro do sub-fluxo: ${node.subFlow}` : null,
       problem.message,
       problem.category ? `categoria: ${problem.category}` : null,
+      node.unresolvedEdges ? `conexões sem dado:\n${descreverArestasSemDado(node.unresolvedEdges)}` : null,
       problem.traceback,
     ].filter(Boolean)
     navigator.clipboard.writeText(parts.join("\n\n"))
@@ -58,6 +59,19 @@ function ProblemCard({ node }: { node: NodeRun }) {
         <pre className="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-destructive/90">
           {problem.message}
         </pre>
+
+        {/* The error names the symptom ("Nenhum GeoDataFrame encontrado"); the
+            cause is often an input that never arrived, because the edge asks
+            for a key its source no longer produces. */}
+        {node.unresolvedEdges && (
+          <div className="rounded border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-[11px] text-amber-700 dark:text-amber-300">
+            <p className="flex items-center gap-1 font-medium">
+              <TbPlugConnectedX size={12} /> O nó rodou sem uma das entradas
+            </p>
+            <p className="mt-0.5 whitespace-pre-wrap font-mono text-[10px]">{descreverArestasSemDado(node.unresolvedEdges)}</p>
+            <p className="mt-0.5 text-[10px] text-muted-foreground">Escolha a saída certa no rótulo da conexão.</p>
+          </div>
+        )}
 
         {/* The taxonomy answers "is it worth retrying?" — more useful than 18
             stack lines for someone who just wants to know what to do now. */}

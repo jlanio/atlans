@@ -169,6 +169,12 @@ class WorkflowExecutor:
         # 'skipped' was not enough, because a live control node (status
         # 'completed') whose branch edge was deactivated kept contributing.
         self._deactivated_edge_ids: set[int] = set()
+        # Incoming edges whose `from_key` the source did not produce, per target.
+        # The edge delivers nothing (edge_resolver) and the target runs without
+        # that input — and fails far from the cause ("Nenhum GeoDataFrame
+        # encontrado") or finishes with wrong data. A log line on the executor was
+        # all that said why; this goes out with the target's completion event.
+        self._arestas_sem_dado: dict[str, list[dict]] = {}
 
         self.final_outputs: Dict[str, Any] = {}
         # In-flight spill tasks. `asyncio.to_thread` is not cancelable, so
@@ -200,7 +206,9 @@ class WorkflowExecutor:
         _events.publish_started(self.publisher, self.task_id, node_id, self.node_mgr.node_defs)
 
     def _publish_completed(self, node_id: str, status: str, duration_ms: float, error: str = None, output_keys: list = None, output_columns: dict = None, branch_result: "bool | None" = None, cache_hit: "bool | None" = None, traceback_str: "str | None" = None, schema_drift: "dict | None" = None, exception: "BaseException | None" = None) -> None:
-        _events.publish_completed(self.publisher, self.task_id, node_id, self.node_mgr.node_defs, status, duration_ms, error, output_keys, output_columns, branch_result, cache_hit, traceback_str, schema_drift, exception)
+        _events.publish_completed(self.publisher, self.task_id, node_id, self.node_mgr.node_defs, status, duration_ms, error, output_keys, output_columns, branch_result, cache_hit, traceback_str, schema_drift, exception,
+                                  # A pinned node did not run on its inputs.
+                                  unresolved_edges=None if cache_hit else self._arestas_sem_dado.get(node_id))
 
     # ── Pin data resolution ──────────────────────────────────────────────────
 
@@ -615,6 +623,13 @@ class WorkflowExecutor:
                             parent_outputs = await asyncio.to_thread(
                                 _load_from_disk, self.all_node_outputs[parent_id]['outputs']
                             )
+                            from_key = Edge.from_dict(edge).from_key
+                            if from_key and from_key not in parent_outputs:
+                                self._arestas_sem_dado.setdefault(node_id, []).append({
+                                    "source": parent_id,
+                                    "from_key": from_key,
+                                    "keys": sorted(str(k) for k in parent_outputs)[:20],
+                                })
                             # Single source of edge semantics (from_key/to_key/spread) —
                             # the SAME one used by the schema simulation below. See
                             # flow/executor/edge_resolver.py and docs/specs/edge-data-contract.md.

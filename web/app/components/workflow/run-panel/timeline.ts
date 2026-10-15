@@ -1,5 +1,5 @@
 import { INodeStatusWorkFlow } from "@/context/useFlowContext"
-import { RunEvent, RunOutcome } from "@/app/stores/workflowExecutionStore"
+import { ArestaSemDado, RunEvent, RunOutcome } from "@/app/stores/workflowExecutionStore"
 
 /** Synthetic node id the backend uses to signal the end of the run. */
 export const WF_COMPLETE = "__workflow_complete__"
@@ -48,6 +48,10 @@ export interface NodeRun {
   cacheHit: boolean
   branchResult?: boolean
   schemaDrift?: { missing: string[]; extra: string[] } | null
+  /** Incoming edges that delivered nothing: the source did not produce the key
+   *  the edge asks for (renamed output, removed rule, child port renamed). The
+   *  node ran without that input — usually the real cause of its failure. */
+  unresolvedEdges?: (ArestaSemDado & { sourceName: string })[] | null
   debug: Record<string, string> | null
   prints: NodePrint[]
   problem: NodeProblem | null
@@ -91,6 +95,7 @@ function emptyNodeRun(nodeId: string, name: string, type: string, order: number)
     outputKeys: [],
     cacheHit: false,
     schemaDrift: null,
+    unresolvedEdges: null,
     debug: null,
     prints: [],
     problem: null,
@@ -239,6 +244,15 @@ export function buildTimeline(
       if (ev.cache_hit !== undefined) run.cacheHit = !!ev.cache_hit
       if (ev.branch_result !== undefined) run.branchResult = ev.branch_result
       if (ev.schema_drift) run.schemaDrift = ev.schema_drift
+      if (ev.unresolved_edges?.length) {
+        // Inside a sub-workflow the source is the child's LOCAL id; its row
+        // was registered prefixed with the parent's.
+        const pai = ev.subworkflow_parent ?? null
+        run.unresolvedEdges = ev.unresolved_edges.map(a => ({
+          ...a,
+          sourceName: (byId.get(a.source) ?? (pai ? byId.get(`${pai}::${a.source}`) : undefined))?.name ?? a.source,
+        }))
+      }
       if (run.order === Number.MAX_SAFE_INTEGER) run.order = order++
       // A node that finished with no observed `started` (truncated replay):
       // rebuilds the start from the end minus the duration, to keep the offset.

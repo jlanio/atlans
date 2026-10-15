@@ -46,6 +46,8 @@ def publish_completed(
     traceback_str: "str | None" = None,
     schema_drift: "dict | None" = None,
     exception: "BaseException | None" = None,
+    *,
+    unresolved_edges: "list | None" = None,
 ) -> None:
     try:
         node_def = node_defs.get(node_id, {})
@@ -71,6 +73,11 @@ def publish_completed(
             extra["traceback"] = traceback_str
         if schema_drift:
             extra["schema_drift"] = schema_drift
+        # Incoming edges whose `from_key` the source did not produce: each one
+        # delivered nothing to this node. `[{source, from_key, keys}]`, where
+        # `keys` is what the source did produce.
+        if unresolved_edges:
+            extra["unresolved_edges"] = unresolved_edges
 
         # Error category PER NODE. The taxonomy already existed for the whole job
         # (executor → server); publishing it here is what lets the panel say
@@ -82,7 +89,7 @@ def publish_completed(
 
         if status == "failed":
             level = LEVEL_ERROR
-        elif schema_drift:
+        elif schema_drift or unresolved_edges:
             level = LEVEL_WARN
         else:
             level = LEVEL_INFO
