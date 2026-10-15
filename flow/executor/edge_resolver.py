@@ -22,6 +22,30 @@ from dataclasses import dataclass
 from typing import Any, List, Mapping
 
 
+# The spellings of a boolean the MCP validation accepts (Pydantic's lax `bool`,
+# `validate_service.EdgeDefinition`). Only a JSON `true`/`false` used to count
+# here: `"condition": "false"` passed validation as a valid branch, was saved as
+# written and ran as a DATA edge — the rejected branch ran too.
+_RAMO_VERDADEIRO = frozenset({"true", "t", "yes", "y", "on", "1"})
+_RAMO_FALSO = frozenset({"false", "f", "no", "n", "off", "0"})
+
+
+def condicao_do_ramo(cond: Any) -> bool | None:
+    """`condition` as a branch: True/False, or None for a data edge."""
+    if isinstance(cond, bool):
+        return cond
+    if isinstance(cond, str):
+        texto = cond.lower()
+        if texto in _RAMO_VERDADEIRO:
+            return True
+        if texto in _RAMO_FALSO:
+            return False
+        return None
+    if isinstance(cond, (int, float)) and cond in (0, 1):
+        return bool(cond)
+    return None
+
+
 @dataclass(frozen=True)
 class Edge:
     """Typed view of an edge. `condition` is the branch routing of control
@@ -38,7 +62,13 @@ class Edge:
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any]) -> "Edge":
-        cond = d.get("condition")
+        cond = condicao_do_ramo(d.get("condition"))
+        if cond is None and d.get("source_handle") in ("true", "false"):
+            # The branch handle with no usable `condition`. The editor draws
+            # such an edge on that branch (`resolveSourceHandle`) and writes the
+            # `condition` back on its next save; until then the run has to route
+            # it the way the canvas shows it, not run it on both branches.
+            cond = d["source_handle"] == "true"
         # `or None` normalizes "" (falsy, treated as absent by the run) to None,
         # preserving the truthiness semantics of the original code.
         return cls(
@@ -46,7 +76,7 @@ class Edge:
             target=d["target"],
             from_key=d.get("from_key") or None,
             to_key=d.get("to_key") or None,
-            condition=cond if isinstance(cond, bool) else None,
+            condition=cond,
         )
 
 

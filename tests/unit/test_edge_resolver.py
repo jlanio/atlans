@@ -6,6 +6,8 @@ docs/specs/edge-data-contract.md.
 Pins down the run's historical cascade AND guarantees that the schema simulation
 resolves the SAME ports (the run × preview divergence was the central bug).
 """
+import pytest
+
 from flow.executor.edge_resolver import (
     Edge,
     resolve_edge_inputs,
@@ -30,8 +32,42 @@ def test_from_dict_empty_string_becomes_none():
 def test_from_dict_condition_e_branch():
     assert Edge.from_dict({"source": "a", "target": "b", "condition": True}).is_branch
     assert Edge.from_dict({"source": "a", "target": "b", "condition": False}).is_branch
-    # a non-bool condition is ignored (does not become a branch).
-    assert Edge.from_dict({"source": "a", "target": "b", "condition": "true"}).is_branch is False
+    # What is not a boolean in any spelling the validation accepts stays a data edge.
+    for nao_e_ramo in ("", "maybe", 2, 0.5, None, [], {}):
+        assert Edge.from_dict({"source": "a", "target": "b", "condition": nao_e_ramo}).is_branch is False
+
+
+@pytest.mark.parametrize("escrito, ramo", [
+    ("true", True), ("false", False), ("True", True), ("FALSE", False),
+    ("yes", True), ("no", False), ("on", True), ("off", False),
+    ("t", True), ("f", False), ("y", True), ("n", False),
+    ("1", True), ("0", False), (1, True), (0, False), (1.0, True), (0.0, False),
+])
+def test_from_dict_condition_escrita_como_a_validacao_aceita(escrito, ramo):
+    # The MCP validation (Pydantic's lax bool) reports these as a valid branch;
+    # read as a data edge, the rejected branch ran too.
+    e = Edge.from_dict({"source": "a", "target": "b", "condition": escrito})
+    assert e.is_branch and e.condition is ramo
+
+
+@pytest.mark.parametrize("handle, ramo", [("true", True), ("false", False)])
+def test_from_dict_handle_de_ramo_sem_condition(handle, ramo):
+    # The editor draws this edge on the branch handle (and writes `condition` on
+    # its next save); the run has to route it the same way meanwhile.
+    e = Edge.from_dict({"source": "a", "target": "b", "source_handle": handle})
+    assert e.is_branch and e.condition is ramo
+    lixo = Edge.from_dict({"source": "a", "target": "b", "source_handle": handle, "condition": "maybe"})
+    assert lixo.condition is ramo
+
+
+def test_from_dict_condition_valida_vence_o_handle():
+    e = Edge.from_dict({"source": "a", "target": "b", "source_handle": "true", "condition": False})
+    assert e.condition is False
+
+
+def test_from_dict_handle_de_dado_nao_vira_ramo():
+    e = Edge.from_dict({"source": "a", "target": "b", "source_handle": "output", "from_key": "output"})
+    assert e.is_branch is False
 
 
 # ── resolve_edge_inputs (run) ─────────────────────────────────────────────────

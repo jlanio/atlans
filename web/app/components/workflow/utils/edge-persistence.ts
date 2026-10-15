@@ -22,6 +22,28 @@ function isRoutingHandle(handle?: string | null): boolean {
   return handle === "true" || handle === "false"
 }
 
+/**
+ * `condition` as a branch, or `undefined` for a data edge — the same spellings
+ * the executor accepts (`condicao_do_ramo` in flow/executor/edge_resolver.py),
+ * which are the ones the MCP validation lets through. Read as truthy, a
+ * `"false"` written as text anchored the edge on the TRUE branch, and the next
+ * save wrote `condition: true` — the editor inverted the branch on its own.
+ */
+export function ramoDaCondicao(condition: unknown): boolean | undefined {
+  if (typeof condition === "boolean") return condition
+  if (typeof condition === "string") {
+    const texto = condition.toLowerCase()
+    if (RAMO_VERDADEIRO.has(texto)) return true
+    if (RAMO_FALSO.has(texto)) return false
+    return undefined
+  }
+  if (condition === 0 || condition === 1) return condition === 1
+  return undefined
+}
+
+const RAMO_VERDADEIRO = new Set(["true", "t", "yes", "y", "on", "1"])
+const RAMO_FALSO = new Set(["false", "f", "no", "n", "off", "0"])
+
 /** Converts a React Flow edge to the persisted format. */
 export function serializeEdge(edge: Edge): IEdgeDefinition {
   const { source, target, sourceHandle, targetHandle, data } = edge
@@ -73,8 +95,9 @@ export function resolveSourceHandle(
   // 2. Conditional branch — only if the node REALLY has true/false ports.
   //    Trusting `condition` without checking the node would revive the bug in reverse.
   const isRoutingNode = outputs.some(p => p.name === "true" || p.name === "false")
-  if (isRoutingNode && edge.condition !== undefined) {
-    return edge.condition ? "true" : "false"
+  const ramo = ramoDaCondicao(edge.condition)
+  if (isRoutingNode && ramo !== undefined) {
+    return ramo ? "true" : "false"
   }
 
   // 3. Recovery of edges saved before the fix: the port id was lost, but

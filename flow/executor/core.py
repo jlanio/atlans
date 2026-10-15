@@ -681,13 +681,16 @@ class WorkflowExecutor:
                     if branch_edges and "branch" in outputs and isinstance(outputs.get("branch"), bool):
                         branch = outputs["branch"]
                         self.logger.info("[%s] Resultado do branch: %s", node_id, branch)
+                        # The branch as `Edge` reads it, never the raw `condition`:
+                        # a `"false"` written as text is a branch, and comparing it
+                        # raw with the bool output would never match.
                         active_edges = [
                             e for e in outgoing_edges
-                            if not Edge.from_dict(e).is_branch or e.get("condition") == branch
+                            if not Edge.from_dict(e).is_branch or Edge.from_dict(e).condition == branch
                         ]
 
                         # Propagates skip only to the target of the BRANCH edges not chosen
-                        deactivated = [e for e in branch_edges if e.get("condition") != branch]
+                        deactivated = [e for e in branch_edges if Edge.from_dict(e).condition != branch]
                         for edge in deactivated:
                             # Records the deactivated edge so the target's input assembly
                             # does NOT inject this branch's output (the target may

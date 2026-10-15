@@ -129,3 +129,26 @@ def test_normal_routing_keeps_working():
     assert ex.node_stats["V"]["status"] != "skipped", "ramo true deve rodar"
     assert ex.node_stats["F"]["status"] == "skipped", "ramo false deve ser skipado"
     assert "V" in final and "F" not in final
+
+
+@pytest.mark.parametrize("verdadeiro, falso", [
+    ("true", "false"),   # `condition` as text (MCP, hand-written JSON)
+    (1, 0),
+    (..., ...),          # only the branch handle, no `condition`
+])
+def test_ramo_escrito_sem_bool_json_ainda_roteia(verdadeiro, falso):
+    # Any of these passed the MCP validation (or is drawn on the branch by the
+    # editor) and ran as DATA edges: the rejected branch ran too.
+    e_v = {"source": "A", "target": "V", "source_handle": "true"}
+    e_f = {"source": "A", "target": "F", "source_handle": "false"}
+    if verdadeiro is not ...:
+        e_v["condition"], e_f["condition"] = verdadeiro, falso
+    definition = {
+        "nodes": [_trigger("T"), _branch("A"), _merge("V"), _merge("F")],
+        "edges": [{"source": "T", "target": "A"}, e_v, e_f],
+    }
+    ex = WorkflowExecutor(definition, task_id="ramo-texto", publisher=_publisher())
+    final = asyncio.run(ex.run(initial_inputs={"T": {"output": _gdf()}}))
+    assert ex.node_stats["V"]["status"] != "skipped", "ramo true deve rodar"
+    assert ex.node_stats["F"]["status"] == "skipped", "ramo false deve ser skipado"
+    assert "V" in final and "F" not in final
