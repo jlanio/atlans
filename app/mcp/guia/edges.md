@@ -43,6 +43,15 @@ against the source's declared outputs and returns:
 A source that declares no output at all produces no diagnostic: there is nothing to
 compare against.
 
+At a `SubWorkflow` node the outputs are the `ports` of the called workflow's
+`SubWorkflowOutput`, so this check needs `workspace_id`. With it, a `from_key`
+the child does not declare is `edge_from_key_unknown` too — usually a port
+renamed in the child after the parent was wired. `from_key: "subWorkflowResult"`
+delivers the dict with ALL the child's ports, not a layer:
+`edge_subworkflow_envelope` (**warning**) — name the port. A `to_key` arriving
+at the node that is neither a child input port nor a key its `inputsMapping`
+reads is dropped by the child: `edge_to_key_unknown` (**warning**).
+
 ## Fork
 
 An edge leaving a control node carries `condition: true` or

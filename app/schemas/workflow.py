@@ -104,6 +104,24 @@ class WorkflowMoveResult(BaseModel):
     warnings: List[WorkflowMoveWarning] = Field(default_factory=list)
 
 
+class SubworkflowNotice(BaseModel):
+    """A workflow that calls the saved one as a sub-workflow and uses a port
+    this save removed or renamed in its contract.
+
+    One per caller node and side: `saida` when the caller's edges leaving the
+    SubWorkflow node name a removed output — from now on they deliver nothing;
+    `entrada` when the node feeds a removed input (an `inputsMapping` key, or an
+    arriving edge's `to_key`) — the child drops it. `edges` counts the caller's
+    edges on those ports (0 when only its mapping uses them).
+    """
+    workflow_id: str
+    workflow_name: str
+    node_id: Optional[str] = None
+    side: Literal["saida", "entrada"]
+    ports: List[str] = Field(default_factory=list)
+    edges: int = 0
+
+
 class WorkflowRead(BaseModel):
     id: int
     id_hash: str
@@ -134,6 +152,11 @@ class WorkflowRead(BaseModel):
     # as `expected_etag` on its next save, which is refused with 409 if someone
     # else saved in between. Filled on GET and PUT; not a database column.
     definition_etag: Optional[str] = None
+    # Callers this save broke: workflows of the same workspace that call this one
+    # as a sub-workflow and use a port the save removed. Empty on GET and in the
+    # normal case; the editor sums them up in one toast. Set by the PUT route,
+    # like `definition_etag` — not a database column.
+    subworkflow_notices: List[SubworkflowNotice] = Field(default_factory=list)
 
     @field_validator("definition_etag", mode="before")
     @classmethod
@@ -142,6 +165,13 @@ class WorkflowRead(BaseModel):
         # transient attribute, like `schedule_notices`). Anything that is not
         # text is "no tag" — a save without the check — never a 500.
         return valor if isinstance(valor, str) else None
+
+    @field_validator("subworkflow_notices", mode="before")
+    @classmethod
+    def _avisos_so_lista(cls, valor):
+        # Same reason as the tag: an object that answers any attribute (a test
+        # double, a proxy) must not fail the response. Not a list is no notice.
+        return valor if isinstance(valor, list) else []
 
     class Config:
         from_attributes = True

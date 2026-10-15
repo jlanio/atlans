@@ -430,6 +430,7 @@ async def update_workflow(
     `definition`, the save is refused with 409 (`definition_conflict`) if the
     stored definition changed since — see `definition_etag`.
     """
+    from app.services.contrato_do_subfluxo import avisos_aos_pais, portas_removidas
     from app.services.workflow_version_service import definition_etag
 
     if expected_etag is not None and getattr(workflow_in, "definition", None) is not None:
@@ -450,6 +451,8 @@ async def update_workflow(
         _recusar_segredo(new_schema, schema=True)   # same reason as the POST
 
     new_def = getattr(workflow_in, "definition", None)
+    saidas_removidas: set = set()
+    entradas_removidas: set = set()
     if new_def is not None:
         _recusar_segredo(new_def)
         _recusar_arestas_malformadas(new_def)
@@ -472,6 +475,12 @@ async def update_workflow(
                 detail="Sub-workflows invalidos:\n- " + "\n- ".join(cross_errors),
             )
 
+        # The ports this save takes out of the contract, when this workflow is
+        # called as a sub-workflow. Read BEFORE the save: the service updates this
+        # same ORM object (one session per request), and afterwards
+        # `wf.definition` is already the new one.
+        saidas_removidas, entradas_removidas = portas_removidas(wf.definition, new_def)
+
     try:
         atualizado = await service.update_workflow(
             wf.id_hash, workflow_in, change_note=change_note,
@@ -486,6 +495,14 @@ async def update_workflow(
     # stored, for the editor's next save.
     if hasattr(atualizado, "definition"):
         atualizado.definition_etag = definition_etag(atualizado.definition)
+        # Same kind of attribute: the callers that use a port this save removed.
+        # Only looked up when a port was removed, and it never blocks — the save
+        # is already committed; the choice was to warn the callers, not to pin
+        # the version they call.
+        if saidas_removidas or entradas_removidas:
+            atualizado.subworkflow_notices = await avisos_aos_pais(
+                db, wf.id_hash, wf.workspace_id, saidas_removidas, entradas_removidas,
+            )
     return atualizado
 
 

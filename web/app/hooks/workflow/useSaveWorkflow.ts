@@ -1,5 +1,5 @@
 import { INodeContext } from "@/context/useFlowContext"
-import { INodesDefinition, IEdgeDefinition } from "@/service/types"
+import { INodesDefinition, IEdgeDefinition, ISubworkflowNotice } from "@/service/types"
 import { GisFlowService } from "@/service/GisFlowService"
 import { createToast } from "@/utils/createToast"
 import { Edge, useReactFlow, useStoreApi, type Viewport } from "@xyflow/react"
@@ -49,6 +49,33 @@ function savedGraphMayHaveNodes(snapshot: string | null): boolean {
   } catch {
     // corrupted snapshot — does not block
     return false
+  }
+}
+
+/** "a, b, c e mais 2": a toast is read at a glance, not scrolled. */
+function listaCurta(itens: string[], max = 3): string {
+  return itens.length <= max
+    ? itens.join(", ")
+    : `${itens.slice(0, max).join(", ")} e mais ${itens.length - max}`
+}
+
+/**
+ * ONE toast for every caller a save of a sub-workflow broke. The backend sends
+ * one notice per caller node and side; a toast each would bury the editor when
+ * a widely used sub-workflow loses a port, and what the person needs is which
+ * workflows to reopen and which ports to fix there.
+ */
+function resumoDosAvisosDeSubfluxo(avisos: ISubworkflowNotice[]) {
+  const nomes = [...new Map(avisos.map(a => [a.workflow_id, a.workflow_name])).values()]
+  const portas = [...new Set(avisos.flatMap(a => a.ports))].sort()
+  const n = nomes.length
+  const uma = portas.length === 1
+  return {
+    titulo: `${n} ${n === 1 ? "workflow usa" : "workflows usam"} ${uma ? "uma porta removida" : "portas removidas"}`,
+    descricao:
+      `${uma ? "Porta" : "Portas"}: ${listaCurta(portas)}. ${n === 1 ? "Workflow" : "Workflows"}: ${listaCurta(nomes)}. `
+      + `Até ajustar ${n === 1 ? "esse workflow" : "esses workflows"}, o que passava por `
+      + `${uma ? "essa porta" : "essas portas"} não chega.`,
   }
 }
 
@@ -236,6 +263,16 @@ export const useSaveWorkflow = () => {
         // needs to know the schedule did not take effect).
         for (const aviso of data.data?.schedule_notices ?? []) {
           createToast.warning("Agendamento não aplicado", aviso.message)
+        }
+        // Saved — but other workflows call this one as a sub-workflow and use
+        // ports this save removed or renamed: their edges on those ports deliver
+        // nothing from now on. Nothing on THIS canvas shows it, so the backend
+        // lists them (`subworkflow_notices`) and one amber toast sums them up —
+        // also on a silent save, for the same reason as the schedule notice.
+        const avisosDeSubfluxo = data.data?.subworkflow_notices ?? []
+        if (avisosDeSubfluxo.length > 0) {
+          const { titulo, descricao } = resumoDosAvisosDeSubfluxo(avisosDeSubfluxo)
+          createToast.warning(titulo, descricao)
         }
         return data
       }

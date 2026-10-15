@@ -428,3 +428,107 @@ async def test_simulation_scope_carries_the_workspace():
         await _validate({"nodes": [_no("n1", "ReadGeoJSON")], "edges": [], "workspace_id": "ws-test-001"})
 
     assert visto["escopo"] == credential_loader.CredentialScope(frozenset({USUARIO}), "ws-test-001")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Edges at a SubWorkflow node, against the child's contract
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# `validate_edges` skips the ports of a SubWorkflow source: they come from
+# ANOTHER workflow's contract, which the executor never reads. With
+# `workspace_id` the service reads that contract and checks the caller's edges
+# — which is how a caller broken by a renamed port in the child gets caught.
+
+FILHO = "filho-1"
+
+
+def _filho(saidas=("faixa", "mapa"), entradas=("focos",)):
+    return {"nodes": [
+        {"id": "in", "name": "SubWorkflowInput", "type": "trigger", "properties": {"ports": list(entradas)}},
+        {"id": "out", "name": "SubWorkflowOutput", "type": "output", "properties": {"ports": list(saidas)}},
+    ], "edges": []}
+
+
+def _chamador(*arestas, **props):
+    return {
+        "nodes": [
+            _no("t", "WebhookTrigger", "trigger"),
+            _no("sub", "SubWorkflow", "control", workflowHash=FILHO, **props),
+            _no("d", "Merge", "control", strategy="first"),
+        ],
+        "edges": [{"source": "t", "target": "sub", "from_key": "output"}, *arestas],
+        "workspace_id": "ws-test-001",
+    }
+
+
+async def _report_contra(filho: dict, corpo: dict) -> dict:
+    """The validation with the session returning `filho` as the called workflow."""
+    a, b, c = _patches_de_workspace()
+    with _fake_session([(FILHO, filho)]), a, b, c, _fake_simulation({}):
+        return (await _validate(corpo))["__report__"]
+
+
+def _da_aresta(itens: list) -> list:
+    return [(i["code"], i["edge"]) for i in itens if i["code"].startswith("edge_")]
+
+
+async def test_from_key_que_o_filho_nao_declara_e_erro():
+    report = await _report_contra(_filho(), _chamador({"source": "sub", "target": "d", "from_key": "faixa_velha"}))
+
+    assert _da_aresta(report["errors"]) == [
+        ("edge_from_key_unknown", {"source": "sub", "target": "d", "from_key": "faixa_velha"}),
+    ]
+    assert "nada" in report["errors"][-1]["message"] and "faixa" in report["errors"][-1]["message"]
+    assert report["ok"] is False
+
+
+async def test_porta_que_o_filho_declara_passa():
+    report = await _report_contra(_filho(), _chamador({"source": "sub", "target": "d", "from_key": "faixa"}))
+    assert _da_aresta(report["errors"]) == [] and _da_aresta(report["warnings"]) == []
+
+
+async def test_subworkflowresult_com_portas_declaradas_vira_aviso():
+    # It delivers the dict of ALL ports: a node that expects a layer gets a dict.
+    report = await _report_contra(
+        _filho(), _chamador({"source": "sub", "target": "d", "from_key": "subWorkflowResult"}),
+    )
+    assert _da_aresta(report["errors"]) == []
+    assert _da_aresta(report["warnings"]) == [
+        ("edge_subworkflow_envelope", {"source": "sub", "target": "d", "from_key": "subWorkflowResult"}),
+    ]
+
+
+async def test_filho_sem_portas_de_saida_nao_permite_afirmar_nada():
+    # Passthrough output: what comes out depends on what arrives inside the child.
+    report = await _report_contra(
+        _filho(saidas=()), _chamador({"source": "sub", "target": "d", "from_key": "qualquer"}),
+    )
+    assert _da_aresta(report["errors"]) == [] and _da_aresta(report["warnings"]) == []
+
+
+async def test_to_key_que_o_filho_nao_declara_vira_aviso():
+    corpo = _chamador()
+    corpo["edges"][0]["to_key"] = "focos_velho"
+    report = await _report_contra(_filho(), corpo)
+
+    assert _da_aresta(report["warnings"]) == [("edge_to_key_unknown", {"source": "t", "target": "sub"})]
+    assert "focos" in report["warnings"][-1]["message"]
+
+
+async def test_to_key_lido_pelo_mapeamento_nao_e_aviso():
+    # With a mapping the to_key names the caller's key, which the mapping reads
+    # — stored as JSON text, the way the editor writes it.
+    corpo = _chamador(inputsMapping='{"focos": "camada"}')
+    corpo["edges"][0]["to_key"] = "camada"
+    report = await _report_contra(_filho(), corpo)
+
+    assert _da_aresta(report["warnings"]) == []
+
+
+async def test_sem_workspace_nada_muda():
+    corpo = _chamador({"source": "sub", "target": "d", "from_key": "faixa_velha"})
+    del corpo["workspace_id"]
+    with _no_session(), _fake_simulation({}):
+        report = (await _validate(corpo))["__report__"]
+
+    assert _da_aresta(report["errors"]) == []
