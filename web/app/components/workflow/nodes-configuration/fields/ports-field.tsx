@@ -1,7 +1,8 @@
 "use client"
 
 /**
- * Editor for the input ports of a node with dynamic inputs (Python Script).
+ * Editor for the input ports of a node with dynamic inputs (Python Script,
+ * Merge, Carta Imagem).
  *
  * It is a FIELD, not a helper: node-config-form's `HELPER_MAP` replaces the
  * whole form, and here the Python code needs to stay visible next to the ports
@@ -64,9 +65,15 @@ const ONDE_ESTAO = {
 type PortsFieldProps = FieldProps<{
   /** How many edges arrive at this node — the editor locks while there is any. */
   conexoesDeEntrada?: number
+  /**
+   * Each port name becomes a variable of the node's code (Python Script). The
+   * Merge and the Carta Imagem read them as keys, so their texts do not speak
+   * of variables or of a script they do not have.
+   */
+  nomeViraVariavel?: boolean
 }>
 
-const PortsField = ({ field, values, setNodeField, conexoesDeEntrada = 0 }: PortsFieldProps) => {
+const PortsField = ({ field, values, setNodeField, conexoesDeEntrada = 0, nomeViraVariavel = false }: PortsFieldProps) => {
   const portas = useMemo(() => lerPortas(values?.[field.name]), [values, field.name])
   const travado = conexoesDeEntrada > 0
 
@@ -106,8 +113,10 @@ const PortsField = ({ field, values, setNodeField, conexoesDeEntrada = 0 }: Port
         <p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
           <TbInfoCircle size={14} className="mt-px shrink-0" />
           <span>
-            Sem portas, o nó aceita uma conexão e a variável recebe o nome da
-            saída do nó anterior. Defina <strong className="font-medium text-foreground">duas ou mais</strong>{" "}
+            {nomeViraVariavel
+              ? "Sem portas, o nó aceita uma conexão e a variável recebe o nome da saída do nó anterior."
+              : "Sem portas, cada conexão chega com o nome da saída do nó anterior — duas com o mesmo nome se sobrescrevem e só a última fica."}{" "}
+            Defina <strong className="font-medium text-foreground">duas ou mais</strong>{" "}
             para receber entradas separadas, cada uma com o nome que você der.
           </span>
         </p>
@@ -143,15 +152,17 @@ const PortsField = ({ field, values, setNodeField, conexoesDeEntrada = 0 }: Port
                   </Button>
                 </div>
                 {invalida && (
-                  // The name becomes a VARIABLE inside the script: a space or an
-                  // accent would produce a SyntaxError in the middle of the
+                  // In the Python Script the name becomes a VARIABLE: a space or
+                  // an accent would produce a SyntaxError in the middle of the
                   // user's code, far from the cause. The space gets its own
                   // message for being the common case and the only one with an
                   // obvious fix to suggest.
                   <span className="text-[10px] text-destructive">
                     {hasSpace
                       ? "Espaços não são aceitos — use _ para separar palavras (ex: meus_pontos)."
-                      : "Só letras, números e _ — o nome vira uma variável no script."}
+                      : nomeViraVariavel
+                        ? "Só letras, números e _ — o nome vira uma variável no script."
+                        : "Só letras, números e _."}
                   </span>
                 )}
                 {duplicates.has(porta) && (

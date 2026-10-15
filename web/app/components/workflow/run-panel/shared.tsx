@@ -113,7 +113,7 @@ export function descreverEntradasSobrescritas(entradas: NonNullable<NodeRun["ove
 export function EntradaSobrescritaBadge({ entradas }: { entradas: NonNullable<NodeRun["overwrittenInputs"]> }) {
   return (
     <span
-      title={`Duas conexões escrevem a mesma entrada — o nó só viu a última:\n${descreverEntradasSobrescritas(entradas)}\nDê a cada conexão uma entrada própria.`}
+      title={`Duas conexões escrevem a mesma entrada — o nó só viu a última:\n${descreverEntradasSobrescritas(entradas)}\nDê a cada conexão uma entrada própria (no Merge e no Python Script, declare as portas de entrada e ligue cada conexão a uma).`}
       className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-px text-[10px] text-amber-600 dark:text-amber-400"
     >
       <TbArrowMerge size={10} /> entrada sobrescrita

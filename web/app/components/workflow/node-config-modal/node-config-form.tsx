@@ -270,7 +270,7 @@ const NodeConfigForm = ({
           case "drive":   return <DriveField key={key} {...fieldProps} />
           case "artifact": return <ArtifactField key={key} {...fieldProps} />
           case "select":  return <SelectField key={key} {...fieldProps} />
-          case "ports":   return <PortsField key={key} {...fieldProps} conexoesDeEntrada={conexoesDeEntrada} />
+          case "ports":   return <PortsField key={key} {...fieldProps} conexoesDeEntrada={conexoesDeEntrada} nomeViraVariavel={nodeName === "PythonScript"} />
           case "chips":   return <ChipsField key={key} {...fieldProps} sugestoes={suggestColumns(field)} sugestoesDesatualizadas={suggestedColumns.desatualizadas} sugestoesParciais={suggestedColumns.parciais} />
           case "keyvalue": return <KeyValueField key={key} {...fieldProps} />
           case "object":

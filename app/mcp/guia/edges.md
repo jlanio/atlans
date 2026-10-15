@@ -19,6 +19,11 @@ layer B, a `SubWorkflowOutput` with several ports), `to_key` is **mandatory**
 — without it both edges spread and the second overwrites the first,
 silently. If the child consumes only one piece of data, you can leave both blank.
 
+A `Merge` that joins parallel branches is one of them: two branches that both
+deliver `output` collide and `strategy: all` returns one. Declare its `ports`
+(one per branch) and point each edge's `to_key` at one; `all` then returns
+`{port: value}` and `first`/`last` follow the port order.
+
 ## A nonexistent `from_key` does not bring down the run
 
 In production the executor is tolerant on purpose: a `from_key` with no

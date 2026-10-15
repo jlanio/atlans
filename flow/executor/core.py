@@ -1051,7 +1051,8 @@ class WorkflowExecutor:
                     if entradas is not None and to_key not in entradas:
                         # The node reads its declared inputs by name: a key outside
                         # them is not read (CartaImagem drops the layer, a
-                        # SubWorkflowOutput discards the value).
+                        # SubWorkflowOutput discards the value, a Merge puts it
+                        # after its ports).
                         diagnostics.append({
                             "severity": "warning",
                             "code": "edge_to_key_unknown",
@@ -1062,14 +1063,33 @@ class WorkflowExecutor:
                                 f"Entradas: {sorted(entradas)}."
                             ),
                         })
+                elif self.node_mgr.node_defs.get(node_id, {}).get("name") == "Merge":
+                    portas = self._entradas_declaradas(node_id) or set()
+                    if len(portas) > 1:
+                        # Without `to_key` the value arrives under the parent's
+                        # own key, not on a port: two such edges (both `output`)
+                        # overwrite each other and 'all' returns one branch.
+                        diagnostics.append({
+                            "severity": "warning",
+                            "code": "edge_to_key_missing",
+                            "source": parent_id,
+                            "target": node_id,
+                            "message": (
+                                f"aresta de '{parent_id}' para o Merge '{node_id}' sem "
+                                f"to_key: o valor chega com o nome da saída de "
+                                f"'{parent_id}', fora das portas {sorted(portas)}. "
+                                f"Indique a porta em to_key."
+                            ),
+                        })
         return diagnostics
 
     def _entradas_declaradas(self, node_id: str) -> "set[str] | None":
         """Input names a node reads, or None when they are not known statically.
 
         Catalog `inputs` for most nodes; the `ports` property for a
-        SubWorkflowOutput, whose ports are its inputs. Other dynamic-input nodes
-        (the Python Script) and nodes that declare no input are left out.
+        SubWorkflowOutput, whose ports are its inputs, and for a Merge. Other
+        dynamic-input nodes (the Python Script) and nodes that declare no input
+        are left out.
         """
         node_def = self.node_mgr.node_defs.get(node_id) or {}
         cls = self.node_mgr.factory.get(node_def.get("name"))
@@ -1078,7 +1098,7 @@ class WorkflowExecutor:
         except Exception:
             return None
         if desc.get("dynamic_inputs"):
-            if node_def.get("name") != "SubWorkflowOutput":
+            if node_def.get("name") not in ("SubWorkflowOutput", "Merge"):
                 return None
             from flow.utils.workflow_contract import _parse_ports
             props = node_def.get("properties") or node_def.get("parameters") or {}
