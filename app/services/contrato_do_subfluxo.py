@@ -75,6 +75,18 @@ def _nomes(contrato: Dict[str, Any], lado: str) -> Set[str]:
     return {p["name"] for p in contrato.get(lado) or []}
 
 
+# The SubWorkflow node's envelope output, the dict of all the child's ports
+# (`RESULT_KEY` in flow/nodes/control/sub_workflow.py, not imported here: that
+# module loads the whole node registry).
+_ENVELOPE = "subWorkflowResult"
+
+
+def _chave_de_entrada(aresta: Dict[str, Any]) -> Optional[str]:
+    """The key an edge delivers into the node: its `to_key`, else its `from_key`
+    (`resolve_edge_inputs`). None for an edge that spreads everything."""
+    return aresta.get("to_key") or _chave_de_saida(aresta)
+
+
 def _chave_de_saida(aresta: Dict[str, Any]) -> Optional[str]:
     """The `from_key` the run delivers on an edge (`from_key_efetiva`).
 
@@ -106,6 +118,12 @@ def portas_removidas(antes: Any, depois: Any) -> Tuple[Set[str], Set[str]]:
         return set(), set()
     saidas = _nomes(velho, "outputs") - _nomes(novo, "outputs")
     entradas = _nomes(velho, "inputs") - _nomes(novo, "inputs")
+    # Without a SubWorkflowOutput the child has no output at all: the caller's
+    # SubWorkflow node fails at run ("não declara saída"), whatever edge leaves
+    # it — even a passthrough output, which declared no port to compare. The
+    # envelope joins the removed names, and `avisos_aos_pais` lists every caller.
+    if velho["has_output_node"] and not novo["has_output_node"]:
+        saidas = _nomes(velho, "outputs") | {_ENVELOPE}
     # A SubWorkflowInput left with no ports is passthrough again: it hands the
     # child every key a caller sends, so nothing those callers map is dropped.
     # The output has no such twin — with no ports it returns whatever reaches it
@@ -149,6 +167,11 @@ async def avisos_aos_pais(
                     if e.get("source") == nid and (_chave_de_saida(e) or e.get("source_handle")) in saidas
                 ]
                 portas_s = sorted({_chave_de_saida(e) or e.get("source_handle") for e in saindo})
+                if _ENVELOPE in saidas:
+                    # The output node itself is gone: the node fails at run
+                    # whatever leaves it, so the caller is listed in any case.
+                    saindo = [e for e in arestas if e.get("source") == nid]
+                    portas_s = sorted(saidas)
 
                 mapa = _mapeamento(props.get("inputsMapping"))
                 if mapa:
@@ -158,8 +181,11 @@ async def avisos_aos_pais(
                     # edges stay as they are, the mapping is what needs fixing.
                     portas_e, n_e = sorted(k for k in mapa if k in entradas), 0
                 else:
-                    chegando = [e for e in arestas if e.get("target") == nid and e.get("to_key") in entradas]
-                    portas_e, n_e = sorted({e["to_key"] for e in chegando}), len(chegando)
+                    # The key the edge delivers: its `to_key`, or its
+                    # `from_key` without one — the child's allowlist drops
+                    # either, even with a single declared input.
+                    chegando = [e for e in arestas if e.get("target") == nid and _chave_de_entrada(e) in entradas]
+                    portas_e, n_e = sorted({_chave_de_entrada(e) for e in chegando}), len(chegando)
 
                 for lado, portas, n in (("saida", portas_s, len(saindo)), ("entrada", portas_e, n_e)):
                     if portas:
@@ -290,14 +316,17 @@ def diagnosticos_de_contrato(
                         ),
                     })
             else:
-                chave = e.get("to_key")
+                # The key the edge delivers (`to_key`, else `from_key`): the
+                # child's allowlist drops it either way.
+                chave = _chave_de_entrada(e)
                 if chave and entradas and chave not in entradas:
                     diagnosticos.append({
                         "severity": "warning", "code": "edge_to_key_unknown",
                         "source": origem, "target": destino,
                         "message": (
-                            f"to_key '{chave}' não é uma entrada do sub-fluxo '{alvo}' chamado em "
-                            f"'{destino}': o sub-fluxo descarta a chave. Entradas: {sorted(entradas)}."
+                            f"a entrada '{chave}' não é uma entrada do sub-fluxo '{alvo}' chamado em "
+                            f"'{destino}': o sub-fluxo descarta a chave. Entradas: {sorted(entradas)}. "
+                            "Indique a porta em to_key."
                         ),
                     })
     return diagnosticos

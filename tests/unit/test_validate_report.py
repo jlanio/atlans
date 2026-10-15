@@ -456,7 +456,9 @@ def _chamador(*arestas, **props):
             _no("sub", "SubWorkflow", "control", workflowHash=FILHO, **props),
             _no("d", "Merge", "control", strategy="first"),
         ],
-        "edges": [{"source": "t", "target": "sub", "from_key": "output"}, *arestas],
+        # Wired the way the child reads it: the child's allowlist drops any other
+        # key, which validation now flags on its own.
+        "edges": [{"source": "t", "target": "sub", "from_key": "output", "to_key": "focos"}, *arestas],
         "workspace_id": "ws-test-001",
     }
 

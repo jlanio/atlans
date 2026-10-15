@@ -95,6 +95,15 @@ def test_tirar_o_no_de_entrada_remove_as_entradas():
     assert portas_removidas(_filho(), _filho(com_entrada=False)) == (set(), {"focos", "bbox"})
 
 
+def test_tirar_o_no_de_saida_remove_a_saida_inteira():
+    # Without a SubWorkflowOutput the caller's node fails at run, whatever edge
+    # leaves it — a passthrough output declared no port to compare.
+    sem_saida = {"nodes": [n for n in _filho()["nodes"] if n["name"] != "SubWorkflowOutput"], "edges": []}
+    assert portas_removidas(_filho(), sem_saida) == ({"faixa", "mapa", "subWorkflowResult"}, set())
+    passthrough = _filho(saidas=())
+    assert portas_removidas(passthrough, sem_saida)[0] == {"subWorkflowResult"}
+
+
 def test_workflow_que_nao_e_subfluxo_nao_tem_o_que_remover():
     comum = {"nodes": [{"id": "a", "name": "ReadGeoJSON", "properties": {}}], "edges": []}
     assert portas_removidas(comum, {"nodes": [], "edges": []}) == (set(), set())
@@ -225,6 +234,32 @@ async def test_entrada_removida_no_mapeamento_gravado_pelo_editor(banco):
 async def test_entrada_removida_no_to_key_de_aresta_que_chega(banco):
     await _gravar(banco, _wf("pai", _pai(chegando=("focos", "bbox")), name="Relatório"))
     assert await _avisos(banco, entradas={"focos"}) == [_aviso("entrada", ["focos"], 1)]
+
+
+async def test_entrada_removida_entregue_pelo_from_key_sem_to_key(banco):
+    # The run delivers `to_key or from_key`: with one declared input the editor
+    # writes no `to_key`, and the child's allowlist drops the key just the same.
+    pai = _pai()
+    pai["edges"].append({"source": "t", "target": "sub", "from_key": "focos"})
+    await _gravar(banco, _wf("pai", pai, name="Relatório"))
+    assert await _avisos(banco, entradas={"focos"}) == [_aviso("entrada", ["focos"], 1)]
+
+
+async def test_sem_no_de_saida_todo_pai_que_chama_e_listado(banco):
+    # Even one whose edges do not name a port: the node fails at run.
+    pai = _pai()
+    pai["edges"].append({"source": "sub", "target": "d"})
+    await _gravar(banco, _wf("pai", pai, name="Relatório"))
+    assert await _avisos(banco, saidas={"faixa", "mapa", "subWorkflowResult"}) == [
+        _aviso("saida", ["faixa", "mapa", "subWorkflowResult"], 1),
+    ]
+
+
+def test_validacao_confere_a_chave_entregue_sem_to_key():
+    contratos = {FILHO: {"inputs": [{"name": "focos"}], "outputs": []}}
+    pai = {**_pai(), "edges": [{"source": "t", "target": "sub", "from_key": "output"}]}
+    [diag] = diagnosticos_de_contrato(pai, contratos)
+    assert diag["code"] == "edge_to_key_unknown" and "'output'" in diag["message"]
 
 
 async def test_com_mapeamento_o_to_key_e_chave_do_pai(banco):
