@@ -85,6 +85,19 @@ class _Resultado:
         self.definition = definition
 
 
+class _Banco:
+    """The stored row: what the locked SELECT reads."""
+
+    def __init__(self, definition):
+        self.definition = definition
+        self.sql: list[str] = []
+
+    async def execute(self, stmt):
+        from sqlalchemy.dialects import postgresql
+        self.sql.append(str(stmt.compile(dialect=postgresql.dialect())))
+        return type("R", (), {"scalar_one_or_none": lambda _s: self.definition})()
+
+
 @pytest.fixture
 def rota(monkeypatch):
     monkeypatch.setattr(WR.limiter, "enabled", False)
@@ -102,10 +115,11 @@ def rota(monkeypatch):
             gravados.append(workflow_in.definition)
             return _Resultado(workflow_in.definition)
 
-    async def salvar(definition, expected_etag):
+    async def salvar(definition, expected_etag, banco=None):
         return await WR.update_workflow(
             request=None, workflow_in=WorkflowUpdate(definition=definition),
-            expected_etag=expected_etag, service=_Service(), wf=_Wf(), db=None, current_user=_User(),
+            expected_etag=expected_etag, service=_Service(), wf=_Wf(),
+            db=banco or _Banco(_Wf.definition), current_user=_User(),
         )
 
     return salvar, gravados
@@ -131,6 +145,19 @@ async def test_salvar_com_a_etiqueta_atual_grava_e_devolve_a_nova(rota):
 
     assert gravados == [nova]
     assert resposta.definition_etag == definition_etag(nova)
+
+
+async def test_etiqueta_conferida_contra_a_linha_travada_no_banco(rota):
+    # Another save committed after this request loaded the workflow: the
+    # object in memory still has the old definition, the row has the new one.
+    # Read from memory, both saves with the old tag went through.
+    salvar, gravados = rota
+    banco = _Banco(_copia(edges=[]))
+    resposta = await salvar(_copia(edges=[{"source": "a", "target": "b"}]), definition_etag(DEF), banco)
+
+    assert resposta.status_code == 409
+    assert gravados == []
+    assert banco.sql and banco.sql[0].rstrip().endswith("FOR UPDATE")
 
 
 async def test_sem_etiqueta_nada_muda(rota):

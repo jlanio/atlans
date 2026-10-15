@@ -23,6 +23,7 @@ from app.core.rate_limiter import limiter
 from app.core.rbac import ROLE_ADMIN, ROLE_EDITOR, ROLE_OPERATOR, ROLE_VIEWER
 from app.core.utils.logger import get_logger
 from app.core.utils.redacao import definition_contains_secret, params_schema_contains_secret
+from app.models.workflow import Workflow
 from flow.core.graph import ponta
 from app.services import pin_service
 from app.services.pin_service import MAX_TTL_HOURS
@@ -434,7 +435,15 @@ async def update_workflow(
     from app.services.workflow_version_service import definition_etag
 
     if expected_etag is not None and getattr(workflow_in, "definition", None) is not None:
-        if definition_etag(wf.definition) != expected_etag:
+        # Compared against the STORED row, locked until this save commits: read
+        # from the object the dependency loaded, two saves carrying the same tag
+        # both passed the check before either committed, and the second wrote
+        # over the first — the lost edit the tag exists to stop. Under the lock
+        # the second waits, reads the first one's definition and gets the 409.
+        armazenada = (await db.execute(
+            select(Workflow.definition).where(Workflow.id_hash == wf.id_hash).with_for_update()
+        )).scalar_one_or_none()
+        if definition_etag(armazenada) != expected_etag:
             return JSONResponse(status_code=409, content={
                 "error": "definition_conflict",
                 "detail": (
