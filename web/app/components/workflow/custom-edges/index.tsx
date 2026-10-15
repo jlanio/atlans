@@ -251,7 +251,9 @@ const CustomEdge = ({
             data-edge-id={id}
             data-role="edge-label"
             className={cn(
-              "absolute z-[20]",
+              // `nokey`: the key selector keeps the focus after a click, and
+              // Backspace then deleted the node selected on the canvas.
+              "nokey absolute z-[20]",
               canSwitch ? "pointer-events-auto" : "pointer-events-none",
             )}
             style={{

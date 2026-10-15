@@ -71,7 +71,9 @@ export default function WorkflowLocation({ workspaceId, carregando = false, chil
       // before the add-node button, in the right corner. `flex-wrap`: the
       // save chip drops to the line below when the two do not fit, instead of
       // squeezing the workflow name.
-      className={`${LAYER_ABOVE_CANVAS} left-2 top-2 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-2 pl-safe sm:left-4 sm:top-3 sm:max-w-[min(44rem,calc(100%-6rem))]`}
+      // `nokey`, like the actions bar: the save chip's "Tentar novamente" keeps
+      // the focus after a click, and Backspace then deleted the selected node.
+      className={`nokey ${LAYER_ABOVE_CANVAS} left-2 top-2 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-2 pl-safe sm:left-4 sm:top-3 sm:max-w-[min(44rem,calc(100%-6rem))]`}
     >
       {/* `min-h-8`: with the skeletons (shorter than the text) the box
           shrank and the row jumped when the name arrived. */}

@@ -56,6 +56,10 @@ import SubflowViewer from "@/app/components/workflow/subflow-viewer"
 import RunPanel from "@/app/components/workflow/run-panel"
 import AssistantPanel from "@/app/components/workflow/assistente"
 import CanvasToolbar from "@/app/components/workflow/canvas-toolbar"
+import ActionsButton from "@/app/components/workflow/buttons"
+import WorkflowLocation from "@/app/components/workflow/workflow-location"
+import GlobalSaveIndicator from "@/app/components/workflow/global-save-indicator"
+import { useWorkflowSaveStore } from "@/app/stores/workflowSaveStore"
 import { useSubflowDrilldownStore } from "@/app/stores/subflowDrilldownStore"
 import { useRunPanelStore } from "@/app/stores/runPanelStore"
 import { useAssistantEditorStore } from "@/app/stores/assistenteEditorStore"
@@ -299,6 +303,31 @@ describe("Backspace nos painéis e na barra de ferramentas do canvas — não ap
     await assentar()
 
     expect(noExiste()).toBe(true)
+  })
+
+  it("no botão Salvar da barra de ações", async () => {
+    // After a click on Salvar the focus stays on it, with the node selected.
+    montar(<ActionsButton />)
+    const salvar = await screen.findByRole("button", { name: /Salvar workflow/ })
+
+    focar(salvar)
+    backspace(salvar)
+    await assentar()
+
+    expect(noExiste()).toBe(true)
+  })
+
+  it("no 'Tentar novamente' do chip de salvamento", async () => {
+    useWorkflowSaveStore.setState({ saveStatus: "error", lastError: "falhou" })
+    montar(<WorkflowLocation><GlobalSaveIndicator /></WorkflowLocation>)
+    const tentar = await screen.findByRole("button", { name: "Tentar novamente" })
+
+    focar(tentar)
+    backspace(tentar)
+    await assentar()
+
+    expect(noExiste()).toBe(true)
+    useWorkflowSaveStore.setState({ saveStatus: "idle", lastError: null })
   })
 
   it("no menu do assistente (o Radix o desenha fora do painel)", async () => {

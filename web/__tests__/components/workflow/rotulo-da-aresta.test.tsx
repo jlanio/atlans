@@ -124,6 +124,13 @@ describe("rótulo da aresta e botão de excluir", () => {
     expect(lixeira()!.className).toContain("pointer-events-none")
   })
 
+  it("o seletor de chave não deixa o Backspace apagar o nó selecionado", () => {
+    // React Flow's delete key skips only text fields and `.nokey` elements: after
+    // a click on the selector the focus stays there, with a node selected.
+    desenhar({ from_key: "a" })
+    expect(rotulo().className).toContain("nokey")
+  })
+
   it("canvas somente leitura (celular) não oferece excluir", () => {
     estado.canvasReadOnly = true
     desenhar({ from_key: "a" })
