@@ -339,11 +339,14 @@ describe("buildEdges", () => {
   it("aresta sem as duas pontas fica de fora, para não voltar no próximo salvar", () => {
     // Saved by hand or by another client. It cannot be drawn and the executor
     // skips it; kept, it went back in every save, which the server refuses (422).
+    // The same rule as the server's `ponta`: a non-empty text or an integer.
     const salvas = [
       { source: "a", target: "b" }, { source: "a" }, { target: "b" }, { source: "", target: "b" }, null,
+      { source: "a", target: true }, { source: ["x"], target: "b" }, { source: "a", target: 1.5 },
+      { source: 7, target: "b" },
     ] as unknown as CanvasDefinition["edges"]
     const arestas = buildEdges({ edges: salvas }, [])
-    expect(arestas.map(e => [e.source, e.target])).toEqual([["a", "b"]])
+    expect(arestas.map(e => [e.source, e.target])).toEqual([["a", "b"], [7, "b"]])
     expect(buildNodes({ nodes: [{ id: "x", name: "Sumiu", type: "action", properties: {}, position: { x: 0, y: 0 } }], edges: salvas }, [{ name: "Outro" } as INodesAPI]))
       .toHaveLength(1)
   })

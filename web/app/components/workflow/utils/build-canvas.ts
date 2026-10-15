@@ -138,10 +138,15 @@ export function buildNodes(
  * An edge with both ends. One saved without `source` or `target` (by hand, by
  * another client) cannot be drawn and the executor skips it; kept on the
  * canvas it went back in every save, which the server now refuses (422), and
- * the workflow could no longer be saved at all.
+ * the workflow could no longer be saved at all. The same rule as the server's
+ * `ponta` (flow/core/graph.py): an end is a non-empty text or an integer —
+ * kept with a `true` or a list as its end, the edge made every save fail.
  */
+function ponta(valor: unknown): boolean {
+  return typeof valor === "string" ? valor !== "" : Number.isInteger(valor)
+}
 function ligaDoisNos(edge: IEdgeDefinition | null | undefined): edge is IEdgeDefinition {
-  return Boolean(edge && edge.source != null && edge.source !== "" && edge.target != null && edge.target !== "")
+  return Boolean(edge && ponta(edge.source) && ponta(edge.target))
 }
 
 /**
