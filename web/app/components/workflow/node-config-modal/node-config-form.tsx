@@ -20,6 +20,7 @@ import SortByField from "../nodes-configuration/fields/sort-by-field"
 import SwitchRulesField from "../nodes-configuration/fields/switch-rules-field"
 import { NO_SUGGESTION, sugestaoParaNo } from "../utils/colunas-conhecidas"
 import { saidasDoNo } from "../utils/node-ports"
+import { arestasQueLeem, mudancaDeSaidas } from "../utils/variaveis-de-saida"
 import { useKnownColumnsStore } from "@/app/stores/knownColumnsStore"
 import WFSHelper from "../nodes-configuration/wfs-helper"
 import NodeOperationHelper from "../nodes-configuration/node-operation-helper"
@@ -28,7 +29,8 @@ import SetFieldsHelper from "../nodes-configuration/set-fields-helper"
 import SubWorkflowHelper from "../nodes-configuration/sub-workflow-helper"
 import SubWorkflowPortsHelper from "../nodes-configuration/sub-workflow-ports-helper"
 import { INodePortAPI, INodesPropertyAPI } from "@/service/types"
-import { useEdges } from "@xyflow/react"
+import { useEdges, useReactFlow } from "@xyflow/react"
+import { TbPlugConnectedX } from "react-icons/tb"
 
 // The object editor drags json-edit-react (~54 KB minified) along, and most
 // nodes don't have a single field of type `object`. Loaded on demand, it even
@@ -117,6 +119,42 @@ const HELPER_MAP: Record<string, React.ComponentType<HelperProps>> = {
   SubWorkflowOutput: SubWorkflowOutputPorts,
 }
 
+/** A connection leaving this node: the output it reads, and where it goes. */
+interface ConexaoDeSaida {
+  id: string
+  chave: string
+  destino: string
+}
+
+/**
+ * The connections an output-variable change would leave without data, named
+ * one by one — the same look as `LockedPortsNotice`, since it is the same kind
+ * of consequence. A warning, not a lock: dropping a variable can be exactly
+ * what the person wants, and the edge's key can be chosen again on its badge.
+ */
+function ConexoesSemDadoNotice({ conexoes }: { conexoes: ConexaoDeSaida[] }) {
+  const varias = conexoes.length > 1
+  const variasVariaveis = new Set(conexoes.map(c => c.chave)).size > 1
+  return (
+    <p className="flex items-start gap-2 rounded-md border border-yellow-500/40 bg-yellow-500/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+      <TbPlugConnectedX size={14} className="mt-px shrink-0 text-yellow-500" />
+      <span>
+        {varias ? "Ao aplicar, as conexões " : "Ao aplicar, a conexão "}
+        {conexoes.map((c, i) => (
+          <React.Fragment key={c.id}>
+            {i > 0 && (i === conexoes.length - 1 ? " e " : ", ")}
+            <strong className="font-medium text-foreground"><code>{c.chave}</code> → {c.destino}</strong>
+          </React.Fragment>
+        ))}
+        {varias ? " ficariam sem dado na execução: " : " ficaria sem dado na execução: "}
+        {variasVariaveis
+          ? "as variáveis que elas leem deixam de existir. Mantenha os nomes, ou escolha outra saída no rótulo de cada conexão."
+          : `a variável que ${varias ? "elas leem" : "ela lê"} deixa de existir. Mantenha o nome, ou escolha outra saída no rótulo ${varias ? "de cada conexão" : "da conexão"}.`}
+      </span>
+    </p>
+  )
+}
+
 /**
  * Central panel of the modal — renders the node's configuration fields.
  * Reuses exactly the same field components as the legacy panel.
@@ -141,6 +179,21 @@ const NodeConfigForm = ({
   // ports on. Counting only the arriving ones, always zero on that trigger, left
   // its port editor open while edges hung from its ports.
   const conexoesDeSaida = edges.filter(e => e.source === nodeFound?.id).length
+
+  // The edges this configuration, once applied, would leave without data: the
+  // ones reading an output variable that is gone with no one-for-one rename (a
+  // rename takes them along on applying — see the modal). Shown under the
+  // variables while they are typed, so the consequence is read before applying.
+  // The target's name is read at render, not subscribed: the form already
+  // re-renders on every keystroke and every edge change.
+  const { getNode } = useReactFlow()
+  const conexoesSemDado: ConexaoDeSaida[] = arestasQueLeem(
+    edges, nodeFound?.id ?? "", mudancaDeSaidas(nodeFound?.data, values).perdidas,
+  ).map(e => ({
+    id: e.id,
+    chave: String(e.data?.from_key),
+    destino: String(getNode(e.target)?.data?.alias || e.target),
+  }))
 
   // Known columns of the nodes UPSTREAM of this one — from a run in this session
   // or re-hydrated from the last persisted run. They become suggestions in the
@@ -261,7 +314,18 @@ const NodeConfigForm = ({
 
         // Fields by type
         switch (field.type) {
-          case "string":  return <StringField key={key} {...fieldProps} nodeFound={nodeFound} sugestoes={suggestColumns(field)} sugestoesDesatualizadas={suggestedColumns.desatualizadas} sugestoesParciais={suggestedColumns.parciais} />
+          case "string":
+            // The output variables carry, right under them, the connections a
+            // change would leave empty. The wrapper is there with or without the
+            // notice: swapping the element around the input as the notice comes
+            // and goes would remount the input and drop the focus mid-name.
+            if (field.name === "output_vars") return (
+              <div key={key} className="flex flex-col gap-2">
+                <StringField {...fieldProps} nodeFound={nodeFound} sugestoes={suggestColumns(field)} sugestoesDesatualizadas={suggestedColumns.desatualizadas} sugestoesParciais={suggestedColumns.parciais} />
+                {conexoesSemDado.length > 0 && <ConexoesSemDadoNotice conexoes={conexoesSemDado} />}
+              </div>
+            )
+            return <StringField key={key} {...fieldProps} nodeFound={nodeFound} sugestoes={suggestColumns(field)} sugestoesDesatualizadas={suggestedColumns.desatualizadas} sugestoesParciais={suggestedColumns.parciais} />
           case "number":  return <NumericField key={key} {...fieldProps} variant="number" />
           case "integer": return <NumericField key={key} {...fieldProps} variant="integer" />
           case "boolean": return <BooleanField key={key} {...fieldProps} />
