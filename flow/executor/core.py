@@ -180,6 +180,8 @@ class WorkflowExecutor:
         # wins: a Merge "all" fed by two parallel branches wired by the editor
         # (both edges carry `output`) returned only one of them, silently.
         self._entradas_sobrescritas: dict[str, list[dict]] = {}
+        # `_pode_rotear` per node id (one catalog read per node).
+        self._roteia_por_no: dict[str, bool] = {}
 
         self.final_outputs: Dict[str, Any] = {}
         # In-flight spill tasks. `asyncio.to_thread` is not cancelable, so
@@ -709,9 +711,12 @@ class WorkflowExecutor:
                     #    active; only branch edges with condition != branch are
                     #    deactivated. Previously, condition=None != branch deactivated the
                     #    data edge and skipped the target.
+                    #  - A `condition` only makes a branch edge where the source
+                    #    can route (`_e_ramo`): the old editor's stray one on a
+                    #    named port is a data edge.
                     outgoing_edges = self.outgoing.get(node_id, [])
                     active_edges = outgoing_edges
-                    branch_edges = [e for e in outgoing_edges if Edge.from_dict(e).is_branch]
+                    branch_edges = [e for e in outgoing_edges if self._e_ramo(e)]
                     if branch_edges and "branch" in outputs and isinstance(outputs.get("branch"), bool):
                         branch = outputs["branch"]
                         self.logger.info("[%s] Resultado do branch: %s", node_id, branch)
@@ -720,7 +725,7 @@ class WorkflowExecutor:
                         # raw with the bool output would never match.
                         active_edges = [
                             e for e in outgoing_edges
-                            if not Edge.from_dict(e).is_branch or Edge.from_dict(e).condition == branch
+                            if not self._e_ramo(e) or Edge.from_dict(e).condition == branch
                         ]
 
                         # Propagates skip only to the target of the BRANCH edges not chosen
@@ -994,7 +999,7 @@ class WorkflowExecutor:
                 aresta = Edge.from_dict(edge)
                 from_key = aresta.from_key
                 to_key = edge.get("to_key")
-                is_branch = aresta.is_branch
+                is_branch = self._e_ramo(edge)
 
                 if from_key:
                     # The SubWorkflow node returns `{subWorkflowResult, **child
@@ -1082,6 +1087,51 @@ class WorkflowExecutor:
                             ),
                         })
         return diagnostics
+
+    def _e_ramo(self, edge: dict) -> bool:
+        """Is this a BRANCH edge — one the source's `branch` output routes?
+
+        A `condition` only routes where the source can route. The editor once
+        wrote `condition: false` on every edge leaving a NAMED output handle
+        (`sourceHandle === "true"` with sourceHandle "body"), and those edges
+        are still in saved workflows. Read as branches, a source whose output
+        has a boolean `branch` (a Python Script variable, a child workflow port)
+        switched them off and skipped everything below — the editor already
+        draws them as the data edges they are (`resolveSourceHandle`).
+        """
+        return Edge.from_dict(edge).is_branch and self._pode_rotear(edge["source"])
+
+    def _pode_rotear(self, node_id: str) -> bool:
+        """Can the node route by `branch`?
+
+        Yes when it declares `branches` (Conditional, JinjaBranch,
+        ChangeDetector). No when it draws two or more NAMED output handles
+        instead — catalog ports, `outputs_from_ports`, `output_vars`, a child
+        workflow's ports: the only nodes the old editor wrote a stray
+        `condition` for. Any other node keeps the rule it always had (a bool
+        `condition` plus a bool `branch` output routes).
+        """
+        if node_id in self._roteia_por_no:
+            return self._roteia_por_no[node_id]
+        node_def = self.node_mgr.node_defs.get(node_id) or {}
+        nome = node_def.get("name")
+        cls = self.node_mgr.factory.get(nome)
+        try:
+            desc = cls.description() if cls else {}
+        except Exception:
+            desc = {}
+        if desc.get("branches"):
+            pode = True
+        else:
+            portas = [o for o in (desc.get("outputs") or []) if isinstance(o, dict) and o.get("port")]
+            pode = not (
+                len(portas) > 1
+                or desc.get("outputs_from_ports")
+                or desc.get("dynamic_output")
+                or nome == "SubWorkflow"
+            )
+        self._roteia_por_no[node_id] = pode
+        return pode
 
     def _entradas_declaradas(self, node_id: str) -> "set[str] | None":
         """Input names a node reads, or None when they are not known statically.

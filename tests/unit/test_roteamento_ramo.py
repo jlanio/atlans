@@ -152,3 +152,65 @@ def test_ramo_escrito_sem_bool_json_ainda_roteia(verdadeiro, falso):
     assert ex.node_stats["V"]["status"] != "skipped", "ramo true deve rodar"
     assert ex.node_stats["F"]["status"] == "skipped", "ramo false deve ser skipado"
     assert "V" in final and "F" not in final
+
+
+# ── A stray `condition` the old editor wrote on data edges ────────────────────
+
+class _NodeWithNamedPorts(BaseNode):
+    """Two NAMED output handles, one of them a boolean called `branch`. The old
+    editor wrote `condition: false` on every edge leaving a named handle (and,
+    after a reload, `source_handle: "false"`)."""
+
+    @classmethod
+    def description(cls):
+        return {"name": "TestePortasNomeadas", "type": "action", "properties": [],
+                "outputs": [{"name": "dados", "type": "any", "port": True},
+                            {"name": "branch", "type": "boolean", "port": True}]}
+
+    async def execute(self, inputs):
+        return {"dados": inputs.get("output"), "branch": True}
+
+
+@pytest.fixture
+def _registra_portas():
+    from flow.registry import NODE_REGISTRY
+    NODE_REGISTRY["TestePortasNomeadas"] = _NodeWithNamedPorts
+    try:
+        yield
+    finally:
+        NODE_REGISTRY.pop("TestePortasNomeadas", None)
+
+
+@pytest.mark.parametrize("legado", [
+    {"condition": False},
+    {"condition": False, "source_handle": "false"},
+])
+def test_condition_espuria_de_no_com_portas_nomeadas_nao_desliga_a_aresta(_registra_portas, legado):
+    # Read as a branch, `branch: True` switched the edge off and D was skipped.
+    definition = {
+        "nodes": [_trigger("T"), {"id": "N", "type": "action", "name": "TestePortasNomeadas", "properties": {}}, _merge("D")],
+        "edges": [{"source": "T", "target": "N"}, {"source": "N", "target": "D", "from_key": "dados", **legado}],
+    }
+    ex = WorkflowExecutor(definition, task_id="espuria", publisher=_publisher())
+    final = asyncio.run(ex.run(initial_inputs={"T": {"output": _gdf()}}))
+    assert ex.node_stats["D"]["status"] != "skipped"
+    assert len(final["D"]["output"]) == 3
+
+
+def test_condition_espuria_e_aresta_de_dado_na_validacao(_registra_portas):
+    # A data edge with no key from a node with two outputs spreads both: the
+    # ambiguity warning the stray `condition` used to hide.
+    ex = WorkflowExecutor(
+        {"nodes": [_merge("N"), _merge("D")], "edges": [{"source": "N", "target": "D", "condition": False}]},
+        task_id="valida", publisher=_publisher(),
+    )
+    ex.node_mgr.node_defs["N"]["name"] = "TestePortasNomeadas"
+    ex.simulated_outputs = {"N": {"status": "ok", "schema": [{"fields": [{"name": "dados"}, {"name": "branch"}]}]}}
+    assert [d["severity"] for d in ex.validate_edges()] == ["warning"]
+
+
+def test_no_que_declara_ramos_segue_roteando_pela_condition():
+    # Guard: the Conditional declares `branches`; its `condition` routes as always.
+    ex = WorkflowExecutor({"nodes": [_branch("A"), _merge("B")], "edges": [{"source": "A", "target": "B", "condition": False}]},
+                          task_id="guarda", publisher=_publisher())
+    assert ex._e_ramo(ex.outgoing["A"][0]) is True
