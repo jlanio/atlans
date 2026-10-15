@@ -32,6 +32,7 @@ from app.core.utils.datetime_utils import utc_now_naive
 from app.core.utils.logger import get_logger
 from app.models.artifact import Artifact
 from app.models.workspace_file import WorkspaceFile
+from app.services.pin_service import chaves_do_pin
 from app.services.remocao_de_artefatos import remove_artifacts
 
 logger = get_logger(__name__)
@@ -91,7 +92,8 @@ async def purge_workspace_storage(
         # left over points to nothing — a 404 on every following run, and since
         # auto-pin only fires with an EMPTY ref, the breakage did not resolve itself.
         # Clears the ref and keeps pin_metadata: the pin intent survives and the
-        # next run rewrites the cache under a new key.
+        # next run rewrites the cache under a new key. The pin's extra layers have
+        # no Artifact row: they are deleted here, from the ref, before it is cleared.
         from sqlalchemy.orm.attributes import flag_modified
         from app.models.workflow import Workflow
 
@@ -102,10 +104,14 @@ async def purge_workspace_storage(
             pins = wf.pinned_outputs
             if not isinstance(pins, dict):
                 continue
-            zerados = {
-                nid for nid, ref in pins.items()
-                if isinstance(ref, dict) and "__pin_s3_key__" in ref
-            }
+            zerados = set()
+            for nid, ref in pins.items():
+                if not (isinstance(ref, dict) and "__pin_s3_key__" in ref):
+                    continue
+                if await _apagar_camadas_extras_do_pin(s3, ref, workspace_id):
+                    zerados.add(nid)
+                else:
+                    removed["skipped_s3_errors"] += 1
             if not zerados:
                 continue
             wf.pinned_outputs = {
@@ -160,6 +166,32 @@ async def purge_workspace_storage(
         removed["skipped_s3_errors"],
     )
     return removed
+
+
+async def _apagar_camadas_extras_do_pin(s3, ref: dict, workspace_id: str) -> bool:
+    """Deletes the objects of the pin's extra layers. False if one stayed in storage.
+
+    Only the first layer (`__pin_s3_key__`) has an `Artifact` row, and
+    `remove_artifacts` has already dealt with it. The others — one per DataFrame
+    output beyond the first, in `__pin_frames__` — exist only in the ref. That is why
+    the ref survives a failure here: it is the only record of the object, and clearing
+    it would leave an orphan nobody knows about, the same invariant that keeps the
+    row in `remove_artifacts`. Repeating the purge finishes the job.
+    """
+    principal = ref.get("__pin_s3_key__")
+    ok = True
+    for chave in chaves_do_pin(ref, workspace_id):
+        if chave == principal:
+            continue
+        try:
+            await s3.delete_strict_async(chave, allow_missing=True)
+        except Exception as exc:
+            logger.warning(
+                "Purge: camada de pin %s ficou no storage (%s); a referência fica para "
+                "a próxima passada.", chave, exc,
+            )
+            ok = False
+    return ok
 
 
 async def schedule_workspace_data_expiry(db: AsyncSession, workspace_id: str) -> dict:

@@ -510,6 +510,10 @@ def _safe_pin_ref(run: WorkflowRun, nid: str, ref: dict) -> dict | None:
     'pin-cache/{workspace_id or "default"}/{task_id or "no-task"}/{nome}'
     (flow/executor/pin.py) — we reproduce that here so as not to break the
     legitimate path, ignoring what came in the payload.
+
+    The DataFrames after the first one have objects of their own, listed in
+    `__pin_frames__`; the executor's entry is rebuilt, never copied (see
+    `_safe_pin_frames`).
     """
     fmt = ref.get("__pin_format__") or "json"
     if fmt not in _PIN_FORMATS:
@@ -529,6 +533,55 @@ def _safe_pin_ref(run: WorkflowRun, nid: str, ref: dict) -> dict | None:
     safe["__pin_s3_key__"]  = s3_key
     safe["__pin_format__"]  = fmt
     safe["__pin_filename__"] = filename
+
+    # `dict(ref)` brought the executor's layer entry along with the rest: it only
+    # comes back as the server rebuilds it.
+    safe.pop("__pin_frames__", None)
+    if "__pin_frames__" in ref:
+        frames = _safe_pin_frames(run, nid, ref["__pin_frames__"])
+        if frames is None:
+            return None
+        if frames:
+            safe["__pin_frames__"] = frames
+    return safe
+
+
+def _safe_pin_frames(run: WorkflowRun, nid: str, frames) -> dict | None:
+    """The pin's extra layers with the names and keys the SERVER derives.
+
+    Same rule as the first layer: the name is rebuilt from (node, output) by the
+    very function the executor uploads with (`pin_frame_filename`), the key goes
+    through `_derive_s3_key` and its guard, and only `format` is read from the
+    entry — a `filename` or `s3_key` the executor wrote is dropped. These names
+    feed the unpin delete just like `__pin_s3_key__`.
+
+    Only the name is stored: the folder is the one of `__pin_s3_key__` (same
+    derivation), and repeating it would grow `pinned_outputs` by a whole key per
+    layer, in a column that goes out in every dispatch of the workflow.
+
+    None drops the WHOLE pin. Keeping the layers that derive and discarding the
+    others would store a pin that delivers the node's output without one of them:
+    the edge out of it would deliver nothing on every run, with the node shown as
+    served from cache. Without the pin the node runs again, and auto-pin retries.
+    """
+    from flow.executor.pin import PIN_FRAME_FORMATS, PIN_MAX_FRAMES, pin_frame_filename
+
+    if not isinstance(frames, dict) or len(frames) > PIN_MAX_FRAMES:
+        return None
+    safe: dict[str, dict] = {}
+    for output_key, frame in frames.items():
+        fmt = frame.get("format") if isinstance(frame, dict) else None
+        if fmt not in PIN_FRAME_FORMATS:
+            return None
+        s3_key = _derive_s3_key(
+            "pin-cache",
+            run.workspace_id or "default",
+            run.task_id or "no-task",
+            pin_frame_filename(nid, output_key, fmt),
+        )
+        if not s3_key:
+            return None
+        safe[output_key] = {"format": fmt, "filename": s3_key.rsplit("/", 1)[1]}
     return safe
 
 

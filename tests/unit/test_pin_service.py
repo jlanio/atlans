@@ -514,6 +514,42 @@ async def test_unpin_does_not_delete_key_of_another_workspace(banco):
     assert falso.await_count == 0  # nothing was deleted
 
 
+async def test_despinar_apaga_o_objeto_de_cada_camada_do_no(banco):
+    """A node with several DataFrame outputs has one object per layer, and only the
+    first one has an `Artifact` row. Deleting only the ref's key and the row's left
+    the other layers in MinIO with nothing pointing at them.
+
+    The SEG-10 guard holds for each layer: a name that climbs out of the folder
+    (written by a server that stored the executor's entry as it came) is not
+    deleted."""
+    db, wf = await _workflow(banco)
+    pasta = f"pin-cache/{WS}/run-1"
+    wf.pinned_outputs = {"n1": {
+        "__pin_s3_key__": f"{pasta}/n1_pin.parquet",
+        "__pin_format__": "parquet",
+        "__pin_frames__": {
+            "removed": {"format": "parquet", "filename": "n1_pin_removed_0a1b2c3d4e5f.parquet"},
+            "lines": {"format": "geojson", "filename": "n1_pin_lines_5f4e3d2c1b0a.geojson"},
+            "forjada": {"format": "parquet", "filename": "../../OUTRO-WS/run-1/segredo.parquet"},
+        },
+    }}
+    wf.pin_metadata = {"n1": {"pinned_at": utc_now_naive().isoformat()}}
+    db.add(Artifact(workspace_id=WS, workflow_hash=WF, node_id="n1",
+                    output_key="pin-cache-n1", filename="n1_pin.parquet",
+                    s3_key=f"{pasta}/n1_pin.parquet", is_pinned=True))
+    await db.commit()
+
+    falso = AsyncMock()
+    with patch("app.core.storage.delete_strict_async", new=falso):
+        await pin_service.unpin_output(db, wf, "n1")
+
+    assert {c.args[0] for c in falso.await_args_list} == {
+        f"{pasta}/n1_pin.parquet",
+        f"{pasta}/n1_pin_removed_0a1b2c3d4e5f.parquet",
+        f"{pasta}/n1_pin_lines_5f4e3d2c1b0a.geojson",
+    }
+
+
 async def test_pin_does_not_persist_client_forged_key(banco):
     """Audit SEG-10: the client's `outputs` is never stored; a forged
     `__pin_s3_key__` is rejected, and the pin stays `{}`."""

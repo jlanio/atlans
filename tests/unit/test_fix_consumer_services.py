@@ -10,6 +10,7 @@ Covers:
   - B13 : run does not get stuck as a zombie in 'pending' and cancel_run closes a run without a host.
   - B7  : sign_csr_via_stepca fails instead of returning an empty ca_pem.
 """
+import re
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -334,6 +335,53 @@ class TestSafePinRef:
         assert rrc._safe_pin_ref(run, "n1", {
             "__pin_s3_key__": "pin-cache/x/y/z", "__pin_format__": "../../etc",
         }) is None
+
+    def test_camadas_extras_tem_nome_derivado_no_servidor(self):
+        """Each extra DataFrame of the pin is an object of its own, and its name feeds
+        the unpin delete exactly like `__pin_s3_key__`: what the executor wrote in
+        the entry (a name climbing out of the folder, a key of another workspace,
+        the name of the first layer) does not survive."""
+        run = _make_run(workspace_id="ws-alvo")
+        ref = rrc._safe_pin_ref(run, "n1", {
+            "__pin_s3_key__": f"pin-cache/ws-alvo/{run.task_id}/n1_pin.parquet",
+            "__pin_format__": "parquet",
+            "__pin_geo_key__": "output",
+            "__pin_frames__": {
+                "removed": {"format": "parquet",
+                            "filename": "../../ws-vitima/run-1/n9_pin.parquet",
+                            "s3_key": "pin-cache/ws-vitima/run-1/n9_pin.parquet"},
+                "lines": {"format": "geojson", "filename": "n1_pin.parquet"},
+            },
+        })
+
+        camadas = ref["__pin_frames__"]
+        assert list(camadas) == ["removed", "lines"]
+        for camada in camadas.values():
+            assert set(camada) == {"format", "filename"}
+            assert re.fullmatch(r"[A-Za-z0-9_-]+\.(parquet|geojson)", camada["filename"])
+            assert camada["filename"] != "n1_pin.parquet"
+        assert camadas["removed"]["format"] == "parquet"
+        assert camadas["removed"]["filename"].endswith(".parquet")
+        assert camadas["lines"]["filename"].endswith(".geojson")
+        assert camadas["removed"]["filename"] != camadas["lines"]["filename"]
+
+    @pytest.mark.parametrize("camadas, rotulo", [
+        ({"removed": {"format": "../../etc", "filename": "x.parquet"}}, "formato forjado"),
+        ({"removed": {"format": "json", "filename": "x.json"}}, "formato que não é de camada"),
+        ({"removed": "pin-cache/ws-vitima/x.parquet"}, "entrada que não é dict"),
+        (["removed"], "camadas que não são dict"),
+        ({f"c{i}": {"format": "parquet"} for i in range(100)}, "camadas acima do teto"),
+    ])
+    def test_camada_que_nao_deriva_descarta_o_pin_inteiro(self, camadas, rotulo):
+        """Keeping the layers that derive and dropping the rest would store a pin
+        that delivers the node's output without one of them. Without the pin, the
+        node just runs again on the next execution."""
+        run = _make_run(workspace_id="ws-alvo")
+        assert rrc._safe_pin_ref(run, "n1", {
+            "__pin_s3_key__": f"pin-cache/ws-alvo/{run.task_id}/n1_pin.parquet",
+            "__pin_format__": "parquet",
+            "__pin_frames__": camadas,
+        }) is None, rotulo
 
     @pytest.mark.asyncio
     async def test_pinned_outputs_persisted_with_server_key(self):
