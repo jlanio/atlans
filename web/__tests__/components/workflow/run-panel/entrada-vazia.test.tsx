@@ -21,6 +21,7 @@ vi.mock("@/app/hooks/workflow/useConfigNodeParams", () => ({
 
 import { buildTimeline } from "@/app/components/workflow/run-panel/timeline"
 import ProblemsTab from "@/app/components/workflow/run-panel/problems-tab"
+import { EntradaSobrescritaBadge } from "@/app/components/workflow/run-panel/shared"
 import { RunEvent, toRunEvent } from "@/app/stores/workflowExecutionStore"
 import { INodeStatusWorkFlow } from "@/context/useFlowContext"
 
@@ -69,5 +70,36 @@ describe("conexão que não entregou dado", () => {
     render(<ProblemsTab timeline={buildTimeline([falhou({ unresolved_edges: SEM_DADO })], canvas)} />)
     expect(screen.getByText("O nó rodou sem uma das entradas")).toBeInTheDocument()
     expect(screen.getByText(/"Script de origem" não produziu "resultado" \(produziu: areas, total\)/)).toBeInTheDocument()
+  })
+})
+
+/**
+ * Two incoming edges writing the same input key: the executor applies them in
+ * order and the node only sees the last value. A Merge "all" fed by two
+ * parallel branches wired in the editor (both edges carry `output`) returned
+ * one branch, with nothing failing.
+ */
+describe("entrada escrita por duas conexões", () => {
+  const SOBRESCRITA = [{ key: "output", source: "b", overwrote: "a" }]
+  const merge = [
+    { id: "a", status: "completed", position: { x: 0, y: 0 }, data: { alias: "Lotes" } },
+    { id: "b", status: "completed", position: { x: 0, y: 0 }, data: { alias: "Quadras" } },
+    { id: "m", status: "completed", position: { x: 0, y: 0 }, data: { alias: "Juntar" } },
+  ] as unknown as INodeStatusWorkFlow[]
+
+  it("o evento traz quem substituiu quem, com os nomes dos nós", () => {
+    const ev = toRunEvent({
+      node: "m", status: "completed", kind: "lifecycle", level: "warn", timestamp: 1_700_000_001,
+      extra: { overwritten_inputs: SOBRESCRITA },
+    })
+    expect(ev.overwritten_inputs).toEqual(SOBRESCRITA)
+    const linha = buildTimeline([ev], merge).nodes.find(n => n.nodeId === "m")!
+    expect(linha.overwrittenInputs).toEqual([{ ...SOBRESCRITA[0], sourceName: "Quadras", overwroteName: "Lotes" }])
+  })
+
+  it("o selo diz que o nó só viu o último valor", () => {
+    render(<EntradaSobrescritaBadge entradas={[{ ...SOBRESCRITA[0], sourceName: "Quadras", overwroteName: "Lotes" }]} />)
+    const selo = screen.getByText("entrada sobrescrita")
+    expect(selo.closest("span")!.title).toContain('"output": o valor de "Quadras" substituiu o de "Lotes"')
   })
 })

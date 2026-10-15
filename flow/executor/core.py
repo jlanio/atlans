@@ -175,6 +175,11 @@ class WorkflowExecutor:
         # encontrado") or finishes with wrong data. A log line on the executor was
         # all that said why; this goes out with the target's completion event.
         self._arestas_sem_dado: dict[str, list[dict]] = {}
+        # Input keys written by more than one incoming edge, per target. The
+        # edges are applied in list order (`inputs.update`) and the last one
+        # wins: a Merge "all" fed by two parallel branches wired by the editor
+        # (both edges carry `output`) returned only one of them, silently.
+        self._entradas_sobrescritas: dict[str, list[dict]] = {}
 
         self.final_outputs: Dict[str, Any] = {}
         # In-flight spill tasks. `asyncio.to_thread` is not cancelable, so
@@ -208,7 +213,8 @@ class WorkflowExecutor:
     def _publish_completed(self, node_id: str, status: str, duration_ms: float, error: str = None, output_keys: list = None, output_columns: dict = None, branch_result: "bool | None" = None, cache_hit: "bool | None" = None, traceback_str: "str | None" = None, schema_drift: "dict | None" = None, exception: "BaseException | None" = None) -> None:
         _events.publish_completed(self.publisher, self.task_id, node_id, self.node_mgr.node_defs, status, duration_ms, error, output_keys, output_columns, branch_result, cache_hit, traceback_str, schema_drift, exception,
                                   # A pinned node did not run on its inputs.
-                                  unresolved_edges=None if cache_hit else self._arestas_sem_dado.get(node_id))
+                                  unresolved_edges=None if cache_hit else self._arestas_sem_dado.get(node_id),
+                                  overwritten_inputs=None if cache_hit else self._entradas_sobrescritas.get(node_id))
 
     # ── Pin data resolution ──────────────────────────────────────────────────
 
@@ -595,6 +601,8 @@ class WorkflowExecutor:
                         inputs = self.initial_inputs.get(node_id, self.initial_inputs) or {}
                     else:
                         inputs = {}
+                        # Which parent wrote each input key — to say who overwrote whom.
+                        origem_da_chave: dict = {}
                         for edge in self.incoming.get(node_id, []):
                             parent_id = edge['source']
                             # A skipped parent (branch not taken) does not contribute: the edge
@@ -633,10 +641,21 @@ class WorkflowExecutor:
                             # Single source of edge semantics (from_key/to_key/spread) —
                             # the SAME one used by the schema simulation below. See
                             # flow/executor/edge_resolver.py and docs/specs/edge-data-contract.md.
-                            inputs.update(resolve_edge_inputs(
+                            entregue = resolve_edge_inputs(
                                 edge, parent_outputs,
                                 logger=self.logger, node_id=node_id, parent_id=parent_id,
-                            ))
+                            )
+                            for chave in entregue:
+                                if chave in origem_da_chave:
+                                    sobrescritas = self._entradas_sobrescritas.setdefault(node_id, [])
+                                    if len(sobrescritas) < 20:
+                                        sobrescritas.append({
+                                            "key": str(chave),
+                                            "source": parent_id,
+                                            "overwrote": origem_da_chave[chave],
+                                        })
+                                origem_da_chave[chave] = parent_id
+                            inputs.update(entregue)
                             batch_consumed_parents.append(parent_id)
 
                     tasks.append(self._run_node_with_tracking(node_id, inputs))

@@ -7,7 +7,7 @@ import {
 import { cn } from "@/lib/utils"
 import { NodeRun, RunTimeline } from "./timeline"
 import {
-  DriftBadge, Elapsed, EntradaVaziaBadge, Highlight, NodeStatusIcon,
+  DriftBadge, Elapsed, EntradaSobrescritaBadge, EntradaVaziaBadge, Highlight, NodeStatusIcon,
   formatMs, formatOffset, useOpenSubworkflow, useNodeFocus,
 } from "./shared"
 import { useRunPanelStore } from "@/app/stores/runPanelStore"
@@ -112,6 +112,7 @@ const NodeRow = memo(function NodeRow({
         )}
         {node.schemaDrift && <DriftBadge drift={node.schemaDrift} />}
         {node.unresolvedEdges && <EntradaVaziaBadge arestas={node.unresolvedEdges} />}
+        {node.overwrittenInputs && <EntradaSobrescritaBadge entradas={node.overwrittenInputs} />}
         {node.prints.length > 0 && (
           <span title="Linhas de saída (print)" className="inline-flex items-center gap-0.5 rounded bg-cyan-500/10 px-1.5 py-px text-[10px] text-cyan-600 dark:text-cyan-400">
             <TbTerminal2 size={10} /> {node.prints.length}

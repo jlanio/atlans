@@ -51,6 +51,9 @@ export interface RunEvent {
   /** Incoming edges whose `from_key` the source did not produce — each one
    *  delivered nothing to this node (flow/executor/events.py). */
   unresolved_edges?: ArestaSemDado[] | null
+  /** Input keys two incoming edges wrote: `source`'s value replaced
+   *  `overwrote`'s, which this node never saw (flow/executor/events.py). */
+  overwritten_inputs?: EntradaSobrescrita[] | null
   /** Id of the canvas SubWorkflow node, when the event came from INSIDE a
    *  sub-workflow. The child's nodes do not exist on the parent's canvas; without
    *  this the line appeared in the panel without saying where it came from, and
@@ -66,6 +69,13 @@ export interface ArestaSemDado {
   source: string
   from_key: string
   keys: string[]
+}
+
+/** An input key written by two edges: `source` replaced `overwrote`. */
+export interface EntradaSobrescrita {
+  key: string
+  source: string
+  overwrote: string
 }
 
 /** Ceiling on events kept in the panel's memory.
@@ -101,6 +111,7 @@ export interface RawEvent {
     cache_hit?: boolean
     schema_drift?: { missing: string[]; extra: string[] }
     unresolved_edges?: ArestaSemDado[]
+    overwritten_inputs?: EntradaSobrescrita[]
     subworkflow_parent_node?: string
   } | null
 }
@@ -152,6 +163,7 @@ export function toRunEvent(data: RawEvent): RunEvent {
     cache_hit: data.extra?.cache_hit,
     schema_drift: data.extra?.schema_drift ?? null,
     unresolved_edges: data.extra?.unresolved_edges ?? null,
+    overwritten_inputs: data.extra?.overwritten_inputs ?? null,
     subworkflow_parent: data.extra?.subworkflow_parent_node ?? null,
     raw: data as object,
   }

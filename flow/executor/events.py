@@ -48,6 +48,7 @@ def publish_completed(
     exception: "BaseException | None" = None,
     *,
     unresolved_edges: "list | None" = None,
+    overwritten_inputs: "list | None" = None,
 ) -> None:
     try:
         node_def = node_defs.get(node_id, {})
@@ -78,6 +79,10 @@ def publish_completed(
         # `keys` is what the source did produce.
         if unresolved_edges:
             extra["unresolved_edges"] = unresolved_edges
+        # Input keys two incoming edges wrote: `[{key, source, overwrote}]` —
+        # `source`'s value replaced `overwrote`'s, which this node never saw.
+        if overwritten_inputs:
+            extra["overwritten_inputs"] = overwritten_inputs
 
         # Error category PER NODE. The taxonomy already existed for the whole job
         # (executor → server); publishing it here is what lets the panel say
@@ -89,7 +94,7 @@ def publish_completed(
 
         if status == "failed":
             level = LEVEL_ERROR
-        elif schema_drift or unresolved_edges:
+        elif schema_drift or unresolved_edges or overwritten_inputs:
             level = LEVEL_WARN
         else:
             level = LEVEL_INFO

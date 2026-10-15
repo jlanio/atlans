@@ -1,5 +1,5 @@
 import { INodeStatusWorkFlow } from "@/context/useFlowContext"
-import { ArestaSemDado, RunEvent, RunOutcome } from "@/app/stores/workflowExecutionStore"
+import { ArestaSemDado, EntradaSobrescrita, RunEvent, RunOutcome } from "@/app/stores/workflowExecutionStore"
 
 /** Synthetic node id the backend uses to signal the end of the run. */
 export const WF_COMPLETE = "__workflow_complete__"
@@ -52,6 +52,9 @@ export interface NodeRun {
    *  the edge asks for (renamed output, removed rule, child port renamed). The
    *  node ran without that input — usually the real cause of its failure. */
   unresolvedEdges?: (ArestaSemDado & { sourceName: string })[] | null
+  /** Input keys two incoming edges wrote — the node never saw the first value
+   *  (e.g. a Merge "all" whose two branches both deliver `output`). */
+  overwrittenInputs?: (EntradaSobrescrita & { sourceName: string; overwroteName: string })[] | null
   debug: Record<string, string> | null
   prints: NodePrint[]
   problem: NodeProblem | null
@@ -96,6 +99,7 @@ function emptyNodeRun(nodeId: string, name: string, type: string, order: number)
     cacheHit: false,
     schemaDrift: null,
     unresolvedEdges: null,
+    overwrittenInputs: null,
     debug: null,
     prints: [],
     problem: null,
@@ -244,14 +248,20 @@ export function buildTimeline(
       if (ev.cache_hit !== undefined) run.cacheHit = !!ev.cache_hit
       if (ev.branch_result !== undefined) run.branchResult = ev.branch_result
       if (ev.schema_drift) run.schemaDrift = ev.schema_drift
-      if (ev.unresolved_edges?.length) {
+      if (ev.unresolved_edges?.length || ev.overwritten_inputs?.length) {
         // Inside a sub-workflow the source is the child's LOCAL id; its row
         // was registered prefixed with the parent's.
         const pai = ev.subworkflow_parent ?? null
-        run.unresolvedEdges = ev.unresolved_edges.map(a => ({
-          ...a,
-          sourceName: (byId.get(a.source) ?? (pai ? byId.get(`${pai}::${a.source}`) : undefined))?.name ?? a.source,
-        }))
+        const nomeDe = (id: string) =>
+          (byId.get(id) ?? (pai ? byId.get(`${pai}::${id}`) : undefined))?.name ?? id
+        if (ev.unresolved_edges?.length) {
+          run.unresolvedEdges = ev.unresolved_edges.map(a => ({ ...a, sourceName: nomeDe(a.source) }))
+        }
+        if (ev.overwritten_inputs?.length) {
+          run.overwrittenInputs = ev.overwritten_inputs.map(o => ({
+            ...o, sourceName: nomeDe(o.source), overwroteName: nomeDe(o.overwrote),
+          }))
+        }
       }
       if (run.order === Number.MAX_SAFE_INTEGER) run.order = order++
       // A node that finished with no observed `started` (truncated replay):

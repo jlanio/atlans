@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { useReactFlow } from "@xyflow/react"
 import {
-  TbCircleCheck, TbCircleX, TbCircleDashed, TbAlertTriangle, TbPlugConnectedX, TbHelpCircle,
+  TbCircleCheck, TbCircleX, TbCircleDashed, TbAlertTriangle, TbArrowMerge, TbPlugConnectedX, TbHelpCircle,
 } from "react-icons/tb"
 import ExecActivity from "@/app/components/shared/exec-activity"
 import { cn } from "@/lib/utils"
@@ -97,6 +97,26 @@ export function EntradaVaziaBadge({ arestas }: { arestas: NonNullable<NodeRun["u
       className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-px text-[10px] text-amber-600 dark:text-amber-400"
     >
       <TbPlugConnectedX size={10} /> entrada vazia
+    </span>
+  )
+}
+
+/** Which input keys two edges wrote, one per line. */
+export function descreverEntradasSobrescritas(entradas: NonNullable<NodeRun["overwrittenInputs"]>): string {
+  return entradas.map(o => (
+    `"${o.key}": o valor de "${o.sourceName}" substituiu o de "${o.overwroteName}"`
+  )).join("\n")
+}
+
+/** Two incoming edges wrote the same input key and the node only saw the last
+ *  one — the result can be missing a whole branch, with nothing failing. */
+export function EntradaSobrescritaBadge({ entradas }: { entradas: NonNullable<NodeRun["overwrittenInputs"]> }) {
+  return (
+    <span
+      title={`Duas conexões escrevem a mesma entrada — o nó só viu a última:\n${descreverEntradasSobrescritas(entradas)}\nDê a cada conexão uma entrada própria.`}
+      className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-px text-[10px] text-amber-600 dark:text-amber-400"
+    >
+      <TbArrowMerge size={10} /> entrada sobrescrita
     </span>
   )
 }
