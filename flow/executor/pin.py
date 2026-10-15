@@ -33,7 +33,7 @@ _PIN_RETRY_MAX_DELAY = int(os.getenv("PIN_UPLOAD_RETRY_MAX_DELAY", "30"))
 # the server derives (`run_result_consumer._safe_pin_ref`), so each layer adds a
 # short name to `pinned_outputs` rather than a whole key — and the server rebuilds
 # the name from (node, output) instead of trusting the one written here.
-PIN_FRAME_FORMATS = ("parquet", "geojson")
+PIN_FRAME_FORMATS = ("parquet", "geojson", "pandas-json")
 
 # Ceiling on extra layers per node, applied here and by the server (which drops the
 # whole pin above it). A legitimate node with dozens of DataFrame outputs is already
@@ -96,10 +96,17 @@ def pin_frame_s3_key(main_s3_key: Any, filename: Any) -> Optional[str]:
 
 
 def _serialize_frame(df: Any) -> "tuple[bytes | str, str, str]":
-    """(content, format, content_type) of a DataFrame: Parquet, with GeoJSON as plan B.
+    """(content, format, content_type) of a DataFrame, in a form `_read_frame`
+    reads back: Parquet, else GeoJSON for a GeoDataFrame and pandas' own JSON
+    ("pandas-json", the `split` orientation) for a plain table.
 
     Parquet goes out as the path of a temporary file, which `upload_pin_to_minio`
-    reads and removes.
+    reads and removes. A plain table used to fall back to `df.to_json()` labelled
+    as GeoJSON, which no read could open: a mixed-type column ([12.5, "sem dado"])
+    or repeated column names were enough for Parquet to fail, and the pinned node
+    then ran again on every run, uploading the pin again each time. `split` keeps
+    each value with its own type and accepts repeated column names; what has no
+    JSON form becomes text (`default_handler=str`), so it does not fail.
     """
     import geopandas as gpd
 
@@ -114,12 +121,23 @@ def _serialize_frame(df: Any) -> "tuple[bytes | str, str, str]":
             raise
         return _tmp.name, "parquet", "application/octet-stream"
     except (ImportError, Exception) as exc:
-        logger.debug("Falha ao serializar pin como parquet, usando fallback GeoJSON: %s", exc)
-        # GeoDataFrame through the single helper (datetime becomes text in a copy —
-        # the raw `to_json` failed on a datetime column, taking down the pin
-        # along with the Parquet). A plain DataFrame still goes through pandas' `to_json`.
-        geojson_str = gdf_para_geojson(df, nat_as_null=True) if isinstance(df, gpd.GeoDataFrame) else df.to_json()
-        return geojson_str.encode("utf-8"), "geojson", "application/geo+json"
+        logger.debug("Falha ao serializar pin como parquet, usando o plano B: %s", exc)
+    if isinstance(df, gpd.GeoDataFrame):
+        # Through the single helper (datetime becomes text in a copy — the raw
+        # `to_json` failed on a datetime column, taking down the pin).
+        return gdf_para_geojson(df, nat_as_null=True).encode("utf-8"), "geojson", "application/geo+json"
+    texto = df.to_json(orient="split", default_handler=str, date_format="iso")
+    return texto.encode("utf-8"), "pandas-json", "application/json"
+
+
+def _remove_temporary(*contents: Any) -> None:
+    """Removes the temporary Parquet files among `contents` (the str ones)."""
+    for content in contents:
+        if isinstance(content, str):
+            try:
+                os.unlink(content)
+            except OSError:
+                pass
 
 
 def _json_value(key: Any, value: Any) -> Any:
@@ -190,7 +208,17 @@ def upload_pin_artifact(node_id: str, outputs: Dict[str, Any], workspace_id: str
                 f"saída com {len(more_frames) + 1} DataFrames; o pin guarda no máximo "
                 f"{PIN_MAX_FRAMES + 1}."
             )
+        # Every layer serialized BEFORE any upload: a layer that cannot be
+        # written must not leave the ones already uploaded behind, with no ref
+        # pointing at them, on every run that retries.
         content, fmt, content_type = _serialize_frame(geo_val)
+        serialized: list = []
+        try:
+            for k, frame in more_frames.items():
+                serialized.append((k, *_serialize_frame(frame)))
+        except Exception:
+            _remove_temporary(content, *(item[1] for item in serialized))
+            raise
         filename = f"{node_id}_pin.{fmt}"
     else:
         content = json.dumps(outputs, default=str).encode("utf-8")
@@ -201,28 +229,43 @@ def upload_pin_artifact(node_id: str, outputs: Dict[str, Any], workspace_id: str
         extra = {}
 
     s3_key = f"pin-cache/{ws_id}/{task_id}/{filename}"
-    upload_pin_to_minio(content, s3_key, content_type)
+    if not has_geo:
+        upload_pin_to_minio(content, s3_key, content_type)
+        return {
+            "__pin_s3_key__": s3_key, "__pin_format__": fmt,
+            "__pin_geo_key__": None, "__pin_filename__": filename,
+        }
 
     # A failed layer upload raises and the node is left unpinned (core logs "Auto-pin
     # falhou"): a ref missing a layer would deliver the output without it.
     frames: Dict[str, Dict[str, str]] = {}
-    for k, frame in more_frames.items():
-        frame_content, frame_fmt, frame_type = _serialize_frame(frame)
-        frame_name = pin_frame_filename(node_id, k, frame_fmt)
-        upload_pin_to_minio(frame_content, pin_frame_s3_key(s3_key, frame_name), frame_type)
-        frames[str(k)] = {"format": frame_fmt, "filename": frame_name}
+    pendentes = [content, *(item[1] for item in serialized)]
+    try:
+        upload_pin_to_minio(content, s3_key, content_type)
+        pendentes.pop(0)
+        for k, frame_content, frame_fmt, frame_type in serialized:
+            frame_name = pin_frame_filename(node_id, k, frame_fmt)
+            upload_pin_to_minio(frame_content, pin_frame_s3_key(s3_key, frame_name), frame_type)
+            pendentes.pop(0)
+            frames[str(k)] = {"format": frame_fmt, "filename": frame_name}
+    except Exception:
+        _remove_temporary(*pendentes)
+        raise
 
-    ref: Dict[str, Any] = {
+    return {
         "__pin_s3_key__": s3_key,
         "__pin_format__": fmt,
         "__pin_geo_key__": geo_key,
         "__pin_filename__": filename,
+        # Always present, even empty: it is what tells this ref from one written
+        # before one object per layer (see `download_pin_artifact`).
+        "__pin_frames__": frames,
+        **({"__pin_extra__": extra} if extra else {}),
+        # The order the node produced: rebuilt from objects and values, the
+        # outputs came back first layer first, and a Merge "last" or an edge
+        # with only `to_key` (the first value) picked another output.
+        "__pin_order__": [str(k) for k in outputs],
     }
-    if frames:
-        ref["__pin_frames__"] = frames
-    if extra:
-        ref["__pin_extra__"] = extra
-    return ref
 
 
 def upload_pin_to_minio(content: "bytes | str", s3_key: str, content_type: str) -> None:
@@ -294,7 +337,7 @@ def _download_from_minio(s3_key: str) -> Optional[bytes]:
 
 
 def _read_frame(content: bytes, fmt: str) -> Any:
-    """A pinned DataFrame rebuilt from its object (`fmt` is "parquet" or "geojson")."""
+    """A pinned DataFrame rebuilt from its object (`fmt` in `PIN_FRAME_FORMATS`)."""
     import io as _io
 
     if fmt == "parquet":
@@ -303,8 +346,20 @@ def _read_frame(content: bytes, fmt: str) -> Any:
             return gpd.read_parquet(_io.BytesIO(content))
         except Exception as exc:
             logger.debug("Falha ao ler pin como GeoDataFrame, tentando pandas: %s", exc)
+            import geopandas as gpd
             import pandas as pd
-            return pd.read_parquet(_io.BytesIO(content))
+            df = pd.read_parquet(_io.BytesIO(content))
+            # An empty GeoDataFrame with no geometry column (a Switch's empty
+            # bucket) has no geo metadata to come back with: in the run it was a
+            # GeoDataFrame, and a node that tells the two apart would differ.
+            if df.empty and len(df.columns) == 0:
+                return gpd.GeoDataFrame()
+            return df
+    if fmt == "pandas-json":
+        import pandas as pd
+        return pd.read_json(
+            _io.StringIO(content.decode("utf-8")), orient="split", dtype=False, convert_dates=False,
+        )
     # `driver="GeoJSON"` does NOT restrict the driver when reading with pyogrio;
     # `read_geodataframe` rejects VRT content based on the content itself.
     from flow.utils.leitura_geo import read_geodataframe
@@ -334,8 +389,9 @@ def download_pin_artifact(pinned: Dict[str, Any]) -> Dict[str, Any]:
     # A pin written before one object per layer holds the text "<DataFrame RxC>"
     # where its second layer should be, and the pinned run delivered that text.
     # Its first object exists, so nothing else would ever call it broken: {}
-    # makes the node run and auto-pin rewrite it, with every layer.
-    if isinstance(extra, dict) and any(
+    # makes the node run and auto-pin rewrite it, with every layer. Only such a
+    # ref: one written since carries `__pin_frames__`, even empty.
+    if "__pin_frames__" not in pinned and isinstance(extra, dict) and any(
         isinstance(v, str) and _LAYER_AS_TEXT.fullmatch(v) for v in extra.values()
     ):
         logger.warning("Pin com camada gravada como texto em %s: o nó roda e o pin é regravado.", s3_key)
@@ -375,5 +431,12 @@ def download_pin_artifact(pinned: Dict[str, Any]) -> Dict[str, Any]:
 
     if extra:
         outputs.update(extra)
+
+    ordem = pinned.get("__pin_order__")
+    if isinstance(ordem, list):
+        outputs = {
+            **{k: outputs[k] for k in ordem if isinstance(k, str) and k in outputs},
+            **{k: v for k, v in outputs.items() if k not in ordem},
+        }
 
     return outputs

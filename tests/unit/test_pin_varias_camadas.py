@@ -325,3 +325,73 @@ def test_camada_extra_sumida_do_storage_faz_o_no_rodar_de_novo(minio):
     ex.logger = logging.getLogger("test-pin-camadas")
     assert asyncio.run(ex._resolve_pin_data("n1")) is None
     assert ex.pinned_outputs["n1"] == {}
+
+
+# ── Layers Parquet cannot write, output order, empty buckets ──────────────────
+
+def test_tabela_que_o_parquet_nao_grava_volta_do_pin(minio):
+    # A mixed-type column or repeated column names are enough for Parquet to
+    # fail. The plan B used to be `df.to_json()` labelled GeoJSON, which no read
+    # could open: the pinned node ran again on every run, re-uploading the pin.
+    misto = pd.DataFrame({"valor": [12.5, "sem dado"], "cod": [1, "A2"]})
+    repetidas = pd.concat([pd.DataFrame({"a": [1, 2]}), pd.DataFrame({"a": [3, 4]})], axis=1)
+    ref = _ida_e_volta("n1", pin.upload_pin_artifact(
+        "n1", {"output": _gdf(2), "misto": misto, "repetidas": repetidas}, WS, TASK,
+    ))
+    assert {c["format"] for c in ref["__pin_frames__"].values()} == {"pandas-json"}
+
+    de_volta = pin.download_pin_artifact(ref)
+    assert de_volta["misto"].values.tolist() == [[12.5, 1], ["sem dado", "A2"]]
+    assert de_volta["repetidas"].values.tolist() == [[1, 3], [2, 4]]
+
+
+def test_tabela_como_primeira_camada_tambem_volta(minio):
+    ref = _ida_e_volta("n1", pin.upload_pin_artifact(
+        "n1", {"tabela": pd.DataFrame({"valor": [12.5, "sem dado"]})}, WS, TASK,
+    ))
+    assert ref["__pin_format__"] == "pandas-json"
+    assert pin.download_pin_artifact(ref)["tabela"].values.tolist() == [[12.5], ["sem dado"]]
+
+
+def test_saidas_voltam_na_ordem_em_que_o_no_as_produziu(minio):
+    # Rebuilt first layer first, a Merge "last" with a spread edge, or an edge
+    # with only `to_key` (the first value), picked another output.
+    saidas = {"branch": True, "value": 3, "output": _gdf(2), "result": _gdf(3)}
+    ref = _ida_e_volta("n1", pin.upload_pin_artifact("n1", saidas, WS, TASK))
+    assert list(pin.download_pin_artifact(ref)) == ["branch", "value", "output", "result"]
+
+
+def test_geodataframe_vazio_sem_geometria_volta_como_geodataframe(minio):
+    # A Switch's empty bucket: Parquet keeps no geo metadata for it.
+    ref = _ida_e_volta("n1", pin.upload_pin_artifact(
+        "n1", {"output": _gdf(2), "vazio": gpd.GeoDataFrame()}, WS, TASK,
+    ))
+    assert isinstance(pin.download_pin_artifact(ref)["vazio"], gpd.GeoDataFrame)
+
+
+def test_camada_que_nao_serializa_nao_deixa_objetos_no_storage(minio, monkeypatch):
+    # Every layer is serialized before any upload: one that fails must not leave
+    # the first object behind with no ref, on every run that retries.
+    original = pin._serialize_frame
+    chamadas = []
+
+    def falha_na_segunda(df):
+        chamadas.append(df)
+        if len(chamadas) == 2:
+            raise ValueError("não serializa")
+        return original(df)
+
+    monkeypatch.setattr(pin, "_serialize_frame", falha_na_segunda)
+    with pytest.raises(ValueError):
+        pin.upload_pin_artifact("n1", {"output": _gdf(2), "outra": _gdf(3)}, WS, TASK)
+    assert minio.objetos == {}
+
+
+def test_ref_nova_com_texto_parecido_com_dataframe_nao_e_regravada(minio):
+    # Only a ref written before one object per layer can hold the serializer's
+    # "<DataFrame RxC>" text in place of a layer; a node may well produce it.
+    ref = _ida_e_volta("n1", pin.upload_pin_artifact(
+        "n1", {"output": _gdf(2), "rotulo": "<DataFrame 2x2>"}, WS, TASK,
+    ))
+    assert ref["__pin_frames__"] == {}
+    assert pin.download_pin_artifact(ref)["rotulo"] == "<DataFrame 2x2>"

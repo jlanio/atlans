@@ -438,7 +438,8 @@ async def _register_artifacts_if_present(db, run: WorkflowRun, stats: dict) -> N
 # exactly the format the executor uses in flow/utils/artifact_helpers.py and
 # flow/executor/pin.py — and still revalidates it with the same guard as the HTTP
 # endpoints, restricted to the run's workspace.
-_PIN_FORMATS = ("json", "geojson", "parquet")
+# "pandas-json": a plain table Parquet could not write (flow/executor/pin.py).
+_PIN_FORMATS = ("json", "geojson", "parquet", "pandas-json")
 
 # The _S3_KEY_RE (drive_router) charset minus the slash: anything left over becomes '_'.
 _UNSAFE_NAME_CHARS = re.compile(r"[^A-Za-z0-9_.-]")
@@ -535,14 +536,18 @@ def _safe_pin_ref(run: WorkflowRun, nid: str, ref: dict) -> dict | None:
     safe["__pin_filename__"] = filename
 
     # `dict(ref)` brought the executor's layer entry along with the rest: it only
-    # comes back as the server rebuilds it.
+    # comes back as the server rebuilds it — even empty, since its presence is
+    # what tells this ref from one written before one object per layer.
     safe.pop("__pin_frames__", None)
     if "__pin_frames__" in ref:
         frames = _safe_pin_frames(run, nid, ref["__pin_frames__"])
         if frames is None:
             return None
-        if frames:
-            safe["__pin_frames__"] = frames
+        safe["__pin_frames__"] = frames
+    # The order of the node's outputs: only a list of names travels.
+    ordem = safe.get("__pin_order__")
+    if ordem is not None and not (isinstance(ordem, list) and all(isinstance(k, str) for k in ordem)):
+        safe.pop("__pin_order__")
     return safe
 
 
