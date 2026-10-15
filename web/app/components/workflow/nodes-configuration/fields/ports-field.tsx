@@ -25,24 +25,41 @@ import type { FieldProps } from "./types"
 /**
  * Notice for a port editor locked by connected edges.
  *
- * It lives here and is also used by the sub-workflow port editor: the reason
- * for the lock is the same in both, and so is the worst outcome. Changing the
- * ports with connected edges makes them point to a connection point that no
+ * It lives here and is also used by the sub-workflow editors: the reason for
+ * the lock is the same in all of them, and so is the worst outcome. Changing
+ * the ports with connected edges makes them point to a connection point that no
  * longer exists — they vanish from the canvas and keep executing, and with no
  * line drawn not even the delete button is reachable.
+ *
+ * `sentido` says which edges hold the lock, because that depends on the side
+ * the ports are drawn on: arriving ones for ports that are input handles,
+ * leaving ones for ports that are output handles (`outputs_from_ports`), either
+ * for what defines both sides at once (the SubWorkflow's target workflow).
+ * Telling someone to disconnect the edges "arriving" at a trigger would send
+ * them looking for edges that do not exist. `acao` is what the lock holds back.
  */
-export function LockedPortsNotice({ conexoes }: { conexoes: number }) {
+export function LockedPortsNotice({ conexoes, sentido = "chegando", acao = "mudar as portas" }: {
+  conexoes: number
+  sentido?: keyof typeof ONDE_ESTAO
+  acao?: string
+}) {
   return (
     <p className="flex items-start gap-2 rounded-md border border-yellow-500/40 bg-yellow-500/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
       <TbPlugConnected size={14} className="mt-px shrink-0 text-yellow-500" />
       <span>
         {conexoes === 1 ? "Há 1 conexão" : `Há ${conexoes} conexões`}{" "}
-        chegando a este nó. Desconecte antes de mudar as portas — senão as
+        {ONDE_ESTAO[sentido]}. Desconecte antes de {acao} — senão as
         ligações existentes ficariam apontando para portas que não existem mais.
       </span>
     </p>
   )
 }
+
+const ONDE_ESTAO = {
+  chegando: "chegando a este nó",
+  saindo: "saindo deste nó",
+  ambos: "neste nó",
+} as const
 
 type PortsFieldProps = FieldProps<{
   /** How many edges arrive at this node — the editor locks while there is any. */

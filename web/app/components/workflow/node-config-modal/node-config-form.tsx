@@ -69,6 +69,12 @@ interface HelperProps {
   // would silently unlock the editor — and the defect would only show up as an
   // edge gone from someone's canvas. This way, forgetting doesn't compile.
   conexoesDeEntrada: number
+  // The same lock for ports drawn on the OUTPUT side: SubWorkflowInput
+  // (`outputs_from_ports`) turns each port into an output handle, so the edges a
+  // rename strands are the ones LEAVING it. The SubWorkflow needs both counts:
+  // its target workflow defines its handles on both sides. REQUIRED for the same
+  // reason as the field above.
+  conexoesDeSaida: number
   // Known columns from the upstream nodes, for the helpers whose fields ask for
   // a column name (the whole of SetFields is that). Without passing through
   // here, the "redefinir campos" (redefine fields) node was the only one in the
@@ -131,6 +137,10 @@ const NodeConfigForm = ({
   // to delete them.
   const edges = useEdges()
   const conexoesDeEntrada = edges.filter(e => e.target === nodeFound?.id).length
+  // And how many leave it — the side an `outputs_from_ports` node draws its
+  // ports on. Counting only the arriving ones, always zero on that trigger, left
+  // its port editor open while edges hung from its ports.
+  const conexoesDeSaida = edges.filter(e => e.source === nodeFound?.id).length
 
   // Known columns of the nodes UPSTREAM of this one — from a run in this session
   // or re-hydrated from the last persisted run. They become suggestions in the
@@ -200,6 +210,7 @@ const NodeConfigForm = ({
           nodeId={nodeFound?.id}
           campos={nodeFound?.data?.fields}
           conexoesDeEntrada={conexoesDeEntrada}
+          conexoesDeSaida={conexoesDeSaida}
           sugestoesDeColunas={suggestedColumns.todas}
           sugestoesDesatualizadas={suggestedColumns.desatualizadas}
           sugestoesParciais={suggestedColumns.parciais}
