@@ -49,8 +49,8 @@ Five codes bring down the definition (the tool returns the `validation` error wi
 | `construction_error` | the executor could not build the workflow |
 
 The other codes (invalid alias, undeclared property, orphan edge, unreachable
-node, unknown `from_key`) come as an error or a warning in the same
-report, without preventing the rest from being read. `report.ok` is `false` whenever there is
+node, unknown `from_key`, a node `type` other than the catalog's) come as an
+error or a warning in the same report, without preventing the rest from being read. `report.ok` is `false` whenever there is
 any error; a warning does not bring it down.
 
 Fix everything the report pointed out and validate again — not one thing per

@@ -451,6 +451,41 @@ def lint_definition(
 
         desc = descriptors.get(name) if descriptors else None
         if desc:
+            # The run reads the SAVED `type` to tell a trigger: saved as
+            # "trigger", a node takes the run's initial input and ignores the
+            # edges that reach it; a catalog trigger saved as anything else is
+            # not a starting point. The editor rebuilds the type from the
+            # catalog, so only a definition written elsewhere carries this.
+            tipo, do_catalogo = node.get("type"), desc.get("type")
+            if tipo and do_catalogo and tipo != do_catalogo:
+                if tipo == "trigger":
+                    # Without incoming edges it is only a starting point — a
+                    # `DriveTrigger` migrated to `DataInput` keeps its saved
+                    # type on purpose (`migrar-nos`) so the workflow still
+                    # starts there. With them, those edges deliver nothing.
+                    chegam = any(str(ponta(e, "target")) == nid for e in edges)
+                    (rel.erro if chegam else rel.aviso)(
+                        "node_type_mismatch",
+                        f"'{name}' (id={nid}) salvo com type 'trigger', mas no catálogo é "
+                        f"'{do_catalogo}': o run o trata como gatilho"
+                        + (", e as arestas que chegam a ele não entregam nada" if chegam else "")
+                        + f". Use type '{do_catalogo}'.",
+                        node_id=nid,
+                    )
+                elif do_catalogo == "trigger":
+                    rel.erro(
+                        "node_type_mismatch",
+                        f"'{name}' (id={nid}) é gatilho no catálogo, mas foi salvo com type "
+                        f"'{tipo}': o run não o trata como ponto de partida. Use type 'trigger'.",
+                        node_id=nid,
+                    )
+                else:
+                    rel.aviso(
+                        "node_type_mismatch",
+                        f"'{name}' (id={nid}) salvo com type '{tipo}'; no catálogo é "
+                        f"'{do_catalogo}'. Use o do catálogo.",
+                        node_id=nid,
+                    )
             props = [
                 p for p in (desc.get("properties") or [])
                 if isinstance(p, dict) and p.get("name")
