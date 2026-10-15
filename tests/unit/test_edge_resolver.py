@@ -65,6 +65,14 @@ def test_from_dict_condition_valida_vence_o_handle():
     assert e.condition is False
 
 
+@pytest.mark.parametrize("condition", [False, True, "false"])
+def test_from_dict_condition_numa_porta_nomeada_e_aresta_de_dado(condition):
+    # The old editor wrote `condition: false` on every edge leaving a named
+    # handle; the canvas draws it on its port, and so does the run.
+    e = Edge.from_dict({"source": "a", "target": "b", "source_handle": "body", "condition": condition})
+    assert e.is_branch is False
+
+
 def test_from_dict_handle_de_dado_nao_vira_ramo():
     e = Edge.from_dict({"source": "a", "target": "b", "source_handle": "output", "from_key": "output"})
     assert e.is_branch is False

@@ -91,12 +91,20 @@ class Edge:
     @classmethod
     def from_dict(cls, d: Mapping[str, Any]) -> "Edge":
         cond = condicao_do_ramo(d.get("condition"))
-        if cond is None and d.get("source_handle") in ("true", "false"):
+        handle = d.get("source_handle")
+        if cond is None and handle in ("true", "false"):
             # The branch handle with no usable `condition`. The editor draws
             # such an edge on that branch (`resolveSourceHandle`) and writes the
             # `condition` back on its next save; until then the run has to route
             # it the way the canvas shows it, not run it on both branches.
-            cond = d["source_handle"] == "true"
+            cond = handle == "true"
+        elif cond is not None and isinstance(handle, str) and handle and handle not in ("true", "false"):
+            # Leaving a NAMED port it is a data edge, whatever `condition` says:
+            # the editor once wrote `condition: false` on every edge leaving a
+            # named handle (`sourceHandle === "true"` with sourceHandle "body"),
+            # and the canvas draws those edges on their port. Read as a branch,
+            # a source whose output has a boolean `branch` switched it off.
+            cond = None
         # `or None` normalizes "" (falsy, treated as absent by the run) to None,
         # preserving the truthiness semantics of the original code.
         return cls(

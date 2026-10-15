@@ -176,6 +176,28 @@ describe("buildNodes — nó fora do catálogo", () => {
     ])
   })
 
+  it("porta nomeada com `condition` sobrando continua porta depois de salvar", () => {
+    // The old editor wrote `condition: false` on every edge leaving a named
+    // handle. Read as a branch, the node became a true/false node and the save
+    // rewrote the edge as the false branch, losing the port.
+    const definition = {
+      nodes: [
+        { id: "h", name: "HttpDesativado", type: "action", properties: {}, position: { x: 0, y: 0 } },
+        { id: "b", name: "PythonScript", type: "action", properties: {}, position: { x: 0, y: 0 } },
+        { id: "c", name: "PythonScript", type: "action", properties: {}, position: { x: 0, y: 0 } },
+      ],
+      edges: [
+        { source: "h", target: "b", source_handle: "body", condition: false, from_key: "body" },
+        { source: "h", target: "c", source_handle: "headers", from_key: "headers" },
+      ],
+    }
+    const nodes = buildNodes(definition, catalogo)
+    expect(nodes[0].data.outputs).toEqual([{ name: "body" }, { name: "headers" }])
+    expect(nodes[0].data.branches).toBeUndefined()
+    const salvas = buildEdges(definition, nodes).map(e => serializeEdge(e))
+    expect(salvas[0]).toEqual({ source: "h", target: "b", source_handle: "body", from_key: "body" })
+  })
+
   it("as portas nomeadas em uso continuam ancoradas depois de salvar", () => {
     const definition = {
       nodes: [

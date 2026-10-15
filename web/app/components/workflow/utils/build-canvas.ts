@@ -41,10 +41,16 @@ function saidasDasArestasSalvas(
   let ramo = false
   for (const e of edges ?? []) {
     if (e?.source !== nodeId) continue
-    if (e.source_handle === "true" || e.source_handle === "false" || ramoDaCondicao(e.condition) !== undefined) {
+    if (e.source_handle === "true" || e.source_handle === "false") {
       ramo = true
     } else if (e.source_handle) {
+      // A named port, even with a `condition`: the old editor wrote
+      // `condition: false` on every edge leaving a named handle. Read as a
+      // branch, the node became a true/false node, the edge was anchored on
+      // "false" and the next save wrote it as a branch, losing the port.
       nomes.add(e.source_handle)
+    } else if (ramoDaCondicao(e.condition) !== undefined) {
+      ramo = true
     }
   }
   const portas = [...nomes].map(name => ({ name }))

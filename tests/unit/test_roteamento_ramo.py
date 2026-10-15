@@ -158,8 +158,7 @@ def test_ramo_escrito_sem_bool_json_ainda_roteia(verdadeiro, falso):
 
 class _NodeWithNamedPorts(BaseNode):
     """Two NAMED output handles, one of them a boolean called `branch`. The old
-    editor wrote `condition: false` on every edge leaving a named handle (and,
-    after a reload, `source_handle: "false"`)."""
+    editor wrote `condition: false` on every edge leaving a named handle."""
 
     @classmethod
     def description(cls):
@@ -171,25 +170,39 @@ class _NodeWithNamedPorts(BaseNode):
         return {"dados": inputs.get("output"), "branch": True}
 
 
+class _ScriptRoteador(BaseNode):
+    """A Python Script-like node (dynamic outputs, one anonymous handle) that an
+    agent wired as a router: `condition` edges with no handle."""
+
+    @classmethod
+    def description(cls):
+        return {"name": "TesteScriptRoteador", "type": "action", "properties": [],
+                "dynamic_output": True, "outputs": [{"name": "result", "type": "any"}]}
+
+    async def execute(self, inputs):
+        return {"result": inputs.get("output"), "branch": False}
+
+
 @pytest.fixture
 def _registra_portas():
     from flow.registry import NODE_REGISTRY
     NODE_REGISTRY["TestePortasNomeadas"] = _NodeWithNamedPorts
+    NODE_REGISTRY["TesteScriptRoteador"] = _ScriptRoteador
     try:
         yield
     finally:
         NODE_REGISTRY.pop("TestePortasNomeadas", None)
+        NODE_REGISTRY.pop("TesteScriptRoteador", None)
 
 
-@pytest.mark.parametrize("legado", [
-    {"condition": False},
-    {"condition": False, "source_handle": "false"},
-])
-def test_condition_espuria_de_no_com_portas_nomeadas_nao_desliga_a_aresta(_registra_portas, legado):
+def test_condition_espuria_numa_porta_nomeada_nao_desliga_a_aresta(_registra_portas):
     # Read as a branch, `branch: True` switched the edge off and D was skipped.
     definition = {
         "nodes": [_trigger("T"), {"id": "N", "type": "action", "name": "TestePortasNomeadas", "properties": {}}, _merge("D")],
-        "edges": [{"source": "T", "target": "N"}, {"source": "N", "target": "D", "from_key": "dados", **legado}],
+        "edges": [
+            {"source": "T", "target": "N"},
+            {"source": "N", "target": "D", "source_handle": "dados", "from_key": "dados", "condition": False},
+        ],
     }
     ex = WorkflowExecutor(definition, task_id="espuria", publisher=_publisher())
     final = asyncio.run(ex.run(initial_inputs={"T": {"output": _gdf()}}))
@@ -201,16 +214,27 @@ def test_condition_espuria_e_aresta_de_dado_na_validacao(_registra_portas):
     # A data edge with no key from a node with two outputs spreads both: the
     # ambiguity warning the stray `condition` used to hide.
     ex = WorkflowExecutor(
-        {"nodes": [_merge("N"), _merge("D")], "edges": [{"source": "N", "target": "D", "condition": False}]},
+        {"nodes": [_merge("N"), _merge("D")],
+         "edges": [{"source": "N", "target": "D", "source_handle": "dados", "condition": False}]},
         task_id="valida", publisher=_publisher(),
     )
-    ex.node_mgr.node_defs["N"]["name"] = "TestePortasNomeadas"
     ex.simulated_outputs = {"N": {"status": "ok", "schema": [{"fields": [{"name": "dados"}, {"name": "branch"}]}]}}
     assert [d["severity"] for d in ex.validate_edges()] == ["warning"]
 
 
-def test_no_que_declara_ramos_segue_roteando_pela_condition():
-    # Guard: the Conditional declares `branches`; its `condition` routes as always.
-    ex = WorkflowExecutor({"nodes": [_branch("A"), _merge("B")], "edges": [{"source": "A", "target": "B", "condition": False}]},
-                          task_id="guarda", publisher=_publisher())
-    assert ex._e_ramo(ex.outgoing["A"][0]) is True
+def test_script_usado_como_roteador_segue_roteando(_registra_portas):
+    # Guard: whatever the node, a `condition` with no named port routes. A
+    # Python Script an agent wired with condition edges must not run both sides.
+    definition = {
+        "nodes": [_trigger("T"), {"id": "S", "type": "action", "name": "TesteScriptRoteador", "properties": {}},
+                  _merge("SIM"), _merge("NAO")],
+        "edges": [
+            {"source": "T", "target": "S"},
+            {"source": "S", "target": "SIM", "condition": True},
+            {"source": "S", "target": "NAO", "condition": False},
+        ],
+    }
+    ex = WorkflowExecutor(definition, task_id="roteador", publisher=_publisher())
+    asyncio.run(ex.run(initial_inputs={"T": {"output": _gdf()}}))
+    assert ex.node_stats["SIM"]["status"] == "skipped"
+    assert ex.node_stats["NAO"]["status"] != "skipped"
