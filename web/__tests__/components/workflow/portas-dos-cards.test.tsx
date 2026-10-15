@@ -157,6 +157,12 @@ describe("cada card desenha as portas que a ancoragem usa", () => {
     expect(desenhar(no("salvar")).source).toEqual([""])
   })
 
+  it("gatilho com uma aresta chegando desenha uma entrada para ela", () => {
+    expect(desenhar(no("webhook")).target).toEqual([])
+    estado.edges = [{ source: "geojson", target: "webhook" }]
+    expect(desenhar(no("webhook")).target).toEqual([""])
+  })
+
   it("um card de nó desconhecido do catálogo desenha a porta anônima", () => {
     const desconhecido = { ...no("http"), type: "NotFound", data: { ...no("http").data, outputs: [], inputs: [] } }
     expect(desenhar(desconhecido)).toEqual({ source: [""], target: [""] })
