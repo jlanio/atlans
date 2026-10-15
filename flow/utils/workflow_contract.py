@@ -125,11 +125,20 @@ def collect_subworkflow_references(definition: Dict[str, Any]) -> list[Dict[str,
     """Lists all SubWorkflow nodes in the definition with their workflowHash
     + inputsMapping. Used for cross-workflow validation on save."""
     refs: list[Dict[str, Any]] = []
-    for n in (definition.get("nodes") or []):
-        if n.get("name") != "SubWorkflow":
+    nodes = definition.get("nodes") if isinstance(definition, dict) else None
+    for n in nodes if isinstance(nodes, list) else []:
+        # Tolerant on purpose: the PUT also reads the STORED definition here
+        # (`_referencias_alteradas`), and one written by hand or by an older
+        # client — a numeric hash, a node that is not an object — made every
+        # save of that workflow a 500, the one that would fix it included.
+        if not isinstance(n, dict) or n.get("name") != "SubWorkflow":
             continue
-        props = n.get("properties") or {}
-        wh = (props.get("workflowHash") or "").strip()
+        props = n.get("properties")
+        props = props if isinstance(props, dict) else {}
+        wh = props.get("workflowHash")
+        if isinstance(wh, (int, float)) and not isinstance(wh, bool):
+            wh = str(wh)
+        wh = wh.strip() if isinstance(wh, str) else ""
         mapping = props.get("inputsMapping") or {}
         if not wh:
             continue

@@ -194,6 +194,29 @@ class TestCollectSubworkflowReferences:
 
 # ── validate_subworkflow_references_against_db ─────────────────────────────
 
+class TestReferenciasDeDefinicaoMalformada:
+    """The PUT reads the STORED definition too (`_referencias_alteradas`): one
+    written by hand or by an older client made every save of it a 500."""
+
+    def test_no_que_nao_e_objeto_e_hash_que_nao_e_texto(self):
+        definition = {"nodes": [
+            None, "x", {"name": "SubWorkflow", "properties": None},
+            {"id": "s1", "name": "SubWorkflow", "properties": {"workflowHash": 123}},
+            {"id": "s2", "name": "SubWorkflow", "properties": {"workflowHash": ["a"]}},
+            {"id": "s3", "name": "SubWorkflow", "properties": {"workflowHash": True}},
+        ]}
+        assert [(r["node_id"], r["workflow_hash"]) for r in collect_subworkflow_references(definition)] == [("s1", "123")]
+        assert collect_subworkflow_references({"nodes": "nada"}) == []
+        assert collect_subworkflow_references(None) == []
+
+    def test_put_com_definicao_salva_malformada_nao_quebra(self):
+        from app.api.routers.workflows_router import _referencias_alteradas
+
+        salva = {"nodes": [{"id": "s", "name": "SubWorkflow", "properties": {"workflowHash": 123}}]}
+        nova = {"nodes": [{"id": "s", "name": "SubWorkflow", "properties": {"workflowHash": "filho-1"}}]}
+        assert [n["id"] for n in _referencias_alteradas(nova, salva)["nodes"]] == ["s"]
+
+
 class _FakeWorkflow:
     def __init__(self, id_hash, workspace_id, flag_ative, definition):
         self.id_hash = id_hash
