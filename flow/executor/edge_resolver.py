@@ -22,6 +22,58 @@ from dataclasses import dataclass
 from typing import Any, List, Mapping
 
 
+# The spellings of a boolean the MCP validation accepts (Pydantic's lax `bool`,
+# `validate_service.EdgeDefinition`). Only a JSON `true`/`false` used to count
+# here: `"condition": "false"` passed validation as a valid branch, was saved as
+# written and ran as a DATA edge — the rejected branch ran too.
+_RAMO_VERDADEIRO = frozenset({"true", "t", "yes", "y", "on", "1"})
+_RAMO_FALSO = frozenset({"false", "f", "no", "n", "off", "0"})
+
+
+def condicao_do_ramo(cond: Any) -> bool | None:
+    """`condition` as a branch: True/False, or None for a data edge."""
+    if isinstance(cond, bool):
+        return cond
+    if isinstance(cond, str):
+        texto = cond.lower()
+        if texto in _RAMO_VERDADEIRO:
+            return True
+        if texto in _RAMO_FALSO:
+            return False
+        return None
+    if isinstance(cond, (int, float)) and cond in (0, 1):
+        return bool(cond)
+    return None
+
+
+# The SubWorkflow node's envelope output: the dict of ALL the child's ports
+# (`RESULT_KEY` in flow/nodes/control/sub_workflow.py).
+_ENVELOPE_DO_SUBFLUXO = "subWorkflowResult"
+
+
+def from_key_efetiva(d: Mapping[str, Any]) -> str | None:
+    """The `from_key` an edge really means.
+
+    The editor used to save an edge dragged from a SubWorkflow's port `r2` with
+    the port as `source_handle` and the envelope as `from_key` — its candidate
+    list did not know the child's ports — and the run delivered the dict of ALL
+    the ports instead of r2. The handle is what the person pulled, so that pair
+    reads as the port: the same reading as the editor's `chaveEfetiva`
+    (web/app/components/workflow/utils/edge-persistence.ts), which writes
+    `from_key: r2` on the next save. The envelope chosen on purpose is saved
+    without a handle and is left alone, as are the branch handles.
+    """
+    from_key = d.get("from_key") or None
+    handle = d.get("source_handle")
+    if (
+        from_key == _ENVELOPE_DO_SUBFLUXO
+        and isinstance(handle, str) and handle
+        and handle not in (_ENVELOPE_DO_SUBFLUXO, "true", "false")
+    ):
+        return handle
+    return from_key
+
+
 @dataclass(frozen=True)
 class Edge:
     """Typed view of an edge. `condition` is the branch routing of control
@@ -38,15 +90,29 @@ class Edge:
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any]) -> "Edge":
-        cond = d.get("condition")
+        cond = condicao_do_ramo(d.get("condition"))
+        handle = d.get("source_handle")
+        if cond is None and handle in ("true", "false"):
+            # The branch handle with no usable `condition`. The editor draws
+            # such an edge on that branch (`resolveSourceHandle`) and writes the
+            # `condition` back on its next save; until then the run has to route
+            # it the way the canvas shows it, not run it on both branches.
+            cond = handle == "true"
+        elif cond is not None and isinstance(handle, str) and handle and handle not in ("true", "false"):
+            # Leaving a NAMED port it is a data edge, whatever `condition` says:
+            # the editor once wrote `condition: false` on every edge leaving a
+            # named handle (`sourceHandle === "true"` with sourceHandle "body"),
+            # and the canvas draws those edges on their port. Read as a branch,
+            # a source whose output has a boolean `branch` switched it off.
+            cond = None
         # `or None` normalizes "" (falsy, treated as absent by the run) to None,
         # preserving the truthiness semantics of the original code.
         return cls(
             source=d["source"],
             target=d["target"],
-            from_key=d.get("from_key") or None,
+            from_key=from_key_efetiva(d),
             to_key=d.get("to_key") or None,
-            condition=cond if isinstance(cond, bool) else None,
+            condition=cond,
         )
 
 

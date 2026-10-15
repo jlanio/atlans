@@ -11,7 +11,8 @@
 import { describe, it, expect } from "vitest"
 
 import { buildEdges, buildNodes } from "@/app/components/workflow/utils/build-canvas"
-import { INodesAPI } from "@/service/types"
+import { serializeEdge } from "@/app/components/workflow/utils/edge-persistence"
+import { CanvasDefinition, INodesAPI } from "@/service/types"
 
 const catalogo = [
   {
@@ -112,6 +113,116 @@ describe("buildNodes", () => {
     // here would become a broken canvas instead of an empty one.
     expect(buildNodes(undefined, catalogo)).toEqual([])
     expect(buildNodes({}, catalogo)).toEqual([])
+  })
+})
+
+/**
+ * A node the catalog does not list — disabled by an admin in /admin/nodes,
+ * renamed or removed. Rebuilt from a schema that is not there, it lost its
+ * properties and became a "trigger", and the next save of anything else in the
+ * workflow persisted both: the configuration was gone for good, the executor
+ * ignored its incoming edges and the trigger card drew no input for them.
+ */
+describe("buildNodes — nó fora do catálogo", () => {
+  const salvo = {
+    id: "buf", name: "Buffer", type: "spatial", alias: "Faixa de 30 m",
+    properties: { distance: "30", unit: "m" }, position: { x: 5, y: 6 },
+  }
+
+  it("mantém propriedades, tipo e apelido como foram salvos", () => {
+    const [no] = buildNodes({ nodes: [salvo] }, catalogo)
+    expect(no.data.properties).toEqual({ distance: "30", unit: "m" })
+    expect(no.data.type).toBe("spatial")
+    expect(no.data.alias).toBe("Faixa de 30 m")
+    // The card with both handles, not the trigger one (no input handle).
+    expect(no.type).toBe("DefaultIcon")
+  })
+
+  it("sem tipo salvo, não vira gatilho", () => {
+    const [no] = buildNodes({ nodes: [{ ...salvo, type: undefined as unknown as string }] }, catalogo)
+    expect(no.data.type).toBe("action")
+    expect(no.type).toBe("DefaultIcon")
+  })
+
+  it("não divide o objeto de propriedades com a definition", () => {
+    const definition = { nodes: [salvo] }
+    const [no] = buildNodes(definition, catalogo)
+    no.data.properties.distance = "50"
+    expect(salvo.properties.distance).toBe("30")
+  })
+
+  it("as arestas de ramo continuam ramo depois de salvar", () => {
+    // A Conditional that left the catalog: its branch edges kept their anchor
+    // only by luck of the true handle, and the save dropped `condition`.
+    const definition = {
+      nodes: [
+        { id: "se", name: "CondicionalAntigo", type: "control", properties: {}, position: { x: 0, y: 0 } },
+        { id: "b", name: "PythonScript", type: "action", properties: {}, position: { x: 0, y: 0 } },
+        { id: "c", name: "PythonScript", type: "action", properties: {}, position: { x: 0, y: 0 } },
+      ],
+      edges: [
+        { source: "se", target: "b", source_handle: "true", condition: true, from_key: "result" },
+        { source: "se", target: "c", condition: false, from_key: "result" },
+      ],
+    }
+    const nodes = buildNodes(definition, catalogo)
+    expect(nodes[0].data.outputs).toEqual([{ name: "true" }, { name: "false" }])
+    // Still a branch node: true/false route, they are not data keys.
+    expect(nodes[0].data.branches).toBe(true)
+    const salvas = buildEdges(definition, nodes).map(e => serializeEdge(e))
+    expect(salvas).toEqual([
+      { source: "se", target: "b", source_handle: "true", condition: true, from_key: "result" },
+      { source: "se", target: "c", source_handle: "false", condition: false, from_key: "result" },
+    ])
+  })
+
+  it("porta nomeada com `condition` sobrando continua porta depois de salvar", () => {
+    // The old editor wrote `condition: false` on every edge leaving a named
+    // handle. Read as a branch, the node became a true/false node and the save
+    // rewrote the edge as the false branch, losing the port.
+    const definition = {
+      nodes: [
+        { id: "h", name: "HttpDesativado", type: "action", properties: {}, position: { x: 0, y: 0 } },
+        { id: "b", name: "PythonScript", type: "action", properties: {}, position: { x: 0, y: 0 } },
+        { id: "c", name: "PythonScript", type: "action", properties: {}, position: { x: 0, y: 0 } },
+      ],
+      edges: [
+        { source: "h", target: "b", source_handle: "body", condition: false, from_key: "body" },
+        { source: "h", target: "c", source_handle: "headers", from_key: "headers" },
+      ],
+    }
+    const nodes = buildNodes(definition, catalogo)
+    expect(nodes[0].data.outputs).toEqual([{ name: "body" }, { name: "headers" }])
+    expect(nodes[0].data.branches).toBeUndefined()
+    const salvas = buildEdges(definition, nodes).map(e => serializeEdge(e))
+    expect(salvas[0]).toEqual({ source: "h", target: "b", source_handle: "body", from_key: "body" })
+  })
+
+  it("as portas nomeadas em uso continuam ancoradas depois de salvar", () => {
+    const definition = {
+      nodes: [
+        { id: "d", name: "EntradaDesativada", type: "datasource", properties: {}, position: { x: 0, y: 0 } },
+        { id: "b", name: "PythonScript", type: "action", properties: {}, position: { x: 0, y: 0 } },
+      ],
+      edges: [
+        { source: "d", target: "b", source_handle: "output", from_key: "output", to_key: "a" },
+        { source: "d", target: "b", source_handle: "metadata", from_key: "metadata", to_key: "b" },
+      ],
+    }
+    const nodes = buildNodes(definition, catalogo)
+    const salvas = buildEdges(definition, nodes).map(e => serializeEdge(e))
+    expect(salvas.map(e => e.source_handle)).toEqual(["output", "metadata"])
+    expect(salvas.map(e => e.to_key)).toEqual(["a", "b"])
+  })
+
+  it("nó do catálogo salvo com o tipo errado volta ao tipo do catálogo", () => {
+    // What the fallback above wrote: a PythonScript persisted as "trigger".
+    const [no] = buildNodes(
+      { nodes: [{ id: "a", name: "PythonScript", properties: {}, position: { x: 0, y: 0 }, type: "trigger" }] },
+      catalogo,
+    )
+    expect(no.data.type).toBe("action")
+    expect(no.type).toBe("DefaultIcon")
   })
 })
 
@@ -223,5 +334,20 @@ describe("buildEdges", () => {
   it("definition sem arestas devolve lista vazia", () => {
     expect(buildEdges(undefined, [])).toEqual([])
     expect(buildEdges({}, [])).toEqual([])
+  })
+
+  it("aresta sem as duas pontas fica de fora, para não voltar no próximo salvar", () => {
+    // Saved by hand or by another client. It cannot be drawn and the executor
+    // skips it; kept, it went back in every save, which the server refuses (422).
+    // The same rule as the server's `ponta`: a non-empty text or an integer.
+    const salvas = [
+      { source: "a", target: "b" }, { source: "a" }, { target: "b" }, { source: "", target: "b" }, null,
+      { source: "a", target: true }, { source: ["x"], target: "b" }, { source: "a", target: 1.5 },
+      { source: 7, target: "b" },
+    ] as unknown as CanvasDefinition["edges"]
+    const arestas = buildEdges({ edges: salvas }, [])
+    expect(arestas.map(e => [e.source, e.target])).toEqual([["a", "b"], [7, "b"]])
+    expect(buildNodes({ nodes: [{ id: "x", name: "Sumiu", type: "action", properties: {}, position: { x: 0, y: 0 } }], edges: salvas }, [{ name: "Outro" } as INodesAPI]))
+      .toHaveLength(1)
   })
 })

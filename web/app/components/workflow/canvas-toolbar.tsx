@@ -77,10 +77,15 @@ const CanvasToolbar = ({ onUndo, onRedo, canUndo, canRedo, onSaveSnapshot }: Can
           buttons added up to ~336px of height — half the usable screen — and at
           32px they fell well short of the 44px touch target. Undo, redo and
           organize go because the canvas there doesn't edit; the path highlight
-          goes because it's triggered by hover, which doesn't exist on touch. */}
+          goes because it's triggered by hover, which doesn't exist on touch.
+
+          `nokey`: React Flow's delete key listens on the whole document and
+          skips only text fields and `.nokey` elements. A click on undo, redo or
+          "Organizar" leaves the focus on that button and the selection as it
+          was, so the next Backspace deleted the selected node. */}
       <div
         data-canvas-chrome=""
-        className={`${LAYER_ABOVE_CANVAS} right-2 sm:right-4 pr-safe flex flex-col gap-1.5 transition-[bottom] duration-150`}
+        className={`nokey ${LAYER_ABOVE_CANVAS} right-2 sm:right-4 pr-safe flex flex-col gap-1.5 transition-[bottom] duration-150`}
         style={{ bottom: dockHeight + 16 }}
       >
         {!readOnly && (

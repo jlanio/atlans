@@ -6,6 +6,8 @@ docs/specs/edge-data-contract.md.
 Pins down the run's historical cascade AND guarantees that the schema simulation
 resolves the SAME ports (the run × preview divergence was the central bug).
 """
+import pytest
+
 from flow.executor.edge_resolver import (
     Edge,
     resolve_edge_inputs,
@@ -30,8 +32,77 @@ def test_from_dict_empty_string_becomes_none():
 def test_from_dict_condition_e_branch():
     assert Edge.from_dict({"source": "a", "target": "b", "condition": True}).is_branch
     assert Edge.from_dict({"source": "a", "target": "b", "condition": False}).is_branch
-    # a non-bool condition is ignored (does not become a branch).
-    assert Edge.from_dict({"source": "a", "target": "b", "condition": "true"}).is_branch is False
+    # What is not a boolean in any spelling the validation accepts stays a data edge.
+    for nao_e_ramo in ("", "maybe", 2, 0.5, None, [], {}):
+        assert Edge.from_dict({"source": "a", "target": "b", "condition": nao_e_ramo}).is_branch is False
+
+
+@pytest.mark.parametrize("escrito, ramo", [
+    ("true", True), ("false", False), ("True", True), ("FALSE", False),
+    ("yes", True), ("no", False), ("on", True), ("off", False),
+    ("t", True), ("f", False), ("y", True), ("n", False),
+    ("1", True), ("0", False), (1, True), (0, False), (1.0, True), (0.0, False),
+])
+def test_from_dict_condition_escrita_como_a_validacao_aceita(escrito, ramo):
+    # The MCP validation (Pydantic's lax bool) reports these as a valid branch;
+    # read as a data edge, the rejected branch ran too.
+    e = Edge.from_dict({"source": "a", "target": "b", "condition": escrito})
+    assert e.is_branch and e.condition is ramo
+
+
+@pytest.mark.parametrize("handle, ramo", [("true", True), ("false", False)])
+def test_from_dict_handle_de_ramo_sem_condition(handle, ramo):
+    # The editor draws this edge on the branch handle (and writes `condition` on
+    # its next save); the run has to route it the same way meanwhile.
+    e = Edge.from_dict({"source": "a", "target": "b", "source_handle": handle})
+    assert e.is_branch and e.condition is ramo
+    lixo = Edge.from_dict({"source": "a", "target": "b", "source_handle": handle, "condition": "maybe"})
+    assert lixo.condition is ramo
+
+
+def test_from_dict_condition_valida_vence_o_handle():
+    e = Edge.from_dict({"source": "a", "target": "b", "source_handle": "true", "condition": False})
+    assert e.condition is False
+
+
+@pytest.mark.parametrize("condition", [False, True, "false"])
+def test_from_dict_condition_numa_porta_nomeada_e_aresta_de_dado(condition):
+    # The old editor wrote `condition: false` on every edge leaving a named
+    # handle; the canvas draws it on its port, and so does the run.
+    e = Edge.from_dict({"source": "a", "target": "b", "source_handle": "body", "condition": condition})
+    assert e.is_branch is False
+
+
+def test_from_dict_handle_de_dado_nao_vira_ramo():
+    e = Edge.from_dict({"source": "a", "target": "b", "source_handle": "output", "from_key": "output"})
+    assert e.is_branch is False
+
+
+# ── An edge the editor saved from a SubWorkflow port with the envelope as key ──
+
+def test_porta_do_subfluxo_com_o_envelope_entrega_a_porta():
+    # Dragged from port `r2`, the editor used to save `from_key:
+    # "subWorkflowResult"` (its candidates did not know the child's ports): the
+    # run delivered the dict of ALL the ports instead of r2.
+    saida = {"subWorkflowResult": {"r1": 1, "r2": 2}, "r1": 1, "r2": 2}
+    aresta = {"source": "sub", "target": "b", "source_handle": "r2", "from_key": "subWorkflowResult"}
+    assert Edge.from_dict(aresta).from_key == "r2"
+    assert resolve_edge_inputs(aresta, saida) == {"r2": 2}
+    assert resolve_edge_inputs({**aresta, "to_key": "data"}, saida) == {"data": 2}
+
+
+@pytest.mark.parametrize("aresta, chave", [
+    # The envelope chosen on purpose is saved without a handle.
+    ({"from_key": "subWorkflowResult"}, "subWorkflowResult"),
+    ({"source_handle": "", "from_key": "subWorkflowResult"}, "subWorkflowResult"),
+    ({"source_handle": "subWorkflowResult", "from_key": "subWorkflowResult"}, "subWorkflowResult"),
+    # A port with a key of its own, a branch handle, a handle with no key.
+    ({"source_handle": "r2", "from_key": "r1"}, "r1"),
+    ({"source_handle": "true", "from_key": "subWorkflowResult"}, "subWorkflowResult"),
+    ({"source_handle": "r2"}, None),
+])
+def test_so_o_par_porta_e_envelope_muda_de_chave(aresta, chave):
+    assert Edge.from_dict({"source": "a", "target": "b", **aresta}).from_key == chave
 
 
 # ── resolve_edge_inputs (run) ─────────────────────────────────────────────────

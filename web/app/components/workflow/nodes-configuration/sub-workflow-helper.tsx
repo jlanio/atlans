@@ -15,7 +15,7 @@
  * Replaces what used to be 3 raw JSON fields.
  */
 import { useEffect, useMemo, useState } from "react"
-import { useReactFlow } from "@xyflow/react"
+import { useReactFlow, useStore } from "@xyflow/react"
 import { useParams } from "next/navigation"
 import { Label } from "@/app/components/ui/label"
 import { Input } from "@/app/components/ui/input"
@@ -32,6 +32,7 @@ import { TbAlertTriangle, TbRefresh } from "react-icons/tb"
 import { SeloAssistente } from "@/app/components/shared/selo-assistente"
 import { GisFlowService } from "@/service/GisFlowService"
 import type { IWorkflowContract } from "@/service/types"
+import { LockedPortsNotice } from "./fields/ports-field"
 
 
 interface Props {
@@ -40,6 +41,12 @@ interface Props {
   hasUnsaved: boolean
   /** This node's id on the canvas — used to find the keys that arrive at it. */
   nodeId?: string
+  /** Edges arriving at and leaving this node. The target's contract defines
+   *  the node's handles on BOTH sides, so either kind locks the target — see
+   *  `alvoTravado`. No default value, as in the port editors: a silent default
+   *  would unlock the selector if the form forgot to pass them. */
+  conexoesDeEntrada: number
+  conexoesDeSaida: number
 }
 
 /** A key available at the point of the graph where this SubWorkflow sits. */
@@ -112,13 +119,30 @@ interface WorkflowListItem {
 }
 
 
-export default function SubWorkflowHelper({ values, setNodeField, nodeId }: Props) {
+export default function SubWorkflowHelper({
+  values, setNodeField, nodeId, conexoesDeEntrada, conexoesDeSaida,
+}: Props) {
   const { keys: availableKeys, hasUnnamedEdge } = useAvailableInputKeys(nodeId)
   const { id: currentWorkflowId } = useParams<{ id?: string }>()
 
   // ── State ───────────────────────────────────────────────────────────────
   const workflowHash = String(values?.workflowHash ?? "").trim()
   const timeoutSeconds = Number(values?.timeoutSeconds ?? 300)
+
+  // The target APPLIED to the node on the canvas — not the form's, which moves
+  // as the operator picks. The node's handles come from the applied one.
+  const alvoAplicado = useStore(s => String(
+    (s.nodeLookup.get(nodeId ?? "")?.data?.properties as Record<string, unknown> | undefined)?.workflowHash ?? "",
+  ).trim())
+  // Switching the target swaps the node's handles for the new contract's ports,
+  // and an edge on a port the new target lacks is no longer drawn: it stays in
+  // the workflow, keeps running and cannot be deleted. Same lock and same notice
+  // as the port editors. Choosing the FIRST target stays free: with none applied
+  // the node has no ports, every edge sits on its anonymous handle and nothing
+  // can be stranded — and that is the common path, since the "+" next to a port
+  // creates the SubWorkflow already linked, before anyone configures it.
+  const conexoes = conexoesDeEntrada + conexoesDeSaida
+  const alvoTravado = alvoAplicado !== "" && conexoes > 0
 
   const inputsMapping: Record<string, string> = useMemo(() => {
     const raw = values?.inputsMapping
@@ -213,6 +237,7 @@ export default function SubWorkflowHelper({ values, setNodeField, nodeId }: Prop
         <Select
           value={workflowHash || "__none__"}
           onValueChange={(v) => setNodeField("workflowHash", v === "__none__" ? "" : v)}
+          disabled={alvoTravado}
         >
           <SelectTrigger className="h-9">
             <SelectValue placeholder="Selecione um workflow" />
@@ -229,6 +254,9 @@ export default function SubWorkflowHelper({ values, setNodeField, nodeId }: Prop
             ))}
           </SelectContent>
         </Select>
+        {alvoTravado && (
+          <LockedPortsNotice conexoes={conexoes} sentido="ambos" acao="trocar o workflow alvo" />
+        )}
         {workflowHash && !targetWorkflow && (
           <p className="text-[10px] text-muted-foreground italic">
             Hash: <code>{workflowHash}</code> (fora do workspace ou já apagado)

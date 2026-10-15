@@ -233,3 +233,36 @@ describe("aplicarProposta", () => {
     }
   })
 })
+
+/**
+ * The assistant builds on the SAVED workflow and never sees the canvas's
+ * unsaved edits: a connection drawn by hand since then disappeared on apply —
+ * and after the conversation's first acceptance, apply happens on its own.
+ */
+describe("aplicarProposta — ligações feitas no canvas", () => {
+  const arestasDoCanvas = (pares: [string, string][]) =>
+    pares.map(([source, target], i) => ({ id: `e${i}`, source, target, type: "custom", data: {} }))
+
+  it("conta a ligação entre nós que ficam e que a proposta não tem", () => {
+    // a→c drawn by hand; the proposal still says a→b→c.
+    const { resumo } = aplicarProposta(PROPOSAL, catalogo, noCanvas(),
+      arestasDoCanvas([["a", "b"], ["b", "c"], ["a", "c"]]))
+    expect(resumo.arestasRemovidas).toBe(1)
+  })
+
+  it("a mesma ligação com outra chave não conta como perdida", () => {
+    const comChave = arestasDoCanvas([["a", "b"], ["b", "c"]])
+      .map(e => ({ ...e, data: { from_key: "output" } }))
+    expect(aplicarProposta(PROPOSAL, catalogo, noCanvas(), comChave).resumo.arestasRemovidas).toBe(0)
+  })
+
+  it("ligação de um nó removido já vai com ele", () => {
+    const onlyA = { nodes: [{ id: "a", name: "DriveFile", properties: { file_id: "mun.shp" } }], edges: [] } as unknown as CanvasDefinition
+    const { resumo } = aplicarProposta(onlyA, catalogo, noCanvas(), arestasDoCanvas([["a", "b"], ["b", "c"]]))
+    expect(resumo).toEqual({ novos: 0, alterados: 0, removidos: 2, arestasRemovidas: 0 })
+  })
+
+  it("sem as arestas do canvas, o resumo é o de sempre", () => {
+    expect(aplicarProposta(PROPOSAL, catalogo, noCanvas()).resumo).toEqual({ novos: 1, alterados: 1, removidos: 0 })
+  })
+})

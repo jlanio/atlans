@@ -46,6 +46,9 @@ def publish_completed(
     traceback_str: "str | None" = None,
     schema_drift: "dict | None" = None,
     exception: "BaseException | None" = None,
+    *,
+    unresolved_edges: "list | None" = None,
+    overwritten_inputs: "list | None" = None,
 ) -> None:
     try:
         node_def = node_defs.get(node_id, {})
@@ -71,6 +74,18 @@ def publish_completed(
             extra["traceback"] = traceback_str
         if schema_drift:
             extra["schema_drift"] = schema_drift
+        # Incoming edges whose `from_key` the source did not produce: each one
+        # delivered nothing to this node. `[{source, from_key, keys}]`, where
+        # `keys` is what the source did produce. Both lists are capped where
+        # they are built (20 entries, 20 keys), so they stay small and out of
+        # HEAVY_EXTRA_KEYS: the reduction would drop them with the traceback,
+        # on the failed node where they explain the failure.
+        if unresolved_edges:
+            extra["unresolved_edges"] = unresolved_edges
+        # Input keys two incoming edges wrote: `[{key, source, overwrote}]` —
+        # `source`'s value replaced `overwrote`'s, which this node never saw.
+        if overwritten_inputs:
+            extra["overwritten_inputs"] = overwritten_inputs
 
         # Error category PER NODE. The taxonomy already existed for the whole job
         # (executor → server); publishing it here is what lets the panel say
@@ -82,7 +97,7 @@ def publish_completed(
 
         if status == "failed":
             level = LEVEL_ERROR
-        elif schema_drift:
+        elif schema_drift or unresolved_edges or overwritten_inputs:
             level = LEVEL_WARN
         else:
             level = LEVEL_INFO

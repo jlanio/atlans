@@ -2,6 +2,7 @@ import { NodesDrawerState, useWorkflowCatalogStore } from "@/app/stores/workflow
 import { typeDescription, typeStyle, typeName } from "@/consts/NodeTypeStyles"
 import { cn } from "@/lib/utils"
 import IconDrawer from "./components/icon-drawer"
+import { useLigandoDeUmNo } from "./nodes-drawer"
 
 // Label, description and color all come from `consts/NodeTypeStyles`. This file
 // kept a third table of its own (the second inside the drawer), and it disagreed
@@ -11,7 +12,11 @@ import IconDrawer from "./components/icon-drawer"
 const OptionsDrawer = () => {
   const nodesAPI = useWorkflowCatalogStore(s => s.nodesAPI)
   const setNodesDrawerState = useWorkflowCatalogStore(s => s.setNodesDrawerState)
+  // Linking from a port, the node list leaves triggers out (see
+  // `useLigandoDeUmNo`); offering their category would only lead to an empty list.
+  const ligando = useLigandoDeUmNo()
   const uniqueType = [...new Set(nodesAPI.map(n => n.type as string))]
+    .filter(type => !(ligando && type === "trigger"))
 
   function handleDrawerState(state: NodesDrawerState) {
     setNodesDrawerState(state)

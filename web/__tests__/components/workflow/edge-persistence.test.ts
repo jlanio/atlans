@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { Edge } from "@xyflow/react"
-import { serializeEdge, resolveSourceHandle } from "@/app/components/workflow/utils/edge-persistence"
-import { INodePortAPI } from "@/service/types"
+import { serializeEdge, resolveSourceHandle, ramoDaCondicao } from "@/app/components/workflow/utils/edge-persistence"
+import { IEdgeDefinition, INodePortAPI } from "@/service/types"
 
 /**
  * Regression: connecting "Entrada de Dados" (2 ports) to "Salvar em PostGIS"
@@ -152,6 +152,45 @@ describe("resolveSourceHandle — arestas salvas antes da correção", () => {
     const orfa = { source: "sumiu", target: "b", from_key: "output" }
 
     expect(resolveSourceHandle(orfa, new Map())).toBeUndefined()
+  })
+})
+
+/**
+ * `condition` written as text (MCP, hand-written JSON). The MCP validation
+ * accepts these spellings as a branch, and so does the executor; read as
+ * truthy, `"false"` anchored the edge on the TRUE branch, and the next save
+ * wrote `condition: true` — the editor inverted the branch on its own.
+ */
+describe("resolveSourceHandle — condition escrito sem bool JSON", () => {
+  // The `IEdgeDefinition` type says boolean; what arrives from the API is JSON.
+  const ramo = (condition: unknown) =>
+    resolveSourceHandle({ source: "a", target: "b", condition } as unknown as IEdgeDefinition,
+      new Map([["a", CONDITIONAL]]))
+
+  it.each([
+    ["false", "false"], ["true", "true"], ["FALSE", "false"], ["no", "false"], ["0", "false"],
+    [0, "false"], [1, "true"], [false, "false"], [true, "true"],
+  ])("condition %j → ramo %s", (condition, esperado) => {
+    expect(ramo(condition)).toBe(esperado)
+  })
+
+  it.each([null, "", "maybe", 2])("condition %j não escolhe ramo", (condition) => {
+    // `null` used to fall in as `false` (`null !== undefined`, then falsy).
+    expect(ramo(condition)).toBeUndefined()
+  })
+
+  it("o ramo carregado volta a ser gravado igual", () => {
+    const handle = ramo("false")
+    expect(serializeEdge(edge({ sourceHandle: handle })).condition).toBe(false)
+  })
+})
+
+describe("ramoDaCondicao", () => {
+  it("só lê como ramo o que o executor também lê", () => {
+    expect(ramoDaCondicao("off")).toBe(false)
+    expect(ramoDaCondicao("y")).toBe(true)
+    expect(ramoDaCondicao(" true ")).toBeUndefined()
+    expect(ramoDaCondicao(undefined)).toBeUndefined()
   })
 })
 

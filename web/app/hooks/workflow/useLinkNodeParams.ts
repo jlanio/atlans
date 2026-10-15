@@ -11,7 +11,12 @@ export const useLinkNodeParams = () => {
   const setLinkNodeParam = (nodeId: string, handleNodeId?: string) => {
     const params = new URLSearchParams(searchParams.toString())
     params.set('ndid', nodeId)
+    // No handle id is an anonymous output, and then the previous `ndhid` has to
+    // GO: a "+" on a named port followed by a "+" on an anonymous output kept the
+    // old one, and the new edge left from a handle its source does not have —
+    // React Flow does not draw it, and it was saved like that.
     if (handleNodeId) params.set('ndhid', handleNodeId)
+    else params.delete('ndhid')
     // `replace`, not `push`: ephemeral UI param (connection drawer). See useUrlParam.
     router.replace(`${pathname}/?${params.toString()}`)
   }

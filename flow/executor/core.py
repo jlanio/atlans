@@ -169,6 +169,17 @@ class WorkflowExecutor:
         # 'skipped' was not enough, because a live control node (status
         # 'completed') whose branch edge was deactivated kept contributing.
         self._deactivated_edge_ids: set[int] = set()
+        # Incoming edges whose `from_key` the source did not produce, per target.
+        # The edge delivers nothing (edge_resolver) and the target runs without
+        # that input — and fails far from the cause ("Nenhum GeoDataFrame
+        # encontrado") or finishes with wrong data. A log line on the executor was
+        # all that said why; this goes out with the target's completion event.
+        self._arestas_sem_dado: dict[str, list[dict]] = {}
+        # Input keys written by more than one incoming edge, per target. The
+        # edges are applied in list order (`inputs.update`) and the last one
+        # wins: a Merge "all" fed by two parallel branches wired by the editor
+        # (both edges carry `output`) returned only one of them, silently.
+        self._entradas_sobrescritas: dict[str, list[dict]] = {}
 
         self.final_outputs: Dict[str, Any] = {}
         # In-flight spill tasks. `asyncio.to_thread` is not cancelable, so
@@ -200,7 +211,10 @@ class WorkflowExecutor:
         _events.publish_started(self.publisher, self.task_id, node_id, self.node_mgr.node_defs)
 
     def _publish_completed(self, node_id: str, status: str, duration_ms: float, error: str = None, output_keys: list = None, output_columns: dict = None, branch_result: "bool | None" = None, cache_hit: "bool | None" = None, traceback_str: "str | None" = None, schema_drift: "dict | None" = None, exception: "BaseException | None" = None) -> None:
-        _events.publish_completed(self.publisher, self.task_id, node_id, self.node_mgr.node_defs, status, duration_ms, error, output_keys, output_columns, branch_result, cache_hit, traceback_str, schema_drift, exception)
+        _events.publish_completed(self.publisher, self.task_id, node_id, self.node_mgr.node_defs, status, duration_ms, error, output_keys, output_columns, branch_result, cache_hit, traceback_str, schema_drift, exception,
+                                  # A pinned node did not run on its inputs.
+                                  unresolved_edges=None if cache_hit else self._arestas_sem_dado.get(node_id),
+                                  overwritten_inputs=None if cache_hit else self._entradas_sobrescritas.get(node_id))
 
     # ── Pin data resolution ──────────────────────────────────────────────────
 
@@ -587,6 +601,8 @@ class WorkflowExecutor:
                         inputs = self.initial_inputs.get(node_id, self.initial_inputs) or {}
                     else:
                         inputs = {}
+                        # Which parent wrote each input key — to say who overwrote whom.
+                        origem_da_chave: dict = {}
                         for edge in self.incoming.get(node_id, []):
                             parent_id = edge['source']
                             # A skipped parent (branch not taken) does not contribute: the edge
@@ -615,13 +631,38 @@ class WorkflowExecutor:
                             parent_outputs = await asyncio.to_thread(
                                 _load_from_disk, self.all_node_outputs[parent_id]['outputs']
                             )
+                            from_key = Edge.from_dict(edge).from_key
+                            if from_key and from_key not in parent_outputs:
+                                # Capped like `overwritten_inputs`: it travels in the
+                                # node's event, which has a size ceiling, and is not
+                                # among the keys the reduction drops — the hint it
+                                # gives is most useful on a failed node, whose long
+                                # traceback is what the reduction cuts.
+                                sem_dado = self._arestas_sem_dado.setdefault(node_id, [])
+                                if len(sem_dado) < 20:
+                                    sem_dado.append({
+                                        "source": parent_id,
+                                        "from_key": from_key,
+                                        "keys": sorted(str(k) for k in parent_outputs)[:20],
+                                    })
                             # Single source of edge semantics (from_key/to_key/spread) —
                             # the SAME one used by the schema simulation below. See
                             # flow/executor/edge_resolver.py and docs/specs/edge-data-contract.md.
-                            inputs.update(resolve_edge_inputs(
+                            entregue = resolve_edge_inputs(
                                 edge, parent_outputs,
                                 logger=self.logger, node_id=node_id, parent_id=parent_id,
-                            ))
+                            )
+                            for chave in entregue:
+                                if chave in origem_da_chave:
+                                    sobrescritas = self._entradas_sobrescritas.setdefault(node_id, [])
+                                    if len(sobrescritas) < 20:
+                                        sobrescritas.append({
+                                            "key": str(chave),
+                                            "source": parent_id,
+                                            "overwrote": origem_da_chave[chave],
+                                        })
+                                origem_da_chave[chave] = parent_id
+                            inputs.update(entregue)
                             batch_consumed_parents.append(parent_id)
 
                     tasks.append(self._run_node_with_tracking(node_id, inputs))
@@ -675,19 +716,24 @@ class WorkflowExecutor:
                     #    active; only branch edges with condition != branch are
                     #    deactivated. Previously, condition=None != branch deactivated the
                     #    data edge and skipped the target.
+                    #  - A `condition` on an edge leaving a NAMED port is the old
+                    #    editor's stray one: a data edge (`Edge.from_dict`).
                     outgoing_edges = self.outgoing.get(node_id, [])
                     active_edges = outgoing_edges
                     branch_edges = [e for e in outgoing_edges if Edge.from_dict(e).is_branch]
                     if branch_edges and "branch" in outputs and isinstance(outputs.get("branch"), bool):
                         branch = outputs["branch"]
                         self.logger.info("[%s] Resultado do branch: %s", node_id, branch)
+                        # The branch as `Edge` reads it, never the raw `condition`:
+                        # a `"false"` written as text is a branch, and comparing it
+                        # raw with the bool output would never match.
                         active_edges = [
                             e for e in outgoing_edges
-                            if not Edge.from_dict(e).is_branch or e.get("condition") == branch
+                            if not Edge.from_dict(e).is_branch or Edge.from_dict(e).condition == branch
                         ]
 
                         # Propagates skip only to the target of the BRANCH edges not chosen
-                        deactivated = [e for e in branch_edges if e.get("condition") != branch]
+                        deactivated = [e for e in branch_edges if Edge.from_dict(e).condition != branch]
                         for edge in deactivated:
                             # Records the deactivated edge so the target's input assembly
                             # does NOT inject this branch's output (the target may
@@ -946,20 +992,34 @@ class WorkflowExecutor:
             for edge in self.incoming.get(node_id, []):
                 parent_id = edge["source"]
                 parent_output = self.simulated_outputs.get(parent_id)
-                if not parent_output or parent_output.get("status") != "ok":
-                    continue
-                schema_list = parent_output.get("schema") or []
-                fields = schema_list[0].get("fields", []) if schema_list else []
-                names = {f.get("name") for f in fields if f.get("name")}
-                if not names:
-                    continue
+                names: set = set()
+                if parent_output and parent_output.get("status") == "ok":
+                    schema_list = parent_output.get("schema") or []
+                    fields = schema_list[0].get("fields", []) if schema_list else []
+                    names = {f.get("name") for f in fields if f.get("name")}
 
-                from_key = edge.get("from_key")
+                aresta = Edge.from_dict(edge)
+                from_key = aresta.from_key
                 to_key = edge.get("to_key")
-                is_branch = Edge.from_dict(edge).is_branch
+                is_branch = aresta.is_branch
 
-                if from_key:
-                    if from_key not in names:
+                # The source side needs the source's outputs: without them a
+                # typo cannot be told from a dynamic output. The target side
+                # (below) only needs the target, and runs either way.
+                if not names:
+                    pass
+                elif from_key:
+                    # The SubWorkflow node returns `{subWorkflowResult, **child
+                    # ports}` (sub_workflow.py): the child's ports are outputs
+                    # too, but they come from ANOTHER workflow's contract, which
+                    # this simulation does not read. Calling them unknown sent
+                    # agents (told to iterate until `ok`) to rewire correct edges
+                    # onto `subWorkflowResult`, which delivers the wrapper dict
+                    # instead of the port's value.
+                    if (
+                        from_key not in names
+                        and self.node_mgr.node_defs.get(parent_id, {}).get("name") != "SubWorkflow"
+                    ):
                         diagnostics.append({
                             "severity": "error",
                             "source": parent_id,
@@ -981,4 +1041,85 @@ class WorkflowExecutor:
                             f"from_key para evitar ambiguidade."
                         ),
                     })
+                elif not is_branch and len(names) > 1:
+                    # Only `to_key`: the run renames the FIRST value of the output
+                    # (edge_resolver) — an HTTP Request's status_code, not its body.
+                    diagnostics.append({
+                        "severity": "warning",
+                        "code": "edge_to_key_only",
+                        "source": parent_id,
+                        "target": node_id,
+                        "message": (
+                            f"aresta de '{parent_id}' só com to_key '{to_key}' "
+                            f"({len(names)} saídas: {sorted(names)}): entrega só o "
+                            f"primeiro valor da saída. Especifique from_key."
+                        ),
+                    })
+
+                if to_key:
+                    entradas = self._entradas_declaradas(node_id)
+                    if entradas is not None and to_key not in entradas:
+                        # The node reads its declared inputs by name: a key outside
+                        # them is not read (CartaImagem drops the layer, a
+                        # SubWorkflowOutput discards the value, a Merge puts it
+                        # after its ports).
+                        diagnostics.append({
+                            "severity": "warning",
+                            "code": "edge_to_key_unknown",
+                            "source": parent_id,
+                            "target": node_id,
+                            "message": (
+                                f"to_key '{to_key}' não é uma entrada de '{node_id}'. "
+                                f"Entradas: {sorted(entradas)}."
+                            ),
+                        })
+                elif self.node_mgr.node_defs.get(node_id, {}).get("name") == "Merge":
+                    portas = self._entradas_declaradas(node_id) or set()
+                    if len(portas) > 1:
+                        # Without `to_key` the value arrives under the parent's
+                        # own key, not on a port: two such edges (both `output`)
+                        # overwrite each other and 'all' returns one branch.
+                        diagnostics.append({
+                            "severity": "warning",
+                            "code": "edge_to_key_missing",
+                            "source": parent_id,
+                            "target": node_id,
+                            "message": (
+                                f"aresta de '{parent_id}' para o Merge '{node_id}' sem "
+                                f"to_key: o valor chega com o nome da saída de "
+                                f"'{parent_id}', fora das portas {sorted(portas)}. "
+                                f"Indique a porta em to_key."
+                            ),
+                        })
         return diagnostics
+
+    def _entradas_declaradas(self, node_id: str) -> "set[str] | None":
+        """Input names a node reads BY NAME, or None when any key will do or
+        they are not known statically.
+
+        The `ports` property for a SubWorkflowOutput (its allowlist drops any
+        other key, even with a single port), a Merge and a CartaImagem (they
+        tell keys apart from two ports on, as the editor does — with one, what
+        arrives is the input). Catalog `inputs` from two on (`get_pair`): a node
+        with one declared input takes whatever arrives (`get_first_gdf`, the
+        Aggregate's scan), so a `to_key` with another name works there. The
+        Python Script reads every key as a variable and is left out.
+        """
+        node_def = self.node_mgr.node_defs.get(node_id) or {}
+        nome = node_def.get("name")
+        cls = self.node_mgr.factory.get(nome)
+        try:
+            desc = cls.description() if cls else {}
+        except Exception:
+            return None
+        if desc.get("dynamic_inputs"):
+            if nome not in ("SubWorkflowOutput", "Merge", "CartaImagem"):
+                return None
+            from flow.utils.workflow_contract import _parse_ports
+            props = node_def.get("properties") or node_def.get("parameters") or {}
+            portas = set(_parse_ports(props.get("ports")))
+            if nome != "SubWorkflowOutput" and len(portas) < 2:
+                return None
+            return portas or None
+        nomes = {i["name"] for i in (desc.get("inputs") or []) if isinstance(i, dict) and i.get("name")}
+        return nomes if len(nomes) > 1 else None

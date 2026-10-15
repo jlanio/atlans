@@ -1,11 +1,12 @@
 import { NodeProps, useNodeConnections } from "@xyflow/react";
-import { memo, ReactNode, useCallback } from "react";
+import { memo, ReactNode, useCallback, useMemo } from "react";
 import IconRoot from "../../icon-root";
-import { HandleSource, HandleTarget } from "../../handle";
-import AddConnectionHandle from "../../add-connection-handle";
+import { PortasDeEntrada, PortasDeSaida } from "../../portas";
 import { INodeContext } from "@/context/useFlowContext";
+import { INodePortAPI } from "@/service/types";
 import ToolsIcon from "../../tools";
 import { useTools } from "@/app/hooks/workflow/useTools";
+import { calcNodeHeight } from "../../../utils/node-metrics";
 
 interface ActionsIconRootProps extends NodeProps<INodeContext> {
   children: ReactNode
@@ -27,6 +28,16 @@ const ActionsIconRoot = ({ children, id, data, selected }: ActionsIconRootProps)
   // Same source as the outputs: the input port also needs to know whether it is
   // connected to choose between a solid and a dashed stroke.
   const entradas = useNodeConnections({ id, handleType: "target" })
+  const saidasEmUso = useMemo(() => new Set(saidas.map(c => c.sourceHandle ?? "__default__")), [saidas])
+  const entradasEmUso = useMemo(() => new Set(entradas.map(c => c.targetHandle ?? "__default__")), [entradas])
+
+  // The ports the catalog declares, as on every other card (see `portas.tsx`):
+  // this card drew one anonymous output whatever the node declared, and the
+  // HTTP Request declares three.
+  const outputs = (data.outputs ?? []) as INodePortAPI[]
+  const inputs = (data.inputs ?? []) as INodePortAPI[]
+  const nodeHeight = calcNodeHeight(Math.max(outputs.length, inputs.length))
+  const cardStyle = useMemo(() => ({ height: nodeHeight }), [nodeHeight])
 
   const title = (data.properties?.["alias"] as string | undefined) || (data.alias as string)
 
@@ -38,16 +49,15 @@ const ActionsIconRoot = ({ children, id, data, selected }: ActionsIconRootProps)
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
       data-selected={`${!!selected}`}
+      style={cardStyle}
     >
       <ToolsIcon nodeId={id} open={toolState !== "disable"} />
 
       {children}
 
-      <AddConnectionHandle nodeId={id} connectionVisible={saidas.length === 0}>
-        <HandleSource livre={saidas.length === 0} />
-      </AddConnectionHandle>
+      <PortasDeSaida nodeId={id} outputs={outputs} nodeHeight={nodeHeight} emUso={saidasEmUso} />
 
-      <HandleTarget livre={entradas.length === 0} />
+      <PortasDeEntrada inputs={inputs} nodeHeight={nodeHeight} emUso={entradasEmUso} />
     </IconRoot>
   )
 }

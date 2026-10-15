@@ -190,8 +190,11 @@ const RunPanel = () => {
   return (
     // nowheel/nopan prevent the canvas from capturing scrolls and drags made
     // inside the panel — without them, scrolling the list zoomed the graph.
+    // nokey does the same for React Flow's delete key, which listens on the
+    // whole document: clicking a node to find its row leaves it selected, and
+    // Backspace on a tab or on "Fechar" deleted it.
     <div
-      className="nowheel nopan nodrag absolute inset-x-0 bottom-0 z-20 flex flex-col border-t border-border bg-background/95 shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.35)] backdrop-blur"
+      className="nowheel nopan nodrag nokey absolute inset-x-0 bottom-0 z-20 flex flex-col border-t border-border bg-background/95 shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.35)] backdrop-blur"
       style={{ height: open ? height : RUN_BAR_HEIGHT }}
       onContextMenu={e => e.stopPropagation()}
     >

@@ -16,10 +16,55 @@
 import { Edge } from "@xyflow/react"
 import { v4 as uuid } from "uuid"
 import { INodeContext } from "@/context/useFlowContext"
-import { CanvasDefinition, INodePortAPI, INodesAPI } from "@/service/types"
+import { CanvasDefinition, IEdgeDefinition, INodePortAPI, INodesAPI } from "@/service/types"
 import { getTypeIcon } from "@/utils/getTypeIconsUtils"
 import { contratoDoNo, inputHandle } from "./node-ports"
-import { resolveSourceHandle } from "./edge-persistence"
+import { chaveEfetiva, ramoDaCondicao, resolveSourceHandle } from "./edge-persistence"
+
+/**
+ * Output handles a node missing from the catalog had in use, read from its
+ * saved edges.
+ *
+ * Without its schema the node declares no port, so every edge leaving it was
+ * anchored on the anonymous handle and the next save dropped its
+ * `source_handle` — and with it a branch's `condition`, which `serializeEdge`
+ * only writes for a true/false handle: the branch edges of a disabled
+ * Conditional came back as plain data edges, and both branches ran. The
+ * handles the edges point at are what the card has to draw for them to keep
+ * their anchor. A branch handle brings both, as on any branch node.
+ */
+function saidasDasArestasSalvas(
+  edges: CanvasDefinition["edges"],
+  nodeId: string,
+): INodePortAPI[] {
+  const nomes = new Set<string>()
+  let ramo = false
+  for (const e of edges ?? []) {
+    if (e?.source !== nodeId) continue
+    if (e.source_handle === "true" || e.source_handle === "false") {
+      ramo = true
+    } else if (e.source_handle) {
+      // A named port, even with a `condition`: the old editor wrote
+      // `condition: false` on every edge leaving a named handle. Read as a
+      // branch, the node became a true/false node, the edge was anchored on
+      // "false" and the next save wrote it as a branch, losing the port.
+      nomes.add(e.source_handle)
+    } else if (ramoDaCondicao(e.condition) !== undefined) {
+      ramo = true
+    }
+  }
+  const portas = [...nomes].map(name => ({ name }))
+  return ramo ? [{ name: "true" }, { name: "false" }, ...portas] : portas
+}
+
+/** The output side of a node missing from the catalog, from its saved edges:
+ *  the handles, and whether it routes — so true/false stay branches and never
+ *  become data keys (`getCandidateKeys`). */
+function contratoDasArestasSalvas(edges: CanvasDefinition["edges"], nodeId: string) {
+  const outputs = saidasDasArestasSalvas(edges, nodeId)
+  const ramifica = outputs.some(p => p.name === "true" || p.name === "false")
+  return { outputs, ...(ramifica ? { branches: true } : {}) }
+}
 
 /**
  * Canvas nodes for a definition.
@@ -27,6 +72,13 @@ import { resolveSourceHandle } from "./edge-persistence"
  * `properties` is rebuilt field by field from the catalog — and not copied from
  * the definition — so that a new field in the schema reaches the node already
  * with the backend's default, without a data migration.
+ *
+ * A node the catalog does not list (disabled by an admin, renamed or removed)
+ * is kept exactly as saved. Rebuilt from a schema that is not there, its
+ * properties came out empty and its type fell back to "trigger", and the next
+ * save — of anything else in the workflow — persisted both: the configuration
+ * was gone for good, and as a "trigger" the executor ignores its incoming edges
+ * and the card draws no input, so those edges vanished from the canvas.
  */
 export function buildNodes(
   definition: CanvasDefinition | undefined,
@@ -36,7 +88,10 @@ export function buildNodes(
 
   return definition.nodes.map((node, indice) => {
     const nodeApiFound = nodesAPI.find(n => n.name === node.name)
-    const properties = {} as Record<string, string>
+    const properties = nodeApiFound ? {} as Record<string, string> : { ...(node.properties ?? {}) }
+    // The catalog's type wins: a type persisted wrong (the fallback above
+    // wrote "trigger" for nodes that are not) is corrected on the next save.
+    const type = nodeApiFound?.type ?? node.type ?? "action"
 
     nodeApiFound?.properties.forEach(field => {
       properties[field.name] = (node.properties?.[field.name] ?? field.default) as string
@@ -67,13 +122,31 @@ export function buildNodes(
           suggest_columns: prop.suggest_columns,
         })) ?? [],
         properties,
-        type: nodeApiFound?.type ?? "trigger",
+        type,
         ...contratoDoNo(nodeApiFound, properties),
+        ...(nodeApiFound ? {} : contratoDasArestasSalvas(definition.edges, node.id)),
       },
-      type: getTypeIcon(node),
+      // The card follows the same type: with the persisted one, a node saved as
+      // "trigger" by mistake got the trigger card, which has no input handle.
+      type: getTypeIcon({ ...node, type }),
       position: node.position ?? { x: 0 + (180 * indice), y: 0 },
     } satisfies INodeContext
   })
+}
+
+/**
+ * An edge with both ends. One saved without `source` or `target` (by hand, by
+ * another client) cannot be drawn and the executor skips it; kept on the
+ * canvas it went back in every save, which the server now refuses (422), and
+ * the workflow could no longer be saved at all. The same rule as the server's
+ * `ponta` (flow/core/graph.py): an end is a non-empty text or an integer —
+ * kept with a `true` or a list as its end, the edge made every save fail.
+ */
+function ponta(valor: unknown): boolean {
+  return typeof valor === "string" ? valor !== "" : Number.isInteger(valor)
+}
+function ligaDoisNos(edge: IEdgeDefinition | null | undefined): edge is IEdgeDefinition {
+  return Boolean(edge && ponta(edge.source) && ponta(edge.target))
 }
 
 /**
@@ -93,18 +166,23 @@ export function buildEdges(
     nodes.map(n => [n.id, ((n.data?.inputs ?? []) as INodePortAPI[]).map(p => p.name)]),
   )
 
-  return definition.edges.map(edge => ({
-    id: uuid(),
-    source: edge.source,
-    target: edge.target,
-    sourceHandle: resolveSourceHandle(edge, outputsByNodeId),
-    targetHandle: inputHandle(edge, inputsByNodeId),
-    type: "custom",
-    data: {
-      ...(edge.from_key ? { from_key: edge.from_key } : {}),
-      ...(edge.to_key ? { to_key: edge.to_key } : {}),
-    },
-  } satisfies Edge))
+  return definition.edges.filter(ligaDoisNos).map(salva => {
+    // The key the edge really means (see `chaveEfetiva`): from here on the
+    // canvas, the anchoring and the next save all use it.
+    const edge = { ...salva, from_key: chaveEfetiva(salva) }
+    return {
+      id: uuid(),
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: resolveSourceHandle(edge, outputsByNodeId),
+      targetHandle: inputHandle(edge, inputsByNodeId),
+      type: "custom",
+      data: {
+        ...(edge.from_key ? { from_key: edge.from_key } : {}),
+        ...(edge.to_key ? { to_key: edge.to_key } : {}),
+      },
+    } satisfies Edge
+  })
 }
 
 export type { CanvasDefinition } from "@/service/types"

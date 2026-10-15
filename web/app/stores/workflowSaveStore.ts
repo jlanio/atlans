@@ -26,6 +26,23 @@ interface WorkflowSaveState {
   /** Moment (epoch ms) at which the reference snapshot was taken on hydration.
    *  `null` = no self-correction window is open. See `autocorrigirSnapshot`. */
   snapshotIniciadoEm: number | null
+  /** The canvas holds the graph of the workflow being edited. `false` from the
+   *  moment an existing workflow starts loading until its hydration
+   *  (`initSnapshot`): in between, the canvas is empty — or still shows the
+   *  previous workflow — and a save would write that over the server's
+   *  definition. The creation screen is born `true`: there is nothing to load. */
+  canvasHidratado: boolean
+  /** `definition_etag` of the definition the canvas is based on — the loaded
+   *  one, then each save's. Sent back on the next save, which the server
+   *  refuses (409) if someone else saved in between. `null` = not known (new
+   *  workflow, older server): the save goes without the check. */
+  definitionEtag: string | null
+  /** Which canvas this state belongs to: incremented on every workflow switch.
+   *  A save takes it when it starts; an answer that comes back after a switch
+   *  is about another workflow and must not touch this state — it wrote the
+   *  previous workflow's tag (the next save here then failed with a false
+   *  conflict) and its snapshot (the change detector compared against it). */
+  geracao: number
 }
 
 interface WorkflowSaveActions {
@@ -44,7 +61,8 @@ interface WorkflowSaveActions {
   setStatus(status: SaveStatus): void
   /** `savedAt` is the server's `updated_at` on hydration and `viewport` is what
    *  came in the `definition`; when omitted, they keep the current value (the
-   *  reset on workflow switch is what clears them). */
+   *  reset on workflow switch is what clears them). Also marks the canvas as
+   *  hydrated: from here on there is a graph to save. */
   initSnapshot(nodes: INodesDefinition[], edges: IEdgeDefinition[], name: string, savedAt?: number | null, viewport?: Viewport | null): void
   isDirty(nodes: INodesDefinition[], edges: IEdgeDefinition[], name: string): boolean
   /**
@@ -100,6 +118,11 @@ export const useWorkflowSaveStore = create<WorkflowSaveState & WorkflowSaveActio
     workflowName: '',
     flagActive: true,
     snapshotIniciadoEm: null,
+    // Nothing is on the canvas until a workflow hydrates it (or the creation
+    // screen opens) — the safe side for a flag that holds back saves.
+    canvasHidratado: false,
+    definitionEtag: null,
+    geracao: 0,
 
     setWorkflowName: (name) => {
       set({ workflowName: name })
@@ -149,6 +172,7 @@ export const useWorkflowSaveStore = create<WorkflowSaveState & WorkflowSaveActio
       set({
         lastSavedSnapshot: snapshot,
         snapshotIniciadoEm: Date.now(),
+        canvasHidratado: true,
         ...(savedAt !== undefined ? { lastSavedAt: savedAt } : {}),
         ...(viewport !== undefined ? { lastSavedViewport: viewport } : {}),
       })

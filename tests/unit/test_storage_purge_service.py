@@ -107,6 +107,66 @@ async def test_purge_clears_workflow_pin_refs(mock_del):
     mock_del.assert_called()          # the pin object left MinIO
 
 
+def _wf_com_pin_de_camadas(pasta: str) -> MagicMock:
+    wf = MagicMock()
+    wf.pinned_outputs = {"n1": {
+        "__pin_s3_key__": f"{pasta}/n1_pin.parquet",
+        "__pin_format__": "parquet",
+        "__pin_frames__": {
+            "removed": {"format": "parquet", "filename": "n1_pin_removed_0a1b2c3d4e5f.parquet"},
+        },
+    }}
+    return wf
+
+
+@pytest.mark.asyncio
+@patch("app.core.storage.delete_strict")
+async def test_purga_apaga_tambem_as_camadas_extras_do_pin(mock_del):
+    """Only the first layer of a pin has an `Artifact` row; the others exist only in
+    the ref. Clearing the ref without deleting them left objects that nothing
+    points at anymore."""
+    from app.services import storage_purge_service as mod
+
+    pasta = "pin-cache/ws-1/t1"
+    wf = _wf_com_pin_de_camadas(pasta)
+    db = _db_with(artifacts=[_artifact(id=7, s3_key=f"{pasta}/n1_pin.parquet")], workflows=[wf])
+
+    with patch("sqlalchemy.orm.attributes.flag_modified"):
+        r = await mod.purge_workspace_storage(db, "ws-1", scope="artifacts")
+
+    assert {c.args[0] for c in mock_del.call_args_list} == {
+        f"{pasta}/n1_pin.parquet",
+        f"{pasta}/n1_pin_removed_0a1b2c3d4e5f.parquet",
+    }
+    assert wf.pinned_outputs == {"n1": {}}
+    assert r["pins_resetados"] == 1
+
+
+@pytest.mark.asyncio
+async def test_camada_extra_que_o_s3_nao_apagou_mantem_a_ref_do_pin():
+    """The module's invariant applied to the layer that has no row: the ref is the only
+    record of the object, so it survives the S3 failure and repeating the purge
+    finishes the job — clearing it would turn the object into an invisible orphan."""
+    from app.services import storage_purge_service as mod
+
+    pasta = "pin-cache/ws-1/t1"
+    wf = _wf_com_pin_de_camadas(pasta)
+    ref_antes = dict(wf.pinned_outputs["n1"])
+    db = _db_with(artifacts=[_artifact(id=7, s3_key=f"{pasta}/n1_pin.parquet")], workflows=[wf])
+
+    def _delete(chave, allow_missing=True):
+        if "removed" in chave:
+            raise RuntimeError("MinIO fora")
+
+    with patch("app.core.storage.delete_strict", side_effect=_delete), \
+         patch("sqlalchemy.orm.attributes.flag_modified"):
+        r = await mod.purge_workspace_storage(db, "ws-1", scope="artifacts")
+
+    assert wf.pinned_outputs == {"n1": ref_antes}
+    assert r["pins_resetados"] == 0
+    assert r["skipped_s3_errors"] == 1
+
+
 @pytest.mark.asyncio
 @patch("app.core.storage.delete_strict")
 async def test_scope_drive_does_not_touch_artifacts(mock_del):

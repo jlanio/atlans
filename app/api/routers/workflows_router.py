@@ -1,5 +1,7 @@
+import json
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, HTTPException, Depends, Request, Header
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +23,8 @@ from app.core.rate_limiter import limiter
 from app.core.rbac import ROLE_ADMIN, ROLE_EDITOR, ROLE_OPERATOR, ROLE_VIEWER
 from app.core.utils.logger import get_logger
 from app.core.utils.redacao import definition_contains_secret, params_schema_contains_secret
+from app.models.workflow import Workflow
+from flow.core.graph import ponta
 from app.services import pin_service
 from app.services.pin_service import MAX_TTL_HOURS
 
@@ -67,6 +71,33 @@ def _recusar_segredo(definition: Any, *, schema: bool = False) -> None:
         )
 
 
+def _recusar_arestas_malformadas(definition: Any) -> None:
+    """Rejects an edge that does not connect two nodes.
+
+    The definition is a free dict, so an edge with no `source` or `target` (or
+    a `null` in the list) was saved as written: the canvas cannot draw it and
+    the executor skips it as an orphan (flow/core/graph.py) — a connection
+    someone meant to make vanished with nothing said. The MCP validation
+    already refused it (`EdgeDefinition`); REST, where the editor and other
+    clients save, did not. The editor drops such edges when it opens a
+    workflow, so an old one in the database does not block its next save.
+    """
+    if not isinstance(definition, dict) or definition.get("edges") is None:
+        return
+    arestas = definition["edges"]
+    if not isinstance(arestas, list):
+        raise HTTPException(status_code=422, detail="`edges` da definição deve ser uma lista.")
+    ruins = [i for i, e in enumerate(arestas) if ponta(e, "source") is None or ponta(e, "target") is None]
+    if ruins:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Aresta sem `source` ou `target` na definição (posição "
+                f"{', '.join(str(i) for i in ruins[:10])}): cada aresta liga dois nós pelos ids."
+            ),
+        )
+
+
 @router.post("", status_code=201, summary="Create a new workflow definition")
 @limiter.limit("30/minute")
 async def create_workflow(
@@ -84,6 +115,7 @@ async def create_workflow(
     )
 
     _recusar_segredo(payload.definition)
+    _recusar_arestas_malformadas(payload.definition)
     # `params_schema` is a sibling column, writable in the same body, and — unlike the
     # definition — it does NOT go through `encrypt_workflow_connections`: it goes raw to
     # the database. MCP output already redacts `params_schema.token`, so leaving it out
@@ -168,10 +200,16 @@ async def read_workflow(
     # so the "<REDACTED>" marker is never written by a flush of the GET. Modern
     # workflows use credential_id (resolved only at dispatch) and expose nothing.
     from app.core.utils.redacao import redact_definition
+    from app.services.workflow_version_service import definition_etag, etiqueta_da_definicao_visivel
     dados = WorkflowRead.model_validate(wf)
     if isinstance(dados.definition, dict) and dados.definition:
-        return dados.model_copy(update={"definition": redact_definition(dados.definition)})
-    return dados
+        # The tag of the copy the response carries (decrypted by the dependency,
+        # redacted here): the same `definition_etag`, without a second copy.
+        redigida = redact_definition(dados.definition)
+        return dados.model_copy(update={
+            "definition": redigida, "definition_etag": etiqueta_da_definicao_visivel(redigida),
+        })
+    return dados.model_copy(update={"definition_etag": definition_etag(None)})
 
 @router.get(
     "/{id_hash}/contract",
@@ -363,12 +401,28 @@ async def preview_move_workflow(
     return await _move(payload, service, wf, db, current_user, dry_run=True)
 
 
+def _referencias_alteradas(nova: Dict[str, Any], salva: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """The new definition's SubWorkflow nodes whose reference (node, workflow,
+    `inputsMapping`) is not in the saved one — what a save has to validate."""
+    from flow.utils.workflow_contract import collect_subworkflow_references
+
+    # Ids compared as text: a hand-written id that is a list or an object is not
+    # hashable, and the set lookups turned every such save into a 500.
+    def chave(ref: dict) -> tuple:
+        return (str(ref["node_id"]), ref["workflow_hash"], json.dumps(ref["inputs_mapping"], sort_keys=True, default=str))
+
+    ja_salvas = {chave(r) for r in collect_subworkflow_references(salva or {})}
+    ids = {str(r["node_id"]) for r in collect_subworkflow_references(nova) if chave(r) not in ja_salvas}
+    return {"nodes": [n for n in (nova.get("nodes") or []) if isinstance(n, dict) and str(n.get("id")) in ids]}
+
+
 @router.put("/{id_hash}", response_model=WorkflowRead, summary="Atualiza um workflow existente")
 @limiter.limit("30/minute")
 async def update_workflow(
     request: Request,
     workflow_in: WorkflowUpdate,
     change_note: str | None = None,
+    expected_etag: str | None = None,
     service: WorkflowService = Depends(get_workflow_service),
     wf=Depends(workflow_com_papel(ROLE_EDITOR)),
     db: AsyncSession = Depends(get_db),
@@ -378,7 +432,32 @@ async def update_workflow(
     Updates fields of an existing workflow.
     Only the fields sent in the payload are changed.
     If `definition` is changed, the current version is saved automatically as a snapshot.
+
+    `expected_etag`: the `definition_etag` the client loaded. When given with a
+    `definition`, the save is refused with 409 (`definition_conflict`) if the
+    stored definition changed since — see `definition_etag`.
     """
+    from app.services.contrato_do_subfluxo import avisos_aos_pais, portas_removidas
+    from app.services.workflow_version_service import definition_etag
+
+    if expected_etag is not None and getattr(workflow_in, "definition", None) is not None:
+        # Compared against the STORED row, locked until this save commits: read
+        # from the object the dependency loaded, two saves carrying the same tag
+        # both passed the check before either committed, and the second wrote
+        # over the first — the lost edit the tag exists to stop. Under the lock
+        # the second waits, reads the first one's definition and gets the 409.
+        armazenada = (await db.execute(
+            select(Workflow.definition).where(Workflow.id_hash == wf.id_hash).with_for_update()
+        )).scalar_one_or_none()
+        if definition_etag(armazenada) != expected_etag:
+            return JSONResponse(status_code=409, content={
+                "error": "definition_conflict",
+                "detail": (
+                    "Este workflow foi alterado em outro lugar (outra aba, outra pessoa "
+                    "ou o assistente) depois que você o abriu. Suas alterações não foram "
+                    "salvas: recarregue para ver a versão atual."
+                ),
+            })
     # If the definition changed, validate cross-workflow references against the DB.
     # `WorkflowUpdate` is partial: an absent `definition` means "do not touch it",
     # and refusing there would block even renaming a workflow.
@@ -387,22 +466,38 @@ async def update_workflow(
         _recusar_segredo(new_schema, schema=True)   # same reason as the POST
 
     new_def = getattr(workflow_in, "definition", None)
+    saidas_removidas: set = set()
+    entradas_removidas: set = set()
     if new_def is not None:
         _recusar_segredo(new_def)
+        _recusar_arestas_malformadas(new_def)
         # The credentials (SEG-12) are checked by the service in `update_workflow`.
 
         from flow.utils.workflow_contract import validate_subworkflow_references_against_db
+        # Only the references this save creates or changes. One that was already
+        # saved and broke because the CHILD changed — deactivated, moved, a port
+        # renamed — made every save of the parent fail with 422, including saves
+        # that do not touch it and the silent save before Executar: the person
+        # could neither keep nor run any edit. The run still refuses a broken
+        # reference, saying why.
+        alteradas = _referencias_alteradas(new_def, wf.definition)
         cross_errors = await validate_subworkflow_references_against_db(
-            new_def, db, workspace_id=wf.workspace_id,
-        )
+            alteradas, db, workspace_id=wf.workspace_id,
+        ) if alteradas["nodes"] else []
         if cross_errors:
             raise HTTPException(
                 status_code=422,
                 detail="Sub-workflows invalidos:\n- " + "\n- ".join(cross_errors),
             )
 
+        # The ports this save takes out of the contract, when this workflow is
+        # called as a sub-workflow. Read BEFORE the save: the service updates this
+        # same ORM object (one session per request), and afterwards
+        # `wf.definition` is already the new one.
+        saidas_removidas, entradas_removidas = portas_removidas(wf.definition, new_def)
+
     try:
-        return await service.update_workflow(
+        atualizado = await service.update_workflow(
             wf.id_hash, workflow_in, change_note=change_note,
             updated_by_id=current_user.id_hash,
         )
@@ -411,6 +506,19 @@ async def update_workflow(
     except Exception as e:
         logger.error("Erro ao atualizar workflow '%s': %s", wf.id_hash, e)
         raise HTTPException(status_code=400, detail="Não foi possível atualizar o workflow.")
+    # Transient attribute, like `schedule_notices`: the tag of what was just
+    # stored, for the editor's next save.
+    if hasattr(atualizado, "definition"):
+        atualizado.definition_etag = definition_etag(atualizado.definition)
+        # Same kind of attribute: the callers that use a port this save removed.
+        # Only looked up when a port was removed, and it never blocks — the save
+        # is already committed; the choice was to warn the callers, not to pin
+        # the version they call.
+        if saidas_removidas or entradas_removidas:
+            atualizado.subworkflow_notices = await avisos_aos_pais(
+                db, wf.id_hash, wf.workspace_id, saidas_removidas, entradas_removidas,
+            )
+    return atualizado
 
 
 # ------------------------------------------------------------------ #

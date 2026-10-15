@@ -36,15 +36,20 @@ interface Props {
   setNodeField: (field: string, value: string | number | boolean) => void
   hasUnsaved: boolean
   variant: "input" | "output"
-  /** Edges arriving at this node. Only matters on the output side: there the
-   *  ports are connection points, and changing them with an edge attached
-   *  would leave the edge pointing at a point that no longer exists. On the
-   *  input side the ports are not handles — the node is a trigger and nothing
-   *  arrives at it.
+  /** Edges arriving at this node. They lock the OUTPUT side
+   *  (SubWorkflowOutput): there the ports are input connection points, and
+   *  changing them with an edge attached would leave the edge pointing at a
+   *  point that no longer exists.
    *
    *  No default value: a silent default would unlock the editor on its own if
    *  someone forgot to wire the count in the form. */
   conexoesDeEntrada: number
+  /** Edges leaving this node. They lock the INPUT side (SubWorkflowInput),
+   *  whose ports are OUTPUT connection points (`outputs_from_ports`): renaming
+   *  or removing one strands the edges that leave it. Nothing ever arrives at
+   *  that trigger, so the arriving count — always zero there — left the editor
+   *  open. No default value, for the same reason. */
+  conexoesDeSaida: number
 }
 
 
@@ -117,12 +122,15 @@ export function problemaNaPorta(
 
 
 export default function SubWorkflowPortsHelper({
-  values, setNodeField, variant, conexoesDeEntrada,
+  values, setNodeField, variant, conexoesDeEntrada, conexoesDeSaida,
 }: Props) {
   const ports = useMemo(() => parsePorts(values?.ports), [values?.ports])
 
   const isInput = variant === "input"
-  const travado = !isInput && conexoesDeEntrada > 0
+  // The edges a port change would strand are on the side the ports are drawn
+  // on: leaving SubWorkflowInput, arriving at SubWorkflowOutput.
+  const conexoes = isInput ? conexoesDeSaida : conexoesDeEntrada
+  const travado = conexoes > 0
   const label = isInput ? "Portas de entrada" : "Portas de saída"
   const placeholder = isInput ? "ex: geometry" : "ex: result_geometry"
   const helpText = isInput
@@ -183,7 +191,7 @@ export default function SubWorkflowPortsHelper({
 
       <p className="text-[11px] text-muted-foreground">{helpText}</p>
 
-      {travado && <LockedPortsNotice conexoes={conexoesDeEntrada} />}
+      {travado && <LockedPortsNotice conexoes={conexoes} sentido={isInput ? "saindo" : "chegando"} />}
 
       {ports.length === 0 ? (
         // The contract is opt-in: an empty list is a valid passthrough mode, not an

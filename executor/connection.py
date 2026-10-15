@@ -10,13 +10,13 @@ import asyncio
 import json
 import logging
 import time
-from datetime import datetime, date
 
 import websockets
 from websockets.exceptions import ConnectionClosed, ConnectionClosedError
 from websockets.frames import Close
 
 from flow.utils.backoff import with_jitter
+from flow.utils.json_saida import json_default
 from flow.utils.protocolo_ws import (
     PROTOCOL_VERSION,
     ERROR_TYPE,
@@ -35,39 +35,8 @@ from executor.job_validator import JobValidationError, validate_control_message
 logger = logging.getLogger(__name__)
 
 
-def _json_default(obj):
-    """Serializes types the standard json does not support (Timestamp, datetime, date, etc.)."""
-    # pandas.Timestamp e datetime.datetime
-    if isinstance(obj, (datetime, date)):
-        return obj.isoformat()
-    # numpy int/float
-    try:
-        import numpy as np
-        if isinstance(obj, (np.integer,)):
-            return int(obj)
-        if isinstance(obj, (np.floating,)):
-            return float(obj)
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-    except ImportError:
-        pass
-    # pandas.Timestamp (in case it is not a datetime subclass in this environment)
-    try:
-        import pandas as pd
-        if isinstance(obj, pd.Timestamp):
-            return obj.isoformat()
-        if isinstance(obj, pd.NA.__class__):
-            return None
-        # GeoDataFrame/DataFrame — nunca serializar inteiro, retorna apenas resumo
-        if isinstance(obj, pd.DataFrame):
-            return f"<DataFrame {obj.shape[0]}x{obj.shape[1]}>"
-    except ImportError:
-        pass
-    # Limita strings muito longas para evitar payload gigante
-    s = str(obj)
-    if len(s) > 500:
-        return s[:500] + "...[truncated]"
-    return s
+# The serializer's `default`, shared with the pin (flow/executor/pin.py).
+_json_default = json_default
 
 
 # WebSocket payload limit (16 MB) — matches uvicorn's ws_max_size in app/main.py.

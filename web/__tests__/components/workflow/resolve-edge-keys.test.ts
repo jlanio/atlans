@@ -122,8 +122,10 @@ describe("sourceHandleDaChave", () => {
     expect(sourceHandleDaChave(outs, "focos")).toBe("focos")
   })
 
-  it("nó multi-saída, `nome` não é porta → undefined (não mexe no handle atual)", () => {
-    // Avoids re-anchoring on a nonexistent port; the caller keeps the sourceHandle.
-    expect(sourceHandleDaChave([{ name: "focos" }, { name: "bbox" }], "data")).toBeUndefined()
+  it("nó multi-saída, `nome` não é porta → null (a aresta sai da porta)", () => {
+    // The SubWorkflow's envelope chosen on an edge that sat on a port: keeping
+    // the port saved the old drag defect's pair (port + envelope), which loads
+    // as "the port" — the choice would be undone on the next load.
+    expect(sourceHandleDaChave([{ name: "focos" }, { name: "bbox" }], "data")).toBeNull()
   })
 })

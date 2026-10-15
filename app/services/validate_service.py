@@ -29,8 +29,9 @@ Order, and the reason for it:
    execute, because the DatabaseSpatialQuery simulation CONNECTS to the
    credential's database; below that only the user's own scope applies. Then, the
    checks that need the database (nodes disabled by the admin, sub-workflow
-   references).
-5. Executor → simulation → edge diagnostics; the result is
+   references and the contracts of the called workflows).
+5. Executor → simulation → edge diagnostics, plus the edges at each SubWorkflow
+   node checked against the called workflow's contract; the result is
    `{node_id: {...}}` + `__edge_diagnostics__` (only when present) + `__report__`
    (always; consumers skip the `__*` keys).
 
@@ -55,6 +56,7 @@ from app.core.db import get_session_async
 from app.core.exceptions import CredentialAccessDeniedError, InvalidDefinitionError
 from app.core.rbac import ROLE_OPERATOR
 from app.services import fontes_service
+from app.services.contrato_do_subfluxo import contratos_dos_filhos, diagnosticos_de_contrato
 from app.services.credential_resolver import receiving_property, accepted_types_from_descriptor
 from app.services.disabled_nodes_service import disabled_names
 from flow.utils.definition_lint import FATAL_CODES, LintReport, lint_definition
@@ -117,6 +119,10 @@ class EdgeDefinition(BaseModel):
     from_key: Optional[str] = None
     to_key: Optional[str] = None
     condition: Optional[bool] = None
+    # The branch handle: with no usable `condition`, the run routes the edge by
+    # it (edge_resolver.Edge.from_dict). Dropped here, the validation read as a
+    # data edge what the run treats as a branch.
+    source_handle: Optional[str] = None
 
 
 class WorkflowDefinition(BaseModel):
@@ -128,6 +134,37 @@ class WorkflowDefinition(BaseModel):
 
 
 # --- HELPERS ---
+# React Flow's names for what the definition calls `source_handle`, `from_key` and
+# `to_key`. The model above drops them before the lint, and the executor never
+# reads them: an edge written with them runs as "spread every output", which
+# is not what whoever wrote `fromKey` meant — and nothing said so.
+_CHAVES_DO_REACT_FLOW = {
+    "sourceHandle": "source_handle",
+    "targetHandle": "to_key",
+    "fromKey": "from_key",
+    "toKey": "to_key",
+    "data": "from_key/to_key no nível da aresta",
+}
+
+
+def _chaves_de_aresta_ignoradas(definition: Any) -> List[tuple]:
+    """`(edge, key, what to use)` for each React Flow key in the RAW edges."""
+    if not isinstance(definition, dict):
+        return []
+    # Raw, before the Pydantic model: an `edges` that is not a list (a number,
+    # a boolean) escaped as a TypeError the MCP tools do not translate, instead
+    # of the model's validation error right after.
+    arestas = definition.get("edges")
+    achados = []
+    for edge in arestas if isinstance(arestas, list) else []:
+        if not isinstance(edge, dict):
+            continue
+        for chave, certo in _CHAVES_DO_REACT_FLOW.items():
+            if chave in edge:
+                achados.append(({"source": edge.get("source"), "target": edge.get("target")}, chave, certo))
+    return achados
+
+
 def _payload_para_o_executor(definition: WorkflowDefinition) -> dict:
     """Definition in the format the executor and the server helpers read.
 
@@ -294,9 +331,9 @@ def _build_report(
         if d.get("from_key") is not None:
             edge["from_key"] = d["from_key"]
         if d.get("severity") == "error":
-            errors.append(_item("edge_from_key_unknown", "error", str(d.get("message", "")), edge=edge))
+            errors.append(_item(d.get("code") or "edge_from_key_unknown", "error", str(d.get("message", "")), edge=edge))
         else:
-            warnings.append(_item("edge_spread_ambiguous", "warning", str(d.get("message", "")), edge=edge))
+            warnings.append(_item(d.get("code") or "edge_spread_ambiguous", "warning", str(d.get("message", "")), edge=edge))
 
     for node_id, saida in simulated_outputs.items():
         if str(node_id).startswith("__") or not isinstance(saida, dict):
@@ -359,6 +396,7 @@ async def validar_definicao(
     from flow.executor import WorkflowExecutor
     from flow.registry import NODE_REGISTRY
 
+    ignoradas = _chaves_de_aresta_ignoradas(definition)
     if not isinstance(definition, WorkflowDefinition):
         definition = WorkflowDefinition.model_validate(definition)
     if workspace_id is None:
@@ -385,6 +423,14 @@ async def validar_definicao(
             continue
 
     lint = lint_definition(nodes, payload["edges"], registry_names=NODE_REGISTRY.keys(), descriptors=descriptors)
+    for edge, chave, certo in ignoradas:
+        lint.aviso(
+            "edge_unknown_key",
+            f"aresta '{edge['source']}' -> '{edge['target']}' usa '{chave}' (nome do "
+            f"React Flow), que o executor ignora: use {certo}. Sem isso a aresta "
+            "repassa todas as saídas da origem.",
+            edge=edge,
+        )
     if lint.fatal:
         raise InvalidDefinitionError(_fatal_message(lint), report=_build_report(
             lint, nodes, disabled_nodes=None, subworkflow_errors=None,
@@ -394,6 +440,7 @@ async def validar_definicao(
     cred_ids = _valid_credential_ids(nodes)
     disabled_nodes: Optional[list] = None
     subworkflow_errors: Optional[list] = None
+    contratos_chamados: dict = {}
     shared_scope: Optional[str] = None
     avisos_de_fonte: list = []
     if cred_ids or workspace_id:
@@ -428,6 +475,11 @@ async def validar_definicao(
                 subworkflow_errors = list(
                     await validate_subworkflow_references_against_db(payload, db, workspace_id=workspace_id)
                 )
+                # The contracts of the workflows this one calls, for its edges at
+                # each SubWorkflow node (below, after the executor's own edge
+                # diagnostics). A child that renamed a port leaves its callers
+                # wired to a name it no longer has.
+                contratos_chamados = await contratos_dos_filhos(db, payload, workspace_id)
                 # The source catalog: no network, one query per definition. Fails
                 # OPEN here too — validation does not depend on the catalog.
                 try:
@@ -458,6 +510,11 @@ async def validar_definicao(
     # Under a reserved key, in the same pattern as __artifacts__/__response__, so as
     # not to be confused with the per-node_id schemas. Only appears when there is something.
     diagnostics = executor.validate_edges()
+    # `validate_edges` lets any `from_key` leaving a SubWorkflow node through: the
+    # child's ports come from another workflow, which the executor never reads.
+    # Here the child's contract is known (only with `workspace_id`), so the
+    # caller's edges are checked against it, in the same report.
+    diagnostics.extend(diagnosticos_de_contrato(payload, contratos_chamados))
     saida = executor.simulated_outputs
     if diagnostics:
         saida["__edge_diagnostics__"] = diagnostics

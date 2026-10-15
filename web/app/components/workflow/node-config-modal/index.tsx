@@ -1,7 +1,7 @@
 import { INodeContext } from "@/context/useFlowContext"
 import { useWorkflowCatalogStore } from "@/app/stores/workflowCatalogStore"
 import { useConfigNodeParams } from "@/app/hooks/workflow/useConfigNodeParams"
-import { Edge, useReactFlow, useStore } from "@xyflow/react"
+import { Edge, useReactFlow, useStore, useStoreApi } from "@xyflow/react"
 import { memo, useCallback, useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { createPortal } from "react-dom"
@@ -28,6 +28,7 @@ import { NODE_ICONS } from "@/consts/WorkflowIcons"
 
 import { TYPE_STYLES, DEFAULT_STYLE } from "@/consts/NodeTypeStyles"
 import { RESERVED_ALIASES, isValidAlias } from "../utils/node-alias"
+import { mudancaDeSaidas, trocasDaChaveRenomeada } from "../utils/variaveis-de-saida"
 
 // Classes shared by the side panels (Input / Output) and the central modal.
 // Centralizing them avoids visual drift among the 3 panels when adjusting width/shadow.
@@ -50,6 +51,7 @@ const MODAL_BOX  = "relative pointer-events-auto bg-background rounded-lg border
 const NodeConfigModal = () => {
   const { id: workflowId } = useParams<{ id?: string }>()
   const { setNodes, getNode } = useReactFlow<INodeContext, Edge>()
+  const store = useStoreApi<INodeContext, Edge>()
   const { configNodeIdParam, removeConfigNodeParam } = useConfigNodeParams()
   // The modal is a portal WITHOUT a blocking overlay: the canvas stays draggable
   // while it is open. Subscribing to `useNodes()` made the reconciliation below
@@ -158,6 +160,21 @@ const NodeConfigModal = () => {
 
     // Functional form: applies on top of the store's latest list.
     setNodes(nds => nds.map(node => (node.id === updatedNode.id ? updatedNode : node)))
+
+    // A renamed output variable takes along the edges that read it. Left on the
+    // old name they stayed drawn, saved and ran, delivering nothing. Emitted as
+    // edge changes, like the badge's key choice: the editor records them as one
+    // undo step that also holds this configuration, so Ctrl+Z never leaves the
+    // node delivering one name and its edges reading the other. Any other loss
+    // of a name in use is warned about in the form, before applying.
+    const { renomeada } = mudancaDeSaidas(nodeFound.data, values)
+    if (renomeada) {
+      const { edges } = store.getState()
+      store.getState().triggerEdgeChanges(
+        trocasDaChaveRenomeada(edges, nodeFound.id, renomeada, nodeFound.data.outputs),
+      )
+    }
+
     setNodeFound(updatedNode)
     removeConfigNodeParam()
   }
@@ -185,9 +202,16 @@ const NodeConfigModal = () => {
 
   if (!isOpen || !nodeFound) return null
 
-  // Modal rendered as a portal — no blocking overlay
+  // Modal rendered as a portal — no blocking overlay.
+  //
+  // `nokey` keeps React Flow's keyboard out of it. Its delete key listens on
+  // the whole document and only skips text fields and `.nokey` elements; the
+  // double-click that opens this modal leaves the node selected, so Backspace
+  // on any button, select or switch in here deleted the very node being
+  // configured, edges and all. Text inputs were already safe — which is why it
+  // went unnoticed while typing.
   const modal = createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+    <div className="nokey fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
       {/* Subtle backdrop — clickable to close, allows drag-through */}
       <div
         className="absolute inset-0 bg-black/20 pointer-events-auto"

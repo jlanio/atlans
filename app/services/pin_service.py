@@ -336,6 +336,44 @@ async def _artefato_de_pin(db: AsyncSession, workflow_hash: str, node_id: str):
     return resultado.scalar_one_or_none()
 
 
+def _no_prefixo_do_workspace(chave: Any, workspace_id: Any) -> bool:
+    """Audit SEG-10: only a key INSIDE `pin-cache/{workspace_id}/` may be deleted.
+
+    Legitimate keys are derived on the server as `pin-cache/{workspace_id}/…`;
+    any key outside that (an old forged entry) is ignored, not deleted.
+    """
+    return isinstance(chave, str) and chave.startswith(f"pin-cache/{workspace_id}/") and ".." not in chave
+
+
+def chaves_do_pin(ref: Any, workspace_id: Any) -> list[str]:
+    """The storage objects of a pin ref that may be deleted — one per layer.
+
+    The first layer is `__pin_s3_key__`. Each further DataFrame output of the node
+    has an object of its own, named in `__pin_frames__` (`flow/executor/pin.py`),
+    with no `Artifact` row: the ref is the only record of it, so every path that
+    deletes pin objects — unpin, move, workspace purge — reads it here, or leaves
+    those objects in MinIO with nothing pointing at them.
+
+    Each layer's key is the folder of `__pin_s3_key__` plus its name, the same one
+    the executor downloads (`pin_frame_s3_key`): a ref pointing outside the
+    workspace takes its layers out of the guard along with it, and a name that
+    climbs out of the folder is refused before the guard.
+    """
+    if not isinstance(ref, dict):
+        return []
+    from flow.executor.pin import pin_frame_s3_key
+
+    principal = ref.get("__pin_s3_key__")
+    chaves = [principal]
+    camadas = ref.get("__pin_frames__")
+    if isinstance(camadas, dict):
+        chaves += [
+            pin_frame_s3_key(principal, camada.get("filename"))
+            for camada in camadas.values() if isinstance(camada, dict)
+        ]
+    return list(dict.fromkeys(k for k in chaves if _no_prefixo_do_workspace(k, workspace_id)))
+
+
 async def unpin_output(db: AsyncSession, wf, node_id: str) -> dict:
     """Unpins the node and deletes the cache object — in that order, on purpose.
 
@@ -368,20 +406,16 @@ async def unpin_output(db: AsyncSession, wf, node_id: str) -> dict:
     flag_modified(wf, "pin_metadata")
 
     artefato = await _artefato_de_pin(db, wf.id_hash, node_id)
-    # The two keys may diverge; deleting both is what leaves no object
-    # behind. `dict.fromkeys` preserves order and removes repetition.
+    # The ref's key and the row's may diverge; deleting both is what leaves no
+    # object behind. The ref also brings one key per extra layer (a DataFrame
+    # output beyond the first), which has no row. `dict.fromkeys` preserves order
+    # and removes repetition.
     #
     # Audit (SEG-10): only deletes keys INSIDE the workspace prefix of this
-    # workflow. Legitimate keys are derived on the server as
-    # `pin-cache/{workspace_id}/…`; any key outside that (an old forged
-    # entry) is ignored, not deleted.
-    prefixo = f"pin-cache/{wf.workspace_id}/"
+    # workflow (`_no_prefixo_do_workspace`).
     chaves = dict.fromkeys(
-        k for k in (
-            ref.get("__pin_s3_key__") if isinstance(ref, dict) else None,
-            getattr(artefato, "s3_key", None),
-        )
-        if isinstance(k, str) and k.startswith(prefixo) and ".." not in k
+        k for k in (*chaves_do_pin(ref, wf.workspace_id), getattr(artefato, "s3_key", None))
+        if _no_prefixo_do_workspace(k, wf.workspace_id)
     )
     if artefato is not None:
         await db.delete(artefato)

@@ -2,15 +2,13 @@ import { INodeContext } from "@/context/useFlowContext"
 import { useTools } from "@/app/hooks/workflow/useTools"
 import { useEdges, NodeProps } from "@xyflow/react"
 import { memo, useCallback, useMemo } from "react"
-import AddConnectionHandle from "../add-connection-handle"
-import AddInputHandle from "../add-input-handle"
-import { HandleSource, HandleTarget } from "../handle"
 import IconRoot from "../icon-root"
+import { PortasDeEntrada, PortasDeSaida } from "../portas"
 import ToolsIcon from "../tools"
 import { NODE_ICONS } from "@/consts/WorkflowIcons"
 import { TbError404 } from "react-icons/tb"
 import { INodePortAPI } from "@/service/types"
-import { calcNodeHeight, portTopStyle } from "../../utils/node-metrics"
+import { calcNodeHeight } from "../../utils/node-metrics"
 
 // `selected` comes from the React Flow prop. Reading `useNodes()` just to find
 // that out subscribed to the whole node array: during a drag React Flow emits a
@@ -45,9 +43,14 @@ const DefaultTypeIcon = ({ id, data, selected }: NodeProps<INodeContext>) => {
   const isOutputNode = data.type === "output"
   const outputs = (data.outputs ?? []) as INodePortAPI[]
   const inputs  = (data.inputs  ?? []) as INodePortAPI[]
+  // Output-type nodes are terminal: no output to start a connection from. But an
+  // edge can already leave one — written through the MCP or by hand, and the
+  // executor runs it — and without a handle React Flow does not draw it: it
+  // could be neither seen nor deleted. Those nodes draw their outputs.
+  const drawOutputs = !isOutputNode || connectedSources.size > 0
 
   const title = (data.properties?.["alias"] as string | undefined) || (data.alias as string)
-  const nodeHeight = calcNodeHeight(Math.max(isOutputNode ? 0 : outputs.length, inputs.length))
+  const nodeHeight = calcNodeHeight(Math.max(drawOutputs ? outputs.length : 0, inputs.length))
   // Stable object: recreating it per render invalidated the card's props
   // comparison on every frame.
   const cardStyle = useMemo(() => ({ height: nodeHeight }), [nodeHeight])
@@ -67,63 +70,11 @@ const DefaultTypeIcon = ({ id, data, selected }: NodeProps<INodeContext>) => {
       <Icon className="text-xl" />
 
       {/* ── Outputs (right) — output-type nodes are terminal, with no output ── */}
-      {!isOutputNode && (
-        outputs.length > 1 ? (
-          outputs.map((port, i) => {
-            const ts = portTopStyle(i, outputs.length, nodeHeight)
-            return (
-              <AddConnectionHandle
-                key={port.name}
-                nodeId={id}
-                label={port.name}
-                handleId={port.name}
-                connectionVisible={!connectedSources.has(port.name)}
-                style={ts}
-              >
-                <HandleSource
-                  id={port.name}
-                  className="port-top"
-                  livre={!connectedSources.has(port.name)}
-                  style={ts}
-                />
-              </AddConnectionHandle>
-            )
-          })
-        ) : (
-          <AddConnectionHandle
-            nodeId={id}
-            connectionVisible={!connectedSources.has("__default__")}
-          >
-            <HandleSource livre={!connectedSources.has("__default__")} />
-          </AddConnectionHandle>
-        )
+      {drawOutputs && (
+        <PortasDeSaida nodeId={id} outputs={outputs} nodeHeight={nodeHeight} emUso={connectedSources} />
       )}
 
-      {/* ── Inputs (left) — a dashed line distinguishes them from outputs ── */}
-      {inputs.length > 1 ? (
-        inputs.map((port, i) => {
-          const ts = portTopStyle(i, inputs.length, nodeHeight)
-          return (
-            <AddInputHandle
-              key={port.name}
-              label={port.name}
-              connectionVisible={!connectedTargets.has(port.name)}
-              style={ts}
-            >
-              <HandleTarget
-                id={port.name}
-                className="port-top"
-                livre={!connectedTargets.has(port.name)}
-                style={ts}
-                title={port.name}
-              />
-            </AddInputHandle>
-          )
-        })
-      ) : (
-        <HandleTarget livre={!connectedTargets.has("__default__")} />
-      )}
-
+      <PortasDeEntrada inputs={inputs} nodeHeight={nodeHeight} emUso={connectedTargets} />
 
     </IconRoot>
   )

@@ -1274,6 +1274,23 @@ export interface IScheduleNotice {
   details?: Record<string, unknown>
 }
 
+/**
+ * A workflow that calls the saved one as a sub-workflow and uses a port the
+ * save removed or renamed. Mirrors the backend's `SubworkflowNotice`: one per
+ * caller node and side — `saida` when its edges leaving the node name a removed
+ * output (they deliver nothing), `entrada` when it feeds a removed input (the
+ * child drops it). The editor sums them up in one toast.
+ */
+export interface ISubworkflowNotice {
+  workflow_id: string
+  workflow_name: string
+  node_id?: string | null
+  side: "saida" | "entrada"
+  ports: string[]
+  /** The caller's edges on those ports (0 when only its mapping uses them). */
+  edges: number
+}
+
 export interface IWorkflow {
   id?: number
   id_hash: string
@@ -1319,6 +1336,13 @@ export interface IWorkflow {
   deleted_at?: string | null
   /** Schedule notices from this save (empty in the normal case). */
   schedule_notices?: IScheduleNotice[]
+  /** Tag of the stored definition (GET/PUT). The editor sends it back as
+   *  `expected_etag` on its next save: a save over a definition someone else
+   *  changed in between is refused with 409 `definition_conflict`. */
+  definition_etag?: string | null
+  /** Callers this save broke: workflows that call this one as a sub-workflow
+   *  and use a port the save removed (PUT only; empty in the normal case). */
+  subworkflow_notices?: ISubworkflowNotice[]
 }
 
 export interface IWorkflowGroup {

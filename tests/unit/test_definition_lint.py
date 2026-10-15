@@ -121,7 +121,9 @@ def test_cycle_is_fatal():
 
 
 def test_report_without_fatal_is_not_fatal():
-    rel = _lint([_n("a"), _n("b")], [{"source": "a", "target": "ghost"}])
+    # The a -> b edge keeps the run from being empty (with only the orphan edge,
+    # nothing would run — `empty_run`, an error, though not a fatal one).
+    rel = _lint([_n("a"), _n("b")], [{"source": "a", "target": "b"}, {"source": "a", "target": "ghost"}])
 
     assert rel.errors == []
     assert not rel.fatal
@@ -166,6 +168,21 @@ def test_isolated_node_and_node_outside_trigger_cone_are_distinct_warnings():
     assert "sem caminho a partir de um trigger" in fora["z"]
     assert fora["x"] != fora["y"]
     assert rel.execution_order == ["t", "a"]
+
+
+def test_nenhuma_aresta_ligando_nos_e_execucao_vazia():
+    # Edges pointing at ids that are not in the definition: every node leaves
+    # the run, and nothing would execute.
+    rel = _lint([_n("t2", name="T", ntype="trigger"), _n("a2")],
+                [{"source": "t", "target": "a"}])
+    assert "empty_run" in _codes(rel.errors)
+    assert rel.execution_order == []
+
+
+def test_execucao_com_algum_no_nao_e_vazia():
+    rel = _lint([_n("t", name="T", ntype="trigger"), _n("a"), _n("x")],
+                [{"source": "t", "target": "a"}, {"source": "x", "target": "ghost"}])
+    assert "empty_run" not in _codes(rel.errors)
 
 
 def test_without_edges_no_node_is_unreachable():
@@ -630,3 +647,32 @@ def test_secret_keys_in_sync_with_the_factory():
     from flow.factory import _SECRET_PROPERTIES
 
     assert SECRET_KEYS == _SECRET_PROPERTIES
+
+
+# ── Saved `type` outside the catalog's ────────────────────────────────────────
+
+_DESC_TIPOS = {**_DESCRIPTORS, "C": {"name": "C", "type": "control", "properties": []}}
+
+
+@pytest.mark.parametrize("no, arestas, severidade", [
+    # Saved as trigger: the run feeds it the initial input and ignores its edges.
+    (_n("n1", name="A", ntype="trigger"), [{"source": "t", "target": "n1"}], "error"),
+    # With no edge reaching it, it is only a starting point (a migrated DriveTrigger).
+    (_n("n1", name="A", ntype="trigger"), [], "warning"),
+    # A catalog trigger saved as something else is not a starting point.
+    (_n("n1", name="T", ntype="action"), [], "error"),
+    # No trigger involved: the run does not read it, the catalog's is the right one.
+    (_n("n1", name="A", ntype="control"), [], "warning"),
+])
+def test_type_diferente_do_catalogo(no, arestas, severidade):
+    rel = _lint([_n("t", name="T", ntype="trigger"), no], arestas, descriptors={**_DESC_TIPOS})
+    diags = [d for d in rel.errors + rel.warnings if d.code == "node_type_mismatch"]
+    assert [d.severity for d in diags] == [severidade]
+    assert diags[0].node_id == "n1"
+
+
+def test_type_igual_ao_catalogo_ou_sem_descriptor_nao_avisa():
+    assert "node_type_mismatch" not in _codes(_lint([_n("n1", name="A", ntype="action")], descriptors=_DESC_TIPOS).warnings)
+    # Without the descriptors there is nothing to compare against.
+    rel = _lint([_n("n1", name="A", ntype="trigger")])
+    assert "node_type_mismatch" not in _codes(rel.errors + rel.warnings)

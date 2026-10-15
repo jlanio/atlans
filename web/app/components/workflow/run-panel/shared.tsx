@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { useReactFlow } from "@xyflow/react"
 import {
-  TbCircleCheck, TbCircleX, TbCircleDashed, TbAlertTriangle, TbHelpCircle,
+  TbCircleCheck, TbCircleX, TbCircleDashed, TbAlertTriangle, TbArrowMerge, TbPlugConnectedX, TbHelpCircle,
 } from "react-icons/tb"
 import ExecActivity from "@/app/components/shared/exec-activity"
 import { cn } from "@/lib/utils"
@@ -75,6 +75,48 @@ export function DriftBadge({ drift }: { drift: { missing: string[]; extra: strin
       className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-px text-[10px] text-amber-600 dark:text-amber-400"
     >
       <TbAlertTriangle size={10} /> schema
+    </span>
+  )
+}
+
+/** What each incoming edge that delivered nothing asked for, one per line. */
+export function descreverArestasSemDado(arestas: NonNullable<NodeRun["unresolvedEdges"]>): string {
+  return arestas.map(a => (
+    `"${a.sourceName}" não produziu "${a.from_key}"`
+    + (a.keys.length ? ` (produziu: ${a.keys.join(", ")})` : " (não produziu nada)")
+  )).join("\n")
+}
+
+/** The node ran without one of its inputs: an edge asks for a key its source
+ *  no longer produces. Shown even when the node "completed" — with the input
+ *  missing, a green run can carry wrong data. */
+export function EntradaVaziaBadge({ arestas }: { arestas: NonNullable<NodeRun["unresolvedEdges"]> }) {
+  return (
+    <span
+      title={`Conexão sem dado — o nó rodou sem esta entrada:\n${descreverArestasSemDado(arestas)}`}
+      className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-px text-[10px] text-amber-600 dark:text-amber-400"
+    >
+      <TbPlugConnectedX size={10} /> entrada vazia
+    </span>
+  )
+}
+
+/** Which input keys two edges wrote, one per line. */
+export function descreverEntradasSobrescritas(entradas: NonNullable<NodeRun["overwrittenInputs"]>): string {
+  return entradas.map(o => (
+    `"${o.key}": o valor de "${o.sourceName}" substituiu o de "${o.overwroteName}"`
+  )).join("\n")
+}
+
+/** Two incoming edges wrote the same input key and the node only saw the last
+ *  one — the result can be missing a whole branch, with nothing failing. */
+export function EntradaSobrescritaBadge({ entradas }: { entradas: NonNullable<NodeRun["overwrittenInputs"]> }) {
+  return (
+    <span
+      title={`Duas conexões escrevem a mesma entrada — o nó só viu a última:\n${descreverEntradasSobrescritas(entradas)}\nDê a cada conexão uma entrada própria (no Merge e no Python Script, declare as portas de entrada e ligue cada conexão a uma).`}
+      className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-px text-[10px] text-amber-600 dark:text-amber-400"
+    >
+      <TbArrowMerge size={10} /> entrada sobrescrita
     </span>
   )
 }

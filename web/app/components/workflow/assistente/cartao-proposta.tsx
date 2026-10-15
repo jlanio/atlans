@@ -19,8 +19,8 @@
 // The assistant still does NOT save: drawing is a draft on the canvas, and the
 // editor's Save still belongs to whoever is using it.
 
-import { useEffect, useMemo, useRef } from "react"
-import { useNodes } from "@xyflow/react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useEdges, useNodes } from "@xyflow/react"
 import { TbAlertTriangle, TbCheck, TbWand } from "react-icons/tb"
 
 import { Button } from "@/app/components/ui/button"
@@ -37,28 +37,50 @@ interface Props {
   liberado: boolean
   /** Called on the first accepted drawing, so the following ones don't ask. */
   onLiberar: () => void
+  /** Ids of the edges the conversation's last drawing put on the canvas. They
+   *  are not connections made by hand: a drawing that rewires them does not
+   *  have to wait for a click. */
+  arestasDoAssistente?: ReadonlySet<string>
 }
 
-export default function ProposalCard({ proposta, onAplicar, liberado, onLiberar }: Props) {
+export default function ProposalCard({ proposta, onAplicar, liberado, onLiberar, arestasDoAssistente }: Props) {
   const nodesAPI = useWorkflowCatalogStore(s => s.nodesAPI)
   // Subscribes to the canvas HERE, not in the drawer: only this card needs to react
   // to what is drawn, and subscribing up there would re-render the whole
   // conversation on every frame of a drag.
   const nos = useNodes<INodeContext>()
+  const arestas = useEdges()
 
   const resultado = useMemo(
-    () => aplicarProposta(proposta.definicao, nodesAPI, nos),
-    [proposta.definicao, nodesAPI, nos],
+    () => aplicarProposta(
+      proposta.definicao, nodesAPI, nos,
+      arestasDoAssistente?.size ? arestas.filter(e => !arestasDoAssistente.has(e.id)) : arestas,
+    ),
+    [proposta.definicao, nodesAPI, nos, arestas, arestasDoAssistente],
   )
 
-  const { novos, alterados, removidos } = resultado.resumo
+  const { novos, alterados, removidos, arestasRemovidas = 0 } = resultado.resumo
 
   // Empty canvas: nothing to lose, always draws. Canvas with work: only after
-  // the conversation's first acceptance.
+  // the conversation's first acceptance — and never over connections drawn
+  // since: the assistant builds on the SAVED workflow, so an edge made by hand
+  // in the meantime would vanish with no one asked.
+  //
+  // Decided ONCE, on the canvas the card arrived on (or as soon as the catalog
+  // lets it decide). Recomputed on every render, a card held back re-armed as
+  // soon as the canvas changed: after the person drew a NEWER card, the older
+  // one found nothing left to remove and drew itself over it, taking back what
+  // the newer one had added. Lazy initialization of a ref, the one write during
+  // render React allows.
   const canvasEmpty = nos.length === 0
-  const drawsAutomatically = proposta.desenhar === true
-    && resultado.catalogoPronto
-    && (canvasEmpty || liberado)
+  const decisao = useRef<boolean | null>(null)
+  if (decisao.current === null && proposta.desenhar === true && resultado.catalogoPronto) {
+    decisao.current = canvasEmpty || (liberado && arestasRemovidas === 0)
+  }
+  const drawsAutomatically = decisao.current === true
+  // Drawn by the button: the card says so and stops offering it.
+  const [desenhadoNoClique, setDesenhadoNoClique] = useState(false)
+  const desenhado = drawsAutomatically || desenhadoNoClique
 
   // Once per card. Without the lock, any canvas re-render (a drag,
   // a zoom) would reapply the same proposal and undo what the person just
@@ -85,7 +107,7 @@ export default function ProposalCard({ proposta, onAplicar, liberado, onLiberar 
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-foreground">
             {proposta.desenhar
-              ? (drawsAutomatically ? "Desenhado no canvas" : "Pronto para desenhar")
+              ? (desenhado ? "Desenhado no canvas" : "Pronto para desenhar")
               : (validated ? "Validação limpa" : "Validação com pendências")}
           </p>
           {proposta.nota && (
@@ -114,14 +136,17 @@ export default function ProposalCard({ proposta, onAplicar, liberado, onLiberar 
 
       {/* The count of what CHANGES on the canvas. Only appears when there is a canvas:
           on an empty workflow "4 novos" tells nothing the 4 nodes don't already say. */}
-      {(alterados > 0 || removidos > 0) && (
+      {(alterados > 0 || removidos > 0 || arestasRemovidas > 0) && (
         <p className="mt-2 text-xs tabular-nums text-muted-foreground">
           {[
             novos > 0 ? `${novos} ${novos === 1 ? "novo" : "novos"}` : null,
             alterados > 0 ? `${alterados} ${alterados === 1 ? "alterado" : "alterados"}` : null,
             removidos > 0 ? `${removidos} ${removidos === 1 ? "removido" : "removidos"}` : null,
+            arestasRemovidas > 0
+              ? `${plural(arestasRemovidas, "ligação removida", "ligações removidas")}`
+              : null,
           ].filter(Boolean).join(" · ")}
-          {removidos > 0 && (
+          {(removidos > 0 || arestasRemovidas > 0) && (
             <span className="block text-destructive">
               Aplicar substitui o canvas. O que não estiver no fluxo proposto some.
             </span>
@@ -133,17 +158,15 @@ export default function ProposalCard({ proposta, onAplicar, liberado, onLiberar 
           first drawing on a canvas that already had work. After it, the
           conversation draws by itself and the footer disappears — interrupting at
           every node would be the opposite of watching the workflow grow. */}
-      {proposta.desenhar && !drawsAutomatically && (
+      {proposta.desenhar && !desenhado && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             className="max-md:h-10"
             disabled={!resultado.catalogoPronto}
             onClick={() => {
-              // The lock BEFORE releasing: releasing makes `drawsAutomatically`
-              // true, the effect fires, and without this the same drawing
-              // would land on the canvas twice.
               alreadyDrew.current = true
+              setDesenhadoNoClique(true)
               onLiberar()
               onAplicar(resultado)
             }}
@@ -157,7 +180,7 @@ export default function ProposalCard({ proposta, onAplicar, liberado, onLiberar 
         </div>
       )}
 
-      {proposta.desenhar && drawsAutomatically && (
+      {proposta.desenhar && desenhado && (
         <p className="mt-2 text-[11px] text-muted-foreground">
           Desenhar não salva — o Salvar continua seu.
         </p>

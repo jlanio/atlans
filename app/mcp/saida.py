@@ -101,9 +101,11 @@ def iso(valor: Any) -> str | None:
 
 # ── Summary of a definition ──────────────────────────────────────────────────
 
-# Edge keys that matter to whoever reads the workflow. `source_handle` is left
-# out: it is canvas drawing, not data semantics.
-_EDGE_KEYS = ("from_key", "to_key", "condition")
+# Edge keys that matter to whoever reads the workflow. `source_handle` goes too:
+# it is not only drawing — it routes a branch edge written without `condition`
+# and names the SubWorkflow port an edge leaves from (`from_key_efetiva`), and
+# a workflow rewritten from this summary without it lost both.
+_EDGE_KEYS = ("from_key", "to_key", "condition", "source_handle")
 
 
 def _nodes(definition: Mapping[str, Any]) -> Iterable[Mapping[str, Any]]:
@@ -126,6 +128,9 @@ def definition_summary(
     definition: a pin is workflow state, not drawing. Only pins of nodes that
     still exist are included — an orphan pin describes a deleted node.
     """
+    # Here, not at the top: `flow.executor` pulls the whole engine in.
+    from flow.executor.edge_resolver import from_key_efetiva
+
     nos = list(_nodes(definition))
     ids = {str(no.get("id") or "") for no in nos}
 
@@ -147,7 +152,8 @@ def definition_summary(
                 continue
             item = {"source": aresta.get("source"), "target": aresta.get("target")}
             for chave in _EDGE_KEYS:
-                valor = aresta.get(chave)
+                # The key the run delivers, not a stale spelling of it.
+                valor = from_key_efetiva(aresta) if chave == "from_key" else aresta.get(chave)
                 if valor not in (None, ""):
                     item[chave] = valor
             arestas.append(item)

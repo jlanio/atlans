@@ -170,6 +170,44 @@ async def test_pin_objects_are_deleted_from_storage(_without_minio):
 
 
 @pytest.mark.asyncio
+async def test_mover_recolhe_o_objeto_de_cada_camada_do_pin(_without_minio):
+    """A node with several DataFrame outputs has one object per layer; collecting only
+    `__pin_s3_key__` left the others behind in the source workspace's prefix."""
+    pasta = f"pin-cache/{ORIGEM}/run-1"
+    wf = _workflow(pinned_outputs={"n1": {
+        "__pin_s3_key__": f"{pasta}/n1_pin.parquet",
+        "__pin_format__": "parquet",
+        "__pin_frames__": {
+            "removed": {"format": "parquet", "filename": "n1_pin_removed_0a1b2c3d4e5f.parquet"},
+            "lines": {"format": "geojson", "filename": "n1_pin_lines_5f4e3d2c1b0a.geojson"},
+        },
+    }})
+    await _mover(wf)
+
+    assert _without_minio.await_args.args[0] == [
+        f"{pasta}/n1_pin.parquet",
+        f"{pasta}/n1_pin_removed_0a1b2c3d4e5f.parquet",
+        f"{pasta}/n1_pin_lines_5f4e3d2c1b0a.geojson",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_mover_nao_apaga_objeto_de_pin_fora_do_workspace_de_origem(_without_minio):
+    """The same guard as the unpin (SEG-10): a ref pointing outside
+    `pin-cache/{origin}/` (an old forged entry) does not become a delete of
+    another tenant's object."""
+    wf = _workflow(pinned_outputs={"n1": {
+        "__pin_s3_key__": "pin-cache/OUTRO-WS/run-1/n1_pin.parquet",
+        "__pin_frames__": {
+            "removed": {"format": "parquet", "filename": "n1_pin_removed_0a1b2c3d4e5f.parquet"},
+        },
+    }})
+    await _mover(wf)
+
+    assert _without_minio.await_args.args[0] == []
+
+
+@pytest.mark.asyncio
 async def test_authorship_is_stamped():
     wf = _workflow()
     await _mover(wf, moved_by_id="usr-9")

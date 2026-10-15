@@ -10,10 +10,15 @@ import { getLaneOffset } from "../utils/edge-bundling"
 import { getCandidateKeys, sourceHandleDaChave } from "../utils/resolve-edge-keys"
 import { corDoTom, tomDaAresta } from "../utils/exec-colors"
 import { useSubflowReadOnly, useSubflowStatus } from "../subflow-viewer/scope"
+import { useCanvasReadOnly } from "../canvas-interaction"
 
 // The Conditional's routing handles. Only decides whether the badge becomes a key
 // selector — the COLOR comes from `tomDaAresta`, which already knows these same handles.
 const BRANCH_HANDLE = new Set(["true", "false"])
+
+// How far above the badge the delete button sits: the badge is ~17px tall and
+// the button ~19px, so their edges stay a few pixels apart.
+const DELETE_ABOVE_LABEL = 22
 
 const CustomEdge = ({
   id,
@@ -36,6 +41,9 @@ const CustomEdge = ({
   // provider returns the literal default and never re-renders.
   const inViewer = useSubflowReadOnly()
   const subflowStatus = useSubflowStatus()
+  // Neither the sub-workflow viewer nor the phone canvas edits the graph.
+  const canvasReadOnly = useCanvasReadOnly()
+  const canDelete = !inViewer && !canvasReadOnly
   // Scalar selectors by id: subscribing to `statusWorkflow` (a new object on every
   // WS message) re-rendered ALL visible edges, and each one also rebuilt its own
   // Map over the whole node list.
@@ -97,6 +105,7 @@ const CustomEdge = ({
     store.getState().nodeLookup.get(source)?.data as Parameters<typeof getCandidateKeys>[0],
   )
   const canSwitch = candidatos.length > 1 && !BRANCH_HANDLE.has(handleKey)
+  const hasLabel = Boolean(label || canSwitch)
 
   const chooseKey = (nome: string) => {
     const atual = store.getState().edgeLookup.get(id)
@@ -111,9 +120,9 @@ const CustomEdge = ({
     // sourceHandle with a field without a connection point (which the selector
     // offers via getCandidateKeys) pointed the line at a nonexistent handle and
     // React Flow stopped drawing it: the edge VANISHED on choosing the key.
-    // `sourceHandleDaChave` returns `undefined` when there's nothing to change;
-    // otherwise the named handle or `null` (anonymous, which still clears a ghost
-    // handle already stored).
+    // `sourceHandleDaChave` returns the named handle when the key is a real port,
+    // otherwise `null` (anonymous, which also clears a ghost handle already
+    // stored, and takes a SubWorkflow envelope off the port it sat on).
     const saidas = (store.getState().nodeLookup.get(source)?.data as { outputs?: Array<{ name?: string }> } | undefined)?.outputs
     const newHandle = sourceHandleDaChave(saidas, nome)
     // Emits as an EdgeChange instead of a direct setEdges: that's what makes the
@@ -125,7 +134,7 @@ const CustomEdge = ({
       type: "replace",
       item: {
         ...atual,
-        sourceHandle: newHandle === undefined ? atual.sourceHandle : newHandle,
+        sourceHandle: newHandle,
         data: { ...atual.data, from_key: nome },
       },
     }])
@@ -230,19 +239,25 @@ const CustomEdge = ({
         {/* Badge with the label (from_key or true/false) — edge midpoint.
             With more than one candidate it becomes a button: it was the only way
             to fix the key later, since before, choosing wrong forced you to
-            delete the edge and redo the connection. On hover it moves up a line
-            to make room for the delete button, instead of disappearing. */}
-        {(label || canSwitch) && (
+            delete the edge and redo the connection.
+
+            It stays put on hover. It used to move up a line to make room for
+            the delete button, which then showed up exactly where the badge had
+            been: the hover that precedes any click moved the badge away from
+            the cursor and put the delete button under it, so a click aimed at
+            the output selector deleted the edge. */}
+        {hasLabel && (
           <div
             data-edge-id={id}
             data-role="edge-label"
             className={cn(
-              "absolute z-[20] transition-transform duration-150",
+              // `nokey`: the key selector keeps the focus after a click, and
+              // Backspace then deleted the node selected on the canvas.
+              "nokey absolute z-[20]",
               canSwitch ? "pointer-events-auto" : "pointer-events-none",
             )}
             style={{
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`
-                + (isToolOpen ? " translateY(-16px)" : ""),
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
               // `EdgeLabelRenderer` is a portal: this div is not inside the
               // edge's <g> and wouldn't inherit the variable from there.
               "--exec-color": color,
@@ -310,31 +325,42 @@ const CustomEdge = ({
           </div>
         )}
 
-        {/* Delete button — visible on hover/active tool */}
-        <div
-          data-edge-id={id}
-          data-role="edge-delete"
-          onMouseEnter={() => { setHovered(true); handleToolState("onFocus") }}
-          onMouseLeave={() => { setHovered(false); handleToolState("leave") }}
-          className={cn(
-            "absolute transition-opacity duration-200",
-            isToolOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-          )}
-          style={{
-            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            pointerEvents: "all",
-          }}
-        >
-          <button
-            // Same reason as the key change: a direct `setEdges` doesn't generate an
-            // EdgeChange, so deleting an edge via the button never entered the
-            // history and Ctrl+Z didn't bring it back.
-            onClick={() => store.getState().triggerEdgeChanges([{ id, type: "remove" }])}
-            className="group !pointer-events-auto bg-background/80 border border-border rounded-full p-0.5 shadow-sm hover:border-destructive transition-colors cursor-pointer"
+        {/* Delete button — visible on hover/active tool. With a badge it sits
+            ABOVE it, never where it is: the cursor aiming at the badge must not
+            land on it (see the badge's comment).
+
+            Clickable only while visible. An inline `pointerEvents: "all"` (and
+            a `!pointer-events-auto` on the button) used to win over the
+            `pointer-events-none` of the hidden state, so the invisible button
+            under a badge that lets clicks through deleted the edge on a click
+            on the badge. */}
+        {canDelete && (
+          <div
+            data-edge-id={id}
+            data-role="edge-delete"
+            onMouseEnter={() => { setHovered(true); handleToolState("onFocus") }}
+            onMouseLeave={() => { setHovered(false); handleToolState("leave") }}
+            className={cn(
+              "absolute transition-opacity duration-200",
+              isToolOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+            )}
+            style={{
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`
+                + (hasLabel ? ` translateY(-${DELETE_ABOVE_LABEL}px)` : ""),
+            }}
           >
-            <MdDelete size={13} className="group-hover:text-destructive text-muted-foreground transition-colors" />
-          </button>
-        </div>
+            <button
+              // Same reason as the key change: a direct `setEdges` doesn't generate an
+              // EdgeChange, so deleting an edge via the button never entered the
+              // history and Ctrl+Z didn't bring it back.
+              onClick={() => store.getState().triggerEdgeChanges([{ id, type: "remove" }])}
+              title="Excluir conexão"
+              className="group bg-background/80 border border-border rounded-full p-0.5 shadow-sm hover:border-destructive transition-colors cursor-pointer"
+            >
+              <MdDelete size={13} className="group-hover:text-destructive text-muted-foreground transition-colors" />
+            </button>
+          </div>
+        )}
       </EdgeLabelRenderer>
     </>
   )

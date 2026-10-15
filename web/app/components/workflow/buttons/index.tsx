@@ -28,9 +28,13 @@ const ActionsButton = ({ workflow }: ActionsButtonProps) => {
     // `z-10` that each button had was inert — `z-index` does nothing on a
     // `position: static` element; the layer has to belong to the CONTAINER. See
     // canvas-layers.
+    // `nokey`: React Flow's delete key listens on the whole document and skips
+    // only text fields and `.nokey` elements. After a click on Salvar, Executar
+    // or the history, the focus stays on the button and Backspace deleted the
+    // node still selected on the canvas, along with its edges.
     <div
       data-canvas-chrome=""
-      className={`${LAYER_ABOVE_CANVAS} left-2 sm:left-4 pl-safe flex flex-col gap-2 transition-[bottom] duration-150`}
+      className={`nokey ${LAYER_ABOVE_CANVAS} left-2 sm:left-4 pl-safe flex flex-col gap-2 transition-[bottom] duration-150`}
       style={{ bottom: dockHeight + 16 }}
     >
       {id ?

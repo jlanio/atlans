@@ -19,6 +19,11 @@ layer B, a `SubWorkflowOutput` with several ports), `to_key` is **mandatory**
 — without it both edges spread and the second overwrites the first,
 silently. If the child consumes only one piece of data, you can leave both blank.
 
+A `Merge` that joins parallel branches is one of them: two branches that both
+deliver `output` collide and `strategy: all` returns one. Declare its `ports`
+(one per branch) and point each edge's `to_key` at one; `all` then returns
+`{port: value}` and `first`/`last` follow the port order.
+
 ## A nonexistent `from_key` does not bring down the run
 
 In production the executor is tolerant on purpose: a `from_key` with no
@@ -37,6 +42,16 @@ against the source's declared outputs and returns:
 
 A source that declares no output at all produces no diagnostic: there is nothing to
 compare against.
+
+At a `SubWorkflow` node the outputs are the `ports` of the called workflow's
+`SubWorkflowOutput`, so this check needs `workspace_id`. With it, a `from_key`
+the child does not declare is `edge_from_key_unknown` too — usually a port
+renamed in the child after the parent was wired. `from_key: "subWorkflowResult"`
+delivers the dict with ALL the child's ports, not a layer:
+`edge_subworkflow_envelope` (**warning**) — name the port. With an
+`inputsMapping`, only the keys it reads reach the child; without one, a
+`to_key` that is not a child input port is dropped by the child. Either way:
+`edge_to_key_unknown` (**warning**).
 
 ## Fork
 

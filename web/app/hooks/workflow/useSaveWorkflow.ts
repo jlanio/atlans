@@ -1,5 +1,5 @@
 import { INodeContext } from "@/context/useFlowContext"
-import { INodesDefinition, IEdgeDefinition } from "@/service/types"
+import { INodesDefinition, IEdgeDefinition, ISubworkflowNotice } from "@/service/types"
 import { GisFlowService } from "@/service/GisFlowService"
 import { createToast } from "@/utils/createToast"
 import { Edge, useReactFlow, useStoreApi, type Viewport } from "@xyflow/react"
@@ -14,6 +14,9 @@ export interface SaveOptions {
    *  error toast — the caller answers with its own — and no "Salvo" (saved) flash
    *  when there is nothing to save. The chip keeps reflecting the state. */
   silent?: boolean
+  /** Save even if the definition changed elsewhere since it was loaded — what
+   *  the conflict toast's "Salvar mesmo assim" asks for. */
+  force?: boolean
 }
 
 // Normalizes properties by sorting keys — JSON.stringify preserves insertion
@@ -29,6 +32,51 @@ function normalizeProperties(properties: unknown): Record<string, string> {
     sorted[key] = source[key]
   }
   return sorted
+}
+
+/**
+ * Whether the last saved graph may have nodes — what the "never save an empty
+ * graph" rail asks. With no snapshot the saved state is UNKNOWN, not empty: the
+ * canvas has not been hydrated, which is exactly when an empty canvas means "not
+ * loaded" rather than "cleared". Before, a missing snapshot switched the rail
+ * off, and the snapshot only exists after the very load it was meant to cover.
+ */
+function savedGraphMayHaveNodes(snapshot: string | null): boolean {
+  if (!snapshot) return true
+  try {
+    const prev = JSON.parse(snapshot) as { nodes?: unknown[] }
+    return !!prev.nodes && prev.nodes.length > 0
+  } catch {
+    // corrupted snapshot — does not block
+    return false
+  }
+}
+
+/** "a, b, c e mais 2": a toast is read at a glance, not scrolled. */
+function listaCurta(itens: string[], max = 3): string {
+  return itens.length <= max
+    ? itens.join(", ")
+    : `${itens.slice(0, max).join(", ")} e mais ${itens.length - max}`
+}
+
+/**
+ * ONE toast for every caller a save of a sub-workflow broke. The backend sends
+ * one notice per caller node and side; a toast each would bury the editor when
+ * a widely used sub-workflow loses a port, and what the person needs is which
+ * workflows to reopen and which ports to fix there.
+ */
+function resumoDosAvisosDeSubfluxo(avisos: ISubworkflowNotice[]) {
+  const nomes = [...new Map(avisos.map(a => [a.workflow_id, a.workflow_name])).values()]
+  const portas = [...new Set(avisos.flatMap(a => a.ports))].sort()
+  const n = nomes.length
+  const uma = portas.length === 1
+  return {
+    titulo: `${n} ${n === 1 ? "workflow usa" : "workflows usam"} ${uma ? "uma porta removida" : "portas removidas"}`,
+    descricao:
+      `${uma ? "Porta" : "Portas"}: ${listaCurta(portas)}. ${n === 1 ? "Workflow" : "Workflows"}: ${listaCurta(nomes)}. `
+      + `Até ajustar ${n === 1 ? "esse workflow" : "esses workflows"}, o que passava por `
+      + `${uma ? "essa porta" : "essas portas"} não chega.`,
+  }
 }
 
 /**
@@ -96,11 +144,30 @@ export const useSaveWorkflow = () => {
     return saveWorkflow(opcoes)
   }
 
-  async function saveWorkflow({ silent = false }: SaveOptions = {}) {
+  async function saveWorkflow({ silent = false, force = false }: SaveOptions = {}) {
 
     const store = useWorkflowSaveStore.getState()
     if (store.isSaving)
       return
+
+    // An existing workflow whose graph has not reached the canvas yet (node
+    // catalog still loading, or the previous workflow still on screen while this
+    // one loads) has nothing of the user's to save — and the payload would be
+    // built from an empty canvas, or from another workflow's graph. It lives here
+    // and not in the callers because every one of them comes through: Ctrl+S has
+    // no "loaded yet?" of its own (only the buttons fade out while loading) and
+    // Executar saves silently before dispatching. Before the name check too: until
+    // the workflow request returns the name is still empty, and a save there asked
+    // for a name the workflow already has.
+    //
+    // An explicit save says why it did nothing: refused in silence, Ctrl+S on a
+    // slow load looked like a broken shortcut — or like a save that happened.
+    // The silent one stays silent, as everywhere here: its caller answers with
+    // its own message.
+    if (id && !store.canvasHidratado) {
+      if (!silent) createToast.info("Aguarde o workflow carregar para salvar")
+      return { data: null, error: null }
+    }
 
     // Captures the latest value from the store
     const currentName = store.workflowName
@@ -119,20 +186,13 @@ export const useSaveWorkflow = () => {
     // need to delete the nodes on the canvas (which brings isDirty with an
     // explicit nodes=[] as the last rendered state). Protects against stale
     // closures that called saveWorkflow before the canvas hydrated.
-    if (id && nodesReq.length === 0 && store.lastSavedSnapshot) {
-      try {
-        const prev = JSON.parse(store.lastSavedSnapshot) as { nodes?: unknown[] }
-        if (prev.nodes && prev.nodes.length > 0) {
-          // The workflow had nodes — we refuse to overwrite it with an empty one.
-          console.warn(
-            "[useSaveWorkflow] Tentativa de salvar workflow existente com 0 nós bloqueada "
-            + "(provável closure stale pré-hidratação).",
-          )
-          return { data: null, error: null }
-        }
-      } catch {
-        // corrupted snapshot — does not block
-      }
+    if (id && nodesReq.length === 0 && savedGraphMayHaveNodes(store.lastSavedSnapshot)) {
+      // The workflow had nodes — or may have — and we refuse to overwrite it with an empty one.
+      console.warn(
+        "[useSaveWorkflow] Tentativa de salvar workflow existente com 0 nós bloqueada "
+        + "(provável closure stale pré-hidratação).",
+      )
+      return { data: null, error: null }
     }
 
     if (id && !store.isDirty(nodesReq, edgesReq, currentName)) {
@@ -158,6 +218,11 @@ export const useSaveWorkflow = () => {
     // isSaving. (Before, the start was in handleSaveWorkflow and the early
     // returns above left isSaving=true stuck).
     store.startSaving()
+    // The canvas this save belongs to. Switching workflows while the request is
+    // in flight resets the store for the other one; the answer then says
+    // nothing about the canvas on screen (see `geracao`).
+    const geracao = useWorkflowSaveStore.getState().geracao
+    const deOutroCanvas = () => useWorkflowSaveStore.getState().geracao !== geracao
 
     try {
       if (id) {
@@ -172,9 +237,36 @@ export const useSaveWorkflow = () => {
             edges: edgesReq,
             viewport: viewportReq,
           },
-        })
+        }, { expectedEtag: force ? null : store.definitionEtag })
+
+        if (data.error?.code === "definition_conflict") {
+          // Someone else saved this workflow after it was opened here — another
+          // tab, another person, the assistant. Saving on would erase what they
+          // did (their edges included) with nothing said, which is what the tag
+          // exists to stop. Said even on a silent save: Executar stops here, and
+          // the person has to know why.
+          if (deOutroCanvas()) {
+            // Already on another workflow: no chip to mark, and no "save
+            // anyway" — it builds the payload from the canvas ON SCREEN and
+            // would write the other workflow's graph over this one.
+            createToast.error("Workflow não salvo", data.error.message)
+            return data
+          }
+          store.failSave(data.error.message ?? "Workflow alterado em outro lugar.")
+          createToast.error("Workflow alterado em outro lugar", data.error.message, {
+            label: "Salvar mesmo assim",
+            // Same guard when clicked later: the toast outlives a switch.
+            onClick: () => { if (!deOutroCanvas()) void saveWorkflow({ force: true }) },
+          })
+          return data
+        }
 
         if (data.error) {
+          if (deOutroCanvas()) {
+            // The person left believing it was saved: say so even if silent.
+            createToast.error(`Workflow não salvo`, data.error.message)
+            return data
+          }
           store.failSave(data.error.message)
           // On a silent save (triggered by Execute before dispatch), the chip
           // already shows "Falha ao salvar" (save failed) — a toast here would
@@ -183,11 +275,15 @@ export const useSaveWorkflow = () => {
           return data
         }
 
-        const snapshot = JSON.stringify({ name: currentName, nodes: nodesReq, edges: edgesReq })
-        // No success toast: the chip next to the workflow path says "Salvo"
-        // and keeps saying "Salvo há N min" (saved N min ago). A toast on every
-        // Ctrl+S was noise about the same information.
-        store.completeSave(snapshot, viewportReq)
+        if (!deOutroCanvas()) {
+          // The saved definition is the new base for the next save's check.
+          useWorkflowSaveStore.setState({ definitionEtag: data.data?.definition_etag ?? null })
+          const snapshot = JSON.stringify({ name: currentName, nodes: nodesReq, edges: edgesReq })
+          // No success toast: the chip next to the workflow path says "Salvo"
+          // and keeps saying "Salvo há N min" (saved N min ago). A toast on every
+          // Ctrl+S was noise about the same information.
+          store.completeSave(snapshot, viewportReq)
+        }
         // Saved, but the schedule may not have been applied (inactive workflow,
         // invalid expression): the backend returns the reason in
         // `schedule_notices`. In that case the "Salvo" on the chip would hide an
@@ -195,6 +291,16 @@ export const useSaveWorkflow = () => {
         // needs to know the schedule did not take effect).
         for (const aviso of data.data?.schedule_notices ?? []) {
           createToast.warning("Agendamento não aplicado", aviso.message)
+        }
+        // Saved — but other workflows call this one as a sub-workflow and use
+        // ports this save removed or renamed: their edges on those ports deliver
+        // nothing from now on. Nothing on THIS canvas shows it, so the backend
+        // lists them (`subworkflow_notices`) and one amber toast sums them up —
+        // also on a silent save, for the same reason as the schedule notice.
+        const avisosDeSubfluxo = data.data?.subworkflow_notices ?? []
+        if (avisosDeSubfluxo.length > 0) {
+          const { titulo, descricao } = resumoDosAvisosDeSubfluxo(avisosDeSubfluxo)
+          createToast.warning(titulo, descricao)
         }
         return data
       }
@@ -217,10 +323,13 @@ export const useSaveWorkflow = () => {
       })
 
       if (data.error) {
-        store.failSave(data.error.message)
+        if (!deOutroCanvas()) store.failSave(data.error.message)
         createToast.error(`Workflow não criado`, data.error.message)
         return data
       }
+      // Created, but the person already opened another workflow: neither its
+      // state nor its URL are this one's to change.
+      if (deOutroCanvas()) return data
 
       store.completeSave(JSON.stringify({ name: currentName, nodes: nodesReq, edges: edgesReq }), viewportReq)
 
@@ -234,7 +343,7 @@ export const useSaveWorkflow = () => {
 
       return data
     } catch (err) {
-      store.failSave(String(err))
+      if (!deOutroCanvas()) store.failSave(String(err))
       createToast.error("Erro ao salvar workflow", String(err))
     }
 

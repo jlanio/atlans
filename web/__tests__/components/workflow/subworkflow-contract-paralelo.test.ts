@@ -7,11 +7,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { renderHook, waitFor } from "@testing-library/react"
 
+// The canvas state setters the editor hands the hook.
 const setNodes = vi.fn()
 const setEdges = vi.fn()
-vi.mock("@xyflow/react", () => ({
-  useReactFlow: () => ({ setNodes, setEdges }),
-}))
 // `applyPorts` calls `reancorarArestasDoNo` inside `setEdges` (a mock that
 // doesn't run the updater) — it doesn't run in the test, but the import has to resolve.
 vi.mock("@/app/components/workflow/utils/node-ports", () => ({
@@ -43,7 +41,7 @@ describe("useSubWorkflowContractSync — busca os contratos em paralelo", () => 
     const p2 = pendente<{ data: unknown }>()
     getContract.mockReturnValueOnce(p1.promise).mockReturnValueOnce(p2.promise)
 
-    renderHook(() => useSubWorkflowContractSync([subwf("n1", "h1"), subwf("n2", "h2")]))
+    renderHook(() => useSubWorkflowContractSync([subwf("n1", "h1"), subwf("n2", "h2")], setNodes, setEdges))
 
     // The waterfall (`for...of await`) would only call the 2nd AFTER the 1st
     // resolved; since none resolved, it'd stay at 1. `Promise.all` calls both at once.

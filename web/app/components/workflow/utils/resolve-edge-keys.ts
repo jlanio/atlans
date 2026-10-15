@@ -13,18 +13,24 @@ import { saidasDoNo } from "./node-ports"
  */
 
 /**
- * A node's `from_key` candidates: the instance's output fields.
+ * A node's `from_key` candidates: the instance's outputs (`saidasDoNo`).
  *
- * `saidasDoNo` resolves the source: the catalog's fields (`saidas`) or, in the
- * Python Script, the `output_vars` variables — offering the catalog's "result"
- * created an edge with a `from_key` the executor does not find in the result.
- * Branches (`true`/`false`) never show up: they route execution and are not
- * fields.
+ * `saidasDoNo` resolves the source: the catalog's fields (`saidas`), in the
+ * Python Script the `output_vars` variables — offering the catalog's "result"
+ * created an edge with a `from_key` the executor does not find in the result —
+ * and, first, the output ports that are not catalog fields: the SubWorkflow's,
+ * one per port of the CHILD's contract. Dragging from port `r2` used to find no
+ * candidate called `r2`, fall to the first one and record `subWorkflowResult`:
+ * the edge delivered the whole result instead of r2, and after a reload it
+ * jumped to the first port. Branches (`true`/`false`) never show up: they route
+ * execution and are not fields.
  */
 export function getCandidateKeys(nodeData?: {
   saidas?: INodeOutputField[]
   dynamic_output?: boolean
   properties?: Record<string, unknown>
+  outputs?: INodePortAPI[]
+  branches?: boolean
 }): INodePortAPI[] {
   const candidates: INodePortAPI[] = []
   const seen = new Set<string>()
@@ -116,15 +122,21 @@ export function portaDeEntradaPadrao(declaredInputs: unknown): string | undefine
  *   • single output (0/1 output)          → `null`      (anonymous handle; also
  *                                            clears an already saved ghost handle)
  *   • multi-output and `nome` is a port   → `nome`
- *   • multi-output and `nome` is no port  → `undefined` (leaves the handle as is)
+ *   • multi-output and `nome` is no port  → `null`      (the edge leaves the port)
+ *
+ * The last case is the SubWorkflow's `subWorkflowResult` envelope chosen on the
+ * badge of an edge that sits on a port. Keeping the port there saved exactly
+ * what the old drag defect saved — the port as handle, the envelope as key —
+ * and that pair is now read as "the port" (`chaveEfetiva`), so the choice would
+ * be undone on the next load. Without a handle the envelope stays chosen.
  */
 export function sourceHandleDaChave(
   outputs: ReadonlyArray<{ name?: string }> | undefined,
   nome: string,
-): string | null | undefined {
+): string | null {
   const saidas = outputs ?? []
   if (saidas.length <= 1) return null
-  return saidas.some((o) => o?.name === nome) ? nome : undefined
+  return saidas.some((o) => o?.name === nome) ? nome : null
 }
 
 /**

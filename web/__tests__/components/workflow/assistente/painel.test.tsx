@@ -40,6 +40,8 @@ vi.mock("@/extensoes", async (original) => ({
 vi.mock("@xyflow/react", async (original) => ({
   ...(await original<Record<string, unknown>>()),
   useNodes: vi.fn(() => []),
+  // The card also reads the canvas edges (connections a drawing would drop).
+  useEdges: vi.fn(() => []),
 }))
 
 import AssistantPanel from "@/app/components/workflow/assistente"

@@ -151,7 +151,7 @@ arrives at the node):
   ],
   "edges": [
     { "source": "entrada", "target": "filho", "from_key": "output" },
-    { "source": "filho", "target": "saida", "from_key": "subWorkflowResult" }
+    { "source": "filho", "target": "saida", "from_key": "faixa_de_risco" }
   ]
 }
 ```
@@ -160,7 +160,9 @@ Each port declared in `SubWorkflowInput` becomes a named output of the trigger,
 and the edge leaving it carries a `from_key` with the port's name — that is how the
 child chooses what to pass along. In `SubWorkflowOutput`, conversely, each
 incoming edge needs a distinct `to_key`: it is the name of the sub-workflow's
-output port. A key outside the `ports` is discarded at both ends.
+output port. A key outside the `ports` is discarded at both ends. In the parent,
+the edge leaving `SubWorkflow` names one of those ports as `from_key`
+(`subWorkflowResult` is a dict with all of them, not a layer).
 
 ## 5. Cataloged source (WFS) filtered on the server → publish to the map
 

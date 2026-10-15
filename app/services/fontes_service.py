@@ -926,6 +926,8 @@ def _bbox_from_edge(nid: str, definition: Mapping[str, Any]) -> bool:
     The edge semantics are the executor's (flow/executor/edge_resolver.py): with
     `from_key`/`to_key`, the input port is `to_key or from_key`; without
     both, everything the origin produces goes in."""
+    from flow.executor.edge_resolver import from_key_efetiva
+
     nomes = {
         str(n.get("id")): str(n.get("name") or "")
         for n in definition.get("nodes") or [] if isinstance(n, Mapping)
@@ -933,7 +935,7 @@ def _bbox_from_edge(nid: str, definition: Mapping[str, Any]) -> bool:
     for aresta in definition.get("edges") or []:
         if not isinstance(aresta, Mapping) or str(aresta.get("target")) != nid:
             continue
-        de, para = aresta.get("from_key") or None, aresta.get("to_key") or None
+        de, para = from_key_efetiva(aresta), aresta.get("to_key") or None
         if (para or de) == "bbox_string":
             return True
         if de is None and para is None and _produces_bbox_string(nomes.get(str(aresta.get("source")), "")):

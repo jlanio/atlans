@@ -261,6 +261,49 @@ class TestHasSubstantialChanges:
     def test_empty_definitions_returns_false(self):
         assert _has_substantial_changes({}, {}) is False
 
+    # The edges below are in the PERSISTED shape (`serializeEdge` in the web app):
+    # snake_case, with no React Flow `sourceHandle`/`targetHandle`. Keyed on
+    # those camelCase fields, every edge read as `(source, target, None, None)`
+    # and rewiring never became a version.
+
+    def _nodes(self):
+        return [self._node("http"), self._node("script")]
+
+    def test_switching_an_edge_output_returns_true(self):
+        old = self._def(nodes=self._nodes(), edges=[
+            {"source": "http", "target": "script", "source_handle": "status_code", "from_key": "status_code"}])
+        new = self._def(nodes=self._nodes(), edges=[
+            {"source": "http", "target": "script", "source_handle": "body", "from_key": "body"}])
+        assert _has_substantial_changes(old, new) is True
+
+    def test_switching_an_edge_input_key_returns_true(self):
+        old = self._def(nodes=self._nodes(), edges=[{"source": "http", "target": "script", "to_key": "a"}])
+        new = self._def(nodes=self._nodes(), edges=[{"source": "http", "target": "script", "to_key": "b"}])
+        assert _has_substantial_changes(old, new) is True
+
+    def test_switching_a_branch_returns_true(self):
+        old = self._def(nodes=self._nodes(), edges=[
+            {"source": "http", "target": "script", "source_handle": "true", "condition": True}])
+        new = self._def(nodes=self._nodes(), edges=[
+            {"source": "http", "target": "script", "source_handle": "false", "condition": False}])
+        assert _has_substantial_changes(old, new) is True
+
+    def test_parallel_edge_between_the_same_nodes_returns_true(self):
+        uma = {"source": "http", "target": "script", "from_key": "body"}
+        old = self._def(nodes=self._nodes(), edges=[uma])
+        new = self._def(nodes=self._nodes(), edges=[uma, dict(uma)])
+        assert _has_substantial_changes(old, new) is True
+
+    def test_reordered_edges_returns_false(self):
+        a = {"source": "http", "target": "script", "from_key": "body", "to_key": "a"}
+        b = {"to_key": "b", "from_key": "headers", "target": "script", "source": "http"}
+        old = self._def(nodes=self._nodes(), edges=[a, b])
+        new = self._def(nodes=self._nodes(), edges=[dict(b), dict(a)])
+        assert _has_substantial_changes(old, new) is False
+
+    def test_null_edges_is_the_same_as_none(self):
+        assert _has_substantial_changes({"nodes": [], "edges": None}, {"nodes": []}) is False
+
 
 # ── TestCreateWorkflow ────────────────────────────────────────────────────────
 

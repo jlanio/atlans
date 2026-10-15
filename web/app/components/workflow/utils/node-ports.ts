@@ -215,6 +215,8 @@ export function saidasDoNo(
     outputs_from_ports?: boolean
     saidas?: { name: string; type?: string; description?: string }[]
     properties?: Record<string, unknown>
+    outputs?: { name: string; description?: string }[]
+    branches?: boolean
   } | undefined,
 ): { name: string; type?: string; description?: string }[] {
   const bruto = data?.properties?.output_vars
@@ -233,7 +235,21 @@ export function saidasDoNo(
   if (data?.outputs_from_ports) {
     return [...new Set(lerPortas(data?.properties?.ports))].map(name => ({ name }))
   }
-  return data?.saidas ?? []
+  // Output ports that are not catalog fields: the SubWorkflow's, one per port
+  // of the CHILD's contract (`outputs`, filled in when the contract arrives),
+  // while its catalog only knows the `subWorkflowResult` envelope — the dict of
+  // ALL the ports. The node returns each port as a key of its own too, and a
+  // port is what a connection usually wants: listed only as the envelope, an
+  // edge out of a single-port SubWorkflow was born with `subWorkflowResult` and
+  // the next node got the dict instead of the layer. So the ports come first,
+  // for every count; a branch node's `outputs` (true/false) route and are left
+  // out. Every other node's ports are catalog fields already listed below.
+  const catalogo = data?.saidas ?? []
+  const doCatalogo = new Set(catalogo.map(c => c.name))
+  const doContrato = (data?.branches ? [] : (data?.outputs ?? []))
+    .filter(p => p?.name && !doCatalogo.has(p.name))
+    .map(p => ({ name: p.name, description: p.description }))
+  return doContrato.length ? [...doContrato, ...catalogo] : catalogo
 }
 
 /** Minimal node shape the reconciliation needs to see. */

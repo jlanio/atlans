@@ -199,6 +199,38 @@ async def _avisar_subworkflows(db, definition: dict, target_ws: str) -> List[Dic
     return avisos
 
 
+async def chamadores_no_workspace(db, id_hash: str, workspace_id: str) -> List[tuple]:
+    """`(id_hash, name, definition, SubWorkflow node ids)` of each workflow of
+    `workspace_id` that calls `id_hash` as a sub-workflow; deleted ones left out.
+
+    Shared by the move report (`_avisar_dependentes`, below) and by the save of a
+    sub-workflow that removes ports (`contrato_do_subfluxo.avisos_aos_pais`),
+    which reads the definitions to see which ports each caller uses. They come
+    as stored: only `connectionString` values are encrypted in a definition, and
+    neither caller reads them. Only columns are selected, so no ORM object joins
+    the session and nothing read here can be flushed back.
+    """
+    # Database pre-filter so we don't fetch the definition of the whole workspace.
+    # It is just a LIKE over the text of the nodes array: the real confirmation
+    # comes from the collector below, because the hash may appear in any other
+    # field of the JSON.
+    candidatos = (await db.execute(
+        select(Workflow.id_hash, Workflow.name, Workflow.definition).where(
+            Workflow.deleted_at.is_(None),
+            Workflow.workspace_id == workspace_id,
+            Workflow.id_hash != id_hash,
+            Workflow.definition["nodes"].as_string().contains(id_hash),
+        )
+    )).all()
+
+    chamadores: List[tuple] = []
+    for dep_hash, dep_name, dep_def in candidatos:
+        nodes = _collect_subworkflow_refs(dep_def or {}).get(id_hash)
+        if nodes:
+            chamadores.append((dep_hash, dep_name, dep_def or {}, nodes))
+    return chamadores
+
+
 async def _avisar_dependentes(db, id_hash: str, origin_ws: str | None) -> List[Dict[str, Any]]:
     """Workflows that call THIS one as a sub-workflow and are left behind.
 
@@ -209,30 +241,15 @@ async def _avisar_dependentes(db, id_hash: str, origin_ws: str | None) -> List[D
     if not origin_ws:
         return []
 
-    # Database pre-filter so we don't fetch the definition of the whole workspace.
-    # It is just a LIKE over the text of the nodes array: the real confirmation
-    # comes from the collector below, because the hash may appear in any other
-    # field of the JSON.
-    candidatos = (await db.execute(
-        select(Workflow.id_hash, Workflow.name, Workflow.definition).where(
-            Workflow.deleted_at.is_(None),
-            Workflow.workspace_id == origin_ws,
-            Workflow.id_hash != id_hash,
-            Workflow.definition["nodes"].as_string().contains(id_hash),
+    return [
+        warn(
+            "reverse_dependents",
+            f"O workflow '{dep_name}' chama este como sub-fluxo e vai parar "
+            "de funcionar, pois ficará em outro workspace.",
+            workflow_hash=dep_hash, workflow_name=dep_name, node_ids=nodes,
         )
-    )).all()
-
-    avisos: List[Dict[str, Any]] = []
-    for dep_hash, dep_name, dep_def in candidatos:
-        nodes = _collect_subworkflow_refs(dep_def or {}).get(id_hash)
-        if nodes:
-            avisos.append(warn(
-                "reverse_dependents",
-                f"O workflow '{dep_name}' chama este como sub-fluxo e vai parar "
-                "de funcionar, pois ficará em outro workspace.",
-                workflow_hash=dep_hash, workflow_name=dep_name, node_ids=nodes,
-            ))
-    return avisos
+        for dep_hash, dep_name, _, nodes in await chamadores_no_workspace(db, id_hash, origin_ws)
+    ]
 
 
 async def _avisar_arquivos(db, definition: dict, target_ws: str) -> List[Dict[str, Any]]:

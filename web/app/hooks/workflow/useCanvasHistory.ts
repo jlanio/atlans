@@ -9,6 +9,48 @@ interface Snapshot {
 
 const MAX_HISTORY = 50
 
+/** Equal by reference or, failing that, by serialized content. */
+function sameContent(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  try {
+    return JSON.stringify(a) === JSON.stringify(b)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Same workflow on both sides: nodes with the same id, type, position and data;
+ * edges with the same id, ends, handles and data. Selection, measured size and
+ * the assistant's entrance classes are left out on purpose — they change with
+ * nobody editing anything.
+ */
+function sameGraph(a: Snapshot, b: Snapshot): boolean {
+  if (a.nodes.length !== b.nodes.length || a.edges.length !== b.edges.length) return false
+
+  const nodesOfB = new Map(b.nodes.map(node => [node.id, node]))
+  for (const node of a.nodes) {
+    const other = nodesOfB.get(node.id)
+    if (!other || other.type !== node.type) return false
+    // Optional access: a node without a position must not make the history
+    // throw — at worst, the step is recorded.
+    if (other.position?.x !== node.position?.x || other.position?.y !== node.position?.y) return false
+    if (!sameContent(other.data, node.data)) return false
+  }
+
+  const edgesOfB = new Map(b.edges.map(edge => [edge.id, edge]))
+  for (const edge of a.edges) {
+    const other = edgesOfB.get(edge.id)
+    if (!other || other.source !== edge.source || other.target !== edge.target) return false
+    // React Flow uses `null` for an anonymous handle and a loaded edge may carry
+    // `undefined`: the same handle either way.
+    if ((other.sourceHandle ?? null) !== (edge.sourceHandle ?? null)) return false
+    if ((other.targetHandle ?? null) !== (edge.targetHandle ?? null)) return false
+    if (!sameContent(other.data, edge.data)) return false
+  }
+  return true
+}
+
 /**
  * Undo/redo hook for the ReactFlow canvas.
  * - Call `saveSnapshot()` after each operation that should be undoable (add/remove node, etc.)
@@ -27,14 +69,29 @@ export function useCanvasHistory() {
   // the canvas.
   const [, bumpVersion] = useReducer((v: number) => v + 1, 0)
 
-  /** Saves the current state to history (discards future entries after the pointer). */
-  const saveSnapshot = useCallback(() => {
+  /**
+   * Saves the current state to history (discards future entries after the pointer).
+   * `state` records one the caller has just handed to the canvas: until React
+   * commits it, `getNodes()`/`getEdges()` still return the previous one.
+   */
+  const saveSnapshot = useCallback((state?: Snapshot) => {
     if (isTravelingRef.current) return
 
-    const snapshot: Snapshot = {
+    const snapshot: Snapshot = state ?? {
       nodes: getNodes() as INodeContext[],
       edges: getEdges(),
     }
+
+    // The canvas already IS the step under the pointer: nothing new to record.
+    // This is what keeps undo/redo from writing over its own future. Restoring
+    // goes through React Flow's setNodes/setEdges, which a controlled flow turns
+    // into add/remove/replace changes — and the editor answers those with a
+    // snapshot 300 ms later. By then `isTravelingRef` (reset on the next tick) no
+    // longer held it back: the restored canvas went in as a new step, the redo
+    // was discarded, and the next Ctrl+Z landed on that duplicate. Comparing
+    // content instead of timing holds however late the snapshot arrives.
+    const atPointer = history.current[pointer.current]
+    if (atPointer && sameGraph(atPointer, snapshot)) return
 
     // Removes "future" snapshots (after undoing and then changing)
     history.current = history.current.slice(0, pointer.current + 1)

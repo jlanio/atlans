@@ -30,6 +30,7 @@ from app.core.utils.encryption import decrypt_workflow_connections, encrypt_work
 from app.core.utils.logger import get_logger
 from app.models.artifact import Artifact
 from app.models.models import Schedule, Workflow
+from app.services.pin_service import chaves_do_pin
 from app.services.workflow_move_report import collect_warnings, warn
 
 _logger = get_logger(__name__)
@@ -167,7 +168,7 @@ async def move_workflow(
     # reason in the docstring, `wf.definition` may be in plain text in the
     # session, and workflow_versions is a persisted table like any other.
     snapshot = encrypt_workflow_connections(copy.deepcopy(wf.definition or {}))
-    pins_to_delete = _pin_keys(wf.pinned_outputs)
+    pins_to_delete = _pin_keys(wf.pinned_outputs, origin_ws)
 
     async def _apply(nome: str) -> None:
         """Writes everything that makes up the move. Re-runnable after a rollback.
@@ -266,15 +267,20 @@ async def move_workflow(
     return resultado
 
 
-def _pin_keys(pinned_outputs) -> list[str]:
-    """The pins' s3_keys, for removal after the commit."""
+def _pin_keys(pinned_outputs, workspace_id) -> list[str]:
+    """The pins' s3_keys — one per layer —, for removal after the commit.
+
+    The unpin's reading (`pin_service.chaves_do_pin`): a node with several
+    DataFrame outputs has one object per layer, and only the first is
+    `__pin_s3_key__`. It also brings the unpin's guard (SEG-10): only keys under
+    `pin-cache/{workspace_id}/` of the SOURCE workspace — an old forged entry
+    would otherwise make the move delete an object of another tenant.
+    """
     if not isinstance(pinned_outputs, dict):
         return []
-    return [
-        ref["__pin_s3_key__"]
-        for ref in pinned_outputs.values()
-        if isinstance(ref, dict) and isinstance(ref.get("__pin_s3_key__"), str)
-    ]
+    return list(dict.fromkeys(
+        chave for ref in pinned_outputs.values() for chave in chaves_do_pin(ref, workspace_id)
+    ))
 
 
 async def _apagar_pins(keys: list[str]) -> None:

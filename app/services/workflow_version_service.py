@@ -2,6 +2,10 @@
 # Workflow version management.
 
 import copy
+import hashlib
+import json
+from collections import Counter
+from typing import Any, Mapping
 
 from sqlalchemy.orm.attributes import set_committed_value
 
@@ -20,6 +24,40 @@ from flow.utils.workflow_contract import _node_properties
 _logger = get_logger(__name__)
 
 
+def definition_etag(definition: "Mapping[str, Any] | None") -> str:
+    """Version tag of a stored definition, for the editor's save.
+
+    The editor saves the whole definition, so a tab that opened the workflow
+    before someone else saved it — another tab, another person, an agent through
+    the MCP — wrote over that change on its next save and went on showing
+    "Salvo": edges added elsewhere vanished with nothing said. The editor sends
+    back the tag it loaded (`expected_etag` on PUT) and the save is refused with
+    409 when the stored definition changed since.
+
+    Computed over the definition as clients see it (decrypted, then redacted):
+    the tag goes to viewers too, and a hash over a connection string would let
+    them test guesses offline. Without `viewport`: panning in another tab is not
+    a conflict. Not `updated_at`: pinning a node or switching the workflow on
+    bumps it without touching the definition.
+    """
+    bruta = copy.deepcopy(dict(definition or {}))
+    bruta.pop("viewport", None)
+    try:
+        bruta = decrypt_workflow_connections(bruta)
+    except ValueError:
+        pass  # a corrupted token: tag what is there; reading/saving reports it
+    return etiqueta_da_definicao_visivel(redact_definition(bruta))
+
+
+def etiqueta_da_definicao_visivel(visivel: "Mapping[str, Any]") -> str:
+    """`definition_etag` of a definition ALREADY as clients see it (decrypted,
+    then redacted). The GET has that copy for its response: tagging it saves a
+    second deep copy and redaction of the whole definition on every load."""
+    sem_camera = {k: v for k, v in dict(visivel or {}).items() if k != "viewport"}
+    canonica = json.dumps(sem_camera, sort_keys=True, separators=(",", ":"), default=str, ensure_ascii=False)
+    return hashlib.sha256(canonica.encode("utf-8")).hexdigest()[:32]
+
+
 def _has_substantial_changes(old_def: dict, new_def: dict) -> bool:
     """Returns True only if there were substantial changes to the workflow definition:
     nodes added/removed, connections changed or properties modified.
@@ -32,12 +70,20 @@ def _has_substantial_changes(old_def: dict, new_def: dict) -> bool:
     if set(old_nodes.keys()) != set(new_nodes.keys()):
         return True
 
-    # Connections (edges) changed
-    def _edge_key(e: dict) -> tuple:
-        return (e.get("source"), e.get("target"), e.get("sourceHandle"), e.get("targetHandle"))
+    # Connections (edges) changed. The whole edge counts, compared as a
+    # multiset. The persisted edge is snake_case — `{source, target,
+    # source_handle?, condition?, from_key?, to_key?}`, written by
+    # `serializeEdge` in the web app — and this used to key on React Flow's
+    # `sourceHandle`/`targetHandle`, which never reach the definition: every edge
+    # read as `(source, target, None, None)`, in a set. Switching an edge's
+    # output, its input key or its branch, or adding a second edge between the
+    # same two nodes, never became a version, and the previous wiring was gone
+    # from the history.
+    def _edge_key(e) -> str:
+        return json.dumps(e, sort_keys=True, default=str)
 
-    old_edges = {_edge_key(e) for e in old_def.get("edges", [])}
-    new_edges = {_edge_key(e) for e in new_def.get("edges", [])}
+    old_edges = Counter(_edge_key(e) for e in old_def.get("edges") or [])
+    new_edges = Counter(_edge_key(e) for e in new_def.get("edges") or [])
     if old_edges != new_edges:
         return True
 
