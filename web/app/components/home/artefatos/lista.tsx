@@ -32,8 +32,8 @@ import type { CollectionItem } from "./normalizar"
 // exceeds hundreds of rows and mounting them all freezes the shell's scroll.
 const VIRTUAL_ABOVE = 150
 
-// Drive icons cover shp/gpkg; the artifact formats use the same names.
-const ICON_ALIAS: Record<string, string> = { shapefile: "shp", geoparquet: "gpkg" }
+// Drive icons cover shp/gpkg/kml; the artifact formats use the same names.
+const ICON_ALIAS: Record<string, string> = { shapefile: "shp", geoparquet: "gpkg", kmz: "kml" }
 
 // The 3rem rail only fits an icon: `SidebarMenuSub` already hides on its own
 // in icon mode, but the blocks that are NOT a sublist (the virtual list, the

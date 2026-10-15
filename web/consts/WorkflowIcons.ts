@@ -21,7 +21,7 @@ import {
   TbFileCode, TbWorldDownload, TbBrandPython,
   TbSwitchHorizontal, TbSortAscending, TbCopyOff, TbDatabaseImport,
   TbWebhook, TbVersionsFilled, TbCategory, TbTableShare,
-  TbMap2,
+  TbMap2, TbFileExport,
 } from "react-icons/tb";
 import { IoNotificationsOutline } from "react-icons/io5";
 import { GrTrigger, GrAction } from "react-icons/gr";
@@ -132,6 +132,7 @@ export type OutputType =
   | "SaveGeoJSON"
   | "SaveToShapefile"
   | "SaveToGeoParquet"
+  | "SaveFile"
   | "SaveToS3"
   | "SendEmail"
   | "SendWebhook"
@@ -147,6 +148,7 @@ export const OUTPUT_ICONS = {
   "SaveToPostgres":    SiPostgresql,
   "SaveToShapefile":   LuFileArchive,
   "SaveToGeoParquet":  LuFile,
+  "SaveFile":          TbFileExport,
   "SaveToS3":          MdCloudUpload,
   "SendEmail":         MdOutlineEmail,
   "SendWebhook":       MdWebhook,

@@ -55,7 +55,7 @@ from app.mcp.tools.execucao import get_run
 from app.mcp.tools.workflows import get_workflow, get_workflow_contract, list_workflows
 
 # Without `type`, the catalog comes out only as a map of groups. The whole index
-# exceeds 10 KB and the full sheet of the 63 nodes, 70 KB: delivering that as a
+# exceeds 10 KB and the full sheet of the 64 nodes, 70 KB: delivering that as a
 # single blob in a `resources/read` spends the reader's context budget before
 # the conversation begins. The hint says how to get to what matters.
 CATALOG_HINT = (
@@ -131,7 +131,7 @@ def registrar_resources(server) -> None:
         mime_type="application/json",
     )
     async def catalogo_de_nos(ctx: Context, type: str | None = None) -> str:
-        """The catalog in two layers — never all 63 nodes in a single blob.
+        """The catalog in two layers — never all 64 nodes in a single blob.
 
         The parameter is called `type` because that is the variable's name in
         the URI, and the SDK matches the two by name.
