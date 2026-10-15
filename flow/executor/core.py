@@ -633,11 +633,18 @@ class WorkflowExecutor:
                             )
                             from_key = Edge.from_dict(edge).from_key
                             if from_key and from_key not in parent_outputs:
-                                self._arestas_sem_dado.setdefault(node_id, []).append({
-                                    "source": parent_id,
-                                    "from_key": from_key,
-                                    "keys": sorted(str(k) for k in parent_outputs)[:20],
-                                })
+                                # Capped like `overwritten_inputs`: it travels in the
+                                # node's event, which has a size ceiling, and is not
+                                # among the keys the reduction drops — the hint it
+                                # gives is most useful on a failed node, whose long
+                                # traceback is what the reduction cuts.
+                                sem_dado = self._arestas_sem_dado.setdefault(node_id, [])
+                                if len(sem_dado) < 20:
+                                    sem_dado.append({
+                                        "source": parent_id,
+                                        "from_key": from_key,
+                                        "keys": sorted(str(k) for k in parent_outputs)[:20],
+                                    })
                             # Single source of edge semantics (from_key/to_key/spread) —
                             # the SAME one used by the schema simulation below. See
                             # flow/executor/edge_resolver.py and docs/specs/edge-data-contract.md.

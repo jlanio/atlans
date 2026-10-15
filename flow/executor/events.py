@@ -76,7 +76,10 @@ def publish_completed(
             extra["schema_drift"] = schema_drift
         # Incoming edges whose `from_key` the source did not produce: each one
         # delivered nothing to this node. `[{source, from_key, keys}]`, where
-        # `keys` is what the source did produce.
+        # `keys` is what the source did produce. Both lists are capped where
+        # they are built (20 entries, 20 keys), so they stay small and out of
+        # HEAVY_EXTRA_KEYS: the reduction would drop them with the traceback,
+        # on the failed node where they explain the failure.
         if unresolved_edges:
             extra["unresolved_edges"] = unresolved_edges
         # Input keys two incoming edges wrote: `[{key, source, overwrote}]` —

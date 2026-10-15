@@ -148,3 +148,10 @@ def test_chaves_distintas_nao_avisam():
     )
     assert "overwritten_inputs" not in evento.args[6]
     assert _Destino.recebido == {"x": 1, "y": 10}
+
+
+def test_lista_de_arestas_sem_dado_tem_teto():
+    # It travels in the node's event, which has a size ceiling.
+    edges = [{"source": "F", "target": "D", "from_key": f"falta_{i}", "to_key": f"e{i}"} for i in range(30)]
+    evento = _rodar(edges)
+    assert len(evento.args[6]["unresolved_edges"]) == 20
