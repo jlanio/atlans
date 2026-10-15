@@ -977,6 +977,18 @@ class WorkflowExecutor:
                 is_branch = Edge.from_dict(edge).is_branch
 
                 if from_key:
+                    # The SubWorkflow node returns `{subWorkflowResult, **child
+                    # ports}` (sub_workflow.py): the child's ports are outputs
+                    # too, but they come from ANOTHER workflow's contract, which
+                    # this simulation does not read. Calling them unknown sent
+                    # agents (told to iterate until `ok`) to rewire correct edges
+                    # onto `subWorkflowResult`, which delivers the wrapper dict
+                    # instead of the port's value.
+                    if (
+                        from_key not in names
+                        and self.node_mgr.node_defs.get(parent_id, {}).get("name") == "SubWorkflow"
+                    ):
+                        continue
                     if from_key not in names:
                         diagnostics.append({
                             "severity": "error",

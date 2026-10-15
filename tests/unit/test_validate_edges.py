@@ -50,6 +50,23 @@ def test_valid_from_key_produces_no_diagnostic():
     assert ex.validate_edges() == []
 
 
+def test_porta_do_filho_saindo_de_subworkflow_nao_vira_erro():
+    # SubWorkflow returns `{subWorkflowResult, **child ports}`; the ports come from
+    # the child's contract, which the simulation does not read. The editor writes
+    # the port name as from_key, and that edge is the one that works at run.
+    ex = _executor([_n("a", name="SubWorkflow", ntype="control"), _n("b")],
+                   [{"source": "a", "target": "b", "from_key": "faixa_de_risco"}])
+    ex.simulated_outputs = {"a": {"status": "ok", "schema": _schema("subWorkflowResult")}}
+    assert ex.validate_edges() == []
+
+
+def test_from_key_errado_de_outro_no_continua_erro():
+    ex = _executor([_n("a", name="Merge", ntype="control"), _n("b")],
+                   [{"source": "a", "target": "b", "from_key": "faixa_de_risco"}])
+    ex.simulated_outputs = {"a": {"status": "ok", "schema": _schema("output")}}
+    assert [d["severity"] for d in ex.validate_edges()] == ["error"]
+
+
 def test_spread_from_multi_output_source_becomes_warning():
     ex = _executor([_n("a", ntype="action"), _n("b")],
                    [{"source": "a", "target": "b"}])  # no from_key/to_key
