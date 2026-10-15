@@ -46,8 +46,15 @@ def definition_etag(definition: "Mapping[str, Any] | None") -> str:
         bruta = decrypt_workflow_connections(bruta)
     except ValueError:
         pass  # a corrupted token: tag what is there; reading/saving reports it
-    visivel = redact_definition(bruta)
-    canonica = json.dumps(visivel, sort_keys=True, separators=(",", ":"), default=str, ensure_ascii=False)
+    return etiqueta_da_definicao_visivel(redact_definition(bruta))
+
+
+def etiqueta_da_definicao_visivel(visivel: "Mapping[str, Any]") -> str:
+    """`definition_etag` of a definition ALREADY as clients see it (decrypted,
+    then redacted). The GET has that copy for its response: tagging it saves a
+    second deep copy and redaction of the whole definition on every load."""
+    sem_camera = {k: v for k, v in dict(visivel or {}).items() if k != "viewport"}
+    canonica = json.dumps(sem_camera, sort_keys=True, separators=(",", ":"), default=str, ensure_ascii=False)
     return hashlib.sha256(canonica.encode("utf-8")).hexdigest()[:32]
 
 

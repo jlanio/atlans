@@ -200,12 +200,16 @@ async def read_workflow(
     # so the "<REDACTED>" marker is never written by a flush of the GET. Modern
     # workflows use credential_id (resolved only at dispatch) and expose nothing.
     from app.core.utils.redacao import redact_definition
-    from app.services.workflow_version_service import definition_etag
+    from app.services.workflow_version_service import definition_etag, etiqueta_da_definicao_visivel
     dados = WorkflowRead.model_validate(wf)
-    etag = definition_etag(dados.definition if isinstance(dados.definition, dict) else None)
     if isinstance(dados.definition, dict) and dados.definition:
-        return dados.model_copy(update={"definition": redact_definition(dados.definition), "definition_etag": etag})
-    return dados.model_copy(update={"definition_etag": etag})
+        # The tag of the copy the response carries (decrypted by the dependency,
+        # redacted here): the same `definition_etag`, without a second copy.
+        redigida = redact_definition(dados.definition)
+        return dados.model_copy(update={
+            "definition": redigida, "definition_etag": etiqueta_da_definicao_visivel(redigida),
+        })
+    return dados.model_copy(update={"definition_etag": definition_etag(None)})
 
 @router.get(
     "/{id_hash}/contract",

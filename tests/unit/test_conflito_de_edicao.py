@@ -194,6 +194,42 @@ async def test_leitura_devolve_a_etiqueta():
     assert dados.definition_etag == definition_etag(DEF)
 
 
+async def test_leitura_etiqueta_a_copia_redigida_com_o_mesmo_valor_do_save():
+    # The GET tags the copy it returns (decrypted, then redacted) instead of
+    # copying and redacting the whole definition twice; the tag must still be
+    # the one the PUT compares against the stored, encrypted row.
+    from datetime import datetime
+    from app.core.utils.encryption import encrypt_workflow_connections
+
+    claro = {"nodes": [{"id": "p", "name": "PostgreSQL", "properties": {
+        "connectionString": "postgresql://u:s@db/x"}}], "edges": [], "viewport": {"x": 1, "y": 2, "zoom": 1}}
+    gravado = encrypt_workflow_connections(json.loads(json.dumps(claro)))
+
+    class _Lido:
+        id = 1
+        id_hash = "wf-1"
+        name = "x"
+        flag_ative = True
+        description = None
+        version = None
+        priority = 0
+        workspace_id = "ws-1"
+        group_id = None
+        params_schema = None
+        notification_url = None
+        definition = claro
+        portal_access = "disabled"
+        portal_shared_with = None
+        created_at = datetime(2026, 1, 1)
+        updated_at = datetime(2026, 1, 1)
+        deleted_at = None
+        schedule_notices = []
+
+    dados = await WR.read_workflow(wf=_Lido())
+    assert dados.definition_etag == definition_etag(gravado)
+    assert dados.definition["nodes"][0]["properties"]["connectionString"] == "<REDACTED>"
+
+
 def test_etiqueta_que_nao_e_texto_vira_sem_etiqueta():
     # The tag is read from the object the route returns; an attribute that is
     # not text (anything other than what a route set) means "no tag", not a 500.
