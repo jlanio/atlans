@@ -182,6 +182,22 @@ describe("Ctrl+Z / Ctrl+Y no editor", () => {
     expect(ligacoes()).toEqual(["A->B", "B->C"])
   })
 
+  it("o nó adicionado pela paleta (Ctrl+K) é um passo: Ctrl+Z desfaz só ele", async () => {
+    const { container } = montar(workflow(["A", "B"]))
+    await esperar(50)
+    conectar(container, "A", "B")
+    await esperar(PASSO)
+
+    act(() => { window.dispatchEvent(new CustomEvent("command-add-node", { detail: { name: "Buffer" } })) })
+    await esperar(PASSO)
+    expect(nos()).toHaveLength(3)
+
+    teclar("z")
+    await esperar(50)
+    expect(nos()).toEqual(["A", "B"])
+    expect(ligacoes()).toEqual(["A->B"])
+  })
+
   it("Ctrl+Z, uma pausa e Ctrl+Y: o refazer continua lá", async () => {
     montar(workflow(["A", "B"]))
     await esperar(50)

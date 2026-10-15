@@ -351,13 +351,16 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
         },
       }
 
-      setNodes(prev => [...prev, newNode])
+      // `addNodes`, not the state setter: only a change schedules a history
+      // snapshot, so with the setter Ctrl+Z took the node away together with
+      // the step before it (same reason as `addEdgeWithKey`).
+      reactFlowInstance.addNodes(newNode)
       setNewlyAddedNodeId(newNode.id)
     }
 
     window.addEventListener("command-add-node", handleCommandAddNode)
     return () => window.removeEventListener("command-add-node", handleCommandAddNode)
-  }, [nodesAPI, reactFlowInstance, setNodes, setNewlyAddedNodeId])
+  }, [nodesAPI, reactFlowInstance, setNewlyAddedNodeId])
 
   // Initializes static references — on mount only.
   // setFlowContext here only updates the context's 3 immutable fields
