@@ -186,6 +186,23 @@ def test_validacao_le_a_aresta_antiga_como_a_porta():
         == ["edge_subworkflow_envelope"]
 
 
+def test_com_mapeamento_entrada_que_ele_nao_le_e_descartada():
+    # sub_workflow.py builds the child's inputs from the mapping alone: a key the
+    # mapping does not read never reaches the child, even one named like a child
+    # input — and with no to_key the key is the edge's from_key.
+    contratos = {FILHO: {"inputs": [{"name": "geometria"}, {"name": "limite"}], "outputs": []}}
+    pai = _pai(mapping='{"limite": "area"}')
+    pai["edges"] = [
+        {"source": "t", "target": "sub", "from_key": "output", "to_key": "geometria"},
+        {"source": "t", "target": "sub", "from_key": "output", "to_key": "area"},
+        {"source": "t", "target": "sub", "from_key": "bbox"},
+    ]
+    diags = diagnosticos_de_contrato(pai, contratos)
+    assert [(d["code"], d["message"].split("'")[1]) for d in diags] == [
+        ("edge_to_key_unknown", "geometria"), ("edge_to_key_unknown", "bbox"),
+    ]
+
+
 async def test_id_de_no_numerico_sai_como_texto(banco):
     # A definition written by hand through the API may carry a numeric id; the
     # notice is validated after the save committed, and must not become a 500.

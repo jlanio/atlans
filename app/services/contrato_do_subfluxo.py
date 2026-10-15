@@ -218,9 +218,10 @@ def diagnosticos_de_contrato(
     - `from_key: subWorkflowResult` while the child declares outputs → warning
       `edge_subworkflow_envelope`: it delivers the dict of every port, and a
       node expecting a layer gets a dict;
-    - `to_key` arriving that is neither a child input nor a key the node's
-      `inputsMapping` reads → warning `edge_to_key_unknown`: the child's input
-      allowlist drops it.
+    - a key arriving that the child drops → warning `edge_to_key_unknown`:
+      with an `inputsMapping`, one the mapping does not read (only mapped keys
+      reach the child); without one, a `to_key` that is not a child input (the
+      child's allowlist).
 
     A child that declares no port on a side says nothing about that side: it is
     passthrough there, and what goes through depends on what arrives.
@@ -270,15 +271,33 @@ def diagnosticos_de_contrato(
         if destino in chamadas:
             alvo, contrato, mapa = chamadas[destino]
             entradas = _nomes(contrato, "inputs")
-            chave = e.get("to_key")
-            lidas = {v for v in mapa.values() if isinstance(v, str)}
-            if chave and entradas and chave not in entradas and chave not in lidas:
-                diagnosticos.append({
-                    "severity": "warning", "code": "edge_to_key_unknown",
-                    "source": origem, "target": destino,
-                    "message": (
-                        f"to_key '{chave}' não é uma entrada do sub-fluxo '{alvo}' chamado em "
-                        f"'{destino}': o sub-fluxo descarta a chave. Entradas: {sorted(entradas)}."
-                    ),
-                })
+            if mapa:
+                # With a mapping only the keys it reads reach the child
+                # (sub_workflow.py builds the child's inputs from it alone): an
+                # arriving key the mapping does not read is dropped, even one
+                # named like a child input. The key is the edge's `to_key`, or
+                # its `from_key` without one.
+                chave = e.get("to_key") or _chave_de_saida(e)
+                lidas = {v for v in mapa.values() if isinstance(v, str)}
+                if chave and chave not in lidas:
+                    diagnosticos.append({
+                        "severity": "warning", "code": "edge_to_key_unknown",
+                        "source": origem, "target": destino,
+                        "message": (
+                            f"a entrada '{chave}' de '{destino}' não é lida pelo inputsMapping "
+                            f"(lê: {sorted(lidas)}): com mapeamento, só as chaves mapeadas chegam "
+                            f"ao sub-fluxo '{alvo}', e esta é descartada."
+                        ),
+                    })
+            else:
+                chave = e.get("to_key")
+                if chave and entradas and chave not in entradas:
+                    diagnosticos.append({
+                        "severity": "warning", "code": "edge_to_key_unknown",
+                        "source": origem, "target": destino,
+                        "message": (
+                            f"to_key '{chave}' não é uma entrada do sub-fluxo '{alvo}' chamado em "
+                            f"'{destino}': o sub-fluxo descarta a chave. Entradas: {sorted(entradas)}."
+                        ),
+                    })
     return diagnosticos
