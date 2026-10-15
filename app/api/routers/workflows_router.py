@@ -1,5 +1,6 @@
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, HTTPException, Depends, Request, Header
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -168,10 +169,12 @@ async def read_workflow(
     # so the "<REDACTED>" marker is never written by a flush of the GET. Modern
     # workflows use credential_id (resolved only at dispatch) and expose nothing.
     from app.core.utils.redacao import redact_definition
+    from app.services.workflow_version_service import definition_etag
     dados = WorkflowRead.model_validate(wf)
+    etag = definition_etag(dados.definition if isinstance(dados.definition, dict) else None)
     if isinstance(dados.definition, dict) and dados.definition:
-        return dados.model_copy(update={"definition": redact_definition(dados.definition)})
-    return dados
+        return dados.model_copy(update={"definition": redact_definition(dados.definition), "definition_etag": etag})
+    return dados.model_copy(update={"definition_etag": etag})
 
 @router.get(
     "/{id_hash}/contract",
@@ -369,6 +372,7 @@ async def update_workflow(
     request: Request,
     workflow_in: WorkflowUpdate,
     change_note: str | None = None,
+    expected_etag: str | None = None,
     service: WorkflowService = Depends(get_workflow_service),
     wf=Depends(workflow_com_papel(ROLE_EDITOR)),
     db: AsyncSession = Depends(get_db),
@@ -378,7 +382,23 @@ async def update_workflow(
     Updates fields of an existing workflow.
     Only the fields sent in the payload are changed.
     If `definition` is changed, the current version is saved automatically as a snapshot.
+
+    `expected_etag`: the `definition_etag` the client loaded. When given with a
+    `definition`, the save is refused with 409 (`definition_conflict`) if the
+    stored definition changed since — see `definition_etag`.
     """
+    from app.services.workflow_version_service import definition_etag
+
+    if expected_etag is not None and getattr(workflow_in, "definition", None) is not None:
+        if definition_etag(wf.definition) != expected_etag:
+            return JSONResponse(status_code=409, content={
+                "error": "definition_conflict",
+                "detail": (
+                    "Este workflow foi alterado em outro lugar (outra aba, outra pessoa "
+                    "ou o assistente) depois que você o abriu. Suas alterações não foram "
+                    "salvas: recarregue para ver a versão atual."
+                ),
+            })
     # If the definition changed, validate cross-workflow references against the DB.
     # `WorkflowUpdate` is partial: an absent `definition` means "do not touch it",
     # and refusing there would block even renaming a workflow.
@@ -402,7 +422,7 @@ async def update_workflow(
             )
 
     try:
-        return await service.update_workflow(
+        atualizado = await service.update_workflow(
             wf.id_hash, workflow_in, change_note=change_note,
             updated_by_id=current_user.id_hash,
         )
@@ -411,6 +431,11 @@ async def update_workflow(
     except Exception as e:
         logger.error("Erro ao atualizar workflow '%s': %s", wf.id_hash, e)
         raise HTTPException(status_code=400, detail="Não foi possível atualizar o workflow.")
+    # Transient attribute, like `schedule_notices`: the tag of what was just
+    # stored, for the editor's next save.
+    if hasattr(atualizado, "definition"):
+        atualizado.definition_etag = definition_etag(atualizado.definition)
+    return atualizado
 
 
 # ------------------------------------------------------------------ #

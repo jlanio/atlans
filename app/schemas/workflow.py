@@ -130,6 +130,10 @@ class WorkflowRead(BaseModel):
     # toast when it comes filled in. Populated as a transient attribute on the
     # ORM object returned by `update_workflow` — it is not a database column.
     schedule_notices: List[ScheduleNotice] = Field(default_factory=list)
+    # Tag of the stored definition (`definition_etag`): the editor sends it back
+    # as `expected_etag` on its next save, which is refused with 409 if someone
+    # else saved in between. Filled on GET and PUT; not a database column.
+    definition_etag: Optional[str] = None
 
     class Config:
         from_attributes = True

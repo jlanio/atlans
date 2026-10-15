@@ -2,8 +2,10 @@
 # Workflow version management.
 
 import copy
+import hashlib
 import json
 from collections import Counter
+from typing import Any, Mapping
 
 from sqlalchemy.orm.attributes import set_committed_value
 
@@ -20,6 +22,33 @@ from app.crud.workflow_crud import WorkflowCRUD
 from flow.utils.workflow_contract import _node_properties
 
 _logger = get_logger(__name__)
+
+
+def definition_etag(definition: "Mapping[str, Any] | None") -> str:
+    """Version tag of a stored definition, for the editor's save.
+
+    The editor saves the whole definition, so a tab that opened the workflow
+    before someone else saved it — another tab, another person, an agent through
+    the MCP — wrote over that change on its next save and went on showing
+    "Salvo": edges added elsewhere vanished with nothing said. The editor sends
+    back the tag it loaded (`expected_etag` on PUT) and the save is refused with
+    409 when the stored definition changed since.
+
+    Computed over the definition as clients see it (decrypted, then redacted):
+    the tag goes to viewers too, and a hash over a connection string would let
+    them test guesses offline. Without `viewport`: panning in another tab is not
+    a conflict. Not `updated_at`: pinning a node or switching the workflow on
+    bumps it without touching the definition.
+    """
+    bruta = copy.deepcopy(dict(definition or {}))
+    bruta.pop("viewport", None)
+    try:
+        bruta = decrypt_workflow_connections(bruta)
+    except ValueError:
+        pass  # a corrupted token: tag what is there; reading/saving reports it
+    visivel = redact_definition(bruta)
+    canonica = json.dumps(visivel, sort_keys=True, separators=(",", ":"), default=str, ensure_ascii=False)
+    return hashlib.sha256(canonica.encode("utf-8")).hexdigest()[:32]
 
 
 def _has_substantial_changes(old_def: dict, new_def: dict) -> bool:
