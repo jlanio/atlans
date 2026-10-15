@@ -325,9 +325,9 @@ def _build_report(
         if d.get("from_key") is not None:
             edge["from_key"] = d["from_key"]
         if d.get("severity") == "error":
-            errors.append(_item("edge_from_key_unknown", "error", str(d.get("message", "")), edge=edge))
+            errors.append(_item(d.get("code") or "edge_from_key_unknown", "error", str(d.get("message", "")), edge=edge))
         else:
-            warnings.append(_item("edge_spread_ambiguous", "warning", str(d.get("message", "")), edge=edge))
+            warnings.append(_item(d.get("code") or "edge_spread_ambiguous", "warning", str(d.get("message", "")), edge=edge))
 
     for node_id, saida in simulated_outputs.items():
         if str(node_id).startswith("__") or not isinstance(saida, dict):

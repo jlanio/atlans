@@ -67,6 +67,49 @@ def test_from_key_errado_de_outro_no_continua_erro():
     assert [d["severity"] for d in ex.validate_edges()] == ["error"]
 
 
+def test_so_to_key_de_origem_com_varias_saidas_vira_aviso():
+    # The run renames the FIRST value of the output (edge_resolver): an HTTP
+    # Request's status_code, not the body the edge was meant to carry.
+    ex = _executor([_n("a", ntype="action"), _n("b")],
+                   [{"source": "a", "target": "b", "to_key": "entrada"}])
+    ex.simulated_outputs = {"a": {"status": "ok", "schema": _schema("status_code", "headers", "body")}}
+    diag = ex.validate_edges()
+    assert [(d["severity"], d.get("code")) for d in diag] == [("warning", "edge_to_key_only")]
+    assert "primeiro valor" in diag[0]["message"]
+
+
+def test_so_to_key_de_origem_com_uma_saida_e_renomear():
+    ex = _executor([_n("a", ntype="action"), _n("b")],
+                   [{"source": "a", "target": "b", "to_key": "entrada"}])
+    ex.simulated_outputs = {"a": {"status": "ok", "schema": _schema("output")}}
+    assert ex.validate_edges() == []
+
+
+def test_to_key_fora_das_entradas_declaradas_vira_aviso():
+    # SpatialJoin reads `layerA`/`layerB` by name: `left` is never read.
+    ex = _executor([_n("a", ntype="action"), {"id": "j", "type": "spatial", "name": "SpatialJoin", "properties": {}}],
+                   [{"source": "a", "target": "j", "from_key": "output", "to_key": "left"}])
+    ex.simulated_outputs = {"a": {"status": "ok", "schema": _schema("output")}}
+    diag = ex.validate_edges()
+    assert [(d["severity"], d.get("code")) for d in diag] == [("warning", "edge_to_key_unknown")]
+    assert "layerA" in diag[0]["message"]
+
+
+def test_to_key_declarado_nao_avisa():
+    ex = _executor([_n("a", ntype="action"), {"id": "j", "type": "spatial", "name": "SpatialJoin", "properties": {}}],
+                   [{"source": "a", "target": "j", "from_key": "output", "to_key": "layerA"}])
+    ex.simulated_outputs = {"a": {"status": "ok", "schema": _schema("output")}}
+    assert ex.validate_edges() == []
+
+
+def test_to_key_fora_das_portas_do_subworkflowoutput_vira_aviso():
+    saida = {"id": "s", "type": "output", "name": "SubWorkflowOutput", "properties": {"ports": ["faixa"]}}
+    ex = _executor([_n("a", ntype="action"), saida],
+                   [{"source": "a", "target": "s", "from_key": "output", "to_key": "faixas"}])
+    ex.simulated_outputs = {"a": {"status": "ok", "schema": _schema("output")}}
+    assert [d.get("code") for d in ex.validate_edges()] == ["edge_to_key_unknown"]
+
+
 def test_spread_from_multi_output_source_becomes_warning():
     ex = _executor([_n("a", ntype="action"), _n("b")],
                    [{"source": "a", "target": "b"}])  # no from_key/to_key

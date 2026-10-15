@@ -1030,4 +1030,58 @@ class WorkflowExecutor:
                             f"from_key para evitar ambiguidade."
                         ),
                     })
+                elif not is_branch and len(names) > 1:
+                    # Only `to_key`: the run renames the FIRST value of the output
+                    # (edge_resolver) — an HTTP Request's status_code, not its body.
+                    diagnostics.append({
+                        "severity": "warning",
+                        "code": "edge_to_key_only",
+                        "source": parent_id,
+                        "target": node_id,
+                        "message": (
+                            f"aresta de '{parent_id}' só com to_key '{to_key}' "
+                            f"({len(names)} saídas: {sorted(names)}): entrega só o "
+                            f"primeiro valor da saída. Especifique from_key."
+                        ),
+                    })
+
+                if to_key:
+                    entradas = self._entradas_declaradas(node_id)
+                    if entradas is not None and to_key not in entradas:
+                        # The node reads its declared inputs by name: a key outside
+                        # them is not read (CartaImagem drops the layer, a
+                        # SubWorkflowOutput discards the value).
+                        diagnostics.append({
+                            "severity": "warning",
+                            "code": "edge_to_key_unknown",
+                            "source": parent_id,
+                            "target": node_id,
+                            "message": (
+                                f"to_key '{to_key}' não é uma entrada de '{node_id}'. "
+                                f"Entradas: {sorted(entradas)}."
+                            ),
+                        })
         return diagnostics
+
+    def _entradas_declaradas(self, node_id: str) -> "set[str] | None":
+        """Input names a node reads, or None when they are not known statically.
+
+        Catalog `inputs` for most nodes; the `ports` property for a
+        SubWorkflowOutput, whose ports are its inputs. Other dynamic-input nodes
+        (the Python Script) and nodes that declare no input are left out.
+        """
+        node_def = self.node_mgr.node_defs.get(node_id) or {}
+        cls = self.node_mgr.factory.get(node_def.get("name"))
+        try:
+            desc = cls.description() if cls else {}
+        except Exception:
+            return None
+        if desc.get("dynamic_inputs"):
+            if node_def.get("name") != "SubWorkflowOutput":
+                return None
+            from flow.utils.workflow_contract import _parse_ports
+            props = node_def.get("properties") or node_def.get("parameters") or {}
+            portas = set(_parse_ports(props.get("ports")))
+            return portas or None
+        nomes = {i["name"] for i in (desc.get("inputs") or []) if isinstance(i, dict) and i.get("name")}
+        return nomes or None
