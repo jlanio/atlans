@@ -10,7 +10,10 @@
  * for every dialog opened over the canvas — the pin dialog, the run parameters,
  * the sub-workflow viewer — and for what Radix renders in its own portal at the
  * end of the body (a select's options, a dialog or sheet opened from the
- * modal), which no marked root contains.
+ * modal), which no marked root contains. And for the panels that stay open next
+ * to the canvas — the run panel, the assistant and its menu — and the canvas
+ * toolbar: clicking undo or "Organizar" leaves the focus on that button, with
+ * the node still selected.
  *
  * A real `<ReactFlow>`, with its real key listener; only the URL (Next's
  * router) and the server are in memory.
@@ -37,16 +40,25 @@ vi.mock("@monaco-editor/react", () => ({
   loader: { config: () => {} },
 }))
 // The sub-workflow viewer fetches the child's definition; still loading is
-// enough — its bar, with the buttons, is already on screen.
+// enough — its bar, with the buttons, is already on screen. The assistant only
+// draws its panel once the installation says it is on.
 vi.mock("@/service/GisFlowService", () => ({
-  GisFlowService: { getWorkflowById: () => new Promise(() => {}) },
+  GisFlowService: {
+    getWorkflowById: () => new Promise(() => {}),
+    estadoDoAssistente: async () => ({ data: { ativo: true, motivo: null, cota: null }, error: null }),
+  },
 }))
 
 import NodeConfigModal from "@/app/components/workflow/node-config-modal"
 import PinDialog from "@/app/components/workflow/custom-nodes/tools/pin-dialog"
 import ExecuteParamsDialog from "@/app/components/workflow/execute-params-dialog"
 import SubflowViewer from "@/app/components/workflow/subflow-viewer"
+import RunPanel from "@/app/components/workflow/run-panel"
+import AssistantPanel from "@/app/components/workflow/assistente"
+import CanvasToolbar from "@/app/components/workflow/canvas-toolbar"
 import { useSubflowDrilldownStore } from "@/app/stores/subflowDrilldownStore"
+import { useRunPanelStore } from "@/app/stores/runPanelStore"
+import { useAssistantEditorStore } from "@/app/stores/assistenteEditorStore"
 
 /** Selected, as the double-click that opens the modal leaves it. */
 const NO: Node = {
@@ -127,6 +139,9 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   useSubflowDrilldownStore.getState().close()
+  useRunPanelStore.getState().setOpen(false)
+  useAssistantEditorStore.setState({ aberto: false })
+  localStorage.clear()
 })
 
 describe("Backspace com o foco no canvas — continua apagando", () => {
@@ -237,6 +252,62 @@ describe("Backspace nos outros diálogos abertos por cima do canvas — não apa
 
     focar(fechar)
     backspace(fechar)
+    await assentar()
+
+    expect(noExiste()).toBe(true)
+  })
+})
+
+describe("Backspace nos painéis e na barra de ferramentas do canvas — não apaga o nó", () => {
+  it("num botão do painel de execução", async () => {
+    // Inside <ReactFlow> in the editor, which is no `.nokey` either: the panel
+    // is a dock next to the nodes, and the selection stays while it is read.
+    act(() => useRunPanelStore.getState().setOpen(true))
+    montar(<RunPanel />)
+    const fechar = await screen.findByTitle("Fechar")
+    const aba = screen.getByRole("button", { name: /Problemas/ })
+
+    for (const botao of [aba, fechar]) {
+      focar(botao)
+      backspace(botao)
+    }
+    await assentar()
+
+    expect(noExiste()).toBe(true)
+  })
+
+  it("nos botões de desfazer, refazer e organizar da barra de ferramentas", async () => {
+    montar(<CanvasToolbar onUndo={() => {}} onRedo={() => {}} canUndo canRedo />)
+    const botoes = ["Desfazer (Ctrl+Z)", "Refazer (Ctrl+Y)", "Organizar nós automaticamente"]
+      .map(titulo => screen.getByTitle(titulo))
+
+    for (const botao of botoes) {
+      focar(botao)
+      backspace(botao)
+    }
+    await assentar()
+
+    expect(noExiste()).toBe(true)
+  })
+
+  it("num botão do painel do assistente", async () => {
+    montar(<AssistantPanel abrirPorPadrao onAplicar={() => {}} />)
+    const fechar = await screen.findByRole("button", { name: "Fechar o assistente" })
+
+    focar(fechar)
+    backspace(fechar)
+    await assentar()
+
+    expect(noExiste()).toBe(true)
+  })
+
+  it("no menu do assistente (o Radix o desenha fora do painel)", async () => {
+    montar(<AssistantPanel abrirPorPadrao onAplicar={() => {}} />)
+    tecla(await screen.findByRole("button", { name: "Mais ações do assistente" }), "Enter")
+    const recomecar = await screen.findByRole("menuitem", { name: "Recomeçar a conversa" })
+
+    focar(recomecar)
+    backspace(recomecar)
     await assentar()
 
     expect(noExiste()).toBe(true)

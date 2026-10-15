@@ -135,6 +135,13 @@ export default function AssistantPanel({ workflowId, abrirPorPadrao = false, onA
       // nowheel/nopan/nodrag: without them React Flow captures the conversation's
       // scrolling and the handle's drag, and scrolling the list zoomed the graph.
       //
+      // nokey: React Flow's delete key listens on the whole document, not only
+      // on the canvas, and skips only text fields and `.nokey` elements. The
+      // node selected on the canvas stays selected while the conversation is
+      // read, and Backspace on any button here (close, stop, apply a proposal)
+      // deleted it. Its menu is portaled out of this drawer and carries its own
+      // (`ui/dropdown-menu.tsx`).
+      //
       // `max-h-svh` is the CEILING, and without it the conversation's
       // `overflow-y-auto` never scrolls. The dashboard shell is `min-h-svh`
       // (`ui/sidebar.tsx`), which is a FLOOR and not a ceiling: since this drawer
@@ -158,7 +165,7 @@ export default function AssistantPanel({ workflowId, abrirPorPadrao = false, onA
       // is a shell, like the sidebar container's `h-svh`, and a shell can't
       // reflow in the middle of scrolling.
       className={cn(
-        "nowheel nopan nodrag relative z-20 flex h-full max-h-svh shrink-0 flex-col border-l border-border bg-background",
+        "nowheel nopan nodrag nokey relative z-20 flex h-full max-h-svh shrink-0 flex-col border-l border-border bg-background",
         // On the phone the drawer takes over the screen: a 360px canvas split in two
         // serves neither half.
         "max-md:absolute max-md:inset-0 max-md:w-full max-md:border-l-0",
