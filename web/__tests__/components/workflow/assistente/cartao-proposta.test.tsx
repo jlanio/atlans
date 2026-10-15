@@ -85,5 +85,40 @@ describe("cartão da proposta com a conversa já liberada", () => {
     expect(screen.getByText(/1 ligação removida/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: /Desenhar no canvas/ }))
     expect(onAplicar).toHaveBeenCalledTimes(1)
+    // Drawn: it says so and stops offering the button.
+    expect(screen.getByText("Desenhado no canvas")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /Desenhar no canvas/ })).toBeNull()
+  })
+
+  it("retido, não se desenha sozinho depois que o canvas muda", () => {
+    // Held back by the hand-made b→c. The person then draws a NEWER card, whose
+    // canvas no longer has b→c: recomputed against it, this older card found
+    // nothing to remove and drew itself over the newer one.
+    canvas.edges = [
+      { id: "1", source: "a", target: "b" }, { id: "2", source: "a", target: "c" },
+      { id: "3", source: "b", target: "c" },
+    ]
+    const onAplicar = vi.fn()
+    const card = () => <ProposalCard proposta={PROPOSTA} onAplicar={onAplicar} liberado onLiberar={() => {}} />
+    const { rerender } = render(card())
+    expect(onAplicar).not.toHaveBeenCalled()
+
+    canvas.edges = [{ id: "1", source: "a", target: "b" }, { id: "2", source: "a", target: "c" }]
+    rerender(card())
+    expect(onAplicar).not.toHaveBeenCalled()
+    expect(screen.getByRole("button", { name: /Desenhar no canvas/ })).toBeInTheDocument()
+  })
+
+  it("ligação que o próprio assistente desenhou não segura o desenho seguinte", () => {
+    // b→c came from the conversation's previous drawing: the new one rewiring it
+    // is the assistant changing its own work, not a connection made by hand.
+    canvas.edges = [
+      { id: "1", source: "a", target: "b" }, { id: "2", source: "a", target: "c" },
+      { id: "3", source: "b", target: "c" },
+    ]
+    const onAplicar = vi.fn()
+    render(<ProposalCard proposta={PROPOSTA} onAplicar={onAplicar} liberado onLiberar={() => {}}
+      arestasDoAssistente={new Set(["1", "2", "3"])} />)
+    expect(onAplicar).toHaveBeenCalledTimes(1)
   })
 })

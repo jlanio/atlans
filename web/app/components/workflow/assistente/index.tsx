@@ -69,6 +69,15 @@ export default function AssistantPanel({ workflowId, abrirPorPadrao = false, onA
   // same reasons the conversation resets: it's another conversation, and consent
   // doesn't carry over.
   const [liberado, setUnlocked] = useState(false)
+  // The edges the last drawing put on the canvas (a drawing replaces the whole
+  // graph, so these are its edges, by id). A later drawing that rewires them is
+  // the conversation changing its own work, not dropping a connection made by
+  // hand — it must not stop and ask.
+  const [arestasDoAssistente, setArestasDoAssistente] = useState<ReadonlySet<string>>(() => new Set())
+  const aplicarDesenho = useCallback((resultado: ProposalResult) => {
+    setArestasDoAssistente(new Set(resultado.edges.map(e => e.id)))
+    onAplicar(resultado)
+  }, [onAplicar])
   useEffect(() => { setUnlocked(false) }, [workflowId])
 
   useEffect(() => { hidratar(abrirPorPadrao) }, [hidratar, abrirPorPadrao])
@@ -193,7 +202,7 @@ export default function AssistantPanel({ workflowId, abrirPorPadrao = false, onA
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => { setUnlocked(false); void esquecer() }}>
+            <DropdownMenuItem onClick={() => { setUnlocked(false); setArestasDoAssistente(new Set()); void esquecer() }}>
               Recomeçar a conversa
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -217,9 +226,10 @@ export default function AssistantPanel({ workflowId, abrirPorPadrao = false, onA
         proposta={(p) => (
           <ProposalCard
             proposta={p}
-            onAplicar={onAplicar}
+            onAplicar={aplicarDesenho}
             liberado={liberado}
             onLiberar={() => setUnlocked(true)}
+            arestasDoAssistente={arestasDoAssistente}
           />
         )}
       />
