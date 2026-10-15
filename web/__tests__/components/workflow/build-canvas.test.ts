@@ -167,6 +167,8 @@ describe("buildNodes — nó fora do catálogo", () => {
     }
     const nodes = buildNodes(definition, catalogo)
     expect(nodes[0].data.outputs).toEqual([{ name: "true" }, { name: "false" }])
+    // Still a branch node: true/false route, they are not data keys.
+    expect(nodes[0].data.branches).toBe(true)
     const salvas = buildEdges(definition, nodes).map(e => serializeEdge(e))
     expect(salvas).toEqual([
       { source: "se", target: "b", source_handle: "true", condition: true, from_key: "result" },

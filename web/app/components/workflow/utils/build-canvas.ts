@@ -51,6 +51,15 @@ function saidasDasArestasSalvas(
   return ramo ? [{ name: "true" }, { name: "false" }, ...portas] : portas
 }
 
+/** The output side of a node missing from the catalog, from its saved edges:
+ *  the handles, and whether it routes — so true/false stay branches and never
+ *  become data keys (`getCandidateKeys`). */
+function contratoDasArestasSalvas(edges: CanvasDefinition["edges"], nodeId: string) {
+  const outputs = saidasDasArestasSalvas(edges, nodeId)
+  const ramifica = outputs.some(p => p.name === "true" || p.name === "false")
+  return { outputs, ...(ramifica ? { branches: true } : {}) }
+}
+
 /**
  * Canvas nodes for a definition.
  *
@@ -109,7 +118,7 @@ export function buildNodes(
         properties,
         type,
         ...contratoDoNo(nodeApiFound, properties),
-        ...(nodeApiFound ? {} : { outputs: saidasDasArestasSalvas(definition.edges, node.id) }),
+        ...(nodeApiFound ? {} : contratoDasArestasSalvas(definition.edges, node.id)),
       },
       // The card follows the same type: with the persisted one, a node saved as
       // "trigger" by mistake got the trigger card, which has no input handle.

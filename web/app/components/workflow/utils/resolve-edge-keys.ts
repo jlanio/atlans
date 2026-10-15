@@ -13,22 +13,42 @@ import { saidasDoNo } from "./node-ports"
  */
 
 /**
- * A node's `from_key` candidates: the instance's output fields.
+ * A node's `from_key` candidates: the instance's output fields, then its named
+ * output ports.
  *
  * `saidasDoNo` resolves the source: the catalog's fields (`saidas`) or, in the
  * Python Script, the `output_vars` variables — offering the catalog's "result"
  * created an edge with a `from_key` the executor does not find in the result.
  * Branches (`true`/`false`) never show up: they route execution and are not
  * fields.
+ *
+ * The named ports join because a port is not always a catalog field. The
+ * SubWorkflow draws one output per port of the CHILD's contract (`outputs`,
+ * filled in when the contract arrives), while its catalog only knows
+ * `subWorkflowResult`. Dragging from port `r2` found no candidate called `r2`,
+ * fell to the first one and recorded `subWorkflowResult`: the edge delivered the
+ * whole result instead of r2 — the node returns each port as a key of its own,
+ * next to the envelope — and after a reload it jumped to the first port, since
+ * a `from_key` that is not a port name gives `reancorarArestasDoNo` nothing to
+ * anchor on.
+ *
+ * Only from 2 ports on, the threshold at which the card draws NAMED handles
+ * (`portasDeSaida`), and never on a branch node, whose `outputs` are the
+ * true/false handles. Every other node's ports are catalog fields or
+ * `outputs_from_ports` ports, which `saidasDoNo` already returns, so its list
+ * does not change.
  */
 export function getCandidateKeys(nodeData?: {
   saidas?: INodeOutputField[]
   dynamic_output?: boolean
   properties?: Record<string, unknown>
+  outputs?: INodePortAPI[]
+  branches?: boolean
 }): INodePortAPI[] {
   const candidates: INodePortAPI[] = []
   const seen = new Set<string>()
-  for (const field of saidasDoNo(nodeData)) {
+  const portas = nodeData?.branches ? [] : (nodeData?.outputs ?? [])
+  for (const field of [...saidasDoNo(nodeData), ...(portas.length > 1 ? portas : [])]) {
     if (!field?.name || seen.has(field.name)) continue
     seen.add(field.name)
     candidates.push(field)
