@@ -25,8 +25,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
       // (`useToastsForaDoPainel`, `globals.css`); sonner's own 24px and 16px
       // otherwise. `min()`: on a narrow screen, or with the panel dragged wide,
       // beside it would push the toast off the left edge — it stops 16px short.
+      // `100%`, not `100vw`: the toaster's box, without the scrollbar gutter.
       offset={{
-        right: "min(calc(24px + var(--toasts-recuo-direita, 0px)), calc(100vw - var(--width) - 16px))",
+        right: "min(calc(24px + var(--toasts-recuo-direita, 0px)), calc(100% - var(--width) - 16px))",
         bottom: "calc(24px + var(--toasts-recuo-baixo, 0px))",
       }}
       mobileOffset={{ bottom: "calc(16px + var(--toasts-recuo-baixo, 0px))" }}

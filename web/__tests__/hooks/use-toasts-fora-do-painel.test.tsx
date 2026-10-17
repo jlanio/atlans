@@ -60,6 +60,9 @@ beforeEach(() => {
     unobserve() {}
     disconnect() {}
   })
+  // The root's box ends before the scrollbar gutter, as `scrollbar-gutter:
+  // stable` leaves it — and `clientWidth` would still say 1440.
+  geometria(raiz, { right: 1430, bottom: 900 })
   Object.defineProperty(raiz, "clientWidth", { configurable: true, value: 1440 })
   Object.defineProperty(raiz, "clientHeight", { configurable: true, value: 900 })
 })
@@ -73,14 +76,14 @@ describe("toasts fora do painel do assistente", () => {
   it("diz quanto da borda direita o painel ocupa e quanto do pé o campo ocupa", () => {
     montar()
 
-    expect(lido("--painel-ocupa-direita")).toBe("380px")
+    expect(lido("--painel-ocupa-direita")).toBe("370px")
     expect(lido("--painel-ocupa-baixo")).toBe("110px")
   })
 
   it("a folga cobre o que fica colado ao painel (a coluna do canvas, no editor)", () => {
     montar({ folga: 48 })
 
-    expect(lido("--painel-ocupa-direita")).toBe("428px")
+    expect(lido("--painel-ocupa-direita")).toBe("418px")
   })
 
   it("acompanha o painel arrastado e o campo que cresce com o texto", () => {
@@ -90,7 +93,7 @@ describe("toasts fora do painel do assistente", () => {
     geometria(getByTestId("campo"), { top: 700 })
     act(() => observadores.forEach(avisar => avisar()))
 
-    expect(lido("--painel-ocupa-direita")).toBe("540px")
+    expect(lido("--painel-ocupa-direita")).toBe("530px")
     expect(lido("--painel-ocupa-baixo")).toBe("200px")
   })
 
@@ -100,7 +103,7 @@ describe("toasts fora do painel do assistente", () => {
     geometria(getByTestId("painel"), { left: 996 })
     act(() => { getByTestId("painel").dispatchEvent(new Event("animationend")) })
 
-    expect(lido("--painel-ocupa-direita")).toBe("444px")
+    expect(lido("--painel-ocupa-direita")).toBe("434px")
   })
 
   it("fechado ou desmontado, os toasts voltam ao canto", () => {
@@ -128,7 +131,7 @@ describe("toasts fora do painel do assistente", () => {
       return el
     })
     expect(toaster.style.getPropertyValue("--offset-right")).toBe(
-      "min(calc(24px + var(--toasts-recuo-direita, 0px)), calc(100vw - var(--width) - 16px))",
+      "min(calc(24px + var(--toasts-recuo-direita, 0px)), calc(100% - var(--width) - 16px))",
     )
     expect(toaster.style.getPropertyValue("--offset-bottom")).toBe("calc(24px + var(--toasts-recuo-baixo, 0px))")
     expect(toaster.style.getPropertyValue("--mobile-offset-bottom")).toBe("calc(16px + var(--toasts-recuo-baixo, 0px))")

@@ -40,9 +40,11 @@ export function useToastsForaDoPainel(
     const raiz = document.documentElement
 
     const medir = () => {
-      // `clientWidth`/`clientHeight`, not `innerWidth`: the toaster is
-      // `position: fixed`, and its edges are the viewport's without the scrollbar.
-      const ladoDoPainel = raiz.clientWidth - elemento.getBoundingClientRect().left
+      // Against the root's box, where the toaster (`position: fixed`) ends. Not
+      // `clientWidth`: `globals.css` reserves the scrollbar gutter
+      // (`scrollbar-gutter: stable`), and `clientWidth` counts it — the toasts
+      // moved that much too far.
+      const ladoDoPainel = raiz.getBoundingClientRect().right - elemento.getBoundingClientRect().left
       const topoDoCampo = campo.current ? raiz.clientHeight - campo.current.getBoundingClientRect().top : 0
       raiz.style.setProperty(OCUPA_DIREITA, `${Math.max(0, Math.round(ladoDoPainel + folga))}px`)
       raiz.style.setProperty(OCUPA_BAIXO, `${Math.max(0, Math.round(topoDoCampo))}px`)
