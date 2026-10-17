@@ -465,13 +465,19 @@ class WorkflowService:
                 ) from exc
             raise
 
-        # 3. Applies the schedule, if there is a ScheduleTrigger
+        # 3. Applies the schedule, if there is a ScheduleTrigger. What it did NOT
+        # apply (invalid expression, inactive workflow) travels back the way it
+        # does on update: a transient attribute, always set, that the routes and
+        # the MCP tool read. Dropped here, the first save said "Salvo" and the
+        # workflow was born with no schedule.
+        schedule_notices = []
         if extract_schedule_node(definition):
             try:
-                await apply_schedule_if_needed(workflow, definition, self.crud.db)
+                schedule_notices = await apply_schedule_if_needed(workflow, definition, self.crud.db) or []
             except Exception as exc:
                 _logger.warning("Falha ao criar agendamento para workflow %s: %s", workflow.id_hash, exc)
 
+        workflow.schedule_notices = schedule_notices
         return workflow
 
     async def duplicate_workflow(

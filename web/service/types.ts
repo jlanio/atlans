@@ -1296,6 +1296,9 @@ export interface ISubworkflowNotice {
 export interface IWorkflowCriado {
   id: string
   name: string
+  /** Only the create's: what the first save did NOT do to the schedule, as in
+   *  the update's answer (`IWorkflow.schedule_notices`). */
+  schedule_notices?: IScheduleNotice[]
 }
 
 export interface IWorkflow {

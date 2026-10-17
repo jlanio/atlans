@@ -618,6 +618,34 @@ async def test_create_workflow_stores_description_and_params_schema(banco, valid
     assert gravado.params_schema == {"uf": {"type": "string"}}
 
 
+def scheduled_definition(cron: str) -> dict:
+    return {
+        "nodes": [{
+            "id": "n1", "name": "ScheduleTrigger", "type": "trigger",
+            "properties": {"strategy": "cron", "cron_expression": cron, "timezone": "America/Cuiaba", "active": True},
+        }],
+        "edges": [],
+    }
+
+
+async def test_create_says_what_the_schedule_did_not_apply(banco, validacao):
+    """As on update: a ScheduleTrigger the scheduler refuses is not a silent
+    "created" — the model would tell the person the workflow runs at 8."""
+    from app.models.schedule import Schedule
+
+    recusado = await create_workflow(ctx(), name="Seis campos", definition=scheduled_definition("0 0 8 * * *"))
+    aceito = await create_workflow(ctx(), name="Cinco campos", definition=scheduled_definition("0 8 * * *"))
+
+    assert recusado["schedule_notice_codes"] == ["invalid_schedule"]
+    [aviso] = recusado["untrusted_data"]["schedule_notices"]
+    assert "O workflow foi salvo sem agendamento." in aviso["message"]
+    assert aceito["schedule_notice_codes"] == []
+    assert "schedule_notices" not in aceito["untrusted_data"]
+    async with banco() as db:
+        agendados = (await db.execute(select(Schedule.workflow_hash))).scalars().all()
+    assert agendados == [aceito["id"]]
+
+
 # ── update_workflow ───────────────────────────────────────────────────────────
 
 

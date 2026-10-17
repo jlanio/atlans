@@ -142,6 +142,18 @@ async def test_invalid_config_preserves_the_schedule_and_warns(workflow, crud):
     crud.schedule_crud.delete.assert_not_awaited()
     crud.create_schedule.assert_not_awaited()
     assert [a.code for a in avisos] == ["invalid_schedule"]
+    assert "O agendamento anterior foi mantido." in avisos[0].message
+
+
+async def test_invalid_config_with_no_schedule_yet_does_not_claim_one_was_kept(workflow, crud):
+    """The first save of a new workflow (or the first schedule of an old one):
+    there is no previous schedule, so the notice says the workflow went without one."""
+    avisos = await apply_schedule_if_needed(workflow, _definition(cron_expression="0 7 * *"), MagicMock())
+
+    crud.create_schedule.assert_not_awaited()
+    assert [a.code for a in avisos] == ["invalid_schedule"]
+    assert "O workflow foi salvo sem agendamento." in avisos[0].message
+    assert "anterior" not in avisos[0].message
 
 
 async def test_equivalent_cron_does_not_recreate_the_schedule(workflow, crud):
