@@ -69,6 +69,17 @@ describe("rótulos das ferramentas", () => {
     }
   })
 
+  it("as ferramentas próprias das superfícies também têm rótulo", () => {
+    // Not MCP tools: the editor's drawing was left out of the table, and its step
+    // showed `desenhar_no_canvas` raw in the middle of the conversation.
+    for (const nome of ["desenhar_no_canvas", "exibir_no_globo", "sugerir_respostas"]) {
+      for (const idioma of ["pt-BR", "en", "es"] as const) {
+        expect(toolLabel(nome, idioma), `${idioma}:${nome}`).not.toBe(nome)
+      }
+    }
+    expect(toolLabel("desenhar_no_canvas")).toBe("Desenhando no canvas")
+  })
+
   it("nome desconhecido volta cru — inclusive os do protótipo de Object", () => {
     expect(toolLabel("ferramenta_nova")).toBe("ferramenta_nova")
     expect(toolLabel("toString", "en")).toBe("toString")
