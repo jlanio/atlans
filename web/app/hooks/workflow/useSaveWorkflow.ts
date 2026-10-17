@@ -338,7 +338,11 @@ export const useSaveWorkflow = () => {
       // you were editing) and Ctrl+S stayed on /workflow/create with no id —
       // the next Ctrl+S created a copy. `replace`, not `push`: going back to
       // /create in the history would mean going back to "create another".
-      const newId = data.data?.id_hash
+      //
+      // The new id comes as `id` (see createWorkflow). Reading `id_hash` here
+      // found nothing: the editor stayed on /workflow/create with no Executar,
+      // and every later save tried to create again and hit the name already taken.
+      const newId = data.data?.id
       if (newId) router.replace(`/workflow/${newId}`)
 
       return data

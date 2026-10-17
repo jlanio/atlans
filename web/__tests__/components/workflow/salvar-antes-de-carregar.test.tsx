@@ -142,7 +142,7 @@ beforeEach(() => {
   servico.getCredentials.mockResolvedValue({ data: [], error: null })
   servico.listPinnedNodes.mockResolvedValue({ data: { pinned_nodes: [] }, error: null })
   servico.updateWorkflowById.mockImplementation(async (id: string) => ({ data: { id_hash: id }, error: null }))
-  servico.createWorkflow.mockResolvedValue({ data: { id_hash: "wf-novo" }, error: null })
+  servico.createWorkflow.mockResolvedValue({ data: { id: "wf-novo", name: "Novo fluxo" }, error: null })
   useWorkflowCatalogStore.setState({ nodesAPI: CATALOGO, nodesFetchedAt: Date.now() })
   toasts.avisos = []
 })

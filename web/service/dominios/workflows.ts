@@ -35,7 +35,10 @@ export function getWorkflows(workspaceId?: string, opts?: { incluirDoAssistente?
 export function createWorkflow(newWorkflow: Omit<IWorkflow, "id_hash" | "created_by_id" | "updated_by_id">) {
   // created_by_id and updated_by_id are filled in by the backend from the
   // authenticated user; the frontend must never make up these values.
-  return post<IWorkflow>("/workflows", newWorkflow)
+  //
+  // The answer is not the workflow: like /duplicate, it is `{ id, name }`, and
+  // `id` is the new workflow's `id_hash`.
+  return post<{ id: string; name: string }>("/workflows", newWorkflow)
 }
 
 export function updateWorkflowById(
