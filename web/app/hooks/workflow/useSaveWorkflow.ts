@@ -1,5 +1,5 @@
 import { INodeContext } from "@/context/useFlowContext"
-import { INodesDefinition, IEdgeDefinition, ISubworkflowNotice } from "@/service/types"
+import { INodesDefinition, IEdgeDefinition, IScheduleNotice, ISubworkflowNotice } from "@/service/types"
 import { GisFlowService } from "@/service/GisFlowService"
 import { createToast } from "@/utils/createToast"
 import { Edge, useReactFlow, useStoreApi, type Viewport } from "@xyflow/react"
@@ -58,6 +58,17 @@ function listaCurta(itens: string[], max = 3): string {
   return itens.length <= max
     ? itens.join(", ")
     : `${itens.slice(0, max).join(", ")} e mais ${itens.length - max}`
+}
+
+/**
+ * What a save did NOT do to the schedule (inactive workflow, invalid
+ * expression): the backend says why in `schedule_notices`, on the create's
+ * answer and on the update's. The "Salvo" on the chip would hide it, so each one
+ * is an amber toast — even on a silent save: the user needs to know the schedule
+ * did not take effect.
+ */
+function avisarDoAgendamento(avisos: IScheduleNotice[] | undefined) {
+  for (const aviso of avisos ?? []) createToast.warning("Agendamento não aplicado", aviso.message)
 }
 
 /**
@@ -285,14 +296,8 @@ export const useSaveWorkflow = () => {
           // Ctrl+S was noise about the same information.
           store.completeSave(snapshot, viewportReq)
         }
-        // Saved, but the schedule may not have been applied (inactive workflow,
-        // invalid expression): the backend returns the reason in
-        // `schedule_notices`. In that case the "Salvo" on the chip would hide an
-        // important caveat — show an amber toast (even on a silent save: the user
-        // needs to know the schedule did not take effect).
-        for (const aviso of data.data?.schedule_notices ?? []) {
-          createToast.warning("Agendamento não aplicado", aviso.message)
-        }
+        // Saved, but the schedule may not have been applied.
+        avisarDoAgendamento(data.data?.schedule_notices)
         // Saved — but other workflows call this one as a sub-workflow and use
         // ports this save removed or renamed: their edges on those ports deliver
         // nothing from now on. Nothing on THIS canvas shows it, so the backend
@@ -334,6 +339,10 @@ export const useSaveWorkflow = () => {
         createToast.error(`Workflow não criado`, data.error.message)
         return data
       }
+      // Created, but maybe without the schedule its canvas shows. Before the
+      // checks below on purpose: the notice is about the workflow just created,
+      // wherever the person is by now.
+      avisarDoAgendamento(data.data?.schedule_notices)
       // Created, but the person already opened another workflow: neither its
       // state nor its URL are this one's to change.
       if (deOutroCanvas()) return data

@@ -143,6 +143,38 @@ describe("salvar um workflow novo", () => {
     expect(levarConversaDoAssistente).not.toHaveBeenCalled()
   })
 
+  it("o que o agendamento não aplicou vira aviso, como numa edição", async () => {
+    // Before, the create answer had no notices: a ScheduleTrigger the scheduler
+    // refused (a cron with 6 fields, drawn by the assistant) was born unscheduled
+    // with only "Salvo" on screen.
+    const aviso = "Configuração de agendamento inválida: cron_expression deve ter 5 campos. O workflow foi salvo sem agendamento."
+    createWorkflow.mockResolvedValue({
+      data: { ...CRIADO.data, schedule_notices: [{ code: "invalid_schedule", severity: "warning", message: aviso }] },
+      error: null,
+    })
+
+    await montar()()
+
+    expect(toast.warning).toHaveBeenCalledWith("Agendamento não aplicado", aviso)
+    expect(replace).toHaveBeenCalledWith("/workflow/wf-novo")
+  })
+
+  it("o aviso de agendamento chega mesmo a quem já saiu da tela", async () => {
+    // It is about the workflow just created, not about the screen on view.
+    createWorkflow.mockImplementation(async () => {
+      window.history.pushState({}, "", "/projects")
+      return {
+        data: { ...CRIADO.data, schedule_notices: [{ code: "invalid_schedule", severity: "warning", message: "inválido" }] },
+        error: null,
+      }
+    })
+
+    await montar()()
+
+    expect(toast.warning).toHaveBeenCalledWith("Agendamento não aplicado", "inválido")
+    expect(replace).not.toHaveBeenCalled()
+  })
+
   it("se outro workflow abriu durante o pedido, não mexe no editor dele", async () => {
     createWorkflow.mockImplementation(async () => {
       useWorkflowSaveStore.setState(s => ({ geracao: s.geracao + 1 }))

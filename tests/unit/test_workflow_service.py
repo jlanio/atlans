@@ -322,6 +322,7 @@ class TestCreateWorkflow:
         enc.assert_called_once_with(definition)
         service.crud.create.assert_called_once()
         assert result is sample_workflow
+        assert result.schedule_notices == []
 
     @pytest.mark.asyncio
     async def test_stamps_author_on_create(self, service, sample_workflow):
@@ -370,6 +371,25 @@ class TestCreateWorkflow:
             result = await service.create_workflow("wf", definition, created_by_id="usr-1")
 
         assert result is sample_workflow
+        assert result.schedule_notices == []
+
+    @pytest.mark.asyncio
+    async def test_schedule_notices_travel_back_with_the_created_workflow(self, service, sample_workflow):
+        """What the schedule did not apply goes back as on update: a transient
+        attribute the routes read. Dropped, the first save said only "Salvo"."""
+        from app.schemas.schedule import ScheduleNotice
+
+        definition = {"nodes": [{"type": "trigger", "name": "ScheduleTrigger"}], "edges": []}
+        aviso = ScheduleNotice(code="invalid_schedule", message="Configuração de agendamento inválida.")
+        service.crud.create = AsyncMock(return_value=sample_workflow)
+
+        with patch("app.services.workflow_service.encrypt_workflow_connections", return_value=definition), \
+             patch("app.services.workflow_service.extract_schedule_node", return_value={"type": "trigger"}), \
+             patch("app.services.workflow_service.apply_schedule_if_needed",
+                   new_callable=AsyncMock, return_value=[aviso]):
+            result = await service.create_workflow("wf", definition, created_by_id="usr-1")
+
+        assert result.schedule_notices == [aviso]
 
 
 # ── TestGetWorkflowByHash ─────────────────────────────────────────────────────

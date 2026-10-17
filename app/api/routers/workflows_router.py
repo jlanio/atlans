@@ -152,7 +152,13 @@ async def create_workflow(
             updated_by_id=current_user.id_hash,
         )
         logger.info(f"Workflow '{payload.name}' criado por '{current_user.id_hash}'.")
-        return {"id": wf.id_hash, "name": wf.name}
+        return {
+            "id": wf.id_hash,
+            "name": wf.name,
+            # What the save did NOT do to the schedule, as in the PUT's answer:
+            # the editor turns each notice into a toast.
+            "schedule_notices": [n.model_dump() for n in getattr(wf, "schedule_notices", None) or []],
+        }
     except ValueError as e:
         logger.error(f"Erro ao criar workflow: {e}")
         raise HTTPException(status_code=400, detail="Não foi possível criar o workflow. Verifique os dados informados.")

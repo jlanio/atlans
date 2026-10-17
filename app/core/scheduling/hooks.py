@@ -227,7 +227,12 @@ async def apply_schedule_if_needed(
         notices.append(ScheduleNotice(
             code="invalid_schedule",
             severity="warning",
-            message=f"Configuração de agendamento inválida: {exc}. O agendamento anterior foi mantido.",
+            message=f"Configuração de agendamento inválida: {exc}. " + (
+                # A new workflow (or one scheduled for the first time) has no
+                # previous schedule to keep.
+                "O agendamento anterior foi mantido." if existentes
+                else "O workflow foi salvo sem agendamento."
+            ),
         ))
         return notices
 
