@@ -13,13 +13,14 @@
  * frame boundaries.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react"
+import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react"
 
 // `vi.mock` is hoisted to the top of the file, so the factory can't close
 // over a module variable — hence `vi.hoisted`.
 const servico = vi.hoisted(() => ({
   estadoDoAssistente: vi.fn(async () => ({ data: { ativo: true, motivo: null as string | null, cota: null }, error: null })),
   esquecerConversaDoAssistente: vi.fn(async () => ({ data: undefined, error: null })),
+  levarConversaDoAssistente: vi.fn(async () => ({ data: { levada: true }, error: null })),
 }))
 vi.mock("@/service/GisFlowService", () => ({ GisFlowService: servico }))
 
@@ -45,6 +46,7 @@ vi.mock("@xyflow/react", async (original) => ({
 }))
 
 import AssistantPanel from "@/app/components/workflow/assistente"
+import { levarConversaDaCriacao } from "@/app/components/workflow/assistente/conversa-da-criacao"
 import { useAssistantEditorStore } from "@/app/stores/assistenteEditorStore"
 import { useWorkflowCatalogStore } from "@/app/stores/workflowCatalogStore"
 import type { INodesAPI } from "@/service/types"
@@ -481,5 +483,58 @@ describe("cota cheia na gaveta do editor", () => {
     const aviso = await screen.findByTestId("aviso-de-cota")
     expect(aviso.textContent).toContain("reabre em")
     expect(aviso.textContent).not.toContain("algumas horas")
+  })
+})
+
+// ── The conversation outlives the cards ────────────────────────────────────────
+//
+// Closing the drawer unmounts the conversation, and the first save of a new
+// workflow reopens the editor on its id with the conversation carried along
+// (`conversa-da-criacao.ts`). Either way every card mounts again — and a card
+// that decides again on that mount draws its proposal again.
+
+describe("gaveta do assistente — cartões que voltam a montar", () => {
+  beforeEach(() => onApplied.mockClear())
+
+  it("fechar e reabrir a gaveta não redesenha o que já foi desenhado", async () => {
+    await conversar()
+    expect(onApplied).toHaveBeenCalledTimes(1)
+
+    act(() => useAssistantEditorStore.setState({ aberto: false }))
+    act(() => useAssistantEditorStore.setState({ aberto: true }))
+
+    expect(screen.getByText("Desenhado no canvas")).toBeTruthy()
+    expect(onApplied).toHaveBeenCalledTimes(1)
+  })
+
+  it("o editor que o primeiro save abre continua a conversa, de gaveta aberta, sem redesenhar", async () => {
+    // /workflow/create: the conversation draws the workflow on the empty canvas.
+    const criacao = render(<AssistantPanel abrirPorPadrao onAplicar={onApplied} />)
+    const campo = await screen.findByLabelText("Mensagem para o assistente")
+    fireEvent.change(campo, { target: { value: "monta um buffer de 500m" } })
+    fireEvent.submit(campo.closest("form")!)
+    await screen.findAllByTestId("cartao-proposta")
+    await waitFor(() => expect(screen.queryByLabelText("Parar")).toBeNull())
+    expect(onApplied).toHaveBeenCalledTimes(1)
+
+    // The save created wf-novo and reopens the editor there.
+    levarConversaDaCriacao("wf-novo")
+    criacao.unmount()
+
+    // An existing workflow's editor: its drawer starts closed — but not this one,
+    // and its canvas is empty until the saved graph loads.
+    render(<AssistantPanel workflowId="wf-novo" onAplicar={onApplied} />, { reactStrictMode: true })
+
+    expect(await screen.findByText("Vou montar o fluxo.")).toBeTruthy()
+    expect(screen.getAllByText("Desenhado no canvas").length).toBeGreaterThan(0)
+    expect(onApplied).toHaveBeenCalledTimes(1)
+    expect(servico.levarConversaDoAssistente).toHaveBeenCalledWith("wf-novo")
+  })
+
+  it("um workflow aberto pela lista continua com a gaveta fechada por padrão", async () => {
+    useAssistantEditorStore.setState({ aberto: false })
+    render(<AssistantPanel workflowId="wf-outro" onAplicar={onApplied} />)
+
+    expect(await screen.findByLabelText("Abrir o assistente")).toBeTruthy()
   })
 })

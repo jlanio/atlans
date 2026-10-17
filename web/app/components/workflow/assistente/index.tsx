@@ -29,6 +29,7 @@ import { QuotaFullNotice } from "@/app/components/home/assistente/aviso-de-cota"
 import type { ProposalResult } from "../utils/aplicar-proposta"
 import Conversa from "@/app/components/home/assistente/conversa"
 import ProposalCard from "./cartao-proposta"
+import { conversaQueChegou } from "./conversa-da-criacao"
 import QuotaUsage from "@/app/components/home/assistente/uso-da-cota"
 
 const WIDTH_KEY = "atlans:assistente:largura"
@@ -80,7 +81,11 @@ export default function AssistantPanel({ workflowId, abrirPorPadrao = false, onA
   }, [onAplicar])
   useEffect(() => { setUnlocked(false) }, [workflowId])
 
-  useEffect(() => { hidratar(abrirPorPadrao) }, [hidratar, abrirPorPadrao])
+  // The editor the create screen's first save opened keeps the drawer as it was
+  // there, not the closed default of an existing workflow: the person is still
+  // building the same workflow.
+  const [veioDaCriacao] = useState(() => conversaQueChegou(workflowId) !== null)
+  useEffect(() => { hidratar(abrirPorPadrao || veioDaCriacao) }, [hidratar, abrirPorPadrao, veioDaCriacao])
 
   // Ctrl+I, on the template of the run dock's Ctrl+` — and with the same guard:
   // without it, the shortcut would fire while someone types a node's SQL query.

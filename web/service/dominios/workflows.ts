@@ -2,7 +2,7 @@
 
 import { qs, get, post, put, patch, delWithResponse, del } from "../http"
 import type {
-  INodesAPI, IPinNodeMeta, IWorkflow, IWorkflowGroup, IWorkflowMoveResult, IWorkflowVersion,
+  INodesAPI, IPinNodeMeta, IWorkflow, IWorkflowCriado, IWorkflowGroup, IWorkflowMoveResult, IWorkflowVersion,
 } from "../types"
 
 // ── Workflows ──────────────────────────────────────────────────────────────
@@ -35,7 +35,10 @@ export function getWorkflows(workspaceId?: string, opts?: { incluirDoAssistente?
 export function createWorkflow(newWorkflow: Omit<IWorkflow, "id_hash" | "created_by_id" | "updated_by_id">) {
   // created_by_id and updated_by_id are filled in by the backend from the
   // authenticated user; the frontend must never make up these values.
-  return post<IWorkflow>("/workflows", newWorkflow)
+  //
+  // The answer is not the workflow: like /duplicate, it is `{ id, name }`, and
+  // `id` is the new workflow's `id_hash`.
+  return post<IWorkflowCriado>("/workflows", newWorkflow)
 }
 
 export function updateWorkflowById(
@@ -63,7 +66,7 @@ export function deleteWorkflowById(id: string) { return del(`/workflows/${id}`) 
  * along TURNED OFF, and pins and portal publication do not come along.
  */
 export function duplicateWorkflowById(id: string, name?: string) {
-  return post<{ id: string; name: string }>(`/workflows/${id}/duplicate`, name ? { name } : {})
+  return post<IWorkflowCriado>(`/workflows/${id}/duplicate`, name ? { name } : {})
 }
 
 /**

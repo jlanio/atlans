@@ -791,7 +791,9 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
             The snapshot comes BEFORE `setNodes`: it is what lets Ctrl+Z undo
             an apply, which is the safety net of a destructive button. */}
         <AssistantPanel
-          workflowId={workflow?.id_hash}
+          // The route's id until the workflow arrives: without it the drawer
+          // took the loading editor for the create screen.
+          workflowId={workflow?.id_hash ?? idDaRota}
           abrirPorPadrao={!idDaRota}
           onAplicar={applyFromAssistant}
         />

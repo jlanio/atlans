@@ -26,6 +26,11 @@ import type { IAssistantState } from "@/service/types"
 import { API_URL } from "@/utils/env"
 import { emptyTurn, type AssistantTurn } from "@/app/components/home/assistente/quadros"
 import {
+  conversaQueChegou,
+  receberConversa,
+  registrarConversaDaCriacao,
+} from "@/app/components/workflow/assistente/conversa-da-criacao"
+import {
   NO_CONNECTION,
   applyQuota,
   applyToTurn,
@@ -62,22 +67,42 @@ export interface Assistente {
 export function useAssistenteEditor(workflowId?: string): Assistente {
   const [estado, setAppState] = useState<IAssistantState | null>(null)
   const [consultando, setQuerying] = useState(true)
-  const [turnos, setTurns] = useState<AssistantTurn[]>([])
+  // The editor the create screen's first save opened starts with the
+  // conversation that built the workflow (`conversa-da-criacao.ts`).
+  const [turnos, setTurns] = useState<AssistantTurn[]>(() => conversaQueChegou(workflowId) ?? [])
   const [correndo, setRunning] = useState(false)
 
   const abortRef = useRef<AbortController | null>(null)
+  // The workflow whose conversation this hook took over; null when none. Not
+  // `undefined`: that is the create screen's `workflowId`, and leaving a
+  // workflow for it must still clear the conversation.
+  const recebidaPara = useRef<string | null>(null)
 
   // Switching workflow means switching conversation: the previous workflow's
   // history has nothing to do with this one, and its stream must not keep
-  // writing here.
+  // writing here. Except the conversation handed over by the create screen.
   useEffect(() => {
-    setTurns([])
+    const chegou = receberConversa(workflowId)
+    if (chegou) {
+      setTurns(chegou)
+      recebidaPara.current = workflowId ?? null
+    } else if (recebidaPara.current !== workflowId) {
+      // StrictMode runs this twice on mount, and the second run finds nothing
+      // left to take: it must not wipe what the first one took.
+      setTurns([])
+      recebidaPara.current = null
+    }
     setRunning(false)
     return () => {
       abortRef.current?.abort()
       abortRef.current = null
     }
   }, [workflowId])
+
+  // The create screen tells its first save what to hand over.
+  useEffect(() => {
+    if (!workflowId) registrarConversaDaCriacao(turnos, correndo)
+  }, [workflowId, turnos, correndo])
 
   useEffect(() => {
     let vivo = true

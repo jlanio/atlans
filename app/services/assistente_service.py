@@ -1563,6 +1563,31 @@ async def esquecer_conversa(redis, user_id: str, workflow_id: str | None) -> Non
         logger.warning("Falha ao esquecer a conversa: %s", exc.__class__.__name__)
 
 
+async def levar_conversa_da_criacao(redis, user_id: str, workflow_id: str) -> bool:
+    """Moves the create screen's conversation to the workflow it has just created.
+
+    The create screen talks under `novo`; its first save opens /workflow/<id>,
+    whose panel talks under the id. Without the move, the conversation that built
+    the workflow stayed behind: the next message on the new workflow started with
+    no memory, and the old conversation came back on the next create screen.
+
+    Moves nothing while a turn is still running on `novo` (it ends by writing its
+    transcript back there) or when the workflow already has a conversation. Never
+    raises — a Redis failure costs the memory, not the workflow.
+    """
+    if redis is None or not workflow_id or workflow_id == NEW_WORKFLOW:
+        return False
+    origem = conversation_key(user_id, None)
+    try:
+        if await redis.exists(lock_key(user_id, None)) or not await redis.exists(origem):
+            return False
+        # Atomic, keeps the TTL and refuses when the destination exists.
+        return bool(await redis.renamenx(origem, conversation_key(user_id, workflow_id)))
+    except Exception as exc:  # pragma: no cover - depends on Redis
+        logger.warning("Falha ao levar a conversa da tela de criar: %s", exc.__class__.__name__)
+        return False
+
+
 # Renews at TTL/3: plenty of margin for one renewal to fail and the next one
 # to still land before expiry.
 _INTERVALO_DE_RENOVACAO_DA_TRAVA_S = LOCK_TTL_S / 3
@@ -1660,6 +1685,7 @@ __all__ = [
     "escopo_do_editor_para",
     "ferramentas_para_o_modelo",
     "esquecer_conversa",
+    "levar_conversa_da_criacao",
     "montar_sistema",
     "salvar_conversa",
     "trava_exclusiva",

@@ -8,6 +8,7 @@ import { useWorkspace } from "@/context/WorkspaceContext"
 import { useWorkflowSaveStore } from "@/app/stores/workflowSaveStore"
 import { serializeEdge } from "@/app/components/workflow/utils/edge-persistence"
 import { viewportsIguais } from "@/app/components/workflow/utils/viewport-salvo"
+import { levarConversaDaCriacao } from "@/app/components/workflow/assistente/conversa-da-criacao"
 
 export interface SaveOptions {
   /** Save triggered by another action (Executar saves before dispatching): no
@@ -305,6 +306,12 @@ export const useSaveWorkflow = () => {
         return data
       }
 
+      // The screen this save was asked from. Leaving it while the request is in
+      // flight (Projetos, any other menu) mounts no other editor, so `geracao`
+      // does not move: without this, the redirect below would pull the person
+      // back into the editor from wherever they went.
+      const caminho = window.location.pathname
+
       // New workflow: reasonable defaults for the metadata fields.
       // created_by_id/updated_by_id are filled in by the backend from the
       // authenticated user — they are not sent by the frontend.
@@ -333,13 +340,35 @@ export const useSaveWorkflow = () => {
 
       store.completeSave(JSON.stringify({ name: currentName, nodes: nodesReq, edges: edgesReq }), viewportReq)
 
-      // The workflow now exists: the URL becomes its URL, and the editor stays
-      // open. Before, the button sent you to the project list (abandoning what
+      // The workflow now exists: the URL becomes its URL, and the editor reopens
+      // on it (/workflow/[id] loads it back from the server). Before, the
+      // button sent you to the project list (abandoning what
       // you were editing) and Ctrl+S stayed on /workflow/create with no id —
       // the next Ctrl+S created a copy. `replace`, not `push`: going back to
       // /create in the history would mean going back to "create another".
-      const newId = data.data?.id_hash
-      if (newId) router.replace(`/workflow/${newId}`)
+      //
+      // The new id comes as `id` (see createWorkflow). Reading `id_hash` here
+      // found nothing: the editor stayed on /workflow/create with no Executar,
+      // and every later save tried to create again and hit the name already taken.
+      const newId = data.data?.id
+      if (!newId) {
+        // Created, but with nowhere to open it. A plain "Salvo" here is how the
+        // missing id went unnoticed: say where the workflow is instead.
+        console.error("[useSaveWorkflow] POST /workflows answered without an id:", data.data)
+        createToast.warning("Workflow criado", "Abra-o pela lista de Projetos para continuar e executar.")
+        return data
+      }
+      if (window.location.pathname !== caminho) return data
+
+      // The assistant's conversation that built it goes along: the drawer
+      // mounts again over there.
+      levarConversaDaCriacao(newId)
+      // Until /workflow/<id> mounts, this canvas is that workflow but the route
+      // still says "create": a save now would POST again and hit the name just
+      // taken. Holding `isSaving` turns those saves away; the editor that mounts
+      // there resets the store, which releases it.
+      useWorkflowSaveStore.setState({ isSaving: true })
+      router.replace(`/workflow/${newId}`)
 
       return data
     } catch (err) {

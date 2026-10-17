@@ -299,6 +299,80 @@ async def test_forget_erases_only_that_workflows_conversation(client):
     assert "assistente:conversa:usr-test-001:wf-2" in redis.dados
 
 
+# ── Levar a conversa da tela de criar ─────────────────────────────────────────
+# The first save of a new workflow opens /workflow/<id>, whose panel talks under
+# the id. The conversation that built the workflow lives under `novo`.
+
+LEVAR = "/assistente/editor/conversa/levar"
+NOVO = "assistente:conversa:usr-test-001:novo"
+
+
+async def test_the_create_screens_conversation_moves_to_the_new_workflow(client):
+    redis = FakeRedis()
+    redis.dados[NOVO] = '[{"role": "user", "content": "monte um buffer"}]'
+    redis.ttls[NOVO] = 3_000
+
+    with _enabled(redis):
+        r = await client.post(LEVAR, params={"workflow_id": "wf-novo"})
+
+    assert r.status_code == 200 and r.json() == {"levada": True}
+    assert NOVO not in redis.dados
+    destino = "assistente:conversa:usr-test-001:wf-novo"
+    assert json.loads(redis.dados[destino]) == [{"role": "user", "content": "monte um buffer"}]
+    # It keeps the time it had left: moving is not a new conversation.
+    assert redis.ttls[destino] == 3_000
+
+
+async def test_a_turn_still_running_on_the_create_screen_keeps_its_conversation(client):
+    """The turn ends by writing its transcript back under `novo`: moving it now
+    would split the conversation in two."""
+    redis = FakeRedis()
+    redis.dados[NOVO] = "[]"
+    redis.dados["assistente:trava:usr-test-001:novo"] = "1"
+
+    with _enabled(redis):
+        r = await client.post(LEVAR, params={"workflow_id": "wf-novo"})
+
+    assert r.json() == {"levada": False}
+    assert NOVO in redis.dados
+    assert "assistente:conversa:usr-test-001:wf-novo" not in redis.dados
+
+
+async def test_the_workflows_own_conversation_is_not_overwritten(client):
+    redis = FakeRedis()
+    redis.dados[NOVO] = '[{"role": "user", "content": "da criação"}]'
+    redis.dados["assistente:conversa:usr-test-001:wf-1"] = '[{"role": "user", "content": "do fluxo"}]'
+
+    with _enabled(redis):
+        r = await client.post(LEVAR, params={"workflow_id": "wf-1"})
+
+    assert r.json() == {"levada": False}
+    assert json.loads(redis.dados["assistente:conversa:usr-test-001:wf-1"])[0]["content"] == "do fluxo"
+    assert NOVO in redis.dados
+
+
+@pytest.mark.parametrize("workflow_id", ["wf-novo", "novo"])
+async def test_nothing_to_move_is_not_an_error(client, workflow_id):
+    """No conversation on the create screen, or a target that IS the create
+    screen: nothing moves, and the save that called this does not hear about it."""
+    redis = FakeRedis()
+    if workflow_id == "novo":
+        redis.dados[NOVO] = "[]"
+
+    with _enabled(redis):
+        r = await client.post(LEVAR, params={"workflow_id": workflow_id})
+
+    assert r.status_code == 200 and r.json() == {"levada": False}
+    assert not any(c[0] == "renamenx" for c in redis.chamadas)
+
+
+async def test_moving_needs_the_assistant_on(client):
+    with _enabled(FakeRedis(), ativo=False):
+        r = await client.post(LEVAR, params={"workflow_id": "wf-novo"})
+
+    assert r.status_code == 503
+
+
 # ── A trava ───────────────────────────────────────────────────────────────────
 
 
