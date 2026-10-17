@@ -164,6 +164,9 @@ describe("gaveta do assistente", () => {
     expect(screen.getByText("Procurando nós")).toBeTruthy()
     expect(screen.queryByText(/search_nodes/)).toBeNull()
     expect(screen.getByText("Validando o fluxo")).toBeTruthy()
+    // The editor's own tool is not an MCP tool, and the table had left it out.
+    expect(screen.getByText("Desenhando no canvas")).toBeTruthy()
+    expect(screen.queryByText(/desenhar_no_canvas/)).toBeNull()
   })
 
   it("no canvas vazio o fluxo entra sozinho, sem botão", async () => {
