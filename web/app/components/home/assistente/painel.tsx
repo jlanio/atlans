@@ -15,6 +15,7 @@ import { Textarea } from "@/app/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useResizablePanel } from "@/app/hooks/useResizablePanel"
+import { useToastsForaDoPainel } from "@/app/hooks/useToastsForaDoPainel"
 import { useHomeStore } from "@/app/stores/homeStore"
 import Conversa from "@/app/components/home/assistente/conversa"
 import type { AssistantTurn } from "@/app/components/home/assistente/quadros"
@@ -96,6 +97,11 @@ export default function Painel({
     enabled: !isMobile,
   })
 
+  // Same corner as the toasts: they landed on the message field.
+  const painelRef = useRef<HTMLElement>(null)
+  const campoRef = useRef<HTMLFormElement>(null)
+  useToastsForaDoPainel(painelRef, campoRef, true)
+
   const submeter = useCallback(() => {
     const texto = rascunho.trim()
     // With an attachment ready and the field empty, the submission is the reference
@@ -117,6 +123,7 @@ export default function Painel({
 
   return (
     <aside
+      ref={painelRef}
       // The width goes through a CSS var, and the phone is decided by MEDIA QUERY and
       // not by JS: `useIsMobile` returns `false` on each instance's 1st render,
       // and a 420px panel anchored to the right started with 84px off screen on
@@ -202,6 +209,7 @@ export default function Painel({
       <RejectedAttachmentsNotice anexos={anexos} onFechar={descartarAnexosRecusados} className="mx-3 mb-2 shrink-0" />
 
       <form
+        ref={campoRef}
         className="shrink-0 border-t border-border p-2"
         // The drag highlight in the drawer follows the same contract as the bar
         // (`data-arraste`), except that here the target is the composer, not a pill.

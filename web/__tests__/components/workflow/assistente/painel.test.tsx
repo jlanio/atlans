@@ -541,3 +541,17 @@ describe("gaveta do assistente — cartões que voltam a montar", () => {
     expect(await screen.findByLabelText("Abrir o assistente")).toBeTruthy()
   })
 })
+
+describe("gaveta do assistente — os toasts", () => {
+  it("aberta, afasta os toasts do campo de mensagem; fechada, devolve o canto a eles", async () => {
+    // The toasts stack in the bottom right corner, on the message field. The
+    // measure itself is in `use-toasts-fora-do-painel.test.tsx`.
+    const recuo = () => document.documentElement.style.getPropertyValue("--painel-ocupa-direita")
+    render(<AssistantPanel workflowId="wf1" abrirPorPadrao onAplicar={onApplied} />)
+    await screen.findByLabelText("Mensagem para o assistente")
+    expect(recuo()).not.toBe("")
+
+    act(() => useAssistantEditorStore.setState({ aberto: false }))
+    expect(recuo()).toBe("")
+  })
+})

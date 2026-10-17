@@ -1822,3 +1822,20 @@
     animation: none;
   }
 }
+
+/* The toasts keep clear of an assistant panel on screen (`useToastsForaDoPainel`).
+   The Toaster stacks them in the bottom right corner, where the editor's drawer
+   and the Home's conversation keep their message field: a toast landed on what
+   the person was typing. While the panel is a column, the toasts move to its
+   left; once it takes the screen (the phone), they rise above its field.
+   `ui/sonner.tsx` adds these to its own distances. */
+:root {
+  --toasts-recuo-direita: 0px;
+  --toasts-recuo-baixo: 0px;
+}
+@media (min-width: 768px) {
+  :root { --toasts-recuo-direita: var(--painel-ocupa-direita, 0px); }
+}
+@media (max-width: 767px) {
+  :root { --toasts-recuo-baixo: var(--painel-ocupa-baixo, 0px); }
+}
