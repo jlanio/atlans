@@ -52,5 +52,7 @@ async def test_create_answers_id_and_name(open_route):
         request=None, payload=payload, service=service, current_user=_FakeUser(), db=None,
     )
 
-    assert resposta == {"id": "wf-novo", "name": "Novo fluxo"}
+    # What the editor reads. Other fields may join the answer; these two may not leave.
+    assert resposta["id"] == "wf-novo"
+    assert resposta["name"] == "Novo fluxo"
     assert len(service.chamadas) == 1

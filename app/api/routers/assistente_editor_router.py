@@ -2,7 +2,7 @@
 """
 The assistant in the editor — /assistente/editor.
 
-Three routes, and the first is the only one that does any work: `POST /conversa`
+Four routes, and the first is the only one that does any work: `POST /conversa`
 returns the answer as `text/event-stream`, frame by frame, while the tool loop
 runs against this process's MCP server.
 
@@ -27,7 +27,7 @@ import json
 from contextlib import suppress
 from typing import AsyncIterator
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from mcp.server.mcpserver.exceptions import ToolError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -231,3 +231,19 @@ async def esquecer(
     _require_enabled()
     await assistente.esquecer_conversa(infra.redis_ou_none(), current_user.id_hash, workflow_id)
     return None
+
+
+@router.post("/conversa/levar", summary="Levar a conversa da tela de criar para o fluxo criado")
+async def levar(
+    workflow_id: str = Query(..., min_length=1, max_length=64),
+    current_user=Depends(get_current_user),
+) -> dict[str, bool]:
+    """The first save of a new workflow opens it under its own id: this carries the
+    create screen's conversation along (`levar_conversa_da_criacao`). Only the
+    caller's own conversations move — the key is per person — so, as in forgetting,
+    there is nothing to check about the workflow itself."""
+    _require_enabled()
+    levada = await assistente.levar_conversa_da_criacao(
+        infra.redis_ou_none(), current_user.id_hash, workflow_id,
+    )
+    return {"levada": levada}

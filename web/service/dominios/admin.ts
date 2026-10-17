@@ -196,6 +196,11 @@ export function esquecerConversaDoAssistente(workflowId?: string) {
   return del(`/assistente/editor/conversa${qs({ workflow_id: workflowId })}`)
 }
 
+/** Moves the create screen's conversation to the workflow its first save created. */
+export function levarConversaDoAssistente(workflowId: string) {
+  return post<{ levada: boolean }>(`/assistente/editor/conversa/levar${qs({ workflow_id: workflowId })}`)
+}
+
 // ── Home assistant (persisted conversations) ───────────────────────────
 //
 // Only listing/replay/rename/delete live here (plain JSON). The conversation

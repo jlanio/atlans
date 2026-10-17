@@ -1291,6 +1291,13 @@ export interface ISubworkflowNotice {
   edges: number
 }
 
+/** What POST /workflows and POST /workflows/{id}/duplicate answer: the new
+ *  workflow's `id_hash` (named `id` here) and its name. Not the workflow. */
+export interface IWorkflowCriado {
+  id: string
+  name: string
+}
+
 export interface IWorkflow {
   id?: number
   id_hash: string

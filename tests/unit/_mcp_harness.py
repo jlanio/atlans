@@ -412,6 +412,18 @@ class FakeRedis:
             self.ttls.pop(chave, None)
         return apagadas
 
+    async def renamenx(self, origem, destino):
+        """Like Redis: errors without the source, refuses an existing destination, keeps the TTL."""
+        self.chamadas.append(("renamenx", origem, destino))
+        if origem not in self.dados:
+            raise RuntimeError("ERR no such key")
+        if destino in self.dados:
+            return 0
+        self.dados[destino] = self.dados.pop(origem)
+        if origem in self.ttls:
+            self.ttls[destino] = self.ttls.pop(origem)
+        return 1
+
     async def lrange(self, chave, inicio, fim):
         self.chamadas.append(("lrange", chave, inicio, fim))
         lista = self.dados.get(chave) or []

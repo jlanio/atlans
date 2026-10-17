@@ -43,6 +43,17 @@ interface Props {
   arestasDoAssistente?: ReadonlySet<string>
 }
 
+// What happened to a proposal belongs to the PROPOSAL, not to the card showing it.
+// The card mounts again whenever the drawer reopens (closed, the conversation is
+// not rendered) and when the first save of a new workflow carries the
+// conversation to the editor of its id (`conversa-da-criacao.ts`). Deciding again
+// on that mount — on a canvas cleared since, or still loading, so empty — drew the
+// old proposal a second time over whatever the canvas had become.
+/** Proposals a card has already shown. */
+const montadas = new WeakSet<WorkflowProposal>()
+/** Proposals already put on the canvas, by themselves or by the button. */
+const desenhadas = new WeakSet<WorkflowProposal>()
+
 export default function ProposalCard({ proposta, onAplicar, liberado, onLiberar, arestasDoAssistente }: Props) {
   const nodesAPI = useWorkflowCatalogStore(s => s.nodesAPI)
   // Subscribes to the canvas HERE, not in the drawer: only this card needs to react
@@ -72,26 +83,32 @@ export default function ProposalCard({ proposta, onAplicar, liberado, onLiberar,
   // one found nothing left to remove and drew itself over it, taking back what
   // the newer one had added. Lazy initialization of a ref, the one write during
   // render React allows.
+  //
+  // A card mounted AGAIN decides nothing: drawing by itself is the workflow
+  // appearing while the model builds it, and that moment has passed. It shows
+  // what happened instead — drawn, or still offering the button.
   const canvasEmpty = nos.length === 0
-  const decisao = useRef<boolean | null>(null)
+  const [voltou] = useState(() => montadas.has(proposta))
+  useEffect(() => { montadas.add(proposta) }, [proposta])
+  const decisao = useRef<boolean | null>(voltou ? false : null)
   if (decisao.current === null && proposta.desenhar === true && resultado.catalogoPronto) {
     decisao.current = canvasEmpty || (liberado && arestasRemovidas === 0)
   }
   const drawsAutomatically = decisao.current === true
-  // Drawn by the button: the card says so and stops offering it.
-  const [desenhadoNoClique, setDesenhadoNoClique] = useState(false)
+  // Drawn by the button (or before this card mounted): the card says so and
+  // stops offering it.
+  const [desenhadoNoClique, setDesenhadoNoClique] = useState(() => desenhadas.has(proposta))
   const desenhado = drawsAutomatically || desenhadoNoClique
 
-  // Once per card. Without the lock, any canvas re-render (a drag,
+  // Once per proposal. Without the lock, any canvas re-render (a drag,
   // a zoom) would reapply the same proposal and undo what the person just
   // changed — and `resultado` changes identity on every render, so the
   // dependency list alone doesn't hold it.
-  const alreadyDrew = useRef(false)
   useEffect(() => {
-    if (!drawsAutomatically || alreadyDrew.current) return
-    alreadyDrew.current = true
+    if (!drawsAutomatically || desenhadas.has(proposta)) return
+    desenhadas.add(proposta)
     onAplicar(resultado)
-  }, [drawsAutomatically, onAplicar, resultado])
+  }, [drawsAutomatically, onAplicar, resultado, proposta])
   // `ok: null` is "don't know" — the validation report couldn't be read. Treating
   // it as "passed" would mean offering to apply a workflow nobody confirmed.
   const validated = proposta.ok === true && (proposta.erros ?? 0) === 0
@@ -165,7 +182,7 @@ export default function ProposalCard({ proposta, onAplicar, liberado, onLiberar,
             className="max-md:h-10"
             disabled={!resultado.catalogoPronto}
             onClick={() => {
-              alreadyDrew.current = true
+              desenhadas.add(proposta)
               setDesenhadoNoClique(true)
               onLiberar()
               onAplicar(resultado)

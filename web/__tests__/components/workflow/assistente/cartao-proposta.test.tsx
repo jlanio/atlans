@@ -54,8 +54,13 @@ const no = (id: string, name: string, properties: Record<string, string>) => ({
   data: { name, properties, alias: name, type: "action" },
 })
 
+// What a card decided stays with the proposal object (`montadas`, `desenhadas`),
+// and the stream builds a new one per frame: one per test, as in a conversation.
+let proposta: WorkflowProposal
+
 beforeEach(() => {
   cleanup()
+  proposta = { ...PROPOSTA }
   useWorkflowCatalogStore.setState({ nodesAPI: catalogo })
   canvas.nodes = [
     no("a", "DriveFile", { file_id: "mun.shp" }),
@@ -68,7 +73,7 @@ describe("cartão da proposta com a conversa já liberada", () => {
   it("desenha sozinho quando não derruba nenhuma ligação", () => {
     canvas.edges = [{ id: "1", source: "a", target: "b" }, { id: "2", source: "a", target: "c" }]
     const onAplicar = vi.fn()
-    render(<ProposalCard proposta={PROPOSTA} onAplicar={onAplicar} liberado onLiberar={() => {}} />)
+    render(<ProposalCard proposta={proposta} onAplicar={onAplicar} liberado onLiberar={() => {}} />)
     expect(onAplicar).toHaveBeenCalledTimes(1)
   })
 
@@ -79,7 +84,7 @@ describe("cartão da proposta com a conversa já liberada", () => {
       { id: "3", source: "b", target: "c" },
     ]
     const onAplicar = vi.fn()
-    render(<ProposalCard proposta={PROPOSTA} onAplicar={onAplicar} liberado onLiberar={() => {}} />)
+    render(<ProposalCard proposta={proposta} onAplicar={onAplicar} liberado onLiberar={() => {}} />)
 
     expect(onAplicar).not.toHaveBeenCalled()
     expect(screen.getByText(/1 ligação removida/)).toBeInTheDocument()
@@ -99,7 +104,7 @@ describe("cartão da proposta com a conversa já liberada", () => {
       { id: "3", source: "b", target: "c" },
     ]
     const onAplicar = vi.fn()
-    const card = () => <ProposalCard proposta={PROPOSTA} onAplicar={onAplicar} liberado onLiberar={() => {}} />
+    const card = () => <ProposalCard proposta={proposta} onAplicar={onAplicar} liberado onLiberar={() => {}} />
     const { rerender } = render(card())
     expect(onAplicar).not.toHaveBeenCalled()
 
@@ -117,8 +122,56 @@ describe("cartão da proposta com a conversa já liberada", () => {
       { id: "3", source: "b", target: "c" },
     ]
     const onAplicar = vi.fn()
-    render(<ProposalCard proposta={PROPOSTA} onAplicar={onAplicar} liberado onLiberar={() => {}}
+    render(<ProposalCard proposta={proposta} onAplicar={onAplicar} liberado onLiberar={() => {}}
       arestasDoAssistente={new Set(["1", "2", "3"])} />)
     expect(onAplicar).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("cartão que volta a montar", () => {
+  it("com os efeitos rodando duas vezes (StrictMode), desenha uma vez só", () => {
+    canvas.edges = [{ id: "1", source: "a", target: "b" }, { id: "2", source: "a", target: "c" }]
+    const onAplicar = vi.fn()
+    render(<ProposalCard proposta={proposta} onAplicar={onAplicar} liberado onLiberar={() => {}} />,
+      { reactStrictMode: true })
+
+    expect(onAplicar).toHaveBeenCalledTimes(1)
+    expect(screen.getByText("Desenhado no canvas")).toBeInTheDocument()
+  })
+
+  // The drawer reopened, or the conversation came along to the editor of the
+  // workflow its first save created — whose canvas is EMPTY until the graph loads.
+  it("não decide de novo: o desenho retido não cai no canvas vazio de outro editor", () => {
+    canvas.edges = [
+      { id: "1", source: "a", target: "b" }, { id: "2", source: "a", target: "c" },
+      { id: "3", source: "b", target: "c" },
+    ]
+    const onAplicar = vi.fn()
+    const { unmount } = render(<ProposalCard proposta={proposta} onAplicar={onAplicar} liberado onLiberar={() => {}} />)
+    expect(onAplicar).not.toHaveBeenCalled()
+    unmount()
+
+    canvas.nodes = []
+    canvas.edges = []
+    render(<ProposalCard proposta={proposta} onAplicar={onAplicar} liberado={false} onLiberar={() => {}} />)
+
+    expect(onAplicar).not.toHaveBeenCalled()
+    expect(screen.getByRole("button", { name: /Desenhar no canvas/ })).toBeInTheDocument()
+  })
+
+  it("o que já foi desenhado volta dizendo que foi, e não desenha de novo", () => {
+    canvas.edges = [{ id: "1", source: "a", target: "b" }, { id: "2", source: "a", target: "c" }]
+    const onAplicar = vi.fn()
+    const { unmount } = render(<ProposalCard proposta={proposta} onAplicar={onAplicar} liberado onLiberar={() => {}} />)
+    expect(onAplicar).toHaveBeenCalledTimes(1)
+    unmount()
+
+    canvas.nodes = []
+    canvas.edges = []
+    render(<ProposalCard proposta={proposta} onAplicar={onAplicar} liberado onLiberar={() => {}} />)
+
+    expect(onAplicar).toHaveBeenCalledTimes(1)
+    expect(screen.getByText("Desenhado no canvas")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /Desenhar no canvas/ })).toBeNull()
   })
 })

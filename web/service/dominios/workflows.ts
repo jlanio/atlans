@@ -2,7 +2,7 @@
 
 import { qs, get, post, put, patch, delWithResponse, del } from "../http"
 import type {
-  INodesAPI, IPinNodeMeta, IWorkflow, IWorkflowGroup, IWorkflowMoveResult, IWorkflowVersion,
+  INodesAPI, IPinNodeMeta, IWorkflow, IWorkflowCriado, IWorkflowGroup, IWorkflowMoveResult, IWorkflowVersion,
 } from "../types"
 
 // ── Workflows ──────────────────────────────────────────────────────────────
@@ -38,7 +38,7 @@ export function createWorkflow(newWorkflow: Omit<IWorkflow, "id_hash" | "created
   //
   // The answer is not the workflow: like /duplicate, it is `{ id, name }`, and
   // `id` is the new workflow's `id_hash`.
-  return post<{ id: string; name: string }>("/workflows", newWorkflow)
+  return post<IWorkflowCriado>("/workflows", newWorkflow)
 }
 
 export function updateWorkflowById(
@@ -66,7 +66,7 @@ export function deleteWorkflowById(id: string) { return del(`/workflows/${id}`) 
  * along TURNED OFF, and pins and portal publication do not come along.
  */
 export function duplicateWorkflowById(id: string, name?: string) {
-  return post<{ id: string; name: string }>(`/workflows/${id}/duplicate`, name ? { name } : {})
+  return post<IWorkflowCriado>(`/workflows/${id}/duplicate`, name ? { name } : {})
 }
 
 /**
