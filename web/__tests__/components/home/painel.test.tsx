@@ -286,3 +286,15 @@ describe("Painel — os anexos (o recurso não some ao recolher em painel)", () 
     expect(screen.getByTestId("convite-de-soltura")).toBeTruthy()
   })
 })
+
+describe("Painel do assistente — os toasts", () => {
+  it("aberto, afasta os toasts do composer; ao sair da tela, devolve o canto a eles", () => {
+    // Same corner as the toasts. The measure itself is in `use-toasts-fora-do-painel.test.tsx`.
+    const recuo = () => document.documentElement.style.getPropertyValue("--painel-ocupa-direita")
+    montar()
+    expect(recuo()).not.toBe("")
+
+    cleanup()
+    expect(recuo()).toBe("")
+  })
+})

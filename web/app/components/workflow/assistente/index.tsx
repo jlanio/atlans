@@ -13,7 +13,7 @@
 // Dragging comes from `useResizablePanel`, which already handles pointer capture,
 // keyboard, viewport clamping and remembering the width in `localStorage`.
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { TbDotsVertical, TbPlayerStopFilled, TbSend, TbSparkles, TbX } from "react-icons/tb"
 
 import { Button } from "@/app/components/ui/button"
@@ -23,6 +23,7 @@ import {
 import { Textarea } from "@/app/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { useResizablePanel } from "@/app/hooks/useResizablePanel"
+import { useToastsForaDoPainel } from "@/app/hooks/useToastsForaDoPainel"
 import { useAssistenteEditor } from "@/app/hooks/workflow/useAssistenteEditor"
 import { useAssistantEditorStore } from "@/app/stores/assistenteEditorStore"
 import { QuotaFullNotice } from "@/app/components/home/assistente/aviso-de-cota"
@@ -33,6 +34,11 @@ import { conversaQueChegou } from "./conversa-da-criacao"
 import QuotaUsage from "@/app/components/home/assistente/uso-da-cota"
 
 const WIDTH_KEY = "atlans:assistente:largura"
+
+// The canvas's toolbar column sits right beside the drawer (`canvas-toolbar.tsx`:
+// `sm:right-4`, 32px buttons). The toasts that move off the drawer clear it too,
+// instead of landing on the zoom buttons.
+const CANVAS_TOOLBAR = 48
 
 // F4 renamed the width key (it was atlans:copiloto:largura) without a migration.
 // Copies the old one to the new one ONCE, on module load (client only),
@@ -114,6 +120,11 @@ export default function AssistantPanel({ workflowId, abrirPorPadrao = false, onA
     enabled: aberto,
   })
 
+  // The toasts stack in the bottom right corner, on top of the message field.
+  const gavetaRef = useRef<HTMLElement>(null)
+  const campoRef = useRef<HTMLFormElement>(null)
+  useToastsForaDoPainel(gavetaRef, campoRef, aberto && !consultando && estado?.ativo === true, CANVAS_TOOLBAR)
+
   const submeter = useCallback(() => {
     const texto = rascunho.trim()
     if (!texto || correndo) return
@@ -146,6 +157,7 @@ export default function AssistantPanel({ workflowId, abrirPorPadrao = false, onA
 
   return (
     <aside
+      ref={gavetaRef}
       // nowheel/nopan/nodrag: without them React Flow captures the conversation's
       // scrolling and the handle's drag, and scrolling the list zoomed the graph.
       //
@@ -255,6 +267,7 @@ export default function AssistantPanel({ workflowId, abrirPorPadrao = false, onA
       )}
 
       <form
+        ref={campoRef}
         className="shrink-0 border-t border-border p-2"
         onSubmit={e => { e.preventDefault(); submeter() }}
       >
