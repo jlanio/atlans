@@ -160,7 +160,7 @@ def _cmd_check_db(args: argparse.Namespace) -> int:
     relatorio = asyncio.run(diagnosticar())
     for linha in relatorio.linhas:
         print(linha)
-    return 0 if relatorio.ok else 1
+    return 1  # descartavel: prova que o ensaio fica vermelho
 
 
 def _cmd_status(args: argparse.Namespace) -> int:
