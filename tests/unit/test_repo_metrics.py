@@ -16,6 +16,12 @@ What is protected:
 - **Owner vs. people from outside.** Issues by the owner and PRs by bots do not
   count as outside interest or external contributors.
 - **The month cut** is by UTC date, both edges included.
+- **The rate limit is not "no access".** 403 with `X-RateLimit-Remaining: 0`
+  or `Retry-After`, and 429, stop the run with a message saying when to try
+  again; so does a 401/403 on /repos, /forks, /issues or /releases. No
+  traceback, exit ≠ 0, and neither the history nor the report is written.
+- **The token stays at GitHub's API**: pagination does not follow a `next`
+  link to another host.
 
 No network: the HTTP layer is swapped for a dictionary of fixtures.
 """
@@ -266,3 +272,90 @@ def test_history_of_another_repo_is_refused(rm, tmp_path):
             "--out-history", str(tmp_path / "h.json"), "--out-report", str(tmp_path / "r.md")]
     assert rm.main(argv, env={}, fetch=FakeHTTP(_routes()), now=NOW) == 2
     assert not (tmp_path / "h.json").exists()
+
+
+# ── Rate limit and fatal errors: a clear message, no traceback, nothing written ──
+
+RESET = 1792332000  # 2026-10-18T14:00:00Z
+LIMITE = (403, {"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": str(RESET)},
+          b'{"message": "API rate limit exceeded"}')
+
+
+def _main(rm, tmp_path, http, *, token=True):
+    out_h, out_r = tmp_path / "h.json", tmp_path / "r.md"
+    argv = ["--repo", "jlanio/atlans", "--out-history", str(out_h), "--out-report", str(out_r)]
+    env = {"ATLANS_METRICS_TOKEN": TOKEN} if token else {}
+    code = rm.main(argv, env=env, fetch=http, now=NOW)
+    assert not out_h.exists() and not out_r.exists(), "uma coleta incompleta não grava nada"
+    return code
+
+
+@pytest.mark.parametrize(
+    "url, token",
+    [
+        (API, False),
+        (f"{API}/forks?sort=oldest&per_page=100", False),
+        (f"{API}/stargazers?per_page=100", True),
+        (f"{API}/traffic/views?per=day", True),
+        (f"{API}/traffic/popular/referrers", True),
+    ],
+)
+def test_rate_limit_stops_without_writing_and_says_when(rm, tmp_path, capsys, url, token):
+    routes = _routes()
+    routes[url] = LIMITE
+    assert _main(rm, tmp_path, FakeHTTP(routes), token=token) == 3
+
+    err = capsys.readouterr().err
+    assert "limite da API do GitHub esgotado (HTTP 403)" in err
+    assert "depois de 2026-10-18T14:00:00Z (UTC)" in err
+    assert "token sem acesso" not in err
+    assert "Traceback" not in err and TOKEN not in err
+
+
+def test_429_and_retry_after_are_the_rate_limit(rm, tmp_path, capsys):
+    routes = _routes()
+    routes[f"{API}/traffic/clones?per=day"] = (429, {}, b"")
+    assert _main(rm, tmp_path, FakeHTTP(routes)) == 3
+    assert "limite da API do GitHub esgotado (HTTP 429); tenta de novo mais tarde" in capsys.readouterr().err
+
+    # The secondary limit: 403 with Retry-After, the quota itself not at zero.
+    routes = _routes()
+    routes[f"{API}/issues?state=all&per_page=100"] = (403, {"retry-after": "60", "x-ratelimit-remaining": "10"}, b"")
+    assert _main(rm, tmp_path, FakeHTTP(routes)) == 3
+    assert "limite da API do GitHub esgotado (HTTP 403)" in capsys.readouterr().err
+
+
+def test_403_with_quota_left_on_traffic_is_still_no_access(rm, tmp_path):
+    routes = _routes(traffic_status=403)
+    for url in (f"{API}/traffic/views?per=day", f"{API}/traffic/clones?per=day"):
+        routes[url] = (403, {"X-RateLimit-Remaining": "4999"}, routes[url][2])
+    hist, report, _ = _run(rm, tmp_path, http=FakeHTTP(routes))
+    assert hist["traffic"]["views"]["reason"] == "token sem acesso: HTTP 403"
+
+
+@pytest.mark.parametrize("url", [API, f"{API}/releases?per_page=100"])
+def test_401_on_a_required_endpoint_stops_with_a_message(rm, tmp_path, capsys, url):
+    routes = _routes()
+    routes[url] = (401, {}, b'{"message": "Bad credentials"}')
+    assert _main(rm, tmp_path, FakeHTTP(routes)) == 4
+
+    err = capsys.readouterr().err
+    assert f"GitHub negou acesso (HTTP 401) em {url}; confira o token em ATLANS_METRICS_TOKEN" in err
+    assert "Traceback" not in err and TOKEN not in err
+
+
+def test_other_http_errors_stop_with_a_message(rm, tmp_path, capsys):
+    routes = _routes()
+    routes[f"{API}/forks?sort=oldest&per_page=100"] = (502, {}, b"")
+    assert _main(rm, tmp_path, FakeHTTP(routes)) == 1
+    assert "GitHub respondeu HTTP 502" in capsys.readouterr().err
+
+
+def test_pagination_does_not_send_the_token_to_another_host(rm, tmp_path, capsys):
+    routes = _routes()
+    url = f"{API}/stargazers?per_page=100"
+    routes[url] = (200, {"Link": '<https://evil.example/next>; rel="next"'}, routes[url][2])
+    http = FakeHTTP(routes)
+    assert _main(rm, tmp_path, http) == 1
+    assert all(u.startswith("https://api.github.com/") for u, _ in http.calls)
+    assert "aponta para fora de https://api.github.com" in capsys.readouterr().err

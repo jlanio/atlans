@@ -20,6 +20,11 @@ passes the previous history in and keeps the one written out.
   old one for a repeated date, so the history goes back further than GitHub.
 - The listing of stargazers with their dates also needs a token nowadays (401
   without one): the total stars still come from /repos.
+- The rate limit (403/429 with `X-RateLimit-Remaining: 0` or `Retry-After`) is
+  not "no access": the run stops with a message saying when to try again, and
+  writes nothing — a partial history would lose what the next run can collect.
+  So does a 401/403 on the endpoints every report needs (/repos, /forks,
+  /issues, /releases), e.g. an invalid token.
 
 Standard library only; runs on any system.
 """
@@ -48,12 +53,47 @@ OK = "ok"
 _NEXT = re.compile(r'<([^>]+)>;\s*rel="next"')
 
 
-class Unavailable(Exception):
+class GitHubError(Exception):
+    """The collection cannot go on. The message never carries the token."""
+
+
+class Unavailable(GitHubError):
     """The endpoint answered 401/403: it needs a token, or a token with more access."""
 
-    def __init__(self, status: int):
+    def __init__(self, status: int, url: str = ""):
         super().__init__(f"HTTP {status}")
         self.status = status
+        self.url = url
+
+
+class RateLimited(GitHubError):
+    """403/429 from the rate limit: not a problem of access, only of time."""
+
+    def __init__(self, status: int, retry_at: dt.datetime | None):
+        super().__init__(f"HTTP {status}")
+        self.status = status
+        self.retry_at = retry_at
+
+
+def _header(headers: dict[str, str], name: str) -> str | None:
+    return next((v for k, v in headers.items() if k.lower() == name), None)
+
+
+def _rate_limited(status: int, headers: dict[str, str]) -> RateLimited | None:
+    """GitHub's primary limit says `X-RateLimit-Remaining: 0` and when it resets;
+    the secondary one sends `Retry-After` (seconds). 429 is always the limit."""
+    remaining = _header(headers, "x-ratelimit-remaining")
+    retry_after = _header(headers, "retry-after")
+    if status != 429 and not (status == 403 and (remaining == "0" or retry_after is not None)):
+        return None
+    retry_at = None
+    if retry_after is not None and retry_after.strip().isdigit():
+        retry_at = dt.datetime.now(dt.timezone.utc) + dt.timedelta(seconds=int(retry_after))
+    else:
+        reset = _header(headers, "x-ratelimit-reset")
+        if reset and reset.strip().isdigit():
+            retry_at = dt.datetime.fromtimestamp(int(reset), dt.timezone.utc)
+    return RateLimited(status, retry_at)
 
 
 def urllib_fetch(url: str, headers: dict[str, str]) -> tuple[int, dict[str, str], bytes]:
@@ -64,6 +104,8 @@ def urllib_fetch(url: str, headers: dict[str, str]) -> tuple[int, dict[str, str]
             return resp.status, dict(resp.headers.items()), resp.read()
     except urllib.error.HTTPError as e:
         return e.code, dict(e.headers.items()) if e.headers else {}, e.read() or b""
+    except (urllib.error.URLError, TimeoutError) as e:
+        raise GitHubError(f"sem resposta do GitHub em {url}: {getattr(e, 'reason', e)}") from None
 
 
 class GitHub:
@@ -87,13 +129,15 @@ class GitHub:
 
     def _get(self, url: str, accept: str):
         status, headers, body = self._fetch(url, self._headers(accept))
+        limited = _rate_limited(status, headers)
+        if limited:
+            raise limited
         if status in (401, 403):
-            raise Unavailable(status)
+            raise Unavailable(status, url)
         if status != 200:
             # The URL only: the request headers carry the token.
-            raise RuntimeError(f"GitHub respondeu HTTP {status} em {url}")
-        link = next((v for k, v in headers.items() if k.lower() == "link"), "")
-        return json.loads(body.decode("utf-8")), link
+            raise GitHubError(f"GitHub respondeu HTTP {status} em {url}")
+        return json.loads(body.decode("utf-8")), _header(headers, "link") or ""
 
     def get(self, path: str, accept: str = "application/vnd.github+json"):
         data, _ = self._get(f"{API}{path}", accept)
@@ -108,6 +152,9 @@ class GitHub:
             items.extend(data)
             m = _NEXT.search(link)
             url = m.group(1) if m else None
+            # The next request carries the token: only to GitHub's API.
+            if url and not url.startswith(f"{API}/"):
+                raise GitHubError(f"a paginação de {path} aponta para fora de {API}; não sigo")
         return items
 
 
@@ -413,7 +460,20 @@ def main(argv: list[str] | None = None, env=os.environ, fetch=urllib_fetch, now:
             return 2
 
     gh = GitHub(env.get(TOKEN_ENV) or None, fetch=fetch)
-    current = collect(gh, args.repo)
+    # Nothing is written unless the whole collection went through.
+    try:
+        current = collect(gh, args.repo)
+    except RateLimited as e:
+        when = f"depois de {e.retry_at:%Y-%m-%dT%H:%M:%SZ} (UTC)" if e.retry_at else "mais tarde"
+        print(f"limite da API do GitHub esgotado ({e}); tenta de novo {when}. Nada foi gravado.", file=sys.stderr)
+        return 3
+    except Unavailable as e:
+        hint = f"confira o token em {TOKEN_ENV}" if gh.has_token else "o repositório é público?"
+        print(f"GitHub negou acesso ({e}) em {e.url}; {hint}. Nada foi gravado.", file=sys.stderr)
+        return 4
+    except GitHubError as e:
+        print(f"{e}. Nada foi gravado.", file=sys.stderr)
+        return 1
     new_history = merge(history, current, args.repo, collected_at)
 
     args.out_history.write_text(json.dumps(new_history, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
