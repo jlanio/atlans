@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "repo": "jlanio/atlans",
+  "traffic": {
+    "views": {
+      "status": "ok",
+      "daily": {
+        "2026-09-15": {"count": 8, "uniques": 3},
+        "2026-09-30": {"count": 1, "uniques": 1},
+        "2026-10-01": {"count": 2, "uniques": 1}
+      }
+    },
+    "clones": {"status": "ok", "daily": {"2026-09-15": {"count": 1, "uniques": 1}}},
+    "referrers": {"status": "ok", "collected_at": "2026-10-01T09:00:00Z", "items": [{"referrer": "old.example", "count": 1, "uniques": 1}]}
+  },
+  "snapshots": {
+    "2026-09-28": {"collected_at": "2026-09-28T09:00:00Z", "stars": 1, "forks": 1, "watchers": 1, "downloads": 30}
+  },
+  "updated_at": "2026-10-01T09:00:00Z"
+}
