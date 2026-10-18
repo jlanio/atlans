@@ -1,0 +1,56 @@
+name: Revisão
+
+# The review required on main, as a check. The repository has ONE GitHub
+# identity (`jlanio`, admin), and the agents work as it too: GitHub forbids
+# the author from approving their own PR, so a native "1 required approval"
+# would never be met — and turning it off leaves main with no review at all.
+# The review becomes the required check `Revisão (QA)` instead: it passes only
+# when the PR has a review on the CURRENT head SHA whose body has a line
+# `QA-APROVADO`. A COMMENT review counts (the author cannot APPROVE).
+#
+# Tied to the SHA on purpose: a new push is a new SHA, and the check goes back
+# to red until there is a new review. An approval of code that changed after
+# it is not an approval.
+#
+# It FAILS while there is no review, it is never skipped: a skipped check
+# counts as green for a required rule. Hence no `if:` on the job, and no
+# branch filter either, for the same reason as in ci.yml.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+
+# Reads the PR's reviews and nothing else. No checkout, no third-party
+# action and no secret: only the `gh` already on the runner, with GITHUB_TOKEN.
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  revisao:
+    name: Revisão (QA)
+    runs-on: ubuntu-latest
+    steps:
+      # The SHA is the payload's, not the PR's head fetched now: this run's
+      # check is attached to the payload's SHA, so that is the one it must
+      # vouch for. If a push lands meanwhile, its own run judges the new SHA.
+      # A dismissed review does not count, nor one asking for changes.
+      - name: Review com QA-APROVADO no SHA atual
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          aprovadas=$(gh api --paginate "repos/$REPO/pulls/$PR/reviews?per_page=100" --jq '
+            .[]
+            | select(.commit_id == env.HEAD_SHA)
+            | select(.state == "COMMENTED" or .state == "APPROVED")
+            | select((.body // "") | split("\n") | map(gsub("^\\s+|\\s+$"; "")) | any(. == "QA-APROVADO"))
+            | .id')
+          if [ -z "$aprovadas" ]; then
+            echo "::error title=Revisão (QA)::Aguardando revisão do QA para ${HEAD_SHA:0:7}"
+            exit 1
+          fi
+          echo "Revisão do QA encontrada para ${HEAD_SHA:0:7} (review $(echo "$aprovadas" | head -n1))."
