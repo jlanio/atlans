@@ -229,3 +229,10 @@ def test_the_ci_job_reads_the_pr_through_env_only():
     assert {"BASE_SHA", "HEAD_SHA", "HEAD_REF", "PR_TITLE", "PR_BODY", "PR_AUTHOR"} <= set(verificacao["env"])
     interpolados = [p.get("name") for p in job["steps"] if "${{" in str(p.get("run", ""))]
     assert interpolados == [], f"entrada do PR interpolada em run: {interpolados}"
+
+
+def test_the_rule_names_can_be_quoted_in_a_pr_body(atribuicao):
+    """The job's log goes into PR bodies as evidence: its rule names must not
+    trip the rules themselves."""
+    nomes = [nome for _, nome in atribuicao.FOOTER_RULES + atribuicao.PR_RULES]
+    assert atribuicao.check_pr_text("\n".join(nomes)) == []

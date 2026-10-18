@@ -39,15 +39,17 @@ AGENT_TERMS = (
 
 # The tool footers and links, in commit messages and in the PR alike.
 FOOTER_RULES = (
-    (re.compile(r"generated\s+with\s*\[?\s*claude", re.I), "rodapé de ferramenta (Generated with Claude)"),
-    (re.compile(r"🤖\s*generated", re.I), "rodapé de ferramenta (🤖 Generated)"),
-    (re.compile(r"claude\.ai/code", re.I), "link para claude.ai/code"),
+    (re.compile(r"generated\s+with\s*\[?\s*claude", re.I), "rodapé de ferramenta"),
+    (re.compile(r"🤖\s*generated", re.I), "rodapé de ferramenta (emoji de robô)"),
+    (re.compile(r"claude\.ai/code", re.I), "link de sessão web do agente"),
 )
 
 # Only in the PR's title and body: what the agent's web interface leaves there.
+# The rule names are reported, and none of them matches a rule: pasting the
+# job's log into a PR body must not break the job.
 PR_RULES = (
-    (re.compile(r"ccr-projects-attribution", re.I), "marcador oculto ccr-projects-attribution"),
-    (re.compile(r"requested\s+by.*claude\.ai", re.I), "Requested by com link claude.ai"),
+    (re.compile(r"ccr-projects-attribution", re.I), "marcador oculto de atribuição do agente"),
+    (re.compile(r"requested\s+by.*claude\.ai", re.I), "Requested by com link do agente"),
 )
 
 TRAILER = re.compile(r"^\s*co-authored-by\s*:", re.I)
