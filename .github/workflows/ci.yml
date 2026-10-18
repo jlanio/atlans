@@ -450,3 +450,58 @@ jobs:
       - name: Lock do executor instala no Windows
         working-directory: desktop
         run: npm run python:lock:check
+
+  # The real stack (API, executor with mTLS, web from the production build,
+  # Postgres) and, on it, the browser tests. The name is fixed: it becomes a
+  # required check of main's ruleset (M6), so no path filter (a required
+  # check with one stays "pending" forever on PRs that do not touch the path)
+  # and no continue-on-error. For now: the stack comes up, the local executor
+  # gets online, the test user logs in, and smoke.sh passes.
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      E2E_EMAIL: e2e@example.com
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # A throwaway password per run, masked in the log: nothing to keep in
+      # the repository or in the secrets.
+      - name: Senha do usuário de teste
+        run: |
+          senha="$(openssl rand -hex 16)"
+          echo "::add-mask::$senha"
+          echo "E2E_SENHA=$senha" >> "$GITHUB_ENV"
+
+      - name: Subir a stack
+        run: scripts/e2e/subir.sh
+
+      - name: Smoke
+        env:
+          COMPOSE_FILE: docker-compose.yml:scripts/e2e/compose.e2e.yml
+        run: scripts/smoke.sh
+
+      - name: Logs do compose
+        if: failure()
+        env:
+          COMPOSE_FILE: docker-compose.yml:scripts/e2e/compose.e2e.yml
+        run: |
+          mkdir -p e2e-logs
+          docker compose --profile dev --profile executor-local ps -a > e2e-logs/ps.txt 2>&1 || true
+          docker compose --profile dev --profile executor-local logs --no-color --timestamps > e2e-logs/compose.log 2>&1 || true
+          docker logs --timestamps atlans-e2e-postgres > e2e-logs/postgres.log 2>&1 || true
+
+      - name: Enviar os logs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-logs
+          path: e2e-logs/
+          retention-days: 7
+
+      - name: Descer a stack
+        if: always()
+        run: scripts/e2e/descer.sh

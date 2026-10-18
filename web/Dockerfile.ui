@@ -30,6 +30,10 @@ RUN echo ">> npm ci (deps)..." && npm ci
 
 # ---------- BUILD (production) ----------
 FROM base AS builder
+# Inlined by `next build`. Unset in the production image (Traefik serves the
+# API on the site's own origin); the E2E stack sets it to the API's port
+# (scripts/e2e/compose.e2e.yml), as the dev server has it.
+ARG NEXT_PUBLIC_API_PORT
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # `public/` is optional for Next, but the runner stage copies the whole
