@@ -14,6 +14,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -39,7 +40,7 @@ def _hook(tmp_path: Path, mensagem: str) -> subprocess.CompletedProcess:
     arquivo = tmp_path / "COMMIT_EDITMSG"
     arquivo.write_text(mensagem, encoding="utf-8")
     return subprocess.run(
-        ["python", str(SCRIPT), "message", str(arquivo)], capture_output=True, text=True,
+        [sys.executable, str(SCRIPT), "message", str(arquivo)], capture_output=True, text=True,
     )
 
 
@@ -188,7 +189,7 @@ def test_the_cli_lists_branch_title_and_commit_together(repo):
     env = {**os.environ, **_pr(repo, BASE_SHA=base, HEAD_REF="claude/x", PR_TITLE=FOOTER)}
     env.pop("GITHUB_ACTIONS", None)
     saida = subprocess.run(
-        ["python", str(SCRIPT), "pr"], cwd=repo, env=env, capture_output=True, text=True,
+        [sys.executable, str(SCRIPT), "pr"], cwd=repo, env=env, capture_output=True, text=True,
     )
     assert saida.returncode == 1
     for trecho in ("trailer de co-autoria", "branch claude/x", "título do PR"):
