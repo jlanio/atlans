@@ -80,6 +80,13 @@ _ASSINATURAS = (
     (b"\x1f\x8b", "gz"),
 )
 _GEOJSON = re.compile(rb'"type"\s*:\s*"(FeatureCollection|Feature)"')
+_BLOCO_GEOJSON = 1024 * 1024
+_SOBREPOSICAO_GEOJSON = 256
+
+# The URL formats that are tables, where latitude/longitude columns make points.
+# The same list decides what the form shows (`visibleWhen`) and what the node
+# applies: a value typed under another format stays saved, out of sight.
+_FORMATOS_COM_COORDENADAS = ("csv", "xlsx", "zip")
 
 # How the message names what came, and what to do about the kinds that are
 # not a choice of the field.
@@ -162,9 +169,22 @@ def _aplicar_crs(gdf: Any, crs: str) -> Any:
 
 
 def _arquivo_geojson(path: str) -> bool:
-    """A `.json` that is GeoJSON — what APIs and many portals serve."""
+    """A `.json` that is GeoJSON — what APIs and many portals serve.
+
+    The marker is searched in the whole file, not only in its start: a
+    serializer that sorts the keys (`json.dumps(sort_keys=True)`) writes `type`
+    after `features` and, in each feature, after the geometry — for a municipal
+    boundary, megabytes in. Read in blocks, with an overlap that keeps a marker
+    split between two of them.
+    """
+    resto = b""
     with open(path, "rb") as f:
-        return bool(_GEOJSON.search(f.read(8192)))
+        while bloco := f.read(_BLOCO_GEOJSON):
+            janela = resto + bloco
+            if _GEOJSON.search(janela):
+                return True
+            resto = janela[-_SOBREPOSICAO_GEOJSON:]
+    return False
 
 
 def _ler_zip(path: str, crs: str, padrao: str, pular_linhas: int, info: dict | None) -> Any:
@@ -273,10 +293,6 @@ def _load_file(path: str, ext: str, crs: str, *, zip_member: str = "", skip_rows
 
 # ── URL context ───────────────────────────────────────────────────────────────
 
-def _extensao_do_nome(nome: str) -> str:
-    return posixpath.splitext(nome or "")[1].lower().lstrip(".")
-
-
 def _nome_da_url(url: str) -> str:
     return posixpath.basename(unquote(urlparse(url).path)) or "download"
 
@@ -315,25 +331,33 @@ def _o_que_veio(caminho: str, inicio: bytes) -> str:
 
 def _tipo_do_zip(caminho: str) -> str:
     """XLSX and KMZ are ZIPs too: the names inside say which one this is."""
-    import zipfile
+    from flow.utils.leitura_zip import ZipInvalidoError, abrir, legiveis
     try:
-        with zipfile.ZipFile(caminho) as zf:
-            nomes = zf.namelist()
-    except zipfile.BadZipFile:
-        return "zip"
+        # `abrir` refuses an absurd number of entries before parsing them all.
+        with abrir(caminho) as zf:
+            infos = zf.infolist()
+    except ZipInvalidoError:
+        return "zip"  # the read says what is wrong with it
+    nomes = [i.filename for i in infos]
     if "[Content_Types].xml" in nomes and any(n.startswith("xl/") for n in nomes):
         return "xlsx"
-    from flow.utils.leitura_zip import EXTENSOES_LEGIVEIS
-    legiveis = [n for n in nomes if _extensao_do_nome(n) in EXTENSOES_LEGIVEIS]
-    if legiveis and all(n.lower().endswith(".kml") for n in legiveis):
+    lidos = legiveis(infos)
+    if lidos and all(n.lower().endswith(".kml") for n in lidos):
         return "kmz"
     return "zip"
 
 
 def _conferir_formato(esperado: str, caminho: str, inicio: bytes) -> None:
     """Fails when the content is not the format the person said would come,
-    saying what came — and, when it is another choice of the field, which one."""
+    saying what came — and, when it is another choice of the field, which one.
+
+    Blocking (it may open a ZIP or read the whole file): runs off the event loop.
+    """
     veio = _o_que_veio(caminho, inicio)
+    # The first 8 KB say "json" when the GeoJSON marker comes later (sorted keys,
+    # a large first geometry); only who expects GeoJSON pays to look further.
+    if veio == "json" and esperado == "geojson" and _arquivo_geojson(caminho):
+        veio = "geojson"
     if veio in _ACEITA[esperado]:
         return
     opcao = "csv" if veio == "texto" else veio
@@ -534,7 +558,7 @@ class DataInput(BaseNode):
                     "default": "",
                     "description": "Opcional. Com latitude e longitude preenchidas, uma tabela "
                                    "(CSV, XLSX) vira pontos, com as coordenadas no CRS de saída.",
-                    "visibleWhen": _visivel_no_formato("csv", "xlsx", "zip"),
+                    "visibleWhen": _visivel_no_formato(*_FORMATOS_COM_COORDENADAS),
                 },
                 {
                     "name": "lonColumn",
@@ -542,7 +566,7 @@ class DataInput(BaseNode):
                     "type": "string",
                     "default": "",
                     "description": "Opcional. Veja a coluna de latitude.",
-                    "visibleWhen": _visivel_no_formato("csv", "xlsx", "zip"),
+                    "visibleWhen": _visivel_no_formato(*_FORMATOS_COM_COORDENADAS),
                 },
                 {
                     "name": "crs",
@@ -594,7 +618,10 @@ class DataInput(BaseNode):
             if download.tamanho == 0:
                 raise ValueError(f"O servidor devolveu '{nome}' vazio (0 bytes).")
             content_type = download.headers.get("content-type", "")
-            _conferir_formato(esperado, download.caminho, download.inicio)
+            # Off the event loop, which also serves the executor's WebSocket:
+            # telling a ZIP's kind parses its central directory, and checking a
+            # GeoJSON may read the whole file.
+            await asyncio.to_thread(_conferir_formato, esperado, download.caminho, download.inicio)
             ext = esperado
             # The readers pick the driver by the extension (pyogrio opens a
             # `.zip` through /vsizip/, GDAL's XLSX driver wants `.xlsx`).
@@ -629,6 +656,13 @@ class DataInput(BaseNode):
             raise ValueError("'Linhas a ignorar no início' não pode ser negativo.")
         lat_col: str = self.get_param("latColumn", "").strip()
         lon_col: str = self.get_param("lonColumn", "").strip()
+        if (lat_col or lon_col) and context == "url" \
+                and self.get_param("expectedFormat", _ESCOLHER) not in _FORMATOS_COM_COORDENADAS:
+            # The form hides the columns for this format, but what was typed under
+            # another one stays saved: applying it would fail the run over fields
+            # the person cannot see.
+            logger.info("DataInput: colunas de latitude/longitude ignoradas — o formato escolhido não é tabela.")
+            lat_col = lon_col = ""
         if bool(lat_col) != bool(lon_col):
             raise ValueError(
                 "Preencha as duas colunas, latitude e longitude, para gerar pontos — ou nenhuma."

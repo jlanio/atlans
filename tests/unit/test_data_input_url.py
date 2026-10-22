@@ -6,6 +6,7 @@ pyogrio 0.13.0): shapefile in a subfolder, two shapefiles, CSV in cp1252,
 INMET's CSVs with metadata above the header.
 """
 import io
+import json
 import zipfile
 
 import geopandas as gpd
@@ -102,6 +103,25 @@ async def test_only_one_coordinate_column_is_refused():
         await _no(latColumn="lat").execute({})
 
 
+async def test_coordinate_columns_hidden_by_the_format_are_not_applied(rede):
+    # Typed while the format was CSV, then the format changed: the form hides
+    # both fields (visibleWhen), the values stay saved, and the run must not
+    # fail over fields the person cannot see.
+    rede.rota(f"{BASE}/arquivo", httpx.Response(200, json=[{"a": 1}]))
+
+    saida = await _no(expectedFormat="json", latColumn="lat", lonColumn="lon").execute({})
+
+    assert saida["output"] == [{"a": 1}]
+
+
+async def test_a_hidden_half_pair_of_coordinates_is_not_refused(rede):
+    rede.rota(f"{BASE}/arquivo", httpx.Response(200, json=[{"a": 1}]))
+
+    # The download happens (and fails on its own format), instead of "Preencha as duas colunas".
+    with pytest.raises(ValueError, match="Esperava GeoPackage"):
+        await _no(expectedFormat="gpkg", latColumn="lat").execute({})
+
+
 async def test_skips_the_lines_above_the_header(rede):
     rede.rota(f"{BASE}/arquivo", httpx.Response(200, content=INMET, headers={"Content-Type": "text/csv"}))
 
@@ -127,6 +147,28 @@ async def test_geojson_served_as_json(rede):
 
     assert isinstance(saida["output"], gpd.GeoDataFrame)
     assert saida["metadata"]["extension"] == "geojson"
+
+
+async def test_geojson_with_sorted_keys_and_a_large_first_geometry(rede):
+    # json.dumps(sort_keys=True) writes "type" after "features" and, in each
+    # feature, after the geometry: the marker comes past the first 8 KB.
+    anel = [[-50 + i * 1e-4, -10 + (i % 7) * 1e-4] for i in range(2000)] + [[-50, -10]]
+    corpo = json.dumps({"type": "FeatureCollection", "features": [
+        {"type": "Feature", "properties": {"n": 1}, "geometry": {"type": "Polygon", "coordinates": [anel]}},
+    ]}, sort_keys=True)
+    assert corpo.index('"type": "Feature"') > 8192
+    rede.rota(f"{BASE}/arquivo", httpx.Response(200, text=corpo))
+
+    saida = await _no(expectedFormat="geojson").execute({})
+
+    assert isinstance(saida["output"], gpd.GeoDataFrame) and saida["output"]["n"].tolist() == [1]
+
+
+async def test_a_json_error_is_still_refused_when_geojson_was_expected(rede):
+    rede.rota(f"{BASE}/arquivo", httpx.Response(200, json={"erro": "cota excedida"}))
+
+    with pytest.raises(ValueError, match="Esperava GeoJSON, mas o servidor devolveu um JSON"):
+        await _no(expectedFormat="geojson").execute({})
 
 
 async def test_json_chosen_for_a_geojson_stays_json(rede):
@@ -187,6 +229,28 @@ async def test_gzip_is_named(rede):
     with pytest.raises(ValueError, match=r"gzip \(\.gz\)") as erro:
         await _no(url=f"{BASE}/focos.csv.gz").execute({})
     assert "versão .zip ou sem compressão" in str(erro.value)
+
+
+async def test_the_format_check_runs_off_the_event_loop(rede, monkeypatch):
+    # Telling a ZIP's kind parses its central directory (a million entries: ~10 s);
+    # on the loop, that would stall the executor's WebSocket for every job.
+    import threading
+
+    from flow.nodes.datasource import data_input
+
+    rede.rota(f"{BASE}/arquivo", httpx.Response(200, content=b"a,b\n1,2\n"))
+    no_loop = []
+    original = data_input._conferir_formato
+
+    def espiao(*args):
+        no_loop.append(threading.current_thread() is threading.main_thread())
+        return original(*args)
+
+    monkeypatch.setattr(data_input, "_conferir_formato", espiao)
+
+    await _no().execute({})
+
+    assert no_loop == [False]
 
 
 async def test_an_empty_file(rede):
@@ -289,6 +353,18 @@ def test_a_trailing_separator_adds_no_empty_column(tmp_path):
 
     assert list(tabela.columns) == ["Data", "Chuva (mm)"]
     assert tabela["Chuva (mm)"].tolist()[0] == 0.2
+
+
+def test_a_stray_quote_above_the_header_does_not_swallow_it(tmp_path):
+    # The lines are skipped as lines: pandas' `skiprows` counted CSV rows, and the
+    # open quote glued the metadata to the header below it.
+    caminho = tmp_path / "estacao.csv"
+    caminho.write_bytes(b'Fonte:;"preliminar\nUF:;DF\nData;Chuva (mm)\n2024/01/01;0,2\n')
+
+    tabela = _load_file(str(caminho), "csv", "", skip_rows=2)
+
+    assert list(tabela.columns) == ["Data", "Chuva (mm)"]
+    assert tabela["Chuva (mm)"].tolist() == [0.2]
 
 
 def test_a_headerless_column_with_data_stays(tmp_path):

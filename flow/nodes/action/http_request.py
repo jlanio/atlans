@@ -75,8 +75,9 @@ def _merge_query(url: str, params: Any) -> List[Tuple[str, str]]:
 
 
 # The credential and origin rules live in a shared module since DataInput's URL
-# origin also authenticates and follows redirects. The private names stay: the
-# redaction (app/core/utils/redacao.py) and the tests import them from here.
+# origin also authenticates and follows redirects. The private names stay
+# because tests import them from here (test_http_request_auth_retry,
+# test_definition_lint).
 _CREDENTIAL_HEADERS = CREDENTIAL_HEADERS
 _same_origin = same_origin
 _without_credentials = without_credentials

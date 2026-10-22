@@ -30,16 +30,20 @@ import fnmatch
 import os
 import posixpath
 import shutil
+import struct
 import tempfile
 import zipfile
+import zlib
 from contextlib import contextmanager
 from typing import Iterator
 
 # Extensions of a file DataInput knows how to read once extracted. A ZIP inside
 # the ZIP is not among them: one level is what portals publish, and recursion
-# would multiply the bomb checks for no case seen in practice.
+# would multiply the bomb checks for no case seen in practice. Nor is the old
+# Excel `.xls`: the executor has no reader for it (pandas would need xlrd), so
+# counting it would only pick, or ask about, a file that then fails to open.
 EXTENSOES_LEGIVEIS = frozenset({
-    "shp", "geojson", "json", "gpkg", "kml", "kmz", "gml", "fgb", "csv", "xlsx", "xls",
+    "shp", "geojson", "json", "gpkg", "kml", "kmz", "gml", "fgb", "csv", "xlsx",
 })
 
 _MAX_MEMBROS = 50_000
@@ -81,12 +85,47 @@ def _resumo(nomes: list[str]) -> str:
     return mostrados + (f" (e mais {resto})" if resto > 0 else "")
 
 
+def _muitas_entradas(n: int) -> str:
+    return f"O ZIP tem {n} entradas, acima do máximo de {_MAX_MEMBROS} que o nó abre."
+
+
+def _entradas_declaradas(caminho_zip: str) -> int | None:
+    """How many entries the ZIP's end record declares, read WITHOUT parsing them.
+
+    `zipfile.ZipFile` parses the whole central directory as it opens: a 100 MB
+    ZIP of a million empty entries took ~10 s and hundreds of MB before
+    `_MAX_MEMBROS` could refuse it. The record is read by the same function
+    `ZipFile` uses (ZIP64 included), so the count is the one it would parse.
+    None when it cannot be read — `ZipFile` then says what is wrong.
+    """
+    ler_fim = getattr(zipfile, "_EndRecData", None)
+    indice = getattr(zipfile, "_ECD_ENTRIES_TOTAL", None)
+    if ler_fim is None or indice is None:
+        return None
+    try:
+        with open(caminho_zip, "rb") as f:
+            fim = ler_fim(f)
+    except (OSError, zipfile.BadZipFile, struct.error):
+        return None
+    return None if fim is None else int(fim[indice])
+
+
+def abrir(caminho_zip: str) -> zipfile.ZipFile:
+    """Opens a ZIP that came from outside, refusing more than `_MAX_MEMBROS`
+    entries BEFORE parsing them, and a file that is not a ZIP with a sentence."""
+    declaradas = _entradas_declaradas(caminho_zip)
+    if declaradas is not None and declaradas > _MAX_MEMBROS:
+        raise ZipInvalidoError(_muitas_entradas(declaradas))
+    try:
+        return zipfile.ZipFile(caminho_zip)
+    except zipfile.BadZipFile as e:
+        raise ZipInvalidoError(f"O arquivo não é um ZIP válido: {e}") from e
+
+
 def _inspecionar(zf: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
     infos = zf.infolist()
-    if len(infos) > _MAX_MEMBROS:
-        raise ZipInvalidoError(
-            f"O ZIP tem {len(infos)} entradas, acima do máximo de {_MAX_MEMBROS} que o nó abre."
-        )
+    if len(infos) > _MAX_MEMBROS:  # the end record could not be read before opening
+        raise ZipInvalidoError(_muitas_entradas(len(infos)))
     if any(i.filename.lower().endswith(".vrt") for i in infos):
         raise ZipInvalidoError("Arquivo .zip contem um .vrt — recusado por seguranca.")
     return [i for i in infos if not _ignorado(i.filename)]
@@ -203,12 +242,7 @@ def _checar_tamanhos(membros: list[zipfile.ZipInfo]) -> None:
 def extrair(caminho_zip: str, padrao: str) -> Iterator[tuple[str, str, str]]:
     """Extracts the chosen member to a temporary folder and yields
     (local path, extension, name inside the ZIP). The folder is removed on exit."""
-    try:
-        zf = zipfile.ZipFile(caminho_zip)
-    except zipfile.BadZipFile as e:
-        raise ZipInvalidoError(f"O arquivo não é um ZIP válido: {e}") from e
-
-    with zf:
+    with abrir(caminho_zip) as zf:
         infos = _inspecionar(zf)
         principal = escolher(infos, padrao)
         membros = _companheiros(infos, principal)
@@ -230,18 +264,14 @@ def extrair(caminho_zip: str, padrao: str) -> Iterator[tuple[str, str, str]]:
                     ) from e
                 except RuntimeError as e:  # zipfile: "File is encrypted, password required"
                     raise ZipInvalidoError(f"Não foi possível extrair '{info.filename}': {e}") from e
+                except (zipfile.BadZipFile, EOFError, zlib.error) as e:
+                    # Bad CRC, truncated or garbled data: a sentence instead of a
+                    # traceback, and DataInput's fallback keeps GDAL's error beside it.
+                    raise ZipInvalidoError(
+                        f"'{info.filename}' está corrompido dentro do ZIP ({e}). Baixe ou gere o ZIP de novo."
+                    ) from e
                 if info.filename == principal:
                     destino_principal = destino
             yield destino_principal, _extensao(principal), principal
         finally:
             shutil.rmtree(pasta, ignore_errors=True)
-
-
-def listar(caminho_zip: str) -> list[str]:
-    """Readable members of the ZIP (with the same refusals as `extrair`), or []
-    if the file does not even open as a ZIP."""
-    try:
-        with zipfile.ZipFile(caminho_zip) as zf:
-            return legiveis(_inspecionar(zf))
-    except zipfile.BadZipFile:
-        return []

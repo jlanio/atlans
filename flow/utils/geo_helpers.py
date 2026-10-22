@@ -180,6 +180,17 @@ def response_too_large(limite: int) -> ValueError:
     return ValueError(f"Resposta excedeu o limite de {limite} bytes.")
 
 
+def _without_body(response) -> bool:
+    """HEAD, 1xx, 204 and 304 answer without a body: their `Content-Length` is
+    the size of the resource (RFC 9110 §8.6), not of what comes. A HEAD that
+    asks how big a 100 MB file is must not be refused for being 100 MB."""
+    return (
+        response.request.method == "HEAD"
+        or response.status_code < 200
+        or response.status_code in (204, 304)
+    )
+
+
 async def read_with_limit(response, limite: int) -> bytes:
     """Reads a response opened with `stream=True`, giving up as soon as the body
     passes `limite` bytes.
@@ -192,7 +203,7 @@ async def read_with_limit(response, limite: int) -> bytes:
     memory —, so a gzip that inflates is also caught.
     """
     declarado = response.headers.get("content-length", "")
-    if declarado.isdigit() and int(declarado) > limite:
+    if declarado.isdigit() and int(declarado) > limite and not _without_body(response):
         await response.aclose()
         raise response_too_large(limite)
     partes: list[bytes] = []

@@ -62,4 +62,10 @@ describe("campoVisivel", () => {
   it("a shape it does not know shows the field instead of hiding it", () => {
     expect(campoVisivel({ outro: 1 } as unknown as VisibleWhen, {})).toBe(true)
   })
+
+  it("an `any` it does not know shows the field too, instead of breaking the form", () => {
+    expect(campoVisivel({ any: [{ field: "a" }] } as unknown as VisibleWhen, {})).toBe(true)
+    expect(campoVisivel({ any: [[{ field: "a", in: [1] }, { in: [1] }]] } as unknown as VisibleWhen, {})).toBe(true)
+    expect(campoVisivel({ any: "context" } as unknown as VisibleWhen, {})).toBe(true)
+  })
 })

@@ -32,12 +32,25 @@ def ler_csv(caminho: str, pular_linhas: int = 0) -> pd.DataFrame:
         cabecalho = arquivo.readline().decode("utf-8-sig", errors="replace")
     separador = ";" if cabecalho.count(";") > cabecalho.count(",") else ","
     try:
-        tabela = pd.read_csv(caminho, sep=separador, skiprows=pular_linhas)
+        tabela = _ler_a_partir_da_linha(caminho, pular_linhas, sep=separador)
     except UnicodeDecodeError:
         # "CSV (separado por vírgulas)" in Excel in Portuguese is not UTF-8.
-        tabela = pd.read_csv(caminho, sep=separador, encoding="cp1252", skiprows=pular_linhas)
+        tabela = _ler_a_partir_da_linha(caminho, pular_linhas, sep=separador, encoding="cp1252")
     tabela = _sem_coluna_fantasma(tabela)
     return _virgula_decimal(tabela) if separador == ";" else tabela
+
+
+def _ler_a_partir_da_linha(caminho: str, pular_linhas: int, **opcoes) -> pd.DataFrame:
+    """pandas reads from the line after the skipped ones — the same physical
+    lines `readline` skipped to find the header. `skiprows` counts CSV rows
+    instead, and a stray quote in a metadata line (`Fonte:;"preliminar`) glued
+    it to the lines below: the header the separator came from was swallowed."""
+    if not pular_linhas:
+        return pd.read_csv(caminho, **opcoes)
+    with open(caminho, "rb") as arquivo:
+        for _ in range(pular_linhas):
+            arquivo.readline()
+        return pd.read_csv(arquivo, **opcoes)
 
 
 def _sem_coluna_fantasma(tabela: pd.DataFrame) -> pd.DataFrame:

@@ -6,6 +6,7 @@ download, every redirect hop is revalidated against SSRF, the token does not
 follow a hop to another origin, and only what is transient is retried.
 """
 import os
+import ssl
 
 import httpx
 import pytest
@@ -179,6 +180,91 @@ def test_the_url_shown_hides_secrets():
 
     assert "senha" not in mostrada and "abc123" not in mostrada and "t0k" not in mostrada
     assert "X-Amz-Expires=60" in mostrada and "ano=2024" in mostrada
+
+
+def test_a_malformed_url_shown_still_hides_secrets():
+    # A typo in the port used to make the masking give up and return the URL as typed.
+    mostrada = para_registro("https://user:senha@dados.exemplo.gov.br:44x/a.zip?token=t0k")  # pragma: allowlist secret
+
+    assert "senha" not in mostrada and "t0k" not in mostrada
+    assert mostrada == "https://dados.exemplo.gov.br:44x/a.zip?token=***"
+    assert para_registro("https://[::1/a?token=t0k") == "(URL inválida)"
+
+
+async def test_a_full_disk_does_not_open_the_hosts_circuit(rede, monkeypatch):
+    rede.rota(URL, httpx.Response(200, content=b"a;b\n1;2\n"))
+
+    class _DiscoCheio:
+        def write(self, _parte):
+            raise OSError(28, "No space left on device")
+
+        def flush(self):
+            pass
+
+        def close(self):
+            pass
+
+    def fdopen(fd, *_a, **_k):
+        os.close(fd)
+        return _DiscoCheio()
+
+    monkeypatch.setattr(os, "fdopen", fdopen)
+
+    for _ in range(6):
+        with pytest.raises(RuntimeError, match="disco do executor"):
+            await baixar_para_arquivo(URL)
+
+    assert circuit_breaker.get_circuit_breaker("http:dados.exemplo.gov.br").state == "closed"
+
+
+@pytest.mark.parametrize("escrita_falha", [True, False], ids=["write-and-close", "close-only"])
+async def test_a_close_that_fails_is_still_the_disk(rede, monkeypatch, tmp_path, escrita_falha):
+    # With the disk full, closing the file flushes its buffer and fails again:
+    # after a failed write that error must not replace the write's, and alone
+    # it is the disk's as well, not the host's.
+    rede.rota(URL, httpx.Response(200, content=b"a;b\n1;2\n"))
+
+    class _DiscoCheio:
+        def write(self, _parte):
+            if escrita_falha:
+                raise OSError(28, "No space left on device")
+
+        def flush(self):
+            pass
+
+        def close(self):
+            raise OSError(28, "No space left on device")
+
+    def fdopen(fd, *_a, **_k):
+        os.close(fd)
+        return _DiscoCheio()
+
+    monkeypatch.setattr(os, "fdopen", fdopen)
+
+    for _ in range(6):
+        with pytest.raises(RuntimeError, match="disco do executor"):
+            await baixar_para_arquivo(URL)
+
+    assert circuit_breaker.get_circuit_breaker("http:dados.exemplo.gov.br").state == "closed"
+    assert _sobras(tmp_path) == []
+
+
+async def test_a_tls_error_in_the_middle_of_the_body_is_the_network(rede, tmp_path):
+    # anyio raises a corrupted TLS record as a bare ssl.SSLError — an OSError —
+    # instead of httpx's ReadError. It is retried like any network failure and
+    # never reported as the executor's disk.
+    async def corpo():
+        yield b"a;b\n"
+        raise ssl.SSLError(1, "[SSL: DECRYPTION_FAILED_OR_BAD_RECORD_MAC] decryption failed or bad record mac")
+
+    rede.rota(URL, lambda _p: httpx.Response(200, content=corpo()))
+
+    with pytest.raises(RuntimeError, match="Erro de rede no download") as erro:
+        await baixar_para_arquivo(URL, tentativas=1)
+
+    assert "BAD_RECORD_MAC" in str(erro.value) and "disco" not in str(erro.value)
+    assert len(rede.pedidos) == 2
+    assert _sobras(tmp_path) == []
 
 
 @pytest.mark.parametrize(("valor", "esperado"), [

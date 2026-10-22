@@ -130,6 +130,36 @@ def test_an_encrypted_member_is_named():
         leitura_zip._checar_tamanhos([info])
 
 
+def test_too_many_entries_are_refused_before_the_zip_is_parsed(tmp_path, monkeypatch):
+    monkeypatch.setattr(leitura_zip, "_MAX_MEMBROS", 10)
+    caminho = _zip(tmp_path, [(f"f{i}.csv", b"a\n") for i in range(20)])
+
+    def sem_parse(*_a, **_k):
+        raise AssertionError("ZipFile parsed the whole central directory before the refusal")
+
+    monkeypatch.setattr(leitura_zip.zipfile, "ZipFile", sem_parse)
+
+    with pytest.raises(ZipInvalidoError, match="20 entradas"):
+        with extrair(caminho, ""):
+            pass
+
+
+def test_a_corrupted_member_is_named(tmp_path):
+    caminho = tmp_path / "dados.zip"
+    with zipfile.ZipFile(caminho, "w", zipfile.ZIP_STORED) as zf:
+        zf.writestr("a.csv", b"coluna\nvalor-original\n")
+    caminho.write_bytes(caminho.read_bytes().replace(b"valor-original", b"valor-ALTERADO"))
+
+    with pytest.raises(ZipInvalidoError, match="'a.csv' está corrompido"):
+        with extrair(str(caminho), ""):
+            pass
+
+
+def test_an_old_excel_does_not_count_as_readable():
+    # The executor has no `.xls` reader: the CSV beside the data dictionary is the one.
+    assert escolher(_infos(["dados.csv", "dicionario.xls"]), "") == "dados.csv"
+
+
 def test_a_file_that_is_not_a_zip(tmp_path):
     caminho = tmp_path / "falso.zip"
     caminho.write_bytes(b"isto nao e zip")

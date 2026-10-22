@@ -17,8 +17,10 @@ as it passes the limit, with the same defenses as the other outbound nodes:
 The caller removes the returned file.
 """
 import asyncio
+import contextlib
 import os
 import re
+import ssl
 import tempfile
 from dataclasses import dataclass, field
 from email.message import Message
@@ -91,15 +93,50 @@ class _Falha:
 
 @dataclass
 class _Recusa:
-    """Our own policy refused (size limit). Kept apart from an exception raised
-    inside the circuit breaker, which would count it as a failure of the HOST:
-    five oversized files would open the circuit for every workflow that talks
-    to it."""
+    """Our own policy refused (size limit), or our own disk failed. Kept apart
+    from an exception raised inside the circuit breaker, which would count it
+    as a failure of the HOST: five oversized files would open the circuit for
+    every workflow that talks to it."""
     erro: Exception
 
 
 class _LimiteExcedido(Exception):
     pass
+
+
+class _DiscoLocal(Exception):
+    """Writing to the executor's own disk failed (full, read-only). The host is
+    not to blame, so it goes back as `_Recusa`, outside the circuit breaker."""
+
+
+async def _gravar(funcao, *args) -> None:
+    try:
+        await asyncio.to_thread(funcao, *args)
+    except OSError as e:
+        raise _DiscoLocal() from e
+
+
+def _sem_disco(erro: BaseException | None) -> RuntimeError:
+    return RuntimeError(f"Não foi possível gravar o download no disco do executor: {erro}")
+
+
+@contextlib.contextmanager
+def _arquivo(fd: int):
+    """The download's file. Failing to close it is the disk's (`_DiscoLocal`)
+    only when nothing else failed first: with the disk full, closing flushes
+    what is left in the buffer and fails again, and that error would replace
+    the one that says what happened."""
+    destino = os.fdopen(fd, "wb")
+    try:
+        yield destino
+    except BaseException:
+        with contextlib.suppress(OSError):
+            destino.close()
+        raise
+    try:
+        destino.close()
+    except OSError as e:
+        raise _DiscoLocal() from e
 
 
 def para_registro(url: str) -> str:
@@ -108,9 +145,16 @@ def para_registro(url: str) -> str:
     try:
         partes = urlsplit(url)
         host = partes.hostname or ""
+    except ValueError:
+        # Not even split (an unbalanced `[`): nothing of it is shown — the user
+        # part and the query may carry the very secret this function hides.
+        return "(URL inválida)"
+    try:
         porta = partes.port
     except ValueError:
-        return url
+        # A port that is not a number (a typo): shown as typed — it is no
+        # secret — while the user part and the query are still masked below.
+        porta = partes.netloc.rpartition("@")[2].rpartition(":")[2]
     if ":" in host:  # IPv6 goes in brackets in the URL
         host = f"[{host}]"
     netloc = f"{host}:{porta}" if porta else host
@@ -193,11 +237,14 @@ async def _tentar(
             if max_bytes and declarado.isdigit() and int(declarado) > max_bytes:
                 return _Recusa(_grande_demais(max_bytes, int(declarado)))
 
-            fd, caminho = tempfile.mkstemp(prefix="atlans-download-")
+            try:
+                fd, caminho = tempfile.mkstemp(prefix="atlans-download-")
+            except OSError as e:
+                return _Recusa(_sem_disco(e))
             total = 0
             inicio = bytearray()
             try:
-                with os.fdopen(fd, "wb") as destino:
+                with _arquivo(fd) as destino:
                     async for parte in response.aiter_bytes(_CHUNK):
                         total += len(parte)
                         # Counts DECODED bytes — what goes to disk —, so a gzip
@@ -206,10 +253,14 @@ async def _tentar(
                             raise _LimiteExcedido()
                         if len(inicio) < _INICIO:
                             inicio.extend(parte[: _INICIO - len(inicio)])
-                        await asyncio.to_thread(destino.write, parte)
+                        await _gravar(destino.write, parte)
+                    await _gravar(destino.flush)
             except _LimiteExcedido:
                 _remover(caminho)
                 return _Recusa(_grande_demais(max_bytes))
+            except _DiscoLocal as e:
+                _remover(caminho)
+                return _Recusa(_sem_disco(e.__cause__))
             except BaseException:
                 _remover(caminho)
                 raise
@@ -263,7 +314,9 @@ async def _com_tentativas(
             )
         except CircuitOpenError as e:
             raise RuntimeError(str(e)) from e
-        except httpx.TransportError as e:
+        except (httpx.TransportError, ssl.SSLError) as e:
+            # A corrupted TLS record in the middle of the body comes from anyio
+            # as a bare `ssl.SSLError`, not as httpx's ReadError: network too.
             if ultima:
                 raise RuntimeError(
                     f"Erro de rede no download de {para_registro(url)}: {e}"
