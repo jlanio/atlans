@@ -1,7 +1,6 @@
 # flow/nodes/actions/http_request.py
 
 import asyncio
-import base64
 import json
 import httpx
 import geopandas as gpd
@@ -9,6 +8,13 @@ from urllib.parse import parse_qsl, urlparse
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
 from flow.utils.geo_helpers import gdf_para_geojson, safe_httpx_request
+from flow.utils.autenticacao_http import (
+    CREDENTIAL_HEADERS,
+    apply_auth,
+    exigir_credencial_resolvida,
+    same_origin,
+    without_credentials,
+)
 from flow.utils.circuit_breaker import get_circuit_breaker, CircuitOpenError
 from flow.utils.backoff import espera_exponencial
 from flow.utils.logger import get_logger
@@ -68,73 +74,13 @@ def _merge_query(url: str, params: Any) -> List[Tuple[str, str]]:
     return da_url + from_field
 
 
-# Headers that carry a credential and must not cross a change of origin.
-# It's the same list curl and requests drop when following a 3xx.
-_CREDENTIAL_HEADERS = frozenset({'authorization', 'cookie', 'proxy-authorization'})
-
-
-def _same_origin(a: str, b: str) -> bool:
-    """Compares origin in the RFC 6454 sense: scheme, host and effective port."""
-    _DEFAULT_PORTS = {'http': 80, 'https': 443}
-    def origem(u: str):
-        p = urlparse(u)
-        esquema = (p.scheme or '').lower()
-        return (esquema, (p.hostname or '').lower(), p.port or _DEFAULT_PORTS.get(esquema))
-    return origem(a) == origem(b)
-
-
-def _without_credentials(headers: Dict[str, str]) -> Dict[str, str]:
-    """Copy of the headers without the ones that carry a secret."""
-    return {k: v for k, v in headers.items() if k.lower() not in _CREDENTIAL_HEADERS}
-
-
-def _apply_auth(headers: Dict[str, str], auth: Any) -> Dict[str, str]:
-    """Builds the `Authorization` header from the resolved credential.
-
-    The credential wins over an `Authorization` written by hand in the headers:
-    whoever selected a credential expressed the stronger intent, and the
-    opposite would let a header forgotten in the form silently drop the secret
-    the user just chose.
-    """
-    if not isinstance(auth, dict):
-        return headers
-
-    tipo = auth.get('type')
-    if not tipo:
-        return headers
-    if tipo not in ('http_bearer', 'http_basic'):
-        # The resolver injects `http_auth` for WFS credentials too; one of
-        # them chosen here would be ignored and the request would go out ANONYMOUS.
-        raise ValueError(
-            f"A credencial escolhida (tipo '{tipo}') não serve para requisição HTTP: "
-            "use uma do tipo HTTP Bearer ou HTTP Basic."
-        )
-
-    # HTTP headers are case-insensitive, but dictionaries are not:
-    # writing to `Authorization` left a hand-typed `authorization` standing
-    # beside it, and the node sent TWO authentication headers — it's up to the
-    # server to decide which one counts, and neither outcome is what the user asked for.
-    for existente in [k for k in headers if k.lower() == 'authorization']:
-        headers.pop(existente)
-
-    if tipo == 'http_bearer':
-        token = str(auth.get('token') or '').strip()
-        if not token:
-            raise ValueError(
-                "A credencial Bearer selecionada não tem token preenchido."
-            )
-        headers['Authorization'] = f'Bearer {token}'
-    elif tipo == 'http_basic':
-        usuario = str(auth.get('username') or '')
-        senha   = str(auth.get('password') or '')
-        if not usuario:
-            raise ValueError(
-                "A credencial Basic selecionada não tem usuário preenchido."
-            )
-        par = base64.b64encode(f'{usuario}:{senha}'.encode('utf-8')).decode('ascii')
-        headers['Authorization'] = f'Basic {par}'
-
-    return headers
+# The credential and origin rules live in a shared module since DataInput's URL
+# origin also authenticates and follows redirects. The private names stay: the
+# redaction (app/core/utils/redacao.py) and the tests import them from here.
+_CREDENTIAL_HEADERS = CREDENTIAL_HEADERS
+_same_origin = same_origin
+_without_credentials = without_credentials
+_apply_auth = apply_auth
 
 
 @register_node
@@ -312,21 +258,11 @@ class HttpRequestNode(BaseNode):
         if not url:
             raise ValueError("Parâmetro 'url' é obrigatório para HttpRequest.")
 
-        # The server REMOVES `credential_id` from the properties when injecting the
-        # resolved credential (see credential_resolver.inject_credentials).
-        # Arriving here with the id STILL present and without `http_auth` means
-        # the resolution didn't happen — credential deleted, outside the scope of
-        # whoever triggered it, or orphaned. Before, this went through silently: the
-        # request went out ANONYMOUS, and since the node doesn't treat 4xx as a failure,
-        # a 401 became normal output and the workflow went on with the error response
-        # in place of the data.
-        if self.parameters.get('credential_id') and not self.parameters.get('http_auth'):
-            raise ValueError(
-                "A credencial escolhida para este nó não pôde ser resolvida — ela pode "
-                "ter sido apagada, não estar acessível a quem disparou a execução, ou ser "
-                "de um tipo que este nó não usa (Bearer ou Basic). "
-                "A requisição NÃO foi enviada, para não sair sem autenticação."
-            )
+        # Credential chosen but not resolved: refuses instead of going out
+        # anonymous, where a 401 would become normal output (the node doesn't
+        # treat 4xx as a failure) and the workflow would go on with the error
+        # response in place of the data.
+        exigir_credencial_resolvida(self.parameters)
 
         # httpx's `params` replaces the URL's ENTIRE query, it doesn't add to
         # it. Passing the empty dictionary — the field's default — erased the query

@@ -16,18 +16,39 @@ import pandas as pd
 _NUMERO_COM_VIRGULA = re.compile(r"[+-]?(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d+)?")
 
 
-def ler_csv(caminho: str) -> pd.DataFrame:
+def ler_csv(caminho: str, pular_linhas: int = 0) -> pd.DataFrame:
     """Reads a CSV separated by ',' or by ';', told apart by the header line,
-    in UTF-8 or in the Windows-1252 that Excel in Portuguese saves."""
+    in UTF-8 or in the Windows-1252 that Excel in Portuguese saves.
+
+    `pular_linhas` skips lines ABOVE the header — the INMET stations' CSVs open
+    with eight lines of metadata (region, state, coordinates…) in two columns,
+    and read from the first line they became a two-column table, or a parser
+    error further down. The separator is decided on the real header line.
+    """
+    pular_linhas = max(0, int(pular_linhas or 0))
     with open(caminho, "rb") as arquivo:
+        for _ in range(pular_linhas):
+            arquivo.readline()
         cabecalho = arquivo.readline().decode("utf-8-sig", errors="replace")
     separador = ";" if cabecalho.count(";") > cabecalho.count(",") else ","
     try:
-        tabela = pd.read_csv(caminho, sep=separador)
+        tabela = pd.read_csv(caminho, sep=separador, skiprows=pular_linhas)
     except UnicodeDecodeError:
         # "CSV (separado por vírgulas)" in Excel in Portuguese is not UTF-8.
-        tabela = pd.read_csv(caminho, sep=separador, encoding="cp1252")
+        tabela = pd.read_csv(caminho, sep=separador, encoding="cp1252", skiprows=pular_linhas)
+    tabela = _sem_coluna_fantasma(tabela)
     return _virgula_decimal(tabela) if separador == ";" else tabela
+
+
+def _sem_coluna_fantasma(tabela: pd.DataFrame) -> pd.DataFrame:
+    """A separator at the end of every line — INMET's CSVs, and many exports —
+    makes pandas invent an empty column called 'Unnamed: N'. Only that one goes:
+    a column without a header that has data is data."""
+    fantasmas = [
+        c for c in tabela.columns
+        if isinstance(c, str) and c.startswith("Unnamed: ") and tabela[c].isna().all()
+    ]
+    return tabela.drop(columns=fantasmas) if fantasmas else tabela
 
 
 def _virgula_decimal(tabela: pd.DataFrame) -> pd.DataFrame:

@@ -102,3 +102,16 @@ def read_geodataframe(fonte, **kwargs):
     else:
         _validate_path(os.fspath(fonte))
     return gpd.read_file(fonte, **kwargs)
+
+
+def list_layers(fonte) -> list[str]:
+    """Layer names of a file, with the same refusals as `read_geodataframe`.
+
+    DataInput uses it to say, in the run log, that a ZIP has more than one layer
+    and which one was read — pyogrio only warns about it, and the warning never
+    reached the person who built the workflow.
+    """
+    _validate_path(os.fspath(fonte))
+    import pyogrio
+
+    return [str(linha[0]) for linha in pyogrio.list_layers(fonte)]
