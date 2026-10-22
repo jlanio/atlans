@@ -20,6 +20,7 @@ import SortByField from "../nodes-configuration/fields/sort-by-field"
 import SwitchRulesField from "../nodes-configuration/fields/switch-rules-field"
 import { NO_SUGGESTION, sugestaoParaNo } from "../utils/colunas-conhecidas"
 import { saidasDoNo } from "../utils/node-ports"
+import { campoVisivel } from "./visibilidade"
 import { arestasQueLeem, mudancaDeSaidas } from "../utils/variaveis-de-saida"
 import { useKnownColumnsStore } from "@/app/stores/knownColumnsStore"
 import WFSHelper from "../nodes-configuration/wfs-helper"
@@ -222,13 +223,8 @@ const NodeConfigForm = ({
   const hasUnsaved = JSON.stringify(nodeFound?.data.properties) !== JSON.stringify(values)
 
   // Declarative conditional visibility: a field with `visibleWhen` only appears
-  // when the referenced field's current value is in `in`. List → AND.
-  const isFieldVisible = (field: INodesPropertyAPI): boolean => {
-    const vw = field.visibleWhen
-    if (!vw) return true
-    const rules = Array.isArray(vw) ? vw : [vw]
-    return rules.every(r => r.in.includes(values?.[r.field] as string | number | boolean))
-  }
+  // when the referenced field's current value is in `in`. List → AND, `{ any }` → OR.
+  const isFieldVisible = (field: INodesPropertyAPI): boolean => campoVisivel(field.visibleWhen, values)
 
   // Node without fields — shows only the operation helper
   if (nodeFound?.data.fields.length === 0) {

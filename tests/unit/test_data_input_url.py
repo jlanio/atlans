@@ -35,7 +35,8 @@ def rede(monkeypatch):
 
 
 def _no(**props):
-    return DataInput(node_id="n1", parameters={"context": "url", "url": f"{BASE}/arquivo", **props})
+    parametros = {"context": "url", "url": f"{BASE}/arquivo", "expectedFormat": "csv", **props}
+    return DataInput(node_id="n1", parameters=parametros)
 
 
 def _shapefile(tmp_path, nome, n):
@@ -110,46 +111,82 @@ async def test_skips_the_lines_above_the_header(rede):
     assert tabela["TEMPERATURA DO AR - BULBO SECO, HORARIA (C)"].tolist() == [21.4, 20.9]
 
 
-# ── Format detection ──────────────────────────────────────────────────────────
+# ── Expected format ───────────────────────────────────────────────────────────
+
+async def test_the_format_must_be_chosen_before_downloading(rede):
+    with pytest.raises(ValueError, match="Escolha o 'Formato esperado'"):
+        await _no(expectedFormat="escolher").execute({})
+    assert rede.pedidos == []
+
 
 async def test_geojson_served_as_json(rede):
     corpo = gpd.GeoDataFrame({"n": [1]}, geometry=[Point(-47, -15)], crs="EPSG:4326").to_json()
     rede.rota(f"{BASE}/api/limites.json", httpx.Response(200, text=corpo, headers={"Content-Type": "application/json"}))
 
-    saida = await _no(url=f"{BASE}/api/limites.json").execute({})
+    saida = await _no(url=f"{BASE}/api/limites.json", expectedFormat="geojson").execute({})
 
     assert isinstance(saida["output"], gpd.GeoDataFrame)
     assert saida["metadata"]["extension"] == "geojson"
 
 
-async def test_a_zip_without_a_name_is_told_by_its_content(rede, tmp_path):
+async def test_json_chosen_for_a_geojson_stays_json(rede):
+    corpo = gpd.GeoDataFrame({"n": [1]}, geometry=[Point(-47, -15)], crs="EPSG:4326").to_json()
+    rede.rota(f"{BASE}/arquivo", httpx.Response(200, text=corpo))
+
+    saida = await _no(expectedFormat="json").execute({})
+
+    assert saida["output"]["type"] == "FeatureCollection"
+
+
+async def test_a_zip_without_an_extension_in_the_url(rede, tmp_path):
     rede.rota(f"{BASE}/download.php", httpx.Response(200, content=_zip(_shapefile(tmp_path, "municipios", 3).items())))
 
-    saida = await _no(url=f"{BASE}/download.php?id=123").execute({})
+    saida = await _no(url=f"{BASE}/download.php?id=123", expectedFormat="zip").execute({})
 
     assert saida["output"]["nome"].tolist() == ["municipios0", "municipios1", "municipios2"]
     assert saida["metadata"]["extension"] == "zip"
 
 
-async def test_an_html_page_is_not_read_as_a_file(rede):
+async def test_an_html_page_instead_of_the_file(rede):
     rede.rota(f"{BASE}/arquivo", httpx.Response(200, text="<!DOCTYPE html><html><body>Entrar</body></html>"))
 
-    with pytest.raises(ValueError, match="página HTML"):
+    with pytest.raises(ValueError, match="Esperava CSV, mas o servidor devolveu uma página HTML") as erro:
         await _no().execute({})
+    assert "tela de login" in str(erro.value)
 
 
-async def test_a_name_that_contradicts_the_content(rede):
+async def test_a_json_error_instead_of_the_zip(rede):
     rede.rota(f"{BASE}/municipios.zip", httpx.Response(200, json={"erro": "cota excedida"}))
 
-    with pytest.raises(ValueError, match="o conteúdo não é ZIP"):
-        await _no(url=f"{BASE}/municipios.zip").execute({})
+    with pytest.raises(ValueError, match="Esperava ZIP, mas o servidor devolveu um JSON") as erro:
+        await _no(url=f"{BASE}/municipios.zip", expectedFormat="zip").execute({})
+    assert "cota excedida" in str(erro.value)
+    assert "escolha 'JSON' em 'Formato esperado'" in str(erro.value)
 
 
-async def test_gzip_is_refused_by_name(rede):
+async def test_a_zip_where_a_csv_was_expected_names_the_option(rede, tmp_path):
+    rede.rota(f"{BASE}/arquivo", httpx.Response(200, content=_zip([("a.csv", b"x\n")])))
+
+    with pytest.raises(ValueError, match="Esperava CSV, mas o servidor devolveu um ZIP") as erro:
+        await _no().execute({})
+    assert "escolha 'ZIP (shapefile ou outros arquivos dentro)'" in str(erro.value)
+
+
+async def test_a_spreadsheet_is_not_taken_for_a_zip(rede):
+    planilha = _zip([("[Content_Types].xml", b"<Types/>"), ("xl/workbook.xml", b"<workbook/>")])
+    rede.rota(f"{BASE}/arquivo", httpx.Response(200, content=planilha))
+
+    with pytest.raises(ValueError, match="devolveu uma planilha XLSX") as erro:
+        await _no(expectedFormat="zip").execute({})
+    assert "escolha 'XLSX (Excel)'" in str(erro.value)
+
+
+async def test_gzip_is_named(rede):
     rede.rota(f"{BASE}/focos.csv.gz", httpx.Response(200, content=b"\x1f\x8b\x08\x00" + b"\x00" * 20))
 
-    with pytest.raises(ValueError, match="gzip"):
+    with pytest.raises(ValueError, match=r"gzip \(\.gz\)") as erro:
         await _no(url=f"{BASE}/focos.csv.gz").execute({})
+    assert "versão .zip ou sem compressão" in str(erro.value)
 
 
 async def test_an_empty_file(rede):
@@ -157,6 +194,21 @@ async def test_an_empty_file(rede):
 
     with pytest.raises(ValueError, match="vazio"):
         await _no().execute({})
+
+
+def test_format_fields_follow_the_choice_only_on_the_url():
+    """On the URL origin a field shows for the formats it serves; on the Drive
+    and in Artifacts the file's format is only known at run time, so it always
+    shows (node-config-form evaluates `any` as an OR)."""
+    props = {p["name"]: p for p in DataInput.description()["properties"]}
+    na_origem_armazenada = {"field": "context", "in": ["drive", "artifacts"]}
+
+    assert props["expectedFormat"]["visibleWhen"] == {"field": "context", "in": ["url"]}
+    assert props["zipMember"]["visibleWhen"] == {
+        "any": [na_origem_armazenada, {"field": "expectedFormat", "in": ["zip"]}]}
+    assert props["skipRows"]["visibleWhen"]["any"][1]["in"] == ["csv", "zip"]
+    assert props["latColumn"]["visibleWhen"]["any"][1]["in"] == ["csv", "xlsx", "zip"]
+    assert props["lonColumn"]["visibleWhen"] == props["latColumn"]["visibleWhen"]
 
 
 # ── Credential ────────────────────────────────────────────────────────────────
@@ -181,7 +233,7 @@ async def test_a_shapefile_in_a_subfolder(rede, tmp_path):
     entradas = [(f"dados/{n}", c) for n, c in _shapefile(tmp_path, "municipios", 2).items()]
     rede.rota(f"{BASE}/arquivo", httpx.Response(200, content=_zip(entradas)))
 
-    saida = await _no().execute({})
+    saida = await _no(expectedFormat="zip").execute({})
 
     assert saida["output"]["nome"].tolist() == ["municipios0", "municipios1"]
     assert saida["output"].crs.to_epsg() == 4326  # reprojected from 4674, as always
@@ -192,7 +244,7 @@ async def test_two_shapefiles_choose_by_pattern(rede, tmp_path):
     entradas = list(_shapefile(tmp_path, "municipios", 3).items()) + list(_shapefile(tmp_path, "estados", 2).items())
     rede.rota(f"{BASE}/arquivo", httpx.Response(200, content=_zip(entradas)))
 
-    saida = await _no(zipMember="estados*").execute({})
+    saida = await _no(expectedFormat="zip", zipMember="estados*").execute({})
 
     assert saida["output"]["nome"].tolist() == ["estados0", "estados1"]
     assert saida["metadata"]["zip_member"] == "estados.shp"
@@ -203,7 +255,7 @@ async def test_two_shapefiles_without_a_pattern_read_as_before_and_say_so(rede, 
     rede.rota(f"{BASE}/arquivo", httpx.Response(200, content=_zip(entradas)))
 
     with caplog.at_level("WARNING", logger="flow.nodes.datasource.data_input"):
-        saida = await _no().execute({})
+        saida = await _no(expectedFormat="zip").execute({})
 
     assert len(saida["output"]) == 3
     assert "o ZIP tem 2 camadas" in caplog.text and "Arquivo dentro do ZIP" in caplog.text
@@ -212,7 +264,7 @@ async def test_two_shapefiles_without_a_pattern_read_as_before_and_say_so(rede, 
 async def test_an_excel_csv_inside_a_zip(rede):
     rede.rota(f"{BASE}/arquivo", httpx.Response(200, content=_zip([("capitais.csv", CSV_EXCEL)])))
 
-    tabela = (await _no().execute({}))["output"]
+    tabela = (await _no(expectedFormat="zip").execute({}))["output"]
 
     assert tabela["nome"].tolist() == ["São Paulo", "Manaus"]
     assert tabela["valor"].tolist() == [1500.5, 12.25]
@@ -223,7 +275,7 @@ async def test_inmet_station_from_a_zip_of_stations(rede):
         ("INMET_CO_DF_A001_BRASILIA.CSV", INMET), ("INMET_CO_GO_A002_GOIANIA.CSV", INMET),
     ])))
 
-    saida = await _no(zipMember="*A001*", skipRows=8).execute({})
+    saida = await _no(expectedFormat="zip", zipMember="*A001*", skipRows=8).execute({})
 
     assert list(saida["output"].columns)[:2] == ["Data", "Hora UTC"]
     assert saida["metadata"]["zip_member"] == "INMET_CO_DF_A001_BRASILIA.CSV"
@@ -250,7 +302,7 @@ async def test_skip_rows_with_several_files_asks_which(rede):
     rede.rota(f"{BASE}/arquivo", httpx.Response(200, content=_zip([("a.csv", b"x\n"), ("b.csv", b"y\n")])))
 
     with pytest.raises(ValueError, match="Diga qual em 'Arquivo dentro do ZIP'"):
-        await _no(skipRows=1).execute({})
+        await _no(expectedFormat="zip", skipRows=1).execute({})
 
 
 async def test_two_shapefiles_in_a_subfolder_ask_which_first(rede, tmp_path):
@@ -259,7 +311,7 @@ async def test_two_shapefiles_in_a_subfolder_ask_which_first(rede, tmp_path):
     rede.rota(f"{BASE}/arquivo", httpx.Response(200, content=_zip(entradas)))
 
     with pytest.raises(RuntimeError) as erro:
-        await _no().execute({})
+        await _no(expectedFormat="zip").execute({})
     mensagem = str(erro.value)
     assert mensagem.startswith("O ZIP tem 2 arquivos que o nó lê: BR/municipios.shp, BR/estados.shp.")
     assert "Lido como está, o ZIP deu erro no GDAL" in mensagem

@@ -173,7 +173,7 @@ async def test_retries_a_network_failure_then_gives_up(rede):
 
 
 def test_the_url_shown_hides_secrets():
-    url = "https://user:senha@s3.exemplo.net/b/x.zip?X-Amz-Signature=abc123&X-Amz-Expires=60&token=t0k&ano=2024"
+    url = "https://user:senha@s3.exemplo.net/b/x.zip?X-Amz-Signature=abc123&X-Amz-Expires=60&token=t0k&ano=2024"  # pragma: allowlist secret
 
     mostrada = para_registro(url)
 

@@ -38,8 +38,39 @@ _GEO_EXTENSIONS = {"geojson", "shp", "zip", "kml", "kmz", "gpkg", "gml", "fgb"}
 # usually the wrong file.
 _MAX_DOWNLOAD_MB_PADRAO = 800
 
-# Formats told apart by the content's first bytes — the name on the URL can be
-# `download.php?id=123`, and a portal's error page often comes as 200.
+# The formats of the URL origin, as `expectedFormat` names them. The person says
+# what the address delivers and the node checks the content against it: the name
+# on the URL can be `download.php?id=123`, and a portal's error page often comes
+# as 200 — guessing would turn a JSON error into the node's output, and the
+# workflow would go on with it.
+_FORMATOS_URL = {
+    "csv": "CSV",
+    "zip": "ZIP (shapefile ou outros arquivos dentro)",
+    "geojson": "GeoJSON",
+    "json": "JSON",
+    "kml": "KML",
+    "kmz": "KMZ",
+    "gpkg": "GeoPackage",
+    "xlsx": "XLSX (Excel)",
+}
+# The form's select cannot start empty (Radix refuses an empty item value), so
+# the field starts on an option that is not a format, and the node refuses it.
+_ESCOLHER = "escolher"
+
+# What each choice accepts among the kinds `_o_que_veio` tells apart. A GeoJSON
+# is JSON too; a ZIP holding only KML (a KMZ under another name) is still a ZIP.
+_ACEITA = {
+    "csv": {"texto"},
+    "zip": {"zip", "kmz"},
+    "geojson": {"geojson"},
+    "json": {"json", "geojson"},
+    "kml": {"kml"},
+    "kmz": {"kmz"},
+    "gpkg": {"gpkg"},
+    "xlsx": {"xlsx"},
+}
+
+# Kinds told apart by the content's first bytes.
 _ASSINATURAS = (
     (b"PK\x03\x04", "zip"),
     (b"PK\x05\x06", "zip"),  # empty ZIP
@@ -48,19 +79,43 @@ _ASSINATURAS = (
     (b"fgb\x03", "fgb"),
     (b"\x1f\x8b", "gz"),
 )
-_BINARIOS = frozenset({"zip", "xlsx", "kmz", "gpkg", "xls", "fgb"})
-_TEXTO = frozenset({"csv", "json", "geojson", "kml", "gml"})
-_POR_CONTENT_TYPE = {
-    "text/csv": "csv",
-    "application/csv": "csv",
-    "text/comma-separated-values": "csv",
-    "application/geo+json": "geojson",
-    "application/vnd.geo+json": "geojson",
-    "application/json": "json",
-    "application/vnd.google-earth.kml+xml": "kml",
-    "application/gml+xml": "gml",
-}
 _GEOJSON = re.compile(rb'"type"\s*:\s*"(FeatureCollection|Feature)"')
+
+# How the message names what came, and what to do about the kinds that are
+# not a choice of the field.
+_O_QUE_E = {
+    "html": "uma página HTML",
+    "gz": "um arquivo gzip (.gz)",
+    "xls": "uma planilha XLS (Excel antigo)",
+    "fgb": "um FlatGeobuf",
+    "zip": "um ZIP",
+    "kmz": "um KMZ",
+    "xlsx": "uma planilha XLSX",
+    "gpkg": "um GeoPackage",
+    "json": "um JSON",
+    "geojson": "um GeoJSON",
+    "kml": "um KML",
+    "xml": "um XML",
+    "texto": "um arquivo de texto",
+    "binario": "um arquivo binário",
+}
+_O_QUE_FAZER = {
+    "html": " Costuma ser tela de login, captcha ou página de erro do portal: abra a URL "
+            "no navegador para conferir o endereço direto do arquivo.",
+    "gz": " A Entrada de Dados não lê .gz: use a versão .zip ou sem compressão, se o "
+          "portal oferecer.",
+    "xls": " O executor não lê o Excel antigo: use a versão XLSX ou CSV, se o portal oferecer.",
+}
+
+# The fields of a file format. On the Drive and in Artifacts the file is chosen
+# in the picker and its format is only known when the node runs, so they always
+# show; on the URL origin they show for the format chosen. `any` is an OR of
+# rules (node-config-form's visibility).
+_NA_ORIGEM_ARMAZENADA = {"field": "context", "in": ["drive", "artifacts"]}
+
+
+def _visivel_no_formato(*formatos: str) -> dict:
+    return {"any": [_NA_ORIGEM_ARMAZENADA, {"field": "expectedFormat", "in": list(formatos)}]}
 
 
 def _ler_kmz(path: str) -> Any:
@@ -236,80 +291,30 @@ def _amostra(inicio: bytes) -> str:
     return repr(inicio[:40])[2:-1]
 
 
-def _detectar_extensao(caminho: str, inicio: bytes, nome: str, content_type: str) -> str:
-    """The format of a downloaded file, which DataInput's readers expect as an
-    extension. The content decides what it can decide (magic bytes, HTML page);
-    the name (`Content-Disposition` or the URL) and then the `Content-Type`
-    decide among the text formats; a name that contradicts the content is an
-    error, not a guess."""
+def _o_que_veio(caminho: str, inicio: bytes) -> str:
+    """The kind of content a download delivered, told by its first bytes —
+    never by the name or the `Content-Type`, which an error page shares with
+    the file it replaced."""
+    magia = next((tipo for assinatura, tipo in _ASSINATURAS if inicio.startswith(assinatura)), None)
+    if magia == "zip":
+        return _tipo_do_zip(caminho)
+    if magia:
+        return magia
     cabeca = inicio.lstrip(b"\xef\xbb\xbf").lstrip()
     baixo = cabeca[:512].lower()
     if baixo.startswith(b"<!doctype html") or baixo.startswith(b"<html"):
-        raise ValueError(
-            "O endereço devolveu uma página HTML, não um arquivo — costuma ser tela de "
-            "login, captcha ou página de erro do portal. Abra a URL no navegador para "
-            "conferir o endereço direto do arquivo."
-        )
-
-    pelo_nome = _extensao_do_nome(nome)
-    pelo_conteudo = next((ext for magia, ext in _ASSINATURAS if inicio.startswith(magia)), None)
-
-    if pelo_conteudo == "gz":
-        raise ValueError(
-            f"'{nome}' veio compactado em gzip (.gz), formato que a Entrada de Dados não "
-            "lê. Use a versão .zip ou sem compressão, se o portal oferecer."
-        )
-    if pelo_conteudo == "zip":
-        return _tipo_do_zip(caminho, pelo_nome)
-    if pelo_conteudo:
-        return pelo_conteudo
-
-    if pelo_nome in _BINARIOS:
-        raise ValueError(
-            f"O arquivo se chama '{nome}', mas o conteúdo não é {pelo_nome.upper()} "
-            f"(começa com: {_amostra(inicio)}). O servidor pode ter devolvido uma "
-            "mensagem de erro no lugar do arquivo."
-        )
+        return "html"
     if b"\x00" in inicio:
-        raise ValueError(
-            f"Formato de '{nome}' não reconhecido (começa com: {_amostra(inicio)}). "
-            "A Entrada de Dados lê CSV, ZIP, GeoJSON, KML/KMZ, GeoPackage, XLSX e JSON."
-        )
-
-    if pelo_nome == "csv" and cabeca[:1] in (b"{", b"[", b"<"):
-        raise ValueError(
-            f"O arquivo se chama '{nome}', mas o conteúdo não parece CSV "
-            f"(começa com: {_amostra(cabeca)}). O servidor pode ter devolvido uma "
-            "mensagem de erro no lugar do arquivo."
-        )
-
-    tipo = (content_type or "").split(";")[0].strip().lower()
-    if pelo_nome in _TEXTO:
-        ext = pelo_nome
-    elif _POR_CONTENT_TYPE.get(tipo) in _TEXTO:
-        ext = _POR_CONTENT_TYPE[tipo]
-    elif cabeca[:1] in (b"{", b"["):
-        ext = "json"
-    elif cabeca[:1] == b"<":
-        trecho = cabeca[:4096].lower()
-        if b"<kml" in trecho:
-            ext = "kml"
-        elif b"gml" in trecho:
-            ext = "gml"
-        else:
-            raise ValueError(
-                f"'{nome}' é um XML que não é KML nem GML (começa com: {_amostra(cabeca)})."
-            )
-    else:
-        ext = "csv"
-
-    if ext == "json" and _GEOJSON.search(inicio):
-        ext = "geojson"
-    return ext
+        return "binario"
+    if cabeca[:1] in (b"{", b"["):
+        return "geojson" if _GEOJSON.search(inicio) else "json"
+    if cabeca[:1] == b"<":
+        return "kml" if b"<kml" in cabeca[:4096].lower() else "xml"
+    return "texto"
 
 
-def _tipo_do_zip(caminho: str, pelo_nome: str) -> str:
-    """XLSX and KMZ are ZIPs too: the content says which one this is."""
+def _tipo_do_zip(caminho: str) -> str:
+    """XLSX and KMZ are ZIPs too: the names inside say which one this is."""
     import zipfile
     try:
         with zipfile.ZipFile(caminho) as zf:
@@ -318,13 +323,28 @@ def _tipo_do_zip(caminho: str, pelo_nome: str) -> str:
         return "zip"
     if "[Content_Types].xml" in nomes and any(n.startswith("xl/") for n in nomes):
         return "xlsx"
-    if pelo_nome == "kmz":
-        return "kmz"
     from flow.utils.leitura_zip import EXTENSOES_LEGIVEIS
     legiveis = [n for n in nomes if _extensao_do_nome(n) in EXTENSOES_LEGIVEIS]
     if legiveis and all(n.lower().endswith(".kml") for n in legiveis):
         return "kmz"
     return "zip"
+
+
+def _conferir_formato(esperado: str, caminho: str, inicio: bytes) -> None:
+    """Fails when the content is not the format the person said would come,
+    saying what came — and, when it is another choice of the field, which one."""
+    veio = _o_que_veio(caminho, inicio)
+    if veio in _ACEITA[esperado]:
+        return
+    opcao = "csv" if veio == "texto" else veio
+    o_que_fazer = _O_QUE_FAZER.get(veio) or (
+        f" Se é isso mesmo, escolha '{_FORMATOS_URL[opcao]}' em 'Formato esperado'."
+        if opcao in _FORMATOS_URL else ""
+    )
+    raise ValueError(
+        f"Esperava {_FORMATOS_URL[esperado].split(' (')[0]}, mas o servidor devolveu "
+        f"{_O_QUE_E[veio]} (começa com: {_amostra(inicio)}).{o_que_fazer}"
+    )
 
 
 # ── Points from latitude/longitude columns ────────────────────────────────────
@@ -436,6 +456,19 @@ class DataInput(BaseNode):
                     "visibleWhen": {"field": "context", "in": ["url"]},
                 },
                 {
+                    "name": "expectedFormat", "required": True,
+                    "label": "Formato esperado",
+                    "type": "select",
+                    "default": _ESCOLHER,
+                    "description": "O formato do arquivo que a URL entrega. O nó confere o "
+                                   "conteúdo baixado e falha se vier outra coisa — uma página "
+                                   "de login ou um JSON de erro no lugar do arquivo, por exemplo.",
+                    "options": [{"value": _ESCOLHER, "label": "Escolha o formato do arquivo"}] + [
+                        {"value": valor, "label": rotulo} for valor, rotulo in _FORMATOS_URL.items()
+                    ],
+                    "visibleWhen": {"field": "context", "in": ["url"]},
+                },
+                {
                     "name": "credential_id",
                     "label": "Credencial",
                     "type": "credential",
@@ -483,6 +516,7 @@ class DataInput(BaseNode):
                     "description": "Só para ZIP: qual arquivo ler, pelo nome ou por um padrão "
                                    "(*.shp, municipios*.shp, *A001*.CSV). Vazio lê o ZIP como "
                                    "sempre; se ele tiver mais de uma camada, o log lista as outras.",
+                    "visibleWhen": _visivel_no_formato("zip"),
                 },
                 {
                     "name": "skipRows",
@@ -491,6 +525,7 @@ class DataInput(BaseNode):
                     "default": 0,
                     "description": "Linhas acima do cabeçalho, como os metadados da estação "
                                    "nos CSVs do INMET (8).",
+                    "visibleWhen": _visivel_no_formato("csv", "zip"),
                 },
                 {
                     "name": "latColumn",
@@ -499,6 +534,7 @@ class DataInput(BaseNode):
                     "default": "",
                     "description": "Opcional. Com latitude e longitude preenchidas, uma tabela "
                                    "(CSV, XLSX) vira pontos, com as coordenadas no CRS de saída.",
+                    "visibleWhen": _visivel_no_formato("csv", "xlsx", "zip"),
                 },
                 {
                     "name": "lonColumn",
@@ -506,6 +542,7 @@ class DataInput(BaseNode):
                     "type": "string",
                     "default": "",
                     "description": "Opcional. Veja a coluna de latitude.",
+                    "visibleWhen": _visivel_no_formato("csv", "xlsx", "zip"),
                 },
                 {
                     "name": "crs",
@@ -531,6 +568,12 @@ class DataInput(BaseNode):
         url: str = self.get_param("url", "").strip()
         if not url:
             raise ValueError("Parametro 'url' e obrigatorio no contexto URL.")
+        esperado: str = self.get_param("expectedFormat", _ESCOLHER)
+        if esperado not in _FORMATOS_URL:
+            raise ValueError(
+                "Escolha o 'Formato esperado' do arquivo (CSV, ZIP, GeoJSON…): o nó confere "
+                "o que chegar contra ele e falha se vier outra coisa."
+            )
         exigir_credencial_resolvida(self.parameters)
         headers = apply_auth({}, self.get_param("http_auth"))
 
@@ -551,7 +594,8 @@ class DataInput(BaseNode):
             if download.tamanho == 0:
                 raise ValueError(f"O servidor devolveu '{nome}' vazio (0 bytes).")
             content_type = download.headers.get("content-type", "")
-            ext = _detectar_extensao(download.caminho, download.inicio, nome, content_type)
+            _conferir_formato(esperado, download.caminho, download.inicio)
+            ext = esperado
             # The readers pick the driver by the extension (pyogrio opens a
             # `.zip` through /vsizip/, GDAL's XLSX driver wants `.xlsx`).
             caminho = f"{download.caminho}.{ext}"
