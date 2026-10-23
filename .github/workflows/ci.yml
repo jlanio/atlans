@@ -100,6 +100,38 @@ jobs:
           print('OK: nenhum segredo novo fora do baseline')
           "
 
+  # The owner's attribution rule (scripts/atribuicao_commits.py): the author
+  # e-mail and the message of every commit in the PR, the branch, the title and
+  # the body. Safety net for whoever did not install the `commit-msg` hook, in
+  # the same role as secrets-scan. Pull requests only: on push to main there is
+  # no PR to read. Title, body and branch are untrusted input — they reach the
+  # script through `env:`, never interpolated into `run:`.
+  attribution:
+    name: Atribuição (commits e PR)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The whole history: BASE_SHA..HEAD_SHA needs both ends.
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Check commits, branch, title and body
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: python scripts/atribuicao_commits.py pr
+
   backend:
     name: Backend (Python)
     runs-on: ubuntu-latest
