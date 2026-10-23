@@ -513,7 +513,14 @@ services:
   traefik:
     image: traefik:v3.6
     profiles: ["prod"]
-    restart: unless-stopped
+    # `always`, not `unless-stopped` like the rest: Traefik is the only way in
+    # (80/443). After the host went down abruptly, Docker brought every other
+    # container back and restored this one without starting it — no start, no
+    # error in its log — and the site stayed down until someone ran
+    # `docker start` (2026-10-17 and twice on 2026-10-23). `always` starts it
+    # on every daemon start, however it stopped; a `docker stop` still holds
+    # until the next one.
+    restart: always
     ports:
       - "80:80"
       - "443:443"
