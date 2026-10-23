@@ -1,0 +1,7 @@
+[
+  {"number": 5, "created_at": "2026-10-06T12:00:00Z", "user": {"login": "carla", "type": "User"}, "labels": []},
+  {"number": 6, "created_at": "2026-10-07T12:00:00Z", "user": {"login": "jlanio", "type": "User"}, "labels": [], "pull_request": {"url": "x"}},
+  {"number": 7, "created_at": "2026-10-08T12:00:00Z", "user": {"login": "dora", "type": "User"}, "labels": [], "pull_request": {"url": "x"}},
+  {"number": 8, "created_at": "2026-10-09T12:00:00Z", "user": {"login": "dependabot[bot]", "type": "Bot"}, "labels": [], "pull_request": {"url": "x"}},
+  {"number": 9, "created_at": "2026-09-09T12:00:00Z", "user": {"login": "eva", "type": "User"}, "labels": [], "pull_request": {"url": "x"}}
+]
