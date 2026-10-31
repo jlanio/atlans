@@ -87,6 +87,17 @@ def test_without_the_parameter_nothing_is_forced(env):
     assert env._connect_args(_BASE) == (_BASE, {})
 
 
+def test_the_migration_session_is_utc(env):
+    """Like the API's (app/core/db.py): `now()` into a TIMESTAMP column is UTC."""
+    assert env._session_options(_BASE) == "-c timezone=UTC"
+
+
+def test_the_url_options_are_kept_next_to_the_time_zone(env):
+    """connect_args replaces the URL's `options`: they have to be carried over."""
+    url = f"{_BASE}?options=-c%20search_path%3Dpublic"
+    assert env._session_options(url) == "-c search_path=public -c timezone=UTC"
+
+
 def test_the_other_query_parameters_survive(env):
     url, args = env._connect_args(f"{_BASE}?ssl=verify-ca&application_name=alembic")
     assert url == f"{_BASE}?application_name=alembic"

@@ -106,8 +106,27 @@ def _timeouts(statement_timeout_s: int, command_timeout_s: int) -> dict:
     return args
 
 
+def _utc_session(connect_args: dict) -> dict:
+    """connect_args with the session's time zone pinned to UTC.
+
+    The `TIMESTAMP` (without time zone) columns are written both by Postgres'
+    `now()` (server_default, e.g. artifacts.created_at, workspace_files.created_at)
+    and by the app's `utc_now_naive()`, and compared with cut-offs computed in UTC
+    (app/core/storage_reconciliation.py). `now()` becomes a `timestamp` in the
+    SESSION's time zone, which by default is the server's (`timezone` in
+    postgresql.conf): on a server in America/Cuiaba, created_at came out 4 h
+    behind every UTC cut-off. Pinned per connection, it no longer depends on how
+    the server was installed. `timestamptz` values are unaffected (asyncpg reads
+    and writes them as instants).
+    """
+    return {
+        **connect_args,
+        "server_settings": {**connect_args.get("server_settings", {}), "timezone": "UTC"},
+    }
+
+
 _async_url, _connect_args = _parse_url(DATABASE_URL) if DATABASE_URL else (None, {})
-_connect_args = {**_connect_args, **_timeouts(DB_STATEMENT_TIMEOUT, DB_COMMAND_TIMEOUT)}
+_connect_args = _utc_session({**_connect_args, **_timeouts(DB_STATEMENT_TIMEOUT, DB_COMMAND_TIMEOUT)})
 
 # --- Async Engine & Session ---
 #

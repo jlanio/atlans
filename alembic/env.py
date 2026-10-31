@@ -15,6 +15,7 @@ from pathlib import Path
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import make_url
 from alembic import context
 from dotenv import load_dotenv
 
@@ -132,9 +133,24 @@ def _connect_args(url: str) -> tuple[str, dict]:
     return url, connect_args
 
 
+def _session_options(url: str) -> str:
+    """libpq `options` for the migration session: the URL's own plus timezone=UTC.
+
+    The same session time zone as the API (app/core/db.py, `_utc_session`): a
+    `now()` that a migration writes into a TIMESTAMP column comes out in UTC, like
+    the rows the API writes, whatever the server's `timezone`. connect_args
+    replaces the URL's `options`, so those are carried over.
+    """
+    proprias = make_url(url).query.get("options", "")
+    if isinstance(proprias, tuple):
+        proprias = " ".join(proprias)
+    return f"{proprias} -c timezone=UTC".strip()
+
+
 def run_migrations_online() -> None:
     """Connects to the database and applies migrations."""
     url, connect_args = _connect_args(_get_sync_url())
+    connect_args["options"] = _session_options(url)
 
     configuration = config.get_section(config.config_ini_section, {})
     configuration["sqlalchemy.url"] = url
