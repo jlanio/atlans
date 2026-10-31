@@ -59,9 +59,31 @@ async def enforce_portal_access(wf: "Workflow | None", request: Request) -> None
     if claims is None:
         raise HTTPException(status_code=401, detail="Token invalido.")
 
-    allowed = [item.lower() for item in (wf.portal_shared_with or [])]
-    if claims.get("sub", "") not in allowed and claims.get("username", "").lower() not in allowed:
-        raise HTTPException(status_code=403, detail="Acesso negado a este portal.")
+    allowed = [str(item).strip().lower() for item in (wf.portal_shared_with or [])]
+    if claims.get("sub", "") in allowed or claims.get("username", "").lower() in allowed:
+        return
+    # The sharing form offers "e-mail ou username", but the access token
+    # carries no e-mail: an entry like `alice@exemplo.org` never matched and the
+    # invited person got a 403. Only when the list has an e-mail, look it up.
+    if any("@" in item for item in allowed) and await _email_do_usuario(claims.get("sub")) in allowed:
+        return
+    raise HTTPException(status_code=403, detail="Acesso negado a este portal.")
+
+
+async def _email_do_usuario(user_id_hash: str | None) -> str | None:
+    """The account's e-mail, lower-cased, if it is active. None otherwise."""
+    if not user_id_hash:
+        return None
+    from sqlalchemy import select as _select
+    from app.core.db import AsyncSessionLocal
+    from app.models.user import User
+    async with AsyncSessionLocal() as db:
+        row = (await db.execute(
+            _select(User.email, User.status).where(User.id_hash == user_id_hash)
+        )).first()
+    if not row or (row[1] and row[1] != "active") or not row[0]:
+        return None
+    return str(row[0]).strip().lower()
 
 
 def _headers_do_tile(portal_access: str) -> dict:

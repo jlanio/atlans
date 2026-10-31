@@ -194,7 +194,9 @@ async def _apagar_camadas_extras_do_pin(s3, ref: dict, workspace_id: str) -> boo
     return ok
 
 
-async def schedule_workspace_data_expiry(db: AsyncSession, workspace_id: str) -> dict:
+async def schedule_workspace_data_expiry(
+    db: AsyncSession, workspace_id: str, *, deleted_at=None,
+) -> dict:
     """Marks the workspace's data for removal by the global cleanup.
 
     Used in the workspace DELETE. We prefer `expires_at` to deleting right away:
@@ -205,19 +207,56 @@ async def schedule_workspace_data_expiry(db: AsyncSession, workspace_id: str) ->
     immediately — leaving them would keep in MinIO data that nobody can
     list anymore (the listing is always per workspace).
     """
-    now = utc_now_naive()
+    # The mark is the workspace's own `deleted_at` (the same instant the
+    # cascade stamps on the workflows): a restore finds exactly the artifacts
+    # this delete expired — see `restore_workspace_data_expiry`.
+    marca = deleted_at or utc_now_naive()
 
     artifacts = (await db.execute(
         select(func.count(Artifact.id)).where(Artifact.workspace_id == workspace_id)
     )).scalar() or 0
 
     # Expires immediately: the cleanup runs periodically and does the actual removal.
+    # Pins stay out: they do not follow retention (the cleanup skips them) and
+    # are a cache the restored workflows still point to; the admin purge
+    # removes them with everything else.
     await db.execute(
         Artifact.__table__.update()
-        .where(Artifact.workspace_id == workspace_id)
-        .values(expires_at=now)
+        .where(Artifact.workspace_id == workspace_id, Artifact.is_pinned == False)  # noqa: E712
+        .values(expires_at=marca)
     )
 
     drive = await purge_workspace_storage(db, workspace_id, scope="drive")
 
     return {"artifacts": int(artifacts), "drive_files": drive["drive_files"]}
+
+
+async def restore_workspace_data_expiry(db: AsyncSession, workspace_id: str, deleted_at) -> int:
+    """Undoes `schedule_workspace_data_expiry` for what the cleanup has not
+    removed yet: the artifacts this delete expired go back to the retention
+    policy (counted from their creation, as when they were registered).
+
+    Without it, a restored workspace kept its artifacts with `expires_at` in
+    the past, and the next cleanup pass (within the hour) deleted them — and
+    their published portal layers — although the workspace was live again.
+    """
+    from datetime import timedelta
+
+    from app.core.run_result_consumer import _get_retention_days
+
+    if deleted_at is None:
+        return 0
+    dias = await _get_retention_days(db)
+    result = await db.execute(
+        select(Artifact).where(
+            Artifact.workspace_id == workspace_id,
+            Artifact.expires_at == deleted_at,
+            Artifact.is_pinned == False,  # noqa: E712
+        )
+    )
+    devolvidos = 0
+    for artefato in result.scalars():
+        criado = artefato.created_at or utc_now_naive()
+        artefato.expires_at = (criado + timedelta(days=dias)) if dias else None
+        devolvidos += 1
+    return devolvidos

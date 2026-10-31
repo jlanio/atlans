@@ -207,7 +207,10 @@ async def restore_workspace(
     ws = await _get_deleted_workspace(id_hash, db)
 
     from app.services.workflow_service import restore_workspace_workflows
+    from app.services.storage_purge_service import restore_workspace_data_expiry
     restored = await restore_workspace_workflows(db, id_hash, ws.deleted_at)
+    # The artifacts the delete expired and the cleanup has not removed yet.
+    await restore_workspace_data_expiry(db, id_hash, ws.deleted_at)
 
     ws.deleted_at = None
     await db.commit()
@@ -250,20 +253,21 @@ async def purge_workspace(
     # do not run again; their final cleanup is outside this endpoint (the
     # history of runs and metrics still references these hashes).
     #
-    # The storage expiration here is a safety net: the workspace DELETE already
-    # ran the same helper, so in practice it is usually a no-op. It covers the case
-    # where purge_expired_artifacts has not run yet when the row disappears — without
-    # it the artifacts become nameless orphans in /admin/storage.
-    from app.services.storage_purge_service import schedule_workspace_data_expiry
-    scheduled = await schedule_workspace_data_expiry(db, id_hash)
+    # Removes the storage NOW, pins included. Expiring it (as before) left the
+    # pin-cache artifacts behind for good: the retention cleanup skips pins, so
+    # their rows and MinIO objects outlived the workspace as nameless orphans.
+    # What an S3 failure leaves behind is counted and can be purged again from
+    # /admin/storage.
+    from app.services.storage_purge_service import purge_workspace_storage
+    removido = await purge_workspace_storage(db, id_hash, scope="all")
 
     await db.delete(ws)
     await db.commit()
     logger.warning(
-        "Admin '%s' purgou definitivamente o workspace '%s' (dono=%s; agendados p/ "
-        "remoção: %d artefato(s), %d arquivo(s) do Drive)",
+        "Admin '%s' purgou definitivamente o workspace '%s' (dono=%s; removidos: "
+        "%d artefato(s), %d arquivo(s) do Drive; pendentes por falha no S3: %d)",
         current_user.username, id_hash, ws.owner_id,
-        scheduled["artifacts"], scheduled["drive_files"],
+        removido["artifacts"], removido["drive_files"], removido["skipped_s3_errors"],
     )
 
 

@@ -385,6 +385,12 @@ class DriveService:
                     WorkspaceFile.workspace_id == workspace_id,
                     WorkspaceFile.original_name == filename,
                     WorkspaceFile.status == "confirmed",
+                    # Only a file stored in MinIO can be overwritten. A GeoSync
+                    # catalog entry with the same name has no object
+                    # (`s3_key` NULL): reusing it changed its mime/uploader and
+                    # then failed with a 500 on the presigned PUT.
+                    WorkspaceFile.content_location == "minio",
+                    WorkspaceFile.s3_key.isnot(None),
                 )
                 .order_by(WorkspaceFile.created_at.desc())
                 .limit(1)
@@ -897,6 +903,17 @@ class DriveService:
 
         from app.services.workflow_service import WorkflowService
         service = WorkflowService(self.db)
-        task_id = await service.execute_workflow(wf, inputs=inputs)
+        # `start_analysis` is the dispatch entry point; the method called here
+        # before (`execute_workflow`) never existed, and every GeoSync trigger
+        # answered 500. The executor already authenticated by mTLS: the
+        # webhook trigger's token does not apply. Labelled "webhook" (an
+        # automatic external trigger) so the history filters keep working.
+        resultado = await service.start_analysis(
+            wf.id_hash,
+            inputs=inputs or {},
+            autenticar_entrada=False,
+            workflow=wf,
+            trigger_source="webhook",
+        )
 
-        return {"task_id": task_id, "workflow_id_hash": workflow_id_hash, "status": "dispatched"}
+        return {"task_id": resultado.id, "workflow_id_hash": workflow_id_hash, "status": "dispatched"}

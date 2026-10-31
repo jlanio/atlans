@@ -268,6 +268,71 @@ async def revoke_refresh_family(family: str) -> None:
     await r.delete(f"{_REFRESH_FAMILY_PREFIX}{family}", f"{_REFRESH_PREV_PREFIX}{family}")
 
 
+# ── Revoking every session of a user (password reset) ─────────────────────────
+# Redis has no index family → user, so a password reset cannot delete the
+# user's families one by one. Instead each session carries the moment it was
+# opened (`fam_iat`, epoch ms, set at login and kept across refreshes) and the
+# reset records `sessions_revoked_at:{user}`: every token whose session opened
+# before that mark stops working — the access token at the next request, the
+# refresh token at the next renewal. The mark only has to outlive the longest
+# token issued before it (a refresh token: _REFRESH_EXPIRE_DAYS).
+_SESSIONS_REVOKED_PREFIX = "sessions_revoked_at:"
+_SESSIONS_REVOKED_TTL = _REFRESH_FAMILY_TTL + 60
+
+
+def session_opened_at() -> int:
+    """`fam_iat` for a session opened now (epoch ms)."""
+    return int(datetime.now(timezone.utc).timestamp() * 1000)
+
+
+async def revoke_user_sessions(user_id_hash: str) -> None:
+    """Ends every session the user has open right now (see the block above)."""
+    from app.core.redis import get_redis_pool
+
+    r = get_redis_pool()
+    await r.setex(
+        f"{_SESSIONS_REVOKED_PREFIX}{user_id_hash}",
+        _SESSIONS_REVOKED_TTL,
+        str(session_opened_at()),
+    )
+
+
+async def session_revoked(claims: dict) -> bool:
+    """Was the session of these claims opened before the user's last revocation?
+
+    A token without `fam_iat` predates the claim, so it also predates any mark.
+    Fail-CLOSED like the blacklist: without Redis there is no way to know, and
+    the answer is 503, not a session that may have been revoked."""
+    from app.core.redis import get_redis_pool
+
+    sub = claims.get("sub")
+    if not sub:
+        return True
+    try:
+        marca = await get_redis_pool().get(f"{_SESSIONS_REVOKED_PREFIX}{sub}")
+    except Exception as exc:
+        _logger.error(
+            "session_revoked: Redis indisponível — rejeitando autenticação "
+            "(fail-closed): %s", exc,
+        )
+        raise HTTPException(
+            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Serviço de autenticação temporariamente indisponível. Tente novamente em instantes.",
+        ) from exc
+    if marca is None:
+        return False
+    if isinstance(marca, (bytes, bytearray)):
+        marca = marca.decode()
+    try:
+        revogada_em = int(marca)
+    except (TypeError, ValueError):
+        return True
+    aberta_em = claims.get("fam_iat")
+    if not isinstance(aberta_em, int) or isinstance(aberta_em, bool):
+        return True
+    return aberta_em < revogada_em
+
+
 # ── Refresh rate limit per FAMILY (not per IP) ─────────────────────────────────
 # /auth/refresh cannot be limited per IP: Next.js renews server→server, so all
 # users arrive with the SAME IP (the web pod's) and would share a single

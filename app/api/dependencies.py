@@ -51,7 +51,9 @@ async def validate_access_token_claims(token: str) -> dict | None:
     base (the blacklist check has diverged between the paths in the past)."""
     # Local import (not the top-level one) so that tests patching
     # app.core.utils.jwt_utils.decode_token reach this call.
-    from app.core.utils.jwt_utils import AUDIENCE_ACCESS, decode_token, is_token_blacklisted
+    from app.core.utils.jwt_utils import (
+        AUDIENCE_ACCESS, decode_token, is_token_blacklisted, session_revoked,
+    )
     try:
         claims = decode_token(token, expected_audience=AUDIENCE_ACCESS)
         if claims.get("type") != "access":
@@ -59,6 +61,9 @@ async def validate_access_token_claims(token: str) -> dict | None:
     except (_jwt.PyJWTError, ValueError):
         return None
     if await is_token_blacklisted(token):
+        return None
+    # A password reset ends every session opened before it (jwt_utils).
+    if await session_revoked(claims):
         return None
     return claims
 

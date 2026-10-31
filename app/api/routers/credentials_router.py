@@ -149,16 +149,47 @@ async def _test_connectivity(cred_type: str, data: dict) -> dict:
 
 
 async def _test_db_connection(cred_type: str, data: dict) -> dict:
-    from app.core.credentials.connection_builder import build_connection_data
+    from app.core.credentials.connection_builder import build_connection_data, porta_valida
     import asyncio
+
+    # SSRF: the test connects FROM THE API host, inside the platform's network
+    # (its own Postgres, Redis, MinIO). Without this check, any signed-in user
+    # could probe internal hosts and ports and guess passwords through the three
+    # distinct answers. Same rule as the S3 test below. The resolved address is
+    # the one connected to (no second resolution in between).
+    host = str(data.get("host") or "localhost").strip()
+    padrao = 5432 if cred_type == "postgresql" else 3306
+    porta = porta_valida(data.get("port")) if str(data.get("port") or "").strip() else padrao
+    if porta is None:
+        return {"ok": False, "message": "Porta inválida: use um número de 1 a 65535."}
+    from flow.utils.geo_helpers import validate_url_ssrf
+    alvo = f"[{host}]" if ":" in host and not host.startswith("[") else host
+    try:
+        ip, _nome = await asyncio.to_thread(validate_url_ssrf, f"http://{alvo}:{porta}/")
+    except ValueError as exc:
+        return {
+            "ok": False,
+            "message": (
+                f"Endereço bloqueado no teste pelo servidor: {exc} O teste não alcança "
+                "redes internas; a conexão real é feita pelo executor."
+            ),
+        }
 
     built = build_connection_data(cred_type, data)
     conn_str = built.get("connectionString", "")
+    if cred_type == "postgresql":
+        # libpq connects to `hostaddr` and keeps `host` for TLS verification.
+        connect_args = {"connect_timeout": 5, "hostaddr": ip}
+    else:
+        from urllib.parse import quote_plus
+        ip_na_url = f"[{ip}]" if ":" in ip else ip
+        conn_str = conn_str.replace(f"@{quote_plus(host)}:", f"@{ip_na_url}:", 1)
+        connect_args = {"connect_timeout": 5}
 
     def _try_connect():
         try:
             import sqlalchemy
-            engine = sqlalchemy.create_engine(conn_str, connect_args={"connect_timeout": 5})
+            engine = sqlalchemy.create_engine(conn_str, connect_args=connect_args)
             with engine.connect() as conn:
                 conn.execute(sqlalchemy.text("SELECT 1"))
             engine.dispose()

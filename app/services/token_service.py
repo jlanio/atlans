@@ -28,11 +28,10 @@ async def create_email_verification_token(user_id_hash: str) -> str:
 
 async def verify_email_token(token: str) -> str | None:
     """Validates and consumes the token. Returns user_id_hash or None if invalid/expired."""
+    # GETDEL: reading and consuming in one step. With GET then DEL, two
+    # requests carrying the same token could both read it before either deleted.
     redis = get_redis_pool()
-    user_id = await redis.get(f"email_verify:{token}")
-    if user_id:
-        await redis.delete(f"email_verify:{token}")
-    return user_id
+    return await redis.getdel(f"email_verify:{token}")
 
 
 # ── Password reset ─────────────────────────────────────────────────────────
@@ -56,9 +55,10 @@ async def create_password_reset_token(user_id_hash: str) -> str:
 
 async def verify_password_reset_token(token: str) -> str | None:
     """Validates and consumes the reset token. Returns user_id_hash or None."""
+    # GETDEL (see verify_email_token): a reset link is used once, even when
+    # two requests carry it at the same moment.
     redis = get_redis_pool()
-    user_id = await redis.get(f"pwd_reset:{token}")
+    user_id = await redis.getdel(f"pwd_reset:{token}")
     if user_id:
-        await redis.delete(f"pwd_reset:{token}")
         await redis.delete(f"pwd_reset_user:{user_id}")
     return user_id
