@@ -307,6 +307,8 @@ async def fechar_run_nao_entregue(
 # small network latencies can make a legitimate heartbeat arrive right at
 # the limit; 180s gives comfortable slack without leaving orphans alive for hours.
 _ORPHAN_WATCHDOG_INTERVAL = 180
+# A renewal interval (30 s) plus margin: see the re-check in the watchdog.
+_AUSENCIA_CONFIRMADA_S = 40
 
 async def orphan_runs_watchdog() -> None:
     """Background task that enumerates 'running' runs whose executor has NO
@@ -374,6 +376,18 @@ async def orphan_runs_watchdog() -> None:
                         "preservados, reavalia no proximo ciclo.",
                         executor_id,
                     )
+
+            if offline:
+                # One look is not enough: after a Redis restart or FLUSHALL, a
+                # CONNECTED executor only rewrites its presence on its next
+                # renewal (up to `_PRESENCE_RENEW_INTERVAL`), and a sweep inside
+                # that window failed runs that were making progress. Absence
+                # must outlast one renewal.
+                await asyncio.sleep(_AUSENCIA_CONFIRMADA_S)
+                offline = [
+                    executor_id for executor_id in offline
+                    if await _redis_presence_or_unknown(executor_id) is False
+                ]
 
             if not offline:
                 continue

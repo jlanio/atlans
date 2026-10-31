@@ -144,6 +144,21 @@ def _webhook_rate_key(request: Request) -> str:
     return f"{_client_key(request)}:{workflow_hash}"
 
 
+def _http_status_valido(valor) -> int | None:
+    """The ResponseNode's status code as an int in 100–599, or None.
+
+    It comes from the workflow author: a string or an out-of-range number made
+    the response itself fail when sent, a 500 with no explanation.
+    """
+    if isinstance(valor, bool):
+        return None
+    try:
+        codigo = int(valor)
+    except (TypeError, ValueError):
+        return None
+    return codigo if 100 <= codigo <= 599 else None
+
+
 @router.post("/execute/{id_hash}", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit("20/minute", key_func=_webhook_rate_key)
 async def webhook_trigger(
@@ -169,10 +184,24 @@ async def webhook_trigger(
                 raise HTTPException(status_code=413, detail=f"Payload excede {_MAX_WEBHOOK_BODY // (1024*1024)}MB.")
         except ValueError:
             pass
+    # The limit is enforced on the bytes actually read: a chunked body has no
+    # Content-Length, and `request.json()` read it whole, without a ceiling.
+    bruto = bytearray()
+    async for pedaco in request.stream():
+        bruto.extend(pedaco)
+        if len(bruto) > _MAX_WEBHOOK_BODY:
+            raise HTTPException(status_code=413, detail=f"Payload excede {_MAX_WEBHOOK_BODY // (1024*1024)}MB.")
     try:
-        body = await request.json()
-    except JSONDecodeError:
+        body = json.loads(bytes(bruto)) if bruto else {}
+    except (JSONDecodeError, UnicodeDecodeError):
         body = {}
+    if not isinstance(body, dict):
+        # Valid JSON that is not an object (`[...]`, `"x"`, `3`): `body.pop`
+        # below raised and the caller got a generic 500.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="O corpo do webhook deve ser um objeto JSON (ex.: {\"campo\": \"valor\"}).",
+        )
 
     debug_mode = bool(body.pop("debug_mode", False))
     # no_wait=True: returns 202 immediately without waiting for the ResponseNode.
@@ -295,7 +324,16 @@ async def webhook_trigger(
 
     # 6) Builds the HTTP response from the ResponseNode's data
     resp = payload.get("response") or {}
-    http_status  = resp.get("status_code", 200)
+    http_status = _http_status_valido(resp.get("status_code", 200))
+    if http_status is None:
+        logger.error(
+            "[webhook] ResponseNode com status_code invalido %r (task_id=%s)",
+            resp.get("status_code"), task_id,
+        )
+        return JSONResponse(
+            {"error": "O ResponseNode definiu um status_code inválido (use 100–599).", "task_id": task_id},
+            status_code=500,
+        )
     _content_type, extra_headers = _sanitize_node_response(resp, request)
 
     # 6a) Body stored in MinIO (large body, avoids HoL on the executor→server WS):

@@ -2,6 +2,7 @@
 # Orchestration and dispatch of workflow runs to executors.
 
 import asyncio
+import contextlib
 import json
 import random
 import time
@@ -670,6 +671,13 @@ class _Dispatch:
     inicio: float
     has_response_node: bool
     ultimo_erro: str = ""
+    # Set the moment an executor accepted the job. From then on the job is THERE:
+    # a failure in the bookkeeping after it (the confirmation's commit) must not
+    # close the run as "failed/dispatch" — the executor would be running a job
+    # the server already declared failed, its next inventory would cancel it and
+    # the real result would be dropped. The ACK and the inventory take the run
+    # from here; the orphan watchdog covers a lost executor.
+    entregue: bool = False
 
     def resultado(self) -> DispatchResult:
         return DispatchResult(id=self.job_id, has_response_node=self.has_response_node)
@@ -753,6 +761,15 @@ async def _dispatch_job(
         raise await _close_without_executor(despacho)
 
     except Exception as exc:
+        if despacho.entregue:
+            # Already on an executor: leave the run open (see _Dispatch.entregue).
+            _logger.error(
+                "Job '%s' entregue, mas a confirmacao falhou (%s): o run segue aberto "
+                "e o ACK/inventario do executor o atualizam.", job_id, exc,
+            )
+            with contextlib.suppress(Exception):
+                await db.rollback()
+            return despacho.resultado()
         # Safety net: closes the run before propagating. Idempotent — path
         # (4) already wrote 'failed' and it is not rewritten here.
         await _close_orphan_dispatch(db, run, exc)
@@ -911,6 +928,7 @@ async def _try_candidates(d: _Dispatch, plaintext: bytes) -> DispatchResult | No
             d.ultimo_erro = f"Executor '{label}' não aceitou o job (fila cheia ou desconectado)."
             continue
 
+        d.entregue = True
         return await _confirm_delivery(d, ag, indice, label)
     return None
 

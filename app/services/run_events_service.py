@@ -963,4 +963,17 @@ async def publicar_conclusao(
                     run_id, status, erro=mensagem, extra=extra, timestamp=ts,
                 )
                 append_events(pipe, run_id, [evento])
+                if status != "completed":
+                    # Unblocks a synchronous webhook waiting on this run (the
+                    # job_result path already does it). Without it the caller
+                    # held the connection for the whole timeout and got a 504
+                    # instead of the real failure. Harmless when nobody waits:
+                    # the key expires.
+                    chave = f"webhook_response:{run_id}"
+                    pipe.lpush(chave, json.dumps({
+                        "job_status": status,
+                        "error": mensagem or "Execução encerrada pelo servidor.",
+                        "response": None,
+                    }))
+                    pipe.expire(chave, 300)
             await pipe.execute()

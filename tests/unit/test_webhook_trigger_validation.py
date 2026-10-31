@@ -185,3 +185,18 @@ def test_router_triggers_workflow_with_valid_webhook_trigger(client, mock_servic
     assert response.status_code == 202
     assert response.json() == {"task_id": "task-xyz"}
     mock_service.start_analysis.assert_called_once()
+
+
+def test_a_json_body_that_is_not_an_object_is_a_422(client):
+    """`[...]` used to reach `body.pop` and come back as a generic 500."""
+    response = client.post("/webhook/execute/abc123", json=[1, 2, 3])
+    assert response.status_code == 422
+
+
+def test_the_response_status_code_is_validated():
+    from app.api.routers.webhook_router import _http_status_valido
+
+    assert _http_status_valido(201) == 201
+    assert _http_status_valido("404") == 404
+    for invalido in ("abc", None, 99, 600, True, 3.7e10):
+        assert _http_status_valido(invalido) is None

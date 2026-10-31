@@ -176,6 +176,9 @@ class AsyncScheduler:
                 return
 
             # ── Disparo ───────────────────────────────────────────────────────
+            # The slot that is firing: the next one is computed from it, not
+            # from this tick's `now` (see `_next_after_fire`).
+            slot = s.next_run_at
             logger.info(
                 "AsyncScheduler: disparando workflow '%s' (schedule '%s').",
                 s.workflow_hash, s.job_id,
@@ -191,7 +194,7 @@ class AsyncScheduler:
             finally:
                 # Updates timestamps and releases the lock (commit ends the FOR UPDATE transaction)
                 s.last_run_at = now
-                s.next_run_at = self._compute_next(s, now)
+                s.next_run_at = self._next_after_fire(s, slot, now)
                 await db.commit()
 
     # ── Workflow triggering ────────────────────────────────────────────────────
@@ -364,6 +367,44 @@ class AsyncScheduler:
         )
         return None
 
+    def _next_after_fire(self, sched: Schedule, slot: datetime | None, now: datetime) -> datetime | None:
+        """The slot after the one that just fired.
+
+        Anchored at the SLOT, not at this tick's `now`: the tick runs up to 30 s
+        after the due time (plus the serial dispatch of the other due
+        schedules), and a 60 s interval computed from `now` became 60–90 s,
+        drifting later on every run. Missed slots (the API was down) still
+        collapse into a single catch-up: the result is never in the past.
+
+        One firing per wall-clock time: when the clocks go back (DST), cron
+        produced the same local time twice, an hour apart ("30 1 * * *" fired
+        at 01:30 and again at the second 01:30).
+        """
+        if slot is None:
+            return self._compute_next(sched, now)
+        if sched.strategy == "interval" and sched.interval and sched.unit:
+            segundos = self._interval_seconds(sched.interval, sched.unit)
+            if not segundos:
+                return None
+            passos = int((now - slot).total_seconds() // segundos) + 1
+            proximo = slot + timedelta(seconds=segundos * max(passos, 1))
+            return proximo if proximo > now else proximo + timedelta(seconds=segundos)
+
+        proximo = self._compute_next(sched, slot)
+        if proximo is not None and proximo <= now:
+            proximo = self._compute_next(sched, now)
+        tz = self._tz_of(sched)
+        relogio_do_slot = self._to_local(slot, tz).replace(tzinfo=None)
+        tentativas = 0
+        while (
+            proximo is not None
+            and self._to_local(proximo, tz).replace(tzinfo=None) == relogio_do_slot
+            and tentativas < 3
+        ):
+            proximo = self._compute_next(sched, proximo)
+            tentativas += 1
+        return proximo
+
     @staticmethod
     def _to_local(after: datetime, tz: tzinfo) -> datetime:
         """Naive UTC (the loop's internal convention) -> aware in the schedule's timezone."""
@@ -390,7 +431,8 @@ class AsyncScheduler:
             logger.warning("AsyncScheduler: cron inválido '%s': %s", expression, exc)
             return None
 
-    def _interval_next(self, interval: int, unit: str, after: datetime) -> datetime | None:
+    @staticmethod
+    def _interval_seconds(interval: int, unit: str) -> int | None:
         seconds_map = {
             "seconds": interval,
             "minutes": interval * 60,
@@ -400,6 +442,12 @@ class AsyncScheduler:
         seconds = seconds_map.get(unit)
         if not seconds:
             logger.warning("AsyncScheduler: unidade inválida '%s'.", unit)
+            return None
+        return seconds
+
+    def _interval_next(self, interval: int, unit: str, after: datetime) -> datetime | None:
+        seconds = self._interval_seconds(interval, unit)
+        if not seconds:
             return None
         return after + timedelta(seconds=seconds)
 

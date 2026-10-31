@@ -31,6 +31,9 @@ class _Pipeline:
     def rpush(self, chave, valor):
         self.comandos.append(("rpush", chave, valor))
 
+    def lpush(self, chave, valor):
+        self.comandos.append(("lpush", chave, valor))
+
     def ltrim(self, chave, inicio, fim):
         self.comandos.append(("ltrim", chave, inicio, fim))
 
@@ -68,7 +71,13 @@ async def test_cancelled_goes_out_in_job_result_format(redis):
     await RES.publicar_conclusao(["run-1"], status="cancelled", mensagem="Cancelado antes.")
 
     [comandos] = redis.executados
-    assert [c[0] for c in comandos] == ["rpush", "ltrim", "expire", "publish"]
+    # The event (history + channel), then the answer that unblocks a
+    # synchronous webhook waiting on this run.
+    assert [c[0] for c in comandos] == ["rpush", "ltrim", "expire", "publish", "lpush", "expire"]
+    assert comandos[4][1] == "webhook_response:run-1"
+    assert json.loads(comandos[4][2]) == {
+        "job_status": "cancelled", "error": "Cancelado antes.", "response": None,
+    }
     assert comandos[0][1] == "workflow:run-1:history"
     assert comandos[1][2:] == (-MAX_EVENTS_IN_HISTORY, -1)
     assert comandos[2][2] == REDIS_TTL_1H
@@ -103,7 +112,7 @@ async def test_hundreds_of_runs_go_in_batches(redis):
 
     await RES.publicar_conclusao(ids, status="failed", mensagem="x")
 
-    assert [len(p) // 4 for p in redis.executados] == [RES._PUBLISH_CHUNK, 1]
+    assert [len(p) // 6 for p in redis.executados] == [RES._PUBLISH_CHUNK, 1]
     publicados = [c[1] for p in redis.executados for c in p if c[0] == "publish"]
     assert publicados == [f"workflow:{i}:events" for i in ids]
 
