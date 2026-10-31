@@ -81,7 +81,8 @@ describe('enrolar concorrente', () => {
     const segundo = await enrolar({ executorId: 'abc', otp: '222' })
 
     expect(spawnMock).toHaveBeenCalledTimes(1)
-    expect(segundo).toMatchObject({ ok: false, codigo: 'enroll_recusado' })
+    // Not `enroll_recusado`: the server refused nothing, and the OTP may still be good.
+    expect(segundo).toMatchObject({ ok: false, codigo: 'enroll_em_andamento' })
 
     await concluir(p)
     expect(await primeiro).toMatchObject({ ok: true })

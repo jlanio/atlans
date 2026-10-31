@@ -406,20 +406,17 @@ app.on('second-instance', (_evento, argv) => {
 })
 
 /**
- * Keeps a deep link for the Onboarding that is about to mount — and only then.
+ * Keeps a deep link for an Onboarding that mounts in the next minutes.
  *
- * With the panel already up, the push delivers it (or there is no form to
- * receive it). With the machine already enrolled no Onboarding mounts to
- * consume it, and the request sat in memory until a "Refazer enrollment" days
- * later popped "Vincular este computador?" filled in by whatever page sent
- * the link. The expiry covers a link that opened the app and was never looked
- * at.
+ * Only the Onboarding listens to the push, and the main process cannot tell
+ * whether one is mounted: a machine still enrolled but REVOKED shows the panel,
+ * and the web's "Abrir no app" link is exactly what the user wants once they
+ * click "Refazer enrollment". So the request is always kept — but only for
+ * `VALIDADE_DEEP_LINK_MS`: before, it sat in memory until a "Refazer
+ * enrollment" days later popped "Vincular este computador?" filled in by
+ * whatever page had sent the link.
  */
 function guardarDeepLink(pedido: DeepLinkRequest): void {
-  const painel = mainWindow()
-  // A panel still loading has not subscribed to the push yet: it counts as closed.
-  if (painel && !painel.webContents.isLoading()) return
-  if (lerConfiguracao().configurado) return
   deepLinkPendente = { pedido, expiraEm: Date.now() + VALIDADE_DEEP_LINK_MS }
 }
 
@@ -439,12 +436,13 @@ function handleDeepLink(bruta: string): void {
 
 app.whenReady().then(() => {
   // Before ensureDirectories: the migration only happens while the new
-  // config/ and certs/ do not exist yet.
+  // config/ and certs/ are missing or empty.
   const migrado = migrateLegacyData()
   ensureDirectories()
   if (migrado) {
+    // Says what moved — never more than that.
     store.registrarLinhaBruta(
-      `[app] Dados migrados de "${migrado}" para "AtlansExecutor" — certificado e configuração preservados.`,
+      `[app] Dados migrados de "${migrado.origem}" para "AtlansExecutor": ${migrado.movidas.join(', ')}.`,
       'stderr',
     )
   }

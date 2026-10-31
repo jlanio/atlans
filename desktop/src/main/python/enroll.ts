@@ -23,6 +23,8 @@ export type EnrollCode =
   | 'otp_ausente'
   | 'executor_id_ausente'
   | 'enroll_recusado'
+  /** Local, not from Python: another enrollment of this app is still running. */
+  | 'enroll_em_andamento'
   | 'signing_key_conflict'
   | 'saida_invalida'
   | 'timeout'
@@ -68,7 +70,9 @@ let emCurso: Promise<EnrollResult> | null = null
 export function enrolar(pedido: EnrollRequest): Promise<EnrollResult> {
   if (emCurso) {
     return Promise.resolve({
-      ok: false, codigo: 'enroll_recusado',
+      // Its own code: `enroll_recusado` made the form say the SERVER refused
+      // and mark the OTP red, while the first run could still succeed with it.
+      ok: false, codigo: 'enroll_em_andamento',
       erro: 'Já há um enrollment em andamento — aguarde o resultado.',
     })
   }

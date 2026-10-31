@@ -62,7 +62,7 @@ describe('migrateLegacyData', () => {
     escrever('AtlansExecutor/lockfile', '')
     escrever('AtlansExecutor/Network/Cookies', '')
 
-    expect(migrateLegacyData()).toBe('AtlasExecutor')
+    expect(migrateLegacyData()).toEqual({ origem: 'AtlasExecutor', movidas: ['certs', 'config', 'logs'] })
     expect(ler('AtlansExecutor/config/.env')).toBe('EXECUTOR_ID=antigo\n')
     expect(ler('AtlansExecutor/certs/key.pem')).toBe('KEY')
     expect(ler('AtlansExecutor/logs/agent.log')).toBe('log')
@@ -73,7 +73,7 @@ describe('migrateLegacyData', () => {
 
   it('migra quando a pasta nova ainda não existe', () => {
     instalacaoAntiga('Atlans Executor')
-    expect(migrateLegacyData()).toBe('Atlans Executor')
+    expect(migrateLegacyData()?.origem).toBe('Atlans Executor')
     expect(path.join(raiz, 'AtlansExecutor')).toBe(USER_DATA)
     expect(ler('AtlansExecutor/certs/cert.pem')).toBe('CERT')
   })
@@ -94,7 +94,7 @@ describe('migrateLegacyData', () => {
     instalacaoAntiga('AtlasExecutor')
     escrever('AtlansExecutor/logs/novo.log', 'novo')
 
-    expect(migrateLegacyData()).toBe('AtlasExecutor')
+    expect(migrateLegacyData()).toEqual({ origem: 'AtlasExecutor', movidas: ['certs', 'config'] })
     expect(existe('AtlansExecutor/certs/cert.pem')).toBe(true)
     expect(existe('AtlansExecutor/logs/agent.log')).toBe(false)
     expect(ler('AtlansExecutor/logs/novo.log')).toBe('novo')
@@ -110,9 +110,38 @@ describe('migrateLegacyData', () => {
 
   it('é idempotente: a segunda chamada não faz nada', () => {
     instalacaoAntiga('AtlasExecutor')
-    expect(migrateLegacyData()).toBe('AtlasExecutor')
+    expect(migrateLegacyData()?.origem).toBe('AtlasExecutor')
     instalacaoAntiga('Atlas Executor')
     expect(migrateLegacyData()).toBeNull()
     expect(ler('AtlansExecutor/config/.env')).toBe('EXECUTOR_ID=antigo\n')
+  })
+
+  it('pastas VAZIAS (deixadas pelo ensureDirectories) contam como ausentes', () => {
+    // A release where the migration did not run left config/ and certs/ empty:
+    // keying on the folders alone stranded those users' certificates.
+    instalacaoAntiga('AtlasExecutor')
+    fs.mkdirSync(path.join(raiz, 'AtlansExecutor/config'), { recursive: true })
+    fs.mkdirSync(path.join(raiz, 'AtlansExecutor/certs'), { recursive: true })
+
+    expect(migrateLegacyData()?.origem).toBe('AtlasExecutor')
+    expect(ler('AtlansExecutor/certs/cert.pem')).toBe('CERT')
+    expect(ler('AtlansExecutor/config/.env')).toBe('EXECUTOR_ID=antigo\n')
+  })
+
+  it('pasta antiga sem certificado não é migrada (nada a preservar)', () => {
+    escrever('AtlasExecutor/config/.env', 'EXECUTOR_ID=antigo\n')
+    escrever('AtlasExecutor/logs/agent.log', 'log')
+    expect(migrateLegacyData()).toBeNull()
+    expect(existe('AtlansExecutor/config')).toBe(false)
+  })
+
+  it('certs e config andam juntos: com o lugar de config ocupado, nada se move', () => {
+    instalacaoAntiga('AtlasExecutor')
+    // config/'s slot holds a FILE (neither absent nor an empty folder): moving
+    // only the certificate would pair it with whatever config ends up there.
+    escrever('AtlansExecutor/config', 'não é pasta')
+    expect(migrateLegacyData()).toBeNull()
+    expect(existe('AtlasExecutor/certs/cert.pem')).toBe(true)
+    expect(existe('AtlansExecutor/certs')).toBe(false)
   })
 })
