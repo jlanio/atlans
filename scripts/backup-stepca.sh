@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # scripts/backup-stepca.sh
 # Backs up the step-ca-data volume to backups/step-ca-YYYY-MM-DD-HHMM.tar.gz.
-# Keeps the 14 most recent backups; removes the older ones.
+# Keeps the 14 most recent backups; removes the older ones. The directory is
+# 0700 and each archive 0600, owned by whoever runs the script.
 #
 # Recommended to run daily via cron:
 #   0 3 * * * cd /caminho/do/deploy && ./scripts/backup-stepca.sh >> backups/cron.log 2>&1
@@ -23,15 +24,39 @@ if ! docker volume inspect step-ca-data >/dev/null 2>&1; then
     exit 1
 fi
 
+# The archive holds the CA's private keys and secrets/password (the password of
+# those keys, in clear text): only whoever runs the backup may read it. umask
+# 077 before anything is created makes a new directory 0700 and each archive
+# 0600; an existing directory keeps the mode it was born with, so it is
+# tightened too — and if that fails (a directory owned by someone else), the
+# backup is not written there.
+umask 077
 mkdir -p "$BACKUP_DIR"
+if ! chmod 700 "$BACKUP_DIR"; then
+    err "Nao foi possivel restringir ${BACKUP_DIR} a 0700 (o diretorio e de outro usuario?)."
+    exit 1
+fi
+# Archives written by earlier versions of this script were born 0644.
+chmod 600 "$BACKUP_DIR"/step-ca-*.tar.gz 2>/dev/null || true
+
 STAMP=$(date +%F-%H%M)
 TARGET="${BACKUP_DIR}/step-ca-${STAMP}.tar.gz"
+PARTIAL="${TARGET}.partial"
 
 log "Criando ${TARGET}..."
-docker run --rm \
+# tar writes to stdout and the file is created HERE, by this shell (with the
+# umask above): it belongs to whoever runs the script. Written by the
+# container, it was root's and 0644 — readable by every user of the host. The
+# temporary name keeps an interrupted tar from counting as a backup in the
+# retention below.
+if ! docker run --rm \
     -v step-ca-data:/data:ro \
-    -v "${BACKUP_DIR}:/backup" \
-    alpine tar czf "/backup/step-ca-${STAMP}.tar.gz" -C /data .
+    alpine tar czf - -C /data . > "$PARTIAL"; then
+    rm -f "$PARTIAL"
+    err "Falha ao gerar o backup (docker run alpine tar)."
+    exit 1
+fi
+mv -f "$PARTIAL" "$TARGET"
 
 SIZE=$(du -h "$TARGET" | cut -f1)
 ok "Backup criado: ${TARGET} (${SIZE})"

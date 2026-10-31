@@ -946,9 +946,8 @@ volumes:
   # `docker compose down -v` (which destroys compose-managed volumes). Manual
   # bootstrap:
   #   docker volume create step-ca-data
-  # Periodic backup recommended:
-  #   docker run --rm -v step-ca-data:/data -v $(pwd)/backups:/backup alpine \
-  #       tar czf /backup/step-ca-$(date +%F).tar.gz -C /data .
+  # Periodic backup recommended: `make backup-stepca` (scripts/backup-stepca.sh,
+  # archives 0600 in a 0700 backups/ — they hold the CA's keys and password).
   step-ca-data:
     external: true
 
