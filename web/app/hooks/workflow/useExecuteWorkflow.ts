@@ -1,5 +1,5 @@
 import { useParams } from "next/navigation"
-import { useSaveWorkflow } from "./useSaveWorkflow"
+import { useSaveWorkflow, type SaveSkipReason } from "./useSaveWorkflow"
 import { useEffect, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { INodeContext, INodeStatusWorkFlow, StatusWorkflow } from "@/context/useFlowContext"
@@ -35,6 +35,16 @@ const TERMINAL_OUTCOME: Record<string, StatusWorkflow> = {
   success:   "completed",
   failed:    "failed",
   cancelled: "cancelled",
+}
+
+/** What Executar tells the person when the save before the run wrote nothing.
+ *  The run does not go out: it would execute the stored definition while the
+ *  canvas shows another one. */
+const RUN_NOT_SAVED: Record<SaveSkipReason, [titulo: string, descricao?: string]> = {
+  in_flight:    ["Salvamento em andamento", "Execute de novo quando o workflow terminar de salvar."],
+  not_hydrated: ["Aguarde o workflow carregar para executar"],
+  needs_name:   ["Dê um nome ao workflow para executar"],
+  empty_graph:  ["Workflow não executado", "Não foi possível salvar o canvas antes de executar."],
 }
 
 /** Bridge to the socket OWNER.
@@ -326,10 +336,20 @@ export const useExecuteWorkflow = () => {
     }
     store.startExecution(initialNodes)
 
+    // The run executes what is STORED, so it only goes out once the canvas is
+    // confirmed saved. Checking only for `error` let every skipped save through
+    // — a Ctrl+S still in flight, a canvas not loaded yet, a missing name — and
+    // the run used the previous definition while the canvas showed this one.
     const respSave = await saveWorkflow({ silent: true })
 
-    if (respSave?.error) {
+    if (respSave.outcome !== "saved") {
       store.resetExecution()
+      // A failed save has already spoken (chip, conflict toast); a skipped one
+      // was silent, so Executar says why nothing ran.
+      if (respSave.outcome === "skipped" && respSave.skipReason) {
+        const [titulo, descricao] = RUN_NOT_SAVED[respSave.skipReason]
+        createToast.info(titulo, descricao)
+      }
       return
     }
 

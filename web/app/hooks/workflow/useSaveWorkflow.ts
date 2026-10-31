@@ -1,5 +1,5 @@
 import { INodeContext } from "@/context/useFlowContext"
-import { INodesDefinition, IEdgeDefinition, IScheduleNotice, ISubworkflowNotice } from "@/service/types"
+import { INodesDefinition, IEdgeDefinition, IResponse, IScheduleNotice, ISubworkflowNotice, IWorkflow, IWorkflowCriado } from "@/service/types"
 import { GisFlowService } from "@/service/GisFlowService"
 import { createToast } from "@/utils/createToast"
 import { Edge, useReactFlow, useStoreApi, type Viewport } from "@xyflow/react"
@@ -19,6 +19,34 @@ export interface SaveOptions {
    *  the conflict toast's "Salvar mesmo assim" asks for. */
   force?: boolean
 }
+
+/**
+ * What a save call did — what Executar needs to know before dispatching a run.
+ *
+ * `saved`: the canvas is on the server (written now, or already identical).
+ * `skipped`: nothing was written AND nothing says the canvas is saved. These
+ * used to answer `undefined` or an empty envelope, which Executar read as "no
+ * error" and dispatched anyway — running the stored definition while the canvas
+ * showed another one. `error`: the write was refused or failed; the save has
+ * already said so (chip, toast) by its usual rules.
+ */
+export type SaveOutcome = "saved" | "skipped" | "error"
+
+/** Why a save wrote nothing: another save in flight, the canvas does not hold
+ *  this route's workflow yet, the workflow has no name, or the empty-graph rail. */
+export type SaveSkipReason = "in_flight" | "not_hydrated" | "needs_name" | "empty_graph"
+
+export interface SaveResult {
+  /** Not `status`: the API envelope spread into the result already has one. */
+  outcome: SaveOutcome
+  /** Only on `skipped`. */
+  skipReason?: SaveSkipReason
+  data?: IWorkflow | IWorkflowCriado | null
+  error?: IResponse<unknown>["error"] | null
+}
+
+const skipped = (skipReason: SaveSkipReason): SaveResult =>
+  ({ outcome: "skipped", skipReason, data: null, error: null })
 
 // Normalizes properties by sorting keys — JSON.stringify preserves insertion
 // order, so two objects with the same entries but different orders produce
@@ -147,20 +175,20 @@ export const useSaveWorkflow = () => {
   }
 
 
-  function handleSaveWorkflow(opcoes: SaveOptions = {}) {
+  async function handleSaveWorkflow(opcoes: SaveOptions = {}): Promise<SaveResult> {
     // Single guard — the decision to start lives in saveWorkflow. Before the
     // Zustand refactor, handleSaveWorkflow set isSaving=true here; but
     // Zustand is synchronous, so the next guard in saveWorkflow blocked
     // everything immediately and no PUT was ever fired.
-    if (useWorkflowSaveStore.getState().isSaving) return
+    if (useWorkflowSaveStore.getState().isSaving) return skipped("in_flight")
     return saveWorkflow(opcoes)
   }
 
-  async function saveWorkflow({ silent = false, force = false }: SaveOptions = {}) {
+  async function saveWorkflow({ silent = false, force = false }: SaveOptions = {}): Promise<SaveResult> {
 
     const store = useWorkflowSaveStore.getState()
     if (store.isSaving)
-      return
+      return skipped("in_flight")
 
     // An existing workflow whose graph has not reached the canvas yet (node
     // catalog still loading, or the previous workflow still on screen while this
@@ -176,9 +204,20 @@ export const useSaveWorkflow = () => {
     // slow load looked like a broken shortcut — or like a save that happened.
     // The silent one stays silent, as everywhere here: its caller answers with
     // its own message.
-    if (id && !store.canvasHidratado) {
+    //
+    // The id check is defense in depth for the route switch: if a late answer
+    // for the previous workflow ever hydrates the canvas under this route, the
+    // graph on screen is THAT workflow's, and the PUT below — addressed by the
+    // route id — would write it over this one.
+    const canvasDeOutroWorkflow = !!id && !!store.canvasWorkflowId && store.canvasWorkflowId !== id
+    if (id && (!store.canvasHidratado || canvasDeOutroWorkflow)) {
+      if (canvasDeOutroWorkflow) {
+        console.warn(
+          `[useSaveWorkflow] Save recusado: o canvas tem o workflow ${store.canvasWorkflowId}, a rota é ${id}.`,
+        )
+      }
       if (!silent) createToast.info("Aguarde o workflow carregar para salvar")
-      return { data: null, error: null }
+      return skipped("not_hydrated")
     }
 
     // Captures the latest value from the store
@@ -188,7 +227,7 @@ export const useSaveWorkflow = () => {
       // next click — after the user fills in the name in UnsavedDialog —
       // would be blocked by the `if (store.isSaving) return` guard above).
       store.setStatus('needs_name')
-      return
+      return skipped("needs_name")
     }
 
     const { nodesReq, edgesReq, viewportReq } = buildPayload()
@@ -204,7 +243,7 @@ export const useSaveWorkflow = () => {
         "[useSaveWorkflow] Tentativa de salvar workflow existente com 0 nós bloqueada "
         + "(provável closure stale pré-hidratação).",
       )
-      return { data: null, error: null }
+      return skipped("empty_graph")
     }
 
     if (id && !store.isDirty(nodesReq, edgesReq, currentName)) {
@@ -221,7 +260,7 @@ export const useSaveWorkflow = () => {
         // everything is saved. No status reset is needed, since
         // startSaving() has not been called yet.
         if (!silent) store.flashSaved()
-        return { data: null, error: null }
+        return { outcome: "saved", data: null, error: null }
       }
     }
 
@@ -262,7 +301,7 @@ export const useSaveWorkflow = () => {
             // anyway" — it builds the payload from the canvas ON SCREEN and
             // would write the other workflow's graph over this one.
             createToast.error("Workflow não salvo", data.error.message)
-            return data
+            return { ...data, outcome: "error" }
           }
           store.failSave(data.error.message ?? "Workflow alterado em outro lugar.")
           createToast.error("Workflow alterado em outro lugar", data.error.message, {
@@ -270,21 +309,21 @@ export const useSaveWorkflow = () => {
             // Same guard when clicked later: the toast outlives a switch.
             onClick: () => { if (!deOutroCanvas()) void saveWorkflow({ force: true }) },
           })
-          return data
+          return { ...data, outcome: "error" }
         }
 
         if (data.error) {
           if (deOutroCanvas()) {
             // The person left believing it was saved: say so even if silent.
             createToast.error(`Workflow não salvo`, data.error.message)
-            return data
+            return { ...data, outcome: "error" }
           }
           store.failSave(data.error.message)
           // On a silent save (triggered by Execute before dispatch), the chip
           // already shows "Falha ao salvar" (save failed) — a toast here would
           // be the second warning.
           if (!silent) createToast.error(`Workflow não salvo`, data.error.message)
-          return data
+          return { ...data, outcome: "error" }
         }
 
         if (!deOutroCanvas()) {
@@ -308,7 +347,7 @@ export const useSaveWorkflow = () => {
           const { titulo, descricao } = resumoDosAvisosDeSubfluxo(avisosDeSubfluxo)
           createToast.warning(titulo, descricao)
         }
-        return data
+        return { ...data, outcome: "saved" }
       }
 
       // The screen this save was asked from. Leaving it while the request is in
@@ -337,7 +376,7 @@ export const useSaveWorkflow = () => {
       if (data.error) {
         if (!deOutroCanvas()) store.failSave(data.error.message)
         createToast.error(`Workflow não criado`, data.error.message)
-        return data
+        return { ...data, outcome: "error" }
       }
       // Created, but maybe without the schedule its canvas shows. Before the
       // checks below on purpose: the notice is about the workflow just created,
@@ -345,7 +384,7 @@ export const useSaveWorkflow = () => {
       avisarDoAgendamento(data.data?.schedule_notices)
       // Created, but the person already opened another workflow: neither its
       // state nor its URL are this one's to change.
-      if (deOutroCanvas()) return data
+      if (deOutroCanvas()) return { ...data, outcome: "saved" }
 
       store.completeSave(JSON.stringify({ name: currentName, nodes: nodesReq, edges: edgesReq }), viewportReq)
 
@@ -365,9 +404,9 @@ export const useSaveWorkflow = () => {
         // missing id went unnoticed: say where the workflow is instead.
         console.error("[useSaveWorkflow] POST /workflows answered without an id:", data.data)
         createToast.warning("Workflow criado", "Abra-o pela lista de Projetos para continuar e executar.")
-        return data
+        return { ...data, outcome: "saved" }
       }
-      if (window.location.pathname !== caminho) return data
+      if (window.location.pathname !== caminho) return { ...data, outcome: "saved" }
 
       // The assistant's conversation that built it goes along: the drawer
       // mounts again over there.
@@ -379,10 +418,13 @@ export const useSaveWorkflow = () => {
       useWorkflowSaveStore.setState({ isSaving: true })
       router.replace(`/workflow/${newId}`)
 
-      return data
+      return { ...data, outcome: "saved" }
     } catch (err) {
       if (!deOutroCanvas()) store.failSave(String(err))
       createToast.error("Erro ao salvar workflow", String(err))
+      // This used to fall off the end (`undefined`), and Executar, seeing no
+      // `error`, dispatched the run anyway.
+      return { outcome: "error", data: null, error: { name: "Error", message: String(err) } }
     }
 
   }

@@ -437,6 +437,7 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
       saveStatus: 'idle',
       snapshotIniciadoEm: null,
       canvasHidratado: !idDaRota,
+      canvasWorkflowId: null,
       definitionEtag: null,
       geracao: s.geracao + 1,
     }))
@@ -539,8 +540,12 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
     // restore, a "Falha ao salvar" — message included — about edits no longer on
     // the canvas stayed up, and kept the page asking for confirmation on close.
     // On a first hydration this is the state the workflow switch already left.
+    //
+    // `canvasWorkflowId` records whose graph this is: the save checks it
+    // against the route before addressing the PUT by the route id.
     useWorkflowSaveStore.setState({
       definitionEtag: workflow.definition_etag ?? null,
+      canvasWorkflowId: workflow.id_hash,
       saveStatus: 'idle',
       lastError: null,
     })
