@@ -59,7 +59,7 @@ def _include_object(obj, name, type_, reflected, compare_to):
 def _get_sync_url() -> str:
     """
     Returns DATABASE_URL converted to the synchronous driver (psycopg2).
-    Removes sslmode from the query string and passes it via connect_args if needed.
+    The ssl/sslmode parameter is moved to connect_args by `_connect_args`.
     """
     url = os.environ["DATABASE_URL"]
     # Swap the async driver for the sync one
@@ -86,23 +86,55 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+_SSL_OFF = {"disable", "false", "0", "no", "allow"}
+_SSL_VERIFY = {"verify-ca", "verify-full"}
+
+
+def _connect_args(url: str) -> tuple[str, dict]:
+    """(URL without ssl/sslmode, psycopg2 connect_args) — the TLS of DATABASE_URL.
+
+    The same reading as the API's engine (app/core/db.py, `_parse_url`):
+      - no parameter                → nothing (libpq's default)
+      - disable/false/0/no/allow    → sslmode=disable
+      - verify-ca / verify-full     → the same mode, with the CA of
+                                      DATABASE_CA_CERT as `sslrootcert`
+      - require/prefer/true/1/...   → sslmode=require (encrypts, does not verify)
+
+    verify-ca/verify-full used to become `require` here: the API refused a server
+    with the wrong certificate and `alembic upgrade`, with the same URL, accepted
+    it — a MITM got the migration connection, with the owner's credentials.
+    Without DATABASE_CA_CERT, libpq looks for ~/.postgresql/root.crt and refuses
+    to connect if it is not there (the API falls back to the system's trusted
+    roots): set DATABASE_CA_CERT to verify against a private CA.
+    """
+    connect_args: dict = {}
+    match = re.search(r"[?&](?:ssl|sslmode)=([^&]+)", url)
+    if not match:
+        return url, connect_args
+
+    raw_value = match.group(1).lower()
+    # The parameter goes with the `&` after it, and its `?`/`&` stays: the next
+    # parameter keeps a valid separator (`?ssl=x&a=b` -> `?a=b`).
+    url = re.sub(r"([?&])(?:ssl|sslmode)=[^&]*&?", r"\1", url)
+    url = url.rstrip("?&")
+
+    if raw_value in _SSL_OFF:
+        connect_args["sslmode"] = "disable"
+    elif raw_value in _SSL_VERIFY:
+        connect_args["sslmode"] = raw_value
+        # Even when the file does not exist: libpq then fails naming the path,
+        # instead of silently checking against another CA.
+        ca_cert = os.getenv("DATABASE_CA_CERT", "").strip()
+        if ca_cert:
+            connect_args["sslrootcert"] = ca_cert
+    else:
+        connect_args["sslmode"] = "require"
+    return url, connect_args
+
+
 def run_migrations_online() -> None:
     """Connects to the database and applies migrations."""
-    url = _get_sync_url()
-
-    # Extract ssl/sslmode from the URL and pass it via connect_args to psycopg2
-    sslmode = None
-    match = re.search(r"[?&](?:ssl|sslmode)=([^&]+)", url)
-    if match:
-        raw_value = match.group(1).lower()
-        sslmode = "disable" if raw_value in {"disable", "false", "0", "no", "allow"} else "require"
-        url = re.sub(r"[?&](?:ssl|sslmode)=[^&]*", "", url)
-        url = re.sub(r"\?&", "?", url)
-        url = url.rstrip("?&")
-
-    connect_args = {}
-    if sslmode:
-        connect_args["sslmode"] = sslmode
+    url, connect_args = _connect_args(_get_sync_url())
 
     configuration = config.get_section(config.config_ini_section, {})
     configuration["sqlalchemy.url"] = url
