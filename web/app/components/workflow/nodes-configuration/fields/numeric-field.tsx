@@ -23,6 +23,18 @@ const NumericField = ({ field, values, setNodeField, variant = "number" }: Numer
         type="number"
         step={isInt ? 1 : undefined}
         onChange={e => {
+          // An emptied input means "not filled in", not zero: `Number("")` is 0,
+          // so clearing an optional field (limit, timeout, tolerance) stored a
+          // silent 0 and the input snapped back to "0". It is stored as "" —
+          // the executor's parameter validation reads "" in a numeric field as
+          // "use the declared default" (flow/utils/parameter_validation.py),
+          // which is also what the drawer seeds unset fields with. A browser
+          // also reports "" while the typed text is not a number yet ("-" on
+          // the way to "-5"), and "" leaves that text alone where 0 replaced it.
+          if (e.target.value === "") {
+            setNodeField(field.name, "")
+            return
+          }
           const n = Number(e.target.value)
           setNodeField(field.name, isInt ? Math.round(n) : n)
         }}
