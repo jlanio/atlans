@@ -495,7 +495,7 @@ def test_p4_upload_streams_and_hashes_the_content(tmp_path):
 
 def test_p4_local_to_remote_does_not_block_the_event_loop(tmp_path, without_spatial_validation):
     """
-    The 30s application heartbeat is the only keepalive (ping_interval=None): if the
+    The 30s application heartbeat is a keepalive the server watches: if the
     scan/diff goes back inside the coroutine, the connection drops with 4408 and the
     run in progress dies.
 

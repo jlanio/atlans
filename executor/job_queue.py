@@ -88,6 +88,10 @@ class ExecutorJobQueue:
         # Jobs canceled while still waiting in the queue. An item cannot be removed
         # from the middle of a PriorityQueue, so the worker discards it on pickup.
         self._cancelled: set[str] = set()
+        # Running jobs whose task `cancel()` interrupted on request (user or
+        # server). Tells them apart from the jobs a shutdown past its deadline
+        # abandons, which are not user cancellations.
+        self._cancelled_by_request: set[str] = set()
         # Jobs accepted and not yet finished (in the queue, stuck on the semaphore or
         # running). This is what lets `cancel()` answer "unknown" honestly
         # instead of marking any unknown id in `_cancelled` forever —
@@ -122,6 +126,11 @@ class ExecutorJobQueue:
     # and nobody resends it. Implementing re-dispatch requires a server change
     # (executor_ws_router._handle_job_result) — do not assume it already exists.
     NAO_INICIADO = "Job não iniciado — executor encerrando."
+    # A RUNNING job abandoned because the shutdown deadline expired. It is not
+    # a user cancellation: it goes to the server as an executor loss.
+    INTERROMPIDO_NO_DESLIGAMENTO = (
+        "Execução interrompida: o executor foi encerrado antes de o job terminar."
+    )
 
     async def shutdown(self, timeout: int = 120):
         """
@@ -284,6 +293,20 @@ class ExecutorJobQueue:
                 try:
                     await task
                 except asyncio.CancelledError:
+                    if self._shutting_down and job_id not in self._cancelled_by_request:
+                        # The WORKER is being canceled (shutdown past its
+                        # deadline). Canceling the worker also cancels the task it
+                        # awaits, so `task.cancelled()` is True here as well — which
+                        # made this look like a user cancellation and reported
+                        # "Execução cancelada pelo usuário" for a job nobody
+                        # canceled. Reported as an executor loss instead.
+                        task.cancel()
+                        await self._notify_cancelled(
+                            item.message,
+                            reason=self.INTERROMPIDO_NO_DESLIGAMENTO,
+                            perda_do_executor=True,
+                        )
+                        raise
                     if task.cancelled():
                         # Cancellation of THIS job (via cancel()). Does not propagate:
                         # the worker stays alive for the next queue item.
@@ -306,6 +329,7 @@ class ExecutorJobQueue:
                     self._active_jobs.pop(job_id, None)
                     self._active_tasks.pop(job_id, None)
                     self._cancelled.discard(job_id)
+                    self._cancelled_by_request.discard(job_id)
                     self._known.discard(job_id)
                     self._queue.task_done()
 
@@ -344,7 +368,9 @@ class ExecutorJobQueue:
         except Exception as exc:
             logger.warning("Falha ao anunciar drenagem ao servidor: %s", exc)
 
-    async def _notify_cancelled(self, message: dict, reason: str | None = None) -> None:
+    async def _notify_cancelled(
+        self, message: dict, reason: str | None = None, perda_do_executor: bool = False,
+    ) -> None:
         if self._on_cancelled is None:
             return
         if reason:
@@ -352,6 +378,8 @@ class ExecutorJobQueue:
             # signature is public (`on_cancelled(message)`) — changing it would break
             # every call site. Shallow copy: we do not touch the caller's dict.
             message = {**message, "cancel_reason": reason}
+        if perda_do_executor:
+            message = {**message, "cancel_as_executor_loss": True}
         try:
             await self._on_cancelled(message)
         except Exception as exc:
@@ -368,6 +396,7 @@ class ExecutorJobQueue:
         """
         task = self._active_tasks.get(job_id)
         if task is not None and not task.done():
+            self._cancelled_by_request.add(job_id)
             task.cancel()
             logger.info("Cancelamento solicitado para job '%s' em execução.", job_id)
             return "running"

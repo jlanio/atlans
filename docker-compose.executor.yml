@@ -56,6 +56,11 @@ services:
     container_name: atlans-executor
     # on-failure: restarts on a crash (exit != 0). A revoked one exits with 0 → stops.
     restart: on-failure
+    # The executor drains on SIGTERM: up to 120 s for the running jobs and
+    # 30 s for the server to confirm their results (executor/main.py). Docker's
+    # default is 10 s, after which it SIGKILLs — every `up -d`/`restart`
+    # interrupted the jobs mid-drain, and the next boot blamed "out of memory".
+    stop_grace_period: 160s
 
     env_file: executor/.env
 

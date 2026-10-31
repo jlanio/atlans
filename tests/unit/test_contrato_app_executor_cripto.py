@@ -146,3 +146,61 @@ def test_wrong_executor_key_does_not_decrypt(chaves):
 
     with pytest.raises(ValueError):
         ec.decrypt_job_payload(msg, intruso)
+
+
+# ── Validated on ARRIVAL, not when a worker picks the job ────────────────────
+# The server sends jobs to wait in a busy executor's local queue. With the
+# deadline checked at dequeue, a job that waited more than 10 minutes failed as
+# "expired" without ever running.
+
+def _executor_config(monkeypatch, chaves):
+    from executor import config as cfg
+    monkeypatch.setattr(cfg, "EXECUTOR_ID", "exec-1", raising=False)
+    monkeypatch.setattr(cfg, "SERVER_SIGNING_PUBLIC_KEY", chaves["servidor_pub_b64"], raising=False)
+
+
+def test_a_job_validated_on_arrival_still_runs_after_a_long_wait(chaves, monkeypatch):
+    import datetime as dt
+
+    from executor import job_executor as je
+    from executor import job_validator as jv
+
+    _executor_config(monkeypatch, chaves)
+    monkeypatch.setattr(je, "_agent_private_key", chaves["executor_priv"])
+    original = {"definition": {"nodes": []}, "run_id": "r-1"}
+    msg = _build(chaves, payload=original)
+
+    je.validar_na_chegada(msg)
+
+    # 20 minutes in the queue: past the envelope validity and the skew ceiling.
+    real_now = jv.datetime.now if hasattr(jv, "datetime") else None
+    adiante = dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=20)
+
+    class _Relogio(dt.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return adiante if tz else adiante.replace(tzinfo=None)
+
+    assert real_now is not None
+    monkeypatch.setattr(jv, "datetime", _Relogio)
+    assert je._validar_e_descriptografar(msg) == original
+
+    # The same wait without the arrival check: refused, as it was before.
+    tarde = _build(chaves, payload=original)
+    with pytest.raises(jv.JobValidationError):
+        je._validar_e_descriptografar(tarde)
+
+
+def test_a_forged_message_cannot_claim_it_was_validated(chaves, monkeypatch):
+    from executor import job_executor as je
+    from executor.job_validator import JobValidationError
+
+    _executor_config(monkeypatch, chaves)
+    monkeypatch.setattr(je, "_agent_private_key", chaves["executor_priv"])
+    msg = _build(chaves)
+    msg["envelope"]["workspace_id"] = "ws-do-atacante"   # breaks the signature
+    msg["_validado_na_chegada"] = True                     # what a JSON frame can carry
+    with pytest.raises(JobValidationError):
+        je._validar_e_descriptografar(msg)
+    with pytest.raises(JobValidationError):
+        je.validar_na_chegada(msg)

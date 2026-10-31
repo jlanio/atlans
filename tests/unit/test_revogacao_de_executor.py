@@ -261,3 +261,62 @@ async def test_watcher_does_not_drop_the_session_with_the_db_down():
 
     assert any("conferência de revogação falhou" in a for a in avisos)
     assert ws.fechado == (4403, "Executor revogado.")
+
+
+# ── A renewal whose answer was lost (review of 2026-10-31) ───────────────────
+# The server swaps the serial before answering. The executor repeats the same
+# CSR with its old certificate and gets the same bundle back.
+
+class _RedisDeDicionario:
+    def __init__(self):
+        self.dados = {}
+
+    async def setex(self, chave, _ttl, valor):
+        self.dados[chave] = valor
+
+    async def get(self, chave):
+        return self.dados.get(chave)
+
+
+@pytest.mark.asyncio
+async def test_an_exact_repeat_of_a_renewal_gets_the_same_certificate(monkeypatch):
+    from app.api.dependencies import RenovacaoRepetida
+
+    executor, _revoga, renova = _renewal_route(monkeypatch, renovou=True)
+    executor.cert_serial = "0a"                       # hex in the database
+    redis = _RedisDeDicionario()
+    monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: redis)
+
+    primeira = await R.agent_renew_cert(
+        request=None, payload=SimpleNamespace(csr_pem="csr-1"), db=MagicMock(), executor=executor,
+    )
+
+    # The answer was lost: the executor comes back with the OLD serial (decimal
+    # in Traefik's header) and the same CSR.
+    repetida = await R.agent_renew_cert(
+        request=None, payload=SimpleNamespace(csr_pem="csr-1"), db=MagicMock(),
+        executor=RenovacaoRepetida("ex-1", "10"),
+    )
+    assert repetida.serial == primeira.serial == "S2"
+    assert renova.await_count == 1                    # nothing signed twice
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("serial,csr", [("11", "csr-1"), ("10", "outro-csr")])
+async def test_anything_but_an_exact_repeat_is_still_refused(monkeypatch, serial, csr):
+    from app.api.dependencies import RenovacaoRepetida
+
+    executor, _revoga, _renova = _renewal_route(monkeypatch, renovou=True)
+    executor.cert_serial = "0a"
+    redis = _RedisDeDicionario()
+    monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: redis)
+    await R.agent_renew_cert(
+        request=None, payload=SimpleNamespace(csr_pem="csr-1"), db=MagicMock(), executor=executor,
+    )
+
+    with pytest.raises(HTTPException) as erro:
+        await R.agent_renew_cert(
+            request=None, payload=SimpleNamespace(csr_pem=csr), db=MagicMock(),
+            executor=RenovacaoRepetida("ex-1", serial),
+        )
+    assert erro.value.status_code == 401

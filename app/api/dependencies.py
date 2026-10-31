@@ -495,6 +495,47 @@ async def get_agent_from_mtls(
         raise HTTPException(status_code=_MTLS_HTTP_STATUS.get(exc.reason, 401), detail=exc.detail)
 
 
+class RenovacaoRepetida:
+    """An executor presenting the serial it just renewed AWAY from.
+
+    Only `/executores/renew-cert` accepts it, and only to hand back the bundle
+    of that same renewal when the request repeats it exactly (same CSR, within
+    the replay window): the answer of a renewal can be lost after the server
+    already swapped the serial. Anything else is refused as before.
+    """
+
+    __slots__ = ("executor_id", "serial")
+
+    def __init__(self, executor_id: str, serial: str):
+        self.executor_id = executor_id
+        self.serial = serial
+
+
+async def get_agent_from_mtls_or_renewal_replay(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """`get_agent_from_mtls`, except that an active executor whose ONLY problem
+    is a serial that no longer matches (or was revoked by a renewal) comes back
+    as `RenovacaoRepetida` for the renewal route to check against its replay."""
+    header_value = request.headers.get("X-Forwarded-Tls-Client-Cert-Info", "")
+    try:
+        return await validate_executor_mtls(
+            header_value=header_value,
+            client_host=request.client.host if request.client else None,
+            url_path=request.url.path,
+            db=db,
+        )
+    except ExecutorMtlsError as exc:
+        if exc.reason in ("serial_mismatch", "revoked"):
+            # validate_executor_mtls already checked the trusted proxy, the CN
+            # and that the executor exists and is active before the serial.
+            cn, serial = _parse_traefik_client_cert(header_value)
+            if cn and serial:
+                return RenovacaoRepetida(cn.removeprefix("executor-"), serial)
+        raise HTTPException(status_code=_MTLS_HTTP_STATUS.get(exc.reason, 401), detail=exc.detail)
+
+
 class ExecutorOuUsuario:
     """Who authenticated on a route that accepts both identities.
 

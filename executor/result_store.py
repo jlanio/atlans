@@ -21,6 +21,7 @@ operations become no-ops and the behavior reverts to the pre-refactor
 "in-memory outbox".
 """
 
+import contextlib
 import json
 import logging
 import os
@@ -128,6 +129,12 @@ def _get_conn() -> sqlite3.Connection | None:
                         attempts   INTEGER NOT NULL DEFAULT 0
                     )
                 """)
+                # `sent_at`: when the result last left through the WebSocket.
+                # The row is kept for `JANELA_DE_REENVIO_S` after that (see
+                # `mark_sent`). Added to existing outboxes in place.
+                colunas = {r[1] for r in c.execute("PRAGMA table_info(pending_results)")}
+                if "sent_at" not in colunas:
+                    c.execute("ALTER TABLE pending_results ADD COLUMN sent_at REAL")
                 # Journal of jobs accepted and still WITHOUT a result (see
                 # `registrar_em_voo`). Only ids and timestamps: none of the payload.
                 c.execute("""
@@ -233,8 +240,20 @@ def put(result: dict[str, Any]) -> None:
         logger.warning("result_store.put falhou para job '%s': %s", job_id, exc)
 
 
+# How long a SENT result stays in the outbox. `ws.send()` returning only means
+# the frame reached the local kernel: on a half-open connection (NAT drop, a
+# laptop that slept, a proxy that died) the send succeeds for minutes while the
+# server already tore the session down, and the result was deleted here with
+# nothing left to replay. The protocol has no receipt for a result, so the copy
+# is kept for longer than TCP takes to give up on a dead peer (~15 min on
+# Linux) and replayed on the next session. A result the server already has is
+# dropped there (first outcome wins), so the replay is harmless.
+JANELA_DE_REENVIO_S = 20 * 60
+
+
 def mark_sent(job_id: str) -> None:
-    """Removes the result from the store after successful delivery to the server."""
+    """Records that the result left through the WebSocket; the copy stays for
+    `JANELA_DE_REENVIO_S`, then is purged (see `purge_sent`)."""
     if not job_id:
         return
     try:
@@ -243,11 +262,51 @@ def mark_sent(job_id: str) -> None:
             if conn is None:
                 return
             conn.execute(
-                "DELETE FROM pending_results WHERE job_id = ?",
-                (str(job_id),),
+                "UPDATE pending_results SET sent_at = ? WHERE job_id = ?",
+                (time.time(), str(job_id)),
             )
+        purge_sent()
     except Exception as exc:
         logger.warning("result_store.mark_sent falhou para job '%s': %s", job_id, exc)
+
+
+def purge_sent(agora: float | None = None) -> None:
+    """Deletes results sent longer ago than the replay window. Never raises."""
+    limite = (time.time() if agora is None else agora) - JANELA_DE_REENVIO_S
+    try:
+        with _lock:
+            conn = _get_conn()
+            if conn is None:
+                return
+            conn.execute(
+                "DELETE FROM pending_results WHERE sent_at IS NOT NULL AND sent_at < ?",
+                (limite,),
+            )
+    except Exception as exc:
+        logger.debug("result_store.purge_sent: %s", exc)
+
+
+def load_recently_sent() -> list[dict]:
+    """Results sent within the replay window, oldest first — what a new
+    session resends in case the previous one was already dead. Never raises."""
+    purge_sent()
+    try:
+        with _lock:
+            conn = _get_conn()
+            if conn is None:
+                return []
+            rows = conn.execute(
+                "SELECT payload FROM pending_results WHERE sent_at IS NOT NULL "
+                "ORDER BY created_at ASC"
+            ).fetchall()
+    except Exception as exc:
+        logger.warning("result_store.load_recently_sent falhou: %s", exc)
+        return []
+    out: list[dict] = []
+    for (payload,) in rows:
+        with contextlib.suppress(json.JSONDecodeError):
+            out.append(json.loads(payload))
+    return out
 
 
 def increment_attempts(job_id: str) -> None:
@@ -273,6 +332,9 @@ def load_pending() -> list[dict]:
     Call at executor startup to drain and re-enqueue what was not sent
     before the previous crash. Never raises: failures return [].
     """
+    # Includes the results sent within the replay window: the previous process
+    # may have sent them on a connection that was already dead.
+    purge_sent()
     try:
         with _lock:
             conn = _get_conn()
@@ -306,7 +368,9 @@ def count_pending() -> int:
             conn = _get_conn()
             if conn is None:
                 return 0
-            row = conn.execute("SELECT COUNT(*) FROM pending_results").fetchone()
+            row = conn.execute(
+                "SELECT COUNT(*) FROM pending_results WHERE sent_at IS NULL"
+            ).fetchone()
             return int(row[0]) if row else 0
     except Exception as exc:
         logger.debug("result_store.count_pending: %s", exc)
@@ -331,7 +395,9 @@ def job_ids_pendentes() -> list[str] | None:
             conn = _get_conn()
             if conn is None:
                 return []
-            rows = conn.execute("SELECT job_id FROM pending_results").fetchall()
+            rows = conn.execute(
+                "SELECT job_id FROM pending_results WHERE sent_at IS NULL"
+            ).fetchall()
         return [r[0] for r in rows]
     except Exception as exc:
         logger.warning("Outbox ilegível ao listar os resultados pendentes: %s", exc)

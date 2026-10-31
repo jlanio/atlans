@@ -18,7 +18,16 @@ from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from executor._ambiente import ler_int
-from executor.enrollment import CERT_FILE, _build_csr, _persist_bundle, _ws_to_http
+from executor.enrollment import (
+    CERT_FILE,
+    RENEWAL_PENDING_FILE,
+    _build_csr,
+    _persist_bundle,
+    _ws_to_http,
+    drop_pending_renewal,
+    load_pending_renewal,
+    save_pending_renewal,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +74,55 @@ def _days_until_expiry(cert_path: Path) -> float | None:
     return (expires_at - datetime.now(timezone.utc)).total_seconds() / 86400.0
 
 
+# ── Interrupted renewal ────────────────────────────────────────────────────────
+# The server revokes the current serial and commits the new one BEFORE it
+# answers. A lost answer (read timeout, proxy reset) left this executor with a
+# serial the server had already revoked: every later renewal was refused, and
+# the next reconnect ended the process until a new OTP. The key and CSR of a
+# renewal in progress are kept on disk until its bundle is persisted; resending
+# the SAME CSR within the server's replay window gives back the same bundle.
+
+PENDING_FILE = RENEWAL_PENDING_FILE
+# Shorter than the server's replay window (app/api/routers/executores_router.py,
+# _JANELA_DE_REPETICAO_S = 30 min), so a resumed request always finds it.
+_PENDING_MAX_AGE_S = 25 * 60
+
+
+def _load_pending(cert_dir: Path) -> "tuple[Ed25519PrivateKey, str] | None":
+    import time
+
+    try:
+        dados = load_pending_renewal(cert_dir)
+    except Exception as exc:
+        logger.warning("Renovacao pendente ilegivel — descartada: %s", exc)
+        _drop_pending(cert_dir)
+        return None
+    if dados is None:
+        return None
+    if time.time() - dados["criado_em"] > _PENDING_MAX_AGE_S:
+        _drop_pending(cert_dir)
+        return None
+    return dados["key"], dados["csr_pem"]
+
+
+def _save_pending(cert_dir: Path, key: Ed25519PrivateKey, csr_pem: str) -> None:
+    import time
+
+    save_pending_renewal(cert_dir, key, csr_pem, time.time())
+
+
+def _drop_pending(cert_dir: Path) -> None:
+    try:
+        drop_pending_renewal(cert_dir)
+    except OSError as exc:
+        logger.warning("Nao foi possivel apagar a renovacao pendente: %s", exc)
+
+
+def has_pending_renewal(cert_dir: str | Path) -> bool:
+    """Whether a renewal was interrupted before its bundle was persisted."""
+    return _load_pending(Path(cert_dir)) is not None
+
+
 # ── API publica ────────────────────────────────────────────────────────────────
 
 
@@ -78,22 +136,36 @@ async def maybe_renew(server_url: str, cert_dir: str | Path) -> bool:
     if days_left is None:
         logger.error("Sem cert atual valido — renovacao impossivel. Rode `enroll` novamente.")
         return False
-    if days_left > RENEW_BEFORE_DAYS:
-        logger.debug("Cert ainda valido por %.1f dias — sem renewal necessario.", days_left)
-        return False
 
-    logger.info("Cert vence em %.1f dias — iniciando renewal...", days_left)
+    pendente = _load_pending(cert_dir)
+    if pendente is not None:
+        # Resumes an interrupted renewal with the SAME key and CSR, whatever the
+        # remaining validity: the server may already have revoked this serial.
+        new_ed, csr_pem = pendente
+        logger.warning("Retomando renovacao interrompida (a resposta anterior nao chegou).")
+    else:
+        if days_left > RENEW_BEFORE_DAYS:
+            logger.debug("Cert ainda valido por %.1f dias — sem renewal necessario.", days_left)
+            return False
 
-    # Preserves the current cert's CN in the new CSR — step-ca requires it to
-    # match the sub of the OTT that the backend generates from the executor_id.
-    cn = _cert_common_name(cert_dir / CERT_FILE)
-    if not cn:
-        logger.error("Nao foi possivel extrair CN do cert atual — renewal abortado.")
-        return False
+        logger.info("Cert vence em %.1f dias — iniciando renewal...", days_left)
 
-    # Gera nova chave + CSR.
-    new_ed = Ed25519PrivateKey.generate()
-    csr_pem = _build_csr(new_ed, cn=cn).decode()
+        # Preserves the current cert's CN in the new CSR — step-ca requires it to
+        # match the sub of the OTT that the backend generates from the executor_id.
+        cn = _cert_common_name(cert_dir / CERT_FILE)
+        if not cn:
+            logger.error("Nao foi possivel extrair CN do cert atual — renewal abortado.")
+            return False
+
+        # Gera nova chave + CSR.
+        new_ed = Ed25519PrivateKey.generate()
+        csr_pem = _build_csr(new_ed, cn=cn).decode()
+        try:
+            _save_pending(cert_dir, new_ed, csr_pem)
+        except OSError as exc:
+            # Without the record the renewal still works; it only loses the
+            # recovery from a lost answer.
+            logger.warning("Nao foi possivel registrar a renovacao em andamento: %s", exc)
 
     http_base = _ws_to_http(server_url).rstrip("/")
     url = f"{http_base}/executores/renew-cert"
@@ -119,6 +191,15 @@ async def maybe_renew(server_url: str, cert_dir: str | Path) -> bool:
 
     if resp.status_code not in (200, 201):
         logger.error("Servidor recusou renewal (status %s): %s", resp.status_code, resp.text[:200])
+        if resp.status_code in (400, 409, 422):
+            # A definitive refusal of THIS request (invalid CSR, executor changed
+            # during the signature): retrying the same CSR cannot succeed.
+            _drop_pending(cert_dir)
+        elif resp.status_code in (401, 403):
+            logger.error(
+                "O servidor nao aceita mais o certificado atual. Se a renovacao "
+                "anterior nao for retomada nos proximos minutos, refaca o enrollment."
+            )
         return False
 
     try:
@@ -132,6 +213,8 @@ async def maybe_renew(server_url: str, cert_dir: str | Path) -> bool:
     # overwrites the good credentials leaves the executor offline with no
     # chance of self-correction.
     problema = _persist_bundle(cert_dir, bundle, new_ed)
+    if not problema:
+        _drop_pending(cert_dir)
     if problema:
         logger.error(
             "Renewal abortado — bundle invalido (%s). Nenhum arquivo foi alterado; "
