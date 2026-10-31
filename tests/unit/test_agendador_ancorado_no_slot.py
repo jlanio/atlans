@@ -60,6 +60,20 @@ def test_which_schedules_name_their_hour():
     assert fixo(_sched(cron_expression="0 1,13 * * *")) is True
     assert fixo(_sched(cron_expression="0 * * * *")) is False
     assert fixo(_sched(cron_expression="*/5 */2 * * *")) is False
-    assert fixo(_sched(cron_expression="0 9-17 * * 1-5")) is False
+    # A range, a list or a step from a number NAME their hours (round-2 review).
+    assert fixo(_sched(cron_expression="0 9-17 * * 1-5")) is True
+    assert fixo(_sched(cron_expression="0 1-3 * * *")) is True
+    assert fixo(_sched(cron_expression="0 1/2 * * *")) is True
+    assert fixo(_sched(cron_expression="@daily")) is True
+    assert fixo(_sched(cron_expression="@hourly")) is False
     assert fixo(_sched(strategy="rrule", rrule_expression="FREQ=DAILY;BYHOUR=1")) is True
     assert fixo(_sched(strategy="rrule", rrule_expression="FREQ=HOURLY")) is False
+
+
+def test_a_range_of_hours_fires_once_when_the_clocks_go_back():
+    # "0 1-3" in New York: 01:00 EDT (05:00 UTC) fired; the repeated 01:00 EST
+    # (06:00 UTC) is the same wall-clock time — the next is 02:00 EST (07:00 UTC).
+    s = _sched(cron_expression="0 1-3 * * *", timezone="America/New_York")
+    slot = datetime(2026, 11, 1, 5, 0)
+    proximo = AsyncScheduler()._next_after_fire(s, slot, slot + timedelta(seconds=20))
+    assert proximo == datetime(2026, 11, 1, 7, 0)

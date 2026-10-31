@@ -1678,7 +1678,13 @@ _CONSUMER_HEARTBEAT_S = 15
 _RECLAIM_INTERVAL_S = 60
 
 
-async def _keep_alive(r: aioredis.Redis, chave_viva: str) -> None:
+# An item handled for longer than this is considered stuck: the heartbeat stops
+# renewing, so another worker reclaims it once the key expires. Far above any
+# legitimate item (a FOR UPDATE wait is capped by the 60 s statement timeout).
+_ITEM_PRESO_S = 15 * 60
+
+
+async def _keep_alive(r: aioredis.Redis, chave_viva: str, item: dict | None = None) -> None:
     """Renews the consumer's liveness key for as long as the consumer lives.
 
     A task of its own, not a step of the loop: renewed only BETWEEN items, an
@@ -1688,12 +1694,21 @@ async def _keep_alive(r: aioredis.Redis, chave_viva: str) -> None:
     time. A Redis error only skips a beat; the loop's own reconnect handles a
     dead connection."""
     while True:
-        try:
-            await r.set(chave_viva, "1", ex=_CONSUMER_ALIVE_TTL_S)
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            logger.warning("Consumer: falha ao renovar a chave de vida: %s", exc)
+        desde = (item or {}).get("desde")
+        if desde is not None and _time.monotonic() - desde > _ITEM_PRESO_S:
+            # A handler that never returns would hold its item forever behind
+            # a live key: stop vouching for it, and it is reclaimed.
+            logger.error(
+                "Consumer: item em processamento ha mais de %ds — deixando de renovar "
+                "a chave de vida para que seja reivindicado.", _ITEM_PRESO_S,
+            )
+        else:
+            try:
+                await r.set(chave_viva, "1", ex=_CONSUMER_ALIVE_TTL_S)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.warning("Consumer: falha ao renovar a chave de vida: %s", exc)
         await asyncio.sleep(_CONSUMER_HEARTBEAT_S)
 
 
@@ -1844,7 +1859,8 @@ async def run_consumer_loop() -> None:
             vivo = f"{CONSUMER_ALIVE_PREFIX}{consumidor}"
             # Alive BEFORE the first item, and renewed while an item is handled.
             await r.set(vivo, "1", ex=_CONSUMER_ALIVE_TTL_S)
-            pulso = asyncio.create_task(_keep_alive(r, vivo))
+            em_curso: dict = {"desde": None}
+            pulso = asyncio.create_task(_keep_alive(r, vivo, em_curso))
             try:
                 proxima_reivindicacao = 0.0
                 while True:
@@ -1852,7 +1868,11 @@ async def run_consumer_loop() -> None:
                     if agora >= proxima_reivindicacao:
                         await _reclaim_abandoned(r, QUEUE_RESULTS, processando)
                         proxima_reivindicacao = agora + _RECLAIM_INTERVAL_S
-                    await _consume_one(r, QUEUE_RESULTS, _process_result, processando)
+                    em_curso["desde"] = _time.monotonic()
+                    try:
+                        await _consume_one(r, QUEUE_RESULTS, _process_result, processando)
+                    finally:
+                        em_curso["desde"] = None
             finally:
                 pulso.cancel()
                 with contextlib.suppress(asyncio.CancelledError, Exception):

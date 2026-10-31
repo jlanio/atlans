@@ -116,3 +116,26 @@ def test_validated_addresses_refuses_if_any_is_internal(monkeypatch):
 
     monkeypatch.setattr(socket, "getaddrinfo", _resolve_ok)
     assert G.validated_addresses("db.exemplo.org") == ["8.8.8.8"]
+
+
+@pytest.mark.asyncio
+async def test_the_test_tries_at_most_three_addresses_within_one_deadline(monkeypatch):
+    """A name with 20 addresses held a worker thread ~100 s after the answer
+    (round-2 review): at most 3, each with its share of the deadline."""
+    import sqlalchemy
+
+    muitos = [f"203.0.113.{i}" for i in range(1, 21)]
+    monkeypatch.setattr("flow.utils.geo_helpers.validated_addresses", lambda _h: muitos)
+    chamadas = []
+
+    def _create_engine(url, connect_args=None):
+        chamadas.append(connect_args)
+        return _Engine(falha=True)
+
+    monkeypatch.setattr(sqlalchemy, "create_engine", _create_engine)
+    resposta = await R._test_db_connection(
+        "mysql", {"host": "db.exemplo.org", "port": "3306", "user": "u", "password": "p", "database": "d"},
+    )
+    assert resposta["ok"] is False
+    assert len(chamadas) == 3
+    assert all(c["connect_timeout"] * 3 <= R._PRAZO_DO_TESTE_S for c in chamadas)

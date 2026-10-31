@@ -178,3 +178,29 @@ async def test_a_redis_error_only_skips_a_beat(monkeypatch):
     with pytest.raises(asyncio.CancelledError):
         await pulso
     assert r.chaves.get("vivo") == "1"
+
+
+
+async def test_a_stuck_item_stops_being_vouched_for(monkeypatch):
+    """A handler that never returns kept its item from being reclaimed while the
+    heartbeat lived on (round-2 review): past the ceiling, the key is no longer
+    renewed."""
+    import time as _t
+
+    r = _RedisDeListas()
+    renovacoes = []
+    original = r.set
+
+    async def _set(k, v, ex=None, nx=False):
+        renovacoes.append(k)
+        await original(k, v, ex=ex, nx=nx)
+
+    r.set = _set
+    monkeypatch.setattr(rrc, "_CONSUMER_HEARTBEAT_S", 0.01)
+    item = {"desde": _t.monotonic() - rrc._ITEM_PRESO_S - 1}
+    pulso = asyncio.create_task(rrc._keep_alive(r, "vivo", item))
+    await asyncio.sleep(0.05)
+    pulso.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await pulso
+    assert renovacoes == []

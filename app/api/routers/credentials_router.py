@@ -148,6 +148,10 @@ async def _test_connectivity(cred_type: str, data: dict) -> dict:
     return {"ok": True, "message": "Campos validados com sucesso."}
 
 
+_ENDERECOS_NO_TESTE = 3
+_PRAZO_DO_TESTE_S = 9
+
+
 async def _test_db_connection(cred_type: str, data: dict) -> dict:
     from app.core.credentials.connection_builder import build_connection_data, porta_valida
     import asyncio
@@ -175,6 +179,12 @@ async def _test_db_connection(cred_type: str, data: dict) -> dict:
             ),
         }
 
+    # At most 3 addresses, each with its share of the answer's 10 s: a name
+    # resolving to 20 addresses held a worker thread (the pool login's bcrypt
+    # also uses) for ~100 s after the answer was already sent.
+    ips = ips[:_ENDERECOS_NO_TESTE]
+    por_tentativa = max(1, _PRAZO_DO_TESTE_S // len(ips))
+
     built = build_connection_data(cred_type, data)
     conn_str = built.get("connectionString", "")
     tentativas: list[tuple[str, dict]] = []
@@ -183,7 +193,8 @@ async def _test_db_connection(cred_type: str, data: dict) -> dict:
         # a LIST of both (same length), it falls back from one address to the
         # next, as it would on its own after resolving the name.
         tentativas.append((conn_str, {
-            "connect_timeout": 5,
+            # libpq applies connect_timeout PER address of the list.
+            "connect_timeout": por_tentativa,
             "host": ",".join([nome] * len(ips)),
             "hostaddr": ",".join(ips),
         }))
@@ -194,7 +205,7 @@ async def _test_db_connection(cred_type: str, data: dict) -> dict:
             ip_na_url = f"[{ip}]" if ":" in ip else ip
             tentativas.append((
                 conn_str.replace(f"@{quote_plus(host)}:", f"@{ip_na_url}:", 1),
-                {"connect_timeout": 5},
+                {"connect_timeout": por_tentativa},
             ))
 
     def _try_connect():
@@ -213,7 +224,7 @@ async def _test_db_connection(cred_type: str, data: dict) -> dict:
         return {"ok": False, "message": "Falha na conexão com o banco de dados. Verifique as credenciais e o endereço do servidor."}
 
     try:
-        return await asyncio.wait_for(asyncio.to_thread(_try_connect), timeout=10)
+        return await asyncio.wait_for(asyncio.to_thread(_try_connect), timeout=_PRAZO_DO_TESTE_S + 1)
     except asyncio.TimeoutError:
         return {"ok": False, "message": "Tempo limite excedido ao tentar conectar (10s)."}
     except Exception as exc:

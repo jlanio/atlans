@@ -415,11 +415,18 @@ class AsyncScheduler:
         time (DST ending) a duplicate firing to skip: "30 1 * * *" means ONE
         01:30 a day, while "0 * * * *" means every hour, the repeated one too."""
         if sched.strategy == "cron" and sched.cron_expression:
-            campos = sched.cron_expression.split()
+            expressao = sched.cron_expression.strip().lower()
+            if expressao.startswith("@"):
+                # @daily/@midnight/@weekly/@monthly/@yearly name an hour (00);
+                # @hourly is every hour.
+                return expressao not in ("@hourly",)
+            campos = expressao.split()
             if len(campos) < 2:
                 return False
-            hora = campos[1]
-            return not any(c in hora for c in "*/-")
+            # Only an hour field starting with `*` (`*`, `*/2`) runs through
+            # every hour; a list, a range or a step from a number (`1,13`,
+            # `9-17`, `1/2`) names its hours — a repeated one is a duplicate.
+            return not campos[1].startswith("*")
         if sched.strategy == "rrule" and sched.rrule_expression:
             texto = sched.rrule_expression.upper()
             return not any(f"FREQ={f}" in texto for f in ("HOURLY", "MINUTELY", "SECONDLY"))
