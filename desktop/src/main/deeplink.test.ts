@@ -15,7 +15,7 @@ import { describe, expect, it, vi } from 'vitest'
 // downloaded by postinstall — and desktop/.npmrc turns off install scripts.
 vi.mock('electron', () => ({ app: {} }))
 
-import { ehDeepLink, interpretar, urlDosArgumentos } from './deeplink.js'
+import { ehDeepLink, interpretar, semOtp, urlDosArgumentos } from './deeplink.js'
 
 const OK = 'atlans://enroll?executor_id=abc-123&otp=segredo&server=https://agents.atlans.example.org'
 
@@ -144,5 +144,23 @@ describe('urlDosArgumentos', () => {
 
   it('ignora argumento que apenas contem o esquema', () => {
     expect(urlDosArgumentos(['--url=atlans://enroll?x=1'])).toBeNull()
+  })
+})
+
+describe('semOtp', () => {
+  it('mascara o OTP e mantém o resto do link legível', () => {
+    // A refused link goes to the log, which is exported and attached to
+    // support requests — the OTP must not go with it.
+    expect(semOtp('atlans://enroll?executor_id=abc&otp=segredo&server=https://outro'))
+      .toBe('atlans://enroll?executor_id=abc&otp=***&server=https://outro')
+  })
+
+  it('mascara o OTP em qualquer posição e caixa', () => {
+    expect(semOtp('atlans://enroll?OTP=segredo')).toBe('atlans://enroll?OTP=***')
+    expect(semOtp('atlans://enroll?executor_id=a&otp=s1&otp=s2#x')).toBe('atlans://enroll?executor_id=a&otp=***&otp=***#x')
+  })
+
+  it('não toca em parâmetros que só terminam em otp', () => {
+    expect(semOtp('atlans://enroll?notp=visivel')).toBe('atlans://enroll?notp=visivel')
   })
 })

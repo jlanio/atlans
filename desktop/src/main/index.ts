@@ -24,7 +24,9 @@ import {
 } from './state/config.js'
 import { ESTRATEGIAS, SYNC_MODES, SYNC_DEFAULTS } from '../shared/geosync.js'
 import { consultarStatusCacheado, invalidarStatus } from './python/status.js'
-import { interpretar, registerProtocol, urlDosArgumentos } from './deeplink.js'
+import {
+  interpretar, registerProtocol, semOtp, urlDosArgumentos, type DeepLinkRequest,
+} from './deeplink.js'
 import { startUpdater, installNow, stopUpdater } from './updater.js'
 import { AppStore } from './state/store.js'
 import { updateTray, createTray, destroyTray } from './ui/tray.js'
@@ -58,8 +60,11 @@ const store = new AppStore()
 // Deep link that arrived before the renderer existed. Without this, an
 // `atlans://` that OPENS the app would be lost: the window has not yet
 // subscribed to the channel when the event is emitted, and the form would
-// show up empty.
-let deepLinkPendente: ReturnType<typeof interpretar> = null
+// show up empty. Kept only under the conditions of `guardarDeepLink`.
+let deepLinkPendente: { pedido: DeepLinkRequest; expiraEm: number } | null = null
+
+/** How long a kept deep link waits for the form to mount. */
+const VALIDADE_DEEP_LINK_MS = 10 * 60_000
 let supervisor: PythonSupervisor | null = null
 let encerrando = false
 // Signature of the last status sent to the web window — push dedupe. See the
@@ -199,7 +204,7 @@ function registerIpc(): void {
   ipcMain.handle(CHANNELS.deepLinkPendente, () => {
     const p = deepLinkPendente
     deepLinkPendente = null   // consumed only once
-    return p
+    return p && Date.now() < p.expiraEm ? p.pedido : null
   })
 
   ipcMain.handle(CHANNELS.enrolar, async (_e, pedido: unknown) => {
@@ -400,16 +405,34 @@ app.on('second-instance', (_evento, argv) => {
   abrirJanelaWeb()
 })
 
+/**
+ * Keeps a deep link for the Onboarding that is about to mount — and only then.
+ *
+ * With the panel already up, the push delivers it (or there is no form to
+ * receive it). With the machine already enrolled no Onboarding mounts to
+ * consume it, and the request sat in memory until a "Refazer enrollment" days
+ * later popped "Vincular este computador?" filled in by whatever page sent
+ * the link. The expiry covers a link that opened the app and was never looked
+ * at.
+ */
+function guardarDeepLink(pedido: DeepLinkRequest): void {
+  const painel = mainWindow()
+  // A panel still loading has not subscribed to the push yet: it counts as closed.
+  if (painel && !painel.webContents.isLoading()) return
+  if (lerConfiguracao().configurado) return
+  deepLinkPendente = { pedido, expiraEm: Date.now() + VALIDADE_DEEP_LINK_MS }
+}
+
 function handleDeepLink(bruta: string): void {
   const pedido = interpretar(bruta)
   if (!pedido) {
     // Silent refusal for the user, loud in the log: a malformed deep link is
     // almost always a page trying something, and it is not worth an alert that
-    // teaches people to ignore alerts.
-    store.registrarLinhaBruta(`[app] Deep link recusado: ${bruta.slice(0, 120)}`, 'stderr')
+    // teaches people to ignore alerts. Without the OTP: the log is exportable.
+    store.registrarLinhaBruta(`[app] Deep link recusado: ${semOtp(bruta).slice(0, 120)}`, 'stderr')
     return
   }
-  deepLinkPendente = pedido
+  guardarDeepLink(pedido)
   broadcast(CHANNELS.aoReceberDeepLink, pedido)
   abrirJanela()
 }
@@ -450,10 +473,8 @@ app.whenReady().then(() => {
 
   // A deep link that OPENED the app arrives in the process's own argv.
   const initialUrl = urlDosArgumentos(process.argv)
-  if (initialUrl) {
-    const pedido = interpretar(initialUrl)
-    if (pedido) deepLinkPendente = pedido
-  }
+  const pedidoInicial = initialUrl ? interpretar(initialUrl) : null
+  if (pedidoInicial) guardarDeepLink(pedidoInicial)
 
   const cfg = lerConfiguracao()
   if (cfg.configurado) {
@@ -481,7 +502,7 @@ app.whenReady().then(() => {
   // a window: an unconfigured app that starts at logon and does not show up
   // would leave the person with no clue what to do, so that case still opens
   // the web window.
-  if (deepLinkPendente) abrirJanela()
+  if (pedidoInicial) abrirJanela()
   else if (!(cfg.configurado && startedHidden())) abrirJanelaWeb()
 })
 

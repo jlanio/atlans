@@ -81,6 +81,17 @@ export function interpretar(bruta: string): DeepLinkRequest | null {
 }
 
 /**
+ * The raw link with the OTP masked, for the log.
+ *
+ * A refused link often still carries a real OTP (a `server=` typo, a link
+ * edited by hand), and the log is kept in memory, shown in the panel and
+ * exported to a file the user attaches to a support request.
+ */
+export function semOtp(bruta: string): string {
+  return bruta.replace(/([?&]otp=)[^&#]*/gi, '$1***')
+}
+
+/**
  * Does the URL use the deep link scheme (`atlans://`)?
  *
  * Only the scheme — content validation is {@link interpretar}'s job. It serves
