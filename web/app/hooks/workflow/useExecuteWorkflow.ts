@@ -198,10 +198,19 @@ export const useExecuteWorkflow = () => {
    *  It is the safety net for a `__workflow_complete__` that did not arrive: the
    *  database knows the outcome even when the live channel failed. */
   async function reconcileRun(taskId: string): Promise<boolean> {
+    // Only the run the store still shows may be closed from here. The store is
+    // global: by the time X's drop is reconciled, the user may be on another
+    // workflow whose live run Y was re-attached — and closing the panel with X's
+    // outcome ended Y as "Concluído/Falhou" while it ran, after which the
+    // RUN_TERMINAL guard discarded every event Y still sent. Checked before the
+    // request and again after it, since the switch can happen during the await.
+    // `false` is the safe answer: the caller re-checks the same refs and stops.
+    if (!stillOnRun(taskId)) return false
     try {
       const detail = await GisFlowService.getRunDetail(taskId)
       const desfecho = TERMINAL_OUTCOME[detail?.data?.status ?? ""]
       if (!desfecho) return false
+      if (!stillOnRun(taskId)) return false
       const store = useWorkflowExecutionStore.getState()
       if (!store.isExecuting) return true
       // `completeExecution` settles the stuck nodes: they started, the run ended,
@@ -213,6 +222,12 @@ export const useExecuteWorkflow = () => {
       // try — asserting "failed" here would be inventing an outcome.
       return false
     }
+  }
+
+  /** This mount still follows `taskId`, and the store still holds that run. */
+  function stillOnRun(taskId: string): boolean {
+    return activeRunRef.current === taskId
+      && useWorkflowExecutionStore.getState().viewingRunId === taskId
   }
 
   /** Fetches the session again before a reconnect, for the token `onopen` sends.
@@ -254,7 +269,7 @@ export const useExecuteWorkflow = () => {
     // switched workflows, or an `attachToRun` may have already reopened the
     // socket (the Executar button, the re-attach). Reconnecting on top would
     // open a second connection for the same run.
-    if (activeRunRef.current !== taskId) return
+    if (!stillOnRun(taskId)) return
     if (wsRef.current) return
 
     if (attemptsRef.current >= MAX_RECONEXOES) {
@@ -416,6 +431,17 @@ export const useExecuteWorkflow = () => {
   // replays the run's whole history (Redis) and then streams live. Returns the
   // socket so the caller can close it (e.g. when switching workflows).
   function attachToRun(taskId: string): WebSocket {
+    // The server replays the run's COMPLETE history on every connect (Redis
+    // `LRANGE 0 -1`), and `appendEvents` only appends. When the store already
+    // holds this run's log — a reconnect after a drop, or a re-attach that kept
+    // the progress already painted — the replay landed on top of it: every
+    // print() line, the "Saída" count, Copiar/Baixar and the rotation all
+    // doubled (tripled on the next drop). The log is swapped for the replay
+    // when its first batch arrives (see `onmessage`); the canvas is left alone,
+    // since the replay re-applies the lifecycle in order and ends on the same
+    // node states. Not on attach: a reconnect that fails before any frame (a
+    // 4401, the server down) would leave the panel empty for nothing.
+    let replayReplacesLog = useWorkflowExecutionStore.getState().viewingRunId === taskId
     // Closes any previous connection (intentionally) before opening the new one, so
     // there are never two WSs writing to the store at the same time.
     closeOnPurpose(wsRef.current)
@@ -605,6 +631,17 @@ export const useExecuteWorkflow = () => {
       drainBatch()
     }
 
+    // First content on this socket = the start of the server's replay. Clears
+    // the log it is about to redeliver (events, rotation and server discard
+    // counts, run start, sub-workflow roots, outcome — all derived from the
+    // events) before anything of the replay is counted, so nothing of it is
+    // wiped either. Node states stay: see `replayReplacesLog`.
+    function startReplay() {
+      if (!replayReplacesLog) return
+      replayReplacesLog = false
+      useWorkflowExecutionStore.getState().clearEvents()
+    }
+
     ws.onmessage = (event) => {
       // ANY frame counts as a sign of life — including the heartbeat (empty batch)
       // and even an unreadable frame: what the watchdog watches is the transport's
@@ -621,6 +658,9 @@ export const useExecuteWorkflow = () => {
         frame = JSON.parse(event.data)
       } catch (err) {
         console.error("[ws/workflow] frame ilegível — lote descartado", err)
+        // Only a batch with content can be corrupted (a heartbeat is a fixed
+        // empty frame), so this one may be the replay's first.
+        startReplay()
         // Counts it as a visible loss: the "Bruto" (raw) tab shows the warning instead
         // of the log looking complete.
         useWorkflowExecutionStore.getState().registrarDescartados(1)
@@ -637,6 +677,9 @@ export const useExecuteWorkflow = () => {
       // started sending the live stream in batches left the immediate-completion
       // path dead.
       const eventos: RawEvent[] = Array.isArray(frame?.events) ? frame.events : []
+
+      // Before the `dropped` below: it belongs to the new log.
+      if (eventos.length > 0) startReplay()
 
       // SERVER back-pressure (the 500-slot buffer evicts old stdout).
       // Without adding this up, the "Bruto" tab drops the warning and the user

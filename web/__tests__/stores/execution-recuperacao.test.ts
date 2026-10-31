@@ -16,7 +16,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { renderHook, act, waitFor } from "@testing-library/react"
-import { useWorkflowExecutionStore, RUN_TERMINAL } from "@/app/stores/workflowExecutionStore"
+import { useWorkflowExecutionStore, RUN_TERMINAL, toRunEvent } from "@/app/stores/workflowExecutionStore"
 import type { INodeStatusWorkFlow } from "@/context/useFlowContext"
 
 const RUN = "run-x"
@@ -426,6 +426,114 @@ describe("recuperação do stream de execução", () => {
     act(() => { ws2.onopen?.() })
     expect(getSession).toHaveBeenCalled()
     expect(ws2.enviados).toEqual(["TOKEN-RENOVADO"])
+    view.unmount()
+  })
+
+  // ── 8. Reconnecting does not replay the history on top of the panel ─────
+  //
+  // The server replays the run's WHOLE history on every connect (Redis
+  // `LRANGE 0 -1`) and the store only appends. A reconnect used to append the
+  // replay after the events already shown: every print() line twice (three
+  // times after the next drop), and the "Saída" count, Copiar/Baixar with it.
+
+  const historico = [
+    { node: "n1", status: "started",   kind: "lifecycle", timestamp: 1 },
+    { node: "n1", status: "log",       kind: "stdout", extra: { lines: ["a", "b"] }, timestamp: 2 },
+    { node: "n1", status: "completed", kind: "lifecycle", timestamp: 3 },
+    { node: "n2", status: "started",   kind: "lifecycle", timestamp: 4 },
+  ]
+  const quadro = (events: object[], dropped = 0) =>
+    ({ data: JSON.stringify({ type: "events", events, dropped }) })
+
+  it("reconectar não duplica as linhas que já estão no painel", async () => {
+    const { view, ws } = await anexar()
+    // The live stream lost 3 stdout events to server back-pressure.
+    act(() => { ws.onopen?.(); ws.onmessage?.(quadro(historico, 3)) })
+    act(() => { runPendingFrames() })
+    expect(useWorkflowExecutionStore.getState().events).toHaveLength(4)
+    expect(useWorkflowExecutionStore.getState().droppedEvents).toBe(3)
+
+    vi.useFakeTimers()
+    await act(async () => { ws.cairDoServidor(1006) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_100) })
+    const ws2 = FakeSocket.abertos[1]
+    expect(ws2?.url).toContain(RUN)
+
+    // Reconnected, replay not here yet: nothing on screen is lost meanwhile —
+    // neither the log nor the canvas. (A reconnect refused before any frame,
+    // a 4401 for one, must not leave the panel empty.)
+    act(() => { ws2.onopen?.() })
+    let estado = useWorkflowExecutionStore.getState()
+    expect(estado.events).toHaveLength(4)
+    expect(estado.statusById.get("n1")?.status).toBe("completed")
+    expect(estado.statusById.get("n2")?.status).toBe("started")
+
+    // The server sends the COMPLETE history again, plus what happened in the gap.
+    const novo = { node: "n2", status: "log", kind: "stdout", extra: { lines: ["c"] }, timestamp: 5 }
+    act(() => { ws2.onmessage?.(quadro([...historico, novo])) })
+    // The fake clock also owns requestAnimationFrame now: one frame drains.
+    await act(async () => { await vi.advanceTimersByTimeAsync(20) })
+
+    estado = useWorkflowExecutionStore.getState()
+    expect(estado.events).toHaveLength(5)
+    expect(estado.events.flatMap(e => e.lines ?? [])).toEqual(["a", "b", "c"])
+    expect(estado.events.map(e => e.seq)).toEqual([0, 1, 2, 3, 4])
+    expect(estado.runStartedTs).toBe(1_000)
+    // The replay comes from the Redis history, which still has what the live
+    // queue dropped: the old discard count would now be a lie.
+    expect(estado.droppedEvents).toBe(0)
+    // The canvas was not reset along with the log.
+    expect(estado.statusById.get("n1")?.status).toBe("completed")
+    expect(estado.statusById.get("n2")?.status).toBe("started")
+    expect(estado.isExecuting).toBe(true)
+
+    view.unmount()
+  })
+
+  it("re-anexar a um run cujo log já está no store também troca o log pelo replay", async () => {
+    // A second mount of the owner (or a re-run effect) re-attaches WITHOUT
+    // `startExecution`, to keep the progress painted: same replay, same doubling.
+    const store = useWorkflowExecutionStore.getState()
+    store.startExecution(canvasNodes.map(n => ({ ...n, status: "idle" })) as unknown as INodeStatusWorkFlow[])
+    store.setTaskId(RUN)
+    store.appendEvents(historico.map(toRunEvent))
+
+    const { view, ws } = await anexar()
+    act(() => { ws.onmessage?.(quadro(historico)) })
+    act(() => { runPendingFrames() })
+
+    expect(useWorkflowExecutionStore.getState().events).toHaveLength(4)
+    view.unmount()
+  })
+
+  // ── 9. Reconciling one run never closes another ─────────────────────────
+
+  it("reconciliar o run X depois de trocar para o run Y não encerra Y", async () => {
+    const { view, ws } = await anexar()
+    // X dropped and its reconciliation is waiting on a slow API.
+    type Detalhe = { data: { status: string } }
+    let responder: (v: Detalhe) => void = () => {}
+    getRunDetail.mockImplementationOnce(() => new Promise<Detalhe>(r => { responder = r }))
+    await act(async () => { ws.cairDoServidor(1006) })
+    expect(getRunDetail).toHaveBeenCalledTimes(1)
+
+    // Meanwhile the user opens workflow B, whose live run Y is re-attached.
+    currentWorkflow = "wf-b"
+    runsByWorkflow["wf-b"] = [{ run_id: "run-y", status: "running" }]
+    view.rerender()
+    await waitFor(() => expect(FakeSocket.abertos.at(-1)?.url).toContain("run-y"))
+
+    // X's answer: finished. It is about X, not about the panel on screen.
+    await act(async () => { responder({ data: { status: "success" } }) })
+
+    const estado = useWorkflowExecutionStore.getState()
+    expect(estado.viewingRunId).toBe("run-y")
+    expect(estado.isExecuting).toBe(true)
+    expect(RUN_TERMINAL.has(estado.statusWorkflow?.status ?? "")).toBe(false)
+    // Nor does anything reconnect to X.
+    expect(FakeSocket.abertos.filter(s => s.url.endsWith(`/${RUN}`))).toHaveLength(1)
+
+    delete runsByWorkflow["wf-b"]
     view.unmount()
   })
 
