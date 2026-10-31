@@ -191,6 +191,54 @@ def test_a_malformed_url_shown_still_hides_secrets():
     assert para_registro("https://[::1/a?token=t0k") == "(URL inválida)"
 
 
+def test_the_url_shown_hides_more_secret_names_and_semicolon_pairs():
+    url = "https://portal.gov.br/x.csv?user=ana&pwd=S3nha1&jsessionid=abcd1234;token=t0k3n&ano=2024"  # pragma: allowlist secret
+
+    mostrada = para_registro(url)
+
+    for segredo in ("S3nha1", "abcd1234", "t0k3n"):
+        assert segredo not in mostrada
+    assert "user=ana" in mostrada and "ano=2024" in mostrada and ";token=***" in mostrada
+
+
+def test_the_circuit_key_never_carries_the_password_of_the_url():
+    # The key is printed in the "temporarily unavailable" error stored with the run.
+    from flow.utils.autenticacao_http import circuit_key
+
+    assert circuit_key("https://joao:s3nh4@Portal.gov.br:8443/dados.zip") == "http:portal.gov.br:8443"  # pragma: allowlist secret
+    assert circuit_key("https://portal.gov.br/x") == "http:portal.gov.br"
+    assert circuit_key("https://[::1/x") == "http:(URL inválida)"
+
+
+async def test_an_open_circuit_does_not_show_the_password_of_the_url(rede, monkeypatch):
+    import time
+
+    breaker = circuit_breaker.get_circuit_breaker("http:dados.exemplo.gov.br")
+    monkeypatch.setattr(breaker, "_state", breaker.OPEN)
+    monkeypatch.setattr(breaker, "_opened_at", time.monotonic())
+
+    with pytest.raises(RuntimeError, match="temporariamente indisponível") as erro:
+        await baixar_para_arquivo("https://joao:s3nh4@dados.exemplo.gov.br/a.csv")  # pragma: allowlist secret
+
+    assert "s3nh4" not in str(erro.value) and "joao" not in str(erro.value)
+
+
+def test_a_secret_the_server_echoes_is_masked_in_the_error():
+    from flow.utils.download_seguro import _Falha, _mensagem_de_falha
+
+    basic = "Basic " + __import__("base64").b64encode(b"ana:Senh4Forte").decode()
+    corpo = 'invalid apikey AK-998877 for Bearer tok-ABCDEF; user ana pass Senh4Forte'  # pragma: allowlist secret
+
+    for cabecalhos in ({"Authorization": "Bearer tok-ABCDEF"}, {"Authorization": basic}):
+        mensagem = _mensagem_de_falha(
+            "https://api.exemplo.gov.br/v1/file?apikey=AK-998877", _Falha(403, corpo), cabecalhos,
+        )
+        assert "AK-998877" not in mensagem
+        assert "apikey=***" in mensagem
+    assert "tok-ABCDEF" not in _mensagem_de_falha(URL, _Falha(401, corpo), {"Authorization": "Bearer tok-ABCDEF"})
+    assert "Senh4Forte" not in _mensagem_de_falha(URL, _Falha(401, corpo), {"Authorization": basic})
+
+
 async def test_a_full_disk_does_not_open_the_hosts_circuit(rede, monkeypatch):
     rede.rota(URL, httpx.Response(200, content=b"a;b\n1;2\n"))
 

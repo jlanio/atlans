@@ -2,6 +2,7 @@ import geopandas as gpd
 from typing import Any, Dict
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
+from flow.utils.coordenadas import pontos_de_colunas
 from flow.utils.drive_resolver import read_drive_file_as
 from flow.utils.leitura_csv import ler_csv
 from flow.utils.logger import get_logger
@@ -9,20 +10,12 @@ logger = get_logger(__name__)
 
 
 def _read_csv_as_geodataframe(file_path: str, lat_col: str, lon_col: str, crs: str) -> gpd.GeoDataFrame:
-    """Helper bloqueante: le CSV e converte colunas lat/lon em geometria de pontos."""
-    df = ler_csv(file_path)
+    """Helper bloqueante: le CSV e converte colunas lat/lon em geometria de pontos.
 
-    if lat_col not in df.columns:
-        raise ValueError(f"Coluna de latitude '{lat_col}' nao encontrada no CSV. Colunas disponiveis: {list(df.columns)}")
-    if lon_col not in df.columns:
-        raise ValueError(f"Coluna de longitude '{lon_col}' nao encontrada no CSV. Colunas disponiveis: {list(df.columns)}")
-
-    gdf = gpd.GeoDataFrame(
-        df,
-        geometry=gpd.points_from_xy(df[lon_col], df[lat_col]),
-        crs=crs
-    )
-    return gdf
+    The conversion is DataInput's (flow/utils/coordenadas.py): a decimal comma
+    is read, and a row without coordinates stays without geometry instead of
+    becoming POINT (NaN NaN)."""
+    return pontos_de_colunas(ler_csv(file_path), lat_col, lon_col, crs)
 
 
 @register_node

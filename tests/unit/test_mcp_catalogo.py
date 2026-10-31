@@ -184,15 +184,29 @@ async def test_brief_carries_the_property_essentials(catalogo):
     assert ficha["name"] == "DatabaseQuery"
     assert ficha["requires_credential"] is True
     for propriedade in ficha["properties"]:
-        # Label, help and conditional visibility are the visual editor's business.
+        # Label, help and conditional visibility are the visual editor's business;
+        # only the condition of a required field stays.
         assert set(propriedade) <= {
             "name",
             "type",
             "required",
+            "required_when",
             "default",
             "options",
             "credential_types",
         }
+
+
+async def test_a_field_required_in_one_mode_says_which(catalogo):
+    # Without the condition the sheet said every DataInput needs a URL, a Drive
+    # file and an artifact at once.
+    ficha = await describe_node(ctx(), name="DataInput", brief=True)
+    campos = {p["name"]: p for p in ficha["properties"]}
+
+    assert campos["url"]["required_when"] == {"field": "context", "in": ["url"]}
+    assert campos["driveFileId"]["required_when"] == {"field": "context", "in": ["drive"]}
+    assert "required_when" not in campos["context"]
+    assert "visibleWhen" not in campos["zipMember"]
 
 
 async def test_full_carries_more_than_the_brief(catalogo):

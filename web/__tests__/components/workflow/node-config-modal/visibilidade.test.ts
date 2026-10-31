@@ -68,4 +68,13 @@ describe("campoVisivel", () => {
     expect(campoVisivel({ any: [[{ field: "a", in: [1] }, { in: [1] }]] } as unknown as VisibleWhen, {})).toBe(true)
     expect(campoVisivel({ any: "context" } as unknown as VisibleWhen, {})).toBe(true)
   })
+
+  it("`any` wins over the `field`/`in` kept beside it for editors older than `any`", () => {
+    // DataInput sends both: an editor from before `any` reads `field`/`in` (every
+    // origin, so the field shows); this one must read `any` and hide it.
+    const comLegado = { ...doZip, field: "context", in: ["drive", "artifacts", "url"] } as unknown as VisibleWhen
+    expect(campoVisivel(comLegado, { context: "url", expectedFormat: "csv" })).toBe(false)
+    expect(campoVisivel(comLegado, { context: "url", expectedFormat: "zip" })).toBe(true)
+    expect(campoVisivel(comLegado, { context: "drive", expectedFormat: "csv" })).toBe(true)
+  })
 })

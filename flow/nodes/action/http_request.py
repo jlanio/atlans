@@ -11,12 +11,13 @@ from flow.utils.geo_helpers import gdf_para_geojson, safe_httpx_request
 from flow.utils.autenticacao_http import (
     CREDENTIAL_HEADERS,
     apply_auth,
+    circuit_key,
     exigir_credencial_resolvida,
     same_origin,
     without_credentials,
 )
 from flow.utils.circuit_breaker import get_circuit_breaker, CircuitOpenError
-from flow.utils.backoff import espera_exponencial
+from flow.utils.backoff import HTTP_STATUS_REPETIVEIS, HTTP_TETO_ESPERA_S, espera_exponencial
 from flow.utils.logger import get_logger
 from typing import Any, Dict, List, Tuple
 
@@ -27,14 +28,10 @@ logger = get_logger(__name__)
 # others are idempotent by the protocol's definition.
 _RETRYABLE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE'})
 
-# Failures where retrying makes sense: the server said "I'm overloaded" or
-# "try again". 4xx (except 429) is a request error — retrying gives the same error.
-_STATUS_REPETIVEIS = frozenset({429, 500, 502, 503, 504})
-# Ceiling on the wait between retries. With the maximum attempts the node
-# offers, the wait doesn't come close, but the shared policy requires a
-# declared ceiling — and a high `tentativas` configured on the canvas must not
-# be able to hold the workflow for minutes.
-_WAIT_CEILING_S = 30.0
+# Failures where retrying makes sense, and the ceiling on the wait between
+# retries: the policy shared with DataInput's download (flow/utils/backoff.py).
+_STATUS_REPETIVEIS = HTTP_STATUS_REPETIVEIS
+_WAIT_CEILING_S = HTTP_TETO_ESPERA_S
 
 
 def _int(valor: Any, padrao: int) -> int:
@@ -275,8 +272,7 @@ class HttpRequestNode(BaseNode):
         # also serves WFS and the webhook, which build the query on their own.
         params = _merge_query(url, params)
 
-        host    = urlparse(url).netloc or url
-        breaker = get_circuit_breaker(f"http:{host}")
+        breaker = get_circuit_breaker(circuit_key(url))
 
         logger.info("Preparando requisição HTTP: %s %s [circuit=%s]", method, url, breaker.state)
 
@@ -429,9 +425,7 @@ class HttpRequestNode(BaseNode):
                 # continuing to use the original address's breaker counted the
                 # destination's failures against the one that only redirected, and
                 # stopped consulting the circuit of the host actually being called.
-                hop_breaker = get_circuit_breaker(
-                    f"http:{urlparse(destino).netloc or destino}"
-                )
+                hop_breaker = get_circuit_breaker(circuit_key(destino))
                 try:
                     response = await hop_breaker.call(_do_request)
                 except CircuitOpenError as e:

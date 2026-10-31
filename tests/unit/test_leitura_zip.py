@@ -6,6 +6,7 @@ uploaded —, so what is refused is refused BEFORE a byte is written: a name
 with `..`, an entry that expands a thousandfold, a `.vrt`.
 """
 import os
+import struct
 import zipfile
 
 import pytest
@@ -139,9 +140,70 @@ def test_too_many_entries_are_refused_before_the_zip_is_parsed(tmp_path, monkeyp
 
     monkeypatch.setattr(leitura_zip.zipfile, "ZipFile", sem_parse)
 
-    with pytest.raises(ZipInvalidoError, match="20 entradas"):
+    with pytest.raises(ZipInvalidoError, match="mais de 10 entradas"):
         with extrair(caminho, ""):
             pass
+
+
+def _com_total_declarado(caminho: str, total: int) -> None:
+    """Rewrites the end record's entry count, leaving the directory as it is."""
+    dados = bytearray(open(caminho, "rb").read())
+    fim = dados.rfind(b"PK\x05\x06")
+    struct.pack_into("<HH", dados, fim + 8, total, total)
+    open(caminho, "wb").write(dados)
+
+
+def test_an_end_record_that_lies_about_the_count_does_not_get_past(tmp_path, monkeypatch):
+    # zipfile walks the directory by its size and ignores the declared total:
+    # a ZIP declaring 1 entry was parsed whole before the refusal.
+    monkeypatch.setattr(leitura_zip, "_MAX_MEMBROS", 10)
+    caminho = _zip(tmp_path, [(f"f{i}.csv", b"a\n") for i in range(20)])
+    _com_total_declarado(caminho, 1)
+
+    def sem_parse(*_a, **_k):
+        raise AssertionError("ZipFile parsed the whole central directory before the refusal")
+
+    monkeypatch.setattr(leitura_zip.zipfile, "ZipFile", sem_parse)
+
+    with pytest.raises(ZipInvalidoError, match="mais de 10 entradas"):
+        leitura_zip.membros(caminho)
+
+
+def test_the_walk_counts_what_zipfile_parses(tmp_path):
+    caminho = _zip(tmp_path, [(f"pasta/f{i}.csv", b"a\n") for i in range(7)])
+    _com_total_declarado(caminho, 1)
+
+    assert leitura_zip._contar_entradas(caminho) == 7
+    assert len(zipfile.ZipFile(caminho).infolist()) == 7
+
+
+def test_a_name_flagged_utf8_that_is_not_gives_a_sentence(tmp_path):
+    caminho = _zip(tmp_path, [("municipio.csv", b"a;b\n1;2\n")])
+    dados = bytearray(open(caminho, "rb").read())
+    diretorio = dados.rfind(b"PK\x01\x02")
+    nome = dados.find(b"municipio.csv", diretorio)
+    dados[nome + 7] = 0xED  # 'município' written in cp1252
+    flags = struct.unpack_from("<H", dados, diretorio + 8)[0]
+    struct.pack_into("<H", dados, diretorio + 8, flags | 0x800)
+    open(caminho, "wb").write(dados)
+
+    with pytest.raises(leitura_zip.ZipIlegivelError, match="marcado como UTF-8"):
+        leitura_zip.membros(caminho)
+
+
+def test_the_whole_zip_for_gdal_gets_the_bomb_rule_on_every_member(tmp_path, monkeypatch):
+    monkeypatch.setattr(leitura_zip, "_PISO_RAZAO_BYTES", 1024)
+    monkeypatch.setattr(leitura_zip, "_RAZAO_MAXIMA", 100)
+    caminho = _zip(tmp_path, [("dados.csv", b"a;b\n1;2\n"), ("dados.dbf", b"0" * 5_000_000)])
+
+    with pytest.raises(ZipInvalidoError, match="zip bomb"):
+        leitura_zip.conferir_para_gdal(caminho)
+
+
+def test_the_whole_zip_for_gdal_passes_a_normal_zip(tmp_path):
+    caminho = _zip(tmp_path, [("dados.csv", b"a;b\n1;2\n"), ("__MACOSX/._dados.csv", b"x")])
+
+    assert [i.filename for i in leitura_zip.conferir_para_gdal(caminho)] == ["dados.csv"]
 
 
 def test_a_corrupted_member_is_named(tmp_path):

@@ -25,6 +25,10 @@ outside (a URL, or a Drive file anyone in the workspace uploaded):
   - any `.vrt` in the ZIP, the same rule as `leitura_geo`;
   - encrypted members and compression methods `zipfile` does not read, with a
     sentence instead of a traceback.
+
+A ZIP read whole by GDAL, with no member chosen, gets the same count, `.vrt`
+and zip-bomb refusals for every member (`conferir_para_gdal`): GDAL inflates
+what it reads, even without writing it to disk.
 """
 import fnmatch
 import os
@@ -89,37 +93,75 @@ def _muitas_entradas(n: int) -> str:
     return f"O ZIP tem {n} entradas, acima do máximo de {_MAX_MEMBROS} que o nó abre."
 
 
-def _entradas_declaradas(caminho_zip: str) -> int | None:
-    """How many entries the ZIP's end record declares, read WITHOUT parsing them.
+_INTERNOS_DO_ZIPFILE = (
+    "_EndRecData", "_ECD_SIZE", "_ECD_LOCATION", "_ECD_SIGNATURE", "stringEndArchive64",
+    "sizeEndCentDir64", "sizeEndCentDir64Locator", "sizeCentralDir", "stringCentralDir",
+)
+
+
+def _contar_entradas(caminho_zip: str) -> int | None:
+    """How many entries `zipfile` will parse, counted WITHOUT building them and
+    stopping as soon as there are more than `_MAX_MEMBROS`.
 
     `zipfile.ZipFile` parses the whole central directory as it opens: a 100 MB
     ZIP of a million empty entries took ~10 s and hundreds of MB before
-    `_MAX_MEMBROS` could refuse it. The record is read by the same function
-    `ZipFile` uses (ZIP64 included), so the count is the one it would parse.
-    None when it cannot be read — `ZipFile` then says what is wrong.
+    `_MAX_MEMBROS` could refuse it. The end record's total cannot decide it:
+    `zipfile` walks the directory by its SIZE and ignores that number, so a ZIP
+    declaring one entry may hold a million. The walk below is the arithmetic of
+    `zipfile._RealGetContents` (ZIP64 included), reading only each entry's
+    fixed header. None when the records cannot be read — `ZipFile` then says
+    what is wrong.
     """
-    ler_fim = getattr(zipfile, "_EndRecData", None)
-    indice = getattr(zipfile, "_ECD_ENTRIES_TOTAL", None)
-    if ler_fim is None or indice is None:
+    if not all(hasattr(zipfile, nome) for nome in _INTERNOS_DO_ZIPFILE):
         return None
     try:
         with open(caminho_zip, "rb") as f:
-            fim = ler_fim(f)
-    except (OSError, zipfile.BadZipFile, struct.error):
+            fim = zipfile._EndRecData(f)
+            if fim is None:
+                return None
+            tamanho = fim[zipfile._ECD_SIZE]
+            inicio = fim[zipfile._ECD_LOCATION] - tamanho
+            if fim[zipfile._ECD_SIGNATURE] == zipfile.stringEndArchive64:
+                inicio -= zipfile.sizeEndCentDir64 + zipfile.sizeEndCentDir64Locator
+            f.seek(inicio)
+            lidos = entradas = 0
+            while lidos < tamanho and entradas <= _MAX_MEMBROS:
+                cabecalho = f.read(zipfile.sizeCentralDir)
+                if (len(cabecalho) < zipfile.sizeCentralDir
+                        or cabecalho[:4] != zipfile.stringCentralDir):
+                    return None  # truncated or garbled: ZipFile says so
+                nome, extra, comentario = struct.unpack_from("<HHH", cabecalho, 28)
+                f.seek(nome + extra + comentario, os.SEEK_CUR)
+                lidos += zipfile.sizeCentralDir + nome + extra + comentario
+                entradas += 1
+    except (OSError, ValueError, zipfile.BadZipFile, struct.error):
         return None
-    return None if fim is None else int(fim[indice])
+    return entradas
+
+
+class ZipIlegivelError(ZipInvalidoError):
+    """`zipfile` itself could not read the ZIP. Kept apart from a refusal of
+    ours: DataInput still lets GDAL try such a file, as it did before."""
 
 
 def abrir(caminho_zip: str) -> zipfile.ZipFile:
     """Opens a ZIP that came from outside, refusing more than `_MAX_MEMBROS`
-    entries BEFORE parsing them, and a file that is not a ZIP with a sentence."""
-    declaradas = _entradas_declaradas(caminho_zip)
-    if declaradas is not None and declaradas > _MAX_MEMBROS:
-        raise ZipInvalidoError(_muitas_entradas(declaradas))
+    entries BEFORE parsing them, and a file `zipfile` cannot read with a
+    sentence instead of a traceback."""
+    entradas = _contar_entradas(caminho_zip)
+    if entradas is not None and entradas > _MAX_MEMBROS:
+        raise ZipInvalidoError(f"O ZIP tem mais de {_MAX_MEMBROS} entradas, o máximo que o nó abre.")
     try:
         return zipfile.ZipFile(caminho_zip)
-    except zipfile.BadZipFile as e:
-        raise ZipInvalidoError(f"O arquivo não é um ZIP válido: {e}") from e
+    except UnicodeDecodeError as e:
+        # A name flagged as UTF-8 that is not (cp1252 written by an old tool).
+        raise ZipIlegivelError(
+            "O ZIP tem um nome de arquivo marcado como UTF-8 que não está em UTF-8. "
+            "Recompacte o arquivo com outra ferramenta."
+        ) from e
+    except (zipfile.BadZipFile, ValueError, struct.error, EOFError, NotImplementedError) as e:
+        # Garbled records reach ZipFile's parser as other exceptions than BadZipFile.
+        raise ZipIlegivelError(f"O arquivo não é um ZIP válido: {e}") from e
 
 
 def _inspecionar(zf: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
@@ -129,6 +171,25 @@ def _inspecionar(zf: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
     if any(i.filename.lower().endswith(".vrt") for i in infos):
         raise ZipInvalidoError("Arquivo .zip contem um .vrt — recusado por seguranca.")
     return [i for i in infos if not _ignorado(i.filename)]
+
+
+def membros(caminho_zip: str) -> list[zipfile.ZipInfo]:
+    """The ZIP's members after the refusals that need no extraction (too many
+    entries, counted before parsing them; a `.vrt`), with macOS metadata and
+    folders left out."""
+    with abrir(caminho_zip) as zf:
+        return _inspecionar(zf)
+
+
+def conferir_para_gdal(caminho_zip: str) -> list[zipfile.ZipInfo]:
+    """The checks for a ZIP handed WHOLE to GDAL ('Arquivo dentro do ZIP'
+    empty, or a KMZ of several KML). GDAL inflates whatever layer it opens, so
+    the zip-bomb rule applies to every member here; `extrair` only checks the
+    files it writes. Returns the members, as `membros`."""
+    infos = membros(caminho_zip)
+    for info in infos:
+        _conferir_razao(info)
+    return infos
 
 
 def legiveis(infos: list[zipfile.ZipInfo]) -> list[str]:
@@ -212,6 +273,15 @@ def _companheiros(infos: list[zipfile.ZipInfo], principal: str) -> list[zipfile.
     ]
 
 
+def _conferir_razao(info: zipfile.ZipInfo) -> None:
+    razao = info.file_size / max(info.compress_size, 1)
+    if info.file_size > _PISO_RAZAO_BYTES and razao > _RAZAO_MAXIMA:
+        raise ZipInvalidoError(
+            f"'{info.filename}' se expande {razao:.0f} vezes ao descompactar — "
+            "padrão de ZIP malicioso (zip bomb). O ZIP foi recusado."
+        )
+
+
 def _checar_tamanhos(membros: list[zipfile.ZipInfo]) -> None:
     total = 0
     for info in membros:
@@ -224,12 +294,7 @@ def _checar_tamanhos(membros: list[zipfile.ZipInfo]) -> None:
             raise ZipInvalidoError(
                 f"'{info.filename}' está protegido por senha dentro do ZIP; o nó não lê ZIP com senha."
             )
-        razao = info.file_size / max(info.compress_size, 1)
-        if info.file_size > _PISO_RAZAO_BYTES and razao > _RAZAO_MAXIMA:
-            raise ZipInvalidoError(
-                f"'{info.filename}' se expande {razao:.0f} vezes ao descompactar — "
-                "padrão de ZIP malicioso (zip bomb). O ZIP foi recusado."
-            )
+        _conferir_razao(info)
         total += info.file_size
     if total > LIMITE_EXTRACAO:
         raise ZipInvalidoError(

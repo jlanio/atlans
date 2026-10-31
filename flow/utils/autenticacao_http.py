@@ -27,6 +27,21 @@ def same_origin(a: str, b: str) -> bool:
     return origem(a) == origem(b)
 
 
+def circuit_key(url: str) -> str:
+    """The circuit-breaker key of an address: `http:` plus its host and port.
+
+    Never the `user:password@` a URL may carry: the key is printed in the
+    "temporarily unavailable" error stored with the run, and in the breaker's
+    logs. The host is case-insensitive, so `Portal.gov.br` and `portal.gov.br`
+    share one circuit.
+    """
+    try:
+        netloc = urlparse(url).netloc
+    except ValueError:  # an unbalanced `[`: the request fails on its own
+        return 'http:(URL inválida)'
+    return f"http:{netloc.rpartition('@')[2].lower() or '(sem host)'}"
+
+
 def without_credentials(headers: Dict[str, str]) -> Dict[str, str]:
     """Copy of the headers without the ones that carry a secret."""
     return {k: v for k, v in headers.items() if k.lower() not in CREDENTIAL_HEADERS}

@@ -26,6 +26,7 @@ from urllib.parse import unquote, urlparse
 
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
+from flow.utils.coordenadas import pontos_de_colunas as _pontos_de_colunas
 from flow.utils.logger import get_logger
 from flow.utils.drive_resolver import resolve_drive_file, resolve_artifact_file
 
@@ -119,10 +120,18 @@ _O_QUE_FAZER = {
 # show; on the URL origin they show for the format chosen. `any` is an OR of
 # rules (node-config-form's visibility).
 _NA_ORIGEM_ARMAZENADA = {"field": "context", "in": ["drive", "artifacts"]}
+# An editor older than `any` (a tab left open across the deploy) reads only
+# `field`/`in` and broke the form on `r.in` without them. Naming every origin
+# there makes it show the field, as it did before the formats existed; the
+# current editor reads `any` first and never looks at them.
+_EM_QUALQUER_ORIGEM = {"field": "context", "in": ["drive", "artifacts", "url"]}
 
 
 def _visivel_no_formato(*formatos: str) -> dict:
-    return {"any": [_NA_ORIGEM_ARMAZENADA, {"field": "expectedFormat", "in": list(formatos)}]}
+    return {
+        "any": [_NA_ORIGEM_ARMAZENADA, {"field": "expectedFormat", "in": list(formatos)}],
+        **_EM_QUALQUER_ORIGEM,
+    }
 
 
 def _ler_kmz(path: str) -> Any:
@@ -132,22 +141,19 @@ def _ler_kmz(path: str) -> Any:
     KMZ made of several KML (LIBKML's own, with layers/) is read as it is.
 
     The KML goes to a file, not to memory: as bytes it was held twice (here
-    and in GDAL's /vsimem), half again the RAM for a large KMZ.
+    and in GDAL's /vsimem), half again the RAM for a large KMZ. It is extracted
+    like any member of a ZIP, with the same refusals (zip bomb, size, names): a
+    KMZ downloaded from a URL is as foreign as a ZIP.
     """
-    import shutil
-    import tempfile
-    import zipfile
+    from flow.utils import leitura_zip
     from flow.utils.leitura_geo import read_geodataframe
 
-    with zipfile.ZipFile(path) as kmz:
-        kmls = [nome for nome in kmz.namelist() if nome.lower().endswith(".kml")]
-        if len(kmls) != 1:
-            return read_geodataframe(path)
-        with tempfile.TemporaryDirectory() as pasta:
-            doc = os.path.join(pasta, "doc.kml")
-            with kmz.open(kmls[0]) as origem, open(doc, "wb") as destino:
-                shutil.copyfileobj(origem, destino)
-            return read_geodataframe(doc)
+    kmls = [i.filename for i in leitura_zip.membros(path) if i.filename.lower().endswith(".kml")]
+    if len(kmls) != 1:
+        leitura_zip.conferir_para_gdal(path)
+        return read_geodataframe(path)
+    with leitura_zip.extrair(path, kmls[0]) as (doc, _ext, _nome):
+        return read_geodataframe(doc)
 
 
 def _ler_geo(path: str, ext: str, crs: str) -> Any:
@@ -187,6 +193,18 @@ def _arquivo_geojson(path: str) -> bool:
     return False
 
 
+# Formats that are always ONE layer for GDAL. A ZIP whose only readable file is
+# one of them needs no listing before the read: the listing opened the ZIP in
+# GDAL a second time on every read, Drive workflows included.
+_UMA_CAMADA = frozenset({"shp", "geojson", "json", "csv", "fgb"})
+
+
+def _talvez_varias_camadas(membros: list) -> bool:
+    from flow.utils.leitura_zip import legiveis
+    lidos = legiveis(membros)
+    return len(lidos) != 1 or posixpath.splitext(lidos[0])[1].lower().lstrip(".") not in _UMA_CAMADA
+
+
 def _ler_zip(path: str, crs: str, padrao: str, pular_linhas: int, info: dict | None) -> Any:
     """A ZIP read as GDAL sees it, as always, or through ONE member.
 
@@ -202,20 +220,28 @@ def _ler_zip(path: str, crs: str, padrao: str, pular_linhas: int, info: dict | N
 
     padrao = (padrao or "").strip()
     if not padrao and not pular_linhas:
+        # Handed whole to GDAL, every member gets the zip-bomb rule first: GDAL
+        # inflates what it reads. A ZIP `zipfile` cannot read at all still goes
+        # to GDAL, as before, and the fallback below says what is wrong.
+        try:
+            membros = leitura_zip.conferir_para_gdal(path)
+        except leitura_zip.ZipIlegivelError:
+            membros = None
         # Only GDAL's own reading inside the `try`: a CRS that does not exist,
         # for one, must fail as itself, not as a ZIP that would not open.
         try:
-            camadas = list_layers(path)
             leitura = {}
-            if len(camadas) > 1:
-                logger.warning(
-                    "DataInput: o ZIP tem %d camadas (%s); foi lida a primeira, '%s'. "
-                    "Para ler outra, preencha 'Arquivo dentro do ZIP' (aceita padrão, como *.shp).",
-                    len(camadas), ", ".join(camadas[:12]), camadas[0],
-                )
-                # The first layer is the one GDAL already read by default; naming
-                # it only silences pyogrio's warning, which the sentence above replaces.
-                leitura = {"layer": camadas[0]}
+            if membros is None or _talvez_varias_camadas(membros):
+                camadas = list_layers(path)
+                if len(camadas) > 1:
+                    logger.warning(
+                        "DataInput: o ZIP tem %d camadas (%s); foi lida a primeira, '%s'. "
+                        "Para ler outra, preencha 'Arquivo dentro do ZIP' (aceita padrão, como *.shp).",
+                        len(camadas), ", ".join(camadas[:12]), camadas[0],
+                    )
+                    # The first layer is the one GDAL already read by default; naming
+                    # it only silences pyogrio's warning, which the sentence above replaces.
+                    leitura = {"layer": camadas[0]}
             lido = read_geodataframe(path, **leitura)
         except UnsafeGeoSourceError:
             raise
@@ -271,7 +297,9 @@ def _ler(path: str, ext: str, crs: str, *, zip_member: str = "", skip_rows: int 
 
     if ext == "json":
         import json
-        with open(path, "r", encoding="utf-8") as f:
+        # utf-8-sig: a BOM (IIS/.NET portals write one) is skipped, as the
+        # format check skips it; plain UTF-8 reads the same.
+        with open(path, "r", encoding="utf-8-sig") as f:
             return json.load(f)
 
     with open(path, "rb") as f:
@@ -331,11 +359,10 @@ def _o_que_veio(caminho: str, inicio: bytes) -> str:
 
 def _tipo_do_zip(caminho: str) -> str:
     """XLSX and KMZ are ZIPs too: the names inside say which one this is."""
-    from flow.utils.leitura_zip import ZipInvalidoError, abrir, legiveis
+    from flow.utils.leitura_zip import ZipInvalidoError, legiveis, membros
     try:
-        # `abrir` refuses an absurd number of entries before parsing them all.
-        with abrir(caminho) as zf:
-            infos = zf.infolist()
+        # `membros` refuses an absurd number of entries before parsing them all.
+        infos = membros(caminho)
     except ZipInvalidoError:
         return "zip"  # the read says what is wrong with it
     nomes = [i.filename for i in infos]
@@ -369,54 +396,6 @@ def _conferir_formato(esperado: str, caminho: str, inicio: bytes) -> None:
         f"Esperava {_FORMATOS_URL[esperado].split(' (')[0]}, mas o servidor devolveu "
         f"{_O_QUE_E[veio]} (começa com: {_amostra(inicio)}).{o_que_fazer}"
     )
-
-
-# ── Points from latitude/longitude columns ────────────────────────────────────
-
-def _coordenada(serie, coluna: str):
-    import pandas as pd
-    if pd.api.types.is_numeric_dtype(serie):
-        return pd.to_numeric(serie, errors="coerce")
-    # A ',' CSV can still quote a decimal comma ("-23,55"); XLSX keeps text as typed.
-    texto = serie.astype("string").str.strip().str.replace(",", ".", regex=False)
-    numeros = pd.to_numeric(texto, errors="coerce")
-    invalidos = texto.notna() & (texto != "") & numeros.isna()
-    if invalidos.any():
-        exemplo = serie[invalidos].iloc[0]
-        raise ValueError(f"A coluna '{coluna}' tem valor que não é número: {exemplo!r}.")
-    return numeros
-
-
-def _pontos_de_colunas(dados: Any, lat_col: str, lon_col: str, crs: str) -> Any:
-    """A table with latitude/longitude columns as a GeoDataFrame of points, in
-    `crs` — the same rule as ReadCSVWithCoords, now for any origin."""
-    import geopandas as gpd
-    import pandas as pd
-
-    if isinstance(dados, gpd.GeoDataFrame):
-        logger.info("DataInput: colunas de latitude/longitude ignoradas — o arquivo já tem geometria.")
-        return dados
-    if not isinstance(dados, pd.DataFrame):
-        raise ValueError(
-            "As colunas de latitude e longitude valem para tabelas (CSV, XLSX); "
-            "este arquivo não foi lido como tabela."
-        )
-    for coluna, papel in ((lat_col, "latitude"), (lon_col, "longitude")):
-        if coluna not in dados.columns:
-            raise ValueError(
-                f"Coluna de {papel} '{coluna}' não encontrada. "
-                f"Colunas disponíveis: {list(dados.columns)}"
-            )
-    lat = _coordenada(dados[lat_col], lat_col)
-    lon = _coordenada(dados[lon_col], lon_col)
-    pontos = gpd.points_from_xy(lon, lat)
-    vazias = (lat.isna() | lon.isna()).to_numpy()
-    if vazias.any():
-        # A point at (NaN, NaN) is not "no position": it breaks a spatial join
-        # downstream. Without coordinates, the row stays without geometry.
-        pontos[vazias] = None
-        logger.warning("DataInput: %d linha(s) sem coordenada ficaram sem geometria.", int(vazias.sum()))
-    return gpd.GeoDataFrame(dados, geometry=pontos, crs=crs)
 
 
 @register_node

@@ -17,6 +17,8 @@ as it passes the limit, with the same defenses as the other outbound nodes:
 The caller removes the returned file.
 """
 import asyncio
+import base64
+import binascii
 import contextlib
 import os
 import re
@@ -24,12 +26,17 @@ import ssl
 import tempfile
 from dataclasses import dataclass, field
 from email.message import Message
-from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
+from urllib.parse import unquote, unquote_plus, urlsplit, urlunsplit
 
 import httpx
 
-from flow.utils.autenticacao_http import same_origin, without_credentials
-from flow.utils.backoff import espera_exponencial
+from flow.utils.autenticacao_http import (
+    CREDENTIAL_HEADERS,
+    circuit_key,
+    same_origin,
+    without_credentials,
+)
+from flow.utils.backoff import HTTP_STATUS_REPETIVEIS, HTTP_TETO_ESPERA_S, espera_exponencial
 from flow.utils.circuit_breaker import CircuitOpenError, get_circuit_breaker
 from flow.utils.geo_helpers import (
     is_tls_verify_error,
@@ -46,10 +53,9 @@ logger = get_logger(__name__)
 # redirects hold the run.
 MAX_REDIRECTS = 5
 
-# The same transient set as HttpRequest: the server said "overloaded" or "try
-# again". Other 4xx are request errors — repeating gives the same answer.
-_STATUS_REPETIVEIS = frozenset({429, 500, 502, 503, 504})
-_WAIT_CEILING_S = 30.0
+# The transient set and the wait ceiling HttpRequest uses (flow/utils/backoff.py).
+_STATUS_REPETIVEIS = HTTP_STATUS_REPETIVEIS
+_WAIT_CEILING_S = HTTP_TETO_ESPERA_S
 
 # Chunk written to disk at a time. Large enough that the thread hop per write
 # costs nothing next to the network, small enough to keep memory flat.
@@ -63,8 +69,11 @@ _INICIO = 8192
 # GeoServer's authkey). They are masked wherever the URL is shown: run log,
 # error message and the node's `metadata`, which is stored with the run.
 _PARAM_SECRETO = re.compile(
-    r"(?i)(token|key|secret|senha|password|passwd|signature|^sig$|auth|credential)"
+    r"(?i)(token|key|secret|senha|password|passwd|pwd|signature|auth|credential|session|jwt"
+    r"|^(sig|pass|sid|code|access)$)"
 )
+# A query is split on `&` and on `;` (the older separator some servers take).
+_PAR_DA_QUERY = re.compile(r"([^&;=]*)=([^&;]*)")
 
 
 @dataclass
@@ -158,11 +167,48 @@ def para_registro(url: str) -> str:
     if ":" in host:  # IPv6 goes in brackets in the URL
         host = f"[{host}]"
     netloc = f"{host}:{porta}" if porta else host
-    pares = parse_qsl(partes.query, keep_blank_values=True)
-    query = urlencode(
-        [(k, "***" if _PARAM_SECRETO.search(k) else v) for k, v in pares], safe="*/:",
-    )
-    return urlunsplit((partes.scheme, netloc, partes.path, query, ""))
+    return urlunsplit((partes.scheme, netloc, partes.path, _mascarar_query(partes.query), ""))
+
+
+def _mascarar_query(query: str) -> str:
+    """The query with the value of each secret-looking parameter as `***`.
+    Everything else stays as typed, separators included."""
+    def trocar(par: re.Match) -> str:
+        return f"{par.group(1)}=***" if _PARAM_SECRETO.search(unquote_plus(par.group(1))) else par.group(0)
+    return _PAR_DA_QUERY.sub(trocar, query)
+
+
+def _segredos(url: str, cabecalhos: dict | None) -> list[str]:
+    """The secrets a server may echo back in an error body: the URL's password
+    and secret query values, and the credential the request carried."""
+    valores: set[str] = set()
+    try:
+        partes = urlsplit(url)
+        senha = partes.password
+    except ValueError:
+        partes, senha = None, None
+    if senha:
+        valores.update({senha, unquote(senha)})
+    for chave, valor in _PAR_DA_QUERY.findall(partes.query if partes else ""):
+        if valor and _PARAM_SECRETO.search(unquote_plus(chave)):
+            valores.update({valor, unquote_plus(valor)})
+    for nome, valor in (cabecalhos or {}).items():
+        if nome.lower() not in CREDENTIAL_HEADERS or not valor:
+            continue
+        valores.add(valor)
+        esquema, _, credencial = valor.partition(" ")
+        if not credencial:
+            continue
+        valores.add(credencial)
+        if esquema.lower() == "basic":
+            try:
+                usuario_senha = base64.b64decode(credencial, validate=True).decode("utf-8")
+            except (binascii.Error, UnicodeDecodeError):
+                continue
+            valores.update({usuario_senha, usuario_senha.partition(":")[2]})
+    # Longest first, so a secret that contains another is masked whole. A very
+    # short value (a "1") would mask half the body for nothing.
+    return sorted((v for v in valores if len(v) >= 4), key=len, reverse=True)
 
 
 def nome_sugerido(headers) -> str:
@@ -284,14 +330,19 @@ def _remover(caminho: str) -> None:
         pass
 
 
-def _mensagem_de_falha(url: str, falha: _Falha) -> str:
+def _mensagem_de_falha(url: str, falha: _Falha, cabecalhos: dict | None = None) -> str:
     dica = ""
     if falha.status in (401, 403):
         dica = (" O servidor exige autenticação ou recusou a que foi enviada: "
                 "confira a credencial do nó.")
     elif falha.status == 404:
         dica = " Confira o endereço: o arquivo pode ter mudado de lugar ou de nome."
-    trecho = f" Resposta: {falha.trecho}" if falha.trecho else ""
+    trecho = falha.trecho
+    # APIs often echo the URL or the refused token in the error body: the
+    # sentence would show it in clear right after the URL masked it.
+    for segredo in _segredos(url, cabecalhos):
+        trecho = trecho.replace(segredo, "***")
+    trecho = f" Resposta: {trecho}" if trecho else ""
     return f"O servidor respondeu HTTP {falha.status} para {para_registro(url)}.{dica}{trecho}"
 
 
@@ -300,7 +351,7 @@ async def _com_tentativas(
 ):
     """One hop (one URL), repeated on transient failure. Returns Download or
     _Redirecionamento."""
-    breaker = get_circuit_breaker(f"http:{urlparse(url).netloc or url}")
+    breaker = get_circuit_breaker(circuit_key(url))
     total = max(0, tentativas) + 1
     for tentativa in range(total):
         ultima = tentativa == total - 1
@@ -331,7 +382,7 @@ async def _com_tentativas(
             if not isinstance(resultado, _Falha):
                 return resultado
             if ultima or resultado.status not in _STATUS_REPETIVEIS:
-                raise RuntimeError(_mensagem_de_falha(url, resultado))
+                raise RuntimeError(_mensagem_de_falha(url, resultado, cabecalhos))
             logger.warning(
                 "Tentativa %d/%d do download devolveu HTTP %s — repetindo.",
                 tentativa + 1, total, resultado.status,

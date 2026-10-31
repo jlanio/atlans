@@ -268,8 +268,8 @@ def test_format_fields_follow_the_choice_only_on_the_url():
     na_origem_armazenada = {"field": "context", "in": ["drive", "artifacts"]}
 
     assert props["expectedFormat"]["visibleWhen"] == {"field": "context", "in": ["url"]}
-    assert props["zipMember"]["visibleWhen"] == {
-        "any": [na_origem_armazenada, {"field": "expectedFormat", "in": ["zip"]}]}
+    assert props["zipMember"]["visibleWhen"]["any"] == [
+        na_origem_armazenada, {"field": "expectedFormat", "in": ["zip"]}]
     assert props["skipRows"]["visibleWhen"]["any"][1]["in"] == ["csv", "zip"]
     assert props["latColumn"]["visibleWhen"]["any"][1]["in"] == ["csv", "xlsx", "zip"]
     assert props["lonColumn"]["visibleWhen"] == props["latColumn"]["visibleWhen"]
