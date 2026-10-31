@@ -56,19 +56,38 @@ _BASE = "postgresql+psycopg2://u:p@db:5432/x"  # pragma: allowlist secret
 
 
 @pytest.mark.parametrize("valor", ["verify-ca", "verify-full", "VERIFY-FULL"])
-def test_verify_modes_are_kept_with_the_ca(env, monkeypatch, valor):
-    monkeypatch.setenv("DATABASE_CA_CERT", "/certs/pg-ca.crt")
+def test_verify_modes_are_kept_with_the_system_roots_and_the_ca(env, monkeypatch, tmp_path, valor):
+    """The roots the API trusts: the system's plus DATABASE_CA_CERT, in one file."""
+    sistema = tmp_path / "sistema.pem"
+    sistema.write_text("SISTEMA\n")
+    ca = tmp_path / "pg-ca.crt"
+    ca.write_text("PRIVADA\n")
+    monkeypatch.setattr(env, "_bundle_do_sistema", lambda: str(sistema))
+    monkeypatch.setenv("DATABASE_CA_CERT", str(ca))
     url, args = env._connect_args(f"{_BASE}?ssl={valor}")
     assert url == _BASE
     assert args["sslmode"] == valor.lower()
-    assert args["sslrootcert"] == "/certs/pg-ca.crt"
+    assert Path(args["sslrootcert"]).read_text() == "SISTEMA\nPRIVADA\n"
 
 
-def test_verify_without_ca_leaves_libpq_default_root(env):
-    """No sslrootcert: libpq looks for ~/.postgresql/root.crt and refuses without
-    it — never a silent downgrade to `require`."""
+@pytest.mark.parametrize("ca", [None, "/nao/existe/pg-ca.crt"])
+def test_verify_without_a_ca_file_uses_the_system_roots(env, monkeypatch, tmp_path, ca):
+    """Never a silent downgrade to `require` — and never libpq's lone
+    ~/.postgresql/root.crt either: the API, with the same URL, trusts the
+    system's roots, so the migration does too (fix review)."""
+    sistema = tmp_path / "sistema.pem"
+    sistema.write_text("SISTEMA\n")
+    monkeypatch.setattr(env, "_bundle_do_sistema", lambda: str(sistema))
+    if ca:
+        monkeypatch.setenv("DATABASE_CA_CERT", ca)
     _, args = env._connect_args(f"{_BASE}?sslmode=verify-full")
-    assert args == {"sslmode": "verify-full"}
+    assert args == {"sslmode": "verify-full", "sslrootcert": str(sistema)}
+
+
+def test_without_any_system_bundle_libpq_reads_its_own_store(env, monkeypatch):
+    monkeypatch.setattr(env, "_bundle_do_sistema", lambda: None)
+    _, args = env._connect_args(f"{_BASE}?sslmode=verify-ca")
+    assert args["sslrootcert"] == "system"
 
 
 @pytest.mark.parametrize("valor, esperado", [

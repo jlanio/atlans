@@ -132,10 +132,12 @@ x-api-env: &api-env
 x-api-volumes: &api-volumes
   - artifacts_data:/data/artifacts
 
-# The log of every service except the API and the web: json-file WITH a
-# ceiling. Without max-size, json-file grows until the disk fills (Traefik's,
-# with the access log, fastest). LOG_MAX_SIZE x LOG_MAX_FILE per container,
-# 10m x 5 by default; `docker compose logs` reads the rotated files too.
+# The log of every service except the API and the web: the block
+# `servicos-${LOG_SERVICOS:-rotacionado}` of docker-compose.logs.yml. By
+# default json-file WITH a ceiling — without max-size, json-file grows until
+# the disk fills (Traefik's, with the access log, fastest); LOG_MAX_SIZE x
+# LOG_MAX_FILE per container, 10m x 5. `LOG_SERVICOS=daemon` keeps the
+# daemon's own driver instead (a host that ships every log via daemon.json).
 #
 # api-prod and web-prod follow LOG_DRIVER instead (default json-file, which
 # runs on any host). json-file deletes the log along with the container, and
@@ -147,12 +149,6 @@ x-api-volumes: &api-volumes
 # max-size/max-file options json-file needs, so the options of each driver
 # live in docker-compose.logs.yml and the service picks its block by name
 # (`extends`, `api-${LOG_DRIVER}`).
-x-log-rotacionado: &log-rotacionado
-  driver: json-file
-  options:
-    max-size: ${LOG_MAX_SIZE:-10m}
-    max-file: ${LOG_MAX_FILE:-5}
-
 services:
 
   redis:
@@ -164,7 +160,9 @@ services:
     # (REDIS_IMAGE=redis:7-alpine) or switches starting from an empty volume.
     image: ${REDIS_IMAGE:-valkey/valkey:8-alpine}
     restart: unless-stopped
-    logging: *log-rotacionado
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     command: >
@@ -227,7 +225,9 @@ services:
       # below); in the container uvicorn always listens on 8000.
       - "127.0.0.1:${API_PORT:-8000}:8000"
     restart: unless-stopped
-    logging: *log-rotacionado
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     volumes:
       - .:/app
       - artifacts_data:/data/artifacts
@@ -323,7 +323,9 @@ services:
       - ./web:/app
       - /app/node_modules
     restart: unless-stopped
-    logging: *log-rotacionado
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     networks:
       - backend
       - dev-net
@@ -354,7 +356,9 @@ services:
     image: smallstep/step-ca:0.27.0
     profiles: ["executor-local"]
     restart: unless-stopped
-    logging: *log-rotacionado
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     environment:
       DOCKER_STEPCA_INIT_NAME: "Atlans Internal CA"
       DOCKER_STEPCA_INIT_DNS_NAMES: "step-ca,localhost"
@@ -384,7 +388,9 @@ services:
     image: traefik:v3.6
     profiles: ["executor-local"]
     restart: unless-stopped
-    logging: *log-rotacionado
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     depends_on:
       # The host certificate is issued before the CA starts: healthy means it exists.
       step-ca-dev:
@@ -448,7 +454,9 @@ services:
       context: .
       dockerfile: Dockerfile.executor
     restart: unless-stopped
-    logging: *log-rotacionado
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     depends_on:
       traefik-dev:
         condition: service_started
@@ -492,7 +500,9 @@ services:
       context: .
       dockerfile: Dockerfile.api
     restart: unless-stopped
-    logging: *log-rotacionado
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     depends_on:
       # Started first, the executor's image creates the shared volume with its
       # own user, the same uid as this one: otherwise it would be born root's.
@@ -530,7 +540,9 @@ services:
     image: smallstep/step-ca:0.27.0
     profiles: ["prod"]
     restart: unless-stopped
-    logging: *log-rotacionado
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     environment:
       DOCKER_STEPCA_INIT_NAME: "Atlans Internal CA"
       DOCKER_STEPCA_INIT_DNS_NAMES: "step-ca,localhost"
@@ -559,7 +571,9 @@ services:
     # on every daemon start, however it stopped; a `docker stop` still holds
     # until the next one.
     restart: always
-    logging: *log-rotacionado
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     ports:
       - "80:80"
       - "443:443"
@@ -943,7 +957,9 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    logging: *log-rotacionado
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     # Artifact upload/download buffers can grow; 2GB covers the typical usage
     # of workflows with multiple medium-sized files in parallel.
     deploy:

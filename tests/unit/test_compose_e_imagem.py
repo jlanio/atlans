@@ -109,45 +109,56 @@ def _blocos_por_driver() -> dict:
     return yaml.safe_load(LOGS_POR_DRIVER.read_text(encoding="utf-8"))["services"]
 
 
+_POR_SERVICOS = "servicos-${LOG_SERVICOS:-rotacionado}"
+# Drivers that take neither max-size nor max-file (they ship elsewhere, with
+# their own ceiling); Docker refuses to create the container with an option
+# the driver does not know.
+_SEM_ROTACAO = {"journald", "syslog", "gelf", "fluentd", "awslogs", "splunk"}
+
+
 def _assert_bounded(nome: str, logging: dict) -> None:
-    """json-file only with max-size/max-file; journald (its own ceiling) without
-    them — Docker refuses to create the container with an option the driver
-    does not know."""
+    """json-file/local only with max-size/max-file; the drivers that ship the
+    log elsewhere without them."""
     opcoes = logging.get("options") or {}
-    if logging["driver"] == "json-file":
+    if logging["driver"] in ("json-file", "local"):
         assert opcoes.get("max-size") == "${LOG_MAX_SIZE:-10m}", nome
         assert opcoes.get("max-file") == "${LOG_MAX_FILE:-5}", nome
     else:
-        assert logging["driver"] == "journald", nome
+        assert logging["driver"] in _SEM_ROTACAO, nome
         assert not {"max-size", "max-file"} & set(opcoes), nome
 
 
 def test_every_service_log_has_a_ceiling():
     """A service without `logging` gets the daemon's default — json-file with no
     ceiling on a stock Docker: Traefik's access log, Redis' saves every minute
-    and the executor's jobs grew until the disk filled."""
+    and the executor's jobs grew until the disk filled. The only way to the
+    daemon's driver is the explicit `LOG_SERVICOS=daemon` (servicos-daemon)."""
     blocos = _blocos_por_driver()
     for nome, bloco in blocos.items():
+        if nome == "servicos-daemon":
+            assert "logging" not in bloco, nome
+            continue
         _assert_bounded(f"docker-compose.logs.yml:{nome}", bloco["logging"])
 
     executor = yaml.safe_load(COMPOSE_EXECUTOR.read_text(encoding="utf-8"))["services"]
-    servicos = {
-        **{f"docker-compose.yml:{n}": s for n, s in _compose()["services"].items()},
-        **{f"docker-compose.executor.yml:{n}": s for n, s in executor.items()},
-    }
-    for nome, servico in servicos.items():
-        if "extends" in servico:
-            # api-prod and web-prod: the block of LOG_DRIVER, which exists for
-            # both documented drivers.
-            assert servico["extends"]["file"] == "docker-compose.logs.yml", nome
-            base = servico["extends"]["service"]
-            assert base.endswith(f"-{_POR_DRIVER}"), nome
-            prefixo = base.removesuffix(_POR_DRIVER)
-            assert {f"{prefixo}json-file", f"{prefixo}journald"} <= set(blocos), nome
-            assert "logging" not in servico, nome
+    for nome, servico in executor.items():
+        assert "logging" in servico, f"docker-compose.executor.yml:{nome}: sem logging"
+        _assert_bounded(f"docker-compose.executor.yml:{nome}", servico["logging"])
+
+    for nome, servico in _compose()["services"].items():
+        assert "extends" in servico, f"{nome}: sem extends, vale o padrao do daemon"
+        assert servico["extends"]["file"] == "docker-compose.logs.yml", nome
+        assert "logging" not in servico, nome
+        base = servico["extends"]["service"]
+        if base == _POR_SERVICOS:
+            assert {"servicos-rotacionado", "servicos-daemon"} <= set(blocos), nome
             continue
-        assert "logging" in servico, f"{nome}: sem logging, vale o padrao do daemon"
-        _assert_bounded(nome, servico["logging"])
+        # api-prod and web-prod: the block of LOG_DRIVER.
+        assert base.endswith(f"-{_POR_DRIVER}"), nome
+        prefixo = base.removesuffix(_POR_DRIVER)
+        assert {
+            f"{prefixo}{d}" for d in ("json-file", "journald", "local", "syslog", "gelf", "fluentd")
+        } <= set(blocos), nome
 
 
 def test_the_api_and_web_keep_their_journald_tags():

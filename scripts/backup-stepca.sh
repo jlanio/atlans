@@ -28,13 +28,14 @@ fi
 # those keys, in clear text): only whoever runs the backup may read it. umask
 # 077 before anything is created makes a new directory 0700 and each archive
 # 0600; an existing directory keeps the mode it was born with, so it is
-# tightened too — and if that fails (a directory owned by someone else), the
-# backup is not written there.
+# tightened too. If that fails (a directory owned by root while the backup
+# runs as a docker-group user, an NFS export with root_squash), the backup is
+# still written — skipping it would lose the CA's only copy — with a warning:
+# the archive itself is born 0600 by the umask, whatever the directory.
 umask 077
 mkdir -p "$BACKUP_DIR"
-if ! chmod 700 "$BACKUP_DIR"; then
-    err "Nao foi possivel restringir ${BACKUP_DIR} a 0700 (o diretorio e de outro usuario?)."
-    exit 1
+if ! chmod 700 "$BACKUP_DIR" 2>/dev/null; then
+    err "AVISO: nao foi possivel restringir ${BACKUP_DIR} a 0700 (o diretorio e de outro usuario?); o arquivo do backup sai 0600 mesmo assim."
 fi
 # Archives written by earlier versions of this script were born 0644.
 chmod 600 "$BACKUP_DIR"/step-ca-*.tar.gz 2>/dev/null || true

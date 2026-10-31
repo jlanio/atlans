@@ -110,3 +110,25 @@ def test_retention_keeps_the_most_recent(rodar):
     assert len(restantes) == 2
     assert "step-ca-2026-01-03-0300.tar.gz" in restantes   # the newest of the old ones
     assert "step-ca-2026-01-01-0300.tar.gz" not in restantes
+
+
+def test_a_directory_that_cannot_be_tightened_still_gets_the_backup(rodar, tmp_path):
+    """A directory owned by root while the backup runs as a docker-group user
+    (or an NFS export with root_squash): exiting lost the CA's only copy. The
+    backup is written with a warning — the archive is 0600 regardless (fix
+    review)."""
+    executar, destino = rodar
+    bin_dir = tmp_path / "bin"
+    chmod_falso = bin_dir / "chmod"
+    # Fails only for the directory itself; archives still get their mode.
+    chmod_falso.write_text(
+        '#!/bin/sh\n[ "$2" = "$BACKUP_DIR" ] && exit 1\nexec /bin/chmod "$@"\n'
+    )
+    chmod_falso.chmod(0o755)
+
+    resultado = executar()
+
+    assert resultado.returncode == 0, resultado.stderr
+    assert "AVISO" in resultado.stderr
+    (arquivo,) = destino.glob("step-ca-*.tar.gz")
+    assert _modo(arquivo) == 0o600

@@ -91,6 +91,49 @@ _SSL_OFF = {"disable", "false", "0", "no", "allow"}
 _SSL_VERIFY = {"verify-ca", "verify-full"}
 
 
+def _bundle_do_sistema() -> str | None:
+    """The system's CA bundle file, the one Python's `ssl` trusts by default."""
+    import ssl
+
+    caminhos = ssl.get_default_verify_paths()
+    for candidato in (caminhos.cafile, caminhos.openssl_cafile, "/etc/ssl/certs/ca-certificates.crt"):
+        if candidato and os.path.isfile(candidato):
+            return candidato
+    try:
+        import certifi
+
+        return certifi.where()
+    except Exception:
+        return None
+
+
+def _raizes_confiaveis(ca_cert: str) -> str:
+    """`sslrootcert` with the roots the API trusts (app/core/db.py): the
+    system's, plus DATABASE_CA_CERT when that file exists.
+
+    libpq takes ONE file and, without it, looks only at ~/.postgresql/root.crt:
+    passing just DATABASE_CA_CERT (or nothing) made `alembic upgrade` refuse a
+    server whose certificate the API — with the same URL — accepted (a public
+    CA, a managed Postgres, an intermediate-only CA file). With a CA file, the
+    two go together in a private temporary bundle."""
+    sistema = _bundle_do_sistema()
+    if ca_cert and os.path.isfile(ca_cert):
+        if not sistema:
+            return ca_cert
+        import atexit
+        import tempfile
+
+        fd, combinado = tempfile.mkstemp(prefix="pg-roots-", suffix=".pem")
+        with os.fdopen(fd, "wb") as destino:
+            for origem in (sistema, ca_cert):
+                with open(origem, "rb") as f:
+                    destino.write(f.read().rstrip(b"\n") + b"\n")
+        atexit.register(lambda: os.path.exists(combinado) and os.remove(combinado))
+        return combinado
+    # libpq 16+ reads "system" as the OpenSSL default store.
+    return sistema or "system"
+
+
 def _connect_args(url: str) -> tuple[str, dict]:
     """(URL without ssl/sslmode, psycopg2 connect_args) — the TLS of DATABASE_URL.
 
@@ -104,9 +147,8 @@ def _connect_args(url: str) -> tuple[str, dict]:
     verify-ca/verify-full used to become `require` here: the API refused a server
     with the wrong certificate and `alembic upgrade`, with the same URL, accepted
     it — a MITM got the migration connection, with the owner's credentials.
-    Without DATABASE_CA_CERT, libpq looks for ~/.postgresql/root.crt and refuses
-    to connect if it is not there (the API falls back to the system's trusted
-    roots): set DATABASE_CA_CERT to verify against a private CA.
+    The roots trusted are the API's (`_raizes_confiaveis`): the system's, plus
+    DATABASE_CA_CERT when that file exists — the same URL connects in both.
     """
     connect_args: dict = {}
     match = re.search(r"[?&](?:ssl|sslmode)=([^&]+)", url)
@@ -123,11 +165,7 @@ def _connect_args(url: str) -> tuple[str, dict]:
         connect_args["sslmode"] = "disable"
     elif raw_value in _SSL_VERIFY:
         connect_args["sslmode"] = raw_value
-        # Even when the file does not exist: libpq then fails naming the path,
-        # instead of silently checking against another CA.
-        ca_cert = os.getenv("DATABASE_CA_CERT", "").strip()
-        if ca_cert:
-            connect_args["sslrootcert"] = ca_cert
+        connect_args["sslrootcert"] = _raizes_confiaveis(os.getenv("DATABASE_CA_CERT", "").strip())
     else:
         connect_args["sslmode"] = "require"
     return url, connect_args
