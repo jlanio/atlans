@@ -69,3 +69,30 @@ def test_the_api_receives_the_redis_password_to_encode_the_url():
     env = _compose()["x-api-env"]
     assert env["REDIS_URL"] == "redis://:${REDIS_PASSWORD}@redis:6379/0"
     assert env["REDIS_PASSWORD"] == "${REDIS_PASSWORD}"
+
+
+# ── API_PORT ─────────────────────────────────────────────────────────────────
+
+
+def _uvicorn_port(comando: str) -> str:
+    return re.search(r"--port (\d+)", comando).group(1)
+
+
+def test_the_web_reaches_the_api_on_the_port_it_listens_on():
+    """API_PORT was half honoured: web-prod called api-prod:${API_PORT} while
+    uvicorn always listens on the port of its command — any other API_PORT
+    broke the site. The internal hop uses the container's port."""
+    servicos = _compose()["services"]
+    porta = _uvicorn_port(servicos["api-prod"]["command"])
+    assert servicos["web-prod"]["environment"]["API_INTERNA"] == f"http://api-prod:{porta}"
+    rotulos = servicos["api-prod"]["labels"]
+    assert f"traefik.http.services.api-svc.loadbalancer.server.port={porta}" in rotulos
+
+
+def test_the_dev_browser_port_is_the_published_port():
+    """In dev the browser goes to localhost:NEXT_PUBLIC_API_PORT: the API has to
+    be published on that same host port (and listen on its own in the container)."""
+    servicos = _compose()["services"]
+    porta = _uvicorn_port(servicos["api"]["command"])
+    assert servicos["api"]["ports"] == [f"127.0.0.1:${{API_PORT:-8000}}:{porta}"]
+    assert servicos["web-dev"]["environment"]["NEXT_PUBLIC_API_PORT"] == "${API_PORT:-8000}"
