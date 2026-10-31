@@ -330,3 +330,23 @@ async def test_an_email_link_is_consumed_once():
         token = await token_service.create_email_verification_token(USUARIO)
         assert await token_service.verify_email_token(token) == USUARIO
         assert await token_service.verify_email_token(token) is None
+
+
+@pytest.mark.asyncio
+async def test_a_password_reset_clears_the_account_lockout(api_login):
+    """Locking the account by its username must not outlast a password reset:
+    the owner proved they hold the e-mail and gets the login back."""
+    client, r, estado = api_login
+    for _ in range(5):
+        await client.post("/auth/login", json={"identifier": "ana", "password": "errada"})
+    assert f"login_locked:account:{USUARIO}" in r.dados
+
+    estado["usuario"].email = "ana@exemplo.org"
+    with patch("app.api.routers.auth_router.verify_password_reset_token", AsyncMock(return_value=USUARIO)), \
+         patch("app.services.api_token_service.revoke_all_for_user", AsyncMock()):
+        resp = await client.post(
+            "/auth/reset-password",
+            json={"token": "t", "password": "NovaSenha!12345", "password_confirm": "NovaSenha!12345"},  # pragma: allowlist secret
+        )
+    assert resp.status_code == 200, resp.text
+    assert not [k for k in r.dados if k.startswith("login_locked:") or k.startswith("login_failed:")]

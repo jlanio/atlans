@@ -162,10 +162,10 @@ async def _test_db_connection(cred_type: str, data: dict) -> dict:
     porta = porta_valida(data.get("port")) if str(data.get("port") or "").strip() else padrao
     if porta is None:
         return {"ok": False, "message": "Porta inválida: use um número de 1 a 65535."}
-    from flow.utils.geo_helpers import validate_url_ssrf
-    alvo = f"[{host}]" if ":" in host and not host.startswith("[") else host
+    from flow.utils.geo_helpers import validated_addresses
+    nome = host[1:-1] if host.startswith("[") and host.endswith("]") else host
     try:
-        ip, _nome = await asyncio.to_thread(validate_url_ssrf, f"http://{alvo}:{porta}/")
+        ips = await asyncio.to_thread(validated_addresses, nome)
     except ValueError as exc:
         return {
             "ok": False,
@@ -177,26 +177,40 @@ async def _test_db_connection(cred_type: str, data: dict) -> dict:
 
     built = build_connection_data(cred_type, data)
     conn_str = built.get("connectionString", "")
+    tentativas: list[tuple[str, dict]] = []
     if cred_type == "postgresql":
-        # libpq connects to `hostaddr` and keeps `host` for TLS verification.
-        connect_args = {"connect_timeout": 5, "hostaddr": ip}
+        # libpq connects to `hostaddr` and keeps `host` for TLS verification. With
+        # a LIST of both (same length), it falls back from one address to the
+        # next, as it would on its own after resolving the name.
+        tentativas.append((conn_str, {
+            "connect_timeout": 5,
+            "host": ",".join([nome] * len(ips)),
+            "hostaddr": ",".join(ips),
+        }))
     else:
+        # The MySQL driver takes one address: try them in order, as libpq does.
         from urllib.parse import quote_plus
-        ip_na_url = f"[{ip}]" if ":" in ip else ip
-        conn_str = conn_str.replace(f"@{quote_plus(host)}:", f"@{ip_na_url}:", 1)
-        connect_args = {"connect_timeout": 5}
+        for ip in ips:
+            ip_na_url = f"[{ip}]" if ":" in ip else ip
+            tentativas.append((
+                conn_str.replace(f"@{quote_plus(host)}:", f"@{ip_na_url}:", 1),
+                {"connect_timeout": 5},
+            ))
 
     def _try_connect():
-        try:
-            import sqlalchemy
-            engine = sqlalchemy.create_engine(conn_str, connect_args=connect_args)
-            with engine.connect() as conn:
-                conn.execute(sqlalchemy.text("SELECT 1"))
-            engine.dispose()
-            return {"ok": True, "message": "Conexão estabelecida com sucesso!"}
-        except Exception as exc:
-            logger.warning("Falha no teste de conexão DB: %s", exc)
-            return {"ok": False, "message": "Falha na conexão com o banco de dados. Verifique as credenciais e o endereço do servidor."}
+        import sqlalchemy
+        for url, connect_args in tentativas:
+            try:
+                engine = sqlalchemy.create_engine(url, connect_args=connect_args)
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(sqlalchemy.text("SELECT 1"))
+                finally:
+                    engine.dispose()
+                return {"ok": True, "message": "Conexão estabelecida com sucesso!"}
+            except Exception as exc:
+                logger.warning("Falha no teste de conexão DB: %s", exc)
+        return {"ok": False, "message": "Falha na conexão com o banco de dados. Verifique as credenciais e o endereço do servidor."}
 
     try:
         return await asyncio.wait_for(asyncio.to_thread(_try_connect), timeout=10)

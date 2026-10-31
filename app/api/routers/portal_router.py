@@ -28,7 +28,9 @@ router = APIRouter(
 
 # ── Portal access gate (reusable) ─────────────────────────────────────────────
 
-async def enforce_portal_access(wf: "Workflow | None", request: Request) -> None:
+async def enforce_portal_access(
+    wf: "Workflow | None", request: Request, db: "AsyncSession | None" = None,
+) -> None:
     """Applies the portal's access control. Raises HTTPException if denied.
 
     disabled/nonexistent/inactive -> 404; public -> open; private -> access
@@ -65,22 +67,29 @@ async def enforce_portal_access(wf: "Workflow | None", request: Request) -> None
     # The sharing form offers "e-mail ou username", but the access token
     # carries no e-mail: an entry like `alice@exemplo.org` never matched and the
     # invited person got a 403. Only when the list has an e-mail, look it up.
-    if any("@" in item for item in allowed) and await _email_do_usuario(claims.get("sub")) in allowed:
+    # `db` is the request's own session: a second pooled session per tile, while
+    # the route's one holds a connection, exhausts the pool under a tile burst.
+    if any("@" in item for item in allowed) and await _email_do_usuario(claims.get("sub"), db) in allowed:
         return
     raise HTTPException(status_code=403, detail="Acesso negado a este portal.")
 
 
-async def _email_do_usuario(user_id_hash: str | None) -> str | None:
-    """The account's e-mail, lower-cased, if it is active. None otherwise."""
+async def _email_do_usuario(user_id_hash: str | None, db: "AsyncSession | None" = None) -> str | None:
+    """The account's e-mail, lower-cased, if it is active. None otherwise.
+
+    Reads on the caller's session when there is one (every route passes it);
+    its own session is only the fallback for a caller without one."""
     if not user_id_hash:
         return None
     from sqlalchemy import select as _select
     from app.core.db import AsyncSessionLocal
     from app.models.user import User
-    async with AsyncSessionLocal() as db:
-        row = (await db.execute(
-            _select(User.email, User.status).where(User.id_hash == user_id_hash)
-        )).first()
+    consulta = _select(User.email, User.status).where(User.id_hash == user_id_hash)
+    if db is not None:
+        row = (await db.execute(consulta)).first()
+    else:
+        async with AsyncSessionLocal() as propria:
+            row = (await propria.execute(consulta)).first()
     if not row or (row[1] and row[1] != "active") or not row[0]:
         return None
     return str(row[0]).strip().lower()
@@ -124,7 +133,7 @@ async def get_portal_data(
         ).where(Workflow.id_hash == workflow_hash)
     )
     wf = result.first()
-    await enforce_portal_access(wf, request)
+    await enforce_portal_access(wf, request, db)
 
     # Fetch layer metadata (without geojson_data)
     _pl_cols = (
@@ -466,7 +475,7 @@ async def download_portal_layer(
             Workflow.flag_ative, Workflow.portal_access, Workflow.portal_shared_with,
         ).where(Workflow.id_hash == pl.workflow_hash)
     )
-    await enforce_portal_access(wf_result.first(), request)
+    await enforce_portal_access(wf_result.first(), request, db)
 
     return JSONResponse(
         content=pl.geojson_data,
@@ -513,7 +522,7 @@ async def get_mvt_tile(
     )
     gate = gate_result.first()
 
-    await enforce_portal_access(gate, request)
+    await enforce_portal_access(gate, request, db)
 
     layer_id = gate.layer_id
     if layer_id is None:

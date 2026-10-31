@@ -393,6 +393,10 @@ class AsyncScheduler:
         proximo = self._compute_next(sched, slot)
         if proximo is not None and proximo <= now:
             proximo = self._compute_next(sched, now)
+        if not self._fires_at_a_fixed_hour(sched):
+            # An hourly (or more frequent) schedule fires in the repeated hour
+            # too, like cron does: skipping it left a 2-hour gap.
+            return proximo
         tz = self._tz_of(sched)
         relogio_do_slot = self._to_local(slot, tz).replace(tzinfo=None)
         tentativas = 0
@@ -404,6 +408,22 @@ class AsyncScheduler:
             proximo = self._compute_next(sched, proximo)
             tentativas += 1
         return proximo
+
+    @staticmethod
+    def _fires_at_a_fixed_hour(sched: Schedule) -> bool:
+        """Does the schedule name its hour(s)? Only then is a repeated local
+        time (DST ending) a duplicate firing to skip: "30 1 * * *" means ONE
+        01:30 a day, while "0 * * * *" means every hour, the repeated one too."""
+        if sched.strategy == "cron" and sched.cron_expression:
+            campos = sched.cron_expression.split()
+            if len(campos) < 2:
+                return False
+            hora = campos[1]
+            return not any(c in hora for c in "*/-")
+        if sched.strategy == "rrule" and sched.rrule_expression:
+            texto = sched.rrule_expression.upper()
+            return not any(f"FREQ={f}" in texto for f in ("HOURLY", "MINUTELY", "SECONDLY"))
+        return False
 
     @staticmethod
     def _to_local(after: datetime, tz: tzinfo) -> datetime:

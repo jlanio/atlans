@@ -287,9 +287,12 @@ async def _process_result(db, payload: dict) -> bool:
         and payload.get("status") != run.status
     )
 
+    # The guess was counted on the day the SERVER closed the run; read that
+    # moment before `_update_run_status` overwrites `end_time`.
+    fechado_pelo_servidor_em = run.end_time
     await _update_run_status(db, run, payload)
     if corrige_inferido:
-        await _correct_inferred_usage(db, run)
+        await _correct_inferred_usage(db, run, fechado_pelo_servidor_em)
 
     # Usage accounting comes FIRST: it is the only billing data and must not
     # depend on metrics (which the error path may not produce).
@@ -1467,11 +1470,14 @@ async def _upsert_usage_daily(db, run: WorkflowRun, stats: dict, first_close: bo
     logger.debug("run %s: usage_daily atualizado (status=%s).", run.task_id, run.status)
 
 
-async def _correct_inferred_usage(db, run: WorkflowRun) -> None:
+async def _correct_inferred_usage(db, run: WorkflowRun, contado_em=None) -> None:
     """Moves a run counted as a failure (the server's guess) to its real outcome.
 
     Only the outcome counters change; the run was already in `total_runs`.
-    Best-effort: a failure here is logged, never blocks the run's update.
+    The row is the one of the day the guess was counted (`contado_em`, the
+    server's close): across midnight, today's row would move another run's
+    failure, or none. Best-effort: a failure here is logged, never blocks the
+    run's update.
     """
     from app.models.run_metrics import UsageDaily
     from sqlalchemy import update as sa_update
@@ -1482,7 +1488,7 @@ async def _correct_inferred_usage(db, run: WorkflowRun) -> None:
         await db.execute(
             sa_update(UsageDaily)
             .where(
-                UsageDaily.date == utc_now_naive().date(),
+                UsageDaily.date == _utc_date(contado_em),
                 UsageDaily.workspace_id == run.workspace_id,
                 UsageDaily.failed_runs > 0,
             )
@@ -1496,6 +1502,15 @@ async def _correct_inferred_usage(db, run: WorkflowRun) -> None:
         logger.warning("run %s: correcao de usage_daily nao aplicada: %s", run.task_id, exc)
         with contextlib.suppress(Exception):
             await db.rollback()
+
+
+def _utc_date(momento):
+    """The UTC date of a moment (naive = already UTC); today without one."""
+    if momento is None:
+        return utc_now_naive().date()
+    if getattr(momento, "tzinfo", None) is not None:
+        momento = momento.astimezone(timezone.utc)
+    return momento.date()
 
 
 def _ip_do_payload(payload: dict) -> str | None:
@@ -1663,6 +1678,25 @@ _CONSUMER_HEARTBEAT_S = 15
 _RECLAIM_INTERVAL_S = 60
 
 
+async def _keep_alive(r: aioredis.Redis, chave_viva: str) -> None:
+    """Renews the consumer's liveness key for as long as the consumer lives.
+
+    A task of its own, not a step of the loop: renewed only BETWEEN items, an
+    item that took longer than the TTL (a `FOR UPDATE` wait, slow storage)
+    looked abandoned, and another worker put it back on the queue while this
+    one was still processing it — the same result handled twice, at the same
+    time. A Redis error only skips a beat; the loop's own reconnect handles a
+    dead connection."""
+    while True:
+        try:
+            await r.set(chave_viva, "1", ex=_CONSUMER_ALIVE_TTL_S)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.warning("Consumer: falha ao renovar a chave de vida: %s", exc)
+        await asyncio.sleep(_CONSUMER_HEARTBEAT_S)
+
+
 async def _reclaim_abandoned(r: aioredis.Redis, queue: str, my_processing: str) -> int:
     """Moves back to the queue the items of consumers that are gone."""
     devolvidos = 0
@@ -1734,6 +1768,13 @@ async def _handle_item(r: aioredis.Redis, queue: str, handler, raw: str) -> None
         logger.error("Payload inválido na fila %s: %s — %s", queue, raw[:200], exc)
         await r.lpush(QUEUE_DEAD_LETTER, raw)
         return
+    if not isinstance(payload, dict):
+        # Valid JSON that is not an object: every path below reads it as a dict,
+        # and the error handler itself would raise — the item would stay in the
+        # processing list and crash a consumer on every reclaim.
+        logger.error("Payload que nao e objeto na fila %s: %s", queue, raw[:200])
+        await r.lpush(QUEUE_DEAD_LETTER, raw)
+        return
 
     try:
         async with AsyncSessionLocal() as db:
@@ -1801,16 +1842,21 @@ async def run_consumer_loop() -> None:
             consumidor = uuid.uuid4().hex
             processando = f"{QUEUE_PROCESSING_PREFIX}{consumidor}"
             vivo = f"{CONSUMER_ALIVE_PREFIX}{consumidor}"
-            proximo_pulso = proxima_reivindicacao = 0.0
-            while True:
-                agora = _time.monotonic()
-                if agora >= proximo_pulso:
-                    await r.set(vivo, "1", ex=_CONSUMER_ALIVE_TTL_S)
-                    proximo_pulso = agora + _CONSUMER_HEARTBEAT_S
-                if agora >= proxima_reivindicacao:
-                    await _reclaim_abandoned(r, QUEUE_RESULTS, processando)
-                    proxima_reivindicacao = agora + _RECLAIM_INTERVAL_S
-                await _consume_one(r, QUEUE_RESULTS, _process_result, processando)
+            # Alive BEFORE the first item, and renewed while an item is handled.
+            await r.set(vivo, "1", ex=_CONSUMER_ALIVE_TTL_S)
+            pulso = asyncio.create_task(_keep_alive(r, vivo))
+            try:
+                proxima_reivindicacao = 0.0
+                while True:
+                    agora = _time.monotonic()
+                    if agora >= proxima_reivindicacao:
+                        await _reclaim_abandoned(r, QUEUE_RESULTS, processando)
+                        proxima_reivindicacao = agora + _RECLAIM_INTERVAL_S
+                    await _consume_one(r, QUEUE_RESULTS, _process_result, processando)
+            finally:
+                pulso.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await pulso
         except asyncio.CancelledError:
             # API shutdown — propagate without reconnecting
             logger.info("Consumer run_results encerrado (cancelado).")

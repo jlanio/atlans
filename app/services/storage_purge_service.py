@@ -25,7 +25,7 @@ to delete it in a standalone deletion; here it is preserved and counted in
 """
 from __future__ import annotations
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.utils.datetime_utils import utc_now_naive
@@ -220,9 +220,16 @@ async def schedule_workspace_data_expiry(
     # Pins stay out: they do not follow retention (the cleanup skips them) and
     # are a cache the restored workflows still point to; the admin purge
     # removes them with everything else.
+    # Only artifacts not already due earlier: one the user removed carries an
+    # earlier "being removed" mark, and overwriting it with this delete's mark
+    # would let a restore bring it back.
     await db.execute(
         Artifact.__table__.update()
-        .where(Artifact.workspace_id == workspace_id, Artifact.is_pinned == False)  # noqa: E712
+        .where(
+            Artifact.workspace_id == workspace_id,
+            Artifact.is_pinned == False,  # noqa: E712
+            or_(Artifact.expires_at.is_(None), Artifact.expires_at > marca),
+        )
         .values(expires_at=marca)
     )
 

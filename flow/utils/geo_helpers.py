@@ -342,6 +342,42 @@ def validate_url_ssrf(url: str) -> tuple[str, str]:
     return resolved_ip, hostname
 
 
+def validated_addresses(hostname: str) -> list[str]:
+    """Every address `hostname` resolves to, in resolver order without repeats,
+    once ALL of them passed the same check as `validate_url_ssrf` — or
+    ValueError. One resolution: the caller connects to exactly these.
+
+    For clients that fall back from one address to the next (libpq with a
+    `hostaddr` list): pinning only the first broke a dual-stack or multi-address
+    host whose first address is unreachable."""
+    try:
+        direto = ipaddress.ip_address(hostname)
+    except ValueError:
+        direto = None
+    if direto is not None:
+        if _dangerous_address(direto):
+            raise ValueError(
+                f"Requisições para endereços internos/privados não são permitidas ({hostname})."
+            )
+        return [str(direto)]
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        raise ValueError(f"Não foi possível resolver o hostname '{hostname}'.")
+    enderecos: list[str] = []
+    for info in infos:
+        candidato = info[4][0]
+        if _dangerous_address(ipaddress.ip_address(candidato)):
+            raise ValueError(
+                f"Requisições para endereços internos/privados não são permitidas ({candidato})."
+            )
+        if candidato not in enderecos:
+            enderecos.append(candidato)
+    if not enderecos:
+        raise ValueError(f"Não foi possível resolver o hostname '{hostname}'.")
+    return enderecos
+
+
 def ensure_extension(path: str, ext: str) -> str:
     """Ensures `path` ends with the extension `ext` (e.g. '.shp', '.parquet')."""
     if not ext.startswith("."):

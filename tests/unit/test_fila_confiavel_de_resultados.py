@@ -112,3 +112,69 @@ async def test_the_items_of_a_dead_consumer_go_back_to_the_queue():
     # The consumer takes from the right: "a" (the oldest) comes out first.
     assert r.listas["run_results"] == ["b", "a"]
     assert r.listas["run_results:processando:vivo"] == ["c"]   # a live one is left alone
+
+
+# ── Regressions of the reliable queue (fix review) ───────────────────────────
+
+
+@pytest.mark.parametrize("bruto", ['["lista"]', '"texto"', "7", "null"])
+async def test_valid_json_that_is_not_an_object_goes_to_the_dead_letter(_sessao, bruto):
+    """It used to make the error handler itself raise (`payload.get` on a list):
+    the item stayed in the processing list and crashed a consumer on every reclaim."""
+    r = _RedisDeListas()
+    await r.lpush("run_results", bruto)
+    chamadas = []
+
+    async def _handler(_db, p):
+        chamadas.append(p)
+        return True
+
+    await rrc._consume_one(r, "run_results", _handler, "run_results:processando:eu")
+
+    assert chamadas == []
+    assert r.listas.get(rrc.QUEUE_DEAD_LETTER) == [bruto]
+    assert r.listas.get("run_results:processando:eu") == []
+
+
+async def test_the_liveness_key_is_renewed_while_an_item_is_handled(monkeypatch):
+    """A slow item (a FOR UPDATE wait, slow storage) must not look abandoned:
+    the key is renewed by its own task, not between items."""
+    r = _RedisDeListas()
+    renovacoes = []
+    original = r.set
+
+    async def _set(k, v, ex=None, nx=False):
+        renovacoes.append(k)
+        await original(k, v, ex=ex, nx=nx)
+
+    r.set = _set
+    monkeypatch.setattr(rrc, "_CONSUMER_HEARTBEAT_S", 0.01)
+
+    pulso = asyncio.create_task(rrc._keep_alive(r, "run_results:consumidor:eu"))
+    await asyncio.sleep(0.06)          # "processing" a slow item, no loop iteration
+    pulso.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await pulso
+
+    assert renovacoes.count("run_results:consumidor:eu") >= 3
+
+
+async def test_a_redis_error_only_skips_a_beat(monkeypatch):
+    r = _RedisDeListas()
+    falhas = {"n": 0}
+    original = r.set
+
+    async def _set(k, v, ex=None, nx=False):
+        if falhas["n"] < 2:
+            falhas["n"] += 1
+            raise ConnectionError("redis piscou")
+        await original(k, v, ex=ex, nx=nx)
+
+    r.set = _set
+    monkeypatch.setattr(rrc, "_CONSUMER_HEARTBEAT_S", 0.01)
+    pulso = asyncio.create_task(rrc._keep_alive(r, "vivo"))
+    await asyncio.sleep(0.06)
+    pulso.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await pulso
+    assert r.chaves.get("vivo") == "1"

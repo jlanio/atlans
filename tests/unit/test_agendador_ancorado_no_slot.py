@@ -43,3 +43,23 @@ def test_cron_that_missed_slots_does_not_fire_in_the_past():
     slot = datetime(2026, 11, 1, 1, 0)
     agora = datetime(2026, 11, 1, 5, 20)
     assert AsyncScheduler()._next_after_fire(s, slot, agora) == datetime(2026, 11, 1, 6, 0)
+
+
+def test_an_hourly_cron_fires_in_the_repeated_hour_too():
+    # 2026-11-01 01:00 happens twice in New York (05:00 and 06:00 UTC). An hourly
+    # schedule fires in both, like cron: skipping the second left a 2-hour gap.
+    s = _sched(cron_expression="0 * * * *", timezone="America/New_York")
+    slot = datetime(2026, 11, 1, 5, 0)           # the first 01:00 (EDT)
+    proximo = AsyncScheduler()._next_after_fire(s, slot, slot + timedelta(seconds=20))
+    assert proximo == datetime(2026, 11, 1, 6, 0)   # the second 01:00 (EST)
+
+
+def test_which_schedules_name_their_hour():
+    fixo = AsyncScheduler._fires_at_a_fixed_hour
+    assert fixo(_sched(cron_expression="30 1 * * *")) is True
+    assert fixo(_sched(cron_expression="0 1,13 * * *")) is True
+    assert fixo(_sched(cron_expression="0 * * * *")) is False
+    assert fixo(_sched(cron_expression="*/5 */2 * * *")) is False
+    assert fixo(_sched(cron_expression="0 9-17 * * 1-5")) is False
+    assert fixo(_sched(strategy="rrule", rrule_expression="FREQ=DAILY;BYHOUR=1")) is True
+    assert fixo(_sched(strategy="rrule", rrule_expression="FREQ=HOURLY")) is False

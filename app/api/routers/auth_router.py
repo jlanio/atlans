@@ -443,6 +443,17 @@ async def reset_password(
     # sessions still alive.
     await revoke_user_sessions(user.id_hash)
     await db.commit()
+    # Whoever proved they own the e-mail gets the login back: the account's
+    # lockout (and the identifiers' buckets) would otherwise keep them out for
+    # up to 15 minutes with the NEW password. Best-effort.
+    try:
+        from app.core.redis import get_redis_pool
+
+        r = get_redis_pool()
+        for balde in (_account_bucket(user), user.username.lower(), user.email.lower()):
+            await _clear_attempts(balde, r)
+    except Exception as exc:
+        logger.warning("Lockout de '%s' nao limpo apos a redefinicao: %s", user.username, exc)
     logger.info("Senha do usuário '%s' redefinida.", user.username)
     return MessageResponse(message="Senha redefinida com sucesso!")
 
