@@ -91,14 +91,6 @@ const EXCECOES: { arquivo: string; motivo: string }[] = [
     arquivo: "app/hooks/home/useCamadas.ts",
     motivo: "fetch cross-origin da URL pré-assinada, sem Authorization",
   },
-  {
-    // Before reconnecting the run socket, a fresh access token comes from
-    // next-auth's OWN route (/api/auth/session, on the Next server — not the
-    // API). `getSession` would broadcast to every tab, and a session fetch that
-    // fails during the outage that dropped the socket turned the tab anonymous.
-    arquivo: "app/hooks/workflow/useExecuteWorkflow.ts",
-    motivo: "token da sessão via rota do next-auth, sem broadcast; não é chamada à API",
-  },
 ]
 
 function tsFiles(dir: string, acc: string[] = []): string[] {

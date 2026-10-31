@@ -34,10 +34,12 @@ const canvasNodes = [
 /** The session SessionProvider holds, and the one /api/auth/session answers now. */
 let sessaoNoProvider: unknown = null
 const getSession = vi.fn(async (): Promise<unknown> => null)
+/** `useSession().update()` — what /api/auth/session answers now (null = the fetch failed). */
+const atualizarSessao = vi.fn(async (): Promise<unknown> => null)
 
 vi.mock("next/navigation", () => ({ useParams: () => ({ id: currentWorkflow }) }))
 vi.mock("next-auth/react", () => ({
-  useSession: () => ({ data: sessaoNoProvider }),
+  useSession: () => ({ data: sessaoNoProvider, update: atualizarSessao }),
   getSession: () => getSession(),
 }))
 vi.mock("@/app/hooks/workflow/useSaveWorkflow", () => ({
@@ -113,6 +115,8 @@ describe("recuperação do stream de execução", () => {
     sessaoNoProvider = null
     getSession.mockReset()
     getSession.mockResolvedValue(null)
+    atualizarSessao.mockReset()
+    atualizarSessao.mockResolvedValue(null)
     vi.stubGlobal("WebSocket", FakeSocket)
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
       const id = nextFrame++
@@ -417,27 +421,53 @@ describe("recuperação do stream de execução", () => {
     act(() => { ws.onopen?.() })
     expect(ws.enviados).toEqual(["TOKEN-DO-ANEXO"])
 
-    // A plain fetch of /api/auth/session — not getSession, which broadcasts and,
-    // failing during the outage, would turn the tab anonymous.
-    const buscas: string[] = []
-    const fetchOriginal = globalThis.fetch
-    globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {
-      buscas.push(String(url))
-      return new Response(JSON.stringify({ user: { access_token: "TOKEN-RENOVADO" } }), { status: 200 })
-    }) as typeof fetch
-    try {
-      vi.useFakeTimers()
-      await act(async () => { ws.cairDoServidor(4401) })
-      await act(async () => { await vi.advanceTimersByTimeAsync(1_100) })
+    // `update()`: keeps the session if the fetch fails (getSession turned the
+    // tab anonymous) and tells the provider, so a dead refresh signs out.
+    atualizarSessao.mockResolvedValue({ user: { access_token: "TOKEN-RENOVADO" } })
+    vi.useFakeTimers()
+    await act(async () => { ws.cairDoServidor(4401) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_100) })
 
-      const ws2 = FakeSocket.abertos[1]
-      act(() => { ws2.onopen?.() })
-      expect(buscas).toContain("/api/auth/session")
-      expect(getSession).not.toHaveBeenCalled()
-      expect(ws2.enviados).toEqual(["TOKEN-RENOVADO"])
-    } finally {
-      globalThis.fetch = fetchOriginal
+    const ws2 = FakeSocket.abertos[1]
+    act(() => { ws2.onopen?.() })
+    expect(atualizarSessao).toHaveBeenCalled()
+    expect(getSession).not.toHaveBeenCalled()
+    expect(ws2.enviados).toEqual(["TOKEN-RENOVADO"])
+    view.unmount()
+  })
+
+  it("com o refresh token morto, para de reconectar", async () => {
+    // /api/auth/session answers 200 with `error: RefreshTokenExpired`: the
+    // token will never be accepted. Reconnecting looped forever — the API
+    // accepts the socket before the token, and the attempt counter reset on
+    // every open (round-2 review).
+    sessaoNoProvider = { user: { access_token: "VELHO" } }
+    const { view, ws } = await anexar()
+    act(() => { ws.onopen?.() })
+    atualizarSessao.mockResolvedValue({ user: { access_token: "VELHO" }, error: "RefreshTokenExpired" })
+
+    vi.useFakeTimers()
+    await act(async () => { ws.cairDoServidor(4401) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(20_000) })
+
+    expect(FakeSocket.abertos).toHaveLength(1)
+    view.unmount()
+  })
+
+  it("um token recusado em todo socket esgota as tentativas", async () => {
+    // Open → 4401 → open… with no frame ever arriving: the backoff must still
+    // count (it reset on `onopen`, before the refusal).
+    sessaoNoProvider = { user: { access_token: "RECUSADO" } }
+    atualizarSessao.mockResolvedValue({ user: { access_token: "RECUSADO" } })
+    const { view } = await anexar()
+    vi.useFakeTimers()
+    for (let i = 0; i < 12; i++) {
+      const atual = FakeSocket.abertos.at(-1)!
+      act(() => { atual.onopen?.() })
+      await act(async () => { atual.cairDoServidor(4401) })
+      await act(async () => { await vi.advanceTimersByTimeAsync(20_000) })
     }
+    expect(FakeSocket.abertos.length).toBeLessThanOrEqual(9)
     view.unmount()
   })
 
@@ -515,6 +545,38 @@ describe("recuperação do stream de execução", () => {
     act(() => { runPendingFrames() })
 
     expect(useWorkflowExecutionStore.getState().events).toHaveLength(4)
+    view.unmount()
+  })
+
+  it("o replay é reconhecido pelo conteúdo, não pelo relógio do executor", async () => {
+    // The executor's clock stepped back: the replay's events carry the same
+    // timestamps as the panel's, but a NEW live event before them has an
+    // older time. Judged by clock, the batch looked new and doubled the log.
+    const store = useWorkflowExecutionStore.getState()
+    store.startExecution(canvasNodes.map(n => ({ ...n, status: "idle" })) as unknown as INodeStatusWorkFlow[])
+    store.setTaskId(RUN)
+    store.appendEvents(historico.map(toRunEvent))
+
+    const { view, ws } = await anexar()
+    act(() => { ws.onmessage?.(quadro(historico)) })
+    act(() => { runPendingFrames() })
+
+    expect(useWorkflowExecutionStore.getState().events).toHaveLength(4)
+    view.unmount()
+  })
+
+  it("um quadro ilegível antes do replay mantém o aviso de descarte", async () => {
+    const store = useWorkflowExecutionStore.getState()
+    store.startExecution(canvasNodes.map(n => ({ ...n, status: "idle" })) as unknown as INodeStatusWorkFlow[])
+    store.setTaskId(RUN)
+    store.appendEvents(historico.map(toRunEvent))
+
+    const { view, ws } = await anexar()
+    act(() => { ws.onmessage?.({ data: "{corrompido" }) })
+    act(() => { ws.onmessage?.(quadro(historico)) })
+    act(() => { runPendingFrames() })
+
+    expect(useWorkflowExecutionStore.getState().droppedEvents).toBe(1)
     view.unmount()
   })
 

@@ -88,9 +88,15 @@ export function Onboarding({
   }, [config.executorId])
 
   // Deep link: what arrived before mounting (invoke) and what arrives after (push).
+  // A push RECEIVED here also clears the main process's kept copy (the invoke
+  // consumes it): kept, it came back on the next Onboarding within 10 minutes
+  // — after enrolling with it, or after "Ignorar" — with an already used OTP.
   useEffect(() => {
     void window.atlas.deepLinkPendente().then((p) => { if (p) setLinkRequest(p) })
-    return window.atlas.aoReceberDeepLink(setLinkRequest)
+    return window.atlas.aoReceberDeepLink((pedido) => {
+      setLinkRequest(pedido)
+      void window.atlas.deepLinkPendente()
+    })
   }, [])
 
   const podeEnviar = executorId.trim() && otp.trim() && !enviando
