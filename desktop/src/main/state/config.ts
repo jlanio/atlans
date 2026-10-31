@@ -125,6 +125,48 @@ export function lerGeoSync(): ConfigGeoSync {
 export interface InvalidFolder { caminho: string; motivo: string }
 
 /**
+ * Characters that cannot go into a `.env` value.
+ *
+ * A line break would split the value into a NEW line that python-dotenv loads
+ * as a variable of its own — `SERVER_SIGNING_PUBLIC_KEY`, `ATLANS_CA_SHA256`
+ * and others the spawn does not pin. NUL makes `spawn()` throw when the value
+ * reaches the executor's environment.
+ */
+const CARACTERES_PROIBIDOS = /[\r\n\0]/
+
+/** Only keys the executor could define, in the case it uses. */
+const CHAVE_VALIDA = /^[A-Z0-9_]+$/
+
+/** True only for an existing DIRECTORY — a file, a missing path or an unreadable one is false. */
+export function ehPasta(p: string): boolean {
+  try {
+    return fs.statSync(p).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Resolves `caminho` against the allowlist of `abrirCaminho`; null if it is
+ * not on it.
+ *
+ * `shell.openPath` on a FILE executes it (ShellExecute "open"), and the folder
+ * entries come from the `.env`, which the renderer writes. So the comparison is
+ * between resolved paths (no `..`, no mixed separators), and a folder entry
+ * only counts while it really is a directory. The `.env` itself is the only
+ * file the app opens.
+ */
+export function caminhoParaAbrir(
+  caminho: unknown, arquivos: string[], pastas: Array<string | null>,
+): string | null {
+  if (typeof caminho !== 'string' || !caminho.trim()) return null
+  const alvo = path.resolve(caminho)
+  if (arquivos.some((a) => path.resolve(a) === alvo)) return alvo
+  if (pastas.some((p) => p && path.resolve(p) === alvo) && ehPasta(alvo)) return alvo
+  return null
+}
+
+/**
  * `EXECUTOR_SYNC_DIRS` is a COMMA-separated list, and Python splits it blindly
  * (`config.py`: `SYNC_DIRS.split(",")`). A folder with a comma in its name
  * would become two nonexistent entries, and GeoSync would sync nothing without
@@ -133,10 +175,16 @@ export interface InvalidFolder { caminho: string; motivo: string }
  */
 export function validateFolder(pasta: string | null): InvalidFolder | null {
   if (!pasta) return null
+  if (CARACTERES_PROIBIDOS.test(pasta)) {
+    return { caminho: pasta, motivo: 'o caminho contém uma quebra de linha' }
+  }
   if (pasta.includes(',')) {
     return { caminho: pasta, motivo: 'o caminho contém vírgula, que separa as pastas na configuração' }
   }
   if (!fs.existsSync(pasta)) return { caminho: pasta, motivo: 'a pasta não existe' }
+  // A file passed `existsSync`, and the folder is on the allowlist of
+  // `abrirCaminho` — which would then launch it.
+  if (!ehPasta(pasta)) return { caminho: pasta, motivo: 'o caminho não é uma pasta' }
   return null
 }
 
@@ -189,11 +237,20 @@ export function lerExecucao(defaultArtifactsDir: string): RunConfig {
 }
 
 export function gravarExecucao(cfg: RunConfig): void {
+  const pasta = cfg.artifactsDir.trim()
+  if (CARACTERES_PROIBIDOS.test(pasta)) {
+    throw new Error('A pasta de artefatos não foi salva: o caminho contém uma quebra de linha.')
+  }
+  // A folder that does not exist yet is fine: the executor creates it. An
+  // existing FILE is not — this value is on the allowlist of `abrirCaminho`.
+  if (pasta && fs.existsSync(pasta) && !ehPasta(pasta)) {
+    throw new Error(`A pasta de artefatos não foi salva: "${pasta}" é um arquivo, não uma pasta.`)
+  }
   gravarEnv({
     EXECUTOR_MAX_CONCURRENT: String(inteiroDoEnv(String(cfg.workers), LIMITES.workers)),
     EXECUTOR_MAX_QUEUE_SIZE: String(inteiroDoEnv(String(cfg.filaMax), LIMITES.filaMax)),
     EXECUTOR_JOB_TIMEOUT: String(inteiroDoEnv(String(cfg.timeoutS), LIMITES.timeoutS)),
-    EXECUTOR_ARTIFACTS_DIR: cfg.artifactsDir.trim(),
+    EXECUTOR_ARTIFACTS_DIR: pasta,
     // Reasserted on every save, and not read from `cfg`: if someone hand-edited
     // the `.env` to another address, saving any setting brings the file back
     // to the correct server instead of preserving the change.
@@ -245,6 +302,18 @@ export function lerEnv(): Record<string, string> {
  *   - a commented-out key (`# EXECUTOR_X=`) does NOT count as existing.
  */
 export function gravarEnv(valores: Record<string, string>): void {
+  // Validated BEFORE touching the file, so a refusal writes nothing. The values
+  // come from the renderer (folder, workspace), and `trim()` only cleans the
+  // ends: an embedded line break became a new variable in the `.env`. Throwing
+  // instead of stripping: silently saving something other than what was asked
+  // is worse than saying no.
+  for (const [chave, valor] of Object.entries(valores)) {
+    if (!CHAVE_VALIDA.test(chave)) throw new Error(`Chave inválida para o .env: ${JSON.stringify(chave)}`)
+    if (typeof valor !== 'string' || CARACTERES_PROIBIDOS.test(valor)) {
+      throw new Error(`Valor recusado para ${chave}: quebras de linha não são permitidas.`)
+    }
+  }
+
   fs.mkdirSync(path.dirname(ENV_FILE), { recursive: true })
 
   const original = fs.existsSync(ENV_FILE) ? fs.readFileSync(ENV_FILE, 'utf8') : ''

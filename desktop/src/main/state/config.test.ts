@@ -25,8 +25,8 @@ vi.mock('../paths.js', () => ({
 }))
 
 const {
-  artifactsDirEfetivo, descartarEnrollment, gravarEnv, gravarExecucao, gravarGeoSync,
-  lerConfiguracao, lerEnv, lerExecucao, lerGeoSync,
+  artifactsDirEfetivo, caminhoParaAbrir, descartarEnrollment, gravarEnv, gravarExecucao, gravarGeoSync,
+  lerConfiguracao, lerEnv, lerExecucao, lerGeoSync, validateFolder,
 } = await import('./config.js')
 
 beforeEach(() => {
@@ -142,6 +142,23 @@ describe('gravarEnv', () => {
     const primeiro = fs.readFileSync(envFile, 'utf8')
     gravarEnv({ EXECUTOR_ID: 'abc' })
     expect(fs.readFileSync(envFile, 'utf8')).toBe(primeiro)
+  })
+
+  it.each(['a\nB=2', 'a\rB=2', 'a\r\nB=2', 'a\0'])(
+    'recusa valor com quebra de linha (%j) sem escrever nada',
+    (valor) => {
+      // An embedded `\n` became a NEW line, which python-dotenv loads as a
+      // variable of its own — SERVER_SIGNING_PUBLIC_KEY, for one, which
+      // replaces the server key pinned at enrollment.
+      escrever('A=1\n')
+      expect(() => gravarEnv({ EXECUTOR_ID: 'novo', B: valor })).toThrow(/B/)
+      expect(fs.readFileSync(envFile, 'utf8')).toBe('A=1\n')
+    },
+  )
+
+  it.each(['exec_id', 'A B', 'A=B', 'A\nB', ''])('recusa chave fora do formato (%j)', (chave) => {
+    expect(() => gravarEnv({ [chave]: 'x' })).toThrow(/Chave/)
+    expect(fs.existsSync(envFile)).toBe(false)
   })
 })
 
@@ -350,6 +367,32 @@ describe('configuração de execução', () => {
     expect(lerEnv().EXECUTOR_JOB_TIMEOUT).toBe('3600')
   })
 
+  it('pasta de artefatos com quebra de linha não injeta variável no .env', () => {
+    const cfg = {
+      workers: 4, filaMax: 50, timeoutS: 60, nivelLog: 'INFO' as const,
+      artifactsDir: 'D:/dados\nSERVER_SIGNING_PUBLIC_KEY=chave-do-atacante',
+    }
+    expect(() => gravarExecucao(cfg)).toThrow(/quebra de linha/)
+    expect(lerEnv().SERVER_SIGNING_PUBLIC_KEY).toBeUndefined()
+  })
+
+  it('pasta de artefatos que é um ARQUIVO é recusada', () => {
+    // The value is on the allowlist of `abrirCaminho`, and `shell.openPath` on
+    // a file executes it.
+    const arquivo = path.join(tmp, 'payload.exe')
+    fs.writeFileSync(arquivo, 'MZ')
+    expect(() => gravarExecucao({
+      workers: 4, filaMax: 50, timeoutS: 60, artifactsDir: arquivo, nivelLog: 'INFO',
+    })).toThrow(/não uma pasta/)
+    expect(lerEnv().EXECUTOR_ARTIFACTS_DIR).toBeUndefined()
+  })
+
+  it('pasta de artefatos que ainda não existe é aceita — o executor a cria', () => {
+    const nova = path.join(tmp, 'ainda-nao-existe')
+    gravarExecucao({ workers: 4, filaMax: 50, timeoutS: 60, artifactsDir: nova, nivelLog: 'INFO' })
+    expect(lerEnv().EXECUTOR_ARTIFACTS_DIR).toBe(nova)
+  })
+
   it('preserva chaves que a tela não conhece', () => {
     escrever('EXECUTOR_HOST_ALIASES=db=localhost:5433\nMINIO_ENDPOINT=http://x\n')
     gravarExecucao({
@@ -410,5 +453,54 @@ describe('artifactsDirEfetivo', () => {
   it('valor em branco não vale como configuração', () => {
     escrever('EXECUTOR_ARTIFACTS_DIR=   \n')
     expect(artifactsDirEfetivo('C:/padrao')).toBe('C:/padrao')
+  })
+})
+
+describe('validateFolder', () => {
+  it('aceita uma pasta que existe', () => {
+    expect(validateFolder(tmp)).toBeNull()
+  })
+
+  it('recusa um arquivo — existir não basta', () => {
+    // `existsSync` let a file through, and the GeoSync folder is on the
+    // allowlist of `abrirCaminho`.
+    const arquivo = path.join(tmp, 'x.bat')
+    fs.writeFileSync(arquivo, '')
+    expect(validateFolder(arquivo)?.motivo).toMatch(/não é uma pasta/)
+  })
+
+  it('recusa quebra de linha', () => {
+    expect(validateFolder(`${tmp}\nEXECUTOR_X=1`)?.motivo).toMatch(/quebra de linha/)
+  })
+})
+
+describe('caminhoParaAbrir', () => {
+  const abrir = (c: unknown, pastas: Array<string | null>) => caminhoParaAbrir(c, [envFile], pastas)
+
+  it('abre uma pasta da lista', () => {
+    expect(abrir(certDir, [certDir])).toBe(path.resolve(certDir))
+  })
+
+  it('compara caminhos resolvidos', () => {
+    expect(abrir(path.join(certDir, '..', 'certs'), [certDir])).toBe(path.resolve(certDir))
+  })
+
+  it('NÃO abre um arquivo registrado como pasta', () => {
+    // The bypass: the renderer saves an executable as the artifacts folder and
+    // then asks to "open" it — `shell.openPath` would run it.
+    const arquivo = path.join(tmp, 'payload.exe')
+    fs.writeFileSync(arquivo, 'MZ')
+    expect(abrir(arquivo, [arquivo])).toBeNull()
+  })
+
+  it('o .env do app é o único arquivo que abre', () => {
+    escrever('A=1\n')
+    expect(abrir(envFile, [])).toBe(path.resolve(envFile))
+  })
+
+  it('recusa o que não está na lista, e o que não é texto', () => {
+    expect(abrir(tmp, [certDir, null])).toBeNull()
+    expect(abrir(42, [certDir])).toBeNull()
+    expect(abrir('', [''])).toBeNull()
   })
 })

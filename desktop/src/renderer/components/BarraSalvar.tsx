@@ -21,15 +21,21 @@ import { useState } from 'react'
 import { TbRotate } from 'react-icons/tb'
 import { Button } from './ui/button.js'
 import { useSnapshot } from '../lib/snapshot.js'
+import { cn } from '../lib/utils.js'
 
 export function BarraSalvar({
-  mudou, salvo, invalido, motivoInvalido, rodando, aoSalvar, aoDescartar,
+  mudou, salvo, invalido, motivoInvalido, erro, rodando, aoSalvar, aoDescartar,
 }: {
   mudou: boolean
   salvo: boolean
   /** Blocks saving — there is a value outside the accepted range. */
   invalido?: boolean
   motivoInvalido?: string
+  /**
+   * Why the last save was refused by the main process. Unlike `invalido` it
+   * does not block the button: the person fixes the value and tries again.
+   */
+  erro?: string | null
   /** The executor is up; only then does offering the restart make sense. */
   rodando: boolean
   aoSalvar: () => Promise<void> | void
@@ -66,12 +72,12 @@ export function BarraSalvar({
             Salvar alterações
           </Button>
           <Button variant="ghost" disabled={ocupado} onClick={aoDescartar}>Descartar</Button>
-          <span className="text-xs text-muted-foreground">
+          <span className={cn('text-xs', erro && !invalido ? 'text-destructive' : 'text-muted-foreground')}>
             {invalido
               ? (motivoInvalido ?? 'Há um valor fora da faixa aceita.')
-              : rodando
+              : erro || (rodando
                 ? 'O executor lê estes ajustes ao iniciar — dá para reiniciá-lo aqui depois de salvar.'
-                : 'Será aplicado quando o executor iniciar.'}
+                : 'Será aplicado quando o executor iniciar.')}
           </span>
         </>
       ) : reiniciado ? (

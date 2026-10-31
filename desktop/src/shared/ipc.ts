@@ -108,8 +108,12 @@ export interface AtlasApi {
   janela(acao: WindowAction): Promise<boolean>
 
   geosync(): Promise<ConfigGeoSync>
-  /** Saves and returns the rejected folders — empty means everything was saved. */
-  salvarGeosync(cfg: ConfigGeoSync): Promise<{ salvo: boolean; invalidas: InvalidFolder[] }>
+  /**
+   * Saves and returns the rejected folders — empty means everything was saved.
+   * `salvo: false` with `erro` means nothing was written (a value refused by
+   * the `.env` writer, or a disk error).
+   */
+  salvarGeosync(cfg: ConfigGeoSync): Promise<{ salvo: boolean; invalidas: InvalidFolder[]; erro?: string }>
   /**
    * Workspaces accessible to this executor.
    *
@@ -123,7 +127,12 @@ export interface AtlasApi {
   deepLinkPendente(): Promise<DeepLinkRequest | null>
 
   execucao(): Promise<RunConfig>
-  salvarExecucao(cfg: RunConfig): Promise<RunConfig>
+  /**
+   * Saves and returns the configuration as re-read from the `.env`. On
+   * `salvo: false` nothing was written, and `erro` says why (the artifacts
+   * folder is a file, a value carries a line break, a disk error).
+   */
+  salvarExecucao(cfg: RunConfig): Promise<{ salvo: boolean; config: RunConfig; erro?: string }>
   /** Saves the visible log to a file chosen by the user. Returns the path. */
   exportarLog(texto: string): Promise<string | null>
   /**
