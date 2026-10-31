@@ -38,6 +38,7 @@ caller.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -61,6 +62,10 @@ _LEEM_URL = frozenset({"WFS", "DataInput"})
 
 ILEGIVEL = "definition (ilegível)"
 
+# What the executor resolves inside a string: Jinja (`{{ }}`, `{% %}`) and
+# `$Alias.campo` (the same pattern as flow/utils/definition_lint.py).
+_REFERENCIA_A_ALIAS = re.compile(r"\$[^\W\d]\w*")
+
 
 def _tipo(no: Mapping[str, Any]) -> str:
     """The node type in either canvas format (`name` at the top or in `data`)."""
@@ -83,7 +88,14 @@ def _rotulo(no: Mapping[str, Any], tipo: str) -> str:
 
 
 def _tem_expressao(valor: Any) -> bool:
-    return isinstance(valor, str) and ("{{" in valor or "{%" in valor)
+    return isinstance(valor, str) and (
+        "{{" in valor or "{%" in valor or _REFERENCIA_A_ALIAS.search(valor) is not None
+    )
+
+
+def _opcao(valor: Any) -> str:
+    """A select's value the way the executor reads it (case and spaces ignored)."""
+    return str(valor or "").strip().lower()
 
 
 def _desconhecido_ou_com_escrita(tipo: str) -> bool:
@@ -139,8 +151,15 @@ def nos_que_agem(definicao: Any, *, disparos: bool = True) -> list[str]:
         props = _propriedades(no)
         if tipo in _SO_O_ARTEFATO_DO_RUN:
             # Their `credential_id` is the download token: not a use of a secret.
-            destino = props.get("context")
-            if destino not in (None, "", "artifacts"):
+            # DataOutput acts when its destination is not the run's artifact;
+            # CartaImagem when its basemap is a custom tile URL — the tiles are
+            # fetched from a host (and with coordinates, or expressions) the
+            # definition chose.
+            if tipo == "DataOutput" and _opcao(props.get("context")) not in ("", "artifacts"):
+                agem.append(_rotulo(no, tipo))
+            elif tipo == "CartaImagem" and (
+                _opcao(props.get("fundo")) == "personalizado" or _tem_expressao(props.get("fundo_url"))
+            ):
                 agem.append(_rotulo(no, tipo))
             continue
         if tipo in _DISPAROS_AUTONOMOS:
@@ -151,7 +170,8 @@ def nos_que_agem(definicao: Any, *, disparos: bool = True) -> list[str]:
             tipo in _ESCREVEM_FORA
             or tipo in _SEMPRE_AGEM
             or props.get("credential_id")
-            or (tipo in _LEEM_URL and _tem_expressao(props.get("url")))
+            or (tipo in _LEEM_URL and _tem_expressao(props.get("url"))
+                and (tipo != "DataInput" or _opcao(props.get("context")) == "url"))
             or _desconhecido_ou_com_escrita(tipo)
         ):
             agem.append(_rotulo(no, tipo))
@@ -171,7 +191,7 @@ def urls_lidas(definicao: Any) -> list[tuple[str, str]]:
         if tipo not in _LEEM_URL:
             continue
         props = _propriedades(no)
-        if tipo == "DataInput" and props.get("context") not in ("url",):
+        if tipo == "DataInput" and _opcao(props.get("context")) != "url":
             continue
         url = props.get("url")
         if isinstance(url, str) and url.strip() and not _tem_expressao(url):

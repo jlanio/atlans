@@ -86,6 +86,15 @@ async def test_reading_and_transforming_does_not_act():
         # The run's data can leave in the query string of a templated URL.
         (_no("u", "WFS", url="https://x.example/ows?f={{ n1.output }}"), "WFS (u)"),
         (_no("i", "DataInput", context="url", url="https://x.example/{{ n1.output }}"), "DataInput (i)"),
+        # The executor reads the select case- and space-insensitively, and
+        # resolves `$Alias.campo` too (round-2 review).
+        (_no("i2", "DataInput", context=" URL ", url="https://x.example/?d=$Fonte.output"), "DataInput (i2)"),
+        (_no("u2", "WFS", url="https://geoserver.exemplo.gov.br/ows?d=$Fonte.output"), "WFS (u2)"),
+        (_no("d4", "DataOutput", context="Drive"), "DataOutput (d4)"),
+        # A custom basemap fetches tiles from a host the definition chose.
+        (_no("c2", "CartaImagem", fundo="personalizado", fundo_url="https://x.example/{z}/{x}/{y}.png"),
+         "CartaImagem (c2)"),
+        (_no("c3", "CartaImagem", fundo=" Personalizado "), "CartaImagem (c3)"),
         # Unknown to the registry: no way to tell it is harmless.
         (_no("z", "NoQueNaoExiste"), "NoQueNaoExiste (z)"),
     ],
@@ -122,6 +131,7 @@ async def test_a_definition_sent_as_a_json_string_is_judged_like_a_dict():
     [
         _no("d", "DataOutput", credential_id="cred-1"),        # the download token
         _no("c", "CartaImagem", credential_id="cred-1"),       # a run artifact too
+        _no("c4", "CartaImagem", fundo="osm"),                  # a built-in basemap
         _no("d3", "DataOutput", context="artifacts"),
     ],
 )
@@ -303,13 +313,42 @@ async def test_a_string_definition_does_not_slip_past_the_gate():
     assert _confirmacoes(eventos)[0].dados["acao"]["efeitos"] == ["SendEmail (n4)"]
 
 
-async def test_reading_a_url_outside_the_catalog_asks_for_the_click():
-    """Creating and running a WFS of an uncatalogued URL is the same request a
-    probe_source would ask a click for."""
-    estado, eventos = _estado()
+async def test_a_url_outside_the_catalog_asks_on_run_not_on_create(fluxo_do_assistente):
+    """Creating fetches no URL: asking there too made one file read cost two
+    clicks (round-2 review). Running an uncatalogued URL asks, like a
+    probe_source of it would."""
     fora = {"nodes": [_no("w", "WFS", url="https://outro.exemplo.net/wfs", typeName="a:b"), _no("o", "DataOutput")]}
-    assert await ag._home_gate(estado, "create_workflow", {"name": "x", "definition": fora}, "tu-1") is not None
+    estado, eventos = _estado()
+    assert await ag._home_gate(estado, "create_workflow", {"name": "x", "definition": fora}, "tu-1") is None
+    assert not eventos
+
+    fluxo_do_assistente["definition"] = fora
+    redis = FakeRedis()
+    estado, eventos = _estado(redis)
+    assert await ag._home_gate(estado, "run_workflow", {"workflow_id": "wf-a"}, "tu-2") is not None
     assert _confirmacoes(eventos)[0].dados["acao"]["efeitos"] == ["WFS (w)"]
+    import json
+    (guardado,) = redis.dados.values()
+    assert json.loads(guardado)["urls_aprovaveis"] == ["https://outro.exemplo.net/wfs"]
+
+
+async def test_an_approved_url_does_not_ask_again(fluxo_do_assistente):
+    """The person confirmed the run once: re-running the same workflow (or
+    another reading the same URL) is free for them — not for someone else."""
+    fluxo_do_assistente["definition"] = {"nodes": [
+        _no("i", "DataInput", context="URL", url="https://dados.exemplo.net/a.csv"), _no("o", "DataOutput"),
+    ]}
+    redis = FakeRedis()
+    await ag.aprovar_urls(redis, "usr-1", ["https://dados.exemplo.net/a.csv"])
+    estado, eventos = _estado(redis)
+    assert await ag._home_gate(estado, "run_workflow", {"workflow_id": "wf-a"}, "tu-1") is None
+    assert not eventos
+    # Another user: still asks.
+    import dataclasses
+    estado2, eventos2 = _estado(redis)
+    estado2.escopo = dataclasses.replace(estado2.escopo, user_id="usr-2")
+    assert await ag._home_gate(estado2, "run_workflow", {"workflow_id": "wf-a"}, "tu-2") is not None
+    assert len(_confirmacoes(eventos2)) == 1
 
 
 async def test_the_run_card_says_which_stored_nodes_act(fluxo_do_assistente):

@@ -325,11 +325,14 @@ showcase** and, in the footer, **Entrar** (Sign in) and **Criar conta** (Create 
   assistant's OWN workflows go without one only while they read and transform:
   creating, changing or running one whose definition acts outside the platform
   (e-mail, webhook, HTTP request, writes to the Drive/a database/S3, the
-  portal, a sub-workflow, a stored credential, a URL built from an expression
-  or one not in the catalog; on create/change, a trigger that fires on its own)
+  portal, a sub-workflow, a stored credential, a custom basemap URL, a URL
+  built from an expression; on create/change, a trigger that fires on its own)
   asks for the click too, and the card lists those nodes
-  (`app/services/assistente_efeitos.py`). In the editor, which has no card,
-  `run_workflow` refuses such a workflow: the person runs it with the button.
+  (`app/services/assistente_efeitos.py`). RUNNING a workflow that reads a
+  literal URL outside the catalog asks once: the confirmed URL stays approved
+  for that person for 30 days. In the editor, which has no card, `run_workflow`
+  refuses a workflow with acting nodes: the person runs it with the button
+  (the catalog is not consulted there — the person sees every URL on the canvas).
 - **Persisted conversations**, several per person, with no expiry (the
   `conversas` and `mensagens` tables), in place of the editor's transcript in Redis with a 24 h
   TTL.
