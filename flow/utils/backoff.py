@@ -49,6 +49,14 @@ MIN_JITTER_FACTOR = 0.5
 # the `min` saturates anyway.
 _MAX_EXPONENT = 64
 
+# HTTP answers worth repeating: the server said "I'm overloaded" or "try again".
+# A 4xx other than 429 is a request error — repeating gives the same answer.
+# Shared by HttpRequest and DataInput's download, so the two cannot drift.
+HTTP_STATUS_REPETIVEIS = frozenset({429, 500, 502, 503, 504})
+# Ceiling on the wait between HTTP attempts: a high `tentativas` configured on
+# the canvas must not be able to hold the workflow for minutes.
+HTTP_TETO_ESPERA_S = 30.0
+
 
 def with_jitter(segundos: float) -> float:
     """Spreads out an already computed wait.

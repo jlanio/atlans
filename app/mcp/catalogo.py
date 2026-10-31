@@ -157,12 +157,18 @@ def catalog_types(defs: Iterable[Any]) -> list[dict]:
 
 
 def _essential_property(p: Any) -> dict:
-    """The minimum to configure the property — no label, help or visibility."""
+    """The minimum to configure the property — no label, help or visibility,
+    except the condition under which a required field is required."""
     item: dict[str, Any] = {"name": getattr(p, "name", None), "type": getattr(p, "type", None)}
-    # `required` does not exist in today's catalog; it is read via getattr so that
-    # the day it starts to exist the information shows up without touching this.
+    # Read via getattr so a schema without `required` keeps working.
     if getattr(p, "required", None):
         item["required"] = True
+        # A field required in one mode only (DataInput's `url` with the origin
+        # URL, its Drive file with the origin Drive): without the condition the
+        # sheet said every DataInput needs a URL, a Drive file and an artifact.
+        condicao = getattr(p, "visibleWhen", None)
+        if condicao:
+            item["required_when"] = condicao
     default = getattr(p, "default", None)
     if default is not None:
         item["default"] = default

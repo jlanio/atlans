@@ -1164,6 +1164,15 @@ export interface IVisibleWhen {
   in: (string | number | boolean)[]
 }
 
+/**
+ * OR of rules: the field shows when any of them holds — each one a rule or an
+ * AND list. DataInput needs it: a format field shows on the Drive (whose file's
+ * format is only known at run time) OR when the URL origin's chosen format uses it.
+ */
+export interface IVisibleWhenAny {
+  any: (IVisibleWhen | IVisibleWhen[])[]
+}
+
 export interface INodesPropertyAPI {
   name: string
   /** Label shown in the UI. When missing, uses name. */
@@ -1181,8 +1190,8 @@ export interface INodesPropertyAPI {
   drive_extensions?: string[]
   /** Options for type == "select" */
   options?: ISelectOption[]
-  /** Conditional visibility (declarative). A single rule or a list (AND). */
-  visibleWhen?: IVisibleWhen | IVisibleWhen[]
+  /** Conditional visibility (declarative). A single rule, a list (AND) or `{ any }` (OR). */
+  visibleWhen?: IVisibleWhen | IVisibleWhen[] | IVisibleWhenAny
   /** execute() rejects empty — the label gets an asterisk (a signal, not a block). */
   required?: boolean
   /** Example of the expected format, shown in the empty input. */

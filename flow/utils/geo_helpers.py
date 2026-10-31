@@ -134,19 +134,9 @@ def tls_verify_error_message(url: str, exc: BaseException) -> str:
     )
 
 
-async def safe_httpx_request(
-    method: str,
-    url: str,
-    *,
-    timeout: float = 15.0,
-    follow_redirects: bool = False,
-    headers: dict | None = None,
-    content: bytes | None = None,
-    json: dict | None = None,
-    params: dict | None = None,
-    max_response_bytes: int | None = None,
-):
-    """Makes an HTTP request with IP pinning to prevent DNS rebinding.
+async def pin_request_target(url: str, headers: dict | None = None) -> tuple[str, dict, dict | None]:
+    """Validates `url` against SSRF and returns what the request must carry to hit
+    the very IP that was validated: (pinned URL, headers with `Host`, extensions).
 
     Flow:
       1. validate_url_ssrf: resolves hostname → IP, rejects internal IPs.
@@ -159,13 +149,10 @@ async def safe_httpx_request(
       - validate_url_ssrf resolves evil.com → 1.2.3.4 (public) PASS
       - httpx.get(url) resolves evil.com → 169.254.169.254 (metadata) FAIL
 
-    Blocks redirects by default (follow_redirects=False): if the server
-    answers 302 to an internal URL, without SSRF re-evaluation we become a proxy.
-    A caller that needs redirects must revalidate manually.
-
-    max_response_bytes: limits the body read (defense against a huge response).
+    Shared by `safe_httpx_request` and the streaming download
+    (flow/utils/download_seguro.py): the pinning is the defense against DNS
+    rebinding, and a second copy would be a second place to get it wrong.
     """
-    import httpx as _httpx
     import asyncio as _asyncio
 
     parsed = urlparse(url)
@@ -185,6 +172,79 @@ async def safe_httpx_request(
     # Extensions: sni_hostname ensures the TLS handshake presents the correct
     # name for validating the server's cert.
     extensions = {"sni_hostname": hostname} if parsed.scheme == "https" else None
+    return pinned_url, req_headers, extensions
+
+
+def response_too_large(limite: int) -> ValueError:
+    """The error of a body above the limit — a single sentence for every reader."""
+    return ValueError(f"Resposta excedeu o limite de {limite} bytes.")
+
+
+def _without_body(response) -> bool:
+    """HEAD, 1xx, 204 and 304 answer without a body: their `Content-Length` is
+    the size of the resource (RFC 9110 §8.6), not of what comes. A HEAD that
+    asks how big a 100 MB file is must not be refused for being 100 MB."""
+    return (
+        response.request.method == "HEAD"
+        or response.status_code < 200
+        or response.status_code in (204, 304)
+    )
+
+
+async def read_with_limit(response, limite: int) -> bytes:
+    """Reads a response opened with `stream=True`, giving up as soon as the body
+    passes `limite` bytes.
+
+    The limit used to be checked AFTER `aread()`, when the whole body was already
+    in the executor's memory: a 2 GB answer was loaded in full only to be
+    refused. Here the declared `Content-Length` refuses it before the first
+    byte, and the count while reading covers what does not declare it (chunked)
+    or declares less than it sends. It counts DECODED bytes — what reaches
+    memory —, so a gzip that inflates is also caught.
+    """
+    declarado = response.headers.get("content-length", "")
+    if declarado.isdigit() and int(declarado) > limite and not _without_body(response):
+        await response.aclose()
+        raise response_too_large(limite)
+    partes: list[bytes] = []
+    total = 0
+    async for parte in response.aiter_bytes():
+        total += len(parte)
+        if total > limite:
+            await response.aclose()
+            raise response_too_large(limite)
+        partes.append(parte)
+    # The same attribute `Response.aread()` fills (httpx/_models.py): from here
+    # on `.content`, `.text` and `.json()` work as on a response read in full.
+    response._content = b"".join(partes)
+    return response._content
+
+
+async def safe_httpx_request(
+    method: str,
+    url: str,
+    *,
+    timeout: float = 15.0,
+    follow_redirects: bool = False,
+    headers: dict | None = None,
+    content: bytes | None = None,
+    json: dict | None = None,
+    params: dict | None = None,
+    max_response_bytes: int | None = None,
+):
+    """Makes an HTTP request with IP pinning to prevent DNS rebinding
+    (see `pin_request_target`).
+
+    Blocks redirects by default (follow_redirects=False): if the server
+    answers 302 to an internal URL, without SSRF re-evaluation we become a proxy.
+    A caller that needs redirects must revalidate manually.
+
+    max_response_bytes: limits the body read (defense against a huge response).
+    The body is then read in chunks and the read stops at the limit.
+    """
+    import httpx as _httpx
+
+    pinned_url, req_headers, extensions = await pin_request_target(url, headers)
 
     async with _httpx.AsyncClient(
         timeout=timeout, follow_redirects=follow_redirects,
@@ -196,7 +256,12 @@ async def safe_httpx_request(
         if extensions:
             request.extensions.update(extensions)
         try:
-            response = await client.send(request)
+            # With a limit, the body only comes in through `read_with_limit`;
+            # without one, httpx reads it whole, as it always did.
+            if max_response_bytes is not None:
+                response = await client.send(request, stream=True)
+            else:
+                response = await client.send(request)
         except Exception as exc:
             # An invalid TLS chain arrives as httpx.ConnectError carrying the raw
             # OpenSSL message. Translating it here covers at once every node
@@ -209,12 +274,7 @@ async def safe_httpx_request(
             raise
 
         if max_response_bytes is not None:
-            # Le no max N bytes; truncar protege memoria.
-            await response.aread()
-            if len(response.content) > max_response_bytes:
-                raise ValueError(
-                    f"Resposta excedeu o limite de {max_response_bytes} bytes."
-                )
+            await read_with_limit(response, max_response_bytes)
 
         return response
 

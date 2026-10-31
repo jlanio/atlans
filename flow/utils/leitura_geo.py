@@ -13,6 +13,7 @@
 #      refuses GDAL virtual paths (/vsicurl, CSV:..., PG:...) and, for .zip,
 #      refuses when there is an embedded .vrt. Independent of import order.
 
+import functools
 import io
 import os
 import zipfile
@@ -54,6 +55,24 @@ def _zip_has_vrt(data_or_path) -> bool:
         return False
 
 
+@functools.lru_cache(maxsize=64)
+def _zip_tem_vrt(caminho: str, _tamanho: int, _modificado_ns: int, _inode: int) -> bool:
+    """`_zip_has_vrt` of a file on disk, remembered while the file is the same
+    (size, modification time, inode): DataInput lists a ZIP's layers and then
+    reads it, and each call parsed the whole central directory again."""
+    return _zip_has_vrt(caminho)
+
+
+def _zip_tem_vrt_no_disco(caminho: str) -> bool:
+    try:
+        estado = os.stat(caminho)
+    except OSError:
+        return _zip_has_vrt(caminho)
+    return _zip_tem_vrt(
+        os.path.realpath(caminho), estado.st_size, estado.st_mtime_ns, estado.st_ino,
+    )
+
+
 def _validate_bytes(dados: bytes) -> None:
     if _has_vrt_signature(dados):
         raise UnsafeGeoSourceError(
@@ -79,7 +98,7 @@ def _validate_path(caminho: str) -> None:
         raise UnsafeGeoSourceError(
             "Conteudo recusado: documento OGR VRT nao e permitido."
         )
-    if cabecalho[:4] == b"PK\x03\x04" and _zip_has_vrt(caminho):
+    if cabecalho[:4] == b"PK\x03\x04" and _zip_tem_vrt_no_disco(caminho):
         raise UnsafeGeoSourceError("Arquivo .zip contem um .vrt — recusado por seguranca.")
 
 
@@ -102,3 +121,16 @@ def read_geodataframe(fonte, **kwargs):
     else:
         _validate_path(os.fspath(fonte))
     return gpd.read_file(fonte, **kwargs)
+
+
+def list_layers(fonte) -> list[str]:
+    """Layer names of a file, with the same refusals as `read_geodataframe`.
+
+    DataInput uses it to say, in the run log, that a ZIP has more than one layer
+    and which one was read — pyogrio only warns about it, and the warning never
+    reached the person who built the workflow.
+    """
+    _validate_path(os.fspath(fonte))
+    import pyogrio
+
+    return [str(linha[0]) for linha in pyogrio.list_layers(fonte)]
