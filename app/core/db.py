@@ -59,13 +59,24 @@ def _parse_url(url: str) -> tuple[str, dict]:
     #   verify-ca             → verifies the chain (CA from DATABASE_CA_CERT)
     #   verify-full           → verifies chain + hostname
     import os as _os
-    _ssl_ctx = ssl.create_default_context()
     ca_cert = _os.getenv("DATABASE_CA_CERT", "").strip()
-    if ca_cert and _os.path.isfile(ca_cert):
-        try:
-            _ssl_ctx.load_verify_locations(cafile=ca_cert)
-        except OSError as e:
-            logger.warning("DATABASE_CA_CERT não pôde ser carregado (%s): %s", ca_cert, e)
+    if ssl_value == "verify-ca" and ca_cert and _os.path.isfile(ca_cert):
+        # verify-ca checks the chain WITHOUT the host name: with the public
+        # roots also trusted, any publicly issued certificate would pass. The
+        # private CA ALONE.
+        _ssl_ctx = ssl.create_default_context(cafile=ca_cert)
+    else:
+        _ssl_ctx = ssl.create_default_context()
+        if ca_cert and _os.path.isfile(ca_cert):
+            try:
+                _ssl_ctx.load_verify_locations(cafile=ca_cert)
+            except OSError as e:
+                logger.warning("DATABASE_CA_CERT não pôde ser carregado (%s): %s", ca_cert, e)
+        elif ssl_value == "verify-ca":
+            logger.warning(
+                "ssl=verify-ca sem DATABASE_CA_CERT valido: a cadeia e conferida contra "
+                "as raizes publicas SEM o nome do host. Defina DATABASE_CA_CERT (ou use verify-full)."
+            )
 
     if ssl_value == "verify-full":
         _ssl_ctx.check_hostname = True

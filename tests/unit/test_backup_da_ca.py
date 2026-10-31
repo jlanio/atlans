@@ -132,3 +132,36 @@ def test_a_directory_that_cannot_be_tightened_still_gets_the_backup(rodar, tmp_p
     assert "AVISO" in resultado.stderr
     (arquivo,) = destino.glob("step-ca-*.tar.gz")
     assert _modo(arquivo) == 0o600
+
+
+def test_a_directory_others_can_write_is_refused_when_it_cannot_be_tightened(rodar, tmp_path):
+    """Someone else could plant the file the archive goes into and receive the
+    CA's keys (round-2 review): a world-writable directory that cannot be
+    tightened gets no backup."""
+    executar, destino = rodar
+    destino.mkdir()
+    destino.chmod(0o777)
+    chmod_falso = tmp_path / "bin" / "chmod"
+    chmod_falso.write_text('#!/bin/sh\n[ "$2" = "$BACKUP_DIR" ] && exit 1\nexec /bin/chmod "$@"\n')
+    chmod_falso.chmod(0o755)
+
+    resultado = executar()
+
+    assert resultado.returncode != 0
+    assert not list(destino.glob("step-ca-*"))
+
+
+def test_the_partial_file_has_an_unpredictable_name(rodar):
+    """A predictable `<target>.partial` could be created by someone else first."""
+    executar, destino = rodar
+    destino.mkdir()
+    previsivel = destino / "armadilha.partial"
+    previsivel.write_text("")
+    previsivel.chmod(0o666)
+
+    resultado = executar()
+
+    assert resultado.returncode == 0, resultado.stderr
+    (arquivo,) = destino.glob("step-ca-*.tar.gz")
+    assert _modo(arquivo) == 0o600
+    assert previsivel.read_text() == ""

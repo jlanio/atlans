@@ -586,18 +586,24 @@ persistent — without the `/var/log/journal` directory, it lives in memory and 
 next boot.
 
 The options of each driver are in [docker-compose.logs.yml](../docker-compose.logs.yml)
-(`api-prod` and `web-prod` take theirs from there by `LOG_DRIVER`): only
-`json-file` and `journald` are defined. Another driver needs its
+(`api-prod` and `web-prod` take theirs from there by `LOG_DRIVER`):
+`json-file`, `journald`, `local`, `syslog`, `gelf`, `fluentd`, `awslogs` and
+`splunk` are defined (the collectors' address comes from the driver's own
+options, in `daemon.json` or an edit there). Another driver needs its
 `api-<driver>`/`web-<driver>` blocks there; without them `docker compose`
 stops with `service "api-<driver>" not found`.
 
 ### Log rotation
 
 Every other service (Traefik, Redis, MinIO, step-ca and the dev ones), and the
-API and the web with `LOG_DRIVER=json-file`, write to `json-file` with a ceiling:
+API and the web with `LOG_DRIVER=json-file` or `local`, write with a ceiling:
 `LOG_MAX_SIZE` × `LOG_MAX_FILE` per container (default `10m` × `5`).
 `docker compose logs` reads the rotated files too. Changing the values takes a
 recreate (`docker compose --profile prod up -d`).
+
+A host that ships every container's log through its own `daemon.json`
+(journald, Loki, a SIEM) sets `LOG_SERVICOS=daemon`: the other services then
+keep the daemon's driver, with the daemon's ceiling, instead of `json-file`.
 
 ### Traefik access log
 

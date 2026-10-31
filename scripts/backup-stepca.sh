@@ -30,19 +30,29 @@ fi
 # 0600; an existing directory keeps the mode it was born with, so it is
 # tightened too. If that fails (a directory owned by root while the backup
 # runs as a docker-group user, an NFS export with root_squash), the backup is
-# still written — skipping it would lose the CA's only copy — with a warning:
-# the archive itself is born 0600 by the umask, whatever the directory.
+# still written — skipping it would lose the CA's only copy — UNLESS other
+# users can write in the directory: then one of them could plant the file the
+# archive goes into, and the keys would land in a file they own.
 umask 077
 mkdir -p "$BACKUP_DIR"
 if ! chmod 700 "$BACKUP_DIR" 2>/dev/null; then
-    err "AVISO: nao foi possivel restringir ${BACKUP_DIR} a 0700 (o diretorio e de outro usuario?); o arquivo do backup sai 0600 mesmo assim."
+    if [ -n "$(find "$BACKUP_DIR" -maxdepth 0 -perm /022 2>/dev/null)" ]; then
+        err "${BACKUP_DIR} e gravavel por outros usuarios e nao pode ser restrito a 0700: backup NAO gravado (as chaves da CA ficariam expostas)."
+        exit 1
+    fi
+    err "AVISO: nao foi possivel restringir ${BACKUP_DIR} a 0700 (o diretorio e de outro usuario?); o arquivo do backup e criado 0600 mesmo assim."
 fi
 # Archives written by earlier versions of this script were born 0644.
 chmod 600 "$BACKUP_DIR"/step-ca-*.tar.gz 2>/dev/null || true
 
 STAMP=$(date +%F-%H%M)
 TARGET="${BACKUP_DIR}/step-ca-${STAMP}.tar.gz"
-PARTIAL="${TARGET}.partial"
+# A NEW file with an unpredictable name, created exclusively by this user
+# (mktemp: O_EXCL, 0600): never one someone else prepared under a known name.
+PARTIAL=$(mktemp "${BACKUP_DIR}/.step-ca-${STAMP}.XXXXXX") || {
+    err "Nao foi possivel criar o arquivo temporario em ${BACKUP_DIR}."
+    exit 1
+}
 
 log "Criando ${TARGET}..."
 # tar writes to stdout and the file is created HERE, by this shell (with the

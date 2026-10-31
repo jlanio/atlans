@@ -107,15 +107,21 @@ def _bundle_do_sistema() -> str | None:
         return None
 
 
-def _raizes_confiaveis(ca_cert: str) -> str:
-    """`sslrootcert` with the roots the API trusts (app/core/db.py): the
-    system's, plus DATABASE_CA_CERT when that file exists.
+def _raizes_confiaveis(modo: str, ca_cert: str) -> str:
+    """`sslrootcert` for verify-ca / verify-full.
 
-    libpq takes ONE file and, without it, looks only at ~/.postgresql/root.crt:
-    passing just DATABASE_CA_CERT (or nothing) made `alembic upgrade` refuse a
-    server whose certificate the API — with the same URL — accepted (a public
-    CA, a managed Postgres, an intermediate-only CA file). With a CA file, the
-    two go together in a private temporary bundle."""
+    verify-ca checks the chain WITHOUT the host name: trusting public roots
+    there lets a MITM with ANY publicly issued certificate in. So:
+      verify-ca    a configured DATABASE_CA_CERT ALONE (missing file → libpq
+                   fails naming it: fail closed); without one, libpq's
+                   "system" — which libpq itself refuses for verify-ca, with a
+                   message saying why: set DATABASE_CA_CERT.
+      verify-full  the system's roots plus DATABASE_CA_CERT when that file
+                   exists (the host name is checked, so a public root is safe —
+                   the same roots the API trusts, app/core/db.py).
+    """
+    if modo == "verify-ca":
+        return ca_cert or "system"
     sistema = _bundle_do_sistema()
     if ca_cert and os.path.isfile(ca_cert):
         if not sistema:
@@ -147,8 +153,8 @@ def _connect_args(url: str) -> tuple[str, dict]:
     verify-ca/verify-full used to become `require` here: the API refused a server
     with the wrong certificate and `alembic upgrade`, with the same URL, accepted
     it — a MITM got the migration connection, with the owner's credentials.
-    The roots trusted are the API's (`_raizes_confiaveis`): the system's, plus
-    DATABASE_CA_CERT when that file exists — the same URL connects in both.
+    The roots trusted: see `_raizes_confiaveis` (verify-ca only the private CA;
+    verify-full the system's plus the CA, like the API).
     """
     connect_args: dict = {}
     match = re.search(r"[?&](?:ssl|sslmode)=([^&]+)", url)
@@ -165,7 +171,7 @@ def _connect_args(url: str) -> tuple[str, dict]:
         connect_args["sslmode"] = "disable"
     elif raw_value in _SSL_VERIFY:
         connect_args["sslmode"] = raw_value
-        connect_args["sslrootcert"] = _raizes_confiaveis(os.getenv("DATABASE_CA_CERT", "").strip())
+        connect_args["sslrootcert"] = _raizes_confiaveis(raw_value, os.getenv("DATABASE_CA_CERT", "").strip())
     else:
         connect_args["sslmode"] = "require"
     return url, connect_args

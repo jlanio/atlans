@@ -55,26 +55,50 @@ def env(monkeypatch):
 _BASE = "postgresql+psycopg2://u:p@db:5432/x"  # pragma: allowlist secret
 
 
-@pytest.mark.parametrize("valor", ["verify-ca", "verify-full", "VERIFY-FULL"])
-def test_verify_modes_are_kept_with_the_system_roots_and_the_ca(env, monkeypatch, tmp_path, valor):
-    """The roots the API trusts: the system's plus DATABASE_CA_CERT, in one file."""
+def test_verify_full_trusts_the_system_roots_and_the_ca(env, monkeypatch, tmp_path):
+    """verify-full checks the host name: the system's roots plus the private CA,
+    the same roots the API trusts."""
     sistema = tmp_path / "sistema.pem"
     sistema.write_text("SISTEMA\n")
     ca = tmp_path / "pg-ca.crt"
     ca.write_text("PRIVADA\n")
     monkeypatch.setattr(env, "_bundle_do_sistema", lambda: str(sistema))
     monkeypatch.setenv("DATABASE_CA_CERT", str(ca))
-    url, args = env._connect_args(f"{_BASE}?ssl={valor}")
-    assert url == _BASE
-    assert args["sslmode"] == valor.lower()
-    assert Path(args["sslrootcert"]).read_text() == "SISTEMA\nPRIVADA\n"
+    for valor in ("verify-full", "VERIFY-FULL"):
+        url, args = env._connect_args(f"{_BASE}?ssl={valor}")
+        assert url == _BASE
+        assert args["sslmode"] == "verify-full"
+        assert Path(args["sslrootcert"]).read_text() == "SISTEMA\nPRIVADA\n"
+
+
+def test_verify_ca_trusts_the_private_ca_alone(env, monkeypatch, tmp_path):
+    """verify-ca checks the chain WITHOUT the host name: with public roots too,
+    any publicly issued certificate let a MITM into the migration (round-2
+    review). A missing CA file is passed as is — libpq fails naming it."""
+    monkeypatch.setattr(env, "_bundle_do_sistema", lambda: "/etc/ssl/certs/ca-certificates.crt")
+    ca = tmp_path / "pg-ca.crt"
+    ca.write_text("PRIVADA\n")
+    monkeypatch.setenv("DATABASE_CA_CERT", str(ca))
+    _, args = env._connect_args(f"{_BASE}?ssl=verify-ca")
+    assert args == {"sslmode": "verify-ca", "sslrootcert": str(ca)}
+
+    monkeypatch.setenv("DATABASE_CA_CERT", "/nao/existe/pg-ca.crt")
+    _, args = env._connect_args(f"{_BASE}?ssl=verify-ca")
+    assert args["sslrootcert"] == "/nao/existe/pg-ca.crt"
+
+
+def test_verify_ca_without_a_ca_lets_libpq_refuse_the_public_roots(env, monkeypatch):
+    """libpq refuses verify-ca with sslrootcert=system, saying why: the
+    migration fails closed instead of trusting any public certificate."""
+    monkeypatch.delenv("DATABASE_CA_CERT", raising=False)
+    _, args = env._connect_args(f"{_BASE}?ssl=verify-ca")
+    assert args == {"sslmode": "verify-ca", "sslrootcert": "system"}
 
 
 @pytest.mark.parametrize("ca", [None, "/nao/existe/pg-ca.crt"])
-def test_verify_without_a_ca_file_uses_the_system_roots(env, monkeypatch, tmp_path, ca):
-    """Never a silent downgrade to `require` — and never libpq's lone
-    ~/.postgresql/root.crt either: the API, with the same URL, trusts the
-    system's roots, so the migration does too (fix review)."""
+def test_verify_full_without_a_ca_file_uses_the_system_roots(env, monkeypatch, tmp_path, ca):
+    """The host name is checked, so the system's roots are safe — and the API,
+    with the same URL, trusts them: the migration connects where the API does."""
     sistema = tmp_path / "sistema.pem"
     sistema.write_text("SISTEMA\n")
     monkeypatch.setattr(env, "_bundle_do_sistema", lambda: str(sistema))
@@ -86,7 +110,7 @@ def test_verify_without_a_ca_file_uses_the_system_roots(env, monkeypatch, tmp_pa
 
 def test_without_any_system_bundle_libpq_reads_its_own_store(env, monkeypatch):
     monkeypatch.setattr(env, "_bundle_do_sistema", lambda: None)
-    _, args = env._connect_args(f"{_BASE}?sslmode=verify-ca")
+    _, args = env._connect_args(f"{_BASE}?sslmode=verify-full")
     assert args["sslrootcert"] == "system"
 
 
