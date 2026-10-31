@@ -220,7 +220,8 @@ async def _editor_run_acts(estado: EstadoDoLaco, argumentos: Any) -> list[str] |
         async with infra.sessao() as db:
             wf, _role = await carregar_workflow(db, estado.escopo, str(ref))
             # Read inside the block: the session's rollback expires `wf`.
-            return nos_que_agem(getattr(wf, "definition", None))
+            # Running creates no schedule: the trigger nodes do not count.
+            return nos_que_agem(getattr(wf, "definition", None), disparos=False)
     except Exception:
         logger.exception("Nao foi possivel ler o fluxo %s no editor; recusando a execucao.", ref)
         return None

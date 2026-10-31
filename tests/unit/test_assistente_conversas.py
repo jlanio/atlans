@@ -370,18 +370,26 @@ async def test_a_pending_confirmation_is_reopened_even_with_the_awaiting_result(
     conv = await _conversa_com_pendente(sessao)
     redis = FakeRedis()
     chave = ag.chave_de_confirmacao(USUARIO, conv.id_hash, "tu-pend")
-    redis.dados[chave] = json.dumps({"token": "tok-1", "tool": "delete_schedule", "args": {"schedule_id": "sch-1"}})
+    redis.dados[chave] = json.dumps({
+        "token": "tok-1", "tool": "delete_schedule", "args": {"schedule_id": "sch-1"},
+        "efeitos": ["SendEmail (n4)"],
+    })
 
     quadros = await svc.replay_frames(sessao, conv.id_hash, redis=redis, user_id=USUARIO, tokens_total=0)
 
     tipos = [q["tipo"] for q in quadros]
     assert "confirmacao" in tipos
-    # The call stays open: no ferramenta_fim for it while the card is live.
-    assert not [q for q in quadros if q["tipo"] == "ferramenta_fim" and q["dados"]["id"] == "tu-pend"]
+    # The same frames as live: the card, then the call closed WITHOUT error
+    # (waiting, not failed — an error flag turned the step red on reload).
+    fins = [q for q in quadros if q["tipo"] == "ferramenta_fim" and q["dados"]["id"] == "tu-pend"]
+    assert [f["dados"]["erro"] for f in fins] == [False]
+    assert tipos.index("confirmacao") < quadros.index(fins[0])
     (card,) = [q for q in quadros if q["tipo"] == "confirmacao"]
     assert card["dados"]["token"] == "tok-1"
     assert card["dados"]["acao"]["tool"] == "delete_schedule"
     assert card["dados"]["acao"]["alvo"] == "sch-1"
+    # Why the click was asked comes back too (stored with the confirmation).
+    assert card["dados"]["acao"]["efeitos"] == ["SendEmail (n4)"]
 
 
 async def test_a_decided_or_expired_confirmation_closes_the_call(sessao):

@@ -41,7 +41,7 @@ from app.core.utils.logger import get_logger
 from app.mcp import infra
 from app.mcp.guardas import GUARDAS
 from app.mcp.resolucao import carregar_workflow
-from app.services.assistente_efeitos import nos_que_agem
+from app.services.assistente_efeitos import nos_que_agem, urls_lidas
 from app.services.assistente_service import (
     EstadoDoLaco,
     Evento,
@@ -302,26 +302,26 @@ def chave_de_confirmacao(user_id: str, conversa_id: str | None, tool_use_id: str
     return f"agente:confirmacao:{user_id}:{conversa_id or 'novo'}:{tool_use_id}"
 
 
-async def _target_workflow(estado: EstadoDoLaco, argumentos: Any) -> tuple[bool, list[str]]:
-    """(belongs to the person, nodes of its STORED definition that act outside).
+async def _target_workflow(estado: EstadoDoLaco, argumentos: Any) -> tuple[bool, Any]:
+    """(belongs to the person, its STORED definition).
 
     Same fail-closed reading as `_workflow_belongs_to_person`, which it serves:
     no clear target or a load error answers "the person's" — and then the click
-    is asked anyway, so the node list does not matter.
+    is asked anyway, so the definition does not matter.
     """
     ref = argumentos.get("workflow_id") if isinstance(argumentos, dict) else None
     if not ref:
-        return True, []
+        return True, None
     try:
         async with infra.sessao() as db:
             wf, _role = await carregar_workflow(db, estado.escopo, str(ref))
             # Read INSIDE the block (see `_workflow_belongs_to_person`).
             origem = getattr(wf, "origem", "usuario")
-            agem = nos_que_agem(getattr(wf, "definition", None))
+            definicao = getattr(wf, "definition", None)
     except Exception:
         logger.exception("Nao foi possivel ler o fluxo %s; exigindo clique.", ref)
-        return True, []
-    return origem != "assistente", agem
+        return True, None
+    return origem != "assistente", definicao
 
 
 async def _workflow_belongs_to_person(estado: EstadoDoLaco, argumentos: Any) -> bool:
@@ -343,7 +343,7 @@ async def _workflow_belongs_to_person(estado: EstadoDoLaco, argumentos: Any) -> 
     workflows — which is the Home's entire path (create the workflow, run it,
     send the layer to the globe).
     """
-    da_pessoa, _agem = await _target_workflow(estado, argumentos)
+    da_pessoa, _definicao = await _target_workflow(estado, argumentos)
     return da_pessoa
 
 
@@ -371,33 +371,63 @@ async def _fonte_fora_do_catalogo(estado: EstadoDoLaco, argumentos: Any) -> bool
         return True
 
 
-async def _confirmavel(estado: EstadoDoLaco, nome: str, argumentos: Any) -> bool:
+async def _urls_fora_do_catalogo(estado: EstadoDoLaco, definicao: Any) -> list[str]:
+    """The URL-reading nodes whose literal URL is NOT in the catalog — the
+    same request a `probe_source` of that URL would ask a click for. Fails
+    CLOSED: a lookup error counts every URL as outside."""
+    urls = urls_lidas(definicao)
+    if not urls:
+        return []
+    try:
+        from app.services import fontes_service
+
+        async with infra.sessao() as db:
+            return [
+                rotulo for rotulo, url in urls
+                if not await fontes_service.url_no_catalogo(db, estado.escopo, url)
+            ]
+    except Exception:
+        logger.exception("Nao foi possivel consultar o catalogo; exigindo clique.")
+        return [rotulo for rotulo, _url in urls]
+
+
+async def _efeitos_da_definicao(estado: EstadoDoLaco, definicao: Any, *, disparos: bool) -> list[str]:
+    return [*nos_que_agem(definicao, disparos=disparos), *await _urls_fora_do_catalogo(estado, definicao)]
+
+
+async def _confirmavel(estado: EstadoDoLaco, nome: str, argumentos: Any) -> tuple[bool, list[str]]:
+    """(asks for the click, the acting nodes the card shows)."""
     if nome in CONFIRMAVEIS_SEMPRE:
-        return True
+        return True, []
     if nome in CONFIRMAVEIS_SE_O_FLUXO_AGE:
-        return bool(nos_que_agem(_definition_arg(argumentos)))
+        efeitos = await _efeitos_da_definicao(estado, _definition_arg(argumentos), disparos=True)
+        return bool(efeitos), efeitos
     if nome in CONFIRMAVEIS_SE_FLUXO_DA_PESSOA:
-        da_pessoa, agem = await _target_workflow(estado, argumentos)
-        if da_pessoa:
-            return True
+        da_pessoa, guardada = await _target_workflow(estado, argumentos)
         if nome == "update_workflow":
             # What matters is what the workflow WILL do: the new definition.
-            # A rename (no definition) keeps the stored one, which got here
-            # through a click already if it acts.
+            # A rename (no definition) keeps the stored one.
             nova = _definition_arg(argumentos)
-            return bool(nos_que_agem(nova)) if nova is not None else bool(agem)
-        return bool(agem)
+            efeitos = await _efeitos_da_definicao(
+                estado, nova if nova is not None else guardada, disparos=True,
+            )
+        else:
+            # Running creates no schedule: the triggers do not count here.
+            efeitos = await _efeitos_da_definicao(estado, guardada, disparos=False)
+        return (da_pessoa or bool(efeitos)), efeitos
     if nome in ("probe_source", "register_source"):
-        return await _fonte_fora_do_catalogo(estado, argumentos)
-    return False
+        return await _fonte_fora_do_catalogo(estado, argumentos), []
+    return False, []
 
 
-def _card_action(nome: str, argumentos: Any) -> dict[str, Any]:
+def _card_action(nome: str, argumentos: Any, efeitos: list[str] | None = None) -> dict[str, Any]:
     """What the confirmation card shows: the tool, the summarized arguments, the
-    target and — when the definition in the arguments acts outside — which nodes
-    do it, so the person sees WHY the click is being asked."""
+    target and — when the workflow acts outside — which nodes do it, so the
+    person sees WHY the click is being asked. `efeitos` comes from the gate
+    (it also knows the STORED definition of a run); without it, the definition
+    in the arguments is judged."""
     acao: dict[str, Any] = {"tool": nome, "argumentos": _summarize(argumentos), "alvo": _target(argumentos)}
-    agem = nos_que_agem(_definition_arg(argumentos))
+    agem = efeitos if efeitos is not None else nos_que_agem(_definition_arg(argumentos))
     if agem:
         acao["efeitos"] = agem[:20]
     return acao
@@ -415,7 +445,8 @@ def _target(argumentos: Any) -> str | None:
 
 
 async def _ask_confirmation(
-    estado: EstadoDoLaco, nome: str, argumentos: Any, tool_use_id: str | None
+    estado: EstadoDoLaco, nome: str, argumentos: Any, tool_use_id: str | None,
+    efeitos: list[str] | None = None,
 ) -> tuple[str, bool]:
     """Stores `{token, tool, args}` in Redis, emits the `confirmacao` frame and returns
     to the model a NON-error "aguardando" (waiting) `tool_result`.
@@ -443,6 +474,8 @@ async def _ask_confirmation(
             # client sends in the confirmation POST.
             "args": argumentos if isinstance(argumentos, dict) else {},
             "criado_em": utc_now_naive().isoformat(),
+            # Why the click was asked: the replay shows the same card.
+            "efeitos": list(efeitos or []),
         },
         ensure_ascii=False,
     )
@@ -459,7 +492,7 @@ async def _ask_confirmation(
             {
                 "tool_use_id": tool_use_id,
                 "token": token,
-                "acao": _card_action(nome, argumentos),
+                "acao": _card_action(nome, argumentos, efeitos),
             },
         )
     )
@@ -478,9 +511,10 @@ async def _home_gate(
         # `permitida` already filters the list the model sees; refusing here too keeps
         # the response uniform and is the same `list_tools`/`call_tool` separation as MCP.
         return (OUT_OF_REACH_MESSAGE, True)
-    if not await _confirmavel(estado, nome, argumentos):
+    pede, efeitos = await _confirmavel(estado, nome, argumentos)
+    if not pede:
         return None
-    return await _ask_confirmation(estado, nome, argumentos, tool_use_id)
+    return await _ask_confirmation(estado, nome, argumentos, tool_use_id, efeitos)
 
 
 # ── The frames the Home emits after a tool ───────────────────────────────────

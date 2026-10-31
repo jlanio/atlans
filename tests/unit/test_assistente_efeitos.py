@@ -26,13 +26,31 @@ from ._mcp_harness import FakeRedis, fake_scope
 
 pytestmark = pytest.mark.asyncio
 
+CATALOGADA = "https://geoserver.exemplo.gov.br/ows"
+
+
+@pytest.fixture(autouse=True)
+def catalogo_basico(monkeypatch):
+    """The catalog knows CATALOGADA; any other literal URL is outside it."""
+    from app.services import fontes_service
+
+    async def _no_catalogo(_db, _escopo, url):
+        return fontes_service.normalize_url(url) == CATALOGADA
+
+    @asynccontextmanager
+    async def _sessao():
+        yield object()
+
+    monkeypatch.setattr(fontes_service, "url_no_catalogo", _no_catalogo)
+    monkeypatch.setattr(ag.infra, "sessao", _sessao)
+
 
 def _no(nid, nome, **props):
     return {"id": nid, "name": nome, "type": "x", "properties": props}
 
 
 LE_E_TRANSFORMA = {"nodes": [
-    _no("n1", "WFS", url="https://exemplo.org/ows", typeName="a:b"),
+    _no("n1", "WFS", url=CATALOGADA, typeName="a:b"),
     _no("n2", "Buffer", distance=10),
     _no("n3", "DataOutput"),
 ], "edges": []}
@@ -62,7 +80,12 @@ async def test_reading_and_transforming_does_not_act():
         (_no("wh", "WebhookTrigger"), "WebhookTrigger (wh)"),
         # Reads, but with the person's stored secret.
         (_no("q", "DatabaseQuery", credential_id="cred-1"), "DatabaseQuery (q)"),
-        (_no("d", "DataOutput", credential_id="cred-1"), "DataOutput (d)"),
+        # Writes into the shared Drive (and may overwrite a file others read).
+        (_no("d", "DataOutput", context="drive", overwrite=True), "DataOutput (d)"),
+        (_no("d2", "DataOutput", context="{{ inputs.destino }}"), "DataOutput (d2)"),
+        # The run's data can leave in the query string of a templated URL.
+        (_no("u", "WFS", url="https://x.example/ows?f={{ n1.output }}"), "WFS (u)"),
+        (_no("i", "DataInput", context="url", url="https://x.example/{{ n1.output }}"), "DataInput (i)"),
         # Unknown to the registry: no way to tell it is harmless.
         (_no("z", "NoQueNaoExiste"), "NoQueNaoExiste (z)"),
     ],
@@ -76,9 +99,40 @@ async def test_the_canvas_format_with_data_is_read_too():
     assert nos_que_agem(definicao) == ["SendWebhook (n9)"]
 
 
-@pytest.mark.parametrize("definicao", [None, "x", {}, {"nodes": "x"}, {"nodes": [1, None]}])
-async def test_garbage_has_nothing_to_run(definicao):
+@pytest.mark.parametrize("definicao", [None, {}, {"nodes": []}, {"nodes": [1, None]}])
+async def test_nothing_to_run_acts_on_nothing(definicao):
     assert nos_que_agem(definicao) == []
+
+
+@pytest.mark.parametrize("definicao", ["x", 7, {"nodes": "x"}])
+async def test_an_unreadable_definition_acts(definicao):
+    """Fail closed: the tool parses strings itself, so judging only dicts let
+    a string through (fix review)."""
+    from app.services.assistente_efeitos import ILEGIVEL
+    assert nos_que_agem(definicao) == [ILEGIVEL]
+
+
+async def test_a_definition_sent_as_a_json_string_is_judged_like_a_dict():
+    import json
+    assert nos_que_agem(json.dumps(MANDA_EMAIL)) == ["SendEmail (n4)"]
+
+
+@pytest.mark.parametrize(
+    "no",
+    [
+        _no("d", "DataOutput", credential_id="cred-1"),        # the download token
+        _no("c", "CartaImagem", credential_id="cred-1"),       # a run artifact too
+        _no("d3", "DataOutput", context="artifacts"),
+    ],
+)
+async def test_what_only_produces_the_run_artifact_does_not_act(no):
+    assert nos_que_agem({"nodes": [no]}) == []
+
+
+async def test_a_trigger_counts_when_creating_not_when_running():
+    gatilho = {"nodes": [_no("t", "ScheduleTrigger", cron="* * * * *"), _no("o", "DataOutput")]}
+    assert nos_que_agem(gatilho) == ["ScheduleTrigger (t)"]
+    assert nos_que_agem(gatilho, disparos=False) == []
 
 
 # ── the Home gate ────────────────────────────────────────────────────────────
@@ -114,6 +168,10 @@ async def test_creating_a_workflow_that_sends_email_asks_for_the_click_and_says_
     (card,) = _confirmacoes(eventos)
     assert card.dados["acao"]["tool"] == "create_workflow"
     assert card.dados["acao"]["efeitos"] == ["SendEmail (n4)"]
+    # The replay shows the same reason: it is stored with the confirmation.
+    import json
+    (guardado,) = redis.dados.values()
+    assert json.loads(guardado)["efeitos"] == ["SendEmail (n4)"]
     # What the click will execute is what was stored, with the whole definition.
     assert len(redis.dados) == 1
 
@@ -233,3 +291,39 @@ async def test_a_catalog_lookup_failure_asks_for_the_click(monkeypatch):
     estado, eventos = _estado()
     veredito = await ag._home_gate(estado, "probe_source", {"url": "https://geoserver.exemplo.gov.br/ows"}, "tu-1")
     assert veredito is not None and len(_confirmacoes(eventos)) == 1
+
+
+async def test_a_string_definition_does_not_slip_past_the_gate():
+    """The MCP SDK parses a JSON-string argument back into a dict before the tool
+    runs: the gate has to judge it the same way (fix review)."""
+    import json
+    estado, eventos = _estado()
+    args = {"name": "x", "definition": json.dumps(MANDA_EMAIL)}
+    assert await ag._home_gate(estado, "create_workflow", args, "tu-1") is not None
+    assert _confirmacoes(eventos)[0].dados["acao"]["efeitos"] == ["SendEmail (n4)"]
+
+
+async def test_reading_a_url_outside_the_catalog_asks_for_the_click():
+    """Creating and running a WFS of an uncatalogued URL is the same request a
+    probe_source would ask a click for."""
+    estado, eventos = _estado()
+    fora = {"nodes": [_no("w", "WFS", url="https://outro.exemplo.net/wfs", typeName="a:b"), _no("o", "DataOutput")]}
+    assert await ag._home_gate(estado, "create_workflow", {"name": "x", "definition": fora}, "tu-1") is not None
+    assert _confirmacoes(eventos)[0].dados["acao"]["efeitos"] == ["WFS (w)"]
+
+
+async def test_the_run_card_says_which_stored_nodes_act(fluxo_do_assistente):
+    """The run's arguments carry no definition: the card shows the STORED one's
+    acting nodes, so the person sees why the click is asked."""
+    fluxo_do_assistente["definition"] = MANDA_EMAIL
+    estado, eventos = _estado()
+    await ag._home_gate(estado, "run_workflow", {"workflow_id": "wf-a"}, "tu-1")
+    assert _confirmacoes(eventos)[0].dados["acao"]["efeitos"] == ["SendEmail (n4)"]
+
+
+async def test_running_a_workflow_with_a_schedule_trigger_is_free(fluxo_do_assistente):
+    """Running creates no schedule: the trigger only counts on create/update."""
+    fluxo_do_assistente["definition"] = {"nodes": [*LE_E_TRANSFORMA["nodes"], _no("t", "ScheduleTrigger")]}
+    estado, eventos = _estado()
+    assert await ag._home_gate(estado, "run_workflow", {"workflow_id": "wf-a"}, "tu-1") is None
+    assert not eventos

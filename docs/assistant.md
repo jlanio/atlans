@@ -321,7 +321,15 @@ showcase** and, in the footer, **Entrar** (Sign in) and **Criar conta** (Create 
   PAT scopes (`assistant_scope`). What holds back destructive actions is not the absence of a
   scope: it is the **confirmation gate verified on the server**. Editing/running a
   workflow the person created, touching a schedule, deleting a Drive file,
-  publishing, restoring, turning on/off — all of this asks for a click.
+  publishing, restoring, turning on/off — all of this asks for a click. The
+  assistant's OWN workflows go without one only while they read and transform:
+  creating, changing or running one whose definition acts outside the platform
+  (e-mail, webhook, HTTP request, writes to the Drive/a database/S3, the
+  portal, a sub-workflow, a stored credential, a URL built from an expression
+  or one not in the catalog; on create/change, a trigger that fires on its own)
+  asks for the click too, and the card lists those nodes
+  (`app/services/assistente_efeitos.py`). In the editor, which has no card,
+  `run_workflow` refuses such a workflow: the person runs it with the button.
 - **Persisted conversations**, several per person, with no expiry (the
   `conversas` and `mensagens` tables), in place of the editor's transcript in Redis with a 24 h
   TTL.
@@ -329,9 +337,9 @@ showcase** and, in the footer, **Entrar** (Sign in) and **Criar conta** (Create 
   call `search_sources` and `describe_source` BEFORE anything else — the
   source comes pre-mapped from the catalog (`docs/sources.md`), with no network and no guessing of
   `url`/`typeName`. Only when the catalog does not have the source does it probe
-  (`probe_source`) and register (`register_source`) — both go through WITHOUT a click
-  (`ESCRITAS_SEM_CLIQUE`): probing and storing a source is the normal way of working,
-  not a destructive action.
+  (`probe_source`) and register (`register_source`). Both are free for a URL
+  already in the catalog (refreshing a known source); for a URL that is not, the
+  Home asks for the click — that request goes to a host and path the model chose.
 
 ## Dragging files to the Drive
 
