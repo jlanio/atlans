@@ -31,8 +31,15 @@ const canvasNodes = [
   { id: "n2", position: { x: 0, y: 0 }, data: {} },
 ]
 
+/** The session SessionProvider holds, and the one /api/auth/session answers now. */
+let sessaoNoProvider: unknown = null
+const getSession = vi.fn(async (): Promise<unknown> => null)
+
 vi.mock("next/navigation", () => ({ useParams: () => ({ id: currentWorkflow }) }))
-vi.mock("next-auth/react", () => ({ useSession: () => ({ data: null }) }))
+vi.mock("next-auth/react", () => ({
+  useSession: () => ({ data: sessaoNoProvider }),
+  getSession: () => getSession(),
+}))
 vi.mock("@/app/hooks/workflow/useSaveWorkflow", () => ({
   useSaveWorkflow: () => ({ saveWorkflow: vi.fn(async () => ({ error: null })) }),
 }))
@@ -67,11 +74,12 @@ class FakeSocket {
   onerror: ((err: unknown) => void) | null = null
   onclose: ((ev: { code: number }) => void) | null = null
   fechadoCom: number | null = null
+  enviados: string[] = []
 
   constructor(public url: string) {
     FakeSocket.abertos.push(this)
   }
-  send() {}
+  send(msg: string) { this.enviados.push(msg) }
   /** Close requested by the CODE (intentional). */
   close(code = 1000) {
     this.fechadoCom = code
@@ -102,6 +110,9 @@ describe("recuperação do stream de execução", () => {
     quadros.clear()
     nextFrame = 1
     getRunDetail.mockClear()
+    sessaoNoProvider = null
+    getSession.mockReset()
+    getSession.mockResolvedValue(null)
     vi.stubGlobal("WebSocket", FakeSocket)
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
       const id = nextFrame++
@@ -380,6 +391,41 @@ describe("recuperação do stream de execução", () => {
       expect(RUN_TERMINAL.has(estado.statusWorkflow?.status ?? "")).toBe(false)
     })
 
+    view.unmount()
+  })
+
+  // ── 7. The token goes out at open time, not from the attach's closure ───
+
+  it("o token sai da sessão do momento do onopen, não do render que anexou", async () => {
+    sessaoNoProvider = { user: { access_token: "T1" } }
+    const { view, ws } = await anexar()
+    // SessionProvider refetched (poll, focus) before the socket opened.
+    sessaoNoProvider = { user: { access_token: "T2" } }
+    view.rerender()
+
+    act(() => { ws.onopen?.() })
+    expect(ws.enviados).toEqual(["T2"])
+    view.unmount()
+  })
+
+  it("reconectar renova a sessão antes e manda o token novo", async () => {
+    // Past the API's 30 min TTL the server refuses the token (4401). The tab
+    // kept focus, so the provider still holds the old one; reconnecting with
+    // the attach's token failed the same way until giving up.
+    sessaoNoProvider = { user: { access_token: "TOKEN-DO-ANEXO" } }
+    const { view, ws } = await anexar()
+    act(() => { ws.onopen?.() })
+    expect(ws.enviados).toEqual(["TOKEN-DO-ANEXO"])
+
+    getSession.mockResolvedValue({ user: { access_token: "TOKEN-RENOVADO" } })
+    vi.useFakeTimers()
+    await act(async () => { ws.cairDoServidor(4401) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_100) })
+
+    const ws2 = FakeSocket.abertos[1]
+    act(() => { ws2.onopen?.() })
+    expect(getSession).toHaveBeenCalled()
+    expect(ws2.enviados).toEqual(["TOKEN-RENOVADO"])
     view.unmount()
   })
 

@@ -1,7 +1,7 @@
 import { useParams } from "next/navigation"
 import { useSaveWorkflow, type SaveSkipReason } from "./useSaveWorkflow"
 import { useEffect, useRef } from "react"
-import { useSession } from "next-auth/react"
+import { getSession, useSession } from "next-auth/react"
 import { INodeContext, INodeStatusWorkFlow, StatusWorkflow } from "@/context/useFlowContext"
 import { createToast } from "@/utils/createToast"
 import { dayjs } from "@/lib/dayjs"
@@ -94,6 +94,19 @@ export const useExecuteWorkflow = () => {
   // decide whether to re-attach — avoids clobbering a freshly triggered run.
   const sessionTriggeredRef = useRef(false)
   const { data: session } = useSession()
+  // The token the socket authenticates with, read in `onopen` — not captured by
+  // the attach. `onopen` runs after the render that opened the socket, and a
+  // reconnect reuses THAT render's closures (onclose → recoverStream →
+  // attachToRun): the token in the closure was the one from when the run was
+  // first attached, so once the API's 30 min access TTL passed, every reconnect
+  // sent the same expired token and got 4401 until it gave up. The ref follows
+  // the session SessionProvider refetches (poll, tab focus) and is refreshed
+  // before each reconnect (see `refreshAccessToken`). An effect keyed on the
+  // token, not a write per render: a render with the provider's older copy must
+  // not overwrite a token the reconnect just fetched.
+  const accessToken = session?.user?.access_token ?? null
+  const accessTokenRef = useRef(accessToken)
+  useEffect(() => { accessTokenRef.current = accessToken }, [accessToken])
 
   // Acessa store para isExecuting e debugMode
   const isExecuting = useWorkflowExecutionStore(s => s.isExecuting)
@@ -202,6 +215,23 @@ export const useExecuteWorkflow = () => {
     }
   }
 
+  /** Fetches the session again before a reconnect, for the token `onopen` sends.
+   *
+   *  The drop being recovered may BE the server refusing an expired token
+   *  (4401), and in a tab that keeps focus SessionProvider may not have
+   *  refetched yet. `getSession` goes through /api/auth/session, where the jwt
+   *  callback refreshes an expired access token. Best effort: on failure the
+   *  current token goes, and the next attempt tries again. */
+  async function refreshAccessToken() {
+    try {
+      const fresca = await getSession()
+      const token = fresca?.user?.access_token
+      if (token) accessTokenRef.current = token
+    } catch {
+      // Network failure: keep the token we have.
+    }
+  }
+
   /** The stream dropped with the run still open: finds out whether it has already
    *  ended and, if not, reconnects with backoff. On reconnecting, the history
    *  replay rebuilds what was lost in the gap — which is why reconnecting is cheap
@@ -242,10 +272,13 @@ export const useExecuteWorkflow = () => {
     const base = Math.min(1000 * 2 ** attemptsRef.current, 15_000)
     attemptsRef.current += 1
     cancelReconnect()
+    // Fetched during the backoff, so the reconnect does not wait for it.
+    const tokenRenovado = refreshAccessToken()
     // 50-100% jitter, as in the executor's backoff: several tabs that dropped
     // together don't come back in a burst against the same server.
-    reconexaoRef.current = setTimeout(() => {
+    reconexaoRef.current = setTimeout(async () => {
       reconexaoRef.current = null
+      await tokenRenovado
       // The user may have switched workflows — or reconnected by another route —
       // during the wait.
       if (activeRunRef.current !== taskId || wsRef.current) return
@@ -397,7 +430,8 @@ export const useExecuteWorkflow = () => {
     useWorkflowExecutionStore.getState().setWsState("connecting")
 
     ws.onopen = () => {
-      const token = session?.user?.access_token ?? ""
+      // From the ref, at open time — see `accessTokenRef`.
+      const token = accessTokenRef.current ?? ""
       if (token) ws.send(token)
       // The socket's REAL state — the panel's "live" indicator reads from here instead
       // of inferring from isExecuting, which stayed green with the socket dead.

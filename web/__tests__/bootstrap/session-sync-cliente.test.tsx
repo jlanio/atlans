@@ -12,8 +12,9 @@ import type { ReactNode } from "react"
 import { renderToString } from "react-dom/server"
 
 const { setAuthToken } = vi.hoisted(() => ({ setAuthToken: vi.fn() }))
-const { sessionAtual } = vi.hoisted(() => ({
+const { sessionAtual, provedor } = vi.hoisted(() => ({
   sessionAtual: { valor: null as unknown },
+  provedor: { props: null as Record<string, unknown> | null },
 }))
 
 vi.mock("@/service/GisFlowService", () => ({
@@ -25,12 +26,15 @@ vi.mock("@/context/NotificationsContext", () => ({
 }))
 vi.mock("@/app/components/command-palette", () => ({ default: () => null }))
 vi.mock("next-auth/react", () => ({
-  SessionProvider: ({ children }: { children?: ReactNode }) => children ?? null,
+  SessionProvider: (props: { children?: ReactNode }) => {
+    provedor.props = props
+    return props.children ?? null
+  },
   signOut: vi.fn(),
   useSession: () => ({ data: sessionAtual.valor, status: "authenticated" }),
 }))
 
-import { SessionSync } from "@/app/components/providers"
+import Providers, { SessionSync } from "@/app/components/providers"
 
 describe("SessionSync no cliente", () => {
   it("escreve o token durante o render, antes de qualquer efeito", () => {
@@ -50,5 +54,24 @@ describe("SessionSync no cliente", () => {
     renderToString(<SessionSync />)
 
     expect(setAuthToken).toHaveBeenCalledWith(null)
+  })
+})
+
+describe("Providers: a sessão do cliente não envelhece numa aba com foco", () => {
+  it("refaz a sessão periodicamente, em SEGUNDOS e bem abaixo do TTL do access token", () => {
+    // Without a refetchInterval next-auth only refetches on visibilitychange: a
+    // tab that kept focus held an expired token past the API's 30 min, and the
+    // run WebSocket — which authenticates with that browser copy — got 4401.
+    provedor.props = null
+    renderToString(<Providers session={null}>{null}</Providers>)
+    // Written by the SessionProvider double during the render above.
+    const props = provedor.props as Record<string, unknown> | null
+
+    const intervalo = props?.refetchInterval as number
+    expect(intervalo).toBeGreaterThan(0)
+    // next-auth multiplies by 1000: a value in ms would mean days.
+    expect(intervalo * 1000).toBeLessThan(29 * 60 * 1000) // ACCESS_TTL_MS in auth.ts
+    // The focus refetch stays on (next-auth's default).
+    expect(props?.refetchOnWindowFocus).not.toBe(false)
   })
 })

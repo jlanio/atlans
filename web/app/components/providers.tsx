@@ -53,6 +53,22 @@ export function SessionSync() {
 }
 
 /**
+ * How often (SECONDS — next-auth's unit) the client session is refetched.
+ *
+ * Without it next-auth only refetches when the tab becomes visible again, so a
+ * tab that keeps focus held the access token it loaded with past the API's
+ * 30 min TTL (`ACCESS_TTL_MS` in auth.ts) — and that browser copy is what the
+ * run WebSocket authenticates with (the HTTP calls go through /terra, which
+ * uses the middleware's fresh copy). It is well below the TTL, not just under
+ * it, because a refetch does not refresh early: the jwt callback renews the
+ * token only once it is past `ACCESS_TTL_MS`, so after that the client copy can
+ * stay expired for up to one interval. Five minutes bounds that window; each
+ * poll is a GET /api/auth/session that only calls the API when the token is due.
+ * (A value here, not an import of auth.ts: that module is server-only.)
+ */
+const SESSION_REFETCH_INTERVAL_S = 5 * 60
+
+/**
  * `session` comes resolved from the server — in practice, from the MIDDLEWARE,
  * passed to the dashboard layout via header (see SESSION_HEADER in auth.ts).
  * Without it next-auth fires a GET /api/auth/session on mount and `status`
@@ -70,7 +86,7 @@ export default function Providers({
   children: React.ReactNode;
 }) {
   return (
-    <SessionProvider session={session}>
+    <SessionProvider session={session} refetchInterval={SESSION_REFETCH_INTERVAL_S}>
       <SessionSync />
       <NotificationsProvider>
         <CommandPalette />

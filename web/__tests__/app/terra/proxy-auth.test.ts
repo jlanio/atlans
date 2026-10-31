@@ -82,15 +82,37 @@ describe("proxy /terra — autenticação", () => {
     expect(sentAuthHeader().get("authorization")).toBe("Bearer VIA-AUTH")
   })
 
-  it("path público: não exige sessão, não chama auth, e preserva o Bearer do cliente", async () => {
+  it("path público sem sessão: não exige sessão, não chama auth, e preserva o Bearer do cliente", async () => {
+    // No SESSION_HEADER (anonymous visitor): the decode finds nothing.
+    decodeMock.mockReturnValue(null)
     const res = await GET(
       req("artifacts/portal/mapa", { authorization: "Bearer CLIENTE" }),
       ctx(["artifacts", "portal", "mapa"]),
     )
     expect(res.status).toBe(200)
     expect(authMock).not.toHaveBeenCalled()
-    expect(decodeMock).not.toHaveBeenCalled()
     expect(sentAuthHeader().get("authorization")).toBe("Bearer CLIENTE")
+  })
+
+  it.each([
+    ["auth/tokens", ["auth", "tokens"]],
+    ["drive/abc/download", ["drive", "abc", "download"]],
+  ])("path público COM sessão (%s): autentica com o token do servidor, não com o Bearer velho do cliente", async (path, segs) => {
+    // The browser's copy is only refreshed when useSession refetches; in a tab
+    // that kept focus past the access TTL it is expired, while the middleware's
+    // copy is fresh. Forwarding the client's made Drive downloads and the API
+    // token page fail with 401 in a session that was still valid.
+    decodeMock.mockReturnValue({ user: { access_token: "SERVIDOR-FRESCO" } })
+    const res = await GET(
+      req(path, { authorization: "Bearer CLIENTE-VENCIDO", "x-atlans-session": "HDR" }),
+      ctx(segs),
+    )
+    expect(res.status).toBe(200)
+    expect(decodeMock).toHaveBeenCalledWith("HDR")
+    // A public path never falls back to auth(): the anonymous portal must not pay for it.
+    expect(authMock).not.toHaveBeenCalled()
+    expect(sentAuthHeader().get("authorization")).toBe("Bearer SERVIDOR-FRESCO")
+    expect(sentAuthHeader().get("x-atlans-session")).toBeNull()
   })
 })
 
@@ -153,5 +175,27 @@ describe("proxy /terra — endurecimento (auditoria)", () => {
     const res = await POST(post("workflows", { origin: "https://atlans.example.org", host: "atlans.example.org", "sec-fetch-site": "same-origin" }), ctx(["workflows"]))
     expect(res.status).toBe(200)
     expect(fetchMock).toHaveBeenCalled()
+  })
+
+  it("path público autenticado pela sessão também passa pelo CSRF", async () => {
+    // Now that the session's token goes to public paths, another page could
+    // create or revoke an API token as the user without this check.
+    decodeMock.mockReturnValue({ user: { access_token: "T" } })
+    const res = await POST(
+      post("auth/tokens", { origin: "https://evil.example", host: "atlans.example.org", "x-atlans-session": "HDR" }),
+      ctx(["auth", "tokens"]),
+    )
+    expect(res.status).toBe(403)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("path público sem sessão continua isento do CSRF: nada do usuário vai junto", async () => {
+    decodeMock.mockReturnValue(null)
+    const res = await POST(
+      post("auth/login", { "sec-fetch-site": "same-site", origin: "https://blog.example.org", host: "atlans.example.org" }),
+      ctx(["auth", "login"]),
+    )
+    expect(res.status).toBe(200)
+    expect(sentAuthHeader().get("authorization")).toBeNull()
   })
 })
