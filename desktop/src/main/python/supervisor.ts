@@ -296,6 +296,15 @@ export class PythonSupervisor extends EventEmitter {
   forcar(): void {
     this.pareiDeProposito = true
     this.cancelarBackoff()
+    // No process: the click came during the restart backoff, with the
+    // "Encerrando" alert still on screen. Killing nothing and leaving the state
+    // alone stranded the supervisor in `restarting`, with no timer and no
+    // process — and the panel offers no "Iniciar" in that state. A `failed`
+    // keeps its cause: it is what the user has to act on.
+    if (!this.proc) {
+      if (this._estado !== 'failed') this.mudarEstado('stopped')
+      return
+    }
     this.matarAForca()
   }
 

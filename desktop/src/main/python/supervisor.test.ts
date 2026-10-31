@@ -333,6 +333,33 @@ describe('stop', () => {
     await p
   })
 
+  it('"Forçar agora" durante o backoff para de vez, e não fica em restarting', async () => {
+    // The draining alert outlived the process into the restart backoff; its
+    // "Forçar agora" found no process to kill and changed nothing, leaving the
+    // supervisor in `restarting` with no timer — and no way out in the panel.
+    const { sup, procs, spawnFn } = criar()
+    sup.start()
+    procs[0]!.emitir({ v: 1, t: 'state', ts: 1, data: { phase: 'draining', step: null, detail: null } })
+    await tick()
+    procs[0]!.sair(1)
+    await tick()
+    expect(sup.estado).toBe('restarting')
+
+    sup.forcar()
+    await vi.advanceTimersByTimeAsync(120_000)
+    expect(sup.estado).toBe('stopped')
+    expect(spawnFn).toHaveBeenCalledTimes(1)
+  })
+
+  it('"Forçar agora" sem processo não apaga um failed', async () => {
+    const { sup, procs } = criar()
+    sup.start()
+    procs[0]!.emit('error', new Error('ENOENT'))
+    await tick()
+    sup.forcar()
+    expect(sup.estado).toBe('failed')
+  })
+
   it('forca o encerramento quando o teto de graca estoura', async () => {
     const { sup, procs } = criar()
     sup.start()
