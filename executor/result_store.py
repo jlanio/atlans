@@ -9,8 +9,11 @@ workflow stays in the "running" state indefinitely on the server.
 
 This module provides a lightweight SQLite "outbox" layer:
   - `put(result)`    — persists the result when it is produced
-  - `mark_sent(id)`  — removes it after the server confirms receipt
-  - `load_pending()` — at executor startup, returns what was never sent
+  - `mark_sent(id)`  — records that it left; the copy stays for the replay
+                       window (`JANELA_DE_REENVIO_S`), then is purged
+  - `load_pending()` — what was never sent
+  - `load_for_boot_replay()` — at executor startup: the never-sent results plus
+                       the ones sent within the replay window
 
 No additional dependencies: uses the stdlib sqlite3 in WAL mode to
 support concurrent writes between the executor and the sender_loop.
@@ -327,21 +330,14 @@ def increment_attempts(job_id: str) -> None:
 
 
 def load_pending() -> list[dict]:
-    """Returns all pending results, oldest first.
-
-    Call at executor startup to drain and re-enqueue what was not sent
-    before the previous crash. Never raises: failures return [].
-    """
-    # Includes the results sent within the replay window: the previous process
-    # may have sent them on a connection that was already dead.
-    purge_sent()
+    """Returns the results never sent, oldest first. Never raises: failures return []."""
     try:
         with _lock:
             conn = _get_conn()
             if conn is None:
                 return []
             rows = conn.execute(
-                "SELECT payload FROM pending_results ORDER BY created_at ASC"
+                "SELECT payload FROM pending_results WHERE sent_at IS NULL ORDER BY created_at ASC"
             ).fetchall()
     except Exception as exc:
         logger.warning("result_store.load_pending falhou: %s", exc)
@@ -354,6 +350,14 @@ def load_pending() -> list[dict]:
         except json.JSONDecodeError as exc:
             logger.warning("result_store: payload corrompido, pulando: %s", exc)
     return out
+
+
+def load_for_boot_replay() -> list[dict]:
+    """What the executor resends at startup: every result never sent, then the
+    ones sent within the replay window — the previous process may have sent
+    those on a connection that was already dead (the server keeps the first
+    outcome, so a repeat is harmless). Never raises: failures return []."""
+    return load_pending() + load_recently_sent()
 
 
 def count_pending() -> int:

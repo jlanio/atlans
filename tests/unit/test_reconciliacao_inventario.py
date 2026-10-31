@@ -922,11 +922,20 @@ def test_a_sent_result_stays_for_the_replay_window_and_then_goes(store):
     assert store.job_ids_pendentes() == []          # no longer "not sent"
     assert store.count_pending() == 0
     assert [r["job_id"] for r in store.load_recently_sent()] == ["j1"]
-    assert [r["job_id"] for r in store.load_pending()] == ["j1"]   # boot replays it too
+    assert store.load_pending() == []                               # never-sent only
+    assert [r["job_id"] for r in store.load_for_boot_replay()] == ["j1"]   # boot replays it too
 
     store.purge_sent(agora=time.time() + store.JANELA_DE_REENVIO_S + 1)
     assert store.load_recently_sent() == []
-    assert store.load_pending() == []
+    assert store.load_for_boot_replay() == []
+
+
+def test_the_boot_replay_sends_the_never_sent_first(store):
+    store.put({"job_id": "enviado", "status": "ok"})
+    store.mark_sent("enviado")
+    store.put({"job_id": "nunca", "status": "ok"})
+
+    assert [r["job_id"] for r in store.load_for_boot_replay()] == ["nunca", "enviado"]
 
 
 def test_a_new_result_for_the_same_job_is_pending_again(store):

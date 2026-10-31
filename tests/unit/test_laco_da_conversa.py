@@ -34,6 +34,17 @@ from ._mcp_harness import FakeRedis, fake_scope
 
 pytestmark = pytest.mark.asyncio
 
+
+@pytest.fixture(autouse=True)
+def _saved_workflow_does_not_act(monkeypatch):
+    """The editor refuses `run_workflow` for a saved workflow that acts outside,
+    reading it from the database (its own tests are in test_assistente_service).
+    The loop here runs a workflow that only reads and transforms."""
+    async def _nada(_estado, _argumentos):
+        return []
+
+    monkeypatch.setattr(cs, "_editor_run_acts", _nada)
+
 MODEL = "fornecedor/modelo-de-teste"
 TETO = 50_000
 REQUEST = {"role": "user", "content": "monta um fluxo de buffer"}

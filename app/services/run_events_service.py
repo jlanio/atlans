@@ -963,7 +963,7 @@ async def publicar_conclusao(
                     run_id, status, erro=mensagem, extra=extra, timestamp=ts,
                 )
                 append_events(pipe, run_id, [evento])
-                if status != "completed":
+                if status in ("failed", "cancelled"):
                     # Unblocks a synchronous webhook waiting on this run (the
                     # job_result path already does it). Without it the caller
                     # held the connection for the whole timeout and got a 504

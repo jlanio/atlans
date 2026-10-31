@@ -813,7 +813,7 @@ async def main():
         keep the executor from operating.
         """
         try:
-            pending = await asyncio.to_thread(result_store.load_pending)
+            pending = await asyncio.to_thread(result_store.load_for_boot_replay)
         except Exception as exc:
             logger.warning("Falha ao restaurar resultados pendentes (ignorando): %s", exc)
             return
