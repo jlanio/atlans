@@ -60,8 +60,13 @@ fi
 
 # 3. Redis ping
 REDIS_PASS=$(grep -E '^REDIS_PASSWORD=' .env 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"')
-# The password goes via the REDISCLI_AUTH variable, not `-a`: in argv it shows up in `ps`.
-if [ -n "$REDIS_PASS" ] && docker compose exec -T -e REDISCLI_AUTH="$REDIS_PASS" redis redis-cli --no-auth-warning ping 2>/dev/null | grep -q PONG; then
+# The password reaches redis-cli in the REDISCLI_AUTH variable and never in an
+# argv, where `ps` shows it: not in `-a`, and not in `docker compose exec -e
+# REDISCLI_AUTH=<password>` either (the host's ps). It goes through stdin —
+# printf is a builtin — and the container's shell puts it in the variable.
+if [ -n "$REDIS_PASS" ] && printf '%s' "$REDIS_PASS" \
+        | docker compose exec -T redis sh -c 'REDISCLI_AUTH="$(cat)" redis-cli --no-auth-warning ping' 2>/dev/null \
+        | grep -q PONG; then
     pass "Redis responde PONG"
 else
     fail "Redis nao responde (verifique REDIS_PASSWORD no .env e container redis)"

@@ -46,6 +46,7 @@ from slowapi import Limiter
 
 from app.core.trusted_proxy import get_client_ip
 from app.core.utils.logger import get_logger
+from app.core.utils.url_do_redis import redis_url_with_encoded_password
 
 logger = get_logger(__name__)
 
@@ -74,6 +75,9 @@ def _storage_do_limiter() -> str:
     app_redis = (os.getenv("REDIS_URL") or "").strip()
     if not app_redis:
         return "memory://"
+    # The same URL the rest of the API uses (app/core/config.py): the password
+    # that compose interpolated verbatim, percent-encoded.
+    app_redis = redis_url_with_encoded_password(app_redis, os.getenv("REDIS_PASSWORD"))
     if _scheme(app_redis) not in _REDIS_SCHEMES:
         # `unix://` and the like work for redis-py, but `limits` does not know the
         # scheme and would reject it at import — the API would not even start.

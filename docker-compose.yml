@@ -17,6 +17,10 @@ x-api-env: &api-env
   TZ: ${TZ}
   DATABASE_URL: ${DATABASE_URL}
   REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+  # Compose interpolates the password into the URL verbatim; with it here too,
+  # the API percent-encodes a character reserved in URLs (/ ? # % @...) before
+  # using the URL (app/core/utils/url_do_redis.py).
+  REDIS_PASSWORD: ${REDIS_PASSWORD}
   # Per-IP rate limit counters (app/core/rate_limiter.py). Empty (default)
   # = the REDIS_URL above, and the limits apply to the whole API; `memory://`
   # goes back to each worker's memory (see docs/operations.md).
@@ -158,7 +162,9 @@ services:
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      # The password in REDISCLI_AUTH (read by redis-cli and valkey-cli), never
+      # in `-a`: on a command line it shows up in `ps`, on the host too.
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli --no-auth-warning ping | grep PONG"]
       interval: 10s
       timeout: 5s
       retries: 5

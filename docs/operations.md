@@ -307,8 +307,10 @@ testing. `RATE_LIMIT_STORAGE_URI=memory://` in the dev `.env` avoids that, and t
 reset the counters:
 
 ```bash
-docker compose exec redis sh -c 'redis-cli --no-auth-warning -a "$REDIS_PASSWORD" --scan --pattern "LIMITS:*" | xargs -r redis-cli --no-auth-warning -a "$REDIS_PASSWORD" del'
+docker compose exec redis sh -c 'export REDISCLI_AUTH="$REDIS_PASSWORD"; redis-cli --no-auth-warning --scan --pattern "LIMITS:*" | xargs -r redis-cli --no-auth-warning del'
 ```
+
+(The password goes in `REDISCLI_AUTH`, not `-a`: on a command line it shows up in `ps`.)
 
 ## Database query timeouts
 

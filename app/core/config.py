@@ -7,6 +7,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 from dotenv import load_dotenv
 
+from app.core.utils.url_do_redis import redis_url_with_encoded_password
+
 # In development the compose file mounts the repository at /app, its .env
 # included, and the API runs as UID 1000. When the host user has another UID,
 # that .env (mode 600, from make bootstrap) cannot be read in there, and the
@@ -24,7 +26,12 @@ DATABASE_URL   = os.getenv("DATABASE_URL")
 
 # Redis connection URL — used by pub/sub, the run_creates/run_results queues and the cache.
 # Ex: redis://:senha@redis:6379/0
-REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
+# The compose file interpolates REDIS_PASSWORD into it verbatim and passes the
+# password too: a character reserved in URLs is percent-encoded here
+# (app/core/utils/url_do_redis.py).
+REDIS_URL: str = redis_url_with_encoded_password(
+    os.getenv("REDIS_URL", "redis://redis:6379/0"), os.getenv("REDIS_PASSWORD")
+)
 ECHO_SQL       = os.getenv("ECHO_SQL", "false").lower() == "true"
 
 # Routing by workspace POLICY (docs/specs/executor-isolation-routing.md).

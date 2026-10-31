@@ -9,8 +9,15 @@ import json
 import re
 from pathlib import Path
 
+import yaml
+
 RAIZ = Path(__file__).resolve().parents[2]
 DOCKERFILE_API = RAIZ / "Dockerfile.api"
+COMPOSE = RAIZ / "docker-compose.yml"
+
+
+def _compose() -> dict:
+    return yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
 
 
 def _cmd(dockerfile: Path) -> list[str]:
@@ -27,3 +34,38 @@ def test_the_api_image_default_command_has_no_reload():
     cmd = _cmd(DOCKERFILE_API)
     assert cmd[:2] == ["uvicorn", "app.main:app"]
     assert "--reload" not in cmd
+
+
+# ── The Redis password ───────────────────────────────────────────────────────
+
+# `redis-cli -a <password>` (or `--pass`): the password in argv, visible in `ps`
+# — on the host too, for a process in a container.
+_SENHA_NA_LINHA = re.compile(r"redis-cli\b[^\n|;]*\s(-a|--pass)\s")
+
+
+def test_redis_cli_never_takes_the_password_on_the_command_line():
+    arquivos = [COMPOSE, RAIZ / "scripts" / "smoke.sh", *sorted((RAIZ / "docs").rglob("*.md"))]
+    achados = [
+        f"{arquivo.relative_to(RAIZ)}: {linha.strip()}"
+        for arquivo in arquivos
+        for linha in arquivo.read_text(encoding="utf-8").splitlines()
+        if _SENHA_NA_LINHA.search(linha)
+    ]
+    assert achados == []
+    teste = " ".join(_compose()["services"]["redis"]["healthcheck"]["test"])
+    assert 'REDISCLI_AUTH="$${REDIS_PASSWORD}" redis-cli' in teste
+
+
+def test_smoke_does_not_put_the_password_in_the_docker_command_line():
+    """`docker compose exec -e REDISCLI_AUTH=<password>` is argv of the host's docker."""
+    smoke = (RAIZ / "scripts" / "smoke.sh").read_text(encoding="utf-8")
+    assert "-e REDISCLI_AUTH=" not in smoke
+    assert 'REDISCLI_AUTH="$(cat)" redis-cli' in smoke
+
+
+def test_the_api_receives_the_redis_password_to_encode_the_url():
+    """REDIS_URL is interpolated verbatim; the API encodes it with REDIS_PASSWORD
+    (app/core/utils/url_do_redis.py)."""
+    env = _compose()["x-api-env"]
+    assert env["REDIS_URL"] == "redis://:${REDIS_PASSWORD}@redis:6379/0"
+    assert env["REDIS_PASSWORD"] == "${REDIS_PASSWORD}"
