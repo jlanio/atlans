@@ -4,6 +4,7 @@ Spatial Filter node — filters features by bounding box or by another layer (ma
 """
 import asyncio
 import geopandas as gpd
+from shapely.geometry import box
 from typing import Any, Dict
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
@@ -97,8 +98,13 @@ class SpatialFilterNode(BaseNode):
                 raise ValueError("A caixa delimitadora deve ter exatamente 4 valores: minx,miny,maxx,maxy.")
 
             def _bbox_filter(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-                inside = gdf.cx[parts[0]:parts[2], parts[1]:parts[3]]
-                return gdf.drop(index=inside.index) if invert else inside
+                # The same test `gdf.cx[...]` applies (intersects the box), as a
+                # POSITIONAL mask: `drop(index=inside.index)` dropped by label,
+                # and with a repeated index label (a spatial join's output) it
+                # also dropped the rows OUTSIDE the box that shared the label.
+                caixa = box(parts[0], parts[1], parts[2], parts[3])
+                hits = gdf.geometry.intersects(caixa).to_numpy()
+                return gdf[~hits] if invert else gdf[hits]
 
             result = await asyncio.to_thread(_bbox_filter, gdf)
 

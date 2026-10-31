@@ -32,6 +32,8 @@ def _montar_envelope_gzip(cabecalho: dict, geojson_str: str) -> tuple[bytes, int
 
 @register_node
 class PublishMap(BaseNode):
+
+    TEM_EFEITO_COLATERAL = True
     @classmethod
     def description(cls) -> dict:
         return {

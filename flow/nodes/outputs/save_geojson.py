@@ -18,6 +18,8 @@ logger = get_logger(__name__)
 
 @register_node
 class SaveGeoJSON(BaseNode):
+
+    TEM_EFEITO_COLATERAL = True
     @classmethod
     def description(cls) -> dict:
         return {

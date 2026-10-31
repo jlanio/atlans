@@ -12,7 +12,13 @@
 
 import ast
 import builtins
+import contextlib
+import os
 import re
+import site
+import sys
+import sysconfig
+import threading
 
 # ── Allowed modules ──────────────────────────────────────────────────────────
 # Only modules that are safe for geospatial data manipulation.
@@ -127,6 +133,55 @@ _BLOCKED_METHODS = {
     "attrgetter", "methodcaller",
 }
 
+# ── File, network and deserialization I/O of the allowlisted libraries ───────
+# Blocking `open` and `import os` is not enough: pandas, geopandas, numpy and
+# pyogrio read and write files and URLs on their own. `pd.read_csv('/etc/...')`
+# returned any file of the executor (its mTLS key included),
+# `pd.read_csv('http://169.254.169.254/...')` reached internal addresses,
+# `df.to_csv('/tmp/x')` wrote anywhere and `pd.read_pickle(...)` executes code
+# while deserializing. None of them has a dunder or an import for the checks
+# above to see. The Jinja sandbox (flow/utils/jinja_seguro.py) already blocked
+# the same methods on the same objects; this layer did not.
+#
+# Every `read_*` attribute is refused by prefix (read_csv, read_file,
+# read_parquet, read_pickle, read_postgis, read_dataframe…): none of them is
+# needed to transform data that arrives through the node's inputs.
+_IO_READ_PREFIX = "read_"
+_IO_BLOCKED_ATTRS = {
+    # writers that always take a destination
+    "to_file", "to_pickle", "to_parquet", "to_feather", "to_hdf", "to_excel",
+    "to_orc", "to_stata", "to_sql", "to_gbq", "to_postgis", "to_clipboard",
+    "tofile", "save", "savez", "savez_compressed", "savetxt",
+    "write_dataframe", "write_arrow",
+    # numpy/pyogrio/pandas loaders and file handles not covered by `read_`
+    "load", "loadtxt", "genfromtxt", "fromfile", "fromregex", "memmap",
+    "open_memmap", "DataSource", "open_arrow", "list_layers",
+    "ctypeslib", "load_library",
+    # pandas' own URL/file plumbing and pickle shim
+    "urlopen", "get_handle", "pickle_compat",
+    # `query`/`eval` evaluate a STRING at runtime: a string assembled by
+    # concatenation escapes every check above (`'@g.gi_' + 'frame…'`).
+    # Alternative for the user: boolean indexing, `df[df["pop"] > 1000]`.
+    "query", "eval",
+    # process-wide PROJ settings: they change the behavior of every other node
+    # of the executor (and turn on PROJ's network access)
+    "set_data_dir", "append_data_dir", "set_network_enabled",
+    "set_ca_bundle_path",
+}
+# Return a string when called WITHOUT a destination (`gdf.to_json()` is common
+# and legitimate) and write to a file when given one. Allowed only as the
+# function of a call that names no destination: no positional argument, no
+# destination keyword and no `**kwargs`. Taking the bound method itself
+# (`f = df.to_csv`) is refused, because the call the check sees would be `f(...)`.
+_WRITERS_WITH_DESTINATION = {
+    "to_csv", "to_json", "to_html", "to_xml", "to_string", "to_markdown",
+    "to_latex",
+}
+_DESTINATION_KWARGS = {
+    "path_or_buf", "buf", "path", "fname", "excel_writer",
+    "filepath_or_buffer", "filename",
+}
+
 # Dunder token (`__algo__`) — used to catch dunders SMUGGLED in as a
 # string literal (`obj.__getattribute__('__class__')`, `'{0.__init__.__globals__}'`,
 # `d['__builtins__']`). Requires at least one character between the underscore pairs.
@@ -153,6 +208,12 @@ def validate_code_ast(code: str) -> None:
         SyntaxError: if the code has a syntax error.
     """
     tree = ast.parse(code)
+    # Parent of each node: `_check_writer` needs to know whether the attribute
+    # is the function being called, and with which arguments.
+    pais: dict[int, ast.AST] = {}
+    for pai in ast.walk(tree):
+        for filho in ast.iter_child_nodes(pai):
+            pais[id(filho)] = pai
     for node in ast.walk(tree):
         # import xxx
         if isinstance(node, ast.Import):
@@ -165,6 +226,8 @@ def validate_code_ast(code: str) -> None:
         # obj.__subclasses__, obj.format, obj.gi_frame, etc.
         elif isinstance(node, ast.Attribute):
             _check_attr(node.attr)
+            if node.attr in _WRITERS_WITH_DESTINATION:
+                _check_writer(node, pais.get(id(node)))
         # '__class__', '{0.__init__.__globals__}', d['__builtins__'] — the dunder
         # travels as text. ast.walk visits EVERY ast.Constant (call argument,
         # subscript key, format spec), so a single loop covers all three.
@@ -194,6 +257,31 @@ def _check_attr(attr: str) -> None:
             f"Uso do metodo '{attr}' nao e permitido por seguranca; "
             "use f-strings para formatar texto."
         )
+    if attr in ("query", "eval"):
+        raise UnsafeCodeError(
+            f"Uso do metodo '{attr}' nao e permitido por seguranca: ele avalia "
+            "texto como codigo. Use indexacao booleana, por exemplo "
+            "df[df['coluna'] > 10]."
+        )
+    if attr.startswith(_IO_READ_PREFIX) or attr in _IO_BLOCKED_ATTRS:
+        raise UnsafeCodeError(
+            f"Uso de '{attr}' nao e permitido no PythonScript: ler ou gravar "
+            "arquivos e URLs fica com os nos de entrada e saida do fluxo. "
+            "Conecte os dados como entrada do no."
+        )
+
+
+def _check_writer(node: ast.Attribute, pai: ast.AST | None) -> None:
+    """Allows `x.to_json()`-style calls only without a write destination."""
+    chamada_direta = isinstance(pai, ast.Call) and pai.func is node
+    if chamada_direta and not pai.args and not any(
+        kw.arg is None or kw.arg in _DESTINATION_KWARGS for kw in pai.keywords
+    ):
+        return
+    raise UnsafeCodeError(
+        f"'{node.attr}' so e permitido sem destino (devolve texto): chame "
+        f"'.{node.attr}()' sem caminho, buffer ou argumentos posicionais."
+    )
 
 
 def _check_module(module_name: str) -> None:
@@ -233,3 +321,154 @@ def build_safe_builtins() -> dict:
     }
     safe["__import__"] = safe_import
     return safe
+
+
+# ── Runtime guard (audit hook) ───────────────────────────────────────────────
+# The AST check sees names, not objects: a bound method kept under another name,
+# or a library path nobody listed, still reaches the file system or the network.
+# This second layer watches what the interpreter actually does while the user's
+# code runs. A process-wide audit hook (PEP 578) refuses, ONLY on the thread
+# running the script, the operations a data transformation never needs:
+# sockets, processes, ctypes, unpickling, file writes and file reads outside the
+# folders of Python and its packages (imports and time zone data live there; the
+# executor's certificates, .env and spill files do not).
+#
+# What it does not cover: I/O done inside C libraries (GDAL through pyogrio,
+# PROJ) raises no audit event — those entry points are refused by name above.
+# Audit hooks cannot be removed; outside a script the hook returns on its first
+# line, so the other nodes pay one attribute read per audited event.
+
+_estado_do_script = threading.local()
+
+_EVENTOS_BLOQUEADOS = frozenset({
+    "os.system", "os.kill", "os.killpg", "os.remove", "os.rename", "os.rmdir",
+    "os.mkdir", "os.chmod", "os.chown", "os.chflags", "os.lchflags",
+    "os.symlink", "os.link", "os.truncate", "os.utime", "os.putenv",
+    "os.unsetenv", "os.chdir", "os.startfile", "os.add_dll_directory",
+    # `marshal.loads` stays allowed: the import system uses it to load .pyc
+    # files, and a lazy import inside a script is legitimate.
+    "pickle.find_class",
+    "sys.addaudithook", "sys.settrace", "sys.setprofile",
+    "gc.get_objects", "gc.get_referrers", "gc.get_referents",
+    "code.__new__",
+})
+_PREFIXOS_BLOQUEADOS = (
+    "socket.", "subprocess.", "os.exec", "os.spawn", "os.posix_spawn",
+    "os.fork", "ctypes.", "shutil.", "tempfile.", "sqlite3.", "urllib.",
+    "http.client.", "ftplib.", "smtplib.", "poplib.", "imaplib.", "nntplib.",
+    "telnetlib.", "webbrowser.", "winreg.", "_winapi.", "msvcrt.",
+    "resource.", "signal.", "glob.", "mmap.",
+)
+_BITS_DE_ESCRITA = (
+    getattr(os, "O_WRONLY", 0) | getattr(os, "O_RDWR", 0) | getattr(os, "O_CREAT", 0)
+    | getattr(os, "O_TRUNC", 0) | getattr(os, "O_APPEND", 0)
+)
+_raizes_de_leitura: tuple[str, ...] | None = None
+_guarda_instalada = False
+_trava_da_guarda = threading.Lock()
+
+
+def _calcular_raizes_de_leitura() -> tuple[str, ...]:
+    """Folders a script may read from: Python itself, its packages, tz data."""
+    candidatas: set[str] = set()
+    for prefixo in (sys.prefix, sys.base_prefix, sys.exec_prefix, sys.base_exec_prefix):
+        if prefixo:
+            candidatas.add(prefixo)
+    for chave in ("stdlib", "platstdlib", "purelib", "platlib"):
+        caminho = sysconfig.get_paths().get(chave)
+        if caminho:
+            candidatas.add(caminho)
+    with contextlib.suppress(Exception):
+        candidatas.update(site.getsitepackages())
+    with contextlib.suppress(Exception):
+        candidatas.add(site.getusersitepackages())
+    tzpath = sysconfig.get_config_var("TZPATH") or ""
+    candidatas.update(p for p in tzpath.split(os.pathsep) if p)
+    raizes = set()
+    for caminho in candidatas:
+        real = os.path.realpath(caminho)
+        # A prefix at the file system root would allow everything.
+        if real and real != os.path.sep and os.path.dirname(real) != real:
+            raizes.add(real)
+    return tuple(sorted(raizes))
+
+
+def _dentro_das_raizes(caminho) -> bool:
+    if isinstance(caminho, int):
+        return False
+    try:
+        real = os.path.realpath(os.fsdecode(caminho))
+    except Exception:
+        return False
+    raizes = _raizes_de_leitura or ()
+    return any(real == r or real.startswith(r + os.sep) for r in raizes)
+
+
+def _recusar(evento: str) -> None:
+    raise PermissionError(
+        f"Operação bloqueada no PythonScript ({evento}): o script não pode "
+        "acessar rede, processos ou arquivos fora dos dados recebidos."
+    )
+
+
+def _guarda_de_auditoria(evento: str, args: tuple) -> None:
+    if not getattr(_estado_do_script, "ativo", False):
+        return
+    if evento == "open":
+        caminho = args[0] if args else None
+        modo = args[1] if len(args) > 1 else None
+        flags = args[2] if len(args) > 2 else 0
+        escreve = bool(modo and any(c in str(modo) for c in "wax+")) or bool(
+            isinstance(flags, int) and flags & _BITS_DE_ESCRITA
+        )
+        if escreve or not _dentro_das_raizes(caminho):
+            _recusar(f"open {caminho!r}")
+        return
+    if evento in ("os.listdir", "os.scandir"):
+        caminho = args[0] if args and args[0] is not None else "."
+        if not _dentro_das_raizes(caminho):
+            _recusar(evento)
+        return
+    if evento in _EVENTOS_BLOQUEADOS or evento.startswith(_PREFIXOS_BLOQUEADOS):
+        _recusar(evento)
+
+
+def instalar_guarda_de_execucao() -> None:
+    """Installs the audit hook once per process (idempotent)."""
+    global _guarda_instalada, _raizes_de_leitura
+    with _trava_da_guarda:
+        if _guarda_instalada:
+            return
+        _raizes_de_leitura = _calcular_raizes_de_leitura()
+        sys.addaudithook(_guarda_de_auditoria)
+        _guarda_instalada = True
+
+
+@contextlib.contextmanager
+def executando_codigo_do_usuario():
+    """Marks the CURRENT thread as running user code while the block lasts."""
+    instalar_guarda_de_execucao()
+    anterior = getattr(_estado_do_script, "ativo", False)
+    _estado_do_script.ativo = True
+    try:
+        yield
+    finally:
+        _estado_do_script.ativo = anterior
+
+
+@contextlib.contextmanager
+def fora_do_codigo_do_usuario():
+    """Suspends the guard for the platform's own work done on the script's
+    thread (publishing print() lines, logging), which may legitimately use
+    sockets or write log files."""
+    anterior = getattr(_estado_do_script, "ativo", False)
+    _estado_do_script.ativo = False
+    try:
+        yield
+    finally:
+        _estado_do_script.ativo = anterior
+
+
+def liberar_thread_do_script() -> None:
+    """Clears the mark on the current thread (safety net after a timeout)."""
+    _estado_do_script.ativo = False

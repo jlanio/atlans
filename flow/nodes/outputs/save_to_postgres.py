@@ -37,6 +37,8 @@ class SaveToPostgres(BaseNode):
       - chunksize: rows per batch in the INSERT (0 -> automatic from the number of columns)
     """
 
+    TEM_EFEITO_COLATERAL = True
+
     @classmethod
     def description(cls) -> Dict[str, Any]:
         return {

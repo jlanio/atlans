@@ -661,6 +661,8 @@ def gravar(
 class SaveFileNode(BaseNode):
     """Saves a layer or a table as GeoPackage, KMZ/KML, Excel or CSV."""
 
+    TEM_EFEITO_COLATERAL = True
+
     @classmethod
     def description(cls) -> Dict[str, Any]:
         return {

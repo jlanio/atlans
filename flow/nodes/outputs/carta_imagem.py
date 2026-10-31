@@ -177,6 +177,8 @@ def _load_matplotlib():
 class CartaImagem(BaseNode):
     """Composes the layers connected to the ports into an image map (PNG, JPG or PDF)."""
 
+    TEM_EFEITO_COLATERAL = True
+
     @classmethod
     def description(cls) -> Dict[str, Any]:
         return {

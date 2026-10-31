@@ -257,3 +257,56 @@ def test_blocks_dangerous_module_handle(codigo):
 ])
 def test_allows_legitimate_data_manipulation(codigo):
     validate_code_ast(codigo)  # must not raise
+
+
+# ── I/O of the allowlisted libraries (review of 2026-10-31) ─────────────────
+# pandas/geopandas/numpy read and write files and URLs by themselves: none of
+# these has a dunder or an import for the older checks to see.
+
+@pytest.mark.parametrize("code", [
+    "import pandas as pd\nresult = pd.read_pickle('/tmp/x.pkl')",
+    "import pandas as pd\nresult = pd.read_csv('/etc/passwd')",
+    "import pandas as pd\nresult = pd.read_csv('http://169.254.169.254/latest/meta-data/')",
+    "import pandas as pd\nresult = pd.read_parquet('http://169.254.169.254/x')",
+    "import geopandas as gpd\nresult = gpd.read_file('/etc/passwd')",
+    "import pyogrio\nresult = pyogrio.read_dataframe('/etc/passwd')",
+    "result = minha.to_pickle('/tmp/evil.pkl')",
+    "minha.to_file('/tmp/x.gpkg')",
+    "import numpy as np\nresult = np.DataSource('/tmp').open('/etc/passwd')",
+    "import numpy as np\nresult = np.load('/tmp/x.npy')",
+    "import numpy as np\nnp.save('/tmp/x.npy', np.array([1]))",
+    "result = minha.query('a > 1', engine='python')",
+    "result = minha.eval('a + b')",
+    "import pandas as pd\nresult = pd.io.common.urlopen('http://x')",
+    "import pyproj\npyproj.network.set_network_enabled(True)",
+])
+def test_library_io_is_refused(code):
+    with pytest.raises(UnsafeCodeError):
+        validate_code_ast(code)
+
+
+@pytest.mark.parametrize("code", [
+    "result = minha.to_csv('/tmp/evil.txt')",
+    "result = minha.to_csv(path_or_buf='/tmp/evil.txt')",
+    "result = minha.to_json(buf)",
+    "result = minha.to_csv(**{'path_or_buf': '/tmp/x'})",
+    "f = minha.to_csv\nresult = f('/tmp/x')",       # the bound method under another name
+    "result = list(map(minha.to_csv, ['/tmp/x']))",
+])
+def test_writers_with_a_destination_are_refused(code):
+    with pytest.raises(UnsafeCodeError):
+        validate_code_ast(code)
+
+
+@pytest.mark.parametrize("code", [
+    "result = gdf.to_json()",
+    "result = df.to_csv(index=False, sep=';')",
+    "result = df.to_string(max_rows=10)",
+    "result = df.to_html(index=False)",
+    "result = gdf.to_crs(3857)",
+    "result = df.to_dict(orient='records')",
+    "import json\nresult = json.loads('{\"a\": 1}')",
+    "result = df[df['pop'] > 1000]",
+])
+def test_transformations_without_io_still_pass(code):
+    validate_code_ast(code)

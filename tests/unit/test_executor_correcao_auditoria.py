@@ -90,9 +90,17 @@ class _ClassifiedFailure(BaseNode):
 
     async def execute(self, inputs):
         CALLS[self.node_id] = CALLS.get(self.node_id, 0) + 1
-        if self.get_param("tipo", "user") == "transient":
+        tipo = self.get_param("tipo", "user")
+        if tipo == "transient":
             raise ConnectionError("rede caiu")
+        if tipo == "refused":
+            raise ConnectionRefusedError("conexao recusada")
+        if tipo == "timeout":
+            raise TimeoutError("sem resposta")
         raise ValueError("dado ruim")
+
+    def tem_efeito_colateral(self) -> bool:
+        return bool(self.get_param("escreve", False))
 
 
 @pytest.fixture
@@ -200,6 +208,35 @@ def test_retry_retries_transient_error(_registra):
     with pytest.raises(Exception):
         asyncio.run(ex.run(initial_inputs={"T": {"output": _gdf()}}))
     assert CALLS.get("R") == 3, "erro transitório deve ser retentado até esgotar"
+
+
+@pytest.mark.parametrize("tipo,esperado", [
+    ("timeout", 1),      # the write may have happened: repeating could duplicate it
+    ("transient", 1),    # a reset says nothing about what the remote side applied
+    ("refused", 3),      # provably sent nothing: safe to repeat
+])
+def test_a_node_that_writes_only_retries_what_provably_sent_nothing(_registra, tipo, esperado):
+    definition = {
+        "nodes": [_trigger("T"),
+                  {"id": "R", "type": "action", "name": "TesteFalhaClassificada",
+                   "properties": {"tipo": tipo, "escreve": True, "retry_count": 2, "retry_delay_s": 0}}],
+        "edges": [{"source": "T", "target": "R"}],
+    }
+    ex = WorkflowExecutor(definition, task_id=f"rt-{tipo}", publisher=_publisher())
+    with pytest.raises(Exception):
+        asyncio.run(ex.run(initial_inputs={"T": {"output": _gdf()}}))
+    assert CALLS.get("R") == esperado
+
+
+def test_writer_nodes_declare_their_side_effects():
+    from flow.nodes.action.http_request import HttpRequestNode
+    from flow.nodes.outputs.save_to_postgis import SaveToPostGIS
+    from flow.nodes.outputs.send_webhook import SendWebhookNode
+
+    assert SaveToPostGIS("a", {}).tem_efeito_colateral()
+    assert SendWebhookNode("b", {}).tem_efeito_colateral()
+    assert not HttpRequestNode("c", {"method": "GET"}).tem_efeito_colateral()
+    assert HttpRequestNode("d", {"method": "post"}).tem_efeito_colateral()
 
 
 # ── F-audit: a spill that does not restore fails loudly, does not deliver the sentinel ──

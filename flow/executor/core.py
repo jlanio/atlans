@@ -26,7 +26,7 @@ from flow.executor.utils import _count_gdf_features, _output_columns, _build_deb
 from flow.executor.spill import _spill_to_disk, _load_from_disk, _cleanup_spill, _delete_spill_files
 from flow.executor.rendering import expr_svc, render_node_parameters
 from flow.executor.edge_resolver import Edge, resolve_edge_inputs, resolve_edge_schema_inputs
-from flow.utils.error_taxonomy import classify_error, is_retryable
+from flow.utils.error_taxonomy import classify_error, did_not_reach_the_destination, is_retryable
 import flow.executor.pin as _pin
 import flow.executor.events as _events
 
@@ -347,6 +347,11 @@ class WorkflowExecutor:
                     # no chance of the result changing and (b) repeated side effects
                     # of non-idempotent nodes. The last attempt also lands here.
                     if _attempt >= _retry_count or not is_retryable(classify_error(_exc)):
+                        raise
+                    # A node that writes is only repeated when the failure
+                    # provably sent nothing: after a timeout or a reset the
+                    # write may already have happened, and a retry duplicates it.
+                    if node.tem_efeito_colateral() and not did_not_reach_the_destination(_exc):
                         raise
                     self.logger.warning(
                         "Nó %s falhou (tentativa %d/%d): %s. Retentando em %ss...",

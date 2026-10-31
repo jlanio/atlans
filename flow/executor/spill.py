@@ -42,7 +42,11 @@ def _spill_to_disk(task_id: str, node_id: str, outputs: dict) -> dict:
         try:
             os.makedirs(spill_dir, exist_ok=True)
             path = os.path.join(spill_dir, f"{node_id}_{key}_{uuid.uuid4().hex[:8]}.parquet")
-            value.to_parquet(path, index=False)
+            # `index=None` keeps the index (a RangeIndex as metadata, any other
+            # as a column restored on read). With `index=False` a frame above
+            # the threshold came back with a fresh 0..n-1 index while a smaller
+            # one kept its own: the downstream result depended on the data size.
+            value.to_parquet(path, index=None)
             modified[key] = {"__spilled__": True, "__spill_path__": path, "__spill_key__": key}
             logger.info(
                 "Spill-to-disk: nó %s, key '%s' (%.1f MB) salvo em %s",

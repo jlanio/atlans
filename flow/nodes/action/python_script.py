@@ -16,6 +16,9 @@ from flow.nodes.base import BaseNode
 from flow.registry import register_node
 from flow.utils.code_sandbox import (
     build_safe_builtins,
+    executando_codigo_do_usuario,
+    fora_do_codigo_do_usuario,
+    liberar_thread_do_script,
     validate_code_ast,
     UnsafeCodeError,
 )
@@ -262,12 +265,27 @@ def _run_script(
     Executes the Python script in the given namespace with restricted builtins.
     Redirects stdout so that print() appears in the UI terminal in real time.
     """
-    stream = _LoggingStream(log_fn, publish_fn)
+    # The platform's own work on this thread (publishing a batch of print()
+    # lines, logging) runs with the runtime guard suspended: it may use the
+    # event loop's socket or write a log file, which the user's code may not.
+    def _log_da_plataforma(msg: str) -> None:
+        with fora_do_codigo_do_usuario():
+            log_fn(msg)
+
+    def _publicacao_da_plataforma(linhas: List[str]) -> None:
+        with fora_do_codigo_do_usuario():
+            publish_fn(linhas)  # type: ignore[misc]
+
+    stream = _LoggingStream(
+        _log_da_plataforma, _publicacao_da_plataforma if publish_fn else None
+    )
     old_stdout = sys.stdout
     try:
         sys.stdout = stream  # type: ignore[assignment]
         namespace["__builtins__"] = _SAFE_BUILTINS
-        exec(compile(code, "<PythonScript>", "exec"), namespace)  # noqa: S102
+        codigo = compile(code, "<PythonScript>", "exec")
+        with executando_codigo_do_usuario():
+            exec(codigo, namespace)  # noqa: S102
     finally:
         # Restores stdout BEFORE the flush: if the timeout's asynchronous
         # interruption (_ScriptInterrupted) lands in this finally, the global
@@ -435,6 +453,10 @@ class PythonScript(BaseNode):
                 # interruption — the global stdout never stays stuck on the node's stream.
                 if sys.stdout is not stdout_before:
                     sys.stdout = stdout_before
+                # Same reason for the runtime guard's mark: an interruption
+                # landing inside the context manager's exit could leave this
+                # pool worker marked as running user code.
+                liberar_thread_do_script()
 
         future = loop.run_in_executor(_SCRIPT_POOL, _executar_script)
         # Do NOT use asyncio.wait_for: on timeout it tries to CANCEL the future and,

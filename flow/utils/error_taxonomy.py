@@ -24,6 +24,7 @@ Categories and retry semantics:
 logic uses to decide between re-dispatch and dead-letter.
 """
 import asyncio
+import socket
 
 # categoria → retryable
 _RETRYABLE = {
@@ -72,3 +73,22 @@ def classify_error(exc: BaseException) -> str:
     if has(ValueError, TypeError, KeyError, IndexError):
         return "user"
     return "internal"
+
+
+def did_not_reach_the_destination(exc: BaseException) -> bool:
+    """True when the failure provably happened BEFORE anything was sent.
+
+    A refused connection or a name that does not resolve never delivered the
+    request. A timeout or a reset does not say that: the remote side may have
+    received and applied the write before the answer was lost, so repeating it
+    can duplicate rows, e-mails or webhooks. Used to decide whether a node with
+    side effects may be retried.
+    """
+    for e in _chain(exc):
+        if isinstance(e, (ConnectionRefusedError, socket.gaierror)):
+            return True
+        # httpx/httpcore raise ConnectError for "could not open the connection";
+        # matched by name so this module keeps no HTTP-client dependency.
+        if type(e).__name__ == "ConnectError":
+            return True
+    return False

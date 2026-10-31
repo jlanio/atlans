@@ -51,6 +51,8 @@ class SaveToShapefileNode(BaseNode):
     and uploads it to MinIO as an artifact.
     """
 
+    TEM_EFEITO_COLATERAL = True
+
     @classmethod
     def description(cls) -> Dict[str, Any]:
         return {

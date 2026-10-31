@@ -25,6 +25,8 @@ class SaveToGeoParquetNode(BaseNode):
     Saves a GeoDataFrame as GeoParquet and uploads it to MinIO as an artifact.
     """
 
+    TEM_EFEITO_COLATERAL = True
+
     @classmethod
     def description(cls) -> Dict[str, Any]:
         return {

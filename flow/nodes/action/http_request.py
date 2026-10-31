@@ -91,6 +91,11 @@ class HttpRequestNode(BaseNode):
       Received GeoDataFrames are automatically converted to GeoJSON.
     """
 
+    def tem_efeito_colateral(self) -> bool:
+        # Only methods that read are safe to repeat after an ambiguous failure.
+        metodo = str(self.parameters.get("method", "GET") or "GET").strip().upper()
+        return metodo not in ("GET", "HEAD", "OPTIONS")
+
     @classmethod
     def description(cls) -> Dict[str, Any]:
         return {

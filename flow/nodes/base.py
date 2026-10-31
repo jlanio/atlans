@@ -152,6 +152,15 @@ class BaseNode(ABC):
         except (TypeError, ValueError):
             raise ValueError(f"Parâmetro '{name}' deve ser inteiro. Recebido: {self.parameters.get(name)!r}")
 
+    # Nodes that write somewhere (a table, a bucket, a mailbox, a webhook) set
+    # this: their retries only repeat a failure that provably sent nothing
+    # (see flow/utils/error_taxonomy.did_not_reach_the_destination).
+    TEM_EFEITO_COLATERAL: bool = False
+
+    def tem_efeito_colateral(self) -> bool:
+        """Whether running this node again can repeat a write."""
+        return self.TEM_EFEITO_COLATERAL
+
     def get_retry_params(self) -> tuple[int, float]:
         """Returns (retry_count, retry_delay_s) configured on the node (default: 0 retries, 5s wait)."""
         return self.get_param_int("retry_count", 0), self.get_param_float("retry_delay_s", 5.0)
