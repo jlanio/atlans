@@ -60,3 +60,43 @@ describe('enrolar', () => {
     }
   })
 })
+
+describe('enrolar concorrente', () => {
+  const RESULTADO_OK = {
+    ok: true, executor_id: 'abc', serial: null, fingerprint: null, expires_at: null,
+    cert_dir: 'C:/certs', env_path: 'C:/.env',
+  }
+
+  async function concluir(p: FakeProc): Promise<void> {
+    p.stdout.write(JSON.stringify(RESULTADO_OK) + '\n')
+    await tick()
+    p.emit('close', 0)
+  }
+
+  it('um segundo pedido com o primeiro em andamento é recusado, sem novo processo', async () => {
+    // Two enroll processes replace cert.pem and key.pem file by file; run
+    // together, the pair on disk could come from different runs.
+    const p = nextProcess()
+    const primeiro = enrolar({ executorId: 'abc', otp: '111' })
+    const segundo = await enrolar({ executorId: 'abc', otp: '222' })
+
+    expect(spawnMock).toHaveBeenCalledTimes(1)
+    expect(segundo).toMatchObject({ ok: false, codigo: 'enroll_recusado' })
+
+    await concluir(p)
+    expect(await primeiro).toMatchObject({ ok: true })
+  })
+
+  it('terminado o primeiro, o próximo pedido roda', async () => {
+    const p1 = nextProcess()
+    const primeiro = enrolar({ executorId: 'abc', otp: '111' })
+    await concluir(p1)
+    await primeiro
+
+    const p2 = nextProcess()
+    const segundo = enrolar({ executorId: 'abc', otp: '222' })
+    await concluir(p2)
+    expect(await segundo).toMatchObject({ ok: true })
+    expect(spawnMock).toHaveBeenCalledTimes(2)
+  })
+})

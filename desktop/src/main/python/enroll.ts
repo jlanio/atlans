@@ -54,7 +54,32 @@ export interface EnrollRequest {
 /** Enrollment should not take longer than this; beyond it, the server is hung. */
 const TIMEOUT_MS = 120_000
 
+/**
+ * The enrollment in progress, if any.
+ *
+ * Only the renderer's `enviando` flag kept a second one from starting — not a
+ * double IPC, nor a deep link push crossing a manual submit. Two processes
+ * each write `cert.pem.new`/`key.pem.new` and replace file by file
+ * (executor/enrollment.py), so the pair on disk could end up with the cert of
+ * one run and the key of the other: a machine that can no longer connect.
+ */
+let emCurso: Promise<EnrollResult> | null = null
+
 export function enrolar(pedido: EnrollRequest): Promise<EnrollResult> {
+  if (emCurso) {
+    return Promise.resolve({
+      ok: false, codigo: 'enroll_recusado',
+      erro: 'Já há um enrollment em andamento — aguarde o resultado.',
+    })
+  }
+  const atual = executar(pedido)
+  emCurso = atual
+  const liberar = () => { if (emCurso === atual) emCurso = null }
+  atual.then(liberar, liberar)
+  return atual
+}
+
+function executar(pedido: EnrollRequest): Promise<EnrollResult> {
   return new Promise((resolve) => {
     const proc = spawn(PYTHON_EXE, [
       '-X', 'utf8', '-m', 'executor', 'enroll',
