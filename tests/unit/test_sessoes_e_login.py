@@ -206,7 +206,7 @@ async def test_username_and_email_share_the_account_lockout(api_login):
     client, r, _estado = api_login
     respostas = []
     for ident in ["ana", "ana@exemplo.org", "ana", "ana@exemplo.org", "ana"]:
-        resp = await client.post("/auth/login", json={"identifier": ident, "password": "errada"})
+        resp = await client.post("/auth/login", json={"identifier": ident, "password": "errada"})  # pragma: allowlist secret
         respostas.append(resp.status_code)
     # Five wrong guesses at the account, whichever identifier: locked.
     assert respostas == [401, 401, 401, 401, 429]
@@ -220,7 +220,7 @@ async def test_username_and_email_share_the_account_lockout(api_login):
 @pytest.mark.asyncio
 async def test_a_successful_login_clears_the_account_bucket_and_opens_a_dated_session(api_login):
     client, r, _estado = api_login
-    await client.post("/auth/login", json={"identifier": "ana", "password": "errada"})
+    await client.post("/auth/login", json={"identifier": "ana", "password": "errada"})  # pragma: allowlist secret
     assert r.dados.get(f"login_failed:account:{USUARIO}") == 1
 
     antes = jwt_utils.session_opened_at()
@@ -338,7 +338,7 @@ async def test_a_password_reset_clears_the_account_lockout(api_login):
     the owner proved they hold the e-mail and gets the login back."""
     client, r, estado = api_login
     for _ in range(5):
-        await client.post("/auth/login", json={"identifier": "ana", "password": "errada"})
+        await client.post("/auth/login", json={"identifier": "ana", "password": "errada"})  # pragma: allowlist secret
     assert f"login_locked:account:{USUARIO}" in r.dados
 
     estado["usuario"].email = "ana@exemplo.org"

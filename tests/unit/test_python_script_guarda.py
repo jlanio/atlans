@@ -23,7 +23,7 @@ def _rodar(code: str, **namespace):
 
 def test_reading_a_file_outside_the_python_folders_is_refused(tmp_path):
     segredo = tmp_path / "key.pem"
-    segredo.write_text("-----BEGIN PRIVATE KEY-----")
+    segredo.write_text("-----BEGIN PRIVATE KEY-----")  # pragma: allowlist secret
     with pytest.raises(PermissionError, match="bloqueada"):
         _rodar(f"result = pd.read_csv({str(segredo)!r}, header=None)")
 
