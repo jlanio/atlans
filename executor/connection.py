@@ -135,6 +135,14 @@ _SENT_TTL_S = 90.0
 _PING_INTERVAL_S = 30.0
 _PING_TIMEOUT_S = 120.0
 _SENT_MAX = 2000
+# SUCCESSES sent recently, kept WHOLE (stats included) in memory — never on
+# disk, where the outbox keeps only a stripped copy. A half-open socket loses
+# a success silently; the next session of the same process resends it, so the
+# run closes as the success it was (artifacts and metrics registered) instead
+# of a "lost" failure whose retry would repeat its side effects.
+_SUCESSOS_JANELA_S = 20 * 60
+_SUCESSOS_MAX = 50
+_STATUS_DE_SUCESSO = ("success", "ok", "completed")
 # Reason of the 'cancelled' result of a job the executor did not have when the
 # cancellation arrived (see `_close_unknown_cancellation`).
 _UNKNOWN_CANCELLATION_REASON = (
@@ -349,6 +357,8 @@ class ExecutorConnection:
         self._session_started_at: float | None = None
         # job_id -> instant the result was sent; see `_remember_sent`.
         self._sent: dict[str, float] = {}
+        # job_id -> (monotonic instant of the FIRST send, the whole result)
+        self._sucessos_enviados: dict[str, tuple[float, dict]] = {}
         # Sessions opened by this process: from the second on, the results the
         # previous one sent are replayed (see _reenviar_resultados_recentes).
         self._sessoes = 0
@@ -1018,6 +1028,7 @@ class ExecutorConnection:
             if sent_ok:
                 enviado = str(result.get("job_id") or "")
                 self._remember_sent(enviado)
+                self._lembrar_sucesso(enviado, result)
                 result_store.mark_sent(enviado)
 
     # Room the replay leaves in the result queue for the jobs running NOW: they
@@ -1054,10 +1065,14 @@ class ExecutorConnection:
             for item in list(getattr(self._results, "_queue", ()) or ())
             if isinstance(item, dict)
         }
+        # The outbox's failures/cancellations (complete as stored), then the
+        # successes kept whole in memory (the outbox's stripped copy of a
+        # success would close the run without its artifacts).
+        self._podar_sucessos()
+        candidatos = [r for r in recentes if r.get("status") not in _STATUS_DE_SUCESSO]
+        candidatos += [dict(r) for _quando, r in list(self._sucessos_enviados.values())]
         reenviados = 0
-        for resultado in recentes:
-            if resultado.get("status") in ("success", "ok", "completed"):
-                continue
+        for resultado in candidatos:
             if str(resultado.get("job_id")) in na_fila:
                 continue
             while self._results.qsize() >= self._REENVIO_RESERVA:
@@ -1070,7 +1085,7 @@ class ExecutorConnection:
             await asyncio.sleep(self._REENVIO_INTERVALO_S)
         if reenviados:
             logger.info(
-                "Reenviados %d resultado(s) de falha/cancelamento da sessão anterior "
+                "Reenviados %d resultado(s) da sessão anterior "
                 "(a conexão pode ter caído antes de o servidor recebê-los).", reenviados,
             )
 
@@ -1363,6 +1378,23 @@ class ExecutorConnection:
                     break
             await asyncio.sleep(_INVENTORY_INTERVAL)
 
+    def _lembrar_sucesso(self, job_id: str, result: dict) -> None:
+        """Keeps the whole result of a sent success for the replay window (see
+        `_SUCESSOS_JANELA_S`). A resend keeps the FIRST instant: the window
+        does not restart on every reconnect."""
+        if not job_id or result.get("status") not in _STATUS_DE_SUCESSO:
+            return
+        if job_id not in self._sucessos_enviados:
+            self._sucessos_enviados[job_id] = (time.monotonic(), result)
+        self._podar_sucessos()
+
+    def _podar_sucessos(self) -> None:
+        vence = time.monotonic() - _SUCESSOS_JANELA_S
+        for job_id in [j for j, (quando, _r) in self._sucessos_enviados.items() if quando < vence]:
+            del self._sucessos_enviados[job_id]
+        while len(self._sucessos_enviados) > _SUCESSOS_MAX:
+            self._sucessos_enviados.pop(next(iter(self._sucessos_enviados)))
+
     def _remember_sent(self, job_id: str) -> None:
         """Keeps for a few minutes the id of a result that has just gone out.
 
@@ -1413,7 +1445,10 @@ class ExecutorConnection:
         pendentes = self._pending_results()
         if pendentes is None:
             return None
-        return pendentes | set(self._recently_sent())
+        # The successes kept for the replay are still "on their way": the
+        # server must not close them as lost before the resend arrives.
+        self._podar_sucessos()
+        return pendentes | set(self._recently_sent()) | set(self._sucessos_enviados)
 
     def _build_inventory(self) -> dict:
         ativos = self._queue.active_job_ids() if self._queue is not None else []

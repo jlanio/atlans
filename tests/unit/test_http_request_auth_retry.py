@@ -591,3 +591,28 @@ def test_a_connect_timeout_sent_nothing():
 
     assert did_not_reach_the_destination(httpx.ConnectTimeout("handshake")) is True
     assert did_not_reach_the_destination(httpx.ReadTimeout("no answer")) is False
+
+
+def test_a_failed_307_hop_keeps_its_own_meaning():
+    """A 307/308 asks to repeat the request elsewhere: there is no proof the
+    original was applied, so a refused connection there still allows the
+    executor's retry (round-2 review)."""
+    import httpx
+
+    from flow.utils.error_taxonomy import did_not_reach_the_destination
+
+    chamadas = []
+
+    async def falsa(**kw):
+        chamadas.append(kw["method"])
+        if len(chamadas) == 1:
+            return FakeResponse(307, headers={"location": "https://fora.exemplo.com/outro"})
+        raise httpx.ConnectError("connection refused")
+
+    no = _no(method="POST", body='{"a":1}', followRedirects=True)
+    with patch("flow.nodes.action.http_request.safe_httpx_request", side_effect=falsa):
+        with pytest.raises(Exception) as erro:
+            asyncio.run(no.execute({}))
+
+    assert chamadas == ["POST", "POST"]
+    assert did_not_reach_the_destination(erro.value) is True

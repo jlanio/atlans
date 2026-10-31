@@ -2,6 +2,7 @@ import asyncio
 import ctypes
 import io
 import os
+import re
 import sys
 import threading
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -256,30 +257,31 @@ class _LoggingStream(io.TextIOBase):
 
 
 _bibliotecas_aquecidas = False
+# A script that may pull matplotlib in (the Styler's gradients and bars use its
+# colormaps). Only those pay the import (~40 MB, ~1 s cold).
+_PEDE_MATPLOTLIB = re.compile(r"\b(matplotlib|style|plot|cmap|colormap|gradient)\b")
 
 
-def _aquecer_bibliotecas() -> None:
-    """Imports, OUTSIDE the user's code, the libraries that write on their first
-    import: matplotlib creates its config/cache folder (`df.style.
-    background_gradient()` pulls it in) and pyogrio sets an environment
-    variable. Imported for the first time inside a script, the runtime guard
-    refused those writes and the script failed for reasons it did not cause.
-    Once per process; a library that is not installed is simply skipped."""
+def _aquecer_bibliotecas(code: str) -> None:
+    """Imports matplotlib OUTSIDE the user's code when the script may use it:
+    its first import creates the config/cache folder, which the runtime guard
+    refuses inside the script — `df.style.background_gradient()` failed for
+    reasons the script did not cause. Runs before the timed script thread (it
+    does not count against the timeout, and an interruption cannot leave it
+    half done); the flag is set only once it worked. Not installed → skipped."""
     global _bibliotecas_aquecidas
-    if _bibliotecas_aquecidas:
+    if _bibliotecas_aquecidas or not _PEDE_MATPLOTLIB.search(code or ""):
+        return
+    try:
+        import matplotlib
+
+        matplotlib.get_cachedir()
+        matplotlib.get_configdir()
+    except ImportError:
+        pass
+    except Exception:  # noqa: BLE001 - a broken install must not stop the node
         return
     _bibliotecas_aquecidas = True
-    for nome in ("matplotlib", "pyogrio"):
-        try:
-            modulo = __import__(nome)
-            if nome == "matplotlib":
-                modulo.get_cachedir()
-                modulo.get_configdir()
-                # Builds (and saves) the font cache, which the Styler's
-                # colormaps would otherwise try to write from inside the script.
-                __import__("matplotlib.font_manager")
-        except Exception:  # noqa: S112 - optional libraries
-            continue
 
 
 def _run_script(
@@ -311,7 +313,6 @@ def _run_script(
         sys.stdout = stream  # type: ignore[assignment]
         namespace["__builtins__"] = _SAFE_BUILTINS
         codigo = compile(code, "<PythonScript>", "exec")
-        _aquecer_bibliotecas()
         with executando_codigo_do_usuario():
             exec(codigo, namespace)  # noqa: S102
     finally:
@@ -486,6 +487,8 @@ class PythonScript(BaseNode):
                 # pool worker marked as running user code.
                 liberar_thread_do_script()
 
+        # On the node's own pool (never the default one the GIS nodes share).
+        await loop.run_in_executor(_SCRIPT_POOL, _aquecer_bibliotecas, code)
         future = loop.run_in_executor(_SCRIPT_POOL, _executar_script)
         # Do NOT use asyncio.wait_for: on timeout it tries to CANCEL the future and,
         # since the executor's thread is already running (not cancelable), WAITS for

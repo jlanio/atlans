@@ -390,6 +390,7 @@ class HttpRequestNode(BaseNode):
         # through the same function, which revalidates the URL and redoes the IP pinning.
         if follow_redirect:
             saltos = 0
+            ja_entregue = False
             while response.is_redirect and saltos < max_redirects:
                 destino = response.headers.get('location')
                 if not destino:
@@ -426,6 +427,11 @@ class HttpRequestNode(BaseNode):
                     request_kwargs['method'] = 'GET'
                     request_kwargs.pop('json', None)
                     request_kwargs.pop('content', None)
+                    # The server APPLIED the original request and points to its
+                    # result ("see other"): from here a failure is after delivery.
+                    # A 307/308 asks to repeat the request elsewhere — no proof
+                    # it was applied, so a failure there keeps its own meaning.
+                    ja_entregue = True
 
                 # The circuit breaker is PER HOST, and after the hop the host is different:
                 # continuing to use the original address's breaker counted the
@@ -435,12 +441,16 @@ class HttpRequestNode(BaseNode):
                 try:
                     response = await hop_breaker.call(_do_request)
                 except CircuitOpenError as e:
-                    raise RequestAlreadyDelivered(str(e))
+                    if ja_entregue:
+                        raise RequestAlreadyDelivered(str(e))
+                    raise RuntimeError(str(e))
                 except httpx.TransportError as e:
-                    # The ORIGINAL request was delivered (it is what answered
-                    # the 3xx): a connection refused here must not read as
-                    # "nothing was sent", or the executor would repeat a POST
-                    # the API already applied.
+                    if not ja_entregue:
+                        raise
+                    # The ORIGINAL request was applied (it is what answered the
+                    # 303): a connection refused here must not read as "nothing
+                    # was sent", or the executor would repeat a POST the API
+                    # already applied.
                     raise RequestAlreadyDelivered(
                         f"Erro ao seguir o redirecionamento para {destino}: {e}"
                     ) from e

@@ -998,7 +998,7 @@ async def test_a_new_session_resends_what_the_previous_one_sent(store):
     conn = _new_connection(fila)
     store.put({"job_id": "j1", "run_id": "j1", "status": "error", "error": "x"})
     store.mark_sent("j1")
-    # A sent SUCCESS is not resent (no stats in the outbox).
+    # A sent SUCCESS is not resent from the outbox (no stats there)...
     store.put({"job_id": "ok1", "run_id": "ok1", "status": "success"})
     store.mark_sent("ok1")
 
@@ -1027,3 +1027,45 @@ async def test_the_session_replay_leaves_room_for_live_results(store, monkeypatc
     tarefa.cancel()
     with pytest.raises(asyncio.CancelledError):
         await tarefa
+
+
+async def test_a_sent_success_is_resent_whole_from_memory(store, monkeypatch):
+    """A half-open socket loses a success silently. The outbox's copy has no
+    stats; the WHOLE result is kept in memory for the window and resent by the
+    next session of the same process, so the run closes as the success it was
+    instead of a "lost" failure whose retry repeats side effects (round-2 review)."""
+    fila = asyncio.Queue()
+    conn = _new_connection(fila)
+    monkeypatch.setattr(type(conn), "_REENVIO_INTERVALO_S", 0)
+    completo = {"job_id": "ok1", "run_id": "ok1", "status": "success", "stats": {"artefatos": ["a.geojson"]}}
+    conn._lembrar_sucesso("ok1", completo)
+    store.put(completo)
+    store.mark_sent("ok1")
+
+    # Still "on its way" for the inventory: the server must not close it as lost.
+    assert "ok1" in conn._results_in_flight()
+
+    await conn._reenviar_resultados_recentes()
+    reenviado = fila.get_nowait()
+    assert reenviado["stats"] == {"artefatos": ["a.geojson"]}
+
+
+def test_the_memory_of_sent_successes_is_bounded_and_keeps_the_first_instant(monkeypatch):
+    from executor import connection as C
+
+    conn = _new_connection(asyncio.Queue())
+    conn._lembrar_sucesso("j1", {"job_id": "j1", "status": "success"})
+    primeiro = conn._sucessos_enviados["j1"][0]
+    conn._lembrar_sucesso("j1", {"job_id": "j1", "status": "success"})
+    assert conn._sucessos_enviados["j1"][0] == primeiro      # a resend does not restart it
+    conn._lembrar_sucesso("e1", {"job_id": "e1", "status": "error"})
+    assert "e1" not in conn._sucessos_enviados               # failures live in the outbox
+
+    monkeypatch.setattr(C, "_SUCESSOS_MAX", 3)
+    for i in range(10):
+        conn._lembrar_sucesso(f"s{i}", {"job_id": f"s{i}", "status": "success"})
+    assert list(conn._sucessos_enviados) == ["s7", "s8", "s9"]
+
+    monkeypatch.setattr(C, "_SUCESSOS_JANELA_S", -1)
+    conn._podar_sucessos()
+    assert conn._sucessos_enviados == {}

@@ -310,3 +310,56 @@ def test_writers_with_a_destination_are_refused(code):
 ])
 def test_transformations_without_io_still_pass(code):
     validate_code_ast(code)
+
+
+# ── Round-2 review: import forms, class patterns and legitimate privates ─────
+
+@pytest.mark.parametrize("code", [
+    "from pyogrio.raw import read",
+    "import pyogrio.raw as r",
+    "from pyogrio import vsi_listtree",
+    "from geopandas.io.file import _read_file",
+    "from pandas.io.common import os",
+    "from pandas.core.arrays.arrow.array import pa",
+    "from datetime import sys",
+    "from numpy import *",
+    "import geopandas.io.file as f",
+    "match 1:\n    case object(__class__=c):\n        pass",
+    "match x:\n    case object(OSFile=f):\n        pass",
+    "from . import algo",
+])
+def test_import_forms_and_class_patterns_go_through_the_same_rules(code):
+    """Only attribute access was checked: imported names, submodules of an
+    import and the keywords of a class pattern read attributes with no
+    ast.Attribute — the GDAL/Arrow I/O and /vsicurl/ came back through them."""
+    with pytest.raises(UnsafeCodeError):
+        validate_code_ast(code)
+
+
+def test_pyogrio_left_the_allowlist():
+    with pytest.raises(UnsafeCodeError):
+        validate_code_ast("import pyogrio")
+
+
+@pytest.mark.parametrize("code", [
+    "for row in df.itertuples():\n    d = row._asdict()\n    v = row._1",
+    "from collections import namedtuple\nP = namedtuple('P', 'a b')\np = P(1, 2)._replace(a=3)\nf = P._fields",
+    "class C:\n    def __init__(self):\n        self._x = 1\n    def v(self):\n        return self._x",
+    "result = df._get_numeric_data()",
+    "nome = gdf._geometry_column_name",
+    "result = df.raw + df.fs",
+    "from shapely.geometry import Point, shape\nfrom shapely.ops import unary_union",
+    "from datetime import datetime, timedelta",
+    "import numpy.random as npr",
+    "match row:\n    case {'a': 1}:\n        pass",
+])
+def test_ordinary_code_with_underscores_and_imports_still_passes(code):
+    """A general ban on `_x` refused namedtuples, itertuples rows, user classes
+    and pandas' own helpers (round-2 review): only the I/O internals are out."""
+    validate_code_ast(code)
+
+
+@pytest.mark.parametrize("nome", ["_read_file", "_to_file", "_datasource", "_get_handle", "vsi_unlink"])
+def test_the_private_io_internals_stay_out(nome):
+    with pytest.raises(UnsafeCodeError):
+        validate_code_ast(f"x = obj.{nome}")

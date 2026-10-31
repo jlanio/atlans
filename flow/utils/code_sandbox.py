@@ -28,7 +28,10 @@ ALLOWED_MODULES = {
     # `fiona` left the list together with the dependency: geopandas 1.x reads and
     # writes via pyogrio, and keeping both packaged two copies of GDAL in the same
     # process (~99 MB, with global GDAL_DATA/PROJ_LIB contended between them).
-    "pandas", "geopandas", "numpy", "shapely", "pyproj", "pyogrio",
+    # `pyogrio` left too: it is GDAL's file and network I/O itself (read,
+    # write, list, delete, /vsicurl/), done in C where the runtime guard sees
+    # nothing — and a transform script needs none of it.
+    "pandas", "geopandas", "numpy", "shapely", "pyproj",
     # Safe stdlib
     # `operator` and `string` LEFT the list: they were sandbox escape vectors.
     # `operator.attrgetter('__bases__')(cls)` and `operator.methodcaller(...)`
@@ -173,21 +176,26 @@ _IO_BLOCKED_ATTRS = {
     # is pyarrow (`pa.OSFile(path)` read and wrote any file), `gpd.io.file`
     # holds pyogrio's readers and writers, `pd.io`/`pd.compat` reach the same.
     "pa", "pyarrow", "arrow", "pyogrio", "fiona", "osgeo", "gdal", "ogr", "osr",
-    "rasterio", "io", "compat", "fs",
+    "rasterio", "io", "compat",
     # pyarrow file handles and filesystems
     "OSFile", "MemoryMappedFile", "input_stream", "output_stream",
     "LocalFileSystem", "filesystem",
     # GDAL entry points: a path like 'CSV:/etc/x' or '/vsicurl/http://…' read
     # files and internal URLs; vsi_* listed and deleted files; config options
     # are process-wide (GDAL_HTTP_UNSAFESSL stayed on for every other node).
-    "from_file", "from_postgis", "raw", "memory_map",
+    "from_file", "from_postgis", "memory_map",
     "set_gdal_config_options", "get_gdal_config_option",
 }
-# Private attributes (`gpd.io.file._read_file`, `_to_file`, `_datasource`…) are
-# the same I/O behind an underscore, and no data transformation needs a
-# library's internals. `vsi_*` is GDAL's virtual file system (list, read,
-# delete files).
-_IO_PRIVATE = re.compile(r"^_[^_]|^vsi_")
+# The libraries' PRIVATE readers and writers (`gpd.io.file._read_file`,
+# `_to_file`, `_datasource`, pandas' `_get_handle`…): the same I/O behind an
+# underscore. Only these — a general ban on `_x` refused ordinary code
+# (`row._asdict()`, `row._1` from itertuples, `self._x`, `df._get_numeric_data()`).
+# `vsi_*` is GDAL's virtual file system (list, read, delete files).
+_IO_PRIVATE = re.compile(
+    r"^_+(read|write|load|open|save|datasource|get_handle|get_filepath)"
+    r"|^_+to_(file|parquet|feather|pickle|hdf|sql|excel|orc|stata|csv|json)"
+    r"|^vsi_"
+)
 # Return a string when called WITHOUT a destination (`gdf.to_json()` is common
 # and legitimate) and write to a file when given one. Allowed only as the
 # function of a call that names no destination: no positional argument, no
@@ -239,10 +247,31 @@ def validate_code_ast(code: str) -> None:
         if isinstance(node, ast.Import):
             for alias in node.names:
                 _check_module(alias.name)
+                # `import pyogrio.raw as r` names a submodule without any
+                # ast.Attribute: every component goes through the same check.
+                for parte in alias.name.split(".")[1:]:
+                    _check_attr(parte)
         # from xxx import yyy
         elif isinstance(node, ast.ImportFrom):
+            if node.level:
+                raise UnsafeCodeError("Importacao relativa nao e permitida no PythonScript.")
             if node.module:
                 _check_module(node.module)
+                for parte in node.module.split(".")[1:]:
+                    _check_attr(parte)
+            # The imported NAMES are attribute access too (`from pandas.io.common
+            # import os`, `from geopandas.io.file import _read_file`): same check.
+            for alias in node.names:
+                if alias.name == "*":
+                    raise UnsafeCodeError(
+                        "`from ... import *` nao e permitido no PythonScript: importe os nomes."
+                    )
+                _check_attr(alias.name)
+        # `case object(OSFile=f)` / `case object(__class__=c)`: a class pattern
+        # reads attributes by keyword, with no ast.Attribute either.
+        elif isinstance(node, ast.MatchClass):
+            for nome in node.kwd_attrs:
+                _check_attr(nome)
         # obj.__subclasses__, obj.format, obj.gi_frame, etc.
         elif isinstance(node, ast.Attribute):
             _check_attr(node.attr)
@@ -283,7 +312,12 @@ def _check_attr(attr: str) -> None:
             "texto como codigo. Use indexacao booleana, por exemplo "
             "df[df['coluna'] > 10]."
         )
-    if attr.startswith(_IO_READ_PREFIX) or attr in _IO_BLOCKED_ATTRS or _IO_PRIVATE.match(attr):
+    if _IO_PRIVATE.match(attr) and not attr.startswith(_IO_READ_PREFIX):
+        raise UnsafeCodeError(
+            f"Uso de '{attr}' nao e permitido no PythonScript: e um interno de "
+            "biblioteca que le ou grava arquivos. Conecte os dados como entrada do no."
+        )
+    if attr.startswith(_IO_READ_PREFIX) or attr in _IO_BLOCKED_ATTRS:
         raise UnsafeCodeError(
             f"Uso de '{attr}' nao e permitido no PythonScript: ler ou gravar "
             "arquivos e URLs fica com os nos de entrada e saida do fluxo. "
@@ -330,6 +364,13 @@ def safe_import(name, *args, **kwargs):
             f"Modulo '{name}' nao e permitido no PythonScript. "
             f"Modulos disponiveis: {sorted(ALLOWED_MODULES)}"
         )
+    # The same rules as the AST check, at run time: submodules and imported names.
+    fromlist = args[2] if len(args) > 2 else kwargs.get("fromlist")
+    for parte in [*name.split(".")[1:], *(fromlist or ())]:
+        try:
+            _check_attr(str(parte))
+        except UnsafeCodeError as exc:
+            raise ImportError(str(exc)) from None
     return _original_import(name, *args, **kwargs)
 
 
@@ -424,18 +465,28 @@ def _dentro_das_raizes(caminho) -> bool:
     return any(real == r or real.startswith(r + os.sep) for r in raizes)
 
 
+def _pastas_do_sys_path() -> frozenset[str]:
+    pastas = set()
+    for p in sys.path:
+        with contextlib.suppress(Exception):
+            pastas.add(os.path.realpath(p or "."))
+    return frozenset(pastas)
+
+
 def _e_pasta_do_sys_path(caminho) -> bool:
-    """Is it exactly a `sys.path` folder? Python's import machinery lists those
-    to find modules; refused, it cached an EMPTY listing and later imports of
-    the platform from that folder failed after the script ended. Only the
-    listing is allowed — reading a file there still has to be inside the roots."""
+    """Is it exactly a `sys.path` folder (as it was when the script started)?
+    Python's import machinery lists those to find modules; refused, it cached
+    an EMPTY listing and later imports of the platform from that folder failed
+    after the script ended. Only the listing is allowed — reading a file there
+    still has to be inside the roots."""
     if isinstance(caminho, int):
         return False
     try:
         real = os.path.realpath(os.fsdecode(caminho))
-        return any(os.path.realpath(p or ".") == real for p in sys.path)
     except Exception:
         return False
+    pastas = getattr(_estado_do_script, "sys_path", None)
+    return real in pastas if pastas is not None else False
 
 
 def _recusar(evento: str) -> None:
@@ -483,11 +534,16 @@ def executando_codigo_do_usuario():
     """Marks the CURRENT thread as running user code while the block lasts."""
     instalar_guarda_de_execucao()
     anterior = getattr(_estado_do_script, "ativo", False)
+    caminho_anterior = getattr(_estado_do_script, "sys_path", None)
+    # The import machinery's folders AS THEY WERE: user code appending to
+    # sys.path must not widen what may be listed.
+    _estado_do_script.sys_path = _pastas_do_sys_path()
     _estado_do_script.ativo = True
     try:
         yield
     finally:
         _estado_do_script.ativo = anterior
+        _estado_do_script.sys_path = caminho_anterior
 
 
 @contextlib.contextmanager

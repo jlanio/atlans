@@ -92,27 +92,25 @@ def test_the_guard_does_not_leak_to_other_code(tmp_path):
     assert erros == []
 
 
-def test_libraries_that_write_on_import_are_warmed_up_outside_the_script(monkeypatch):
-    """matplotlib (cache/config folder, font cache) and pyogrio (an environment
-    variable) write on their FIRST import; imported inside a script, the guard
-    refused it and the script failed for reasons it did not cause (fix review)."""
+def test_matplotlib_is_warmed_up_outside_the_script_only_when_it_may_be_used(monkeypatch):
+    """matplotlib writes its config/cache folder on its FIRST import; imported
+    inside a script, the guard refused it. Warmed up once, outside the timed
+    thread, and only for a script that may use it (fix review)."""
     import sys
 
     from flow.nodes.action import python_script as P
 
     monkeypatch.setattr(P, "_bibliotecas_aquecidas", False)
-    P._aquecer_bibliotecas()
-    for nome in ("matplotlib", "pyogrio"):
-        try:
-            __import__(nome)
-        except ImportError:
-            continue
-        assert nome in sys.modules
-    # Once per process.
-    chamadas = []
-    monkeypatch.setattr("builtins.__import__", lambda *a, **k: chamadas.append(a[0]))
-    P._aquecer_bibliotecas()
-    assert chamadas == []
+    P._aquecer_bibliotecas("result = df.groupby('a').sum()")
+    assert P._bibliotecas_aquecidas is False          # nothing to warm up
+
+    P._aquecer_bibliotecas("result = df.style.background_gradient().to_html()")
+    assert P._bibliotecas_aquecidas is True
+    try:
+        import matplotlib  # noqa: F401
+        assert "matplotlib" in sys.modules
+    except ImportError:
+        pass
 
 
 def test_listing_a_sys_path_folder_is_allowed_reading_outside_is_not(tmp_path, monkeypatch):
@@ -137,3 +135,20 @@ def test_listing_a_sys_path_folder_is_allowed_reading_outside_is_not(tmp_path, m
         with pytest.raises(PermissionError):
             os.listdir(tmp_path.parent)
     del ns
+
+
+def test_appending_to_sys_path_inside_the_script_does_not_widen_listing(tmp_path, monkeypatch):
+    """The allowed listing is the sys.path AS IT WAS when the script started:
+    user code appending a folder must not make it listable (fix review)."""
+    import sys
+
+    from flow.utils import code_sandbox as C
+
+    C.instalar_guarda_de_execucao()
+    with C.executando_codigo_do_usuario():
+        sys.path.append(str(tmp_path))
+        try:
+            with pytest.raises(PermissionError):
+                os.listdir(tmp_path)
+        finally:
+            sys.path.remove(str(tmp_path))
