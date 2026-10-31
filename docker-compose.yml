@@ -125,15 +125,26 @@ x-api-env: &api-env
 x-api-volumes: &api-volumes
   - artifacts_data:/data/artifacts
 
-# Log driver for the API and the web: LOG_DRIVER in .env (default json-file,
-# which runs on any host). json-file deletes the log along with the container,
-# and the deploy recreates api-prod and web-prod: in production on a host with
-# systemd, `journald` keeps the log on the host after the deploy, with
-# journald's own disk ceiling, and `docker compose logs` keeps reading it
-# (direct query: `journalctl -t <tag>`). Without systemd-journald on the host
-# (Docker Desktop, for example), journald does not start.
-x-log-persistente: &log-persistente
-  driver: ${LOG_DRIVER:-json-file}
+# The log of every service except the API and the web: json-file WITH a
+# ceiling. Without max-size, json-file grows until the disk fills (Traefik's,
+# with the access log, fastest). LOG_MAX_SIZE x LOG_MAX_FILE per container,
+# 10m x 5 by default; `docker compose logs` reads the rotated files too.
+#
+# api-prod and web-prod follow LOG_DRIVER instead (default json-file, which
+# runs on any host). json-file deletes the log along with the container, and
+# the deploy recreates those two: in production on a host with systemd,
+# `journald` keeps the log on the host after the deploy, with journald's own
+# disk ceiling, and `docker compose logs` keeps reading it (direct query:
+# `journalctl -t <tag>`). Without systemd-journald on the host (Docker
+# Desktop, for example), journald does not start. journald rejects the
+# max-size/max-file options json-file needs, so the options of each driver
+# live in docker-compose.logs.yml and the service picks its block by name
+# (`extends`, `api-${LOG_DRIVER}`).
+x-log-rotacionado: &log-rotacionado
+  driver: json-file
+  options:
+    max-size: ${LOG_MAX_SIZE:-10m}
+    max-file: ${LOG_MAX_FILE:-5}
 
 services:
 
@@ -146,6 +157,7 @@ services:
     # (REDIS_IMAGE=redis:7-alpine) or switches starting from an empty volume.
     image: ${REDIS_IMAGE:-valkey/valkey:8-alpine}
     restart: unless-stopped
+    logging: *log-rotacionado
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     command: >
@@ -205,6 +217,7 @@ services:
       # below); in the container uvicorn always listens on 8000.
       - "127.0.0.1:${API_PORT:-8000}:8000"
     restart: unless-stopped
+    logging: *log-rotacionado
     volumes:
       - .:/app
       - artifacts_data:/data/artifacts
@@ -300,6 +313,7 @@ services:
       - ./web:/app
       - /app/node_modules
     restart: unless-stopped
+    logging: *log-rotacionado
     networks:
       - backend
       - dev-net
@@ -330,6 +344,7 @@ services:
     image: smallstep/step-ca:0.27.0
     profiles: ["executor-local"]
     restart: unless-stopped
+    logging: *log-rotacionado
     environment:
       DOCKER_STEPCA_INIT_NAME: "Atlans Internal CA"
       DOCKER_STEPCA_INIT_DNS_NAMES: "step-ca,localhost"
@@ -359,6 +374,7 @@ services:
     image: traefik:v3.6
     profiles: ["executor-local"]
     restart: unless-stopped
+    logging: *log-rotacionado
     depends_on:
       # The host certificate is issued before the CA starts: healthy means it exists.
       step-ca-dev:
@@ -422,6 +438,7 @@ services:
       context: .
       dockerfile: Dockerfile.executor
     restart: unless-stopped
+    logging: *log-rotacionado
     depends_on:
       traefik-dev:
         condition: service_started
@@ -465,6 +482,7 @@ services:
       context: .
       dockerfile: Dockerfile.api
     restart: unless-stopped
+    logging: *log-rotacionado
     depends_on:
       # Started first, the executor's image creates the shared volume with its
       # own user, the same uid as this one: otherwise it would be born root's.
@@ -502,6 +520,7 @@ services:
     image: smallstep/step-ca:0.27.0
     profiles: ["prod"]
     restart: unless-stopped
+    logging: *log-rotacionado
     environment:
       DOCKER_STEPCA_INIT_NAME: "Atlans Internal CA"
       DOCKER_STEPCA_INIT_DNS_NAMES: "step-ca,localhost"
@@ -530,6 +549,7 @@ services:
     # on every daemon start, however it stopped; a `docker stop` still holds
     # until the next one.
     restart: always
+    logging: *log-rotacionado
     ports:
       - "80:80"
       - "443:443"
@@ -559,7 +579,8 @@ services:
       # does not need to write to the CA folder.
       # See docs/operations.md, "Traefik dynamic configuration".
       - ./traefik-dynamic:/etc/traefik/dynamic:ro
-      # Traefik access log on the host (TRAEFIK_LOG_DIR; default ./logs/traefik).
+      # Only for an access log in a file (TRAEFIK_ACCESSLOG_FILEPATH, below):
+      # it lands in TRAEFIK_LOG_DIR on the host (default ./logs/traefik).
       - ${TRAEFIK_LOG_DIR:-./logs/traefik}:/var/log/traefik
       # Internal CA that signs the executors' certs — used to validate client certs in mTLS.
       # make bootstrap-stepca copies the intermediate.crt and the AGENTS_HOST cert to ./traefik/atlans-ca/.
@@ -603,7 +624,14 @@ services:
       - "--log.level=INFO"
       - "--api=false"
       - "--accesslog=true"
-      - "--accesslog.filepath=/var/log/traefik/access.log"
+      # The access log goes to the container's output by default, under the
+      # json-file rotation of the service (`docker compose logs traefik`).
+      # Written to /var/log/traefik/access.log it grew forever: Traefik does not
+      # rotate it. Whoever reads the file (fail2ban, goaccess) sets
+      # TRAEFIK_ACCESSLOG_FILEPATH=/var/log/traefik/access.log and rotates it
+      # on the host (logrotate + `docker compose kill -s USR1 traefik`, which
+      # makes Traefik reopen it; see docs/operations.md).
+      - "--accesslog.filepath=${TRAEFIK_ACCESSLOG_FILEPATH:-/dev/stdout}"
       - "--accesslog.bufferingsize=100"
       - "--accesslog.format=json"
       - "--accesslog.fields.defaultmode=keep"
@@ -682,10 +710,10 @@ services:
       # Required for the /executores/enroll and /executores/renew-cert endpoints.
       - step-ca-data:/etc/step-ca:ro
     restart: unless-stopped
-    logging:
-      <<: *log-persistente
-      options:
-        tag: atlans-api
+    # The log driver (LOG_DRIVER) and its options: docker-compose.logs.yml.
+    extends:
+      file: docker-compose.logs.yml
+      service: api-${LOG_DRIVER:-json-file}
     networks:
       - proxy-net
       - backend
@@ -843,10 +871,10 @@ services:
       # O nome que a tela mostra (barra lateral, entrada, aba). Vazio = Atlans.
       NOME_NA_TELA: ${NOME_NA_TELA:-}
     restart: unless-stopped
-    logging:
-      <<: *log-persistente
-      options:
-        tag: atlans-web
+    # The log driver (LOG_DRIVER) and its options: docker-compose.logs.yml.
+    extends:
+      file: docker-compose.logs.yml
+      service: web-${LOG_DRIVER:-json-file}
     # 512M was not enough: on September 22 the kernel killed next-server at
     # 519 MB of RSS (cgroup OOM) and the site went down until Docker restarted
     # it. 1G leaves room for the runtime + SSR cache without reserving anything
@@ -898,6 +926,7 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    logging: *log-rotacionado
     # Artifact upload/download buffers can grow; 2GB covers the typical usage
     # of workflows with multiple medium-sized files in parallel.
     deploy:

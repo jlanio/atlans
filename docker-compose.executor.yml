@@ -62,6 +62,15 @@ services:
     # interrupted the jobs mid-drain, and the next boot blamed "out of memory".
     stop_grace_period: 160s
 
+    # json-file with a ceiling: without max-size Docker keeps the executor's
+    # whole output (every job's log) until the disk fills. LOG_MAX_SIZE and
+    # LOG_MAX_FILE in the .env next to this file; 10m x 5 by default.
+    logging:
+      driver: json-file
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: ${LOG_MAX_FILE:-5}
+
     env_file: executor/.env
 
     environment:

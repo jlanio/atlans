@@ -1,0 +1,45 @@
+# The log of api-prod and web-prod, by LOG_DRIVER (.env): docker-compose.yml
+# takes the block `<api|web>-${LOG_DRIVER:-json-file}` from here (`extends`).
+# Not a project of its own — no image, nothing to bring up.
+#
+# The options live apart per driver because each driver rejects the others':
+# json-file needs max-size/max-file (without them it grows until the disk
+# fills), and journald refuses both ("unknown log opt").
+#
+#   json-file  any host (the default). Rotated: LOG_MAX_SIZE x LOG_MAX_FILE
+#              per container, 10m x 5. Deleted along with the container — and
+#              every deploy recreates these two.
+#   journald   a host with systemd: the log stays on the host across deploys,
+#              under journald's own ceiling (SystemMaxUse); `journalctl -t
+#              atlans-api`. See docs/operations.md, "Logs that survive the deploy".
+#
+# Another driver: add `api-<driver>` and `web-<driver>` blocks here.
+
+services:
+  api-json-file:
+    logging:
+      driver: json-file
+      options:
+        tag: atlans-api
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: ${LOG_MAX_FILE:-5}
+
+  web-json-file:
+    logging:
+      driver: json-file
+      options:
+        tag: atlans-web
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: ${LOG_MAX_FILE:-5}
+
+  api-journald:
+    logging:
+      driver: journald
+      options:
+        tag: atlans-api
+
+  web-journald:
+    logging:
+      driver: journald
+      options:
+        tag: atlans-web

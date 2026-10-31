@@ -585,6 +585,50 @@ and at most 4 GB): when it fills up, the oldest goes. To keep more, raise
 persistent — without the `/var/log/journal` directory, it lives in memory and vanishes at the
 next boot.
 
+The options of each driver are in [docker-compose.logs.yml](../docker-compose.logs.yml)
+(`api-prod` and `web-prod` take theirs from there by `LOG_DRIVER`): only
+`json-file` and `journald` are defined. Another driver needs its
+`api-<driver>`/`web-<driver>` blocks there; without them `docker compose`
+stops with `service "api-<driver>" not found`.
+
+### Log rotation
+
+Every other service (Traefik, Redis, MinIO, step-ca and the dev ones), and the
+API and the web with `LOG_DRIVER=json-file`, write to `json-file` with a ceiling:
+`LOG_MAX_SIZE` × `LOG_MAX_FILE` per container (default `10m` × `5`).
+`docker compose logs` reads the rotated files too. Changing the values takes a
+recreate (`docker compose --profile prod up -d`).
+
+### Traefik access log
+
+It goes to Traefik's output, in JSON, under that same rotation:
+
+```bash
+docker compose --profile prod logs traefik --since 1h | grep '"RequestMethod"'
+```
+
+It used to be written to `logs/traefik/access.log` on the host, a file Traefik
+never rotates. To keep it in a file (for fail2ban, goaccess...), set
+`TRAEFIK_ACCESSLOG_FILEPATH=/var/log/traefik/access.log` in the `.env`: it lands in
+`TRAEFIK_LOG_DIR` (default `./logs/traefik`), and rotating it is the host's job —
+for example, `/etc/logrotate.d/atlans-traefik`:
+
+```
+/caminho/da/instalacao/logs/traefik/access.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    postrotate
+        cd /caminho/da/instalacao && docker compose --profile prod kill -s USR1 traefik
+    endscript
+}
+```
+
+`USR1` makes Traefik reopen the file after the rename.
+
 ## Workflows with renamed nodes
 
 A workflow saved with a node's old name fails at startup with `Node 'X' não

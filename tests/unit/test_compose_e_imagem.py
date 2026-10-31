@@ -96,3 +96,74 @@ def test_the_dev_browser_port_is_the_published_port():
     porta = _uvicorn_port(servicos["api"]["command"])
     assert servicos["api"]["ports"] == [f"127.0.0.1:${{API_PORT:-8000}}:{porta}"]
     assert servicos["web-dev"]["environment"]["NEXT_PUBLIC_API_PORT"] == "${API_PORT:-8000}"
+
+
+# ── Logs with a ceiling ──────────────────────────────────────────────────────
+
+LOGS_POR_DRIVER = RAIZ / "docker-compose.logs.yml"
+COMPOSE_EXECUTOR = RAIZ / "docker-compose.executor.yml"
+_POR_DRIVER = "${LOG_DRIVER:-json-file}"
+
+
+def _blocos_por_driver() -> dict:
+    return yaml.safe_load(LOGS_POR_DRIVER.read_text(encoding="utf-8"))["services"]
+
+
+def _assert_bounded(nome: str, logging: dict) -> None:
+    """json-file only with max-size/max-file; journald (its own ceiling) without
+    them — Docker refuses to create the container with an option the driver
+    does not know."""
+    opcoes = logging.get("options") or {}
+    if logging["driver"] == "json-file":
+        assert opcoes.get("max-size") == "${LOG_MAX_SIZE:-10m}", nome
+        assert opcoes.get("max-file") == "${LOG_MAX_FILE:-5}", nome
+    else:
+        assert logging["driver"] == "journald", nome
+        assert not {"max-size", "max-file"} & set(opcoes), nome
+
+
+def test_every_service_log_has_a_ceiling():
+    """A service without `logging` gets the daemon's default — json-file with no
+    ceiling on a stock Docker: Traefik's access log, Redis' saves every minute
+    and the executor's jobs grew until the disk filled."""
+    blocos = _blocos_por_driver()
+    for nome, bloco in blocos.items():
+        _assert_bounded(f"docker-compose.logs.yml:{nome}", bloco["logging"])
+
+    executor = yaml.safe_load(COMPOSE_EXECUTOR.read_text(encoding="utf-8"))["services"]
+    servicos = {
+        **{f"docker-compose.yml:{n}": s for n, s in _compose()["services"].items()},
+        **{f"docker-compose.executor.yml:{n}": s for n, s in executor.items()},
+    }
+    for nome, servico in servicos.items():
+        if "extends" in servico:
+            # api-prod and web-prod: the block of LOG_DRIVER, which exists for
+            # both documented drivers.
+            assert servico["extends"]["file"] == "docker-compose.logs.yml", nome
+            base = servico["extends"]["service"]
+            assert base.endswith(f"-{_POR_DRIVER}"), nome
+            prefixo = base.removesuffix(_POR_DRIVER)
+            assert {f"{prefixo}json-file", f"{prefixo}journald"} <= set(blocos), nome
+            assert "logging" not in servico, nome
+            continue
+        assert "logging" in servico, f"{nome}: sem logging, vale o padrao do daemon"
+        _assert_bounded(nome, servico["logging"])
+
+
+def test_the_api_and_web_keep_their_journald_tags():
+    """docs/operations.md: `journalctl -t atlans-api` / `-t atlans-web`."""
+    blocos = _blocos_por_driver()
+    servicos = _compose()["services"]
+    for servico, tag in (("api-prod", "atlans-api"), ("web-prod", "atlans-web")):
+        prefixo = servicos[servico]["extends"]["service"].removesuffix(_POR_DRIVER)
+        for driver in ("json-file", "journald"):
+            assert blocos[f"{prefixo}{driver}"]["logging"]["options"]["tag"] == tag
+
+
+def test_the_traefik_access_log_is_not_an_unrotated_file():
+    """Written to /var/log/traefik/access.log it grew forever (Traefik does not
+    rotate it). By default it goes to the container output, under the rotation
+    above; a file is an explicit choice (TRAEFIK_ACCESSLOG_FILEPATH)."""
+    comando = _compose()["services"]["traefik"]["command"]
+    caminhos = [a for a in comando if a.startswith("--accesslog.filepath=")]
+    assert caminhos == ["--accesslog.filepath=${TRAEFIK_ACCESSLOG_FILEPATH:-/dev/stdout}"]
