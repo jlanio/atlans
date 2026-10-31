@@ -275,3 +275,37 @@ async def test_a_user_cancel_during_the_shutdown_stays_a_cancellation():
 
     assert len(avisos) == 1
     assert "cancel_as_executor_loss" not in avisos[0]
+
+
+async def test_a_job_that_finishes_as_the_shutdown_cancels_is_not_reported_lost():
+    """The job finished in the same instant the worker was canceled: its outcome
+    is already reported; an `executor_lost` would overwrite it (fix review)."""
+    import asyncio as _asyncio
+
+    from executor.job_queue import ExecutorJobQueue
+
+    avisos = []
+    terminou = _asyncio.Event()
+    fila = None
+
+    async def _executa(_msg):
+        # Schedules the worker's cancellation BEFORE this task completes: it runs
+        # first, finds the awaited task already done and leaves the worker to
+        # raise CancelledError at `await task` with the job finished.
+        fila._shutting_down = True            # the drain is past its deadline
+        loop = _asyncio.get_running_loop()
+        for w in fila._workers:
+            loop.call_soon(w.cancel)
+        terminou.set()
+        return "ok"
+
+    async def _cancelado(msg):
+        avisos.append(msg)
+
+    fila = ExecutorJobQueue(on_execute=_executa, max_concurrent=1, max_queue_size=5, on_cancelled=_cancelado)
+    await fila.start(n_workers=1)
+    await fila.enqueue({"envelope": {"job_id": "J1"}})
+    await _asyncio.wait_for(terminou.wait(), timeout=2)
+    await _asyncio.sleep(0.05)
+
+    assert avisos == []

@@ -167,7 +167,27 @@ _IO_BLOCKED_ATTRS = {
     # of the executor (and turn on PROJ's network access)
     "set_data_dir", "append_data_dir", "set_network_enabled",
     "set_ca_bundle_path",
+    # Libraries whose I/O happens in C (GDAL, Arrow): the runtime audit hook
+    # never sees it, so the way IN is what has to be closed. Reached through
+    # attribute chains of the allowlisted modules — `pd.core.arrays.arrow.array.pa`
+    # is pyarrow (`pa.OSFile(path)` read and wrote any file), `gpd.io.file`
+    # holds pyogrio's readers and writers, `pd.io`/`pd.compat` reach the same.
+    "pa", "pyarrow", "arrow", "pyogrio", "fiona", "osgeo", "gdal", "ogr", "osr",
+    "rasterio", "io", "compat", "fs",
+    # pyarrow file handles and filesystems
+    "OSFile", "MemoryMappedFile", "input_stream", "output_stream",
+    "LocalFileSystem", "filesystem",
+    # GDAL entry points: a path like 'CSV:/etc/x' or '/vsicurl/http://…' read
+    # files and internal URLs; vsi_* listed and deleted files; config options
+    # are process-wide (GDAL_HTTP_UNSAFESSL stayed on for every other node).
+    "from_file", "from_postgis", "raw", "memory_map",
+    "set_gdal_config_options", "get_gdal_config_option",
 }
+# Private attributes (`gpd.io.file._read_file`, `_to_file`, `_datasource`…) are
+# the same I/O behind an underscore, and no data transformation needs a
+# library's internals. `vsi_*` is GDAL's virtual file system (list, read,
+# delete files).
+_IO_PRIVATE = re.compile(r"^_[^_]|^vsi_")
 # Return a string when called WITHOUT a destination (`gdf.to_json()` is common
 # and legitimate) and write to a file when given one. Allowed only as the
 # function of a call that names no destination: no positional argument, no
@@ -263,7 +283,7 @@ def _check_attr(attr: str) -> None:
             "texto como codigo. Use indexacao booleana, por exemplo "
             "df[df['coluna'] > 10]."
         )
-    if attr.startswith(_IO_READ_PREFIX) or attr in _IO_BLOCKED_ATTRS:
+    if attr.startswith(_IO_READ_PREFIX) or attr in _IO_BLOCKED_ATTRS or _IO_PRIVATE.match(attr):
         raise UnsafeCodeError(
             f"Uso de '{attr}' nao e permitido no PythonScript: ler ou gravar "
             "arquivos e URLs fica com os nos de entrada e saida do fluxo. "
@@ -404,6 +424,20 @@ def _dentro_das_raizes(caminho) -> bool:
     return any(real == r or real.startswith(r + os.sep) for r in raizes)
 
 
+def _e_pasta_do_sys_path(caminho) -> bool:
+    """Is it exactly a `sys.path` folder? Python's import machinery lists those
+    to find modules; refused, it cached an EMPTY listing and later imports of
+    the platform from that folder failed after the script ended. Only the
+    listing is allowed — reading a file there still has to be inside the roots."""
+    if isinstance(caminho, int):
+        return False
+    try:
+        real = os.path.realpath(os.fsdecode(caminho))
+        return any(os.path.realpath(p or ".") == real for p in sys.path)
+    except Exception:
+        return False
+
+
 def _recusar(evento: str) -> None:
     raise PermissionError(
         f"Operação bloqueada no PythonScript ({evento}): o script não pode "
@@ -426,7 +460,7 @@ def _guarda_de_auditoria(evento: str, args: tuple) -> None:
         return
     if evento in ("os.listdir", "os.scandir"):
         caminho = args[0] if args and args[0] is not None else "."
-        if not _dentro_das_raizes(caminho):
+        if not _dentro_das_raizes(caminho) and not _e_pasta_do_sys_path(caminho):
             _recusar(evento)
         return
     if evento in _EVENTOS_BLOQUEADOS or evento.startswith(_PREFIXOS_BLOQUEADOS):

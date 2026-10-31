@@ -916,7 +916,7 @@ async def test_contract_the_executor_inventory_passes_the_server_schema(store):
 # stays in the outbox (out of the "pending" count) and the next session resends it.
 
 def test_a_sent_result_stays_for_the_replay_window_and_then_goes(store):
-    store.put({"job_id": "j1", "run_id": "j1", "status": "ok"})
+    store.put({"job_id": "j1", "run_id": "j1", "status": "error", "error": "x"})
     store.mark_sent("j1")
 
     assert store.job_ids_pendentes() == []          # no longer "not sent"
@@ -931,11 +931,35 @@ def test_a_sent_result_stays_for_the_replay_window_and_then_goes(store):
 
 
 def test_the_boot_replay_sends_the_never_sent_first(store):
-    store.put({"job_id": "enviado", "status": "ok"})
+    store.put({"job_id": "enviado", "status": "error", "error": "x"})
     store.mark_sent("enviado")
     store.put({"job_id": "nunca", "status": "ok"})
 
     assert [r["job_id"] for r in store.load_for_boot_replay()] == ["nunca", "enviado"]
+
+
+def test_a_sent_success_is_not_replayed(store):
+    """The outbox keeps a result without `stats`: a replayed success would
+    close the run as success with its artifacts unregistered (fix review)."""
+    store.put({"job_id": "ok1", "status": "success", "stats": {"artefatos": [1]}})
+    store.mark_sent("ok1")
+    assert store.load_for_boot_replay() == []
+
+
+def test_a_resend_does_not_restart_the_replay_window(store):
+    """Each resend rewrote `sent_at`: rows never aged out while reconnects came
+    in under the window (fix review)."""
+    store.put({"job_id": "j1", "status": "error", "error": "x"})
+    store.mark_sent("j1")
+    primeiro = store._get_conn().execute("SELECT sent_at FROM pending_results").fetchone()[0]
+    time.sleep(0.01)
+    store.mark_sent("j1")
+    assert store._get_conn().execute("SELECT sent_at FROM pending_results").fetchone()[0] == primeiro
+
+
+def test_the_outbox_keeps_retryable(store):
+    store.put({"job_id": "j1", "status": "error", "error_category": "executor_lost", "retryable": True})
+    assert store.load_pending()[0]["retryable"] is True
 
 
 def test_a_new_result_for_the_same_job_is_pending_again(store):
@@ -972,12 +996,34 @@ def test_an_outbox_from_before_the_column_is_migrated(tmp_path, monkeypatch):
 async def test_a_new_session_resends_what_the_previous_one_sent(store):
     fila = asyncio.Queue()
     conn = _new_connection(fila)
-    store.put({"job_id": "j1", "run_id": "j1", "status": "ok"})
+    store.put({"job_id": "j1", "run_id": "j1", "status": "error", "error": "x"})
     store.mark_sent("j1")
+    # A sent SUCCESS is not resent (no stats in the outbox).
+    store.put({"job_id": "ok1", "run_id": "ok1", "status": "success"})
+    store.mark_sent("ok1")
 
     await conn._reenviar_resultados_recentes()
     assert fila.get_nowait()["job_id"] == "j1"
+    assert fila.empty()
     # Already queued: not added twice.
     fila.put_nowait({"job_id": "j1"})
     await conn._reenviar_resultados_recentes()
     assert fila.qsize() == 1
+
+
+async def test_the_session_replay_leaves_room_for_live_results(store, monkeypatch):
+    """With a long list of recent results, the replay filled the 86-slot queue
+    and the next live result was dropped (fix review): it now waits for room."""
+    fila = asyncio.Queue(maxsize=20)
+    conn = _new_connection(fila)
+    monkeypatch.setattr(type(conn), "_REENVIO_INTERVALO_S", 0)
+    for i in range(30):
+        store.put({"job_id": f"j{i}", "run_id": f"j{i}", "status": "error", "error": "x"})
+        store.mark_sent(f"j{i}")
+
+    tarefa = asyncio.create_task(conn._reenviar_resultados_recentes())
+    await asyncio.sleep(0.05)
+    assert fila.qsize() <= conn._REENVIO_RESERVA       # room left for live results
+    tarefa.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await tarefa

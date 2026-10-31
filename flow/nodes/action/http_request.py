@@ -7,6 +7,7 @@ import geopandas as gpd
 from urllib.parse import parse_qsl, urlparse
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
+from flow.utils.error_taxonomy import RequestAlreadyDelivered
 from flow.utils.geo_helpers import gdf_para_geojson, safe_httpx_request
 from flow.utils.autenticacao_http import (
     CREDENTIAL_HEADERS,
@@ -434,7 +435,15 @@ class HttpRequestNode(BaseNode):
                 try:
                     response = await hop_breaker.call(_do_request)
                 except CircuitOpenError as e:
-                    raise RuntimeError(str(e))
+                    raise RequestAlreadyDelivered(str(e))
+                except httpx.TransportError as e:
+                    # The ORIGINAL request was delivered (it is what answered
+                    # the 3xx): a connection refused here must not read as
+                    # "nothing was sent", or the executor would repeat a POST
+                    # the API already applied.
+                    raise RequestAlreadyDelivered(
+                        f"Erro ao seguir o redirecionamento para {destino}: {e}"
+                    ) from e
                 saltos += 1
 
             if response.is_redirect:

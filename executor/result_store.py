@@ -179,7 +179,8 @@ def _get_conn() -> sqlite3.Connection | None:
 # directly over WS when the connection is alive (they don't go through the outbox).
 # `error_category` is included because the replay needs it: without the
 # category, the failure resent at boot reached the server as a generic "internal".
-_SAFE_RESULT_FIELDS = {"job_id", "run_id", "status", "error", "error_category"}
+# `retryable` too: an executor-loss result without it lost the retry on replay.
+_SAFE_RESULT_FIELDS = {"job_id", "run_id", "status", "error", "error_category", "retryable"}
 
 
 def _sanitize(result: dict[str, Any]) -> dict[str, Any]:
@@ -264,8 +265,10 @@ def mark_sent(job_id: str) -> None:
             conn = _get_conn()
             if conn is None:
                 return
+            # The FIRST send starts the window; a replay does not restart it —
+            # otherwise rows never aged out while reconnects came in under it.
             conn.execute(
-                "UPDATE pending_results SET sent_at = ? WHERE job_id = ?",
+                "UPDATE pending_results SET sent_at = COALESCE(sent_at, ?) WHERE job_id = ?",
                 (time.time(), str(job_id)),
             )
         purge_sent()
@@ -352,12 +355,17 @@ def load_pending() -> list[dict]:
     return out
 
 
+_SUCESSO = ("success", "ok", "completed")
+
+
 def load_for_boot_replay() -> list[dict]:
     """What the executor resends at startup: every result never sent, then the
-    ones sent within the replay window — the previous process may have sent
-    those on a connection that was already dead (the server keeps the first
-    outcome, so a repeat is harmless). Never raises: failures return []."""
-    return load_pending() + load_recently_sent()
+    FAILED/CANCELLED ones sent within the replay window — the previous process
+    may have sent those on a connection that was already dead (the server keeps
+    the first outcome, so a repeat is harmless). A sent success is not resent:
+    the outbox keeps it without `stats`, and it would close the run as success
+    with its artifacts unregistered. Never raises: failures return []."""
+    return load_pending() + [r for r in load_recently_sent() if r.get("status") not in _SUCESSO]
 
 
 def count_pending() -> int:

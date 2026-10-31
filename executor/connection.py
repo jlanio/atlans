@@ -433,6 +433,19 @@ class ExecutorConnection:
                     logger.warning("Certificado renovado — reconectando.")
                     delay = 1
                     continue
+                if terminal and self._ha_renovacao_pendente():
+                    # The resume failed for a passing reason (network, server
+                    # restarting) while the saved renewal is still valid: one
+                    # quick attempt and then stopping for good left the machine
+                    # unable to connect until a manual re-enrollment. Keep
+                    # trying with backoff until it works or the saved renewal
+                    # expires — only then is the refusal final.
+                    logger.warning(
+                        "Renovacao pendente ainda nao concluida — nova tentativa em %ss.", delay,
+                    )
+                    rescheduled = await self._esperar_retry(delay)
+                    delay = 1 if rescheduled else min(delay * 2, config.RECONNECT_MAX_DELAY)
+                    continue
 
                 if terminal:
                     # 401/403/404 from the server = authoritative deny (revoked cert,
@@ -455,6 +468,14 @@ class ExecutorConnection:
                 self._stats.on_disconnected(next_retry_s=actual)
                 rescheduled = await self._esperar_retry(actual)
                 delay = 1 if rescheduled else min(delay * 2, config.RECONNECT_MAX_DELAY)
+
+    @staticmethod
+    def _ha_renovacao_pendente() -> bool:
+        from executor import renewal
+        try:
+            return renewal.has_pending_renewal(config.EXECUTOR_CERT_DIR)
+        except Exception:
+            return False
 
     async def _retomar_renovacao_interrompida(self) -> bool:
         """Resumes a renewal whose answer was lost, if there is one. Best-effort."""
@@ -585,8 +606,6 @@ class ExecutorConnection:
             # have reached the server (half-open connection). Resend it; the
             # server keeps the first outcome and drops duplicates.
             self._sessoes += 1
-            if self._sessoes > 1:
-                await self._reenviar_resultados_recentes()
 
             # Starts parallel work as Tasks to allow cancellation
             tasks: list[asyncio.Task] = [
@@ -598,6 +617,13 @@ class ExecutorConnection:
             ]
             if self._events is not None:
                 tasks.append(asyncio.create_task(self._event_sender_loop(ws), name="events"))
+            # Outside `tasks`: it ENDS on its own, and the FIRST_COMPLETED below
+            # would take that for the session ending. Started after the loops, so
+            # it never delays them.
+            reenvio = (
+                asyncio.create_task(self._reenviar_resultados_recentes(), name="reenvio")
+                if self._sessoes > 1 else None
+            )
 
             # Waits for the FIRST task to finish — normally _receive_loop when the
             # server closes the connection. Cancelling the others immediately lets the
@@ -614,10 +640,12 @@ class ExecutorConnection:
                 # window was taken out and discarded (ws closed). Cancelling here is
                 # what makes main.py's "ORDERLY shutdown" label hold for
                 # the connection's children.
+                if reenvio is not None and not reenvio.done():
+                    reenvio.cancel()
                 for task in tasks:
                     if not task.done():
                         task.cancel()
-                await asyncio.gather(*tasks, return_exceptions=True)
+                await asyncio.gather(*tasks, *([reenvio] if reenvio else []), return_exceptions=True)
                 # SessionMaker acabou: sem socket ate a proxima conexao.
                 self._ws = None
 
@@ -992,12 +1020,32 @@ class ExecutorConnection:
                 self._remember_sent(enviado)
                 result_store.mark_sent(enviado)
 
+    # Room the replay leaves in the result queue for the jobs running NOW: they
+    # use put_nowait and are DROPPED on a full queue (the same reserve as the
+    # boot replay in main.py).
+    _REENVIO_RESERVA = 8
+    # Pace of the replay: the server caps results per second per executor, and a
+    # live result arriving in a burst of replays could be refused with them.
+    _REENVIO_INTERVALO_S = 0.05
+
     async def _reenviar_resultados_recentes(self) -> None:
-        """Puts back in the queue the results sent within the outbox's replay
-        window (see result_store.JANELA_DE_REENVIO_S). Best-effort."""
+        """Puts back in the queue the FAILED/CANCELLED results sent within the
+        outbox's replay window (see result_store.JANELA_DE_REENVIO_S). Best-effort.
+
+        Only those: the outbox keeps a stripped result (no `stats`), so a
+        replayed SUCCESS would close the run as success with its artifacts and
+        metrics unregistered — worse than the server closing it as lost
+        (failed, retryable), which the user sees. An error or a cancellation
+        carries everything the server reads.
+
+        Paced and bounded like the boot replay: the queue keeps room for live
+        results, and the replays do not go out in one burst.
+        """
         from executor import result_store
         try:
-            recentes = await asyncio.to_thread(result_store.load_recently_sent)
+            # Synchronous on purpose: SQLite by key costs microseconds, and
+            # `to_thread` waits for the pool the GIS nodes may be filling.
+            recentes = result_store.load_recently_sent()
         except Exception as exc:
             logger.debug("Reenvio de resultados recentes ignorado: %s", exc)
             return
@@ -1008,17 +1056,22 @@ class ExecutorConnection:
         }
         reenviados = 0
         for resultado in recentes:
+            if resultado.get("status") in ("success", "ok", "completed"):
+                continue
             if str(resultado.get("job_id")) in na_fila:
                 continue
+            while self._results.qsize() >= self._REENVIO_RESERVA:
+                await asyncio.sleep(0.2)
             try:
                 self._results.put_nowait(resultado)
-                reenviados += 1
             except asyncio.QueueFull:
                 break
+            reenviados += 1
+            await asyncio.sleep(self._REENVIO_INTERVALO_S)
         if reenviados:
             logger.info(
-                "Reenviando %d resultado(s) da sessão anterior (a conexão pode ter "
-                "caído antes de o servidor recebê-los).", reenviados,
+                "Reenviados %d resultado(s) de falha/cancelamento da sessão anterior "
+                "(a conexão pode ter caído antes de o servidor recebê-los).", reenviados,
             )
 
     def _requeue_result(self, result: dict, attempts: int = 0) -> None:

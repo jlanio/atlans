@@ -293,6 +293,12 @@ class ExecutorJobQueue:
                 try:
                     await task
                 except asyncio.CancelledError:
+                    if task.done() and not task.cancelled():
+                        # The job FINISHED in the same instant the worker was
+                        # canceled: its outcome is already reported (and in the
+                        # outbox). Reporting a loss now would overwrite that
+                        # outcome with `executor_lost`.
+                        raise
                     if self._shutting_down and job_id not in self._cancelled_by_request:
                         # The WORKER is being canceled (shutdown past its
                         # deadline). Canceling the worker also cancels the task it

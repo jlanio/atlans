@@ -255,6 +255,33 @@ class _LoggingStream(io.TextIOBase):
         self._flush_batch()
 
 
+_bibliotecas_aquecidas = False
+
+
+def _aquecer_bibliotecas() -> None:
+    """Imports, OUTSIDE the user's code, the libraries that write on their first
+    import: matplotlib creates its config/cache folder (`df.style.
+    background_gradient()` pulls it in) and pyogrio sets an environment
+    variable. Imported for the first time inside a script, the runtime guard
+    refused those writes and the script failed for reasons it did not cause.
+    Once per process; a library that is not installed is simply skipped."""
+    global _bibliotecas_aquecidas
+    if _bibliotecas_aquecidas:
+        return
+    _bibliotecas_aquecidas = True
+    for nome in ("matplotlib", "pyogrio"):
+        try:
+            modulo = __import__(nome)
+            if nome == "matplotlib":
+                modulo.get_cachedir()
+                modulo.get_configdir()
+                # Builds (and saves) the font cache, which the Styler's
+                # colormaps would otherwise try to write from inside the script.
+                __import__("matplotlib.font_manager")
+        except Exception:  # noqa: S112 - optional libraries
+            continue
+
+
 def _run_script(
     code: str,
     namespace: Dict[str, Any],
@@ -284,6 +311,7 @@ def _run_script(
         sys.stdout = stream  # type: ignore[assignment]
         namespace["__builtins__"] = _SAFE_BUILTINS
         codigo = compile(code, "<PythonScript>", "exec")
+        _aquecer_bibliotecas()
         with executando_codigo_do_usuario():
             exec(codigo, namespace)  # noqa: S102
     finally:
