@@ -27,9 +27,10 @@ import app.models
 from app.extensoes import esquemas
 from app.models.base import Base
 
-# `app.models.__init__` imports only some of the modules; to compare with the
-# script the metadata must be COMPLETE — otherwise the test passes precisely when
-# a new model was forgotten, which is the case it exists to catch.
+# `app.models.__init__` already walks its modules; this walks them again so the
+# comparison does not depend on it: to compare with the script the metadata must
+# be COMPLETE — otherwise the test passes precisely when a new model was
+# forgotten, which is the case it exists to catch.
 for _mod in pkgutil.iter_modules(app.models.__path__):
     importlib.import_module(f"app.models.{_mod.name}")
 

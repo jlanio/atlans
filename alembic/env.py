@@ -23,21 +23,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 load_dotenv()
 
-# Import Base and all models so the metadata is populated
+# Base and EVERY model, so the metadata is complete: the package imports each
+# of its modules (and the extensions' models). A list here left eight tables
+# out, and autogenerate proposed dropping them.
+import app.models  # noqa: F401, E402
 from app.models.base import Base  # noqa: E402
-from app.models import (  # noqa: F401, E402
-    models,
-    user,
-    workspace,
-    credential,
-    system_config,
-    workspace_member,
-    artifact,
-    executor,
-    workspace_executor,
-    api_token,
-    conversa,
-)
 
 config = context.config
 
