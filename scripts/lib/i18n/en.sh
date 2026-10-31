@@ -151,6 +151,8 @@ M_net_none_free='No free /16 range in 172.16.0.0/12 for proxy-net.'
 M_net_none_free_hint='Set PROXY_NET_SUBNET in .env, with TRUSTED_PROXIES covering it.'
 M_net_chosen='Free range for proxy-net: %s (saved in .env).'
 M_net_trusted='TRUSTED_PROXIES=%s does not cover proxy-net (%s): executors will get 401. Add the range in .env.'
+M_net_traefik_ip='Traefik on the fixed IP %s in proxy-net (TRAEFIK_IP in .env): only it may present the executor certificate to the API.'
+M_net_traefik_ip_outside='TRAEFIK_IP=%s is outside proxy-net (%s): Traefik will not start. Fix or remove TRAEFIK_IP in .env.'
 
 M_pending_database='the database (DATABASE_URL) in .env'
 M_pending_minio='MINIO_ROOT_USER is still change-me in .env'

@@ -107,12 +107,19 @@ x-api-env: &api-env
   AGENDAMENTO_FUSO_PADRAO: ${AGENDAMENTO_FUSO_PADRAO:-}
   EMAIL_VERIFY_TOKEN_TTL: ${EMAIL_VERIFY_TOKEN_TTL:-1440}
   PASSWORD_RESET_TOKEN_TTL: ${PASSWORD_RESET_TOKEN_TTL:-30}
-  # Traefik network: trusted origin for X-Forwarded-Tls-Client-Cert-Info
-  # (executor mTLS identity) and X-Forwarded-For (rate limit key).
+  # Trusted origin for X-Forwarded-For (rate limit key): Traefik AND the web
+  # container, whose /terra proxy forwards the client's XFF to the API.
   # Not to be confused with EDGE_PROXIES (Cloudflare, which APPENDS the client
   # to XFF): it is not passed here on purpose — the app default is already the
   # Cloudflare list. See .env.example and app/core/trusted_proxy.py.
   TRUSTED_PROXIES: ${TRUSTED_PROXIES:-172.16.0.0/12}
+  # The only origin of X-Forwarded-Tls-Client-Cert-Info (the executor's mTLS
+  # identity): Traefik's fixed IP (TRAEFIK_IP, below in the traefik service),
+  # never a range — 172.16.0.0/12 covers every container on these networks,
+  # the web and MinIO included, and any of them could present the header.
+  # Without TRAEFIK_IP (installations from before it), TRUSTED_PROXIES as
+  # before; `make bootstrap` sets it when it creates proxy-net.
+  MTLS_PROXIES: ${MTLS_PROXIES:-${TRAEFIK_IP:-${TRUSTED_PROXIES:-172.16.0.0/12}}}
   # ── mTLS + step-ca + OTP de enrollment ───────────────────────────────────
   STEPCA_URL: ${STEPCA_URL:-https://step-ca:9000}
   STEPCA_PROVISIONER_NAME: ${STEPCA_PROVISIONER_NAME:-atlans-app}
@@ -204,6 +211,9 @@ services:
       # traefik-dev, published on the loopback (profile executor-local, below).
       # AGENTS_URL in .env still wins.
       AGENTS_URL: ${AGENTS_URL:-https://${EXECUTOR_LOCAL_HOST:-agents.localhost}:${EXECUTOR_LOCAL_PORT:-8443}}
+      # traefik-dev has no fixed IP (TRAEFIK_IP is production Traefik's): in dev
+      # the mTLS header keeps coming from the TRUSTED_PROXIES range.
+      MTLS_PROXIES: ${MTLS_PROXIES:-${TRUSTED_PROXIES:-172.16.0.0/12}}
     # A Postgres on the host itself is `host.docker.internal` in DATABASE_URL
     # (`localhost` inside the container is the container); on Linux the name
     # only exists with this extra_hosts, as in api-prod.
@@ -228,8 +238,8 @@ services:
       - backend
       - dev-net
       # step-ca-dev and traefik-dev live here (profile executor-local). The
-      # range is inside TRUSTED_PROXIES, which is what lets the API accept the
-      # mTLS header from traefik-dev.
+      # range is inside MTLS_PROXIES (above), which is what lets the API accept
+      # the mTLS header from traefik-dev.
       - proxy-net
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ping')"]
@@ -659,7 +669,14 @@ services:
           cpus: "0.5"
           memory: 256M
     networks:
-      - proxy-net
+      proxy-net:
+        # TRAEFIK_IP: a fixed address inside proxy-net, the only one the API
+        # accepts the executors' mTLS identity header from (MTLS_PROXIES, in
+        # x-api-env). `make bootstrap` picks the last address of the range
+        # when it creates the network (a new installation); empty = an address
+        # Docker hands out, and the header is trusted from TRUSTED_PROXIES as
+        # before. It has to be inside PROXY_NET_SUBNET, or Traefik does not start.
+        ipv4_address: ${TRAEFIK_IP:-}
 
   api-prod:
     profiles: ["prod"]
@@ -955,8 +972,8 @@ networks:
     driver: bridge
     name: proxy-net   # nome fixo — sem prefixo do projeto (necessário para Traefik)
     # Fixed subnet: TRUSTED_PROXIES points to this range (it is where Traefik's
-    # requests to the API come from, and it is what authorizes the mTLS cert
-    # header). Without pinning it, a network recreation may get another range
+    # requests to the API come from), and Traefik's fixed IP (TRAEFIK_IP) lives
+    # in it. Without pinning it, a network recreation may get another range
     # from Docker and all executors start getting 401.
     # Only takes effect when the network is created — on an existing network
     # Docker ignores it.

@@ -536,11 +536,25 @@ fi
 # The compose default stays 172.18: compose recreates a network whose range
 # changed, and a new default would move proxy-net on servers already running.
 ui_stage network
+# >>> faixas_ipv4 (tests/unit/test_ip_fixo_do_traefik.py runs these functions)
 ip2int() {
     local IFS=.
     # shellcheck disable=SC2086
     set -- $1
     echo $(( ($1 << 24) | ($2 << 16) | ($3 << 8) | $4 ))
+}
+int2ip() {
+    echo "$(( ($1 >> 24) & 255 )).$(( ($1 >> 16) & 255 )).$(( ($1 >> 8) & 255 )).$(( $1 & 255 ))"
+}
+# last_usable CIDR: the highest host address of an IPv4 range (/30 or wider).
+# Docker hands out addresses from the bottom of the range: the top one stays
+# free for a fixed IP.
+last_usable() {
+    local net="${1%/*}" len="${1#*/}" mask
+    case "$len" in ''|*[!0-9]*) return 1 ;; esac
+    [ "$len" -le 30 ] || return 1
+    mask=$(( (0xFFFFFFFF << (32 - len)) & 0xFFFFFFFF ))
+    int2ip $(( ($(ip2int "$net") & mask) + (1 << (32 - len)) - 2 ))
 }
 # cidr_overlap A B: true when the IPv4 ranges A and B share any address.
 cidr_overlap() {
@@ -558,6 +572,7 @@ cidr_contains() {
     [ "$li" = "$2" ] && li=32
     [ "$lo" -le "$li" ] && cidr_overlap "$1" "$2"
 }
+# <<< faixas_ipv4
 # IPv4 ranges already in use: Docker networks (except proxy-net itself) and,
 # on Linux, the host routes (VPN, the WSL network, the LAN).
 used_ranges() {
@@ -629,7 +644,24 @@ else
     fi
 fi
 
-# The API only accepts the mTLS cert header from TRUSTED_PROXIES: proxy-net must be inside it.
+# Traefik's fixed IP (TRAEFIK_IP): the only peer the API accepts the executors'
+# mTLS identity header from (MTLS_PROXIES in docker-compose.yml) — not the whole
+# Docker range, where the web and MinIO containers also live. Only when
+# proxy-net does not exist yet: Docker refuses a fixed IP on a network created
+# without a declared range, as a proxy-net older than PROXY_NET_SUBNET may be.
+# An existing installation turns it on by hand (docs/self-hosting.md).
+TRAEFIK_IP_ENV="$(env_get TRAEFIK_IP)"
+if [ -z "$TRAEFIK_IP_ENV" ] && [ -z "$PROXY_SUBNET_ATUAL" ] \
+        && TRAEFIK_IP_NOVO="$(last_usable "$PROXY_SUBNET_FINAL")"; then
+    upsert_env .env TRAEFIK_IP "$TRAEFIK_IP_NOVO"
+    ui_ok "$(t net_traefik_ip "$TRAEFIK_IP_NOVO")"
+elif [ -n "$TRAEFIK_IP_ENV" ] && is_ipv4_cidr "$PROXY_SUBNET_FINAL" && is_ipv4_cidr "$TRAEFIK_IP_ENV" \
+        && ! cidr_contains "$PROXY_SUBNET_FINAL" "$TRAEFIK_IP_ENV/32"; then
+    ui_warn "$(t net_traefik_ip_outside "$TRAEFIK_IP_ENV" "$PROXY_SUBNET_FINAL")"
+fi
+
+# The API only reads X-Forwarded-For from TRUSTED_PROXIES (and, without
+# TRAEFIK_IP, the mTLS cert header too): proxy-net must be inside it.
 TRUSTED_ENV="$(env_get TRUSTED_PROXIES)"
 if [ -n "$TRUSTED_ENV" ] && is_ipv4_cidr "$PROXY_SUBNET_FINAL"; then
     COBERTO=false

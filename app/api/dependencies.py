@@ -377,9 +377,11 @@ def assert_request_from_trusted_proxy(client_host: str | None, path: str) -> Non
     (layer 1 is the `strip-executor-cert-header@file` middleware in Traefik).
     Needed because Traefik's `passTLSClientCert` only overwrites the
     header when there is a client cert — it never removes a header already present.
+    The peer has to be in MTLS_PROXIES (Traefik alone, in the compose file), not
+    merely in TRUSTED_PROXIES: the web container is there too, for the XFF.
     """
-    from app.core.trusted_proxy import is_trusted_proxy
-    if is_trusted_proxy(client_host):
+    from app.core.trusted_proxy import is_mtls_proxy
+    if is_mtls_proxy(client_host):
         return
     from app.core.utils.logger import get_logger as _gl
     _gl("app.api.dependencies.mtls").warning(
