@@ -417,15 +417,27 @@ describe("recuperação do stream de execução", () => {
     act(() => { ws.onopen?.() })
     expect(ws.enviados).toEqual(["TOKEN-DO-ANEXO"])
 
-    getSession.mockResolvedValue({ user: { access_token: "TOKEN-RENOVADO" } })
-    vi.useFakeTimers()
-    await act(async () => { ws.cairDoServidor(4401) })
-    await act(async () => { await vi.advanceTimersByTimeAsync(1_100) })
+    // A plain fetch of /api/auth/session — not getSession, which broadcasts and,
+    // failing during the outage, would turn the tab anonymous.
+    const buscas: string[] = []
+    const fetchOriginal = globalThis.fetch
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {
+      buscas.push(String(url))
+      return new Response(JSON.stringify({ user: { access_token: "TOKEN-RENOVADO" } }), { status: 200 })
+    }) as typeof fetch
+    try {
+      vi.useFakeTimers()
+      await act(async () => { ws.cairDoServidor(4401) })
+      await act(async () => { await vi.advanceTimersByTimeAsync(1_100) })
 
-    const ws2 = FakeSocket.abertos[1]
-    act(() => { ws2.onopen?.() })
-    expect(getSession).toHaveBeenCalled()
-    expect(ws2.enviados).toEqual(["TOKEN-RENOVADO"])
+      const ws2 = FakeSocket.abertos[1]
+      act(() => { ws2.onopen?.() })
+      expect(buscas).toContain("/api/auth/session")
+      expect(getSession).not.toHaveBeenCalled()
+      expect(ws2.enviados).toEqual(["TOKEN-RENOVADO"])
+    } finally {
+      globalThis.fetch = fetchOriginal
+    }
     view.unmount()
   })
 
@@ -503,6 +515,51 @@ describe("recuperação do stream de execução", () => {
     act(() => { runPendingFrames() })
 
     expect(useWorkflowExecutionStore.getState().events).toHaveLength(4)
+    view.unmount()
+  })
+
+  it("um primeiro lote mais novo que o painel não é replay: o log fica", async () => {
+    // The server's history expired (or was lost): the reconnect delivers only
+    // live events. Clearing then wiped the whole log for a handful of lines.
+    const store = useWorkflowExecutionStore.getState()
+    store.startExecution(canvasNodes.map(n => ({ ...n, status: "idle" })) as unknown as INodeStatusWorkFlow[])
+    store.setTaskId(RUN)
+    store.appendEvents(historico.map(toRunEvent))
+
+    const { view, ws } = await anexar()
+    const ao_vivo = { node: "n2", status: "log", kind: "stdout", extra: { lines: ["z"] }, timestamp: 9 }
+    act(() => { ws.onmessage?.(quadro([ao_vivo])) })
+    act(() => { runPendingFrames() })
+
+    const estado = useWorkflowExecutionStore.getState()
+    expect(estado.events).toHaveLength(5)
+    expect(estado.events.flatMap(e => e.lines ?? [])).toEqual(["a", "b", "z"])
+    view.unmount()
+  })
+
+  it("o replay de um run longo mantém o início e os grupos de subfluxo", async () => {
+    // The server keeps only the last 5000 events: a long run's replay no longer
+    // carries the start or the sub-workflow's first events.
+    const store = useWorkflowExecutionStore.getState()
+    store.startExecution(canvasNodes.map(n => ({ ...n, status: "idle" })) as unknown as INodeStatusWorkFlow[])
+    store.setTaskId(RUN)
+    store.appendEvents([
+      { node: "sub", status: "started", kind: "lifecycle", timestamp: 1, extra: { subworkflow_parent_node: "n1" } },
+      ...historico.slice(1),
+    ].map(toRunEvent))
+    const antes = useWorkflowExecutionStore.getState()
+    expect(antes.runStartedTs).toBe(1_000)
+    expect(antes.subflowRoots.has("n1")).toBe(true)
+
+    const { view, ws } = await anexar()
+    // The replay starts at timestamp 3: the first two aged out of the history.
+    act(() => { ws.onmessage?.(quadro(historico.slice(2))) })
+    act(() => { runPendingFrames() })
+
+    const estado = useWorkflowExecutionStore.getState()
+    expect(estado.events).toHaveLength(2)
+    expect(estado.runStartedTs).toBe(1_000)
+    expect(estado.subflowRoots.has("n1")).toBe(true)
     view.unmount()
   })
 

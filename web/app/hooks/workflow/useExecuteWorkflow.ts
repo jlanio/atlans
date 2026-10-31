@@ -1,7 +1,7 @@
 import { useParams } from "next/navigation"
 import { useSaveWorkflow, type SaveSkipReason } from "./useSaveWorkflow"
 import { useEffect, useRef } from "react"
-import { getSession, useSession } from "next-auth/react"
+import { useSession } from "next-auth/react"
 import { INodeContext, INodeStatusWorkFlow, StatusWorkflow } from "@/context/useFlowContext"
 import { createToast } from "@/utils/createToast"
 import { dayjs } from "@/lib/dayjs"
@@ -234,12 +234,17 @@ export const useExecuteWorkflow = () => {
    *
    *  The drop being recovered may BE the server refusing an expired token
    *  (4401), and in a tab that keeps focus SessionProvider may not have
-   *  refetched yet. `getSession` goes through /api/auth/session, where the jwt
-   *  callback refreshes an expired access token. Best effort: on failure the
-   *  current token goes, and the next attempt tries again. */
+   *  refetched yet. /api/auth/session runs the jwt callback, which refreshes an
+   *  expired access token. A plain fetch, NOT `getSession`: that one broadcasts
+   *  to every tab, and a session fetch failing during the very outage that
+   *  dropped the socket turned the tab anonymous (next-auth sets the session to
+   *  null and stops refetching). Best effort: on any failure the current token
+   *  goes, and the next attempt tries again. */
   async function refreshAccessToken() {
     try {
-      const fresca = await getSession()
+      const resposta = await fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store" })
+      if (!resposta.ok) return
+      const fresca = (await resposta.json()) as { user?: { access_token?: string } } | null
       const token = fresca?.user?.access_token
       if (token) accessTokenRef.current = token
     } catch {
@@ -633,13 +638,25 @@ export const useExecuteWorkflow = () => {
 
     // First content on this socket = the start of the server's replay. Clears
     // the log it is about to redeliver (events, rotation and server discard
-    // counts, run start, sub-workflow roots, outcome — all derived from the
-    // events) before anything of the replay is counted, so nothing of it is
-    // wiped either. Node states stay: see `replayReplacesLog`.
-    function startReplay() {
+    // counts, outcome) before anything of the replay is counted, so nothing of
+    // it is wiped either. The run's start and the sub-workflow groups are kept:
+    // the server keeps only the last 5000 events, so a long run's replay no
+    // longer carries them. Node states stay: see `replayReplacesLog`.
+    //
+    // Only when the batch really REPEATS what the panel has: a first batch that
+    // starts after the newest event already shown is not a replay (the server's
+    // history expired or was lost) — clearing then would wipe the whole log for
+    // a handful of live lines.
+    function startReplay(eventos: RawEvent[]) {
       if (!replayReplacesLog) return
       replayReplacesLog = false
-      useWorkflowExecutionStore.getState().clearEvents()
+      const estado = useWorkflowExecutionStore.getState()
+      const primeiro = eventos[0]?.timestamp
+      const ultimoMostrado = estado.events[estado.events.length - 1]?.ts
+      if (typeof primeiro === "number" && typeof ultimoMostrado === "number" && primeiro * 1000 > ultimoMostrado) {
+        return
+      }
+      estado.restartLogForReplay()
     }
 
     ws.onmessage = (event) => {
@@ -658,9 +675,9 @@ export const useExecuteWorkflow = () => {
         frame = JSON.parse(event.data)
       } catch (err) {
         console.error("[ws/workflow] frame ilegível — lote descartado", err)
-        // Only a batch with content can be corrupted (a heartbeat is a fixed
-        // empty frame), so this one may be the replay's first.
-        startReplay()
+        // Not a decision point for the replay: with nothing readable there is
+        // no telling whether it repeats the log, and wiping it on a corrupted
+        // frame would lose more than it saves. The next readable batch decides.
         // Counts it as a visible loss: the "Bruto" (raw) tab shows the warning instead
         // of the log looking complete.
         useWorkflowExecutionStore.getState().registrarDescartados(1)
@@ -679,7 +696,7 @@ export const useExecuteWorkflow = () => {
       const eventos: RawEvent[] = Array.isArray(frame?.events) ? frame.events : []
 
       // Before the `dropped` below: it belongs to the new log.
-      if (eventos.length > 0) startReplay()
+      if (eventos.length > 0) startReplay(eventos)
 
       // SERVER back-pressure (the 500-slot buffer evicts old stdout).
       // Without adding this up, the "Bruto" tab drops the warning and the user

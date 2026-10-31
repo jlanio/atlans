@@ -57,20 +57,17 @@ describe("SessionSync no cliente", () => {
   })
 })
 
-describe("Providers: a sessão do cliente não envelhece numa aba com foco", () => {
-  it("refaz a sessão periodicamente, em SEGUNDOS e bem abaixo do TTL do access token", () => {
-    // Without a refetchInterval next-auth only refetches on visibilitychange: a
-    // tab that kept focus held an expired token past the API's 30 min, and the
-    // run WebSocket — which authenticates with that browser copy — got 4401.
+describe("Providers: a sessão do cliente não vira anônima por um fetch que falhou", () => {
+  it("não refaz a sessão por intervalo (um poll que falha deixa a aba anônima)", () => {
+    // In next-auth 5 one failed /api/auth/session sets the session to null and
+    // stops refetching. The run socket fetches its own fresh token before a
+    // reconnect, so no periodic poll is needed.
     provedor.props = null
     renderToString(<Providers session={null}>{null}</Providers>)
     // Written by the SessionProvider double during the render above.
     const props = provedor.props as Record<string, unknown> | null
 
-    const intervalo = props?.refetchInterval as number
-    expect(intervalo).toBeGreaterThan(0)
-    // next-auth multiplies by 1000: a value in ms would mean days.
-    expect(intervalo * 1000).toBeLessThan(29 * 60 * 1000) // ACCESS_TTL_MS in auth.ts
+    expect(props?.refetchInterval).toBeUndefined()
     // The focus refetch stays on (next-auth's default).
     expect(props?.refetchOnWindowFocus).not.toBe(false)
   })
