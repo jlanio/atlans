@@ -177,6 +177,35 @@ describe("proxy /terra — endurecimento (auditoria)", () => {
     expect(fetchMock).toHaveBeenCalled()
   })
 
+  // `same-site` is a sibling subdomain (or the other scheme): another origin, and
+  // the one case SameSite=Lax does not cover — the browser sends the session
+  // cookie along. It used to be trusted like same-origin.
+  it("POST same-site de um subdomínio irmão é bloqueado com 403", async () => {
+    decodeMock.mockReturnValue({ user: { access_token: "T" } })
+    const res = await POST(
+      post("workflows", { "sec-fetch-site": "same-site", origin: "https://blog.example.org", host: "atlans.example.org" }),
+      ctx(["workflows"]),
+    )
+    expect(res.status).toBe(403)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("POST same-site cuja Origin é o próprio host passa (cai na comparação de Origin)", async () => {
+    // e.g. the http:// page of the same host: same-site, not same-origin.
+    decodeMock.mockReturnValue({ user: { access_token: "T" } })
+    const res = await POST(
+      post("workflows", { "sec-fetch-site": "same-site", origin: "http://atlans.example.org", host: "atlans.example.org" }),
+      ctx(["workflows"]),
+    )
+    expect(res.status).toBe(200)
+  })
+
+  it("POST com Sec-Fetch-Site: none (iniciado pelo usuário) passa", async () => {
+    decodeMock.mockReturnValue({ user: { access_token: "T" } })
+    const res = await POST(post("workflows", { "sec-fetch-site": "none", host: "atlans.example.org" }), ctx(["workflows"]))
+    expect(res.status).toBe(200)
+  })
+
   it("path público autenticado pela sessão também passa pelo CSRF", async () => {
     // Now that the session's token goes to public paths, another page could
     // create or revoke an API token as the user without this check.

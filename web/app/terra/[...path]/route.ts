@@ -72,7 +72,15 @@ function csrfBlocked(req: NextRequest): boolean {
   if (secFetchSite === "cross-site") return true
   // Modern browsers assert same-origin: trust it and avoid comparing Host
   // (which a proxy may rewrite), while still blocking cross-site above.
-  if (secFetchSite === "same-origin" || secFetchSite === "same-site") return false
+  // `none` is a request the user started (address bar, bookmark): no other
+  // page made it.
+  //
+  // `same-site` is NOT trusted outright: it is a sibling subdomain (or the other
+  // scheme) — another origin, and precisely the one case SameSite=Lax does not
+  // cover, since the browser sends the session cookie along. A page on any
+  // subdomain of the site could post here as the user. It falls through to the
+  // Origin comparison like a request without the header.
+  if (secFetchSite === "same-origin" || secFetchSite === "none") return false
   const origin = req.headers.get("origin")
   if (origin) {
     try {
