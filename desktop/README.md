@@ -116,7 +116,7 @@ dependency — everything uses the Node 20 stdlib and Windows' own `tar`.
 | `scripts/fetch-python.mjs` | Downloads the asset described in `python-runtime.json`, **checks the SHA-256** and extracts it. Idempotent — that is what makes the CI cache useful. |
 | `scripts/build-python-runtime.mjs` | `pip install --require-hashes` from the executor's lock ([`executor/requirements-full.txt`](../executor/requirements-full.txt)), pruning measured step by step, `compileall`, and writes `resources/payload.json`. |
 | `scripts/check-lock.mjs` | `npm run python:lock:check` (runs in CI): installs the executor's lock into a clean Windows CPython, with hashes and wheels only, and runs `pip check`. |
-| `scripts/payload-stage.mjs` | Copies `executor/` and `flow/` in deterministic order, excluding `.env`, `certs/` and `__pycache__`. |
+| `scripts/payload-stage.mjs` | Copies `executor/` and `flow/` in deterministic order, excluding developer secrets at any depth (`.env*` except `.env.example`, `*.pem/key/p12/pfx`, `cert(s)/`, `executor-certs/` — see `scripts/segredos.mjs`) and `__pycache__`, then fails the build if any of them made it into `resources/`. |
 | `scripts/smoke-python.mjs` + `smoke.py` | 12 steps that prove the bundle imports and works. |
 
 ### Three decisions that are not obvious
