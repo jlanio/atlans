@@ -405,6 +405,24 @@ describe('comandos', () => {
     const { sup } = criar()
     expect(sup.enviar({ cmd: 'ping' })).toBe(false)
   })
+
+  it('pipe quebrado vira linha de log, e não exceção no main', async () => {
+    // A command written while Python is exiting fails ASYNCHRONOUSLY (EPIPE),
+    // as an 'error' on stdin — out of reach of the try/catch. Unhandled, it
+    // was an uncaught exception in the main process. vitest fails the run on
+    // an unhandled error, so getting here clean is part of the assertion.
+    const { sup, procs } = criar()
+    const linhas: string[] = []
+    sup.on('linha', (t) => linhas.push(t))
+    sup.start()
+    procs[0]!.stdin._transform = (_c, _e, cb) => cb(new Error('write EPIPE'))
+
+    expect(sup.enviar({ cmd: 'ping' })).toBe(true)
+    await tick()
+
+    expect(linhas.some((l) => l.includes('"ping"') && l.includes('EPIPE'))).toBe(true)
+    expect(linhas.some((l) => l.includes('stdin do executor') && l.includes('EPIPE'))).toBe(true)
+  })
 })
 
 describe('streams', () => {

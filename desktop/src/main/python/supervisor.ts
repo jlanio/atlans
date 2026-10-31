@@ -158,6 +158,14 @@ export class PythonSupervisor extends EventEmitter {
     proc.stdout.on('data', (c: string) => parser.push(c))
     proc.stderr.setEncoding('utf8')
     proc.stderr.on('data', (c: string) => stderr.push(c))
+    // A write to a process that is already going away fails ASYNCHRONOUSLY
+    // (EPIPE, or ERROR_NO_DATA on Windows), as an 'error' on the stream — the
+    // try/catch in `enviar` never sees it. Without a listener it becomes an
+    // uncaught exception in main, the "JavaScript error in the main process"
+    // dialog, for a command that simply arrived too late.
+    proc.stdin.on('error', (err) => {
+      this.emit('linha', `[supervisor] stdin do executor: ${err.message}`, 'stderr')
+    })
 
     // Finalization runs ONCE per process, on `close` and not on `exit`: Node
     // fires `exit` while stdout may still hold the executor's last lines, and
@@ -323,7 +331,11 @@ export class PythonSupervisor extends EventEmitter {
     const proc = this.proc
     if (!proc || proc.stdin.destroyed || !proc.stdin.writable) return false
     try {
-      proc.stdin.write(JSON.stringify(cmd) + '\n')
+      // `true` means "queued", not "delivered": the pipe can still break before
+      // Python reads it. The callback is where that shows up.
+      proc.stdin.write(JSON.stringify(cmd) + '\n', (err) => {
+        if (err) this.emit('linha', `[supervisor] comando "${cmd.cmd}" nao chegou ao executor: ${err.message}`, 'stderr')
+      })
       return true
     } catch {
       return false

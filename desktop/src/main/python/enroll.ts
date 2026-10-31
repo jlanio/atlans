@@ -93,6 +93,11 @@ export function enrolar(pedido: EnrollRequest): Promise<EnrollResult> {
     proc.stdout.on('data', (c: string) => { saida += c })
     proc.stderr.setEncoding('utf8')
     proc.stderr.on('data', (c: string) => { erro += c })
+    // Writing the OTP to a process that died at startup (or never started)
+    // fails asynchronously, as an 'error' on stdin; without a listener that is
+    // an uncaught exception in main. The reason joins the stderr text, which is
+    // what the user sees if no result comes out.
+    proc.stdin.on('error', (e) => { erro += `\n[app] stdin do enrollment: ${e.message}` })
 
     proc.on('error', (e) => finish({
       ok: false, codigo: 'enroll_recusado',
