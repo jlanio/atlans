@@ -81,6 +81,7 @@ const pt = {
     decidido: "Decidido.",
     semSaida: "Esta ação já foi decidida ou expirou.",
     prazo: "Vale por 15 minutos.",
+    efeitos: (lista: string) => `Age fora da plataforma: ${lista}`,
     sim: "sim",
     nao: "não",
     /** The labels of the arguments that describe the action's TARGET, by key. */
@@ -317,6 +318,7 @@ export const en: typeof pt = {
     decidido: "Decided.",
     semSaida: "This action was already decided or has expired.",
     prazo: "Valid for 15 minutes.",
+    efeitos: (lista: string) => `Acts outside the platform: ${lista}`,
     sim: "yes",
     nao: "no",
     campos: {
@@ -537,6 +539,7 @@ export const es: typeof pt = {
     decidido: "Decidido.",
     semSaida: "Esta acción ya se decidió o expiró.",
     prazo: "Válido por 15 minutos.",
+    efeitos: (lista: string) => `Actúa fuera de la plataforma: ${lista}`,
     sim: "sí",
     nao: "no",
     campos: {

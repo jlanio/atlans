@@ -396,15 +396,11 @@ async def _reopened_confirmation(
     guardado = await read_confirmation(redis, user_id, conversa_id, tool_use_id)
     if not guardado:
         return None
-    args = guardado.get("args")
     return {
         "tool_use_id": tool_use_id,
         "token": guardado.get("token"),
-        "acao": {
-            "tool": guardado.get("tool"),
-            "argumentos": cs._summarize(args),
-            "alvo": ag._target(args),
-        },
+        # The same card the loop emitted (tool, arguments, target, acting nodes).
+        "acao": ag._card_action(guardado.get("tool"), guardado.get("args")),
     }
 
 
@@ -466,6 +462,21 @@ async def replay_frames(
                     {"tipo": "ferramenta", "dados": {"id": tuid, "nome": nome, "argumentos": cs._summarize(args)}}
                 )
                 resultado = resultados.get(tuid)
+                # A call waiting for the click HAS a tool_result: the loop records
+                # the gate's "aguardando" verdict (non-error, on purpose) like any
+                # other result. While its Redis key lives, the replay reopens the
+                # card instead of closing the call; once decided or expired, it is
+                # closed like any other.
+                aguardando = (
+                    resultado is not None
+                    and not resultado[1]
+                    and resultado[0] == ag.AWAITING_MESSAGE
+                )
+                if aguardando:
+                    reaberta = await _reopened_confirmation(redis, user_id, conversa_id, tuid)
+                    if reaberta is not None:
+                        quadros.append({"tipo": "confirmacao", "dados": reaberta})
+                        continue
                 if resultado is not None:
                     result_text, had_error = resultado
                     quadros.append(

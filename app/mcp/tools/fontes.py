@@ -26,14 +26,18 @@ Four decisions shape the module:
   same yardstick as Drive) and is born in `ESCRITAS_SEM_CLIQUE` on Home and in
   `ESCREVEM_MAS_PASSAM` in the editor: registering is cheap and reversible,
   and asking for a click for every new source would bring back the cost the
-  catalog came to remove.
+  catalog came to remove. On Home, a URL that is NOT in the catalog yet asks
+  for the click (probe and register alike): that request goes to a host and
+  path the model chose.
 - **What the model pastes is what the node declares.** `node_snippet` carries
   only the properties `WFSNode` knows today (`fontes_service.node_snippet`);
   `version` stays in the catalog until the node declares it.
 - **Human-written text goes down in `untrusted_data`.** Title, description,
   hints and tags are written by people (in the Vault or in `register_source`);
   URL, typeName, columns and CRS stay at the top, sanitized, like the Drive
-  columns in `list_drive_files` — the model needs to copy them.
+  columns in `list_drive_files` — the model needs to copy them. The exception
+  is `probe_source`: there the layer name (and the snippet carrying it) comes
+  straight from a server nobody vetted yet, so it goes in `untrusted_data`.
 """
 from __future__ import annotations
 
@@ -377,10 +381,14 @@ async def probe_source(
         return envelope(dados, layers=camadas)
 
     dados["outcome"] = "layer_described"
-    dados["layer"] = sondagem.camada.name
     dados["schema"] = _summarized_schema(sondagem.esquema)
     dados["catalog"] = in_catalog
-    dados["node_snippet"] = sanitize({
+    if in_catalog is None:
+        dados["hint"] = "fonte fora do catálogo: register_source(url, type_name) a guarda para a próxima vez"
+    # The layer's Name is text the probed server wrote, like its title: it goes
+    # in `untrusted_data` — and so does the snippet that carries it as typeName.
+    # The top level keeps what this server produced (ids, enums, numbers).
+    node_snippet = {
         "name": fontes_service.NO_WFS,
         "type": "datasource",
         "properties": {
@@ -388,10 +396,9 @@ async def probe_source(
                 "url": endereco, "typeName": sondagem.camada.name, "sortBy": _sort_by(sondagem.esquema),
             }.items() if v
         },
-    })
-    if in_catalog is None:
-        dados["hint"] = "fonte fora do catálogo: register_source(url, type_name) a guarda para a próxima vez"
-    return envelope(dados, title=sondagem.camada.title, description=sondagem.camada.abstract,
+    }
+    return envelope(dados, layer=sondagem.camada.name, node_snippet=node_snippet,
+                    title=sondagem.camada.title, description=sondagem.camada.abstract,
                     keywords=list(sondagem.camada.keywords) or None)
 
 

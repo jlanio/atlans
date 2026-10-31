@@ -36,6 +36,20 @@ describe("aplicarQuadro — quadros da Home", () => {
     })
   })
 
+  it("confirmacao traz os nós que agem fora (efeitos), só os textos válidos", () => {
+    const t = aplicarQuadro(emptyTurn("t"), {
+      evento: "confirmacao",
+      dados: {
+        tool_use_id: "tu2", token: "TOK",
+        acao: { tool: "create_workflow", argumentos: {}, efeitos: ["SendEmail (n4)", 7, "", "SendWebhook (n5)"] },
+      },
+    })
+    const bloco = t.blocos[0]
+    expect(bloco.tipo).toBe("confirmacao")
+    if (bloco.tipo !== "confirmacao") return
+    expect(bloco.confirmacao.acao.efeitos).toEqual(["SendEmail (n4)", "SendWebhook (n5)"])
+  })
+
   it("respostas_rapidas vira um bloco com as opções limpas: sem pontas, sem repetida, três no máximo", () => {
     const t = aplicarQuadro(emptyTurn("t"), {
       evento: "respostas_rapidas",

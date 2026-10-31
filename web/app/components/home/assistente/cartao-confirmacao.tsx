@@ -115,6 +115,12 @@ export default function ConfirmationCard({ confirmacao, decidido, expirado = fal
         acao.alvo && <p className="mt-0.5 break-words text-xs text-amber-400/70">{acao.alvo}</p>
       )}
 
+      {acao.efeitos && acao.efeitos.length > 0 && (
+        <p className="mt-1 break-words text-xs font-medium text-amber-300">
+          {t.efeitos(acao.efeitos.join(", "))}
+        </p>
+      )}
+
       <div className="mt-2 flex gap-2 max-md:gap-3">
         <Button
           size="sm"
