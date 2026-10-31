@@ -438,8 +438,8 @@ function handleDeepLink(bruta: string): void {
 }
 
 app.whenReady().then(() => {
-  // Before ensureDirectories: the migration only happens while the new folder
-  // does not exist yet.
+  // Before ensureDirectories: the migration only happens while the new
+  // config/ and certs/ do not exist yet.
   const migrado = migrateLegacyData()
   ensureDirectories()
   if (migrado) {

@@ -100,25 +100,45 @@ export const LOG_DIR = path.join(USER_DATA, 'logs')
 export const ARTIFACTS_DIR_PADRAO = path.join(app.getPath('home'), 'AtlansExecutor', 'artifacts')
 
 /**
+ * What the migration carries over. The rest of an old folder is Chromium's
+ * (cache, Preferences, Local Storage), which rebuilds itself.
+ */
+const SUBPASTAS_MIGRADAS = ['config', 'certs', 'logs']
+
+/**
  * Moves the data from a folder with an old name, if there is one. Idempotent.
  *
- * Runs before `ensureDirectories`: once the directories exist, the migration
- * becomes a no-op (it does not overwrite current data with the old data).
+ * Keyed on the app's OWN data (`config/`, `certs/`), not on the userData
+ * folder itself: Chromium creates that folder before `whenReady` (the
+ * single-instance lockfile, `Network/`, `Preferences`), and checking it made
+ * the migration a permanent no-op — the user lost the certificate the
+ * migration exists to keep. Each subtree moves on its own, and only into a
+ * slot that is still empty: current data is never overwritten by old data.
+ *
+ * Runs before `ensureDirectories`, which would create the markers.
  */
 export function migrateLegacyData(): string | null {
-  if (fs.existsSync(USER_DATA)) return null
+  if (fs.existsSync(CONFIG_DIR) || fs.existsSync(CERT_DIR)) return null
 
   const raiz = path.dirname(USER_DATA)
   for (const antigo of NOMES_ANTIGOS) {
     const origem = path.join(raiz, antigo)
     if (origem === USER_DATA || !fs.existsSync(origem)) continue
-    try {
-      fs.renameSync(origem, USER_DATA)
-      return antigo
-    } catch {
-      // Folder in use, or permissions. Not fatal: the app goes on with the new,
-      // empty folder and the user redoes the link.
+    let moveu = false
+    for (const sub of SUBPASTAS_MIGRADAS) {
+      const de = path.join(origem, sub)
+      const para = path.join(USER_DATA, sub)
+      if (!fs.existsSync(de) || fs.existsSync(para)) continue
+      try {
+        fs.mkdirSync(USER_DATA, { recursive: true })
+        fs.renameSync(de, para)
+        moveu = true
+      } catch {
+        // Folder in use, or permissions. Not fatal: the app goes on with the new,
+        // empty folder and the user redoes the link.
+      }
     }
+    if (moveu) return antigo
   }
   return null
 }
