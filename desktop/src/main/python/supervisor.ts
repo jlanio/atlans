@@ -45,7 +45,13 @@ export const TIMEOUT_SHUTDOWN_MS = 150_000
 export interface SupervisorOptions {
   pythonExe: string
   cwd: string
-  env: NodeJS.ProcessEnv
+  /**
+   * Environment of the executor. A factory is called on EVERY spawn: the
+   * values depend on the `.env` (the artifacts folder set in Ajustes), and a
+   * snapshot taken once at boot kept handing the restarted executor the old
+   * folder — python-dotenv does not override what the process env already has.
+   */
+  env: NodeJS.ProcessEnv | (() => NodeJS.ProcessEnv)
   /** Injectable for testing. */
   spawnFn?: typeof spawn
   agora?: () => number
@@ -108,11 +114,22 @@ export class PythonSupervisor extends EventEmitter {
     this.pareiDeProposito = false
     this.drenando = false
     this.cancelarBackoff()
+
+    // Resolved here, not in the constructor — see `SupervisorOptions.env`.
+    // A factory that throws (unreadable `.env`) must not escape: `start()` also
+    // runs from the backoff timer, where a throw is an uncaught exception in main.
+    let env: NodeJS.ProcessEnv
+    try {
+      env = typeof this.opcoes.env === 'function' ? this.opcoes.env() : this.opcoes.env
+    } catch (err) {
+      this.mudarEstado('failed', `nao foi possivel montar o ambiente do executor: ${(err as Error).message}`)
+      return
+    }
     this.mudarEstado('starting')
 
     const proc = this.spawnFn(this.opcoes.pythonExe, ['-X', 'utf8', '-m', 'executor'], {
       cwd: this.opcoes.cwd,
-      env: this.opcoes.env,
+      env,
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     }) as ChildProcessWithoutNullStreams

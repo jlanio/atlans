@@ -32,9 +32,9 @@ class FakeProc extends EventEmitter {
   }
 }
 
-function criar() {
+function criar(env: NodeJS.ProcessEnv | (() => NodeJS.ProcessEnv) = {}) {
   const procs: FakeProc[] = []
-  const spawnFn = vi.fn(() => {
+  const spawnFn = vi.fn((_exe: string, _args: string[], _opts: { env?: NodeJS.ProcessEnv }) => {
     const p = new FakeProc()
     procs.push(p)
     return p
@@ -43,7 +43,7 @@ function criar() {
   const sup = new PythonSupervisor({
     pythonExe: 'python',
     cwd: '.',
-    env: {},
+    env,
     spawnFn: spawnFn as never,
   })
   sup.on('estado', (e, d) => estados.push([e, d]))
@@ -84,6 +84,35 @@ describe('start', () => {
     procs[0]!.emit('error', new Error('ENOENT'))
     await tick()
     expect(sup.estado).toBe('failed')
+  })
+})
+
+describe('ambiente do spawn', () => {
+  it('relê o ambiente a cada spawn', async () => {
+    // The artifacts folder comes from the `.env`. Computed once at boot, the
+    // executor restarted after "Salvar" + "Reiniciar agora" kept receiving the
+    // old folder in its environment — which python-dotenv does not override.
+    let pasta = 'C:/antiga'
+    const { sup, procs, spawnFn } = criar(() => ({ EXECUTOR_ARTIFACTS_DIR: pasta }))
+    sup.start()
+    pasta = 'D:/nova'
+    const p = sup.restart()
+    await tick()
+    procs[0]!.sair(0)
+    await p
+
+    expect(spawnFn).toHaveBeenCalledTimes(2)
+    expect(spawnFn.mock.calls[0]![2].env?.EXECUTOR_ARTIFACTS_DIR).toBe('C:/antiga')
+    expect(spawnFn.mock.calls[1]![2].env?.EXECUTOR_ARTIFACTS_DIR).toBe('D:/nova')
+  })
+
+  it('falha ao montar o ambiente vira failed, sem lançar', () => {
+    // `start()` also runs from the backoff timer: a throw there would be an
+    // uncaught exception in the main process.
+    const { sup, spawnFn } = criar(() => { throw new Error('EACCES') })
+    expect(() => sup.start()).not.toThrow()
+    expect(sup.estado).toBe('failed')
+    expect(spawnFn).not.toHaveBeenCalled()
   })
 })
 

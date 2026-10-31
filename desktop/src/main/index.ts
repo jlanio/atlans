@@ -86,9 +86,10 @@ function createSupervisor(): PythonSupervisor {
   const sup = new PythonSupervisor({
     pythonExe: PYTHON_EXE,
     cwd: RESOURCES,
-    // Reads the `.env` on every spawn: setting the folder in Ajustes (Settings)
-    // and restarting the executor has to take effect without reopening the app.
-    env: ambienteDoSpawn(envDoExecutor(artifactsDirEfetivo(ARTIFACTS_DIR_PADRAO))),
+    // A factory, so the `.env` is read on every spawn: setting the folder in
+    // Ajustes (Settings) and restarting the executor has to take effect without
+    // reopening the app.
+    env: () => ambienteDoSpawn(envDoExecutor(artifactsDirEfetivo(ARTIFACTS_DIR_PADRAO))),
   })
 
   sup.on('estado', (estado, detalhe) => {
