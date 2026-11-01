@@ -30,9 +30,10 @@
 # Exit 0 = every step PASS; anything else = at least one FAIL (the summary at the
 # end says which).
 
-# The steps run as `("$fn")` and cleanup through `trap`: calls shellcheck >= 0.11
-# cannot see, so it reports every function as never invoked.
-# shellcheck disable=SC2329
+# The steps run as `("$fn")` and cleanup through `trap`: calls shellcheck cannot
+# see, so it reports every function as never invoked — SC2329 from 0.11 on, and
+# SC2317 ("unreachable") in the 0.9/0.10 of Ubuntu 24.04, which the CI runner uses.
+# shellcheck disable=SC2317,SC2329
 set -euo pipefail
 
 OLD_REF="${OLD_REF:-3bf789a}"
