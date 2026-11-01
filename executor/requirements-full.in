@@ -42,7 +42,7 @@ pyogrio==0.13.0
 # 2.5 and pandas 3.0 — a major version, with copy-on-write and the new string
 # dtype silently changing the nodes' behavior. Bumping each one is its own PR,
 # with the suite green. Same versions in requirements.in.
-numpy==2.5.3
+numpy==2.5.4
 pandas==2.3.3
 # Used by flow/executor/spill.py, pin.py and the GeoParquet nodes. Same
 # version in requirements.in.
