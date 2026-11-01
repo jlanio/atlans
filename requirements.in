@@ -12,18 +12,18 @@
 # Style: == (exact) instead of >= (loose). Reproducible builds +
 # updates reviewed in a PR, instead of surprise transitive patches.
 
-uvicorn[standard]==0.53.0
-fastapi==0.141.1
-websockets==17.1
+uvicorn[standard]==0.54.0
+fastapi==0.143.5
+websockets==17.2
 python-multipart==0.0.32
-pydantic==2.13.5
-sqlalchemy==2.0.54
-asyncpg==0.31.0
+pydantic==2.14.1
+sqlalchemy[asyncio]==2.1.5
+asyncpg==0.32.0
 psycopg2-binary==2.9.13
-python-dotenv==1.2.3
+python-dotenv==1.2.4
 httpx==0.28.1
 apscheduler==3.11.3
-geopandas==1.1.4
+geopandas==1.2.0
 # numpy, pandas and pyproj come in through geopandas. Pinned on the switch to Python
 # 3.12: on 3.10 the resolver stopped at numpy 2.2.x, pandas 2.3.x and pyproj 3.7.x,
 # because the following lines require 3.11+. Unpinned, 3.12 would bring numpy 2.5 and
@@ -46,7 +46,7 @@ pyarrow==25.0.1
 matplotlib==3.11.2
 redis==8.1.0
 croniter==6.2.4
-cachetools==7.2.0
+cachetools==7.2.3
 slowapi==0.1.10
 # slowapi's counting backend. Pinned because `RATE_LIMIT_STORAGE_URI`
 # (app/core/rate_limiter.py) now builds its Redis storage.
@@ -60,19 +60,19 @@ rich==15.0.0
 # executor/requirements-full.in: CI installs only the API lock.
 pathspec==1.1.1
 watchdog==6.0.0
-cryptography==50.0.1
+cryptography==50.0.2
 Jinja2==3.1.6
 jsonschema==4.26.0
 geoalchemy2==0.20.0
 
 # Auth JWT
-PyJWT==2.14.0
+PyJWT==2.15.1
 # Password hashing calls bcrypt directly (app/core/utils/jwt_utils.py, in the
 # bcrypt_sha256 scheme passlib used to define). The pre-key is 44 bytes, so
 # bcrypt versions 4 and 5 (which reject passwords over 72 bytes) work; the
 # tests/unit/test_hash_de_senha.py checks the real hash on each version.
 bcrypt==5.0.0
-pydantic[email]==2.13.5
+pydantic[email]==2.14.1
 
 # Geocodificacao
 geopy==2.5.0
@@ -85,11 +85,11 @@ aiosqlite==0.22.1
 python-dateutil==2.9.0.post0
 
 # MinIO/S3
-boto3==1.43.98
+boto3==1.43.114
 alembic==1.20.0
 
 # Email — pin when installed in the prod image (currently >=2.0.0 in the local environment)
-resend==2.47.0
+resend==2.50.0
 
 # HTML sanitization (email body coming from the SendEmail node, via the executor).
 # nh3 is the binding for ammonia (Rust): a real allowlist, with an HTML parser.
@@ -106,10 +106,10 @@ mcp==2.2.0
 mcp-types==2.2.0
 httpx2==2.12.0
 httpcore2==2.12.0
-sse-starlette==3.4.11
+sse-starlette==3.5.0
 
 # Copilot — the model client (app/services/openrouter.py) talks to
 # OpenRouter over plain HTTP on the `httpx` already pinned above: no model
 # vendor SDK goes into the image.
-opentelemetry-api==1.44.0
+opentelemetry-api==1.45.1
 typing-inspection==0.4.4

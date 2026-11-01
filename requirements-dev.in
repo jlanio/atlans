@@ -13,7 +13,7 @@
 # on the command line, not in a `-c` here, because of Dependabot (see PARES in
 # scripts/travar_python.py).
 
-ruff==0.16.8
+ruff==0.17.1
 
 # Audit of known vulnerabilities (the CI's "Auditoria de dependências" job,
 # which for now only reports). Locally, the same command as CI — the locks already
@@ -30,7 +30,7 @@ detect-secrets==1.5.0
 # `language: system`, running these pinned versions. A remote repository hook
 # would resolve its own dependencies on PyPI, without hashes, on every
 # installation.
-pre-commit==4.6.2
+pre-commit==4.7.0
 pre-commit-hooks==6.0.0
 
 # Only Windows uses it (`build`, from pip-tools, asks for colorama there), and the
@@ -42,5 +42,5 @@ colorama==0.4.6
 # Lock generation (scripts/travar_python.py): pip-compile produces the format
 # Dependabot knows how to update; uv resolves with a cutoff date for the
 # 14-day quarantine (pip-compile doesn't filter by date).
-pip-tools==7.6.1
-uv==0.12.17
+pip-tools==7.6.2
+uv==0.13.1
